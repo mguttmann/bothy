@@ -1,9 +1,19 @@
-%% ERD part 10: module notify. Source: 03-data-model.md, 4.10.
+%% ERD part 10: modules notify and gateway. Source: 03-data-model.md, 4.10 and 4.16.
+%% gateway_presence has no foreign keys (a row lives only as long as its connection).
 %% Pure log columns (created_by, updated_by and similar) point to principals(id) and
 %% are not drawn as a relationship.
 %% Tables of other modules only with their key.
 erDiagram
   direction LR
+  gateway_presence {
+    uuid gateway_session_id PK
+    uuid node_id
+    uuid principal_id
+    uuid device_id
+    uuid[] focus_thread_ids
+    boolean idle
+    timestamptz updated_at
+  }
   notification_preferences {
     uuid user_id PK, FK
     text target_kind PK "space, channel, thread"

@@ -84,8 +84,8 @@ the waves before it are merged; many can start earlier, as soon as their own dep
 |---|---|
 | 1 | M1-01, M1-02, M2-32, M4-03 |
 | 2 | M1-03, M1-04, M1-05, M2-38, M4-01, M6-10 |
-| 3 | M1-06, M1-07, M1-17, M1-74, M3-17, M4-04, M4-06, M4-08, M4-10 |
-| 4 | M1-08, M1-09, M1-22, M2-23, M3-01, M4-02, M4-05, M4-11, M4-12, M4-16, M5-01 |
+| 3 | M1-06, M1-07, M1-17, M1-74, M3-17, M4-04, M4-06, M4-08, M4-10, M7-24 |
+| 4 | M1-08, M1-09, M1-22, M2-23, M3-01, M4-02, M4-05, M4-11, M4-12, M4-16, M5-01, M7-19 |
 | 5 | M1-10, M1-12, M3-02, M4-07, M4-09, M4-15, M6-11, M8-01 |
 | 6 | M1-11, M1-13, M4-13, M6-12, M8-02 |
 | 7 | M1-14, M1-15, M1-18, M1-23, M1-26, M4-14 |
@@ -107,24 +107,25 @@ the waves before it are merged; many can start earlier, as soon as their own dep
 | 23 | M1-65, M6-01, M8-10 |
 | 24 | M1-66, M1-70, M1-72, M2-07, M6-02 |
 | 25 | M1-67, M1-68, M2-20 |
-| 26 | M1-69, M2-21, M2-43 |
+| 26 | M1-69, M2-21, M2-43, M7-25 |
 | 27 | M1-73, M2-02, M2-44, M3-03, M4-28, M4-31 |
 | 28 | M2-03, M2-04, M2-45, M2-47, M3-04, M4-35, M6-03, M7-02, M7-29 |
 | 29 | M2-05, M2-46, M3-05, M3-06, M6-04, M7-03, M7-04, M7-15 |
 | 30 | M2-06, M2-27, M2-48, M3-10, M3-11, M4-22, M6-07, M7-16 |
-| 31 | M2-08, M6-08, M6-09, M6-18 |
+| 31 | M2-08, M6-08, M6-09, M6-18, M7-20 |
 | 32 | M2-09, M2-16 |
 | 33 | M2-10, M2-12, M2-14, M2-15, M2-17, M2-18, M2-19, M3-19, M8-03 |
 | 34 | M2-11, M2-22, M2-25, M2-29, M3-20, M3-21, M3-23, M8-08 |
-| 35 | M2-13, M2-28, M2-30, M2-33, M2-34, M3-07, M3-24, M4-30, M6-13 |
+| 35 | M2-13, M2-28, M2-30, M2-33, M2-34, M3-07, M3-24, M4-30, M6-13, M7-17 |
 | 36 | M2-31, M2-35, M2-49, M3-08, M3-14, M3-22, M4-33, M6-15, M8-11 |
 | 37 | M2-36, M2-37, M2-50, M3-09, M3-12, M3-15, M3-16, M4-21, M4-23, M6-05, M8-04 |
 | 38 | M4-24, M5-02, M6-06, M6-14, M7-05, M8-05, M8-06 |
 | 39 | M4-32, M4-34, M4-36, M5-03, M5-04, M7-06, M7-09, M8-07 |
 | 40 | M4-38, M5-05, M5-06, M5-07, M5-08, M5-09, M6-16, M7-07, M7-08, M7-12, M7-14, M8-09 |
-| 41 | M5-10, M5-11, M6-17, M7-23 |
+| 41 | M5-10, M5-11, M6-17, M7-18, M7-21, M7-23, M7-26, M7-27 |
 | 42 | M5-12, M7-13 |
 | 43 | M5-13 |
+| 44 | M7-28 |
 
 ## Index
 
@@ -368,6 +369,16 @@ names listed here.
 | 42 | M7-13 | Mobile app distribution and minimum version | `M7-13-mobile-distribution.md` | M5-11, M7-12 |
 | 40 | M7-14 | Portability test in CI with the full stack | `M7-14-portability-test.md` | M2-29, M7-03, M7-09, M7-29 |
 | 29 | M7-15 | OpenTofu module `generic-vm` | `M7-15-tofu-generic-vm.md` | M7-29 |
+| 35 | M7-17 | Multi-node operation (level 2) | `M7-17-multi-node.md` | M1-72, M2-10, M2-47, M3-23 |
+| 41 | M7-18 | Capacity load test | `M7-18-capacity-load-test.md` | M7-14 |
+| 4 | M7-19 | API reference in the docs site | `M7-19-api-reference-docs.md` | M1-17 |
+| 31 | M7-20 | Alerts into the instance and to the outside | `M7-20-alert-routing.md` | M1-73, M2-27 |
+| 41 | M7-21 | Status page in apps and console | `M7-21-status-views.md` | M5-03, M6-04, M7-08 |
+| 3 | M7-24 | Token output for TypeScript | `M7-24-tokens-typescript.md` | M6-10 |
+| 26 | M7-25 | Grafana panel plugin "Bothy Live" | `M7-25-grafana-plugin.md` | M1-68, M7-24 |
+| 41 | M7-26 | Plugin in the Compose stack, portability and release | `M7-26-plugin-release.md` | M7-14, M7-25 |
+| 41 | M7-27 | Demo instance with made-up data (`bothy setup --demo`) | `M7-27-demo-instance.md` | M2-48, M6-14, M6-15, M7-14 |
+| 44 | M7-28 | Showcase: images, video, landing pages and release template | `M7-28-showcase.md` | M5-13, M6-16, M6-18, M7-25, M7-27 |
 | 30 | M7-16 | OpenTofu modules `hetzner`, `aws`, `azure` | `M7-16-tofu-cloud-modules.md` | M7-15 |
 | 41 | M7-23 | Release chain of the host service | `M7-23-host-release-chain.md` | M2-48, M7-12 |
 | 28 | M7-29 | Setup wizard `install.sh` (installation in one command) | `M7-29-setup-wizard.md` | M1-73, M7-10 |
@@ -425,6 +436,7 @@ waves, the graph and the column "Depends on" of the plan against the index.
 | `portability-trial` | M7-14 |
 | `tofu-check` | M7-15 |
 | `tofu-vm-test` | M7-15 |
+| `showcase` | M7-28 |
 
 To change a dependency, edit the column "Depends on" of the index and the row in the plan, then
 run `uv run --project tools --locked --quiet python tools/docs/brief_deps.py --write`; it
@@ -1077,10 +1089,35 @@ flowchart TB
   M7_29 --> M7_14
   M7_29 --> M7_15
   M7_15 --> M7_16
+  M1_72 --> M7_17
+  M2_10 --> M7_17
+  M2_47 --> M7_17
+  M3_23 --> M7_17
+  M7_14 --> M7_18
+  M1_17 --> M7_19
+  M1_73 --> M7_20
+  M2_27 --> M7_20
+  M5_03 --> M7_21
+  M6_04 --> M7_21
+  M7_08 --> M7_21
   M1_50 --> M7_22
   M3_02 --> M7_22
   M2_48 --> M7_23
   M7_12 --> M7_23
+  M6_10 --> M7_24
+  M1_68 --> M7_25
+  M7_24 --> M7_25
+  M7_14 --> M7_26
+  M7_25 --> M7_26
+  M2_48 --> M7_27
+  M6_14 --> M7_27
+  M6_15 --> M7_27
+  M7_14 --> M7_27
+  M5_13 --> M7_28
+  M6_16 --> M7_28
+  M6_18 --> M7_28
+  M7_25 --> M7_28
+  M7_27 --> M7_28
   M1_73 --> M7_29
   M7_10 --> M7_29
   M1_22 --> M8_01

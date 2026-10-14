@@ -30,7 +30,9 @@ Checked by go-arch-lint (ADR 0008).
 
 ## Tables
 
-None. The module reads through the ports of other modules (03-data-model.md, principle 12).
+`gateway_presence` (03-data-model.md, section 4.16, R-DM-51; built by PLAN M7-17).
+
+Only this module writes and reads this table via SQL (03-data-model.md, principle 12); for everything else it reads through the ports of other modules.
 
 ## Actions (05-actions.md)
 

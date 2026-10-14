@@ -162,7 +162,7 @@ Diagram: [c4-3-server-components.svg](../architecture/c4-3-server-components.svg
 | `runs` | trigger decision, runs and run document, steps, follow-ups, components, interactions, command execution, invocation tokens | `runs`, `run_steps`, `run_followups`, `message_components`, `interactions` | 09, 10 |
 | `sync` | event log (append, tail, catch-up, redaction, partitions), snapshot, idempotency keys, read state, drafts, personal settings, cursors of the worker consumers | `event_log`, `event_consumer_cursors`, `idempotency_keys`, `read_states`, `drafts`, `user_settings` | 04, 15 |
 | `notify` | notification levels, quiet hours, push registrations, push consumer and dispatch | `notification_preferences`, `quiet_hours`, `push_registrations` | 13 |
-| `gateway` | WebSocket endpoint, gateway sessions, hub, focus, typing, forwarding of ephemeral events, agent connections | none | 04, 06 |
+| `gateway` | WebSocket endpoint, gateway sessions, hub, focus, typing, forwarding of ephemeral events, agent connections, shared presence state of several nodes | `gateway_presence` | 04, 06 |
 | `search` | search query over messages, thread titles and files with a permission filter, ranking | none | 14 |
 | `stats` | statistics for console and apps: usage per space, runs, tool calls, costs, error rates; own measurement (counters in memory, flush, retention), SLO traffic light, live frame `stats.live`, timeline | `stats_minutes` | 01, 17, 25 |
 | `apps` | apps and manifests, installations, scopes, outgoing webhooks with consumer and delivery, incoming webhooks | `apps`, `app_installations`, `webhook_subscriptions`, `webhook_deliveries`, `incoming_webhooks` | 11 |

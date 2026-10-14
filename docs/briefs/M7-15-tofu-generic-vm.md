@@ -41,7 +41,7 @@ Rules for every brief:
 8. White label: examples use `chat.example.com`, the owner `alex`; no company, host or personal names, no real IP addresses outside the documentation ranges.
 9. Provider versions, the cloud image and every tool are pinned (checksum or digest); Renovate keeps them current.
 10. Specification first: a change to the module contract updates `infra/tofu/README.md` and the module README in the same change. The core contract is not edited by this ticket. Everything this ticket adds is English.
-11. No cost (D-W-125): no cloud account; the VM test runs locally or on a GitHub-hosted standard runner.
+11. No cost (D-W-125): no cloud account; the VM test runs locally on the build host (D-W-127).
 12. Never tag, never create a release, never publish, never apply against a provider account (D-W-125).
 
 Product requirements implemented here:

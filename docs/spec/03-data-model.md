@@ -74,7 +74,7 @@ migration comes with that milestone, the contract already applies now.
 | `privacy` | Privacy requests | yes |
 | `importer` | Import sources and imported items | yes |
 | `status` | Status page, backup runs | yes |
-| `gateway` | WebSocket endpoint, gateway sessions, focus, typing, ephemeral events | none |
+| `gateway` | WebSocket endpoint, gateway sessions, focus, typing, ephemeral events, shared presence state of several nodes | yes |
 | `search` | Search coordinator over the read ports of `messaging`, `chat` and `files` ([14-search.md](14-search.md)) | none |
 | `stats` | Statistics of the console from the read ports of other modules, own measurement as minute aggregates ([25-visualization.md](25-visualization.md)) | yes |
 | `terminal` | Hosts, pairing, session users per person, terminal sessions, terminal session tokens, relay of the streams ([24-terminal.md](24-terminal.md)) | yes |
@@ -2544,6 +2544,32 @@ Partitioning: by `bucket_start` per day (`PARTITION BY RANGE`); the job `stats.r
 partitions in advance and detaches expired ones.
 Retention: `stats` (period `retention.stats_minutes`).
 
+### 4.16 Gateway (`gateway`)
+
+#### `gateway_presence`
+
+Purpose: the shared presence state of the counted live connections of humans, so that a `worker`
+and other `api` nodes see who is connected where ([13-push-notifications.md](13-push-notifications.md),
+section 12 point 4; [02-architecture.md](02-architecture.md), section 16). Module: `gateway`.
+`UNLOGGED`: the contents are lost after a crash of the database, and the nodes write them again.
+
+| Field | Type | Null | Default | Rules / notes |
+|---|---|---|---|---|
+| `gateway_session_id` | `uuid` | no | | gateway session of the connection |
+| `node_id` | `uuid` | no | | process instance of the `api` node that holds the connection; new at every start |
+| `principal_id` | `uuid` | no | | the human of the connection |
+| `device_id` | `uuid` | no | | the device of the connection |
+| `focus_thread_ids` | `uuid[]` | no | `'{}'` | threads in focus after the checks of the gateway (op `focus`, [04-sync-protocol.md](04-sync-protocol.md), section 6.2) |
+| `idle` | `boolean` | no | `false` | the client reported `idle` |
+| `updated_at` | `timestamptz` | no | `now()` | last write or refresh by the node |
+
+PK: `gateway_session_id`. FK: none (a row lives only as long as its connection; it is not
+evidence). Indexes: `(principal_id)`; `(node_id)`. Retention: `transient` (the node deletes the row
+when the connection ends and all its rows on an orderly shutdown; readers ignore rows whose
+`updated_at` is older than `cluster.presence_ttl`, and the gateway deletes them). Only processes in
+role `api`, and in role `all` with `cluster.mode = multi`, write the table; a process in role `all`
+with `cluster.mode = single` keeps the state in memory (R-DM-51).
+
 ## 5. Search vectors
 
 Full-text search uses PostgreSQL `tsvector` as stored, generated columns. This keeps the
@@ -2685,7 +2711,7 @@ sessions of other people that are not closed (`close_reason = 'i6_violation'`).
 ## 7. ERD
 
 The ERDs exist only in [../architecture/](../architecture/README.md) as Mermaid sources with SVG,
-one diagram per module. They show every table of sections 4.1 to 4.12, 4.14 and 4.15 exactly
+one diagram per module. They show every table of sections 4.1 to 4.12 and 4.14 to 4.16 exactly
 once with its columns and every foreign key relation except pure log columns. The technical
 tables of section 4.13 are left out on purpose. The comparison with this chapter is a gate
 (`make diagrams`, `tools/docs/erd_check.py`). This chapter stays normative; on a difference,
@@ -2702,7 +2728,7 @@ section 4 applies, and the gate fails.
 | [erd-7-terminal.mmd](../architecture/erd-7-terminal.mmd) | `terminal` |
 | [erd-8-audit-privacy.mmd](../architecture/erd-8-audit-privacy.mmd) | `audit`, `privacy` |
 | [erd-9-import-status-statistics.mmd](../architecture/erd-9-import-status-statistics.mmd) | `importer`, `status`, `stats` |
-| [erd-10-notification.mmd](../architecture/erd-10-notification.mmd) | `notify` |
+| [erd-10-notification.mmd](../architecture/erd-10-notification.mmd) | `notify`, `gateway` |
 
 ## 8. Decisions of this chapter
 
@@ -2758,6 +2784,7 @@ section 4 applies, and the gate fails.
 | R-DM-48 | The ETag of a transcript is derived from its four transcript columns; `files` gets no `version` column. | 05 section 4.8 requires `If-Match` for `file.transcript.submit`; a derived strong ETag (as for other rows without a version, 06 section 8 point 1) detects a lost update without a new column that every file write would have to raise (D-W-108). |
 | R-DM-49 | `auth_sessions` stores "View as person" of a console session in `view_as_user_id` and `view_as_started_at` (console sessions only, both set or both empty); `access.view_as` from a console session sets them in the transaction of its audit entry, `access.view_as.end` or the first request after `authz.view_as_max_duration` clears them with an audit entry of the end. | [07-permissions.md](07-permissions.md) section 9.2 requires state on the console session (target person, start) and operations to start and end it, added to the core contract before PLAN M6-01 builds the console session (D-W-100 extended to M5 and M6). |
 | R-DM-50 | `instance` stores the identity of the database cluster (`pg_system_identifier`, `pg_timeline_id`); `bothy migrate up` fills it while empty, `bothy restore finalize` replaces it after a restore or a move, and a differing current identity keeps the server not ready (section 6.7). | [ADR 0059](../adr/0059-sync-epoch-after-restore.md) leaves the start lock open; a point-in-time restore raises the timeline and a logical restore changes the system identifier, so both are detected without a value outside the database. |
+| R-DM-51 | `gateway_presence` (module `gateway`, `UNLOGGED`) holds the counted live connections of humans with device, focus and `idle`; processes in role `api` (and in role `all` with `cluster.mode = multi`) write it, the `worker` reads it through the presence port; rows of a node that stopped refreshing are ignored after `cluster.presence_ttl`. | With separate roles or several `api` nodes, the presence state of one process is not visible to the `worker` that decides about hints (13, section 12 point 4; RK-37); a table read in the decision's transaction needs no broker, and `UNLOGGED` keeps the write cost low for data that is worthless after a crash. |
 | R-DM-52 | The deletion journal numbers its objects densely in `deletion_journal_state` (module `privacy`): the consumer `privacy.journal` writes object `next_number` and moves the number with its cursor, the retention removes objects from `low_number` upward, and `bothy restore finalize` continues from the restored `next_number` to the first missing number. | The object storage port has no listing and no conditional write (core S3, [ADR 0010](../adr/0010-object-storage-behind-an-s3-interface-local-driver-as-default.md)); dense numbers make the journal readable and deletable without either. |
 
 ## 9. Configuration values of this chapter
