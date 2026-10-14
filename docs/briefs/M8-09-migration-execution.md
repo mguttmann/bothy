@@ -55,8 +55,8 @@ Product requirements implemented here:
 
 Create:
 
-- `docs/operations/discord-migration.md` (Design note 1), linked from `docs/operations/` index pages and `mkdocs.yml` navigation.
-- `services/server/test/importtool/rehearsal_test.go` (note 2) and, if the fixture of M8-01 is too small for a whole-server rehearsal, `services/server/cmd/bothy/importtool/discord/testdata/guild_rehearsal.json` (several categories, at least six channels including forums and an uncategorized one, archived and active threads, bots, webhooks, busy agent outputs, attachments over and under the limit, a session file).
+- `docs/operations/discord-migration.md` (Design note 1), linked from the `mkdocs.yml` navigation and from `docs/operations/install-compose.md`.
+- `services/server/test/importtool/rehearsal_test.go` (note 2) and, if the fixture of M8-01 is too small for a whole-server rehearsal, `services/server/cmd/bothy/importtool/discord/testdata/guild_rehearsal.json` (several categories, channels of every mapped kind of 22 5.1 (text, announcement, forum, media, voice to be skipped, one without category), archived and active threads, bots, webhooks, busy agent outputs, attachments over and under the limit, a session references file for `--sessions`).
 - Tests named under "Tests".
 
 Change:
@@ -92,7 +92,7 @@ Change:
     b. Console steps through the API (create with the mapping, start, step-up session).
     c. Pilot: `--apply --channel` for two channels with `--sessions`; report counts equal the fixture for those channels.
     d. Full import, then parallel operation: several mirror rounds while the fake Discord gets new messages (some busy, some unsettled); spot checks compare, per channel, the report counts and a sample of messages (author mapping, order, attachments or jump links) with the fixture.
-    e. Switch every channel in turn: `switch --discord-locked`, console steps, a test trigger in an imported thread with a binding where the fixture has a reference; once revert one channel and switch it again.
+    e. Switch every channel in turn: `switch --discord-locked`, console steps, and in every switched channel a test trigger in one of its imported threads that the operator answers in Bothy only, with a binding where the fixture has a reference; once revert one channel and switch it again.
     f. Complete the source; assert every channel `lead = bothy`, the source `completed`, the fake Discord saw only `GET` across the whole test, and no message was copied twice.
 
 3. **Decision sheet in the report** (owner rule on external steps). For the live run: what it costs (no money: a free Discord bot application; owner time; a maintenance window per channel), what it proves (exit criterion 2 on real data), what can go wrong and how it is contained (missing intent: preflight abort; rate limits and IP blocks: the guard and the separate bot, RK-76; half-finished outputs: settle rule, RK-74; double booked costs: baseline, RK-75; a wrong mapping: dry run and revert), the order of steps, and the recommendation (start with a dry run on the real server and one pilot channel). The owner decides; this ticket ends with that sheet.
