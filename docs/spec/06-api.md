@@ -1198,6 +1198,7 @@ Events (receive action per 05, section 6; schema in openapi.yaml):
 | `notification_pref.updated` | durable | `self` | self | `NotificationPrefUpdatedEvent` |  |
 | `quiet_hours.updated` | durable | `self` | self | `QuietHoursUpdatedEvent` |  |
 | `gdpr.request_updated` | durable | `gdpr.request.read` |  | `GdprRequestUpdatedEvent` |  |
+| `gdpr.request_due` | durable | `self` | self | `GdprRequestDueEvent` |  |
 | `import.progress` | durable | `import.read` |  | `ImportProgressEvent` |  |
 | `agent.invocation` | durable | `agent.events.consume` | self | `AgentInvocationEvent` | yes |
 | `agent.followup` | durable | `agent.events.consume` | self | `AgentFollowupEvent` | yes |

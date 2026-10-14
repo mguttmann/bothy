@@ -249,6 +249,9 @@ from .gdpr_decision import GdprDecision
 from .gdpr_decision_decision import GdprDecisionDecision
 from .gdpr_request import GdprRequest
 from .gdpr_request_create import GdprRequestCreate
+from .gdpr_request_due_event import GdprRequestDueEvent
+from .gdpr_request_due_event_type import GdprRequestDueEventType
+from .gdpr_request_due_payload import GdprRequestDuePayload
 from .gdpr_request_kind import GdprRequestKind
 from .gdpr_request_page import GdprRequestPage
 from .gdpr_request_payload import GdprRequestPayload
@@ -967,6 +970,9 @@ __all__ = (
     "GdprDecisionDecision",
     "GdprRequest",
     "GdprRequestCreate",
+    "GdprRequestDueEvent",
+    "GdprRequestDueEventType",
+    "GdprRequestDuePayload",
     "GdprRequestKind",
     "GdprRequestPage",
     "GdprRequestPayload",

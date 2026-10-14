@@ -30,7 +30,7 @@ Checked by go-arch-lint (ADR 0008).
 
 ## Tables
 
-`gdpr_requests`.
+`gdpr_requests`, `deletion_journal_state` (numbering of the deletion journal, R-DM-52).
 
 Only this module writes and reads these tables via SQL (03-data-model.md, principle 12).
 
@@ -40,7 +40,7 @@ Only this module writes and reads these tables via SQL (03-data-model.md, princi
 
 ## Events and WebSocket ops
 
-- Durable: `gdpr.request_updated`.
+- Durable: `gdpr.request_updated`, `gdpr.request_due`.
 - Ephemeral: none.
 - WebSocket ops (client to server): none.
 

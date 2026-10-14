@@ -8471,6 +8471,12 @@ export interface components {
             device_id: components["schemas"]["Uuid"];
             platform: components["schemas"]["DevicePlatform"];
         };
+        /** @description An open privacy request reaches the reminder lead before its statutory deadline (R-AZ-35). Carries only the ID, the kind and the deadline. */
+        GdprRequestDuePayload: {
+            request_id: components["schemas"]["Uuid"];
+            kind: components["schemas"]["GdprRequestKind"];
+            due_at: components["schemas"]["Timestamp"];
+        };
         SessionRevokedPayload: {
             session_id: components["schemas"]["Uuid"];
             /** @enum {string} */
@@ -9634,6 +9640,18 @@ export interface components {
              */
             type: "gdpr.request_updated";
         };
+        /** @description Durable event `gdpr.request_due`. */
+        GdprRequestDueEvent: components["schemas"]["EventEnvelope"] & {
+            /** @enum {string} */
+            type: "gdpr.request_due";
+            payload: components["schemas"]["GdprRequestDuePayload"];
+        } & {
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            type: "gdpr.request_due";
+        };
         /** @description Durable event `import.progress`. */
         ImportProgressEvent: components["schemas"]["EventEnvelope"] & {
             /** @enum {string} */
@@ -9791,7 +9809,7 @@ export interface components {
             image_url?: string;
         };
         /** @description Any durable event, discriminated by `type`. Clients skip unknown types and still advance their cursor. */
-        Event: components["schemas"]["MessageCreatedEvent"] | components["schemas"]["MessageUpdatedEvent"] | components["schemas"]["MessageDeletedEvent"] | components["schemas"]["ReactionAddedEvent"] | components["schemas"]["ReactionRemovedEvent"] | components["schemas"]["PinAddedEvent"] | components["schemas"]["PinRemovedEvent"] | components["schemas"]["ThreadCreatedEvent"] | components["schemas"]["ThreadUpdatedEvent"] | components["schemas"]["ThreadClosedEvent"] | components["schemas"]["ThreadReopenedEvent"] | components["schemas"]["ThreadMovedEvent"] | components["schemas"]["ThreadMovedOutEvent"] | components["schemas"]["AgentSessionChangedEvent"] | components["schemas"]["RunStateChangedEvent"] | components["schemas"]["SpaceCreatedEvent"] | components["schemas"]["SpaceUpdatedEvent"] | components["schemas"]["SpaceArchivedEvent"] | components["schemas"]["ChannelCreatedEvent"] | components["schemas"]["ChannelUpdatedEvent"] | components["schemas"]["ChannelSettingsChangedEvent"] | components["schemas"]["ChannelArchivedEvent"] | components["schemas"]["CommandChangedEvent"] | components["schemas"]["FileUpdatedEvent"] | components["schemas"]["UserUpdatedEvent"] | components["schemas"]["AgentUpdatedEvent"] | components["schemas"]["InstanceUpdatedEvent"] | components["schemas"]["StatusUpdatedEvent"] | components["schemas"]["GrantChangedEvent"] | components["schemas"]["GroupChangedEvent"] | components["schemas"]["AccessChangedEvent"] | components["schemas"]["AccessExpiringEvent"] | components["schemas"]["DevicePendingEvent"] | components["schemas"]["SessionRevokedEvent"] | components["schemas"]["ReadStateUpdatedEvent"] | components["schemas"]["DraftUpdatedEvent"] | components["schemas"]["DraftDeletedEvent"] | components["schemas"]["SettingsUpdatedEvent"] | components["schemas"]["SidebarUpdatedEvent"] | components["schemas"]["NotificationPrefUpdatedEvent"] | components["schemas"]["QuietHoursUpdatedEvent"] | components["schemas"]["GdprRequestUpdatedEvent"] | components["schemas"]["ImportProgressEvent"] | components["schemas"]["AgentInvocationEvent"] | components["schemas"]["AgentFollowupEvent"] | components["schemas"]["RunCancelRequestedEvent"] | components["schemas"]["InteractionCreatedEvent"] | components["schemas"]["CommandInvokedEvent"] | components["schemas"]["AgentConfigChangedEvent"] | components["schemas"]["HostUpdatedEvent"] | components["schemas"]["TerminalSessionChangedEvent"];
+        Event: components["schemas"]["MessageCreatedEvent"] | components["schemas"]["MessageUpdatedEvent"] | components["schemas"]["MessageDeletedEvent"] | components["schemas"]["ReactionAddedEvent"] | components["schemas"]["ReactionRemovedEvent"] | components["schemas"]["PinAddedEvent"] | components["schemas"]["PinRemovedEvent"] | components["schemas"]["ThreadCreatedEvent"] | components["schemas"]["ThreadUpdatedEvent"] | components["schemas"]["ThreadClosedEvent"] | components["schemas"]["ThreadReopenedEvent"] | components["schemas"]["ThreadMovedEvent"] | components["schemas"]["ThreadMovedOutEvent"] | components["schemas"]["AgentSessionChangedEvent"] | components["schemas"]["RunStateChangedEvent"] | components["schemas"]["SpaceCreatedEvent"] | components["schemas"]["SpaceUpdatedEvent"] | components["schemas"]["SpaceArchivedEvent"] | components["schemas"]["ChannelCreatedEvent"] | components["schemas"]["ChannelUpdatedEvent"] | components["schemas"]["ChannelSettingsChangedEvent"] | components["schemas"]["ChannelArchivedEvent"] | components["schemas"]["CommandChangedEvent"] | components["schemas"]["FileUpdatedEvent"] | components["schemas"]["UserUpdatedEvent"] | components["schemas"]["AgentUpdatedEvent"] | components["schemas"]["InstanceUpdatedEvent"] | components["schemas"]["StatusUpdatedEvent"] | components["schemas"]["GrantChangedEvent"] | components["schemas"]["GroupChangedEvent"] | components["schemas"]["AccessChangedEvent"] | components["schemas"]["AccessExpiringEvent"] | components["schemas"]["DevicePendingEvent"] | components["schemas"]["SessionRevokedEvent"] | components["schemas"]["ReadStateUpdatedEvent"] | components["schemas"]["DraftUpdatedEvent"] | components["schemas"]["DraftDeletedEvent"] | components["schemas"]["SettingsUpdatedEvent"] | components["schemas"]["SidebarUpdatedEvent"] | components["schemas"]["NotificationPrefUpdatedEvent"] | components["schemas"]["QuietHoursUpdatedEvent"] | components["schemas"]["GdprRequestUpdatedEvent"] | components["schemas"]["GdprRequestDueEvent"] | components["schemas"]["ImportProgressEvent"] | components["schemas"]["AgentInvocationEvent"] | components["schemas"]["AgentFollowupEvent"] | components["schemas"]["RunCancelRequestedEvent"] | components["schemas"]["InteractionCreatedEvent"] | components["schemas"]["CommandInvokedEvent"] | components["schemas"]["AgentConfigChangedEvent"] | components["schemas"]["HostUpdatedEvent"] | components["schemas"]["TerminalSessionChangedEvent"];
         /** @description One page. `next_cursor` is absent on the last page. */
         MentionItemPage: {
             items: components["schemas"]["MentionItem"][];

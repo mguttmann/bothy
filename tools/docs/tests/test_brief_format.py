@@ -5,9 +5,10 @@ docs/briefs/README.md names the parts of a brief (goal, chapters to read, fixed 
 scope and boundaries, tests first, acceptance criteria, report format) and its index lists the
 title and file of each ticket. This test holds every brief of the index to that shape: the title
 line equals the index row, the status line names the milestone of the ticket, the eleven
-sections stand in their order, the report uses the launcher placeholders, and every brief written
-before M1 closed (milestones M2 and later, D-W-100, D-W-114, D-W-120 and D-W-124) carries the limit
-for names that differ from merged code, and every M8 brief forbids live Discord calls (D-W-124).
+sections stand in their order, the report uses the launcher placeholders, and every brief
+written before M1 closed (milestones M2 and later, D-W-100, D-W-114, D-W-120, D-W-124 and
+D-W-125) carries the limit for names that differ from merged code, every M7 brief forbids
+tagging by itself (D-W-125), and every M8 brief forbids live Discord calls (D-W-124).
 Dependencies, waves and make targets are checked by brief_deps.py.
 """
 
@@ -65,6 +66,8 @@ def problems(tid: str, text: str) -> list[str]:
         found.append("boundaries lack the limit of D-W-100 for names that differ from merged code")
     if tid[:2] == "M8" and "\n- Never contact Discord" not in boundaries:
         found.append("M8 boundaries lack 'Never contact Discord' (fakes only, D-W-124)")
+    if tid[:2] == "M7" and "never tag" not in boundaries:
+        found.append("M7 boundaries lack 'never tag' (tags stay with the owner, D-W-125)")
     return found
 
 
@@ -88,6 +91,13 @@ def test_an_m8_brief_without_the_discord_boundary_is_found() -> None:
     text = (BRIEFS / name).read_text(encoding="utf-8")
     text = text.replace("\n- Never contact Discord", "\n- Contact")
     assert any("Never contact Discord" in p for p in problems(tid, text))
+
+
+def test_an_m7_brief_without_the_tag_boundary_is_found() -> None:
+    """An M7 brief must keep tags, releases and deployments with the owner (D-W-125)."""
+    tid, name = next((t, n) for t, n in index_rows() if t.startswith("M7"))
+    text = (BRIEFS / name).read_text(encoding="utf-8").replace("never tag", "tag")
+    assert any("never tag" in p for p in problems(tid, text))
 
 
 def test_a_wrong_milestone_is_found() -> None:

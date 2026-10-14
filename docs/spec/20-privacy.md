@@ -263,7 +263,7 @@ audit chain and replies with a quote stay consistent (03, principle 7).
    months only with a justification that is communicated to the person within the first month
    (Art. 12(3) GDPR, https://gdpr-info.eu/art-12-gdpr/, retrieved 2026-10-10 [verified]). The
    deadline is not a configuration value because it is statutory.
-4. The console warns before the deadline expires (index `(state, due_at)` from 03).
+4. The console warns before the deadline expires (index `(state, due_at)` from 03). Owners also get the personal event `gdpr.request_due` once per open request (05, R-AZ-35), which becomes a hint of kind `admin` ([13-push-notifications.md](13-push-notifications.md), section 2).
 5. The package is available for `privacy.export_ttl`; download with step-up (`gdpr.export.download`), then
    deleted.
 

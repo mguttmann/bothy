@@ -26691,6 +26691,17 @@ components:
           $ref: '#/components/schemas/Uuid'
         platform:
           $ref: '#/components/schemas/DevicePlatform'
+    GdprRequestDuePayload:
+      type: object
+      description: An open privacy request reaches the reminder lead before its statutory deadline (R-AZ-35). Carries only the ID, the kind and the deadline.
+      required: [request_id, kind, due_at]
+      properties:
+        request_id:
+          $ref: '#/components/schemas/Uuid'
+        kind:
+          $ref: '#/components/schemas/GdprRequestKind'
+        due_at:
+          $ref: '#/components/schemas/Timestamp'
     SessionRevokedPayload:
       type: object
       required: [session_id, reason]
@@ -28347,6 +28358,18 @@ components:
             enum: [gdpr.request_updated]
           payload:
             $ref: '#/components/schemas/GdprRequestPayload'
+    GdprRequestDueEvent:
+      description: Durable event `gdpr.request_due`.
+      allOf:
+      - $ref: '#/components/schemas/EventEnvelope'
+      - type: object
+        required: [type, payload]
+        properties:
+          type:
+            type: string
+            enum: [gdpr.request_due]
+          payload:
+            $ref: '#/components/schemas/GdprRequestDuePayload'
     ImportProgressEvent:
       description: Durable event `import.progress`.
       allOf:
@@ -28603,6 +28626,7 @@ components:
       - $ref: '#/components/schemas/NotificationPrefUpdatedEvent'
       - $ref: '#/components/schemas/QuietHoursUpdatedEvent'
       - $ref: '#/components/schemas/GdprRequestUpdatedEvent'
+      - $ref: '#/components/schemas/GdprRequestDueEvent'
       - $ref: '#/components/schemas/ImportProgressEvent'
       - $ref: '#/components/schemas/AgentInvocationEvent'
       - $ref: '#/components/schemas/AgentFollowupEvent'
@@ -28657,6 +28681,7 @@ components:
           notification_pref.updated: '#/components/schemas/NotificationPrefUpdatedEvent'
           quiet_hours.updated: '#/components/schemas/QuietHoursUpdatedEvent'
           gdpr.request_updated: '#/components/schemas/GdprRequestUpdatedEvent'
+          gdpr.request_due: '#/components/schemas/GdprRequestDueEvent'
           import.progress: '#/components/schemas/ImportProgressEvent'
           agent.invocation: '#/components/schemas/AgentInvocationEvent'
           agent.followup: '#/components/schemas/AgentFollowupEvent'

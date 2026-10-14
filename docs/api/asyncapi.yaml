@@ -161,6 +161,8 @@ channels:
         $ref: '#/components/messages/event.quiet_hours.updated'
       event.gdpr.request_updated:
         $ref: '#/components/messages/event.gdpr.request_updated'
+      event.gdpr.request_due:
+        $ref: '#/components/messages/event.gdpr.request_due'
       event.import.progress:
         $ref: '#/components/messages/event.import.progress'
       event.agent.invocation:
@@ -708,6 +710,7 @@ operations:
     - $ref: '#/channels/gateway/messages/event.notification_pref.updated'
     - $ref: '#/channels/gateway/messages/event.quiet_hours.updated'
     - $ref: '#/channels/gateway/messages/event.gdpr.request_updated'
+    - $ref: '#/channels/gateway/messages/event.gdpr.request_due'
     - $ref: '#/channels/gateway/messages/event.import.progress'
     - $ref: '#/channels/gateway/messages/event.agent.invocation'
     - $ref: '#/channels/gateway/messages/event.agent.followup'
@@ -1843,6 +1846,22 @@ components:
             enum: [dispatch]
           d:
             $ref: ./openapi.yaml#/components/schemas/GdprRequestUpdatedEvent
+    event.gdpr.request_due:
+      name: gdpr.request_due
+      title: dispatch gdpr.request_due
+      summary: Durable event, at least once, in `seq` order.
+      x-event-kind: durable
+      x-receive-action: self
+      payload:
+        type: object
+        required: [op, d]
+        properties:
+          op:
+            type: string
+            enum: [dispatch]
+          d:
+            $ref: ./openapi.yaml#/components/schemas/GdprRequestDueEvent
+      x-audience: self
     event.import.progress:
       name: import.progress
       title: dispatch import.progress

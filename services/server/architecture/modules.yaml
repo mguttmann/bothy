@@ -194,9 +194,9 @@ modules:
     depends_on: [identity, chat, agents, messaging, files]
     adapter_vendors: []
   privacy:
-    tables: [gdpr_requests]
+    tables: [gdpr_requests, deletion_journal_state]
     actions: [gdpr.request.create, gdpr.request.read, gdpr.request.decide, gdpr.export.download]
-    events: [gdpr.request_updated]
+    events: [gdpr.request_updated, gdpr.request_due]
     ephemeral_events: []
     ws_ops: []
     depends_on: [identity, files]

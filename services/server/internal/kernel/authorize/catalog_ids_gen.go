@@ -911,6 +911,8 @@ const (
 	EventDraftUpdated EventType = "draft.updated"
 	// EventFileUpdated is the event type file.updated.
 	EventFileUpdated EventType = "file.updated"
+	// EventGdprRequestDue is the event type gdpr.request_due.
+	EventGdprRequestDue EventType = "gdpr.request_due"
 	// EventGdprRequestUpdated is the event type gdpr.request_updated.
 	EventGdprRequestUpdated EventType = "gdpr.request_updated"
 	// EventGrantChanged is the event type grant.changed.
@@ -1012,6 +1014,7 @@ var eventTypeByID = map[string]EventType{
 	"draft.deleted":                  EventDraftDeleted,
 	"draft.updated":                  EventDraftUpdated,
 	"file.updated":                   EventFileUpdated,
+	"gdpr.request_due":               EventGdprRequestDue,
 	"gdpr.request_updated":           EventGdprRequestUpdated,
 	"grant.changed":                  EventGrantChanged,
 	"group.changed":                  EventGroupChanged,
@@ -1074,6 +1077,7 @@ var eventTypeList = []EventType{
 	EventDraftDeleted,
 	EventDraftUpdated,
 	EventFileUpdated,
+	EventGdprRequestDue,
 	EventGdprRequestUpdated,
 	EventGrantChanged,
 	EventGroupChanged,

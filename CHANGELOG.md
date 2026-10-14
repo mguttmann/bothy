@@ -151,6 +151,12 @@ operated, and the order of the build.
   corrects the column "Depends on" of nine M4 tickets in the plan, and D-W-116 for nine more); a
   docs test holds the shape of every brief (title, status line, sections, report placeholders);
   the apps read the server-place keys that steer their own behaviour through `AppConfig` (D-W-115).
+- Build briefs M7-01 to M7-09 and M7-22 of milestone M7 (image `bothy-postgres`, backup service,
+  restore test, `bothy restore finalize` with a start lock, retention per class, privacy requests,
+  deletion journal, maintenance mode, status page, audit checkpoints in object storage) in the brief
+  index with waves and graph and in the site navigation, written before M1 closes (D-W-125); core
+  contract: the database identity in `instance` (R-DM-50), the numbering of the deletion journal
+  (R-DM-52) and the personal event `gdpr.request_due` (R-AZ-35).
 - Build briefs of milestone M6 for the console session, the statistics in the server and the
   visualization track (`docs/briefs/M6-01`, `M6-05`, `M6-10` to `M6-15`) in the brief index with
   waves and graph and in the site navigation, written before M1 closes (D-W-120); core contract

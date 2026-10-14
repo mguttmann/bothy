@@ -27,6 +27,11 @@ erDiagram
     text state
     uuid result_file_id FK
   }
+  deletion_journal_state {
+    smallint id PK "exactly one row"
+    bigint next_number
+    bigint low_number
+  }
   audit_ip_keys {
     uuid id PK "ip_key_id in audit_events.details"
     timestamptz valid_from UK
