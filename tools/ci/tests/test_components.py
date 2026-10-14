@@ -17,6 +17,10 @@ import pytest
         (["services/server/internal/chat/x.go"], ["server"]),
         (["apps/client/lib/main.dart", "packages/design_system/lib/a.dart"], ["apps"]),
         (["design/tokens/color.json"], ["apps"]),
+        # The Dart tests of packages/bothy_noise read the shared Noise test data of the host
+        # service, so a change there runs the Go and the Dart gates (docs/DECISIONS.md D-M2-38-5).
+        (["services/host/testdata/noise/recordings/go.json"], ["apps", "server"]),
+        (["services/host/internal/noise/noise.go"], ["server"]),
         (["sdk/python/src/x.py"], ["sdk-python"]),
         (["sdk/typescript/src/x.ts"], ["sdk-typescript"]),
         (["plugins/hermes-adapter/x.py"], ["plugins"]),

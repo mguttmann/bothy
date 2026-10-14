@@ -1,0 +1,20 @@
+# SPDX-License-Identifier: Apache-2.0
+name: bothy_noise
+description: >-
+  Noise_NK_25519_ChaChaPoly_SHA256 handshake, transport, terminal frames and host key
+  fingerprint of the Bothy terminal (docs/spec/24-terminal.md), in pure Dart.
+version: 0.0.0
+publish_to: none
+
+environment:
+  sdk: ^3.13.5
+  # The Flutter pin that CI reads until apps/client has its own pubspec.yaml
+  # (docs/DECISIONS.md D-M2-38-12); the package itself imports no Flutter.
+  flutter: 3.47.7
+
+dependencies:
+  cryptography: ^2.9.0
+
+dev_dependencies:
+  lints: ^6.1.0
+  test: ^1.33.0

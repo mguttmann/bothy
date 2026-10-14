@@ -185,7 +185,11 @@ threat model T-TM-13).
 ### Confirmation
 
 * Conformance with public Noise test vectors (cacophony, noise-c; 24 section 5.2) in Go
-  and Dart (TM-T01) and a cross test of Go against Dart (TM-T02).
+  and Dart (TM-T01) and a cross test of Go against Dart (TM-T02). Since M2-38: TM-T01 is held by
+  `TestVectorsTMT01` in `services/host/internal/noise` and `test/vectors_test.dart` in
+  `packages/bothy_noise`; TM-T02 is held by `TestRecordingsTMT02Dart` and
+  `TestRecordingsTMT02Negative` in Go and `test/recordings_test.dart` in Dart, over the
+  recordings of both languages in both roles.
 * Separation of users and disabling on a second control connection (TM-T22, TM-T23).
 * Replay and token tests in the host service (TM-T03 to TM-T05).
 * Canary test over relay, logs, database and telemetry (TM-T06).

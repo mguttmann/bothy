@@ -33,6 +33,9 @@ operated, and the order of the build.
 - CI path filter: a change of docs/spec/09-agents.md selects the gate component `plugins`.
 - Root Makefile: `make typecheck` runs mypy inside each Python project, and `make lint` excludes
   `<project>/.venv` and `<project>/generated` from bandit.
+- Host service module `services/host` (own `VERSION` and `CHANGELOG.md`) and the Dart package
+  `packages/bothy_noise` with the Noise core of the terminal (M2-38); the gates, CI and CodeQL
+  cover both.
 - Rules for AI coding agents (`AGENTS.md`, loaded by `CLAUDE.md`): public-repository
   hygiene, English only, one pull request per ticket, review findings fixed before merge.
 - Specification entry point (`docs/SPEC.md`) with goals, non-goals, hard invariants,
@@ -283,6 +286,12 @@ operated, and the order of the build.
 - The CI path filter selects both SDK components for a change under `sdk/testdata/` (shared G5
   fixtures); CodeQL analyses `javascript-typescript` (the TypeScript SDK); Renovate groups the SDK
   code generators.
+- Gates for a second Go module and the first Dart package (M2-38): `make perf` runs only for
+  the Go modules with performance targets (`PERF_MODULES`), a Dart package without `test/` fails
+  `make test` and one without `coverage/lcov.info` fails `make coverage`; CI installs Go for every
+  tracked `services/*/go.mod` and Flutter for every tracked Dart package, CodeQL builds the host
+  module, a change under `services/host/testdata/noise/` selects the apps gates as well, and
+  SonarQube reads the coverage of both new components.
 
 ### Security
 

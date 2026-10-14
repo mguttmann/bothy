@@ -47,6 +47,9 @@ GITLEAKS_LOG_OPTS ?= HEAD
 UV := uv
 UVRUN := $(UV) run --project tools --locked --quiet
 NODE_BIN := tools/node/node_modules/.bin
+# git exports GIT_DIR and friends to hooks (the pre-push hook runs `make check`); Flutter reads
+# its own version with git inside the SDK, so it runs without them (docs/DECISIONS.md D-M2-38-22).
+FLUTTER := env -u GIT_DIR -u GIT_WORK_TREE -u GIT_INDEX_FILE -u GIT_COMMON_DIR -u GIT_PREFIX flutter
 FETCH := $(UVRUN) python tools/bin/fetch_tools.py
 # go, a Docker-compatible runtime and the pins of the server gates; a gap fails (R-QA-02).
 GO_PREREQS := $(UVRUN) python tools/ci/go_prereqs.py
@@ -73,6 +76,11 @@ TS_PROJECTS := $(patsubst %/,%,$(sort $(dir $(shell git ls-files -- 'sdk/typescr
 # only tracked files count and .gitignore rules of enclosing checkouts cannot hide them.
 LOCK_NAMES := uv.lock package-lock.json pnpm-lock.yaml pubspec.lock go.mod
 PRODUCT_SOURCES := $(shell git ls-files -- 'services/*.go' 'apps/*.dart' 'packages/*.dart' 'sdk/*.py' 'sdk/*.ts' 'plugins/*.py' 'plugins/*.ts' 2>/dev/null | head -n 1)
+# Go modules with performance targets (docs/spec/02-architecture.md "Performance targets", R-AR-20);
+# the host service has none (docs/spec/24-terminal.md), so `make perf` skips it
+# (docs/DECISIONS.md D-M2-38-3). A listed module without perf/ still fails.
+PERF_MODULES := services/server
+PERF_MODS = $(filter $(PERF_MODULES),$(GO_MODS))
 GO_ON := $(and $(GO_MODS),$(call want,server))
 DART_ON := $(and $(DART_PKGS),$(call want,apps))
 PY_ON := $(and $(PY_PROJECTS),$(or $(call want,sdk-python),$(call want,plugins)))
@@ -167,8 +175,8 @@ lint: ## Linters: file hygiene hooks, ruff, bandit, Dockerfile pins, actionlint,
 	else gl=$(call tool,golangci-lint) || exit 1; \
 	  for m in $(GO_MODS); do (cd $$m && go vet ./... && "$$gl" run ./...) || exit 1; done; fi
 	@if [ -z "$(DART_ON)" ]; then $(call skip,dart-lint,no Dart package selected); \
-	else for p in $(DART_PKGS); do (cd $$p && flutter analyze --fatal-infos && \
-	  if grep -q '^ *custom_lint:' pubspec.yaml; then dart run custom_lint; fi); done; fi
+	else for p in $(DART_PKGS); do (cd $$p && $(FLUTTER) pub get --enforce-lockfile && $(FLUTTER) analyze --fatal-infos && \
+	  if grep -q '^ *custom_lint:' pubspec.yaml; then dart run custom_lint; fi) || exit 1; done; fi
 	@# bandit skips the project's virtual environment and generated code (docs/DECISIONS.md M2-23/7).
 	@if [ -z "$(PY_ON)" ]; then $(call skip,py-lint,no Python project selected); \
 	else for p in $(PY_PROJECTS); do $(UV) run --project $$p --locked ruff check $$p && \
@@ -196,8 +204,12 @@ test: ## All tests with coverage data
 	@if [ -z "$(GO_ON)" ]; then $(call skip,go-test,no Go module selected); \
 	else $(GO_PREREQS) test || exit 1; gal=$(call tool,go-arch-lint) || exit 1; \
 	  for m in $(GO_MODS); do (cd $$m && GO_ARCH_LINT="$$gal" go test -race -covermode=atomic -coverprofile=coverage.out ./...) || exit 1; done; fi
+	@# --enforce-lockfile: a pubspec.lock that no longer matches pubspec.yaml fails instead of being
+	@# rewritten silently, so osv and licenses always read the lock file the tests ran with.
 	@if [ -z "$(DART_ON)" ]; then $(call skip,dart-test,no Dart package selected); \
-	else for p in $(DART_PKGS); do (cd $$p && if [ -d test ]; then flutter test --coverage; fi); done; fi
+	else for p in $(DART_PKGS); do \
+	  [ -d $$p/test ] || { echo "$$p: no test/ directory (docs/spec/23-quality.md, 3)" >&2; exit 1; }; \
+	  (cd $$p && $(FLUTTER) pub get --enforce-lockfile && $(FLUTTER) test --coverage) || exit 1; done; fi
 	@if [ -z "$(PY_ON)" ]; then $(call skip,py-test,no Python project selected); \
 	else for p in $(PY_PROJECTS); do (cd $$p && $(UV) run --locked pytest --cov --cov-report=xml:coverage.xml); done; fi
 	@if [ -z "$(TS_ON)" ]; then $(call skip,ts-test,no TypeScript project selected); \
@@ -222,8 +234,9 @@ coverage: test ## Coverage thresholds (named values quality.coverage.*)
 	  [ -n "$$total" ] || { echo "coverage: go tool cover printed no total for $$m" >&2; exit 1; }; \
 	  awk -v t="$$total" -v min=$(COVERAGE_GO_MIN) -v m=$$m 'BEGIN { if (t+0 < min) { printf "%s: coverage %s%% < %s%%\n", m, t, min; exit 1 } }' || exit 1; done; fi
 	@if [ -z "$(DART_ON)" ]; then $(call skip,dart-coverage,no Dart package selected); \
-	else for p in $(DART_PKGS); do [ -f $$p/coverage/lcov.info ] || continue; \
-	  awk -F: -v min=$(COVERAGE_DART_MIN) -v p=$$p '/^LF:/ {lf+=$$2} /^LH:/ {lh+=$$2} END { pct = lf ? 100*lh/lf : 100; if (pct < min) { printf "%s: coverage %.1f%% < %s%%\n", p, pct, min; exit 1 } }' $$p/coverage/lcov.info; done; fi
+	else for p in $(DART_PKGS); do \
+	  [ -f $$p/coverage/lcov.info ] || { echo "$$p: coverage/lcov.info is missing; make test writes it" >&2; exit 1; }; \
+	  awk -F: -v min=$(COVERAGE_DART_MIN) -v p=$$p '/^LF:/ {lf+=$$2} /^LH:/ {lh+=$$2} END { pct = lf ? 100*lh/lf : 100; if (pct < min) { printf "%s: coverage %.1f%% < %s%%\n", p, pct, min; exit 1 } }' $$p/coverage/lcov.info || exit 1; done; fi
 	@[ -z "$(PY_ON)$(TS_ON)" ] || echo "  python/typescript components enforce their threshold in their own test config"
 
 commitlint: ## Conventional Commits and DCO sign-off for commits not yet on the remote main
@@ -300,8 +313,9 @@ migrations-lock: ## Record the checksums of new migrations in <module>/migration
 
 perf: ## Load tests against the performance targets (end of a milestone and releases, not a gate; P-07)
 	@if [ -z "$(GO_ON)" ]; then $(call skip,perf,no Go module selected under services/); \
+	elif [ -z "$(PERF_MODS)" ]; then $(call skip,perf,no Go module with performance targets selected); \
 	else $(GO_PREREQS) perf || exit 1; \
-	  for m in $(GO_MODS); do \
+	  for m in $(PERF_MODS); do \
 	    [ -d $$m/perf ] || { echo "perf: $$m/perf does not exist; load tests live there (docs/spec/02-architecture.md \"Performance targets\")" >&2; exit 1; }; \
 	    echo "  perf: targets hold only on perf.reference_profile"; \
 	    (cd $$m && go test -tags perf -count=1 -timeout $(PERF_TIMEOUT) ./perf/...) || exit 1; \

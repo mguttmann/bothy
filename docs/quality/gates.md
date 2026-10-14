@@ -68,7 +68,16 @@ with a hint.
   `plugins/`, a TypeScript project a `package.json` under `sdk/typescript/` or
   `plugins/`. New files count only after `git add`.
 * A missing tool, a missing list, a missing token or a missing
-  part of the component contract (chapter 23, section 3) is an error.
+  part of the component contract (chapter 23, section 3) is an error. A Dart package without
+  `test/` fails in `make test`, one without `coverage/lcov.info` after the tests in
+  `make coverage`.
+* CI installs Go as soon as a `services/*/go.mod` is tracked (version from the `go.mod` of the
+  server, otherwise of the host service; all modules have the same `go` and `toolchain` lines), and
+  Flutter as soon as a Dart package is tracked (version from `environment.flutter` of the
+  app's `pubspec.yaml`, until then from `packages/bothy_noise`; all pins equal).
+  `tools/ci/tests/test_ci_toolchains.py` holds both. A change under
+  `services/host/testdata/noise/` also selects the component `apps`, because the Dart tests read
+  this test data.
 * Contributors from forks explicitly switch off what they do not have:
   `DENYLIST_FLAGS=--allow-missing` (public rules only), `SONAR_SKIP=1` and
   `REVIEW_SKIP=1` (no independent review of their own). Everything is visible in the output;
@@ -96,8 +105,10 @@ with a hint.
 
 ## Performance (`make perf`)
 
-`make perf` runs the load tests of every Go module: `go test -tags perf -count=1` over
-`<module>/perf/...`, with the time limit `quality.perf.timeout` per module. It runs at the
+`make perf` runs the load tests of every Go module with performance targets (list `PERF_MODULES`
+in the root `Makefile`, today only `services/server`; the host service has no performance targets, 24):
+`go test -tags perf -count=1` over `<module>/perf/...`, with the time limit `quality.perf.timeout`
+per module. It runs at the
 close of every milestone and in the release, never in `gates` and never in the pre-push hook
 (PLAN P-07): the performance targets from chapter 02 "Performance targets" apply only on
 `perf.reference_profile`; on arbitrary hardware the measurements would not be comparable
@@ -106,7 +117,8 @@ module.
 
 Load tests carry the build tag `perf`, so that `make test` does not run them. Their packages
 are under `<module>/perf/` and do not count toward coverage. Without a Go module,
-`make perf` reports `SKIP`; a Go module without `perf/` is an error. Like the server gates,
+`make perf` reports `SKIP`, as it does without a selected module from `PERF_MODULES`; a module
+from `PERF_MODULES` without `perf/` is an error. Like the server gates,
 `make perf` needs go, a Docker-compatible runtime and the pins.
 
 ## Migrations

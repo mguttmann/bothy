@@ -1,0 +1,107 @@
+# SPDX-License-Identifier: Apache-2.0
+#
+# golangci-lint v2 configuration of the host module (docs/spec/23-quality.md
+# "Component contract"): the linters and settings of services/server/.golangci.yml, with the
+# exclusions of this module and its own import prefix. Module boundaries are checked by
+# go-arch-lint with the hand-maintained .go-arch-lint.yml (make arch).
+version: "2"
+
+linters:
+  default: standard
+  enable:
+    - bodyclose
+    - errname
+    - errorlint
+    - exhaustive
+    - forbidigo
+    - gocognit
+    - goconst
+    - gocritic
+    - gosec
+    - misspell
+    - noctx
+    - nolintlint
+    - revive
+    - sloglint
+    - unparam
+  settings:
+    forbidigo:
+      # Only cmd/bothy-host reads the process environment; the packages get their values from
+      # their callers (docs/spec/02-architecture.md "Konfigurationsladen" item 5, the same rule as
+      # in the server). Type information resolves renamed imports, so
+      # `import e "os"; e.Getenv(...)` is found as well.
+      analyze-types: true
+      # Example functions in tests are checked as well; they are documentation that readers copy.
+      exclude-godoc-examples: false
+      forbid:
+        - pattern: ^os\.(Getenv|LookupEnv|Environ|ExpandEnv)$
+          pkg: ^os$
+          msg: pass configuration in from the caller; only cmd/bothy-host reads the environment
+        - pattern: ^syscall\.(Getenv|Environ)$
+          pkg: ^syscall$
+          msg: pass configuration in from the caller; only cmd/bothy-host reads the environment
+        # Cmd.Environ returns the whole process environment when Cmd.Env is nil.
+        - pattern: ^exec\.Cmd\.Environ$
+          pkg: ^os/exec$
+          msg: pass configuration in from the caller; only cmd/bothy-host reads the environment
+        # ProxyFromEnvironment configures outgoing calls from HTTP_PROXY and related variables.
+        - pattern: ^http\.ProxyFromEnvironment$
+          pkg: ^net/http$
+          msg: pass configuration in from the caller; only cmd/bothy-host reads the environment
+    gocognit:
+      # SonarQube rule go:S3776 of the quality gate "Bothy way" (quality/sonar/quality-gate.json,
+      # no new issue) reports a function above cognitive complexity 15. gocognit reports above
+      # min-complexity, so make lint fails on the same functions before the analysis does.
+      min-complexity: 15
+    goconst:
+      # Rule go:S1192 of the same gate: a string literal written three times. goconst counts per
+      # package where the analysis counts per file, and it skips literals in call arguments,
+      # which the analysis counts (docs/DECISIONS.md M1-07).
+      min-occurrences: 3
+    nolintlint:
+      # Every suppression names its linter and says why.
+      require-explanation: true
+      require-specific: true
+    sloglint:
+      # docs/observability/signals.md "Logs": the message is constant English text, never built
+      # from input; attributes are slog.Attr values with constant keys (the catalog keys live in
+      # internal/platform/otel/attr); a function that has a context passes it on, so the
+      # record carries trace_id, span_id and bothy.correlation_id (brief M1-10).
+      static-msg: true
+      attr-only: true
+      no-raw-keys: true
+      context: scope
+    revive:
+      rules:
+        # A doc comment on every exported symbol and on every package
+        # (fixed requirement "documentation in code").
+        - name: exported
+        - name: package-comments
+  # The exclusion preset "comments" would hide missing doc comments; it stays off.
+  exclusions:
+    presets: []
+    # Generated files are linted too, so a "// Code generated ... DO NOT EDIT." header cannot hide a
+    # forbidden call.
+    generated: disable
+    rules:
+      # cmd/bothy-host is the one place that reads the environment (M2-42 adds its commands).
+      - path: ^cmd/bothy-host/
+        linters: [forbidigo]
+      # The tests of the recordings and fingerprint vectors read UPDATE_RECORDINGS, the switch of
+      # make -C services/host recordings that writes the test data instead of comparing it
+      # (docs/DECISIONS.md D-M2-38-18).
+      - path: ^internal/(noise/recordings|fingerprint/fingerprint)_test\.go$
+        linters: [forbidigo]
+      # Like the analysis (sonar.test.inclusions), gocognit and goconst check product code only;
+      # table rows of tests repeat literals on purpose.
+      - path: _test\.go$
+        linters: [gocognit, goconst]
+
+formatters:
+  enable:
+    - gofmt
+    - goimports
+  settings:
+    goimports:
+      local-prefixes:
+        - github.com/OWNER/bothy/services/host

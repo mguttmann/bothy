@@ -417,7 +417,9 @@ services/server/
 services/host/                host service bothy-host (own Go module, own version; 24-terminal.md)
   cmd/bothy-host/             main: subcommands install, pair, doctor, run, restart, session-user,
                               pty-helper (24 section 2.2, 16 section 4.4)
-  internal/                   noise, frame, control, pty (unix, windows), profiles, doctor, state
+  internal/                   noise, frame, fingerprint, control, pty (unix, windows), profiles, doctor, state
+  testdata/noise/             test vectors, Go and Dart recordings, fingerprint vectors (24, 5.2, 14)
+  .go-arch-lint.yml           maintained by hand, one component per package (no module register)
 ```
 
 Test helpers that tests of several packages use live in the tree of the component whose types they

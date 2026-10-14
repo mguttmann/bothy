@@ -710,7 +710,7 @@ D11, M8, M9 and section 7 (shortcuts in the terminal). Design and colors: compon
 
 | Package | Content | Not |
 |---|---|---|
-| `bothy_noise` | handshake `Noise_NK_25519_ChaChaPoly_SHA256` as initiator (device) and, only for tests, as responder; transport states; prologue from protocol version, session ID and host ID; encoding of the frames `start`, `data`, `resize`, `close`, `exit`, `replay_begin`, `replay_end` (24, section 5.4); fingerprint according to 24, section 4.3. Primitives from the package `cryptography` (24, section 5.2). | no Flutter, no network, no storage |
+| `bothy_noise` | handshake `Noise_NK_25519_ChaChaPoly_SHA256` as initiator (device) and, only for tests, as responder in its own library `package:bothy_noise/testing.dart`; transport states; prologue from protocol version, session ID and host ID; hash of the ephemeral key for `client_ephemeral_key_hash` (24, section 5.3); encoding of the frames `start`, `data`, `resize`, `close`, `exit`, `replay_begin`, `replay_end` (24, section 5.4); fingerprint according to 24, section 4.3. Primitives from the package `cryptography` (24, section 5.2). | no Flutter, no network, no storage |
 | `terminal_ui` | widget with the renderer `xterm` (24, section 12), header with host, LLM login badge, fingerprint and remaining time; tabs per session; dialogs "Open terminal" and "Key changed"; extra keys bar; flow from 23.2 | no permission logic (principle 1), no gateway, no local database |
 
 Ports of `terminal_ui`, implemented per app:

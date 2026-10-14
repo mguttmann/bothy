@@ -60,6 +60,11 @@ jobs:
           # downloaded, the build cache never. An analysis must not trust state written by
           # another run, and on free public runners a cache saves nothing worth that risk.
           cache: false
+      - if: matrix.language == 'go'
+        uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version-file: services/host/go.mod
+          cache: false
       - uses: github/codeql-action/init@24c54180a607b1449ed407dd24f251e4e9147c8d # v4.38.3
         with:
           languages: ${{ matrix.language }}
@@ -71,6 +76,13 @@ jobs:
         env:
           # The server ships as a static binary (baseline B2, ADR 0005): CodeQL sees the
           # build configuration that is shipped.
+          CGO_ENABLED: "0"
+        run: go build ./...
+      - name: Build the host module for CodeQL
+        if: matrix.language == 'go'
+        working-directory: services/host
+        env:
+          # bothy-host ships without cgo (docs/DECISIONS.md D-M2-38-6).
           CGO_ENABLED: "0"
         run: go build ./...
       - uses: github/codeql-action/analyze@24c54180a607b1449ed407dd24f251e4e9147c8d # v4.38.3

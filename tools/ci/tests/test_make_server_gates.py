@@ -138,8 +138,12 @@ class Fakes:
         self, *args: str, modules: str | None = None, **env: str
     ) -> subprocess.CompletedProcess[str]:
         """Run a target of the root Makefile with the fakes in place of the real tools."""
+        selected = str(self.module) if modules is None else modules
         variables = [
-            f"GO_MODS={self.module if modules is None else modules}",
+            f"GO_MODS={selected}",
+            # The throwaway modules stand for modules with performance targets
+            # (PERF_MODULES, docs/DECISIONS.md D-M2-38-3).
+            f"PERF_MODULES={selected}",
             "COMPONENTS=all",
             f"GO_PREREQS={self.bin / 'prereqs'}",
             f"FETCH={os.path.relpath(self.bin / 'fetch', REPO)}",
@@ -771,8 +775,16 @@ def test_licenses_pass_the_allowlist_to_osv_scanner(fakes: Fakes, shell: list[st
     The SDK projects are left out here (their locks would join the list); this test is about
     the server module.
     """
+    # DART_PKGS= keeps the tracked Dart packages (packages/bothy_noise, M2-38) out of the
+    # expected arguments; the Dart lock files are the business of the Dart lines.
     command = _recipe_command(
-        "licenses", "--licenses=", fakes, "PY_PROJECTS=", "TS_PROJECTS=", modules="services/server"
+        "licenses",
+        "--licenses=",
+        fakes,
+        "PY_PROJECTS=",
+        "TS_PROJECTS=",
+        "DART_PKGS=",
+        modules="services/server",
     )
     result = _bash(command, fakes, shell)
     assert result.returncode == 0, result.stdout + result.stderr
