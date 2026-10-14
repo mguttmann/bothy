@@ -40,8 +40,9 @@ func namedConstraints(t *testing.T, conn *pgx.Conn, table string) []string {
 // TestAuthzGroupsGrantsSchema holds acceptance criterion 1 of M1-27: groups,
 // group_memberships and grants match docs/spec/03-data-model.md section 4.3 column by column,
 // with every check, unique index, index and foreign key; groups.provider_id is added by the
-// migration of identity_providers (M1-36). The only deviations are the deferred foreign keys
-// grants.target_space_id, target_channel_id and target_host_id (M1-52, M1-53, M2-39).
+// migration of identity_providers (M1-36) and grants.target_host_id by the terminal migration
+// (M2-39). The only deviations are the deferred foreign keys grants.target_space_id and
+// target_channel_id (M1-52, M1-53).
 func TestAuthzGroupsGrantsSchema(t *testing.T) {
 	t.Parallel()
 	conn := pgtest.New(t).SuperConn(t)
@@ -145,6 +146,8 @@ func TestAuthzGroupsGrantsSchema(t *testing.T) {
 				// The foreign key of the channel target comes with channels (00025, M1-53).
 				"grants_target_channel_id_fkey: FOREIGN KEY (target_channel_id) REFERENCES channels(id) ON DELETE RESTRICT",
 				"grants_target_kind_check: CHECK ((target_kind = ANY (ARRAY['instance'::text, 'space'::text, 'channel'::text, 'host'::text])))",
+				// The foreign key M1-27 deferred, added by 00028_terminal_hosts.sql (M2-39).
+				"grants_target_host_id_fkey: FOREIGN KEY (target_host_id) REFERENCES hosts(id) ON DELETE RESTRICT",
 				"grants_target_shape_check: CHECK ((((target_space_id IS NOT NULL) = (target_kind = 'space'::text)) AND ((target_channel_id IS NOT NULL) = (target_kind = 'channel'::text)) AND ((target_host_id IS NOT NULL) = (target_kind = 'host'::text))))",
 				// The foreign key of the space target comes with spaces (00023, M1-52).
 				"grants_target_space_id_fkey: FOREIGN KEY (target_space_id) REFERENCES spaces(id) ON DELETE RESTRICT",

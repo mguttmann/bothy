@@ -20,6 +20,7 @@ import (
 	"github.com/OWNER/bothy/services/server/internal/kernel/txn"
 	"github.com/OWNER/bothy/services/server/internal/platform/pg"
 	"github.com/OWNER/bothy/services/server/internal/platform/pg/pgtest"
+	"github.com/OWNER/bothy/services/server/test/terminaltest"
 )
 
 func TestMain(m *testing.M) { os.Exit(pgtest.Main(m)) }
@@ -156,8 +157,8 @@ func wantViolation(t *testing.T, name string, err error, code, constraint string
 }
 
 // TestGrantChecks holds the checks of grants in 03 section 4.3: each row is rejected by the named
-// constraint or accepted. The host rows use a random target_host_id; its foreign key comes with
-// M2-39.
+// constraint or accepted. The host rows name a host of the terminal fixtures, since the foreign
+// key of target_host_id exists (M2-39).
 func TestGrantChecks(t *testing.T) {
 	t.Parallel()
 	e := newEnv(t)
@@ -177,7 +178,11 @@ func TestGrantChecks(t *testing.T) {
 		level            any
 		caps             []string
 	}
-	space, channel, host := e.space(t, alex).String(), e.channel(t, alex).String(), ids.New().String()
+	hostID, err := terminaltest.InsertHost(context.Background(), e.pool, terminaltest.Host{State: "pairing", CreatedBy: alex})
+	if err != nil {
+		t.Fatal(err)
+	}
+	space, channel, host := e.space(t, alex).String(), e.channel(t, alex).String(), hostID.String()
 	for _, tt := range []struct {
 		name       string
 		r          row
@@ -460,7 +465,11 @@ func TestStoreRoundTrip(t *testing.T) {
 	space := domain.Target{Kind: domain.TargetSpace, SpaceID: e.space(t, alex)}
 	g1 := mustGrant(samS, space, domain.LevelWrite, caps(t, "upload", "export"), t0.Add(24*time.Hour))
 	g2 := mustGrant(samS, domain.Target{Kind: domain.TargetInstance}, domain.LevelRead, 0, time.Time{})
-	g3 := mustGrant(samS, domain.Target{Kind: domain.TargetHost, HostID: ids.New()}, domain.LevelNone, caps(t, "terminal"), time.Time{})
+	hostID, err := terminaltest.InsertHost(ctx, e.pool, terminaltest.Host{State: "pairing", CreatedBy: alex})
+	if err != nil {
+		t.Fatal(err)
+	}
+	g3 := mustGrant(samS, domain.Target{Kind: domain.TargetHost, HostID: hostID}, domain.LevelNone, caps(t, "terminal"), time.Time{})
 	mustGrant(domain.Subject{Kind: domain.SubjectUser, PrincipalID: robin}, space, domain.LevelRead, 0, time.Time{})
 	mustGrant(domain.Subject{Kind: domain.SubjectAgent, PrincipalID: helper}, space, domain.LevelWrite, caps(t, "upload"), time.Time{})
 	gs := mustGrant(domain.Subject{Kind: domain.SubjectGroup, GroupID: support.ID}, space, domain.LevelTrigger, caps(t, "manage", "approve_actions"), time.Time{})

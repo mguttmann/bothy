@@ -15,8 +15,6 @@ rules:
     milestone: M6
   - match: "app."  # M2-24, M2-25
     milestone: M2
-  - match: "audit."  # M1-24, M1-50
-    milestone: M1
   - match: "auth."  # M1-28 to M1-45
     milestone: M1
   - match: auth.console_session_idle_timeout  # M6-01
@@ -57,8 +55,6 @@ rules:
     milestone: M3
   - match: "gateway."  # M1-64
     milestone: M1
-  - match: "host."  # M2-39
-    milestone: M2
   - match: "interaction."  # M2-15
     milestone: M2
   - match: "message."  # M1-46, M1-56, M1-57

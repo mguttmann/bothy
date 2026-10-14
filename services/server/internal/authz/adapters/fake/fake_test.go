@@ -3,6 +3,7 @@
 package fake_test
 
 import (
+	"bytes"
 	"context"
 	"errors"
 	"slices"
@@ -287,5 +288,53 @@ func TestStructureOnPutChannel(t *testing.T) {
 	s.PutChannel(authz.ChannelFacts{ID: id, Kind: authz.ChannelText})
 	if len(got) != 1 || got[0] != id {
 		t.Fatalf("hook saw %v", got)
+	}
+}
+
+// TestHosts (M2-39): the fake host source serves its hosts, ascending, the hosts of a holder,
+// and fails on demand.
+func TestHosts(t *testing.T) {
+	t.Parallel()
+	ctx := context.Background()
+	h := fake.NewHosts()
+	alex := ids.New()
+	a, b := ids.New(), ids.New()
+	h.Put(authz.HostFacts{ID: a, State: "active", AssignedUserID: alex})
+	h.Put(authz.HostFacts{ID: b, State: "retired"})
+	if f, ok, err := h.Host(ctx, a); err != nil || !ok || f.AssignedUserID != alex {
+		t.Fatalf("Host = %+v, %v, %v", f, ok, err)
+	}
+	if _, ok, _ := h.Host(ctx, ids.New()); ok {
+		t.Fatal("an unknown host is found")
+	}
+	if all, err := h.HostIDs(ctx); err != nil || len(all) != 2 || bytes.Compare(all[0][:], all[1][:]) > 0 {
+		t.Fatalf("HostIDs = %v, %v", all, err)
+	}
+	if mine, err := h.AssignedTo(ctx, alex); err != nil || len(mine) != 1 || mine[0] != a {
+		t.Fatalf("AssignedTo = %v, %v", mine, err)
+	}
+	if none, _ := h.AssignedTo(ctx, ids.ID{}); len(none) != 0 {
+		t.Fatal("the zero holder holds hosts")
+	}
+	h.Fail(true)
+	if _, _, err := h.Host(ctx, a); err == nil {
+		t.Fatal("Fail(true) does not fail Host")
+	}
+	if _, err := h.HostIDs(ctx); err == nil {
+		t.Fatal("Fail(true) does not fail HostIDs")
+	}
+	if _, err := h.AssignedTo(ctx, alex); err == nil {
+		t.Fatal("Fail(true) does not fail AssignedTo")
+	}
+	s := fake.NewStore()
+	if err := s.InsertGrant(ctx, domain.Grant{ID: ids.New(), Subject: domain.Subject{Kind: domain.SubjectUser, PrincipalID: alex},
+		Target: domain.Target{Kind: domain.TargetHost, HostID: a}, Caps: domain.CapsOf(domain.CapTerminal)}); err != nil {
+		t.Fatal(err)
+	}
+	if got, err := s.ActiveGrantsOnHosts(ctx, []ids.ID{a}); err != nil || len(got) != 1 {
+		t.Fatalf("ActiveGrantsOnHosts = %v, %v", got, err)
+	}
+	if got, _ := s.ActiveGrantsOnHosts(ctx, []ids.ID{b}); len(got) != 0 {
+		t.Fatal("a grant on another host")
 	}
 }

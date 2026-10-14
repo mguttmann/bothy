@@ -214,6 +214,10 @@ Normative together with [24-terminal.md](24-terminal.md), section 8.
       `P <> H.credential_holder_id`); or
     - a valid grant (2.5) with target `H` and `terminal` to `P` or one of their valid
       groups.
+
+   The exception of the first item (an owner on a host with `personal`) is decided by the
+   guard rule SR11 with the reason `i6_holder_only` (section 4.2, step 9; M2-40); the atom
+   `+terminal` of the requirement does not repeat it (docs/DECISIONS.md D-M2-39-3).
 4. Effective `terminal` is not enough: SR10, SR11 and SR12 (section 5) block afterwards. The preview
    of a grant that does not take effect because of SR10 or for lack of a session user (SR12) says
    so (hint `terminal_not_effective`).
@@ -388,6 +392,14 @@ Order and reason:
   confirmation. Otherwise the step-up prompt would reveal that the action would be possible.
 - Guard rules last: they need the full context (level, run, thread) and apply to owners too,
   where they say so.
+
+Exception to the order: if the requirement of an action is `All(HumanSession, ...)` (`host.read`,
+`host.manage`, from M2-40 also `terminal.*`), `authorize` checks right after step 1 and before the
+rights state, resolution and visibility whether a person acts in a session; agents, apps and
+personal tokens get `forbidden` with `subject_kind_not_allowed`. Reason: 05 section 4.14 rejects
+them with this reason, and the visibility before it would turn that into `404`. The answer depends
+only on the principal, never on the resource, so it reveals nothing about a host (AZ-P4;
+docs/DECISIONS.md D-M2-39-4).
 
 Requirements that need facts of a later milestone (runs, sessions and commands of the
 agents, components, files, webhooks, import) stand until then as deferred entries in the
@@ -1083,7 +1095,7 @@ DM between Alex and Sam. The clock is controllable in tests.
 | AZ-M57 | Owner | host R2 | `grant.create` group Leser `terminal` | | `invariant_violation` `i6_violation` |
 | AZ-M58 | Alex | host R1 | `terminal.open` | step-up already used for another opening | `step_up_required` `terminal_step_up_not_fresh` |
 | AZ-M59 | Lotse | host R1 | `terminal.open` | agent token | `forbidden` `subject_kind_not_allowed` |
-| AZ-M60 | Alex | host R1 | `terminal.open` | grant on the instance with `trigger` and all capabilities, no grant on R1 | `not_found` (host not visible) |
+| AZ-M60 | Alex | host R3 (without assignee) | `terminal.open` | grant on the instance with `trigger` and all capabilities, no grant on R3 | `not_found` (host not visible) |
 | AZ-M61 | Owner | host R1 | `terminal.open` | fresh step-up, no valid assignment of the owner to a session user on R1 | `forbidden` `terminal_no_session_user` (SR12) |
 
 ### 11.2 Required tests

@@ -368,3 +368,37 @@ func TestRecord_ConcurrentInOneUnitKeepsEveryEntry(t *testing.T) {
 		t.Fatalf("%d of %d concurrent entries were written", got, n)
 	}
 }
+
+// TestDetails_OSUserName (M2-39, 19 SEC-AUD-5): the name of a session user is accepted only under
+// the reserved member os_user and only in the form of host_session_users.os_user; a value outside
+// the pattern, the value under another key and another kind under os_user are refused at Record.
+func TestDetails_OSUserName(t *testing.T) {
+	t.Parallel()
+	w := newWorld(t, time.Minute, 10)
+	ok := auditing.Entry{Action: "host.manage", Decision: auditing.DecisionAllow,
+		Attrs: auditing.Attrs{"os_user": auditing.OSUserName("BOTHY-S-SHARED"), "operation": auditing.Code("session_user")}}
+	if err := w.uow.Do(as(alex), func(ctx context.Context) error { return w.rec.Record(ctx, ok) }); err != nil {
+		t.Fatalf("Record with os_user: %v", err)
+	}
+	if got := w.store.committed()[0].Details["os_user"]; got != "BOTHY-S-SHARED" {
+		t.Fatalf("os_user = %v", got)
+	}
+	bad := map[string]auditing.Attrs{
+		"path":            {"os_user": auditing.OSUserName("../x")},
+		"slash":           {"os_user": auditing.OSUserName("a/b")},
+		"leading dot":     {"os_user": auditing.OSUserName(".hidden")},
+		"empty":           {"os_user": auditing.OSUserName("")},
+		"space":           {"os_user": auditing.OSUserName("two words")},
+		"under other key": {"name": auditing.OSUserName("bothy-s-sam")},
+		"code as os_user": {"os_user": auditing.Code("bothy-s-sam")},
+	}
+	for name, attrs := range bad {
+		e := auditing.Entry{Action: "host.manage", Decision: auditing.DecisionAllow, Attrs: attrs}
+		if err := w.uow.Do(as(alex), func(ctx context.Context) error { return w.rec.Record(ctx, e) }); errs.KindOf(err) != errs.KindInternal {
+			t.Errorf("%s: Record = %v, want kind internal", name, err)
+		}
+	}
+	if n := len(w.store.committed()); n != 1 {
+		t.Fatalf("%d entries written, want the one valid entry", n)
+	}
+}

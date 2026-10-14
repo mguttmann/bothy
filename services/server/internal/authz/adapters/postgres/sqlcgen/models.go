@@ -319,6 +319,56 @@ type GroupMembership struct {
 	RemovedBy        pgtype.UUID
 }
 
+type Host struct {
+	ID                          pgtype.UUID
+	Name                        string
+	State                       string
+	Platform                    pgtype.Text
+	AssignedUserID              pgtype.UUID
+	DevEnvironmentID            pgtype.UUID
+	LlmCredentials              string
+	CredentialHolderID          pgtype.UUID
+	LlmCredentialsDeclaredBy    pgtype.UUID
+	LlmCredentialsDeclaredAt    pgtype.Timestamptz
+	DeclaredServerHost          bool
+	PairingCodeHash             []byte
+	PairingExpiresAt            pgtype.Timestamptz
+	NoisePublicKey              []byte
+	AuthPublicJwk               []byte
+	AuthJkt                     pgtype.Text
+	KeyFingerprint              pgtype.Text
+	KeyGeneration               int32
+	FingerprintFailures         int32
+	PairedAt                    pgtype.Timestamptz
+	ConfirmedBy                 pgtype.UUID
+	ConfirmedAt                 pgtype.Timestamptz
+	ReportedProfiles            []byte
+	ReportedSessionUsers        []byte
+	ReportedDoctor              []byte
+	ReportedIsServerHost        pgtype.Bool
+	ReportedRequireLocalConfirm pgtype.Bool
+	ReportedOsVersion           pgtype.Text
+	ReportedHostVersion         pgtype.Text
+	LastSeenAt                  pgtype.Timestamptz
+	CreatedBy                   pgtype.UUID
+	CreatedAt                   pgtype.Timestamptz
+	DisabledAt                  pgtype.Timestamptz
+	DisabledReason              pgtype.Text
+	RetiredAt                   pgtype.Timestamptz
+	Version                     int64
+}
+
+type HostSessionUser struct {
+	ID        pgtype.UUID
+	HostID    pgtype.UUID
+	UserID    pgtype.UUID
+	OsUser    string
+	CreatedBy pgtype.UUID
+	CreatedAt pgtype.Timestamptz
+	RevokedBy pgtype.UUID
+	RevokedAt pgtype.Timestamptz
+}
+
 type IdempotencyKey struct {
 	PrincipalID    pgtype.UUID
 	Key            pgtype.UUID
@@ -447,6 +497,32 @@ type Space struct {
 	CreatedAt              pgtype.Timestamptz
 	ArchivedAt             pgtype.Timestamptz
 	Version                int64
+}
+
+type TerminalSession struct {
+	ID                pgtype.UUID
+	HostID            pgtype.UUID
+	UserID            pgtype.UUID
+	HostSessionUserID pgtype.UUID
+	OpenedByDeviceID  pgtype.UUID
+	DeviceID          pgtype.UUID
+	AuthSessionID     pgtype.UUID
+	Profile           string
+	State             string
+	TokenJti          pgtype.UUID
+	KeyGeneration     int32
+	OpenedAt          pgtype.Timestamptz
+	StartedAt         pgtype.Timestamptz
+	DetachedAt        pgtype.Timestamptz
+	LastInputAt       pgtype.Timestamptz
+	ClosedAt          pgtype.Timestamptz
+	ClosedBy          pgtype.UUID
+	CloseReason       pgtype.Text
+	CloseDetail       pgtype.Text
+	ExitCode          pgtype.Int4
+	BytesIn           int64
+	BytesOut          int64
+	Version           int64
 }
 
 type Thread struct {

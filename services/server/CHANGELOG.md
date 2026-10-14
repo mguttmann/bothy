@@ -138,6 +138,25 @@ documented in this file. The format is based on
   sidebar row of a person (collapsed, own order) is last write wins with `sidebar.updated` to
   the person. `chat` is now the space part of the structure source of authz, and `SpaceView`
   reports the caller's effective level and capabilities.
+
+- Host records of the terminal module (M2-39): the migration `00028_terminal_hosts.sql` with
+  `hosts`, `host_session_users` and `terminal_sessions` (the composite key of a session to the
+  session user of its host and person) and the foreign key `grants.target_host_id`; the operations
+  `listHosts`, `createHost` (pairing code `bothy_hpc_...` shown once, only its HMAC stored),
+  `getHost`, `updateHost` (name, holder, session users after ruling T12) and `setHostState`
+  (disable, enable, retire after the life cycle of 24 section 3.1). Every change is a rights change
+  with step-up, a mandatory reason, an audit entry and the event `host.updated` without keys;
+  leaving `active` and ending an assignment end the sessions in the same transaction, audited as
+  `terminal.terminate`. In `authz` the host is a target outside the tree: `HostSource`, the
+  snapshot map of host grants, `TerminalOn`, the atoms `HumanSession`, `Assignee` and `Terminal`,
+  the gate that refuses agents, apps and personal tokens with `subject_kind_not_allowed`, host
+  entries in `access.changed` and `Scope(host.read)`. Identity issues the token kind `hpc`, the
+  signing-key purpose `terminal` gets an active key at every start, the audit details know the
+  reserved member `os_user`. New keys `host.name_max_chars`, `host.os_user_max_chars`,
+  `terminal.pairing_code_ttl`, `terminal.session_token_ttl` and `audit.reason_max_chars`. An owner
+  reads host grants with `getGrant` and `listGrants?target_kind=host`; every list cursor whose key
+  carries a NUL character answers `400 cursor_invalid` instead of `500`.
+
 - Device approval and pairing (M1-38): a device that logs in without an enrollment code stays
   `pending` with tokens but no access beyond reading itself and shows a verification code
   derived from the token pepper, its id and its DPoP key (never stored). `approveDevice` (owner or

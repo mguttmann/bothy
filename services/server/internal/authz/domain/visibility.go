@@ -41,7 +41,7 @@ var ownedKinds = map[string]bool{
 // ownerOnlyKinds are visible to effective owners only.
 //
 //nolint:goconst // resource kinds of the generated catalogue, listed once per rule
-var ownerOnlyKinds = map[string]bool{KindApp: true, "webhook_delivery": true, "import_source": true, kindHost: true}
+var ownerOnlyKinds = map[string]bool{KindApp: true, "webhook_delivery": true, "import_source": true}
 
 // IsChannelPathKind reports whether kind lives in a channel (05 section 2.2).
 func IsChannelPathKind(kind string) bool { return channelPathKinds[kind] }
@@ -109,6 +109,17 @@ var kindRules = map[string]func(in Input) (bool, Reason, error){
 	kindGroup: func(in Input) (bool, Reason, error) {
 		return in.Eff.Owner || in.GroupMember, ReasonNoGrant, nil
 	},
+	kindHost: hostVisible,
+}
+
+// hostVisible: an effective owner sees every host, its holder the own host, a person with the
+// effective right terminal that host (07 section 2.12 point 5); with "view as" both views must see
+// it. Agents and apps never reach a host action (the gate of HumanSession).
+func hostVisible(in Input) (bool, Reason, error) {
+	if in.Host == nil {
+		return false, "", internalError("host resource without its facts")
+	}
+	return in.Host.Visible, ReasonNoGrant, nil
 }
 
 // personVisible: people and apps see the directory; an agent sees only itself.

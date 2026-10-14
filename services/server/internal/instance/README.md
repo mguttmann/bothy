@@ -83,10 +83,11 @@ Normative: [19-security.md](../../../../docs/spec/19-security.md) section 10,
 [09-agents.md](../../../../docs/spec/09-agents.md) section 4.5 and
 [ADR 0066](../../../../docs/adr/0066-signing-keys-in-the-writable-key-store.md).
 
-**Purposes.** `access_token`, `invocation`, `webhook_out` and `audit_checkpoint`, each with
-Ed25519 keys (`alg = EdDSA`). The table also allows `terminal`; M2-39 adds it to the managed
-purposes, until then `Rotate` refuses it with `400 validation_failed` (`/purpose`,
-`not_supported`).
+**Purposes.** `access_token`, `invocation`, `webhook_out`, `audit_checkpoint` and `terminal`
+(M2-39, the session tokens of the terminal), each with Ed25519 keys (`alg = EdDSA`).
+`EnsureActive` creates an active key for each at every start. `terminal` rotates only on owner
+request (like `webhook_out`) and is never published in the JWKS; the host service gets its keys
+over the control connection (M2-43).
 
 **States.** `next` (published, not signing), `active` (signs; exactly one per purpose through the
 partial unique index), `retiring` (stopped signing at `not_after`, still published) and `retired`
@@ -103,8 +104,9 @@ errors and responses name purpose and `kid` only.
 **Windows.** A retiring key becomes retired once the longest validity of what it signed has
 passed: `auth.access_token_ttl` + `auth.clock_leeway` (`access_token`),
 `agent.invocation_token_ttl` + `auth.clock_leeway` (`invocation`), `webhook.delivery_timeout` +
-`auth.clock_leeway` (`webhook_out`, every attempt signs anew), zero for `audit_checkpoint` (old
-checkpoints verify through `Verify` in any state).
+`auth.clock_leeway` (`webhook_out`, every attempt signs anew), `terminal.session_token_ttl` +
+`auth.clock_leeway` (`terminal`), zero for `audit_checkpoint` (old checkpoints verify through
+`Verify` in any state).
 
 **Transitions** (pure functions in `domain`, applied in `app`):
 

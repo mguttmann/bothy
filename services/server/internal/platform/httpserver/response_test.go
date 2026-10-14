@@ -383,6 +383,18 @@ func TestCursor_RoundTripAndRejections(t *testing.T) {
 			}
 		}
 	}
+	// A key string with NUL cannot reach PostgreSQL text (SQLSTATE 22021, a 500): a client that
+	// forges a cursor with it gets cursor_invalid in every list (M2-39 red team).
+	for _, forged := range []any{threadKey{CreatedAt: "a\x00b", ID: thingID}, map[string]any{"created_at": "x", "id": thingID, "a\x00": 1}} {
+		nul, err := httpserver.EncodeCursor("threads", binding, forged)
+		if err != nil {
+			t.Fatal(err)
+		}
+		var k map[string]any
+		if err := httpserver.DecodeCursor("threads", binding, nul, &k); errs.KindOf(err) != errs.KindBadRequest {
+			t.Errorf("NUL in a cursor key: %v", err)
+		}
+	}
 	if _, err := httpserver.EncodeCursor("", binding, key); err == nil {
 		t.Error("empty list name accepted")
 	}

@@ -93,6 +93,9 @@ type Store interface {
 	// spaceIDs or on one of channelIDs, ordered by id (the affected principals of a rights change
 	// on a target, 02 section 8.1).
 	ActiveGrantsOnTargets(ctx context.Context, spaceIDs, channelIDs []ids.ID) ([]domain.Grant, error)
+	// ActiveGrantsOnHosts returns the grants that are not revoked on one of hostIDs, ordered by id
+	// (the affected principals of a rights change on a host, M2-39); an empty list gives none.
+	ActiveGrantsOnHosts(ctx context.Context, hostIDs []ids.ID) ([]domain.Grant, error)
 
 	// ListLiveGroups returns at most limit live groups with an id above after, ascending; with a
 	// non-zero memberID only the groups in which memberID has a membership in effect at t (M1-48).

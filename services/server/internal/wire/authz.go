@@ -26,6 +26,7 @@ import (
 	"github.com/OWNER/bothy/services/server/internal/platform/config"
 	"github.com/OWNER/bothy/services/server/internal/platform/otel/attr"
 	"github.com/OWNER/bothy/services/server/internal/platform/pg"
+	"github.com/OWNER/bothy/services/server/internal/terminal"
 )
 
 // msgRegistrationCheckFailed is the log message of each violation the catalogue check finds.
@@ -34,9 +35,9 @@ const msgRegistrationCheckFailed = "registration check failed"
 // moduleRegistrations are the Register(r *authorize.Registry) functions of the module ports, in
 // the order of the module register. In M1 identity registers user.updated (M1-31), authz
 // access.changed (M1-29), grant.changed, group.changed and access.expiring (M1-30) and agents
-// agent.updated (M1-51) and chat space.created, space.updated, space.archived and sidebar.updated
-// (M1-52); each module's ticket appends its function here.
-var moduleRegistrations = []func(*authorize.Registry){identity.Register, authz.Register, agents.Register, chat.Register}
+// agent.updated (M1-51), chat space.created, space.updated, space.archived and sidebar.updated
+// (M1-52) and terminal (M2-39); each module's ticket appends its function here.
+var moduleRegistrations = []func(*authorize.Registry){identity.Register, authz.Register, agents.Register, chat.Register, terminal.Register}
 
 // BuildRegistry returns a registry filled by every function of register; nil means the
 // production list of the module ports.
@@ -155,6 +156,7 @@ func NewAuthorizer(pool *pg.Pool, cfg authzapp.AuthorizerConfig, cat *authzapp.C
 		Credentials: identityapp.NewCredentialSource(identitypg.NewRepository(pool), identitypg.NewRepository(pool), identitypg.NewRepository(pool)),
 		Structure:   NewStructureSource(pool),
 		Policies:    NewAgentPolicySource(pool),
+		Hosts:       NewHostSource(pool),
 		Versions:    instanceapp.NewVersions(instancepg.NewRepository(pool)),
 		Recorder:    rec,
 		Clock:       clk,
@@ -172,6 +174,8 @@ type RightsSources struct {
 	Principals authz.PrincipalSource
 	Structure  authz.StructureSource
 	Policies   authz.AgentPolicySource
+	// Hosts nil means the host source of terminal (M2-39).
+	Hosts authz.HostSource
 }
 
 // NewRightsHook returns the rights hooks of authz over pool (M1-29): the counters of instance
@@ -190,12 +194,15 @@ func NewRightsHook(pool *pg.Pool, src RightsSources, clk clock.Clock, log *slog.
 	if src.Policies == nil {
 		src.Policies = NewAgentPolicySource(pool)
 	}
+	if src.Hosts == nil {
+		src.Hosts = NewHostSource(pool)
+	}
 	if clk == nil {
 		clk = clock.System()
 	}
 	return authzapp.NewRightsHook(authzapp.RightsHookDeps{
 		Counters: InstanceCounters(pool), Store: authzpg.NewRepository(pool), Expiry: authzpg.NewRepository(pool), Principals: src.Principals,
-		Structure: src.Structure, Policies: src.Policies, Clock: clk, Log: orDiscard(log),
+		Structure: src.Structure, Policies: src.Policies, Hosts: src.Hosts, Clock: clk, Log: orDiscard(log),
 	})
 }
 
@@ -274,7 +281,7 @@ func NewAuthzAdmin(pool *pg.Pool, cfg authzapp.AdminConfig, a *Audit, sy *Sync, 
 	}
 	admin, err := authzapp.NewAdminService(authzapp.AdminDeps{
 		UoW: a.UoW(), Authorizer: az, Store: authzpg.NewRepository(pool),
-		Principals: identityapp.NewPrincipalSource(identitypg.NewRepository(pool)), Structure: NewStructureSource(pool),
+		Principals: identityapp.NewPrincipalSource(identitypg.NewRepository(pool)), Structure: NewStructureSource(pool), Hosts: NewHostSource(pool),
 		Rights: a.RightsHook(), Audit: a.Recorder(), Clock: clk, Events: sy.Appender(), Scopes: az, Cursors: authzhttp.Cursors{},
 		Config: cfg,
 	})

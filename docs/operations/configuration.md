@@ -215,8 +215,8 @@ Source: [03-data-model.md](../spec/03-data-model.md), section 9.
 | `branding.product_name_max_chars` | `BOTHY_BRANDING__PRODUCT_NAME_MAX_CHARS` | Server | int | `64` | length of the product name in the branding (`instance_settings`, `branding.product_name`) in Unicode characters | active |
 | `group.name_max_chars` | `BOTHY_GROUP__NAME_MAX_CHARS` | Server | int | `100` | length of a group name in Unicode characters | active |
 | `group.description_max_chars` | `BOTHY_GROUP__DESCRIPTION_MAX_CHARS` | Server | int | `500` | length of a group description in Unicode characters | active |
-| `host.name_max_chars` | `BOTHY_HOST__NAME_MAX_CHARS` | Server |  | `100` | length of a host name in Unicode characters | planned (M2) |
-| `host.os_user_max_chars` | `BOTHY_HOST__OS_USER_MAX_CHARS` | Server |  | `64` | length of the name of a session user in `host_session_users.os_user` | planned (M2) |
+| `host.name_max_chars` | `BOTHY_HOST__NAME_MAX_CHARS` | Server | int | `100` | length of a host name in Unicode characters | active |
+| `host.os_user_max_chars` | `BOTHY_HOST__OS_USER_MAX_CHARS` | Server | int | `64` | length of the name of a session user in `host_session_users.os_user` | active |
 | `space.name_max_chars` | `BOTHY_SPACE__NAME_MAX_CHARS` | Server | int | `100` | length of a space name in Unicode characters | active |
 | `channel.name_max_chars` | `BOTHY_CHANNEL__NAME_MAX_CHARS` | Server | int | `100` | length of a channel name in Unicode characters | active |
 | `channel.topic_max_chars` | `BOTHY_CHANNEL__TOPIC_MAX_CHARS` | Server | int | `1024` | length of a channel topic in Unicode characters | active |
@@ -730,7 +730,7 @@ Source: [19-security.md](../spec/19-security.md), section 16.
 | `audit.checkpoint_s3_use_path_style` | `BOTHY_AUDIT__CHECKPOINT_S3_USE_PATH_STYLE` | Server | bool | `true` | path-style requests of an `s3://` sink instead of `<bucket>.<endpoint host>` | active |
 | `audit.checkpoint_s3_access_key_ref` | `BOTHY_AUDIT__CHECKPOINT_S3_ACCESS_KEY_REF` | Server | secret_ref | `file:<secrets.dir>/audit_checkpoint_s3_access_key` | secret reference of the own access key ID of an `s3://` sink, read only with an `s3://` sink; supplied by the owner from a separate account ([backup-restore.md](../operations/backup-restore.md) 8) | active |
 | `audit.checkpoint_s3_secret_key_ref` | `BOTHY_AUDIT__CHECKPOINT_S3_SECRET_KEY_REF` | Server | secret_ref | `file:<secrets.dir>/audit_checkpoint_s3_secret_key` | secret reference of the own secret access key of an `s3://` sink, read only with an `s3://` sink | active |
-| `audit.reason_max_chars` | `BOTHY_AUDIT__REASON_MAX_CHARS` | Server |  | `500` | maximum length of a mandatory reason of an administrative action in Unicode characters (SEC-AUD-5) | planned (M1) |
+| `audit.reason_max_chars` | `BOTHY_AUDIT__REASON_MAX_CHARS` | Server | int | `500` | maximum length of a mandatory reason of an administrative action in Unicode characters (SEC-AUD-5) | active |
 | `signing_key.cache_ttl` | `BOTHY_SIGNING_KEY__CACHE_TTL` | Server | duration | `30s` | longest time a process still accepts a retired key or does not know a new one | active |
 | `signing_key.rotation_check_interval` | `BOTHY_SIGNING_KEY__ROTATION_CHECK_INTERVAL` | Server | duration | `1m` | interval of the job `instance.key_rotation` | active |
 | `signing_key.access_token_rotation_interval` | `BOTHY_SIGNING_KEY__ACCESS_TOKEN_ROTATION_INTERVAL` | Server | duration | `30d` | scheduled rotation of the key for access tokens | active |
@@ -805,11 +805,11 @@ Source: [24-terminal.md](../spec/24-terminal.md), section 17.
 
 | Key | Environment | Place | Type | Default | Meaning | Status |
 |---|---|---|---|---|---|---|
-| `terminal.pairing_code_ttl` | `BOTHY_TERMINAL__PAIRING_CODE_TTL` | Server |  | `15m` | Validity of a pairing code for a host | planned (M2) |
+| `terminal.pairing_code_ttl` | `BOTHY_TERMINAL__PAIRING_CODE_TTL` | Server | duration | `15m` | Validity of a pairing code for a host | active |
 | `terminal.fingerprint_confirm_chars` | `BOTHY_TERMINAL__FINGERPRINT_CONFIRM_CHARS` | Server |  | `8` | this many characters of the fingerprint the owner types for the confirmation | planned (M2) |
 | `terminal.fingerprint_max_attempts` | `BOTHY_TERMINAL__FINGERPRINT_MAX_ATTEMPTS` | Server |  | `3` | failed attempts at the confirmation, then fallback to `pairing` | planned (M2) |
 | `terminal.step_up_max_age` | `BOTHY_TERMINAL__STEP_UP_MAX_AGE` | Server |  | `60s` | the step-up for `terminal.open` and `terminal.attach` must be at most this old | planned (M2) |
-| `terminal.session_token_ttl` | `BOTHY_TERMINAL__SESSION_TOKEN_TTL` | Server |  | `30s` | Validity of a terminal session token | planned (M2) |
+| `terminal.session_token_ttl` | `BOTHY_TERMINAL__SESSION_TOKEN_TTL` | Server | duration | `30s` | Validity of a terminal session token | active |
 | `terminal.open_timeout` | `BOTHY_TERMINAL__OPEN_TIMEOUT` | Server |  | `20s` | Deadline until both sides are connected in the relay and the handshake is complete | planned (M2) |
 | `terminal.detach_grace` | `BOTHY_TERMINAL__DETACH_GRACE` | Server |  | `15m` | this long a detached session stays attachable | planned (M2) |
 | `terminal.quick_reattach_window` | `BOTHY_TERMINAL__QUICK_REATTACH_WINDOW` | Server |  | `60s` | Reattach from the same device without a new step-up within this time after the detach | planned (M2) |

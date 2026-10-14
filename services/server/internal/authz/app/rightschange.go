@@ -36,6 +36,8 @@ type RightsHookDeps struct {
 	Principals authz.PrincipalSource
 	Structure  authz.StructureSource
 	Policies   authz.AgentPolicySource
+	// Hosts is the host source of the terminal module (M2-39); nil means a world without hosts.
+	Hosts authz.HostSource
 	// Expiry selects and marks the due expiries every rights change folds in (M1-30).
 	Expiry ExpiryStore
 	// Clock is read once per phase.
@@ -81,6 +83,7 @@ func NewRightsHook(d RightsHookDeps) (*RightsHook, error) {
 	if log == nil {
 		log = slog.Default()
 	}
+	d.Hosts = hostsOrNone(d.Hosts)
 	return &RightsHook{d: d, log: log}, nil
 }
 
@@ -351,15 +354,15 @@ func mapsKeys(m map[ids.ID]domain.AccessView) func(func(ids.ID) bool) {
 	}
 }
 
-// accessTargets converts domain entries; channels in added and changed carry their
-// capabilities as a non-nil list.
+// accessTargets converts domain entries; channels in added and changed and hosts in added carry
+// their capabilities as a non-nil list (a host: [terminal], without level, M2-39).
 func accessTargets(list []domain.AccessEntry) []authorize.AccessTarget {
 	out := make([]authorize.AccessTarget, 0, len(list))
 	for _, e := range list {
 		at := authorize.AccessTarget{
 			Kind: authorize.AccessTargetKind(e.Kind), ID: e.ID, Level: e.Level.String(), PreviousLevel: e.PreviousLevel.String(),
 		}
-		if e.Kind == domain.AccessKindChannel && e.Level != domain.LevelNone {
+		if e.Kind == domain.AccessKindChannel && e.Level != domain.LevelNone || e.Kind == domain.AccessKindHost && e.Caps.Has(domain.CapTerminal) {
 			at.Capabilities = append([]string{}, e.Caps.Names()...)
 		}
 		out = append(out, at)
@@ -592,15 +595,17 @@ func triggerWorld(ctx context.Context, store Store, principals authz.PrincipalSo
 	return w, nil
 }
 
-// structureView is the structure read once per phase: the channel paths and the space paths.
+// structureView is the structure read once per phase: the channel paths, the space paths and the
+// hosts.
 type structureView struct {
 	channels []domain.Path
 	spaces   []domain.Path
+	hosts    []ids.ID
 }
 
-// structureNow reads the channels and spaces from the structure source; a space path carries
-// whether the space is archived, so archiving it changes the levels of the view (07 section 4.5
-// point 3).
+// structureNow reads the channels and spaces from the structure source and the hosts from the
+// host source; a space path carries whether the space is archived, so archiving it changes the
+// levels of the view (07 section 4.5 point 3).
 func (h *RightsHook) structureNow(ctx context.Context) (structureView, error) {
 	chans, err := h.d.Structure.Channels(ctx)
 	if err != nil {
@@ -610,7 +615,11 @@ func (h *RightsHook) structureNow(ctx context.Context) (structureView, error) {
 	if err != nil {
 		return structureView{}, sourceError("structure source", err)
 	}
-	w := structureView{}
+	hosts, err := h.d.Hosts.HostIDs(ctx)
+	if err != nil {
+		return structureView{}, sourceError("host source", err)
+	}
+	w := structureView{hosts: hosts}
 	for _, id := range spaces {
 		archived, err := h.d.Structure.SpaceArchived(ctx, id)
 		if err != nil {
@@ -642,24 +651,24 @@ func (h *RightsHook) viewOf(ctx context.Context, w structureView, principal ids.
 	if err := readGrants(ctx, h.d.Store, principal, kind == domain.KindUser, &in, t); err != nil {
 		return domain.AccessView{}, err
 	}
-	return domain.AccessViewOf(domain.BuildSnapshot(in), kind, principal, w.channels, w.spaces), nil
+	return domain.AccessViewOf(domain.BuildSnapshot(in), kind, principal, w.channels, w.spaces, w.hosts), nil
 }
 
 // affectedByTargets derives the affected principals of target refs (02 section 8.1, 04 section
 // 8.2): the subjects of grants in effect at t on the targets, their ancestors and, for a space,
-// its channels, with the members of subject groups; the active owners; and the effective
-// operators of the channels concerned. The difference step drops everyone without a change.
+// its channels, with the members of subject groups; the active owners; the effective operators
+// of the channels concerned; and the holder of a host target (M2-39). The difference step drops everyone without a change.
 func (h *RightsHook) affectedByTargets(ctx context.Context, targets []txn.Ref, t time.Time) ([]ids.ID, error) {
 	if len(targets) == 0 {
 		return nil, nil
 	}
-	spaces, channels, out, err := h.targetScope(ctx, targets)
+	spaces, channels, hosts, out, err := h.targetScope(ctx, targets)
 	if err != nil {
 		return nil, err
 	}
-	grants, err := h.d.Store.ActiveGrantsOnTargets(ctx, spaces, channels)
+	grants, err := h.grantsOnTargets(ctx, spaces, channels, hosts)
 	if err != nil {
-		return nil, sourceError("grant store", err)
+		return nil, err
 	}
 	var groups []ids.ID
 	for _, g := range grants {
@@ -684,33 +693,92 @@ func (h *RightsHook) affectedByTargets(ctx context.Context, targets []txn.Ref, t
 	return slices.DeleteFunc(out, func(id ids.ID) bool { return id.IsZero() }), nil
 }
 
+// grantsOnTargets returns the grants that are not revoked on the instance and the spaces and
+// channels (when any) and on the hosts (when any).
+func (h *RightsHook) grantsOnTargets(ctx context.Context, spaces, channels, hosts []ids.ID) ([]domain.Grant, error) {
+	var grants []domain.Grant
+	if len(spaces) > 0 || len(channels) > 0 {
+		g, err := h.d.Store.ActiveGrantsOnTargets(ctx, spaces, channels)
+		if err != nil {
+			return nil, sourceError("grant store", err)
+		}
+		grants = g
+	}
+	if len(hosts) > 0 {
+		g, err := h.d.Store.ActiveGrantsOnHosts(ctx, hosts)
+		if err != nil {
+			return nil, sourceError("grant store", err)
+		}
+		grants = append(grants, g...)
+	}
+	return grants, nil
+}
+
 // targetScope returns the spaces and channels whose grants concern targets (a space with its
-// channels, a channel with its space) and the effective operators of those channels.
-func (h *RightsHook) targetScope(ctx context.Context, targets []txn.Ref) (spaces, channels, operators []ids.ID, err error) {
+// channels, a channel with its space), the hosts among targets, and the principals the targets
+// name directly: the effective operators of those channels and the holder of each host (M2-39).
+func (h *RightsHook) targetScope(ctx context.Context, targets []txn.Ref) (spaces, channels, hosts, names []ids.ID, err error) {
 	chans, err := h.d.Structure.Channels(ctx)
 	if err != nil {
-		return nil, nil, nil, sourceError("structure source", err)
+		return nil, nil, nil, nil, sourceError("structure source", err)
 	}
 	for _, r := range targets {
+		var named []ids.ID
 		switch r.Kind {
 		case string(authorize.ResourceSpace):
 			spaces = append(spaces, r.ID)
-			ch, ops := channelsOfSpace(chans, r.ID)
-			channels, operators = append(channels, ch...), append(operators, ops...)
+			channels, named = appendSpace(chans, r.ID, channels)
 		case string(authorize.ResourceChannel):
 			channels = append(channels, r.ID)
-			c, ok, err := h.d.Structure.Channel(ctx, r.ID)
-			if err != nil {
-				return nil, nil, nil, sourceError("structure source", err)
+			var space ids.ID
+			if space, named, err = h.channelTarget(ctx, r.ID); err != nil {
+				return nil, nil, nil, nil, err
 			}
-			if ok {
-				spaces, operators = append(spaces, c.SpaceID), append(operators, c.EffectiveOperatorID)
+			if !space.IsZero() || len(named) > 0 {
+				spaces = append(spaces, space)
+			}
+		case string(authorize.ResourceHost):
+			hosts = append(hosts, r.ID)
+			if named, err = h.hostTarget(ctx, r.ID); err != nil {
+				return nil, nil, nil, nil, err
 			}
 		default:
-			return nil, nil, nil, internal("a rights change target must be a space or a channel, not " + r.Kind)
+			return nil, nil, nil, nil, internal("a rights change target must be a space, a channel or a host, not " + r.Kind)
 		}
+		names = append(names, named...)
 	}
-	return spaces, channels, operators, nil
+	return spaces, channels, hosts, names, nil
+}
+
+// appendSpace adds the channels of space among chans to channels and returns their operators.
+func appendSpace(chans []authz.ChannelFacts, space ids.ID, channels []ids.ID) ([]ids.ID, []ids.ID) {
+	ch, ops := channelsOfSpace(chans, space)
+	return append(channels, ch...), ops
+}
+
+// channelTarget returns the space and the effective operator of a channel target; zero values for
+// an unknown channel.
+func (h *RightsHook) channelTarget(ctx context.Context, id ids.ID) (ids.ID, []ids.ID, error) {
+	c, ok, err := h.d.Structure.Channel(ctx, id)
+	if err != nil {
+		return ids.ID{}, nil, sourceError("structure source", err)
+	}
+	if !ok {
+		return ids.ID{}, nil, nil
+	}
+	return c.SpaceID, []ids.ID{c.EffectiveOperatorID}, nil
+}
+
+// hostTarget returns the holder of a host target (M2-39); none for an unknown host.
+func (h *RightsHook) hostTarget(ctx context.Context, id ids.ID) ([]ids.ID, error) {
+	f, ok, err := h.d.Hosts.Host(ctx, id)
+	if err != nil {
+		return nil, sourceError("host source", err)
+	}
+	if !ok {
+		return nil, nil
+	}
+	return []ids.ID{f.AssignedUserID}, nil
 }
 
 // channelsOfSpace returns the channels of space among chans and their effective operators.
