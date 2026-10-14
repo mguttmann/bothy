@@ -24,6 +24,7 @@ the assembly of `bothy serve` (M1-11). Only `cmd` imports it.
 | `authz.go` | catalogue start check (M1-25): `BuildRegistry` over the module `Register` functions (`Deps.Registrations` replaces them in tests), `RouteBindings`, `NewAuthzCatalog` (closed catalogue with `bothy.authz.errors`); every role checks routes and registrations before the routes are mounted, one ERROR line `registration check failed` per violation; `moduleRegistrations` holds `authz.Register` (`access.changed`, M1-29); `NewRightsHook` with `RightsSources` builds the rights hooks of authz (M1-29) |
 | `ratelimit.go`, `configkeys_ratelimit.go` | `RateLimitConfig`, `InstallRateLimits` and the start check (M1-19); the keys `ratelimit.*` |
 | `serve.go` | `Serve`, `ServeConfig`, `Deps`: start order and stop steps of `bothy serve` |
+| `setup.go` | `InstallSetupGate` and `RouteActions` (the setup gate over the instance row, M1-37); `Setup` (`NewSetup`, `BootstrapOwner`, `IssueRecoveryCode`, `Close`): the parts of the server `bothy setup` needs, as `bothy_app` |
 | `switchlog.go` | the process logger that follows the switch from stdout JSON to the telemetry logger |
 
 ## Serve assembly

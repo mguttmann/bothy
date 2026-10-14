@@ -161,11 +161,20 @@ func (stubServer) UnlinkIdentity(context.Context, rest.UnlinkIdentityRequestObje
 	return nil, nil
 }
 
+func (stubServer) RedeemEnrollmentCode(context.Context, rest.RedeemEnrollmentCodeRequestObject) (rest.RedeemEnrollmentCodeResponseObject, error) {
+	return nil, nil
+}
+
+func (stubServer) CreateEnrollmentCode(context.Context, rest.CreateEnrollmentCodeRequestObject) (rest.CreateEnrollmentCodeResponseObject, error) {
+	return nil, nil
+}
+
 // TestRealTable_Enabled pins the enabled operations (P-04) with action and rate-limit class
 // (AZ-P1): the three device reads of M1-33, the ten people, owner and self operations of M1-31
 // and the JWKS and the rotation of the signing keys (M1-32), the sessions (M1-34), the step-up
-// (M1-35), the providers and credentials (M1-36) and the API tokens (M1-44). A handler ticket
-// that enables an operation changes this test together with
+// (M1-35), the providers and credentials (M1-36), the API tokens (M1-44), the audit log (M1-50)
+// and the enrollment codes (M1-37). A handler ticket that enables an operation changes this test
+// together with
 // api/operations.yaml.
 func TestRealTable_Enabled(t *testing.T) {
 	type entry struct{ pattern, action, class string }
@@ -211,6 +220,9 @@ func TestRealTable_Enabled(t *testing.T) {
 		"listAuditEvents":   {"GET /api/v1/audit/events", "audit.read", "rl.admin"},
 		"exportAuditEvents": {"GET /api/v1/audit/export", "audit.read", "rl.admin"},
 		"verifyAuditChain":  {"POST /api/v1/audit/verify", "audit.verify", "rl.admin"},
+		// M1-37
+		"redeemEnrollmentCode": {"POST /api/v1/auth/enroll/redeem", "auth.login.complete", "rl.public_auth"},
+		"createEnrollmentCode": {"POST /api/v1/users/{user_id}/enrollment-codes", "user.update", "rl.admin"},
 	}
 	ops := routes.Enabled()
 	if len(ops) != len(want) {

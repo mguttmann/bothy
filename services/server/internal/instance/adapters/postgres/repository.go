@@ -5,6 +5,7 @@ package postgres
 import (
 	"context"
 	"errors"
+	"time"
 
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgtype"
@@ -69,6 +70,39 @@ func (r *Repository) LoadInstance(ctx context.Context) (instance.Record, bool, e
 	if err != nil {
 		return instance.Record{}, false, err
 	}
+	return toRecord(sqlcgen.LockInstanceRow(row)), true, nil
+}
+
+// LockInstance reads the instance row and locks it until the end of the unit of work
+// (app.Repository); it needs one, because the lock would end with an autocommit.
+func (r *Repository) LockInstance(ctx context.Context) (instance.Record, bool, error) {
+	tx, err := pg.Tx(ctx)
+	if err != nil {
+		return instance.Record{}, false, err
+	}
+	row, err := sqlcgen.New(tx).LockInstance(ctx)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return instance.Record{}, false, nil
+	}
+	if err != nil {
+		return instance.Record{}, false, err
+	}
+	return toRecord(row), true, nil
+}
+
+// CompleteSetup sets setup_completed_at = at unless it is set (app.Repository) and reports
+// whether the row changed; it needs a unit of work.
+func (r *Repository) CompleteSetup(ctx context.Context, at time.Time) (bool, error) {
+	tx, err := pg.Tx(ctx)
+	if err != nil {
+		return false, err
+	}
+	n, err := sqlcgen.New(tx).CompleteSetup(ctx, timestamptz(at))
+	return n == 1, err
+}
+
+// toRecord converts the columns of the instance row.
+func toRecord(row sqlcgen.LockInstanceRow) instance.Record {
 	rec := instance.Record{
 		InstanceID:       ids.ID(row.InstanceID.Bytes),
 		SchemaVersion:    row.SchemaVersion,
@@ -79,7 +113,7 @@ func (r *Repository) LoadInstance(ctx context.Context) (instance.Record, bool, e
 	if row.SetupCompletedAt.Valid {
 		rec.SetupCompletedAt = row.SetupCompletedAt.Time.UTC()
 	}
-	return rec, true, nil
+	return rec
 }
 
 // EnsureInstance inserts the row unless it exists (app.Repository).

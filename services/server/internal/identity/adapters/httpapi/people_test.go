@@ -305,7 +305,6 @@ func TestValidation(t *testing.T) {
 		{`{"handle":"other","display_name":"A","time_zone":"Mars/Olympus"}`, "/time_zone", 400},
 		{`{"handle":"other","display_name":"A","time_zone":"Local"}`, "/time_zone", 400},
 		{`{"handle":"other","display_name":"A","locale":"not a tag"}`, "/locale", 400},
-		{`{"handle":"other","display_name":"A","local_account":true}`, "/local_account", 400},
 	}
 	for _, c := range cases {
 		r := w.do("owner", http.MethodPost, usersPath, c.body, "")
@@ -330,5 +329,10 @@ func TestValidation(t *testing.T) {
 	}
 	if _, ok := d["enrollment"]; ok {
 		t.Fatal("enrollment without local_account")
+	}
+	// Without an enabled local provider a local account is refused (M1-37).
+	p := w.want(w.do("owner", http.MethodPost, usersPath, `{"handle":"robin","display_name":"Robin","local_account":true}`, ""), http.StatusConflict, "conflict")
+	if p["reason"] != "local_provider_disabled" {
+		t.Fatalf("reason %v, want local_provider_disabled", p["reason"])
 	}
 }

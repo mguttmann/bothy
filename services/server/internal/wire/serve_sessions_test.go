@@ -31,6 +31,7 @@ func TestServe_AuthenticatesPeople(t *testing.T) {
 	t.Parallel()
 	ctx := context.Background()
 	db := newServeDB(t)
+	completeSetup(t, db)
 	env := serveEnv(t, db)
 	p := start(t, wire.RoleAPI, env, wire.Deps{})
 	waitReadyz(t, p.waitInternal(t), http.StatusOK)

@@ -58,6 +58,15 @@ func newServeDB(t *testing.T) *pgtest.DB {
 	return db
 }
 
+// completeSetup sets instance.setup_completed_at as the schema owner, the state after bothy setup
+// bootstrap-owner, for tests of operations behind the setup gate (M1-37).
+func completeSetup(t *testing.T, db *pgtest.DB) {
+	t.Helper()
+	if _, err := db.Pool(t, pg.RoleOwner).Exec(context.Background(), `UPDATE instance SET setup_completed_at = now() WHERE id = 1`); err != nil {
+		t.Fatal(err)
+	}
+}
+
 // keyStores maps a database name of newServeDB to the key store its processes share.
 var keyStores sync.Map
 
@@ -274,6 +283,9 @@ func waitReadyz(t *testing.T, port int, code int) string {
 func TestServeRolesStartReadyAndStop(t *testing.T) {
 	t.Parallel()
 	db := newServeDB(t)
+	// Past the setup gate, so an unmatched path reaches the mux (before setup it is 503
+	// setup_required, TestServe_IDT06_SetupGate).
+	completeSetup(t, db)
 	for _, role := range []wire.Role{wire.RoleAPI, wire.RoleWorker, wire.RoleAll} {
 		t.Run(string(role), func(t *testing.T) {
 			t.Parallel()

@@ -379,8 +379,8 @@ Source: [08-identity.md](../spec/08-identity.md), section 18.
 | `auth.group_claim_max_age` | `BOTHY_AUTH__GROUP_CLAIM_MAX_AGE` | Server |  | `30d` | Expiry of memberships from group claims after the last login | planned (M1) |
 | `auth.idp_recheck_interval` | `BOTHY_AUTH__IDP_RECHECK_INTERVAL` | Server |  | `30d` | new login at the provider at the latest after this | planned (M1) |
 | `auth.trusted_header_bind_requests` | `BOTHY_AUTH__TRUSTED_HEADER_BIND_REQUESTS` | Server |  | `true` | every request must carry the same header login | planned (M1) |
-| `auth.enrollment_code_ttl` | `BOTHY_AUTH__ENROLLMENT_CODE_TTL` | Server |  | `72h` | Validity of an enrollment code | planned (M1) |
-| `auth.enrollment_code_max_attempts` | `BOTHY_AUTH__ENROLLMENT_CODE_MAX_ATTEMPTS` | Server |  | `5` | Failed attempts per enrollment code | planned (M1) |
+| `auth.enrollment_code_ttl` | `BOTHY_AUTH__ENROLLMENT_CODE_TTL` | Server | duration | `72h` | Validity of an enrollment code | active |
+| `auth.enrollment_code_max_attempts` | `BOTHY_AUTH__ENROLLMENT_CODE_MAX_ATTEMPTS` | Server | int | `5` | Failed attempts per enrollment code | active |
 | `auth.device_pending_ttl` | `BOTHY_AUTH__DEVICE_PENDING_TTL` | Server |  | `24h` | after this, a pending device is revoked | planned (M1) |
 | `auth.device_verification_code_digits` | `BOTHY_AUTH__DEVICE_VERIFICATION_CODE_DIGITS` | Server |  | `6` | Length of the verification code | planned (M1) |
 | `auth.pairing_code_ttl` | `BOTHY_AUTH__PAIRING_CODE_TTL` | Server |  | `5m` | Validity of a pairing code | planned (M1) |

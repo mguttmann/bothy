@@ -4,9 +4,9 @@
 
 -- name: InsertSession :exec
 INSERT INTO auth_sessions (id, user_id, device_id, client_component, parent_session_id, identity_id, auth_method,
-                           created_at, expires_at)
+                           created_at, expires_at, last_ip)
 VALUES (@id, @user_id, @device_id, @client_component, sqlc.narg(parent_session_id), sqlc.narg(identity_id),
-        @auth_method, @created_at, @expires_at);
+        @auth_method, @created_at, @expires_at, sqlc.narg(last_ip)::inet);
 
 -- name: GetSession :one
 SELECT * FROM auth_sessions WHERE id = @id;

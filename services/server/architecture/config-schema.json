@@ -194,6 +194,30 @@
       "doc": "Token kinds (agent, app, personal) whose API tokens must be DPoP-bound."
     },
     {
+      "name": "auth.enrollment_code_max_attempts",
+      "env": "BOTHY_AUTH__ENROLLMENT_CODE_MAX_ATTEMPTS",
+      "kind": "int",
+      "default": "5",
+      "required": false,
+      "enum": [],
+      "min": "1",
+      "max": "",
+      "chapter": "08-identity.md",
+      "doc": "Failed attempts with a matching enrollment code; then the code is invalid."
+    },
+    {
+      "name": "auth.enrollment_code_ttl",
+      "env": "BOTHY_AUTH__ENROLLMENT_CODE_TTL",
+      "kind": "duration",
+      "default": "72h",
+      "required": false,
+      "enum": [],
+      "min": "1m",
+      "max": "",
+      "chapter": "08-identity.md",
+      "doc": "Validity of an enrollment code from its issue."
+    },
+    {
       "name": "auth.login_fail_window",
       "env": "BOTHY_AUTH__LOGIN_FAIL_WINDOW",
       "kind": "duration",

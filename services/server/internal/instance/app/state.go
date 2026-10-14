@@ -5,6 +5,7 @@ package app
 import (
 	"context"
 	"fmt"
+	"time"
 
 	"github.com/OWNER/bothy/services/server/internal/instance"
 	"github.com/OWNER/bothy/services/server/internal/instance/domain"
@@ -64,4 +65,34 @@ func (s *state) RecordMigration(ctx context.Context, schemaVersion int64, minSer
 		return err
 	})
 	return rec, err
+}
+
+// LockForSetup implements instance.State: the row locked FOR UPDATE in the ambient unit of work.
+func (s *state) LockForSetup(ctx context.Context) (instance.Record, error) {
+	if !txn.InUnit(ctx) {
+		return instance.Record{}, errs.New(errs.CodeInternalError, "instance: LockForSetup needs a unit of work")
+	}
+	rec, found, err := s.repo.LockInstance(ctx)
+	if err != nil {
+		return instance.Record{}, err
+	}
+	if !found {
+		return instance.Record{}, errs.New(errs.CodeNotFound, `the instance row is missing; run "bothy migrate up"`)
+	}
+	return rec, nil
+}
+
+// CompleteSetup implements instance.State.
+func (s *state) CompleteSetup(ctx context.Context, at time.Time) error {
+	if !txn.InUnit(ctx) {
+		return errs.New(errs.CodeInternalError, "instance: CompleteSetup needs a unit of work")
+	}
+	changed, err := s.repo.CompleteSetup(ctx, at)
+	if err != nil {
+		return err
+	}
+	if !changed {
+		return errs.New(errs.CodeConflict, "instance: setup is already complete")
+	}
+	return nil
 }

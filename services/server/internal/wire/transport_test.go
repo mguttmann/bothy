@@ -110,6 +110,7 @@ func (p *process) waitPublic(t *testing.T) int {
 func TestServeTLSPublicListener(t *testing.T) {
 	t.Parallel()
 	db := newServeDB(t)
+	completeSetup(t, db)
 	env := serveEnv(t, db, "BOTHY_SERVER__PUBLIC_URL=https://127.0.0.1:8443", "BOTHY_HTTP__HSTS_MAX_AGE=600s",
 		"BOTHY_SERVER__TLS_CERT_REF=file:<secrets.dir>/tls_cert", "BOTHY_SERVER__TLS_KEY_REF=file:<secrets.dir>/tls_key")
 	pool := writeTLSPair(t, envValue(env, "BOTHY_SECRETS__DIR"))

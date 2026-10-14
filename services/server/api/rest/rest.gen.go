@@ -15505,6 +15505,12 @@ type ExportAuditEventsParams struct {
 	To Timestamp `form:"to" json:"to"`
 }
 
+// RedeemEnrollmentCodeParams defines parameters for RedeemEnrollmentCode.
+type RedeemEnrollmentCodeParams struct {
+	// DPoP DPoP proof (RFC 9449) signed with the device key that the new tokens will be bound to.
+	DPoP DpopProof `json:"DPoP"`
+}
+
 // RefreshTokenParams defines parameters for RefreshToken.
 type RefreshTokenParams struct {
 	// DPoP DPoP proof (RFC 9449) signed with the device key that the new tokens will be bound to.
@@ -15612,6 +15618,12 @@ type EnableUserParams struct {
 	IdempotencyKey *IdempotencyKey `json:"Idempotency-Key,omitempty"`
 }
 
+// CreateEnrollmentCodeParams defines parameters for CreateEnrollmentCode.
+type CreateEnrollmentCodeParams struct {
+	// IdempotencyKey UUIDv7 chosen by the client per logical operation. A repeat with the same request returns the stored response; a different request gives 422 `idempotency_key_reuse`; a repeat while the first is running gives 409 `request_in_progress`. Kept for `sync.idempotency_key_ttl`.
+	IdempotencyKey *IdempotencyKey `json:"Idempotency-Key,omitempty"`
+}
+
 // ListUserSessionsParams defines parameters for ListUserSessions.
 type ListUserSessionsParams struct {
 	// Cursor Cursor from `next_cursor` of the previous page.
@@ -15621,6 +15633,9 @@ type ListUserSessionsParams struct {
 
 // VerifyAuditChainJSONRequestBody defines body for VerifyAuditChain for application/json ContentType.
 type VerifyAuditChainJSONRequestBody = AuditVerifyRequest
+
+// RedeemEnrollmentCodeJSONRequestBody defines body for RedeemEnrollmentCode for application/json ContentType.
+type RedeemEnrollmentCodeJSONRequestBody = EnrollRedeemRequest
 
 // CompleteStepUpWithDeviceKeyJSONRequestBody defines body for CompleteStepUpWithDeviceKey for application/json ContentType.
 type CompleteStepUpWithDeviceKeyJSONRequestBody = StepUpDeviceKeyRequest
@@ -17573,6 +17588,9 @@ type ServerInterface interface {
 	// VerifyAuditChain Verify the hash chain
 	// (POST /audit/verify)
 	VerifyAuditChain(w http.ResponseWriter, r *http.Request)
+	// RedeemEnrollmentCode Redeem an enrollment code with device keys and log in
+	// (POST /auth/enroll/redeem)
+	RedeemEnrollmentCode(w http.ResponseWriter, r *http.Request, params RedeemEnrollmentCodeParams)
 	// Logout End the current session
 	// (POST /auth/logout)
 	Logout(w http.ResponseWriter, r *http.Request)
@@ -17666,6 +17684,9 @@ type ServerInterface interface {
 	// EnableUser Enable a person
 	// (POST /users/{user_id}/enable)
 	EnableUser(w http.ResponseWriter, r *http.Request, userId UserIdPath, params EnableUserParams)
+	// CreateEnrollmentCode Issue an enrollment code
+	// (POST /users/{user_id}/enrollment-codes)
+	CreateEnrollmentCode(w http.ResponseWriter, r *http.Request, userId UserIdPath, params CreateEnrollmentCodeParams)
 	// UnlinkIdentity Unlink an identity
 	// (DELETE /users/{user_id}/identities/{identity_id})
 	UnlinkIdentity(w http.ResponseWriter, r *http.Request, userId UserIdPath, identityId IdentityIdPath)
@@ -17871,6 +17892,51 @@ func (siw *ServerInterfaceWrapper) VerifyAuditChain(w http.ResponseWriter, r *ht
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		siw.Handler.VerifyAuditChain(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// RedeemEnrollmentCode operation middleware
+func (siw *ServerInterfaceWrapper) RedeemEnrollmentCode(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params RedeemEnrollmentCodeParams
+
+	headers := r.Header
+
+	// ------------- Required header parameter "DPoP" -------------
+	if valueList, found := headers[http.CanonicalHeaderKey("DPoP")]; found {
+		var DPoP DpopProof
+		n := len(valueList)
+		if n != 1 {
+			siw.ErrorHandlerFunc(w, r, &TooManyValuesForParamError{ParamName: "DPoP", Count: n})
+			return
+		}
+
+		err = runtime.BindStyledParameterWithOptions("simple", "DPoP", valueList[0], &DPoP, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: true, Type: "string", Format: ""})
+		if err != nil {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "DPoP", Err: err})
+			return
+		}
+
+		params.DPoP = DPoP
+
+	} else {
+		err := fmt.Errorf("Header parameter DPoP is required, but not found")
+		siw.ErrorHandlerFunc(w, r, &RequiredHeaderError{ParamName: "DPoP", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.RedeemEnrollmentCode(w, r, params)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -18936,6 +19002,56 @@ func (siw *ServerInterfaceWrapper) EnableUser(w http.ResponseWriter, r *http.Req
 	handler.ServeHTTP(w, r)
 }
 
+// CreateEnrollmentCode operation middleware
+func (siw *ServerInterfaceWrapper) CreateEnrollmentCode(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "user_id" -------------
+	var userId UserIdPath
+
+	err = runtime.BindStyledParameterWithOptions("simple", "user_id", r.PathValue("user_id"), &userId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "uuid", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "user_id", Err: err})
+		return
+	}
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params CreateEnrollmentCodeParams
+
+	headers := r.Header
+
+	// ------------- Optional header parameter "Idempotency-Key" -------------
+	if valueList, found := headers[http.CanonicalHeaderKey("Idempotency-Key")]; found {
+		var IdempotencyKey IdempotencyKey
+		n := len(valueList)
+		if n != 1 {
+			siw.ErrorHandlerFunc(w, r, &TooManyValuesForParamError{ParamName: "Idempotency-Key", Count: n})
+			return
+		}
+
+		err = runtime.BindStyledParameterWithOptions("simple", "Idempotency-Key", valueList[0], &IdempotencyKey, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: "uuid"})
+		if err != nil {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "Idempotency-Key", Err: err})
+			return
+		}
+
+		params.IdempotencyKey = &IdempotencyKey
+
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.CreateEnrollmentCode(w, r, userId, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
 // UnlinkIdentity operation middleware
 func (siw *ServerInterfaceWrapper) UnlinkIdentity(w http.ResponseWriter, r *http.Request) {
 
@@ -19147,6 +19263,7 @@ func HandlerWithOptions(si ServerInterface, options StdHTTPServerOptions) http.H
 	}
 
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/instance/jwks", wrapper.GetJwks)
+	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/auth/enroll/redeem", wrapper.RedeemEnrollmentCode)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/auth/token/refresh", wrapper.RefreshToken)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/auth/logout", wrapper.Logout)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/auth/step-up/challenge", wrapper.CreateStepUpChallenge)
@@ -19159,6 +19276,7 @@ func HandlerWithOptions(si ServerInterface, options StdHTTPServerOptions) http.H
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/users/{user_id}", wrapper.GetUser)
 	m.HandleFunc(http.MethodPatch+" "+options.BaseURL+"/users/{user_id}", wrapper.UpdateUser)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/users/{user_id}/enable", wrapper.EnableUser)
+	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/users/{user_id}/enrollment-codes", wrapper.CreateEnrollmentCode)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/users/{user_id}/credentials", wrapper.GetUserCredentials)
 	m.HandleFunc(http.MethodDelete+" "+options.BaseURL+"/users/{user_id}/identities/{identity_id}", wrapper.UnlinkIdentity)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/users/{user_id}/devices", wrapper.ListUserDevices)
@@ -19796,6 +19914,159 @@ type VerifyAuditChaindefaultApplicationProblemPlusJSONResponse struct {
 }
 
 func (response VerifyAuditChaindefaultApplicationProblemPlusJSONResponse) VisitVerifyAuditChainResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	if response.Headers.CorrelationId != nil {
+		w.Header().Set("Correlation-Id", fmt.Sprint(*response.Headers.CorrelationId))
+	}
+	w.WriteHeader(response.StatusCode)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type RedeemEnrollmentCodeRequestObject struct {
+	Params RedeemEnrollmentCodeParams
+	Body   *RedeemEnrollmentCodeJSONRequestBody
+}
+
+type RedeemEnrollmentCodeResponseObject interface {
+	VisitRedeemEnrollmentCodeResponse(w http.ResponseWriter) error
+}
+
+type RedeemEnrollmentCode201ResponseHeaders struct {
+	CorrelationId   *CorrelationId
+	RateLimit       *string
+	RateLimitPolicy *string
+}
+
+type RedeemEnrollmentCode201JSONResponse struct {
+	Body    TokenResponse
+	Headers RedeemEnrollmentCode201ResponseHeaders
+}
+
+func (response RedeemEnrollmentCode201JSONResponse) VisitRedeemEnrollmentCodeResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	if response.Headers.CorrelationId != nil {
+		w.Header().Set("Correlation-Id", fmt.Sprint(*response.Headers.CorrelationId))
+	}
+	if response.Headers.RateLimit != nil {
+		w.Header().Set("RateLimit", fmt.Sprint(*response.Headers.RateLimit))
+	}
+	if response.Headers.RateLimitPolicy != nil {
+		w.Header().Set("RateLimit-Policy", fmt.Sprint(*response.Headers.RateLimitPolicy))
+	}
+	w.WriteHeader(201)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type RedeemEnrollmentCode400ApplicationProblemPlusJSONResponse struct {
+	BadRequestApplicationProblemPlusJSONResponse
+}
+
+func (response RedeemEnrollmentCode400ApplicationProblemPlusJSONResponse) VisitRedeemEnrollmentCodeResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	if response.Headers.CorrelationId != nil {
+		w.Header().Set("Correlation-Id", fmt.Sprint(*response.Headers.CorrelationId))
+	}
+	w.WriteHeader(400)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type RedeemEnrollmentCode401ApplicationProblemPlusJSONResponse struct {
+	UnauthorizedApplicationProblemPlusJSONResponse
+}
+
+func (response RedeemEnrollmentCode401ApplicationProblemPlusJSONResponse) VisitRedeemEnrollmentCodeResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	if response.Headers.CorrelationId != nil {
+		w.Header().Set("Correlation-Id", fmt.Sprint(*response.Headers.CorrelationId))
+	}
+	if response.Headers.DPoPNonce != nil {
+		w.Header().Set("DPoP-Nonce", fmt.Sprint(*response.Headers.DPoPNonce))
+	}
+	if response.Headers.WWWAuthenticate != nil {
+		w.Header().Set("WWW-Authenticate", fmt.Sprint(*response.Headers.WWWAuthenticate))
+	}
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type RedeemEnrollmentCode409ApplicationProblemPlusJSONResponse struct {
+	ConflictApplicationProblemPlusJSONResponse
+}
+
+func (response RedeemEnrollmentCode409ApplicationProblemPlusJSONResponse) VisitRedeemEnrollmentCodeResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	if response.Headers.CorrelationId != nil {
+		w.Header().Set("Correlation-Id", fmt.Sprint(*response.Headers.CorrelationId))
+	}
+	w.WriteHeader(409)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type RedeemEnrollmentCode429ApplicationProblemPlusJSONResponse struct {
+	TooManyRequestsApplicationProblemPlusJSONResponse
+}
+
+func (response RedeemEnrollmentCode429ApplicationProblemPlusJSONResponse) VisitRedeemEnrollmentCodeResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	if response.Headers.CorrelationId != nil {
+		w.Header().Set("Correlation-Id", fmt.Sprint(*response.Headers.CorrelationId))
+	}
+	if response.Headers.RateLimit != nil {
+		w.Header().Set("RateLimit", fmt.Sprint(*response.Headers.RateLimit))
+	}
+	if response.Headers.RateLimitPolicy != nil {
+		w.Header().Set("RateLimit-Policy", fmt.Sprint(*response.Headers.RateLimitPolicy))
+	}
+	if response.Headers.RetryAfter != nil {
+		w.Header().Set("Retry-After", fmt.Sprint(*response.Headers.RetryAfter))
+	}
+	w.WriteHeader(429)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type RedeemEnrollmentCodedefaultApplicationProblemPlusJSONResponse struct {
+	Body       Problem
+	Headers    ErrorResponseHeaders
+	StatusCode int
+}
+
+func (response RedeemEnrollmentCodedefaultApplicationProblemPlusJSONResponse) VisitRedeemEnrollmentCodeResponse(w http.ResponseWriter) error {
 
 	var buf bytes.Buffer
 	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
@@ -24913,6 +25184,216 @@ func (response EnableUserdefaultApplicationProblemPlusJSONResponse) VisitEnableU
 	return err
 }
 
+type CreateEnrollmentCodeRequestObject struct {
+	UserId UserIdPath `json:"user_id"`
+	Params CreateEnrollmentCodeParams
+}
+
+type CreateEnrollmentCodeResponseObject interface {
+	VisitCreateEnrollmentCodeResponse(w http.ResponseWriter) error
+}
+
+type CreateEnrollmentCode201ResponseHeaders struct {
+	CorrelationId   *CorrelationId
+	RateLimit       *string
+	RateLimitPolicy *string
+}
+
+type CreateEnrollmentCode201JSONResponse struct {
+	Body    EnrollmentCode
+	Headers CreateEnrollmentCode201ResponseHeaders
+}
+
+func (response CreateEnrollmentCode201JSONResponse) VisitCreateEnrollmentCodeResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	if response.Headers.CorrelationId != nil {
+		w.Header().Set("Correlation-Id", fmt.Sprint(*response.Headers.CorrelationId))
+	}
+	if response.Headers.RateLimit != nil {
+		w.Header().Set("RateLimit", fmt.Sprint(*response.Headers.RateLimit))
+	}
+	if response.Headers.RateLimitPolicy != nil {
+		w.Header().Set("RateLimit-Policy", fmt.Sprint(*response.Headers.RateLimitPolicy))
+	}
+	w.WriteHeader(201)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type CreateEnrollmentCode400ApplicationProblemPlusJSONResponse struct {
+	BadRequestApplicationProblemPlusJSONResponse
+}
+
+func (response CreateEnrollmentCode400ApplicationProblemPlusJSONResponse) VisitCreateEnrollmentCodeResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	if response.Headers.CorrelationId != nil {
+		w.Header().Set("Correlation-Id", fmt.Sprint(*response.Headers.CorrelationId))
+	}
+	w.WriteHeader(400)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type CreateEnrollmentCode401ApplicationProblemPlusJSONResponse struct {
+	UnauthorizedApplicationProblemPlusJSONResponse
+}
+
+func (response CreateEnrollmentCode401ApplicationProblemPlusJSONResponse) VisitCreateEnrollmentCodeResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	if response.Headers.CorrelationId != nil {
+		w.Header().Set("Correlation-Id", fmt.Sprint(*response.Headers.CorrelationId))
+	}
+	if response.Headers.DPoPNonce != nil {
+		w.Header().Set("DPoP-Nonce", fmt.Sprint(*response.Headers.DPoPNonce))
+	}
+	if response.Headers.WWWAuthenticate != nil {
+		w.Header().Set("WWW-Authenticate", fmt.Sprint(*response.Headers.WWWAuthenticate))
+	}
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type CreateEnrollmentCode403ApplicationProblemPlusJSONResponse struct {
+	ForbiddenApplicationProblemPlusJSONResponse
+}
+
+func (response CreateEnrollmentCode403ApplicationProblemPlusJSONResponse) VisitCreateEnrollmentCodeResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	if response.Headers.CorrelationId != nil {
+		w.Header().Set("Correlation-Id", fmt.Sprint(*response.Headers.CorrelationId))
+	}
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type CreateEnrollmentCode404ApplicationProblemPlusJSONResponse struct {
+	NotFoundApplicationProblemPlusJSONResponse
+}
+
+func (response CreateEnrollmentCode404ApplicationProblemPlusJSONResponse) VisitCreateEnrollmentCodeResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	if response.Headers.CorrelationId != nil {
+		w.Header().Set("Correlation-Id", fmt.Sprint(*response.Headers.CorrelationId))
+	}
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type CreateEnrollmentCode409ApplicationProblemPlusJSONResponse struct {
+	ConflictApplicationProblemPlusJSONResponse
+}
+
+func (response CreateEnrollmentCode409ApplicationProblemPlusJSONResponse) VisitCreateEnrollmentCodeResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	if response.Headers.CorrelationId != nil {
+		w.Header().Set("Correlation-Id", fmt.Sprint(*response.Headers.CorrelationId))
+	}
+	w.WriteHeader(409)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type CreateEnrollmentCode422ApplicationProblemPlusJSONResponse struct {
+	UnprocessableEntityApplicationProblemPlusJSONResponse
+}
+
+func (response CreateEnrollmentCode422ApplicationProblemPlusJSONResponse) VisitCreateEnrollmentCodeResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	if response.Headers.CorrelationId != nil {
+		w.Header().Set("Correlation-Id", fmt.Sprint(*response.Headers.CorrelationId))
+	}
+	w.WriteHeader(422)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type CreateEnrollmentCode429ApplicationProblemPlusJSONResponse struct {
+	TooManyRequestsApplicationProblemPlusJSONResponse
+}
+
+func (response CreateEnrollmentCode429ApplicationProblemPlusJSONResponse) VisitCreateEnrollmentCodeResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	if response.Headers.CorrelationId != nil {
+		w.Header().Set("Correlation-Id", fmt.Sprint(*response.Headers.CorrelationId))
+	}
+	if response.Headers.RateLimit != nil {
+		w.Header().Set("RateLimit", fmt.Sprint(*response.Headers.RateLimit))
+	}
+	if response.Headers.RateLimitPolicy != nil {
+		w.Header().Set("RateLimit-Policy", fmt.Sprint(*response.Headers.RateLimitPolicy))
+	}
+	if response.Headers.RetryAfter != nil {
+		w.Header().Set("Retry-After", fmt.Sprint(*response.Headers.RetryAfter))
+	}
+	w.WriteHeader(429)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type CreateEnrollmentCodedefaultApplicationProblemPlusJSONResponse struct {
+	Body       Problem
+	Headers    ErrorResponseHeaders
+	StatusCode int
+}
+
+func (response CreateEnrollmentCodedefaultApplicationProblemPlusJSONResponse) VisitCreateEnrollmentCodeResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	if response.Headers.CorrelationId != nil {
+		w.Header().Set("Correlation-Id", fmt.Sprint(*response.Headers.CorrelationId))
+	}
+	w.WriteHeader(response.StatusCode)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
 type UnlinkIdentityRequestObject struct {
 	UserId     UserIdPath     `json:"user_id"`
 	IdentityId IdentityIdPath `json:"identity_id"`
@@ -25279,6 +25760,9 @@ type StrictServerInterface interface {
 	// VerifyAuditChain Verify the hash chain
 	// (POST /audit/verify)
 	VerifyAuditChain(ctx context.Context, request VerifyAuditChainRequestObject) (VerifyAuditChainResponseObject, error)
+	// RedeemEnrollmentCode Redeem an enrollment code with device keys and log in
+	// (POST /auth/enroll/redeem)
+	RedeemEnrollmentCode(ctx context.Context, request RedeemEnrollmentCodeRequestObject) (RedeemEnrollmentCodeResponseObject, error)
 	// Logout End the current session
 	// (POST /auth/logout)
 	Logout(ctx context.Context, request LogoutRequestObject) (LogoutResponseObject, error)
@@ -25372,6 +25856,9 @@ type StrictServerInterface interface {
 	// EnableUser Enable a person
 	// (POST /users/{user_id}/enable)
 	EnableUser(ctx context.Context, request EnableUserRequestObject) (EnableUserResponseObject, error)
+	// CreateEnrollmentCode Issue an enrollment code
+	// (POST /users/{user_id}/enrollment-codes)
+	CreateEnrollmentCode(ctx context.Context, request CreateEnrollmentCodeRequestObject) (CreateEnrollmentCodeResponseObject, error)
 	// UnlinkIdentity Unlink an identity
 	// (DELETE /users/{user_id}/identities/{identity_id})
 	UnlinkIdentity(ctx context.Context, request UnlinkIdentityRequestObject) (UnlinkIdentityResponseObject, error)
@@ -25495,6 +25982,39 @@ func (sh *strictHandler) VerifyAuditChain(w http.ResponseWriter, r *http.Request
 		sh.options.ResponseErrorHandlerFunc(w, r, err)
 	} else if validResponse, ok := response.(VerifyAuditChainResponseObject); ok {
 		if err := validResponse.VisitVerifyAuditChainResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// RedeemEnrollmentCode operation middleware
+func (sh *strictHandler) RedeemEnrollmentCode(w http.ResponseWriter, r *http.Request, params RedeemEnrollmentCodeParams) {
+	var request RedeemEnrollmentCodeRequestObject
+
+	request.Params = params
+
+	var body RedeemEnrollmentCodeJSONRequestBody
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
+		return
+	}
+	request.Body = &body
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.RedeemEnrollmentCode(ctx, request.(RedeemEnrollmentCodeRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "RedeemEnrollmentCode")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(RedeemEnrollmentCodeResponseObject); ok {
+		if err := validResponse.VisitRedeemEnrollmentCodeResponse(w); err != nil {
 			sh.options.ResponseErrorHandlerFunc(w, r, err)
 		}
 	} else if response != nil {
@@ -26381,6 +26901,33 @@ func (sh *strictHandler) EnableUser(w http.ResponseWriter, r *http.Request, user
 		sh.options.ResponseErrorHandlerFunc(w, r, err)
 	} else if validResponse, ok := response.(EnableUserResponseObject); ok {
 		if err := validResponse.VisitEnableUserResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// CreateEnrollmentCode operation middleware
+func (sh *strictHandler) CreateEnrollmentCode(w http.ResponseWriter, r *http.Request, userId UserIdPath, params CreateEnrollmentCodeParams) {
+	var request CreateEnrollmentCodeRequestObject
+
+	request.UserId = userId
+	request.Params = params
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.CreateEnrollmentCode(ctx, request.(CreateEnrollmentCodeRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "CreateEnrollmentCode")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(CreateEnrollmentCodeResponseObject); ok {
+		if err := validResponse.VisitCreateEnrollmentCodeResponse(w); err != nil {
 			sh.options.ResponseErrorHandlerFunc(w, r, err)
 		}
 	} else if response != nil {

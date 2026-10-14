@@ -16,3 +16,13 @@ ON CONFLICT (id) DO NOTHING;
 UPDATE instance
 SET schema_version = sqlc.arg(schema_version)::bigint, min_server_version = sqlc.arg(min_server_version)::text
 WHERE id = 1 AND schema_version <= sqlc.arg(schema_version)::bigint;
+
+-- name: LockInstance :one
+-- bothy setup (M1-37): the row locked until the end of the unit of work, so two setups serialise.
+-- bothy_app may lock it through its column right UPDATE (setup_completed_at).
+SELECT instance_id, setup_completed_at, schema_version, min_server_version, sync_epoch, created_at
+FROM instance WHERE id = 1 FOR UPDATE;
+
+-- name: CompleteSetup :execrows
+-- Sets setup_completed_at once; a set value never changes (setup never reverts).
+UPDATE instance SET setup_completed_at = sqlc.arg(at)::timestamptz WHERE id = 1 AND setup_completed_at IS NULL;

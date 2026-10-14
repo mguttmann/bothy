@@ -65,6 +65,8 @@ type Handlers struct {
 	*identityhttp.Credentials
 	// Tokens implements listTokens, createToken and revokeToken (identity, M1-44).
 	*identityhttp.Tokens
+	// Enrollment implements redeemEnrollmentCode and createEnrollmentCode (identity, M1-37).
+	*identityhttp.Enrollment
 }
 
 // routeBuilder builds and verifies the routes of one REST surface against a catalogue with the

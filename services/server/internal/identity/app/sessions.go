@@ -141,7 +141,7 @@ func (s *Sessions) StartSession(ctx context.Context, in identity.StartSession) (
 		now := s.d.Clock.Now()
 		sess := SessionRecord{
 			ID: ids.New(), UserID: in.UserID, DeviceID: in.DeviceID, Component: identity.ComponentApp, AuthMethod: in.AuthMethod,
-			CreatedAt: now, ExpiresAt: now.Add(s.cfg.SessionMaxAge),
+			CreatedAt: now, ExpiresAt: now.Add(s.cfg.SessionMaxAge), LastIP: in.ClientIP,
 		}
 		if in.IdentityID != nil {
 			sess.IdentityID = *in.IdentityID
