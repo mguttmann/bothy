@@ -44,6 +44,9 @@ from pathlib import Path
 README = Path("docs/briefs/README.md")
 PLAN = Path("docs/PLAN.md")
 MAKEFILE = Path("Makefile")
+# Mermaid renders at most this many edges per diagram (its default `maxEdges`); the graph is
+# split into one block per milestone of the dependent tickets to stay below it.
+MAX_GRAPH_EDGES = 500
 
 _ID = re.compile(r"M\d-\d\d")
 _FENCE = re.compile(r"^\s*(`{3,}|~{3,})")
@@ -306,6 +309,13 @@ def check(root: Path) -> list[str]:
     )
     if shown != sorted(_edges(index.deps)):
         problems.append(f"{README}: graph edges differ from the index (run --write)")
+    for n, block in enumerate(readme[start:end].split("```mermaid")[1:], start=1):
+        count = sum(1 for line in block.split("```")[0].splitlines() if _EDGE.match(line))
+        if count > MAX_GRAPH_EDGES:
+            problems.append(
+                f"{README}: graph block {n} has {count} edges, above the edge limit "
+                f"{MAX_GRAPH_EDGES} of Mermaid (run --write)"
+            )
     plan = _plan_deps((root / PLAN).read_text(encoding="utf-8"), index.deps)
     for tid, ds in index.deps.items():
         if tid not in plan:
@@ -380,12 +390,29 @@ def write(root: Path) -> None:
     text = text[:start] + body + text[end:]
     start, end = _section(text, "Dependency graph")
     body = text[start:end]
-    lines = [ln for ln in body.splitlines() if not _EDGE.match(ln)]
-    close = max(i for i, ln in enumerate(lines) if ln.strip() == "```")
-    edges = [f"  {a.replace('-', '_')} --> {b.replace('-', '_')}" for a, b in _edges(index.deps)]
-    lines[close:close] = edges
-    text = text[:start] + "\n".join(lines) + ("\n" if body.endswith("\n") else "") + text[end:]
+    intro = body.split("```mermaid", 1)[0].split("\nTickets of M", 1)[0].rstrip("\n")
+    rest = text[end:]
+    graph = render_graph(index.deps) + ("\n" if rest else "")
+    text = text[:start] + intro + "\n\n" + graph + rest
     path.write_text(text, encoding="utf-8")
+
+
+def render_graph(deps: dict[str, list[str]]) -> str:
+    """Render one Mermaid block per milestone of the dependent tickets (MAX_GRAPH_EDGES)."""
+
+    def node(tid: str) -> str:
+        return tid.replace("-", "_")
+
+    out = []
+    for milestone in sorted({tid[:2] for tid in deps}):
+        tickets = sorted(t for t in deps if t[:2] == milestone)
+        edges = [(d, t) for d, t in _edges(deps) if t[:2] == milestone]
+        nodes = sorted(set(tickets) | {d for d, _ in edges})
+        lines = [f"Tickets of {milestone}:", "", "```mermaid", "flowchart TB"]
+        lines += [f'  {node(n)}["{n}"]' for n in nodes]
+        lines += [f"  {node(d)} --> {node(t)}" for d, t in edges]
+        out.append("\n".join([*lines, "```", ""]))
+    return "\n".join(out)
 
 
 def main(argv: list[str] | None = None) -> int:
