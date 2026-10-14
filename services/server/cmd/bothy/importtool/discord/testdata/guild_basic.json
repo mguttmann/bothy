@@ -1,0 +1,100 @@
+{
+  "me": {"id": "13000002", "username": "import-bot", "global_name": null, "bot": true},
+  "guild": {
+    "id": "13000001",
+    "name": "Example Workshop",
+    "roles": [
+      {"id": "13000001", "name": "@everyone"},
+      {"id": "13000021", "name": "Maintainers"}
+    ]
+  },
+  "channels": [
+    {"id": "13000101", "type": 4, "guild_id": "13000001", "name": "Projects", "position": 0, "permission_overwrites": []},
+    {"id": "13000102", "type": 4, "guild_id": "13000001", "name": "Community", "position": 1, "permission_overwrites": [{"id": "13000021", "type": 0, "allow": "1024", "deny": "0"}]},
+    {"id": "13000103", "type": 0, "guild_id": "13000001", "parent_id": "13000101", "name": "general", "position": 0, "topic": "Everyday talk", "last_message_id": "13001012", "permission_overwrites": []},
+    {"id": "13000104", "type": 5, "guild_id": "13000001", "parent_id": "13000102", "name": "news", "position": 1, "topic": null, "last_message_id": null, "permission_overwrites": []},
+    {"id": "13000105", "type": 15, "guild_id": "13000001", "parent_id": "13000101", "name": "support", "position": 2, "permission_overwrites": [],
+     "available_tags": [
+       {"id": "13000201", "name": "open", "emoji_id": null, "emoji_name": null},
+       {"id": "13000202", "name": "done", "emoji_id": null, "emoji_name": "✅"}
+     ]},
+    {"id": "13000106", "type": 2, "guild_id": "13000001", "parent_id": "13000102", "name": "lounge", "position": 3, "permission_overwrites": []},
+    {"id": "13000107", "type": 0, "guild_id": "13000001", "parent_id": null, "name": "random", "position": 4, "permission_overwrites": []}
+  ],
+  "active_threads": [
+    {"id": "13001001", "type": 11, "guild_id": "13000001", "parent_id": "13000103", "owner_id": "13000011", "name": "Release planning", "last_message_id": "13002002",
+     "thread_metadata": {"archived": false, "archive_timestamp": "2026-03-10T09:00:00.000000+00:00", "locked": false}},
+    {"id": "13000302", "type": 11, "guild_id": "13000001", "parent_id": "13000105", "owner_id": "13000012", "name": "Login fails on the second device", "applied_tags": ["13000201"],
+     "thread_metadata": {"archived": false, "archive_timestamp": "2026-03-09T12:00:00.000000+00:00", "locked": false}}
+  ],
+  "archived_public": {
+    "13000103": [
+      {"has_more": true, "threads": [
+        {"id": "13000311", "type": 11, "guild_id": "13000001", "parent_id": "13000103", "owner_id": "13000011", "name": "Old idea one", "thread_metadata": {"archived": true, "archive_timestamp": "2026-03-05T10:00:00.000000+00:00", "locked": false}},
+        {"id": "13000312", "type": 11, "guild_id": "13000001", "parent_id": "13000103", "owner_id": "13000012", "name": "Old idea two", "thread_metadata": {"archived": true, "archive_timestamp": "2026-03-04T10:00:00.000000+00:00", "locked": false}}
+      ]},
+      {"has_more": true, "threads": [
+        {"id": "13000312", "type": 11, "guild_id": "13000001", "parent_id": "13000103", "owner_id": "13000012", "name": "Old idea two", "thread_metadata": {"archived": true, "archive_timestamp": "2026-03-04T10:00:00.000000+00:00", "locked": false}},
+        {"id": "13000313", "type": 11, "guild_id": "13000001", "parent_id": "13000103", "owner_id": "13000013", "name": "Old idea three", "thread_metadata": {"archived": true, "archive_timestamp": "2026-03-03T10:00:00.000000+00:00", "locked": true}}
+      ]},
+      {"has_more": true, "threads": [
+        {"id": "13000314", "type": 11, "guild_id": "13000001", "parent_id": "13000103", "owner_id": "13000011", "name": "Old idea four", "thread_metadata": {"archived": true, "archive_timestamp": "2026-03-02T10:00:00.000000+00:00", "locked": false}}
+      ]}
+    ],
+    "13000105": [
+      {"has_more": false, "threads": [
+        {"id": "13000321", "type": 11, "guild_id": "13000001", "parent_id": "13000105", "owner_id": "13000013", "name": "Export to a spreadsheet", "applied_tags": ["13000202"], "thread_metadata": {"archived": true, "archive_timestamp": "2026-02-20T08:30:00.000000+00:00", "locked": false}}
+      ]}
+    ]
+  },
+  "messages": {
+    "13000103": [
+      {"id": "13001001", "channel_id": "13000103", "type": 0, "author": {"id": "13000011", "username": "alex", "global_name": "Alex", "bot": false},
+       "content": "Shall we plan the next release?", "timestamp": "2026-03-01T09:00:00.000000+00:00", "edited_timestamp": null, "pinned": true, "mentions": [],
+       "reactions": [{"count": 2, "emoji": {"id": null, "name": "👍"}}],
+       "thread": {"id": "13001001", "type": 11, "guild_id": "13000001", "parent_id": "13000103", "name": "Release planning", "thread_metadata": {"archived": false, "archive_timestamp": "2026-03-10T09:00:00.000000+00:00", "locked": false}}},
+      {"id": "13001002", "channel_id": "13000103", "type": 19, "author": {"id": "13000012", "username": "sam", "global_name": "Sam", "bot": false},
+       "content": "Yes, next week works for me.", "timestamp": "2026-03-01T09:05:00.000000+00:00", "edited_timestamp": "2026-03-01T09:06:00.000000+00:00", "pinned": false,
+       "mentions": [{"id": "13000011", "username": "alex", "global_name": "Alex", "bot": false}],
+       "message_reference": {"type": 0, "message_id": "13001001", "channel_id": "13000103", "guild_id": "13000001"}},
+      {"id": "13001003", "channel_id": "13000103", "type": 20, "author": {"id": "13000016", "username": "helper-bot", "global_name": null, "bot": true},
+       "content": "Build 42 passed.", "timestamp": "2026-03-01T09:10:00.000000+00:00", "pinned": false, "mentions": []},
+      {"id": "13001004", "channel_id": "13000103", "type": 0, "author": {"id": "13000013", "username": "robin", "global_name": "Robin", "bot": false},
+       "content": "Notes attached.", "timestamp": "2026-03-01T09:15:00.000000+00:00", "pinned": false, "mentions": [],
+       "attachments": [{"id": "13005001", "filename": "notes.txt", "size": 1234, "content_type": "text/plain; charset=utf-8",
+         "url": "https://cdn.example.com/attachments/13000103/13005001/notes.txt?ex=69a1b2c3&is=69a0b1c2&hm=1f2e3d4c5b6a79881f2e3d4c5b6a79881f2e3d4c5b6a79881f2e3d4c5b6a7988&",
+         "proxy_url": "https://media.example.com/attachments/13000103/13005001/notes.txt?ex=69a1b2c3&is=69a0b1c2&hm=1f2e3d4c5b6a79881f2e3d4c5b6a79881f2e3d4c5b6a79881f2e3d4c5b6a7988&"}]},
+      {"id": "13001005", "channel_id": "13000103", "type": 0, "author": {"id": "13000014", "username": "Deploy hook", "global_name": null, "bot": true},
+       "webhook_id": "13000015", "content": "", "timestamp": "2026-03-01T09:20:00.000000+00:00", "pinned": false, "mentions": [],
+       "embeds": [{"type": "rich", "title": "Deployment finished", "description": "Version 1.2.0 is live.", "url": "https://example.com/deployments/7"}]},
+      {"id": "13001006", "channel_id": "13000103", "type": 0, "author": {"id": "13000012", "username": "sam", "global_name": "Sam", "bot": false},
+       "content": "", "timestamp": "2026-03-01T09:25:00.000000+00:00", "pinned": false, "mentions": [],
+       "sticker_items": [{"id": "13006001", "name": "thumbs up", "format_type": 1}]},
+      {"id": "13001007", "channel_id": "13000103", "type": 0, "author": {"id": "13000011", "username": "alex", "global_name": "Alex", "bot": false},
+       "content": "", "timestamp": "2026-03-01T09:30:00.000000+00:00", "pinned": false, "mentions": [],
+       "poll": {"question": {"text": "Release on Monday or Tuesday?"}, "answers": [{"answer_id": 1, "poll_media": {"text": "Monday"}}, {"answer_id": 2, "poll_media": {"text": "Tuesday"}}]}},
+      {"id": "13001008", "channel_id": "13000103", "type": 0, "author": {"id": "13000013", "username": "robin", "global_name": "Robin", "bot": false},
+       "content": "", "timestamp": "2026-03-01T09:35:00.000000+00:00", "pinned": false, "mentions": [],
+       "message_reference": {"type": 1, "message_id": "13009001", "channel_id": "13000107", "guild_id": "13000001"},
+       "message_snapshots": [{"message": {"type": 0, "content": "Forwarded checklist", "timestamp": "2026-02-28T17:00:00.000000+00:00", "edited_timestamp": null, "attachments": [], "embeds": [], "sticker_items": []}}]},
+      {"id": "13001009", "channel_id": "13000103", "type": 6, "author": {"id": "13000011", "username": "alex", "global_name": "Alex", "bot": false},
+       "content": "", "timestamp": "2026-03-01T09:40:00.000000+00:00", "pinned": false, "mentions": [],
+       "message_reference": {"type": 0, "message_id": "13001001", "channel_id": "13000103", "guild_id": "13000001"}},
+      {"id": "13001010", "channel_id": "13000103", "type": 23, "author": {"id": "13000016", "username": "helper-bot", "global_name": null, "bot": true},
+       "content": "Translated: good morning", "timestamp": "2026-03-01T09:45:00.000000+00:00", "pinned": false, "mentions": []},
+      {"id": "13001011", "channel_id": "13000103", "type": 18, "author": {"id": "13000012", "username": "sam", "global_name": "Sam", "bot": false},
+       "content": "Deployment questions", "timestamp": "2026-03-01T09:50:00.000000+00:00", "pinned": false, "mentions": []},
+      {"id": "13001012", "channel_id": "13000103", "type": 0, "author": {"id": "13000013", "username": "robin", "global_name": "Robin", "bot": false},
+       "content": "See you on Monday.", "timestamp": "2026-03-01T09:55:00.000000+00:00", "pinned": false, "mentions": [],
+       "reactions": [{"count": 1, "emoji": {"id": "13007001", "name": "party"}}]}
+    ],
+    "13001001": [
+      {"id": "13002001", "channel_id": "13001001", "type": 21, "author": {"id": "13000011", "username": "alex", "global_name": "Alex", "bot": false},
+       "content": "", "timestamp": "2026-03-01T09:00:01.000000+00:00", "pinned": false, "mentions": [],
+       "message_reference": {"type": 0, "message_id": "13001001", "channel_id": "13000103", "guild_id": "13000001"}},
+      {"id": "13002002", "channel_id": "13001001", "type": 0, "author": {"id": "13000012", "username": "sam", "global_name": "Sam", "bot": false},
+       "content": "I will draft the notes.", "timestamp": "2026-03-01T10:00:00.000000+00:00", "pinned": false, "mentions": []}
+    ],
+    "13000107": []
+  }
+}
