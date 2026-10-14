@@ -91,7 +91,7 @@ Only this module writes and reads these tables by SQL (03-data-model.md, princip
 
 ## Actions (05-actions.md)
 
-`instance.discovery.read`, `instance.read`, `instance.settings.read`, `instance.settings.update`, `instance.branding.update`, `feature_flag.read`, `feature_flag.update`, `signing_key.rotate`, `signing_key.transition`.
+`instance.discovery.read`, `console.csp_report`, `instance.read`, `instance.settings.read`, `instance.settings.update`, `instance.branding.update`, `feature_flag.read`, `feature_flag.update`, `signing_key.rotate`, `signing_key.transition`.
 
 ## Events and WebSocket ops
 

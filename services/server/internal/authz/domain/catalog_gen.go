@@ -7,6 +7,7 @@ package domain
 // actionSpecs are the actions of the catalogue by id.
 var actionSpecs = map[string]ActionSpec{
 	"access.explain":               {ID: "access.explain", Resources: []string{"space", "channel"}, Right: "owner or manage", Audit: "no", RateLimitClass: "rl.read", Effect: "read"},
+	"access.hints.read":            {ID: "access.hints.read", Resources: []string{"instance", "space"}, Right: "owner or manage", Audit: "no", RateLimitClass: "rl.read", Effect: "read"},
 	"access.preview":               {ID: "access.preview", Resources: []string{}, Right: "permission of the target action", OwnerAsTarget: true, Audit: "no", RateLimitClass: "rl.admin", Effect: "write"},
 	"access.view_as":               {ID: "access.view_as", Resources: []string{"user"}, Right: "owner", Owner: true, StepUp: true, Audit: "yes", RateLimitClass: "rl.admin", Effect: "write"},
 	"access.view_as.end":           {ID: "access.view_as.end", Resources: []string{"auth_session"}, Right: "self", Audit: "yes", RateLimitClass: "rl.admin", Effect: "write"},
@@ -59,6 +60,7 @@ var actionSpecs = map[string]ActionSpec{
 	"command.register":             {ID: "command.register", Resources: []string{"command"}, Right: "agent-self or app-self with scope", Audit: "yes", RateLimitClass: "rl.admin", Effect: "write", AppScope: "commands:write"},
 	"command.remove":               {ID: "command.remove", Resources: []string{"command"}, Right: "agent-self or app-self with scope", Audit: "yes", RateLimitClass: "rl.admin", Effect: "write", AppScope: "commands:write"},
 	"component.update":             {ID: "component.update", Resources: []string{"component"}, Right: "author of the message (agent-self or app-self)", Audit: "no", RateLimitClass: "rl.write", Effect: "write", AppScope: "components:write"},
+	"console.csp_report":           {ID: "console.csp_report", Resources: []string{"instance"}, Right: "public", Audit: "no", RateLimitClass: "rl.public_auth", Effect: "read"},
 	"cost.read.aggregate":          {ID: "cost.read.aggregate", Resources: []string{"instance", "space", "agent"}, Right: "owner; space with manage", Audit: "no", RateLimitClass: "rl.read", Effect: "read"},
 	"cost.read.thread":             {ID: "cost.read.thread", Resources: []string{"thread"}, Right: "read", Audit: "no", RateLimitClass: "rl.read", Effect: "read"},
 	"cost.reconcile":               {ID: "cost.reconcile", Resources: []string{"instance"}, Right: "owner", Owner: true, StepUp: true, Audit: "yes", RateLimitClass: "rl.admin", Effect: "write"},
@@ -217,6 +219,7 @@ var actionSpecs = map[string]ActionSpec{
 // actionIDs are the ids of actionSpecs, sorted ascending.
 var actionIDs = []string{
 	"access.explain",
+	"access.hints.read",
 	"access.preview",
 	"access.view_as",
 	"access.view_as.end",
@@ -269,6 +272,7 @@ var actionIDs = []string{
 	"command.register",
 	"command.remove",
 	"component.update",
+	"console.csp_report",
 	"cost.read.aggregate",
 	"cost.read.thread",
 	"cost.reconcile",

@@ -164,6 +164,11 @@ operated, and the order of the build.
   device E2E and performance, terminal with extra keys bar and its E2E) in the brief index with
   waves and graph and in the site navigation; make target `e2e-mobile` in the table of targets
   created by tickets (D-W-120, D-W-122).
+- Build briefs of milestone M6 for the web console (app, CSP, administration, statistics view,
+  permission hints, apps and webhooks, instance settings, visualizations in all apps, optional
+  Grafana embedding, terminal) in the brief index with waves and graph and in the site
+  navigation; make target `console-e2e` in the table of targets created by tickets; core contract
+  actions `console.csp_report` (R-AZ-33) and `access.hints.read` (R-AZ-34) (D-W-120, D-W-123).
 
 - Gate `register-check` (`tools/doccheck/register_check.py`): the module register
   `services/server/architecture/modules.yaml` must equal the tables and their modules in

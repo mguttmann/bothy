@@ -73,6 +73,7 @@ rules:
       enum:
         # BEGIN GENERATED: authz_actions (make catalog)
         - access.explain
+        - access.hints.read
         - access.preview
         - access.view_as
         - access.view_as.end
@@ -125,6 +126,7 @@ rules:
         - command.register
         - command.remove
         - component.update
+        - console.csp_report
         - cost.read.aggregate
         - cost.read.thread
         - cost.reconcile
@@ -330,6 +332,7 @@ rules:
       enum: &receive_actions
         # BEGIN GENERATED: receive_actions (make catalog)
         - access.explain
+        - access.hints.read
         - access.preview
         - access.view_as
         - access.view_as.end
@@ -382,6 +385,7 @@ rules:
         - command.register
         - command.remove
         - component.update
+        - console.csp_report
         - cost.read.aggregate
         - cost.read.thread
         - cost.reconcile
