@@ -91,9 +91,9 @@ the waves before it are merged; many can start earlier, as soon as their own dep
 | 7 | M1-14, M1-15, M1-18, M1-23, M1-26, M4-14 |
 | 8 | M1-16, M1-19, M1-21, M1-24, M1-25, M1-27, M4-17 |
 | 9 | M1-20, M1-28, M2-01, M4-18 |
-| 10 | M1-29, M1-32, M1-33, M4-19 |
-| 11 | M1-30, M1-31, M1-34 |
-| 12 | M1-35 |
+| 10 | M1-29, M1-32, M1-33, M4-19, M4-25 |
+| 11 | M1-30, M1-31, M1-34, M4-20, M4-26 |
+| 12 | M1-35, M4-27, M4-29 |
 | 13 | M1-36, M1-44, M1-50 |
 | 14 | M1-37, M1-45, M1-46, M1-48, M1-51, M2-24 |
 | 15 | M1-38, M1-39, M1-40, M1-41, M1-43, M1-47, M1-49, M1-52, M2-39 |
@@ -108,17 +108,18 @@ the waves before it are merged; many can start earlier, as soon as their own dep
 | 24 | M1-66, M1-70, M1-72, M2-07 |
 | 25 | M1-67, M1-68, M2-20 |
 | 26 | M1-69, M2-21, M2-43 |
-| 27 | M1-73, M2-02, M2-44, M3-03 |
+| 27 | M1-73, M2-02, M2-44, M3-03, M4-28 |
 | 28 | M2-03, M2-04, M2-45, M2-47, M3-04 |
 | 29 | M2-05, M2-46, M3-05, M3-06 |
-| 30 | M2-06, M2-27, M2-48, M3-10, M3-11 |
+| 30 | M2-06, M2-27, M2-48, M3-10, M3-11, M4-22 |
 | 31 | M2-08 |
 | 32 | M2-09, M2-16 |
 | 33 | M2-10, M2-12, M2-14, M2-15, M2-17, M2-18, M2-19, M3-19 |
 | 34 | M2-11, M2-22, M2-25, M2-29, M3-20, M3-21, M3-23 |
 | 35 | M2-13, M2-28, M2-30, M2-33, M2-34, M3-07, M3-24 |
 | 36 | M2-31, M2-35, M2-49, M3-08, M3-14, M3-22 |
-| 37 | M2-36, M2-37, M2-50, M3-09, M3-12, M3-15, M3-16 |
+| 37 | M2-36, M2-37, M2-50, M3-09, M3-12, M3-15, M3-16, M4-21, M4-23 |
+| 38 | M4-24 |
 
 ## Index
 
@@ -296,6 +297,16 @@ names listed here.
 | 8 | M4-17 | Fake server for integration tests | `M4-17-fake-server.md` | M4-14, M4-15, M4-16 |
 | 9 | M4-18 | Desktop app shell | `M4-18-desktop-shell.md` | M4-07, M4-11, M4-17 |
 | 10 | M4-19 | Sidebar, spaces, channels and post list | `M4-19-sidebar-post-list.md` | M4-18 |
+| 11 | M4-20 | Thread view, input and message actions | `M4-20-thread-view.md` | M4-19 |
+| 37 | M4-21 | Live box, trigger state, follow-ups, components and commands | `M4-21-agent-interface.md` | M4-20, M2-31 |
+| 30 | M4-22 | Files, images and voice messages on the desktop | `M4-22-files-desktop.md` | M4-20, M3-05 |
+| 37 | M4-23 | Search, quick switcher, mentions and Running now | `M4-23-search-switcher.md` | M4-20, M3-14 |
+| 38 | M4-24 | Keyboard shortcuts and focus order | `M4-24-shortcuts-focus.md` | M4-21, M4-23 |
+| 10 | M4-25 | Settings, devices and sessions on the desktop | `M4-25-settings-devices.md` | M4-18 |
+| 11 | M4-26 | Administration: people, groups and devices | `M4-26-admin-people.md` | M4-25 |
+| 12 | M4-27 | Administration: grant wizard, Who has access, View as person | `M4-27-admin-grants.md` | M4-26 |
+| 27 | M4-28 | Administration: agents, backend switch, costs and tokens | `M4-28-admin-agents.md` | M4-27, M2-21 |
+| 12 | M4-29 | Administration: audit view | `M4-29-admin-audit.md` | M4-26 |
 
 ## Make targets created by tickets
 
@@ -504,6 +515,16 @@ flowchart TB
   M4_17["M4-17"]
   M4_18["M4-18"]
   M4_19["M4-19"]
+  M4_20["M4-20"]
+  M4_21["M4-21"]
+  M4_22["M4-22"]
+  M4_23["M4-23"]
+  M4_24["M4-24"]
+  M4_25["M4-25"]
+  M4_26["M4-26"]
+  M4_27["M4-27"]
+  M4_28["M4-28"]
+  M4_29["M4-29"]
   M1_02 --> M1_03
   M1_01 --> M1_04
   M1_01 --> M1_05
@@ -784,4 +805,19 @@ flowchart TB
   M4_11 --> M4_18
   M4_17 --> M4_18
   M4_18 --> M4_19
+  M4_19 --> M4_20
+  M2_31 --> M4_21
+  M4_20 --> M4_21
+  M3_05 --> M4_22
+  M4_20 --> M4_22
+  M3_14 --> M4_23
+  M4_20 --> M4_23
+  M4_21 --> M4_24
+  M4_23 --> M4_24
+  M4_18 --> M4_25
+  M4_25 --> M4_26
+  M4_26 --> M4_27
+  M2_21 --> M4_28
+  M4_27 --> M4_28
+  M4_26 --> M4_29
 ```

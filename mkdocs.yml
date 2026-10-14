@@ -362,3 +362,13 @@ nav:
           - "M4-17: Fake server for integration tests": briefs/M4-17-fake-server.md
           - "M4-18: Desktop app shell": briefs/M4-18-desktop-shell.md
           - "M4-19: Sidebar, spaces, channels and post list": briefs/M4-19-sidebar-post-list.md
+          - "M4-20: Thread view, input and message actions": briefs/M4-20-thread-view.md
+          - "M4-21: Live box, trigger state, follow-ups, components and commands": briefs/M4-21-agent-interface.md
+          - "M4-22: Files, images and voice messages on the desktop": briefs/M4-22-files-desktop.md
+          - "M4-23: Search, quick switcher, mentions and Running now": briefs/M4-23-search-switcher.md
+          - "M4-24: Keyboard shortcuts and focus order": briefs/M4-24-shortcuts-focus.md
+          - "M4-25: Settings, devices and sessions on the desktop": briefs/M4-25-settings-devices.md
+          - "M4-26: Administration: people, groups and devices": briefs/M4-26-admin-people.md
+          - "M4-27: Administration: grant wizard, Who has access, View as person": briefs/M4-27-admin-grants.md
+          - "M4-28: Administration: agents, backend switch, costs and tokens": briefs/M4-28-admin-agents.md
+          - "M4-29: Administration: audit view": briefs/M4-29-admin-audit.md
