@@ -2,11 +2,15 @@
 """Tests for the model split and the CSS and Dart emitters."""
 
 import json
+import re
 import tempfile
 import unittest
 from pathlib import Path
 
-from tokenkit import emit_css, emit_dart, emit_docs, model
+import tokens
+from tokenkit import accents, emit_css, emit_dart, emit_docs, model
+
+ROOT = Path(__file__).resolve().parents[3]
 
 
 def _write(path: Path, data) -> None:
@@ -114,6 +118,64 @@ class DartTest(unittest.TestCase):
 
     def test_translucent_colour_literal(self):
         self.assertEqual(emit_dart.color_literal("#08191c", 0.48), "Color(0x7A08191C)")
+
+
+class AccentOutputTest(unittest.TestCase):
+    @classmethod
+    def setUpClass(cls):
+        cls.model = model.build(ROOT / "design" / "tokens" / "theme.resolver.json")
+        cls.rules = json.loads((ROOT / "design" / "design-rules.json").read_text(encoding="utf-8"))
+        cls.variants = accents.derive(cls.model.full["theme"], cls.rules)
+        member = cls.rules["accent_variants"]
+        cls.others = [a for a in member["accents"] if a != member["default"]]
+
+    def test_dart_has_accent_extension(self):
+        text = emit_dart.render(self.model, "HEADER", self.variants, "spruce")
+        self.assertIn("final class DsAccent extends ThemeExtension<DsAccent> {", text)
+        for accent in self.others:
+            for theme in ("light", "dark"):
+                name = theme + accent[:1].upper() + accent[1:]
+                self.assertEqual(text.count(f"  static const DsAccent {name} = DsAccent("), 1, name)
+        self.assertIn("static DsAccent of(String key, Brightness brightness) {", text)
+        self.assertIn("'loch' => dark ? darkLoch : lightLoch,", text)
+        self.assertIn("_ => dark ? darkSpruce : lightSpruce,", text)
+        for field in ("accentBg", "accentBgHover", "accentBgPressed", "accentFg", "accentSubtle"):
+            self.assertIn(f"  final Color {field};", text)
+        for field in ("textLink", "focusRing", "runRunning"):
+            self.assertIn(f"  final Color {field};", text)
+        self.assertIn("DsAccent copyWith({", text)
+        self.assertIn("DsAccent lerp(covariant ThemeExtension<DsAccent>? other, double t) {", text)
+        # DsColors keeps its fields, so existing code compiles.
+        self.assertIn("  final Color accentBg;", text.split("final class DsAccent")[0])
+
+    def test_css_accent_blocks(self):
+        text = emit_css.render(self.model, "HEADER", self.variants, "spruce")
+        self.assertNotIn('[data-accent="spruce"]', text)
+        for accent in self.others:
+            for theme in ("light", "dark"):
+                swapped = {emit_css.var_name(role) for role, v in self.variants[(theme, accent)].items() if v.swapped}
+                selector = re.escape(f'[data-accent="{accent}"][data-theme="{theme}"]')
+                match = re.search(selector + r"[^{]*\{([^}]*)\}", text)
+                self.assertIsNotNone(match, f"{accent} {theme}")
+                names = set(re.findall(r"(--ds-[a-z0-9-]+):", match.group(1)))
+                self.assertEqual(names, swapped, f"{accent} {theme}")
+        self.assertIn('[data-accent="loch"]:not([data-theme])', text)
+        self.assertNotIn(
+            "--ds-color-focus-ring:", text.split('[data-accent="loch"][data-theme="dark"]')[1].split("}")[0]
+        )
+
+    def test_resolved_json_accents(self):
+        data = json.loads(tokens._resolved_json(self.model, self.variants, "spruce"))
+        section = data["accents"]
+        self.assertEqual(section["default"], "spruce")
+        self.assertEqual(list(section["variants"]), self.rules["accent_variants"]["accents"])
+        loch = section["variants"]["loch"]["light"]["color.accent.bg"]
+        self.assertEqual(set(loch), {"hex", "alias", "moved_from", "swapped"})
+        self.assertTrue(loch["alias"].startswith("palette.loch."))
+        kept = section["variants"]["loch"]["dark"]["color.focus.ring"]
+        self.assertEqual((kept["alias"], kept["swapped"]), ("palette.gorse.300", False))
+        base = data["contexts"]["theme"]["light"]["color.accent.bg"]["value"]
+        self.assertEqual(section["variants"]["spruce"]["light"]["color.accent.bg"]["hex"], base)
 
 
 if __name__ == "__main__":

@@ -55,6 +55,13 @@ jedem `build` und `check`; der Rest ist Teil der Review-Liste in [components.md]
 | Status als Reaktion, Status als Emoji | Studie B: Status-Emoji waren der alte Behelf | Auslöser-Status ist ein Feld (`trigger_state`) mit eigenen Icons |
 | Schwebende Karten, Willkommens-Banner, Terminal-Optik, Brutalismus | Studie B | Review |
 
+Guard scope of the instance accent (M4-03): the guard "Marke und Akzent" (scope `palette.spruce.`,
+`color.accent.`) protects the product's own brand and checks the base roles only. The accent
+variants of an instance are not checked against it, because chapter 01 section 12 deliberately
+allows `heather`, `rowan` and `amber` as the instance owner's choice from the checked palette,
+while the product brand stays spruce; contrast applies to the variants in full. The guard "Keine
+Discord-Nähe in der ganzen Palette" covers every scale and so every variant.
+
 ## Namensherkunft
 
 Der Arbeitsname **Bothy** ist das schottische Wort für eine einfache, offene Schutzhütte, die
@@ -134,5 +141,20 @@ Eine Instanz kann Produktname, Logo und Akzent einstellen (`branding.*`, ADR 004
 kein freier Farbwert, sondern ein Schlüssel aus `category.*` (Standard `spruce`), weil nur diese
 Kombinationen den Kontrast-Test bestehen. Wählt eine Instanz einen anderen Akzent, tauscht die App
 die Rollen `color.accent.*`, `color.text.link`, `color.focus.ring` und `color.run.running` gegen
-die gleich hellen Stufen der gewählten Leiter. Diese Varianten erzeugt der Generator in einer
-späteren Ausbaustufe als eigene Kontexte und prüft sie mit (Ticket "Akzent-Varianten").
+die gleich hellen Stufen der gewählten Leiter.
+
+The generator builds these variants (M4-03). The member `accent_variants` of
+`design/design-rules.json` names the allowed accents (`spruce`, `loch`, `heather`, `rowan`,
+`amber`, `gorse`, `moss`; default `spruce`) and the swapped roles. Per theme a role is swapped only
+where it aliases a step of `palette.spruce`; it then takes the same step of the chosen scale, or
+the nearest step by number when the scale lacks it (a tie goes darker in light, lighter in dark).
+Every other role keeps its value: in dark, `color.focus.ring` aliases `gorse` and stays, and so do
+the sidebar, the text on the accent and the category colours. If a variant fails a contrast
+pairing of the rules file, it moves one step at a time along its scale towards more contrast until
+every pairing passes; if no step passes, `build` and `check` fail. Every pairing that contains a
+swapped role is checked for every accent in light and dark and listed in
+[contrast.md](contrast.md), moved steps marked. The outputs: the Dart extension `DsAccent` (one
+constant per theme and accent, `DsAccent.of(key, brightness)`, an unknown key gives `spruce`),
+blocks `[data-accent="<key>"]` in `tokens.css` (on the same element as `data-theme`) and the member
+`accents` of `tokens.resolved.json`. The default accent equals the base roles exactly. The preview
+shows the default accent only.

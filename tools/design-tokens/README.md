@@ -32,9 +32,9 @@ uv run --project tools --locked check-jsonschema --schemafile https://www.design
 
 | Datei | Inhalt |
 |---|---|
-| `design/build/tokens.css` | CSS-Variablen `--ds-*`; Theme über `data-theme` oder `prefers-color-scheme`, Dichte über `data-density`, Bewegung über `data-motion` oder `prefers-reduced-motion` |
-| `design/build/dart/design_tokens.g.dart` | `DsPalette`, `DsColors`, `DsElevation`, `DsDensity`, `DsMotion` (je `ThemeExtension` mit Instanzen je Kontext), `DsSpace`, `DsRadius`, `DsBorderWidth`, `DsLayout`, `DsSize`, `DsIconSize`, `DsFonts`, `DsType`, `DsIcons` |
-| `design/build/tokens.resolved.json` | alle Tokens aufgelöst, je Kontext, plus Icon-Zuordnung und erlaubte Bereichs-Icons |
+| `design/build/tokens.css` | CSS-Variablen `--ds-*`; Theme über `data-theme` oder `prefers-color-scheme`, Dichte über `data-density`, Bewegung über `data-motion` oder `prefers-reduced-motion`; instance accent over `data-accent="<key>"` on the same element as `data-theme` (only the swapped variables, per non-default accent and theme) |
+| `design/build/dart/design_tokens.g.dart` | `DsPalette`, `DsColors`, `DsAccent`, `DsElevation`, `DsDensity`, `DsMotion` (je `ThemeExtension` mit Instanzen je Kontext; `DsAccent` with one constant per theme and accent and `DsAccent.of(key, brightness)`, an unknown key gives the default), `DsSpace`, `DsRadius`, `DsBorderWidth`, `DsLayout`, `DsSize`, `DsIconSize`, `DsFonts`, `DsType`, `DsIcons` |
+| `design/build/tokens.resolved.json` | alle Tokens aufgelöst, je Kontext, plus Icon-Zuordnung und erlaubte Bereichs-Icons; member `accents`: default and, per accent and theme, every accent role with `hex`, `alias`, `moved_from` and `swapped` |
 | `design/build/preview.html` | eigenständige Vorschau mit eingebetteten Schriften und Icons |
 | `design/build/README.md` | Hinweis "generiert" |
 | `docs/design/palette.md`, `contrast.md`, `tokens.md` | erzeugte Doku |
@@ -52,6 +52,13 @@ der benutzten Flutter-Typen; gegen das echte Flutter-SDK ist sie noch nicht übe
    `text` 4.5, `large-text` 3, `ui` 3 (WCAG 2.2 SC 1.4.3 und 1.4.11). Luminanz nach WCAG mit der
    Schwelle 0.04045 der sRGB-Norm (https://www.w3.org/WAI/GL/wiki/Relative_luminance, abgerufen
    2026-10-10).
+   Accent variants (`tokenkit/accents.py`, member `accent_variants` of
+   `design/design-rules.json`): for every allowed accent and theme, each role that aliases a step
+   of the default scale takes the same step of the chosen scale (nearest step by number if it is
+   missing); a step that fails a pairing moves along the scale towards more contrast. Every
+   pairing that contains a swapped role is checked per accent and theme with the same
+   thresholds; a variant below them, or a scale without a passing step, fails `build` and `check`.
+   An invalid member (default not an accent, accent not a scale, role missing) is an error (exit 2).
 3. **Palettenwächter:** verbotene Referenzfarben (OKLab-Abstand), verbotene Farbtonbereiche,
    Mindest-Chroma für Neutrale. Regeln und Quellen stehen in `design/design-rules.json`.
 4. **Aktualität:** `check` vergleicht jede erzeugte Datei Byte für Byte.
@@ -66,6 +73,9 @@ der benutzten Flutter-Typen; gegen das echte Flutter-SDK ist sie noch nicht übe
 - Farbräume: `oklch` und `srgb` werden gerechnet; andere Farbräume brauchen `hex` als Rückfall.
 - Ein Token darf nur von einem Modifikator abhängen; sonst bricht `build` ab (die Ausgaben wären
   nicht eindeutig).
+- The instance accent is no resolver modifier: an accent role always depends on the theme as
+  well, which the rule above forbids. The variants are derived from the theme contexts and written
+  as the separate extension `DsAccent` and separate CSS blocks.
 
 ## vendor/
 

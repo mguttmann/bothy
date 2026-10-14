@@ -1233,6 +1233,8 @@ Regeln:
 - `branding.accent_color` ist ein Schlüssel aus den Kategorie-Farben (`spruce`, `loch`, `heather`,
   `rowan`, `amber`, `gorse`, `moss`), kein freier Farbwert; nur diese Kombinationen sind im
   Kontrast-Test (03, `instance_settings`; Schema in der Konfigurationsreferenz).
+  Every variant of these accents, in light and dark, is in the contrast table
+  ([contrast.md](../design/contrast.md)); the design generator fails when one falls below AA.
 - Ohne eigene Build-Konfiguration baut das Repo eine neutrale Fassung mit dem Arbeitsnamen und
   Platzhalter-IDs unter `example.com`.
 - Das Logo wird als Datei hochgeladen und nur über den Server ausgeliefert; die App fällt auf das

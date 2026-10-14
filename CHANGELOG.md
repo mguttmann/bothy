@@ -20,6 +20,11 @@ Planning stage (milestone M0). Nothing is installable yet.
 
 ### Added
 
+- Design tokens: accent variants for every instance accent of `branding.accent_color` in light and
+  dark. The generator swaps the accent roles for the same step of the chosen scale, moves a
+  failing step, checks every pairing with a swapped role and writes `DsAccent` (Dart),
+  `data-accent` blocks (`tokens.css`), the member `accents` of `tokens.resolved.json` and one
+  section per accent and theme in `docs/design/contrast.md`; `make tokens` fails below AA (M4-03).
 - Host service module `services/host` (own `VERSION` and `CHANGELOG.md`) and the Dart package
   `packages/bothy_noise` with the Noise core of the terminal (M2-38); the gates, CI and CodeQL
   cover both.

@@ -26,7 +26,7 @@ from pathlib import Path
 HERE = Path(__file__).resolve().parent
 sys.path.insert(0, str(HERE))
 
-from tokenkit import dtcg, emit_css, emit_dart, emit_docs, emit_preview, model, rules  # noqa: E402
+from tokenkit import accents, dtcg, emit_css, emit_dart, emit_docs, emit_preview, model, rules  # noqa: E402
 
 ROOT = HERE.parents[1]
 RESOLVER = ROOT / "design" / "tokens" / "theme.resolver.json"
@@ -52,7 +52,20 @@ PREVIEWS = [
 ]
 
 
-def _resolved_json(m: model.Model) -> str:
+def _accents_json(variants: dict, default: str) -> dict:
+    """Member `accents` of tokens.resolved.json: accent -> theme -> role -> hex, alias, moved_from, swapped."""
+    out: dict = {}
+    for (theme, accent), roles in variants.items():
+        out.setdefault(accent, {})[theme] = {
+            role: {"hex": v.hex, "alias": v.alias, "moved_from": v.moved_from, "swapped": v.swapped}
+            for role, v in roles.items()
+        }
+    return {"default": default, "variants": out}
+
+
+def _resolved_json(m: model.Model, variants: dict | None = None, default: str = "") -> str:
+    """The file tokens.resolved.json; `variants` and `default` add the member `accents`."""
+
     def value(token: dtcg.Token):
         if token.type == "color":
             alpha = dtcg.color_alpha(token.value)
@@ -72,6 +85,8 @@ def _resolved_json(m: model.Model) -> str:
         },
         "icons": emit_dart.icon_extension(m),
     }
+    if variants:
+        data["accents"] = _accents_json(variants, default)
     return json.dumps(data, indent=2, ensure_ascii=False) + "\n"
 
 
@@ -97,6 +112,13 @@ def generate() -> tuple[dict[Path, str], list[str]]:
     rule_data = json.loads(RULES.read_text(encoding="utf-8"))
     themes = m.full["theme"]
     rows = rules.check_contrast(themes, rule_data["contrast_pairs"])
+    default = rule_data.get("accent_variants", {}).get("default", "")
+    try:
+        variants = accents.derive(themes, rule_data)
+        accent_problems: list[str] = []
+    except accents.AccentContrastError as exc:
+        variants, accent_problems = {}, [str(exc)]
+    accent_rows = rules.check_accent_contrast(themes, rule_data["contrast_pairs"], variants, default)
     guard_problems: list[str] = []
     for ctx, tokens in themes.items():
         guard_problems += [f"[{ctx}] {p}" for p in rules.check_guards(tokens, rule_data["palette_guards"])]
@@ -104,15 +126,21 @@ def generate() -> tuple[dict[Path, str], list[str]]:
         f"[{r.theme}] {r.fg} on {r.bg}: {r.ratio:.2f} < {r.required} ({r.fg_hex} on {r.bg_hex})"
         for r in rows
         if not r.passed
-    ] + guard_problems
+    ]
+    problems += [
+        f"[{r.theme}, accent {r.accent}] {r.fg} on {r.bg}: {r.ratio:.2f} < {r.required} ({r.fg_hex} on {r.bg_hex})"
+        for r in accent_rows
+        if not r.passed
+    ]
+    problems += accent_problems + guard_problems
     outputs = {
         BUILD / "README.md": _build_readme(),
-        BUILD / "tokens.css": emit_css.render(m, HEADER),
-        BUILD / "dart" / "design_tokens.g.dart": emit_dart.render(m, HEADER),
-        BUILD / "tokens.resolved.json": _resolved_json(m),
+        BUILD / "tokens.css": emit_css.render(m, HEADER, variants, default),
+        BUILD / "dart" / "design_tokens.g.dart": emit_dart.render(m, HEADER, variants, default),
+        BUILD / "tokens.resolved.json": _resolved_json(m, variants, default),
         BUILD / "preview.html": emit_preview.render(m, VENDOR, HEADER),
         DOCS / "palette.md": emit_docs.palette_md(m, HEADER),
-        DOCS / "contrast.md": emit_docs.contrast_md(rows, guard_problems, HEADER),
+        DOCS / "contrast.md": emit_docs.contrast_md(rows, guard_problems, HEADER, accent_rows, variants, default),
         DOCS / "tokens.md": emit_docs.tokens_md(m, HEADER),
     }
     return outputs, problems

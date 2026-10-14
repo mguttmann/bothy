@@ -17,6 +17,10 @@ Gemeinsame Regeln für alle Komponenten:
   im Web als ARIA). Labels kommen aus `packages/l10n`, nie aus Daten des Agenten allein.
 - **Farbe nie allein:** Zustände unterscheiden sich in Icon-Form und Text.
 - **Bewegung** nur über `motion.*`; im Kontext `reduced` keine Bewegung.
+- **Accent roles from `DsAccent`:** components read `color.accent.*`, `color.text.link`,
+  `color.focus.ring` and `color.run.running` only from the theme extension `DsAccent` (Dart) or the
+  `--ds-*` variables under `data-accent` (web), never from `DsColors`, so the instance accent
+  (`branding.accent_color`) applies everywhere. Every variant is in [contrast.md](contrast.md).
 
 ## 1. Nachricht
 

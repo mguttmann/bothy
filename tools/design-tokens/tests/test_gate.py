@@ -70,6 +70,43 @@ class CheckGateTest(unittest.TestCase):
         self.assertEqual(proc.returncode, 1)
         self.assertIn("gate: [light] color.text.primary on color.surface.canvas: 1.00 < 4.5", proc.stderr)
 
+    def test_check_fails_when_accent_output_stale(self):
+        dart = self.root / "design" / "build" / "dart" / "design_tokens.g.dart"
+        text = dart.read_text(encoding="utf-8")
+        head, _, tail = text.partition("  static const DsAccent lightLoch = DsAccent(")
+        self.assertTrue(tail, "lightLoch constant missing")
+        first = tail.index("Color(0xFF") + len("Color(0xFF")
+        changed = tail[:first] + ("000000" if tail[first : first + 6] != "000000" else "FFFFFF") + tail[first + 6 :]
+        dart.write_text(head + "  static const DsAccent lightLoch = DsAccent(" + changed, encoding="utf-8")
+        proc = self._check()
+        self.assertEqual(proc.returncode, 1)
+        self.assertIn("stale: design/build/dart/design_tokens.g.dart", proc.stderr)
+
+    def test_build_fails_below_aa_for_accent(self):
+        # A flat mid-grey scale as an extra accent: no step reaches 4.5:1 against light or dark text.
+        def add_flat_scale(data):
+            grey = {"colorSpace": "srgb", "components": [0.55, 0.55, 0.55]}
+            data["palette"]["fog"] = {step: {"$value": grey} for step in ("50", "300", "500", "700", "900", "950")}
+
+        def add_accent(data):
+            data["accent_variants"]["accents"].append("fog")
+
+        self._edit_json("design/tokens/color.palette.tokens.json", add_flat_scale)
+        self._edit_json("design/design-rules.json", add_accent)
+        before = {p: p.read_bytes() for p in (self.root / "design" / "build").rglob("*") if p.is_file()}
+        before |= {p: p.read_bytes() for p in (self.root / "docs" / "design").glob("*.md")}
+        proc = subprocess.run(
+            [sys.executable, str(self.root / "tools" / "design-tokens" / "tokens.py"), "build"],
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+        self.assertEqual(proc.returncode, 1, proc.stderr)
+        self.assertIn("accent fog, theme light: no step of fog meets ", proc.stderr)
+        self.assertNotIn("[light] ", proc.stderr)
+        after = {p: p.read_bytes() for p in before}
+        self.assertEqual(after, before)
+
     def test_changed_vendor_file_fails(self):
         # The incident class: a line-ending rewrite of a vendored text file.
         license_file = self.root / "tools" / "design-tokens" / "vendor" / "phosphor" / "LICENSE"

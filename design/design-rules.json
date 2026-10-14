@@ -67,6 +67,12 @@
      "fg": ["color.category.spruce.fg", "color.category.loch.fg", "color.category.heather.fg", "color.category.rowan.fg", "color.category.amber.fg", "color.category.gorse.fg", "color.category.moss.fg", "color.category.granite.fg"],
      "bg": ["color.surface.canvas", "color.surface.list", "color.surface.overlay"]}
   ],
+  "accent_variants": {
+    "$comment": "Accents an instance may choose (branding.accent_color, 01 section 12). Roles that alias palette.spruce are swapped for the same step of the chosen scale; every pairing with a swapped role is checked per accent and theme.",
+    "default": "spruce",
+    "accents": ["spruce", "loch", "heather", "rowan", "amber", "gorse", "moss"],
+    "roles": ["color.accent.bg", "color.accent.bg-hover", "color.accent.bg-pressed", "color.accent.fg", "color.accent.subtle", "color.text.link", "color.focus.ring", "color.run.running"]
+  },
   "palette_guards": [
     {
       "name": "Marke und Akzent",

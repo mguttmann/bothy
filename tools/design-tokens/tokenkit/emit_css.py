@@ -6,6 +6,9 @@ Selection rules:
   (`prefers-color-scheme`) decides.
 - Density: `data-density="comfortable|compact|touch"`.
 - Motion: `data-motion="full|reduced"` wins; without it `prefers-reduced-motion` decides.
+- Accent: `data-accent="<key>"` on the same element as `data-theme` (the root) swaps the accent
+  roles for each non-default accent; without `data-theme` the system setting picks the theme of
+  the variant, as for the base roles. The default accent needs no attribute.
 """
 
 from __future__ import annotations
@@ -113,7 +116,47 @@ def _block(selector: str, tokens: dict[str, dtcg.Token], indent: str = "") -> st
     return "\n".join(lines)
 
 
-def render(model: Model, header: str) -> str:
+def _decl_block(selector: str, decls: list[tuple[str, str]], indent: str = "") -> str:
+    lines = [f"{indent}{selector} {{"]
+    lines += [f"{indent}  {name}: {val};" for name, val in sorted(decls)]
+    lines.append(f"{indent}}}")
+    return "\n".join(lines)
+
+
+def accent_blocks(variants: dict[tuple[str, str], dict], default: str, default_theme: str) -> list[str]:
+    """CSS blocks of every non-default accent: only the swapped `--ds-*` variables per theme.
+
+    Args:
+        variants: `accents.derive` output, (theme, accent) -> role -> Variant.
+        default: the default accent (no block; the base roles are its values).
+        default_theme: theme that applies without `data-theme` and without a system preference.
+
+    Returns:
+        Blocks in accent order: the default theme, the other theme, then the
+        `prefers-color-scheme` block for an element without `data-theme`.
+    """
+    out: list[str] = []
+    accent_keys = list(dict.fromkeys(accent for _, accent in variants))
+    themes = list(dict.fromkeys(theme for theme, _ in variants))
+    for accent in accent_keys:
+        if accent == default:
+            continue
+        sel = f'[data-accent="{accent}"]'
+        for theme in sorted(themes, key=lambda t: t != default_theme):
+            decls = [(var_name(role), v.hex) for role, v in variants[(theme, accent)].items() if v.swapped]
+            if theme == default_theme:
+                out.append(_decl_block(f'{sel}:not([data-theme]), {sel}[data-theme="{theme}"]', decls))
+            else:
+                out.append(_decl_block(f'{sel}[data-theme="{theme}"]', decls))
+                media = _decl_block(f"{sel}:not([data-theme])", decls, indent="  ")
+                out.append(f"@media (prefers-color-scheme: {theme}) {{\n{media}\n}}")
+    return out
+
+
+def render(
+    model: Model, header: str, variants: dict[tuple[str, str], dict] | None = None, default_accent: str | None = None
+) -> str:
+    """The file `tokens.css`; `variants` and `default_accent` add the `data-accent` blocks."""
     out = [f"/* {header} */", ""]
     out.append(_block(":root", model.base))
     theme = model.contexts.get("theme", {})
@@ -129,6 +172,9 @@ def render(model: Model, header: str) -> str:
         out.append(f"@media (prefers-color-scheme: {media}) {{")
         out.append(_block(":root:not([data-theme])", theme[other], indent="  "))
         out.append("}")
+        for block in accent_blocks(variants or {}, default_accent or "", default):
+            out.append("")
+            out.append(block)
     for name in ("density", "motion"):
         ctxs = model.contexts.get(name, {})
         if not ctxs:

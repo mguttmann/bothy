@@ -2815,5 +2815,724 @@
       "robot",
       "gear-six"
     ]
+  },
+  "accents": {
+    "default": "spruce",
+    "variants": {
+      "spruce": {
+        "light": {
+          "color.accent.bg": {
+            "hex": "#136f69",
+            "alias": "palette.spruce.700",
+            "moved_from": null,
+            "swapped": true
+          },
+          "color.accent.bg-hover": {
+            "hex": "#0c5450",
+            "alias": "palette.spruce.800",
+            "moved_from": null,
+            "swapped": true
+          },
+          "color.accent.bg-pressed": {
+            "hex": "#063b38",
+            "alias": "palette.spruce.900",
+            "moved_from": null,
+            "swapped": true
+          },
+          "color.accent.fg": {
+            "hex": "#136f69",
+            "alias": "palette.spruce.700",
+            "moved_from": null,
+            "swapped": true
+          },
+          "color.accent.subtle": {
+            "hex": "#e4fbf8",
+            "alias": "palette.spruce.50",
+            "moved_from": null,
+            "swapped": true
+          },
+          "color.text.link": {
+            "hex": "#136f69",
+            "alias": "palette.spruce.700",
+            "moved_from": null,
+            "swapped": true
+          },
+          "color.focus.ring": {
+            "hex": "#1b8a83",
+            "alias": "palette.spruce.600",
+            "moved_from": null,
+            "swapped": true
+          },
+          "color.run.running": {
+            "hex": "#1b8a83",
+            "alias": "palette.spruce.600",
+            "moved_from": null,
+            "swapped": true
+          }
+        },
+        "dark": {
+          "color.accent.bg": {
+            "hex": "#49c0b7",
+            "alias": "palette.spruce.400",
+            "moved_from": null,
+            "swapped": true
+          },
+          "color.accent.bg-hover": {
+            "hex": "#7cd5cd",
+            "alias": "palette.spruce.300",
+            "moved_from": null,
+            "swapped": true
+          },
+          "color.accent.bg-pressed": {
+            "hex": "#a8e8e1",
+            "alias": "palette.spruce.200",
+            "moved_from": null,
+            "swapped": true
+          },
+          "color.accent.fg": {
+            "hex": "#7cd5cd",
+            "alias": "palette.spruce.300",
+            "moved_from": null,
+            "swapped": true
+          },
+          "color.accent.subtle": {
+            "hex": "#032624",
+            "alias": "palette.spruce.950",
+            "moved_from": null,
+            "swapped": true
+          },
+          "color.text.link": {
+            "hex": "#7cd5cd",
+            "alias": "palette.spruce.300",
+            "moved_from": null,
+            "swapped": true
+          },
+          "color.focus.ring": {
+            "hex": "#d9c42b",
+            "alias": "palette.gorse.300",
+            "moved_from": null,
+            "swapped": false
+          },
+          "color.run.running": {
+            "hex": "#49c0b7",
+            "alias": "palette.spruce.400",
+            "moved_from": null,
+            "swapped": true
+          }
+        }
+      },
+      "loch": {
+        "light": {
+          "color.accent.bg": {
+            "hex": "#12659d",
+            "alias": "palette.loch.700",
+            "moved_from": null,
+            "swapped": true
+          },
+          "color.accent.bg-hover": {
+            "hex": "#0b4d79",
+            "alias": "palette.loch.800",
+            "moved_from": null,
+            "swapped": true
+          },
+          "color.accent.bg-pressed": {
+            "hex": "#053656",
+            "alias": "palette.loch.900",
+            "moved_from": null,
+            "swapped": true
+          },
+          "color.accent.fg": {
+            "hex": "#12659d",
+            "alias": "palette.loch.700",
+            "moved_from": null,
+            "swapped": true
+          },
+          "color.accent.subtle": {
+            "hex": "#eef6fe",
+            "alias": "palette.loch.50",
+            "moved_from": null,
+            "swapped": true
+          },
+          "color.text.link": {
+            "hex": "#12659d",
+            "alias": "palette.loch.700",
+            "moved_from": null,
+            "swapped": true
+          },
+          "color.focus.ring": {
+            "hex": "#197fc3",
+            "alias": "palette.loch.600",
+            "moved_from": null,
+            "swapped": true
+          },
+          "color.run.running": {
+            "hex": "#197fc3",
+            "alias": "palette.loch.600",
+            "moved_from": null,
+            "swapped": true
+          }
+        },
+        "dark": {
+          "color.accent.bg": {
+            "hex": "#58b3fa",
+            "alias": "palette.loch.400",
+            "moved_from": null,
+            "swapped": true
+          },
+          "color.accent.bg-hover": {
+            "hex": "#8ec9fb",
+            "alias": "palette.loch.300",
+            "moved_from": null,
+            "swapped": true
+          },
+          "color.accent.bg-pressed": {
+            "hex": "#bbdefd",
+            "alias": "palette.loch.200",
+            "moved_from": null,
+            "swapped": true
+          },
+          "color.accent.fg": {
+            "hex": "#8ec9fb",
+            "alias": "palette.loch.300",
+            "moved_from": null,
+            "swapped": true
+          },
+          "color.accent.subtle": {
+            "hex": "#02223a",
+            "alias": "palette.loch.950",
+            "moved_from": null,
+            "swapped": true
+          },
+          "color.text.link": {
+            "hex": "#8ec9fb",
+            "alias": "palette.loch.300",
+            "moved_from": null,
+            "swapped": true
+          },
+          "color.focus.ring": {
+            "hex": "#d9c42b",
+            "alias": "palette.gorse.300",
+            "moved_from": null,
+            "swapped": false
+          },
+          "color.run.running": {
+            "hex": "#58b3fa",
+            "alias": "palette.loch.400",
+            "moved_from": null,
+            "swapped": true
+          }
+        }
+      },
+      "heather": {
+        "light": {
+          "color.accent.bg": {
+            "hex": "#a51f6f",
+            "alias": "palette.heather.700",
+            "moved_from": null,
+            "swapped": true
+          },
+          "color.accent.bg-hover": {
+            "hex": "#810e55",
+            "alias": "palette.heather.800",
+            "moved_from": null,
+            "swapped": true
+          },
+          "color.accent.bg-pressed": {
+            "hex": "#5d073c",
+            "alias": "palette.heather.900",
+            "moved_from": null,
+            "swapped": true
+          },
+          "color.accent.fg": {
+            "hex": "#a51f6f",
+            "alias": "palette.heather.700",
+            "moved_from": null,
+            "swapped": true
+          },
+          "color.accent.subtle": {
+            "hex": "#fef1f7",
+            "alias": "palette.heather.50",
+            "moved_from": null,
+            "swapped": true
+          },
+          "color.text.link": {
+            "hex": "#a51f6f",
+            "alias": "palette.heather.700",
+            "moved_from": null,
+            "swapped": true
+          },
+          "color.focus.ring": {
+            "hex": "#c53a88",
+            "alias": "palette.heather.600",
+            "moved_from": null,
+            "swapped": true
+          },
+          "color.run.running": {
+            "hex": "#c53a88",
+            "alias": "palette.heather.600",
+            "moved_from": null,
+            "swapped": true
+          }
+        },
+        "dark": {
+          "color.accent.bg": {
+            "hex": "#f878ba",
+            "alias": "palette.heather.400",
+            "moved_from": null,
+            "swapped": true
+          },
+          "color.accent.bg-hover": {
+            "hex": "#fca3cd",
+            "alias": "palette.heather.300",
+            "moved_from": null,
+            "swapped": true
+          },
+          "color.accent.bg-pressed": {
+            "hex": "#fdc8df",
+            "alias": "palette.heather.200",
+            "moved_from": null,
+            "swapped": true
+          },
+          "color.accent.fg": {
+            "hex": "#fca3cd",
+            "alias": "palette.heather.300",
+            "moved_from": null,
+            "swapped": true
+          },
+          "color.accent.subtle": {
+            "hex": "#3e0327",
+            "alias": "palette.heather.950",
+            "moved_from": null,
+            "swapped": true
+          },
+          "color.text.link": {
+            "hex": "#fca3cd",
+            "alias": "palette.heather.300",
+            "moved_from": null,
+            "swapped": true
+          },
+          "color.focus.ring": {
+            "hex": "#d9c42b",
+            "alias": "palette.gorse.300",
+            "moved_from": null,
+            "swapped": false
+          },
+          "color.run.running": {
+            "hex": "#f878ba",
+            "alias": "palette.heather.400",
+            "moved_from": null,
+            "swapped": true
+          }
+        }
+      },
+      "rowan": {
+        "light": {
+          "color.accent.bg": {
+            "hex": "#b21622",
+            "alias": "palette.rowan.700",
+            "moved_from": null,
+            "swapped": true
+          },
+          "color.accent.bg-hover": {
+            "hex": "#890f18",
+            "alias": "palette.rowan.800",
+            "moved_from": null,
+            "swapped": true
+          },
+          "color.accent.bg-pressed": {
+            "hex": "#63080e",
+            "alias": "palette.rowan.900",
+            "moved_from": null,
+            "swapped": true
+          },
+          "color.accent.fg": {
+            "hex": "#b21622",
+            "alias": "palette.rowan.700",
+            "moved_from": null,
+            "swapped": true
+          },
+          "color.accent.subtle": {
+            "hex": "#fef2f0",
+            "alias": "palette.rowan.50",
+            "moved_from": null,
+            "swapped": true
+          },
+          "color.text.link": {
+            "hex": "#b21622",
+            "alias": "palette.rowan.700",
+            "moved_from": null,
+            "swapped": true
+          },
+          "color.focus.ring": {
+            "hex": "#d43538",
+            "alias": "palette.rowan.600",
+            "moved_from": null,
+            "swapped": true
+          },
+          "color.run.running": {
+            "hex": "#d43538",
+            "alias": "palette.rowan.600",
+            "moved_from": null,
+            "swapped": true
+          }
+        },
+        "dark": {
+          "color.accent.bg": {
+            "hex": "#fb827a",
+            "alias": "palette.rowan.400",
+            "moved_from": null,
+            "swapped": true
+          },
+          "color.accent.bg-hover": {
+            "hex": "#fcaaa3",
+            "alias": "palette.rowan.300",
+            "moved_from": null,
+            "swapped": true
+          },
+          "color.accent.bg-pressed": {
+            "hex": "#fdcbc6",
+            "alias": "palette.rowan.200",
+            "moved_from": null,
+            "swapped": true
+          },
+          "color.accent.fg": {
+            "hex": "#fcaaa3",
+            "alias": "palette.rowan.300",
+            "moved_from": null,
+            "swapped": true
+          },
+          "color.accent.subtle": {
+            "hex": "#430307",
+            "alias": "palette.rowan.950",
+            "moved_from": null,
+            "swapped": true
+          },
+          "color.text.link": {
+            "hex": "#fcaaa3",
+            "alias": "palette.rowan.300",
+            "moved_from": null,
+            "swapped": true
+          },
+          "color.focus.ring": {
+            "hex": "#d9c42b",
+            "alias": "palette.gorse.300",
+            "moved_from": null,
+            "swapped": false
+          },
+          "color.run.running": {
+            "hex": "#fb827a",
+            "alias": "palette.rowan.400",
+            "moved_from": null,
+            "swapped": true
+          }
+        }
+      },
+      "amber": {
+        "light": {
+          "color.accent.bg": {
+            "hex": "#8c4f10",
+            "alias": "palette.amber.700",
+            "moved_from": null,
+            "swapped": true
+          },
+          "color.accent.bg-hover": {
+            "hex": "#6b3b09",
+            "alias": "palette.amber.800",
+            "moved_from": null,
+            "swapped": true
+          },
+          "color.accent.bg-pressed": {
+            "hex": "#4c2905",
+            "alias": "palette.amber.900",
+            "moved_from": null,
+            "swapped": true
+          },
+          "color.accent.fg": {
+            "hex": "#8c4f10",
+            "alias": "palette.amber.700",
+            "moved_from": null,
+            "swapped": true
+          },
+          "color.accent.subtle": {
+            "hex": "#fef3ea",
+            "alias": "palette.amber.50",
+            "moved_from": null,
+            "swapped": true
+          },
+          "color.text.link": {
+            "hex": "#8c4f10",
+            "alias": "palette.amber.700",
+            "moved_from": null,
+            "swapped": true
+          },
+          "color.focus.ring": {
+            "hex": "#ae6416",
+            "alias": "palette.amber.600",
+            "moved_from": null,
+            "swapped": true
+          },
+          "color.run.running": {
+            "hex": "#ae6416",
+            "alias": "palette.amber.600",
+            "moved_from": null,
+            "swapped": true
+          }
+        },
+        "dark": {
+          "color.accent.bg": {
+            "hex": "#ec9340",
+            "alias": "palette.amber.400",
+            "moved_from": null,
+            "swapped": true
+          },
+          "color.accent.bg-hover": {
+            "hex": "#fcaf6f",
+            "alias": "palette.amber.300",
+            "moved_from": null,
+            "swapped": true
+          },
+          "color.accent.bg-pressed": {
+            "hex": "#fdcfaa",
+            "alias": "palette.amber.200",
+            "moved_from": null,
+            "swapped": true
+          },
+          "color.accent.fg": {
+            "hex": "#fcaf6f",
+            "alias": "palette.amber.300",
+            "moved_from": null,
+            "swapped": true
+          },
+          "color.accent.subtle": {
+            "hex": "#331902",
+            "alias": "palette.amber.950",
+            "moved_from": null,
+            "swapped": true
+          },
+          "color.text.link": {
+            "hex": "#fcaf6f",
+            "alias": "palette.amber.300",
+            "moved_from": null,
+            "swapped": true
+          },
+          "color.focus.ring": {
+            "hex": "#d9c42b",
+            "alias": "palette.gorse.300",
+            "moved_from": null,
+            "swapped": false
+          },
+          "color.run.running": {
+            "hex": "#ec9340",
+            "alias": "palette.amber.400",
+            "moved_from": null,
+            "swapped": true
+          }
+        }
+      },
+      "gorse": {
+        "light": {
+          "color.accent.bg": {
+            "hex": "#735e10",
+            "alias": "palette.gorse.700",
+            "moved_from": null,
+            "swapped": true
+          },
+          "color.accent.bg-hover": {
+            "hex": "#59470a",
+            "alias": "palette.gorse.800",
+            "moved_from": null,
+            "swapped": true
+          },
+          "color.accent.bg-pressed": {
+            "hex": "#3f3105",
+            "alias": "palette.gorse.900",
+            "moved_from": null,
+            "swapped": true
+          },
+          "color.accent.fg": {
+            "hex": "#735e10",
+            "alias": "palette.gorse.700",
+            "moved_from": null,
+            "swapped": true
+          },
+          "color.accent.subtle": {
+            "hex": "#fef5aa",
+            "alias": "palette.gorse.50",
+            "moved_from": null,
+            "swapped": true
+          },
+          "color.text.link": {
+            "hex": "#735e10",
+            "alias": "palette.gorse.700",
+            "moved_from": null,
+            "swapped": true
+          },
+          "color.focus.ring": {
+            "hex": "#8d7716",
+            "alias": "palette.gorse.600",
+            "moved_from": null,
+            "swapped": true
+          },
+          "color.run.running": {
+            "hex": "#8d7716",
+            "alias": "palette.gorse.600",
+            "moved_from": null,
+            "swapped": true
+          }
+        },
+        "dark": {
+          "color.accent.bg": {
+            "hex": "#c2ab24",
+            "alias": "palette.gorse.400",
+            "moved_from": null,
+            "swapped": true
+          },
+          "color.accent.bg-hover": {
+            "hex": "#d9c42b",
+            "alias": "palette.gorse.300",
+            "moved_from": null,
+            "swapped": true
+          },
+          "color.accent.bg-pressed": {
+            "hex": "#eddc59",
+            "alias": "palette.gorse.200",
+            "moved_from": null,
+            "swapped": true
+          },
+          "color.accent.fg": {
+            "hex": "#d9c42b",
+            "alias": "palette.gorse.300",
+            "moved_from": null,
+            "swapped": true
+          },
+          "color.accent.subtle": {
+            "hex": "#291f02",
+            "alias": "palette.gorse.950",
+            "moved_from": null,
+            "swapped": true
+          },
+          "color.text.link": {
+            "hex": "#d9c42b",
+            "alias": "palette.gorse.300",
+            "moved_from": null,
+            "swapped": true
+          },
+          "color.focus.ring": {
+            "hex": "#d9c42b",
+            "alias": "palette.gorse.300",
+            "moved_from": null,
+            "swapped": false
+          },
+          "color.run.running": {
+            "hex": "#c2ab24",
+            "alias": "palette.gorse.400",
+            "moved_from": null,
+            "swapped": true
+          }
+        }
+      },
+      "moss": {
+        "light": {
+          "color.accent.bg": {
+            "hex": "#137337",
+            "alias": "palette.moss.700",
+            "moved_from": null,
+            "swapped": true
+          },
+          "color.accent.bg-hover": {
+            "hex": "#0c5828",
+            "alias": "palette.moss.800",
+            "moved_from": null,
+            "swapped": true
+          },
+          "color.accent.bg-pressed": {
+            "hex": "#063e1a",
+            "alias": "palette.moss.900",
+            "moved_from": null,
+            "swapped": true
+          },
+          "color.accent.fg": {
+            "hex": "#137337",
+            "alias": "palette.moss.700",
+            "moved_from": null,
+            "swapped": true
+          },
+          "color.accent.subtle": {
+            "hex": "#e4fde8",
+            "alias": "palette.moss.50",
+            "moved_from": null,
+            "swapped": true
+          },
+          "color.text.link": {
+            "hex": "#137337",
+            "alias": "palette.moss.700",
+            "moved_from": null,
+            "swapped": true
+          },
+          "color.focus.ring": {
+            "hex": "#1b9046",
+            "alias": "palette.moss.600",
+            "moved_from": null,
+            "swapped": true
+          },
+          "color.run.running": {
+            "hex": "#1b9046",
+            "alias": "palette.moss.600",
+            "moved_from": null,
+            "swapped": true
+          }
+        },
+        "dark": {
+          "color.accent.bg": {
+            "hex": "#62c37a",
+            "alias": "palette.moss.400",
+            "moved_from": null,
+            "swapped": true
+          },
+          "color.accent.bg-hover": {
+            "hex": "#89d89a",
+            "alias": "palette.moss.300",
+            "moved_from": null,
+            "swapped": true
+          },
+          "color.accent.bg-pressed": {
+            "hex": "#afeaba",
+            "alias": "palette.moss.200",
+            "moved_from": null,
+            "swapped": true
+          },
+          "color.accent.fg": {
+            "hex": "#89d89a",
+            "alias": "palette.moss.300",
+            "moved_from": null,
+            "swapped": true
+          },
+          "color.accent.subtle": {
+            "hex": "#03280f",
+            "alias": "palette.moss.950",
+            "moved_from": null,
+            "swapped": true
+          },
+          "color.text.link": {
+            "hex": "#89d89a",
+            "alias": "palette.moss.300",
+            "moved_from": null,
+            "swapped": true
+          },
+          "color.focus.ring": {
+            "hex": "#d9c42b",
+            "alias": "palette.gorse.300",
+            "moved_from": null,
+            "swapped": false
+          },
+          "color.run.running": {
+            "hex": "#62c37a",
+            "alias": "palette.moss.400",
+            "moved_from": null,
+            "swapped": true
+          }
+        }
+      }
+    }
   }
 }

@@ -22,6 +22,8 @@ class RuleError(ValueError):
 
 @dataclass
 class ContrastRow:
+    """One checked pairing: colours, ratio and threshold; `accent` is empty for the base roles."""
+
     theme: str
     fg: str
     bg: str
@@ -31,6 +33,7 @@ class ContrastRow:
     ratio: float
     required: float
     usage: str
+    accent: str = ""
 
     @property
     def passed(self) -> bool:
@@ -83,6 +86,58 @@ def check_contrast(themes: dict[str, dict[str, dtcg.Token]], pairs: list[dict]) 
                     ratio=color.contrast(fg_hex, bg_hex),
                     required=THRESHOLDS[pair["kind"]],
                     usage=pair.get("usage", ""),
+                )
+            )
+    return rows
+
+
+def check_accent_contrast(
+    themes: dict[str, dict[str, dtcg.Token]],
+    pairs: list[dict],
+    variants: dict[tuple[str, str], dict],
+    default: str,
+) -> list[ContrastRow]:
+    """Contrast rows of every non-default accent, one per pairing that contains a swapped role.
+
+    The default accent adds no rows: its variants equal the base roles, which `check_contrast`
+    already covers.
+
+    Args:
+        themes: resolved token map per theme context.
+        pairs: `contrast_pairs` of the rules file (lists are expanded).
+        variants: `accents.derive` output, (theme, accent) -> role -> Variant.
+        default: the default accent.
+
+    Returns:
+        Rows with `accent` set, in the order of `variants`, then of the expanded pairs.
+
+    Raises:
+        RuleError: a pairing names an unknown, non-colour or translucent token.
+    """
+    rows: list[ContrastRow] = []
+    expanded = expand_pairs(pairs)
+    for (theme, accent), roles in variants.items():
+        if accent == default:
+            continue
+        swapped = {role: v.hex for role, v in roles.items() if v.swapped}
+        tokens = themes[theme]
+        for pair in expanded:
+            if pair["fg"] not in swapped and pair["bg"] not in swapped:
+                continue
+            fg_hex = swapped.get(pair["fg"]) or _hex(tokens, pair["fg"], theme)
+            bg_hex = swapped.get(pair["bg"]) or _hex(tokens, pair["bg"], theme)
+            rows.append(
+                ContrastRow(
+                    theme=theme,
+                    fg=pair["fg"],
+                    bg=pair["bg"],
+                    kind=pair["kind"],
+                    fg_hex=fg_hex,
+                    bg_hex=bg_hex,
+                    ratio=color.contrast(fg_hex, bg_hex),
+                    required=THRESHOLDS[pair["kind"]],
+                    usage=pair.get("usage", ""),
+                    accent=accent,
                 )
             )
     return rows
