@@ -38,6 +38,10 @@ from pathlib import Path
 from typing import Any
 
 DEFAULT_CONFIG = Path(__file__).resolve().parents[2] / "quality" / "sonar"
+# How SonarQube Cloud words a refusal by the organization's plan, for example
+# "Organization '<id>' is not allowed to perform this action" (set_default, add_project) or
+# "... is not allowed to modify Quality gates" (select), both seen on 2026-10-14.
+_PLAN_REFUSAL = re.compile(r": Organization '[^']*' is not allowed to ")
 _RULE = re.compile(r"<repositoryKey>([^<]+)</repositoryKey>\s*<key>([^<]+)</key>")
 _TIMEOUT_S = 60
 _MAX_ERROR_CHARS = 300
@@ -236,13 +240,11 @@ def _gate_ref(
 def _plan_refused(client: Client, exc: SonarError) -> bool:
     """Whether SonarQube Cloud refused a call because the organization's plan lacks it.
 
-    Only the plan's wording counts; any other refusal, such as HTTP 403 "Insufficient
-    privileges" for a token without the permission, still fails the run.
+    Only the plan's wording counts (_PLAN_REFUSAL); any other refusal, such as HTTP 403
+    "Insufficient privileges" for a token without the permission, still fails the run.
     """
     return (
-        client.is_cloud
-        and exc.status in (400, 403)
-        and "is not allowed to perform this action" in str(exc)
+        client.is_cloud and exc.status in (400, 403) and _PLAN_REFUSAL.search(str(exc)) is not None
     )
 
 

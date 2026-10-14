@@ -187,6 +187,10 @@ operated, and the order of the build.
   becomes a named gap with the server's reason and the next language is still applied;
   `make sonar-config-check` reads the project's profiles and gate and reports a built-in one
   as a gap, while any other profile or gate fails the check. SonarQube Server is unchanged.
+- `quality_sync.py` also counts the refusal "Organization ... is not allowed to modify Quality
+  gates" (HTTP 403 on `api/qualitygates/select`) as a plan gap; before, it stopped
+  `make sonar-config` because only the wording "is not allowed to perform this action" was
+  recognized.
 - `docs/api/openapi.yaml` 0.2.0: the response `Conflict` names the problem code
   `file_blocked` in the order of the codes; `createHost` and `issueHostPairingCode` take
   `Idempotency-Key` and list `422 idempotency_key_reuse` instead of the exemption `auth_flow`,

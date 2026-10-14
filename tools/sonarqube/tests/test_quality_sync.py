@@ -287,7 +287,7 @@ def test_cloud_plan_refusing_project_assignment_is_a_gap_per_language() -> None:
                 for lang in CLOUD_LANGUAGES
             ),
             f"{qs.GATE_NOT_ON_PROJECT} (POST {url}/api/qualitygates/select: HTTP 403: "
-            f"Organization '{ORG}' is not allowed to perform this action)",
+            f"Organization '{ORG}' is not allowed to modify Quality gates)",
         ]
         for language in CLOUD_LANGUAGES:
             prof = state.profile(language, "Bothy way")
