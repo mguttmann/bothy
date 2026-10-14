@@ -46,6 +46,10 @@ var appPrivileges = map[string][]string{
 	// 03 idempotency_keys (M1-20): the stage inserts, completes and replaces expired rows, the
 	// cleanup job deletes them.
 	"idempotency_keys": {"SELECT", "INSERT", "UPDATE", "DELETE"},
+	// 03 section 4.2: devices are revoked by state, keys by revoked_at; the rows are security
+	// history, deleted only by the retention job of class security, which grants it (M1-33).
+	"devices":     {"SELECT", "INSERT", "UPDATE"},
+	"device_keys": {"SELECT", "INSERT", "UPDATE"},
 }
 
 // allPrivileges are the table rights PostgreSQL 18 knows (MAINTAIN since 17).

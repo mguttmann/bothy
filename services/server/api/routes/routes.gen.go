@@ -4,4 +4,47 @@ package routes
 
 // operations are the operations of the enable list's section enabled, sorted by operation ID,
 // with the metadata the spec declares for them.
-var operations = []Operation{}
+var operations = []Operation{
+	{
+		ID:             "getDevice",
+		Method:         "GET",
+		Path:           "/api/v1/devices/{device_id}",
+		Pattern:        "GET /api/v1/devices/{device_id}",
+		Action:         "device.list",
+		RateLimitClass: "rl.read",
+		Public:         false,
+		IdempotencyKey: false,
+		IfMatch:        IfMatchNone,
+		RequestBody:    BodyNone,
+		BodyRequired:   false,
+		ETagStatuses:   nil,
+	},
+	{
+		ID:             "listMyDevices",
+		Method:         "GET",
+		Path:           "/api/v1/me/devices",
+		Pattern:        "GET /api/v1/me/devices",
+		Action:         "device.list",
+		RateLimitClass: "rl.read",
+		Public:         false,
+		IdempotencyKey: false,
+		IfMatch:        IfMatchNone,
+		RequestBody:    BodyNone,
+		BodyRequired:   false,
+		ETagStatuses:   nil,
+	},
+	{
+		ID:             "listUserDevices",
+		Method:         "GET",
+		Path:           "/api/v1/users/{user_id}/devices",
+		Pattern:        "GET /api/v1/users/{user_id}/devices",
+		Action:         "device.list",
+		RateLimitClass: "rl.read",
+		Public:         false,
+		IdempotencyKey: false,
+		IfMatch:        IfMatchNone,
+		RequestBody:    BodyNone,
+		BodyRequired:   false,
+		ETagStatuses:   nil,
+	},
+}

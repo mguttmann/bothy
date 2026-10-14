@@ -17,6 +17,7 @@ the assembly of `bothy serve` (M1-11). Only `cmd` imports it.
 | `database.go`, `egress.go`, `secrets.go`, `telemetry.go` | binding of the platform `Config` structs, the secret provider |
 | `audit.go` | `Audit` (`NewAudit`, `Start`, `UoW`, `Recorder`, `RightsHook`), `AuditConfig`, `SecretsKEK`: the audit module of a role (M1-24) |
 | `txn.go` | `Modules`, `NewModules`, `NewTxnRegistry` (the one list of hooks and subscribers, golden file `testdata/txn_registrations.golden`), `UnitConfig` |
+| `identity.go` | `Identity` (`NewIdentity`, `Start`), `IdentityConfig`, `TokenPepper`: devices, the DPoP verifier with its jti store and the device handlers (M1-33) |
 | `routes.go` | `Role`, `Handlers`, `MountRoutes` (start step 7, every route through the HTTP chain, CORS preflights), `RouteOptions`, `HTTPOperation` |
 | `jobs.go` | `JobsConfig`, `JobRole`, `NewJobRegistry` (one job registry for all roles), `MigrateUpSteps` (River before goose, then the after-step `instance`) |
 | `instance.go` | `MigrationSteps` (the after-step `instance`), `InstanceCounters` and `loadInstance`, the start step `instance` |
@@ -39,6 +40,7 @@ components, in start order:
 | `schema` | `pg.CheckSchema` against the highest embedded version; older aborts with the hint to run `bothy migrate up` | all |
 | `instance` | loads the instance row through `instance.State` (missing: abort with the hint to run `bothy migrate up`), logs the setup state, compares the own version with `instance.min_server_version`; below it the readiness check `schema_requires_newer_server` fails for good (M1-15) | all |
 | `audit` | resolves `privacy.audit_ip_kek_ref` once (fail fast), builds the audit module with the unit of work of the role (`NewAudit`) and starts the aggregator of denials (`Audit.Start`), registering the stop step `audit_denials` (M1-24) | all |
+| `identity` | after `audit`, `sync` and `authz`: resolves `auth.token_pepper_ref` once (32 bytes as hex, fail fast), builds `Identity` over the unit of work of `audit` and the Authorizer, starts the sweeper of the jti store with the stop step `dpop_replay_sweeper` in `PhaseHTTP`; `routes` mounts its device handlers unless `Deps.Handlers` names one (M1-33) | all |
 | `routes` | catalogue check of route bindings and registrations (all roles, M1-25); then `NewChain` (validator over `api/rest.Spec`, `actor.AnonymousOnly`), `InstallRateLimits` (start check of the classes, limiter in `StageRateLimit`, sweeper with the stop step `ratelimit_sweeper` in `PhaseHTTP`, M1-19) and `MountRoutes` on the public mux with the `authz` catalogue | api, all (check: every role) |
 | `jobs` | `jobs.ValidateMigrations` (missing River migrations abort with the hint to run `bothy migrate up`), `jobs.New` for the role, `Start` of River (02 "Start" step 8; no-op for api and while no kind is registered), `Runner.FailOn` on `Failed` | all |
 | `public_listener` | opens `server.listen_addr`, logs `public listener started` | api, all |

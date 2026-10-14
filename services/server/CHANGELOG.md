@@ -35,6 +35,20 @@ documented in this file. The format is based on
   `RightsChangeOf`, `InRightsChange`; `internal/kernel/authorize`: `AccessChanged`;
   `internal/kernel/errs`: `ProblemExtender`, merged into the problem body by
   `internal/platform/httpserver`.
+- `internal/identity` (M1-33): devices with their two public keys (`dpop`, `step_up`) in the new
+  tables `devices` and `device_keys` (migration 00008), the port `Devices` (`Register`, `Get`,
+  `ListMine`, `ListForUser`, `ActiveKey`) with `device.list` through `authorize`, and the port
+  `DPoP`: the one DPoP verifier of RFC 9449 with stateless server nonces derived from the token
+  pepper, the `htu` normalization and a per-process `jti` store with a sweeper. The REST
+  operations `listMyDevices`, `listUserDevices` and `getDevice` are enabled. The device part of
+  `authz.CredentialSource` replaces the empty credential source; test helpers in
+  `adapters/identitytest`.
+- `internal/kernel/jose` (M1-33, ADR 0067): compact JWS with `ES256` and `EdDSA`, public JWKs of
+  EC P-256 and OKP Ed25519 with RFC 7638 thumbprints, signing through a `Signer`; standard
+  library only, with fuzz targets and seed corpus.
+- Configuration keys `auth.dpop_nonce_ttl`, `auth.dpop_proof_max_age`, `auth.clock_leeway`,
+  `auth.token_pepper_ref`, `api.page_size_default` and `api.page_size_max`; `bothy serve` resolves
+  the token pepper at its start (step 6d).
 
 - `internal/authz` (M1-28): the one authorization function. `app.Authorizer` implements
   `kernel/authorize.Authorizer` with `Authorize` (07 section 4.2: liveness, pending, resolution

@@ -1,0 +1,2 @@
+go test fuzz v1
+[]byte("{\"kty\":\"EC\",\"crv\":\"P-256\",\"x\":\"l8tFrhx-34tV3hRICRDY9zCkDlpBhF42UQUfWVAWBFs\",\"y\":\"AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAE\"}")

@@ -127,6 +127,8 @@ func TestConfigPrintNeverShowsSecrets(t *testing.T) {
 	// privacy.audit_ip_kek_ref (M1-24) below secrets.dir.
 	writeSecret(t, dir, "telemetry_pseudonym_key", strings.Repeat("k", 32), 0o600)
 	writeSecret(t, dir, "audit_ip_kek", strings.Repeat("6b", 32), 0o600)
+	// and auth.token_pepper_ref (M1-33).
+	writeSecret(t, dir, "token_pepper", strings.Repeat("7c", 32), 0o600)
 	for _, args := range [][]string{{"config", "print", "--redacted"}, {"config", "check", "--secrets"}} {
 		code, stdout, stderr = runBothy(t, []string{"BOTHY_SECRETS__DIR=" + dir}, args...)
 		if code != 0 || stderr != "" {
@@ -134,13 +136,14 @@ func TestConfigPrintNeverShowsSecrets(t *testing.T) {
 		}
 		noCanary(t, canaries, stdout, stderr)
 	}
-	// The directory holds db_app_password, telemetry_pseudonym_key and audit_ip_kek only, as the secrets of an
+	// The directory holds db_app_password, telemetry_pseudonym_key, audit_ip_kek and token_pepper only, as the secrets of an
 	// api container do: the references of bothy migrate are skipped, not reported as missing
 	// (docs/DECISIONS.md M1-12).
 	skipped := ": skipped (read only by bothy migrate up --bootstrap)\n"
 	// The keys of the S3 driver are read only with file.storage.driver = s3 (12 "18.").
 	s3Skipped := ": skipped (read only with file.storage.driver = s3)\n"
-	want = "secret database.password_ref: ok\n" +
+	want = "secret auth.token_pepper_ref: ok\n" +
+		"secret database.password_ref: ok\n" +
 		"secret file.s3.access_key_ref" + s3Skipped +
 		"secret file.s3.secret_key_ref" + s3Skipped +
 		"secret migrate.app_password_ref" + skipped +
