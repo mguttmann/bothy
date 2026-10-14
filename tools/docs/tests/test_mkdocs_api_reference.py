@@ -230,6 +230,11 @@ def test_text_outside_code_spans_is_escaped() -> None:
     assert hook.text("`{x:\n  <body>}` <y>") == "`{x: <body>}` &lt;y>"
 
 
+def test_pipe_is_escaped_only_outside_code_spans() -> None:
+    # Python-Markdown tables keep `|` inside code spans; a backslash there would be literal.
+    assert hook.cell("a | b `^(x|y)$`") == "a \\| b `^(x|y)$`"
+
+
 def test_schema_page_renders_types_and_nested_properties() -> None:
     page = hook.render_schemas(_mini_openapi())
     assert "### Thread {#schema-Thread}" in page

@@ -70,7 +70,9 @@ def text(value: object) -> str:
 
 def cell(value: object) -> str:
     """Return document text fit for one Markdown table cell (no pipes, no line breaks)."""
-    out = text(value).replace("|", "\\|")
+    # Python-Markdown's tables keep `|` inside code spans, where a backslash would be literal.
+    parts = _CODE_SPAN.split(text(value))
+    out = "".join(p if p.startswith("`") else p.replace("|", "\\|") for p in parts)
     return out.replace("\n\n", "<br><br>").replace("\n", " ")
 
 
