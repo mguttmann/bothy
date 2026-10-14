@@ -399,3 +399,9 @@ nav:
           - "M5-05: Android push service without the Flutter engine": briefs/M5-05-android-push.md
           - "M5-06: Sharing from other apps": briefs/M5-06-sharing.md
           - "M5-07: Voice recording, camera and photo": briefs/M5-07-voice-camera.md
+          - "M5-08: App lock": briefs/M5-08-app-lock.md
+          - "M5-09: Emergency actions on mobile": briefs/M5-09-mobile-emergency.md
+          - "M5-10: Accessibility on mobile": briefs/M5-10-mobile-a11y.md
+          - "M5-11: Device E2E and performance targets on mobile": briefs/M5-11-mobile-e2e-perf.md
+          - "M5-12: Terminal on mobile with extra keys bar": briefs/M5-12-mobile-terminal.md
+          - "M5-13: Terminal E2E on mobile": briefs/M5-13-mobile-terminal-e2e.md

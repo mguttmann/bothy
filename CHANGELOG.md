@@ -152,6 +152,10 @@ operated, and the order of the build.
   Android, `ClientKit` with the Notification Service Extension, the Android push service, sharing,
   voice and camera) in the brief index with waves and graph and in the site navigation (D-W-120,
   D-W-121).
+- Build briefs M5-08 to M5-13 of milestone M5 (app lock, emergency actions, accessibility,
+  device E2E and performance, terminal with extra keys bar and its E2E) in the brief index with
+  waves and graph and in the site navigation; make target `e2e-mobile` in the table of targets
+  created by tickets (D-W-120, D-W-122).
 
 - Gate `register-check` (`tools/doccheck/register_check.py`): the module register
   `services/server/architecture/modules.yaml` must equal the tables and their modules in
