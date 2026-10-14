@@ -122,3 +122,28 @@ func TestRevokeSubjectGrants(t *testing.T) {
 	})
 	wantErr(t, err, errs.CodeValidationFailed, "")
 }
+
+// TestScope_AppTokenScopes (INT-W19/4): Scope of an app follows the scope rule of Authorize, so
+// the token must carry the scope as well as the installation; a token without messages:read gets
+// an empty scope, the same request without a token sees the channel.
+func TestScope_AppTokenScopes(t *testing.T) {
+	w := newWorld(t)
+	reader := w.app()
+	reader.GrantedScopes, reader.Scopes = []string{domain.ScopeMessagesRead}, []string{domain.ScopeMessagesRead}
+	sc, err := w.az.Scope(context.Background(), reader, authorize.ActionMessageRead)
+	if err != nil || !slices.Contains(sc.ChannelIDs, w.eskalation) {
+		t.Fatalf("scope with the token scope %+v %v", sc, err)
+	}
+	reader.Scopes = []string{domain.ScopeMessagesWrite}
+	w.versions.Bump()
+	sc, err = w.az.Scope(context.Background(), reader, authorize.ActionMessageRead)
+	if err != nil || len(sc.ChannelIDs) != 0 {
+		t.Fatalf("scope without the token scope %+v %v", sc, err)
+	}
+	reader.TokenID, reader.Scopes = ids.ID{}, nil
+	w.versions.Bump()
+	sc, err = w.az.Scope(context.Background(), reader, authorize.ActionMessageRead)
+	if err != nil || !slices.Contains(sc.ChannelIDs, w.eskalation) {
+		t.Fatalf("scope without a token %+v %v", sc, err)
+	}
+}
