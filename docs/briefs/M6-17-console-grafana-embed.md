@@ -66,7 +66,7 @@ Client:
 
 Tests and docs:
 
-- `infra/compose/console-e2e-grafana.yaml` (an overlay for `console-e2e`): a test proxy container that serves a static test dashboard page on its own origin with the headers of 25 9.2 item 3 and logs the requests (Design note 4).
+- `infra/compose/test/compose.console-e2e-grafana.yaml` (an overlay for `console-e2e` under `infra/compose/test`, which the installation bundle excludes, next to the overlay of M6-03): a test proxy container that serves a static test dashboard page on its own origin with the headers of 25 9.2 item 3 and logs the requests (Design note 4).
 - `tools/console-e2e`: the SEC-T19 and VZ-T12 suites (Design note 4).
 - `docs/operations/grafana-embedding.md`: the example auth proxy (Grafana `[auth.proxy]` with a sender list, `allow_embedding = true`, the proxy headers, an own subdomain on the same site, only owners), linked from `mkdocs.yml` and the operations index.
 - `docs/spec/25-visualization.md` 9.2 (the `getInstance` member, the console page), `docs/spec/19-security.md` 5 rule 7 only if the build sharpens it, `apps/console/README.md`, root and server `CHANGELOG.md` under `[Unreleased]`, `docs/DECISIONS.md` section 10 rows `D-M6-17-1` to `D-M6-17-4`.

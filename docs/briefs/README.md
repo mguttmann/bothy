@@ -349,7 +349,7 @@ names listed here.
 | 30 | M6-07 | Permission hints and expiry overview | `M6-07-permission-hints.md` | M1-30, M6-04 |
 | 31 | M6-08 | Manage apps, webhooks and incoming webhooks | `M6-08-apps-webhooks-admin.md` | M2-26, M2-27, M6-04 |
 | 31 | M6-09 | Manage instance, branding, login providers and feature flags | `M6-09-instance-admin.md` | M1-47, M3-10, M6-04 |
-| 40 | M6-16 | Visualizations in the desktop app, console and mobile | `M6-16-viz-in-apps.md` | M5-03, M6-03, M6-06, M6-12, M6-14, M6-15 |
+| 40 | M6-16 | Visualizations in the desktop app, console and mobile | `M6-16-viz-in-apps.md` | M5-03, M6-04, M6-06, M6-12, M6-14, M6-15 |
 | 41 | M6-17 | Optional Grafana embedding in the console | `M6-17-console-grafana-embed.md` | M6-16 |
 | 31 | M6-18 | Terminal in the console (ADR 0070) | `M6-18-console-terminal.md` | M2-48, M4-35, M4-37, M6-04 |
 
@@ -990,7 +990,7 @@ flowchart TB
   M6_13 --> M6_14
   M6_13 --> M6_15
   M5_03 --> M6_16
-  M6_03 --> M6_16
+  M6_04 --> M6_16
   M6_06 --> M6_16
   M6_12 --> M6_16
   M6_14 --> M6_16

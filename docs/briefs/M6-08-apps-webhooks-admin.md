@@ -66,6 +66,7 @@ Change:
 
 - Desktop administration navigation (`apps/client`) and console routes (`apps`): host the screens.
 - `tools/console-e2e`: the `patrol` web suites of this ticket.
+- `infra/compose/test/` (the `console-e2e` overlay of M6-03, which the installation bundle excludes): a webhook receiver service inside the Compose network that serves HTTPS with a certificate for its service name from the per-run test CA of M6-03 and records the deliveries for the test (reachable from the host only on `127.0.0.1`); in the E2E configuration only, `webhook.allowed_hosts` and `egress.allowed_hosts` (`<receiver>;allow_private`, because the receiver has a private Compose address) list the receiver, and the `api` container trusts the test CA through `SSL_CERT_FILE` pointing to a bundle of the system roots and the test CA (Go reads it on Linux); the release image and the bundle stay unchanged.
 - `packages/l10n` ARB files (consent texts, 11 4.3 effects); `packages/admin_ui/README.md`; root `CHANGELOG.md` under `[Unreleased]`; `docs/DECISIONS.md` section 10 rows `D-M6-08-1` to `D-M6-08-4`.
 
 ## Out of scope

@@ -1,6 +1,6 @@
 # M6-16: Visualizations in the desktop app, console and mobile
 
-Status: ready | Depends on: M5-03, M6-03, M6-06, M6-12, M6-14, M6-15 | Milestone: M6
+Status: ready | Depends on: M5-03, M6-04, M6-06, M6-12, M6-14, M6-15 | Milestone: M6
 
 ## Goal
 
