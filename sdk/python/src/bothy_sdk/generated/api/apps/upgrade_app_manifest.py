@@ -1,0 +1,206 @@
+from http import HTTPStatus
+from typing import Any
+from urllib.parse import quote
+from uuid import UUID
+
+import httpx
+
+from ...client import AuthenticatedClient, Client
+from ...models.app import App
+from ...models.app_install import AppInstall
+from ...models.problem import Problem
+from ...types import Response
+
+
+def _get_kwargs(
+    app_id: UUID,
+    *,
+    body: AppInstall,
+) -> dict[str, Any]:
+    headers: dict[str, Any] = {}
+
+    _kwargs: dict[str, Any] = {
+        "method": "put",
+        "url": "/apps/{app_id}/manifest".format(
+            app_id=quote(str(app_id), safe=""),
+        ),
+    }
+
+    _kwargs["json"] = body.to_dict()
+
+    headers["Content-Type"] = "application/json"
+
+    _kwargs["headers"] = headers
+    return _kwargs
+
+
+def _parse_response(
+    *, client: AuthenticatedClient | Client, response: httpx.Response
+) -> App | Problem:
+    if response.status_code == 200:
+        response_200 = App.from_dict(response.json())
+
+        return response_200
+
+    if response.status_code == 400:
+        response_400 = Problem.from_dict(response.json())
+
+        return response_400
+
+    if response.status_code == 401:
+        response_401 = Problem.from_dict(response.json())
+
+        return response_401
+
+    if response.status_code == 403:
+        response_403 = Problem.from_dict(response.json())
+
+        return response_403
+
+    if response.status_code == 404:
+        response_404 = Problem.from_dict(response.json())
+
+        return response_404
+
+    if response.status_code == 409:
+        response_409 = Problem.from_dict(response.json())
+
+        return response_409
+
+    if response.status_code == 429:
+        response_429 = Problem.from_dict(response.json())
+
+        return response_429
+
+    response_default = Problem.from_dict(response.json())
+
+    return response_default
+
+
+def _build_response(
+    *, client: AuthenticatedClient | Client, response: httpx.Response
+) -> Response[App | Problem]:
+    return Response(
+        status_code=HTTPStatus(response.status_code),
+        content=response.content,
+        headers=response.headers,
+        parsed=_parse_response(client=client, response=response),
+    )
+
+
+def sync_detailed(
+    app_id: UUID,
+    *,
+    client: AuthenticatedClient | Client,
+    body: AppInstall,
+) -> Response[App | Problem]:
+    """Install a new manifest version
+
+    Args:
+        app_id (UUID): UUIDv7 (RFC 9562), lowercase canonical form.
+        body (AppInstall):
+
+    Raises:
+        errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
+        httpx.TimeoutException: If the request takes longer than Client.timeout.
+
+    Returns:
+        Response[App | Problem]
+    """
+
+    kwargs = _get_kwargs(
+        app_id=app_id,
+        body=body,
+    )
+
+    response = client.get_httpx_client().request(
+        **kwargs,
+    )
+
+    return _build_response(client=client, response=response)
+
+
+def sync(
+    app_id: UUID,
+    *,
+    client: AuthenticatedClient | Client,
+    body: AppInstall,
+) -> App | Problem | None:
+    """Install a new manifest version
+
+    Args:
+        app_id (UUID): UUIDv7 (RFC 9562), lowercase canonical form.
+        body (AppInstall):
+
+    Raises:
+        errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
+        httpx.TimeoutException: If the request takes longer than Client.timeout.
+
+    Returns:
+        App | Problem
+    """
+
+    return sync_detailed(
+        app_id=app_id,
+        client=client,
+        body=body,
+    ).parsed
+
+
+async def asyncio_detailed(
+    app_id: UUID,
+    *,
+    client: AuthenticatedClient | Client,
+    body: AppInstall,
+) -> Response[App | Problem]:
+    """Install a new manifest version
+
+    Args:
+        app_id (UUID): UUIDv7 (RFC 9562), lowercase canonical form.
+        body (AppInstall):
+
+    Raises:
+        errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
+        httpx.TimeoutException: If the request takes longer than Client.timeout.
+
+    Returns:
+        Response[App | Problem]
+    """
+
+    kwargs = _get_kwargs(
+        app_id=app_id,
+        body=body,
+    )
+
+    response = await client.get_async_httpx_client().request(**kwargs)
+
+    return _build_response(client=client, response=response)
+
+
+async def asyncio(
+    app_id: UUID,
+    *,
+    client: AuthenticatedClient | Client,
+    body: AppInstall,
+) -> App | Problem | None:
+    """Install a new manifest version
+
+    Args:
+        app_id (UUID): UUIDv7 (RFC 9562), lowercase canonical form.
+        body (AppInstall):
+
+    Raises:
+        errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
+        httpx.TimeoutException: If the request takes longer than Client.timeout.
+
+    Returns:
+        App | Problem
+    """
+
+    return (
+        await asyncio_detailed(
+            app_id=app_id,
+            client=client,
+            body=body,
+        )
+    ).parsed

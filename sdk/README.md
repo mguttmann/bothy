@@ -1,6 +1,7 @@
 # sdk
 
-Status: planned. This folder contains no code yet.
+Status: generated cores and tolerance layers of both SDKs (M2-23); the hand layers follow with
+M2-29 (Python) and M2-30 (TypeScript).
 
 ## Purpose
 
@@ -10,8 +11,9 @@ components, commands, idempotency, retries, webhook signatures and test doubles 
 
 | Folder | Language | State |
 |---|---|---|
-| `python/` | Python | planned |
-| `typescript/` | TypeScript | planned |
+| `python/` | Python | generated core (openapi-python-client) and tolerance layer; [README](python/README.md) |
+| `typescript/` | TypeScript | generated types (openapi-typescript), openapi-fetch client and tolerance layer; [README](typescript/README.md) |
+| `testdata/` | - | shared G5 fixtures of both SDKs; [README](testdata/tolerance/README.md) |
 
 The clients of the apps (Dart) are also generated from the specification, but they belong to the
 apps (docs/spec/15-client-architecture.md).
@@ -43,3 +45,8 @@ Status values: `supported`, `deprecated`, `end-of-life`.
 
 The names on PyPI and npm depend on the final product name and are not reserved yet
 (question to the owner).
+
+Working names until OQ-17 is decided: Python distribution `bothy-sdk` (import package
+`bothy_sdk`) and npm package `bothy-sdk`. Both packages are private (`Private :: Do Not Upload`,
+`"private": true`) and are not published; they are a listed kind of "places that carry the
+product name" in docs/spec/02-architecture.md section 6.

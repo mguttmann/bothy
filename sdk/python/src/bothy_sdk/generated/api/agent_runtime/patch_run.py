@@ -1,0 +1,218 @@
+from http import HTTPStatus
+from typing import Any
+from urllib.parse import quote
+from uuid import UUID
+
+import httpx
+
+from ...client import AuthenticatedClient, Client
+from ...models.problem import Problem
+from ...models.run_patch import RunPatch
+from ...models.run_patch_result import RunPatchResult
+from ...types import Response
+
+
+def _get_kwargs(
+    run_id: UUID,
+    *,
+    body: RunPatch,
+) -> dict[str, Any]:
+    headers: dict[str, Any] = {}
+
+    _kwargs: dict[str, Any] = {
+        "method": "patch",
+        "url": "/runs/{run_id}".format(
+            run_id=quote(str(run_id), safe=""),
+        ),
+    }
+
+    _kwargs["json"] = body.to_dict()
+
+    headers["Content-Type"] = "application/json"
+
+    _kwargs["headers"] = headers
+    return _kwargs
+
+
+def _parse_response(
+    *, client: AuthenticatedClient | Client, response: httpx.Response
+) -> Problem | RunPatchResult:
+    if response.status_code == 200:
+        response_200 = RunPatchResult.from_dict(response.json())
+
+        return response_200
+
+    if response.status_code == 400:
+        response_400 = Problem.from_dict(response.json())
+
+        return response_400
+
+    if response.status_code == 401:
+        response_401 = Problem.from_dict(response.json())
+
+        return response_401
+
+    if response.status_code == 403:
+        response_403 = Problem.from_dict(response.json())
+
+        return response_403
+
+    if response.status_code == 404:
+        response_404 = Problem.from_dict(response.json())
+
+        return response_404
+
+    if response.status_code == 409:
+        response_409 = Problem.from_dict(response.json())
+
+        return response_409
+
+    if response.status_code == 429:
+        response_429 = Problem.from_dict(response.json())
+
+        return response_429
+
+    response_default = Problem.from_dict(response.json())
+
+    return response_default
+
+
+def _build_response(
+    *, client: AuthenticatedClient | Client, response: httpx.Response
+) -> Response[Problem | RunPatchResult]:
+    return Response(
+        status_code=HTTPStatus(response.status_code),
+        content=response.content,
+        headers=response.headers,
+        parsed=_parse_response(client=client, response=response),
+    )
+
+
+def sync_detailed(
+    run_id: UUID,
+    *,
+    client: AuthenticatedClient | Client,
+    body: RunPatch,
+) -> Response[Problem | RunPatchResult]:
+    """Apply a live-box patch
+
+     Same as gateway op `run.update`. Paths outside the allowed set and `state` are rejected. A wrong
+    `base_version` gives 409 `base_version_conflict` with the current document in `current`.
+
+    Args:
+        run_id (UUID): UUIDv7 (RFC 9562), lowercase canonical form.
+        body (RunPatch):
+
+    Raises:
+        errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
+        httpx.TimeoutException: If the request takes longer than Client.timeout.
+
+    Returns:
+        Response[Problem | RunPatchResult]
+    """
+
+    kwargs = _get_kwargs(
+        run_id=run_id,
+        body=body,
+    )
+
+    response = client.get_httpx_client().request(
+        **kwargs,
+    )
+
+    return _build_response(client=client, response=response)
+
+
+def sync(
+    run_id: UUID,
+    *,
+    client: AuthenticatedClient | Client,
+    body: RunPatch,
+) -> Problem | RunPatchResult | None:
+    """Apply a live-box patch
+
+     Same as gateway op `run.update`. Paths outside the allowed set and `state` are rejected. A wrong
+    `base_version` gives 409 `base_version_conflict` with the current document in `current`.
+
+    Args:
+        run_id (UUID): UUIDv7 (RFC 9562), lowercase canonical form.
+        body (RunPatch):
+
+    Raises:
+        errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
+        httpx.TimeoutException: If the request takes longer than Client.timeout.
+
+    Returns:
+        Problem | RunPatchResult
+    """
+
+    return sync_detailed(
+        run_id=run_id,
+        client=client,
+        body=body,
+    ).parsed
+
+
+async def asyncio_detailed(
+    run_id: UUID,
+    *,
+    client: AuthenticatedClient | Client,
+    body: RunPatch,
+) -> Response[Problem | RunPatchResult]:
+    """Apply a live-box patch
+
+     Same as gateway op `run.update`. Paths outside the allowed set and `state` are rejected. A wrong
+    `base_version` gives 409 `base_version_conflict` with the current document in `current`.
+
+    Args:
+        run_id (UUID): UUIDv7 (RFC 9562), lowercase canonical form.
+        body (RunPatch):
+
+    Raises:
+        errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
+        httpx.TimeoutException: If the request takes longer than Client.timeout.
+
+    Returns:
+        Response[Problem | RunPatchResult]
+    """
+
+    kwargs = _get_kwargs(
+        run_id=run_id,
+        body=body,
+    )
+
+    response = await client.get_async_httpx_client().request(**kwargs)
+
+    return _build_response(client=client, response=response)
+
+
+async def asyncio(
+    run_id: UUID,
+    *,
+    client: AuthenticatedClient | Client,
+    body: RunPatch,
+) -> Problem | RunPatchResult | None:
+    """Apply a live-box patch
+
+     Same as gateway op `run.update`. Paths outside the allowed set and `state` are rejected. A wrong
+    `base_version` gives 409 `base_version_conflict` with the current document in `current`.
+
+    Args:
+        run_id (UUID): UUIDv7 (RFC 9562), lowercase canonical form.
+        body (RunPatch):
+
+    Raises:
+        errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
+        httpx.TimeoutException: If the request takes longer than Client.timeout.
+
+    Returns:
+        Problem | RunPatchResult
+    """
+
+    return (
+        await asyncio_detailed(
+            run_id=run_id,
+            client=client,
+            body=body,
+        )
+    ).parsed

@@ -442,6 +442,8 @@ by kind:
   `%ProgramData%\bothy-host`); protocol identifiers `bothy-terminal/1` (Noise prologue) and
   `bothy-host-fp/1` (fingerprint); release component `host`.
 - Packages of the apps: Dart packages with the prefix `bothy_` (`bothy_viz`, `bothy_noise`).
+- SDKs: Python distribution `bothy-sdk`, import package `bothy_sdk`, npm package `bothy-sdk` (not
+  published until OQ-17 is decided).
 - Grafana plugin ([25-visualization.md](25-visualization.md), section 8): folder and
   release component `grafana-bothy-live`, plugin ID `bothy-live-panel`, dashboard `bothy-live`.
 - Cross-cutting: prefix of the telemetry, alert and SLO names (`bothy.`, `bothy_`, `Bothy`); prefix

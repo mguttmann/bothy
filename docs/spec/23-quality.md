@@ -60,8 +60,8 @@ the following applies per kind:
 |---|---|
 | Go module | `go.mod` and `go.sum`; tests with `go test`; golangci-lint configuration in the module (dependency rules: chapter 02); `.go-arch-lint.yml`, generated from `architecture/modules.yaml` (gate `arch`); migrations under `migrations/` with the checksum file `migrations.sha256` next to them (gate `migrations-lint`, as soon as there are migrations); load tests under `perf/` with the build tag `perf` (`make perf`); coverage does not count `test/**` and `perf/**`, because they are test code themselves (02, section 6), and not generated files `*.gen.go`, because their generator and its golden test hold them |
 | Dart package | `pubspec.yaml`, tests under `test/`; `custom_lint` as a dev dependency when own rules apply |
-| Python project | `pyproject.toml` with a uv lock; ruff, mypy and pytest in the dev group; coverage threshold in its own pytest configuration |
-| TypeScript project | `package.json` with the scripts `format`, `format:check`, `lint`, `typecheck`, `test` (coverage threshold in the test runner) |
+| Python project | `pyproject.toml` with a uv lock; ruff, mypy and pytest in the dev group; coverage threshold `quality.coverage.python_min_percent` in its own pytest configuration (`fail_under`); generated code counts toward neither coverage nor style lint and format checks, but stays in mypy |
+| TypeScript project | `package.json` with the scripts `format`, `format:check`, `lint`, `typecheck`, `test` (coverage threshold `quality.coverage.typescript_min_percent` in the test runner); generated code counts toward neither coverage nor Prettier and ESLint, but stays in `tsc` |
 | Release | Makefile in the component folder with the target `release-build` (arguments `VERSION`, `OUT`); apps in addition `release-apple` and `release-windows`; the product (`bothy`, root Makefile) also reads `GITHUB_REPOSITORY_OWNER` for the registry in the bundle ([18-release.md](18-release.md), section 2.1) |
 | Generated client | Makefile with the target `generate-check` (generate from `docs/api/`, compile; a deviation from the checked-in state reports an error) |
 | Design tokens | `tools/design-tokens/Makefile` with the target `check` |
@@ -198,6 +198,8 @@ fixed and the delta is checked again; the threat model (chapter 19) is updated. 
 | `quality.coverage.tools_min_percent` | `90` | percent | Minimum coverage of the repository tools | `tools/pyproject.toml` (`fail_under`) |
 | `quality.coverage.go_min_percent` | `80` | percent | Minimum coverage per Go module | `Makefile` (`COVERAGE_GO_MIN`) |
 | `quality.coverage.dart_min_percent` | `80` | percent | Minimum coverage per Dart package | `Makefile` (`COVERAGE_DART_MIN`) |
+| `quality.coverage.python_min_percent` | `80` | percent | Minimum coverage per Python project under `sdk/` and `plugins/` | the project's `pyproject.toml` (`fail_under` in `[tool.coverage.report]`) |
+| `quality.coverage.typescript_min_percent` | `80` | percent | Minimum coverage per TypeScript project | the project's `vitest.config.ts` (`coverage.thresholds`) |
 | `quality.perf.timeout` | `60m` | duration | Time limit of `make perf` per Go module | `Makefile` (`PERF_TIMEOUT`) |
 | `quality.sonar.new_issues_max` | `0` | count | New findings in new code | `quality/sonar/quality-gate.json` |
 | `quality.sonar.new_hotspots_reviewed_min_percent` | `100` | percent | Reviewed security hotspots in new code | `quality/sonar/quality-gate.json` |

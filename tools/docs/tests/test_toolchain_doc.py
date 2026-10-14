@@ -2,8 +2,9 @@
 """Version guard: docs/quality/toolchain.md names exactly the pinned versions.
 
 Sources of pins: the Python and Node locks, tools/bin/tools.lock.json, the Makefile, the
-SonarQube compose file, the pre-commit configuration, the workflows and the `tool` directives of
-the Go modules under services/.
+SonarQube compose file, the pre-commit configuration, the workflows, the `tool` directives of
+the Go modules under services/ and the code generators in the locks of the SDKs under sdk/.
+The generator row of docs/spec/06-api.md 14 names the same versions.
 """
 
 from __future__ import annotations
@@ -70,6 +71,61 @@ def test_go_tools_are_read_from_go_mod() -> None:
     assert go_tools().get("oapi-codegen") == "v2.8.0"
 
 
+# Code generators pinned inside the SDK components (docs/DECISIONS.md M2-23/2): name to the
+# lock that pins it. Only the generators are read from these locks; the other dev tools of the
+# SDKs share their versions with tools/ (M2-23/10).
+SDK_GENERATORS = {
+    "openapi-python-client": "sdk/python/uv.lock",
+    "openapi-typescript": "sdk/typescript/package-lock.json",
+}
+SDK_RUNTIME = {"openapi-fetch": "sdk/typescript/package-lock.json"}
+
+
+def sdk_pins() -> dict[str, str]:
+    """Locked versions of the SDK code generators and of the TypeScript runtime client."""
+    pins: dict[str, str] = {}
+    for name, lock in {**SDK_GENERATORS, **SDK_RUNTIME}.items():
+        path = REPO / lock
+        if lock.endswith("uv.lock"):
+            packages = tomllib.loads(path.read_text())["package"]
+            [version] = [p["version"] for p in packages if p["name"].lower() == name]
+        else:
+            version = json.loads(path.read_text())["packages"][f"node_modules/{name}"]["version"]
+        pins[name] = version
+    return pins
+
+
+def test_sdk_generators_are_pinned_exactly_in_the_manifests() -> None:
+    pins = sdk_pins()
+    project = tomllib.loads((REPO / "sdk" / "python" / "pyproject.toml").read_text())
+    assert (
+        f"openapi-python-client=={pins['openapi-python-client']}"
+        in project["dependency-groups"]["dev"]
+    )
+    package = json.loads((REPO / "sdk" / "typescript" / "package.json").read_text())
+    assert package["devDependencies"]["openapi-typescript"] == pins["openapi-typescript"]
+
+
+def test_codegen_table_of_chapter_06_names_the_pins() -> None:
+    text = (REPO / "docs" / "spec" / "06-api.md").read_text(encoding="utf-8")
+    part = text.split("## 14. Code generation", 1)[1].split("\n## ", 1)[0]
+    rows = {
+        r.split("|")[1].strip(): r.split("|")[2] for r in part.splitlines() if r.startswith("| ")
+    }
+    pins = sdk_pins()
+    typescript = rows["TypeScript SDK"]
+    python = rows["Python SDK and Hermes adapter"]
+    assert re.findall(r"openapi-typescript ([0-9][0-9A-Za-z.+-]*[0-9])", typescript) == [
+        pins["openapi-typescript"]
+    ]
+    assert re.findall(r"openapi-fetch ([0-9][0-9A-Za-z.+-]*[0-9])", typescript) == [
+        pins["openapi-fetch"]
+    ]
+    assert re.findall(r"openapi-python-client ([0-9][0-9A-Za-z.+-]*[0-9])", python) == [
+        pins["openapi-python-client"]
+    ]
+
+
 def pinned_tools() -> dict[str, str]:
     pins: dict[str, str] = dict(go_tools())
     lock = tomllib.loads((REPO / "tools" / "uv.lock").read_text())
@@ -101,6 +157,7 @@ def pinned_tools() -> dict[str, str]:
     assert m, "pre-commit-hooks"
     pins["pre-commit-hooks"] = m.group(1)
     pins["uv"] = "system tool"
+    pins.update({k: v for k, v in sdk_pins().items() if k in SDK_GENERATORS})
     return pins
 
 
@@ -132,6 +189,7 @@ def test_every_pinned_gate_tool_is_documented() -> None:
     direct += [re.split(r"[=<>]", d)[0].lower() for d in project["dependency-groups"]["dev"]]
     expected = set(binaries) | set(npm) | {d for d in direct if not d.startswith("types-")}
     expected |= set(go_tools())
+    expected |= set(SDK_GENERATORS)
     assert expected - documented == set()
 
 

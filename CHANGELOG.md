@@ -253,6 +253,15 @@ operated, and the order of the build.
   directory removal on delete, multipart layout and ETag) as built by M3-01; chapter 02
   "13. Configuration loading" item 4 lists the cross-check `file_fs_root_absolute`; ADR 0010
   "Confirmation" names the conformance suite and the property test.
+- `make api-clients` (gate G4) runs `generate-check` of `sdk/python` and `sdk/typescript`, fails
+  for a client directory with a tracked manifest but without that target and respects
+  `COMPONENTS`; `make bootstrap-ci` installs the locked SDK dependencies (`npm ci
+  --ignore-scripts`, `uv sync --locked`); `make typecheck` runs mypy inside each Python project and
+  `make lint` keeps bandit out of its `.venv` and generated code. New named values
+  `quality.coverage.python_min_percent` and `quality.coverage.typescript_min_percent`.
+- The CI path filter selects both SDK components for a change under `sdk/testdata/` (shared G5
+  fixtures); CodeQL analyses `javascript-typescript` (the TypeScript SDK); Renovate groups the SDK
+  code generators.
 
 ### Security
 

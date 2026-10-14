@@ -1,0 +1,11 @@
+# SPDX-License-Identifier: Apache-2.0
+#
+# Configuration of openapi-python-client for the generated core (`make generate`). Standard
+# settings (docs/spec/06-api.md 14): in particular `literal_enums` stays off, because the
+# tolerance layer (src/bothy_sdk/tolerance.py) needs enum classes. Only the post hooks are
+# set: ruff of the locked dev group runs with --isolated, so the output depends neither on the
+# working directory nor on a ruff configuration around it (the project excludes the generated
+# directory from ruff, which would otherwise skip it).
+post_hooks:
+  - "ruff check --isolated --target-version py311 --fix-only --no-cache --quiet ."
+  - "ruff format --isolated --no-cache --target-version py311 --quiet ."

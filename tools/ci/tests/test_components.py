@@ -20,6 +20,8 @@ import pytest
         (["sdk/python/src/x.py"], ["sdk-python"]),
         (["sdk/typescript/src/x.ts"], ["sdk-typescript"]),
         (["plugins/hermes-adapter/x.py"], ["plugins"]),
+        # Shared G5 fixtures of both SDKs (docs/DECISIONS.md M2-23/6).
+        (["sdk/testdata/tolerance/unknown_field.json"], ["sdk-python", "sdk-typescript"]),
         (["docs/api/openapi.yaml"], ["apps", "plugins", "sdk-python", "sdk-typescript", "server"]),
         (["docs/spec/07-permissions.md", "infra/compose/compose.yaml", "README.md"], []),
         # The server generates its route table and action catalogue from the action catalogue

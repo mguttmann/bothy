@@ -3,8 +3,9 @@
 Every tool of the gates with version, purpose, place of running, license and reason. A test keeps
 the versions on this page equal to the pins (`tools/docs/tests/test_toolchain_doc.py`):
 `tools/uv.lock`, `tools/node/package-lock.json`, `tools/bin/tools.lock.json`, `Makefile`,
-`tools/sonarqube/compose.yaml`, `.pre-commit-config.yaml`, the workflows and the
-`tool` directives of the Go modules under `services/`.
+`tools/sonarqube/compose.yaml`, `.pre-commit-config.yaml`, the workflows, the
+`tool` directives of the Go modules under `services/` and (code generators of the SDKs)
+`sdk/python/uv.lock` and `sdk/typescript/package-lock.json`.
 
 Place of running: "local" means via `make` on the developer's host, "CI" means in the
 same make target in GitHub Actions. All gate tools run in both places.
@@ -38,6 +39,8 @@ same make target in GitHub Actions. All gate tools run in both places.
 | `gitleaks` | `8.30.1` | secrets in all commits | MIT | as a CLI, not as an action (license obligation of the action in organizations) |
 | `golangci-lint` | `2.14.0` | Go linter bundle including gosec and depguard | GPL-3.0 | standard for Go; dependency rules of the modules (chapter 02) |
 | `oapi-codegen` | `v2.8.0` | Go server interface and models from `docs/api/openapi.yaml` (`tool` in `services/server/go.mod`, runs in `make codegen-check`) | Apache-2.0 ([LICENSE](https://github.com/oapi-codegen/oapi-codegen/blob/v2.8.0/LICENSE), retrieved 2026-10-12) | ADR 0013; 06 "Code generation" |
+| `openapi-python-client` | `0.29.1` | core of the Python SDK from `docs/api/openapi.yaml` (dev group of `sdk/python/pyproject.toml`, runs in `make api-clients`) | MIT | 06 "Code generation", ADR 0026 |
+| `openapi-typescript` | `7.13.0` | types of the TypeScript SDK from `docs/api/openapi.yaml` (`devDependencies` of `sdk/typescript/package.json`, runs in `make api-clients`) | MIT | 06 "Code generation", ADR 0026 |
 | `go-arch-lint` | `1.19.0` | module boundaries of the Go modules from the module register | MIT | checked in 02 "go-arch-lint" on a skeleton of all modules; checks packages and third-party libraries |
 | `sqlc` | `1.31.1` | typed Go code from SQL, drift check | MIT | ADR 0007 |
 | `govulncheck` | `v1.8.0` | reachable Go vulnerabilities | BSD-3-Clause | checks call graphs instead of only versions |
