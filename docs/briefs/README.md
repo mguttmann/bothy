@@ -90,8 +90,8 @@ the waves before it are merged; many can start earlier, as soon as their own dep
 | 6 | M1-11, M1-13, M4-13, M6-12, M8-02 |
 | 7 | M1-14, M1-15, M1-18, M1-23, M1-26, M4-14 |
 | 8 | M1-16, M1-19, M1-21, M1-24, M1-25, M1-27, M4-17, M7-01 |
-| 9 | M1-20, M1-28, M2-01, M4-18 |
-| 10 | M1-29, M1-32, M1-33, M4-19, M4-25 |
+| 9 | M1-20, M1-28, M2-01, M4-18, M7-10 |
+| 10 | M1-29, M1-32, M1-33, M4-19, M4-25, M7-11 |
 | 11 | M1-30, M1-31, M1-34, M4-20, M4-26 |
 | 12 | M1-35, M4-27, M4-29 |
 | 13 | M1-36, M1-44, M1-50 |
@@ -109,9 +109,9 @@ the waves before it are merged; many can start earlier, as soon as their own dep
 | 25 | M1-67, M1-68, M2-20 |
 | 26 | M1-69, M2-21, M2-43 |
 | 27 | M1-73, M2-02, M2-44, M3-03, M4-28, M4-31 |
-| 28 | M2-03, M2-04, M2-45, M2-47, M3-04, M4-35, M6-03, M7-02 |
-| 29 | M2-05, M2-46, M3-05, M3-06, M6-04, M7-03, M7-04 |
-| 30 | M2-06, M2-27, M2-48, M3-10, M3-11, M4-22, M6-07 |
+| 28 | M2-03, M2-04, M2-45, M2-47, M3-04, M4-35, M6-03, M7-02, M7-29 |
+| 29 | M2-05, M2-46, M3-05, M3-06, M6-04, M7-03, M7-04, M7-15 |
+| 30 | M2-06, M2-27, M2-48, M3-10, M3-11, M4-22, M6-07, M7-16 |
 | 31 | M2-08, M6-08, M6-09, M6-18 |
 | 32 | M2-09, M2-16 |
 | 33 | M2-10, M2-12, M2-14, M2-15, M2-17, M2-18, M2-19, M3-19, M8-03 |
@@ -121,9 +121,9 @@ the waves before it are merged; many can start earlier, as soon as their own dep
 | 37 | M2-36, M2-37, M2-50, M3-09, M3-12, M3-15, M3-16, M4-21, M4-23, M6-05, M8-04 |
 | 38 | M4-24, M5-02, M6-06, M6-14, M7-05, M8-05, M8-06 |
 | 39 | M4-32, M4-34, M4-36, M5-03, M5-04, M7-06, M7-09, M8-07 |
-| 40 | M4-38, M5-05, M5-06, M5-07, M5-08, M5-09, M6-16, M7-07, M7-08, M8-09 |
-| 41 | M5-10, M5-11, M6-17 |
-| 42 | M5-12 |
+| 40 | M4-38, M5-05, M5-06, M5-07, M5-08, M5-09, M6-16, M7-07, M7-08, M7-12, M7-14, M8-09 |
+| 41 | M5-10, M5-11, M6-17, M7-23 |
+| 42 | M5-12, M7-13 |
 | 43 | M5-13 |
 
 ## Index
@@ -362,6 +362,15 @@ names listed here.
 | 40 | M7-08 | Maintenance mode `read_only` (ADR 0065) | `M7-08-maintenance-mode.md` | M7-09 |
 | 39 | M7-09 | Status page with automatic checks | `M7-09-status-page.md` | M6-13, M7-02, M7-05 |
 | 14 | M7-22 | Audit log checkpoints in object storage | `M7-22-audit-checkpoints-s3.md` | M1-50, M3-02 |
+| 9 | M7-10 | Server release chain with a trial release (ADR 0036, 0060, 0062) | `M7-10-server-release-chain.md` | M7-01 |
+| 10 | M7-11 | Breaking-change check of the API against the last publication (G6) | `M7-11-api-breaking-check.md` | M1-03, M7-10 |
+| 40 | M7-12 | Desktop app distribution (ADR 0037) | `M7-12-desktop-distribution.md` | M4-34, M7-10 |
+| 42 | M7-13 | Mobile app distribution and minimum version | `M7-13-mobile-distribution.md` | M5-11, M7-12 |
+| 40 | M7-14 | Portability test in CI with the full stack | `M7-14-portability-test.md` | M2-29, M7-03, M7-09, M7-29 |
+| 29 | M7-15 | OpenTofu module `generic-vm` | `M7-15-tofu-generic-vm.md` | M7-29 |
+| 30 | M7-16 | OpenTofu modules `hetzner`, `aws`, `azure` | `M7-16-tofu-cloud-modules.md` | M7-15 |
+| 41 | M7-23 | Release chain of the host service | `M7-23-host-release-chain.md` | M2-48, M7-12 |
+| 28 | M7-29 | Setup wizard `install.sh` (installation in one command) | `M7-29-setup-wizard.md` | M1-73, M7-10 |
 | 5 | M8-01 | Discord read client with pure GET | `M8-01-discord-read-client.md` | M1-22 |
 | 6 | M8-02 | CDN fetch with host allow list | `M8-02-cdn-fetch.md` | M8-01 |
 | 33 | M8-03 | Import interface in the server | `M8-03-import-server.md` | M2-09 |
@@ -410,6 +419,12 @@ waves, the graph and the column "Depends on" of the plan against the index.
 | `console-e2e` | M6-03 |
 | `postgres-image` | M7-01 |
 | `postgres-image-test` | M7-01 |
+| `release-prep` | M7-10 |
+| `release-trial` | M7-10 |
+| `api-breaking` | M7-11 |
+| `portability-trial` | M7-14 |
+| `tofu-check` | M7-15 |
+| `tofu-vm-test` | M7-15 |
 
 To change a dependency, edit the column "Depends on" of the index and the row in the plan, then
 run `uv run --project tools --locked --quiet python tools/docs/brief_deps.py --write`; it
@@ -1049,8 +1064,25 @@ flowchart TB
   M6_13 --> M7_09
   M7_02 --> M7_09
   M7_05 --> M7_09
+  M7_01 --> M7_10
+  M1_03 --> M7_11
+  M7_10 --> M7_11
+  M4_34 --> M7_12
+  M7_10 --> M7_12
+  M5_11 --> M7_13
+  M7_12 --> M7_13
+  M2_29 --> M7_14
+  M7_03 --> M7_14
+  M7_09 --> M7_14
+  M7_29 --> M7_14
+  M7_29 --> M7_15
+  M7_15 --> M7_16
   M1_50 --> M7_22
   M3_02 --> M7_22
+  M2_48 --> M7_23
+  M7_12 --> M7_23
+  M1_73 --> M7_29
+  M7_10 --> M7_29
   M1_22 --> M8_01
   M8_01 --> M8_02
   M2_09 --> M8_03
