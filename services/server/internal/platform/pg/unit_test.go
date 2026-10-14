@@ -348,8 +348,11 @@ func TestUnitOfWork_RealDeadlockIsRetried(t *testing.T) {
 			t.Fatalf("a unit failed: %v", err)
 		}
 	}
-	if total := attempts[0].Load() + attempts[1].Load(); total != 3 {
-		t.Fatalf("attempts = %d and %d, want one retry", attempts[0].Load(), attempts[1].Load())
+	// At least one unit is a deadlock victim and runs again, and each unit commits exactly once
+	// (checked below). How many attempts each side needs is not fixed: CI runs saw both units
+	// retry (2 and 2), so the test does not demand exactly one retry.
+	if total := attempts[0].Load() + attempts[1].Load(); total < 3 {
+		t.Fatalf("attempts = %d and %d, want at least one retry", attempts[0].Load(), attempts[1].Load())
 	}
 	var v1, v2 string
 	q := pg.Querier(context.Background(), e.pool)
