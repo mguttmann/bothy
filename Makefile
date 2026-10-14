@@ -201,9 +201,11 @@ test: ## All tests with coverage data
 	cd tools && uv run --locked --quiet pytest --cov --cov-report=xml:../.cache/coverage/tools.xml --cov-report=term
 	@# Prerequisites first: without a Docker runtime the integration tests fail clearly (P-09).
 	@# The architecture tests of tools/archgen run the pinned go-arch-lint named by GO_ARCH_LINT.
+	@# -coverpkg=./...: a statement counts as covered when any test of its module runs it, also a
+	@# test in another package (a use case tested through its HTTP adapter); see PL/1.
 	@if [ -z "$(GO_ON)" ]; then $(call skip,go-test,no Go module selected); \
 	else $(GO_PREREQS) test || exit 1; gal=$(call tool,go-arch-lint) || exit 1; \
-	  for m in $(GO_MODS); do (cd $$m && GO_ARCH_LINT="$$gal" go test -race -covermode=atomic -coverprofile=coverage.out ./...) || exit 1; done; fi
+	  for m in $(GO_MODS); do (cd $$m && GO_ARCH_LINT="$$gal" go test -race -covermode=atomic -coverpkg=./... -coverprofile=coverage.out ./...) || exit 1; done; fi
 	@# --enforce-lockfile: a pubspec.lock that no longer matches pubspec.yaml fails instead of being
 	@# rewritten silently, so osv and licenses always read the lock file the tests ran with.
 	@if [ -z "$(DART_ON)" ]; then $(call skip,dart-test,no Dart package selected); \

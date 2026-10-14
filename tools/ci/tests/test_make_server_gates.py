@@ -576,6 +576,7 @@ def test_go_tests_check_prerequisites_first(fakes: Fakes, shell: list[str]) -> N
         "test",
         "-race",
         "-covermode=atomic",
+        "-coverpkg=./...",
         "-coverprofile=coverage.out",
         "./...",
     ]
