@@ -44,7 +44,7 @@ Rules for every brief:
 
 Product requirements implemented here:
 
-11. Only `GET`, only `https`, only hosts from `import.discord.cdn_hosts` (exact match after lowercasing, no wildcard, default port only), no redirects, no environment proxy (22 6.5 item 2, REUSE 5.2).
+11. Only `GET`, only `https`, only hosts from `import.discord.cdn_hosts` (exact match after lowercasing, no wildcard, the default port unless the entry names one), no redirects, no environment proxy (22 6.5 item 2, REUSE 5.2).
 12. No credential to the CDN: no `Authorization` header, no cookie jar; the request carries only `User-Agent` and `Accept` (22 4.1 last sentence, 14).
 13. Size: an attachment whose declared `size` is above `import.attachment_max_bytes` is not requested at all (22 6.5 item 1); a response with a larger `Content-Length` is rejected before reading; the body is read through a limit of `import.attachment_max_bytes` plus one byte and rejected when that byte arrives (REUSE 5.2).
 14. Expired signature: on `403` or `404` re-read the message once (`MessagesAround` with limit 1 of the message ID), take the attachment with the same ID, try once more; no further loop (22 6.5 item 3).
@@ -91,7 +91,7 @@ Change:
 
 ## Design notes
 
-1. **URL check before any connection** (22 6.5 item 2; REUSE 5.2). Parse with `url.Parse`; reject a URL with user information, a scheme other than `https` (`ErrCDNScheme`), a host not in `CDNConfig.Hosts` after lowercasing and without a trailing dot (`ErrCDNHostNotAllowed`), or an explicit port other than `443`. Then the egress client of M1-22 with `Options{Purpose: "import_cdn", Hosts: <exactly these hosts>, Redirects: egress.RedirectNever, Timeout: cfg.Timeout, MaxResponseBytes: cfg.MaxBytes + 1}` does the address checks after resolution (no private or blocked addresses; tests add the test-only rule with `allow_private` for their `.test` host). One egress client per fetcher is enough: the host policy already restricts every request to the allow list (REUSE 5.2 asks for "one transport per allowed host"; Ruling for docs/DECISIONS.md: the per-request host policy of `platform/egress` gives the same guarantee, because no connection is shared across a host that the policy did not allow).
+1. **URL check before any connection** (22 6.5 item 2; REUSE 5.2). Parse with `url.Parse`; reject a URL with user information, a scheme other than `https` (`ErrCDNScheme`), a host not in `CDNConfig.Hosts` after lowercasing and without a trailing dot (`ErrCDNHostNotAllowed`), or an explicit port other than the port of the matching allow-list entry (`443` when the entry names none; production entries from `import.discord.cdn_hosts` name none, while tests write the fake's port into the entry as `host:port`). Then the egress client of M1-22 with `Options{Purpose: "import_cdn", Hosts: <exactly these hosts>, Redirects: egress.RedirectNever, Timeout: cfg.Timeout, MaxResponseBytes: cfg.MaxBytes + 1}` does the address checks after resolution (no private or blocked addresses; tests add the test-only rule with `allow_private` for their `.test` host). One egress client per fetcher is enough: the host policy already restricts every request to the allow list (REUSE 5.2 asks for "one transport per allowed host"; Ruling for docs/DECISIONS.md: the per-request host policy of `platform/egress` gives the same guarantee, because no connection is shared across a host that the policy did not allow).
 
 2. **Redirects.** Any `3xx` is `ErrCDNRedirect` with the safe URL of the request; the `Location` header is never read into an error.
 
@@ -101,7 +101,7 @@ Change:
 
 5. **Fake CDN** (`discordtest.NewCDN`). TLS `httptest` on `127.0.0.1:0` under two host names (`cdn.discord.test`, `media.discord.test`) and one foreign host (`evil.test`) for the negative cases; files of a given size served with or without `Content-Length`; fault modes: `302` to the foreign host, `403` once then success with a new signature (the fake Discord answers the re-read with the fresh URL), `404` always, `429` with `retry_after`, oversize body behind a small `Content-Length` lie, an error body that echoes the request URL with its query. It logs method, host, path, query and whether `Authorization` or `Cookie` was present.
 
-6. **Rulings for `docs/DECISIONS.md`** (`D-M8-02-<n>`): one egress client with a host policy instead of one transport per host (note 1); the re-read rule and `ErrCDNGone` (note 4); the explicit port rule (`443` only) of note 1.
+6. **Rulings for `docs/DECISIONS.md`** (`D-M8-02-<n>`): one egress client with a host policy instead of one transport per host (note 1); the re-read rule and `ErrCDNGone` (note 4); the port rule of note 1 (`443` unless the allow-list entry names a port).
 
 ## Tests (write them first)
 

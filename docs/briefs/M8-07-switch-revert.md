@@ -63,6 +63,7 @@ Create (package `cmd/bothy/importtool`):
 Change:
 
 - `status.go` of M8-04 (note 4), `run.go` (the subcommands), `README.md` (the per-channel migration flow with the console steps).
+- `cmd/bothy/importtool/bothyapi/bothytest`: the routes `getChannel`, `listChannelThreads` and `listThreadMessages` that `revert` and `status` read.
 - `docs/spec/22-import-migration.md` 10.1 (the flag `--discord-locked`), 13.3 (that the flag stands for step 1).
 - `services/server/CHANGELOG.md`; `docs/DECISIONS.md` section 10 rows `D-M8-07-1` to `D-M8-07-4`.
 
@@ -104,13 +105,13 @@ Change:
 
 - `importtool/switch_test.go` with the fakes: `TestSwitchNeedsDiscordLocked` (exit `2`, no request at either fake); `TestSwitchHeldBackExit1` (busy and unsettled counts); `TestSwitchSecondRound`; `TestSwitchWrongLeadExit2`; `TestRevertOnlyReads` (Bothy fake logs only `GET`, Discord fake logs nothing); `TestStatusFlags`.
 - `test/importtool/switch_test.go` (plan acceptance: "integration test: mirror, switchover, test trigger, revert; two places never lead at the same time") against the real server, with Robin's step-up session standing in for the web console and the agent test client for Lotse:
-    1. Import and mirror a fixture channel with an imported session reference; `lead = discord`, read-only, no operator.
+    1. Seed: Alex has a grant with `trigger` on the target channel's space. Import and mirror a fixture channel with an imported session reference; `lead = discord`, read-only, no operator.
     2. A busy Discord message: `switch --discord-locked` exits `1`; after it settles and the busy reaction is gone, `switch` exits `0` and the message is copied once.
     3. Console step through the API: `setImportLead` `bothy`, `setChannelOperator` Lotse.
     4. Probe: Alex writes in the imported thread; exactly one run for Lotse; the imported session binds (`session_mode = bind`); Lotse's answer is in Bothy; the fake Discord logged only `GET` for the whole test.
     5. A late Discord message in the switched channel: the next mirror round warns and copies nothing.
     6. `revert` prints the thread with two Bothy messages (Alex and Lotse).
-    7. Console step: `setImportLead` `discord`; an active run of Lotse is cancelled with `channel_read_only`; Alex's `createMessage` is `403 channel_read_only`.
+    7. Alex triggers Lotse once more and the agent test client keeps the run `running`; console step: `setImportLead` `discord`; that run gets `run.cancel_requested` with `channel_read_only`; then the console removes the operator (`setChannelOperator` with the value 03 uses for no operator); Alex's `createMessage` is `403 channel_read_only`.
     8. The next mirror round copies the late Discord message of step 5, after the cursor, once.
     After every step the test asserts the invariant: stored `lead = discord` exactly when the Bothy channel is read-only and has no running run of Lotse started after the step; stored `lead = bothy` exactly when it is writable (22 12.1).
 

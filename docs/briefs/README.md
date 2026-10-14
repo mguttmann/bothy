@@ -13,8 +13,9 @@ before M1 closes, so that builds do not run out of work (D-W-100, D-W-114, D-W-1
 [DECISIONS.md](../DECISIONS.md)): they name interfaces of earlier milestones as those briefs and
 the merged code name them, and each carries the boundary that a build session follows merged
 code that differs only in names and stops with `Verdict: BLOCKED` where it behaves differently
-from the specification. Briefs of the milestones after these are written when the owner asks for
-them or when the milestone before them closes.
+from the specification. The brief of M8-09 (the execution) follows once M7-14 and M7-21 have
+briefs. Briefs of the milestones after these are written when the owner asks for them or when the
+milestone before them closes.
 
 ## How a brief runs
 

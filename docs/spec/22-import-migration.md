@@ -490,7 +490,7 @@ Who may bind is governed by `agent.invoke`: the binding arises only from a permi
 |---|---|
 | `bothy import login --server <url>` | logs the tool in as a `cli` device through device pairing; the owner approves the pairing code in the app or the web console; writes only the session file of the tool |
 | `bothy import logout` | ends the session on the server and deletes the session file |
-| `bothy import discord --guild <id> --map <file>` | dry run: only `GET` against Discord and Bothy, writes nothing, not even a local file; prints the check report |
+| `bothy import discord --guild <id> --map <file>` | dry run: only `GET` against Discord and Bothy, writes nothing, not even a local file (exceptions of the login in rule 5 of 10.2); prints the check report |
 | `… --apply` | imports into the source of this guild that the owner created and started in the web console (section 8); without such a running source exit `2` |
 | `… --apply --follow` | read mirror as a loop (section 12); without `--apply` one reading round per interval with "would copy" |
 | `… --apply --once` | exactly one round of the read mirror; for scheduled calls |
@@ -524,7 +524,7 @@ selects exactly these threads; `--sessions <file>` (section 9); `--report text|j
 | `0` | done, or dry run without errors |
 | `1` | run aborted (network, rate limit above the limit, server error); the state remains, a new run resumes |
 | `2` | invocation, mapping file or preflight check faulty; nothing written |
-| `3` | source already running (without `--takeover`); with `--once` the normal case for scheduled calls |
+| `3` | another run holds the lease of the source (without `--takeover`, section 7.4); with `--once` the normal case for scheduled calls |
 
 ## 11. Check report
 
@@ -665,7 +665,7 @@ When all channels have `lead = bothy`: end the mirror; source `completed` (`impo
 owner in the web console). The
 mapping `import_items` remains until the owner has the retention class `import` deleted
 ([20-privacy.md](20-privacy.md)). After that a repeated import is no longer idempotent;
-the tool warns before this step.
+the web console warns before this step (in the confirmation of the completion).
 
 ## 14. Security and privacy
 
