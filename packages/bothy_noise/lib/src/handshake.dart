@@ -121,6 +121,23 @@ Future<SymmetricState> _initialState(
   return ss;
 }
 
+/// The step counter and the broken flag of a handshake object, and the check at the start of
+/// every step: a broken object refuses every call (D-M2-38-8), a step out of order is an
+/// invalid state.
+mixin _HandshakeSteps {
+  int _step = 0;
+  bool _broken = false;
+
+  void _guard(String operation, int step) {
+    if (_broken) {
+      throw NoiseException(NoiseError.broken, operation);
+    }
+    if (_step != step) {
+      throw NoiseException(NoiseError.invalidState, operation);
+    }
+  }
+}
+
 /// The result of a completed handshake on the device.
 class NkResult {
   /// Creates the result; built by [NkInitiator.readMessage2].
@@ -138,7 +155,7 @@ class NkResult {
 
 /// The device side of the handshake `Noise_NK_25519_ChaChaPoly_SHA256`: [writeMessage1], then
 /// [readMessage2]. Not safe for overlapping calls: await each call before the next.
-class NkInitiator {
+class NkInitiator with _HandshakeSteps {
   NkInitiator._(
     this._ss,
     this._hostStatic,
@@ -150,8 +167,6 @@ class NkInitiator {
   final Uint8List _hostStatic;
   final SimpleKeyPair _ephemeral;
   final Uint8List _ephemeralPublic;
-  int _step = 0;
-  bool _broken = false;
 
   /// Starts the handshake to the host with [hostStaticPublicKey] (its pinned
   /// `noise_public_key`) for the session [sessionId] on the host [hostId] (16 bytes each,
@@ -264,15 +279,6 @@ class NkInitiator {
       throw const NoiseException(NoiseError.handshakeFailed, 'handshake step');
     }
   }
-
-  void _guard(String operation, int step) {
-    if (_broken) {
-      throw NoiseException(NoiseError.broken, operation);
-    }
-    if (_step != step) {
-      throw NoiseException(NoiseError.invalidState, operation);
-    }
-  }
 }
 
 /// Starts an initiator with a raw [prologue]; the public test vectors of TM-T01 use their own
@@ -303,7 +309,7 @@ Future<NkInitiator> startInitiatorWithPrologue({
 
 /// The host side of the handshake: readMessage1, then writeMessage2. Only for tests and fake
 /// hosts (docs/spec/15-client-architecture.md 23.1); exported by `package:bothy_noise/testing.dart`.
-class NkResponder {
+class NkResponder with _HandshakeSteps {
   NkResponder._(this._ss, this._static, this._ephemeral, this._ephemeralPublic);
 
   final SymmetricState _ss;
@@ -311,8 +317,6 @@ class NkResponder {
   final SimpleKeyPair _ephemeral;
   final Uint8List _ephemeralPublic;
   Uint8List? _initiatorEphemeral;
-  int _step = 0;
-  bool _broken = false;
 
   /// Starts the host side with its [staticKeyPair] for [sessionId] on [hostId]. [ephemeral]
   /// fixes the ephemeral key of message 2 for recordings; null generates a fresh one.
@@ -432,15 +436,6 @@ class NkResponder {
       // Any other failure of a step ends the handshake as well (D-M2-38-8).
       _broken = true;
       throw const NoiseException(NoiseError.handshakeFailed, 'handshake step');
-    }
-  }
-
-  void _guard(String operation, int step) {
-    if (_broken) {
-      throw NoiseException(NoiseError.broken, operation);
-    }
-    if (_step != step) {
-      throw NoiseException(NoiseError.invalidState, operation);
     }
   }
 }

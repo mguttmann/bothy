@@ -82,38 +82,8 @@ void main() {
     );
     expect(p, [
       ...ascii.encode('bothy-terminal/1'),
-      0x01,
-      0x92,
-      0xf4,
-      0xa0,
-      0x7b,
-      0x1c,
-      0x7b,
-      0x22,
-      0x9d,
-      0x4f,
-      0x5a,
-      0x6b,
-      0x7c,
-      0x8d,
-      0x9e,
-      0x0f, //
-      0x01,
-      0x92,
-      0xf4,
-      0xa0,
-      0x7b,
-      0x1c,
-      0x7b,
-      0x22,
-      0x9d,
-      0x4f,
-      0x5a,
-      0x6b,
-      0x7c,
-      0x8d,
-      0x9e,
-      0x10,
+      ...hexBytes('0192f4a07b1c7b229d4f5a6b7c8d9e0f'),
+      ...hexBytes('0192f4a07b1c7b229d4f5a6b7c8d9e10'),
     ]);
     expect(
       () => buildPrologue(Uint8List(15), Uint8List(16)),
@@ -609,3 +579,9 @@ Future<(Uint8List, NoiseTransport)> resp2Pair(
   await r.readMessage1(m1);
   return r.writeMessage2(const []);
 }
+
+/// The bytes of a hex string with two digits per byte.
+List<int> hexBytes(String hex) => [
+  for (var i = 0; i < hex.length; i += 2)
+    int.parse(hex.substring(i, i + 2), radix: 16),
+];
