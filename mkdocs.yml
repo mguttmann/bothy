@@ -426,3 +426,14 @@ nav:
           - "M8-09: Carry out the migration of an existing installation (owner go)": briefs/M8-09-migration-execution.md
           - "M8-10: Login and API client of the import tool": briefs/M8-10-import-login-client.md
           - "M8-11: Thread, message, pin and file items of the import interface": briefs/M8-11-import-content-items.md
+      - Milestone M7:
+          - "M7-01: Image `bothy-postgres` with pgBackRest": briefs/M7-01-postgres-image.md
+          - "M7-02: Backup service: schedules, manifest and metrics (ADR 0058)": briefs/M7-02-backup-service.md
+          - "M7-03: Automatic restore test": briefs/M7-03-restore-test.md
+          - "M7-04: `bothy restore finalize` and sync epoch (ADR 0059)": briefs/M7-04-restore-finalize-epoch.md
+          - "M7-05: Retention per class": briefs/M7-05-retention-per-class.md
+          - "M7-06: Access, export, account deletion and rectification": briefs/M7-06-privacy-requests.md
+          - "M7-07: Deletion journal and restore": briefs/M7-07-deletion-journal.md
+          - "M7-08: Maintenance mode `read_only` (ADR 0065)": briefs/M7-08-maintenance-mode.md
+          - "M7-09: Status page with automatic checks": briefs/M7-09-status-page.md
+          - "M7-22: Audit log checkpoints in object storage": briefs/M7-22-audit-checkpoints-s3.md

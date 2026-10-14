@@ -2736,6 +2736,14 @@ events:
   resource: gdpr_request
   receive_action: gdpr.request.read
   resource_version: false
+- type: gdpr.request_due
+  kind: durable
+  resource: principal
+  receive_action: self
+  audience: self
+  note: an open privacy request reaches the reminder lead before its `due_at`; to every active owner, once
+    per request; payload only `request_id`, `kind` and `due_at` (R-AZ-35)
+  resource_version: false
 - type: import.progress
   kind: durable
   resource: import_source

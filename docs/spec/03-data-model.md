@@ -126,12 +126,14 @@ Purpose: exactly one row with the identity of this installation. Module: `instan
 | `schema_version` | `bigint` | no | | last applied migration, for display only |
 | `min_server_version` | `text` | yes | | SemVer; lowest server version that may run with this schema; set by `bothy migrate`. A server with a lower version reports not ready ([16-operations.md](16-operations.md), section 10) |
 | `sync_epoch` | `uuid` | no | | UUIDv7 of the current timeline of the event log; generated on the first `bothy migrate up`, new after every restore (section 6.7) |
+| `pg_system_identifier` | `text` | yes | | `system_identifier` of `pg_control_system()` of the database cluster, as decimal text (the value is an unsigned 64-bit number); set by `bothy migrate up` while empty and by `bothy restore finalize` (section 6.7, R-DM-50) |
+| `pg_timeline_id` | `bigint` | yes | | `timeline_id` of `pg_control_checkpoint()`, read together with `pg_system_identifier` (R-DM-50) |
 | `created_at` | `timestamptz` | no | `now()` | |
 
 PK: `id`. FK: none. Unique: `instance_id`. Indexes: no others.
 Retention: `config`. `bothy migrate up` creates the row if it is missing
 (`INSERT ... ON CONFLICT (id) DO NOTHING`), and then sets `schema_version` and
-`min_server_version`; it never changes `instance_id`, `sync_epoch` and `setup_completed_at`. Reason:
+`min_server_version`; it never changes `instance_id`, `sync_epoch` and `setup_completed_at`, and it sets `pg_system_identifier` and `pg_timeline_id` only while they are empty. Reason:
 `migrate` is the first step of every installation, and the readiness check needs
 `min_server_version` before there is an owner.
 
@@ -1831,12 +1833,12 @@ requests) never stand in this table. Delivery fields (invocation token,
 #### `event_consumer_cursors`
 
 Purpose: durable read position of the consumers in the `worker` that create external effects
-from the event log (push, outgoing webhooks; [02-architecture.md](02-architecture.md),
+from the event log (push, outgoing webhooks, deletion journal; [02-architecture.md](02-architecture.md),
 section 11.5). Module: `sync`.
 
 | Field | Type | Null | Default | Rules / notes |
 |---|---|---|---|---|
-| `name` | `text` | no | | `CHECK (name IN ('push','webhooks'))`; new consumers are an additive migration |
+| `name` | `text` | no | | `CHECK (name IN ('push','webhooks','privacy.journal'))`; new consumers are an additive migration (`privacy.journal`: M7-07, deletion journal of [20-privacy.md](20-privacy.md), section 4.6) |
 | `last_seq` | `bigint` | no | `0` | highest processed global sequence |
 | `updated_at` | `timestamptz` | no | `now()` | |
 
@@ -2246,6 +2248,24 @@ DELETE SET NULL. Unique: partial index `(subject_user_id, kind) WHERE state IN (
 'approved','running')`. Indexes: `(state, due_at)` for the job worker and deadline warnings.
 Retention: `privacy_job`.
 
+#### `deletion_journal_state`
+
+Purpose: the numbering of the deletion journal outside the database ([20-privacy.md](20-privacy.md),
+section 4.6). The object storage port has no listing, so journal objects carry dense numbers, and
+this single row says which number comes next and which is the lowest one not yet removed. Module:
+`privacy`.
+
+| Field | Type | Null | Default | Rules / notes |
+|---|---|---|---|---|
+| `id` | `smallint` | no | `1` | `CHECK (id = 1)`: exactly one row |
+| `next_number` | `bigint` | no | `1` | number of the next journal object; moves in the transaction that moves the cursor `privacy.journal` |
+| `low_number` | `bigint` | no | `1` | lowest number whose object the retention has not removed yet; the retention removes an object only when it is older than `privacy.deletion_journal_retention` and its number is below the `deletion_journal.next_number` of every backup that is still kept, so a restore of any kept backup finds its first object |
+| `updated_at` | `timestamptz` | no | `now()` | |
+
+PK: `id`. FK: none. Indexes: via the PK. Retention: `config`. After a restore, `bothy restore
+finalize` reads the journal from the restored `next_number` up to the first missing number and
+stores the number after the last object found (R-DM-52).
+
 #### `status_components`
 
 Purpose: components of the status page. Module: `status`.
@@ -2646,6 +2666,7 @@ with the same numbers. Therefore:
 2. Clients store the epoch together with the cursor. If it differs, the server requires a resync
    ([04-sync-protocol.md](04-sync-protocol.md), section 7.5).
 3. A move without data loss ([16-operations.md](16-operations.md), section 11) keeps the epoch.
+4. `bothy restore finalize` also stores the identity of the restored database in `instance.pg_system_identifier` and `instance.pg_timeline_id` in the same transaction. A server whose current database identity differs from the stored one does not become ready until `bothy restore finalize` has run, because a restore without it would mix two timelines; a move without data loss stores the new identity without a new epoch (R-DM-50; the readiness reason and the operator switch are in [16-operations.md](16-operations.md), section 8.4).
 
 ### 6.8 I6 check
 
@@ -2736,6 +2757,8 @@ section 4 applies, and the gate fails.
 | R-DM-47 | `runs.invocation_held_until` is also set while the server transcript of a triggering voice message is `pending`; the release follows the same rules with `voice.transcript_hold_max`. | 04 section 15.3 step 1 and R-SY-20 hold `agent.invocation` until a server transcript is final, and the column already names `voice.transcript_hold_max`, but its rule named only attachments (D-W-108). |
 | R-DM-48 | The ETag of a transcript is derived from its four transcript columns; `files` gets no `version` column. | 05 section 4.8 requires `If-Match` for `file.transcript.submit`; a derived strong ETag (as for other rows without a version, 06 section 8 point 1) detects a lost update without a new column that every file write would have to raise (D-W-108). |
 | R-DM-49 | `auth_sessions` stores "View as person" of a console session in `view_as_user_id` and `view_as_started_at` (console sessions only, both set or both empty); `access.view_as` from a console session sets them in the transaction of its audit entry, `access.view_as.end` or the first request after `authz.view_as_max_duration` clears them with an audit entry of the end. | [07-permissions.md](07-permissions.md) section 9.2 requires state on the console session (target person, start) and operations to start and end it, added to the core contract before PLAN M6-01 builds the console session (D-W-100 extended to M5 and M6). |
+| R-DM-50 | `instance` stores the identity of the database cluster (`pg_system_identifier`, `pg_timeline_id`); `bothy migrate up` fills it while empty, `bothy restore finalize` replaces it after a restore or a move, and a differing current identity keeps the server not ready (section 6.7). | [ADR 0059](../adr/0059-sync-epoch-after-restore.md) leaves the start lock open; a point-in-time restore raises the timeline and a logical restore changes the system identifier, so both are detected without a value outside the database. |
+| R-DM-52 | The deletion journal numbers its objects densely in `deletion_journal_state` (module `privacy`): the consumer `privacy.journal` writes object `next_number` and moves the number with its cursor, the retention removes objects from `low_number` upward, and `bothy restore finalize` continues from the restored `next_number` to the first missing number. | The object storage port has no listing and no conditional write (core S3, [ADR 0010](../adr/0010-object-storage-behind-an-s3-interface-local-driver-as-default.md)); dense numbers make the journal readable and deletable without either. |
 
 ## 9. Configuration values of this chapter
 

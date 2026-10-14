@@ -11,6 +11,7 @@ documented in this file. The format is based on
 
 ### Added
 
+- `KNOWN_EVENT_TYPES` lists the personal event `gdpr.request_due` (R-AZ-35).
 - Generated types `src/generated/openapi.ts` from `docs/api/openapi.yaml` (openapi-typescript
   7.13.0, standard settings).
 - `make generate` and `make generate-check` (gate G4: drift check, `tsc --noEmit` with

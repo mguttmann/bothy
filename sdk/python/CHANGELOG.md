@@ -11,6 +11,7 @@ documented in this file. The format is based on
 
 ### Added
 
+- Generated models of the personal event `gdpr.request_due` (R-AZ-35).
 - Generated core `bothy_sdk.generated` from `docs/api/openapi.yaml` (openapi-python-client
   0.29.1, standard settings): models and sync and async functions of every REST operation.
 - `make generate` and `make generate-check` (gate G4: drift check, compileall, mypy).

@@ -167,7 +167,7 @@ Diagram: [c4-3-server-components.svg](../architecture/c4-3-server-components.svg
 | `stats` | statistics for console and apps: usage per space, runs, tool calls, costs, error rates; own measurement (counters in memory, flush, retention), SLO traffic light, live frame `stats.live`, timeline | `stats_minutes` | 01, 17, 25 |
 | `apps` | apps and manifests, installations, scopes, outgoing webhooks with consumer and delivery, incoming webhooks | `apps`, `app_installations`, `webhook_subscriptions`, `webhook_deliveries`, `incoming_webhooks` | 11 |
 | `importer` | import sources, batches with origin key (`import.apply`), ownership list and read-only state of mirrored channels; the dry run lives in the tool | `import_sources`, `import_items` | 22 |
-| `privacy` | privacy requests, export and deletion through the participants of all modules | `gdpr_requests` | 20 |
+| `privacy` | privacy requests, export and deletion through the participants of all modules, deletion journal | `gdpr_requests`, `deletion_journal_state` | 20 |
 | `status` | status page, components, incidents, automatic checks, backup runs | `status_components`, `status_incidents`, `status_incident_updates`, `status_incident_components`, `backup_runs` | 16, 17 |
 | `terminal` | hosts and pairing, declaration of the LLM login (I6), session users per person (T12), terminal sessions, terminal session tokens, control connections of the host services, relay of the streams | `hosts`, `host_session_users`, `terminal_sessions` | 24 |
 
@@ -342,7 +342,7 @@ An event type has exactly one producing module. The receive action is in 05 sect
 | `notify` | `notification_pref.updated`, `quiet_hours.updated` | `notification.created` | |
 | `apps` | | | |
 | `status` | `status.updated` | | |
-| `privacy` | `gdpr.request_updated` | | |
+| `privacy` | `gdpr.request_updated`, `gdpr.request_due` | | |
 | `importer` | `import.progress` | | |
 | `gateway` | | `typing.started` | `identify`, `resume`, `heartbeat`, `reauth`, `focus`, `typing.start`, `typing.stop` |
 | `search` | | | |

@@ -25,6 +25,7 @@ if TYPE_CHECKING:
     from ..models.draft_deleted_event import DraftDeletedEvent
     from ..models.draft_updated_event import DraftUpdatedEvent
     from ..models.file_updated_event import FileUpdatedEvent
+    from ..models.gdpr_request_due_event import GdprRequestDueEvent
     from ..models.gdpr_request_updated_event import GdprRequestUpdatedEvent
     from ..models.grant_changed_event import GrantChangedEvent
     from ..models.group_changed_event import GroupChangedEvent
@@ -71,10 +72,10 @@ class EventPage:
         events (list[AccessChangedEvent | AccessExpiringEvent | AgentConfigChangedEvent | AgentFollowupEvent |
             AgentInvocationEvent | AgentSessionChangedEvent | AgentUpdatedEvent | ChannelArchivedEvent | ChannelCreatedEvent
             | ChannelSettingsChangedEvent | ChannelUpdatedEvent | CommandChangedEvent | CommandInvokedEvent |
-            DevicePendingEvent | DraftDeletedEvent | DraftUpdatedEvent | FileUpdatedEvent | GdprRequestUpdatedEvent |
-            GrantChangedEvent | GroupChangedEvent | HostUpdatedEvent | ImportProgressEvent | InstanceUpdatedEvent |
-            InteractionCreatedEvent | MessageCreatedEvent | MessageDeletedEvent | MessageUpdatedEvent |
-            NotificationPrefUpdatedEvent | PinAddedEvent | PinRemovedEvent | QuietHoursUpdatedEvent | ReactionAddedEvent |
+            DevicePendingEvent | DraftDeletedEvent | DraftUpdatedEvent | FileUpdatedEvent | GdprRequestDueEvent |
+            GdprRequestUpdatedEvent | GrantChangedEvent | GroupChangedEvent | HostUpdatedEvent | ImportProgressEvent |
+            InstanceUpdatedEvent | InteractionCreatedEvent | MessageCreatedEvent | MessageDeletedEvent | MessageUpdatedEvent
+            | NotificationPrefUpdatedEvent | PinAddedEvent | PinRemovedEvent | QuietHoursUpdatedEvent | ReactionAddedEvent |
             ReactionRemovedEvent | ReadStateUpdatedEvent | RunCancelRequestedEvent | RunStateChangedEvent |
             SessionRevokedEvent | SettingsUpdatedEvent | SidebarUpdatedEvent | SpaceArchivedEvent | SpaceCreatedEvent |
             SpaceUpdatedEvent | StatusUpdatedEvent | TerminalSessionChangedEvent | ThreadClosedEvent | ThreadCreatedEvent |
@@ -102,6 +103,7 @@ class EventPage:
         | DraftDeletedEvent
         | DraftUpdatedEvent
         | FileUpdatedEvent
+        | GdprRequestDueEvent
         | GdprRequestUpdatedEvent
         | GrantChangedEvent
         | GroupChangedEvent
@@ -160,6 +162,7 @@ class EventPage:
         from ..models.draft_deleted_event import DraftDeletedEvent
         from ..models.draft_updated_event import DraftUpdatedEvent
         from ..models.file_updated_event import FileUpdatedEvent
+        from ..models.gdpr_request_due_event import GdprRequestDueEvent
         from ..models.gdpr_request_updated_event import GdprRequestUpdatedEvent
         from ..models.grant_changed_event import GrantChangedEvent
         from ..models.group_changed_event import GroupChangedEvent
@@ -242,6 +245,7 @@ class EventPage:
                 or isinstance(events_item_data, NotificationPrefUpdatedEvent)
                 or isinstance(events_item_data, QuietHoursUpdatedEvent)
                 or isinstance(events_item_data, GdprRequestUpdatedEvent)
+                or isinstance(events_item_data, GdprRequestDueEvent)
                 or isinstance(events_item_data, ImportProgressEvent)
                 or isinstance(events_item_data, AgentInvocationEvent)
                 or isinstance(events_item_data, AgentFollowupEvent)
@@ -295,6 +299,7 @@ class EventPage:
         from ..models.draft_deleted_event import DraftDeletedEvent
         from ..models.draft_updated_event import DraftUpdatedEvent
         from ..models.file_updated_event import FileUpdatedEvent
+        from ..models.gdpr_request_due_event import GdprRequestDueEvent
         from ..models.gdpr_request_updated_event import GdprRequestUpdatedEvent
         from ..models.grant_changed_event import GrantChangedEvent
         from ..models.group_changed_event import GroupChangedEvent
@@ -357,6 +362,7 @@ class EventPage:
                 | DraftDeletedEvent
                 | DraftUpdatedEvent
                 | FileUpdatedEvent
+                | GdprRequestDueEvent
                 | GdprRequestUpdatedEvent
                 | GrantChangedEvent
                 | GroupChangedEvent
@@ -769,7 +775,7 @@ class EventPage:
                 try:
                     if not isinstance(data, dict):
                         raise TypeError()
-                    componentsschemas_event_type_42 = ImportProgressEvent.from_dict(
+                    componentsschemas_event_type_42 = GdprRequestDueEvent.from_dict(
                         data
                     )
 
@@ -779,7 +785,7 @@ class EventPage:
                 try:
                     if not isinstance(data, dict):
                         raise TypeError()
-                    componentsschemas_event_type_43 = AgentInvocationEvent.from_dict(
+                    componentsschemas_event_type_43 = ImportProgressEvent.from_dict(
                         data
                     )
 
@@ -789,7 +795,9 @@ class EventPage:
                 try:
                     if not isinstance(data, dict):
                         raise TypeError()
-                    componentsschemas_event_type_44 = AgentFollowupEvent.from_dict(data)
+                    componentsschemas_event_type_44 = AgentInvocationEvent.from_dict(
+                        data
+                    )
 
                     return componentsschemas_event_type_44
                 except (TypeError, ValueError, AttributeError, KeyError):
@@ -797,9 +805,7 @@ class EventPage:
                 try:
                     if not isinstance(data, dict):
                         raise TypeError()
-                    componentsschemas_event_type_45 = RunCancelRequestedEvent.from_dict(
-                        data
-                    )
+                    componentsschemas_event_type_45 = AgentFollowupEvent.from_dict(data)
 
                     return componentsschemas_event_type_45
                 except (TypeError, ValueError, AttributeError, KeyError):
@@ -807,7 +813,7 @@ class EventPage:
                 try:
                     if not isinstance(data, dict):
                         raise TypeError()
-                    componentsschemas_event_type_46 = InteractionCreatedEvent.from_dict(
+                    componentsschemas_event_type_46 = RunCancelRequestedEvent.from_dict(
                         data
                     )
 
@@ -817,7 +823,7 @@ class EventPage:
                 try:
                     if not isinstance(data, dict):
                         raise TypeError()
-                    componentsschemas_event_type_47 = CommandInvokedEvent.from_dict(
+                    componentsschemas_event_type_47 = InteractionCreatedEvent.from_dict(
                         data
                     )
 
@@ -827,7 +833,7 @@ class EventPage:
                 try:
                     if not isinstance(data, dict):
                         raise TypeError()
-                    componentsschemas_event_type_48 = AgentConfigChangedEvent.from_dict(
+                    componentsschemas_event_type_48 = CommandInvokedEvent.from_dict(
                         data
                     )
 
@@ -837,18 +843,28 @@ class EventPage:
                 try:
                     if not isinstance(data, dict):
                         raise TypeError()
-                    componentsschemas_event_type_49 = HostUpdatedEvent.from_dict(data)
+                    componentsschemas_event_type_49 = AgentConfigChangedEvent.from_dict(
+                        data
+                    )
 
                     return componentsschemas_event_type_49
                 except (TypeError, ValueError, AttributeError, KeyError):
                     pass
+                try:
+                    if not isinstance(data, dict):
+                        raise TypeError()
+                    componentsschemas_event_type_50 = HostUpdatedEvent.from_dict(data)
+
+                    return componentsschemas_event_type_50
+                except (TypeError, ValueError, AttributeError, KeyError):
+                    pass
                 if not isinstance(data, dict):
                     raise TypeError()
-                componentsschemas_event_type_50 = TerminalSessionChangedEvent.from_dict(
+                componentsschemas_event_type_51 = TerminalSessionChangedEvent.from_dict(
                     data
                 )
 
-                return componentsschemas_event_type_50
+                return componentsschemas_event_type_51
 
             events_item = _parse_events_item(events_item_data)
 

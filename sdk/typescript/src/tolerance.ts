@@ -80,6 +80,7 @@ export const KNOWN_EVENT_TYPES = [
   "notification_pref.updated",
   "quiet_hours.updated",
   "gdpr.request_updated",
+  "gdpr.request_due",
   "import.progress",
   "agent.invocation",
   "agent.followup",
