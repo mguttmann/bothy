@@ -37,6 +37,25 @@ func TestObjectStoreHasExactlyThePortOperations(t *testing.T) {
 	}
 }
 
+// TestPresignUploadPartTakesThePartSize holds docs/DECISIONS.md M3-02/9: PresignUploadPart takes
+// the part size before the validity, so the S3 driver can bind the length into the signature
+// (12 "3.3", R-FI-02).
+func TestPresignUploadPartTakesThePartSize(t *testing.T) {
+	t.Parallel()
+	m, ok := reflect.TypeFor[app.ObjectStore]().MethodByName("PresignUploadPart")
+	if !ok {
+		t.Fatal("no PresignUploadPart")
+	}
+	var got []string
+	for i := range m.Type.NumIn() {
+		got = append(got, m.Type.In(i).String())
+	}
+	want := []string{"context.Context", "string", "string", "int", "int64", "time.Duration"}
+	if !slices.Equal(got, want) {
+		t.Errorf("PresignUploadPart parameters = %v, want %v", got, want)
+	}
+}
+
 // TestErrInvalidKeyIsTheDomainError: callers test one value, whichever layer refused the key.
 func TestErrInvalidKeyIsTheDomainError(t *testing.T) {
 	t.Parallel()

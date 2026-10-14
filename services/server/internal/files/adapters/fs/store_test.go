@@ -267,7 +267,7 @@ func allOps(ctx context.Context, s app.ObjectStore, key string) map[string]error
 	_, headErr := s.Head(ctx, key)
 	_, createErr := s.CreateMultipart(ctx, key)
 	_, partErr := s.UploadPart(ctx, key, "", 1, strings.NewReader("x"), 1)
-	_, presignErr := s.PresignUploadPart(ctx, key, "", 1, time.Minute)
+	_, presignErr := s.PresignUploadPart(ctx, key, "", 1, 1, time.Minute)
 	return map[string]error{
 		"Put":               s.Put(ctx, key, strings.NewReader("x"), 1),
 		"Get":               getErr,
@@ -828,13 +828,17 @@ func TestPresignNotSupported(t *testing.T) {
 	t.Parallel()
 	root := newRoot(t)
 	s := openStore(t, root)
-	_, err := s.PresignUploadPart(t.Context(), origKey(t, ids.New()), "", 1, time.Minute)
+	_, err := s.PresignUploadPart(t.Context(), origKey(t, ids.New()), "", 1, 1, time.Minute)
 	if !errors.Is(err, app.ErrNotSupported) {
 		t.Errorf("PresignUploadPart err = %v, want ErrNotSupported", err)
 	}
 	// The port contract refuses a part number below 1 first, on every driver.
-	if _, err := s.PresignUploadPart(t.Context(), origKey(t, ids.New()), "", 0, time.Minute); !errors.Is(err, app.ErrInvalidPart) {
+	if _, err := s.PresignUploadPart(t.Context(), origKey(t, ids.New()), "", 0, 1, time.Minute); !errors.Is(err, app.ErrInvalidPart) {
 		t.Errorf("PresignUploadPart(0) err = %v, want ErrInvalidPart", err)
+	}
+	// So is a size below 1 (docs/DECISIONS.md M3-02/9).
+	if _, err := s.PresignUploadPart(t.Context(), origKey(t, ids.New()), "", 1, 0, time.Minute); !errors.Is(err, app.ErrSizeMismatch) {
+		t.Errorf("PresignUploadPart(size 0) err = %v, want ErrSizeMismatch", err)
 	}
 	if got := entries(t, root); !slices.Equal(got, []string{".tmp/"}) {
 		t.Errorf("entries = %v", got)

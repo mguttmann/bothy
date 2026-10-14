@@ -67,6 +67,11 @@
       ]
     },
     {
+      "description": "SeaweedFS image of the S3 driver tests (docs/DECISIONS.md M3-02/13): its version equals BOTHY_SEAWEEDFS_VERSION, so it joins the group Compose-Images and moves in the same pull request; TestSeaweedImagePinned fails when the three differ",
+      "matchFileNames": ["services/server/internal/files/adapters/s3/seaweed_test.go"],
+      "groupName": "Compose-Images"
+    },
+    {
       "description": "Local SonarQube and its database",
       "matchFileNames": ["tools/sonarqube/compose.yaml"],
       "groupName": "local SonarQube"
@@ -112,6 +117,14 @@
         "image: (?<depName>[a-z0-9][a-z0-9./_-]*):\\$\\{BOTHY_[A-Z0-9_]+_VERSION:-(?<currentValue>[^}\\s]+)\\}"
       ],
       "datasourceTemplate": "docker"
+    },
+    {
+      "customType": "regex",
+      "description": "SeaweedFS image of the S3 driver tests, pinned by digest; the version follows BOTHY_SEAWEEDFS_VERSION",
+      "managerFilePatterns": ["/^services/server/internal/files/adapters/s3/seaweed_test\\.go$/"],
+      "matchStrings": [
+        "// renovate: datasource=(?<datasource>\\S+) depName=(?<depName>\\S+)\\nconst seaweedImage = \"[^:\"]+:(?<currentValue>[^@\"]+)@(?<currentDigest>sha256:[0-9a-f]{64})\""
+      ]
     },
     {
       "customType": "regex",

@@ -486,14 +486,14 @@ Source: [12-files.md](../spec/12-files.md), section 18.
 | `file.storage.driver` | `BOTHY_FILE__STORAGE__DRIVER` | Server | enum(fs, s3) | `fs` | `fs` or `s3` | active |
 | `file.fs.root` | `BOTHY_FILE__FS__ROOT` | Server | string | `/var/lib/bothy/files` | root of the file system driver (path in the container) | active |
 | `file.fs.min_free_bytes` | `BOTHY_FILE__FS__MIN_FREE_BYTES` | Server |  | `2147483648` | free space below which uploads are rejected with `503 unavailable` (`reason` `storage_full`) | planned (M3) |
-| `file.s3.endpoint` | `BOTHY_FILE__S3__ENDPOINT` | Server |  | empty | S3 endpoint | planned (M3) |
-| `file.s3.region` | `BOTHY_FILE__S3__REGION` | Server |  | `us-east-1` | region for the signature | planned (M3) |
-| `file.s3.bucket` | `BOTHY_FILE__S3__BUCKET` | Server |  | empty | bucket | planned (M3) |
-| `file.s3.prefix` | `BOTHY_FILE__S3__PREFIX` | Server |  | empty | prefix before all keys | planned (M3) |
-| `file.s3.use_path_style` | `BOTHY_FILE__S3__USE_PATH_STYLE` | Server |  | `true` | path style instead of virtual hosts | planned (M3) |
-| `file.s3.checksum_mode` | `BOTHY_FILE__S3__CHECKSUM_MODE` | Server |  | `when_required` | SDK checksums for request and response | planned (M3) |
-| `file.s3.access_key_ref` | `BOTHY_FILE__S3__ACCESS_KEY_REF` | Server |  | `file:<secrets.dir>/s3_access_key` | references to the secret provider; read only with `file.storage.driver = s3` | planned (M3) |
-| `file.s3.secret_key_ref` | `BOTHY_FILE__S3__SECRET_KEY_REF` | Server |  | `file:<secrets.dir>/s3_secret_key` | references to the secret provider; read only with `file.storage.driver = s3` | planned (M3) |
+| `file.s3.endpoint` | `BOTHY_FILE__S3__ENDPOINT` | Server | string | empty | S3 endpoint | active |
+| `file.s3.region` | `BOTHY_FILE__S3__REGION` | Server | string | `us-east-1` | region for the signature | active |
+| `file.s3.bucket` | `BOTHY_FILE__S3__BUCKET` | Server | string | empty | bucket | active |
+| `file.s3.prefix` | `BOTHY_FILE__S3__PREFIX` | Server | string | empty | prefix before all keys | active |
+| `file.s3.use_path_style` | `BOTHY_FILE__S3__USE_PATH_STYLE` | Server | bool | `true` | path style instead of virtual hosts | active |
+| `file.s3.checksum_mode` | `BOTHY_FILE__S3__CHECKSUM_MODE` | Server | enum(when_required, when_supported) | `when_required` | SDK checksums for request and response: `when_required` or `when_supported` (only with an `https` endpoint) | active |
+| `file.s3.access_key_ref` | `BOTHY_FILE__S3__ACCESS_KEY_REF` | Server | secret_ref | `file:<secrets.dir>/s3_access_key` | reference to the secret provider; read only with `file.storage.driver = s3` | active |
+| `file.s3.secret_key_ref` | `BOTHY_FILE__S3__SECRET_KEY_REF` | Server | secret_ref | `file:<secrets.dir>/s3_secret_key` | reference to the secret provider; read only with `file.storage.driver = s3` | active |
 | `file.s3.presigned_upload` | `BOTHY_FILE__S3__PRESIGNED_UPLOAD` | Server |  | `false` | allow mode `presigned` | planned (M3) |
 | `file.s3.presign_ttl` | `BOTHY_FILE__S3__PRESIGN_TTL` | Server |  | `15m` | validity of a presigned URL | planned (M3) |
 | `file.upload_part_bytes` | `BOTHY_FILE__UPLOAD_PART_BYTES` | Server |  | `8388608` | part size | planned (M3) |

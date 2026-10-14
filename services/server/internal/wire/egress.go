@@ -60,6 +60,6 @@ func egressRules(entries []string) ([]egress.Rule, error) {
 // egressAllowedHosts is the cross-check egress_allowed_hosts: it refuses an entry that
 // egress.ParseRule refuses and two entries for the same host and port.
 func egressAllowedHosts(v *config.Values) error {
-	_, err := egressRules(v.Strings("egress.allowed_hosts"))
+	_, err := egressRules(v.Strings(keyEgressAllowedHosts))
 	return err
 }

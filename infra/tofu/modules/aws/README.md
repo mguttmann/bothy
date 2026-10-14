@@ -14,7 +14,7 @@ For the shared inputs see [variables.tf](variables.tf). In addition: `region`, `
 | Network | VPC with private subnets for host and database; public only a load balancer with TLS (`edge_mode = reverse_proxy`) or nothing (`private`) |
 | Host | EC2 `instance_type`, own disk for Docker data, instance role without keys on the host |
 | Database | `database_mode = managed`: Amazon RDS for PostgreSQL with PITR of the provider; roles from [16-operations.md](../../../../docs/spec/16-operations.md) 7.1 by bootstrap. Whether RDS offers PostgreSQL 18 is checked by the build ticket [assumed] |
-| Files | Amazon S3, versioning on; access through the instance role |
+| Files | Amazon S3, versioning on; access with the keys of `file.s3.access_key_ref` and `file.s3.secret_key_ref`, not the instance role: [12-files.md](../../../../docs/spec/12-files.md) 4.3 allows only secret references, and [19-security.md](../../../../docs/spec/19-security.md) SEC-NET-3 always blocks the metadata address (M3-02) |
 | Off-site | second bucket with Object Lock, own role with write only; deletion only by a separate account |
 | Secrets | at first driver `file` on the host; later AWS Secrets Manager (driver `awssm`) |
 | Telemetry | overlay of choice; no AWS-specific backend in the product |
