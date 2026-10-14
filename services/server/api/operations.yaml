@@ -20,6 +20,7 @@ enabled:             # operationIds that have a handler; sorted ascending
   - beginPairing
   - beginPasskeyLogin
   - beginPasskeyRegistration
+  - closeThread
   - completeEnrollment
   - completeIdentityLink
   - completeOidcLogin
@@ -65,11 +66,13 @@ enabled:             # operationIds that have a handler; sorted ascending
   - getMyCredentials
   - getProblemType
   - getSpace
+  - getThread
   - getUser
   - getUserCredentials
   - handleOidcCallback
   - listAgents
   - listAuditEvents
+  - listChannelThreads
   - listFeatureFlags
   - listForumTags
   - listGrants
@@ -99,6 +102,7 @@ enabled:             # operationIds that have a handler; sorted ascending
   - redeemEnrollmentCode
   - refreshToken
   - removeGroupMember
+  - reopenThread
   - revokeDevice
   - revokeGrant
   - revokeOwner
@@ -113,6 +117,8 @@ enabled:             # operationIds that have a handler; sorted ascending
   - setCredentialHolder
   - setHostState
   - setSpaceOperator
+  - setThreadTags
+  - setThreadTitle
   - unlinkIdentity
   - updateAgent
   - updateBranding
@@ -169,9 +175,6 @@ later:               # every other operationId of docs/api/openapi.yaml; sorted 
   - operation_id: closeTerminalSession
     etappe: M2
     ticket: M2-44
-  - operation_id: closeThread
-    etappe: M1
-    ticket: M1-55
   - operation_id: completeImport
     etappe: M8
     ticket: M8-03
@@ -364,9 +367,6 @@ later:               # every other operationId of docs/api/openapi.yaml; sorted 
   - operation_id: getTerminalSession
     etappe: M2
     ticket: M2-44
-  - operation_id: getThread
-    etappe: M1
-    ticket: M1-55
   - operation_id: getThreadCosts
     etappe: M2
     ticket: M2-22
@@ -412,9 +412,6 @@ later:               # every other operationId of docs/api/openapi.yaml; sorted 
   - operation_id: listChannelCommands
     etappe: M2
     ticket: M2-16
-  - operation_id: listChannelThreads
-    etappe: M1
-    ticket: M1-55
   - operation_id: listEvents
     etappe: M1
     ticket: M1-63
@@ -561,9 +558,6 @@ later:               # every other operationId of docs/api/openapi.yaml; sorted 
   - operation_id: removeReaction
     etappe: M1
     ticket: M1-59
-  - operation_id: reopenThread
-    etappe: M1
-    ticket: M1-55
   - operation_id: reportAgentSession
     etappe: M2
     ticket: M2-12
@@ -614,12 +608,6 @@ later:               # every other operationId of docs/api/openapi.yaml; sorted 
   - operation_id: setMyLocalCredential
     etappe: M1
     ticket: M1-39
-  - operation_id: setThreadTags
-    etappe: M1
-    ticket: M1-55
-  - operation_id: setThreadTitle
-    etappe: M1
-    ticket: M1-55
   - operation_id: startImport
     etappe: M8
     ticket: M8-03

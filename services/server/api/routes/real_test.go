@@ -449,6 +449,30 @@ func (stubServer) DeleteForumTag(context.Context, rest.DeleteForumTagRequestObje
 	return nil, nil
 }
 
+func (stubServer) ListChannelThreads(context.Context, rest.ListChannelThreadsRequestObject) (rest.ListChannelThreadsResponseObject, error) {
+	return nil, nil
+}
+
+func (stubServer) GetThread(context.Context, rest.GetThreadRequestObject) (rest.GetThreadResponseObject, error) {
+	return nil, nil
+}
+
+func (stubServer) SetThreadTitle(context.Context, rest.SetThreadTitleRequestObject) (rest.SetThreadTitleResponseObject, error) {
+	return nil, nil
+}
+
+func (stubServer) CloseThread(context.Context, rest.CloseThreadRequestObject) (rest.CloseThreadResponseObject, error) {
+	return nil, nil
+}
+
+func (stubServer) ReopenThread(context.Context, rest.ReopenThreadRequestObject) (rest.ReopenThreadResponseObject, error) {
+	return nil, nil
+}
+
+func (stubServer) SetThreadTags(context.Context, rest.SetThreadTagsRequestObject) (rest.SetThreadTagsResponseObject, error) {
+	return nil, nil
+}
+
 func (stubServer) ListAgents(context.Context, rest.ListAgentsRequestObject) (rest.ListAgentsResponseObject, error) {
 	return nil, nil
 }
@@ -633,6 +657,13 @@ func TestRealTable_Enabled(t *testing.T) {
 		// M1-54
 		"setSpaceOperator":   {"PUT /api/v1/spaces/{space_id}/operator", "space.operator.set", "rl.admin"},
 		"setChannelOperator": {"PUT /api/v1/channels/{channel_id}/operator", "channel.operator.set", "rl.admin"},
+		// M1-55
+		"listChannelThreads": {"GET /api/v1/channels/{channel_id}/threads", "thread.read", "rl.read"},
+		"getThread":          {"GET /api/v1/threads/{thread_id}", "thread.read", "rl.read"},
+		"setThreadTitle":     {"PUT /api/v1/threads/{thread_id}/title", "thread.title.update", "rl.write"},
+		"closeThread":        {"POST /api/v1/threads/{thread_id}/close", "thread.close", "rl.write"},
+		"reopenThread":       {"POST /api/v1/threads/{thread_id}/reopen", "thread.reopen", "rl.write"},
+		"setThreadTags":      {"PUT /api/v1/threads/{thread_id}/tags", "thread.tags.set", "rl.write"},
 		// M2-39
 		"listHosts":    {"GET /api/v1/hosts", "host.read", "rl.read"},
 		"createHost":   {"POST /api/v1/hosts", "host.manage", "rl.admin"},

@@ -30,7 +30,8 @@ func boolPtr(b bool) *bool { return &b }
 func TestNewChannelConfig(t *testing.T) {
 	t.Parallel()
 	e := newEnv(t)
-	deps := app.Deps{Store: e.store, UoW: e.uow, Authorizer: e.az, Rights: e.rights, Audit: e.rec, Events: e.events}
+	deps := app.Deps{Store: e.store, UoW: e.uow, Authorizer: e.az, Rights: e.rights, Audit: e.rec, Events: e.events,
+		Policies: policies{}, Cursors: cursors{}}
 	for _, c := range []app.Config{
 		{SpaceNameMaxChars: 1, ChannelNameMaxChars: 0, ChannelTopicMaxChars: 1, TagNameMaxChars: 1, HistoryBackfillLimitMax: 1},
 		{SpaceNameMaxChars: 1, ChannelNameMaxChars: 1, ChannelTopicMaxChars: 1, TagNameMaxChars: 1, HistoryBackfillLimitDefault: 2, HistoryBackfillLimitMax: 1},

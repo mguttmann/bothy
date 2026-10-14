@@ -46,6 +46,7 @@ func TestGenerate_Fixture_Golden(t *testing.T) {
 	golden := map[string]string{
 		filepath.Join(cfg.restDir, "models.gen.go"):    "../internal/fixture/rest/models.gen.go",
 		filepath.Join(cfg.restDir, "rest.gen.go"):      "../internal/fixture/rest/rest.gen.go",
+		filepath.Join(cfg.restDir, "objects.gen.go"):   "../internal/fixture/rest/objects.gen.go",
 		filepath.Join(cfg.restDir, "openapi.gen.yaml"): fixtureDir + "/openapi.yaml",
 		filepath.Join(cfg.routesDir, "routes.gen.go"):  "../internal/fixture/routes/routes.gen.go",
 		filepath.Join(cfg.routesDir, "catalog.gen.go"): "../internal/fixture/routes/catalog.gen.go",

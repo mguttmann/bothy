@@ -38,6 +38,16 @@ type Config struct {
 	// HistoryBackfillLimitMax is channel.history_backfill_limit_max (checked by M2-02 when the
 	// limit becomes writable).
 	HistoryBackfillLimitMax int `config:"channel.history_backfill_limit_max"`
+	// ThreadTitleMaxChars is thread.title_max_chars, the longest thread title (M1-55).
+	ThreadTitleMaxChars int `config:"thread.title_max_chars"`
+	// ThreadMaxTags is thread.max_tags, the most forum tags of one thread.
+	ThreadMaxTags int `config:"thread.max_tags"`
+	// PlaceholderTitles is thread.placeholder_titles, the placeholder titles of 09 section 12.
+	PlaceholderTitles []string `config:"thread.placeholder_titles"`
+	// PageSizeDefault is api.page_size_default, the page size of listChannelThreads without limit.
+	PageSizeDefault int `config:"api.page_size_default"`
+	// PageSizeMax is api.page_size_max; larger limits are capped.
+	PageSizeMax int `config:"api.page_size_max"`
 }
 
 // limits returns the text limits of channels and tags.
@@ -54,6 +64,10 @@ func (c Config) check() error {
 		return errors.New("chat: channel.name_max_chars, channel.topic_max_chars and forum_tag.name_max_chars must be at least 1")
 	case c.HistoryBackfillLimitDefault < 0 || c.HistoryBackfillLimitDefault > c.HistoryBackfillLimitMax:
 		return errors.New("chat: channel.history_backfill_limit_default must be between 0 and channel.history_backfill_limit_max")
+	case c.ThreadTitleMaxChars < 1 || c.ThreadMaxTags < 1:
+		return errors.New("chat: thread.title_max_chars and thread.max_tags must be at least 1")
+	case c.PageSizeDefault < 1 || c.PageSizeMax < 1:
+		return errors.New("chat: api.page_size_default and api.page_size_max must be at least 1")
 	}
 	return nil
 }
@@ -72,6 +86,12 @@ type Deps struct {
 	Audit auditing.Recorder
 	// Events appends the durable events.
 	Events eventlog.Appender
+	// Policies gives the billing mode of the fixed operator of a thread (Thread.billing_mode,
+	// M1-55) and, with Directory, whether an agent_id names an agent with an agents row (M1-54);
+	// internal/wire binds the source of agents.
+	Policies authz.AgentPolicySource
+	// Cursors encodes and checks the cursors of listChannelThreads.
+	Cursors Cursors
 	// Clock gives creation and archive times; nil means clock.System().
 	Clock clock.Clock
 	// RightsChanges names the old and the new operator as affected principals of an operator
@@ -80,10 +100,19 @@ type Deps struct {
 	// Directory and Policies answer whether an agent_id names an active agent with an agents row
 	// (identity and the agent policy source of agents behind the port of authz, D1 of M1-54).
 	Directory identity.Directory
-	Policies  authz.AgentPolicySource
 }
 
-// Service implements chat.Structure (space, sidebar, channel, forum tag and operator part). It is safe for concurrent use.
+// Cursors is the outgoing port that encodes and checks the opaque list cursors (06 section 6
+// point 2); adapters/httpapi implements it with the codec of platform/httpserver.
+type Cursors interface {
+	// Encode returns the cursor of key for list and binding.
+	Encode(list string, binding []byte, key any) (string, error)
+	// Decode checks s against list and binding and fills key. Errors: cursor_invalid.
+	Decode(list string, binding []byte, s string, key any) error
+}
+
+// Service implements chat.Structure (space, sidebar, channel, forum tag and operator part) and
+// chat.Threads (M1-55). It is safe for concurrent use.
 type Service struct {
 	cfg Config
 	d   Deps
@@ -96,7 +125,7 @@ var _ chat.Structure = (*Service)(nil)
 // default outside its range.
 func New(cfg Config, d Deps) (*Service, error) {
 	if d.Store == nil || d.UoW == nil || d.Authorizer == nil || d.Rights == nil || d.Audit == nil || d.Events == nil ||
-		d.RightsChanges == nil || d.Directory == nil || d.Policies == nil {
+		d.RightsChanges == nil || d.Directory == nil || d.Policies == nil || d.Cursors == nil {
 		return nil, errors.New("chat: New needs every collaborator")
 	}
 	if err := cfg.check(); err != nil {

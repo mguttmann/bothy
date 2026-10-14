@@ -136,6 +136,18 @@ func (s *Source) ChannelDetails(ctx context.Context, channelIDs []ids.ID) (map[i
 	return out, nil
 }
 
+// Thread implements authz.StructureSource (brief M1-55 D8): the channel, the kind, the creator and
+// the fixed operator of the thread id; the space and the archived or read-only state come with the
+// facts of its channel, which authz resolves next. It reads inside the ambient transaction of ctx
+// when there is one.
+func (s *Source) Thread(ctx context.Context, id ids.ID) (authz.ThreadFacts, bool, error) {
+	th, found, err := s.store.Thread(ctx, id)
+	if err != nil || !found {
+		return authz.ThreadFacts{}, false, err
+	}
+	return authz.ThreadFacts{ID: th.ID, ChannelID: th.ChannelID, Main: th.Main(), OperatorAgentID: th.OperatorAgentID, CreatedBy: th.CreatedBy}, true, nil
+}
+
 // facts converts a channel row into the facts of authorize. Project binding comes with M2-03 and
 // dm participation with V3; both are absent here.
 func facts(c app.ChannelRow) authz.ChannelFacts {
@@ -146,17 +158,6 @@ func facts(c app.ChannelRow) authz.ChannelFacts {
 		RequireMention:      ch.RequireMention, ThreadRequireMention: ch.ThreadRequireMention, FreeResponse: ch.FreeResponse,
 		AllowMentionedAgents: ch.AllowMentionedAgents, Archived: ch.Archived() || c.SpaceArchived,
 	}
-}
-
-// Thread implements authz.StructureSource: the channel, the kind, the fixed operator (zero for a
-// main thread) and the creator of the thread id, so authorize applies the operator rule of a
-// thread (07 section 2.9 point 2, D6 of M1-54).
-func (s *Source) Thread(ctx context.Context, id ids.ID) (authz.ThreadFacts, bool, error) {
-	t, found, err := s.store.Thread(ctx, id)
-	if err != nil || !found {
-		return authz.ThreadFacts{}, false, err
-	}
-	return authz.ThreadFacts{ID: t.ID, ChannelID: t.ChannelID, Main: t.Main, OperatorAgentID: t.OperatorAgentID, CreatedBy: t.CreatedBy}, true, nil
 }
 
 // ServedTargets implements authz.StructureSource: the targets agentID serves for I1 (10 sections

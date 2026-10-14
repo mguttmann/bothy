@@ -107,6 +107,9 @@ var appPrivileges = map[string][]string{
 	"channel_skill_bindings": {"SELECT", "INSERT", "UPDATE", "DELETE"},
 	"forum_tags":             {"SELECT", "INSERT", "UPDATE"},
 	"threads":                {"SELECT", "INSERT", "UPDATE"},
+	// 03 thread_tags (M1-55): setThreadTags replaces the set and deleteForumTag drops the rows of
+	// its tag; a row is never updated.
+	"thread_tags": {"SELECT", "INSERT", "DELETE"},
 	// 03 section 4.14 (M2-39): hosts and terminal sessions are security history; a session user
 	// row is never deleted while its host is not retired (ruling T12, R-DM-39). The retention
 	// job of class security grants its own DELETE (M7).

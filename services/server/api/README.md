@@ -15,6 +15,7 @@ nennt (PLAN P-04). Normativ sind [06-api.md](../../../docs/spec/06-api.md), Absc
 | `rest/oapi-codegen.yaml` | Einstellungen von oapi-codegen (`std-http-server`, `strict-server`, `models`, `skip-prune`) | ja |
 | `rest/models.gen.go` | Go-Typen aller Schemas, Parameter und Request-Bodies (Teil vor `ServerInterface`) | erzeugt |
 | `rest/rest.gen.go` | Server der freigeschalteten Operationen (ab `ServerInterface`) | erzeugt |
+| `rest/objects.gen.go` | Request and response objects of the strict server (from the first `*RequestObject` up to `StrictServerInterface`, INT-W17/4) | erzeugt |
 | `rest/openapi.gen.yaml` | Byte-gleiche Kopie von `docs/api/openapi.yaml`; `rest.Spec` (`rest/spec.go`) bettet sie für den Anfrage-Validator der HTTP-Kette ein (M1-18) | erzeugt |
 | `routes/routes.go` | Typen, `Table`, `Recorder`, `Verify`, `Build`, Nachschlagen | ja |
 | `routes/routes.gen.go`, `catalog.gen.go`, `build.gen.go` | Operationstabelle, Aktionskatalog, Verbindung zum erzeugten Server | erzeugt |
@@ -139,3 +140,5 @@ downloads with the deadline `http.transfer_timeout`). Nachschlagen über `routes
   `rest.gen.go` (`splitRest`, DECISIONS.md INT-W14/4), weil eine Datei `repo.max_file_kb`
   überschritt. `rest.gen.go` wächst weiter mit jeder freigeschalteten Operation;
   `TestRealRest_BelowMaxFileKB` und der Hook `check-added-large-files` halten die Grenze je Datei.
+- Since INT-W17/4 the request and response objects of the strict server go to `objects.gen.go`,
+  because `rest.gen.go` again exceeded `repo.max_file_kb` with M1-54 and M1-55.

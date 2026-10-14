@@ -722,7 +722,7 @@ func (s *server) startChat(context.Context) error {
 	if a == nil || sy == nil || !ok {
 		return errors.New("wire: the chat step needs audit, sync and the Authorizer of authz")
 	}
-	c, err := NewChat(cfg, pool, a.UoW(), az, rights, ChatWrites{Audit: a.Recorder(), Events: sy.Appender(), Rights: a.RightsHook()}, s.deps.Clock)
+	c, err := NewChat(cfg, pool, a.UoW(), az, rights, ChatWrites{Audit: a.Recorder(), Events: sy.Appender(), Rights: a.RightsHook()}, nil, s.deps.Clock)
 	if err != nil {
 		return err
 	}

@@ -227,7 +227,7 @@ Quelle: [03-datenmodell.md](../spec/03-datenmodell.md), Abschnitt 9.
 | `channel.history_backfill_limit_max` | `BOTHY_CHANNEL__HISTORY_BACKFILL_LIMIT_MAX` | Server | int | `200` | Obergrenze für `history_backfill_limit` | aktiv |
 | `channel.prompt_max_bytes` | `BOTHY_CHANNEL__PROMPT_MAX_BYTES` | Server |  | `32768` | Größe eines Kanal-Prompts | geplant (M2) |
 | `thread.title_max_chars` | `BOTHY_THREAD__TITLE_MAX_CHARS` | Server | int | `200` | Länge eines Thread-Titels | aktiv |
-| `thread.max_tags` | `BOTHY_THREAD__MAX_TAGS` | Server |  | `5` | Forum-Tags je Thread | geplant (M1) |
+| `thread.max_tags` | `BOTHY_THREAD__MAX_TAGS` | Server | int | `5` | Forum-Tags je Thread | aktiv |
 | `message.max_content_bytes` | `BOTHY_MESSAGE__MAX_CONTENT_BYTES` | Server | int | `262144` | Größe einer Nachricht (lange Antworten ohne Teilen) | aktiv |
 | `message.max_attachments` | `BOTHY_MESSAGE__MAX_ATTACHMENTS` | Server | int | `10` | Anhänge je Nachricht | aktiv |
 | `message.max_mentions` | `BOTHY_MESSAGE__MAX_MENTIONS` | Server |  | `50` | verschiedene Erwähnungs-Handles je Nachricht (Inhaltsformat, `messages`) | geplant (M1) |
@@ -425,7 +425,7 @@ Quelle: [09-agenten.md](../spec/09-agenten.md), Abschnitt 21.
 | `component.max_per_message` | `BOTHY_COMPONENT__MAX_PER_MESSAGE` | Server |  | `25` | Komponenten je Nachricht | geplant (M2) |
 | `component.custom_id_max_chars` | `BOTHY_COMPONENT__CUSTOM_ID_MAX_CHARS` | Server |  | `100` | Länge von `custom_id` | geplant (M2) |
 | `component.form_max_fields` | `BOTHY_COMPONENT__FORM_MAX_FIELDS` | Server |  | `10` | Felder je Formular | geplant (M2) |
-| `thread.placeholder_titles` | `BOTHY_THREAD__PLACEHOLDER_TITLES` | Server |  | `["", "Neuer Chat", "New chat", "Chat", "Ohne Titel", "Untitled", "Test"]` | Platzhalter für die Titel-Erkennung | geplant (M1) |
+| `thread.placeholder_titles` | `BOTHY_THREAD__PLACEHOLDER_TITLES` | Server | list(string) | `["Neuer Chat", "New chat", "Chat", "Ohne Titel", "Untitled", "Test"]` | Platzhalter für die Titel-Erkennung; der leere Titel gilt immer als Platzhalter (12 Punkt 2), ein Listeneintrag ist nie leer | aktiv |
 | `adapter.invocation_token_leeway` |  | Adapter |  | `10s` | Uhren-Toleranz bei `exp` und `iat`; höchstens `auth.clock_leeway` des Servers (4.5) |  |
 | `adapter.jwks_refresh_min_interval` |  | Adapter |  | `60s` | höchstens so oft JWKS neu laden |  |
 | `hermes_adapter.platform_key` |  | Hermes-Adapter |  | `bothy` | Plattformname in Hermes; nach Inbetriebnahme nie ändern |  |

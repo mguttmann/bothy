@@ -5,10 +5,7 @@ package postgres
 import (
 	"bytes"
 	"context"
-	"errors"
 	"slices"
-
-	"github.com/jackc/pgx/v5"
 
 	"github.com/OWNER/bothy/services/server/internal/chat/adapters/postgres/sqlcgen"
 	"github.com/OWNER/bothy/services/server/internal/chat/app"
@@ -93,19 +90,4 @@ func (r *Repository) ServedTargets(ctx context.Context, agent ids.ID) ([]app.Ser
 		return bytes.Compare(a.ChannelID[:], b.ChannelID[:])
 	})
 	return slices.Compact(out), nil
-}
-
-// Thread implements app.Store.
-func (r *Repository) Thread(ctx context.Context, id ids.ID) (app.ThreadRow, bool, error) {
-	row, err := r.read(ctx).GetThreadFacts(ctx, uuid(id))
-	if errors.Is(err, pgx.ErrNoRows) {
-		return app.ThreadRow{}, false, nil
-	}
-	if err != nil {
-		return app.ThreadRow{}, false, mapError(err, "reading a thread")
-	}
-	return app.ThreadRow{
-		ID: idOf(row.ID), ChannelID: idOf(row.ChannelID), Main: row.Kind == domain.ThreadKindMain,
-		OperatorAgentID: idOf(row.OperatorAgentID), CreatedBy: idOf(row.CreatedBy),
-	}, true, nil
 }

@@ -229,9 +229,9 @@ func (s *Service) MoveForumTag(ctx context.Context, a actor.Actor, channelID, ta
 	return tagDTO(t), err
 }
 
-// DeleteForumTag implements chat.Structure (forum_tag.manage, see tagUnit): sets deleted_at; a
-// deleted tag of the channel is a call without change, a tag that never belonged to the channel
-// is not_found.
+// DeleteForumTag implements chat.Structure (forum_tag.manage, see tagUnit): sets deleted_at and
+// deletes the thread_tags rows of the tag (M1-55); a deleted tag of the channel is a call without
+// change, a tag that never belonged to the channel is not_found.
 func (s *Service) DeleteForumTag(ctx context.Context, a actor.Actor, channelID, tagID ids.ID) error {
 	_, err := s.tagUnit(ctx, a, channelID, opDelete, func(ctx context.Context, _ ChannelRow) (domain.ForumTag, bool, error) {
 		t, err := s.liveTag(ctx, channelID, tagID, false)
@@ -242,7 +242,12 @@ func (s *Service) DeleteForumTag(ctx context.Context, a actor.Actor, channelID, 
 			return t, false, nil
 		}
 		t.DeletedAt = s.d.Clock.Now().UTC().Truncate(time.Microsecond)
-		return t, true, s.d.Store.SaveForumTag(ctx, t)
+		if err := s.d.Store.SaveForumTag(ctx, t); err != nil {
+			return domain.ForumTag{}, false, err
+		}
+		// The assignments go in the same unit, without an event per thread: clients reload the
+		// tags on channel.updated and drop unknown tag IDs (brief M1-55 D5).
+		return t, true, s.d.Store.DeleteTagAssignments(ctx, t.ID)
 	})
 	return err
 }

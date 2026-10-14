@@ -1560,7 +1560,7 @@ Konfiguration des jeweiligen Programms außerhalb des Servers.
 | `component.max_per_message` | Server | `25` | Komponenten je Nachricht |
 | `component.custom_id_max_chars` | Server | `100` | Länge von `custom_id` |
 | `component.form_max_fields` | Server | `10` | Felder je Formular |
-| `thread.placeholder_titles` | Server | `["", "Neuer Chat", "New chat", "Chat", "Ohne Titel", "Untitled", "Test"]` | Platzhalter für die Titel-Erkennung |
+| `thread.placeholder_titles` | Server | `["Neuer Chat", "New chat", "Chat", "Ohne Titel", "Untitled", "Test"]` | Platzhalter für die Titel-Erkennung; der leere Titel gilt immer als Platzhalter (12 Punkt 2), ein Listeneintrag ist nie leer |
 | `adapter.invocation_token_leeway` | Adapter | `10s` | Uhren-Toleranz bei `exp` und `iat`; höchstens `auth.clock_leeway` des Servers (4.5) |
 | `adapter.jwks_refresh_min_interval` | Adapter | `60s` | höchstens so oft JWKS neu laden |
 | `hermes_adapter.platform_key` | Hermes-Adapter | `bothy` | Plattformname in Hermes; nach Inbetriebnahme nie ändern |

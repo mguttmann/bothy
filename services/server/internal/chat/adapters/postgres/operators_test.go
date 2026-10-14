@@ -112,11 +112,11 @@ func TestRepositoryOperators(t *testing.T) {
 		t.Fatalf("lotse served %+v %v", served, err)
 	}
 	f, found, err := e.repo.Thread(ctx, th)
-	if err != nil || !found || f.Main || f.OperatorAgentID != assistent || f.ChannelID != inherit.ID || f.CreatedBy != alex {
+	if err != nil || !found || f.Main() || f.OperatorAgentID != assistent || f.ChannelID != inherit.ID || f.CreatedBy != alex {
 		t.Fatalf("thread %+v %v %v", f, found, err)
 	}
 	f, found, err = e.repo.Thread(ctx, main.ID)
-	if err != nil || !found || !f.Main || !f.OperatorAgentID.IsZero() {
+	if err != nil || !found || !f.Main() || !f.OperatorAgentID.IsZero() {
 		t.Fatalf("main thread %+v %v %v", f, found, err)
 	}
 	if _, found, err := e.repo.Thread(ctx, ids.New()); found || err != nil {

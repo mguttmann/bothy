@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: Apache-2.0
 
-// Package postgres is the PostgreSQL adapter of the chat module (M1-52, M1-53): the sqlc queries
+// Package postgres is the PostgreSQL adapter of the chat module (M1-52, M1-53, M1-55): the sqlc queries
 // in queries/, the generated code in sqlcgen/ and Repository, which implements app.Store over the
-// tables spaces, user_space_states, channels, forum_tags and the main threads of threads
+// tables spaces, user_space_states, channels, forum_tags, threads and thread_tags
 // (docs/spec/03-datenmodell.md section 4.5). Only this package
 // runs SQL on them (03 Grundsatz 12).
 //

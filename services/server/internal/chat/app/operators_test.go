@@ -8,6 +8,7 @@ import (
 	"slices"
 	"testing"
 
+	"github.com/OWNER/bothy/services/server/internal/authz"
 	"github.com/OWNER/bothy/services/server/internal/chat"
 	"github.com/OWNER/bothy/services/server/internal/identity"
 	"github.com/OWNER/bothy/services/server/internal/kernel/actor"
@@ -21,7 +22,11 @@ import (
 func (e *env) addAgent(status identity.Status, row bool) ids.ID {
 	id := ids.New()
 	e.dir.principals[id] = identity.PrincipalView{ID: id, Kind: actor.KindAgent, Status: status}
-	e.pol.rows[id] = row
+	if row {
+		e.store.mu.Lock()
+		e.store.policies[id] = authz.AgentPolicy{BillingMode: "organization"}
+		e.store.mu.Unlock()
+	}
 	return id
 }
 

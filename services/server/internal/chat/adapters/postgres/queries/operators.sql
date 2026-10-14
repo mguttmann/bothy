@@ -54,8 +54,3 @@ WHERE t.kind = 'thread' AND t.operator_agent_id = @agent_id
 -- The spaces that are not archived whose default operator is agent_id, also without a channel
 -- (10 section 5.2 point 3, 03 section 6.4 point 3), ascending.
 SELECT id FROM spaces WHERE default_operator_agent_id = @agent_id AND archived_at IS NULL ORDER BY id;
-
--- name: GetThreadFacts :one
--- One thread for authorize resolution: its channel, kind, fixed operator and creator (07 section
--- 7.2 step 4, the operator rule of a thread).
-SELECT id, channel_id, kind, operator_agent_id, created_by FROM threads WHERE id = @id;

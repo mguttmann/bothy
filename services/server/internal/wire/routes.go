@@ -62,6 +62,9 @@ type Handlers struct {
 	// moveChannel, archiveChannel, listForumTags, createForumTag, updateForumTag, moveForumTag and
 	// deleteForumTag (chat, M1-53).
 	*chathttp.Channels
+	// Threads implements listChannelThreads, getThread, setThreadTitle, closeThread, reopenThread
+	// and setThreadTags (chat, M1-55).
+	*chathttp.Threads
 	// Log implements listAuditEvents, exportAuditEvents and verifyAuditChain (audit, M1-50).
 	*audithttp.Log
 	// Devices implements listMyDevices, listUserDevices and getDevice (identity, M1-33).

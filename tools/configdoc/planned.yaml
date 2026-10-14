@@ -111,8 +111,6 @@ rules:
     etappe: M1
   - match: "terminal."  # M2-40 to M2-46
     etappe: M2
-  - match: "thread."  # M1-46, M1-55
-    etappe: M1
   - match: "voice."  # M3-09
     etappe: M3
   - match: "webhook."  # M2-24, M2-26

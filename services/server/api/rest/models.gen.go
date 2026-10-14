@@ -15395,6 +15395,22 @@ type MoveForumTagParams struct {
 	IdempotencyKey *IdempotencyKey `json:"Idempotency-Key,omitempty"`
 }
 
+// ListChannelThreadsParams defines parameters for ListChannelThreads.
+type ListChannelThreadsParams struct {
+	// Cursor Cursor from `next_cursor` of the previous page.
+	Cursor *Cursor `form:"cursor,omitempty" json:"cursor,omitempty"`
+	Limit  *Limit  `form:"limit,omitempty" json:"limit,omitempty"`
+
+	// State Filter by state.
+	State *ThreadState `form:"state,omitempty" json:"state,omitempty"`
+
+	// TagId Only threads with this tag.
+	TagId *Uuid `form:"tag_id,omitempty" json:"tag_id,omitempty"`
+
+	// Sort Sort order, newest first.
+	Sort *ForumSort `form:"sort,omitempty" json:"sort,omitempty"`
+}
+
 // ApproveDeviceParams defines parameters for ApproveDevice.
 type ApproveDeviceParams struct {
 	// IdempotencyKey UUIDv7 chosen by the client per logical operation. A repeat with the same request returns the stored response; a different request gives 422 `idempotency_key_reuse`; a repeat while the first is running gives 409 `request_in_progress`. Kept for `sync.idempotency_key_ttl`.
@@ -15635,6 +15651,30 @@ type MoveSpaceParams struct {
 
 // SetSpaceOperatorParams defines parameters for SetSpaceOperator.
 type SetSpaceOperatorParams struct {
+	// IfMatch ETag of the version the change is based on, e.g. `"7"`. Mismatch gives 412 `version_conflict`.
+	IfMatch IfMatchRequired `json:"If-Match"`
+}
+
+// CloseThreadParams defines parameters for CloseThread.
+type CloseThreadParams struct {
+	// IdempotencyKey UUIDv7 chosen by the client per logical operation. A repeat with the same request returns the stored response; a different request gives 422 `idempotency_key_reuse`; a repeat while the first is running gives 409 `request_in_progress`. Kept for `sync.idempotency_key_ttl`.
+	IdempotencyKey *IdempotencyKey `json:"Idempotency-Key,omitempty"`
+}
+
+// ReopenThreadParams defines parameters for ReopenThread.
+type ReopenThreadParams struct {
+	// IdempotencyKey UUIDv7 chosen by the client per logical operation. A repeat with the same request returns the stored response; a different request gives 422 `idempotency_key_reuse`; a repeat while the first is running gives 409 `request_in_progress`. Kept for `sync.idempotency_key_ttl`.
+	IdempotencyKey *IdempotencyKey `json:"Idempotency-Key,omitempty"`
+}
+
+// SetThreadTagsParams defines parameters for SetThreadTags.
+type SetThreadTagsParams struct {
+	// IfMatch Optional ETag; when given, a mismatch gives 412 `version_conflict`.
+	IfMatch *IfMatchOptional `json:"If-Match,omitempty"`
+}
+
+// SetThreadTitleParams defines parameters for SetThreadTitle.
+type SetThreadTitleParams struct {
 	// IfMatch ETag of the version the change is based on, e.g. `"7"`. Mismatch gives 412 `version_conflict`.
 	IfMatch IfMatchRequired `json:"If-Match"`
 }
@@ -15881,6 +15921,12 @@ type MoveSpaceJSONRequestBody = MovePosition
 
 // SetSpaceOperatorJSONRequestBody defines body for SetSpaceOperator for application/json ContentType.
 type SetSpaceOperatorJSONRequestBody = OperatorSet
+
+// SetThreadTagsJSONRequestBody defines body for SetThreadTags for application/json ContentType.
+type SetThreadTagsJSONRequestBody = ThreadTagsPut
+
+// SetThreadTitleJSONRequestBody defines body for SetThreadTitle for application/json ContentType.
+type SetThreadTitleJSONRequestBody = ThreadTitlePut
 
 // CreateUserJSONRequestBody defines body for CreateUser for application/json ContentType.
 type CreateUserJSONRequestBody = UserCreate

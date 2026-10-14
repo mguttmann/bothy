@@ -4,9 +4,11 @@ package wire
 
 import "github.com/OWNER/bothy/services/server/internal/platform/config"
 
-// chatConfigKeys returns the keys the module chat reads from docs/spec/03-datenmodell.md
+// chatConfigKeys returns the keys the module chat owns from docs/spec/03-datenmodell.md
 // "Konfigurationswerte dieses Kapitels": the space name limit (M1-52), the channel and tag text
-// limits and the history backfill limits of a channel (M1-53).
+// limits and the history backfill limits of a channel (M1-53), the tag limit of a thread (M1-55);
+// and from docs/spec/09-agenten.md the placeholder titles (M1-55). thread.title_max_chars is
+// declared with messaging (configkeys_messaging.go), the page sizes with the API keys.
 func chatConfigKeys() []config.Key {
 	return []config.Key{
 		{
@@ -38,6 +40,19 @@ func chatConfigKeys() []config.Key {
 			Name: "channel.history_backfill_limit_max", Kind: config.KindInt, Default: "200", Min: "0",
 			Doc:     "Upper bound of history_backfill_limit.",
 			Chapter: chapter03,
+		},
+		{
+			Name: "thread.max_tags", Kind: config.KindInt, Default: "5", Min: "1",
+			Doc:     "Most forum tags of one thread.",
+			Chapter: chapter03,
+		},
+		{
+			// The empty title is a placeholder by the rule itself (09 section 12), and a list
+			// element is never empty, so the default has no empty entry (docs/DECISIONS.md M1-55/2).
+			Name: "thread.placeholder_titles", Kind: config.KindStringList,
+			Default: `["Neuer Chat", "New chat", "Chat", "Ohne Titel", "Untitled", "Test"]`,
+			Doc:     "Placeholder titles: a new thread with such a title keeps title_source auto.",
+			Chapter: chapter09,
 		},
 	}
 }

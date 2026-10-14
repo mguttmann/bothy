@@ -223,7 +223,7 @@ func (s *Service) createChannel(ctx context.Context, a actor.Actor, spaceID ids.
 		return ChannelRow{}, err
 	}
 	if ch.Kind == domain.ChannelText {
-		if err := s.emitThread(ctx, spaceID, main); err != nil {
+		if err := s.emitThread(ctx, authorize.EventThreadCreated, spaceID, threadDTO(main, nil)); err != nil {
 			return ChannelRow{}, err
 		}
 	}
@@ -525,24 +525,6 @@ func channelBody(c ChannelRow) channelJSON {
 	}
 }
 
-// threadJSON is the schema Thread for the main thread: no parent message, no operator, no tags.
-type threadJSON struct {
-	ID             string   `json:"id"`
-	ChannelID      string   `json:"channel_id"`
-	Kind           string   `json:"kind"`
-	Title          string   `json:"title"`
-	TitleSource    string   `json:"title_source"`
-	State          string   `json:"state"`
-	LastMessageSeq int64    `json:"last_message_seq"`
-	UnreadFloorSeq int64    `json:"unread_floor_seq,omitempty"`
-	LastActivityAt string   `json:"last_activity_at"`
-	MessageCount   int      `json:"message_count"`
-	CreatedBy      string   `json:"created_by"`
-	CreatedAt      string   `json:"created_at"`
-	Version        int64    `json:"version"`
-	TagIDs         []string `json:"tag_ids"`
-}
-
 // emitChannel appends the channel event typ for c (05 section 6, 04 section 2.2): resource the
 // channel with its version, scope space and channel, payload ChannelPayload, receive action
 // channel.read.
@@ -558,28 +540,5 @@ func (s *Service) emitChannel(ctx context.Context, typ authorize.EventType, c Ch
 		Type: string(typ), SchemaVersion: 1, ActorKind: kind, ActorPrincipalID: actorID, SpaceID: c.Channel.SpaceID,
 		ChannelID: c.Channel.ID, ResourceKind: resourceChannel, ResourceID: c.Channel.ID, ResourceVersion: c.Channel.Version,
 		ReceiveAction: receiveChannelRead, Payload: payload,
-	})
-}
-
-// emitThread appends thread.created for the main thread th of a channel in space: resource the
-// thread with its version, scope space, channel and thread, payload ThreadPayload with tag_ids
-// [], receive action thread.read.
-func (s *Service) emitThread(ctx context.Context, space ids.ID, th domain.Thread) error {
-	payload, err := json.Marshal(struct {
-		Thread threadJSON `json:"thread"`
-	}{threadJSON{
-		ID: th.ID.String(), ChannelID: th.ChannelID.String(), Kind: th.Kind, Title: th.Title, TitleSource: th.TitleSource,
-		State: th.State, LastMessageSeq: th.LastMessageSeq, UnreadFloorSeq: th.UnreadFloorSeq, LastActivityAt: stamp(th.LastActivityAt),
-		MessageCount: th.MessageCount, CreatedBy: th.CreatedBy.String(), CreatedAt: stamp(th.CreatedAt), Version: th.Version,
-		TagIDs: []string{},
-	}})
-	if err != nil {
-		return errs.Wrap(errs.CodeInternalError, err, "chat: thread event payload")
-	}
-	kind, actorID := eventActor(ctx)
-	return s.d.Events.Append(ctx, eventlog.Event{
-		Type: string(authorize.EventThreadCreated), SchemaVersion: 1, ActorKind: kind, ActorPrincipalID: actorID, SpaceID: space,
-		ChannelID: th.ChannelID, ThreadID: th.ID, ResourceKind: resourceThread, ResourceID: th.ID, ResourceVersion: th.Version,
-		ReceiveAction: receiveThreadRead, Payload: payload,
 	})
 }
