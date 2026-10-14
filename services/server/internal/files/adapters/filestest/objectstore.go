@@ -243,8 +243,8 @@ func casePutCancelled(t *testing.T, s app.ObjectStore, c *caseEnv) {
 	ctx, cancel := context.WithCancel(t.Context())
 	cancel()
 	data := c.content(128)
-	if err := s.Put(ctx, key, bytes.NewReader(data), int64(len(data))); err == nil {
-		t.Error("Put with a cancelled context succeeded")
+	if err := s.Put(ctx, key, bytes.NewReader(data), int64(len(data))); !errors.Is(err, context.Canceled) {
+		t.Errorf("Put with a cancelled context: err = %v, want context.Canceled", err)
 	}
 	wantMissing(t, s, key)
 }

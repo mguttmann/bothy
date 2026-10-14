@@ -8,6 +8,8 @@
 // Example:
 //
 //	rc, err := store.Get(ctx, key, &app.ByteRange{Offset: 0, Length: 1024})
-//	if errors.Is(err, app.ErrNotFound) { ... }
+//	if err != nil {
+//		return err // errors.Is(err, app.ErrNotFound) for a missing object
+//	}
 //	defer rc.Close()
 package app
