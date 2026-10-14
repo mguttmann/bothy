@@ -232,6 +232,30 @@ def test_write_regenerates_waves_and_graph(tmp_path: Path) -> None:
     assert brief_deps.check(root) == []
 
 
+def test_write_splits_the_graph_per_milestone(tmp_path: Path) -> None:
+    """Each milestone of the dependent tickets gets its own block, so no block hits the limit."""
+    rows = dict(INDEX_ROWS, **{"M2-01": (4, "M1-03")})
+    root = _repo(tmp_path, rows=rows, waves=WAVES, edges="  M1_01 --> M1_02\n")
+    assert brief_deps.main(["--root", str(root), "--write"]) == 0
+    text = (root / "docs/briefs/README.md").read_text(encoding="utf-8")
+    graph = text.split("## Dependency graph")[1]
+    blocks = graph.split("```mermaid")[1:]
+    assert len(blocks) == 2
+    assert "M1_02 --> M1_03" in blocks[0]
+    assert "M1_03 --> M2_01" in blocks[1]
+    assert 'M1_03["M1-03"]' in blocks[1]
+    assert brief_deps.check(root) == []
+
+
+def test_graph_block_over_the_edge_limit_fails(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A block with more edges than Mermaid renders is reported."""
+    monkeypatch.setattr(brief_deps, "MAX_GRAPH_EDGES", 1)
+    root = _repo(tmp_path)
+    assert any("edge limit" in p for p in brief_deps.check(root))
+
+
 def test_main_reports_problems(tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
     root = _repo(tmp_path, bodies={"M1-01": "Run `make nowhere`."})
     assert brief_deps.main(["--root", str(root)]) == 1

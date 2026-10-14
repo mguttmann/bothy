@@ -164,6 +164,11 @@ operated, and the order of the build.
   release, API breaking-change gate, desktop and mobile distribution with a test publisher,
   portability test, OpenTofu modules, host service release chain, setup wizard) in the brief index
   with waves and graph and in the site navigation (D-W-127).
+- Build briefs M7-17 to M7-21 and M7-24 to M7-28 of milestone M7 (multi-node operation,
+  capacity load test, API reference in the docs site, alert routing, status views, token output for
+  TypeScript, Grafana panel plugin and its release, demo instance, showcase) in the brief index
+  with waves and graph and in the site navigation (D-W-128); core contract: the shared presence
+  table `gateway_presence` (R-DM-51).
 - Build briefs of milestone M6 for the console session, the statistics in the server and the
   visualization track (`docs/briefs/M6-01`, `M6-05`, `M6-10` to `M6-15`) in the brief index with
   waves and graph and in the site navigation, written before M1 closes (D-W-120); core contract

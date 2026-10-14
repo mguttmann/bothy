@@ -446,3 +446,13 @@ nav:
           - "M7-16: OpenTofu modules `hetzner`, `aws`, `azure`": briefs/M7-16-tofu-cloud-modules.md
           - "M7-23: Release chain of the host service": briefs/M7-23-host-release-chain.md
           - "M7-29: Setup wizard `install.sh` (installation in one command)": briefs/M7-29-setup-wizard.md
+          - "M7-17: Multi-node operation (level 2)": briefs/M7-17-multi-node.md
+          - "M7-18: Capacity load test": briefs/M7-18-capacity-load-test.md
+          - "M7-19: API reference in the docs site": briefs/M7-19-api-reference-docs.md
+          - "M7-20: Alerts into the instance and to the outside": briefs/M7-20-alert-routing.md
+          - "M7-21: Status page in apps and console": briefs/M7-21-status-views.md
+          - "M7-24: Token output for TypeScript": briefs/M7-24-tokens-typescript.md
+          - 'M7-25: Grafana panel plugin "Bothy Live"': briefs/M7-25-grafana-plugin.md
+          - "M7-26: Plugin in the Compose stack, portability and release": briefs/M7-26-plugin-release.md
+          - "M7-27: Demo instance with made-up data (`bothy setup --demo`)": briefs/M7-27-demo-instance.md
+          - "M7-28: Showcase: images, video, landing pages and release template": briefs/M7-28-showcase.md

@@ -242,7 +242,7 @@ modules:
     depends_on: [instance, identity, chat, agents, messaging, sync]
     adapter_vendors: []
   gateway:
-    tables: []
+    tables: [gateway_presence]
     actions: [gateway.connect, gateway.focus, typing.start]
     events: []
     ephemeral_events: [typing.started]
