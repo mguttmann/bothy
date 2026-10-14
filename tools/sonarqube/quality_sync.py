@@ -9,14 +9,17 @@ same profile delta (docs/quality/sonarqube-local.md).
 
 Usage (token only from the environment variable SONAR_TOKEN, never printed):
   quality_sync.py apply --url http://127.0.0.1:9000
-  quality_sync.py check --url https://sonarcloud.io --organization <org>
+  quality_sync.py check --url https://sonarcloud.io --organization <org> --project <key>
 
 Languages the server does not know (Dart and Swift on the Community Build) are skipped
 and listed; the Cloud check covers them.
 
-SonarQube Cloud refuses a custom default gate (HTTP 403 on set_as_default) on plans that
-do not include it. In cloud mode that is a reported gap, not a failure: apply still
-applies the profiles, and check reports the gap while every other difference fails.
+SonarQube Cloud refuses a custom default gate (HTTP 403 on set_as_default) and a custom
+default profile (HTTP 400 on set_default) on plans that do not include them. In cloud mode
+the profiles are therefore never made the organization default: apply assigns each profile
+and the gate to the project (--project, SONAR_PROJECT_KEY) instead. A call the plan refuses
+is a reported gap, not a failure, and apply continues with the next language; check reports
+a project still on a built-in profile or gate as a gap while every other difference fails.
 """
 
 from __future__ import annotations
@@ -40,6 +43,8 @@ _TIMEOUT_S = 60
 _MAX_ERROR_CHARS = 300
 _MAX_ERROR_BODY_BYTES = 65536
 GATE_NOT_DEFAULT = "gate not default: plan does not allow it"
+GATE_NOT_ON_PROJECT = "gate not assigned to project: plan does not allow it"
+PROFILE_NOT_ON_PROJECT = "not assigned to project: plan does not allow it"
 
 
 class SonarError(Exception):
@@ -134,14 +139,20 @@ def _error_messages(body: bytes) -> str:
 class Client:
     """Minimal SonarQube Web API client (token auth, optional organization for the cloud)."""
 
-    def __init__(self, url: str, token: str, organization: str | None = None) -> None:
-        """Create a client; raises SonarError for a URL scheme other than http or https."""
+    def __init__(
+        self, url: str, token: str, organization: str | None = None, project: str | None = None
+    ) -> None:
+        """Create a client; raises SonarError for a URL scheme other than http or https.
+
+        `project` is the project key the cloud assigns gate and profiles to.
+        """
         if urllib.parse.urlsplit(url).scheme not in ("http", "https"):
             raise SonarError(f"unsupported URL scheme in {url!r}; use http or https")
         self._url = url.rstrip("/")
         self._token = token
         self._organization = organization
         self.is_cloud = organization is not None
+        self.project = project
 
     def _params(self, params: dict[str, str]) -> dict[str, str]:
         return {**params, "organization": self._organization} if self._organization else params
@@ -222,6 +233,26 @@ def _gate_ref(
     return {id_key: gate_id} if client.is_cloud else {name_key: name}
 
 
+def _plan_refused(client: Client, exc: SonarError) -> bool:
+    """Whether SonarQube Cloud refused a call because the organization's plan lacks it.
+
+    Only the plan's wording counts; any other refusal, such as HTTP 403 "Insufficient
+    privileges" for a token without the permission, still fails the run.
+    """
+    return (
+        client.is_cloud
+        and exc.status in (400, 403)
+        and "is not allowed to perform this action" in str(exc)
+    )
+
+
+def _cloud_project(client: Client) -> str:
+    """Return the project key the cloud mode assigns to; raises SonarError if it is missing."""
+    if not client.project:
+        raise SonarError("SonarQube Cloud needs the project key (--project or SONAR_PROJECT_KEY)")
+    return client.project
+
+
 def _profile(client: Client, language: str, name: str) -> dict[str, Any] | None:
     found = client.get_json("api/qualityprofiles/search", language=language, qualityProfile=name)
     return next((p for p in found["profiles"] if p["name"] == name), None)
@@ -232,9 +263,8 @@ def _active_rules(client: Client, language: str, name: str) -> set[str]:
     return xml_rules(xml.decode("utf-8"))
 
 
-def apply(client: Client, config: Config) -> Report:
-    """Create or update gate and profiles so that the server matches the config."""
-    report = Report()
+def _apply_gate(client: Client, config: Config, report: Report) -> str:
+    """Create or update the gate, make it the default and return its id."""
     found = _gate(client, config.gate_name)
     if found is None:
         client.post("api/qualitygates/create", name=config.gate_name)
@@ -274,6 +304,14 @@ def apply(client: Client, config: Config) -> Report:
         if not (client.is_cloud and exc.status == 403):
             raise
         report.gaps.append(GATE_NOT_DEFAULT)
+    return gate_id
+
+
+def apply(client: Client, config: Config) -> Report:
+    """Create or update gate and profiles so that the server matches the config."""
+    report = Report()
+    project = _cloud_project(client) if client.is_cloud else ""
+    gate_id = _apply_gate(client, config, report)
 
     parent = config.parent_for(client)
     available = _languages(client)
@@ -300,15 +338,39 @@ def apply(client: Client, config: Config) -> Report:
             xml_path.name,
             xml_path.read_text(encoding="utf-8"),
         )
-        client.post(
-            "api/qualityprofiles/set_default", language=language, qualityProfile=config.profile_name
-        )
+        if not client.is_cloud:
+            client.post(
+                "api/qualityprofiles/set_default",
+                language=language,
+                qualityProfile=config.profile_name,
+            )
+            continue
+        try:
+            client.post(
+                "api/qualityprofiles/add_project",
+                language=language,
+                qualityProfile=config.profile_name,
+                project=project,
+            )
+        except SonarError as exc:
+            if not _plan_refused(client, exc):
+                raise
+            report.gaps.append(f"profile {language}: {PROFILE_NOT_ON_PROJECT} ({exc})")
+    if client.is_cloud:
+        # After the profiles, so that a refused gate cannot keep them from the project.
+        try:
+            client.post("api/qualitygates/select", gateId=gate_id, projectKey=project)
+        except SonarError as exc:
+            if not _plan_refused(client, exc):
+                raise
+            report.gaps.append(f"{GATE_NOT_ON_PROJECT} ({exc})")
     return report
 
 
 def check(client: Client, config: Config) -> Report:
     """Compare gate and profiles on the server with the config without changing anything."""
     report = Report()
+    project = _cloud_project(client) if client.is_cloud else ""
     found = _gate(client, config.gate_name)
     if found is None:
         report.problems.append(f"gate '{config.gate_name}' is missing")
@@ -331,6 +393,13 @@ def check(client: Client, config: Config) -> Report:
                 report.gaps.append(GATE_NOT_DEFAULT)
             else:
                 report.problems.append(f"gate '{config.gate_name}' is not the default gate")
+        if client.is_cloud:
+            _check_project_gate(client, config.gate_name, project, report)
+
+    used: dict[str, dict[str, Any]] = {}
+    if client.is_cloud:
+        found_used = client.get_json("api/qualityprofiles/search", project=project)["profiles"]
+        used = {p["language"]: p for p in found_used}
 
     want_parent = config.parent_for(client)
     available = _languages(client)
@@ -342,6 +411,8 @@ def check(client: Client, config: Config) -> Report:
         if profile is None:
             report.problems.append(f"profile {language}: '{config.profile_name}' is missing")
             continue
+        if client.is_cloud:
+            _check_project_profile(used.get(language), language, config.profile_name, report)
         parent = profile.get("parentName")
         if parent != want_parent:
             report.problems.append(
@@ -360,12 +431,45 @@ def check(client: Client, config: Config) -> Report:
     return report
 
 
+def _check_project_gate(client: Client, name: str, project: str, report: Report) -> None:
+    """Report the gate the cloud project uses: a built-in one is a plan gap, another a problem."""
+    by_project = client.get_json("api/qualitygates/get_by_project", project=project)
+    used = by_project["qualityGate"]["name"]
+    if used == name:
+        return
+    gates = client.get_json("api/qualitygates/list")["qualitygates"]
+    if any(g["name"] == used and g.get("isBuiltIn") for g in gates):
+        report.gaps.append(f"{GATE_NOT_ON_PROJECT}: project uses the built-in gate '{used}'")
+    else:
+        report.problems.append(f"gate '{name}': project uses gate '{used}'")
+
+
+def _check_project_profile(
+    used: dict[str, Any] | None, language: str, name: str, report: Report
+) -> None:
+    """Report the profile the cloud project uses for `language` like _check_project_gate."""
+    if used is None:
+        report.problems.append(f"profile {language}: project uses no profile, want '{name}'")
+    elif used["name"] == name:
+        return
+    elif used.get("isBuiltIn"):
+        report.gaps.append(
+            f"profile {language}: {PROFILE_NOT_ON_PROJECT}: project uses the built-in profile "
+            f"'{used['name']}'"
+        )
+    else:
+        report.problems.append(
+            f"profile {language}: project uses profile '{used['name']}', want '{name}'"
+        )
+
+
 def main(argv: list[str] | None = None) -> int:
     """Command line entry point (`apply` or `check`); returns the process exit code."""
     parser = argparse.ArgumentParser(description="Apply or check the SonarQube quality setup.")
     parser.add_argument("command", choices=("apply", "check"))
     parser.add_argument("--url", default=os.environ.get("SONAR_HOST_URL", "http://127.0.0.1:9000"))
     parser.add_argument("--organization", default=os.environ.get("SONAR_ORGANIZATION") or None)
+    parser.add_argument("--project", default=os.environ.get("SONAR_PROJECT_KEY") or None)
     parser.add_argument("--config", type=Path, default=DEFAULT_CONFIG)
     args = parser.parse_args(argv)
     token = os.environ.get("SONAR_TOKEN", "")
@@ -375,7 +479,7 @@ def main(argv: list[str] | None = None) -> int:
             file=sys.stderr,
         )
         return 2
-    client = Client(args.url, token, args.organization)
+    client = Client(args.url, token, args.organization, args.project)
     try:
         config = load_config(args.config)
         report = apply(client, config) if args.command == "apply" else check(client, config)

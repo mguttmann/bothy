@@ -2,7 +2,8 @@
 #
 # Apply the repository's SonarQube quality gate and quality profiles (quality/sonar/) to
 # SonarQube Cloud and check them (docs/quality/sonarqube-local.md, section 6;
-# docs/quality/public-switch.md, step 12). The token exists only as the secret SONAR_TOKEN,
+# docs/quality/public-switch.md, step 12). On the cloud the gate and the profiles are
+# assigned to the project of the variable SONAR_PROJECT_KEY. The token exists only as the secret SONAR_TOKEN,
 # so the maintainer starts this run by hand after a change under quality/sonar/ or the
 # monthly check: gh workflow run sonar-config.yml --ref main.
 #
@@ -30,6 +31,7 @@ jobs:
     env:
       SONAR_HOST_URL: https://sonarcloud.io
       SONAR_ORGANIZATION: ${{ vars.SONAR_ORGANIZATION }}
+      SONAR_PROJECT_KEY: ${{ vars.SONAR_PROJECT_KEY }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -46,8 +48,12 @@ jobs:
             echo "::error::repository variable SONAR_ORGANIZATION is not set"
             exit 1
           fi
-          make sonar-config SONAR_HOST_URL="$SONAR_HOST_URL" SONAR_ORGANIZATION="$SONAR_ORGANIZATION"
+          if [ -z "$SONAR_PROJECT_KEY" ]; then
+            echo "::error::repository variable SONAR_PROJECT_KEY is not set"
+            exit 1
+          fi
+          make sonar-config SONAR_HOST_URL="$SONAR_HOST_URL" SONAR_ORGANIZATION="$SONAR_ORGANIZATION" SONAR_PROJECT_KEY="$SONAR_PROJECT_KEY"
       - name: make sonar-config-check
         env:
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
-        run: make sonar-config-check SONAR_HOST_URL="$SONAR_HOST_URL" SONAR_ORGANIZATION="$SONAR_ORGANIZATION"
+        run: make sonar-config-check SONAR_HOST_URL="$SONAR_HOST_URL" SONAR_ORGANIZATION="$SONAR_ORGANIZATION" SONAR_PROJECT_KEY="$SONAR_PROJECT_KEY"

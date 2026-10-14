@@ -6,7 +6,14 @@ Endpoint names and parameters follow the public Web API description
 it follows SonarQube Cloud instead (https://sonarcloud.io/api/webservices/list,
 retrieved 2026-10-13): create_condition needs `gateId` and set_as_default needs `id`.
 `gate_default_forbidden=True` answers set_as_default with HTTP 403, as SonarQube Cloud does
-for a custom default gate on a plan that does not include it.
+for a custom default gate on a plan that does not include it. `profile_default_forbidden` and
+`profile_project_forbidden` answer set_default and add_project with HTTP 400 "Organization ...
+is not allowed to perform this action", as SonarQube Cloud answered set_default on a
+sonar-config run of 2026-10-14; `gate_select_forbidden` answers select with HTTP 403 and the
+same message. `project_permission_denied` answers add_project with HTTP 403 "Insufficient
+privileges", as for a token without the needed permission. A project
+uses the profile or gate assigned to it, otherwise the default one; the built-in gate is
+"Sonar way".
 """
 
 from __future__ import annotations
@@ -42,6 +49,12 @@ class State:
     gate_ids: dict[str, str] = field(default_factory=dict)
     default_gate: str | None = None
     gate_default_forbidden: bool = False
+    profile_default_forbidden: bool = False
+    profile_project_forbidden: bool = False
+    gate_select_forbidden: bool = False
+    project_permission_denied: bool = False
+    project_gate: str | None = None
+    project_profiles: dict[str, str] = field(default_factory=dict)
     profiles: list[Profile] = field(default_factory=list)
     calls: list[tuple[str, str, dict[str, str]]] = field(default_factory=list)
     tokens: list[str] = field(default_factory=list)
@@ -136,6 +149,12 @@ def _languages(state: State, _: dict[str, str]) -> tuple[int, Any, str]:
 
 
 _BAD_REQUEST = (400, {"errors": [{"msg": "missing parameter"}]}, "application/json")
+_NOT_ALLOWED = (
+    400,
+    {"errors": [{"msg": "Organization 'example-org' is not allowed to perform this action"}]},
+    "application/json",
+)
+BUILTIN_GATE = "Sonar way"
 
 
 def _gate_name(state: State, p: dict[str, str], name_key: str, id_key: str) -> str | None:
@@ -193,6 +212,8 @@ def _gate_list(state: State, _: dict[str, str]) -> tuple[int, Any, str]:
         {"id": state.gate_ids[n], "name": n, "isDefault": n == state.default_gate}
         for n in state.gates
     ]
+    builtin = {"id": "1", "name": BUILTIN_GATE, "isBuiltIn": True}
+    gates.append({**builtin, "isDefault": state.default_gate is None})
     return 200, {"qualitygates": gates}, "application/json"
 
 
@@ -206,12 +227,43 @@ def _gate_default(state: State, p: dict[str, str]) -> tuple[int, Any, str]:
     return 204, "", "text/plain"
 
 
+def _gate_select(state: State, p: dict[str, str]) -> tuple[int, Any, str]:
+    if state.gate_select_forbidden:
+        return 403, _NOT_ALLOWED[1], "application/json"
+    gate = _gate_name(state, p, "gateName", "gateId")
+    if gate not in state.gates or not p.get("projectKey"):
+        return _BAD_REQUEST
+    state.project_gate = gate
+    return 204, "", "text/plain"
+
+
+def _gate_by_project(state: State, p: dict[str, str]) -> tuple[int, Any, str]:
+    if not p.get("project"):
+        return _BAD_REQUEST
+    name = state.project_gate or state.default_gate or BUILTIN_GATE
+    is_default = name == state.default_gate
+    gate = {"id": state.gate_ids.get(name, "1"), "name": name, "default": is_default}
+    return 200, {"qualityGate": gate}, "application/json"
+
+
+def _project_profile(state: State, language: str) -> Profile | None:
+    name = state.project_profiles.get(language)
+    if name is not None:
+        return state.profile(language, name)
+    return next((x for x in state.profiles if x.language == language and x.default), None)
+
+
 def _qp_search(state: State, p: dict[str, str]) -> tuple[int, Any, str]:
-    found = [
-        x
-        for x in state.profiles
-        if x.language == p.get("language", x.language) and x.name == p.get("qualityProfile", x.name)
-    ]
+    if p.get("project"):
+        used = [_project_profile(state, lang) for lang in state.languages]
+        found = [x for x in used if x is not None]
+    else:
+        found = [
+            x
+            for x in state.profiles
+            if x.language == p.get("language", x.language)
+            and x.name == p.get("qualityProfile", x.name)
+        ]
     return (
         200,
         {
@@ -258,7 +310,20 @@ def _qp_restore(state: State, p: dict[str, str]) -> tuple[int, Any, str]:
     return 200, {"profile": {"key": prof.key}}, "application/json"
 
 
+def _qp_add_project(state: State, p: dict[str, str]) -> tuple[int, Any, str]:
+    if state.profile_project_forbidden:
+        return _NOT_ALLOWED
+    if state.project_permission_denied:
+        return 403, {"errors": [{"msg": "Insufficient privileges"}]}, "application/json"
+    if not p.get("project") or state.profile(p["language"], p["qualityProfile"]) is None:
+        return _BAD_REQUEST
+    state.project_profiles[p["language"]] = p["qualityProfile"]
+    return 204, "", "text/plain"
+
+
 def _qp_default(state: State, p: dict[str, str]) -> tuple[int, Any, str]:
+    if state.profile_default_forbidden:
+        return _NOT_ALLOWED
     for prof in state.profiles:
         if prof.language == p["language"]:
             prof.default = prof.name == p["qualityProfile"]
@@ -281,11 +346,14 @@ ROUTES = {
     ("POST", "/api/qualitygates/update_condition"): _cond_update,
     ("POST", "/api/qualitygates/delete_condition"): _cond_delete,
     ("POST", "/api/qualitygates/set_as_default"): _gate_default,
+    ("POST", "/api/qualitygates/select"): _gate_select,
+    ("GET", "/api/qualitygates/get_by_project"): _gate_by_project,
     ("GET", "/api/qualityprofiles/search"): _qp_search,
     ("POST", "/api/qualityprofiles/create"): _qp_create,
     ("POST", "/api/qualityprofiles/change_parent"): _qp_parent,
     ("POST", "/api/qualityprofiles/restore"): _qp_restore,
     ("POST", "/api/qualityprofiles/set_default"): _qp_default,
+    ("POST", "/api/qualityprofiles/add_project"): _qp_add_project,
     ("GET", "/api/qualityprofiles/backup"): _qp_backup,
 }
 

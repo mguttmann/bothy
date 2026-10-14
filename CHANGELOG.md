@@ -179,6 +179,14 @@ operated, and the order of the build.
   `errors[].msg` of the response, shortened) after the HTTP status; before, a refusal such as
   HTTP 400 on `api/qualityprofiles/set_default` showed only the status and could not be
   diagnosed from the run log.
+- `quality_sync.py` on SonarQube Cloud no longer makes the quality profiles the organization
+  default, which plans without that feature refuse (HTTP 400 on
+  `api/qualityprofiles/set_default` stopped the run at the first language). It assigns each
+  profile and the quality gate to the project instead (`api/qualityprofiles/add_project`,
+  `api/qualitygates/select`, project key from `SONAR_PROJECT_KEY`). A refusal by the plan
+  becomes a named gap with the server's reason and the next language is still applied;
+  `make sonar-config-check` reads the project's profiles and gate and reports a built-in one
+  as a gap, while any other profile or gate fails the check. SonarQube Server is unchanged.
 - `docs/api/openapi.yaml` 0.2.0: the response `Conflict` names the problem code
   `file_blocked` in the order of the codes; `createHost` and `issueHostPairingCode` take
   `Idempotency-Key` and list `422 idempotency_key_reuse` instead of the exemption `auth_flow`,
