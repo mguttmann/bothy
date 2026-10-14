@@ -46,3 +46,9 @@ func (s *PrincipalSource) Principal(ctx context.Context, id ids.ID) (authz.Princ
 func (s *PrincipalSource) ActiveOwnerIDs(ctx context.Context) ([]ids.ID, error) {
 	return s.store.ActiveOwnerIDs(ctx)
 }
+
+// HasActivePasskey implements authz.PrincipalSource: a passkey of userID with revoked_at IS NULL
+// (M1-40). Errors: those of the Store.
+func (s *PrincipalSource) HasActivePasskey(ctx context.Context, userID ids.ID) (bool, error) {
+	return s.store.HasActivePasskey(ctx, userID)
+}

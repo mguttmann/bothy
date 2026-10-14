@@ -185,6 +185,38 @@ func (stubServer) UnlinkIdentity(context.Context, rest.UnlinkIdentityRequestObje
 	return nil, nil
 }
 
+func (stubServer) BeginPasskeyLogin(context.Context, rest.BeginPasskeyLoginRequestObject) (rest.BeginPasskeyLoginResponseObject, error) {
+	return nil, nil
+}
+
+func (stubServer) CompletePasskeyLogin(context.Context, rest.CompletePasskeyLoginRequestObject) (rest.CompletePasskeyLoginResponseObject, error) {
+	return nil, nil
+}
+
+func (stubServer) BeginEnrollment(context.Context, rest.BeginEnrollmentRequestObject) (rest.BeginEnrollmentResponseObject, error) {
+	return nil, nil
+}
+
+func (stubServer) CompleteEnrollment(context.Context, rest.CompleteEnrollmentRequestObject) (rest.CompleteEnrollmentResponseObject, error) {
+	return nil, nil
+}
+
+func (stubServer) BeginPasskeyRegistration(context.Context, rest.BeginPasskeyRegistrationRequestObject) (rest.BeginPasskeyRegistrationResponseObject, error) {
+	return nil, nil
+}
+
+func (stubServer) CompletePasskeyRegistration(context.Context, rest.CompletePasskeyRegistrationRequestObject) (rest.CompletePasskeyRegistrationResponseObject, error) {
+	return nil, nil
+}
+
+func (stubServer) RevokePasskey(context.Context, rest.RevokePasskeyRequestObject) (rest.RevokePasskeyResponseObject, error) {
+	return nil, nil
+}
+
+func (stubServer) CompleteStepUpWithPasskey(context.Context, rest.CompleteStepUpWithPasskeyRequestObject) (rest.CompleteStepUpWithPasskeyResponseObject, error) {
+	return nil, nil
+}
+
 func (stubServer) RedeemEnrollmentCode(context.Context, rest.RedeemEnrollmentCodeRequestObject) (rest.RedeemEnrollmentCodeResponseObject, error) {
 	return nil, nil
 }
@@ -213,8 +245,8 @@ func (stubServer) CompletePairing(context.Context, rest.CompletePairingRequestOb
 // (AZ-P1): the three device reads of M1-33, the ten people, owner and self operations of M1-31
 // and the JWKS and the rotation of the signing keys (M1-32), the sessions (M1-34), the step-up
 // (M1-35), the providers and credentials (M1-36), the API tokens (M1-44), the audit log (M1-50),
-// the enrollment codes (M1-37) and the device approval and pairing (M1-38). A handler ticket that enables an operation changes this test
-// together with
+// the enrollment codes (M1-37), the device approval and pairing (M1-38) and the passkeys (M1-40).
+// A handler ticket that enables an operation changes this test together with
 // api/operations.yaml.
 func TestRealTable_Enabled(t *testing.T) {
 	type entry struct{ pattern, action, class string }
@@ -275,6 +307,15 @@ func TestRealTable_Enabled(t *testing.T) {
 		"putInstanceSetting":   {"PUT /api/v1/instance/settings/{key}", "instance.settings.update", "rl.admin"},
 		"updateBranding":       {"PUT /api/v1/instance/branding", "instance.branding.update", "rl.admin"},
 		"getProblemType":       {"GET /api/v1/problems/{code}", "instance.discovery.read", "rl.public_auth"},
+		// M1-40
+		"beginPasskeyLogin":           {"POST /api/v1/auth/passkey/begin", "auth.login.begin", "rl.public_auth"},
+		"completePasskeyLogin":        {"POST /api/v1/auth/passkey/complete", "auth.login.complete", "rl.public_auth"},
+		"beginEnrollment":             {"POST /api/v1/auth/enroll/begin", "auth.login.begin", "rl.public_auth"},
+		"completeEnrollment":          {"POST /api/v1/auth/enroll/complete", "auth.login.complete", "rl.public_auth"},
+		"beginPasskeyRegistration":    {"POST /api/v1/me/passkeys/begin", "passkey.register", "rl.admin"},
+		"completePasskeyRegistration": {"POST /api/v1/me/passkeys/complete", "passkey.register", "rl.admin"},
+		"revokePasskey":               {"DELETE /api/v1/users/{user_id}/passkeys/{passkey_id}", "passkey.revoke", "rl.admin"},
+		"completeStepUpWithPasskey":   {"POST /api/v1/auth/step-up/passkey", "auth.step_up", "rl.public_auth"},
 	}
 	ops := routes.Enabled()
 	if len(ops) != len(want) {

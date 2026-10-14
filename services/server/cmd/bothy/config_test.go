@@ -179,6 +179,7 @@ func TestConfigPrintShowsSourcePerKey(t *testing.T) {
 		"auth.enrollment_code_ttl = 3d  # default\n" +
 		"auth.local_password_enabled = true  # default\n" +
 		"auth.login_fail_window = 15m  # default\n" +
+		"auth.login_flow_ttl = 10m  # default\n" +
 		"auth.pairing_code_chars = 8  # default\n" +
 		"auth.pairing_code_ttl = 5m  # default\n" +
 		"auth.personal_token_max_ttl = 90d  # default\n" +
@@ -189,6 +190,8 @@ func TestConfigPrintShowsSourcePerKey(t *testing.T) {
 		"auth.step_up_fail_limit = 5  # default\n" +
 		"auth.step_up_max_age = 5m  # default\n" +
 		"auth.token_pepper_ref = file:/run/bothy/secrets/token_pepper  # default\n" +
+		"auth.webauthn_origins =   # default\n" +
+		"auth.webauthn_rp_id =   # default\n" +
 		"authz.expiry_reminder_lead = 2d  # default\n" +
 		"authz.expiry_sweep_batch_max = 500  # default\n" +
 		"authz.expiry_sweep_interval = 1m  # default\n" +

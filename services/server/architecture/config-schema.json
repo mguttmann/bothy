@@ -266,6 +266,18 @@
       "doc": "Window in which failed attempts count."
     },
     {
+      "name": "auth.login_flow_ttl",
+      "env": "BOTHY_AUTH__LOGIN_FLOW_TTL",
+      "kind": "duration",
+      "default": "10m",
+      "required": false,
+      "enum": [],
+      "min": "1s",
+      "max": "",
+      "chapter": "08-identitaet.md",
+      "doc": "Validity of a login flow and of a passkey ceremony (login, enrollment, registration)."
+    },
+    {
       "name": "auth.pairing_code_chars",
       "env": "BOTHY_AUTH__PAIRING_CODE_CHARS",
       "kind": "int",
@@ -384,6 +396,30 @@
       "max": "",
       "chapter": "08-identitaet.md",
       "doc": "Secret reference of the server pepper for the HMAC hashes of tokens and codes and the DPoP nonce key; 32 bytes as hex."
+    },
+    {
+      "name": "auth.webauthn_origins",
+      "env": "BOTHY_AUTH__WEBAUTHN_ORIGINS",
+      "kind": "list(string)",
+      "default": "",
+      "required": false,
+      "enum": [],
+      "min": "",
+      "max": "",
+      "chapter": "08-identitaet.md",
+      "doc": "Allowed origins of the passkeys; empty means the origin of server.public_url; entries may be app origins such as android:apk-key-hash:..."
+    },
+    {
+      "name": "auth.webauthn_rp_id",
+      "env": "BOTHY_AUTH__WEBAUTHN_RP_ID",
+      "kind": "string",
+      "default": "",
+      "required": false,
+      "enum": [],
+      "min": "",
+      "max": "",
+      "chapter": "08-identitaet.md",
+      "doc": "RP ID of the passkeys; empty means the host of server.public_url (an IP address there means no passkeys)."
     },
     {
       "name": "authz.expiry_reminder_lead",

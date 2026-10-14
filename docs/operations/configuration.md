@@ -367,7 +367,7 @@ Quelle: [08-identitaet.md](../spec/08-identitaet.md), Abschnitt 18.
 | `auth.token_pepper_ref` | `BOTHY_AUTH__TOKEN_PEPPER_REF` | Server | secret_ref | `file:<secrets.dir>/token_pepper` | Verweis auf den Server-Pepper für die HMAC-Hashes aller Tokens und Codes (03, Grundsatz 9) | aktiv |
 | `auth.clock_leeway` | `BOTHY_AUTH__CLOCK_LEEWAY` | Server | duration | `30s` | erlaubte Uhrabweichung bei `exp`, `nbf`, `iat` | aktiv |
 | `auth.dpop_proof_max_age` | `BOTHY_AUTH__DPOP_PROOF_MAX_AGE` | Server | duration | `60s` | Höchstalter eines DPoP-Beweises (`iat`) | aktiv |
-| `auth.login_flow_ttl` | `BOTHY_AUTH__LOGIN_FLOW_TTL` | Server |  | `10m` | Gültigkeit eines Anmeldevorgangs | geplant (M1) |
+| `auth.login_flow_ttl` | `BOTHY_AUTH__LOGIN_FLOW_TTL` | Server | duration | `10m` | Gültigkeit eines Anmeldevorgangs | aktiv |
 | `auth.server_code_ttl` | `BOTHY_AUTH__SERVER_CODE_TTL` | Server |  | `60s` | Gültigkeit des einmaligen Server-Codes | geplant (M1) |
 | `auth.oidc_jwks_cache_ttl` | `BOTHY_AUTH__OIDC_JWKS_CACHE_TTL` | Server |  | `1h` | Cache der Anbieter-Metadaten (Discovery) und -Schlüssel (JWKS) | geplant (M1) |
 | `auth.oidc_client_assertion_ttl` | `BOTHY_AUTH__OIDC_CLIENT_ASSERTION_TTL` | Server |  | `2m` | Gültigkeit einer Client-Assertion bei `private_key_jwt` | geplant (M1) |
@@ -389,8 +389,8 @@ Quelle: [08-identitaet.md](../spec/08-identitaet.md), Abschnitt 18.
 | `auth.console_session_idle_timeout` | `BOTHY_AUTH__CONSOLE_SESSION_IDLE_TIMEOUT` | Server |  | `30m` | Leerlauf bis zum Ende der Konsolen-Sitzung | geplant (M6) |
 | `auth.local_password_enabled` | `BOTHY_AUTH__LOCAL_PASSWORD_ENABLED` | Server | bool | `true` | Passwort mit TOTP als Rückfall für lokale Konten | aktiv |
 | `auth.totp_key_ref` | `BOTHY_AUTH__TOTP_KEY_REF` | Server |  | `file:<secrets.dir>/totp_key` | Verweis auf den Schlüssel (32 Byte), mit dem TOTP-Geheimnisse verschlüsselt werden | geplant (M1) |
-| `auth.webauthn_rp_id` | `BOTHY_AUTH__WEBAUTHN_RP_ID` | Server |  | leer | RP-ID der Passkeys; leer heißt Host von `server.public_url` | geplant (M1) |
-| `auth.webauthn_origins` | `BOTHY_AUTH__WEBAUTHN_ORIGINS` | Server |  | leer | erlaubte Origins der Passkeys; leer heißt Origin von `server.public_url`; Einträge dürfen auch App-Origins wie `android:apk-key-hash:...` sein | geplant (M1) |
+| `auth.webauthn_rp_id` | `BOTHY_AUTH__WEBAUTHN_RP_ID` | Server | string | leer | RP-ID der Passkeys; leer heißt Host von `server.public_url` | aktiv |
+| `auth.webauthn_origins` | `BOTHY_AUTH__WEBAUTHN_ORIGINS` | Server | list(string) | leer | erlaubte Origins der Passkeys; leer heißt Origin von `server.public_url`; Einträge dürfen auch App-Origins wie `android:apk-key-hash:...` sein | aktiv |
 | `auth.password_min_length` | `BOTHY_AUTH__PASSWORD_MIN_LENGTH` | Server |  | `12` | Mindestlänge eines Passworts | geplant (M1) |
 | `auth.argon2id_memory_kib` | `BOTHY_AUTH__ARGON2ID_MEMORY_KIB` | Server |  | `65536` | Argon2id-Speicher (Untergrenze 19456) | geplant (M1) |
 | `auth.argon2id_iterations` | `BOTHY_AUTH__ARGON2ID_ITERATIONS` | Server |  | `3` | Argon2id-Durchläufe (Untergrenze 2) | geplant (M1) |

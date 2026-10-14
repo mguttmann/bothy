@@ -96,7 +96,9 @@ modules:
     ephemeral_events: []
     ws_ops: []
     depends_on: [instance, authz]
-    adapter_vendors: [pgx, xtext]   # sqlc code and the repository (M1-26); adapters/locale parses BCP 47 tags (M1-31)
+    # sqlc code and the repository (M1-26); adapters/locale parses BCP 47 tags (M1-31);
+    # adapters/webauthn verifies passkeys with go-webauthn (M1-40).
+    adapter_vendors: [pgx, xtext, webauthn]
   chat:
     tables: [spaces, user_space_states, channels, channel_skill_bindings, project_bindings,
              dm_participants, forum_tags, threads, thread_tags]
@@ -269,5 +271,7 @@ vendors:                    # <group>: [<import path>, <import path>/**]
   # AWS SDK for Go v2 and smithy-go of the S3 driver (docs/spec/12-dateien.md "4.3", ADR 0010).
   awssdk: [github.com/aws/aws-sdk-go-v2, github.com/aws/aws-sdk-go-v2/**, github.com/aws/smithy-go,
            github.com/aws/smithy-go/**]
+  # WebAuthn passkeys of identity adapters/webauthn (M1-40, docs/spec/08-identitaet.md "2.5").
+  webauthn: [github.com/go-webauthn/webauthn, github.com/go-webauthn/webauthn/**]
   # Port bindings and AutoRemove of the pgtest container: testcontainers takes these moby types.
   mobyapi: [github.com/moby/moby/api/types/container, github.com/moby/moby/api/types/network]

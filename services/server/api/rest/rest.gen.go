@@ -15155,6 +15155,12 @@ type ExportAuditEventsParams struct {
 	To Timestamp `form:"to" json:"to"`
 }
 
+// CompleteEnrollmentParams defines parameters for CompleteEnrollment.
+type CompleteEnrollmentParams struct {
+	// DPoP DPoP proof (RFC 9449) signed with the device key that the new tokens will be bound to.
+	DPoP DpopProof `json:"DPoP"`
+}
+
 // RedeemEnrollmentCodeParams defines parameters for RedeemEnrollmentCode.
 type RedeemEnrollmentCodeParams struct {
 	// DPoP DPoP proof (RFC 9449) signed with the device key that the new tokens will be bound to.
@@ -15169,6 +15175,12 @@ type BeginPairingParams struct {
 
 // CompletePairingParams defines parameters for CompletePairing.
 type CompletePairingParams struct {
+	// DPoP DPoP proof (RFC 9449) signed with the device key that the new tokens will be bound to.
+	DPoP DpopProof `json:"DPoP"`
+}
+
+// CompletePasskeyLoginParams defines parameters for CompletePasskeyLogin.
+type CompletePasskeyLoginParams struct {
 	// DPoP DPoP proof (RFC 9449) signed with the device key that the new tokens will be bound to.
 	DPoP DpopProof `json:"DPoP"`
 }
@@ -15320,6 +15332,12 @@ type ListUserSessionsParams struct {
 // VerifyAuditChainJSONRequestBody defines body for VerifyAuditChain for application/json ContentType.
 type VerifyAuditChainJSONRequestBody = AuditVerifyRequest
 
+// BeginEnrollmentJSONRequestBody defines body for BeginEnrollment for application/json ContentType.
+type BeginEnrollmentJSONRequestBody = EnrollBeginRequest
+
+// CompleteEnrollmentJSONRequestBody defines body for CompleteEnrollment for application/json ContentType.
+type CompleteEnrollmentJSONRequestBody = EnrollCompleteRequest
+
 // RedeemEnrollmentCodeJSONRequestBody defines body for RedeemEnrollmentCode for application/json ContentType.
 type RedeemEnrollmentCodeJSONRequestBody = EnrollRedeemRequest
 
@@ -15329,8 +15347,17 @@ type BeginPairingJSONRequestBody = PairingBeginRequest
 // CompletePairingJSONRequestBody defines body for CompletePairing for application/json ContentType.
 type CompletePairingJSONRequestBody = PairingCompleteRequest
 
+// BeginPasskeyLoginJSONRequestBody defines body for BeginPasskeyLogin for application/json ContentType.
+type BeginPasskeyLoginJSONRequestBody = PasskeyLoginBeginRequest
+
+// CompletePasskeyLoginJSONRequestBody defines body for CompletePasskeyLogin for application/json ContentType.
+type CompletePasskeyLoginJSONRequestBody = PasskeyLoginCompleteRequest
+
 // CompleteStepUpWithDeviceKeyJSONRequestBody defines body for CompleteStepUpWithDeviceKey for application/json ContentType.
 type CompleteStepUpWithDeviceKeyJSONRequestBody = StepUpDeviceKeyRequest
+
+// CompleteStepUpWithPasskeyJSONRequestBody defines body for CompleteStepUpWithPasskey for application/json ContentType.
+type CompleteStepUpWithPasskeyJSONRequestBody = StepUpPasskeyRequest
 
 // RefreshTokenJSONRequestBody defines body for RefreshToken for application/json ContentType.
 type RefreshTokenJSONRequestBody = TokenRefreshRequest
@@ -15352,6 +15379,9 @@ type PutInstanceSettingJSONRequestBody = InstanceSettingPut
 
 // ApprovePairingJSONRequestBody defines body for ApprovePairing for application/json ContentType.
 type ApprovePairingJSONRequestBody = PairingApprove
+
+// CompletePasskeyRegistrationJSONRequestBody defines body for CompletePasskeyRegistration for application/json ContentType.
+type CompletePasskeyRegistrationJSONRequestBody = PasskeyRegisterComplete
 
 // UpdateMyProfileJSONRequestBody defines body for UpdateMyProfile for application/json ContentType.
 type UpdateMyProfileJSONRequestBody = ProfileUpdate
@@ -17220,6 +17250,12 @@ type ServerInterface interface {
 	// VerifyAuditChain Verify the hash chain
 	// (POST /audit/verify)
 	VerifyAuditChain(w http.ResponseWriter, r *http.Request)
+	// BeginEnrollment Start the first passkey registration with an enrollment code
+	// (POST /auth/enroll/begin)
+	BeginEnrollment(w http.ResponseWriter, r *http.Request)
+	// CompleteEnrollment Register the first passkey and log in
+	// (POST /auth/enroll/complete)
+	CompleteEnrollment(w http.ResponseWriter, r *http.Request, params CompleteEnrollmentParams)
 	// RedeemEnrollmentCode Redeem an enrollment code with device keys and log in
 	// (POST /auth/enroll/redeem)
 	RedeemEnrollmentCode(w http.ResponseWriter, r *http.Request, params RedeemEnrollmentCodeParams)
@@ -17232,12 +17268,21 @@ type ServerInterface interface {
 	// CompletePairing Collect the tokens of an approved pairing
 	// (POST /auth/pairing/complete)
 	CompletePairing(w http.ResponseWriter, r *http.Request, params CompletePairingParams)
+	// BeginPasskeyLogin Start a passkey login
+	// (POST /auth/passkey/begin)
+	BeginPasskeyLogin(w http.ResponseWriter, r *http.Request)
+	// CompletePasskeyLogin Finish a passkey login and register the device
+	// (POST /auth/passkey/complete)
+	CompletePasskeyLogin(w http.ResponseWriter, r *http.Request, params CompletePasskeyLoginParams)
 	// CreateStepUpChallenge Create a step-up challenge
 	// (POST /auth/step-up/challenge)
 	CreateStepUpChallenge(w http.ResponseWriter, r *http.Request)
 	// CompleteStepUpWithDeviceKey Confirm step-up with the device key after user verification
 	// (POST /auth/step-up/device-key)
 	CompleteStepUpWithDeviceKey(w http.ResponseWriter, r *http.Request)
+	// CompleteStepUpWithPasskey Confirm step-up with a passkey
+	// (POST /auth/step-up/passkey)
+	CompleteStepUpWithPasskey(w http.ResponseWriter, r *http.Request)
 	// RefreshToken Rotate the refresh token
 	// (POST /auth/token/refresh)
 	RefreshToken(w http.ResponseWriter, r *http.Request, params RefreshTokenParams)
@@ -17292,6 +17337,12 @@ type ServerInterface interface {
 	// ApprovePairing Approve a device pairing with its code
 	// (POST /me/devices/pairings)
 	ApprovePairing(w http.ResponseWriter, r *http.Request, params ApprovePairingParams)
+	// BeginPasskeyRegistration Start registering a passkey
+	// (POST /me/passkeys/begin)
+	BeginPasskeyRegistration(w http.ResponseWriter, r *http.Request)
+	// CompletePasskeyRegistration Finish registering a passkey
+	// (POST /me/passkeys/complete)
+	CompletePasskeyRegistration(w http.ResponseWriter, r *http.Request)
 	// UpdateMyProfile Change own profile
 	// (PATCH /me/profile)
 	UpdateMyProfile(w http.ResponseWriter, r *http.Request, params UpdateMyProfileParams)
@@ -17352,6 +17403,9 @@ type ServerInterface interface {
 	// UnlinkIdentity Unlink an identity
 	// (DELETE /users/{user_id}/identities/{identity_id})
 	UnlinkIdentity(w http.ResponseWriter, r *http.Request, userId UserIdPath, identityId IdentityIdPath)
+	// RevokePasskey Revoke a passkey
+	// (DELETE /users/{user_id}/passkeys/{passkey_id})
+	RevokePasskey(w http.ResponseWriter, r *http.Request, userId UserIdPath, passkeyId PasskeyIdPath)
 	// ListUserSessions List sessions of a person
 	// (GET /users/{user_id}/sessions)
 	ListUserSessions(w http.ResponseWriter, r *http.Request, userId UserIdPath, params ListUserSessionsParams)
@@ -17563,6 +17617,65 @@ func (siw *ServerInterfaceWrapper) VerifyAuditChain(w http.ResponseWriter, r *ht
 	handler.ServeHTTP(w, r)
 }
 
+// BeginEnrollment operation middleware
+func (siw *ServerInterfaceWrapper) BeginEnrollment(w http.ResponseWriter, r *http.Request) {
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.BeginEnrollment(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// CompleteEnrollment operation middleware
+func (siw *ServerInterfaceWrapper) CompleteEnrollment(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params CompleteEnrollmentParams
+
+	headers := r.Header
+
+	// ------------- Required header parameter "DPoP" -------------
+	if valueList, found := headers[http.CanonicalHeaderKey("DPoP")]; found {
+		var DPoP DpopProof
+		n := len(valueList)
+		if n != 1 {
+			siw.ErrorHandlerFunc(w, r, &TooManyValuesForParamError{ParamName: "DPoP", Count: n})
+			return
+		}
+
+		err = runtime.BindStyledParameterWithOptions("simple", "DPoP", valueList[0], &DPoP, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: true, Type: "string", Format: ""})
+		if err != nil {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "DPoP", Err: err})
+			return
+		}
+
+		params.DPoP = DPoP
+
+	} else {
+		err := fmt.Errorf("Header parameter DPoP is required, but not found")
+		siw.ErrorHandlerFunc(w, r, &RequiredHeaderError{ParamName: "DPoP", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.CompleteEnrollment(w, r, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
 // RedeemEnrollmentCode operation middleware
 func (siw *ServerInterfaceWrapper) RedeemEnrollmentCode(w http.ResponseWriter, r *http.Request) {
 
@@ -17712,6 +17825,65 @@ func (siw *ServerInterfaceWrapper) CompletePairing(w http.ResponseWriter, r *htt
 	handler.ServeHTTP(w, r)
 }
 
+// BeginPasskeyLogin operation middleware
+func (siw *ServerInterfaceWrapper) BeginPasskeyLogin(w http.ResponseWriter, r *http.Request) {
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.BeginPasskeyLogin(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// CompletePasskeyLogin operation middleware
+func (siw *ServerInterfaceWrapper) CompletePasskeyLogin(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params CompletePasskeyLoginParams
+
+	headers := r.Header
+
+	// ------------- Required header parameter "DPoP" -------------
+	if valueList, found := headers[http.CanonicalHeaderKey("DPoP")]; found {
+		var DPoP DpopProof
+		n := len(valueList)
+		if n != 1 {
+			siw.ErrorHandlerFunc(w, r, &TooManyValuesForParamError{ParamName: "DPoP", Count: n})
+			return
+		}
+
+		err = runtime.BindStyledParameterWithOptions("simple", "DPoP", valueList[0], &DPoP, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: true, Type: "string", Format: ""})
+		if err != nil {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "DPoP", Err: err})
+			return
+		}
+
+		params.DPoP = DPoP
+
+	} else {
+		err := fmt.Errorf("Header parameter DPoP is required, but not found")
+		siw.ErrorHandlerFunc(w, r, &RequiredHeaderError{ParamName: "DPoP", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.CompletePasskeyLogin(w, r, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
 // CreateStepUpChallenge operation middleware
 func (siw *ServerInterfaceWrapper) CreateStepUpChallenge(w http.ResponseWriter, r *http.Request) {
 
@@ -17731,6 +17903,20 @@ func (siw *ServerInterfaceWrapper) CompleteStepUpWithDeviceKey(w http.ResponseWr
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		siw.Handler.CompleteStepUpWithDeviceKey(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// CompleteStepUpWithPasskey operation middleware
+func (siw *ServerInterfaceWrapper) CompleteStepUpWithPasskey(w http.ResponseWriter, r *http.Request) {
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.CompleteStepUpWithPasskey(w, r)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -18275,6 +18461,34 @@ func (siw *ServerInterfaceWrapper) ApprovePairing(w http.ResponseWriter, r *http
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		siw.Handler.ApprovePairing(w, r, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// BeginPasskeyRegistration operation middleware
+func (siw *ServerInterfaceWrapper) BeginPasskeyRegistration(w http.ResponseWriter, r *http.Request) {
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.BeginPasskeyRegistration(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// CompletePasskeyRegistration operation middleware
+func (siw *ServerInterfaceWrapper) CompletePasskeyRegistration(w http.ResponseWriter, r *http.Request) {
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.CompletePasskeyRegistration(w, r)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -19093,6 +19307,41 @@ func (siw *ServerInterfaceWrapper) UnlinkIdentity(w http.ResponseWriter, r *http
 	handler.ServeHTTP(w, r)
 }
 
+// RevokePasskey operation middleware
+func (siw *ServerInterfaceWrapper) RevokePasskey(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "user_id" -------------
+	var userId UserIdPath
+
+	err = runtime.BindStyledParameterWithOptions("simple", "user_id", r.PathValue("user_id"), &userId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "uuid", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "user_id", Err: err})
+		return
+	}
+
+	// ------------- Path parameter "passkey_id" -------------
+	var passkeyId PasskeyIdPath
+
+	err = runtime.BindStyledParameterWithOptions("simple", "passkey_id", r.PathValue("passkey_id"), &passkeyId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "uuid", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "passkey_id", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.RevokePasskey(w, r, userId, passkeyId)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
 // ListUserSessions operation middleware
 func (siw *ServerInterfaceWrapper) ListUserSessions(w http.ResponseWriter, r *http.Request) {
 
@@ -19271,16 +19520,23 @@ func HandlerWithOptions(si ServerInterface, options StdHTTPServerOptions) http.H
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/instance/discovery", wrapper.GetDiscovery)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/instance/jwks", wrapper.GetJwks)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/problems/{code}", wrapper.GetProblemType)
+	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/auth/passkey/begin", wrapper.BeginPasskeyLogin)
+	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/auth/passkey/complete", wrapper.CompletePasskeyLogin)
+	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/auth/enroll/begin", wrapper.BeginEnrollment)
+	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/auth/enroll/complete", wrapper.CompleteEnrollment)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/auth/enroll/redeem", wrapper.RedeemEnrollmentCode)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/auth/pairing/begin", wrapper.BeginPairing)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/auth/pairing/complete", wrapper.CompletePairing)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/auth/token/refresh", wrapper.RefreshToken)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/auth/logout", wrapper.Logout)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/auth/step-up/challenge", wrapper.CreateStepUpChallenge)
+	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/auth/step-up/passkey", wrapper.CompleteStepUpWithPasskey)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/auth/step-up/device-key", wrapper.CompleteStepUpWithDeviceKey)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/me", wrapper.GetMe)
 	m.HandleFunc(http.MethodPatch+" "+options.BaseURL+"/me/profile", wrapper.UpdateMyProfile)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/me/credentials", wrapper.GetMyCredentials)
+	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/me/passkeys/begin", wrapper.BeginPasskeyRegistration)
+	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/me/passkeys/complete", wrapper.CompletePasskeyRegistration)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/users", wrapper.ListUsers)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/users", wrapper.CreateUser)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/users/{user_id}", wrapper.GetUser)
@@ -19289,6 +19545,7 @@ func HandlerWithOptions(si ServerInterface, options StdHTTPServerOptions) http.H
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/users/{user_id}/enrollment-codes", wrapper.CreateEnrollmentCode)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/users/{user_id}/credentials", wrapper.GetUserCredentials)
 	m.HandleFunc(http.MethodDelete+" "+options.BaseURL+"/users/{user_id}/identities/{identity_id}", wrapper.UnlinkIdentity)
+	m.HandleFunc(http.MethodDelete+" "+options.BaseURL+"/users/{user_id}/passkeys/{passkey_id}", wrapper.RevokePasskey)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/users/{user_id}/devices", wrapper.ListUserDevices)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/users/{user_id}/sessions", wrapper.ListUserSessions)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/owners", wrapper.ListOwners)
@@ -19944,6 +20201,273 @@ func (response VerifyAuditChaindefaultApplicationProblemPlusJSONResponse) VisitV
 	return err
 }
 
+type BeginEnrollmentRequestObject struct {
+	Body *BeginEnrollmentJSONRequestBody
+}
+
+type BeginEnrollmentResponseObject interface {
+	VisitBeginEnrollmentResponse(w http.ResponseWriter) error
+}
+
+type BeginEnrollment200ResponseHeaders struct {
+	CorrelationId   *CorrelationId
+	RateLimit       *string
+	RateLimitPolicy *string
+}
+
+type BeginEnrollment200JSONResponse struct {
+	Body    WebAuthnChallenge
+	Headers BeginEnrollment200ResponseHeaders
+}
+
+func (response BeginEnrollment200JSONResponse) VisitBeginEnrollmentResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	if response.Headers.CorrelationId != nil {
+		w.Header().Set("Correlation-Id", fmt.Sprint(*response.Headers.CorrelationId))
+	}
+	if response.Headers.RateLimit != nil {
+		w.Header().Set("RateLimit", fmt.Sprint(*response.Headers.RateLimit))
+	}
+	if response.Headers.RateLimitPolicy != nil {
+		w.Header().Set("RateLimit-Policy", fmt.Sprint(*response.Headers.RateLimitPolicy))
+	}
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type BeginEnrollment400ApplicationProblemPlusJSONResponse struct {
+	BadRequestApplicationProblemPlusJSONResponse
+}
+
+func (response BeginEnrollment400ApplicationProblemPlusJSONResponse) VisitBeginEnrollmentResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	if response.Headers.CorrelationId != nil {
+		w.Header().Set("Correlation-Id", fmt.Sprint(*response.Headers.CorrelationId))
+	}
+	w.WriteHeader(400)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type BeginEnrollment401ApplicationProblemPlusJSONResponse struct {
+	UnauthorizedApplicationProblemPlusJSONResponse
+}
+
+func (response BeginEnrollment401ApplicationProblemPlusJSONResponse) VisitBeginEnrollmentResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	if response.Headers.CorrelationId != nil {
+		w.Header().Set("Correlation-Id", fmt.Sprint(*response.Headers.CorrelationId))
+	}
+	if response.Headers.DPoPNonce != nil {
+		w.Header().Set("DPoP-Nonce", fmt.Sprint(*response.Headers.DPoPNonce))
+	}
+	if response.Headers.WWWAuthenticate != nil {
+		w.Header().Set("WWW-Authenticate", fmt.Sprint(*response.Headers.WWWAuthenticate))
+	}
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type BeginEnrollment429ApplicationProblemPlusJSONResponse struct {
+	TooManyRequestsApplicationProblemPlusJSONResponse
+}
+
+func (response BeginEnrollment429ApplicationProblemPlusJSONResponse) VisitBeginEnrollmentResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	if response.Headers.CorrelationId != nil {
+		w.Header().Set("Correlation-Id", fmt.Sprint(*response.Headers.CorrelationId))
+	}
+	if response.Headers.RateLimit != nil {
+		w.Header().Set("RateLimit", fmt.Sprint(*response.Headers.RateLimit))
+	}
+	if response.Headers.RateLimitPolicy != nil {
+		w.Header().Set("RateLimit-Policy", fmt.Sprint(*response.Headers.RateLimitPolicy))
+	}
+	if response.Headers.RetryAfter != nil {
+		w.Header().Set("Retry-After", fmt.Sprint(*response.Headers.RetryAfter))
+	}
+	w.WriteHeader(429)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type BeginEnrollmentdefaultApplicationProblemPlusJSONResponse struct {
+	Body       Problem
+	Headers    ErrorResponseHeaders
+	StatusCode int
+}
+
+func (response BeginEnrollmentdefaultApplicationProblemPlusJSONResponse) VisitBeginEnrollmentResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	if response.Headers.CorrelationId != nil {
+		w.Header().Set("Correlation-Id", fmt.Sprint(*response.Headers.CorrelationId))
+	}
+	w.WriteHeader(response.StatusCode)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type CompleteEnrollmentRequestObject struct {
+	Params CompleteEnrollmentParams
+	Body   *CompleteEnrollmentJSONRequestBody
+}
+
+type CompleteEnrollmentResponseObject interface {
+	VisitCompleteEnrollmentResponse(w http.ResponseWriter) error
+}
+
+type CompleteEnrollment201ResponseHeaders struct {
+	CorrelationId   *CorrelationId
+	RateLimit       *string
+	RateLimitPolicy *string
+}
+
+type CompleteEnrollment201JSONResponse struct {
+	Body    TokenResponse
+	Headers CompleteEnrollment201ResponseHeaders
+}
+
+func (response CompleteEnrollment201JSONResponse) VisitCompleteEnrollmentResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	if response.Headers.CorrelationId != nil {
+		w.Header().Set("Correlation-Id", fmt.Sprint(*response.Headers.CorrelationId))
+	}
+	if response.Headers.RateLimit != nil {
+		w.Header().Set("RateLimit", fmt.Sprint(*response.Headers.RateLimit))
+	}
+	if response.Headers.RateLimitPolicy != nil {
+		w.Header().Set("RateLimit-Policy", fmt.Sprint(*response.Headers.RateLimitPolicy))
+	}
+	w.WriteHeader(201)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type CompleteEnrollment400ApplicationProblemPlusJSONResponse struct {
+	BadRequestApplicationProblemPlusJSONResponse
+}
+
+func (response CompleteEnrollment400ApplicationProblemPlusJSONResponse) VisitCompleteEnrollmentResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	if response.Headers.CorrelationId != nil {
+		w.Header().Set("Correlation-Id", fmt.Sprint(*response.Headers.CorrelationId))
+	}
+	w.WriteHeader(400)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type CompleteEnrollment401ApplicationProblemPlusJSONResponse struct {
+	UnauthorizedApplicationProblemPlusJSONResponse
+}
+
+func (response CompleteEnrollment401ApplicationProblemPlusJSONResponse) VisitCompleteEnrollmentResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	if response.Headers.CorrelationId != nil {
+		w.Header().Set("Correlation-Id", fmt.Sprint(*response.Headers.CorrelationId))
+	}
+	if response.Headers.DPoPNonce != nil {
+		w.Header().Set("DPoP-Nonce", fmt.Sprint(*response.Headers.DPoPNonce))
+	}
+	if response.Headers.WWWAuthenticate != nil {
+		w.Header().Set("WWW-Authenticate", fmt.Sprint(*response.Headers.WWWAuthenticate))
+	}
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type CompleteEnrollment429ApplicationProblemPlusJSONResponse struct {
+	TooManyRequestsApplicationProblemPlusJSONResponse
+}
+
+func (response CompleteEnrollment429ApplicationProblemPlusJSONResponse) VisitCompleteEnrollmentResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	if response.Headers.CorrelationId != nil {
+		w.Header().Set("Correlation-Id", fmt.Sprint(*response.Headers.CorrelationId))
+	}
+	if response.Headers.RateLimit != nil {
+		w.Header().Set("RateLimit", fmt.Sprint(*response.Headers.RateLimit))
+	}
+	if response.Headers.RateLimitPolicy != nil {
+		w.Header().Set("RateLimit-Policy", fmt.Sprint(*response.Headers.RateLimitPolicy))
+	}
+	if response.Headers.RetryAfter != nil {
+		w.Header().Set("Retry-After", fmt.Sprint(*response.Headers.RetryAfter))
+	}
+	w.WriteHeader(429)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type CompleteEnrollmentdefaultApplicationProblemPlusJSONResponse struct {
+	Body       Problem
+	Headers    ErrorResponseHeaders
+	StatusCode int
+}
+
+func (response CompleteEnrollmentdefaultApplicationProblemPlusJSONResponse) VisitCompleteEnrollmentResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	if response.Headers.CorrelationId != nil {
+		w.Header().Set("Correlation-Id", fmt.Sprint(*response.Headers.CorrelationId))
+	}
+	w.WriteHeader(response.StatusCode)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
 type RedeemEnrollmentCodeRequestObject struct {
 	Params RedeemEnrollmentCodeParams
 	Body   *RedeemEnrollmentCodeJSONRequestBody
@@ -20540,6 +21064,273 @@ func (response CompletePairingdefaultApplicationProblemPlusJSONResponse) VisitCo
 	return err
 }
 
+type BeginPasskeyLoginRequestObject struct {
+	Body *BeginPasskeyLoginJSONRequestBody
+}
+
+type BeginPasskeyLoginResponseObject interface {
+	VisitBeginPasskeyLoginResponse(w http.ResponseWriter) error
+}
+
+type BeginPasskeyLogin200ResponseHeaders struct {
+	CorrelationId   *CorrelationId
+	RateLimit       *string
+	RateLimitPolicy *string
+}
+
+type BeginPasskeyLogin200JSONResponse struct {
+	Body    WebAuthnChallenge
+	Headers BeginPasskeyLogin200ResponseHeaders
+}
+
+func (response BeginPasskeyLogin200JSONResponse) VisitBeginPasskeyLoginResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	if response.Headers.CorrelationId != nil {
+		w.Header().Set("Correlation-Id", fmt.Sprint(*response.Headers.CorrelationId))
+	}
+	if response.Headers.RateLimit != nil {
+		w.Header().Set("RateLimit", fmt.Sprint(*response.Headers.RateLimit))
+	}
+	if response.Headers.RateLimitPolicy != nil {
+		w.Header().Set("RateLimit-Policy", fmt.Sprint(*response.Headers.RateLimitPolicy))
+	}
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type BeginPasskeyLogin400ApplicationProblemPlusJSONResponse struct {
+	BadRequestApplicationProblemPlusJSONResponse
+}
+
+func (response BeginPasskeyLogin400ApplicationProblemPlusJSONResponse) VisitBeginPasskeyLoginResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	if response.Headers.CorrelationId != nil {
+		w.Header().Set("Correlation-Id", fmt.Sprint(*response.Headers.CorrelationId))
+	}
+	w.WriteHeader(400)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type BeginPasskeyLogin401ApplicationProblemPlusJSONResponse struct {
+	UnauthorizedApplicationProblemPlusJSONResponse
+}
+
+func (response BeginPasskeyLogin401ApplicationProblemPlusJSONResponse) VisitBeginPasskeyLoginResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	if response.Headers.CorrelationId != nil {
+		w.Header().Set("Correlation-Id", fmt.Sprint(*response.Headers.CorrelationId))
+	}
+	if response.Headers.DPoPNonce != nil {
+		w.Header().Set("DPoP-Nonce", fmt.Sprint(*response.Headers.DPoPNonce))
+	}
+	if response.Headers.WWWAuthenticate != nil {
+		w.Header().Set("WWW-Authenticate", fmt.Sprint(*response.Headers.WWWAuthenticate))
+	}
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type BeginPasskeyLogin429ApplicationProblemPlusJSONResponse struct {
+	TooManyRequestsApplicationProblemPlusJSONResponse
+}
+
+func (response BeginPasskeyLogin429ApplicationProblemPlusJSONResponse) VisitBeginPasskeyLoginResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	if response.Headers.CorrelationId != nil {
+		w.Header().Set("Correlation-Id", fmt.Sprint(*response.Headers.CorrelationId))
+	}
+	if response.Headers.RateLimit != nil {
+		w.Header().Set("RateLimit", fmt.Sprint(*response.Headers.RateLimit))
+	}
+	if response.Headers.RateLimitPolicy != nil {
+		w.Header().Set("RateLimit-Policy", fmt.Sprint(*response.Headers.RateLimitPolicy))
+	}
+	if response.Headers.RetryAfter != nil {
+		w.Header().Set("Retry-After", fmt.Sprint(*response.Headers.RetryAfter))
+	}
+	w.WriteHeader(429)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type BeginPasskeyLogindefaultApplicationProblemPlusJSONResponse struct {
+	Body       Problem
+	Headers    ErrorResponseHeaders
+	StatusCode int
+}
+
+func (response BeginPasskeyLogindefaultApplicationProblemPlusJSONResponse) VisitBeginPasskeyLoginResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	if response.Headers.CorrelationId != nil {
+		w.Header().Set("Correlation-Id", fmt.Sprint(*response.Headers.CorrelationId))
+	}
+	w.WriteHeader(response.StatusCode)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type CompletePasskeyLoginRequestObject struct {
+	Params CompletePasskeyLoginParams
+	Body   *CompletePasskeyLoginJSONRequestBody
+}
+
+type CompletePasskeyLoginResponseObject interface {
+	VisitCompletePasskeyLoginResponse(w http.ResponseWriter) error
+}
+
+type CompletePasskeyLogin201ResponseHeaders struct {
+	CorrelationId   *CorrelationId
+	RateLimit       *string
+	RateLimitPolicy *string
+}
+
+type CompletePasskeyLogin201JSONResponse struct {
+	Body    TokenResponse
+	Headers CompletePasskeyLogin201ResponseHeaders
+}
+
+func (response CompletePasskeyLogin201JSONResponse) VisitCompletePasskeyLoginResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	if response.Headers.CorrelationId != nil {
+		w.Header().Set("Correlation-Id", fmt.Sprint(*response.Headers.CorrelationId))
+	}
+	if response.Headers.RateLimit != nil {
+		w.Header().Set("RateLimit", fmt.Sprint(*response.Headers.RateLimit))
+	}
+	if response.Headers.RateLimitPolicy != nil {
+		w.Header().Set("RateLimit-Policy", fmt.Sprint(*response.Headers.RateLimitPolicy))
+	}
+	w.WriteHeader(201)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type CompletePasskeyLogin400ApplicationProblemPlusJSONResponse struct {
+	BadRequestApplicationProblemPlusJSONResponse
+}
+
+func (response CompletePasskeyLogin400ApplicationProblemPlusJSONResponse) VisitCompletePasskeyLoginResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	if response.Headers.CorrelationId != nil {
+		w.Header().Set("Correlation-Id", fmt.Sprint(*response.Headers.CorrelationId))
+	}
+	w.WriteHeader(400)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type CompletePasskeyLogin401ApplicationProblemPlusJSONResponse struct {
+	UnauthorizedApplicationProblemPlusJSONResponse
+}
+
+func (response CompletePasskeyLogin401ApplicationProblemPlusJSONResponse) VisitCompletePasskeyLoginResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	if response.Headers.CorrelationId != nil {
+		w.Header().Set("Correlation-Id", fmt.Sprint(*response.Headers.CorrelationId))
+	}
+	if response.Headers.DPoPNonce != nil {
+		w.Header().Set("DPoP-Nonce", fmt.Sprint(*response.Headers.DPoPNonce))
+	}
+	if response.Headers.WWWAuthenticate != nil {
+		w.Header().Set("WWW-Authenticate", fmt.Sprint(*response.Headers.WWWAuthenticate))
+	}
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type CompletePasskeyLogin429ApplicationProblemPlusJSONResponse struct {
+	TooManyRequestsApplicationProblemPlusJSONResponse
+}
+
+func (response CompletePasskeyLogin429ApplicationProblemPlusJSONResponse) VisitCompletePasskeyLoginResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	if response.Headers.CorrelationId != nil {
+		w.Header().Set("Correlation-Id", fmt.Sprint(*response.Headers.CorrelationId))
+	}
+	if response.Headers.RateLimit != nil {
+		w.Header().Set("RateLimit", fmt.Sprint(*response.Headers.RateLimit))
+	}
+	if response.Headers.RateLimitPolicy != nil {
+		w.Header().Set("RateLimit-Policy", fmt.Sprint(*response.Headers.RateLimitPolicy))
+	}
+	if response.Headers.RetryAfter != nil {
+		w.Header().Set("Retry-After", fmt.Sprint(*response.Headers.RetryAfter))
+	}
+	w.WriteHeader(429)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type CompletePasskeyLogindefaultApplicationProblemPlusJSONResponse struct {
+	Body       Problem
+	Headers    ErrorResponseHeaders
+	StatusCode int
+}
+
+func (response CompletePasskeyLogindefaultApplicationProblemPlusJSONResponse) VisitCompletePasskeyLoginResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	if response.Headers.CorrelationId != nil {
+		w.Header().Set("Correlation-Id", fmt.Sprint(*response.Headers.CorrelationId))
+	}
+	w.WriteHeader(response.StatusCode)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
 type CreateStepUpChallengeRequestObject struct {
 }
 
@@ -20810,6 +21601,158 @@ type CompleteStepUpWithDeviceKeydefaultApplicationProblemPlusJSONResponse struct
 }
 
 func (response CompleteStepUpWithDeviceKeydefaultApplicationProblemPlusJSONResponse) VisitCompleteStepUpWithDeviceKeyResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	if response.Headers.CorrelationId != nil {
+		w.Header().Set("Correlation-Id", fmt.Sprint(*response.Headers.CorrelationId))
+	}
+	w.WriteHeader(response.StatusCode)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type CompleteStepUpWithPasskeyRequestObject struct {
+	Body *CompleteStepUpWithPasskeyJSONRequestBody
+}
+
+type CompleteStepUpWithPasskeyResponseObject interface {
+	VisitCompleteStepUpWithPasskeyResponse(w http.ResponseWriter) error
+}
+
+type CompleteStepUpWithPasskey200ResponseHeaders struct {
+	CorrelationId   *CorrelationId
+	RateLimit       *string
+	RateLimitPolicy *string
+}
+
+type CompleteStepUpWithPasskey200JSONResponse struct {
+	Body    StepUpResult
+	Headers CompleteStepUpWithPasskey200ResponseHeaders
+}
+
+func (response CompleteStepUpWithPasskey200JSONResponse) VisitCompleteStepUpWithPasskeyResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	if response.Headers.CorrelationId != nil {
+		w.Header().Set("Correlation-Id", fmt.Sprint(*response.Headers.CorrelationId))
+	}
+	if response.Headers.RateLimit != nil {
+		w.Header().Set("RateLimit", fmt.Sprint(*response.Headers.RateLimit))
+	}
+	if response.Headers.RateLimitPolicy != nil {
+		w.Header().Set("RateLimit-Policy", fmt.Sprint(*response.Headers.RateLimitPolicy))
+	}
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type CompleteStepUpWithPasskey400ApplicationProblemPlusJSONResponse struct {
+	BadRequestApplicationProblemPlusJSONResponse
+}
+
+func (response CompleteStepUpWithPasskey400ApplicationProblemPlusJSONResponse) VisitCompleteStepUpWithPasskeyResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	if response.Headers.CorrelationId != nil {
+		w.Header().Set("Correlation-Id", fmt.Sprint(*response.Headers.CorrelationId))
+	}
+	w.WriteHeader(400)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type CompleteStepUpWithPasskey401ApplicationProblemPlusJSONResponse struct {
+	UnauthorizedApplicationProblemPlusJSONResponse
+}
+
+func (response CompleteStepUpWithPasskey401ApplicationProblemPlusJSONResponse) VisitCompleteStepUpWithPasskeyResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	if response.Headers.CorrelationId != nil {
+		w.Header().Set("Correlation-Id", fmt.Sprint(*response.Headers.CorrelationId))
+	}
+	if response.Headers.DPoPNonce != nil {
+		w.Header().Set("DPoP-Nonce", fmt.Sprint(*response.Headers.DPoPNonce))
+	}
+	if response.Headers.WWWAuthenticate != nil {
+		w.Header().Set("WWW-Authenticate", fmt.Sprint(*response.Headers.WWWAuthenticate))
+	}
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type CompleteStepUpWithPasskey403ApplicationProblemPlusJSONResponse struct {
+	ForbiddenApplicationProblemPlusJSONResponse
+}
+
+func (response CompleteStepUpWithPasskey403ApplicationProblemPlusJSONResponse) VisitCompleteStepUpWithPasskeyResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	if response.Headers.CorrelationId != nil {
+		w.Header().Set("Correlation-Id", fmt.Sprint(*response.Headers.CorrelationId))
+	}
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type CompleteStepUpWithPasskey429ApplicationProblemPlusJSONResponse struct {
+	TooManyRequestsApplicationProblemPlusJSONResponse
+}
+
+func (response CompleteStepUpWithPasskey429ApplicationProblemPlusJSONResponse) VisitCompleteStepUpWithPasskeyResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	if response.Headers.CorrelationId != nil {
+		w.Header().Set("Correlation-Id", fmt.Sprint(*response.Headers.CorrelationId))
+	}
+	if response.Headers.RateLimit != nil {
+		w.Header().Set("RateLimit", fmt.Sprint(*response.Headers.RateLimit))
+	}
+	if response.Headers.RateLimitPolicy != nil {
+		w.Header().Set("RateLimit-Policy", fmt.Sprint(*response.Headers.RateLimitPolicy))
+	}
+	if response.Headers.RetryAfter != nil {
+		w.Header().Set("Retry-After", fmt.Sprint(*response.Headers.RetryAfter))
+	}
+	w.WriteHeader(429)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type CompleteStepUpWithPasskeydefaultApplicationProblemPlusJSONResponse struct {
+	Body       Problem
+	Headers    ErrorResponseHeaders
+	StatusCode int
+}
+
+func (response CompleteStepUpWithPasskeydefaultApplicationProblemPlusJSONResponse) VisitCompleteStepUpWithPasskeyResponse(w http.ResponseWriter) error {
 
 	var buf bytes.Buffer
 	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
@@ -23636,6 +24579,290 @@ type ApprovePairingdefaultApplicationProblemPlusJSONResponse struct {
 }
 
 func (response ApprovePairingdefaultApplicationProblemPlusJSONResponse) VisitApprovePairingResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	if response.Headers.CorrelationId != nil {
+		w.Header().Set("Correlation-Id", fmt.Sprint(*response.Headers.CorrelationId))
+	}
+	w.WriteHeader(response.StatusCode)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type BeginPasskeyRegistrationRequestObject struct {
+}
+
+type BeginPasskeyRegistrationResponseObject interface {
+	VisitBeginPasskeyRegistrationResponse(w http.ResponseWriter) error
+}
+
+type BeginPasskeyRegistration200ResponseHeaders struct {
+	CorrelationId   *CorrelationId
+	RateLimit       *string
+	RateLimitPolicy *string
+}
+
+type BeginPasskeyRegistration200JSONResponse struct {
+	Body    WebAuthnChallenge
+	Headers BeginPasskeyRegistration200ResponseHeaders
+}
+
+func (response BeginPasskeyRegistration200JSONResponse) VisitBeginPasskeyRegistrationResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	if response.Headers.CorrelationId != nil {
+		w.Header().Set("Correlation-Id", fmt.Sprint(*response.Headers.CorrelationId))
+	}
+	if response.Headers.RateLimit != nil {
+		w.Header().Set("RateLimit", fmt.Sprint(*response.Headers.RateLimit))
+	}
+	if response.Headers.RateLimitPolicy != nil {
+		w.Header().Set("RateLimit-Policy", fmt.Sprint(*response.Headers.RateLimitPolicy))
+	}
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type BeginPasskeyRegistration401ApplicationProblemPlusJSONResponse struct {
+	UnauthorizedApplicationProblemPlusJSONResponse
+}
+
+func (response BeginPasskeyRegistration401ApplicationProblemPlusJSONResponse) VisitBeginPasskeyRegistrationResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	if response.Headers.CorrelationId != nil {
+		w.Header().Set("Correlation-Id", fmt.Sprint(*response.Headers.CorrelationId))
+	}
+	if response.Headers.DPoPNonce != nil {
+		w.Header().Set("DPoP-Nonce", fmt.Sprint(*response.Headers.DPoPNonce))
+	}
+	if response.Headers.WWWAuthenticate != nil {
+		w.Header().Set("WWW-Authenticate", fmt.Sprint(*response.Headers.WWWAuthenticate))
+	}
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type BeginPasskeyRegistration403ApplicationProblemPlusJSONResponse struct {
+	ForbiddenApplicationProblemPlusJSONResponse
+}
+
+func (response BeginPasskeyRegistration403ApplicationProblemPlusJSONResponse) VisitBeginPasskeyRegistrationResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	if response.Headers.CorrelationId != nil {
+		w.Header().Set("Correlation-Id", fmt.Sprint(*response.Headers.CorrelationId))
+	}
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type BeginPasskeyRegistration429ApplicationProblemPlusJSONResponse struct {
+	TooManyRequestsApplicationProblemPlusJSONResponse
+}
+
+func (response BeginPasskeyRegistration429ApplicationProblemPlusJSONResponse) VisitBeginPasskeyRegistrationResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	if response.Headers.CorrelationId != nil {
+		w.Header().Set("Correlation-Id", fmt.Sprint(*response.Headers.CorrelationId))
+	}
+	if response.Headers.RateLimit != nil {
+		w.Header().Set("RateLimit", fmt.Sprint(*response.Headers.RateLimit))
+	}
+	if response.Headers.RateLimitPolicy != nil {
+		w.Header().Set("RateLimit-Policy", fmt.Sprint(*response.Headers.RateLimitPolicy))
+	}
+	if response.Headers.RetryAfter != nil {
+		w.Header().Set("Retry-After", fmt.Sprint(*response.Headers.RetryAfter))
+	}
+	w.WriteHeader(429)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type BeginPasskeyRegistrationdefaultApplicationProblemPlusJSONResponse struct {
+	Body       Problem
+	Headers    ErrorResponseHeaders
+	StatusCode int
+}
+
+func (response BeginPasskeyRegistrationdefaultApplicationProblemPlusJSONResponse) VisitBeginPasskeyRegistrationResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	if response.Headers.CorrelationId != nil {
+		w.Header().Set("Correlation-Id", fmt.Sprint(*response.Headers.CorrelationId))
+	}
+	w.WriteHeader(response.StatusCode)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type CompletePasskeyRegistrationRequestObject struct {
+	Body *CompletePasskeyRegistrationJSONRequestBody
+}
+
+type CompletePasskeyRegistrationResponseObject interface {
+	VisitCompletePasskeyRegistrationResponse(w http.ResponseWriter) error
+}
+
+type CompletePasskeyRegistration201ResponseHeaders struct {
+	CorrelationId   *CorrelationId
+	RateLimit       *string
+	RateLimitPolicy *string
+}
+
+type CompletePasskeyRegistration201JSONResponse struct {
+	Body    Passkey
+	Headers CompletePasskeyRegistration201ResponseHeaders
+}
+
+func (response CompletePasskeyRegistration201JSONResponse) VisitCompletePasskeyRegistrationResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	if response.Headers.CorrelationId != nil {
+		w.Header().Set("Correlation-Id", fmt.Sprint(*response.Headers.CorrelationId))
+	}
+	if response.Headers.RateLimit != nil {
+		w.Header().Set("RateLimit", fmt.Sprint(*response.Headers.RateLimit))
+	}
+	if response.Headers.RateLimitPolicy != nil {
+		w.Header().Set("RateLimit-Policy", fmt.Sprint(*response.Headers.RateLimitPolicy))
+	}
+	w.WriteHeader(201)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type CompletePasskeyRegistration400ApplicationProblemPlusJSONResponse struct {
+	BadRequestApplicationProblemPlusJSONResponse
+}
+
+func (response CompletePasskeyRegistration400ApplicationProblemPlusJSONResponse) VisitCompletePasskeyRegistrationResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	if response.Headers.CorrelationId != nil {
+		w.Header().Set("Correlation-Id", fmt.Sprint(*response.Headers.CorrelationId))
+	}
+	w.WriteHeader(400)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type CompletePasskeyRegistration401ApplicationProblemPlusJSONResponse struct {
+	UnauthorizedApplicationProblemPlusJSONResponse
+}
+
+func (response CompletePasskeyRegistration401ApplicationProblemPlusJSONResponse) VisitCompletePasskeyRegistrationResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	if response.Headers.CorrelationId != nil {
+		w.Header().Set("Correlation-Id", fmt.Sprint(*response.Headers.CorrelationId))
+	}
+	if response.Headers.DPoPNonce != nil {
+		w.Header().Set("DPoP-Nonce", fmt.Sprint(*response.Headers.DPoPNonce))
+	}
+	if response.Headers.WWWAuthenticate != nil {
+		w.Header().Set("WWW-Authenticate", fmt.Sprint(*response.Headers.WWWAuthenticate))
+	}
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type CompletePasskeyRegistration403ApplicationProblemPlusJSONResponse struct {
+	ForbiddenApplicationProblemPlusJSONResponse
+}
+
+func (response CompletePasskeyRegistration403ApplicationProblemPlusJSONResponse) VisitCompletePasskeyRegistrationResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	if response.Headers.CorrelationId != nil {
+		w.Header().Set("Correlation-Id", fmt.Sprint(*response.Headers.CorrelationId))
+	}
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type CompletePasskeyRegistration429ApplicationProblemPlusJSONResponse struct {
+	TooManyRequestsApplicationProblemPlusJSONResponse
+}
+
+func (response CompletePasskeyRegistration429ApplicationProblemPlusJSONResponse) VisitCompletePasskeyRegistrationResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	if response.Headers.CorrelationId != nil {
+		w.Header().Set("Correlation-Id", fmt.Sprint(*response.Headers.CorrelationId))
+	}
+	if response.Headers.RateLimit != nil {
+		w.Header().Set("RateLimit", fmt.Sprint(*response.Headers.RateLimit))
+	}
+	if response.Headers.RateLimitPolicy != nil {
+		w.Header().Set("RateLimit-Policy", fmt.Sprint(*response.Headers.RateLimitPolicy))
+	}
+	if response.Headers.RetryAfter != nil {
+		w.Header().Set("Retry-After", fmt.Sprint(*response.Headers.RetryAfter))
+	}
+	w.WriteHeader(429)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type CompletePasskeyRegistrationdefaultApplicationProblemPlusJSONResponse struct {
+	Body       Problem
+	Headers    ErrorResponseHeaders
+	StatusCode int
+}
+
+func (response CompletePasskeyRegistrationdefaultApplicationProblemPlusJSONResponse) VisitCompletePasskeyRegistrationResponse(w http.ResponseWriter) error {
 
 	var buf bytes.Buffer
 	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
@@ -27169,6 +28396,189 @@ func (response UnlinkIdentitydefaultApplicationProblemPlusJSONResponse) VisitUnl
 	return err
 }
 
+type RevokePasskeyRequestObject struct {
+	UserId    UserIdPath    `json:"user_id"`
+	PasskeyId PasskeyIdPath `json:"passkey_id"`
+}
+
+type RevokePasskeyResponseObject interface {
+	VisitRevokePasskeyResponse(w http.ResponseWriter) error
+}
+
+type RevokePasskey204ResponseHeaders struct {
+	CorrelationId   *CorrelationId
+	RateLimit       *string
+	RateLimitPolicy *string
+}
+
+type RevokePasskey204Response struct {
+	Headers RevokePasskey204ResponseHeaders
+}
+
+func (response RevokePasskey204Response) VisitRevokePasskeyResponse(w http.ResponseWriter) error {
+	if response.Headers.CorrelationId != nil {
+		w.Header().Set("Correlation-Id", fmt.Sprint(*response.Headers.CorrelationId))
+	}
+	if response.Headers.RateLimit != nil {
+		w.Header().Set("RateLimit", fmt.Sprint(*response.Headers.RateLimit))
+	}
+	if response.Headers.RateLimitPolicy != nil {
+		w.Header().Set("RateLimit-Policy", fmt.Sprint(*response.Headers.RateLimitPolicy))
+	}
+	w.WriteHeader(204)
+	return nil
+}
+
+type RevokePasskey400ApplicationProblemPlusJSONResponse struct {
+	BadRequestApplicationProblemPlusJSONResponse
+}
+
+func (response RevokePasskey400ApplicationProblemPlusJSONResponse) VisitRevokePasskeyResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	if response.Headers.CorrelationId != nil {
+		w.Header().Set("Correlation-Id", fmt.Sprint(*response.Headers.CorrelationId))
+	}
+	w.WriteHeader(400)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type RevokePasskey401ApplicationProblemPlusJSONResponse struct {
+	UnauthorizedApplicationProblemPlusJSONResponse
+}
+
+func (response RevokePasskey401ApplicationProblemPlusJSONResponse) VisitRevokePasskeyResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	if response.Headers.CorrelationId != nil {
+		w.Header().Set("Correlation-Id", fmt.Sprint(*response.Headers.CorrelationId))
+	}
+	if response.Headers.DPoPNonce != nil {
+		w.Header().Set("DPoP-Nonce", fmt.Sprint(*response.Headers.DPoPNonce))
+	}
+	if response.Headers.WWWAuthenticate != nil {
+		w.Header().Set("WWW-Authenticate", fmt.Sprint(*response.Headers.WWWAuthenticate))
+	}
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type RevokePasskey403ApplicationProblemPlusJSONResponse struct {
+	ForbiddenApplicationProblemPlusJSONResponse
+}
+
+func (response RevokePasskey403ApplicationProblemPlusJSONResponse) VisitRevokePasskeyResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	if response.Headers.CorrelationId != nil {
+		w.Header().Set("Correlation-Id", fmt.Sprint(*response.Headers.CorrelationId))
+	}
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type RevokePasskey404ApplicationProblemPlusJSONResponse struct {
+	NotFoundApplicationProblemPlusJSONResponse
+}
+
+func (response RevokePasskey404ApplicationProblemPlusJSONResponse) VisitRevokePasskeyResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	if response.Headers.CorrelationId != nil {
+		w.Header().Set("Correlation-Id", fmt.Sprint(*response.Headers.CorrelationId))
+	}
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type RevokePasskey409ApplicationProblemPlusJSONResponse struct {
+	ConflictApplicationProblemPlusJSONResponse
+}
+
+func (response RevokePasskey409ApplicationProblemPlusJSONResponse) VisitRevokePasskeyResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	if response.Headers.CorrelationId != nil {
+		w.Header().Set("Correlation-Id", fmt.Sprint(*response.Headers.CorrelationId))
+	}
+	w.WriteHeader(409)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type RevokePasskey429ApplicationProblemPlusJSONResponse struct {
+	TooManyRequestsApplicationProblemPlusJSONResponse
+}
+
+func (response RevokePasskey429ApplicationProblemPlusJSONResponse) VisitRevokePasskeyResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	if response.Headers.CorrelationId != nil {
+		w.Header().Set("Correlation-Id", fmt.Sprint(*response.Headers.CorrelationId))
+	}
+	if response.Headers.RateLimit != nil {
+		w.Header().Set("RateLimit", fmt.Sprint(*response.Headers.RateLimit))
+	}
+	if response.Headers.RateLimitPolicy != nil {
+		w.Header().Set("RateLimit-Policy", fmt.Sprint(*response.Headers.RateLimitPolicy))
+	}
+	if response.Headers.RetryAfter != nil {
+		w.Header().Set("Retry-After", fmt.Sprint(*response.Headers.RetryAfter))
+	}
+	w.WriteHeader(429)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type RevokePasskeydefaultApplicationProblemPlusJSONResponse struct {
+	Body       Problem
+	Headers    ErrorResponseHeaders
+	StatusCode int
+}
+
+func (response RevokePasskeydefaultApplicationProblemPlusJSONResponse) VisitRevokePasskeyResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	if response.Headers.CorrelationId != nil {
+		w.Header().Set("Correlation-Id", fmt.Sprint(*response.Headers.CorrelationId))
+	}
+	w.WriteHeader(response.StatusCode)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
 type ListUserSessionsRequestObject struct {
 	UserId UserIdPath `json:"user_id"`
 	Params ListUserSessionsParams
@@ -27352,6 +28762,12 @@ type StrictServerInterface interface {
 	// VerifyAuditChain Verify the hash chain
 	// (POST /audit/verify)
 	VerifyAuditChain(ctx context.Context, request VerifyAuditChainRequestObject) (VerifyAuditChainResponseObject, error)
+	// BeginEnrollment Start the first passkey registration with an enrollment code
+	// (POST /auth/enroll/begin)
+	BeginEnrollment(ctx context.Context, request BeginEnrollmentRequestObject) (BeginEnrollmentResponseObject, error)
+	// CompleteEnrollment Register the first passkey and log in
+	// (POST /auth/enroll/complete)
+	CompleteEnrollment(ctx context.Context, request CompleteEnrollmentRequestObject) (CompleteEnrollmentResponseObject, error)
 	// RedeemEnrollmentCode Redeem an enrollment code with device keys and log in
 	// (POST /auth/enroll/redeem)
 	RedeemEnrollmentCode(ctx context.Context, request RedeemEnrollmentCodeRequestObject) (RedeemEnrollmentCodeResponseObject, error)
@@ -27364,12 +28780,21 @@ type StrictServerInterface interface {
 	// CompletePairing Collect the tokens of an approved pairing
 	// (POST /auth/pairing/complete)
 	CompletePairing(ctx context.Context, request CompletePairingRequestObject) (CompletePairingResponseObject, error)
+	// BeginPasskeyLogin Start a passkey login
+	// (POST /auth/passkey/begin)
+	BeginPasskeyLogin(ctx context.Context, request BeginPasskeyLoginRequestObject) (BeginPasskeyLoginResponseObject, error)
+	// CompletePasskeyLogin Finish a passkey login and register the device
+	// (POST /auth/passkey/complete)
+	CompletePasskeyLogin(ctx context.Context, request CompletePasskeyLoginRequestObject) (CompletePasskeyLoginResponseObject, error)
 	// CreateStepUpChallenge Create a step-up challenge
 	// (POST /auth/step-up/challenge)
 	CreateStepUpChallenge(ctx context.Context, request CreateStepUpChallengeRequestObject) (CreateStepUpChallengeResponseObject, error)
 	// CompleteStepUpWithDeviceKey Confirm step-up with the device key after user verification
 	// (POST /auth/step-up/device-key)
 	CompleteStepUpWithDeviceKey(ctx context.Context, request CompleteStepUpWithDeviceKeyRequestObject) (CompleteStepUpWithDeviceKeyResponseObject, error)
+	// CompleteStepUpWithPasskey Confirm step-up with a passkey
+	// (POST /auth/step-up/passkey)
+	CompleteStepUpWithPasskey(ctx context.Context, request CompleteStepUpWithPasskeyRequestObject) (CompleteStepUpWithPasskeyResponseObject, error)
 	// RefreshToken Rotate the refresh token
 	// (POST /auth/token/refresh)
 	RefreshToken(ctx context.Context, request RefreshTokenRequestObject) (RefreshTokenResponseObject, error)
@@ -27424,6 +28849,12 @@ type StrictServerInterface interface {
 	// ApprovePairing Approve a device pairing with its code
 	// (POST /me/devices/pairings)
 	ApprovePairing(ctx context.Context, request ApprovePairingRequestObject) (ApprovePairingResponseObject, error)
+	// BeginPasskeyRegistration Start registering a passkey
+	// (POST /me/passkeys/begin)
+	BeginPasskeyRegistration(ctx context.Context, request BeginPasskeyRegistrationRequestObject) (BeginPasskeyRegistrationResponseObject, error)
+	// CompletePasskeyRegistration Finish registering a passkey
+	// (POST /me/passkeys/complete)
+	CompletePasskeyRegistration(ctx context.Context, request CompletePasskeyRegistrationRequestObject) (CompletePasskeyRegistrationResponseObject, error)
 	// UpdateMyProfile Change own profile
 	// (PATCH /me/profile)
 	UpdateMyProfile(ctx context.Context, request UpdateMyProfileRequestObject) (UpdateMyProfileResponseObject, error)
@@ -27484,6 +28915,9 @@ type StrictServerInterface interface {
 	// UnlinkIdentity Unlink an identity
 	// (DELETE /users/{user_id}/identities/{identity_id})
 	UnlinkIdentity(ctx context.Context, request UnlinkIdentityRequestObject) (UnlinkIdentityResponseObject, error)
+	// RevokePasskey Revoke a passkey
+	// (DELETE /users/{user_id}/passkeys/{passkey_id})
+	RevokePasskey(ctx context.Context, request RevokePasskeyRequestObject) (RevokePasskeyResponseObject, error)
 	// ListUserSessions List sessions of a person
 	// (GET /users/{user_id}/sessions)
 	ListUserSessions(ctx context.Context, request ListUserSessionsRequestObject) (ListUserSessionsResponseObject, error)
@@ -27604,6 +29038,70 @@ func (sh *strictHandler) VerifyAuditChain(w http.ResponseWriter, r *http.Request
 		sh.options.ResponseErrorHandlerFunc(w, r, err)
 	} else if validResponse, ok := response.(VerifyAuditChainResponseObject); ok {
 		if err := validResponse.VisitVerifyAuditChainResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// BeginEnrollment operation middleware
+func (sh *strictHandler) BeginEnrollment(w http.ResponseWriter, r *http.Request) {
+	var request BeginEnrollmentRequestObject
+
+	var body BeginEnrollmentJSONRequestBody
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
+		return
+	}
+	request.Body = &body
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.BeginEnrollment(ctx, request.(BeginEnrollmentRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "BeginEnrollment")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(BeginEnrollmentResponseObject); ok {
+		if err := validResponse.VisitBeginEnrollmentResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// CompleteEnrollment operation middleware
+func (sh *strictHandler) CompleteEnrollment(w http.ResponseWriter, r *http.Request, params CompleteEnrollmentParams) {
+	var request CompleteEnrollmentRequestObject
+
+	request.Params = params
+
+	var body CompleteEnrollmentJSONRequestBody
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
+		return
+	}
+	request.Body = &body
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.CompleteEnrollment(ctx, request.(CompleteEnrollmentRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "CompleteEnrollment")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(CompleteEnrollmentResponseObject); ok {
+		if err := validResponse.VisitCompleteEnrollmentResponse(w); err != nil {
 			sh.options.ResponseErrorHandlerFunc(w, r, err)
 		}
 	} else if response != nil {
@@ -27734,6 +29232,70 @@ func (sh *strictHandler) CompletePairing(w http.ResponseWriter, r *http.Request,
 	}
 }
 
+// BeginPasskeyLogin operation middleware
+func (sh *strictHandler) BeginPasskeyLogin(w http.ResponseWriter, r *http.Request) {
+	var request BeginPasskeyLoginRequestObject
+
+	var body BeginPasskeyLoginJSONRequestBody
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
+		return
+	}
+	request.Body = &body
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.BeginPasskeyLogin(ctx, request.(BeginPasskeyLoginRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "BeginPasskeyLogin")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(BeginPasskeyLoginResponseObject); ok {
+		if err := validResponse.VisitBeginPasskeyLoginResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// CompletePasskeyLogin operation middleware
+func (sh *strictHandler) CompletePasskeyLogin(w http.ResponseWriter, r *http.Request, params CompletePasskeyLoginParams) {
+	var request CompletePasskeyLoginRequestObject
+
+	request.Params = params
+
+	var body CompletePasskeyLoginJSONRequestBody
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
+		return
+	}
+	request.Body = &body
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.CompletePasskeyLogin(ctx, request.(CompletePasskeyLoginRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "CompletePasskeyLogin")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(CompletePasskeyLoginResponseObject); ok {
+		if err := validResponse.VisitCompletePasskeyLoginResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
 // CreateStepUpChallenge operation middleware
 func (sh *strictHandler) CreateStepUpChallenge(w http.ResponseWriter, r *http.Request) {
 	var request CreateStepUpChallengeRequestObject
@@ -27782,6 +29344,37 @@ func (sh *strictHandler) CompleteStepUpWithDeviceKey(w http.ResponseWriter, r *h
 		sh.options.ResponseErrorHandlerFunc(w, r, err)
 	} else if validResponse, ok := response.(CompleteStepUpWithDeviceKeyResponseObject); ok {
 		if err := validResponse.VisitCompleteStepUpWithDeviceKeyResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// CompleteStepUpWithPasskey operation middleware
+func (sh *strictHandler) CompleteStepUpWithPasskey(w http.ResponseWriter, r *http.Request) {
+	var request CompleteStepUpWithPasskeyRequestObject
+
+	var body CompleteStepUpWithPasskeyJSONRequestBody
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
+		return
+	}
+	request.Body = &body
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.CompleteStepUpWithPasskey(ctx, request.(CompleteStepUpWithPasskeyRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "CompleteStepUpWithPasskey")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(CompleteStepUpWithPasskeyResponseObject); ok {
+		if err := validResponse.VisitCompleteStepUpWithPasskeyResponse(w); err != nil {
 			sh.options.ResponseErrorHandlerFunc(w, r, err)
 		}
 	} else if response != nil {
@@ -28288,6 +29881,61 @@ func (sh *strictHandler) ApprovePairing(w http.ResponseWriter, r *http.Request, 
 		sh.options.ResponseErrorHandlerFunc(w, r, err)
 	} else if validResponse, ok := response.(ApprovePairingResponseObject); ok {
 		if err := validResponse.VisitApprovePairingResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// BeginPasskeyRegistration operation middleware
+func (sh *strictHandler) BeginPasskeyRegistration(w http.ResponseWriter, r *http.Request) {
+	var request BeginPasskeyRegistrationRequestObject
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.BeginPasskeyRegistration(ctx, request.(BeginPasskeyRegistrationRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "BeginPasskeyRegistration")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(BeginPasskeyRegistrationResponseObject); ok {
+		if err := validResponse.VisitBeginPasskeyRegistrationResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// CompletePasskeyRegistration operation middleware
+func (sh *strictHandler) CompletePasskeyRegistration(w http.ResponseWriter, r *http.Request) {
+	var request CompletePasskeyRegistrationRequestObject
+
+	var body CompletePasskeyRegistrationJSONRequestBody
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
+		return
+	}
+	request.Body = &body
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.CompletePasskeyRegistration(ctx, request.(CompletePasskeyRegistrationRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "CompletePasskeyRegistration")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(CompletePasskeyRegistrationResponseObject); ok {
+		if err := validResponse.VisitCompletePasskeyRegistrationResponse(w); err != nil {
 			sh.options.ResponseErrorHandlerFunc(w, r, err)
 		}
 	} else if response != nil {
@@ -28875,6 +30523,33 @@ func (sh *strictHandler) UnlinkIdentity(w http.ResponseWriter, r *http.Request, 
 		sh.options.ResponseErrorHandlerFunc(w, r, err)
 	} else if validResponse, ok := response.(UnlinkIdentityResponseObject); ok {
 		if err := validResponse.VisitUnlinkIdentityResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// RevokePasskey operation middleware
+func (sh *strictHandler) RevokePasskey(w http.ResponseWriter, r *http.Request, userId UserIdPath, passkeyId PasskeyIdPath) {
+	var request RevokePasskeyRequestObject
+
+	request.UserId = userId
+	request.PasskeyId = passkeyId
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.RevokePasskey(ctx, request.(RevokePasskeyRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "RevokePasskey")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(RevokePasskeyResponseObject); ok {
+		if err := validResponse.VisitRevokePasskeyResponse(w); err != nil {
 			sh.options.ResponseErrorHandlerFunc(w, r, err)
 		}
 	} else if response != nil {

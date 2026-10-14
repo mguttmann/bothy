@@ -39,7 +39,7 @@ var loginCfg = app.Config{
 	AccessTokenTTL: 10 * time.Minute, RefreshTokenTTL: 14 * 24 * time.Hour, SessionMaxAge: 30 * 24 * time.Hour,
 	RefreshReuseGrace: 30 * time.Second, LastActiveGranularity: 5 * time.Minute, StepUpChallengeTTL: 2 * time.Minute,
 	StepUpFailLimit: 3, LoginFailWindow: 15 * time.Minute, CleanupInterval: time.Hour,
-	EnrollmentCodeTTL: 72 * time.Hour, EnrollmentCodeMaxAttempts: 2,
+	EnrollmentCodeTTL: 72 * time.Hour, EnrollmentCodeMaxAttempts: 2, LoginFlowTTL: 10 * time.Minute,
 	DevicePendingTTL: 24 * time.Hour, DeviceVerificationCodeDigits: 6, PairingCodeTTL: 5 * time.Minute, PairingCodeChars: 8,
 	APITokenMaxTTL: 365 * 24 * time.Hour, PersonalTokenMaxTTL: 90 * 24 * time.Hour, DPoPRequiredFor: []string{"agent"},
 }

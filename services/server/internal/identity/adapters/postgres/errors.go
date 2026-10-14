@@ -36,7 +36,7 @@ const (
 // uniqueFields maps the unique indexes and primary keys of the migration to the field a
 // conflict names. A primary key conflict means a reused id, which only a programming error
 // produces, so it is not in the list and stays internal.
-var uniqueFields = map[string]string{
+var uniqueFields = map[string]string{ //nolint:gosec // G101: constraint names and field pointers, no secret
 	"principals_handle_lower_key": "/handle",
 	"users_email_lower_key":       "/email",
 	"owners_active_user_key":      fieldUserID,
@@ -50,6 +50,8 @@ var uniqueFields = map[string]string{
 	"identity_providers_name_lower_key":  "/name",
 	"identity_providers_single_kind_key": fieldKind,
 	"user_identities_active_subject_key": "/subject",
+	// M1-40: a credential ID belongs to one passkey for good (409 conflict on a duplicate).
+	"passkey_credentials_credential_id_key": "/credential",
 }
 
 // constraintFields maps checks and foreign keys to the column they guard. Triggers raise with

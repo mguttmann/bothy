@@ -194,6 +194,15 @@ Grund: Eine Passkey-Anmeldung umginge sonst `auth.idp_recheck_interval`. Für ei
 Login-Namen liefert `beginPasskeyLogin` eine Schein-Credential-ID aus HMAC und Namen, damit die
 Antwort keine Konten verrät.
 
+Details of the implementation (M1-40, [docs/DECISIONS.md](../DECISIONS.md) M1-40): when
+`auth.webauthn_rp_id` is empty and the host of `server.public_url` is an IP address or a single
+label (never an RP ID), or both passkey keys are empty and `server.public_url` is `http` outside
+`localhost` (no secure context), the instance has no passkeys; a passkey counts as a remaining
+sign-in method for `identity.unlink` only while a local identity remains; the passkey operations answer
+`403 feature_disabled` and `createStepUpChallenge` has no `passkey_options`. Every completion that
+opened an issued ceremony row and then failed sets the row to `failed` after the rollback, so a row
+works once even when the login, the device or the code is rejected after the check.
+
 Passwort mit TOTP (Tabelle `local_credentials` in 03):
 
 - Passwort-Hash Argon2id im PHC-Format. Untergrenze nach OWASP: 19 MiB Speicher, 2 Durchläufe,

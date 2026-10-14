@@ -520,12 +520,71 @@ Prinzipale, Menschen, Owner, Anmelde-Treiber, Identitäten, lokale Anmeldedaten,
 - The integration tests of the instance operations run in the session world of this package
   (`adapters/httpapi/instance_settings_test.go`, docs/DECISIONS.md M1-46/11).
 
+### Passkeys (M1-40)
+
+- Port (`passkeys.go`, `stepup.go`): `Passkeys` (`BeginPasskeyLogin`, `CompletePasskeyLogin`,
+  `BeginEnrollment`, `CompleteEnrollment`, `BeginPasskeyRegistration`,
+  `CompletePasskeyRegistration`, `RevokePasskey`) with `WebAuthnChallenge`, `PasskeyLogin` and
+  `PasskeyEnrollment`; `StepUp.CompleteWithPasskey`; `Challenge.PasskeyOptions`;
+  `StepUpMethodPasskey`.
+- `domain` (`ceremony.go`, `relyingparty.go`): the schema `webauthn_session.v1` (RP ID, required
+  user verification, allowed credential IDs, user handle; never the challenge), `CheckCeremony`
+  (only `issued` and not expired), `ClientDataChallenge` and `ChallengeMatches` (the challenge of
+  `clientDataJSON` against the stored HMAC, `hmac.Equal`), `SignCount` (the counter rule),
+  `DecoyCredentialID` (`passkey-decoy/v1`), `UserHandle` (16 bytes of the principal ID),
+  `ResolveRelyingParty` (defaults from `server.public_url`, the start validation of
+  `auth.webauthn_rp_id` and `auth.webauthn_origins`), `CheckPasskeyName`.
+- `app`: `Passkeys` (the use cases), the shared `ceremonies` helper (open, check, assert, record a
+  use, burn a failed row), `StepUps.CompleteWithPasskey` and the `passkey_options` of
+  `CreateChallenge`, `PasskeySource` (credential overview and remaining sign-in methods),
+  `EnrollmentCodes.MatchID`; outgoing ports `PasskeyStore` and `PasskeyVerifier` (JSON in and out,
+  error class `ErrPasskeyRejected`).
+- `adapters/webauthn`: `Verifier` with go-webauthn (pinned `v0.18.2`), see its README;
+  `adapters/webauthn/virtualauthn`: the software authenticator of the tests.
+- Ceremonies (row of `auth_challenges`, value 32 bytes of `crypto/rand` stored only as HMAC):
+
+  | Purpose | Bound to | Lifetime | Refusal |
+  |---|---|---|---|
+  | `passkey_login` | nothing (the credential names the person) | `auth.login_flow_ttl` | `401 unauthenticated`, the same body every time |
+  | `passkey_enroll` | `enrollment_code_id` (matched at begin, locked and checked again and redeemed at complete) | `auth.login_flow_ttl` | `401`; a refused response counts a failed attempt of the code |
+  | `passkey_register` | `session_id` of the caller | `auth.login_flow_ttl` | `400 validation_failed` (`/credential`), duplicate `409` |
+  | `step_up` (M1-35) | `session_id`; `passkey_options` over the same value | `auth.step_up_challenge_ttl` | `401 step_up_required`, counts toward `auth.step_up_fail_limit` |
+
+  Complete locks the row, accepts only `issued` before `expires_at`, checks the HMAC, verifies and
+  sets `used`; a completion that failed after the row was opened sets it `failed` after the
+  rollback (docs/DECISIONS.md M1-40/6). Assertions: origin in the list, RP ID hash, user present
+  and user verified, signature with the stored COSE key, credential not revoked, person `active`;
+  backup state updated, sign counter per M1-40/3.
+- Operations (`adapters/httpapi/passkeys.go`; `createStepUpChallenge` in `stepup.go`):
+
+  | Operation | Action | Answer |
+  |---|---|---|
+  | `beginPasskeyLogin` | `auth.login.begin`, anonymous | `200 WebAuthnChallenge`; a name without passkeys gets one decoy ID |
+  | `completePasskeyLogin` | `auth.login.complete`, anonymous, DPoP login proof | `201 TokenResponse`, new device `pending`; only with an active identity at the enabled `local` provider |
+  | `beginEnrollment` | `auth.login.begin`, anonymous | `200 WebAuthnChallenge`; no attempt counted |
+  | `completeEnrollment` | `auth.login.complete`, anonymous, DPoP login proof | `201 TokenResponse`, device `active`, code used |
+  | `beginPasskeyRegistration`, `completePasskeyRegistration` | `passkey.register` (self; step-up once an active passkey exists, decided in `authz`) | `200 WebAuthnChallenge`, `201 Passkey` |
+  | `revokePasskey` | `passkey.revoke` (self or owner, step-up) | `204`, also for a revoked passkey; `404` for another person's |
+  | `completeStepUpWithPasskey` | `auth.step_up` | `200 StepUpResult`, `step_up_method = passkey`; a `cli` session `403` |
+
+  An instance whose `server.public_url` names an IP address (or uses `http` outside `localhost`)
+  without configured passkey keys has no passkeys (`403 feature_disabled`, M1-40/5).
+- `adapters/postgres`: `queries/passkey_credentials.sql`, `passkeys.go`; `InsertChallenge` writes
+  `enrollment_code_id` and `webauthn_session`; `LockEnrollmentCode`.
+- Migration `migrations/00019_identity_passkey_credentials.sql`: `passkey_credentials` as 03
+  section 4.2; `bothy_app` may read, insert and update (not delete).
+- Configuration: `auth.login_flow_ttl`, `auth.webauthn_rp_id`, `auth.webauthn_origins` (cross-check
+  `webauthn_relying_party`), `auth.token_pepper_ref`.
+- Tests: `domain/ceremony_test.go`, `adapters/webauthn/webauthn_test.go`,
+  `adapters/httpapi/passkeys_test.go` (every test of the brief), `internal/authz/app`
+  (`TestConditionalStepUp`). Rulings: docs/DECISIONS.md M1-40.
+
 ## Port (Wurzelpaket `internal/identity`)
 
-- Eingehend: `Auth` (Anmeldung, Refresh, Logout, Kind-Sitzungen), `StepUp` (Step-up, M1-35), `Providers` and `Identities` (M1-36), `Enrollment` (M1-37), `Directory`, `Devices`, `Tokens` and `TokenAdmin` (M1-44), `Owners`; deklariert `AvatarFiles`.
+- Eingehend: `Auth` (Anmeldung, Refresh, Logout, Kind-Sitzungen), `StepUp` (Step-up, M1-35), `Providers` and `Identities` (M1-36), `Enrollment` (M1-37), `Passkeys` (M1-40), `Directory`, `Devices`, `Tokens` and `TokenAdmin` (M1-44), `Owners`; deklariert `AvatarFiles`.
 - Gibt In-Tx-Ereignisse aus: `DeviceRevoked`, `SessionEnded`.
 - Abonniert In-Tx-Ereignisse: keine.
-- Implementiert Quellen-Ports und Querschnitts-Ports: kernel `actor.Authenticator`, `authz.PrincipalSource`, `authz.CredentialSource` (Sitzung, Gerät, Token für die Prüfung `check_active`, 07 Abschnitt 4.2), `instance.LoginOptionsSource`, `instance.FlagUserSource`, kernel `personaldata.Participant`.
+- Implementiert Quellen-Ports und Querschnitts-Ports: kernel `actor.Authenticator`, `authz.PrincipalSource` (mit `HasActivePasskey`, M1-40), `authz.CredentialSource` (Sitzung, Gerät, Token für die Prüfung `check_active`, 07 Abschnitt 4.2), `instance.LoginOptionsSource`, `instance.FlagUserSource`, kernel `personaldata.Participant`.
 
 ## Abhängigkeiten
 

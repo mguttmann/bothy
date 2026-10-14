@@ -73,6 +73,10 @@ type Handlers struct {
 	// Approval implements approveDevice, beginPairing, approvePairing and completePairing
 	// (identity, M1-38).
 	*identityhttp.Approval
+	// Passkeys implements beginPasskeyLogin, completePasskeyLogin, beginEnrollment,
+	// completeEnrollment, beginPasskeyRegistration, completePasskeyRegistration, revokePasskey and
+	// completeStepUpWithPasskey (identity, M1-40).
+	*identityhttp.Passkeys
 }
 
 // routeBuilder builds and verifies the routes of one REST surface against a catalogue with the

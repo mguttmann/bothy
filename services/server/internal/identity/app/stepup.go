@@ -4,10 +4,12 @@ package app
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"time"
 
 	"github.com/OWNER/bothy/services/server/internal/identity"
+	"github.com/OWNER/bothy/services/server/internal/identity/domain"
 	"github.com/OWNER/bothy/services/server/internal/identity/domain/stepup"
 	"github.com/OWNER/bothy/services/server/internal/kernel/actor"
 	"github.com/OWNER/bothy/services/server/internal/kernel/auditing"
@@ -37,6 +39,14 @@ type StepUpDeps struct {
 	Audit auditing.Recorder
 	// Clock is the time of challenges and confirmations; nil means clock.System().
 	Clock clock.Clock
+	// Passkeys, People, Verifier and RelyingParty serve the step-up with a passkey (M1-40):
+	// CreateChallenge adds passkey_options for a person with an active passkey, and
+	// CompleteWithPasskey checks the assertion. Without Passkeys, or with a disabled relying
+	// party, there are no passkey options and CompleteWithPasskey answers feature_disabled.
+	Passkeys     PasskeyStore
+	People       Store
+	Verifier     PasskeyVerifier
+	RelyingParty domain.RelyingParty
 }
 
 // StepUps implements identity.StepUp with the device key (08 section 6.2, brief M1-35 "Design
@@ -45,6 +55,7 @@ type StepUps struct {
 	cfg    Config
 	pepper []byte
 	d      StepUpDeps
+	c      *ceremonies
 }
 
 // Compile-time check: StepUps is the step-up port of identity.
@@ -65,7 +76,14 @@ func NewStepUps(cfg Config, pepper []byte, d StepUpDeps) (*StepUps, error) {
 	if d.Clock == nil {
 		d.Clock = clock.System()
 	}
-	return &StepUps{cfg: cfg, pepper: append([]byte(nil), pepper...), d: d}, nil
+	s := &StepUps{cfg: cfg, pepper: append([]byte(nil), pepper...), d: d}
+	if d.Passkeys != nil {
+		if d.People == nil || (d.Verifier == nil && d.RelyingParty.Enabled) {
+			return nil, errors.New("identity: the step-up with a passkey needs the people store and the verifier")
+		}
+		s.c = &ceremonies{passkeys: d.Passkeys, people: d.People, verifier: d.Verifier, rp: d.RelyingParty, pepper: s.pepper, audit: d.Audit}
+	}
+	return s, nil
 }
 
 // Audit values of auth.step_up (05 section 6, SEC-AUD-5): codes and ids only, never the value or
@@ -192,7 +210,12 @@ func (s *StepUps) CreateChallenge(ctx context.Context, a actor.Actor) (identity.
 		ID: ids.New(), SessionID: a.SessionID, Purpose: PurposeStepUp, Hash: stepup.ChallengeHash(s.pepper, value),
 		Status: ChallengeIssued, CreatedAt: now, ExpiresAt: now.Add(s.cfg.StepUpChallengeTTL),
 	}
+	var options []byte
 	err = s.d.UoW.Do(ctx, func(ctx context.Context) error {
+		var err error
+		if options, c.WebAuthnSession, err = s.passkeyOptions(ctx, a.ID, value); err != nil {
+			return err
+		}
 		if err := s.d.Challenges.InsertChallenge(ctx, c); err != nil {
 			return err
 		}
@@ -204,7 +227,30 @@ func (s *StepUps) CreateChallenge(ctx context.Context, a actor.Actor) (identity.
 	if err != nil {
 		return identity.Challenge{}, err
 	}
-	return identity.Challenge{ID: c.ID, Value: value, ExpiresAt: c.ExpiresAt}, nil
+	return identity.Challenge{ID: c.ID, Value: value, ExpiresAt: c.ExpiresAt, PasskeyOptions: options}, nil
+}
+
+// passkeyOptions returns the WebAuthn request options over value and the webauthn_session.v1 of
+// the step-up challenge when the person userID has an active passkey and the relying party is
+// enabled (08 section 6.2 step 1, M1-40); nil and nil otherwise.
+func (s *StepUps) passkeyOptions(ctx context.Context, userID ids.ID, value string) ([]byte, []byte, error) {
+	if s.c == nil || s.c.enabled() != nil {
+		return nil, nil, nil
+	}
+	active, err := s.c.passkeys.ActivePasskeysOfUser(ctx, userID)
+	if err != nil || len(active) == 0 {
+		return nil, nil, err
+	}
+	raw, err := domain.DecodeChallenge(value)
+	if err != nil {
+		return nil, nil, errs.Wrap(errs.CodeInternalError, err, "identity: challenge value")
+	}
+	opts, err := s.c.verifier.RequestOptions(active, raw)
+	if err != nil {
+		return nil, nil, errs.Wrap(errs.CodeInternalError, err, "identity: request options")
+	}
+	session, err := s.c.session(active, nil)
+	return opts, session, err
 }
 
 // completion is the outcome of the unit of work of a completion: the result of a success, or a
@@ -246,17 +292,46 @@ func (s *StepUps) CompleteWithDeviceKey(ctx context.Context, a actor.Actor, chal
 	return out.result, nil
 }
 
+// lockSession locks the session rows of a completion first (03 section 6.3) and checks that the
+// session sid is still active at now.
+func (s *StepUps) lockSession(ctx context.Context, sid ids.ID, now time.Time) error {
+	tree, err := s.d.Sessions.LockSessionTree(ctx, sid)
+	if err != nil {
+		return err
+	}
+	// authorize saw the session active; a revocation that committed since then ends here.
+	if sess, ok := find(tree, sid); !ok || !sess.Active(now) {
+		return denyStepUp(errs.New(errs.CodeSessionRevoked, ""), auditing.ReasonSessionRevoked, causeSessionEnded, sid)
+	}
+	return nil
+}
+
+// opened locks the challenge challengeID after the session rows and checks that it is an issued
+// step-up challenge of the session sid, not expired at now. Errors: the denials that do not count
+// (08 section 6.2).
+func (s *StepUps) opened(ctx context.Context, sid, challengeID ids.ID, now time.Time) (ChallengeRecord, error) {
+	ch, found, err := s.d.Challenges.LockChallenge(ctx, challengeID)
+	if err != nil {
+		return ChallengeRecord{}, err
+	}
+	// Without the challenge the value cannot be signed, so these do not count (08 section 6.2).
+	switch {
+	case !found || ch.Purpose != PurposeStepUp || ch.SessionID != sid:
+		return ChallengeRecord{}, required(causeUnknownChallenge, sid)
+	case ch.Status != ChallengeIssued:
+		return ChallengeRecord{}, required(causeChallengeFinished, sid)
+	case !now.Before(ch.ExpiresAt):
+		return ChallengeRecord{}, required(causeChallengeExpired, sid)
+	}
+	return ch, nil
+}
+
 // complete is the body of CompleteWithDeviceKey inside its unit of work.
 func (s *StepUps) complete(ctx context.Context, a actor.Actor, challengeID ids.ID, signature string) (completion, error) {
 	sid := a.SessionID
 	now := s.now()
-	tree, err := s.d.Sessions.LockSessionTree(ctx, sid)
-	if err != nil {
+	if err := s.lockSession(ctx, sid, now); err != nil {
 		return completion{}, err
-	}
-	// authorize saw the session active; a revocation that committed since then ends here.
-	if sess, ok := find(tree, sid); !ok || !sess.Active(now) {
-		return completion{}, denyStepUp(errs.New(errs.CodeSessionRevoked, ""), auditing.ReasonSessionRevoked, causeSessionEnded, sid)
 	}
 	key, found, err := s.d.Devices.ActiveKey(ctx, a.DeviceID, identity.KeyPurposeStepUp)
 	if err != nil {
@@ -269,18 +344,9 @@ func (s *StepUps) complete(ctx context.Context, a actor.Actor, challengeID ids.I
 	if err != nil {
 		return completion{}, errs.Wrap(errs.CodeInternalError, err, "identity: stored step_up key")
 	}
-	ch, found, err := s.d.Challenges.LockChallenge(ctx, challengeID)
+	ch, err := s.opened(ctx, sid, challengeID, now)
 	if err != nil {
 		return completion{}, err
-	}
-	// Without the challenge the value cannot be signed, so these do not count (08 section 6.2).
-	switch {
-	case !found || ch.Purpose != PurposeStepUp || ch.SessionID != sid:
-		return completion{}, required(causeUnknownChallenge, sid)
-	case ch.Status != ChallengeIssued:
-		return completion{}, required(causeChallengeFinished, sid)
-	case !now.Before(ch.ExpiresAt):
-		return completion{}, required(causeChallengeExpired, sid)
 	}
 	cause := stepup.Check(signature, stepup.Expect{
 		Key: jwk, Alg: key.Alg, ChallengeHash: ch.Hash, Pepper: s.pepper, SessionID: sid, IssuedAt: ch.CreatedAt, Now: now,
@@ -289,16 +355,22 @@ func (s *StepUps) complete(ctx context.Context, a actor.Actor, challengeID ids.I
 	if cause != "" {
 		return s.fail(ctx, a, ch.ID, cause, now)
 	}
-	if err := s.d.Challenges.FinishChallenge(ctx, ch.ID, ChallengeUsed, now); err != nil {
+	return s.confirmed(ctx, sid, ch.ID, identity.StepUpMethodDeviceKey, now)
+}
+
+// confirmed ends the challenge as used, sets the step-up of the session with method and writes
+// the allow entry, in the ambient unit of work.
+func (s *StepUps) confirmed(ctx context.Context, sid, challengeID ids.ID, method string, now time.Time) (completion, error) {
+	if err := s.d.Challenges.FinishChallenge(ctx, challengeID, ChallengeUsed, now); err != nil {
 		return completion{}, err
 	}
-	if err := s.d.Challenges.SetSessionStepUp(ctx, sid, now, identity.StepUpMethodDeviceKey); err != nil {
+	if err := s.d.Challenges.SetSessionStepUp(ctx, sid, now, method); err != nil {
 		return completion{}, err
 	}
-	err = s.d.Audit.Record(ctx, auditing.Entry{
+	err := s.d.Audit.Record(ctx, auditing.Entry{
 		Action: string(authorize.ActionAuthStepUp), Decision: auditing.DecisionAllow, ResourceKind: resourceAuthSession, ResourceID: sid,
 		Attrs: auditing.Attrs{
-			attrStep: auditing.Code(stepConfirm), attrMethod: auditing.Code(identity.StepUpMethodDeviceKey), attrChallengeID: auditing.ID(ch.ID),
+			attrStep: auditing.Code(stepConfirm), attrMethod: auditing.Code(method), attrChallengeID: auditing.ID(challengeID),
 		},
 	})
 	if err != nil {
@@ -337,4 +409,67 @@ func (s *StepUps) fail(ctx context.Context, a actor.Actor, challengeID ids.ID, c
 		return completion{}, err
 	}
 	return completion{failed: true, revoked: revoke}, nil
+}
+
+// CompleteWithPasskey implements identity.StepUp (brief M1-40 "Step-up with passkey"): the actor
+// checks and authorize of CompleteWithDeviceKey (a cli session gets 403 before any check of the
+// assertion), then one unit of work that locks the session rows and the challenge, verifies the
+// assertion against an active passkey of the session's person and sets the step-up with method
+// passkey. A wrong confirmation (another challenge, another person's passkey, a refused
+// assertion) fails the challenge and counts toward auth.step_up_fail_limit like a wrong
+// signature. It works for local and OIDC people.
+func (s *StepUps) CompleteWithPasskey(ctx context.Context, a actor.Actor, challengeID ids.ID, credential json.RawMessage) (identity.StepUpResult, error) {
+	ctx, err := withCaller(ctx, a)
+	if err != nil {
+		return identity.StepUpResult{}, err
+	}
+	if err := s.admit(ctx, a); err != nil {
+		return identity.StepUpResult{}, s.finish(ctx, err)
+	}
+	if s.c == nil {
+		return identity.StepUpResult{}, (&ceremonies{}).enabled()
+	}
+	if err := s.c.enabled(); err != nil {
+		return identity.StepUpResult{}, err
+	}
+	var out completion
+	err = s.d.UoW.Do(ctx, func(ctx context.Context) error {
+		var err error
+		out, err = s.completePasskey(ctx, a, challengeID, credential)
+		return err
+	})
+	if err != nil {
+		return identity.StepUpResult{}, s.finish(ctx, err)
+	}
+	switch {
+	case out.revoked:
+		return identity.StepUpResult{}, errs.New(errs.CodeSessionRevoked, "")
+	case out.failed:
+		return identity.StepUpResult{}, errs.New(errs.CodeStepUpRequired, "")
+	}
+	return out.result, nil
+}
+
+// completePasskey is the body of CompleteWithPasskey inside its unit of work.
+func (s *StepUps) completePasskey(ctx context.Context, a actor.Actor, challengeID ids.ID, credential json.RawMessage) (completion, error) {
+	sid := a.SessionID
+	now := s.now()
+	if err := s.lockSession(ctx, sid, now); err != nil {
+		return completion{}, err
+	}
+	ch, err := s.opened(ctx, sid, challengeID, now)
+	if err != nil {
+		return completion{}, err
+	}
+	res, err := s.c.assertion(ctx, ch, credential, a.ID)
+	if cause, ok := refusalCause(err); ok {
+		return s.fail(ctx, a, ch.ID, stepup.Cause(cause), now)
+	}
+	if err != nil {
+		return completion{}, err
+	}
+	if err := s.c.recordUse(ctx, res, authorize.ActionAuthStepUp, now); err != nil {
+		return completion{}, err
+	}
+	return s.confirmed(ctx, sid, ch.ID, identity.StepUpMethodPasskey, now)
 }

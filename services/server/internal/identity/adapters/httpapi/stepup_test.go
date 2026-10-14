@@ -73,9 +73,6 @@ func (w *sworld) phone(user ids.ID) *stepClient {
 func (c *stepClient) challenge() (string, string) {
 	c.w.t.Helper()
 	m := c.w.want(c.call(http.MethodPost, challengePath, ""), http.StatusOK, "")
-	if _, ok := m["passkey_options"]; ok {
-		c.w.t.Fatal("passkey_options present before M1-40")
-	}
 	return m["challenge_id"].(string), m["challenge"].(string)
 }
 

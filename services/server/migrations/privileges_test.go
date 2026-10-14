@@ -87,6 +87,8 @@ var appPrivileges = map[string][]string{
 	// 03 device_pairings (M1-38): a pairing ends by its status; deleting old rows belongs to the
 	// retention job.
 	"device_pairings": {"SELECT", "INSERT", "UPDATE"},
+	// 03 passkey_credentials (M1-40): a passkey ends by revoked_at; the rows are security history.
+	"passkey_credentials": {"SELECT", "INSERT", "UPDATE"},
 }
 
 // allPrivileges are the table rights PostgreSQL 18 knows (MAINTAIN since 17).

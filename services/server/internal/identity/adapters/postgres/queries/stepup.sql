@@ -5,8 +5,12 @@
 -- challenge (03 "Sperrreihenfolge").
 
 -- name: InsertChallenge :exec
-INSERT INTO auth_challenges (id, purpose, session_id, challenge_hash, status, created_at, expires_at)
-VALUES (@id, @purpose, sqlc.narg(session_id), @challenge_hash, 'issued', @created_at, @expires_at);
+-- Every purpose (03 auth_challenges): session_id for step_up and passkey_register,
+-- enrollment_code_id for passkey_enroll, webauthn_session for the WebAuthn ceremonies (M1-40).
+INSERT INTO auth_challenges (id, purpose, session_id, enrollment_code_id, challenge_hash, webauthn_session, status,
+                             created_at, expires_at)
+VALUES (@id, @purpose, sqlc.narg(session_id), sqlc.narg(enrollment_code_id), @challenge_hash, sqlc.narg(webauthn_session),
+        'issued', @created_at, @expires_at);
 
 -- name: LockChallenge :one
 SELECT * FROM auth_challenges WHERE id = @id FOR UPDATE;
