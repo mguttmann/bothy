@@ -161,14 +161,14 @@ modules:
     depends_on: [agents]
     adapter_vendors: []
   terminal:
-    tables: [hosts, terminal_sessions]
+    tables: [hosts, host_session_users, terminal_sessions]
     actions: [host.read, host.manage, host.pair, host.connect, terminal.open, terminal.attach,
               terminal.stream, terminal.read_own, terminal.close, terminal.terminate]
     events: [host.updated, terminal_session.changed]
     ephemeral_events: [host.presence_changed]
     ws_ops: []
     depends_on: [instance, identity, authz, agents]
-    adapter_vendors: []
+    adapter_vendors: [pgx]   # sqlc code and the repository (M2-39)
   runs:
     tables: [runs, run_steps, run_followups, message_components, interactions]
     actions: [agent.invoke, run.read, run.overview.read, run.context.read, run.start, run.update,

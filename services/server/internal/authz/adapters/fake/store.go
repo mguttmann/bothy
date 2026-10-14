@@ -248,6 +248,18 @@ func (s *Store) ActiveGrantsOnTargets(_ context.Context, spaceIDs, channelIDs []
 	}), nil
 }
 
+// ActiveGrantsOnHosts implements app.Store.
+func (s *Store) ActiveGrantsOnHosts(_ context.Context, hostIDs []ids.ID) ([]domain.Grant, error) {
+	if err := s.err(); err != nil {
+		return nil, err
+	}
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return s.active(func(g domain.Grant) bool {
+		return g.Target.Kind == domain.TargetHost && slices.Contains(hostIDs, g.Target.HostID)
+	}), nil
+}
+
 // InsertGrant implements app.Store.
 func (s *Store) InsertGrant(_ context.Context, g domain.Grant) error {
 	if err := s.err(); err != nil {

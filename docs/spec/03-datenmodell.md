@@ -75,7 +75,7 @@ Migration kommt mit dieser Etappe, der Vertrag gilt schon jetzt.
 | `gateway` | WebSocket-Endpunkt, Gateway-Sitzungen, Fokus, Tippen, kurzlebige Ereignisse | keine |
 | `search` | Such-Koordinator über die Lese-Ports von `messaging`, `chat` und `files` ([14-suche.md](14-suche.md)) | keine |
 | `stats` | Statistik der Konsole aus den Lese-Ports anderer Module, eigene Messung als Minuten-Aggregate ([25-visualisierung.md](25-visualisierung.md)) | ja |
-| `terminal` | Rechner, Kopplung, Terminal-Sitzungen, Sitzungs-Marken, Relais der Ströme ([24-terminal.md](24-terminal.md)) | ja |
+| `terminal` | Rechner, Kopplung, Sitzungsbenutzer je Person, Terminal-Sitzungen, Sitzungs-Marken, Relais der Ströme ([24-terminal.md](24-terminal.md)) | ja |
 
 Die zwei Module ohne Tabellen sind eigene Module, weil sie eigene Ports, Abhängigkeiten und
 Leistungsziele haben ([02-architektur.md](02-architektur.md), Abschnitt 4). Technische Tabellen
@@ -745,7 +745,7 @@ Transaktion; so wird nach einem Ausfall des worker jeder Ablauf genau einmal gem
 die `grants`, `group_memberships`, `owners`, Bediener-Zuordnungen, `agents.billing_mode`,
 `agents.credential_holder_id`, `agents.tool_class`, den Zustand einer Dev-Umgebung, an einem Rechner
 `state`, `assigned_user_id`, `dev_environment_id`, `llm_credentials`, `credential_holder_id` oder
-`declared_server_host` oder den Status eines Prinzipals ändert, erhöht `sequence_counters.permission_version` (Abschnitt 6.3). Das gilt
+`declared_server_host` oder `reported_session_users`, die Zeilen in `host_session_users` oder den Status eines Prinzipals ändert, erhöht `sequence_counters.permission_version` (Abschnitt 6.3). Das gilt
 auch für den Job `authz.expiry_sweep`, der abgelaufene Freigaben und Mitgliedschaften meldet.
 
 ### 4.4 Agenten und Apps (`agents`, `apps`)
@@ -2347,8 +2347,9 @@ LLM-Anmeldung (I6) und sein gemeldeter Zustand. Modul: `terminal`.
 | `paired_at` | `timestamptz` | ja | | letzte erfolgreiche `host.pair` |
 | `confirmed_by` | `uuid` | ja | | Owner, der den Fingerabdruck bestätigt hat |
 | `confirmed_at` | `timestamptz` | ja | | |
-| `reported_profiles` | `jsonb` | nein | `'[]'` | Schema `host_profiles.v1`: je Profil `name`, `display_name`, `kind` (`shell`, `claude`, `command`), bei `claude` die Anzeigenamen der Arbeitsordner; nie Befehlszeilen, Pfade oder Umgebung |
-| `reported_doctor` | `jsonb` | nein | `'{}'` | Schema `host_doctor.v1`: Ergebnis und Code je Prüfung HD1 bis HD8 (24, Abschnitt 2.2); nie Inhalte |
+| `reported_profiles` | `jsonb` | nein | `'[]'` | Schema `host_profiles.v1`: je Profil `name`, `display_name`, `kind` (`shell`, `claude`, `command`); nie Befehlszeilen, Pfade oder Umgebung |
+| `reported_session_users` | `jsonb` | nein | `'[]'` | Schema `host_reported_session_users.v1`: je Name aus `host_service.session_users` `os_user` und `workdirs`, die Anzeigenamen seiner Arbeitsordner des Profils `claude` aus `host_service.claude_workdirs` nach HD7 (ein Ordner bei zwei Sitzungsbenutzern fehlt in beiden Listen) in deren Reihenfolge; in genau dieser Liste löst der Host-Dienst `wdi` auf; gemeldet bei `host.pair` und mit jedem `report` (24, Abschnitt 2.2); nie Pfade |
+| `reported_doctor` | `jsonb` | nein | `'[]'` | Schema `host_doctor.v1`: Liste mit Ergebnis und Code je Prüfung HD1 bis HD11 (24, Abschnitt 2.2); je Konto, das die Regel für Namen aus 24, Abschnitt 2.2 nennt, ein eigener Eintrag mit seinem Namen (`session_user`): bei HD6, HD10 (falsche Gegenstelle) und HD11 der betroffene Sitzungsbenutzer, bei HD9 jeder frühere Sitzungsbenutzer mit lesbarem Home, für andere Benutzer ein Eintrag ohne Namen; Prüfung und Name zusammen eindeutig; nie Inhalte, Pfade oder Werte |
 | `reported_is_server_host` | `boolean` | ja | | Meldung des Host-Dienstes (24, Abschnitt 2.3) |
 | `reported_require_local_confirm` | `boolean` | ja | | Meldung, ob `host_service.require_local_confirm` an ist |
 | `reported_os_version` | `text` | ja | | |
@@ -2378,6 +2379,39 @@ Aufräumjob `terminal.sweep` ([02-architektur.md](02-architektur.md), Abschnitt 
 Verbindungszustand (verbunden, getrennt) hält der Server nur im Speicher; er erscheint als
 kurzlebiges Ereignis `host.presence_changed` (05).
 
+#### `host_session_users`
+
+Zweck: Zuordnung einer Person zu ihrem eigenen Sitzungsbenutzer (Benutzer des Betriebssystems) auf
+einem Rechner, Ruling T12 ([24-terminal.md](24-terminal.md), Abschnitt 2.2). Ein Sitzungsbenutzer
+gehört höchstens einer Person, auch nach dem Ende der Zuordnung. Modul: `terminal`.
+
+| Feld | Typ | Null | Standard | Regeln / Hinweise |
+|---|---|---|---|---|
+| `id` | `uuid` | nein | | UUIDv7 |
+| `host_id` | `uuid` | nein | | |
+| `user_id` | `uuid` | nein | | Mensch, dem der Sitzungsbenutzer gehört |
+| `os_user` | `text` | nein | | Name des Sitzungsbenutzers wie in `host_service.session_users`; nicht leer, höchstens `host.os_user_max_chars` Zeichen, nur Buchstaben, Ziffern, `_`, `.` und `-` (`CHECK (os_user ~ '^[A-Za-z0-9_][A-Za-z0-9_.-]*$')`); nie ein Pfad |
+| `created_by` | `uuid` | nein | | Owner der Zuordnung |
+| `created_at` | `timestamptz` | nein | `now()` | |
+| `revoked_by` | `uuid` | ja | | Owner, der die Zuordnung beendet hat |
+| `revoked_at` | `timestamptz` | ja | | Ende der Zuordnung; die Zeile bleibt, der Name bleibt für diesen Rechner belegt |
+
+PK: `id`. FK: `host_id` -> `hosts(id)` ON DELETE RESTRICT; `user_id` -> `users(principal_id)` ON
+DELETE RESTRICT; `created_by`, `revoked_by` -> `principals(id)` ON DELETE RESTRICT.
+Checks: `(revoked_at IS NULL) = (revoked_by IS NULL)`. Regel der Anwendung, nicht der Datenbank,
+weil die Meldung sich später ändern darf: Beim Anlegen muss `os_user` in
+`hosts.reported_session_users` stehen; sonst lehnt `host.manage` mit `400 validation_failed` ab
+(`errors[].code = session_user_not_on_host`, 24 Abschnitt 2.2).
+Unique: `(id, host_id, user_id)` als Ziel des zusammengesetzten Fremdschlüssels von
+`terminal_sessions`; `(host_id, lower(os_user))` über alle Zeilen, auch beendete (nie geteilt, auch nicht über
+die Zeit; Namen der Betriebssysteme sind unter macOS und Windows ohne Groß- und Kleinschreibung);
+`(host_id, user_id) WHERE revoked_at IS NULL` (höchstens eine gültige Zuordnung je Person und
+Rechner). Ein Verstoß gegen eine der beiden letzten ergibt `409 conflict` mit `reason:
+session_user_taken`.
+Indexe: `(user_id) WHERE revoked_at IS NULL` für das Beenden bei Sperre der Person.
+Aufbewahrung: `security` (Frist `retention.security_after_end` nach `retired_at` des Rechners).
+Zeilen werden nie gelöscht, solange der Rechner nicht `retired` ist; sonst würde der Name wieder frei.
+
 #### `terminal_sessions`
 
 Zweck: Metadaten einer Terminal-Sitzung. Nie Inhalte, nie Befehle. Modul: `terminal`.
@@ -2387,6 +2421,7 @@ Zweck: Metadaten einer Terminal-Sitzung. Nie Inhalte, nie Befehle. Modul: `termi
 | `id` | `uuid` | nein | | UUIDv7; Sitzungs-ID im Prolog und in `sid` der Marke |
 | `host_id` | `uuid` | nein | | |
 | `user_id` | `uuid` | nein | | Mensch der Sitzung; nur Menschen |
+| `host_session_user_id` | `uuid` | nein | | Sitzungsbenutzer der Person auf diesem Rechner beim Öffnen (SR12); Quelle von `osu` in jeder Marke der Sitzung |
 | `opened_by_device_id` | `uuid` | nein | | Gerät beim Öffnen |
 | `device_id` | `uuid` | nein | | Gerät der letzten Öffnung oder des letzten Anhängens |
 | `auth_session_id` | `uuid` | nein | | Anmeldesitzung der letzten Öffnung oder des letzten Anhängens; ihr Widerruf beendet die Sitzung |
@@ -2400,7 +2435,7 @@ Zweck: Metadaten einer Terminal-Sitzung. Nie Inhalte, nie Befehle. Modul: `termi
 | `last_input_at` | `timestamptz` | ja | | grob, vom Relais; Grundlage der Leerlauf-Prüfung des Servers |
 | `closed_at` | `timestamptz` | ja | | |
 | `closed_by` | `uuid` | ja | | Mensch bei `client_closed` und `closed_by_owner`; sonst NULL |
-| `close_reason` | `text` | ja | | `CHECK (close_reason IN ('client_closed','closed_by_owner','process_exited','idle_timeout','max_duration','detach_expired','access_revoked','i6_violation','host_disabled','host_retired','host_rekeyed','user_disabled','device_revoked','session_revoked','logout','open_failed','host_policy_violation'))` (24, Abschnitt 10.3) |
+| `close_reason` | `text` | ja | | `CHECK (close_reason IN ('client_closed','closed_by_owner','process_exited','idle_timeout','max_duration','detach_expired','access_revoked','i6_violation','host_disabled','host_retired','host_rekeyed','host_restarted','user_disabled','device_revoked','session_revoked','logout','open_failed','host_policy_violation'))` (24, Abschnitt 10.3) |
 | `close_detail` | `text` | ja | | Code aus der geschlossenen Liste in 24, Abschnitt 10.3; nie Freitext |
 | `exit_code` | `integer` | ja | | Exitcode des Prozesses, wenn gemeldet |
 | `bytes_in` | `bigint` | nein | `0` | Bytes der Transportnachrichten vom Gerät, gezählt im Relais |
@@ -2408,7 +2443,11 @@ Zweck: Metadaten einer Terminal-Sitzung. Nie Inhalte, nie Befehle. Modul: `termi
 | `version` | `bigint` | nein | `1` | |
 
 PK: `id`. FK: `host_id` -> `hosts(id)` ON DELETE RESTRICT; `user_id` -> `users(principal_id)` ON
-DELETE RESTRICT; `opened_by_device_id`, `device_id` -> `devices(id)` ON DELETE RESTRICT;
+DELETE RESTRICT; `(host_session_user_id, host_id, user_id)` -> `host_session_users(id, host_id,
+user_id)` ON DELETE RESTRICT (die Datenbank hält so, dass der Sitzungsbenutzer zu Rechner und
+Person der Sitzung gehört; ein Fehler im Code kann kein `osu` einer anderen Person in eine Marke
+schreiben);
+`opened_by_device_id`, `device_id` -> `devices(id)` ON DELETE RESTRICT;
 `auth_session_id` -> `auth_sessions(id)` ON DELETE RESTRICT; `closed_by` -> `principals(id)` ON
 DELETE RESTRICT.
 Checks: `(state = 'closed') = (closed_at IS NOT NULL)`; `(state = 'closed') = (close_reason IS NOT
@@ -3343,6 +3382,9 @@ erDiagram
 | R-DM-36 | `terminal_sessions` hält nur Metadaten; Inhalte gibt es im Server nicht. | Ende-zu-Ende-Verschlüsselung ohne Speicher im Server; Nachweis über Audit und Metadaten ([24-terminal.md](24-terminal.md), Abschnitt 10.4). |
 | R-DM-37 | Verbrauch eines Step-up für das Terminal als Spalte `auth_sessions.step_up_consumed_at`. | Eine Bestätigung gilt für genau eine Öffnung; eine Spalte an der Sitzung genügt, weil die Bestätigung ohnehin je Sitzung gilt ([08-identitaet.md](08-identitaet.md), Abschnitt 6.3). |
 | R-DM-38 | Eigene Messung als Minuten-Aggregate in `stats_minutes` ohne Primärschlüssel, mit eindeutigem Schlüssel über alle Dimensionen (`NULLS NOT DISTINCT`), additivem Upsert und Tagespartitionen. | Mehrere Prozesse und Knoten addieren ohne Koordinator in dieselbe Zeile; Aufbewahrung durch Abhängen ganzer Partitionen wie R-DM-15; die Statistik liest nie aus der Telemetrie (R-OB-08, Ruling T7). |
+| R-DM-39 | Sitzungsbenutzer je Person in `host_session_users`, Name je Rechner eindeutig über alle Zeilen, auch beendete. | Ruling T12: Anmeldedaten eines Sitzungsbenutzers gehören genau einer Person; ein wieder vergebener Name gäbe der nächsten Person die Anmeldungen und Dauerläufer der vorigen ([24-terminal.md](24-terminal.md), Abschnitt 2.2). |
+| R-DM-40 | `terminal_sessions` verweist mit `(host_session_user_id, host_id, user_id)` auf `host_session_users(id, host_id, user_id)`. | Ein Fremdschlüssel nur auf `id` ließe einen Sitzungsbenutzer eines anderen Rechners oder einer anderen Person zu; der Host-Dienst bände einen neuen Namen dann an die falsche Person (D-W-66). |
+| R-DM-41 | `hosts.reported_session_users` hält die gemeldeten Namen der Sitzungsbenutzer mit den Anzeigenamen ihrer Arbeitsordner. | Der Server ordnet nur Namen zu, die der Rechner kennt, und bietet je Person nur ihre eigenen Arbeitsordner an (Rulings T12 und T13; D-W-62, D-W-63). |
 
 ## 9. Konfigurationswerte dieses Kapitels
 
@@ -3356,6 +3398,7 @@ Die Werte sind Standardwerte. Andere Kapitel verweisen nur auf den Namen.
 | `group.name_max_chars` | `100` | Länge eines Gruppennamens in Unicode-Zeichen |
 | `group.description_max_chars` | `500` | Länge einer Gruppenbeschreibung in Unicode-Zeichen |
 | `host.name_max_chars` | `100` | Länge eines Rechnernamens in Unicode-Zeichen |
+| `host.os_user_max_chars` | `64` | Länge des Namens eines Sitzungsbenutzers in `host_session_users.os_user` |
 | `space.name_max_chars` | `100` | Länge eines Bereichsnamens in Unicode-Zeichen |
 | `channel.name_max_chars` | `100` | Länge eines Kanalnamens in Unicode-Zeichen |
 | `channel.topic_max_chars` | `1024` | Länge eines Kanal-Themas in Unicode-Zeichen |

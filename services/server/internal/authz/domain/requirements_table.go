@@ -115,9 +115,10 @@ var requirementGroups = []struct {
 	}},
 	{"owner oder self", Any(Owner, GroupMember), []string{"group.read"}},
 	{"host-self", Deferred("M2"), []string{"host.connect"}},
-	{"owner", Deferred("M2"), []string{"host.manage"}},
+	// host.manage and host.read are gated by HumanSession (M2-39, 05 section 4.14).
+	{"owner", All(HumanSession, Owner), []string{"host.manage"}},
 	{"public (gültiger Kopplungs-Code)", Deferred("M2"), []string{"host.pair"}},
-	{"owner oder assignee oder +terminal", Deferred("M2"), []string{"host.read"}},
+	{"owner oder assignee oder +terminal", All(HumanSession, Any(Owner, Assignee, Terminal)), []string{"host.read"}},
 	{"owner", Deferred("M8"), []string{"import.apply"}},
 	{"trigger", Deferred("M2"), []string{"interaction.create"}},
 	{"agent-self bzw. app-self", Any(AgentSelf, AppSelf), []string{"interaction.respond"}},

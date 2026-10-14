@@ -23,6 +23,7 @@ import (
 	"github.com/OWNER/bothy/services/server/internal/kernel/authorize"
 	"github.com/OWNER/bothy/services/server/internal/kernel/ids"
 	"github.com/OWNER/bothy/services/server/internal/kernel/reqmeta"
+	"github.com/OWNER/bothy/services/server/test/terminaltest"
 )
 
 // The configuration of 07 section 14 that the expiry tests use.
@@ -515,8 +516,12 @@ func TestExpiryReminder_ShortGrantOnNextRun(t *testing.T) {
 	if got[w.lotse].Target != nil {
 		t.Fatal("an instance grant carries a target")
 	}
-	// A host grant omits the target too (07 section 9.4); hosts come with M2-39.
-	host := w.grantRow(t, domain.Subject{Kind: domain.SubjectUser, PrincipalID: w.alex}, domain.Target{Kind: domain.TargetHost, HostID: ids.New()},
+	// A host grant omits the target too (07 section 9.4); the host is a fixture of terminal (M2-39).
+	hostID, err := terminaltest.InsertHost(context.Background(), w.pool, terminaltest.Host{State: "pairing", CreatedBy: w.owner})
+	if err != nil {
+		t.Fatal(err)
+	}
+	host := w.grantRow(t, domain.Subject{Kind: domain.SubjectUser, PrincipalID: w.alex}, domain.Target{Kind: domain.TargetHost, HostID: hostID},
 		domain.LevelNone, w.clk.Now().Add(time.Hour), domain.CapTerminal)
 	seq = w.lastSeq(t)
 	w.remindAt(t, w.clk.Now().Add(sweepInterval))

@@ -1,12 +1,11 @@
 from __future__ import annotations
 
 from collections.abc import Mapping
-from typing import Any, Self, TypeVar, cast
+from typing import Any, Self, TypeVar
 
 from attrs import define as _attrs_define
 
 from ..models.host_profile_kind import HostProfileKind
-from ..types import UNSET, Unset
 
 T = TypeVar("T", bound="HostProfile")
 
@@ -19,14 +18,11 @@ class HostProfile:
         name (str):
         display_name (str):
         kind (HostProfileKind):
-        workdirs (list[str] | Unset): Display names of the allowed working directories of a `claude` profile; the client
-            sends the index, never a path.
     """
 
     name: str
     display_name: str
     kind: HostProfileKind
-    workdirs: list[str] | Unset = UNSET
 
     def to_dict(self) -> dict[str, Any]:
         name = self.name
@@ -34,10 +30,6 @@ class HostProfile:
         display_name = self.display_name
 
         kind = self.kind.value
-
-        workdirs: list[str] | Unset = UNSET
-        if not isinstance(self.workdirs, Unset):
-            workdirs = self.workdirs
 
         field_dict: dict[str, Any] = {}
 
@@ -48,8 +40,6 @@ class HostProfile:
                 "kind": kind,
             }
         )
-        if workdirs is not UNSET:
-            field_dict["workdirs"] = workdirs
 
         return field_dict
 
@@ -62,13 +52,10 @@ class HostProfile:
 
         kind = HostProfileKind(d.pop("kind"))
 
-        workdirs = cast(list[str], d.pop("workdirs", UNSET))
-
         host_profile = cls(
             name=name,
             display_name=display_name,
             kind=kind,
-            workdirs=workdirs,
         )
 
         return host_profile

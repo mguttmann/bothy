@@ -17,6 +17,8 @@ from ..types import UNSET, Unset
 if TYPE_CHECKING:
     from ..models.host_doctor_check import HostDoctorCheck
     from ..models.host_profile import HostProfile
+    from ..models.host_reported_session_user import HostReportedSessionUser
+    from ..models.host_session_user import HostSessionUser
 
 
 T = TypeVar("T", bound="Host")
@@ -35,7 +37,8 @@ class Host:
         declared_server_host (bool):
         key_generation (int):
         profiles (list[HostProfile]):
-        doctor (list[HostDoctorCheck]):
+        doctor (list[HostDoctorCheck]): One entry per check HD1 to HD11; a failed HD6, HD9, HD10 or HD11 has one entry
+            per account named by the rule for names (24, 2.2).
         connected (bool): The control connection of the host service is open (memory of the server).
         created_at (datetime.datetime): RFC 3339 timestamp in UTC with millisecond precision and suffix `Z`.
         version (int):
@@ -48,6 +51,11 @@ class Host:
         noise_public_key (str | Unset): Static X25519 key of the host, 32 bytes base64url without padding; absent before
             pairing.
         key_fingerprint (str | Unset):
+        session_users (list[HostSessionUser] | Unset): Valid session user assignments (ruling T12), visible like every
+            other member to everyone with `host.read`. Absent when there is none.
+        reported_session_users (list[HostReportedSessionUser] | Unset): Session users the host service reported at
+            pairing and in its last `report` (24 section 2.2). An assignment works only while its name is in this list
+            (SR12); `confirmHost` and `updateHost` accept only these names. Absent before pairing.
         require_local_confirm (bool | Unset): Report whether `host_service.require_local_confirm` is on.
         host_version (str | Unset):
         os_version (str | Unset):
@@ -72,6 +80,8 @@ class Host:
     reported_is_server_host: bool | Unset = UNSET
     noise_public_key: str | Unset = UNSET
     key_fingerprint: str | Unset = UNSET
+    session_users: list[HostSessionUser] | Unset = UNSET
+    reported_session_users: list[HostReportedSessionUser] | Unset = UNSET
     require_local_confirm: bool | Unset = UNSET
     host_version: str | Unset = UNSET
     os_version: str | Unset = UNSET
@@ -129,6 +139,20 @@ class Host:
 
         key_fingerprint = self.key_fingerprint
 
+        session_users: list[dict[str, Any]] | Unset = UNSET
+        if not isinstance(self.session_users, Unset):
+            session_users = []
+            for session_users_item_data in self.session_users:
+                session_users_item = session_users_item_data.to_dict()
+                session_users.append(session_users_item)
+
+        reported_session_users: list[dict[str, Any]] | Unset = UNSET
+        if not isinstance(self.reported_session_users, Unset):
+            reported_session_users = []
+            for reported_session_users_item_data in self.reported_session_users:
+                reported_session_users_item = reported_session_users_item_data.to_dict()
+                reported_session_users.append(reported_session_users_item)
+
         require_local_confirm = self.require_local_confirm
 
         host_version = self.host_version
@@ -170,6 +194,10 @@ class Host:
             field_dict["noise_public_key"] = noise_public_key
         if key_fingerprint is not UNSET:
             field_dict["key_fingerprint"] = key_fingerprint
+        if session_users is not UNSET:
+            field_dict["session_users"] = session_users
+        if reported_session_users is not UNSET:
+            field_dict["reported_session_users"] = reported_session_users
         if require_local_confirm is not UNSET:
             field_dict["require_local_confirm"] = require_local_confirm
         if host_version is not UNSET:
@@ -185,6 +213,8 @@ class Host:
     def from_dict(cls, src_dict: Mapping[str, Any]) -> Self:
         from ..models.host_doctor_check import HostDoctorCheck
         from ..models.host_profile import HostProfile
+        from ..models.host_reported_session_user import HostReportedSessionUser
+        from ..models.host_session_user import HostSessionUser
 
         d = dict(src_dict)
         id = UUID(d.pop("id"))
@@ -253,6 +283,26 @@ class Host:
 
         key_fingerprint = d.pop("key_fingerprint", UNSET)
 
+        _session_users = d.pop("session_users", UNSET)
+        session_users: list[HostSessionUser] | Unset = UNSET
+        if _session_users is not UNSET:
+            session_users = []
+            for session_users_item_data in _session_users:
+                session_users_item = HostSessionUser.from_dict(session_users_item_data)
+
+                session_users.append(session_users_item)
+
+        _reported_session_users = d.pop("reported_session_users", UNSET)
+        reported_session_users: list[HostReportedSessionUser] | Unset = UNSET
+        if _reported_session_users is not UNSET:
+            reported_session_users = []
+            for reported_session_users_item_data in _reported_session_users:
+                reported_session_users_item = HostReportedSessionUser.from_dict(
+                    reported_session_users_item_data
+                )
+
+                reported_session_users.append(reported_session_users_item)
+
         require_local_confirm = d.pop("require_local_confirm", UNSET)
 
         host_version = d.pop("host_version", UNSET)
@@ -285,6 +335,8 @@ class Host:
             reported_is_server_host=reported_is_server_host,
             noise_public_key=noise_public_key,
             key_fingerprint=key_fingerprint,
+            session_users=session_users,
+            reported_session_users=reported_session_users,
             require_local_confirm=require_local_confirm,
             host_version=host_version,
             os_version=os_version,

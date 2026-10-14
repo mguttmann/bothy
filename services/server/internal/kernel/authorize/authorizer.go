@@ -67,6 +67,11 @@ type Scope struct {
 	FullyVisibleSpaceIDs []ids.ID
 	// InstanceWide reports owner or read on the instance (07 7.2).
 	InstanceWide bool
+	// HostIDs are the hosts of host.read, ascending, for "id = ANY($1)" (M2-39): the hosts with
+	// the effective right terminal and the own hosts of the holder; empty when AllHosts is set.
+	HostIDs []ids.ID
+	// AllHosts reports an effective owner, who reads every host (07 section 2.12 point 5).
+	AllHosts bool
 	// PermissionVersion is the rights version the scope was built at.
 	PermissionVersion int64
 }
@@ -82,7 +87,7 @@ type Authorizer interface {
 	// return it (it renders as 500 or 503).
 	Authorize(ctx context.Context, p Principal, a Action, r Resource) (Decision, error)
 	// Scope returns the visible sets for the list action a (an action whose requirement is read on
-	// a channel path, or space.read). A principal that fails the liveness checks gets the error of
+	// a channel path, space.read, or host.read for the hosts). A principal that fails the liveness checks gets the error of
 	// its decision (Decision.Err), not an empty scope.
 	Scope(ctx context.Context, p Principal, a Action) (Scope, error)
 }

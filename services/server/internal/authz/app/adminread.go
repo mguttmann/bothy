@@ -192,18 +192,33 @@ func (s *AdminService) ListGroupMembers(ctx context.Context, caller actor.Actor,
 
 // grantReadResource is the resource of grant.read on the target of a grant (05 grant.read:
 // space, channel, host, principal). An instance grant is owner only: grant.read on the caller as
-// a principal has the requirement owner. Hosts come with M2-39; until then no host is visible.
+// a principal has the requirement owner. A host grant is read like an instance grant (owner only,
+// the requirement of grant.read on a host): the holder sees the host but no grant on it, and a
+// non-owner gets the same answer for a host grant and an unknown id (M2-39).
 func grantReadResource(caller actor.Actor, kind domain.TargetKind, id ids.ID) (authorize.Resource, bool) {
 	switch kind {
 	case domain.TargetSpace:
 		return authorize.Resource{Kind: authorize.ResourceSpace, ID: id}, true
 	case domain.TargetChannel:
 		return authorize.Resource{Kind: authorize.ResourceChannel, ID: id}, true
-	case domain.TargetInstance:
+	case domain.TargetInstance, domain.TargetHost:
 		return authorize.Resource{Kind: authorize.ResourcePrincipal, ID: caller.ID, OwnerID: caller.ID}, true
-	case domain.TargetHost:
 	}
 	return authorize.Resource{}, false
+}
+
+// checkTarget authorizes grant.read on the target filter r of listGrants. A refused non-owner gets
+// 404 for a host filter, the answer of an unknown host (D-M2-39-6), except for the reasons of a
+// pending person or device, which refuse before visibility.
+func (s *AdminService) checkTarget(ctx context.Context, caller actor.Actor, kind domain.TargetKind, r authorize.Resource) error {
+	d, err := s.d.Authorizer.Authorize(ctx, caller, authorize.ActionGrantRead, r)
+	if err != nil {
+		return err
+	}
+	if kind == domain.TargetHost && d.Outcome == authorize.OutcomeForbidden && !isPendingReason(d.Reason) {
+		return errNotFound()
+	}
+	return d.Err()
 }
 
 // GetGrant implements authz.Admin: outside the caller's manage scope, and for an instance grant
@@ -263,7 +278,7 @@ func (s *AdminService) ListGrants(ctx context.Context, caller actor.Actor, q aut
 		if !ok {
 			return authz.GrantPage{}, errNotFound()
 		}
-		if err := s.check(ctx, caller, authorize.ActionGrantRead, r); err != nil {
+		if err := s.checkTarget(ctx, caller, f.TargetKind, r); err != nil {
 			return authz.GrantPage{}, err
 		}
 	}

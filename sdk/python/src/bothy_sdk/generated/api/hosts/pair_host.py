@@ -81,7 +81,8 @@ def sync_detailed(
     """Redeem a pairing code from the host service
 
      Called by `bothy-host pair` without login. Registers the static X25519 key (Noise) and the Ed25519
-    key (login) of the host. The host becomes `confirming`; an owner confirms the fingerprint (24, 3.2).
+    key (login) of the host, its profiles and the names of its session users (`reported_session_users`,
+    24 section 2.2). The host becomes `confirming`; an owner confirms the fingerprint (24, 3.2).
 
     Args:
         body (HostPairRequest):
@@ -113,7 +114,8 @@ def sync(
     """Redeem a pairing code from the host service
 
      Called by `bothy-host pair` without login. Registers the static X25519 key (Noise) and the Ed25519
-    key (login) of the host. The host becomes `confirming`; an owner confirms the fingerprint (24, 3.2).
+    key (login) of the host, its profiles and the names of its session users (`reported_session_users`,
+    24 section 2.2). The host becomes `confirming`; an owner confirms the fingerprint (24, 3.2).
 
     Args:
         body (HostPairRequest):
@@ -140,7 +142,8 @@ async def asyncio_detailed(
     """Redeem a pairing code from the host service
 
      Called by `bothy-host pair` without login. Registers the static X25519 key (Noise) and the Ed25519
-    key (login) of the host. The host becomes `confirming`; an owner confirms the fingerprint (24, 3.2).
+    key (login) of the host, its profiles and the names of its session users (`reported_session_users`,
+    24 section 2.2). The host becomes `confirming`; an owner confirms the fingerprint (24, 3.2).
 
     Args:
         body (HostPairRequest):
@@ -170,7 +173,8 @@ async def asyncio(
     """Redeem a pairing code from the host service
 
      Called by `bothy-host pair` without login. Registers the static X25519 key (Noise) and the Ed25519
-    key (login) of the host. The host becomes `confirming`; an owner confirms the fingerprint (24, 3.2).
+    key (login) of the host, its profiles and the names of its session users (`reported_session_users`,
+    24 section 2.2). The host becomes `confirming`; an owner confirms the fingerprint (24, 3.2).
 
     Args:
         body (HostPairRequest):

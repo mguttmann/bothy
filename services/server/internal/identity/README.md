@@ -308,11 +308,14 @@ Prinzipale, Menschen, Owner, Anmelde-Treiber, Identitäten, lokale Anmeldedaten,
 ### API tokens (M1-44)
 
 - Format (`domain/apitoken`, ADR 0061): `bothy_<kind>_<random>_<checksum>`, 60 characters. Kinds
-  `agt` (agent), `app` (app), `pat` (person), `whi` (incoming webhook, format only until M2-27).
+  `agt` (agent), `app` (app), `pat` (person), `whi` (incoming webhook, format only until M2-27),
+  `hpc` (pairing code of a terminal host, M2-39: issued by `Tokens.NewHostPairingCode` as a
+  redacting `Token` with its HMAC under the token pepper, without a database call; only
+  `host.pair` of M2-41 redeems it, and the authenticator refuses it before any lookup like `whi`).
   The random part is 32 bytes from `crypto/rand` as a big-endian integer in Base62
   (`0-9A-Za-z`), left-padded to 43 digits; the checksum is CRC-32 (IEEE) of those 43 ASCII bytes
   in Base62, left-padded to 6 digits. `Parse` accepts exactly
-  `^bothy_(agt|app|pat|whi)_[0-9A-Za-z]{43}_[0-9A-Za-z]{6}$` with an equal checksum and a random
+  `^bothy_(agt|app|pat|whi|hpc)_[0-9A-Za-z]{43}_[0-9A-Za-z]{6}$` with an equal checksum and a random
   value below 2^256. `token_prefix` is `bothy_<kind>_` plus the first 6 random characters,
   `token_hash` is HMAC-SHA-256 with the pepper of `auth.token_pepper_ref` over the whole token.
   The constant `bothy` is written once (`product`). Test vectors:

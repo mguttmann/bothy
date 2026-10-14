@@ -10,6 +10,7 @@ class TerminalCloseReason(StrEnum):
     HOST_DISABLED = "host_disabled"
     HOST_POLICY_VIOLATION = "host_policy_violation"
     HOST_REKEYED = "host_rekeyed"
+    HOST_RESTARTED = "host_restarted"
     HOST_RETIRED = "host_retired"
     I6_VIOLATION = "i6_violation"
     IDLE_TIMEOUT = "idle_timeout"

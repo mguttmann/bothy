@@ -133,3 +133,12 @@ func archivedCap(path Path, r Rights) Rights {
 	}
 	return r
 }
+
+// TerminalOn reports the effective right terminal of the principal with snapshot s on the host
+// hostID (07 section 2.12 point 3): an effective owner holds it on every host, anyone else through
+// a grant terminal in effect on the host, directly or through a group in effect. It does not
+// depend on the state or the holder of the host. The exception of I6 for owners on a personal host
+// is decided by the guard SR11 of M2-40 (07 section 4.2 step 9), which comes after the requirement.
+func TerminalOn(s Snapshot, hostID ids.ID) bool {
+	return s.Owner || s.Hosts[hostID].Has(CapTerminal)
+}

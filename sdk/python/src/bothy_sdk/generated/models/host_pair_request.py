@@ -10,6 +10,7 @@ from ..types import UNSET, Unset
 
 if TYPE_CHECKING:
     from ..models.host_profile import HostProfile
+    from ..models.host_reported_session_user import HostReportedSessionUser
     from ..models.json_object import JsonObject
 
 
@@ -26,6 +27,8 @@ class HostPairRequest:
         platform (HostPlatform):
         host_version (str):
         profiles (list[HostProfile]):
+        session_users (list[HostReportedSessionUser]): The session users of `host_service.session_users` with the
+            display names of their working directories (24 section 2.2).
         os_version (str | Unset):
     """
 
@@ -35,6 +38,7 @@ class HostPairRequest:
     platform: HostPlatform
     host_version: str
     profiles: list[HostProfile]
+    session_users: list[HostReportedSessionUser]
     os_version: str | Unset = UNSET
 
     def to_dict(self) -> dict[str, Any]:
@@ -53,6 +57,11 @@ class HostPairRequest:
             profiles_item = profiles_item_data.to_dict()
             profiles.append(profiles_item)
 
+        session_users = []
+        for session_users_item_data in self.session_users:
+            session_users_item = session_users_item_data.to_dict()
+            session_users.append(session_users_item)
+
         os_version = self.os_version
 
         field_dict: dict[str, Any] = {}
@@ -65,6 +74,7 @@ class HostPairRequest:
                 "platform": platform,
                 "host_version": host_version,
                 "profiles": profiles,
+                "session_users": session_users,
             }
         )
         if os_version is not UNSET:
@@ -75,6 +85,7 @@ class HostPairRequest:
     @classmethod
     def from_dict(cls, src_dict: Mapping[str, Any]) -> Self:
         from ..models.host_profile import HostProfile
+        from ..models.host_reported_session_user import HostReportedSessionUser
         from ..models.json_object import JsonObject
 
         d = dict(src_dict)
@@ -95,6 +106,15 @@ class HostPairRequest:
 
             profiles.append(profiles_item)
 
+        session_users = []
+        _session_users = d.pop("session_users")
+        for session_users_item_data in _session_users:
+            session_users_item = HostReportedSessionUser.from_dict(
+                session_users_item_data
+            )
+
+            session_users.append(session_users_item)
+
         os_version = d.pop("os_version", UNSET)
 
         host_pair_request = cls(
@@ -104,6 +124,7 @@ class HostPairRequest:
             platform=platform,
             host_version=host_version,
             profiles=profiles,
+            session_users=session_users,
             os_version=os_version,
         )
 

@@ -76,7 +76,9 @@ A flat object (19 SEC-AUD-5): the reserved members `ip_hmac` (64 hex characters)
 `agent_id`, `credential_holder_id`, `principal_ids`; only through `auditing.Violations`) and
 `reason` (the only free text, only through `auditing.ReasonText`, checked with
 `kernel/textcheck`; its length bound `audit.reason_max_chars` belongs to the request validation of
-the action). Callers may not set `ip_hmac`, `ip_key_id` or `aggregate`. Every other member has a
+the action) and `os_user` (M2-39: the name of a session user of a terminal host, only through
+`auditing.OSUserName`, only in the form `^[A-Za-z0-9_][A-Za-z0-9_.-]*$`, never a path; M2-43
+reuses it for `host.connect`). Callers may not set `ip_hmac`, `ip_key_id` or `aggregate`. Every other member has a
 key matching `^[a-z][a-z0-9_]*$` and a value that is a UUID, a code (`^[a-z0-9][a-z0-9_.:-]*$`, at
 most `domain.MaxCodeLen` bytes, never an IP address), an integer, a boolean, a canonical time or a flat list of one of
 these kinds. Anything else is refused when the entry is recorded (a programming error, kind

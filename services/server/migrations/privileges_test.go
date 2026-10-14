@@ -101,6 +101,12 @@ var appPrivileges = map[string][]string{
 	// space is never deleted; a sidebar row is personal data that erasure deletes (M7-06).
 	"spaces":            {"SELECT", "INSERT", "UPDATE"},
 	"user_space_states": {"SELECT", "INSERT", "UPDATE", "DELETE"},
+	// 03 section 4.14 (M2-39): hosts and terminal sessions are security history; a session user
+	// row is never deleted while its host is not retired (ruling T12, R-DM-39). The retention
+	// job of class security grants its own DELETE (M7).
+	"hosts":              {"SELECT", "INSERT", "UPDATE"},
+	"host_session_users": {"SELECT", "INSERT", "UPDATE"},
+	"terminal_sessions":  {"SELECT", "INSERT", "UPDATE"},
 }
 
 // allPrivileges are the table rights PostgreSQL 18 knows (MAINTAIN since 17).

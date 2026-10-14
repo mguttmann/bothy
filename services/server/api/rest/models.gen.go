@@ -1885,19 +1885,26 @@ func (e HostDisabledReason) Valid() bool {
 
 // Defines values for HostDoctorCheckCheck.
 const (
-	Hd1User       HostDoctorCheckCheck = "hd1_user"
-	Hd2Groups     HostDoctorCheckCheck = "hd2_groups"
-	Hd3Sudo       HostDoctorCheckCheck = "hd3_sudo"
-	Hd4StateDir   HostDoctorCheckCheck = "hd4_state_dir"
-	Hd5ServerHost HostDoctorCheckCheck = "hd5_server_host"
-	Hd6LlmLogin   HostDoctorCheckCheck = "hd6_llm_login"
-	Hd7Profiles   HostDoctorCheckCheck = "hd7_profiles"
-	Hd8Separation HostDoctorCheckCheck = "hd8_separation"
+	Hd10HelperIntegrity HostDoctorCheckCheck = "hd10_helper_integrity"
+	Hd11SharedLocations HostDoctorCheckCheck = "hd11_shared_locations"
+	Hd1User             HostDoctorCheckCheck = "hd1_user"
+	Hd2Groups           HostDoctorCheckCheck = "hd2_groups"
+	Hd3Sudo             HostDoctorCheckCheck = "hd3_sudo"
+	Hd4StateDir         HostDoctorCheckCheck = "hd4_state_dir"
+	Hd5ServerHost       HostDoctorCheckCheck = "hd5_server_host"
+	Hd6LlmLogin         HostDoctorCheckCheck = "hd6_llm_login"
+	Hd7Profiles         HostDoctorCheckCheck = "hd7_profiles"
+	Hd8Separation       HostDoctorCheckCheck = "hd8_separation"
+	Hd9ForeignHomes     HostDoctorCheckCheck = "hd9_foreign_homes"
 )
 
 // Valid indicates whether the value is a known member of the HostDoctorCheckCheck enum.
 func (e HostDoctorCheckCheck) Valid() bool {
 	switch e {
+	case Hd10HelperIntegrity:
+		return true
+	case Hd11SharedLocations:
+		return true
 	case Hd1User:
 		return true
 	case Hd2Groups:
@@ -1913,6 +1920,8 @@ func (e HostDoctorCheckCheck) Valid() bool {
 	case Hd7Profiles:
 		return true
 	case Hd8Separation:
+		return true
+	case Hd9ForeignHomes:
 		return true
 	default:
 		return false
@@ -4220,11 +4229,15 @@ func (e TemplateScope) Valid() bool {
 // Defines values for TerminalCloseDetail.
 const (
 	HandshakeFailed           TerminalCloseDetail = "handshake_failed"
+	HelperUntrusted           TerminalCloseDetail = "helper_untrusted"
 	LocalConfirmDenied        TerminalCloseDetail = "local_confirm_denied"
 	OpenTimeout               TerminalCloseDetail = "open_timeout"
 	ProfileUnknown            TerminalCloseDetail = "profile_unknown"
 	PtyFailed                 TerminalCloseDetail = "pty_failed"
 	ServerHostOwnerOnly       TerminalCloseDetail = "server_host_owner_only"
+	SessionUserMismatch       TerminalCloseDetail = "session_user_mismatch"
+	SessionUserUnknown        TerminalCloseDetail = "session_user_unknown"
+	SharedLocation            TerminalCloseDetail = "shared_location"
 	SubscriptionLoginDetected TerminalCloseDetail = "subscription_login_detected"
 	TokenExpired              TerminalCloseDetail = "token_expired"
 	TokenInvalid              TerminalCloseDetail = "token_invalid"
@@ -4236,6 +4249,8 @@ func (e TerminalCloseDetail) Valid() bool {
 	switch e {
 	case HandshakeFailed:
 		return true
+	case HelperUntrusted:
+		return true
 	case LocalConfirmDenied:
 		return true
 	case OpenTimeout:
@@ -4245,6 +4260,12 @@ func (e TerminalCloseDetail) Valid() bool {
 	case PtyFailed:
 		return true
 	case ServerHostOwnerOnly:
+		return true
+	case SessionUserMismatch:
+		return true
+	case SessionUserUnknown:
+		return true
+	case SharedLocation:
 		return true
 	case SubscriptionLoginDetected:
 		return true
@@ -4269,6 +4290,7 @@ const (
 	TerminalCloseReasonHostDisabled        TerminalCloseReason = "host_disabled"
 	TerminalCloseReasonHostPolicyViolation TerminalCloseReason = "host_policy_violation"
 	TerminalCloseReasonHostRekeyed         TerminalCloseReason = "host_rekeyed"
+	TerminalCloseReasonHostRestarted       TerminalCloseReason = "host_restarted"
 	TerminalCloseReasonHostRetired         TerminalCloseReason = "host_retired"
 	TerminalCloseReasonI6Violation         TerminalCloseReason = "i6_violation"
 	TerminalCloseReasonIdleTimeout         TerminalCloseReason = "idle_timeout"
@@ -4298,6 +4320,8 @@ func (e TerminalCloseReason) Valid() bool {
 	case TerminalCloseReasonHostPolicyViolation:
 		return true
 	case TerminalCloseReasonHostRekeyed:
+		return true
+	case TerminalCloseReasonHostRestarted:
 		return true
 	case TerminalCloseReasonHostRetired:
 		return true
@@ -8858,7 +8882,9 @@ type Host struct {
 
 	// DisabledReason Present exactly with `state = disabled`. `duplicate_connection` means a second live control connection with the same keys; only re-pairing helps (24, 3.4).
 	DisabledReason *HostDisabledReason `json:"disabled_reason,omitempty"`
-	Doctor         []HostDoctorCheck   `json:"doctor"`
+
+	// Doctor One entry per check HD1 to HD11; a failed HD6, HD9, HD10 or HD11 has one entry per account named by the rule for names (24, 2.2).
+	Doctor []HostDoctorCheck `json:"doctor"`
 
 	// HostVersion Examples: 1.0.0
 	HostVersion *string `json:"host_version,omitempty"`
@@ -8894,8 +8920,14 @@ type Host struct {
 	// ReportedIsServerHost Report of the host service (24, 2.3); absent before the first report.
 	ReportedIsServerHost *bool `json:"reported_is_server_host,omitempty"`
 
+	// ReportedSessionUsers Session users the host service reported at pairing and in its last `report` (24 section 2.2). An assignment works only while its name is in this list (SR12); `confirmHost` and `updateHost` accept only these names. Absent before pairing.
+	ReportedSessionUsers *[]HostReportedSessionUser `json:"reported_session_users,omitempty"`
+
 	// RequireLocalConfirm Report whether `host_service.require_local_confirm` is on.
 	RequireLocalConfirm *bool `json:"require_local_confirm,omitempty"`
+
+	// SessionUsers Valid session user assignments (ruling T12), visible like every other member to everyone with `host.read`. Absent when there is none.
+	SessionUsers *[]HostSessionUser `json:"session_users,omitempty"`
 
 	// State Life cycle of a host (24, 3.1). Only `active` allows sessions.
 	State   HostState `json:"state"`
@@ -8935,6 +8967,9 @@ type HostConfirm struct {
 	// LlmCredentials Owner declaration of the LLM login on a host (24, 7.2). `personal` needs `credential_holder_id` (I6).
 	LlmCredentials LlmCredentials `json:"llm_credentials"`
 	Reason         string         `json:"reason"`
+
+	// SessionUsers Session user per person (ruling T12); a person without one gets no terminal on the host (SR12).
+	SessionUsers *[]HostSessionUserAssign `json:"session_users,omitempty"`
 }
 
 // HostCreate defines model for HostCreate.
@@ -8949,13 +8984,18 @@ type HostCreate struct {
 	Reason string `json:"reason"`
 }
 
-// HostDoctorCheck Result of one self-check of the host service (`host_doctor.v1`, checks HD1 to HD8 in 24, 2.2). Codes only.
+// HostDoctorCheck Result of one self-check of the host service (`host_doctor.v1`, checks HD1 to HD11 in 24, 2.2). Codes and, following the rule for names (24, 2.2), the name of each account a person with a terminal can cause the finding in; never content, paths or values. When HD6 or HD11 fails, the list has one entry per affected session user; when HD10 fails with a wrong peer, one entry per session user of that channel; when HD9 fails, one entry per former session user whose home can be listed, plus one entry without a name for any other user; `check` and `session_user` together are unique in the list.
 type HostDoctorCheck struct {
 	Check HostDoctorCheckCheck `json:"check"`
 
 	// Code Examples: subscription_login_detected
 	Code *string `json:"code,omitempty"`
 	Ok   bool    `json:"ok"`
+
+	// SessionUser Only when not passed: with `hd6_llm_login` and `hd11_shared_locations` the session user whose account the finding is in; with `hd10_helper_integrity` and a wrong peer the session user of that channel; with `hd9_foreign_homes` a former session user of this host (bound to a person in the state directory, no longer in `host_service.session_users`) whose home can be listed. The operator knows where to look, and the console shows the person of the assignment (24, 2.2 and 7.4). One entry per such account; names of other users are never sent. A name, never a path.
+	//
+	// Examples: bothy-s-robin
+	SessionUser *string `json:"session_user,omitempty"`
 }
 
 // HostDoctorCheckCheck defines model for HostDoctorCheck.Check.
@@ -8977,7 +9017,10 @@ type HostIdentify struct {
 	// HostId UUIDv7 (RFC 9562), lowercase canonical form.
 	HostId      Uuid   `json:"host_id"`
 	HostVersion string `json:"host_version"`
-	Proof       string `json:"proof"`
+
+	// LiveSessions Only on the control connection, always present there (empty when none). The sessions the host service knows, those whose PTY still runs and those whose end it could not report yet (it reports that end with `session.ended` after `ready`). After a restart of the host service the list is empty. The server ends every other session of the host in state `active` or `detached` with `host_restarted` (24, 6.2).
+	LiveSessions *[]Uuid `json:"live_sessions,omitempty"`
+	Proof        string  `json:"proof"`
 
 	// ProtocolVersion Examples: 1
 	ProtocolVersion int `json:"protocol_version"`
@@ -9020,6 +9063,9 @@ type HostPairRequest struct {
 	PairingCode    string        `json:"pairing_code"`
 	Platform       HostPlatform  `json:"platform"`
 	Profiles       []HostProfile `json:"profiles"`
+
+	// SessionUsers The session users of `host_service.session_users` with the display names of their working directories (24 section 2.2).
+	SessionUsers []HostReportedSessionUser `json:"session_users"`
 }
 
 // HostPairResult defines model for HostPairResult.
@@ -9122,9 +9168,6 @@ type HostProfile struct {
 
 	// Name Examples: shell
 	Name string `json:"name"`
-
-	// Workdirs Display names of the allowed working directories of a `claude` profile; the client sends the index, never a path.
-	Workdirs *[]string `json:"workdirs,omitempty"`
 }
 
 // HostProfileKind defines model for HostProfile.Kind.
@@ -9139,13 +9182,26 @@ type HostReady struct {
 	State HostState `json:"state"`
 }
 
-// HostReport Report of profiles and self-checks; never content, paths or values.
+// HostReport Report of profiles, session users and self-checks; never content, paths or values. Sent after every `ready` before the host service accepts `session.open`, and on every change. When `doctor` refuses the start, the host service still logs in, sends one `report` and closes the connection without accepting `session.open` (24 section 2.2).
 type HostReport struct {
-	Doctor              []HostDoctorCheck `json:"doctor"`
-	IsServerHost        bool              `json:"is_server_host"`
-	OsVersion           *string           `json:"os_version,omitempty"`
-	Profiles            []HostProfile     `json:"profiles"`
-	RequireLocalConfirm bool              `json:"require_local_confirm"`
+	// Doctor One entry per check HD1 to HD11; a failed HD6, HD9, HD10 or HD11 has one entry per account named by the rule for names (24, 2.2).
+	Doctor              []HostDoctorCheck         `json:"doctor"`
+	IsServerHost        bool                      `json:"is_server_host"`
+	OsVersion           *string                   `json:"os_version,omitempty"`
+	Profiles            []HostProfile             `json:"profiles"`
+	RequireLocalConfirm bool                      `json:"require_local_confirm"`
+	SessionUsers        []HostReportedSessionUser `json:"session_users"`
+}
+
+// HostReportedSessionUser A session user the host service reports (`host_reported_session_users.v1`, 24 section 2.2), with the display names of its own working directories of the `claude` profile (ruling T13). Names only, never paths.
+type HostReportedSessionUser struct {
+	// OsUser Operating system user name from `host_service.session_users`.
+	//
+	// Examples: bothy-s-robin
+	OsUser string `json:"os_user"`
+
+	// Workdirs Display names of the working directories of this session user in `host_service.claude_workdirs` after check HD7, in their order (a directory listed under two session users is dropped from both lists); empty means no `claude` profile for this session user. A client sends the index into its own list, never a path; the host service resolves the index in exactly this list (24, 2.2 and 5.3).
+	Workdirs []string `json:"workdirs"`
 }
 
 // HostSessionClose defines model for HostSessionClose.
@@ -9188,6 +9244,29 @@ type HostSessionStarted struct {
 	SessionId Uuid `json:"session_id"`
 }
 
+// HostSessionUser A valid assignment of a person to their own session user on the host (ruling T12, 24 section 2.2).
+type HostSessionUser struct {
+	// CreatedAt RFC 3339 timestamp in UTC with millisecond precision and suffix `Z`.
+	CreatedAt Timestamp `json:"created_at"`
+
+	// OsUser Examples: bothy-s-robin
+	OsUser string `json:"os_user"`
+
+	// UserId UUIDv7 (RFC 9562), lowercase canonical form.
+	UserId Uuid `json:"user_id"`
+}
+
+// HostSessionUserAssign Assigns a person their own session user on a host (ruling T12, 24 section 2.2). The name must be one the host reported (`reported_session_users`); any other name gives `400 validation_failed` with `errors[].code` `session_user_not_on_host`, and nothing is stored.
+type HostSessionUserAssign struct {
+	// OsUser Operating system user name from `host_service.session_users`; at most `host.os_user_max_chars` characters; never a path.
+	//
+	// Examples: bothy-s-robin
+	OsUser string `json:"os_user"`
+
+	// UserId UUIDv7 (RFC 9562), lowercase canonical form.
+	UserId Uuid `json:"user_id"`
+}
+
 // HostState Life cycle of a host (24, 3.1). Only `active` allows sessions.
 type HostState string
 
@@ -9202,11 +9281,17 @@ type HostStateSetState string
 
 // HostUpdate Members that are absent stay unchanged. To remove the assignee send `clear_assigned_user` (no JSON null, ADR 0053).
 type HostUpdate struct {
+	// AddSessionUsers New session user assignments (ruling T12).
+	AddSessionUsers *[]HostSessionUserAssign `json:"add_session_users,omitempty"`
+
 	// AssignedUserId UUIDv7 (RFC 9562), lowercase canonical form.
 	AssignedUserId    *Uuid   `json:"assigned_user_id,omitempty"`
 	ClearAssignedUser *bool   `json:"clear_assigned_user,omitempty"`
 	Name              *string `json:"name,omitempty"`
 	Reason            string  `json:"reason"`
+
+	// RevokeSessionUsers People whose session user assignment ends; their names stay taken on this host.
+	RevokeSessionUsers *[]Uuid `json:"revoke_session_users,omitempty"`
 }
 
 // HostUpdatedEvent Durable event `host.updated`.
@@ -9270,7 +9355,7 @@ type HostUpdatedEventType string
 
 // HostUpdatedPayload defines model for HostUpdatedPayload.
 type HostUpdatedPayload struct {
-	// Host A connected host. Keys are public; the client pins `noise_public_key` per device (24, 5.5).
+	// Host Never carries `noise_public_key`; clients read keys with `getHost`.
 	Host Host `json:"host"`
 
 	// KeyChanged True after a re-pairing (24, 3.3).
@@ -13752,7 +13837,7 @@ type TerminalSessionOpen struct {
 	Profile string `json:"profile"`
 	Rows    int    `json:"rows"`
 
-	// WorkdirIndex Index into `workdirs` of a `claude` profile.
+	// WorkdirIndex Only with a `claude` profile: index into `workdirs` of the caller's own entry in `reported_session_users` (ruling T13). Another index gives 403 `terminal_denied` with `reason: profile_unknown`. The session token carries it as `wdi` (24, 5.3 and 11.1).
 	WorkdirIndex *int `json:"workdir_index,omitempty"`
 }
 
@@ -15352,6 +15437,37 @@ type AddGroupMemberParams struct {
 	IdempotencyKey *IdempotencyKey `json:"Idempotency-Key,omitempty"`
 }
 
+// ListHostsParams defines parameters for ListHosts.
+type ListHostsParams struct {
+	// Cursor Cursor from `next_cursor` of the previous page.
+	Cursor *Cursor `form:"cursor,omitempty" json:"cursor,omitempty"`
+	Limit  *Limit  `form:"limit,omitempty" json:"limit,omitempty"`
+}
+
+// CreateHostParams defines parameters for CreateHost.
+type CreateHostParams struct {
+	// IdempotencyKey UUIDv7 chosen by the client per logical operation. A repeat with the same request returns the stored response; a different request gives 422 `idempotency_key_reuse`; a repeat while the first is running gives 409 `request_in_progress`. Kept for `sync.idempotency_key_ttl`.
+	IdempotencyKey *IdempotencyKey `json:"Idempotency-Key,omitempty"`
+}
+
+// UpdateHostParams defines parameters for UpdateHost.
+type UpdateHostParams struct {
+	// IdempotencyKey UUIDv7 chosen by the client per logical operation. A repeat with the same request returns the stored response; a different request gives 422 `idempotency_key_reuse`; a repeat while the first is running gives 409 `request_in_progress`. Kept for `sync.idempotency_key_ttl`.
+	IdempotencyKey *IdempotencyKey `json:"Idempotency-Key,omitempty"`
+
+	// IfMatch ETag of the version the change is based on, e.g. `"7"`. Mismatch gives 412 `version_conflict`.
+	IfMatch IfMatchRequired `json:"If-Match"`
+}
+
+// SetHostStateParams defines parameters for SetHostState.
+type SetHostStateParams struct {
+	// IdempotencyKey UUIDv7 chosen by the client per logical operation. A repeat with the same request returns the stored response; a different request gives 422 `idempotency_key_reuse`; a repeat while the first is running gives 409 `request_in_progress`. Kept for `sync.idempotency_key_ttl`.
+	IdempotencyKey *IdempotencyKey `json:"Idempotency-Key,omitempty"`
+
+	// IfMatch ETag of the version the change is based on, e.g. `"7"`. Mismatch gives 412 `version_conflict`.
+	IfMatch IfMatchRequired `json:"If-Match"`
+}
+
 // CreateIdentityProviderParams defines parameters for CreateIdentityProvider.
 type CreateIdentityProviderParams struct {
 	// IdempotencyKey UUIDv7 chosen by the client per logical operation. A repeat with the same request returns the stored response; a different request gives 422 `idempotency_key_reuse`; a repeat while the first is running gives 409 `request_in_progress`. Kept for `sync.idempotency_key_ttl`.
@@ -15612,6 +15728,15 @@ type UpdateGroupJSONRequestBody = GroupUpdate
 
 // AddGroupMemberJSONRequestBody defines body for AddGroupMember for application/json ContentType.
 type AddGroupMemberJSONRequestBody = GroupMemberAdd
+
+// CreateHostJSONRequestBody defines body for CreateHost for application/json ContentType.
+type CreateHostJSONRequestBody = HostCreate
+
+// UpdateHostJSONRequestBody defines body for UpdateHost for application/json ContentType.
+type UpdateHostJSONRequestBody = HostUpdate
+
+// SetHostStateJSONRequestBody defines body for SetHostState for application/json ContentType.
+type SetHostStateJSONRequestBody = HostStateSet
 
 // CreateIdentityProviderJSONRequestBody defines body for CreateIdentityProvider for application/json ContentType.
 type CreateIdentityProviderJSONRequestBody = IdentityProviderCreate

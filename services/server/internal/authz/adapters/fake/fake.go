@@ -650,3 +650,60 @@ func (s *Credentials) Credentials(_ context.Context, ref authz.CredentialRef) (a
 
 // compareIDs orders ids by their bytes, the creation order of UUIDv7.
 func compareIDs(a, b ids.ID) int { return slices.Compare(a[:], b[:]) }
+
+// Hosts is an in-memory authz.HostSource (M2-39).
+type Hosts struct {
+	failer
+	mu   sync.Mutex
+	rows map[ids.ID]authz.HostFacts
+}
+
+// Compile-time check.
+var _ authz.HostSource = (*Hosts)(nil)
+
+// NewHosts returns an empty source.
+func NewHosts() *Hosts { return &Hosts{rows: map[ids.ID]authz.HostFacts{}} }
+
+// Put adds or replaces the facts of f.ID.
+func (s *Hosts) Put(f authz.HostFacts) {
+	s.mu.Lock()
+	s.rows[f.ID] = f
+	s.mu.Unlock()
+}
+
+// Host implements authz.HostSource.
+func (s *Hosts) Host(_ context.Context, id ids.ID) (authz.HostFacts, bool, error) {
+	if err := s.err(); err != nil {
+		return authz.HostFacts{}, false, err
+	}
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	f, ok := s.rows[id]
+	return f, ok, nil
+}
+
+// HostIDs implements authz.HostSource.
+func (s *Hosts) HostIDs(_ context.Context) ([]ids.ID, error) {
+	if err := s.err(); err != nil {
+		return nil, err
+	}
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return sortIDs(slices.Collect(maps.Keys(s.rows))), nil
+}
+
+// AssignedTo implements authz.HostSource.
+func (s *Hosts) AssignedTo(_ context.Context, userID ids.ID) ([]ids.ID, error) {
+	if err := s.err(); err != nil {
+		return nil, err
+	}
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	var out []ids.ID
+	for id, f := range s.rows {
+		if f.AssignedUserID == userID && !userID.IsZero() {
+			out = append(out, id)
+		}
+	}
+	return sortIDs(out), nil
+}

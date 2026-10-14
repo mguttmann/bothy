@@ -54,8 +54,9 @@ states, with named constraints (`grants_subject_shape_check`, `grants_bot_limits
 - **Deferred foreign keys.** The target tables do not exist yet, so these columns are plain `uuid`
   until the migration that creates each table adds the key: `groups.provider_id ->
   identity_providers(id)` (M1-36), `grants.target_space_id -> spaces(id)` (M1-52),
-  `grants.target_channel_id -> channels(id)` (M1-53) and `grants.target_host_id -> hosts(id)`
-  (M2-39), all `ON DELETE RESTRICT`. Until then no code path creates space, channel or host grants.
+  `grants.target_channel_id -> channels(id)` (M1-53), all `ON DELETE RESTRICT`; `grants.target_host_id
+  -> hosts(id)` exists since M2-39 (migration `00025_terminal_hosts.sql`). Until then no code path
+  creates space or channel grants.
 - **Immutability trigger** `authz_grants_immutable` (BEFORE UPDATE ON `grants`, SQLSTATE `23514`):
   allowed are only the revocation (`revoked_at`, `revoked_by`, `revoke_reason`, once, with
   `revoked_at` set) and setting `expiry_reminded_at` or `expiry_reported_at` from NULL. Every
@@ -422,3 +423,32 @@ Groups with `source = oidc_claim` follow the group claim of their provider at ev
   `TestGroupClaimSync_ConcurrentLoginsSerialise`, `TestGroupClaimSync_ExpiryWithoutJob` and the
   AZ-P7 case `group.member.sync` of `TestAZ_P7_I1PerAction`). The login path is tested in
   identity (`adapters/httpapi/oidc_groups_test.go`). Rulings: docs/DECISIONS.md M1-42.
+
+## Target host (M2-39)
+
+A host is a target outside the tree instance, space, channel (07 section 2.12):
+
+- **Source.** `HostSource` (`Host`, `HostIDs`, `AssignedTo`) with `HostFacts` (state, holder, LLM
+  declaration, server host); terminal implements it (`terminal/app.HostSource`), `internal/wire`
+  binds it for the Authorizer, the rights hook and the Admin use cases. A nil source means a world
+  without hosts: every host is not found.
+- **Snapshot.** `Snapshot.Hosts` holds the capabilities of the host grants in effect (own and of
+  the groups in effect); their expiries enter `ValidUntil`. `TerminalOn(s, h)` is an effective owner
+  or a grant `terminal` on `h`; the I6 exception for owners belongs to SR11 (M2-40).
+- **Requirements.** `host.read` is `All(HumanSession, Any(Owner, Assignee, Terminal))`,
+  `host.manage` `All(HumanSession, Owner)`. A requirement whose first part is `HumanSession` is a
+  gate: `authorize` and `Scope` refuse agents, apps and personal tokens with
+  `subject_kind_not_allowed` right after the liveness checks, before any resource is resolved.
+  `host.pair`, `host.connect` and `terminal.*` (except the system action) stay deferred.
+- **Visibility.** A host resource resolves through the source; it is visible to an effective
+  owner, its holder and a person with `TerminalOn`, with "view as" to both views.
+- **Scope.** `Scope(host.read)` gives `AllHosts` to an effective owner, otherwise the ascending
+  `HostIDs` of the terminal grants and the own hosts, intersected with "view as".
+- **access.changed.** `AccessView.Hosts` holds the hosts with `TerminalOn` (every host for an
+  owner); a host is `added` with `capabilities: ["terminal"]` and no level or `removed`. The rights
+  hook derives the affected principals of a `host` target: every active owner, the holder and the
+  subjects of the grants on the host (`Store.ActiveGrantsOnHosts`, groups expanded).
+- **Grants.** `CreateGrant` on a host needs an existing host and refuses a retired one with `409
+  conflict`; subject and capability rules stay with `CheckGrantShape`.
+- **Tests.** `TestHostRequirement`, `TestAZM60_InstanceGrantGivesNoHost`, `TestScope_Hosts`,
+  `TestSnapshot_HostGrants`, `TestDiffVisible_Hosts` and the hosts of the AZ-P8 differential test.

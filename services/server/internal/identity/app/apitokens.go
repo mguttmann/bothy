@@ -129,7 +129,8 @@ func kindOf(k domain.Kind) (tokenKind, bool) {
 	return tokenKind{}, false
 }
 
-// actorKindOf returns the principal kind an API token kind authenticates; whi authenticates none.
+// actorKindOf returns the principal kind an API token kind authenticates; whi and hpc
+// authenticate none, so the authenticator refuses them before any database call.
 func actorKindOf(k apitoken.Kind) (domain.Kind, actor.Kind, bool) {
 	switch k {
 	case apitoken.KindAgent:
@@ -138,9 +139,19 @@ func actorKindOf(k apitoken.Kind) (domain.Kind, actor.Kind, bool) {
 		return domain.KindApp, actor.KindApp, true
 	case apitoken.KindPersonal:
 		return domain.KindUser, actor.KindUser, true
-	case apitoken.KindIncomingWebhook:
+	case apitoken.KindIncomingWebhook, apitoken.KindHostPairingCode:
 	}
 	return "", "", false
+}
+
+// NewHostPairingCode implements identity.Tokens: a code of kind hpc from the random source of
+// the use cases (crypto/rand unless a test sets one) and its HMAC with the pepper.
+func (s *Tokens) NewHostPairingCode(context.Context) (identity.PairingCode, error) {
+	secret, err := apitoken.Generate(s.d.Random, apitoken.KindHostPairingCode)
+	if err != nil {
+		return identity.PairingCode{}, errs.Wrap(errs.CodeInternalError, err, "identity: random source")
+	}
+	return identity.PairingCode{Secret: identity.NewToken(secret), Hash: apitoken.Hash(s.pepper, secret)}, nil
 }
 
 // now is the time of the clock at the precision of PostgreSQL, so answers equal stored values.

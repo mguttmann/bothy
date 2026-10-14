@@ -211,7 +211,8 @@ Quelle: [03-datenmodell.md](../spec/03-datenmodell.md), Abschnitt 9.
 | `branding.product_name_max_chars` | `BOTHY_BRANDING__PRODUCT_NAME_MAX_CHARS` | Server | int | `64` | Länge des Produktnamens im Branding (`instance_settings`, `branding.product_name`) in Unicode-Zeichen | aktiv |
 | `group.name_max_chars` | `BOTHY_GROUP__NAME_MAX_CHARS` | Server | int | `100` | Länge eines Gruppennamens in Unicode-Zeichen | aktiv |
 | `group.description_max_chars` | `BOTHY_GROUP__DESCRIPTION_MAX_CHARS` | Server | int | `500` | Länge einer Gruppenbeschreibung in Unicode-Zeichen | aktiv |
-| `host.name_max_chars` | `BOTHY_HOST__NAME_MAX_CHARS` | Server |  | `100` | Länge eines Rechnernamens in Unicode-Zeichen | geplant (M2) |
+| `host.name_max_chars` | `BOTHY_HOST__NAME_MAX_CHARS` | Server | int | `100` | Länge eines Rechnernamens in Unicode-Zeichen | aktiv |
+| `host.os_user_max_chars` | `BOTHY_HOST__OS_USER_MAX_CHARS` | Server | int | `64` | Länge des Namens eines Sitzungsbenutzers in `host_session_users.os_user` | aktiv |
 | `space.name_max_chars` | `BOTHY_SPACE__NAME_MAX_CHARS` | Server | int | `100` | Länge eines Bereichsnamens in Unicode-Zeichen | aktiv |
 | `channel.name_max_chars` | `BOTHY_CHANNEL__NAME_MAX_CHARS` | Server |  | `100` | Länge eines Kanalnamens in Unicode-Zeichen | geplant (M1) |
 | `channel.topic_max_chars` | `BOTHY_CHANNEL__TOPIC_MAX_CHARS` | Server |  | `1024` | Länge eines Kanal-Themas in Unicode-Zeichen | geplant (M1) |
@@ -715,7 +716,7 @@ Quelle: [19-sicherheit.md](../spec/19-sicherheit.md), Abschnitt 16.
 | `egress.max_response_bytes` | `BOTHY_EGRESS__MAX_RESPONSE_BYTES` | Server | int | `1048576` | größte Antwort einer ausgehenden Anfrage | aktiv |
 | `audit.checkpoint_interval` | `BOTHY_AUDIT__CHECKPOINT_INTERVAL` | Server | duration | `1h` | Abstand der signierten Prüfpunkte des Audit-Logs | aktiv |
 | `audit.checkpoint_sink` | `BOTHY_AUDIT__CHECKPOINT_SINK` | Server | string | leer | Ablageziel der Prüfpunkte außerhalb der Datenbank: leer (Warnung, SEC-AUD-2) oder `file://<absoluter Pfad>` auf einem Speicher außerhalb des Datenbank-Volumes; andere Schemata lehnt `bothy config check` ab. Ein Objektspeicher mit Aufbewahrungssperre als Ziel ist das empfohlene Ziel für Produktion und kommt mit PLAN M7-22 | aktiv |
-| `audit.reason_max_chars` | `BOTHY_AUDIT__REASON_MAX_CHARS` | Server |  | `500` | größte Länge eines Pflichtgrunds einer Verwaltungsaktion in Unicode-Zeichen (SEC-AUD-5) | geplant (M1) |
+| `audit.reason_max_chars` | `BOTHY_AUDIT__REASON_MAX_CHARS` | Server | int | `500` | größte Länge eines Pflichtgrunds einer Verwaltungsaktion in Unicode-Zeichen (SEC-AUD-5) | aktiv |
 | `signing_key.cache_ttl` | `BOTHY_SIGNING_KEY__CACHE_TTL` | Server | duration | `30s` | längste Zeit, die ein Prozess einen zurückgezogenen Schlüssel noch annimmt oder einen neuen nicht kennt | aktiv |
 | `signing_key.rotation_check_interval` | `BOTHY_SIGNING_KEY__ROTATION_CHECK_INTERVAL` | Server | duration | `1m` | Abstand des Jobs `instance.key_rotation` | aktiv |
 | `signing_key.access_token_rotation_interval` | `BOTHY_SIGNING_KEY__ACCESS_TOKEN_ROTATION_INTERVAL` | Server | duration | `30d` | planmäßiger Wechsel des Schlüssels für Zugriffstokens | aktiv |
@@ -788,11 +789,11 @@ Quelle: [24-terminal.md](../spec/24-terminal.md), Abschnitt 17.
 
 | Schlüssel | Umgebung | Ort | Typ | Standard | Bedeutung | Stand |
 |---|---|---|---|---|---|---|
-| `terminal.pairing_code_ttl` | `BOTHY_TERMINAL__PAIRING_CODE_TTL` | Server |  | `15m` | Gültigkeit eines Kopplungs-Codes für einen Rechner | geplant (M2) |
+| `terminal.pairing_code_ttl` | `BOTHY_TERMINAL__PAIRING_CODE_TTL` | Server | duration | `15m` | Gültigkeit eines Kopplungs-Codes für einen Rechner | aktiv |
 | `terminal.fingerprint_confirm_chars` | `BOTHY_TERMINAL__FINGERPRINT_CONFIRM_CHARS` | Server |  | `8` | so viele Zeichen des Fingerabdrucks tippt der Owner bei der Bestätigung | geplant (M2) |
 | `terminal.fingerprint_max_attempts` | `BOTHY_TERMINAL__FINGERPRINT_MAX_ATTEMPTS` | Server |  | `3` | Fehlversuche bei der Bestätigung, danach Rückfall auf `pairing` | geplant (M2) |
 | `terminal.step_up_max_age` | `BOTHY_TERMINAL__STEP_UP_MAX_AGE` | Server |  | `60s` | so jung muss der Step-up für `terminal.open` und `terminal.attach` sein | geplant (M2) |
-| `terminal.session_token_ttl` | `BOTHY_TERMINAL__SESSION_TOKEN_TTL` | Server |  | `30s` | Gültigkeit einer Sitzungs-Marke | geplant (M2) |
+| `terminal.session_token_ttl` | `BOTHY_TERMINAL__SESSION_TOKEN_TTL` | Server | duration | `30s` | Gültigkeit einer Sitzungs-Marke | aktiv |
 | `terminal.open_timeout` | `BOTHY_TERMINAL__OPEN_TIMEOUT` | Server |  | `20s` | Frist, bis beide Seiten im Relais verbunden sind und der Handshake steht | geplant (M2) |
 | `terminal.detach_grace` | `BOTHY_TERMINAL__DETACH_GRACE` | Server |  | `15m` | so lange bleibt eine getrennte Sitzung anhängbar | geplant (M2) |
 | `terminal.quick_reattach_window` | `BOTHY_TERMINAL__QUICK_REATTACH_WINDOW` | Server |  | `60s` | Wiederanhängen vom selben Gerät ohne neuen Step-up innerhalb dieser Zeit nach der Trennung | geplant (M2) |
@@ -807,12 +808,14 @@ Quelle: [24-terminal.md](../spec/24-terminal.md), Abschnitt 17.
 | `terminal.host_auth_timeout` | `BOTHY_TERMINAL__HOST_AUTH_TIMEOUT` | Server |  | `10s` | Frist zwischen `hello` und `identify` der Steuer- und Datenverbindung | geplant (M2) |
 | `terminal.sweep_interval` | `BOTHY_TERMINAL__SWEEP_INTERVAL` | Server |  | `30s` | Abstand des Jobs `terminal.sweep` ([02-architektur.md](../spec/02-architektur.md), Abschnitt 12.3) | geplant (M2) |
 | `terminal.host_duplicate_probe_timeout` | `BOTHY_TERMINAL__HOST_DUPLICATE_PROBE_TIMEOUT` | Server |  | `5s` | so lange wartet der Server auf die Antwort der älteren Steuerverbindung (3.4) | geplant (M2) |
-| `host_service.state_dir` |  | Host-Dienst |  | `/var/lib/bothy-host` (Windows: `%ProgramData%\bothy-host`) | Zustandsordner mit Schlüsseln und Anmeldedateien des Profils `claude` |  |
-| `host_service.session_user` |  | Host-Dienst |  | `bothy-session` | Benutzer, unter dem PTY-Helfer und Sitzungen laufen; nie der Dienstbenutzer (2.2) |  |
+| `host_service.state_dir` |  | Host-Dienst |  | `/var/lib/bothy-host` (Windows: `%ProgramData%\bothy-host`) | Zustandsordner mit den Schlüsseln des Rechners, den Bindungen der Sitzungsbenutzer an Personen und bei `organization` dem API-Schlüssel des Profils `claude`; nie eine Abo-Anmeldung (7.4) |  |
+| `host_service.session_users` |  | Host-Dienst |  | leer | Sitzungsbenutzer dieses Rechners, je Person einer; je Eintrag ein PTY-Helfer; nie der Dienstbenutzer; leer heißt: HD1 nicht bestanden; gelesen nur beim Start, geändert mit `bothy-host session-user add` und `remove`, die den Host-Dienst dafür neu starten (2.2) |  |
 | `host_service.extra_forbidden_groups` |  | Host-Dienst |  | leer | weitere Gruppen, die HD2 zusätzlich zur festen Liste sperrt |  |
-| `host_service.credential_check_interval` |  | Host-Dienst |  | `60s` | Abstand der Prüfung HD6 während des Betriebs (7.4) |  |
+| `host_service.credential_check_interval` |  | Host-Dienst |  | `60s` | Abstand der Prüfungen HD6 und HD11 während des Betriebs (2.2, 7.4) |  |
+| `host_service.entry_scan_timeout` |  | Host-Dienst |  | `10m` | Höchstdauer der Prüfung der Einträge von HD11 je Sitzungsbenutzer; danach bricht sein PTY-Helfer sie ab, und HD11 besteht für ihn nicht (`entry_scan_timeout`, 2.2) |  |
 | `host_service.profiles` |  | Host-Dienst |  | `[shell]` | angebotene Profile (11.1) |  |
-| `host_service.claude_workdirs` |  | Host-Dienst |  | leer | erlaubte Arbeitsordner des Profils `claude`; leer heißt kein Profil `claude` |  |
+| `host_service.claude_bin` |  | Host-Dienst |  | leer | absoluter Pfad des Coding-Agenten, den HD6 für `claude auth status` aufruft und den das Profil `claude` bei `organization` startet; gehört mit Ordnerkette, Interpreter und den Ordnern der Suchliste einem vertrauenswürdigen Besitzer (2.2 Punkt 6, HD10); unter Windows eine `.exe`; leer heißt: HD6 prüft nur die Anmeldeorte und warnt, bei `organization` gibt es kein Profil `claude`, die Durchsetzung trägt der eigene Sitzungsbenutzer (7.4); für HD6 und das Profil gilt der Wert auch als leer, wenn sich der Pfad nicht auflösen lässt oder die Suchliste den Interpreter eines Skripts nicht findet |  |
+| `host_service.claude_workdirs` |  | Host-Dienst |  | leer | Arbeitsordner des Profils `claude` je Sitzungsbenutzer (Name aus `host_service.session_users` -> Liste von Ordnern mit Anzeigenamen; gemeldet werden nur die Anzeigenamen); jeder Ordner gehört genau diesem Sitzungsbenutzer (Ruling T13, HD7, HD11); ein Ordner bei zwei Sitzungsbenutzern fällt aus beiden Listen, gemeldet und für `wdi` benutzt wird die Liste danach; gelesen nur beim Start, eine Änderung wirkt nach `bothy-host restart`; ohne Eintrag kein Profil `claude` für diesen Sitzungsbenutzer, leer heißt kein Profil `claude` |  |
 | `host_service.scrollback_bytes` |  | Host-Dienst |  | `1048576` | Rückblick-Puffer je Sitzung, nur im Speicher |  |
 | `host_service.require_local_confirm` |  | Host-Dienst |  | `false` | jede PTY erst nach Zustimmung am Rechner (6.4) |  |
 | `host_service.local_confirm_timeout` |  | Host-Dienst |  | `60s` | Frist für die Zustimmung am Rechner |  |

@@ -300,10 +300,13 @@ from .host_profile import HostProfile
 from .host_profile_kind import HostProfileKind
 from .host_ready import HostReady
 from .host_report import HostReport
+from .host_reported_session_user import HostReportedSessionUser
 from .host_session_close import HostSessionClose
 from .host_session_ended import HostSessionEnded
 from .host_session_open import HostSessionOpen
 from .host_session_started import HostSessionStarted
+from .host_session_user import HostSessionUser
+from .host_session_user_assign import HostSessionUserAssign
 from .host_state import HostState
 from .host_state_set import HostStateSet
 from .host_state_set_state import HostStateSetState
@@ -1008,10 +1011,13 @@ __all__ = (
     "HostProfileKind",
     "HostReady",
     "HostReport",
+    "HostReportedSessionUser",
     "HostSessionClose",
     "HostSessionEnded",
     "HostSessionOpen",
     "HostSessionStarted",
+    "HostSessionUser",
+    "HostSessionUserAssign",
     "HostState",
     "HostStateSet",
     "HostStateSetState",

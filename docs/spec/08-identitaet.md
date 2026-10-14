@@ -788,10 +788,13 @@ die Person kannte, Geheimnisse in ihrer Dev-Umgebung rotieren.
 
 - **Form.** `<präfix>_<art>_<zufall>_<prüfsumme>` nach [ADR 0061](../adr/0061-token-format-mit-festem-praefix-und-pruefsumme.md): Präfix `bothy` (eine der
   gelisteten Stellen mit dem Arbeitsnamen, [02-architektur.md](02-architektur.md) Abschnitt 6),
-  Art `agt` (Agent), `app` (App), `pat` (persönlich), `whi` (Eingangs-Webhook), 256 Bit Zufall in
+  Art `agt` (Agent), `app` (App), `pat` (persönlich), `whi` (Eingangs-Webhook), `hpc`
+  (Kopplungs-Code eines Rechners), 256 Bit Zufall in
   Base62 (Alphabet `0-9A-Za-z`) als genau 43 Zeichen, Prüfsumme CRC-32 (IEEE) über die Zeichen des
   Zufallsteils als genau 6 Base62-Zeichen. Die Art folgt dem Prinzipal: `agt` nur für Agenten,
-  `app` nur für Apps, `pat` nur für Menschen; `whi` stellt nur ein Eingangs-Webhook aus. Grund:
+  `app` nur für Apps, `pat` nur für Menschen; `whi` stellt nur ein Eingangs-Webhook aus; `hpc`
+  stellt nur `host.manage` aus, nur `host.pair` löst ihn ein, und die Authentisierung nimmt ihn nie
+  an (wie `whi`, ohne Datenbankzugriff abgelehnt; [24-terminal.md](24-terminal.md), Abschnitt 3.2). Grund:
   Das Präfix erlaubt eine Regel im Secret-Scanner ([23-qualitaet.md](23-qualitaet.md)); die
   Prüfsumme weist Tippfehler und Zufallsfunde ohne Datenbankzugriff ab.
 - **Speicher.** Nur HMAC-SHA-256 mit Server-Pepper und die ersten 6 Zeichen des Zufallsteils als

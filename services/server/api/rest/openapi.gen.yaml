@@ -16876,10 +16876,16 @@ paths:
                       - name: claude
                         display_name: Claude Code
                         kind: claude
-                        workdirs: [Project A]
                       doctor:
                       - check: hd1_user
                         ok: true
+                      session_users:
+                      - user_id: 0192f4a0-7b1c-7f89-8d6b-6960453241bc
+                        os_user: bothy-s-robin
+                        created_at: '2026-10-10T09:42:00.000Z'
+                      reported_session_users:
+                      - os_user: bothy-s-robin
+                        workdirs: [Project A]
                       connected: true
                       host_version: 1.0.0
                       created_at: '2026-10-10T09:30:00.000Z'
@@ -16960,7 +16966,7 @@ paths:
       summary: Redeem a pairing code from the host service
       tags: [Hosts]
       description: |-
-        Called by `bothy-host pair` without login. Registers the static X25519 key (Noise) and the Ed25519 key (login) of the host. The host becomes `confirming`; an owner confirms the fingerprint (24, 3.2).
+        Called by `bothy-host pair` without login. Registers the static X25519 key (Noise) and the Ed25519 key (login) of the host, its profiles and the names of its session users (`reported_session_users`, 24 section 2.2). The host becomes `confirming`; an owner confirms the fingerprint (24, 3.2).
       x-authz-action: host.pair
       x-rate-limit-class: rl.public_auth
       x-idempotency-exempt: auth_flow
@@ -16988,6 +16994,12 @@ paths:
                   - name: shell
                     display_name: Shell
                     kind: shell
+                  - name: claude
+                    display_name: Claude Code
+                    kind: claude
+                  session_users:
+                  - os_user: bothy-s-robin
+                    workdirs: [Project A]
       responses:
         '201':
           description: Created.
@@ -17065,10 +17077,16 @@ paths:
                     - name: claude
                       display_name: Claude Code
                       kind: claude
-                      workdirs: [Project A]
                     doctor:
                     - check: hd1_user
                       ok: true
+                    session_users:
+                    - user_id: 0192f4a0-7b1c-7f89-8d6b-6960453241bc
+                      os_user: bothy-s-robin
+                      created_at: '2026-10-10T09:42:00.000Z'
+                    reported_session_users:
+                    - os_user: bothy-s-robin
+                      workdirs: [Project A]
                     connected: true
                     host_version: 1.0.0
                     created_at: '2026-10-10T09:30:00.000Z'
@@ -17090,7 +17108,7 @@ paths:
       summary: Change name or assignee of a host
       tags: [Hosts]
       description: |-
-        A new `assigned_user_id` ends the sessions of people who no longer qualify under SR10 (`access_revoked`). Needs step-up.
+        A new `assigned_user_id` ends the sessions of people who no longer qualify under SR10 (`access_revoked`). `add_session_users` assigns own session users (ruling T12; a taken name gives `409 conflict` with `reason: session_user_taken`, a name the host does not report in `reported_session_users` gives `400 validation_failed` with `errors[].code` `session_user_not_on_host`); `revoke_session_users` ends the assignment of the listed people, ends their sessions on the host (`access_revoked`) and keeps the name taken (24 section 2.2). Needs step-up.
       x-authz-action: host.manage
       x-rate-limit-class: rl.admin
       parameters:
@@ -17145,10 +17163,16 @@ paths:
                     - name: claude
                       display_name: Claude Code
                       kind: claude
-                      workdirs: [Project A]
                     doctor:
                     - check: hd1_user
                       ok: true
+                    session_users:
+                    - user_id: 0192f4a0-7b1c-7f89-8d6b-6960453241bc
+                      os_user: bothy-s-robin
+                      created_at: '2026-10-10T09:42:00.000Z'
+                    reported_session_users:
+                    - os_user: bothy-s-robin
+                      workdirs: [Project A]
                     connected: true
                     host_version: 1.0.0
                     created_at: '2026-10-10T09:30:00.000Z'
@@ -17239,7 +17263,7 @@ paths:
       summary: Confirm the fingerprint and declare the LLM login
       tags: [Hosts]
       description: |-
-        The owner types the first `terminal.fingerprint_confirm_chars` characters shown by `bothy-host pair`. A mismatch gives `409 fingerprint_mismatch`; after `terminal.fingerprint_max_attempts` failures the host falls back to `pairing`. I6 is checked in the same transaction (`409 i6_violation`). Needs step-up.
+        The owner types the first `terminal.fingerprint_confirm_chars` characters shown by `bothy-host pair`. A mismatch gives `409 fingerprint_mismatch`; after `terminal.fingerprint_max_attempts` failures the host falls back to `pairing`. I6 is checked in the same transaction (`409 i6_violation`). `session_users` assigns each person their own session user on this host (ruling T12, 24 section 2.2); a name that belongs or belonged to another person on this host, or a second valid assignment of one person, gives `409 conflict` with `reason: session_user_taken`; a name the host did not report (`reported_session_users`) gives `400 validation_failed` with `errors[].code` `session_user_not_on_host`, and nothing is stored. Without an assignment a person gets no terminal there (SR12). Needs step-up.
       x-authz-action: host.manage
       x-rate-limit-class: rl.admin
       parameters:
@@ -17259,6 +17283,9 @@ paths:
                   fingerprint_prefix: 7K2QM9XD
                   llm_credentials: organization
                   declared_server_host: false
+                  session_users:
+                  - user_id: 0192f4a0-7b1c-7f89-8d6b-6960453241bc
+                    os_user: bothy-s-robin
                   reason: Build machine of the engineering team
       responses:
         '200':
@@ -17296,10 +17323,16 @@ paths:
                     - name: claude
                       display_name: Claude Code
                       kind: claude
-                      workdirs: [Project A]
                     doctor:
                     - check: hd1_user
                       ok: true
+                    session_users:
+                    - user_id: 0192f4a0-7b1c-7f89-8d6b-6960453241bc
+                      os_user: bothy-s-robin
+                      created_at: '2026-10-10T09:42:00.000Z'
+                    reported_session_users:
+                    - os_user: bothy-s-robin
+                      workdirs: [Project A]
                     connected: true
                     host_version: 1.0.0
                     created_at: '2026-10-10T09:30:00.000Z'
@@ -17384,10 +17417,16 @@ paths:
                     - name: claude
                       display_name: Claude Code
                       kind: claude
-                      workdirs: [Project A]
                     doctor:
                     - check: hd1_user
                       ok: true
+                    session_users:
+                    - user_id: 0192f4a0-7b1c-7f89-8d6b-6960453241bc
+                      os_user: bothy-s-robin
+                      created_at: '2026-10-10T09:42:00.000Z'
+                    reported_session_users:
+                    - os_user: bothy-s-robin
+                      workdirs: [Project A]
                     connected: true
                     host_version: 1.0.0
                     created_at: '2026-10-10T09:30:00.000Z'
@@ -17472,10 +17511,16 @@ paths:
                     - name: claude
                       display_name: Claude Code
                       kind: claude
-                      workdirs: [Project A]
                     doctor:
                     - check: hd1_user
                       ok: true
+                    session_users:
+                    - user_id: 0192f4a0-7b1c-7f89-8d6b-6960453241bc
+                      os_user: bothy-s-robin
+                      created_at: '2026-10-10T09:42:00.000Z'
+                    reported_session_users:
+                    - os_user: bothy-s-robin
+                      workdirs: [Project A]
                     connected: true
                     host_version: 1.0.0
                     created_at: '2026-10-10T09:30:00.000Z'
@@ -17505,7 +17550,7 @@ paths:
       summary: Open a terminal session
       tags: [Terminal]
       description: |-
-        Needs a fresh, unused step-up (passkey or step-up device key; in the console only a passkey with `userVerification = required`), the `terminal` right, SR10 and SR11 (I6). Consumes the step-up and returns a one-time session token for the Noise handshake (24, 5 and 6.1). The device then connects to `stream_path`.
+        Needs a fresh, unused step-up (passkey or step-up device key; in the console only a passkey with `userVerification = required`), the `terminal` right, SR10, SR11 (I6) and SR12 (an own session user on the host whose name the host reports, otherwise 403 `terminal_denied` with `reason: no_session_user`). With a `claude` profile `workdir_index` must point into the caller's own working directories (ruling T13). Consumes the step-up and returns a one-time session token for the Noise handshake (24, 5 and 6.1). The device then connects to `stream_path`.
       x-authz-action: terminal.open
       x-rate-limit-class: rl.terminal
       x-idempotency-exempt: auth_flow
@@ -28678,26 +28723,67 @@ components:
         kind:
           type: string
           enum: [shell, claude, command]
-        workdirs:
-          type: array
-          description: Display names of the allowed working directories of a `claude` profile; the client sends the index, never a path.
-          items:
-            type: string
-            examples: [Project A]
     HostDoctorCheck:
       type: object
-      description: Result of one self-check of the host service (`host_doctor.v1`, checks HD1 to HD8 in 24, 2.2). Codes only.
+      description: Result of one self-check of the host service (`host_doctor.v1`, checks HD1 to HD11 in 24, 2.2). Codes and, following the rule for names (24, 2.2), the name of each account a person with a terminal can cause the finding in; never content, paths or values. When HD6 or HD11 fails, the list has one entry per affected session user; when HD10 fails with a wrong peer, one entry per session user of that channel; when HD9 fails, one entry per former session user whose home can be listed, plus one entry without a name for any other user; `check` and `session_user` together are unique in the list.
       required: [check, ok]
       properties:
         check:
           type: string
-          enum: [hd1_user, hd2_groups, hd3_sudo, hd4_state_dir, hd5_server_host, hd6_llm_login, hd7_profiles, hd8_separation]
+          enum: [hd1_user, hd2_groups, hd3_sudo, hd4_state_dir, hd5_server_host, hd6_llm_login, hd7_profiles, hd8_separation, hd9_foreign_homes, hd10_helper_integrity, hd11_shared_locations]
         ok:
           type: boolean
         code:
           type: string
           pattern: ^[a-z0-9_]+$
           examples: [subscription_login_detected]
+        session_user:
+          type: string
+          description: 'Only when not passed: with `hd6_llm_login` and `hd11_shared_locations` the session user whose account the finding is in; with `hd10_helper_integrity` and a wrong peer the session user of that channel; with `hd9_foreign_homes` a former session user of this host (bound to a person in the state directory, no longer in `host_service.session_users`) whose home can be listed. The operator knows where to look, and the console shows the person of the assignment (24, 2.2 and 7.4). One entry per such account; names of other users are never sent. A name, never a path.'
+          pattern: ^[A-Za-z0-9_][A-Za-z0-9_.-]*$
+          examples: [bothy-s-robin]
+    HostSessionUserAssign:
+      type: object
+      additionalProperties: false
+      description: Assigns a person their own session user on a host (ruling T12, 24 section 2.2). The name must be one the host reported (`reported_session_users`); any other name gives `400 validation_failed` with `errors[].code` `session_user_not_on_host`, and nothing is stored.
+      required: [user_id, os_user]
+      properties:
+        user_id:
+          $ref: '#/components/schemas/Uuid'
+        os_user:
+          type: string
+          description: Operating system user name from `host_service.session_users`; at most `host.os_user_max_chars` characters; never a path.
+          pattern: ^[A-Za-z0-9_][A-Za-z0-9_.-]*$
+          examples: [bothy-s-robin]
+    HostSessionUser:
+      type: object
+      description: A valid assignment of a person to their own session user on the host (ruling T12, 24 section 2.2).
+      required: [user_id, os_user, created_at]
+      properties:
+        user_id:
+          $ref: '#/components/schemas/Uuid'
+        os_user:
+          type: string
+          examples: [bothy-s-robin]
+        created_at:
+          $ref: '#/components/schemas/Timestamp'
+    HostReportedSessionUser:
+      type: object
+      additionalProperties: false
+      description: A session user the host service reports (`host_reported_session_users.v1`, 24 section 2.2), with the display names of its own working directories of the `claude` profile (ruling T13). Names only, never paths.
+      required: [os_user, workdirs]
+      properties:
+        os_user:
+          type: string
+          description: Operating system user name from `host_service.session_users`.
+          pattern: ^[A-Za-z0-9_][A-Za-z0-9_.-]*$
+          examples: [bothy-s-robin]
+        workdirs:
+          type: array
+          description: Display names of the working directories of this session user in `host_service.claude_workdirs` after check HD7, in their order (a directory listed under two session users is dropped from both lists); empty means no `claude` profile for this session user. A client sends the index into its own list, never a path; the host service resolves the index in exactly this list (24, 2.2 and 5.3).
+          items:
+            type: string
+            examples: [Project A]
     Host:
       type: object
       description: A connected host. Keys are public; the client pins `noise_public_key` per device (24, 5.5).
@@ -28745,8 +28831,19 @@ components:
             $ref: '#/components/schemas/HostProfile'
         doctor:
           type: array
+          description: One entry per check HD1 to HD11; a failed HD6, HD9, HD10 or HD11 has one entry per account named by the rule for names (24, 2.2).
           items:
             $ref: '#/components/schemas/HostDoctorCheck'
+        session_users:
+          type: array
+          description: Valid session user assignments (ruling T12), visible like every other member to everyone with `host.read`. Absent when there is none.
+          items:
+            $ref: '#/components/schemas/HostSessionUser'
+        reported_session_users:
+          type: array
+          description: Session users the host service reported at pairing and in its last `report` (24 section 2.2). An assignment works only while its name is in this list (SR12); `confirmHost` and `updateHost` accept only these names. Absent before pairing.
+          items:
+            $ref: '#/components/schemas/HostReportedSessionUser'
         require_local_confirm:
           type: boolean
           description: Report whether `host_service.require_local_confirm` is on.
@@ -28806,7 +28903,7 @@ components:
     HostPairRequest:
       type: object
       additionalProperties: false
-      required: [pairing_code, noise_public_key, auth_public_jwk, platform, host_version, profiles]
+      required: [pairing_code, noise_public_key, auth_public_jwk, platform, host_version, profiles, session_users]
       properties:
         pairing_code:
           type: string
@@ -28828,6 +28925,11 @@ components:
           type: array
           items:
             $ref: '#/components/schemas/HostProfile'
+        session_users:
+          type: array
+          description: The session users of `host_service.session_users` with the display names of their working directories (24 section 2.2).
+          items:
+            $ref: '#/components/schemas/HostReportedSessionUser'
     HostPairResult:
       type: object
       required: [host_id, key_fingerprint, instance_id]
@@ -28850,6 +28952,16 @@ components:
           $ref: '#/components/schemas/Uuid'
         clear_assigned_user:
           type: boolean
+        add_session_users:
+          type: array
+          description: New session user assignments (ruling T12).
+          items:
+            $ref: '#/components/schemas/HostSessionUserAssign'
+        revoke_session_users:
+          type: array
+          description: People whose session user assignment ends; their names stay taken on this host.
+          items:
+            $ref: '#/components/schemas/Uuid'
         reason:
           type: string
     HostConfirm:
@@ -28867,6 +28979,11 @@ components:
           $ref: '#/components/schemas/Uuid'
         declared_server_host:
           type: boolean
+        session_users:
+          type: array
+          description: Session user per person (ruling T12); a person without one gets no terminal on the host (SR12).
+          items:
+            $ref: '#/components/schemas/HostSessionUserAssign'
         reason:
           type: string
     HostLlmCredentialsSet:
@@ -28897,10 +29014,10 @@ components:
     TerminalCloseReason:
       type: string
       description: Why a session ended (24, 10.3).
-      enum: [client_closed, closed_by_owner, process_exited, idle_timeout, max_duration, detach_expired, access_revoked, i6_violation, host_disabled, host_retired, host_rekeyed, user_disabled, device_revoked, session_revoked, logout, open_failed, host_policy_violation]
+      enum: [client_closed, closed_by_owner, process_exited, idle_timeout, max_duration, detach_expired, access_revoked, i6_violation, host_disabled, host_retired, host_rekeyed, host_restarted, user_disabled, device_revoked, session_revoked, logout, open_failed, host_policy_violation]
     TerminalCloseDetail:
       type: string
-      enum: [token_invalid, token_expired, token_replayed, handshake_failed, profile_unknown, server_host_owner_only, local_confirm_denied, subscription_login_detected, pty_failed, open_timeout]
+      enum: [token_invalid, token_expired, token_replayed, handshake_failed, profile_unknown, session_user_unknown, session_user_mismatch, server_host_owner_only, local_confirm_denied, subscription_login_detected, helper_untrusted, shared_location, pty_failed, open_timeout]
     TerminalSession:
       type: object
       description: Metadata of a terminal session. Never content.
@@ -28963,7 +29080,8 @@ components:
           examples: [shell]
         workdir_index:
           type: integer
-          description: Index into `workdirs` of a `claude` profile.
+          minimum: 0
+          description: 'Only with a `claude` profile: index into `workdirs` of the caller''s own entry in `reported_session_users` (ruling T13). Another index gives 403 `terminal_denied` with `reason: profile_unknown`. The session token carries it as `wdi` (24, 5.3 and 11.1).'
         cols:
           type: integer
           minimum: 1
@@ -29031,6 +29149,7 @@ components:
       properties:
         host:
           $ref: '#/components/schemas/Host'
+          description: Never carries `noise_public_key`; clients read keys with `getHost`.
         key_changed:
           type: boolean
           description: True after a re-pairing (24, 3.3).
@@ -29145,6 +29264,11 @@ components:
         session_id:
           $ref: '#/components/schemas/Uuid'
           description: Only on a data connection; the session the connection belongs to.
+        live_sessions:
+          type: array
+          description: Only on the control connection, always present there (empty when none). The sessions the host service knows, those whose PTY still runs and those whose end it could not report yet (it reports that end with `session.ended` after `ready`). After a restart of the host service the list is empty. The server ends every other session of the host in state `active` or `detached` with `host_restarted` (24, 6.2).
+          items:
+            $ref: '#/components/schemas/Uuid'
     HostReady:
       type: object
       required: [host_id, state]
@@ -29166,15 +29290,20 @@ components:
           $ref: '#/components/schemas/Timestamp'
     HostReport:
       type: object
-      description: Report of profiles and self-checks; never content, paths or values.
-      required: [profiles, doctor, is_server_host, require_local_confirm]
+      description: Report of profiles, session users and self-checks; never content, paths or values. Sent after every `ready` before the host service accepts `session.open`, and on every change. When `doctor` refuses the start, the host service still logs in, sends one `report` and closes the connection without accepting `session.open` (24 section 2.2).
+      required: [profiles, session_users, doctor, is_server_host, require_local_confirm]
       properties:
         profiles:
           type: array
           items:
             $ref: '#/components/schemas/HostProfile'
+        session_users:
+          type: array
+          items:
+            $ref: '#/components/schemas/HostReportedSessionUser'
         doctor:
           type: array
+          description: One entry per check HD1 to HD11; a failed HD6, HD9, HD10 or HD11 has one entry per account named by the rule for names (24, 2.2).
           items:
             $ref: '#/components/schemas/HostDoctorCheck'
         is_server_host:

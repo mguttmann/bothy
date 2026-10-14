@@ -115,7 +115,12 @@ def sync_detailed(
     """Change name or assignee of a host
 
      A new `assigned_user_id` ends the sessions of people who no longer qualify under SR10
-    (`access_revoked`). Needs step-up.
+    (`access_revoked`). `add_session_users` assigns own session users (ruling T12; a taken name gives
+    `409 conflict` with `reason: session_user_taken`, a name the host does not report in
+    `reported_session_users` gives `400 validation_failed` with `errors[].code`
+    `session_user_not_on_host`); `revoke_session_users` ends the assignment of the listed people, ends
+    their sessions on the host (`access_revoked`) and keeps the name taken (24 section 2.2). Needs step-
+    up.
 
     Args:
         host_id (UUID): UUIDv7 (RFC 9562), lowercase canonical form.
@@ -157,7 +162,12 @@ def sync(
     """Change name or assignee of a host
 
      A new `assigned_user_id` ends the sessions of people who no longer qualify under SR10
-    (`access_revoked`). Needs step-up.
+    (`access_revoked`). `add_session_users` assigns own session users (ruling T12; a taken name gives
+    `409 conflict` with `reason: session_user_taken`, a name the host does not report in
+    `reported_session_users` gives `400 validation_failed` with `errors[].code`
+    `session_user_not_on_host`); `revoke_session_users` ends the assignment of the listed people, ends
+    their sessions on the host (`access_revoked`) and keeps the name taken (24 section 2.2). Needs step-
+    up.
 
     Args:
         host_id (UUID): UUIDv7 (RFC 9562), lowercase canonical form.
@@ -194,7 +204,12 @@ async def asyncio_detailed(
     """Change name or assignee of a host
 
      A new `assigned_user_id` ends the sessions of people who no longer qualify under SR10
-    (`access_revoked`). Needs step-up.
+    (`access_revoked`). `add_session_users` assigns own session users (ruling T12; a taken name gives
+    `409 conflict` with `reason: session_user_taken`, a name the host does not report in
+    `reported_session_users` gives `400 validation_failed` with `errors[].code`
+    `session_user_not_on_host`); `revoke_session_users` ends the assignment of the listed people, ends
+    their sessions on the host (`access_revoked`) and keeps the name taken (24 section 2.2). Needs step-
+    up.
 
     Args:
         host_id (UUID): UUIDv7 (RFC 9562), lowercase canonical form.
@@ -234,7 +249,12 @@ async def asyncio(
     """Change name or assignee of a host
 
      A new `assigned_user_id` ends the sessions of people who no longer qualify under SR10
-    (`access_revoked`). Needs step-up.
+    (`access_revoked`). `add_session_users` assigns own session users (ruling T12; a taken name gives
+    `409 conflict` with `reason: session_user_taken`, a name the host does not report in
+    `reported_session_users` gives `400 validation_failed` with `errors[].code`
+    `session_user_not_on_host`); `revoke_session_users` ends the assignment of the listed people, ends
+    their sessions on the host (`access_revoked`) and keeps the name taken (24 section 2.2). Needs step-
+    up.
 
     Args:
         host_id (UUID): UUIDv7 (RFC 9562), lowercase canonical form.

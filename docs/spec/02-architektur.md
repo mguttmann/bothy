@@ -169,7 +169,7 @@ Diagramm: [c4-3-komponenten-server.svg](../architecture/c4-3-komponenten-server.
 | `importer` | Import-Quellen, Stapel mit Herkunftsschlüssel (`import.apply`), Eigentumsliste und Schreibschutz gespiegelter Kanäle; der Trockenlauf liegt im Werkzeug | `import_sources`, `import_items` | 22 |
 | `privacy` | DSGVO-Aufträge, Export und Löschung über die Teilnehmer aller Module | `gdpr_requests` | 20 |
 | `status` | Statusseite, Komponenten, Störungen, automatische Prüfungen, Sicherungsläufe | `status_components`, `status_incidents`, `status_incident_updates`, `status_incident_components`, `backup_runs` | 16, 17 |
-| `terminal` | Rechner und Kopplung, Erklärung der LLM-Anmeldung (I6), Terminal-Sitzungen, Sitzungs-Marken, Steuerverbindungen der Host-Dienste, Relais der Ströme | `hosts`, `terminal_sessions` | 24 |
+| `terminal` | Rechner und Kopplung, Erklärung der LLM-Anmeldung (I6), Sitzungsbenutzer je Person (T12), Terminal-Sitzungen, Sitzungs-Marken, Steuerverbindungen der Host-Dienste, Relais der Ströme | `hosts`, `host_session_users`, `terminal_sessions` | 24 |
 
 Technische Tabellen außerhalb der Module ([03-datenmodell.md](03-datenmodell.md), Abschnitt
 4.13): River legt eigene Tabellen mit Präfix `river_` an (u. a. `river_migration`, `river_job`,

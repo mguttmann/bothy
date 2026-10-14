@@ -16,8 +16,8 @@ import (
 	"github.com/OWNER/bothy/services/server/internal/identity/domain/apitoken"
 )
 
-// kinds are the four token kinds of 08 section 12.
-var kinds = []apitoken.Kind{apitoken.KindAgent, apitoken.KindApp, apitoken.KindPersonal, apitoken.KindIncomingWebhook}
+// kinds are the five token kinds of 08 section 12 (hpc since M2-39).
+var kinds = []apitoken.Kind{apitoken.KindAgent, apitoken.KindApp, apitoken.KindPersonal, apitoken.KindIncomingWebhook, apitoken.KindHostPairingCode}
 
 // TestFormat_RoundTrip generates a token of every kind and parses it back: length 60, the prefix,
 // the kind at its position, the random part and the checksum (ADR 0061 "Confirmation").
@@ -125,7 +125,7 @@ func TestParse_Rejects(t *testing.T) {
 		"wrong prefix":        "bothx" + good[5:],
 		"upper case prefix":   strings.ToUpper(good[:5]) + good[5:],
 		"unknown kind":        "bothy_abc_" + good[10:],
-		"kind hpc":            "bothy_hpc_" + good[10:],
+		"kind hpk":            "bothy_hpk_" + good[10:],
 		"random 42":           "bothy_agt_" + v.Random[:42] + "_" + apitoken.Checksum(v.Random[:42]),
 		"random 44":           "bothy_agt_" + v.Random + "A_" + apitoken.Checksum(v.Random+"A"),
 		"non-Base62":          "bothy_agt_" + v.Random[:42] + "-_" + apitoken.Checksum(v.Random[:42]+"-"),
@@ -197,7 +197,7 @@ func TestGenerate_ReadsExactly32BytesFromCryptoRand(t *testing.T) {
 	if _, err := apitoken.Generate(bytes.NewReader(make([]byte, 31)), apitoken.KindAgent); err == nil {
 		t.Fatal("a source with 31 bytes must fail")
 	}
-	if _, err := apitoken.Generate(nil, apitoken.Kind("hpc")); err == nil {
+	if _, err := apitoken.Generate(nil, apitoken.Kind("xyz")); err == nil {
 		t.Fatal("an unknown kind must fail")
 	}
 	a, _ := apitoken.Generate(nil, apitoken.KindAgent)

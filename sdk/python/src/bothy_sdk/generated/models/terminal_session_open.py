@@ -19,7 +19,9 @@ class TerminalSessionOpen:
         rows (int):
         client_ephemeral_key_hash (str): SHA-256 of the ephemeral X25519 public key the device sends in Noise message 1,
             base64url without padding; becomes the claim `cek`.
-        workdir_index (int | Unset): Index into `workdirs` of a `claude` profile.
+        workdir_index (int | Unset): Only with a `claude` profile: index into `workdirs` of the caller's own entry in
+            `reported_session_users` (ruling T13). Another index gives 403 `terminal_denied` with `reason: profile_unknown`.
+            The session token carries it as `wdi` (24, 5.3 and 11.1).
         pin_changed (bool | Unset): `true` when the person confirmed a host key that differs from the key this device
             pinned earlier (docs/spec/24-terminal.md section 5.5, docs/spec/15-client-architektur.md section 23.3); recorded
             in the audit entry of `terminal.open`. Default: False.

@@ -15,8 +15,6 @@ rules:
     etappe: M6
   - match: "app."  # M2-24, M2-25
     etappe: M2
-  - match: "audit."  # M1-24, M1-50
-    etappe: M1
   - match: "auth."  # M1-28 to M1-45
     etappe: M1
   - match: auth.console_session_idle_timeout  # M6-01
@@ -61,8 +59,6 @@ rules:
     etappe: M1
   - match: "gateway."  # M1-64
     etappe: M1
-  - match: "host."  # M2-39
-    etappe: M2
   - match: "interaction."  # M2-15
     etappe: M2
   - match: "message."  # M1-46, M1-56, M1-57

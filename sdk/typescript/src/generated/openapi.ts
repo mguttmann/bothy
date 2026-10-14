@@ -4395,7 +4395,7 @@ export interface paths {
         put?: never;
         /**
          * Redeem a pairing code from the host service
-         * @description Called by `bothy-host pair` without login. Registers the static X25519 key (Noise) and the Ed25519 key (login) of the host. The host becomes `confirming`; an owner confirms the fingerprint (24, 3.2).
+         * @description Called by `bothy-host pair` without login. Registers the static X25519 key (Noise) and the Ed25519 key (login) of the host, its profiles and the names of its session users (`reported_session_users`, 24 section 2.2). The host becomes `confirming`; an owner confirms the fingerprint (24, 3.2).
          */
         post: operations["pairHost"];
         delete?: never;
@@ -4420,7 +4420,7 @@ export interface paths {
         head?: never;
         /**
          * Change name or assignee of a host
-         * @description A new `assigned_user_id` ends the sessions of people who no longer qualify under SR10 (`access_revoked`). Needs step-up.
+         * @description A new `assigned_user_id` ends the sessions of people who no longer qualify under SR10 (`access_revoked`). `add_session_users` assigns own session users (ruling T12; a taken name gives `409 conflict` with `reason: session_user_taken`, a name the host does not report in `reported_session_users` gives `400 validation_failed` with `errors[].code` `session_user_not_on_host`); `revoke_session_users` ends the assignment of the listed people, ends their sessions on the host (`access_revoked`) and keeps the name taken (24 section 2.2). Needs step-up.
          */
         patch: operations["updateHost"];
         trace?: never;
@@ -4456,7 +4456,7 @@ export interface paths {
         put?: never;
         /**
          * Confirm the fingerprint and declare the LLM login
-         * @description The owner types the first `terminal.fingerprint_confirm_chars` characters shown by `bothy-host pair`. A mismatch gives `409 fingerprint_mismatch`; after `terminal.fingerprint_max_attempts` failures the host falls back to `pairing`. I6 is checked in the same transaction (`409 i6_violation`). Needs step-up.
+         * @description The owner types the first `terminal.fingerprint_confirm_chars` characters shown by `bothy-host pair`. A mismatch gives `409 fingerprint_mismatch`; after `terminal.fingerprint_max_attempts` failures the host falls back to `pairing`. I6 is checked in the same transaction (`409 i6_violation`). `session_users` assigns each person their own session user on this host (ruling T12, 24 section 2.2); a name that belongs or belonged to another person on this host, or a second valid assignment of one person, gives `409 conflict` with `reason: session_user_taken`; a name the host did not report (`reported_session_users`) gives `400 validation_failed` with `errors[].code` `session_user_not_on_host`, and nothing is stored. Without an assignment a person gets no terminal there (SR12). Needs step-up.
          */
         post: operations["confirmHost"];
         delete?: never;
@@ -4516,7 +4516,7 @@ export interface paths {
         put?: never;
         /**
          * Open a terminal session
-         * @description Needs a fresh, unused step-up (passkey or step-up device key; in the console only a passkey with `userVerification = required`), the `terminal` right, SR10 and SR11 (I6). Consumes the step-up and returns a one-time session token for the Noise handshake (24, 5 and 6.1). The device then connects to `stream_path`.
+         * @description Needs a fresh, unused step-up (passkey or step-up device key; in the console only a passkey with `userVerification = required`), the `terminal` right, SR10, SR11 (I6) and SR12 (an own session user on the host whose name the host reports, otherwise 403 `terminal_denied` with `reason: no_session_user`). With a `claude` profile `workdir_index` must point into the caller's own working directories (ruling T13). Consumes the step-up and returns a one-time session token for the Noise handshake (24, 5 and 6.1). The device then connects to `stream_path`.
          */
         post: operations["openTerminalSession"];
         delete?: never;
@@ -9807,16 +9807,45 @@ export interface components {
             display_name: string;
             /** @enum {string} */
             kind: "shell" | "claude" | "command";
-            /** @description Display names of the allowed working directories of a `claude` profile; the client sends the index, never a path. */
-            workdirs?: string[];
         };
-        /** @description Result of one self-check of the host service (`host_doctor.v1`, checks HD1 to HD8 in 24, 2.2). Codes only. */
+        /** @description Result of one self-check of the host service (`host_doctor.v1`, checks HD1 to HD11 in 24, 2.2). Codes and, following the rule for names (24, 2.2), the name of each account a person with a terminal can cause the finding in; never content, paths or values. When HD6 or HD11 fails, the list has one entry per affected session user; when HD10 fails with a wrong peer, one entry per session user of that channel; when HD9 fails, one entry per former session user whose home can be listed, plus one entry without a name for any other user; `check` and `session_user` together are unique in the list. */
         HostDoctorCheck: {
             /** @enum {string} */
-            check: "hd1_user" | "hd2_groups" | "hd3_sudo" | "hd4_state_dir" | "hd5_server_host" | "hd6_llm_login" | "hd7_profiles" | "hd8_separation";
+            check: "hd1_user" | "hd2_groups" | "hd3_sudo" | "hd4_state_dir" | "hd5_server_host" | "hd6_llm_login" | "hd7_profiles" | "hd8_separation" | "hd9_foreign_homes" | "hd10_helper_integrity" | "hd11_shared_locations";
             ok: boolean;
             /** @example subscription_login_detected */
             code?: string;
+            /**
+             * @description Only when not passed: with `hd6_llm_login` and `hd11_shared_locations` the session user whose account the finding is in; with `hd10_helper_integrity` and a wrong peer the session user of that channel; with `hd9_foreign_homes` a former session user of this host (bound to a person in the state directory, no longer in `host_service.session_users`) whose home can be listed. The operator knows where to look, and the console shows the person of the assignment (24, 2.2 and 7.4). One entry per such account; names of other users are never sent. A name, never a path.
+             * @example bothy-s-robin
+             */
+            session_user?: string;
+        };
+        /** @description Assigns a person their own session user on a host (ruling T12, 24 section 2.2). The name must be one the host reported (`reported_session_users`); any other name gives `400 validation_failed` with `errors[].code` `session_user_not_on_host`, and nothing is stored. */
+        HostSessionUserAssign: {
+            user_id: components["schemas"]["Uuid"];
+            /**
+             * @description Operating system user name from `host_service.session_users`; at most `host.os_user_max_chars` characters; never a path.
+             * @example bothy-s-robin
+             */
+            os_user: string;
+        };
+        /** @description A valid assignment of a person to their own session user on the host (ruling T12, 24 section 2.2). */
+        HostSessionUser: {
+            user_id: components["schemas"]["Uuid"];
+            /** @example bothy-s-robin */
+            os_user: string;
+            created_at: components["schemas"]["Timestamp"];
+        };
+        /** @description A session user the host service reports (`host_reported_session_users.v1`, 24 section 2.2), with the display names of its own working directories of the `claude` profile (ruling T13). Names only, never paths. */
+        HostReportedSessionUser: {
+            /**
+             * @description Operating system user name from `host_service.session_users`.
+             * @example bothy-s-robin
+             */
+            os_user: string;
+            /** @description Display names of the working directories of this session user in `host_service.claude_workdirs` after check HD7, in their order (a directory listed under two session users is dropped from both lists); empty means no `claude` profile for this session user. A client sends the index into its own list, never a path; the host service resolves the index in exactly this list (24, 2.2 and 5.3). */
+            workdirs: string[];
         };
         /** @description A connected host. Keys are public; the client pins `noise_public_key` per device (24, 5.5). */
         Host: {
@@ -9848,7 +9877,12 @@ export interface components {
             /** @example 1 */
             key_generation: number;
             profiles: components["schemas"]["HostProfile"][];
+            /** @description One entry per check HD1 to HD11; a failed HD6, HD9, HD10 or HD11 has one entry per account named by the rule for names (24, 2.2). */
             doctor: components["schemas"]["HostDoctorCheck"][];
+            /** @description Valid session user assignments (ruling T12), visible like every other member to everyone with `host.read`. Absent when there is none. */
+            session_users?: components["schemas"]["HostSessionUser"][];
+            /** @description Session users the host service reported at pairing and in its last `report` (24 section 2.2). An assignment works only while its name is in this list (SR12); `confirmHost` and `updateHost` accept only these names. Absent before pairing. */
+            reported_session_users?: components["schemas"]["HostReportedSessionUser"][];
             /** @description Report whether `host_service.require_local_confirm` is on. */
             require_local_confirm?: boolean;
             /** @description The control connection of the host service is open (memory of the server). */
@@ -9892,6 +9926,8 @@ export interface components {
             /** @example 1.0.0 */
             host_version: string;
             profiles: components["schemas"]["HostProfile"][];
+            /** @description The session users of `host_service.session_users` with the display names of their working directories (24 section 2.2). */
+            session_users: components["schemas"]["HostReportedSessionUser"][];
         };
         HostPairResult: {
             host_id: components["schemas"]["Uuid"];
@@ -9903,6 +9939,10 @@ export interface components {
             name?: string;
             assigned_user_id?: components["schemas"]["Uuid"];
             clear_assigned_user?: boolean;
+            /** @description New session user assignments (ruling T12). */
+            add_session_users?: components["schemas"]["HostSessionUserAssign"][];
+            /** @description People whose session user assignment ends; their names stay taken on this host. */
+            revoke_session_users?: components["schemas"]["Uuid"][];
             reason: string;
         };
         HostConfirm: {
@@ -9914,6 +9954,8 @@ export interface components {
             llm_credentials: components["schemas"]["LlmCredentials"];
             credential_holder_id?: components["schemas"]["Uuid"];
             declared_server_host: boolean;
+            /** @description Session user per person (ruling T12); a person without one gets no terminal on the host (SR12). */
+            session_users?: components["schemas"]["HostSessionUserAssign"][];
             reason: string;
         };
         HostLlmCredentialsSet: {
@@ -9933,9 +9975,9 @@ export interface components {
          * @description Why a session ended (24, 10.3).
          * @enum {string}
          */
-        TerminalCloseReason: "client_closed" | "closed_by_owner" | "process_exited" | "idle_timeout" | "max_duration" | "detach_expired" | "access_revoked" | "i6_violation" | "host_disabled" | "host_retired" | "host_rekeyed" | "user_disabled" | "device_revoked" | "session_revoked" | "logout" | "open_failed" | "host_policy_violation";
+        TerminalCloseReason: "client_closed" | "closed_by_owner" | "process_exited" | "idle_timeout" | "max_duration" | "detach_expired" | "access_revoked" | "i6_violation" | "host_disabled" | "host_retired" | "host_rekeyed" | "host_restarted" | "user_disabled" | "device_revoked" | "session_revoked" | "logout" | "open_failed" | "host_policy_violation";
         /** @enum {string} */
-        TerminalCloseDetail: "token_invalid" | "token_expired" | "token_replayed" | "handshake_failed" | "profile_unknown" | "server_host_owner_only" | "local_confirm_denied" | "subscription_login_detected" | "pty_failed" | "open_timeout";
+        TerminalCloseDetail: "token_invalid" | "token_expired" | "token_replayed" | "handshake_failed" | "profile_unknown" | "session_user_unknown" | "session_user_mismatch" | "server_host_owner_only" | "local_confirm_denied" | "subscription_login_detected" | "helper_untrusted" | "shared_location" | "pty_failed" | "open_timeout";
         /** @description Metadata of a terminal session. Never content. */
         TerminalSession: {
             id: components["schemas"]["Uuid"];
@@ -9967,7 +10009,7 @@ export interface components {
         TerminalSessionOpen: {
             /** @example shell */
             profile: string;
-            /** @description Index into `workdirs` of a `claude` profile. */
+            /** @description Only with a `claude` profile: index into `workdirs` of the caller's own entry in `reported_session_users` (ruling T13). Another index gives 403 `terminal_denied` with `reason: profile_unknown`. The session token carries it as `wdi` (24, 5.3 and 11.1). */
             workdir_index?: number;
             cols: number;
             rows: number;
@@ -10006,6 +10048,7 @@ export interface components {
             prologue_version: "bothy-terminal/1";
         };
         HostUpdatedPayload: {
+            /** @description Never carries `noise_public_key`; clients read keys with `getHost`. */
             host: components["schemas"]["Host"];
             /** @description True after a re-pairing (24, 3.3). */
             key_changed?: boolean;
@@ -10081,6 +10124,8 @@ export interface components {
             host_version: string;
             /** @description Only on a data connection; the session the connection belongs to. */
             session_id?: components["schemas"]["Uuid"];
+            /** @description Only on the control connection, always present there (empty when none). The sessions the host service knows, those whose PTY still runs and those whose end it could not report yet (it reports that end with `session.ended` after `ready`). After a restart of the host service the list is empty. The server ends every other session of the host in state `active` or `detached` with `host_restarted` (24, 6.2). */
+            live_sessions?: components["schemas"]["Uuid"][];
         };
         HostReady: {
             host_id: components["schemas"]["Uuid"];
@@ -10092,9 +10137,11 @@ export interface components {
         HostHeartbeatAck: {
             server_time?: components["schemas"]["Timestamp"];
         };
-        /** @description Report of profiles and self-checks; never content, paths or values. */
+        /** @description Report of profiles, session users and self-checks; never content, paths or values. Sent after every `ready` before the host service accepts `session.open`, and on every change. When `doctor` refuses the start, the host service still logs in, sends one `report` and closes the connection without accepting `session.open` (24 section 2.2). */
         HostReport: {
             profiles: components["schemas"]["HostProfile"][];
+            session_users: components["schemas"]["HostReportedSessionUser"][];
+            /** @description One entry per check HD1 to HD11; a failed HD6, HD9, HD10 or HD11 has one entry per account named by the rule for names (24, 2.2). */
             doctor: components["schemas"]["HostDoctorCheck"][];
             is_server_host: boolean;
             require_local_confirm: boolean;

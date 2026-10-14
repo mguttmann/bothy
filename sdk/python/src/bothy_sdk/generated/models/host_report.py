@@ -11,6 +11,7 @@ from ..types import UNSET, Unset
 if TYPE_CHECKING:
     from ..models.host_doctor_check import HostDoctorCheck
     from ..models.host_profile import HostProfile
+    from ..models.host_reported_session_user import HostReportedSessionUser
 
 
 T = TypeVar("T", bound="HostReport")
@@ -18,17 +19,22 @@ T = TypeVar("T", bound="HostReport")
 
 @_attrs_define
 class HostReport:
-    """Report of profiles and self-checks; never content, paths or values.
+    """Report of profiles, session users and self-checks; never content, paths or values. Sent after every `ready` before
+    the host service accepts `session.open`, and on every change. When `doctor` refuses the start, the host service
+    still logs in, sends one `report` and closes the connection without accepting `session.open` (24 section 2.2).
 
-    Attributes:
-        profiles (list[HostProfile]):
-        doctor (list[HostDoctorCheck]):
-        is_server_host (bool):
-        require_local_confirm (bool):
-        os_version (str | Unset):
+        Attributes:
+            profiles (list[HostProfile]):
+            session_users (list[HostReportedSessionUser]):
+            doctor (list[HostDoctorCheck]): One entry per check HD1 to HD11; a failed HD6, HD9, HD10 or HD11 has one entry
+                per account named by the rule for names (24, 2.2).
+            is_server_host (bool):
+            require_local_confirm (bool):
+            os_version (str | Unset):
     """
 
     profiles: list[HostProfile]
+    session_users: list[HostReportedSessionUser]
     doctor: list[HostDoctorCheck]
     is_server_host: bool
     require_local_confirm: bool
@@ -40,6 +46,11 @@ class HostReport:
         for profiles_item_data in self.profiles:
             profiles_item = profiles_item_data.to_dict()
             profiles.append(profiles_item)
+
+        session_users = []
+        for session_users_item_data in self.session_users:
+            session_users_item = session_users_item_data.to_dict()
+            session_users.append(session_users_item)
 
         doctor = []
         for doctor_item_data in self.doctor:
@@ -57,6 +68,7 @@ class HostReport:
         field_dict.update(
             {
                 "profiles": profiles,
+                "session_users": session_users,
                 "doctor": doctor,
                 "is_server_host": is_server_host,
                 "require_local_confirm": require_local_confirm,
@@ -71,6 +83,7 @@ class HostReport:
     def from_dict(cls, src_dict: Mapping[str, Any]) -> Self:
         from ..models.host_doctor_check import HostDoctorCheck
         from ..models.host_profile import HostProfile
+        from ..models.host_reported_session_user import HostReportedSessionUser
 
         d = dict(src_dict)
         profiles = []
@@ -79,6 +92,15 @@ class HostReport:
             profiles_item = HostProfile.from_dict(profiles_item_data)
 
             profiles.append(profiles_item)
+
+        session_users = []
+        _session_users = d.pop("session_users")
+        for session_users_item_data in _session_users:
+            session_users_item = HostReportedSessionUser.from_dict(
+                session_users_item_data
+            )
+
+            session_users.append(session_users_item)
 
         doctor = []
         _doctor = d.pop("doctor")
@@ -95,6 +117,7 @@ class HostReport:
 
         host_report = cls(
             profiles=profiles,
+            session_users=session_users,
             doctor=doctor,
             is_server_host=is_server_host,
             require_local_confirm=require_local_confirm,

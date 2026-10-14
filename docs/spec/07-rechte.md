@@ -214,6 +214,10 @@ Normativ zusammen mit [24-terminal.md](24-terminal.md), Abschnitt 8.
      `P <> H.credential_holder_id`); oder
    - eine gültige Freigabe (2.5) mit Ziel `H` und `terminal` an `P` oder eine seiner gültigen
      Gruppen.
+
+   Die Ausnahme des ersten Punkts (Owner auf einem Rechner mit `personal`) entscheidet die
+   Schutzregel SR11 mit dem Grund `i6_holder_only` (Abschnitt 4.2, Schritt 9; M2-40); das Atom
+   `+terminal` der Anforderung wiederholt sie nicht (docs/DECISIONS.md D-M2-39-3).
 4. Wirksames `terminal` reicht nicht: SR10 und SR11 (Abschnitt 5) sperren danach. Die Vorschau
    einer Freigabe, die wegen SR10 nicht wirkt, sagt das (Hinweis `terminal_not_effective`).
 5. Lesen eines Rechners (`host.read`): Owner, der Rechner-Inhaber (`hosts.assigned_user_id`) und
@@ -372,6 +376,14 @@ Reihenfolge und Grund:
   aufgefordert. Sonst würde die Step-up-Aufforderung verraten, dass die Aktion möglich wäre.
 - Schutzregeln zuletzt: Sie brauchen den vollen Kontext (Stufe, Lauf, Thread) und gelten auch für
   Owner, wo sie das sagen.
+
+Ausnahme in der Reihenfolge: Ist die Anforderung einer Aktion `All(HumanSession, ...)` (`host.read`,
+`host.manage`, ab M2-40 auch `terminal.*`), prüft `authorize` direkt nach Schritt 1 und vor
+Rechte-Stand, Auflösung und Sichtbarkeit, ob ein Mensch in einer Sitzung handelt; Agenten, Apps und
+persönliche Tokens bekommen `forbidden` mit `subject_kind_not_allowed`. Grund: 05 Abschnitt 4.14
+lehnt sie mit diesem Grund ab, und die Sichtbarkeit davor würde daraus `404` machen. Die Antwort
+hängt nur vom Prinzipal ab, nie von der Ressource, sie verrät also nichts über einen Rechner
+(AZ-P4; docs/DECISIONS.md D-M2-39-4).
 
 Anforderungen, die Fakten einer späteren Etappe brauchen (Läufe, Sitzungen und Befehle der
 Agenten, Komponenten, Dateien, Webhooks, Import), stehen bis dahin als zurückgestellte Einträge im
@@ -1032,7 +1044,7 @@ DM zwischen Alex und Sam. Die Uhr ist in Tests steuerbar.
 | AZ-M57 | Owner | Rechner R2 | `grant.create` Gruppe Leser `terminal` | | `invariant_violation` `i6_violation` |
 | AZ-M58 | Alex | Rechner R1 | `terminal.open` | Step-up schon für eine andere Öffnung verbraucht | `step_up_required` `terminal_step_up_not_fresh` |
 | AZ-M59 | Lotse | Rechner R1 | `terminal.open` | Agent-Token | `forbidden` `subject_kind_not_allowed` |
-| AZ-M60 | Alex | Rechner R1 | `terminal.open` | Freigabe an die Instanz mit `trigger` und allen Zusatzrechten, keine Freigabe auf R1 | `not_found` (Rechner nicht sichtbar) |
+| AZ-M60 | Alex | Rechner R3 (ohne Inhaber) | `terminal.open` | Freigabe an die Instanz mit `trigger` und allen Zusatzrechten, keine Freigabe auf R3 | `not_found` (Rechner nicht sichtbar) |
 
 ### 11.2 Pflicht-Tests
 

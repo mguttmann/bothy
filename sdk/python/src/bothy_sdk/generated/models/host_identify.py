@@ -23,6 +23,10 @@ class HostIdentify:
             proof (str):
             host_version (str):
             session_id (UUID | Unset): UUIDv7 (RFC 9562), lowercase canonical form.
+            live_sessions (list[UUID] | Unset): Only on the control connection, always present there (empty when none). The
+                sessions the host service knows, those whose PTY still runs and those whose end it could not report yet (it
+                reports that end with `session.ended` after `ready`). After a restart of the host service the list is empty. The
+                server ends every other session of the host in state `active` or `detached` with `host_restarted` (24, 6.2).
     """
 
     protocol_version: int
@@ -30,6 +34,7 @@ class HostIdentify:
     proof: str
     host_version: str
     session_id: UUID | Unset = UNSET
+    live_sessions: list[UUID] | Unset = UNSET
     additional_properties: dict[str, Any] = _attrs_field(init=False, factory=dict)
 
     def to_dict(self) -> dict[str, Any]:
@@ -45,6 +50,13 @@ class HostIdentify:
         if not isinstance(self.session_id, Unset):
             session_id = str(self.session_id)
 
+        live_sessions: list[str] | Unset = UNSET
+        if not isinstance(self.live_sessions, Unset):
+            live_sessions = []
+            for live_sessions_item_data in self.live_sessions:
+                live_sessions_item = str(live_sessions_item_data)
+                live_sessions.append(live_sessions_item)
+
         field_dict: dict[str, Any] = {}
         field_dict.update(self.additional_properties)
         field_dict.update(
@@ -57,6 +69,8 @@ class HostIdentify:
         )
         if session_id is not UNSET:
             field_dict["session_id"] = session_id
+        if live_sessions is not UNSET:
+            field_dict["live_sessions"] = live_sessions
 
         return field_dict
 
@@ -78,12 +92,22 @@ class HostIdentify:
         else:
             session_id = UUID(_session_id)
 
+        _live_sessions = d.pop("live_sessions", UNSET)
+        live_sessions: list[UUID] | Unset = UNSET
+        if _live_sessions is not UNSET:
+            live_sessions = []
+            for live_sessions_item_data in _live_sessions:
+                live_sessions_item = UUID(live_sessions_item_data)
+
+                live_sessions.append(live_sessions_item)
+
         host_identify = cls(
             protocol_version=protocol_version,
             host_id=host_id,
             proof=proof,
             host_version=host_version,
             session_id=session_id,
+            live_sessions=live_sessions,
         )
 
         host_identify.additional_properties = d

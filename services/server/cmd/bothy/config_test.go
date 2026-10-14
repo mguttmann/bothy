@@ -166,6 +166,7 @@ func TestConfigPrintShowsSourcePerKey(t *testing.T) {
 		"audit.checkpoint_sink =   # default\n" +
 		"audit.deny_aggregate_max_keys = 10000  # default\n" +
 		"audit.deny_aggregate_window = 1m  # default\n" +
+		"audit.reason_max_chars = 500  # default\n" +
 		"auth.access_token_ttl = 10m  # default\n" +
 		"auth.api_token_max_ttl = 365d  # default\n" +
 		"auth.cleanup_interval = 1h  # default\n" +
@@ -246,6 +247,8 @@ func TestConfigPrintShowsSourcePerKey(t *testing.T) {
 		"file.storage.driver = fs  # default\n" +
 		"group.description_max_chars = 500  # default\n" +
 		"group.name_max_chars = 100  # default\n" +
+		"host.name_max_chars = 100  # default\n" +
+		"host.os_user_max_chars = 64  # default\n" +
 		"http.hsts_max_age = 365d  # default\n" +
 		"http.idle_timeout = 2m  # default\n" +
 		"http.max_header_bytes = 65536  # default\n" +
@@ -351,6 +354,8 @@ func TestConfigPrintShowsSourcePerKey(t *testing.T) {
 		"telemetry.pseudonym_key_ref = file:/run/bothy/secrets/telemetry_pseudonym_key  # default\n" +
 		"telemetry.traces.sampler_ratio = 1  # default\n" +
 		"telemetry.traces.trust_remote_parent = false  # default\n" +
+		"terminal.pairing_code_ttl = 15m  # default\n" +
+		"terminal.session_token_ttl = 30s  # default\n" +
 		"thread.title_max_chars = 200  # default\n" +
 		"voice.max_duration = 15m  # default\n" +
 		"webhook.delivery_timeout = 15s  # default\n"

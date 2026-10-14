@@ -110,6 +110,18 @@
       "doc": "Window from the first of identical denials within which they become one audit entry with a count."
     },
     {
+      "name": "audit.reason_max_chars",
+      "env": "BOTHY_AUDIT__REASON_MAX_CHARS",
+      "kind": "int",
+      "default": "500",
+      "required": false,
+      "enum": [],
+      "min": "1",
+      "max": "",
+      "chapter": "19-sicherheit.md",
+      "doc": "Longest mandatory reason of a management action in Unicode characters."
+    },
+    {
       "name": "auth.access_token_ttl",
       "env": "BOTHY_AUTH__ACCESS_TOKEN_TTL",
       "kind": "duration",
@@ -1077,6 +1089,30 @@
       "max": "",
       "chapter": "03-datenmodell.md",
       "doc": "Longest group name in Unicode characters."
+    },
+    {
+      "name": "host.name_max_chars",
+      "env": "BOTHY_HOST__NAME_MAX_CHARS",
+      "kind": "int",
+      "default": "100",
+      "required": false,
+      "enum": [],
+      "min": "1",
+      "max": "",
+      "chapter": "03-datenmodell.md",
+      "doc": "Longest host name in Unicode characters."
+    },
+    {
+      "name": "host.os_user_max_chars",
+      "env": "BOTHY_HOST__OS_USER_MAX_CHARS",
+      "kind": "int",
+      "default": "64",
+      "required": false,
+      "enum": [],
+      "min": "1",
+      "max": "",
+      "chapter": "03-datenmodell.md",
+      "doc": "Longest name of a session user in characters."
     },
     {
       "name": "http.hsts_max_age",
@@ -2354,6 +2390,30 @@
       "max": "",
       "chapter": "17-observability.md",
       "doc": "With true an incoming traceparent becomes the parent of the server span, otherwise only a span link."
+    },
+    {
+      "name": "terminal.pairing_code_ttl",
+      "env": "BOTHY_TERMINAL__PAIRING_CODE_TTL",
+      "kind": "duration",
+      "default": "15m",
+      "required": false,
+      "enum": [],
+      "min": "1s",
+      "max": "",
+      "chapter": "24-terminal.md",
+      "doc": "Validity of the pairing code of a host."
+    },
+    {
+      "name": "terminal.session_token_ttl",
+      "env": "BOTHY_TERMINAL__SESSION_TOKEN_TTL",
+      "kind": "duration",
+      "default": "30s",
+      "required": false,
+      "enum": [],
+      "min": "1s",
+      "max": "",
+      "chapter": "24-terminal.md",
+      "doc": "Validity of a session token of the terminal."
     },
     {
       "name": "thread.title_max_chars",

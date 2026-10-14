@@ -117,7 +117,12 @@ def sync_detailed(
      The owner types the first `terminal.fingerprint_confirm_chars` characters shown by `bothy-host
     pair`. A mismatch gives `409 fingerprint_mismatch`; after `terminal.fingerprint_max_attempts`
     failures the host falls back to `pairing`. I6 is checked in the same transaction (`409
-    i6_violation`). Needs step-up.
+    i6_violation`). `session_users` assigns each person their own session user on this host (ruling T12,
+    24 section 2.2); a name that belongs or belonged to another person on this host, or a second valid
+    assignment of one person, gives `409 conflict` with `reason: session_user_taken`; a name the host
+    did not report (`reported_session_users`) gives `400 validation_failed` with `errors[].code`
+    `session_user_not_on_host`, and nothing is stored. Without an assignment a person gets no terminal
+    there (SR12). Needs step-up.
 
     Args:
         host_id (UUID): UUIDv7 (RFC 9562), lowercase canonical form.
@@ -160,7 +165,12 @@ def sync(
      The owner types the first `terminal.fingerprint_confirm_chars` characters shown by `bothy-host
     pair`. A mismatch gives `409 fingerprint_mismatch`; after `terminal.fingerprint_max_attempts`
     failures the host falls back to `pairing`. I6 is checked in the same transaction (`409
-    i6_violation`). Needs step-up.
+    i6_violation`). `session_users` assigns each person their own session user on this host (ruling T12,
+    24 section 2.2); a name that belongs or belonged to another person on this host, or a second valid
+    assignment of one person, gives `409 conflict` with `reason: session_user_taken`; a name the host
+    did not report (`reported_session_users`) gives `400 validation_failed` with `errors[].code`
+    `session_user_not_on_host`, and nothing is stored. Without an assignment a person gets no terminal
+    there (SR12). Needs step-up.
 
     Args:
         host_id (UUID): UUIDv7 (RFC 9562), lowercase canonical form.
@@ -198,7 +208,12 @@ async def asyncio_detailed(
      The owner types the first `terminal.fingerprint_confirm_chars` characters shown by `bothy-host
     pair`. A mismatch gives `409 fingerprint_mismatch`; after `terminal.fingerprint_max_attempts`
     failures the host falls back to `pairing`. I6 is checked in the same transaction (`409
-    i6_violation`). Needs step-up.
+    i6_violation`). `session_users` assigns each person their own session user on this host (ruling T12,
+    24 section 2.2); a name that belongs or belonged to another person on this host, or a second valid
+    assignment of one person, gives `409 conflict` with `reason: session_user_taken`; a name the host
+    did not report (`reported_session_users`) gives `400 validation_failed` with `errors[].code`
+    `session_user_not_on_host`, and nothing is stored. Without an assignment a person gets no terminal
+    there (SR12). Needs step-up.
 
     Args:
         host_id (UUID): UUIDv7 (RFC 9562), lowercase canonical form.
@@ -239,7 +254,12 @@ async def asyncio(
      The owner types the first `terminal.fingerprint_confirm_chars` characters shown by `bothy-host
     pair`. A mismatch gives `409 fingerprint_mismatch`; after `terminal.fingerprint_max_attempts`
     failures the host falls back to `pairing`. I6 is checked in the same transaction (`409
-    i6_violation`). Needs step-up.
+    i6_violation`). `session_users` assigns each person their own session user on this host (ruling T12,
+    24 section 2.2); a name that belongs or belonged to another person on this host, or a second valid
+    assignment of one person, gives `409 conflict` with `reason: session_user_taken`; a name the host
+    did not report (`reported_session_users`) gives `400 validation_failed` with `errors[].code`
+    `session_user_not_on_host`, and nothing is stored. Without an assignment a person gets no terminal
+    there (SR12). Needs step-up.
 
     Args:
         host_id (UUID): UUIDv7 (RFC 9562), lowercase canonical form.

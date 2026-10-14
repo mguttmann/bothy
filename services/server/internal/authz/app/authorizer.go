@@ -44,6 +44,9 @@ type AuthorizerDeps struct {
 	Credentials authz.CredentialSource
 	Structure   authz.StructureSource
 	Policies    authz.AgentPolicySource
+	// Hosts is the host source of the terminal module (M2-39); nil means a world without hosts,
+	// in which every host is not found.
+	Hosts authz.HostSource
 	// Versions reads the rights version.
 	Versions instance.Versions
 	// Recorder receives every denial and error of a request or op (R-AZ-04).
@@ -66,6 +69,7 @@ type Authorizer struct {
 	creds     authz.CredentialSource
 	structure authz.StructureSource
 	policies  authz.AgentPolicySource
+	hosts     authz.HostSource
 	versions  instance.Versions
 	recorder  auditing.Recorder
 	clock     clock.Clock
@@ -106,7 +110,7 @@ func NewAuthorizer(cfg AuthorizerConfig, d AuthorizerDeps) (*Authorizer, error) 
 	}
 	return &Authorizer{
 		cfg: cfg, catalog: d.Catalog, store: d.Store, principal: d.Principals, creds: d.Credentials,
-		structure: d.Structure, policies: d.Policies, versions: d.Versions, recorder: d.Recorder,
+		structure: d.Structure, policies: d.Policies, hosts: hostsOrNone(d.Hosts), versions: d.Versions, recorder: d.Recorder,
 		clock: d.Clock, log: log, cache: newSnapshotCache(cfg.SnapshotCacheMaxEntries),
 	}, nil
 }
@@ -213,6 +217,11 @@ func (s *actingPrincipal) rights(path domain.Path) (final, base domain.Rights) {
 		final = final.Intersect(domain.Effective(s.actingFor.snap, domain.KindUser, s.actingFor.key.principal, path))
 	}
 	return final, base
+}
+
+// domainPrincipal is the acting principal as the gate of HumanSession sees it: kind and session.
+func (s *actingPrincipal) domainPrincipal() domain.Principal {
+	return domain.Principal{ID: s.id, Kind: s.kind, HasSession: !s.ref.SessionID.IsZero()}
 }
 
 // liveness returns the liveness facts of s.
@@ -367,6 +376,9 @@ func (a *Authorizer) authorize(ctx context.Context, p authorize.Principal, act a
 	s, d, err := a.principalOf(ctx, p, spec.ID, v, t)
 	if err != nil || d.Outcome != domain.OutcomeAllow {
 		return outcome(d), err
+	}
+	if d := domain.GateHumanSession(req, s.domainPrincipal()); d.Outcome != domain.OutcomeAllow {
+		return outcome(d), nil
 	}
 	res, found, err := a.resolve(ctx, act, r)
 	if err != nil || !found {

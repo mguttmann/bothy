@@ -404,6 +404,26 @@ func (r *Repository) ActiveGrantsOnTargets(ctx context.Context, spaceIDs, channe
 	return out, nil
 }
 
+// ActiveGrantsOnHosts implements app.Store.
+func (r *Repository) ActiveGrantsOnHosts(ctx context.Context, hostIDs []ids.ID) ([]domain.Grant, error) {
+	if len(hostIDs) == 0 {
+		return nil, nil
+	}
+	rows, err := r.read(ctx).ListActiveGrantsOnHosts(ctx, uuids(hostIDs))
+	if err != nil {
+		return nil, mapError(err, "reading the grants on hosts")
+	}
+	out := make([]domain.Grant, 0, len(rows))
+	for _, row := range rows {
+		g, err := toGrant(row.Grant)
+		if err != nil {
+			return nil, err
+		}
+		out = append(out, g)
+	}
+	return out, nil
+}
+
 // maxRows converts a page limit for LIMIT; the use cases cap it at api.page_size_max.
 func maxRows(limit int) int32 {
 	if limit < 0 {

@@ -57,5 +57,12 @@ func auditConfigKeys() []config.Key {
 			Doc:     "Secret reference of the key that encrypts the keys of the IP pseudonyms in the database; 32 bytes as hex.",
 			Chapter: chapter20,
 		},
+		{
+			// M2-39 is a first reader: the mandatory reason of host.manage (M2-24 adds the same
+			// key for the app actions).
+			Name: "audit.reason_max_chars", Kind: config.KindInt, Default: "500", Min: "1",
+			Doc:     "Longest mandatory reason of a management action in Unicode characters.",
+			Chapter: chapter19,
+		},
 	}
 }

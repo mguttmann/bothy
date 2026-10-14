@@ -32,6 +32,7 @@ enabled:             # operationIds that have a handler; sorted ascending
   - createExtensionSession
   - createGrant
   - createGroup
+  - createHost
   - createIdentityProvider
   - createSpace
   - createStepUpChallenge
@@ -51,6 +52,7 @@ enabled:             # operationIds that have a handler; sorted ascending
   - getDiscovery
   - getGrant
   - getGroup
+  - getHost
   - getIdentityProvider
   - getInstance
   - getJwks
@@ -67,6 +69,7 @@ enabled:             # operationIds that have a handler; sorted ascending
   - listGrants
   - listGroupMembers
   - listGroups
+  - listHosts
   - listIdentityProviders
   - listInstanceSettings
   - listMyDevices
@@ -98,10 +101,12 @@ enabled:             # operationIds that have a handler; sorted ascending
   - setAgentToolClass
   - setAllAgentsBillingMode
   - setCredentialHolder
+  - setHostState
   - unlinkIdentity
   - updateAgent
   - updateBranding
   - updateGroup
+  - updateHost
   - updateIdentityProvider
   - updateMyProfile
   - updateSpace
@@ -186,9 +191,6 @@ later:               # every other operationId of docs/api/openapi.yaml; sorted 
     ticket: M1-53
   - operation_id: createGdprRequest
     etappe: M7
-  - operation_id: createHost
-    etappe: M2
-    ticket: M2-39
   - operation_id: createImport
     etappe: M8
     ticket: M8-03
@@ -317,9 +319,6 @@ later:               # every other operationId of docs/api/openapi.yaml; sorted 
     ticket: M3-03
   - operation_id: getGdprRequest
     etappe: M7
-  - operation_id: getHost
-    etappe: M2
-    ticket: M2-39
   - operation_id: getImport
     etappe: M8
     ticket: M8-03
@@ -426,9 +425,6 @@ later:               # every other operationId of docs/api/openapi.yaml; sorted 
     ticket: M1-53
   - operation_id: listGdprRequests
     etappe: M7
-  - operation_id: listHosts
-    etappe: M2
-    ticket: M2-39
   - operation_id: listImportItems
     etappe: M8
     ticket: M8-03
@@ -623,9 +619,6 @@ later:               # every other operationId of docs/api/openapi.yaml; sorted 
   - operation_id: setHostLlmCredentials
     etappe: M2
     ticket: M2-40
-  - operation_id: setHostState
-    etappe: M2
-    ticket: M2-39
   - operation_id: setImportCursor
     etappe: M8
     ticket: M8-03
@@ -685,9 +678,6 @@ later:               # every other operationId of docs/api/openapi.yaml; sorted 
   - operation_id: updateForumTag
     etappe: M1
     ticket: M1-53
-  - operation_id: updateHost
-    etappe: M2
-    ticket: M2-39
   - operation_id: updateMessage
     etappe: M1
     ticket: M1-58

@@ -12,8 +12,7 @@ import (
 )
 
 // Purpose is the purpose of a server signing key (docs/spec/03-datenmodell.md
-// server_signing_keys.purpose). The table also allows terminal, which M2-39 adds to the managed
-// purposes; this version manages the four below.
+// server_signing_keys.purpose); this version manages all five purposes of the table.
 type Purpose string
 
 // The purposes this version manages.
@@ -27,18 +26,22 @@ const (
 	// PurposeAuditCheckpoint signs audit checkpoints (19 SEC-AUD-7, M1-50); rotates on owner
 	// request, and its keys are never published.
 	PurposeAuditCheckpoint Purpose = "audit_checkpoint"
+	// PurposeTerminal signs the session tokens of the terminal (24 section 5.3, M2-44); rotates on
+	// owner request, and its keys are never published in the JWKS: the host service gets them
+	// over its control connection (M2-43).
+	PurposeTerminal Purpose = "terminal"
 )
 
 // Purposes returns the managed purposes in a fixed order: EnsureActive creates one active key for
 // each, the rotation job walks them.
 func Purposes() []Purpose {
-	return []Purpose{PurposeAccessToken, PurposeInvocation, PurposeWebhookOut, PurposeAuditCheckpoint}
+	return []Purpose{PurposeAccessToken, PurposeInvocation, PurposeWebhookOut, PurposeAuditCheckpoint, PurposeTerminal}
 }
 
 // Valid reports whether p is a managed purpose.
 func (p Purpose) Valid() bool {
 	switch p {
-	case PurposeAccessToken, PurposeInvocation, PurposeWebhookOut, PurposeAuditCheckpoint:
+	case PurposeAccessToken, PurposeInvocation, PurposeWebhookOut, PurposeAuditCheckpoint, PurposeTerminal:
 		return true
 	}
 	return false
