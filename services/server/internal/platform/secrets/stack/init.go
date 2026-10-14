@@ -22,6 +22,7 @@ import (
 	"slices"
 	"strconv"
 	"strings"
+	"time"
 )
 
 var (
@@ -721,10 +722,19 @@ func only(files map[string][]byte, rel string) map[string][]byte {
 }
 
 // generate fills every item with status generated before anything is written, so failing
-// entropy leaves no half-prepared volume (brief D5: 32 random bytes).
+// entropy leaves no half-prepared volume (brief D5: 32 random bytes; pgbackrest_tls/ is a
+// certificate set, brief M7-01).
 func generate(items []*item, rnd io.Reader) error {
 	for _, it := range items {
 		if it.status != StatusGenerated {
+			continue
+		}
+		if it.entry.Generator == GeneratorPGBackRestTLS {
+			files, err := generatePGBackRestTLS(it.name, rnd, time.Now())
+			if err != nil {
+				return fmt.Errorf("generate %s: %w", it.name, err)
+			}
+			it.final = files
 			continue
 		}
 		raw := make([]byte, 32)
@@ -737,7 +747,7 @@ func generate(items []*item, rnd io.Reader) error {
 			value = base64.RawURLEncoding.EncodeToString(raw)
 		case GeneratorKey:
 			value = hex.EncodeToString(raw)
-		case GeneratorNone, GeneratorPending:
+		case GeneratorNone, GeneratorPending, GeneratorPGBackRestTLS:
 			return fmt.Errorf("generate %s: entry has no generator", it.name)
 		}
 		it.final = map[string][]byte{it.name: []byte(value)}

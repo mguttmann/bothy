@@ -193,7 +193,7 @@ func TestCatalogIsValid(t *testing.T) {
 		}
 		switch e.Origin {
 		case stack.OriginGenerated:
-			if e.Generator != stack.GeneratorToken && e.Generator != stack.GeneratorKey && e.Generator != stack.GeneratorPending {
+			if e.Generator != stack.GeneratorToken && e.Generator != stack.GeneratorKey && e.Generator != stack.GeneratorPGBackRestTLS && e.Generator != stack.GeneratorPending {
 				t.Errorf("generated entry %s has generator %q", e.Name, e.Generator)
 			}
 		case stack.OriginSupplied:
@@ -230,7 +230,7 @@ func TestCatalogPendingAndGenerators(t *testing.T) {
 		"audit_ip_kek":            {stack.GeneratorKey, ""},
 		"file_ticket_key":         {stack.GeneratorKey, ""},
 		"totp_key":                {stack.GeneratorPending, "M1-39"},
-		"pgbackrest_tls/":         {stack.GeneratorPending, "M7-01"},
+		"pgbackrest_tls/":         {stack.GeneratorPGBackRestTLS, ""},
 		"s3_access_key":           {stack.GeneratorPending, "M3"},
 		"s3_secret_key":           {stack.GeneratorPending, "M3"},
 	}
