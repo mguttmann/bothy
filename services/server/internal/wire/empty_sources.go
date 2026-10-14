@@ -11,41 +11,31 @@ import (
 
 // The empty sources of authz (docs/DECISIONS.md M1-28 D2, 02 section 4.4): until the owning modules
 // have tables they report the truth of an instance without those tables, so authorize decides fail
-// closed. The credentials come from identity since M1-33 and the agent policy from agents since
-// M1-51 (wire.NewAuthorizer).
+// closed. The credentials come from identity since M1-33, the agent policy from agents since
+// M1-51 and the spaces from chat since M1-52 (wire.NewAuthorizer).
 
-// emptyStructure knows no space, channel or thread. M1-52 (spaces), M1-53 (channels) and M1-55
-// (threads, dm participation) replace it with the StructureSource of chat.
-type emptyStructure struct{}
+// emptyChannels is the channel and thread part of the structure source: it knows no channel,
+// thread or dm participation. Spaces come from chat since M1-52 (chat.go, chatStructure); M1-53
+// (channels) and M1-55 (threads, dm participation) replace this part with chat.
+type emptyChannels struct{}
 
-var _ authz.StructureSource = emptyStructure{}
-
-func (emptyStructure) Space(context.Context, ids.ID) (bool, error) { return false, nil }
-func (emptyStructure) Spaces(context.Context) ([]ids.ID, error)    { return nil, nil }
-
-// SpaceArchived knows no space until M1-52.
-func (emptyStructure) SpaceArchived(context.Context, ids.ID) (bool, error) { return false, nil }
-func (emptyStructure) Channel(context.Context, ids.ID) (authz.ChannelFacts, bool, error) {
+func (emptyChannels) Channel(context.Context, ids.ID) (authz.ChannelFacts, bool, error) {
 	return authz.ChannelFacts{}, false, nil
 }
-func (emptyStructure) Thread(context.Context, ids.ID) (authz.ThreadFacts, bool, error) {
+func (emptyChannels) Thread(context.Context, ids.ID) (authz.ThreadFacts, bool, error) {
 	return authz.ThreadFacts{}, false, nil
 }
-func (emptyStructure) Channels(context.Context) ([]authz.ChannelFacts, error)       { return nil, nil }
-func (emptyStructure) ChannelsOperatedBy(context.Context, ids.ID) ([]ids.ID, error) { return nil, nil }
-func (emptyStructure) DMChannelsOf(context.Context, ids.ID) ([]ids.ID, error)       { return nil, nil }
+func (emptyChannels) Channels(context.Context) ([]authz.ChannelFacts, error)       { return nil, nil }
+func (emptyChannels) ChannelsOperatedBy(context.Context, ids.ID) ([]ids.ID, error) { return nil, nil }
+func (emptyChannels) DMChannelsOf(context.Context, ids.ID) ([]ids.ID, error)       { return nil, nil }
 
 // ServedTargets knows no served target until M1-54 implements it in chat.
-func (emptyStructure) ServedTargets(context.Context, ids.ID) ([]authz.ChannelRef, error) {
+func (emptyChannels) ServedTargets(context.Context, ids.ID) ([]authz.ChannelRef, error) {
 	return nil, nil
 }
 
-// SpaceDetails knows no space until M1-52.
-func (emptyStructure) SpaceDetails(context.Context, []ids.ID) (map[ids.ID]authz.SpaceDetail, error) {
-	return map[ids.ID]authz.SpaceDetail{}, nil
-}
-
-// ChannelDetails knows no channel until M1-53.
-func (emptyStructure) ChannelDetails(context.Context, []ids.ID) (map[ids.ID]authz.ChannelDetail, error) {
+// ChannelDetails knows no channel until M1-53; the space details come from chat since M1-52
+// (INT-W15/2).
+func (emptyChannels) ChannelDetails(context.Context, []ids.ID) (map[ids.ID]authz.ChannelDetail, error) {
 	return map[ids.ID]authz.ChannelDetail{}, nil
 }

@@ -6,6 +6,7 @@ import (
 	"testing"
 
 	"github.com/OWNER/bothy/services/server/internal/authz/domain"
+	"github.com/OWNER/bothy/services/server/internal/kernel/ids"
 )
 
 // TestEffective_ArchivedCapsAtRead: in an archived channel every effective level is at most read,
@@ -23,6 +24,28 @@ func TestEffective_ArchivedCapsAtRead(t *testing.T) {
 	none := domain.Effective(domain.Snapshot{}, domain.KindUser, samID, path)
 	if none.Level != domain.LevelNone {
 		t.Fatalf("archiving opened a channel: %+v", none)
+	}
+}
+
+// TestEffective_ArchivedSpaceCapsAtRead: in an archived space every effective level on the space is
+// at most read, owners included; capabilities stay, and archiving opens nothing (07 section 4.5,
+// M1-52).
+func TestEffective_ArchivedSpaceCapsAtRead(t *testing.T) {
+	t.Parallel()
+	path := domain.Path{Kind: domain.PathSpace, SpaceID: spaceS, Archived: true}
+	if r := domain.Effective(domain.Snapshot{Owner: true}, domain.KindUser, alexID, path); r.Level != domain.LevelRead || !r.Owner {
+		t.Fatalf("owner in an archived space: %+v", r)
+	}
+	writer := domain.Snapshot{Spaces: map[ids.ID]domain.Rights{spaceS: {Level: domain.LevelTrigger, Caps: domain.CapsOf(domain.CapUpload)}}}
+	if r := domain.Effective(writer, domain.KindUser, samID, path); r.Level != domain.LevelRead || r.Caps != domain.CapsOf(domain.CapUpload) {
+		t.Fatalf("trigger in an archived space: %+v", r)
+	}
+	if r := domain.Effective(domain.Snapshot{}, domain.KindUser, samID, path); r.Level != domain.LevelNone {
+		t.Fatalf("archiving opened a space: %+v", r)
+	}
+	path.Archived = false
+	if r := domain.Effective(writer, domain.KindUser, samID, path); r.Level != domain.LevelTrigger {
+		t.Fatalf("a space that is not archived: %+v", r)
 	}
 }
 

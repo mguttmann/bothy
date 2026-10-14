@@ -12,6 +12,7 @@ enabled:             # operationIds that have a handler; sorted ascending
   - addOwner
   - approveDevice
   - approvePairing
+  - archiveSpace
   - beginEnrollment
   - beginIdentityLink
   - beginOidcLogin
@@ -32,6 +33,7 @@ enabled:             # operationIds that have a handler; sorted ascending
   - createGrant
   - createGroup
   - createIdentityProvider
+  - createSpace
   - createStepUpChallenge
   - createToken
   - createUser
@@ -55,6 +57,7 @@ enabled:             # operationIds that have a handler; sorted ascending
   - getMe
   - getMyCredentials
   - getProblemType
+  - getSpace
   - getUser
   - getUserCredentials
   - handleOidcCallback
@@ -69,15 +72,18 @@ enabled:             # operationIds that have a handler; sorted ascending
   - listMyDevices
   - listMySessions
   - listOwners
+  - listSpaces
   - listTokens
   - listUserDevices
   - listUserSessions
   - listUsers
   - loginWithTrustedHeader
   - logout
+  - moveSpace
   - previewGrant
   - putFeatureFlag
   - putInstanceSetting
+  - putMySidebarSpace
   - redeemEnrollmentCode
   - refreshToken
   - removeGroupMember
@@ -98,6 +104,7 @@ enabled:             # operationIds that have a handler; sorted ascending
   - updateGroup
   - updateIdentityProvider
   - updateMyProfile
+  - updateSpace
   - updateUser
   - verifyAuditChain
   - viewAsUser
@@ -123,9 +130,6 @@ later:               # every other operationId of docs/api/openapi.yaml; sorted 
   - operation_id: archiveChannel
     etappe: M1
     ticket: M1-53
-  - operation_id: archiveSpace
-    etappe: M1
-    ticket: M1-52
   - operation_id: attachTerminalSession
     etappe: M2
     ticket: M2-44
@@ -209,9 +213,6 @@ later:               # every other operationId of docs/api/openapi.yaml; sorted 
   - operation_id: createQuietHoursRule
     etappe: M3
     ticket: M3-18
-  - operation_id: createSpace
-    etappe: M1
-    ticket: M1-52
   - operation_id: createStatusComponent
     etappe: M7
     ticket: M7-09
@@ -348,9 +349,6 @@ later:               # every other operationId of docs/api/openapi.yaml; sorted 
   - operation_id: getSnapshot
     etappe: M1
     ticket: M1-63
-  - operation_id: getSpace
-    etappe: M1
-    ticket: M1-52
   - operation_id: getStatsBackends
     etappe: M6
     ticket: M6-14
@@ -485,9 +483,6 @@ later:               # every other operationId of docs/api/openapi.yaml; sorted 
   - operation_id: listSpaceChannels
     etappe: M1
     ticket: M1-53
-  - operation_id: listSpaces
-    etappe: M1
-    ticket: M1-52
   - operation_id: listTemplates
     etappe: M1
     ticket: M1-60
@@ -518,9 +513,6 @@ later:               # every other operationId of docs/api/openapi.yaml; sorted 
   - operation_id: moveForumTag
     etappe: M1
     ticket: M1-53
-  - operation_id: moveSpace
-    etappe: M1
-    ticket: M1-52
   - operation_id: moveThread
     etappe: M1
     ticket: M1-62
@@ -554,9 +546,6 @@ later:               # every other operationId of docs/api/openapi.yaml; sorted 
   - operation_id: putMySetting
     etappe: M1
     ticket: M1-61
-  - operation_id: putMySidebarSpace
-    etappe: M1
-    ticket: M1-52
   - operation_id: putNotificationPreference
     etappe: M3
     ticket: M3-18
@@ -702,9 +691,6 @@ later:               # every other operationId of docs/api/openapi.yaml; sorted 
   - operation_id: updateMessage
     etappe: M1
     ticket: M1-58
-  - operation_id: updateSpace
-    etappe: M1
-    ticket: M1-52
   - operation_id: updateStatusComponent
     etappe: M7
     ticket: M7-09

@@ -221,6 +221,8 @@ func (w *world) seed() {
 	for i, s := range []ids.ID{w.support, w.marketing, w.research, w.engineering} {
 		w.structure.PutSpaceDetail(authz.SpaceDetail{ID: s, Name: []string{"Support", "Marketing", "Research", "Engineering"}[i],
 			SortKey: "a" + strconv.Itoa(i), Version: 1, CreatedAt: start})
+		// The spaces row behind the foreign key of grants.target_space_id (M1-52).
+		w.sql(`INSERT INTO spaces (id, name, sort_key, created_by) VALUES ($1, $2, 'a0', $3)`, s.String(), s.String(), w.ownerID.String())
 	}
 	w.allgemein = w.channel(w.support, w.lotse)
 	w.eskalation = w.channel(w.support, ids.ID{})

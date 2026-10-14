@@ -212,7 +212,7 @@ Quelle: [03-datenmodell.md](../spec/03-datenmodell.md), Abschnitt 9.
 | `group.name_max_chars` | `BOTHY_GROUP__NAME_MAX_CHARS` | Server | int | `100` | Länge eines Gruppennamens in Unicode-Zeichen | aktiv |
 | `group.description_max_chars` | `BOTHY_GROUP__DESCRIPTION_MAX_CHARS` | Server | int | `500` | Länge einer Gruppenbeschreibung in Unicode-Zeichen | aktiv |
 | `host.name_max_chars` | `BOTHY_HOST__NAME_MAX_CHARS` | Server |  | `100` | Länge eines Rechnernamens in Unicode-Zeichen | geplant (M2) |
-| `space.name_max_chars` | `BOTHY_SPACE__NAME_MAX_CHARS` | Server |  | `100` | Länge eines Bereichsnamens in Unicode-Zeichen | geplant (M1) |
+| `space.name_max_chars` | `BOTHY_SPACE__NAME_MAX_CHARS` | Server | int | `100` | Länge eines Bereichsnamens in Unicode-Zeichen | aktiv |
 | `channel.name_max_chars` | `BOTHY_CHANNEL__NAME_MAX_CHARS` | Server |  | `100` | Länge eines Kanalnamens in Unicode-Zeichen | geplant (M1) |
 | `channel.topic_max_chars` | `BOTHY_CHANNEL__TOPIC_MAX_CHARS` | Server |  | `1024` | Länge eines Kanal-Themas in Unicode-Zeichen | geplant (M1) |
 | `forum_tag.name_max_chars` | `BOTHY_FORUM_TAG__NAME_MAX_CHARS` | Server |  | `50` | Länge eines Tag-Namens in Unicode-Zeichen | geplant (M1) |

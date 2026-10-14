@@ -13,6 +13,7 @@ import (
 	agentshttp "github.com/OWNER/bothy/services/server/internal/agents/adapters/httpapi"
 	audithttp "github.com/OWNER/bothy/services/server/internal/audit/adapters/httpapi"
 	authzhttp "github.com/OWNER/bothy/services/server/internal/authz/adapters/httpapi"
+	chathttp "github.com/OWNER/bothy/services/server/internal/chat/adapters/httpapi"
 	identityhttp "github.com/OWNER/bothy/services/server/internal/identity/adapters/httpapi"
 	instancehttp "github.com/OWNER/bothy/services/server/internal/instance/adapters/httpapi"
 	"github.com/OWNER/bothy/services/server/internal/platform/httpserver"
@@ -53,6 +54,9 @@ type Handlers struct {
 	// setAgentBillingMode, setAllAgentsBillingMode, setCredentialHolder and setAgentToolClass
 	// (agents, M1-51).
 	*agentshttp.Agents
+	// Spaces implements listSpaces, createSpace, getSpace, updateSpace, moveSpace, archiveSpace
+	// and putMySidebarSpace (chat, M1-52).
+	*chathttp.Spaces
 	// Log implements listAuditEvents, exportAuditEvents and verifyAuditChain (audit, M1-50).
 	*audithttp.Log
 	// Devices implements listMyDevices, listUserDevices and getDevice (identity, M1-33).

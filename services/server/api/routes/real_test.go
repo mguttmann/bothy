@@ -349,6 +349,34 @@ func (stubServer) LoginWithTrustedHeader(context.Context, rest.LoginWithTrustedH
 	return nil, nil
 }
 
+func (stubServer) ListSpaces(context.Context, rest.ListSpacesRequestObject) (rest.ListSpacesResponseObject, error) {
+	return nil, nil
+}
+
+func (stubServer) CreateSpace(context.Context, rest.CreateSpaceRequestObject) (rest.CreateSpaceResponseObject, error) {
+	return nil, nil
+}
+
+func (stubServer) GetSpace(context.Context, rest.GetSpaceRequestObject) (rest.GetSpaceResponseObject, error) {
+	return nil, nil
+}
+
+func (stubServer) UpdateSpace(context.Context, rest.UpdateSpaceRequestObject) (rest.UpdateSpaceResponseObject, error) {
+	return nil, nil
+}
+
+func (stubServer) MoveSpace(context.Context, rest.MoveSpaceRequestObject) (rest.MoveSpaceResponseObject, error) {
+	return nil, nil
+}
+
+func (stubServer) ArchiveSpace(context.Context, rest.ArchiveSpaceRequestObject) (rest.ArchiveSpaceResponseObject, error) {
+	return nil, nil
+}
+
+func (stubServer) PutMySidebarSpace(context.Context, rest.PutMySidebarSpaceRequestObject) (rest.PutMySidebarSpaceResponseObject, error) {
+	return nil, nil
+}
+
 func (stubServer) ListAgents(context.Context, rest.ListAgentsRequestObject) (rest.ListAgentsResponseObject, error) {
 	return nil, nil
 }
@@ -509,6 +537,14 @@ func TestRealTable_Enabled(t *testing.T) {
 		// M1-47
 		"listFeatureFlags": {"GET /api/v1/feature-flags", "feature_flag.read", "rl.read"},
 		"putFeatureFlag":   {"PUT /api/v1/feature-flags/{key}", "feature_flag.update", "rl.admin"},
+		// M1-52
+		"listSpaces":        {"GET /api/v1/spaces", "space.read", "rl.read"},
+		"createSpace":       {"POST /api/v1/spaces", "space.create", "rl.admin"},
+		"getSpace":          {"GET /api/v1/spaces/{space_id}", "space.read", "rl.read"},
+		"updateSpace":       {"PATCH /api/v1/spaces/{space_id}", "space.update", "rl.admin"},
+		"moveSpace":         {"POST /api/v1/spaces/{space_id}/move", "space.reorder", "rl.admin"},
+		"archiveSpace":      {"POST /api/v1/spaces/{space_id}/archive", "space.archive", "rl.admin"},
+		"putMySidebarSpace": {"PUT /api/v1/me/sidebar/spaces/{space_id}", "sidebar.update", "rl.write"},
 	}
 	ops := routes.Enabled()
 	if len(ops) != len(want) {

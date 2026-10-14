@@ -19,6 +19,7 @@ import (
 
 	"github.com/OWNER/bothy/services/server/api/rest"
 	"github.com/OWNER/bothy/services/server/api/routes"
+	"github.com/OWNER/bothy/services/server/internal/authz"
 	authzapp "github.com/OWNER/bothy/services/server/internal/authz/app"
 	"github.com/OWNER/bothy/services/server/internal/identity/domain/trustedheader"
 	"github.com/OWNER/bothy/services/server/internal/instance"
@@ -150,6 +151,8 @@ type server struct {
 	settings *InstanceSettings
 	// agents is the agents module (M1-51): the agent records and their REST handlers.
 	agents *Agents
+	// chat is the chat module (M1-52): spaces, the sidebar and their REST handlers.
+	chat *Chat
 	// signingKeys are the server signing keys (M1-32) and keyCheck the interval of their job.
 	signingKeys *SigningKeys
 	keyCheck    time.Duration
@@ -188,6 +191,8 @@ type server struct {
 //     and start the sweeper of the jti store; its stop step runs in the HTTP phase (startIdentity),
 //     6e. agents (M1-51): build the agent records over the unit of work, the Authorizer, the rights
 //     hook and the identity module (startAgents),
+//     6f. chat (M1-52): build the spaces and the sidebar over the unit of work, the Authorizer,
+//     the recorder and the appender (startChat),
 //  7. extension points, in this order: signing keys (M1-32), routes (the catalogue check of
 //     route bindings and registrations for every role, M1-25, then InstallRateLimits with its
 //     sweeper, M1-19, InstallIdempotency, M1-20, and MountRoutes, api and all), log
@@ -348,6 +353,7 @@ func (s *server) components() []lifecycle.Component {
 		step("settings", s.startSettings),
 		step("identity", s.startIdentity),
 		step("agents", s.startAgents),
+		step("chat", s.startChat),
 		step("signing_keys", s.startSigningKeys),
 		step("audit_log", s.startAuditLog),
 		step("sessions", s.startSessions),
@@ -697,6 +703,30 @@ func (s *server) startAgents(context.Context) error {
 	return nil
 }
 
+// startChat is start step 6f (M1-52): the chat module over the pool, the unit of work and the
+// recorder of the audit step, the appender of the sync step and the Authorizer.
+func (s *server) startChat(context.Context) error {
+	cfg, err := ChatConfig(s.values)
+	if err != nil {
+		return err
+	}
+	s.mu.Lock()
+	pool, a, az, sy := s.pool, s.audit, s.authorizer, s.sync
+	s.mu.Unlock()
+	rights, ok := az.(authz.RightsQuery)
+	if a == nil || sy == nil || !ok {
+		return errors.New("wire: the chat step needs audit, sync and the Authorizer of authz")
+	}
+	c, err := NewChat(cfg, pool, a.UoW(), az, rights, ChatWrites{Audit: a.Recorder(), Events: sy.Appender()}, s.deps.Clock)
+	if err != nil {
+		return err
+	}
+	s.mu.Lock()
+	s.chat = c
+	s.mu.Unlock()
+	return nil
+}
+
 // startSessions is the second extension point of start step 7 (M1-34): the session part of
 // identity over the signing keys of the previous step and the instance id, the issuer of access
 // tokens. From here on the HTTP chain authenticates people with identity's Authenticator.
@@ -743,6 +773,9 @@ func (s *server) handlers() Handlers {
 	}
 	if h.Agents == nil && s.agents != nil {
 		h.Agents = s.agents.Handlers
+	}
+	if h.Spaces == nil && s.chat != nil {
+		h.Spaces = s.chat.Handlers
 	}
 	if h.Keys == nil && s.signingKeys != nil {
 		h.Keys = s.signingKeys.Handlers

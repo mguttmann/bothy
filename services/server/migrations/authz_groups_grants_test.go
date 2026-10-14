@@ -144,6 +144,8 @@ func TestAuthzGroupsGrantsSchema(t *testing.T) {
 				"grants_subject_shape_check: CHECK ((((subject_kind = 'group'::text) = ((subject_group_id IS NOT NULL) AND (subject_principal_id IS NULL))) AND ((subject_kind <> 'group'::text) = ((subject_principal_id IS NOT NULL) AND (subject_group_id IS NULL)))))",
 				"grants_target_kind_check: CHECK ((target_kind = ANY (ARRAY['instance'::text, 'space'::text, 'channel'::text, 'host'::text])))",
 				"grants_target_shape_check: CHECK ((((target_space_id IS NOT NULL) = (target_kind = 'space'::text)) AND ((target_channel_id IS NOT NULL) = (target_kind = 'channel'::text)) AND ((target_host_id IS NOT NULL) = (target_kind = 'host'::text))))",
+				// The foreign key of the space target comes with spaces (00023, M1-52).
+				"grants_target_space_id_fkey: FOREIGN KEY (target_space_id) REFERENCES spaces(id) ON DELETE RESTRICT",
 				"grants_terminal_only_on_host_check: CHECK (((target_kind = 'host'::text) OR (NOT ('terminal'::text = ANY (capabilities)))))",
 			},
 			indexes: []string{

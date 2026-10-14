@@ -15439,6 +15439,33 @@ type RotateSigningKeyParams struct {
 	IdempotencyKey *IdempotencyKey `json:"Idempotency-Key,omitempty"`
 }
 
+// CreateSpaceParams defines parameters for CreateSpace.
+type CreateSpaceParams struct {
+	// IdempotencyKey UUIDv7 chosen by the client per logical operation. A repeat with the same request returns the stored response; a different request gives 422 `idempotency_key_reuse`; a repeat while the first is running gives 409 `request_in_progress`. Kept for `sync.idempotency_key_ttl`.
+	IdempotencyKey *IdempotencyKey `json:"Idempotency-Key,omitempty"`
+}
+
+// UpdateSpaceParams defines parameters for UpdateSpace.
+type UpdateSpaceParams struct {
+	// IdempotencyKey UUIDv7 chosen by the client per logical operation. A repeat with the same request returns the stored response; a different request gives 422 `idempotency_key_reuse`; a repeat while the first is running gives 409 `request_in_progress`. Kept for `sync.idempotency_key_ttl`.
+	IdempotencyKey *IdempotencyKey `json:"Idempotency-Key,omitempty"`
+
+	// IfMatch ETag of the version the change is based on, e.g. `"7"`. Mismatch gives 412 `version_conflict`.
+	IfMatch IfMatchRequired `json:"If-Match"`
+}
+
+// ArchiveSpaceParams defines parameters for ArchiveSpace.
+type ArchiveSpaceParams struct {
+	// IdempotencyKey UUIDv7 chosen by the client per logical operation. A repeat with the same request returns the stored response; a different request gives 422 `idempotency_key_reuse`; a repeat while the first is running gives 409 `request_in_progress`. Kept for `sync.idempotency_key_ttl`.
+	IdempotencyKey *IdempotencyKey `json:"Idempotency-Key,omitempty"`
+}
+
+// MoveSpaceParams defines parameters for MoveSpace.
+type MoveSpaceParams struct {
+	// IdempotencyKey UUIDv7 chosen by the client per logical operation. A repeat with the same request returns the stored response; a different request gives 422 `idempotency_key_reuse`; a repeat while the first is running gives 409 `request_in_progress`. Kept for `sync.idempotency_key_ttl`.
+	IdempotencyKey *IdempotencyKey `json:"Idempotency-Key,omitempty"`
+}
+
 // ListUsersParams defines parameters for ListUsers.
 type ListUsersParams struct {
 	// Cursor Cursor from `next_cursor` of the previous page.
@@ -15619,6 +15646,9 @@ type UpdateMyProfileJSONRequestBody = ProfileUpdate
 // CreateExtensionSessionJSONRequestBody defines body for CreateExtensionSession for application/json ContentType.
 type CreateExtensionSessionJSONRequestBody = ExtensionSessionCreate
 
+// PutMySidebarSpaceJSONRequestBody defines body for PutMySidebarSpace for application/json ContentType.
+type PutMySidebarSpaceJSONRequestBody = SidebarStatePut
+
 // AddOwnerJSONRequestBody defines body for AddOwner for application/json ContentType.
 type AddOwnerJSONRequestBody = OwnerAdd
 
@@ -15630,6 +15660,18 @@ type CreateTokenJSONRequestBody = ApiTokenCreate
 
 // RotateSigningKeyJSONRequestBody defines body for RotateSigningKey for application/json ContentType.
 type RotateSigningKeyJSONRequestBody = SigningKeyRotate
+
+// CreateSpaceJSONRequestBody defines body for CreateSpace for application/json ContentType.
+type CreateSpaceJSONRequestBody = SpaceCreate
+
+// UpdateSpaceJSONRequestBody defines body for UpdateSpace for application/json ContentType.
+type UpdateSpaceJSONRequestBody = SpaceUpdate
+
+// ArchiveSpaceJSONRequestBody defines body for ArchiveSpace for application/json ContentType.
+type ArchiveSpaceJSONRequestBody = ReasonBody
+
+// MoveSpaceJSONRequestBody defines body for MoveSpace for application/json ContentType.
+type MoveSpaceJSONRequestBody = MovePosition
 
 // CreateUserJSONRequestBody defines body for CreateUser for application/json ContentType.
 type CreateUserJSONRequestBody = UserCreate

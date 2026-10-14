@@ -97,6 +97,10 @@ var appPrivileges = map[string][]string{
 	"auth_login_flows": {"SELECT", "INSERT", "UPDATE", "DELETE"},
 	// 03 agents (M1-51): an agent principal is never hard deleted, its record lives with it.
 	"agents": {"SELECT", "INSERT", "UPDATE"},
+	// 03 spaces (M1-52): archiving is final and the data stays for retention and export, so a
+	// space is never deleted; a sidebar row is personal data that erasure deletes (M7-06).
+	"spaces":            {"SELECT", "INSERT", "UPDATE"},
+	"user_space_states": {"SELECT", "INSERT", "UPDATE", "DELETE"},
 }
 
 // allPrivileges are the table rights PostgreSQL 18 knows (MAINTAIN since 17).

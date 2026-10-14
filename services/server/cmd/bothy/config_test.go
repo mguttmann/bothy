@@ -333,6 +333,7 @@ func TestConfigPrintShowsSourcePerKey(t *testing.T) {
 		"signing_key.cache_ttl = 30s  # default\n" +
 		"signing_key.invocation_rotation_interval = 30d  # default\n" +
 		"signing_key.rotation_check_interval = 1m  # default\n" +
+		"space.name_max_chars = 100  # default\n" +
 		"startup.dependency_wait = 1m  # default\n" +
 		"sync.event_log_partition_size = 1000000  # default\n" +
 		"sync.event_log_partitions_ahead = 3  # default\n" +

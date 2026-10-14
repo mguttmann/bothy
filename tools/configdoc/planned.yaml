@@ -101,8 +101,6 @@ rules:
     etappe: M5
   - match: server.maintenance_mode  # M7-08
     etappe: M7
-  - match: "space."  # M1-52
-    etappe: M1
   - match: "stats."  # M6-05 to M6-15
     etappe: M6
   - match: "status."  # M7-09

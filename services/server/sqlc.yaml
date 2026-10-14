@@ -75,3 +75,12 @@ sql:
         package: sqlcgen
         out: internal/agents/adapters/postgres/sqlcgen
         sql_package: pgx/v5
+  # chat (M1-52)
+  - engine: postgresql
+    schema: migrations
+    queries: internal/chat/adapters/postgres/queries
+    gen:
+      go:
+        package: sqlcgen
+        out: internal/chat/adapters/postgres/sqlcgen
+        sql_package: pgx/v5
