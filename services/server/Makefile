@@ -26,7 +26,7 @@ help: ## Show the targets
 # Static binaries without cgo, built like the binary in services/server/Dockerfile (same flags),
 # so the release binary and the one in the image come from the same build rule. release.yml
 # signs them and adds SBOMs and checksums (docs/spec/18-release.md section 6).
-release-build: ## bothy binaries for linux/amd64 and linux/arm64: make release-build VERSION=<x.y.z> OUT=<dir>
+release-build: ## Server binaries (cmd/bothy) for linux/amd64 and linux/arm64: make release-build VERSION=<x.y.z> OUT=<dir>
 	@[ -n "$${OUT:-}" ] && [ -n "$${VERSION:-}" ] || { echo "usage: make release-build VERSION=<x.y.z> OUT=<dir>"; exit 2; }
 	@[ "$$(tr -d '[:space:]' < VERSION)" = "$$VERSION" ] || { echo "release-build: VERSION file says $$(tr -d '[:space:]' < VERSION), not $$VERSION"; exit 1; }
 	@mkdir -p "$$OUT" || exit 1
