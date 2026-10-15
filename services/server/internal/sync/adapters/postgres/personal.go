@@ -271,6 +271,23 @@ func (r *PersonalRepository) Settings(ctx context.Context, user ids.ID) ([]sync.
 	return out, nil
 }
 
+// SettingValues implements app.PersonalStore with one query.
+func (r *PersonalRepository) SettingValues(ctx context.Context, users []ids.ID, keys []string) (map[ids.ID]map[string]json.RawMessage, error) {
+	rows, err := r.read(ctx).SettingValues(ctx, sqlcgen.SettingValuesParams{UserIds: uuids(users), Keys: keys})
+	if err != nil {
+		return nil, failed(err, "reading setting values")
+	}
+	out := map[ids.ID]map[string]json.RawMessage{}
+	for _, row := range rows {
+		u := idOf(row.UserID)
+		if out[u] == nil {
+			out[u] = map[string]json.RawMessage{}
+		}
+		out[u][row.Key] = json.RawMessage(row.Value)
+	}
+	return out, nil
+}
+
 // oneSetting converts the result of a single-row query; no row is found false.
 func oneSetting(row sqlcgen.UserSetting, err error, what string) (sync.UserSetting, bool, error) {
 	if errors.Is(err, pgx.ErrNoRows) {

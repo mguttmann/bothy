@@ -73,6 +73,9 @@ type PersonalStore interface {
 	DeleteSetting(ctx context.Context, user ids.ID, key string) (st sync.UserSetting, found bool, err error)
 	// Settings returns every stored setting of user, ascending by key.
 	Settings(ctx context.Context, user ids.ID) ([]sync.UserSetting, error)
+	// SettingValues returns the stored values of keys for the people users, keyed by person and
+	// key; absent rows are absent.
+	SettingValues(ctx context.Context, users []ids.ID, keys []string) (map[ids.ID]map[string]json.RawMessage, error)
 }
 
 // ThreadSource is the part of chat.Threads the read states and drafts need.

@@ -22,3 +22,8 @@ DELETE FROM user_settings WHERE user_id = sqlc.arg(user_id) AND key = sqlc.arg(k
 
 -- name: ListSettings :many
 SELECT * FROM user_settings WHERE user_id = sqlc.arg(user_id) ORDER BY key;
+
+-- name: SettingValues :many
+-- The stored values of the keys of many people in one read (M3-18: notify reads
+-- notify.default_level of every candidate of a thread). No defaults: absent rows stay absent.
+SELECT user_id, key, value FROM user_settings WHERE user_id = ANY (@user_ids::uuid[]) AND key = ANY (@keys::text[]);
