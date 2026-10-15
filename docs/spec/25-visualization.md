@@ -509,7 +509,11 @@ CSP). Conditions:
    `color.viz.grid`, `color.viz.axis`, `color.viz.area-fill` and the
    mapping of the traffic light onto the existing state roles `color.success.*`, `color.warning.*`,
    `color.danger.*`. States of runs use the roles of the live box. Every pairing is in
-   `design/design-rules.json`.
+   `design/design-rules.json`. "Distinguishable despite red-green confusion" is a gate: `make
+   tokens` simulates protanopia, deuteranopia and tritanopia (Machado et al. 2009, severity 1.0)
+   and requires the OKLab distance `cvd_min_delta_e_ok` of `design/design-rules.json` between
+   adjacent series (series 8 with series 1 included) and between the three traffic light states
+   (`success.fg`, `warning.fg`, `danger.fg`); [contrast.md](../design/contrast.md) lists the rows.
 3. `tools/design-tokens` gets a further output `design/build/ts/tokens.gen.ts` (colors per
    theme, font families, font sizes, radii as TypeScript constants) and copies the
    font files to `design/build/ts/fonts/`. The plugin imports only this file; `tokens.py

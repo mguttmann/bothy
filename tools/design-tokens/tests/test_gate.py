@@ -20,8 +20,8 @@ def _sha256(path):
     return hashlib.sha256(path.read_bytes()).hexdigest()
 
 
-class CheckGateTest(unittest.TestCase):
-    """Each test copies tools/design-tokens, design/ and docs/design/ and runs the gate there."""
+class GateTreeMixin:
+    """Copies tools/design-tokens, design/ and docs/design/ to a temporary root; `_check` runs the gate there."""
 
     def setUp(self):
         self._tmp = tempfile.TemporaryDirectory(prefix="design-tokens-gate-")
@@ -52,6 +52,10 @@ class CheckGateTest(unittest.TestCase):
         change(data)
         path.write_text(json.dumps(data, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
 
+
+class CheckGateTest(GateTreeMixin, unittest.TestCase):
+    """Each test copies tools/design-tokens, design/ and docs/design/ and runs the gate there."""
+
     def test_repository_state_passes(self):
         proc = self._check()
         self.assertEqual(proc.returncode, 0, proc.stderr)
@@ -64,6 +68,28 @@ class CheckGateTest(unittest.TestCase):
         proc = self._check()
         self.assertEqual(proc.returncode, 1)
         self.assertIn("stale: design/build/tokens.css", proc.stderr)
+
+    def test_changed_series_without_rebuild_fails(self):
+        def darker_series(data):
+            data["color"]["viz"]["series"]["1"]["$value"] = "{palette.loch.700}"
+
+        self._edit_json("design/tokens/color.light.tokens.json", darker_series)
+        proc = self._check()
+        self.assertEqual(proc.returncode, 1)
+        self.assertIn("stale: design/build/tokens.css", proc.stderr)
+
+    def test_series_breaking_the_cvd_rule_fails(self):
+        def twin_series(data):
+            series = data["color"]["viz"]["series"]
+            series["2"]["$value"] = {"colorSpace": "srgb", "components": [0x1A / 255, 0x7F / 255, 0xC3 / 255]}
+            series["1"]["$value"] = {"colorSpace": "srgb", "components": [0x19 / 255, 0x7F / 255, 0xC3 / 255]}
+
+        self._edit_json("design/tokens/color.light.tokens.json", twin_series)
+        proc = self._check()
+        self.assertEqual(proc.returncode, 1)
+        self.assertIn(
+            "gate: [light, deuteranopia] color.viz.series.1 and color.viz.series.2: deltaE_ok 0.00", proc.stderr
+        )
 
     def test_contrast_pair_below_aa_fails(self):
         def text_like_canvas(data):

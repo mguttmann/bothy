@@ -26,7 +26,7 @@ from pathlib import Path
 HERE = Path(__file__).resolve().parent
 sys.path.insert(0, str(HERE))
 
-from tokenkit import accents, dtcg, emit_css, emit_dart, emit_docs, emit_mermaid, emit_preview, model, rules  # noqa: E402
+from tokenkit import accents, cvd, dtcg, emit_css, emit_dart, emit_docs, emit_mermaid, emit_preview, model, rules  # noqa: E402
 
 ROOT = HERE.parents[1]
 RESOLVER = ROOT / "design" / "tokens" / "theme.resolver.json"
@@ -68,8 +68,32 @@ def _accents_json(variants: dict, default: str) -> dict:
     return {"default": default, "variants": out}
 
 
-def _resolved_json(m: model.Model, variants: dict | None = None, default: str = "") -> str:
-    """The file tokens.resolved.json; `variants` and `default` add the member `accents`."""
+def _cvd_json(cvd_rows: list, rule_data: dict) -> dict:
+    """Member `cvd` of tokens.resolved.json: model, minimum and one entry per checked pair."""
+    return {
+        "model": cvd.MODEL,
+        "source": cvd.SOURCE,
+        "min_delta_e_ok": rule_data["cvd_min_delta_e_ok"]["value"],
+        "rows": [
+            {
+                "theme": r.theme,
+                "deficiency": r.deficiency,
+                "a": r.a,
+                "b": r.b,
+                "a_simulated": r.a_sim,
+                "b_simulated": r.b_sim,
+                "delta_e_ok": round(r.distance, 4),
+                "passed": r.passed,
+            }
+            for r in cvd_rows
+        ],
+    }
+
+
+def _resolved_json(
+    m: model.Model, variants: dict | None = None, default: str = "", cvd_member: dict | None = None
+) -> str:
+    """The file tokens.resolved.json; `variants` and `default` add `accents`, `cvd_member` adds `cvd`."""
 
     def value(token: dtcg.Token):
         if token.type == "color":
@@ -92,6 +116,8 @@ def _resolved_json(m: model.Model, variants: dict | None = None, default: str = 
     }
     if variants:
         data["accents"] = _accents_json(variants, default)
+    if cvd_member:
+        data["cvd"] = cvd_member
     return json.dumps(data, indent=2, ensure_ascii=False) + "\n"
 
 
@@ -129,6 +155,8 @@ def generate() -> tuple[dict[Path, str], list[str]]:
     except accents.AccentContrastError as exc:
         variants, accent_problems = {}, [str(exc)]
     accent_rows = rules.check_accent_contrast(themes, rule_data["contrast_pairs"], variants, default)
+    cvd_rows = rules.check_cvd(themes, rule_data)
+    cvd_member = _cvd_json(cvd_rows, rule_data) if cvd_rows else None
     guard_problems: list[str] = []
     for ctx, tokens in themes.items():
         guard_problems += [f"[{ctx}] {p}" for p in rules.check_guards(tokens, rule_data["palette_guards"])]
@@ -142,17 +170,25 @@ def generate() -> tuple[dict[Path, str], list[str]]:
         for r in accent_rows
         if not r.passed
     ]
+    problems += [
+        f"[{r.theme}, {r.deficiency}] {r.a} and {r.b}: deltaE_ok {r.distance:.3f} < {r.required:g} "
+        f"({r.a_hex} and {r.b_hex}, simulated {r.a_sim} and {r.b_sim})"
+        for r in cvd_rows
+        if not r.passed
+    ]
     problems += accent_problems + guard_problems
     outputs = {
         BUILD / "README.md": _build_readme(),
         BUILD / "tokens.css": emit_css.render(m, HEADER, variants, default),
         BUILD / "dart" / "design_tokens.g.dart": emit_dart.render(m, HEADER, variants, default),
-        BUILD / "tokens.resolved.json": _resolved_json(m, variants, default),
+        BUILD / "tokens.resolved.json": _resolved_json(m, variants, default, cvd_member),
         BUILD / "preview.html": emit_preview.render(m, VENDOR, HEADER),
         BUILD / "mermaid.config.json": emit_mermaid.render(m),
         DOCS / "site-theme.css": emit_mermaid.material_css(m, HEADER),
         DOCS / "palette.md": emit_docs.palette_md(m, HEADER),
-        DOCS / "contrast.md": emit_docs.contrast_md(rows, guard_problems, HEADER, accent_rows, variants, default),
+        DOCS / "contrast.md": emit_docs.contrast_md(
+            rows, guard_problems, HEADER, accent_rows, variants, default, cvd_rows, rule_data.get("cvd_min_delta_e_ok")
+        ),
         DOCS / "tokens.md": emit_docs.tokens_md(m, HEADER),
     }
     return outputs, problems

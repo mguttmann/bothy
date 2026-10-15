@@ -25,6 +25,11 @@ operated, and the order of the build.
 
 ### Added
 
+- Design tokens: `make tokens` checks the chart series `color.viz.series.1` to `.8` (adjacent
+  pairs and series 8 with series 1) and the traffic light states `success.fg`, `warning.fg` and
+  `danger.fg` under simulated protanopia, deuteranopia and tritanopia (Machado et al. 2009,
+  severity 1.0) against the minimum OKLab distance `cvd_min_delta_e_ok`; failures name theme,
+  deficiency, pair and distance, and `docs/design/contrast.md` lists every row (M6-10).
 - The docs site has a REST reference, a schema reference and a gateway reference, rendered in
   every `make docs` from `docs/api/openapi.yaml` and `docs/api/asyncapi.yaml` by the MkDocs
   hook `tools/docs/mkdocs_api_reference.py`; `make docs` also fails when a built page loads a
@@ -267,6 +272,12 @@ operated, and the order of the build.
 
 ### Changed
 
+- Design tokens: series and state roles moved along their scales so that they stay apart under
+  the simulation: light `color.viz.series.3` `spruce.600` to `spruce.700`, `.6` `moss.600` to
+  `moss.900`, `color.warning.fg` `amber.700` to `amber.800`, `color.danger.fg` `rowan.700` to
+  `rowan.900`; dark `color.viz.series.3` `spruce.400` to `spruce.300`, `.7` `rowan.400` to
+  `rowan.500`, `color.danger.fg` `rowan.300` to `rowan.400`. Every contrast pairing stays green;
+  the previews are regenerated (M6-10).
 - `make test` measures Go coverage with `-coverpkg=./...`: a statement counts as covered when
   any test of its module runs it, also one in another package, for the gate `coverage` and for
   the new-code coverage in SonarQube (PL/1 in [DECISIONS.md](docs/DECISIONS.md)).

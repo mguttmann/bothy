@@ -65,7 +65,7 @@
     },
     "warning": {
       "$description": "Amber: stall, degraded, estimate exceeded.",
-      "fg": {"$value": "{palette.amber.700}"},
+      "fg": {"$value": "{palette.amber.800}"},
       "subtle": {"$value": "{palette.amber.100}", "$description": "amber.100 instead of amber.50: as a surface, amber.50 looks like cream (guard in design/design-rules.json)."},
       "border": {"$value": "{palette.amber.600}"},
       "bg": {"$value": "{palette.amber.300}"},
@@ -73,7 +73,7 @@
     },
     "danger": {
       "$description": "Rowan: errors, destructive actions.",
-      "fg": {"$value": "{palette.rowan.700}"},
+      "fg": {"$value": "{palette.rowan.900}"},
       "subtle": {"$value": "{palette.rowan.50}"},
       "border": {"$value": "{palette.rowan.600}"},
       "bg": {"$value": "{palette.rowan.700}"},
@@ -150,10 +150,10 @@
         "$description": "Categorical series in a fixed order; blue and orange first, because they stay distinguishable with red-green color blindness. A second cue (label or pattern) is required.",
         "1": {"$value": "{palette.loch.600}"},
         "2": {"$value": "{palette.amber.600}"},
-        "3": {"$value": "{palette.spruce.600}"},
+        "3": {"$value": "{palette.spruce.700}"},
         "4": {"$value": "{palette.heather.600}"},
         "5": {"$value": "{palette.gorse.600}"},
-        "6": {"$value": "{palette.moss.600}"},
+        "6": {"$value": "{palette.moss.900}"},
         "7": {"$value": "{palette.rowan.600}"},
         "8": {"$value": "{palette.granite.500}"}
       },
