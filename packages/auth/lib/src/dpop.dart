@@ -25,8 +25,8 @@ import 'package:domain/domain.dart';
 /// );
 /// ```
 final class DpopProofFactory {
-  /// Creates the factory for [key], taking nonces from [nonces], time from [clock] and the
-  /// `jti` values from [ids].
+  /// Creates the factory for the signer `key`, taking nonces from the store `nonces`, time
+  /// from `clock` and the `jti` values from `ids`.
   DpopProofFactory(this._key, this._nonces, this._clock, this._ids);
 
   final DeviceKeySigner _key;

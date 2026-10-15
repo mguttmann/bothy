@@ -128,7 +128,7 @@ class RefreshInterceptor extends Interceptor {
 /// (`beginPairing`, `completePairing`, `completeOidcLogin` and the other completions) and no
 /// `Authorization`. A second `use_dpop_nonce` goes to the caller.
 class DpopInterceptor extends Interceptor {
-  /// Internal: created by the session over its [SessionCore] with its [proofs].
+  /// Internal: created by the session over its [SessionCore] with its `proofs`.
   DpopInterceptor(this._core, this._proofs);
 
   final SessionCore _core;
@@ -218,7 +218,7 @@ const String stepUpPurposeExtra = 'auth.step_up_purpose';
 /// A cancelled prompt ends the request with [StepUpCancelled]; a second `step_up_required`
 /// after a successful confirmation goes to the caller, never into a loop.
 class StepUpInterceptor extends Interceptor {
-  /// Internal: created by the session over its [SessionCore] with its [stepUp] service.
+  /// Internal: created by the session over its [SessionCore] with its `stepUp` service.
   StepUpInterceptor(this._core, this._stepUp);
 
   final SessionCore _core;
