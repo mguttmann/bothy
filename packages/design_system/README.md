@@ -2,9 +2,9 @@
 
 The one place where the apps and the console get their look: the generated design tokens, the
 theme built from them, the resolver from the personal settings to the theme inputs, the bundled
-fonts and the shared golden test setup. Components (M4-07) and icons (M4-05) follow.
+fonts, the semantic icons and the shared golden test setup. Components (M4-07) follow.
 
-Status: tokens, theme, fonts and golden setup (M4-04). Kind: Flutter package, a member of the
+Status: tokens, theme, fonts and golden setup (M4-04), icons (M4-05). Kind: Flutter package, a member of the
 Dart workspace at the repository root (`resolution: workspace`, `publish_to: none`).
 
 ## What the package provides
@@ -18,6 +18,9 @@ Dart workspace at the repository root (`resolution: workspace`, `publish_to: non
 | `buildDsTheme`, `dsTextStyle`, `DsNoTransitionsBuilder` | `design_system.dart` | `ThemeData` of a `DsContext`; a type role ready for rendering |
 | `context.dsColors`, `dsAccent`, `dsDensity`, `dsMotion`, `dsElevation` | `design_system.dart` | accessors on `BuildContext`; a `StateError` naming the extension when the theme was not built with `buildDsTheme` |
 | `DsThemeScope` | `design_system.dart` | applies a `DsContext` with `AnimatedTheme` (`motion.duration.fade`, zero under reduced motion) |
+| `DsIcon`, `DsIconSizeRole`, `DsIconPlaceholder` | `design_system.dart` | a semantic icon of `DsIcons` at `icon.size.*`; see "Icons" |
+| `DsIconAssets`, `dsSemanticIcons`, `dsIconPackage` | `design_system.dart` | generated asset lookup of the icons and the list of every semantic icon |
+| `dsPumpIcons` | `testing.dart` | `pumpBeforeTest` of a golden with icons: pumps until every icon asset is loaded |
 | `dsGoldenMatrix` | `testing.dart` | one alchemist `GoldenTestGroup` per theme, density, text scale and locale; import it from tests only |
 
 Widgets read colors, type, spacing and motion only from these classes (ADR 0030); no literal
@@ -97,6 +100,25 @@ of both repositories at the new commit, store them under the names of `fonts/`, 
 `fonts/MANIFEST.json` (source, commit, `sha256`, `bytes`) and run the tests. Every file stays below
 `repo.max_file_kb`.
 
+## Icons
+
+`DsIcon(DsIcons.<name>, label: ...)` draws a semantic icon; the glyph and its weight come from
+`design/tokens/icon.tokens.json`, never from a Phosphor name in widget code
+(docs/design/icons.md "Rules"). `filled: true` draws the `fill` form (active, reached state);
+`size` is `DsIconSizeRole.sm`, `md` (default) or `lg`; the color defaults to
+`color.text.primary`. Every icon needs a non-empty `label` (read by the screen reader as an
+image) or `decorative: true` (excluded from semantics); otherwise the constructor throws an
+`ArgumentError`. `trigger.working`, `run.running` and `state.reconnecting` rotate once per
+`motion.duration.pulse` in full motion and stand still in reduced motion.
+
+The assets are generated (docs/design/icons.md "Integration (M4-05)"): `assets/icons/<weight>/<glyph>.vec`
+compiled from the vendored Phosphor SVGs by `uv run tools/design-tokens/tokens.py icons` (also
+part of `build`), with `assets/icons/LICENSE` (Phosphor, MIT) and `assets/icons/MANIFEST.json`
+(source and asset SHA-256, total size). Never edit them; a new icon is a change in
+`icon.tokens.json`, then `tokens.py vendor` when its SVG is not vendored yet, then `build`.
+`test/icons_complete_test.dart` checks that every semantic and space icon resolves and the
+golden `test/goldens/icons_test.dart` shows every semantic icon in its mapped weight and in fill.
+
 ## Tokens
 
 `lib/src/generated/design_tokens.g.dart` is generated: never edit it. Change `design/tokens/` and
@@ -122,8 +144,10 @@ macOS; on another system the command rewrites only the CI goldens.
 Allowed members (docs/spec/15-client-architektur.md, 3.1; `tools/arch-check/rules.yaml`): `l10n`, `domain` (arrows of the diagram).
 Every other member is out of reach; `make arch` fails on a dependency or an import of it.
 External: `alchemist` (MIT) as a regular dependency, because `testing.dart` returns its
-`GoldenTestGroup` (docs/DECISIONS.md D-M4-04-5); `crypto` as a dev dependency for the font
-check.
+`GoldenTestGroup` (docs/DECISIONS.md D-M4-04-5); `flutter_test` (SDK) as a regular dependency
+for `dsPumpIcons`; `vector_graphics` (BSD-3-Clause) renders the icons; `crypto` as a dev
+dependency for the font check; `vector_graphics_compiler` (BSD-3-Clause) as a dev dependency
+that `tokens.py icons` runs from the workspace lock.
 
 Further rules checked by `make arch`:
 
@@ -135,7 +159,9 @@ Further rules checked by `make arch`:
 |---|---|
 | `lib/design_system.dart` | the public library; every public symbol has a doc comment (`make lint`, `public_member_api_docs`) |
 | `lib/testing.dart` | golden helpers for tests of every member |
-| `lib/src/generated/` | the generated token copy (no doc lint, no format check, no coverage) |
+| `lib/src/generated/` | the generated token copy and icon lookup (no doc lint, no format check, no coverage) |
+| `lib/src/icons/` | `DsIcon` |
+| `assets/icons/` | generated icon assets, Phosphor MIT text, `MANIFEST.json` |
 | `lib/src/theme/` | context, resolver, theme builder, scope widget |
 | `fonts/` | bundled font files, OFL texts, `MANIFEST.json` |
 | `test/` | tests, run by `make test` with coverage (`quality.coverage.dart_min_percent`) |

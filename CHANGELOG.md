@@ -25,6 +25,13 @@ Planning stage (milestone M0). Nothing is installable yet.
   font sizes and radii as typed constants) and copies the vendored Atkinson Hyperlegible fonts
   with their SIL Open Font License to `design/build/ts/fonts/`; `make tokens` fails on a stale or
   hand-edited file, a missing font or licence, and compiles the file with `tsc --strict` (M7-24).
+- Design system icons: `DsIcon` draws every semantic icon of `icon.tokens.json` from Phosphor
+  2.1.1 vectors compiled by `vector_graphics_compiler` (chosen over an icon font after a
+  sharpness and size measurement, docs/design/icons.md), at the `icon.size.*` tokens, with a
+  required label or `decorative: true` and the spin of `trigger.working`, `run.running` and
+  `state.reconnecting` only in full motion. `tokens.py icons` (part of `build`) generates the
+  assets, their lookup, the MIT text and a manifest, and `make tokens` fails on a missing glyph
+  or a stale asset; a golden shows every icon in its weight and in fill (M4-05).
 - Design tokens: `make tokens` checks the chart series `color.viz.series.1` to `.8` (adjacent
   pairs and series 8 with series 1) and the traffic light states `success.fg`, `warning.fg` and
   `danger.fg` under simulated protanopia, deuteranopia and tritanopia (Machado et al. 2009,

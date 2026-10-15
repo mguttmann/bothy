@@ -9,6 +9,7 @@ library;
 
 import 'package:alchemist/alchemist.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_test/flutter_test.dart';
 
 import 'design_system.dart';
 
@@ -66,6 +67,34 @@ GoldenTestGroup dsGoldenMatrix({
               ),
     ],
   );
+}
+
+/// Pumps until every [DsIcon] below the root has loaded its asset, then settles.
+///
+/// Icon assets load asynchronously from the asset bundle, which a widget test only serves
+/// outside the fake async zone; the loop gives the loads real time ([WidgetTester.runAsync])
+/// and stops when no [DsIconPlaceholder] is left. Pass it as `pumpBeforeTest` of a golden
+/// that shows icons. Throws a [StateError] when an icon is still pending after [timeout].
+///
+/// ```dart
+/// goldenTest('icons', fileName: 'icons', pumpBeforeTest: dsPumpIcons, builder: ...);
+/// ```
+Future<void> dsPumpIcons(
+  WidgetTester tester, {
+  Duration timeout = const Duration(seconds: 10),
+}) async {
+  final watch = Stopwatch()..start();
+  await tester.pump();
+  while (find.byType(DsIconPlaceholder).evaluate().isNotEmpty) {
+    if (watch.elapsed > timeout) {
+      throw StateError('icon assets still loading after $timeout');
+    }
+    await tester.runAsync(
+      () => Future<void>.delayed(const Duration(milliseconds: 5)),
+    );
+    await tester.pump();
+  }
+  await tester.pumpAndSettle();
 }
 
 /// One scenario of [dsGoldenMatrix]: locale, text scale, theme scope and background.

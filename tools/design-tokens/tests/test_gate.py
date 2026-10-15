@@ -3,12 +3,14 @@
 
 import hashlib
 import json
+import os
 import shutil
 import subprocess
 import sys
 import tempfile
 import unittest
 from pathlib import Path
+from unittest import mock
 
 import tokens
 
@@ -21,7 +23,8 @@ def _sha256(path):
 
 
 class GateTreeMixin:
-    """Copies tools/design-tokens, design/ and docs/design/ to a temporary root; `_check` runs the gate there."""
+    """Copies tools/design-tokens, design/, docs/design/ and the generated files of packages/design_system
+    to a temporary root; `_check` runs the gate there."""
 
     def setUp(self):
         self._tmp = tempfile.TemporaryDirectory(prefix="design-tokens-gate-")
@@ -30,10 +33,15 @@ class GateTreeMixin:
         shutil.copytree(HERE, self.root / "tools" / "design-tokens", ignore=ignore)
         shutil.copytree(ROOT / "design", self.root / "design", ignore=ignore)
         shutil.copytree(ROOT / "docs" / "design", self.root / "docs" / "design", ignore=ignore)
-        package_copy = Path("packages", "design_system", "lib", "src", "generated")
-        shutil.copytree(ROOT / package_copy, self.root / package_copy, ignore=ignore)
+        package = Path("packages", "design_system")
+        for sub in (Path("lib", "src", "generated"), Path("assets", "icons")):
+            shutil.copytree(ROOT / package / sub, self.root / package / sub, ignore=ignore)
+        # The icon compiler runs in the real package: the copy has no resolved Dart workspace.
+        self._env = mock.patch.dict(os.environ, {tokens.ICON_COMPILER_ENV: str(ROOT / package)})
+        self._env.start()
 
     def tearDown(self):
+        self._env.stop()
         self._tmp.cleanup()
 
     def _check(self):

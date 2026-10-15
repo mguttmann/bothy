@@ -5,7 +5,12 @@ Resolver Module 2025.10), prüft Kontrast und Palettenwächter und schreibt alle
 und Gründe: ADR 0030. Gestaltung: [docs/design/README.md](../../docs/design/README.md).
 
 Nur Python-Standardbibliothek; `uv` stellt die Python-Version (PEP 723 im Kopf von `tokens.py`).
-Keine Paket-Abhängigkeit, damit das Gate ohne Netz und ohne Lieferkette läuft.
+Keine Paket-Abhängigkeit, damit das Gate ohne Netz und ohne Lieferkette läuft. The one exception is
+the icon build: it runs `dart run vector_graphics_compiler` in `packages/design_system`, from the
+workspace lock and without a network once `flutter pub get` has run, so `build`, `check`, `icons`
+and the tests need the pinned Flutter SDK on `PATH` (R-QA-02). `DS_ICON_COMPILER_DIR` names
+another package directory for the compiler; the gate tests set it, because they check a copy of
+the tree without a resolved workspace.
 
 ## Befehle
 
@@ -16,7 +21,8 @@ Aus dem Wurzelverzeichnis des Repositorys:
 | `uv run tools/design-tokens/tokens.py build` | Gates prüfen, dann alle Ausgaben schreiben. Exit 1 bei Verstoß, nichts wird geschrieben. |
 | `uv run tools/design-tokens/tokens.py check` | Gates prüfen und vergleichen; Exit 1, wenn eine erzeugte Datei nicht zur Quelle passt. Für das lokale Gate und CI. |
 | `uv run tools/design-tokens/tokens.py previews [--view NAME]` | PNG-Vorschauen nach `docs/design/previews/` mit dem Playwright-CLI (`npx`, gepinnte Version in `tokens.py`). Braucht Node und einen installierten Chromium. Nicht Teil von `check`, weil Pixel je Maschine abweichen. `--view` (repeatable: `palette`, `layout`, `components`, `mobile`, `viz`) renders only these views and leaves the other images unchanged. |
-| `uv run tools/design-tokens/tokens.py vendor --phosphor DIR --sans DIR --mono DIR` | Schriften und benutzte Phosphor-SVGs nach `vendor/` kopieren (Textdateien mit LF), `vendor/MANIFEST.json` mit SHA-256 der gespeicherten Bytes schreiben. |
+| `uv run tools/design-tokens/tokens.py icons` | Only the icon assets of `packages/design_system` (see "Icon assets"); `build` writes them too. |
+| `uv run tools/design-tokens/tokens.py vendor --phosphor DIR [--sans DIR --mono DIR]` | Copy the used Phosphor SVGs (every mapped glyph in its weight and in `fill`, every space icon in `regular`) and, when `--sans` and `--mono` are given, the fonts to `vendor/` (text files with LF), and write `vendor/MANIFEST.json` with the SHA-256 of the stored bytes. Without the font options `vendor/fonts/` stays as it is. |
 | `make tokens` | Das Gate (Teil von `make gates`): ruft `make -C tools/design-tokens check` auf, also die Tests unter `tests/` und danach `tokens.py check`, beides in der gepinnten Umgebung `tools/`. |
 | `make lint`, `make fmt-check` | ruff mit der Konfiguration `ruff.toml` dieses Ordners, dazu bandit. |
 
@@ -40,6 +46,7 @@ uv run --project tools --locked check-jsonschema --schemafile https://www.design
 | `design/build/ts/fonts/` | byte-identical copies of every file under `vendor/fonts/`: the WOFF2 files of Atkinson Hyperlegible Next and Mono and their SIL Open Font License texts (`<family>.OFL.txt`) |
 | `design/build/preview.html` | eigenständige Vorschau mit eingebetteten Schriften und Icons |
 | `design/build/README.md` | Hinweis "generiert" |
+| `packages/design_system/assets/icons/<weight>/<glyph>.vec`, `LICENSE`, `MANIFEST.json`, `packages/design_system/lib/src/generated/ds_icon_assets.g.dart` | the icon assets (see "Icon assets") |
 | `docs/design/palette.md`, `contrast.md`, `tokens.md` | erzeugte Doku |
 
 The Dart file is not `dart format`-formatted; as generated code the package copy is outside the
@@ -103,6 +110,20 @@ analyzes its users and `flutter test` compiles it (M4-04).
 - The instance accent is no resolver modifier: an accent role always depends on the theme as
   well, which the rule above forbids. The variants are derived from the theme contexts and written
   as the separate extension `DsAccent` and separate CSS blocks.
+
+## Icon assets
+
+`tokenkit/icon_assets.py` reads `ds.icons` of the resolved model and builds every mapped glyph in
+its mapped weight and in `fill`, and every space icon in `regular`, sorted by `<weight>/<glyph>`:
+`assets/icons/<weight>/<glyph>.vec` compiled by `vector_graphics_compiler` (one call for all SVGs;
+the mask, clip and overdraw optimizers are off, so the output needs no native library and is the
+same on every host), the lookup `lib/src/generated/ds_icon_assets.g.dart` (`DsIconAssets`,
+`dsSemanticIcons`), `assets/icons/LICENSE` and `assets/icons/MANIFEST.json` (package, compiler
+version, SHA-256 of every source and asset, `total_bytes`). `check` builds them in memory and
+reports every asset that differs byte for byte, is missing or is not generated (an extra file
+under `assets/icons/`) as `stale:`; a mapped glyph without its SVG fails `build`, `check` and
+`icons` with exit 2 and names the semantic name, the glyph and the weight. The choice of vectors
+over an icon font: docs/design/icons.md "Integration (M4-05)", docs/DECISIONS.md D-M4-05-1.
 
 ## vendor/
 
