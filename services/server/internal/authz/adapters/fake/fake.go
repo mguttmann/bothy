@@ -63,6 +63,8 @@ type Principals struct {
 	passkeys map[ids.ID]bool
 	// profiles are the names, locales and time zones set with PutProfile (M1-49).
 	profiles map[ids.ID]authz.PrincipalProfile
+	// local are the persons with an established password path (SetLocalCredential).
+	local map[ids.ID]bool
 }
 
 // Compile-time check.
@@ -107,6 +109,26 @@ func (s *Principals) HasActivePasskey(_ context.Context, userID ids.ID) (bool, e
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	return s.passkeys[userID], nil
+}
+
+// SetLocalCredential records whether the person id has an established password path.
+func (s *Principals) SetLocalCredential(id ids.ID, established bool) {
+	s.mu.Lock()
+	if s.local == nil {
+		s.local = map[ids.ID]bool{}
+	}
+	s.local[id] = established
+	s.mu.Unlock()
+}
+
+// HasEstablishedLocalCredential implements authz.PrincipalSource.
+func (s *Principals) HasEstablishedLocalCredential(_ context.Context, id ids.ID) (bool, error) {
+	if err := s.err(); err != nil {
+		return false, err
+	}
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return s.local[id], nil
 }
 
 // ActiveOwnerIDs implements authz.PrincipalSource.

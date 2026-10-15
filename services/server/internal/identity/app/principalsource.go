@@ -55,6 +55,12 @@ func (s *PrincipalSource) HasActivePasskey(ctx context.Context, userID ids.ID) (
 	return s.store.HasActivePasskey(ctx, userID)
 }
 
+// HasEstablishedLocalCredential implements authz.PrincipalSource over the Store. Errors: those
+// of the Store.
+func (s *PrincipalSource) HasEstablishedLocalCredential(ctx context.Context, userID ids.ID) (bool, error) {
+	return s.store.HasEstablishedLocalCredential(ctx, userID)
+}
+
 // Refs implements authz.PrincipalSource (M1-48): the public views (handle, display name, avatar)
 // of the known principals among principals, whatever their status; unknown ids are absent.
 // Errors: those of the Store.

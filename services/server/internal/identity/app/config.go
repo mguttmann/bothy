@@ -120,4 +120,22 @@ type Config struct {
 	// the job identity.auth_cleanup (device.expire). Zero switches the check off; the key's
 	// minimum keeps it on in a server.
 	DeviceInactiveRevokeAfter time.Duration `config:"auth.device_inactive_revoke_after"`
+	// LocalPasswordEnabled is auth.local_password_enabled: password with TOTP as fallback for
+	// local accounts (M1-39); off, the login answers 404 and setMyLocalCredential 403.
+	LocalPasswordEnabled bool `config:"auth.local_password_enabled"`
+	// PasswordMinLength is auth.password_min_length, in Unicode code points after NFC.
+	PasswordMinLength int `config:"auth.password_min_length"`
+	// Argon2idMemoryKiB, Argon2idIterations and Argon2idParallelism are auth.argon2id_*, the
+	// parameters of new password hashes (OWASP floor 19456 KiB, 2, 1; 08 section 2.5).
+	Argon2idMemoryKiB   int `config:"auth.argon2id_memory_kib"`
+	Argon2idIterations  int `config:"auth.argon2id_iterations"`
+	Argon2idParallelism int `config:"auth.argon2id_parallelism"`
+	// LoginFailLimit is auth.login_fail_limit: failures of a login name per LoginFailWindow
+	// before the password path is locked.
+	LoginFailLimit int `config:"auth.login_fail_limit"`
+	// LoginLockDuration is auth.login_lock_duration, how long the password path stays locked.
+	LoginLockDuration time.Duration `config:"auth.login_lock_duration"`
+	// TOTPKeyRef is auth.totp_key_ref, the secret reference of the AES-256 key of the TOTP
+	// secrets (32 bytes as hex).
+	TOTPKeyRef string `config:"auth.totp_key_ref"`
 }

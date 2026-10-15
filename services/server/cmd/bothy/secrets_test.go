@@ -130,6 +130,8 @@ func TestConfigPrintNeverShowsSecrets(t *testing.T) {
 	writeSecret(t, dir, "audit_ip_kek", strings.Repeat("6b", 32), 0o600)
 	// and auth.token_pepper_ref (M1-33).
 	writeSecret(t, dir, "token_pepper", strings.Repeat("7c", 32), 0o600)
+	// and auth.totp_key_ref (M1-39).
+	writeSecret(t, dir, "totp_key", strings.Repeat("5d", 32), 0o600)
 	for _, args := range [][]string{{"config", "print", "--redacted"}, {"config", "check", "--secrets"}} {
 		code, stdout, stderr = runBothy(t, []string{"BOTHY_SECRETS__DIR=" + dir}, args...)
 		if code != 0 || stderr != "" {
@@ -148,6 +150,7 @@ func TestConfigPrintNeverShowsSecrets(t *testing.T) {
 	want = "secret audit.checkpoint_s3_access_key_ref" + sinkSkipped +
 		"secret audit.checkpoint_s3_secret_key_ref" + sinkSkipped +
 		"secret auth.token_pepper_ref: ok\n" +
+		"secret auth.totp_key_ref: ok\n" +
 		"secret database.password_ref: ok\n" +
 		"secret file.s3.access_key_ref" + s3Skipped +
 		"secret file.s3.secret_key_ref" + s3Skipped +
@@ -307,7 +310,7 @@ func TestSecretsInitCommand(t *testing.T) {
 		t.Fatalf("fresh target: exit %d, stderr %q, stdout\n%s", code, stderr, first)
 	}
 	lines := reportLines(t, first, target)
-	for _, want := range []string{"generated db_app_password sha256:", "adopted apns_key.p8 sha256:", "pending totp_key", "missing sentry_key"} {
+	for _, want := range []string{"generated db_app_password sha256:", "adopted apns_key.p8 sha256:", "generated totp_key sha256:", "missing sentry_key"} {
 		if !slices.ContainsFunc(lines, func(l string) bool { return strings.HasPrefix(l, want) }) {
 			t.Errorf("report has no line %q:\n%s", want, first)
 		}

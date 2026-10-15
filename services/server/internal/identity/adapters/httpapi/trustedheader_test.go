@@ -47,7 +47,7 @@ func headerWorld(t *testing.T, trusted string, bind, loopback bool) *sworld {
 	cfg := sessCfg
 	cfg.TrustedProxies = []netip.Prefix{netip.MustParsePrefix(trusted)}
 	cfg.TrustedHeaderBindRequests = bind
-	w := newSessionWorldWith(t, pgtest.New(t), clock.NewFake(sessStart), ids.New(), keyDir(t), cfg)
+	w := newSessionWorldWith(t, pgtest.New(t), clock.NewFake(sessStart), ids.New(), keyDir(t), worldOptions{cfg: func(c *app.Config) { *c = cfg }})
 	w.id.SetPublicListenerLoopback(loopback)
 	return w
 }

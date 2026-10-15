@@ -42,8 +42,10 @@ vendors:
     in: [github.com/testcontainers/testcontainers-go, github.com/testcontainers/testcontainers-go/**]
   v-webauthn:
     in: [github.com/go-webauthn/webauthn, github.com/go-webauthn/webauthn/**]
+  v-xcrypto:
+    in: [golang.org/x/crypto/argon2]
   v-xtext:
-    in: [golang.org/x/text/language]
+    in: [golang.org/x/text/language, golang.org/x/text/unicode/norm]
   v-yaml:
     in: [go.yaml.in/yaml/v3]
 components:
@@ -333,7 +335,7 @@ deps:
     mayDependOn: [identity-app, identity, identity-domain, kernel-ports, instance, authz]
   identity-adapters:
     mayDependOn: [identity-adapters, identity, identity-app, identity-domain, kernel-ports, platform-buildinfo, platform-config, platform-egress, platform-health, platform-httpserver, platform-jobs, platform-jsoncanon, platform-lifecycle, platform-otel, platform-pg, platform-ratelimit, platform-secrets, api, instance, authz]
-    canUse: [v-pgx, v-xtext, v-webauthn]
+    canUse: [v-pgx, v-xtext, v-webauthn, v-xcrypto]
   chat:
     mayDependOn: [chat, kernel-ports]
   chat-domain:

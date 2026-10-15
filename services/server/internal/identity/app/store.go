@@ -43,6 +43,10 @@ type OwnerRecord struct {
 // violation is validation_failed with the column as field, anything else is internal (or the
 // unavailable error of the pool).
 type Store interface {
+	// HasEstablishedLocalCredential reports a local_credentials row of an active identity of
+	// userID with totp_enabled_at IS NOT NULL: the established password path (M1-39, 07 section
+	// 4.2 step 8).
+	HasEstablishedLocalCredential(ctx context.Context, userID ids.ID) (bool, error)
 	// Principal returns the principal id with its owner flag; found is false for an unknown id.
 	Principal(ctx context.Context, id ids.ID) (rec PrincipalRecord, found bool, err error)
 	// Principals returns the known principals among ids in ascending id order; unknown and

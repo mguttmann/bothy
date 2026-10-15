@@ -110,6 +110,8 @@ type Handlers struct {
 	// Hosts implements listHosts, createHost, getHost, updateHost and setHostState (terminal,
 	// M2-39) and setHostLlmCredentials (M2-40).
 	*terminalhttp.Hosts
+	// Local implements loginWithPassword and setMyLocalCredential (identity, M1-39).
+	*identityhttp.Local
 }
 
 // routeBuilder builds and verifies the routes of one REST surface against a catalogue with the

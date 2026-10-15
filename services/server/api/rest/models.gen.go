@@ -15608,6 +15608,12 @@ type CompletePasskeyLoginParams struct {
 	DPoP DpopProof `json:"DPoP"`
 }
 
+// LoginWithPasswordParams defines parameters for LoginWithPassword.
+type LoginWithPasswordParams struct {
+	// DPoP DPoP proof (RFC 9449) signed with the device key that the new tokens will be bound to.
+	DPoP DpopProof `json:"DPoP"`
+}
+
 // RefreshTokenParams defines parameters for RefreshToken.
 type RefreshTokenParams struct {
 	// DPoP DPoP proof (RFC 9449) signed with the device key that the new tokens will be bound to.
@@ -16078,6 +16084,9 @@ type BeginPasskeyLoginJSONRequestBody = PasskeyLoginBeginRequest
 // CompletePasskeyLoginJSONRequestBody defines body for CompletePasskeyLogin for application/json ContentType.
 type CompletePasskeyLoginJSONRequestBody = PasskeyLoginCompleteRequest
 
+// LoginWithPasswordJSONRequestBody defines body for LoginWithPassword for application/json ContentType.
+type LoginWithPasswordJSONRequestBody = PasswordLoginRequest
+
 // CompleteStepUpWithDeviceKeyJSONRequestBody defines body for CompleteStepUpWithDeviceKey for application/json ContentType.
 type CompleteStepUpWithDeviceKeyJSONRequestBody = StepUpDeviceKeyRequest
 
@@ -16182,6 +16191,9 @@ type BeginIdentityLinkJSONRequestBody = IdentityLinkBegin
 
 // CompleteIdentityLinkJSONRequestBody defines body for CompleteIdentityLink for application/json ContentType.
 type CompleteIdentityLinkJSONRequestBody = IdentityLinkComplete
+
+// SetMyLocalCredentialJSONRequestBody defines body for SetMyLocalCredential for application/json ContentType.
+type SetMyLocalCredentialJSONRequestBody = LocalCredentialSet
 
 // CompletePasskeyRegistrationJSONRequestBody defines body for CompletePasskeyRegistration for application/json ContentType.
 type CompletePasskeyRegistrationJSONRequestBody = PasskeyRegisterComplete

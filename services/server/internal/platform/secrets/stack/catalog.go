@@ -82,8 +82,8 @@ var catalog = []Entry{
 	{Name: "db_maint_password", Origin: OriginGenerated, Generator: GeneratorToken, Services: []string{serviceServer, serviceMigrate}},
 	{Name: "db_monitor_password", Origin: OriginGenerated, Generator: GeneratorToken, Services: []string{serviceCollector, serviceMigrate}},
 	{Name: "token_pepper", Origin: OriginGenerated, Generator: GeneratorKey, Services: []string{serviceServer}},
-	// The TOTP key format (AES-256-GCM key of local_credentials) is fixed by its ticket.
-	{Name: "totp_key", Origin: OriginGenerated, Generator: GeneratorPending, PendingOn: "M1-39", Services: []string{serviceServer}},
+	// The AES-256-GCM key of the TOTP secrets in local_credentials (M1-39): 32 bytes as hex.
+	{Name: "totp_key", Origin: OriginGenerated, Generator: GeneratorKey, Services: []string{serviceServer}},
 	{Name: "telemetry_pseudonym_key", Origin: OriginGenerated, Generator: GeneratorKey, Services: []string{serviceServer, serviceCollector}},
 	{Name: "audit_ip_kek", Origin: OriginGenerated, Generator: GeneratorKey, Services: []string{serviceServer}},
 	{Name: "file_ticket_key", Origin: OriginGenerated, Generator: GeneratorKey, Services: []string{serviceServer}},

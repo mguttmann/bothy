@@ -116,6 +116,9 @@ var appPrivileges = map[string][]string{
 	"hosts":              {"SELECT", "INSERT", "UPDATE"},
 	"host_session_users": {"SELECT", "INSERT", "UPDATE"},
 	"terminal_sessions":  {"SELECT", "INSERT", "UPDATE"},
+	// 03 local_credentials (M1-39): one row per local identity, changed in place; it goes with
+	// its identity (ON DELETE CASCADE).
+	"local_credentials": {"SELECT", "INSERT", "UPDATE"},
 }
 
 // allPrivileges are the table rights PostgreSQL 18 knows (MAINTAIN since 17).
