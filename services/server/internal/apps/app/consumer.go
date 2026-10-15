@@ -93,7 +93,9 @@ func (c *Consumer) HandleEvent(ctx context.Context, ev sync.Event) error {
 
 // add inserts the row of ev for cand and applies the quota and the job of design note 3 d and e.
 func (c *Consumer) add(ctx context.Context, m *roundMemo, cand Candidate, ev sync.Event) error {
-	inserted, err := c.w.d.Store.InsertDelivery(ctx, DeliveryRecord{ID: ids.New(), SubscriptionID: cand.SubscriptionID, EventSeq: ev.Seq, EventID: ev.ID})
+	inserted, err := c.w.d.Store.InsertDelivery(ctx, DeliveryRecord{
+		ID: ids.New(), SubscriptionID: cand.SubscriptionID, EventSeq: ev.Seq, EventID: ev.ID, CreatedAt: c.w.now(),
+	})
 	if err != nil || !inserted {
 		return err
 	}

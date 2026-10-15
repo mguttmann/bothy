@@ -181,6 +181,7 @@ func (r *Repository) InsertDelivery(ctx context.Context, d app.DeliveryRecord) (
 	}
 	n, err := q.InsertDelivery(ctx, sqlcgen.InsertDeliveryParams{
 		ID: uuid(d.ID), SubscriptionID: uuid(d.SubscriptionID), EventSeq: d.EventSeq, EventID: uuid(d.EventID),
+		CreatedAt: pgtype.Timestamptz{Time: d.CreatedAt, Valid: true},
 	})
 	if err != nil {
 		return false, mapError(err, "inserting a delivery")

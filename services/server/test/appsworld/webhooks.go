@@ -28,9 +28,11 @@ import (
 
 	appsjobs "github.com/OWNER/bothy/services/server/internal/apps/adapters/jobs"
 	appsapp "github.com/OWNER/bothy/services/server/internal/apps/app"
+	"github.com/OWNER/bothy/services/server/internal/kernel/actor"
 	"github.com/OWNER/bothy/services/server/internal/kernel/eventlog"
 	"github.com/OWNER/bothy/services/server/internal/kernel/ids"
 	"github.com/OWNER/bothy/services/server/internal/platform/egress"
+	"github.com/OWNER/bothy/services/server/internal/platform/httpserver/httpservertest"
 	"github.com/OWNER/bothy/services/server/internal/platform/jobs"
 	"github.com/OWNER/bothy/services/server/internal/platform/jobs/jobstest"
 	"github.com/OWNER/bothy/services/server/internal/sync"
@@ -214,6 +216,7 @@ type webhookParts struct {
 	Resolver   *Resolver
 	Metrics    *Metrics
 	Config     appsapp.WebhookConfig
+	deps       appsapp.WebhookDeps
 }
 
 // writeMasterKey writes the master key of the v1 secrets into the secrets directory dir.
@@ -499,3 +502,51 @@ func Status(status int, headers ...string) func(*http.Request, []byte) (int, htt
 
 // Itoa is strconv.Itoa for the tests.
 func Itoa(n int) string { return strconv.Itoa(n) }
+
+// Anonymous sends a request without credentials.
+func (w *World) Anonymous(method, path string) *httpservertest.Response {
+	w.t.Helper()
+	return w.h.Do(w.h.NewRequest(method, path, ""))
+}
+
+// Logs returns the captured log records of the modules.
+func (w *World) Logs() []httpservertest.Record { return w.logs.Records() }
+
+// RowsJSON returns every row of table as JSON text (row_to_json), read as the database owner, for
+// the leak checks.
+func (w *World) RowsJSON(table string) []string {
+	w.t.Helper()
+	rows, err := w.owner.Query(context.Background(), `SELECT row_to_json(t)::text FROM `+table+` t`)
+	Must(w.t, err)
+	defer rows.Close()
+	var out []string
+	for rows.Next() {
+		var s string
+		Must(w.t, rows.Scan(&s))
+		out = append(out, s)
+	}
+	return out
+}
+
+// WebhookService builds a second webhook service over the collaborators of the world with the
+// store wrapped by wrap and the scheduler of the world, as a second worker would; the tests of
+// the crash and of concurrent attempts use it.
+func (w *World) WebhookService(wrap func(appsapp.WebhookStore) appsapp.WebhookStore) *appsapp.WebhookService {
+	w.t.Helper()
+	d := w.web.deps
+	if wrap != nil {
+		d.Store = wrap(d.Store)
+	}
+	d.Scheduler = w.apps.Scheduler
+	svc, err := appsapp.NewWebhooks(w.web.Config, d)
+	Must(w.t, err)
+	return svc
+}
+
+// RevokeGrant revokes the grant id as Robin through authz.Admin.
+func (w *World) RevokeGrant(id ids.ID) {
+	w.t.Helper()
+	robin := w.RobinPhone.StepUp().Actor()
+	_, err := w.admin.RevokeGrant(actor.WithActor(context.Background(), robin), robin, id, "Access ends")
+	Must(w.t, err)
+}

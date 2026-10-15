@@ -73,8 +73,8 @@ WHERE s.state IN ('active', 'paused') AND i.state IN ('active', 'suspended')
 ORDER BY s.id;
 
 -- name: InsertDelivery :execrows
-INSERT INTO webhook_deliveries (id, subscription_id, event_seq, event_id, status, attempt)
-VALUES (@id, @subscription_id, @event_seq, @event_id, 'pending', 0)
+INSERT INTO webhook_deliveries (id, subscription_id, event_seq, event_id, status, attempt, created_at)
+VALUES (@id, @subscription_id, @event_seq, @event_id, 'pending', 0, @created_at)
 ON CONFLICT (subscription_id, event_seq) DO NOTHING;
 
 -- name: CountPending :one

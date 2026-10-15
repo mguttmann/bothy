@@ -25,6 +25,8 @@ import (
 
 	"github.com/OWNER/bothy/services/server/api/rest"
 	"github.com/OWNER/bothy/services/server/api/routes"
+	appshttp "github.com/OWNER/bothy/services/server/internal/apps/adapters/httpapi"
+	appspg "github.com/OWNER/bothy/services/server/internal/apps/adapters/postgres"
 	appsapp "github.com/OWNER/bothy/services/server/internal/apps/app"
 	"github.com/OWNER/bothy/services/server/internal/audit/adapters/logs"
 	auditpg "github.com/OWNER/bothy/services/server/internal/audit/adapters/postgres"
@@ -262,6 +264,13 @@ func (w *World) buildApps(o Options, pool *pg.Pool, hook *authzapp.RightsHook, a
 	master := wire.NewHMACMasterKey(sp, "file:<secrets.dir>/webhook_hmac_master_key")
 	Must(t, master.Check(context.Background()))
 	syncRepo := syncpg.NewRepository(pool, log)
+	// The instance row with its sync_epoch, as bothy migrate up writes it (M1-15).
+	w.SQL(`INSERT INTO instance (id, instance_id, schema_version, sync_epoch) VALUES (1, $1, 1, $2) ON CONFLICT (id) DO NOTHING`,
+		ids.New().String(), ids.New().String())
+	repo := appspg.NewRepository(pool)
+	w.web.deps = appsapp.WebhookDeps{Store: repo, Repo: repo, UoW: w.uow, Authorizer: az, Audit: w.rec, Sender: sender, Master: master,
+		Keys: keys, State: instanceapp.NewState(instancepg.NewRepository(pool), w.uow), Log: syncRepo, Cursors: appshttp.Cursors{},
+		Clock: w.Clk, Logger: log}
 	w.apps, err = wire.NewApps(cfg, pool, wire.AppsDeps{UoW: w.uow, Rights: hook, Authorizer: az, Audit: w.rec, Identity: w.id, Grants: w.admin,
 		Clock: w.Clk, Webhooks: wire.WebhookDeps{Config: wcfg, Keys: keys, State: instanceapp.NewState(instancepg.NewRepository(pool), w.uow),
 			Log: syncRepo, Master: master, Sender: sender, Logger: log}})

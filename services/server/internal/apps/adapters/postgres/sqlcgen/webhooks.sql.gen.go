@@ -236,8 +236,8 @@ func (q *Queries) HeadDelivery(ctx context.Context, subscriptionID pgtype.UUID) 
 }
 
 const insertDelivery = `-- name: InsertDelivery :execrows
-INSERT INTO webhook_deliveries (id, subscription_id, event_seq, event_id, status, attempt)
-VALUES ($1, $2, $3, $4, 'pending', 0)
+INSERT INTO webhook_deliveries (id, subscription_id, event_seq, event_id, status, attempt, created_at)
+VALUES ($1, $2, $3, $4, 'pending', 0, $5)
 ON CONFLICT (subscription_id, event_seq) DO NOTHING
 `
 
@@ -246,6 +246,7 @@ type InsertDeliveryParams struct {
 	SubscriptionID pgtype.UUID
 	EventSeq       int64
 	EventID        pgtype.UUID
+	CreatedAt      pgtype.Timestamptz
 }
 
 func (q *Queries) InsertDelivery(ctx context.Context, arg InsertDeliveryParams) (int64, error) {
@@ -254,6 +255,7 @@ func (q *Queries) InsertDelivery(ctx context.Context, arg InsertDeliveryParams) 
 		arg.SubscriptionID,
 		arg.EventSeq,
 		arg.EventID,
+		arg.CreatedAt,
 	)
 	if err != nil {
 		return 0, err

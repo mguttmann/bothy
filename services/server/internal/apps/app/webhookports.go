@@ -85,8 +85,8 @@ type WebhookStore interface {
 	Installation(ctx context.Context, id ids.ID) (InstallationRecord, bool, error)
 	// Candidates returns the candidates of a consumer round.
 	Candidates(ctx context.Context) ([]Candidate, error)
-	// InsertDelivery inserts a pending row unless one exists for subscription and seq; inserted
-	// reports a new row.
+	// InsertDelivery inserts a pending row with created_at of d unless one exists for subscription
+	// and seq; inserted reports a new row.
 	InsertDelivery(ctx context.Context, d DeliveryRecord) (inserted bool, err error)
 	// CountPending counts the pending rows of a subscription up to bound.
 	CountPending(ctx context.Context, subscriptionID ids.ID, bound int) (int, error)
