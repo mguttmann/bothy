@@ -800,4 +800,41 @@ class AppLocalizationsDe extends AppLocalizations {
 
   @override
   String get markdownCopyCode => 'Code kopieren';
+
+  @override
+  String get triggerReasonMultipleAgentsMentioned =>
+      'Bitte nur einen Agenten erwähnen.';
+
+  @override
+  String get triggerReasonAgentNotAllowedHere =>
+      'Dieser Agent antwortet hier nicht.';
+
+  @override
+  String get triggerReasonNoTriggerRight =>
+      'Du darfst hier keine Agenten auslösen.';
+
+  @override
+  String get triggerReasonRunActiveOtherAgent =>
+      'Ein anderer Agent arbeitet gerade in diesem Thread.';
+
+  @override
+  String get triggerReasonAgentDisabled => 'Agent ist abgeschaltet.';
+
+  @override
+  String get triggerReasonBillingModePersonalNotHolder =>
+      'Dieser Agent läuft auf einem persönlichen Abo.';
+
+  @override
+  String get triggerReasonVoiceUnsupported =>
+      'Sprachnachrichten werden hier nicht verstanden.';
+
+  @override
+  String get triggerReasonRunActive =>
+      'Der Agent arbeitet gerade; Befehl nach dem Lauf erneut senden.';
+
+  @override
+  String get liveBoxReasonUserCancelledNoName => 'Von einer Person abgebrochen';
+
+  @override
+  String get threadRowStateWaiting => 'Wartet auf Antwort';
 }

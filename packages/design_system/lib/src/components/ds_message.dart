@@ -141,10 +141,43 @@ class DsMessageState extends State<DsMessage> {
     super.dispose();
   }
 
+  /// Block elements whose neighbors the label separates with a space, so list items and
+  /// table cells are not read as one word.
+  static const _blocks = {
+    'p',
+    'li',
+    'ul',
+    'ol',
+    'blockquote',
+    'pre',
+    'hr',
+    'table',
+    'thead',
+    'tbody',
+    'tr', //
+    'td', 'th', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6',
+  };
+
+  static String _plainNode(md.Node node) {
+    if (node is md.Text) return node.text;
+    if (node is! md.Element) return '';
+    if (node.tag == 'img') return node.attributes['alt'] ?? '';
+    final out = StringBuffer();
+    md.Node? previous;
+    for (final child in node.children ?? const <md.Node>[]) {
+      final block =
+          (child is md.Element && _blocks.contains(child.tag)) ||
+          (previous is md.Element && _blocks.contains(previous.tag));
+      if (previous != null && block) out.write(' ');
+      out.write(_plainNode(child));
+      previous = child;
+    }
+    return out.toString();
+  }
+
   String _plain(String source) =>
-      DsMarkdown.parse(source)
-          .map((n) => n is md.Element || n is md.Text ? n.textContent : '')
-          .join(' ')
+      _plainNode(md.Element('root', DsMarkdown.parse(source)))
+          .replaceAll(RegExp(r'\s+'), ' ')
           .trim();
 
   String _label(BuildContext context) {
@@ -222,6 +255,16 @@ class DsMessageState extends State<DsMessage> {
             children: body,
           ),
         ),
+        // A continuation has no header, but a triggering message always shows its state
+        // (01 6.3); it moves to the end of the row.
+        if (widget.isContinuation && d.triggerState != null) ...[
+          const SizedBox(width: DsSpace.s8),
+          DsTriggerStateIcon(
+            state: d.triggerState!,
+            reason: d.triggerReason,
+            onTap: widget.onTriggerTap,
+          ),
+        ],
       ],
     );
     if (d.delivery == DsDelivery.sending) {
@@ -273,7 +316,12 @@ class DsMessageState extends State<DsMessage> {
             child: Stack(
               clipBehavior: Clip.none,
               children: [
-                Semantics(container: true, label: _label(context), child: row),
+                Semantics(
+                  container: true,
+                  explicitChildNodes: true,
+                  label: _label(context),
+                  child: row,
+                ),
                 if (showBar)
                   PositionedDirectional(
                     top: 0,
@@ -421,13 +469,13 @@ class DsMessageState extends State<DsMessage> {
         color: colors.textPrimary,
         fontSize: context.dsDensity.messageFontSize,
       );
-      final markdown = ExcludeSemantics(
-        child: DsMarkdown(
-          d.content,
-          onOpenLink: widget.onOpenLink,
-          attachments: widget.attachments,
-          style: style,
-        ),
+      // The content keeps its own semantics, so links and the copy button of code blocks
+      // stay reachable for screen readers below the message label.
+      final markdown = DsMarkdown(
+        d.content,
+        onOpenLink: widget.onOpenLink,
+        attachments: widget.attachments,
+        style: style,
       );
       out.add(
         _expanded

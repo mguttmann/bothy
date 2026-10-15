@@ -193,7 +193,14 @@ class DsMessageComponentsState extends State<DsMessageComponents> {
   @override
   void didUpdateWidget(DsMessageComponents oldWidget) {
     super.didUpdateWidget(oldWidget);
-    if (!identical(oldWidget.data, widget.data)) {
+    // The lock ends only when the caller reports a new state of the card; an equal view
+    // model rebuilt by the parent keeps it (a double click creates nothing twice, 01 6.5).
+    final o = oldWidget.data;
+    final n = widget.data;
+    if (o.messageId != n.messageId ||
+        o.state != n.state ||
+        o.pendingCustomId != n.pendingCustomId ||
+        o.errorText != n.errorText) {
       _pressed = null;
     }
   }

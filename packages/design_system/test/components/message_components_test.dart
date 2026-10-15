@@ -374,4 +374,24 @@ void main() {
       {'reason': 'ok', 'count': 3, 'urgent': false},
     ]);
   });
+
+  testWidgets('a rebuild with equal data keeps the lock', (tester) async {
+    final calls = <String>[];
+    DsComponentData fresh() => DsComponentData(
+      messageId: 'm1',
+      items: [
+        for (final id in ['allow', 'deny'])
+          DsComponentItem(
+            customId: id,
+            type: DsComponentType.button,
+            label: id,
+          ),
+      ],
+    );
+    await pumpDs(tester, _card(fresh(), onActivate: (id, _) => calls.add(id)));
+    await tester.tap(find.text('allow'));
+    await pumpDs(tester, _card(fresh(), onActivate: (id, _) => calls.add(id)));
+    await tester.tap(find.text('deny'));
+    expect(calls, ['allow']);
+  });
 }

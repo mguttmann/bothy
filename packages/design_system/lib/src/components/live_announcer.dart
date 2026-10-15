@@ -68,13 +68,15 @@ class LiveAnnouncer {
     }
     String? candidate;
     if (state != _state) candidate = state;
-    if (questionId != null && questionId != _questionId) {
-      candidate = question ?? state;
-    }
+    final newQuestion = questionId != null && questionId != _questionId;
+    if (newQuestion) candidate = question ?? state;
     _state = state;
     _questionId = questionId;
     if (candidate == null) return;
-    if (candidate == _lastSent) {
+    // A return to the announced state cancels a waiting one; a new question is always news,
+    // even when its text equals the last announcement (every question of an agent reads the
+    // same).
+    if (!newQuestion && candidate == _lastSent) {
       _pending = null;
       return;
     }

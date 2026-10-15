@@ -1151,5 +1151,45 @@
   "markdownCopyCode": "Copy code",
   "@markdownCopyCode": {
     "description": "Copy button of a code block in a message (components.md section 1)."
+  },
+  "triggerReasonMultipleAgentsMentioned": "Please mention only one agent.",
+  "@triggerReasonMultipleAgentsMentioned": {
+    "description": "Notice for the rejection reason `multiple_agents_mentioned` at acceptance of a triggering message (docs/spec/09 section 3.5; components.md section 5)."
+  },
+  "triggerReasonAgentNotAllowedHere": "This agent does not answer here.",
+  "@triggerReasonAgentNotAllowedHere": {
+    "description": "Notice for the rejection reason `agent_not_allowed_here` at acceptance of a triggering message (docs/spec/09 section 3.5; components.md section 5)."
+  },
+  "triggerReasonNoTriggerRight": "You may not trigger agents here.",
+  "@triggerReasonNoTriggerRight": {
+    "description": "Notice for the rejection reason `no_trigger_right` at acceptance of a triggering message (docs/spec/09 section 3.5; components.md section 5)."
+  },
+  "triggerReasonRunActiveOtherAgent": "Another agent is currently working in this thread.",
+  "@triggerReasonRunActiveOtherAgent": {
+    "description": "Notice for the rejection reason `run_active_other_agent` at acceptance of a triggering message (docs/spec/09 section 3.5; components.md section 5)."
+  },
+  "triggerReasonAgentDisabled": "Agent is switched off.",
+  "@triggerReasonAgentDisabled": {
+    "description": "Notice for the rejection reason `agent_disabled` at acceptance of a triggering message (docs/spec/09 section 3.5; components.md section 5)."
+  },
+  "triggerReasonBillingModePersonalNotHolder": "This agent uses a personal subscription.",
+  "@triggerReasonBillingModePersonalNotHolder": {
+    "description": "Notice for the rejection reason `billing_mode_personal_not_holder` at acceptance of a triggering message (docs/spec/09 section 3.5; components.md section 5)."
+  },
+  "triggerReasonVoiceUnsupported": "Voice messages are not understood here.",
+  "@triggerReasonVoiceUnsupported": {
+    "description": "Notice for the rejection reason `voice_unsupported` at acceptance of a triggering message (docs/spec/09 section 3.5; components.md section 5)."
+  },
+  "triggerReasonRunActive": "The agent is currently working; send the command again after the run.",
+  "@triggerReasonRunActive": {
+    "description": "Notice for the rejection reason `run_active` at acceptance of a triggering message (docs/spec/09 section 3.5; components.md section 5)."
+  },
+  "liveBoxReasonUserCancelledNoName": "Canceled by a person",
+  "@liveBoxReasonUserCancelledNoName": {
+    "description": "Translated state reason `user_cancelled` of a run when the name of the person is not known (components.md section 2.1)."
+  },
+  "threadRowStateWaiting": "Waiting for an answer",
+  "@threadRowStateWaiting": {
+    "description": "State word of a forum post whose run waits for an answer from someone other than the reader (components.md section 6)."
   }
 }

@@ -1296,6 +1296,66 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Copy code'**
   String get markdownCopyCode;
+
+  /// Notice for the rejection reason `multiple_agents_mentioned` at acceptance of a triggering message (docs/spec/09 section 3.5; components.md section 5).
+  ///
+  /// In en, this message translates to:
+  /// **'Please mention only one agent.'**
+  String get triggerReasonMultipleAgentsMentioned;
+
+  /// Notice for the rejection reason `agent_not_allowed_here` at acceptance of a triggering message (docs/spec/09 section 3.5; components.md section 5).
+  ///
+  /// In en, this message translates to:
+  /// **'This agent does not answer here.'**
+  String get triggerReasonAgentNotAllowedHere;
+
+  /// Notice for the rejection reason `no_trigger_right` at acceptance of a triggering message (docs/spec/09 section 3.5; components.md section 5).
+  ///
+  /// In en, this message translates to:
+  /// **'You may not trigger agents here.'**
+  String get triggerReasonNoTriggerRight;
+
+  /// Notice for the rejection reason `run_active_other_agent` at acceptance of a triggering message (docs/spec/09 section 3.5; components.md section 5).
+  ///
+  /// In en, this message translates to:
+  /// **'Another agent is currently working in this thread.'**
+  String get triggerReasonRunActiveOtherAgent;
+
+  /// Notice for the rejection reason `agent_disabled` at acceptance of a triggering message (docs/spec/09 section 3.5; components.md section 5).
+  ///
+  /// In en, this message translates to:
+  /// **'Agent is switched off.'**
+  String get triggerReasonAgentDisabled;
+
+  /// Notice for the rejection reason `billing_mode_personal_not_holder` at acceptance of a triggering message (docs/spec/09 section 3.5; components.md section 5).
+  ///
+  /// In en, this message translates to:
+  /// **'This agent uses a personal subscription.'**
+  String get triggerReasonBillingModePersonalNotHolder;
+
+  /// Notice for the rejection reason `voice_unsupported` at acceptance of a triggering message (docs/spec/09 section 3.5; components.md section 5).
+  ///
+  /// In en, this message translates to:
+  /// **'Voice messages are not understood here.'**
+  String get triggerReasonVoiceUnsupported;
+
+  /// Notice for the rejection reason `run_active` at acceptance of a triggering message (docs/spec/09 section 3.5; components.md section 5).
+  ///
+  /// In en, this message translates to:
+  /// **'The agent is currently working; send the command again after the run.'**
+  String get triggerReasonRunActive;
+
+  /// Translated state reason `user_cancelled` of a run when the name of the person is not known (components.md section 2.1).
+  ///
+  /// In en, this message translates to:
+  /// **'Canceled by a person'**
+  String get liveBoxReasonUserCancelledNoName;
+
+  /// State word of a forum post whose run waits for an answer from someone other than the reader (components.md section 6).
+  ///
+  /// In en, this message translates to:
+  /// **'Waiting for an answer'**
+  String get threadRowStateWaiting;
 }
 
 class _AppLocalizationsDelegate

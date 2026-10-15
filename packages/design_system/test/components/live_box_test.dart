@@ -423,6 +423,28 @@ void main() {
       },
     );
 
+    test('a second question with the same text is announced too', () {
+      announcer.observe(state: 'Waiting', questionId: null);
+      now = now.add(const Duration(seconds: 30));
+      announcer.observe(state: 'Waiting', questionId: 'q1', question: 'Q');
+      now = now.add(const Duration(seconds: 30));
+      announcer.observe(state: 'Waiting', questionId: 'q2', question: 'Q');
+      expect(sent, ['Q', 'Q']);
+    });
+
+    test('a new question within the interval waits instead of dropping', () {
+      announcer.observe(state: 'Waiting', questionId: null);
+      now = now.add(const Duration(seconds: 30));
+      announcer.observe(state: 'Waiting', questionId: 'q1', question: 'Q');
+      now = now.add(const Duration(seconds: 1));
+      announcer.observe(state: 'Running', questionId: null);
+      now = now.add(const Duration(seconds: 1));
+      announcer.observe(state: 'Waiting', questionId: 'q2', question: 'Q');
+      now = now.add(const Duration(seconds: 10));
+      announcer.flush();
+      expect(sent, ['Q', 'Q']);
+    });
+
     test('a change back to the announced state cancels the pending one', () {
       announcer.observe(state: 'Running', questionId: null);
       now = now.add(const Duration(seconds: 30));

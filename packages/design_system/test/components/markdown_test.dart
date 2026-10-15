@@ -248,4 +248,25 @@ void main() {
     );
     expect(find.byType(Table), findsOneWidget);
   });
+
+  testWidgets('an image inside a link keeps its text form in the link', (
+    tester,
+  ) async {
+    final l = await en();
+    await pumpDs(
+      tester,
+      md(
+        'see [![build](https://example.com/b.svg)](https://example.com/x) end',
+      ),
+    );
+    final link = tester.widget<DsMarkdownLink>(find.byType(DsMarkdownLink));
+    expect(link.text, l.markdownImage('build', 'example.com'));
+  });
+
+  testWidgets('a loose task list keeps its boxes', (tester) async {
+    await pumpDs(tester, md('- [x] done\n\n- [ ] open'));
+    final boxes = tester.widgetList<Checkbox>(find.byType(Checkbox)).toList();
+    expect(boxes.map((b) => b.value), [true, false]);
+    expect(allText(tester), isNot(contains('•')));
+  });
 }

@@ -198,5 +198,15 @@
   "costInformationOnly": "nur Information",
   "markdownImage": "Bild: {alt} ({domain})",
   "markdownImageNoDomain": "Bild: {alt}",
-  "markdownCopyCode": "Code kopieren"
+  "markdownCopyCode": "Code kopieren",
+  "triggerReasonMultipleAgentsMentioned": "Bitte nur einen Agenten erwähnen.",
+  "triggerReasonAgentNotAllowedHere": "Dieser Agent antwortet hier nicht.",
+  "triggerReasonNoTriggerRight": "Du darfst hier keine Agenten auslösen.",
+  "triggerReasonRunActiveOtherAgent": "Ein anderer Agent arbeitet gerade in diesem Thread.",
+  "triggerReasonAgentDisabled": "Agent ist abgeschaltet.",
+  "triggerReasonBillingModePersonalNotHolder": "Dieser Agent läuft auf einem persönlichen Abo.",
+  "triggerReasonVoiceUnsupported": "Sprachnachrichten werden hier nicht verstanden.",
+  "triggerReasonRunActive": "Der Agent arbeitet gerade; Befehl nach dem Lauf erneut senden.",
+  "liveBoxReasonUserCancelledNoName": "Von einer Person abgebrochen",
+  "threadRowStateWaiting": "Wartet auf Antwort"
 }
