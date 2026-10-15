@@ -137,6 +137,9 @@ var appPrivileges = map[string][]string{
 	"read_states":   {"SELECT", "INSERT", "UPDATE"},
 	"drafts":        {"SELECT", "INSERT", "UPDATE", "DELETE"},
 	"user_settings": {"SELECT", "INSERT", "UPDATE", "DELETE"},
+	// M3-18: the notification levels and quiet hours of a person.
+	"notification_preferences": {"SELECT", "INSERT", "UPDATE", "DELETE"},
+	"quiet_hours":              {"SELECT", "INSERT", "UPDATE", "DELETE"},
 	// 03 local_credentials (M1-39): one row per local identity, changed in place; it goes with
 	// its identity (ON DELETE CASCADE).
 	"local_credentials": {"SELECT", "INSERT", "UPDATE"},
