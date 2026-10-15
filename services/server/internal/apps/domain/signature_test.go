@@ -84,7 +84,9 @@ func TestWriteWebhookTestVectors(t *testing.T) {
 	if os.Getenv("BOTHY_WRITE_VECTORS") == "" {
 		t.Skip("set BOTHY_WRITE_VECTORS=1 to regenerate docs/api/webhook-test-vectors.json")
 	}
-	seed := func(b byte) string { return base64.StdEncoding.EncodeToString(bytes.Repeat([]byte{b}, ed25519.SeedSize)) }
+	seed := func(b byte) string {
+		return base64.StdEncoding.EncodeToString(bytes.Repeat([]byte{b}, ed25519.SeedSize))
+	}
 	pub := func(s string) string {
 		raw, _ := base64.StdEncoding.DecodeString(s)
 		k := ed25519.NewKeyFromSeed(raw).Public().(ed25519.PublicKey)

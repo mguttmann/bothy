@@ -62,8 +62,8 @@ func TestWebhookOutDeliverRequirement(t *testing.T) {
 		}
 	}
 	for name, r := range map[string]authorize.Resource{
-		"empty DeliveryOf":  delivery(w.msg(w.eskalation, w.alex), "", ids.ID{}),
-		"DeliveryOf itself": delivery(w.msg(w.eskalation, w.alex), deliver, ids.ID{}),
+		"empty DeliveryOf":      delivery(w.msg(w.eskalation, w.alex), "", ids.ID{}),
+		"DeliveryOf itself":     delivery(w.msg(w.eskalation, w.alex), deliver, ids.ID{}),
 		"self without audience": delivery(w.msg(w.eskalation, w.alex), "self", ids.ID{}),
 	} {
 		if _, err := w.az.Authorize(ctx, w.deliveryApp(sub, read), deliver, r); err == nil {

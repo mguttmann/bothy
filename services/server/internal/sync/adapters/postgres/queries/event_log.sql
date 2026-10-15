@@ -56,6 +56,15 @@ SELECT COALESCE(max(seq), 0)::bigint FROM event_log;
 -- The smallest retained seq, 0 when the log is empty (min_retained_seq of 04 "resync_required").
 SELECT COALESCE(min(seq), 0)::bigint FROM event_log;
 
+-- name: EventBySeq :many
+-- One event by its seq for the webhook delivery (M2-26); no row when retention removed it.
+SELECT seq, id, type, schema_version, occurred_at, actor_kind, actor_principal_id, space_id,
+       channel_id, thread_id, resource_kind, resource_id, resource_version, audience_principal_id,
+       receive_action, payload, truncated, redacted_at, correlation_id, trace_context,
+       client_msg_id, permission_version
+FROM event_log
+WHERE seq = sqlc.arg(seq)::bigint;
+
 -- name: EventsAfter :many
 -- One batch of the log tail: the events after a seq in seq order.
 SELECT seq, id, type, schema_version, occurred_at, actor_kind, actor_principal_id, space_id,
