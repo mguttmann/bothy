@@ -10,8 +10,7 @@ import (
 	chathttp "github.com/OWNER/bothy/services/server/internal/chat/adapters/httpapi"
 	chatpg "github.com/OWNER/bothy/services/server/internal/chat/adapters/postgres"
 	chatapp "github.com/OWNER/bothy/services/server/internal/chat/app"
-	identitypg "github.com/OWNER/bothy/services/server/internal/identity/adapters/postgres"
-	identityapp "github.com/OWNER/bothy/services/server/internal/identity/app"
+	"github.com/OWNER/bothy/services/server/internal/identity"
 	"github.com/OWNER/bothy/services/server/internal/kernel/auditing"
 	"github.com/OWNER/bothy/services/server/internal/kernel/authorize"
 	"github.com/OWNER/bothy/services/server/internal/kernel/clock"
@@ -54,6 +53,10 @@ type ChatWrites struct {
 	Audit  auditing.Recorder
 	Events eventlog.Appender
 	Rights authz.RightsChanges
+	// Directory is the principal directory of identity with the search language configuration
+	// (Identity.Directory, M3-13): every thread takes the language of its creator from it
+	// (14 3.1). The operator checks of M1-54 read the agents through it as well.
+	Directory identity.Directory
 }
 
 // Chat is the chat module of the process (M1-52 to M1-55): the space, sidebar, channel, forum tag
@@ -71,22 +74,22 @@ type Chat struct {
 }
 
 // NewChat builds the chat module over pool with the unit of work uow, the Authorizer az (also the
-// rights query of SpaceView), the recorder, appender and rights hook of w, the principal
-// directory of identity over pool, the agent policy source policies (the agents rows of M1-54 and
+// rights query of SpaceView), the recorder, appender, rights hook and principal directory of w,
+// the agent policy source policies (the agents rows of M1-54 and
 // the billing mode of a thread operator; nil means the source of agents, NewAgentPolicySource)
 // and the clock (nil means clock.System()). It opens no connection. Errors: a missing
 // collaborator or a limit the use cases refuse.
 func NewChat(cfg chatapp.Config, pool *pg.Pool, uow txn.UnitOfWork, az authorize.Authorizer, rights authz.RightsQuery,
 	w ChatWrites, policies authz.AgentPolicySource, clk clock.Clock) (*Chat, error) {
-	if az == nil || rights == nil {
-		return nil, errors.New("wire: the chat module needs the Authorizer")
+	if az == nil || rights == nil || w.Directory == nil {
+		return nil, errors.New("wire: the chat module needs the Authorizer and the directory of identity")
 	}
 	if policies == nil {
 		policies = NewAgentPolicySource(pool)
 	}
 	svc, err := chatapp.New(cfg, chatapp.Deps{
 		Store: chatpg.NewRepository(pool), UoW: uow, Authorizer: az, Rights: rights, Audit: w.Audit, Events: w.Events,
-		RightsChanges: w.Rights, Directory: identityapp.NewDirectory(identitypg.NewRepository(pool)),
+		RightsChanges: w.Rights, Directory: w.Directory,
 		Policies: policies, Cursors: chathttp.Cursors{}, Clock: clk,
 	})
 	if err != nil {

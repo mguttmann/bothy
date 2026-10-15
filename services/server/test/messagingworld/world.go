@@ -39,6 +39,7 @@ import (
 	"github.com/OWNER/bothy/services/server/internal/kernel/authorize"
 	"github.com/OWNER/bothy/services/server/internal/kernel/clock"
 	"github.com/OWNER/bothy/services/server/internal/kernel/ids"
+	"github.com/OWNER/bothy/services/server/internal/kernel/searchlang"
 	"github.com/OWNER/bothy/services/server/internal/kernel/txn"
 	"github.com/OWNER/bothy/services/server/internal/messaging"
 	messagingapp "github.com/OWNER/bothy/services/server/internal/messaging/app"
@@ -195,7 +196,12 @@ func New(t *testing.T, subscribe Subscribe, opts ...Option) *World {
 	if err != nil {
 		t.Fatal(err)
 	}
-	c, err := wire.NewChat(chatConfig, pool, uow, az, az, wire.ChatWrites{Audit: rec, Events: appender, Rights: hook}, w.policies, w.Clock)
+	settings, err := wire.NewInstanceSettings(wire.DefaultInstanceConfig(), true, pool, uow, az, wire.SettingsWrites{Audit: rec, Events: appender}, w.Clock)
+	if err != nil {
+		t.Fatal(err)
+	}
+	dir := wire.NewSearchDirectory(pool, SearchLanguages(t), settings.Admin)
+	c, err := wire.NewChat(chatConfig, pool, uow, az, az, wire.ChatWrites{Audit: rec, Events: appender, Rights: hook, Directory: dir}, w.policies, w.Clock)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -205,7 +211,7 @@ func New(t *testing.T, subscribe Subscribe, opts ...Option) *World {
 	for _, o := range opts {
 		o(&mcfg)
 	}
-	m, err := wire.NewMessaging(mcfg, pool, uow, az, appender, c.Service, w.Clock, log)
+	m, err := wire.NewMessaging(mcfg, pool, uow, az, appender, c.Service, dir, w.Clock, log)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -213,6 +219,17 @@ func New(t *testing.T, subscribe Subscribe, opts ...Option) *World {
 	w.H = harness(t, pool, uow, w.actors, wire.Handlers{Spaces: c.Handlers, Channels: c.ChannelHandlers, Threads: c.ThreadHandlers, Messages: m.Handlers}, w.Clock)
 	w.OwnerID = w.Person("owner", true)
 	return w
+}
+
+// SearchLanguages returns the language configuration of the chapter defaults (search.languages
+// german and english, search.locale_map de and en; docs/spec/14-suche.md section 15).
+func SearchLanguages(t testing.TB) searchlang.Map {
+	t.Helper()
+	m, err := searchlang.New([]string{"german", "english"}, map[string]string{"de": "german", "en": "english"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	return m
 }
 
 // registry returns the sealed txn registry with the rights hooks, the sync and audit hooks and

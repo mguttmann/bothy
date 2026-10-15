@@ -150,3 +150,16 @@ func TestLanguages(t *testing.T) {
 		t.Errorf("zero Map: Languages() = %#v, want an empty slice", got)
 	}
 }
+
+func TestLocaleIndex(t *testing.T) {
+	t.Parallel()
+	m, err := searchlang.New([]string{"german", "english"}, map[string]string{"en": "english", "de": "german", "at": "german"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	for config, want := range map[string]int{"german": 1, "english": 3, "simple": 0, "french": 0} {
+		if got := m.LocaleIndex(config); got != want {
+			t.Errorf("LocaleIndex(%s) = %d, want %d", config, got, want)
+		}
+	}
+}

@@ -118,12 +118,12 @@ func (r *Repository) InsertMainThread(ctx context.Context, th domain.Thread) (do
 	}
 	row, err := q.InsertMainThread(ctx, sqlcgen.InsertMainThreadParams{
 		ID: uuid(th.ID), ChannelID: uuid(th.ChannelID), CreatedBy: uuid(th.CreatedBy),
-		CreatedAt: pgtype.Timestamptz{Time: th.CreatedAt, Valid: true},
+		CreatedAt: pgtype.Timestamptz{Time: th.CreatedAt, Valid: true}, SearchLanguage: th.SearchLanguage,
 	})
 	if err != nil {
 		return domain.Thread{}, mapError(err, "inserting a main thread")
 	}
-	return toThread(row), nil
+	return toThread(threadRow(row)), nil
 }
 
 // ForumTags implements app.Store.

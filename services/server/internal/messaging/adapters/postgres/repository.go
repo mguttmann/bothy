@@ -59,7 +59,7 @@ func (r *Repository) write(ctx context.Context) (*sqlcgen.Queries, error) {
 // Message implements app.Store.
 func (r *Repository) Message(ctx context.Context, id ids.ID) (domain.Message, bool, error) {
 	row, err := r.read(ctx).GetMessage(ctx, uuid(id))
-	return one(row, err, "reading a message")
+	return one(messageRow(row), err, "reading a message")
 }
 
 // MessageByClientID implements app.Store.
@@ -67,7 +67,7 @@ func (r *Repository) MessageByClientID(ctx context.Context, author, clientMsgID 
 	row, err := r.read(ctx).GetMessageByClientID(ctx, sqlcgen.GetMessageByClientIDParams{
 		AuthorPrincipalID: uuid(author), ClientMsgID: uuid(clientMsgID),
 	})
-	return one(row, err, "reading a message by client_msg_id")
+	return one(messageRow(row), err, "reading a message by client_msg_id")
 }
 
 // clientIDConstraint is the unique index of 04 section 5.1 point 2.
@@ -84,7 +84,7 @@ func (r *Repository) InsertMessage(ctx context.Context, m domain.Message) (domai
 		AuthorPrincipalID: uuid(m.AuthorID), ClientMsgID: uuid(m.ClientMsgID), ClientPayloadSha256: m.PayloadSHA256,
 		Origin: string(m.Origin), Kind: string(m.Kind), SystemCode: pgtype.Text{String: m.SystemCode, Valid: m.SystemCode != ""},
 		ContentMd: m.ContentMD, ContentFormat: m.ContentFormat, ReplyToMessageID: optionalUUID(m.ReplyToID),
-		Silent: m.Silent, CreatedAt: pgtype.Timestamptz{Time: m.CreatedAt, Valid: true},
+		Silent: m.Silent, CreatedAt: pgtype.Timestamptz{Time: m.CreatedAt, Valid: true}, SearchLanguage: m.SearchLanguage,
 	})
 	var pgErr *pgconn.PgError
 	if errors.As(err, &pgErr) && pgErr.Code == "23505" && pgErr.ConstraintName == clientIDConstraint {
@@ -93,7 +93,7 @@ func (r *Repository) InsertMessage(ctx context.Context, m domain.Message) (domai
 	if err != nil {
 		return domain.Message{}, mapError(err, "inserting a message")
 	}
-	return toMessage(row), nil
+	return toMessage(messageRow(row)), nil
 }
 
 // InsertMentions implements app.Store with one INSERT over unnest (brief M1-56 D9).
@@ -128,8 +128,38 @@ func (r *Repository) Mentions(ctx context.Context, message ids.ID) ([]ids.ID, er
 	return out, nil
 }
 
+// messageRow is the column list every query of messages.sql returns: the columns of messages
+// without search_language and search_vector (docs/DECISIONS.md D-M3-13-10). The row types sqlc
+// generates per query have exactly these fields, so each converts to it.
+type messageRow struct {
+	ID                  pgtype.UUID
+	ThreadID            pgtype.UUID
+	ChannelID           pgtype.UUID
+	ThreadSeq           int64
+	AuthorPrincipalID   pgtype.UUID
+	ClientMsgID         pgtype.UUID
+	ClientPayloadSha256 []byte
+	Origin              string
+	Kind                string
+	SystemCode          pgtype.Text
+	ContentMd           string
+	ContentFormat       int16
+	ReplyToMessageID    pgtype.UUID
+	RunID               pgtype.UUID
+	TriggerState        pgtype.Text
+	TriggerStateReason  pgtype.Text
+	TriggerStateAt      pgtype.Timestamptz
+	Silent              bool
+	ImportItemID        pgtype.UUID
+	Version             int64
+	EditedAt            pgtype.Timestamptz
+	DeletedAt           pgtype.Timestamptz
+	DeletedBy           pgtype.UUID
+	CreatedAt           pgtype.Timestamptz
+}
+
 // one converts a single-row result: no row is found == false.
-func one(row sqlcgen.Message, err error, what string) (domain.Message, bool, error) {
+func one(row messageRow, err error, what string) (domain.Message, bool, error) {
 	if errors.Is(err, pgx.ErrNoRows) {
 		return domain.Message{}, false, nil
 	}
@@ -139,8 +169,8 @@ func one(row sqlcgen.Message, err error, what string) (domain.Message, bool, err
 	return toMessage(row), true, nil
 }
 
-// toMessage converts a row.
-func toMessage(row sqlcgen.Message) domain.Message {
+// toMessage converts a row; SearchLanguage stays empty, because no read selects it.
+func toMessage(row messageRow) domain.Message {
 	return domain.Message{
 		ID: idOf(row.ID), ThreadID: idOf(row.ThreadID), ChannelID: idOf(row.ChannelID), ThreadSeq: row.ThreadSeq,
 		AuthorID: idOf(row.AuthorPrincipalID), ClientMsgID: idOf(row.ClientMsgID), PayloadSHA256: row.ClientPayloadSha256,

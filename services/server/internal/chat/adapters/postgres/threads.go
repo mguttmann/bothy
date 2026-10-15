@@ -26,7 +26,7 @@ const parentConstraint = "threads_parent_message_id_key"
 // Thread implements app.Store.
 func (r *Repository) Thread(ctx context.Context, id ids.ID) (domain.Thread, bool, error) {
 	row, err := r.read(ctx).GetThread(ctx, uuid(id))
-	return oneThread(row, err, "reading a thread")
+	return oneThread(threadRow(row), err, "reading a thread")
 }
 
 // LockThread implements app.Store.
@@ -36,7 +36,7 @@ func (r *Repository) LockThread(ctx context.Context, id ids.ID) (domain.Thread, 
 		return domain.Thread{}, false, err
 	}
 	row, err := q.LockThread(ctx, uuid(id))
-	return oneThread(row, err, "locking a thread")
+	return oneThread(threadRow(row), err, "locking a thread")
 }
 
 // InsertThread implements app.Store: a second thread of the same parent message is 409 conflict
@@ -49,7 +49,7 @@ func (r *Repository) InsertThread(ctx context.Context, th domain.Thread) (domain
 	row, err := q.InsertThread(ctx, sqlcgen.InsertThreadParams{
 		ID: uuid(th.ID), ChannelID: uuid(th.ChannelID), ParentMessageID: optionalUUID(th.ParentMessageID), Title: th.Title,
 		TitleSource: string(th.TitleSource), OperatorAgentID: optionalUUID(th.OperatorAgentID), CreatedBy: uuid(th.CreatedBy),
-		CreatedAt: pgtype.Timestamptz{Time: th.CreatedAt, Valid: true},
+		CreatedAt: pgtype.Timestamptz{Time: th.CreatedAt, Valid: true}, SearchLanguage: th.SearchLanguage,
 	})
 	var pgErr *pgconn.PgError
 	if errors.As(err, &pgErr) && pgErr.Code == sqlstateUniqueViolation && pgErr.ConstraintName == parentConstraint {
@@ -59,7 +59,7 @@ func (r *Repository) InsertThread(ctx context.Context, th domain.Thread) (domain
 	if err != nil {
 		return domain.Thread{}, mapError(err, "inserting a thread")
 	}
-	return toThread(row), nil
+	return toThread(threadRow(row)), nil
 }
 
 // SaveThread implements app.Store.
@@ -85,7 +85,7 @@ func (r *Repository) AppendToThread(ctx context.Context, id ids.ID, reopen bool,
 	if err != nil {
 		return domain.Thread{}, mapError(err, "appending to a thread")
 	}
-	return toThread(row), nil
+	return toThread(threadRow(row)), nil
 }
 
 // ListThreads implements app.Store.
@@ -97,19 +97,27 @@ func (r *Repository) ListThreads(ctx context.Context, tq app.ThreadQuery) ([]dom
 	tag := optionalUUID(tq.TagID)
 	after := pgtype.Timestamptz{Time: tq.AfterAt, Valid: tq.HasAfter}
 	var (
-		rows []sqlcgen.Thread
+		rows []threadRow
 		err  error
 	)
 	if tq.ByCreated {
-		rows, err = r.read(ctx).ListThreadsByCreated(ctx, sqlcgen.ListThreadsByCreatedParams{
+		var created []sqlcgen.ListThreadsByCreatedRow
+		created, err = r.read(ctx).ListThreadsByCreated(ctx, sqlcgen.ListThreadsByCreatedParams{
 			ChannelID: uuid(tq.ChannelID), State: state, TagID: tag, HasAfter: tq.HasAfter, AfterAt: after, AfterID: uuid(tq.AfterID),
 			MaxRows: int32(tq.Limit),
 		})
+		for _, row := range created {
+			rows = append(rows, threadRow(row))
+		}
 	} else {
-		rows, err = r.read(ctx).ListThreadsByActivity(ctx, sqlcgen.ListThreadsByActivityParams{
+		var active []sqlcgen.ListThreadsByActivityRow
+		active, err = r.read(ctx).ListThreadsByActivity(ctx, sqlcgen.ListThreadsByActivityParams{
 			ChannelID: uuid(tq.ChannelID), State: state, TagID: tag, HasAfter: tq.HasAfter, AfterAt: after, AfterID: uuid(tq.AfterID),
 			MaxRows: int32(tq.Limit),
 		})
+		for _, row := range active {
+			rows = append(rows, threadRow(row))
+		}
 	}
 	if err != nil {
 		return nil, mapError(err, "listing threads")
@@ -163,8 +171,32 @@ func (r *Repository) DeleteTagAssignments(ctx context.Context, tag ids.ID) error
 	return mapError(q.DeleteTagAssignments(ctx, uuid(tag)), "deleting the assignments of a tag")
 }
 
+// threadRow is the column list every query of threads.sql and threads_main.sql returns: the
+// columns of threads without search_language and title_search (docs/DECISIONS.md D-M3-13-10).
+// The row types sqlc generates per query have exactly these fields, so each converts to it.
+type threadRow struct {
+	ID              pgtype.UUID
+	ChannelID       pgtype.UUID
+	Kind            string
+	ParentMessageID pgtype.UUID
+	Title           string
+	TitleSource     string
+	State           string
+	ClosedAt        pgtype.Timestamptz
+	ClosedBy        pgtype.UUID
+	OperatorAgentID pgtype.UUID
+	LastMessageSeq  int64
+	UnreadFloorSeq  int64
+	LastActivityAt  pgtype.Timestamptz
+	MessageCount    int32
+	CreatedBy       pgtype.UUID
+	CreatedAt       pgtype.Timestamptz
+	MovedAt         pgtype.Timestamptz
+	Version         int64
+}
+
 // oneThread converts the result of a single-thread query; no rows is found false.
-func oneThread(row sqlcgen.Thread, err error, what string) (domain.Thread, bool, error) {
+func oneThread(row threadRow, err error, what string) (domain.Thread, bool, error) {
 	if errors.Is(err, pgx.ErrNoRows) {
 		return domain.Thread{}, false, nil
 	}
@@ -174,8 +206,8 @@ func oneThread(row sqlcgen.Thread, err error, what string) (domain.Thread, bool,
 	return toThread(row), true, nil
 }
 
-// toThread converts a thread row.
-func toThread(row sqlcgen.Thread) domain.Thread {
+// toThread converts a thread row; SearchLanguage stays empty, because no read selects it.
+func toThread(row threadRow) domain.Thread {
 	return domain.Thread{
 		ID: idOf(row.ID), ChannelID: idOf(row.ChannelID), Kind: domain.ThreadKind(row.Kind), ParentMessageID: idOf(row.ParentMessageID),
 		Title: row.Title, TitleSource: domain.TitleSource(row.TitleSource), State: domain.ThreadState(row.State),

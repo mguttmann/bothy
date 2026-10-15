@@ -208,7 +208,11 @@ func (s *Service) createChannel(ctx context.Context, a actor.Actor, spaceID ids.
 	}
 	var main domain.Thread
 	if ch.Kind == domain.ChannelText {
-		if main, err = s.d.Store.InsertMainThread(ctx, domain.NewMainThread(ids.New(), ch.ID, a.ID, ch.CreatedAt)); err != nil {
+		main = domain.NewMainThread(ids.New(), ch.ID, a.ID, ch.CreatedAt)
+		if main.SearchLanguage, err = s.searchLanguage(ctx, a); err != nil {
+			return ChannelRow{}, err
+		}
+		if main, err = s.d.Store.InsertMainThread(ctx, main); err != nil {
 			return ChannelRow{}, err
 		}
 		ch.MainThreadID = main.ID

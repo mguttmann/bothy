@@ -399,6 +399,9 @@ func (s *Service) Create(ctx context.Context, a actor.Actor, cmd chat.CreateThre
 			return chat.Thread{}, err
 		}
 	}
+	if th.SearchLanguage, err = s.searchLanguage(ctx, a); err != nil {
+		return chat.Thread{}, err
+	}
 	if th, err = s.d.Store.InsertThread(ctx, th); err != nil {
 		return chat.Thread{}, err
 	}
@@ -412,6 +415,17 @@ func (s *Service) Create(ctx context.Context, a actor.Actor, cmd chat.CreateThre
 		return chat.Thread{}, err
 	}
 	return v, s.emitThread(ctx, authorize.EventThreadCreated, c.Channel.SpaceID, v)
+}
+
+// searchLanguage returns the text search configuration of a thread that a creates
+// (docs/spec/14-suche.md 3.1, docs/DECISIONS.md D-M3-13-1 and D-M3-13-2): the language of the
+// person through identity, or the instance language for an agent or an app, without reading the
+// principal. It reads inside the caller's unit of work; the value is set once at creation.
+func (s *Service) searchLanguage(ctx context.Context, a actor.Actor) (string, error) {
+	if a.Kind != actor.KindUser {
+		return s.d.Directory.InstanceSearchLanguage(ctx)
+	}
+	return s.d.Directory.SearchLanguage(ctx, a.ID)
 }
 
 // newThread checks parent, tags and title of cmd for the channel c and returns the new thread

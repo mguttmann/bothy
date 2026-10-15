@@ -107,6 +107,18 @@ func (m Map) Configs() []string {
 	return slices.Compact(out)
 }
 
+// LocaleIndex returns the position (1-based, keys in sorted order) of the first entry of the
+// locale map whose value is config, or 0 when no entry has it. Start errors use it to name the
+// entry of search.locale_map that holds a configuration without printing the configuration.
+func (m Map) LocaleIndex(config string) int {
+	for i, k := range slices.Sorted(maps.Keys(m.locales)) {
+		if m.locales[k] == config {
+			return i + 1
+		}
+	}
+	return 0
+}
+
 // validName reports whether s is an unqualified PostgreSQL identifier in lower case that needs no
 // quoting and keeps its length.
 func validName(s string) bool {

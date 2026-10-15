@@ -36,7 +36,9 @@ import (
 	"github.com/OWNER/bothy/services/server/internal/kernel/actor"
 	"github.com/OWNER/bothy/services/server/internal/kernel/clock"
 	"github.com/OWNER/bothy/services/server/internal/kernel/ids"
+	"github.com/OWNER/bothy/services/server/internal/kernel/searchlang"
 	"github.com/OWNER/bothy/services/server/internal/kernel/txn"
+	messagingapp "github.com/OWNER/bothy/services/server/internal/messaging/app"
 	"github.com/OWNER/bothy/services/server/internal/platform/httpserver"
 	"github.com/OWNER/bothy/services/server/internal/platform/httpserver/httpservertest"
 	"github.com/OWNER/bothy/services/server/internal/platform/pg"
@@ -154,8 +156,26 @@ func newWorld(t *testing.T) *world {
 	return w
 }
 
-// newEmptyWorld builds the modules and the harness with only the owner.
+// newEmptyWorld builds the modules and the harness with only the owner and the language
+// configuration of the chapter defaults (docs/spec/14-suche.md section 15).
 func newEmptyWorld(t *testing.T) *world {
+	t.Helper()
+	return newEmptyWorldWith(t, chapterSearch(t))
+}
+
+// chapterSearch is the language configuration of the chapter defaults: search.languages german and
+// english, search.locale_map de and en.
+func chapterSearch(t *testing.T) searchlang.Map {
+	t.Helper()
+	m, err := searchlang.New([]string{"german", "english"}, map[string]string{"de": "german", "en": "english"})
+	must(t, err)
+	return m
+}
+
+// newEmptyWorldWith builds the modules and the harness with only the owner and the language
+// configuration search, which identity answers the language of new messages and threads with
+// (M3-13).
+func newEmptyWorldWith(t *testing.T, search searchlang.Map) *world {
 	t.Helper()
 	db := pgtest.New(t)
 	cfg := db.Config(pg.RoleApp)
@@ -204,7 +224,7 @@ func newEmptyWorld(t *testing.T) *world {
 	must(t, err)
 	settings, err := wire.NewInstanceSettings(wire.DefaultInstanceConfig(), true, pool, uow, w.az, wire.SettingsWrites{Audit: w.rec, Events: appender}, w.clk)
 	must(t, err)
-	writes := wire.IdentityWrites{Audit: w.rec, Events: appender, Settings: settings.Admin, Flags: settings.Admin}
+	writes := wire.IdentityWrites{Audit: w.rec, Events: appender, Settings: settings.Admin, Flags: settings.Admin, Search: search}
 	w.id, err = wire.NewIdentity(idConfig, pool, uow, w.az, writes, pepper, w.clk, log)
 	must(t, err)
 	ag, err := wire.NewAgents(agentsapp.Config{PageSizeDefault: 20, PageSizeMax: 50}, pool, uow, w.az, hook, writes, w.id, w.clk, log)
@@ -215,10 +235,16 @@ func newEmptyWorld(t *testing.T) *world {
 		Config: authzapp.AdminConfig{GroupNameMaxChars: 100, GroupDescriptionMaxChars: 500, PageSizeDefault: 20, PageSizeMax: 50},
 	})
 	must(t, err)
-	c, err := wire.NewChat(chatConfig, pool, uow, w.az, w.az, wire.ChatWrites{Audit: w.rec, Events: appender, Rights: w.hook}, nil, w.clk)
+	c, err := wire.NewChat(chatConfig, pool, uow, w.az, w.az, wire.ChatWrites{Audit: w.rec, Events: appender, Rights: w.hook,
+		Directory: w.id.Directory}, nil, w.clk)
+	must(t, err)
+	// Messaging, threads and the instance settings serve the search tests of M3-13.
+	m, err := wire.NewMessaging(messagingapp.Config{MaxContentBytes: 4096, MaxMentions: 4, EventPayloadMaxBytes: 65536,
+		TemplateNameMaxChars: 100, TemplateMaxPerScope: 100, ListContentMaxBytes: 4096, PageSizeDefault: 20, PageSizeMax: 50},
+		pool, uow, w.az, appender, c.Service, w.id.Directory, w.clk, nil)
 	must(t, err)
 	built, err := routes.Build(wire.Handlers{Access: authzhttp.New(w.admin), Agents: ag.Handlers, Spaces: c.Handlers, Channels: c.ChannelHandlers,
-		People: w.id.PeopleHandlers}, wire.RouteOptions(), routes.SpecCatalog())
+		People: w.id.PeopleHandlers, Threads: c.ThreadHandlers, Messages: m.Handlers, Admin: settings.Handlers}, wire.RouteOptions(), routes.SpecCatalog())
 	must(t, err)
 	var rs []httpservertest.Route
 	for _, r := range built {
