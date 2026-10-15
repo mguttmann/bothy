@@ -301,6 +301,20 @@ void main() {
       expect(wire, DeviceKeyError.values.map((e) => e.wire));
     });
 
+    test('Windows sends the same codes as iOS and macOS', () {
+      // The native sides spell the shared codes themselves; this keeps the Windows store
+      // (M4-11) and the Swift core (M4-10) on the constants of DeviceKeyError.
+      final windows = File('windows/core/device_key_store.cpp')
+          .readAsStringSync();
+      final darwin = File(
+        'darwin/device_key/DeviceKeyCore/Sources/DeviceKeyCore/DeviceKeyError.swift',
+      ).readAsStringSync();
+      for (final code in DeviceKeyError.values) {
+        expect(windows, contains('return "${code.wire}";'), reason: code.wire);
+        expect(darwin, contains('return "${code.wire}"'), reason: code.wire);
+      }
+    });
+
     test('a platform without the plugin reports not_available', () async {
       final api = _FakeHostApi()..error = MissingPluginException('none');
       final client = DeviceKeyClient(api: api);

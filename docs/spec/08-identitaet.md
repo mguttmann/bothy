@@ -510,7 +510,7 @@ Beide Schlüssel sind nicht exportierbar und, wo die Plattform es bietet, hardwa
 |---|---|---|---|
 | iOS, iPadOS, macOS | Secure Enclave | `ES256` | Step-up-Schlüssel mit Bindung an die aktuell eingerichtete Biometrie, damit neu hinzugefügte Fingerabdrücke ihn ungültig machen |
 | Android | Android Keystore, StrongBox falls vorhanden | `ES256` | Step-up-Schlüssel mit verpflichtender Nutzer-Authentisierung; on API 26 to 29 strong biometrics only, from API 30 biometrics or the device credential ([15](15-client-architektur.md) 9) |
-| Windows | TPM über den Platform Crypto Provider, Bestätigung über Windows Hello | `ES256` angestrebt | offen: ob Windows Hello den Step-up-Schlüssel als `ES256` liefert; sonst ist `RS256` oder `PS256` in `device_keys.alg` nötig (Abschnitt 17) |
+| Windows | `dpop`: TPM über den Platform Crypto Provider, without P-256 or TPM a software key reported as not hardware-bound | `ES256` | settled by M4-11 (D-M4-11-2): Windows has no system-enforced confirmation per use for an `ES256` key (strong key protection is a password the process can supply and that is cached per process; Windows Hello keys are RSA), so Windows clients have no `step_up` key and use the other step-up methods of this section. A Windows Hello step-up key would need `RS256` or `PS256` in `device_keys.alg` (03) and in the JOSE profile (ADR 0067), a core contract change (Abschnitt 17) |
 | Web-Konsole | kein Geräteschlüssel | | Sitzung per Cookie (Abschnitt 7.5), Step-up per Passkey |
 
 Ob ein Schlüssel wirklich hardwaregestützt ist, kann der Server ohne Attestierung nicht prüfen.
@@ -1018,7 +1018,7 @@ Die beim Entwurf beantragten Ergänzungen sind entschieden (Integration vom 2026
 | K-ID-1 | Tabelle `local_credentials` | übernommen, 03 Abschnitt 4.2 |
 | K-ID-2 | Tabelle `enrollment_codes` | übernommen, 03 Abschnitt 4.2 |
 | K-ID-3 | Tabelle `auth_login_flows` | übernommen, 03 Abschnitt 4.2, mit den Namen der API (`client_challenge`, `app_redirect_uri`, `login_code`) |
-| K-ID-4 | `device_keys.purpose` und ein aktiver Schlüssel je Zweck | übernommen; `RS256`/`PS256` für Windows bleibt offen (Abschnitt 6.1), eine Erweiterung ist additiv |
+| K-ID-4 | `device_keys.purpose` und ein aktiver Schlüssel je Zweck | übernommen; `RS256`/`PS256` für Windows bleibt offen (Abschnitt 6.1), eine Erweiterung ist additiv; until then Windows clients have no `step_up` key (M4-11, D-M4-11-2) |
 | K-ID-5 | `auth_sessions.client_component`, `parent_session_id`, `cookie_hash`; neue Anmeldewege; `revoke_reason = inactive` | übernommen, dazu `auth_sessions.step_up_method` |
 | K-ID-6 | `refresh_token_families.dpop_jkt` | übernommen, dazu Nachsicht `auth.refresh_reuse_grace` (03) |
 | K-ID-7 | Systemaktion `instance.bootstrap`; `user.enable` für `pending -> active` | übernommen, 05 |

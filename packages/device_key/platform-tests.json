@@ -3,5 +3,10 @@
     ["sh", "darwin/run_core_tests.sh"],
     ["sh", "darwin/run_ios_sim_tests.sh"]
   ],
-  "android": [["sh", "android/run_instrumented_tests.sh"]]
+  "android": [["sh", "android/run_instrumented_tests.sh"]],
+  "windows": [
+    ["cmake", "-S", "windows/core", "-B", "build/core-tests"],
+    ["cmake", "--build", "build/core-tests", "--config", "Debug"],
+    ["ctest", "--test-dir", "build/core-tests", "-C", "Debug", "--output-on-failure"]
+  ]
 }

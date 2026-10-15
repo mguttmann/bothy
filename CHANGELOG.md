@@ -39,6 +39,13 @@ Planning stage (milestone M0). Nothing is installable yet.
   `state.reconnecting` only in full motion. `tokens.py icons` (part of `build`) generates the
   assets, their lookup, the MIT text and a manifest, and `make tokens` fails on a missing glyph
   or a stale asset; a golden shows every icon in its weight and in fill (M4-05).
+- Device key for Windows: `packages/device_key` gains its Windows part, a C++ Pigeon host and the
+  static library `device_key_core` over CNG. The `dpop` key is an ECDSA P-256 key of the user in the
+  TPM (Platform Crypto Provider, after `NCryptIsAlgSupported`) or, without a TPM or without P-256,
+  in the software key storage provider and reported as not hardware-bound; export policy `0`, the
+  provider fixed at creation, a lost key reported as `key_invalidated`. There is no step-up key on
+  Windows, because Windows enforces no confirmation per use for a P-256 key (08 6.1, D-M4-11-2);
+  `make apps-platform` runs the CTest suite on Windows (M4-11).
 - Design tokens: `make tokens` checks the chart series `color.viz.series.1` to `.8` (adjacent
   pairs and series 8 with series 1) and the traffic light states `success.fg`, `warning.fg` and
   `danger.fg` under simulated protanopia, deuteranopia and tritanopia (Machado et al. 2009,
