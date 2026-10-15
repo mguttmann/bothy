@@ -48,6 +48,9 @@ same make target in GitHub Actions. All gate tools run in both places.
 | `lychee` | `0.24.2` | links and anchors in Markdown | Apache-2.0 OR MIT | checks anchors in Markdown files offline |
 | `osv-scanner` | `2.6.0` | vulnerabilities and licenses of all lock files | Apache-2.0 | one tool for Go, Dart, Python and npm |
 | `trivy` | `0.69.3` | misconfiguration and image vulnerabilities | Apache-2.0 | image scan at release; version see below |
+| `cosign` | `3.1.3` | signs and verifies the release images, binaries and `SHA256SUMS` (`release.yml`, `make release-trial`) | Apache-2.0 | the Sigstore signing tool of ADR 0036; with a key pair and a signing configuration without Rekor, Fulcio and timestamp service in the private phase (ADR 0062) |
+| `syft` | `1.54.1` | SPDX and CycloneDX SBOMs of every release image per platform and every binary | Apache-2.0 | the SBOM generator behind `anchore/sbom-action`, as a binary so that the trial release and `release.yml` run the same version (18, section 6) |
+| `git-cliff` | `2.14.2` | selects and parses the commits of one component for `make release-prep` | MIT OR Apache-2.0 | ADR 0060: path filter and tag pattern per component, offline |
 | `otelcol-contrib` | `0.162.0` | `otelcol-contrib validate` for the collector base, every overlay and pairs of two overlays (`ops-check`) | Apache-2.0 | the same distribution and version as the collector image (`BOTHY_OTELCOL_VERSION`); only it knows the contrib components of the overlays |
 | `promtool` | `3.15.0` | `promtool check config`, `check rules` and `test rules` (`ops-check`) | Apache-2.0 | check tool from the Prometheus release of the image version (`BOTHY_PROMETHEUS_VERSION`) |
 | `amtool` | `0.34.1` | `amtool check-config` and routing tests (`ops-check`) | Apache-2.0 | check tool from the Alertmanager release of the image version (`BOTHY_ALERTMANAGER_VERSION`) |

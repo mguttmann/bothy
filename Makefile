@@ -100,7 +100,7 @@ TS_ON := $(and $(TS_PROJECTS),$(or $(call want,sdk-typescript),$(call want,plugi
         gitleaks-staged denylist denylist-history licenses docs adr-index config-reference config-doc-check catalog catalog-check linkcheck \
         trivy-image portability linkcheck-external diagrams tokens api-lint api-checks api-tables api-clients \
         runners-check release-pins commitlint \
-        review labels-check labels-sync tools-lock release-build clean \
+        review labels-check labels-sync tools-lock release-build release-prep release-trial scancode clean \
         codegen-check arch register-check migrations-lint migrations-lock perf ops-check \
         image image-test postgres-image postgres-image-test apps-platform
 
@@ -542,6 +542,11 @@ release-build: ## Product release bundle (tag v<version>): Compose installation,
 	mkdir -p "$$OUT"
 	git archive --format=tar.gz --prefix="bothy-$$VERSION/" -o "$$OUT/bothy-compose-$$VERSION.tar.gz" HEAD \
 	  infra/compose LICENSE NOTICE CHANGELOG.md VERSION
+
+release-prep: ## Prepare a component release (ADR 0060): make release-prep COMPONENT=<name> [CHANNEL=beta]
+	@[ -n "$${COMPONENT:-}" ] || { echo "usage: make release-prep COMPONENT=<name> [CHANNEL=beta]"; exit 2; }
+	@gc=$(call tool,git-cliff) || exit 1; \
+	$(UVRUN) python tools/ci/release_prep.py --component "$$COMPONENT" --channel "$${CHANNEL:-stable}" --git-cliff "$$gc"
 
 # ---- server image (ADR 0012; not part of `gates`: needs Docker with buildx, see CONTRIBUTING.md) --
 # The release (M7) and the Compose smoke test (M1-73) start from `make image`. The local tag is
