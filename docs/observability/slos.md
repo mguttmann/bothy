@@ -29,8 +29,10 @@ Status: draft M0. Decision: ADR 0035. The source of all numbers is the Sloth fil
 
 The column "Metric of the own measurement" reproduces the label `bothy_sli_metric` of the SLO in the
 Sloth file; it maps the SLO to its metric in `stats_minutes`
-([25-visualization.md](../spec/25-visualization.md), section 3.3). The build ticket PLAN M6-11
-sets the labels; until then this column is the requirement for them.
+([25-visualization.md](../spec/25-visualization.md), section 3.3). The source is the label
+in the Sloth file; `make ops-check` holds this column equal to it (check `sli-labels`) and the
+generated bounds of server and apps equal a fresh run of `tools/observability/sli_bounds.py`
+(check `sli-bounds`).
 
 Rationale:
 
