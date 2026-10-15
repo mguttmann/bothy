@@ -11,6 +11,15 @@ documented in this file. The format is based on
 
 ### Added
 
+- CDN fetch of the import tool (M8-02): `discord.Fetcher` loads one Discord attachment with
+  `GET` only when the link is `https` on a host of `import.discord.cdn_hosts` (exact match, port
+  `443` unless the entry names one), without token or cookie, without redirects or an
+  environment proxy, bounded by `import.attachment_max_bytes` (declared size, `Content-Length`
+  and the bytes read) and `import.http_timeout`. On `403` or `404` it reads the message once
+  more for a fresh link and tries once more (`ErrCDNGone` otherwise); `429` follows the wait
+  limits of the read client. Errors and logs show scheme, host and path only (`SafeURL`); the
+  body streams to the caller and never touches the disk. The fake CDN `discordtest.NewCDN`
+  serves the tests.
 - Image `bothy-postgres` (M7-01): `postgres:18` pinned by digest plus pgBackRest 2.59.3 from the
   PostgreSQL project's Debian repository (key checked by fingerprint, a version below 2.59.3 fails
   the build and the start) and `bothy-backupd`, built for linux/amd64 and linux/arm64 without
