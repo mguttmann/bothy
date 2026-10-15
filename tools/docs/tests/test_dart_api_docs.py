@@ -27,6 +27,11 @@ name = os.path.basename(sys.argv[0])
 args = sys.argv[1:]
 with open(os.environ["FAKE_LOG"], "a", encoding="utf-8") as fh:
     fh.write(json.dumps({{"tool": name, "args": args, "cwd": os.getcwd()}}) + "\\n")
+hook = ("GIT_DIR", "GIT_WORK_TREE", "GIT_INDEX_FILE", "GIT_COMMON_DIR", "GIT_PREFIX")
+git = sorted(k for k in os.environ if k in hook)
+if git:
+    with open(os.environ["FAKE_LOG"] + ".git", "a", encoding="utf-8") as fh:
+        fh.write(name + " " + ",".join(git) + "\\n")
 if name == "dart" and args[:1] == ["doc"]:
     out = args[args.index("--output") + 1]
     os.makedirs(out, exist_ok=True)
@@ -173,3 +178,14 @@ def test_external_font_links_are_removed_from_the_pages(tmp_path: Path) -> None:
     text = page.read_text(encoding="utf-8")
     assert "fonts.g" not in text
     assert 'href="static-assets/styles.css"' in text
+
+
+def test_flutter_and_dart_run_without_the_git_variables_of_a_hook(
+    repo: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    # The pre-push hook runs `make check` with the git variables set; with them Flutter reads
+    # its own version as 0.0.0-unknown and the workspace does not resolve (D-M2-38-22).
+    for name in ("GIT_DIR", "GIT_WORK_TREE", "GIT_INDEX_FILE", "GIT_COMMON_DIR", "GIT_PREFIX"):
+        monkeypatch.setenv(name, str(repo / ".git"))
+    assert _run(repo) == 0
+    assert not (repo.parent / "calls.jsonl.git").exists()

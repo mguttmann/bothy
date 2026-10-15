@@ -14,6 +14,7 @@ Usage: dart_api_docs.py --out docs/api/dart [--root <repository>] [--rules <rule
 from __future__ import annotations
 
 import argparse
+import os
 import re
 import shutil
 import subprocess
@@ -52,9 +53,18 @@ def packages(rules: Path) -> list[tuple[str, str]]:
     return [(m["name"], m["path"]) for m in data["members"] if m["kind"] != "app"]
 
 
+# git exports these to hooks (the pre-push hook runs `make check`); with them Flutter takes the
+# repository for its own checkout, reads its version as 0.0.0-unknown and the workspace does not
+# resolve. The root Makefile drops them the same way (FLUTTER, docs/DECISIONS.md D-M2-38-22).
+_GIT_LOCATION_VARIABLES = frozenset(
+    {"GIT_DIR", "GIT_WORK_TREE", "GIT_INDEX_FILE", "GIT_COMMON_DIR", "GIT_PREFIX"}
+)
+
+
 def _run(command: list[str], cwd: Path) -> tuple[int, str]:
+    env = {k: v for k, v in os.environ.items() if k not in _GIT_LOCATION_VARIABLES}
     result = subprocess.run(
-        command, cwd=cwd, capture_output=True, text=True, check=False, encoding="utf-8"
+        command, cwd=cwd, env=env, capture_output=True, text=True, check=False, encoding="utf-8"
     )
     output = result.stdout + result.stderr
     sys.stdout.write(output)
