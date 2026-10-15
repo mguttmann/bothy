@@ -427,6 +427,7 @@ Spätere DDL-Jobs nutzen dasselbe Muster.
 | `archive_timeout` | `backup.pg.archive_timeout` | begrenzt den Datenverlust bei wenig Schreiblast |
 | Isolationsstufe | `READ COMMITTED` | Zähler-Muster ([04-sync-protokoll.md](04-sync-protokoll.md) 3.2) |
 | `statement_timeout` je Anwendungsverbindung | `database.statement_timeout` | keine hängenden Abfragen |
+| Character classification of the database (`LC_CTYPE`) | UTF-8 capable, for example `en_US.utf8` (the official image's default); not `C` | upper and lower case of non-ASCII letters in text search: under `C` a search for "ärger" never finds "Ärger"; the start check `pg.CheckTextSearch` refuses such a database ([02-architektur.md](02-architektur.md) 15.1 step 4, M3-13) |
 
 ## 8. Sicherung und Wiederherstellung
 

@@ -12,12 +12,42 @@ import (
 )
 
 const getMessage = `-- name: GetMessage :one
-SELECT id, thread_id, channel_id, thread_seq, author_principal_id, client_msg_id, client_payload_sha256, origin, kind, system_code, content_md, content_format, reply_to_message_id, run_id, trigger_state, trigger_state_reason, trigger_state_at, silent, import_item_id, version, edited_at, deleted_at, deleted_by, created_at FROM messages WHERE id = $1
+SELECT id, thread_id, channel_id, thread_seq, author_principal_id, client_msg_id, client_payload_sha256, origin, kind,
+    system_code, content_md, content_format, reply_to_message_id, run_id, trigger_state, trigger_state_reason, trigger_state_at,
+    silent, import_item_id, version, edited_at, deleted_at, deleted_by, created_at
+FROM messages WHERE id = $1
 `
 
-func (q *Queries) GetMessage(ctx context.Context, id pgtype.UUID) (Message, error) {
+type GetMessageRow struct {
+	ID                  pgtype.UUID
+	ThreadID            pgtype.UUID
+	ChannelID           pgtype.UUID
+	ThreadSeq           int64
+	AuthorPrincipalID   pgtype.UUID
+	ClientMsgID         pgtype.UUID
+	ClientPayloadSha256 []byte
+	Origin              string
+	Kind                string
+	SystemCode          pgtype.Text
+	ContentMd           string
+	ContentFormat       int16
+	ReplyToMessageID    pgtype.UUID
+	RunID               pgtype.UUID
+	TriggerState        pgtype.Text
+	TriggerStateReason  pgtype.Text
+	TriggerStateAt      pgtype.Timestamptz
+	Silent              bool
+	ImportItemID        pgtype.UUID
+	Version             int64
+	EditedAt            pgtype.Timestamptz
+	DeletedAt           pgtype.Timestamptz
+	DeletedBy           pgtype.UUID
+	CreatedAt           pgtype.Timestamptz
+}
+
+func (q *Queries) GetMessage(ctx context.Context, id pgtype.UUID) (GetMessageRow, error) {
 	row := q.db.QueryRow(ctx, getMessage, id)
-	var i Message
+	var i GetMessageRow
 	err := row.Scan(
 		&i.ID,
 		&i.ThreadID,
@@ -48,7 +78,10 @@ func (q *Queries) GetMessage(ctx context.Context, id pgtype.UUID) (Message, erro
 }
 
 const getMessageByClientID = `-- name: GetMessageByClientID :one
-SELECT id, thread_id, channel_id, thread_seq, author_principal_id, client_msg_id, client_payload_sha256, origin, kind, system_code, content_md, content_format, reply_to_message_id, run_id, trigger_state, trigger_state_reason, trigger_state_at, silent, import_item_id, version, edited_at, deleted_at, deleted_by, created_at FROM messages WHERE author_principal_id = $1 AND client_msg_id = $2
+SELECT id, thread_id, channel_id, thread_seq, author_principal_id, client_msg_id, client_payload_sha256, origin, kind,
+    system_code, content_md, content_format, reply_to_message_id, run_id, trigger_state, trigger_state_reason, trigger_state_at,
+    silent, import_item_id, version, edited_at, deleted_at, deleted_by, created_at
+FROM messages WHERE author_principal_id = $1 AND client_msg_id = $2
 `
 
 type GetMessageByClientIDParams struct {
@@ -56,10 +89,37 @@ type GetMessageByClientIDParams struct {
 	ClientMsgID       pgtype.UUID
 }
 
+type GetMessageByClientIDRow struct {
+	ID                  pgtype.UUID
+	ThreadID            pgtype.UUID
+	ChannelID           pgtype.UUID
+	ThreadSeq           int64
+	AuthorPrincipalID   pgtype.UUID
+	ClientMsgID         pgtype.UUID
+	ClientPayloadSha256 []byte
+	Origin              string
+	Kind                string
+	SystemCode          pgtype.Text
+	ContentMd           string
+	ContentFormat       int16
+	ReplyToMessageID    pgtype.UUID
+	RunID               pgtype.UUID
+	TriggerState        pgtype.Text
+	TriggerStateReason  pgtype.Text
+	TriggerStateAt      pgtype.Timestamptz
+	Silent              bool
+	ImportItemID        pgtype.UUID
+	Version             int64
+	EditedAt            pgtype.Timestamptz
+	DeletedAt           pgtype.Timestamptz
+	DeletedBy           pgtype.UUID
+	CreatedAt           pgtype.Timestamptz
+}
+
 // The idempotency lookup of 04 section 5.1 point 4.
-func (q *Queries) GetMessageByClientID(ctx context.Context, arg GetMessageByClientIDParams) (Message, error) {
+func (q *Queries) GetMessageByClientID(ctx context.Context, arg GetMessageByClientIDParams) (GetMessageByClientIDRow, error) {
 	row := q.db.QueryRow(ctx, getMessageByClientID, arg.AuthorPrincipalID, arg.ClientMsgID)
-	var i Message
+	var i GetMessageByClientIDRow
 	err := row.Scan(
 		&i.ID,
 		&i.ThreadID,
@@ -92,10 +152,14 @@ func (q *Queries) GetMessageByClientID(ctx context.Context, arg GetMessageByClie
 const insertMessage = `-- name: InsertMessage :one
 
 INSERT INTO messages (id, thread_id, channel_id, thread_seq, author_principal_id, client_msg_id, client_payload_sha256,
-                      origin, kind, system_code, content_md, content_format, reply_to_message_id, silent, version, created_at)
+                      origin, kind, system_code, content_md, content_format, reply_to_message_id, silent, version, created_at,
+                      search_language)
 VALUES ($1, $2, $3, $4, $5, $6, $7,
-        $8, $9, $10, $11, $12, $13, $14, 1, $15)
-RETURNING id, thread_id, channel_id, thread_seq, author_principal_id, client_msg_id, client_payload_sha256, origin, kind, system_code, content_md, content_format, reply_to_message_id, run_id, trigger_state, trigger_state_reason, trigger_state_at, silent, import_item_id, version, edited_at, deleted_at, deleted_by, created_at
+        $8, $9, $10, $11, $12, $13, $14, 1, $15,
+        $16::text::regconfig)
+RETURNING id, thread_id, channel_id, thread_seq, author_principal_id, client_msg_id, client_payload_sha256, origin, kind,
+    system_code, content_md, content_format, reply_to_message_id, run_id, trigger_state, trigger_state_reason, trigger_state_at,
+    silent, import_item_id, version, edited_at, deleted_at, deleted_by, created_at
 `
 
 type InsertMessageParams struct {
@@ -114,13 +178,46 @@ type InsertMessageParams struct {
 	ReplyToMessageID    pgtype.UUID
 	Silent              bool
 	CreatedAt           pgtype.Timestamptz
+	SearchLanguage      string
+}
+
+type InsertMessageRow struct {
+	ID                  pgtype.UUID
+	ThreadID            pgtype.UUID
+	ChannelID           pgtype.UUID
+	ThreadSeq           int64
+	AuthorPrincipalID   pgtype.UUID
+	ClientMsgID         pgtype.UUID
+	ClientPayloadSha256 []byte
+	Origin              string
+	Kind                string
+	SystemCode          pgtype.Text
+	ContentMd           string
+	ContentFormat       int16
+	ReplyToMessageID    pgtype.UUID
+	RunID               pgtype.UUID
+	TriggerState        pgtype.Text
+	TriggerStateReason  pgtype.Text
+	TriggerStateAt      pgtype.Timestamptz
+	Silent              bool
+	ImportItemID        pgtype.UUID
+	Version             int64
+	EditedAt            pgtype.Timestamptz
+	DeletedAt           pgtype.Timestamptz
+	DeletedBy           pgtype.UUID
+	CreatedAt           pgtype.Timestamptz
 }
 
 // SPDX-License-Identifier: Apache-2.0
 // Queries on messages (messaging, docs/spec/03-datenmodell.md section 4.6).
+//
+// The columns are listed instead of "*": no read carries search_language or the generated
+// search_vector (docs/DECISIONS.md D-M3-13-10). Every INSERT names search_language, the language
+// of 14 3.1 (M3-13); the static test TestMessageInsertsSetSearchLanguage holds it.
 // A new message; thread_seq comes from threads.last_message_seq under the row lock (03 section
 // 6.2). A second (author_principal_id, client_msg_id) violates messages_author_client_msg_id_key.
-func (q *Queries) InsertMessage(ctx context.Context, arg InsertMessageParams) (Message, error) {
+// search_language goes in as text and is cast here, so pgx needs no codec for regconfig.
+func (q *Queries) InsertMessage(ctx context.Context, arg InsertMessageParams) (InsertMessageRow, error) {
 	row := q.db.QueryRow(ctx, insertMessage,
 		arg.ID,
 		arg.ThreadID,
@@ -137,8 +234,9 @@ func (q *Queries) InsertMessage(ctx context.Context, arg InsertMessageParams) (M
 		arg.ReplyToMessageID,
 		arg.Silent,
 		arg.CreatedAt,
+		arg.SearchLanguage,
 	)
-	var i Message
+	var i InsertMessageRow
 	err := row.Scan(
 		&i.ID,
 		&i.ThreadID,

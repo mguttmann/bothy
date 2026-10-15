@@ -33,7 +33,7 @@ func TestRepositoryChannels(t *testing.T) {
 			return err
 		}
 		var err error
-		if main, err = e.repo.InsertMainThread(ctx, domain.NewMainThread(ids.New(), text.ID, alex, t0)); err != nil {
+		if main, err = e.repo.InsertMainThread(ctx, mainThread(text.ID, alex)); err != nil {
 			return err
 		}
 		return e.repo.InsertChannel(ctx, forum)

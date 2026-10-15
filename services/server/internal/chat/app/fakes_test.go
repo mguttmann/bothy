@@ -417,6 +417,13 @@ type directory struct {
 	principals map[ids.ID]identity.PrincipalView
 }
 
+// SearchLanguage answers the language of a thread's creator: german for every principal (the
+// rule itself is tested in identity/app and test/integration).
+func (d directory) SearchLanguage(context.Context, ids.ID) (string, error) { return "german", nil }
+
+// InstanceSearchLanguage answers the instance language: english.
+func (d directory) InstanceSearchLanguage(context.Context) (string, error) { return "english", nil }
+
 func (d directory) Principal(_ context.Context, id ids.ID) (identity.PrincipalView, error) {
 	p, ok := d.principals[id]
 	if !ok {

@@ -4,6 +4,7 @@ package config
 
 import (
 	"fmt"
+	"maps"
 	"net/netip"
 	"slices"
 	"strconv"
@@ -74,7 +75,7 @@ type value struct {
 //
 // The accessors panic when the key is not in the schema or has a kind the accessor does not
 // serve. Both are programming errors that tests catch, not operator errors; the panic message
-// names the key and its kind, never a value. Slices are returned as copies.
+// names the key and its kind, never a value. Slices and maps are returned as copies.
 type Values struct {
 	schema *Schema
 	vals   map[string]value
@@ -124,6 +125,12 @@ func (v *Values) Strings(key string) []string {
 // Prefixes returns a copy of the value of a list(cidr) key.
 func (v *Values) Prefixes(key string) []netip.Prefix {
 	return slices.Clone(v.lookup("Prefixes", key, KindCIDRList).v.([]netip.Prefix))
+}
+
+// StringMap returns a copy of the value of a map(string) key; the empty map is an empty, non-nil
+// map.
+func (v *Values) StringMap(key string) map[string]string {
+	return maps.Clone(v.lookup("StringMap", key, KindStringMap).v.(map[string]string))
 }
 
 // Text returns the canonical text of the value of any key: the text bothy config print shows,

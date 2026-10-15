@@ -257,6 +257,7 @@ Tickets der Module `identity`, `chat`, `agents`).
 | `kernel/reqmeta` | `correlation_id` (Trace-ID der Anfrage, als UUID geschrieben, keine UUIDv7) und Client-IP der Anfrage im Kontext; nur Standardbibliothek | `platform/httpserver` setzt die Werte | `audit`, `sync`, `platform/*` |
 | `kernel/jose` | Kompakte JWS lesen, bauen und prüfen (`ES256`, `EdDSA`, `RS256`, `PS256`), JWK lesen und Fingerabdruck nach RFC 7638; nur Standardbibliothek ([ADR 0067](../adr/0067-jose-profil-mit-der-standardbibliothek.md)) | kernel selbst | `identity` (DPoP, Zugriffstokens, Step-up, ID-Tokens, Client-Assertion), `instance` (JWKS, Prüfung von Prüfpunkten), `audit`, später `runs` |
 | `kernel/designkeys` | erlaubte Schlüssel des Design-Systems als Daten: Kategorie-Farben, Akzente, Bereichs-Icons; erzeugt aus `design/build/tokens.resolved.json` (PLAN M1-46) | Generator | `instance` (Branding), `chat` (Bereiche, Tags) |
+| `kernel/searchlang` | Validated language configuration of full-text search: `search.languages` and `search.locale_map`, the configuration of a locale's first language subtag, the query languages and every configuration the server uses ([14-suche.md](14-suche.md) 3.1, M3-13); standard library only | kernel selbst | `identity` (language of new messages and threads), `wire` (checks, start check), later `search` (M3-14) and `files` (M3-15) |
 | `kernel/actor` | Prinzipal einer Anfrage (ID, Art, Gerät, Sitzung, Step-up-Zeit, Scopes); `Authenticator` mit `Revalidate` (geprüften Prinzipal ohne neuen Beweis erneut prüfen: Sitzung, Gerät, Token, Status; schließt Gateway-Verbindungen nach Widerruf von Tokens und Agenten, die kein `session.revoked` haben) | `identity` | `platform/httpserver`, `gateway` |
 | `kernel/authorize` | Aktionen (generiert aus `docs/spec/actions.yaml`, [ADR 0049](../adr/0049-maschinenlesbarer-aktionskatalog-als-einzige-quelle.md)), Ressourcen-Deskriptor (mit optionalem zweitem Ziel, 07 Abschnitt 4.2), `Decision`, `Authorizer` (`Authorize`, `Scope` für Listen, `Observe` für Ereignisse des Logs), Filtermodus `Filter(ctx)` für Elemente von Listen, Suche und Momentaufnahme (keine Ablehnung im Audit, 07 Abschnitt 4.2), Zustellmodus `Delivery(ctx)` des Gateways (Filtermodus plus Rechte-Stand aus `Observe` statt einer Leseabfrage je Ereignis), In-Tx-Ereignis `AccessChanged`. `Registry` collects the event types, WebSocket ops and terminal channel ops a binary emits and accepts; modules fill it through `Register` in their port, and the start checks it against the closed catalogue of `authz` (M1-25) | `authz` | allen |
 | `kernel/txn` | Unit of Work, Phasen vor dem Commit, In-Tx-Ereignisbus (Abschnitt 8) | `platform/pg`; Phasen-Hooks von `authz`, `sync`, `audit` | allen `app`-Paketen |
@@ -357,7 +358,7 @@ Ein Ereignistyp hat genau ein erzeugendes Modul. Die Empfangs-Aktion steht in 05
 | Schicht | Paket | Enthält | Darf importieren | Darf nicht |
 |---|---|---|---|---|
 | Port | `internal/<modul>` | Eingehende Schnittstellen, Befehls- und Ergebnis-Typen (DTOs), In-Tx-Ereignisse, deklarierte Quellen-Ports | `kernel` | `domain`, `app`, `adapters`, fremde Module, Fremdbibliotheken |
-| Domain | `internal/<modul>/domain` | Entitäten, Wertobjekte, Zustandsmaschinen (z. B. Lauf-Übergänge), Invarianten, reine Funktionen | Pakete aus `kernel-core` (`kernel/ids`, `kernel/clock`, `kernel/errs`, `kernel/textcheck`, `kernel/reqmeta`, `kernel/jose`, `kernel/designkeys`) | Ein- und Ausgabe, SQL, HTTP, Kontext mit Transaktion, Fremdbibliotheken |
+| Domain | `internal/<modul>/domain` | Entitäten, Wertobjekte, Zustandsmaschinen (z. B. Lauf-Übergänge), Invarianten, reine Funktionen | Pakete aus `kernel-core` (`kernel/ids`, `kernel/clock`, `kernel/errs`, `kernel/textcheck`, `kernel/reqmeta`, `kernel/jose`, `kernel/designkeys`, `kernel/searchlang`) | Ein- und Ausgabe, SQL, HTTP, Kontext mit Transaktion, Fremdbibliotheken |
 | Anwendung | `internal/<modul>/app` | Anwendungsfälle: `authorize`, Unit of Work, Domain aufrufen, Ereignisse anhängen; ausgehende Ports (Repository, Uhr, Fremddienst) als Schnittstellen | eigener Port, eigene Domain, `kernel`, Ports erlaubter Module | `adapters`, `platform`, `api`, Fremdbibliotheken |
 | Adapter | `internal/<modul>/adapters/<art>` | `postgres` (sqlc-Code und Repository), `httpapi` (Teil des generierten Server-Interfaces), weitere wie `objectstore`, `clamav`, `apns` | alles des eigenen Moduls, `kernel`, `platform`, `api`, Ports erlaubter Module, zugelassene Fremdbibliotheken | `app` oder `domain` fremder Module |
 
@@ -482,7 +483,7 @@ Einträge, nie Felder):
 version: 1
 exclude: [tools]                  # Verzeichnisse, die go-arch-lint nicht prüft (Werkzeuge)
 kernel:
-  core: [ids, clock, errs, textcheck, reqmeta, jose, designkeys]   # von jedem Paket nutzbar
+  core: [ids, clock, errs, textcheck, reqmeta, jose, designkeys, searchlang]   # von jedem Paket nutzbar
   ports: [actor, authorize, txn, eventlog, auditing, idempotency, personaldata, measure]
 platform:                         # je Plattform-Paket eine Komponente
   jobs: {depends_on: [pg], vendors: [river]}
@@ -555,7 +556,7 @@ vendors:
 components:
   kernel-core:   { in: [internal/kernel/ids, internal/kernel/clock, internal/kernel/errs,
                         internal/kernel/textcheck, internal/kernel/reqmeta, internal/kernel/jose,
-                        internal/kernel/designkeys] }
+                        internal/kernel/designkeys, internal/kernel/searchlang] }
   kernel-ports:  { in: [internal/kernel/actor, internal/kernel/authorize, internal/kernel/txn,
                         internal/kernel/eventlog, internal/kernel/auditing,
                         internal/kernel/idempotency, internal/kernel/personaldata,
@@ -1072,7 +1073,11 @@ Server lädt.
    an IP address), `file.s3.checksum_mode` (`when_supported` only with an `https` endpoint) and `egress.allowed_hosts` (an `http` endpoint needs an entry with
    `allow_private` for the request host and port, because the egress client allows `http` only
    there, [19-sicherheit.md](19-sicherheit.md) SEC-NET-2); with `fs` no `file.s3.*` value is
-   read. Dazu prüft der Lader eine Regel für einen einzelnen Schlüssel, die kein
+   read. The entries of `search.languages` are unique, unqualified lower-case PostgreSQL
+   identifiers and never `simple` (check `search_languages`); every key of `search.locale_map` is
+   a first language subtag in lower-case ASCII letters and every value is listed in
+   `search.languages` or is `simple` (check `search_locale_map`, the start error of
+   [14-suche.md](14-suche.md) 3.1; M3-13). Dazu prüft der Lader eine Regel für einen einzelnen Schlüssel, die kein
    Typ ausdrückt: `secrets.dir` ist ein absoluter Pfad in sauberer Form (kein `.` oder `..`, kein
    doppelter oder abschließender `/`), nicht `/`, ohne NUL-Zeichen und ohne `<`, wie ihn der
    Secret-Provider verlangt; ein falscher Wert ist ein Problem von `secrets.dir` allein, nicht der
@@ -1201,6 +1206,11 @@ Clients nehmen nach 04 wieder auf.
    erlaubt, weil Migrationen nach Erweitern und Zusammenziehen gebaut sind (ADR 0007). River's
    migrations in `jobs.schema` must be complete as well; otherwise the start aborts with the same
    hint (checked in step 8 for every role, M1-14).
+   Then the text search of the database (M3-13, [14-suche.md](14-suche.md) 3.1): every
+   configuration of `search.languages` and `search.locale_map` (plus `simple`) must exist on the
+   search path, and the database must fold the case of non-ASCII letters
+   ([16-betrieb.md](16-betrieb.md) 7.2); otherwise the start aborts with exit code `1` before any
+   public listener, and the message names the key and the entry, never the configured name.
 5. Instanz laden (fehlt die Zeile: Abbruch mit Hinweis auf `bothy migrate up`). Ohne
    `setup_completed_at` startet der Server vollständig, beantwortet aber nur Health-Checks und
    Discovery, alles andere mit `503 setup_required` (08, Abschnitt 4); er prüft den Zustand je

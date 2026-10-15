@@ -33,6 +33,7 @@ import (
 	"github.com/OWNER/bothy/services/server/internal/kernel/actor"
 	"github.com/OWNER/bothy/services/server/internal/kernel/clock"
 	"github.com/OWNER/bothy/services/server/internal/kernel/ids"
+	"github.com/OWNER/bothy/services/server/internal/kernel/searchlang"
 	"github.com/OWNER/bothy/services/server/internal/kernel/txn"
 	"github.com/OWNER/bothy/services/server/internal/platform/httpserver"
 	"github.com/OWNER/bothy/services/server/internal/platform/httpserver/httpservertest"
@@ -170,7 +171,12 @@ func newWorld(t *testing.T) *world {
 	if err != nil {
 		t.Fatal(err)
 	}
-	c, err := wire.NewChat(chatConfig, pool, uow, az, az, wire.ChatWrites{Audit: w.rec, Events: appender, Rights: hook}, policies, w.clk)
+	settings, err := wire.NewInstanceSettings(wire.DefaultInstanceConfig(), true, pool, uow, az, wire.SettingsWrites{Audit: w.rec, Events: appender}, w.clk)
+	if err != nil {
+		t.Fatal(err)
+	}
+	c, err := wire.NewChat(chatConfig, pool, uow, az, az, wire.ChatWrites{Audit: w.rec, Events: appender, Rights: hook,
+		Directory: wire.NewSearchDirectory(pool, searchlang.Map{}, settings.Admin)}, policies, w.clk)
 	if err != nil {
 		t.Fatal(err)
 	}

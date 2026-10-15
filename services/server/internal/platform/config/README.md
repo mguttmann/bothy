@@ -32,10 +32,16 @@ nicht hierher.
   Querprüfung; `(*Schema).Keys()` liefert die Schlüssel nach Namen sortiert.
 - `Load(schema, Sources{Env, File, Flags})` liefert `*Values` oder `*LoadError` mit allen
   Problemen.
-- `Values`: `String`, `Int`, `Float`, `Bool`, `Duration`, `Strings`, `Prefixes`, `Text`,
-  `Source`, `File`. Ein unbekannter Schlüssel oder eine falsche Art ist ein Programmierfehler und
+- `Values`: `String`, `Int`, `Float`, `Bool`, `Duration`, `Strings`, `Prefixes`, `StringMap`,
+  `Text`, `Source`, `File`. Ein unbekannter Schlüssel oder eine falsche Art ist ein Programmierfehler und
   führt zu einem Panic, den Tests finden.
 - `Bind(values, &cfg)` füllt eine Struktur des nutzenden Pakets; `internal/wire` ruft es auf.
+- Kind `map(string)` (`KindStringMap`, M3-13, for `search.locale_map`): in defaults, the
+  environment and a file scalar a JSON object whose values are strings; in the file also a YAML
+  mapping of plain scalars below the key. Duplicate and empty keys, values that are no string,
+  nested objects or mappings, sequences, aliases and tags are problems that name the entry by its
+  position. The canonical text is the JSON object with sorted keys; `Values.StringMap` and `Bind`
+  into `map[string]string` hand out copies (docs/DECISIONS.md D-M3-13-4).
 - `EnvName` und `KeyFromEnv` sind für gültige Namen exakt umkehrbar.
 
 ## Regeln

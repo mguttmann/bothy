@@ -112,18 +112,21 @@ func (r *Repository) SaveChannel(ctx context.Context, c domain.Channel) error {
 
 // InsertMainThread implements app.Store.
 func (r *Repository) InsertMainThread(ctx context.Context, th domain.Thread) (domain.Thread, error) {
+	if err := searchLanguageSet(th); err != nil {
+		return domain.Thread{}, err
+	}
 	q, err := r.write(ctx)
 	if err != nil {
 		return domain.Thread{}, err
 	}
 	row, err := q.InsertMainThread(ctx, sqlcgen.InsertMainThreadParams{
 		ID: uuid(th.ID), ChannelID: uuid(th.ChannelID), CreatedBy: uuid(th.CreatedBy),
-		CreatedAt: pgtype.Timestamptz{Time: th.CreatedAt, Valid: true},
+		CreatedAt: pgtype.Timestamptz{Time: th.CreatedAt, Valid: true}, SearchLanguage: th.SearchLanguage,
 	})
 	if err != nil {
 		return domain.Thread{}, mapError(err, "inserting a main thread")
 	}
-	return toThread(row), nil
+	return toThread(threadRow(row)), nil
 }
 
 // ForumTags implements app.Store.

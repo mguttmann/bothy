@@ -8,9 +8,11 @@ import (
 
 	"github.com/OWNER/bothy/services/server/internal/identity"
 	"github.com/OWNER/bothy/services/server/internal/identity/domain"
+	"github.com/OWNER/bothy/services/server/internal/instance"
 	"github.com/OWNER/bothy/services/server/internal/kernel/actor"
 	"github.com/OWNER/bothy/services/server/internal/kernel/errs"
 	"github.com/OWNER/bothy/services/server/internal/kernel/ids"
+	"github.com/OWNER/bothy/services/server/internal/kernel/searchlang"
 )
 
 // Directory implements identity.Directory over a Store. It is read only and does not call
@@ -18,6 +20,17 @@ import (
 // Store is.
 type Directory struct {
 	store Store
+	// search is the language configuration of WithSearch; nil fails SearchLanguage and
+	// InstanceSearchLanguage closed, so a writer that was wired without it never writes simple
+	// by accident.
+	search *searchLanguages
+}
+
+// searchLanguages is what SearchLanguage needs besides the Store: the validated configuration
+// and the reader of locale.default.
+type searchLanguages struct {
+	langs    searchlang.Map
+	settings instance.Settings
 }
 
 // Compile-time check: Directory is the port identity.Directory.
@@ -26,6 +39,62 @@ var _ identity.Directory = (*Directory)(nil)
 // NewDirectory returns the directory over store.
 func NewDirectory(store Store) *Directory {
 	return &Directory{store: store}
+}
+
+// WithSearch returns a copy of d that answers SearchLanguage and InstanceSearchLanguage with the
+// language configuration langs (search.languages, search.locale_map) and reads locale.default
+// through settings (instance.Settings.LocaleDefault). The writers of messages and threads
+// (messaging, chat) get such a directory from internal/wire.
+func (d *Directory) WithSearch(langs searchlang.Map, settings instance.Settings) *Directory {
+	return &Directory{store: d.store, search: &searchLanguages{langs: langs, settings: settings}}
+}
+
+// SearchLanguage implements identity.Directory (14 3.1, docs/DECISIONS.md D-M3-13-1): a person
+// gets the mapping of users.locale, every other principal the mapping of locale.default. A person
+// costs one read by primary key, another principal two. Errors: kind not_found for an unknown
+// id; internal without WithSearch; the errors of the Store and of the settings.
+func (d *Directory) SearchLanguage(ctx context.Context, id ids.ID) (string, error) {
+	if err := d.searchConfigured(); err != nil {
+		return "", err
+	}
+	rec, found, err := d.store.User(ctx, id)
+	if err != nil {
+		return "", err
+	}
+	if found {
+		return d.search.langs.For(rec.User.Locale), nil
+	}
+	if _, found, err = d.store.Principal(ctx, id); err != nil {
+		return "", err
+	}
+	if !found {
+		return "", notFound("principal")
+	}
+	return d.InstanceSearchLanguage(ctx)
+}
+
+// InstanceSearchLanguage implements identity.Directory: the mapping of locale.default. Errors:
+// internal without WithSearch or without settings; the error of the settings.
+func (d *Directory) InstanceSearchLanguage(ctx context.Context) (string, error) {
+	if err := d.searchConfigured(); err != nil {
+		return "", err
+	}
+	if d.search.settings == nil {
+		return "", errs.New(errs.CodeInternalError, "identity: the directory has no instance settings for locale.default")
+	}
+	locale, err := d.search.settings.LocaleDefault(ctx)
+	if err != nil {
+		return "", err
+	}
+	return d.search.langs.For(locale), nil
+}
+
+// searchConfigured fails when the directory was built without WithSearch.
+func (d *Directory) searchConfigured() error {
+	if d.search == nil {
+		return errs.New(errs.CodeInternalError, "identity: the directory has no search language configuration")
+	}
+	return nil
 }
 
 // Principal implements identity.Directory. Errors: kind not_found for an unknown id; the

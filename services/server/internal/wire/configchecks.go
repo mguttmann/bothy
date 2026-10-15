@@ -50,6 +50,8 @@ var configChecks = []configCheck{
 	{name: "client_versions_semver", keys: clientVersionKeys, fn: clientVersionsSemVer},
 	{name: "jwks_max_age_below_rotation", keys: []string{keyJWKSMaxAge, keyInvocationRotation, keyAccessRotation}, fn: jwksMaxAgeBelowRotation},
 	{name: "webauthn_relying_party", keys: []string{keyPublicURL, keyWebAuthnRPID, keyWebAuthnOrigins}, fn: webAuthnRelyingParty},
+	{name: "search_languages", keys: []string{keySearchLanguages}, fn: searchLanguagesCheck},
+	{name: "search_locale_map", keys: []string{keySearchLanguages, keySearchLocaleMap}, fn: searchLocaleMapCheck},
 }
 
 // webAuthnRelyingParty holds auth.webauthn_rp_id and auth.webauthn_origins to the rules of the

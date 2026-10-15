@@ -208,7 +208,7 @@ func (s *Service) createChannel(ctx context.Context, a actor.Actor, spaceID ids.
 	}
 	var main domain.Thread
 	if ch.Kind == domain.ChannelText {
-		if main, err = s.d.Store.InsertMainThread(ctx, domain.NewMainThread(ids.New(), ch.ID, a.ID, ch.CreatedAt)); err != nil {
+		if main, err = s.insertMainThread(ctx, a, ch); err != nil {
 			return ChannelRow{}, err
 		}
 		ch.MainThreadID = main.ID
@@ -228,6 +228,18 @@ func (s *Service) createChannel(ctx context.Context, a actor.Actor, spaceID ids.
 		}
 	}
 	return row, nil
+}
+
+// insertMainThread inserts the main thread of the new text channel ch with the search language
+// of its creator a (14 3.1, docs/DECISIONS.md D-M3-13-2) and returns the stored thread.
+func (s *Service) insertMainThread(ctx context.Context, a actor.Actor, ch domain.Channel) (domain.Thread, error) {
+	main := domain.NewMainThread(ids.New(), ch.ID, a.ID, ch.CreatedAt)
+	lang, err := s.searchLanguage(ctx, a)
+	if err != nil {
+		return domain.Thread{}, err
+	}
+	main.SearchLanguage = lang
+	return s.d.Store.InsertMainThread(ctx, main)
 }
 
 // newChannel checks kind, forum sort, name and topic of cmd and returns the new channel without

@@ -90,4 +90,15 @@ type Directory interface {
 	User(ctx context.Context, id ids.ID) (UserView, error)
 	// ActiveOwners returns the owners with revoked_at IS NULL, ordered by granted_at, then id.
 	ActiveOwners(ctx context.Context) ([]OwnerView, error)
+	// SearchLanguage returns the text search configuration of a new message or thread by the
+	// principal id (docs/spec/14-suche.md 3.1): for a person search.locale_map of the first
+	// language subtag of users.locale, for an agent or an app the same of locale.default, simple
+	// when the map has no entry. Errors: kind not_found for an unknown id; internal when the
+	// directory has no language configuration.
+	SearchLanguage(ctx context.Context, id ids.ID) (string, error)
+	// InstanceSearchLanguage returns the text search configuration of locale.default through
+	// search.locale_map (simple without entry): the language of system lines, imports and file
+	// text (14 3.1). Errors: the database error; internal when the directory has no language
+	// configuration.
+	InstanceSearchLanguage(ctx context.Context) (string, error)
 }

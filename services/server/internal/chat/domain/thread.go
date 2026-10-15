@@ -89,6 +89,11 @@ type Thread struct {
 	CreatedAt, LastActivityAt, MovedAt time.Time
 	// Version is 1 for a new thread.
 	Version int64
+	// SearchLanguage is the text search configuration of the title (threads.search_language,
+	// docs/spec/14-suche.md 3.1): the use case sets it from the creator before the insert; the
+	// store writes it once and never reads it back, so a loaded thread has "" (docs/DECISIONS.md
+	// D-M3-13-10).
+	SearchLanguage string
 }
 
 // NewMainThread returns the main thread of channel with the defaults of 03: title ”, title

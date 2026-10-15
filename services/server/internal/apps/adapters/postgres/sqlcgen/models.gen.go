@@ -480,6 +480,8 @@ type Message struct {
 	DeletedAt           pgtype.Timestamptz
 	DeletedBy           pgtype.UUID
 	CreatedAt           pgtype.Timestamptz
+	SearchLanguage      interface{}
+	SearchVector        interface{}
 }
 
 type MessageTemplate struct {
@@ -627,6 +629,8 @@ type Thread struct {
 	CreatedAt       pgtype.Timestamptz
 	MovedAt         pgtype.Timestamptz
 	Version         int64
+	SearchLanguage  interface{}
+	TitleSearch     interface{}
 }
 
 type ThreadTag struct {

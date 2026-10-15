@@ -5,6 +5,7 @@ package config
 import (
 	"errors"
 	"fmt"
+	"maps"
 	"net/netip"
 	"reflect"
 	"slices"
@@ -14,26 +15,28 @@ import (
 // The field types Bind fills, each with the kinds it accepts. Only these exact types fit; a named
 // type such as `type Role string` does not, so that a field never silently changes meaning.
 var bindTypes = map[reflect.Type][]Kind{
-	reflect.TypeFor[string]():         stringKinds,
-	reflect.TypeFor[bool]():           {KindBool},
-	reflect.TypeFor[int64]():          {KindInt},
-	reflect.TypeFor[int]():            {KindInt},
-	reflect.TypeFor[float64]():        {KindFloat},
-	reflect.TypeFor[time.Duration]():  {KindDuration},
-	reflect.TypeFor[[]string]():       {KindStringList},
-	reflect.TypeFor[[]netip.Prefix](): {KindCIDRList},
+	reflect.TypeFor[string]():            stringKinds,
+	reflect.TypeFor[bool]():              {KindBool},
+	reflect.TypeFor[int64]():             {KindInt},
+	reflect.TypeFor[int]():               {KindInt},
+	reflect.TypeFor[float64]():           {KindFloat},
+	reflect.TypeFor[time.Duration]():     {KindDuration},
+	reflect.TypeFor[[]string]():          {KindStringList},
+	reflect.TypeFor[[]netip.Prefix]():    {KindCIDRList},
+	reflect.TypeFor[map[string]string](): {KindStringMap},
 }
 
 // Bind fills the struct dst points to from v. Every exported field carries a tag
 // `config:"<key>"` and has the Go type of the key's kind: string (string, enum, listen address,
 // cron, semver, secret_ref, url), bool, int64 or int (int), float64, time.Duration, []string
-// (list(string)) or []netip.Prefix (list(cidr)). Unexported fields are left alone.
+// (list(string)), []netip.Prefix (list(cidr)) or map[string]string (map(string)). Unexported
+// fields are left alone.
 //
 // A consumer declares its Config struct in its own package (02 "Konfigurationsladen" item 5);
 // internal/wire loads the values once and binds each struct. Bind returns an error, and changes
 // nothing, when dst is not a non-nil pointer to a struct, when an exported field has no tag,
 // names an unknown key or has a type that does not fit the kind, or when an int value does not
-// fit into int. The error names the field and the key, never a value. Slices are copies.
+// fit into int. The error names the field and the key, never a value. Slices and maps are copies.
 //
 // Example:
 //
@@ -104,6 +107,8 @@ func bindValue(v *Values, field string, f reflect.StructField, fv reflect.Value)
 		x = reflect.ValueOf(int(n))
 	case f.Type.Kind() == reflect.Slice:
 		x = reflect.AppendSlice(reflect.MakeSlice(f.Type, 0, x.Len()), x)
+	case f.Type.Kind() == reflect.Map:
+		x = reflect.ValueOf(maps.Clone(val.v.(map[string]string)))
 	}
 	return x, nil
 }

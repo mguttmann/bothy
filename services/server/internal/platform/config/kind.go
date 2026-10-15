@@ -7,6 +7,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"math"
 	"net"
 	"net/netip"
@@ -44,6 +45,7 @@ const (
 	KindSemVer                     // SemVer 2.0.0 without leading v; string
 	KindSecretRef                  // <scheme>:<reference> with scheme file or env; string
 	KindURL                        // http or https URL with host; string
+	KindStringMap                  // JSON object of strings, YAML mapping in the file; map[string]string
 )
 
 var kindNames = map[Kind]string{
@@ -60,6 +62,7 @@ var kindNames = map[Kind]string{
 	KindSemVer:     "semver",
 	KindSecretRef:  "secret_ref",
 	KindURL:        "url",
+	KindStringMap:  "map(string)",
 }
 
 // String returns the name of the kind as the configuration reference writes it ("duration",
@@ -134,8 +137,82 @@ func parseValue(k Kind, enum []string, text string) (any, string, error) {
 			return nil, "", err
 		}
 		return text, text, nil
+	case KindStringMap:
+		entries, err := splitObject(text)
+		if err != nil {
+			return nil, "", err
+		}
+		return parseEntries(entries)
 	}
 	return nil, "", fmt.Errorf("unknown kind %s", k)
+}
+
+// entry is one key and value of a map(string) value in the order of its source.
+type entry struct{ key, value string }
+
+// errNotObject is the error of a map(string) text that is not a JSON object of strings.
+var errNotObject = errors.New("must be a JSON object whose values are strings")
+
+// splitObject splits the environment and default form of a map(string) value: a JSON object
+// whose values are strings, in the order of the text. The JSON errors are not passed on: they
+// quote the offending character of the input. A value that is no string is reported by its
+// position, never by its text.
+func splitObject(text string) ([]entry, error) {
+	dec := json.NewDecoder(strings.NewReader(text))
+	if tok, err := dec.Token(); err != nil || tok != json.Delim('{') {
+		return nil, errNotObject
+	}
+	var entries []entry
+	for dec.More() {
+		k, err := dec.Token()
+		if err != nil {
+			return nil, errNotObject
+		}
+		v, err := dec.Token()
+		if err != nil {
+			return nil, errNotObject
+		}
+		s, ok := v.(string)
+		if !ok {
+			return nil, fmt.Errorf("entry %d: the value must be a string", len(entries)+1)
+		}
+		// Object keys are always strings in a valid JSON text.
+		entries = append(entries, entry{key: k.(string), value: s})
+	}
+	if tok, err := dec.Token(); err != nil || tok != json.Delim('}') {
+		return nil, errNotObject
+	}
+	if _, err := dec.Token(); !errors.Is(err, io.EOF) {
+		return nil, errNotObject
+	}
+	return entries, nil
+}
+
+// parseEntries checks the entries of a map(string) value, as they come from splitObject or from
+// a YAML mapping, and returns the map and its canonical text: the JSON object with the keys
+// sorted. Errors name the position of an entry, never its text.
+func parseEntries(entries []entry) (any, string, error) {
+	m := make(map[string]string, len(entries))
+	for i, e := range entries {
+		if e.key == "" {
+			return nil, "", fmt.Errorf("entry %d has an empty key", i+1)
+		}
+		if _, dup := m[e.key]; dup {
+			return nil, "", fmt.Errorf("entry %d repeats the key of an earlier entry", i+1)
+		}
+		m[e.key] = e.value
+	}
+	return m, mapText(m), nil
+}
+
+// mapText renders a map as a JSON object with sorted keys and without HTML escaping.
+func mapText(m map[string]string) string {
+	var buf bytes.Buffer
+	enc := json.NewEncoder(&buf)
+	enc.SetEscapeHTML(false)
+	// Encoding a map[string]string cannot fail; encoding/json sorts the keys.
+	_ = enc.Encode(m)
+	return strings.TrimSuffix(buf.String(), "\n")
 }
 
 func parseBool(text string) (any, string, error) {

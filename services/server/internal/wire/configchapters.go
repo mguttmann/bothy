@@ -18,6 +18,7 @@ const (
 	chapter09 = "09-agenten.md"
 	chapter11 = "11-erweiterungen.md"
 	chapter12 = "12-dateien.md"
+	chapter14 = "14-suche.md"
 	chapter16 = "16-betrieb.md"
 	chapter17 = "17-observability.md"
 	chapter18 = "18-release.md"

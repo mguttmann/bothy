@@ -95,6 +95,10 @@ type Message struct {
 	DeletedBy           ids.ID
 	// CreatedAt is the creation time.
 	CreatedAt time.Time
+	// SearchLanguage is the text search configuration of the content (messages.search_language,
+	// docs/spec/14-suche.md 3.1): the use case sets it before the insert; the store writes it once
+	// and never reads it back, so a loaded message has "" (docs/DECISIONS.md D-M3-13-10).
+	SearchLanguage string
 }
 
 // OriginFor returns the origin of a message by a principal of kind (user, agent or app; 09

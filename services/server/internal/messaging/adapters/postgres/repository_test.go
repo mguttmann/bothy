@@ -47,7 +47,7 @@ func TestRepository_MessagesAndMentions(t *testing.T) {
 	m := domain.Message{
 		ID: ids.New(), ThreadID: main, ChannelID: ch, ThreadSeq: 1, AuthorID: w.OwnerID, ClientMsgID: ids.New(),
 		PayloadSHA256: []byte{1, 2, 3}, Origin: domain.OriginHuman, Kind: domain.KindText, ContentMD: "hello",
-		ContentFormat: domain.ContentFormat, Silent: true, Version: 1, CreatedAt: at,
+		ContentFormat: domain.ContentFormat, Silent: true, Version: 1, CreatedAt: at, SearchLanguage: "german",
 	}
 	if _, err := repo.InsertMessage(ctx, m); err == nil {
 		t.Fatal("insert outside a unit of work")

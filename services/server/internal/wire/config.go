@@ -34,6 +34,7 @@ var configKeyGroups = []func() []config.Key{
 	instanceConfigKeys,
 	terminalConfigKeys,
 	appsConfigKeys,
+	searchConfigKeys,
 }
 
 // ConfigSchema builds the configuration schema of the server: every key of configKeyGroups and

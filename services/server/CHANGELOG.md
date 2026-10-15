@@ -32,7 +32,18 @@ documented in this file. The format is based on
   `message.list_content_max_bytes` (now an active key) with `content_truncated`; `limit` defaults
   to `api.page_size_default` and is capped at `api.page_size_max`. The port
   `messaging.Messages` adds `History` and `Get` for later callers.
-
+- Search vectors (M3-13): migration `00035` adds `messages.search_language`,
+  `messages.search_vector`, `threads.search_language` and `threads.title_search` as `STORED`
+  generated columns with the expressions of 03 section 5 and the platform function
+  `search_tsquery(regconfig[], text)` of 14 4.2 (executable only by `bothy_app`); migration
+  `00036` builds their GIN indexes concurrently. Every new message and thread takes the language
+  of its author or creator through `search.locale_map` (the instance language for agents, apps
+  and system lines), set once at creation and never from a request. New configuration keys
+  `search.languages` and `search.locale_map` with the new kind `map(string)` and the checks
+  `search_languages` and `search_locale_map`; the start stops when a configured text search
+  configuration is missing in the database or the database does not fold the case of non-ASCII
+  letters. Adding the generated columns rewrites `messages` and `threads` once (no release
+  exists yet).
 - Sending messages (M1-56): `createMessage` and `createThread`. Migrations `00032` and `00033`
   create `messages` and `mentions` and give `threads.parent_message_id` its deferred foreign key.
   A message is idempotent by its author and `client_msg_id` (a repetition answers `200` with

@@ -224,6 +224,21 @@ template has `channel_id` and is checked against the channel (`template.read` wi
   visible one `404`.
 - Templates append no event (05 section 6); clients reload them by REST (M1-60/4).
 
+## Search language (M3-13)
+
+Every insert of `messages` names `search_language`, the text search configuration of
+[14-suche.md](../../../../docs/spec/14-suche.md) 3.1, computed in the unit of work of the insert
+through `identity.Directory`: origin `human` takes `SearchLanguage(author)` (the mapping of
+`users.locale` through `search.locale_map`), origin `agent` and `app` take
+`InstanceSearchLanguage` without reading the principal, and the reopen line (origin `system`)
+takes the instance language whoever caused it. The value goes to SQL as text and is cast there;
+`domain.Message.SearchLanguage` is write-only. The generated `search_vector` keeps itself
+current: an edit recomputes it with the stored language, a deleted message (empty content) has an
+empty vector. The queries list their columns, so no read carries `search_language` or
+`search_vector` (docs/DECISIONS.md D-M3-13-10). `TestMessageInsertsSetSearchLanguage`
+(`adapters/postgres`) fails when an `INSERT INTO messages` of `queries/*.sql` does not name
+`search_language` (later writers: M2 agent messages, M8-03 import, V3-01 DMs).
+
 ## Hinweise für den Bau
 
 - Idempotenz über das Paar aus Autor und `client_msg_id` (04, 5.1).

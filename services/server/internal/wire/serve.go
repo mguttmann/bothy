@@ -13,6 +13,7 @@ import (
 	"net/http"
 	"net/url"
 	"os"
+	"slices"
 	"strconv"
 	stdsync "sync"
 	"time"
@@ -29,6 +30,7 @@ import (
 	"github.com/OWNER/bothy/services/server/internal/kernel/actor"
 	"github.com/OWNER/bothy/services/server/internal/kernel/authorize"
 	"github.com/OWNER/bothy/services/server/internal/kernel/clock"
+	"github.com/OWNER/bothy/services/server/internal/kernel/searchlang"
 	"github.com/OWNER/bothy/services/server/internal/platform/buildinfo"
 	"github.com/OWNER/bothy/services/server/internal/platform/config"
 	"github.com/OWNER/bothy/services/server/internal/platform/egress"
@@ -169,6 +171,10 @@ type server struct {
 	keyCheck    time.Duration
 	// blocked is set when a readiness check fails for good (schema_requires_newer_server).
 	blocked bool
+	// search is the language configuration of full-text search (search.languages,
+	// search.locale_map; M3-13): identity answers the language of new messages and threads with
+	// it, and the step schema checks its configurations against the database.
+	search searchlang.Map
 }
 
 // Serve assembles `bothy serve` for role from the loaded values v and returns the Runner;
@@ -183,7 +189,10 @@ type server struct {
 //     plaintext without a peer filter (R-SE-09),
 //  4. database: pg.Open and WaitReady within startup.dependency_wait; readiness check database,
 //  5. schema: pg.CheckSchema against the highest version of deps.Migrations; an older database
-//     ends the start with the hint to run "bothy migrate up" (Serve never migrates, R-AR-16),
+//     ends the start with the hint to run "bothy migrate up" (Serve never migrates, R-AR-16);
+//     then pg.CheckTextSearch with the configurations of search.languages and search.locale_map
+//     (M3-13): a missing configuration or a database without case folding of non-ASCII letters
+//     ends the start,
 //  6. instance (M1-15): load the instance row (missing: the start ends with the hint to run
 //     "bothy migrate up") and compare the own version with instance.min_server_version; below
 //     it the readiness check schema_requires_newer_server fails for good (loadInstance),
@@ -274,6 +283,9 @@ func Serve(_ context.Context, v *config.Values, role Role, deps Deps) (*lifecycl
 	}
 	s.jobsCfg.Logger = logger
 	if s.syncCfg, err = SyncConfigFrom(v); err != nil {
+		return nil, err
+	}
+	if s.search, err = SearchLanguages(v); err != nil {
 		return nil, err
 	}
 	s.runner = lifecycle.New(lifecycle.Options{
@@ -696,7 +708,7 @@ func (s *server) startIdentity(ctx context.Context) error {
 		return err
 	}
 	id, err := NewIdentity(cfg, pool, a.UoW(), az, IdentityWrites{Audit: a.Recorder(), Events: sy.Appender(), Settings: st.Admin, Flags: st.Admin,
-		Fresh: fresh, Apps: NewAppInstallations(pool)}, pepper, s.deps.Clock, s.logger())
+		Fresh: fresh, Apps: NewAppInstallations(pool), Search: s.search}, pepper, s.deps.Clock, s.logger())
 	if err != nil {
 		return err
 	}
@@ -740,13 +752,14 @@ func (s *server) startChat(context.Context) error {
 		return err
 	}
 	s.mu.Lock()
-	pool, a, az, sy := s.pool, s.audit, s.authorizer, s.sync
+	pool, a, az, sy, id := s.pool, s.audit, s.authorizer, s.sync, s.identity
 	s.mu.Unlock()
 	rights, ok := az.(authz.RightsQuery)
-	if a == nil || sy == nil || !ok {
-		return errors.New("wire: the chat step needs audit, sync and the Authorizer of authz")
+	if a == nil || sy == nil || !ok || id == nil {
+		return errors.New("wire: the chat step needs audit, sync, the Authorizer of authz and identity")
 	}
-	c, err := NewChat(cfg, pool, a.UoW(), az, rights, ChatWrites{Audit: a.Recorder(), Events: sy.Appender(), Rights: a.RightsHook()}, nil, s.deps.Clock)
+	c, err := NewChat(cfg, pool, a.UoW(), az, rights, ChatWrites{Audit: a.Recorder(), Events: sy.Appender(), Rights: a.RightsHook(),
+		Directory: id.Directory}, nil, s.deps.Clock)
 	if err != nil {
 		return err
 	}
@@ -754,7 +767,7 @@ func (s *server) startChat(context.Context) error {
 	if err != nil {
 		return err
 	}
-	m, err := NewMessaging(mcfg, pool, a.UoW(), az, sy.Appender(), c.Service, s.deps.Clock, s.logger())
+	m, err := NewMessaging(mcfg, pool, a.UoW(), az, sy.Appender(), c.Service, id.Directory, s.deps.Clock, s.logger())
 	if err != nil {
 		return err
 	}
@@ -943,11 +956,41 @@ func (s *server) authorizerOf() authorize.Authorizer {
 	return s.authorizer
 }
 
+// checkSchema is start step 5: the schema version (pg.CheckSchema), then the text search of the
+// database (M3-13, docs/DECISIONS.md D-M3-13-6): every configuration of search.languages and
+// search.locale_map exists, and the database folds the case of non-ASCII letters. A failure ends
+// the start with exit code 1 before any public listener opens.
 func (s *server) checkSchema(ctx context.Context) error {
 	s.mu.Lock()
 	pool := s.pool
 	s.mu.Unlock()
-	return pg.CheckSchema(ctx, pool, s.required)
+	if err := pg.CheckSchema(ctx, pool, s.required); err != nil {
+		return err
+	}
+	return textSearchError(pg.CheckTextSearch(ctx, pool, s.search.Configs()), s.search)
+}
+
+// textSearchError names the configuration key and entry of a missing text search configuration
+// instead of its position in langs.Configs(), never the name itself: the first entry of
+// search.languages, else of search.locale_map in key order, that holds the missing name. Other
+// errors pass unchanged.
+func textSearchError(err error, langs searchlang.Map) error {
+	var missing *pg.TextSearchConfigMissingError
+	if !errors.As(err, &missing) {
+		return err
+	}
+	configs := langs.Configs()
+	if missing.Position < 1 || missing.Position > len(configs) {
+		return err
+	}
+	name := configs[missing.Position-1]
+	if i := slices.Index(langs.Languages(), name); i >= 0 {
+		return fmt.Errorf("wire: search.languages entry %d names a text search configuration the database does not have", i+1)
+	}
+	if i := langs.LocaleIndex(name); i > 0 {
+		return fmt.Errorf("wire: the value of search.locale_map entry %d (in key order) names a text search configuration the database does not have", i)
+	}
+	return fmt.Errorf("wire: the database has no text search configuration %s", searchlang.Simple)
 }
 
 // mountRoutes checks the route bindings and the registrations of the modules against the closed

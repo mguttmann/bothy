@@ -12,7 +12,10 @@ import (
 )
 
 const getVisibleMessage = `-- name: GetVisibleMessage :one
-SELECT id, thread_id, channel_id, thread_seq, author_principal_id, client_msg_id, client_payload_sha256, origin, kind, system_code, content_md, content_format, reply_to_message_id, run_id, trigger_state, trigger_state_reason, trigger_state_at, silent, import_item_id, version, edited_at, deleted_at, deleted_by, created_at FROM messages m WHERE m.id = $1 AND m.channel_id = ANY($2::uuid[])
+SELECT id, thread_id, channel_id, thread_seq, author_principal_id, client_msg_id, client_payload_sha256, origin, kind,
+    system_code, content_md, content_format, reply_to_message_id, run_id, trigger_state, trigger_state_reason, trigger_state_at,
+    silent, import_item_id, version, edited_at, deleted_at, deleted_by, created_at
+FROM messages m WHERE m.id = $1 AND m.channel_id = ANY($2::uuid[])
 `
 
 type GetVisibleMessageParams struct {
@@ -20,11 +23,39 @@ type GetVisibleMessageParams struct {
 	VisibleChannelIds []pgtype.UUID
 }
 
+type GetVisibleMessageRow struct {
+	ID                  pgtype.UUID
+	ThreadID            pgtype.UUID
+	ChannelID           pgtype.UUID
+	ThreadSeq           int64
+	AuthorPrincipalID   pgtype.UUID
+	ClientMsgID         pgtype.UUID
+	ClientPayloadSha256 []byte
+	Origin              string
+	Kind                string
+	SystemCode          pgtype.Text
+	ContentMd           string
+	ContentFormat       int16
+	ReplyToMessageID    pgtype.UUID
+	RunID               pgtype.UUID
+	TriggerState        pgtype.Text
+	TriggerStateReason  pgtype.Text
+	TriggerStateAt      pgtype.Timestamptz
+	Silent              bool
+	ImportItemID        pgtype.UUID
+	Version             int64
+	EditedAt            pgtype.Timestamptz
+	DeletedAt           pgtype.Timestamptz
+	DeletedBy           pgtype.UUID
+	CreatedAt           pgtype.Timestamptz
+}
+
 // getMessage: the message @id when its channel is visible (07 section 7.4 rule 1); a foreign and
-// an unknown id both give no row.
-func (q *Queries) GetVisibleMessage(ctx context.Context, arg GetVisibleMessageParams) (Message, error) {
+// an unknown id both give no row. The columns are listed, so the read carries neither
+// search_language nor search_vector (D-M3-13-10, INT-W22/3).
+func (q *Queries) GetVisibleMessage(ctx context.Context, arg GetVisibleMessageParams) (GetVisibleMessageRow, error) {
 	row := q.db.QueryRow(ctx, getVisibleMessage, arg.ID, arg.VisibleChannelIds)
-	var i Message
+	var i GetVisibleMessageRow
 	err := row.Scan(
 		&i.ID,
 		&i.ThreadID,
@@ -56,7 +87,7 @@ func (q *Queries) GetVisibleMessage(ctx context.Context, arg GetVisibleMessagePa
 
 const listThreadAfter = `-- name: ListThreadAfter :many
 WITH page AS (
-    SELECT m.id, m.thread_id, m.channel_id, m.thread_seq, m.author_principal_id, m.client_msg_id, m.client_payload_sha256, m.origin, m.kind, m.system_code, m.content_md, m.content_format, m.reply_to_message_id, m.run_id, m.trigger_state, m.trigger_state_reason, m.trigger_state_at, m.silent, m.import_item_id, m.version, m.edited_at, m.deleted_at, m.deleted_by, m.created_at FROM messages m
+    SELECT m.id, m.thread_id, m.channel_id, m.thread_seq, m.author_principal_id, m.client_msg_id, m.client_payload_sha256, m.origin, m.kind, m.system_code, m.content_md, m.content_format, m.reply_to_message_id, m.run_id, m.trigger_state, m.trigger_state_reason, m.trigger_state_at, m.silent, m.import_item_id, m.version, m.edited_at, m.deleted_at, m.deleted_by, m.created_at, m.search_language, m.search_vector FROM messages m
     WHERE m.thread_id = $1 AND m.channel_id = ANY($2::uuid[]) AND m.thread_seq > $3
     ORDER BY m.thread_seq
     LIMIT $4
@@ -153,19 +184,19 @@ func (q *Queries) ListThreadAfter(ctx context.Context, arg ListThreadAfterParams
 
 const listThreadAround = `-- name: ListThreadAround :many
 WITH below AS (
-    SELECT m.id, m.thread_id, m.channel_id, m.thread_seq, m.author_principal_id, m.client_msg_id, m.client_payload_sha256, m.origin, m.kind, m.system_code, m.content_md, m.content_format, m.reply_to_message_id, m.run_id, m.trigger_state, m.trigger_state_reason, m.trigger_state_at, m.silent, m.import_item_id, m.version, m.edited_at, m.deleted_at, m.deleted_by, m.created_at FROM messages m
+    SELECT m.id, m.thread_id, m.channel_id, m.thread_seq, m.author_principal_id, m.client_msg_id, m.client_payload_sha256, m.origin, m.kind, m.system_code, m.content_md, m.content_format, m.reply_to_message_id, m.run_id, m.trigger_state, m.trigger_state_reason, m.trigger_state_at, m.silent, m.import_item_id, m.version, m.edited_at, m.deleted_at, m.deleted_by, m.created_at, m.search_language, m.search_vector FROM messages m
     WHERE m.thread_id = $1 AND m.channel_id = ANY($2::uuid[]) AND m.thread_seq < $3
     ORDER BY m.thread_seq DESC
     LIMIT $4
 ), above AS (
-    SELECT m.id, m.thread_id, m.channel_id, m.thread_seq, m.author_principal_id, m.client_msg_id, m.client_payload_sha256, m.origin, m.kind, m.system_code, m.content_md, m.content_format, m.reply_to_message_id, m.run_id, m.trigger_state, m.trigger_state_reason, m.trigger_state_at, m.silent, m.import_item_id, m.version, m.edited_at, m.deleted_at, m.deleted_by, m.created_at FROM messages m
+    SELECT m.id, m.thread_id, m.channel_id, m.thread_seq, m.author_principal_id, m.client_msg_id, m.client_payload_sha256, m.origin, m.kind, m.system_code, m.content_md, m.content_format, m.reply_to_message_id, m.run_id, m.trigger_state, m.trigger_state_reason, m.trigger_state_at, m.silent, m.import_item_id, m.version, m.edited_at, m.deleted_at, m.deleted_by, m.created_at, m.search_language, m.search_vector FROM messages m
     WHERE m.thread_id = $1 AND m.channel_id = ANY($2::uuid[]) AND m.thread_seq >= $3
     ORDER BY m.thread_seq
     LIMIT $4
 ), page AS (
-    SELECT b.id, b.thread_id, b.channel_id, b.thread_seq, b.author_principal_id, b.client_msg_id, b.client_payload_sha256, b.origin, b.kind, b.system_code, b.content_md, b.content_format, b.reply_to_message_id, b.run_id, b.trigger_state, b.trigger_state_reason, b.trigger_state_at, b.silent, b.import_item_id, b.version, b.edited_at, b.deleted_at, b.deleted_by, b.created_at, true AS before_side FROM below b
+    SELECT b.id, b.thread_id, b.channel_id, b.thread_seq, b.author_principal_id, b.client_msg_id, b.client_payload_sha256, b.origin, b.kind, b.system_code, b.content_md, b.content_format, b.reply_to_message_id, b.run_id, b.trigger_state, b.trigger_state_reason, b.trigger_state_at, b.silent, b.import_item_id, b.version, b.edited_at, b.deleted_at, b.deleted_by, b.created_at, b.search_language, b.search_vector, true AS before_side FROM below b
     UNION ALL
-    SELECT a.id, a.thread_id, a.channel_id, a.thread_seq, a.author_principal_id, a.client_msg_id, a.client_payload_sha256, a.origin, a.kind, a.system_code, a.content_md, a.content_format, a.reply_to_message_id, a.run_id, a.trigger_state, a.trigger_state_reason, a.trigger_state_at, a.silent, a.import_item_id, a.version, a.edited_at, a.deleted_at, a.deleted_by, a.created_at, false AS before_side FROM above a
+    SELECT a.id, a.thread_id, a.channel_id, a.thread_seq, a.author_principal_id, a.client_msg_id, a.client_payload_sha256, a.origin, a.kind, a.system_code, a.content_md, a.content_format, a.reply_to_message_id, a.run_id, a.trigger_state, a.trigger_state_reason, a.trigger_state_at, a.silent, a.import_item_id, a.version, a.edited_at, a.deleted_at, a.deleted_by, a.created_at, a.search_language, a.search_vector, false AS before_side FROM above a
 )
 SELECT p.id, p.thread_id, p.channel_id, p.thread_seq, p.author_principal_id, p.client_msg_id, p.origin, p.kind,
        p.system_code, p.content_md, p.content_format, p.reply_to_message_id, p.silent, p.version, p.edited_at,
@@ -254,7 +285,7 @@ func (q *Queries) ListThreadAround(ctx context.Context, arg ListThreadAroundPara
 
 const listThreadBefore = `-- name: ListThreadBefore :many
 WITH page AS (
-    SELECT m.id, m.thread_id, m.channel_id, m.thread_seq, m.author_principal_id, m.client_msg_id, m.client_payload_sha256, m.origin, m.kind, m.system_code, m.content_md, m.content_format, m.reply_to_message_id, m.run_id, m.trigger_state, m.trigger_state_reason, m.trigger_state_at, m.silent, m.import_item_id, m.version, m.edited_at, m.deleted_at, m.deleted_by, m.created_at FROM messages m
+    SELECT m.id, m.thread_id, m.channel_id, m.thread_seq, m.author_principal_id, m.client_msg_id, m.client_payload_sha256, m.origin, m.kind, m.system_code, m.content_md, m.content_format, m.reply_to_message_id, m.run_id, m.trigger_state, m.trigger_state_reason, m.trigger_state_at, m.silent, m.import_item_id, m.version, m.edited_at, m.deleted_at, m.deleted_by, m.created_at, m.search_language, m.search_vector FROM messages m
     WHERE m.thread_id = $1 AND m.channel_id = ANY($2::uuid[]) AND m.thread_seq < $3
     ORDER BY m.thread_seq DESC
     LIMIT $4
@@ -352,7 +383,7 @@ func (q *Queries) ListThreadBefore(ctx context.Context, arg ListThreadBeforePara
 const listThreadNewest = `-- name: ListThreadNewest :many
 
 WITH page AS (
-    SELECT m.id, m.thread_id, m.channel_id, m.thread_seq, m.author_principal_id, m.client_msg_id, m.client_payload_sha256, m.origin, m.kind, m.system_code, m.content_md, m.content_format, m.reply_to_message_id, m.run_id, m.trigger_state, m.trigger_state_reason, m.trigger_state_at, m.silent, m.import_item_id, m.version, m.edited_at, m.deleted_at, m.deleted_by, m.created_at FROM messages m
+    SELECT m.id, m.thread_id, m.channel_id, m.thread_seq, m.author_principal_id, m.client_msg_id, m.client_payload_sha256, m.origin, m.kind, m.system_code, m.content_md, m.content_format, m.reply_to_message_id, m.run_id, m.trigger_state, m.trigger_state_reason, m.trigger_state_at, m.silent, m.import_item_id, m.version, m.edited_at, m.deleted_at, m.deleted_by, m.created_at, m.search_language, m.search_vector FROM messages m
     WHERE m.thread_id = $1 AND m.channel_id = ANY($2::uuid[])
     ORDER BY m.thread_seq DESC
     LIMIT $3
