@@ -62,6 +62,32 @@ Every connection goes through `internal/platform/egress`: no environment proxy, 
 host policy of exactly the API host, the egress address checks. The package imports no server
 module (`TestDiscordClientImportsNoServerModule`).
 
+## CDN fetch
+
+`Fetcher` loads one attachment (22 6.5, REUSE 5.2): `NewFetcher(CDNConfig, reader, Deps)` and
+`Fetch(ctx, AttachmentRef)`, which returns a `Download` whose `Body` the caller streams and
+closes (M8-04 uploads it). Rules:
+
+- `GET` only, `https` only (`ErrCDNScheme`), no user info, and a host and port that match an
+  entry of `import.discord.cdn_hosts` exactly after lowercasing and dropping a trailing dot; an
+  entry without a port allows only `443` (`ErrCDNHostNotAllowed`). The check runs before any
+  connection, also on the fresh link after a re-read; `platform/egress` then checks the
+  resolved addresses with a host policy of exactly the same entries.
+- No credential: the request carries only `User-Agent` and `Accept` (and the
+  `Accept-Encoding` of the transport); the fetcher has no token and no cookie jar.
+- No redirect is followed: a `3xx` is `ErrCDNRedirect`, the `Location` is never read.
+- Size: an attachment whose declared `size` is above `import.attachment_max_bytes` is not
+  requested; a larger `Content-Length` is closed unread; the body returns `ErrTooLarge` once the
+  byte after the limit arrives. Each request is bounded by `import.http_timeout`.
+- Expired link: on `403` or `404` the message is read once more (`MessagesAround` with limit 1),
+  the attachment with the same ID gives the fresh link, and the fetch is tried exactly once
+  more; a missing message or attachment or a second `403` or `404` is `ErrCDNGone`.
+- `429` waits `retry_after` or `Retry-After` within `import.discord.max_429_retries` and
+  `import.discord.max_rate_wait`, like the API client; `5xx` is a `*CallError` without retry.
+- Errors and log lines name only scheme, host and path (`SafeURL`); the error body of the CDN is
+  never read, except the body of a `429` for its wait, which is never shown.
+- Nothing is written to disk: no temp file, no cache.
+
 ## Fake Discord for tests
 
 `discordtest` starts a TLS fake on `127.0.0.1` with a free port under the host name
@@ -87,7 +113,18 @@ header. `Requests` returns the log (method, host, path, query, whether `Authoriz
 present, `User-Agent`); every method other than `GET` answers `405`. Only `_test.go` files import
 `discordtest` (`TestNoTestPackageInBinary`).
 
+`discordtest.NewCDN` is a fake CDN over TLS on `127.0.0.1` with a free port under
+`cdn.discord.test`, `media.discord.test` and the foreign `evil.test`. It serves files of a given
+size with or without `Content-Length`, accepts only a given `hm` signature per file (any other
+answers `403`, like an expired link), and injects a redirect, any status, `429` with
+`retry_after`, an oversize body behind a small `Content-Length` and an error body that echoes the
+request URL. Its log records method, host, path, query, the header names and whether
+`Authorization` or `Cookie` was present. `Hosts` and `EgressConfig` give the allow list and the
+test-only egress rules (all three names with `allow_private`, so only the fetcher's own list
+keeps requests away from `evil.test`).
+
 ## Not proven
 
-The client was never run against the real Discord; header names and wait semantics follow the
-cited documentation ([R4], [R6], [R7] of chapter 22).
+The client was never run against the real Discord, and the fetcher never against its CDN; header
+names, wait semantics and the expiry of signed links follow the cited documentation ([R4],
+[R5], [R6], [R7] of chapter 22).
