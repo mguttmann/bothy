@@ -196,7 +196,18 @@ func (s *Setup) identity(ctx context.Context, v *config.Values, sp *secrets.Prov
 	if err != nil {
 		return err
 	}
-	if s.id, err = NewIdentity(icfg, s.pool, s.audit.UoW(), az, IdentityWrites{Audit: s.audit.Recorder(), Events: sy.Appender()}, pepper, nil, log); err != nil {
+	// The people use cases read locale.default through the instance settings (M1-46, INT-W13/5).
+	scfg, err := InstanceConfig(v)
+	if err != nil {
+		return err
+	}
+	st, err := NewInstanceSettings(scfg, LocalPasswordEnabled(v), s.pool, s.audit.UoW(), az,
+		SettingsWrites{Audit: s.audit.Recorder(), Events: sy.Appender()}, nil)
+	if err != nil {
+		return err
+	}
+	w := IdentityWrites{Audit: s.audit.Recorder(), Events: sy.Appender(), Settings: st.Admin}
+	if s.id, err = NewIdentity(icfg, s.pool, s.audit.UoW(), az, w, pepper, nil, log); err != nil {
 		return err
 	}
 	return s.id.BindSessions(keys.Keys, rec.InstanceID)

@@ -250,6 +250,14 @@ type Instance struct {
 	CreatedAt        pgtype.Timestamptz
 }
 
+type InstanceSetting struct {
+	Key       string
+	Value     []byte
+	Version   int64
+	UpdatedBy pgtype.UUID
+	UpdatedAt pgtype.Timestamptz
+}
+
 type Owner struct {
 	ID        pgtype.UUID
 	UserID    pgtype.UUID

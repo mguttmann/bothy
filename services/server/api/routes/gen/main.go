@@ -8,7 +8,9 @@
 //   - <rest-dir>/rest.gen.go: models of every schema, std-http and strict server of the enabled
 //     operations (oapi-codegen),
 //   - <routes-dir>/routes.gen.go, catalog.gen.go, build.gen.go: the operation table, the action
-//     catalogue and the glue for api/routes.
+//     catalogue and the glue for api/routes,
+//   - <routes-dir>/meta.gen.go: the spec version, the gateway protocol versions of -asyncapi and
+//     the problem catalogue x-problem-codes (M1-46).
 //
 // Every problem of the inputs is reported, one per line with file and operation ID or entry;
 // nothing is written then. api/generate.go runs it for the real surface and for the fixture of
@@ -64,6 +66,7 @@ func run(ctx context.Context, args []string, stderr io.Writer) int {
 		{&c.routesDir, "routes-dir", "output directory of the route files", true},
 		{&c.restPkg, "rest-pkg", "import path of the package in -rest-dir", true},
 		{&c.corePkg, "core-pkg", "import path of api/routes; empty when -routes-dir is api/routes", false},
+		{&c.asyncapi, "asyncapi", "AsyncAPI document (docs/api/asyncapi.yaml) for the gateway protocol versions; empty for none", false},
 	}
 	for _, f := range flags {
 		fs.StringVar(f.value, f.name, "", f.usage)

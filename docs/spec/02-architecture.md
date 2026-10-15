@@ -453,10 +453,22 @@ by kind:
   of the API tokens and pairing codes `bothy_` with the gitleaks rule
   ([ADR 0061](../adr/0061-token-format-with-a-fixed-prefix-and-checksum.md)); default value of the
   setting `branding.product_name`.
+- Tools and operations: identifiers with the prefix `bothy-` (Semgrep rules, workflows,
+  dashboards, SLOs, Compose services, temporary names); the name alone as a value of the default
+  configuration (database and service name, components); display names in the tools (NOTICE,
+  documentation site, project and quality gate in SonarQube, title of gitleaks, dashboards and
+  folder in Grafana, design preview). Fixed and never renamed: the advisory lock keys `bothyjob`
+  and `bothyboo` (a new value would let two server versions migrate at the same time).
 
-This list is the only one; a test (PLAN M1-46) allows the name in code and configuration only
-in places of these kinds. A change of the name does not silently change the protocol identifiers:
-they are part of the terminal protocol and change only with a new protocol version.
+This list is the only one; a test (PLAN M1-46, `tools/ci/tests/test_product_name_places.py`)
+allows the name in code and configuration (without `docs/`, Markdown and code generated from the
+documentation) only in these forms: module path, whole path segment, prefix (`bothy-`, `bothy_`,
+`bothy.`, `BOTHY_`), alert name `Bothy<Name>` (only the names of the alert rules and the examples
+of the alert tooling), binary before a subcommand (in `cmd/bothy` also as the command word and in
+identifiers), whole value outside the client code (`apps/`, `packages/`) and display name in the
+tool files named above. Prose in comments and texts for people do not name it. A change of the
+name does not silently change the protocol identifiers: they are part of the terminal protocol
+and change only with a new protocol version.
 
 ## 7. Automatic check of the rules
 

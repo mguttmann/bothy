@@ -222,4 +222,7 @@ Technology without domain logic; only `adapters/`, `wire` and `cmd` may import i
 ## Name-bound locations
 
 The product name appears in code only here: Go module path in `go.mod`, binary `bothy` (`cmd/bothy`), prefix
-`BOTHY_` of the environment variables, image name. The list is kept in 18-release.md.
+`BOTHY_` of the environment variables, image name and the default of the displayed product name,
+the constant `DefaultProductName` in `internal/instance/domain` (setting
+`branding.product_name`, ADR 0044). 02-architecture.md, section 6, keeps the complete list by kind;
+`tools/ci/tests/test_product_name_places.py` holds it.

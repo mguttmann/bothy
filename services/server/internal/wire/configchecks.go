@@ -44,6 +44,7 @@ var configChecks = []configCheck{
 		"file.s3.use_path_style", "file.s3.checksum_mode", keyEgressAllowedHosts}, fn: fileS3},
 	{name: "consumer_alert_below_retention", keys: []string{keyConsumerPendingAlertAfter, keySyncEventRetention}, fn: consumerAlertBelowRetention},
 	{name: "dpop_required_for", keys: []string{keyDPoPRequiredFor}, fn: dpopRequiredFor},
+	{name: "client_versions_semver", keys: clientVersionKeys, fn: clientVersionsSemVer},
 	{name: "jwks_max_age_below_rotation", keys: []string{keyJWKSMaxAge, keyInvocationRotation, keyAccessRotation}, fn: jwksMaxAgeBelowRotation},
 }
 

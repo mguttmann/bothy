@@ -212,7 +212,7 @@ Source: [03-data-model.md](../spec/03-data-model.md), section 9.
 |---|---|---|---|---|---|---|
 | `principal.handle_max_chars` | `BOTHY_PRINCIPAL__HANDLE_MAX_CHARS` | Server | int | `32` | length of a handle | active |
 | `principal.display_name_max_chars` | `BOTHY_PRINCIPAL__DISPLAY_NAME_MAX_CHARS` | Server | int | `64` | length of a display name in Unicode characters | active |
-| `branding.product_name_max_chars` | `BOTHY_BRANDING__PRODUCT_NAME_MAX_CHARS` | Server |  | `64` | length of the product name in the branding (`instance_settings`, `branding.product_name`) in Unicode characters | planned (M1) |
+| `branding.product_name_max_chars` | `BOTHY_BRANDING__PRODUCT_NAME_MAX_CHARS` | Server | int | `64` | length of the product name in the branding (`instance_settings`, `branding.product_name`) in Unicode characters | active |
 | `group.name_max_chars` | `BOTHY_GROUP__NAME_MAX_CHARS` | Server |  | `100` | length of a group name in Unicode characters | planned (M1) |
 | `group.description_max_chars` | `BOTHY_GROUP__DESCRIPTION_MAX_CHARS` | Server |  | `500` | length of a group description in Unicode characters | planned (M1) |
 | `host.name_max_chars` | `BOTHY_HOST__NAME_MAX_CHARS` | Server |  | `100` | length of a host name in Unicode characters | planned (M2) |
@@ -230,10 +230,10 @@ Source: [03-data-model.md](../spec/03-data-model.md), section 9.
 | `channel.history_backfill_limit_default` | `BOTHY_CHANNEL__HISTORY_BACKFILL_LIMIT_DEFAULT` | Server |  | `20` | default for `history_backfill_limit` | planned (M1) |
 | `channel.history_backfill_limit_max` | `BOTHY_CHANNEL__HISTORY_BACKFILL_LIMIT_MAX` | Server |  | `200` | upper limit for `history_backfill_limit` | planned (M1) |
 | `channel.prompt_max_bytes` | `BOTHY_CHANNEL__PROMPT_MAX_BYTES` | Server |  | `32768` | size of a channel prompt | planned (M2) |
-| `thread.title_max_chars` | `BOTHY_THREAD__TITLE_MAX_CHARS` | Server |  | `200` | length of a thread title | planned (M1) |
+| `thread.title_max_chars` | `BOTHY_THREAD__TITLE_MAX_CHARS` | Server | int | `200` | length of a thread title | active |
 | `thread.max_tags` | `BOTHY_THREAD__MAX_TAGS` | Server |  | `5` | forum tags per thread | planned (M1) |
 | `message.max_content_bytes` | `BOTHY_MESSAGE__MAX_CONTENT_BYTES` | Server | int | `262144` | size of a message (long answers without splitting) | active |
-| `message.max_attachments` | `BOTHY_MESSAGE__MAX_ATTACHMENTS` | Server |  | `10` | attachments per message | planned (M1) |
+| `message.max_attachments` | `BOTHY_MESSAGE__MAX_ATTACHMENTS` | Server | int | `10` | attachments per message | active |
 | `message.max_mentions` | `BOTHY_MESSAGE__MAX_MENTIONS` | Server |  | `50` | distinct mention handles per message (content format, `messages`) | planned (M1) |
 | `reaction.emoji_max_bytes` | `BOTHY_REACTION__EMOJI_MAX_BYTES` | Server |  | `64` | largest length of a reaction emoji in bytes (otherwise a grapheme cluster has no limit) | planned (M1) |
 | `reaction.max_distinct_per_message` | `BOTHY_REACTION__MAX_DISTINCT_PER_MESSAGE` | Server |  | `20` | distinct emoji per message; limits `Message.reactions` and the payload of the events | planned (M1) |
@@ -392,7 +392,7 @@ Source: [08-identity.md](../spec/08-identity.md), section 18.
 | `auth.require_key_attestation` | `BOTHY_AUTH__REQUIRE_KEY_ATTESTATION` | Server |  | `false` | Require platform attestation of the device keys | planned (V3) |
 | `auth.console_session_max_age` | `BOTHY_AUTH__CONSOLE_SESSION_MAX_AGE` | Server |  | `12h` | absolute duration of a console session | planned (M6) |
 | `auth.console_session_idle_timeout` | `BOTHY_AUTH__CONSOLE_SESSION_IDLE_TIMEOUT` | Server |  | `30m` | idle time until the console session ends | planned (M6) |
-| `auth.local_password_enabled` | `BOTHY_AUTH__LOCAL_PASSWORD_ENABLED` | Server |  | `true` | password with TOTP as a fallback for local accounts | planned (M1) |
+| `auth.local_password_enabled` | `BOTHY_AUTH__LOCAL_PASSWORD_ENABLED` | Server | bool | `true` | password with TOTP as a fallback for local accounts | active |
 | `auth.totp_key_ref` | `BOTHY_AUTH__TOTP_KEY_REF` | Server |  | `file:<secrets.dir>/totp_key` | Reference to the key (32 bytes) with which TOTP secrets are encrypted | planned (M1) |
 | `auth.webauthn_rp_id` | `BOTHY_AUTH__WEBAUTHN_RP_ID` | Server |  | empty | RP ID of the passkeys; empty means the host of `server.public_url` | planned (M1) |
 | `auth.webauthn_origins` | `BOTHY_AUTH__WEBAUTHN_ORIGINS` | Server |  | empty | allowed origins of the passkeys; empty means the origin of `server.public_url`; entries may also be app origins such as `android:apk-key-hash:...` | planned (M1) |
@@ -529,7 +529,7 @@ Source: [12-files.md](../spec/12-files.md), section 18.
 | `file.unattached_ttl` | `BOTHY_FILE__UNATTACHED_TTL` | Server |  | `24h` | period for never attached files | planned (M3) |
 | `file.failed_row_ttl` | `BOTHY_FILE__FAILED_ROW_TTL` | Server |  | `7d` | period for rows of failed or blocked files | planned (M3) |
 | `file.gc_interval` | `BOTHY_FILE__GC_INTERVAL` | Server |  | `10m` | interval of the cleanup job | planned (M3) |
-| `voice.max_duration` | `BOTHY_VOICE__MAX_DURATION` | Server |  | `15m` | longest voice message | planned (M1) |
+| `voice.max_duration` | `BOTHY_VOICE__MAX_DURATION` | Server | duration | `15m` | longest voice message | active |
 | `voice.transcription_mode` | `BOTHY_VOICE__TRANSCRIPTION_MODE` | Server |  | `agent` | `off`, `agent` or `service` | planned (M3) |
 | `voice.transcription_url` | `BOTHY_VOICE__TRANSCRIPTION_URL` | Server |  | empty | endpoint of the transcription service | planned (M3) |
 | `voice.transcription_api_key_ref` | `BOTHY_VOICE__TRANSCRIPTION_API_KEY_REF` | Server |  | empty | reference to the key | planned (M3) |
@@ -704,14 +704,14 @@ Source: [18-release.md](../spec/18-release.md), section 12.
 
 | Key | Environment | Place | Type | Default | Meaning | Status |
 |---|---|---|---|---|---|---|
-| `client.min_version.ios` | `BOTHY_CLIENT__MIN_VERSION__IOS` | Server |  | empty | smallest allowed app version on iOS; empty means no limit | planned (M1) |
-| `client.min_version.android` | `BOTHY_CLIENT__MIN_VERSION__ANDROID` | Server |  | empty | the same for Android | planned (M1) |
-| `client.min_version.macos` | `BOTHY_CLIENT__MIN_VERSION__MACOS` | Server |  | empty | the same for macOS | planned (M1) |
-| `client.min_version.windows` | `BOTHY_CLIENT__MIN_VERSION__WINDOWS` | Server |  | empty | the same for Windows | planned (M1) |
-| `client.recommended_version.ios` | `BOTHY_CLIENT__RECOMMENDED_VERSION__IOS` | Server |  | empty | below it the app shows an update notice | planned (M1) |
-| `client.recommended_version.android` | `BOTHY_CLIENT__RECOMMENDED_VERSION__ANDROID` | Server |  | empty | the same for Android | planned (M1) |
-| `client.recommended_version.macos` | `BOTHY_CLIENT__RECOMMENDED_VERSION__MACOS` | Server |  | empty | the same for macOS | planned (M1) |
-| `client.recommended_version.windows` | `BOTHY_CLIENT__RECOMMENDED_VERSION__WINDOWS` | Server |  | empty | the same for Windows | planned (M1) |
+| `client.min_version.ios` | `BOTHY_CLIENT__MIN_VERSION__IOS` | Server | string | empty | smallest allowed app version on iOS; empty means no limit | active |
+| `client.min_version.android` | `BOTHY_CLIENT__MIN_VERSION__ANDROID` | Server | string | empty | the same for Android | active |
+| `client.min_version.macos` | `BOTHY_CLIENT__MIN_VERSION__MACOS` | Server | string | empty | the same for macOS | active |
+| `client.min_version.windows` | `BOTHY_CLIENT__MIN_VERSION__WINDOWS` | Server | string | empty | the same for Windows | active |
+| `client.recommended_version.ios` | `BOTHY_CLIENT__RECOMMENDED_VERSION__IOS` | Server | string | empty | below it the app shows an update notice | active |
+| `client.recommended_version.android` | `BOTHY_CLIENT__RECOMMENDED_VERSION__ANDROID` | Server | string | empty | the same for Android | active |
+| `client.recommended_version.macos` | `BOTHY_CLIENT__RECOMMENDED_VERSION__MACOS` | Server | string | empty | the same for macOS | active |
+| `client.recommended_version.windows` | `BOTHY_CLIENT__RECOMMENDED_VERSION__WINDOWS` | Server | string | empty | the same for Windows | active |
 
 ### 19 Security
 

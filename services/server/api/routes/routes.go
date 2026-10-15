@@ -45,6 +45,22 @@ const (
 	classNone   = "none"
 )
 
+// ProblemType documents one problem code of x-problem-codes (06 section 5): getProblemType
+// serves it at the type URI /api/v1/problems/{code} (M1-46). ClientAction is "" when the
+// contract names none.
+type ProblemType struct {
+	// Code is the problem code, the last segment of the type URI.
+	Code string
+	// Status is the HTTP status of the code.
+	Status int
+	// Title is the English title, equal to the title of a problem body.
+	Title string
+	// Description says when the code occurs.
+	Description string
+	// ClientAction says what a client should do.
+	ClientAction string
+}
+
 // IfMatchMode says whether an operation takes an If-Match header (06 "Concurrency").
 type IfMatchMode int
 

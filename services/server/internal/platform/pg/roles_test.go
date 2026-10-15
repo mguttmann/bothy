@@ -116,7 +116,7 @@ func TestBootstrapIdempotent(t *testing.T) {
 		t.Fatal(err)
 	}
 	if seen != 4 {
-		t.Errorf("%d bothy roles, want 4", seen)
+		t.Errorf("%d bothy_* roles, want 4", seen)
 	}
 	var monitor bool
 	if err := super.QueryRow(ctx, "SELECT pg_has_role('bothy_monitor', 'pg_monitor', 'MEMBER')").Scan(&monitor); err != nil || !monitor {

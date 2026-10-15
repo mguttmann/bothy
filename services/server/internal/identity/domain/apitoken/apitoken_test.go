@@ -48,7 +48,7 @@ func TestFormat_RoundTrip(t *testing.T) {
 			t.Fatalf("HasPrefix(%q) = false", tok)
 		}
 	}
-	if apitoken.HasPrefix("Bothy_agt_x") || apitoken.HasPrefix("eyJhbGciOi") {
+	if apitoken.HasPrefix(strings.ToUpper(apitoken.Prefix[:1])+apitoken.Prefix[1:]+"agt_x") || apitoken.HasPrefix("eyJhbGciOi") {
 		t.Fatal("HasPrefix accepts a value without the product prefix")
 	}
 }
@@ -123,7 +123,7 @@ func TestParse_Rejects(t *testing.T) {
 	cases := map[string]string{
 		"empty":               "",
 		"wrong prefix":        "bothx" + good[5:],
-		"upper case prefix":   "BOTHY" + good[5:],
+		"upper case prefix":   strings.ToUpper(good[:5]) + good[5:],
 		"unknown kind":        "bothy_abc_" + good[10:],
 		"kind hpc":            "bothy_hpc_" + good[10:],
 		"random 42":           "bothy_agt_" + v.Random[:42] + "_" + apitoken.Checksum(v.Random[:42]),

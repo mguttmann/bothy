@@ -62,7 +62,7 @@ func (c secretCredentials) Retrieve(ctx context.Context) (aws.Credentials, error
 	return aws.Credentials{
 		AccessKeyID:     string(access.Bytes()),
 		SecretAccessKey: string(secret.Bytes()),
-		Source:          "bothy secret provider",
+		Source:          "server secret provider",
 		CanExpire:       true,
 		Expires:         c.now(),
 	}, nil

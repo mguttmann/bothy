@@ -11,7 +11,7 @@ import "github.com/OWNER/bothy/services/server/internal/platform/config"
 func telemetryConfigKeys() []config.Key {
 	return []config.Key{
 		{
-			Name: "telemetry.enabled", Kind: config.KindBool, Default: "true",
+			Name: "telemetry.enabled", Kind: config.KindBool, Default: defaultTrue,
 			Doc:     "Turns the OTLP export of traces, metrics and logs on or off; logs then go to stdout.",
 			Chapter: chapter17,
 		},

@@ -76,7 +76,15 @@ func TestServe_AuthenticatesPeople(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	id, err := wire.NewIdentity(cfg, pool, a.UoW(), allowAll{}, wire.IdentityWrites{Audit: a.Recorder(), Events: sy.Appender()}, pepper, nil, log)
+	instCfg, err := wire.InstanceConfig(values)
+	if err != nil {
+		t.Fatal(err)
+	}
+	st, err := wire.NewInstanceSettings(instCfg, true, pool, a.UoW(), allowAll{}, wire.SettingsWrites{Audit: a.Recorder(), Events: sy.Appender()}, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	id, err := wire.NewIdentity(cfg, pool, a.UoW(), allowAll{}, wire.IdentityWrites{Audit: a.Recorder(), Events: sy.Appender(), Settings: st.Admin}, pepper, nil, log)
 	if err != nil {
 		t.Fatal(err)
 	}

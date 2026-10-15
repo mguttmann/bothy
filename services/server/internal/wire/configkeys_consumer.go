@@ -22,7 +22,7 @@ func consumerConfigKeys() []config.Key {
 			Doc: "Events per round of a worker consumer."},
 		{Name: "consumer.poll_interval", Kind: config.KindDuration, Default: "1s", Min: minDeadline, Chapter: chapter02,
 			Doc: "How often a worker consumer runs a round without a notification."},
-		{Name: keyConsumerPendingAlertAfter, Kind: config.KindDuration, Default: "15m", Min: "1s", Chapter: chapter02,
+		{Name: keyConsumerPendingAlertAfter, Kind: config.KindDuration, Default: defaultQuarterHour, Min: "1s", Chapter: chapter02,
 			Doc: "Age of the oldest unprocessed event of a worker consumer that raises the alarm; strictly below sync.event_retention."},
 	}
 }

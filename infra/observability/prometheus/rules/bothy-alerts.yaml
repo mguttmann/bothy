@@ -21,7 +21,7 @@ groups:
         labels:
           severity: page
         annotations:
-          summary: "No telemetry from the Bothy server for 10 minutes (server down or export broken)."
+          summary: "No telemetry from the server for 10 minutes (server down or export broken)."
           runbook_url: "docs/observability/alerting.md#bothyservertelemetrymissing"
 
       - alert: BothyCollectorDown

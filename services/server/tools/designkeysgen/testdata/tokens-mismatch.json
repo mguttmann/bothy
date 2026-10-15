@@ -1,0 +1,9 @@
+{
+  "contexts": {
+    "theme": {
+      "light": {"color.category.moss.fg": {"type": "color", "value": "#111111"}},
+      "dark": {"color.category.loch.fg": {"type": "color", "value": "#222222"}}
+    }
+  },
+  "icons": {"space-icons": ["code"]}
+}

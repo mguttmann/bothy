@@ -175,6 +175,7 @@ func TestConfigPrintShowsSourcePerKey(t *testing.T) {
 		"auth.dpop_required_for = agent  # default\n" +
 		"auth.enrollment_code_max_attempts = 5  # default\n" +
 		"auth.enrollment_code_ttl = 3d  # default\n" +
+		"auth.local_password_enabled = true  # default\n" +
 		"auth.login_fail_window = 15m  # default\n" +
 		"auth.personal_token_max_ttl = 90d  # default\n" +
 		"auth.refresh_reuse_grace = 30s  # default\n" +
@@ -188,6 +189,15 @@ func TestConfigPrintShowsSourcePerKey(t *testing.T) {
 		"authz.expiry_sweep_batch_max = 500  # default\n" +
 		"authz.expiry_sweep_interval = 1m  # default\n" +
 		"authz.snapshot_cache_max_entries = 10000  # default\n" +
+		"branding.product_name_max_chars = 64  # default\n" +
+		"client.min_version.android =   # default\n" +
+		"client.min_version.ios =   # default\n" +
+		"client.min_version.macos =   # default\n" +
+		"client.min_version.windows =   # default\n" +
+		"client.recommended_version.android =   # default\n" +
+		"client.recommended_version.ios =   # default\n" +
+		"client.recommended_version.macos =   # default\n" +
+		"client.recommended_version.windows =   # default\n" +
 		"consumer.batch_size = 500  # default\n" +
 		"consumer.pending_alert_after = 15m  # default\n" +
 		"consumer.poll_interval = 1s  # default\n" +
@@ -236,6 +246,7 @@ func TestConfigPrintShowsSourcePerKey(t *testing.T) {
 		"jobs.queue.maintenance.max_workers = 2  # default\n" +
 		"jobs.queue.privacy.max_workers = 1  # default\n" +
 		"jobs.schema = jobs  # default\n" +
+		"message.max_attachments = 10  # default\n" +
 		"message.max_content_bytes = 2048  # env BOTHY_MESSAGE__MAX_CONTENT_BYTES\n" +
 		"migrate.app_password_ref = file:/run/bothy/secrets/db_app_password  # default\n" +
 		"migrate.bootstrap_password_ref = file:/run/bothy/secrets/db_superuser_password  # default\n" +
@@ -322,6 +333,8 @@ func TestConfigPrintShowsSourcePerKey(t *testing.T) {
 		"telemetry.pseudonym_key_ref = file:/run/bothy/secrets/telemetry_pseudonym_key  # default\n" +
 		"telemetry.traces.sampler_ratio = 1  # default\n" +
 		"telemetry.traces.trust_remote_parent = false  # default\n" +
+		"thread.title_max_chars = 200  # default\n" +
+		"voice.max_duration = 15m  # default\n" +
 		"webhook.delivery_timeout = 15s  # default\n"
 	if code != 0 || stdout != want || stderr != "" {
 		t.Fatalf("exit %d, stderr %q, stdout\n%s\nwant\n%s", code, stderr, stdout, want)

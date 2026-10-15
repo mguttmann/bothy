@@ -31,7 +31,7 @@ variable "bothy_version" {
 }
 
 variable "image_registry" {
-  description = "Registry path of the Bothy images in lower case, e.g. ghcr.io/<owner>."
+  description = "Registry path of the server images in lower case, e.g. ghcr.io/<owner>."
   type        = string
 }
 

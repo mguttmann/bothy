@@ -139,6 +139,9 @@ type IdentityWrites struct {
 	// PersonalTokens is the switch tokens.personal_enabled; nil binds app.PersonalTokensDefault
 	// (off) until M1-47 rebinds it over the feature flags of instance.
 	PersonalTokens app.PersonalTokenSwitch
+	// Settings reads locale.default, the language createUser stores when the request names none
+	// (M1-46).
+	Settings instance.Settings
 }
 
 // NewIdentity builds the identity module over pool with the unit of work uow, the Authorizer az,
@@ -170,7 +173,7 @@ func NewIdentity(cfg app.Config, pool *pg.Pool, uow txn.UnitOfWork, az authorize
 	people, err := app.NewPeople(cfg, app.PeopleDeps{
 		Store: repo, UoW: uow, Authorizer: az, Audit: w.Audit, Events: w.Events, Cursors: identityhttp.Cursors{},
 		Versions: instanceapp.NewVersions(instanceRepo), Locales: locale.Parser{}, Providers: repo, Identities: repo,
-		Enrollment: enrollment, Clock: clk,
+		Enrollment: enrollment, Settings: w.Settings, Clock: clk,
 	})
 	if err != nil {
 		return nil, err

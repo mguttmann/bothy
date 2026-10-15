@@ -23,6 +23,10 @@ type renderData struct {
 	RestPkg string // import path of the generated rest package
 	Ops     []opMeta
 	Actions []catalogAction
+	// SpecVersion, Problems and GatewayVersions fill meta.gen.go (M1-46).
+	SpecVersion     string
+	Problems        []problemType
+	GatewayVersions []int
 }
 
 var funcs = template.FuncMap{
@@ -132,11 +136,46 @@ func register(Server, {{.Q}}Options, *{{.Q}}Recorder) {}
 {{- end}}
 `))
 
-// renderRoutes renders routes.gen.go, catalog.gen.go and build.gen.go for the enabled
+var metaTemplate = template.Must(template.New("meta").Funcs(funcs).Parse(`{{.Header}}
+
+package routes
+{{if .Q}}
+import routes {{quote .CorePkg}}
+{{end}}
+// SpecVersion is info.version of the OpenAPI document this server implements; discovery and
+// getInstance report it (06 section 13 item 1).
+const SpecVersion = {{quote .SpecVersion}}
+
+// GatewayProtocolVersions returns info.x-protocol-versions of the AsyncAPI document, the gateway
+// protocol versions this server speaks, sorted (04 section 6.1); a fresh slice per call, nil
+// when the generator read no AsyncAPI document.
+func GatewayProtocolVersions() []int {
+	return {{ints .GatewayVersions}}
+}
+
+// ProblemTypes returns x-problem-codes of the schema Problem, the one catalogue of problem codes
+// (06 section 5, R-API-23), sorted by code; a fresh slice per call.
+func ProblemTypes() []{{.Q}}ProblemType {
+{{- if .Problems}}
+	return []{{.Q}}ProblemType{
+{{- range .Problems}}
+		{Code: {{quote .Code}}, Status: {{.Status}}, Title: {{quote .Title}}, Description: {{quote .Description}}, ClientAction: {{quote .ClientAction}}},
+{{- end}}
+	}
+{{- else}}
+	return nil
+{{- end}}
+}
+`))
+
+// renderRoutes renders routes.gen.go, catalog.gen.go, build.gen.go and meta.gen.go for the enabled
 // operations of in. corePkg is the import path of api/routes, or "" when the files go into
 // api/routes itself; restPkg is the import path of the generated rest package.
 func renderRoutes(in *inputs, corePkg, restPkg string) (map[string][]byte, error) {
-	data := renderData{Header: header, CorePkg: corePkg, RestPkg: restPkg, Actions: in.actions}
+	data := renderData{
+		Header: header, CorePkg: corePkg, RestPkg: restPkg, Actions: in.actions,
+		SpecVersion: in.specVersion, Problems: in.problems, GatewayVersions: in.gatewayVersions,
+	}
 	if corePkg != "" {
 		data.Q = "routes."
 	}
@@ -150,6 +189,7 @@ func renderRoutes(in *inputs, corePkg, restPkg string) (map[string][]byte, error
 		"routes.gen.go":  routesTemplate,
 		"catalog.gen.go": catalogTemplate,
 		"build.gen.go":   buildTemplate,
+		"meta.gen.go":    metaTemplate,
 	} {
 		var buf bytes.Buffer
 		if err := tmpl.Execute(&buf, data); err != nil {
