@@ -836,6 +836,15 @@ func TestRealTable_Enabled(t *testing.T) {
 		// M1-57
 		"listThreadMessages": {"GET /api/v1/threads/{thread_id}/messages", "thread.read", "rl.read"},
 		"getMessage":         {"GET /api/v1/messages/{message_id}", "message.read", "rl.read"},
+
+		// M2-26
+		"getWebhookKeys":            {"GET /api/v1/instance/webhook-keys", "instance.discovery.read", "rl.public_auth"},
+		"listWebhookSubscriptions":  {"GET /api/v1/apps/{app_id}/webhooks", "webhook_out.read", "rl.read"},
+		"createWebhookSubscription": {"POST /api/v1/apps/{app_id}/webhooks", "webhook_out.manage", "rl.admin"},
+		"updateWebhookSubscription": {"PATCH /api/v1/webhooks/{subscription_id}", "webhook_out.manage", "rl.admin"},
+		"deleteWebhookSubscription": {"DELETE /api/v1/webhooks/{subscription_id}", "webhook_out.manage", "rl.admin"},
+		"listWebhookDeliveries":     {"GET /api/v1/webhooks/{subscription_id}/deliveries", "webhook_out.read", "rl.read"},
+		"redeliverWebhook":          {"POST /api/v1/webhook-deliveries/{delivery_id}/redeliver", "webhook_out.redeliver", "rl.admin"},
 	}
 	ops := routes.Enabled()
 	if len(ops) != len(want) {
