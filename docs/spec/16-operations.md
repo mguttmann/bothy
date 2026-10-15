@@ -696,6 +696,7 @@ Later DDL jobs use the same pattern.
 | `archive_timeout` | `backup.pg.archive_timeout` | limits data loss under low write load |
 | Isolation level | `READ COMMITTED` | counter pattern ([04-sync-protocol.md](04-sync-protocol.md) 3.2) |
 | `statement_timeout` per application connection | `database.statement_timeout` | no hanging queries |
+| Character classification of the database (`LC_CTYPE`) | UTF-8 capable, for example `en_US.utf8` (the official image's default); not `C` | upper and lower case of non-ASCII letters in text search: under `C` a search for "ärger" never finds "Ärger"; the start check `pg.CheckTextSearch` refuses such a database ([02-architektur.md](02-architektur.md) 15.1 step 4, M3-13) |
 
 ## 8. Backup and restore
 

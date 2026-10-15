@@ -885,6 +885,19 @@ Principals, people, owners, login drivers, identities, local credentials, enroll
 - Tests: `app/apptokens_test.go` (`TestCreateToken_AppScopes`, `TestAuthenticateAPIToken_AppInstallation`,
   `TestPrincipalWrites`); the HTTP cases run in `apps/adapters/httpapi`.
 
+### Search language of new messages and threads (M3-13)
+
+`identity.Directory` has two more reads ([14-search.md](../../../../docs/spec/14-search.md) 3.1,
+docs/DECISIONS.md D-M3-13-1): `SearchLanguage(ctx, id)` gives for a person the configuration of
+the first language subtag of `users.locale` through `search.locale_map` (one read by primary
+key), for an agent or app that of `locale.default`, `simple` without a map entry, and `not_found`
+for an unknown id; `InstanceSearchLanguage(ctx)` gives that of `locale.default`, read through
+`instance.Settings.LocaleDefault`. Both join the ambient transaction. `app.NewDirectory(store)`
+answers them only after `WithSearch(langs, settings)` (`kernel/searchlang.Map`); without it both
+fail closed with `internal`, so a writer wired without the configuration never writes `simple`
+by accident. `wire.NewIdentity` builds its `Directory` that way from `IdentityWrites.Search` and
+`Settings` (`wire.NewSearchDirectory`).
+
 ## Port (root package `internal/identity`)
 
 - Inbound: `Auth` (login, refresh, logout, child sessions), `StepUp` (step-up, M1-35), `Providers` and `Identities` (M1-36), `Enrollment` (M1-37), `LocalCredentials` (M1-39), `Passkeys` (M1-40), `OIDCLogin` (M1-41), `TrustedHeaderLogins` (M1-43), `Directory`, `Devices`, `Tokens` and `TokenAdmin` (M1-44), `PrincipalWriter` (M1-51), `Lifecycle` (M1-45), `Owners`, `PrincipalWrites` (M2-24); declares `AvatarFiles`, `AppInstallations` (M2-24).
