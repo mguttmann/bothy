@@ -509,7 +509,7 @@ Both keys are non-exportable and, where the platform offers it, hardware-backed:
 | Platform | Storage | Algorithm | Note |
 |---|---|---|---|
 | iOS, iPadOS, macOS | Secure Enclave | `ES256` | step-up key bound to the currently enrolled biometrics, so that newly added fingerprints invalidate it |
-| Android | Android Keystore, StrongBox if available | `ES256` | step-up key with mandatory user authentication |
+| Android | Android Keystore, StrongBox if available | `ES256` | step-up key with mandatory user authentication; on API 26 to 29 strong biometrics only, from API 30 biometrics or the device credential ([15](15-client-architecture.md) 9) |
 | Windows | TPM via the Platform Crypto Provider, confirmation via Windows Hello | `ES256` intended | open: whether Windows Hello delivers the step-up key as `ES256`; otherwise `RS256` or `PS256` is needed in `device_keys.alg` (section 17) |
 | Web console | no device key | | session by cookie (section 7.5), step-up by passkey |
 

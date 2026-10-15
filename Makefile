@@ -692,8 +692,8 @@ portability: ## Full stack from images on this machine plus smoke test (contract
 	@[ -x infra/compose/smoke.sh ] || { echo "portability: infra/compose/smoke.sh is missing (docs/quality/gates.md)"; exit 1; }
 	infra/compose/smoke.sh
 
-# ---- platform tests of the apps (not part of `gates`: they need a desktop session) ------------
-apps-platform: ## Platform tests of the members on this host (platform-tests.json; CI jobs apps-macos, apps-windows)
+# ---- platform tests of the apps (not part of `gates`: they need a desktop session or a device) -
+apps-platform: ## Platform tests of the members on this host and an attached Android device (platform-tests.json; CI jobs apps-macos, apps-windows, apps-android)
 	$(UVRUN) python tools/ci/apps_platform.py
 
 # ---- review and repository maintenance -------------------------------------------------

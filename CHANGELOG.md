@@ -59,6 +59,19 @@ operated, and the order of the build.
   the RFC 7638 thumbprint and `R || S` signatures, and the Swift package `DeviceKeyCore` that the
   app extensions reuse. `make codegen-check` regenerates the Pigeon code, `make apps-platform`
   runs the Swift tests on macOS and in the iOS simulator (M4-10).
+- `packages/device_key` for Android: the same Dart API and Pigeon channel, backed by the Kotlin
+  module `android/devicekeycore` (Android Keystore, P-256, StrongBox where the device has it with
+  a fallback to the trusted execution environment, a software key reported as not
+  hardware-bound elsewhere). The `step_up` key needs authentication for every signature through
+  `BiometricPrompt` (strong biometrics or the device credential from API 30, strong biometrics
+  only on API 26 to 29) and is invalidated by new biometrics; the `dpop` key signs without a
+  prompt. Signatures leave as `R || S`; the attestation is the key's certificate chain. `sign`
+  takes optional `StepUpPrompt` texts. The core module is meant for reuse by the push service and
+  the share activity (M5-01).
+- `make apps-platform` knows the system `android` (exactly one attached device or emulator), the
+  CI jobs `apps (Android API 26)` and `apps (Android API 36)` run the instrumented tests on
+  emulators and feed `ci-ok`, and `make test` runs the JVM tests of the Gradle modules under
+  `packages/*/android` (M5-01).
 - Release chain of the server (M7-10): `make release-prep COMPONENT=<name> [CHANNEL=beta]`
   computes the next version per component from its Conventional Commits (git-cliff, `cliff.toml`),
   renames the changelog section and writes `VERSION`; `make release-trial COMPONENT=server`
