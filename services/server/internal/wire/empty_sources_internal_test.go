@@ -6,26 +6,17 @@ import (
 	"context"
 	"testing"
 
-	"github.com/OWNER/bothy/services/server/internal/authz"
 	"github.com/OWNER/bothy/services/server/internal/kernel/ids"
 )
 
-// TestEmptySourcesKnowNothing holds that the empty structure source reports an instance without
-// spaces, channels, threads and served targets, so authorize decides fail closed until the owning
-// modules replace it (ruling D2 of the M1-28 brief). The agent policy comes from agents since M1-51.
+// TestEmptySourcesKnowNothing holds that the empty channel part of the structure source reports
+// an instance without channels, threads, details and served targets, so authorize decides fail
+// closed until the owning modules replace it (ruling D2 of the M1-28 brief). The agent policy
+// comes from agents since M1-51 and the spaces from chat since M1-52.
 func TestEmptySourcesKnowNothing(t *testing.T) {
 	t.Parallel()
 	ctx, id := context.Background(), ids.New()
-	s := emptyStructure{}
-	if ok, err := s.Space(ctx, id); ok || err != nil {
-		t.Errorf("Space = %v, %v", ok, err)
-	}
-	if got, err := s.Spaces(ctx); got != nil || err != nil {
-		t.Errorf("Spaces = %v, %v", got, err)
-	}
-	if ok, err := s.SpaceArchived(ctx, id); ok || err != nil {
-		t.Errorf("SpaceArchived = %v, %v", ok, err)
-	}
+	s := emptyChannels{}
 	if _, ok, err := s.Channel(ctx, id); ok || err != nil {
 		t.Errorf("Channel = %v, %v", ok, err)
 	}
@@ -44,5 +35,7 @@ func TestEmptySourcesKnowNothing(t *testing.T) {
 	if got, err := s.ServedTargets(ctx, id); got != nil || err != nil {
 		t.Errorf("ServedTargets = %v, %v", got, err)
 	}
-	var _ authz.StructureSource = s
+	if got, err := s.ChannelDetails(ctx, []ids.ID{id}); len(got) != 0 || err != nil {
+		t.Errorf("ChannelDetails = %v, %v", got, err)
+	}
 }

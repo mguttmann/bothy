@@ -5274,7 +5274,7 @@ paths:
                 summary: Request
                 value:
                   name: Research
-                  icon: icon.flask
+                  icon: flask
                   color: heather
       responses:
         '201':
@@ -5296,7 +5296,7 @@ paths:
                   value:
                     id: 0192f4a0-7b1c-7881-8522-0a58634abc14
                     name: Support
-                    icon: icon.headset
+                    icon: headset
                     color: moss
                     sort_key: a0
                     version: 3
@@ -5348,7 +5348,7 @@ paths:
                     space:
                       id: 0192f4a0-7b1c-7881-8522-0a58634abc14
                       name: Support
-                      icon: icon.headset
+                      icon: headset
                       color: moss
                       sort_key: a0
                       version: 3
@@ -5410,7 +5410,7 @@ paths:
                   value:
                     id: 0192f4a0-7b1c-7881-8522-0a58634abc14
                     name: Support
-                    icon: icon.headset
+                    icon: headset
                     color: moss
                     sort_key: a0
                     version: 3
@@ -5476,7 +5476,7 @@ paths:
                   value:
                     id: 0192f4a0-7b1c-7881-8522-0a58634abc14
                     name: Support
-                    icon: icon.headset
+                    icon: headset
                     color: moss
                     sort_key: a0
                     version: 3
@@ -5489,6 +5489,8 @@ paths:
           $ref: '#/components/responses/Forbidden'
         '404':
           $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
         '422':
           $ref: '#/components/responses/UnprocessableEntity'
         '429':
@@ -5538,7 +5540,7 @@ paths:
                   value:
                     id: 0192f4a0-7b1c-7881-8522-0a58634abc14
                     name: Support
-                    icon: icon.headset
+                    icon: headset
                     color: moss
                     sort_key: a0
                     version: 3
@@ -5602,7 +5604,7 @@ paths:
                   value:
                     id: 0192f4a0-7b1c-7881-8522-0a58634abc14
                     name: Support
-                    icon: icon.headset
+                    icon: headset
                     color: moss
                     sort_key: a0
                     version: 3

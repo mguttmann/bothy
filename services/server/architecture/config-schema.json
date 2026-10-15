@@ -2203,6 +2203,18 @@
       "doc": "Interval of the job instance.key_rotation."
     },
     {
+      "name": "space.name_max_chars",
+      "env": "BOTHY_SPACE__NAME_MAX_CHARS",
+      "kind": "int",
+      "default": "100",
+      "required": false,
+      "enum": [],
+      "min": "1",
+      "max": "",
+      "chapter": "03-data-model.md",
+      "doc": "Longest space name in Unicode characters."
+    },
+    {
       "name": "startup.dependency_wait",
       "env": "BOTHY_STARTUP__DEPENDENCY_WAIT",
       "kind": "duration",

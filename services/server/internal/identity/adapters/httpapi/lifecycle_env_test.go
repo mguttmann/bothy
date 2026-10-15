@@ -87,6 +87,8 @@ func (w *sworld) spaceGrant(principal, by ids.ID) ids.ID {
 	w.t.Helper()
 	space, grant := ids.New(), ids.New()
 	w.structure.PutSpace(space)
+	// The spaces row behind the foreign key of grants.target_space_id (M1-52).
+	w.sql(`INSERT INTO spaces (id, name, sort_key, created_by) VALUES ($1, $2, 'a0', $3)`, space.String(), space.String(), by.String())
 	w.sql(`INSERT INTO grants (id, subject_kind, subject_principal_id, target_kind, target_space_id, level, reason, granted_by)
 		VALUES ($1, 'user', $2, 'space', $3, 'read', 'Team', $4)`, grant.String(), principal.String(), space.String(), by.String())
 	return grant

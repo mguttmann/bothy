@@ -217,7 +217,7 @@ Source: [03-data-model.md](../spec/03-data-model.md), section 9.
 | `group.description_max_chars` | `BOTHY_GROUP__DESCRIPTION_MAX_CHARS` | Server | int | `500` | length of a group description in Unicode characters | active |
 | `host.name_max_chars` | `BOTHY_HOST__NAME_MAX_CHARS` | Server |  | `100` | length of a host name in Unicode characters | planned (M2) |
 | `host.os_user_max_chars` | `BOTHY_HOST__OS_USER_MAX_CHARS` | Server |  | `64` | length of the name of a session user in `host_session_users.os_user` | planned (M2) |
-| `space.name_max_chars` | `BOTHY_SPACE__NAME_MAX_CHARS` | Server |  | `100` | length of a space name in Unicode characters | planned (M1) |
+| `space.name_max_chars` | `BOTHY_SPACE__NAME_MAX_CHARS` | Server | int | `100` | length of a space name in Unicode characters | active |
 | `channel.name_max_chars` | `BOTHY_CHANNEL__NAME_MAX_CHARS` | Server |  | `100` | length of a channel name in Unicode characters | planned (M1) |
 | `channel.topic_max_chars` | `BOTHY_CHANNEL__TOPIC_MAX_CHARS` | Server |  | `1024` | length of a channel topic in Unicode characters | planned (M1) |
 | `forum_tag.name_max_chars` | `BOTHY_FORUM_TAG__NAME_MAX_CHARS` | Server |  | `50` | length of a tag name in Unicode characters | planned (M1) |

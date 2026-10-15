@@ -101,8 +101,6 @@ rules:
     milestone: M5
   - match: server.maintenance_mode  # M7-08
     milestone: M7
-  - match: "space."  # M1-52
-    milestone: M1
   - match: "stats."  # M6-05 to M6-15
     milestone: M6
   - match: "status."  # M7-09
