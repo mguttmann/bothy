@@ -731,6 +731,11 @@ zufällig auftreten.
 [12-dateien.md](12-dateien.md); `terminal.*` und `host_service.*` in [24-terminal.md](24-terminal.md); `client.cache_max_age`, `client.outbox_retry_base` und
 `client.outbox_retry_cap` in [04-sync-protokoll.md](04-sync-protokoll.md).
 
+The apps read these values, every other value of place `App` and the server keys of
+D-W-115 and D-W-116 through `AppConfig` in `packages/domain`, generated from and held equal to
+the configuration reference ([../operations/configuration.md](../operations/configuration.md),
+section 4) by `make codegen-check`.
+
 ## 23. Terminal-Ansicht
 
 Normativ für Protokoll, Rechte, Grenzen und Tests: [24-terminal.md](24-terminal.md). Dieser

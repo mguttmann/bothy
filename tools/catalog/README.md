@@ -186,3 +186,11 @@ einen Schreibfehler von `generate`), `generated_blocks`,
 - `tests/table_import.py` liest nur die eingefrorene Fassung von 05 vor dem Umbau
   (`tests/fixtures/05-aktionen-before.md.txt`) und dient nur dem Beweis, dass die Tabellen
   zeilengleich geblieben sind.
+
+## Client event catalogue
+
+`event_catalog_dart.py` (English, M4-08) writes the event catalogue of `packages/domain`
+(`lib/src/rules/event_catalog.g.dart`) from the `events:` list: per type durable or ephemeral,
+`resource_version`, the resource kind and `audience: self`. `make event-catalog` regenerates
+it, `make codegen-check` fails when it is stale (docs/DECISIONS.md D-M4-08-3). Tests:
+`tests/test_event_catalog_dart.py`.
