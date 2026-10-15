@@ -1,31 +1,42 @@
 # apps/console
 
-Status: geplant (M0). Noch kein Code.
+Status: skeleton (M4-01): `lib/main.dart` starts an empty `MaterialApp` without text, and
+`test/app_test.dart` pumps it. M6-01 builds the console on it.
 
-Web-Konsole für Verwaltung und Statistik, gebaut mit Flutter Web (ADR 0028). Kein Chat im Browser;
-Links auf Threads öffnen die App.
+Web console for administration and statistics, built with Flutter Web (ADR 0028). No chat in
+the browser; links to threads open the app.
 
-## Zweck
+## Purpose
 
-- Personen, Gruppen, Freigaben mit Klartext-Vorschau, "Wer hat Zugriff?", "Als Person ansehen".
-- Agenten mit Backend-Richtlinie und Kosten, Apps und Webhooks, Import, Instanz und Branding,
-  Statusseite.
-- Audit-Log mit Prüfung der Hash-Kette, Statistik.
+- People, groups, grants with a plain-text preview, "Who has access?", "View as person".
+- Agents with backend policy and costs, apps and webhooks, import, instance and branding,
+  status page.
+- Audit log with verification of the hash chain, statistics, terminal (ADR 0070).
 
-Screens: [01-produkt.md](../../docs/spec/01-produkt.md), Abschnitte 5.2 und 5.5. Die Screens kommen
-aus `packages/admin_ui` und sind dieselben wie in der Desktop-App.
+Screens: [01-produkt.md](../../docs/spec/01-produkt.md), sections 5.2 and 5.5. The screens
+come from `packages/admin_ui` and are the same as in the desktop app.
 
-## Technik
+## Dependencies
 
-- Pakete: `design_system`, `l10n`, `domain`, `api_client`, `auth`, `admin_ui`, `device_key`
-  (WebCrypto). Nicht: `sync_engine`, `local_store` (Architekturtest).
-- Anmeldung mit WebAuthn-Passkeys oder OIDC; DPoP mit nicht extrahierbarem WebCrypto-Schlüssel;
-  Step-up per Passkey ([15-client-architektur.md](../../docs/spec/15-client-architektur.md),
-  Abschnitte 8 und 9).
-- JavaScript-Build; Semantik beim Start eingeschaltet (Barrierefreiheit).
-- Ausgeliefert vom Server unter einem eigenen Pfad, gleiche Herkunft wie die API (Betrieb:
+Allowed members (docs/spec/15-client-architektur.md, 3.1; `tools/arch-check/rules.yaml`):
+`admin_ui`, `device_key` (WebCrypto), `terminal_ui` and every member they reach. Never
+`sync_engine` or `local_store`, also not through another member (rule 3); `make arch` fails
+otherwise.
+
+## Technology
+
+- Login with WebAuthn passkeys or OIDC; DPoP with a non-extractable WebCrypto key; step-up by
+  passkey ([15-client-architektur.md](../../docs/spec/15-client-architektur.md), sections 8
+  and 9).
+- JavaScript build; semantics enabled at start (accessibility).
+- Served by the server under a path of its own, same origin as the API (operations:
   [16-betrieb.md](../../docs/spec/16-betrieb.md)).
+- The `web/` folder comes with M6-01 and holds no native source (rule 4).
 
-## Plattformen
+## Platforms
 
-Aktuelle Versionen von Chromium-Browsern, Firefox und Safari.
+Current versions of Chromium browsers, Firefox and Safari.
+
+## Build and test
+
+From the repository root: `make lint test coverage arch COMPONENTS=apps`.

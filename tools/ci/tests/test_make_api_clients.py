@@ -299,3 +299,35 @@ def test_g4_spec_change_without_regeneration_fails(tmp_path: Path, sdk: str) -> 
     assert _GENERATED_THREAD[sdk] in changed, output
     assert "drift_probe_example" in (copy / _GENERATED_THREAD[sdk]).read_text(encoding="utf-8")
     assert _git(REPO, "status", "--porcelain", "--untracked-files=all") == before
+
+
+def test_real_api_client_skeleton_passes_and_fails_on_untracked_generation(
+    tmp_path: Path,
+) -> None:
+    """packages/api_client is a skeleton until M4-02 (docs/DECISIONS.md D-M4-01-11).
+
+    Its `generate-check` passes while no generated code is tracked, so the gate `api-clients`
+    stays fail-closed for the manifest without failing on the skeleton, and it fails once
+    generated code appears without the generator that keeps it equal to the contract.
+    """
+    client = tmp_path / "repo" / "packages" / "api_client"
+    shutil.copytree(
+        REPO / "packages" / "api_client",
+        client,
+        ignore=shutil.ignore_patterns(".dart_tool", "build", "coverage"),
+    )
+    _commit_all(tmp_path / "repo")
+    env = _env()
+    ok = make("generate-check", cwd=client, env=env)
+    assert ok.returncode == 0, ok.stdout + ok.stderr
+    assert "api_client: skeleton (M4-01)" in ok.stdout
+    generated = client / "lib" / "src" / "generated" / "api.dart"
+    generated.parent.mkdir(parents=True)
+    generated.write_text("// generated\n", encoding="utf-8")
+    _git(tmp_path / "repo", "add", "-A")
+    failing = make("generate-check", cwd=client, env=env)
+    assert failing.returncode == 2
+    assert "api_client: generated code is tracked, but its generator comes with M4-02" in (
+        failing.stderr
+    )
+    assert "lib/src/generated/api.dart" in failing.stderr

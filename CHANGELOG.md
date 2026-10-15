@@ -30,6 +30,17 @@ Planning stage (milestone M0). Nothing is installable yet.
   hook `tools/docs/mkdocs_api_reference.py`; `make docs` also fails when a built page loads a
   script, stylesheet or font from another origin (`tools/docs/external_assets_check.py`)
   (M7-19).
+- One Dart pub workspace at the repository root (`pubspec.yaml`, one `pubspec.lock`) with the
+  fourteen members of docs/spec/15-client-architektur.md 3: the apps `apps/client` and
+  `apps/console` and the packages under `packages/` as skeletons, `bothy_noise` taken over;
+  the Flutter pin moves to the root `pubspec.yaml` (M4-01).
+- Architecture test `tools/arch-check` in `make arch`: the dependency rules of 15 3.1 for every
+  member, with the reach of the diagram as an allow list (M4-01).
+- Documentation in code as a gate for Dart: `public_member_api_docs` as an error in every
+  member, and `make docs` puts the `dart doc` pages of every package into the site
+  (`docs/reference/dart-api.md`) (M4-01).
+- `make apps-platform` and the CI jobs `apps-macos` and `apps-windows` for the platform tests
+  of the apps (M4-01).
 - Host service module `services/host` (own `VERSION` and `CHANGELOG.md`) and the Dart package
   `packages/bothy_noise` with the Noise core of the terminal (M2-38); the gates, CI and CodeQL
   cover both.

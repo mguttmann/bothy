@@ -24,10 +24,15 @@ REPO = Path(__file__).resolve().parents[3]
 _DROPPED = {"MAKEFLAGS", "MAKELEVEL", "MFLAGS", "COMPONENTS", "COVERAGE_DART_MIN", "GO_MODS"}
 
 _FAKE = """#!{python}
-import json, os, sys
+import json, os, subprocess, sys
 name = os.path.basename(sys.argv[0])
 with open(os.environ["FAKE_LOG"], "a", encoding="utf-8") as fh:
     fh.write(json.dumps({{"tool": name, "args": sys.argv[1:], "cwd": os.getcwd()}}) + "\\n")
+# A Python script the case copied into the repository runs for real (tools/ci/lcov_filter.py).
+if name == "uv" and "python" in sys.argv:
+    script = sys.argv[sys.argv.index("python") + 1:]
+    if script and os.path.isfile(script[0]):
+        sys.exit(subprocess.run([sys.executable, *script]).returncode)
 if name == "flutter" and sys.argv[1:2] == ["pub"] and os.environ.get("FAKE_FLUTTER_PUB_EXIT"):
     sys.exit(int(os.environ["FAKE_FLUTTER_PUB_EXIT"]))
 if name == "flutter" and sys.argv[1:2] == ["test"] and os.environ.get("FAKE_LCOV"):
@@ -121,6 +126,7 @@ def test_perf_still_requires_perf_dir_of_listed_module(repo: Repo) -> None:
 
 def _dart_package(repo: Repo, *, tests: bool = True) -> None:
     repo.write("packages/example_pkg/pubspec.yaml", "name: example_pkg\n")
+    repo.write("tools/ci/lcov_filter.py", (REPO / "tools/ci/lcov_filter.py").read_text())
     repo.write(
         "packages/example_pkg/lib/example_pkg.dart", "// SPDX-License-Identifier: Apache-2.0\n"
     )
@@ -135,12 +141,12 @@ def test_dart_package_with_tests_runs_flutter_test(repo: Repo) -> None:
     assert result.returncode == 0, result.stdout + result.stderr
     package = str((repo.root / "packages" / "example_pkg").resolve())
     calls = repo.calls("flutter")
-    # A stale pubspec.lock fails before the tests instead of being rewritten silently.
-    assert [c["args"] for c in calls] == [
-        ["pub", "get", "--enforce-lockfile"],
-        ["test", "--coverage"],
+    # A stale pubspec.lock fails before the tests instead of being rewritten silently; the
+    # workspace resolves once at the root (brief M4-01, Design note 4).
+    assert [(c["args"], c["cwd"]) for c in calls] == [
+        (["pub", "get", "--enforce-lockfile"], str(repo.root.resolve())),
+        (["test", "--coverage"], package),
     ]
-    assert {c["cwd"] for c in calls} == {package}
 
 
 def test_dart_lint_enforces_the_lockfile(repo: Repo) -> None:

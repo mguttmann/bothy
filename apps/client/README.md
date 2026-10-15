@@ -1,44 +1,53 @@
 # apps/client
 
-Status: geplant (M0). Noch kein Code.
+Status: skeleton (M4-01): `lib/main.dart` starts an empty `MaterialApp` without text, and
+`test/app_test.dart` pumps it. M4-18 builds the app shell on it.
 
-Flutter-App für iOS, Android, macOS und Windows. Eine Codebasis für Oberfläche und Logik; nativer
-Code nur, wo das System es verlangt.
+Flutter app for macOS and Windows, later iOS and Android. One code base for interface and
+logic; native code only where the system requires it.
 
-## Zweck
+## Purpose
 
-- Bereiche, Kanäle, Foren und Threads; Agenten-Sitzungen mit Live-Box, Nachträgen, Komponenten und
-  Slash-Befehlen ([01-produkt.md](../../docs/spec/01-produkt.md)).
-- Offline lesen und schreiben mit Ausgangsfach; Nachholen nach [04-sync-protokoll.md](../../docs/spec/04-sync-protokoll.md).
-- Push ohne Inhalt, Text holt die App selbst; Teilen aus anderen Apps; Sprachnachrichten.
-- Verwaltung auf Desktop (aus `packages/admin_ui`), Notfall-Aktionen auf dem Telefon.
+- Spaces, channels, forums and threads; agent sessions with live box, follow-ups, components
+  and slash commands ([01-produkt.md](../../docs/spec/01-produkt.md)).
+- Offline reading and writing with an outbox; catch-up according to
+  [04-sync-protokoll.md](../../docs/spec/04-sync-protokoll.md).
+- Push without content, the app fetches the text itself; sharing from other apps; voice
+  messages.
+- Administration on the desktop (from `packages/admin_ui`), emergency actions on the phone.
 
-## Aufbau (geplant)
+## Dependencies
 
-| Pfad | Inhalt |
-|---|---|
-| `lib/` | App-Hülle, Router (`go_router`), Layouts je Formfaktor (Desktop vier Spalten, Mobil Stapel), Chat-Funktionen |
-| `ios/` | Runner, Notification Service Extension, Share Extension, `ClientKit` (Swift Package, geteilt mit macOS) |
-| `macos/` | Runner, Notification Service Extension, Share Extension, Sparkle 2 |
-| `android/` | Activity, eigener FCM-Dienst mit WorkManager, Teilen-Activity |
-| `windows/` | Runner, Infobereich, MSIX-Manifest mit Share Target, Toast-Aktivierung |
-| `integration_test/` | Tests gegen den Fake-Server; Geräte-E2E mit `patrol` |
+Allowed members (docs/spec/15-client-architektur.md, 3.1; `tools/arch-check/rules.yaml`):
+`admin_ui`, `sync_engine`, `design_system`, `device_key`, `terminal_ui` and every member they
+reach; `make arch` checks the manifest and every import.
 
-## Plattformen
+## Layout
 
-| Ziel | Mindestversion | Verteilung |
+| Path | Content | Ticket |
 |---|---|---|
+| `lib/` | app shell, router (`go_router`), layouts per form factor, chat features | M4-18 onward |
+| `test/` | widget tests, run by `make test` | M4-01 onward |
+| `macos/`, `windows/` | runners, notification area, MSIX manifest, Share Target, Sparkle 2 | M4-18 (`flutter create`) |
+| `ios/`, `android/` | runners, Notification Service Extension, Share Extension, push service | M5 |
+| `integration_test/` | tests against the fake server; device E2E with `patrol` | M4 and M5 |
+
+## Platforms
+
+| Target | Minimum version | Distribution |
+|---|---|---|
+| macOS | 12 | Developer ID, notarization, Sparkle 2 (stable, beta) |
+| Windows | 10 version 2004 | MSIX with `.appinstaller` |
 | iOS | 15 | TestFlight, App Store |
-| Android | API 26 | Play Internal Testing oder Firebase App Distribution |
-| macOS | 12 | Developer ID, Notarisierung, Sparkle 2 (stable, beta) |
-| Windows | 10 Version 2004 | MSIX mit `.appinstaller` |
+| Android | API 26 | Play Internal Testing or Firebase App Distribution |
 
-Gründe und Belege: [15-client-architektur.md](../../docs/spec/15-client-architektur.md), Abschnitt 2.
-Release und Signieren: [18-release.md](../../docs/spec/18-release.md).
+Reasons: [15-client-architektur.md](../../docs/spec/15-client-architektur.md), section 2.
+Release and signing: [18-release.md](../../docs/spec/18-release.md).
 
-## Bauen (geplant)
+## Build and test
 
-Ein Make-Ziel je Plattform aus dem Repo-Wurzelverzeichnis (Qualitäts-Team). Die
-Build-Konfiguration der Instanz (`branding.yaml`, ADR 0044) liefert App-Name, IDs, Push-Themen,
-Update-Feeds und Signier-Identitäten; ohne sie entsteht eine neutrale Fassung mit Platzhaltern unter
-`example.com`.
+From the repository root: `make lint test coverage arch COMPONENTS=apps`. Platform tests,
+once the app has them, are listed in `platform-tests.json` and run with `make apps-platform`
+on macOS or Windows. The build configuration of the instance (`branding.yaml`, ADR 0044)
+supplies app name, IDs, push topics, update feeds and signing identities; without it a neutral
+build with placeholders under `example.com` is produced.

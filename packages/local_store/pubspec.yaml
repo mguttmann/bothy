@@ -1,0 +1,15 @@
+# SPDX-License-Identifier: Apache-2.0
+name: local_store
+description: >-
+  drift database of the apps: schema mirror, migrations and encryption, without Flutter.
+version: 0.0.0
+publish_to: none
+resolution: workspace
+
+environment:
+  sdk: ^3.13.5
+  flutter: 3.47.7
+
+dev_dependencies:
+  lints: ^6.1.0
+  test: ^1.31.1

@@ -30,8 +30,9 @@ from typing import Any
 GATE_COMPONENTS: dict[str, tuple[str, ...]] = {
     "server": ("services/",),
     # The Dart tests of packages/bothy_noise read the Noise test vectors, recordings and
-    # fingerprint vectors of the host service (docs/DECISIONS.md D-M2-38-5).
-    "apps": ("apps/", "packages/", "design/", "services/host/testdata/noise/"),
+    # fingerprint vectors of the host service (docs/DECISIONS.md D-M2-38-5). The architecture
+    # test of the Dart workspace belongs to its gates (docs/DECISIONS.md D-M4-01-8).
+    "apps": ("apps/", "packages/", "design/", "services/host/testdata/noise/", "tools/arch-check/"),
     # sdk/testdata/ holds the shared G5 fixtures that both SDK test suites read.
     "sdk-python": ("sdk/python/", "sdk/testdata/"),
     "sdk-typescript": ("sdk/typescript/", "sdk/testdata/"),
@@ -47,6 +48,9 @@ GATE_COMPONENT_INPUTS: dict[str, tuple[str, ...]] = {
     # Chapter 09 is the contract of the adapters under plugins/; its section 17.10 is bound to the
     # recording evidence of plugins/hermes-adapter by the offline fixture tests.
     "plugins": ("docs/spec/09-agenten.md",),
+    # The root files of the Dart workspace: manifest with the Flutter pin, the one lock file and
+    # the shared analysis rules (docs/DECISIONS.md D-M4-01-8).
+    "apps": ("pubspec.yaml", "pubspec.lock", "analysis_options.yaml"),
 }
 # Areas without component gates; their repository-wide gates always run.
 NO_COMPONENT_PREFIXES = ("docs/", "infra/")

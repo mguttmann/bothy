@@ -60,13 +60,31 @@ gilt je Art:
 | Art | Erwartet von der Komponente |
 |---|---|
 | Go-Modul | `go.mod` und `go.sum`; Tests mit `go test`; golangci-lint-Konfiguration im Modul (Abhängigkeitsregeln: Kapitel 02); `.go-arch-lint.yml`, im Server erzeugt aus `architecture/modules.yaml`, im Host-Dienst von Hand gepflegt mit einer Komponente je Paket (Gate `arch`); Migrationen unter `migrations/` mit der Prüfsummen-Datei `migrations.sha256` daneben (Gate `migrations-lint`, sobald es Migrationen gibt); Lasttests unter `perf/` mit dem Build-Tag `perf` (`make perf`) nur für Module mit Leistungszielen (Liste `PERF_MODULES` im Root-`Makefile`; der Host-Dienst hat keine); die Abdeckung zählt `test/**` und `perf/**` nicht mit, weil sie selbst Testcode sind (02, Abschnitt 6), und erzeugte Dateien `*.gen.go` nicht, weil ihr Generator und sein Golden-Test sie halten |
-| Dart-Paket | `pubspec.yaml`, Tests unter `test/`; `custom_lint` als dev-Abhängigkeit, wenn eigene Regeln gelten; ein Paket ohne `test/` scheitert in `make test`, eines ohne Abdeckungsbericht `coverage/lcov.info` in `make coverage` |
+| Dart-Paket | `pubspec.yaml`, Tests unter `test/`; `custom_lint` als dev-Abhängigkeit, wenn eigene Regeln gelten; ein Paket ohne `test/` scheitert in `make test`, eines ohne Abdeckungsbericht `coverage/lcov.info` in `make coverage`; a member of the Dart workspace at the repository root (`resolution: workspace`, `publish_to: none`, listed in the root `workspace:` and in `tools/arch-check/rules.yaml`, one root `pubspec.lock`, dependency rules of 15 3.1 in `make arch`); generated code (`*.g.dart`, `*.freezed.dart`, `*.drift.dart`, `lib/src/generated/`) counts toward neither coverage nor the doc and style lint and the format check, but stays in the compile check and the errors of `flutter analyze` |
 | Python-Projekt | `pyproject.toml` mit uv-Lock; ruff, mypy und pytest in der dev-Gruppe; Abdeckungsschwelle `quality.coverage.python_min_percent` in der eigenen pytest-Konfiguration (`fail_under`); generated code counts toward neither coverage nor style lint and format checks, but stays in mypy |
 | TypeScript-Projekt | `package.json` mit den Skripten `format`, `format:check`, `lint`, `typecheck`, `test` (Abdeckungsschwelle `quality.coverage.typescript_min_percent` im Test-Runner); generated code counts toward neither coverage nor Prettier and ESLint, but stays in `tsc` |
 | Release | Makefile im Komponenten-Ordner mit dem Ziel `release-build` (Argumente `VERSION`, `OUT`); Apps zusätzlich `release-apple` und `release-windows` |
 | Generierter Client | Makefile mit dem Ziel `generate-check` (aus `docs/api/` erzeugen, kompilieren, Abweichung vom eingecheckten Stand meldet Fehler) |
 | Design-Tokens | `tools/design-tokens/Makefile` mit dem Ziel `check` |
 | Portabilität | ausführbares `infra/compose/smoke.sh` |
+
+### Doku im Code
+
+Bau-Vorgabe 3 des Owners verlangt einen Doc-Kommentar an jedem öffentlichen Modul, jeder
+Klasse, Funktion und Schnittstelle und API-Doku, die aus dem Code entsteht. Beides ist ein
+Gate, kein Review-Punkt (R-QA-14):
+
+| Sprache | Gate für Doc-Kommentare (in `make lint`) | Erzeugte API-Doku | Ab |
+|---|---|---|---|
+| Python | ruff-Regeln `D` mit Konvention `google`; Tests ausgenommen | Python-SDK: Referenz in der Doku-Site aus den Docstrings (mkdocstrings), Build in `make docs` | Werkzeuge in `tools/` heute; SDK M2-29 |
+| Go | golangci-lint mit `revive`, Regeln `exported` und `package-comments` | keine eigene Site: die öffentliche Schnittstelle des Servers ist `docs/api/openapi.yaml` (ADR 0013, spec first), gerendert in der Doku-Site; Go-Pakete sind intern | M1-05 |
+| Dart | Lint `public_member_api_docs` in `analysis_options.yaml` jedes Pakets; erzeugter Code ausgenommen (the rule is an error in the root `analysis_options.yaml` that every member includes) | `dart doc` je Paket ohne Warnung, Ergebnis in der Doku-Site (`tools/docs/dart_api_docs.py` in `make docs`, page `docs/reference/dart-api.md`) | M4-01 |
+| TypeScript | typedoc mit Prüfung auf undokumentierte Exporte als Fehler | TypeScript-SDK: typedoc-Referenz in der Doku-Site | M2-30 |
+
+Jedes Gate hat einen Test: ein öffentliches Symbol ohne Doc-Kommentar lässt es scheitern.
+"OpenAPI aus den Routen" heißt hier eine Quelle für beides: `openapi.yaml` ist normativ,
+Routen und Clients entstehen daraus, `make codegen-check` hält sie gleich
+([briefs/README.md](../briefs/README.md), Punkt 6).
 
 Fehlt ein Teil, obwohl die Komponente Code hat, schlägt das Gate fehl. Der Teil "Release" gilt
 ab der Release-Kette der Komponente, die das Ziel `release-build` und seinen Check mitbringt
@@ -153,6 +171,7 @@ oder NEIN. Bei NEIN wird behoben und das Delta erneut geprüft; das Bedrohungsmo
 | R-QA-09 | Links ins Internet sind kein Gate (`linkcheck-external` manuell). | Fremde Server machen ein Gate sonst nicht reproduzierbar. Lokale Links und Anker prüft `linkcheck` streng. |
 | R-QA-10 | Keine `.sonarcloud.properties`; SonarQube Cloud analysiert über CI, die automatische Analyse bleibt aus. | Abdeckung und Pull-Request-Dekoration brauchen die CI-Analyse; beide Wege zugleich stören sich. |
 | R-QA-11 | Testserver, die große Welten über die öffentliche API aufbauen (Vertrags-, Leck-, Kanarien-Tests, Vorbereitung der Lasttests), heben `ratelimit.*` über ihre Konfiguration an; gemessene Lasttests und Tests der Rate-Limits laufen mit den Standardwerten. | Aufbau über die API prüft die echten Wege, scheitert aber an Limits für Menschen; Messungen und Limit-Tests müssen die ausgelieferten Werte sehen. |
+| R-QA-14 | Doc-Kommentare sind je Sprache ein Lint-Gate (ruff `D`, revive `exported`, `public_member_api_docs`, typedoc); API-Doku wird für die SDKs und Dart-Pakete erzeugt, für den Server ist `openapi.yaml` die Quelle. | Bau-Vorgabe 3; eine Regel ohne Gate wird nicht eingehalten (im Werkzeug-Code fehlten Docstrings bei den meisten öffentlichen Symbolen). |
 
 ## 11. Konfigurationswerte dieses Kapitels
 

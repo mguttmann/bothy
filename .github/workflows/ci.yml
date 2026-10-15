@@ -99,13 +99,13 @@ jobs:
         with:
           go-version-file: ${{ hashFiles('services/server/go.mod') != '' && 'services/server/go.mod' || 'services/host/go.mod' }}
           cache-dependency-path: services/*/go.sum
-      # Flutter for every tracked Dart package; until apps/client exists, packages/bothy_noise
-      # carries the pin (docs/DECISIONS.md D-M2-38-12).
+      # Flutter for every tracked Dart package, pinned in the root pubspec.yaml of the Dart
+      # workspace (docs/DECISIONS.md D-M4-01-1).
       - if: hashFiles('apps/*/pubspec.yaml', 'packages/*/pubspec.yaml') != ''
         uses: subosito/flutter-action@1a449444c387b1966244ae4d4f8c696479add0b2 # v2.23.0
         with:
           channel: stable
-          flutter-version-file: ${{ hashFiles('apps/client/pubspec.yaml') != '' && 'apps/client/pubspec.yaml' || 'packages/bothy_noise/pubspec.yaml' }}
+          flutter-version-file: pubspec.yaml
           cache: true
       - name: Restore pinned binaries and hook environments
         uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
@@ -203,13 +203,13 @@ jobs:
         with:
           go-version-file: ${{ hashFiles('services/server/go.mod') != '' && 'services/server/go.mod' || 'services/host/go.mod' }}
           cache-dependency-path: services/*/go.sum
-      # Flutter for every tracked Dart package; until apps/client exists, packages/bothy_noise
-      # carries the pin (docs/DECISIONS.md D-M2-38-12).
+      # Flutter for every tracked Dart package, pinned in the root pubspec.yaml of the Dart
+      # workspace (docs/DECISIONS.md D-M4-01-1).
       - if: hashFiles('apps/*/pubspec.yaml', 'packages/*/pubspec.yaml') != ''
         uses: subosito/flutter-action@1a449444c387b1966244ae4d4f8c696479add0b2 # v2.23.0
         with:
           channel: stable
-          flutter-version-file: ${{ hashFiles('apps/client/pubspec.yaml') != '' && 'apps/client/pubspec.yaml' || 'packages/bothy_noise/pubspec.yaml' }}
+          flutter-version-file: pubspec.yaml
           cache: true
       - run: make bootstrap-ci
       - name: make sonar
@@ -257,9 +257,61 @@ jobs:
       - name: make postgres-image postgres-image-test
         run: make postgres-image postgres-image-test
 
+  # Platform tests of the apps (make apps-platform, docs/DECISIONS.md D-M4-01-7): native code
+  # and desktop integration tests need macOS and Windows (ADR 0039), the pure gates run on
+  # Linux. Only when the apps component is selected; in the private phase there is no runner
+  # for them, so they run in the public phase only, and ci-ok accepts "skipped".
+  apps-macos:
+    name: apps (macOS)
+    needs: plan
+    if: (github.event.repository.visibility == 'public' || (github.event_name == 'schedule' && vars.BOTHY_VISIBILITY == 'public')) && (needs.plan.outputs.components == 'all' || contains(format(' {0} ', needs.plan.outputs.components), ' apps '))
+    runs-on: macos-15
+    timeout-minutes: 45
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: subosito/flutter-action@1a449444c387b1966244ae4d4f8c696479add0b2 # v2.23.0
+        with:
+          channel: stable
+          flutter-version-file: pubspec.yaml
+          cache: true
+      - uses: astral-sh/setup-uv@1c37ad07a6a961277cf70c0d37d6f313000f5884 # v10.3.0
+        with:
+          enable-cache: false
+      - name: make apps-platform
+        shell: bash
+        run: uv run --project tools --locked --quiet python tools/ci/apps_platform.py
+
+  apps-windows:
+    name: apps (Windows)
+    needs: plan
+    if: (github.event.repository.visibility == 'public' || (github.event_name == 'schedule' && vars.BOTHY_VISIBILITY == 'public')) && (needs.plan.outputs.components == 'all' || contains(format(' {0} ', needs.plan.outputs.components), ' apps '))
+    runs-on: windows-2025
+    timeout-minutes: 45
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: subosito/flutter-action@1a449444c387b1966244ae4d4f8c696479add0b2 # v2.23.0
+        with:
+          channel: stable
+          flutter-version-file: pubspec.yaml
+          cache: true
+      - uses: astral-sh/setup-uv@1c37ad07a6a961277cf70c0d37d6f313000f5884 # v10.3.0
+        with:
+          enable-cache: false
+      - name: make apps-platform
+        shell: bash
+        run: uv run --project tools --locked --quiet python tools/ci/apps_platform.py
+
   ci-ok:
     name: ci-ok
-    needs: [plan, gates, denylist, denylist-fork, sonar, postgres-image]
+    needs: [plan, gates, denylist, denylist-fork, sonar, postgres-image, apps-macos, apps-windows]
     if: always()
     runs-on: ${{ github.event.repository.private && fromJSON('["self-hosted","bothy-ci"]') || 'ubuntu-24.04' }}
     timeout-minutes: 5
@@ -272,9 +324,11 @@ jobs:
           DENY_FORK: ${{ needs.denylist-fork.result }}
           SONAR: ${{ needs.sonar.result }}
           POSTGRES_IMAGE: ${{ needs.postgres-image.result }}
+          APPS_MACOS: ${{ needs.apps-macos.result }}
+          APPS_WINDOWS: ${{ needs.apps-windows.result }}
         # Explicit checks: a failing test inside an && list would not stop `bash -e`.
         run: |
-          echo "plan=$PLAN gates=$GATES denylist=$DENY denylist-fork=$DENY_FORK sonar=$SONAR postgres-image=$POSTGRES_IMAGE"
+          echo "plan=$PLAN gates=$GATES denylist=$DENY denylist-fork=$DENY_FORK sonar=$SONAR postgres-image=$POSTGRES_IMAGE apps-macos=$APPS_MACOS apps-windows=$APPS_WINDOWS"
           fail=0
           if [ "$PLAN" != success ]; then fail=1; fi
           if [ "$GATES" != success ]; then fail=1; fi
@@ -282,4 +336,6 @@ jobs:
           case "$SONAR" in success|skipped) ;; *) fail=1 ;; esac
           # Skipped when the component server did not change (job postgres-image).
           case "$POSTGRES_IMAGE" in success|skipped) ;; *) fail=1 ;; esac
+          case "$APPS_MACOS" in success|skipped) ;; *) fail=1 ;; esac
+          case "$APPS_WINDOWS" in success|skipped) ;; *) fail=1 ;; esac
           exit "$fail"
