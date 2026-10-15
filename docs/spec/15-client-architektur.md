@@ -421,6 +421,14 @@ eigene Einträge vor der Nachricht, die sie anhängt; die Nachricht wartet, bis 
   Nutzerbestätigung verlangt (Biometrie oder PIN); die Web-Konsole nutzt WebAuthn-Passkeys. Für
   `terminal.open` und `terminal.attach` ist der Step-up frisch und wird verbraucht (08, Abschnitt
   6.3); die Konsole nutzt dafür nur einen Passkey mit `userVerification = required`.
+- **Interceptor order:** `packages/auth` fills the auth slot of `createApiClient` with
+  `RefreshInterceptor`, `DpopInterceptor` and `StepUpInterceptor` in this order, so a request is
+  refreshed before its proof hashes the token, and each interceptor answers only its own problem
+  code (`token_expired`, `use_dpop_nonce`, `step_up_required`) with at most one repeat.
+- **Signed out:** `401 session_revoked`, a rejected refresh, a revoked pending device, the
+  gateway close `4012` and `logout` end in the event `SignedOut(reason)` of `packages/auth` after
+  the secret store is cleared; for a revoked session or device (`deleteLocalData`) the app deletes
+  the local data of that server (R-SY-14).
 - **Terminal-Strom:** je Sitzung eine eigene WebSocket-Verbindung neben dem Gateway (Abschnitt
   23.2); er läuft nie über `sync_engine`.
 

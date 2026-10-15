@@ -365,6 +365,13 @@ license.override = ["BSD-3-Clause"]
 reason = "deps.dev knows no license for this pub package; its LICENSE file on pub.dev is BSD-3-Clause. Dev package of device_key (code generator)."
 
 [[PackageOverrides]]
+name = "pointycastle"
+version = "4.0.0"
+ecosystem = "Pub"
+license.override = ["MIT"]
+reason = "deps.dev knows no license for this pub package; its LICENSE file on pub.dev is the MIT text of the Legion of the Bouncy Castle (checked against the 4.0.0 archive on 2026-10-15 for M4-09). Dev dependency of packages/auth for the software P-256 signer of its tests only (docs/DECISIONS.md D-M4-09-6)."
+
+[[PackageOverrides]]
 name = "pool"
 version = "1.5.3"
 ecosystem = "Pub"
