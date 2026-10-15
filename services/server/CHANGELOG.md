@@ -11,6 +11,17 @@ documented in this file. The format is based on
 
 ### Added
 
+- Discord read client of the import tool (M8-01): `cmd/bothy/importtool/discord` reads a Discord
+  server through the `GET` calls of chapter 22 section 4.1 only (user, guild, channels, active
+  and archived threads with the page loop by `archive_timestamp`, one channel, messages after,
+  before and around an ID in ascending order). The bot token prints as `[redacted]` everywhere and
+  goes only to the host of `import.discord.api_base` over `https`, redirects are never followed,
+  and every connection goes through the egress client. The rate-limit guard waits
+  `X-RateLimit-Reset-After` and `retry_after` or `Retry-After`, retries `429` at most
+  `import.discord.max_429_retries` times, aborts on a wait above `import.discord.max_rate_wait`,
+  never retries `401` or `403` and ends a channel after its `403` for the run. The test fake
+  `discordtest` (TLS on `127.0.0.1`, fixture guild, fault injection, token echo, request log)
+  is for later import tickets and never reaches the binary.
 - `internal/authz` (M1-30): the periodic jobs `authz.expiry_sweep` and `authz.expiry_reminder`
   on the queue `maintenance`. The sweep reports every expired grant and membership exactly once
   in batches of `authz.expiry_sweep_batch_max`: raised rights version, `expiry_reported_at`,
