@@ -8,3 +8,11 @@
 # Changes need a pull request with the reason, like allowed.txt.
 
 quality/licenses/* | the license policy lists the identifiers it allows and forbids
+docs/* | documentation names and discusses licenses (ADRs, briefs, specification, tool chain, rulings); every file there is under the repository license
+tools/* | development tools are not shipped (licenses.md); their manifests and lock files list the licenses of the tools, and the design-token generator vendors the OFL-1.1 fonts of docs/design/typography.md rule 5
+design/* | the design tokens and their preview name the OFL-1.1 fonts of docs/design/typography.md rule 5, which ship with the apps and not with a server release
+CONTRIBUTING.md | names the DCO and why there is no CLA (ADR 0003)
+services/host/testdata/noise/* | Noise test vectors under the Unlicense (D-M2-38-15); test data, in no binary
+services/host/internal/noise/vectors_test.go | names the license of the test vectors it reads (D-M2-38-15)
+services/server/osv-scanner.toml | the license overrides of OSV-Scanner name the licenses they record (licenses.md rule 3)
+services/server/tools/* | code generators that write the SPDX header of generated files; ScanCode reads the header template as an unknown SPDX reference
