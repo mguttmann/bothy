@@ -578,6 +578,10 @@ documented in this file. The format is based on
 
 ### Security
 
+- `github.com/getkin/kin-openapi` 0.144.0 to 0.149.0 (and `santhosh-tekuri/jsonschema/v6` 6.0.2 to
+  6.0.3 with it): the advisories GHSA-23vg-4cjm-66q5, GHSA-fh4f-47mf-f2gj, GHSA-g8cf-rcjf-c8cf,
+  GHSA-mh7x-f8wq-4jhx, GHSA-rj39-cv6w-8wv7 and GHSA-vrcc-3ch7-hppw failed the gate `osv`; the
+  generated API code does not change.
 - The application role may only insert and read `audit_events`; `UPDATE`, `DELETE` and
   `TRUNCATE` are revoked and refused by triggers for every role, the table owner included (only a
   `DELETE` by `bothy_maint` passes, for the retention trim of M7).
