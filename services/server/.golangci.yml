@@ -140,9 +140,9 @@ linters:
       # (GO_ARCH_LINT) and pass it on to them (docs/DECISIONS.md M1-07).
       - path: ^tools/.+_test\.go$
         linters: [forbidigo]
-      # Like the analysis (sonar.test.inclusions), gocognit and goconst check product code only;
-      # table rows of tests repeat literals on purpose.
-      - path: _test\.go$
+      # Like the analysis (sonar.test.inclusions: *_test.go and test/), gocognit and goconst check
+      # product code only; table rows and scenarios of tests repeat literals on purpose.
+      - path: (_test\.go$|^test/)
         linters: [gocognit, goconst]
       # Tests log arbitrary keys on purpose: they prove that the handlers of platform/otel drop
       # them and that secret values stay redacted (docs/DECISIONS.md M1-10).
