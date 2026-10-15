@@ -11,28 +11,25 @@
 //
 //	go generate ./internal/identity/domain/...
 //
-// Exit codes: 0 written, 1 I/O error, 2 usage error.
+// Exit codes: 0 written, 1 I/O error, 2 usage error (also without -zip and GOROOT).
 package main
 
 import (
 	"archive/zip"
 	"bytes"
-	"context"
 	"errors"
 	"flag"
 	"fmt"
 	"go/format"
 	"io"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"slices"
-	"strings"
 )
 
 func main() { os.Exit(run(os.Args[1:], os.Stderr)) }
 
-// run parses args (-zip, default the zip of `go env GOROOT`; -out, the file to write).
+// run parses args (-zip, default the zip under $GOROOT, which go generate sets; -out, the file to write).
 func run(args []string, stderr io.Writer) int {
 	fs := flag.NewFlagSet("zonegen", flag.ContinueOnError)
 	fs.SetOutput(stderr)
@@ -43,12 +40,13 @@ func run(args []string, stderr io.Writer) int {
 		return 2
 	}
 	if *zipPath == "" {
-		root, err := exec.CommandContext(context.Background(), "go", "env", "GOROOT").Output()
-		if err != nil {
-			_, _ = fmt.Fprintln(stderr, "zonegen: go env GOROOT:", err)
-			return 1
+		// go generate sets GOROOT for the generator; the tool starts no command of its own.
+		root := os.Getenv("GOROOT") //nolint:forbidigo // a go generate tool outside the server; go generate passes GOROOT
+		if root == "" {
+			_, _ = fmt.Fprintln(stderr, "zonegen: GOROOT is not set; run through go generate or pass -zip")
+			return 2
 		}
-		*zipPath = filepath.Join(strings.TrimSpace(string(root)), "lib", "time", "zoneinfo.zip")
+		*zipPath = filepath.Join(root, "lib", "time", "zoneinfo.zip")
 	}
 	names, err := Names(*zipPath)
 	if err == nil {
