@@ -5017,6 +5017,7 @@ paths:
       operationId: createIdentityProvider
       summary: Add an identity provider
       tags: [Admin]
+      description: 'Adds an identity provider (08, 2.6). A `trusted_header` provider that would be enabled (the default) while the public listener is not bound to a loopback address is refused with `409 conflict`, `reason: trusted_header_requires_loopback` and a `hint` naming `server.listen_addr` (08, 2.4 rule 1).'
       x-authz-action: identity_provider.manage
       x-rate-limit-class: rl.admin
       parameters:
@@ -5122,6 +5123,7 @@ paths:
       operationId: updateIdentityProvider
       summary: Change an identity provider
       tags: [Admin]
+      description: 'Changes an identity provider; absent members stay. Setting `enabled` to true on a `trusted_header` provider while the public listener is not bound to a loopback address is refused with `409 conflict`, `reason: trusted_header_requires_loopback` and a `hint` naming `server.listen_addr` (08, 2.4 rule 1). Disabling a provider ends the sessions of its identities (08, 3.3).'
       x-authz-action: identity_provider.manage
       x-rate-limit-class: rl.admin
       parameters:

@@ -170,6 +170,12 @@ const timestampLayout = "2006-01-02T15:04:05.000Z"
 // emitUpdated appends user.updated for u (04 section 2.2): resource user without version, empty
 // scope, the actor of the request, payload UserPayload with the state after the change.
 func (s *People) emitUpdated(ctx context.Context, u identity.UserView) error {
+	return appendUserUpdated(ctx, s.d.Events, u)
+}
+
+// appendUserUpdated appends user.updated for u through events, with the actor of the request
+// (People and the provisioning of the header login, M1-43).
+func appendUserUpdated(ctx context.Context, events eventlog.Appender, u identity.UserView) error {
 	body := userJSON{
 		ID: u.ID.String(), Handle: u.Handle, DisplayName: u.DisplayName, Status: string(u.Status), IsOwner: u.IsOwner,
 		Locale: u.Locale, TimeZone: u.TimeZone, CreatedAt: u.CreatedAt.UTC().Truncate(time.Millisecond).Format(timestampLayout),
@@ -184,7 +190,7 @@ func (s *People) emitUpdated(ctx context.Context, u identity.UserView) error {
 		return errs.Wrap(errs.CodeInternalError, err, "identity: user.updated payload")
 	}
 	kind, id := eventActor(ctx)
-	return s.d.Events.Append(ctx, eventlog.Event{
+	return events.Append(ctx, eventlog.Event{
 		Type: eventUserUpdated, SchemaVersion: 1, ActorKind: kind, ActorPrincipalID: id,
 		ResourceKind: resourceUser, ResourceID: u.ID, ReceiveAction: receiveUserRead, Payload: payload,
 	})

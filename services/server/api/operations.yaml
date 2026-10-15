@@ -55,6 +55,7 @@ enabled:             # operationIds that have a handler; sorted ascending
   - listUserDevices
   - listUserSessions
   - listUsers
+  - loginWithTrustedHeader
   - logout
   - putInstanceSetting
   - redeemEnrollmentCode
@@ -534,9 +535,6 @@ later:               # every other operationId of docs/api/openapi.yaml; sorted 
   - operation_id: loginWithPassword
     milestone: M1
     ticket: M1-39
-  - operation_id: loginWithTrustedHeader
-    milestone: M1
-    ticket: M1-43
   - operation_id: markThreadUnread
     milestone: M1
     ticket: M1-61

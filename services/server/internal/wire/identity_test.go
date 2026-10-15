@@ -4,6 +4,7 @@ package wire_test
 
 import (
 	"context"
+	"net/netip"
 	"os"
 	"path/filepath"
 	"reflect"
@@ -33,7 +34,9 @@ func TestIdentityConfigBindsDefaults(t *testing.T) {
 		EnrollmentCodeTTL: 72 * time.Hour, EnrollmentCodeMaxAttempts: 5, LoginFlowTTL: 10 * time.Minute, WebAuthnOrigins: []string{},
 		DevicePendingTTL: 24 * time.Hour, DeviceVerificationCodeDigits: 6, PairingCodeTTL: 5 * time.Minute, PairingCodeChars: 8,
 		ServerCodeTTL: time.Minute, OIDCJWKSCacheTTL: time.Hour, OIDCClientAssertionTTL: 2 * time.Minute,
-		IDPRecheckInterval: 30 * 24 * time.Hour,
+		IDPRecheckInterval:        30 * 24 * time.Hour,
+		TrustedProxies:            []netip.Prefix{netip.MustParsePrefix("127.0.0.1/32"), netip.MustParsePrefix("::1/128")},
+		TrustedHeaderBindRequests: true,
 	}
 	if !reflect.DeepEqual(cfg, want) {
 		t.Fatalf("IdentityConfig = %+v, want %+v", cfg, want)

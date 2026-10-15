@@ -93,6 +93,18 @@ documented in this file. The format is based on
   `auth.oidc_client_assertion_ttl` and `auth.idp_recheck_interval`; `auth.login_flow_ttl` (M1-40)
   also bounds an OIDC login flow; operations guide `docs/operations/oidc-entra.md` with a
   Microsoft Entra ID example.
+- Login with the identity header of a trusted reverse proxy (M1-43): the operation
+  `loginWithTrustedHeader` (`POST /api/v1/auth/trusted-header/login`) maps the decoded login (RFC
+  2047, `utf-8` and `us-ascii` only) of a `trusted_header` provider to a known identity, links it
+  through an `enrollment_code` or provisions a pending person, and completes the login with device
+  keys and DPoP tokens like every driver. The header counts only from a TCP peer in
+  `server.trusted_proxies` and only while the public listener is bound to loopback; otherwise the
+  login answers `404`, `/readyz` fails with `trusted_header_requires_loopback`, and enabling the
+  provider answers `409 conflict` with that reason (PLAN W4). The new key
+  `auth.trusted_header_bind_requests` (default `true`) binds every later request and refresh of
+  such a session to the same login; a mismatch revokes the session (`trusted_header_mismatch`).
+  `kernel/reqmeta.Transport` carries the TCP peer, the header and the route's action from
+  `platform/httpserver`; the audit reason `trusted_header_requires_loopback` joins 07 section 4.1.
 - Instance settings, branding and discovery (M1-46): the migration `00017_instance_settings.sql`,
   the settings registry of configuration.md section 6, the generated design keys
   `kernel/designkeys` (category colours and space icons from the design tokens, the accent list of

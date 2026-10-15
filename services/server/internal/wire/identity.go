@@ -30,6 +30,7 @@ import (
 	"github.com/OWNER/bothy/services/server/internal/kernel/txn"
 	"github.com/OWNER/bothy/services/server/internal/platform/config"
 	"github.com/OWNER/bothy/services/server/internal/platform/egress"
+	"github.com/OWNER/bothy/services/server/internal/platform/health"
 	"github.com/OWNER/bothy/services/server/internal/platform/lifecycle"
 	"github.com/OWNER/bothy/services/server/internal/platform/pg"
 	"github.com/OWNER/bothy/services/server/internal/platform/secrets"
@@ -137,15 +138,20 @@ type Identity struct {
 	// OIDCHandlers are the REST handlers of beginOidcLogin, handleOidcCallback, completeOidcLogin,
 	// beginIdentityLink and completeIdentityLink; nil until BindOIDC.
 	OIDCHandlers *identityhttp.OIDC
-	cfg          app.Config
-	state        instance.State
-	repo         *identitypg.Repository
-	uow          txn.UnitOfWork
-	az           authorize.Authorizer
-	writes       IdentityWrites
-	pepper       []byte
-	clk          clock.Clock
-	log          *slog.Logger
+	// TrustedHeader is the driver trusted_header (M1-43): the loopback flag of the public listener,
+	// the readiness check and the per-request binding.
+	TrustedHeader *app.TrustedHeaderDriver
+	// TrustedHeaderHandlers is the REST handler of loginWithTrustedHeader; nil until BindSessions.
+	TrustedHeaderHandlers *identityhttp.TrustedHeader
+	cfg                   app.Config
+	state                 instance.State
+	repo                  *identitypg.Repository
+	uow                   txn.UnitOfWork
+	az                    authorize.Authorizer
+	writes                IdentityWrites
+	pepper                []byte
+	clk                   clock.Clock
+	log                   *slog.Logger
 }
 
 // IdentityWrites are the collaborators of the writing use cases of identity (M1-31): the
@@ -200,6 +206,10 @@ func NewIdentity(cfg app.Config, pool *pg.Pool, uow txn.UnitOfWork, az authorize
 	if w.PersonalTokens == nil {
 		w.PersonalTokens = app.PersonalTokensDefault{}
 	}
+	driver, err := app.NewTrustedHeaderDriver(cfg, repo, repo, orDiscard(log))
+	if err != nil {
+		return nil, err
+	}
 	tokens, err := app.NewTokens(cfg, pepper, app.TokensDeps{
 		Store: repo, Principals: repo, UoW: uow, Authorizer: az, Audit: w.Audit, Cursors: identityhttp.Cursors{},
 		Switch: w.PersonalTokens, Clock: clk,
@@ -210,7 +220,7 @@ func NewIdentity(cfg app.Config, pool *pg.Pool, uow txn.UnitOfWork, az authorize
 	return &Identity{
 		Devices: devices, People: people, PeopleHandlers: identityhttp.NewPeople(people, people), DPoP: verifier, Replay: store,
 		Handlers: identityhttp.NewDevices(devices), Tokens: tokens, TokenHandlers: identityhttp.NewTokens(tokens),
-		Enrollment: enrollment, cfg: cfg, state: instanceapp.NewState(instanceRepo, uow),
+		Enrollment: enrollment, TrustedHeader: driver, cfg: cfg, state: instanceapp.NewState(instanceRepo, uow),
 		repo: repo, uow: uow, az: az, writes: w, pepper: append([]byte(nil), pepper...), clk: clk, log: orDiscard(log),
 	}, nil
 }
@@ -231,13 +241,14 @@ func (i *Identity) BindSessions(keys instance.Keys, instanceID ids.ID) error {
 	}
 	sessions, err := app.NewSessions(i.cfg, i.pepper, app.SessionsDeps{
 		Store: i.repo, Devices: i.repo, People: i.repo, Tokens: tokens, DPoP: i.DPoP, UoW: i.uow, Authorizer: i.az,
-		Audit: i.writes.Audit, Events: i.writes.Events, Cursors: identityhttp.Cursors{}, Clock: i.clk,
+		Audit: i.writes.Audit, Events: i.writes.Events, Cursors: identityhttp.Cursors{}, Clock: i.clk, Binding: i.TrustedHeader,
 	})
 	if err != nil {
 		return err
 	}
 	auth, err := app.NewAuthenticator(i.cfg, app.AuthenticatorDeps{
 		AccessTokens: tokens, DPoP: i.DPoP, Sessions: i.repo, APITokens: i.repo, Pepper: i.pepper, Clock: i.clk, Log: i.log,
+		Binding: i.TrustedHeader, Revoker: sessions, UoW: i.uow, Audit: i.writes.Audit,
 	})
 	if err != nil {
 		return err
@@ -255,7 +266,7 @@ func (i *Identity) BindSessions(keys instance.Keys, instanceID ids.ID) error {
 	}
 	providers, err := app.NewProviders(i.cfg, app.ProvidersDeps{
 		Store: i.repo, Rules: app.DefaultProviderRules(SecretRefSyntax{}), UoW: i.uow, Authorizer: i.az, Audit: i.writes.Audit,
-		Auth: sessions, Clock: i.clk,
+		Auth: sessions, Clock: i.clk, TrustedHeader: i.TrustedHeader,
 	})
 	if err != nil {
 		return err
@@ -274,7 +285,7 @@ func (i *Identity) BindSessions(keys instance.Keys, instanceID ids.ID) error {
 	logins, err := app.NewService(i.cfg, app.ServiceDeps{
 		People: i.repo, Devices: i.repo, Providers: i.repo, Identities: i.repo, Enrollment: i.Enrollment, Auth: sessions,
 		DPoP: i.DPoP, Instance: i.state, Keys: keys, Locales: locale.Parser{}, UoW: i.uow, Authorizer: i.az, Audit: i.writes.Audit,
-		Clock: i.clk, Sessions: i.repo, Pairings: i.repo, Pepper: i.pepper,
+		Clock: i.clk, Sessions: i.repo, Pairings: i.repo, Pepper: i.pepper, TrustedHeader: i.TrustedHeader, Events: i.writes.Events,
 	})
 	if err != nil {
 		return err
@@ -287,6 +298,7 @@ func (i *Identity) BindSessions(keys instance.Keys, instanceID ids.ID) error {
 	}
 	i.Logins, i.EnrollmentHandlers, i.AuthCleanup = logins, identityhttp.NewEnrollment(logins), cleanup
 	i.ApprovalHandlers = identityhttp.NewApproval(logins, i.DPoP)
+	i.TrustedHeaderHandlers = identityhttp.NewTrustedHeader(logins)
 	passkeys, err := app.NewPasskeys(i.cfg, i.pepper, app.PasskeysDeps{
 		Passkeys: i.repo, Challenges: i.repo, Verifier: verifier, RelyingParty: rp, Logins: logins, UoW: i.uow, Authorizer: i.az,
 		Audit: i.writes.Audit, Clock: i.clk,
@@ -419,6 +431,23 @@ func confined(ref secrets.Ref, dir string) bool {
 		return strings.HasPrefix(ref.Path, providerSecretPrefix) && len(ref.Path) > len(providerSecretPrefix)
 	}
 	return false
+}
+
+// SetPublicListenerLoopback records whether the bound public listener is a loopback address
+// (M1-43, W4); the start calls it after the listen, tests inject the flag.
+func (i *Identity) SetPublicListenerLoopback(loopback bool) {
+	i.TrustedHeader.SetPublicListenerLoopback(loopback)
+}
+
+// checkTrustedHeaderLoopback is the readiness check of the trusted_header driver (08 section 2.4,
+// 16 section 4.3, W4).
+const checkTrustedHeaderLoopback = app.ReasonTrustedHeaderRequiresLoopback
+
+// RegisterTrustedHeaderReadiness adds the readiness check trusted_header_requires_loopback of id to
+// reg: /readyz fails with that name while an enabled trusted_header provider exists and the public
+// listener is not loopback (W4: the driver stays off instead of stopping the start).
+func RegisterTrustedHeaderReadiness(reg *health.Registry, id *Identity) {
+	reg.AddReadiness(checkTrustedHeaderLoopback, id.TrustedHeader.Ready)
 }
 
 // secretsDirStandIn replaces the placeholder <secrets.dir> while a reference is only checked: the

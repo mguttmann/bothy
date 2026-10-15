@@ -43,4 +43,6 @@ R-Qualität
 
 # Non-ASCII test values of the name decoding and the handle derivation of the login drivers
 # (M1-41, M1-43): example names with a diacritic, and letters that the handle rule must drop.
+Röbin
 Ünal
+ÄÖÜ
