@@ -1,0 +1,5 @@
+{
+  "@@locale": "en",
+  "itemCount": "{count} items",
+  "@itemCount": {"description": "A count.", "placeholders": {"count": {"type": "int"}}}
+}

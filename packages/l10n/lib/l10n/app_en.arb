@@ -1,0 +1,393 @@
+{
+  "@@locale": "en",
+  "triggerStateReceived": "Received",
+  "@triggerStateReceived": {
+    "description": "Label of the trigger state `received` on the triggering message (components.md section 5)."
+  },
+  "triggerStateQueued": "Queued",
+  "@triggerStateQueued": {
+    "description": "Label of the trigger state `queued` on the triggering message (components.md section 5)."
+  },
+  "triggerStateWorking": "Working",
+  "@triggerStateWorking": {
+    "description": "Label of the trigger state `working` on the triggering message (components.md section 5)."
+  },
+  "triggerStateDone": "Done",
+  "@triggerStateDone": {
+    "description": "Label of the trigger state `done` on the triggering message (components.md section 5)."
+  },
+  "triggerStateFailed": "Failed",
+  "@triggerStateFailed": {
+    "description": "Label of the trigger state `failed` on the triggering message (components.md section 5)."
+  },
+  "triggerStateFollowupDelivered": "Follow-up delivered",
+  "@triggerStateFollowupDelivered": {
+    "description": "Label of the trigger state `followup_delivered` on the triggering message (components.md section 5)."
+  },
+  "triggerStateFailedWithReason": "Failed: {reason}",
+  "@triggerStateFailedWithReason": {
+    "description": "Tooltip and semantics label of the trigger state `failed` with the translated reason (components.md section 5).",
+    "placeholders": {
+      "reason": {
+        "type": "String",
+        "example": "Project not ready"
+      }
+    }
+  },
+  "liveBoxStateQueued": "Queued",
+  "@liveBoxStateQueued": {
+    "description": "State word of the live box for the run state `queued` (components.md section 2.1)."
+  },
+  "liveBoxStateRunning": "Running",
+  "@liveBoxStateRunning": {
+    "description": "State word of the live box for the run state `running` (components.md section 2.1)."
+  },
+  "liveBoxStateWaitingForYou": "Waiting for you",
+  "@liveBoxStateWaitingForYou": {
+    "description": "State word of the live box for the run state `waiting_input` when the question waits for the reader (components.md section 2.1)."
+  },
+  "liveBoxStateCompleted": "Done",
+  "@liveBoxStateCompleted": {
+    "description": "State word of the live box for the run state `completed` (components.md section 2.1)."
+  },
+  "liveBoxStateFailed": "Failed",
+  "@liveBoxStateFailed": {
+    "description": "State word of the live box for the run state `failed` (components.md section 2.1)."
+  },
+  "liveBoxStateCancelled": "Canceled",
+  "@liveBoxStateCancelled": {
+    "description": "State word of the live box for the run state `cancelled` (components.md section 2.1)."
+  },
+  "liveBoxStateWaitingFor": "Waiting for {name}",
+  "@liveBoxStateWaitingFor": {
+    "description": "State word of the live box for `waiting_input` when the question waits for another person (components.md section 2.1).",
+    "placeholders": {
+      "name": {
+        "type": "String",
+        "example": "Alex"
+      }
+    }
+  },
+  "liveBoxReasonBillingModeMismatch": "Backend does not match",
+  "@liveBoxReasonBillingModeMismatch": {
+    "description": "Translated state reason `billing_mode_mismatch` of a run (components.md section 2.1)."
+  },
+  "liveBoxReasonAccessRevoked": "Access revoked",
+  "@liveBoxReasonAccessRevoked": {
+    "description": "Translated state reason `access_revoked` of a run (components.md section 2.1)."
+  },
+  "liveBoxReasonStale": "Canceled after stall",
+  "@liveBoxReasonStale": {
+    "description": "Translated state reason `stale` of a run (components.md section 2.1)."
+  },
+  "liveBoxReasonAdapterError": "Error in the adapter",
+  "@liveBoxReasonAdapterError": {
+    "description": "Translated state reason `adapter_error` of a run (components.md section 2.1)."
+  },
+  "liveBoxReasonCancelTimeout": "Adapter did not confirm the cancellation",
+  "@liveBoxReasonCancelTimeout": {
+    "description": "Translated state reason `cancel_timeout` of a run (components.md section 2.1)."
+  },
+  "liveBoxReasonProjectNotReady": "Project not ready",
+  "@liveBoxReasonProjectNotReady": {
+    "description": "Translated state reason `project_not_ready` of a run (components.md section 2.1)."
+  },
+  "liveBoxReasonUserCancelled": "Canceled by {name}",
+  "@liveBoxReasonUserCancelled": {
+    "description": "Translated state reason `user_cancelled` of a run with the name of the person who stopped it (components.md section 2.1).",
+    "placeholders": {
+      "name": {
+        "type": "String",
+        "example": "Sam"
+      }
+    }
+  },
+  "liveBoxStop": "Stop",
+  "@liveBoxStop": {
+    "description": "Button in the footer of the live box that stops the run (components.md section 2.1)."
+  },
+  "liveBoxEarlierSteps": "{count, plural, =1{1 earlier step} other{{count} earlier steps}}",
+  "@liveBoxEarlierSteps": {
+    "description": "Link to the steps of the live box above the visible ones (components.md section 2.1).",
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "liveBoxStall": "{minutes, plural, =1{No progress for 1 minute} other{No progress for {minutes} minutes}}",
+  "@liveBoxStall": {
+    "description": "Banner of the live box after `run.stall_after` without progress; the caller passes the minutes (components.md section 2.1).",
+    "placeholders": {
+      "minutes": {
+        "type": "int"
+      }
+    }
+  },
+  "accessNotFoundOrNoAccess": "Not found or no access",
+  "@accessNotFoundOrNoAccess": {
+    "description": "Shown for a link to something invisible, whether it exists or not (01 section 6.7)."
+  },
+  "accessNoAccessAnymore": "No access anymore",
+  "@accessNoAccessAnymore": {
+    "description": "Shown when an open view closes because the person lost access (01 section 6.6)."
+  },
+  "messageSending": "Sending",
+  "@messageSending": {
+    "description": "State of a sent message that the server has not confirmed yet (01 section 6.6)."
+  },
+  "messageSendingDelayed": "Sending delayed",
+  "@messageSendingDelayed": {
+    "description": "State of a waiting message whose sending takes longer than usual (01 section 6.6)."
+  },
+  "connectionOffline": "Offline",
+  "@connectionOffline": {
+    "description": "Banner at the top of the content while the app has no connection (01 section 6.6)."
+  },
+  "relativeDayToday": "Today",
+  "@relativeDayToday": {
+    "description": "A time stamp of today, in the time zone of the person."
+  },
+  "relativeDayYesterday": "Yesterday",
+  "@relativeDayYesterday": {
+    "description": "A time stamp of yesterday, in the time zone of the person."
+  },
+  "problemValidationFailed": "Some input is not valid",
+  "@problemValidationFailed": {
+    "description": "Text of the problem code `validation_failed` (docs/api/openapi.yaml, x-problem-codes)."
+  },
+  "problemMalformedRequest": "The request could not be read",
+  "@problemMalformedRequest": {
+    "description": "Text of the problem code `malformed_request` (docs/api/openapi.yaml, x-problem-codes)."
+  },
+  "problemCursorInvalid": "The list position is no longer valid. Reload the list",
+  "@problemCursorInvalid": {
+    "description": "Text of the problem code `cursor_invalid` (docs/api/openapi.yaml, x-problem-codes)."
+  },
+  "problemWebhookHostNotAllowed": "The webhook target is not on the allow list",
+  "@problemWebhookHostNotAllowed": {
+    "description": "Text of the problem code `webhook_host_not_allowed` (docs/api/openapi.yaml, x-problem-codes)."
+  },
+  "problemUnauthenticated": "Please sign in",
+  "@problemUnauthenticated": {
+    "description": "Text of the problem code `unauthenticated` (docs/api/openapi.yaml, x-problem-codes)."
+  },
+  "problemTokenExpired": "Your sign-in has expired",
+  "@problemTokenExpired": {
+    "description": "Text of the problem code `token_expired` (docs/api/openapi.yaml, x-problem-codes)."
+  },
+  "problemSessionRevoked": "This session was ended",
+  "@problemSessionRevoked": {
+    "description": "Text of the problem code `session_revoked` (docs/api/openapi.yaml, x-problem-codes)."
+  },
+  "problemStepUpRequired": "Please confirm with your device",
+  "@problemStepUpRequired": {
+    "description": "Text of the problem code `step_up_required` (docs/api/openapi.yaml, x-problem-codes)."
+  },
+  "problemUseDpopNonce": "Please try again",
+  "@problemUseDpopNonce": {
+    "description": "Text of the problem code `use_dpop_nonce` (docs/api/openapi.yaml, x-problem-codes)."
+  },
+  "problemInvalidDpopProof": "The device proof was not accepted",
+  "@problemInvalidDpopProof": {
+    "description": "Text of the problem code `invalid_dpop_proof` (docs/api/openapi.yaml, x-problem-codes)."
+  },
+  "problemForbidden": "You are not allowed to do this",
+  "@problemForbidden": {
+    "description": "Text of the problem code `forbidden` (docs/api/openapi.yaml, x-problem-codes)."
+  },
+  "problemScopeMissing": "The app lacks a required scope",
+  "@problemScopeMissing": {
+    "description": "Text of the problem code `scope_missing` (docs/api/openapi.yaml, x-problem-codes)."
+  },
+  "problemDevicePending": "This device is waiting for approval",
+  "@problemDevicePending": {
+    "description": "Text of the problem code `device_pending` (docs/api/openapi.yaml, x-problem-codes)."
+  },
+  "problemChannelReadOnly": "This channel is read-only",
+  "@problemChannelReadOnly": {
+    "description": "Text of the problem code `channel_read_only` (docs/api/openapi.yaml, x-problem-codes)."
+  },
+  "problemFeatureDisabled": "This feature is turned off",
+  "@problemFeatureDisabled": {
+    "description": "Text of the problem code `feature_disabled` (docs/api/openapi.yaml, x-problem-codes)."
+  },
+  "problemAgentInvocationDenied": "The agent cannot be started here",
+  "@problemAgentInvocationDenied": {
+    "description": "Text of the problem code `agent_invocation_denied` (docs/api/openapi.yaml, x-problem-codes)."
+  },
+  "problemTerminalDenied": "The terminal cannot be opened here",
+  "@problemTerminalDenied": {
+    "description": "Text of the problem code `terminal_denied` (docs/api/openapi.yaml, x-problem-codes)."
+  },
+  "problemInvocationTokenInvalid": "The call token of the agent is not valid",
+  "@problemInvocationTokenInvalid": {
+    "description": "Text of the problem code `invocation_token_invalid` (docs/api/openapi.yaml, x-problem-codes)."
+  },
+  "problemNotFound": "Not found or no access",
+  "@problemNotFound": {
+    "description": "Text of the problem code `not_found` (docs/api/openapi.yaml, x-problem-codes)."
+  },
+  "problemMethodNotAllowed": "This request is not supported",
+  "@problemMethodNotAllowed": {
+    "description": "Text of the problem code `method_not_allowed` (docs/api/openapi.yaml, x-problem-codes)."
+  },
+  "problemConflict": "This conflicts with the current state",
+  "@problemConflict": {
+    "description": "Text of the problem code `conflict` (docs/api/openapi.yaml, x-problem-codes)."
+  },
+  "problemRequestInProgress": "The request is still in progress",
+  "@problemRequestInProgress": {
+    "description": "Text of the problem code `request_in_progress` (docs/api/openapi.yaml, x-problem-codes)."
+  },
+  "problemI1Violation": "This change would let others use a personal agent",
+  "@problemI1Violation": {
+    "description": "Text of the problem code `i1_violation` (docs/api/openapi.yaml, x-problem-codes)."
+  },
+  "problemI6Violation": "Only the holder of the personal LLM login may open a terminal on this host",
+  "@problemI6Violation": {
+    "description": "Text of the problem code `i6_violation` (docs/api/openapi.yaml, x-problem-codes)."
+  },
+  "problemLastOwner": "At least one active owner must remain",
+  "@problemLastOwner": {
+    "description": "Text of the problem code `last_owner` (docs/api/openapi.yaml, x-problem-codes)."
+  },
+  "problemAlreadyStarted": "The run has already started",
+  "@problemAlreadyStarted": {
+    "description": "Text of the problem code `already_started` (docs/api/openapi.yaml, x-problem-codes)."
+  },
+  "problemBillingModeMismatch": "The backend does not match the billing mode",
+  "@problemBillingModeMismatch": {
+    "description": "Text of the problem code `billing_mode_mismatch` (docs/api/openapi.yaml, x-problem-codes)."
+  },
+  "problemToolClassMismatch": "The reported tool class is above the allowed one",
+  "@problemToolClassMismatch": {
+    "description": "Text of the problem code `tool_class_mismatch` (docs/api/openapi.yaml, x-problem-codes)."
+  },
+  "problemHostUnavailable": "The host is not reachable",
+  "@problemHostUnavailable": {
+    "description": "Text of the problem code `host_unavailable` (docs/api/openapi.yaml, x-problem-codes)."
+  },
+  "problemFingerprintMismatch": "The fingerprint does not match the host",
+  "@problemFingerprintMismatch": {
+    "description": "Text of the problem code `fingerprint_mismatch` (docs/api/openapi.yaml, x-problem-codes)."
+  },
+  "problemInvalidStateTransition": "This change is not possible in the current state",
+  "@problemInvalidStateTransition": {
+    "description": "Text of the problem code `invalid_state_transition` (docs/api/openapi.yaml, x-problem-codes)."
+  },
+  "problemBaseVersionConflict": "The run changed in the meantime",
+  "@problemBaseVersionConflict": {
+    "description": "Text of the problem code `base_version_conflict` (docs/api/openapi.yaml, x-problem-codes)."
+  },
+  "problemComponentUsed": "This element was already used, has expired or is turned off",
+  "@problemComponentUsed": {
+    "description": "Text of the problem code `component_used` (docs/api/openapi.yaml, x-problem-codes)."
+  },
+  "problemOperatorMismatch": "The target channel has a different operator",
+  "@problemOperatorMismatch": {
+    "description": "Text of the problem code `operator_mismatch` (docs/api/openapi.yaml, x-problem-codes)."
+  },
+  "problemFileNotReady": "The file is not ready yet",
+  "@problemFileNotReady": {
+    "description": "Text of the problem code `file_not_ready` (docs/api/openapi.yaml, x-problem-codes)."
+  },
+  "problemFileBlocked": "The file is blocked and is never delivered",
+  "@problemFileBlocked": {
+    "description": "Text of the problem code `file_blocked` (docs/api/openapi.yaml, x-problem-codes)."
+  },
+  "problemTitleManual": "The title was set by hand",
+  "@problemTitleManual": {
+    "description": "Text of the problem code `title_manual` (docs/api/openapi.yaml, x-problem-codes)."
+  },
+  "problemResyncRequired": "A full reload is needed",
+  "@problemResyncRequired": {
+    "description": "Text of the problem code `resync_required` (docs/api/openapi.yaml, x-problem-codes)."
+  },
+  "problemMessageDeleted": "The message was deleted",
+  "@problemMessageDeleted": {
+    "description": "Text of the problem code `message_deleted` (docs/api/openapi.yaml, x-problem-codes)."
+  },
+  "problemGone": "This has expired",
+  "@problemGone": {
+    "description": "Text of the problem code `gone` (docs/api/openapi.yaml, x-problem-codes)."
+  },
+  "problemVersionConflict": "Someone else changed this in the meantime",
+  "@problemVersionConflict": {
+    "description": "Text of the problem code `version_conflict` (docs/api/openapi.yaml, x-problem-codes)."
+  },
+  "problemPayloadTooLarge": "The content is too large",
+  "@problemPayloadTooLarge": {
+    "description": "Text of the problem code `payload_too_large` (docs/api/openapi.yaml, x-problem-codes)."
+  },
+  "problemUnsupportedMediaType": "This file type is not allowed",
+  "@problemUnsupportedMediaType": {
+    "description": "Text of the problem code `unsupported_media_type` (docs/api/openapi.yaml, x-problem-codes)."
+  },
+  "problemRangeNotSatisfiable": "The requested part lies outside the file",
+  "@problemRangeNotSatisfiable": {
+    "description": "Text of the problem code `range_not_satisfiable` (docs/api/openapi.yaml, x-problem-codes)."
+  },
+  "problemIdempotencyKeyReuse": "The request was repeated with different content",
+  "@problemIdempotencyKeyReuse": {
+    "description": "Text of the problem code `idempotency_key_reuse` (docs/api/openapi.yaml, x-problem-codes)."
+  },
+  "problemPreconditionRequired": "The version check is missing",
+  "@problemPreconditionRequired": {
+    "description": "Text of the problem code `precondition_required` (docs/api/openapi.yaml, x-problem-codes)."
+  },
+  "problemRateLimited": "Too many requests. Please wait a moment",
+  "@problemRateLimited": {
+    "description": "Text of the problem code `rate_limited` (docs/api/openapi.yaml, x-problem-codes)."
+  },
+  "problemInternalError": "Something went wrong on the server",
+  "@problemInternalError": {
+    "description": "Text of the problem code `internal_error` (docs/api/openapi.yaml, x-problem-codes)."
+  },
+  "problemUnavailable": "The server is not available right now",
+  "@problemUnavailable": {
+    "description": "Text of the problem code `unavailable` (docs/api/openapi.yaml, x-problem-codes)."
+  },
+  "problemMaintenance": "Maintenance: changes are paused, reading continues",
+  "@problemMaintenance": {
+    "description": "Text of the problem code `maintenance` (docs/api/openapi.yaml, x-problem-codes)."
+  },
+  "problemSetupRequired": "The instance is not set up yet",
+  "@problemSetupRequired": {
+    "description": "Text of the problem code `setup_required` (docs/api/openapi.yaml, x-problem-codes)."
+  },
+  "problemForbiddenCapabilityMissing": "You lack an extra permission for this",
+  "@problemForbiddenCapabilityMissing": {
+    "description": "Text of the problem code `forbidden` with the reason `capability_missing` (07 section 4.1, docs/api/openapi.yaml)."
+  },
+  "problemForbiddenLevelInsufficient": "Your access level is too low for this",
+  "@problemForbiddenLevelInsufficient": {
+    "description": "Text of the problem code `forbidden` with the reason `level_insufficient` (07 section 4.1, docs/api/openapi.yaml)."
+  },
+  "problemForbiddenOwnerOnly": "Only an owner can do this",
+  "@problemForbiddenOwnerOnly": {
+    "description": "Text of the problem code `forbidden` with the reason `owner_only` (07 section 4.1, docs/api/openapi.yaml)."
+  },
+  "problemForbiddenViewAsReadOnly": "Read only while you view as another person",
+  "@problemForbiddenViewAsReadOnly": {
+    "description": "Text of the problem code `forbidden` with the reason `view_as_read_only` (07 section 4.1, docs/api/openapi.yaml)."
+  },
+  "problemChannelReadOnlyChannelArchived": "This channel is archived",
+  "@problemChannelReadOnlyChannelArchived": {
+    "description": "Text of the problem code `channel_read_only` with the reason `channel_archived` (07 section 4.1, docs/api/openapi.yaml)."
+  },
+  "problemAgentInvocationDeniedProjectNotReady": "The project of the agent is not ready",
+  "@problemAgentInvocationDeniedProjectNotReady": {
+    "description": "Text of the problem code `agent_invocation_denied` with the reason `project_not_ready` (07 section 4.1, docs/api/openapi.yaml)."
+  },
+  "problemFallback": "Something went wrong ({code})",
+  "@problemFallback": {
+    "description": "Text of a problem code the app does not know; shows the code so support can find it (01 section 9).",
+    "placeholders": {
+      "code": {
+        "type": "String",
+        "example": "future_code"
+      }
+    }
+  }
+}

@@ -36,6 +36,13 @@ license.override = ["BSD-3-Clause"]
 reason = "Flutter SDK package (bin/cache/pkg/sky_engine): the dart:ui interface of the Flutter engine, BSD-3-Clause like the SDK. Its LICENSE file also collects the notices of the third-party code compiled into the engine that every Flutter app ships (ADR 0027), among them Apache-2.0, MIT, BSD, Zlib, Unicode, IJG and FreeType texts; the review of these notices is the ScanCode step before a release (docs/quality/licenses.md item 4)."
 
 [[PackageOverrides]]
+name = "flutter_localizations"
+version = "0.0.0"
+ecosystem = "Pub"
+license.override = ["BSD-3-Clause"]
+reason = "Flutter SDK package (packages/flutter_localizations of the SDK) without a LICENSE file of its own; the LICENSE of the Flutter repository it belongs to is BSD-3-Clause (checked against Flutter 3.47.7 on 2026-10-15 for M4-06). Runtime dependency of packages/l10n."
+
+[[PackageOverrides]]
 name = "_fe_analyzer_shared"
 version = "103.0.0"
 ecosystem = "Pub"
@@ -468,3 +475,27 @@ version = "3.1.4"
 ecosystem = "Pub"
 license.override = ["MIT"]
 reason = "deps.dev knows no license for this pub package; its LICENSE file on pub.dev is MIT. Transitive package of cryptography, test or lints."
+
+# Added on 2026-10-15 for M4-06 (packages/l10n), each checked against the LICENSE file of
+# that version as pub.dev ships it.
+
+[[PackageOverrides]]
+name = "intl"
+version = "0.20.3"
+ecosystem = "Pub"
+license.override = ["BSD-3-Clause"]
+reason = "deps.dev knows no license for this pub package; its LICENSE file on pub.dev is BSD-3-Clause. Runtime dependency of packages/l10n (formatting)."
+
+[[PackageOverrides]]
+name = "timezone"
+version = "0.11.2"
+ecosystem = "Pub"
+license.override = ["BSD-2-Clause"]
+reason = "deps.dev knows no license for this pub package; its LICENSE file on pub.dev is BSD-2-Clause. Runtime dependency of packages/l10n (IANA time zones)."
+
+[[PackageOverrides]]
+name = "http"
+version = "1.6.0"
+ecosystem = "Pub"
+license.override = ["BSD-3-Clause"]
+reason = "deps.dev knows no license for this pub package; its LICENSE file on pub.dev is BSD-3-Clause. Transitive package of timezone."
