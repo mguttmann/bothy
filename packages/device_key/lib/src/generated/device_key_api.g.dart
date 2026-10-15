@@ -172,6 +172,67 @@ class DeviceKeyInfoMessage {
   }
 }
 
+/// The texts of the step-up prompt on Android (brief M5-01, Design note 1).
+///
+/// They come from `packages/l10n`; iOS and macOS ignore them, because the
+/// system shows its own text there.
+class PromptTextsMessage {
+  PromptTextsMessage({
+    required this.title,
+    this.subtitle,
+    required this.negativeButton,
+  });
+
+  /// The prompt's title.
+  String title;
+
+  /// An optional second line.
+  String? subtitle;
+
+  /// The cancel button, shown where the prompt accepts biometrics only.
+  String negativeButton;
+
+  List<Object?> _toList() {
+    return <Object?>[title, subtitle, negativeButton];
+  }
+
+  Object encode() {
+    return _toList();
+  }
+
+  static PromptTextsMessage decode(Object result) {
+    result as List<Object?>;
+    return PromptTextsMessage(
+      title: result[0]! as String,
+      subtitle: result[1] as String?,
+      negativeButton: result[2]! as String,
+    );
+  }
+
+  @override
+  // ignore: avoid_equals_and_hash_code_on_mutable_classes
+  bool operator ==(Object other) {
+    if (other is! PromptTextsMessage || other.runtimeType != runtimeType) {
+      return false;
+    }
+    if (identical(this, other)) {
+      return true;
+    }
+    return _deepEquals(title, other.title) &&
+        _deepEquals(subtitle, other.subtitle) &&
+        _deepEquals(negativeButton, other.negativeButton);
+  }
+
+  @override
+  // ignore: avoid_equals_and_hash_code_on_mutable_classes
+  int get hashCode => _deepHash(<Object?>[runtimeType, ..._toList()]);
+
+  @override
+  String toString() {
+    return 'PromptTextsMessage(title: $title, subtitle: $subtitle, negativeButton: $negativeButton)';
+  }
+}
+
 class _PigeonCodec extends StandardMessageCodec {
   const _PigeonCodec();
   @override
@@ -184,6 +245,9 @@ class _PigeonCodec extends StandardMessageCodec {
       writeValue(buffer, value.index);
     } else if (value is DeviceKeyInfoMessage) {
       buffer.putUint8(130);
+      writeValue(buffer, value.encode());
+    } else if (value is PromptTextsMessage) {
+      buffer.putUint8(131);
       writeValue(buffer, value.encode());
     } else {
       super.writeValue(buffer, value);
@@ -198,6 +262,8 @@ class _PigeonCodec extends StandardMessageCodec {
         return value == null ? null : KeyPurposeMessage.values[value];
       case 130:
         return DeviceKeyInfoMessage.decode(readValue(buffer)!);
+      case 131:
+        return PromptTextsMessage.decode(readValue(buffer)!);
       default:
         return super.readValueOfType(type, buffer);
     }
@@ -274,11 +340,14 @@ class DeviceKeyHostApi {
   }
 
   /// Signs [data] with ES256 and returns `R || S` (64 bytes); asynchronous,
-  /// because the step-up key shows the system prompt.
+  /// because the step-up key shows the system prompt. [prompt] carries the
+  /// prompt texts for Android; the step-up key there fails with `internal`
+  /// without them.
   Future<Uint8List> sign(
     String scope,
     KeyPurposeMessage purpose,
     Uint8List data,
+    PromptTextsMessage? prompt,
   ) async {
     final pigeonVar_channelName =
         'dev.flutter.pigeon.device_key.DeviceKeyHostApi.sign$pigeonVar_messageChannelSuffix';
@@ -288,7 +357,7 @@ class DeviceKeyHostApi {
       binaryMessenger: pigeonVar_binaryMessenger,
     );
     final Future<Object?> pigeonVar_sendFuture = pigeonVar_channel.send(
-      <Object?>[scope, purpose, data],
+      <Object?>[scope, purpose, data, prompt],
     );
     final pigeonVar_replyList = await pigeonVar_sendFuture as List<Object?>?;
 

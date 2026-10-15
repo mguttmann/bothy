@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import 'dart:convert';
+import 'dart:io';
 
 import 'package:crypto/crypto.dart';
 import 'package:device_key/device_key.dart';
@@ -20,6 +21,7 @@ class _FakeHostApi extends DeviceKeyHostApi {
   Uint8List signature = Uint8List(0);
   Uint8List? attestationBytes;
   Object? error;
+  PromptTextsMessage? lastPrompt;
   final calls = <String>[];
 
   void _maybeThrow() {
@@ -52,8 +54,10 @@ class _FakeHostApi extends DeviceKeyHostApi {
     String scope,
     KeyPurposeMessage purpose,
     Uint8List data,
+    PromptTextsMessage? prompt,
   ) async {
     calls.add('sign $scope ${purpose.name} ${data.length}');
+    lastPrompt = prompt;
     _maybeThrow();
     return signature;
   }
@@ -174,6 +178,33 @@ void main() {
       expect(api.calls, ['sign $scope dpop 14']);
     });
 
+    test('the step-up prompt texts pass through to the native side', () async {
+      final api = _FakeHostApi()..signature = Uint8List(64);
+      final client = DeviceKeyClient(api: api);
+      await client.sign(
+        scope,
+        KeyPurpose.stepUp,
+        Uint8List(1),
+        prompt: const StepUpPrompt(
+          title: 'Confirm as Alex',
+          subtitle: 'chat.example.com',
+          negativeButton: 'Cancel',
+        ),
+      );
+      expect(api.lastPrompt!.title, 'Confirm as Alex');
+      expect(api.lastPrompt!.subtitle, 'chat.example.com');
+      expect(api.lastPrompt!.negativeButton, 'Cancel');
+      await client.sign(
+        scope,
+        KeyPurpose.stepUp,
+        Uint8List(1),
+        prompt: const StepUpPrompt(title: 'Confirm', negativeButton: 'Cancel'),
+      );
+      expect(api.lastPrompt!.subtitle, isNull);
+      await client.sign(scope, KeyPurpose.dpop, Uint8List(1));
+      expect(api.lastPrompt, isNull);
+    });
+
     test('a signature that is not 64 bytes is an internal error', () async {
       final api = _FakeHostApi()..signature = Uint8List(70);
       final client = DeviceKeyClient(api: api);
@@ -257,6 +288,17 @@ void main() {
         'not_available',
         'internal',
       ]);
+    });
+
+    test('the Android core sends the same codes (DeviceKeyError.kt)', () {
+      final kotlin = File(
+        'android/devicekeycore/src/main/kotlin/devicekey/core/DeviceKeyError.kt',
+      ).readAsStringSync();
+      final wire = RegExp(
+        r'^    [A-Z_]+\("([a-z_]+)", ',
+        multiLine: true,
+      ).allMatches(kotlin).map((m) => m.group(1));
+      expect(wire, DeviceKeyError.values.map((e) => e.wire));
     });
 
     test('a platform without the plugin reports not_available', () async {
