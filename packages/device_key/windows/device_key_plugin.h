@@ -68,9 +68,10 @@ class DeviceKeyPlugin : public flutter::Plugin, public DeviceKeyHostApi {
   /// See DeviceKeyHostApi::KeyInfo.
   ErrorOr<std::optional<DeviceKeyInfoMessage>> KeyInfo(const std::string& scope,
                                                        const KeyPurposeMessage& purpose) override;
-  /// See DeviceKeyHostApi::Sign; the reply arrives on the platform thread.
+  /// See DeviceKeyHostApi::Sign; the reply arrives on the platform thread. Windows ignores
+  /// prompt, the texts of the Android step-up prompt: it has no step-up key (D-M4-11-2).
   void Sign(const std::string& scope, const KeyPurposeMessage& purpose,
-            const std::vector<uint8_t>& data,
+            const std::vector<uint8_t>& data, const PromptTextsMessage* prompt,
             std::function<void(ErrorOr<std::vector<uint8_t>> reply)> result) override;
   /// See DeviceKeyHostApi::Attestation; Windows returns none in this version.
   ErrorOr<std::optional<std::vector<uint8_t>>> Attestation(

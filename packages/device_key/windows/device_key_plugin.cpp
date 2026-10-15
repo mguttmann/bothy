@@ -122,6 +122,7 @@ ErrorOr<std::optional<DeviceKeyInfoMessage>> DeviceKeyPlugin::KeyInfo(
 
 void DeviceKeyPlugin::Sign(const std::string& scope, const KeyPurposeMessage& purpose,
                            const std::vector<uint8_t>& data,
+                           const PromptTextsMessage* /*prompt*/,
                            std::function<void(ErrorOr<std::vector<uint8_t>> reply)> result) {
   // TPM operations block for up to seconds, so they run on the worker; the reply goes back to
   // the platform thread, where Flutter expects channel replies.
