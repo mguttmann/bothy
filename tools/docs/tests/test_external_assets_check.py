@@ -59,7 +59,7 @@ def test_external_font_in_a_stylesheet_fails(tmp_path: Path) -> None:
     css.write_text("@font-face { src: url(https://fonts.example.com/a.woff2); }\n")
     findings = check.scan(tmp_path)
     assert [f.path for f in findings] == [css]
-    assert "fonts.example.com" in findings[0].url
+    assert findings[0].url == "https://fonts.example.com/a.woff2"
 
 
 def test_nested_pages_are_scanned(tmp_path: Path) -> None:
