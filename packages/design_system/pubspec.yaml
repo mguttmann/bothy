@@ -11,10 +11,30 @@ environment:
   flutter: 3.47.7
 
 dependencies:
+  # A regular dependency because lib/testing.dart returns its GoldenTestGroup; apps import
+  # testing.dart only from their tests (docs/DECISIONS.md D-M4-04-5).
+  alchemist: ^0.14.1
   flutter:
     sdk: flutter
 
 dev_dependencies:
+  crypto: ^3.0.7
   flutter_lints: ^6.0.0
   flutter_test:
     sdk: flutter
+
+# The variable font files and their OFL texts (fonts/MANIFEST.json, docs/design/typography.md
+# "Einbindung"). The weight drives the `wght` axis (dsTextStyle).
+flutter:
+  uses-material-design: true
+  fonts:
+    - family: Atkinson Hyperlegible Next
+      fonts:
+        - asset: fonts/AtkinsonHyperlegibleNext-VariableFont_wght.ttf
+        - asset: fonts/AtkinsonHyperlegibleNext-Italic-VariableFont_wght.ttf
+          style: italic
+    - family: Atkinson Hyperlegible Mono
+      fonts:
+        - asset: fonts/AtkinsonHyperlegibleMono-VariableFont_wght.ttf
+        - asset: fonts/AtkinsonHyperlegibleMono-Italic-VariableFont_wght.ttf
+          style: italic
