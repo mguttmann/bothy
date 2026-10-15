@@ -10,6 +10,7 @@ Dart package of the apps are generated from them. Conventions:
 | [asyncapi.yaml](asyncapi.yaml) | Gateway WebSocket (AsyncAPI 3.0): ops, events, close codes; bodies via `$ref` to openapi.yaml |
 | [webhooks.md](webhooks.md) | Delivery, signature, retry and verification of webhooks; incoming webhooks |
 | [redocly.yaml](redocly.yaml) | Lint rules for both files, including the requirement of `x-authz-action` and the comparison with the action catalogue |
+| [webhook-test-vectors.json](webhook-test-vectors.json) | Test vectors of the webhook signatures (`v1a`, `v1`) and of the HMAC derivation; the contract of every verifier (M2-26, webhooks.md 2.2) |
 
 ## Check
 

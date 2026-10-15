@@ -209,6 +209,11 @@ E = Elevation of Privilege. "Register" refers to section 6.
 | I | App reads more than needed | scopes plus grants (07, 2.10) | T-PL-01 |
 | D | Webhook flood | `rl.webhook_in` | T-DS-01 |
 | E | App confirms approval cards | apps never `trigger`, never `approve_actions` (SR4) | T-PL-01 |
+| S | Forged or replayed webhook at the receiver | `v1a` always, `v1` per subscription, `webhook-timestamp` and `webhook-id` for freshness and duplicates, test vectors (G10; M2-26) | T-PL-01 |
+| I | App receives events outside its grants or scopes | `webhook_out.deliver` before every attempt with current permissions, `dead` without a request (M2-26) | T-PL-01 |
+| I | Webhook to a private target (DNS rebinding) | host list `webhook.allowed_hosts`, egress client with an address check at connection setup, no redirects (M2-26) | T-NW-01 |
+| I | HMAC secret from the database or the idempotency store | derived, never stored, one-time response (M2-26) | T-TK-02 |
+| D | Slow receiver congests deliveries | order per subscription, queue `delivery`, delivery quota, disabling (M2-26) | T-DS-01 |
 
 ### 5.12 Push
 

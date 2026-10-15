@@ -79,8 +79,11 @@ The framework is built with the first consumer (webhooks, build ticket M2-01), n
 - Bad, because consequences have a delay until the next round; `perf.push_handoff_p95`
   holds it.
 - Bad, because a consumer that stands still for longer than `sync.event_retention` loses events
-  as soon as their partition is detached. For webhook subscriptions, `last_delivered_seq` detects
-  the gap and turns the subscription off with a notification (11, section 6). For the consumer
+  as soon as their partition is detached. For webhook subscriptions the gap is detected at two
+  points (M2-26): at the head of a subscription, when the event of its lowest pending delivery left
+  the log, and in the round of the consumer `webhooks`, which reports the range retention removed
+  before it read it (`sync.ConsumerLossHandler`); both disable the subscription with cause `gap`
+  (11, section 6). For the consumer
   itself the gauges `bothy.event.consumer.lag` and `bothy.event.consumer.pending_age` and the
   alarm `BothyEventConsumerLag` at `consumer.pending_alert_after`, strictly below
   `sync.event_retention`, report the stall long before (M2-01, see More Information).
@@ -96,7 +99,9 @@ The framework is built with the first consumer (webhooks, build ticket M2-01), n
   `TestConsumerRoundLockedEndsAtOnce` in `services/server/internal/sync/adapters/postgres`; the
   lag gauges by `TestConsumerLagGauges`, the alarm by the promtool cases of
   `BothyEventConsumerLag`.
-- Test: a permission revocation between round and job prevents the sending.
+- Test: a permission revocation between round and job prevents the sending. Built in M2-26 as
+  `TestDeliveryRevokedRightIsDeadWithoutRequest` and `TestDeliveryScopeRemovedIsDead`; the loss of
+  the consumer itself by `TestConsumerLossDisablesSubscriptions` and `TestRoundCallsHandleLost`.
 - Load test `perf/push_handoff` with `perf.push_handoff_p95` (build ticket M3-24).
 - Restore test: after `bothy restore finalize` every cursor is at `head_seq`
   (ADR 0059).

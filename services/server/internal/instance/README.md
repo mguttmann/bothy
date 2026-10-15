@@ -11,7 +11,7 @@ Instance identity, sync epoch, minimum server version, settings and branding, fe
 
 | Package | Content |
 |---|---|
-| `internal/instance` | port: `CounterName` and the three counter constants, `Counters`, `Record` (`SetupCompleted`), `State`, `Versions`; signing keys (`keys.go`): `Purpose`, `KeyState`, `RotateMode`, `Signer`, `PublicKey`, `JWK`, `JWKSet`, `RotateCommand`, `Rotation`, `Keys`, `ErrJWSInvalid`, `SignatureAlgs`; settings (`settings.go`): `SupportedLocales`, `Settings`, `Branding`, `LoginOptionsSource`, `LoginOptions`, `ProviderInfo`, `Admin` with its DTOs (`Setting`, `IfMatch`, `PutSetting`, `UpdateBranding`, `Info`, `Limits`, `Discovery`, `ClientVersion`, `ProblemType`); feature flags (`flags.go`): the registry `RegisteredFlags` with `FlagDefinition`, `FlagKind` and the key constants, `Flags`, `FlagSubject`, `SubjectOf`, `EvaluatedFlag`, `FlagAdmin` with `FeatureFlag`, `FlagRollout`, `PutFlagCmd`, the source ports `FlagGroupSource` and `FlagUserSource` |
+| `internal/instance` | port: `CounterName` and the three counter constants, `Counters`, `Record` (`SetupCompleted`), `State`, `Versions`; signing keys (`keys.go`): `Purpose`, `KeyState`, `RotateMode`, `Signer`, `PublicKey`, `JWK`, `JWKSet`, `RotateCommand`, `Rotation`, `Keys`, `ErrJWSInvalid`, `SignatureAlgs`, `FormatWebhookPublicKey`; settings (`settings.go`): `SupportedLocales`, `Settings`, `Branding`, `LoginOptionsSource`, `LoginOptions`, `ProviderInfo`, `Admin` with its DTOs (`Setting`, `IfMatch`, `PutSetting`, `UpdateBranding`, `Info`, `Limits`, `Discovery`, `ClientVersion`, `ProblemType`); feature flags (`flags.go`): the registry `RegisteredFlags` with `FlagDefinition`, `FlagKind` and the key constants, `Flags`, `FlagSubject`, `SubjectOf`, `EvaluatedFlag`, `FlagAdmin` with `FeatureFlag`, `FlagRollout`, `PutFlagCmd`, the source ports `FlagGroupSource` and `FlagUserSource` |
 | `domain/` | counter names and the phase rule (`CheckAdvance`, `CheckRead`, `CheckAdvanceCount`), `CompareSemVer`, `ValidateSemVer`, `CheckServerVersion` (SemVer 2.0.0 precedence, hand-written: the domain layer imports no third-party library); the transitions of the signing keys (`signingkey.go`: `DueTransitions`, `EmergencyTransitions`, `LostTransitions`, `PendingNext`, `ActiveKey`, `Window`); the settings registry (`settings.go`: `Registry`, `Validate`, `ValidateProductName`, `ValidateAccentColor`, `DefaultProductName`), the branding version and changes (`branding.go`) and the discovery rules (`discovery.go`: `MinClientVersions`, `LocalPasswordEnabled`, `DiscoveryFeatures`, `ContentETag`); the flag rules (`flags.go`: `FlagSpec`, `CheckRegistry`, `Evaluate`, `InRollout`, `Rollout`, `NormalizeRollout`, `ReachedRemoveBy`) |
 | `app/` | `NewCounters` (phase guard, then the repository) and `NewState` (row in a unit of work), outgoing port `Repository`; `NewKeys` (`Keys`, `KeysConfig`) with the outgoing ports `KeyRepository` and `KeyStore`; `NewAdmin` (`Admin`, `Config`, `Contract`) with the outgoing ports `SettingsRepository` and `FlagRepository` (`flags.go`: `Admin` also implements `Flags` and `FlagAdmin`; `FlagSpecs`) |
 | `adapters/postgres/` | `Repository` over `platform/pg` (both outgoing ports), sqlc queries in `queries/`, generated code in `sqlcgen/` (entry in `services/server/sqlc.yaml`) |
@@ -144,8 +144,13 @@ returns a key in any state. `Verify(ctx, purpose, compactJWS)` (M1-50) parses a 
 algorithm of the row and returns payload and `kid`; every failure about the JWS wraps
 `instance.ErrJWSInvalid`, a database error does not. The audit checkpoints verify through it. `JWKS` authorizes `instance.discovery.read` and publishes the `next`,
 `active` and `retiring` keys of `access_token` and `invocation`, ordered by purpose, state
-(`active`, `next`, `retiring`) and `kid`; `webhook_out` keys go out through `getWebhookKeys` (M2),
-`audit_checkpoint` keys never.
+(`active`, `next`, `retiring`) and `kid`; `webhook_out` keys go out through `getWebhookKeys`,
+`audit_checkpoint` keys never. `Signers(ctx, purpose)` (M2-26) returns the signing set of the
+outgoing webhooks: the `active` key first, then every `retiring` key whose `not_after` lies ahead,
+never `next` or `retired`. `PublicKeys(ctx, purpose)` authorizes `instance.discovery.read` like
+`JWKS` and returns the `next`, `active` and `retiring` keys of the purpose; `getWebhookKeys`
+publishes those of `webhook_out` as `FormatWebhookPublicKey` writes them (`whpk_` and the standard
+base64 of the DER SubjectPublicKeyInfo), with the `Cache-Control` of `getJwks`.
 
 **HTTP.** `getJwks` answers `application/jwk-set+json` with `Cache-Control: public,
 max-age=<agent.jwks_max_age in whole seconds>`; the CORS stage adds
