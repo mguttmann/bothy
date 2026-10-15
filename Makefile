@@ -27,6 +27,8 @@ COVERAGE_GO_MIN ?= 80
 COVERAGE_DART_MIN ?= 80
 # Time limit of `make perf` per Go module (named value quality.perf.timeout).
 PERF_TIMEOUT ?= 60m
+# Time limit of each Go test binary in `make test` (named value quality.test.go_timeout).
+GO_TEST_TIMEOUT ?= 20m
 SONAR_HOST_URL ?= http://127.0.0.1:9000
 SONAR_ORGANIZATION ?=
 SONAR_PROJECT_KEY ?= bothy
@@ -203,9 +205,11 @@ test: ## All tests with coverage data
 	@# The architecture tests of tools/archgen run the pinned go-arch-lint named by GO_ARCH_LINT.
 	@# -coverpkg=./...: a statement counts as covered when any test of its module runs it, also a
 	@# test in another package (a use case tested through its HTTP adapter); see PL/1.
+	@# -timeout: each test binary gets GO_TEST_TIMEOUT instead of the default 10m, because the
+	@# instrumentation of the whole module slows the larger packages down (PL/2).
 	@if [ -z "$(GO_ON)" ]; then $(call skip,go-test,no Go module selected); \
 	else $(GO_PREREQS) test || exit 1; gal=$(call tool,go-arch-lint) || exit 1; \
-	  for m in $(GO_MODS); do (cd $$m && GO_ARCH_LINT="$$gal" go test -race -covermode=atomic -coverpkg=./... -coverprofile=coverage.out ./...) || exit 1; done; fi
+	  for m in $(GO_MODS); do (cd $$m && GO_ARCH_LINT="$$gal" go test -race -covermode=atomic -coverpkg=./... -coverprofile=coverage.out -timeout=$(GO_TEST_TIMEOUT) ./...) || exit 1; done; fi
 	@# --enforce-lockfile: a pubspec.lock that no longer matches pubspec.yaml fails instead of being
 	@# rewritten silently, so osv and licenses always read the lock file the tests ran with.
 	@if [ -z "$(DART_ON)" ]; then $(call skip,dart-test,no Dart package selected); \

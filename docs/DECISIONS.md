@@ -1824,6 +1824,7 @@ The brief names these rows D-M3-02-1 to D-M3-02-13; they follow the numbering of
 | No | Date | Ruling | Reason |
 |---|---|---|---|
 | PL/1 | 2026-10-14 | `make test` runs the Go tests with `-coverpkg=./...`: a statement counts as covered when any test of its module runs it, also a test in another package. The gate `coverage` (`quality.coverage.go_min_percent`) and the new-code coverage of SonarQube read this profile. | Many use cases are tested through their HTTP adapter against PostgreSQL (the coming sessions, refresh and step-up flows among them); with per-package coverage the code those tests run counted as uncovered, and the new-code gate failed for code that the suite executes. |
+| PL/2 | 2026-10-15 | `make test` gives each Go test binary `quality.test.go_timeout` (`20m`, `GO_TEST_TIMEOUT`) instead of the default ten minutes of `go test`. | With `-coverpkg=./...` (PL/1) every package instruments the whole module; `internal/identity/adapters/httpapi` needed 568 s in the `sonar` job of #84 and passed ten minutes in the `sonar` job of a later pull request twice, so the job failed although no test failed. |
 
 ## M1-20 Idempotency keys
 

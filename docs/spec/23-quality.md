@@ -201,6 +201,7 @@ fixed and the delta is checked again; the threat model (chapter 19) is updated. 
 | `quality.coverage.python_min_percent` | `80` | percent | Minimum coverage per Python project under `sdk/` and `plugins/` | the project's `pyproject.toml` (`fail_under` in `[tool.coverage.report]`) |
 | `quality.coverage.typescript_min_percent` | `80` | percent | Minimum coverage per TypeScript project | the project's `vitest.config.ts` (`coverage.thresholds`) |
 | `quality.perf.timeout` | `60m` | duration | Time limit of `make perf` per Go module | `Makefile` (`PERF_TIMEOUT`) |
+| `quality.test.go_timeout` | `20m` | duration | Time limit of each Go test binary in `make test` (`go test -timeout`) | `Makefile` (`GO_TEST_TIMEOUT`) |
 | `quality.sonar.new_issues_max` | `0` | count | New findings in new code | `quality/sonar/quality-gate.json` |
 | `quality.sonar.new_hotspots_reviewed_min_percent` | `100` | percent | Reviewed security hotspots in new code | `quality/sonar/quality-gate.json` |
 | `quality.sonar.new_coverage_min_percent` | `80` | percent | Coverage of new code | `quality/sonar/quality-gate.json` |
