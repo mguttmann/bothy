@@ -14,7 +14,7 @@ analyzer:
     strict-inference: true
     strict-raw-types: true
   errors:
-    # Every public symbol has a doc comment (docs/spec/23-qualitaet.md "Doku im Code").
+    # Every public symbol has a doc comment (docs/spec/23-quality.md "Documentation in code").
     public_member_api_docs: error
   exclude:
     - "**/*.g.dart"

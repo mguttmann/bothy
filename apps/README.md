@@ -10,8 +10,8 @@ tickets fill them.
 | [console](console/README.md) | Administration and statistics in the browser, no chat | Web | Flutter Web (ADR 0028) | M6-01 onward |
 
 Both apps use the packages of [`packages/`](../packages/README.md). Architecture:
-[docs/spec/15-client-architektur.md](../docs/spec/15-client-architektur.md). Usage and screens:
-[docs/spec/01-produkt.md](../docs/spec/01-produkt.md). Design: [docs/design/](../docs/design/README.md).
+[docs/spec/15-client-architecture.md](../docs/spec/15-client-architecture.md). Usage and screens:
+[docs/spec/01-product.md](../docs/spec/01-product.md). Design: [docs/design/](../docs/design/README.md).
 
 Shared rules (checked by `make arch`, `tools/arch-check/rules.yaml`):
 

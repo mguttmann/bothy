@@ -1,13 +1,13 @@
 # terminal_ui
 
-Terminal view: renderer `xterm`, sessions, key pinning through ports, extra keys bar (docs/spec/15-client-architektur.md, section 23).
+Terminal view: renderer `xterm`, sessions, key pinning through ports, extra keys bar (docs/spec/15-client-architecture.md, section 23).
 
 Status: skeleton (M4-01); M4-35 fills it. Kind: Flutter package, a member of the Dart
 workspace at the repository root (`resolution: workspace`, `publish_to: none`).
 
 ## Dependencies
 
-Allowed members (docs/spec/15-client-architektur.md, 3.1; `tools/arch-check/rules.yaml`): `design_system`, `auth`, `api_client`, `bothy_noise`, `domain` (arrows of the diagram), and through them `l10n`.
+Allowed members (docs/spec/15-client-architecture.md, 3.1; `tools/arch-check/rules.yaml`): `design_system`, `auth`, `api_client`, `bothy_noise`, `domain` (arrows of the diagram), and through them `l10n`.
 Every other member is out of reach; `make arch` fails on a dependency or an import of it.
 
 Further rules checked by `make arch`:

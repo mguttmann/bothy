@@ -4,7 +4,7 @@
 For every member of `tools/arch-check/rules.yaml` that is a package (not an app) the script runs
 `dart doc --output <out>/<member>` in the member folder, after one `flutter pub get
 --enforce-lockfile` at the workspace root. A non-zero exit or any output line with `warning:`
-or `error:` fails the run (documentation in code is a gate, docs/spec/23-qualitaet.md). The
+or `error:` fails the run (documentation in code is a gate, docs/spec/23-quality.md). The
 pages are generated for every build and never tracked (docs/DECISIONS.md D-M4-01-6); MkDocs
 copies them into the site, and docs/reference/dart-api.md links them.
 

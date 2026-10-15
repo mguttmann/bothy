@@ -1,13 +1,13 @@
 # bothy_viz
 
-Visualizations of the statistics (docs/spec/25-visualisierung.md): views, primitives, fixtures and harness, with the port `LiveFrameSource` for the live stream.
+Visualizations of the statistics (docs/spec/25-visualization.md): views, primitives, fixtures and harness, with the port `LiveFrameSource` for the live stream.
 
 Status: skeleton (M4-01); M6-10 onward fills it. Kind: Flutter package, a member of the Dart
 workspace at the repository root (`resolution: workspace`, `publish_to: none`).
 
 ## Dependencies
 
-Allowed members (docs/spec/15-client-architektur.md, 3.1; `tools/arch-check/rules.yaml`): `design_system`, `api_client`, `domain` (arrows of the diagram), and through them `l10n`.
+Allowed members (docs/spec/15-client-architecture.md, 3.1; `tools/arch-check/rules.yaml`): `design_system`, `api_client`, `domain` (arrows of the diagram), and through them `l10n`.
 Every other member is out of reach; `make arch` fails on a dependency or an import of it.
 
 Further rules checked by `make arch`:

@@ -1,5 +1,5 @@
 # SPDX-License-Identifier: Apache-2.0
-"""Architecture test of the Dart workspace (docs/spec/15-client-architektur.md 3.1, brief M4-01).
+"""Architecture test of the Dart workspace (docs/spec/15-client-architecture.md 3.1, brief M4-01).
 
 The rules come from `rules.yaml` next to this file. For every member of the workspace the test
 reads the manifest and every `import` and `export` directive under `lib/`, `test/`,

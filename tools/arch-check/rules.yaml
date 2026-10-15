@@ -1,7 +1,7 @@
 # SPDX-License-Identifier: Apache-2.0
 #
 # Dependency rules of the Dart workspace: the single source of tools/arch-check/arch_check.py
-# (docs/spec/15-client-architektur.md, sections 3 and 3.1; brief M4-01).
+# (docs/spec/15-client-architecture.md, sections 3 and 3.1; brief M4-01).
 #
 # The members are listed in the order of 15 3, which is also the order of the root
 # `workspace:` list. `edges` are the arrows of the diagram of 15 3.1; a member may depend on

@@ -9,16 +9,16 @@ logic; native code only where the system requires it.
 ## Purpose
 
 - Spaces, channels, forums and threads; agent sessions with live box, follow-ups, components
-  and slash commands ([01-produkt.md](../../docs/spec/01-produkt.md)).
+  and slash commands ([01-product.md](../../docs/spec/01-product.md)).
 - Offline reading and writing with an outbox; catch-up according to
-  [04-sync-protokoll.md](../../docs/spec/04-sync-protokoll.md).
+  [04-sync-protocol.md](../../docs/spec/04-sync-protocol.md).
 - Push without content, the app fetches the text itself; sharing from other apps; voice
   messages.
 - Administration on the desktop (from `packages/admin_ui`), emergency actions on the phone.
 
 ## Dependencies
 
-Allowed members (docs/spec/15-client-architektur.md, 3.1; `tools/arch-check/rules.yaml`):
+Allowed members (docs/spec/15-client-architecture.md, 3.1; `tools/arch-check/rules.yaml`):
 `admin_ui`, `sync_engine`, `design_system`, `device_key`, `terminal_ui` and every member they
 reach; `make arch` checks the manifest and every import.
 
@@ -41,7 +41,7 @@ reach; `make arch` checks the manifest and every import.
 | iOS | 15 | TestFlight, App Store |
 | Android | API 26 | Play Internal Testing or Firebase App Distribution |
 
-Reasons: [15-client-architektur.md](../../docs/spec/15-client-architektur.md), section 2.
+Reasons: [15-client-architecture.md](../../docs/spec/15-client-architecture.md), section 2.
 Release and signing: [18-release.md](../../docs/spec/18-release.md).
 
 ## Build and test

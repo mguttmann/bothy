@@ -15,7 +15,7 @@ exact `environment.flutter` version of the root `pubspec.yaml`. The host service
 at the repository root: run `flutter pub get` there once (one `pubspec.lock`), and the gates
 run `flutter analyze` at the root and `flutter test` per member; every member needs a `test/`
 directory and reaches the coverage threshold, and `make arch` checks the dependency rules of
-docs/spec/15-client-architektur.md 3.1. Platform tests of the apps run with
+docs/spec/15-client-architecture.md 3.1. Platform tests of the apps run with
 `make apps-platform` on macOS or Windows. A Docker-compatible runtime is needed for the local SonarQube and for server
 work: integration tests run against PostgreSQL in throwaway containers, and `make perf` runs
 the load tests. As soon as a Go module exists, every server gate fails without Go, a

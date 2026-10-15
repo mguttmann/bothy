@@ -1,7 +1,7 @@
 # tools/arch-check
 
 Architecture test of the Dart workspace: holds the dependency rules of
-[docs/spec/15-client-architektur.md](../../docs/spec/15-client-architektur.md), section 3.1,
+[docs/spec/15-client-architecture.md](../../docs/spec/15-client-architecture.md), section 3.1,
 for every member of the workspace on every run of the gate (`make arch`, brief M4-01).
 
 | File | Content |

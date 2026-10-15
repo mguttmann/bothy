@@ -6,7 +6,7 @@ The API documentation of the Dart packages is generated from their doc comments 
 symbol without a doc comment fails `make lint` (`public_member_api_docs`), and a warning of
 `dart doc` fails `make docs`. The apps `apps/client` and `apps/console` are not libraries and
 have no API pages. Layout and dependency rules of the workspace:
-[15 Client-Architektur](../spec/15-client-architektur.md), sections 3 and 3.1.
+[15 Client architecture](../spec/15-client-architecture.md), sections 3 and 3.1.
 
 | Package | Purpose |
 |---|---|

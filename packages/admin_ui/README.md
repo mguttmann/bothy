@@ -7,7 +7,7 @@ workspace at the repository root (`resolution: workspace`, `publish_to: none`).
 
 ## Dependencies
 
-Allowed members (docs/spec/15-client-architektur.md, 3.1; `tools/arch-check/rules.yaml`): `design_system`, `auth`, `api_client`, `bothy_viz` (arrows of the diagram), and through them `domain`, `l10n`.
+Allowed members (docs/spec/15-client-architecture.md, 3.1; `tools/arch-check/rules.yaml`): `design_system`, `auth`, `api_client`, `bothy_viz` (arrows of the diagram), and through them `domain`, `l10n`.
 Every other member is out of reach; `make arch` fails on a dependency or an import of it.
 
 Further rules checked by `make arch`:

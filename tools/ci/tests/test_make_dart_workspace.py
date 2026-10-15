@@ -212,7 +212,7 @@ def test_member_without_tests_fails(repo: Repo) -> None:
     repo.commit()
     result = repo.make("test", "COMPONENTS=apps")
     assert result.returncode == 2
-    assert "packages/beta: no test/ directory (docs/spec/23-qualitaet.md, 3)" in result.stderr
+    assert "packages/beta: no test/ directory (docs/spec/23-quality.md, 3)" in result.stderr
 
 
 def test_coverage_ignores_generated_files(repo: Repo) -> None:
@@ -275,8 +275,9 @@ def test_docs_runs_dart_api_docs(repo: Repo) -> None:
     result = repo.make("docs", "COMPONENTS=apps")
     assert result.returncode == 0, result.stdout + result.stderr
     scripts = [c[0] for c in repo.python_calls()]
-    assert scripts == ["tools/docs/adr_index.py", "tools/docs/dart_api_docs.py"]
-    assert repo.python_calls()[1] == ["tools/docs/dart_api_docs.py", "--out", "docs/api/dart"]
+    # The Dart API pages are built after the other docs checks and before the site build.
+    assert scripts[-2:] == ["tools/docs/dart_api_docs.py", "tools/docs/external_assets_check.py"]
+    assert ["tools/docs/dart_api_docs.py", "--out", "docs/api/dart"] in repo.python_calls()
     uv = [c["args"] for c in repo.calls("uv")]
     assert any("mkdocs" in args for args in uv)  # type: ignore[operator]
     # The site links into the generated pages, so the docs gate builds them for every

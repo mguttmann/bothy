@@ -10,7 +10,6 @@ every member pin the same exact version.
 
 from __future__ import annotations
 
-import os
 import re
 import subprocess
 from pathlib import Path
@@ -120,35 +119,14 @@ def test_apps_jobs_run_the_platform_tests(job: str, runner: str) -> None:
     assert any(_uses(s, "astral-sh/setup-uv") for s in spec["steps"])
 
 
-def _ci_ok(**results: str) -> int:
-    """Run the script of the ci-ok job with the given job results (others: success)."""
-    job = _jobs()["ci-ok"]
-    [step] = job["steps"]
-    env = dict.fromkeys(step["env"], "success")
-    env.update(results)
-    return subprocess.run(
-        ["bash", "-e", "-c", step["run"]],
-        env={**env, "PATH": os.environ["PATH"]},
-        capture_output=True,
-        text=True,
-        check=False,
-    ).returncode
+def test_ci_ok_requires_the_apps_jobs_by_name() -> None:
+    # ci-ok has no `needs`; tools/ci/ci_ok.py requires the jobs of ci.yml by name.
+    import ci_ok
 
-
-def test_ci_ok_waits_for_the_apps_jobs() -> None:
-    needs = _jobs()["ci-ok"]["needs"]
-    assert set(APPS_JOBS) <= set(needs)
-    env = _jobs()["ci-ok"]["steps"][0]["env"]
-    assert env["APPS_MACOS"] == "${{ needs.apps-macos.result }}"
-    assert env["APPS_WINDOWS"] == "${{ needs.apps-windows.result }}"
-
-
-@pytest.mark.parametrize("variable", ["APPS_MACOS", "APPS_WINDOWS"])
-@pytest.mark.parametrize(
-    ("result", "code"), [("success", 0), ("skipped", 0), ("failure", 1), ("cancelled", 1)]
-)
-def test_ci_ok_accepts_success_or_skipped_apps_jobs(variable: str, result: str, code: int) -> None:
-    assert _ci_ok(**{variable: result}) == code
+    names = {_jobs()[job]["name"] for job in APPS_JOBS}
+    rules = {n: rule.ok for rule in ci_ok.RULES for n in rule.names}
+    for name in names:
+        assert rules[name] == frozenset({"success", "skipped"}), name
 
 
 def _directive(go_mod: str, name: str) -> str:
