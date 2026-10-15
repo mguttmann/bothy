@@ -14,3 +14,11 @@ Copyright 2020-2024 The Atkinson Hyperlegible Next Project Authors
 Atkinson Hyperlegible Mono
 Copyright 2020-2024 The Atkinson Hyperlegible Mono Project Authors
 (https://github.com/googlefonts/atkinson-hyperlegible-next-mono)
+
+This product bundles icons of Phosphor Icons (@phosphor-icons/core), compiled into
+packages/design_system/assets/icons/, licensed under the MIT License; the license text ships
+in packages/design_system/assets/icons/LICENSE:
+
+Phosphor Icons
+Copyright (c) 2023 Phosphor Icons
+(https://github.com/phosphor-icons/core)
