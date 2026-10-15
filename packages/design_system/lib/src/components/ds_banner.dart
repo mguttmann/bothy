@@ -65,7 +65,12 @@ class DsBanner extends StatelessWidget {
         ),
         child: Row(
           children: [
-            DsIcon(dsToneGlyph(tone), size: DsIconSizeRole.sm, color: t.fg, decorative: true),
+            DsIcon(
+              dsToneGlyph(tone),
+              size: DsIconSizeRole.sm,
+              color: t.fg,
+              decorative: true,
+            ),
             const SizedBox(width: DsSpace.s8),
             Expanded(child: Text(text, style: style)),
             if (actionLabel != null && onAction != null)

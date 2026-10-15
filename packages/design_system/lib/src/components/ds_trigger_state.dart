@@ -60,7 +60,9 @@ class DsTriggerStateIcon extends StatelessWidget {
       DsTriggerState.working => l.triggerStateWorking,
       DsTriggerState.done => l.triggerStateDone,
       DsTriggerState.failed =>
-        why == null ? l.triggerStateFailed : l.triggerStateFailedWithReason(why),
+        why == null
+            ? l.triggerStateFailed
+            : l.triggerStateFailedWithReason(why),
       DsTriggerState.cancelled =>
         why == null
             ? l.triggerStateCancelled
@@ -74,7 +76,10 @@ class DsTriggerStateIcon extends StatelessWidget {
   Widget build(BuildContext context) {
     final colors = context.dsColors;
     final (glyph, color) = switch (state) {
-      DsTriggerState.received => (DsIcons.triggerReceived, colors.triggerReceived),
+      DsTriggerState.received => (
+        DsIcons.triggerReceived,
+        colors.triggerReceived,
+      ),
       DsTriggerState.queued => (DsIcons.triggerQueued, colors.triggerQueued),
       DsTriggerState.working => (DsIcons.triggerWorking, colors.triggerWorking),
       DsTriggerState.done => (DsIcons.triggerDone, colors.triggerDone),
@@ -99,7 +104,12 @@ class DsTriggerStateIcon extends StatelessWidget {
         child: Center(
           widthFactor: 1,
           heightFactor: 1,
-          child: DsIcon(glyph, size: DsIconSizeRole.sm, color: color, decorative: true),
+          child: DsIcon(
+            glyph,
+            size: DsIconSizeRole.sm,
+            color: color,
+            decorative: true,
+          ),
         ),
       ),
     );

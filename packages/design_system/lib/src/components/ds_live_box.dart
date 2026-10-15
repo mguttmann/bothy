@@ -175,7 +175,8 @@ class DsLiveBoxState extends State<DsLiveBox> {
   }
 
   TextStyle _mono(BuildContext context) =>
-      dsTextStyle(DsType.codeSm).copyWith(color: context.dsColors.textSecondary);
+      dsTextStyle(DsType.codeSm)
+          .copyWith(color: context.dsColors.textSecondary);
 
   Widget _stateIcon(BuildContext context) => DsIcon(
     dsRunStateGlyph(widget.run.state),
@@ -206,7 +207,10 @@ class DsLiveBoxState extends State<DsLiveBox> {
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: DsSpace.s8),
         decoration: BoxDecoration(
-          border: Border.all(color: colors.dangerBorder, width: DsBorderWidth.hairline),
+          border: Border.all(
+            color: colors.dangerBorder,
+            width: DsBorderWidth.hairline,
+          ),
           borderRadius: BorderRadius.circular(DsRadius.md),
         ),
         child: Row(
@@ -222,7 +226,8 @@ class DsLiveBoxState extends State<DsLiveBox> {
               const SizedBox(width: DsSpace.s4),
               Text(
                 l.liveBoxStop,
-                style: dsTextStyle(DsType.label).copyWith(color: colors.dangerFg),
+                style: dsTextStyle(DsType.label)
+                    .copyWith(color: colors.dangerFg),
               ),
             ],
           ],
@@ -239,7 +244,9 @@ class DsLiveBoxState extends State<DsLiveBox> {
     final mono = _mono(context);
     final visible = widget.visibleSteps!;
     final steps = run.steps;
-    final hidden = _allSteps || steps.length <= visible ? 0 : steps.length - visible;
+    final hidden = _allSteps || steps.length <= visible
+        ? 0
+        : steps.length - visible;
     final shown = steps.sublist(hidden);
 
     final header = Wrap(
@@ -254,17 +261,22 @@ class DsLiveBoxState extends State<DsLiveBox> {
             const SizedBox(width: DsSpace.s6),
             Text(
               dsRunStateWord(l, run),
-              style: dsTextStyle(DsType.label).copyWith(color: colors.textPrimary),
+              style: dsTextStyle(DsType.label)
+                  .copyWith(color: colors.textPrimary),
             ),
           ],
         ),
         Text(f.elapsed(run.elapsed), style: mono),
         if (run.contextPercent != null)
           Text(l.liveBoxContext(f.percent(run.contextPercent!)), style: mono),
-        if (run.tokens != null) Text(l.liveBoxTokens(f.count(run.tokens!)), style: mono),
+        if (run.tokens != null)
+          Text(l.liveBoxTokens(f.count(run.tokens!)), style: mono),
         if (run.cost != null) DsCostText(run.cost!),
         if (run.billingMode != null)
-          DsBillingBadge(mode: run.billingMode!, holderName: run.billingHolderName),
+          DsBillingBadge(
+            mode: run.billingMode!,
+            holderName: run.billingHolderName,
+          ),
         if (widget.onCollapse != null)
           DsTappable(
             onTap: widget.onCollapse,
@@ -290,15 +302,24 @@ class DsLiveBoxState extends State<DsLiveBox> {
       if (code != null) {
         final text = dsReasonText(l, code, name: run.cancelledByName);
         reason = text != null
-            ? Text(text, style: dsTextStyle(DsType.bodySm).copyWith(color: colors.textPrimary))
-            : Text(code, style: dsTextStyle(DsType.codeSm).copyWith(color: colors.textPrimary));
+            ? Text(
+                text,
+                style: dsTextStyle(DsType.bodySm)
+                    .copyWith(color: colors.textPrimary),
+              )
+            : Text(
+                code,
+                style: dsTextStyle(DsType.codeSm)
+                    .copyWith(color: colors.textPrimary),
+              );
       }
     }
 
     final children = <Widget>[
       header,
       ?reason,
-      if ((run.statusLine ?? '').trim().isNotEmpty) DsStatusLine(run.statusLine),
+      if ((run.statusLine ?? '').trim().isNotEmpty)
+        DsStatusLine(run.statusLine),
       if (hidden > 0)
         Align(
           alignment: AlignmentDirectional.centerStart,
@@ -311,7 +332,8 @@ class DsLiveBoxState extends State<DsLiveBox> {
               widthFactor: 1,
               child: Text(
                 l.liveBoxEarlierSteps(hidden),
-                style: dsTextStyle(DsType.label).copyWith(color: context.dsAccent.textLink),
+                style: dsTextStyle(DsType.label)
+                    .copyWith(color: context.dsAccent.textLink),
               ),
             ),
           ),
@@ -322,12 +344,16 @@ class DsLiveBoxState extends State<DsLiveBox> {
           padding: const EdgeInsets.only(left: DsSpace.s8),
           decoration: BoxDecoration(
             border: Border(
-              left: BorderSide(color: colors.borderDefault, width: DsBorderWidth.spine),
+              left: BorderSide(
+                color: colors.borderDefault,
+                width: DsBorderWidth.spine,
+              ),
             ),
           ),
           child: Text(
             run.lastTextExcerpt!,
-            style: dsTextStyle(DsType.bodySm).copyWith(color: colors.textSecondary),
+            style: dsTextStyle(DsType.bodySm)
+                .copyWith(color: colors.textSecondary),
           ),
         ),
       if (run.stalled)
@@ -346,7 +372,8 @@ class DsLiveBoxState extends State<DsLiveBox> {
               Expanded(
                 child: Text(
                   l.liveBoxFollowupHint,
-                  style: dsTextStyle(DsType.caption).copyWith(color: colors.textSecondary),
+                  style: dsTextStyle(DsType.caption)
+                      .copyWith(color: colors.textSecondary),
                 ),
               ),
             ],
@@ -359,7 +386,10 @@ class DsLiveBoxState extends State<DsLiveBox> {
       child: Container(
         decoration: BoxDecoration(
           color: colors.surfaceRaised,
-          border: Border.all(color: colors.borderDefault, width: DsBorderWidth.hairline),
+          border: Border.all(
+            color: colors.borderDefault,
+            width: DsBorderWidth.hairline,
+          ),
           borderRadius: BorderRadius.circular(DsRadius.md),
         ),
         clipBehavior: Clip.antiAlias,
@@ -395,7 +425,8 @@ class DsLiveBoxState extends State<DsLiveBox> {
     final f = dsFormat(context);
     final colors = context.dsColors;
     final run = widget.run;
-    final style = dsTextStyle(DsType.bodySm).copyWith(color: colors.textSecondary);
+    final style = dsTextStyle(DsType.bodySm)
+        .copyWith(color: colors.textSecondary);
     const dot = ' · ';
     return DsTappable(
       onTap: widget.onExpand,
@@ -424,11 +455,16 @@ class DsLiveBoxState extends State<DsLiveBox> {
                     TextSpan(text: l.liveBoxRan(f.durationShort(run.elapsed))),
                     TextSpan(text: '$dot${l.liveBoxTools(run.toolCount)}'),
                     if (run.subagentCount > 0)
-                      TextSpan(text: '$dot${l.liveBoxSubagents(run.subagentCount)}'),
+                      TextSpan(
+                        text: '$dot${l.liveBoxSubagents(run.subagentCount)}',
+                      ),
                     if (run.cost != null) ...[
                       const TextSpan(text: dot),
                       TextSpan(
-                        text: f.money(run.cost!.money.amount, run.cost!.money.currency),
+                        text: f.money(
+                          run.cost!.money.amount,
+                          run.cost!.money.currency,
+                        ),
                         style: _mono(context),
                       ),
                       if (DsCostText.suffix(context, run.cost!) case final s?)
@@ -458,11 +494,17 @@ class DsLiveBoxState extends State<DsLiveBox> {
     final density = context.dsDensity;
     return Container(
       constraints: BoxConstraints(minHeight: density.controlHeight),
-      padding: const EdgeInsets.symmetric(horizontal: DsSpace.s8, vertical: DsSpace.s4),
+      padding: const EdgeInsets.symmetric(
+        horizontal: DsSpace.s8,
+        vertical: DsSpace.s4,
+      ),
       decoration: BoxDecoration(
         color: colors.surfaceRaised,
         border: Border(
-          bottom: BorderSide(color: colors.borderSubtle, width: DsBorderWidth.hairline),
+          bottom: BorderSide(
+            color: colors.borderSubtle,
+            width: DsBorderWidth.hairline,
+          ),
           left: BorderSide(color: spineColor, width: DsBorderWidth.spine),
         ),
       ),
@@ -480,7 +522,8 @@ class DsLiveBoxState extends State<DsLiveBox> {
                   const SizedBox(width: DsSpace.s6),
                   Text(
                     dsRunStateWord(l, run),
-                    style: dsTextStyle(DsType.label).copyWith(color: colors.textPrimary),
+                    style: dsTextStyle(DsType.label)
+                        .copyWith(color: colors.textPrimary),
                   ),
                   const SizedBox(width: DsSpace.s6),
                   Text(f.elapsed(run.elapsed), style: _mono(context)),

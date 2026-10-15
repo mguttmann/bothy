@@ -91,7 +91,10 @@ void main() {
   });
 
   testWidgets('file: and relative links are plain text', (tester) async {
-    await pumpDs(tester, md('[f](file:///etc/passwd) [r](../x) [p](//example.com/x)'));
+    await pumpDs(
+      tester,
+      md('[f](file:///etc/passwd) [r](../x) [p](//example.com/x)'),
+    );
     expect(find.byType(DsMarkdownLink), findsNothing);
   });
 
@@ -116,8 +119,13 @@ void main() {
     expect(opened, [Uri.parse('https://example.com/path')]);
   });
 
-  testWidgets('a focused link shows its domain and opens on Enter', (tester) async {
-    await pumpDs(tester, md('[c](https://example.com/path) and [m](mailto:sam@example.com)'));
+  testWidgets('a focused link shows its domain and opens on Enter', (
+    tester,
+  ) async {
+    await pumpDs(
+      tester,
+      md('[c](https://example.com/path) and [m](mailto:sam@example.com)'),
+    );
     await tester.sendKeyEvent(LogicalKeyboardKey.tab);
     await tester.pumpAndSettle();
     expect(find.text('example.com'), findsOneWidget);
@@ -127,7 +135,9 @@ void main() {
     expect(opened, [Uri.parse('https://example.com/path')]);
   });
 
-  testWidgets('internal references are active and show their path', (tester) async {
+  testWidgets('internal references are active and show their path', (
+    tester,
+  ) async {
     await pumpDs(tester, md('[t](/t/0190?m=1) [c](/c/0191)'));
     expect(find.byType(DsMarkdownLink), findsNWidgets(2));
     await tester.tap(find.byType(DsMarkdownLink).first);
@@ -137,7 +147,10 @@ void main() {
   testWidgets('a link whose text names another domain shows the real one', (
     tester,
   ) async {
-    await pumpDs(tester, md('[https://example.org](https://evil.example.com@example.net/x)'));
+    await pumpDs(
+      tester,
+      md('[https://example.org](https://evil.example.com@example.net/x)'),
+    );
     final link = tester.widget<DsMarkdownLink>(find.byType(DsMarkdownLink));
     expect(link.target, 'example.net');
   });
@@ -157,36 +170,41 @@ void main() {
 
     expect(styleOf('Title')?.fontSize, DsType.heading.fontSize);
     expect(styleOf('Title')?.fontWeight, DsType.heading.fontWeight);
-    expect(styleOf('Small')!.fontSize!, lessThanOrEqualTo(DsType.heading.fontSize!));
+    expect(
+      styleOf('Small')!.fontSize!,
+      lessThanOrEqualTo(DsType.heading.fontSize!),
+    );
   });
 
-  testWidgets('a fenced block scrolls horizontally and copies exactly the code', (
-    tester,
-  ) async {
-    String? copied;
-    tester.binding.defaultBinaryMessenger.setMockMethodCallHandler(
-      SystemChannels.platform,
-      (call) async {
-        if (call.method == 'Clipboard.setData') {
-          copied = (call.arguments as Map)['text'] as String;
-        }
-        return null;
-      },
-    );
-    const code = 'make check && echo "a very long line that does not wrap at all"';
-    await pumpDs(tester, md('```sh\n$code\n```'), width: 240);
-    final scroll = tester.widget<SingleChildScrollView>(
-      find.descendant(
-        of: find.byType(DsMarkdownCodeBlock),
-        matching: find.byType(SingleChildScrollView),
-      ),
-    );
-    expect(scroll.scrollDirection, Axis.horizontal);
-    expect(find.text('sh'), findsOneWidget);
-    final l = await en();
-    await tester.tap(find.bySemanticsLabel(l.markdownCopyCode));
-    expect(copied, code);
-  });
+  testWidgets(
+    'a fenced block scrolls horizontally and copies exactly the code',
+    (tester) async {
+      String? copied;
+      tester.binding.defaultBinaryMessenger.setMockMethodCallHandler(
+        SystemChannels.platform,
+        (call) async {
+          if (call.method == 'Clipboard.setData') {
+            copied = (call.arguments as Map)['text'] as String;
+          }
+          return null;
+        },
+      );
+      const code =
+          'make check && echo "a very long line that does not wrap at all"';
+      await pumpDs(tester, md('```sh\n$code\n```'), width: 240);
+      final scroll = tester.widget<SingleChildScrollView>(
+        find.descendant(
+          of: find.byType(DsMarkdownCodeBlock),
+          matching: find.byType(SingleChildScrollView),
+        ),
+      );
+      expect(scroll.scrollDirection, Axis.horizontal);
+      expect(find.text('sh'), findsOneWidget);
+      final l = await en();
+      await tester.tap(find.bySemanticsLabel(l.markdownCopyCode));
+      expect(copied, code);
+    },
+  );
 
   testWidgets('lists, quotes, tables, tasks, rules and emphasis render', (
     tester,
@@ -204,12 +222,28 @@ void main() {
       ),
     );
     final text = allText(tester);
-    for (final part in ['bold', 'em', 'gone', 'code', 'quote', 'one', 'two', 'first', 'second', 'done', 'open', 'a', '2']) {
+    for (final part in [
+      'bold',
+      'em',
+      'gone',
+      'code',
+      'quote',
+      'one',
+      'two',
+      'first',
+      'second',
+      'done',
+      'open',
+      'a',
+      '2',
+    ]) {
       expect(text, contains(part));
     }
     expect(find.byType(Checkbox), findsNWidgets(2));
     expect(
-      tester.widgetList<Checkbox>(find.byType(Checkbox)).every((c) => c.onChanged == null),
+      tester
+          .widgetList<Checkbox>(find.byType(Checkbox))
+          .every((c) => c.onChanged == null),
       isTrue,
     );
     expect(find.byType(Table), findsOneWidget);

@@ -25,7 +25,10 @@ void main() {
 
   testWidgets('organization: icon, text and label', (tester) async {
     final l = await en();
-    await pumpDs(tester, const DsBillingBadge(mode: DsBillingMode.organization));
+    await pumpDs(
+      tester,
+      const DsBillingBadge(mode: DsBillingMode.organization),
+    );
     expect(find.text(l.billingOrganization), findsOneWidget);
     expect(find.bySemanticsLabel(l.billingLabelOrganization), findsOneWidget);
     final icon = tester.widget<DsIcon>(find.byType(DsIcon));
@@ -33,7 +36,9 @@ void main() {
     expect(icon.color, DsColors.light.badgeOrganizationFg);
   });
 
-  testWidgets('a differing reported mode adds the warning badge', (tester) async {
+  testWidgets('a differing reported mode adds the warning badge', (
+    tester,
+  ) async {
     final l = await en();
     await pumpDs(
       tester,
@@ -68,46 +73,53 @@ void main() {
     expect(find.text(l.billingUnknown('future_mode')), findsOneWidget);
   });
 
-  testWidgets('cost text: Estimate for organization, information only for personal', (
-    tester,
-  ) async {
-    final l = await en();
-    await pumpDs(
-      tester,
-      const DsCostText(
-        DsCost(
-          DsMoney(1.2, 'USD'),
-          mode: DsBillingMode.organization,
-          isEstimate: true,
+  testWidgets(
+    'cost text: Estimate for organization, information only for personal',
+    (tester) async {
+      final l = await en();
+      await pumpDs(
+        tester,
+        const DsCostText(
+          DsCost(
+            DsMoney(1.2, 'USD'),
+            mode: DsBillingMode.organization,
+            isEstimate: true,
+          ),
         ),
-      ),
-    );
-    expect(allText(tester), contains('USD 1.20'));
-    expect(allText(tester), contains(l.costEstimate));
+      );
+      expect(allText(tester), contains('USD 1.20'));
+      expect(allText(tester), contains(l.costEstimate));
 
-    await pumpDs(
-      tester,
-      const DsCostText(
-        DsCost(DsMoney(1.2, 'USD'), mode: DsBillingMode.organization),
-      ),
-    );
-    expect(allText(tester), isNot(contains(l.costEstimate)));
+      await pumpDs(
+        tester,
+        const DsCostText(
+          DsCost(DsMoney(1.2, 'USD'), mode: DsBillingMode.organization),
+        ),
+      );
+      expect(allText(tester), isNot(contains(l.costEstimate)));
 
-    await pumpDs(
-      tester,
-      const DsCostText(DsCost(DsMoney(1.2, 'USD'), mode: DsBillingMode.personal)),
-    );
-    expect(allText(tester), contains(l.costInformationOnly));
+      await pumpDs(
+        tester,
+        const DsCostText(
+          DsCost(DsMoney(1.2, 'USD'), mode: DsBillingMode.personal),
+        ),
+      );
+      expect(allText(tester), contains(l.costInformationOnly));
 
-    final g = await de();
-    await pumpDs(
-      tester,
-      const DsCostText(
-        DsCost(DsMoney(1.2, 'USD'), mode: DsBillingMode.organization, isEstimate: true),
-      ),
-      locale: const Locale('de'),
-    );
-    expect(allText(tester), contains('1,20 USD'));
-    expect(allText(tester), contains(g.costEstimate));
-  });
+      final g = await de();
+      await pumpDs(
+        tester,
+        const DsCostText(
+          DsCost(
+            DsMoney(1.2, 'USD'),
+            mode: DsBillingMode.organization,
+            isEstimate: true,
+          ),
+        ),
+        locale: const Locale('de'),
+      );
+      expect(allText(tester), contains('1,20 USD'));
+      expect(allText(tester), contains(g.costEstimate));
+    },
+  );
 }

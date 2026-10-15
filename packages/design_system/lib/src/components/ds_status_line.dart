@@ -30,10 +30,8 @@ class DsStatusLine extends StatelessWidget {
     if (value.isEmpty) return const SizedBox.shrink();
     final colors = context.dsColors;
     final body = dsTextStyle(DsType.bodySm).copyWith(color: colors.textPrimary);
-    final code = dsTextStyle(DsType.codeSm).copyWith(
-      color: colors.codeFg,
-      backgroundColor: colors.codeBg,
-    );
+    final code = dsTextStyle(DsType.codeSm)
+        .copyWith(color: colors.codeFg, backgroundColor: colors.codeBg);
     final parts = value.split('`');
     return Tooltip(
       message: value,

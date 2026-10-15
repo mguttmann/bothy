@@ -51,10 +51,12 @@ Future<void> pumpDs(
 }
 
 /// The English texts, for expectations.
-Future<AppLocalizations> en() => AppLocalizations.delegate.load(const Locale('en'));
+Future<AppLocalizations> en() =>
+    AppLocalizations.delegate.load(const Locale('en'));
 
 /// The German texts, for expectations.
-Future<AppLocalizations> de() => AppLocalizations.delegate.load(const Locale('de'));
+Future<AppLocalizations> de() =>
+    AppLocalizations.delegate.load(const Locale('de'));
 
 /// Every text of the [RichText] widgets below the root, joined.
 String allText(WidgetTester tester) {
