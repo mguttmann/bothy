@@ -1,6 +1,6 @@
 # Module `audit`
 
-Status: built in part (M1-24, M1-50): the hash chain of `audit_events`, the recorder behind the kernel port `auditing.Recorder` with the audit phase hook, the aggregation of identical denials and the keys of the IP pseudonyms (`audit_ip_keys`) (M1-24); the port `Log` with query, export and verification, the signed checkpoints (`audit_checkpoints`) with the file sink, the job `audit.chain_verify` and the operations `listAuditEvents`, `exportAuditEvents`, `verifyAuditChain` (M1-50). Truncation with an anchor and the destruction of IP keys come with M7, an object storage sink with retention lock with M7-22.
+Status: built in part (M1-24, M1-50, M7-22): the hash chain of `audit_events`, the recorder behind the kernel port `auditing.Recorder` with the audit phase hook, the aggregation of identical denials and the keys of the IP pseudonyms (`audit_ip_keys`) (M1-24); the port `Log` with query, export and verification, the signed checkpoints (`audit_checkpoints`) with the file sink, the job `audit.chain_verify` and the operations `listAuditEvents`, `exportAuditEvents`, `verifyAuditChain` (M1-50). The object store sink with retention lock (`s3://`, M7-22) is built. Truncation with an anchor and the destruction of IP keys come with M7.
 The normative source is [docs/spec/02-architecture.md](../../../../docs/spec/02-architecture.md); if this file differs, the chapter applies.
 
 ## Purpose
@@ -13,11 +13,13 @@ Audit log with hash chain, signed checkpoints, keys of the IP pseudonyms, query,
 |---|---|
 | `internal/audit` | port root package: `Log` (`List`, `Export`, `Verify`) with `Query`, `Page`, `Event`, `EventWriter`, `VerifyRequest`, `VerifyResult`, `WarningSinkNotConfigured` (M1-50) |
 | `internal/kernel/auditing` | the cross-cutting port: `Recorder`, `Entry`, `Decision`, `Reason` with `KnownReasons` (the closed list of 07 "4.1"), the typed values `ID`, `Code`, `Int`, `Bool`, `Time`, `List`, `ReasonText`, `Violations` |
-| `domain/` | `Row`, `CanonicalRow`, `EventJSON`, `ChainHash`, `ZeroHash`, `DetailsV1` with `Validate`, `IPHMAC`, `KeyPeriod`, `SealIPKey` and `OpenIPKey` (AES-256-GCM), `DecodeKEK`, the aggregation `Aggregation` with `AggregateKey` and `Bucket` (time always passed in); the chain walk `Walk` with `Failure`, `FailureReason` and `FirstFailure` (`verify.go`), the checkpoint payload `Checkpoint` with `NewCheckpoint`, `Canonical`, `ParseCheckpoint`, `CheckpointDigest` and the check of the sink chain `CheckCheckpoints` (`checkpoint.go`), `ParseSink` (`sink.go`) |
+| `domain/` | `Row`, `CanonicalRow`, `EventJSON`, `ChainHash`, `ZeroHash`, `DetailsV1` with `Validate`, `IPHMAC`, `KeyPeriod`, `SealIPKey` and `OpenIPKey` (AES-256-GCM), `DecodeKEK`, the aggregation `Aggregation` with `AggregateKey` and `Bucket` (time always passed in); the chain walk `Walk` with `Failure`, `FailureReason` and `FirstFailure` (`verify.go`), the checkpoint payload `Checkpoint` with `NewCheckpoint`, `Canonical`, `ParseCheckpoint`, `CheckpointDigest` and the check of the sink chain `CheckCheckpoints` (`checkpoint.go`), `ParseSink` with `Sink`, `SinkKind` and `ValidBucket` (`sink.go`) |
 | `app/` | `Recorder` (implements `auditing.Recorder`), `Chain` (audit phase hook), `Aggregator` (`Run`, `FlushDue`, `Flush`), `Keyring`; `Log` (implements `audit.Log`: `query.go`, `export.go`, `verify.go`, and `RunCheckpoint`, the job, in `checkpoint_job.go`), `NoSink`; outgoing ports `Store`, `KEKSource`, `Reporter`, `CheckpointSink`, `Cursors`, `Metrics` |
 | `adapters/postgres/` | `Repository` over `platform/pg`, sqlc queries in `queries/audit.sql`, generated code in `sqlcgen/` (entry in `services/server/sqlc.yaml`) |
 | `adapters/logs/` | `Reporter` over the server logger: constant messages, catalogue keys only |
 | `adapters/filesink/` | `Sink`, the `file://` implementation of `CheckpointSink` |
+| `adapters/s3sink/` | `Sink`, the `s3://` implementation of `CheckpointSink` over an S3-compatible object store with `Config`, `New` and the lock check `CheckLock` (M7-22); the second and last package that imports the AWS SDK |
+| `app/sinktest/` | `Run`, the conformance suite of `CheckpointSink` that `filesink` and `s3sink` pass (only tests import it, `TestFilestestNotInBinary`) |
 | `adapters/jobs/` | the periodic job `audit.chain_verify` on the queue `maintenance` |
 | `adapters/httpapi/` | the handlers of `listAuditEvents`, `exportAuditEvents`, `verifyAuditChain` and the cursor codec `Cursors` |
 | `adapters/otelmetrics/` | `bothy.audit.verify.failures` and `bothy.audit.verify.last_success.timestamp` |
@@ -139,13 +141,34 @@ signed with the active key of purpose `audit_checkpoint` (`instance.Keys.Signer`
 `previous_checkpoint_hash` is the SHA-256 of the previous canonical payload and absent for the
 first. `audit_checkpoints.signature` holds the whole JWS.
 
-`audit.checkpoint_sink` is empty (`NoSink`) or `file://<absolute path>` (`ParseSink`; the cross-check
-`audit_checkpoint_sink` of `bothy config check` refuses every other value, also percent escapes and names the supported
-scheme). The file sink writes `<path>/<instance_id>/<seq with 20 digits>.jws`, directory `0700`,
+`audit.checkpoint_sink` is empty (`NoSink`), `file://<absolute path>` or `s3://<bucket>[/<prefix>]`
+(`ParseSink` returns a `Sink` with its `SinkKind`; the cross-check `audit_checkpoint_sink` of `bothy
+config check` refuses every other value, also percent escapes, and names the supported schemes). The file sink writes `<path>/<instance_id>/<seq with 20 digits>.jws`, directory `0700`,
 file `0600`: a temporary file with `O_EXCL`, synced, then a hard link to the name, which fails when
 the name exists, then `fsync` of the directory. The same content again is accepted, other content
 is an error and the file stays. `<path>` must exist: the sink never creates it. The file system
 must support hard links; a link in place of the directory or of a file is refused.
+
+### Object store sink (M7-22)
+
+`audit.checkpoint_sink = s3://<bucket>[/<prefix>]` selects `adapters/s3sink` (`wire.CheckpointSink`
+selects the sink by scheme). Every checkpoint is the object `[<prefix>/]<instance_id>/<seq with 20
+digits>.jws`. `Put` reads the oldest version of the key first (the same bytes count as stored,
+other bytes are `ErrCheckpointConflict`), then writes with `If-None-Match: *`; on a refusal of a
+concurrent writer the stored bytes decide the same way. `List` pages through `ListObjectVersions`
+below `[<prefix>/]<instance_id>/`, takes the oldest version of every checkpoint key (delete
+markers are skipped) and returns the checkpoints in `seq` order. A process reads every version once: the bodies stay
+in memory by key and version ID, and new ones are read with at most 16 concurrent GETs
+(docs/DECISIONS.md M7-22/7), so a run of the job costs one listing and the new checkpoints. The bucket must have Object Lock
+with a default retention in mode `COMPLIANCE` of at least `retention.audit`: `CheckLock` reads it,
+and `bothy config check` (`wire.CheckCheckpointSink`) and the start step `audit_log` fail
+otherwise. The sink has its own endpoint, region, path style and credentials
+(`audit.checkpoint_s3_*`), goes through the egress client with purpose `audit_checkpoint`
+(`egress.timeout`, `egress.max_response_bytes`), never uses the default configuration or
+credential chain of the SDK, and holds only `PutObject`, `GetObject`, `ListObjectVersions` and
+`GetObjectLockConfiguration`. Its errors name the operation and the S3 code or status, never
+the endpoint or credentials. The tests run against the SeaweedFS image the files driver pins
+(docs/DECISIONS.md M7-22/2).
 
 ### Job `audit.chain_verify`
 
@@ -192,7 +215,8 @@ allow entry (20: every read of the log is audited).
   row is found by `verifyAuditChain` against the sink, not by the job and its alert.
 - Whoever controls both the database and the sink can rewrite both (threat model T-DB-01); the
   removal of the newest checkpoint files together with a rewrite of the rows after the remaining
-  ones is not detectable. An object storage sink with retention lock (M7-22) closes this.
+  ones is not detectable. The object store sink with retention lock (M7-22) closes this for a
+  bucket in mode `COMPLIANCE`, whose objects nobody can delete or replace before the period ends.
 - Until the anchors of M7 every walk from the first retained row starts at row 1, so a log whose
   first rows are gone is `seq_gap` at 1; the retention trim of M7 changes this rule with its
   anchors.
@@ -220,6 +244,8 @@ allow entry (20: every read of the log is audited).
 May use the ports of these modules: `instance`.
 
 Reason: counter `audit_seq`; the signing keys of purpose `audit_checkpoint` (`instance.Keys`, M1-50).
+
+Vendor (go-arch-lint `adapter_vendors`): `awssdk` for `adapters/s3sink` (M7-22); depguard narrows it to that one adapter.
 
 In addition, for all modules: `internal/kernel`; `internal/platform` and `api/` only in `adapters/`.
 Checked by go-arch-lint (ADR 0008).

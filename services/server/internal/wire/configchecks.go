@@ -10,6 +10,7 @@ import (
 	"net/url"
 	"time"
 
+	"github.com/OWNER/bothy/services/server/internal/audit/adapters/s3sink"
 	auditdomain "github.com/OWNER/bothy/services/server/internal/audit/domain"
 	identityapp "github.com/OWNER/bothy/services/server/internal/identity/app"
 	"github.com/OWNER/bothy/services/server/internal/platform/config"
@@ -38,7 +39,8 @@ var configChecks = []configCheck{
 	{name: "tls_https", keys: []string{keyPublicURL, keyTLSCertRef, keyTLSKeyRef}, fn: tlsHTTPS},
 	{name: "hsts_whole_seconds", keys: []string{"http.hsts_max_age"}, fn: hstsWholeSeconds},
 	{name: "audit_ip_key_retention", keys: []string{"privacy.audit_ip_key_period", "privacy.audit_ip_key_retention"}, fn: auditIPKeyRetention},
-	{name: "audit_checkpoint_sink", keys: []string{keyCheckpointSink}, fn: auditCheckpointSink},
+	{name: "audit_checkpoint_sink", keys: []string{keyCheckpointSink, keyCheckpointS3Endpoint, keyCheckpointS3Region,
+		keyCheckpointS3PathStyle, keyEgressAllowedHosts}, fn: auditCheckpointSink},
 	{name: "file_fs_root_absolute", keys: []string{keyStorageDriver, "file.fs.root"}, fn: fileFSRootAbsolute},
 	{name: "file_s3", keys: []string{keyStorageDriver, "file.s3.endpoint", "file.s3.region", "file.s3.bucket", "file.s3.prefix",
 		"file.s3.use_path_style", "file.s3.checksum_mode", keyEgressAllowedHosts}, fn: fileS3},
@@ -126,11 +128,26 @@ func auditIPKeyRetention(v *config.Values) error {
 	return nil
 }
 
-// auditCheckpointSink requires audit.checkpoint_sink to be empty or file://<absolute path> (19
-// section 16, M1-50); the message names the supported scheme and never the value.
+// auditCheckpointSink requires audit.checkpoint_sink to be empty, file://<absolute path> or
+// s3://<bucket>[/<prefix>] (19 section 16); with s3:// it fills s3sink.Config from the three
+// non-secret keys audit.checkpoint_s3_* and runs Config.Validate against the parsed entries of
+// egress.allowed_hosts (M7-22), so an http endpoint without an allow_private entry fails at load.
+// The lock of the bucket needs a request; CheckCheckpointSink and the start check it. Entries of
+// egress.allowed_hosts that do not parse are the problem of the check egress_allowed_hosts.
 func auditCheckpointSink(v *config.Values) error {
-	_, err := auditdomain.ParseSink(v.String(keyCheckpointSink))
-	return err
+	target, err := auditdomain.ParseSink(v.String(keyCheckpointSink))
+	if err != nil || target.Kind != auditdomain.SinkS3 {
+		return err
+	}
+	cfg := s3sink.Config{
+		Bucket: target.Bucket, Prefix: target.Prefix, Endpoint: v.String(keyCheckpointS3Endpoint),
+		Region: v.String(keyCheckpointS3Region), UsePathStyle: v.Bool(keyCheckpointS3PathStyle),
+	}
+	rules, err := egressRules(v.Strings(keyEgressAllowedHosts))
+	if err != nil {
+		return nil //nolint:nilerr // reported by egress_allowed_hosts
+	}
+	return cfg.Validate(rules)
 }
 
 // publicURLOrigin requires server.public_url to be an origin: scheme, host, optional port and

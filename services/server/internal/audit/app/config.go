@@ -26,8 +26,8 @@ type Config struct {
 	// CheckpointInterval is audit.checkpoint_interval: the period of the job audit.chain_verify,
 	// which signs the next checkpoint (19 SEC-AUD-2).
 	CheckpointInterval time.Duration `config:"audit.checkpoint_interval"`
-	// CheckpointSink is audit.checkpoint_sink: empty (no sink, a permanent warning) or
-	// file://<absolute path> (19 section 16, ParseSink).
+	// CheckpointSink is audit.checkpoint_sink: empty (no sink, a permanent warning),
+	// file://<absolute path> or s3://<bucket>[/<prefix>] (19 section 16, ParseSink).
 	CheckpointSink string `config:"audit.checkpoint_sink"`
 	// PageSizeDefault is api.page_size_default: the page of listAuditEvents without limit.
 	PageSizeDefault int `config:"api.page_size_default"`

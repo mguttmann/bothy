@@ -62,6 +62,10 @@ no batch delete, no versioning, no bucket policies. Details:
   `TestFSConformance` (M3-01), the S3 driver follows with M3-02.
 - The S3 driver depends only on a Go interface with exactly the core S3 operations; an
   architecture rule allows the import of the S3 SDK only in `internal/files/adapters/s3`.
+  Since M7-22 the rule allows exactly one more package, the object store sink of the audit
+  checkpoints `internal/audit/adapters/s3sink`, with its own narrow interface (`PutObject`,
+  `GetObject`, `ListObjectVersions`, `GetObjectLockConfiguration`); depguard rule
+  `aws-sdk-only-in-s3-driver` and `TestS3SDKOnlyInAdapter` name both packages.
 - A property test checks that no object key contains channel IDs, space IDs or
   names.
   The property test is `TestObjectKeysCarryNoContext` in

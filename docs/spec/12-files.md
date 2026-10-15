@@ -372,9 +372,11 @@ S3 driver rules (M3-02, `internal/files/adapters/s3`, docs/DECISIONS.md M3-02/1 
 - Core S3 only: the driver holds a Go interface with exactly `PutObject`, `GetObject`,
   `HeadObject`, `DeleteObject`, `CreateMultipartUpload`, `UploadPart`,
   `CompleteMultipartUpload`, `AbortMultipartUpload` and a presign interface with only
-  `PresignUploadPart`. Only this package imports the AWS SDK (depguard in `make lint`,
+  `PresignUploadPart`. Only this package and the audit checkpoint sink
+  `internal/audit/adapters/s3sink` (M7-22) import the AWS SDK (depguard in `make lint`,
   `TestS3SDKOnlyInAdapter`); forbidigo forbids `DeleteObjects` and `PresignGetObject`. No request
-  sets server-side encryption, ACL, tagging, object lock, storage class or conditional headers.
+  of the files driver sets server-side encryption, ACL, tagging, object lock, storage class or
+  conditional headers.
 - `file.s3.endpoint` is required; the driver never uses the endpoint resolution, the default
   configuration or the credential chain of the SDK (environment, shared files, instance
   metadata, whose address SEC-NET-3 always blocks).
@@ -403,6 +405,15 @@ S3 driver rules (M3-02, `internal/files/adapters/s3`, docs/DECISIONS.md M3-02/1 
   contain a request URL, a query, a presigned URL, the endpoint or credentials. A `HEAD` answer
   has no body, so `Head` on a missing bucket reads as `ErrNotFound`; `Get` reports `NoSuchBucket`
   as a storage failure.
+
+The second package that may import the AWS SDK (M7-22, docs/DECISIONS.md M7-22/4) is the object
+store sink of the audit checkpoints, `internal/audit/adapters/s3sink`
+([19-security.md](19-security.md) section 16, `audit.checkpoint_sink = s3://...`). It holds a
+Go interface with only `PutObject` (with `If-None-Match: *`), `GetObject`, `ListObjectVersions`
+and `GetObjectLockConfiguration` (`TestAPIMethodSet`), and follows the egress and credential rules
+above with its own keys (`audit.checkpoint_s3_*`, purpose `audit_checkpoint`, the limits
+`egress.timeout` and `egress.max_response_bytes`). The rules of this section stay unchanged for
+the files driver.
 
 ### 4.4 Key schema
 
@@ -813,7 +824,7 @@ signature names only in the audit log.
 | Test | Holds |
 |---|---|
 | Driver conformance: the same test suite against the file system and against SeaweedFS (testcontainers) | port contract, ranges, multipart, deletion of missing objects |
-| The S3 driver depends only on a Go interface with the port operations; architecture rule: only `internal/files/adapters/s3` imports the S3 SDK | "core S3 only", no `DeleteObjects` |
+| The S3 driver depends only on a Go interface with the port operations; architecture rule: only `internal/files/adapters/s3` imports the S3 SDK (and, since M7-22, the audit checkpoint sink `internal/audit/adapters/s3sink`) | "core S3 only", no `DeleteObjects` |
 | EICAR test file against a real clamd container | `infected`, never servable, objects deleted, audit entry |
 | clamd stopped | file stays `pending`, `409 file_not_ready`; after the start `clean` |
 | Archive above `MaxRecursion` | `Heuristics.Limits.Exceeded` becomes `error`, not `clean` |

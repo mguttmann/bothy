@@ -87,7 +87,8 @@ type SignedCheckpoint struct {
 
 // CheckpointSink is the place outside the database where the checkpoints lie
 // (audit.checkpoint_sink, 19 SEC-AUD-2 and SEC-AUD-7); adapters/filesink implements file://,
-// NoSink stands for the empty value. Implementations are safe for concurrent use.
+// adapters/s3sink s3:// (M7-22), NoSink stands for the empty value. Every implementation passes
+// the conformance suite app/sinktest. Implementations are safe for concurrent use.
 type CheckpointSink interface {
 	// Configured reports whether a sink is set; without one no checkpoint leaves the database
 	// and every verification carries the warning checkpoint_sink_not_configured.
@@ -95,7 +96,8 @@ type CheckpointSink interface {
 	// Put stores c once. The same content again is accepted; other content for a stored seq is
 	// an error wrapping ErrCheckpointConflict and the stored checkpoint stays.
 	Put(ctx context.Context, c SignedCheckpoint) error
-	// List returns every stored checkpoint; the order is the sink's.
+	// List returns every stored checkpoint in seq order. It verifies nothing; verification
+	// stays in audit/domain.
 	List(ctx context.Context) ([]SignedCheckpoint, error)
 }
 

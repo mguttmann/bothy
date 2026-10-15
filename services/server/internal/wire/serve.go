@@ -28,6 +28,7 @@ import (
 	"github.com/OWNER/bothy/services/server/internal/kernel/clock"
 	"github.com/OWNER/bothy/services/server/internal/platform/buildinfo"
 	"github.com/OWNER/bothy/services/server/internal/platform/config"
+	"github.com/OWNER/bothy/services/server/internal/platform/egress"
 	"github.com/OWNER/bothy/services/server/internal/platform/health"
 	"github.com/OWNER/bothy/services/server/internal/platform/httpserver"
 	"github.com/OWNER/bothy/services/server/internal/platform/jobs"
@@ -715,8 +716,10 @@ func fill[T any](dst **T, built *T) {
 
 // startAuditLog is the second extension point of start step 7 (M1-50): the query, export and
 // verification of the audit log and the job audit.chain_verify over the signing keys of the
-// previous step, the Authorizer and the instance ID. Processes that run jobs write the warning
-// audit_checkpoint_sink_not_configured once here when no sink is configured (19 SEC-AUD-2).
+// previous step, the Authorizer and the instance ID. The sink of audit.checkpoint_sink is built
+// here; an object store target without an effective retention lock stops the start (M7-22).
+// Processes that run jobs write the warning audit_checkpoint_sink_not_configured once here when
+// no sink is configured (19 SEC-AUD-2).
 func (s *server) startAuditLog(ctx context.Context) error {
 	s.mu.Lock()
 	a, keys, az, rec := s.audit, s.signingKeys, s.authorizer, s.instance
@@ -724,7 +727,11 @@ func (s *server) startAuditLog(ctx context.Context) error {
 	if a == nil || keys == nil || az == nil {
 		return errors.New("wire: the audit log needs the audit step, the signing keys and the Authorizer")
 	}
-	if err := a.BindLog(keys.Keys, az, rec.InstanceID, s.deps.Clock); err != nil {
+	sink, err := CheckpointSink(ctx, s.values, rec.InstanceID, CheckpointSinkDeps{Secrets: s.sp, Egress: egress.Deps{Logger: s.logger()}})
+	if err != nil {
+		return err
+	}
+	if err := a.BindLog(keys.Keys, az, rec.InstanceID, s.deps.Clock, sink); err != nil {
 		return err
 	}
 	if s.worker() {

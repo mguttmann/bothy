@@ -16,6 +16,7 @@ import (
 
 	"github.com/OWNER/bothy/services/server/internal/audit/adapters/filesink"
 	"github.com/OWNER/bothy/services/server/internal/audit/app"
+	"github.com/OWNER/bothy/services/server/internal/audit/app/sinktest"
 	"github.com/OWNER/bothy/services/server/internal/kernel/ids"
 )
 
@@ -205,4 +206,15 @@ func TestSinkRefusesLinksAndWideModes(t *testing.T) {
 	if _, err := s2.List(ctx); err == nil {
 		t.Error("List followed a link in place of the directory")
 	}
+}
+
+// TestConformance runs the conformance suite of app.CheckpointSink against the file sink
+// (M7-22, Design note 3).
+func TestConformance(t *testing.T) {
+	t.Parallel()
+	sinktest.Run(t, func(t *testing.T) app.CheckpointSink {
+		t.Helper()
+		s, _, _ := newSink(t)
+		return s
+	})
 }

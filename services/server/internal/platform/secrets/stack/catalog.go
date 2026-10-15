@@ -94,6 +94,10 @@ var catalog = []Entry{
 	// Generated only with the s3 profile, whose generator M3 builds; until then supplied.
 	{Name: "s3_access_key", Origin: OriginSupplied, Generator: GeneratorPending, PendingOn: "M3", Services: []string{serviceServer, serviceSeaweedfs, serviceBackup}},
 	{Name: "s3_secret_key", Origin: OriginSupplied, Generator: GeneratorPending, PendingOn: "M3", Services: []string{serviceServer, serviceSeaweedfs, serviceBackup}},
+	// The own key of the object store of the audit checkpoints, from a separate account (M7-22);
+	// only the server reads it.
+	{Name: "audit_checkpoint_s3_access_key", Origin: OriginSupplied, Services: []string{serviceServer}},
+	{Name: "audit_checkpoint_s3_secret_key", Origin: OriginSupplied, Services: []string{serviceServer}},
 	{Name: "grafana_admin_password", Origin: OriginGenerated, Generator: GeneratorToken, Services: []string{serviceGrafana}},
 	{Name: "apns_key.p8", Origin: OriginSupplied, Services: []string{serviceServer}},
 	{Name: "fcm_service_account.json", Origin: OriginSupplied, Services: []string{serviceServer}},

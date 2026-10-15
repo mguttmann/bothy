@@ -74,6 +74,66 @@
       "doc": "Interval of the job audit.chain_verify, which recomputes the audit chain and signs the next checkpoint."
     },
     {
+      "name": "audit.checkpoint_s3_access_key_ref",
+      "env": "BOTHY_AUDIT__CHECKPOINT_S3_ACCESS_KEY_REF",
+      "kind": "secret_ref",
+      "default": "file:<secrets.dir>/audit_checkpoint_s3_access_key",
+      "required": false,
+      "enum": [],
+      "min": "",
+      "max": "",
+      "chapter": "19-security.md",
+      "doc": "Secret reference of the access key ID of the object store of the audit checkpoints, read only with an s3:// sink."
+    },
+    {
+      "name": "audit.checkpoint_s3_endpoint",
+      "env": "BOTHY_AUDIT__CHECKPOINT_S3_ENDPOINT",
+      "kind": "string",
+      "default": "",
+      "required": false,
+      "enum": [],
+      "min": "",
+      "max": "",
+      "chapter": "19-security.md",
+      "doc": "Endpoint of the object store of the audit checkpoints, an absolute http or https URL without path, required with an s3:// sink."
+    },
+    {
+      "name": "audit.checkpoint_s3_region",
+      "env": "BOTHY_AUDIT__CHECKPOINT_S3_REGION",
+      "kind": "string",
+      "default": "us-east-1",
+      "required": false,
+      "enum": [],
+      "min": "",
+      "max": "",
+      "chapter": "19-security.md",
+      "doc": "Region of the S3 signature of the object store of the audit checkpoints."
+    },
+    {
+      "name": "audit.checkpoint_s3_secret_key_ref",
+      "env": "BOTHY_AUDIT__CHECKPOINT_S3_SECRET_KEY_REF",
+      "kind": "secret_ref",
+      "default": "file:<secrets.dir>/audit_checkpoint_s3_secret_key",
+      "required": false,
+      "enum": [],
+      "min": "",
+      "max": "",
+      "chapter": "19-security.md",
+      "doc": "Secret reference of the secret access key of the object store of the audit checkpoints, read only with an s3:// sink."
+    },
+    {
+      "name": "audit.checkpoint_s3_use_path_style",
+      "env": "BOTHY_AUDIT__CHECKPOINT_S3_USE_PATH_STYLE",
+      "kind": "bool",
+      "default": "true",
+      "required": false,
+      "enum": [],
+      "min": "",
+      "max": "",
+      "chapter": "19-security.md",
+      "doc": "Path-style requests to the object store of the audit checkpoints instead of virtual-hosted requests on <bucket>.<endpoint host>."
+    },
+    {
       "name": "audit.checkpoint_sink",
       "env": "BOTHY_AUDIT__CHECKPOINT_SINK",
       "kind": "string",
@@ -83,7 +143,7 @@
       "min": "",
       "max": "",
       "chapter": "19-security.md",
-      "doc": "Where the signed audit checkpoints are stored outside the database: empty (a permanent warning) or file://<absolute path> on storage outside the database volume."
+      "doc": "Where the signed audit checkpoints are stored outside the database: empty (a permanent warning), file://<absolute path> on storage outside the database volume, or s3://<bucket>[/<prefix>] in an object store with a retention lock."
     },
     {
       "name": "audit.deny_aggregate_max_keys",
@@ -1741,6 +1801,18 @@
       "max": "1h",
       "chapter": "02-architecture.md",
       "doc": "Interval in which full rate-limit buckets are removed; a full bucket decides like a missing one."
+    },
+    {
+      "name": "retention.audit",
+      "env": "BOTHY_RETENTION__AUDIT",
+      "kind": "duration",
+      "default": "365d",
+      "required": false,
+      "enum": [],
+      "min": "1d",
+      "max": "",
+      "chapter": "20-privacy.md",
+      "doc": "How long the audit log is kept before it is trimmed with an anchor."
     },
     {
       "name": "secrets.cache_ttl",

@@ -143,7 +143,11 @@ func TestConfigPrintNeverShowsSecrets(t *testing.T) {
 	skipped := ": skipped (read only by bothy migrate up --bootstrap)\n"
 	// The keys of the S3 driver are read only with file.storage.driver = s3 (12 "18.").
 	s3Skipped := ": skipped (read only with file.storage.driver = s3)\n"
-	want = "secret auth.token_pepper_ref: ok\n" +
+	// The keys of the object store sink are read only with an s3:// audit.checkpoint_sink (M7-22).
+	sinkSkipped := ": skipped (read only with audit.checkpoint_sink = s3://)\n"
+	want = "secret audit.checkpoint_s3_access_key_ref" + sinkSkipped +
+		"secret audit.checkpoint_s3_secret_key_ref" + sinkSkipped +
+		"secret auth.token_pepper_ref: ok\n" +
 		"secret database.password_ref: ok\n" +
 		"secret file.s3.access_key_ref" + s3Skipped +
 		"secret file.s3.secret_key_ref" + s3Skipped +

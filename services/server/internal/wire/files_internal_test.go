@@ -9,7 +9,8 @@ import (
 	"testing"
 )
 
-// TestFilestestNotInBinary keeps the conformance suite of the files module out of the binary
+// TestFilestestNotInBinary keeps the conformance suites of the files module and of the audit
+// checkpoint sinks (M7-22) out of the binary
 // (02 "6. Code-Layout"; pattern of M1-33).
 func TestFilestestNotInBinary(t *testing.T) {
 	t.Parallel()
@@ -18,7 +19,7 @@ func TestFilestestNotInBinary(t *testing.T) {
 		t.Fatalf("go list -deps does not list internal/wire; the check would prove nothing")
 	}
 	for _, d := range deps {
-		if strings.HasSuffix(d, "/filestest") {
+		if strings.HasSuffix(d, "/filestest") || strings.HasSuffix(d, "/sinktest") {
 			t.Errorf("cmd/bothy depends on %s", d)
 		}
 	}
