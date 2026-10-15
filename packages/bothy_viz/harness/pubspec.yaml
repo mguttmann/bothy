@@ -1,0 +1,27 @@
+# SPDX-License-Identifier: Apache-2.0
+name: bothy_viz_harness
+description: >-
+  Harness app of bothy_viz: every mark (and from M6-12 every view) from the fixtures, without a
+  server, with switches for theme, density, text size, language, fixture state and time-lapse.
+version: 0.0.0
+publish_to: none
+resolution: workspace
+
+environment:
+  sdk: ^3.13.5
+  flutter: 3.47.7
+
+# The members of bothy_viz plus bothy_viz itself (tools/arch-check/rules.yaml).
+dependencies:
+  api_client: any
+  bothy_viz: any
+  design_system: any
+  domain: any
+  flutter:
+    sdk: flutter
+  l10n: any
+
+dev_dependencies:
+  flutter_lints: ^6.0.0
+  flutter_test:
+    sdk: flutter

@@ -136,6 +136,7 @@
   "vizTileDown": "{delta} weniger als im Vorzeitraum",
   "vizTileSame": "wie im Vorzeitraum",
   "vizNotShown": "nicht angezeigt",
+  "vizStale": "Keine neuen Daten",
   "vizHarnessTitle": "Testumgebung der Visualisierungen",
   "vizHarnessTheme": "Design",
   "vizHarnessThemeLight": "Hell",

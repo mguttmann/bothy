@@ -508,6 +508,9 @@ class AppLocalizationsDe extends AppLocalizations {
   String get vizNotShown => 'nicht angezeigt';
 
   @override
+  String get vizStale => 'Keine neuen Daten';
+
+  @override
   String get vizHarnessTitle => 'Testumgebung der Visualisierungen';
 
   @override

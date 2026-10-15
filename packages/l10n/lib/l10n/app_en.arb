@@ -670,6 +670,10 @@
   "@vizNotShown": {
     "description": "Screen reader text for a value the server did not deliver (no permission); never read as zero (25 section 4 rule 5)."
   },
+  "vizStale": "No new data",
+  "@vizStale": {
+    "description": "Marker of a live view when no frame arrived for viz.stale_after (25 section 5.1)."
+  },
   "vizHarnessTitle": "Visualization harness",
   "@vizHarnessTitle": {
     "description": "Title of the harness app of bothy_viz (25 section 7.1)."

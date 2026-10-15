@@ -500,6 +500,9 @@ class AppLocalizationsEn extends AppLocalizations {
   String get vizNotShown => 'not shown';
 
   @override
+  String get vizStale => 'No new data';
+
+  @override
   String get vizHarnessTitle => 'Visualization harness';
 
   @override
