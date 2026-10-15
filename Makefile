@@ -548,6 +548,38 @@ release-prep: ## Prepare a component release (ADR 0060): make release-prep COMPO
 	@gc=$(call tool,git-cliff) || exit 1; \
 	$(UVRUN) python tools/ci/release_prep.py --component "$$COMPONENT" --channel "$${CHANNEL:-stable}" --git-cliff "$$gc"
 
+# Trial release (D-W-127): the release steps of a component against a local registry on
+# 127.0.0.1, a throwaway cosign key pair and a temporary directory, then the verification an
+# instance operator runs. Never under GitHub Actions; never a tag, a release or a remote push.
+# TRIAL_PLATFORMS narrows the platforms (default: linux/amd64,linux/arm64).
+TRIAL_PLATFORMS ?=
+release-trial: ## Trial release against local throwaway targets: make release-trial COMPONENT=server
+	@[ -n "$${COMPONENT:-}" ] || { echo "usage: make release-trial COMPONENT=server [TRIAL_PLATFORMS=linux/amd64,linux/arm64]"; exit 2; }
+	@[ -z "$${GITHUB_ACTIONS:-}" ] || { echo "release-trial: refuses to run under GitHub Actions" >&2; exit 2; }
+	@docker buildx version >/dev/null 2>&1 || { echo "release-trial: docker buildx is required (CONTRIBUTING.md)" >&2; exit 1; }
+	@cosign=$(call tool,cosign) && syft=$(call tool,syft) || exit 1; \
+	$(UVRUN) python tools/ci/release_trial.py --component "$$COMPONENT" --cosign "$$cosign" --syft "$$syft" \
+	  $(if $(TRIAL_PLATFORMS),--platforms '$(TRIAL_PLATFORMS)')
+
+# License and copyright scan of the tracked tree before every release (docs/quality/licenses.md
+# section 4). ScanCode runs in a container built from tools/scancode/Dockerfile (base image by
+# digest, release archive by sha256); its native parts exist for linux/amd64 only, so on an arm64
+# host it runs emulated and slowly. Not a pull request gate: a run over the whole tree takes long.
+SCANCODE_VERSION := $(shell sed -n 's/^ARG SCANCODE_VERSION=//p' tools/scancode/Dockerfile)
+SCANCODE_IMAGE ?= bothy-scancode:$(SCANCODE_VERSION)-local
+SCANCODE_OUT ?= .cache/scancode
+scancode: ## ScanCode over the tracked tree with the license gate (release step): make scancode [SCANCODE_OUT=<dir>]
+	@docker buildx version >/dev/null 2>&1 || { echo "scancode: docker buildx is required (CONTRIBUTING.md)" >&2; exit 1; }
+	docker buildx build --platform linux/amd64 --load --tag '$(SCANCODE_IMAGE)' tools/scancode
+	@mkdir -p '$(SCANCODE_OUT)' || exit 1; out=$$(cd '$(SCANCODE_OUT)' && pwd) || exit 1; \
+	tree=$$(mktemp -d "$${TMPDIR:-/tmp}/bothy-scancode.XXXXXX") || exit 1; trap 'rm -rf "$$tree"' EXIT; \
+	git archive HEAD | tar -x -C "$$tree" || exit 1; \
+	docker run --rm --platform linux/amd64 --user "$$(id -u):$$(id -g)" --network none \
+	  -v "$$tree:/scan/tree:ro" -v "$$out:/scan/out" '$(SCANCODE_IMAGE)' \
+	  --license --copyright --strip-root --processes 4 --timeout 300 --quiet \
+	  --json-pp /scan/out/scancode.json /scan/tree || exit 1; \
+	$(UVRUN) python tools/ci/scancode_policy.py --report "$$out/scancode.json"
+
 # ---- server image (ADR 0012; not part of `gates`: needs Docker with buildx, see CONTRIBUTING.md) --
 # The release (M7) and the Compose smoke test (M1-73) start from `make image`. The local tag is
 # `<version>-local`, never `latest` (docs/spec/18-release.md "Channels" rule 3).

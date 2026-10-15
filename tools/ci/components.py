@@ -6,7 +6,8 @@ component-specific gates only for the listed ones; repository-wide gates always 
 A change outside every known area selects `all` (fail safe).
 
 Release components map a tag `<component>/v<semver>` (or `v<semver>` for the whole
-product) to a directory with its own VERSION file (docs/spec/18-release.md).
+product) to a directory with its own VERSION file and a CHANGELOG.md with a section for that
+version (docs/spec/18-release.md); `release` rejects the tag otherwise.
 
 The product bundle pins the server version in the line `BOTHY_VERSION=` of
 infra/compose/.env.example (docs/spec/18-release.md, 2.1). `pins` checks the committed state
@@ -179,6 +180,14 @@ def release_info(tag: str, repo: Path) -> dict[str, Any]:
     recorded = version_file.read_text(encoding="utf-8").strip()
     if recorded != version:
         raise ReleaseError(f"{directory}/VERSION says {recorded}, tag says {version}")
+    # The release notes come from this section; without it nothing may be built or published
+    # (ADR 0036 "Confirmation", ADR 0060).
+    changelog = repo / directory / "CHANGELOG.md"
+    if not changelog.is_file():
+        raise ReleaseError(f"{directory}/CHANGELOG.md is missing")
+    heading = re.compile(rf"^## \[{re.escape(version)}\]", re.MULTILINE)
+    if not heading.search(changelog.read_text(encoding="utf-8")):
+        raise ReleaseError(f"{directory}/CHANGELOG.md has no section [{version}]")
     return {
         "component": component,
         "version": version,

@@ -1,0 +1,10 @@
+# SPDX-License-Identifier: Apache-2.0
+#
+# Paths of the tracked tree whose ScanCode findings were reviewed once and do not stop a
+# release (docs/quality/licenses.md section 4, `make scancode`). One entry per line:
+# `<pattern> | <reason>`; the pattern is an fnmatch pattern on the repository path, where `*`
+# also matches `/`. Only text that names or quotes a license without licensing the file goes
+# here; code under a license outside quality/licenses/allowed.txt is never an exception.
+# Changes need a pull request with the reason, like allowed.txt.
+
+quality/licenses/* | the license policy lists the identifiers it allows and forbids
