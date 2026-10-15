@@ -117,9 +117,72 @@ def palette_md(model: Model, header: str) -> str:
     return "\n".join(lines)
 
 
-def contrast_md(rows: list[ContrastRow], guards: list[str], header: str) -> str:
-    """Render the contrast table page with failed pairs and guard problems as Markdown."""
-    failed = [r for r in rows if not r.passed]
+def _variant_label(variant) -> str:
+    """`loch.700`, `loch.700, moved from 600`, or the kept value with "not swapped"."""
+    name = f"{variant.scale}.{variant.step}" if variant.scale else variant.hex
+    if not variant.swapped:
+        return f"{name}, not swapped"
+    return f"{name}, moved from {variant.moved_from}" if variant.moved_from else name
+
+
+def _accent_sections(accent_rows: list[ContrastRow], variants: dict[tuple[str, str], dict], default: str) -> list[str]:
+    lines: list[str] = []
+    if not variants:
+        return lines
+    accent_keys = list(dict.fromkeys(accent for _, accent in variants))
+    themes = list(dict.fromkeys(theme for theme, _ in variants))
+    lines += [
+        "## Accent variants",
+        "",
+        "An instance chooses its accent (`branding.accent_color`, list in `accent_variants` of",
+        "`design/design-rules.json`). Roles that alias the default scale take the same step of the",
+        "chosen scale; a step that fails a pairing moves along the scale until every pairing passes",
+        '("moved from"). Roles that alias another scale keep their value ("not swapped"). Per accent',
+        "and theme only the pairings that contain a swapped role are listed; all other pairings are",
+        "those of the theme sections above.",
+        "",
+        f"Accent `{default}` is the default: its variants are the base roles of the theme sections above.",
+        "",
+    ]
+    for accent in accent_keys:
+        if accent == default:
+            continue
+        for theme in themes:
+            roles = variants[(theme, accent)]
+            rows = [r for r in accent_rows if r.theme == theme and r.accent == accent]
+            labels = {role: _variant_label(v) for role, v in roles.items() if v.swapped}
+            lines.append(f"### Accent {accent}, theme {theme}")
+            lines.append("")
+            lines.append("| Role | Step | Value |")
+            lines.append("|---|---|---|")
+            for role, variant in roles.items():
+                lines.append(f"| `{role}` | {_variant_label(variant)} | `{variant.hex}` |")
+            lines.append("")
+            lines.append("| Foreground | Background | Kind | Values | Ratio | Threshold | Result | Usage |")
+            lines.append("|---|---|---|---|---|---|---|---|")
+            for r in rows:
+                fg = f"`{r.fg}` ({labels[r.fg]})" if r.fg in labels else f"`{r.fg}`"
+                bg = f"`{r.bg}` ({labels[r.bg]})" if r.bg in labels else f"`{r.bg}`"
+                verdict = "passed" if r.passed else "FAILED"
+                lines.append(
+                    f"| {fg} | {bg} | {r.kind} | `{r.fg_hex}` on `{r.bg_hex}` | {r.ratio:.2f} | "
+                    f"{r.required:g} | {verdict} | {r.usage} |"
+                )
+            lines.append("")
+    return lines
+
+
+def contrast_md(
+    rows: list[ContrastRow],
+    guards: list[str],
+    header: str,
+    accent_rows: list[ContrastRow] | None = None,
+    variants: dict[tuple[str, str], dict] | None = None,
+    default: str = "",
+) -> str:
+    """The contrast table: base rows per theme, then one section per non-default accent and theme."""
+    accent_rows = accent_rows or []
+    failed = [r for r in rows + accent_rows if not r.passed]
     lines = [
         "# Contrast table (WCAG 2.2)",
         "",
@@ -130,7 +193,8 @@ def contrast_md(rows: list[ContrastRow], guards: list[str], header: str) -> str:
         "`ui` 3:1 (SC 1.4.11), source https://www.w3.org/TR/WCAG22/ (retrieved 2026-10-10).",
         "The tool stops if a pairing falls below its threshold; this page is written only on success.",
         "",
-        f"Result: {len(rows)} pairings checked, {len(failed)} below the threshold.",
+        f"Result: {len(rows) + len(accent_rows)} pairings checked, {len(failed)} below the threshold"
+        + (f" ({len(accent_rows)} of them in the accent variants)." if accent_rows else "."),
         "",
         "Palette guards (ban list as a test): " + ("all met." if not guards else f"{len(guards)} violations."),
         "",
@@ -149,4 +213,5 @@ def contrast_md(rows: list[ContrastRow], guards: list[str], header: str) -> str:
                 f"{r.required:g} | {verdict} | {r.usage} |"
             )
         lines.append("")
+    lines += _accent_sections(accent_rows, variants or {}, default)
     return "\n".join(lines)

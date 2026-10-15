@@ -1111,6 +1111,246 @@ final class DsColors extends ThemeExtension<DsColors> {
   }
 }
 
+/// Accent roles per theme and instance accent (`branding.accent_color`, ADR 0044).
+///
+/// Roles: `color.accent.bg`, `color.accent.bg-hover`, `color.accent.bg-pressed`, `color.accent.fg`, `color.accent.subtle`, `color.text.link`, `color.focus.ring`, `color.run.running`. Components read these roles only
+/// from DsAccent, never from DsColors, so the instance accent applies everywhere. Every
+/// constant passed the contrast gate (docs/design/contrast.md); roles that do not follow
+/// the accent in a theme carry their base value.
+@immutable
+final class DsAccent extends ThemeExtension<DsAccent> {
+  const DsAccent({
+    required this.accentBg,
+    required this.accentBgHover,
+    required this.accentBgPressed,
+    required this.accentFg,
+    required this.accentSubtle,
+    required this.textLink,
+    required this.focusRing,
+    required this.runRunning,
+  });
+
+  final Color accentBg;
+  final Color accentBgHover;
+  final Color accentBgPressed;
+  final Color accentFg;
+  final Color accentSubtle;
+  final Color textLink;
+  final Color focusRing;
+  final Color runRunning;
+
+  static const DsAccent lightSpruce = DsAccent(
+    accentBg: Color(0xFF136F69),
+    accentBgHover: Color(0xFF0C5450),
+    accentBgPressed: Color(0xFF063B38),
+    accentFg: Color(0xFF136F69),
+    accentSubtle: Color(0xFFE4FBF8),
+    textLink: Color(0xFF136F69),
+    focusRing: Color(0xFF1B8A83),
+    runRunning: Color(0xFF1B8A83),
+  );
+
+  static const DsAccent darkSpruce = DsAccent(
+    accentBg: Color(0xFF49C0B7),
+    accentBgHover: Color(0xFF7CD5CD),
+    accentBgPressed: Color(0xFFA8E8E1),
+    accentFg: Color(0xFF7CD5CD),
+    accentSubtle: Color(0xFF032624),
+    textLink: Color(0xFF7CD5CD),
+    focusRing: Color(0xFFD9C42B),
+    runRunning: Color(0xFF49C0B7),
+  );
+
+  static const DsAccent lightLoch = DsAccent(
+    accentBg: Color(0xFF12659D),
+    accentBgHover: Color(0xFF0B4D79),
+    accentBgPressed: Color(0xFF053656),
+    accentFg: Color(0xFF12659D),
+    accentSubtle: Color(0xFFEEF6FE),
+    textLink: Color(0xFF12659D),
+    focusRing: Color(0xFF197FC3),
+    runRunning: Color(0xFF197FC3),
+  );
+
+  static const DsAccent darkLoch = DsAccent(
+    accentBg: Color(0xFF58B3FA),
+    accentBgHover: Color(0xFF8EC9FB),
+    accentBgPressed: Color(0xFFBBDEFD),
+    accentFg: Color(0xFF8EC9FB),
+    accentSubtle: Color(0xFF02223A),
+    textLink: Color(0xFF8EC9FB),
+    focusRing: Color(0xFFD9C42B),
+    runRunning: Color(0xFF58B3FA),
+  );
+
+  static const DsAccent lightHeather = DsAccent(
+    accentBg: Color(0xFFA51F6F),
+    accentBgHover: Color(0xFF810E55),
+    accentBgPressed: Color(0xFF5D073C),
+    accentFg: Color(0xFFA51F6F),
+    accentSubtle: Color(0xFFFEF1F7),
+    textLink: Color(0xFFA51F6F),
+    focusRing: Color(0xFFC53A88),
+    runRunning: Color(0xFFC53A88),
+  );
+
+  static const DsAccent darkHeather = DsAccent(
+    accentBg: Color(0xFFF878BA),
+    accentBgHover: Color(0xFFFCA3CD),
+    accentBgPressed: Color(0xFFFDC8DF),
+    accentFg: Color(0xFFFCA3CD),
+    accentSubtle: Color(0xFF3E0327),
+    textLink: Color(0xFFFCA3CD),
+    focusRing: Color(0xFFD9C42B),
+    runRunning: Color(0xFFF878BA),
+  );
+
+  static const DsAccent lightRowan = DsAccent(
+    accentBg: Color(0xFFB21622),
+    accentBgHover: Color(0xFF890F18),
+    accentBgPressed: Color(0xFF63080E),
+    accentFg: Color(0xFFB21622),
+    accentSubtle: Color(0xFFFEF2F0),
+    textLink: Color(0xFFB21622),
+    focusRing: Color(0xFFD43538),
+    runRunning: Color(0xFFD43538),
+  );
+
+  static const DsAccent darkRowan = DsAccent(
+    accentBg: Color(0xFFFB827A),
+    accentBgHover: Color(0xFFFCAAA3),
+    accentBgPressed: Color(0xFFFDCBC6),
+    accentFg: Color(0xFFFCAAA3),
+    accentSubtle: Color(0xFF430307),
+    textLink: Color(0xFFFCAAA3),
+    focusRing: Color(0xFFD9C42B),
+    runRunning: Color(0xFFFB827A),
+  );
+
+  static const DsAccent lightAmber = DsAccent(
+    accentBg: Color(0xFF8C4F10),
+    accentBgHover: Color(0xFF6B3B09),
+    accentBgPressed: Color(0xFF4C2905),
+    accentFg: Color(0xFF8C4F10),
+    accentSubtle: Color(0xFFFEF3EA),
+    textLink: Color(0xFF8C4F10),
+    focusRing: Color(0xFFAE6416),
+    runRunning: Color(0xFFAE6416),
+  );
+
+  static const DsAccent darkAmber = DsAccent(
+    accentBg: Color(0xFFEC9340),
+    accentBgHover: Color(0xFFFCAF6F),
+    accentBgPressed: Color(0xFFFDCFAA),
+    accentFg: Color(0xFFFCAF6F),
+    accentSubtle: Color(0xFF331902),
+    textLink: Color(0xFFFCAF6F),
+    focusRing: Color(0xFFD9C42B),
+    runRunning: Color(0xFFEC9340),
+  );
+
+  static const DsAccent lightGorse = DsAccent(
+    accentBg: Color(0xFF735E10),
+    accentBgHover: Color(0xFF59470A),
+    accentBgPressed: Color(0xFF3F3105),
+    accentFg: Color(0xFF735E10),
+    accentSubtle: Color(0xFFFEF5AA),
+    textLink: Color(0xFF735E10),
+    focusRing: Color(0xFF8D7716),
+    runRunning: Color(0xFF8D7716),
+  );
+
+  static const DsAccent darkGorse = DsAccent(
+    accentBg: Color(0xFFC2AB24),
+    accentBgHover: Color(0xFFD9C42B),
+    accentBgPressed: Color(0xFFEDDC59),
+    accentFg: Color(0xFFD9C42B),
+    accentSubtle: Color(0xFF291F02),
+    textLink: Color(0xFFD9C42B),
+    focusRing: Color(0xFFD9C42B),
+    runRunning: Color(0xFFC2AB24),
+  );
+
+  static const DsAccent lightMoss = DsAccent(
+    accentBg: Color(0xFF137337),
+    accentBgHover: Color(0xFF0C5828),
+    accentBgPressed: Color(0xFF063E1A),
+    accentFg: Color(0xFF137337),
+    accentSubtle: Color(0xFFE4FDE8),
+    textLink: Color(0xFF137337),
+    focusRing: Color(0xFF1B9046),
+    runRunning: Color(0xFF1B9046),
+  );
+
+  static const DsAccent darkMoss = DsAccent(
+    accentBg: Color(0xFF62C37A),
+    accentBgHover: Color(0xFF89D89A),
+    accentBgPressed: Color(0xFFAFEABA),
+    accentFg: Color(0xFF89D89A),
+    accentSubtle: Color(0xFF03280F),
+    textLink: Color(0xFF89D89A),
+    focusRing: Color(0xFFD9C42B),
+    runRunning: Color(0xFF62C37A),
+  );
+
+  /// Accent roles for the instance accent [key] (`branding.accent_color`) and [brightness].
+  ///
+  /// An unknown key gives the default accent `spruce`, so an instance setting written
+  /// by a newer server never leaves the app without accent colours.
+  static DsAccent of(String key, Brightness brightness) {
+    final dark = brightness == Brightness.dark;
+    return switch (key) {
+      'loch' => dark ? darkLoch : lightLoch,
+      'heather' => dark ? darkHeather : lightHeather,
+      'rowan' => dark ? darkRowan : lightRowan,
+      'amber' => dark ? darkAmber : lightAmber,
+      'gorse' => dark ? darkGorse : lightGorse,
+      'moss' => dark ? darkMoss : lightMoss,
+      _ => dark ? darkSpruce : lightSpruce,
+    };
+  }
+
+  @override
+  DsAccent copyWith({
+    Color? accentBg,
+    Color? accentBgHover,
+    Color? accentBgPressed,
+    Color? accentFg,
+    Color? accentSubtle,
+    Color? textLink,
+    Color? focusRing,
+    Color? runRunning,
+  }) {
+    return DsAccent(
+      accentBg: accentBg ?? this.accentBg,
+      accentBgHover: accentBgHover ?? this.accentBgHover,
+      accentBgPressed: accentBgPressed ?? this.accentBgPressed,
+      accentFg: accentFg ?? this.accentFg,
+      accentSubtle: accentSubtle ?? this.accentSubtle,
+      textLink: textLink ?? this.textLink,
+      focusRing: focusRing ?? this.focusRing,
+      runRunning: runRunning ?? this.runRunning,
+    );
+  }
+
+  @override
+  DsAccent lerp(covariant ThemeExtension<DsAccent>? other, double t) {
+    if (other is! DsAccent) {
+      return this;
+    }
+    return DsAccent(
+      accentBg: Color.lerp(accentBg, other.accentBg, t)!,
+      accentBgHover: Color.lerp(accentBgHover, other.accentBgHover, t)!,
+      accentBgPressed: Color.lerp(accentBgPressed, other.accentBgPressed, t)!,
+      accentFg: Color.lerp(accentFg, other.accentFg, t)!,
+      accentSubtle: Color.lerp(accentSubtle, other.accentSubtle, t)!,
+      textLink: Color.lerp(textLink, other.textLink, t)!,
+      focusRing: Color.lerp(focusRing, other.focusRing, t)!,
+      runRunning: Color.lerp(runRunning, other.runRunning, t)!,
+    );
+  }
+}
+
 /// Shadows for layers above the content, per theme.
 @immutable
 final class DsElevation extends ThemeExtension<DsElevation> {

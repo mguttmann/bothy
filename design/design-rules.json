@@ -79,6 +79,12 @@
      "fg": ["color.viz.series.1", "color.viz.series.2", "color.viz.series.3", "color.viz.series.4", "color.viz.series.5", "color.viz.series.6", "color.viz.series.7", "color.viz.series.8", "color.viz.axis"],
      "bg": ["color.surface.canvas", "color.surface.list", "color.surface.raised"]}
   ],
+  "accent_variants": {
+    "$comment": "Accents an instance may choose (branding.accent_color, 01 section 12). Roles that alias palette.spruce are swapped for the same step of the chosen scale; every pairing with a swapped role is checked per accent and theme.",
+    "default": "spruce",
+    "accents": ["spruce", "loch", "heather", "rowan", "amber", "gorse", "moss"],
+    "roles": ["color.accent.bg", "color.accent.bg-hover", "color.accent.bg-pressed", "color.accent.fg", "color.accent.subtle", "color.text.link", "color.focus.ring", "color.run.running"]
+  },
   "palette_guards": [
     {
       "name": "Brand and accent",

@@ -32,9 +32,9 @@ uv run --project tools --locked check-jsonschema --schemafile https://www.design
 
 | File | Content |
 |---|---|
-| `design/build/tokens.css` | CSS variables `--ds-*`; theme via `data-theme` or `prefers-color-scheme`, density via `data-density`, motion via `data-motion` or `prefers-reduced-motion` |
-| `design/build/dart/design_tokens.g.dart` | `DsPalette`, `DsColors`, `DsElevation`, `DsDensity`, `DsMotion` (each a `ThemeExtension` with instances per context), `DsSpace`, `DsRadius`, `DsBorderWidth`, `DsLayout`, `DsSize`, `DsIconSize`, `DsFonts`, `DsType`, `DsIcons` |
-| `design/build/tokens.resolved.json` | all tokens resolved, per context, plus the icon mapping and the allowed space icons |
+| `design/build/tokens.css` | CSS variables `--ds-*`; theme via `data-theme` or `prefers-color-scheme`, density via `data-density`, motion via `data-motion` or `prefers-reduced-motion`; instance accent over `data-accent="<key>"` on the same element as `data-theme` (only the swapped variables, per non-default accent and theme) |
+| `design/build/dart/design_tokens.g.dart` | `DsPalette`, `DsColors`, `DsAccent`, `DsElevation`, `DsDensity`, `DsMotion` (each a `ThemeExtension` with instances per context; `DsAccent` with one constant per theme and accent and `DsAccent.of(key, brightness)`, an unknown key gives the default), `DsSpace`, `DsRadius`, `DsBorderWidth`, `DsLayout`, `DsSize`, `DsIconSize`, `DsFonts`, `DsType`, `DsIcons` |
+| `design/build/tokens.resolved.json` | all tokens resolved, per context, plus the icon mapping and the allowed space icons; member `accents`: default and, per accent and theme, every accent role with `hex`, `alias`, `moved_from` and `swapped` |
 | `design/build/preview.html` | standalone preview with embedded fonts and icons |
 | `design/build/README.md` | note "generated" |
 | `docs/design/palette.md`, `contrast.md`, `tokens.md` | generated docs |
@@ -52,6 +52,13 @@ for the Flutter types it uses; it has not yet been compiled against the real Flu
    `text` 4.5, `large-text` 3, `ui` 3 (WCAG 2.2 SC 1.4.3 and 1.4.11). Luminance per WCAG with the
    threshold 0.04045 of the sRGB standard (https://www.w3.org/WAI/GL/wiki/Relative_luminance, retrieved
    2026-10-10).
+   Accent variants (`tokenkit/accents.py`, member `accent_variants` of
+   `design/design-rules.json`): for every allowed accent and theme, each role that aliases a step
+   of the default scale takes the same step of the chosen scale (nearest step by number if it is
+   missing); a step that fails a pairing moves along the scale towards more contrast. Every
+   pairing that contains a swapped role is checked per accent and theme with the same
+   thresholds; a variant below them, or a scale without a passing step, fails `build` and `check`.
+   An invalid member (default not an accent, accent not a scale, role missing) is an error (exit 2).
 3. **Palette guards:** forbidden reference colors (OKLab distance), forbidden hue ranges,
    minimum chroma for neutrals. Rules and sources are in `design/design-rules.json`.
 4. **Freshness:** `check` compares every generated file byte for byte.
@@ -66,6 +73,9 @@ for the Flutter types it uses; it has not yet been compiled against the real Flu
 - Color spaces: `oklch` and `srgb` are computed; other color spaces need `hex` as a fallback.
 - A token may depend on only one modifier; otherwise `build` aborts (the outputs would not be
   unambiguous).
+- The instance accent is no resolver modifier: an accent role always depends on the theme as
+  well, which the rule above forbids. The variants are derived from the theme contexts and written
+  as the separate extension `DsAccent` and separate CSS blocks.
 
 ## vendor/
 
