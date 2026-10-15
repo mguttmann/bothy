@@ -422,8 +422,8 @@ That is why all clients use **ES256** for DPoP and step-up, although the data mo
 
 | Platform | Device key (DPoP) | Step-up key | Secrets (refresh token, DB key) |
 |---|---|---|---|
-| iOS | Secure Enclave, P-256, without user confirmation, keychain access group with the extensions, `AfterFirstUnlockThisDeviceOnly` | Secure Enclave, P-256, `.userPresence` | Keychain through `flutter_secure_storage` (publisher steenbakker.dev); tokens for the extensions in the shared access group with `AfterFirstUnlockThisDeviceOnly`, DB key `WhenUnlockedThisDeviceOnly` |
-| macOS | Secure Enclave (Macs with an Apple chip or with Touch Bar and Touch ID according to the Apple documentation), otherwise a keychain key without the enclave, reported to the server as "not hardware-bound" | like iOS | Data Protection keychain |
+| iOS | Secure Enclave, P-256, without user confirmation, keychain access group with the extensions, `AfterFirstUnlockThisDeviceOnly` | Secure Enclave, P-256, `.biometryCurrentSet` when biometrics are enrolled (new biometrics invalidate the key, [08](08-identity.md) 6.1), otherwise `.userPresence` (device password); `WhenPasscodeSetThisDeviceOnly` | Keychain through `flutter_secure_storage` (publisher steenbakker.dev); tokens for the extensions in the shared access group with `AfterFirstUnlockThisDeviceOnly`, DB key `WhenUnlockedThisDeviceOnly` |
+| macOS | Secure Enclave (Macs with an Apple chip or with Touch Bar and Touch ID according to the Apple documentation), otherwise a keychain key without the enclave, reported to the server as "not hardware-bound" | like iOS; without an enclave a software key whose keychain item carries `.userPresence` | Data Protection keychain |
 | Android | Android Keystore, StrongBox if available (`setIsStrongBoxBacked`, fallback on `StrongBoxUnavailableException`), P-256 | Keystore key with user authentication per operation through `BiometricPrompt` | `flutter_secure_storage` (RSA-OAEP plus AES-GCM, key in the Keystore according to the package documentation) |
 | Windows | CNG with Microsoft Platform Crypto Provider (TPM), ECDSA P-256 after a check with `NCryptIsAlgSupported`; without a TPM a software key, reported as not hardware-bound | TPM key with Windows Hello confirmation [assumed, details not verified] | `flutter_secure_storage` (Windows Credential Manager plus AES-GCM files according to the package README [verified through search, source code not read]) |
 | Web (console) | none: cookie session according to the backend-for-frontend pattern, tokens only in the server ([08](08-identity.md) section 7.5) | WebAuthn passkey, otherwise a renewed OIDC login or password with TOTP | none in the browser; cookie `HttpOnly` |
@@ -434,10 +434,22 @@ Sources: https://pub.dev/packages/flutter_secure_storage (version 11.2.0, retrie
 retrieved 2026-10-10 [verified]); that every TPM 2.0 offers P-256 is [assumed] and is checked at
 runtime.
 
-`packages/device_key` is a federated Flutter plugin with Pigeon (flutter.dev) for typed
-channels. It offers: create a key, return the public JWK and thumbprint, sign,
-return an attestation (if the platform has it), delete a key. The Swift and Kotlin parts
-use the same implementation as the extensions.
+`packages/device_key` is one Flutter plugin package with a folder per platform and a typed
+Pigeon (flutter.dev) interface as its boundary, not a set of federated packages (docs/DECISIONS.md
+D-M4-10-1). It offers: create a key, return the public JWK and thumbprint, sign, return an
+attestation (if the platform has it), delete the keys of a server. The JWK and the RFC 7638
+thumbprint are computed in Dart for every platform; signatures leave the native side in the JOSE
+form `R || S` (D-M4-10-2). The Swift and Kotlin parts use the same implementation as the
+extensions: on iOS and macOS that is the Swift package `DeviceKeyCore`
+(`packages/device_key/darwin/device_key/DeviceKeyCore`, CryptoKit, Security and LocalAuthentication), which the
+plugin package and the Notification Service and Share Extensions depend on (D-M4-10-4). Every key
+item is a generic password in the Data Protection keychain (also on macOS), never synchronizable,
+labelled `<prefix>.<sha256(scope)>.<purpose>`; it holds the enclave-wrapped key blob, or without an
+enclave the software key. The DPoP key sits in the keychain access group shared with the
+extensions, which the app names in its Info.plist key `DeviceKeyAccessGroup`. Step-up access
+control: `.biometryCurrentSet` where biometrics are enrolled, `.userPresence` otherwise (D-M4-10-3),
+so a Mac without Touch ID still confirms with the device password. App Attest is not used yet;
+the attestation stays empty on iOS and macOS.
 
 Because the refresh token is bound to the device key (DPoP), a stolen token is worthless without
 the device; that lowers the requirement on the storage of the tokens, not on the key.

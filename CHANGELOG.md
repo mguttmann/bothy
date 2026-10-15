@@ -25,6 +25,13 @@ operated, and the order of the build.
 
 ### Added
 
+- `packages/device_key` for iOS and macOS: two ES256 device keys per server (`dpop` without a
+  prompt, `step_up` with biometrics or the device password) in the Secure Enclave where there is
+  one, otherwise a software key in the Data Protection keychain reported as not hardware-bound;
+  never synchronizable, always `ThisDeviceOnly`. A Pigeon channel, a Dart API with the public JWK,
+  the RFC 7638 thumbprint and `R || S` signatures, and the Swift package `DeviceKeyCore` that the
+  app extensions reuse. `make codegen-check` regenerates the Pigeon code, `make apps-platform`
+  runs the Swift tests on macOS and in the iOS simulator (M4-10).
 - Design tokens: `tools/design-tokens` writes `design/build/ts/tokens.gen.ts` for the Grafana
   panel plugin (colour roles of both themes including the chart and state roles, font families,
   font sizes and radii as typed constants) and copies the vendored Atkinson Hyperlegible fonts
