@@ -5,6 +5,9 @@
 // docs/spec/02-architektur.md section "Befehle des Binarys", and a command is only added here
 // when its ticket builds it.
 //
+// The code of `bothy import` lives in packages under cmd/bothy/importtool (D-W-124): the
+// read-only Discord client cmd/bothy/importtool/discord and its test fake discordtest.
+//
 // Exit codes: 0 success, 1 failure, 2 usage error. Codes from 3 upwards are specific to a
 // command and documented in its help, so orchestrators and scripts can tell "called wrongly"
 // from "failed at run time" without parsing text.

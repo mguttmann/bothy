@@ -33,7 +33,7 @@ der Überblick.
 | `bothy migrate up\|status\|validate` | Migrationen (goose, rivermigrate); nie implizit beim Start |
 | `bothy setup bootstrap-owner\|issue-enrollment-code` | Einrichtung, erster Owner, Einladungs-Code (08-identitaet.md) |
 | `bothy config check\|print` | Konfiguration prüfen (mit `--secrets` auch jeden Verweis auflösen) und redigiert ausgeben |
-| `bothy import discord ...` | Import und Lese-Spiegel über die API (22-import-migration.md) |
+| `bothy import discord ...` | Import und Lese-Spiegel über die API (22-import-migration.md); Code unter `cmd/bothy/importtool` (D-W-124), Discord-Lese-Client: [`cmd/bothy/importtool/discord`](cmd/bothy/importtool/discord/README.md) |
 | `bothy restore finalize` | nach einer Wiederherstellung: neue Sync-Epoche (16-betrieb.md) |
 | `bothy secrets init\|export` | Geheimnisse anlegen und sichern (16-betrieb.md) |
 | `bothy healthcheck --url` | Gesundheitsprüfung einer Loopback-URL des internen Listeners (16-betrieb.md) |
