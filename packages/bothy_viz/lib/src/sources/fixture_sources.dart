@@ -10,7 +10,7 @@ import 'live_frame_source.dart';
 import 'stats_query_source.dart';
 import 'viz_clock.dart';
 
-/// One frame of a replay: [frame] arrives [after] the previous one (the first after start).
+/// One frame of a replay: `frame` arrives `after` the previous one (the first after start).
 typedef ReplayStep = ({Duration after, api.StatsLiveFrame frame});
 
 /// A [LiveFrameSource] that replays frames on its clock, without a server.
