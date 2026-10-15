@@ -1,6 +1,6 @@
 # SPDX-License-Identifier: Apache-2.0
 #
-# Image bothy-postgres (docs/spec/16-betrieb.md 2, docs/spec/18-release.md "Server-Images" rules
+# Image bothy-postgres (docs/spec/16-operations.md 2, docs/spec/18-release.md "Server images" rules
 # 2 and 4, brief M7-01): the official postgres:18 plus pgBackRest and bothy-backupd. One image
 # serves the Compose services postgres and backup; entrypoint.sh picks the role. Build context is
 # the repository root; Dockerfile.dockerignore next to this file keeps it to what the image needs:
@@ -9,7 +9,7 @@
 #     --build-arg VERSION="$(cat services/server/VERSION)" --build-arg REVISION="$(git rev-parse HEAD)" .
 #
 # `make postgres-image` calls it this way. No step runs on the target platform, so both platforms
-# build natively on any host, without emulation (18 "Server-Images" rule 2, docs/DECISIONS.md
+# build natively on any host, without emulation (18 "Server images" rule 2, docs/DECISIONS.md
 # D-M7-01-2): the Go builder cross compiles bothy-backupd, the package stage downloads the
 # packages of the target architecture on the build platform and unpacks them, and the final
 # stage only copies. Base images are pinned by digest (SEC-SC-4, `make lint`); Renovate updates

@@ -1,8 +1,8 @@
 # Image `bothy-postgres`
 
-The database image of a Bothy instance ([16-betrieb.md](../../../../docs/spec/16-betrieb.md)
-sections 2 and 8, [18-release.md](../../../../docs/spec/18-release.md) "Server-Images" rules 2
-and 4, [ADR 0058](../../../../docs/adr/0058-sicherung-mit-pgbackrest-objektsicherung-und-restore-test.md)):
+The database image of a Bothy instance ([16-operations.md](../../../../docs/spec/16-operations.md)
+sections 2 and 8, [18-release.md](../../../../docs/spec/18-release.md) "Server images" rules 2
+and 4, [ADR 0058](../../../../docs/adr/0058-backup-with-pgbackrest-object-backup-and-restore-test.md)):
 the official `postgres:18` image, pinned by digest, plus pgBackRest and
 [`bothy-backupd`](../../cmd/bothy-backupd/README.md). One image serves the two Compose services
 `postgres` and `backup` (R-OP-07), so both always run the same pgBackRest.

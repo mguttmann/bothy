@@ -1,7 +1,7 @@
 #!/bin/sh
 # SPDX-License-Identifier: Apache-2.0
 #
-# Version guard of bothy-postgres (docs/spec/16-betrieb.md 8.1 rationale 4, brief M7-01):
+# Version guard of bothy-postgres (docs/spec/16-operations.md 8.1 rationale 4, brief M7-01):
 # pgBackRest below 2.59.3 can produce weak keys and salts, so the image never ships it and never
 # starts it.
 #

@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 // Command bothy-backupd runs in the container backup of the image bothy-postgres
-// (docs/spec/16-betrieb.md 2 and 8.2, brief M7-01): it supervises the pgBackRest TLS server
+// (docs/spec/16-operations.md 2 and 8.2, brief M7-01): it supervises the pgBackRest TLS server
 // of the repository host and creates the stanza on its first start. Schedules, the logical and
 // the object backup and the restore test come with later tickets (M7-02, M7-03); their use cases
 // live in the module status, not here.
@@ -33,7 +33,7 @@ import (
 	"github.com/OWNER/bothy/services/server/internal/platform/buildinfo"
 )
 
-// Exit codes, the same as those of the server binary (docs/spec/02-architektur.md "Befehle des Binarys").
+// Exit codes, the same as those of the server binary (docs/spec/02-architecture.md "Commands of the binary").
 const (
 	exitOK      = 0
 	exitFailure = 1

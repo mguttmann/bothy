@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # SPDX-License-Identifier: Apache-2.0
 #
-# Entry point of bothy-postgres (docs/spec/16-betrieb.md 2 and 8.2, brief M7-01). One image
+# Entry point of bothy-postgres (docs/spec/16-operations.md 2 and 8.2, brief M7-01). One image
 # serves two Compose services; the command decides the role:
 #
 #   bothy-backupd ...   repository host `backup`: pgBackRest repository with encryption, TLS

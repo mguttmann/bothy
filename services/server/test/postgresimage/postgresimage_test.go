@@ -440,7 +440,7 @@ type imageConfig struct {
 	} `json:"Config"`
 }
 
-// TestImageLabelsTagsAndVersion checks the OCI labels of 18 "Server-Images" rule 6, that the image
+// TestImageLabelsTagsAndVersion checks the OCI labels of 18 "Server images" rule 6, that the image
 // has no tag latest, runs as postgres and ships pgBackRest 2.59.3 or later.
 func TestImageLabelsTagsAndVersion(t *testing.T) {
 	image := env(t, "BOTHY_TEST_IMAGE")
@@ -469,7 +469,7 @@ func TestImageLabelsTagsAndVersion(t *testing.T) {
 	}
 	for _, tag := range c.RepoTags {
 		if strings.HasSuffix(tag, ":latest") {
-			t.Errorf("image has tag %s (18 \"Kanäle\" rule 3)", tag)
+			t.Errorf("image has tag %s (18 \"Channels\" rule 3)", tag)
 		}
 	}
 	if c.Config.User != "999:999" {

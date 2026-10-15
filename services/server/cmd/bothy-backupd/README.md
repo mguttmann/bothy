@@ -2,7 +2,7 @@
 
 The process of the Compose service `backup` in the image
 [`bothy-postgres`](../../images/bothy-postgres/README.md)
-([16-betrieb.md](../../../../docs/spec/16-betrieb.md) 2 and 8.2). It is a second program of the
+([16-operations.md](../../../../docs/spec/16-operations.md) 2 and 8.2). It is a second program of the
 server module, not a command of `bothy`: the server binary with its API role has no business in
 the database image (docs/DECISIONS.md D-M7-01-3). Its version is the server version
 (`internal/platform/buildinfo`), so one release builds and versions both images from one commit.
