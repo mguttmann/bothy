@@ -1269,7 +1269,7 @@
         },
         "color.danger.fg": {
           "type": "color",
-          "value": "#b21622"
+          "value": "#63080e"
         },
         "color.danger.on-bg": {
           "type": "color",
@@ -1465,6 +1465,50 @@
           "type": "color",
           "value": "#1b8a83"
         },
+        "color.viz.area-fill": {
+          "type": "color",
+          "value": "#ccf5f0"
+        },
+        "color.viz.axis": {
+          "type": "color",
+          "value": "#748486"
+        },
+        "color.viz.grid": {
+          "type": "color",
+          "value": "#dae5e7"
+        },
+        "color.viz.series.1": {
+          "type": "color",
+          "value": "#197fc3"
+        },
+        "color.viz.series.2": {
+          "type": "color",
+          "value": "#ae6416"
+        },
+        "color.viz.series.3": {
+          "type": "color",
+          "value": "#136f69"
+        },
+        "color.viz.series.4": {
+          "type": "color",
+          "value": "#c53a88"
+        },
+        "color.viz.series.5": {
+          "type": "color",
+          "value": "#8d7716"
+        },
+        "color.viz.series.6": {
+          "type": "color",
+          "value": "#063e1a"
+        },
+        "color.viz.series.7": {
+          "type": "color",
+          "value": "#d43538"
+        },
+        "color.viz.series.8": {
+          "type": "color",
+          "value": "#748486"
+        },
         "color.warning.bg": {
           "type": "color",
           "value": "#fcaf6f"
@@ -1475,7 +1519,7 @@
         },
         "color.warning.fg": {
           "type": "color",
-          "value": "#8c4f10"
+          "value": "#6b3b09"
         },
         "color.warning.on-bg": {
           "type": "color",
@@ -1823,7 +1867,7 @@
         },
         "color.danger.fg": {
           "type": "color",
-          "value": "#fcaaa3"
+          "value": "#fb827a"
         },
         "color.danger.on-bg": {
           "type": "color",
@@ -2018,6 +2062,50 @@
         "color.trigger.working": {
           "type": "color",
           "value": "#49c0b7"
+        },
+        "color.viz.area-fill": {
+          "type": "color",
+          "value": "#063b38"
+        },
+        "color.viz.axis": {
+          "type": "color",
+          "value": "#8f9fa1"
+        },
+        "color.viz.grid": {
+          "type": "color",
+          "value": "#24363a"
+        },
+        "color.viz.series.1": {
+          "type": "color",
+          "value": "#58b3fa"
+        },
+        "color.viz.series.2": {
+          "type": "color",
+          "value": "#ec9340"
+        },
+        "color.viz.series.3": {
+          "type": "color",
+          "value": "#7cd5cd"
+        },
+        "color.viz.series.4": {
+          "type": "color",
+          "value": "#f878ba"
+        },
+        "color.viz.series.5": {
+          "type": "color",
+          "value": "#d9c42b"
+        },
+        "color.viz.series.6": {
+          "type": "color",
+          "value": "#62c37a"
+        },
+        "color.viz.series.7": {
+          "type": "color",
+          "value": "#f15653"
+        },
+        "color.viz.series.8": {
+          "type": "color",
+          "value": "#8f9fa1"
         },
         "color.warning.bg": {
           "type": "color",
@@ -3534,5 +3622,672 @@
         }
       }
     }
+  },
+  "cvd": {
+    "model": "Machado, Oliveira and Fernandes 2009, severity 1.0, applied in linear sRGB",
+    "source": "IEEE TVCG 15(6), 2009, doi:10.1109/TVCG.2009.113",
+    "min_delta_e_ok": 0.05,
+    "rows": [
+      {
+        "theme": "light",
+        "deficiency": "protanopia",
+        "a": "color.viz.series.1",
+        "b": "color.viz.series.2",
+        "a_simulated": "#5e82c6",
+        "b_simulated": "#7b6c02",
+        "delta_e_ok": 0.2327,
+        "passed": true
+      },
+      {
+        "theme": "light",
+        "deficiency": "protanopia",
+        "a": "color.viz.series.2",
+        "b": "color.viz.series.3",
+        "a_simulated": "#7b6c02",
+        "b_simulated": "#686869",
+        "delta_e_ok": 0.1102,
+        "passed": true
+      },
+      {
+        "theme": "light",
+        "deficiency": "protanopia",
+        "a": "color.viz.series.3",
+        "b": "color.viz.series.4",
+        "a_simulated": "#686869",
+        "b_simulated": "#4f628a",
+        "delta_e_ok": 0.0713,
+        "passed": true
+      },
+      {
+        "theme": "light",
+        "deficiency": "protanopia",
+        "a": "color.viz.series.4",
+        "b": "color.viz.series.5",
+        "a_simulated": "#4f628a",
+        "b_simulated": "#857500",
+        "delta_e_ok": 0.1932,
+        "passed": true
+      },
+      {
+        "theme": "light",
+        "deficiency": "protanopia",
+        "a": "color.viz.series.5",
+        "b": "color.viz.series.6",
+        "a_simulated": "#857500",
+        "b_simulated": "#3e3817",
+        "delta_e_ok": 0.2299,
+        "passed": true
+      },
+      {
+        "theme": "light",
+        "deficiency": "protanopia",
+        "a": "color.viz.series.6",
+        "b": "color.viz.series.7",
+        "a_simulated": "#3e3817",
+        "b_simulated": "#655c36",
+        "delta_e_ok": 0.1357,
+        "passed": true
+      },
+      {
+        "theme": "light",
+        "deficiency": "protanopia",
+        "a": "color.viz.series.7",
+        "b": "color.viz.series.8",
+        "a_simulated": "#655c36",
+        "b_simulated": "#818286",
+        "delta_e_ok": 0.1481,
+        "passed": true
+      },
+      {
+        "theme": "light",
+        "deficiency": "protanopia",
+        "a": "color.viz.series.8",
+        "b": "color.viz.series.1",
+        "a_simulated": "#818286",
+        "b_simulated": "#5e82c6",
+        "delta_e_ok": 0.1061,
+        "passed": true
+      },
+      {
+        "theme": "light",
+        "deficiency": "deuteranopia",
+        "a": "color.viz.series.1",
+        "b": "color.viz.series.2",
+        "a_simulated": "#4673c2",
+        "b_simulated": "#8c7d16",
+        "delta_e_ok": 0.2449,
+        "passed": true
+      },
+      {
+        "theme": "light",
+        "deficiency": "deuteranopia",
+        "a": "color.viz.series.2",
+        "b": "color.viz.series.3",
+        "a_simulated": "#8c7d16",
+        "b_simulated": "#5c5f6a",
+        "delta_e_ok": 0.1646,
+        "passed": true
+      },
+      {
+        "theme": "light",
+        "deficiency": "deuteranopia",
+        "a": "color.viz.series.3",
+        "b": "color.viz.series.4",
+        "a_simulated": "#5c5f6a",
+        "b_simulated": "#777b85",
+        "delta_e_ok": 0.0944,
+        "passed": true
+      },
+      {
+        "theme": "light",
+        "deficiency": "deuteranopia",
+        "a": "color.viz.series.4",
+        "b": "color.viz.series.5",
+        "a_simulated": "#777b85",
+        "b_simulated": "#8a7b1d",
+        "delta_e_ok": 0.1261,
+        "passed": true
+      },
+      {
+        "theme": "light",
+        "deficiency": "deuteranopia",
+        "a": "color.viz.series.5",
+        "b": "color.viz.series.6",
+        "a_simulated": "#8a7b1d",
+        "b_simulated": "#38331d",
+        "delta_e_ok": 0.2699,
+        "passed": true
+      },
+      {
+        "theme": "light",
+        "deficiency": "deuteranopia",
+        "a": "color.viz.series.6",
+        "b": "color.viz.series.7",
+        "a_simulated": "#38331d",
+        "b_simulated": "#8c7e32",
+        "delta_e_ok": 0.2776,
+        "passed": true
+      },
+      {
+        "theme": "light",
+        "deficiency": "deuteranopia",
+        "a": "color.viz.series.7",
+        "b": "color.viz.series.8",
+        "a_simulated": "#8c7e32",
+        "b_simulated": "#7e8086",
+        "delta_e_ok": 0.1077,
+        "passed": true
+      },
+      {
+        "theme": "light",
+        "deficiency": "deuteranopia",
+        "a": "color.viz.series.8",
+        "b": "color.viz.series.1",
+        "a_simulated": "#7e8086",
+        "b_simulated": "#4673c2",
+        "delta_e_ok": 0.1284,
+        "passed": true
+      },
+      {
+        "theme": "light",
+        "deficiency": "tritanopia",
+        "a": "color.viz.series.1",
+        "b": "color.viz.series.2",
+        "a_simulated": "#009098",
+        "b_simulated": "#bf5356",
+        "delta_e_ok": 0.2405,
+        "passed": true
+      },
+      {
+        "theme": "light",
+        "deficiency": "tritanopia",
+        "a": "color.viz.series.2",
+        "b": "color.viz.series.3",
+        "a_simulated": "#bf5356",
+        "b_simulated": "#00726d",
+        "delta_e_ok": 0.239,
+        "passed": true
+      },
+      {
+        "theme": "light",
+        "deficiency": "tritanopia",
+        "a": "color.viz.series.3",
+        "b": "color.viz.series.4",
+        "a_simulated": "#00726d",
+        "b_simulated": "#d3325c",
+        "delta_e_ok": 0.2943,
+        "passed": true
+      },
+      {
+        "theme": "light",
+        "deficiency": "tritanopia",
+        "a": "color.viz.series.4",
+        "b": "color.viz.series.5",
+        "a_simulated": "#d3325c",
+        "b_simulated": "#996d65",
+        "delta_e_ok": 0.1427,
+        "passed": true
+      },
+      {
+        "theme": "light",
+        "deficiency": "tritanopia",
+        "a": "color.viz.series.5",
+        "b": "color.viz.series.6",
+        "a_simulated": "#996d65",
+        "b_simulated": "#003d36",
+        "delta_e_ok": 0.2788,
+        "passed": true
+      },
+      {
+        "theme": "light",
+        "deficiency": "tritanopia",
+        "a": "color.viz.series.6",
+        "b": "color.viz.series.7",
+        "a_simulated": "#003d36",
+        "b_simulated": "#e90038",
+        "delta_e_ok": 0.3973,
+        "passed": true
+      },
+      {
+        "theme": "light",
+        "deficiency": "tritanopia",
+        "a": "color.viz.series.7",
+        "b": "color.viz.series.8",
+        "a_simulated": "#e90038",
+        "b_simulated": "#6f8585",
+        "delta_e_ok": 0.2636,
+        "passed": true
+      },
+      {
+        "theme": "light",
+        "deficiency": "tritanopia",
+        "a": "color.viz.series.8",
+        "b": "color.viz.series.1",
+        "a_simulated": "#6f8585",
+        "b_simulated": "#009098",
+        "delta_e_ok": 0.0757,
+        "passed": true
+      },
+      {
+        "theme": "light",
+        "deficiency": "protanopia",
+        "a": "color.success.fg",
+        "b": "color.warning.fg",
+        "a_simulated": "#746832",
+        "b_simulated": "#4a4001",
+        "delta_e_ok": 0.1463,
+        "passed": true
+      },
+      {
+        "theme": "light",
+        "deficiency": "protanopia",
+        "a": "color.warning.fg",
+        "b": "color.danger.fg",
+        "a_simulated": "#4a4001",
+        "b_simulated": "#27230d",
+        "delta_e_ok": 0.1228,
+        "passed": true
+      },
+      {
+        "theme": "light",
+        "deficiency": "protanopia",
+        "a": "color.success.fg",
+        "b": "color.danger.fg",
+        "a_simulated": "#746832",
+        "b_simulated": "#27230d",
+        "delta_e_ok": 0.2652,
+        "passed": true
+      },
+      {
+        "theme": "light",
+        "deficiency": "deuteranopia",
+        "a": "color.success.fg",
+        "b": "color.warning.fg",
+        "a_simulated": "#69613b",
+        "b_simulated": "#554b09",
+        "delta_e_ok": 0.0828,
+        "passed": true
+      },
+      {
+        "theme": "light",
+        "deficiency": "deuteranopia",
+        "a": "color.warning.fg",
+        "b": "color.danger.fg",
+        "a_simulated": "#554b09",
+        "b_simulated": "#3d360a",
+        "delta_e_ok": 0.0828,
+        "passed": true
+      },
+      {
+        "theme": "light",
+        "deficiency": "deuteranopia",
+        "a": "color.success.fg",
+        "b": "color.danger.fg",
+        "a_simulated": "#69613b",
+        "b_simulated": "#3d360a",
+        "delta_e_ok": 0.1593,
+        "passed": true
+      },
+      {
+        "theme": "light",
+        "deficiency": "tritanopia",
+        "a": "color.success.fg",
+        "b": "color.warning.fg",
+        "a_simulated": "#007165",
+        "b_simulated": "#763032",
+        "delta_e_ok": 0.2025,
+        "passed": true
+      },
+      {
+        "theme": "light",
+        "deficiency": "tritanopia",
+        "a": "color.warning.fg",
+        "b": "color.danger.fg",
+        "a_simulated": "#763032",
+        "b_simulated": "#6e000c",
+        "delta_e_ok": 0.0794,
+        "passed": true
+      },
+      {
+        "theme": "light",
+        "deficiency": "tritanopia",
+        "a": "color.success.fg",
+        "b": "color.danger.fg",
+        "a_simulated": "#007165",
+        "b_simulated": "#6e000c",
+        "delta_e_ok": 0.269,
+        "passed": true
+      },
+      {
+        "theme": "dark",
+        "deficiency": "protanopia",
+        "a": "color.viz.series.1",
+        "b": "color.viz.series.2",
+        "a_simulated": "#93b5fd",
+        "b_simulated": "#ae9c36",
+        "delta_e_ok": 0.246,
+        "passed": true
+      },
+      {
+        "theme": "dark",
+        "deficiency": "protanopia",
+        "a": "color.viz.series.2",
+        "b": "color.viz.series.3",
+        "a_simulated": "#ae9c36",
+        "b_simulated": "#cccccd",
+        "delta_e_ok": 0.1994,
+        "passed": true
+      },
+      {
+        "theme": "dark",
+        "deficiency": "protanopia",
+        "a": "color.viz.series.3",
+        "b": "color.viz.series.4",
+        "a_simulated": "#cccccd",
+        "b_simulated": "#8696bc",
+        "delta_e_ok": 0.1824,
+        "passed": true
+      },
+      {
+        "theme": "dark",
+        "deficiency": "protanopia",
+        "a": "color.viz.series.4",
+        "b": "color.viz.series.5",
+        "a_simulated": "#8696bc",
+        "b_simulated": "#d7be00",
+        "delta_e_ok": 0.2571,
+        "passed": true
+      },
+      {
+        "theme": "dark",
+        "deficiency": "protanopia",
+        "a": "color.viz.series.5",
+        "b": "color.viz.series.6",
+        "a_simulated": "#d7be00",
+        "b_simulated": "#c4b575",
+        "delta_e_ok": 0.0856,
+        "passed": true
+      },
+      {
+        "theme": "dark",
+        "deficiency": "protanopia",
+        "a": "color.viz.series.6",
+        "b": "color.viz.series.7",
+        "a_simulated": "#c4b575",
+        "b_simulated": "#807651",
+        "delta_e_ok": 0.2077,
+        "passed": true
+      },
+      {
+        "theme": "dark",
+        "deficiency": "protanopia",
+        "a": "color.viz.series.7",
+        "b": "color.viz.series.8",
+        "a_simulated": "#807651",
+        "b_simulated": "#9c9da1",
+        "delta_e_ok": 0.1446,
+        "passed": true
+      },
+      {
+        "theme": "dark",
+        "deficiency": "protanopia",
+        "a": "color.viz.series.8",
+        "b": "color.viz.series.1",
+        "a_simulated": "#9c9da1",
+        "b_simulated": "#93b5fd",
+        "delta_e_ok": 0.1308,
+        "passed": true
+      },
+      {
+        "theme": "dark",
+        "deficiency": "deuteranopia",
+        "a": "color.viz.series.1",
+        "b": "color.viz.series.2",
+        "a_simulated": "#7da5f9",
+        "b_simulated": "#c3b041",
+        "delta_e_ok": 0.2598,
+        "passed": true
+      },
+      {
+        "theme": "dark",
+        "deficiency": "deuteranopia",
+        "a": "color.viz.series.2",
+        "b": "color.viz.series.3",
+        "a_simulated": "#c3b041",
+        "b_simulated": "#bdc1ce",
+        "delta_e_ok": 0.1607,
+        "passed": true
+      },
+      {
+        "theme": "dark",
+        "deficiency": "deuteranopia",
+        "a": "color.viz.series.3",
+        "b": "color.viz.series.4",
+        "a_simulated": "#bdc1ce",
+        "b_simulated": "#a9acb7",
+        "delta_e_ok": 0.0665,
+        "passed": true
+      },
+      {
+        "theme": "dark",
+        "deficiency": "deuteranopia",
+        "a": "color.viz.series.4",
+        "b": "color.viz.series.5",
+        "a_simulated": "#a9acb7",
+        "b_simulated": "#ddc638",
+        "delta_e_ok": 0.1876,
+        "passed": true
+      },
+      {
+        "theme": "dark",
+        "deficiency": "deuteranopia",
+        "a": "color.viz.series.5",
+        "b": "color.viz.series.6",
+        "a_simulated": "#ddc638",
+        "b_simulated": "#b6ac7f",
+        "delta_e_ok": 0.1238,
+        "passed": true
+      },
+      {
+        "theme": "dark",
+        "deficiency": "deuteranopia",
+        "a": "color.viz.series.6",
+        "b": "color.viz.series.7",
+        "a_simulated": "#b6ac7f",
+        "b_simulated": "#a6984f",
+        "delta_e_ok": 0.0732,
+        "passed": true
+      },
+      {
+        "theme": "dark",
+        "deficiency": "deuteranopia",
+        "a": "color.viz.series.7",
+        "b": "color.viz.series.8",
+        "a_simulated": "#a6984f",
+        "b_simulated": "#999ba1",
+        "delta_e_ok": 0.106,
+        "passed": true
+      },
+      {
+        "theme": "dark",
+        "deficiency": "deuteranopia",
+        "a": "color.viz.series.8",
+        "b": "color.viz.series.1",
+        "a_simulated": "#999ba1",
+        "b_simulated": "#7da5f9",
+        "delta_e_ok": 0.1266,
+        "passed": true
+      },
+      {
+        "theme": "dark",
+        "deficiency": "tritanopia",
+        "a": "color.viz.series.1",
+        "b": "color.viz.series.2",
+        "a_simulated": "#00c4cc",
+        "b_simulated": "#ff7f81",
+        "delta_e_ok": 0.2825,
+        "passed": true
+      },
+      {
+        "theme": "dark",
+        "deficiency": "tritanopia",
+        "a": "color.viz.series.2",
+        "b": "color.viz.series.3",
+        "a_simulated": "#ff7f81",
+        "b_simulated": "#56d9d2",
+        "delta_e_ok": 0.2775,
+        "passed": true
+      },
+      {
+        "theme": "dark",
+        "deficiency": "tritanopia",
+        "a": "color.viz.series.3",
+        "b": "color.viz.series.4",
+        "a_simulated": "#56d9d2",
+        "b_simulated": "#ff7491",
+        "delta_e_ok": 0.2965,
+        "passed": true
+      },
+      {
+        "theme": "dark",
+        "deficiency": "tritanopia",
+        "a": "color.viz.series.4",
+        "b": "color.viz.series.5",
+        "a_simulated": "#ff7491",
+        "b_simulated": "#eab5a8",
+        "delta_e_ok": 0.1447,
+        "passed": true
+      },
+      {
+        "theme": "dark",
+        "deficiency": "tritanopia",
+        "a": "color.viz.series.5",
+        "b": "color.viz.series.6",
+        "a_simulated": "#eab5a8",
+        "b_simulated": "#4ec0b1",
+        "delta_e_ok": 0.1824,
+        "passed": true
+      },
+      {
+        "theme": "dark",
+        "deficiency": "tritanopia",
+        "a": "color.viz.series.6",
+        "b": "color.viz.series.7",
+        "a_simulated": "#4ec0b1",
+        "b_simulated": "#ff3157",
+        "delta_e_ok": 0.3497,
+        "passed": true
+      },
+      {
+        "theme": "dark",
+        "deficiency": "tritanopia",
+        "a": "color.viz.series.7",
+        "b": "color.viz.series.8",
+        "a_simulated": "#ff3157",
+        "b_simulated": "#8aa0a0",
+        "delta_e_ok": 0.2637,
+        "passed": true
+      },
+      {
+        "theme": "dark",
+        "deficiency": "tritanopia",
+        "a": "color.viz.series.8",
+        "b": "color.viz.series.1",
+        "a_simulated": "#8aa0a0",
+        "b_simulated": "#00c4cc",
+        "delta_e_ok": 0.1164,
+        "passed": true
+      },
+      {
+        "theme": "dark",
+        "deficiency": "protanopia",
+        "a": "color.success.fg",
+        "b": "color.warning.fg",
+        "a_simulated": "#d9cc96",
+        "b_simulated": "#c6b56a",
+        "delta_e_ok": 0.075,
+        "passed": true
+      },
+      {
+        "theme": "dark",
+        "deficiency": "protanopia",
+        "a": "color.warning.fg",
+        "b": "color.danger.fg",
+        "a_simulated": "#c6b56a",
+        "b_simulated": "#9e9679",
+        "delta_e_ok": 0.1145,
+        "passed": true
+      },
+      {
+        "theme": "dark",
+        "deficiency": "protanopia",
+        "a": "color.success.fg",
+        "b": "color.danger.fg",
+        "a_simulated": "#d9cc96",
+        "b_simulated": "#9e9679",
+        "delta_e_ok": 0.1722,
+        "passed": true
+      },
+      {
+        "theme": "dark",
+        "deficiency": "deuteranopia",
+        "a": "color.success.fg",
+        "b": "color.warning.fg",
+        "a_simulated": "#cdc39e",
+        "b_simulated": "#d9c770",
+        "delta_e_ok": 0.0589,
+        "passed": true
+      },
+      {
+        "theme": "dark",
+        "deficiency": "deuteranopia",
+        "a": "color.warning.fg",
+        "b": "color.danger.fg",
+        "a_simulated": "#d9c770",
+        "b_simulated": "#bcaf78",
+        "delta_e_ok": 0.0808,
+        "passed": true
+      },
+      {
+        "theme": "dark",
+        "deficiency": "deuteranopia",
+        "a": "color.success.fg",
+        "b": "color.danger.fg",
+        "a_simulated": "#cdc39e",
+        "b_simulated": "#bcaf78",
+        "delta_e_ok": 0.0682,
+        "passed": true
+      },
+      {
+        "theme": "dark",
+        "deficiency": "tritanopia",
+        "a": "color.success.fg",
+        "b": "color.warning.fg",
+        "a_simulated": "#7dd5c7",
+        "b_simulated": "#ff9fa0",
+        "delta_e_ok": 0.2016,
+        "passed": true
+      },
+      {
+        "theme": "dark",
+        "deficiency": "tritanopia",
+        "a": "color.warning.fg",
+        "b": "color.danger.fg",
+        "a_simulated": "#ff9fa0",
+        "b_simulated": "#ff7081",
+        "delta_e_ok": 0.0986,
+        "passed": true
+      },
+      {
+        "theme": "dark",
+        "deficiency": "tritanopia",
+        "a": "color.success.fg",
+        "b": "color.danger.fg",
+        "a_simulated": "#7dd5c7",
+        "b_simulated": "#ff7081",
+        "delta_e_ok": 0.2775,
+        "passed": true
+      }
+    ]
   }
 }

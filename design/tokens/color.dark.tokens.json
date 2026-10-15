@@ -73,7 +73,7 @@
     },
     "danger": {
       "$description": "Vogelbeere: Fehler, zerstörende Aktionen.",
-      "fg": {"$value": "{palette.rowan.300}"},
+      "fg": {"$value": "{palette.rowan.400}"},
       "subtle": {"$value": "{palette.rowan.950}"},
       "border": {"$value": "{palette.rowan.400}"},
       "bg": {"$value": "{palette.rowan.400}"},
@@ -116,6 +116,23 @@
       "$description": "Code in Nachrichten und Werkzeug-Details.",
       "fg": {"$value": "{palette.granite.100}"},
       "bg": {"$value": "{palette.granite.925}"}
+    },
+    "viz": {
+      "$description": "Charts in bothy_viz and in the Grafana panel (components.md, section 11; 25-visualisierung.md, section 10).",
+      "series": {
+        "$description": "Categorical series in a fixed order; blue and orange first, because they stay distinguishable with red-green color blindness. A second cue (label or pattern) is required.",
+        "1": {"$value": "{palette.loch.400}"},
+        "2": {"$value": "{palette.amber.400}"},
+        "3": {"$value": "{palette.spruce.300}"},
+        "4": {"$value": "{palette.heather.400}"},
+        "5": {"$value": "{palette.gorse.300}"},
+        "6": {"$value": "{palette.moss.400}"},
+        "7": {"$value": "{palette.rowan.500}"},
+        "8": {"$value": "{palette.granite.400}"}
+      },
+      "axis": {"$value": "{palette.granite.400}", "$description": "Axis lines and tick marks; labels in color.text.secondary."},
+      "grid": {"$value": "{palette.granite.800}", "$description": "Grid lines and the line between lanes; purely structural, no contrast requirement."},
+      "area-fill": {"$value": "{palette.spruce.900}", "$description": "Fill under a line; the line carries the information, the fill does not."}
     },
     "category": {
       "$description": "Kategorie-Farben für Bereiche (spaces.color) und Forum-Tags (forum_tags.color). Der gespeicherte Wert ist der Schlüssel, z. B. 'heather'.",

@@ -29,6 +29,16 @@ def _srgb_decode(x: float) -> float:
     return ((x + 0.055) / 1.055) ** 2.4
 
 
+def srgb_encode(x: float) -> float:
+    """Gamma-encode one linear sRGB component (IEC 61966-2-1)."""
+    return _srgb_encode(x)
+
+
+def srgb_decode(x: float) -> float:
+    """Decode one gamma-encoded sRGB component to linear light (IEC 61966-2-1)."""
+    return _srgb_decode(x)
+
+
 def oklab_to_linear_srgb(lightness: float, a: float, b: float) -> RGB:
     l_ = lightness + 0.3963377774 * a + 0.2158037573 * b
     m_ = lightness - 0.1055613458 * a - 0.0638541728 * b

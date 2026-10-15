@@ -1,8 +1,8 @@
 # SPDX-License-Identifier: Apache-2.0
-"""Self-contained preview page: palette, desktop layout, component sheet and mobile screens.
+"""Self-contained preview page: palette, desktop layout, component sheet, mobile screens and charts.
 
 Fonts and icons are embedded (base64 and an SVG sprite) so the file renders the same everywhere,
-offline, and in screenshots. `?view=palette|layout|components|mobile` shows one section only,
+offline, and in screenshots. `?view=palette|layout|components|mobile|viz` shows one section only,
 `?theme=light|dark` forces a theme, `?density=compact|comfortable|touch` forces a density.
 All example data is fictitious (people Alex, Sam, Robin; areas Support, Marketing, Engineering,
 Research).
@@ -373,6 +373,36 @@ pre.code{font-family:var(--ds-font-family-mono);font-size:var(--ds-type-code-fon
 .offline .ic{color:var(--ds-color-warning-fg)}
 .pending{opacity:.72}
 .pending .ts{display:inline-flex;gap:4px;align-items:center}
+
+/* charts */
+.vz{display:grid;grid-template-columns:repeat(4,1fr);gap:16px}
+.tile{border:1px solid var(--ds-color-border-default);border-radius:var(--ds-radius-lg);padding:12px 14px;background:var(--ds-color-surface-raised)}
+.tile .lab{font-size:var(--ds-type-label-font-size);color:var(--ds-color-text-secondary);font-weight:600}
+.tile .num{font-family:var(--ds-font-family-mono);font-size:var(--ds-type-display-font-size);font-weight:700;line-height:1.15;margin:4px 0}
+.tile .cmp{display:flex;gap:6px;align-items:center;font-size:12px;color:var(--ds-color-text-secondary)}
+.lanes{grid-column:1/5;border:1px solid var(--ds-color-border-default);border-radius:var(--ds-radius-lg);overflow:hidden;background:var(--ds-color-surface-canvas)}
+.lane{display:grid;grid-template-columns:150px 1fr;min-height:104px;border-bottom:1px solid var(--ds-color-viz-grid)}
+.lane:last-child{border-bottom:0}
+.lane .lh{display:flex;align-items:center;gap:8px;padding:0 14px;font-weight:700;background:var(--ds-color-surface-list)}
+.lane .cards{display:flex;gap:12px;align-items:center;padding:12px}
+.rc{position:relative;width:260px;padding:8px 10px 8px 16px;border-radius:var(--ds-radius-md);border:1px solid var(--ds-color-border-default);background:var(--ds-color-surface-raised);font-size:13px;display:flex;flex-direction:column;gap:4px}
+.rc::before{content:"";position:absolute;left:0;top:0;bottom:0;width:var(--ds-border-width-spine);border-radius:var(--ds-radius-md) 0 0 var(--ds-radius-md)}
+.rc.s-running::before{background:var(--ds-color-run-running)} .rc.s-waiting::before{background:var(--ds-color-run-waiting)} .rc.s-completed::before{background:var(--ds-color-run-completed)}
+.rc .top{display:flex;align-items:center;gap:6px;font-weight:700}
+.rc .bot{display:flex;align-items:center;gap:8px}
+.chart{grid-column:span 2;border:1px solid var(--ds-color-border-default);border-radius:var(--ds-radius-lg);padding:12px 14px;background:var(--ds-color-surface-canvas)}
+.chart h4{margin:0 0 8px;font-size:var(--ds-type-label-font-size)}
+.chart svg{width:100%;height:180px;display:block}
+.chart text{font-family:var(--ds-font-family-sans);font-size:11px;fill:var(--ds-color-text-secondary)}
+.legend{display:flex;flex-wrap:wrap;gap:10px;margin-top:8px;font-size:12px;color:var(--ds-color-text-secondary)}
+.legend span{display:inline-flex;align-items:center;gap:5px}
+.legend i{width:10px;height:10px;border-radius:2px;display:inline-block}
+.slo{grid-column:1/5;display:flex;gap:16px;flex-wrap:wrap}
+.slo .badge{height:28px;padding:0 10px;font-size:13px}
+.b-ok{background:var(--ds-color-success-subtle);color:var(--ds-color-success-fg)}
+.b-warn{background:var(--ds-color-warning-subtle);color:var(--ds-color-warning-fg)}
+.b-bad{background:var(--ds-color-danger-subtle);color:var(--ds-color-danger-fg)}
+.b-none{background:var(--ds-color-surface-sunken);color:var(--ds-color-text-secondary)}
 """
 
 SCRIPT = r"""
@@ -783,6 +813,76 @@ def _mobile_section(c: _Ctx) -> str:
     )
 
 
+def _viz_section(c: _Ctx) -> str:
+    """Section `viz`: tiles, live lanes, stacked bars over all eight series, an area chart and the SLO light."""
+    bars = []
+    days = 7
+    for d in range(days):
+        y = 150
+        for k in range(1, 9):
+            h = 4 + ((d * 7 + k * 5) % 13)
+            y -= h
+            bars.append(
+                f'<rect x="{44 + d * 62}" y="{y}" width="40" height="{h}" fill="var(--ds-color-viz-series-{k})"/>'
+            )
+    grid = "".join(
+        f'<line x1="36" x2="480" y1="{y}" y2="{y}" stroke="var(--ds-color-viz-grid)"/>' for y in (30, 70, 110)
+    )
+    axis = '<line x1="36" x2="480" y1="150" y2="150" stroke="var(--ds-color-viz-axis)"/><line x1="36" x2="36" y1="20" y2="150" stroke="var(--ds-color-viz-axis)"/>'
+    labels = "".join(
+        f'<text x="{56 + d * 62}" y="166">{t}</text>'
+        for d, t in enumerate(("Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"))
+    )
+    names = (
+        "dev-runner",
+        "review-bot",
+        "support-agent",
+        "research-bot",
+        "release-bot",
+        "docs-bot",
+        "import-bot",
+        "others",
+    )
+    legend = "".join(
+        f'<span><i style="background:var(--ds-color-viz-series-{k})"></i>{n}</span>' for k, n in enumerate(names, 1)
+    )
+    pts = [(36 + i * 37, 130 - ((i * 37) % 70) - (20 if i % 3 == 0 else 0)) for i in range(13)]
+    line = " ".join(f"{x},{y}" for x, y in pts)
+    area = f"M36,150 L{line.replace(' ', ' L')} L480,150 Z"
+    tiles = "".join(
+        f'<div class="tile"><div class="lab">{lab}</div><div class="num">{num}</div><div class="cmp">{c.ic(ic, "sm")}{cmp}</div></div>'
+        for lab, num, ic, cmp in (
+            ("Runs today", "128", "trigger.followup", "12 more than yesterday"),
+            ("Tool calls", "2,941", "trigger.followup", "8% more than yesterday"),
+            ("Costs today", "USD 14.20", "cost", "Estimate, API mode only"),
+            ("Delivery p99", "84 ms", "run.completed", "on target"),
+        )
+    )
+    lanes = f"""
+<div class="lanes" role="table" aria-label="Live topology">
+  <div class="lane"><div class="lh"><span class="sico" style="color:var(--ds-color-category-loch-fg)">{c.ic("code")}</span>Engineering</div><div class="cards">
+    <div class="rc s-running"><div class="top">{c.ic("run.running", "sm c-running")}dev-runner<span class="t-caption muted">4:12</span></div><div class="bot"><span class="tool">{c.ic("step.tool_call")}Bash</span><span class="t-code-sm">go test</span></div><div class="bot"><span class="badge b-org">Org.</span><span class="t-code-sm">USD 0.62</span></div></div>
+    <div class="rc s-completed"><div class="top">{c.ic("run.completed", "sm c-completed")}review-bot<span class="t-caption muted">2 min ago</span></div><div class="bot"><span class="tool">{c.ic("step.tool_call")}Read</span><span class="t-code-sm">3 files</span></div><div class="bot"><span class="badge b-org">Org.</span><span class="t-code-sm">USD 0.08</span></div></div>
+  </div></div>
+  <div class="lane"><div class="lh"><span class="sico" style="color:var(--ds-color-category-heather-fg)">{c.ic("headset")}</span>Support</div><div class="cards">
+    <div class="rc s-waiting"><div class="top">{c.ic("run.waiting", "sm c-waiting")}support-agent<span class="t-caption muted">waiting</span></div><div class="bot">Approval waiting</div><div class="bot"><span class="badge b-pers">Personal</span><span class="t-caption muted">information only</span></div></div>
+  </div></div>
+</div>"""
+    charts = f"""
+<div class="chart"><h4>Runs per agent, last 7 days</h4><svg viewBox="0 0 490 172" role="img" aria-label="Stacked bars of the runs per agent">{grid}{"".join(bars)}{axis}{labels}</svg><div class="legend">{legend}</div></div>
+<div class="chart"><h4>Delivery p99 today</h4><svg viewBox="0 0 490 172" role="img" aria-label="Area of the delivery time p99">{grid}<path d="{area}" fill="var(--ds-color-viz-area-fill)"/><polyline points="{line}" fill="none" stroke="var(--ds-color-viz-series-1)" stroke-width="2"/>{axis}</svg><div class="legend"><span><i style="background:var(--ds-color-viz-series-1)"></i>p99 in ms</span><span>target 250 ms</span></div></div>"""
+    slo = f"""
+<div class="slo"><span class="badge b-ok">{c.ic("run.completed", "sm")}Delivery: on target</span><span class="badge b-warn">{c.ic("state.warning", "sm")}Reconnect: budget tight</span><span class="badge b-bad">{c.ic("state.error", "sm")}Push: target missed</span><span class="badge b-none">{c.ic("state.info", "sm")}Agent runs: not enough data</span><span class="t-caption muted" style="align-self:center">own measurement</span></div>"""
+    return (
+        '<section class="pv" id="viz"><h2 class="t-title">Statistics and live views</h2><div class="vz">'
+        + tiles
+        + lanes
+        + charts
+        + slo
+        + "</div></section>"
+    )
+
+
 def render(model: Model, vendor: Path, header: str) -> str:
     c = _Ctx(model)
     tokens_css = emit_css.render(model, header)
@@ -805,6 +905,7 @@ def render(model: Model, vendor: Path, header: str) -> str:
         + _layout_section(c)
         + _components_section(c)
         + _mobile_section(c)
+        + _viz_section(c)
         + _palette_section(model)
         + "<script>"
         + SCRIPT

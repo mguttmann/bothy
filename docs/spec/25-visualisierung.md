@@ -497,12 +497,17 @@ setzt (Standard leer, dann gibt es keine Einbettung und keine Lockerung der CSP)
 ## 10. Gemeinsame Designsprache
 
 1. Quelle aller Farben, Schriften, Abstände und Bewegungen ist `design/tokens/` (ADR 0030).
-2. Neue Rollen für Diagramme (Ticket "Viz-Tokens"): `color.viz.series.1` bis `color.viz.series.8`
-   (kategorial, in beiden Themes mit Kontrast `ui` gegen die Fläche geprüft und gegen Rot-Grün-
-   Verwechslung unterscheidbar), `color.viz.grid`, `color.viz.axis`, `color.viz.area-fill` und die
+2. Rollen für Diagramme (in `design/tokens/` vorhanden, Prüfung der Farbschwäche in PLAN M6-10):
+   `color.viz.series.1` bis `color.viz.series.8` (kategorial, in beiden Themes mit Kontrast `ui`
+   gegen die Fläche geprüft und gegen Rot-Grün-Verwechslung unterscheidbar),
+   `color.viz.grid`, `color.viz.axis`, `color.viz.area-fill` und die
    Zuordnung der Ampel auf die vorhandenen Zustandsrollen `color.success.*`, `color.warning.*`,
    `color.danger.*`. Zustände von Läufen nutzen die Rollen der Live-Box. Jede Paarung steht in
-   `design/design-rules.json`.
+   `design/design-rules.json`. "Distinguishable despite red-green confusion" is a gate: `make
+   tokens` simulates protanopia, deuteranopia and tritanopia (Machado et al. 2009, severity 1.0)
+   and requires the OKLab distance `cvd_min_delta_e_ok` of `design/design-rules.json` between
+   adjacent series (series 8 with series 1 included) and between the three traffic light states
+   (`success.fg`, `warning.fg`, `danger.fg`); [contrast.md](../design/contrast.md) lists the rows.
 3. `tools/design-tokens` bekommt eine weitere Ausgabe `design/build/ts/tokens.gen.ts` (Farben je
    Theme, Schriftfamilien, Schriftgrößen, Radien als TypeScript-Konstanten) und kopiert die
    Schriftdateien nach `design/build/ts/fonts/`. Das Plugin importiert nur diese Datei; `tokens.py
@@ -546,7 +551,7 @@ setzt (Standard leer, dann gibt es keine Einbettung und keine Lockerung der CSP)
 
 | Etappe | Inhalt |
 |---|---|
-| nach den frühen M4-Tickets (Design-System; Spur parallel, PLAN P-21) | `bothy_viz` mit Fixtures, Harness und Golden-Tests gegen den Schein-Server; Viz-Tokens; `sli_bounds.py` mit Labels `bothy_sli_metric` |
+| nach den frühen M4-Tickets (Design-System; Spur parallel, PLAN P-21) | `bothy_viz` mit Fixtures, Harness und Golden-Tests gegen den Schein-Server; Prüfung der Viz-Tokens auf Farbschwäche; `sli_bounds.py` mit Labels `bothy_sli_metric` |
 | M6 | Server: `kernel/measure`, `stats_minutes`, Flush, Aufbewahrung, `stats.live`, `getStatsLive`, `getStatsTimeline`, `getStatsSlo`, `getStatsBackends`, Heartbeat-Feld `rate_limit`; Ansichten in Desktop-App, mobiler App und Web-Konsole; TV-Modus in Desktop-App und Konsole; optionale Einbettung in der Konsole |
 | M7 | Grafana-Panel-Plugin, Token-Ausgabe für TypeScript, Dashboard `bothy-live`, Provisioning im Compose-Stack |
 | nach V1 | Signatur als Community-Plugin (Owner-Frage) |

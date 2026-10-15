@@ -65,7 +65,24 @@
      "bg": ["color.surface.sidebar", "color.surface.sidebar-hover", "color.surface.sidebar-selected"]},
     {"usage": "Kategorie-Punkt und Icon auf Inhaltsflächen", "kind": "ui",
      "fg": ["color.category.spruce.fg", "color.category.loch.fg", "color.category.heather.fg", "color.category.rowan.fg", "color.category.amber.fg", "color.category.gorse.fg", "color.category.moss.fg", "color.category.granite.fg"],
-     "bg": ["color.surface.canvas", "color.surface.list", "color.surface.overlay"]}
+     "bg": ["color.surface.canvas", "color.surface.list", "color.surface.overlay"]},
+    {"usage": "Charts: series and axes against the surface", "kind": "ui",
+     "fg": ["color.viz.series.1", "color.viz.series.2", "color.viz.series.3", "color.viz.series.4", "color.viz.series.5", "color.viz.series.6", "color.viz.series.7", "color.viz.series.8", "color.viz.axis"],
+     "bg": ["color.surface.canvas", "color.surface.list", "color.surface.raised"]}
+  ],
+  "cvd_min_delta_e_ok": {
+    "value": 0.05,
+    "source": "Just noticeable difference 0.02 of deltaE OK in CSS Color Module Level 4 (https://www.w3.org/TR/css-color-4/#binsearch), the value tokenkit/color.py names; Szafir, Modeling Color Difference for Visualization Design, IEEE TVCG 24(1), 2018, doi:10.1109/TVCG.2017.2744359.",
+    "reason": "2.5 times the just noticeable difference: chart marks are small (bars, 10 px legend squares, 2 px lines; components.md section 11), and Szafir 2018 measured that the noticeable difference grows as marks get smaller. The factor is a stated design choice, not a measured value."
+  },
+  "cvd_pairs": [
+    {"usage": "Chart series, adjacent in the fixed order; series 8 with series 1 because the order wraps",
+     "deficiencies": ["protanopia", "deuteranopia", "tritanopia"],
+     "sequence": ["color.viz.series.1", "color.viz.series.2", "color.viz.series.3", "color.viz.series.4", "color.viz.series.5", "color.viz.series.6", "color.viz.series.7", "color.viz.series.8"],
+     "wrap": true},
+    {"usage": "SLO traffic light on the state roles",
+     "deficiencies": ["protanopia", "deuteranopia", "tritanopia"],
+     "pairs": [["color.success.fg", "color.warning.fg"], ["color.warning.fg", "color.danger.fg"], ["color.success.fg", "color.danger.fg"]]}
   ],
   "accent_variants": {
     "$comment": "Accents an instance may choose (branding.accent_color, 01 section 12). Roles that alias palette.spruce are swapped for the same step of the chosen scale; every pairing with a swapped role is checked per accent and theme.",

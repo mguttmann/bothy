@@ -15,7 +15,7 @@ Aus dem Wurzelverzeichnis des Repositorys:
 |---|---|
 | `uv run tools/design-tokens/tokens.py build` | Gates prüfen, dann alle Ausgaben schreiben. Exit 1 bei Verstoß, nichts wird geschrieben. |
 | `uv run tools/design-tokens/tokens.py check` | Gates prüfen und vergleichen; Exit 1, wenn eine erzeugte Datei nicht zur Quelle passt. Für das lokale Gate und CI. |
-| `uv run tools/design-tokens/tokens.py previews` | PNG-Vorschauen nach `docs/design/previews/` mit dem Playwright-CLI (`npx`, gepinnte Version in `tokens.py`). Braucht Node und einen installierten Chromium. Nicht Teil von `check`, weil Pixel je Maschine abweichen. |
+| `uv run tools/design-tokens/tokens.py previews [--view NAME]` | PNG-Vorschauen nach `docs/design/previews/` mit dem Playwright-CLI (`npx`, gepinnte Version in `tokens.py`). Braucht Node und einen installierten Chromium. Nicht Teil von `check`, weil Pixel je Maschine abweichen. `--view` (repeatable: `palette`, `layout`, `components`, `mobile`, `viz`) renders only these views and leaves the other images unchanged. |
 | `uv run tools/design-tokens/tokens.py vendor --phosphor DIR --sans DIR --mono DIR` | Schriften und benutzte Phosphor-SVGs nach `vendor/` kopieren (Textdateien mit LF), `vendor/MANIFEST.json` mit SHA-256 der gespeicherten Bytes schreiben. |
 | `make tokens` | Das Gate (Teil von `make gates`): ruft `make -C tools/design-tokens check` auf, also die Tests unter `tests/` und danach `tokens.py check`, beides in der gepinnten Umgebung `tools/`. |
 | `make lint`, `make fmt-check` | ruff mit der Konfiguration `ruff.toml` dieses Ordners, dazu bandit. |
@@ -59,10 +59,27 @@ der benutzten Flutter-Typen; gegen das echte Flutter-SDK ist sie noch nicht übe
    pairing that contains a swapped role is checked per accent and theme with the same
    thresholds; a variant below them, or a scale without a passing step, fails `build` and `check`.
    An invalid member (default not an accent, accent not a scale, role missing) is an error (exit 2).
-3. **Palettenwächter:** verbotene Referenzfarben (OKLab-Abstand), verbotene Farbtonbereiche,
+3. **Color vision deficiency** (`tokenkit/cvd.py`, members `cvd_min_delta_e_ok` and `cvd_pairs`
+   of `design/design-rules.json`): every listed pair is simulated for protanopia, deuteranopia and
+   tritanopia in each theme with the matrices of Machado, Oliveira and Fernandes 2009 at severity
+   1.0 (decode sRGB, multiply in linear sRGB, clip to [0, 1], encode), and the OKLab distance
+   (`delta_e_ok`) of the two simulated colours must reach `cvd_min_delta_e_ok`; the value, its
+   source and its reason stand next to it in the rules file. The pairs: adjacent chart series in
+   the fixed order of components.md section 11 (`sequence`, with `wrap` for series 8 with series
+   1) and the traffic light pairs of `color.success.fg`, `color.warning.fg` and
+   `color.danger.fg` (`pairs`). A failure reads
+   `gate: [light, deuteranopia] color.viz.series.3 and color.viz.series.4: deltaE_ok <distance> < <minimum> (<hex a> and <hex b>, simulated <hex> and <hex>)`:
+   theme, deficiency, both roles, the measured distance, the minimum, the source colours and what
+   they look like under the simulation. Fix it by moving one of the two roles along its scale
+   (lightness first, so the hue order stays recognisable) and keep the contrast pairings green.
+   An unknown role or deficiency is an error of the rules file (exit 2). `contrast.md` lists every
+   row in the section "Color vision deficiency", `tokens.resolved.json` in the member `cvd`.
+   The accents of M4-03 swap none of these roles, so the check runs once per theme (a test holds
+   this).
+4. **Palettenwächter:** verbotene Referenzfarben (OKLab-Abstand), verbotene Farbtonbereiche,
    Mindest-Chroma für Neutrale. Regeln und Quellen stehen in `design/design-rules.json`.
-4. **Aktualität:** `check` vergleicht jede erzeugte Datei Byte für Byte.
-5. **Herkunft:** `check` vergleicht jede Datei unter `vendor/fonts/` und `vendor/phosphor/` mit ihrem
+5. **Aktualität:** `check` vergleicht jede erzeugte Datei Byte für Byte.
+6. **Herkunft:** `check` vergleicht jede Datei unter `vendor/fonts/` und `vendor/phosphor/` mit ihrem
    SHA-256 in `vendor/MANIFEST.json`; eine fehlende, zusätzliche oder veränderte Datei schlägt fehl.
 
 ## Bewusste Grenzen

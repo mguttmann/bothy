@@ -11,7 +11,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from . import color, dtcg
+from . import color, cvd, dtcg
 
 THRESHOLDS = {"text": 4.5, "large-text": 3.0, "ui": 3.0}
 
@@ -40,15 +40,15 @@ class ContrastRow:
         return round(self.ratio, 2) >= self.required
 
 
-def _hex(tokens: dict[str, dtcg.Token], path: str, theme: str) -> str:
+def _hex(tokens: dict[str, dtcg.Token], path: str, theme: str, what: str = "contrast pair") -> str:
     token = tokens.get(path)
     if token is None:
-        raise RuleError(f"contrast pair references unknown token {path!r} (theme {theme})")
+        raise RuleError(f"{what} references unknown token {path!r} (theme {theme})")
     if token.type != "color":
         raise RuleError(f"{path} is not a colour token")
     alpha = dtcg.color_alpha(token.value)
     if alpha < 1:
-        raise RuleError(f"{path} is translucent; contrast pairs need opaque colours")
+        raise RuleError(f"{path} is translucent; {what}s need opaque colours")
     return dtcg.color_hex(token)
 
 
@@ -140,6 +140,80 @@ def check_accent_contrast(
                     accent=accent,
                 )
             )
+    return rows
+
+
+def expand_cvd_pairs(entries: list[dict]) -> list[dict]:
+    """Expand the `cvd_pairs` entries of the rules file into one dict per checked pair.
+
+    An entry names `deficiencies` (non-empty, from `cvd.DEFICIENCIES`) and either `sequence`
+    (roles in their fixed order; adjacent roles form the pairs, `wrap: true` adds last with
+    first) or `pairs` (a list of `[role_a, role_b]`).
+
+    Returns:
+        Dicts with `a`, `b`, `usage` and `deficiencies`, in entry order.
+
+    Raises:
+        RuleError: unknown or missing deficiency, neither `sequence` nor `pairs`, a sequence
+            shorter than two roles, or a pair that is not two roles.
+    """
+    out: list[dict] = []
+    for entry in entries:
+        usage = entry.get("usage", "")
+        deficiencies = entry.get("deficiencies") or []
+        if not deficiencies:
+            raise RuleError(f"cvd_pairs entry {usage!r} names no deficiency")
+        for deficiency in deficiencies:
+            if deficiency not in cvd.DEFICIENCIES:
+                known = ", ".join(cvd.DEFICIENCIES)
+                raise RuleError(f"cvd_pairs entry {usage!r}: unknown deficiency {deficiency!r} (known: {known})")
+        if "sequence" in entry:
+            seq = entry["sequence"]
+            if len(seq) < 2:
+                raise RuleError(f"cvd_pairs entry {usage!r}: a sequence needs at least two roles")
+            pairs = list(zip(seq[:-1], seq[1:], strict=True))
+            if entry.get("wrap"):
+                pairs.append((seq[-1], seq[0]))
+        elif "pairs" in entry:
+            pairs = []
+            for pair in entry["pairs"]:
+                if len(pair) != 2:
+                    raise RuleError(f"cvd_pairs entry {usage!r}: a pair needs exactly two roles, got {pair!r}")
+                pairs.append((pair[0], pair[1]))
+        else:
+            raise RuleError(f"cvd_pairs entry {usage!r} needs `sequence` or `pairs`")
+        out += [{"a": a, "b": b, "usage": usage, "deficiencies": list(deficiencies)} for a, b in pairs]
+    return out
+
+
+def check_cvd(themes: dict[str, dict[str, dtcg.Token]], rule_data: dict) -> list[cvd.CvdRow]:
+    """Colour vision deficiency rows: every `cvd_pairs` pair, per theme and deficiency.
+
+    Args:
+        themes: resolved token map per theme context.
+        rule_data: the whole rules file; reads `cvd_min_delta_e_ok.value` and `cvd_pairs`.
+
+    Returns:
+        Rows per theme (in `themes` order), then per entry and deficiency, then pair.
+        Empty when the rules file has no `cvd_pairs`.
+
+    Raises:
+        RuleError: `cvd_pairs` without `cvd_min_delta_e_ok`, an invalid entry
+            (`expand_cvd_pairs`), or a role that is unknown, not a colour or translucent.
+    """
+    entries = rule_data.get("cvd_pairs")
+    if entries is None:
+        return []
+    minimum = rule_data.get("cvd_min_delta_e_ok", {}).get("value")
+    if not isinstance(minimum, (int, float)) or minimum <= 0:
+        raise RuleError("cvd_pairs needs cvd_min_delta_e_ok.value, a positive number")
+    groups = [(entry, expand_cvd_pairs([entry])) for entry in entries]
+    rows: list[cvd.CvdRow] = []
+    for theme, tokens in themes.items():
+        for entry, pairs in groups:
+            colors = {role: _hex(tokens, role, theme, "cvd pair") for p in pairs for role in (p["a"], p["b"])}
+            triples = [(p["a"], p["b"], p["usage"]) for p in pairs]
+            rows += cvd.check_pairs(theme, colors, triples, entry["deficiencies"], float(minimum))
     return rows
 
 

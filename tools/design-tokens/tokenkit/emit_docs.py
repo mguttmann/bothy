@@ -3,7 +3,7 @@
 
 from __future__ import annotations
 
-from . import color, dtcg, emit_css
+from . import color, cvd, dtcg, emit_css
 from .model import Model
 from .rules import ContrastRow
 
@@ -173,6 +173,38 @@ def _accent_sections(accent_rows: list[ContrastRow], variants: dict[tuple[str, s
     return lines
 
 
+def _cvd_section(cvd_rows: list[cvd.CvdRow], minimum: dict | None) -> list[str]:
+    """Section "Color vision deficiency": model, source, minimum and one row per pair, theme and deficiency."""
+    if not cvd_rows or not minimum:
+        return []
+    failed = [r for r in cvd_rows if not r.passed]
+    lines = [
+        "## Color vision deficiency",
+        "",
+        f"Model: {cvd.MODEL} ({cvd.SOURCE}). Each colour is decoded to linear sRGB, multiplied with",
+        "the matrix of the deficiency, clipped to [0, 1] and encoded again. Measure: OKLab distance",
+        "(`delta_e_ok`) of the two simulated colours. Minimum `cvd_min_delta_e_ok` of",
+        f"`design/design-rules.json`: {minimum['value']:g}. Source: {minimum['source']} Reason: {minimum['reason']}",
+        "",
+        "The pairs (`cvd_pairs`): adjacent chart series in their fixed order, series 8 with series 1",
+        "because the order wraps, and the three traffic light pairs. A simulation is a model, not a",
+        "test with people; series and states always carry a label or an icon with text as well.",
+        "",
+        f"Result: {len(cvd_rows)} rows checked, {len(failed)} below the minimum.",
+        "",
+        "| Theme | Deficiency | Role A | Role B | Values | Simulated | delta_e_ok | Minimum | Result | Usage |",
+        "|---|---|---|---|---|---|---|---|---|---|",
+    ]
+    for r in cvd_rows:
+        verdict = "passed" if r.passed else "FAILED"
+        lines.append(
+            f"| {r.theme} | {r.deficiency} | `{r.a}` | `{r.b}` | `{r.a_hex}` and `{r.b_hex}` | "
+            f"`{r.a_sim}` and `{r.b_sim}` | {r.distance:.3f} | {r.required:g} | {verdict} | {r.usage} |"
+        )
+    lines.append("")
+    return lines
+
+
 def contrast_md(
     rows: list[ContrastRow],
     guards: list[str],
@@ -180,8 +212,10 @@ def contrast_md(
     accent_rows: list[ContrastRow] | None = None,
     variants: dict[tuple[str, str], dict] | None = None,
     default: str = "",
+    cvd_rows: list[cvd.CvdRow] | None = None,
+    cvd_minimum: dict | None = None,
 ) -> str:
-    """The contrast table: base rows per theme, then one section per non-default accent and theme."""
+    """The contrast table: base rows per theme, one section per non-default accent and theme, then the CVD rows."""
     accent_rows = accent_rows or []
     failed = [r for r in rows + accent_rows if not r.passed]
     lines = [
@@ -216,4 +250,5 @@ def contrast_md(
             )
         lines.append("")
     lines += _accent_sections(accent_rows, variants or {}, default)
+    lines += _cvd_section(cvd_rows or [], cvd_minimum)
     return "\n".join(lines)

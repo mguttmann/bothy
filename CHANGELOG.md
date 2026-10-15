@@ -20,6 +20,14 @@ Planning stage (milestone M0). Nothing is installable yet.
 
 ### Added
 
+- Design tokens: `make tokens` checks the chart series `color.viz.series.1` to `.8` (adjacent
+  pairs and series 8 with series 1) and the traffic light states `success.fg`, `warning.fg` and
+  `danger.fg` under simulated protanopia, deuteranopia and tritanopia (Machado et al. 2009,
+  severity 1.0) against the minimum OKLab distance `cvd_min_delta_e_ok`; failures name theme,
+  deficiency, pair and distance, and `docs/design/contrast.md` lists every row (M6-10). The chart
+  roles `color.viz.*`, their contrast pairing and `tokens.py previews --view` come with it (plan
+  ruling D-W-13).
+
 - Design tokens: accent variants for every instance accent of `branding.accent_color` in light and
   dark. The generator swaps the accent roles for the same step of the chosen scale, moves a
   failing step, checks every pairing with a swapped role and writes `DsAccent` (Dart),
@@ -102,6 +110,13 @@ Planning stage (milestone M0). Nothing is installable yet.
   the Compose `stop_grace_period` of every service that runs `serve` (rules D1 to D10).
 
 ### Changed
+
+- Design tokens: series and state roles moved along their scales so that they stay apart under
+  the simulation: light `color.viz.series.3` `spruce.600` to `spruce.700`, `.6` `moss.600` to
+  `moss.900`, `color.warning.fg` `amber.700` to `amber.800`, `color.danger.fg` `rowan.700` to
+  `rowan.900`; dark `color.viz.series.3` `spruce.400` to `spruce.300`, `.7` `rowan.400` to
+  `rowan.500`, `color.danger.fg` `rowan.300` to `rowan.400`. Every contrast pairing stays green;
+  the previews are regenerated (M6-10).
 
 - Gates for a second Go module and the first Dart package (M2-38): `make perf` runs only for
   the Go modules with performance targets (`PERF_MODULES`), a Dart package without `test/` fails

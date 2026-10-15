@@ -4,7 +4,8 @@ Status: Entwurf M0. Spezifikation der Kern-Komponenten für `packages/design_sys
 Farben nur als Token-Namen; Zahlen in [tokens.md](tokens.md) und [palette.md](palette.md). Jede
 Text- oder Icon-Farbe auf einer Fläche steht als Paarung in `design/design-rules.json` und ist in
 [contrast.md](contrast.md) für hell und dunkel geprüft. Bilder:
-[Komponenten dunkel](previews/components-dark.png), [hell](previews/components-light.png).
+[Komponenten dunkel](previews/components-dark.png), [hell](previews/components-light.png); charts
+[dark](previews/viz-dark.png), [light](previews/viz-light.png).
 Datenfelder nach [03-datenmodell.md](../spec/03-datenmodell.md), Ereignisse nach
 [04-sync-protokoll.md](../spec/04-sync-protokoll.md).
 
@@ -318,7 +319,7 @@ Apps und Konsole; dieselben Rollen nutzt das Grafana-Panel über die TypeScript-
 | Bahn (Bereich) | Zeile mit Kopf links (Kategorie-Farbe und Icon des Bereichs), Linie `color.viz.grid` zwischen Bahnen | `color.border.*`, `space.*` |
 | Lauf-Karte | wie eine eingeklappte Live-Box: Rückgrat links in der Zustandsfarbe des Laufs, Agent, Werkzeug-Chip (Abschnitt 3), Abzeichen Backend-Richtlinie (Abschnitt 10), Kosten in Mono | Rollen der Live-Box, `type.code` |
 | Kennzahl-Kachel | Zahl groß in Mono, Etikett darüber, Vergleich zum Vorzeitraum als Text mit Icon (nie nur Farbe) | `type.display`, `type.label` |
-| Fläche und Balken | Serien in `color.viz.series.1` bis `.8` in fester Reihenfolge; Achsen `color.viz.axis`; Füllung `color.viz.area-fill` | neue Rollen (Ticket "Viz-Tokens") |
+| Fläche und Balken | Serien in `color.viz.series.1` bis `.8` in fester Reihenfolge; Achsen `color.viz.axis`; Füllung `color.viz.area-fill`; grid lines `color.viz.grid` | `color.viz.*` |
 | SLO-Ampel | Punkt mit Icon und Text "im Ziel", "Budget knapp", "Ziel verfehlt", "zu wenig Daten" und Etikett "eigene Messung" | `color.success.*`, `color.warning.*`, `color.danger.*`, neutrale Rolle für "zu wenig Daten" |
 | Zeitleiste | Abspielkopf als senkrechte Linie, Steuerung mit Icons aus `icon.tokens.json` | `motion.*` |
 
@@ -326,9 +327,19 @@ Regeln:
 
 - Kein Verlauf, kein Leuchten, keine 3D-Optik (Verbotsliste in [README.md](README.md)).
 - Jede Grundform hat Semantik und eine Tabellenansicht mit denselben Werten.
-- Neue Rollen `color.viz.*` brauchen Paarungen in `design/design-rules.json` mit Kontrast `ui`
-  gegen die Fläche in beiden Themes; die kategorialen Serien müssen ohne Rot-Grün-Unterscheidung
-  unterscheidbar sein (Muster oder Beschriftung als zweites Merkmal).
+- The roles `color.viz.*` are in the tokens; series and axis are checked against `surface.canvas`,
+  `surface.list` and `surface.raised` with contrast `ui` in both themes
+  ([contrast.md](contrast.md)). `grid` and `area-fill` never carry information alone and therefore
+  have no contrast requirement. The series order starts with blue and orange, which stay
+  distinguishable with red-green color blindness; a second cue (label or pattern) is required
+  anyway. `make tokens` also checks every adjacent pair of series (1 with 2 up to 7 with 8, and
+  8 with 1 because the order wraps when a view needs more than eight groups) under simulated
+  protanopia, deuteranopia and tritanopia: the OKLab distance of the simulated colours must reach
+  `cvd_min_delta_e_ok` of `design/design-rules.json` (section "Color vision deficiency" of
+  [contrast.md](contrast.md)).
+- The SLO traffic light uses only `color.success.*`, `color.warning.*` and `color.danger.*`; the
+  same check holds `success.fg`, `warning.fg` and `danger.fg` pairwise apart by
+  `cvd_min_delta_e_ok`, and every state carries an icon and text as well.
 - TV-Modus: dunkles Theme, Dichte `comfortable`, Schriftgrößen eine Stufe größer; keine Bewegung im
   Kontext `reduced`.
 
