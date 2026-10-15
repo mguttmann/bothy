@@ -1,0 +1,191 @@
+{
+  "at": "2026-10-15T10:00:00.000Z",
+  "interval_ms": 1000,
+  "scope": {
+    "kind": "instance"
+  },
+  "runs": [
+    {
+      "run_id": "0192f4a0-7b1c-7000-8a00-000000000401",
+      "thread_id": "0192f4a0-7b1c-7000-8a00-000000000301",
+      "channel_id": "0192f4a0-7b1c-7000-8a00-000000000102",
+      "space_id": "0192f4a0-7b1c-7000-8a00-000000000002",
+      "agent_id": "0192f4a0-7b1c-7000-8a00-000000000202",
+      "state": "running",
+      "queued_at": "2026-10-15T09:58:25.000Z",
+      "started_at": "2026-10-15T09:58:30.000Z",
+      "billing_mode": "organization",
+      "step": {
+        "kind": "tool_call",
+        "name": "Bash"
+      },
+      "approval_pending": false,
+      "cost_micros": 620000,
+      "currency": "USD",
+      "cost_is_estimate": true
+    },
+    {
+      "run_id": "0192f4a0-7b1c-7000-8a00-000000000402",
+      "thread_id": "0192f4a0-7b1c-7000-8a00-000000000302",
+      "channel_id": "0192f4a0-7b1c-7000-8a00-000000000103",
+      "space_id": "0192f4a0-7b1c-7000-8a00-000000000002",
+      "agent_id": "0192f4a0-7b1c-7000-8a00-000000000202",
+      "state": "waiting_input",
+      "queued_at": "2026-10-15T09:55:00.000Z",
+      "started_at": "2026-10-15T09:55:10.000Z",
+      "billing_mode": "organization",
+      "step": {
+        "kind": "tool_call",
+        "name": "Edit"
+      },
+      "approval_pending": true,
+      "cost_micros": 120000,
+      "currency": "USD",
+      "cost_is_estimate": false
+    },
+    {
+      "run_id": "0192f4a0-7b1c-7000-8a00-000000000403",
+      "thread_id": "0192f4a0-7b1c-7000-8a00-000000000303",
+      "channel_id": "0192f4a0-7b1c-7000-8a00-000000000101",
+      "space_id": "0192f4a0-7b1c-7000-8a00-000000000001",
+      "agent_id": "0192f4a0-7b1c-7000-8a00-000000000201",
+      "state": "queued",
+      "queued_at": "2026-10-15T09:59:56.000Z",
+      "billing_mode": "personal",
+      "approval_pending": false,
+      "cost_micros": 50000,
+      "currency": "USD",
+      "cost_is_estimate": true
+    },
+    {
+      "run_id": "0192f4a0-7b1c-7000-8a00-000000000404",
+      "thread_id": "0192f4a0-7b1c-7000-8a00-000000000304",
+      "channel_id": "0192f4a0-7b1c-7000-8a00-000000000101",
+      "space_id": "0192f4a0-7b1c-7000-8a00-000000000001",
+      "agent_id": "0192f4a0-7b1c-7000-8a00-000000000201",
+      "state": "running",
+      "queued_at": "2026-10-15T09:59:20.000Z",
+      "started_at": "2026-10-15T09:59:22.000Z",
+      "billing_mode": "personal",
+      "step": {
+        "kind": "subagent",
+        "name": "triage"
+      },
+      "approval_pending": false,
+      "cost_micros": 30000,
+      "currency": "USD",
+      "cost_is_estimate": true
+    }
+  ],
+  "runs_truncated": false,
+  "agents": [
+    {
+      "agent_id": "0192f4a0-7b1c-7000-8a00-000000000201",
+      "presence": "online",
+      "billing_mode": "personal",
+      "rate_limit": {
+        "state": "near_limit",
+        "resets_at": "2026-10-15T10:20:00.000Z"
+      }
+    },
+    {
+      "agent_id": "0192f4a0-7b1c-7000-8a00-000000000202",
+      "presence": "degraded",
+      "billing_mode": "organization",
+      "reported_billing_mode": "organization",
+      "rate_limit": {
+        "state": "ok"
+      }
+    }
+  ],
+  "rates": [
+    {
+      "metric": "messages_created",
+      "last_minute": 14,
+      "current_minute": 5
+    },
+    {
+      "metric": "runs_started",
+      "last_minute": 3,
+      "current_minute": 1
+    },
+    {
+      "metric": "tool_calls",
+      "last_minute": 41,
+      "current_minute": 12,
+      "last_minute_sum": 9300
+    },
+    {
+      "metric": "invocations_denied",
+      "last_minute": 0,
+      "current_minute": 0
+    },
+    {
+      "metric": "catchups",
+      "last_minute": 2,
+      "current_minute": 0,
+      "last_minute_sum": 840
+    },
+    {
+      "metric": "resyncs",
+      "dimension": "too_far_behind",
+      "last_minute": 1,
+      "current_minute": 0
+    },
+    {
+      "metric": "slow_consumer_closes",
+      "last_minute": 0,
+      "current_minute": 0
+    },
+    {
+      "metric": "cost",
+      "dimension": "organization",
+      "last_minute": 3,
+      "current_minute": 1,
+      "last_minute_sum": 740000,
+      "currency": "USD"
+    }
+  ],
+  "sli": [
+    {
+      "metric": "sli.api_availability",
+      "total": 12000,
+      "good": 11994,
+      "ratio": 0.9995
+    },
+    {
+      "metric": "sli.delivery_latency",
+      "total": 5400,
+      "good": 5391,
+      "ratio": 0.99833
+    },
+    {
+      "metric": "sli.reconnect",
+      "total": 80,
+      "good": 79,
+      "ratio": 0.9875
+    },
+    {
+      "metric": "sli.push_acceptance",
+      "total": 0,
+      "good": 0
+    },
+    {
+      "metric": "sli.run_start",
+      "total": 40,
+      "good": 40,
+      "ratio": 1.0
+    },
+    {
+      "metric": "sli.turn_duration",
+      "total": 36,
+      "good": 33,
+      "ratio": 0.91667
+    }
+  ],
+  "connections": {
+    "user": 12,
+    "agent": 2,
+    "app": 1
+  }
+}
