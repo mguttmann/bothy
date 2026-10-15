@@ -16,7 +16,9 @@ import (
 	"github.com/OWNER/bothy/services/server/internal/kernel/ids"
 )
 
-func (s *store) ShareSpace(ctx context.Context, id ids.ID) (domain.Space, bool, error) { return s.Space(ctx, id) }
+func (s *store) ShareSpace(ctx context.Context, id ids.ID) (domain.Space, bool, error) {
+	return s.Space(ctx, id)
+}
 
 func (s *store) ShareChannel(ctx context.Context, id ids.ID) (app.ChannelRow, bool, error) {
 	return s.Channel(ctx, id)

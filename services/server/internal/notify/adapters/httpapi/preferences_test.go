@@ -109,9 +109,9 @@ func (e *env) put(name, kind string, id ids.ID, body string) *httpservertest.Res
 // level is a body with level only.
 func level(l string) string { return `{"level":"` + l + `"}` }
 
-// num returns the JSON number m[k] as int.
-func num(m map[string]any, k string) int {
-	f, _ := m[k].(float64)
+// version returns the JSON number m["version"] as int.
+func version(m map[string]any) int {
+	f, _ := m["version"].(float64)
 	return int(f)
 }
 
@@ -305,7 +305,7 @@ func TestPutNotificationPreference_Lifecycle(t *testing.T) {
 	t.Parallel()
 	e := newEnv(t)
 	m := e.Want(e.put("alex", "thread", e.t, level("mentions")), http.StatusOK, "")
-	if num(m, "version") != 1 || m["level"] != "mentions" || m["target_kind"] != "thread" || m["target_id"] != e.t.String() {
+	if version(m) != 1 || m["level"] != "mentions" || m["target_kind"] != "thread" || m["target_id"] != e.t.String() {
 		t.Fatalf("first put %v", m)
 	}
 	if _, ok := m["muted_until"]; ok {
@@ -323,17 +323,17 @@ func TestPutNotificationPreference_Lifecycle(t *testing.T) {
 		t.Fatalf("actor %s", evs[0].actor)
 	}
 	m = e.Want(e.put("alex", "thread", e.t, level("mentions")), http.StatusOK, "")
-	if num(m, "version") != 1 || len(e.events(t, "notification_pref.updated")) != 1 {
+	if version(m) != 1 || len(e.events(t, "notification_pref.updated")) != 1 {
 		t.Fatalf("the same body again: %v", m)
 	}
 	m = e.Want(e.put("alex", "thread", e.t, level("all")), http.StatusOK, "")
-	if num(m, "version") != 2 || len(e.events(t, "notification_pref.updated")) != 2 {
+	if version(m) != 2 || len(e.events(t, "notification_pref.updated")) != 2 {
 		t.Fatalf("another level: %v", m)
 	}
 	nanos := e.Clock.Now().Add(time.Hour).Add(123456789 * time.Nanosecond).UTC()
 	body := `{"level":"all","muted_until":"` + nanos.Format(time.RFC3339Nano) + `"}`
 	m = e.Want(e.put("alex", "thread", e.t, body), http.StatusOK, "")
-	if num(m, "version") != 3 || m["muted_until"] != nanos.Truncate(time.Millisecond).Format("2006-01-02T15:04:05.000Z") {
+	if version(m) != 3 || m["muted_until"] != nanos.Truncate(time.Millisecond).Format("2006-01-02T15:04:05.000Z") {
 		t.Fatalf("muted_until answer: %v", m)
 	}
 	var stored time.Time
@@ -344,7 +344,7 @@ func TestPutNotificationPreference_Lifecycle(t *testing.T) {
 		t.Fatalf("stored %v, want microseconds of %v", stored, nanos)
 	}
 	m = e.Want(e.put("alex", "thread", e.t, body), http.StatusOK, "")
-	if num(m, "version") != 3 || len(e.events(t, "notification_pref.updated")) != 3 {
+	if version(m) != 3 || len(e.events(t, "notification_pref.updated")) != 3 {
 		t.Fatalf("an equal muted_until is a no-op: %v", m)
 	}
 }
@@ -369,7 +369,7 @@ func TestDeleteNotificationPreference(t *testing.T) {
 	if n := len(e.events(t, "notification_pref.updated")); n != 3 {
 		t.Fatalf("a second delete wrote an event: %d", n)
 	}
-	if m := e.Want(e.put("alex", "channel", e.allgemein, level("all")), http.StatusOK, ""); num(m, "version") != 1 {
+	if m := e.Want(e.put("alex", "channel", e.allgemein, level("all")), http.StatusOK, ""); version(m) != 1 {
 		t.Fatalf("restart: %v", m)
 	}
 }
@@ -438,8 +438,8 @@ func TestNotificationPreference_TargetChecks(t *testing.T) {
 		{http.MethodPut, prefPath("thread", e.t), level("all")},
 		{http.MethodDelete, prefPath("thread", e.t), ""},
 		{http.MethodGet, quietPath, ""},
-		{http.MethodPost, quietPath, ruleBody(31, "22:00", "07:00", "", true)},
-		{http.MethodPut, rulePath(rule), ruleBody(31, "22:00", "07:00", "", true)},
+		{http.MethodPost, quietPath, ruleBody(31, "22:00", "07:00", "")},
+		{http.MethodPut, rulePath(rule), ruleBody(31, "22:00", "07:00", "")},
 		{http.MethodDelete, rulePath(rule), ""},
 	} {
 		headers := []string{}
@@ -597,9 +597,9 @@ func TestArchive_RaceWithPut(t *testing.T) {
 	}
 }
 
-// ruleBody is a QuietHoursRuleInput; an empty zone is absent.
-func ruleBody(weekdays int, start, end, zone string, enabled bool) string {
-	b := `{"weekdays":` + strconv.Itoa(weekdays) + `,"start_local":"` + start + `","end_local":"` + end + `","enabled":` + strconv.FormatBool(enabled)
+// ruleBody is an enabled QuietHoursRuleInput; an empty zone is absent.
+func ruleBody(weekdays int, start, end, zone string) string {
+	b := `{"weekdays":` + strconv.Itoa(weekdays) + `,"start_local":"` + start + `","end_local":"` + end + `","enabled":true`
 	if zone != "" {
 		b += `,"time_zone":"` + zone + `"`
 	}
@@ -620,10 +620,10 @@ func TestQuietHours_Lifecycle(t *testing.T) {
 	t.Parallel()
 	e := newEnv(t)
 	key := mw.Key()
-	r := e.Do("alex", http.MethodPost, quietPath, ruleBody(31, "22:00", "07:00", "Europe/Berlin", true), key...)
+	r := e.Do("alex", http.MethodPost, quietPath, ruleBody(31, "22:00", "07:00", "Europe/Berlin"), key...)
 	m := e.Want(r, http.StatusCreated, "")
 	id := m["id"].(string)
-	if num(m, "version") != 1 || m["time_zone"] != "Europe/Berlin" {
+	if version(m) != 1 || m["time_zone"] != "Europe/Berlin" {
 		t.Fatalf("create %v", m)
 	}
 	evs := e.events(t, "quiet_hours.updated")
@@ -634,27 +634,27 @@ func TestQuietHours_Lifecycle(t *testing.T) {
 	if p := quietPayload(t, evs[0].payload); len(p.Rules) != 1 || p.Rules[0].Id.String() != id {
 		t.Fatalf("payload %s", evs[0].payload)
 	}
-	again := e.Do("alex", http.MethodPost, quietPath, ruleBody(31, "22:00", "07:00", "Europe/Berlin", true), key...)
+	again := e.Do("alex", http.MethodPost, quietPath, ruleBody(31, "22:00", "07:00", "Europe/Berlin"), key...)
 	if am := e.Want(again, http.StatusCreated, ""); am["id"] != id || again.Header.Get("Idempotent-Replay") != "true" {
 		t.Fatalf("replay %v %v", again.Header, am)
 	}
-	second := e.Want(e.Do("alex", http.MethodPost, quietPath, ruleBody(96, "00:00", "00:00", "", true), mw.Key()...), http.StatusCreated, "")
+	second := e.Want(e.Do("alex", http.MethodPost, quietPath, ruleBody(96, "00:00", "00:00", ""), mw.Key()...), http.StatusCreated, "")
 	if n := e.Count(`SELECT count(*)::int FROM quiet_hours`); n != 2 {
 		t.Fatalf("%d rules", n)
 	}
 	if p := quietPayload(t, e.events(t, "quiet_hours.updated")[1].payload); len(p.Rules) != 2 || p.Rules[0].Id.String() > p.Rules[1].Id.String() {
 		t.Fatalf("complete list ascending: %+v", p.Rules)
 	}
-	m = e.Want(e.Do("alex", http.MethodPut, rulePath(id), ruleBody(31, "22:00", "07:00", "Europe/Berlin", true)), http.StatusOK, "")
-	if num(m, "version") != 1 || len(e.events(t, "quiet_hours.updated")) != 2 {
+	m = e.Want(e.Do("alex", http.MethodPut, rulePath(id), ruleBody(31, "22:00", "07:00", "Europe/Berlin")), http.StatusOK, "")
+	if version(m) != 1 || len(e.events(t, "quiet_hours.updated")) != 2 {
 		t.Fatalf("no-op put %v", m)
 	}
-	m = e.Want(e.Do("alex", http.MethodPut, rulePath(id), ruleBody(31, "22:00", "07:00", "", true)), http.StatusOK, "")
-	if _, ok := m["time_zone"]; ok || num(m, "version") != 2 || len(e.events(t, "quiet_hours.updated")) != 3 {
+	m = e.Want(e.Do("alex", http.MethodPut, rulePath(id), ruleBody(31, "22:00", "07:00", "")), http.StatusOK, "")
+	if _, ok := m["time_zone"]; ok || version(m) != 2 || len(e.events(t, "quiet_hours.updated")) != 3 {
 		t.Fatalf("put without zone %v", m)
 	}
-	mw.Same404(t, e.Do("sam", http.MethodPut, rulePath(id), ruleBody(1, "01:00", "02:00", "", true)),
-		e.Do("sam", http.MethodPut, rulePath(ids.New().String()), ruleBody(1, "01:00", "02:00", "", true)))
+	mw.Same404(t, e.Do("sam", http.MethodPut, rulePath(id), ruleBody(1, "01:00", "02:00", "")),
+		e.Do("sam", http.MethodPut, rulePath(ids.New().String()), ruleBody(1, "01:00", "02:00", "")))
 	mw.Same404(t, e.Do("sam", http.MethodDelete, rulePath(id), ""), e.Do("sam", http.MethodDelete, rulePath(ids.New().String()), ""))
 	e.Want(e.Do("alex", http.MethodDelete, rulePath(id), ""), http.StatusNoContent, "")
 	evs = e.events(t, "quiet_hours.updated")
@@ -673,7 +673,7 @@ func TestQuietHours_Validation(t *testing.T) {
 	t.Parallel()
 	e := newEnv(t)
 	for _, zone := range []string{"Mars/Olympus", "Local"} {
-		p := e.Want(e.Do("alex", http.MethodPost, quietPath, ruleBody(31, "22:00", "07:00", zone, true), mw.Key()...), http.StatusBadRequest, "validation_failed")
+		p := e.Want(e.Do("alex", http.MethodPost, quietPath, ruleBody(31, "22:00", "07:00", zone), mw.Key()...), http.StatusBadRequest, "validation_failed")
 		if ptr, code := mw.Field(p); ptr != "/time_zone" || code != "unknown_time_zone" {
 			t.Fatalf("%s: %v", zone, p)
 		}
@@ -683,9 +683,9 @@ func TestQuietHours_Validation(t *testing.T) {
 	if ptr, code := mw.Field(p); ptr != "/time_zone" || code != "unknown_time_zone" {
 		t.Fatalf("empty zone: %v", p)
 	}
-	e.Want(e.Do("alex", http.MethodPost, quietPath, ruleBody(0, "22:00", "07:00", "", true), mw.Key()...), http.StatusBadRequest, "validation_failed")
-	e.Want(e.Do("alex", http.MethodPost, quietPath, ruleBody(31, "24:00", "07:00", "", true), mw.Key()...), http.StatusBadRequest, "validation_failed")
-	e.Want(e.Do("alex", http.MethodPost, quietPath, ruleBody(31, "00:00", "00:00", "", true), mw.Key()...), http.StatusCreated, "")
+	e.Want(e.Do("alex", http.MethodPost, quietPath, ruleBody(0, "22:00", "07:00", ""), mw.Key()...), http.StatusBadRequest, "validation_failed")
+	e.Want(e.Do("alex", http.MethodPost, quietPath, ruleBody(31, "24:00", "07:00", ""), mw.Key()...), http.StatusBadRequest, "validation_failed")
+	e.Want(e.Do("alex", http.MethodPost, quietPath, ruleBody(31, "00:00", "00:00", ""), mw.Key()...), http.StatusCreated, "")
 }
 
 // TestQuietHours_ListBoundByPayloadSize: with a small sync.event_payload_max_bytes the create that
@@ -696,7 +696,7 @@ func TestQuietHours_ListBoundByPayloadSize(t *testing.T) {
 	e := newEnvWith(t, 600)
 	var created []string
 	for range 20 {
-		r := e.Do("alex", http.MethodPost, quietPath, ruleBody(31, "22:00", "07:00", "Europe/Berlin", true), mw.Key()...)
+		r := e.Do("alex", http.MethodPost, quietPath, ruleBody(31, "22:00", "07:00", "Europe/Berlin"), mw.Key()...)
 		if r.StatusCode == http.StatusBadRequest {
 			p := e.Want(r, http.StatusBadRequest, "validation_failed")
 			if ptr, code := mw.Field(p); ptr != "" || code != "limit_reached" {
@@ -709,7 +709,7 @@ func TestQuietHours_ListBoundByPayloadSize(t *testing.T) {
 	if len(created) == 0 || len(created) == 20 || e.Count(`SELECT count(*)::int FROM quiet_hours`) != len(created) {
 		t.Fatalf("%d created", len(created))
 	}
-	e.Want(e.Do("alex", http.MethodPut, rulePath(created[0]), ruleBody(31, "21:00", "07:00", "Europe/Berlin", true)), http.StatusOK, "")
+	e.Want(e.Do("alex", http.MethodPut, rulePath(created[0]), ruleBody(31, "21:00", "07:00", "Europe/Berlin")), http.StatusOK, "")
 }
 
 // TestQuietHours_ConcurrentCreates: ten parallel creates give ten rows, ten events, and the last
@@ -722,7 +722,7 @@ func TestQuietHours_ConcurrentCreates(t *testing.T) {
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
-			r := e.Do("alex", http.MethodPost, quietPath, ruleBody(31, "22:00", "07:00", "", true), mw.Key()...)
+			r := e.Do("alex", http.MethodPost, quietPath, ruleBody(31, "22:00", "07:00", ""), mw.Key()...)
 			if r.StatusCode != http.StatusCreated {
 				t.Errorf("status %d: %s", r.StatusCode, r.Body)
 			}
@@ -745,7 +745,7 @@ func TestQuietRules_UserTimeZone(t *testing.T) {
 	e := newEnv(t)
 	// updateMyProfile is not part of this world; the column is set as identity would store it.
 	e.SQL(`UPDATE users SET time_zone = 'Europe/Berlin' WHERE principal_id = $1`, e.alex.String())
-	id := e.Want(e.Do("alex", http.MethodPost, quietPath, ruleBody(16, "22:00", "07:00", "", true), mw.Key()...), http.StatusCreated, "")["id"].(string)
+	id := e.Want(e.Do("alex", http.MethodPost, quietPath, ruleBody(16, "22:00", "07:00", ""), mw.Key()...), http.StatusCreated, "")["id"].(string)
 	at := func(s string) bool {
 		t.Helper()
 		rules, err := e.Notify.Facts().QuietRules(context.Background(), []ids.ID{e.alex})
@@ -762,7 +762,7 @@ func TestQuietRules_UserTimeZone(t *testing.T) {
 	if !at("2026-10-23T21:30:00Z") || at("2026-10-23T19:30:00Z") {
 		t.Fatal("the person's zone Europe/Berlin")
 	}
-	e.Want(e.Do("alex", http.MethodPut, rulePath(id), ruleBody(16, "22:00", "07:00", "UTC", true)), http.StatusOK, "")
+	e.Want(e.Do("alex", http.MethodPut, rulePath(id), ruleBody(16, "22:00", "07:00", "UTC")), http.StatusOK, "")
 	if at("2026-10-23T21:30:00Z") || !at("2026-10-23T22:30:00Z") {
 		t.Fatal("the rule's zone UTC")
 	}
@@ -774,14 +774,14 @@ func TestPersonalDataNotRetrievable(t *testing.T) {
 	t.Parallel()
 	e := newEnv(t)
 	e.Want(e.put("alex", "channel", e.allgemein, level("mute")), http.StatusOK, "")
-	id := e.Want(e.Do("alex", http.MethodPost, quietPath, ruleBody(31, "22:00", "07:00", "", true), mw.Key()...), http.StatusCreated, "")["id"].(string)
+	id := e.Want(e.Do("alex", http.MethodPost, quietPath, ruleBody(31, "22:00", "07:00", ""), mw.Key()...), http.StatusCreated, "")["id"].(string)
 	if items := e.Want(e.Do("sam", http.MethodGet, prefsPath, ""), http.StatusOK, "")["items"].([]any); len(items) != 0 {
 		t.Fatalf("sam sees %v", items)
 	}
 	if items := e.Want(e.Do("sam", http.MethodGet, quietPath, ""), http.StatusOK, "")["items"].([]any); len(items) != 0 {
 		t.Fatalf("sam sees %v", items)
 	}
-	e.Want(e.Do("sam", http.MethodPut, rulePath(id), ruleBody(31, "22:00", "07:00", "", true)), http.StatusNotFound, "not_found")
+	e.Want(e.Do("sam", http.MethodPut, rulePath(id), ruleBody(31, "22:00", "07:00", "")), http.StatusNotFound, "not_found")
 	e.Want(e.Do("sam", http.MethodDelete, rulePath(id), ""), http.StatusNotFound, "not_found")
 	// Sam's own delete on Allgemein touches only Sam's row.
 	e.Want(e.Do("sam", http.MethodDelete, prefPath("channel", e.allgemein), ""), http.StatusNoContent, "")

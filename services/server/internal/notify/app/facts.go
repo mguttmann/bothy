@@ -5,6 +5,7 @@ package app
 import (
 	"context"
 	"encoding/json"
+	"slices"
 	"time"
 
 	"github.com/OWNER/bothy/services/server/internal/chat"
@@ -49,20 +50,9 @@ func (f Facts) LevelFacts(ctx context.Context, threadID ids.ID, userIDs []ids.ID
 		return nil, err
 	}
 	for _, r := range rows {
-		lf, ok := out[r.UserID]
-		if !ok {
-			continue
+		if lf, ok := out[r.UserID]; ok {
+			out[r.UserID] = withRow(lf, path, r)
 		}
-		p := &domain.Preference{Level: domain.Level(r.Level), MutedUntil: r.MutedUntil}
-		switch {
-		case r.Target.Kind == chat.TargetThread && r.Target.ID == path.ThreadID:
-			lf.Thread = p
-		case r.Target.Kind == chat.TargetChannel && r.Target.ID == path.ChannelID:
-			lf.Channel = p
-		case r.Target.Kind == chat.TargetSpace && !path.SpaceID.IsZero() && r.Target.ID == path.SpaceID:
-			lf.Space = p
-		}
-		out[r.UserID] = lf
 	}
 	vals, err := f.d.Settings.ValuesFor(ctx, userIDs, []string{settingDefaultLevel})
 	if err != nil {
@@ -70,23 +60,47 @@ func (f Facts) LevelFacts(ctx context.Context, threadID ids.ID, userIDs []ids.ID
 	}
 	invalid := false
 	for u, kv := range vals {
-		raw, ok := kv[settingDefaultLevel]
 		lf, known := out[u]
-		if !ok || !known {
+		if !known {
 			continue
 		}
-		var s string
-		if json.Unmarshal(raw, &s) != nil || !domain.Level(s).Valid() {
-			invalid = true
-			continue
-		}
-		lf.PersonalDefault = domain.Level(s)
+		level, ok := personalDefault(kv)
+		invalid = invalid || !ok
+		lf.PersonalDefault = level
 		out[u] = lf
 	}
 	if invalid {
 		f.d.Log.WarnContext(ctx, "notify: a stored notify.default_level is not a level and counts as unset")
 	}
 	return out, nil
+}
+
+// withRow puts the own row r into the slot of lf its target names on path.
+func withRow(lf domain.LevelFacts, path chat.NotificationPath, r PreferenceRow) domain.LevelFacts {
+	p := &domain.Preference{Level: domain.Level(r.Level), MutedUntil: r.MutedUntil}
+	switch {
+	case r.Target.Kind == chat.TargetThread && r.Target.ID == path.ThreadID:
+		lf.Thread = p
+	case r.Target.Kind == chat.TargetChannel && r.Target.ID == path.ChannelID:
+		lf.Channel = p
+	case r.Target.Kind == chat.TargetSpace && !path.SpaceID.IsZero() && r.Target.ID == path.SpaceID:
+		lf.Space = p
+	}
+	return lf
+}
+
+// personalDefault reads the stored notify.default_level of kv; ok is false for a stored value
+// that is not a level (it then counts as unset). An absent key is "" and ok.
+func personalDefault(kv map[string]json.RawMessage) (domain.Level, bool) {
+	raw, present := kv[settingDefaultLevel]
+	if !present {
+		return "", true
+	}
+	var s string
+	if json.Unmarshal(raw, &s) != nil || !domain.Level(s).Valid() {
+		return "", false
+	}
+	return domain.Level(s), true
 }
 
 // QuietRules returns the quiet-hour rules of the people userIDs with their zones loaded (brief
@@ -106,31 +120,11 @@ func (f Facts) QuietRules(ctx context.Context, userIDs []ids.ID) (map[ids.ID][]d
 	if err != nil {
 		return nil, err
 	}
-	var needZone []ids.ID
-	for u, rules := range stored {
-		for _, r := range rules {
-			if r.TimeZone == "" {
-				needZone = append(needZone, u)
-				break
-			}
-		}
-	}
-	people, err := f.d.Users.Users(ctx, needZone)
+	people, err := f.d.Users.Users(ctx, needingZone(stored))
 	if err != nil {
 		return nil, err
 	}
-	zones, failed := map[string]*time.Location{}, false
-	load := func(name string) *time.Location {
-		if loc, ok := zones[name]; ok {
-			return loc
-		}
-		loc, err := time.LoadLocation(name)
-		if err != nil || name == "" || name == "Local" {
-			loc, failed = time.UTC, true
-		}
-		zones[name] = loc
-		return loc
-	}
+	zones := &zoneCache{m: map[string]*time.Location{}}
 	for u, rules := range stored {
 		list := make([]domain.QuietRule, 0, len(rules))
 		for _, r := range rules {
@@ -138,7 +132,7 @@ func (f Facts) QuietRules(ctx context.Context, userIDs []ids.ID) (map[ids.ID][]d
 			if name == "" {
 				name = people[u].TimeZone
 			}
-			qr, err := quietRule(r, load(name))
+			qr, err := quietRule(r, zones.load(name))
 			if err != nil {
 				return nil, err
 			}
@@ -146,10 +140,41 @@ func (f Facts) QuietRules(ctx context.Context, userIDs []ids.ID) (map[ids.ID][]d
 		}
 		out[u] = list
 	}
+	failed := zones.failed
 	if failed {
 		f.d.Log.WarnContext(ctx, "notify: a stored time zone no longer loads and counts as UTC")
 	}
 	return out, nil
+}
+
+// needingZone returns the people with at least one rule without its own zone.
+func needingZone(stored map[ids.ID][]notify.QuietHoursRule) []ids.ID {
+	var out []ids.ID
+	for u, rules := range stored {
+		if slices.ContainsFunc(rules, func(r notify.QuietHoursRule) bool { return r.TimeZone == "" }) {
+			out = append(out, u)
+		}
+	}
+	return out
+}
+
+// zoneCache loads each zone name once per call; a name that does not load is UTC and sets failed.
+type zoneCache struct {
+	m      map[string]*time.Location
+	failed bool
+}
+
+// load returns the zone of name.
+func (z *zoneCache) load(name string) *time.Location {
+	if loc, ok := z.m[name]; ok {
+		return loc
+	}
+	loc, err := time.LoadLocation(name)
+	if err != nil || name == "" || name == "Local" {
+		loc, z.failed = time.UTC, true
+	}
+	z.m[name] = loc
+	return loc
 }
 
 // quietRule converts a stored rule for domain.InQuietHours.
@@ -159,5 +184,5 @@ func quietRule(r notify.QuietHoursRule, loc *time.Location) (domain.QuietRule, e
 	if err1 != nil || err2 != nil || r.Weekdays < 1 || r.Weekdays > 127 {
 		return domain.QuietRule{}, errs.New(errs.CodeInternalError, "notify: a stored quiet-hour rule breaks the table checks")
 	}
-	return domain.QuietRule{Weekdays: uint8(r.Weekdays), Start: start, End: end, Location: loc, Enabled: r.Enabled}, nil //nolint:gosec // G115: 1 to 127 checked above
+	return domain.QuietRule{Weekdays: uint8(r.Weekdays), Start: start, End: end, Location: loc, Enabled: r.Enabled}, nil
 }
