@@ -71,6 +71,12 @@ type ServerInterface interface {
 	// UninstallApp Uninstall an app
 	// (POST /apps/{app_id}/uninstall)
 	UninstallApp(w http.ResponseWriter, r *http.Request, appId AppIdPath, params UninstallAppParams)
+	// ListWebhookSubscriptions List outgoing webhook subscriptions
+	// (GET /apps/{app_id}/webhooks)
+	ListWebhookSubscriptions(w http.ResponseWriter, r *http.Request, appId AppIdPath)
+	// CreateWebhookSubscription Subscribe a URL to events
+	// (POST /apps/{app_id}/webhooks)
+	CreateWebhookSubscription(w http.ResponseWriter, r *http.Request, appId AppIdPath, params CreateWebhookSubscriptionParams)
 	// ListAuditEvents Query the audit log
 	// (GET /audit/events)
 	ListAuditEvents(w http.ResponseWriter, r *http.Request, params ListAuditEventsParams)
@@ -293,6 +299,9 @@ type ServerInterface interface {
 	// PutInstanceSetting Set an instance setting
 	// (PUT /instance/settings/{key})
 	PutInstanceSetting(w http.ResponseWriter, r *http.Request, key KeyPath, params PutInstanceSettingParams)
+	// GetWebhookKeys Public keys for webhook signatures
+	// (GET /instance/webhook-keys)
+	GetWebhookKeys(w http.ResponseWriter, r *http.Request)
 	// GetMe Read the calling principal
 	// (GET /me)
 	GetMe(w http.ResponseWriter, r *http.Request)
@@ -467,6 +476,18 @@ type ServerInterface interface {
 	// ViewAsUser See the instance as a person sees it
 	// (GET /users/{user_id}/view-as)
 	ViewAsUser(w http.ResponseWriter, r *http.Request, userId UserIdPath)
+	// RedeliverWebhook Deliver an event again
+	// (POST /webhook-deliveries/{delivery_id}/redeliver)
+	RedeliverWebhook(w http.ResponseWriter, r *http.Request, deliveryId DeliveryIdPath, params RedeliverWebhookParams)
+	// DeleteWebhookSubscription Delete a subscription
+	// (DELETE /webhooks/{subscription_id})
+	DeleteWebhookSubscription(w http.ResponseWriter, r *http.Request, subscriptionId SubscriptionIdPath)
+	// UpdateWebhookSubscription Change, pause or rotate a subscription
+	// (PATCH /webhooks/{subscription_id})
+	UpdateWebhookSubscription(w http.ResponseWriter, r *http.Request, subscriptionId SubscriptionIdPath, params UpdateWebhookSubscriptionParams)
+	// ListWebhookDeliveries List delivery attempts
+	// (GET /webhooks/{subscription_id}/deliveries)
+	ListWebhookDeliveries(w http.ResponseWriter, r *http.Request, subscriptionId SubscriptionIdPath, params ListWebhookDeliveriesParams)
 }
 
 // ServerInterfaceWrapper converts contexts to parameters.
@@ -1246,6 +1267,82 @@ func (siw *ServerInterfaceWrapper) UninstallApp(w http.ResponseWriter, r *http.R
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		siw.Handler.UninstallApp(w, r, appId, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// ListWebhookSubscriptions operation middleware
+func (siw *ServerInterfaceWrapper) ListWebhookSubscriptions(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "app_id" -------------
+	var appId AppIdPath
+
+	err = runtime.BindStyledParameterWithOptions("simple", "app_id", r.PathValue("app_id"), &appId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "uuid", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "app_id", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.ListWebhookSubscriptions(w, r, appId)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// CreateWebhookSubscription operation middleware
+func (siw *ServerInterfaceWrapper) CreateWebhookSubscription(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "app_id" -------------
+	var appId AppIdPath
+
+	err = runtime.BindStyledParameterWithOptions("simple", "app_id", r.PathValue("app_id"), &appId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "uuid", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "app_id", Err: err})
+		return
+	}
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params CreateWebhookSubscriptionParams
+
+	headers := r.Header
+
+	// ------------- Optional header parameter "Idempotency-Key" -------------
+	if valueList, found := headers[http.CanonicalHeaderKey("Idempotency-Key")]; found {
+		var IdempotencyKey IdempotencyKey
+		n := len(valueList)
+		if n != 1 {
+			siw.ErrorHandlerFunc(w, r, &TooManyValuesForParamError{ParamName: "Idempotency-Key", Count: n})
+			return
+		}
+
+		err = runtime.BindStyledParameterWithOptions("simple", "Idempotency-Key", valueList[0], &IdempotencyKey, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: "uuid"})
+		if err != nil {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "Idempotency-Key", Err: err})
+			return
+		}
+
+		params.IdempotencyKey = &IdempotencyKey
+
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.CreateWebhookSubscription(w, r, appId, params)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -4301,6 +4398,20 @@ func (siw *ServerInterfaceWrapper) PutInstanceSetting(w http.ResponseWriter, r *
 	handler.ServeHTTP(w, r)
 }
 
+// GetWebhookKeys operation middleware
+func (siw *ServerInterfaceWrapper) GetWebhookKeys(w http.ResponseWriter, r *http.Request) {
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.GetWebhookKeys(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
 // GetMe operation middleware
 func (siw *ServerInterfaceWrapper) GetMe(w http.ResponseWriter, r *http.Request) {
 
@@ -6510,6 +6621,200 @@ func (siw *ServerInterfaceWrapper) ViewAsUser(w http.ResponseWriter, r *http.Req
 	handler.ServeHTTP(w, r)
 }
 
+// RedeliverWebhook operation middleware
+func (siw *ServerInterfaceWrapper) RedeliverWebhook(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "delivery_id" -------------
+	var deliveryId DeliveryIdPath
+
+	err = runtime.BindStyledParameterWithOptions("simple", "delivery_id", r.PathValue("delivery_id"), &deliveryId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "uuid", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "delivery_id", Err: err})
+		return
+	}
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params RedeliverWebhookParams
+
+	headers := r.Header
+
+	// ------------- Optional header parameter "Idempotency-Key" -------------
+	if valueList, found := headers[http.CanonicalHeaderKey("Idempotency-Key")]; found {
+		var IdempotencyKey IdempotencyKey
+		n := len(valueList)
+		if n != 1 {
+			siw.ErrorHandlerFunc(w, r, &TooManyValuesForParamError{ParamName: "Idempotency-Key", Count: n})
+			return
+		}
+
+		err = runtime.BindStyledParameterWithOptions("simple", "Idempotency-Key", valueList[0], &IdempotencyKey, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: "uuid"})
+		if err != nil {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "Idempotency-Key", Err: err})
+			return
+		}
+
+		params.IdempotencyKey = &IdempotencyKey
+
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.RedeliverWebhook(w, r, deliveryId, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// DeleteWebhookSubscription operation middleware
+func (siw *ServerInterfaceWrapper) DeleteWebhookSubscription(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "subscription_id" -------------
+	var subscriptionId SubscriptionIdPath
+
+	err = runtime.BindStyledParameterWithOptions("simple", "subscription_id", r.PathValue("subscription_id"), &subscriptionId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "uuid", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "subscription_id", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.DeleteWebhookSubscription(w, r, subscriptionId)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// UpdateWebhookSubscription operation middleware
+func (siw *ServerInterfaceWrapper) UpdateWebhookSubscription(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "subscription_id" -------------
+	var subscriptionId SubscriptionIdPath
+
+	err = runtime.BindStyledParameterWithOptions("simple", "subscription_id", r.PathValue("subscription_id"), &subscriptionId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "uuid", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "subscription_id", Err: err})
+		return
+	}
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params UpdateWebhookSubscriptionParams
+
+	headers := r.Header
+
+	// ------------- Optional header parameter "Idempotency-Key" -------------
+	if valueList, found := headers[http.CanonicalHeaderKey("Idempotency-Key")]; found {
+		var IdempotencyKey IdempotencyKey
+		n := len(valueList)
+		if n != 1 {
+			siw.ErrorHandlerFunc(w, r, &TooManyValuesForParamError{ParamName: "Idempotency-Key", Count: n})
+			return
+		}
+
+		err = runtime.BindStyledParameterWithOptions("simple", "Idempotency-Key", valueList[0], &IdempotencyKey, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: "uuid"})
+		if err != nil {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "Idempotency-Key", Err: err})
+			return
+		}
+
+		params.IdempotencyKey = &IdempotencyKey
+
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.UpdateWebhookSubscription(w, r, subscriptionId, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// ListWebhookDeliveries operation middleware
+func (siw *ServerInterfaceWrapper) ListWebhookDeliveries(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "subscription_id" -------------
+	var subscriptionId SubscriptionIdPath
+
+	err = runtime.BindStyledParameterWithOptions("simple", "subscription_id", r.PathValue("subscription_id"), &subscriptionId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "uuid", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "subscription_id", Err: err})
+		return
+	}
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params ListWebhookDeliveriesParams
+
+	// ------------- Optional query parameter "cursor" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "cursor", r.URL.Query(), &params.Cursor, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "cursor"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "cursor", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "limit" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "limit", r.URL.Query(), &params.Limit, runtime.BindQueryParameterOptions{Type: "integer", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "limit"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "limit", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "status" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "status", r.URL.Query(), &params.Status, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "status"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "status", Err: err})
+		}
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.ListWebhookDeliveries(w, r, subscriptionId, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
 type UnescapedCookieParamError struct {
 	ParamName string
 	Err       error
@@ -6632,6 +6937,7 @@ func HandlerWithOptions(si ServerInterface, options StdHTTPServerOptions) http.H
 
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/instance/discovery", wrapper.GetDiscovery)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/instance/jwks", wrapper.GetJwks)
+	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/instance/webhook-keys", wrapper.GetWebhookKeys)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/problems/{code}", wrapper.GetProblemType)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/auth/oidc/begin", wrapper.BeginOidcLogin)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/auth/oidc/callback", wrapper.HandleOidcCallback)
@@ -6768,6 +7074,12 @@ func HandlerWithOptions(si ServerInterface, options StdHTTPServerOptions) http.H
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/apps/{app_id}/suspend", wrapper.SuspendApp)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/apps/{app_id}/resume", wrapper.ResumeApp)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/apps/{app_id}/uninstall", wrapper.UninstallApp)
+	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/apps/{app_id}/webhooks", wrapper.ListWebhookSubscriptions)
+	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/apps/{app_id}/webhooks", wrapper.CreateWebhookSubscription)
+	m.HandleFunc(http.MethodDelete+" "+options.BaseURL+"/webhooks/{subscription_id}", wrapper.DeleteWebhookSubscription)
+	m.HandleFunc(http.MethodPatch+" "+options.BaseURL+"/webhooks/{subscription_id}", wrapper.UpdateWebhookSubscription)
+	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/webhooks/{subscription_id}/deliveries", wrapper.ListWebhookDeliveries)
+	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/webhook-deliveries/{delivery_id}/redeliver", wrapper.RedeliverWebhook)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/audit/events", wrapper.ListAuditEvents)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/audit/export", wrapper.ExportAuditEvents)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/audit/verify", wrapper.VerifyAuditChain)
@@ -6981,6 +7293,12 @@ type StrictServerInterface interface {
 	// UninstallApp Uninstall an app
 	// (POST /apps/{app_id}/uninstall)
 	UninstallApp(ctx context.Context, request UninstallAppRequestObject) (UninstallAppResponseObject, error)
+	// ListWebhookSubscriptions List outgoing webhook subscriptions
+	// (GET /apps/{app_id}/webhooks)
+	ListWebhookSubscriptions(ctx context.Context, request ListWebhookSubscriptionsRequestObject) (ListWebhookSubscriptionsResponseObject, error)
+	// CreateWebhookSubscription Subscribe a URL to events
+	// (POST /apps/{app_id}/webhooks)
+	CreateWebhookSubscription(ctx context.Context, request CreateWebhookSubscriptionRequestObject) (CreateWebhookSubscriptionResponseObject, error)
 	// ListAuditEvents Query the audit log
 	// (GET /audit/events)
 	ListAuditEvents(ctx context.Context, request ListAuditEventsRequestObject) (ListAuditEventsResponseObject, error)
@@ -7203,6 +7521,9 @@ type StrictServerInterface interface {
 	// PutInstanceSetting Set an instance setting
 	// (PUT /instance/settings/{key})
 	PutInstanceSetting(ctx context.Context, request PutInstanceSettingRequestObject) (PutInstanceSettingResponseObject, error)
+	// GetWebhookKeys Public keys for webhook signatures
+	// (GET /instance/webhook-keys)
+	GetWebhookKeys(ctx context.Context, request GetWebhookKeysRequestObject) (GetWebhookKeysResponseObject, error)
 	// GetMe Read the calling principal
 	// (GET /me)
 	GetMe(ctx context.Context, request GetMeRequestObject) (GetMeResponseObject, error)
@@ -7377,6 +7698,18 @@ type StrictServerInterface interface {
 	// ViewAsUser See the instance as a person sees it
 	// (GET /users/{user_id}/view-as)
 	ViewAsUser(ctx context.Context, request ViewAsUserRequestObject) (ViewAsUserResponseObject, error)
+	// RedeliverWebhook Deliver an event again
+	// (POST /webhook-deliveries/{delivery_id}/redeliver)
+	RedeliverWebhook(ctx context.Context, request RedeliverWebhookRequestObject) (RedeliverWebhookResponseObject, error)
+	// DeleteWebhookSubscription Delete a subscription
+	// (DELETE /webhooks/{subscription_id})
+	DeleteWebhookSubscription(ctx context.Context, request DeleteWebhookSubscriptionRequestObject) (DeleteWebhookSubscriptionResponseObject, error)
+	// UpdateWebhookSubscription Change, pause or rotate a subscription
+	// (PATCH /webhooks/{subscription_id})
+	UpdateWebhookSubscription(ctx context.Context, request UpdateWebhookSubscriptionRequestObject) (UpdateWebhookSubscriptionResponseObject, error)
+	// ListWebhookDeliveries List delivery attempts
+	// (GET /webhooks/{subscription_id}/deliveries)
+	ListWebhookDeliveries(ctx context.Context, request ListWebhookDeliveriesRequestObject) (ListWebhookDeliveriesResponseObject, error)
 }
 
 type StrictHandlerFunc func(ctx context.Context, w http.ResponseWriter, r *http.Request, request any) (any, error)
@@ -7970,6 +8303,66 @@ func (sh *strictHandler) UninstallApp(w http.ResponseWriter, r *http.Request, ap
 		sh.options.ResponseErrorHandlerFunc(w, r, err)
 	} else if validResponse, ok := response.(UninstallAppResponseObject); ok {
 		if err := validResponse.VisitUninstallAppResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// ListWebhookSubscriptions operation middleware
+func (sh *strictHandler) ListWebhookSubscriptions(w http.ResponseWriter, r *http.Request, appId AppIdPath) {
+	var request ListWebhookSubscriptionsRequestObject
+
+	request.AppId = appId
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.ListWebhookSubscriptions(ctx, request.(ListWebhookSubscriptionsRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "ListWebhookSubscriptions")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(ListWebhookSubscriptionsResponseObject); ok {
+		if err := validResponse.VisitListWebhookSubscriptionsResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// CreateWebhookSubscription operation middleware
+func (sh *strictHandler) CreateWebhookSubscription(w http.ResponseWriter, r *http.Request, appId AppIdPath, params CreateWebhookSubscriptionParams) {
+	var request CreateWebhookSubscriptionRequestObject
+
+	request.AppId = appId
+	request.Params = params
+
+	var body CreateWebhookSubscriptionJSONRequestBody
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
+		return
+	}
+	request.Body = &body
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.CreateWebhookSubscription(ctx, request.(CreateWebhookSubscriptionRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "CreateWebhookSubscription")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(CreateWebhookSubscriptionResponseObject); ok {
+		if err := validResponse.VisitCreateWebhookSubscriptionResponse(w); err != nil {
 			sh.options.ResponseErrorHandlerFunc(w, r, err)
 		}
 	} else if response != nil {
@@ -10210,6 +10603,30 @@ func (sh *strictHandler) PutInstanceSetting(w http.ResponseWriter, r *http.Reque
 	}
 }
 
+// GetWebhookKeys operation middleware
+func (sh *strictHandler) GetWebhookKeys(w http.ResponseWriter, r *http.Request) {
+	var request GetWebhookKeysRequestObject
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.GetWebhookKeys(ctx, request.(GetWebhookKeysRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "GetWebhookKeys")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(GetWebhookKeysResponseObject); ok {
+		if err := validResponse.VisitGetWebhookKeysResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
 // GetMe operation middleware
 func (sh *strictHandler) GetMe(w http.ResponseWriter, r *http.Request) {
 	var request GetMeRequestObject
@@ -11901,6 +12318,120 @@ func (sh *strictHandler) ViewAsUser(w http.ResponseWriter, r *http.Request, user
 		sh.options.ResponseErrorHandlerFunc(w, r, err)
 	} else if validResponse, ok := response.(ViewAsUserResponseObject); ok {
 		if err := validResponse.VisitViewAsUserResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// RedeliverWebhook operation middleware
+func (sh *strictHandler) RedeliverWebhook(w http.ResponseWriter, r *http.Request, deliveryId DeliveryIdPath, params RedeliverWebhookParams) {
+	var request RedeliverWebhookRequestObject
+
+	request.DeliveryId = deliveryId
+	request.Params = params
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.RedeliverWebhook(ctx, request.(RedeliverWebhookRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "RedeliverWebhook")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(RedeliverWebhookResponseObject); ok {
+		if err := validResponse.VisitRedeliverWebhookResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// DeleteWebhookSubscription operation middleware
+func (sh *strictHandler) DeleteWebhookSubscription(w http.ResponseWriter, r *http.Request, subscriptionId SubscriptionIdPath) {
+	var request DeleteWebhookSubscriptionRequestObject
+
+	request.SubscriptionId = subscriptionId
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.DeleteWebhookSubscription(ctx, request.(DeleteWebhookSubscriptionRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "DeleteWebhookSubscription")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(DeleteWebhookSubscriptionResponseObject); ok {
+		if err := validResponse.VisitDeleteWebhookSubscriptionResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// UpdateWebhookSubscription operation middleware
+func (sh *strictHandler) UpdateWebhookSubscription(w http.ResponseWriter, r *http.Request, subscriptionId SubscriptionIdPath, params UpdateWebhookSubscriptionParams) {
+	var request UpdateWebhookSubscriptionRequestObject
+
+	request.SubscriptionId = subscriptionId
+	request.Params = params
+
+	var body UpdateWebhookSubscriptionJSONRequestBody
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
+		return
+	}
+	request.Body = &body
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.UpdateWebhookSubscription(ctx, request.(UpdateWebhookSubscriptionRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "UpdateWebhookSubscription")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(UpdateWebhookSubscriptionResponseObject); ok {
+		if err := validResponse.VisitUpdateWebhookSubscriptionResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// ListWebhookDeliveries operation middleware
+func (sh *strictHandler) ListWebhookDeliveries(w http.ResponseWriter, r *http.Request, subscriptionId SubscriptionIdPath, params ListWebhookDeliveriesParams) {
+	var request ListWebhookDeliveriesRequestObject
+
+	request.SubscriptionId = subscriptionId
+	request.Params = params
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.ListWebhookDeliveries(ctx, request.(ListWebhookDeliveriesRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "ListWebhookDeliveries")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(ListWebhookDeliveriesResponseObject); ok {
+		if err := validResponse.VisitListWebhookDeliveriesResponse(w); err != nil {
 			sh.options.ResponseErrorHandlerFunc(w, r, err)
 		}
 	} else if response != nil {

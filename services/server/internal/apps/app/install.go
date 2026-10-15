@@ -18,7 +18,8 @@ import (
 // before anything is loaded; check manifest, reason and consent; then one unit of work declared as
 // a rights change (permission_version first) locks the slug, creates the principal or reinstalls
 // the existing one, writes apps and app_installations and the allow entry. No token and no grant
-// is created (design note 8).
+// is created (design note 8). A manifest with delivery.mode webhook gets its subscription in the
+// same transaction (M2-26 design note 14).
 func (s *Service) Install(ctx context.Context, a actor.Actor, cmd apps.InstallCmd) (apps.App, error) {
 	ctx, err := withCaller(ctx, a)
 	if err != nil {
@@ -90,6 +91,11 @@ func (s *Service) install(ctx context.Context, a actor.Actor, id ids.ID, m domai
 	attrs[attrReason] = auditing.ReasonText(cmd.Reason)
 	if err := s.record(ctx, authorize.ActionAppInstall, id, attrs); err != nil {
 		return apps.App{}, err
+	}
+	if m.Delivery != nil && m.Delivery.Mode == domain.DeliveryWebhook {
+		if err := s.d.Webhooks.createManifestSubscription(ctx, a, inst, m.Delivery.EventsURL); err != nil {
+			return apps.App{}, err
+		}
 	}
 	return view(rec, inst, m.Name), nil
 }

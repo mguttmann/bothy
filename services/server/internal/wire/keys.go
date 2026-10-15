@@ -108,15 +108,16 @@ func (k *SigningKeys) Ready(ctx context.Context) error {
 // startSigningKeys is the first extension point of start step 7 (M1-32, 02 section 15.1): it
 // builds the signing keys over the unit of work of the audit step and the Authorizer of the authz
 // step, creates the missing active keys (EnsureActive, every role) and registers the readiness
-// check signing_keys. A key store that cannot be written ends the start here; the secrets step
-// has already checked owner, mode and writability of the directory.
+// check signing_keys, and binds the keys to the outgoing webhooks of the apps step. A key store that
+// cannot be written ends the start here; the secrets step has already checked owner, mode and
+// writability of the directory.
 func (s *server) startSigningKeys(ctx context.Context) error {
 	cfg, err := SigningKeysConfig(s.values)
 	if err != nil {
 		return err
 	}
 	s.mu.Lock()
-	pool, a, az := s.pool, s.audit, s.authorizer
+	pool, a, az, ap := s.pool, s.audit, s.authorizer, s.apps
 	s.mu.Unlock()
 	if a == nil || az == nil {
 		return errors.New("wire: the signing keys need the unit of work of audit and the Authorizer")
@@ -128,6 +129,10 @@ func (s *server) startSigningKeys(ctx context.Context) error {
 	s.reg.AddReadiness(CheckSigningKeys, keys.Ready)
 	if err := keys.Keys.EnsureActive(ctx); err != nil {
 		return err
+	}
+	if ap != nil {
+		// The outgoing webhooks sign with the webhook_out keys (M2-26).
+		ap.BindKeys(keys.Keys)
 	}
 	s.mu.Lock()
 	s.signingKeys = keys

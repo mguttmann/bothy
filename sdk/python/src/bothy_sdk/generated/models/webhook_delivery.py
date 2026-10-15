@@ -22,10 +22,11 @@ class WebhookDelivery:
         subscription_id (UUID): UUIDv7 (RFC 9562), lowercase canonical form.
         event_id (UUID): UUIDv7 (RFC 9562), lowercase canonical form.
         event_seq (int):
-        event_type (str):
         attempt (int):
         status (WebhookDeliveryStatus):
         created_at (datetime.datetime): RFC 3339 timestamp in UTC with millisecond precision and suffix `Z`.
+        event_type (str | Unset): Type of the event, read from the event log; absent once the event left the event log
+            (`sync.event_retention`).
         response_code (int | Unset):
         last_error (str | Unset):
         next_attempt_at (datetime.datetime | Unset): RFC 3339 timestamp in UTC with millisecond precision and suffix
@@ -37,10 +38,10 @@ class WebhookDelivery:
     subscription_id: UUID
     event_id: UUID
     event_seq: int
-    event_type: str
     attempt: int
     status: WebhookDeliveryStatus
     created_at: datetime.datetime
+    event_type: str | Unset = UNSET
     response_code: int | Unset = UNSET
     last_error: str | Unset = UNSET
     next_attempt_at: datetime.datetime | Unset = UNSET
@@ -56,13 +57,13 @@ class WebhookDelivery:
 
         event_seq = self.event_seq
 
-        event_type = self.event_type
-
         attempt = self.attempt
 
         status = self.status.value
 
         created_at = self.created_at.isoformat()
+
+        event_type = self.event_type
 
         response_code = self.response_code
 
@@ -84,12 +85,13 @@ class WebhookDelivery:
                 "subscription_id": subscription_id,
                 "event_id": event_id,
                 "event_seq": event_seq,
-                "event_type": event_type,
                 "attempt": attempt,
                 "status": status,
                 "created_at": created_at,
             }
         )
+        if event_type is not UNSET:
+            field_dict["event_type"] = event_type
         if response_code is not UNSET:
             field_dict["response_code"] = response_code
         if last_error is not UNSET:
@@ -112,13 +114,13 @@ class WebhookDelivery:
 
         event_seq = d.pop("event_seq")
 
-        event_type = d.pop("event_type")
-
         attempt = d.pop("attempt")
 
         status = WebhookDeliveryStatus(d.pop("status"))
 
         created_at = datetime.datetime.fromisoformat(d.pop("created_at"))
+
+        event_type = d.pop("event_type", UNSET)
 
         response_code = d.pop("response_code", UNSET)
 
@@ -143,10 +145,10 @@ class WebhookDelivery:
             subscription_id=subscription_id,
             event_id=event_id,
             event_seq=event_seq,
-            event_type=event_type,
             attempt=attempt,
             status=status,
             created_at=created_at,
+            event_type=event_type,
             response_code=response_code,
             last_error=last_error,
             next_attempt_at=next_attempt_at,

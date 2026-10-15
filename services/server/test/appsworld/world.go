@@ -14,6 +14,7 @@ import (
 	"fmt"
 	"log/slog"
 	"net/http"
+	"net/netip"
 	"os"
 	"path/filepath"
 	"slices"
@@ -46,11 +47,14 @@ import (
 	"github.com/OWNER/bothy/services/server/internal/kernel/ids"
 	"github.com/OWNER/bothy/services/server/internal/kernel/jose"
 	"github.com/OWNER/bothy/services/server/internal/kernel/txn"
+	"github.com/OWNER/bothy/services/server/internal/platform/egress"
 	"github.com/OWNER/bothy/services/server/internal/platform/httpserver"
 	"github.com/OWNER/bothy/services/server/internal/platform/httpserver/httpservertest"
+	"github.com/OWNER/bothy/services/server/internal/platform/jobs"
 	"github.com/OWNER/bothy/services/server/internal/platform/pg"
 	"github.com/OWNER/bothy/services/server/internal/platform/pg/pgtest"
 	"github.com/OWNER/bothy/services/server/internal/platform/secrets"
+	"github.com/OWNER/bothy/services/server/internal/sync"
 	syncpg "github.com/OWNER/bothy/services/server/internal/sync/adapters/postgres"
 	"github.com/OWNER/bothy/services/server/internal/sync/adapters/telemetry"
 	syncapp "github.com/OWNER/bothy/services/server/internal/sync/app"
@@ -123,6 +127,9 @@ type World struct {
 	admin     *authzapp.AdminService
 	structure *fake.Structure
 	h         *httpservertest.Harness
+	appender  *syncapp.Appender
+	consumers *syncapp.ConsumerService
+	web       webhookParts
 	// Support with its channels Allgemein and Eskalation and their main threads (07 section 11.1).
 	Support, Allgemein, Eskalation    ids.ID
 	AllgemeinThread, EskalationThread ids.ID
@@ -134,7 +141,10 @@ type World struct {
 }
 
 // NewWorld builds a world on a new database with Robin (owner), Sam and Alex.
-func NewWorld(t *testing.T) *World {
+func NewWorld(t *testing.T) *World { return NewWorldWith(t, Options{}) }
+
+// NewWorldWith builds a world with the options o.
+func NewWorldWith(t *testing.T, o Options) *World {
 	t.Helper()
 	db := pgtest.New(t)
 	cfg := db.Config(pg.RoleApp)
@@ -168,6 +178,7 @@ func NewWorld(t *testing.T) *World {
 	Must(t, err)
 	appender, err := syncapp.NewAppender(syncapp.AppenderConfig{PayloadMaxBytes: 65536}, telemetry.Correlator{})
 	Must(t, err)
+	w.appender = appender
 	Must(t, hook.Bind(authzapp.RightsBindings{Events: appender, Audit: w.rec}))
 	maint, err := syncapp.NewPartitionMaintenance(syncapp.PartitionConfig{Size: 1000, Ahead: 2, Retention: 30 * 24 * time.Hour, LockTimeout: 2 * time.Second},
 		w.uow, syncpg.NewRepository(pool, log), clk)
@@ -187,6 +198,7 @@ func NewWorld(t *testing.T) *World {
 	Must(t, err)
 	dir := filepath.Join(t.TempDir(), "signing-keys")
 	Must(t, os.Mkdir(dir, 0o700))
+	writeMasterKey(t, filepath.Dir(dir))
 	sp, err := secrets.NewProvider(secrets.Options{Dir: filepath.Dir(dir), SigningKeyDir: dir, CacheTTL: time.Minute})
 	Must(t, err)
 	keys, err := wire.NewSigningKeys(wire.SigningKeyConfig{Keys: instanceapp.KeysConfig{
@@ -201,10 +213,10 @@ func NewWorld(t *testing.T) *World {
 		Settings: settings.Admin, Flags: settings.Admin}, testPepper, clk, log)
 	Must(t, err)
 	Must(t, w.id.BindSessions(keys.Keys, ids.New()))
-	w.apps, err = wire.NewApps(appsCfg, pool, wire.AppsDeps{UoW: w.uow, Rights: hook, Authorizer: az, Audit: w.rec, Identity: w.id, Grants: w.admin, Clock: clk})
-	Must(t, err)
+	w.buildApps(o, pool, hook, az, keys.Keys, sp, log)
 	built, err := routes.Build(wire.Handlers{Sessions: w.id.SessionHandlers, StepUps: w.id.StepUpHandlers, Devices: w.id.Handlers, People: w.id.PeopleHandlers,
-		Providers: w.id.ProviderHandlers, Credentials: w.id.CredentialHandlers, Tokens: w.id.TokenHandlers, Apps: w.apps.Handlers},
+		Providers: w.id.ProviderHandlers, Credentials: w.id.CredentialHandlers, Tokens: w.id.TokenHandlers, Apps: w.apps.Handlers,
+		Webhooks: w.apps.WebhookHandlers, Keys: keys.Handlers},
 		wire.RouteOptions(), routes.SpecCatalog())
 	Must(t, err)
 	var rs []httpservertest.Route
@@ -220,6 +232,47 @@ func NewWorld(t *testing.T) *World {
 	})
 	w.Seed()
 	return w
+}
+
+// buildApps builds the module apps with the outgoing webhooks of the world: two TLS receivers,
+// the fake resolver, the egress client with the fake metrics, the master key in the secrets
+// directory, River's tables with an insert-only runtime, and the worker consumer webhooks with
+// its cursor at the head.
+func (w *World) buildApps(o Options, pool *pg.Pool, hook *authzapp.RightsHook, az authorize.Authorizer, keys appsapp.Signers,
+	sp *secrets.Provider, log *slog.Logger) {
+	t := w.t
+	cert, roots := testCertificate(t)
+	w.web.Hooks, w.web.Alt = newReceiver(t, HooksHost, cert), newReceiver(t, AltHost, cert)
+	w.web.Resolver = &Resolver{m: map[string][]netip.Addr{}}
+	w.web.Resolver.Set(HooksHost, "127.0.0.1")
+	w.web.Resolver.Set(AltHost, "127.0.0.1")
+	w.web.Metrics = &Metrics{n: map[egress.Reason]int{}}
+	wcfg := WebhookConfig()
+	wcfg.AllowedHosts = append(append([]string{}, appsCfg.AllowedHosts...),
+		HooksHost+":"+w.web.Hooks.Port(), AltHost+":"+w.web.Alt.Port())
+	if o.Webhook != nil {
+		o.Webhook(&wcfg)
+	}
+	w.web.Config = wcfg
+	cfg := appsCfg
+	cfg.AllowedHosts = wcfg.AllowedHosts
+	sender, err := wire.NewWebhookSender(egressConfig(t, o, w.web.Hooks, w.web.Alt, wcfg.DeliveryTimeout), wcfg,
+		egress.Deps{Resolver: w.web.Resolver, RootCAs: roots, Logger: log, Metrics: w.web.Metrics})
+	Must(t, err)
+	master := wire.NewHMACMasterKey(sp, "file:<secrets.dir>/webhook_hmac_master_key")
+	Must(t, master.Check(context.Background()))
+	syncRepo := syncpg.NewRepository(pool, log)
+	w.apps, err = wire.NewApps(cfg, pool, wire.AppsDeps{UoW: w.uow, Rights: hook, Authorizer: az, Audit: w.rec, Identity: w.id, Grants: w.admin,
+		Clock: w.Clk, Webhooks: wire.WebhookDeps{Config: wcfg, Keys: keys, State: instanceapp.NewState(instancepg.NewRepository(pool), w.uow),
+			Log: syncRepo, Master: master, Sender: sender, Logger: log}})
+	Must(t, err)
+	w.migrateJobs()
+	w.apps.BindJobs(w.newRuntime(jobs.RoleAPI).Inserter())
+	w.consumers, err = syncapp.NewConsumerService(syncapp.ConsumerConfig{BatchSize: 100, PollInterval: time.Second,
+		ReconnectBackoffCap: time.Second, StatesTimeout: 5 * time.Second}, w.uow, syncRepo, syncRepo, log)
+	Must(t, err)
+	Must(t, w.consumers.Register(sync.ConsumerWebhooks, w.apps.Consumer()))
+	Must(t, w.consumers.Ensure(context.Background()))
 }
 
 // Must fails t on err.

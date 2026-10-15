@@ -209,6 +209,34 @@ func (stubServer) UpdateUser(context.Context, rest.UpdateUserRequestObject) (res
 	return nil, nil
 }
 
+func (stubServer) ListWebhookSubscriptions(context.Context, rest.ListWebhookSubscriptionsRequestObject) (rest.ListWebhookSubscriptionsResponseObject, error) {
+	return nil, nil
+}
+
+func (stubServer) CreateWebhookSubscription(context.Context, rest.CreateWebhookSubscriptionRequestObject) (rest.CreateWebhookSubscriptionResponseObject, error) {
+	return nil, nil
+}
+
+func (stubServer) UpdateWebhookSubscription(context.Context, rest.UpdateWebhookSubscriptionRequestObject) (rest.UpdateWebhookSubscriptionResponseObject, error) {
+	return nil, nil
+}
+
+func (stubServer) DeleteWebhookSubscription(context.Context, rest.DeleteWebhookSubscriptionRequestObject) (rest.DeleteWebhookSubscriptionResponseObject, error) {
+	return nil, nil
+}
+
+func (stubServer) ListWebhookDeliveries(context.Context, rest.ListWebhookDeliveriesRequestObject) (rest.ListWebhookDeliveriesResponseObject, error) {
+	return nil, nil
+}
+
+func (stubServer) RedeliverWebhook(context.Context, rest.RedeliverWebhookRequestObject) (rest.RedeliverWebhookResponseObject, error) {
+	return nil, nil
+}
+
+func (stubServer) GetWebhookKeys(context.Context, rest.GetWebhookKeysRequestObject) (rest.GetWebhookKeysResponseObject, error) {
+	return nil, nil
+}
+
 func (stubServer) GetJwks(context.Context, rest.GetJwksRequestObject) (rest.GetJwksResponseObject, error) {
 	return nil, nil
 }

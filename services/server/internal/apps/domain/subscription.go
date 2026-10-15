@@ -227,6 +227,20 @@ func ValidateTarget(raw string, allowed []AllowedHost) (Target, error) {
 	return Target{URL: u, Host: host, Port: port}, nil
 }
 
+// HostOf returns the canonical host of an address for audit details and logs, never its path or
+// query; "" when the address has no usable host.
+func HostOf(raw string) string {
+	u, err := url.Parse(raw)
+	if err != nil {
+		return ""
+	}
+	h, ok := canonicalHost(u.Hostname())
+	if !ok {
+		return ""
+	}
+	return h
+}
+
 // AllowsHost returns the host policy of the webhook egress client over allowed: scheme https and
 // a canonical host and port that match an entry, the same rule as ValidateTarget, so a list
 // changed after a restart blocks old subscriptions at delivery.

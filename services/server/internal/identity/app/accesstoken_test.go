@@ -103,6 +103,12 @@ func (*fakeKeys) Verify(context.Context, instance.Purpose, []byte) ([]byte, stri
 	return nil, "", instance.ErrJWSInvalid
 }
 func (*fakeKeys) JWKS(context.Context) (instance.JWKSet, error) { return instance.JWKSet{}, nil }
+func (*fakeKeys) Signers(context.Context, instance.Purpose) ([]instance.Signer, error) {
+	return nil, nil
+}
+func (*fakeKeys) PublicKeys(context.Context, instance.Purpose) ([]instance.PublicKey, error) {
+	return nil, nil
+}
 func (*fakeKeys) Rotate(context.Context, actor.Actor, instance.RotateCommand) (instance.Rotation, error) {
 	return instance.Rotation{}, nil
 }
