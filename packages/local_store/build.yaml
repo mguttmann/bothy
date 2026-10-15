@@ -1,0 +1,25 @@
+# SPDX-License-Identifier: Apache-2.0
+# drift code generation and the migration workflow of local_store (docs/spec/15-client-architektur.md
+# 6.2, brief M4-12 Design note 4). `make codegen-check` runs both generators and fails on drift.
+targets:
+  $default:
+    builders:
+      drift_dev:
+        options:
+          # Text keeps the millisecond precision and the UTC flag of the server times, so a
+          # stored entity equals the one written (docs/DECISIONS.md D-M4-12-3).
+          store_date_time_values_as_text: true
+          # The DAOs use the query builder; the manager API would add code nobody calls and
+          # bring the generated file close to repo.max_file_kb.
+          generate_manager: false
+          sql:
+            dialect: sqlite
+            options:
+              version: "3.45"
+              modules:
+                - fts5
+          # `dart run drift_dev make-migrations` (15 6.2).
+          databases:
+            local_store: lib/src/database.dart
+          schema_dir: drift_schemas/
+          test_dir: test/drift/

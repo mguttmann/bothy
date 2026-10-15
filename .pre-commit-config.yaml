@@ -19,7 +19,9 @@ repos:
         args: [--markdown-linebreak-ext=md]
         exclude: '\.svg$'
       - id: end-of-file-fixer
-        exclude: '\.svg$'
+        # drift writes its schema files without a final newline and make-migrations refuses a
+        # stored schema that differs by one byte (docs/DECISIONS.md D-M4-12-7).
+        exclude: '(\.svg|/drift_schemas/.*\.json)$'
       - id: mixed-line-ending
         args: [--fix=lf]
       - id: check-yaml

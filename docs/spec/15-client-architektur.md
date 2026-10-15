@@ -220,12 +220,24 @@ sind als End-of-Life markiert (pub.dev-API, Version `0.6.0+eol` bzw. `0.7.0+eol`
 2026-10-10 [belegt]) und werden nicht genutzt.
 
 ```yaml
-# pubspec.yaml der App (Ausschnitt)
+# root pubspec.yaml of the workspace (excerpt)
 hooks:
   user_defines:
     sqlite3:
       source: sqlite3mc
 ```
+
+As built (M4-12): the user define lives in the root `pubspec.yaml`, because build hooks read
+user defines only from the workspace root; with the pinned SDK the hook then loads SQLite 3.54.0
+as SQLite3MultipleCiphers 2.6.1 (package `sqlite3` 3.7.1, a prebuilt library checked against
+the hashes of the package). The cipher is the SQLite3MultipleCiphers default `chacha20`
+(ChaCha20-Poly1305); the key is set as the first statement in the raw form
+`PRAGMA key = "x'<64 hex>'"`, which that library takes without a key derivation, and the opener
+checks the key, the cipher and FTS5 before drift uses the connection
+(`packages/local_store/README.md`, docs/DECISIONS.md D-M4-12-1, D-M4-12-2). The offline search
+table `search_index` is FTS5 with the tokenizer `unicode61 remove_diacritics 2` and no stemmer
+([14](14-suche.md) 6, D-M4-12-5). Schema version 1 has every table of 6.1 except
+`host_key_pins`, which M4-36 adds with its own schema version (D-M4-12-8).
 
 ### 6.1 Schema-Spiegel
 
@@ -279,6 +291,9 @@ gesendete Arbeit enthalten; `host_key_pins` ebenso, weil sie Vertrauensanker sin
   dass Android-Backups eine alte Datenbank zurückspielen können).
 - Aufräumen: Einträge ohne Zugriff seit `client.cache_max_age` und alles über `client.cache_max_bytes`
   (älteste zuerst) werden entfernt; nie Ausgangsfach und Entwürfe.
+  As built (M4-12): `CacheCleaner` removes threads (with everything below them) and file cache
+  rows by `last_accessed_at`; it never touches `outbox`, `drafts` and `share_inbox`, and never
+  the structure rows (spaces, channels, principals, commands, instance) the sidebar needs.
 - Entzug ([04](04-sync-protokoll.md) Abschnitt 8.3): Bei `access.changed` mit `removed` löscht der
   Dispatcher in einer Transaktion alle Zeilen der Ziele, ihre Dateien im Cache und ihre Einträge im
   Suchindex. Bei `4012` löscht die App Datenbank, Datei-Cache, Schlüssel und Tokens.

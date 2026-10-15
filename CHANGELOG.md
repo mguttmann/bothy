@@ -27,6 +27,14 @@ Planning stage (milestone M0). Nothing is installable yet.
   publishes at most one state per frame and discards the document at the end of the run;
   `applyRunPatch` applies RFC 6902 `add`, `replace` and `remove` with copy on write, and
   `RunDocument` reads the live box fields of 09 5.4 (M4-16).
+- Local database of the apps: `packages/local_store` is a drift database on
+  SQLite3MultipleCiphers (cipher `chacha20`, 256-bit key from a key source port), schema
+  version 1 with the mirror tables of the client architecture chapter and the local tables
+  `outbox`, `sync_state`, `loaded_ranges`, `file_cache`, `share_inbox` and the FTS5
+  `search_index`; DAOs with the version rule on every upsert, the cursor stored in the page's
+  transaction, removal of targets and wipe, the cache cleanup by `client.cache_max_age` and
+  `client.cache_max_bytes`, and a migration survival test for outbox, drafts and share inbox;
+  `make codegen-check` compares the drift generation (M4-12).
 - Design tokens: `tools/design-tokens` writes `design/build/ts/tokens.gen.ts` for the Grafana
   panel plugin (colour roles of both themes including the chart and state roles, font families,
   font sizes and radii as typed constants) and copies the vendored Atkinson Hyperlegible fonts
