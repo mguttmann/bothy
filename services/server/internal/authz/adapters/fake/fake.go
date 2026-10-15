@@ -50,7 +50,7 @@ func (f *failer) err() error {
 }
 
 func sortIDs(list []ids.ID) []ids.ID {
-	slices.SortFunc(list, func(a, b ids.ID) int { return slices.Compare(a[:], b[:]) })
+	slices.SortFunc(list, compareIDs)
 	return list
 }
 
@@ -121,6 +121,23 @@ func (s *Principals) ActiveOwnerIDs(_ context.Context) ([]ids.ID, error) {
 		}
 	}
 	return sortIDs(out), nil
+}
+
+// Refs implements authz.PrincipalSource: the handle and display name of a fake principal are
+// its id, because the facts carry no names.
+func (s *Principals) Refs(_ context.Context, principals []ids.ID) (map[ids.ID]authz.PrincipalRef, error) {
+	if err := s.err(); err != nil {
+		return nil, err
+	}
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	out := map[ids.ID]authz.PrincipalRef{}
+	for _, id := range principals {
+		if f, ok := s.rows[id]; ok {
+			out[id] = authz.PrincipalRef{ID: id, Kind: f.Kind, Handle: id.String(), DisplayName: id.String()}
+		}
+	}
+	return out, nil
 }
 
 // Structure is an in-memory authz.StructureSource. ServedTargets follows the rules of its doc
@@ -479,3 +496,6 @@ func (s *Credentials) Credentials(_ context.Context, ref authz.CredentialRef) (a
 	}
 	return f, nil
 }
+
+// compareIDs orders ids by their bytes, the creation order of UUIDv7.
+func compareIDs(a, b ids.ID) int { return slices.Compare(a[:], b[:]) }

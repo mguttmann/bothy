@@ -305,3 +305,102 @@ func (v *Versions) PermissionVersion(_ context.Context) (int64, error) {
 	}
 	return v.v.Load(), nil
 }
+
+// ListLiveGroups implements app.Store.
+func (s *Store) ListLiveGroups(_ context.Context, after, memberID ids.ID, t time.Time, limit int) ([]domain.Group, error) {
+	if err := s.err(); err != nil {
+		return nil, err
+	}
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	var out []domain.Group
+	for _, g := range s.groups {
+		if !g.DeletedAt.IsZero() || compareIDs(g.ID, after) <= 0 || (!memberID.IsZero() && !s.memberAt(g, memberID, t)) {
+			continue
+		}
+		out = append(out, g)
+	}
+	slices.SortFunc(out, func(a, b domain.Group) int { return compareIDs(a.ID, b.ID) })
+	return out[:min(len(out), max(limit, 0))], nil
+}
+
+// memberAt reports a membership of user in g in effect at t; s.mu is held.
+func (s *Store) memberAt(g domain.Group, user ids.ID, t time.Time) bool {
+	for _, m := range s.memberships {
+		if m.GroupID == g.ID && m.UserID == user && m.InEffect(g, t) {
+			return true
+		}
+	}
+	return false
+}
+
+// CountMembersInEffect implements app.Store.
+func (s *Store) CountMembersInEffect(_ context.Context, groupIDs []ids.ID, t time.Time) (map[ids.ID]int, error) {
+	if err := s.err(); err != nil {
+		return nil, err
+	}
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	out := map[ids.ID]int{}
+	for _, m := range s.memberships {
+		if slices.Contains(groupIDs, m.GroupID) && m.RemovedAt.IsZero() && (m.ExpiresAt.IsZero() || m.ExpiresAt.After(t)) {
+			out[m.GroupID]++
+		}
+	}
+	return out, nil
+}
+
+// ListMembersInEffect implements app.Store.
+func (s *Store) ListMembersInEffect(_ context.Context, groupID, after ids.ID, t time.Time, limit int) ([]domain.Membership, error) {
+	if err := s.err(); err != nil {
+		return nil, err
+	}
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	var out []domain.Membership
+	for _, m := range s.memberships {
+		if m.GroupID == groupID && compareIDs(m.ID, after) > 0 && m.RemovedAt.IsZero() && (m.ExpiresAt.IsZero() || m.ExpiresAt.After(t)) {
+			out = append(out, m)
+		}
+	}
+	slices.SortFunc(out, func(a, b domain.Membership) int { return compareIDs(a.ID, b.ID) })
+	return out[:min(len(out), max(limit, 0))], nil
+}
+
+// ListGrants implements app.Store with the semantics of the PostgreSQL adapter.
+func (s *Store) ListGrants(_ context.Context, f app.GrantFilter, after ids.ID, t time.Time, limit int) ([]domain.Grant, error) {
+	if err := s.err(); err != nil {
+		return nil, err
+	}
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	var out []domain.Grant
+	for _, g := range s.grants {
+		if compareIDs(g.ID, after) > 0 && grantMatches(f, g, t) {
+			out = append(out, g)
+		}
+	}
+	slices.SortFunc(out, func(a, b domain.Grant) int { return compareIDs(a.ID, b.ID) })
+	return out[:min(len(out), max(limit, 0))], nil
+}
+
+// grantMatches applies f to g at t.
+func grantMatches(f app.GrantFilter, g domain.Grant, t time.Time) bool {
+	switch {
+	case !f.IncludeRevoked && !g.InEffect(t):
+		return false
+	case f.TargetKind != "" && g.Target.Kind != f.TargetKind:
+		return false
+	case !f.TargetID.IsZero() && f.TargetID != g.Target.SpaceID && f.TargetID != g.Target.ChannelID && f.TargetID != g.Target.HostID:
+		return false
+	case f.SubjectKind != "" && g.Subject.Kind != f.SubjectKind:
+		return false
+	case !f.SubjectID.IsZero() && f.SubjectID != g.Subject.PrincipalID && f.SubjectID != g.Subject.GroupID:
+		return false
+	}
+	if f.AllTargets {
+		return true
+	}
+	return (g.Target.Kind == domain.TargetSpace && slices.Contains(f.ManageSpaces, g.Target.SpaceID)) ||
+		(g.Target.Kind == domain.TargetChannel && slices.Contains(f.ManageChannels, g.Target.ChannelID))
+}

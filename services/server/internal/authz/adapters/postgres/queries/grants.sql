@@ -53,3 +53,24 @@ WHERE g.revoked_at IS NULL
        OR g.target_space_id = ANY (@space_ids::uuid[])
        OR g.target_channel_id = ANY (@channel_ids::uuid[]))
 ORDER BY g.id;
+
+-- name: ListGrantsPage :many
+-- One keyset page of grants ascending by id (listGrants, M1-48). Without include_revoked only the
+-- grants in effect at @at (not revoked, not expired); the filters are optional; without
+-- all_targets only grants on the spaces and channels of the caller's manage scope, so the scope
+-- is applied in the query and a filter never widens it (07 section 2.6 item 6).
+SELECT sqlc.embed(g)
+FROM grants g
+WHERE g.id > @after_id
+  AND (@include_revoked::boolean OR (g.revoked_at IS NULL AND (g.expires_at IS NULL OR g.expires_at > @at)))
+  AND (sqlc.narg(target_kind)::text IS NULL OR g.target_kind = sqlc.narg(target_kind)::text)
+  AND (sqlc.narg(target_id)::uuid IS NULL OR g.target_space_id = sqlc.narg(target_id)::uuid
+       OR g.target_channel_id = sqlc.narg(target_id)::uuid OR g.target_host_id = sqlc.narg(target_id)::uuid)
+  AND (sqlc.narg(subject_kind)::text IS NULL OR g.subject_kind = sqlc.narg(subject_kind)::text)
+  AND (sqlc.narg(subject_id)::uuid IS NULL OR g.subject_principal_id = sqlc.narg(subject_id)::uuid
+       OR g.subject_group_id = sqlc.narg(subject_id)::uuid)
+  AND (@all_targets::boolean
+       OR (g.target_kind = 'space' AND g.target_space_id = ANY (@manage_spaces::uuid[]))
+       OR (g.target_kind = 'channel' AND g.target_channel_id = ANY (@manage_channels::uuid[])))
+ORDER BY g.id
+LIMIT @max_rows;

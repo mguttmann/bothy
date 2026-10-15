@@ -10,6 +10,7 @@ import (
 	"slices"
 	"time"
 
+	"github.com/OWNER/bothy/services/server/internal/authz"
 	"github.com/OWNER/bothy/services/server/internal/authz/domain"
 	"github.com/OWNER/bothy/services/server/internal/kernel/actor"
 	"github.com/OWNER/bothy/services/server/internal/kernel/auditing"
@@ -333,19 +334,37 @@ func grantPayload(g domain.Grant) grantJSON {
 	return j
 }
 
-// grantChanged is grant.changed with change expired (05 section 6): resource the grant, scope the
-// space and, for a channel target, the channel with its space from the structure source; actor
-// system.
+// grantChanged is grant.changed with change expired (05 section 6) and actor system.
 func (h *RightsHook) grantChanged(ctx context.Context, g domain.Grant) (eventlog.Event, error) {
+	return grantChangedEvent(ctx, h.d.Structure, g, changeExpired, eventlog.ActorSystem, ids.ID{})
+}
+
+// The values of GrantChangedPayload.change and GroupChangedPayload.change (05 section 6).
+const (
+	changeCreated       = "created"
+	changeRevoked       = "revoked"
+	changeExpired       = "expired"
+	changeUpdated       = "updated"
+	changeDeleted       = "deleted"
+	changeMemberAdded   = "member_added"
+	changeMemberRemoved = "member_removed"
+	changeMemberExpired = "member_expired"
+)
+
+// grantChangedEvent is grant.changed (05 section 6) with change and the actor: resource the
+// grant, scope the space and, for a channel target, the channel with its space from structure;
+// an instance or host grant has an empty scope.
+func grantChangedEvent(ctx context.Context, structure authz.StructureSource, g domain.Grant, change string,
+	kind eventlog.ActorKind, actorID ids.ID) (eventlog.Event, error) {
 	payload, err := json.Marshal(struct {
 		Grant  grantJSON `json:"grant"`
 		Change string    `json:"change"`
-	}{Grant: grantPayload(g), Change: "expired"})
+	}{Grant: grantPayload(g), Change: change})
 	if err != nil {
 		return eventlog.Event{}, errs.Wrap(errs.CodeInternalError, err, "authz: grant.changed payload")
 	}
 	ev := eventlog.Event{
-		Type: eventGrantChanged, SchemaVersion: 1, ActorKind: eventlog.ActorSystem,
+		Type: eventGrantChanged, SchemaVersion: 1, ActorKind: kind, ActorPrincipalID: actorID,
 		ResourceKind: string(authorize.ResourceGrant), ResourceID: g.ID, ReceiveAction: receiveGrantRead, Payload: payload,
 	}
 	switch g.Target.Kind {
@@ -353,7 +372,7 @@ func (h *RightsHook) grantChanged(ctx context.Context, g domain.Grant) (eventlog
 		ev.SpaceID = g.Target.SpaceID
 	case domain.TargetChannel:
 		ev.ChannelID = g.Target.ChannelID
-		c, ok, err := h.d.Structure.Channel(ctx, g.Target.ChannelID)
+		c, ok, err := structure.Channel(ctx, g.Target.ChannelID)
 		if err != nil {
 			return eventlog.Event{}, sourceError("structure source", err)
 		}
@@ -377,26 +396,41 @@ type groupJSON struct {
 	CreatedAt   string `json:"created_at"`
 }
 
-// groupChanged is group.changed with change member_expired (05 section 6): resource the group,
-// empty scope, actor system, the member as user_id and the group with its member_count.
+// groupChanged is group.changed with change member_expired (05 section 6), actor system.
 func groupChanged(m domain.MembershipWithGroup, count int) (eventlog.Event, error) {
-	g := groupJSON{
-		ID: m.Group.ID.String(), Name: m.Group.Name, Description: m.Group.Description, Source: m.Group.Source,
-		ExternalRef: m.Group.ExternalRef, MemberCount: count, CreatedAt: timestampText(m.Group.CreatedAt),
+	return groupChangedEvent(m.Group, count, changeMemberExpired, m.Membership.UserID, eventlog.ActorSystem, ids.ID{})
+}
+
+// groupPayload converts g with its member_count to the schema Group.
+func groupPayload(g domain.Group, count int) groupJSON {
+	j := groupJSON{
+		ID: g.ID.String(), Name: g.Name, Description: g.Description, Source: g.Source,
+		ExternalRef: g.ExternalRef, MemberCount: count, CreatedAt: timestampText(g.CreatedAt),
 	}
-	if !m.Group.ProviderID.IsZero() {
-		g.ProviderID = m.Group.ProviderID.String()
+	if !g.ProviderID.IsZero() {
+		j.ProviderID = g.ProviderID.String()
 	}
-	payload, err := json.Marshal(struct {
+	return j
+}
+
+// groupChangedEvent is group.changed (05 section 6): resource the group, empty scope, the actor,
+// the group with its member_count, change and, for a member change, the member as user_id (left
+// out for a zero user, never null).
+func groupChangedEvent(g domain.Group, count int, change string, user ids.ID, kind eventlog.ActorKind, actorID ids.ID) (eventlog.Event, error) {
+	body := struct {
 		Group  groupJSON `json:"group"`
 		Change string    `json:"change"`
-		UserID string    `json:"user_id"`
-	}{Group: g, Change: "member_expired", UserID: m.Membership.UserID.String()})
+		UserID string    `json:"user_id,omitempty"`
+	}{Group: groupPayload(g, count), Change: change}
+	if !user.IsZero() {
+		body.UserID = user.String()
+	}
+	payload, err := json.Marshal(body)
 	if err != nil {
 		return eventlog.Event{}, errs.Wrap(errs.CodeInternalError, err, "authz: group.changed payload")
 	}
 	return eventlog.Event{
-		Type: eventGroupChanged, SchemaVersion: 1, ActorKind: eventlog.ActorSystem,
-		ResourceKind: string(authorize.ResourceGroup), ResourceID: m.Group.ID, ReceiveAction: receiveGroupRead, Payload: payload,
+		Type: eventGroupChanged, SchemaVersion: 1, ActorKind: kind, ActorPrincipalID: actorID,
+		ResourceKind: string(authorize.ResourceGroup), ResourceID: g.ID, ReceiveAction: receiveGroupRead, Payload: payload,
 	}, nil
 }

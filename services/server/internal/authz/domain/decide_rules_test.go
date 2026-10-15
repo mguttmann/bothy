@@ -180,7 +180,8 @@ func TestVisibleByResourceKind(t *testing.T) {
 		{domain.TargetInstance, domain.Rights{Level: domain.LevelTrigger}, false},
 		{domain.TargetInstance, owner, true},
 		{domain.TargetHost, owner, true},
-		{domain.TargetSpace, domain.Rights{Level: domain.LevelRead}, true},
+		{domain.TargetSpace, domain.Rights{Level: domain.LevelRead}, false},
+		{domain.TargetSpace, domain.Rights{Level: domain.LevelRead, Caps: domain.CapsOf(domain.CapManage)}, true},
 		{domain.TargetChannel, domain.Rights{}, false},
 	} {
 		g := base("grant", ids.New(), ids.ID{})

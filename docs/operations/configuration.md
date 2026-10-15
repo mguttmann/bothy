@@ -213,8 +213,8 @@ Source: [03-data-model.md](../spec/03-data-model.md), section 9.
 | `principal.handle_max_chars` | `BOTHY_PRINCIPAL__HANDLE_MAX_CHARS` | Server | int | `32` | length of a handle | active |
 | `principal.display_name_max_chars` | `BOTHY_PRINCIPAL__DISPLAY_NAME_MAX_CHARS` | Server | int | `64` | length of a display name in Unicode characters | active |
 | `branding.product_name_max_chars` | `BOTHY_BRANDING__PRODUCT_NAME_MAX_CHARS` | Server | int | `64` | length of the product name in the branding (`instance_settings`, `branding.product_name`) in Unicode characters | active |
-| `group.name_max_chars` | `BOTHY_GROUP__NAME_MAX_CHARS` | Server |  | `100` | length of a group name in Unicode characters | planned (M1) |
-| `group.description_max_chars` | `BOTHY_GROUP__DESCRIPTION_MAX_CHARS` | Server |  | `500` | length of a group description in Unicode characters | planned (M1) |
+| `group.name_max_chars` | `BOTHY_GROUP__NAME_MAX_CHARS` | Server | int | `100` | length of a group name in Unicode characters | active |
+| `group.description_max_chars` | `BOTHY_GROUP__DESCRIPTION_MAX_CHARS` | Server | int | `500` | length of a group description in Unicode characters | active |
 | `host.name_max_chars` | `BOTHY_HOST__NAME_MAX_CHARS` | Server |  | `100` | length of a host name in Unicode characters | planned (M2) |
 | `host.os_user_max_chars` | `BOTHY_HOST__OS_USER_MAX_CHARS` | Server |  | `64` | length of the name of a session user in `host_session_users.os_user` | planned (M2) |
 | `space.name_max_chars` | `BOTHY_SPACE__NAME_MAX_CHARS` | Server |  | `100` | length of a space name in Unicode characters | planned (M1) |

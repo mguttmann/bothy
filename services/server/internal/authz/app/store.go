@@ -82,6 +82,35 @@ type Store interface {
 	// spaceIDs or on one of channelIDs, ordered by id (the affected principals of a rights change
 	// on a target, 02 section 8.1).
 	ActiveGrantsOnTargets(ctx context.Context, spaceIDs, channelIDs []ids.ID) ([]domain.Grant, error)
+
+	// ListLiveGroups returns at most limit live groups with an id above after, ascending; with a
+	// non-zero memberID only the groups in which memberID has a membership in effect at t (M1-48).
+	ListLiveGroups(ctx context.Context, after, memberID ids.ID, t time.Time, limit int) ([]domain.Group, error)
+	// CountMembersInEffect returns, per group of groupIDs, the memberships that are neither
+	// removed nor expired at t; a group without such memberships is absent (member_count).
+	CountMembersInEffect(ctx context.Context, groupIDs []ids.ID, t time.Time) (map[ids.ID]int, error)
+	// ListMembersInEffect returns at most limit memberships of groupID in effect at t with an id
+	// above after, ascending (listGroupMembers).
+	ListMembersInEffect(ctx context.Context, groupID, after ids.ID, t time.Time, limit int) ([]domain.Membership, error)
+	// ListGrants returns at most limit grants with an id above after that match f at t,
+	// ascending (listGrants).
+	ListGrants(ctx context.Context, f GrantFilter, after ids.ID, t time.Time, limit int) ([]domain.Grant, error)
+}
+
+// GrantFilter selects the grants of ListGrants. Zero values do not filter. Without AllTargets
+// only grants on ManageSpaces (space targets) and ManageChannels (channel targets) qualify: the
+// manage scope of a caller who is no owner, applied in the query (07 section 2.6 item 6).
+type GrantFilter struct {
+	// TargetKind with TargetID (zero for the instance) and SubjectKind with SubjectID.
+	TargetKind  domain.TargetKind
+	TargetID    ids.ID
+	SubjectKind domain.SubjectKind
+	SubjectID   ids.ID
+	// IncludeRevoked adds revoked and expired grants to the ones in effect.
+	IncludeRevoked bool
+	// AllTargets lifts the scope (owners).
+	AllTargets                   bool
+	ManageSpaces, ManageChannels []ids.ID
 }
 
 // ExpiryStore is the outgoing port of the expiry jobs (M1-30, 07 sections 8.3 and 9.4) over

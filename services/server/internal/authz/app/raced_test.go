@@ -8,6 +8,7 @@ import (
 	"sync"
 	"testing"
 
+	authzhttp "github.com/OWNER/bothy/services/server/internal/authz/adapters/httpapi"
 	"github.com/OWNER/bothy/services/server/internal/authz/app"
 	"github.com/OWNER/bothy/services/server/internal/authz/domain"
 	"github.com/OWNER/bothy/services/server/internal/kernel/ids"
@@ -45,7 +46,8 @@ func TestRevokeGrant_RacedRevocationIsWithoutEffect(t *testing.T) {
 	}}
 	admin, err := app.NewAdminService(app.AdminDeps{
 		UoW: w.uow, Authorizer: w.az, Store: store, Principals: w.principals, Structure: w.structure, Rights: w.hook,
-		Audit: w.rec, Clock: w.clk, Limits: domain.GroupLimits{NameMaxChars: 100},
+		Audit: w.rec, Clock: w.clk, Events: w.appender, Scopes: w.az, Cursors: authzhttp.Cursors{},
+		Config: app.AdminConfig{GroupNameMaxChars: 100, PageSizeDefault: 2, PageSizeMax: 3},
 	})
 	mustOK(t, err)
 	g, err := admin.RevokeGrant(ctx, w.user(w.owner), w.g2, "second")
@@ -90,7 +92,8 @@ func (w *pgWorld) racedAdmin(t *testing.T, store app.Store) *app.AdminService {
 	t.Helper()
 	admin, err := app.NewAdminService(app.AdminDeps{
 		UoW: w.uow, Authorizer: w.az, Store: store, Principals: w.principals, Structure: w.structure, Rights: w.hook,
-		Audit: w.rec, Clock: w.clk, Limits: domain.GroupLimits{NameMaxChars: 100},
+		Audit: w.rec, Clock: w.clk, Events: w.appender, Scopes: w.az, Cursors: authzhttp.Cursors{},
+		Config: app.AdminConfig{GroupNameMaxChars: 100, PageSizeDefault: 2, PageSizeMax: 3},
 	})
 	mustOK(t, err)
 	return admin
@@ -123,7 +126,7 @@ func TestDeleteGroupAndRemoveMember_RacedCallsAreWithoutEffect(t *testing.T) {
 			}, onMembers: c == "group.member.remove"}
 			admin := w.racedAdmin(t, store)
 			if c == "group.delete" {
-				mustOK(t, admin.DeleteGroup(ctx, w.user(w.owner), w.leser, ""))
+				mustOK(t, admin.DeleteGroup(ctx, w.user(w.owner), w.leser))
 			} else {
 				mustOK(t, admin.RemoveGroupMember(ctx, w.user(w.owner), w.leser, w.sam))
 			}

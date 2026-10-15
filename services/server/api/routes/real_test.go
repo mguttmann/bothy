@@ -17,6 +17,54 @@ import (
 // stubServer implements the enabled operations without behaviour; Build only registers them.
 type stubServer struct{}
 
+func (stubServer) ListGroups(context.Context, rest.ListGroupsRequestObject) (rest.ListGroupsResponseObject, error) {
+	return nil, nil
+}
+
+func (stubServer) CreateGroup(context.Context, rest.CreateGroupRequestObject) (rest.CreateGroupResponseObject, error) {
+	return nil, nil
+}
+
+func (stubServer) GetGroup(context.Context, rest.GetGroupRequestObject) (rest.GetGroupResponseObject, error) {
+	return nil, nil
+}
+
+func (stubServer) UpdateGroup(context.Context, rest.UpdateGroupRequestObject) (rest.UpdateGroupResponseObject, error) {
+	return nil, nil
+}
+
+func (stubServer) DeleteGroup(context.Context, rest.DeleteGroupRequestObject) (rest.DeleteGroupResponseObject, error) {
+	return nil, nil
+}
+
+func (stubServer) ListGroupMembers(context.Context, rest.ListGroupMembersRequestObject) (rest.ListGroupMembersResponseObject, error) {
+	return nil, nil
+}
+
+func (stubServer) AddGroupMember(context.Context, rest.AddGroupMemberRequestObject) (rest.AddGroupMemberResponseObject, error) {
+	return nil, nil
+}
+
+func (stubServer) RemoveGroupMember(context.Context, rest.RemoveGroupMemberRequestObject) (rest.RemoveGroupMemberResponseObject, error) {
+	return nil, nil
+}
+
+func (stubServer) ListGrants(context.Context, rest.ListGrantsRequestObject) (rest.ListGrantsResponseObject, error) {
+	return nil, nil
+}
+
+func (stubServer) CreateGrant(context.Context, rest.CreateGrantRequestObject) (rest.CreateGrantResponseObject, error) {
+	return nil, nil
+}
+
+func (stubServer) GetGrant(context.Context, rest.GetGrantRequestObject) (rest.GetGrantResponseObject, error) {
+	return nil, nil
+}
+
+func (stubServer) RevokeGrant(context.Context, rest.RevokeGrantRequestObject) (rest.RevokeGrantResponseObject, error) {
+	return nil, nil
+}
+
 func (stubServer) ListAuditEvents(context.Context, rest.ListAuditEventsRequestObject) (rest.ListAuditEventsResponseObject, error) {
 	return nil, nil
 }
@@ -321,6 +369,19 @@ func TestRealTable_Enabled(t *testing.T) {
 		"listTokens":  {"GET /api/v1/principals/{principal_id}/tokens", "token.list", "rl.read"},
 		"createToken": {"POST /api/v1/principals/{principal_id}/tokens", "token.create", "rl.admin"},
 		"revokeToken": {"DELETE /api/v1/tokens/{token_id}", "token.revoke", "rl.admin"},
+		// M1-48
+		"listGroups":        {"GET /api/v1/groups", "group.read", "rl.read"},
+		"createGroup":       {"POST /api/v1/groups", "group.create", "rl.admin"},
+		"getGroup":          {"GET /api/v1/groups/{group_id}", "group.read", "rl.read"},
+		"updateGroup":       {"PATCH /api/v1/groups/{group_id}", "group.update", "rl.admin"},
+		"deleteGroup":       {"DELETE /api/v1/groups/{group_id}", "group.delete", "rl.admin"},
+		"listGroupMembers":  {"GET /api/v1/groups/{group_id}/members", "group.read", "rl.read"},
+		"addGroupMember":    {"POST /api/v1/groups/{group_id}/members", "group.member.add", "rl.admin"},
+		"removeGroupMember": {"DELETE /api/v1/groups/{group_id}/members/{user_id}", "group.member.remove", "rl.admin"},
+		"listGrants":        {"GET /api/v1/grants", "grant.read", "rl.read"},
+		"createGrant":       {"POST /api/v1/grants", "grant.create", "rl.admin"},
+		"getGrant":          {"GET /api/v1/grants/{grant_id}", "grant.read", "rl.read"},
+		"revokeGrant":       {"POST /api/v1/grants/{grant_id}/revoke", "grant.revoke", "rl.admin"},
 		// M1-50
 		"listAuditEvents":   {"GET /api/v1/audit/events", "audit.read", "rl.admin"},
 		"exportAuditEvents": {"GET /api/v1/audit/export", "audit.read", "rl.admin"},

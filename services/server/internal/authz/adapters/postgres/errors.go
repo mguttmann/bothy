@@ -47,6 +47,7 @@ var constraintFields = map[string]string{
 	"groups_source_check":                "/source",
 	"groups_provider_shape_check":        "/provider_id",
 	"groups_external_ref_shape_check":    "/external_ref",
+	"groups_provider_id_fkey":            "/provider_id",
 	"groups_created_by_fkey":             "/created_by",
 	"group_memberships_group_id_fkey":    "/group_id",
 	"group_memberships_user_id_fkey":     "/user_id",

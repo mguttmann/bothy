@@ -69,6 +69,36 @@ func NewGroup(id ids.ID, name, description string, limits GroupLimits, by ids.ID
 	return Group{ID: id, Name: name, Description: description, Source: GroupSourceLocal, CreatedBy: by, CreatedAt: at}, nil
 }
 
+// NewClaimGroup returns a new group whose members follow the group claim externalRef of the OIDC
+// provider providerID (docs/spec/08-identitaet.md section 3.4; the claim sync is M1-42). Name and
+// description are checked as in NewGroup; the claim value must not be blank and is free of
+// control and bidi characters. Whether the provider exists is held by the foreign key
+// groups_provider_id_fkey.
+//
+// Errors: those of NewGroup; validation_failed on /provider_id (required) or /external_ref
+// (required or a textcheck rule).
+func NewClaimGroup(id ids.ID, name, description string, limits GroupLimits, providerID ids.ID, externalRef string, by ids.ID, at time.Time) (Group, error) {
+	g, err := NewGroup(id, name, description, limits, by, at)
+	if err != nil {
+		return Group{}, err
+	}
+	if err := CheckClaim(providerID, externalRef); err != nil {
+		return Group{}, err
+	}
+	g.Source, g.ProviderID, g.ExternalRef = GroupSourceOIDCClaim, providerID, externalRef
+	return g, nil
+}
+
+// CheckClaim checks the binding of a claim group: a provider and a claim value that is not blank
+// and free of control and bidi characters. Errors: validation_failed on /provider_id or
+// /external_ref.
+func CheckClaim(providerID ids.ID, externalRef string) error {
+	if providerID.IsZero() {
+		return fieldError(pointerProviderID, fieldRequired, "a claim group needs the provider of its claim")
+	}
+	return checkText(pointerExternalRef, "claim value", externalRef, true, 0)
+}
+
 // CheckGroupText checks name and description of a group as NewGroup does: the name not blank,
 // both free of control and bidi characters (SEC-IN-4) and within limits. group.update (M1-29)
 // checks a rename with it. Errors: validation_failed on /name or /description.

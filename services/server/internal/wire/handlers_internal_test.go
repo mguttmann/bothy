@@ -6,6 +6,7 @@ import (
 	"testing"
 
 	audithttp "github.com/OWNER/bothy/services/server/internal/audit/adapters/httpapi"
+	authzhttp "github.com/OWNER/bothy/services/server/internal/authz/adapters/httpapi"
 	identityhttp "github.com/OWNER/bothy/services/server/internal/identity/adapters/httpapi"
 	instancehttp "github.com/OWNER/bothy/services/server/internal/instance/adapters/httpapi"
 )
@@ -29,7 +30,8 @@ func TestHandlers_FillsBuiltAndKeepsInjected(t *testing.T) {
 	log := &audithttp.Log{}
 	injected := &identityhttp.Tokens{}
 
-	s := &server{identity: id, signingKeys: keys, audit: &Audit{handlers: log}}
+	access := &authzhttp.Access{}
+	s := &server{identity: id, signingKeys: keys, audit: &Audit{handlers: log}, authzAdmin: &AuthzAdmin{Handlers: access}}
 	s.deps.Handlers.Tokens = injected
 	h := s.handlers()
 
@@ -48,6 +50,7 @@ func TestHandlers_FillsBuiltAndKeepsInjected(t *testing.T) {
 		{"Approval", h.Approval, id.ApprovalHandlers},
 		{"Keys", h.Keys, keys.Handlers},
 		{"Log", h.Log, log},
+		{"Access", h.Access, access},
 	}
 	for _, c := range checks {
 		if c.got != c.want {
@@ -56,7 +59,7 @@ func TestHandlers_FillsBuiltAndKeepsInjected(t *testing.T) {
 	}
 
 	empty := (&server{}).handlers()
-	if empty.Devices != nil || empty.Tokens != nil || empty.Providers != nil || empty.Keys != nil || empty.Log != nil {
+	if empty.Devices != nil || empty.Tokens != nil || empty.Providers != nil || empty.Keys != nil || empty.Log != nil || empty.Access != nil {
 		t.Errorf("handlers() before the start = %+v, want only nil handlers", empty)
 	}
 }
