@@ -175,8 +175,8 @@ const (
 // fieldDeviceID is the field pointer of DeviceRegistration.device_id.
 const fieldDeviceID = "/device_id"
 
-// fieldCodeTaken is the field code of a taken device id or handle (M1-37, M1-38, M1-41; one
-// constant since INT-W14/10).
+// fieldCodeTaken is the field code of a taken device id or handle (M1-37, M1-38, M1-41, M1-43;
+// one constant since INT-W14/10).
 const fieldCodeTaken = "taken"
 
 // CompleteLogin completes a login of any path in one unit of work (joining the ambient one): the

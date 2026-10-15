@@ -10,6 +10,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"sync"
 	"sync/atomic"
 	"testing"
 	"time"
@@ -59,7 +60,8 @@ var sessCfg = app.Config{
 	EnrollmentCodeTTL: 72 * time.Hour, EnrollmentCodeMaxAttempts: 3, LoginFlowTTL: 10 * time.Minute,
 	DevicePendingTTL: 24 * time.Hour, DeviceVerificationCodeDigits: 6, PairingCodeTTL: 5 * time.Minute, PairingCodeChars: 8,
 	ServerCodeTTL: time.Minute, OIDCJWKSCacheTTL: time.Hour, OIDCClientAssertionTTL: 2 * time.Minute,
-	IDPRecheckInterval: 7 * 24 * time.Hour,
+	IDPRecheckInterval:        7 * 24 * time.Hour,
+	DeviceInactiveRevokeAfter: 180 * 24 * time.Hour,
 }
 
 // testPepper is the token pepper of the session world (generated per test run, never a secret).
@@ -94,6 +96,11 @@ type sworld struct {
 	// harness with further stages (the rate limit of M1-38).
 	routes      []httpservertest.Route
 	idempotency func(http.Handler) http.Handler
+
+	// devicesRevoked are the DeviceRevoked events (M1-45); evMu guards both event lists while
+	// units of work run concurrently.
+	devicesRevoked *[]identity.DeviceRevoked
+	evMu           *sync.Mutex
 }
 
 // setPersonal stores the global value of the feature flag tokens.personal_enabled with an empty
@@ -139,8 +146,9 @@ func newSessionWorldWith(t *testing.T, db *pgtest.DB, clk *clock.Fake, instID id
 	pool := db.OpenPool(t, pcfg)
 	capture := &httpservertest.LogCapture{}
 	log := slog.New(capture)
-	ended := &[]identity.SessionEnded{}
-	w := &sworld{t: t, db: db, pool: pool, owner: db.Pool(t, pg.RoleOwner), clk: clk, logs: capture, ended: ended, instID: instID, dir: dir}
+	ended, devicesRevoked, evMu := &[]identity.SessionEnded{}, &[]identity.DeviceRevoked{}, &sync.Mutex{}
+	w := &sworld{t: t, db: db, pool: pool, owner: db.Pool(t, pg.RoleOwner), clk: clk, logs: capture, ended: ended, instID: instID, dir: dir,
+		devicesRevoked: devicesRevoked, evMu: evMu}
 	repo := postgres.NewRepository(pool)
 	principals := app.NewPrincipalSource(repo)
 	structure, policies := fake.NewStructure(), fake.NewPolicies()
@@ -160,7 +168,18 @@ func newSessionWorldWith(t *testing.T, db *pgtest.DB, clk *clock.Fake, instID id
 	}
 	// A subscriber of SessionEnded the way notify subscribes from M3 on.
 	if err := txn.Subscribe(reg, func(_ context.Context, ev identity.SessionEnded) error {
+		evMu.Lock()
+		defer evMu.Unlock()
 		*ended = append(*ended, ev)
+		return nil
+	}); err != nil {
+		t.Fatal(err)
+	}
+	// A subscriber of DeviceRevoked the way notify subscribes from M3 on (M1-45).
+	if err := txn.Subscribe(reg, func(_ context.Context, ev identity.DeviceRevoked) error {
+		evMu.Lock()
+		defer evMu.Unlock()
+		*devicesRevoked = append(*devicesRevoked, ev)
 		return nil
 	}); err != nil {
 		t.Fatal(err)
@@ -231,7 +250,7 @@ func newSessionWorldWith(t *testing.T, db *pgtest.DB, clk *clock.Fake, instID id
 		Providers: w.id.ProviderHandlers, Credentials: w.id.CredentialHandlers,
 		Tokens: w.id.TokenHandlers, Enrollment: w.id.EnrollmentHandlers, Approval: w.id.ApprovalHandlers, Admin: w.settings.Handlers,
 		Passkeys: w.id.PasskeyHandlers, OIDC: w.id.OIDCHandlers,
-		TrustedHeader: w.id.TrustedHeaderHandlers},
+		TrustedHeader: w.id.TrustedHeaderHandlers, Lifecycle: w.id.LifecycleHandlers},
 		wire.RouteOptions(), routes.SpecCatalog())
 	if err != nil {
 		t.Fatal(err)

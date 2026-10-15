@@ -330,7 +330,8 @@ type LockDeviceRow struct {
 	StepUpKeyThumbprint pgtype.Text
 }
 
-// The device row of an approval or expiry, locked until the end of the unit of work (M1-38).
+// The device row of an approval, expiry (M1-38) or revocation (M1-45), locked until the end of the
+// unit of work.
 func (q *Queries) LockDevice(ctx context.Context, id pgtype.UUID) (LockDeviceRow, error) {
 	row := q.db.QueryRow(ctx, lockDevice, id)
 	var i LockDeviceRow

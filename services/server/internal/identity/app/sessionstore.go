@@ -59,6 +59,8 @@ type AuthState struct {
 	Session          SessionRecord
 	DeviceState      identity.DeviceState
 	DeviceLastSeenAt time.Time
+	// DeviceApprovedAt is devices.approved_at; zero for none (M1-45, the inactivity check).
+	DeviceApprovedAt time.Time
 	DeviceKeyJKT     string
 	// DeviceCreatedAt is devices.created_at: a pending device older than auth.device_pending_ttl
 	// counts as revoked (M1-38).

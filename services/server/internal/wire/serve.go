@@ -774,6 +774,7 @@ func (id *Identity) fillHandlers(h *Handlers) {
 	fill(&h.Passkeys, id.PasskeyHandlers)
 	fill(&h.OIDC, id.OIDCHandlers)
 	fill(&h.TrustedHeader, id.TrustedHeaderHandlers)
+	fill(&h.Lifecycle, id.LifecycleHandlers)
 }
 
 // fill sets *dst to built when *dst is nil, so an injected handler stays.

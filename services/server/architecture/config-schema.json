@@ -218,6 +218,18 @@
       "doc": "Allowed clock skew for exp, nbf and iat."
     },
     {
+      "name": "auth.device_inactive_revoke_after",
+      "env": "BOTHY_AUTH__DEVICE_INACTIVE_REVOKE_AFTER",
+      "kind": "duration",
+      "default": "180d",
+      "required": false,
+      "enum": [],
+      "min": "1h",
+      "max": "",
+      "chapter": "08-identity.md",
+      "doc": "An active device without contact for this long is revoked (reason inactive)."
+    },
+    {
       "name": "auth.device_pending_ttl",
       "env": "BOTHY_AUTH__DEVICE_PENDING_TTL",
       "kind": "duration",

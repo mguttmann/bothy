@@ -26,6 +26,7 @@ const getAuthState = `-- name: GetAuthState :one
 SELECT s.id, s.user_id, s.device_id, s.client_component, s.parent_session_id, s.identity_id, s.auth_method, s.cookie_hash, s.created_at, s.expires_at, s.step_up_at, s.step_up_method, s.step_up_consumed_at, s.last_seen_at, s.last_ip, s.revoked_at, s.revoke_reason,
        d.state        AS device_state,
        d.last_seen_at AS device_last_seen_at,
+       d.approved_at  AS device_approved_at,
        k.jkt          AS dpop_jkt,
        d.created_at   AS device_created_at
 FROM auth_sessions s
@@ -38,6 +39,7 @@ type GetAuthStateRow struct {
 	AuthSession      AuthSession
 	DeviceState      string
 	DeviceLastSeenAt pgtype.Timestamptz
+	DeviceApprovedAt pgtype.Timestamptz
 	DpopJkt          pgtype.Text
 	DeviceCreatedAt  pgtype.Timestamptz
 }
@@ -67,6 +69,7 @@ func (q *Queries) GetAuthState(ctx context.Context, id pgtype.UUID) (GetAuthStat
 		&i.AuthSession.RevokeReason,
 		&i.DeviceState,
 		&i.DeviceLastSeenAt,
+		&i.DeviceApprovedAt,
 		&i.DpopJkt,
 		&i.DeviceCreatedAt,
 	)

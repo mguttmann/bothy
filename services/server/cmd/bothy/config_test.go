@@ -179,6 +179,7 @@ func TestConfigPrintShowsSourcePerKey(t *testing.T) {
 		"auth.api_token_max_ttl = 365d  # default\n" +
 		"auth.cleanup_interval = 1h  # default\n" +
 		"auth.clock_leeway = 30s  # default\n" +
+		"auth.device_inactive_revoke_after = 180d  # default\n" +
 		"auth.device_pending_ttl = 1d  # default\n" +
 		"auth.device_verification_code_digits = 6  # default\n" +
 		"auth.dpop_nonce_ttl = 5m  # default\n" +

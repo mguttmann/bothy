@@ -125,11 +125,11 @@ func newWorld(t *testing.T) *world {
 		HandleMaxChars: 12, DisplayNameMaxChars: 20, DPoPNonceTTL: time.Minute, DPoPProofMaxAge: time.Minute, ClockLeeway: time.Second,
 		PublicURL: "https://bothy.example.com", PageSizeDefault: 2, PageSizeMax: 3, StepUpMaxAge: 5 * time.Minute,
 		APITokenMaxTTL: 24 * time.Hour, PersonalTokenMaxTTL: 24 * time.Hour,
-		// The keys of M1-37, M1-38, M1-40 and M1-41, which NewIdentity requires (INT-W14/8).
+		// The keys of M1-37, M1-38, M1-40, M1-41 and M1-45, which NewIdentity requires (INT-W14/8).
 		EnrollmentCodeTTL: 72 * time.Hour, EnrollmentCodeMaxAttempts: 5, LoginFlowTTL: 10 * time.Minute,
 		DevicePendingTTL: 24 * time.Hour, DeviceVerificationCodeDigits: 6, PairingCodeTTL: 5 * time.Minute, PairingCodeChars: 8,
 		ServerCodeTTL: time.Minute, OIDCJWKSCacheTTL: time.Hour, OIDCClientAssertionTTL: 2 * time.Minute,
-		IDPRecheckInterval: 30 * 24 * time.Hour,
+		IDPRecheckInterval: 30 * 24 * time.Hour, DeviceInactiveRevokeAfter: 180 * 24 * time.Hour,
 	}
 	// Identity takes the instance settings (M1-46) and the feature flags (M1-47) (INT-W14/8).
 	settings, err := wire.NewInstanceSettings(wire.DefaultInstanceConfig(), true, pool, uow, az, wire.SettingsWrites{Audit: rec, Events: appender}, clk)

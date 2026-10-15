@@ -40,6 +40,7 @@ LIMIT @row_limit;
 SELECT sqlc.embed(s),
        d.state        AS device_state,
        d.last_seen_at AS device_last_seen_at,
+       d.approved_at  AS device_approved_at,
        k.jkt          AS dpop_jkt,
        d.created_at   AS device_created_at
 FROM auth_sessions s

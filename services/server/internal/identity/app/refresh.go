@@ -258,6 +258,12 @@ func (s *Sessions) alive(ctx context.Context, sess SessionRecord, fam FamilyReco
 	if dev.KeyThumbprint != fam.DPoPJKT {
 		return false, nil
 	}
+	// An active device without contact for auth.device_inactive_revoke_after refreshes no more
+	// (08 section 5.4, M1-45), like the Authenticator refuses its access tokens.
+	if after := s.cfg.DeviceInactiveRevokeAfter; after > 0 && dev.State == identity.DeviceStateActive &&
+		inactiveSince(dev.LastSeenAt, dev.ApprovedAt, time.Time{}, s.d.Clock.Now().Add(-after)) {
+		return false, nil
+	}
 	p, found, err := s.d.People.Principal(ctx, sess.UserID)
 	if err != nil || !found {
 		return false, err

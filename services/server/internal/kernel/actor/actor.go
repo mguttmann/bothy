@@ -63,7 +63,8 @@ type Actor struct {
 	// TokenID is the API token of an agent, app or personal token; zero otherwise.
 	TokenID ids.ID
 	// CredentialInactive reports that the authenticator found the API token of this request
-	// revoked or expired (M1-44). The authenticator does not reject it, so authorize refuses it in
+	// revoked or expired (M1-44), or the session, device or device key of a person's access token
+	// revoked, ended or inactive (M1-45). The authenticator does not reject it, so authorize refuses it in
 	// check_active and audits token_revoked; the stages before authorize must not act for such a
 	// principal: Idempotency-Key never replays a stored answer to it, the rate limiter keys it by
 	// the client IP and the failed-credentials precheck counts it as a failure.
