@@ -315,6 +315,44 @@ void main() {
       }
     });
 
+    test(
+      'the Windows plugin overrides every method of the generated host API',
+      () {
+        // The Pigeon C++ output changes when the channel gains a parameter (M5-01 added the
+        // prompt texts to sign); the plugin must declare the same parameter types, or the
+        // Windows build breaks while the CTest suite of windows/core still passes (INT-W27/2).
+        List<String> types(String params) => params
+            .split(RegExp(r',(?![^<(]*[>)])'))
+            .map((p) => p.trim().replaceAll(RegExp(r'\s+'), ' '))
+            .where((p) => p.isNotEmpty)
+            .map((p) => p.substring(0, p.lastIndexOf(' ')))
+            .toList();
+        Map<String, List<String>> methods(String source, String suffix) => {
+          for (final m in RegExp(
+            r'(\w+)\(((?:[^;()]|\([^()]*\))*)\)\s*' + suffix,
+            multiLine: true,
+          ).allMatches(source))
+            m.group(1)!: types(m.group(2)!),
+        };
+        final header = File('windows/device_key_api.g.h').readAsStringSync();
+        final api = header.substring(
+          header.indexOf('class DeviceKeyHostApi {'),
+        );
+        final generated = methods(
+          api.substring(0, api.indexOf('\n};')),
+          r'= 0;',
+        );
+        final plugin = methods(
+          File('windows/device_key_plugin.h').readAsStringSync(),
+          r'override;',
+        );
+        expect(generated.keys, isNotEmpty);
+        for (final name in generated.keys) {
+          expect(plugin[name], generated[name], reason: name);
+        }
+      },
+    );
+
     test('a platform without the plugin reports not_available', () async {
       final api = _FakeHostApi()..error = MissingPluginException('none');
       final client = DeviceKeyClient(api: api);
