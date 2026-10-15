@@ -4,7 +4,8 @@
 For every member of `tools/arch-check/rules.yaml` that is a package (not an app) the script runs
 `dart doc --output <out>/<member>` in the member folder, after one `flutter pub get
 --enforce-lockfile` at the workspace root. A non-zero exit or any output line with `warning:`
-or `error:` fails the run (documentation in code is a gate, docs/spec/23-quality.md). The
+or `error:` fails the run (documentation in code is a gate, docs/spec/23-quality.md), except a
+warning located in generated code, which the doc lint excludes as well. The
 pages are generated for every build and never tracked (docs/DECISIONS.md D-M4-01-6); MkDocs
 copies them into the site, and docs/reference/dart-api.md links them.
 
@@ -24,6 +25,32 @@ from pathlib import Path
 import yaml
 
 _MARKERS = ("warning:", "error:")
+
+# The location line `dart doc` prints below a warning: `from <element>: (file://<path>:<l>:<c>)`.
+_FROM = re.compile(r"^\s*from .*\(file://(?P<path>[^)]*?):\d+:\d+\)\s*$")
+# Generated Dart code, the same patterns as the doc lint of the root analysis_options.yaml
+# (docs/DECISIONS.md D-M4-01-4): its doc comments come from the generator.
+_GENERATED = re.compile(r"/lib/src/generated/|\.(?:g|freezed|drift)\.dart$")
+
+
+def findings(output: str) -> list[str]:
+    """The warning and error lines of `dart doc` output that count.
+
+    A warning whose location line points into generated code is left out (the doc lint
+    excludes generated code, docs/DECISIONS.md D-M4-02-7); every error counts, and so does a
+    warning without a location.
+    """
+    lines = output.splitlines()
+    kept = []
+    for i, line in enumerate(lines):
+        if not any(m in line for m in _MARKERS):
+            continue
+        where = _FROM.match(lines[i + 1]) if i + 1 < len(lines) else None
+        if "warning:" in line and where and _GENERATED.search(where.group("path")):
+            continue
+        kept.append(line)
+    return kept
+
 
 # A `<link>` tag whose href names a host: dart doc links Google Fonts (preconnect and two
 # stylesheets) in every page, and the site loads nothing from another origin (M7-19).
@@ -111,7 +138,7 @@ def main(argv: list[str] | None = None) -> int:
         if code != 0:
             print(f"dart-api-docs: {path}: dart doc failed with exit code {code}", file=sys.stderr)
             return 1
-        if any(m in line for line in output.splitlines() for m in _MARKERS):
+        if findings(output):
             print(f"dart-api-docs: {path}: dart doc printed a warning or an error", file=sys.stderr)
             return 1
         strip_external_links(target)

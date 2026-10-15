@@ -114,6 +114,46 @@ def test_warning_line_fails(
     ]
 
 
+_GENERATED_FROM = (
+    "    from event.Event: (file:///w/packages/domain/lib/src/generated/model/event.dart:90:16)"
+)
+
+
+@pytest.mark.parametrize(
+    "location",
+    [
+        _GENERATED_FROM,
+        "    from api.Api: (file:///w/packages/domain/lib/src/model/user.g.dart:3:1)",
+    ],
+)
+def test_warning_in_generated_code_is_ignored(
+    repo: Path, monkeypatch: pytest.MonkeyPatch, location: str
+) -> None:
+    # Generated code is out of the doc lint (docs/DECISIONS.md D-M4-01-4, D-M4-02-7).
+    monkeypatch.setenv(
+        "FAKE_DART_OUTPUT", f"  warning: unresolved doc reference [id]\n{location}\nSuccess!"
+    )
+    assert _run(repo) == 0
+
+
+@pytest.mark.parametrize(
+    "output",
+    [
+        "  warning: unresolved doc reference [id]\n"
+        "    from hand.Client: (file:///w/packages/domain/lib/src/hand/client.dart:9:1)",
+        "  warning: unresolved doc reference [id]",
+        f"  warning: unresolved doc reference [id]\n{_GENERATED_FROM}\n"
+        "  warning: unresolved doc reference [x]",
+        f"  error: broken\n{_GENERATED_FROM}",
+    ],
+)
+def test_warning_outside_generated_code_still_fails(
+    repo: Path, monkeypatch: pytest.MonkeyPatch, output: str
+) -> None:
+    monkeypatch.setenv("FAKE_DART_OUTPUT", output)
+    assert _run(repo) == 1
+
+
 def test_error_line_fails(repo: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setenv("FAKE_DART_OUTPUT", "error: could not resolve package")
     assert _run(repo) == 1
