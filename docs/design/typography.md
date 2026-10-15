@@ -80,8 +80,19 @@ from `type.body`, so that the iPhone does not read smaller than the system defau
 
 ## Integration
 
-- Flutter: `packages/design_system` bundles the variable TTF files from the source repositories
-  in a pinned version with license text; `DsType` (generated) provides the `TextStyle` constants.
+- Flutter: `packages/design_system` bundles the variable TTF files of both families (upright
+  and italic, axis `wght`) from the source repositories at a recorded commit, with the OFL text of
+  each family next to them, under `packages/design_system/fonts/`; `fonts/MANIFEST.json` records
+  source URL, commit, SHA-256 and license of every file, and `test/fonts_test.dart` fails on a
+  changed, missing or extra file or a file without license text (docs/DECISIONS.md D-M4-04-4).
+  The files carry the Google Fonts download names (`<Family>-VariableFont_wght.ttf`), not the
+  bracket names of the repositories. `pubspec.yaml` declares the families
+  `Atkinson Hyperlegible Next` and `Atkinson Hyperlegible Mono`. `DsType` (generated, copied into
+  `lib/src/generated/` by `tokens.py build`) supplies the `TextStyle` constants; `dsTextStyle`
+  adds the package font name `packages/design_system/<family>` in front of the fallback list
+  (apps that depend on the package register the fonts under that name) and drives the `wght`
+  axis from the weight. The theme (`buildDsTheme`) takes its text theme from the roles through
+  `dsTextStyle`; the fallback list of `font.family.*` stays behind it.
 - Web console and docs site: WOFF2 from the same version; `tokens.css` provides the variables
   `--ds-type-*`.
 - Preview: the WOFF2 files are under `tools/design-tokens/vendor/fonts/` and are

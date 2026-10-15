@@ -69,6 +69,20 @@ planning basis names River (MPL-2.0) for background jobs.
    `scancode` runs it for every server tag; a finding stops the release before any image tag,
    and the report is attached to the release.
 
+## Bundled fonts
+
+The apps bundle the fonts Atkinson Hyperlegible Next and Atkinson Hyperlegible Mono as asset
+files under `packages/design_system/fonts/` (docs/design/typography.md). Their license is
+OFL-1.1, settled by D-L11 and docs/design/typography.md (reason 5): the OFL allows embedding in
+apps and redistribution when the license text ships with the files. The font files are bundled
+assets, not package dependencies: `make licenses` (OSV-Scanner over the lock files) does not see
+them, and `quality/licenses/allowed.txt` stays unchanged. Instead the OFL text of each family
+lies next to the files (`fonts/<family>.OFL.txt`), `fonts/MANIFEST.json` records
+`"license": "OFL-1.1"` per file, and `packages/design_system/test/fonts_test.dart` fails when a
+font file has no license text, a manifest entry names another license, or a file differs from
+its recorded SHA-256. `NOTICE` names both fonts with their copyright (docs/DECISIONS.md
+D-M4-04-4).
+
 ## SBOM and checking releases
 
 * Every release contains `sbom.spdx.json` (SPDX, generated with Syft via
