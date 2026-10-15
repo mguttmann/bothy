@@ -100,9 +100,8 @@ final class CacheCleaner {
     return paths;
   }
 
-  Future<List<String>> _deleteThread(String id) => _db.transaction(
-    () => deleteThreads(_db, [id], withDrafts: false),
-  );
+  Future<List<String>> _deleteThread(String id) =>
+      _db.transaction(() => deleteThreads(_db, [id], withDrafts: false));
 
   /// Used pages of the database plus the sum of the file cache rows.
   Future<int> _usedBytes() async {

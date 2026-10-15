@@ -76,10 +76,7 @@ Future<LocalDatabase> openLocalStore({
 /// Opens an empty in-memory database in the calling isolate for tests, with the same feature
 /// checks as [openLocalStore] but without a key; [clock] replaces the time source.
 LocalDatabase openInMemoryForTests({DateTime Function()? clock}) =>
-    LocalDatabase(
-      NativeDatabase.memory(setup: _checkFeatures),
-      clock: clock,
-    );
+    LocalDatabase(NativeDatabase.memory(setup: _checkFeatures), clock: clock);
 
 /// Runs on the database connection before drift uses it.
 void _setUp(Database database, Uint8List key) {

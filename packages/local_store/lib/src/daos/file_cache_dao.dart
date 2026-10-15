@@ -48,7 +48,9 @@ final class FileCacheDao {
     await (_db.update(_db.fileCache)..where(
           (t) => t.fileId.equals(fileId.value) & t.variant.equals(variant),
         ))
-        .write(FileCacheCompanion(lastAccessedAt: Value(toMillis(_db.clock()))));
+        .write(
+          FileCacheCompanion(lastAccessedAt: Value(toMillis(_db.clock()))),
+        );
   }
 
   /// Deletes the row of [fileId] and [variant] and returns its path, or null.
@@ -66,8 +68,9 @@ final class FileCacheDao {
   /// The sum of `size_bytes` of all rows.
   Future<int> totalBytes() async {
     final sum = _db.fileCache.sizeBytes.sum();
-    final row = await (_db.selectOnly(_db.fileCache)..addColumns([sum]))
-        .getSingle();
+    final row = await (_db.selectOnly(
+      _db.fileCache,
+    )..addColumns([sum])).getSingle();
     return row.read(sum) ?? 0;
   }
 

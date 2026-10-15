@@ -40,8 +40,9 @@ final class CommandsDao {
     final rows =
         await (_db.select(_db.commands)
               ..where(
-                (t) =>
-                    t.name.substr(1, prefix.length).equals(prefix.toLowerCase()),
+                (t) => t.name
+                    .substr(1, prefix.length)
+                    .equals(prefix.toLowerCase()),
               )
               ..orderBy([(t) => OrderingTerm(expression: t.name)]))
             .get();

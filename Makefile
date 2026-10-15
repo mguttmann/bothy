@@ -314,9 +314,9 @@ codegen-check: ## Generated code equals a fresh generation (sqlc, go generate, f
 	@# database code and `drift_dev make-migrations` the stored schema file and the schema helpers
 	@# of the migration tests; both must equal a fresh generation, so a changed table without a
 	@# new schema version fails (docs/DECISIONS.md D-M4-12-7).
-	@if [ -z "$(DART_ON)" ]; then $(call skip,codegen-drift,no Dart package selected under apps/ or packages/); \
+	@if [ -z "$(DART_ON)" ]; then $(call skip,codegen-dart-drift,no Dart package selected under apps/ or packages/); \
 	else drift=""; for p in $(DART_PKGS); do ! grep -qs 'drift_dev:' $$p/build.yaml || drift="$$drift $$p"; done; \
-	  if [ -z "$$drift" ]; then $(call skip,codegen-drift,no Dart member with a drift build.yaml); \
+	  if [ -z "$$drift" ]; then $(call skip,codegen-dart-drift,no Dart member with a drift build.yaml); \
 	  else flutter pub get --enforce-lockfile >/dev/null || exit 1; \
 	    for p in $$drift; do \
 	      $(CODEGEN_CHECK) --dir $$p -- sh -c 'dart run build_runner build && dart run drift_dev make-migrations' || exit 1; \

@@ -15,7 +15,11 @@ import 'package:drift/drift.dart';
 abstract final class MigrationRules {
   /// Tables whose rows survive every migration: unsent work (`outbox`, `drafts`) and
   /// handed-over shares (`share_inbox`); M4-36 adds `host_key_pins`.
-  static const Set<String> preservedTables = {'outbox', 'drafts', 'share_inbox'};
+  static const Set<String> preservedTables = {
+    'outbox',
+    'drafts',
+    'share_inbox',
+  };
 
   /// Drops and recreates [cacheTables] and clears `sync_state.cursor` and `sync_epoch`, so the
   /// next connection loads a snapshot (04 7.3). Throws an [ArgumentError] when a preserved

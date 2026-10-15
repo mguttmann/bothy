@@ -213,8 +213,7 @@ final class MessagesDao {
 
   /// Sets the absolute pin state of `pin.*` (04 9 item 3) without touching `version`.
   Future<void> applyPin(MessageId messageId, {required bool pinned}) async {
-    await (_db.update(_db.messages)
-          ..where((t) => t.id.equals(messageId.value)))
+    await (_db.update(_db.messages)..where((t) => t.id.equals(messageId.value)))
         .write(MessagesCompanion(pinned: Value(pinned)));
   }
 
@@ -247,7 +246,9 @@ final class MessagesDao {
     await (_db.delete(
       _db.reactionsSummary,
     )..where((t) => t.messageId.equals(id))).go();
-    await (_db.delete(_db.myMentions)..where((t) => t.messageId.equals(id))).go();
+    await (_db.delete(
+      _db.myMentions,
+    )..where((t) => t.messageId.equals(id))).go();
     await (_db.delete(
       _db.messageComponents,
     )..where((t) => t.messageId.equals(id))).go();

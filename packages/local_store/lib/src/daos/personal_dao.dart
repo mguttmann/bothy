@@ -70,7 +70,10 @@ final class PersonalDao {
   }
 
   /// The draft of [threadId], or of a new post in [channelId] when [threadId] is null.
-  Stream<Draft?> watchDraft({required ChannelId channelId, ThreadId? threadId}) =>
+  Stream<Draft?> watchDraft({
+    required ChannelId channelId,
+    ThreadId? threadId,
+  }) =>
       (_db.select(_db.drafts)..where(
             (t) =>
                 t.channelId.equals(channelId.value) &
