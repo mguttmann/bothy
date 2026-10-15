@@ -97,11 +97,15 @@ func (s *Devices) Get(ctx context.Context, a actor.Actor, deviceID ids.ID) (iden
 	if err != nil {
 		return identity.Device{}, err
 	}
+	// A missing device is described without an owner, which only an owner sees; authorize still
+	// runs first, so an anonymous caller gets 401 for a missing and an existing device alike
+	// (07 section 4.2, red team M1-31).
+	r := authorize.Resource{Kind: authorize.ResourceDevice, ID: deviceID, OwnerID: d.UserID}
+	if err := s.authorize(ctx, a, r); err != nil {
+		return identity.Device{}, err
+	}
 	if !found {
 		return identity.Device{}, invisible()
-	}
-	if err := s.authorize(ctx, a, authorize.Resource{Kind: authorize.ResourceDevice, ID: d.ID, OwnerID: d.UserID}); err != nil {
-		return identity.Device{}, err
 	}
 	return d, nil
 }
@@ -116,16 +120,17 @@ func (s *Devices) ListMine(ctx context.Context, a actor.Actor, p identity.Page) 
 
 // ListForUser implements identity.Devices. The resource is the device set of userID (kind
 // device without id, owner userID): devices are visible to their person and to owners only, so
-// another person gets not_found, never forbidden (05 rule 2; docs/DECISIONS.md M1-33). An
-// unknown person is not_found before authorize.
+// another person gets not_found, never forbidden (05 rule 2; docs/DECISIONS.md M1-33). authorize
+// runs before the person is looked up, so an unknown person gives the answer of authorize first
+// and not_found only to a caller it allows (red team M1-31).
 func (s *Devices) ListForUser(ctx context.Context, a actor.Actor, userID ids.ID, p identity.Page) (identity.DevicePage, error) {
+	if err := s.authorize(ctx, a, authorize.Resource{Kind: authorize.ResourceDevice, OwnerID: userID}); err != nil {
+		return identity.DevicePage{}, err
+	}
 	if _, found, err := s.deps.People.User(ctx, userID); err != nil || !found {
 		if err == nil {
 			err = invisible()
 		}
-		return identity.DevicePage{}, err
-	}
-	if err := s.authorize(ctx, a, authorize.Resource{Kind: authorize.ResourceDevice, OwnerID: userID}); err != nil {
 		return identity.DevicePage{}, err
 	}
 	return s.page(ctx, a, userID, p)

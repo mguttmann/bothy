@@ -24,6 +24,18 @@ documented in this file. The format is based on
   `domain.AssumeValid`, `adapters/jobs`, the configuration keys `authz.expiry_sweep_interval`,
   `authz.expiry_reminder_lead` and `authz.expiry_sweep_batch_max`, and the registration of
   `grant.changed`, `group.changed` and `access.expiring`.
+- People, owners and own profile (M1-31): the operations `listUsers`, `createUser`, `getUser`,
+  `updateUser`, `enableUser`, `listOwners`, `addOwner`, `revokeOwner`, `getMe` and
+  `updateMyProfile` with the ports `identity.People` and `identity.Owners`, the durable event
+  `user.updated`, audit entries with IDs and field names only, and the rights changes
+  `owner.add`, `owner.remove` and `user.enable` through the authz hook (`409 i1_violation`, `409
+  last_owner`). No self registration; `local_account` answers `400` until enrollment codes exist.
+  `kernel/txn.AllowLateRightsChange` lets the unit of the Idempotency-Key stage become a rights
+  change in the use case's nested unit; `httpservertest` gains `Actors`, `InSession`,
+  `WithToken` and the response validator `ResponseValidator` (one per contract and
+  operation list, `SharedResponseValidator`). Time zones are checked against the IANA names of the toolchain's
+  tzdata (`tools/zonegen`). The device reads `getDevice` and `listUserDevices` authorize before they
+  answer an unknown device or person.
 
 - Idempotency keys (M1-20): `StageIdempotency` of `platform/httpserver` runs every keyed request
   in one unit of work with the key row of `idempotency_keys` (migration `00007`), stores final

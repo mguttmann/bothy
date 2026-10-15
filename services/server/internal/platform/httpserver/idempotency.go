@@ -246,7 +246,7 @@ func (s *idempotencyStage) serve(w http.ResponseWriter, r *http.Request, next ht
 		var err error
 		out, err = s.attempt(ctx, w, r, next, req, body)
 		return err
-	})
+	}, txn.AllowLateRightsChange()) // a keyed use case declares its rights change itself (M1-31)
 	switch {
 	case errors.Is(err, idempotency.ErrInProgress):
 		WriteProblem(w, r, errs.New(errs.CodeRequestInProgress, ""))

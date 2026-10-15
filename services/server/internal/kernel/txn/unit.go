@@ -54,6 +54,9 @@ type Options struct {
 	// Targets are the spaces or channels whose rights change (archive); authz derives the
 	// affected principals from them (02 section 8.1). First-named order without duplicates.
 	Targets []Ref
+	// LateRightsChange lets an outermost unit without RightsChange become one through its first
+	// nested Do that declares a rights change (AllowLateRightsChange).
+	LateRightsChange bool
 }
 
 // Ref names a resource or a target of a rights change by its catalogue resource kind and id. The
@@ -133,6 +136,21 @@ func RightsChange(affected ...ids.ID) Option {
 	}
 }
 
+// AllowLateRightsChange lets an outermost unit that does not declare a rights change become one
+// later, once: the first nested Do that declares a rights change runs the rights begin hook
+// before its function and the rights check hook right after it, inside the ambient transaction;
+// sync and audit still run once at the end of the outer unit. Only the Idempotency-Key stage of
+// platform/httpserver opens its unit with it (docs/DECISIONS.md M1-20/4 and M1-31): when the
+// nested unit begins, the stage has written nothing but its claim row of idempotency_keys, so the
+// begin hook still locks permission_version before any domain row (03 "Lock order"). The
+// caller of this option guarantees that; platform/pg cannot see it. A failed late rights change
+// fails the whole unit, also when its caller swallows the error, so a use case behind the stage
+// must not rely on swallowing an error of its rights unit (authz twoUnits does for errRaced;
+// M1-48, which keys revokeGrant, must hand that case on, docs/DECISIONS.md M1-31).
+func AllowLateRightsChange() Option {
+	return func(o *Options) { o.LateRightsChange = true }
+}
+
 // ApplyOptions collects opts in order; nil entries are ignored.
 func ApplyOptions(opts ...Option) Options {
 	var o Options
@@ -188,8 +206,32 @@ type Unit struct {
 // another phase. Only the caller of NewUnit holds that function, so code that reads the unit
 // from a context cannot change its phase (instance.Counters trusts the phase, M1-15).
 func NewUnit(reg *Registry, opts Options) (*Unit, func(Phase)) {
+	u, c := NewControlledUnit(reg, opts)
+	return u, c.SetPhase
+}
+
+// UnitControl changes a unit: its phase and, once, its declaration of a late rights change. Only
+// the caller of NewControlledUnit holds it.
+type UnitControl struct {
+	u *Unit
+}
+
+// NewControlledUnit returns a unit in PhaseNone with an empty state and its control. platform/pg
+// uses it to declare a late rights change (AllowLateRightsChange).
+func NewControlledUnit(reg *Registry, opts Options) (*Unit, UnitControl) {
 	u := &Unit{reg: reg, opts: opts, values: map[any]any{}}
-	return u, func(p Phase) { u.phase.Store(uint32(p)) }
+	return u, UnitControl{u: u}
+}
+
+// SetPhase moves the unit to p.
+func (c UnitControl) SetPhase(p Phase) { c.u.phase.Store(uint32(p)) }
+
+// Declare replaces the options of the unit with o; platform/pg calls it once, when a unit opened
+// with AllowLateRightsChange becomes a rights change.
+func (c UnitControl) Declare(o Options) {
+	c.u.mu.Lock()
+	defer c.u.mu.Unlock()
+	c.u.opts = o
 }
 
 // Phase returns the current phase.
@@ -202,7 +244,9 @@ func (u *Unit) Registry() *Registry { return u.reg }
 
 // Options returns a copy of the options of the outermost Do.
 func (u *Unit) Options() Options {
+	u.mu.Lock()
 	o := u.opts
+	u.mu.Unlock()
 	o.Affected = slices.Clone(o.Affected)
 	o.Targets = slices.Clone(o.Targets)
 	return o
@@ -253,20 +297,28 @@ func CurrentPhase(ctx context.Context) Phase {
 // hooks (M1-29) read it.
 func AffectedPrincipals(ctx context.Context) ([]ids.ID, bool) {
 	u, ok := UnitFrom(ctx)
-	if !ok || !u.opts.RightsChange {
+	if !ok {
 		return nil, false
 	}
-	return slices.Clone(u.opts.Affected), true
+	o := u.Options()
+	if !o.RightsChange {
+		return nil, false
+	}
+	return o.Affected, true
 }
 
 // RightsChangeOf returns the declaration of the outermost unit of ctx and true, or the zero
 // value and false outside a unit or without RightsChange. The authz hooks (M1-29) read it.
 func RightsChangeOf(ctx context.Context) (RightsChangeSpec, bool) {
 	u, ok := UnitFrom(ctx)
-	if !ok || !u.opts.RightsChange {
+	if !ok {
 		return RightsChangeSpec{}, false
 	}
-	return u.opts.Spec(), true
+	o := u.Options()
+	if !o.RightsChange {
+		return RightsChangeSpec{}, false
+	}
+	return o.Spec(), true
 }
 
 // InRightsChange reports whether ctx is inside a unit of work declared as a rights change.

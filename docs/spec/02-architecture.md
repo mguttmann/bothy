@@ -726,6 +726,12 @@ the wait time.
   concurrent retry waits on the primary key until the first transaction ends, and then reads
   the stored response. If the wait ends with `database.lock_timeout`, the server answers
   `409 request_in_progress` (04, 5.2) and stores nothing.
+- Rights changes behind the stage (M1-31): the stage opens its unit with
+  `txn.AllowLateRightsChange()`. The use case declares its rights change in its nested unit as
+  everywhere else; that nested unit then runs the rights begin hook (phase 1), its work and the
+  rights check (phase 3.1) inside the stage's transaction, and sync and audit run once at the end.
+  The stage has written only its key row by then, so `permission_version` is still the first
+  domain lock (section "Lock order"); a second rights change in the same unit is refused.
 - Reason: key and effect arise in one transaction. A crash in between leaves no key without an
   effect and no effect without a key.
 

@@ -8,9 +8,19 @@
 # checks this file; it never rewrites it.
 version: 1
 enabled:             # operationIds that have a handler; sorted ascending
+  - addOwner
+  - createUser
+  - enableUser
   - getDevice
+  - getMe
+  - getUser
   - listMyDevices
+  - listOwners
   - listUserDevices
+  - listUsers
+  - revokeOwner
+  - updateMyProfile
+  - updateUser
 later:               # every other operationId of docs/api/openapi.yaml; sorted by operation_id
   - operation_id: abortUpload
     milestone: M3
@@ -21,9 +31,6 @@ later:               # every other operationId of docs/api/openapi.yaml; sorted 
   - operation_id: addGroupMember
     milestone: M1
     ticket: M1-48
-  - operation_id: addOwner
-    milestone: M1
-    ticket: M1-31
   - operation_id: addReaction
     milestone: M1
     ticket: M1-59
@@ -212,9 +219,6 @@ later:               # every other operationId of docs/api/openapi.yaml; sorted 
   - operation_id: createUpload
     milestone: M3
     ticket: M3-03
-  - operation_id: createUser
-    milestone: M1
-    ticket: M1-31
   - operation_id: createWebhookSubscription
     milestone: M2
     ticket: M2-26
@@ -285,9 +289,6 @@ later:               # every other operationId of docs/api/openapi.yaml; sorted 
   - operation_id: enableAgent
     milestone: M1
     ticket: M1-51
-  - operation_id: enableUser
-    milestone: M1
-    ticket: M1-31
   - operation_id: explainChannelAccess
     milestone: M1
     ticket: M1-49
@@ -361,9 +362,6 @@ later:               # every other operationId of docs/api/openapi.yaml; sorted 
   - operation_id: getJwks
     milestone: M1
     ticket: M1-32
-  - operation_id: getMe
-    milestone: M1
-    ticket: M1-31
   - operation_id: getMessage
     milestone: M1
     ticket: M1-57
@@ -435,9 +433,6 @@ later:               # every other operationId of docs/api/openapi.yaml; sorted 
   - operation_id: getUsageStats
     milestone: M6
     ticket: M6-05
-  - operation_id: getUser
-    milestone: M1
-    ticket: M1-31
   - operation_id: getUserCredentials
     milestone: M1
     ticket: M1-36
@@ -554,9 +549,6 @@ later:               # every other operationId of docs/api/openapi.yaml; sorted 
   - operation_id: listMyTemplates
     milestone: M1
     ticket: M1-60
-  - operation_id: listOwners
-    milestone: M1
-    ticket: M1-31
   - operation_id: listPins
     milestone: M1
     ticket: M1-59
@@ -596,9 +588,6 @@ later:               # every other operationId of docs/api/openapi.yaml; sorted 
   - operation_id: listUserSessions
     milestone: M1
     ticket: M1-34
-  - operation_id: listUsers
-    milestone: M1
-    ticket: M1-31
   - operation_id: listWebhookDeliveries
     milestone: M2
     ticket: M2-26
@@ -745,9 +734,6 @@ later:               # every other operationId of docs/api/openapi.yaml; sorted 
   - operation_id: revokeIncomingWebhook
     milestone: M2
     ticket: M2-27
-  - operation_id: revokeOwner
-    milestone: M1
-    ticket: M1-31
   - operation_id: revokePasskey
     milestone: M1
     ticket: M1-40
@@ -876,9 +862,6 @@ later:               # every other operationId of docs/api/openapi.yaml; sorted 
   - operation_id: updateMessage
     milestone: M1
     ticket: M1-58
-  - operation_id: updateMyProfile
-    milestone: M1
-    ticket: M1-31
   - operation_id: updateSpace
     milestone: M1
     ticket: M1-52
@@ -888,9 +871,6 @@ later:               # every other operationId of docs/api/openapi.yaml; sorted 
   - operation_id: updateTemplate
     milestone: M1
     ticket: M1-60
-  - operation_id: updateUser
-    milestone: M1
-    ticket: M1-31
   - operation_id: updateWebhookSubscription
     milestone: M2
     ticket: M2-26
