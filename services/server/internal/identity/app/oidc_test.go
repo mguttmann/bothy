@@ -10,11 +10,14 @@ import (
 	"errors"
 	"net/http"
 	"net/url"
+	"slices"
 	"strconv"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
+	"github.com/OWNER/bothy/services/server/internal/authz"
 	"github.com/OWNER/bothy/services/server/internal/identity"
 	"github.com/OWNER/bothy/services/server/internal/identity/adapters/identitytest"
 	"github.com/OWNER/bothy/services/server/internal/identity/adapters/oidc/oidctest"
@@ -23,6 +26,7 @@ import (
 	"github.com/OWNER/bothy/services/server/internal/kernel/actor"
 	"github.com/OWNER/bothy/services/server/internal/kernel/errs"
 	"github.com/OWNER/bothy/services/server/internal/kernel/ids"
+	"github.com/OWNER/bothy/services/server/internal/kernel/txn"
 	"github.com/OWNER/bothy/services/server/internal/platform/egress"
 	"github.com/OWNER/bothy/services/server/internal/wire"
 )
@@ -44,6 +48,42 @@ func (s secretMap) Resolve(_ context.Context, ref string) ([]byte, error) {
 	return nil, errors.New("unknown reference")
 }
 
+// scriptedClaimSync is the claim sync of the OIDC app world: fn answers each call (nil fn: a call
+// is a test failure, for providers without groups_claim); the commands are kept. The claim sync
+// itself is tested in authz and through the login in adapters/httpapi (M1-42).
+type scriptedClaimSync struct {
+	t     *testing.T
+	mu    sync.Mutex
+	fn    func(ctx context.Context) error
+	calls []authz.SyncClaimGroupsCmd
+}
+
+// SyncClaimGroups implements authz.ClaimSync.
+func (s *scriptedClaimSync) SyncClaimGroups(ctx context.Context, cmd authz.SyncClaimGroupsCmd) (authz.SyncClaimGroupsResult, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.calls = append(s.calls, cmd)
+	if s.fn == nil {
+		s.t.Error("claim sync called for a provider without groups_claim")
+		return authz.SyncClaimGroupsResult{}, nil
+	}
+	return authz.SyncClaimGroupsResult{}, s.fn(ctx)
+}
+
+// script sets fn and clears the recorded calls.
+func (s *scriptedClaimSync) script(fn func(ctx context.Context) error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.fn, s.calls = fn, nil
+}
+
+// recorded returns the commands seen since the last script.
+func (s *scriptedClaimSync) recorded() []authz.SyncClaimGroupsCmd {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return slices.Clone(s.calls)
+}
+
 // oidcApp is the login world with the OIDC use cases bound to a fake provider.
 type oidcApp struct {
 	w    *peopleWorld
@@ -51,6 +91,8 @@ type oidcApp struct {
 	o    *app.OIDC
 	idp  *oidctest.IDP
 	prov ids.ID
+	// claims is the claim sync behind the completion (M1-42).
+	claims *scriptedClaimSync
 }
 
 // newOIDCApp builds the world; provisioning sets allow_provisioning of the provider.
@@ -64,12 +106,14 @@ func newOIDCApp(t *testing.T, provisioning bool) *oidcApp {
 	if err != nil {
 		t.Fatal(err)
 	}
+	claims := &scriptedClaimSync{t: t}
 	eg := egress.Config{Timeout: 10 * time.Second, MaxResponseBytes: 1 << 20,
 		AllowedHosts: []egress.Rule{{Host: "127.0.0.1", Port: uint16(port), AllowPrivate: true}}}
-	if err := id.BindOIDC(wire.OIDCDeps{Egress: eg, Secrets: secretMap{oidcSecretRef: []byte(secret)}, RootCAs: idp.RootCAs()}); err != nil {
+	if err := id.BindOIDC(wire.OIDCDeps{Egress: eg, Secrets: secretMap{oidcSecretRef: []byte(secret)}, RootCAs: idp.RootCAs(),
+		ClaimGroups: claims}); err != nil {
 		t.Fatal(err)
 	}
-	a := &oidcApp{w: w, id: id, o: id.OIDC, idp: idp, prov: ids.New()}
+	a := &oidcApp{w: w, id: id, o: id.OIDC, idp: idp, prov: ids.New(), claims: claims}
 	conf, _ := json.Marshal(map[string]any{"issuer": idp.Issuer(), "client_id": "chat", "client_auth": "client_secret_basic",
 		"client_secret_ref": oidcSecretRef})
 	w.sql(`INSERT INTO identity_providers (id, kind, name, config, allow_provisioning) VALUES ($1, 'oidc', 'Company', $2, $3)`,
@@ -266,5 +310,66 @@ func TestOIDCProvisioning(t *testing.T) {
 	}
 	if status != "pending" || email != nil || !strings.HasPrefix(handle, "newbie-") {
 		t.Fatalf("person %s %s %v", handle, status, email)
+	}
+}
+
+// TestOIDCClaimSyncRetry (M1-42): a login whose claim sync reports a change runs its unit of work
+// again as a rights change of group.member.sync with the claim values, the time of the request and
+// auth.group_claim_max_age; an I1 violation of the sync fails the login, ends the flow as failed
+// and leaves no session; an absent claim never calls the sync.
+func TestOIDCClaimSyncRetry(t *testing.T) {
+	t.Parallel()
+	a := newOIDCApp(t, true)
+	ctx := context.Background()
+	a.w.person("owner1", "active", true)
+	a.w.sql(`UPDATE identity_providers SET config = config || '{"groups_claim":"groups"}'::jsonb WHERE id = $1`, a.prov.String())
+	var declared []string
+	a.claims.script(func(ctx context.Context) error {
+		spec, ok := txn.RightsChangeOf(ctx)
+		if !ok {
+			return authz.ErrClaimSyncNeedsRightsChange
+		}
+		declared = append(declared, spec.Action)
+		return nil
+	})
+	a.idp.SetGroups("groups", "support", "research")
+	verifier, u := a.login(t, ctx, nil, "claimed")
+	out, err := a.complete(u.Query().Get("login_code"), verifier)
+	if err != nil {
+		t.Fatal(err)
+	}
+	calls := a.claims.recorded()
+	if len(calls) != 2 || len(declared) != 1 || declared[0] != "group.member.sync" || calls[1].UserID != out.Tokens.Session.UserID ||
+		calls[1].ProviderID != a.prov || strings.Join(calls[1].ClaimValues, ",") != "research,support" || calls[1].MaxAge != 30*24*time.Hour ||
+		!calls[1].Now.Equal(a.w.clk.Now()) {
+		t.Fatalf("calls %+v declared %v", calls, declared)
+	}
+
+	// An I1 violation of the sync fails the login and ends the flow as failed.
+	a.claims.script(func(ctx context.Context) error {
+		if !txn.InRightsChange(ctx) {
+			return authz.ErrClaimSyncNeedsRightsChange
+		}
+		return authz.NewI1Violation([]authz.I1Conflict{{AgentID: ids.New()}}).WithHint(authz.HintI1ClaimSync)
+	})
+	verifier, u = a.login(t, ctx, nil, "blocked")
+	_, err = a.complete(u.Query().Get("login_code"), verifier)
+	if e, ok := errs.As(err); !ok || e.Code != errs.CodeI1Violation || e.Hint != authz.HintI1ClaimSync {
+		t.Fatalf("error %v", err)
+	}
+	attempt := u.Query().Get("login_attempt_id")
+	if n := a.w.count(`SELECT count(*) FROM auth_login_flows WHERE id = $1 AND status = 'failed'`, attempt); n != 1 {
+		t.Fatal("the flow did not fail")
+	}
+	if n := a.w.count(`SELECT count(*) FROM principals WHERE handle LIKE 'blocked%'`); n != 0 {
+		t.Fatal("the refused login provisioned a person")
+	}
+
+	// An absent claim never calls the sync.
+	a.claims.script(nil)
+	a.idp.Reset()
+	verifier, u = a.login(t, ctx, nil, "absent")
+	if _, err := a.complete(u.Query().Get("login_code"), verifier); err != nil {
+		t.Fatal(err)
 	}
 }

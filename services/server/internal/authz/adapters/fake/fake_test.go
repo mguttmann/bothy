@@ -203,3 +203,42 @@ func TestStoreAndVersions(t *testing.T) {
 		t.Fatal("no error")
 	}
 }
+
+// TestStoreClaimQueries: the in-memory claim queries match the PostgreSQL ones (M1-42).
+func TestStoreClaimQueries(t *testing.T) {
+	t.Parallel()
+	ctx := context.Background()
+	s := fake.NewStore()
+	prov, other, user := ids.New(), ids.New(), ids.New()
+	support := domain.Group{ID: ids.New(), Name: "Support", Source: domain.GroupSourceOIDCClaim, ProviderID: prov, ExternalRef: "support"}
+	foreign := domain.Group{ID: ids.New(), Name: "Foreign", Source: domain.GroupSourceOIDCClaim, ProviderID: other, ExternalRef: "support"}
+	local := domain.Group{ID: ids.New(), Name: "Local", Source: domain.GroupSourceLocal}
+	for _, g := range []domain.Group{support, foreign, local} {
+		if err := s.InsertGroup(ctx, g); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if got, err := s.ClaimGroupsByRefs(ctx, prov, []string{"support"}); err != nil || len(got) != 1 || got[0].ID != support.ID {
+		t.Fatalf("ClaimGroupsByRefs %+v %v", got, err)
+	}
+	m := domain.Membership{ID: ids.New(), GroupID: support.ID, UserID: user, ExpiresAt: at, ExpiryRemindedAt: at, ExpiryReportedAt: at}
+	for _, x := range []domain.Membership{m, {ID: ids.New(), GroupID: foreign.ID, UserID: user}, {ID: ids.New(), GroupID: local.ID, UserID: user}} {
+		if err := s.InsertMembership(ctx, x); err != nil {
+			t.Fatal(err)
+		}
+	}
+	got, err := s.LockClaimMembershipsOfUser(ctx, user, prov)
+	if err != nil || len(got) != 1 || got[0].Membership.ID != m.ID {
+		t.Fatalf("LockClaimMembershipsOfUser %+v %v", got, err)
+	}
+	if ok, err := s.ExtendMembership(ctx, m.ID, at.Add(time.Hour), at); err != nil || !ok {
+		t.Fatalf("ExtendMembership %v %v", ok, err)
+	}
+	got, _ = s.LockClaimMembershipsOfUser(ctx, user, prov)
+	if e := got[0].Membership; !e.ExpiresAt.Equal(at.Add(time.Hour)) || !e.ExpiryRemindedAt.IsZero() || !e.ExpiryReportedAt.IsZero() {
+		t.Fatalf("after extension %+v", e)
+	}
+	if ok, _ := s.ExtendMembership(ctx, ids.New(), at, at); ok {
+		t.Fatal("an unknown membership was extended")
+	}
+}

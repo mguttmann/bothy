@@ -32,6 +32,12 @@ type ExternalIdentity struct {
 	AuthTime time.Time
 	// AMR are the authentication methods the provider names.
 	AMR []string
+	// GroupsState is GroupsPresent, GroupsAbsent or GroupsOverage for a provider with
+	// groups_claim, empty for one without (no claim sync, M1-42).
+	GroupsState string
+	// Groups are the values of a present group claim, sorted and without duplicates. They can be
+	// names, so they are never logged and never written to audit details.
+	Groups []string
 }
 
 // externalJSON is the stored form; empty members stay out.
@@ -44,6 +50,8 @@ type externalJSON struct {
 	EmailHint         string   `json:"email_hint,omitempty"`
 	AuthTime          int64    `json:"auth_time"`
 	AMR               []string `json:"amr,omitempty"`
+	GroupsState       string   `json:"groups_state,omitempty"`
+	Groups            []string `json:"groups,omitempty"`
 }
 
 // MarshalJSON writes the schema external_identity.v1 with auth_time in Unix seconds.
@@ -51,6 +59,7 @@ func (x ExternalIdentity) MarshalJSON() ([]byte, error) {
 	return json.Marshal(externalJSON{
 		Schema: SchemaExternalIdentity, Issuer: x.Issuer, Subject: x.Subject, DisplayName: x.DisplayName,
 		PreferredUsername: x.PreferredUsername, EmailHint: x.EmailHint, AuthTime: x.AuthTime.Unix(), AMR: x.AMR,
+		GroupsState: x.GroupsState, Groups: x.Groups,
 	})
 }
 
@@ -58,7 +67,8 @@ func (x ExternalIdentity) MarshalJSON() ([]byte, error) {
 var errExternal = errors.New("oidcflow: stored external identity does not follow external_identity.v1")
 
 // ParseExternalIdentity reads a stored external identity; unknown members, another schema, a
-// missing issuer or subject are errors.
+// missing issuer or subject, an unknown groups_state and groups without groups_state "present"
+// are errors.
 func ParseExternalIdentity(b []byte) (ExternalIdentity, error) {
 	var j externalJSON
 	dec := json.NewDecoder(bytes.NewReader(b))
@@ -66,9 +76,18 @@ func ParseExternalIdentity(b []byte) (ExternalIdentity, error) {
 	if err := dec.Decode(&j); err != nil || j.Schema != SchemaExternalIdentity || j.Issuer == "" || j.Subject == "" {
 		return ExternalIdentity{}, errExternal
 	}
+	switch j.GroupsState {
+	case "", GroupsAbsent, GroupsOverage:
+		if j.Groups != nil {
+			return ExternalIdentity{}, errExternal
+		}
+	case GroupsPresent:
+	default:
+		return ExternalIdentity{}, errExternal
+	}
 	return ExternalIdentity{
 		Issuer: j.Issuer, Subject: j.Subject, DisplayName: j.DisplayName, PreferredUsername: j.PreferredUsername,
-		EmailHint: j.EmailHint, AuthTime: time.Unix(j.AuthTime, 0).UTC(), AMR: j.AMR,
+		EmailHint: j.EmailHint, AuthTime: time.Unix(j.AuthTime, 0).UTC(), AMR: j.AMR, GroupsState: j.GroupsState, Groups: j.Groups,
 	}, nil
 }
 

@@ -16,6 +16,9 @@ const (
 	HintI1 = "Switch the agent to organization first."
 	// HintLastOwner names the way out of last_owner.
 	HintLastOwner = "Appoint another owner first."
+	// HintI1ClaimSync is the hint of an OIDC login refused because its group claim would violate
+	// I1 (brief M1-42 "I1 violation").
+	HintI1ClaimSync = "Sign-in blocked by a group mapping. An owner must switch the affected agent to organization first."
 )
 
 // I1Conflict is one personal agent whose trigger set is not exactly its credential holder
@@ -62,6 +65,15 @@ func NewI1Violation(conflicts []I1Conflict) *InvariantError {
 		err: errs.New(errs.CodeI1Violation, "The change would let someone other than the credential holder trigger a personal agent.").
 			WithReason(string(errs.CodeI1Violation)).WithHint(HintI1),
 	}
+}
+
+// WithHint returns a copy of e with hint instead of its hint; the code and the conflicts stay.
+func (e *InvariantError) WithHint(hint string) *InvariantError {
+	inner := *e.err
+	inner.Hint = hint
+	out := *e
+	out.err = &inner
+	return &out
 }
 
 // NewLastOwnerViolation returns the error of a change that leaves no active owner (07 SR8).

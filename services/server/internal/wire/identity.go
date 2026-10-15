@@ -11,6 +11,7 @@ import (
 	"path"
 	"strings"
 
+	"github.com/OWNER/bothy/services/server/internal/authz"
 	identityhttp "github.com/OWNER/bothy/services/server/internal/identity/adapters/httpapi"
 	"github.com/OWNER/bothy/services/server/internal/identity/adapters/instanceflags"
 	"github.com/OWNER/bothy/services/server/internal/identity/adapters/locale"
@@ -354,12 +355,15 @@ type OIDCDeps struct {
 	// RootCAs are the trusted TLS roots of the provider requests; nil means the system roots.
 	// Only tests set them.
 	RootCAs *x509.CertPool
+	// ClaimGroups is the claim group sync of authz (the Admin use cases of start step 6c), called
+	// at the completion of an OIDC login (M1-42).
+	ClaimGroups authz.ClaimSync
 }
 
 // BindOIDC builds the OIDC login (M1-41) over the login service of BindSessions: the provider
 // client over platform/egress with auth.oidc_jwks_cache_ttl and auth.oidc_client_assertion_ttl,
-// the use cases with auth.login_flow_ttl and auth.server_code_ttl, and their handlers. The start
-// calls it after BindSessions. Errors: BindSessions has not run, a duration or collaborator the
+// the use cases with auth.login_flow_ttl, auth.server_code_ttl and auth.group_claim_max_age over
+// the claim group sync of authz, and their handlers. The start calls it after BindSessions. Errors: BindSessions has not run, a duration or collaborator the
 // client or the use cases refuse.
 func (i *Identity) BindOIDC(d OIDCDeps) error {
 	if i.Logins == nil {
@@ -370,7 +374,7 @@ func (i *Identity) BindOIDC(d OIDCDeps) error {
 	if err != nil {
 		return err
 	}
-	o, err := app.NewOIDC(i.cfg, i.pepper, app.OIDCDeps{Logins: i.Logins, Flows: i.repo, Client: client, Log: i.log})
+	o, err := app.NewOIDC(i.cfg, i.pepper, app.OIDCDeps{Logins: i.Logins, Flows: i.repo, Client: client, ClaimGroups: d.ClaimGroups, Log: i.log})
 	if err != nil {
 		return err
 	}

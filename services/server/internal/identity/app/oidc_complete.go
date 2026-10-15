@@ -6,6 +6,7 @@ import (
 	"context"
 	"errors"
 
+	"github.com/OWNER/bothy/services/server/internal/authz"
 	"github.com/OWNER/bothy/services/server/internal/identity"
 	"github.com/OWNER/bothy/services/server/internal/identity/domain"
 	"github.com/OWNER/bothy/services/server/internal/identity/domain/oidcflow"
@@ -14,6 +15,7 @@ import (
 	"github.com/OWNER/bothy/services/server/internal/kernel/authorize"
 	"github.com/OWNER/bothy/services/server/internal/kernel/errs"
 	"github.com/OWNER/bothy/services/server/internal/kernel/ids"
+	"github.com/OWNER/bothy/services/server/internal/kernel/txn"
 )
 
 // The causes of a rejected oidcCompletion in audit details (codes, SEC-AUD-5).
@@ -47,8 +49,10 @@ type oidcCompletion struct {
 // CompleteOIDCLogin implements identity.OIDCLogin (brief M1-41 "completeOidcLogin"): authorize,
 // the DPoP proof as a login proof without ath (a rejected proof never looks the code up), then one
 // unit of work: the flow by its login_code (locked), the PKCE check, the mapping of 08 section 3.1
-// (identity, enrollment code, provisioning), device, session and tokens, and the flow completed
-// with its external identity dropped.
+// (identity, enrollment code, provisioning), the claim group sync (M1-42), device, session and
+// tokens, and the flow completed with its external identity dropped. When the sync changes
+// memberships the unit runs once more, declared as a rights change of group.member.sync; an I1
+// violation of the sync leaves nothing of the login and ends the flow as failed (409 i1_violation).
 func (o *OIDC) CompleteOIDCLogin(ctx context.Context, in identity.OIDCComplete) (identity.RedeemResult, error) {
 	if err := o.authorize(ctx, actor.Anonymous(), authorize.ActionAuthLoginComplete, instanceResource); err != nil {
 		return identity.RedeemResult{}, err
@@ -62,7 +66,7 @@ func (o *OIDC) CompleteOIDCLogin(ctx context.Context, in identity.OIDCComplete) 
 		out LoginResult
 		st  oidcCompletion
 	)
-	err = o.s.d.UoW.Do(ctx, func(ctx context.Context) error {
+	unit := func(ctx context.Context) error {
 		st = oidcCompletion{}
 		f, err := o.redeemable(ctx, hash, oidcflow.ModeLogin, errs.New(errs.CodeUnauthenticated, ""))
 		if err != nil {
@@ -77,15 +81,42 @@ func (o *OIDC) CompleteOIDCLogin(ctx context.Context, in identity.OIDCComplete) 
 			return err
 		}
 		return o.completeFlow(ctx, f.ID)
-	})
-	if err != nil {
-		return identity.RedeemResult{}, o.completeFailed(ctx, err, st, authorize.ActionAuthLoginComplete)
+	}
+	if err := o.runCompletion(ctx, unit, &st); err != nil {
+		return identity.RedeemResult{}, err
 	}
 	res := identity.RedeemResult{Tokens: out.Tokens}
 	if proof.NonceStale {
 		res.Nonce = o.s.d.DPoP.CurrentNonce()
 	}
 	return res, nil
+}
+
+// runCompletion runs the unit of work of a login completion. When the claim sync changes
+// memberships the unit runs again as a rights change of group.member.sync, so permission_version
+// is locked before any row (03 section 6.3) and only a change raises it (M1-42). An I1 violation
+// of the sync (08 section 3.4 item 3) leaves nothing of the login: the flow ends as failed and the
+// InvariantError is the answer (authz wrote the deny entry). Other failures go to completeFailed.
+func (o *OIDC) runCompletion(ctx context.Context, unit func(ctx context.Context) error, st *oidcCompletion) error {
+	err := o.s.d.UoW.Do(ctx, unit)
+	if errors.Is(err, authz.ErrClaimSyncNeedsRightsChange) {
+		err = o.s.d.UoW.Do(ctx, unit, txn.DeclareRightsChange(txn.RightsChangeSpec{
+			Action: string(authorize.ActionGroupMemberSync), Resource: txn.Ref{Kind: resourceUser},
+		}))
+	}
+	var inv *authz.InvariantError
+	switch {
+	case err == nil:
+		return nil
+	case errors.As(err, &inv):
+		if !st.flow.ID.IsZero() {
+			if ferr := o.failFlow(ctx, st.flow.ID); ferr != nil {
+				return ferr
+			}
+		}
+		return err
+	}
+	return o.completeFailed(ctx, err, *st, authorize.ActionAuthLoginComplete)
 }
 
 // redeemable locks the flow of a login_code hash and returns it when it has mode, the status
@@ -126,6 +157,17 @@ func (o *OIDC) login(ctx context.Context, f LoginFlowRecord, in identity.OIDCCom
 	ext := *f.External
 	base := LoginCompletion{
 		AuthMethod: identity.AuthOIDC, Device: in.Device, ProofJKT: jkt, ClientIP: in.ClientIP, AllowPending: true, Trust: TrustUnconfirmed,
+	}
+	if ext.GroupsState == oidcflow.GroupsPresent {
+		// Only a present claim changes memberships; absent and overage leave them to run out
+		// after auth.group_claim_max_age (08 sections 2.3 and 3.4).
+		now := o.s.d.Clock.Now()
+		base.Sync = func(ctx context.Context, user ids.ID) error {
+			_, err := o.d.ClaimGroups.SyncClaimGroups(ctx, authz.SyncClaimGroupsCmd{
+				UserID: user, ProviderID: p.ID, ClaimValues: ext.Groups, Now: now, MaxAge: o.cfg.GroupClaimMaxAge,
+			})
+			return err
+		}
 	}
 	rec, known, err := o.s.d.Identities.ActiveIdentityBySubject(ctx, p.ID, ext.Subject)
 	if err != nil {

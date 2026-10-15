@@ -20,6 +20,7 @@ import (
 	"github.com/OWNER/bothy/services/server/internal/audit/adapters/logs"
 	auditpg "github.com/OWNER/bothy/services/server/internal/audit/adapters/postgres"
 	auditapp "github.com/OWNER/bothy/services/server/internal/audit/app"
+	"github.com/OWNER/bothy/services/server/internal/authz"
 	"github.com/OWNER/bothy/services/server/internal/authz/adapters/fake"
 	authzpg "github.com/OWNER/bothy/services/server/internal/authz/adapters/postgres"
 	authzapp "github.com/OWNER/bothy/services/server/internal/authz/app"
@@ -60,7 +61,7 @@ var sessCfg = app.Config{
 	EnrollmentCodeTTL: 72 * time.Hour, EnrollmentCodeMaxAttempts: 3, LoginFlowTTL: 10 * time.Minute,
 	DevicePendingTTL: 24 * time.Hour, DeviceVerificationCodeDigits: 6, PairingCodeTTL: 5 * time.Minute, PairingCodeChars: 8,
 	ServerCodeTTL: time.Minute, OIDCJWKSCacheTTL: time.Hour, OIDCClientAssertionTTL: 2 * time.Minute,
-	IDPRecheckInterval:        7 * 24 * time.Hour,
+	IDPRecheckInterval: 7 * 24 * time.Hour, GroupClaimMaxAge: 30 * 24 * time.Hour,
 	DeviceInactiveRevokeAfter: 180 * 24 * time.Hour,
 }
 
@@ -88,6 +89,13 @@ type sworld struct {
 	// az is the real authorizer; structure the fake structure source behind it (M1-35).
 	az        authorize.Authorizer
 	structure *fake.Structure
+	// policies is the fake agent policy source behind the rights hook; rights, appender, authz and
+	// principals build the authz Admin use cases of the claim group sync (M1-42).
+	policies   *fake.Policies
+	rights     *authzapp.RightsHook
+	appender   *syncapp.Appender
+	authz      *authzapp.Authorizer
+	principals authz.PrincipalSource
 	// dir is the signing key directory of the installation.
 	dir string
 	// seq numbers the handles of the token cases (M1-44).
@@ -217,6 +225,7 @@ func newSessionWorldWith(t *testing.T, db *pgtest.DB, clk *clock.Fake, instID id
 		t.Fatal(err)
 	}
 	w.az, w.structure = az, structure
+	w.policies, w.rights, w.appender, w.authz, w.principals = policies, hook, appender, az, principals
 	sp, err := secrets.NewProvider(secrets.Options{Dir: filepath.Dir(dir), SigningKeyDir: dir, CacheTTL: time.Minute})
 	if err != nil {
 		t.Fatal(err)

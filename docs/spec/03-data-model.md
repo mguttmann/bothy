@@ -683,7 +683,7 @@ Purpose: membership of a person in a group, with history. Module: `authz`.
 | `added_at` | `timestamptz` | no | `now()` | |
 | `expires_at` | `timestamptz` | yes | | checked on every `authorize` |
 | `expiry_reminded_at` | `timestamptz` | yes | | expiry reminder written (`access.expiring`) |
-| `expiry_reported_at` | `timestamptz` | yes | | expiry reported (`access.changed`, system action `group.member.expire`); exactly once per membership |
+| `expiry_reported_at` | `timestamptz` | yes | | expiry reported (`access.changed`, system action `group.member.expire`); exactly once per expiry time (the extension by `group.member.sync` clears the column) |
 | `removed_at` | `timestamptz` | yes | | |
 | `removed_by` | `uuid` | yes | | |
 
@@ -697,6 +697,9 @@ Retention: `account`.
 Only the sync at login changes memberships in groups with `source = 'oidc_claim'`
 (system action `group.member.sync`, [08-identity.md](08-identity.md), section 3.4); there
 `added_by` and `removed_by` are the person whose login carried the claim.
+The sync extends an existing row (expired or not) by setting `expires_at` and clearing
+`expiry_reminded_at` and `expiry_reported_at`: reminder and expiry report are written once per
+expiry time, so the new expiry is reminded and reported again (M1-42, docs/DECISIONS.md M1-42).
 
 #### `grants`
 
