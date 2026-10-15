@@ -286,7 +286,7 @@ commitlint: ## Conventional Commits and DCO sign-off for commits not yet on the 
 # of go-arch-lint and sqlc; tools/ci/go_prereqs.py). Every step ends with `|| exit 1`, so a
 # recipe stops on its own even in a shell without errexit (docs/DECISIONS.md M1-01/8); the
 # flags in SHELL (top of this file, also for GNU make 3.81) are the second line of defence.
-codegen-check: ## Generated code equals a fresh generation (sqlc, go generate, flutter gen-l10n, Pigeon, the domain tables)
+codegen-check: ## Generated code equals a fresh generation (sqlc, go generate, flutter gen-l10n, Pigeon, drift, the domain tables)
 	@if [ -z "$(GO_ON)" ]; then $(call skip,codegen-check,no Go module selected under services/); \
 	else $(GO_PREREQS) codegen-check || exit 1; \
 	  gal=$(call tool,go-arch-lint) || exit 1; sqlc=$(call tool,sqlc) || exit 1; \
@@ -309,6 +309,17 @@ codegen-check: ## Generated code equals a fresh generation (sqlc, go generate, f
 	  else $(FLUTTER) pub get --enforce-lockfile >/dev/null || exit 1; \
 	    for f in $$inputs; do p=$${f%/pigeons/*}; \
 	      $(CODEGEN_CHECK) --dir $$p -- sh -c 'dart run pigeon --input "$$1" && dart format lib/src/generated >/dev/null' pigeon "$${f#$$p/}" || exit 1; \
+	    done; fi; fi
+	@# drift of the Dart members with a drift build.yaml (brief M4-12): build_runner writes the
+	@# database code and `drift_dev make-migrations` the stored schema file and the schema helpers
+	@# of the migration tests; both must equal a fresh generation, so a changed table without a
+	@# new schema version fails (docs/DECISIONS.md D-M4-12-7).
+	@if [ -z "$(DART_ON)" ]; then $(call skip,codegen-drift,no Dart package selected under apps/ or packages/); \
+	else drift=""; for p in $(DART_PKGS); do ! grep -qs 'drift_dev:' $$p/build.yaml || drift="$$drift $$p"; done; \
+	  if [ -z "$$drift" ]; then $(call skip,codegen-drift,no Dart member with a drift build.yaml); \
+	  else flutter pub get --enforce-lockfile >/dev/null || exit 1; \
+	    for p in $$drift; do \
+	      $(CODEGEN_CHECK) --dir $$p -- sh -c 'dart run build_runner build && dart run drift_dev make-migrations' || exit 1; \
 	    done; fi; fi
 	@# The tables of packages/domain: AppConfig from the configuration reference and the event
 	@# catalogue from actions.yaml (docs/DECISIONS.md D-M4-08-3, D-M4-08-5). Python only, so
