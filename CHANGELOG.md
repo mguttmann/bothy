@@ -48,6 +48,13 @@ operated, and the order of the build.
   verifies and only then tags. cosign, syft and git-cliff are pinned; `check_runners.py` rejects
   signing steps outside the environment `release`; a tag without a changelog section stops in
   `resolve`.
+- Localization in `packages/l10n`: the ARB files `app_en.arb` (template) and `app_de.arb`
+  (default locale) with the first keys, the generated `AppLocalizations`, `problemText` for every
+  problem code with a fallback that shows the code, `L10nFormat` for money, numbers, durations
+  and times per locale, `resolveAppLocale` and the term table generated from 01 section 9. Tests
+  reject a missing translation, a placeholder mismatch, a missing description, en and em dashes,
+  emoji and a German text without the term of the table; `make codegen-check` regenerates in a
+  temporary copy and fails on untranslated messages or stale generated code (M4-06).
 - One Dart pub workspace at the repository root (`pubspec.yaml`, one `pubspec.lock`) with the
   fourteen members of docs/spec/15-client-architecture.md 3: the apps `apps/client` and
   `apps/console` and the packages under `packages/` as skeletons, `bothy_noise` taken over;

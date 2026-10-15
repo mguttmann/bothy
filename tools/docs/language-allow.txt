@@ -17,6 +17,10 @@ path: services/server/internal/platform/jsoncanon/jsoncanon_test.go
 # SPDX license expressions as test data (M7-10): `MIT`, `AND`, `OR` and `WITH` read as German
 # function words to the gate.
 path: tools/ci/tests/test_scancode_policy.py
+
+# German product strings of the `de` locale (D-W-94, M4-06).
+path: packages/l10n/lib/l10n/app_de.arb
+path: packages/l10n/lib/src/generated/app_localizations_de.dart
 # Third-party files, kept byte for byte as published.
 path: tools/design-tokens/vendor/fonts/*
 path: tools/design-tokens/vendor/phosphor/*
