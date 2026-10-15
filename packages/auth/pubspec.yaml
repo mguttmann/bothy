@@ -10,6 +10,21 @@ environment:
   sdk: ^3.13.5
   flutter: 3.47.7
 
+# api_client and domain are the arrows of 15 3.1; crypto gives SHA-256 for `ath`, PKCE and the
+# JWK thumbprint. dio, built_value and built_collection are the types of the api_client surface
+# this package touches (interceptors, JSON objects, maps), already in the workspace lock.
+dependencies:
+  api_client:
+    path: ../api_client
+  built_collection: ^5.1.2
+  built_value: ^8.13.0
+  crypto: ^3.0.7
+  dio: ^5.11.1
+  domain:
+    path: ../domain
+
 dev_dependencies:
   lints: ^6.1.0
+  # Only the software P-256 signer of the tests (test/support/), never in the library.
+  pointycastle: ^4.0.0
   test: ^1.31.1
