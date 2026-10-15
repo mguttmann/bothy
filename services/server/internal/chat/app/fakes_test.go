@@ -491,6 +491,10 @@ func (s *store) LockThread(ctx context.Context, id ids.ID) (domain.Thread, bool,
 	return s.Thread(ctx, id)
 }
 
+func (s *store) ShareThread(ctx context.Context, id ids.ID) (domain.Thread, bool, error) {
+	return s.Thread(ctx, id)
+}
+
 func (s *store) InsertThread(_ context.Context, th domain.Thread) (domain.Thread, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()

@@ -1,6 +1,6 @@
 # Modul `chat`
 
-Status: spaces and the sidebar (M1-52), channels and forum tags (M1-53), operators with I1 (M1-54) and threads (M1-55) built; `createThread` is built in `messaging` (M1-56).
+Status: spaces and the sidebar (M1-52), channels and forum tags (M1-53), operators with I1 (M1-54) and threads (M1-55) built; `createThread` is built in `messaging` (M1-56); `Threads.InfoForShare` for the read states and drafts of sync (M1-61).
 Normativ ist [docs/spec/02-architektur.md](../../../../docs/spec/02-architektur.md); bei Abweichung gilt das Kapitel.
 
 ## Zweck
@@ -185,6 +185,11 @@ actions, explanation, preview and view-as with real sources).
   `Reopen` and `SetTags` for the six handlers; the DTOs `Thread`, `ThreadInfo`, `ParentMessage`,
   `CreateThreadCmd`, `AppendCmd`, `Appended`, `ListThreadsQuery`, `ThreadPage`, `SetTitleCmd` and
   `SetTagsCmd`. `Register` adds `thread.updated`, `thread.closed` and `thread.reopened`.
+  `InfoForShare` (M1-61) is `Info` with `FOR SHARE` on the thread row until the end of the
+  caller's unit of work (`Store.ShareThread`), so sync copies the channel of a thread that no
+  concurrent move (M1-62) changes before its commit; `ThreadInfo` carries `LastMessageSeq` and
+  `UnreadFloorSeq`. sync reads the sidebar through `Structure.ListSidebarStates` and the kind and
+  space of a channel draft through `Structure.GetChannel`.
 - Domain (`domain/thread.go`): `Thread` with `ThreadKind`, `ThreadState`, `TitleSource`; `Close`
   (a main thread is `409 invalid_state_transition`, a closed thread unchanged), `Reopen`,
   `SetTitle`; `CheckThreadTitle` (`thread.title_max_chars` Unicode characters, SEC-IN-4 through

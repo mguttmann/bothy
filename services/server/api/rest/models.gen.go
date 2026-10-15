@@ -15786,6 +15786,12 @@ type UpdateMyProfileParams struct {
 	IdempotencyKey *IdempotencyKey `json:"Idempotency-Key,omitempty"`
 }
 
+// ListMyReadStatesParams defines parameters for ListMyReadStates.
+type ListMyReadStatesParams struct {
+	// ChannelId Only threads of this channel.
+	ChannelId Uuid `form:"channel_id" json:"channel_id"`
+}
+
 // ListMySessionsParams defines parameters for ListMySessions.
 type ListMySessionsParams struct {
 	// Cursor Cursor from `next_cursor` of the previous page.
@@ -15922,6 +15928,15 @@ type ListThreadMessagesParams struct {
 
 	// Limit Page size.
 	Limit *PageLimit `form:"limit,omitempty" json:"limit,omitempty"`
+}
+
+// MarkThreadUnreadParams defines parameters for MarkThreadUnread.
+type MarkThreadUnreadParams struct {
+	// IdempotencyKey UUIDv7 chosen by the client per logical operation. A repeat with the same request returns the stored response; a different request gives 422 `idempotency_key_reuse`; a repeat while the first is running gives 409 `request_in_progress`. Kept for `sync.idempotency_key_ttl`.
+	IdempotencyKey *IdempotencyKey `json:"Idempotency-Key,omitempty"`
+
+	// IfMatch ETag of the version the change is based on, e.g. `"7"`. Mismatch gives 412 `version_conflict`.
+	IfMatch IfMatchRequired `json:"If-Match"`
 }
 
 // ReopenThreadParams defines parameters for ReopenThread.
@@ -16111,6 +16126,9 @@ type UpdateChannelJSONRequestBody = ChannelUpdate
 // ArchiveChannelJSONRequestBody defines body for ArchiveChannel for application/json ContentType.
 type ArchiveChannelJSONRequestBody = ReasonBody
 
+// PutChannelDraftJSONRequestBody defines body for PutChannelDraft for application/json ContentType.
+type PutChannelDraftJSONRequestBody = DraftPut
+
 // MoveChannelJSONRequestBody defines body for MoveChannel for application/json ContentType.
 type MoveChannelJSONRequestBody = MovePosition
 
@@ -16216,6 +16234,9 @@ type UpdateMyProfileJSONRequestBody = ProfileUpdate
 // CreateExtensionSessionJSONRequestBody defines body for CreateExtensionSession for application/json ContentType.
 type CreateExtensionSessionJSONRequestBody = ExtensionSessionCreate
 
+// PutMySettingJSONRequestBody defines body for PutMySetting for application/json ContentType.
+type PutMySettingJSONRequestBody = UserSettingPut
+
 // PutMySidebarSpaceJSONRequestBody defines body for PutMySidebarSpace for application/json ContentType.
 type PutMySidebarSpaceJSONRequestBody = SidebarStatePut
 
@@ -16258,8 +16279,17 @@ type SetSpaceOperatorJSONRequestBody = OperatorSet
 // UpdateTemplateJSONRequestBody defines body for UpdateTemplate for application/json ContentType.
 type UpdateTemplateJSONRequestBody = TemplateUpdate
 
+// PutThreadDraftJSONRequestBody defines body for PutThreadDraft for application/json ContentType.
+type PutThreadDraftJSONRequestBody = DraftPut
+
 // CreateMessageJSONRequestBody defines body for CreateMessage for application/json ContentType.
 type CreateMessageJSONRequestBody = MessageCreate
+
+// PutReadStateJSONRequestBody defines body for PutReadState for application/json ContentType.
+type PutReadStateJSONRequestBody = ReadStatePut
+
+// MarkThreadUnreadJSONRequestBody defines body for MarkThreadUnread for application/json ContentType.
+type MarkThreadUnreadJSONRequestBody = ReadStatePut
 
 // SetThreadTagsJSONRequestBody defines body for SetThreadTags for application/json ContentType.
 type SetThreadTagsJSONRequestBody = ThreadTagsPut

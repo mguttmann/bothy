@@ -31,13 +31,18 @@ type Modules struct {
 	Sync *syncapp.PhaseHook
 	// Audit is the audit phase hook (phase 3.3); required.
 	Audit *auditapp.Chain
+	// SyncSubscribers are the in-transaction subscribers of sync (MessagePosted, M1-61);
+	// required. They fail a message with clear_draft until the start binds the appender
+	// (Subscribers.Bind).
+	SyncSubscribers *syncapp.Subscribers
 }
 
 // NewModules returns the module objects over pool with log for their reports; pool may be nil
 // where no unit of work runs (the golden test). It opens no connection. The rights hook gets the
 // empty structure and agent policy sources until M1-54 and M1-51.
 func NewModules(pool *pg.Pool, log *slog.Logger) *Modules {
-	return &Modules{Authz: mustRightsHook(pool, RightsSources{}, nil, log), Sync: newSyncHook(pool, log), Audit: newAuditChain(pool, log)}
+	return &Modules{Authz: mustRightsHook(pool, RightsSources{}, nil, log), Sync: newSyncHook(pool, log), Audit: newAuditChain(pool, log),
+		SyncSubscribers: newSyncSubscribers(pool)}
 }
 
 // NewTxnRegistry returns the sealed txn registry of a process role: every role (api, worker,
@@ -64,6 +69,10 @@ func NewTxnRegistry(m *Modules) (*txn.Registry, error) {
 // skip permission_version, I1 and SR8.
 var errNoAuthzHook = errors.New("wire: the txn registry needs the rights hooks (Modules.Authz)")
 
+// errNoSyncSubscribers reports Modules without the subscribers of sync: a message with
+// clear_draft would keep the draft.
+var errNoSyncSubscribers = errors.New("wire: the txn registry needs the subscribers of sync (Modules.SyncSubscribers)")
+
 // errNoAuditHook reports Modules without the audit hook: every unit of work must chain its audit
 // entries, so a registry without it is refused.
 var errNoAuditHook = errors.New("wire: the txn registry needs the audit hook (Modules.Audit)")
@@ -72,8 +81,9 @@ var errNoAuditHook = errors.New("wire: the txn registry needs the audit hook (Mo
 // list). Hooks and handlers are method values of the module objects in m, never closures here,
 // because the registry derives their owner from the Go package. It sets the tracer of subscriber
 // spans, the rights hooks of phases 1 and 3.1, the sync hook of phase 3.2 and the audit hook of
-// phase 3.3. authorize.AccessChanged, published by authz, has no production subscriber in M1
-// (runs subscribes in M2, 02 section 4.3).
+// phase 3.3, and the subscription messaging.MessagePosted -> sync (drafts with clear_draft,
+// M1-61). authorize.AccessChanged, published by authz, has no production subscriber in M1 (runs
+// subscribes in M2, 02 section 4.3).
 func registerTxn(reg *txn.Registry, m *Modules) error {
 	reg.SetTracer(otel.SubscriberSpan)
 	if m == nil || m.Audit == nil {
@@ -94,7 +104,13 @@ func registerTxn(reg *txn.Registry, m *Modules) error {
 	if err := reg.SetHook(txn.PhaseSync, m.Sync.Run); err != nil {
 		return err
 	}
-	return reg.SetHook(txn.PhaseAudit, m.Audit.Hook)
+	if err := reg.SetHook(txn.PhaseAudit, m.Audit.Hook); err != nil {
+		return err
+	}
+	if m.SyncSubscribers == nil {
+		return errNoSyncSubscribers
+	}
+	return txn.Subscribe(reg, m.SyncSubscribers.OnMessagePosted)
 }
 
 // UnitConfig binds the configuration of the unit of work (database.tx_retry_max and the three

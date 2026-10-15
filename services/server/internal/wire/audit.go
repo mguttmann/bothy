@@ -30,6 +30,7 @@ import (
 	"github.com/OWNER/bothy/services/server/internal/platform/lifecycle"
 	"github.com/OWNER/bothy/services/server/internal/platform/pg"
 	"github.com/OWNER/bothy/services/server/internal/platform/secrets"
+	syncapp "github.com/OWNER/bothy/services/server/internal/sync/app"
 )
 
 // AuditConfig binds the audit.* and privacy.audit_ip_* keys of v into the configuration of the
@@ -234,6 +235,10 @@ func (a *Audit) UoW() txn.UnitOfWork { return a.uow }
 // RightsHook returns the rights hooks of the registry of UoW; start step authz binds them to the
 // appender of sync and the recorder (M1-29).
 func (a *Audit) RightsHook() *authzapp.RightsHook { return a.modules.Authz }
+
+// SyncSubscribers returns the in-transaction subscribers of sync of the registry of the unit of
+// work; the start binds their appender (M1-61).
+func (a *Audit) SyncSubscribers() *syncapp.Subscribers { return a.modules.SyncSubscribers }
 
 // Recorder returns the recorder; it implements auditing.Recorder.
 func (a *Audit) Recorder() *auditapp.Recorder { return a.recorder }

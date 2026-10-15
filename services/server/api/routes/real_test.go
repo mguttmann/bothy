@@ -613,6 +613,54 @@ func (stubServer) ListPins(context.Context, rest.ListPinsRequestObject) (rest.Li
 	return nil, nil
 }
 
+func (stubServer) ListMyReadStates(context.Context, rest.ListMyReadStatesRequestObject) (rest.ListMyReadStatesResponseObject, error) {
+	return nil, nil
+}
+
+func (stubServer) PutReadState(context.Context, rest.PutReadStateRequestObject) (rest.PutReadStateResponseObject, error) {
+	return nil, nil
+}
+
+func (stubServer) MarkThreadUnread(context.Context, rest.MarkThreadUnreadRequestObject) (rest.MarkThreadUnreadResponseObject, error) {
+	return nil, nil
+}
+
+func (stubServer) PutThreadDraft(context.Context, rest.PutThreadDraftRequestObject) (rest.PutThreadDraftResponseObject, error) {
+	return nil, nil
+}
+
+func (stubServer) DeleteThreadDraft(context.Context, rest.DeleteThreadDraftRequestObject) (rest.DeleteThreadDraftResponseObject, error) {
+	return nil, nil
+}
+
+func (stubServer) PutChannelDraft(context.Context, rest.PutChannelDraftRequestObject) (rest.PutChannelDraftResponseObject, error) {
+	return nil, nil
+}
+
+func (stubServer) DeleteChannelDraft(context.Context, rest.DeleteChannelDraftRequestObject) (rest.DeleteChannelDraftResponseObject, error) {
+	return nil, nil
+}
+
+func (stubServer) ListMyDrafts(context.Context, rest.ListMyDraftsRequestObject) (rest.ListMyDraftsResponseObject, error) {
+	return nil, nil
+}
+
+func (stubServer) ListMySettings(context.Context, rest.ListMySettingsRequestObject) (rest.ListMySettingsResponseObject, error) {
+	return nil, nil
+}
+
+func (stubServer) PutMySetting(context.Context, rest.PutMySettingRequestObject) (rest.PutMySettingResponseObject, error) {
+	return nil, nil
+}
+
+func (stubServer) DeleteMySetting(context.Context, rest.DeleteMySettingRequestObject) (rest.DeleteMySettingResponseObject, error) {
+	return nil, nil
+}
+
+func (stubServer) GetMySidebar(context.Context, rest.GetMySidebarRequestObject) (rest.GetMySidebarResponseObject, error) {
+	return nil, nil
+}
+
 func (stubServer) SetThreadTags(context.Context, rest.SetThreadTagsRequestObject) (rest.SetThreadTagsResponseObject, error) {
 	return nil, nil
 }
@@ -860,6 +908,19 @@ func TestRealTable_Enabled(t *testing.T) {
 		"pinMessage":     {"PUT /api/v1/messages/{message_id}/pin", "pin.create", "rl.write"},
 		"unpinMessage":   {"DELETE /api/v1/messages/{message_id}/pin", "pin.delete", "rl.write"},
 		"listPins":       {"GET /api/v1/threads/{thread_id}/pins", "thread.read", "rl.read"},
+		// M1-61
+		"listMyReadStates":   {"GET /api/v1/me/read-states", "settings.read", "rl.read"},
+		"putReadState":       {"PUT /api/v1/threads/{thread_id}/read-state", "read_state.update", "rl.write"},
+		"markThreadUnread":   {"POST /api/v1/threads/{thread_id}/read-state/mark-unread", "read_state.mark_unread", "rl.write"},
+		"putThreadDraft":     {"PUT /api/v1/threads/{thread_id}/draft", "draft.write", "rl.write"},
+		"deleteThreadDraft":  {"DELETE /api/v1/threads/{thread_id}/draft", "draft.write", "rl.write"},
+		"putChannelDraft":    {"PUT /api/v1/channels/{channel_id}/draft", "draft.write", "rl.write"},
+		"deleteChannelDraft": {"DELETE /api/v1/channels/{channel_id}/draft", "draft.write", "rl.write"},
+		"listMyDrafts":       {"GET /api/v1/me/drafts", "draft.read", "rl.read"},
+		"listMySettings":     {"GET /api/v1/me/settings", "settings.read", "rl.read"},
+		"putMySetting":       {"PUT /api/v1/me/settings/{key}", "settings.update", "rl.write"},
+		"deleteMySetting":    {"DELETE /api/v1/me/settings/{key}", "settings.update", "rl.write"},
+		"getMySidebar":       {"GET /api/v1/me/sidebar", "settings.read", "rl.read"},
 		// M2-39
 		"listHosts":             {"GET /api/v1/hosts", "host.read", "rl.read"},
 		"createHost":            {"POST /api/v1/hosts", "host.manage", "rl.admin"},

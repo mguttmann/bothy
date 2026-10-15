@@ -233,6 +233,19 @@ type DevicePairing struct {
 	CompletedAt        pgtype.Timestamptz
 }
 
+type Draft struct {
+	ID                pgtype.UUID
+	UserID            pgtype.UUID
+	ThreadID          pgtype.UUID
+	ChannelID         pgtype.UUID
+	ContentMd         string
+	ReplyToMessageID  pgtype.UUID
+	FileIds           []pgtype.UUID
+	Version           int64
+	UpdatedByDeviceID pgtype.UUID
+	UpdatedAt         pgtype.Timestamptz
+}
+
 type EnrollmentCode struct {
 	ID             pgtype.UUID
 	UserID         pgtype.UUID
@@ -557,6 +570,16 @@ type Reaction struct {
 	CreatedAt   pgtype.Timestamptz
 }
 
+type ReadState struct {
+	UserID            pgtype.UUID
+	ThreadID          pgtype.UUID
+	ChannelID         pgtype.UUID
+	LastReadSeq       int64
+	Version           int64
+	UpdatedByDeviceID pgtype.UUID
+	UpdatedAt         pgtype.Timestamptz
+}
+
 type RefreshToken struct {
 	ID         pgtype.UUID
 	FamilyID   pgtype.UUID
@@ -681,6 +704,15 @@ type UserIdentity struct {
 	LinkedAt    pgtype.Timestamptz
 	LastLoginAt pgtype.Timestamptz
 	UnlinkedAt  pgtype.Timestamptz
+}
+
+type UserSetting struct {
+	UserID            pgtype.UUID
+	Key               string
+	Value             []byte
+	Version           int64
+	UpdatedByDeviceID pgtype.UUID
+	UpdatedAt         pgtype.Timestamptz
 }
 
 type UserSpaceState struct {
