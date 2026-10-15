@@ -23,14 +23,29 @@ const _stepUpRetried = 'auth.step_up_retried';
 const _tokenVersion = 'auth.token_version';
 const _generation = 'auth.generation';
 
-/// Repeats [options] through every interceptor of [dio] and hands the result to [handler].
+/// Repeats the request of [err] through every interceptor of [core]'s client and hands the
+/// result to [handler]; every auth repeat goes through here.
+///
+/// A late answer to a request of an earlier session is never resent with the token of the
+/// session that replaced it. A `FormData` body is sent as a fresh clone, because Dio finalizes
+/// a `FormData` once; a stream body cannot be read twice, so its first error goes back to the
+/// caller instead of a broken repeat.
 Future<void> _repeat(
-  Dio dio,
-  RequestOptions options,
+  SessionCore core,
+  DioException err,
   ErrorInterceptorHandler handler,
 ) async {
+  final options = err.requestOptions;
+  final sentIn = options.extra[_generation];
+  if (sentIn != null && sentIn != core.generation) return handler.next(err);
+  final data = options.data;
+  if (data is FormData) {
+    options.data = data.clone();
+  } else if (data is Stream) {
+    return handler.next(err);
+  }
   try {
-    handler.resolve(await dio.fetch<Object?>(options));
+    handler.resolve(await core.api.dio.fetch<Object?>(options));
   } on DioException catch (e) {
     handler.next(e);
   }
@@ -80,9 +95,10 @@ class RefreshInterceptor extends Interceptor {
       // R-SY-14: a revoked session or device ends here; the app deletes local data. A late
       // answer to a request of an earlier session (sent before a logout and a new login) must
       // not end the session that replaced it.
-      if (options.extra[_generation] == _core.generation) {
-        await _core.signOut(SignOutReason.sessionRevoked);
-      }
+      await _core.signOutIfCurrent(
+        options.extra[_generation] as int?,
+        SignOutReason.sessionRevoked,
+      );
       return handler.next(err);
     }
     if ((problem.code != 'token_expired' &&
@@ -100,7 +116,7 @@ class RefreshInterceptor extends Interceptor {
         return handler.next(authError(options, e));
       }
     }
-    await _repeat(_core.api.dio, options, handler);
+    await _repeat(_core, err, handler);
   }
 }
 
@@ -178,7 +194,7 @@ class DpopInterceptor extends Interceptor {
     }
     options.extra[_nonceRetried] = true;
     _core.log('nonce retry');
-    await _repeat(_core.api.dio, options, handler);
+    await _repeat(_core, err, handler);
   }
 }
 
@@ -235,6 +251,6 @@ class StepUpInterceptor extends Interceptor {
     }
     // The headers interceptor writes the same Idempotency-Key again from the request's extra;
     // the DPoP interceptor signs a new proof for the current token.
-    await _repeat(_core.api.dio, options, handler);
+    await _repeat(_core, err, handler);
   }
 }

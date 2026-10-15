@@ -87,6 +87,15 @@ typedef Route = FutureOr<FakeReply> Function(SeenRequest request);
 /// Thrown by a route to simulate a network failure.
 class NetworkDown implements Exception {}
 
+/// The JSON body, or the raw text of a body that is not JSON (multipart uploads).
+Object? _bodyOf(String text) {
+  try {
+    return jsonDecode(text);
+  } on FormatException {
+    return text;
+  }
+}
+
 /// A Dio adapter that dispatches to routes by `METHOD path` and records every request.
 class FakeServer implements HttpClientAdapter {
   /// Every request seen, in order.
@@ -123,7 +132,7 @@ class FakeServer implements HttpClientAdapter {
         for (final e in options.headers.entries)
           e.key.toLowerCase(): e.value.toString(),
       },
-      text.isEmpty ? null : jsonDecode(text),
+      text.isEmpty ? null : _bodyOf(text),
       Map.of(options.extra),
     );
     onSend?.call(seen);

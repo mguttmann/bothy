@@ -488,9 +488,15 @@ final class LoginService {
         }
       } on DioException catch (e) {
         final own = e.error;
-        if (own is AuthException) return LoginFailed(reason: _reasonOf(own));
+        // A refresh that failed on the network or with a transient status keeps polling.
+        if (own is AuthException && own is! RefreshUnavailable) {
+          return LoginFailed(reason: _reasonOf(own));
+        }
         final problem = problemOf(e);
-        if (problem != null && problem.status != 429 && problem.status < 500) {
+        if (own is! RefreshUnavailable &&
+            problem != null &&
+            problem.status != 429 &&
+            problem.status < 500) {
           return LoginFailed(reason: problem.code, problem: problem);
         }
       }

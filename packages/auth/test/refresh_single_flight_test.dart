@@ -260,4 +260,36 @@ void main() {
       expect(h.store.values.values, contains('RB'));
     },
   );
+
+  for (final relogin in [true, false]) {
+    test('a late refresh rejection of an older session ends nothing '
+        '(${relogin ? 'after a new login' : 'after a logout'})', () async {
+      final h = Harness();
+      await h.signIn(access: 'A1', refresh: 'R1');
+      final gate = Completer<void>();
+      h.server.routes['POST /auth/token/refresh'] = (_) async {
+        await gate.future;
+        return FakeReply.problem(401, 'session_revoked');
+      };
+      h.server.routes['POST /auth/logout'] = (_) => const FakeReply(204);
+      final late = expectLater(
+        h.session.refresh.refreshNow(),
+        throwsA(isA<SessionEnded>()),
+      );
+      await h.settle();
+      await h.session.login.logout();
+      if (relogin) await h.signIn(access: 'B1', refresh: 'RB');
+      await h.settle();
+      h.events.clear();
+      gate.complete();
+      await late;
+      await h.settle();
+      expect(h.events, isEmpty);
+      expect(h.store.values.keys.any((k) => k.endsWith('device_id')), isTrue);
+      if (relogin) {
+        expect(h.session.session, isNotNull);
+        expect(h.store.values.values, contains('RB'));
+      }
+    });
+  }
 }

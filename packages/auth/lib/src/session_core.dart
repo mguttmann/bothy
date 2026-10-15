@@ -130,6 +130,21 @@ final class SessionCore {
     if (hadSession) emit(SignedOut(reason));
   }
 
+  /// Signs out for [reason] only while [generationAtStart] is still current, so a late answer
+  /// of an earlier session never ends the session that replaced it; returns whether it did.
+  /// A `null` [generationAtStart] counts as current.
+  Future<bool> signOutIfCurrent(
+    int? generationAtStart,
+    SignOutReason reason,
+  ) async {
+    if (generationAtStart != null && generationAtStart != generation) {
+      log('late answer of an earlier session ignored');
+      return false;
+    }
+    await signOut(reason);
+    return true;
+  }
+
   /// Closes the event stream.
   Future<void> close() => _events.close();
 }

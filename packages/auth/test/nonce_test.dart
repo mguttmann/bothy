@@ -2,6 +2,8 @@
 
 // Nonce adoption and the single retry on use_dpop_nonce (RFC 9449 8, brief M4-09 Design note 3).
 
+import 'dart:convert';
+
 import 'package:api_client/api_client.dart';
 import 'package:auth/auth.dart';
 import 'package:dio/dio.dart';
@@ -127,5 +129,66 @@ void main() {
     expect(second.headers.containsKey('authorization'), isFalse);
     expect(second.proof!.payload['nonce'], 'p1');
     expect(second.proof!.payload.containsKey('ath'), isFalse);
+  });
+
+  test('a nonce repeat resends a multipart body', () async {
+    var calls = 0;
+    h.server.routes['PUT /me/avatar'] = (_) {
+      calls++;
+      if (calls == 1) {
+        return FakeReply.problem(
+          401,
+          'use_dpop_nonce',
+          headers: {'DPoP-Nonce': 'fresh'},
+        );
+      }
+      return FakeReply.problem(404, 'not_found');
+    };
+    final upload = h.session.api.getMeApi().setMyAvatar(
+      file: MultipartFile.fromString('avatar-bytes', filename: 'a.png'),
+    );
+    await expectLater(
+      upload,
+      throwsA(
+        isA<DioException>().having(
+          (e) => ApiProblem.of(e)?.status,
+          'status',
+          404,
+        ),
+      ),
+    );
+    final sent = h.server.to('/me/avatar');
+    expect(sent, hasLength(2));
+    expect(sent[1].body.toString(), contains('avatar-bytes'));
+  });
+
+  test('a stream body is not repeated; the first error goes back', () async {
+    h.server.routes['GET /devices/${h.deviceId}'] = (_) => FakeReply.problem(
+      401,
+      'use_dpop_nonce',
+      headers: {'DPoP-Nonce': 'fresh'},
+    );
+    final request = h.session.api.dio.get<Object?>(
+      '/devices/${h.deviceId}',
+      data: Stream<List<int>>.value(utf8.encode('x')),
+      options: Options(
+        extra: {
+          'secure': [
+            {'type': 'http', 'scheme': 'DPoP', 'name': 'dpopAuth'},
+          ],
+        },
+      ),
+    );
+    await expectLater(
+      request,
+      throwsA(
+        isA<DioException>().having(
+          (e) => ApiProblem.of(e)?.code,
+          'code',
+          'use_dpop_nonce',
+        ),
+      ),
+    );
+    expect(h.server.to('/devices/${h.deviceId}'), hasLength(1));
   });
 }

@@ -272,6 +272,43 @@ void main() {
     });
   });
 
+  group('pending device with a transient refresh error', () {
+    test('polling keeps going when a refresh fails on the network', () async {
+      h.server.routes['POST /auth/password/login'] = (_) =>
+          tokens(state: 'pending', code: '1');
+      final first = await h.session.login.loginWithPassword(
+        loginName: 'alex',
+        password: 'pw',
+        totpCode: '123456',
+      ) as LoginPending;
+      var refreshes = 0;
+      h.server.routes['POST /auth/token/refresh'] = (_) {
+        refreshes++;
+        if (refreshes == 1) throw NetworkDown();
+        return FakeReply(
+          200,
+          tokenBody(
+            access: accessToken(
+              'A2',
+              h.clock.now().add(const Duration(minutes: 5)),
+            ),
+            refresh: 'R2',
+            deviceId: h.deviceId,
+          ),
+        );
+      };
+      h.server.routes['GET /devices/${h.deviceId}'] = (_) => FakeReply(
+        200,
+        deviceBody(h.deviceId, refreshes >= 2 ? 'active' : 'pending'),
+      );
+      final done = await h.session.login.pollPendingDevice(
+        first.device.deviceId,
+      );
+      expect(done, isA<LoginSignedIn>());
+      expect(refreshes, 2);
+    });
+  });
+
   group('pairing', () {
     test(
       'beginPairing returns the code; pollPairing polls until approved',

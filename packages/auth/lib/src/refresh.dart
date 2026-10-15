@@ -92,7 +92,7 @@ final class RefreshCoordinator {
         extra: {internalRequestExtra: true},
       );
     } on DioException catch (e) {
-      throw await _failure(e);
+      throw await _failure(e, generation);
     }
     final state = await _core.adopt(
       response.data!,
@@ -102,9 +102,14 @@ final class RefreshCoordinator {
     return state.accessToken;
   }
 
-  Future<AuthException> _failure(DioException e) async {
+  Future<AuthException> _failure(DioException e, int generation) async {
     final own = e.error;
     if (own is AuthException) return own;
+    if (generation != _core.generation) {
+      // The session this refresh belonged to ended while it ran; its late failure must not
+      // touch the store or the events of the session that replaced it.
+      return const SessionEnded(SignOutReason.loggedOut);
+    }
     final problem = problemOf(e);
     if (problem != null && problem.status == 401) {
       final reason = problem.code == 'session_revoked'
