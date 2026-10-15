@@ -287,7 +287,7 @@ Principals, people, owners, login drivers, identities, local credentials, enroll
   | `deleteIdentityProvider` | `identity_provider.manage` | allow `{provider_kind}` | `204`, `409` while referenced |
   | `getMyCredentials` | `identity.read` on the caller | none | `200 CredentialOverview` |
   | `getUserCredentials` | `identity.read` on the person (self or owner, others `404`) | none | `200 CredentialOverview` |
-  | `unlinkIdentity` | `identity.unlink` on the person (self or owner, step-up) | allow `{identity_id, provider_id, provider_kind, sessions_revoked}` | `204`, `409 no_login_method_left` |
+  | `unlinkIdentity` | `identity.unlink` on the person (self or owner, step-up) | allow `{identity_id, provider_id, provider_kind, sessions_revoked}` | `204`, `409 conflict` (reason `no_login_method_left`) |
 
 - `adapters/postgres`: `queries/providers.sql`, `queries/identities.sql`, `providers.go`; a taken
   name is `409` at `/name`, a second `trusted_header` or `local` provider `409` at `/kind`, an

@@ -48,8 +48,8 @@ documented in this file. The format is based on
   `file:` or `env:` references, checked for syntax and never resolved). At most one
   `trusted_header` and one `local` provider, names unique without regard to case. An external
   identity maps to a person only through provider, subject and, for OIDC, issuer, never through
-  e-mail (ID-T04). Unlinking refuses to remove the last sign-in method (`409
-  no_login_method_left`, also under concurrency); unlinking an identity and disabling a provider
+  e-mail (ID-T04). Unlinking refuses to remove the last sign-in method (`409 conflict`
+  (reason `no_login_method_left`), also under concurrency); unlinking an identity and disabling a provider
   revoke the sessions started through them. A provider that identities or claim groups reference
   cannot be deleted (`409`, disable it instead).
 - Step-up with the device key (M1-35): the migration `00012_identity_step_up.sql`
