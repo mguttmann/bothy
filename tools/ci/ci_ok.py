@@ -51,6 +51,9 @@ RULES = (
     # Skipped when the component apps did not change (M4-01).
     Rule(("apps (macOS)",), frozenset({"success", "skipped"})),
     Rule(("apps (Windows)",), frozenset({"success", "skipped"})),
+    # Also skipped while the repository is private (M5-01, docs/DECISIONS.md D-M5-01-5).
+    Rule(("apps (Android API 26)",), frozenset({"success", "skipped"})),
+    Rule(("apps (Android API 36)",), frozenset({"success", "skipped"})),
 )
 
 

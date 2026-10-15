@@ -29,6 +29,8 @@ GREEN = {
     "postgres-image (arm64)": "success",
     "apps (macOS)": "success",
     "apps (Windows)": "success",
+    "apps (Android API 26)": "success",
+    "apps (Android API 36)": "success",
 }
 
 
@@ -63,6 +65,14 @@ def test_apps_platform_jobs_may_be_skipped_but_not_fail() -> None:
     skipped = {**GREEN, "apps (macOS)": "skipped", "apps (Windows)": "skipped"}
     assert ci_ok.evaluate(jobs(skipped), "runner-9")[0] == "pass"
     failed = {**GREEN, "apps (Windows)": "failure"}
+    assert ci_ok.evaluate(jobs(failed), "runner-9")[0] == "fail"
+
+
+def test_android_jobs_may_be_skipped_but_not_fail() -> None:
+    # Skipped while the repository is private (docs/DECISIONS.md D-M5-01-5).
+    skipped = {**GREEN, "apps (Android API 26)": "skipped", "apps (Android API 36)": "skipped"}
+    assert ci_ok.evaluate(jobs(skipped), "runner-9")[0] == "pass"
+    failed = {**GREEN, "apps (Android API 36)": "failure"}
     assert ci_ok.evaluate(jobs(failed), "runner-9")[0] == "fail"
 
 
