@@ -41,9 +41,15 @@ class _DsToolChipState extends State<DsToolChip> {
     final f = dsFormat(context);
     final colors = context.dsColors;
     final step = widget.step;
-    final duration = step.duration == null ? null : f.durationShort(step.duration!);
+    final duration = step.duration == null
+        ? null
+        : f.durationShort(step.duration!);
     final (Color color, String suffix, String status) = switch (step.status) {
-      DsStepStatus.pending => (colors.runQueued, l.toolChipWaiting, l.toolChipWaiting),
+      DsStepStatus.pending => (
+        colors.runQueued,
+        l.toolChipWaiting,
+        l.toolChipWaiting,
+      ),
       DsStepStatus.running => (
         context.dsAccent.runRunning,
         l.toolChipRunning(duration ?? ''),
@@ -52,9 +58,15 @@ class _DsToolChipState extends State<DsToolChip> {
       DsStepStatus.completed => (
         colors.runCompleted,
         duration ?? '',
-        duration == null ? l.toolChipCompleted : '${l.toolChipCompleted}, $duration',
+        duration == null
+            ? l.toolChipCompleted
+            : '${l.toolChipCompleted}, $duration',
       ),
-      DsStepStatus.failed => (colors.runFailed, l.toolChipFailed, l.toolChipFailed),
+      DsStepStatus.failed => (
+        colors.runFailed,
+        l.toolChipFailed,
+        l.toolChipFailed,
+      ),
       DsStepStatus.cancelled => (
         colors.runCancelled,
         l.toolChipCancelled,
@@ -78,10 +90,15 @@ class _DsToolChipState extends State<DsToolChip> {
       DsStepKind.unknown => (DsIcons.stepStatus, l.toolChipKindUnknown),
     };
     // A running step spins with the run icon; the kind icon stays for the other states.
-    final icon = step.status == DsStepStatus.running ? DsIcons.runRunning : glyph;
+    final icon = step.status == DsStepStatus.running
+        ? DsIcons.runRunning
+        : glyph;
     final hasDetail = step.detail != null && step.detail!.isNotEmpty;
     final chip = Container(
-      padding: const EdgeInsets.symmetric(horizontal: DsSpace.s8, vertical: DsSpace.s4),
+      padding: const EdgeInsets.symmetric(
+        horizontal: DsSpace.s8,
+        vertical: DsSpace.s4,
+      ),
       decoration: BoxDecoration(
         color: colors.surfaceSunken,
         borderRadius: BorderRadius.circular(DsRadius.sm),
@@ -92,7 +109,8 @@ class _DsToolChipState extends State<DsToolChip> {
           const SizedBox(width: DsSpace.s8),
           Text(
             step.name,
-            style: dsTextStyle(DsType.codeSm).copyWith(color: colors.textPrimary),
+            style: dsTextStyle(DsType.codeSm)
+                .copyWith(color: colors.textPrimary),
           ),
           if (step.title != null) ...[
             const SizedBox(width: DsSpace.s8),
@@ -101,7 +119,8 @@ class _DsToolChipState extends State<DsToolChip> {
                 step.title!,
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
-                style: dsTextStyle(DsType.bodySm).copyWith(color: colors.textSecondary),
+                style: dsTextStyle(DsType.bodySm)
+                    .copyWith(color: colors.textSecondary),
               ),
             ),
           ] else
@@ -109,7 +128,8 @@ class _DsToolChipState extends State<DsToolChip> {
           const SizedBox(width: DsSpace.s8),
           Text(
             suffix,
-            style: dsTextStyle(DsType.codeSm).copyWith(color: colors.textSecondary),
+            style: dsTextStyle(DsType.codeSm)
+                .copyWith(color: colors.textSecondary),
           ),
         ],
       ),
@@ -142,7 +162,8 @@ class _DsToolChipState extends State<DsToolChip> {
                 child: Text(
                   step.detail!,
                   softWrap: false,
-                  style: dsTextStyle(DsType.codeSm).copyWith(color: colors.codeFg),
+                  style: dsTextStyle(DsType.codeSm)
+                      .copyWith(color: colors.codeFg),
                 ),
               ),
             ),

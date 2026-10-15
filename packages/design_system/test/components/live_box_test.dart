@@ -54,8 +54,16 @@ void main() {
     final colors = DsColors.light;
     final accent = DsAccent.of(dsDefaultAccent, Brightness.light);
     final table = {
-      DsRunState.queued: (colors.runQueued, DsIcons.runQueued, l.liveBoxStateQueued),
-      DsRunState.running: (accent.runRunning, DsIcons.runRunning, l.liveBoxStateRunning),
+      DsRunState.queued: (
+        colors.runQueued,
+        DsIcons.runQueued,
+        l.liveBoxStateQueued,
+      ),
+      DsRunState.running: (
+        accent.runRunning,
+        DsIcons.runRunning,
+        l.liveBoxStateRunning,
+      ),
       DsRunState.waitingInput: (
         colors.runWaiting,
         DsIcons.runWaiting,
@@ -66,15 +74,23 @@ void main() {
         DsIcons.runCompleted,
         l.liveBoxStateCompleted,
       ),
-      DsRunState.failed: (colors.runFailed, DsIcons.runFailed, l.liveBoxStateFailed),
+      DsRunState.failed: (
+        colors.runFailed,
+        DsIcons.runFailed,
+        l.liveBoxStateFailed,
+      ),
       DsRunState.cancelled: (
         colors.runCancelled,
         DsIcons.runCancelled,
         l.liveBoxStateCancelled,
       ),
     };
-    for (final MapEntry(key: state, value: (color, glyph, word)) in table.entries) {
-      await pumpDs(tester, DsLiveBox(_run(state), visibleSteps: 6, announceMinInterval: _interval));
+    for (final MapEntry(key: state, value: (color, glyph, word))
+        in table.entries) {
+      await pumpDs(
+        tester,
+        DsLiveBox(_run(state), visibleSteps: 6, announceMinInterval: _interval),
+      );
       final box = tester.state<DsLiveBoxState>(find.byType(DsLiveBox));
       expect(box.spineColor, color, reason: state.name);
       expect(
@@ -90,7 +106,11 @@ void main() {
     final l = await en();
     await pumpDs(
       tester,
-      DsLiveBox(_run(DsRunState.waitingInput, waitingFor: 'Alex'), visibleSteps: 6, announceMinInterval: _interval),
+      DsLiveBox(
+        _run(DsRunState.waitingInput, waitingFor: 'Alex'),
+        visibleSteps: 6,
+        announceMinInterval: _interval,
+      ),
     );
     expect(find.text(l.liveBoxStateWaitingFor('Alex')), findsOneWidget);
   });
@@ -101,20 +121,32 @@ void main() {
     final l = await en();
     await pumpDs(
       tester,
-      DsLiveBox(_run(DsRunState.failed, reason: 'billing_mode_mismatch'), visibleSteps: 6, announceMinInterval: _interval),
+      DsLiveBox(
+        _run(DsRunState.failed, reason: 'billing_mode_mismatch'),
+        visibleSteps: 6,
+        announceMinInterval: _interval,
+      ),
     );
     expect(find.text(l.liveBoxReasonBillingModeMismatch), findsOneWidget);
     expect(find.text('billing_mode_mismatch'), findsNothing);
 
     await pumpDs(
       tester,
-      DsLiveBox(_run(DsRunState.cancelled, reason: 'user_cancelled'), visibleSteps: 6, announceMinInterval: _interval),
+      DsLiveBox(
+        _run(DsRunState.cancelled, reason: 'user_cancelled'),
+        visibleSteps: 6,
+        announceMinInterval: _interval,
+      ),
     );
     expect(find.text(l.liveBoxReasonUserCancelled('Sam')), findsOneWidget);
 
     await pumpDs(
       tester,
-      DsLiveBox(_run(DsRunState.failed, reason: 'future_reason'), visibleSteps: 6, announceMinInterval: _interval),
+      DsLiveBox(
+        _run(DsRunState.failed, reason: 'future_reason'),
+        visibleSteps: 6,
+        announceMinInterval: _interval,
+      ),
     );
     expect(find.text(l.liveBoxStateFailed), findsOneWidget);
     final code = tester.widget<Text>(find.text('future_reason'));
@@ -128,7 +160,11 @@ void main() {
     final l = await en();
     await pumpDs(
       tester,
-      DsLiveBox(_run(DsRunState.running, steps: _steps(9)), visibleSteps: 6, announceMinInterval: _interval),
+      DsLiveBox(
+        _run(DsRunState.running, steps: _steps(9)),
+        visibleSteps: 6,
+        announceMinInterval: _interval,
+      ),
     );
     expect(find.byType(DsToolChip), findsNWidgets(6));
     expect(find.text(l.liveBoxEarlierSteps(3)), findsOneWidget);
@@ -139,64 +175,69 @@ void main() {
     expect(find.byType(DsToolChip), findsNWidgets(9));
   });
 
-  testWidgets('numbers are in type.code-sm; header, status line, last text, stop', (
-    tester,
-  ) async {
-    final l = await en();
-    var stops = 0;
-    await pumpDs(
-      tester,
-      DsLiveBox(
-        _run(DsRunState.running),
-        visibleSteps: 6,
-        announceMinInterval: _interval,
-        onStop: () => stops++,
-      ),
-    );
-    final elapsed = tester.widget<Text>(find.text('4:12'));
-    expect(elapsed.style?.fontFamily, DsType.codeSm.fontFamily);
-    expect(find.text(l.liveBoxTokens('48,100')), findsOneWidget);
-    expect(find.text(l.liveBoxContext('62%')), findsOneWidget);
-    expect(find.byType(DsStatusLine), findsOneWidget);
-    expect(find.text('The suite is green.'), findsOneWidget);
-    expect(find.byType(DsBillingBadge), findsOneWidget);
-    expect(find.text(l.liveBoxFollowupHint), findsOneWidget);
-    await tester.tap(find.bySemanticsLabel(l.liveBoxStopRun('Robin')));
-    expect(stops, 1);
-    // The container label leads; the plain texts inside follow it.
-    expect(
-      find.bySemanticsLabel(
-        RegExp(
-          '^${RegExp.escape(l.liveBoxSemanticsLabel('Robin', l.liveBoxStateRunning, '4:12', 62))}',
+  testWidgets(
+    'numbers are in type.code-sm; header, status line, last text, stop',
+    (tester) async {
+      final l = await en();
+      var stops = 0;
+      await pumpDs(
+        tester,
+        DsLiveBox(
+          _run(DsRunState.running),
+          visibleSteps: 6,
+          announceMinInterval: _interval,
+          onStop: () => stops++,
         ),
-      ),
-      findsOneWidget,
-    );
-  });
+      );
+      final elapsed = tester.widget<Text>(find.text('4:12'));
+      expect(elapsed.style?.fontFamily, DsType.codeSm.fontFamily);
+      expect(find.text(l.liveBoxTokens('48,100')), findsOneWidget);
+      expect(find.text(l.liveBoxContext('62%')), findsOneWidget);
+      expect(find.byType(DsStatusLine), findsOneWidget);
+      expect(find.text('The suite is green.'), findsOneWidget);
+      expect(find.byType(DsBillingBadge), findsOneWidget);
+      expect(find.text(l.liveBoxFollowupHint), findsOneWidget);
+      await tester.tap(find.bySemanticsLabel(l.liveBoxStopRun('Robin')));
+      expect(stops, 1);
+      // The container label leads; the plain texts inside follow it.
+      expect(
+        find.bySemanticsLabel(
+          RegExp(
+            '^${RegExp.escape(l.liveBoxSemanticsLabel('Robin', l.liveBoxStateRunning, '4:12', 62))}',
+          ),
+        ),
+        findsOneWidget,
+      );
+    },
+  );
 
-  testWidgets('a waiting run shows the question instead of the follow-up note', (
-    tester,
-  ) async {
-    final l = await en();
-    await pumpDs(
-      tester,
-      DsLiveBox(
-        _run(DsRunState.waitingInput),
-        visibleSteps: 6,
-        announceMinInterval: _interval,
-        question: const Text('question'),
-      ),
-    );
-    expect(find.text('question'), findsOneWidget);
-    expect(find.text(l.liveBoxFollowupHint), findsNothing);
-  });
+  testWidgets(
+    'a waiting run shows the question instead of the follow-up note',
+    (tester) async {
+      final l = await en();
+      await pumpDs(
+        tester,
+        DsLiveBox(
+          _run(DsRunState.waitingInput),
+          visibleSteps: 6,
+          announceMinInterval: _interval,
+          question: const Text('question'),
+        ),
+      );
+      expect(find.text('question'), findsOneWidget);
+      expect(find.text(l.liveBoxFollowupHint), findsNothing);
+    },
+  );
 
   testWidgets('stall banner', (tester) async {
     final l = await en();
     await pumpDs(
       tester,
       DsLiveBox(
-        _run(DsRunState.running, stalledFor: const Duration(minutes: 4, seconds: 30)),
+        _run(
+          DsRunState.running,
+          stalledFor: const Duration(minutes: 4, seconds: 30),
+        ),
         visibleSteps: 6,
         announceMinInterval: _interval,
       ),
@@ -225,7 +266,12 @@ void main() {
     final text = allText(tester);
     expect(
       text,
-      contains(l.liveBoxRan(const L10nFormat(Locale('en')).durationShort(const Duration(minutes: 28)))),
+      contains(
+        l.liveBoxRan(
+          const L10nFormat(Locale('en'))
+              .durationShort(const Duration(minutes: 28)),
+        ),
+      ),
     );
     expect(text, contains(l.liveBoxTools(3)));
     expect(text, contains(l.liveBoxSubagents(2)));
@@ -253,7 +299,10 @@ void main() {
     expect(find.text('4:12'), findsOneWidget);
     expect(find.byType(DsStatusLine), findsOneWidget);
     final stop = find.bySemanticsLabel(l.liveBoxStopRun('Robin'));
-    expect(tester.getSize(stop).height, greaterThanOrEqualTo(DsDensity.touch.targetMin));
+    expect(
+      tester.getSize(stop).height,
+      greaterThanOrEqualTo(DsDensity.touch.targetMin),
+    );
     await tester.tap(stop);
     expect(stops, 1);
     await tester.tap(find.text(l.liveBoxStateRunning));
@@ -264,7 +313,8 @@ void main() {
     tester,
   ) async {
     final l = await en();
-    final twelve = const L10nFormat(Locale('en')).durationShort(const Duration(seconds: 12));
+    final twelve = const L10nFormat(Locale('en'))
+        .durationShort(const Duration(seconds: 12));
     final cases = {
       DsStepStatus.pending: l.toolChipWaiting,
       DsStepStatus.running: l.toolChipRunning(twelve),
@@ -291,7 +341,9 @@ void main() {
     }
     expect(
       find.bySemanticsLabel(
-        RegExp('^${RegExp.escape(l.toolChipLabel(l.toolChipKindToolCall, 'grep', ''))}'),
+        RegExp(
+          '^${RegExp.escape(l.toolChipLabel(l.toolChipKindToolCall, 'grep', ''))}',
+        ),
       ),
       findsOneWidget,
     );
@@ -342,27 +394,34 @@ void main() {
     test('a new question announces', () {
       announcer.observe(state: 'Waiting', questionId: null, question: 'Q');
       now = now.add(const Duration(seconds: 30));
-      announcer.observe(state: 'Waiting', questionId: 'q1', question: 'Question from Robin');
+      announcer.observe(
+        state: 'Waiting',
+        questionId: 'q1',
+        question: 'Question from Robin',
+      );
       expect(sent, ['Question from Robin']);
     });
 
-    test('two changes within the interval give one announcement, the later', () {
-      announcer.observe(state: 'Queued', questionId: null);
-      now = now.add(const Duration(seconds: 30));
-      announcer.observe(state: 'Running', questionId: null);
-      expect(sent, ['Running']);
-      now = now.add(const Duration(seconds: 2));
-      announcer.observe(state: 'Waiting', questionId: null);
-      now = now.add(const Duration(seconds: 2));
-      announcer.observe(state: 'Done', questionId: null);
-      expect(sent, ['Running']);
-      expect(announcer.pendingDue, DateTime.utc(2026, 10, 15, 12, 0, 40));
-      now = now.add(const Duration(seconds: 6));
-      announcer.flush();
-      expect(sent, ['Running', 'Done']);
-      announcer.flush();
-      expect(sent, ['Running', 'Done']);
-    });
+    test(
+      'two changes within the interval give one announcement, the later',
+      () {
+        announcer.observe(state: 'Queued', questionId: null);
+        now = now.add(const Duration(seconds: 30));
+        announcer.observe(state: 'Running', questionId: null);
+        expect(sent, ['Running']);
+        now = now.add(const Duration(seconds: 2));
+        announcer.observe(state: 'Waiting', questionId: null);
+        now = now.add(const Duration(seconds: 2));
+        announcer.observe(state: 'Done', questionId: null);
+        expect(sent, ['Running']);
+        expect(announcer.pendingDue, DateTime.utc(2026, 10, 15, 12, 0, 40));
+        now = now.add(const Duration(seconds: 6));
+        announcer.flush();
+        expect(sent, ['Running', 'Done']);
+        announcer.flush();
+        expect(sent, ['Running', 'Done']);
+      },
+    );
 
     test('a change back to the announced state cancels the pending one', () {
       announcer.observe(state: 'Running', questionId: null);
@@ -388,7 +447,9 @@ void main() {
       (message) async {
         final map = message! as Map<Object?, Object?>;
         if (map['type'] == 'announce') {
-          announced.add((map['data']! as Map<Object?, Object?>)['message']! as String);
+          announced.add(
+            (map['data']! as Map<Object?, Object?>)['message']! as String,
+          );
         }
         return null;
       },
@@ -403,7 +464,9 @@ void main() {
     expect(announced, isEmpty);
     await show(_run(DsRunState.completed, steps: _steps(2)));
     await tester.pump();
-    expect(announced, [l.liveBoxAnnounceState('Robin', l.liveBoxStateCompleted)]);
+    expect(announced, [
+      l.liveBoxAnnounceState('Robin', l.liveBoxStateCompleted),
+    ]);
   });
 }
 

@@ -150,7 +150,8 @@ enum DsRunState implements DsCode {
   final String code;
 
   /// Whether the run is still active (`queued`, `running`, `waiting_input`).
-  bool get isActive => this == queued || this == running || this == waitingInput;
+  bool get isActive =>
+      this == queued || this == running || this == waitingInput;
 
   /// The state of [code]; [unknown] for any other value.
   static DsRunState fromCode(String? code) => _fromCode(values, code, unknown);
@@ -396,8 +397,7 @@ enum DsCategory implements DsCode {
   final String code;
 
   /// The category of [code]; [granite] for any other value.
-  static DsCategory fromCode(String? code) =>
-      _fromCode(values, code, granite);
+  static DsCategory fromCode(String? code) => _fromCode(values, code, granite);
 }
 
 /// The delivery of an own message through the outbox (01 section 6.6).

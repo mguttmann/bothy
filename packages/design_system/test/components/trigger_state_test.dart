@@ -13,7 +13,10 @@ void main() {
   ) async {
     final l = await en();
     final expected = {
-      DsTriggerState.received: (DsIcons.triggerReceived, l.triggerStateReceived),
+      DsTriggerState.received: (
+        DsIcons.triggerReceived,
+        l.triggerStateReceived,
+      ),
       DsTriggerState.queued: (DsIcons.triggerQueued, l.triggerStateQueued),
       DsTriggerState.working: (DsIcons.triggerWorking, l.triggerStateWorking),
       DsTriggerState.done: (DsIcons.triggerDone, l.triggerStateDone),
@@ -34,7 +37,8 @@ void main() {
       DsTriggerState.cancelled: colors.runCancelled,
       DsTriggerState.followupDelivered: colors.triggerFollowup,
     };
-    for (final MapEntry(key: state, value: (glyph, label)) in expected.entries) {
+    for (final MapEntry(key: state, value: (glyph, label))
+        in expected.entries) {
       await pumpDs(tester, DsTriggerStateIcon(state: state));
       final icon = tester.widget<DsIcon>(find.byType(DsIcon));
       expect(icon.glyph, glyph, reason: state.name);
@@ -76,7 +80,9 @@ void main() {
       ),
     );
     expect(
-      find.bySemanticsLabel(l.triggerStateFailedWithReason('run_active_other_agent')),
+      find.bySemanticsLabel(
+        l.triggerStateFailedWithReason('run_active_other_agent'),
+      ),
       findsOneWidget,
     );
     await pumpDs(
@@ -121,7 +127,9 @@ void main() {
   });
 
   test('codes map both ways and unknown codes never throw', () {
-    for (final s in DsTriggerState.values.where((s) => s != DsTriggerState.unknown)) {
+    for (final s in DsTriggerState.values.where(
+      (s) => s != DsTriggerState.unknown,
+    )) {
       expect(DsTriggerState.fromCode(s.code), s);
     }
     expect(DsTriggerState.fromCode('x'), DsTriggerState.unknown);

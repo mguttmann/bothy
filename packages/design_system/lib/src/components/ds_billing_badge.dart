@@ -123,7 +123,8 @@ class DsCostText extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final fg = color ?? context.dsColors.textSecondary;
-    final amount = dsFormat(context).money(cost.money.amount, cost.money.currency);
+    final amount = dsFormat(context)
+        .money(cost.money.amount, cost.money.currency);
     final extra = suffix(context, cost);
     return Text.rich(
       TextSpan(

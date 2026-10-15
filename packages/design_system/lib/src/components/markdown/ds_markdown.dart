@@ -274,8 +274,10 @@ class _Builder {
   Widget _table(md.Element table) {
     final rows = <List<md.Element>>[];
     final headerRows = <int>{};
-    for (final section in (table.children ?? const []).whereType<md.Element>()) {
-      for (final row in (section.children ?? const []).whereType<md.Element>()) {
+    for (final section
+        in (table.children ?? const []).whereType<md.Element>()) {
+      for (final row
+          in (section.children ?? const []).whereType<md.Element>()) {
         if (section.tag == 'thead') headerRows.add(rows.length);
         rows.add((row.children ?? const []).whereType<md.Element>().toList());
       }
@@ -283,7 +285,8 @@ class _Builder {
     final width = rows.fold<int>(0, (w, r) => r.length > w ? r.length : w);
     if (width == 0) return const SizedBox.shrink();
     final colors = context.dsColors;
-    final strong = dsTextStyle(DsType.bodyStrong).copyWith(color: colors.textPrimary);
+    final strong = dsTextStyle(DsType.bodyStrong)
+        .copyWith(color: colors.textPrimary);
     return SingleChildScrollView(
       scrollDirection: Axis.horizontal,
       child: Table(
@@ -316,7 +319,11 @@ class _Builder {
     );
   }
 
-  Widget _paragraph(List<md.Node> nodes, TextStyle style, {bool header = false}) {
+  Widget _paragraph(
+    List<md.Node> nodes,
+    TextStyle style, {
+    bool header = false,
+  }) {
     final spans = <InlineSpan>[];
     for (final node in nodes) {
       _inline(node, style, spans);
@@ -378,10 +385,8 @@ class _Builder {
         out.add(
           TextSpan(
             text: node.textContent,
-            style: dsTextStyle(DsType.code).copyWith(
-              color: colors.codeFg,
-              backgroundColor: colors.codeBg,
-            ),
+            style: dsTextStyle(DsType.code)
+                .copyWith(color: colors.codeFg, backgroundColor: colors.codeBg),
           ),
         );
       case 'br':
@@ -559,7 +564,10 @@ class DsMarkdownCodeBlock extends StatelessWidget {
       decoration: BoxDecoration(
         color: colors.codeBg,
         borderRadius: BorderRadius.circular(DsRadius.md),
-        border: Border.all(color: colors.borderSubtle, width: DsBorderWidth.hairline),
+        border: Border.all(
+          color: colors.borderSubtle,
+          width: DsBorderWidth.hairline,
+        ),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -571,7 +579,8 @@ class DsMarkdownCodeBlock extends StatelessWidget {
               Expanded(
                 child: Text(
                   language ?? '',
-                  style: dsTextStyle(DsType.codeSm).copyWith(color: colors.textSecondary),
+                  style: dsTextStyle(DsType.codeSm)
+                      .copyWith(color: colors.textSecondary),
                 ),
               ),
               DsTappable(
@@ -585,9 +594,8 @@ class DsMarkdownCodeBlock extends StatelessWidget {
                     padding: const EdgeInsets.symmetric(horizontal: DsSpace.s8),
                     child: Text(
                       l.markdownCopyCode,
-                      style: dsTextStyle(DsType.label).copyWith(
-                        color: context.dsAccent.textLink,
-                      ),
+                      style: dsTextStyle(DsType.label)
+                          .copyWith(color: context.dsAccent.textLink),
                     ),
                   ),
                 ),

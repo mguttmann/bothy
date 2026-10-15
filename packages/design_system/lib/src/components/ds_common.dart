@@ -58,9 +58,10 @@ String dsRunStateWord(AppLocalizations l, DsRunData run) {
   return switch (run.state) {
     DsRunState.queued => l.liveBoxStateQueued,
     DsRunState.running => l.liveBoxStateRunning,
-    DsRunState.waitingInput => run.waitingForName == null
-        ? l.liveBoxStateWaitingForYou
-        : l.liveBoxStateWaitingFor(run.waitingForName!),
+    DsRunState.waitingInput =>
+      run.waitingForName == null
+          ? l.liveBoxStateWaitingForYou
+          : l.liveBoxStateWaitingFor(run.waitingForName!),
     DsRunState.completed => l.liveBoxStateCompleted,
     DsRunState.failed => l.liveBoxStateFailed,
     DsRunState.cancelled => l.liveBoxStateCancelled,
@@ -213,7 +214,9 @@ class _DsTappableState extends State<DsTappable> {
   @override
   Widget build(BuildContext context) {
     final colors = context.dsColors;
-    final ring = widget.onSidebar ? colors.focusRingOnSidebar : context.dsAccent.focusRing;
+    final ring = widget.onSidebar
+        ? colors.focusRingOnSidebar
+        : context.dsAccent.focusRing;
     final target = context.dsDensity.targetMin;
     final shape = BorderRadius.circular(widget.radius);
     Widget content = ConstrainedBox(
