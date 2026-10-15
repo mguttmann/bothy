@@ -1479,5 +1479,33 @@
   "costInformationOnly": "for information only",
   "@costInformationOnly": {
     "description": "Suffix of a cost in Personal mode (components.md section 10, 01 section 6.7)."
+  },
+  "markdownImage": "Image: {alt} ({domain})",
+  "@markdownImage": {
+    "description": "Text that replaces an image of a message; images are never loaded from a URL (components.md section 1, SEC-OUT-2).",
+    "placeholders": {
+      "alt": {
+        "type": "String",
+        "example": "plan"
+      },
+      "domain": {
+        "type": "String",
+        "example": "example.com"
+      }
+    }
+  },
+  "markdownImageNoDomain": "Image: {alt}",
+  "@markdownImageNoDomain": {
+    "description": "Text that replaces an image without a domain (components.md section 1, SEC-OUT-2).",
+    "placeholders": {
+      "alt": {
+        "type": "String",
+        "example": "plan"
+      }
+    }
+  },
+  "markdownCopyCode": "Copy code",
+  "@markdownCopyCode": {
+    "description": "Copy button of a code block in a message (components.md section 1)."
   }
 }

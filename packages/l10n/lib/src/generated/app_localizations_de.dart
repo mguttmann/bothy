@@ -1022,4 +1022,17 @@ class AppLocalizationsDe extends AppLocalizations {
 
   @override
   String get costInformationOnly => 'nur Information';
+
+  @override
+  String markdownImage(String alt, String domain) {
+    return 'Bild: $alt ($domain)';
+  }
+
+  @override
+  String markdownImageNoDomain(String alt) {
+    return 'Bild: $alt';
+  }
+
+  @override
+  String get markdownCopyCode => 'Code kopieren';
 }
