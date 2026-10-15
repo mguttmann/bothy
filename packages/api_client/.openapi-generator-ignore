@@ -1,0 +1,19 @@
+# SPDX-License-Identifier: Apache-2.0
+#
+# Paths openapi-generator must never write (docs/DECISIONS.md D-M4-02-2). The generator runs into
+# a temporary folder; tool/generate.sh copies only lib/src/generated/ and the generated library
+# entry from there, so these entries keep the hand-written files out of the generator's reach and
+# skip output nobody reads (docs and test stubs of the generator).
+pubspec.yaml
+README.md
+analysis_options.yaml
+Makefile
+.openapi-generator-ignore
+.gitignore
+.travis.yml
+git_push.sh
+build.yaml
+lib/src/hand/**
+test/**
+doc/**
+tool/**

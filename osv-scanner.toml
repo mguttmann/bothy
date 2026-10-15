@@ -89,14 +89,14 @@ name = "built_collection"
 version = "5.1.2"
 ecosystem = "Pub"
 license.override = ["BSD-3-Clause"]
-reason = "deps.dev knows no license for this pub package; its LICENSE file on pub.dev is BSD-3-Clause. Transitive dev package of pigeon (device_key)."
+reason = "deps.dev knows no license for this pub package; its LICENSE file on pub.dev is BSD-3-Clause. Transitive dev package of pigeon (device_key). Also: Runtime package of api_client (the generated code or its serializers)."
 
 [[PackageOverrides]]
 name = "built_value"
 version = "8.13.0"
 ecosystem = "Pub"
 license.override = ["BSD-3-Clause"]
-reason = "deps.dev knows no license for this pub package; its LICENSE file on pub.dev is BSD-3-Clause. Transitive dev package of pigeon (device_key)."
+reason = "deps.dev knows no license for this pub package; its LICENSE file on pub.dev is BSD-3-Clause. Transitive dev package of pigeon (device_key). Also: Runtime package of api_client (the generated code or its serializers)."
 
 [[PackageOverrides]]
 name = "characters"
@@ -173,7 +173,7 @@ name = "dart_style"
 version = "3.1.13"
 ecosystem = "Pub"
 license.override = ["BSD-3-Clause"]
-reason = "deps.dev knows no license for this pub package; its LICENSE file on pub.dev is BSD-3-Clause. Transitive dev package of pigeon (device_key)."
+reason = "deps.dev knows no license for this pub package; its LICENSE file on pub.dev is BSD-3-Clause. Transitive dev package of pigeon (device_key). Also: Dev package of api_client (build_runner or built_value_generator) or one of its transitive packages."
 
 [[PackageOverrides]]
 name = "equatable"
@@ -208,7 +208,7 @@ name = "fixnum"
 version = "1.1.1"
 ecosystem = "Pub"
 license.override = ["BSD-3-Clause"]
-reason = "deps.dev knows no license for this pub package; its LICENSE file on pub.dev is BSD-3-Clause. Transitive dev package of pigeon (device_key)."
+reason = "deps.dev knows no license for this pub package; its LICENSE file on pub.dev is BSD-3-Clause. Transitive dev package of pigeon (device_key). Also: Runtime package of api_client (the generated code or its serializers)."
 
 [[PackageOverrides]]
 name = "flutter_lints"
@@ -236,7 +236,7 @@ name = "graphs"
 version = "2.3.2"
 ecosystem = "Pub"
 license.override = ["BSD-3-Clause"]
-reason = "deps.dev knows no license for this pub package; its LICENSE file on pub.dev is BSD-3-Clause. Transitive dev package of pigeon (device_key)."
+reason = "deps.dev knows no license for this pub package; its LICENSE file on pub.dev is BSD-3-Clause. Transitive dev package of pigeon (device_key). Also: Dev package of api_client (build_runner or built_value_generator) or one of its transitive packages."
 
 [[PackageOverrides]]
 name = "http_multi_server"
@@ -548,3 +548,112 @@ version = "1.6.0"
 ecosystem = "Pub"
 license.override = ["BSD-3-Clause"]
 reason = "deps.dev knows no license for this pub package; its LICENSE file on pub.dev is BSD-3-Clause. Transitive package of timezone."
+# Packages added with the generated REST client of packages/api_client (M4-02), checked on
+# 2026-10-15 against the LICENSE file of each version in the pub cache. Runtime packages: dio,
+# dio_web_adapter, built_value, built_collection, fixnum, one_of and one_of_serializer; the
+# others come with the code generator (build_runner, built_value_generator) as dev dependencies.
+
+[[PackageOverrides]]
+name = "build"
+version = "4.0.11"
+ecosystem = "Pub"
+license.override = ["BSD-3-Clause"]
+reason = "deps.dev knows no license for this pub package; its LICENSE file on pub.dev is BSD-3-Clause. Dev package of api_client (build_runner or built_value_generator) or one of its transitive packages."
+
+[[PackageOverrides]]
+name = "build_config"
+version = "1.3.3"
+ecosystem = "Pub"
+license.override = ["BSD-3-Clause"]
+reason = "deps.dev knows no license for this pub package; its LICENSE file on pub.dev is BSD-3-Clause. Dev package of api_client (build_runner or built_value_generator) or one of its transitive packages."
+
+[[PackageOverrides]]
+name = "build_daemon"
+version = "4.1.7"
+ecosystem = "Pub"
+license.override = ["BSD-3-Clause"]
+reason = "deps.dev knows no license for this pub package; its LICENSE file on pub.dev is BSD-3-Clause. Dev package of api_client (build_runner or built_value_generator) or one of its transitive packages."
+
+[[PackageOverrides]]
+name = "build_runner"
+version = "2.16.1"
+ecosystem = "Pub"
+license.override = ["BSD-3-Clause"]
+reason = "deps.dev knows no license for this pub package; its LICENSE file on pub.dev is BSD-3-Clause. Dev package of api_client (build_runner or built_value_generator) or one of its transitive packages."
+
+[[PackageOverrides]]
+name = "built_value_generator"
+version = "8.13.0"
+ecosystem = "Pub"
+license.override = ["BSD-3-Clause"]
+reason = "deps.dev knows no license for this pub package; its LICENSE file on pub.dev is BSD-3-Clause. Dev package of api_client (build_runner or built_value_generator) or one of its transitive packages."
+
+[[PackageOverrides]]
+name = "checked_yaml"
+version = "2.0.4"
+ecosystem = "Pub"
+license.override = ["BSD-3-Clause"]
+reason = "deps.dev knows no license for this pub package; its LICENSE file on pub.dev is BSD-3-Clause. Dev package of api_client (build_runner or built_value_generator) or one of its transitive packages."
+
+[[PackageOverrides]]
+name = "dio"
+version = "5.11.1"
+ecosystem = "Pub"
+license.override = ["MIT"]
+reason = "deps.dev knows no license for this pub package; its LICENSE file on pub.dev is MIT. Runtime package of api_client (the generated code or its serializers)."
+
+[[PackageOverrides]]
+name = "dio_web_adapter"
+version = "2.2.2"
+ecosystem = "Pub"
+license.override = ["MIT"]
+reason = "deps.dev knows no license for this pub package; its LICENSE file on pub.dev is MIT. Runtime package of api_client (the generated code or its serializers)."
+
+[[PackageOverrides]]
+name = "json_annotation"
+version = "4.12.0"
+ecosystem = "Pub"
+license.override = ["BSD-3-Clause"]
+reason = "deps.dev knows no license for this pub package; its LICENSE file on pub.dev is BSD-3-Clause. Dev package of api_client (build_runner or built_value_generator) or one of its transitive packages."
+
+[[PackageOverrides]]
+name = "one_of"
+version = "1.5.0"
+ecosystem = "Pub"
+license.override = ["BSD-3-Clause"]
+reason = "deps.dev knows no license for this pub package; its LICENSE file on pub.dev is BSD-3-Clause. Runtime package of api_client (the generated code or its serializers)."
+
+[[PackageOverrides]]
+name = "one_of_serializer"
+version = "1.5.0"
+ecosystem = "Pub"
+license.override = ["BSD-3-Clause"]
+reason = "deps.dev knows no license for this pub package; its LICENSE file on pub.dev is BSD-3-Clause. Runtime package of api_client (the generated code or its serializers)."
+
+[[PackageOverrides]]
+name = "pubspec_parse"
+version = "1.6.0"
+ecosystem = "Pub"
+license.override = ["BSD-3-Clause"]
+reason = "deps.dev knows no license for this pub package; its LICENSE file on pub.dev is BSD-3-Clause. Dev package of api_client (build_runner or built_value_generator) or one of its transitive packages."
+
+[[PackageOverrides]]
+name = "quiver"
+version = "3.2.2"
+ecosystem = "Pub"
+license.override = ["Apache-2.0"]
+reason = "deps.dev knows no license for this pub package; its LICENSE file on pub.dev is Apache-2.0. Dev package of api_client (build_runner or built_value_generator) or one of its transitive packages."
+
+[[PackageOverrides]]
+name = "source_gen"
+version = "4.2.4"
+ecosystem = "Pub"
+license.override = ["BSD-3-Clause"]
+reason = "deps.dev knows no license for this pub package; its LICENSE file on pub.dev is BSD-3-Clause. Dev package of api_client (build_runner or built_value_generator) or one of its transitive packages."
+
+[[PackageOverrides]]
+name = "stream_transform"
+version = "2.1.2"
+ecosystem = "Pub"
+license.override = ["BSD-3-Clause"]
+reason = "deps.dev knows no license for this pub package; its LICENSE file on pub.dev is BSD-3-Clause. Dev package of api_client (build_runner or built_value_generator) or one of its transitive packages."

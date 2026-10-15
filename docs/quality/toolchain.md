@@ -42,6 +42,7 @@ selben make-Ziel in GitHub Actions. Alle Gate-Werkzeuge laufen an beiden Orten.
 | `oapi-codegen` | `v2.8.0` | Go-Server-Schnittstelle und Modelle aus `docs/api/openapi.yaml` (`tool` in `services/server/go.mod`, läuft in `make codegen-check`) | Apache-2.0 | ADR 0013; 06 "Codegenerierung" |
 | `openapi-python-client` | `0.29.1` | core of the Python SDK from `docs/api/openapi.yaml` (dev group of `sdk/python/pyproject.toml`, runs in `make api-clients`) | MIT | 06 "Codegenerierung", ADR 0026 |
 | `openapi-typescript` | `7.13.0` | types of the TypeScript SDK from `docs/api/openapi.yaml` (`devDependencies` of `sdk/typescript/package.json`, runs in `make api-clients`) | MIT | 06 "Codegenerierung", ADR 0026 |
+| `openapitools/openapi-generator-cli` | `v7.26.0@sha256:a304ddf1e2e5f24f68fa3153568d6174cea4959d09aa8e3db6d526fd0782326d` (digest of the multi-architecture index) | generator `dart-dio` for `packages/api_client` from `docs/api/openapi.yaml` (`GENERATOR_IMAGE` in `packages/api_client/Makefile`, runs with `docker run --network none` in `make api-clients`) | Apache-2.0 | 06 "Codegenerierung", ADR 0026; the image brings the Java runtime the repository does not pin otherwise (docs/DECISIONS.md D-M4-02-1) |
 | `govulncheck` | `v1.8.0` | erreichbare Go-Schwachstellen | BSD-3-Clause | prüft Aufrufgraphen statt nur Versionen |
 | `go-licenses` | `v2.0.1` | Lizenzen gelinkter Go-Pakete | Apache-2.0 | vom Recherche-Ruling gefordert |
 | `lychee` | `0.24.2` | Links und Anker in Markdown | Apache-2.0 OR MIT | prüft Anker in Markdown-Dateien offline |

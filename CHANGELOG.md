@@ -41,6 +41,12 @@ Planning stage (milestone M0). Nothing is installable yet.
   reject a missing translation, a placeholder mismatch, a missing description, en and em dashes,
   emoji and a German text without the term of the table; `make codegen-check` regenerates in a
   temporary copy and fails on untranslated messages or stale generated code (M4-06).
+- Dart REST client `packages/api_client`: generated from `docs/api/openapi.yaml` with the pinned
+  openapi-generator `dart-dio` image and checked in, plus a hand layer with `createApiClient`,
+  `traceparent` and `Idempotency-Key` headers, retry for reads only, `ApiProblem` and tolerant
+  event decoding; `make api-clients` regenerates it in a temporary copy, compares and analyses it
+  (G4 for Dart), and a G5 test proves that unknown fields, enum values and event types are
+  skipped (M4-02).
 - Design tokens: accent variants for every instance accent of `branding.accent_color` in light and
   dark. The generator swaps the accent roles for the same step of the chosen scale, moves a
   failing step, checks every pairing with a swapped role and writes `DsAccent` (Dart),

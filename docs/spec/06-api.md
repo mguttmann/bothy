@@ -593,19 +593,28 @@ Wunsch je Abo. Zustellung, Wiederholung, Prüfung beim Empfänger und Eingangs-W
 | Go-Server (Modul `api`) | oapi-codegen v2.8.0, Laufzeit `oapi-codegen/runtime` ab v1.6.0, Go ab 1.25 [belegt, Q1] | `std-http-server`, `strict-server`, `models`, `output-options.skip-prune: true` (Gateway-Typen) | erzeugt, `go vet` ohne Befund, Test der `Event`-Union grün; unbekannter Typ liefert Fehler aus `ValueByDiscriminator`, die Seite dekodiert trotzdem |
 | TypeScript-SDK | openapi-typescript 7.13.0, runtime client openapi-fetch 0.17.0 | Standard | `tsc --strict` ohne Fehler; Union über `type` wird eingeengt |
 | Python-SDK und Hermes-Adapter | openapi-python-client 0.29.1 | Standard | erzeugt, kompiliert, importierbar; ohne typisierte Antwort bleiben `image/*`, `application/zip` und NDJSON (Endpunkte existieren, die Handschicht streamt); strenge Enums und Unions (siehe 13.3) |
-| Dart-Paket der Apps | openapi-generator 7.26.0 `dart-dio` (built_value) | `enumUnknownDefaultCase=true`, `legacyDiscriminatorBehavior=false` | erzeugt, `build_runner` erfolgreich, `dart analyze` ohne Fehler (nur Warnungen im generierten Code); DPoP-Schema und `application/octet-stream`-Körper unterstützt der Generator nicht, beides übernimmt die Handschicht; OpenAPI 3.1 dort nur Beta [belegt, Q6] |
+| Dart-Paket der Apps | openapi-generator 7.26.0 `dart-dio` (built_value), image `openapitools/openapi-generator-cli:v7.26.0` pinned by digest in `packages/api_client/Makefile`, run with `docker run --network none` | `enumUnknownDefaultCase=true`, `legacyDiscriminatorBehavior=false`, `sourceFolder=src/generated`, `pubName=api_client`; the paths it must never write are in `packages/api_client/.openapi-generator-ignore` | erzeugt, `build_runner` erfolgreich, `dart analyze` ohne Fehler (nur Warnungen im generierten Code); DPoP-Schema und `application/octet-stream`-Körper unterstützt der Generator nicht, beides übernimmt die Handschicht; OpenAPI 3.1 dort nur Beta [belegt, Q6] |
 
 1. Generierter Code wird eingecheckt. Das Gate erzeugt ihn neu und bricht bei einem Unterschied
    ab (G4). Grund: Review sieht die Wirkung einer Spec-Änderung, Builds brauchen keinen Generator.
    Where the generated code lives: Python SDK in the subpackage `bothy_sdk.generated`
    (`sdk/python/src/bothy_sdk/generated/`), TypeScript SDK in
-   `sdk/typescript/src/generated/openapi.ts`; each generator is pinned inside its component
-   (`make -C sdk/<language> generate`, `generate-check`).
+   `sdk/typescript/src/generated/openapi.ts`, Dart package in `packages/api_client/lib/src/generated/`
+   (the generator's library entry as `generated_api.dart` there); each generator is pinned inside
+   its component (`make -C sdk/<language> generate`, `make -C packages/api_client generate`,
+   `generate-check`). The Dart check generates into a temporary copy and never writes into the
+   working tree.
 2. Jedes SDK hat eine Handschicht über dem generierten Kern (ADR 0026, Team D): DPoP-Beweise und
    Nonce-Wiederholung, IDs für das Ausgangsfach, Toleranz für Unbekanntes, Paginierungs-Iteratoren,
    Abbildung der Problem-Codes, Gateway-Rahmen.
    In the Python SDK the hand layer installs the tolerance on import (`bothy_sdk.tolerance`);
    the generator keeps its standard settings, without custom templates.
+   In the Dart package the hand layer lives in `packages/api_client/lib/src/hand/` and is
+   exported with the generated API from `lib/api_client.dart`: `createApiClient` with the
+   interceptor slot for DPoP of the `auth` package, `traceparent` on every request,
+   `Idempotency-Key` from the caller, retry for `GET` and `HEAD` only, `ApiProblem`, and
+   `EventsPageDecoder`, which keeps an event of unknown type as `UnknownEvent` because the
+   generated union throws on it.
 3. Für AsyncAPI gibt es keinen Generator im Gate. Die Typen kommen aus openapi.yaml; den
    Rahmen-Router schreibt jedes SDK von Hand.
 4. Schemas bleiben konservativ (Lint): kein `null`, keine Typ-Arrays, kein `anyOf`, `oneOf` nur
@@ -623,7 +632,7 @@ Wunsch je Abo. Zustellung, Wiederholung, Prüfung beim Empfänger und Eingangs-W
 | G2 | Katalog-Abgleich `api-catalogue-sync` | `tools/api-checks` (M1-03), `make api-checks` | `x-authz-action` und `x-rate-limit-class` gleich `docs/spec/actions.yaml` ([ADR 0049](../adr/0049-maschinenlesbarer-aktionskatalog-als-einzige-quelle.md)); Ops, Ereignisse und Empfangs-Aktionen in asyncapi.yaml gleich actions.yaml; Schließ-Codes gleich 04 (6.4, Code und Name); jede POST- und PATCH-Operation hat `Idempotency-Key` oder `x-idempotency-exempt` mit bekanntem Grund; Deprecation-Daten nach 13.4; `x-problem-codes` und `x-status` vollständig. Die Listen in redocly.yaml hält `catalog-check` (M1-02) |
 | G3 | Erzeugte Tabellen dieses Kapitels `api-tables` | `tools/api-checks` (M1-03), `make api-tables` | Blöcke der Abschnitte 5, 7, 16 und 17 und `webhook_events` in webhooks.md entsprechen den YAML-Dateien |
 | G4 | Codegenerierung | vier Generatoren aus Abschnitt 14 | erzeugen, kompilieren, keine Abweichung zum eingecheckten Code |
-| G5 | Toleranz-Test | je SDK ein Test mit Fixture (shared fixtures in `sdk/testdata/tolerance/`) | an unknown field is ignored, an unknown enum value is kept as its raw value, an event of unknown type is skipped while the cursor still advances, a received `null` counts as an absent field; all without an error |
+| G5 | Toleranz-Test | je SDK ein Test mit Fixture (shared fixtures in `sdk/testdata/tolerance/`) | an unknown field is ignored, an unknown enum value is kept as its raw value (Dart: the generated unknown default case), an event of unknown type is skipped while the cursor still advances, a received `null` counts as an absent field; all without an error |
 | G6 | Bruch-Prüfung gegen die letzte Veröffentlichung | oasdiff, falls Ticket B-6 es belegt | Tabelle in Abschnitt 13 |
 | G7 | Eigenschaftsbasierte Tests gegen den laufenden Server | Schemathesis gegen den Server aus dem Arbeitsbaum mit Wegwerf-PostgreSQL (`make contract-test`); den Compose-Stack prüft der Rauchtest (`make portability`) | Statuscodes, Medientypen, Antwort-Schemas und Kopfzeilen jeder Op; zustandsbehaftete Folgen über die Links, die Schemathesis ableitet (die Spec hat keine `links`; leitet die gepinnte Version keine Übergänge ab, gilt dieser Teil als nicht bewiesen); eigene Prüfungen: Problem-Format, `Correlation-Id`, kein `null`, 404-Gleichheit für fremde und fehlende IDs |
 | G8 | Antwort-Validierung in Integrationstests | Middleware im Test-Build | jede Antwort jedes Integrationstests passt zur Spec |
