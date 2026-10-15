@@ -157,7 +157,7 @@ func newWorld(t *testing.T) *world {
 	if err != nil {
 		t.Fatal(err)
 	}
-	c, err := wire.NewChat(chatConfig, pool, uow, az, az, wire.ChatWrites{Audit: w.rec, Events: appender}, w.clk)
+	c, err := wire.NewChat(chatConfig, pool, uow, az, az, wire.ChatWrites{Audit: w.rec, Events: appender, Rights: hook}, w.clk)
 	if err != nil {
 		t.Fatal(err)
 	}

@@ -12,6 +12,7 @@ import (
 	"github.com/OWNER/bothy/services/server/internal/authz"
 	"github.com/OWNER/bothy/services/server/internal/chat/app"
 	"github.com/OWNER/bothy/services/server/internal/chat/domain"
+	"github.com/OWNER/bothy/services/server/internal/identity"
 	"github.com/OWNER/bothy/services/server/internal/kernel/auditing"
 	"github.com/OWNER/bothy/services/server/internal/kernel/authorize"
 	"github.com/OWNER/bothy/services/server/internal/kernel/errs"
@@ -387,4 +388,73 @@ func (a *appender) Append(_ context.Context, evs ...eventlog.Event) error {
 	defer a.mu.Unlock()
 	a.evs = append(a.evs, evs...)
 	return nil
+}
+
+// affected records the principals the operator use cases name (M1-54).
+type affected struct {
+	mu   sync.Mutex
+	list []ids.ID
+}
+
+func (a *affected) AddAffected(_ context.Context, ps ...ids.ID) error {
+	a.mu.Lock()
+	defer a.mu.Unlock()
+	a.list = append(a.list, ps...)
+	return nil
+}
+
+// directory answers the principals of agents; an unknown id is not_found.
+type directory struct {
+	identity.Directory
+	principals map[ids.ID]identity.PrincipalView
+}
+
+func (d directory) Principal(_ context.Context, id ids.ID) (identity.PrincipalView, error) {
+	p, ok := d.principals[id]
+	if !ok {
+		return identity.PrincipalView{}, errs.New(errs.CodeNotFound, "")
+	}
+	return p, nil
+}
+
+// policies answers which agents have an agents row.
+type policies struct {
+	authz.AgentPolicySource
+	rows map[ids.ID]bool
+}
+
+func (p policies) AgentPolicy(_ context.Context, id ids.ID) (authz.AgentPolicy, bool, error) {
+	return authz.AgentPolicy{BillingMode: "organization"}, p.rows[id], nil
+}
+
+func (s *store) SaveSpaceOperator(ctx context.Context, sp domain.Space) error {
+	return s.MoveSpace(ctx, sp)
+}
+
+func (s *store) SaveChannelOperator(ctx context.Context, c domain.Channel) error {
+	return s.SaveChannel(ctx, c)
+}
+
+func (s *store) TouchChannel(ctx context.Context, c domain.Channel) error {
+	return s.SaveChannel(ctx, c)
+}
+
+func (s *store) LockInheritingChannels(_ context.Context, space ids.ID) ([]app.ChannelRow, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	var out []app.ChannelRow
+	for _, c := range s.liveChannels(space) {
+		if c.OperatorInherit {
+			out = append(out, s.row(c))
+		}
+	}
+	return out, s.fail
+}
+
+func (s *store) ServedTargets(context.Context, ids.ID) ([]app.ServedTarget, error) {
+	return nil, s.fail
+}
+
+func (s *store) Thread(context.Context, ids.ID) (app.ThreadRow, bool, error) {
+	return app.ThreadRow{}, false, s.fail
 }

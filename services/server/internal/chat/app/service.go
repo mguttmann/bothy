@@ -11,6 +11,7 @@ import (
 	"github.com/OWNER/bothy/services/server/internal/authz"
 	"github.com/OWNER/bothy/services/server/internal/chat"
 	"github.com/OWNER/bothy/services/server/internal/chat/domain"
+	"github.com/OWNER/bothy/services/server/internal/identity"
 	"github.com/OWNER/bothy/services/server/internal/kernel/actor"
 	"github.com/OWNER/bothy/services/server/internal/kernel/auditing"
 	"github.com/OWNER/bothy/services/server/internal/kernel/authorize"
@@ -73,9 +74,16 @@ type Deps struct {
 	Events eventlog.Appender
 	// Clock gives creation and archive times; nil means clock.System().
 	Clock clock.Clock
+	// RightsChanges names the old and the new operator as affected principals of an operator
+	// change (the rights hook of authz, M1-54).
+	RightsChanges authz.RightsChanges
+	// Directory and Policies answer whether an agent_id names an active agent with an agents row
+	// (identity and the agent policy source of agents behind the port of authz, D1 of M1-54).
+	Directory identity.Directory
+	Policies  authz.AgentPolicySource
 }
 
-// Service implements chat.Structure (space, sidebar, channel and forum tag part). It is safe for concurrent use.
+// Service implements chat.Structure (space, sidebar, channel, forum tag and operator part). It is safe for concurrent use.
 type Service struct {
 	cfg Config
 	d   Deps
@@ -87,7 +95,8 @@ var _ chat.Structure = (*Service)(nil)
 // New returns the use cases. Errors: a missing collaborator, a text limit below 1 or a backfill
 // default outside its range.
 func New(cfg Config, d Deps) (*Service, error) {
-	if d.Store == nil || d.UoW == nil || d.Authorizer == nil || d.Rights == nil || d.Audit == nil || d.Events == nil {
+	if d.Store == nil || d.UoW == nil || d.Authorizer == nil || d.Rights == nil || d.Audit == nil || d.Events == nil ||
+		d.RightsChanges == nil || d.Directory == nil || d.Policies == nil {
 		return nil, errors.New("chat: New needs every collaborator")
 	}
 	if err := cfg.check(); err != nil {

@@ -1,12 +1,13 @@
 // SPDX-License-Identifier: Apache-2.0
 
-// Package authzsource is the adapter through which the chat module answers authz (M1-52, M1-53):
-// Source implements the space and channel part of authz.StructureSource (Space, SpaceArchived,
-// Spaces, SpaceDetails, Channel, Channels, ChannelsOperatedBy, ChannelDetails) over the tables
-// spaces, channels and threads, so authorize resolves spaces and channels from real data
-// (docs/spec/02-architecture.md section 4.3, "Quellen-Port"). The thread part follows with M1-55
-// and the served targets with M1-54; until then internal/wire joins this source with the empty
-// thread part. authz never reads these tables.
+// Package authzsource is the adapter through which the chat module answers authz (M1-52, M1-53,
+// M1-54): Source implements authz.StructureSource (Space, SpaceArchived, Spaces, SpaceDetails,
+// Channel, Channels, ChannelsOperatedBy, ChannelDetails; since M1-54 Thread with the fixed
+// operator and ServedTargets for I1) over the tables spaces, channels and threads, so authorize
+// and the rights hook resolve the structure and the operator rule from real data
+// (docs/spec/02-architecture.md section 4.3, "Ports, events and sources per module"). The dm
+// participation follows with V3; until then internal/wire joins this source with the empty dm
+// part. authz never reads these tables.
 //
 // Example:
 //
@@ -22,7 +23,7 @@ import (
 	"github.com/OWNER/bothy/services/server/internal/kernel/ids"
 )
 
-// Source answers the space and channel part of authz.StructureSource. It reads inside the ambient
+// Source answers authz.StructureSource except the dm participation. It reads inside the ambient
 // transaction of ctx when there is one, so the rights hook sees a space a unit of work just
 // archived. It is safe for concurrent use when its store is.
 type Source struct {
@@ -145,4 +146,33 @@ func facts(c app.ChannelRow) authz.ChannelFacts {
 		RequireMention:      ch.RequireMention, ThreadRequireMention: ch.ThreadRequireMention, FreeResponse: ch.FreeResponse,
 		AllowMentionedAgents: ch.AllowMentionedAgents, Archived: ch.Archived() || c.SpaceArchived,
 	}
+}
+
+// Thread implements authz.StructureSource: the channel, the kind, the fixed operator (zero for a
+// main thread) and the creator of the thread id, so authorize applies the operator rule of a
+// thread (07 section 2.9 point 2, D6 of M1-54).
+func (s *Source) Thread(ctx context.Context, id ids.ID) (authz.ThreadFacts, bool, error) {
+	t, found, err := s.store.Thread(ctx, id)
+	if err != nil || !found {
+		return authz.ThreadFacts{}, false, err
+	}
+	return authz.ThreadFacts{ID: t.ID, ChannelID: t.ChannelID, Main: t.Main, OperatorAgentID: t.OperatorAgentID, CreatedBy: t.CreatedBy}, true, nil
+}
+
+// ServedTargets implements authz.StructureSource: the targets agentID serves for I1 (10 sections
+// 5.2 and 5.3, D5 of M1-54), read inside the ambient transaction under the lock of
+// permission_version; none for the zero id.
+func (s *Source) ServedTargets(ctx context.Context, agentID ids.ID) ([]authz.ChannelRef, error) {
+	if agentID.IsZero() {
+		return nil, nil
+	}
+	list, err := s.store.ServedTargets(ctx, agentID)
+	if err != nil {
+		return nil, err
+	}
+	out := make([]authz.ChannelRef, 0, len(list))
+	for _, t := range list {
+		out = append(out, authz.ChannelRef{ChannelID: t.ChannelID, SpaceID: t.SpaceID})
+	}
+	return out, nil
 }

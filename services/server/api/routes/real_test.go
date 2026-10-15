@@ -401,6 +401,14 @@ func (stubServer) ArchiveChannel(context.Context, rest.ArchiveChannelRequestObje
 	return nil, nil
 }
 
+func (stubServer) SetSpaceOperator(context.Context, rest.SetSpaceOperatorRequestObject) (rest.SetSpaceOperatorResponseObject, error) {
+	return nil, nil
+}
+
+func (stubServer) SetChannelOperator(context.Context, rest.SetChannelOperatorRequestObject) (rest.SetChannelOperatorResponseObject, error) {
+	return nil, nil
+}
+
 func (stubServer) ListForumTags(context.Context, rest.ListForumTagsRequestObject) (rest.ListForumTagsResponseObject, error) {
 	return nil, nil
 }
@@ -601,6 +609,9 @@ func TestRealTable_Enabled(t *testing.T) {
 		"updateForumTag":    {"PATCH /api/v1/channels/{channel_id}/tags/{tag_id}", "forum_tag.manage", "rl.admin"},
 		"moveForumTag":      {"POST /api/v1/channels/{channel_id}/tags/{tag_id}/move", "forum_tag.manage", "rl.admin"},
 		"deleteForumTag":    {"DELETE /api/v1/channels/{channel_id}/tags/{tag_id}", "forum_tag.manage", "rl.admin"},
+		// M1-54
+		"setSpaceOperator":   {"PUT /api/v1/spaces/{space_id}/operator", "space.operator.set", "rl.admin"},
+		"setChannelOperator": {"PUT /api/v1/channels/{channel_id}/operator", "channel.operator.set", "rl.admin"},
 	}
 	ops := routes.Enabled()
 	if len(ops) != len(want) {
