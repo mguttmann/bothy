@@ -14,6 +14,7 @@ Usage: dart_api_docs.py --out docs/api/dart [--root <repository>] [--rules <rule
 from __future__ import annotations
 
 import argparse
+import re
 import shutil
 import subprocess
 import sys
@@ -22,6 +23,27 @@ from pathlib import Path
 import yaml
 
 _MARKERS = ("warning:", "error:")
+
+# A `<link>` tag whose href names a host: dart doc links Google Fonts (preconnect and two
+# stylesheets) in every page, and the site loads nothing from another origin (M7-19).
+_EXTERNAL_LINK = re.compile(
+    r"""[ \t]*<link\b[^>]*\bhref=["']?(?:https?:)?//[^>]*>[ \t]*\n?""", re.IGNORECASE
+)
+
+
+def strip_external_links(folder: Path) -> int:
+    """Remove every `<link>` to another origin from the HTML pages below `folder`.
+
+    The pages then use the fonts of the system. Returns the number of changed pages.
+    """
+    changed = 0
+    for page in sorted(folder.rglob("*.html")):
+        text = page.read_text(encoding="utf-8")
+        stripped = _EXTERNAL_LINK.sub("", text)
+        if stripped != text:
+            page.write_text(stripped, encoding="utf-8")
+            changed += 1
+    return changed
 
 
 def packages(rules: Path) -> list[tuple[str, str]]:
@@ -69,6 +91,7 @@ def main(argv: list[str] | None = None) -> int:
         if any(m in line for line in output.splitlines() for m in _MARKERS):
             print(f"dart-api-docs: {path}: dart doc printed a warning or an error", file=sys.stderr)
             return 1
+        strip_external_links(target)
     print(f"dart-api-docs: {len(packages(rules))} packages documented in {args.out}")
     return 0
 

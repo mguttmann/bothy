@@ -153,3 +153,23 @@ def test_page_lists_every_package() -> None:
     page = (REPO / "docs" / "reference" / "dart-api.md").read_text(encoding="utf-8")
     linked = re.findall(r"\]\(\.\./api/dart/([a-z0-9_]+)/index\.html\)", page)
     assert linked == packages
+
+
+def test_external_font_links_are_removed_from_the_pages(tmp_path: Path) -> None:
+    # dart doc links Google Fonts in every page; the site loads nothing from another origin
+    # (tools/docs/external_assets_check.py, M7-19), so the links go and the pages use the
+    # fonts of the system.
+    page = tmp_path / "pkg" / "index.html"
+    page.parent.mkdir()
+    page.write_text(
+        "<head>\n"
+        '  <link rel="preconnect" href="https://fonts.gstatic.com">\n'
+        '  <link href="https://fonts.googleapis.com/css2?family=Roboto+Mono" rel="stylesheet">\n'
+        '  <link rel="stylesheet" href="static-assets/styles.css">\n'
+        "</head>\n",
+        encoding="utf-8",
+    )
+    assert dart_api_docs.strip_external_links(tmp_path) == 1
+    text = page.read_text(encoding="utf-8")
+    assert "fonts.g" not in text
+    assert 'href="static-assets/styles.css"' in text
