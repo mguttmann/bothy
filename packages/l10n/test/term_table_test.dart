@@ -15,7 +15,13 @@ import 'support/arb_rules.dart';
 import 'support/repo.dart';
 
 /// Keys allowed to use an English term without the German one, each with its reason.
-const Map<String, String> exceptions = {};
+const Map<String, String> exceptions = {
+  // The German plural of Lauf is Läufe; the stem check does not see through the umlaut.
+  'vizMetricRunsStarted': 'plural Läufe of Lauf',
+  'vizMetricRunsFinished': 'plural Läufe of Lauf',
+  'vizMoreRunsThanShown': 'plural Läufe of Lauf',
+  'vizChartRuns': 'plural Läufe of Lauf',
+};
 
 void main() {
   test('the checked-in table equals the generation from 01 section 9', () {
