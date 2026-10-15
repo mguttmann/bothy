@@ -5,9 +5,10 @@
 // api/operations.yaml, writes a copy of the spec that keeps only the enabled operations into a
 // temporary directory, runs the oapi-codegen pinned in go.mod on it, and writes:
 //
-//   - <rest-dir>/models.gen.go and <rest-dir>/rest.gen.go: the package oapi-codegen writes, split
-//     before ServerInterface into the models of every schema and the std-http and strict server
-//     of the enabled operations (splitRest),
+//   - <rest-dir>/models.gen.go, <rest-dir>/objects.gen.go and <rest-dir>/rest.gen.go: the package
+//     oapi-codegen writes, split into the models of every schema, the request and response
+//     objects of the strict server and the std-http and strict server of the enabled operations
+//     (splitRest),
 //   - <routes-dir>/routes.gen.go, catalog.gen.go, build.gen.go: the operation table, the action
 //     catalogue and the glue for api/routes,
 //   - <routes-dir>/meta.gen.go: the spec version, the gateway protocol versions of -asyncapi and

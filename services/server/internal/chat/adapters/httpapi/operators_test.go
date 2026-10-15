@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"testing"
 
+	"github.com/OWNER/bothy/services/server/internal/authz"
 	"github.com/OWNER/bothy/services/server/internal/kernel/ids"
 )
 
@@ -17,6 +18,8 @@ func TestOperatorHandlers(t *testing.T) {
 	agent := ids.New()
 	w.sql(`INSERT INTO principals (id, kind, status, handle, display_name) VALUES ($1, 'agent', 'active', 'lotse', 'Lotse')`, agent.String())
 	w.sql(`INSERT INTO agents (principal_id, adapter_kind) VALUES ($1, 'hermes')`, agent.String())
+	// The world's agent policy source is the fake of M1-55 (INT-W17/3): it names the agents row.
+	w.policies.Put(agent, authz.AgentPolicy{BillingMode: "organization", ToolClass: "chat"})
 	sp := w.create("Support")
 	ch := w.channel(sp, "text", "tickets")
 	r := w.do("owner", http.MethodPut, spacePath(sp)+"/operator", `{"mode":"agent","agent_id":"`+agent.String()+`","reason":"Support agent"}`,

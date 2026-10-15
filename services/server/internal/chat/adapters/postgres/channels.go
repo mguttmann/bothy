@@ -123,11 +123,7 @@ func (r *Repository) InsertMainThread(ctx context.Context, th domain.Thread) (do
 	if err != nil {
 		return domain.Thread{}, mapError(err, "inserting a main thread")
 	}
-	return domain.Thread{
-		ID: idOf(row.ID), ChannelID: idOf(row.ChannelID), Kind: row.Kind, Title: row.Title, TitleSource: row.TitleSource,
-		State: row.State, LastMessageSeq: row.LastMessageSeq, UnreadFloorSeq: row.UnreadFloorSeq, MessageCount: int(row.MessageCount),
-		CreatedBy: idOf(row.CreatedBy), CreatedAt: timeOf(row.CreatedAt), LastActivityAt: timeOf(row.LastActivityAt), Version: row.Version,
-	}, nil
+	return toThread(row), nil
 }
 
 // ForumTags implements app.Store.

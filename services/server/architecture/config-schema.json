@@ -2488,6 +2488,30 @@
       "doc": "With true an incoming traceparent becomes the parent of the server span, otherwise only a span link."
     },
     {
+      "name": "thread.max_tags",
+      "env": "BOTHY_THREAD__MAX_TAGS",
+      "kind": "int",
+      "default": "5",
+      "required": false,
+      "enum": [],
+      "min": "1",
+      "max": "",
+      "chapter": "03-data-model.md",
+      "doc": "Most forum tags of one thread."
+    },
+    {
+      "name": "thread.placeholder_titles",
+      "env": "BOTHY_THREAD__PLACEHOLDER_TITLES",
+      "kind": "list(string)",
+      "default": "[\"Neuer Chat\", \"New chat\", \"Chat\", \"Ohne Titel\", \"Untitled\", \"Test\"]",
+      "required": false,
+      "enum": [],
+      "min": "",
+      "max": "",
+      "chapter": "09-agents.md",
+      "doc": "Placeholder titles: a new thread with such a title keeps title_source auto."
+    },
+    {
       "name": "thread.title_max_chars",
       "env": "BOTHY_THREAD__TITLE_MAX_CHARS",
       "kind": "int",

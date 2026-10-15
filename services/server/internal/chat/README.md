@@ -1,6 +1,6 @@
 # Module `chat`
 
-Status: spaces and the sidebar (M1-52), channels and forum tags (M1-53) and operators with I1 (M1-54) built; threads (M1-55) follow with the tickets of the milestone.
+Status: spaces and the sidebar (M1-52), channels and forum tags (M1-53), operators with I1 (M1-54) and threads (M1-55) built; `createThread` (M1-56) follows with the tickets of the milestone.
 The normative source is [docs/spec/02-architecture.md](../../../../docs/spec/02-architecture.md); if this file differs, the chapter applies.
 
 ## Purpose
@@ -32,7 +32,7 @@ Spaces, sidebar state, channels with behavior, skills, project binding, DM parti
 - `adapters/authzsource/`: `Source`, the space and channel part of `authz.StructureSource`
   (`Space`, `SpaceArchived`, `Spaces`, `SpaceDetails`; since M1-53 `Channel`, `Channels`,
   `ChannelsOperatedBy`, `ChannelDetails`, with `Archived` set for an archived channel and for every
-  channel of an archived space; since M1-54 `Thread` and `ServedTargets`); `wire.NewStructureSource`
+  channel of an archived space; since M1-54 `ServedTargets`, since M1-55 `Thread`); `wire.NewStructureSource`
   joins it with the empty dm part until V3.
 - Migrations `00023_chat_spaces.sql` (`spaces`, `user_space_states` exactly as 03 section 4.5,
   sort keys `COLLATE "C"`, and `grants.target_space_id -> spaces(id)` `NOT VALID`) and
@@ -176,6 +176,67 @@ Rulings: docs/DECISIONS.md M1-53. Tests: `domain/channel_test.go`,
 Rulings: docs/DECISIONS.md M1-54. Tests: `domain/operator_test.go` and the cross-module tests in
 `services/server/test/integration` (AZ-M21 to AZ-M25, AZ-M29, BR-01 to BR-03, AZ-P7 for both
 actions, explanation, preview and view-as with real sources).
+
+## Threads (M1-55)
+
+- Port `chat.Threads` (`threads.go`): `Create`, `AppendToThread` and `Info` for `messaging` (M1-56
+  sends messages and enables `createThread` through them), and `List`, `Get`, `SetTitle`, `Close`,
+  `Reopen` and `SetTags` for the six handlers; the DTOs `Thread`, `ThreadInfo`, `ParentMessage`,
+  `CreateThreadCmd`, `AppendCmd`, `Appended`, `ListThreadsQuery`, `ThreadPage`, `SetTitleCmd` and
+  `SetTagsCmd`. `Register` adds `thread.updated`, `thread.closed` and `thread.reopened`.
+- Domain (`domain/thread.go`): `Thread` with `ThreadKind`, `ThreadState`, `TitleSource`; `Close`
+  (a main thread is `409 invalid_state_transition`, a closed thread unchanged), `Reopen`,
+  `SetTitle`; `CheckThreadTitle` (`thread.title_max_chars` Unicode characters, SEC-IN-4 through
+  `kernel/textcheck`, empty allowed, stored as given); `PlaceholderTitle` (trimmed, inner white
+  space collapsed, `strings.EqualFold` against `thread.placeholder_titles`, an entry plus one space
+  and ASCII digits; the empty title always) and `CreateTitleSource`; `CheckTagSet` (duplicates,
+  `thread.max_tags`) and `DiffTags` with the restricted flag.
+- Store: `queries/threads.sql` (read, lock, insert, save, the thread sequence and the two keyset
+  lists) and `queries/thread_tags.sql`; `DeleteForumTag` deletes the `thread_tags` rows of its tag
+  in the same transaction, without an event per thread (clients reload tags on `channel.updated`).
+- Handlers: `Threads` in `adapters/httpapi`; `ETag` on `getThread`, `setThreadTitle` and
+  `setThreadTags`. `Cursors` in the same package is the cursor codec of the list
+  (`httpserver.EncodeCursor`, port `app.Cursors`).
+- Migration `00027_chat_thread_tags.sql`: `thread_tags` as 03; `bothy_app` may read, insert and
+  delete it.
+
+| Operation or port call | Action | Event |
+|---|---|---|
+| `listChannelThreads` | `thread.read` on the channel, then per item in filter mode | |
+| `getThread` | `thread.read` | |
+| `setThreadTitle` | `thread.title.update`, If-Match required | `thread.updated` |
+| `closeThread` | `thread.close` | `thread.closed` |
+| `reopenThread` | `thread.reopen` | `thread.reopened` |
+| `setThreadTags` | `thread.tags.set`, If-Match optional; restricted tags with the restricted flag (`manage`) | `thread.updated` |
+| `Threads.Create` | none (messaging authorized `thread.create`); restricted tags with `thread.tags.set` | `thread.created` |
+| `Threads.AppendToThread` | none (messaging authorized `message.create`); `thread.reopen` on an implicit reopen | `thread.reopened` on a reopen |
+
+- Thread sequence (03 section 6.2): `AppendToThread` locks the row and runs one `UPDATE threads
+  SET last_message_seq = last_message_seq + 1, ... RETURNING`; a rolled back unit returns the
+  number, so the committed numbers are gapless. `Create` and `AppendToThread` fail with `internal`
+  outside a unit of work. `Info` does not authorize.
+- Operator (R-DM-12, R-DM-21): `Create` stores the effective operator of the channel at that
+  moment, `NULL` for none; a later operator change of the channel leaves it. The representation
+  adds `operator_agent_id` and the current `billing_mode` from `authz.AgentPolicySource` (bound in
+  `internal/wire`); main threads carry neither.
+- Title source (09 section 12): a person with a title that is neither empty nor a placeholder
+  creates `manual`, everything else `auto`; `setThreadTitle` by a person sets `manual`, agents and
+  apps keep the source and get `409 title_manual` on a manual one; a main thread is `400`
+  (`main_thread_has_no_title`).
+- Tags (D5): only a forum post (`not_a_forum_post`), no duplicates (`duplicate`), only live tags of
+  the forum (`unknown_tag`), at most `thread.max_tags` (`limit_reached`); the same set answers
+  without an event.
+- List (D6): text channels list their threads of kind `thread`, forums their posts; filters
+  `state` and `tag_id` (an unknown tag gives an empty page), sort `last_activity` or `created`
+  (default the channel's `forum_default_sort`), keyset `(time DESC, id DESC)`, `limit` default
+  `api.page_size_default`, capped at `api.page_size_max`, no totals. The cursor is bound to caller,
+  channel, filters and sort; any other combination is `400 cursor_invalid`.
+- Archived channels: authz caps the level at `read`, so close, reopen, title and tags are `403
+  channel_read_only` with `reason: channel_archived`; reading stays.
+
+Rulings: docs/DECISIONS.md M1-55. Tests: `domain/thread_test.go`,
+`adapters/httpapi/threads_test.go` (PostgreSQL 18, real authz and chat source, response
+validation) and `migrations/chat_thread_tags_test.go`.
 
 ## Port (root package `internal/chat`)
 

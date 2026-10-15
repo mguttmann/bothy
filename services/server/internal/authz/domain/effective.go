@@ -65,9 +65,11 @@ func (p Path) Participant(principal ids.ID) bool {
 }
 
 // ThreadOperator returns the agent that operates the thread of the path: the fixed operator of a
-// non-main thread, otherwise the channel's effective operator.
+// non-main thread, zero when that thread was created without one (R-DM-12, 09 section 3.1: a
+// later operator of the channel does not take it over), otherwise the channel's effective
+// operator (main thread and channel, R-DM-21).
 func (p Path) ThreadOperator() ids.ID {
-	if !p.ThreadID.IsZero() && !p.ThreadMain && !p.ThreadOperatorID.IsZero() {
+	if !p.ThreadID.IsZero() && !p.ThreadMain {
 		return p.ThreadOperatorID
 	}
 	return p.ChannelOperatorID

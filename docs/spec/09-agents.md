@@ -1672,7 +1672,7 @@ configuration of the respective program outside the server.
 | `component.max_per_message` | Server | `25` | components per message |
 | `component.custom_id_max_chars` | Server | `100` | length of `custom_id` |
 | `component.form_max_fields` | Server | `10` | fields per form |
-| `thread.placeholder_titles` | Server | `["", "Neuer Chat", "New chat", "Chat", "Ohne Titel", "Untitled", "Test"]` | placeholders for the title detection |
+| `thread.placeholder_titles` | Server | `["Neuer Chat", "New chat", "Chat", "Ohne Titel", "Untitled", "Test"]` | placeholders for the title detection; the empty title is always a placeholder (12 point 2), a list entry is never empty |
 | `adapter.invocation_token_leeway` | Adapter | `10s` | clock tolerance for `exp` and `iat`; at most the server's `auth.clock_leeway` (4.5) |
 | `adapter.jwks_refresh_min_interval` | Adapter | `60s` | reload JWKS at most this often |
 | `hermes_adapter.platform_key` | Hermes adapter | `bothy` | platform name in Hermes; never change after commissioning |

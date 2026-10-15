@@ -71,6 +71,9 @@ var idConfig = identityapp.Config{
 var chatConfig = chatapp.Config{
 	SpaceNameMaxChars: 40, ChannelNameMaxChars: 40, ChannelTopicMaxChars: 200, TagNameMaxChars: 20,
 	HistoryBackfillLimitDefault: 20, HistoryBackfillLimitMax: 200,
+	ThreadTitleMaxChars: 200, ThreadMaxTags: 5,
+	PlaceholderTitles: []string{"Neuer Chat", "New chat", "Chat", "Ohne Titel", "Untitled", "Test"},
+	PageSizeDefault:   20, PageSizeMax: 50,
 }
 
 // pepper is the token pepper of the world (a fixed test value, never a secret).
@@ -212,7 +215,7 @@ func newEmptyWorld(t *testing.T) *world {
 		Config: authzapp.AdminConfig{GroupNameMaxChars: 100, GroupDescriptionMaxChars: 500, PageSizeDefault: 20, PageSizeMax: 50},
 	})
 	must(t, err)
-	c, err := wire.NewChat(chatConfig, pool, uow, w.az, w.az, wire.ChatWrites{Audit: w.rec, Events: appender, Rights: w.hook}, w.clk)
+	c, err := wire.NewChat(chatConfig, pool, uow, w.az, w.az, wire.ChatWrites{Audit: w.rec, Events: appender, Rights: w.hook}, nil, w.clk)
 	must(t, err)
 	built, err := routes.Build(wire.Handlers{Access: authzhttp.New(w.admin), Agents: ag.Handlers, Spaces: c.Handlers, Channels: c.ChannelHandlers,
 		People: w.id.PeopleHandlers}, wire.RouteOptions(), routes.SpecCatalog())

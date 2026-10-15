@@ -20,6 +20,7 @@ enabled:             # operationIds that have a handler; sorted ascending
   - beginPairing
   - beginPasskeyLogin
   - beginPasskeyRegistration
+  - closeThread
   - completeEnrollment
   - completeIdentityLink
   - completeOidcLogin
@@ -63,11 +64,13 @@ enabled:             # operationIds that have a handler; sorted ascending
   - getMyCredentials
   - getProblemType
   - getSpace
+  - getThread
   - getUser
   - getUserCredentials
   - handleOidcCallback
   - listAgents
   - listAuditEvents
+  - listChannelThreads
   - listFeatureFlags
   - listForumTags
   - listGrants
@@ -96,6 +99,7 @@ enabled:             # operationIds that have a handler; sorted ascending
   - redeemEnrollmentCode
   - refreshToken
   - removeGroupMember
+  - reopenThread
   - revokeDevice
   - revokeGrant
   - revokeOwner
@@ -109,6 +113,8 @@ enabled:             # operationIds that have a handler; sorted ascending
   - setChannelOperator
   - setCredentialHolder
   - setSpaceOperator
+  - setThreadTags
+  - setThreadTitle
   - unlinkIdentity
   - updateAgent
   - updateBranding
@@ -164,9 +170,6 @@ later:               # every other operationId of docs/api/openapi.yaml; sorted 
   - operation_id: closeTerminalSession
     milestone: M2
     ticket: M2-44
-  - operation_id: closeThread
-    milestone: M1
-    ticket: M1-55
   - operation_id: completeImport
     milestone: M8
     ticket: M8-03
@@ -365,9 +368,6 @@ later:               # every other operationId of docs/api/openapi.yaml; sorted 
   - operation_id: getTerminalSession
     milestone: M2
     ticket: M2-44
-  - operation_id: getThread
-    milestone: M1
-    ticket: M1-55
   - operation_id: getThreadCosts
     milestone: M2
     ticket: M2-22
@@ -413,9 +413,6 @@ later:               # every other operationId of docs/api/openapi.yaml; sorted 
   - operation_id: listChannelCommands
     milestone: M2
     ticket: M2-16
-  - operation_id: listChannelThreads
-    milestone: M1
-    ticket: M1-55
   - operation_id: listCostEstimates
     milestone: M2
     ticket: M2-28
@@ -571,9 +568,6 @@ later:               # every other operationId of docs/api/openapi.yaml; sorted 
   - operation_id: renewInvocationToken
     milestone: M2
     ticket: M2-09
-  - operation_id: reopenThread
-    milestone: M1
-    ticket: M1-55
   - operation_id: reportAgentSession
     milestone: M2
     ticket: M2-12
@@ -627,12 +621,6 @@ later:               # every other operationId of docs/api/openapi.yaml; sorted 
   - operation_id: setMyLocalCredential
     milestone: M1
     ticket: M1-39
-  - operation_id: setThreadTags
-    milestone: M1
-    ticket: M1-55
-  - operation_id: setThreadTitle
-    milestone: M1
-    ticket: M1-55
   - operation_id: startImport
     milestone: M8
     ticket: M8-03

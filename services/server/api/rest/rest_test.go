@@ -133,9 +133,10 @@ func TestSchemasGenerated(t *testing.T) {
 	if err := yaml.Unmarshal(data, &spec); err != nil {
 		t.Fatal(err)
 	}
-	// The generator splits the package into models.gen.go and rest.gen.go (INT-W14/4).
+	// The generator splits the package into models.gen.go, objects.gen.go and rest.gen.go
+	// (INT-W14/4, INT-W17/4).
 	declared := map[string]bool{}
-	for _, name := range []string{"models.gen.go", "rest.gen.go"} {
+	for _, name := range []string{"models.gen.go", "objects.gen.go", "rest.gen.go"} {
 		file, err := parser.ParseFile(token.NewFileSet(), name, nil, parser.SkipObjectResolution)
 		if err != nil {
 			t.Fatal(err)
