@@ -28,6 +28,9 @@ type fakeAdmin struct {
 	err       error
 	put       instance.PutSetting
 	update    instance.UpdateBranding
+	flags     []instance.FeatureFlag
+	flag      instance.FeatureFlag
+	putFlag   instance.PutFlagCmd
 }
 
 func (f *fakeAdmin) Discovery(context.Context) (instance.Discovery, error) { return f.discovery, f.err }
@@ -44,6 +47,13 @@ func (f *fakeAdmin) PutSetting(_ context.Context, _ actor.Actor, cmd instance.Pu
 func (f *fakeAdmin) UpdateBranding(_ context.Context, _ actor.Actor, cmd instance.UpdateBranding) (instance.Branding, error) {
 	f.update = cmd
 	return f.branding, f.err
+}
+func (f *fakeAdmin) ListFlags(context.Context, actor.Actor) ([]instance.FeatureFlag, error) {
+	return f.flags, f.err
+}
+func (f *fakeAdmin) PutFlag(_ context.Context, _ actor.Actor, cmd instance.PutFlagCmd) (instance.FeatureFlag, error) {
+	f.putFlag = cmd
+	return f.flag, f.err
 }
 func (f *fakeAdmin) ProblemType(context.Context, string) (instance.ProblemType, error) {
 	return f.problem, f.err

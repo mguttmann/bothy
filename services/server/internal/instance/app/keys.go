@@ -22,7 +22,6 @@ import (
 	"github.com/OWNER/bothy/services/server/internal/kernel/clock"
 	"github.com/OWNER/bothy/services/server/internal/kernel/errs"
 	"github.com/OWNER/bothy/services/server/internal/kernel/jose"
-	"github.com/OWNER/bothy/services/server/internal/kernel/textcheck"
 	"github.com/OWNER/bothy/services/server/internal/kernel/txn"
 )
 
@@ -746,12 +745,7 @@ func checkRotate(cmd instance.RotateCommand) error {
 	if cmd.Mode != instance.ModeScheduled && cmd.Mode != instance.ModeEmergency {
 		fields = append(fields, errs.FieldError{Pointer: "/mode", Code: "invalid_value", Detail: "The mode is scheduled or emergency."})
 	}
-	switch {
-	case strings.TrimSpace(cmd.Reason) == "":
-		fields = append(fields, errs.FieldError{Pointer: "/reason", Code: "required", Detail: "A reason is required."})
-	case textcheck.DisplayText(cmd.Reason) != nil:
-		fields = append(fields, errs.FieldError{Pointer: "/reason", Code: "invalid_format", Detail: "The reason contains a forbidden character."})
-	}
+	fields = append(fields, reasonFields(cmd.Reason)...)
 	if len(fields) > 0 {
 		return errs.New(errs.CodeValidationFailed, "").WithFields(fields...)
 	}

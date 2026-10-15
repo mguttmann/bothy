@@ -328,8 +328,9 @@ Principals, people, owners, login drivers, identities, local credentials, enroll
   (`user.disable`) and M1-51 (`agent.disable`) call `RevokeAllForPrincipal` in their own rights
   change and write their own audit.
 - `app`: `Tokens` (implements both ports), the outgoing port `APITokenStore`, the consumer port
-  `PersonalTokenSwitch` (`PersonalTokensEnabled(ctx, principalID)`) and `PersonalTokensDefault`
-  (always off, bound by `internal/wire` until M1-47 rebinds it over the feature flags).
+  `PersonalTokenSwitch` (`PersonalTokensEnabled(ctx, principalID)`), which `internal/wire` binds
+  to `adapters/instanceflags` over `instance.Flags` (the flag `tokens.personal_enabled` evaluated
+  for the caller, with its rollout; M1-47).
   `CreateToken`: `authorize(token.create)` on the principal (requirement `owner` first, then
   `self`; step-up; a personal token for another person is `forbidden not_self`, for an owner
   through the authz guard), then `404` for an unknown principal, `409 conflict app_not_installed`
@@ -676,6 +677,16 @@ Principals, people, owners, login drivers, identities, local credentials, enroll
   never a forwarded address; header values never reach logs, audit details or problem bodies
   (`TestTrustedHeaderProvisioning/TestTrustedHeaderNeverLogged`). Tests:
   `adapters/httpapi/trustedheader_test.go`.
+
+### Feature flag sources and the personal token switch (M1-47)
+
+- `adapters/flagsource`: `Source` implements `instance.FlagUserSource` over `Principals`: the IDs
+  of a rollout that are principals of kind `user` and not `deleted`; agents and apps are refused
+  (`unknown_user`).
+- `adapters/instanceflags`: `Switch` implements `app.PersonalTokenSwitch` over `instance.Flags`
+  (`tokens.personal_enabled` for the caller); `wire.IdentityWrites.Flags` is required.
+- The integration tests of the flags run in the session world (`adapters/httpapi/flags_test.go`,
+  docs/DECISIONS.md M1-47).
 
 ## Port (root package `internal/identity`)
 

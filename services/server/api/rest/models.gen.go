@@ -15569,6 +15569,12 @@ type ApproveDeviceParams struct {
 	IdempotencyKey *IdempotencyKey `json:"Idempotency-Key,omitempty"`
 }
 
+// PutFeatureFlagParams defines parameters for PutFeatureFlag.
+type PutFeatureFlagParams struct {
+	// IfMatch Optional ETag; when given, a mismatch gives 412 `version_conflict`.
+	IfMatch *IfMatchOptional `json:"If-Match,omitempty"`
+}
+
 // CreateIdentityProviderParams defines parameters for CreateIdentityProvider.
 type CreateIdentityProviderParams struct {
 	// IdempotencyKey UUIDv7 chosen by the client per logical operation. A repeat with the same request returns the stored response; a different request gives 422 `idempotency_key_reuse`; a repeat while the first is running gives 409 `request_in_progress`. Kept for `sync.idempotency_key_ttl`.
@@ -15745,6 +15751,9 @@ type LoginWithTrustedHeaderJSONRequestBody = TrustedHeaderLoginRequest
 
 // ApproveDeviceJSONRequestBody defines body for ApproveDevice for application/json ContentType.
 type ApproveDeviceJSONRequestBody = DeviceApprove
+
+// PutFeatureFlagJSONRequestBody defines body for PutFeatureFlag for application/json ContentType.
+type PutFeatureFlagJSONRequestBody = FeatureFlagPut
 
 // CreateIdentityProviderJSONRequestBody defines body for CreateIdentityProvider for application/json ContentType.
 type CreateIdentityProviderJSONRequestBody = IdentityProviderCreate

@@ -137,6 +137,14 @@ func (stubServer) GetInstance(context.Context, rest.GetInstanceRequestObject) (r
 	return nil, nil
 }
 
+func (stubServer) ListFeatureFlags(context.Context, rest.ListFeatureFlagsRequestObject) (rest.ListFeatureFlagsResponseObject, error) {
+	return nil, nil
+}
+
+func (stubServer) PutFeatureFlag(context.Context, rest.PutFeatureFlagRequestObject) (rest.PutFeatureFlagResponseObject, error) {
+	return nil, nil
+}
+
 func (stubServer) ListInstanceSettings(context.Context, rest.ListInstanceSettingsRequestObject) (rest.ListInstanceSettingsResponseObject, error) {
 	return nil, nil
 }
@@ -349,6 +357,9 @@ func TestRealTable_Enabled(t *testing.T) {
 		"completeIdentityLink": {"POST /api/v1/me/identities/complete", "identity.link", "rl.admin"},
 		// M1-43
 		"loginWithTrustedHeader": {"POST /api/v1/auth/trusted-header/login", "auth.login.complete", "rl.public_auth"},
+		// M1-47
+		"listFeatureFlags": {"GET /api/v1/feature-flags", "feature_flag.read", "rl.read"},
+		"putFeatureFlag":   {"PUT /api/v1/feature-flags/{key}", "feature_flag.update", "rl.admin"},
 	}
 	ops := routes.Enabled()
 	if len(ops) != len(want) {

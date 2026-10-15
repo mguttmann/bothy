@@ -75,7 +75,7 @@ func (w *peopleWorld) identityOf() *wire.Identity {
 	if err != nil {
 		w.t.Fatal(err)
 	}
-	id, err := wire.NewIdentity(loginCfg, w.pool, w.uow, w.az, wire.IdentityWrites{Audit: w.rec, Events: w.events, Settings: st.Admin},
+	id, err := wire.NewIdentity(loginCfg, w.pool, w.uow, w.az, wire.IdentityWrites{Audit: w.rec, Events: w.events, Settings: st.Admin, Flags: st.Admin},
 		[]byte("0123456789abcdef0123456789abcdef"), w.clk, log)
 	if err != nil {
 		w.t.Fatal(err)

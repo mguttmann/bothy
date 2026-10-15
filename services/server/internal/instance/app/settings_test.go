@@ -153,6 +153,9 @@ type adminEnv struct {
 	repo     *fakeRepo
 	audit    *memAudit
 	events   *memEvents
+	flags    *memFlags
+	groups   *memGroups
+	users    *memUsers
 	owner    actor.Actor
 }
 
@@ -161,6 +164,7 @@ func newAdminEnv(t *testing.T, outcome authorize.Outcome, logins instance.LoginO
 	e := &adminEnv{
 		settings: &memSettings{rows: map[string]app.SettingRow{}, lostOnce: map[string]bool{}},
 		repo:     newFakeRepo(), audit: &memAudit{}, events: &memEvents{},
+		flags: &memFlags{rows: map[string]app.FlagRow{}}, groups: &memGroups{}, users: &memUsers{},
 		owner: actor.Actor{ID: ids.New(), Kind: actor.KindUser},
 	}
 	e.repo.row = &instance.Record{InstanceID: ids.New()}
@@ -169,7 +173,7 @@ func newAdminEnv(t *testing.T, outcome authorize.Outcome, logins instance.LoginO
 	}
 	a, err := app.NewAdmin(adminCfg, app.AdminDeps{
 		Instance: e.repo, Settings: e.settings, Logins: logins, UoW: directUoW{}, Authorizer: decide{outcome},
-		Audit: e.audit, Events: e.events, Clock: clock.NewFake(time.Date(2026, 10, 13, 9, 0, 0, 0, time.UTC)),
+		Audit: e.audit, Events: e.events, Flags: e.flags, FlagGroups: e.groups, FlagUsers: e.users, Clock: clock.NewFake(time.Date(2026, 10, 13, 9, 0, 0, 0, time.UTC)),
 		Contract: app.Contract{SpecVersion: "1.2.3", GatewayVersions: []int{1}, Problems: []instance.ProblemType{
 			{Code: "conflict", Status: 409, Title: "Conflict", Description: "The state prevents the change."},
 		}},
@@ -193,7 +197,8 @@ func TestNewAdmin_RefusesMissingPartsAndBadValues(t *testing.T) {
 	t.Parallel()
 	ok := app.AdminDeps{
 		Instance: newFakeRepo(), Settings: &memSettings{}, Logins: fixedLogins{}, UoW: directUoW{}, Authorizer: decide{},
-		Audit: &memAudit{}, Events: &memEvents{}, Contract: app.Contract{SpecVersion: "1.0.0"},
+		Audit: &memAudit{}, Events: &memEvents{}, Flags: &memFlags{}, FlagGroups: &memGroups{}, FlagUsers: memUsers{},
+		Contract: app.Contract{SpecVersion: "1.0.0"},
 	}
 	if _, err := app.NewAdmin(adminCfg, ok); err != nil {
 		t.Fatal(err)
@@ -202,7 +207,13 @@ func TestNewAdmin_RefusesMissingPartsAndBadValues(t *testing.T) {
 	noSpec.Contract.SpecVersion = ""
 	noLogins := ok
 	noLogins.Logins = nil
-	for name, d := range map[string]app.AdminDeps{"no spec": noSpec, "no logins": noLogins} {
+	noFlags := ok
+	noFlags.Flags = nil
+	noGroups := ok
+	noGroups.FlagGroups = nil
+	noUsers := ok
+	noUsers.FlagUsers = nil
+	for name, d := range map[string]app.AdminDeps{"no spec": noSpec, "no logins": noLogins, "no flags": noFlags, "no groups": noGroups, "no users": noUsers} {
 		if _, err := app.NewAdmin(adminCfg, d); err == nil {
 			t.Errorf("%s: no error", name)
 		}

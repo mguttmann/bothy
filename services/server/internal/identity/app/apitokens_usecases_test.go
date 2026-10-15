@@ -24,6 +24,12 @@ type noAudit struct{ auditing.Recorder }
 // testJKT is a well-formed RFC 7638 thumbprint (43 base64url characters), no real key.
 const testJKT = "EXAMPLEexampleEXAMPLEexampleEXAMPLEexample0"
 
+// personalOff is the switch tokens.personal_enabled at its registered default, off.
+type personalOff struct{}
+
+// PersonalTokensEnabled implements app.PersonalTokenSwitch: always false.
+func (personalOff) PersonalTokensEnabled(context.Context, ids.ID) (bool, error) { return false, nil }
+
 // newTokens returns the token use cases over the fixture's database at clk, with DPoP required
 // for agents, personal tokens off and the cursors of nopCursors.
 func newTokens(t *testing.T, f *fixture, clk clock.Clock) *app.Tokens {
@@ -32,7 +38,7 @@ func newTokens(t *testing.T, f *fixture, clk clock.Clock) *app.Tokens {
 		DPoPRequiredFor: []string{app.DPoPForAgent}, PageSizeDefault: 50, PageSizeMax: 200}
 	s, err := app.NewTokens(cfg, tokenPepper, app.TokensDeps{
 		Store: f.repo, Principals: f.repo, UoW: f.uow, Authorizer: denyAll{}, Audit: noAudit{}, Cursors: nopCursors{},
-		Switch: app.PersonalTokensDefault{}, Clock: clk,
+		Switch: personalOff{}, Clock: clk,
 	})
 	if err != nil {
 		t.Fatal(err)
