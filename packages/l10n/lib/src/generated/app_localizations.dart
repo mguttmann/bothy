@@ -914,6 +914,12 @@ abstract class AppLocalizations {
   /// **'not shown'**
   String get vizNotShown;
 
+  /// Marker of a live view when no frame arrived for viz.stale_after (25 section 5.1).
+  ///
+  /// In en, this message translates to:
+  /// **'No new data'**
+  String get vizStale;
+
   /// Title of the harness app of bothy_viz (25 section 7.1).
   ///
   /// In en, this message translates to:
