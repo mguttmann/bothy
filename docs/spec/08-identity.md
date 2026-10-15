@@ -510,7 +510,7 @@ Both keys are non-exportable and, where the platform offers it, hardware-backed:
 |---|---|---|---|
 | iOS, iPadOS, macOS | Secure Enclave | `ES256` | step-up key bound to the currently enrolled biometrics, so that newly added fingerprints invalidate it |
 | Android | Android Keystore, StrongBox if available | `ES256` | step-up key with mandatory user authentication; on API 26 to 29 strong biometrics only, from API 30 biometrics or the device credential ([15](15-client-architecture.md) 9) |
-| Windows | TPM via the Platform Crypto Provider, confirmation via Windows Hello | `ES256` intended | open: whether Windows Hello delivers the step-up key as `ES256`; otherwise `RS256` or `PS256` is needed in `device_keys.alg` (section 17) |
+| Windows | `dpop`: TPM via the Platform Crypto Provider, without P-256 or TPM a software key reported as not hardware-bound | `ES256` | settled by M4-11 (D-M4-11-2): Windows has no system-enforced confirmation per use for an `ES256` key (strong key protection is a password the process can supply and that is cached per process; Windows Hello keys are RSA), so Windows clients have no `step_up` key and use the other step-up methods of this section. A Windows Hello step-up key would need `RS256` or `PS256` in `device_keys.alg` (03) and in the JOSE profile (ADR 0067), a core contract change (section 17) |
 | Web console | no device key | | session by cookie (section 7.5), step-up by passkey |
 
 Without attestation the server cannot check whether a key really is hardware-backed.
@@ -1002,7 +1002,7 @@ The additions requested during drafting have been decided (integration of 2026-1
 | K-ID-1 | Table `local_credentials` | adopted, 03 section 4.2 |
 | K-ID-2 | Table `enrollment_codes` | adopted, 03 section 4.2 |
 | K-ID-3 | Table `auth_login_flows` | adopted, 03 section 4.2, with the names of the API (`client_challenge`, `app_redirect_uri`, `login_code`) |
-| K-ID-4 | `device_keys.purpose` and one active key per purpose | adopted; `RS256`/`PS256` for Windows remains open (section 6.1), an extension is additive |
+| K-ID-4 | `device_keys.purpose` and one active key per purpose | adopted; `RS256`/`PS256` for Windows remains open (section 6.1), an extension is additive; until then Windows clients have no `step_up` key (M4-11, D-M4-11-2) |
 | K-ID-5 | `auth_sessions.client_component`, `parent_session_id`, `cookie_hash`; new login methods; `revoke_reason = inactive` | adopted, plus `auth_sessions.step_up_method` |
 | K-ID-6 | `refresh_token_families.dpop_jkt` | adopted, plus the grace period `auth.refresh_reuse_grace` (03) |
 | K-ID-7 | System action `instance.bootstrap`; `user.enable` for `pending -> active` | adopted, 05 |

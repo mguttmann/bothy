@@ -425,14 +425,22 @@ That is why all clients use **ES256** for DPoP and step-up, although the data mo
 | iOS | Secure Enclave, P-256, without user confirmation, keychain access group with the extensions, `AfterFirstUnlockThisDeviceOnly` | Secure Enclave, P-256, `.biometryCurrentSet` when biometrics are enrolled (new biometrics invalidate the key, [08](08-identity.md) 6.1), otherwise `.userPresence` (device password); `WhenPasscodeSetThisDeviceOnly` | Keychain through `flutter_secure_storage` (publisher steenbakker.dev); tokens for the extensions in the shared access group with `AfterFirstUnlockThisDeviceOnly`, DB key `WhenUnlockedThisDeviceOnly` |
 | macOS | Secure Enclave (Macs with an Apple chip or with Touch Bar and Touch ID according to the Apple documentation), otherwise a keychain key without the enclave, reported to the server as "not hardware-bound" | like iOS; without an enclave a software key whose keychain item carries `.userPresence` | Data Protection keychain |
 | Android | Android Keystore, StrongBox if available (`setIsStrongBoxBacked`, fallback on `StrongBoxUnavailableException`), P-256; without StrongBox and trusted execution environment (emulators) a software Keystore key, reported as not hardware-bound | Keystore key with user authentication per operation through `BiometricPrompt`: from API 30 strong biometrics or the device credential (PIN, pattern, password), on API 26 to 29 strong biometrics only, because a per-operation key cannot be unlocked with the device credential there; without enrolled biometrics on those levels there is no step-up key (`not_available`). Invalidated by new biometrics (`setInvalidatedByBiometricEnrollment`) | `flutter_secure_storage` (RSA-OAEP plus AES-GCM, key in the Keystore according to the package documentation) |
-| Windows | CNG with Microsoft Platform Crypto Provider (TPM), ECDSA P-256 after a check with `NCryptIsAlgSupported`; without a TPM a software key, reported as not hardware-bound | TPM key with Windows Hello confirmation [assumed, details not verified] | `flutter_secure_storage` (Windows Credential Manager plus AES-GCM files according to the package README [verified through search, source code not read]) |
+| Windows | CNG with Microsoft Platform Crypto Provider (TPM), ECDSA P-256 after a check with `NCryptIsAlgSupported`; without a TPM a software key, reported as not hardware-bound; per user, export policy `0`, the provider fixed at creation (D-M4-11-1) | none: Windows enforces no confirmation per use for a P-256 key that code in the process cannot answer itself, so the plugin reports `not_available` and the step-up falls back to the other methods of [08](08-identity.md) 6 (D-M4-11-2) [verified, see below] | `flutter_secure_storage` (Windows Credential Manager plus AES-GCM files according to the package README [verified through search, source code not read]) |
 | Web (console) | none: cookie session according to the backend-for-frontend pattern, tokens only in the server ([08](08-identity.md) section 7.5) | WebAuthn passkey, otherwise a renewed OIDC login or password with TOTP | none in the browser; cookie `HttpOnly` |
 
 Sources: https://pub.dev/packages/flutter_secure_storage (version 11.2.0, retrieved 2026-10-10
 [verified]); Microsoft CNG `NCryptCreatePersistedKey` with `MS_PLATFORM_CRYPTO_PROVIDER`
 (https://learn.microsoft.com/en-us/windows/win32/api/ncrypt/nf-ncrypt-ncryptcreatepersistedkey,
 retrieved 2026-10-10 [verified]); that every TPM 2.0 offers P-256 is [assumed] and is checked at
-runtime.
+runtime. Windows step-up (M4-11): strong key protection (`NCRYPT_UI_POLICY_PROPERTY`,
+`NCRYPT_UI_FORCE_HIGH_PROTECTION_FLAG`) asks for a password whose behavior "is specified by the
+KSP" (https://learn.microsoft.com/en-us/windows/win32/api/certenroll/ne-certenroll-x509privatekeyprotection),
+and the Microsoft providers take that password from the process through `NCRYPT_PIN_PROPERTY` and
+"cache this value so that the user is only prompted once per process"
+(https://learn.microsoft.com/en-us/windows/win32/seccng/key-storage-property-identifiers); Windows
+Hello's `KeyCredentialManager` keys are RSA and sign with SHA-256 and PKCS #1
+(https://learn.microsoft.com/en-us/windows/apps/develop/security/windows-hello), all retrieved
+2026-10-15 [verified]. Not checked on a Windows host.
 
 `packages/device_key` is one Flutter plugin package with a folder per platform and a typed
 Pigeon (flutter.dev) interface as its boundary, not a set of federated packages (docs/DECISIONS.md

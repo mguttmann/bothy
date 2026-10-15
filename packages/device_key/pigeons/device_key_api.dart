@@ -6,8 +6,9 @@
 /// Regenerate with `dart run pigeon --input pigeons/device_key_api.dart` in
 /// `packages/device_key`; `make codegen-check` regenerates and compares. The
 /// generated files are `lib/src/generated/device_key_api.g.dart`,
-/// `darwin/device_key/Sources/device_key/DeviceKeyApi.g.swift` and
-/// `android/src/main/kotlin/devicekey/flutter/DeviceKeyApi.g.kt`.
+/// `darwin/device_key/Sources/device_key/DeviceKeyApi.g.swift`,
+/// `android/src/main/kotlin/devicekey/flutter/DeviceKeyApi.g.kt` and
+/// `windows/device_key_api.g.h` with `windows/device_key_api.g.cpp` (M4-11).
 library;
 
 import 'package:pigeon/pigeon.dart';
@@ -75,6 +76,9 @@ class PromptTextsMessage {
     swiftOut: 'darwin/device_key/Sources/device_key/DeviceKeyApi.g.swift',
     kotlinOut: 'android/src/main/kotlin/devicekey/flutter/DeviceKeyApi.g.kt',
     kotlinOptions: KotlinOptions(package: 'devicekey.flutter'),
+    cppHeaderOut: 'windows/device_key_api.g.h',
+    cppSourceOut: 'windows/device_key_api.g.cpp',
+    cppOptions: CppOptions(namespace: 'device_key'),
     copyrightHeader: 'pigeons/copyright.txt',
   ),
 )
