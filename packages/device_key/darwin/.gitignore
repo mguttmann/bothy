@@ -1,0 +1,5 @@
+# SPDX-License-Identifier: Apache-2.0
+# Build output of swift test and xcodebuild (run_core_tests.sh, run_ios_sim_tests.sh).
+.build/
+.swiftpm/
+DerivedData/

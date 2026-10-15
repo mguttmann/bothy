@@ -265,7 +265,7 @@ commitlint: ## Conventional Commits and DCO sign-off for commits not yet on the 
 # of go-arch-lint and sqlc; tools/ci/go_prereqs.py). Every step ends with `|| exit 1`, so a
 # recipe stops on its own even in a shell without errexit (docs/DECISIONS.md M1-01/8); the
 # flags in SHELL (top of this file, also for GNU make 3.81) are the second line of defence.
-codegen-check: ## Generated code equals a fresh generation (sqlc, go generate, flutter gen-l10n)
+codegen-check: ## Generated code equals a fresh generation (sqlc, go generate, flutter gen-l10n, Pigeon)
 	@if [ -z "$(GO_ON)" ]; then $(call skip,codegen-check,no Go module selected under services/); \
 	else $(GO_PREREQS) codegen-check || exit 1; \
 	  gal=$(call tool,go-arch-lint) || exit 1; sqlc=$(call tool,sqlc) || exit 1; \
@@ -279,6 +279,15 @@ codegen-check: ## Generated code equals a fresh generation (sqlc, go generate, f
 	else l10n=""; for p in $(DART_PKGS); do [ ! -f $$p/l10n.yaml ] || l10n="$$l10n $$p"; done; \
 	  if [ -z "$$l10n" ]; then $(call skip,codegen-dart,no Dart member with l10n.yaml); \
 	  else for p in $$l10n; do $(UVRUN) python tools/ci/l10n_check.py --dir $$p || exit 1; done; fi; fi
+	@# Pigeon channels of the Dart members (brief M4-10): every tracked pigeons/*.dart is generated
+	@# again and the Dart output formatted, as the generation step in the member's README does.
+	@if [ -z "$(DART_ON)" ]; then $(call skip,dart-codegen,no Dart package selected under apps/ or packages/); \
+	else inputs=$$(git ls-files -- $(foreach p,$(DART_PKGS),'$(p)/pigeons/*.dart')) || exit 1; \
+	  if [ -z "$$inputs" ]; then $(call skip,dart-codegen,no Pigeon input under pigeons/); \
+	  else flutter pub get --enforce-lockfile >/dev/null || exit 1; \
+	    for f in $$inputs; do p=$${f%/pigeons/*}; \
+	      $(CODEGEN_CHECK) --dir $$p -- sh -c 'dart run pigeon --input "$$1" && dart format lib/src/generated >/dev/null' pigeon "$${f#$$p/}" || exit 1; \
+	    done; fi; fi
 
 arch: ## Module boundaries: Go modules (go-arch-lint, from the module register) and the Dart workspace (tools/arch-check)
 	@# go-arch-lint does not follow a linked directory but attributes it by the path of the link,

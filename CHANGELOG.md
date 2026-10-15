@@ -121,6 +121,13 @@ Planning stage (milestone M0). Nothing is installable yet.
   reference against the server schema, the chapter tables, the etappe of planned keys
   (`tools/configdoc/planned.yaml`), the names retired by W1 (`tools/configdoc/retired.yaml`) and
   the Compose `stop_grace_period` of every service that runs `serve` (rules D1 to D10).
+- `packages/device_key` for iOS and macOS: two ES256 device keys per server (`dpop` without a
+  prompt, `step_up` with biometrics or the device password) in the Secure Enclave where there is
+  one, otherwise a software key in the Data Protection keychain reported as not hardware-bound;
+  never synchronizable, always `ThisDeviceOnly`. A Pigeon channel, a Dart API with the public JWK,
+  the RFC 7638 thumbprint and `R || S` signatures, and the Swift package `DeviceKeyCore` that the
+  app extensions reuse. `make codegen-check` regenerates the Pigeon code, `make apps-platform`
+  runs the Swift tests on macOS and in the iOS simulator (M4-10).
 
 ### Changed
 

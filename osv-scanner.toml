@@ -85,6 +85,20 @@ license.override = ["BSD-3-Clause"]
 reason = "deps.dev knows no license for this pub package; its LICENSE file on pub.dev is BSD-3-Clause. Transitive package of cryptography, test or lints."
 
 [[PackageOverrides]]
+name = "built_collection"
+version = "5.1.2"
+ecosystem = "Pub"
+license.override = ["BSD-3-Clause"]
+reason = "deps.dev knows no license for this pub package; its LICENSE file on pub.dev is BSD-3-Clause. Transitive dev package of pigeon (device_key)."
+
+[[PackageOverrides]]
+name = "built_value"
+version = "8.13.0"
+ecosystem = "Pub"
+license.override = ["BSD-3-Clause"]
+reason = "deps.dev knows no license for this pub package; its LICENSE file on pub.dev is BSD-3-Clause. Transitive dev package of pigeon (device_key)."
+
+[[PackageOverrides]]
 name = "characters"
 version = "1.4.1"
 ecosystem = "Pub"
@@ -113,6 +127,13 @@ license.override = ["Apache-2.0"]
 reason = "deps.dev knows no license for this pub package; its LICENSE file on pub.dev is Apache-2.0. Transitive package of flutter_test, test or lints."
 
 [[PackageOverrides]]
+name = "code_builder"
+version = "4.13.0"
+ecosystem = "Pub"
+license.override = ["BSD-3-Clause"]
+reason = "deps.dev knows no license for this pub package; its LICENSE file on pub.dev is BSD-3-Clause. Transitive dev package of pigeon (device_key)."
+
+[[PackageOverrides]]
 name = "collection"
 version = "1.19.1"
 ecosystem = "Pub"
@@ -138,7 +159,7 @@ name = "crypto"
 version = "3.0.7"
 ecosystem = "Pub"
 license.override = ["BSD-3-Clause"]
-reason = "deps.dev knows no license for this pub package; its LICENSE file on pub.dev is BSD-3-Clause. Transitive runtime package of cryptography."
+reason = "deps.dev knows no license for this pub package; its LICENSE file on pub.dev is BSD-3-Clause. Runtime package of device_key (thumbprint) and of cryptography."
 
 [[PackageOverrides]]
 name = "cryptography"
@@ -146,6 +167,13 @@ version = "2.9.0"
 ecosystem = "Pub"
 license.override = ["Apache-2.0"]
 reason = "deps.dev knows no license for this pub package; its LICENSE file on pub.dev is Apache-2.0. Runtime dependency."
+
+[[PackageOverrides]]
+name = "dart_style"
+version = "3.1.13"
+ecosystem = "Pub"
+license.override = ["BSD-3-Clause"]
+reason = "deps.dev knows no license for this pub package; its LICENSE file on pub.dev is BSD-3-Clause. Transitive dev package of pigeon (device_key)."
 
 [[PackageOverrides]]
 name = "equatable"
@@ -176,6 +204,13 @@ license.override = ["BSD-3-Clause"]
 reason = "deps.dev knows no license for this pub package; its LICENSE file on pub.dev is BSD-3-Clause. Transitive package of cryptography, test or lints."
 
 [[PackageOverrides]]
+name = "fixnum"
+version = "1.1.1"
+ecosystem = "Pub"
+license.override = ["BSD-3-Clause"]
+reason = "deps.dev knows no license for this pub package; its LICENSE file on pub.dev is BSD-3-Clause. Transitive dev package of pigeon (device_key)."
+
+[[PackageOverrides]]
 name = "flutter_lints"
 version = "6.0.0"
 ecosystem = "Pub"
@@ -195,6 +230,13 @@ version = "2.2.0"
 ecosystem = "Pub"
 license.override = ["BSD-3-Clause"]
 reason = "deps.dev knows no license for this pub package; its LICENSE file on pub.dev is BSD-3-Clause. Transitive package of cryptography, test or lints."
+
+[[PackageOverrides]]
+name = "graphs"
+version = "2.3.2"
+ecosystem = "Pub"
+license.override = ["BSD-3-Clause"]
+reason = "deps.dev knows no license for this pub package; its LICENSE file on pub.dev is BSD-3-Clause. Transitive dev package of pigeon (device_key)."
 
 [[PackageOverrides]]
 name = "http_multi_server"
@@ -300,6 +342,13 @@ version = "1.9.1"
 ecosystem = "Pub"
 license.override = ["BSD-3-Clause"]
 reason = "deps.dev knows no license for this pub package; its LICENSE file on pub.dev is BSD-3-Clause. Transitive package of cryptography, test or lints."
+
+[[PackageOverrides]]
+name = "pigeon"
+version = "29.0.10"
+ecosystem = "Pub"
+license.override = ["BSD-3-Clause"]
+reason = "deps.dev knows no license for this pub package; its LICENSE file on pub.dev is BSD-3-Clause. Dev package of device_key (code generator)."
 
 [[PackageOverrides]]
 name = "pool"
