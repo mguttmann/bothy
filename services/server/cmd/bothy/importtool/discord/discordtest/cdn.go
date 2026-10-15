@@ -9,6 +9,7 @@ import (
 	"crypto/x509"
 	"encoding/json"
 	"fmt"
+	"html"
 	"io"
 	"net"
 	"net/http"
@@ -268,10 +269,12 @@ func (c *CDN) answer(w http.ResponseWriter, r *http.Request, inj CDNResponse) {
 	}
 	body := inj.Body
 	if inj.EchoURL {
-		body = "error for https://" + r.Host + r.URL.RequestURI()
+		// HTML-escaped so that no request value is reflected raw into a response body; the
+		// signature parameters stay in the text, which is what the leak tests look for.
+		body = "error for https://" + html.EscapeString(r.Host+r.URL.RequestURI())
 	}
 	w.WriteHeader(inj.Status)
-	_, _ = io.WriteString(w, body) //nolint:gosec // G705: plain test bodies for the fetcher under test, never HTML in a browser
+	_, _ = io.WriteString(w, body)
 }
 
 // serveFile writes the bytes of f.
