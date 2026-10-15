@@ -12,9 +12,9 @@ import 'viz_texts.dart';
 
 /// One row per label with its bars between [BarModel.from] and [BarModel.to].
 ///
-/// Run bars take the run state roles; the row label and its semantics name the row and the
-/// number of runs ("dev-runner, #backend, 2 runs"), and every bar of a run carries its state as
-/// text in the label of the row, so the state is never color alone.
+/// Run bars take the run state roles and start with the icon of their state, so the state is
+/// never color alone; the semantics label of a row names the row, the number of runs and every
+/// state as text ("dev-runner, #backend, 2 runs, Done, Failed").
 class BarMark extends StatelessWidget {
   /// Creates the mark of [model].
   const BarMark({super.key, required this.model});
@@ -55,21 +55,8 @@ class BarMark extends StatelessWidget {
                     const SizedBox(width: DsSpace.s8),
                     Expanded(
                       child: SizedBox(
-                        height: DsSpace.s16,
-                        child: CustomPaint(
-                          painter: BarPainter(
-                            from: model.from,
-                            to: model.to,
-                            segments: row.segments,
-                            colors: [
-                              for (final s in row.segments)
-                                s.runState != null
-                                    ? runStateColor(colors, s.runState!)
-                                    : vizSeriesColor(colors, s.colorIndex!),
-                            ],
-                            grid: colors.vizGrid,
-                          ),
-                        ),
+                        height: DsIconSize.sizeSm,
+                        child: _BarTrack(model: model, row: row),
                       ),
                     ),
                   ],
@@ -77,6 +64,63 @@ class BarMark extends StatelessWidget {
               ),
             ),
           ),
+      ],
+    );
+  }
+}
+
+/// The bars of one row with the state icon at the start of every run bar.
+class _BarTrack extends StatelessWidget {
+  const _BarTrack({required this.model, required this.row});
+
+  final BarModel model;
+  final BarRow row;
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = context.dsColors;
+    return Stack(
+      children: [
+        Positioned.fill(
+          child: CustomPaint(
+            painter: BarPainter(
+              from: model.from,
+              to: model.to,
+              segments: row.segments,
+              colors: [
+                for (final s in row.segments)
+                  s.runState != null
+                      ? runStateColor(colors, s.runState!)
+                      : vizSeriesColor(colors, s.colorIndex!),
+              ],
+              grid: colors.vizGrid,
+            ),
+          ),
+        ),
+        for (final s in row.segments)
+          if (s.runState != null)
+            Positioned.fill(
+              // Align places the icon at the start of its bar without a LayoutBuilder, which
+              // would break the intrinsic sizing of tables and goldens.
+              child: Align(
+                alignment: Alignment(
+                  2 * BarPainter.fractionOf(model.from, model.to, s.start) - 1,
+                  0,
+                ),
+                child: DecoratedBox(
+                  decoration: BoxDecoration(
+                    color: colors.surfaceRaised,
+                    shape: BoxShape.circle,
+                  ),
+                  child: DsIcon(
+                    runStateGlyph(s.runState!),
+                    size: DsIconSizeRole.sm,
+                    color: colors.textPrimary,
+                    decorative: true,
+                  ),
+                ),
+              ),
+            ),
       ],
     );
   }
@@ -108,6 +152,13 @@ class BarPainter extends CustomPainter {
   /// `color.viz.grid`, the track.
   final Color grid;
 
+  /// The position of [t] between [from] (0) and [to] (1), clamped to that range.
+  static double fractionOf(DateTime from, DateTime to, DateTime t) {
+    final span = to.difference(from).inMilliseconds;
+    if (span <= 0) return 0;
+    return (t.difference(from).inMilliseconds / span).clamp(0, 1).toDouble();
+  }
+
   @override
   void paint(Canvas canvas, Size size) {
     canvas.drawLine(
@@ -117,13 +168,8 @@ class BarPainter extends CustomPainter {
         ..color = grid
         ..strokeWidth = DsBorderWidth.hairline,
     );
-    final span = to.difference(from).inMilliseconds;
-    if (span <= 0) return;
-    double x(DateTime t) =>
-        (size.width * t.difference(from).inMilliseconds / span).clamp(
-          0,
-          size.width,
-        );
+    if (!to.isAfter(from)) return;
+    double x(DateTime t) => size.width * fractionOf(from, to, t);
     for (var i = 0; i < segments.length; i++) {
       final s = segments[i];
       final left = x(s.start);

@@ -27,8 +27,8 @@ final class ExecutiveModel {
   /// ([usage]), `getRunStats` ([runs]), `getErrorStats` ([errors]) and `getCostStats`
   /// ([costs]). Never calls the network.
   ///
-  /// Tiles: the sum per metric name of [usage], [runs] and [errors] over all buckets, in the
-  /// order of the first bucket. Cost tiles: one per billing mode of [costs] with the summed
+  /// Tiles: one per metric name of [usage], [runs] and [errors] in the order of the first
+  /// bucket ([additiveMetrics] summed, levels from the latest bucket of a single group). Cost tiles: one per billing mode of [costs] with the summed
   /// amount; `personal` carries "information only", `organization` "Estimate" while any of
   /// its buckets is an estimate; `null` without [costs].
   factory ExecutiveModel.from({
@@ -40,6 +40,7 @@ final class ExecutiveModel {
   }) {
     final series = <SeriesModel>[];
     final tiles = <MetricTileModel>[];
+    final named = <String>{};
     for (final response in [usage, runs, errors]) {
       if (response == null) continue;
       final parts = SeriesModel.fromStatsSeries(
@@ -47,16 +48,15 @@ final class ExecutiveModel {
         firstColor: series.length,
       );
       series.addAll(parts);
-      final totals = <String, double>{};
+      final byMetric = <String, List<SeriesModel>>{};
       for (final s in parts) {
-        totals[s.queryMetric!] =
-            (totals[s.queryMetric!] ?? 0) +
-            s.points.fold<double>(0, (a, p) => a + p.value);
+        byMetric.putIfAbsent(s.queryMetric!, () => []).add(s);
       }
-      for (final MapEntry(:key, :value) in totals.entries) {
-        tiles.add(
-          MetricTileModel(queryMetric: key, value: value, unit: TileUnit.count),
-        );
+      for (final MapEntry(key: metric, value: groups) in byMetric.entries) {
+        // A metric of an earlier query (`runs` of usage and of run stats) keeps its first tile.
+        if (!named.add(metric)) continue;
+        final tile = _tile(metric, groups);
+        if (tile != null) tiles.add(tile);
       }
     }
     return ExecutiveModel(
@@ -64,6 +64,43 @@ final class ExecutiveModel {
       tiles: List.unmodifiable(tiles),
       series: List.unmodifiable(series),
       costTiles: costs == null ? null : List.unmodifiable(_costTiles(costs)),
+    );
+  }
+
+  /// Counters of the query responses that add up over buckets and groups; every other metric
+  /// (percentiles, rates, distinct counts such as `active_people`) is a level that does not.
+  static const Set<String> additiveMetrics = {
+    'messages',
+    'threads_created',
+    'runs',
+    'completed',
+    'failed',
+    'cancelled',
+    'invocation_denials',
+  };
+
+  /// The tile of [metric] over its [groups]: a counter is the sum of every bucket; a level is
+  /// the value of the latest bucket, and only with one group, because levels of several
+  /// groups do not combine (a distinct count of two spaces is no sum). `null` when no value
+  /// can be shown, never zero.
+  static MetricTileModel? _tile(String metric, List<SeriesModel> groups) {
+    final unit = metric.endsWith('_rate')
+        ? TileUnit.percent
+        : metric.contains('_ms')
+        ? TileUnit.milliseconds
+        : TileUnit.count;
+    if (additiveMetrics.contains(metric)) {
+      final sum = groups.fold<double>(
+        0,
+        (a, s) => a + s.points.fold<double>(0, (b, p) => b + p.value),
+      );
+      return MetricTileModel(queryMetric: metric, value: sum, unit: unit);
+    }
+    if (groups.length != 1 || groups.single.last == null) return null;
+    return MetricTileModel(
+      queryMetric: metric,
+      value: groups.single.last,
+      unit: unit,
     );
   }
 

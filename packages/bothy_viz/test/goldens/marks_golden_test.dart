@@ -82,6 +82,7 @@ void main() {
   goldenTest(
     'bar mark with the timeline runs',
     fileName: 'bar_mark',
+    pumpBeforeTest: dsPumpIcons,
     builder: () => matrix('bar', () => BarMark(model: models.timeline.bars)),
   );
 

@@ -84,7 +84,7 @@ def test_clean_workspace_passes(tree: Tree) -> None:
     tree.source("bothy_noise", "test/x_test.dart", "import 'dart:io';\n")
     code, lines = tree.run()
     assert code == 0, lines
-    assert lines[-1].startswith("14 ")
+    assert lines[-1].startswith(f"{len(arch_check.load_rules(RULES).members)} ")
 
 
 def test_flutter_import_in_domain_fails(tree: Tree) -> None:
@@ -360,7 +360,9 @@ def test_rules_cover_every_member_of_the_repository() -> None:
     tracked = sorted(
         str(p.parent.relative_to(REPO))
         for base in ("apps", "packages")
-        for p in (REPO / base).glob("*/pubspec.yaml")
+        # One level, plus the nested harness of bothy_viz (docs/DECISIONS.md D-M6-11-6).
+        for pattern in ("*/pubspec.yaml", "*/harness/pubspec.yaml")
+        for p in (REPO / base).glob(pattern)
     )
     assert tracked == sorted(m.path for m in rules.members.values())
 
@@ -368,7 +370,8 @@ def test_rules_cover_every_member_of_the_repository() -> None:
 def test_real_repository_passes(capsys: pytest.CaptureFixture[str]) -> None:
     assert arch_check.main(["--root", str(REPO)]) == 0
     out = capsys.readouterr().out
-    assert re.fullmatch(r"arch-check: 14 members, \d+ files, ok\n", out), out
+    members = len(arch_check.load_rules(RULES).members)
+    assert re.fullmatch(rf"arch-check: {members} members, \d+ files, ok\n", out), out
 
 
 def test_main_prints_findings_and_fails(tree: Tree, capsys: pytest.CaptureFixture[str]) -> None:
