@@ -23,15 +23,22 @@ type StepUps struct {
 func NewStepUps(s identity.StepUp) *StepUps { return &StepUps{stepUp: s} }
 
 // CreateStepUpChallenge implements rest.StrictServerInterface (POST /auth/step-up/challenge). The
-// challenge value leaves the server only here; passkey_options stays absent until M1-40.
+// challenge value leaves the server only here; passkey_options are the WebAuthn request options
+// over the same value when the person has an active passkey (M1-40).
 func (h *StepUps) CreateStepUpChallenge(ctx context.Context, _ rest.CreateStepUpChallengeRequestObject) (rest.CreateStepUpChallengeResponseObject, error) {
 	c, err := h.stepUp.CreateChallenge(ctx, principal(ctx))
 	if err != nil {
 		return nil, err
 	}
-	return rest.CreateStepUpChallenge200JSONResponse{Body: rest.StepUpChallenge{
-		ChallengeId: rest.Uuid(c.ID), Challenge: c.Value, ExpiresAt: ms(c.ExpiresAt),
-	}}, nil
+	body := rest.StepUpChallenge{ChallengeId: rest.Uuid(c.ID), Challenge: c.Value, ExpiresAt: ms(c.ExpiresAt)}
+	if len(c.PasskeyOptions) > 0 {
+		o, err := object(c.PasskeyOptions)
+		if err != nil {
+			return nil, err
+		}
+		body.PasskeyOptions = &o
+	}
+	return rest.CreateStepUpChallenge200JSONResponse{Body: body}, nil
 }
 
 // CompleteStepUpWithDeviceKey implements rest.StrictServerInterface (POST

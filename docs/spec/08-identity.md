@@ -194,6 +194,15 @@ Reason: Otherwise a passkey login would bypass `auth.idp_recheck_interval`. For 
 login name `beginPasskeyLogin` returns a dummy credential ID from HMAC and name, so that the
 answer reveals no accounts.
 
+Details of the implementation (M1-40, [docs/DECISIONS.md](../DECISIONS.md) M1-40): when
+`auth.webauthn_rp_id` is empty and the host of `server.public_url` is an IP address or a single
+label (never an RP ID), or both passkey keys are empty and `server.public_url` is `http` outside
+`localhost` (no secure context), the instance has no passkeys; a passkey counts as a remaining
+sign-in method for `identity.unlink` only while a local identity remains; the passkey operations answer
+`403 feature_disabled` and `createStepUpChallenge` has no `passkey_options`. Every completion that
+opened an issued ceremony row and then failed sets the row to `failed` after the rollback, so a row
+works once even when the login, the device or the code is rejected after the check.
+
 Password with TOTP (table `local_credentials` in 03):
 
 - Password hash Argon2id in PHC format. Lower bound per OWASP: 19 MiB memory, 2 iterations,

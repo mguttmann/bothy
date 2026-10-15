@@ -27,7 +27,7 @@ type config struct {
 	spec, catalog, list string // inputs: openapi.yaml, actions.yaml, operations.yaml
 	asyncapi            string // asyncapi.yaml for the gateway protocol versions; "" for none
 	codegenConfig       string // api/rest/oapi-codegen.yaml
-	restDir             string // output directory of rest.gen.go
+	restDir             string // output directory of models.gen.go and rest.gen.go
 	routesDir           string // output directory of routes.gen.go, catalog.gen.go, build.gen.go
 	restPkg             string // import path of the package in restDir
 	corePkg             string // import path of api/routes; "" when routesDir is api/routes itself
@@ -71,10 +71,15 @@ func generate(ctx context.Context, c config) (err error) {
 	if err != nil {
 		return err
 	}
+	models, rest, err := splitRest(rest)
+	if err != nil {
+		return err
+	}
 	// openapi.gen.yaml is the contract byte for byte, next to the server generated from it, so the
 	// request validator of platform/httpserver embeds exactly what the generator read
 	// (make codegen-check holds the copy).
 	outputs := map[string][]byte{
+		filepath.Join(c.restDir, "models.gen.go"):    models,
 		filepath.Join(c.restDir, "rest.gen.go"):      rest,
 		filepath.Join(c.restDir, "openapi.gen.yaml"): in.specData,
 	}

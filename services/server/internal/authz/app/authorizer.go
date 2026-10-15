@@ -361,6 +361,9 @@ func (a *Authorizer) authorize(ctx context.Context, p authorize.Principal, act a
 		return authorize.Decision{}, err
 	}
 	in.Preview = preview
+	if in.StepUpWaived, err = a.stepUpWaived(ctx, spec, act, in.Principal); err != nil {
+		return authorize.Decision{}, err
+	}
 	dd, err := domain.Decide(in)
 	if err != nil {
 		return authorize.Decision{}, err

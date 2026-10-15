@@ -56,7 +56,7 @@ var sessCfg = app.Config{
 	SessionMaxAge: 30 * 24 * time.Hour, RefreshReuseGrace: 30 * time.Second, LastActiveGranularity: 5 * time.Minute,
 	StepUpChallengeTTL: 2 * time.Minute, StepUpFailLimit: 3, LoginFailWindow: 15 * time.Minute, CleanupInterval: time.Hour,
 	APITokenMaxTTL: 365 * 24 * time.Hour, PersonalTokenMaxTTL: 90 * 24 * time.Hour, DPoPRequiredFor: []string{"agent"},
-	EnrollmentCodeTTL: 72 * time.Hour, EnrollmentCodeMaxAttempts: 3,
+	EnrollmentCodeTTL: 72 * time.Hour, EnrollmentCodeMaxAttempts: 3, LoginFlowTTL: 10 * time.Minute,
 	DevicePendingTTL: 24 * time.Hour, DeviceVerificationCodeDigits: 6, PairingCodeTTL: 5 * time.Minute, PairingCodeChars: 8,
 }
 
@@ -216,7 +216,8 @@ func newSessionWorldOn(t *testing.T, db *pgtest.DB, clk *clock.Fake, instID ids.
 	}
 	built, err := routes.Build(wire.Handlers{Sessions: w.id.SessionHandlers, StepUps: w.id.StepUpHandlers, Devices: w.id.Handlers, People: w.id.PeopleHandlers,
 		Providers: w.id.ProviderHandlers, Credentials: w.id.CredentialHandlers,
-		Tokens: w.id.TokenHandlers, Enrollment: w.id.EnrollmentHandlers, Approval: w.id.ApprovalHandlers, Admin: w.settings.Handlers},
+		Tokens: w.id.TokenHandlers, Enrollment: w.id.EnrollmentHandlers, Approval: w.id.ApprovalHandlers, Admin: w.settings.Handlers,
+		Passkeys: w.id.PasskeyHandlers},
 		wire.RouteOptions(), routes.SpecCatalog())
 	if err != nil {
 		t.Fatal(err)

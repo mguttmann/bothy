@@ -55,6 +55,10 @@ type PrincipalSource interface {
 	// ActiveOwnerIDs returns the users with an active owners row whose principal status is
 	// active, ascending by id. I1 and SR8 (M1-29) need this set.
 	ActiveOwnerIDs(ctx context.Context) ([]ids.ID, error)
+	// HasActivePasskey reports whether the person userID has a passkey with revoked_at IS NULL:
+	// hat_anmeldedaten of passkey.register, whose step-up is conditional (07 section 4.2 step 8,
+	// M1-40). It reads inside the ambient transaction of ctx when there is one.
+	HasActivePasskey(ctx context.Context, userID ids.ID) (bool, error)
 }
 
 // ChannelKind is channels.kind.

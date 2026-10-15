@@ -85,17 +85,21 @@ func (q *Queries) FinishChallenge(ctx context.Context, arg FinishChallengeParams
 
 const insertChallenge = `-- name: InsertChallenge :exec
 
-INSERT INTO auth_challenges (id, purpose, session_id, challenge_hash, status, created_at, expires_at)
-VALUES ($1, $2, $3, $4, 'issued', $5, $6)
+INSERT INTO auth_challenges (id, purpose, session_id, enrollment_code_id, challenge_hash, webauthn_session, status,
+                             created_at, expires_at)
+VALUES ($1, $2, $3, $4, $5, $6,
+        'issued', $7, $8)
 `
 
 type InsertChallengeParams struct {
-	ID            pgtype.UUID
-	Purpose       string
-	SessionID     pgtype.UUID
-	ChallengeHash []byte
-	CreatedAt     pgtype.Timestamptz
-	ExpiresAt     pgtype.Timestamptz
+	ID               pgtype.UUID
+	Purpose          string
+	SessionID        pgtype.UUID
+	EnrollmentCodeID pgtype.UUID
+	ChallengeHash    []byte
+	WebauthnSession  []byte
+	CreatedAt        pgtype.Timestamptz
+	ExpiresAt        pgtype.Timestamptz
 }
 
 // SPDX-License-Identifier: Apache-2.0
@@ -103,12 +107,16 @@ type InsertChallengeParams struct {
 // docs/spec/03-data-model.md section 4.2, docs/spec/08-identity.md section 6.2, M1-35).
 // Challenges are stored only as HMAC; a completion locks the session rows first, then the
 // challenge (03 "Lock order").
+// Every purpose (03 auth_challenges): session_id for step_up and passkey_register,
+// enrollment_code_id for passkey_enroll, webauthn_session for the WebAuthn ceremonies (M1-40).
 func (q *Queries) InsertChallenge(ctx context.Context, arg InsertChallengeParams) error {
 	_, err := q.db.Exec(ctx, insertChallenge,
 		arg.ID,
 		arg.Purpose,
 		arg.SessionID,
+		arg.EnrollmentCodeID,
 		arg.ChallengeHash,
+		arg.WebauthnSession,
 		arg.CreatedAt,
 		arg.ExpiresAt,
 	)

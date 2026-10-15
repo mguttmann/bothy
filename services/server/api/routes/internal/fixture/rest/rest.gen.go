@@ -13,69 +13,7 @@ import (
 	"net/http"
 
 	"github.com/oapi-codegen/runtime"
-	openapi_types "github.com/oapi-codegen/runtime/types"
 )
-
-// Problem defines model for Problem.
-type Problem struct {
-	Code   string `json:"code"`
-	Status int    `json:"status"`
-	Title  string `json:"title"`
-	Type   string `json:"type"`
-}
-
-// Thing defines model for Thing.
-type Thing struct {
-	Id      openapi_types.UUID `json:"id"`
-	Name    string             `json:"name"`
-	Version int64              `json:"version"`
-}
-
-// ThingCreate defines model for ThingCreate.
-type ThingCreate struct {
-	Name string `json:"name"`
-}
-
-// ThingUpdate defines model for ThingUpdate.
-type ThingUpdate struct {
-	Name *string `json:"name,omitempty"`
-}
-
-// Unused Referenced by no operation; skip-prune keeps it.
-type Unused struct {
-	Note *string `json:"note,omitempty"`
-}
-
-// IdempotencyKey defines model for IdempotencyKey.
-type IdempotencyKey = openapi_types.UUID
-
-// IfMatchOptional defines model for IfMatchOptional.
-type IfMatchOptional = string
-
-// IfMatchRequired defines model for IfMatchRequired.
-type IfMatchRequired = string
-
-// ThingIdPath defines model for ThingIdPath.
-type ThingIdPath = openapi_types.UUID
-
-// Error defines model for Error.
-type Error = Problem
-
-// CreateThingParams defines parameters for CreateThing.
-type CreateThingParams struct {
-	IdempotencyKey *IdempotencyKey `json:"Idempotency-Key,omitempty"`
-}
-
-// UpdateThingParams defines parameters for UpdateThing.
-type UpdateThingParams struct {
-	IfMatch IfMatchRequired `json:"If-Match"`
-}
-
-// CreateThingJSONRequestBody defines body for CreateThing for application/json ContentType.
-type CreateThingJSONRequestBody = ThingCreate
-
-// UpdateThingJSONRequestBody defines body for UpdateThing for application/json ContentType.
-type UpdateThingJSONRequestBody = ThingUpdate
 
 // ServerInterface represents all server handlers.
 type ServerInterface interface {

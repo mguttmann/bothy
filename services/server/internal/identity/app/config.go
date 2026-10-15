@@ -81,4 +81,13 @@ type Config struct {
 	// DPoPRequiredFor is auth.dpop_required_for: the token kinds (agent, app, personal) whose
 	// tokens must be DPoP-bound.
 	DPoPRequiredFor []string `config:"auth.dpop_required_for"`
+	// LoginFlowTTL is auth.login_flow_ttl, how long a passkey ceremony (login, enrollment,
+	// registration) may be completed after its begin (M1-40).
+	LoginFlowTTL time.Duration `config:"auth.login_flow_ttl"`
+	// WebAuthnRPID is auth.webauthn_rp_id, the RP ID of the passkeys; "" means the host of
+	// server.public_url (domain.ResolveRelyingParty).
+	WebAuthnRPID string `config:"auth.webauthn_rp_id"`
+	// WebAuthnOrigins is auth.webauthn_origins, the allowed origins of the passkeys; empty means
+	// the origin of server.public_url.
+	WebAuthnOrigins []string `config:"auth.webauthn_origins"`
 }

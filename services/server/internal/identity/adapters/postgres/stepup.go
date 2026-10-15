@@ -25,7 +25,8 @@ func (r *Repository) InsertChallenge(ctx context.Context, c app.ChallengeRecord)
 		return err
 	}
 	err = q.InsertChallenge(ctx, sqlcgen.InsertChallengeParams{
-		ID: uuid(c.ID), Purpose: string(c.Purpose), SessionID: optionalUUID(c.SessionID), ChallengeHash: c.Hash,
+		ID: uuid(c.ID), Purpose: string(c.Purpose), SessionID: optionalUUID(c.SessionID),
+		EnrollmentCodeID: optionalUUID(c.EnrollmentCodeID), ChallengeHash: c.Hash, WebauthnSession: c.WebAuthnSession,
 		CreatedAt: ts(c.CreatedAt), ExpiresAt: ts(c.ExpiresAt),
 	})
 	return mapError(err, "inserting a challenge")
@@ -45,7 +46,8 @@ func (r *Repository) LockChallenge(ctx context.Context, id ids.ID) (app.Challeng
 		return app.ChallengeRecord{}, false, mapError(err, "locking a challenge")
 	}
 	return app.ChallengeRecord{
-		ID: idOf(row.ID), SessionID: idOf(row.SessionID), Purpose: app.ChallengePurpose(row.Purpose), Hash: row.ChallengeHash,
+		ID: idOf(row.ID), SessionID: idOf(row.SessionID), EnrollmentCodeID: idOf(row.EnrollmentCodeID),
+		Purpose: app.ChallengePurpose(row.Purpose), Hash: row.ChallengeHash, WebAuthnSession: row.WebauthnSession,
 		Status: app.ChallengeStatus(row.Status), CreatedAt: timeOf(row.CreatedAt), ExpiresAt: timeOf(row.ExpiresAt),
 		FinishedAt: timeOf(row.FinishedAt),
 	}, true, nil
