@@ -25,6 +25,14 @@ import (
 // requires for bots ([R6]); the same placeholder as repo_url of mkdocs.yml.
 const userAgentURL = "https://github.com/OWNER/bothy"
 
+// userAgent returns the User-Agent of the tool for version.
+func userAgent(version string) string { return "DiscordBot (" + userAgentURL + ", " + version + ")" }
+
+// validUserAgentVersion reports whether version fits into the User-Agent.
+func validUserAgentVersion(version string) bool {
+	return version != "" && !strings.ContainsAny(version, "(),\r\n")
+}
+
 // maxPageSize is the largest page Discord serves ([R4]); import.discord.page_size must not
 // exceed it.
 const maxPageSize = 100
@@ -134,7 +142,7 @@ func New(cfg Config, token Token, deps Deps) (*Client, error) {
 		return nil, fmt.Errorf("discord: Config.Egress: %w", err)
 	}
 	c := &Client{http: hc, base: base, api: api, token: token,
-		userAgent: "DiscordBot (" + userAgentURL + ", " + cfg.UserAgentVersion + ")",
+		userAgent: userAgent(cfg.UserAgentVersion),
 		pageSize:  cfg.PageSize, retries: cfg.MaxRetries, maxWait: cfg.MaxRateWait,
 		logger: deps.Logger, sleep: deps.Sleep}
 	if c.logger == nil {
@@ -161,7 +169,7 @@ func validateConfig(cfg Config) (*url.URL, error) {
 		return nil, errors.New("discord: Config.APIBase must be an https URL with a host and without user info")
 	case base.RawQuery != "" || base.Fragment != "" || base.ForceQuery || base.Opaque != "":
 		return nil, errors.New("discord: Config.APIBase must not have a query or fragment")
-	case cfg.UserAgentVersion == "" || strings.ContainsAny(cfg.UserAgentVersion, "(),\r\n"):
+	case !validUserAgentVersion(cfg.UserAgentVersion):
 		return nil, errors.New("discord: Config.UserAgentVersion must be a version without parentheses or commas")
 	case cfg.PageSize < 1 || cfg.PageSize > maxPageSize:
 		return nil, errors.New("discord: Config.PageSize (import.discord.page_size) is outside the range Discord serves")
@@ -482,18 +490,29 @@ func (c *Client) wait(ctx context.Context, rt route, d time.Duration, status int
 	return nil
 }
 
-// send builds and sends one GET and returns status, header and body. It is the only place that
-// builds a request (TestClientHasOnlyGet), and the token enters only through authorize.
+// newGet builds a GET of rawURL with the User-Agent userAgent and the Accept accept. It is the
+// only place of the package that builds a request (TestClientHasOnlyGet); the API client and
+// the CDN fetcher both use it.
+func newGet(ctx context.Context, rawURL, userAgent, accept string) (*http.Request, error) {
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, rawURL, nil)
+	if err != nil {
+		return nil, err
+	}
+	req.Header.Set("User-Agent", userAgent)
+	req.Header.Set("Accept", accept)
+	return req, nil
+}
+
+// send builds and sends one GET and returns status, header and body; the token enters only
+// through authorize.
 func (c *Client) send(ctx context.Context, rt route, u *url.URL) (int, http.Header, []byte, error) {
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, u.String(), nil)
+	req, err := newGet(ctx, u.String(), c.userAgent, "application/json")
 	if err != nil {
 		return 0, nil, nil, &CallError{Op: rt.op(), Kind: errors.New("discord: the request could not be built")}
 	}
 	if err := c.authorize(req); err != nil {
 		return 0, nil, nil, &CallError{Op: rt.op(), Kind: err}
 	}
-	req.Header.Set("User-Agent", c.userAgent)
-	req.Header.Set("Accept", "application/json")
 	resp, err := c.http.Do(req)
 	if err != nil {
 		return 0, nil, nil, &CallError{Op: rt.op(), Kind: err}
