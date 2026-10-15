@@ -218,17 +218,17 @@ Source: [03-data-model.md](../spec/03-data-model.md), section 9.
 | `host.name_max_chars` | `BOTHY_HOST__NAME_MAX_CHARS` | Server |  | `100` | length of a host name in Unicode characters | planned (M2) |
 | `host.os_user_max_chars` | `BOTHY_HOST__OS_USER_MAX_CHARS` | Server |  | `64` | length of the name of a session user in `host_session_users.os_user` | planned (M2) |
 | `space.name_max_chars` | `BOTHY_SPACE__NAME_MAX_CHARS` | Server | int | `100` | length of a space name in Unicode characters | active |
-| `channel.name_max_chars` | `BOTHY_CHANNEL__NAME_MAX_CHARS` | Server |  | `100` | length of a channel name in Unicode characters | planned (M1) |
-| `channel.topic_max_chars` | `BOTHY_CHANNEL__TOPIC_MAX_CHARS` | Server |  | `1024` | length of a channel topic in Unicode characters | planned (M1) |
-| `forum_tag.name_max_chars` | `BOTHY_FORUM_TAG__NAME_MAX_CHARS` | Server |  | `50` | length of a tag name in Unicode characters | planned (M1) |
+| `channel.name_max_chars` | `BOTHY_CHANNEL__NAME_MAX_CHARS` | Server | int | `100` | length of a channel name in Unicode characters | active |
+| `channel.topic_max_chars` | `BOTHY_CHANNEL__TOPIC_MAX_CHARS` | Server | int | `1024` | length of a channel topic in Unicode characters | active |
+| `forum_tag.name_max_chars` | `BOTHY_FORUM_TAG__NAME_MAX_CHARS` | Server | int | `50` | length of a tag name in Unicode characters | active |
 | `identity.last_active_granularity` | `BOTHY_IDENTITY__LAST_ACTIVE_GRANULARITY` | Server | duration | `5m` | `last_active_at` or `last_used_at` is written at most this often | active |
 | `auth.session_max_age` | `BOTHY_AUTH__SESSION_MAX_AGE` | Server | duration | `30d` | absolute end of a login session | active |
 | `auth.refresh_token_ttl` | `BOTHY_AUTH__REFRESH_TOKEN_TTL` | Server | duration | `14d` | lifetime of a refresh token | active |
 | `auth.step_up_max_age` | `BOTHY_AUTH__STEP_UP_MAX_AGE` | Server | duration | `5m` | a step-up confirmation counts as fresh for this long | active |
 | `auth.refresh_reuse_grace` | `BOTHY_AUTH__REFRESH_REUSE_GRACE` | Server | duration | `30s` | grace period for the immediately preceding refresh generation with the same DPoP key | active |
 | `agent.heartbeat_persist_interval` | `BOTHY_AGENT__HEARTBEAT_PERSIST_INTERVAL` | Server |  | `60s` | heartbeat fields are stored at most this often | planned (M2) |
-| `channel.history_backfill_limit_default` | `BOTHY_CHANNEL__HISTORY_BACKFILL_LIMIT_DEFAULT` | Server |  | `20` | default for `history_backfill_limit` | planned (M1) |
-| `channel.history_backfill_limit_max` | `BOTHY_CHANNEL__HISTORY_BACKFILL_LIMIT_MAX` | Server |  | `200` | upper limit for `history_backfill_limit` | planned (M1) |
+| `channel.history_backfill_limit_default` | `BOTHY_CHANNEL__HISTORY_BACKFILL_LIMIT_DEFAULT` | Server | int | `20` | default for `history_backfill_limit` | active |
+| `channel.history_backfill_limit_max` | `BOTHY_CHANNEL__HISTORY_BACKFILL_LIMIT_MAX` | Server | int | `200` | upper limit for `history_backfill_limit` | active |
 | `channel.prompt_max_bytes` | `BOTHY_CHANNEL__PROMPT_MAX_BYTES` | Server |  | `32768` | size of a channel prompt | planned (M2) |
 | `thread.title_max_chars` | `BOTHY_THREAD__TITLE_MAX_CHARS` | Server | int | `200` | length of a thread title | active |
 | `thread.max_tags` | `BOTHY_THREAD__MAX_TAGS` | Server |  | `5` | forum tags per thread | planned (M1) |

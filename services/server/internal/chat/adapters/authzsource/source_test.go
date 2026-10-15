@@ -80,3 +80,65 @@ func TestSourceSpaceDetails(t *testing.T) {
 		t.Fatalf("archived = %+v", d)
 	}
 }
+
+// chanStore answers the channel reads of the source.
+type chanStore struct {
+	app.Store
+	rows []app.ChannelRow
+}
+
+func (s chanStore) Channel(_ context.Context, id ids.ID) (app.ChannelRow, bool, error) {
+	for _, c := range s.rows {
+		if c.Channel.ID == id {
+			return c, true, nil
+		}
+	}
+	return app.ChannelRow{}, false, nil
+}
+
+func (s chanStore) AllChannels(context.Context) ([]app.ChannelRow, error) { return s.rows, nil }
+
+// TestSourceChannels (M1-53): a channel is archived when it or its space is; the effective
+// operator follows inheritance; ChannelsOperatedBy finds the inheriting channel and nothing for
+// the zero id; ChannelDetails omits unknown ids.
+func TestSourceChannels(t *testing.T) {
+	t.Parallel()
+	space, op := ids.New(), ids.New()
+	at := time.Date(2026, 10, 14, 9, 0, 0, 0, time.UTC)
+	live := domain.NewChannel(ids.New(), space, domain.ChannelText, "tickets", "", "a0", ids.New(), 20)
+	gone := domain.NewChannel(ids.New(), space, domain.ChannelForum, "bugs", "", "a1", ids.New(), 20)
+	gone.Archive(at)
+	inSpace := domain.NewChannel(ids.New(), ids.New(), domain.ChannelText, "old", "", "a0", ids.New(), 20)
+	src := authzsource.New(chanStore{rows: []app.ChannelRow{
+		{Channel: live, SpaceDefaultOperatorID: op}, {Channel: gone}, {Channel: inSpace, SpaceArchived: true},
+	}})
+	ctx := context.Background()
+	for _, c := range []struct {
+		id       ids.ID
+		archived bool
+	}{{live.ID, false}, {gone.ID, true}, {inSpace.ID, true}} {
+		f, ok, err := src.Channel(ctx, c.id)
+		if err != nil || !ok || f.Archived != c.archived {
+			t.Errorf("%v: %+v %v %v", c.id, f, ok, err)
+		}
+	}
+	if f, _, _ := src.Channel(ctx, live.ID); f.EffectiveOperatorID != op || f.Kind != authz.ChannelText || !f.RequireMention {
+		t.Fatalf("facts %+v", f)
+	}
+	if _, ok, err := src.Channel(ctx, ids.New()); ok || err != nil {
+		t.Fatal("unknown channel found")
+	}
+	if got, _ := src.ChannelsOperatedBy(ctx, op); len(got) != 1 || got[0] != live.ID {
+		t.Fatalf("operated %v", got)
+	}
+	if got, _ := src.ChannelsOperatedBy(ctx, ids.ID{}); len(got) != 0 {
+		t.Fatalf("zero agent operates %v", got)
+	}
+	if all, _ := src.Channels(ctx); len(all) != 3 {
+		t.Fatalf("channels %v", all)
+	}
+	d, err := src.ChannelDetails(ctx, []ids.ID{live.ID, ids.New()})
+	if err != nil || len(d) != 1 || d[live.ID].OperatorMode != "inherit" || d[live.ID].EffectiveOperatorID != op {
+		t.Fatalf("details %+v, %v", d, err)
+	}
+}

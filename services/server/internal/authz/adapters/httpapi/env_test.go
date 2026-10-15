@@ -215,6 +215,7 @@ func must(t testing.TB, err error) {
 func (w *world) seed() {
 	w.t.Helper()
 	w.ownerID = w.person("owner", true)
+	w.structure.OnPutChannel(w.mirrorChannel)
 	w.alex, w.sam, w.robin = w.person("alex", false), w.person("sam", false), w.person("robin", false)
 	w.lotse, w.texter, w.assistent = w.principal("lotse", "agent"), w.principal("texter", "agent"), w.principal("assistent", "agent")
 	w.support, w.marketing, w.research, w.engineering = ids.New(), ids.New(), ids.New(), ids.New()
@@ -560,4 +561,18 @@ func (w *world) manager(user ids.ID, level string, caps ...string) *client {
 	c := w.login(user)
 	c.stepUp()
 	return c
+}
+
+// mirrorChannel writes the spaces and channels rows of a fake channel, the targets of the foreign
+// keys of grants (M1-52, M1-53); authorize still reads the fake.
+func (w *world) mirrorChannel(c authz.ChannelFacts) {
+	w.t.Helper()
+	var space any
+	inherit := c.Kind != authz.ChannelDM
+	if inherit {
+		space = c.SpaceID.String()
+		w.sql(`INSERT INTO spaces (id, name, sort_key, created_by) VALUES ($1::uuid, $1::text, 'a0', $2) ON CONFLICT (id) DO NOTHING`, c.SpaceID.String(), w.ownerID.String())
+	}
+	w.sql(`INSERT INTO channels (id, space_id, kind, name, sort_key, operator_inherit, history_backfill_limit, created_by)
+		VALUES ($1::uuid, $2, $3, $1::text, 'a0', $4, 20, $5) ON CONFLICT (id) DO NOTHING`, c.ID.String(), space, string(c.Kind), inherit, w.ownerID.String())
 }

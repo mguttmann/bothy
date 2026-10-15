@@ -49,7 +49,7 @@ func newEnv(t *testing.T) *env {
 	}
 	reg.Seal()
 	e.uow = &uow{reg: reg}
-	svc, err := app.New(app.Config{SpaceNameMaxChars: 12}, app.Deps{
+	svc, err := app.New(testConfig(12), app.Deps{
 		Store: e.store, UoW: e.uow, Authorizer: e.az, Rights: rightsPort{e.rights}, Audit: e.rec, Events: e.events,
 		Clock: clock.NewFake(time.Date(2026, 10, 14, 9, 0, 0, 0, time.UTC)),
 	})
@@ -102,14 +102,14 @@ func ptr(s string) *string { return &s }
 
 func TestNew(t *testing.T) {
 	t.Parallel()
-	if _, err := app.New(app.Config{SpaceNameMaxChars: 1}, app.Deps{}); err == nil {
+	if _, err := app.New(testConfig(1), app.Deps{}); err == nil {
 		t.Fatal("missing collaborators accepted")
 	}
 	e := newEnv(t)
 	if _, err := app.New(app.Config{}, app.Deps{Store: e.store, UoW: e.uow, Authorizer: e.az, Rights: e.rights, Audit: e.rec, Events: e.events}); err == nil {
 		t.Fatal("name limit 0 accepted")
 	}
-	if _, err := app.New(app.Config{SpaceNameMaxChars: 1}, app.Deps{Store: e.store, UoW: e.uow, Authorizer: e.az, Rights: e.rights, Audit: e.rec, Events: e.events}); err != nil {
+	if _, err := app.New(testConfig(1), app.Deps{Store: e.store, UoW: e.uow, Authorizer: e.az, Rights: e.rights, Audit: e.rec, Events: e.events}); err != nil {
 		t.Fatal(err)
 	}
 }
@@ -410,4 +410,10 @@ func TestErrorsPass(t *testing.T) {
 			t.Errorf("%s: authorize error swallowed", name)
 		}
 	}
+}
+
+// testConfig returns a valid configuration with the space name limit n.
+func testConfig(n int) app.Config {
+	return app.Config{SpaceNameMaxChars: n, ChannelNameMaxChars: 8, ChannelTopicMaxChars: 8, TagNameMaxChars: 8,
+		HistoryBackfillLimitDefault: 20, HistoryBackfillLimitMax: 200}
 }

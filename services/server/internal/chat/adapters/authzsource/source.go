@@ -1,10 +1,12 @@
 // SPDX-License-Identifier: Apache-2.0
 
-// Package authzsource is the adapter through which the chat module answers authz (M1-52): Source
-// implements the space part of authz.StructureSource (Space, SpaceArchived, Spaces, SpaceDetails) over the table
-// spaces, so authorize resolves spaces from real data (docs/spec/02-architecture.md section 4.3,
-// "Quellen-Port"). The channel and thread part follows with M1-53 and M1-55; until then
-// internal/wire joins this source with the empty channel part. authz never reads the table spaces.
+// Package authzsource is the adapter through which the chat module answers authz (M1-52, M1-53):
+// Source implements the space and channel part of authz.StructureSource (Space, SpaceArchived,
+// Spaces, SpaceDetails, Channel, Channels, ChannelsOperatedBy, ChannelDetails) over the tables
+// spaces, channels and threads, so authorize resolves spaces and channels from real data
+// (docs/spec/02-architecture.md section 4.3, "Quellen-Port"). The thread part follows with M1-55
+// and the served targets with M1-54; until then internal/wire joins this source with the empty
+// thread part. authz never reads these tables.
 //
 // Example:
 //
@@ -20,7 +22,7 @@ import (
 	"github.com/OWNER/bothy/services/server/internal/kernel/ids"
 )
 
-// Source answers the space part of authz.StructureSource. It reads inside the ambient
+// Source answers the space and channel part of authz.StructureSource. It reads inside the ambient
 // transaction of ctx when there is one, so the rights hook sees a space a unit of work just
 // archived. It is safe for concurrent use when its store is.
 type Source struct {
@@ -62,4 +64,85 @@ func (s *Source) SpaceDetails(ctx context.Context, spaceIDs []ids.ID) (map[ids.I
 		}
 	}
 	return out, nil
+}
+
+// Channel implements authz.StructureSource: the facts of the channel id; Archived is set for an
+// archived channel and for every channel of an archived space (07 section 4.5).
+func (s *Source) Channel(ctx context.Context, id ids.ID) (authz.ChannelFacts, bool, error) {
+	c, found, err := s.store.Channel(ctx, id)
+	if err != nil || !found {
+		return authz.ChannelFacts{}, false, err
+	}
+	return facts(c), true, nil
+}
+
+// Channels implements authz.StructureSource: every channel that is not a dm channel, archived
+// ones included, ascending by id.
+func (s *Source) Channels(ctx context.Context) ([]authz.ChannelFacts, error) {
+	rows, err := s.store.AllChannels(ctx)
+	if err != nil {
+		return nil, err
+	}
+	out := make([]authz.ChannelFacts, 0, len(rows))
+	for _, c := range rows {
+		out = append(out, facts(c))
+	}
+	return out, nil
+}
+
+// ChannelsOperatedBy implements authz.StructureSource: the channels that are not dm channels
+// whose effective operator is agentID, archived ones included, ascending by id; none for the zero
+// id.
+func (s *Source) ChannelsOperatedBy(ctx context.Context, agentID ids.ID) ([]ids.ID, error) {
+	if agentID.IsZero() {
+		return nil, nil
+	}
+	rows, err := s.store.AllChannels(ctx)
+	if err != nil {
+		return nil, err
+	}
+	var out []ids.ID
+	for _, c := range rows {
+		if c.Channel.Operator(c.SpaceDefaultOperatorID).EffectiveAgentID == agentID {
+			out = append(out, c.Channel.ID)
+		}
+	}
+	return out, nil
+}
+
+// ChannelDetails implements authz.StructureSource: the details of the known channels among
+// channelIDs, archived or not; an unknown id is absent (M1-49).
+func (s *Source) ChannelDetails(ctx context.Context, channelIDs []ids.ID) (map[ids.ID]authz.ChannelDetail, error) {
+	out := make(map[ids.ID]authz.ChannelDetail, len(channelIDs))
+	for _, id := range channelIDs {
+		c, found, err := s.store.Channel(ctx, id)
+		if err != nil {
+			return nil, err
+		}
+		if !found {
+			continue
+		}
+		ch := c.Channel
+		op := ch.Operator(c.SpaceDefaultOperatorID)
+		out[id] = authz.ChannelDetail{
+			ID: ch.ID, SpaceID: ch.SpaceID, Kind: authz.ChannelKind(ch.Kind), Name: ch.Name, Topic: ch.Topic, SortKey: ch.SortKey,
+			OperatorMode: string(op.Mode), OperatorAgentID: op.AgentID, EffectiveOperatorID: op.EffectiveAgentID,
+			ForumDefaultSort: ch.ForumDefaultSort, DefaultNotificationLevel: ch.DefaultNotificationLevel, ReadOnly: ch.ReadOnly,
+			MainThreadID: ch.MainThreadID, ArchivedAt: ch.ArchivedAt, Version: ch.Version, SettingsVersion: ch.SettingsVersion,
+			CreatedAt: ch.CreatedAt,
+		}
+	}
+	return out, nil
+}
+
+// facts converts a channel row into the facts of authorize. Project binding comes with M2-03 and
+// dm participation with V3; both are absent here.
+func facts(c app.ChannelRow) authz.ChannelFacts {
+	ch := c.Channel
+	return authz.ChannelFacts{
+		ID: ch.ID, SpaceID: ch.SpaceID, Kind: authz.ChannelKind(ch.Kind), ReadOnly: ch.ReadOnly,
+		EffectiveOperatorID: ch.Operator(c.SpaceDefaultOperatorID).EffectiveAgentID,
+		RequireMention:      ch.RequireMention, ThreadRequireMention: ch.ThreadRequireMention, FreeResponse: ch.FreeResponse,
+		AllowMentionedAgents: ch.AllowMentionedAgents, Archived: ch.Archived() || c.SpaceArchived,
+	}
 }

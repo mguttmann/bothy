@@ -1,9 +1,10 @@
 // SPDX-License-Identifier: Apache-2.0
 
-// Package postgres is the PostgreSQL adapter of the chat module (M1-52): the sqlc queries in
-// queries/, the generated code in sqlcgen/ and Repository, which implements app.Store over the
-// tables spaces and user_space_states (docs/spec/03-data-model.md section 4.5). Only this package
-// runs SQL on them (03 Grundsatz 12).
+// Package postgres is the PostgreSQL adapter of the chat module (M1-52, M1-53): the sqlc queries
+// in queries/, the generated code in sqlcgen/ and Repository, which implements app.Store over the
+// tables spaces, user_space_states, channels, forum_tags and the main threads of threads
+// (docs/spec/03-data-model.md section 4.5). Only this package
+// runs SQL on them (03 principle 12).
 //
 // Example:
 //
@@ -241,7 +242,16 @@ func toSidebar(row sqlcgen.UserSpaceState) domain.SidebarState {
 const (
 	sqlstateUniqueViolation = "23505"
 	nameConstraint          = "spaces_name_active_key"
+	channelNameConstraint   = "channels_space_name_active_key"
+	tagNameConstraint       = "forum_tags_channel_name_active_key"
 )
+
+// nameTaken maps the unique name indexes to the detail of their 409 conflict.
+var nameTaken = map[string]string{
+	nameConstraint:        "a space with this name exists",
+	channelNameConstraint: "a channel with this name exists in the space",
+	tagNameConstraint:     "a tag with this name exists in the forum",
+}
 
 // mapError turns a database error of the operation what into a kernel/errs error: a taken name is
 // 409 conflict on /name (never SQL text, a constraint name or a value), a kernel/errs error passes,
@@ -254,9 +264,11 @@ func mapError(err error, what string) error {
 		return err
 	}
 	var pgErr *pgconn.PgError
-	if errors.As(err, &pgErr) && pgErr.Code == sqlstateUniqueViolation && pgErr.ConstraintName == nameConstraint {
-		return errs.Wrap(errs.CodeConflict, err, "a space with this name exists").
-			WithFields(errs.FieldError{Pointer: "/name", Code: "taken", Detail: "already taken"})
+	if errors.As(err, &pgErr) && pgErr.Code == sqlstateUniqueViolation {
+		if what, ok := nameTaken[pgErr.ConstraintName]; ok {
+			return errs.Wrap(errs.CodeConflict, err, what).
+				WithFields(errs.FieldError{Pointer: "/name", Code: "taken", Detail: "already taken"})
+		}
 	}
 	return errs.Wrap(errs.CodeInternalError, err, "chat: "+what+" failed")
 }
@@ -278,7 +290,7 @@ func idOf(u pgtype.UUID) ids.ID {
 	return ids.ID(u.Bytes)
 }
 
-// timeOf converts a column; NULL becomes the zero time. Times are UTC (03 Grundsatz 2).
+// timeOf converts a column; NULL becomes the zero time. Times are UTC (03 principle 2).
 func timeOf(t pgtype.Timestamptz) time.Time {
 	if !t.Valid {
 		return time.Time{}
