@@ -25,6 +25,14 @@ operated, and the order of the build.
 
 ### Added
 
+- Login core of the apps (`packages/auth`, pure Dart): DPoP proofs after RFC 9449 signed through
+  a device key port (ES256, `ath`, server nonce, the gateway form), one repeat on
+  `use_dpop_nonce`, refresh as a single flight per family that stores the new refresh token
+  before the access token is used, step-up with the step-up key and a repeat with the same
+  `Idempotency-Key`, the login flows (OIDC with PKCE, password with TOTP, proxy header, passkey,
+  enrollment code, pairing, pending device, logout), the signed-out event for a revoked session,
+  and Dio interceptors for the slot of `createApiClient`; no secret in any `toString`, error or
+  log line (M4-09).
 - Design tokens: `tools/design-tokens` writes `design/build/ts/tokens.gen.ts` for the Grafana
   panel plugin (colour roles of both themes including the chart and state roles, font families,
   font sizes and radii as typed constants) and copies the vendored Atkinson Hyperlegible fonts
