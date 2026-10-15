@@ -22,7 +22,7 @@ final class LocalTxn {
 
 /// Data access object of the one row of `sync_state`.
 final class SyncStateDao {
-  /// Creates the DAO on [db]; use `LocalDatabase.syncStateDao`.
+  /// Creates the DAO on a database; use `LocalDatabase.syncStateDao`.
   SyncStateDao(this._db);
 
   final LocalDatabase _db;

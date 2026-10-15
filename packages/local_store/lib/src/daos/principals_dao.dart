@@ -12,7 +12,7 @@ import 'upsert.dart';
 
 /// Data access object of principals and agents; hands out domain types only.
 final class PrincipalsDao {
-  /// Creates the DAO on [db]; use `LocalDatabase.principalsDao`.
+  /// Creates the DAO on a database; use `LocalDatabase.principalsDao`.
   PrincipalsDao(this._db);
 
   final LocalDatabase _db;

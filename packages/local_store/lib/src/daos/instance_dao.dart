@@ -11,7 +11,7 @@ import '../mappers/instance.dart';
 
 /// Data access object of the instance row; hands out domain types only.
 final class InstanceDao {
-  /// Creates the DAO on [db]; use `LocalDatabase.instanceDao`.
+  /// Creates the DAO on a database; use `LocalDatabase.instanceDao`.
   InstanceDao(this._db);
 
   final LocalDatabase _db;

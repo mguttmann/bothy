@@ -13,7 +13,7 @@ import 'upsert.dart';
 
 /// Data access object of threads; hands out domain types only.
 final class ThreadsDao {
-  /// Creates the DAO on [db]; use `LocalDatabase.threadsDao`.
+  /// Creates the DAO on a database; use `LocalDatabase.threadsDao`.
   ThreadsDao(this._db);
 
   final LocalDatabase _db;

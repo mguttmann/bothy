@@ -15,7 +15,7 @@ import '../models.dart';
 
 /// Data access object of the share inbox.
 final class ShareInboxDao {
-  /// Creates the DAO on [db]; use `LocalDatabase.shareInboxDao`.
+  /// Creates the DAO on a database; use `LocalDatabase.shareInboxDao`.
   ShareInboxDao(this._db);
 
   final LocalDatabase _db;

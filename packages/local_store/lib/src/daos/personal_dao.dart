@@ -15,7 +15,7 @@ import 'upsert.dart';
 
 /// Data access object of the personal data; hands out domain types only.
 final class PersonalDao {
-  /// Creates the DAO on [db]; use `LocalDatabase.personalDao`.
+  /// Creates the DAO on a database; use `LocalDatabase.personalDao`.
   PersonalDao(this._db);
 
   final LocalDatabase _db;

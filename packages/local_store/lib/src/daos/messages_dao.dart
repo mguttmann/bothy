@@ -15,7 +15,7 @@ import 'upsert.dart';
 
 /// Data access object of messages; hands out domain types only.
 final class MessagesDao {
-  /// Creates the DAO on [db]; use `LocalDatabase.messagesDao`.
+  /// Creates the DAO on a database; use `LocalDatabase.messagesDao`.
   MessagesDao(this._db);
 
   final LocalDatabase _db;

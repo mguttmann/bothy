@@ -14,7 +14,7 @@ import 'upsert.dart';
 
 /// Data access object of the structure tables; hands out domain types only.
 final class StructureDao {
-  /// Creates the DAO on [db]; use `LocalDatabase.structureDao`.
+  /// Creates the DAO on a database; use `LocalDatabase.structureDao`.
   StructureDao(this._db);
 
   final LocalDatabase _db;
