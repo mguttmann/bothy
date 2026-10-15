@@ -310,7 +310,7 @@ func TestSecretsInitCommand(t *testing.T) {
 		t.Fatalf("fresh target: exit %d, stderr %q, stdout\n%s", code, stderr, first)
 	}
 	lines := reportLines(t, first, target)
-	for _, want := range []string{"generated db_app_password sha256:", "adopted apns_key.p8 sha256:", "generated totp_key sha256:", "pending pgbackrest_tls/", "missing sentry_key"} {
+	for _, want := range []string{"generated db_app_password sha256:", "adopted apns_key.p8 sha256:", "generated totp_key sha256:", "generated pgbackrest_tls/ sha256:", "missing sentry_key"} {
 		if !slices.ContainsFunc(lines, func(l string) bool { return strings.HasPrefix(l, want) }) {
 			t.Errorf("report has no line %q:\n%s", want, first)
 		}

@@ -15,6 +15,7 @@ import sys
 from pathlib import Path
 
 import dart_api_docs
+import external_assets_check
 import pytest
 import yaml
 
@@ -31,7 +32,7 @@ if name == "dart" and args[:1] == ["doc"]:
     out = args[args.index("--output") + 1]
     os.makedirs(out, exist_ok=True)
     with open(os.path.join(out, "index.html"), "w", encoding="utf-8") as fh:
-        fh.write("<html></html>")
+        fh.write(os.environ.get("FAKE_DART_HTML", "<html></html>"))
     print(os.environ.get("FAKE_DART_OUTPUT", "Found 0 warnings and 0 errors."))
     sys.exit(int(os.environ.get("FAKE_DART_EXIT", "0")))
 sys.exit(0)
@@ -153,3 +154,28 @@ def test_page_lists_every_package() -> None:
     page = (REPO / "docs" / "reference" / "dart-api.md").read_text(encoding="utf-8")
     linked = re.findall(r"\]\(\.\./api/dart/([a-z0-9_]+)/index\.html\)", page)
     assert linked == packages
+
+
+# The head of a page as `dart doc` writes it: two Google Fonts stylesheets and their preconnect.
+DART_HEAD = """<html><head>
+  <link rel="preconnect" href="https://fonts.gstatic.com">
+  <link href="https://fonts.googleapis.com/css2?family=Roboto+Mono&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Material+Symbols" rel="stylesheet">
+  <link rel="stylesheet" href="static-assets/styles.css">
+</head><body><a href="https://api.flutter.dev/flutter/dart-core/String-class.html">String</a></body></html>
+"""
+
+
+def test_pages_load_no_font_from_another_origin(
+    repo: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """The site loads nothing from another origin (M7-19), so the Google Fonts links go."""
+    monkeypatch.setenv("FAKE_DART_HTML", DART_HEAD)
+    assert _run(repo) == 0
+    out = repo / "docs" / "api" / "dart"
+    assert external_assets_check.scan(out) == []
+    page = (out / "domain" / "index.html").read_text(encoding="utf-8")
+    assert "fonts.g" not in page
+    # Local stylesheets and anchors to external pages stay.
+    assert 'href="static-assets/styles.css"' in page
+    assert 'href="https://api.flutter.dev/' in page

@@ -8,12 +8,17 @@ or `error:` fails the run (documentation in code is a gate, docs/spec/23-qualita
 pages are generated for every build and never tracked (docs/DECISIONS.md D-M4-01-6); MkDocs
 copies them into the site, and docs/reference/dart-api.md links them.
 
+`dart doc` links its fonts from Google Fonts; the site loads nothing from another origin
+(tools/docs/external_assets_check.py, M7-19), so the script removes those `<link>` elements
+from every generated page and the pages use the browser's fonts (docs/DECISIONS.md INT-W20/3).
+
 Usage: dart_api_docs.py --out docs/api/dart [--root <repository>] [--rules <rules.yaml>]
 """
 
 from __future__ import annotations
 
 import argparse
+import re
 import shutil
 import subprocess
 import sys
@@ -22,6 +27,20 @@ from pathlib import Path
 import yaml
 
 _MARKERS = ("warning:", "error:")
+# The Google Fonts stylesheets and their preconnect in the head of every `dart doc` page.
+_FONT_LINK = re.compile(
+    r"[ \t]*<link\b[^>]*\bhref=[\"']https://fonts\.(?:googleapis|gstatic)\.com[^>]*>[ \t]*\n?",
+    re.IGNORECASE,
+)
+
+
+def drop_font_links(folder: Path) -> None:
+    """Remove the Google Fonts `<link>` elements from every HTML page below `folder`."""
+    for page in folder.rglob("*.html"):
+        text = page.read_text(encoding="utf-8")
+        cleaned = _FONT_LINK.sub("", text)
+        if cleaned != text:
+            page.write_text(cleaned, encoding="utf-8")
 
 
 def packages(rules: Path) -> list[tuple[str, str]]:
@@ -69,6 +88,7 @@ def main(argv: list[str] | None = None) -> int:
         if any(m in line for line in output.splitlines() for m in _MARKERS):
             print(f"dart-api-docs: {path}: dart doc printed a warning or an error", file=sys.stderr)
             return 1
+        drop_font_links(target)
     print(f"dart-api-docs: {len(packages(rules))} packages documented in {args.out}")
     return 0
 
