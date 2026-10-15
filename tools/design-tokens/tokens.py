@@ -26,7 +26,7 @@ from pathlib import Path
 HERE = Path(__file__).resolve().parent
 sys.path.insert(0, str(HERE))
 
-from tokenkit import accents, cvd, dtcg, emit_css, emit_dart, emit_docs, emit_preview, model, rules  # noqa: E402
+from tokenkit import accents, cvd, dtcg, emit_css, emit_dart, emit_docs, emit_preview, emit_ts, model, rules  # noqa: E402
 
 ROOT = HERE.parents[1]
 RESOLVER = ROOT / "design" / "tokens" / "theme.resolver.json"
@@ -38,6 +38,7 @@ VENDOR = HERE / "vendor"
 # (docs/spec/15-client-architektur.md 3.1), so `build` writes the same bytes twice and `check`
 # compares both (docs/DECISIONS.md D-M4-04-1).
 PACKAGE_DART = ROOT / "packages" / "design_system" / "lib" / "src" / "generated" / "design_tokens.g.dart"
+TS_FONTS = BUILD / "ts" / "fonts"
 HEADER = (
     "GENERIERT von tools/design-tokens/tokens.py aus design/tokens. Nicht bearbeiten; Quelle ändern und neu erzeugen."
 )
@@ -134,6 +135,9 @@ def _build_readme() -> str:
         "| `dart/design_tokens.g.dart` | Konstanten und `ThemeExtension`-Klassen | `packages/design_system` |\n"
         "| `tokens.resolved.json` | alle Tokens aufgelöst, je Kontext "
         "| Server-Prüfung erlaubter Farb- und Icon-Schlüssel, Design-Werkzeuge |\n"
+        "| `ts/tokens.gen.ts` | colour roles of both themes, font families, font sizes and radii as TypeScript "
+        "constants; `ts/fonts/` holds the bundled fonts with their SIL Open Font License "
+        "| Grafana panel plugin |\n"
         "| `preview.html` | eigenständige Vorschau (Schriften und Icons eingebettet) "
         "| Menschen, Playwright für `docs/design/previews/` |\n\n"
         "Erzeugen: `uv run tools/design-tokens/tokens.py build`. Prüfen: `make tokens`.\n"
@@ -180,6 +184,7 @@ def generate() -> tuple[dict[Path, str], list[str]]:
         BUILD / "tokens.css": emit_css.render(m, HEADER, variants, default),
         BUILD / "dart" / "design_tokens.g.dart": dart,
         PACKAGE_DART: dart,
+        BUILD / "ts" / "tokens.gen.ts": emit_ts.render(m),
         BUILD / "tokens.resolved.json": _resolved_json(m, variants, default, cvd_member),
         BUILD / "preview.html": emit_preview.render(m, VENDOR, HEADER),
         DOCS / "palette.md": emit_docs.palette_md(m, HEADER),
@@ -198,16 +203,27 @@ def cmd_build(_args) -> int:
         for p in problems:
             print("  " + p, file=sys.stderr)
         return 1
+    fonts = emit_ts.font_copies(VENDOR / "fonts", TS_FONTS)
     for path, text in outputs.items():
         path.parent.mkdir(parents=True, exist_ok=True)
         path.write_text(text, encoding="utf-8")
         print(f"wrote {path.relative_to(ROOT)}")
+    TS_FONTS.mkdir(parents=True, exist_ok=True)
+    # The directory holds only copies; a file the vendor set no longer has would ship stale.
+    for extra in emit_ts.font_problems(fonts, TS_FONTS):
+        if extra not in fonts:
+            extra.unlink()
+    for dst, src in fonts.items():
+        shutil.copyfile(src, dst)
+        print(f"copied {dst.relative_to(ROOT)}")
     return 0
 
 
 def cmd_check(_args) -> int:
     outputs, problems = generate()
     stale = [p for p, text in outputs.items() if not p.exists() or p.read_text(encoding="utf-8") != text]
+    fonts = emit_ts.font_copies(VENDOR / "fonts", TS_FONTS)
+    stale += emit_ts.font_problems(fonts, TS_FONTS)
     vendor = vendor_problems(VENDOR)
     for p in problems:
         print("gate: " + p, file=sys.stderr)
@@ -217,7 +233,10 @@ def cmd_check(_args) -> int:
         print("vendor: " + p, file=sys.stderr)
     if problems or stale or vendor:
         return 1
-    print(f"ok: {len(outputs)} generated files up to date, all design gates pass, vendor/ matches MANIFEST.json")
+    print(
+        f"ok: {len(outputs)} generated files and {len(fonts)} font copies up to date, "
+        "all design gates pass, vendor/ matches MANIFEST.json"
+    )
     return 0
 
 

@@ -20,6 +20,11 @@ Planning stage (milestone M0). Nothing is installable yet.
 
 ### Added
 
+- Design tokens: `tools/design-tokens` writes `design/build/ts/tokens.gen.ts` for the Grafana
+  panel plugin (colour roles of both themes including the chart and state roles, font families,
+  font sizes and radii as typed constants) and copies the vendored Atkinson Hyperlegible fonts
+  with their SIL Open Font License to `design/build/ts/fonts/`; `make tokens` fails on a stale or
+  hand-edited file, a missing font or licence, and compiles the file with `tsc --strict` (M7-24).
 - Design tokens: `make tokens` checks the chart series `color.viz.series.1` to `.8` (adjacent
   pairs and series 8 with series 1) and the traffic light states `success.fg`, `warning.fg` and
   `danger.fg` under simulated protanopia, deuteranopia and tritanopia (Machado et al. 2009,

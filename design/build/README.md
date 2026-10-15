@@ -7,6 +7,7 @@ GENERIERT von tools/design-tokens/tokens.py aus design/tokens. Nicht bearbeiten;
 | `tokens.css` | CSS-Variablen (`--ds-*`), Theme, Dichte und Bewegung per Attribut oder Systemeinstellung | Doku-Site, Vorschau, Statusseite |
 | `dart/design_tokens.g.dart` | Konstanten und `ThemeExtension`-Klassen | `packages/design_system` |
 | `tokens.resolved.json` | alle Tokens aufgelöst, je Kontext | Server-Prüfung erlaubter Farb- und Icon-Schlüssel, Design-Werkzeuge |
+| `ts/tokens.gen.ts` | colour roles of both themes, font families, font sizes and radii as TypeScript constants; `ts/fonts/` holds the bundled fonts with their SIL Open Font License | Grafana panel plugin |
 | `preview.html` | eigenständige Vorschau (Schriften und Icons eingebettet) | Menschen, Playwright für `docs/design/previews/` |
 
 Erzeugen: `uv run tools/design-tokens/tokens.py build`. Prüfen: `make tokens`.
