@@ -136,6 +136,8 @@ func TestCheckLiveness(t *testing.T) {
 		{"session expired", func(l *domain.Liveness) { l.SessionExpiresAt = t0 }, domain.ReasonSessionRevoked},
 		{"device revoked", func(l *domain.Liveness) { l.DeviceState = "revoked" }, domain.ReasonDeviceInactive},
 		{"device unknown", func(l *domain.Liveness) { l.DeviceState = "unknown" }, domain.ReasonDeviceInactive},
+		{"device key revoked", func(l *domain.Liveness) { l.DeviceKeyRevoked = true }, domain.ReasonDeviceInactive},
+		{"key revoked on a pending device", func(l *domain.Liveness) { l.DeviceState, l.DeviceKeyRevoked = "pending", true }, domain.ReasonDeviceInactive},
 		{"token revoked", func(l *domain.Liveness) { l.HasToken, l.TokenActive = true, false }, domain.ReasonTokenRevoked},
 		{"token expired", func(l *domain.Liveness) { l.HasToken, l.TokenActive, l.TokenExpiresAt = true, true, t0 }, domain.ReasonTokenRevoked},
 		{"app without installation", func(l *domain.Liveness) { l.IsApp = true }, domain.ReasonAppNotInstalled},

@@ -80,8 +80,8 @@ func (c *Chain) CORSEnabled() bool { return len(c.origins) > 0 }
 // server.public_url and the escaped path (never from the Host header), Authorization, DPoP and the
 // client IP. Without Authorization it returns the anonymous actor; its error becomes the problem
 // (after the failed-credentials hook, when one is set). A request with credentials passes the precheck
-// of M1-19 first, whose settle function gets the result of the Authenticator. The actor goes into
-// the context.
+// of M1-19 first, whose settle function gets the result of the Authenticator. The actor, the DPoP
+// facts of the request (reqmeta.Proof) and a setter of response headers go into the context.
 func (c *Chain) authenticateStage(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		ip, _ := reqmeta.ClientIP(r.Context())
@@ -90,8 +90,14 @@ func (c *Chain) authenticateStage(next http.Handler) http.Handler {
 			HTU:           c.HTU(r),
 			Authorization: authorization(r.Header),
 			DPoP:          r.Header.Get(headerDPoP),
+			DPoPProofs:    r.Header.Values(headerDPoP),
 			ClientIP:      ip,
 		}
+		// The DPoP facts go to the handlers of the login and refresh endpoints, and the
+		// Authenticator and the use cases set DPoP-Nonce without the response writer (M1-34).
+		ctx := reqmeta.WithProof(r.Context(), reqmeta.Proof{Method: creds.Method, HTU: creds.HTU, Values: creds.DPoPProofs})
+		ctx = reqmeta.WithResponseHeaders(ctx, w.Header().Set)
+		r = r.WithContext(ctx)
 		c.mu.Lock()
 		hook, precheck := c.failedCreds, c.precheck
 		c.mu.Unlock()

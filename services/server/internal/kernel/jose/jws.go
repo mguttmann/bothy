@@ -214,6 +214,27 @@ func SignCompact(signer Signer, header Header, payload []byte) (string, error) {
 	return input + "." + encodeSegment(sig), nil
 }
 
+// SignerFunc is a Signer from an algorithm and a signing function. Token issuers whose key sits
+// behind a port that signs with a context (instance.Keys, ADR 0066) wrap that call in Fn, so no
+// type of theirs crosses into this package (M1-34).
+type SignerFunc struct {
+	// Algorithm is the JWS algorithm of the key, AlgES256 or AlgEdDSA.
+	Algorithm string
+	// Fn returns the signature over signingInput.
+	Fn func(signingInput []byte) ([]byte, error)
+}
+
+// Alg returns Algorithm.
+func (s SignerFunc) Alg() string { return s.Algorithm }
+
+// Sign calls Fn; a nil Fn is an error.
+func (s SignerFunc) Sign(signingInput []byte) ([]byte, error) {
+	if s.Fn == nil {
+		return nil, fmt.Errorf("%w: signer without a function", ErrInvalidJWS)
+	}
+	return s.Fn(signingInput)
+}
+
 // ES256Signer signs with an ECDSA P-256 private key; the signature is R || S with 64 bytes.
 type ES256Signer struct {
 	// Key is the private key; it must be on P-256.

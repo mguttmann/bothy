@@ -38,10 +38,28 @@ type Actor struct {
 	Kind Kind
 	// SessionID is auth_sessions.id (people only).
 	SessionID ids.ID
+	// SessionActive reports what the authenticator read for this request: the session exists, is
+	// not revoked, has not reached its end and belongs to ID and DeviceID (M1-34). authz decides
+	// with it (check_active); the authenticator never rejects on it, so the denial is audited.
+	SessionActive bool
 	// DeviceID is the device of the session (people only).
 	DeviceID ids.ID
+	// DeviceState is the state of the device as the authenticator read it for this request:
+	// DevicePending, DeviceActive, DeviceRevoked or DeviceUnknown; "" when the authenticator read
+	// none (then authz falls back to its credential source).
+	DeviceState string
+	// DeviceKeyActive reports that KeyThumbprint is the device's active dpop key.
+	DeviceKeyActive bool
+	// KeyThumbprint is cnf.jkt of the access token, the RFC 7638 thumbprint of the DPoP key.
+	KeyThumbprint string
 	// StepUpAt is the last fresh confirmation of the session; zero when there was none.
 	StepUpAt time.Time
+	// StepUpMethod is auth_sessions.step_up_method of StepUpAt; "" for none.
+	StepUpMethod string
+	// AuthMethod is auth_sessions.auth_method, the login path of the session.
+	AuthMethod string
+	// ClientComponent is auth_sessions.client_component (app, share_ext, console).
+	ClientComponent string
 	// TokenID is the API token of an agent, app or personal token; zero otherwise.
 	TokenID ids.ID
 	// Scopes are the scopes of the API token (api_tokens.scopes, 07 section 3 token_scopes). They
@@ -59,6 +77,15 @@ type Actor struct {
 	// for none. Filled from M2 on.
 	ActingFor ActingFor
 }
+
+// The device states of Actor.DeviceState (devices.state plus unknown for a device that does not
+// exist or belongs to someone else).
+const (
+	DevicePending = "pending"
+	DeviceActive  = "active"
+	DeviceRevoked = "revoked"
+	DeviceUnknown = "unknown"
+)
 
 // ActingFor names the run an agent acts in (07 section 3, SR9): the triggering person, the run,
 // its thread and the jti of the invocation token.
@@ -90,6 +117,18 @@ func (a Actor) InstallationRef() ids.ID { return a.InstallationID }
 
 // StepUpTime returns a.StepUpAt (kernel/authorize.Principal).
 func (a Actor) StepUpTime() time.Time { return a.StepUpAt }
+
+// CredentialState returns the state of session, device and device key the authenticator read for
+// this request and true; false when it read none (DeviceState empty), for example for an API
+// token or a principal built outside the authenticator. authz prefers these fresh facts to its
+// cached ones (07 section 4.2 check_active, M1-34). The signature uses plain values because the
+// kernel ports do not import each other.
+func (a Actor) CredentialState() (sessionActive bool, deviceState string, deviceKeyActive, observed bool) {
+	if a.DeviceState == "" {
+		return false, "", false, false
+	}
+	return a.SessionActive, a.DeviceState, a.DeviceKeyActive, true
+}
 
 // AppGrantedScopes returns a.GrantedScopes (kernel/authorize.Principal); the slice is shared.
 func (a Actor) AppGrantedScopes() []string { return a.GrantedScopes }
@@ -144,6 +183,9 @@ type Credentials struct {
 	Authorization string
 	// DPoP is the value of the DPoP header (the proof), or "".
 	DPoP string
+	// DPoPProofs are all values of the DPoP header in order; more than one is an invalid proof
+	// (RFC 9449 section 4.3). nil when the request has none.
+	DPoPProofs []string
 	// ClientIP is the client IP the chain resolved (06 "Basic rules", row Client IP); the
 	// identity module counts failed proofs against rl.public_auth with it.
 	ClientIP netip.Addr
@@ -169,7 +211,8 @@ type Authenticator interface {
 	Revalidate(ctx context.Context, a Actor) error
 }
 
-// AnonymousOnly is the Authenticator until identity is wired (M1-34): every request without
+// AnonymousOnly is the Authenticator before identity is wired (internal/wire uses identity's from
+// the start step sessions on, M1-34) and in tests: every request without
 // credentials is anonymous, and every request with an Authorization header fails with
 // 401 unauthenticated, so no credential is ever accepted unchecked (fail closed).
 type AnonymousOnly struct{}

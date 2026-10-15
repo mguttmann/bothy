@@ -14,12 +14,14 @@ import (
 	identitypg "github.com/OWNER/bothy/services/server/internal/identity/adapters/postgres"
 	"github.com/OWNER/bothy/services/server/internal/identity/adapters/replay"
 	"github.com/OWNER/bothy/services/server/internal/identity/app"
+	"github.com/OWNER/bothy/services/server/internal/instance"
 	instancepg "github.com/OWNER/bothy/services/server/internal/instance/adapters/postgres"
 	instanceapp "github.com/OWNER/bothy/services/server/internal/instance/app"
 	"github.com/OWNER/bothy/services/server/internal/kernel/auditing"
 	"github.com/OWNER/bothy/services/server/internal/kernel/authorize"
 	"github.com/OWNER/bothy/services/server/internal/kernel/clock"
 	"github.com/OWNER/bothy/services/server/internal/kernel/eventlog"
+	"github.com/OWNER/bothy/services/server/internal/kernel/ids"
 	"github.com/OWNER/bothy/services/server/internal/kernel/txn"
 	"github.com/OWNER/bothy/services/server/internal/platform/config"
 	"github.com/OWNER/bothy/services/server/internal/platform/lifecycle"
@@ -77,7 +79,21 @@ type Identity struct {
 	Replay *replay.Store
 	// Handlers are the REST handlers of listMyDevices, listUserDevices and getDevice.
 	Handlers *identityhttp.Devices
-	cfg      app.Config
+	// Sessions implements the port identity.Auth (M1-34); nil until BindSessions.
+	Sessions *app.Sessions
+	// Authenticator is the kernel/actor.Authenticator of people (M1-34); nil until BindSessions.
+	Authenticator *app.Authenticator
+	// SessionHandlers are the REST handlers of refreshToken, logout, listMySessions,
+	// listUserSessions and createExtensionSession; nil until BindSessions.
+	SessionHandlers *identityhttp.Sessions
+	cfg             app.Config
+	repo            *identitypg.Repository
+	uow             txn.UnitOfWork
+	az              authorize.Authorizer
+	writes          IdentityWrites
+	pepper          []byte
+	clk             clock.Clock
+	log             *slog.Logger
 }
 
 // IdentityWrites are the collaborators of the writing use cases of identity (M1-31): the
@@ -119,8 +135,35 @@ func NewIdentity(cfg app.Config, pool *pg.Pool, uow txn.UnitOfWork, az authorize
 	}
 	return &Identity{
 		Devices: devices, People: people, PeopleHandlers: identityhttp.NewPeople(people, people), DPoP: verifier, Replay: store,
-		Handlers: identityhttp.NewDevices(devices), cfg: cfg,
+		Handlers: identityhttp.NewDevices(devices), cfg: cfg, repo: repo, uow: uow, az: az, writes: w,
+		pepper: append([]byte(nil), pepper...), clk: clk, log: orDiscard(log),
 	}, nil
+}
+
+// BindSessions builds the session part of identity (M1-34) over the signing keys of instance and
+// the instance id (the issuer of access tokens): the use cases of identity.Auth, the Authenticator
+// of the HTTP chain and the session handlers. The start calls it after the signing keys exist.
+// Errors: a duration, URL or collaborator the use cases refuse.
+func (i *Identity) BindSessions(keys instance.Keys, instanceID ids.ID) error {
+	tokens, err := app.NewAccessTokens(app.AccessTokenConfig{
+		InstanceID: instanceID, PublicURL: i.cfg.PublicURL, TTL: i.cfg.AccessTokenTTL, Leeway: i.cfg.ClockLeeway,
+	}, keys, i.clk)
+	if err != nil {
+		return err
+	}
+	sessions, err := app.NewSessions(i.cfg, i.pepper, app.SessionsDeps{
+		Store: i.repo, Devices: i.repo, People: i.repo, Tokens: tokens, DPoP: i.DPoP, UoW: i.uow, Authorizer: i.az,
+		Audit: i.writes.Audit, Events: i.writes.Events, Cursors: identityhttp.Cursors{}, Clock: i.clk,
+	})
+	if err != nil {
+		return err
+	}
+	auth, err := app.NewAuthenticator(i.cfg, tokens, i.DPoP, i.repo, i.clk, i.log)
+	if err != nil {
+		return err
+	}
+	i.Sessions, i.Authenticator, i.SessionHandlers = sessions, auth, identityhttp.NewSessions(sessions, i.DPoP)
+	return nil
 }
 
 // Start runs the sweeper of the jti store every auth.dpop_proof_max_age (the length of the replay

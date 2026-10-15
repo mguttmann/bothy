@@ -43,6 +43,15 @@ type Principal interface {
 	ActingForPerson() ids.ID
 }
 
+// CredentialObserver is implemented by a principal whose authenticator read the state of its
+// session, device and device key for the request (kernel/actor.Actor, M1-34). observed is false
+// when it read none. authz uses these facts in check_active instead of its cached ones, so a
+// revoked session or device takes effect at the next request without a new rights version (07
+// section 4.2, AZ-P9).
+type CredentialObserver interface {
+	CredentialState() (sessionActive bool, deviceState string, deviceKeyActive, observed bool)
+}
+
 // Scope is the result of Authorizer.Scope: the sets list queries filter with (07 section 7.4).
 // The lists are built per request from the rights snapshot and the current structure, so a channel
 // or space created without a new rights version appears at once.

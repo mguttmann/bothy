@@ -5,6 +5,8 @@
 package sqlcgen
 
 import (
+	"net/netip"
+
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
@@ -34,6 +36,26 @@ type AuditIpKey struct {
 	KeyRef        string
 	CreatedAt     pgtype.Timestamptz
 	DestroyedAt   pgtype.Timestamptz
+}
+
+type AuthSession struct {
+	ID               pgtype.UUID
+	UserID           pgtype.UUID
+	DeviceID         pgtype.UUID
+	ClientComponent  string
+	ParentSessionID  pgtype.UUID
+	IdentityID       pgtype.UUID
+	AuthMethod       string
+	CookieHash       []byte
+	CreatedAt        pgtype.Timestamptz
+	ExpiresAt        pgtype.Timestamptz
+	StepUpAt         pgtype.Timestamptz
+	StepUpMethod     pgtype.Text
+	StepUpConsumedAt pgtype.Timestamptz
+	LastSeenAt       pgtype.Timestamptz
+	LastIp           *netip.Addr
+	RevokedAt        pgtype.Timestamptz
+	RevokeReason     pgtype.Text
 }
 
 type Device struct {
@@ -185,6 +207,27 @@ type Principal struct {
 	CreatedAt    pgtype.Timestamptz
 	DisabledAt   pgtype.Timestamptz
 	DeletedAt    pgtype.Timestamptz
+}
+
+type RefreshToken struct {
+	ID         pgtype.UUID
+	FamilyID   pgtype.UUID
+	Generation int32
+	TokenHash  []byte
+	IssuedAt   pgtype.Timestamptz
+	ExpiresAt  pgtype.Timestamptz
+	UsedAt     pgtype.Timestamptz
+}
+
+type RefreshTokenFamily struct {
+	ID                pgtype.UUID
+	SessionID         pgtype.UUID
+	DpopJkt           string
+	CurrentGeneration int32
+	RotatedAt         pgtype.Timestamptz
+	CreatedAt         pgtype.Timestamptz
+	RevokedAt         pgtype.Timestamptz
+	RevokeReason      pgtype.Text
 }
 
 type SequenceCounter struct {

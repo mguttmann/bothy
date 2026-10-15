@@ -168,6 +168,9 @@ func TestConfigPrintShowsSourcePerKey(t *testing.T) {
 		"auth.clock_leeway = 30s  # default\n" +
 		"auth.dpop_nonce_ttl = 5m  # default\n" +
 		"auth.dpop_proof_max_age = 1m  # default\n" +
+		"auth.refresh_reuse_grace = 30s  # default\n" +
+		"auth.refresh_token_ttl = 14d  # default\n" +
+		"auth.session_max_age = 30d  # default\n" +
 		"auth.step_up_max_age = 5m  # default\n" +
 		"auth.token_pepper_ref = file:/run/bothy/secrets/token_pepper  # default\n" +
 		"authz.expiry_reminder_lead = 2d  # default\n" +
@@ -214,6 +217,7 @@ func TestConfigPrintShowsSourcePerKey(t *testing.T) {
 		"http.request_timeout = 15s  # default\n" +
 		"http.transfer_timeout = 10m  # default\n" +
 		"http.unavailable_retry_after = 5s  # default\n" +
+		"identity.last_active_granularity = 5m  # default\n" +
 		"instance.environment = prod  # default\n" +
 		"jobs.queue.default.max_workers = 8  # default\n" +
 		"jobs.queue.delivery.max_workers = 16  # default\n" +

@@ -17,6 +17,26 @@ import (
 // stubServer implements the enabled operations without behaviour; Build only registers them.
 type stubServer struct{}
 
+func (stubServer) RefreshToken(context.Context, rest.RefreshTokenRequestObject) (rest.RefreshTokenResponseObject, error) {
+	return nil, nil
+}
+
+func (stubServer) Logout(context.Context, rest.LogoutRequestObject) (rest.LogoutResponseObject, error) {
+	return nil, nil
+}
+
+func (stubServer) ListMySessions(context.Context, rest.ListMySessionsRequestObject) (rest.ListMySessionsResponseObject, error) {
+	return nil, nil
+}
+
+func (stubServer) ListUserSessions(context.Context, rest.ListUserSessionsRequestObject) (rest.ListUserSessionsResponseObject, error) {
+	return nil, nil
+}
+
+func (stubServer) CreateExtensionSession(context.Context, rest.CreateExtensionSessionRequestObject) (rest.CreateExtensionSessionResponseObject, error) {
+	return nil, nil
+}
+
 func (stubServer) GetDevice(context.Context, rest.GetDeviceRequestObject) (rest.GetDeviceResponseObject, error) {
 	return nil, nil
 }
@@ -99,6 +119,12 @@ func TestRealTable_Enabled(t *testing.T) {
 		"updateMyProfile":  {"PATCH /api/v1/me/profile", "self.profile.update", "rl.write"},
 		"getJwks":          {"GET /api/v1/instance/jwks", "instance.discovery.read", "rl.public_auth"},
 		"rotateSigningKey": {"POST /api/v1/signing-keys/rotate", "signing_key.rotate", "rl.admin"},
+		// M1-34
+		"refreshToken":           {"POST /api/v1/auth/token/refresh", "auth.token.refresh", "rl.public_auth"},
+		"logout":                 {"POST /api/v1/auth/logout", "auth.logout", "rl.write"},
+		"listMySessions":         {"GET /api/v1/me/sessions", "session.list", "rl.read"},
+		"listUserSessions":       {"GET /api/v1/users/{user_id}/sessions", "session.list", "rl.read"},
+		"createExtensionSession": {"POST /api/v1/me/sessions/extensions", "session.extension.create", "rl.write"},
 	}
 	ops := routes.Enabled()
 	if len(ops) != len(want) {

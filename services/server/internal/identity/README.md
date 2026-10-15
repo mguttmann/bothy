@@ -1,6 +1,6 @@
 # Module `identity`
 
-Status: principal tables and directory built (M1-26); devices, device keys and the DPoP verifier built (M1-33); people, owners and the own profile built (M1-31); sessions, logins and tokens follow with the tickets of the milestone.
+Status: principal tables and directory built (M1-26); devices, device keys and the DPoP verifier built (M1-33); people, owners and the own profile built (M1-31); sessions, access tokens, refresh families, logout and the Authenticator built (M1-34); logins, step-up and API tokens follow with the tickets of the milestone.
 The normative source is [docs/spec/02-architecture.md](../../../../docs/spec/02-architecture.md); if this file differs, the chapter applies.
 
 ## Purpose
@@ -54,8 +54,8 @@ Principals, people, owners, login drivers, identities, local credentials, enroll
   info `dpop-nonce/v1`, window `unix / auth.dpop_nonce_ttl`, current and previous window) and the
   replay key `SHA-256(htu || 0x00 || jti)`.
 - `app`: `Devices`, `DPoPVerifier` (checks in the order of the brief, nothing remembered on a
-  failure), `CredentialSource` (device state; sessions and tokens not active until M1-34 and
-  M1-44), the outgoing ports `DeviceStore`, `Cursors` and `ReplayStore`; `Config` binds
+  failure), `CredentialSource` (device state; the session part follows with M1-34, tokens stay not
+  active until M1-44), the outgoing ports `DeviceStore`, `Cursors` and `ReplayStore`; `Config` binds
   `auth.dpop_nonce_ttl`, `auth.dpop_proof_max_age`, `auth.clock_leeway`, `auth.token_pepper_ref`,
   `server.public_url`, `api.page_size_default`, `api.page_size_max`.
 - `adapters/postgres`: `queries/devices.sql` and the device methods of `Repository`; a reused
@@ -130,6 +130,69 @@ Principals, people, owners, login drivers, identities, local credentials, enroll
   credentials, structure and agent policy; every response is validated against
   `docs/api/openapi.yaml` (`httpservertest.ResponseValidator`). Rulings: docs/DECISIONS.md M1-31.
 
+### Sessions, access tokens and refresh families (M1-34)
+
+- Port (`auth.go`): `Auth` (`StartSession` and `StartChildSession` join the ambient unit of work and
+  authorize nothing, the login tickets call them; `CreateExtensionSession`, `Refresh`, `Logout`,
+  `ListSessions` authorize; `RevokeSession` is for M1-35 and M1-45) with `ClientComponent`,
+  `AuthMethod`, `SessionRevokeReason`, `StartSession`, `Session`, `SessionPage`, `TokenSet` and the
+  redacting `Token` (prints `[redacted]` through fmt, slog and JSON; only `Reveal` returns the
+  value). In-transaction event `SessionEnded{SessionIDs, UserID, DeviceID, Reason}` on every
+  revocation that changed something.
+- `domain/session`: the rotation decision `Decide` (`rotate`, `grace_rotate`, `reuse`, `expired`,
+  `family_revoked`; the grace holds strictly below `auth.refresh_reuse_grace`), `BuildClaims`
+  (exactly `iss`, `aud`, `sub`, `sid`, `did`, `jti`, `iat`, `nbf`, `exp`, `cnf.jkt`, `amr`; `exp`
+  never after the session end), `RefreshExpiry`, `Audience`, `NewRefreshToken` (32 bytes from
+  `crypto/rand`, 43 characters base64url) and `TokenHash` (HMAC-SHA-256 with the token pepper).
+- `app`: `AccessTokens` (issues with header `typ` `at+jwt` and the active key of purpose
+  `access_token` of `instance.Keys`; verifies `typ`, `kid` of an `active` or `retiring` key,
+  signature, `iss`, `aud`, `nbf` and `exp` with `auth.clock_leeway`), `Sessions` (implements
+  `identity.Auth`; refresh in one unit of work with the session rows locked in ascending id, then
+  the family), `Authenticator` (implements `kernel/actor.Authenticator`: no header anonymous;
+  several headers or another scheme `401 unauthenticated`; `Bearer bothy_...` waits for M1-44;
+  an access token as Bearer `401 invalid_dpop_proof`; `DPoP`: token, proof, then one query for
+  session, device and active key into the actor; a stale nonce gets `DPoP-Nonce`; activity at most
+  once per `identity.last_active_granularity`), `CredentialSource` (sessions part:
+  `SessionActive`, `SessionExpiresAt`), the outgoing port `SessionStore`. The Authenticator never
+  rejects on session or device state: `authorize` does in `check_active` with the facts the actor
+  carries (`authorize.CredentialObserver`), so the denial is audited and a revocation takes effect
+  at the next request in every process (docs/DECISIONS.md M1-34/2).
+- Operations (`adapters/httpapi/sessions.go`):
+
+  | Operation | Action and resource | Audit | Answer |
+  |---|---|---|---|
+  | `refreshToken` | `auth.token.refresh`, anonymous, `auth_session` | denials (`unauthenticated`, `session_revoked`) | `200 TokenResponse` |
+  | `logout` | `auth.logout` on the caller's session | allow | `204` |
+  | `listMySessions` | `session.list` on the caller | none | `200 SessionPage` |
+  | `listUserSessions` | `session.list` on the person (self or owner, others `404`) | none | `200 SessionPage` |
+  | `createExtensionSession` | `session.extension.create` on the caller's session | allow | `201 TokenResponse` |
+
+  Refresh carries no `Authorization` header (the operation is public), only the proof. A missing
+  proof `401 invalid_dpop_proof`; unknown or expired token `401
+  unauthenticated`; revoked family, session or device, a family key that is no longer the device's
+  active key, disabled person or a session past its end `401 session_revoked`; a proof of
+  another key `401 invalid_dpop_proof` and nothing changes;
+  rotation and grace as 03 `refresh_tokens`; reuse revokes family (`reuse_detected`), session and
+  children (`refresh_reuse`, their families `session_revoked`), commits, then `401
+  session_revoked`. Lists hold active sessions only, children included, newest first.
+- Event `session.revoked`: resource `auth_session`, audience the person, empty scope, actor the
+  acting principal or none, payload `{session_id, reason}`, receive action `self`.
+- `adapters/postgres`: `queries/sessions.sql`, `queries/refresh.sql`, `sessions.go`.
+- Migration `migrations/00011_identity_sessions.sql`: `auth_sessions`, `refresh_token_families`
+  and `refresh_tokens` as 03 section 4.2 (the foreign key of `identity_id` follows with M1-36);
+  `bothy_app` may read, insert and update, not delete.
+- Configuration: `auth.access_token_ttl`, `auth.refresh_token_ttl`, `auth.session_max_age`,
+  `auth.refresh_reuse_grace`, `auth.clock_leeway`, `auth.token_pepper_ref`,
+  `identity.last_active_granularity`, `server.public_url`, `api.page_size_default`,
+  `api.page_size_max`.
+- Lint: depguard `crypto-rand-only-in-identity` bans `math/rand` and `math/rand/v2` here (ID-T27).
+- Tests: `domain/session` (`TestSessionDecide`, `TestAccessToken_Claims`,
+  `TestNewRefreshToken_IDT27`), `app/accesstoken_test.go` (key states, leeway, iss and aud),
+  `TestCredentialSource_Sessions`, `migrations/identity_sessions_test.go`, and the HTTP tests of
+  `adapters/httpapi/sessions_test.go` over PostgreSQL 18 with real signing keys, authz, sync and
+  audit (ID-T14 Bearer case, ID-T15, ID-T16, ID-T17, revocation across two instances, nonce,
+  activity, logout, lists). Rulings: docs/DECISIONS.md M1-34.
+
 ## Port (root package `internal/identity`)
 
 - Inbound: `Auth` (login, refresh, logout, child sessions, step-up), `Directory`, `Devices`, `Tokens`, `Owners`; declares `AvatarFiles`.
@@ -172,7 +235,7 @@ Only this module writes and reads these tables by SQL (03-data-model.md, princip
 
 - Tokens only as HMAC with a server pepper; refresh rotation with a lock on the family; reuse revokes the family and the session (03, 4.2).
 - Implements `kernel/actor.Authenticator` for `platform/httpserver` and `gateway`.
-- Revoking a device or a session increments the permission version (05, column Permissions) and closes connections with `4012` through the event `session.revoked`.
+- Revoking a device or a session closes connections with `4012` through the event `session.revoked`. Logout and refresh reuse do not raise the permission version: `authorize` reads the session state the Authenticator read for the request (docs/DECISIONS.md M1-34/2); `device.revoke` and `session.revoke` (M1-45) keep the rights change of 05.
 
 ## Chapters
 

@@ -464,3 +464,44 @@ func TestOperationFrom(t *testing.T) {
 		t.Fatalf("OperationFrom = %+v", got)
 	}
 }
+
+// nonceAuthenticator sets a response header through the context and accepts every request.
+type nonceAuthenticator struct{ creds *actor.Credentials }
+
+func (n nonceAuthenticator) Authenticate(ctx context.Context, c actor.Credentials) (actor.Actor, error) {
+	*n.creds = c
+	reqmeta.SetResponseHeader(ctx, "DPoP-Nonce", "fresh-nonce")
+	return actor.Anonymous(), nil
+}
+
+func (nonceAuthenticator) Revalidate(context.Context, actor.Actor) error { return nil }
+
+// TestAuth_ProofsAndResponseHeaders (M1-34): the Authenticator sees every DPoP value, the handler
+// finds the DPoP facts in its context, and a header the Authenticator sets through the context
+// reaches the response.
+func TestAuth_ProofsAndResponseHeaders(t *testing.T) {
+	t.Parallel()
+	op := getThing()
+	var creds actor.Credentials
+	var proof reqmeta.Proof
+	h := httpservertest.New(t, httpservertest.Options{
+		Authenticator: nonceAuthenticator{creds: &creds},
+		Routes: []httpservertest.Route{{Op: op, Handler: func(w http.ResponseWriter, r *http.Request) {
+			proof, _ = reqmeta.ProofOf(r.Context())
+			okHandler(op.Action)(w, r)
+		}}},
+	})
+	req := h.NewRequest(http.MethodGet, "/api/v1/things/"+thingID, "", "X-Mode", "fast", "DPoP", "p1")
+	req.Header.Add("DPoP", "p2")
+	resp := h.Do(req)
+	want := httpservertest.PublicURL + "/api/v1/things/" + thingID
+	if len(creds.DPoPProofs) != 2 || creds.DPoPProofs[1] != "p2" || creds.DPoP != "p1" {
+		t.Fatalf("credentials proofs %q, dpop %q", creds.DPoPProofs, creds.DPoP)
+	}
+	if proof.HTU != want || proof.Method != http.MethodGet || len(proof.Values) != 2 {
+		t.Fatalf("proof in the handler %+v", proof)
+	}
+	if resp.Header.Get("DPoP-Nonce") != "fresh-nonce" {
+		t.Fatalf("DPoP-Nonce %q", resp.Header.Get("DPoP-Nonce"))
+	}
+}

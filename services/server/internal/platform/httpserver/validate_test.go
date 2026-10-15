@@ -169,3 +169,24 @@ func TestNewValidatorErrors(t *testing.T) {
 		t.Error("an operation outside the validator must fail closed")
 	}
 }
+
+// TestValidate_MissingDPoPIsUnauthenticated (M1-34): a missing required DPoP header is 401
+// invalid_dpop_proof with the DPoP challenge, not 400 (refreshToken, the login operations); other
+// missing headers stay 400.
+func TestValidate_MissingDPoPIsUnauthenticated(t *testing.T) {
+	t.Parallel()
+	op := httpservertest.Op("getProof", http.MethodGet, "/api/v1/proofs", "proof.read")
+	h := httpservertest.New(t, httpservertest.Options{Routes: []httpservertest.Route{{Op: op,
+		Handler: httpservertest.Authorized(op.Action, func(w http.ResponseWriter, _ *http.Request) { w.WriteHeader(204) })}}})
+	resp := h.Do(h.NewRequest(http.MethodGet, "/api/v1/proofs", "", "X-Mode", "fast"))
+	p := wantProblem(t, resp, 401, "invalid_dpop_proof")
+	if !strings.HasPrefix(resp.Header.Get("WWW-Authenticate"), `DPoP error="invalid_dpop_proof"`) || p["errors"] != nil {
+		t.Fatalf("WWW-Authenticate %q, problem %v", resp.Header.Get("WWW-Authenticate"), p)
+	}
+	resp = h.Do(h.NewRequest(http.MethodGet, "/api/v1/proofs", "", "DPoP", "x"))
+	wantFields(t, fieldErrors(t, resp), "#header/X-Mode required")
+	resp = h.Do(h.NewRequest(http.MethodGet, "/api/v1/proofs", "", "DPoP", "x", "X-Mode", "fast"))
+	if resp.StatusCode != 204 {
+		t.Fatalf("with both headers: %d %s", resp.StatusCode, resp.Body)
+	}
+}

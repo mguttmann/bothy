@@ -190,8 +190,9 @@ func (v *Validator) prune(path string, item *v3.PathItem, keep map[string]bool) 
 // Validate checks the parameters of r and, for a JSON operation, its body against the contract of
 // op. It returns nil, or 400 validation_failed whose errors[] names each violation with a JSON
 // Pointer into the body or #path/<name>, #query/<name>, #header/<name> and a code of the
-// vocabulary above. An operation the validator was not built for is 500 internal_error (fail
-// closed: an unvalidated request must not reach a handler). The body is read and restored.
+// vocabulary above; a missing required DPoP header is 401 invalid_dpop_proof instead (M1-34). An
+// operation the validator was not built for is 500 internal_error (fail closed: an unvalidated
+// request must not reach a handler). The body is read and restored.
 func (v *Validator) Validate(r *http.Request, op Operation) error {
 	entry, ok := v.ops[op.ID]
 	if !ok {
@@ -208,10 +209,19 @@ func (v *Validator) Validate(r *http.Request, op Operation) error {
 	if len(found) == 0 {
 		return nil
 	}
+	return problemOf(found)
+}
+
+// problemOf is the 400 validation_failed of the violations found, each field error once; a
+// missing DPoP header is the 401 of missingProof instead.
+func problemOf(found []*verrors.ValidationError) error {
 	e := errs.New(errs.CodeValidationFailed, "")
 	seen := map[errs.FieldError]bool{}
 	for _, ve := range found {
 		for _, f := range fieldErrors(ve) {
+			if f.Pointer == pointerDPoP && f.Code == fieldCodeRequired {
+				return missingProof()
+			}
 			if !seen[f] {
 				seen[f] = true
 				e = e.WithFields(f)
@@ -249,6 +259,18 @@ func (v *Validator) bodyErrors(r *http.Request, entry opEntry) ([]*verrors.Valid
 		return list, nil
 	}
 	return nil, nil
+}
+
+// pointerDPoP is the field pointer of the DPoP proof header.
+const pointerDPoP = "#header/" + headerDPoP
+
+// missingProof is the answer to a missing required DPoP header: 401 invalid_dpop_proof with the
+// DPoP challenge, the code of every other failed proof (06 section 3.1, RFC 9449 section 7.1),
+// not 400; the client must sign a proof, not fix a parameter (M1-34). The nonce comes with the
+// next answer of the verifier.
+func missingProof() error {
+	return errs.New(errs.CodeInvalidDPoPProof, "").
+		WithHeader("WWW-Authenticate", `DPoP error="invalid_dpop_proof", algs="ES256 EdDSA"`)
 }
 
 // fieldErrors turns one error of the validator into field errors.

@@ -69,8 +69,6 @@ rules:
     milestone: M1
   - match: "host."  # M2-39
     milestone: M2
-  - match: "identity."  # M1-34
-    milestone: M1
   - match: "interaction."  # M2-15
     milestone: M2
   - match: "message."  # M1-46, M1-56, M1-57

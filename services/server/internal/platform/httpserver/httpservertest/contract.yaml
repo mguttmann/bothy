@@ -46,6 +46,25 @@ paths:
       responses:
         '200':
           description: ok
+  /proofs:
+    get:
+      operationId: getProof
+      description: Needs a DPoP proof header (M1-34).
+      parameters:
+      - name: DPoP
+        in: header
+        required: true
+        schema:
+          type: string
+      - name: X-Mode
+        in: header
+        required: true
+        schema:
+          type: string
+          enum: [fast, slow]
+      responses:
+        '204':
+          description: ok
   /things:
     post:
       operationId: createThing

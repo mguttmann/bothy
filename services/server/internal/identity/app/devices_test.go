@@ -184,7 +184,7 @@ func TestCredentialSource_Devices(t *testing.T) {
 	t.Parallel()
 	f := newFixture(t)
 	devs := newDevices(t, f)
-	src := app.NewCredentialSource(f.repo)
+	src := app.NewCredentialSource(f.repo, f.repo)
 	ctx := context.Background()
 	alex := f.add(domain.KindUser, "alex")
 	sam := f.add(domain.KindUser, "sam")
@@ -226,5 +226,64 @@ func TestCredentialSource_Devices(t *testing.T) {
 	}
 	if got, err := src.Credentials(ctx, authz.CredentialRef{PrincipalID: alex.ID}); err != nil || got != (authz.CredentialFacts{}) {
 		t.Errorf("no device id: %+v, %v; want zero facts", got, err)
+	}
+}
+
+// TestCredentialSource_Sessions holds the session part of the source (M1-34): a session is active
+// when it exists, is not revoked and belongs to principal and device; its end is reported for
+// authz to compare, so an expired session is active with an end in the past.
+func TestCredentialSource_Sessions(t *testing.T) {
+	t.Parallel()
+	f := newFixture(t)
+	devs := newDevices(t, f)
+	src := app.NewCredentialSource(f.repo, f.repo)
+	ctx := context.Background()
+	alex := f.add(domain.KindUser, "alex")
+	sam := f.add(domain.KindUser, "sam")
+	r, _, _ := registration(alex.ID)
+	r.State, r.ApprovedBy = identity.DeviceStateActive, &sam.ID
+	d, err := devs.Register(ctx, r)
+	if err != nil {
+		t.Fatal(err)
+	}
+	end := time.Now().Add(time.Hour).UTC().Truncate(time.Microsecond)
+	sess := func(expires time.Time, revoked bool) ids.ID {
+		id := ids.New()
+		f.sql(`INSERT INTO auth_sessions (id, user_id, device_id, auth_method, expires_at) VALUES ($1, $2, $3, 'oidc', $4)`,
+			id.String(), alex.ID.String(), d.ID.String(), expires)
+		if revoked {
+			f.sql(`UPDATE auth_sessions SET revoked_at = now(), revoke_reason = 'logout' WHERE id = $1`, id.String())
+		}
+		return id
+	}
+	active, revoked, expired := sess(end, false), sess(end, true), sess(time.Now().Add(-time.Minute), false)
+	for _, tc := range []struct {
+		name              string
+		principal, sessID ids.ID
+		wantActive        bool
+		wantEnd           bool
+	}{
+		{"active", alex.ID, active, true, true},
+		{"revoked", alex.ID, revoked, false, true},
+		{"expired", alex.ID, expired, true, true},
+		{"foreign principal", sam.ID, active, false, false},
+		{"unknown session", alex.ID, ids.New(), false, false},
+	} {
+		got, err := src.Credentials(ctx, authz.CredentialRef{PrincipalID: tc.principal, SessionID: tc.sessID, DeviceID: d.ID})
+		if err != nil || got.SessionActive != tc.wantActive {
+			t.Errorf("%s: %+v, %v", tc.name, got, err)
+		}
+		if tc.name == "active" && !got.SessionExpiresAt.Equal(end) {
+			t.Errorf("active: end %v, want %v", got.SessionExpiresAt, end)
+		}
+		if tc.name == "expired" && !got.SessionExpiresAt.Before(time.Now()) {
+			t.Errorf("expired: end %v not in the past", got.SessionExpiresAt)
+		}
+		if !tc.wantEnd && got.SessionActive {
+			t.Errorf("%s: active", tc.name)
+		}
+	}
+	if got, err := src.Credentials(ctx, authz.CredentialRef{PrincipalID: alex.ID, SessionID: active, DeviceID: ids.New()}); err != nil || got.SessionActive {
+		t.Errorf("session on another device: %+v, %v", got, err)
 	}
 }
