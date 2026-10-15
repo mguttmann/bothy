@@ -22,6 +22,10 @@ only runs for release tags. Every finding names a rule:
   unpinned-action               `uses:` not pinned to a full commit SHA (or image digest)
   missing-timeout               a job without timeout-minutes (reusable calls excepted)
   runner-without-switch         a runner chosen outside the rules above
+  signing-outside-release       a signing step (cosign sign, sign-blob, attest; the `sign`
+                                command of tools/ci/release_chain.py; actions/attest) in a job
+                                whose environment is not `release`, the only one that holds
+                                the signing key (ADR 0062 "Confirmation")
 
 A public-only or release job may also name its runner as `${{ matrix.<key> }}` when every
 value of that matrix key is a GitHub-hosted label (native builds per architecture).
@@ -57,6 +61,13 @@ _HOSTED_LABEL = re.compile(rf"^{_HOSTED}$")
 _MATRIX_RUNNER = re.compile(r"^\$\{\{\s*matrix\.([A-Za-z0-9_-]+)\s*\}\}$")
 _PINNED = re.compile(r"^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+(?:/[^@\s]+)?@[0-9a-f]{40}$")
 _DOCKER_PINNED = re.compile(r"^docker://[^@\s]+@sha256:[0-9a-f]{64}$")
+# Steps that sign: cosign signing commands, the signing command of the release chain and the
+# Sigstore-backed attestation actions. Verification (`cosign verify`) is not signing.
+_SIGNING_RUN = re.compile(
+    r"\bcosign\s+(?:sign|sign-blob|attest|attest-blob)\b|\brelease_chain\.py\s+sign\b"
+)
+_SIGNING_USES = re.compile(r"^actions/attest(?:-[a-z-]+)?@")
+SIGNING_ENVIRONMENT = "release"
 
 
 @dataclass(frozen=True)
@@ -162,6 +173,15 @@ def _check_job(
     for i, step in enumerate(job.get("steps") or []):
         if isinstance(step, dict):
             _check_uses(file, f"{where} step {i + 1}", step.get("uses"), out)
+            if _is_signing(step) and _environment(job) != SIGNING_ENVIRONMENT:
+                out.append(
+                    Finding(
+                        file,
+                        f"{where} step {i + 1}",
+                        "signing-outside-release",
+                        "signing steps belong in a job with environment: release",
+                    )
+                )
     if "timeout-minutes" not in job:
         out.append(Finding(file, where, "missing-timeout", "set timeout-minutes"))
     guarded = has_public_guard(job.get("if"))
@@ -176,6 +196,25 @@ def _check_job(
     if hosted and (guarded or file in RELEASE_WORKFLOWS):
         return
     out.append(Finding(file, where, "runner-without-switch", runs_on))
+
+
+def _is_signing(step: dict[str, Any]) -> bool:
+    """Return whether a step signs (see _SIGNING_RUN and _SIGNING_USES)."""
+    run, uses = step.get("run"), step.get("uses")
+    return (isinstance(run, str) and _SIGNING_RUN.search(run) is not None) or (
+        isinstance(uses, str) and _SIGNING_USES.match(uses) is not None
+    )
+
+
+def _environment(job: dict[str, Any]) -> str:
+    """Return the environment name of a job, without case and edge blanks ("" without one).
+
+    GitHub compares environment names without case, so `Release` holds the same secrets.
+    """
+    env = job.get("environment")
+    if isinstance(env, dict):
+        env = env.get("name")
+    return env.strip().lower() if isinstance(env, str) else ""
 
 
 def _hosted_matrix(job: dict[str, Any], runs_on: str) -> bool:

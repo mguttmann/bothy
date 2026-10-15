@@ -6,7 +6,8 @@ component-specific gates only for the listed ones; repository-wide gates always 
 A change outside every known area selects `all` (fail safe).
 
 Release components map a tag `<component>/v<semver>` (or `v<semver>` for the whole
-product) to a directory with its own VERSION file (docs/spec/18-release.md).
+product) to a directory with its own VERSION file and a CHANGELOG.md with a section for that
+version (docs/spec/18-release.md); `release` rejects the tag otherwise.
 
 Usage:
   components.py changed --base <sha> --head <sha>   print components for `make COMPONENTS=`
@@ -69,6 +70,9 @@ RELEASE_COMPONENTS: dict[str, tuple[str, str]] = {
     "claude-code-runner": ("plugins/claude-code-runner", "plugins"),
     "grafana-bothy-live": ("plugins/grafana-bothy-live", "plugins"),
 }
+# Paths outside a release component's directory whose commits belong to its releases
+# (ADR 0060 item 2): the API contract ships with the server.
+RELEASE_EXTRA_PATHS: dict[str, tuple[str, ...]] = {"server": ("docs/api",)}
 _SEMVER = re.compile(
     r"^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)"
     r"(?:-((?:0|[1-9]\d*|\d*[A-Za-z-][0-9A-Za-z-]*)(?:\.(?:0|[1-9]\d*|\d*[A-Za-z-][0-9A-Za-z-]*))*))?"
@@ -102,6 +106,45 @@ def format_for_make(names: list[str]) -> str:
     return " ".join(sorted(names))
 
 
+def tag_prefix(component: str) -> str:
+    """Return the tag prefix of a release component, the part before `v<semver>`.
+
+    Args:
+        component: a key of RELEASE_COMPONENTS.
+
+    Returns:
+        `<component>/`, or an empty string for the product `bothy` (tags `v<semver>`).
+
+    Raises:
+        ReleaseError: the component is unknown.
+
+    Example: `tag_prefix("server")` is `"server/"`.
+    """
+    if component not in RELEASE_COMPONENTS:
+        raise ReleaseError(f"unknown release component '{component}'")
+    return "" if component == "bothy" else f"{component}/"
+
+
+def release_paths(component: str) -> tuple[str, ...]:
+    """Return the repository paths whose commits count for a release of `component`.
+
+    Args:
+        component: a key of RELEASE_COMPONENTS.
+
+    Returns:
+        The component directory plus RELEASE_EXTRA_PATHS; an empty tuple for the product
+        `bothy`, whose directory is the repository root (every commit counts).
+
+    Raises:
+        ReleaseError: the component is unknown.
+    """
+    tag_prefix(component)
+    directory = RELEASE_COMPONENTS[component][0]
+    if directory == ".":
+        return ()
+    return (directory, *RELEASE_EXTRA_PATHS.get(component, ()))
+
+
 def release_info(tag: str, repo: Path) -> dict[str, Any]:
     component, sep, rest = tag.rpartition("/")
     if not sep:
@@ -118,6 +161,14 @@ def release_info(tag: str, repo: Path) -> dict[str, Any]:
     recorded = version_file.read_text(encoding="utf-8").strip()
     if recorded != version:
         raise ReleaseError(f"{directory}/VERSION says {recorded}, tag says {version}")
+    # The release notes come from this section; without it nothing may be built or published
+    # (ADR 0036 "Confirmation", ADR 0060).
+    changelog = repo / directory / "CHANGELOG.md"
+    if not changelog.is_file():
+        raise ReleaseError(f"{directory}/CHANGELOG.md is missing")
+    heading = re.compile(rf"^## \[{re.escape(version)}\]", re.MULTILINE)
+    if not heading.search(changelog.read_text(encoding="utf-8")):
+        raise ReleaseError(f"{directory}/CHANGELOG.md has no section [{version}]")
     match = _SEMVER.match(version)
     return {
         "component": component,

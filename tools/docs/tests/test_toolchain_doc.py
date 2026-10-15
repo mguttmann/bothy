@@ -156,6 +156,14 @@ def pinned_tools() -> dict[str, str]:
     m = re.search(r"pre-commit-hooks\n\s+rev: [0-9a-f]{40}  # frozen: (\S+)", hooks)
     assert m, "pre-commit-hooks"
     pins["pre-commit-hooks"] = m.group(1)
+    trial = (REPO / "tools" / "ci" / "release_trial.py").read_text()
+    m = re.search(r'"registry:([^@"]+)@sha256:[0-9a-f]{64}"', trial)
+    assert m, "registry image of the trial release"
+    pins["registry"] = m.group(1)
+    scancode = (REPO / "tools" / "scancode" / "Dockerfile").read_text()
+    m = re.search(r"^ARG SCANCODE_VERSION=(\S+)$", scancode, re.MULTILINE)
+    assert m, "ScanCode version"
+    pins["scancode-toolkit"] = m.group(1)
     pins["uv"] = "Systemwerkzeug"
     pins.update({k: v for k, v in sdk_pins().items() if k in SDK_GENERATORS})
     return pins

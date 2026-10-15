@@ -103,6 +103,13 @@ documented in this file. The format is based on
   `webhook.secret_rotation_overlap` and `webhook.hmac_master_key_ref` with the cross-checks
   `webhook_backoff_order` and `webhook_retry_within_retention`; new generated secret
   `webhook_hmac_master_key`; new log attribute `bothy.webhook_subscription.id`.
+- Release chain (M7-10): `make -C services/server release-build VERSION=<v> OUT=<dir>` builds the
+  static binaries `bothy_<v>_linux_amd64` and `bothy_<v>_linux_arm64`. A tag `server/vX.Y.Z`
+  publishes `bothy-server:X.Y.Z` and `bothy-postgres:pg18-X.Y.Z` (multi-arch, built without
+  emulation) only after the vulnerability scan, ScanCode, SBOMs (SPDX and CycloneDX per image
+  platform and binary), signatures of every digest, binary and `SHA256SUMS`, and their
+  verification; `make release-trial COMPONENT=server` runs the same steps locally.
+  `docs/operations/release.md` section 5 names the verification commands of both phases.
 
 - Sending messages (M1-56): `createMessage` and `createThread`. Migrations `00032` and `00033`
   create `messages` and `mentions` and give `threads.parent_message_id` its deferred foreign key.

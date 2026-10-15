@@ -57,8 +57,17 @@ Planungsgrundlage nennt River (MPL-2.0) für Hintergrundjobs.
    festgehalten; nie pauschal für alle Pakete.
 4. Vor jedem Release und vor dem Öffentlich-Schalten: ScanCode über den ganzen Baum
    (Lizenztexte und Copyright-Angaben in Dateien), Ergebnis im Release-Protokoll. ScanCode
-   ist kein Pull-Request-Gate, weil ein Lauf über den ganzen Baum lange dauert; der
-   Ablauf ist ein Ticket der Release-Etappe.
+   ist kein Pull-Request-Gate, weil ein Lauf über den ganzen Baum lange dauert. As built
+   (M7-10): `make scancode` scans the tracked tree (`git archive HEAD`) with ScanCode Toolkit
+   32.5.0 in a container built from `tools/scancode/Dockerfile` (base image pinned by digest,
+   release archive by sha256; linux/amd64 only, emulated on arm64 hosts), writes
+   `scancode.json` and runs `tools/ci/scancode_policy.py`: every file whose detected license
+   expression the list above does not satisfy (`OR` needs one allowed side, `AND` both,
+   `WITH` its license; `LicenseRef-*` never) and every file ScanCode could not scan is a
+   finding, except paths listed with a reason in `quality/licenses/scancode-exceptions.txt`
+   (text that names or quotes a license without licensing the file). In `release.yml` the job
+   `scancode` runs it for every server tag; a finding stops the release before any image tag,
+   and the report is attached to the release.
 
 ## Bundled fonts
 
@@ -77,7 +86,9 @@ D-M4-04-4).
 ## SBOM und Prüfung von Releases
 
 * Jedes Release enthält `sbom.spdx.json` (SPDX, erzeugt mit Syft über
-  `anchore/sbom-action`) und `SHA256SUMS`.
+  `anchore/sbom-action`) und `SHA256SUMS`. Server releases (M7-10) instead carry SPDX and
+  CycloneDX SBOMs per image platform and per binary from the pinned Syft, signature bundles and
+  a signed `SHA256SUMS` ([18-release.md](../spec/18-release.md) 6.1).
 * Server-Images tragen Provenance und SBOM als Attestation im Registry-Eintrag
   (Buildx, `provenance: mode=max`, `sbom: true`).
 * Im öffentlichen Zustand zusätzlich signierte Build-Provenance und SBOM-Attestation über

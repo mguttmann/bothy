@@ -269,6 +269,53 @@ def test_release_workflow_triggers_are_limited() -> None:
     assert "release-trigger" in check(text, "release.yml")
 
 
+def release_job(step: str, environment: str = "") -> str:
+    """A tag-triggered release workflow with one job that runs `step`."""
+    env_line = f"\n    environment: {environment}" if environment else ""
+    return (
+        "on:\n  push:\n    tags: ['server/v*']\npermissions:\n  contents: read\njobs:\n"
+        f"  sign:{env_line}\n    runs-on: ubuntu-24.04\n    timeout-minutes: 10\n"
+        f"    steps:\n      - {step}\n"
+    )
+
+
+SIGNING_STEPS = [
+    "run: cosign sign --yes --key env://COSIGN_PRIVATE_KEY img@sha256:00",
+    "run: |\n          echo start\n          cosign sign-blob --bundle b.json SHA256SUMS",
+    "run: uv run --project tools python tools/ci/release_chain.py sign --dist dist",
+    f"uses: actions/attest@{SHA} # v4.2.2",
+]
+
+
+@pytest.mark.parametrize("step", SIGNING_STEPS)
+def test_signing_step_outside_the_release_environment(step: str) -> None:
+    assert check(release_job(step), "release.yml") == ["signing-outside-release"]
+    assert check(release_job(step, "release-apple"), "release.yml") == ["signing-outside-release"]
+
+
+@pytest.mark.parametrize("environment", ["release", "Release ", "{name: release}"])
+@pytest.mark.parametrize("step", SIGNING_STEPS)
+def test_signing_step_in_the_release_environment(step: str, environment: str) -> None:
+    assert check(release_job(step, environment), "release.yml") == []
+
+
+def test_signing_rule_applies_to_every_workflow() -> None:
+    text = ok_job().replace("- run: make gates", "- run: cosign sign-blob --bundle x.json x")
+    assert check(text) == ["signing-outside-release"]
+
+
+@pytest.mark.parametrize(
+    "step",
+    [
+        "run: cosign verify --key k.pub img@sha256:00",
+        "run: cosign verify-blob --key k.pub --bundle b.json f",
+        "run: echo cosign-signing-config",
+    ],
+)
+def test_verification_is_not_signing(step: str) -> None:
+    assert check(release_job(step), "release.yml") == []
+
+
 def test_invalid_yaml_is_reported() -> None:
     assert check("on: [unclosed\n") == ["invalid-yaml"]
 

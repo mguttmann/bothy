@@ -1,8 +1,16 @@
 # SPDX-License-Identifier: Apache-2.0
 #
 # Release of one component per tag: `<component>/v<semver>` or `v<semver>` for the whole
-# product (tools/ci/components.py, docs/spec/18-release.md). Order: resolve the tag,
-# run the full gate (ci.yml), build, SBOM, then publish with provenance.
+# product (tools/ci/components.py, docs/spec/18-release.md). Order: resolve the tag (VERSION
+# equals the tag, CHANGELOG.md has its section), run the full gate (ci.yml), build, SBOM, then
+# publish with provenance.
+#
+# Server (docs/spec/18-release.md sections 6 and 7, brief M7-10): `build` pushes bothy-server
+# for both platforms by digest (cross compiled), `postgres-build` pushes bothy-postgres per
+# platform on a native runner by digest, `scancode` scans the tracked tree, and
+# `supply-chain` joins the postgres index, scans both images, writes the SBOMs, signs every
+# digest, binary and SHA256SUMS, verifies like an instance operator and only then sets the
+# version tags (tools/ci/release_chain.py; `make release-trial` runs the same steps locally).
 #
 # Release-class workflow (ADR 0039): only here may jobs use GitHub-hosted runners
 # without the private/public switch, because Windows hardware is missing and macOS
@@ -72,6 +80,9 @@ jobs:
     permissions:
       contents: read
       packages: write # push the server image to ghcr.io
+    outputs:
+      dist_id: ${{ steps.upload.outputs.artifact-id }}
+      server_digest: ${{ steps.image.outputs.digest }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -79,6 +90,24 @@ jobs:
       - uses: astral-sh/setup-uv@1c37ad07a6a961277cf70c0d37d6f313000f5884 # v10.3.0
         with:
           enable-cache: false
+      # The resolve job has no release environment. Its outputs may steer control flow
+      # (`if:`), but no value from it reaches a shell or an action here: this job resolves
+      # the tag again from the fixed component list and stops on any difference (D-W-52).
+      - name: Resolve the tag again on this runner
+        id: info
+        env:
+          TAG: ${{ github.ref_name }}
+        run: uv run --no-project --python 3.14 tools/ci/components.py release --tag "$TAG" --github-output >> "$GITHUB_OUTPUT"
+      - name: Stop if the resolve job reported something else
+        if: >-
+          steps.info.outputs.component != needs.resolve.outputs.component ||
+          steps.info.outputs.version != needs.resolve.outputs.version ||
+          steps.info.outputs.path != needs.resolve.outputs.path ||
+          steps.info.outputs.gate_components != needs.resolve.outputs.gate_components ||
+          steps.info.outputs.prerelease != needs.resolve.outputs.prerelease
+        run: |
+          echo "::error::the resolve job disagrees with this release job; release stopped"
+          exit 1
       - if: hashFiles('services/server/go.mod') != ''
         uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
         with:
@@ -86,27 +115,27 @@ jobs:
           cache: false
       - name: Build release artifacts (component Makefile, target release-build)
         env:
-          COMPONENT_PATH: ${{ needs.resolve.outputs.path }}
-          VERSION: ${{ needs.resolve.outputs.version }}
+          COMPONENT_PATH: ${{ steps.info.outputs.path }}
+          VERSION: ${{ steps.info.outputs.version }}
         run: |
           mkdir -p dist
           make -C "$COMPONENT_PATH" release-build VERSION="$VERSION" OUT="$GITHUB_WORKSPACE/dist"
       - name: Image name (registry names are lower case)
-        if: needs.resolve.outputs.component == 'server'
+        if: steps.info.outputs.component == 'server'
         id: name
         env:
           OWNER: ${{ github.repository_owner }}
         run: echo "image=ghcr.io/${OWNER,,}/bothy-server" >> "$GITHUB_OUTPUT"
-      - if: needs.resolve.outputs.component == 'server'
+      - if: steps.info.outputs.component == 'server'
         uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
-      - if: needs.resolve.outputs.component == 'server'
+      - if: steps.info.outputs.component == 'server'
         uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f # v4.6.0
         with:
           registry: ghcr.io
           username: ${{ github.actor }}
           password: ${{ github.token }}
       - name: Build and push the multi-arch server image by digest only (no tag yet)
-        if: needs.resolve.outputs.component == 'server'
+        if: steps.info.outputs.component == 'server'
         id: image
         uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
         with:
@@ -117,26 +146,326 @@ jobs:
           # so no QEMU step: no stage runs under emulation (docs/spec/18-release.md
           # "Server-Images" rule 2). The build fails if VERSION differs from services/server/VERSION.
           build-args: |
-            VERSION=${{ needs.resolve.outputs.version }}
+            VERSION=${{ steps.info.outputs.version }}
             REVISION=${{ github.sha }}
             SOURCE_URL=${{ github.server_url }}/${{ github.repository }}
           provenance: mode=max
           sbom: true
           outputs: type=image,name=${{ steps.name.outputs.image }},push-by-digest=true,name-canonical=true,push=true
-      - name: Vulnerability scan, then the version tag
-        if: needs.resolve.outputs.component == 'server'
-        env:
-          IMAGE: ${{ steps.name.outputs.image }}
-          DIGEST: ${{ steps.image.outputs.digest }}
-          VERSION: ${{ needs.resolve.outputs.version }}
-        run: |
-          make trivy-image IMAGE="$IMAGE@$DIGEST"
-          docker buildx imagetools create --tag "$IMAGE:$VERSION" "$IMAGE@$DIGEST"
-      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+      # No tag here: scan, ScanCode, SBOMs, signatures and verification come first (job
+      # supply-chain).
+      - id: upload
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: dist-linux
           path: dist
           if-no-files-found: ignore
+
+  # bothy-postgres per platform on a native GitHub-hosted runner, no emulation (18 "Server-Images"
+  # rule 2), pushed by digest only; supply-chain joins the digests into one index.
+  postgres-build:
+    name: postgres-build (${{ matrix.runner }})
+    needs: [resolve, gates]
+    if: needs.resolve.outputs.component == 'server'
+    strategy:
+      fail-fast: true
+      matrix:
+        runner: [ubuntu-24.04, ubuntu-24.04-arm]
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 45
+    permissions:
+      contents: read
+      packages: write # push the database image to ghcr.io by digest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: astral-sh/setup-uv@1c37ad07a6a961277cf70c0d37d6f313000f5884 # v10.3.0
+        with:
+          enable-cache: false
+      # The resolve job has no release environment. Its outputs may steer control flow
+      # (`if:`), but no value from it reaches a shell or an action here: this job resolves
+      # the tag again from the fixed component list and stops on any difference (D-W-52).
+      - name: Resolve the tag again on this runner
+        id: info
+        env:
+          TAG: ${{ github.ref_name }}
+        run: uv run --no-project --python 3.14 tools/ci/components.py release --tag "$TAG" --github-output >> "$GITHUB_OUTPUT"
+      - name: Stop if the resolve job reported something else
+        if: >-
+          steps.info.outputs.component != needs.resolve.outputs.component ||
+          steps.info.outputs.version != needs.resolve.outputs.version ||
+          steps.info.outputs.path != needs.resolve.outputs.path ||
+          steps.info.outputs.gate_components != needs.resolve.outputs.gate_components ||
+          steps.info.outputs.prerelease != needs.resolve.outputs.prerelease
+        run: |
+          echo "::error::the resolve job disagrees with this release job; release stopped"
+          exit 1
+      - name: Image name and platform of this runner
+        id: name
+        env:
+          OWNER: ${{ github.repository_owner }}
+        run: |
+          case "$RUNNER_ARCH" in
+            X64) arch=amd64 ;;
+            ARM64) arch=arm64 ;;
+            *) echo "::error::unexpected runner architecture $RUNNER_ARCH"; exit 1 ;;
+          esac
+          {
+            echo "image=ghcr.io/${OWNER,,}/bothy-postgres"
+            echo "platform=linux/$arch"
+            echo "arch=$arch"
+          } >> "$GITHUB_OUTPUT"
+      - uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
+      - uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f # v4.6.0
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ github.token }}
+      - name: Build and push bothy-postgres for this platform by digest only
+        id: image
+        uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
+        with:
+          context: .
+          file: services/server/images/bothy-postgres/Dockerfile
+          platforms: ${{ steps.name.outputs.platform }}
+          build-args: |
+            VERSION=${{ steps.info.outputs.version }}
+            REVISION=${{ github.sha }}
+            SOURCE_URL=${{ github.server_url }}/${{ github.repository }}
+          provenance: mode=max
+          sbom: true
+          outputs: type=image,name=${{ steps.name.outputs.image }},push-by-digest=true,name-canonical=true,push=true
+      - name: Digest file
+        env:
+          DIGEST: ${{ steps.image.outputs.digest }}
+          ARCH: ${{ steps.name.outputs.arch }}
+        run: |
+          mkdir -p "$RUNNER_TEMP/digest"
+          printf '%s\n' "$DIGEST" > "$RUNNER_TEMP/digest/postgres-$ARCH"
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: postgres-digest-${{ steps.name.outputs.arch }}
+          path: ${{ runner.temp }}/digest
+          if-no-files-found: error
+
+  # License and copyright scan of the tracked tree (docs/quality/licenses.md section 4); a
+  # finding outside quality/licenses/allowed.txt stops the release before any tag. ScanCode's
+  # native parts exist for linux/amd64 only.
+  scancode:
+    name: scancode
+    needs: resolve
+    if: needs.resolve.outputs.component == 'server'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 120
+    outputs:
+      report_id: ${{ steps.upload.outputs.artifact-id }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: astral-sh/setup-uv@1c37ad07a6a961277cf70c0d37d6f313000f5884 # v10.3.0
+        with:
+          enable-cache: false
+      - name: ScanCode over the tracked tree with the license gate
+        run: make scancode SCANCODE_OUT="$RUNNER_TEMP/scancode"
+      - name: Report as a release artifact
+        if: always()
+        env:
+          TAG: ${{ github.ref_name }}
+        run: |
+          mkdir -p "$RUNNER_TEMP/report"
+          cp "$RUNNER_TEMP/scancode/scancode.json" "$RUNNER_TEMP/report/scancode-${TAG//\//-}.json"
+      - id: upload
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: scancode-report
+          path: ${{ runner.temp }}/report
+          if-no-files-found: error
+
+  # Supply chain of the server (ADR 0036, ADR 0062): every step before the version tags. The
+  # signing key of the private phase exists only as a secret of the environment release.
+  supply-chain:
+    name: supply chain (server)
+    needs: [resolve, build, postgres-build, scancode]
+    if: needs.resolve.outputs.component == 'server'
+    environment: release
+    runs-on: ${{ github.event.repository.private && fromJSON('["self-hosted","bothy-ci"]') || 'ubuntu-24.04' }}
+    timeout-minutes: 60
+    permissions:
+      contents: read
+      packages: write # signatures, attestations and version tags in ghcr.io
+      id-token: write # keyless signing and attestations in the public phase
+      attestations: write # store the image attestations (public phase)
+      artifact-metadata: write # storage record required by actions/attest
+    outputs:
+      dist_id: ${{ steps.upload.outputs.artifact-id }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: astral-sh/setup-uv@1c37ad07a6a961277cf70c0d37d6f313000f5884 # v10.3.0
+        with:
+          enable-cache: false
+      # The resolve job has no release environment. Its outputs may steer control flow
+      # (`if:`), but no value from it reaches a shell or an action here: this job resolves
+      # the tag again from the fixed component list and stops on any difference (D-W-52).
+      - name: Resolve the tag again on this runner
+        id: info
+        env:
+          TAG: ${{ github.ref_name }}
+        run: uv run --no-project --python 3.14 tools/ci/components.py release --tag "$TAG" --github-output >> "$GITHUB_OUTPUT"
+      - name: Stop if the resolve job reported something else
+        if: >-
+          steps.info.outputs.component != needs.resolve.outputs.component ||
+          steps.info.outputs.version != needs.resolve.outputs.version ||
+          steps.info.outputs.path != needs.resolve.outputs.path ||
+          steps.info.outputs.gate_components != needs.resolve.outputs.gate_components ||
+          steps.info.outputs.prerelease != needs.resolve.outputs.prerelease
+        run: |
+          echo "::error::the resolve job disagrees with this release job; release stopped"
+          exit 1
+      - name: Image names (registry names are lower case)
+        id: name
+        env:
+          OWNER: ${{ github.repository_owner }}
+        run: |
+          echo "server=ghcr.io/${OWNER,,}/bothy-server" >> "$GITHUB_OUTPUT"
+          echo "postgres=ghcr.io/${OWNER,,}/bothy-postgres" >> "$GITHUB_OUTPUT"
+      - uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
+      - uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f # v4.6.0
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ github.token }}
+      - name: Binaries of the build
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          artifact-ids: ${{ needs.build.outputs.dist_id }}
+          path: dist
+          merge-multiple: true
+      - name: ScanCode report
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          artifact-ids: ${{ needs.scancode.outputs.report_id }}
+          path: dist
+          merge-multiple: true
+      - name: Digests of bothy-postgres per platform
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          pattern: postgres-digest-*
+          path: ${{ runner.temp }}/digest
+          merge-multiple: true
+      - name: Join bothy-postgres into one multi-arch index (by digest, no tag)
+        id: join
+        env:
+          IMAGE: ${{ steps.name.outputs.postgres }}
+        run: |
+          [ -s "$RUNNER_TEMP/digest/postgres-amd64" ] && [ -s "$RUNNER_TEMP/digest/postgres-arm64" ] \
+            || { echo "::error::a platform digest of bothy-postgres is missing"; exit 1; }
+          digest=$(uv run --project tools --locked --quiet python tools/ci/release_chain.py join --repo "$IMAGE" \
+            --digest "$(cat "$RUNNER_TEMP/digest/postgres-amd64")" --digest "$(cat "$RUNNER_TEMP/digest/postgres-arm64")")
+          echo "digest=$digest" >> "$GITHUB_OUTPUT"
+      - name: Image references
+        id: ref
+        env:
+          SERVER: ${{ steps.name.outputs.server }}@${{ needs.build.outputs.server_digest }}
+          POSTGRES: ${{ steps.name.outputs.postgres }}@${{ steps.join.outputs.digest }}
+        run: |
+          echo "server=$SERVER" >> "$GITHUB_OUTPUT"
+          echo "postgres=$POSTGRES" >> "$GITHUB_OUTPUT"
+      - name: Vulnerability scan of both images, each platform
+        env:
+          SERVER: ${{ steps.ref.outputs.server }}
+          POSTGRES: ${{ steps.ref.outputs.postgres }}
+        run: |
+          for platform in linux/amd64 linux/arm64; do
+            TRIVY_PLATFORM="$platform" make trivy-image IMAGE="$SERVER"
+            TRIVY_PLATFORM="$platform" make trivy-image IMAGE="$POSTGRES"
+          done
+      - name: SBOMs (SPDX and CycloneDX) per image platform and binary
+        env:
+          VERSION: ${{ steps.info.outputs.version }}
+          SERVER: ${{ steps.ref.outputs.server }}
+          POSTGRES: ${{ steps.ref.outputs.postgres }}
+        run: |
+          uv run --project tools --locked --quiet python tools/ci/release_chain.py sbom --dist dist \
+            --version "$VERSION" --image "bothy-server=$SERVER" --image "bothy-postgres=$POSTGRES" \
+            --binary "dist/bothy_${VERSION}_linux_amd64" --binary "dist/bothy_${VERSION}_linux_arm64"
+      - name: Sign with the key pair of the private phase (ADR 0062)
+        if: github.event.repository.visibility != 'public'
+        env:
+          COSIGN_PRIVATE_KEY: ${{ secrets.COSIGN_PRIVATE_KEY }}
+          COSIGN_PASSWORD: ${{ secrets.COSIGN_PASSWORD }}
+          VERSION: ${{ steps.info.outputs.version }}
+          SERVER: ${{ steps.ref.outputs.server }}
+          POSTGRES: ${{ steps.ref.outputs.postgres }}
+        run: |
+          uv run --project tools --locked --quiet python tools/ci/release_chain.py sign --mode private \
+            --dist dist --version "$VERSION" \
+            --image "bothy-server=$SERVER" --image "bothy-postgres=$POSTGRES" \
+            --binary "dist/bothy_${VERSION}_linux_amd64" --binary "dist/bothy_${VERSION}_linux_arm64"
+      - name: Verify like an instance operator (private phase)
+        if: github.event.repository.visibility != 'public'
+        env:
+          SERVER: ${{ steps.ref.outputs.server }}
+          POSTGRES: ${{ steps.ref.outputs.postgres }}
+        run: |
+          uv run --project tools --locked --quiet python tools/ci/release_chain.py verify --mode private \
+            --key quality/release/cosign-private-phase.pub --dist dist \
+            --image "bothy-server=$SERVER" --image "bothy-postgres=$POSTGRES"
+      - name: Sign keyless with the workflow identity (public phase)
+        if: github.event.repository.visibility == 'public'
+        env:
+          VERSION: ${{ steps.info.outputs.version }}
+          SERVER: ${{ steps.ref.outputs.server }}
+          POSTGRES: ${{ steps.ref.outputs.postgres }}
+        run: |
+          uv run --project tools --locked --quiet python tools/ci/release_chain.py sign --mode public \
+            --dist dist --version "$VERSION" \
+            --image "bothy-server=$SERVER" --image "bothy-postgres=$POSTGRES" \
+            --binary "dist/bothy_${VERSION}_linux_amd64" --binary "dist/bothy_${VERSION}_linux_arm64"
+      - name: Verify like an instance operator (public phase)
+        if: github.event.repository.visibility == 'public'
+        env:
+          SERVER: ${{ steps.ref.outputs.server }}
+          POSTGRES: ${{ steps.ref.outputs.postgres }}
+        run: |
+          uv run --project tools --locked --quiet python tools/ci/release_chain.py verify --mode public \
+            --identity-regexp "^https://github\\.com/${GITHUB_REPOSITORY}/\\.github/workflows/release\\.yml@refs/tags/server/v" \
+            --issuer https://token.actions.githubusercontent.com --dist dist \
+            --image "bothy-server=$SERVER" --image "bothy-postgres=$POSTGRES"
+      - name: Build provenance of bothy-server (public phase only)
+        if: github.event.repository.visibility == 'public'
+        uses: actions/attest@1e69f48acb82d1966a394da916b4c1698aa569d6 # v4.2.2
+        with:
+          subject-name: ${{ steps.name.outputs.server }}
+          subject-digest: ${{ needs.build.outputs.server_digest }}
+          push-to-registry: true
+      - name: Build provenance of bothy-postgres (public phase only)
+        if: github.event.repository.visibility == 'public'
+        uses: actions/attest@1e69f48acb82d1966a394da916b4c1698aa569d6 # v4.2.2
+        with:
+          subject-name: ${{ steps.name.outputs.postgres }}
+          subject-digest: ${{ steps.join.outputs.digest }}
+          push-to-registry: true
+      # The only place that tags: after scan, ScanCode (a job this one needs), SBOMs, signatures
+      # and verification. compose.yaml pulls exactly these tags (18 "Server-Images" rule 4).
+      - name: Version tags
+        env:
+          VERSION: ${{ steps.info.outputs.version }}
+          SERVER: ${{ steps.ref.outputs.server }}
+          POSTGRES: ${{ steps.ref.outputs.postgres }}
+        run: |
+          uv run --project tools --locked --quiet python tools/ci/release_chain.py tag --image "bothy-server=$SERVER" --tag "$VERSION"
+          uv run --project tools --locked --quiet python tools/ci/release_chain.py tag --image "bothy-postgres=$POSTGRES" --tag "pg18-$VERSION"
+      - id: upload
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: dist-server
+          path: dist
+          if-no-files-found: error
 
   build-apple:
     name: build (macOS and iOS apps)
@@ -193,9 +522,11 @@ jobs:
 
   publish:
     name: publish
-    needs: [resolve, build, build-apple, build-windows]
+    needs: [resolve, build, supply-chain, build-apple, build-windows]
     if: >-
       always() && needs.build.result == 'success' &&
+      contains(fromJSON('["success","skipped"]'), needs.supply-chain.result) &&
+      (needs.resolve.outputs.component != 'server' || needs.supply-chain.result == 'success') &&
       contains(fromJSON('["success","skipped"]'), needs.build-apple.result) &&
       contains(fromJSON('["success","skipped"]'), needs.build-windows.result)
     environment: release
@@ -210,12 +541,44 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
-      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+      - uses: astral-sh/setup-uv@1c37ad07a6a961277cf70c0d37d6f313000f5884 # v10.3.0
+        with:
+          enable-cache: false
+      # The resolve job has no release environment. Its outputs may steer control flow
+      # (`if:`), but no value from it reaches a shell or an action here: this job resolves
+      # the tag again from the fixed component list and stops on any difference (D-W-52).
+      - name: Resolve the tag again on this runner
+        id: info
+        env:
+          TAG: ${{ github.ref_name }}
+        run: uv run --no-project --python 3.14 tools/ci/components.py release --tag "$TAG" --github-output >> "$GITHUB_OUTPUT"
+      - name: Stop if the resolve job reported something else
+        if: >-
+          steps.info.outputs.component != needs.resolve.outputs.component ||
+          steps.info.outputs.version != needs.resolve.outputs.version ||
+          steps.info.outputs.path != needs.resolve.outputs.path ||
+          steps.info.outputs.gate_components != needs.resolve.outputs.gate_components ||
+          steps.info.outputs.prerelease != needs.resolve.outputs.prerelease
+        run: |
+          echo "::error::the resolve job disagrees with this release job; release stopped"
+          exit 1
+      # Server: the signed set of the supply-chain job, by id (SBOMs, signature bundles,
+      # SHA256SUMS and the ScanCode report are already in it).
+      - name: Signed artifacts of the server
+        if: steps.info.outputs.component == 'server'
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          artifact-ids: ${{ needs.supply-chain.outputs.dist_id }}
+          path: dist
+          merge-multiple: true
+      - if: steps.info.outputs.component != 'server'
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
           pattern: dist-*
           path: dist
           merge-multiple: true
       - name: SBOM of all release artifacts
+        if: steps.info.outputs.component != 'server'
         uses: anchore/sbom-action@66cbf4bc1f1c0d2edc94016e65bc221b6bb0ad6c # v0.24.3
         with:
           path: dist
@@ -224,6 +587,7 @@ jobs:
           upload-artifact: false
           upload-release-assets: false
       - name: Checksums
+        if: steps.info.outputs.component != 'server'
         run: |
           mv sbom.spdx.json dist/
           (cd dist && find . -type f -print0 | sort -z | xargs -0 shasum -a 256 > "$RUNNER_TEMP/SHA256SUMS")
@@ -234,7 +598,7 @@ jobs:
         with:
           subject-path: dist/*
       - name: SBOM attestation (public phase only)
-        if: github.event.repository.visibility == 'public'
+        if: github.event.repository.visibility == 'public' && steps.info.outputs.component != 'server'
         uses: actions/attest@1e69f48acb82d1966a394da916b4c1698aa569d6 # v4.2.2
         with:
           subject-path: dist/*
@@ -243,9 +607,9 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
           TAG: ${{ github.ref_name }}
-          COMPONENT_PATH: ${{ needs.resolve.outputs.path }}
-          VERSION: ${{ needs.resolve.outputs.version }}
-          PRERELEASE: ${{ needs.resolve.outputs.prerelease }}
+          COMPONENT_PATH: ${{ steps.info.outputs.path }}
+          VERSION: ${{ steps.info.outputs.version }}
+          PRERELEASE: ${{ steps.info.outputs.prerelease }}
         run: |
           awk -v v="$VERSION" '$0 ~ "^## \\[" v "\\]" {on=1; next} on && /^## \[/ {exit} on {print}' \
             "$COMPONENT_PATH/CHANGELOG.md" > "$RUNNER_TEMP/notes.md"
