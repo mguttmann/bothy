@@ -100,13 +100,15 @@ func cmpProblems(a, b Problem) int {
 	return strings.Compare(a.Message, b.Message)
 }
 
-// provided is one text a source gives for a key: a scalar text, or the elements of a YAML
-// sequence.
+// provided is one text a source gives for a key: a scalar text, the elements of a YAML
+// sequence, or the entries of a YAML mapping (map(string) keys only).
 type provided struct {
-	src   Source
-	text  string
-	elems []string
-	seq   bool
+	src     Source
+	text    string
+	elems   []string
+	seq     bool
+	entries []entry
+	obj     bool
 }
 
 // loader holds the state of one Load call.
@@ -280,6 +282,8 @@ func (l *loader) parse(e *keyEntry, p provided) (value, error) {
 		return value{}, errors.New("expected a single value, found a list")
 	case p.seq:
 		v, canon, err = parseElements(e.Kind, p.elems)
+	case p.obj:
+		v, canon, err = parseEntries(p.entries)
 	default:
 		v, canon, err = e.parseText(p.text)
 	}
@@ -645,8 +649,13 @@ func (l *loader) walkValue(full string, v *yaml.Node, src Source) {
 	}
 }
 
-// fileValue records the value node of a key: a scalar, or a sequence of plain scalars.
+// fileValue records the value node of a key: a scalar, a sequence of plain scalars, or for a
+// map(string) key a mapping of plain scalars.
 func (l *loader) fileValue(key string, v *yaml.Node, src Source) {
+	if v.Kind == yaml.MappingNode && l.s.entries[key].Kind == KindStringMap {
+		l.fileEntries(key, v, src)
+		return
+	}
 	switch v.Kind {
 	case yaml.ScalarNode:
 		l.provide(key, provided{src: src, text: v.Value})
@@ -664,4 +673,20 @@ func (l *loader) fileValue(key string, v *yaml.Node, src Source) {
 		// walk has rejected aliases already; a document node never appears below the root.
 		l.keyProblem(key, src.String(), "expected a value, found "+describe(v))
 	}
+}
+
+// fileEntries records the mapping node v of the map(string) key: every key and value must be a
+// plain scalar; duplicate and empty keys are left for parseEntries. Problems name the entry by
+// its position, never its text.
+func (l *loader) fileEntries(key string, v *yaml.Node, src Source) {
+	entries := make([]entry, 0, len(v.Content)/2)
+	for i := 0; i+1 < len(v.Content); i += 2 {
+		k, val := v.Content[i], v.Content[i+1]
+		if k.Kind != yaml.ScalarNode || nodeProblem(k) != "" || val.Kind != yaml.ScalarNode || nodeProblem(val) != "" {
+			l.keyProblem(key, src.String(), fmt.Sprintf("entry %d must have a plain scalar as key and as value", i/2+1))
+			return
+		}
+		entries = append(entries, entry{key: k.Value, value: val.Value})
+	}
+	l.provide(key, provided{src: src, entries: entries, obj: true})
 }
