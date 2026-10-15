@@ -91,6 +91,17 @@ level of a person for a thread is the first existing value in this order:
 If `muted_until` of the selected row lies in the future, `mute` applies. The same order is
 in [03-data-model.md](03-data-model.md) (`notification_preferences`).
 
+Preferences are set on spaces, channels and threads the person can read, the main thread of a
+text channel included. An archived target (an archived space or channel, or a channel in an
+archived space) takes no new preference: `409 conflict` with `reason` `target_archived`; deleting
+stays possible (docs/DECISIONS.md D-M3-18-2). `muted_until` is stored as given in whole
+microseconds, also when it has passed, and has no effect once passed (D-M3-18-3). A write that
+changes nothing writes no event and keeps the version. Deleting writes `notification_pref.updated`
+with `deleted: true` and the last version plus one; a later write starts at version 1. Archiving a
+space or channel removes, in the same transaction, the preferences of it and of every channel and
+thread below it, of every person, with one `notification_pref.updated` per removed row (D-M3-18-5).
+Lists name only targets the person can still read; the other rows stay stored.
+
 ### 3.2 Automatic following
 
 If a person writes in a thread with `kind = 'thread'` (not in the main thread) or creates
@@ -129,6 +140,13 @@ Rows in `quiet_hours`: weekdays as a bit mask (bit 0 = Monday), `start_local`, `
    With `start_local = end_local` this is a window of 24 hours from `start_local` on each set
    weekday; screen D9 "all day" stores `00:00` to `00:00` (docs/DECISIONS.md D-M3-17-4).
 4. A person is in quiet hours if an enabled row matches.
+
+`time_zone` must be an IANA zone name (`400 validation_failed` with `errors[].code`
+`unknown_time_zone`); absent means `users.time_zone`. A put replaces the whole rule. Every write
+sends the complete list, ascending by `id`, in `quiet_hours.updated`; the writes of one person run
+one after the other (D-M3-18-7). A write that would make that list larger than
+`sync.event_payload_max_bytes` is refused with `400 validation_failed` and `errors[].code`
+`limit_reached`. A stored zone that no longer loads counts as UTC (D-M3-18-8).
 
 Effect of quiet hours: the notification is delivered silently (iOS `interruption-level: passive` and
 priority 5, Android without sound with low priority, desktop without sound). It appears in the
@@ -562,6 +580,8 @@ no person, device or thread IDs.
 2. The consumer `push` determines the candidates per event: people with read permission on the
    channel (from `authz`), mentioned people, the run's triggering person. A batched query on
    `notification_preferences` fetches the levels for all candidates and the three targets (thread, channel, space).
+   `notify` gathers the facts for all candidates of a thread in one query and resolves the level
+   with the pure function of point 3 (docs/DECISIONS.md D-M3-18-9).
 3. The decision per recipient (section 4) is a pure function in the domain part of
    `notify`. It gets facts (level, quiet hours, activity, window state) and returns a
    decision. Tests check it as a table.
