@@ -56,7 +56,7 @@ documented in this file. The format is based on
   failed attempts, which survive the rollback. New operations `redeemEnrollmentCode` (device keys
   only, the device becomes active, every rejected code the same `401`) and
   `createEnrollmentCode`; `createUser` with `local_account` creates the local identity and a code;
-  responses with a code are never stored for an `Idempotency-Key` replay (`409 one_time_secret`).
+  responses with a code are never stored for an `Idempotency-Key` replay (`409 conflict` (reason `one_time_secret`)).
   Migration `00016_identity_enrollment_codes.sql`. The shared login completion of every later login
   path creates devices, sessions and tokens in one place.
 - Identity provider port and provider management (M1-36): the migration

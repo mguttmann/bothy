@@ -423,14 +423,14 @@ Principals, people, owners, login drivers, identities, local credentials, enroll
   | Operation | Action and resource | Audit | Answer |
   |---|---|---|---|
   | `redeemEnrollmentCode` | `auth.login.complete`, anonymous, instance (`rl.public_auth`, no `Idempotency-Key`) | allow with the person as actor `{auth_method, device_id, session_id, new_device, device_state}`; denials with cause and code id | `201 TokenResponse`; every rejected code the same `401 unauthenticated` |
-  | `createEnrollmentCode` | `user.update` on the person (owner with step-up) | allow `{purpose, enrollment_code_id}` | `201 EnrollmentCode` (one-time secret), `409 user_not_active` |
+  | `createEnrollmentCode` | `user.update` on the person (owner with step-up) | allow `{purpose, enrollment_code_id}` | `201 EnrollmentCode` (one-time secret), `409 conflict` (reason `user_not_active`) |
 
-  `createUser` with `local_account` needs an enabled `local` provider (else `409
-  local_provider_disabled`); a disabled `local` provider also rejects the redemption of a person
+  `createUser` with `local_account` needs an enabled `local` provider (else `409 conflict`
+  (reason `local_provider_disabled`)); a disabled `local` provider also rejects the redemption of a person
   with a local identity (the same `401`) and `createEnrollmentCode` for that person (`409`), except
   a recovery code issued on the host, which logs in without the identity (docs/DECISIONS.md
   M1-37/12); both responses with a code are one-time secrets: the
-  Idempotency-Key stage stores `{"one_time_secret": true}` and a replay is `409 one_time_secret`.
+  Idempotency-Key stage stores `{"one_time_secret": true}` and a replay is `409 conflict` (reason `one_time_secret`).
 - Commands (`cmd/bothy setup`, assembled by `wire.Setup` as `bothy_app`): `bootstrap-owner --handle
   --display-name [--locale de] [--time-zone UTC]` creates, in one unit declared as the rights change
   `instance.bootstrap`, the local provider if missing, the person, its owner row (`granted_by`
