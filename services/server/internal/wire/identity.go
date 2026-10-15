@@ -144,15 +144,17 @@ type Identity struct {
 	TrustedHeader *app.TrustedHeaderDriver
 	// TrustedHeaderHandlers is the REST handler of loginWithTrustedHeader; nil until BindSessions.
 	TrustedHeaderHandlers *identityhttp.TrustedHeader
-	cfg                   app.Config
-	state                 instance.State
-	repo                  *identitypg.Repository
-	uow                   txn.UnitOfWork
-	az                    authorize.Authorizer
-	writes                IdentityWrites
-	pepper                []byte
-	clk                   clock.Clock
-	log                   *slog.Logger
+	// Principals implements the port identity.PrincipalWriter for the agents module (M1-51).
+	Principals *app.PrincipalWriter
+	cfg        app.Config
+	state      instance.State
+	repo       *identitypg.Repository
+	uow        txn.UnitOfWork
+	az         authorize.Authorizer
+	writes     IdentityWrites
+	pepper     []byte
+	clk        clock.Clock
+	log        *slog.Logger
 }
 
 // IdentityWrites are the collaborators of the writing use cases of identity (M1-31): the
@@ -212,6 +214,10 @@ func NewIdentity(cfg app.Config, pool *pg.Pool, uow txn.UnitOfWork, az authorize
 	if err != nil {
 		return nil, err
 	}
+	principals, err := app.NewPrincipalWriter(cfg, repo)
+	if err != nil {
+		return nil, err
+	}
 	tokens, err := app.NewTokens(cfg, pepper, app.TokensDeps{
 		Store: repo, Principals: repo, UoW: uow, Authorizer: az, Audit: w.Audit, Cursors: identityhttp.Cursors{},
 		Switch: personal, Clock: clk,
@@ -222,7 +228,7 @@ func NewIdentity(cfg app.Config, pool *pg.Pool, uow txn.UnitOfWork, az authorize
 	return &Identity{
 		Devices: devices, People: people, PeopleHandlers: identityhttp.NewPeople(people, people), DPoP: verifier, Replay: store,
 		Handlers: identityhttp.NewDevices(devices), Tokens: tokens, TokenHandlers: identityhttp.NewTokens(tokens),
-		Enrollment: enrollment, TrustedHeader: driver, cfg: cfg, state: instanceapp.NewState(instanceRepo, uow),
+		Enrollment: enrollment, TrustedHeader: driver, Principals: principals, cfg: cfg, state: instanceapp.NewState(instanceRepo, uow),
 		repo: repo, uow: uow, az: az, writes: w, pepper: append([]byte(nil), pepper...), clk: clk, log: orDiscard(log),
 	}, nil
 }

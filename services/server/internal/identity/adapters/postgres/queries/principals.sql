@@ -33,3 +33,18 @@ SELECT sqlc.embed(p), sqlc.embed(u),
 FROM principals p
 JOIN users u ON u.principal_id = p.id
 WHERE p.id = @id;
+
+-- name: LockPrincipal :one
+-- The principal id locked for a change of its status or display name (M1-51; 03 section 6.3).
+SELECT sqlc.embed(p)
+FROM principals p
+WHERE p.id = @id
+FOR UPDATE;
+
+-- name: SetPrincipalStatus :one
+-- active clears disabled_at, disabled sets it to the transaction time (03 principals, M1-51).
+UPDATE principals
+SET status = @status,
+    disabled_at = CASE WHEN @status::text = 'disabled' THEN now() ELSE NULL END
+WHERE id = @id
+RETURNING *;

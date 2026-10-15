@@ -199,3 +199,63 @@ func (q *Queries) ListPrincipalsByIDs(ctx context.Context, ids []pgtype.UUID) ([
 	}
 	return items, nil
 }
+
+const lockPrincipal = `-- name: LockPrincipal :one
+SELECT p.id, p.kind, p.status, p.handle, p.display_name, p.avatar_file_id, p.created_at, p.disabled_at, p.deleted_at
+FROM principals p
+WHERE p.id = $1
+FOR UPDATE
+`
+
+type LockPrincipalRow struct {
+	Principal Principal
+}
+
+// The principal id locked for a change of its status or display name (M1-51; 03 section 6.3).
+func (q *Queries) LockPrincipal(ctx context.Context, id pgtype.UUID) (LockPrincipalRow, error) {
+	row := q.db.QueryRow(ctx, lockPrincipal, id)
+	var i LockPrincipalRow
+	err := row.Scan(
+		&i.Principal.ID,
+		&i.Principal.Kind,
+		&i.Principal.Status,
+		&i.Principal.Handle,
+		&i.Principal.DisplayName,
+		&i.Principal.AvatarFileID,
+		&i.Principal.CreatedAt,
+		&i.Principal.DisabledAt,
+		&i.Principal.DeletedAt,
+	)
+	return i, err
+}
+
+const setPrincipalStatus = `-- name: SetPrincipalStatus :one
+UPDATE principals
+SET status = $1,
+    disabled_at = CASE WHEN $1::text = 'disabled' THEN now() ELSE NULL END
+WHERE id = $2
+RETURNING id, kind, status, handle, display_name, avatar_file_id, created_at, disabled_at, deleted_at
+`
+
+type SetPrincipalStatusParams struct {
+	Status string
+	ID     pgtype.UUID
+}
+
+// active clears disabled_at, disabled sets it to the transaction time (03 principals, M1-51).
+func (q *Queries) SetPrincipalStatus(ctx context.Context, arg SetPrincipalStatusParams) (Principal, error) {
+	row := q.db.QueryRow(ctx, setPrincipalStatus, arg.Status, arg.ID)
+	var i Principal
+	err := row.Scan(
+		&i.ID,
+		&i.Kind,
+		&i.Status,
+		&i.Handle,
+		&i.DisplayName,
+		&i.AvatarFileID,
+		&i.CreatedAt,
+		&i.DisabledAt,
+		&i.DeletedAt,
+	)
+	return i, err
+}

@@ -10,6 +10,25 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
+type Agent struct {
+	PrincipalID            pgtype.UUID
+	AdapterKind            string
+	Description            string
+	OperatorConfig         []byte
+	BillingMode            string
+	CredentialHolderID     pgtype.UUID
+	BillingModeChangedAt   pgtype.Timestamptz
+	BillingModeChangedBy   pgtype.UUID
+	ToolClass              string
+	ReportedToolClass      pgtype.Text
+	ReportedRuntimeState   string
+	ReportedBillingMode    pgtype.Text
+	ReportedRuntimeVersion pgtype.Text
+	ReportedDetails        []byte
+	LastHeartbeatAt        pgtype.Timestamptz
+	Version                int64
+}
+
 type ApiToken struct {
 	ID          pgtype.UUID
 	PrincipalID pgtype.UUID

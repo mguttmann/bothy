@@ -1,6 +1,6 @@
 # Module `identity`
 
-Status: principal tables and directory built (M1-26); devices, device keys and the DPoP verifier built (M1-33); people, owners and the own profile built (M1-31); sessions, access tokens, refresh families, logout and the Authenticator built (M1-34); step-up with the device key and the job `identity.auth_cleanup` built (M1-35); identity providers, the mapping of external identities, the credential overview and unlinking built (M1-36); API tokens with prefix and checksum built (M1-44); first setup, enrollment codes, the shared login completion and the setup lock built (M1-37); device approval with the verification code, device pairing and the expiry of unconfirmed devices built (M1-38); passkey login, enrollment, registration and step-up built (M1-40); the OIDC login with PKCE, identity linking, provisioning and the re-login rule built (M1-41); the login with the trusted proxy header and its per-request binding built (M1-43).
+Status: principal tables and directory built (M1-26); devices, device keys and the DPoP verifier built (M1-33); people, owners and the own profile built (M1-31); sessions, access tokens, refresh families, logout and the Authenticator built (M1-34); step-up with the device key and the job `identity.auth_cleanup` built (M1-35); identity providers, the mapping of external identities, the credential overview and unlinking built (M1-36); API tokens with prefix and checksum built (M1-44); first setup, enrollment codes, the shared login completion and the setup lock built (M1-37); device approval with the verification code, device pairing and the expiry of unconfirmed devices built (M1-38); passkey login, enrollment, registration and step-up built (M1-40); the OIDC login with PKCE, identity linking, provisioning and the re-login rule built (M1-41); the login with the trusted proxy header and its per-request binding built (M1-43); the principal writer for agent principals built (M1-51).
 The normative source is [docs/spec/02-architecture.md](../../../../docs/spec/02-architecture.md); if this file differs, the chapter applies.
 
 ## Purpose
@@ -688,9 +688,25 @@ Principals, people, owners, login drivers, identities, local credentials, enroll
 - The integration tests of the flags run in the session world (`adapters/httpapi/flags_test.go`,
   docs/DECISIONS.md M1-47).
 
+### Principal writer (M1-51)
+
+- Port (`principals.go`): `PrincipalWriter` with `CreatePrincipal` (`CreatePrincipalCmd`: optional
+  id, kind `agent` or `app`, handle and display name with the rules of M1-26, a taken handle is
+  `409 conflict` on `/handle` without regard to case, also against people), `SetPrincipalStatus`
+  (`active` clears `disabled_at`, `disabled` sets it; `changed` false for the same status;
+  `invalid_state_transition` for a deleted principal or another target) and `SetDisplayName`
+  (`changed` false for the same name). It authorizes nothing (the calling use case of agents did),
+  writes only inside the ambient unit of work and refuses people with kind internal, whose
+  lifecycle belongs to `People`.
+- `app/principalwriter.go`: `PrincipalWriter` over the outgoing port `PrincipalStore`;
+  `adapters/postgres/principalwriter.go` implements it with the queries `LockPrincipal` and
+  `SetPrincipalStatus` of `queries/principals.sql`. `wire.NewIdentity` builds it as
+  `Identity.Principals`.
+- Tests: `adapters/postgres/principalwriter_test.go` (`TestPrincipalWriter_*` on PostgreSQL 18).
+
 ## Port (root package `internal/identity`)
 
-- Inbound: `Auth` (login, refresh, logout, child sessions), `StepUp` (step-up, M1-35), `Providers` and `Identities` (M1-36), `Enrollment` (M1-37), `Passkeys` (M1-40), `OIDCLogin` (M1-41), `TrustedHeaderLogins` (M1-43), `Directory`, `Devices`, `Tokens` and `TokenAdmin` (M1-44), `Owners`; declares `AvatarFiles`.
+- Inbound: `Auth` (login, refresh, logout, child sessions), `StepUp` (step-up, M1-35), `Providers` and `Identities` (M1-36), `Enrollment` (M1-37), `Passkeys` (M1-40), `OIDCLogin` (M1-41), `TrustedHeaderLogins` (M1-43), `Directory`, `Devices`, `Tokens` and `TokenAdmin` (M1-44), `PrincipalWriter` (M1-51), `Owners`; declares `AvatarFiles`.
 - Emits in-tx events: `DeviceRevoked`, `SessionEnded`.
 - Subscribes to in-tx events: none.
 - Implements source ports and cross-cutting ports: kernel `actor.Authenticator`, `authz.PrincipalSource` (with `HasActivePasskey`, M1-40), `authz.CredentialSource` (session, device, token for the check `check_active`, 07 section 4.2), `instance.LoginOptionsSource`, `instance.FlagUserSource`, kernel `personaldata.Participant`.
