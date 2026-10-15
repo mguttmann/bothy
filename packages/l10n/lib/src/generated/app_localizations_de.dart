@@ -328,4 +328,242 @@ class AppLocalizationsDe extends AppLocalizations {
   String problemFallback(String code) {
     return 'Etwas ist schiefgegangen ($code)';
   }
+
+  @override
+  String get vizMetricMessagesCreated => 'Nachrichten';
+
+  @override
+  String get vizMetricThreadsCreated => 'Neue Threads';
+
+  @override
+  String get vizMetricRunsStarted => 'Gestartete Läufe';
+
+  @override
+  String get vizMetricRunsFinished => 'Beendete Läufe';
+
+  @override
+  String get vizMetricToolCalls => 'Werkzeugaufrufe';
+
+  @override
+  String get vizMetricApprovalCards => 'Freigabekarten';
+
+  @override
+  String get vizMetricCost => 'Kosten';
+
+  @override
+  String get vizMetricInvocationsDenied => 'Abgelehnte Aufrufe';
+
+  @override
+  String get vizMetricBillingModeSwitches => 'Wechsel der Abrechnungsart';
+
+  @override
+  String get vizMetricCatchups => 'Nachholvorgänge';
+
+  @override
+  String get vizMetricResyncs => 'Neusynchronisierungen';
+
+  @override
+  String get vizMetricSlowConsumerCloses => 'Trennungen langsamer Clients';
+
+  @override
+  String vizMetricUnknown(String code) {
+    return 'Kennzahl $code';
+  }
+
+  @override
+  String get vizSliApiAvailability => 'API-Verfügbarkeit';
+
+  @override
+  String get vizSliDeliveryLatency => 'Zustell-Latenz';
+
+  @override
+  String get vizSliReconnect => 'Wiederverbindung';
+
+  @override
+  String get vizSliPushAcceptance => 'Push-Annahme';
+
+  @override
+  String get vizSliRunStart => 'Lauf-Start';
+
+  @override
+  String get vizSliTurnDuration => 'Turn-Dauer';
+
+  @override
+  String get vizSloOnTarget => 'im Ziel';
+
+  @override
+  String get vizSloBudgetTight => 'Budget knapp';
+
+  @override
+  String get vizSloTargetMissed => 'Ziel verfehlt';
+
+  @override
+  String get vizSloNotEnoughData => 'zu wenige Daten';
+
+  @override
+  String get vizOwnMeasurement => 'Eigene Messung';
+
+  @override
+  String vizTrafficLightLabel(String slo, String state) {
+    return '$slo: $state, eigene Messung';
+  }
+
+  @override
+  String vizTrafficLightChanged(String slo, String state) {
+    return '$slo ist jetzt $state';
+  }
+
+  @override
+  String get vizCostEstimate => 'Schätzung';
+
+  @override
+  String get vizCostInformationOnly => 'nur zur Information';
+
+  @override
+  String get vizBadgePersonal => 'Persönlich';
+
+  @override
+  String get vizBadgeOrganization => 'Organisation';
+
+  @override
+  String get vizApprovalWaiting => 'Freigabe wartet';
+
+  @override
+  String get vizMoreRunsThanShown => 'Mehr Läufe als angezeigt';
+
+  @override
+  String get vizRunStateWaitingInput => 'Wartet auf Eingabe';
+
+  @override
+  String get vizRunStateUnknown => 'Unbekannter Zustand';
+
+  @override
+  String vizStepToolCall(String name) {
+    return 'Werkzeug $name';
+  }
+
+  @override
+  String vizStepStatus(String name) {
+    return 'Status $name';
+  }
+
+  @override
+  String vizStepSubagent(String name) {
+    return 'Subagent $name';
+  }
+
+  @override
+  String vizStepWorkflow(String name) {
+    return 'Workflow $name';
+  }
+
+  @override
+  String vizStepBackgroundJob(String name) {
+    return 'Hintergrundjob $name';
+  }
+
+  @override
+  String vizLaneLabel(
+    String space,
+    String channel,
+    int count,
+    Object channelName,
+    Object spaceName,
+  ) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count aktive Läufe',
+      one: '1 aktiver Lauf',
+      zero: 'keine aktiven Läufe',
+    );
+    return '$spaceName, $channelName, $_temp0';
+  }
+
+  @override
+  String vizBarRowLabel(String row, int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count Läufe',
+      one: '1 Lauf',
+    );
+    return '$row, $_temp0';
+  }
+
+  @override
+  String get vizChartRates => 'Raten';
+
+  @override
+  String get vizChartRuns => 'Läufe';
+
+  @override
+  String vizTileUp(String delta) {
+    return '$delta mehr als im Vorzeitraum';
+  }
+
+  @override
+  String vizTileDown(String delta) {
+    return '$delta weniger als im Vorzeitraum';
+  }
+
+  @override
+  String get vizTileSame => 'wie im Vorzeitraum';
+
+  @override
+  String get vizNotShown => 'nicht angezeigt';
+
+  @override
+  String get vizHarnessTitle => 'Testumgebung der Visualisierungen';
+
+  @override
+  String get vizHarnessTheme => 'Design';
+
+  @override
+  String get vizHarnessThemeLight => 'Hell';
+
+  @override
+  String get vizHarnessThemeDark => 'Dunkel';
+
+  @override
+  String get vizHarnessDensity => 'Dichte';
+
+  @override
+  String get vizHarnessDensityComfortable => 'Komfortabel';
+
+  @override
+  String get vizHarnessDensityCompact => 'Kompakt';
+
+  @override
+  String get vizHarnessDensityTouch => 'Touch';
+
+  @override
+  String get vizHarnessTextScale => 'Textgröße';
+
+  @override
+  String get vizHarnessLanguage => 'Sprache';
+
+  @override
+  String get vizHarnessFixtureState => 'Fixture-Zustand';
+
+  @override
+  String get vizHarnessTimeLapse => 'Zeitraffer';
+
+  @override
+  String get vizMarkLane => 'Bahn';
+
+  @override
+  String get vizMarkRunCard => 'Laufkarte';
+
+  @override
+  String get vizMarkArea => 'Fläche';
+
+  @override
+  String get vizMarkBar => 'Balken';
+
+  @override
+  String get vizMarkTrafficLight => 'Ampel';
+
+  @override
+  String get vizMarkMetricTile => 'Kennzahl-Kachel';
 }
