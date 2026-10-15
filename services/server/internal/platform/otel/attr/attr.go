@@ -110,6 +110,16 @@ const (
 	Reason = "bothy.reason"
 	// RunState is a run state.
 	RunState = "bothy.run.state"
+	// SigningKeyPurpose is the purpose of a server signing key (access_token, invocation,
+	// webhook_out, audit_checkpoint); logs of key transitions only (M1-32).
+	SigningKeyPurpose = "bothy.signing_key.purpose"
+	// SigningKeyKID is the kid of a server signing key, the RFC 7638 thumbprint of its public key;
+	// logs of key transitions only, never on metrics.
+	SigningKeyKID = "bothy.signing_key.kid"
+	// SigningKeyFromState is the state a signing key leaves (none, next, active, retiring).
+	SigningKeyFromState = "bothy.signing_key.from_state"
+	// SigningKeyToState is the state a signing key enters (next, active, retiring, retired).
+	SigningKeyToState = "bothy.signing_key.to_state"
 	// StepKind is tool_call, status, subagent, workflow or background_job.
 	StepKind = "bothy.step.kind"
 	// VersionOwn is the SemVer version of this server build in the start check of
@@ -159,6 +169,8 @@ var scopes = map[string]scope{
 	Outcome: scopeSpanLog, PrincipalKind: scopeSpanLog, PrincipalPseudoID: scopeSpanLog,
 	PushProvider: scopeSpanLog, RatelimitClass: scopeSpanLog, Reason: scopeSpanLog,
 	RunState: scopeSpanLog, StepKind: scopeSpanLog, VersionOwn: scopeSpanLog, VersionRequired: scopeSpanLog,
+	SigningKeyPurpose: scopeSpanLog, SigningKeyKID: scopeSpanLog, SigningKeyFromState: scopeSpanLog,
+	SigningKeyToState: scopeSpanLog,
 
 	ServerRole: scopeResource,
 	Signal:     scopeMetric,

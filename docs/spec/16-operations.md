@@ -540,8 +540,9 @@ need new keys without manual work on the host.
 Without some secrets, a backup is worthless. The owner exports them after every change in
 encrypted form (`bothy secrets export --from <_store> --age-recipient <public key>`, call in the
 Compose stack below) and keeps the bundle separate from the server and separate from the
-off-site target. The bundle contains `_store/` and the key store `secrets.signing_key_dir`; the
-export takes in the key store with M1-32, which generates the signing keys.
+off-site target. The bundle contains `_store/` and the key store `secrets.signing_key_dir` under
+`signing-keys/` (`--signing-key-dir`, default `/var/lib/bothy/signing-keys`, which `secrets-init`
+mounts read-only; M1-32).
 
 Call in the Compose stack, without a configuration file and without a database:
 
@@ -556,7 +557,9 @@ instead of binary data, and without `--armor` the export refuses to write to a t
 archive with the relative names of the catalogue, so it decrypts to exactly the layout of
 `infra/compose/secrets/` that `secrets-init` takes over; the export therefore rejects files
 without a catalogue entry in `--from` with exit code 2 instead of writing a bundle that the
-restore would later refuse. The last line of `secrets init` names this call with the `_store` of
+restore would later refuse. `secrets init` skips the part `signing-keys/` of a decrypted bundle;
+its files go back into the volume of `secrets.signing_key_dir`
+([disaster-recovery.md](../operations/disaster-recovery.md) Case B). The last line of `secrets init` names this call with the `_store` of
 the run.
 
 | Secret | Consequence of loss |

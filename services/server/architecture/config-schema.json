@@ -2,6 +2,30 @@
   "version": 1,
   "keys": [
     {
+      "name": "agent.invocation_token_ttl",
+      "env": "BOTHY_AGENT__INVOCATION_TOKEN_TTL",
+      "kind": "duration",
+      "default": "60s",
+      "required": false,
+      "enum": [],
+      "min": "1s",
+      "max": "",
+      "chapter": "04-sync-protocol.md",
+      "doc": "Validity of an invocation token."
+    },
+    {
+      "name": "agent.jwks_max_age",
+      "env": "BOTHY_AGENT__JWKS_MAX_AGE",
+      "kind": "duration",
+      "default": "1h",
+      "required": false,
+      "enum": [],
+      "min": "1s",
+      "max": "",
+      "chapter": "09-agents.md",
+      "doc": "Cache lifetime of the JWKS and how long a next key is published before it signs."
+    },
+    {
       "name": "api.cors_allowed_origins",
       "env": "BOTHY_API__CORS_ALLOWED_ORIGINS",
       "kind": "list(string)",
@@ -60,6 +84,18 @@
       "max": "",
       "chapter": "05-actions.md",
       "doc": "Window from the first of identical denials within which they become one audit entry with a count."
+    },
+    {
+      "name": "auth.access_token_ttl",
+      "env": "BOTHY_AUTH__ACCESS_TOKEN_TTL",
+      "kind": "duration",
+      "default": "10m",
+      "required": false,
+      "enum": [],
+      "min": "1s",
+      "max": "",
+      "chapter": "08-identity.md",
+      "doc": "Lifetime of an access token."
     },
     {
       "name": "auth.clock_leeway",
@@ -1371,6 +1407,18 @@
       "doc": "Base directory of the default file: references of secrets."
     },
     {
+      "name": "secrets.signing_key_dir",
+      "env": "BOTHY_SECRETS__SIGNING_KEY_DIR",
+      "kind": "string",
+      "default": "/var/lib/bothy/signing-keys",
+      "required": false,
+      "enum": [],
+      "min": "",
+      "max": "",
+      "chapter": "16-operations.md",
+      "doc": "Writable directory of the private signing keys; owned by the service user with mode 0700."
+    },
+    {
       "name": "server.internal_listen_addr",
       "env": "BOTHY_SERVER__INTERNAL_LISTEN_ADDR",
       "kind": "listen address",
@@ -1517,6 +1565,54 @@
       "max": "1h",
       "chapter": "02-architecture.md",
       "doc": "Whole budget of the shutdown; at least the sum of the step budgets, and the orchestrator waits longer."
+    },
+    {
+      "name": "signing_key.access_token_rotation_interval",
+      "env": "BOTHY_SIGNING_KEY__ACCESS_TOKEN_ROTATION_INTERVAL",
+      "kind": "duration",
+      "default": "30d",
+      "required": false,
+      "enum": [],
+      "min": "1s",
+      "max": "",
+      "chapter": "19-security.md",
+      "doc": "Scheduled rotation of the signing key of access tokens."
+    },
+    {
+      "name": "signing_key.cache_ttl",
+      "env": "BOTHY_SIGNING_KEY__CACHE_TTL",
+      "kind": "duration",
+      "default": "30s",
+      "required": false,
+      "enum": [],
+      "min": "1s",
+      "max": "",
+      "chapter": "19-security.md",
+      "doc": "Longest time a process still accepts a withdrawn signing key or does not know a new one."
+    },
+    {
+      "name": "signing_key.invocation_rotation_interval",
+      "env": "BOTHY_SIGNING_KEY__INVOCATION_ROTATION_INTERVAL",
+      "kind": "duration",
+      "default": "30d",
+      "required": false,
+      "enum": [],
+      "min": "1s",
+      "max": "",
+      "chapter": "09-agents.md",
+      "doc": "Scheduled rotation of the signing key of invocation tokens."
+    },
+    {
+      "name": "signing_key.rotation_check_interval",
+      "env": "BOTHY_SIGNING_KEY__ROTATION_CHECK_INTERVAL",
+      "kind": "duration",
+      "default": "1m",
+      "required": false,
+      "enum": [],
+      "min": "1s",
+      "max": "",
+      "chapter": "19-security.md",
+      "doc": "Interval of the job instance.key_rotation."
     },
     {
       "name": "startup.dependency_wait",
@@ -1730,6 +1826,18 @@
       "max": "",
       "chapter": "17-observability.md",
       "doc": "With true an incoming traceparent becomes the parent of the server span, otherwise only a span link."
+    },
+    {
+      "name": "webhook.delivery_timeout",
+      "env": "BOTHY_WEBHOOK__DELIVERY_TIMEOUT",
+      "kind": "duration",
+      "default": "15s",
+      "required": false,
+      "enum": [],
+      "min": "1ms",
+      "max": "",
+      "chapter": "11-extensions.md",
+      "doc": "Time limit of one webhook delivery."
     }
   ]
 }

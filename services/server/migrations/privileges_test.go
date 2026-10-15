@@ -53,6 +53,9 @@ var appPrivileges = map[string][]string{
 	// 03 event_consumer_cursors: a cursor row is never deleted in operation; restore finalize
 	// moves it (M2-01, M7-04).
 	"event_consumer_cursors": {"SELECT", "INSERT", "UPDATE"},
+	// 03 server_signing_keys (M1-32): keys change by state and not_after; a retired row stays as
+	// the record of a key that signed, deleted only by the retention job of class security.
+	"server_signing_keys": {"SELECT", "INSERT", "UPDATE"},
 }
 
 // allPrivileges are the table rights PostgreSQL 18 knows (MAINTAIN since 17).

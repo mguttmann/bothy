@@ -19,6 +19,7 @@ var configKeyGroups = []func() []config.Key{
 	authzConfigKeys,
 	egressConfigKeys,
 	secretsConfigKeys,
+	signingKeyConfigKeys,
 	databaseConfigKeys,
 	migrateConfigKeys,
 	telemetryConfigKeys,

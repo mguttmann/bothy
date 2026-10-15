@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"path"
 	"sync"
 	"time"
 
@@ -38,12 +39,19 @@ type Config struct {
 	// CacheTTL is secrets.cache_ttl: how long a value that was read stays in use before it is
 	// read again.
 	CacheTTL time.Duration `config:"secrets.cache_ttl"`
+	// SigningKeyDir is secrets.signing_key_dir: the key store of the server signing keys, the
+	// only directory Put and Delete write (ADR 0066).
+	SigningKeyDir string `config:"secrets.signing_key_dir"`
 }
 
 // Options configure NewProvider.
 type Options struct {
 	// Dir is the effective secrets.dir. It must be absolute, clean and not the root directory.
 	Dir string
+	// SigningKeyDir is the effective secrets.signing_key_dir, the only directory whose direct
+	// entries Put and Delete may write (ADR 0066). Empty means no key store: every Put and Delete
+	// is ErrReadOnly. When set it must be absolute, clean and not the root directory.
+	SigningKeyDir string
 	// CacheTTL is how long a value that was read is returned without reading again. It must not
 	// be negative. 0 reads on every Get, so a failing refresh logs and counts on every call; the
 	// configuration key secrets.cache_ttl is therefore at least 1s, and 0 is for tests.
@@ -66,6 +74,7 @@ type Options struct {
 // their Config or a narrow interface (D10). A Provider is safe for concurrent use.
 type Provider struct {
 	dir      string
+	keyDir   string
 	ttl      time.Duration
 	clock    clock.Clock
 	logger   *slog.Logger
@@ -93,12 +102,8 @@ type entry struct {
 // created here from the global OpenTelemetry meter provider; until the telemetry setup installs
 // one, the global delegate forwards later.
 func NewProvider(opts Options) (*Provider, error) {
-	if !isAbsClean(opts.Dir) || opts.Dir == "/" {
-		// The root would turn file:<secrets.dir>/x into file://x (docs/DECISIONS.md M1-09/15).
-		return nil, errors.New("secrets: secrets.dir must be an absolute path other than the root, without . or .. elements, repeated or trailing slashes")
-	}
-	if opts.CacheTTL < 0 {
-		return nil, errors.New("secrets: secrets.cache_ttl must not be negative")
+	if err := checkOptions(opts); err != nil {
+		return nil, err
 	}
 	drivers := opts.Drivers
 	if drivers == nil {
@@ -133,9 +138,24 @@ func NewProvider(opts Options) (*Provider, error) {
 		logger = slog.Default()
 	}
 	return &Provider{
-		dir: opts.Dir, ttl: opts.CacheTTL, clock: clk, logger: logger, drivers: byScheme,
+		dir: opts.Dir, keyDir: opts.SigningKeyDir, ttl: opts.CacheTTL, clock: clk, logger: logger, drivers: byScheme,
 		failures: failures, entries: map[Ref]*entry{},
 	}, nil
+}
+
+// checkOptions checks the directories and the cache TTL of opts (NewProvider).
+func checkOptions(opts Options) error {
+	if !isAbsClean(opts.Dir) || opts.Dir == "/" {
+		// The root would turn file:<secrets.dir>/x into file://x (docs/DECISIONS.md M1-09/15).
+		return errors.New("secrets: secrets.dir must be an absolute path other than the root, without . or .. elements, repeated or trailing slashes")
+	}
+	if opts.CacheTTL < 0 {
+		return errors.New("secrets: secrets.cache_ttl must not be negative")
+	}
+	if opts.SigningKeyDir != "" && (!isAbsClean(opts.SigningKeyDir) || opts.SigningKeyDir == "/") {
+		return errors.New("secrets: secrets.signing_key_dir must be an absolute path other than the root, without . or .. elements, repeated or trailing slashes")
+	}
+	return nil
 }
 
 // Get returns the value of ref and its Version.
@@ -204,6 +224,64 @@ func (p *Provider) Resolve(ctx context.Context, raw string) (Value, Version, err
 		return Value{}, "", err
 	}
 	return p.Get(ctx, ref)
+}
+
+// Put stores v under ref through the driver of ref.Scheme (16 5.2, ADR 0066 rule 2). Only a
+// "file:" reference whose path lies directly in secrets.signing_key_dir is writable; every other
+// reference, "env:" always, and every reference of a provider without a key store is ErrReadOnly,
+// checked before the driver is called. The file driver creates the file with mode 0600 and never
+// overwrites (ErrExists). A cached value of ref is dropped, so the next Get reads the new file.
+//
+// Errors: the context error first; ErrReadOnly; ErrInvalidRef for a reference that breaks the
+// grammar; ErrExists; ErrWriteFailed. They name the reference, never the value.
+//
+// Example:
+//
+//	ref := secrets.Ref{Scheme: "file", Path: "/var/lib/bothy/signing-keys/invocation-<kid>.pem"}
+//	err := p.Put(ctx, ref, secrets.NewValue(pemBytes))
+func (p *Provider) Put(ctx context.Context, ref Ref, v Value) error {
+	w, err := p.writer(ctx, ref)
+	if err != nil {
+		return err
+	}
+	_, err = w.Put(ctx, ref, v)
+	p.forget(ref)
+	return err
+}
+
+// Delete removes the secret ref names, under the same rule as Put (only directly in
+// secrets.signing_key_dir, else ErrReadOnly), and drops its cached value. A missing secret is
+// ErrNotFound; other errors as Put.
+func (p *Provider) Delete(ctx context.Context, ref Ref) error {
+	w, err := p.writer(ctx, ref)
+	if err != nil {
+		return err
+	}
+	err = w.Delete(ctx, ref)
+	p.forget(ref)
+	return err
+}
+
+// writer returns the writing driver of ref when the write rule allows ref (Put).
+func (p *Provider) writer(ctx context.Context, ref Ref) (Writer, error) {
+	if err := ctx.Err(); err != nil {
+		return nil, &RefError{Ref: displayRef(ref), Err: err}
+	}
+	if ref.Scheme != schemeFile || checkRef(ref) != nil || p.keyDir == "" || path.Dir(ref.Path) != p.keyDir {
+		return nil, &RefError{Ref: displayRef(ref), Err: ErrReadOnly, Detail: "only files directly in secrets.signing_key_dir are writable"}
+	}
+	w, ok := p.drivers[ref.Scheme].(Writer)
+	if !ok {
+		return nil, &RefError{Ref: displayRef(ref), Err: ErrReadOnly, Detail: "the driver of this scheme cannot write"}
+	}
+	return w, nil
+}
+
+// forget drops the cache entry of ref.
+func (p *Provider) forget(ref Ref) {
+	p.mu.Lock()
+	delete(p.entries, ref)
+	p.mu.Unlock()
 }
 
 // entry returns the cache entry of ref, creating it on first use.

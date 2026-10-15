@@ -47,6 +47,23 @@ documented in this file. The format is based on
   operation list, `SharedResponseValidator`). Time zones are checked against the IANA names of the toolchain's
   tzdata (`tools/zonegen`). The device reads `getDevice` and `listUserDevices` authorize before they
   answer an unknown device or person.
+- Server signing keys (M1-32): the port `instance.Keys` (`Signer`, `VerificationKey`, `PublicKey`,
+  `JWKS`, `Rotate`, `EnsureActive`) over the table `server_signing_keys` (migration `00010`) and
+  the key store `secrets.signing_key_dir` (Ed25519, PKCS#8 PEM `<purpose>-<kid>.pem`, `kid` after
+  RFC 7638). States `next`, `active`, `retiring` and `retired` with scheduled rotation of
+  `invocation` and `access_token`, owner rotation `scheduled` or `emergency`, the job
+  `instance.key_rotation` and one audit entry per transition. The operations `getJwks` and
+  `rotateSigningKey`, the start step `signing_keys` with the readiness check of the same name,
+  the start check of the key store in every role, and the configuration keys
+  `secrets.signing_key_dir`, `signing_key.cache_ttl`, `signing_key.rotation_check_interval`,
+  `signing_key.access_token_rotation_interval`, `signing_key.invocation_rotation_interval`,
+  `agent.jwks_max_age`, `agent.invocation_token_ttl`, `auth.access_token_ttl` and
+  `webhook.delivery_timeout` with the cross-check of `agent.jwks_max_age` against both rotation
+  intervals.
+- Secret provider (M1-32): `Provider.Put` and `Provider.Delete`, writable only directly in
+  `secrets.signing_key_dir` (`ErrReadOnly`, `ErrExists`, `ErrWriteFailed`), and
+  `CheckSigningKeyDir`. `bothy secrets export` adds the key store under `signing-keys/`
+  (`--signing-key-dir`); `bothy secrets init` skips that part of a decrypted bundle.
 
 - Idempotency keys (M1-20): `StageIdempotency` of `platform/httpserver` runs every keyed request
   in one unit of work with the key row of `idempotency_keys` (migration `00007`), stores final

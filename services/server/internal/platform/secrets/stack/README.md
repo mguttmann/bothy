@@ -11,9 +11,9 @@ Status: built (M1-09). The normative sources are
 Preparation of the volume `secrets` for the Compose stack: `bothy secrets init` generates missing
 secrets, takes over the files the owner supplied and creates one directory per service with
 exactly the copies the service mounts through `subpath`. `bothy secrets export` writes the
-canonical copies as an age-encrypted bundle for escrow. Both commands read only their flags and
-the named directories: no configuration, no environment, no database (the container
-`secrets-init` has none of these).
+canonical copies and the key store of the signing keys as an age-encrypted bundle for escrow.
+Both commands read only their flags and the named directories: no configuration, no environment,
+no database (the container `secrets-init` has none of these).
 
 ## Code
 
@@ -76,7 +76,7 @@ Every row of the table in configuration.md section 5 is an entry with name, orig
   names the service; everything else in the service directory is removed, links too (without
   following them).
 - Relative names are the catalogue names everywhere; so a decrypted bundle has the layout of a
-  source ([disaster-recovery.md](../../../../../../docs/operations/disaster-recovery.md) case B).
+  source (plus `signing-keys/`, which `init` skips) ([disaster-recovery.md](../../../../../../docs/operations/disaster-recovery.md) case B).
 
 ## Reconciliation
 
@@ -176,17 +176,24 @@ of the owner below `offsite/` cannot fake a line in the terminal or the log.
   exclusively with mode `0600`, never overwrites an existing one (exit code 1, file unchanged) and
   removes it again when the export fails.
 - Plaintext exists only in memory; there are no temporary files.
+- The key store of the signing keys (`--signing-key-dir`, default
+  `/var/lib/bothy/signing-keys`, `secrets.signing_key_dir`, ADR 0066 rule 5) follows under the
+  prefix `signing-keys/` (`KeyStorePrefix`): the directory and every regular file
+  `<purpose>-<kid>.pem` with its mode. Leftovers `.bothy-tmp-*` of an interrupted write are
+  skipped; a subdirectory, a link or another name stops the export (usage error, exit code 2),
+  because a restore must not install a file the server never wrote. A key store named with
+  `--signing-key-dir` that does not exist is a usage error; the missing default is skipped with
+  one line on stderr (`signing key store <dir> not found; the bundle holds _store only`).
 
 Decrypt and unpack for a restore:
 `age --decrypt -i <identity> bundle.age | tar -x -C <source>`, then
-`secrets init --adopt-source` (case B).
+`secrets init --adopt-source` (case B). `init` skips the subtree `signing-keys/` of the source;
+its files belong to the volume of `secrets.signing_key_dir` (disaster-recovery.md case B).
 
 ## What is missing
 
 - Generators for `totp_key` (M1-39), `pgbackrest_tls/` (M7-01) and the generated form of
   `s3_access_key` and `s3_secret_key` (M3).
-- The signing keys from `secrets.signing_key_dir` enter the bundle with M1-32, which generates
-  them; until then `export` exports only `_store`.
 
 ## Dependencies
 

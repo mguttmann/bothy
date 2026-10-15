@@ -15,13 +15,14 @@ import (
 // call it once, and modules receive values through their Config or a narrow interface, never a
 // provider of their own.
 //
-// v supplies secrets.dir and secrets.cache_ttl (bound into secrets.Config). env is the process
+// v supplies secrets.dir, secrets.cache_ttl and secrets.signing_key_dir, the only directory Put
+// and Delete write (bound into secrets.Config). env is the process
 // environment as cmd/bothy read it once ("NAME=value" entries); the env driver looks up env:
 // references there, because no other package reads the environment (02 "Configuration loading"
 // item 5). logger receives the error line of a failed refresh; nil means slog.Default(). The
 // clock is the system clock.
 //
-// The error reports a schema without the two keys (config.Bind) or values secrets.NewProvider
+// The error reports a schema without the three keys (config.Bind) or values secrets.NewProvider
 // refuses (a secrets.dir that is not absolute and clean, a negative secrets.cache_ttl); it names
 // keys, never values.
 func NewSecretsProvider(v *config.Values, env []string, logger *slog.Logger) (*secrets.Provider, error) {
@@ -30,10 +31,11 @@ func NewSecretsProvider(v *config.Values, env []string, logger *slog.Logger) (*s
 		return nil, err
 	}
 	return secrets.NewProvider(secrets.Options{
-		Dir:      c.Dir,
-		CacheTTL: c.CacheTTL,
-		Clock:    clock.System(),
-		Logger:   logger,
-		Env:      env,
+		Dir:           c.Dir,
+		SigningKeyDir: c.SigningKeyDir,
+		CacheTTL:      c.CacheTTL,
+		Clock:         clock.System(),
+		Logger:        logger,
+		Env:           env,
 	})
 }

@@ -47,6 +47,7 @@ func refSchema(dir string) func() (*config.Schema, error) {
 		return config.NewSchema([]config.Key{
 			{Name: "secrets.dir", Kind: config.KindString, Default: dir, Doc: "Dir.", Chapter: "16-operations.md"},
 			{Name: "secrets.cache_ttl", Kind: config.KindDuration, Default: "5m", Doc: "TTL.", Chapter: "16-operations.md"},
+			{Name: "secrets.signing_key_dir", Kind: config.KindString, Default: "/var/lib/bothy/signing-keys", Doc: "Key store.", Chapter: "16-operations.md"},
 			{Name: "database.password_ref", Kind: config.KindSecretRef, Default: "file:<secrets.dir>/db_app_password", Doc: "Password.", Chapter: "16-operations.md"},
 			{Name: "database.maint_password_ref", Kind: config.KindSecretRef, Default: "env:BOTHY_SECRET_EXAMPLE_MAINT", Doc: "Password.", Chapter: "16-operations.md"},
 		})
@@ -433,7 +434,13 @@ func TestSecretsExportCommand(t *testing.T) {
 		t.Fatal(err)
 	}
 	writeSecret(t, filepath.Join(from, "offsite"), "rclone.conf", "EXAMPLE-offsite", 0o400)
-	want := map[string]string{"db_app_password": secret, "offsite/rclone.conf": "EXAMPLE-offsite"}
+	keys := filepath.Join(t.TempDir(), "signing-keys")
+	if err := os.Mkdir(keys, 0o700); err != nil {
+		t.Fatal(err)
+	}
+	keyFile := "invocation-EXAMPLE_kid.pem"
+	writeSecret(t, keys, keyFile, "EXAMPLE-key", 0o600)
+	want := map[string]string{"db_app_password": secret, "offsite/rclone.conf": "EXAMPLE-offsite", "signing-keys/" + keyFile: "EXAMPLE-key"}
 	id, err := age.GenerateX25519Identity()
 	if err != nil {
 		t.Fatal(err)
@@ -443,7 +450,7 @@ func TestSecretsExportCommand(t *testing.T) {
 	env := []string{"BOTHY_UNKNOWN__EXAMPLE=1"}
 
 	out := filepath.Join(t.TempDir(), "bundle.age")
-	code, stdout, stderr := runBothy(t, env, "secrets", "export", "--from", from, "--age-recipient", recipient, "--output", out)
+	code, stdout, stderr := runBothy(t, env, "secrets", "export", "--from", from, "--signing-key-dir", keys, "--age-recipient", recipient, "--output", out)
 	if code != 0 || stdout != "" || stderr != "" {
 		t.Fatalf("export to file: exit %d, stdout %q, stderr %q", code, stdout, stderr)
 	}
@@ -460,14 +467,14 @@ func TestSecretsExportCommand(t *testing.T) {
 	}
 
 	// The default output is stdout; a buffer is no terminal, so binary output is fine.
-	code, stdout, stderr = runBothy(t, nil, "secrets", "export", "--from", from, "--age-recipient", recipient)
+	code, stdout, stderr = runBothy(t, nil, "secrets", "export", "--from", from, "--age-recipient", recipient, "--signing-key-dir", keys)
 	if code != 0 || stderr != "" {
 		t.Fatalf("export to stdout: exit %d, stderr %q", code, stderr)
 	}
 	if got := untar(t, []byte(stdout), false, id); !maps.Equal(got, want) {
 		t.Errorf("stdout bundle differs from the store")
 	}
-	code, stdout, stderr = runBothy(t, nil, "secrets", "export", "--from", from, "--age-recipient", recipient, "--output", "-", "--armor")
+	code, stdout, stderr = runBothy(t, nil, "secrets", "export", "--from", from, "--age-recipient", recipient, "--output", "-", "--armor", "--signing-key-dir", keys)
 	if code != 0 || stderr != "" || !strings.HasPrefix(stdout, "-----BEGIN AGE ENCRYPTED FILE-----\n") {
 		t.Fatalf("armored export: exit %d, stderr %q", code, stderr)
 	}
@@ -475,8 +482,24 @@ func TestSecretsExportCommand(t *testing.T) {
 		t.Errorf("armored bundle differs from the store")
 	}
 
+	// A named key store that does not exist is a usage error; a missing default is skipped with
+	// one line on stderr (the test host has no /var/lib/bothy/signing-keys).
+	code, _, stderr = runBothy(t, nil, "secrets", "export", "--from", from, "--age-recipient", recipient, "--signing-key-dir", filepath.Join(keys, "missing"))
+	if code != 2 || !strings.HasPrefix(stderr, "bothy secrets export: ") {
+		t.Errorf("missing named key store: exit %d, stderr %q; want 2", code, stderr)
+	}
+	if _, err := os.Stat(defaultSigningKeyDir); errors.Is(err, os.ErrNotExist) {
+		code, stdout, stderr = runBothy(t, nil, "secrets", "export", "--from", from, "--age-recipient", recipient)
+		if code != 0 || stderr != "signing key store "+defaultSigningKeyDir+" not found; the bundle holds _store only\n" {
+			t.Errorf("missing default key store: exit %d, stderr %q; want 0 and one note", code, stderr)
+		}
+		if got := untar(t, []byte(stdout), false, id); len(got) != len(want)-1 {
+			t.Errorf("bundle without key store holds %d files, want %d", len(got), len(want)-1)
+		}
+	}
+
 	// An existing output file is exit 1 and stays as it was.
-	code, stdout, stderr = runBothy(t, nil, "secrets", "export", "--from", from, "--age-recipient", recipient, "--output", out)
+	code, stdout, stderr = runBothy(t, nil, "secrets", "export", "--from", from, "--age-recipient", recipient, "--output", out, "--signing-key-dir", keys)
 	after, readErr := os.ReadFile(out) //nolint:gosec // G304: the path is the test's own temp file.
 	if code != 1 || stdout != "" || !strings.HasPrefix(stderr, "bothy secrets export: ") || strings.Count(stderr, "\n") != 1 ||
 		readErr != nil || !bytes.Equal(after, bundle) {
@@ -502,6 +525,7 @@ func TestSecretsExportCommand(t *testing.T) {
 		{"secrets", "export", "--age-recipient", recipient},
 		{"secrets", "export", "--from", "", "--age-recipient", recipient},
 		{"secrets", "export", "--from", from, "--age-recipient", recipient, "--output", ""},
+		{"secrets", "export", "--from", from, "--age-recipient", recipient, "--signing-key-dir", ""},
 		{"secrets", "export", "--from", from, "--age-recipient", recipient, "--armor=maybe"},
 		{"secrets", "export", "--from", from, "--age-recipient", recipient, "extra"},
 	} {

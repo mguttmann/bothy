@@ -76,10 +76,11 @@ directory.
 ### Confirmation
 
 - Tests of build ticket M1-32 ([PLAN.md](../PLAN.md)): `TestSecretsPut_*` (only under the
-  directory, mode `0600`, no overwriting), `TestStartup_SigningKeys` (start fails without a
-  writable directory, `/readyz` reports `signing_keys`), `TestEnsureActive_*`,
-  `TestEmergencyRotation_*` and the canary test (no private key in the database, a log or a
-  response).
+  directory, mode `0600`, no overwriting), `TestStartup_SigningKeys_NotWritable` and
+  `TestStartup_SigningKeys_Readiness` (start fails without a writable directory, `/readyz`
+  reports `signing_keys`), `TestEnsureActive_*`, `TestEmergencyRotation_*`,
+  `TestSecretsExport_IncludesKeyStore` and the canary test `TestSigningKeyCanary` (no private
+  key in the database, a log, the audit, a response or an error).
 - Compose mounts the volume `signing-keys` only in `api`, `worker` and, read-only, in `secrets-init`
   ([infra/compose/compose.yaml](../../infra/compose/compose.yaml)).
 

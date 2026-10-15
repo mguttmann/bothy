@@ -23,15 +23,15 @@ import (
 const secretsUsage = `Usage: bothy secrets init --target DIR [--source DIR] [--owner SERVICE=UID:GID ...]
                           [--adopt-source]
        bothy secrets export --from DIR --age-recipient KEY [--age-recipient KEY ...]
-                            [--output FILE|-] [--armor]
+                            [--signing-key-dir DIR] [--output FILE|-] [--armor]
 
 init    prepares the secret volume of the Compose stack: DIR/_store holds the one copy of
         every secret, DIR/<service> the copies that service mounts. It generates missing
         secrets, adopts the files of --source, never replaces a generated secret unless
         --adopt-source is given, and changes nothing on a second run with the same inputs.
         Per secret it prints "<status> <name> <fingerprint>", never a value.
-export  writes the files of --from as a tar bundle encrypted with age to every recipient
-        (escrow); plaintext never reaches a disk.
+export  writes the files of --from and of the signing key store as a tar bundle encrypted
+        with age to every recipient (escrow); plaintext never reaches a disk.
 
 Both read only their flags: no configuration file, no environment, no database.
 
@@ -45,11 +45,19 @@ init flags:
 export flags:
 --from DIR               the _store directory to export, not empty (required)
 --age-recipient KEY      age X25519 public key (age1...); repeatable, at least one
+--signing-key-dir DIR    key store of the signing keys, in the bundle under signing-keys/
+                         (default /var/lib/bothy/signing-keys; skipped with a note on
+                         stderr when the default does not exist)
 --output FILE            new file with mode 0600, never overwritten; - is stdout (default -)
 --armor                  ASCII armor, needed when stdout is a terminal
 
 Exit codes: 0 ok, 1 runtime failure or conflict, 2 usage error.
 `
+
+// defaultSigningKeyDir is the default of secrets.signing_key_dir (docs/operations/configuration.md
+// section 5): the key store export includes. The command reads no configuration, so the default is
+// repeated here; the image test holds the path.
+const defaultSigningKeyDir = "/var/lib/bothy/signing-keys"
 
 // The subcommands of bothy secrets.
 const (
@@ -60,6 +68,7 @@ const (
 // secretsOptions holds the flags of secrets init and export.
 type secretsOptions struct {
 	target, source, from, output string
+	signingKeyDir                string
 	owners                       ownerFlag
 	recipients                   listFlag
 	adoptSource, armor           bool
@@ -82,6 +91,7 @@ func secretsFlags(sub string) (*flag.FlagSet, *secretsOptions) {
 		fs.StringVar(&o.from, "from", "", "_store directory")
 		fs.Var(&o.recipients, "age-recipient", "age X25519 public key")
 		fs.StringVar(&o.output, "output", "-", "output file or -")
+		fs.StringVar(&o.signingKeyDir, "signing-key-dir", defaultSigningKeyDir, "key store of the signing keys")
 		fs.BoolVar(&o.armor, "armor", false, "ASCII armor")
 	}
 	return fs, o
@@ -137,7 +147,7 @@ func secretsCommand(ctx context.Context, args []string, stdout, stderr io.Writer
 	if msg := missingFlag(sub, fs, o); msg != "" {
 		return secretsUsageError(stderr, prefix, msg)
 	}
-	if err := runSecrets(ctx, sub, o, stdout); err != nil {
+	if err := runSecrets(ctx, sub, o, fs, stdout, stderr); err != nil {
 		_, _ = fmt.Fprintf(stderr, "%s: %v\n", prefix, err)
 		if errors.Is(err, stack.ErrUsage) {
 			return exitUsage
@@ -172,18 +182,24 @@ func missingFlag(sub string, fs *flag.FlagSet, o *secretsOptions) string {
 	case o.output == "":
 		// stack.Export reads "" as stdout; an unset variable must not turn a file into it.
 		return "--output needs a file path or -"
+	case o.signingKeyDir == "":
+		return "--signing-key-dir needs a directory path"
 	}
 	return ""
 }
 
 // runSecrets runs init or export with the checked options: init prints its report on stdout,
-// export writes the bundle to --output or stdout.
-func runSecrets(ctx context.Context, sub string, o *secretsOptions, stdout io.Writer) error {
+// export writes the bundle to --output or stdout and its notes to stderr.
+//
+// The key store is optional only at its default path: a named directory that does not exist is a
+// usage error, the missing default is skipped with a line on stderr.
+func runSecrets(ctx context.Context, sub string, o *secretsOptions, fs *flag.FlagSet, stdout, stderr io.Writer) error {
 	if sub == subcommandInit {
 		return secretsInit(ctx, o, stdout)
 	}
 	return stack.Export(ctx, stack.ExportOptions{
 		From: o.from, Recipients: o.recipients, Output: o.output, Armor: o.armor, Stdout: stdout,
+		SigningKeyDir: o.signingKeyDir, SigningKeyDirOptional: !flagGiven(fs, "signing-key-dir"), Notice: stderr,
 	})
 }
 
