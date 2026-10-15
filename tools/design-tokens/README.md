@@ -33,16 +33,17 @@ uv run --project tools --locked check-jsonschema --schemafile https://www.design
 | Datei | Inhalt |
 |---|---|
 | `design/build/tokens.css` | CSS-Variablen `--ds-*`; Theme über `data-theme` oder `prefers-color-scheme`, Dichte über `data-density`, Bewegung über `data-motion` oder `prefers-reduced-motion`; instance accent over `data-accent="<key>"` on the same element as `data-theme` (only the swapped variables, per non-default accent and theme) |
+| `packages/design_system/lib/src/generated/design_tokens.g.dart` | the same bytes as `design/build/dart/design_tokens.g.dart`: the package copy, because a package may not import a file outside its folder; `check` reports it as stale when it differs (docs/DECISIONS.md D-M4-04-1) |
 | `design/build/dart/design_tokens.g.dart` | `DsPalette`, `DsColors`, `DsAccent`, `DsElevation`, `DsDensity`, `DsMotion` (je `ThemeExtension` mit Instanzen je Kontext; `DsAccent` with one constant per theme and accent and `DsAccent.of(key, brightness)`, an unknown key gives the default), `DsSpace`, `DsRadius`, `DsBorderWidth`, `DsLayout`, `DsSize`, `DsIconSize`, `DsFonts`, `DsType`, `DsIcons` |
 | `design/build/tokens.resolved.json` | alle Tokens aufgelöst, je Kontext, plus Icon-Zuordnung und erlaubte Bereichs-Icons; member `accents`: default and, per accent and theme, every accent role with `hex`, `alias`, `moved_from` and `swapped` |
 | `design/build/preview.html` | eigenständige Vorschau mit eingebetteten Schriften und Icons |
 | `design/build/README.md` | Hinweis "generiert" |
 | `docs/design/palette.md`, `contrast.md`, `tokens.md` | erzeugte Doku |
 
-Die Dart-Datei ist nicht `dart format`-formatiert; `packages/design_system` übernimmt sie in seinem
-Build und formatiert dort. Geprüft wurde sie mit `dart analyze` (Dart 3.13.5) gegen Stellvertreter
-der benutzten Flutter-Typen; gegen das echte Flutter-SDK ist sie noch nicht übersetzt (Ticket
-"design_system-Paket").
+The Dart file is not `dart format`-formatted; as generated code the package copy is outside the
+format check, the doc and style lint and coverage (docs/DECISIONS.md D-M4-01-4). It compiles
+against the real Flutter SDK (3.47.7): `packages/design_system` exports it, `flutter analyze`
+analyzes its users and `flutter test` compiles it (M4-04).
 
 ## Gates
 

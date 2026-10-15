@@ -60,6 +60,20 @@ Planungsgrundlage nennt River (MPL-2.0) für Hintergrundjobs.
    ist kein Pull-Request-Gate, weil ein Lauf über den ganzen Baum lange dauert; der
    Ablauf ist ein Ticket der Release-Etappe.
 
+## Bundled fonts
+
+The apps bundle the fonts Atkinson Hyperlegible Next and Atkinson Hyperlegible Mono as asset
+files under `packages/design_system/fonts/` (docs/design/typography.md). Their license is
+OFL-1.1, settled by D-L11 and docs/design/typography.md (reason 5): the OFL allows embedding in
+apps and redistribution when the license text ships with the files. The font files are bundled
+assets, not package dependencies: `make licenses` (OSV-Scanner over the lock files) does not see
+them, and `quality/licenses/allowed.txt` stays unchanged. Instead the OFL text of each family
+lies next to the files (`fonts/<family>.OFL.txt`), `fonts/MANIFEST.json` records
+`"license": "OFL-1.1"` per file, and `packages/design_system/test/fonts_test.dart` fails when a
+font file has no license text, a manifest entry names another license, or a file differs from
+its recorded SHA-256. `NOTICE` names both fonts with their copyright (docs/DECISIONS.md
+D-M4-04-4).
+
 ## SBOM und Prüfung von Releases
 
 * Jedes Release enthält `sbom.spdx.json` (SPDX, erzeugt mit Syft über

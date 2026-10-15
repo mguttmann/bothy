@@ -30,6 +30,8 @@ class GateTreeMixin:
         shutil.copytree(HERE, self.root / "tools" / "design-tokens", ignore=ignore)
         shutil.copytree(ROOT / "design", self.root / "design", ignore=ignore)
         shutil.copytree(ROOT / "docs" / "design", self.root / "docs" / "design", ignore=ignore)
+        package_copy = Path("packages", "design_system", "lib", "src", "generated")
+        shutil.copytree(ROOT / package_copy, self.root / package_copy, ignore=ignore)
 
     def tearDown(self):
         self._tmp.cleanup()
@@ -107,6 +109,27 @@ class CheckGateTest(GateTreeMixin, unittest.TestCase):
         proc = self._check()
         self.assertEqual(proc.returncode, 1)
         self.assertIn("stale: design/build/dart/design_tokens.g.dart", proc.stderr)
+
+    def test_check_fails_when_package_copy_differs(self):
+        copy = self.root / "packages" / "design_system" / "lib" / "src" / "generated" / "design_tokens.g.dart"
+        copy.write_text(copy.read_text(encoding="utf-8") + "// drift\n", encoding="utf-8")
+        proc = self._check()
+        self.assertEqual(proc.returncode, 1)
+        self.assertIn("stale: packages/design_system/lib/src/generated/design_tokens.g.dart", proc.stderr)
+        self.assertNotIn("stale: design/build/dart/design_tokens.g.dart", proc.stderr)
+
+    def test_build_writes_the_package_copy_with_the_same_bytes(self):
+        copy = self.root / "packages" / "design_system" / "lib" / "src" / "generated" / "design_tokens.g.dart"
+        copy.unlink()
+        proc = subprocess.run(
+            [sys.executable, str(self.root / "tools" / "design-tokens" / "tokens.py"), "build"],
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+        self.assertEqual(proc.returncode, 0, proc.stderr)
+        source = self.root / "design" / "build" / "dart" / "design_tokens.g.dart"
+        self.assertEqual(copy.read_bytes(), source.read_bytes())
 
     def test_build_fails_below_aa_for_accent(self):
         # A flat mid-grey scale as an extra accent: no step reaches 4.5:1 against light or dark text.

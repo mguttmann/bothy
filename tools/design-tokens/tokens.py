@@ -34,6 +34,10 @@ RULES = ROOT / "design" / "design-rules.json"
 BUILD = ROOT / "design" / "build"
 DOCS = ROOT / "docs" / "design"
 VENDOR = HERE / "vendor"
+# The package copy of the Dart output: a package may not import a file outside its folder
+# (docs/spec/15-client-architektur.md 3.1), so `build` writes the same bytes twice and `check`
+# compares both (docs/DECISIONS.md D-M4-04-1).
+PACKAGE_DART = ROOT / "packages" / "design_system" / "lib" / "src" / "generated" / "design_tokens.g.dart"
 HEADER = (
     "GENERIERT von tools/design-tokens/tokens.py aus design/tokens. Nicht bearbeiten; Quelle ändern und neu erzeugen."
 )
@@ -170,10 +174,12 @@ def generate() -> tuple[dict[Path, str], list[str]]:
         if not r.passed
     ]
     problems += accent_problems + guard_problems
+    dart = emit_dart.render(m, HEADER, variants, default)
     outputs = {
         BUILD / "README.md": _build_readme(),
         BUILD / "tokens.css": emit_css.render(m, HEADER, variants, default),
-        BUILD / "dart" / "design_tokens.g.dart": emit_dart.render(m, HEADER, variants, default),
+        BUILD / "dart" / "design_tokens.g.dart": dart,
+        PACKAGE_DART: dart,
         BUILD / "tokens.resolved.json": _resolved_json(m, variants, default, cvd_member),
         BUILD / "preview.html": emit_preview.render(m, VENDOR, HEADER),
         DOCS / "palette.md": emit_docs.palette_md(m, HEADER),

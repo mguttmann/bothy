@@ -27,6 +27,13 @@ Planning stage (milestone M0). Nothing is installable yet.
   deficiency, pair and distance, and `docs/design/contrast.md` lists every row (M6-10). The chart
   roles `color.viz.*`, their contrast pairing and `tokens.py previews --view` come with it (plan
   ruling D-W-13).
+- Design system package: `packages/design_system` exports the generated token classes (a copy
+  that `tokens.py build` writes next to `design/build/dart/` and `make tokens` compares), a
+  settings resolver from `appearance.theme`, `appearance.density`, `appearance.reduce_motion` and
+  the instance accent to theme, density, motion and accent, a theme builder with the five token
+  extensions and the color scheme mapping, `DsThemeScope` (no animated switch under reduced
+  motion), the bundled variable fonts Atkinson Hyperlegible Next and Mono with their OFL texts and
+  a checked manifest, and the alchemist golden setup with `dsGoldenMatrix` (M4-04).
 
 - Design tokens: accent variants for every instance accent of `branding.accent_color` in light and
   dark. The generator swaps the accent roles for the same step of the chosen scale, moves a
