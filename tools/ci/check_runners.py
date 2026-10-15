@@ -44,6 +44,10 @@ Every finding names a rule:
                                 upload an artifact with a matching name
   environment-not-literal       an environment name with an expression `${{ }}`; a computed
                                 name could pick a `release*` environment that no rule sees
+  signing-outside-release       a signing step (cosign sign, sign-blob, attest; the `sign`
+                                command of tools/ci/release_chain.py; actions/attest) in a job
+                                whose environment is not `release`, the only one that holds
+                                the signing key (ADR 0062 "Confirmation")
 """
 
 from __future__ import annotations
@@ -83,6 +87,13 @@ PUBLIC_GUARD = (
 _HOSTED_LABEL = re.compile(r"^(?:ubuntu|macos|windows)-[0-9]+(?:\.[0-9]+)?(?:-arm)?$")
 _PINNED = re.compile(r"^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+(?:/[^@\s]+)?@[0-9a-f]{40}$")
 _DOCKER_PINNED = re.compile(r"^docker://[^@\s]+@sha256:[0-9a-f]{64}$")
+# Steps that sign: cosign signing commands, the signing command of the release chain and the
+# Sigstore-backed attestation actions. Verification (`cosign verify`) is not signing.
+_SIGNING_RUN = re.compile(
+    r"\bcosign\s+(?:sign|sign-blob|attest|attest-blob)\b|\brelease_chain\.py\s+sign\b"
+)
+_SIGNING_USES = re.compile(r"^actions/attest(?:-[a-z-]+)?@")
+SIGNING_ENVIRONMENT = "release"
 _MATRIX_REF = re.compile(r"^\$\{\{\s*matrix\.([A-Za-z0-9_-]+)\s*\}\}$")
 # Release jobs: every `needs` inside `${{ }}` outside `if:` is a finding unless it is
 # exactly `needs.<job>.result` or `needs.<release job>.outputs.<name>` (allow list, K3-04).
@@ -252,6 +263,14 @@ def runner_labels(job: dict[str, Any]) -> list[str] | None:
     return [_runs_on_text(c.get(ref.group(1), runs_on)) for c in combos]
 
 
+def _is_signing(step: dict[str, Any]) -> bool:
+    """Return whether a step signs (see _SIGNING_RUN and _SIGNING_USES)."""
+    run, uses = step.get("run"), step.get("uses")
+    return (isinstance(run, str) and _SIGNING_RUN.search(run) is not None) or (
+        isinstance(uses, str) and _SIGNING_USES.match(uses) is not None
+    )
+
+
 def _check_job(
     file: str, name: str, job: dict[str, Any], scheduled: bool, out: list[Finding]
 ) -> None:
@@ -265,6 +284,15 @@ def _check_job(
     for i, step in enumerate(job.get("steps") or []):
         if isinstance(step, dict):
             _check_uses(file, f"{where} step {i + 1}", step.get("uses"), out)
+            if _is_signing(step) and _environment(job).strip().casefold() != SIGNING_ENVIRONMENT:
+                out.append(
+                    Finding(
+                        file,
+                        f"{where} step {i + 1}",
+                        "signing-outside-release",
+                        "signing steps belong in a job with environment: release",
+                    )
+                )
     if "timeout-minutes" not in job:
         out.append(Finding(file, where, "missing-timeout", "set timeout-minutes"))
     if scheduled and not has_public_guard(job.get("if")):
