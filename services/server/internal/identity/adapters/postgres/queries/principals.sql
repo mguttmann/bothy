@@ -22,6 +22,14 @@ FROM principals p
 WHERE p.id = ANY (@ids::uuid[])
 ORDER BY p.id;
 
+-- name: ListActivePrincipalsByHandles :many
+-- The batched mention lookup of messaging (M1-56): active people and agents whose lower-cased
+-- handle is in the list (03 messages "Inhaltsformat" item 3).
+SELECT sqlc.embed(p)
+FROM principals p
+WHERE lower(p.handle) = ANY (@handles::text[]) AND p.status = 'active' AND p.kind IN ('user', 'agent')
+ORDER BY p.id;
+
 -- name: GetPrincipalByHandle :one
 SELECT sqlc.embed(p)
 FROM principals p

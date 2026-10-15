@@ -116,6 +116,10 @@ var appPrivileges = map[string][]string{
 	"hosts":              {"SELECT", "INSERT", "UPDATE"},
 	"host_session_users": {"SELECT", "INSERT", "UPDATE"},
 	"terminal_sessions":  {"SELECT", "INSERT", "UPDATE"},
+	// 03 messages and mentions (M1-56): a deleted message stays as a tombstone (03 principle 7);
+	// editing replaces the mentions of a message and deleting removes them.
+	"messages": {"SELECT", "INSERT", "UPDATE"},
+	"mentions": {"SELECT", "INSERT", "DELETE"},
 	// 03 local_credentials (M1-39): one row per local identity, changed in place; it goes with
 	// its identity (ON DELETE CASCADE).
 	"local_credentials": {"SELECT", "INSERT", "UPDATE"},

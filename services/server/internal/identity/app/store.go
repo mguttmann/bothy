@@ -55,6 +55,9 @@ type Store interface {
 	Principals(ctx context.Context, ids []ids.ID) ([]domain.Principal, error)
 	// PrincipalByHandle returns the principal whose handle equals handle without regard to case.
 	PrincipalByHandle(ctx context.Context, handle string) (p domain.Principal, found bool, err error)
+	// ActivePrincipalsByHandles returns the active people and agents whose lower-cased handle is
+	// in handles (lower case), in one read.
+	ActivePrincipalsByHandles(ctx context.Context, handles []string) ([]domain.Principal, error)
 	// User returns the person id with its owner flag; found is false for an unknown id and for a
 	// principal without a users row.
 	User(ctx context.Context, id ids.ID) (rec UserRecord, found bool, err error)

@@ -127,6 +127,8 @@ func TestChatChannelsMigration_Schema(t *testing.T) {
 			"FOREIGN KEY (closed_by) REFERENCES principals(id) ON DELETE RESTRICT",
 			"FOREIGN KEY (created_by) REFERENCES principals(id) ON DELETE RESTRICT",
 			"FOREIGN KEY (operator_agent_id) REFERENCES agents(principal_id) ON DELETE RESTRICT",
+			// Added by 00032 once messages exists (M1-56).
+			"FOREIGN KEY (parent_message_id) REFERENCES messages(id) ON DELETE RESTRICT DEFERRABLE INITIALLY DEFERRED",
 			"PRIMARY KEY (id)",
 		}, []string{
 			"CREATE INDEX threads_channel_state_activity_idx ON public.threads USING btree (channel_id, state, last_activity_at DESC)",

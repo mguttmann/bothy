@@ -35,7 +35,14 @@ func TestRepositoryThreads(t *testing.T) {
 	if _, err := e.repo.InsertThread(ctx, newThread(0, ids.ID{})); err == nil {
 		t.Fatal("insert outside a unit of work")
 	}
-	parent := ids.New()
+	// The parent message lives in a thread of its own (threads.parent_message_id references
+	// messages since M1-56), in another forum so the lists below do not see it.
+	elsewhere, host, parent := ids.New(), ids.New(), ids.New()
+	e.exec(t, `INSERT INTO channels (id, space_id, kind, name, sort_key, history_backfill_limit, created_by)
+		VALUES ($1, $2, 'forum', 'ideas', 'a1', 20, $3)`, elsewhere.String(), space.String(), alex.String())
+	e.exec(t, `INSERT INTO threads (id, channel_id, kind, created_by) VALUES ($1, $2, 'thread', $3)`, host.String(), elsewhere.String(), alex.String())
+	e.exec(t, `INSERT INTO messages (id, thread_id, channel_id, thread_seq, author_principal_id, client_msg_id, client_payload_sha256, origin)
+		VALUES ($1, $2, $3, 1, $4, $5, '\x00', 'human')`, parent.String(), host.String(), elsewhere.String(), alex.String(), ids.New().String())
 	var made []domain.Thread
 	if err := e.write(t, func(ctx context.Context) error {
 		for i := range 3 {

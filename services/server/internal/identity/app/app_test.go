@@ -330,3 +330,33 @@ func TestDirectoryErrorsCarryNoSQL(t *testing.T) {
 		}
 	}
 }
+
+// TestDirectoryActiveByHandles: the batched mention lookup of M1-56 (brief scope item 7) finds
+// active people and agents by handle without regard to case, keyed by the lower-case handle; apps,
+// disabled principals and unknown handles are absent, and an empty list reads nothing.
+func TestDirectoryActiveByHandles(t *testing.T) {
+	t.Parallel()
+	f := newFixture(t)
+	dir := app.NewDirectory(f.repo)
+	ctx := context.Background()
+	alex := f.add(domain.KindUser, "alex")
+	agent := f.add(domain.KindAgent, "support-agent")
+	app1 := f.add(domain.KindApp, "deploy-app")
+	gone := f.add(domain.KindUser, "sam")
+	if _, err := f.owner.Exec(ctx, `UPDATE principals SET status = 'disabled' WHERE id = $1`, gone.ID.String()); err != nil {
+		t.Fatal(err)
+	}
+	got, err := dir.ActiveByHandles(ctx, []string{"alex", "support-agent", "deploy-app", "sam", "nobody", "ALEX"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(got) != 2 || got["alex"].ID != alex.ID || got["support-agent"].ID != agent.ID || got["support-agent"].Kind != actor.KindAgent {
+		t.Fatalf("ActiveByHandles = %+v", got)
+	}
+	if _, ok := got["deploy-app"]; ok || app1.ID.IsZero() {
+		t.Error("an app is a mention")
+	}
+	if m, err := dir.ActiveByHandles(ctx, nil); err != nil || len(m) != 0 {
+		t.Errorf("ActiveByHandles(nil) = %v, %v", m, err)
+	}
+}

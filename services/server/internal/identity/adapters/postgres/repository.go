@@ -102,6 +102,19 @@ func (r *Repository) PrincipalByHandle(ctx context.Context, handle string) (doma
 	return toPrincipal(row.Principal), true, nil
 }
 
+// ActivePrincipalsByHandles implements app.Store.
+func (r *Repository) ActivePrincipalsByHandles(ctx context.Context, handles []string) ([]domain.Principal, error) {
+	rows, err := r.read(ctx).ListActivePrincipalsByHandles(ctx, handles)
+	if err != nil {
+		return nil, mapError(err, "reading principals by handle")
+	}
+	out := make([]domain.Principal, 0, len(rows))
+	for _, row := range rows {
+		out = append(out, toPrincipal(row.Principal))
+	}
+	return out, nil
+}
+
 // User implements app.Store.
 func (r *Repository) User(ctx context.Context, id ids.ID) (app.UserRecord, bool, error) {
 	row, err := r.read(ctx).GetUser(ctx, uuid(id))

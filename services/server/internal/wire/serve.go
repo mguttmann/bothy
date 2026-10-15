@@ -162,6 +162,8 @@ type server struct {
 	terminal *Terminal
 	// apps is the module apps (M2-24): the app use cases and their REST handlers.
 	apps *Apps
+	// messaging is the messaging module (M1-56), built in the chat step over the threads of chat.
+	messaging *Messaging
 	// signingKeys are the server signing keys (M1-32) and keyCheck the interval of their job.
 	signingKeys *SigningKeys
 	keyCheck    time.Duration
@@ -201,7 +203,7 @@ type server struct {
 //     6e. agents (M1-51): build the agent records over the unit of work, the Authorizer, the rights
 //     hook and the identity module (startAgents),
 //     6f. chat (M1-52): build the spaces and the sidebar over the unit of work, the Authorizer,
-//     the recorder and the appender (startChat),
+//     the recorder and the appender, then messaging over the threads of chat (M1-56; startChat),
 //     6g. terminal (M2-39): build the host records over the unit of work, the Authorizer, the
 //     recorder, the appender and the identity module (startTerminal),
 //     6h. apps (M2-24): build the app use cases and their handlers over identity, the rights hook
@@ -730,7 +732,8 @@ func (s *server) startAgents(context.Context) error {
 }
 
 // startChat is start step 6f (M1-52): the chat module over the pool, the unit of work and the
-// recorder of the audit step, the appender of the sync step and the Authorizer.
+// recorder of the audit step, the appender of the sync step and the Authorizer, and the messaging
+// module over the threads of chat (M1-56).
 func (s *server) startChat(context.Context) error {
 	cfg, err := ChatConfig(s.values)
 	if err != nil {
@@ -747,8 +750,16 @@ func (s *server) startChat(context.Context) error {
 	if err != nil {
 		return err
 	}
+	mcfg, err := MessagingConfig(s.values)
+	if err != nil {
+		return err
+	}
+	m, err := NewMessaging(mcfg, pool, a.UoW(), az, sy.Appender(), c.Service, s.deps.Clock)
+	if err != nil {
+		return err
+	}
 	s.mu.Lock()
-	s.chat = c
+	s.chat, s.messaging = c, m
 	s.mu.Unlock()
 	return nil
 }
@@ -854,6 +865,7 @@ func (s *server) handlers() Handlers {
 	if s.chat != nil {
 		s.chat.fillHandlers(&h)
 	}
+	s.messaging.fillHandlers(&h)
 	if h.Hosts == nil && s.terminal != nil {
 		h.Hosts = s.terminal.Handlers
 	}

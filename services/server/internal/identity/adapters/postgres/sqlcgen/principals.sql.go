@@ -159,6 +159,49 @@ func (q *Queries) InsertUser(ctx context.Context, arg InsertUserParams) error {
 	return err
 }
 
+const listActivePrincipalsByHandles = `-- name: ListActivePrincipalsByHandles :many
+SELECT p.id, p.kind, p.status, p.handle, p.display_name, p.avatar_file_id, p.created_at, p.disabled_at, p.deleted_at
+FROM principals p
+WHERE lower(p.handle) = ANY ($1::text[]) AND p.status = 'active' AND p.kind IN ('user', 'agent')
+ORDER BY p.id
+`
+
+type ListActivePrincipalsByHandlesRow struct {
+	Principal Principal
+}
+
+// The batched mention lookup of messaging (M1-56): active people and agents whose lower-cased
+// handle is in the list (03 messages "Inhaltsformat" item 3).
+func (q *Queries) ListActivePrincipalsByHandles(ctx context.Context, handles []string) ([]ListActivePrincipalsByHandlesRow, error) {
+	rows, err := q.db.Query(ctx, listActivePrincipalsByHandles, handles)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []ListActivePrincipalsByHandlesRow
+	for rows.Next() {
+		var i ListActivePrincipalsByHandlesRow
+		if err := rows.Scan(
+			&i.Principal.ID,
+			&i.Principal.Kind,
+			&i.Principal.Status,
+			&i.Principal.Handle,
+			&i.Principal.DisplayName,
+			&i.Principal.AvatarFileID,
+			&i.Principal.CreatedAt,
+			&i.Principal.DisabledAt,
+			&i.Principal.DeletedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const listPrincipalsByIDs = `-- name: ListPrincipalsByIDs :many
 SELECT p.id, p.kind, p.status, p.handle, p.display_name, p.avatar_file_id, p.created_at, p.disabled_at, p.deleted_at
 FROM principals p
