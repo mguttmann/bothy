@@ -841,47 +841,35 @@ final class DsColors extends ThemeExtension<DsColors> {
       categoryAmberChipBg: categoryAmberChipBg ?? this.categoryAmberChipBg,
       categoryAmberChipFg: categoryAmberChipFg ?? this.categoryAmberChipFg,
       categoryAmberFg: categoryAmberFg ?? this.categoryAmberFg,
-      categoryAmberOnSidebar:
-          categoryAmberOnSidebar ?? this.categoryAmberOnSidebar,
+      categoryAmberOnSidebar: categoryAmberOnSidebar ?? this.categoryAmberOnSidebar,
       categoryGorseChipBg: categoryGorseChipBg ?? this.categoryGorseChipBg,
       categoryGorseChipFg: categoryGorseChipFg ?? this.categoryGorseChipFg,
       categoryGorseFg: categoryGorseFg ?? this.categoryGorseFg,
-      categoryGorseOnSidebar:
-          categoryGorseOnSidebar ?? this.categoryGorseOnSidebar,
-      categoryGraniteChipBg:
-          categoryGraniteChipBg ?? this.categoryGraniteChipBg,
-      categoryGraniteChipFg:
-          categoryGraniteChipFg ?? this.categoryGraniteChipFg,
+      categoryGorseOnSidebar: categoryGorseOnSidebar ?? this.categoryGorseOnSidebar,
+      categoryGraniteChipBg: categoryGraniteChipBg ?? this.categoryGraniteChipBg,
+      categoryGraniteChipFg: categoryGraniteChipFg ?? this.categoryGraniteChipFg,
       categoryGraniteFg: categoryGraniteFg ?? this.categoryGraniteFg,
-      categoryGraniteOnSidebar:
-          categoryGraniteOnSidebar ?? this.categoryGraniteOnSidebar,
-      categoryHeatherChipBg:
-          categoryHeatherChipBg ?? this.categoryHeatherChipBg,
-      categoryHeatherChipFg:
-          categoryHeatherChipFg ?? this.categoryHeatherChipFg,
+      categoryGraniteOnSidebar: categoryGraniteOnSidebar ?? this.categoryGraniteOnSidebar,
+      categoryHeatherChipBg: categoryHeatherChipBg ?? this.categoryHeatherChipBg,
+      categoryHeatherChipFg: categoryHeatherChipFg ?? this.categoryHeatherChipFg,
       categoryHeatherFg: categoryHeatherFg ?? this.categoryHeatherFg,
-      categoryHeatherOnSidebar:
-          categoryHeatherOnSidebar ?? this.categoryHeatherOnSidebar,
+      categoryHeatherOnSidebar: categoryHeatherOnSidebar ?? this.categoryHeatherOnSidebar,
       categoryLochChipBg: categoryLochChipBg ?? this.categoryLochChipBg,
       categoryLochChipFg: categoryLochChipFg ?? this.categoryLochChipFg,
       categoryLochFg: categoryLochFg ?? this.categoryLochFg,
-      categoryLochOnSidebar:
-          categoryLochOnSidebar ?? this.categoryLochOnSidebar,
+      categoryLochOnSidebar: categoryLochOnSidebar ?? this.categoryLochOnSidebar,
       categoryMossChipBg: categoryMossChipBg ?? this.categoryMossChipBg,
       categoryMossChipFg: categoryMossChipFg ?? this.categoryMossChipFg,
       categoryMossFg: categoryMossFg ?? this.categoryMossFg,
-      categoryMossOnSidebar:
-          categoryMossOnSidebar ?? this.categoryMossOnSidebar,
+      categoryMossOnSidebar: categoryMossOnSidebar ?? this.categoryMossOnSidebar,
       categoryRowanChipBg: categoryRowanChipBg ?? this.categoryRowanChipBg,
       categoryRowanChipFg: categoryRowanChipFg ?? this.categoryRowanChipFg,
       categoryRowanFg: categoryRowanFg ?? this.categoryRowanFg,
-      categoryRowanOnSidebar:
-          categoryRowanOnSidebar ?? this.categoryRowanOnSidebar,
+      categoryRowanOnSidebar: categoryRowanOnSidebar ?? this.categoryRowanOnSidebar,
       categorySpruceChipBg: categorySpruceChipBg ?? this.categorySpruceChipBg,
       categorySpruceChipFg: categorySpruceChipFg ?? this.categorySpruceChipFg,
       categorySpruceFg: categorySpruceFg ?? this.categorySpruceFg,
-      categorySpruceOnSidebar:
-          categorySpruceOnSidebar ?? this.categorySpruceOnSidebar,
+      categorySpruceOnSidebar: categorySpruceOnSidebar ?? this.categorySpruceOnSidebar,
       codeBg: codeBg ?? this.codeBg,
       codeFg: codeFg ?? this.codeFg,
       dangerBg: dangerBg ?? this.dangerBg,
@@ -918,8 +906,7 @@ final class DsColors extends ThemeExtension<DsColors> {
       surfaceSelected: surfaceSelected ?? this.surfaceSelected,
       surfaceSidebar: surfaceSidebar ?? this.surfaceSidebar,
       surfaceSidebarHover: surfaceSidebarHover ?? this.surfaceSidebarHover,
-      surfaceSidebarSelected:
-          surfaceSidebarSelected ?? this.surfaceSidebarSelected,
+      surfaceSidebarSelected: surfaceSidebarSelected ?? this.surfaceSidebarSelected,
       surfaceSunken: surfaceSunken ?? this.surfaceSunken,
       terminalAnsiBlack: terminalAnsiBlack ?? this.terminalAnsiBlack,
       terminalAnsiBlue: terminalAnsiBlue ?? this.terminalAnsiBlue,
@@ -947,8 +934,7 @@ final class DsColors extends ThemeExtension<DsColors> {
       textOnAccent: textOnAccent ?? this.textOnAccent,
       textOnSidebar: textOnSidebar ?? this.textOnSidebar,
       textOnSidebarMuted: textOnSidebarMuted ?? this.textOnSidebarMuted,
-      textOnSidebarSecondary:
-          textOnSidebarSecondary ?? this.textOnSidebarSecondary,
+      textOnSidebarSecondary: textOnSidebarSecondary ?? this.textOnSidebarSecondary,
       textPrimary: textPrimary ?? this.textPrimary,
       textSecondary: textSecondary ?? this.textSecondary,
       triggerDone: triggerDone ?? this.triggerDone,
@@ -992,162 +978,46 @@ final class DsColors extends ThemeExtension<DsColors> {
       attentionFg: Color.lerp(attentionFg, other.attentionFg, t)!,
       attentionOnBg: Color.lerp(attentionOnBg, other.attentionOnBg, t)!,
       attentionSubtle: Color.lerp(attentionSubtle, other.attentionSubtle, t)!,
-      badgeOrganizationBg: Color.lerp(
-        badgeOrganizationBg,
-        other.badgeOrganizationBg,
-        t,
-      )!,
-      badgeOrganizationFg: Color.lerp(
-        badgeOrganizationFg,
-        other.badgeOrganizationFg,
-        t,
-      )!,
+      badgeOrganizationBg: Color.lerp(badgeOrganizationBg, other.badgeOrganizationBg, t)!,
+      badgeOrganizationFg: Color.lerp(badgeOrganizationFg, other.badgeOrganizationFg, t)!,
       badgePersonalBg: Color.lerp(badgePersonalBg, other.badgePersonalBg, t)!,
       badgePersonalFg: Color.lerp(badgePersonalFg, other.badgePersonalFg, t)!,
       borderControl: Color.lerp(borderControl, other.borderControl, t)!,
       borderDefault: Color.lerp(borderDefault, other.borderDefault, t)!,
       borderOnSidebar: Color.lerp(borderOnSidebar, other.borderOnSidebar, t)!,
       borderSubtle: Color.lerp(borderSubtle, other.borderSubtle, t)!,
-      categoryAmberChipBg: Color.lerp(
-        categoryAmberChipBg,
-        other.categoryAmberChipBg,
-        t,
-      )!,
-      categoryAmberChipFg: Color.lerp(
-        categoryAmberChipFg,
-        other.categoryAmberChipFg,
-        t,
-      )!,
+      categoryAmberChipBg: Color.lerp(categoryAmberChipBg, other.categoryAmberChipBg, t)!,
+      categoryAmberChipFg: Color.lerp(categoryAmberChipFg, other.categoryAmberChipFg, t)!,
       categoryAmberFg: Color.lerp(categoryAmberFg, other.categoryAmberFg, t)!,
-      categoryAmberOnSidebar: Color.lerp(
-        categoryAmberOnSidebar,
-        other.categoryAmberOnSidebar,
-        t,
-      )!,
-      categoryGorseChipBg: Color.lerp(
-        categoryGorseChipBg,
-        other.categoryGorseChipBg,
-        t,
-      )!,
-      categoryGorseChipFg: Color.lerp(
-        categoryGorseChipFg,
-        other.categoryGorseChipFg,
-        t,
-      )!,
+      categoryAmberOnSidebar: Color.lerp(categoryAmberOnSidebar, other.categoryAmberOnSidebar, t)!,
+      categoryGorseChipBg: Color.lerp(categoryGorseChipBg, other.categoryGorseChipBg, t)!,
+      categoryGorseChipFg: Color.lerp(categoryGorseChipFg, other.categoryGorseChipFg, t)!,
       categoryGorseFg: Color.lerp(categoryGorseFg, other.categoryGorseFg, t)!,
-      categoryGorseOnSidebar: Color.lerp(
-        categoryGorseOnSidebar,
-        other.categoryGorseOnSidebar,
-        t,
-      )!,
-      categoryGraniteChipBg: Color.lerp(
-        categoryGraniteChipBg,
-        other.categoryGraniteChipBg,
-        t,
-      )!,
-      categoryGraniteChipFg: Color.lerp(
-        categoryGraniteChipFg,
-        other.categoryGraniteChipFg,
-        t,
-      )!,
-      categoryGraniteFg: Color.lerp(
-        categoryGraniteFg,
-        other.categoryGraniteFg,
-        t,
-      )!,
-      categoryGraniteOnSidebar: Color.lerp(
-        categoryGraniteOnSidebar,
-        other.categoryGraniteOnSidebar,
-        t,
-      )!,
-      categoryHeatherChipBg: Color.lerp(
-        categoryHeatherChipBg,
-        other.categoryHeatherChipBg,
-        t,
-      )!,
-      categoryHeatherChipFg: Color.lerp(
-        categoryHeatherChipFg,
-        other.categoryHeatherChipFg,
-        t,
-      )!,
-      categoryHeatherFg: Color.lerp(
-        categoryHeatherFg,
-        other.categoryHeatherFg,
-        t,
-      )!,
-      categoryHeatherOnSidebar: Color.lerp(
-        categoryHeatherOnSidebar,
-        other.categoryHeatherOnSidebar,
-        t,
-      )!,
-      categoryLochChipBg: Color.lerp(
-        categoryLochChipBg,
-        other.categoryLochChipBg,
-        t,
-      )!,
-      categoryLochChipFg: Color.lerp(
-        categoryLochChipFg,
-        other.categoryLochChipFg,
-        t,
-      )!,
+      categoryGorseOnSidebar: Color.lerp(categoryGorseOnSidebar, other.categoryGorseOnSidebar, t)!,
+      categoryGraniteChipBg: Color.lerp(categoryGraniteChipBg, other.categoryGraniteChipBg, t)!,
+      categoryGraniteChipFg: Color.lerp(categoryGraniteChipFg, other.categoryGraniteChipFg, t)!,
+      categoryGraniteFg: Color.lerp(categoryGraniteFg, other.categoryGraniteFg, t)!,
+      categoryGraniteOnSidebar: Color.lerp(categoryGraniteOnSidebar, other.categoryGraniteOnSidebar, t)!,
+      categoryHeatherChipBg: Color.lerp(categoryHeatherChipBg, other.categoryHeatherChipBg, t)!,
+      categoryHeatherChipFg: Color.lerp(categoryHeatherChipFg, other.categoryHeatherChipFg, t)!,
+      categoryHeatherFg: Color.lerp(categoryHeatherFg, other.categoryHeatherFg, t)!,
+      categoryHeatherOnSidebar: Color.lerp(categoryHeatherOnSidebar, other.categoryHeatherOnSidebar, t)!,
+      categoryLochChipBg: Color.lerp(categoryLochChipBg, other.categoryLochChipBg, t)!,
+      categoryLochChipFg: Color.lerp(categoryLochChipFg, other.categoryLochChipFg, t)!,
       categoryLochFg: Color.lerp(categoryLochFg, other.categoryLochFg, t)!,
-      categoryLochOnSidebar: Color.lerp(
-        categoryLochOnSidebar,
-        other.categoryLochOnSidebar,
-        t,
-      )!,
-      categoryMossChipBg: Color.lerp(
-        categoryMossChipBg,
-        other.categoryMossChipBg,
-        t,
-      )!,
-      categoryMossChipFg: Color.lerp(
-        categoryMossChipFg,
-        other.categoryMossChipFg,
-        t,
-      )!,
+      categoryLochOnSidebar: Color.lerp(categoryLochOnSidebar, other.categoryLochOnSidebar, t)!,
+      categoryMossChipBg: Color.lerp(categoryMossChipBg, other.categoryMossChipBg, t)!,
+      categoryMossChipFg: Color.lerp(categoryMossChipFg, other.categoryMossChipFg, t)!,
       categoryMossFg: Color.lerp(categoryMossFg, other.categoryMossFg, t)!,
-      categoryMossOnSidebar: Color.lerp(
-        categoryMossOnSidebar,
-        other.categoryMossOnSidebar,
-        t,
-      )!,
-      categoryRowanChipBg: Color.lerp(
-        categoryRowanChipBg,
-        other.categoryRowanChipBg,
-        t,
-      )!,
-      categoryRowanChipFg: Color.lerp(
-        categoryRowanChipFg,
-        other.categoryRowanChipFg,
-        t,
-      )!,
+      categoryMossOnSidebar: Color.lerp(categoryMossOnSidebar, other.categoryMossOnSidebar, t)!,
+      categoryRowanChipBg: Color.lerp(categoryRowanChipBg, other.categoryRowanChipBg, t)!,
+      categoryRowanChipFg: Color.lerp(categoryRowanChipFg, other.categoryRowanChipFg, t)!,
       categoryRowanFg: Color.lerp(categoryRowanFg, other.categoryRowanFg, t)!,
-      categoryRowanOnSidebar: Color.lerp(
-        categoryRowanOnSidebar,
-        other.categoryRowanOnSidebar,
-        t,
-      )!,
-      categorySpruceChipBg: Color.lerp(
-        categorySpruceChipBg,
-        other.categorySpruceChipBg,
-        t,
-      )!,
-      categorySpruceChipFg: Color.lerp(
-        categorySpruceChipFg,
-        other.categorySpruceChipFg,
-        t,
-      )!,
-      categorySpruceFg: Color.lerp(
-        categorySpruceFg,
-        other.categorySpruceFg,
-        t,
-      )!,
-      categorySpruceOnSidebar: Color.lerp(
-        categorySpruceOnSidebar,
-        other.categorySpruceOnSidebar,
-        t,
-      )!,
+      categoryRowanOnSidebar: Color.lerp(categoryRowanOnSidebar, other.categoryRowanOnSidebar, t)!,
+      categorySpruceChipBg: Color.lerp(categorySpruceChipBg, other.categorySpruceChipBg, t)!,
+      categorySpruceChipFg: Color.lerp(categorySpruceChipFg, other.categorySpruceChipFg, t)!,
+      categorySpruceFg: Color.lerp(categorySpruceFg, other.categorySpruceFg, t)!,
+      categorySpruceOnSidebar: Color.lerp(categorySpruceOnSidebar, other.categorySpruceOnSidebar, t)!,
       codeBg: Color.lerp(codeBg, other.codeBg, t)!,
       codeFg: Color.lerp(codeFg, other.codeFg, t)!,
       dangerBg: Color.lerp(dangerBg, other.dangerBg, t)!,
@@ -1156,11 +1026,7 @@ final class DsColors extends ThemeExtension<DsColors> {
       dangerOnBg: Color.lerp(dangerOnBg, other.dangerOnBg, t)!,
       dangerSubtle: Color.lerp(dangerSubtle, other.dangerSubtle, t)!,
       focusRing: Color.lerp(focusRing, other.focusRing, t)!,
-      focusRingOnSidebar: Color.lerp(
-        focusRingOnSidebar,
-        other.focusRingOnSidebar,
-        t,
-      )!,
+      focusRingOnSidebar: Color.lerp(focusRingOnSidebar, other.focusRingOnSidebar, t)!,
       infoBg: Color.lerp(infoBg, other.infoBg, t)!,
       infoBorder: Color.lerp(infoBorder, other.infoBorder, t)!,
       infoFg: Color.lerp(infoFg, other.infoFg, t)!,
@@ -1187,16 +1053,8 @@ final class DsColors extends ThemeExtension<DsColors> {
       surfaceRaised: Color.lerp(surfaceRaised, other.surfaceRaised, t)!,
       surfaceSelected: Color.lerp(surfaceSelected, other.surfaceSelected, t)!,
       surfaceSidebar: Color.lerp(surfaceSidebar, other.surfaceSidebar, t)!,
-      surfaceSidebarHover: Color.lerp(
-        surfaceSidebarHover,
-        other.surfaceSidebarHover,
-        t,
-      )!,
-      surfaceSidebarSelected: Color.lerp(
-        surfaceSidebarSelected,
-        other.surfaceSidebarSelected,
-        t,
-      )!,
+      surfaceSidebarHover: Color.lerp(surfaceSidebarHover, other.surfaceSidebarHover, t)!,
+      surfaceSidebarSelected: Color.lerp(surfaceSidebarSelected, other.surfaceSidebarSelected, t)!,
       surfaceSunken: Color.lerp(surfaceSunken, other.surfaceSunken, t)!,
       terminalAnsiBlack: Color.lerp(terminalAnsiBlack, other.terminalAnsiBlack, t)!,
       terminalAnsiBlue: Color.lerp(terminalAnsiBlue, other.terminalAnsiBlue, t)!,
@@ -1223,16 +1081,8 @@ final class DsColors extends ThemeExtension<DsColors> {
       textMuted: Color.lerp(textMuted, other.textMuted, t)!,
       textOnAccent: Color.lerp(textOnAccent, other.textOnAccent, t)!,
       textOnSidebar: Color.lerp(textOnSidebar, other.textOnSidebar, t)!,
-      textOnSidebarMuted: Color.lerp(
-        textOnSidebarMuted,
-        other.textOnSidebarMuted,
-        t,
-      )!,
-      textOnSidebarSecondary: Color.lerp(
-        textOnSidebarSecondary,
-        other.textOnSidebarSecondary,
-        t,
-      )!,
+      textOnSidebarMuted: Color.lerp(textOnSidebarMuted, other.textOnSidebarMuted, t)!,
+      textOnSidebarSecondary: Color.lerp(textOnSidebarSecondary, other.textOnSidebarSecondary, t)!,
       textPrimary: Color.lerp(textPrimary, other.textPrimary, t)!,
       textSecondary: Color.lerp(textSecondary, other.textSecondary, t)!,
       triggerDone: Color.lerp(triggerDone, other.triggerDone, t)!,
@@ -1504,72 +1354,45 @@ final class DsAccent extends ThemeExtension<DsAccent> {
 /// Shadows for layers above the content, per theme.
 @immutable
 final class DsElevation extends ThemeExtension<DsElevation> {
-  const DsElevation({required this.dialog, required this.menu});
+  const DsElevation({
+    required this.dialog,
+    required this.menu,
+  });
 
   final List<BoxShadow> dialog;
   final List<BoxShadow> menu;
 
   static const DsElevation light = DsElevation(
     dialog: [
-      BoxShadow(
-        color: Color(0x2908191C),
-        offset: Offset(0.0, 4.0),
-        blurRadius: 12.0,
-      ),
-      BoxShadow(
-        color: Color(0x2908191C),
-        offset: Offset(0.0, 24.0),
-        blurRadius: 48.0,
-        spreadRadius: -8.0,
-      ),
+      BoxShadow(color: Color(0x2908191C), offset: Offset(0.0, 4.0), blurRadius: 12.0),
+      BoxShadow(color: Color(0x2908191C), offset: Offset(0.0, 24.0), blurRadius: 48.0, spreadRadius: -8.0),
     ],
     menu: [
-      BoxShadow(
-        color: Color(0x2908191C),
-        offset: Offset(0.0, 2.0),
-        blurRadius: 6.0,
-      ),
-      BoxShadow(
-        color: Color(0x2908191C),
-        offset: Offset(0.0, 8.0),
-        blurRadius: 20.0,
-        spreadRadius: -4.0,
-      ),
+      BoxShadow(color: Color(0x2908191C), offset: Offset(0.0, 2.0), blurRadius: 6.0),
+      BoxShadow(color: Color(0x2908191C), offset: Offset(0.0, 8.0), blurRadius: 20.0, spreadRadius: -4.0),
     ],
   );
 
   static const DsElevation dark = DsElevation(
     dialog: [
-      BoxShadow(
-        color: Color(0x80061416),
-        offset: Offset(0.0, 4.0),
-        blurRadius: 12.0,
-      ),
-      BoxShadow(
-        color: Color(0x80061416),
-        offset: Offset(0.0, 24.0),
-        blurRadius: 48.0,
-        spreadRadius: -8.0,
-      ),
+      BoxShadow(color: Color(0x80061416), offset: Offset(0.0, 4.0), blurRadius: 12.0),
+      BoxShadow(color: Color(0x80061416), offset: Offset(0.0, 24.0), blurRadius: 48.0, spreadRadius: -8.0),
     ],
     menu: [
-      BoxShadow(
-        color: Color(0x80061416),
-        offset: Offset(0.0, 2.0),
-        blurRadius: 6.0,
-      ),
-      BoxShadow(
-        color: Color(0x80061416),
-        offset: Offset(0.0, 8.0),
-        blurRadius: 20.0,
-        spreadRadius: -4.0,
-      ),
+      BoxShadow(color: Color(0x80061416), offset: Offset(0.0, 2.0), blurRadius: 6.0),
+      BoxShadow(color: Color(0x80061416), offset: Offset(0.0, 8.0), blurRadius: 20.0, spreadRadius: -4.0),
     ],
   );
 
   @override
-  DsElevation copyWith({List<BoxShadow>? dialog, List<BoxShadow>? menu}) {
-    return DsElevation(dialog: dialog ?? this.dialog, menu: menu ?? this.menu);
+  DsElevation copyWith({
+    List<BoxShadow>? dialog,
+    List<BoxShadow>? menu,
+  }) {
+    return DsElevation(
+      dialog: dialog ?? this.dialog,
+      menu: menu ?? this.menu,
+    );
   }
 
   @override
@@ -1683,11 +1506,7 @@ final class DsDensity extends ThemeExtension<DsDensity> {
       return this;
     }
     return DsDensity(
-      composerMinHeight: lerpDouble(
-        composerMinHeight,
-        other.composerMinHeight,
-        t,
-      )!,
+      composerMinHeight: lerpDouble(composerMinHeight, other.composerMinHeight, t)!,
       controlHeight: lerpDouble(controlHeight, other.controlHeight, t)!,
       liveboxPad: lerpDouble(liveboxPad, other.liveboxPad, t)!,
       messageFontSize: lerpDouble(messageFontSize, other.messageFontSize, t)!,
@@ -1850,180 +1669,23 @@ abstract final class DsIconSize {
 
 /// Font families with a fallback list.
 abstract final class DsFonts {
-  static const List<String> familyMono = [
-    'Atkinson Hyperlegible Mono',
-    'ui-monospace',
-    'SF Mono',
-    'Cascadia Mono',
-    'Consolas',
-    'monospace',
-  ];
-  static const List<String> familySans = [
-    'Atkinson Hyperlegible Next',
-    'system-ui',
-    '-apple-system',
-    'Segoe UI',
-    'Roboto',
-    'sans-serif',
-  ];
+  static const List<String> familyMono = ['Atkinson Hyperlegible Mono', 'ui-monospace', 'SF Mono', 'Cascadia Mono', 'Consolas', 'monospace'];
+  static const List<String> familySans = ['Atkinson Hyperlegible Next', 'system-ui', '-apple-system', 'Segoe UI', 'Roboto', 'sans-serif'];
 }
 
 /// Type roles. Color comes from DsColors, size scales with MediaQuery.textScaler.
 abstract final class DsType {
-  static const TextStyle body = TextStyle(
-    fontFamily: 'Atkinson Hyperlegible Next',
-    fontFamilyFallback: [
-      'system-ui',
-      '-apple-system',
-      'Segoe UI',
-      'Roboto',
-      'sans-serif',
-    ],
-    fontSize: 15.0,
-    fontWeight: FontWeight.w400,
-    height: 1.467,
-    letterSpacing: 0.0,
-  );
-  static const TextStyle bodySm = TextStyle(
-    fontFamily: 'Atkinson Hyperlegible Next',
-    fontFamilyFallback: [
-      'system-ui',
-      '-apple-system',
-      'Segoe UI',
-      'Roboto',
-      'sans-serif',
-    ],
-    fontSize: 14.0,
-    fontWeight: FontWeight.w400,
-    height: 1.43,
-    letterSpacing: 0.0,
-  );
-  static const TextStyle bodyStrong = TextStyle(
-    fontFamily: 'Atkinson Hyperlegible Next',
-    fontFamilyFallback: [
-      'system-ui',
-      '-apple-system',
-      'Segoe UI',
-      'Roboto',
-      'sans-serif',
-    ],
-    fontSize: 15.0,
-    fontWeight: FontWeight.w600,
-    height: 1.467,
-    letterSpacing: 0.0,
-  );
-  static const TextStyle caption = TextStyle(
-    fontFamily: 'Atkinson Hyperlegible Next',
-    fontFamilyFallback: [
-      'system-ui',
-      '-apple-system',
-      'Segoe UI',
-      'Roboto',
-      'sans-serif',
-    ],
-    fontSize: 12.0,
-    fontWeight: FontWeight.w400,
-    height: 1.333,
-    letterSpacing: 0.0,
-  );
-  static const TextStyle code = TextStyle(
-    fontFamily: 'Atkinson Hyperlegible Mono',
-    fontFamilyFallback: [
-      'ui-monospace',
-      'SF Mono',
-      'Cascadia Mono',
-      'Consolas',
-      'monospace',
-    ],
-    fontSize: 14.0,
-    fontWeight: FontWeight.w400,
-    height: 1.43,
-    letterSpacing: 0.0,
-  );
-  static const TextStyle codeSm = TextStyle(
-    fontFamily: 'Atkinson Hyperlegible Mono',
-    fontFamilyFallback: [
-      'ui-monospace',
-      'SF Mono',
-      'Cascadia Mono',
-      'Consolas',
-      'monospace',
-    ],
-    fontSize: 12.0,
-    fontWeight: FontWeight.w500,
-    height: 1.333,
-    letterSpacing: 0.0,
-  );
-  static const TextStyle display = TextStyle(
-    fontFamily: 'Atkinson Hyperlegible Next',
-    fontFamilyFallback: [
-      'system-ui',
-      '-apple-system',
-      'Segoe UI',
-      'Roboto',
-      'sans-serif',
-    ],
-    fontSize: 30.0,
-    fontWeight: FontWeight.w800,
-    height: 1.2,
-    letterSpacing: -0.4,
-  );
-  static const TextStyle heading = TextStyle(
-    fontFamily: 'Atkinson Hyperlegible Next',
-    fontFamilyFallback: [
-      'system-ui',
-      '-apple-system',
-      'Segoe UI',
-      'Roboto',
-      'sans-serif',
-    ],
-    fontSize: 16.0,
-    fontWeight: FontWeight.w600,
-    height: 1.375,
-    letterSpacing: 0.0,
-  );
-  static const TextStyle label = TextStyle(
-    fontFamily: 'Atkinson Hyperlegible Next',
-    fontFamilyFallback: [
-      'system-ui',
-      '-apple-system',
-      'Segoe UI',
-      'Roboto',
-      'sans-serif',
-    ],
-    fontSize: 13.0,
-    fontWeight: FontWeight.w600,
-    height: 1.385,
-    letterSpacing: 0.0,
-  );
-  static const TextStyle section = TextStyle(
-    fontFamily: 'Atkinson Hyperlegible Next',
-    fontFamilyFallback: [
-      'system-ui',
-      '-apple-system',
-      'Segoe UI',
-      'Roboto',
-      'sans-serif',
-    ],
-    fontSize: 12.0,
-    fontWeight: FontWeight.w700,
-    height: 1.333,
-    letterSpacing: 0.3,
-  );
-  static const TextStyle title = TextStyle(
-    fontFamily: 'Atkinson Hyperlegible Next',
-    fontFamilyFallback: [
-      'system-ui',
-      '-apple-system',
-      'Segoe UI',
-      'Roboto',
-      'sans-serif',
-    ],
-    fontSize: 20.0,
-    fontWeight: FontWeight.w700,
-    height: 1.3,
-    letterSpacing: -0.15,
-  );
+  static const TextStyle body = TextStyle(fontFamily: 'Atkinson Hyperlegible Next', fontFamilyFallback: ['system-ui', '-apple-system', 'Segoe UI', 'Roboto', 'sans-serif'], fontSize: 15.0, fontWeight: FontWeight.w400, height: 1.467, letterSpacing: 0.0);
+  static const TextStyle bodySm = TextStyle(fontFamily: 'Atkinson Hyperlegible Next', fontFamilyFallback: ['system-ui', '-apple-system', 'Segoe UI', 'Roboto', 'sans-serif'], fontSize: 14.0, fontWeight: FontWeight.w400, height: 1.43, letterSpacing: 0.0);
+  static const TextStyle bodyStrong = TextStyle(fontFamily: 'Atkinson Hyperlegible Next', fontFamilyFallback: ['system-ui', '-apple-system', 'Segoe UI', 'Roboto', 'sans-serif'], fontSize: 15.0, fontWeight: FontWeight.w600, height: 1.467, letterSpacing: 0.0);
+  static const TextStyle caption = TextStyle(fontFamily: 'Atkinson Hyperlegible Next', fontFamilyFallback: ['system-ui', '-apple-system', 'Segoe UI', 'Roboto', 'sans-serif'], fontSize: 12.0, fontWeight: FontWeight.w400, height: 1.333, letterSpacing: 0.0);
+  static const TextStyle code = TextStyle(fontFamily: 'Atkinson Hyperlegible Mono', fontFamilyFallback: ['ui-monospace', 'SF Mono', 'Cascadia Mono', 'Consolas', 'monospace'], fontSize: 14.0, fontWeight: FontWeight.w400, height: 1.43, letterSpacing: 0.0);
+  static const TextStyle codeSm = TextStyle(fontFamily: 'Atkinson Hyperlegible Mono', fontFamilyFallback: ['ui-monospace', 'SF Mono', 'Cascadia Mono', 'Consolas', 'monospace'], fontSize: 12.0, fontWeight: FontWeight.w500, height: 1.333, letterSpacing: 0.0);
+  static const TextStyle display = TextStyle(fontFamily: 'Atkinson Hyperlegible Next', fontFamilyFallback: ['system-ui', '-apple-system', 'Segoe UI', 'Roboto', 'sans-serif'], fontSize: 30.0, fontWeight: FontWeight.w800, height: 1.2, letterSpacing: -0.4);
+  static const TextStyle heading = TextStyle(fontFamily: 'Atkinson Hyperlegible Next', fontFamilyFallback: ['system-ui', '-apple-system', 'Segoe UI', 'Roboto', 'sans-serif'], fontSize: 16.0, fontWeight: FontWeight.w600, height: 1.375, letterSpacing: 0.0);
+  static const TextStyle label = TextStyle(fontFamily: 'Atkinson Hyperlegible Next', fontFamilyFallback: ['system-ui', '-apple-system', 'Segoe UI', 'Roboto', 'sans-serif'], fontSize: 13.0, fontWeight: FontWeight.w600, height: 1.385, letterSpacing: 0.0);
+  static const TextStyle section = TextStyle(fontFamily: 'Atkinson Hyperlegible Next', fontFamilyFallback: ['system-ui', '-apple-system', 'Segoe UI', 'Roboto', 'sans-serif'], fontSize: 12.0, fontWeight: FontWeight.w700, height: 1.333, letterSpacing: 0.3);
+  static const TextStyle title = TextStyle(fontFamily: 'Atkinson Hyperlegible Next', fontFamilyFallback: ['system-ui', '-apple-system', 'Segoe UI', 'Roboto', 'sans-serif'], fontSize: 20.0, fontWeight: FontWeight.w700, height: 1.3, letterSpacing: -0.15);
 }
 
 enum DsIconWeight { thin, light, regular, bold, fill, duotone }
@@ -2039,197 +1701,73 @@ final class DsGlyph {
 
 /// Icons from @phosphor-icons/core 2.1.1 (MIT).
 abstract final class DsIcons {
-  static const DsGlyph actionAttach = DsGlyph(
-    'paperclip',
-    DsIconWeight.regular,
-  );
+  static const DsGlyph actionAttach = DsGlyph('paperclip', DsIconWeight.regular);
   static const DsGlyph actionBack = DsGlyph('caret-left', DsIconWeight.bold);
-  static const DsGlyph actionCloseThread = DsGlyph(
-    'seal-check',
-    DsIconWeight.regular,
-  );
-  static const DsGlyph actionCollapse = DsGlyph(
-    'caret-right',
-    DsIconWeight.bold,
-  );
+  static const DsGlyph actionCloseThread = DsGlyph('seal-check', DsIconWeight.regular);
+  static const DsGlyph actionCollapse = DsGlyph('caret-right', DsIconWeight.bold);
   static const DsGlyph actionDelete = DsGlyph('trash', DsIconWeight.regular);
   static const DsGlyph actionDismiss = DsGlyph('x', DsIconWeight.bold);
-  static const DsGlyph actionEdit = DsGlyph(
-    'pencil-simple',
-    DsIconWeight.regular,
-  );
+  static const DsGlyph actionEdit = DsGlyph('pencil-simple', DsIconWeight.regular);
   static const DsGlyph actionExpand = DsGlyph('caret-down', DsIconWeight.bold);
   static const DsGlyph actionExport = DsGlyph('export', DsIconWeight.regular);
   static const DsGlyph actionFilter = DsGlyph('funnel', DsIconWeight.regular);
   static const DsGlyph actionMore = DsGlyph('dots-three', DsIconWeight.bold);
   static const DsGlyph actionMute = DsGlyph('bell-slash', DsIconWeight.regular);
   static const DsGlyph actionNew = DsGlyph('plus', DsIconWeight.bold);
-  static const DsGlyph actionNotifications = DsGlyph(
-    'bell',
-    DsIconWeight.regular,
-  );
+  static const DsGlyph actionNotifications = DsGlyph('bell', DsIconWeight.regular);
   static const DsGlyph actionPin = DsGlyph('push-pin', DsIconWeight.regular);
-  static const DsGlyph actionQuickSwitch = DsGlyph(
-    'command',
-    DsIconWeight.regular,
-  );
+  static const DsGlyph actionQuickSwitch = DsGlyph('command', DsIconWeight.regular);
   static const DsGlyph actionReact = DsGlyph('smiley', DsIconWeight.regular);
-  static const DsGlyph actionReopen = DsGlyph(
-    'arrow-counter-clockwise',
-    DsIconWeight.regular,
-  );
-  static const DsGlyph actionReply = DsGlyph(
-    'arrow-bend-up-left',
-    DsIconWeight.regular,
-  );
-  static const DsGlyph actionSearch = DsGlyph(
-    'magnifying-glass',
-    DsIconWeight.regular,
-  );
-  static const DsGlyph actionSend = DsGlyph(
-    'paper-plane-right',
-    DsIconWeight.fill,
-  );
-  static const DsGlyph actionSettings = DsGlyph(
-    'gear-six',
-    DsIconWeight.regular,
-  );
-  static const DsGlyph actionShare = DsGlyph(
-    'share-network',
-    DsIconWeight.regular,
-  );
+  static const DsGlyph actionReopen = DsGlyph('arrow-counter-clockwise', DsIconWeight.regular);
+  static const DsGlyph actionReply = DsGlyph('arrow-bend-up-left', DsIconWeight.regular);
+  static const DsGlyph actionSearch = DsGlyph('magnifying-glass', DsIconWeight.regular);
+  static const DsGlyph actionSend = DsGlyph('paper-plane-right', DsIconWeight.fill);
+  static const DsGlyph actionSettings = DsGlyph('gear-six', DsIconWeight.regular);
+  static const DsGlyph actionShare = DsGlyph('share-network', DsIconWeight.regular);
   static const DsGlyph actionStop = DsGlyph('stop-circle', DsIconWeight.fill);
-  static const DsGlyph actionTogglePanel = DsGlyph(
-    'sidebar-simple',
-    DsIconWeight.regular,
-  );
-  static const DsGlyph actionVoice = DsGlyph(
-    'microphone',
-    DsIconWeight.regular,
-  );
+  static const DsGlyph actionTogglePanel = DsGlyph('sidebar-simple', DsIconWeight.regular);
+  static const DsGlyph actionVoice = DsGlyph('microphone', DsIconWeight.regular);
   static const DsGlyph adminAudit = DsGlyph('scroll', DsIconWeight.regular);
-  static const DsGlyph adminChecklist = DsGlyph(
-    'list-checks',
-    DsIconWeight.regular,
-  );
-  static const DsGlyph adminConsole = DsGlyph(
-    'sliders-horizontal',
-    DsIconWeight.regular,
-  );
-  static const DsGlyph adminStats = DsGlyph(
-    'chart-line-up',
-    DsIconWeight.regular,
-  );
+  static const DsGlyph adminChecklist = DsGlyph('list-checks', DsIconWeight.regular);
+  static const DsGlyph adminConsole = DsGlyph('sliders-horizontal', DsIconWeight.regular);
+  static const DsGlyph adminStats = DsGlyph('chart-line-up', DsIconWeight.regular);
   static const DsGlyph adminViewAs = DsGlyph('eye', DsIconWeight.regular);
   static const DsGlyph agent = DsGlyph('robot', DsIconWeight.regular);
-  static const DsGlyph billingOrganization = DsGlyph(
-    'buildings',
-    DsIconWeight.fill,
-  );
-  static const DsGlyph billingPersonal = DsGlyph(
-    'user-circle',
-    DsIconWeight.fill,
-  );
-  static const DsGlyph channelDm = DsGlyph(
-    'chat-teardrop',
-    DsIconWeight.regular,
-  );
-  static const DsGlyph channelForum = DsGlyph(
-    'chats-circle',
-    DsIconWeight.regular,
-  );
+  static const DsGlyph billingOrganization = DsGlyph('buildings', DsIconWeight.fill);
+  static const DsGlyph billingPersonal = DsGlyph('user-circle', DsIconWeight.fill);
+  static const DsGlyph channelDm = DsGlyph('chat-teardrop', DsIconWeight.regular);
+  static const DsGlyph channelForum = DsGlyph('chats-circle', DsIconWeight.regular);
   static const DsGlyph channelText = DsGlyph('hash', DsIconWeight.bold);
   static const DsGlyph context = DsGlyph('gauge', DsIconWeight.regular);
   static const DsGlyph cost = DsGlyph('coins', DsIconWeight.regular);
   static const DsGlyph group = DsGlyph('users-three', DsIconWeight.regular);
   static const DsGlyph person = DsGlyph('user', DsIconWeight.regular);
   static const DsGlyph runCancelled = DsGlyph('prohibit', DsIconWeight.regular);
-  static const DsGlyph runCompleted = DsGlyph(
-    'check-circle',
-    DsIconWeight.fill,
-  );
-  static const DsGlyph runFailed = DsGlyph(
-    'warning-octagon',
-    DsIconWeight.fill,
-  );
-  static const DsGlyph runQueued = DsGlyph(
-    'hourglass-medium',
-    DsIconWeight.regular,
-  );
-  static const DsGlyph runRunning = DsGlyph(
-    'circle-notch',
-    DsIconWeight.bold,
-    spins: true,
-  );
+  static const DsGlyph runCompleted = DsGlyph('check-circle', DsIconWeight.fill);
+  static const DsGlyph runFailed = DsGlyph('warning-octagon', DsIconWeight.fill);
+  static const DsGlyph runQueued = DsGlyph('hourglass-medium', DsIconWeight.regular);
+  static const DsGlyph runRunning = DsGlyph('circle-notch', DsIconWeight.bold, spins: true);
   static const DsGlyph runWaiting = DsGlyph('bell-ringing', DsIconWeight.fill);
   static const DsGlyph securityKey = DsGlyph('key', DsIconWeight.regular);
   static const DsGlyph securityLock = DsGlyph('lock-simple', DsIconWeight.fill);
-  static const DsGlyph securityStepUp = DsGlyph(
-    'shield-check',
-    DsIconWeight.fill,
-  );
-  static const DsGlyph stateError = DsGlyph(
-    'warning-circle',
-    DsIconWeight.fill,
-  );
+  static const DsGlyph securityStepUp = DsGlyph('shield-check', DsIconWeight.fill);
+  static const DsGlyph stateError = DsGlyph('warning-circle', DsIconWeight.fill);
   static const DsGlyph stateInfo = DsGlyph('info', DsIconWeight.fill);
-  static const DsGlyph stateOffline = DsGlyph(
-    'cloud-slash',
-    DsIconWeight.regular,
-  );
-  static const DsGlyph stateReconnecting = DsGlyph(
-    'arrows-clockwise',
-    DsIconWeight.regular,
-    spins: true,
-  );
+  static const DsGlyph stateOffline = DsGlyph('cloud-slash', DsIconWeight.regular);
+  static const DsGlyph stateReconnecting = DsGlyph('arrows-clockwise', DsIconWeight.regular, spins: true);
   static const DsGlyph stateWarning = DsGlyph('warning', DsIconWeight.fill);
-  static const DsGlyph stepBackgroundJob = DsGlyph(
-    'clock-countdown',
-    DsIconWeight.regular,
-  );
+  static const DsGlyph stepBackgroundJob = DsGlyph('clock-countdown', DsIconWeight.regular);
   static const DsGlyph stepStatus = DsGlyph('dot-outline', DsIconWeight.fill);
   static const DsGlyph stepSubagent = DsGlyph('robot', DsIconWeight.regular);
   static const DsGlyph stepToolCall = DsGlyph('wrench', DsIconWeight.regular);
-  static const DsGlyph stepWorkflow = DsGlyph(
-    'flow-arrow',
-    DsIconWeight.regular,
-  );
+  static const DsGlyph stepWorkflow = DsGlyph('flow-arrow', DsIconWeight.regular);
   static const DsGlyph tag = DsGlyph('tag', DsIconWeight.regular);
   static const DsGlyph thread = DsGlyph('chat-text', DsIconWeight.regular);
   static const DsGlyph triggerDone = DsGlyph('check-circle', DsIconWeight.fill);
   static const DsGlyph triggerFailed = DsGlyph('x-circle', DsIconWeight.fill);
-  static const DsGlyph triggerFollowup = DsGlyph(
-    'arrow-bend-down-right',
-    DsIconWeight.regular,
-  );
-  static const DsGlyph triggerQueued = DsGlyph(
-    'hourglass-medium',
-    DsIconWeight.regular,
-  );
+  static const DsGlyph triggerFollowup = DsGlyph('arrow-bend-down-right', DsIconWeight.regular);
+  static const DsGlyph triggerQueued = DsGlyph('hourglass-medium', DsIconWeight.regular);
   static const DsGlyph triggerReceived = DsGlyph('check', DsIconWeight.regular);
-  static const DsGlyph triggerWorking = DsGlyph(
-    'circle-notch',
-    DsIconWeight.bold,
-    spins: true,
-  );
-  static const List<String> spaceIcons = [
-    'folder-simple',
-    'headset',
-    'megaphone',
-    'code',
-    'terminal-window',
-    'flask',
-    'briefcase',
-    'book-open',
-    'chart-line-up',
-    'palette',
-    'globe-hemisphere-west',
-    'rocket-launch',
-    'house',
-    'lifebuoy',
-    'newspaper',
-    'users-three',
-    'robot',
-    'gear-six',
-  ];
+  static const DsGlyph triggerWorking = DsGlyph('circle-notch', DsIconWeight.bold, spins: true);
+  static const List<String> spaceIcons = ['folder-simple', 'headset', 'megaphone', 'code', 'terminal-window', 'flask', 'briefcase', 'book-open', 'chart-line-up', 'palette', 'globe-hemisphere-west', 'rocket-launch', 'house', 'lifebuoy', 'newspaper', 'users-three', 'robot', 'gear-six'];
 }

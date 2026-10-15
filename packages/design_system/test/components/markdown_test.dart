@@ -269,4 +269,18 @@ void main() {
     expect(boxes.map((b) => b.value), [true, false]);
     expect(allText(tester), isNot(contains('•')));
   });
+
+  testWidgets('deep nesting is cut to plain text after maxNesting levels', (
+    tester,
+  ) async {
+    for (final source in ['>' * 3000, '- ' * 2000, '${'> ' * 40}deep']) {
+      await pumpDs(tester, md(source));
+      expect(
+        find.byType(Column).evaluate().length,
+        lessThan(DsMarkdown.maxNesting * 4),
+        reason: source.substring(0, 2),
+      );
+    }
+    expect(allText(tester), contains('deep'));
+  });
 }

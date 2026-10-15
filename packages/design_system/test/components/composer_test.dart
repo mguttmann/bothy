@@ -241,4 +241,26 @@ void main() {
     await tester.tap(find.text('/stop'));
     expect(accepted.last, '/stop');
   });
+
+  testWidgets('Enter during an IME composition does not send', (tester) async {
+    final sent = <String>[];
+    final text = TextEditingController();
+    await pumpDs(tester, _composer(controller: text, onSend: sent.add));
+    await _focus(tester);
+    text.value = const TextEditingValue(
+      text: 'nihon',
+      selection: TextSelection.collapsed(offset: 5),
+      composing: TextRange(start: 0, end: 5),
+    );
+    await tester.pump();
+    await tester.sendKeyEvent(LogicalKeyboardKey.enter);
+    expect(sent, isEmpty);
+    text.value = const TextEditingValue(
+      text: 'nihon',
+      selection: TextSelection.collapsed(offset: 5),
+    );
+    await tester.pump();
+    await tester.sendKeyEvent(LogicalKeyboardKey.enter);
+    expect(sent, ['nihon']);
+  });
 }

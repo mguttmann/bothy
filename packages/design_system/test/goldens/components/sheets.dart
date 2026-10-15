@@ -237,9 +237,22 @@ Widget liveBoxFinalSheet() => Sheet([
     visibleSteps: 1,
     announceMinInterval: const Duration(seconds: 2),
   ),
-  DsLiveBox.collapsed(_run(DsRunState.completed), onExpand: () {}),
-  DsLiveBox.collapsed(_run(DsRunState.cancelled), onExpand: () {}),
-  DsLiveBox.mobile(_run(DsRunState.running), onOpen: () {}, onStop: () {}),
+  DsLiveBox.collapsed(
+    _run(DsRunState.completed),
+    announceMinInterval: const Duration(seconds: 2),
+    onExpand: () {},
+  ),
+  DsLiveBox.collapsed(
+    _run(DsRunState.cancelled),
+    announceMinInterval: const Duration(seconds: 2),
+    onExpand: () {},
+  ),
+  DsLiveBox.mobile(
+    _run(DsRunState.running),
+    announceMinInterval: const Duration(seconds: 2),
+    onOpen: () {},
+    onStop: () {},
+  ),
 ]);
 
 /// Tool chips (3), the status line (4) and every trigger state (5).

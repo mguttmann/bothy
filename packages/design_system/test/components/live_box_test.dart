@@ -260,6 +260,7 @@ void main() {
             isEstimate: true,
           ),
         ).copyWithElapsed(const Duration(minutes: 28)),
+        announceMinInterval: _interval,
         onExpand: () => expands++,
       ),
     );
@@ -290,6 +291,7 @@ void main() {
       tester,
       DsLiveBox.mobile(
         _run(DsRunState.running),
+        announceMinInterval: _interval,
         onOpen: () => opens++,
         onStop: () => stops++,
       ),
@@ -489,6 +491,67 @@ void main() {
     expect(announced, [
       l.liveBoxAnnounceState('Robin', l.liveBoxStateCompleted),
     ]);
+  });
+  testWidgets('the collapsed and the mobile line announce state changes too', (
+    tester,
+  ) async {
+    final l = await en();
+    final announced = <String>[];
+    tester.binding.defaultBinaryMessenger.setMockDecodedMessageHandler<Object?>(
+      SystemChannels.accessibility,
+      (message) async {
+        final map = message! as Map<Object?, Object?>;
+        if (map['type'] == 'announce') {
+          announced.add(
+            (map['data']! as Map<Object?, Object?>)['message']! as String,
+          );
+        }
+        return null;
+      },
+    );
+    await pumpDs(
+      tester,
+      DsLiveBox(
+        _run(DsRunState.running),
+        visibleSteps: 6,
+        announceMinInterval: _interval,
+      ),
+    );
+    await pumpDs(
+      tester,
+      DsLiveBox.collapsed(
+        _run(DsRunState.completed),
+        announceMinInterval: _interval,
+      ),
+    );
+    await tester.pump();
+    expect(announced, [
+      l.liveBoxAnnounceState('Robin', l.liveBoxStateCompleted),
+    ]);
+    announced.clear();
+    await pumpDs(
+      tester,
+      // A new box (own key), so the announcer starts fresh on the real clock.
+      DsLiveBox.mobile(
+        _run(DsRunState.running),
+        key: const ValueKey('mobile'),
+        announceMinInterval: _interval,
+      ),
+    );
+    await tester.pump(const Duration(seconds: 30));
+    await pumpDs(
+      tester,
+      DsLiveBox.mobile(
+        _run(DsRunState.failed),
+        key: const ValueKey('mobile'),
+        announceMinInterval: _interval,
+      ),
+    );
+    await tester.pump();
+    expect(
+      announced.last,
+      l.liveBoxAnnounceState('Robin', l.liveBoxStateFailed),
+    );
   });
 }
 
