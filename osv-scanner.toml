@@ -295,6 +295,13 @@ license.override = ["BSD-3-Clause"]
 reason = "deps.dev knows no license for this pub package; its LICENSE file on pub.dev is BSD-3-Clause. Transitive package of cryptography, test or lints."
 
 [[PackageOverrides]]
+name = "markdown"
+version = "7.3.1"
+ecosystem = "Pub"
+license.override = ["BSD-3-Clause"]
+reason = "deps.dev knows no license for this pub package; its LICENSE file on pub.dev is BSD-3-Clause. Markdown parser of design_system (docs/DECISIONS.md D-M4-07-2)."
+
+[[PackageOverrides]]
 name = "matcher"
 version = "0.12.20"
 ecosystem = "Pub"

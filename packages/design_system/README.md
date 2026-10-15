@@ -2,9 +2,9 @@
 
 The one place where the apps and the console get their look: the generated design tokens, the
 theme built from them, the resolver from the personal settings to the theme inputs, the bundled
-fonts, the semantic icons and the shared golden test setup. Components (M4-07) follow.
+fonts, the semantic icons, the core components and the shared golden test setup.
 
-Status: tokens, theme, fonts and golden setup (M4-04), icons (M4-05). Kind: Flutter package, a member of the
+Status: tokens, theme, fonts and golden setup (M4-04), icons (M4-05), core components (M4-07). Kind: Flutter package, a member of the
 Dart workspace at the repository root (`resolution: workspace`, `publish_to: none`).
 
 ## What the package provides
@@ -27,6 +27,40 @@ Widgets read colors, type, spacing and motion only from these classes (ADR 0030)
 size, color, duration or curve in widget code except `0`. Type roles only, never
 `font.size.*`: take the text styles from `Theme.of(context).textTheme` or wrap a role with
 `dsTextStyle(DsType.<role>)`, so the bundled font also resolves inside an app (see "Fonts").
+
+## Components
+
+The core components of docs/design/components.md (M4-07). Each takes a small immutable view
+model of `lib/src/components/view_models.dart` (enums carry the codes of docs/spec/03 and an
+`unknown` member; docs/DECISIONS.md D-M4-07-1), reads every text from `package:l10n`, performs no
+I/O and reports actions through plain callbacks. Values of configuration keys are parameters;
+the apps pass them from the app configuration (M4-08), this package holds no number of them.
+
+| Widget | View model | Configuration parameters | components.md |
+|---|---|---|---|
+| `DsMessage` | `DsMessageData`, `DsMessageAction` | `collapseLines` (`ui.message_collapse_lines`); `isContinuation` computed by the caller from `ui.message_group_window` | 1 |
+| `DsMarkdown` | the Markdown source, `DsAttachmentResolver` | none | 1 |
+| `DsLiveBox`, `.collapsed`, `.mobile` | `DsRunData`, `DsStepData` | `visibleSteps` (`ui.livebox_visible_steps`), `announceMinInterval` (`a11y.live_announce_min_interval`) | 2 |
+| `LiveAnnouncer` | run state and question ID | `minInterval` (`a11y.live_announce_min_interval`) | 2.4 |
+| `DsToolChip` | `DsStepData` | none | 3 |
+| `DsStatusLine` | the text | none | 4 |
+| `DsTriggerStateIcon` | `DsTriggerState` and reason code | none | 5 |
+| `DsThreadRow` | `DsThreadRowData`, `DsTagData` | none | 6 |
+| `DsSpaceRow`, `DsChannelRow` | `DsSpaceRowData`, `DsChannelRowData` | none | 7 |
+| `DsMessageComponents`, `DsButton` | `DsComponentData`, `DsComponentItem`, `DsComponentHeader` | none | 8 |
+| `DsComposer` | `DsComposerCommand`, `DsCommandOption` | `maxLines` (`ui.composer_max_lines`), `enterSends` (`composer.enter_sends`) | 9 |
+| `DsSuggestionList` | `DsSuggestion` | none | 9 |
+| `DsBillingBadge`, `DsCostText` | `DsBillingMode`, `DsCost` | none | 10 |
+| `DsBanner` | `DsTone` and text | none | 2.1, 6.6 of 01 |
+| `DsTappable`, `DsBadge`, `dsIsolate` | shared building blocks | none | "Common rules" |
+
+Security rules held here: Markdown renders no HTML, loads no image and activates only `https`,
+`http`, `mailto` and internal links (SEC-OUT-1, SEC-OUT-2; D-M4-07-2); foreign names are wrapped
+in U+2068 and U+2069 for display, never in semantics labels (SEC-IN-4); origin badges for agent,
+app, import and system (SEC-OUT-3); the card header comes only from `DsComponentHeader`
+(SEC-OUT-4; D-M4-07-3). Tests: `test/components/` (one file per component plus
+`guidelines_test.dart` for contrast, tap targets and labels), goldens in
+`test/goldens/components/` built from the sheets in `sheets.dart`.
 
 ## Resolver
 
@@ -143,7 +177,8 @@ macOS; on another system the command rewrites only the CI goldens.
 
 Allowed members (docs/spec/15-client-architektur.md, 3.1; `tools/arch-check/rules.yaml`): `l10n`, `domain` (arrows of the diagram).
 Every other member is out of reach; `make arch` fails on a dependency or an import of it.
-External: `alchemist` (MIT) as a regular dependency, because `testing.dart` returns its
+External: `markdown` (BSD-3-Clause) parses message Markdown into an AST, rendered by the own
+widgets of `DsMarkdown` (docs/DECISIONS.md D-M4-07-2); `alchemist` (MIT) as a regular dependency, because `testing.dart` returns its
 `GoldenTestGroup` (docs/DECISIONS.md D-M4-04-5); `flutter_test` (SDK) as a regular dependency
 for `dsPumpIcons`; `vector_graphics` (BSD-3-Clause) renders the icons; `crypto` as a dev
 dependency for the font check; `vector_graphics_compiler` (BSD-3-Clause) as a dev dependency
@@ -161,6 +196,7 @@ Further rules checked by `make arch`:
 | `lib/testing.dart` | golden helpers for tests of every member |
 | `lib/src/generated/` | the generated token copy and icon lookup (no doc lint, no format check, no coverage) |
 | `lib/src/icons/` | `DsIcon` |
+| `lib/src/components/` | the core components, their view models and the Markdown renderer |
 | `assets/icons/` | generated icon assets, Phosphor MIT text, `MANIFEST.json` |
 | `lib/src/theme/` | context, resolver, theme builder, scope widget |
 | `fonts/` | bundled font files, OFL texts, `MANIFEST.json` |

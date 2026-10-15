@@ -20,6 +20,12 @@ dependencies:
   # flutter_test in anyway (docs/DECISIONS.md D-M4-05-5).
   flutter_test:
     sdk: flutter
+  # Every interface text of the components (docs/spec/15-client-architektur.md 3.1).
+  l10n:
+    path: ../l10n
+  # Parses message Markdown into an AST; the components build their own widgets from it and
+  # never render HTML (docs/DECISIONS.md D-M4-07-2).
+  markdown: ^7.3.1
   # Renders the compiled Phosphor icons of assets/icons/ (docs/DECISIONS.md D-M4-05-1).
   vector_graphics: ^1.1.19
 

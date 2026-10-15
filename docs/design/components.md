@@ -263,6 +263,15 @@ Barrierefreiheit: Gruppe mit Label aus dem Kartentitel; Knöpfe in Lesereihenfol
 löst eine Freigabe global aus (Fehlbedienung); Enter oder Leertaste nur auf dem fokussierten
 Knopf.
 
+Header and texts (M4-07, SEC-OUT-4): above the agent text a framed header with
+`security.step-up`, built only from server fields: "Request from <Agent>", "Run <Run>",
+"Requires the permission '<Capability>'" and the approval note ("Only <Name> or an owner can
+approve this", "Only an owner can approve this", "Anyone with access to this channel can
+answer"). Below it a divider labeled "Text from <Agent>", then the agent text. While an answer is
+pending the button reads "Sending your choice" to screen readers. Form fields show "Required",
+"At most <n> characters" or "Enter a number"; a select without a choice shows "Choose"; a
+component type the app does not know shows "This element needs a newer app".
+
 ## 9. Eingabe mit Slash-Vorschlägen
 
 Zweck: Nachricht verfassen, Befehle (`commands`) mit Optionen und Autovervollständigung,
@@ -292,6 +301,11 @@ die eigene letzte Nachricht.
 
 Barrierefreiheit: Feld mit Label "Nachricht an <Kanal oder Thread>"; Vorschlagsliste als Listbox
 mit aktivem Eintrag; Anzahl der Vorschläge wird angesagt.
+
+Texts (M4-07): two or more people typing read "Several people are typing"; offline shows
+"Offline: your message waits in the queue" with `state.offline`; incomplete options show
+"Missing option: <Option>" with `state.warning` above the field; the buttons read "Send",
+"Attach file" and "Record voice message".
 
 ## 10. Abzeichen Backend-Richtlinie
 

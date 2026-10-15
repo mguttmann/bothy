@@ -21,6 +21,8 @@ const Map<String, String> exceptions = {
   'vizMetricRunsFinished': 'plural Läufe of Lauf',
   'vizMoreRunsThanShown': 'plural Läufe of Lauf',
   'vizChartRuns': 'plural Läufe of Lauf',
+  // "runs on the subscription" is the verb, not the term Run (components.md section 10).
+  'billingLabelPersonal': 'verb "runs", not the term Run',
 };
 
 void main() {
