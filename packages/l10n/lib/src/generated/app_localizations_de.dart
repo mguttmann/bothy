@@ -563,4 +563,463 @@ class AppLocalizationsDe extends AppLocalizations {
 
   @override
   String get vizMarkMetricTile => 'Kennzahl-Kachel';
+
+  @override
+  String get messageShowMore => 'Mehr anzeigen';
+
+  @override
+  String get messageEdited => '(bearbeitet)';
+
+  @override
+  String get messageDeleted => 'Nachricht gelöscht';
+
+  @override
+  String get messageResend => 'Erneut senden';
+
+  @override
+  String get messageEdit => 'Bearbeiten';
+
+  @override
+  String get messageDiscard => 'Verwerfen';
+
+  @override
+  String get messageActionReply => 'Antworten';
+
+  @override
+  String get messageActionReact => 'Reagieren';
+
+  @override
+  String get messageActionPin => 'Anheften';
+
+  @override
+  String get messageActionMore => 'Mehr';
+
+  @override
+  String get messageMentionsYou => 'Erwähnt dich';
+
+  @override
+  String messageSemanticsLabel(String name, String time, String text) {
+    return '$name, $time, $text';
+  }
+
+  @override
+  String get messageOriginAgent => 'AGENT';
+
+  @override
+  String get messageOriginApp => 'APP';
+
+  @override
+  String get messageOriginImport => 'IMPORT';
+
+  @override
+  String get messageOriginSystem => 'SYSTEM';
+
+  @override
+  String messageReplyTo(String name) {
+    return 'Antwort auf $name';
+  }
+
+  @override
+  String messageAttachment(String name) {
+    return 'Anhang $name';
+  }
+
+  @override
+  String messageReaction(int count, String emoji) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count Reaktionen $emoji',
+      one: '1 Reaktion $emoji',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get messageVoicePlay => 'Sprachnachricht abspielen';
+
+  @override
+  String get messageVoicePause => 'Sprachnachricht anhalten';
+
+  @override
+  String get messageVoiceTranscriptPending => 'Transkript folgt';
+
+  @override
+  String messageSystemThreadReopened(String name) {
+    return 'Wieder geöffnet durch Nachricht von $name';
+  }
+
+  @override
+  String get messageSystemResumeFailed =>
+      'Die Agenten-Sitzung konnte nicht fortgesetzt werden';
+
+  @override
+  String messageSystemUnknown(String code) {
+    return 'Systemnachricht ($code)';
+  }
+
+  @override
+  String get triggerStateCancelled => 'Abgebrochen';
+
+  @override
+  String triggerStateCancelledWithReason(String reason) {
+    return 'Abgebrochen: $reason';
+  }
+
+  @override
+  String triggerStateUnknown(String code) {
+    return 'Zustand $code';
+  }
+
+  @override
+  String liveBoxStateUnknown(String code) {
+    return 'Zustand $code';
+  }
+
+  @override
+  String liveBoxStopRun(String agent) {
+    return 'Lauf von $agent stoppen';
+  }
+
+  @override
+  String liveBoxSemanticsLabel(
+    String agent,
+    String state,
+    String duration,
+    int percent,
+  ) {
+    return 'Lauf von $agent: $state, seit $duration, Kontext $percent Prozent';
+  }
+
+  @override
+  String get liveBoxFollowupHint =>
+      'Nachrichten in diesem Thread erreichen den Agenten als Nachtrag';
+
+  @override
+  String liveBoxTokens(String count) {
+    return '$count Tokens';
+  }
+
+  @override
+  String liveBoxContext(String percent) {
+    return 'Kontext $percent';
+  }
+
+  @override
+  String liveBoxRan(String duration) {
+    return 'Lief $duration';
+  }
+
+  @override
+  String liveBoxTools(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count Werkzeuge',
+      one: '1 Werkzeug',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String liveBoxSubagents(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count Unteragenten',
+      one: '1 Unteragent',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get liveBoxExpand => 'Laufdetails anzeigen';
+
+  @override
+  String get liveBoxCollapse => 'Laufdetails ausblenden';
+
+  @override
+  String get liveBoxOpen => 'Live-Box öffnen';
+
+  @override
+  String liveBoxAnnounceQuestion(String agent) {
+    return 'Frage von $agent';
+  }
+
+  @override
+  String liveBoxAnnounceState(String agent, String state) {
+    return 'Lauf von $agent: $state';
+  }
+
+  @override
+  String get toolChipWaiting => 'wartet';
+
+  @override
+  String toolChipRunning(String duration) {
+    return 'läuft $duration';
+  }
+
+  @override
+  String get toolChipFailed => 'fehlgeschlagen';
+
+  @override
+  String get toolChipCancelled => 'abgebrochen';
+
+  @override
+  String get toolChipCompleted => 'abgeschlossen';
+
+  @override
+  String toolChipUnknownStatus(String code) {
+    return 'Status $code';
+  }
+
+  @override
+  String get toolChipKindToolCall => 'Werkzeug';
+
+  @override
+  String get toolChipKindStatus => 'Status';
+
+  @override
+  String get toolChipKindSubagent => 'Unteragent';
+
+  @override
+  String get toolChipKindWorkflow => 'Workflow';
+
+  @override
+  String get toolChipKindBackgroundJob => 'Hintergrundjob';
+
+  @override
+  String get toolChipKindUnknown => 'Schritt';
+
+  @override
+  String toolChipLabel(String kind, String name, String status) {
+    return '$kind $name, $status';
+  }
+
+  @override
+  String get toolChipDetails => 'Details anzeigen';
+
+  @override
+  String get threadRowWaitingForYou => 'Wartet auf dich';
+
+  @override
+  String get threadRowStateOpen => 'Offen';
+
+  @override
+  String get threadRowStateDone => 'Erledigt';
+
+  @override
+  String threadRowUnread(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count ungelesen',
+      one: '1 ungelesen',
+      zero: 'nichts ungelesen',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String threadRowMentions(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count Erwähnungen',
+      one: '1 Erwähnung',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String threadRowLabel(
+    String title,
+    String state,
+    String time,
+    String unread,
+  ) {
+    return '$title, $state, $time, $unread';
+  }
+
+  @override
+  String threadRowOperator(String name) {
+    return 'Bediener $name';
+  }
+
+  @override
+  String get channelRowRunActive => 'Lauf aktiv';
+
+  @override
+  String get channelRowMuted => 'stummgeschaltet';
+
+  @override
+  String get spaceRowUnread => 'Ungelesen';
+
+  @override
+  String spaceRowExpand(String name) {
+    return '$name ausklappen';
+  }
+
+  @override
+  String spaceRowCollapse(String name) {
+    return '$name einklappen';
+  }
+
+  @override
+  String componentsTextFrom(String agent) {
+    return 'Text von $agent';
+  }
+
+  @override
+  String componentsHeaderRequest(String agent) {
+    return 'Anfrage von $agent';
+  }
+
+  @override
+  String componentsHeaderRun(String run) {
+    return 'Lauf $run';
+  }
+
+  @override
+  String componentsHeaderCapability(String capability) {
+    return 'Erfordert das Recht \'$capability\'';
+  }
+
+  @override
+  String componentsApproverRunStarter(String name) {
+    return 'Nur $name oder ein Owner kann das freigeben';
+  }
+
+  @override
+  String get componentsApproverOwner => 'Nur ein Owner kann das freigeben';
+
+  @override
+  String get componentsApproverAny =>
+      'Alle mit Zugang zu diesem Kanal können antworten';
+
+  @override
+  String componentsDeniedCapability(String capability) {
+    return 'Dafür fehlt dir das Recht \'$capability\'';
+  }
+
+  @override
+  String get capabilityApproveActions => 'Aktionen freigeben';
+
+  @override
+  String componentsUsed(String name, String choice, String time) {
+    return '$name hat \'$choice\' gewählt, $time';
+  }
+
+  @override
+  String get componentsExpired => 'Abgelaufen';
+
+  @override
+  String get componentsDisabled => 'Nicht mehr verfügbar';
+
+  @override
+  String get componentsSending => 'Deine Wahl wird gesendet';
+
+  @override
+  String get componentsSubmit => 'Absenden';
+
+  @override
+  String get componentsSelectPlaceholder => 'Auswählen';
+
+  @override
+  String get componentsFieldRequired => 'Pflichtfeld';
+
+  @override
+  String componentsFieldTooLong(int max) {
+    return 'Höchstens $max Zeichen';
+  }
+
+  @override
+  String get componentsFieldNumber => 'Zahl eingeben';
+
+  @override
+  String get componentsUnsupported => 'Dieses Element braucht eine neuere App';
+
+  @override
+  String composerMessageTo(String target) {
+    return 'Nachricht an $target';
+  }
+
+  @override
+  String composerFollowupTo(String agent) {
+    return 'Nachtrag an $agent';
+  }
+
+  @override
+  String composerTyping(String name) {
+    return '$name schreibt gerade';
+  }
+
+  @override
+  String get composerTypingSeveral => 'Mehrere schreiben gerade';
+
+  @override
+  String get composerSend => 'Senden';
+
+  @override
+  String get composerAttach => 'Datei anhängen';
+
+  @override
+  String get composerVoice => 'Sprachnachricht aufnehmen';
+
+  @override
+  String composerOptionMissing(String option) {
+    return 'Fehlende Option: $option';
+  }
+
+  @override
+  String get composerOffline =>
+      'Offline: deine Nachricht wartet in der Warteschlange';
+
+  @override
+  String get composerReadOnly => 'Nur lesen in diesem Kanal';
+
+  @override
+  String composerSuggestions(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count Vorschläge',
+      one: '1 Vorschlag',
+      zero: 'Keine Vorschläge',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get composerControlCommand => 'Steuerbefehl';
+
+  @override
+  String get billingPersonal => 'Persönlich';
+
+  @override
+  String get billingOrganization => 'Organisation';
+
+  @override
+  String billingUnknown(String code) {
+    return 'Backend $code';
+  }
+
+  @override
+  String billingReported(String mode) {
+    return 'Ist: $mode';
+  }
+
+  @override
+  String billingLabelPersonal(String name) {
+    return 'Backend: Persönlich, läuft auf dem Abo von $name';
+  }
+
+  @override
+  String get billingLabelOrganization => 'Backend: Organisation';
+
+  @override
+  String get costEstimate => 'Schätzung';
+
+  @override
+  String get costInformationOnly => 'nur Information';
 }

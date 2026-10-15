@@ -555,4 +555,462 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get vizMarkMetricTile => 'Metric tile';
+
+  @override
+  String get messageShowMore => 'Show more';
+
+  @override
+  String get messageEdited => '(edited)';
+
+  @override
+  String get messageDeleted => 'Message deleted';
+
+  @override
+  String get messageResend => 'Resend';
+
+  @override
+  String get messageEdit => 'Edit';
+
+  @override
+  String get messageDiscard => 'Discard';
+
+  @override
+  String get messageActionReply => 'Reply';
+
+  @override
+  String get messageActionReact => 'React';
+
+  @override
+  String get messageActionPin => 'Pin';
+
+  @override
+  String get messageActionMore => 'More';
+
+  @override
+  String get messageMentionsYou => 'Mentions you';
+
+  @override
+  String messageSemanticsLabel(String name, String time, String text) {
+    return '$name, $time, $text';
+  }
+
+  @override
+  String get messageOriginAgent => 'AGENT';
+
+  @override
+  String get messageOriginApp => 'APP';
+
+  @override
+  String get messageOriginImport => 'IMPORT';
+
+  @override
+  String get messageOriginSystem => 'SYSTEM';
+
+  @override
+  String messageReplyTo(String name) {
+    return 'Reply to $name';
+  }
+
+  @override
+  String messageAttachment(String name) {
+    return 'Attachment $name';
+  }
+
+  @override
+  String messageReaction(int count, String emoji) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count reactions $emoji',
+      one: '1 reaction $emoji',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get messageVoicePlay => 'Play voice message';
+
+  @override
+  String get messageVoicePause => 'Pause voice message';
+
+  @override
+  String get messageVoiceTranscriptPending => 'Transcript pending';
+
+  @override
+  String messageSystemThreadReopened(String name) {
+    return 'Reopened by message from $name';
+  }
+
+  @override
+  String get messageSystemResumeFailed =>
+      'The agent session could not be resumed';
+
+  @override
+  String messageSystemUnknown(String code) {
+    return 'System message ($code)';
+  }
+
+  @override
+  String get triggerStateCancelled => 'Canceled';
+
+  @override
+  String triggerStateCancelledWithReason(String reason) {
+    return 'Canceled: $reason';
+  }
+
+  @override
+  String triggerStateUnknown(String code) {
+    return 'State $code';
+  }
+
+  @override
+  String liveBoxStateUnknown(String code) {
+    return 'State $code';
+  }
+
+  @override
+  String liveBoxStopRun(String agent) {
+    return 'Stop run of $agent';
+  }
+
+  @override
+  String liveBoxSemanticsLabel(
+    String agent,
+    String state,
+    String duration,
+    int percent,
+  ) {
+    return 'Run of $agent: $state, for $duration, context $percent percent';
+  }
+
+  @override
+  String get liveBoxFollowupHint =>
+      'Messages in this thread reach the agent as a follow-up';
+
+  @override
+  String liveBoxTokens(String count) {
+    return '$count tokens';
+  }
+
+  @override
+  String liveBoxContext(String percent) {
+    return 'Context $percent';
+  }
+
+  @override
+  String liveBoxRan(String duration) {
+    return 'Ran $duration';
+  }
+
+  @override
+  String liveBoxTools(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count tools',
+      one: '1 tool',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String liveBoxSubagents(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count subagents',
+      one: '1 subagent',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get liveBoxExpand => 'Show run details';
+
+  @override
+  String get liveBoxCollapse => 'Hide run details';
+
+  @override
+  String get liveBoxOpen => 'Open live box';
+
+  @override
+  String liveBoxAnnounceQuestion(String agent) {
+    return 'Question from $agent';
+  }
+
+  @override
+  String liveBoxAnnounceState(String agent, String state) {
+    return 'Run of $agent: $state';
+  }
+
+  @override
+  String get toolChipWaiting => 'waiting';
+
+  @override
+  String toolChipRunning(String duration) {
+    return 'running $duration';
+  }
+
+  @override
+  String get toolChipFailed => 'failed';
+
+  @override
+  String get toolChipCancelled => 'canceled';
+
+  @override
+  String get toolChipCompleted => 'completed';
+
+  @override
+  String toolChipUnknownStatus(String code) {
+    return 'status $code';
+  }
+
+  @override
+  String get toolChipKindToolCall => 'Tool';
+
+  @override
+  String get toolChipKindStatus => 'Status';
+
+  @override
+  String get toolChipKindSubagent => 'Subagent';
+
+  @override
+  String get toolChipKindWorkflow => 'Workflow';
+
+  @override
+  String get toolChipKindBackgroundJob => 'Background job';
+
+  @override
+  String get toolChipKindUnknown => 'Step';
+
+  @override
+  String toolChipLabel(String kind, String name, String status) {
+    return '$kind $name, $status';
+  }
+
+  @override
+  String get toolChipDetails => 'Show details';
+
+  @override
+  String get threadRowWaitingForYou => 'Waiting for you';
+
+  @override
+  String get threadRowStateOpen => 'Open';
+
+  @override
+  String get threadRowStateDone => 'Done';
+
+  @override
+  String threadRowUnread(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count unread',
+      one: '1 unread',
+      zero: 'no unread',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String threadRowMentions(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count mentions',
+      one: '1 mention',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String threadRowLabel(
+    String title,
+    String state,
+    String time,
+    String unread,
+  ) {
+    return '$title, $state, $time, $unread';
+  }
+
+  @override
+  String threadRowOperator(String name) {
+    return 'Operator $name';
+  }
+
+  @override
+  String get channelRowRunActive => 'run active';
+
+  @override
+  String get channelRowMuted => 'muted';
+
+  @override
+  String get spaceRowUnread => 'Unread';
+
+  @override
+  String spaceRowExpand(String name) {
+    return 'Expand $name';
+  }
+
+  @override
+  String spaceRowCollapse(String name) {
+    return 'Collapse $name';
+  }
+
+  @override
+  String componentsTextFrom(String agent) {
+    return 'Text from $agent';
+  }
+
+  @override
+  String componentsHeaderRequest(String agent) {
+    return 'Request from $agent';
+  }
+
+  @override
+  String componentsHeaderRun(String run) {
+    return 'Run $run';
+  }
+
+  @override
+  String componentsHeaderCapability(String capability) {
+    return 'Requires the permission \'$capability\'';
+  }
+
+  @override
+  String componentsApproverRunStarter(String name) {
+    return 'Only $name or an owner can approve this';
+  }
+
+  @override
+  String get componentsApproverOwner => 'Only an owner can approve this';
+
+  @override
+  String get componentsApproverAny =>
+      'Anyone with access to this channel can answer';
+
+  @override
+  String componentsDeniedCapability(String capability) {
+    return 'You do not have the permission \'$capability\' for this';
+  }
+
+  @override
+  String get capabilityApproveActions => 'Approve actions';
+
+  @override
+  String componentsUsed(String name, String choice, String time) {
+    return '$name chose \'$choice\', $time';
+  }
+
+  @override
+  String get componentsExpired => 'Expired';
+
+  @override
+  String get componentsDisabled => 'No longer available';
+
+  @override
+  String get componentsSending => 'Sending your choice';
+
+  @override
+  String get componentsSubmit => 'Submit';
+
+  @override
+  String get componentsSelectPlaceholder => 'Choose';
+
+  @override
+  String get componentsFieldRequired => 'Required';
+
+  @override
+  String componentsFieldTooLong(int max) {
+    return 'At most $max characters';
+  }
+
+  @override
+  String get componentsFieldNumber => 'Enter a number';
+
+  @override
+  String get componentsUnsupported => 'This element needs a newer app';
+
+  @override
+  String composerMessageTo(String target) {
+    return 'Message to $target';
+  }
+
+  @override
+  String composerFollowupTo(String agent) {
+    return 'Follow-up to $agent';
+  }
+
+  @override
+  String composerTyping(String name) {
+    return '$name is typing';
+  }
+
+  @override
+  String get composerTypingSeveral => 'Several people are typing';
+
+  @override
+  String get composerSend => 'Send';
+
+  @override
+  String get composerAttach => 'Attach file';
+
+  @override
+  String get composerVoice => 'Record voice message';
+
+  @override
+  String composerOptionMissing(String option) {
+    return 'Missing option: $option';
+  }
+
+  @override
+  String get composerOffline => 'Offline: your message waits in the queue';
+
+  @override
+  String get composerReadOnly => 'Read only in this channel';
+
+  @override
+  String composerSuggestions(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count suggestions',
+      one: '1 suggestion',
+      zero: 'No suggestions',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get composerControlCommand => 'Control command';
+
+  @override
+  String get billingPersonal => 'Personal';
+
+  @override
+  String get billingOrganization => 'Organization';
+
+  @override
+  String billingUnknown(String code) {
+    return 'Backend $code';
+  }
+
+  @override
+  String billingReported(String mode) {
+    return 'Reported: $mode';
+  }
+
+  @override
+  String billingLabelPersonal(String name) {
+    return 'Backend: Personal, runs on the subscription of $name';
+  }
+
+  @override
+  String get billingLabelOrganization => 'Backend: Organization';
+
+  @override
+  String get costEstimate => 'Estimate';
+
+  @override
+  String get costInformationOnly => 'for information only';
 }
