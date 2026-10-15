@@ -18,6 +18,7 @@ from typing import Any
 
 import api_checks
 import pytest
+import viz_fixtures
 import yaml
 
 REPO = Path(__file__).resolve().parents[3]
@@ -39,11 +40,16 @@ _UMLAUT_TITLE = "Gel" + chr(0xF6) + "scht"
 
 
 def _copy_inputs(tmp_path: Path) -> Path:
-    """Copy the inputs of both rules into tmp_path with the same relative paths."""
+    """Copy the inputs of every rule into tmp_path with the same relative paths.
+
+    The fixtures of `viz-fixtures` come along, so a run of all rules on the copy is clean
+    except for what a test changes.
+    """
     for rel in INPUTS:
         target = tmp_path / rel
         target.parent.mkdir(parents=True, exist_ok=True)
         target.write_bytes((REPO / rel).read_bytes())
+    shutil.copytree(REPO / viz_fixtures.FIXTURES_DIR, tmp_path / viz_fixtures.FIXTURES_DIR)
     return tmp_path
 
 
@@ -1390,6 +1396,7 @@ def test_make_api_checks_runs_the_real_tool_on_a_copy(tmp_path: Path) -> None:
         "uv.lock",
         "catalog/action_catalog.py",
         "api-checks/api_checks.py",
+        "api-checks/viz_fixtures.py",
     ):
         (root / "tools" / rel).parent.mkdir(parents=True, exist_ok=True)
         shutil.copy(REPO / "tools" / rel, root / "tools" / rel)
