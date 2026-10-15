@@ -183,6 +183,12 @@ class DsComposerState extends State<DsComposer> {
     if (event is! KeyDownEvent && event is! KeyRepeatEvent) {
       return KeyEventResult.ignored;
     }
+    // While an input method composes (Japanese, Chinese, Korean), Enter, Tab, the arrows and
+    // Escape belong to the input method: they confirm or move the candidate.
+    final composing = _text.value.composing;
+    if (composing.isValid && !composing.isCollapsed) {
+      return KeyEventResult.ignored;
+    }
     final key = event.logicalKey;
     final shift = HardwareKeyboard.instance.isShiftPressed;
     final list = widget.suggestions;

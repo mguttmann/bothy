@@ -59,24 +59,37 @@ class DsLiveBox extends StatefulWidget {
 
   /// The collapsed line of a finished run: icon, "Ran {Duration}", tools, subagents and the
   /// cost with "Estimate" while it is an estimate; [onExpand] loads the document (`run.read`).
-  const DsLiveBox.collapsed(this.run, {super.key, this.onExpand})
-    : _variant = _Variant.collapsed,
-      visibleSteps = null,
-      announceMinInterval = null,
-      onStop = null,
-      onCollapse = null,
-      onOpen = null,
-      question = null;
+  ///
+  /// [announceMinInterval] (`a11y.live_announce_min_interval`) keeps the announcements going
+  /// when the box collapses at the end of the run (01 6.2), so the final state is announced.
+  const DsLiveBox.collapsed(
+    this.run, {
+    super.key,
+    required Duration this.announceMinInterval,
+    this.onExpand,
+  }) : _variant = _Variant.collapsed,
+       visibleSteps = null,
+       onStop = null,
+       onCollapse = null,
+       onOpen = null,
+       question = null;
 
   /// The mobile line: state icon, state and run time, the status line in one line and the
   /// stop button with the hit area `density.target-min`; [onOpen] opens the sheet.
-  const DsLiveBox.mobile(this.run, {super.key, this.onOpen, this.onStop})
-    : _variant = _Variant.mobile,
-      visibleSteps = null,
-      announceMinInterval = null,
-      onCollapse = null,
-      onExpand = null,
-      question = null;
+  ///
+  /// [announceMinInterval] (`a11y.live_announce_min_interval`): the mobile line announces
+  /// state changes and new questions like the full box.
+  const DsLiveBox.mobile(
+    this.run, {
+    super.key,
+    required Duration this.announceMinInterval,
+    this.onOpen,
+    this.onStop,
+  }) : _variant = _Variant.mobile,
+       visibleSteps = null,
+       onCollapse = null,
+       onExpand = null,
+       question = null;
 
   /// The run.
   final DsRunData run;
@@ -169,7 +182,10 @@ class DsLiveBoxState extends State<DsLiveBox> {
     final due = announcer.pendingDue;
     if (due == null) return;
     var wait = due.difference(DateTime.now());
-    if (wait.isNegative) wait = Duration.zero;
+    // At least one millisecond, so an early timer never spins on the same instant.
+    if (wait < const Duration(milliseconds: 1)) {
+      wait = const Duration(milliseconds: 1);
+    }
     _flush = Timer(wait, () {
       if (!mounted) return;
       announcer.flush();

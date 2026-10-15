@@ -191,9 +191,14 @@ class DsMessageState extends State<DsMessage> {
       ),
       _ when d.content.isEmpty && d.voice?.transcript != null =>
         d.voice!.transcript!,
+      // The card body reads the agent text after its server header (SEC-OUT-4); the
+      // message label must not read it first.
+      _ when d.kind == DsMessageKind.card && widget.components != null => '',
       _ => _plain(d.content),
     };
-    final label = l.messageSemanticsLabel(d.authorName, d.timeLabel, text);
+    final label = text.isEmpty
+        ? '${d.authorName}, ${d.timeLabel}'
+        : l.messageSemanticsLabel(d.authorName, d.timeLabel, text);
     return d.mentionsMe ? '${l.messageMentionsYou}, $label' : label;
   }
 

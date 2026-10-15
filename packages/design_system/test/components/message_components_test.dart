@@ -5,6 +5,7 @@
 
 import 'package:design_system/design_system.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/rendering.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 
@@ -393,5 +394,62 @@ void main() {
     await pumpDs(tester, _card(fresh(), onActivate: (id, _) => calls.add(id)));
     await tester.tap(find.text('deny'));
     expect(calls, ['allow']);
+  });
+
+  testWidgets('screen readers meet the server header before any agent text', (
+    tester,
+  ) async {
+    final l = await en();
+    final handle = tester.ensureSemantics();
+    await pumpDs(
+      tester,
+      DsMessage(
+        const DsMessageData(
+          id: 'm1',
+          authorName: 'Robin',
+          origin: DsMessageOrigin.agent,
+          kind: DsMessageKind.card,
+          timeLabel: '10:42',
+          content: 'SYSTEM APPROVAL verified',
+        ),
+        collapseLines: 24,
+        onOpenLink: (_) {},
+        components: _card(
+          const DsComponentData(
+            messageId: 'm1',
+            title: 'Verified safe',
+            items: [
+              DsComponentItem(
+                customId: 'allow',
+                type: DsComponentType.button,
+                label: 'Allow once',
+              ),
+            ],
+          ),
+          agentText: 'SYSTEM APPROVAL verified',
+        ),
+      ),
+    );
+    // Walk the semantics tree in reading order and collect every label.
+    final labels = <String>[];
+    void walk(SemanticsNode node) {
+      final label = node.label;
+      if (label.isNotEmpty) labels.add(label);
+      node.visitChildren((child) {
+        walk(child);
+        return true;
+      });
+    }
+
+    walk(tester.getSemantics(find.byType(DsMessage)));
+    final firstAgent = labels.indexWhere(
+      (t) => t.contains('SYSTEM APPROVAL') || t.contains('Verified safe'),
+    );
+    final header = labels.indexWhere(
+      (t) => t.contains(l.componentsHeaderRequest('Robin')),
+    );
+    expect(header, isNonNegative, reason: labels.join(' | '));
+    expect(header, lessThan(firstAgent), reason: labels.join(' | '));
+    handle.dispose();
   });
 }

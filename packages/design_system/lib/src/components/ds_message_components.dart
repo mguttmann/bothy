@@ -226,11 +226,12 @@ class DsMessageComponentsState extends State<DsMessageComponents> {
     widget.onActivate(customId, value);
   }
 
-  List<String> _headerLines(AppLocalizations l) {
+  List<String> _headerLines(AppLocalizations l, {bool isolate = true}) {
     final h = widget.header;
     final capability = h.requiredCapability;
+    String iso(String name) => isolate ? dsIsolate(name) : name;
     return [
-      l.componentsHeaderRequest(dsIsolate(h.agentName)),
+      l.componentsHeaderRequest(iso(h.agentName)),
       if (h.runLabel != null) l.componentsHeaderRun(h.runLabel!),
       if (capability != null)
         l.componentsHeaderCapability(
@@ -240,7 +241,7 @@ class DsMessageComponentsState extends State<DsMessageComponents> {
         ),
       ...switch (h.approver) {
         DsApprover.runStarter when h.runStarterName != null => [
-          l.componentsApproverRunStarter(dsIsolate(h.runStarterName!)),
+          l.componentsApproverRunStarter(iso(h.runStarterName!)),
         ],
         DsApprover.owner => [l.componentsApproverOwner],
         DsApprover.any => [l.componentsApproverAny],
@@ -256,41 +257,49 @@ class DsMessageComponentsState extends State<DsMessageComponents> {
     final secondary = dsTextStyle(DsType.caption)
         .copyWith(color: c.textSecondary);
     final lines = _headerLines(l);
-    final header = Container(
-      key: DsMessageComponents.headerKey,
-      padding: const EdgeInsets.all(DsSpace.s8),
-      decoration: BoxDecoration(
-        color: c.surfaceSunken,
-        border: Border.all(
-          color: c.borderDefault,
-          width: DsBorderWidth.hairline,
+    final plain = _headerLines(l, isolate: false);
+    // One semantics node with the plain names (isolation marks are for display only).
+    final header = Semantics(
+      container: true,
+      label: plain.join('. '),
+      excludeSemantics: true,
+      child: Container(
+        key: DsMessageComponents.headerKey,
+        padding: const EdgeInsets.all(DsSpace.s8),
+        decoration: BoxDecoration(
+          color: c.surfaceSunken,
+          border: Border.all(
+            color: c.borderDefault,
+            width: DsBorderWidth.hairline,
+          ),
+          borderRadius: BorderRadius.circular(DsRadius.sm),
         ),
-        borderRadius: BorderRadius.circular(DsRadius.sm),
-      ),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          DsIcon(
-            DsIcons.securityStepUp,
-            size: DsIconSizeRole.sm,
-            color: c.textSecondary,
-            decorative: true,
-          ),
-          const SizedBox(width: DsSpace.s8),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  lines.first,
-                  style: dsTextStyle(DsType.label)
-                      .copyWith(color: c.textPrimary),
-                ),
-                for (final line in lines.skip(1)) Text(line, style: secondary),
-              ],
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            DsIcon(
+              DsIcons.securityStepUp,
+              size: DsIconSizeRole.sm,
+              color: c.textSecondary,
+              decorative: true,
             ),
-          ),
-        ],
+            const SizedBox(width: DsSpace.s8),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    lines.first,
+                    style: dsTextStyle(DsType.label)
+                        .copyWith(color: c.textPrimary),
+                  ),
+                  for (final line in lines.skip(1))
+                    Text(line, style: secondary),
+                ],
+              ),
+            ),
+          ],
+        ),
       ),
     );
     final divider = Padding(
@@ -299,6 +308,7 @@ class DsMessageComponentsState extends State<DsMessageComponents> {
         children: [
           Text(
             l.componentsTextFrom(dsIsolate(widget.header.agentName)),
+            semanticsLabel: l.componentsTextFrom(widget.header.agentName),
             style: secondary,
           ),
           const SizedBox(width: DsSpace.s8),
@@ -311,16 +321,24 @@ class DsMessageComponentsState extends State<DsMessageComponents> {
         ],
       ),
     );
+    // The group is labeled by the server header; the agent's card title is read only after
+    // the divider, with the rest of the agent text, so it cannot precede the header.
     return Semantics(
       container: true,
       explicitChildNodes: true,
-      label: widget.data.title,
+      label: plain.first,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         mainAxisSize: MainAxisSize.min,
         children: [
           header,
           divider,
+          if (widget.data.title != null)
+            Semantics(
+              container: true,
+              label: widget.data.title,
+              child: const SizedBox.shrink(),
+            ),
           if (widget.agentText.isNotEmpty)
             DsMarkdown(widget.agentText, onOpenLink: widget.onOpenLink),
           const SizedBox(height: DsSpace.s8),

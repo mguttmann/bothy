@@ -64,6 +64,11 @@ class DsMarkdown extends StatelessWidget {
   /// The body text style, or null for `type.body`.
   final TextStyle? style;
 
+  /// The deepest nesting of block quotes and lists that renders as structure; a deeper
+  /// element renders as its plain text. The server accepts messages without a nesting limit,
+  /// and every level is a widget subtree, so thousands of levels would freeze the interface.
+  static const int maxNesting = 8;
+
   /// Parses [source] into the AST nodes the renderer draws.
   ///
   /// Public for tests and for callers that need to know the structure (for example to count
@@ -153,7 +158,24 @@ class _Builder {
     return out;
   }
 
+  /// The current nesting of block quotes and lists.
+  int _depth = 0;
+
   Widget _block(md.Element e) {
+    final nests = e.tag == 'blockquote' || e.tag == 'ul' || e.tag == 'ol';
+    if (!nests) return _blockAt(e);
+    if (_depth >= DsMarkdown.maxNesting) {
+      return Text(e.textContent, style: base);
+    }
+    _depth++;
+    try {
+      return _blockAt(e);
+    } finally {
+      _depth--;
+    }
+  }
+
+  Widget _blockAt(md.Element e) {
     final colors = context.dsColors;
     switch (e.tag) {
       case 'h1' || 'h2' || 'h3':
