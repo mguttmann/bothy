@@ -338,6 +338,15 @@ type ServerInterface interface {
 	// ListMyMentions List own mentions
 	// (GET /me/mentions)
 	ListMyMentions(w http.ResponseWriter, r *http.Request, params ListMyMentionsParams)
+	// ListMyNotificationPreferences List notification levels
+	// (GET /me/notification-preferences)
+	ListMyNotificationPreferences(w http.ResponseWriter, r *http.Request)
+	// DeleteNotificationPreference Inherit the notification level again
+	// (DELETE /me/notification-preferences/{target_kind}/{target_id})
+	DeleteNotificationPreference(w http.ResponseWriter, r *http.Request, targetKind DeleteNotificationPreferenceParamsTargetKind, targetId TargetIdPath)
+	// PutNotificationPreference Set the notification level of a target
+	// (PUT /me/notification-preferences/{target_kind}/{target_id})
+	PutNotificationPreference(w http.ResponseWriter, r *http.Request, targetKind PutNotificationPreferenceParamsTargetKind, targetId TargetIdPath)
 	// BeginPasskeyRegistration Start registering a passkey
 	// (POST /me/passkeys/begin)
 	BeginPasskeyRegistration(w http.ResponseWriter, r *http.Request)
@@ -347,6 +356,18 @@ type ServerInterface interface {
 	// UpdateMyProfile Change own profile
 	// (PATCH /me/profile)
 	UpdateMyProfile(w http.ResponseWriter, r *http.Request, params UpdateMyProfileParams)
+	// ListMyQuietHours List quiet hours
+	// (GET /me/quiet-hours)
+	ListMyQuietHours(w http.ResponseWriter, r *http.Request)
+	// CreateQuietHoursRule Add a quiet hours rule
+	// (POST /me/quiet-hours)
+	CreateQuietHoursRule(w http.ResponseWriter, r *http.Request, params CreateQuietHoursRuleParams)
+	// DeleteQuietHoursRule Delete a quiet hours rule
+	// (DELETE /me/quiet-hours/{rule_id})
+	DeleteQuietHoursRule(w http.ResponseWriter, r *http.Request, ruleId RuleIdPath)
+	// PutQuietHoursRule Change a quiet hours rule
+	// (PUT /me/quiet-hours/{rule_id})
+	PutQuietHoursRule(w http.ResponseWriter, r *http.Request, ruleId RuleIdPath)
 	// ListMyReadStates List own read positions
 	// (GET /me/read-states)
 	ListMyReadStates(w http.ResponseWriter, r *http.Request, params ListMyReadStatesParams)
@@ -4809,6 +4830,90 @@ func (siw *ServerInterfaceWrapper) ListMyMentions(w http.ResponseWriter, r *http
 	handler.ServeHTTP(w, r)
 }
 
+// ListMyNotificationPreferences operation middleware
+func (siw *ServerInterfaceWrapper) ListMyNotificationPreferences(w http.ResponseWriter, r *http.Request) {
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.ListMyNotificationPreferences(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// DeleteNotificationPreference operation middleware
+func (siw *ServerInterfaceWrapper) DeleteNotificationPreference(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "target_kind" -------------
+	var targetKind DeleteNotificationPreferenceParamsTargetKind
+
+	err = runtime.BindStyledParameterWithOptions("simple", "target_kind", r.PathValue("target_kind"), &targetKind, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "target_kind", Err: err})
+		return
+	}
+
+	// ------------- Path parameter "target_id" -------------
+	var targetId TargetIdPath
+
+	err = runtime.BindStyledParameterWithOptions("simple", "target_id", r.PathValue("target_id"), &targetId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "uuid", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "target_id", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.DeleteNotificationPreference(w, r, targetKind, targetId)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// PutNotificationPreference operation middleware
+func (siw *ServerInterfaceWrapper) PutNotificationPreference(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "target_kind" -------------
+	var targetKind PutNotificationPreferenceParamsTargetKind
+
+	err = runtime.BindStyledParameterWithOptions("simple", "target_kind", r.PathValue("target_kind"), &targetKind, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "target_kind", Err: err})
+		return
+	}
+
+	// ------------- Path parameter "target_id" -------------
+	var targetId TargetIdPath
+
+	err = runtime.BindStyledParameterWithOptions("simple", "target_id", r.PathValue("target_id"), &targetId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "uuid", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "target_id", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.PutNotificationPreference(w, r, targetKind, targetId)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
 // BeginPasskeyRegistration operation middleware
 func (siw *ServerInterfaceWrapper) BeginPasskeyRegistration(w http.ResponseWriter, r *http.Request) {
 
@@ -4869,6 +4974,113 @@ func (siw *ServerInterfaceWrapper) UpdateMyProfile(w http.ResponseWriter, r *htt
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		siw.Handler.UpdateMyProfile(w, r, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// ListMyQuietHours operation middleware
+func (siw *ServerInterfaceWrapper) ListMyQuietHours(w http.ResponseWriter, r *http.Request) {
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.ListMyQuietHours(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// CreateQuietHoursRule operation middleware
+func (siw *ServerInterfaceWrapper) CreateQuietHoursRule(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params CreateQuietHoursRuleParams
+
+	headers := r.Header
+
+	// ------------- Optional header parameter "Idempotency-Key" -------------
+	if valueList, found := headers[http.CanonicalHeaderKey("Idempotency-Key")]; found {
+		var IdempotencyKey IdempotencyKey
+		n := len(valueList)
+		if n != 1 {
+			siw.ErrorHandlerFunc(w, r, &TooManyValuesForParamError{ParamName: "Idempotency-Key", Count: n})
+			return
+		}
+
+		err = runtime.BindStyledParameterWithOptions("simple", "Idempotency-Key", valueList[0], &IdempotencyKey, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: "uuid"})
+		if err != nil {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "Idempotency-Key", Err: err})
+			return
+		}
+
+		params.IdempotencyKey = &IdempotencyKey
+
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.CreateQuietHoursRule(w, r, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// DeleteQuietHoursRule operation middleware
+func (siw *ServerInterfaceWrapper) DeleteQuietHoursRule(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "rule_id" -------------
+	var ruleId RuleIdPath
+
+	err = runtime.BindStyledParameterWithOptions("simple", "rule_id", r.PathValue("rule_id"), &ruleId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "uuid", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "rule_id", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.DeleteQuietHoursRule(w, r, ruleId)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// PutQuietHoursRule operation middleware
+func (siw *ServerInterfaceWrapper) PutQuietHoursRule(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "rule_id" -------------
+	var ruleId RuleIdPath
+
+	err = runtime.BindStyledParameterWithOptions("simple", "rule_id", r.PathValue("rule_id"), &ruleId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "uuid", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "rule_id", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.PutQuietHoursRule(w, r, ruleId)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -7892,6 +8104,13 @@ func HandlerWithOptions(si ServerInterface, options StdHTTPServerOptions) http.H
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/me/settings", wrapper.ListMySettings)
 	m.HandleFunc(http.MethodDelete+" "+options.BaseURL+"/me/settings/{key}", wrapper.DeleteMySetting)
 	m.HandleFunc(http.MethodPut+" "+options.BaseURL+"/me/settings/{key}", wrapper.PutMySetting)
+	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/me/notification-preferences", wrapper.ListMyNotificationPreferences)
+	m.HandleFunc(http.MethodDelete+" "+options.BaseURL+"/me/notification-preferences/{target_kind}/{target_id}", wrapper.DeleteNotificationPreference)
+	m.HandleFunc(http.MethodPut+" "+options.BaseURL+"/me/notification-preferences/{target_kind}/{target_id}", wrapper.PutNotificationPreference)
+	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/me/quiet-hours", wrapper.ListMyQuietHours)
+	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/me/quiet-hours", wrapper.CreateQuietHoursRule)
+	m.HandleFunc(http.MethodDelete+" "+options.BaseURL+"/me/quiet-hours/{rule_id}", wrapper.DeleteQuietHoursRule)
+	m.HandleFunc(http.MethodPut+" "+options.BaseURL+"/me/quiet-hours/{rule_id}", wrapper.PutQuietHoursRule)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/agents", wrapper.ListAgents)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/agents", wrapper.CreateAgent)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/agents/{agent_id}", wrapper.GetAgent)
@@ -8396,6 +8615,15 @@ type StrictServerInterface interface {
 	// ListMyMentions List own mentions
 	// (GET /me/mentions)
 	ListMyMentions(ctx context.Context, request ListMyMentionsRequestObject) (ListMyMentionsResponseObject, error)
+	// ListMyNotificationPreferences List notification levels
+	// (GET /me/notification-preferences)
+	ListMyNotificationPreferences(ctx context.Context, request ListMyNotificationPreferencesRequestObject) (ListMyNotificationPreferencesResponseObject, error)
+	// DeleteNotificationPreference Inherit the notification level again
+	// (DELETE /me/notification-preferences/{target_kind}/{target_id})
+	DeleteNotificationPreference(ctx context.Context, request DeleteNotificationPreferenceRequestObject) (DeleteNotificationPreferenceResponseObject, error)
+	// PutNotificationPreference Set the notification level of a target
+	// (PUT /me/notification-preferences/{target_kind}/{target_id})
+	PutNotificationPreference(ctx context.Context, request PutNotificationPreferenceRequestObject) (PutNotificationPreferenceResponseObject, error)
 	// BeginPasskeyRegistration Start registering a passkey
 	// (POST /me/passkeys/begin)
 	BeginPasskeyRegistration(ctx context.Context, request BeginPasskeyRegistrationRequestObject) (BeginPasskeyRegistrationResponseObject, error)
@@ -8405,6 +8633,18 @@ type StrictServerInterface interface {
 	// UpdateMyProfile Change own profile
 	// (PATCH /me/profile)
 	UpdateMyProfile(ctx context.Context, request UpdateMyProfileRequestObject) (UpdateMyProfileResponseObject, error)
+	// ListMyQuietHours List quiet hours
+	// (GET /me/quiet-hours)
+	ListMyQuietHours(ctx context.Context, request ListMyQuietHoursRequestObject) (ListMyQuietHoursResponseObject, error)
+	// CreateQuietHoursRule Add a quiet hours rule
+	// (POST /me/quiet-hours)
+	CreateQuietHoursRule(ctx context.Context, request CreateQuietHoursRuleRequestObject) (CreateQuietHoursRuleResponseObject, error)
+	// DeleteQuietHoursRule Delete a quiet hours rule
+	// (DELETE /me/quiet-hours/{rule_id})
+	DeleteQuietHoursRule(ctx context.Context, request DeleteQuietHoursRuleRequestObject) (DeleteQuietHoursRuleResponseObject, error)
+	// PutQuietHoursRule Change a quiet hours rule
+	// (PUT /me/quiet-hours/{rule_id})
+	PutQuietHoursRule(ctx context.Context, request PutQuietHoursRuleRequestObject) (PutQuietHoursRuleResponseObject, error)
 	// ListMyReadStates List own read positions
 	// (GET /me/read-states)
 	ListMyReadStates(ctx context.Context, request ListMyReadStatesRequestObject) (ListMyReadStatesResponseObject, error)
@@ -11867,6 +12107,91 @@ func (sh *strictHandler) ListMyMentions(w http.ResponseWriter, r *http.Request, 
 	}
 }
 
+// ListMyNotificationPreferences operation middleware
+func (sh *strictHandler) ListMyNotificationPreferences(w http.ResponseWriter, r *http.Request) {
+	var request ListMyNotificationPreferencesRequestObject
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.ListMyNotificationPreferences(ctx, request.(ListMyNotificationPreferencesRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "ListMyNotificationPreferences")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(ListMyNotificationPreferencesResponseObject); ok {
+		if err := validResponse.VisitListMyNotificationPreferencesResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// DeleteNotificationPreference operation middleware
+func (sh *strictHandler) DeleteNotificationPreference(w http.ResponseWriter, r *http.Request, targetKind DeleteNotificationPreferenceParamsTargetKind, targetId TargetIdPath) {
+	var request DeleteNotificationPreferenceRequestObject
+
+	request.TargetKind = targetKind
+	request.TargetId = targetId
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.DeleteNotificationPreference(ctx, request.(DeleteNotificationPreferenceRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "DeleteNotificationPreference")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(DeleteNotificationPreferenceResponseObject); ok {
+		if err := validResponse.VisitDeleteNotificationPreferenceResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// PutNotificationPreference operation middleware
+func (sh *strictHandler) PutNotificationPreference(w http.ResponseWriter, r *http.Request, targetKind PutNotificationPreferenceParamsTargetKind, targetId TargetIdPath) {
+	var request PutNotificationPreferenceRequestObject
+
+	request.TargetKind = targetKind
+	request.TargetId = targetId
+
+	var body PutNotificationPreferenceJSONRequestBody
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
+		return
+	}
+	request.Body = &body
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.PutNotificationPreference(ctx, request.(PutNotificationPreferenceRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "PutNotificationPreference")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(PutNotificationPreferenceResponseObject); ok {
+		if err := validResponse.VisitPutNotificationPreferenceResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
 // BeginPasskeyRegistration operation middleware
 func (sh *strictHandler) BeginPasskeyRegistration(w http.ResponseWriter, r *http.Request) {
 	var request BeginPasskeyRegistrationRequestObject
@@ -11948,6 +12273,122 @@ func (sh *strictHandler) UpdateMyProfile(w http.ResponseWriter, r *http.Request,
 		sh.options.ResponseErrorHandlerFunc(w, r, err)
 	} else if validResponse, ok := response.(UpdateMyProfileResponseObject); ok {
 		if err := validResponse.VisitUpdateMyProfileResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// ListMyQuietHours operation middleware
+func (sh *strictHandler) ListMyQuietHours(w http.ResponseWriter, r *http.Request) {
+	var request ListMyQuietHoursRequestObject
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.ListMyQuietHours(ctx, request.(ListMyQuietHoursRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "ListMyQuietHours")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(ListMyQuietHoursResponseObject); ok {
+		if err := validResponse.VisitListMyQuietHoursResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// CreateQuietHoursRule operation middleware
+func (sh *strictHandler) CreateQuietHoursRule(w http.ResponseWriter, r *http.Request, params CreateQuietHoursRuleParams) {
+	var request CreateQuietHoursRuleRequestObject
+
+	request.Params = params
+
+	var body CreateQuietHoursRuleJSONRequestBody
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
+		return
+	}
+	request.Body = &body
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.CreateQuietHoursRule(ctx, request.(CreateQuietHoursRuleRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "CreateQuietHoursRule")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(CreateQuietHoursRuleResponseObject); ok {
+		if err := validResponse.VisitCreateQuietHoursRuleResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// DeleteQuietHoursRule operation middleware
+func (sh *strictHandler) DeleteQuietHoursRule(w http.ResponseWriter, r *http.Request, ruleId RuleIdPath) {
+	var request DeleteQuietHoursRuleRequestObject
+
+	request.RuleId = ruleId
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.DeleteQuietHoursRule(ctx, request.(DeleteQuietHoursRuleRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "DeleteQuietHoursRule")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(DeleteQuietHoursRuleResponseObject); ok {
+		if err := validResponse.VisitDeleteQuietHoursRuleResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// PutQuietHoursRule operation middleware
+func (sh *strictHandler) PutQuietHoursRule(w http.ResponseWriter, r *http.Request, ruleId RuleIdPath) {
+	var request PutQuietHoursRuleRequestObject
+
+	request.RuleId = ruleId
+
+	var body PutQuietHoursRuleJSONRequestBody
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
+		return
+	}
+	request.Body = &body
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.PutQuietHoursRule(ctx, request.(PutQuietHoursRuleRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "PutQuietHoursRule")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(PutQuietHoursRuleResponseObject); ok {
+		if err := validResponse.VisitPutQuietHoursRuleResponse(w); err != nil {
 			sh.options.ResponseErrorHandlerFunc(w, r, err)
 		}
 	} else if response != nil {

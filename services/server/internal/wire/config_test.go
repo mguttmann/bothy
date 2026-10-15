@@ -265,6 +265,8 @@ func TestConfigSchemaBuilds(t *testing.T) {
 		"webhook.secret_rotation_overlap":      {Kind: config.KindDuration, Default: "24h", Min: "1ms", Chapter: "11-extensions.md"},
 		"webhook.hmac_master_key_ref": {Kind: config.KindSecretRef, Default: "file:<secrets.dir>/webhook_hmac_master_key",
 			Chapter: "11-extensions.md"},
+		// M3-18
+		"notify.user_default_level": {Kind: config.KindEnum, Default: "mentions", Enum: []string{"all", "mentions", "mute"}, Chapter: "13-push-notifications.md"},
 	}
 	// Two keys per class of 05 "Rate-limit classes" (M1-19), with the defaults of 05 section 10.
 	for class, def := range map[string][2]string{
