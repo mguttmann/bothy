@@ -546,13 +546,22 @@ func TestRunnerWakeSignalsCoalesce(t *testing.T) {
 	t.Parallel()
 	release := make(chan struct{})
 	rounds := &fakeRounds{names: []sync.ConsumerName{sync.ConsumerWebhooks},
-		script: []roundStep{{res: processed(1, false), release: release}}}
+		script: []roundStep{{res: processed(1, false), release: release}}, started: make(chan struct{}, 4)}
 	a := newFakeAfter()
 	w := newFakeWaker()
 	startRunner(t, rounds, w, a, nil)
+	// The wakes must arrive while the first round runs, and dispatch must have forwarded the
+	// last of them before the round ends: a forward that lands after the loop took the first
+	// wake would start a third round (the send of a wake returns before dispatch forwards it).
+	select {
+	case <-rounds.started:
+	case <-time.After(5 * time.Second):
+		t.Fatal("the first round did not start")
+	}
 	for range 5 {
 		w.wake <- struct{}{}
 	}
+	settle()
 	close(release)
 	waitAsked(t, a)
 	waitAsked(t, a)

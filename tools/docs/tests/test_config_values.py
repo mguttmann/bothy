@@ -108,6 +108,7 @@ SOURCES = {
     "quality.coverage.python_min_percent": _python_min_percent,
     "quality.coverage.typescript_min_percent": _sdk_typescript_min,
     "quality.perf.timeout": lambda: _makefile_var("PERF_TIMEOUT"),
+    "quality.test.go_timeout": lambda: _makefile_var("GO_TEST_TIMEOUT"),
     "quality.sonar.new_issues_max": lambda: _gate_value("quality.sonar.new_issues_max"),
     "quality.sonar.new_hotspots_reviewed_min_percent": lambda: _gate_value(
         "quality.sonar.new_hotspots_reviewed_min_percent"
