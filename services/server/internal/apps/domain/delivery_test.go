@@ -18,11 +18,11 @@ import (
 )
 
 // timeoutErr is a transport error that reports a timeout, like a net.Error of a dial.
-type timeoutErr struct{}
+type timeoutError struct{}
 
-func (timeoutErr) Error() string   { return "i/o timeout" }
-func (timeoutErr) Timeout() bool   { return true }
-func (timeoutErr) Temporary() bool { return true }
+func (timeoutError) Error() string   { return "i/o timeout" }
+func (timeoutError) Timeout() bool   { return true }
+func (timeoutError) Temporary() bool { return true }
 
 func TestClassify(t *testing.T) {
 	t.Parallel()
@@ -61,7 +61,7 @@ func TestClassify(t *testing.T) {
 		{name: "wrapped block", err: fmt.Errorf("post: %w", &domain.BlockedError{Reason: "address_blocked"}),
 			kind: domain.OutcomeFailed, code: domain.LastErrorAddressBlocked, counted: true},
 		{name: "deadline", err: context.DeadlineExceeded, kind: domain.OutcomeFailed, code: domain.LastErrorTimeout, counted: true},
-		{name: "net timeout", err: timeoutErr{}, kind: domain.OutcomeFailed, code: domain.LastErrorTimeout, counted: true},
+		{name: "net timeout", err: timeoutError{}, kind: domain.OutcomeFailed, code: domain.LastErrorTimeout, counted: true},
 		{name: "unknown authority", err: fmt.Errorf("tls: %w", x509.UnknownAuthorityError{}), kind: domain.OutcomeFailed,
 			code: domain.LastErrorTLSFailed, counted: true},
 		{name: "hostname", err: x509.HostnameError{Host: "hooks.example.com"}, kind: domain.OutcomeFailed,

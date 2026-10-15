@@ -643,8 +643,8 @@ func EqualList(v any, want ...string) bool {
 
 // ForeignHostManifest names a delivery host outside webhook.allowed_hosts.
 func ForeignHostManifest() map[string]any {
-	return Manifest("tracker", "1.0.0", []string{scopeMessagesWrite}, []string{"messages:read", "events:subscribe"}, func(m map[string]any) {
-		m["events"] = []any{"message.created"}
+	return Manifest("tracker", "1.0.0", []string{scopeMessagesWrite}, []string{scopeMessagesRead, scopeEventsSubscribe}, func(m map[string]any) {
+		m["events"] = []any{typeMessageCreated}
 		m["delivery"] = map[string]any{"mode": "webhook", "events_url": "https://hooks.other.example.com/events"}
 		m["data_egress"] = "Messages of the granted channels go to the help desk."
 	})

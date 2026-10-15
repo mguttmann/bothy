@@ -9,6 +9,7 @@ import (
 	"encoding/base64"
 	"encoding/hex"
 	"encoding/json"
+	"flag"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -77,12 +78,15 @@ func signCase(t *testing.T, v signatureVector) string {
 	return domain.SignatureHeader(v1a, v1)
 }
 
-// TestWriteWebhookTestVectors writes the vector file from fixed seeds when BOTHY_WRITE_VECTORS is
-// set (once, in M2-26); otherwise it is skipped and TestWebhookTestVectors checks the committed
-// file.
+// writeVectors regenerates the vector file (go test ./internal/apps/domain -run
+// TestWriteWebhookTestVectors -args -write-vectors).
+var writeVectors = flag.Bool("write-vectors", false, "regenerate docs/api/webhook-test-vectors.json")
+
+// TestWriteWebhookTestVectors writes the vector file from fixed seeds with -write-vectors (once, in
+// M2-26); otherwise it is skipped and TestWebhookTestVectors checks the committed file.
 func TestWriteWebhookTestVectors(t *testing.T) {
-	if os.Getenv("BOTHY_WRITE_VECTORS") == "" {
-		t.Skip("set BOTHY_WRITE_VECTORS=1 to regenerate docs/api/webhook-test-vectors.json")
+	if !*writeVectors {
+		t.Skip("run with -args -write-vectors to regenerate docs/api/webhook-test-vectors.json")
 	}
 	seed := func(b byte) string {
 		return base64.StdEncoding.EncodeToString(bytes.Repeat([]byte{b}, ed25519.SeedSize))

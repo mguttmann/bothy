@@ -129,6 +129,8 @@ func (s *Service) applyTransition(ctx context.Context, a actor.Actor, c stateCha
 		if err := s.d.Webhooks.ResumeInstallation(ctx, inst.ID); err != nil {
 			return err
 		}
+	case domain.TransitionSuspend:
+		// The delivery job sends nothing for a suspended installation; rows keep their state.
 	}
 	return s.record(ctx, c.act, c.appID, attrs)
 }

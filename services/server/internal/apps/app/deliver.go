@@ -55,22 +55,11 @@ func (w *WebhookService) Deliver(ctx context.Context, subscriptionID ids.ID) err
 
 // claim is step a to e of design note 4 inside the unit of ctx.
 func (w *WebhookService) claim(ctx context.Context, subscriptionID ids.ID) (claim, error) {
-	sub, found, err := w.d.Store.LockSubscription(ctx, subscriptionID)
-	if err != nil || !found || sub.State != domain.SubscriptionActive {
-		return claim{}, err
-	}
-	inst, found, err := w.d.Store.Installation(ctx, sub.InstallationID)
-	if err != nil || !found || inst.State != domain.StateActive {
-		return claim{}, err
-	}
-	head, found, err := w.d.Store.Head(ctx, sub.ID)
-	if err != nil || !found {
+	sub, inst, head, due, err := w.dueHead(ctx, subscriptionID)
+	if err != nil || !due {
 		return claim{}, err
 	}
 	now := w.now()
-	if head.NextAttemptAt.After(now) {
-		return claim{}, nil
-	}
 	ev, found, err := w.d.Log.EventBySeq(ctx, head.EventSeq)
 	if err != nil {
 		return claim{}, err
@@ -78,15 +67,11 @@ func (w *WebhookService) claim(ctx context.Context, subscriptionID ids.ID) (clai
 	if !found {
 		return claim{}, w.gap(ctx, &sub)
 	}
-	if !slices.Contains(sub.EventTypes, ev.Type) || !slices.Contains(inst.EventSubscriptions, ev.Type) {
-		return claim{}, w.finishWithout(ctx, sub.ID, head, apps.LastErrorNotSubscribed)
-	}
-	allowed, err := w.mayReceive(ctx, inst, ev)
-	if err != nil {
-		return claim{}, err
-	}
-	if !allowed {
-		return claim{}, w.finishWithout(ctx, sub.ID, head, apps.LastErrorNotAuthorized)
+	if code, err := w.refusal(ctx, sub, inst, ev); err != nil || code != "" {
+		if err != nil {
+			return claim{}, err
+		}
+		return claim{}, w.finishWithout(ctx, sub.ID, head, code)
 	}
 	req, signer, err := w.sign(ctx, sub, ev, now)
 	if err != nil {
@@ -101,6 +86,38 @@ func (w *WebhookService) claim(ctx context.Context, subscriptionID ids.ID) (clai
 		return claim{}, err
 	}
 	return claim{send: true, req: req, head: head, signer: signer}, nil
+}
+
+// refusal returns the code that ends the head without a request (design note 4 c and d):
+// not_subscribed when the type left the event types of the subscription or of the installation,
+// not_authorized when webhook_out.deliver does not allow it; "" when the attempt may go out.
+func (w *WebhookService) refusal(ctx context.Context, sub SubscriptionRecord, inst InstallationRecord, ev sync.Event) (string, error) {
+	if !slices.Contains(sub.EventTypes, ev.Type) || !slices.Contains(inst.EventSubscriptions, ev.Type) {
+		return apps.LastErrorNotSubscribed, nil
+	}
+	allowed, err := w.mayReceive(ctx, inst, ev)
+	if err != nil || allowed {
+		return "", err
+	}
+	return apps.LastErrorNotAuthorized, nil
+}
+
+// dueHead is step a of design note 4: lock the subscription, and report its head when the
+// subscription is active, its installation active and the head due; due is false otherwise.
+func (w *WebhookService) dueHead(ctx context.Context, subscriptionID ids.ID) (SubscriptionRecord, InstallationRecord, DeliveryRecord, bool, error) {
+	sub, found, err := w.d.Store.LockSubscription(ctx, subscriptionID)
+	if err != nil || !found || sub.State != domain.SubscriptionActive {
+		return SubscriptionRecord{}, InstallationRecord{}, DeliveryRecord{}, false, err
+	}
+	inst, found, err := w.d.Store.Installation(ctx, sub.InstallationID)
+	if err != nil || !found || inst.State != domain.StateActive {
+		return SubscriptionRecord{}, InstallationRecord{}, DeliveryRecord{}, false, err
+	}
+	head, found, err := w.d.Store.Head(ctx, sub.ID)
+	if err != nil || !found || head.NextAttemptAt.After(w.now()) {
+		return SubscriptionRecord{}, InstallationRecord{}, DeliveryRecord{}, false, err
+	}
+	return sub, inst, head, true, nil
 }
 
 // gap is the gap rule at the head (M2-26 design note 5 e, D-M2-26-5): the subscription becomes
@@ -226,7 +243,7 @@ func (w *WebhookService) record(ctx context.Context, c claim, res SendResult, se
 		if err := w.applyTransition(ctx, &sub, domain.EventGone, 0, 0); err != nil {
 			return err
 		}
-	default:
+	case domain.OutcomeThrottled, domain.OutcomeFailed:
 		if err := w.applyRetry(ctx, &sub, &d, o, res, now); err != nil {
 			return err
 		}

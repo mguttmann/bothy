@@ -294,7 +294,7 @@ func (c *checker) address(pointer, raw string) {
 // without fragment.
 func parseHTTPS(raw string) (*url.URL, bool) {
 	u, err := url.Parse(raw)
-	if err != nil || u.Scheme != "https" || u.Hostname() == "" || u.User != nil || u.Fragment != "" ||
+	if err != nil || u.Scheme != schemeHTTPS || u.Hostname() == "" || u.User != nil || u.Fragment != "" ||
 		strings.Contains(raw, "#") || u.Opaque != "" {
 		return nil, false
 	}

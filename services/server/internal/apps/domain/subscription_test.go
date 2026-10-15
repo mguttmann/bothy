@@ -176,7 +176,7 @@ func TestAppSubscribableMatchesContract(t *testing.T) {
 	var spec struct {
 		Webhooks map[string]any `yaml:"webhooks"`
 	}
-	raw, err := os.ReadFile(filepath.Join(root, "docs", "api", "openapi.yaml"))
+	raw, err := os.ReadFile(filepath.Join(root, "docs", "api", "openapi.yaml")) //nolint:gosec // G304: a fixed path below the repository root, not input.
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -189,7 +189,7 @@ func TestAppSubscribableMatchesContract(t *testing.T) {
 			Receivers string `yaml:"receivers"`
 		} `yaml:"events"`
 	}
-	raw, err = os.ReadFile(filepath.Join(root, "docs", "spec", "actions.yaml"))
+	raw, err = os.ReadFile(filepath.Join(root, "docs", "spec", "actions.yaml")) //nolint:gosec // G304: a fixed path below the repository root, not input.
 	if err != nil {
 		t.Fatal(err)
 	}

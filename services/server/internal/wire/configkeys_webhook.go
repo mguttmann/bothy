@@ -25,7 +25,7 @@ func webhookConfigKeys() []config.Key {
 			Chapter: chapter03,
 		},
 		{
-			Name: keyWebhookBackoffBase, Kind: config.KindDuration, Default: "10s", Min: minDeadline,
+			Name: keyWebhookBackoffBase, Kind: config.KindDuration, Default: defaultTenSeconds, Min: minDeadline,
 			Doc:     "Base of the backoff between delivery attempts.",
 			Chapter: chapter03,
 		},
@@ -45,7 +45,7 @@ func webhookConfigKeys() []config.Key {
 			Chapter: chapter11,
 		},
 		{
-			Name: "webhook.secret_rotation_overlap", Kind: config.KindDuration, Default: "24h", Min: minDeadline,
+			Name: "webhook.secret_rotation_overlap", Kind: config.KindDuration, Default: defaultDay, Min: minDeadline,
 			Doc:     "How long the server signs with the old and the new HMAC generation after a rotation.",
 			Chapter: chapter11,
 		},

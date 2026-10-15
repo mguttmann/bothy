@@ -91,8 +91,11 @@ type AllowedHost struct {
 	Port uint16
 }
 
-// httpsPort is the default port of https.
-const httpsPort = 443
+// httpsPort is the default port of https; schemeHTTPS its scheme.
+const (
+	httpsPort   = 443
+	schemeHTTPS = "https"
+)
 
 // ParseAllowedHosts parses the entries of webhook.allowed_hosts (host[:port], no scheme, no path;
 // an IPv6 literal in brackets). Errors name the position of the first bad entry, never its value.
@@ -209,7 +212,7 @@ var (
 //	t, err := domain.ValidateTarget("https://hooks.example.com/chat", allowed) // t.Port == 443
 func ValidateTarget(raw string, allowed []AllowedHost) (Target, error) {
 	u, err := url.Parse(raw)
-	if err != nil || u.Scheme != "https" || u.Opaque != "" || u.User != nil || u.Fragment != "" ||
+	if err != nil || u.Scheme != schemeHTTPS || u.Opaque != "" || u.User != nil || u.Fragment != "" ||
 		strings.Contains(raw, "#") || u.Host == "" {
 		return Target{}, ErrInvalidTarget
 	}
@@ -247,7 +250,7 @@ func HostOf(raw string) string {
 func AllowsHost(allowed []AllowedHost) func(scheme, host string, port uint16) bool {
 	list := slices.Clone(allowed)
 	return func(scheme, host string, port uint16) bool {
-		return scheme == "https" && slices.Contains(list, AllowedHost{Host: host, Port: port})
+		return scheme == schemeHTTPS && slices.Contains(list, AllowedHost{Host: host, Port: port})
 	}
 }
 

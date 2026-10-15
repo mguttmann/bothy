@@ -139,7 +139,7 @@ func TestSenderHeadersAndOutcome(t *testing.T) {
 		t.Fatalf("span %v", a)
 	}
 	for _, v := range a {
-		if strings.Contains(v.Emit(), "/chat") || strings.Contains(v.Emit(), "k=v") {
+		if strings.Contains(v.String(), "/chat") || strings.Contains(v.String(), "k=v") {
 			t.Fatalf("span carries the path: %v", a)
 		}
 	}

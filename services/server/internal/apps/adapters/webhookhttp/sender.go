@@ -145,6 +145,8 @@ func outcomeOf(o domain.Outcome) string {
 		return OutcomeThrottled
 	case domain.OutcomeGone:
 		return OutcomeGone
+	case domain.OutcomeFailed:
+		return OutcomeFailed
 	default:
 		return OutcomeFailed
 	}

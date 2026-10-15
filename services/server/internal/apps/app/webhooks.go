@@ -358,25 +358,11 @@ func (w *WebhookService) update(ctx context.Context, cmd apps.UpdateSubscription
 	if !found {
 		return SubscriptionRecord{}, notFound()
 	}
-	change, changed := changeUpdated, false
-	host := hostOf(rec.URL)
-	if cmd.URL != nil {
-		t, err := w.target(*cmd.URL)
-		if err != nil {
-			return SubscriptionRecord{}, err
-		}
-		rec.URL, host, changed = *cmd.URL, t.Host, true
+	host, changed, err := w.applyFields(ctx, &rec, cmd)
+	if err != nil {
+		return SubscriptionRecord{}, err
 	}
-	if cmd.EventTypes != nil {
-		inst, found, err := w.d.Store.Installation(ctx, rec.InstallationID)
-		if err != nil || !found {
-			return SubscriptionRecord{}, orNotFound(err)
-		}
-		if err := eventTypes(*cmd.EventTypes, inst.EventSubscriptions); err != nil {
-			return SubscriptionRecord{}, err
-		}
-		rec.EventTypes, changed = slices.Clone(*cmd.EventTypes), true
-	}
+	change := changeUpdated
 	if cmd.RotateHMACSecret {
 		if !rec.HMACEnabled {
 			return SubscriptionRecord{}, fieldErr("/rotate_hmac_secret", domain.CodeHMACNotEnabled, "The subscription signs without HMAC; there is no secret to rotate.")
@@ -401,6 +387,30 @@ func (w *WebhookService) update(ctx context.Context, cmd apps.UpdateSubscription
 		return SubscriptionRecord{}, err
 	}
 	return rec, w.recordManage(ctx, rec, host, change)
+}
+
+// applyFields applies a new address and new event types of cmd to rec, checked as at creation; it
+// returns the host for the audit entry and whether anything changed.
+func (w *WebhookService) applyFields(ctx context.Context, rec *SubscriptionRecord, cmd apps.UpdateSubscription) (string, bool, error) {
+	host, changed := hostOf(rec.URL), false
+	if cmd.URL != nil {
+		t, err := w.target(*cmd.URL)
+		if err != nil {
+			return "", false, err
+		}
+		rec.URL, host, changed = *cmd.URL, t.Host, true
+	}
+	if cmd.EventTypes != nil {
+		inst, found, err := w.d.Store.Installation(ctx, rec.InstallationID)
+		if err != nil || !found {
+			return "", false, orNotFound(err)
+		}
+		if err := eventTypes(*cmd.EventTypes, inst.EventSubscriptions); err != nil {
+			return "", false, err
+		}
+		rec.EventTypes, changed = slices.Clone(*cmd.EventTypes), true
+	}
+	return host, changed, nil
 }
 
 // ownerState applies the owner transition to state on rec (M2-26 design note 5 a): pause, or

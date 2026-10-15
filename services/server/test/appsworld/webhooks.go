@@ -379,7 +379,7 @@ func (w *World) Post(author, channel, thread ids.ID, text string) Message {
 	w.t.Helper()
 	payload, _ := json.Marshal(map[string]any{"message": map[string]any{"content_md": text}})
 	ev := eventlog.Event{
-		ID: ids.New(), Type: "message.created", SchemaVersion: 1, ActorKind: eventlog.ActorUser, ActorPrincipalID: author,
+		ID: ids.New(), Type: typeMessageCreated, SchemaVersion: 1, ActorKind: eventlog.ActorUser, ActorPrincipalID: author,
 		SpaceID: w.Support, ChannelID: channel, ThreadID: thread, ResourceKind: "message", ResourceID: ids.New(), ResourceVersion: 1,
 		ReceiveAction: "message.read", Payload: payload,
 	}
@@ -406,15 +406,22 @@ func (w *World) AppendEvent(ev eventlog.Event) int64 {
 // install creates no subscription); mods change it.
 func TrackerEventsManifest(mods ...func(m map[string]any)) map[string]any {
 	return TrackerManifest("1.0.0", append([]func(map[string]any){func(m map[string]any) {
-		m["scopes"] = map[string]any{"required": []string{scopeMessagesWrite}, "optional": []string{"messages:read", "events:subscribe"}}
-		m["events"] = []any{"message.created"}
+		m["scopes"] = map[string]any{"required": []string{scopeMessagesWrite}, "optional": []string{scopeMessagesRead, scopeEventsSubscribe}}
+		m["events"] = []any{typeMessageCreated}
 		m["delivery"] = map[string]any{"mode": "gateway"}
 		m["data_egress"] = "Messages of the granted channels go to the help desk."
 	}}, mods...)...)
 }
 
+// The event type and the scope the webhook tests use most.
+const (
+	typeMessageCreated   = "message.created"
+	scopeEventsSubscribe = "events:subscribe"
+	scopeMessagesRead    = "messages:read"
+)
+
 // TrackerScopes are the granted scopes of Tracker in the webhook tests.
-var TrackerScopes = []string{"events:subscribe", "messages:read", scopeMessagesWrite}
+var TrackerScopes = []string{scopeEventsSubscribe, scopeMessagesRead, scopeMessagesWrite}
 
 // InstallTracker installs Tracker with TrackerScopes, event_subscriptions [message.created] and G-6
 // (write on Support/Eskalation) as Robin with step-up, and returns the owner client and the app id.
@@ -422,7 +429,7 @@ func (w *World) InstallTracker(mods ...func(m map[string]any)) (*Client, ids.ID)
 	w.t.Helper()
 	o := w.RobinPhone.StepUp()
 	a := w.Want(o.Call(http.MethodPost, "/api/v1/apps", InstallBody(TrackerEventsManifest(mods...), TrackerScopes,
-		[]string{"message.created"}), Idem()...), http.StatusCreated, "")
+		[]string{typeMessageCreated}), Idem()...), http.StatusCreated, "")
 	app := ids.MustParse(a["id"].(string))
 	w.Grant(app, w.Eskalation, "write")
 	return o, app
@@ -432,7 +439,7 @@ func (w *World) InstallTracker(mods ...func(m map[string]any)) (*Client, ids.ID)
 // returns the created body.
 func (w *World) Subscribe(o *Client, app ids.ID, hmac bool) map[string]any {
 	w.t.Helper()
-	body, _ := json.Marshal(map[string]any{"url": w.web.Hooks.URL("/chat"), "event_types": []string{"message.created"}, "enable_hmac": hmac})
+	body, _ := json.Marshal(map[string]any{"url": w.web.Hooks.URL("/chat"), "event_types": []string{typeMessageCreated}, "enable_hmac": hmac})
 	return w.Want(o.Call(http.MethodPost, "/api/v1/apps/"+app.String()+"/webhooks", string(body), Idem()...), http.StatusCreated, "")
 }
 

@@ -392,7 +392,9 @@ func TestDeliveryRetryAfter(t *testing.T) {
 		w.Hooks().Respond(appsworld.Status(c.status, "Retry-After", c.retryAfter(now)))
 		w.SQL(`UPDATE webhook_deliveries SET next_attempt_at = $2 WHERE subscription_id = $1`, sub.String(), now)
 		w.DueJobs()
-		w.Webhooks().Deliver(context.Background(), sub) //nolint:errcheck // checked through the row
+		if err := w.Webhooks().Deliver(context.Background(), sub); err != nil {
+			t.Fatal(err)
+		}
 		d := w.Deliveries(sub)[0]
 		if d.Status != "pending" || d.LastError != "throttled" || d.NextAttemptAt == nil || d.NextAttemptAt.Before(now.Add(c.wait).Truncate(time.Second)) {
 			t.Fatalf("%d: row %+v", c.status, d)
