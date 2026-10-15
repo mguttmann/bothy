@@ -7,7 +7,8 @@ import 'package:flutter/material.dart';
 
 // Test strings only; interface texts come from packages/l10n (M4-06).
 const _title = 'Release notes';
-const _body = 'Alex asked Sam and Robin to review the build before the release.';
+const _body =
+    'Alex asked Sam and Robin to review the build before the release.';
 const _code = r'$ make check';
 const _primary = 'Merge';
 const _secondary = 'Cancel';

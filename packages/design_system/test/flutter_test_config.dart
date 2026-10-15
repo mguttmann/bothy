@@ -45,7 +45,7 @@ Future<void> _loadBundledFonts() async {
     final loader = FontLoader(entry['family'] as String);
     for (final font
         in (entry['fonts'] as List<dynamic>).cast<Map<String, dynamic>>()) {
-      // The manifest stores asset keys URL-encoded (the file names contain brackets).
+      // The font manifest stores asset keys URL-encoded; the bundle expects them decoded.
       loader.addFont(rootBundle.load(Uri.decodeFull(font['asset'] as String)));
     }
     await loader.load();
