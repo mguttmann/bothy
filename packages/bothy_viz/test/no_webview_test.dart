@@ -18,11 +18,11 @@ void main() {
       final root = Directory(dir);
       if (!root.existsSync()) continue;
       for (final file in root.listSync(recursive: true).whereType<File>()) {
-        if (!file.path.endsWith('.dart') && !file.path.endsWith('.yaml'))
-          continue;
-        if (file.path.contains('/.dart_tool/') || file.path.contains('/build/'))
-          continue;
-        if (file.absolute.path == self) continue;
+        final source =
+            file.path.endsWith('.dart') || file.path.endsWith('.yaml');
+        final generated =
+            file.path.contains('/.dart_tool/') || file.path.contains('/build/');
+        if (!source || generated || file.absolute.path == self) continue;
         final lines = file.readAsLinesSync();
         for (var i = 0; i < lines.length; i++) {
           // Comments may name what is banned; imports and code may not.

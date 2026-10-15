@@ -12,7 +12,8 @@ import '../model/series_model.dart';
 import 'viz_colors.dart';
 import 'viz_texts.dart';
 
-/// Series as lines with a light area below, on a grid, with a legend of label and last value.
+/// Series as lines with a light area below, on a grid, with a legend of label and last value
+/// (one line per series, wrapping at large text sizes).
 ///
 /// The colors follow the fixed order of the series roles; the legend repeats each series as
 /// text, so no series is told apart by color alone (25 7.4). The semantics label names the
@@ -75,33 +76,31 @@ class AreaMark extends StatelessWidget {
               ),
             ),
             const SizedBox(height: DsSpace.s8),
-            Wrap(
-              spacing: DsSpace.s12,
-              runSpacing: DsSpace.s4,
-              children: [
-                for (final item in legend)
-                  Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      SizedBox.square(
-                        dimension: DsSize.statusDot,
-                        child: DecoratedBox(
-                          decoration: BoxDecoration(
-                            color: item.color,
-                            shape: BoxShape.circle,
-                          ),
+            for (final item in legend)
+              Padding(
+                padding: const EdgeInsets.only(bottom: DsSpace.s4),
+                child: Row(
+                  children: [
+                    SizedBox.square(
+                      dimension: DsSize.statusDot,
+                      child: DecoratedBox(
+                        decoration: BoxDecoration(
+                          color: item.color,
+                          shape: BoxShape.circle,
                         ),
                       ),
-                      const SizedBox(width: DsSpace.s4),
-                      Text(
+                    ),
+                    const SizedBox(width: DsSpace.s4),
+                    Flexible(
+                      child: Text(
                         item.text,
                         style: dsTextStyle(DsType.bodySm)
                             .copyWith(color: colors.textSecondary),
                       ),
-                    ],
-                  ),
-              ],
-            ),
+                    ),
+                  ],
+                ),
+              ),
           ],
         ),
       ),
