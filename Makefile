@@ -174,7 +174,7 @@ lint: ## Linters: file hygiene hooks, ruff, bandit, Dockerfile pins, actionlint,
 	$(UVRUN) ruff check tools
 	@# Every FROM of a tracked Dockerfile is pinned by digest (SEC-SC-4, docs/spec/18-release.md "Server images").
 	$(UVRUN) python tools/ci/dockerfile_pins.py
-	$(UVRUN) bandit -q -c tools/pyproject.toml -r tools/api-checks tools/arch-check tools/bin tools/catalog tools/ci tools/configdoc tools/denylist tools/design-tokens tools/doccheck tools/docs tools/hooks tools/opscheck tools/sonarqube
+	$(UVRUN) bandit -q -c tools/pyproject.toml -r tools/api-checks tools/arch-check tools/bin tools/catalog tools/ci tools/configdoc tools/denylist tools/design-tokens tools/doccheck tools/docs tools/hooks tools/observability tools/opscheck tools/sonarqube
 	$(UVRUN) check-jsonschema --builtin-schema vendor.github-issue-forms $(filter-out %/config.yml,$(wildcard .github/ISSUE_TEMPLATE/*.yml))
 	$(UVRUN) check-jsonschema --builtin-schema vendor.github-issue-config .github/ISSUE_TEMPLATE/config.yml
 	$(UVRUN) check-jsonschema --builtin-schema vendor.renovate renovate.json

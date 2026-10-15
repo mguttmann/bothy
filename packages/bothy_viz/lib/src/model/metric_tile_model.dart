@@ -18,6 +18,9 @@ enum TileUnit {
 
   /// Money in micro units of the tile's currency.
   money,
+
+  /// A duration in milliseconds, for example a percentile of the run duration.
+  milliseconds,
 }
 
 /// One large number with its label, an optional comparison and a cost label.

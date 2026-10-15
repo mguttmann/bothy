@@ -78,8 +78,13 @@ def _pointer(path: Any) -> str:
 
 @functools.lru_cache(maxsize=4)
 def _openapi(text: str) -> Any:
-    """The parsed document; cached by its text, because parsing it dominates the check."""
-    return yaml.load(text, Loader=_LOADER)  # noqa: S506 (CSafeLoader is a safe loader)
+    """The parsed document; cached by its text, because parsing it dominates the check.
+
+    Composed by the C loader when available and constructed by the safe loader, the same
+    result as `yaml.safe_load` in a fraction of the time (as `tools/catalog` does).
+    """
+    node = yaml.compose(text, Loader=_LOADER)
+    return None if node is None else yaml.SafeLoader("").construct_document(node)
 
 
 def check(root: Path) -> list[str]:

@@ -54,6 +54,18 @@ Color runStateColor(DsColors colors, api.RunState state) =>
     }[state] ??
     colors.borderDefault;
 
+/// The icon of a run state of the timeline; the bar shows it next to its color (25 7.4).
+DsGlyph runStateGlyph(api.RunState state) =>
+    <api.RunState, DsGlyph>{
+      api.RunState.queued: DsIcons.runQueued,
+      api.RunState.running: DsIcons.runRunning,
+      api.RunState.waitingInput: DsIcons.runWaiting,
+      api.RunState.completed: DsIcons.runCompleted,
+      api.RunState.failed: DsIcons.runFailed,
+      api.RunState.cancelled: DsIcons.runCancelled,
+    }[state] ??
+    DsIcons.stateInfo;
+
 /// Foreground and subtle background of a state role.
 ({Color fg, Color subtle, Color border}) stateRoleColors(
   DsColors colors,

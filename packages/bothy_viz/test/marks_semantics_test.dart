@@ -89,6 +89,21 @@ void main() {
     },
   );
 
+  testWidgets('every run bar shows the icon of its state, not color alone', (
+    tester,
+  ) async {
+    await pump(tester, BarMark(model: models.timeline.bars));
+    final segments = models.timeline.bars.rows
+        .expand((r) => r.segments)
+        .toList();
+    final icons = tester
+        .widgetList<DsIcon>(find.byType(DsIcon))
+        .map((i) => i.glyph)
+        .toList();
+    expect(icons, [for (final s in segments) runStateGlyph(s.runState!)]);
+    expect(icons, contains(DsIcons.runFailed));
+  });
+
   testWidgets('a tap on a run card reports its thread ID', (tester) async {
     final tapped = <String>[];
     final card = models.normal.lanes.first.cards.first;
@@ -198,10 +213,18 @@ void main() {
                 queryMetric: 'same',
               ),
             ),
+            MetricTileModelView(
+              MetricTileModel(
+                value: 120,
+                unit: TileUnit.milliseconds,
+                queryMetric: 'duration_ms_p95',
+              ),
+            ),
           ],
         ),
       );
       expect(find.text('not shown'), findsOneWidget);
+      expect(find.text('120\u00a0ms'), findsOneWidget);
       expect(find.text('2 more than the previous period'), findsOneWidget);
       expect(find.text('2 less than the previous period'), findsOneWidget);
       expect(find.text('same as the previous period'), findsOneWidget);

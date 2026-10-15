@@ -37,6 +37,8 @@ class MetricTileMark extends StatelessWidget {
       TileUnit.count => texts.format.count(v.round()),
       TileUnit.percent => texts.format.percent(v),
       TileUnit.money => texts.format.money(v / 1000000, model.currency ?? ''),
+      // The unit symbol is the same in every language.
+      TileUnit.milliseconds => '${texts.format.count(v.round())}\u00a0ms',
     };
   }
 
