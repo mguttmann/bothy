@@ -10,6 +10,8 @@ slos:
   - name: "run-start"
     objective: 99.0
     description: "Share of runs that leave queued and start running within 7.5 s."
+    labels:
+      bothy_sli_metric: sli.run_start
     sli:
       events:
         error_query: >-
@@ -36,6 +38,8 @@ slos:
   - name: "turn-duration"
     objective: 95.0
     description: "Share of completed runs that finish within 600 s."
+    labels:
+      bothy_sli_metric: sli.turn_duration
     sli:
       events:
         error_query: >-

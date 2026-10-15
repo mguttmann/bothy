@@ -42,11 +42,11 @@ minversion = "9.0"
 addopts = ["-ra", "--strict-markers", "--strict-config", "--import-mode=importlib"]
 testpaths = [
   "api-checks", "arch-check", "bin", "catalog", "ci", "configdoc", "denylist", "doccheck", "docs", "hooks",
-  "opscheck", "sonarqube",
+  "observability", "opscheck", "sonarqube",
 ]
 pythonpath = [
   "api-checks", "arch-check", "bin", "catalog", "catalog/tests", "ci", "configdoc", "denylist", "doccheck",
-  "docs", "hooks", "opscheck", "sonarqube", "sonarqube/tests", "testing",
+  "docs", "hooks", "observability", "opscheck", "sonarqube", "sonarqube/tests", "testing",
 ]
 filterwarnings = ["error"]
 
@@ -54,7 +54,7 @@ filterwarnings = ["error"]
 branch = true
 source = [
   "api-checks", "arch-check", "bin", "catalog", "ci", "configdoc", "denylist", "doccheck", "docs", "hooks",
-  "opscheck", "sonarqube",
+  "observability", "opscheck", "sonarqube",
 ]
 omit = ["*/tests/*"]
 
@@ -98,7 +98,7 @@ warn_unreachable = true
 # Tool modules only; tests are linted by ruff and executed by pytest.
 files = [
   "api-checks", "arch-check", "bin", "catalog", "ci", "configdoc", "denylist", "doccheck", "docs", "hooks",
-  "opscheck", "sonarqube",
+  "observability", "opscheck", "sonarqube",
 ]
 exclude = ["/tests/"]
 
