@@ -78,12 +78,12 @@ var errNoAuthzHook = errors.New("wire: the txn registry needs the rights hooks (
 // clear_draft would keep the draft.
 var errNoSyncSubscribers = errors.New("wire: the txn registry needs the subscribers of sync (Modules.SyncSubscribers)")
 
-// errNoAuditHook reports Modules without the audit hook: every unit of work must chain its audit
-// entries, so a registry without it is refused.
 // errNoNotifySubscribers reports Modules without the subscribers of notify: an archive would keep
 // the notification preferences of the archived target (R-DM-16).
 var errNoNotifySubscribers = errors.New("wire: the txn registry needs the subscribers of notify (Modules.NotifySubscribers)")
 
+// errNoAuditHook reports Modules without the audit hook: every unit of work must chain its audit
+// entries, so a registry without it is refused.
 var errNoAuditHook = errors.New("wire: the txn registry needs the audit hook (Modules.Audit)")
 
 // registerTxn is the only place with SetHook and Subscribe calls (02 "In-Tx events": one
