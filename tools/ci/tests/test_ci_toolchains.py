@@ -80,7 +80,8 @@ def test_flutter_covers_every_dart_package(job: str) -> None:
     assert step["if"] == FLUTTER_IF
     assert step["with"]["channel"] == "stable"
     for pubspec in _tracked("apps/*pubspec.yaml", "packages/*pubspec.yaml"):
-        assert re.fullmatch(r"(apps|packages)/[^/]+/pubspec\.yaml", pubspec), pubspec
+        # A member one level down, or the nested harness of bothy_viz (D-M6-11-6).
+        assert re.fullmatch(r"(apps|packages)/[^/]+(/harness)?/pubspec\.yaml", pubspec), pubspec
 
 
 @pytest.mark.parametrize(
@@ -221,7 +222,7 @@ def test_flutter_pins_agree() -> None:
         environment = _pubspec(pubspec).get("environment") or {}
         pins[pubspec] = environment.get("flutter")
         sdks[pubspec] = environment.get("sdk")
-    assert len(pins) == 15, sorted(pins)
+    assert len(pins) == 1 + len(_pubspec("pubspec.yaml")["workspace"]), sorted(pins)
     assert all(isinstance(v, str) and re.fullmatch(r"\d+\.\d+\.\d+", v) for v in pins.values()), (
         pins
     )

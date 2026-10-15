@@ -320,4 +320,239 @@ class AppLocalizationsEn extends AppLocalizations {
   String problemFallback(String code) {
     return 'Something went wrong ($code)';
   }
+
+  @override
+  String get vizMetricMessagesCreated => 'Messages';
+
+  @override
+  String get vizMetricThreadsCreated => 'New threads';
+
+  @override
+  String get vizMetricRunsStarted => 'Runs started';
+
+  @override
+  String get vizMetricRunsFinished => 'Runs finished';
+
+  @override
+  String get vizMetricToolCalls => 'Tool calls';
+
+  @override
+  String get vizMetricApprovalCards => 'Approval cards';
+
+  @override
+  String get vizMetricCost => 'Costs';
+
+  @override
+  String get vizMetricInvocationsDenied => 'Denied invocations';
+
+  @override
+  String get vizMetricBillingModeSwitches => 'Billing mode switches';
+
+  @override
+  String get vizMetricCatchups => 'Catch-ups';
+
+  @override
+  String get vizMetricResyncs => 'Resyncs';
+
+  @override
+  String get vizMetricSlowConsumerCloses => 'Closes of slow clients';
+
+  @override
+  String vizMetricUnknown(String code) {
+    return 'Metric $code';
+  }
+
+  @override
+  String get vizSliApiAvailability => 'API availability';
+
+  @override
+  String get vizSliDeliveryLatency => 'Delivery latency';
+
+  @override
+  String get vizSliReconnect => 'Reconnect';
+
+  @override
+  String get vizSliPushAcceptance => 'Push acceptance';
+
+  @override
+  String get vizSliRunStart => 'Run start';
+
+  @override
+  String get vizSliTurnDuration => 'Turn duration';
+
+  @override
+  String get vizSloOnTarget => 'on target';
+
+  @override
+  String get vizSloBudgetTight => 'budget tight';
+
+  @override
+  String get vizSloTargetMissed => 'target missed';
+
+  @override
+  String get vizSloNotEnoughData => 'not enough data';
+
+  @override
+  String get vizOwnMeasurement => 'Own measurement';
+
+  @override
+  String vizTrafficLightLabel(String slo, String state) {
+    return '$slo: $state, own measurement';
+  }
+
+  @override
+  String vizTrafficLightChanged(String slo, String state) {
+    return '$slo is now $state';
+  }
+
+  @override
+  String get vizCostEstimate => 'Estimate';
+
+  @override
+  String get vizCostInformationOnly => 'information only';
+
+  @override
+  String get vizBadgePersonal => 'Personal';
+
+  @override
+  String get vizBadgeOrganization => 'Organization';
+
+  @override
+  String get vizApprovalWaiting => 'Approval waiting';
+
+  @override
+  String get vizMoreRunsThanShown => 'More runs than shown';
+
+  @override
+  String get vizRunStateWaitingInput => 'Waiting for input';
+
+  @override
+  String get vizRunStateUnknown => 'Unknown state';
+
+  @override
+  String vizStepToolCall(String name) {
+    return 'Tool $name';
+  }
+
+  @override
+  String vizStepStatus(String name) {
+    return 'Status $name';
+  }
+
+  @override
+  String vizStepSubagent(String name) {
+    return 'Subagent $name';
+  }
+
+  @override
+  String vizStepWorkflow(String name) {
+    return 'Workflow $name';
+  }
+
+  @override
+  String vizStepBackgroundJob(String name) {
+    return 'Background job $name';
+  }
+
+  @override
+  String vizLaneLabel(String space, String channel, int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count active runs',
+      one: '1 active run',
+      zero: 'no active runs',
+    );
+    return '$space, $channel, $_temp0';
+  }
+
+  @override
+  String vizBarRowLabel(String row, int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count runs',
+      one: '1 run',
+    );
+    return '$row, $_temp0';
+  }
+
+  @override
+  String get vizChartRates => 'Rates';
+
+  @override
+  String get vizChartRuns => 'Runs';
+
+  @override
+  String vizTileUp(String delta) {
+    return '$delta more than the previous period';
+  }
+
+  @override
+  String vizTileDown(String delta) {
+    return '$delta less than the previous period';
+  }
+
+  @override
+  String get vizTileSame => 'same as the previous period';
+
+  @override
+  String get vizNotShown => 'not shown';
+
+  @override
+  String get vizStale => 'No new data';
+
+  @override
+  String get vizHarnessTitle => 'Visualization harness';
+
+  @override
+  String get vizHarnessTheme => 'Theme';
+
+  @override
+  String get vizHarnessThemeLight => 'Light';
+
+  @override
+  String get vizHarnessThemeDark => 'Dark';
+
+  @override
+  String get vizHarnessDensity => 'Density';
+
+  @override
+  String get vizHarnessDensityComfortable => 'Comfortable';
+
+  @override
+  String get vizHarnessDensityCompact => 'Compact';
+
+  @override
+  String get vizHarnessDensityTouch => 'Touch';
+
+  @override
+  String get vizHarnessTextScale => 'Text size';
+
+  @override
+  String get vizHarnessLanguage => 'Language';
+
+  @override
+  String get vizHarnessFixtureState => 'Fixture state';
+
+  @override
+  String get vizHarnessTimeLapse => 'Time-lapse';
+
+  @override
+  String get vizMarkLane => 'Lane';
+
+  @override
+  String get vizMarkRunCard => 'Run card';
+
+  @override
+  String get vizMarkArea => 'Area';
+
+  @override
+  String get vizMarkBar => 'Bar';
+
+  @override
+  String get vizMarkTrafficLight => 'Traffic light';
+
+  @override
+  String get vizMarkMetricTile => 'Metric tile';
 }

@@ -29,8 +29,10 @@ Status: Entwurf M0. Entscheidung: ADR 0035. Quelle aller Zahlen sind die Sloth-D
 
 Die Spalte "Metrik der eigenen Messung" gibt das Label `bothy_sli_metric` des SLO in der
 Sloth-Datei wieder; es ordnet das SLO seiner Metrik in `stats_minutes` zu
-([25-visualisierung.md](../spec/25-visualisierung.md), Abschnitt 3.3). Die Labels setzt das
-Bau-Ticket PLAN M6-11; bis dahin ist diese Spalte die Vorgabe dafür.
+([25-visualisierung.md](../spec/25-visualisierung.md), Abschnitt 3.3). The source is the label
+in the Sloth file; `make ops-check` holds this column equal to it (check `sli-labels`) and the
+generated bounds of server and apps equal a fresh run of `tools/observability/sli_bounds.py`
+(check `sli-bounds`).
 
 Begründungen:
 

@@ -1,7 +1,7 @@
 # SPDX-License-Identifier: Apache-2.0
 """API contract checks: every copy of the contract equals its source (06 G2 and G3).
 
-Two rules of docs/spec/06-api.md section 15:
+Two rules of docs/spec/06-api.md section 15, and the fixture check of chapter 25:
 
 - `api-catalogue-sync` (G2) compares docs/api/openapi.yaml and docs/api/asyncapi.yaml with the
   action catalogue docs/spec/actions.yaml (actions, rate-limit classes, ops, events, receive
@@ -11,10 +11,13 @@ Two rules of docs/spec/06-api.md section 15:
   `x-status` (section 5).
 - `api-tables` (G3) renders the generated blocks of chapter 06 and docs/api/webhooks.md from
   the YAML files and fails on any difference.
+- `viz-fixtures` (25 7.2, VZ-T11) validates every fixture of packages/bothy_viz/fixtures/
+  against its schema in docs/api/openapi.yaml (module `viz_fixtures`).
 
 Commands (run from anywhere; `--root` defaults to the repository of this file):
 
-    api_checks.py check [--rule api-catalogue-sync|api-tables]  # exit 0 clean, 1 findings
+    api_checks.py check [--rule api-catalogue-sync|api-tables|viz-fixtures]
+                                                                # exit 0 clean, 1 findings
     api_checks.py generate                                      # rewrite the generated blocks
 
 Every finding is one line `<rule>: <sub-check>: <subject>: <detail>`; the sub-check `source`
@@ -44,6 +47,7 @@ import yaml
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "catalog"))
 
 import action_catalog
+import viz_fixtures
 from action_catalog import Catalog, CatalogError
 
 REPO = Path(__file__).resolve().parents[2]
@@ -57,7 +61,8 @@ CONFIG_PATH = Path("docs/operations/configuration.md")
 
 RULE_SYNC = "api-catalogue-sync"
 RULE_TABLES = "api-tables"
-RULES = (RULE_SYNC, RULE_TABLES)
+RULE_VIZ = viz_fixtures.RULE
+RULES = (RULE_SYNC, RULE_TABLES, RULE_VIZ)
 SOURCE = "source"
 
 HTTP_METHODS = ("get", "put", "post", "delete", "options", "head", "patch", "trace")
@@ -2069,7 +2074,7 @@ def main(argv: Sequence[str] | None = None) -> int:
     )
     parser.add_argument("command", choices=("check", "generate"))
     parser.add_argument("--root", type=Path, default=REPO, help="repository root")
-    parser.add_argument("--rule", choices=RULES, help="check one rule only (default: both)")
+    parser.add_argument("--rule", choices=RULES, help="check one rule only (default: all)")
     args = parser.parse_args(argv)
     if args.command == "generate":
         if args.rule is not None:
@@ -2097,7 +2102,12 @@ def main(argv: Sequence[str] | None = None) -> int:
             print(f"  rewrote {rel.as_posix()}")
         return 0
     findings: list[str] = []
-    for rule, run in ((RULE_SYNC, check_catalogue_sync), (RULE_TABLES, check_tables)):
+    checks = (
+        (RULE_SYNC, check_catalogue_sync),
+        (RULE_TABLES, check_tables),
+        (RULE_VIZ, viz_fixtures.check),
+    )
+    for rule, run in checks:
         if args.rule not in (None, rule):
             continue
         try:

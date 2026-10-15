@@ -26,6 +26,7 @@ workspace:
   - packages/sync_engine
   - packages/admin_ui
   - packages/bothy_viz
+  - packages/bothy_viz/harness
   - packages/bothy_noise
   - packages/terminal_ui
 

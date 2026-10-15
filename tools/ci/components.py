@@ -53,6 +53,14 @@ GATE_COMPONENT_INPUTS: dict[str, tuple[str, ...]] = {
     # the shared analysis rules (docs/DECISIONS.md D-M4-01-8).
     "apps": ("pubspec.yaml", "pubspec.lock", "analysis_options.yaml"),
 }
+# Directories outside a component whose files feed its generated code: the SLI bounds generator
+# and the Sloth files it reads write services/server/internal/stats/domain/slibounds.gen.go and
+# packages/bothy_viz/lib/src/slo/slo_catalog.g.dart (brief M6-11); their checks `sli-bounds`
+# and `sli-labels` run in `make ops-check`, the generated files in the Go and Dart gates.
+GATE_COMPONENT_INPUT_PREFIXES: dict[str, tuple[str, ...]] = {
+    "server": ("tools/observability/", "infra/observability/slo/"),
+    "apps": ("tools/observability/", "infra/observability/slo/"),
+}
 # Areas without component gates; their repository-wide gates always run.
 NO_COMPONENT_PREFIXES = ("docs/", "infra/")
 NO_COMPONENT_ROOT_FILES = re.compile(r"^[^/]+\.md$|^(?:LICENSE|NOTICE)$")
@@ -89,6 +97,9 @@ def changed(files: list[str]) -> list[str]:
     for path in files:
         owners = [c for c, prefixes in GATE_COMPONENTS.items() if path.startswith(prefixes)]
         owners += [c for c, inputs in GATE_COMPONENT_INPUTS.items() if path in inputs]
+        owners += [
+            c for c, prefixes in GATE_COMPONENT_INPUT_PREFIXES.items() if path.startswith(prefixes)
+        ]
         if owners:
             selected.update(owners)
         elif path.startswith(API_PREFIX):

@@ -1,0 +1,37 @@
+{
+  "items": [
+    {
+      "agent_id": "0192f4a0-7b1c-7000-8a00-000000000201",
+      "billing_mode": "personal",
+      "billing_modes_supported": [
+        "personal",
+        "organization"
+      ],
+      "switches": 1,
+      "invocations_denied": {
+        "i2_denied": 2,
+        "billing_mode_mismatch": 0
+      },
+      "rate_limit": {
+        "state": "near_limit",
+        "resets_at": "2026-10-15T10:20:00.000Z"
+      }
+    },
+    {
+      "agent_id": "0192f4a0-7b1c-7000-8a00-000000000202",
+      "billing_mode": "organization",
+      "reported_billing_mode": "personal",
+      "billing_modes_supported": [
+        "organization"
+      ],
+      "switches": 0,
+      "invocations_denied": {
+        "i2_denied": 0,
+        "billing_mode_mismatch": 3
+      },
+      "rate_limit": {
+        "state": "ok"
+      }
+    }
+  ]
+}

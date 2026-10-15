@@ -12,7 +12,7 @@ braucht nur Python und PyYAML und liest den Aktionskatalog über
 
 | Befehl | Wirkung |
 |---|---|
-| `make api-checks` | Gate: beide Regeln, Exit 1 mit einer Zeile je Befund (`api_checks.py check`; eine Regel allein mit `--rule api-catalogue-sync` oder `--rule api-tables`) |
+| `make api-checks` | Gate: all three rules, exit 1 with one line per finding (`api_checks.py check`; one rule alone with `--rule api-catalogue-sync`, `--rule api-tables` or `--rule viz-fixtures`) |
 | `make api-tables` | erzeugte Blöcke in 06 und `webhooks.md` neu schreiben (`api_checks.py generate`); schreibt nichts, solange eine Eingabe unlesbar oder falsch geformt ist, ein Wert keine Tabellenzelle werden kann, ein Marker kaputt, unbekannt oder fehlend ist oder sich eine der zu ändernden Dateien nicht schreiben lässt |
 | `uv run --project tools --locked pytest tools/api-checks/tests` | Tests: je Teilprüfung und je Block eine Mutation einer Kopie der echten Eingaben, die rot sein muss; das Repository selbst ist grün |
 
@@ -132,3 +132,17 @@ machte den Rest der Zeile sonst zu einer eigenen Zeile, im schlimmsten Fall zu e
 - Kein Server liest die Felder `x-problem-codes`, `x-status`, `x-idempotency-exempt` und
   `x-deprecated-at` vor M1-17 und M1-18; die Listen in `docs/api/redocly.yaml` hält
   `catalog-check` (M1-02).
+
+## Rule `viz-fixtures` (25 7.2, VZ-T11)
+
+`viz_fixtures.py` validates every fixture of
+[`packages/bothy_viz/fixtures/`](../../packages/bothy_viz/fixtures/README.md) against its schema in
+`openapi.yaml`: the file `<schema>.<state>.json` (or `<schema>.<query>.<state>.json`) names the
+schema before its first dot, and the schema is resolved with its references inside the whole
+document and checked with the JSON Schema 2020-12 validator `jsonschema` of the pinned tools
+environment (it comes with the pinned `check-jsonschema`). Sub-checks: `schema` (no such schema),
+`valid` (no JSON, or the first schema error with its JSON pointer), `readme` (a file missing from
+the table "Fixtures" of the fixtures README, or a row without a file) and `coverage` (a listed
+schema without a file). A schema change without adjusted fixtures therefore fails the gate; the
+tests in `tests/test_viz_fixtures.py` prove it on a copy of `openapi.yaml` with an added required
+member.

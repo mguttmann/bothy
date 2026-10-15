@@ -43,6 +43,14 @@ Planning stage (milestone M0). Nothing is installable yet.
   enrollment code, pairing, pending device, logout), the signed-out event for a revoked session,
   and Dio interceptors for the slot of `createApiClient`; no secret in any `toString`, error or
   log line (M4-09).
+- Visualization package (M6-11): `packages/bothy_viz` gets view models from the generated
+  statistics types, the ports `LiveFrameSource` (with the stale rule on an injected clock) and
+  `StatsQuerySource` with fixture implementations, the basic forms lane, run card, area, bar,
+  traffic light and metric tile as `CustomPainter`s with semantics and goldens, JSON fixtures per
+  schema and state with the check `viz-fixtures` of `make api-checks` (VZ-T11), and the harness
+  app `bothy_viz_harness`. `tools/observability/sli_bounds.py` generates the SLI bounds of server
+  and apps from the Sloth files, every SLO carries the label `bothy_sli_metric`, and the checks
+  `sli-bounds` and `sli-labels` of `make ops-check` hold them (VZ-T03).
 - Design tokens: `tools/design-tokens` writes `design/build/ts/tokens.gen.ts` for the Grafana
   panel plugin (colour roles of both themes including the chart and state roles, font families,
   font sizes and radii as typed constants) and copies the vendored Atkinson Hyperlegible fonts

@@ -56,6 +56,9 @@ SUBTREES = (
     "docs/observability",
     "docs/operations/configuration.md",
     "tools/bin/tools.lock.json",
+    "docs/spec/03-datenmodell.md",
+    "services/server/internal/stats/domain/slibounds.gen.go",
+    "packages/bothy_viz/lib/src/slo/slo_catalog.g.dart",
 )
 ALL_CHECKS = [
     "tool-versions",
@@ -69,6 +72,8 @@ ALL_CHECKS = [
     "tempo",
     "sloth",
     "slo-docs",
+    "sli-bounds",
+    "sli-labels",
     "alert-thresholds",
     "tofu",
 ]
@@ -1876,3 +1881,52 @@ def test_sloth_compares_byte_for_byte(tree: Path, old: str, new: str) -> None:
 def test_markdown_table_returns_the_first_table_after_the_heading() -> None:
     text = "## T\n\n| a |\n|---|\n| first |\n\nText.\n\n| b |\n|---|\n| second |\n\n## U\n"
     assert opscheck.markdown_table(text, "T") == [{"a": "first"}]
+
+
+# ---- sli-bounds and sli-labels (VZ-T03) ---------------------------------------------------
+
+GO_BOUNDS = Path("services/server/internal/stats/domain/slibounds.gen.go")
+DART_CATALOG = Path("packages/bothy_viz/lib/src/slo/slo_catalog.g.dart")
+
+
+def test_sli_bounds_reports_a_hand_edited_output(tree: Path) -> None:
+    edit(tree / GO_BOUNDS, "Objective: 95,", "Objective: 96,")
+    [finding] = findings(tree, "sli-bounds")
+    assert finding.startswith(f"{GO_BOUNDS}: differs from a fresh run")
+
+
+def test_sli_bounds_follows_a_changed_threshold(tree: Path) -> None:
+    edit(tree / SLO / "sync.yaml", 'le="0.5"', 'le="1"')
+    [finding] = findings(tree, "sli-bounds")
+    assert finding.startswith(f"{GO_BOUNDS}: differs from a fresh run")
+    assert "+\t\tThreshold: 1000 * time.Millisecond," in finding
+
+
+def test_sli_bounds_reports_a_missing_catalog(tree: Path) -> None:
+    (tree / DART_CATALOG).unlink()
+    assert findings(tree, "sli-bounds") == (f"{DART_CATALOG}: missing; run sli_bounds.py --write",)
+
+
+def test_sli_labels_reports_a_missing_label(tree: Path) -> None:
+    edit(tree / SLO / "push.yaml", "      bothy_sli_metric: sli.push_acceptance\n", "")
+    assert findings(tree, "sli-labels") == (
+        "infra/observability/slo/push.yaml: bothy-push/provider-acceptance: no label"
+        " bothy_sli_metric",
+        "sli.push_acceptance: no SLO carries it",
+        "bothy-push/provider-acceptance: Metrik der eigenen Messung is `sli.push_acceptance`,"
+        " the Sloth file says no label",
+    )
+
+
+def test_sli_labels_reports_a_table_that_differs_from_the_label(tree: Path) -> None:
+    edit(tree / SLOS_MD, "| `sli.reconnect` |", "| `sli.run_start` |")
+    assert findings(tree, "sli-labels") == (
+        "bothy-sync/reconnect: Metrik der eigenen Messung is `sli.run_start`, the Sloth file"
+        " says `sli.reconnect`",
+    )
+
+
+def test_sli_labels_needs_the_metric_column(tree: Path) -> None:
+    edit(tree / SLOS_MD, "| Metrik der eigenen Messung |", "| Metrik |")
+    [finding] = findings(tree, "sli-labels")
+    assert "has no column" in finding

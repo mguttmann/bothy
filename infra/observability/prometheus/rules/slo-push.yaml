@@ -12,6 +12,7 @@ groups:
       /
       (sum(rate(bothy_push_sent_total{job="bothy/bothy-server",bothy_outcome!="rejected_token"}[5m])))
     labels:
+      bothy_sli_metric: sli.push_acceptance
       component: push
       sloth_id: bothy-push-provider-acceptance
       sloth_service: bothy-push
@@ -23,6 +24,7 @@ groups:
       /
       (sum(rate(bothy_push_sent_total{job="bothy/bothy-server",bothy_outcome!="rejected_token"}[30m])))
     labels:
+      bothy_sli_metric: sli.push_acceptance
       component: push
       sloth_id: bothy-push-provider-acceptance
       sloth_service: bothy-push
@@ -34,6 +36,7 @@ groups:
       /
       (sum(rate(bothy_push_sent_total{job="bothy/bothy-server",bothy_outcome!="rejected_token"}[1h])))
     labels:
+      bothy_sli_metric: sli.push_acceptance
       component: push
       sloth_id: bothy-push-provider-acceptance
       sloth_service: bothy-push
@@ -45,6 +48,7 @@ groups:
       /
       (sum(rate(bothy_push_sent_total{job="bothy/bothy-server",bothy_outcome!="rejected_token"}[2h])))
     labels:
+      bothy_sli_metric: sli.push_acceptance
       component: push
       sloth_id: bothy-push-provider-acceptance
       sloth_service: bothy-push
@@ -56,6 +60,7 @@ groups:
       /
       (sum(rate(bothy_push_sent_total{job="bothy/bothy-server",bothy_outcome!="rejected_token"}[6h])))
     labels:
+      bothy_sli_metric: sli.push_acceptance
       component: push
       sloth_id: bothy-push-provider-acceptance
       sloth_service: bothy-push
@@ -67,6 +72,7 @@ groups:
       /
       (sum(rate(bothy_push_sent_total{job="bothy/bothy-server",bothy_outcome!="rejected_token"}[1d])))
     labels:
+      bothy_sli_metric: sli.push_acceptance
       component: push
       sloth_id: bothy-push-provider-acceptance
       sloth_service: bothy-push
@@ -78,6 +84,7 @@ groups:
       /
       (sum(rate(bothy_push_sent_total{job="bothy/bothy-server",bothy_outcome!="rejected_token"}[3d])))
     labels:
+      bothy_sli_metric: sli.push_acceptance
       component: push
       sloth_id: bothy-push-provider-acceptance
       sloth_service: bothy-push
@@ -89,6 +96,7 @@ groups:
       / ignoring (sloth_window)
       count_over_time(slo:sli_error:ratio_rate5m{sloth_id="bothy-push-provider-acceptance", sloth_service="bothy-push", sloth_slo="provider-acceptance"}[30d])
     labels:
+      bothy_sli_metric: sli.push_acceptance
       component: push
       sloth_id: bothy-push-provider-acceptance
       sloth_service: bothy-push
@@ -99,6 +107,7 @@ groups:
   - record: slo:objective:ratio
     expr: vector(0.995)
     labels:
+      bothy_sli_metric: sli.push_acceptance
       component: push
       sloth_id: bothy-push-provider-acceptance
       sloth_service: bothy-push
@@ -106,6 +115,7 @@ groups:
   - record: slo:error_budget:ratio
     expr: vector(1-0.995)
     labels:
+      bothy_sli_metric: sli.push_acceptance
       component: push
       sloth_id: bothy-push-provider-acceptance
       sloth_service: bothy-push
@@ -113,6 +123,7 @@ groups:
   - record: slo:time_period:days
     expr: vector(30)
     labels:
+      bothy_sli_metric: sli.push_acceptance
       component: push
       sloth_id: bothy-push-provider-acceptance
       sloth_service: bothy-push
@@ -123,6 +134,7 @@ groups:
       / on(sloth_id, sloth_slo, sloth_service) group_left
       slo:error_budget:ratio{sloth_id="bothy-push-provider-acceptance", sloth_service="bothy-push", sloth_slo="provider-acceptance"}
     labels:
+      bothy_sli_metric: sli.push_acceptance
       component: push
       sloth_id: bothy-push-provider-acceptance
       sloth_service: bothy-push
@@ -133,6 +145,7 @@ groups:
       / on(sloth_id, sloth_slo, sloth_service) group_left
       slo:error_budget:ratio{sloth_id="bothy-push-provider-acceptance", sloth_service="bothy-push", sloth_slo="provider-acceptance"}
     labels:
+      bothy_sli_metric: sli.push_acceptance
       component: push
       sloth_id: bothy-push-provider-acceptance
       sloth_service: bothy-push
@@ -141,6 +154,7 @@ groups:
     expr: 1 - slo:period_burn_rate:ratio{sloth_id="bothy-push-provider-acceptance",
       sloth_service="bothy-push", sloth_slo="provider-acceptance"}
     labels:
+      bothy_sli_metric: sli.push_acceptance
       component: push
       sloth_id: bothy-push-provider-acceptance
       sloth_service: bothy-push
@@ -148,6 +162,7 @@ groups:
   - record: sloth_slo_info
     expr: vector(1)
     labels:
+      bothy_sli_metric: sli.push_acceptance
       component: push
       sloth_id: bothy-push-provider-acceptance
       sloth_mode: cli-gen-prom

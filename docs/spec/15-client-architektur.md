@@ -123,6 +123,11 @@ flowchart TB
   viz --> ds
   viz --> api
   viz --> domain
+  harness["bothy_viz_harness"]
+  harness --> viz
+  harness --> ds
+  harness --> api
+  harness --> domain
   ds --> l10n
   ds --> domain
   sync --> store

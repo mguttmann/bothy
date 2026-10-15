@@ -11,6 +11,8 @@ slos:
   - name: "provider-acceptance"
     objective: 99.5
     description: "Share of push sends accepted by the provider, excluding invalid device tokens."
+    labels:
+      bothy_sli_metric: sli.push_acceptance
     sli:
       events:
         error_query: sum(rate(bothy_push_sent_total{job="bothy/bothy-server",bothy_outcome=~"provider_error|throttled|rejected_other"}[{{.window}}]))
