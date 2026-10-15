@@ -3,7 +3,6 @@
 // Offline search (14 6, Design note 5): FTS5 with `unicode61 remove_diacritics 2`, `bm25`
 // ordering, `snippet` marks, and no hits after the removal of a target.
 
-import 'package:domain/domain.dart';
 import 'package:local_store/local_store.dart';
 import 'package:test/test.dart';
 
