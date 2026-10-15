@@ -76,7 +76,7 @@ func (h *Keys) RotateSigningKey(ctx context.Context, req rest.RotateSigningKeyRe
 	var cmd instance.RotateCommand
 	if req.Body != nil {
 		cmd = instance.RotateCommand{
-			Purpose: instance.Purpose(req.Body.Purpose), Mode: instance.RotateMode(req.Body.Mode), Reason: req.Body.Reason,
+			Purpose: managedPurpose(string(req.Body.Purpose)), Mode: instance.RotateMode(req.Body.Mode), Reason: req.Body.Reason,
 		}
 	}
 	r, err := h.keys.Rotate(ctx, principal(ctx), cmd)
@@ -96,4 +96,16 @@ func principal(ctx context.Context) actor.Actor {
 		return a
 	}
 	return actor.Anonymous()
+}
+
+// managedPurpose returns the managed purpose constant equal to s, or the empty purpose, which
+// checkRotate refuses as not_supported. The request value itself never reaches the key store paths
+// or the log lines of the use case, only a constant of instance.Purposes.
+func managedPurpose(s string) instance.Purpose {
+	for _, p := range instance.Purposes() {
+		if string(p) == s {
+			return p
+		}
+	}
+	return ""
 }
