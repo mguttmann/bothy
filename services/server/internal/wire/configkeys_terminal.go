@@ -2,13 +2,19 @@
 
 package wire
 
-import "github.com/OWNER/bothy/services/server/internal/platform/config"
+import (
+	"errors"
+
+	"github.com/OWNER/bothy/services/server/internal/platform/config"
+	terminaldomain "github.com/OWNER/bothy/services/server/internal/terminal/domain"
+)
 
 // terminalConfigKeys returns the keys of the terminal module whose first consumer is M2-39: the
 // text limits of hosts and session users (docs/spec/03-data-model.md section 9), the validity
 // of a pairing code (24 section 17), and the validity of a session token, which sets the window
 // a retiring signing key of the purpose terminal stays usable (19 section 10); and since M2-40 the
-// windows of the fresh step-up and of the quick reattach (24 section 17), read by authz.
+// windows of the fresh step-up and of the quick reattach (24 section 17), read by authz; and since
+// M2-41 the confirmation of the fingerprint and the bounds of a report of a host.
 func terminalConfigKeys() []config.Key {
 	return []config.Key{
 		{
@@ -27,6 +33,26 @@ func terminalConfigKeys() []config.Key {
 			Chapter: chapter24,
 		},
 		{
+			Name: keyFingerprintConfirmChars, Kind: config.KindInt, Default: "8", Min: "1",
+			Doc:     "Characters of the fingerprint the owner types at the confirmation of a host.",
+			Chapter: chapter24,
+		},
+		{
+			Name: keyFingerprintMaxAttempts, Kind: config.KindInt, Default: "3", Min: "1",
+			Doc:     "Failed confirmations of a host before it falls back to pairing.",
+			Chapter: chapter24,
+		},
+		{
+			Name: "terminal.report_label_max_chars", Kind: config.KindInt, Default: "100", Min: "1",
+			Doc:     "Longest profile name, display name, working directory label and OS version a host reports, in characters.",
+			Chapter: chapter24,
+		},
+		{
+			Name: "terminal.report_max_entries", Kind: config.KindInt, Default: "64", Min: "1",
+			Doc:     "Most entries of each list a host reports: profiles, session users, working directories of one session user.",
+			Chapter: chapter24,
+		},
+		{
 			Name: "terminal.session_token_ttl", Kind: config.KindDuration, Default: thirtySeconds, Min: "1s",
 			Doc:     "Validity of a session token of the terminal.",
 			Chapter: chapter24,
@@ -42,6 +68,26 @@ func terminalConfigKeys() []config.Key {
 			Chapter: chapter24,
 		},
 	}
+}
+
+// The keys of the start check fingerprint_keys (M2-41).
+const (
+	keyFingerprintConfirmChars = "terminal.fingerprint_confirm_chars"
+	keyFingerprintMaxAttempts  = "terminal.fingerprint_max_attempts"
+)
+
+// fingerprintKeys requires terminal.fingerprint_confirm_chars between 1 and the length of the
+// compact fingerprint and terminal.fingerprint_max_attempts of at least 1 (M2-41, Design note 12);
+// the error names the key, never the value.
+func fingerprintKeys(v *config.Values) error {
+	var problems []error
+	if n := v.Int(keyFingerprintConfirmChars); n < 1 || n > terminaldomain.FingerprintChars {
+		problems = append(problems, errors.New(keyFingerprintConfirmChars+" must be between 1 and the length of the fingerprint"))
+	}
+	if v.Int(keyFingerprintMaxAttempts) < 1 {
+		problems = append(problems, errors.New(keyFingerprintMaxAttempts+" must be at least 1"))
+	}
+	return errors.Join(problems...)
 }
 
 // sixtySeconds is the default of the step-up windows of the terminal (24 section 17).

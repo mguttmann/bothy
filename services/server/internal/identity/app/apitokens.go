@@ -154,6 +154,17 @@ func (s *Tokens) NewHostPairingCode(context.Context) (identity.PairingCode, erro
 	return identity.PairingCode{Secret: identity.NewToken(secret), Hash: apitoken.Hash(s.pepper, secret)}, nil
 }
 
+// HashHostPairingCode implements identity.Tokens: apitoken.Parse checks form, checksum and range,
+// then the kind must be hpc; only then is the HMAC computed (M2-41, Design note 1). Every other
+// value is identity.ErrTokenMalformed.
+func (s *Tokens) HashHostPairingCode(_ context.Context, raw string) ([]byte, error) {
+	p, err := apitoken.Parse(raw)
+	if err != nil || p.Kind != apitoken.KindHostPairingCode {
+		return nil, identity.ErrTokenMalformed
+	}
+	return apitoken.Hash(s.pepper, raw), nil
+}
+
 // now is the time of the clock at the precision of PostgreSQL, so answers equal stored values.
 func (s *Tokens) now() time.Time { return s.d.Clock.Now().Truncate(time.Microsecond) }
 

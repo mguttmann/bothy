@@ -42,6 +42,8 @@ class Problem:
                 first.
             errors (list[FieldError] | Unset): Field errors for `validation_failed`.
             current (JsonObject | Unset): Free-form JSON object whose schema is named in the field description.
+            attempts_remaining (int | Unset): Present with `fingerprint_mismatch`; `0` means the host fell back to `pairing`
+                and needs a new pairing code (24, 3.2).
             conflicts (list[InvariantViolation] | Unset): Present with `i1_violation` (one entry per agent, 10-backend-
                 policy, 5.4) and `i6_violation` (one entry per host, 24, 7.3).
     """
@@ -57,6 +59,7 @@ class Problem:
     hint: str | Unset = UNSET
     errors: list[FieldError] | Unset = UNSET
     current: JsonObject | Unset = UNSET
+    attempts_remaining: int | Unset = UNSET
     conflicts: list[InvariantViolation] | Unset = UNSET
     additional_properties: dict[str, Any] = _attrs_field(init=False, factory=dict)
 
@@ -90,6 +93,8 @@ class Problem:
         if not isinstance(self.current, Unset):
             current = self.current.to_dict()
 
+        attempts_remaining = self.attempts_remaining
+
         conflicts: list[dict[str, Any]] | Unset = UNSET
         if not isinstance(self.conflicts, Unset):
             conflicts = []
@@ -120,6 +125,8 @@ class Problem:
             field_dict["errors"] = errors
         if current is not UNSET:
             field_dict["current"] = current
+        if attempts_remaining is not UNSET:
+            field_dict["attempts_remaining"] = attempts_remaining
         if conflicts is not UNSET:
             field_dict["conflicts"] = conflicts
 
@@ -166,6 +173,8 @@ class Problem:
         else:
             current = JsonObject.from_dict(_current)
 
+        attempts_remaining = d.pop("attempts_remaining", UNSET)
+
         _conflicts = d.pop("conflicts", UNSET)
         conflicts: list[InvariantViolation] | Unset = UNSET
         if _conflicts is not UNSET:
@@ -187,6 +196,7 @@ class Problem:
             hint=hint,
             errors=errors,
             current=current,
+            attempts_remaining=attempts_remaining,
             conflicts=conflicts,
         )
 

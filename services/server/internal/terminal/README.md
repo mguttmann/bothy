@@ -1,6 +1,6 @@
 # Module `terminal`
 
-Status: host records (M2-39), terminal rights (M2-40). The normative source is [docs/spec/24-terminal.md](../../../../docs/spec/24-terminal.md); where they differ, the chapter applies.
+Status: host records (M2-39), terminal rights (M2-40), pairing (M2-41). The normative source is [docs/spec/24-terminal.md](../../../../docs/spec/24-terminal.md); where they differ, the chapter applies.
 
 ## Purpose
 
@@ -12,7 +12,7 @@ Hosts and pairing, declaration of the LLM login (I6), session users per person (
 - `domain/`: `Transition` is the one place that knows the life cycle of 24, section 3.1 (M2-41 and M2-43 call it for their transitions); `CloseReasons` and `CloseDetails` are the closed lists of 24, section 10.3; `NewHostName`, `NewOSUser` and `CheckReason` check the texts (SEC-IN-4); `PlanAssignments` plans assignment and end of session users after T12 (exactly a reported name, uniqueness per host without case over all rows, at most one valid assignment per person, every `400` before any `409`); `reported.go` reads the reported columns.
 - `app/`: the five use cases (`Service`), `EndSessions` (the one way of every end by the server), `HostSource` (implementation of `authz.HostSource`), the view `view.go`, the outgoing ports `Store`, `PairingCodes`, `People`, `Presence` and `Cursors`; `NoConnections` is the presence without control connections.
 - `adapters/postgres/`: the sqlc queries in `queries/`, the generated code in `sqlcgen/` and `Repository`.
-- `adapters/httpapi/`: the handlers of `listHosts`, `createHost`, `getHost`, `updateHost`, `setHostState` and `setHostLlmCredentials` (M2-40).
+- `adapters/httpapi/`: the handlers of `listHosts`, `createHost`, `getHost`, `updateHost`, `setHostState`, `setHostLlmCredentials` (M2-40), `issueHostPairingCode`, `pairHost` and `confirmHost` (M2-41).
 - Test code under `services/server/test/`: `terminaltest` creates hosts in every state with reported profiles, session users and check results as well as assignments and sessions directly in SQL (in production M2-41, M2-43 and M2-44 write these); `terminalworld` is the HTTP test world of M2-39.
 
 ## Port (root package `internal/terminal`)
@@ -90,9 +90,32 @@ Only this module writes and reads these tables via SQL (03-data-model.md, princi
   `TestSetHostLlmCredentials_HTTP`, `TestSR12_ReportDropsName`, `TestPreviewHostGrant`,
   `TestTerminalAuthzAudit_NoContent`, `TestAZP1_TerminalAuthzRoutes`.
 
+## Built in M2-41
+
+- Pairing: `IssuePairingCode` (`issueHostPairingCode`, re-pairing), `Pair` (`pairHost`, public,
+  the code is the proof) and `Confirm` (`confirmHost`) in `app/pairing.go`. One shared issuer
+  (`issueCode` through `PairingCodes.Issue`) serves `createHost`, `issueHostPairingCode` and the
+  fallback; `PairingCodes.Hash` (bound to `identity.Tokens.HashHostPairingCode`) checks form, kind
+  and checksum without database access.
+- `domain/fingerprint.go` (`ComputeFingerprint`, `CompactFingerprint`, Crockford base32, vectors
+  in `domain/testdata` and `services/host/testdata/noise/fingerprint.json`) and
+  `domain/pairing.go` (`ParseHostKeys`, `ValidatePairReport`, `NormalizeFingerprintPrefix`,
+  `PrefixMatches`, `NextAttempt`, `RepairEffects`) with the fuzz targets `FuzzParseHostKeys` and
+  `FuzzNormalizeFingerprintPrefix`.
+- Confirmation: the prefix first; a failed attempt counts without a new version and stays also
+  under an `Idempotency-Key` (`idempotency.KeepEffectOnFinal`); after
+  `terminal.fingerprint_max_attempts` the host falls back to `pairing` without keys. Then
+  assignments (`PlanAssignmentsAt`), declaration (`ApplyLlmDeclaration`, I6) and
+  `declared_server_host` in one transaction.
+- Re-pairing: `RepairEffects` per state, end of the sessions with `host_rekeyed`, `key_changed`
+  exactly when stored keys are discarded; the fingerprint of discarded keys stays stored and
+  refuses the same keys with `host_key_reused`.
+- Tests: `domain` (fingerprint, rules), `app` (`TestTMT20_WrongChecksumNoDatabase`) and
+  `adapters/httpapi/pairing_test.go` (TM-T19, TM-T20, TM-T28 (b) and (e), re-pairing,
+  concurrency, no secrets).
+
 ## Extension points
 
-- M2-41: pairing (`issueHostPairingCode`, `pairHost`, `confirmHost`) through `domain.Transition` and `app.PairingCodes`.
 - M2-43: control connection; replaces the binding `NoConnections` of `app.Presence` with its register and writes the columns `reported_*` and `last_seen_at`.
 - M2-44: calls `identity.StepUp.ConsumeFresh` in the transactions of `openTerminalSession` and `attachTerminalSession`, sets `Resource.HostID` and `Resource.Terminal` and adds `host_not_active` and `terminal_profile_unknown` after SR12.
 - M2-44: sessions and relay; adds `terminal_session.changed`, the close code `4100` and `session.close` to the host service to `EndSessions`.

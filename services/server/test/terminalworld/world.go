@@ -77,7 +77,7 @@ var IDConfig = identityapp.Config{
 
 // HostConfig is the configuration of the host use cases: small limits so the edges are cheap to test.
 var HostConfig = terminalapp.Config{NameMaxChars: 40, OSUserMaxChars: 32, ReasonMaxChars: 60, PairingCodeTTL: 15 * time.Minute,
-	PageSizeDefault: 2, PageSizeMax: 3}
+	PageSizeDefault: 2, PageSizeMax: 3, FingerprintConfirmChars: 8, FingerprintMaxAttempts: 3, ReportLabelMaxChars: 40, ReportMaxEntries: 4}
 
 // Pepper is the token pepper of the world (a fixed test value, never a secret).
 var Pepper = []byte("0123456789abcdef0123456789abcdef")

@@ -245,6 +245,15 @@ def test_bothy_token_with_valid_checksum_is_detected(tmp_path: Path) -> None:
     assert "bothy-api-token" not in _findings(tmp_path, "BOTHY_TOKEN=" + token[:-1])
 
 
+def test_pairing_code_with_valid_checksum_is_detected(tmp_path: Path) -> None:
+    """A pairing code of a host (kind hpc, 24 section 3.2) built like the server builds it is a
+    finding of the rule bothy-api-token (T-TM-06, SEC-SEC-4)."""
+    random_part = _base62(int.from_bytes(secrets.token_bytes(32), "big"), 43)
+    code = "bothy" + "_hpc_" + random_part + "_" + _checksum(random_part)
+    assert len(code) == 60
+    assert "bothy-api-token" in _findings(tmp_path, "BOTHY_PAIRING_CODE=" + code)
+
+
 def test_checksum_vectors_match_go() -> None:
     """Python and Go agree on every checksum vector of the Go testdata file."""
     vectors = json.loads(VECTORS.read_text())["vectors"]
