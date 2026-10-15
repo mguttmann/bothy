@@ -118,15 +118,18 @@ type Identity struct {
 	// EnrollmentHandlers are the REST handlers of redeemEnrollmentCode and createEnrollmentCode;
 	// nil until BindSessions.
 	EnrollmentHandlers *identityhttp.Enrollment
-	cfg                app.Config
-	state              instance.State
-	repo               *identitypg.Repository
-	uow                txn.UnitOfWork
-	az                 authorize.Authorizer
-	writes             IdentityWrites
-	pepper             []byte
-	clk                clock.Clock
-	log                *slog.Logger
+	// ApprovalHandlers are the REST handlers of approveDevice, beginPairing, approvePairing and
+	// completePairing (M1-38); nil until BindSessions.
+	ApprovalHandlers *identityhttp.Approval
+	cfg              app.Config
+	state            instance.State
+	repo             *identitypg.Repository
+	uow              txn.UnitOfWork
+	az               authorize.Authorizer
+	writes           IdentityWrites
+	pepper           []byte
+	clk              clock.Clock
+	log              *slog.Logger
 }
 
 // IdentityWrites are the collaborators of the writing use cases of identity (M1-31): the
@@ -160,7 +163,7 @@ func NewIdentity(cfg app.Config, pool *pg.Pool, uow txn.UnitOfWork, az authorize
 		return nil, err
 	}
 	devices, err := app.NewDevices(cfg, app.DevicesDeps{
-		Store: repo, People: repo, UoW: uow, Authorizer: az, Cursors: identityhttp.Cursors{},
+		Store: repo, People: repo, UoW: uow, Authorizer: az, Cursors: identityhttp.Cursors{}, Pepper: pepper,
 	})
 	if err != nil {
 		return nil, err
@@ -199,8 +202,9 @@ func NewIdentity(cfg app.Config, pool *pg.Pool, uow txn.UnitOfWork, az authorize
 // BindSessions builds the session part of identity (M1-34) over the signing keys of instance and
 // the instance id (the issuer of access tokens): the use cases of identity.Auth, the Authenticator
 // of the HTTP chain and the session handlers, the step-up use cases with their handlers and
-// the use case of identity.auth_cleanup (M1-35), the providers and identities (M1-36), and the
-// login service with the enrollment code handlers and the use cases of bothy setup (M1-37). The start calls it after the signing keys exist.
+// the use case of identity.auth_cleanup (M1-35), the providers and identities (M1-36), the
+// login service with the enrollment code handlers and the use cases of bothy setup (M1-37), and
+// the approval and pairing handlers (M1-38). The start calls it after the signing keys exist.
 // Errors: a duration, URL or collaborator the use cases refuse.
 func (i *Identity) BindSessions(keys instance.Keys, instanceID ids.ID) error {
 	tokens, err := app.NewAccessTokens(app.AccessTokenConfig{
@@ -229,10 +233,6 @@ func (i *Identity) BindSessions(keys instance.Keys, instanceID ids.ID) error {
 	if err != nil {
 		return err
 	}
-	cleanup, err := app.NewAuthCleanup(i.cfg, i.uow, i.repo, i.clk)
-	if err != nil {
-		return err
-	}
 	providers, err := app.NewProviders(i.cfg, app.ProvidersDeps{
 		Store: i.repo, Rules: app.DefaultProviderRules(SecretRefSyntax{}), UoW: i.uow, Authorizer: i.az, Audit: i.writes.Audit,
 		Auth: sessions, Clock: i.clk,
@@ -248,18 +248,25 @@ func (i *Identity) BindSessions(keys instance.Keys, instanceID ids.ID) error {
 		return err
 	}
 	i.Sessions, i.Authenticator, i.SessionHandlers = sessions, auth, identityhttp.NewSessions(sessions, i.DPoP)
-	i.StepUps, i.StepUpHandlers, i.AuthCleanup = stepUps, identityhttp.NewStepUps(stepUps), cleanup
+	i.StepUps, i.StepUpHandlers = stepUps, identityhttp.NewStepUps(stepUps)
 	i.Providers, i.ProviderHandlers = providers, identityhttp.NewProviders(providers)
 	i.Identities, i.CredentialHandlers = identities, identityhttp.NewCredentials(identities)
 	logins, err := app.NewService(i.cfg, app.ServiceDeps{
 		People: i.repo, Devices: i.repo, Providers: i.repo, Identities: i.repo, Enrollment: i.Enrollment, Auth: sessions,
 		DPoP: i.DPoP, Instance: i.state, Keys: keys, Locales: locale.Parser{}, UoW: i.uow, Authorizer: i.az, Audit: i.writes.Audit,
-		Clock: i.clk,
+		Clock: i.clk, Sessions: i.repo, Pairings: i.repo, Pepper: i.pepper,
 	})
 	if err != nil {
 		return err
 	}
-	i.Logins, i.EnrollmentHandlers = logins, identityhttp.NewEnrollment(logins)
+	// The cleanup job revokes expired pending devices and expires pairings through the login
+	// service (M1-38).
+	cleanup, err := app.NewAuthCleanup(i.cfg, i.uow, i.repo, logins, i.clk)
+	if err != nil {
+		return err
+	}
+	i.Logins, i.EnrollmentHandlers, i.AuthCleanup = logins, identityhttp.NewEnrollment(logins), cleanup
+	i.ApprovalHandlers = identityhttp.NewApproval(logins, i.DPoP)
 	return nil
 }
 

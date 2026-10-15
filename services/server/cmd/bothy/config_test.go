@@ -170,6 +170,8 @@ func TestConfigPrintShowsSourcePerKey(t *testing.T) {
 		"auth.api_token_max_ttl = 365d  # default\n" +
 		"auth.cleanup_interval = 1h  # default\n" +
 		"auth.clock_leeway = 30s  # default\n" +
+		"auth.device_pending_ttl = 1d  # default\n" +
+		"auth.device_verification_code_digits = 6  # default\n" +
 		"auth.dpop_nonce_ttl = 5m  # default\n" +
 		"auth.dpop_proof_max_age = 1m  # default\n" +
 		"auth.dpop_required_for = agent  # default\n" +
@@ -177,6 +179,8 @@ func TestConfigPrintShowsSourcePerKey(t *testing.T) {
 		"auth.enrollment_code_ttl = 3d  # default\n" +
 		"auth.local_password_enabled = true  # default\n" +
 		"auth.login_fail_window = 15m  # default\n" +
+		"auth.pairing_code_chars = 8  # default\n" +
+		"auth.pairing_code_ttl = 5m  # default\n" +
 		"auth.personal_token_max_ttl = 90d  # default\n" +
 		"auth.refresh_reuse_grace = 30s  # default\n" +
 		"auth.refresh_token_ttl = 14d  # default\n" +

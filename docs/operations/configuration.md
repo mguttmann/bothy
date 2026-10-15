@@ -381,10 +381,10 @@ Source: [08-identity.md](../spec/08-identity.md), section 18.
 | `auth.trusted_header_bind_requests` | `BOTHY_AUTH__TRUSTED_HEADER_BIND_REQUESTS` | Server |  | `true` | every request must carry the same header login | planned (M1) |
 | `auth.enrollment_code_ttl` | `BOTHY_AUTH__ENROLLMENT_CODE_TTL` | Server | duration | `72h` | Validity of an enrollment code | active |
 | `auth.enrollment_code_max_attempts` | `BOTHY_AUTH__ENROLLMENT_CODE_MAX_ATTEMPTS` | Server | int | `5` | Failed attempts per enrollment code | active |
-| `auth.device_pending_ttl` | `BOTHY_AUTH__DEVICE_PENDING_TTL` | Server |  | `24h` | after this, a pending device is revoked | planned (M1) |
-| `auth.device_verification_code_digits` | `BOTHY_AUTH__DEVICE_VERIFICATION_CODE_DIGITS` | Server |  | `6` | Length of the verification code | planned (M1) |
-| `auth.pairing_code_ttl` | `BOTHY_AUTH__PAIRING_CODE_TTL` | Server |  | `5m` | Validity of a pairing code | planned (M1) |
-| `auth.pairing_code_chars` | `BOTHY_AUTH__PAIRING_CODE_CHARS` | Server |  | `8` | Length of the pairing code (Crockford Base32, 40 bits) | planned (M1) |
+| `auth.device_pending_ttl` | `BOTHY_AUTH__DEVICE_PENDING_TTL` | Server | duration | `24h` | after this, a pending device is revoked | active |
+| `auth.device_verification_code_digits` | `BOTHY_AUTH__DEVICE_VERIFICATION_CODE_DIGITS` | Server | int | `6` | Length of the verification code | active |
+| `auth.pairing_code_ttl` | `BOTHY_AUTH__PAIRING_CODE_TTL` | Server | duration | `5m` | Validity of a pairing code | active |
+| `auth.pairing_code_chars` | `BOTHY_AUTH__PAIRING_CODE_CHARS` | Server | int | `8` | Length of the pairing code (Crockford Base32, 40 bits) | active |
 | `auth.device_inactive_revoke_after` | `BOTHY_AUTH__DEVICE_INACTIVE_REVOKE_AFTER` | Server |  | `180d` | a device without contact is revoked | planned (M1) |
 | `auth.cleanup_interval` | `BOTHY_AUTH__CLEANUP_INTERVAL` | Server | duration | `1h` | Interval of the job `identity.auth_cleanup` (delete expired challenges, login flows and pairings, revoke pending and unused devices) | active |
 | `auth.step_up_challenge_ttl` | `BOTHY_AUTH__STEP_UP_CHALLENGE_TTL` | Server | duration | `2m` | Validity of a step-up challenge | active |

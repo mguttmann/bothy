@@ -147,8 +147,30 @@ func (r *Repository) AuthState(ctx context.Context, id ids.ID) (app.AuthState, b
 	}
 	return app.AuthState{
 		Session: toSession(row.AuthSession), DeviceState: identity.DeviceState(row.DeviceState),
-		DeviceLastSeenAt: timeOf(row.DeviceLastSeenAt), DeviceKeyJKT: row.DpopJkt.String,
+		DeviceLastSeenAt: timeOf(row.DeviceLastSeenAt), DeviceKeyJKT: row.DpopJkt.String, DeviceCreatedAt: timeOf(row.DeviceCreatedAt),
 	}, true, nil
+}
+
+// OpenSessionsOfDevice implements app.SessionStore.
+func (r *Repository) OpenSessionsOfDevice(ctx context.Context, deviceID ids.ID) ([]ids.ID, error) {
+	rows, err := r.read(ctx).ListOpenSessionsOfDevice(ctx, uuid(deviceID))
+	if err != nil {
+		return nil, mapError(err, "listing the sessions of a device")
+	}
+	out := make([]ids.ID, 0, len(rows))
+	for _, id := range rows {
+		out = append(out, idOf(id))
+	}
+	return out, nil
+}
+
+// ClearSessionStepUp implements app.SessionStore.
+func (r *Repository) ClearSessionStepUp(ctx context.Context, id ids.ID) error {
+	q, err := r.write(ctx)
+	if err != nil {
+		return err
+	}
+	return mapError(q.ClearSessionStepUp(ctx, uuid(id)), "ending the step-up of a session")
 }
 
 // Touch implements app.SessionStore. It runs on the pool, never in the request's unit of work.
