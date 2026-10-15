@@ -34,18 +34,21 @@ AsyncAPI 3.1.0 exists. Without `--config`, Redocly uses only its default rules; 
 The versions are pinned; Renovate raises them (ADR 0041). Whoever changes a rule in redocly.yaml
 checks with a deliberately wrong copy of the spec whether the rule fires.
 
-## Render
+## Reference in the docs site
 
-```sh
-# REST reference as one HTML file
-npx -y @redocly/cli@2.62.1 build-docs docs/api/openapi.yaml -o build/api/rest.html
+`make docs` renders three reference pages from these documents in every build: the REST
+reference (every operation by tag, the webhook events, security schemes, shared responses and
+headers), the schemas of `openapi.yaml` and the gateway reference (servers, channels with close
+codes, operations and messages of `asyncapi.yaml`). In the site they are under API as
+"REST reference", "Schemas" and "Gateway reference" (`api/reference/rest/`,
+`api/reference/schemas/`, `api/reference/gateway/`); webhook delivery stays in
+[webhooks.md](webhooks.md), to which the REST reference links.
 
-# gateway reference as HTML
-CI=true npx -y @asyncapi/cli@6.2.0 generate fromTemplate docs/api/asyncapi.yaml \
-  @asyncapi/html-template@3 -o build/api/gateway --force-write --no-interactive
-```
-
-`build/` is not checked in. The docs site (ADR 0045) includes both outputs.
+The pages exist only in the build: the MkDocs hook
+[tools/docs/mkdocs_api_reference.py](../../tools/docs/mkdocs_api_reference.py) generates them,
+and a committed copy under `docs/api/reference/` fails the build. They are static Markdown and
+need no browser script; [tools/docs/external_assets_check.py](../../tools/docs/external_assets_check.py)
+fails `make docs` when a built page loads a script, stylesheet or font from another origin.
 
 ## Change
 

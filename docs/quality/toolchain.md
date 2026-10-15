@@ -58,6 +58,11 @@ same make target in GitHub Actions. All gate tools run in both places.
 | `sonarqube` | `26.9.0.129388-community` | local SonarQube Community Build | LGPL-3.0 | ADR 0040 |
 | `postgres` | `18.6-trixie` | database of the local SonarQube | PostgreSQL | required by the Community Build for continuous operation (H2 only for tests) |
 
+The API reference pages of the site (M7-19) need no tool of their own: the MkDocs hook
+`tools/docs/mkdocs_api_reference.py` renders them with `pyyaml` and `mkdocs` from the table
+above, and `tools/docs/external_assets_check.py` uses only the standard library. Redocly's
+`build-docs` was compared and not taken (docs/DECISIONS.md, M7-19/1).
+
 Licenses: PyPI, npm and the LICENSE files of the projects, retrieved 2026-10-10 [verified].
 Development tools are not shipped; the license rules for shipped
 dependencies are in [licenses.md](licenses.md).
