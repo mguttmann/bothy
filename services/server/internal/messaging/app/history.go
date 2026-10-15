@@ -100,6 +100,9 @@ func (s *Service) History(ctx context.Context, q messaging.HistoryQuery) (messag
 		}
 		out.Items = append(out.Items, v)
 	}
+	if err := s.decorate(ctx, scope.ChannelIDs, out.Items); err != nil {
+		return messaging.HistoryPage{}, err
+	}
 	return out, nil
 }
 
@@ -111,22 +114,32 @@ func (s *Service) History(ctx context.Context, q messaging.HistoryQuery) (messag
 // without access the same not_found as for an unknown id. The content is always whole, a
 // tombstone included.
 func (s *Service) Get(ctx context.Context, messageID ids.ID) (messaging.Message, error) {
+	m, visible, err := s.readMessage(ctx, messageID)
+	if err != nil {
+		return messaging.Message{}, err
+	}
+	return s.stored(ctx, m, visible)
+}
+
+// readMessage reads the message id for message.read the way Get does and returns it with the
+// visible channels of the principal of ctx (also listReactions, M1-59).
+func (s *Service) readMessage(ctx context.Context, messageID ids.ID) (domain.Message, []ids.ID, error) {
 	a := requestPrincipal(ctx)
 	scope, err := s.d.Authorizer.Scope(ctx, a, authorize.ActionMessageRead)
 	if err != nil {
-		return messaging.Message{}, err
+		return domain.Message{}, nil, err
 	}
 	m, visible, err := s.d.Store.VisibleMessage(ctx, messageID, scope.ChannelIDs)
 	if err != nil {
-		return messaging.Message{}, err
+		return domain.Message{}, nil, err
 	}
 	if !visible {
-		return messaging.Message{}, s.notVisible(ctx, a, messageID)
+		return domain.Message{}, nil, s.notVisible(ctx, a, messageID)
 	}
 	if err := s.check(ctx, a, authorize.ActionMessageRead, historyResource(m)); err != nil {
-		return messaging.Message{}, err
+		return domain.Message{}, nil, err
 	}
-	return s.stored(ctx, m)
+	return m, scope.ChannelIDs, nil
 }
 
 // notVisible is the error of a message outside the visible channels: the refusal of message.read

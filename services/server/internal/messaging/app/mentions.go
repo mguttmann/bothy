@@ -93,12 +93,19 @@ func (s Mentions) ListMine(ctx context.Context, q messaging.MentionListQuery) (m
 	}
 	more := len(rows) > limit
 	rows = rows[:min(len(rows), limit)]
+	msgs := make([]messaging.Message, 0, len(rows))
 	for _, r := range rows {
-		m, err := s.stored(ctx, r.Message)
+		m, err := s.base(ctx, r.Message)
 		if err != nil {
 			return messaging.MentionPage{}, err
 		}
-		out.Items = append(out.Items, messaging.MentionItem{Message: m, CreatedAt: r.MentionedAt})
+		msgs = append(msgs, m)
+	}
+	if err := s.decorate(ctx, sc.ChannelIDs, msgs); err != nil {
+		return messaging.MentionPage{}, err
+	}
+	for i, r := range rows {
+		out.Items = append(out.Items, messaging.MentionItem{Message: msgs[i], CreatedAt: r.MentionedAt})
 	}
 	if !more {
 		return out, nil

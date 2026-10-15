@@ -359,6 +359,21 @@ type ServerInterface interface {
 	// UpdateMessage Edit own message
 	// (PATCH /messages/{message_id})
 	UpdateMessage(w http.ResponseWriter, r *http.Request, messageId MessageIdPath, params UpdateMessageParams)
+	// UnpinMessage Unpin a message
+	// (DELETE /messages/{message_id}/pin)
+	UnpinMessage(w http.ResponseWriter, r *http.Request, messageId MessageIdPath)
+	// PinMessage Pin a message
+	// (PUT /messages/{message_id}/pin)
+	PinMessage(w http.ResponseWriter, r *http.Request, messageId MessageIdPath)
+	// ListReactions List who reacted
+	// (GET /messages/{message_id}/reactions)
+	ListReactions(w http.ResponseWriter, r *http.Request, messageId MessageIdPath, params ListReactionsParams)
+	// RemoveReaction Remove own reaction
+	// (DELETE /messages/{message_id}/reactions/{emoji})
+	RemoveReaction(w http.ResponseWriter, r *http.Request, messageId MessageIdPath, emoji EmojiPath)
+	// AddReaction Add own reaction
+	// (PUT /messages/{message_id}/reactions/{emoji})
+	AddReaction(w http.ResponseWriter, r *http.Request, messageId MessageIdPath, emoji EmojiPath)
 	// ListMessageRevisions Read earlier versions
 	// (GET /messages/{message_id}/revisions)
 	ListMessageRevisions(w http.ResponseWriter, r *http.Request, messageId MessageIdPath)
@@ -434,6 +449,9 @@ type ServerInterface interface {
 	// CreateMessage Send a message
 	// (POST /threads/{thread_id}/messages)
 	CreateMessage(w http.ResponseWriter, r *http.Request, threadId ThreadIdPath)
+	// ListPins List pinned messages
+	// (GET /threads/{thread_id}/pins)
+	ListPins(w http.ResponseWriter, r *http.Request, threadId ThreadIdPath)
 	// ReopenThread Reopen a thread
 	// (POST /threads/{thread_id}/reopen)
 	ReopenThread(w http.ResponseWriter, r *http.Request, threadId ThreadIdPath, params ReopenThreadParams)
@@ -4959,6 +4977,196 @@ func (siw *ServerInterfaceWrapper) UpdateMessage(w http.ResponseWriter, r *http.
 	handler.ServeHTTP(w, r)
 }
 
+// UnpinMessage operation middleware
+func (siw *ServerInterfaceWrapper) UnpinMessage(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "message_id" -------------
+	var messageId MessageIdPath
+
+	err = runtime.BindStyledParameterWithOptions("simple", "message_id", r.PathValue("message_id"), &messageId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "uuid", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "message_id", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.UnpinMessage(w, r, messageId)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// PinMessage operation middleware
+func (siw *ServerInterfaceWrapper) PinMessage(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "message_id" -------------
+	var messageId MessageIdPath
+
+	err = runtime.BindStyledParameterWithOptions("simple", "message_id", r.PathValue("message_id"), &messageId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "uuid", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "message_id", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.PinMessage(w, r, messageId)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// ListReactions operation middleware
+func (siw *ServerInterfaceWrapper) ListReactions(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "message_id" -------------
+	var messageId MessageIdPath
+
+	err = runtime.BindStyledParameterWithOptions("simple", "message_id", r.PathValue("message_id"), &messageId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "uuid", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "message_id", Err: err})
+		return
+	}
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params ListReactionsParams
+
+	// ------------- Optional query parameter "cursor" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "cursor", r.URL.Query(), &params.Cursor, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "cursor"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "cursor", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "limit" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "limit", r.URL.Query(), &params.Limit, runtime.BindQueryParameterOptions{Type: "integer", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "limit"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "limit", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "emoji" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "emoji", r.URL.Query(), &params.Emoji, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "emoji"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "emoji", Err: err})
+		}
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.ListReactions(w, r, messageId, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// RemoveReaction operation middleware
+func (siw *ServerInterfaceWrapper) RemoveReaction(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "message_id" -------------
+	var messageId MessageIdPath
+
+	err = runtime.BindStyledParameterWithOptions("simple", "message_id", r.PathValue("message_id"), &messageId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "uuid", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "message_id", Err: err})
+		return
+	}
+
+	// ------------- Path parameter "emoji" -------------
+	var emoji EmojiPath
+
+	err = runtime.BindStyledParameterWithOptions("simple", "emoji", r.PathValue("emoji"), &emoji, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "emoji", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.RemoveReaction(w, r, messageId, emoji)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// AddReaction operation middleware
+func (siw *ServerInterfaceWrapper) AddReaction(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "message_id" -------------
+	var messageId MessageIdPath
+
+	err = runtime.BindStyledParameterWithOptions("simple", "message_id", r.PathValue("message_id"), &messageId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "uuid", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "message_id", Err: err})
+		return
+	}
+
+	// ------------- Path parameter "emoji" -------------
+	var emoji EmojiPath
+
+	err = runtime.BindStyledParameterWithOptions("simple", "emoji", r.PathValue("emoji"), &emoji, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "emoji", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.AddReaction(w, r, messageId, emoji)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
 // ListMessageRevisions operation middleware
 func (siw *ServerInterfaceWrapper) ListMessageRevisions(w http.ResponseWriter, r *http.Request) {
 
@@ -5995,6 +6203,32 @@ func (siw *ServerInterfaceWrapper) CreateMessage(w http.ResponseWriter, r *http.
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		siw.Handler.CreateMessage(w, r, threadId)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// ListPins operation middleware
+func (siw *ServerInterfaceWrapper) ListPins(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "thread_id" -------------
+	var threadId ThreadIdPath
+
+	err = runtime.BindStyledParameterWithOptions("simple", "thread_id", r.PathValue("thread_id"), &threadId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "uuid", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "thread_id", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.ListPins(w, r, threadId)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -7187,12 +7421,18 @@ func HandlerWithOptions(si ServerInterface, options StdHTTPServerOptions) http.H
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/threads/{thread_id}/close", wrapper.CloseThread)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/threads/{thread_id}/reopen", wrapper.ReopenThread)
 	m.HandleFunc(http.MethodPut+" "+options.BaseURL+"/threads/{thread_id}/tags", wrapper.SetThreadTags)
+	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/threads/{thread_id}/pins", wrapper.ListPins)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/threads/{thread_id}/messages", wrapper.ListThreadMessages)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/threads/{thread_id}/messages", wrapper.CreateMessage)
 	m.HandleFunc(http.MethodDelete+" "+options.BaseURL+"/messages/{message_id}", wrapper.DeleteMessage)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/messages/{message_id}", wrapper.GetMessage)
 	m.HandleFunc(http.MethodPatch+" "+options.BaseURL+"/messages/{message_id}", wrapper.UpdateMessage)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/messages/{message_id}/revisions", wrapper.ListMessageRevisions)
+	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/messages/{message_id}/reactions", wrapper.ListReactions)
+	m.HandleFunc(http.MethodDelete+" "+options.BaseURL+"/messages/{message_id}/reactions/{emoji}", wrapper.RemoveReaction)
+	m.HandleFunc(http.MethodPut+" "+options.BaseURL+"/messages/{message_id}/reactions/{emoji}", wrapper.AddReaction)
+	m.HandleFunc(http.MethodDelete+" "+options.BaseURL+"/messages/{message_id}/pin", wrapper.UnpinMessage)
+	m.HandleFunc(http.MethodPut+" "+options.BaseURL+"/messages/{message_id}/pin", wrapper.PinMessage)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/agents", wrapper.ListAgents)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/agents", wrapper.CreateAgent)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/agents/{agent_id}", wrapper.GetAgent)
@@ -7718,6 +7958,21 @@ type StrictServerInterface interface {
 	// UpdateMessage Edit own message
 	// (PATCH /messages/{message_id})
 	UpdateMessage(ctx context.Context, request UpdateMessageRequestObject) (UpdateMessageResponseObject, error)
+	// UnpinMessage Unpin a message
+	// (DELETE /messages/{message_id}/pin)
+	UnpinMessage(ctx context.Context, request UnpinMessageRequestObject) (UnpinMessageResponseObject, error)
+	// PinMessage Pin a message
+	// (PUT /messages/{message_id}/pin)
+	PinMessage(ctx context.Context, request PinMessageRequestObject) (PinMessageResponseObject, error)
+	// ListReactions List who reacted
+	// (GET /messages/{message_id}/reactions)
+	ListReactions(ctx context.Context, request ListReactionsRequestObject) (ListReactionsResponseObject, error)
+	// RemoveReaction Remove own reaction
+	// (DELETE /messages/{message_id}/reactions/{emoji})
+	RemoveReaction(ctx context.Context, request RemoveReactionRequestObject) (RemoveReactionResponseObject, error)
+	// AddReaction Add own reaction
+	// (PUT /messages/{message_id}/reactions/{emoji})
+	AddReaction(ctx context.Context, request AddReactionRequestObject) (AddReactionResponseObject, error)
 	// ListMessageRevisions Read earlier versions
 	// (GET /messages/{message_id}/revisions)
 	ListMessageRevisions(ctx context.Context, request ListMessageRevisionsRequestObject) (ListMessageRevisionsResponseObject, error)
@@ -7793,6 +8048,9 @@ type StrictServerInterface interface {
 	// CreateMessage Send a message
 	// (POST /threads/{thread_id}/messages)
 	CreateMessage(ctx context.Context, request CreateMessageRequestObject) (CreateMessageResponseObject, error)
+	// ListPins List pinned messages
+	// (GET /threads/{thread_id}/pins)
+	ListPins(ctx context.Context, request ListPinsRequestObject) (ListPinsResponseObject, error)
 	// ReopenThread Reopen a thread
 	// (POST /threads/{thread_id}/reopen)
 	ReopenThread(ctx context.Context, request ReopenThreadRequestObject) (ReopenThreadResponseObject, error)
@@ -11320,6 +11578,139 @@ func (sh *strictHandler) UpdateMessage(w http.ResponseWriter, r *http.Request, m
 	}
 }
 
+// UnpinMessage operation middleware
+func (sh *strictHandler) UnpinMessage(w http.ResponseWriter, r *http.Request, messageId MessageIdPath) {
+	var request UnpinMessageRequestObject
+
+	request.MessageId = messageId
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.UnpinMessage(ctx, request.(UnpinMessageRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "UnpinMessage")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(UnpinMessageResponseObject); ok {
+		if err := validResponse.VisitUnpinMessageResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// PinMessage operation middleware
+func (sh *strictHandler) PinMessage(w http.ResponseWriter, r *http.Request, messageId MessageIdPath) {
+	var request PinMessageRequestObject
+
+	request.MessageId = messageId
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.PinMessage(ctx, request.(PinMessageRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "PinMessage")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(PinMessageResponseObject); ok {
+		if err := validResponse.VisitPinMessageResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// ListReactions operation middleware
+func (sh *strictHandler) ListReactions(w http.ResponseWriter, r *http.Request, messageId MessageIdPath, params ListReactionsParams) {
+	var request ListReactionsRequestObject
+
+	request.MessageId = messageId
+	request.Params = params
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.ListReactions(ctx, request.(ListReactionsRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "ListReactions")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(ListReactionsResponseObject); ok {
+		if err := validResponse.VisitListReactionsResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// RemoveReaction operation middleware
+func (sh *strictHandler) RemoveReaction(w http.ResponseWriter, r *http.Request, messageId MessageIdPath, emoji EmojiPath) {
+	var request RemoveReactionRequestObject
+
+	request.MessageId = messageId
+	request.Emoji = emoji
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.RemoveReaction(ctx, request.(RemoveReactionRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "RemoveReaction")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(RemoveReactionResponseObject); ok {
+		if err := validResponse.VisitRemoveReactionResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// AddReaction operation middleware
+func (sh *strictHandler) AddReaction(w http.ResponseWriter, r *http.Request, messageId MessageIdPath, emoji EmojiPath) {
+	var request AddReactionRequestObject
+
+	request.MessageId = messageId
+	request.Emoji = emoji
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.AddReaction(ctx, request.(AddReactionRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "AddReaction")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(AddReactionResponseObject); ok {
+		if err := validResponse.VisitAddReactionResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
 // ListMessageRevisions operation middleware
 func (sh *strictHandler) ListMessageRevisions(w http.ResponseWriter, r *http.Request, messageId MessageIdPath) {
 	var request ListMessageRevisionsRequestObject
@@ -12055,6 +12446,32 @@ func (sh *strictHandler) CreateMessage(w http.ResponseWriter, r *http.Request, t
 		sh.options.ResponseErrorHandlerFunc(w, r, err)
 	} else if validResponse, ok := response.(CreateMessageResponseObject); ok {
 		if err := validResponse.VisitCreateMessageResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// ListPins operation middleware
+func (sh *strictHandler) ListPins(w http.ResponseWriter, r *http.Request, threadId ThreadIdPath) {
+	var request ListPinsRequestObject
+
+	request.ThreadId = threadId
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.ListPins(ctx, request.(ListPinsRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "ListPins")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(ListPinsResponseObject); ok {
+		if err := validResponse.VisitListPinsResponse(w); err != nil {
 			sh.options.ResponseErrorHandlerFunc(w, r, err)
 		}
 	} else if response != nil {

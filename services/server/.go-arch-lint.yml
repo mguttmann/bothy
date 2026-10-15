@@ -38,6 +38,8 @@ vendors:
     in: [github.com/riverqueue/river, github.com/riverqueue/river/**]
   v-testcontainers:
     in: [github.com/testcontainers/testcontainers-go, github.com/testcontainers/testcontainers-go/**]
+  v-uniseg:
+    in: [github.com/rivo/uniseg]
   v-webauthn:
     in: [github.com/go-webauthn/webauthn, github.com/go-webauthn/webauthn/**]
   v-xcrypto:
@@ -369,7 +371,7 @@ deps:
     mayDependOn: [messaging-app, messaging, messaging-domain, kernel-ports, identity, chat, files]
   messaging-adapters:
     mayDependOn: [messaging-adapters, messaging, messaging-app, messaging-domain, kernel-ports, platform-buildinfo, platform-config, platform-egress, platform-health, platform-httpserver, platform-jobs, platform-jsoncanon, platform-lifecycle, platform-otel, platform-pg, platform-ratelimit, platform-secrets, api, identity, chat, files]
-    canUse: [v-pgx]
+    canUse: [v-pgx, v-xtext, v-uniseg]
   status:
     mayDependOn: [status, kernel-ports]
   status-domain:

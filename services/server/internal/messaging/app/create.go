@@ -180,7 +180,11 @@ func (s *Service) repetition(ctx context.Context, a actor.Actor, p prepared) (me
 	if !bytes.Equal(m.PayloadSHA256, p.hash) {
 		return messaging.Message{}, false, errs.New(errs.CodeIdempotencyKeyReuse, "client_msg_id was used with another request")
 	}
-	v, err := s.stored(ctx, m)
+	visible, err := s.visible(ctx, a)
+	if err != nil {
+		return messaging.Message{}, false, err
+	}
+	v, err := s.stored(ctx, m, visible)
 	return v, true, err
 }
 

@@ -21,6 +21,7 @@ require (
 	github.com/pressly/goose/v3 v3.28.0
 	github.com/riverqueue/river v0.49.0
 	github.com/riverqueue/river/riverdriver/riverpgxv5 v0.49.0
+	github.com/rivo/uniseg v0.4.7
 	github.com/standard-webhooks/standard-webhooks/libraries v0.0.1
 	github.com/testcontainers/testcontainers-go v0.44.0
 	go.opentelemetry.io/contrib/bridges/otelslog v0.21.0

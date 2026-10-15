@@ -1,6 +1,6 @@
 # Modul `messaging`
 
-Status: sending built (M1-56): `createMessage` and `createThread`, the tables `messages` and `mentions`, the in-transaction event `MessagePosted` and the durable event `message.created`. Reading built (M1-57): `listThreadMessages` and `getMessage`. Editing, deleting and revisions built (M1-58): `updateMessage`, `deleteMessage`, `listMessageRevisions`, the table `message_revisions`, the in-transaction event `MessageDeleted` and the durable events `message.updated` and `message.deleted`. Mentions and templates built (M1-60): `listMyMentions`, the port `Mentions` with `CountUnread`, the table `message_templates` and its six operations. Reactions, pins and the export follow with the tickets of the etappe.
+Status: sending built (M1-56): `createMessage` and `createThread`, the tables `messages` and `mentions`, the in-transaction event `MessagePosted` and the durable event `message.created`. Reading built (M1-57): `listThreadMessages` and `getMessage`. Editing, deleting and revisions built (M1-58): `updateMessage`, `deleteMessage`, `listMessageRevisions`, the table `message_revisions`, the in-transaction event `MessageDeleted` and the durable events `message.updated` and `message.deleted`. Mentions and templates built (M1-60): `listMyMentions`, the port `Mentions` with `CountUnread`, the table `message_templates` and its six operations. Reactions and pins built (M1-59): `addReaction`, `removeReaction`, `listReactions`, `pinMessage`, `unpinMessage`, `listPins`, the tables `reactions` and `pins` and the durable events `reaction.added`, `reaction.removed`, `pin.added` and `pin.removed`. The export follows with its ticket.
 Normativ ist [docs/spec/02-architektur.md](../../../../docs/spec/02-architektur.md); bei Abweichung gilt das Kapitel.
 
 ## Zweck
@@ -9,7 +9,7 @@ Nachrichten, Revisionen, Erwähnungen, Reaktionen, Anheften, Vorlagen, Kanal-Exp
 
 ## Code
 
-- `internal/messaging` (`messaging.go`, `mentions.go`, `templates.go`): the port. `Messages` with `Create`, `CreateThread`,
+- `internal/messaging` (`messaging.go`, `mentions.go`, `templates.go`, `reactions.go`): the port. `Messages` with `Create`, `CreateThread`,
   `History`, `Get`, `Update`, `Delete` and `Revisions`, the DTOs `Message`, `PrincipalRef`,
   `CreateMessageCmd`, `Created`, `CreateThreadCmd`, `ThreadCreated`, `HistoryQuery` (with
   `HistoryMode`), `HistoryPage`, `UpdateCommand` and `RevisionView`, the in-transaction events
@@ -20,7 +20,9 @@ Nachrichten, Revisionen, Erwähnungen, Reaktionen, Anheften, Vorlagen, Kanal-Exp
   an app with only `messages:write` gets the thread it created; a replay authorizes
   `message.create` on it first). `Mentions` (`ListMine`, `CountUnread`) and `Templates` (`List`,
   `ListMine`, `CreatePersonal`, `CreateForChannel`, `Update`, `Delete`) take the caller from the
-  context (M1-60).
+  context (M1-60). `Reactions` (`Add`, `Remove`, `List` with `ReactionListQuery`, `ReactionPage`,
+  `ReactionView`) and `Pins` (`Pin`, `Unpin`, `List` with `PinView`) take the caller from the
+  context too (M1-59); `Message` carries `Reactions` (`ReactionCount`), `MyReactions` and `Pinned`.
 - `domain/`: the message row (`Message`), `OriginFor` (09 section 3.2), `CheckClientMsgID`,
   `CheckContent`, `CheckMentionCount`, the mention scanner `ScanMentions` with `CodeMask` (the code
   structure of CommonMark 0.31.2), `RequestHash` (04 section 5.1 point 3), `SystemLine` and
@@ -29,32 +31,42 @@ Nachrichten, Revisionen, Erwähnungen, Reaktionen, Anheften, Vorlagen, Kanal-Exp
   `StoresRevision`, the one tombstone function `Tombstone` and `RedactPayload` (04 section 2.2
   rule 5), the `eventlog.RedactFunc` of a deletion; the template row `Template` with `Apply` (no-op
   detection), `TemplateRules` (name and content), `LimitReached`, `ScopeLockKey` and the mention
-  keyset `MentionKey` (M1-60).
+  keyset `MentionKey` (M1-60); for M1-59 `ReactionGroup` with `OrderSummary` and `OwnInOrder`
+  (the order of `reactions` and `my_reactions`), the keyset `ReactionKey`, `InvalidEmoji`,
+  `ReactionLimitReached` and `PinLimitReached`.
 - `app/`: `Service` with `Create` and `CreateThread` (`create.go`, `threads.go`), `History` and
-  `Get`, `Update`, `Delete` and `Revisions` (`edit.go`), `Service.Mentions()` and
-  `Service.Templates()` (the two other ports over the same service), the outgoing ports `Store`
-  (with `HistoryRead` and `HistoryRows`), `Cursors` and `ErrorCounter`, and `ErrClientMsgIDTaken`.
+  `Get`, `Update`, `Delete` and `Revisions` (`edit.go`), `Service.Mentions()`,
+  `Service.Templates()`, `Service.Reactions()` and `Service.Pins()` (the other ports over the same
+  service; `reactions.go`, `pins.go`), the batch loader `decorate` of the one representation
+  (`view.go`), the outgoing ports `Store` (with `HistoryRead`, `HistoryRows`, `ReactionRead`,
+  `ReactionRow` and `PinRow`), `Cursors`, `SymbolNormalizer` and `ErrorCounter`, and
+  `ErrClientMsgIDTaken`.
   `Deps` holds the kernel ports `eventlog.Redactor` (implemented by sync) and `auditing.Recorder`
   besides those of M1-56. `Config` binds `message.max_content_bytes`, `message.max_mentions`,
   `sync.event_payload_max_bytes`, `message.list_content_max_bytes`, `template.name_max_chars`,
-  `template.max_per_scope`, `api.page_size_default` and `api.page_size_max`
+  `template.max_per_scope`, `api.page_size_default`, `api.page_size_max`,
+  `reaction.emoji_max_bytes`, `reaction.max_distinct_per_message` and `pin.max_per_thread`
   (`wire.MessagingConfig`).
 - `adapters/postgres/`: `queries/messages.sql`, `queries/mentions.sql`, `queries/templates.sql`,
-  `queries/revisions.sql` and `queries/history.sql` (`ListThreadNewest`, `ListThreadBefore`,
+  `queries/revisions.sql`, `queries/reactions.sql`, `queries/pins.sql` and `queries/history.sql` (`ListThreadNewest`, `ListThreadBefore`,
   `ListThreadAfter`, `ListThreadAround`, `GetVisibleMessage`), the sqlc output in `sqlcgen/` and
   `Repository` (implements `app.Store`); the mentions of a message are one `INSERT ... SELECT FROM
-  unnest`. Every statement of M1-58 carries `channel_id = ANY(@visible)` or joins `messages` with
-  it. `predicate_test.go` holds `TestQueriesCarryVisibleChannelPredicate` with its allowlist.
+  unnest`. Every statement of M1-58 and M1-59 carries `channel_id = ANY(@visible)` or joins
+  `messages` with it. `predicate_test.go` holds `TestQueriesCarryVisibleChannelPredicate` with its allowlist.
 - `adapters/httpapi/`: `Messages`, the handlers of `createMessage`, `createThread`,
   `listThreadMessages`, `getMessage`, `listMyMentions` and the template operations (a repetition
   answers `200` with `Idempotent-Replay: true`) and of `updateMessage` (with `ETag`),
-  `deleteMessage` and `listMessageRevisions` (`edit.go`); `Cursors`, the cursor codec of
-  platform/httpserver.
+  `deleteMessage` and `listMessageRevisions` (`edit.go`) and of the reaction and pin operations
+  (`reactions.go`); `Cursors`, the cursor codec of platform/httpserver.
+- `adapters/unicode/`: `Normalizer`, the `SymbolNormalizer` of the reaction symbol rule with
+  `github.com/rivo/uniseg` (UAX #29) and `golang.org/x/text/unicode/norm` (NFC), the only
+  third-party libraries of the rule (M1-59).
 - Migrations `00032_messaging_messages.sql` (`messages` and `mentions` as 03 section 4.6 with
   the deviations its header names, and `threads.parent_message_id -> messages(id)` deferred and
   `NOT VALID`), `00033_threads_parent_fk_validate.sql` (validates it),
   `00034_message_templates.sql` (`message_templates` as 03 section 4.6) and
-  `00038_messaging_message_revisions.sql` (`message_revisions` as 03 states it, M1-58).
+  `00038_messaging_message_revisions.sql` (`message_revisions` as 03 states it, M1-58) and
+  `00041_messaging_reactions_pins.sql` (`reactions` and `pins` as 03 states them, M1-59).
 - The test world of both handlers is `services/server/test/messagingworld`.
 
 ## Port (Wurzelpaket `internal/messaging`)
@@ -277,8 +289,7 @@ repetition with the stored response.
 write, an event or an audit entry. The unit of work locks the thread (`chat.Threads.
 LockForMessageChange`) and then the message row (a message deleted meanwhile ends it without a
 write), remembers the mentions, writes the tombstone (`content_md = ''`, `deleted_at`,
-`deleted_by`, next version), removes the revisions and mentions (M1-59 adds reactions and pins at
-the marked step), counts the message down (`chat.Threads.DecrementMessageCount`), redacts the
+`deleted_by`, next version), removes the revisions, mentions, reactions and the pin (M1-59), counts the message down (`chat.Threads.DecrementMessageCount`), redacts the
 payloads of every stored event with resource `message` and this id through
 `eventlog.Redactor` with `domain.RedactPayload`, publishes `MessageDeleted` and appends
 `message.deleted` (payload `MessageDeletedPayload`, after the redaction, so never redacted). A
@@ -301,13 +312,45 @@ version, no `my_reactions`, no `content_truncated`); `reaction.added` and `react
 `message_id`, `thread_id` and `principal_id` with `emoji: ""` and `count: 0`; `pin.added` and
 `pin.removed` stay; any other type fails the deletion. The envelope columns never change.
 
+## Reactions and pins (M1-59)
+
+A reaction is one Unicode symbol of a person, agent or app on a message, never a status: no
+operation touches `trigger_state` or `messages.version`. A pin is moderation with `manage`.
+
+Writes check in this order: the symbol (`SymbolNormalizer`: valid UTF-8, NFC, exactly one
+extended grapheme cluster of at most `reaction.emoji_max_bytes` bytes, no Cc, Cs, Zs, Zl, Zp or
+Bidi control, not only Cf and Mn; `400 invalid_emoji` at `#path/emoji` before any lookup), then
+the message in the visible channels with `authorize` (`reaction.add` on the message,
+`reaction.remove` on the caller's reaction, `pin.create` and `pin.delete` on the message; a
+missing and an invisible message give the same `404`), then in the unit of work the message row
+lock and `deleted_at` (`410 message_deleted` for adding and pinning, `204` without a change for
+removing and unpinning). The row lock serialises the reaction and pin changes of one message, so
+the `count` of `reaction.added` and `reaction.removed` is exact; pinning also takes the thread
+lock first (the lock order of deleting), so `pin.max_per_thread` is exact. One more distinct
+symbol than `reaction.max_distinct_per_message` and one more pin are `400 validation_failed` with
+`limit_reached`. Repetitions answer `204` without a write or an event.
+
+The events carry resource kind `message`, scope space, channel and thread, the receive action
+`message.read` (`reaction.*`) or `thread.read` (`pin.*`) and no resource version, because they
+change none (04 section 9 item 3, `actions.yaml`; docs/DECISIONS.md M1-59/1); their payloads hold
+absolute values. Every `Message` representation gets `reactions` (ordered by the first reaction
+of each symbol, then bytewise by symbol), `pinned` and, only in REST, `my_reactions`, with one
+statement per field set for a whole page; a tombstone has none.
+
+`listReactions` reads the message like `getMessage`, validates the `emoji` filter
+(`#query/emoji`) and pages by `(created_at, principal_id, emoji)` with a cursor bound to the
+list, the message and the filter; the principals come from one directory read. `listPins` checks
+`thread.read`, reads the pins of the live messages in the visible channels newest first and
+checks each with `message.read` in filter mode (a mismatch is dropped, logged and counted as
+`filter_mismatch`).
+
 ## Hinweise für den Bau
 
 - Idempotenz über das Paar aus Autor und `client_msg_id` (04, 5.1).
 - Löschen leert den Inhalt und schwärzt die Nutzlast der Ereignisse in derselben Transaktion (03, 6.5).
 - Eine Erwähnung eines Prinzipals ohne Leserecht wird gespeichert, löst aber nichts aus (03, `mentions`).
 
-Rulings: docs/DECISIONS.md M1-56, M1-57, M1-58 and M1-60.
+Rulings: docs/DECISIONS.md M1-56, M1-57, M1-58, M1-59 and M1-60.
 
 ## Kapitel
 

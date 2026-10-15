@@ -232,9 +232,9 @@ Quelle: [03-datenmodell.md](../spec/03-datenmodell.md), Abschnitt 9.
 | `message.max_content_bytes` | `BOTHY_MESSAGE__MAX_CONTENT_BYTES` | Server | int | `262144` | Größe einer Nachricht (lange Antworten ohne Teilen) | aktiv |
 | `message.max_attachments` | `BOTHY_MESSAGE__MAX_ATTACHMENTS` | Server | int | `10` | Anhänge je Nachricht | aktiv |
 | `message.max_mentions` | `BOTHY_MESSAGE__MAX_MENTIONS` | Server | int | `50` | verschiedene Erwähnungs-Handles je Nachricht (Inhaltsformat, `messages`) | aktiv |
-| `reaction.emoji_max_bytes` | `BOTHY_REACTION__EMOJI_MAX_BYTES` | Server |  | `64` | größte Länge eines Reaktions-Emoji in Bytes (ein Graphem-Cluster hat sonst keine Grenze) | geplant (M1) |
-| `reaction.max_distinct_per_message` | `BOTHY_REACTION__MAX_DISTINCT_PER_MESSAGE` | Server |  | `20` | verschiedene Emoji je Nachricht; begrenzt `Message.reactions` und die Nutzlast der Ereignisse | geplant (M1) |
-| `pin.max_per_thread` | `BOTHY_PIN__MAX_PER_THREAD` | Server |  | `50` | Anheftungen je Thread; `listPins` ist nicht seitenweise | geplant (M1) |
+| `reaction.emoji_max_bytes` | `BOTHY_REACTION__EMOJI_MAX_BYTES` | Server | int | `64` | größte Länge eines Reaktions-Emoji in Bytes (ein Graphem-Cluster hat sonst keine Grenze) | aktiv |
+| `reaction.max_distinct_per_message` | `BOTHY_REACTION__MAX_DISTINCT_PER_MESSAGE` | Server | int | `20` | verschiedene Emoji je Nachricht; begrenzt `Message.reactions` und die Nutzlast der Ereignisse | aktiv |
+| `pin.max_per_thread` | `BOTHY_PIN__MAX_PER_THREAD` | Server | int | `50` | Anheftungen je Thread; `listPins` ist nicht seitenweise | aktiv |
 | `template.name_max_chars` | `BOTHY_TEMPLATE__NAME_MAX_CHARS` | Server | int | `100` | Länge eines Vorlagennamens in Unicode-Zeichen | aktiv |
 | `template.max_per_scope` | `BOTHY_TEMPLATE__MAX_PER_SCOPE` | Server | int | `100` | Vorlagen je Person bzw. je Kanal; `listTemplates` ist nicht seitenweise | aktiv |
 | `file.max_upload_bytes` | `BOTHY_FILE__MAX_UPLOAD_BYTES` | Server | int | `104857600` | Größe einer Datei | aktiv |
