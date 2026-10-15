@@ -22,6 +22,7 @@ type (
 	stubUoW        struct{ txn.UnitOfWork }
 	stubAuthorizer struct{ authorize.Authorizer }
 	stubAudit      struct{ auditing.Recorder }
+	stubExpiry     struct{ app.Expiry }
 )
 
 // stepUpConfig returns the step-up and cleanup values the constructors accept.
@@ -67,15 +68,15 @@ func TestNewStepUps_Refuses(t *testing.T) {
 // errors; a nil clock is the system clock.
 func TestNewAuthCleanup_Refuses(t *testing.T) {
 	t.Parallel()
-	if _, err := app.NewAuthCleanup(stepUpConfig(), stubUoW{}, stubChallenges{}, nil); err != nil {
+	if _, err := app.NewAuthCleanup(stepUpConfig(), stubUoW{}, stubChallenges{}, stubExpiry{}, nil); err != nil {
 		t.Fatalf("NewAuthCleanup with valid values: %v", err)
 	}
-	if _, err := app.NewAuthCleanup(stepUpConfig(), nil, stubChallenges{}, nil); err == nil {
+	if _, err := app.NewAuthCleanup(stepUpConfig(), nil, stubChallenges{}, stubExpiry{}, nil); err == nil {
 		t.Error("NewAuthCleanup without a unit of work passed")
 	}
 	cfg := stepUpConfig()
 	cfg.CleanupInterval = 0
-	if _, err := app.NewAuthCleanup(cfg, stubUoW{}, stubChallenges{}, nil); err == nil {
+	if _, err := app.NewAuthCleanup(cfg, stubUoW{}, stubChallenges{}, stubExpiry{}, nil); err == nil {
 		t.Error("NewAuthCleanup with auth.cleanup_interval 0 passed")
 	}
 }
