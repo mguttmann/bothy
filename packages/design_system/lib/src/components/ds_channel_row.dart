@@ -169,6 +169,10 @@ class _RunDot extends StatefulWidget {
 }
 
 class _RunDotState extends State<_RunDot> with SingleTickerProviderStateMixin {
+  /// The lowest opacity of the pulse; the dot never disappears, so the active run stays
+  /// visible in every frame.
+  static const double _pulseLow = 0.4;
+
   AnimationController? _pulse;
 
   @override
@@ -201,7 +205,7 @@ class _RunDotState extends State<_RunDot> with SingleTickerProviderStateMixin {
     final pulse = _pulse;
     if (pulse != null) {
       dot = FadeTransition(
-        opacity: Tween<double>(begin: 1, end: 0.4).animate(pulse),
+        opacity: Tween<double>(begin: 1, end: _pulseLow).animate(pulse),
         child: dot,
       );
     }

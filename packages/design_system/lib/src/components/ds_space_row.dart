@@ -44,6 +44,10 @@ Color dsCategoryOnSidebar(BuildContext context, DsCategory category) {
 /// DsSpaceRow(space, onToggle: (expanded) => setExpanded(space.id, expanded))
 /// ```
 class DsSpaceRow extends StatelessWidget {
+  /// The alpha of the icon tile in the category color; the token set has no tint role for a
+  /// tile on the sidebar (components.md 7 "a lightly tinted tile of the same color").
+  static const double _tileTint = 0.16;
+
   /// Creates the row of [data].
   const DsSpaceRow(this.data, {super.key, required this.onToggle});
 
@@ -103,7 +107,7 @@ class DsSpaceRow extends StatelessWidget {
                 child: Container(
                   padding: const EdgeInsets.all(DsSpace.s2),
                   decoration: BoxDecoration(
-                    color: tint.withValues(alpha: 0.16),
+                    color: tint.withValues(alpha: _tileTint),
                     borderRadius: BorderRadius.circular(DsRadius.sm),
                   ),
                   child: VectorGraphic(
