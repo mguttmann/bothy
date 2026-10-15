@@ -16,7 +16,7 @@ import 'view_models.dart';
 /// status (components.md section 3).
 ///
 /// Click, Enter or Space opens [DsStepData.detail] in a disclosure below the chip. The label
-/// reads "<Kind> <Name>, <Status>, <Duration>". A running step's icon spins in full motion.
+/// reads "{Kind} {Name}, {Status}, {Duration}". A running step's icon spins in full motion.
 ///
 /// ```dart
 /// DsToolChip(step)
@@ -107,10 +107,15 @@ class _DsToolChipState extends State<DsToolChip> {
         children: [
           DsIcon(icon, size: DsIconSizeRole.sm, color: color, decorative: true),
           const SizedBox(width: DsSpace.s8),
-          Text(
-            step.name,
-            style: dsTextStyle(DsType.codeSm)
-                .copyWith(color: colors.textPrimary),
+          // Names and suffixes shrink with an ellipsis at text scale 2 instead of overflowing.
+          Flexible(
+            child: Text(
+              step.name,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: dsTextStyle(DsType.codeSm)
+                  .copyWith(color: colors.textPrimary),
+            ),
           ),
           if (step.title != null) ...[
             const SizedBox(width: DsSpace.s8),
@@ -126,10 +131,14 @@ class _DsToolChipState extends State<DsToolChip> {
           ] else
             const Spacer(),
           const SizedBox(width: DsSpace.s8),
-          Text(
-            suffix,
-            style: dsTextStyle(DsType.codeSm)
-                .copyWith(color: colors.textSecondary),
+          Flexible(
+            child: Text(
+              suffix,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: dsTextStyle(DsType.codeSm)
+                  .copyWith(color: colors.textSecondary),
+            ),
           ),
         ],
       ),

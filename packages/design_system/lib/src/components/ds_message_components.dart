@@ -113,11 +113,11 @@ class DsButton extends StatelessWidget {
 ///
 /// On top a framed header with the `security.step-up` icon, built only from [header]: the
 /// agent, the run, the required capability and the "who may approve" note. Below a divider
-/// labeled "Text from <agent>" the agent's [agentText] renders as Markdown, so a line that
+/// labeled "Text from {agent}" the agent's [agentText] renders as Markdown, so a line that
 /// imitates a header stays visibly agent text. Then the components by
 /// [DsComponentData.state]: active and [permitted] operable; active and not permitted visible
 /// but disabled with the lock note [deniedReasonText]; sent and waiting (the pressed button
-/// loads, every other one is locked); used ("<Name> chose '<Choice>', <Time>"); expired;
+/// loads, every other one is locked); used ("{Name} chose '{Choice}', {Time}"); expired;
 /// disabled ("No longer available"); an error banner, after which an active card is operable
 /// again.
 ///
@@ -618,6 +618,9 @@ class DsMessageComponentsState extends State<DsMessageComponents> {
             style: dsTextStyle(DsType.bodySm).copyWith(color: c.textPrimary),
             decoration: InputDecoration(
               isDense: true,
+              constraints: BoxConstraints(
+                minHeight: context.dsDensity.targetMin,
+              ),
               filled: true,
               fillColor: c.surfaceInput,
               errorText: error,

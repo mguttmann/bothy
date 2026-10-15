@@ -13,10 +13,10 @@ import '../theme/ds_theme.dart';
 import 'view_models.dart';
 
 /// U+2068 FIRST STRONG ISOLATE.
-const String _fsi = '⁨';
+const String _fsi = '\u2068';
 
 /// U+2069 POP DIRECTIONAL ISOLATE.
-const String _pdi = '⁩';
+const String _pdi = '\u2069';
 
 /// [name] wrapped in a first-strong isolate (U+2068 ... U+2069) for display (SEC-IN-4).
 ///

@@ -32,11 +32,14 @@ void main() {
           onOpen: () => opened++,
         ),
       );
-      final title = tester.widget<Text>(find.text('⁨Release notes⁩'));
+      final title = tester.widget<Text>(find.text('\u2068Release notes\u2069'));
       expect(title.style?.fontWeight, FontWeight.w700);
       expect(find.text(l.threadRowWaitingForYou), findsOneWidget);
-      expect(find.text(l.threadRowOperator('⁨Robin⁩')), findsOneWidget);
-      expect(find.text('⁨release⁩'), findsOneWidget);
+      expect(
+        find.text(l.threadRowOperator('\u2068Robin\u2069')),
+        findsOneWidget,
+      );
+      expect(find.text('\u2068release\u2069'), findsOneWidget);
       expect(find.text('Project not ready'), findsOneWidget);
       expect(
         tester.widgetList<DsIcon>(find.byType(DsIcon)).first.glyph,
@@ -71,7 +74,7 @@ void main() {
           onOpen: () {},
         ),
       );
-      final title = tester.widget<Text>(find.text('⁨Release notes⁩'));
+      final title = tester.widget<Text>(find.text('\u2068Release notes\u2069'));
       expect(title.style?.fontWeight, isNot(FontWeight.w700));
       final icon = tester.widgetList<DsIcon>(find.byType(DsIcon)).first;
       expect(icon.color, DsColors.light.attentionFg);
@@ -95,7 +98,7 @@ void main() {
       );
       final state = tester.state<DsThreadRowState>(find.byType(DsThreadRow));
       expect(state.background, DsColors.light.surfaceSelected);
-      final title = tester.widget<Text>(find.text('⁨Old post⁩'));
+      final title = tester.widget<Text>(find.text('\u2068Old post\u2069'));
       expect(title.style?.color, DsColors.light.textMuted);
       expect(
         find.bySemanticsLabel(
@@ -128,7 +131,7 @@ void main() {
 
       var s = await show(const DsChannelRowData(id: 'c', name: 'general'));
       expect(s.nameColor, c.textOnSidebarSecondary);
-      expect(find.text('⁨general⁩'), findsOneWidget);
+      expect(find.text('\u2068general\u2069'), findsOneWidget);
 
       s = await show(
         const DsChannelRowData(id: 'c', name: 'general', unreadCount: 3),
@@ -200,7 +203,7 @@ void main() {
           onToggle: toggles.add,
         ),
       );
-      expect(find.text('⁨Support⁩'), findsOneWidget);
+      expect(find.text('\u2068Support\u2069'), findsOneWidget);
       expect(
         tester.getSemantics(find.byType(DsSpaceRow)),
         isSemantics(hasExpandedState: true, isExpanded: true),

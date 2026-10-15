@@ -19,11 +19,11 @@ import 'view_models.dart';
 /// `color.border.control`, `radius.lg` and at least `density.composer-min-height`, growing up to
 /// [maxLines] lines (`ui.composer_max_lines`); attach on the left, voice and send on the right;
 /// above it the typing line and, while [suggestions] is not empty, the [DsSuggestionList]. The
-/// placeholder and field label read "Message to <target>", during an active run "Follow-up to
-/// <agent>" ([followupAgentName]).
+/// placeholder and field label read "Message to {target}", during an active run "Follow-up to
+/// {agent}" ([followupAgentName]).
 ///
 /// States: empty (send disabled), text, command selected ([command] with its options as
-/// placeholders), incomplete options (send disabled with the reason "Missing option: <name>"),
+/// placeholders), incomplete options (send disabled with the reason "Missing option: {name}"),
 /// [offline] (a hint that sending goes to the queue; sending stays possible) and [readOnly]
 /// (the field is replaced by the note "Read only in this channel").
 ///
@@ -320,15 +320,6 @@ class DsComposerState extends State<DsComposer> {
       crossAxisAlignment: CrossAxisAlignment.stretch,
       mainAxisSize: MainAxisSize.min,
       children: [
-        if (widget.suggestions.isNotEmpty)
-          Padding(
-            padding: const EdgeInsets.only(bottom: DsSpace.s4),
-            child: DsSuggestionList(
-              widget.suggestions,
-              activeIndex: _active,
-              onAccept: (s) => widget.onAcceptSuggestion?.call(s),
-            ),
-          ),
         if (typing.isNotEmpty)
           Padding(
             padding: const EdgeInsets.only(bottom: DsSpace.s4),
@@ -341,6 +332,15 @@ class DsComposerState extends State<DsComposer> {
                 style: dsTextStyle(DsType.caption)
                     .copyWith(color: c.textSecondary),
               ),
+            ),
+          ),
+        if (widget.suggestions.isNotEmpty)
+          Padding(
+            padding: const EdgeInsets.only(bottom: DsSpace.s4),
+            child: DsSuggestionList(
+              widget.suggestions,
+              activeIndex: _active,
+              onAccept: (s) => widget.onAcceptSuggestion?.call(s),
             ),
           ),
         if (widget.offline)
@@ -399,10 +399,7 @@ class DsComposerState extends State<DsComposer> {
                 ),
               Expanded(
                 child: Padding(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: DsSpace.s12,
-                    vertical: DsSpace.s8,
-                  ),
+                  padding: const EdgeInsets.symmetric(horizontal: DsSpace.s12),
                   child: Semantics(
                     label: fieldLabel,
                     child: TextField(
@@ -414,7 +411,17 @@ class DsComposerState extends State<DsComposer> {
                       keyboardType: TextInputType.multiline,
                       style: dsTextStyle(DsType.body)
                           .copyWith(color: c.textPrimary),
-                      decoration: InputDecoration.collapsed(
+                      // The field itself is the tap target, so it is at least
+                      // density.target-min high; the padding sits inside it.
+                      decoration: InputDecoration(
+                        border: InputBorder.none,
+                        isDense: true,
+                        contentPadding: const EdgeInsets.symmetric(
+                          vertical: DsSpace.s8,
+                        ),
+                        constraints: BoxConstraints(
+                          minHeight: density.targetMin,
+                        ),
                         hintText: placeholder,
                         hintStyle: dsTextStyle(DsType.body)
                             .copyWith(color: c.textSecondary),

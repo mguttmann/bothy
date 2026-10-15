@@ -20,7 +20,7 @@ import 'view_models.dart';
 /// `category.spruce.on-sidebar` that pulses with `motion.duration.pulse`, still in reduced
 /// motion), muted (`color.text.on-sidebar-muted` and the `action.mute` icon), selected
 /// (`color.surface.sidebar-selected`), hover (`color.surface.sidebar-hover`) and focus (ring
-/// `color.focus.ring-on-sidebar`). The label reads "<Name>, <n> unread, <m> mentions, run
+/// `color.focus.ring-on-sidebar`). The label reads "{Name}, {n} unread, {m} mentions, run
 /// active"; Enter or a tap calls [onOpen].
 ///
 /// ```dart

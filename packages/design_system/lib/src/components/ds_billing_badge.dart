@@ -14,8 +14,8 @@ import 'view_models.dart';
 /// the agent card.
 ///
 /// `personal` and `organization` each have their icon, badge colors and text; the label reads
-/// "Backend: Personal, runs on the subscription of <holderName>". When [reportedMode]
-/// (`reported_billing_mode`) is set and differs from [mode], a warning badge "Reported: <mode>"
+/// "Backend: Personal, runs on the subscription of {holderName}". When [reportedMode]
+/// (`reported_billing_mode`) is set and differs from [mode], a warning badge "Reported: {mode}"
 /// follows (runs then fail with `billing_mode_mismatch`). An unknown mode shows [code].
 ///
 /// ```dart

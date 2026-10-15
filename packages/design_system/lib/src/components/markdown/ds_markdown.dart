@@ -31,7 +31,7 @@ typedef DsAttachmentResolver = Widget? Function(Uri reference);
 /// rule, tables (horizontal scroll) and links is built from the AST:
 ///
 /// * raw HTML (`<script>`, `<img>`, any tag) shows as its literal text;
-/// * an image shows as the text "Image: <alt> (<domain>)"; only [attachments] may turn a
+/// * an image shows as the text "Image: {alt} ({domain})"; only [attachments] may turn a
 ///   reference into a widget;
 /// * a link is active only for `https`, `http`, `mailto` and the internal paths `/t/...` and
 ///   `/c/...` ([dsClassifyLink]); its target shows in a tooltip on hover and focus, and
@@ -451,7 +451,7 @@ class _Builder {
 
 /// A placeholder span that carries a resolved attachment widget out of the line.
 class _BlockSpan extends WidgetSpan {
-  _BlockSpan(this.widget) : super(child: widget);
+  const _BlockSpan(this.widget) : super(child: widget);
 
   final Widget widget;
 }

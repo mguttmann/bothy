@@ -44,7 +44,7 @@ import 'view_models.dart';
 /// `color.attention.fg`, else nothing. The title in `type.body-sm`, bold when unread, muted when
 /// done; the time on the right in `type.caption`. The second line: "Waiting for you", the
 /// operator, the mention counter, the tags and an error reason. States rest, hover, selected
-/// ([selected]) and focus. The label reads "<Title>, <State>, <Time>, <n> unread"; Enter opens.
+/// ([selected]) and focus. The label reads "{Title}, {State}, {Time}, {n} unread"; Enter opens.
 ///
 /// ```dart
 /// DsThreadRow(row, selected: row.id == current, onOpen: () => open(row.id))
