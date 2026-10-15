@@ -950,12 +950,17 @@ func (s *AdminService) RevokeSubjectGrants(ctx context.Context, caller actor.Act
 	now := s.d.Clock.Now()
 	n := 0
 	for _, g := range grants {
-		_, ok, err := s.d.Store.RevokeGrant(ctx, g.ID, caller.ID, reason, now)
+		revoked, ok, err := s.d.Store.RevokeGrant(ctx, g.ID, caller.ID, reason, now)
 		if err != nil {
 			return n, err
 		}
-		if ok {
-			n++
+		if !ok {
+			continue
+		}
+		n++
+		// Every grant write appends grant.changed (M1-48), also this cascade (INT-W19/9).
+		if err := s.grantEvent(ctx, authorize.ActionAppUninstall, revoked, changeRevoked); err != nil {
+			return n, err
 		}
 	}
 	return n, nil

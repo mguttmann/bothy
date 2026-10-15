@@ -787,7 +787,7 @@ func (s *server) startTerminal(context.Context) error {
 	return nil
 }
 
-// startApps is start step 6e (M2-24): the module apps over the pool, the unit of work, rights hook
+// startApps is start step 6h (M2-24): the module apps over the pool, the unit of work, rights hook
 // and recorder of the audit step, the Authorizer and identity.
 func (s *server) startApps(context.Context) error {
 	cfg, err := AppsConfig(s.values)

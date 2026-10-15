@@ -5,6 +5,7 @@ package app_test
 import (
 	"context"
 	"slices"
+	"strings"
 	"testing"
 	"time"
 
@@ -93,6 +94,7 @@ func TestRevokeSubjectGrants(t *testing.T) {
 	_, err := w.admin.RevokeSubjectGrants(ctx, owner, w.tracker, "Uninstalled")
 	wantErr(t, err, errs.CodeInternalError, "")
 	second := w.grantRow(t, domain.Subject{Kind: domain.SubjectApp, PrincipalID: w.tracker}, domain.Target{Kind: domain.TargetChannel, ChannelID: w.allgemein}, domain.LevelRead, time.Time{})
+	seq := w.lastSeq(t)
 	var n int
 	err = w.change(ctx, "app.uninstall", txn.Ref{Kind: "app", ID: w.tracker}, []ids.ID{w.tracker}, func(ctx context.Context) error {
 		var err error
@@ -101,6 +103,18 @@ func TestRevokeSubjectGrants(t *testing.T) {
 	})
 	if err != nil || n != 2 {
 		t.Fatalf("revoked %d, %v; want G-6 and the second grant", n, err)
+	}
+	// INT-W19/9: every revoked grant writes grant.changed (M1-48), as the other grant writes do.
+	gc := w.eventsOf(t, "grant.changed", seq)
+	if len(gc) != 2 || gc[0].ActorKind != "user" || !slices.ContainsFunc(gc, func(r logRow) bool { return r.Resource == w.g6 }) ||
+		!slices.ContainsFunc(gc, func(r logRow) bool { return r.Resource == second }) {
+		t.Fatalf("grant.changed %+v", gc)
+	}
+	for _, r := range gc {
+		validateAgainst(t, "GrantChangedPayload", r.Payload)
+		if !strings.Contains(r.Payload, `"change": "revoked"`) {
+			t.Errorf("payload %s", r.Payload)
+		}
 	}
 	for _, id := range []ids.ID{w.g6, second} {
 		g, found, err := w.store.GetGrant(context.Background(), id)

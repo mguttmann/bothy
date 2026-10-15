@@ -117,7 +117,7 @@ func TestMigrations_AppsConstraints(t *testing.T) {
 	wantState(t, exec(app, `DELETE FROM apps WHERE principal_id = $1`, tracker), "42501", "bothy_app deletes an app")
 }
 
-// TestMigrations_AppsDown holds the Down sections: down to version 15 removes both tables and the
+// TestMigrations_AppsDown holds the Down sections: down to version 29 removes both tables and the
 // trigger function, up applies again.
 func TestMigrations_AppsDown(t *testing.T) {
 	t.Parallel()
@@ -130,8 +130,8 @@ func TestMigrations_AppsDown(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if _, err := provider.DownTo(ctx, 15); err != nil {
-		t.Fatalf("down to 15: %v", err)
+	if _, err := provider.DownTo(ctx, 29); err != nil {
+		t.Fatalf("down to 29: %v", err)
 	}
 	var left int
 	if err := sqlDB.QueryRowContext(ctx, `SELECT (to_regclass('apps') IS NOT NULL)::int + (to_regclass('app_installations') IS NOT NULL)::int
