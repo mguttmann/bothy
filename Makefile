@@ -568,6 +568,8 @@ release-trial: ## Trial release against local throwaway targets: make release-tr
 SCANCODE_VERSION := $(shell sed -n 's/^ARG SCANCODE_VERSION=//p' tools/scancode/Dockerfile)
 SCANCODE_IMAGE ?= bothy-scancode:$(SCANCODE_VERSION)-local
 SCANCODE_OUT ?= .cache/scancode
+# Parallel ScanCode processes; each needs up to about 2 GB on the largest files of the tree.
+SCANCODE_PROCESSES ?= 4
 scancode: ## ScanCode over the tracked tree with the license gate (release step): make scancode [SCANCODE_OUT=<dir>]
 	@docker buildx version >/dev/null 2>&1 || { echo "scancode: docker buildx is required (CONTRIBUTING.md)" >&2; exit 1; }
 	docker buildx build --platform linux/amd64 --load --tag '$(SCANCODE_IMAGE)' tools/scancode
@@ -576,7 +578,7 @@ scancode: ## ScanCode over the tracked tree with the license gate (release step)
 	git archive HEAD | tar -x -C "$$tree" || exit 1; \
 	docker run --rm --platform linux/amd64 --user "$$(id -u):$$(id -g)" --network none \
 	  -v "$$tree:/scan/tree:ro" -v "$$out:/scan/out" '$(SCANCODE_IMAGE)' \
-	  --license --copyright --strip-root --processes 4 --timeout 300 --quiet \
+	  --license --copyright --strip-root --processes '$(SCANCODE_PROCESSES)' --timeout 600 --quiet \
 	  --json-pp /scan/out/scancode.json /scan/tree || exit 1; \
 	$(UVRUN) python tools/ci/scancode_policy.py --report "$$out/scancode.json"
 

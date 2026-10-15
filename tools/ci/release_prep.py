@@ -303,6 +303,10 @@ def prepare(
     rel = (lambda name: name) if directory == "." else (lambda name: f"{directory}/{name}")
     last = last_stable_tag(repo, prefix)
     previous, changes = unreleased_changes(repo, git_cliff, config, prefix, paths)
+    if not changes:
+        raise ReleasePrepError(
+            f"nothing to release: no commit of {component}" + (f" since {last}" if last else "")
+        )
     if last is not None and previous != last:
         # git-cliff drops a tag whose commit is outside the include paths and then counts
         # from an older one; the release commit of ADR 0060 always changes VERSION.

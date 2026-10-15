@@ -489,13 +489,15 @@ jobs:
         run: |
           echo "server=$SERVER" >> "$GITHUB_OUTPUT"
           echo "postgres=$POSTGRES" >> "$GITHUB_OUTPUT"
-      - name: Vulnerability scan of both images
+      - name: Vulnerability scan of both images, each platform
         env:
           SERVER: ${{ steps.ref.outputs.server }}
           POSTGRES: ${{ steps.ref.outputs.postgres }}
         run: |
-          make trivy-image IMAGE="$SERVER"
-          make trivy-image IMAGE="$POSTGRES"
+          for platform in linux/amd64 linux/arm64; do
+            TRIVY_PLATFORM="$platform" make trivy-image IMAGE="$SERVER"
+            TRIVY_PLATFORM="$platform" make trivy-image IMAGE="$POSTGRES"
+          done
       - name: SBOMs (SPDX and CycloneDX) per image platform and binary
         env:
           VERSION: ${{ steps.info.outputs.version }}
@@ -545,7 +547,7 @@ jobs:
           POSTGRES: ${{ steps.ref.outputs.postgres }}
         run: |
           uv run --project tools --locked --quiet python tools/ci/release_chain.py verify --mode public \
-            --identity-regexp "^https://github.com/${GITHUB_REPOSITORY}/.github/workflows/release.yml@refs/tags/server/v" \
+            --identity-regexp "^https://github\\.com/${GITHUB_REPOSITORY}/\\.github/workflows/release\\.yml@refs/tags/server/v" \
             --issuer https://token.actions.githubusercontent.com --dist dist \
             --image "bothy-server=$SERVER" --image "bothy-postgres=$POSTGRES"
       - name: Build provenance of bothy-server (public phase only)

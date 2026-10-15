@@ -165,11 +165,11 @@ Public phase (keyless with the identity of the release workflow, plus attestatio
 
 ```
 cosign verify ghcr.io/<owner>/bothy-server@sha256:<digest> \
-  --certificate-identity-regexp '^https://github.com/<owner>/bothy/.github/workflows/release.yml@refs/tags/server/v' \
+  --certificate-identity-regexp '^https://github\.com/<owner>/bothy/\.github/workflows/release\.yml@refs/tags/server/v' \
   --certificate-oidc-issuer https://token.actions.githubusercontent.com
 gh attestation verify oci://ghcr.io/<owner>/bothy-server@sha256:<digest> --repo <owner>/bothy
 cosign verify-blob SHA256SUMS --bundle SHA256SUMS.sigstore.json \
-  --certificate-identity-regexp '^https://github.com/<owner>/bothy/.github/workflows/release.yml@refs/tags/server/v' \
+  --certificate-identity-regexp '^https://github\.com/<owner>/bothy/\.github/workflows/release\.yml@refs/tags/server/v' \
   --certificate-oidc-issuer https://token.actions.githubusercontent.com
 sha256sum --check --strict SHA256SUMS
 ```

@@ -274,7 +274,8 @@ def test_disagreeing_git_cliff_is_an_error(
     fx: Fixture, git_cliff: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     released(fx).commit("fix(server): repair it", "services/server/a.go")
-    monkeypatch.setattr(release_prep, "unreleased_changes", lambda *a: (None, []))
+    change = release_prep.Change("a" * 40, "fix", False)
+    monkeypatch.setattr(release_prep, "unreleased_changes", lambda *a: (None, [change]))
     with pytest.raises(release_prep.ReleasePrepError, match=r"not from tag server/v0\.1\.0"):
         prep(fx, git_cliff)
 
@@ -334,3 +335,10 @@ def test_cli_error_exit(fx: Fixture, git_cliff: Path, capsys: pytest.CaptureFixt
     )
     assert rc == 1
     assert "release-prep:" in capsys.readouterr().err
+
+
+def test_no_commit_since_the_tag_is_nothing_to_release(fx: Fixture, git_cliff: Path) -> None:
+    released(fx)
+    fx.commit("fix(sdk-python): elsewhere", "sdk/python/b.py")
+    with pytest.raises(release_prep.ReleasePrepError, match="nothing to release: no commit"):
+        prep(fx, git_cliff)
