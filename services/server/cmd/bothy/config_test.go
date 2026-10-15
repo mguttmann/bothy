@@ -380,6 +380,8 @@ func TestConfigPrintShowsSourcePerKey(t *testing.T) {
 		"telemetry.pseudonym_key_ref = file:/run/bothy/secrets/telemetry_pseudonym_key  # default\n" +
 		"telemetry.traces.sampler_ratio = 1  # default\n" +
 		"telemetry.traces.trust_remote_parent = false  # default\n" +
+		"template.max_per_scope = 100  # default\n" +
+		"template.name_max_chars = 100  # default\n" +
 		"terminal.pairing_code_ttl = 15m  # default\n" +
 		"terminal.quick_reattach_window = 1m  # default\n" +
 		"terminal.session_token_ttl = 30s  # default\n" +

@@ -11,6 +11,17 @@ documented in this file. The format is based on
 
 ### Added
 
+- Mentions and templates (M1-60): `listMyMentions` lists the caller's mentions in channels it may
+  read, newest first, with a cursor bound to the list and the caller; a mention in an unreadable
+  channel stays stored but is never listed or counted. The port `messaging.Mentions` adds
+  `CountUnread`, the unread mentions per thread above a read sequence in one statement, for the
+  counters of sync (M1-61, M1-63). Migration `00034` creates `message_templates`; the operations
+  `listMyTemplates`, `listTemplates`, `createPersonalTemplate`, `createChannelTemplate`,
+  `updateTemplate` (`If-Match` required) and `deleteTemplate` keep personal templates (resource
+  `user`, `self`) and channel templates (`read` to list, `manage` to change), bounded exactly by
+  the new key `template.max_per_scope`; names are display texts of at most the new key
+  `template.name_max_chars`. Templates append no event.
+
 - Sending messages (M1-56): `createMessage` and `createThread`. Migrations `00032` and `00033`
   create `messages` and `mentions` and give `threads.parent_message_id` its deferred foreign key.
   A message is idempotent by its author and `client_msg_id` (a repetition answers `200` with

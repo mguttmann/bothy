@@ -1,9 +1,9 @@
 // SPDX-License-Identifier: Apache-2.0
 
-// Package postgres is the PostgreSQL adapter of the messaging module (M1-56): the sqlc queries in
-// queries/, the generated code in sqlcgen/ and Repository, which implements app.Store over the
-// tables messages and mentions (docs/spec/03-datenmodell.md section 4.6). Only this package runs
-// SQL on them (03 Grundsatz 12).
+// Package postgres is the PostgreSQL adapter of the messaging module (M1-56, M1-60): the sqlc
+// queries in queries/, the generated code in sqlcgen/ and Repository, which implements app.Store
+// over the tables messages, mentions and message_templates (docs/spec/03-datenmodell.md section
+// 4.6). Only this package runs SQL on them (03 Grundsatz 12).
 //
 // Example:
 //

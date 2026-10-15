@@ -114,6 +114,8 @@ var appPrivileges = map[string][]string{
 	// editing replaces the mentions of a message and deleting removes them.
 	"messages": {"SELECT", "INSERT", "UPDATE"},
 	"mentions": {"SELECT", "INSERT", "DELETE"},
+	// M1-60: templates are deleted softly (deleted_at); no DELETE.
+	"message_templates": {"SELECT", "INSERT", "UPDATE"},
 	// 03 section 4.14 (M2-39): hosts and terminal sessions are security history; a session user
 	// row is never deleted while its host is not retired (ruling T12, R-DM-39). The retention
 	// job of class security grants its own DELETE (M7).

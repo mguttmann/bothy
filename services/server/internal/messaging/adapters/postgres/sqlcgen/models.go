@@ -482,6 +482,18 @@ type Message struct {
 	CreatedAt           pgtype.Timestamptz
 }
 
+type MessageTemplate struct {
+	ID          pgtype.UUID
+	OwnerUserID pgtype.UUID
+	ChannelID   pgtype.UUID
+	Name        string
+	ContentMd   string
+	CreatedBy   pgtype.UUID
+	CreatedAt   pgtype.Timestamptz
+	DeletedAt   pgtype.Timestamptz
+	Version     int64
+}
+
 type Owner struct {
 	ID        pgtype.UUID
 	UserID    pgtype.UUID

@@ -513,6 +513,34 @@ func (stubServer) CreateThread(context.Context, rest.CreateThreadRequestObject) 
 	return nil, nil
 }
 
+func (stubServer) ListMyMentions(context.Context, rest.ListMyMentionsRequestObject) (rest.ListMyMentionsResponseObject, error) {
+	return nil, nil
+}
+
+func (stubServer) ListMyTemplates(context.Context, rest.ListMyTemplatesRequestObject) (rest.ListMyTemplatesResponseObject, error) {
+	return nil, nil
+}
+
+func (stubServer) ListTemplates(context.Context, rest.ListTemplatesRequestObject) (rest.ListTemplatesResponseObject, error) {
+	return nil, nil
+}
+
+func (stubServer) CreatePersonalTemplate(context.Context, rest.CreatePersonalTemplateRequestObject) (rest.CreatePersonalTemplateResponseObject, error) {
+	return nil, nil
+}
+
+func (stubServer) CreateChannelTemplate(context.Context, rest.CreateChannelTemplateRequestObject) (rest.CreateChannelTemplateResponseObject, error) {
+	return nil, nil
+}
+
+func (stubServer) UpdateTemplate(context.Context, rest.UpdateTemplateRequestObject) (rest.UpdateTemplateResponseObject, error) {
+	return nil, nil
+}
+
+func (stubServer) DeleteTemplate(context.Context, rest.DeleteTemplateRequestObject) (rest.DeleteTemplateResponseObject, error) {
+	return nil, nil
+}
+
 func (stubServer) SetThreadTags(context.Context, rest.SetThreadTagsRequestObject) (rest.SetThreadTagsResponseObject, error) {
 	return nil, nil
 }
@@ -725,8 +753,15 @@ func TestRealTable_Enabled(t *testing.T) {
 		"reopenThread":       {"POST /api/v1/threads/{thread_id}/reopen", "thread.reopen", "rl.write"},
 		"setThreadTags":      {"PUT /api/v1/threads/{thread_id}/tags", "thread.tags.set", "rl.write"},
 		// M1-56
-		"createMessage": {"POST /api/v1/threads/{thread_id}/messages", "message.create", "rl.message"},
-		"createThread":  {"POST /api/v1/channels/{channel_id}/threads", "thread.create", "rl.message"},
+		"createMessage":          {"POST /api/v1/threads/{thread_id}/messages", "message.create", "rl.message"},
+		"createThread":           {"POST /api/v1/channels/{channel_id}/threads", "thread.create", "rl.message"},
+		"listMyMentions":         {"GET /api/v1/me/mentions", "mention.list", "rl.read"},
+		"listMyTemplates":        {"GET /api/v1/me/templates", "template.read", "rl.read"},
+		"createPersonalTemplate": {"POST /api/v1/me/templates", "template.manage", "rl.write"},
+		"listTemplates":          {"GET /api/v1/channels/{channel_id}/templates", "template.read", "rl.read"},
+		"createChannelTemplate":  {"POST /api/v1/channels/{channel_id}/templates", "template.manage", "rl.write"},
+		"updateTemplate":         {"PATCH /api/v1/templates/{template_id}", "template.manage", "rl.write"},
+		"deleteTemplate":         {"DELETE /api/v1/templates/{template_id}", "template.manage", "rl.write"},
 		// M2-39
 		"listHosts":             {"GET /api/v1/hosts", "host.read", "rl.read"},
 		"createHost":            {"POST /api/v1/hosts", "host.manage", "rl.admin"},

@@ -2656,6 +2656,30 @@
       "doc": "With true an incoming traceparent becomes the parent of the server span, otherwise only a span link."
     },
     {
+      "name": "template.max_per_scope",
+      "env": "BOTHY_TEMPLATE__MAX_PER_SCOPE",
+      "kind": "int",
+      "default": "100",
+      "required": false,
+      "enum": [],
+      "min": "1",
+      "max": "",
+      "chapter": "03-datenmodell.md",
+      "doc": "Most templates per person or per channel; listTemplates is not paginated."
+    },
+    {
+      "name": "template.name_max_chars",
+      "env": "BOTHY_TEMPLATE__NAME_MAX_CHARS",
+      "kind": "int",
+      "default": "100",
+      "required": false,
+      "enum": [],
+      "min": "1",
+      "max": "",
+      "chapter": "03-datenmodell.md",
+      "doc": "Longest template name in Unicode characters."
+    },
+    {
       "name": "terminal.pairing_code_ttl",
       "env": "BOTHY_TERMINAL__PAIRING_CODE_TTL",
       "kind": "duration",
