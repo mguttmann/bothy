@@ -29,6 +29,7 @@ import (
 	"crypto/x509/pkix"
 	"encoding/json"
 	"fmt"
+	"html"
 	"math/big"
 	"net"
 	"net/http"
@@ -349,7 +350,9 @@ func (f *Fake) serve(w http.ResponseWriter, r *http.Request) {
 	if injected && inj.Status != 0 {
 		body := inj.Body
 		if inj.Echo {
-			body = fmt.Sprintf(`{"message": %q, "code": 0}`, "echo "+r.Header.Get("Authorization")+
+			// HTML-escaped so that no request value is reflected raw into a response body; a
+			// bot token has no character that escaping changes, so the echo stays exact.
+			body = fmt.Sprintf(`{"message": %q, "code": 0}`, "echo "+html.EscapeString(r.Header.Get("Authorization"))+
 				" https://cdn.example.com/a/b.png?"+SignedQuery)
 		}
 		writeJSON(w, inj.Status, []byte(body))
