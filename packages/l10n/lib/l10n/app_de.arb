@@ -128,7 +128,7 @@
   "vizStepSubagent": "Subagent {name}",
   "vizStepWorkflow": "Workflow {name}",
   "vizStepBackgroundJob": "Hintergrundjob {name}",
-  "vizLaneLabel": "{spaceName}, {channelName}, {count, plural, =0{keine aktiven Läufe} =1{1 aktiver Lauf} other{{count} aktive Läufe}}",
+  "vizLaneLabel": "{space}, {channel}, {count, plural, =0{keine aktiven Läufe} =1{1 aktiver Lauf} other{{count} aktive Läufe}}",
   "vizBarRowLabel": "{row}, {count, plural, =1{1 Lauf} other{{count} Läufe}}",
   "vizChartRates": "Raten",
   "vizChartRuns": "Läufe",

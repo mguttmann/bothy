@@ -169,7 +169,10 @@ final class LaneModel {
 
   /// Groups [runs] into lanes by space and channel, in the order the frame gives: a lane
   /// appears where its first run appears, and its cards keep the frame order.
-  static List<LaneModel> group(Iterable<api.StatsLiveRun> runs, VizNames names) {
+  static List<LaneModel> group(
+    Iterable<api.StatsLiveRun> runs,
+    VizNames names,
+  ) {
     final lanes = <(String, String), List<RunCardModel>>{};
     final keys = <(String, String)>[];
     for (final run in runs) {

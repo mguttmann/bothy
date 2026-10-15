@@ -14,6 +14,10 @@ environment:
 # never sync_engine, local_store, a WebView or an iframe.
 dependencies:
   api_client: any
+  # The generated types of api_client are built_value classes; the fixture decoder and the
+  # tests name their serializers and lists.
+  built_collection: ^5.1.2
+  built_value: ^8.13.0
   design_system: any
   domain: any
   flutter:

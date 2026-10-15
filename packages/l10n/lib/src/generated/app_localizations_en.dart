@@ -455,13 +455,7 @@ class AppLocalizationsEn extends AppLocalizations {
   }
 
   @override
-  String vizLaneLabel(
-    String space,
-    String channel,
-    int count,
-    Object channelName,
-    Object spaceName,
-  ) {
+  String vizLaneLabel(String space, String channel, int count) {
     String _temp0 = intl.Intl.pluralLogic(
       count,
       locale: localeName,
@@ -469,7 +463,7 @@ class AppLocalizationsEn extends AppLocalizations {
       one: '1 active run',
       zero: 'no active runs',
     );
-    return '$spaceName, $channelName, $_temp0';
+    return '$space, $channel, $_temp0';
   }
 
   @override

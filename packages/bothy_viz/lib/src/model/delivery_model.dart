@@ -33,7 +33,11 @@ final class SliModel {
 /// Gateway connections of the node by kind; only with one node.
 final class ConnectionsModel {
   /// Creates the counts.
-  const ConnectionsModel({required this.user, required this.agent, required this.app});
+  const ConnectionsModel({
+    required this.user,
+    required this.agent,
+    required this.app,
+  });
 
   /// Connections of people.
   final int user;
@@ -71,11 +75,17 @@ final class DeliveryModel {
       at: frame.at,
       slis: List.unmodifiable([
         for (final s in frame.sli ?? <api.StatsLiveSli>[])
-          SliModel(metric: s.metric, total: s.total, good: s.good, ratio: s.ratio),
+          SliModel(
+            metric: s.metric,
+            total: s.total,
+            good: s.good,
+            ratio: s.ratio,
+          ),
       ]),
       gatewayRates: List.unmodifiable([
         for (var i = 0; i < rates.length; i++)
-          if (gateway.contains(rates[i].metric)) RateModel.fromRate(rates[i], i),
+          if (gateway.contains(rates[i].metric))
+            RateModel.fromRate(rates[i], i),
       ]),
       connections: connections == null
           ? null
