@@ -76,9 +76,12 @@ RUN set -eu; \
     [ -z "$extra" ] || { echo "unexpected top-level paths in the packages: $extra" >&2; exit 1; }; \
     rm -rf /rootfs/usr/share/doc /rootfs/usr/share/man /rootfs/usr/share/lintian; \
     # Directories of pgBackRest owned by the user postgres of the base image (uid and gid 999): the
-    # repository, the log and the configuration the entry point writes. A named volume mounted on
-    # /var/lib/pgbackrest takes owner and mode from here on first use.
-    mkdir -p /owned/var/lib/pgbackrest /owned/var/log/pgbackrest /owned/etc/pgbackrest
+    # repository and the log. A named volume mounted on /var/lib/pgbackrest takes owner and mode
+    # from here on first use. The configuration the entry point writes lives in /tmp, and
+    # /etc/pgbackrest is a link owned by root to it, so no copied path below /etc is writable by
+    # the user (docs/DECISIONS.md D-M7-01-9).
+    mkdir -p /owned/var/lib/pgbackrest /owned/var/log/pgbackrest /link/etc; \
+    ln -s /tmp/bothy-pgbackrest /link/etc/pgbackrest
 
 FROM postgres:18.6-trixie@sha256:74935e72241653ca55e0414067e6d8763aceb8a810eb51b452253ec3dcfc4336
 ARG VERSION REVISION
@@ -93,7 +96,7 @@ COPY --from=packages /rootfs/usr/ /usr/
 COPY --from=packages /rootfs/var/lib/dpkg/status.d/ /var/lib/dpkg/status.d/
 COPY --from=packages --chown=999:999 --chmod=0750 /owned/var/lib/pgbackrest /var/lib/pgbackrest
 COPY --from=packages --chown=999:999 --chmod=0750 /owned/var/log/pgbackrest /var/log/pgbackrest
-COPY --from=packages --chown=999:999 --chmod=0700 /owned/etc/pgbackrest /etc/pgbackrest
+COPY --from=packages /link/etc/ /etc/
 COPY --from=build --chown=0:0 --chmod=0555 /out/bothy-backupd /usr/local/bin/bothy-backupd
 COPY --chown=0:0 --chmod=0555 services/server/images/bothy-postgres/check-pgbackrest-version.sh /usr/local/bin/check-pgbackrest-version.sh
 COPY --chown=0:0 --chmod=0555 services/server/images/bothy-postgres/entrypoint.sh /usr/local/bin/bothy-postgres-entrypoint

@@ -10,7 +10,8 @@
 #                       archive-push over TLS to the repository host, plus a pgBackRest TLS
 #                       server through which the repository host runs its backups
 #
-# Both roles write /etc/pgbackrest/pgbackrest.conf (mode 0600) before the command starts. TLS
+# Both roles write /etc/pgbackrest/pgbackrest.conf (mode 0600) before the command starts; the
+# path is a link owned by root to a directory in /tmp that the entry point creates. TLS
 # keys and the cipher pass are read from files under /run/bothy/secrets (R-OP-05); the cipher
 # pass goes into the configuration file of backup only, because pgBackRest has no option that
 # reads it from a file. The database role holds no cipher pass and no off-site credential
@@ -25,6 +26,8 @@ set -euo pipefail
 readonly secrets=/run/bothy/secrets
 readonly tls_dir=$secrets/pgbackrest_tls
 readonly conf_dir=/etc/pgbackrest
+# Target of the link /etc/pgbackrest (Dockerfile): created here with mode 0700.
+readonly conf_store=/tmp/bothy-pgbackrest
 readonly conf=$conf_dir/pgbackrest.conf
 # Stanza and TLS port are fixed for an instance; bothy-backupd uses the same stanza.
 readonly stanza=bothy
@@ -55,6 +58,8 @@ host_name() {
 # the running user.
 write_conf() {
 	local tmp
+	mkdir -p -m 0700 "$conf_store"
+	[[ -d $conf_store && ! -L $conf_store && -O $conf_store ]] || die "$conf_store is not a directory of the running user"
 	tmp=$(mktemp "$conf_dir/.pgbackrest.conf.XXXXXX")
 	chmod 0600 "$tmp"
 	cat >"$tmp"
