@@ -1278,6 +1278,24 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'for information only'**
   String get costInformationOnly;
+
+  /// Text that replaces an image of a message; images are never loaded from a URL (components.md section 1, SEC-OUT-2).
+  ///
+  /// In en, this message translates to:
+  /// **'Image: {alt} ({domain})'**
+  String markdownImage(String alt, String domain);
+
+  /// Text that replaces an image without a domain (components.md section 1, SEC-OUT-2).
+  ///
+  /// In en, this message translates to:
+  /// **'Image: {alt}'**
+  String markdownImageNoDomain(String alt);
+
+  /// Copy button of a code block in a message (components.md section 1).
+  ///
+  /// In en, this message translates to:
+  /// **'Copy code'**
+  String get markdownCopyCode;
 }
 
 class _AppLocalizationsDelegate
