@@ -447,8 +447,9 @@ final class LoginService {
           ),
         ),
         // `202` carries a PairingStatus, which the generated method cannot read as a
-        // TokenResponse; that failure means "not yet approved".
-        stillWaiting: (e) => e.response?.statusCode == 202,
+        // TokenResponse; that failure means "not yet approved". A network error, `429` and a
+        // `5xx` are transient and keep polling, as in `pollPendingDevice`.
+        stillWaiting: _transientOrPending,
       );
       if (outcome != null) return outcome;
       await _core.clock.delay(_backoff(attempt));
@@ -509,6 +510,12 @@ final class LoginService {
       _core.log('logout call failed: ${problemOf(e)?.code ?? 'network error'}');
     }
     await _core.signOut(SignOutReason.loggedOut);
+  }
+
+  static bool _transientOrPending(DioException e) {
+    if (e.error is AuthException) return false;
+    final status = e.response?.statusCode;
+    return status == null || status == 202 || status == 429 || status >= 500;
   }
 
   Duration _backoff(int attempt) {

@@ -233,4 +233,31 @@ void main() {
       expect(again.session.session!.sid, sessionId);
     },
   );
+
+  test(
+    'a late session_revoked of an older session keeps the new one',
+    () async {
+      final h = Harness();
+      await h.signIn(access: 'A1', refresh: 'R1');
+      final gate = Completer<void>();
+      h.server.routes['GET /devices/${h.deviceId}'] = (_) async {
+        await gate.future;
+        return FakeReply.problem(401, 'session_revoked');
+      };
+      h.server.routes['POST /auth/logout'] = (_) => const FakeReply(204);
+      final pending = h.session.api.getDevicesApi().getDevice(
+        deviceId: h.deviceId,
+      );
+      final caught = expectLater(pending, throwsA(isA<DioException>()));
+      await h.settle();
+      await h.session.login.logout();
+      await h.signIn(access: 'B1', refresh: 'RB');
+      gate.complete();
+      await caught;
+      await h.settle();
+      expect(h.events.whereType<SignedOut>(), isEmpty);
+      expect(h.session.session, isNotNull);
+      expect(h.store.values.values, contains('RB'));
+    },
+  );
 }

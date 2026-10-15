@@ -21,6 +21,7 @@ const _nonceRetried = 'auth.nonce_retried';
 const _refreshRetried = 'auth.refresh_retried';
 const _stepUpRetried = 'auth.step_up_retried';
 const _tokenVersion = 'auth.token_version';
+const _generation = 'auth.generation';
 
 /// Repeats [options] through every interceptor of [dio] and hands the result to [handler].
 Future<void> _repeat(
@@ -76,8 +77,12 @@ class RefreshInterceptor extends Interceptor {
       return handler.next(err);
     }
     if (problem.code == 'session_revoked') {
-      // R-SY-14: a revoked session or device ends here; the app deletes local data.
-      await _core.signOut(SignOutReason.sessionRevoked);
+      // R-SY-14: a revoked session or device ends here; the app deletes local data. A late
+      // answer to a request of an earlier session (sent before a logout and a new login) must
+      // not end the session that replaced it.
+      if (options.extra[_generation] == _core.generation) {
+        await _core.signOut(SignOutReason.sessionRevoked);
+      }
       return handler.next(err);
     }
     if ((problem.code != 'token_expired' &&
@@ -125,6 +130,7 @@ class DpopInterceptor extends Interceptor {
           return handler.reject(authError(options, const NotSignedIn()));
         }
         options.extra[_tokenVersion] = _core.tokens.version;
+        options.extra[_generation] = _core.generation;
         options.headers['Authorization'] = 'DPoP ${state.accessToken}';
         options.headers['DPoP'] = await _proofs.forRequest(
           method: options.method,

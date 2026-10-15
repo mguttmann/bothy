@@ -322,6 +322,26 @@ void main() {
     });
   });
 
+  group('pairing with transient errors', () {
+    for (final kind in ['network', '429', '503']) {
+      test('pollPairing keeps polling after a transient $kind', () async {
+        var polls = 0;
+        h.server.routes['POST /auth/pairing/complete'] = (_) {
+          polls++;
+          if (polls == 1) {
+            if (kind == 'network') throw NetworkDown();
+            if (kind == '429') return FakeReply.problem(429, 'rate_limited');
+            return FakeReply.problem(503, 'unavailable');
+          }
+          return tokens();
+        };
+        final done = await h.session.login.pollPairing(pairingId);
+        expect(done, isA<LoginSignedIn>());
+        expect(polls, 2);
+      });
+    }
+  });
+
   group('password with TOTP', () {
     test(
       'without a code the service asks for the second factor, then signs in',
