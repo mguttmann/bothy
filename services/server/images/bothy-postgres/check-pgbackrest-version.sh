@@ -30,6 +30,7 @@ fi
 version=${reported#pgBackRest }
 case $version in
 '' | *[!0-9.]* | .* | *. | *..*) fail "cannot read a release version from \"$reported\"" ;;
+*) ;;
 esac
 
 # Compare major, minor and patch as numbers; a missing part counts as 0.

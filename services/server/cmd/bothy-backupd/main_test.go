@@ -153,6 +153,10 @@ func TestUsage(t *testing.T) {
 		{[]string{"healthcheck", "--addr", "backup:8432"}, exitUsage},
 		{[]string{"healthcheck", "--addr", "127.0.0.1"}, exitUsage},
 		{[]string{"version", "extra"}, exitUsage},
+		{[]string{"--retry", "1s", "--help"}, exitOK},
+		{[]string{"--bogus"}, exitUsage},
+		{[]string{"--retry", "1s", "extra"}, exitUsage},
+		{[]string{"--pgbackrest", ""}, exitUsage},
 	} {
 		var stdout, stderr bytes.Buffer
 		if got := run(context.Background(), tc.args, &stdout, &stderr); got != tc.code {
@@ -287,5 +291,48 @@ func TestHealthcheckSilentServer(t *testing.T) {
 	}
 	if time.Since(start) > 5*time.Second {
 		t.Errorf("healthcheck took %v with --timeout 200ms", time.Since(start))
+	}
+}
+
+// TestRunServesUntilTheServerFails: the default command of run starts serve with its own
+// signal channel; without a pgBackRest binary it fails.
+func TestRunServesUntilTheServerFails(t *testing.T) {
+	t.Parallel()
+	var stdout, stderr bytes.Buffer
+	args := []string{"--pgbackrest", filepath.Join(t.TempDir(), "missing"), "--retry", "1ms"}
+	if code := run(context.Background(), args, &stdout, &stderr); code != exitFailure {
+		t.Errorf("run without a pgbackrest binary = %d, want %d; stderr %s", code, exitFailure, stderr.String())
+	}
+}
+
+// TestServeAcceptsAServerEndedBySIGTERM: a TLS server that the SIGTERM itself ends (no trap)
+// is the expected outcome of a stop and is not reported as an error.
+func TestServeAcceptsAServerEndedBySIGTERM(t *testing.T) {
+	t.Parallel()
+	dir := t.TempDir()
+	script := "#!/bin/sh\nfor a in \"$@\"; do last=$a; done\n" +
+		"case \"$last\" in\nserver) exec sleep 60 ;;\nstanza-create) echo ok > '" + dir + "/stanza' ;;\nesac\n"
+	bin := filepath.Join(dir, "pgbackrest")
+	if err := os.WriteFile(bin, []byte(script), 0o700); err != nil { //nolint:gosec // G306: the fake must be executable.
+		t.Fatal(err)
+	}
+	signals := make(chan os.Signal, 1)
+	var stderr bytes.Buffer
+	done := make(chan int, 1)
+	go func() {
+		done <- serve(context.Background(), serveOptions{pgbackrest: bin, stanza: "bothy", retry: 10 * time.Millisecond}, signals, &stderr)
+	}()
+	waitFile(t, filepath.Join(dir, "stanza"))
+	signals <- syscall.SIGTERM
+	select {
+	case code := <-done:
+		if code != exitOK {
+			t.Errorf("serve returned %d after SIGTERM, want 0; stderr:\n%s", code, stderr.String())
+		}
+	case <-time.After(10 * time.Second):
+		t.Fatal("serve did not return after SIGTERM")
+	}
+	if strings.Contains(stderr.String(), "stopped with") {
+		t.Errorf("a server ended by SIGTERM was reported as an error:\n%s", stderr.String())
 	}
 }

@@ -38,12 +38,12 @@ die() {
 
 # require NAME: the variable must be set and not empty.
 require() {
-	[ -n "${!1:-}" ] || die "$1 is not set (docs/operations/configuration.md)"
+	[[ -n "${!1:-}" ]] || die "$1 is not set (docs/operations/configuration.md)"
 }
 
 # need_file PATH: a secret file must exist and be readable by this user.
 need_file() {
-	[ -r "$1" ] || die "$1 is missing or not readable; run secrets-init (bothy secrets init)"
+	[[ -r "$1" ]] || die "$1 is missing or not readable; run secrets-init (bothy secrets init)"
 }
 
 # host_name VALUE NAME: a plain host name, so it cannot break the configuration file.
@@ -129,16 +129,16 @@ pg1-socket-path=/var/run/postgresql
 EOF
 }
 
-[ "$(id -u)" != 0 ] || die "runs as the user postgres of the image, not as root"
+[[ "$(id -u)" != 0 ]] || die "runs as the user postgres of the image, not as root"
 check-pgbackrest-version.sh >/dev/null
 
-if [ "${1:-}" = bothy-backupd ]; then
+if [[ "${1:-}" = bothy-backupd ]]; then
 	repository_role
 	exec "$@"
 fi
 
 database_role
-if [ "${1:-}" = postgres ]; then
+if [[ "${1:-}" = postgres ]]; then
 	require BOTHY_PG_ARCHIVE_TIMEOUT
 	[[ $BOTHY_PG_ARCHIVE_TIMEOUT =~ ^[0-9]+(ms|s|min|h)?$ ]] || die "BOTHY_PG_ARCHIVE_TIMEOUT is not a PostgreSQL duration"
 	# The pgBackRest server lets the repository host run backups against this database. It runs
@@ -154,7 +154,7 @@ if [ "${1:-}" = postgres ]; then
 		"$@"
 fi
 # A restore writes into PGDATA; on a fresh volume the directory does not exist yet.
-if [ "${1:-}" = pgbackrest ]; then
+if [[ "${1:-}" = pgbackrest ]]; then
 	mkdir -p "$pgdata"
 	chmod 0700 "$pgdata"
 fi
