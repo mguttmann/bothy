@@ -51,6 +51,8 @@ var configChecks = []configCheck{
 	{name: "jwks_max_age_below_rotation", keys: []string{keyJWKSMaxAge, keyInvocationRotation, keyAccessRotation}, fn: jwksMaxAgeBelowRotation},
 	{name: "fingerprint_keys", keys: []string{keyFingerprintConfirmChars, keyFingerprintMaxAttempts}, fn: fingerprintKeys},
 	{name: "webauthn_relying_party", keys: []string{keyPublicURL, keyWebAuthnRPID, keyWebAuthnOrigins}, fn: webAuthnRelyingParty},
+	{name: "search_languages", keys: []string{keySearchLanguages}, fn: searchLanguagesCheck},
+	{name: "search_locale_map", keys: []string{keySearchLanguages, keySearchLocaleMap}, fn: searchLocaleMapCheck},
 }
 
 // webAuthnRelyingParty holds auth.webauthn_rp_id and auth.webauthn_origins to the rules of the
