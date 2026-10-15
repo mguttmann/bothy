@@ -100,8 +100,9 @@ Flow (diagram in section 14.1):
    and `jwks_uri` from the checked discovery document, never a private address without an entry in
    `egress.allowed_hosts` ([19-security.md](19-security.md), SEC-NET-2).
 6. The server stores only the checked external identity in the flow (`external_identity`, schema
-   `external_identity.v1`: `issuer`, `subject`, `display_name`, `email_hint`, `auth_time`, `amr`,
-   with group sync also `groups_state` and `groups`), creates a one-time server code (in the
+   `external_identity.v1`: `schema`, `issuer`, `subject`, `display_name`, `preferred_username`,
+   `email_hint`, `auth_time` (Unix seconds), `amr`, with group sync also `groups_state` and
+   `groups`; `preferred_username` serves only the handle of a provisioned person), creates a one-time server code (in the
    API `login_code`, validity `auth.server_code_ttl`), bound to `client_challenge` and the flow,
    and redirects to `app_redirect_uri` with `login_code` and `login_attempt_id`. It changes no
    account here. Once the flow has been found, every error ends with a redirect with `error`
@@ -254,6 +255,17 @@ to the secret provider and are not resolved during the check.
 `identity_provider.trusted_header.v1`: `login_header` (required, name of an HTTP header per RFC
 9110, for example `Tailscale-User-Login`) and `name_header` (optional, for example `Tailscale-User-Name`).
 `identity_provider.local.v1`: an empty object.
+
+Refinements of the OIDC driver (M1-41, docs/DECISIONS.md M1-41): the discovery document of an
+issuer is `<issuer>/.well-known/openid-configuration`; for an issuer with `{tenantid}` the
+placeholder is replaced by `organizations` in that URL (the document of the Entra alias names the
+template itself as `issuer`), and the document's `issuer` must equal the configured string. A
+found flow whose callback completes after `expires_at` ends with `flow_expired`; a state whose
+flow is unknown, used or already expired when the callback arrives gets `400` without a redirect.
+`client_secret_ref` and `client_key_ref` must name a file below `<secrets.dir>/idp/` or a
+variable `BOTHY_IDP_*` and never the value of a server `*_ref` key; another reference fails at
+login. A disabled or deleted person, and a subject linked under another issuer of the same
+provider, are refused at completion like an unknown one (`401`).
 
 Refinements enforced at write time (M1-36, docs/DECISIONS.md M1-36/5): an `issuer` path segment
 `common`, `organizations` or `consumers` is refused, a multi-tenant provider names `{tenantid}`

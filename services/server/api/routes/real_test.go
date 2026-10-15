@@ -241,12 +241,32 @@ func (stubServer) CompletePairing(context.Context, rest.CompletePairingRequestOb
 	return nil, nil
 }
 
+func (stubServer) BeginOidcLogin(context.Context, rest.BeginOidcLoginRequestObject) (rest.BeginOidcLoginResponseObject, error) {
+	return nil, nil
+}
+
+func (stubServer) HandleOidcCallback(context.Context, rest.HandleOidcCallbackRequestObject) (rest.HandleOidcCallbackResponseObject, error) {
+	return nil, nil
+}
+
+func (stubServer) CompleteOidcLogin(context.Context, rest.CompleteOidcLoginRequestObject) (rest.CompleteOidcLoginResponseObject, error) {
+	return nil, nil
+}
+
+func (stubServer) BeginIdentityLink(context.Context, rest.BeginIdentityLinkRequestObject) (rest.BeginIdentityLinkResponseObject, error) {
+	return nil, nil
+}
+
+func (stubServer) CompleteIdentityLink(context.Context, rest.CompleteIdentityLinkRequestObject) (rest.CompleteIdentityLinkResponseObject, error) {
+	return nil, nil
+}
+
 // TestRealTable_Enabled pins the enabled operations (P-04) with action and rate-limit class
 // (AZ-P1): the three device reads of M1-33, the ten people, owner and self operations of M1-31
 // and the JWKS and the rotation of the signing keys (M1-32), the sessions (M1-34), the step-up
 // (M1-35), the providers and credentials (M1-36), the API tokens (M1-44), the audit log (M1-50),
-// the enrollment codes (M1-37), the device approval and pairing (M1-38) and the passkeys (M1-40).
-// A handler ticket that enables an operation changes this test together with
+// the enrollment codes (M1-37), the device approval and pairing (M1-38), the passkeys (M1-40) and
+// the OIDC login (M1-41). A handler ticket that enables an operation changes this test together with
 // api/operations.yaml.
 func TestRealTable_Enabled(t *testing.T) {
 	type entry struct{ pattern, action, class string }
@@ -316,6 +336,12 @@ func TestRealTable_Enabled(t *testing.T) {
 		"completePasskeyRegistration": {"POST /api/v1/me/passkeys/complete", "passkey.register", "rl.admin"},
 		"revokePasskey":               {"DELETE /api/v1/users/{user_id}/passkeys/{passkey_id}", "passkey.revoke", "rl.admin"},
 		"completeStepUpWithPasskey":   {"POST /api/v1/auth/step-up/passkey", "auth.step_up", "rl.public_auth"},
+		// M1-41
+		"beginOidcLogin":       {"POST /api/v1/auth/oidc/begin", "auth.login.begin", "rl.public_auth"},
+		"handleOidcCallback":   {"GET /api/v1/auth/oidc/callback", "auth.login.begin", "rl.public_auth"},
+		"completeOidcLogin":    {"POST /api/v1/auth/oidc/complete", "auth.login.complete", "rl.public_auth"},
+		"beginIdentityLink":    {"POST /api/v1/me/identities/begin", "identity.link", "rl.admin"},
+		"completeIdentityLink": {"POST /api/v1/me/identities/complete", "identity.link", "rl.admin"},
 	}
 	ops := routes.Enabled()
 	if len(ops) != len(want) {

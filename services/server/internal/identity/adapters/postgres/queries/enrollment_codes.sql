@@ -26,5 +26,6 @@ UPDATE enrollment_codes SET used_at = @used_at, used_by_device_id = @device_id
 WHERE id = @id AND used_at IS NULL;
 
 -- name: LockEnrollmentCode :one
--- The row of the code a passkey enrollment checked at begin, locked again at complete (M1-40).
+-- The code a passkey enrollment (M1-40) or an OIDC flow (M1-41) checked at begin, locked again
+-- until the end of the completing unit of work, so it is consumed once.
 SELECT * FROM enrollment_codes WHERE id = @id FOR UPDATE;

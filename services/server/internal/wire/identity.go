@@ -4,13 +4,16 @@ package wire
 
 import (
 	"context"
+	"crypto/x509"
 	"encoding/hex"
 	"errors"
 	"log/slog"
+	"path"
 	"strings"
 
 	identityhttp "github.com/OWNER/bothy/services/server/internal/identity/adapters/httpapi"
 	"github.com/OWNER/bothy/services/server/internal/identity/adapters/locale"
+	"github.com/OWNER/bothy/services/server/internal/identity/adapters/oidc"
 	identitypg "github.com/OWNER/bothy/services/server/internal/identity/adapters/postgres"
 	"github.com/OWNER/bothy/services/server/internal/identity/adapters/replay"
 	identitywebauthn "github.com/OWNER/bothy/services/server/internal/identity/adapters/webauthn"
@@ -26,6 +29,7 @@ import (
 	"github.com/OWNER/bothy/services/server/internal/kernel/ids"
 	"github.com/OWNER/bothy/services/server/internal/kernel/txn"
 	"github.com/OWNER/bothy/services/server/internal/platform/config"
+	"github.com/OWNER/bothy/services/server/internal/platform/egress"
 	"github.com/OWNER/bothy/services/server/internal/platform/lifecycle"
 	"github.com/OWNER/bothy/services/server/internal/platform/pg"
 	"github.com/OWNER/bothy/services/server/internal/platform/secrets"
@@ -128,15 +132,20 @@ type Identity struct {
 	// PasskeyHandlers are the REST handlers of the seven passkey operations and
 	// completeStepUpWithPasskey; nil until BindSessions.
 	PasskeyHandlers *identityhttp.Passkeys
-	cfg             app.Config
-	state           instance.State
-	repo            *identitypg.Repository
-	uow             txn.UnitOfWork
-	az              authorize.Authorizer
-	writes          IdentityWrites
-	pepper          []byte
-	clk             clock.Clock
-	log             *slog.Logger
+	// OIDC implements the port identity.OIDCLogin (M1-41); nil until BindOIDC.
+	OIDC *app.OIDC
+	// OIDCHandlers are the REST handlers of beginOidcLogin, handleOidcCallback, completeOidcLogin,
+	// beginIdentityLink and completeIdentityLink; nil until BindOIDC.
+	OIDCHandlers *identityhttp.OIDC
+	cfg          app.Config
+	state        instance.State
+	repo         *identitypg.Repository
+	uow          txn.UnitOfWork
+	az           authorize.Authorizer
+	writes       IdentityWrites
+	pepper       []byte
+	clk          clock.Clock
+	log          *slog.Logger
 }
 
 // IdentityWrites are the collaborators of the writing use cases of identity (M1-31): the
@@ -302,6 +311,114 @@ func relyingParty(cfg app.Config) (identitydomain.RelyingParty, app.PasskeyVerif
 		return identitydomain.RelyingParty{}, nil, err
 	}
 	return rp, v, nil
+}
+
+// OIDCDeps are the collaborators of the OIDC login (M1-41) beside the identity module itself.
+type OIDCDeps struct {
+	// Egress is egress.* (EgressConfig); every provider request goes through it.
+	Egress egress.Config
+	// Secrets resolves client_secret_ref and client_key_ref (ProviderSecrets in production).
+	Secrets oidc.Secrets
+	// RootCAs are the trusted TLS roots of the provider requests; nil means the system roots.
+	// Only tests set them.
+	RootCAs *x509.CertPool
+}
+
+// BindOIDC builds the OIDC login (M1-41) over the login service of BindSessions: the provider
+// client over platform/egress with auth.oidc_jwks_cache_ttl and auth.oidc_client_assertion_ttl,
+// the use cases with auth.login_flow_ttl and auth.server_code_ttl, and their handlers. The start
+// calls it after BindSessions. Errors: BindSessions has not run, a duration or collaborator the
+// client or the use cases refuse.
+func (i *Identity) BindOIDC(d OIDCDeps) error {
+	if i.Logins == nil {
+		return errors.New("wire: BindOIDC needs BindSessions first")
+	}
+	client, err := oidc.New(oidc.Config{CacheTTL: i.cfg.OIDCJWKSCacheTTL, AssertionTTL: i.cfg.OIDCClientAssertionTTL, Egress: d.Egress},
+		oidc.Deps{Providers: i.repo, Secrets: d.Secrets, RootCAs: d.RootCAs, Logger: i.log, Clock: i.clk})
+	if err != nil {
+		return err
+	}
+	o, err := app.NewOIDC(i.cfg, i.pepper, app.OIDCDeps{Logins: i.Logins, Flows: i.repo, Client: client, Log: i.log})
+	if err != nil {
+		return err
+	}
+	i.OIDC, i.OIDCHandlers = o, identityhttp.NewOIDC(o)
+	return nil
+}
+
+// The confinement of provider secrets (docs/DECISIONS.md M1-36/14): a provider configuration may
+// name only files below <secrets.dir>/idp/ and variables starting with BOTHY_IDP_, never a value
+// of a server *_ref key, so an owner cannot send the token pepper or another server secret to an
+// issuer as client secret.
+const (
+	providerSecretDir    = "idp"
+	providerSecretPrefix = "BOTHY_IDP_" //nolint:gosec // G101: a variable name prefix, no secret
+)
+
+// errProviderSecret is the refusal of a reference outside the confinement; it never repeats the
+// reference.
+var errProviderSecret = errors.New("wire: a provider secret must be a file below <secrets.dir>/idp/ or a variable BOTHY_IDP_*, and no server secret")
+
+// ProviderSecrets implements oidc.Secrets over the secret provider with the confinement above.
+type ProviderSecrets struct {
+	sp     *secrets.Provider
+	dir    string
+	server map[string]bool
+}
+
+// NewProviderSecrets returns the source over sp for the configuration v: secrets.dir and the
+// values of every secret_ref key of the schema, which a provider may never name (an empty value
+// names nothing). Errors: the bindings of secrets.* and the schema.
+func NewProviderSecrets(sp *secrets.Provider, v *config.Values) (*ProviderSecrets, error) {
+	var c secrets.Config
+	if err := config.Bind(v, &c); err != nil {
+		return nil, err
+	}
+	schema, err := ConfigSchema()
+	if err != nil {
+		return nil, err
+	}
+	server := map[string]bool{}
+	for _, k := range schema.Keys() {
+		if k.Kind != config.KindSecretRef {
+			continue
+		}
+		if ref, err := secrets.ParseRef(v.String(k.Name), c.Dir); err == nil {
+			server[ref.String()] = true
+		}
+	}
+	return &ProviderSecrets{sp: sp, dir: c.Dir, server: server}, nil
+}
+
+// Resolve implements oidc.Secrets: the reference must parse, lie inside the confinement and be
+// no server secret; then the provider reads it (with its cache).
+func (s *ProviderSecrets) Resolve(ctx context.Context, raw string) ([]byte, error) {
+	ref, err := secrets.ParseRef(raw, s.dir)
+	if err != nil {
+		return nil, err
+	}
+	if !confined(ref, s.dir) || s.server[ref.String()] {
+		return nil, errProviderSecret
+	}
+	v, _, err := s.sp.Get(ctx, ref)
+	if err != nil {
+		return nil, err
+	}
+	return v.Bytes(), nil
+}
+
+// confined reports a file below dir/idp/ or a variable with the provider prefix.
+func confined(ref secrets.Ref, dir string) bool {
+	if ref.Path == "" {
+		return false
+	}
+	switch ref.Scheme {
+	case "file":
+		return strings.HasPrefix(ref.Path, path.Join(dir, providerSecretDir)+"/")
+	case "env":
+		return strings.HasPrefix(ref.Path, providerSecretPrefix) && len(ref.Path) > len(providerSecretPrefix)
+	}
+	return false
 }
 
 // secretsDirStandIn replaces the placeholder <secrets.dir> while a reference is only checked: the

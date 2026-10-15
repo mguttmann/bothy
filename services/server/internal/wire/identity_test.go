@@ -32,6 +32,8 @@ func TestIdentityConfigBindsDefaults(t *testing.T) {
 		APITokenMaxTTL: 365 * 24 * time.Hour, PersonalTokenMaxTTL: 90 * 24 * time.Hour, DPoPRequiredFor: []string{"agent"},
 		EnrollmentCodeTTL: 72 * time.Hour, EnrollmentCodeMaxAttempts: 5, LoginFlowTTL: 10 * time.Minute, WebAuthnOrigins: []string{},
 		DevicePendingTTL: 24 * time.Hour, DeviceVerificationCodeDigits: 6, PairingCodeTTL: 5 * time.Minute, PairingCodeChars: 8,
+		ServerCodeTTL: time.Minute, OIDCJWKSCacheTTL: time.Hour, OIDCClientAssertionTTL: 2 * time.Minute,
+		IDPRecheckInterval: 30 * 24 * time.Hour,
 	}
 	if !reflect.DeepEqual(cfg, want) {
 		t.Fatalf("IdentityConfig = %+v, want %+v", cfg, want)
@@ -95,6 +97,48 @@ func TestTokenPepper(t *testing.T) {
 		}
 		if strings.Contains(err.Error(), "abab") || strings.Contains(err.Error(), "zzzz") {
 			t.Errorf("%s: error names the value: %v", name, err)
+		}
+	}
+}
+
+// TestProviderSecretsConfinement: a provider configuration resolves only files below
+// <secrets.dir>/idp/ and variables BOTHY_IDP_*, never a server secret (docs/DECISIONS.md M1-36/14).
+func TestProviderSecretsConfinement(t *testing.T) {
+	t.Parallel()
+	dir := t.TempDir()
+	if err := os.Mkdir(filepath.Join(dir, "idp"), 0o700); err != nil {
+		t.Fatal(err)
+	}
+	for name, v := range map[string]string{"idp/entra_secret": "EXAMPLE-provider", "token_pepper": "EXAMPLE-pepper", "idp/pepper": "EXAMPLE-pepper"} {
+		if err := os.WriteFile(filepath.Join(dir, name), []byte(v), 0o600); err != nil {
+			t.Fatal(err)
+		}
+	}
+	env := []string{"BOTHY_IDP_ENTRA=EXAMPLE-env", "BOTHY_SECRET_X=EXAMPLE-other"}
+	// An operator who points a server key into idp/ makes that file a server secret.
+	values := loadValues(t, schema(t), "BOTHY_SECRETS__DIR="+dir, "BOTHY_TELEMETRY__PSEUDONYM_KEY_REF=file:<secrets.dir>/idp/pepper")
+	sp, err := wire.NewSecretsProvider(values, env, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	ps, err := wire.NewProviderSecrets(sp, values)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for ref, want := range map[string]string{"file:<secrets.dir>/idp/entra_secret": "EXAMPLE-provider", "env:BOTHY_IDP_ENTRA": "EXAMPLE-env"} {
+		v, err := ps.Resolve(t.Context(), ref)
+		if err != nil || string(v) != want {
+			t.Errorf("%s: %q %v", ref, v, err)
+		}
+	}
+	for _, ref := range []string{
+		"file:<secrets.dir>/token_pepper", "file:" + filepath.Join(dir, "token_pepper"), "env:BOTHY_SECRET_X", "env:BOTHY_IDP_",
+		"file:<secrets.dir>/idp", "file:<secrets.dir>/idp/pepper", "file:<secrets.dir>/idp/../token_pepper", "azkv:vault/x", "plain",
+	} {
+		if v, err := ps.Resolve(t.Context(), ref); err == nil {
+			t.Errorf("%s resolved to %d bytes", ref, len(v))
+		} else if strings.Contains(err.Error(), "EXAMPLE") {
+			t.Errorf("%s: the error carries a value", ref)
 		}
 	}
 }

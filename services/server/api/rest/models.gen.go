@@ -15512,6 +15512,27 @@ type RedeemEnrollmentCodeParams struct {
 	DPoP DpopProof `json:"DPoP"`
 }
 
+// HandleOidcCallbackParams defines parameters for HandleOidcCallback.
+type HandleOidcCallbackParams struct {
+	// State State from the authorization request.
+	State string `form:"state" json:"state"`
+
+	// Iss Issuer of the authorization response (RFC 9207). Required when the provider announces `authorization_response_iss_parameter_supported`.
+	Iss *string `form:"iss,omitempty" json:"iss,omitempty"`
+
+	// Code Authorization code.
+	Code *string `form:"code,omitempty" json:"code,omitempty"`
+
+	// Error Error code from the provider.
+	Error *string `form:"error,omitempty" json:"error,omitempty"`
+}
+
+// CompleteOidcLoginParams defines parameters for CompleteOidcLogin.
+type CompleteOidcLoginParams struct {
+	// DPoP DPoP proof (RFC 9449) signed with the device key that the new tokens will be bound to.
+	DPoP DpopProof `json:"DPoP"`
+}
+
 // BeginPairingParams defines parameters for BeginPairing.
 type BeginPairingParams struct {
 	// DPoP DPoP proof (RFC 9449) signed with the device key that the new tokens will be bound to.
@@ -15686,6 +15707,12 @@ type CompleteEnrollmentJSONRequestBody = EnrollCompleteRequest
 // RedeemEnrollmentCodeJSONRequestBody defines body for RedeemEnrollmentCode for application/json ContentType.
 type RedeemEnrollmentCodeJSONRequestBody = EnrollRedeemRequest
 
+// BeginOidcLoginJSONRequestBody defines body for BeginOidcLogin for application/json ContentType.
+type BeginOidcLoginJSONRequestBody = OidcBeginRequest
+
+// CompleteOidcLoginJSONRequestBody defines body for CompleteOidcLogin for application/json ContentType.
+type CompleteOidcLoginJSONRequestBody = OidcCompleteRequest
+
 // BeginPairingJSONRequestBody defines body for BeginPairing for application/json ContentType.
 type BeginPairingJSONRequestBody = PairingBeginRequest
 
@@ -15724,6 +15751,12 @@ type PutInstanceSettingJSONRequestBody = InstanceSettingPut
 
 // ApprovePairingJSONRequestBody defines body for ApprovePairing for application/json ContentType.
 type ApprovePairingJSONRequestBody = PairingApprove
+
+// BeginIdentityLinkJSONRequestBody defines body for BeginIdentityLink for application/json ContentType.
+type BeginIdentityLinkJSONRequestBody = IdentityLinkBegin
+
+// CompleteIdentityLinkJSONRequestBody defines body for CompleteIdentityLink for application/json ContentType.
+type CompleteIdentityLinkJSONRequestBody = IdentityLinkComplete
 
 // CompletePasskeyRegistrationJSONRequestBody defines body for CompletePasskeyRegistration for application/json ContentType.
 type CompletePasskeyRegistrationJSONRequestBody = PasskeyRegisterComplete

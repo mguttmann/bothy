@@ -61,7 +61,9 @@ Profile (normative together with 08):
 
 Who builds what: PLAN M1-33 creates the package with parsing, verifying (`EdDSA`, `ES256`),
 fingerprints and assembling compact JWS; M1-34 uses it to assemble the access tokens; M1-41 adds
-`RS256` and `PS256`. Every extension of the profile (an algorithm, a header) needs a
+`RS256` and `PS256` (RSA keys with 2048 to 8192 bits only through `ParseVerificationJWK`, never for
+device keys) and, when signing the client assertion, the header `x5t#S256` that Entra requires for
+certificates; verifying does not read it. Every extension of the profile (an algorithm, a header) needs a
 change to this ADR.
 
 ### Consequences

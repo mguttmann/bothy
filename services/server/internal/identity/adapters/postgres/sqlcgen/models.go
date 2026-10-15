@@ -77,6 +77,26 @@ type AuthChallenge struct {
 	FinishedAt       pgtype.Timestamptz
 }
 
+type AuthLoginFlow struct {
+	ID                 pgtype.UUID
+	ProviderID         pgtype.UUID
+	Mode               string
+	UserID             pgtype.UUID
+	DeviceID           pgtype.UUID
+	OidcStateHash      []byte
+	OidcNonceHash      []byte
+	ClientChallenge    string
+	AppRedirectUri     string
+	LoginCodeHash      []byte
+	LoginCodeExpiresAt pgtype.Timestamptz
+	EnrollmentCodeID   pgtype.UUID
+	ExternalIdentity   []byte
+	Status             string
+	Error              pgtype.Text
+	CreatedAt          pgtype.Timestamptz
+	ExpiresAt          pgtype.Timestamptz
+}
+
 type AuthSession struct {
 	ID               pgtype.UUID
 	UserID           pgtype.UUID

@@ -66,7 +66,8 @@ func TestExpectedHTU(t *testing.T) {
 	}
 }
 
-// TestIdentitytest_NotInBinary: the server binary never depends on the test helpers.
+// TestIdentitytest_NotInBinary: the server binary never depends on the test helpers, the fake
+// identity provider of M1-41 included.
 func TestIdentitytest_NotInBinary(t *testing.T) {
 	t.Parallel()
 	out, err := exec.CommandContext(t.Context(), "go", "list", "-deps", "../../../../cmd/bothy").CombinedOutput()
@@ -76,7 +77,9 @@ func TestIdentitytest_NotInBinary(t *testing.T) {
 	if !strings.Contains(string(out), "/internal/identity/adapters/httpapi") {
 		t.Fatalf("go list output does not look like the dependencies of cmd/bothy:\n%.400s", out)
 	}
-	if strings.Contains(string(out), "/internal/identity/adapters/identitytest") {
-		t.Fatal("cmd/bothy depends on internal/identity/adapters/identitytest")
+	for _, helper := range []string{"/internal/identity/adapters/identitytest", "/internal/identity/adapters/oidc/oidctest"} {
+		if strings.Contains(string(out), helper) {
+			t.Fatalf("cmd/bothy depends on %s", helper)
+		}
 	}
 }
