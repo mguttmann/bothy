@@ -1563,6 +1563,18 @@
       "doc": "PostgreSQL schema of River's job tables, separate from the domain tables."
     },
     {
+      "name": "message.list_content_max_bytes",
+      "env": "BOTHY_MESSAGE__LIST_CONTENT_MAX_BYTES",
+      "kind": "int",
+      "default": "16384",
+      "required": false,
+      "enum": [],
+      "min": "1",
+      "max": "",
+      "chapter": "06-api.md",
+      "doc": "Largest content_md of one message in lists; longer content is cut with content_truncated."
+    },
+    {
       "name": "message.max_attachments",
       "env": "BOTHY_MESSAGE__MAX_ATTACHMENTS",
       "kind": "int",

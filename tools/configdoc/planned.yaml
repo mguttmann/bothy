@@ -55,8 +55,6 @@ rules:
     etappe: M1
   - match: "interaction."  # M2-15
     etappe: M2
-  - match: "message."  # M1-46, M1-56, M1-57
-    etappe: M1
   - match: migrate.recent_backup_max_age  # M7-02
     etappe: M7
   - match: migrate.require_recent_backup  # M7-02

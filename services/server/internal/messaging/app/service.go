@@ -33,21 +33,36 @@ type Config struct {
 	TemplateNameMaxChars int `config:"template.name_max_chars"`
 	// TemplateMaxPerScope is template.max_per_scope, the most templates of one person or channel.
 	TemplateMaxPerScope int `config:"template.max_per_scope"`
-	// PageSizeDefault is api.page_size_default, the page size of listMyMentions without limit.
+	// ListContentMaxBytes is message.list_content_max_bytes: History cuts content_md above it at a
+	// UTF-8 character boundary (06 section 6 item 5).
+	ListContentMaxBytes int `config:"message.list_content_max_bytes"`
+	// PageSizeDefault is api.page_size_default, the page size of listMyMentions and of History
+	// without limit.
 	PageSizeDefault int `config:"api.page_size_default"`
 	// PageSizeMax is api.page_size_max; larger limits are capped.
 	PageSizeMax int `config:"api.page_size_max"`
 }
 
-// check refuses limits below 1.
+// check refuses limits below 1 and a default page above the largest.
 func (c Config) check() error {
-	if c.MaxContentBytes < 1 || c.MaxMentions < 1 || c.EventPayloadMaxBytes < 1 {
-		return errors.New("messaging: message.max_content_bytes, message.max_mentions and sync.event_payload_max_bytes must be at least 1")
+	if c.MaxContentBytes < 1 || c.MaxMentions < 1 || c.EventPayloadMaxBytes < 1 || c.ListContentMaxBytes < 1 {
+		return errors.New("messaging: message.max_content_bytes, message.max_mentions, sync.event_payload_max_bytes and message.list_content_max_bytes must be at least 1")
+	}
+	if c.PageSizeDefault < 1 || c.PageSizeDefault > c.PageSizeMax {
+		return errors.New("messaging: api.page_size_default must be at least 1 and not above api.page_size_max")
 	}
 	if c.TemplateNameMaxChars < 1 || c.TemplateMaxPerScope < 1 || c.PageSizeDefault < 1 || c.PageSizeMax < 1 {
 		return errors.New("messaging: template.name_max_chars, template.max_per_scope, api.page_size_default and api.page_size_max must be at least 1")
 	}
 	return nil
+}
+
+// ErrorCounter counts programming errors of the rights check in bothy.authz.errors with the
+// attribute bothy.reason (signals.md, alert BothyAuthzError); internal/wire passes the counter of
+// authz/adapters/telemetry. The application layer knows no metrics library.
+type ErrorCounter interface {
+	// CountError adds one error with reason, for example filter_mismatch.
+	CountError(ctx context.Context, reason string)
 }
 
 // Deps are the collaborators of the messaging use cases.
@@ -66,10 +81,11 @@ type Deps struct {
 	Directory identity.Directory
 	// Cursors encodes and checks the cursors of listMyMentions (platform/httpserver).
 	Cursors Cursors
-	// Errors counts filter mismatches in bothy.authz.errors (07 section 7.4 rule 3); nil counts
-	// nothing.
+	// Errors counts filter mismatches of the mention and history lists in bothy.authz.errors (07
+	// section 7.4 rule 3); nil counts nothing.
 	Errors ErrorCounter
-	// Log receives the line of a filter mismatch; nil means slog.Default().
+	// Log receives the line of a filter mismatch of the mention and history lists; nil means
+	// slog.Default().
 	Log *slog.Logger
 	// Clock gives the creation times; nil means clock.System().
 	Clock clock.Clock
@@ -81,12 +97,6 @@ type Deps struct {
 type Cursors interface {
 	Encode(list string, binding []byte, key any) (string, error)
 	Decode(list string, binding []byte, s string, key any) error
-}
-
-// ErrorCounter counts programming errors of the rights check in bothy.authz.errors with the
-// attribute bothy.reason (authz adapters/telemetry implements it).
-type ErrorCounter interface {
-	CountError(ctx context.Context, reason string)
 }
 
 // Service implements messaging.Messages (M1-56); Service.Mentions and Service.Templates return

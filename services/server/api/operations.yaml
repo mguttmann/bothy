@@ -69,6 +69,7 @@ enabled:             # operationIds that have a handler; sorted ascending
   - getInstance
   - getJwks
   - getMe
+  - getMessage
   - getMyCredentials
   - getProblemType
   - getSpace
@@ -97,6 +98,7 @@ enabled:             # operationIds that have a handler; sorted ascending
   - listSpaceChannels
   - listSpaces
   - listTemplates
+  - listThreadMessages
   - listTokens
   - listUserDevices
   - listUserSessions
@@ -326,9 +328,6 @@ later:               # every other operationId of docs/api/openapi.yaml; sorted 
   - operation_id: getImport
     etappe: M8
     ticket: M8-03
-  - operation_id: getMessage
-    etappe: M1
-    ticket: M1-57
   - operation_id: getMySidebar
     etappe: M1
     ticket: M1-61
@@ -462,9 +461,6 @@ later:               # every other operationId of docs/api/openapi.yaml; sorted 
   - operation_id: listTerminalSessions
     etappe: M2
     ticket: M2-44
-  - operation_id: listThreadMessages
-    etappe: M1
-    ticket: M1-57
   - operation_id: listThreadRuns
     etappe: M2
     ticket: M2-05

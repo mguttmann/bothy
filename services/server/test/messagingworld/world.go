@@ -12,6 +12,7 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"log/slog"
 	"net/http"
 	"strings"
@@ -70,7 +71,15 @@ const (
 	// TemplateNameMax and TemplateMax are template.name_max_chars and template.max_per_scope.
 	TemplateNameMax = 20
 	TemplateMax     = 5
+	// ListContentMax is message.list_content_max_bytes of the world: no cut unless a test sets it.
+	ListContentMax = MaxContent
+	// PageSizeDefault and PageSizeMax are api.page_size_default and api.page_size_max.
+	PageSizeDefault = 20
+	PageSizeMax     = 50
 )
+
+// Option changes the messaging configuration of a world (brief M1-57: small test values).
+type Option func(*messagingapp.Config)
 
 // testKEK is the key-encryption key of the audit recorder in these tests.
 type testKEK struct{}
@@ -130,6 +139,8 @@ type World struct {
 	Threads chat.Threads
 	// Authorizer is the real Authorizer of the world (Scope for CountUnread, M1-60).
 	Authorizer authorize.Authorizer
+	// Logs holds every record the modules logged (the chain logs into H.Logs).
+	Logs *httpservertest.LogCapture
 
 	rec      *Recorder
 	installs *installations
@@ -156,15 +167,16 @@ func (s *installations) LockActiveInstallation(ctx context.Context, appID ids.ID
 }
 
 // New builds a world on a new database with the owner "owner"; subscribe registers the test
-// subscriber of MessagePosted of the calling package.
-func New(t *testing.T, subscribe Subscribe) *World {
+// subscriber of MessagePosted of the calling package; opts change the messaging configuration.
+func New(t *testing.T, subscribe Subscribe, opts ...Option) *World {
 	t.Helper()
 	db := pgtest.New(t)
 	cfg := db.Config(pg.RoleApp)
 	cfg.MaxConns = 32
 	pool := db.OpenPool(t, cfg)
-	log := slog.New(&httpservertest.LogCapture{})
-	w := &World{t: t, Pool: pool, Owner: db.Pool(t, pg.RoleOwner), Clock: clock.NewFake(start), creds: fake.NewCredentials(),
+	capture := &httpservertest.LogCapture{}
+	log := slog.New(capture)
+	w := &World{t: t, Logs: capture, Pool: pool, Owner: db.Pool(t, pg.RoleOwner), Clock: clock.NewFake(start), creds: fake.NewCredentials(),
 		actors: httpservertest.NewActors(), policies: fake.NewPolicies(), rec: &Recorder{t: t},
 		installs: &installations{m: map[ids.ID]identity.ActiveAppInstallation{}}}
 	principals := identityapp.NewPrincipalSource(identitypg.NewRepository(pool)).WithApps(w.installs)
@@ -209,9 +221,13 @@ func New(t *testing.T, subscribe Subscribe) *World {
 	if err != nil {
 		t.Fatal(err)
 	}
-	m, err := wire.NewMessaging(messagingapp.Config{MaxContentBytes: MaxContent, MaxMentions: MaxMentions, EventPayloadMaxBytes: PayloadMax,
-		TemplateNameMaxChars: TemplateNameMax, TemplateMaxPerScope: TemplateMax, PageSizeDefault: 20, PageSizeMax: 50},
-		pool, uow, az, appender, c.Service, w.Clock)
+	mcfg := messagingapp.Config{MaxContentBytes: MaxContent, MaxMentions: MaxMentions, EventPayloadMaxBytes: PayloadMax,
+		TemplateNameMaxChars: TemplateNameMax, TemplateMaxPerScope: TemplateMax,
+		ListContentMaxBytes: ListContentMax, PageSizeDefault: PageSizeDefault, PageSizeMax: PageSizeMax}
+	for _, o := range opts {
+		o(&mcfg)
+	}
+	m, err := wire.NewMessaging(mcfg, pool, uow, az, appender, c.Service, w.Clock, log)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -552,11 +568,21 @@ func JSONErrors(p map[string]any) string {
 	return string(b)
 }
 
-// Same404 checks that two answers are the same 404 apart from correlation_id and instance.
+// Same404 checks that two answers are the same 404 apart from correlation_id and instance in the
+// body and Correlation-Id and Date in the headers (brief M1-57 note 9; Date only differs when the
+// second turns between the two requests).
 func Same404(t *testing.T, a, b *httpservertest.Response) {
 	t.Helper()
 	if a.StatusCode != http.StatusNotFound || b.StatusCode != http.StatusNotFound {
 		t.Fatalf("statuses %d %d", a.StatusCode, b.StatusCode)
+	}
+	ha, hb := a.Header.Clone(), b.Header.Clone()
+	for _, k := range []string{"Correlation-Id", "Date"} {
+		ha.Del(k)
+		hb.Del(k)
+	}
+	if fa, fb := fmt.Sprint(ha), fmt.Sprint(hb); fa != fb {
+		t.Fatalf("404 headers differ:\n%s\n%s", fa, fb)
 	}
 	pa, pb := a.Problem(t), b.Problem(t)
 	for _, k := range []string{"correlation_id", "instance"} {
@@ -576,3 +602,13 @@ func (w *World) ForumTag(forum ids.ID, name string) ids.ID {
 	m := w.Want(w.Do("owner", http.MethodPost, "/api/v1/channels/"+forum.String()+"/tags", `{"name":"`+name+`"}`, Key()...), http.StatusCreated, "")
 	return ids.MustParse(m["id"].(string))
 }
+
+// Tombstone turns the message id into a tombstone the way M1-58 deletes (brief M1-57 note 6):
+// empty content, deleted_at and deleted_by set, version + 1.
+func (w *World) Tombstone(id ids.ID) {
+	w.t.Helper()
+	w.SQL(`UPDATE messages SET content_md = '', deleted_at = now(), deleted_by = $2, version = version + 1 WHERE id = $1`, id.String(), w.OwnerID.String())
+}
+
+// MessagePath is the path of getMessage.
+func MessagePath(id ids.ID) string { return "/api/v1/messages/" + id.String() }

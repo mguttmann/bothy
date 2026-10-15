@@ -1,10 +1,11 @@
 // SPDX-License-Identifier: Apache-2.0
 
 // Package httpapi holds the REST handlers of the messaging module as part of
-// rest.StrictServerInterface: createMessage and createThread (M1-56), listMyMentions and the six
-// template operations (M1-60) of docs/api/openapi.yaml. The use cases authorize; the handlers only
-// convert, set Idempotent-Replay on a repetition and ETag on a template change, and pass errors to
-// the problem writer of the chain unchanged.
+// rest.StrictServerInterface: createMessage and createThread (M1-56), listThreadMessages and
+// getMessage (M1-57), listMyMentions and the six template operations (M1-60) of
+// docs/api/openapi.yaml. The use cases authorize; the handlers only convert, set Idempotent-Replay
+// on a repetition and ETag on a template change, and pass errors to the problem writer of the
+// chain unchanged.
 //
 // Example:
 //
@@ -163,6 +164,10 @@ func MessageREST(m messaging.Message) rest.Message {
 	if m.SystemCode != "" {
 		c := rest.MessageSystemCode(m.SystemCode)
 		out.SystemCode = &c
+	}
+	if m.ContentTruncated {
+		cut := true
+		out.ContentTruncated = &cut
 	}
 	return out
 }

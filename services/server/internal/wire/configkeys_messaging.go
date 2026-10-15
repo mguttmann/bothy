@@ -8,7 +8,8 @@ import "github.com/OWNER/bothy/services/server/internal/platform/config"
 // docs/spec/03-datenmodell.md "Konfigurationswerte dieses Kapitels". It holds the message size
 // now because the cross-check json_limit_above_message reads it, and the attachment count and
 // the thread title length because getInstance reports them as client limits (M1-46). Sending
-// (M1-56) adds the mention limit, the templates (M1-60) their name length and count bound.
+// (M1-56) adds the mention limit, reading (M1-57) the list content limit of docs/spec/06-api.md,
+// the templates (M1-60) their name length and count bound.
 func messagingConfigKeys() []config.Key {
 	return []config.Key{
 		{
@@ -20,6 +21,11 @@ func messagingConfigKeys() []config.Key {
 			Name: "message.max_mentions", Kind: config.KindInt, Default: "50", Min: "1",
 			Doc:     "Most distinct mention handles in one message.",
 			Chapter: chapter03,
+		},
+		{
+			Name: "message.list_content_max_bytes", Kind: config.KindInt, Default: "16384", Min: "1",
+			Doc:     "Largest content_md of one message in lists; longer content is cut with content_truncated.",
+			Chapter: chapter06,
 		},
 		{
 			Name: "message.max_attachments", Kind: config.KindInt, Default: "10", Min: "0",
