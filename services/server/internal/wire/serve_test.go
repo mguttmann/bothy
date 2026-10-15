@@ -9,6 +9,7 @@ import (
 	"encoding/json"
 	"io"
 	"net/http"
+	"net/http/httptest"
 	"os"
 	"path/filepath"
 	"slices"
@@ -374,6 +375,43 @@ func TestServeAbortsOnOldSchema(t *testing.T) {
 	}
 	if code, _ := get(t, internal, "/healthz"); code != 0 {
 		t.Fatal("internal listener left open")
+	}
+	if p.logs.port("public listener started") != 0 {
+		t.Fatal("public listener opened")
+	}
+}
+
+// TestServeRefusesCheckpointSinkWithoutLock: the start step audit_log runs the lock check of an
+// s3:// audit.checkpoint_sink, so a bucket without Object Lock stops the start with an error
+// naming audit.checkpoint_sink and never the endpoint (M7-22, runbook backup-restore 8).
+func TestServeRefusesCheckpointSinkWithoutLock(t *testing.T) {
+	t.Parallel()
+	fake := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path == "/bothy-audit" && r.URL.Query().Has("object-lock") {
+			w.Header().Set("Content-Type", "application/xml")
+			w.WriteHeader(http.StatusNotFound)
+			_, _ = io.WriteString(w, `<?xml version="1.0" encoding="UTF-8"?><Error><Code>ObjectLockConfigurationNotFoundError</Code><Message>none</Message></Error>`)
+			return
+		}
+		http.NotFound(w, r)
+	}))
+	t.Cleanup(fake.Close)
+	db := newServeDB(t)
+	dir := secretsDir(t, db)
+	for _, name := range []string{"audit_checkpoint_s3_access_key", "audit_checkpoint_s3_secret_key"} {
+		if err := os.WriteFile(filepath.Join(dir, name), []byte("EXAMPLEKEY"), 0o600); err != nil {
+			t.Fatal(err)
+		}
+	}
+	host := strings.TrimPrefix(fake.URL, "http://")
+	p := start(t, wire.RoleAll, serveEnv(t, db, "BOTHY_SECRETS__DIR="+dir, "BOTHY_AUDIT__CHECKPOINT_SINK=s3://bothy-audit",
+		"BOTHY_AUDIT__CHECKPOINT_S3_ENDPOINT="+fake.URL, "BOTHY_EGRESS__ALLOWED_HOSTS="+host+";allow_private"), wire.Deps{})
+	if code := p.exit(t); code != lifecycle.ExitFailure {
+		t.Fatalf("exit = %d", code)
+	}
+	err := p.runner.Err()
+	if err == nil || !strings.Contains(err.Error(), "audit.checkpoint_sink") || strings.Contains(err.Error(), host) {
+		t.Fatalf("Err() = %v, want an error naming audit.checkpoint_sink without the endpoint", err)
 	}
 	if p.logs.port("public listener started") != 0 {
 		t.Fatal("public listener opened")

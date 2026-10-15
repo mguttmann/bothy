@@ -68,9 +68,10 @@ linters:
           files:
             - $all
             - "!**/internal/files/adapters/s3/**"
+            - "!**/internal/audit/adapters/s3sink/**"
           deny:
             - pkg: github.com/aws/
-              desc: only internal/files/adapters/s3 may import the AWS SDK (12 "15", ADR 0048)
+              desc: only internal/files/adapters/s3 and internal/audit/adapters/s3sink may import the AWS SDK (12 "15", ADR 0048, M7-22)
         # ID-T27 (docs/spec/08-identitaet.md "15. Tests"): every random part of a token or code of
         # identity (refresh tokens, cookies, API tokens, codes) comes from crypto/rand, so the
         # identity module may not import math/rand at all, tests included (M1-34).

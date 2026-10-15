@@ -86,6 +86,9 @@ ein symmetrischer Schlüssel ist kürzer und schneller, und niemand außerhalb b
 - Architektur-Regel: Nur `internal/files/adapters/s3` importiert das S3-SDK, und der Port
   `ObjectStore` hat keine Operation für signierte Download-URLs (Prüfung der Port-Schnittstelle im
   Treiber-Konformitätstest).
+  The audit checkpoint sink `internal/audit/adapters/s3sink` (M7-22) is the one other package
+  that imports the SDK; it serves no file and holds no presign client, so the rule of this ADR is
+  unchanged.
 - Kanarien-Test aus [17-observability.md](../spec/17-observability.md), Abschnitt 10: Ein Ticket
   taucht in keinem Export auf.
 - SEC-T03 (Kopfzeilen für HTML und SVG: `attachment`, `nosniff`, Sandbox-CSP).

@@ -5,14 +5,17 @@ package wire
 import (
 	"context"
 	"errors"
+	"fmt"
 	"log/slog"
 	"sync"
+	"time"
 
 	"github.com/OWNER/bothy/services/server/internal/audit/adapters/filesink"
 	audithttp "github.com/OWNER/bothy/services/server/internal/audit/adapters/httpapi"
 	"github.com/OWNER/bothy/services/server/internal/audit/adapters/logs"
 	auditmetrics "github.com/OWNER/bothy/services/server/internal/audit/adapters/otelmetrics"
 	auditpg "github.com/OWNER/bothy/services/server/internal/audit/adapters/postgres"
+	"github.com/OWNER/bothy/services/server/internal/audit/adapters/s3sink"
 	auditapp "github.com/OWNER/bothy/services/server/internal/audit/app"
 	"github.com/OWNER/bothy/services/server/internal/audit/domain"
 	authzapp "github.com/OWNER/bothy/services/server/internal/authz/app"
@@ -23,6 +26,7 @@ import (
 	"github.com/OWNER/bothy/services/server/internal/kernel/ids"
 	"github.com/OWNER/bothy/services/server/internal/kernel/txn"
 	"github.com/OWNER/bothy/services/server/internal/platform/config"
+	"github.com/OWNER/bothy/services/server/internal/platform/egress"
 	"github.com/OWNER/bothy/services/server/internal/platform/lifecycle"
 	"github.com/OWNER/bothy/services/server/internal/platform/pg"
 	"github.com/OWNER/bothy/services/server/internal/platform/secrets"
@@ -93,30 +97,106 @@ func NewAudit(pool *pg.Pool, unitCfg pg.UnitConfig, cfg auditapp.Config, kek aud
 	return &Audit{uow: uow, recorder: rec, modules: mods, repo: repo, reporter: logs.New(log), cfg: cfg}, nil
 }
 
-// CheckpointSink returns the sink of audit.checkpoint_sink for instance: app.NoSink for the
-// empty value, the file sink for file://<absolute path>. The error is that of a value the
-// configuration check refuses.
-func CheckpointSink(value string, instance ids.ID) (auditapp.CheckpointSink, error) {
-	dir, err := domain.ParseSink(value)
+// CheckpointSinkDeps are what the object store sink needs beyond the loaded values; the empty
+// value and file:// need none.
+type CheckpointSinkDeps struct {
+	// Secrets resolves audit.checkpoint_s3_access_key_ref and audit.checkpoint_s3_secret_key_ref:
+	// the provider of the process (NewSecretsProvider).
+	Secrets s3sink.SecretResolver
+	// Egress are the resolver, roots, logger and metrics of the egress client of the sink.
+	Egress egress.Deps
+}
+
+// checkpointSinkValues are the keys CheckpointSink reads.
+type checkpointSinkValues struct {
+	Sink         string        `config:"audit.checkpoint_sink"`
+	Retention    time.Duration `config:"retention.audit"`
+	Endpoint     string        `config:"audit.checkpoint_s3_endpoint"`
+	Region       string        `config:"audit.checkpoint_s3_region"`
+	UsePathStyle bool          `config:"audit.checkpoint_s3_use_path_style"`
+	AccessKeyRef string        `config:"audit.checkpoint_s3_access_key_ref"`
+	SecretKeyRef string        `config:"audit.checkpoint_s3_secret_key_ref"`
+}
+
+// CheckpointSink returns the sink of audit.checkpoint_sink for instance (19 section 16): app.NoSink
+// for the empty value, the file sink for file://<absolute path>, and for s3://<bucket>[/<prefix>]
+// the object store sink with the keys audit.checkpoint_s3_*, egress.* and deps, after its lock
+// check: the bucket must have Object Lock with a default retention in mode COMPLIANCE of at least
+// retention.audit (docs/DECISIONS.md M7-22/5). bothy config check and the start step audit_log
+// call it, so a target without an effective lock fails both.
+//
+// Errors name keys, never values: a value the configuration check refuses, a secret or egress
+// setting the sink refuses, a failed request and s3sink.ErrNotImmutable.
+func CheckpointSink(ctx context.Context, v *config.Values, instance ids.ID, deps CheckpointSinkDeps) (auditapp.CheckpointSink, error) {
+	var raw checkpointSinkValues
+	if err := config.Bind(v, &raw); err != nil {
+		return nil, err
+	}
+	target, err := domain.ParseSink(raw.Sink)
 	if err != nil {
 		return nil, err
 	}
-	if dir == "" {
+	switch target.Kind {
+	case domain.SinkNone:
 		return auditapp.NoSink{}, nil
+	case domain.SinkFile:
+		return filesink.New(target.Dir, instance)
+	case domain.SinkS3:
+		return s3CheckpointSink(ctx, v, raw, target, instance, deps)
 	}
-	return filesink.New(dir, instance)
+	return nil, errors.New("config: audit.checkpoint_sink: unknown kind")
+}
+
+// s3CheckpointSink builds the object store sink of target and runs its lock check.
+func s3CheckpointSink(ctx context.Context, v *config.Values, raw checkpointSinkValues, target domain.Sink, instance ids.ID, deps CheckpointSinkDeps) (auditapp.CheckpointSink, error) {
+	cfg := s3sink.Config{
+		Bucket: target.Bucket, Prefix: target.Prefix, Endpoint: raw.Endpoint, Region: raw.Region,
+		UsePathStyle: raw.UsePathStyle, AccessKeyRef: raw.AccessKeyRef, SecretKeyRef: raw.SecretKeyRef,
+	}
+	eg, err := EgressConfig(v)
+	if err != nil {
+		return nil, err
+	}
+	if deps.Secrets == nil {
+		return nil, errors.New("config: audit.checkpoint_s3_access_key_ref: no secret provider to resolve it")
+	}
+	sink, err := s3sink.New(ctx, cfg, instance, s3sink.Deps{Egress: eg, EgressDeps: deps.Egress, Secrets: deps.Secrets})
+	if err != nil {
+		return nil, fmt.Errorf("config: %w", err)
+	}
+	if err := sink.CheckLock(ctx, raw.Retention); err != nil {
+		return nil, fmt.Errorf("config: %w", err)
+	}
+	return sink, nil
+}
+
+// CheckCheckpointSink is the check of an object store target for bothy config check (M7-22):
+// for s3://<bucket>[/<prefix>] it builds the secret provider of the process from v and env and
+// the sink with CheckpointSink, which reads the Object Lock configuration of the bucket; the
+// empty value and file:// need no request and pass. log receives the refused attempts of the
+// egress client.
+//
+// Errors: those of CheckpointSink and of the secret provider, each starting with "config: " and
+// naming keys, never values.
+func CheckCheckpointSink(ctx context.Context, v *config.Values, env []string, log *slog.Logger) error {
+	target, err := domain.ParseSink(v.String(keyCheckpointSink))
+	if err != nil || target.Kind != domain.SinkS3 {
+		return err
+	}
+	p, err := NewSecretsProvider(v, env, log)
+	if err != nil {
+		return fmt.Errorf("config: %w", err)
+	}
+	_, err = CheckpointSink(ctx, v, ids.ID{}, CheckpointSinkDeps{Secrets: p, Egress: egress.Deps{Logger: log}})
+	return err
 }
 
 // BindLog builds the query, export and verification of the log and the job audit.chain_verify
-// (M1-50) over the signing keys of instance, the Authorizer and the instance ID, the issuer of
-// every checkpoint. The instruments go to the global meter provider of platform/otel. Start step
-// audit_log calls it after the signing keys exist. Errors: those of the sink, the instruments
-// and app.NewLog.
-func (a *Audit) BindLog(keys instance.Keys, az authorize.Authorizer, instanceID ids.ID, clk clock.Clock) error {
-	sink, err := CheckpointSink(a.cfg.CheckpointSink, instanceID)
-	if err != nil {
-		return err
-	}
+// (M1-50) over the signing keys of instance, the Authorizer, the instance ID, the issuer of
+// every checkpoint, and sink, the target of audit.checkpoint_sink (CheckpointSink). The
+// instruments go to the global meter provider of platform/otel. Start step audit_log calls it
+// after the signing keys exist. Errors: those of the instruments and app.NewLog.
+func (a *Audit) BindLog(keys instance.Keys, az authorize.Authorizer, instanceID ids.ID, clk clock.Clock, sink auditapp.CheckpointSink) error {
 	metrics, err := auditmetrics.New(nil)
 	if err != nil {
 		return err

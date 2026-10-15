@@ -50,6 +50,8 @@ var freshLines = []string{
 	"generated restic_password",
 	"pending s3_access_key",
 	"pending s3_secret_key",
+	"missing audit_checkpoint_s3_access_key",
+	"missing audit_checkpoint_s3_secret_key",
 	"generated grafana_admin_password",
 	"missing apns_key.p8",
 	"missing fcm_service_account.json",

@@ -8,6 +8,7 @@ import (
 	"flag"
 	"fmt"
 	"io"
+	"slices"
 	"strconv"
 	"strings"
 	"unicode"
@@ -24,8 +25,11 @@ const configUsage = `Usage: bothy config check [--secrets] [--config FILE] [--ro
        bothy config print [--redacted] [--config FILE] [--role ROLE]
 
 check  loads the configuration as the server start does, without starting, and prints
-       "configuration ok" or every problem on stderr. Every secret reference that uses env:
-       adds a warning on stderr, because file: is the recommended form (16-betrieb.md 5.2).
+       "configuration ok" or every problem on stderr. With an s3:// audit.checkpoint_sink it
+       reads the Object Lock configuration of the bucket and fails unless it has a default
+       retention in mode COMPLIANCE of at least retention.audit. Every secret reference that
+       uses env: adds a warning on stderr, because file: is the recommended form
+       (16-betrieb.md 5.2).
 print  prints the effective value and the source of every key, sorted by name. Secret
        references are shown as references; nothing is resolved. The output is always
        redacted; --redacted only states it, and --redacted=false is a usage error.
@@ -36,7 +40,8 @@ print  prints the effective value and the source of every key, sorted by name. S
                insecure_file and read_failed. The reason of a failure goes to stderr.
                References of migrate.* keys print "skipped": only bothy migrate up
                --bootstrap reads them, in its own container. References of file.s3.*
-               keys print "skipped" unless file.storage.driver is s3.
+               keys print "skipped" unless file.storage.driver is s3, references of
+               audit.checkpoint_s3_* keys unless audit.checkpoint_sink is s3://.
                An optional reference without a value (server.tls_cert_ref) prints
                "not set".
                "configuration ok" follows only when every reference resolved.
@@ -93,6 +98,14 @@ func configCommand(ctx context.Context, args, env []string, schema func() (*conf
 	warnEnvRefs(s, values, stderr)
 	if o.resolve && !checkSecretRefs(ctx, s, values, env, stdout, stderr) {
 		return exitFailure
+	}
+	// An object store target of audit.checkpoint_sink is immutable only with a retention lock;
+	// reading the lock needs its keys and a request (M7-22).
+	if hasKey(s, "audit.checkpoint_sink") {
+		if err := wire.CheckCheckpointSink(ctx, values, env, commandLogger(stderr, s, values)); err != nil {
+			_, _ = fmt.Fprintln(stderr, err)
+			return exitFailure
+		}
 	}
 	_, _ = io.WriteString(stdout, "configuration ok\n")
 	return exitOK
@@ -191,16 +204,8 @@ func checkSecretRefs(ctx context.Context, s *config.Schema, values *config.Value
 		if k.Kind != config.KindSecretRef {
 			continue
 		}
-		if strings.HasPrefix(k.Name, migrateSection) {
-			// Only bothy migrate up --bootstrap reads these; the api and worker containers do
-			// not get their files (docs/DECISIONS.md M1-12).
-			_, _ = fmt.Fprintf(stdout, "secret %s: skipped (read only by bothy migrate up --bootstrap)\n", k.Name)
-			continue
-		}
-		if strings.HasPrefix(k.Name, s3Section) && values.String("file.storage.driver") != "s3" {
-			// The keys of the S3 driver are read only with file.storage.driver = s3 (12 "18.",
-			// docs/DECISIONS.md M3-02/6).
-			_, _ = fmt.Fprintf(stdout, "secret %s: skipped (read only with file.storage.driver = s3)\n", k.Name)
+		if reason := skipReason(k.Name, values); reason != "" {
+			_, _ = fmt.Fprintf(stdout, "secret %s: skipped (%s)\n", k.Name, reason)
 			continue
 		}
 		if values.String(k.Name) == "" {
@@ -220,9 +225,35 @@ func checkSecretRefs(ctx context.Context, s *config.Schema, values *config.Value
 	return ok
 }
 
+// skipReason returns why check --secrets does not resolve the reference of key, or "" when it
+// does: only bothy migrate up --bootstrap reads the migrate.* keys and the api and worker
+// containers do not get their files (docs/DECISIONS.md M1-12); the keys of the S3 driver are read
+// only with file.storage.driver = s3 (12 "18.", docs/DECISIONS.md M3-02/6), those of the object
+// store sink only with an s3:// audit.checkpoint_sink (M7-22).
+func skipReason(key string, values *config.Values) string {
+	switch {
+	case strings.HasPrefix(key, migrateSection):
+		return "read only by bothy migrate up --bootstrap"
+	case strings.HasPrefix(key, checkpointS3Section) && !strings.HasPrefix(values.String("audit.checkpoint_sink"), "s3://"):
+		return "read only with audit.checkpoint_sink = s3://"
+	case strings.HasPrefix(key, s3Section) && values.String("file.storage.driver") != "s3":
+		return "read only with file.storage.driver = s3"
+	}
+	return ""
+}
+
 // migrateSection prefixes the keys of bothy migrate; check --secrets does not resolve their
 // references (checkSecretRefs).
 const migrateSection = "migrate."
+
+// hasKey reports whether schema s has the key name; test schemas of the command lack most keys.
+func hasKey(s *config.Schema, name string) bool {
+	return slices.ContainsFunc(s.Keys(), func(k config.Key) bool { return k.Name == name })
+}
+
+// checkpointS3Section prefixes the keys of the object store sink of the audit checkpoints; check
+// --secrets resolves their references only with an s3:// audit.checkpoint_sink (checkSecretRefs).
+const checkpointS3Section = "audit.checkpoint_s3_"
 
 // s3Section prefixes the keys of the S3 driver; check --secrets resolves their references only
 // with file.storage.driver = s3 (checkSecretRefs).

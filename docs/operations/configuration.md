@@ -715,7 +715,12 @@ Quelle: [19-sicherheit.md](../spec/19-sicherheit.md), Abschnitt 16.
 | `egress.timeout` | `BOTHY_EGRESS__TIMEOUT` | Server | duration | `15s` | Zeitgrenze einer ausgehenden Anfrage | aktiv |
 | `egress.max_response_bytes` | `BOTHY_EGRESS__MAX_RESPONSE_BYTES` | Server | int | `1048576` | größte Antwort einer ausgehenden Anfrage | aktiv |
 | `audit.checkpoint_interval` | `BOTHY_AUDIT__CHECKPOINT_INTERVAL` | Server | duration | `1h` | Abstand der signierten Prüfpunkte des Audit-Logs | aktiv |
-| `audit.checkpoint_sink` | `BOTHY_AUDIT__CHECKPOINT_SINK` | Server | string | leer | Ablageziel der Prüfpunkte außerhalb der Datenbank: leer (Warnung, SEC-AUD-2) oder `file://<absoluter Pfad>` auf einem Speicher außerhalb des Datenbank-Volumes; andere Schemata lehnt `bothy config check` ab. Ein Objektspeicher mit Aufbewahrungssperre als Ziel ist das empfohlene Ziel für Produktion und kommt mit PLAN M7-22 | aktiv |
+| `audit.checkpoint_sink` | `BOTHY_AUDIT__CHECKPOINT_SINK` | Server | string | leer | Ablageziel der Prüfpunkte außerhalb der Datenbank: leer (Warnung, SEC-AUD-2), `file://<absoluter Pfad>` auf einem Speicher außerhalb des Datenbank-Volumes, or `s3://<bucket>[/<prefix>]` (M7-22), an S3-compatible object store with a retention lock, the recommended target for production: a bucket in the S3 bucket naming rules, an optional prefix of segments of `[a-z0-9-]` joined by single `/`. `bothy config check` refuses every other form; for `s3://` it and the server start read the Object Lock configuration of the bucket and fail unless Object Lock is enabled with a default retention in mode `COMPLIANCE` of at least `retention.audit` (`GOVERNANCE` fails) | aktiv |
+| `audit.checkpoint_s3_endpoint` | `BOTHY_AUDIT__CHECKPOINT_S3_ENDPOINT` | Server | string | leer | endpoint of the object store of an `s3://` sink, an absolute `http` or `https` URL without path; its own endpoint, separate from `file.s3.endpoint` and the backup; `http` only with an `egress.allowed_hosts` entry with `allow_private` | aktiv |
+| `audit.checkpoint_s3_region` | `BOTHY_AUDIT__CHECKPOINT_S3_REGION` | Server | string | `us-east-1` | region of the S3 signature of an `s3://` sink | aktiv |
+| `audit.checkpoint_s3_use_path_style` | `BOTHY_AUDIT__CHECKPOINT_S3_USE_PATH_STYLE` | Server | bool | `true` | path-style requests of an `s3://` sink instead of `<bucket>.<endpoint host>` | aktiv |
+| `audit.checkpoint_s3_access_key_ref` | `BOTHY_AUDIT__CHECKPOINT_S3_ACCESS_KEY_REF` | Server | secret_ref | `file:<secrets.dir>/audit_checkpoint_s3_access_key` | secret reference of the own access key ID of an `s3://` sink, read only with an `s3://` sink; supplied by the owner from a separate account ([backup-restore.md](../operations/backup-restore.md) 8) | aktiv |
+| `audit.checkpoint_s3_secret_key_ref` | `BOTHY_AUDIT__CHECKPOINT_S3_SECRET_KEY_REF` | Server | secret_ref | `file:<secrets.dir>/audit_checkpoint_s3_secret_key` | secret reference of the own secret access key of an `s3://` sink, read only with an `s3://` sink | aktiv |
 | `audit.reason_max_chars` | `BOTHY_AUDIT__REASON_MAX_CHARS` | Server | int | `500` | größte Länge eines Pflichtgrunds einer Verwaltungsaktion in Unicode-Zeichen (SEC-AUD-5) | aktiv |
 | `signing_key.cache_ttl` | `BOTHY_SIGNING_KEY__CACHE_TTL` | Server | duration | `30s` | längste Zeit, die ein Prozess einen zurückgezogenen Schlüssel noch annimmt oder einen neuen nicht kennt | aktiv |
 | `signing_key.rotation_check_interval` | `BOTHY_SIGNING_KEY__ROTATION_CHECK_INTERVAL` | Server | duration | `1m` | Abstand des Jobs `instance.key_rotation` | aktiv |
@@ -729,7 +734,7 @@ Quelle: [20-datenschutz.md](../spec/20-datenschutz.md), Abschnitt 13.
 |---|---|---|---|---|---|---|
 | `retention.content` | `BOTHY_RETENTION__CONTENT` | Server |  | `none` | Frist für Inhalte; `none` heißt keine automatische Löschung (Konsole verlangt Bestätigung) | geplant (M7) |
 | `retention.security_after_end` | `BOTHY_RETENTION__SECURITY_AFTER_END` | Server |  | `90d` | Sicherheitsdaten nach Ende, Ablauf oder Widerruf | geplant (M7) |
-| `retention.audit` | `BOTHY_RETENTION__AUDIT` | Server |  | `365d` | Audit-Log (Studie C schlug zwölf Monate vor) | geplant (M7) |
+| `retention.audit` | `BOTHY_RETENTION__AUDIT` | Server | duration | `365d` | Audit-Log (Studie C schlug zwölf Monate vor) | aktiv |
 | `retention.cost` | `BOTHY_RETENTION__COST` | Server |  | `395d` | Kosten und Preise | geplant (M7) |
 | `retention.import_after_completion` | `BOTHY_RETENTION__IMPORT_AFTER_COMPLETION` | Server |  | `90d` | Import-Zustand nach Abschluss | geplant (M7) |
 | `retention.privacy_job` | `BOTHY_RETENTION__PRIVACY_JOB` | Server |  | `1095d` | DSGVO-Aufträge (ohne Exportpakete) | geplant (M7) |
@@ -869,6 +874,7 @@ kopiert.
 | `pgbackrest_tls/` | erzeugt (eigene CA) | postgres, backup | gegenseitiges TLS zwischen Datenbank und Repository-Host: `ca.crt`, `postgres.crt` and `postgres.key`, `backup.crt` and `backup.key` (ECDSA P-256, valid for `stack.PGBackRestTLSValidity`; the CA key is not kept) |
 | `restic_password` | erzeugt | backup | Verschlüsselung des restic-Repositorys |
 | `s3_access_key`, `s3_secret_key` | erzeugt (Profil s3) oder geliefert (externer Dienst) | server, seaweedfs, backup | S3-Zugang, `file.s3.access_key_ref` und `file.s3.secret_key_ref` |
+| `audit_checkpoint_s3_access_key`, `audit_checkpoint_s3_secret_key` | geliefert | server | own access key of the object store of the audit checkpoints, `audit.checkpoint_s3_access_key_ref` and `audit.checkpoint_s3_secret_key_ref`; read only with an `s3://` `audit.checkpoint_sink`, from a separate account ([backup-restore.md](backup-restore.md) 8) |
 | `grafana_admin_password` | erzeugt | grafana | Admin-Konto im lokalen Grafana |
 | `apns_key.p8` | geliefert | server | Push iOS und macOS, `push.apns.private_key_ref` |
 | `fcm_service_account.json` | geliefert | server | Push Android |

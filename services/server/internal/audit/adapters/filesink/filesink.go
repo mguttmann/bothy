@@ -187,7 +187,8 @@ func syncDir(dir string) error {
 	return errors.Join(d.Sync(), d.Close())
 }
 
-// List returns every checkpoint file of the instance (app.CheckpointSink). Temporary files and
+// List returns every checkpoint file of the instance in seq order (app.CheckpointSink): the
+// directory is read sorted by name, and the names have the same width. Temporary files and
 // names that are no checkpoint are skipped. Errors: a missing root, and the errors of the file
 // system; a root without a directory of the instance holds no checkpoint yet.
 func (s *Sink) List(_ context.Context) ([]app.SignedCheckpoint, error) {

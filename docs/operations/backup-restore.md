@@ -134,3 +134,59 @@ Audit-Kette sind `page`. Der Test schreibt nie in die produktive Datenbank.
    Datenbank).
 3. Gewöhnliche Löschungen nach dem Zielzeitpunkt (eigene Nachricht gelöscht) sind mit der neuen
    Zeitlinie verloren; die Inhalte erscheinen wieder. Die Störungsmeldung nennt das.
+
+## 8. Immutable storage of the audit checkpoints
+
+The signed checkpoints of the audit log are the only evidence against a complete rewrite
+of the hash chain by the database administrators ([19-sicherheit.md](../spec/19-sicherheit.md),
+SEC-AUD-2; [ADR 0021](../adr/0021-audit-log-hash-verkettet-und-getrennt-von-telemetrie.md)). They
+only help if neither the database administrators nor the administrators of the server host can change or
+delete them. The server stores them at `audit.checkpoint_sink`; the target makes them immutable,
+not the server.
+
+The recommended target is an S3 bucket with Object Lock in mode Compliance. AWS describes the mode like this:
+"In compliance mode, a protected object version can't be overwritten or deleted by any user,
+including the root user in your AWS account." Object Lock requires versioning
+(https://docs.aws.amazon.com/AmazonS3/latest/userguide/object-lock.html, retrieved 2026-10-10
+[verified]). Mode Governance is not enough here: whoever has `s3:BypassGovernanceRetention` can
+delete (same source [verified]).
+
+Set up:
+
+1. Create the bucket in a separate account, not in the account of the off-site backup (section 2)
+   and not in that of the server. Turn on versioning and Object Lock, default retention
+   in mode Compliance with a period of at least `retention.audit`.
+2. The access of the server may only create and read objects; deletion, changes to the retention and
+   bucket settings stay with the owner.
+3. Other S3-compatible storage only if its documentation proves a lock of the same strength (no
+   deletion before the end of the period, not even by the administrator of the storage). Without proof the target
+   counts as not immutable.
+
+Implementation status: built with M7-22. `audit.checkpoint_sink = s3://<bucket>[/<prefix>]`
+stores every checkpoint as the object `[<prefix>/]<instance_id>/<seq with 20 digits>.jws`, written
+once with `If-None-Match: *` and never overwritten; the server reads the oldest version of every
+key, so an overwrite that a storage lets through only adds a version that is never read. Set up
+the server side with the keys of [19-sicherheit.md](../spec/19-sicherheit.md) section 16:
+
+1. `audit.checkpoint_sink = s3://<bucket>[/<prefix>]`, for example `s3://bothy-audit` or
+   `s3://audit-checkpoints.example.com/prod`.
+2. `audit.checkpoint_s3_endpoint` (the endpoint of the separate account, never that of
+   `file.s3.endpoint` or of the backup), `audit.checkpoint_s3_region` and
+   `audit.checkpoint_s3_use_path_style`. An `http` endpoint needs an `egress.allowed_hosts` entry
+   with `allow_private`.
+3. The access key of item 2 above as the supplied files `audit_checkpoint_s3_access_key` and
+   `audit_checkpoint_s3_secret_key` ([configuration.md](configuration.md) section 5), read through
+   `audit.checkpoint_s3_access_key_ref` and `audit.checkpoint_s3_secret_key_ref`. The access needs
+   `s3:PutObject`, `s3:GetObject`, `s3:GetObjectVersion`, `s3:ListBucketVersions` and
+   `s3:GetBucketObjectLockConfiguration`, nothing else.
+4. `bothy config check` reads the Object Lock configuration of the bucket and fails, naming
+   `audit.checkpoint_sink`, unless Object Lock is enabled with a default retention in mode
+   Compliance of at least `retention.audit`; Governance fails. The server start runs the same
+   check and refuses to start with a failing target.
+
+What is proven: the conformance suite, the lock check and the detection of a rewritten chain run
+against the SeaweedFS test container at the version the Compose stack pins (docs/DECISIONS.md
+M7-22/2). Not proven: a real cloud bucket in mode Compliance; the owner checks the first
+checkpoint object of a new bucket once (`HeadObject` shows mode `COMPLIANCE` and a retain-until
+date). A `file://` target stays possible and is not immutable: then the owner copies the
+checkpoints with their own access into the bucket above.
