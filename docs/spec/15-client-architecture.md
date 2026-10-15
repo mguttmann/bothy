@@ -733,6 +733,11 @@ real server.
 [12-files.md](12-files.md); `terminal.*` and `host_service.*` in [24-terminal.md](24-terminal.md); `client.cache_max_age`, `client.outbox_retry_base` and
 `client.outbox_retry_cap` in [04-sync-protocol.md](04-sync-protocol.md).
 
+The apps read these values, every other value of place `App` and the server keys of
+D-W-115 and D-W-116 through `AppConfig` in `packages/domain`, generated from and held equal to
+the configuration reference ([../operations/configuration.md](../operations/configuration.md),
+section 4) by `make codegen-check`.
+
 ## 23. Terminal view
 
 Normative for protocol, permissions, limits and tests: [24-terminal.md](24-terminal.md). This

@@ -83,6 +83,13 @@ operated, and the order of the build.
   event decoding; `make api-clients` regenerates it in a temporary copy, compares and analyses it
   (G4 for Dart), and a G5 test proves that unknown fields, enum values and event types are
   skipped (M4-02).
+- Domain package (`packages/domain`): typed IDs and a monotonic UUIDv7 generator, the entities
+  of the client schema mirror with closed enums that decode unknown values to `unknown`, the
+  sync rules of chapter 04 (version rule, cursor rule, monotonic read state, loaded ranges of
+  `thread_seq`, unread and mention counting), the display rules of chapter 01 (message grouping,
+  forum order with the Done section, cost labels), an event catalogue generated from
+  `docs/spec/actions.yaml` and `AppConfig` generated from the configuration reference;
+  `make codegen-check` fails when either generated table is stale (M4-08).
 - One Dart pub workspace at the repository root (`pubspec.yaml`, one `pubspec.lock`) with the
   fourteen members of docs/spec/15-client-architecture.md 3: the apps `apps/client` and
   `apps/console` and the packages under `packages/` as skeletons, `bothy_noise` taken over;
