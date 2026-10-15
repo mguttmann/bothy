@@ -29,7 +29,8 @@ const msgRegistrationCheckFailed = "registration check failed"
 
 // moduleRegistrations are the Register(r *authorize.Registry) functions of the module ports, in
 // the order of the module register. No module registers an event type, a gateway op or a
-// terminal channel op in M1 except authz with access.changed (M1-29); each module's ticket
+// terminal channel op in M1 except authz with access.changed (M1-29), grant.changed,
+// group.changed and access.expiring (M1-30); each module's ticket
 // appends its function here.
 var moduleRegistrations = []func(*authorize.Registry){authz.Register}
 
@@ -189,7 +190,7 @@ func NewRightsHook(pool *pg.Pool, src RightsSources, clk clock.Clock, log *slog.
 		clk = clock.System()
 	}
 	return authzapp.NewRightsHook(authzapp.RightsHookDeps{
-		Counters: InstanceCounters(pool), Store: authzpg.NewRepository(pool), Principals: src.Principals,
+		Counters: InstanceCounters(pool), Store: authzpg.NewRepository(pool), Expiry: authzpg.NewRepository(pool), Principals: src.Principals,
 		Structure: src.Structure, Policies: src.Policies, Clock: clk, Log: orDiscard(log),
 	})
 }
@@ -202,4 +203,33 @@ func mustRightsHook(pool *pg.Pool, src RightsSources, clk clock.Clock, log *slog
 		panic(err)
 	}
 	return h
+}
+
+// AuthzExpiryConfig binds authz.expiry_sweep_interval, authz.expiry_reminder_lead and
+// authz.expiry_sweep_batch_max into the configuration of the expiry jobs (M1-30). The error names
+// the key whose binding failed, never a value.
+func AuthzExpiryConfig(v *config.Values) (authzapp.ExpiryConfig, error) {
+	var c authzapp.ExpiryConfig
+	if err := config.Bind(v, &c); err != nil {
+		return authzapp.ExpiryConfig{}, err
+	}
+	return c, nil
+}
+
+// NewExpiryService builds the use case of the jobs authz.expiry_sweep and authz.expiry_reminder
+// (M1-30) over pool: the unit of work and the rights hook of the audit step a (the hook must be
+// bound, start step 6c; its begin step folds the due expiries of a sweep batch in), the appender of
+// the sync step sy, the grant store of authz, the PrincipalSource of identity and the system clock.
+// It opens no connection.
+//
+// Errors: those of authzapp.NewExpiryService.
+func NewExpiryService(pool *pg.Pool, a *Audit, sy *Sync, cfg authzapp.ExpiryConfig, log *slog.Logger) (*authzapp.ExpiryService, error) {
+	if a == nil || sy == nil {
+		return nil, errors.New("wire: NewExpiryService needs the audit and the sync step")
+	}
+	return authzapp.NewExpiryService(cfg, authzapp.ExpiryDeps{
+		UoW: a.UoW(), Expiry: authzpg.NewRepository(pool), Rights: a.RightsHook(),
+		Principals: identityapp.NewPrincipalSource(identitypg.NewRepository(pool)),
+		Events:     sy.Appender(), Clock: clock.System(), Log: orDiscard(log),
+	})
 }

@@ -36,6 +36,8 @@ type RightsHookDeps struct {
 	Principals authz.PrincipalSource
 	Structure  authz.StructureSource
 	Policies   authz.AgentPolicySource
+	// Expiry selects and marks the due expiries every rights change folds in (M1-30).
+	Expiry ExpiryStore
 	// Clock is read once per phase.
 	Clock clock.Clock
 	// Log receives failures of the deny audit; nil means slog.Default().
@@ -72,7 +74,7 @@ var _ authz.RightsChanges = (*RightsHook)(nil)
 // NewRightsHook returns the hook; it opens no connection, so the golden test of internal/wire
 // builds it without a database. Errors: a nil dependency other than Log.
 func NewRightsHook(d RightsHookDeps) (*RightsHook, error) {
-	if d.Counters == nil || d.Store == nil || d.Principals == nil || d.Structure == nil || d.Policies == nil || d.Clock == nil {
+	if d.Counters == nil || d.Store == nil || d.Expiry == nil || d.Principals == nil || d.Structure == nil || d.Policies == nil || d.Clock == nil {
 		return nil, errors.New("authz: NewRightsHook needs every dependency")
 	}
 	log := d.Log
@@ -104,14 +106,33 @@ type rightsState struct {
 	t time.Time
 	// before holds the view of each affected principal before the change.
 	before map[ids.ID]domain.AccessView
+	// assume is what every view before assumes valid: the unreported rows (reportedView) and the
+	// expiries the change folded in (expiryfold.go).
+	assume domain.AssumeValid
+	// pending are the grant.changed of the folded expiries and expiredMembers the folded
+	// memberships whose group.changed is built in phase 3.1; both are appended there before
+	// access.changed.
+	pending        []eventlog.Event
+	expiredMembers []domain.MembershipWithGroup
+	// folded counts the folded grants and memberships.
+	folded int
 }
+
+// reportedView is what every view of a rights change assumes valid: each grant and membership
+// whose expiry is not reported yet (domain.AssumeValid.Unreported). Because every rights change
+// first folds in the due expiries (expiryfold.go), an unreported row is one that expires after
+// the time of the change or, in a sweep batch, one left to a later batch; a view is what the
+// client was told, and an expiry reaches the client only once it is reported. authorize itself
+// never assumes anything: an expired row is invalid from its expiry on (07 section 2.5).
+var reportedView = domain.AssumeValid{Unreported: true}
 
 // stateKey keys the rightsState in the unit of work; a retry starts without it.
 var stateKey = txn.NewKey[*rightsState]("authz rights change")
 
 // Begin is the hook of phase 1 (txn.PhaseRightsBegin), the first statement of the transaction:
-// it locks and raises permission_version through instance.Counters, then records the views of
-// the declared principals and of the principals authz derives from the declared targets. It reads
+// it locks and raises permission_version through instance.Counters, folds in the due expiries
+// that are not reported yet (expiryfold.go, M1-30), then records the views of the declared
+// principals and of the principals authz derives from the declared targets. It reads
 // only inside the ambient transaction and never through the snapshot cache, whose keys are
 // committed versions. Errors: kind internal for a unit without a declared catalogue action that
 // changes rights, or before Bind; the errors of the counters and the sources.
@@ -135,14 +156,17 @@ func (h *RightsHook) Begin(ctx context.Context) error {
 		return err
 	}
 	t := h.d.Clock.Now()
-	st := &rightsState{spec: spec, action: act, version: v, t: t, before: map[ids.ID]domain.AccessView{}}
+	st := &rightsState{spec: spec, action: act, version: v, t: t, before: map[ids.ID]domain.AccessView{}, assume: reportedView}
+	if err := h.fold(ctx, st, h.bound.Load(), t); err != nil {
+		return err
+	}
 	affected := slices.Clone(spec.Principals)
 	derived, err := h.affectedByTargets(ctx, spec.Targets, t)
 	if err != nil {
 		return err
 	}
 	affected = append(affected, derived...)
-	if err := h.record(ctx, st, affected, t); err != nil {
+	if err := h.record(ctx, st, affected, t, st.assume); err != nil {
 		return err
 	}
 	return txn.Store(ctx, stateKey, st)
@@ -159,11 +183,12 @@ func (h *RightsHook) AddAffected(ctx context.Context, principals ...ids.ID) erro
 	if !ok {
 		return internal("AddAffected outside a declared rights change")
 	}
-	return h.record(ctx, st, principals, st.t)
+	return h.record(ctx, st, principals, st.t, st.assume)
 }
 
-// record computes and keeps the view of each principal of list that has none yet.
-func (h *RightsHook) record(ctx context.Context, st *rightsState, list []ids.ID, t time.Time) error {
+// record computes and keeps the view of each principal of list that has none yet, with the rows
+// of assume treated as not expired.
+func (h *RightsHook) record(ctx context.Context, st *rightsState, list []ids.ID, t time.Time, assume domain.AssumeValid) error {
 	st.mu.Lock()
 	defer st.mu.Unlock()
 	var missing []ids.ID
@@ -180,7 +205,7 @@ func (h *RightsHook) record(ctx context.Context, st *rightsState, list []ids.ID,
 		return err
 	}
 	for _, p := range missing {
-		v, err := h.viewOf(ctx, w, p, st.version, t)
+		v, err := h.viewOf(ctx, w, p, st.version, t, assume)
 		if err != nil {
 			return err
 		}
@@ -210,6 +235,13 @@ func (h *RightsHook) BeforeCommit(ctx context.Context) error {
 		h.deny(ctx, b.Audit, st.spec, viol)
 		return viol.Err()
 	}
+	folded, err := h.pendingEvents(ctx, st)
+	if err != nil {
+		return err
+	}
+	if err := b.Events.Append(ctx, folded...); err != nil {
+		return err
+	}
 	changes, err := h.differences(ctx, st)
 	if err != nil || len(changes) == 0 {
 		return err
@@ -234,7 +266,7 @@ func (h *RightsHook) differences(ctx context.Context, st *rightsState) ([]author
 	principals := domain.SortIDs(slices.Collect(mapsKeys(st.before)))
 	var out []authorize.PrincipalAccessChange
 	for _, p := range principals {
-		after, err := h.viewOf(ctx, w, p, st.version, st.t)
+		after, err := h.viewOf(ctx, w, p, st.version, st.t, reportedView)
 		if err != nil {
 			return nil, err
 		}
@@ -515,8 +547,9 @@ func (h *RightsHook) structureNow(ctx context.Context) (structureView, error) {
 // viewOf builds the view of principal at version v and time t from the sources, with the same
 // snapshot and Effective function as authorize but without the cache. A person counts as in a
 // session: the owner role takes effect for an active owner (the views are what the person sees
-// in the app). A principal that is unknown or not active sees nothing (SR7).
-func (h *RightsHook) viewOf(ctx context.Context, w structureView, principal ids.ID, v int64, t time.Time) (domain.AccessView, error) {
+// in the app). A principal that is unknown or not active sees nothing (SR7). The rows of assume
+// count as not expired.
+func (h *RightsHook) viewOf(ctx context.Context, w structureView, principal ids.ID, v int64, t time.Time, assume domain.AssumeValid) (domain.AccessView, error) {
 	facts, found, err := h.d.Principals.Principal(ctx, principal)
 	if err != nil {
 		return domain.AccessView{}, sourceError("principal source", err)
@@ -525,7 +558,7 @@ func (h *RightsHook) viewOf(ctx context.Context, w structureView, principal ids.
 		return domain.AccessView{Spaces: map[ids.ID]bool{}, Channels: map[ids.ID]domain.Rights{}}, nil
 	}
 	kind := string(facts.Kind)
-	in := domain.SnapshotInput{PrincipalID: principal, Version: v, At: t, Active: true, Owner: facts.IsOwner && kind == domain.KindUser}
+	in := domain.SnapshotInput{PrincipalID: principal, Version: v, At: t, Active: true, Owner: facts.IsOwner && kind == domain.KindUser, Assume: assume}
 	if err := readGrants(ctx, h.d.Store, principal, kind == domain.KindUser, &in, t); err != nil {
 		return domain.AccessView{}, err
 	}
@@ -550,7 +583,7 @@ func (h *RightsHook) affectedByTargets(ctx context.Context, targets []txn.Ref, t
 	}
 	var groups []ids.ID
 	for _, g := range grants {
-		if !g.InEffect(t) {
+		if !reportedView.Grant(g).InEffect(t) {
 			continue
 		}
 		if g.Subject.Kind == domain.SubjectGroup {
@@ -610,7 +643,8 @@ func channelsOfSpace(chans []authz.ChannelFacts, space ids.ID) (channels, operat
 	return channels, operators
 }
 
-// activeMembers returns the people with a membership in effect at t in one of groups.
+// activeMembers returns the people with a membership in effect at t in one of groups, counting
+// unreported expiries as not yet effective (reportedView).
 func activeMembers(ctx context.Context, store Store, groups []ids.ID, t time.Time) ([]ids.ID, error) {
 	if len(groups) == 0 {
 		return nil, nil
@@ -621,7 +655,7 @@ func activeMembers(ctx context.Context, store Store, groups []ids.ID, t time.Tim
 	}
 	var out []ids.ID
 	for _, m := range ms {
-		if m.Membership.InEffect(m.Group, t) {
+		if reportedView.Membership(m.Membership).InEffect(m.Group, t) {
 			out = append(out, m.Membership.UserID)
 		}
 	}
@@ -629,8 +663,8 @@ func activeMembers(ctx context.Context, store Store, groups []ids.ID, t time.Tim
 }
 
 // readGrants reads the grants of principal and, for a person, its memberships and the grants of
-// the groups in effect at t into in. The Authorizer and the rights hook share it, so a view and
-// a decision always rest on the same facts.
+// the groups in effect at t into in (memberships named in in.Assume count as not expired). The
+// Authorizer and the rights hook share it, so a view and a decision always rest on the same facts.
 func readGrants(ctx context.Context, store Store, principal ids.ID, person bool, in *domain.SnapshotInput, t time.Time) error {
 	var err error
 	if in.Grants, err = store.ActiveGrantsOfPrincipal(ctx, principal); err != nil {
@@ -644,7 +678,7 @@ func readGrants(ctx context.Context, store Store, principal ids.ID, person bool,
 	}
 	var groups []ids.ID
 	for _, m := range in.Memberships {
-		if m.Membership.InEffect(m.Group, t) {
+		if in.Assume.Membership(m.Membership).InEffect(m.Group, t) {
 			groups = append(groups, m.Group.ID)
 		}
 	}
