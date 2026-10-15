@@ -238,6 +238,53 @@ def test_test_runs_each_member_after_one_root_resolution(repo: Repo) -> None:
     ]
 
 
+def _gradle_member(repo: Repo, exit_code: int = 0) -> Path:
+    """A Gradle wrapper in packages/alpha/android that records its calls like the other fakes."""
+    android = repo.root / "packages" / "alpha" / "android"
+    wrapper = repo.write(
+        "packages/alpha/android/gradlew",
+        _FAKE.format(python=sys.executable).replace("sys.exit(0)", f"sys.exit({exit_code})"),
+    )
+    wrapper.chmod(0o755)
+    repo.write("packages/alpha/android/core/build.gradle.kts")
+    repo.write("packages/alpha/android/core/src/test/kotlin/CoreTest.kt")
+    # A module without JVM tests is not run.
+    repo.write("packages/alpha/android/other/build.gradle.kts")
+    repo.write("packages/alpha/android/other/src/main/kotlin/Other.kt")
+    return android
+
+
+def test_test_runs_the_jvm_tests_of_gradle_modules(repo: Repo) -> None:
+    """Brief M5-01: the JVM unit tests of a member's Gradle modules run in `make test`."""
+    repo.workspace()
+    android = _gradle_member(repo)
+    repo.commit()
+    result = repo.make("test", "COMPONENTS=apps")
+    assert result.returncode == 0, result.stdout + result.stderr
+    assert [(c["args"], c["cwd"]) for c in repo.calls("gradlew")] == [
+        (
+            ["--no-daemon", "--quiet", "--console=plain", "-p", "core", "testDebugUnitTest"],
+            str(android.resolve()),
+        )
+    ]
+
+
+def test_failing_jvm_tests_fail_make_test(repo: Repo) -> None:
+    repo.workspace()
+    _gradle_member(repo, exit_code=1)
+    repo.commit()
+    assert repo.make("test", "COMPONENTS=apps").returncode != 0
+
+
+def test_test_skips_jvm_tests_without_gradle_modules(repo: Repo) -> None:
+    repo.workspace()
+    repo.commit()
+    result = repo.make("test", "COMPONENTS=apps")
+    assert result.returncode == 0, result.stdout + result.stderr
+    assert "jvm-test" in result.stdout
+    assert repo.calls("gradlew") == []
+
+
 def test_member_without_tests_fails(repo: Repo) -> None:
     repo.workspace()
     shutil.rmtree(repo.root / "packages" / "beta" / "test")

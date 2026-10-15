@@ -250,6 +250,59 @@ struct DeviceKeyInfoMessage: Hashable, CustomStringConvertible {
   }
 }
 
+/// The texts of the step-up prompt on Android (brief M5-01, Design note 1).
+///
+/// They come from `packages/l10n`; iOS and macOS ignore them, because the
+/// system shows its own text there.
+///
+/// Generated class from Pigeon that represents data sent in messages.
+struct PromptTextsMessage: Hashable, CustomStringConvertible {
+  /// The prompt's title.
+  var title: String
+  /// An optional second line.
+  var subtitle: String? = nil
+  /// The cancel button, shown where the prompt accepts biometrics only.
+  var negativeButton: String
+
+
+  // swift-format-ignore: AlwaysUseLowerCamelCase
+  static func fromList(_ pigeonVar_list: [Any?]) -> PromptTextsMessage? {
+    let title = pigeonVar_list[0] as! String
+    let subtitle: String? = nilOrValue(pigeonVar_list[1])
+    let negativeButton = pigeonVar_list[2] as! String
+
+    return PromptTextsMessage(
+      title: title,
+      subtitle: subtitle,
+      negativeButton: negativeButton
+    )
+  }
+  func toList() -> [Any?] {
+    return [
+      title,
+      subtitle,
+      negativeButton,
+    ]
+  }
+  static func == (lhs: PromptTextsMessage, rhs: PromptTextsMessage) -> Bool {
+    if Swift.type(of: lhs) != Swift.type(of: rhs) {
+      return false
+    }
+    return DeviceKeyApiPigeonInternal.deepEquals(lhs.title, rhs.title) && DeviceKeyApiPigeonInternal.deepEquals(lhs.subtitle, rhs.subtitle) && DeviceKeyApiPigeonInternal.deepEquals(lhs.negativeButton, rhs.negativeButton)
+  }
+
+  func hash(into hasher: inout Hasher) {
+    hasher.combine("PromptTextsMessage")
+    DeviceKeyApiPigeonInternal.deepHash(value: title, hasher: &hasher)
+    DeviceKeyApiPigeonInternal.deepHash(value: subtitle, hasher: &hasher)
+    DeviceKeyApiPigeonInternal.deepHash(value: negativeButton, hasher: &hasher)
+  }
+
+  public var description: String {
+    return "PromptTextsMessage(title: \(String(describing: title)), subtitle: \(String(describing: subtitle)), negativeButton: \(String(describing: negativeButton)))"
+  }
+}
+
 private class DeviceKeyApiPigeonCodecReader: FlutterStandardReader {
   override func readValue(ofType type: UInt8) -> Any? {
     switch type {
@@ -261,6 +314,8 @@ private class DeviceKeyApiPigeonCodecReader: FlutterStandardReader {
       return nil
     case 130:
       return DeviceKeyInfoMessage.fromList(self.readValue() as! [Any?])
+    case 131:
+      return PromptTextsMessage.fromList(self.readValue() as! [Any?])
     default:
       return super.readValue(ofType: type)
     }
@@ -274,6 +329,9 @@ private class DeviceKeyApiPigeonCodecWriter: FlutterStandardWriter {
       super.writeValue(value.rawValue)
     } else if let value = value as? DeviceKeyInfoMessage {
       super.writeByte(130)
+      super.writeValue(value.toList())
+    } else if let value = value as? PromptTextsMessage {
+      super.writeByte(131)
       super.writeValue(value.toList())
     } else {
       super.writeValue(value)
@@ -306,8 +364,10 @@ protocol DeviceKeyHostApi {
   /// Returns the key of [purpose] for [scope], or null; never creates one.
   func keyInfo(scope: String, purpose: KeyPurposeMessage) throws -> DeviceKeyInfoMessage?
   /// Signs [data] with ES256 and returns `R || S` (64 bytes); asynchronous,
-  /// because the step-up key shows the system prompt.
-  func sign(scope: String, purpose: KeyPurposeMessage, data: FlutterStandardTypedData) async throws -> FlutterStandardTypedData
+  /// because the step-up key shows the system prompt. [prompt] carries the
+  /// prompt texts for Android; the step-up key there fails with `internal`
+  /// without them.
+  func sign(scope: String, purpose: KeyPurposeMessage, data: FlutterStandardTypedData, prompt: PromptTextsMessage?) async throws -> FlutterStandardTypedData
   /// Returns an attestation of the key over [challenge], or null where the
   /// platform has none.
   func attestation(scope: String, purpose: KeyPurposeMessage, challenge: FlutterStandardTypedData) throws -> FlutterStandardTypedData?
@@ -356,7 +416,9 @@ class DeviceKeyHostApiSetup {
       keyInfoChannel.setMessageHandler(nil)
     }
     /// Signs [data] with ES256 and returns `R || S` (64 bytes); asynchronous,
-    /// because the step-up key shows the system prompt.
+    /// because the step-up key shows the system prompt. [prompt] carries the
+    /// prompt texts for Android; the step-up key there fails with `internal`
+    /// without them.
     let signChannel = FlutterBasicMessageChannel(name: "dev.flutter.pigeon.device_key.DeviceKeyHostApi.sign\(channelSuffix)", binaryMessenger: binaryMessenger, codec: codec)
     if let api = api {
       signChannel.setMessageHandler { message, reply in
@@ -364,9 +426,10 @@ class DeviceKeyHostApiSetup {
         let scopeArg = args[0] as! String
         let purposeArg = args[1] as! KeyPurposeMessage
         let dataArg = args[2] as! FlutterStandardTypedData
+        let promptArg: PromptTextsMessage? = nilOrValue(args[3])
         Task { @MainActor in
           do {
-            let result = try await api.sign(scope: scopeArg, purpose: purposeArg, data: dataArg)
+            let result = try await api.sign(scope: scopeArg, purpose: purposeArg, data: dataArg, prompt: promptArg)
             reply(wrapResult(result))
           } catch {
             reply(wrapError(error))

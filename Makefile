@@ -70,6 +70,9 @@ GO_MODS := $(patsubst %/,%,$(sort $(dir $(shell git ls-files -- 'services/*go.mo
 DART_PKGS := $(filter-out .,$(patsubst %/,%,$(sort $(dir $(shell git ls-files -- 'apps/*pubspec.yaml' 'packages/*pubspec.yaml' 2>/dev/null)))))
 # Generated Dart files: out of the format check, the doc and style lint (root
 # analysis_options.yaml) and coverage (tools/ci/lcov_filter.py); docs/DECISIONS.md D-M4-01-4.
+# Gradle modules of the Dart members with JVM tests (brief M5-01): <member>/android/<module>
+# with a tracked src/test/; each runs through the member's Gradle wrapper in <member>/android.
+JVM_TEST_MODULES := $(sort $(shell git ls-files -- 'packages/*/android/*/src/test/*' 2>/dev/null | sed -E 's|^(packages/[^/]+/android/[^/]+)/src/test/.*|\1|'))
 DART_GENERATED := \.(g|freezed|drift)\.dart$$|/lib/src/generated/|^(apps|packages)/[^/]+/build/
 # Hand-written Dart files of the members, set in a recipe as `files`.
 dart_files = files=$$(git ls-files -- $(foreach p,$(DART_PKGS),'$(p)/*.dart')) || exit 1; \
@@ -217,6 +220,12 @@ test: ## All tests with coverage data
 	  [ -d $$p/test ] || { echo "$$p: no test/ directory (docs/spec/23-qualitaet.md, 3)" >&2; exit 1; }; done; \
 	  flutter pub get --enforce-lockfile || exit 1; \
 	  for p in $(DART_PKGS); do (cd $$p && flutter test --coverage) || exit 1; done; fi
+	@# JVM tests of the Android code (brief M5-01): without a JDK 17 or the Android SDK
+	@# (ANDROID_HOME) the Gradle wrapper fails, and so does this gate (P-09).
+	@if [ -z "$(DART_ON)" ]; then $(call skip,jvm-test,no Dart package selected); \
+	elif [ -z "$(JVM_TEST_MODULES)" ]; then $(call skip,jvm-test,no Gradle module with src/test under packages/*/android); \
+	else for m in $(JVM_TEST_MODULES); do \
+	  (cd $${m%/*} && ./gradlew --no-daemon --quiet --console=plain -p $${m##*/} testDebugUnitTest) || exit 1; done; fi
 	@if [ -z "$(PY_ON)" ]; then $(call skip,py-test,no Python project selected); \
 	else for p in $(PY_PROJECTS); do (cd $$p && $(UV) run --locked pytest --cov --cov-report=xml:coverage.xml); done; fi
 	@if [ -z "$(TS_ON)" ]; then $(call skip,ts-test,no TypeScript project selected); \
@@ -665,8 +674,8 @@ portability: ## Full stack from images on this machine plus smoke test (contract
 	@[ -x infra/compose/smoke.sh ] || { echo "portability: infra/compose/smoke.sh is missing (docs/quality/gates.md)"; exit 1; }
 	infra/compose/smoke.sh
 
-# ---- platform tests of the apps (not part of `gates`: they need a desktop session) ------------
-apps-platform: ## Platform tests of the members on this host (platform-tests.json; CI jobs apps-macos, apps-windows)
+# ---- platform tests of the apps (not part of `gates`: they need a desktop session or a device) -
+apps-platform: ## Platform tests of the members on this host and an attached Android device (platform-tests.json; CI jobs apps-macos, apps-windows, apps-android)
 	$(UVRUN) python tools/ci/apps_platform.py
 
 # ---- review and repository maintenance -------------------------------------------------

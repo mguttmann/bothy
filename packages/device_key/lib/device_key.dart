@@ -27,4 +27,5 @@ export 'src/device_key.dart'
         DeviceKeyError,
         DeviceKeyException,
         DeviceKeyInfo,
-        KeyPurpose;
+        KeyPurpose,
+        StepUpPrompt;

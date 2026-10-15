@@ -23,10 +23,14 @@ dev_dependencies:
 
 # iOS and macOS share the Swift sources under darwin/ (brief M4-10, Design note 4): the Swift
 # package darwin/device_key, which Flutter links through Swift Package Manager, and the core
-# package darwin/device_key/DeviceKeyCore inside it. Windows (M4-11) and Android (M5-01) follow.
+# package darwin/device_key/DeviceKeyCore inside it. Android (M5-01) has the Gradle project under
+# android/ with the core module android/devicekeycore. Windows (M4-11) follows.
 flutter:
   plugin:
     platforms:
+      android:
+        package: devicekey.flutter
+        pluginClass: DeviceKeyPlugin
       ios:
         pluginClass: DeviceKeyPlugin
         sharedDarwinSource: true

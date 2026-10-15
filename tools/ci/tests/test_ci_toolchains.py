@@ -30,7 +30,10 @@ GO_VERSION_FILE = (
 FLUTTER_IF = "hashFiles('apps/*/pubspec.yaml', 'packages/*/pubspec.yaml') != ''"
 # The root pubspec.yaml of the workspace carries the pin (docs/DECISIONS.md D-M4-01-1).
 FLUTTER_VERSION_FILE = "pubspec.yaml"
-APPS_JOBS = ("apps-macos", "apps-windows")
+APPS_JOBS = ("apps-macos", "apps-windows", "apps-android")
+# The JVM tests of the Android core run in `make test` (brief M5-01): gates and sonar install a
+# JDK and the Android SDK when a Gradle project of a member is tracked.
+ANDROID_IF = "hashFiles('packages/*/android/gradlew') != ''"
 
 
 def _tracked(*patterns: str) -> list[str]:
@@ -120,6 +123,42 @@ def test_apps_jobs_run_the_platform_tests(job: str, runner: str) -> None:
     assert any(_uses(s, "astral-sh/setup-uv") for s in spec["steps"])
 
 
+def test_apps_android_runs_the_instrumented_tests_on_an_emulator() -> None:
+    spec = _jobs()["apps-android"]
+    assert spec["runs-on"] == "ubuntu-24.04"
+    assert spec["needs"] == "plan"
+    assert spec["permissions"] == {"contents": "read"}
+    assert isinstance(spec["timeout-minutes"], int)
+    assert "needs.plan.outputs.components" in spec["if"]
+    assert spec["if"].startswith("(github.event.repository.visibility == 'public'")
+    levels = spec["strategy"]["matrix"]["api-level"]
+    assert 26 in levels, "the minimum API level of 15 2"
+    assert max(levels) >= 35, "the current stable API level"
+    steps = spec["steps"]
+    assert any("kvm" in str(s.get("run", "")) for s in steps), "hardware acceleration"
+    assert any(_uses(s, "actions/setup-java") for s in steps)
+    [emulator] = [s for s in steps if _uses(s, "reactivecircus/android-emulator-runner")]
+    assert emulator["with"]["api-level"] == "${{ matrix.api-level }}"
+    assert emulator["with"]["arch"] == "x86_64"
+    assert emulator["with"]["target"] == "google_apis"
+    platform = "uv run --project tools --locked --quiet python tools/ci/apps_platform.py"
+    assert emulator["with"]["script"] == f"{platform} --system android"
+
+
+@pytest.mark.parametrize("job", ["gates", "sonar"])
+def test_jdk_and_android_sdk_for_the_jvm_tests(job: str) -> None:
+    steps = _steps(job)
+    [java] = [s for s in steps if _uses(s, "actions/setup-java")]
+    assert java["if"] == ANDROID_IF
+    assert java["with"]["java-version"] == "17"
+    [sdk] = [s for s in steps if _uses(s, "android-actions/setup-android")]
+    assert sdk["if"] == ANDROID_IF
+    make = next(i for i, s in enumerate(steps) if str(s.get("run", "")).startswith("make "))
+    assert steps.index(sdk) < make
+    for gradlew in _tracked("packages/*gradlew"):
+        assert re.fullmatch(r"packages/[^/]+/android/gradlew", gradlew), gradlew
+
+
 def _ci_ok(**results: str) -> int:
     """Run the script of the ci-ok job with the given job results (others: success)."""
     job = _jobs()["ci-ok"]
@@ -141,9 +180,10 @@ def test_ci_ok_waits_for_the_apps_jobs() -> None:
     env = _jobs()["ci-ok"]["steps"][0]["env"]
     assert env["APPS_MACOS"] == "${{ needs.apps-macos.result }}"
     assert env["APPS_WINDOWS"] == "${{ needs.apps-windows.result }}"
+    assert env["APPS_ANDROID"] == "${{ needs.apps-android.result }}"
 
 
-@pytest.mark.parametrize("variable", ["APPS_MACOS", "APPS_WINDOWS"])
+@pytest.mark.parametrize("variable", ["APPS_MACOS", "APPS_WINDOWS", "APPS_ANDROID"])
 @pytest.mark.parametrize(
     ("result", "code"), [("success", 0), ("skipped", 0), ("failure", 1), ("cancelled", 1)]
 )

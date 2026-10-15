@@ -105,6 +105,9 @@ Tags die Commit-SHA hinter dem Tag).
 | `docker/login-action` | `v4.6.0` | Anmeldung an ghcr.io |
 | `docker/build-push-action` | `v7.4.0` | Server-Image bauen und pushen (multi-arch by cross compilation in the Dockerfile, without QEMU) |
 | `subosito/flutter-action` | `v2.23.0` | Flutter for every Dart package (jobs `gates`, `sonar`, `apps-macos`, `apps-windows` and the Pages build), from `environment.flutter` of the root `pubspec.yaml` |
+| `actions/setup-java` | `v6.1.0` | Temurin 17 for the Gradle builds of the Android code (jobs `gates`, `sonar`, `apps-android`, brief M5-01) |
+| `android-actions/setup-android` | `v4.0.4` | Android SDK for the JVM tests of the Android core in `make test` (jobs `gates`, `sonar`) |
+| `reactivecircus/android-emulator-runner` | `v2.38.0` | Android emulators with API 26 and 36 for the instrumented tests (job `apps-android`) |
 | `github/codeql-action` | `v4.38.3` | CodeQL und SARIF-Upload (öffentlich) |
 | `ossf/scorecard-action` | `v2.4.4` | OpenSSF Scorecard (öffentlich) |
 | `actions/upload-pages-artifact` | `v5.0.0` | Doku-Site hochladen (öffentlich) |
