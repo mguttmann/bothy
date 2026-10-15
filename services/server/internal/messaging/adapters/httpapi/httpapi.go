@@ -1,13 +1,14 @@
 // SPDX-License-Identifier: Apache-2.0
 
-// Package httpapi holds the REST handlers of the messaging module (M1-56): createMessage and
-// createThread of docs/api/openapi.yaml as part of rest.StrictServerInterface. The use cases of
-// messaging.Messages authorize; the handlers only convert, set Idempotent-Replay on a repetition
-// and pass errors to the problem writer of the chain unchanged.
+// Package httpapi holds the REST handlers of the messaging module as part of
+// rest.StrictServerInterface: createMessage and createThread (M1-56), listMyMentions and the six
+// template operations (M1-60) of docs/api/openapi.yaml. The use cases authorize; the handlers only
+// convert, set Idempotent-Replay on a repetition and ETag on a template change, and pass errors to
+// the problem writer of the chain unchanged.
 //
 // Example:
 //
-//	h := httpapi.New(svc)
+//	h := httpapi.New(svc, svc, svc, threads)
 //	built, err := routes.Build(wire.Handlers{Messages: h}, wire.RouteOptions(), cat)
 package httpapi
 
@@ -22,15 +23,19 @@ import (
 	"github.com/OWNER/bothy/services/server/internal/messaging"
 )
 
-// Messages implements createMessage and createThread.
+// Messages implements the REST operations of messaging.
 type Messages struct {
-	messages messaging.Messages
-	threads  chat.Threads
+	messages  messaging.Messages
+	mentions  messaging.Mentions
+	templates messaging.Templates
+	threads   chat.Threads
 }
 
-// New returns the handlers over the use cases of messaging and the thread port of chat, which
-// gives the thread of a createThread answer.
-func New(m messaging.Messages, t chat.Threads) *Messages { return &Messages{messages: m, threads: t} }
+// New returns the handlers over the use cases of messaging (sending m, mentions mn, templates
+// tp) and the thread port of chat, which gives the thread of a createThread answer.
+func New(m messaging.Messages, mn messaging.Mentions, tp messaging.Templates, t chat.Threads) *Messages {
+	return &Messages{messages: m, mentions: mn, templates: tp, threads: t}
+}
 
 // principal returns the actor of the request; anonymous when the chain set none.
 func principal(ctx context.Context) actor.Actor {

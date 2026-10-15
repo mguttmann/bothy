@@ -238,8 +238,8 @@ Source: [03-data-model.md](../spec/03-data-model.md), section 9.
 | `reaction.emoji_max_bytes` | `BOTHY_REACTION__EMOJI_MAX_BYTES` | Server |  | `64` | largest length of a reaction emoji in bytes (otherwise a grapheme cluster has no limit) | planned (M1) |
 | `reaction.max_distinct_per_message` | `BOTHY_REACTION__MAX_DISTINCT_PER_MESSAGE` | Server |  | `20` | distinct emoji per message; limits `Message.reactions` and the payload of the events | planned (M1) |
 | `pin.max_per_thread` | `BOTHY_PIN__MAX_PER_THREAD` | Server |  | `50` | pins per thread; `listPins` is not paginated | planned (M1) |
-| `template.name_max_chars` | `BOTHY_TEMPLATE__NAME_MAX_CHARS` | Server |  | `100` | length of a template name in Unicode characters | planned (M1) |
-| `template.max_per_scope` | `BOTHY_TEMPLATE__MAX_PER_SCOPE` | Server |  | `100` | templates per person or per channel; `listTemplates` is not paginated | planned (M1) |
+| `template.name_max_chars` | `BOTHY_TEMPLATE__NAME_MAX_CHARS` | Server | int | `100` | length of a template name in Unicode characters | active |
+| `template.max_per_scope` | `BOTHY_TEMPLATE__MAX_PER_SCOPE` | Server | int | `100` | templates per person or per channel; `listTemplates` is not paginated | active |
 | `file.max_upload_bytes` | `BOTHY_FILE__MAX_UPLOAD_BYTES` | Server | int | `104857600` | size of a file | active |
 | `run.excerpt_max_chars` | `BOTHY_RUN__EXCERPT_MAX_CHARS` | Server |  | `500` | length of `last_text_excerpt` | planned (M2) |
 | `run.step_detail_max_bytes` | `BOTHY_RUN__STEP_DETAIL_MAX_BYTES` | Server |  | `16384` | size of `run_steps.detail` | planned (M2) |

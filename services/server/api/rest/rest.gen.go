@@ -164,6 +164,12 @@ type ServerInterface interface {
 	// MoveForumTag Change the position of a forum tag
 	// (POST /channels/{channel_id}/tags/{tag_id}/move)
 	MoveForumTag(w http.ResponseWriter, r *http.Request, channelId ChannelIdPath, tagId TagIdPath, params MoveForumTagParams)
+	// ListTemplates List own and channel templates
+	// (GET /channels/{channel_id}/templates)
+	ListTemplates(w http.ResponseWriter, r *http.Request, channelId ChannelIdPath)
+	// CreateChannelTemplate Create a channel template
+	// (POST /channels/{channel_id}/templates)
+	CreateChannelTemplate(w http.ResponseWriter, r *http.Request, channelId ChannelIdPath, params CreateChannelTemplateParams)
 	// ListChannelThreads List threads or forum posts of a channel
 	// (GET /channels/{channel_id}/threads)
 	ListChannelThreads(w http.ResponseWriter, r *http.Request, channelId ChannelIdPath, params ListChannelThreadsParams)
@@ -308,6 +314,9 @@ type ServerInterface interface {
 	// SetMyLocalCredential Set local password and enroll TOTP
 	// (PUT /me/local-credential)
 	SetMyLocalCredential(w http.ResponseWriter, r *http.Request)
+	// ListMyMentions List own mentions
+	// (GET /me/mentions)
+	ListMyMentions(w http.ResponseWriter, r *http.Request, params ListMyMentionsParams)
 	// BeginPasskeyRegistration Start registering a passkey
 	// (POST /me/passkeys/begin)
 	BeginPasskeyRegistration(w http.ResponseWriter, r *http.Request)
@@ -326,6 +335,12 @@ type ServerInterface interface {
 	// PutMySidebarSpace Collapse or reorder a space for oneself
 	// (PUT /me/sidebar/spaces/{space_id})
 	PutMySidebarSpace(w http.ResponseWriter, r *http.Request, spaceId SpaceIdPath)
+	// ListMyTemplates List own personal templates
+	// (GET /me/templates)
+	ListMyTemplates(w http.ResponseWriter, r *http.Request)
+	// CreatePersonalTemplate Create a personal template
+	// (POST /me/templates)
+	CreatePersonalTemplate(w http.ResponseWriter, r *http.Request, params CreatePersonalTemplateParams)
 	// ListOwners List owners
 	// (GET /owners)
 	ListOwners(w http.ResponseWriter, r *http.Request)
@@ -380,6 +395,12 @@ type ServerInterface interface {
 	// SetSpaceOperator Set the default operator of a space
 	// (PUT /spaces/{space_id}/operator)
 	SetSpaceOperator(w http.ResponseWriter, r *http.Request, spaceId SpaceIdPath, params SetSpaceOperatorParams)
+	// DeleteTemplate Delete a template
+	// (DELETE /templates/{template_id})
+	DeleteTemplate(w http.ResponseWriter, r *http.Request, templateId TemplateIdPath)
+	// UpdateTemplate Change a template
+	// (PATCH /templates/{template_id})
+	UpdateTemplate(w http.ResponseWriter, r *http.Request, templateId TemplateIdPath, params UpdateTemplateParams)
 	// GetThread Read a thread
 	// (GET /threads/{thread_id})
 	GetThread(w http.ResponseWriter, r *http.Request, threadId ThreadIdPath)
@@ -2508,6 +2529,82 @@ func (siw *ServerInterfaceWrapper) MoveForumTag(w http.ResponseWriter, r *http.R
 	handler.ServeHTTP(w, r)
 }
 
+// ListTemplates operation middleware
+func (siw *ServerInterfaceWrapper) ListTemplates(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "channel_id" -------------
+	var channelId ChannelIdPath
+
+	err = runtime.BindStyledParameterWithOptions("simple", "channel_id", r.PathValue("channel_id"), &channelId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "uuid", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "channel_id", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.ListTemplates(w, r, channelId)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// CreateChannelTemplate operation middleware
+func (siw *ServerInterfaceWrapper) CreateChannelTemplate(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "channel_id" -------------
+	var channelId ChannelIdPath
+
+	err = runtime.BindStyledParameterWithOptions("simple", "channel_id", r.PathValue("channel_id"), &channelId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "uuid", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "channel_id", Err: err})
+		return
+	}
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params CreateChannelTemplateParams
+
+	headers := r.Header
+
+	// ------------- Optional header parameter "Idempotency-Key" -------------
+	if valueList, found := headers[http.CanonicalHeaderKey("Idempotency-Key")]; found {
+		var IdempotencyKey IdempotencyKey
+		n := len(valueList)
+		if n != 1 {
+			siw.ErrorHandlerFunc(w, r, &TooManyValuesForParamError{ParamName: "Idempotency-Key", Count: n})
+			return
+		}
+
+		err = runtime.BindStyledParameterWithOptions("simple", "Idempotency-Key", valueList[0], &IdempotencyKey, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: "uuid"})
+		if err != nil {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "Idempotency-Key", Err: err})
+			return
+		}
+
+		params.IdempotencyKey = &IdempotencyKey
+
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.CreateChannelTemplate(w, r, channelId, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
 // ListChannelThreads operation middleware
 func (siw *ServerInterfaceWrapper) ListChannelThreads(w http.ResponseWriter, r *http.Request) {
 
@@ -4355,6 +4452,52 @@ func (siw *ServerInterfaceWrapper) SetMyLocalCredential(w http.ResponseWriter, r
 	handler.ServeHTTP(w, r)
 }
 
+// ListMyMentions operation middleware
+func (siw *ServerInterfaceWrapper) ListMyMentions(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params ListMyMentionsParams
+
+	// ------------- Optional query parameter "cursor" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "cursor", r.URL.Query(), &params.Cursor, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "cursor"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "cursor", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "limit" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "limit", r.URL.Query(), &params.Limit, runtime.BindQueryParameterOptions{Type: "integer", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "limit"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "limit", Err: err})
+		}
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.ListMyMentions(w, r, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
 // BeginPasskeyRegistration operation middleware
 func (siw *ServerInterfaceWrapper) BeginPasskeyRegistration(w http.ResponseWriter, r *http.Request) {
 
@@ -4501,6 +4644,61 @@ func (siw *ServerInterfaceWrapper) PutMySidebarSpace(w http.ResponseWriter, r *h
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		siw.Handler.PutMySidebarSpace(w, r, spaceId)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// ListMyTemplates operation middleware
+func (siw *ServerInterfaceWrapper) ListMyTemplates(w http.ResponseWriter, r *http.Request) {
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.ListMyTemplates(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// CreatePersonalTemplate operation middleware
+func (siw *ServerInterfaceWrapper) CreatePersonalTemplate(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params CreatePersonalTemplateParams
+
+	headers := r.Header
+
+	// ------------- Optional header parameter "Idempotency-Key" -------------
+	if valueList, found := headers[http.CanonicalHeaderKey("Idempotency-Key")]; found {
+		var IdempotencyKey IdempotencyKey
+		n := len(valueList)
+		if n != 1 {
+			siw.ErrorHandlerFunc(w, r, &TooManyValuesForParamError{ParamName: "Idempotency-Key", Count: n})
+			return
+		}
+
+		err = runtime.BindStyledParameterWithOptions("simple", "Idempotency-Key", valueList[0], &IdempotencyKey, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: "uuid"})
+		if err != nil {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "Idempotency-Key", Err: err})
+			return
+		}
+
+		params.IdempotencyKey = &IdempotencyKey
+
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.CreatePersonalTemplate(w, r, params)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -5238,6 +5436,105 @@ func (siw *ServerInterfaceWrapper) SetSpaceOperator(w http.ResponseWriter, r *ht
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		siw.Handler.SetSpaceOperator(w, r, spaceId, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// DeleteTemplate operation middleware
+func (siw *ServerInterfaceWrapper) DeleteTemplate(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "template_id" -------------
+	var templateId TemplateIdPath
+
+	err = runtime.BindStyledParameterWithOptions("simple", "template_id", r.PathValue("template_id"), &templateId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "uuid", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "template_id", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.DeleteTemplate(w, r, templateId)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// UpdateTemplate operation middleware
+func (siw *ServerInterfaceWrapper) UpdateTemplate(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "template_id" -------------
+	var templateId TemplateIdPath
+
+	err = runtime.BindStyledParameterWithOptions("simple", "template_id", r.PathValue("template_id"), &templateId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "uuid", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "template_id", Err: err})
+		return
+	}
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params UpdateTemplateParams
+
+	headers := r.Header
+
+	// ------------- Optional header parameter "Idempotency-Key" -------------
+	if valueList, found := headers[http.CanonicalHeaderKey("Idempotency-Key")]; found {
+		var IdempotencyKey IdempotencyKey
+		n := len(valueList)
+		if n != 1 {
+			siw.ErrorHandlerFunc(w, r, &TooManyValuesForParamError{ParamName: "Idempotency-Key", Count: n})
+			return
+		}
+
+		err = runtime.BindStyledParameterWithOptions("simple", "Idempotency-Key", valueList[0], &IdempotencyKey, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: "uuid"})
+		if err != nil {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "Idempotency-Key", Err: err})
+			return
+		}
+
+		params.IdempotencyKey = &IdempotencyKey
+
+	}
+
+	// ------------- Required header parameter "If-Match" -------------
+	if valueList, found := headers[http.CanonicalHeaderKey("If-Match")]; found {
+		var IfMatch IfMatchRequired
+		n := len(valueList)
+		if n != 1 {
+			siw.ErrorHandlerFunc(w, r, &TooManyValuesForParamError{ParamName: "If-Match", Count: n})
+			return
+		}
+
+		err = runtime.BindStyledParameterWithOptions("simple", "If-Match", valueList[0], &IfMatch, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: true, Type: "string", Format: ""})
+		if err != nil {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "If-Match", Err: err})
+			return
+		}
+
+		params.IfMatch = IfMatch
+
+	} else {
+		err := fmt.Errorf("Header parameter If-Match is required, but not found")
+		siw.ErrorHandlerFunc(w, r, &RequiredHeaderError{ParamName: "If-Match", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.UpdateTemplate(w, r, templateId, params)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -6248,6 +6545,9 @@ func HandlerWithOptions(si ServerInterface, options StdHTTPServerOptions) http.H
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/me/passkeys/begin", wrapper.BeginPasskeyRegistration)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/me/passkeys/complete", wrapper.CompletePasskeyRegistration)
 	m.HandleFunc(http.MethodPut+" "+options.BaseURL+"/me/local-credential", wrapper.SetMyLocalCredential)
+	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/me/mentions", wrapper.ListMyMentions)
+	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/me/templates", wrapper.ListMyTemplates)
+	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/me/templates", wrapper.CreatePersonalTemplate)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/users", wrapper.ListUsers)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/users", wrapper.CreateUser)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/users/{user_id}", wrapper.GetUser)
@@ -6323,6 +6623,10 @@ func HandlerWithOptions(si ServerInterface, options StdHTTPServerOptions) http.H
 	m.HandleFunc(http.MethodDelete+" "+options.BaseURL+"/channels/{channel_id}/tags/{tag_id}", wrapper.DeleteForumTag)
 	m.HandleFunc(http.MethodPatch+" "+options.BaseURL+"/channels/{channel_id}/tags/{tag_id}", wrapper.UpdateForumTag)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/channels/{channel_id}/tags/{tag_id}/move", wrapper.MoveForumTag)
+	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/channels/{channel_id}/templates", wrapper.ListTemplates)
+	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/channels/{channel_id}/templates", wrapper.CreateChannelTemplate)
+	m.HandleFunc(http.MethodDelete+" "+options.BaseURL+"/templates/{template_id}", wrapper.DeleteTemplate)
+	m.HandleFunc(http.MethodPatch+" "+options.BaseURL+"/templates/{template_id}", wrapper.UpdateTemplate)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/channels/{channel_id}/threads", wrapper.ListChannelThreads)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/channels/{channel_id}/threads", wrapper.CreateThread)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/threads/{thread_id}", wrapper.GetThread)
@@ -6655,6 +6959,12 @@ type StrictServerInterface interface {
 	// MoveForumTag Change the position of a forum tag
 	// (POST /channels/{channel_id}/tags/{tag_id}/move)
 	MoveForumTag(ctx context.Context, request MoveForumTagRequestObject) (MoveForumTagResponseObject, error)
+	// ListTemplates List own and channel templates
+	// (GET /channels/{channel_id}/templates)
+	ListTemplates(ctx context.Context, request ListTemplatesRequestObject) (ListTemplatesResponseObject, error)
+	// CreateChannelTemplate Create a channel template
+	// (POST /channels/{channel_id}/templates)
+	CreateChannelTemplate(ctx context.Context, request CreateChannelTemplateRequestObject) (CreateChannelTemplateResponseObject, error)
 	// ListChannelThreads List threads or forum posts of a channel
 	// (GET /channels/{channel_id}/threads)
 	ListChannelThreads(ctx context.Context, request ListChannelThreadsRequestObject) (ListChannelThreadsResponseObject, error)
@@ -6799,6 +7109,9 @@ type StrictServerInterface interface {
 	// SetMyLocalCredential Set local password and enroll TOTP
 	// (PUT /me/local-credential)
 	SetMyLocalCredential(ctx context.Context, request SetMyLocalCredentialRequestObject) (SetMyLocalCredentialResponseObject, error)
+	// ListMyMentions List own mentions
+	// (GET /me/mentions)
+	ListMyMentions(ctx context.Context, request ListMyMentionsRequestObject) (ListMyMentionsResponseObject, error)
 	// BeginPasskeyRegistration Start registering a passkey
 	// (POST /me/passkeys/begin)
 	BeginPasskeyRegistration(ctx context.Context, request BeginPasskeyRegistrationRequestObject) (BeginPasskeyRegistrationResponseObject, error)
@@ -6817,6 +7130,12 @@ type StrictServerInterface interface {
 	// PutMySidebarSpace Collapse or reorder a space for oneself
 	// (PUT /me/sidebar/spaces/{space_id})
 	PutMySidebarSpace(ctx context.Context, request PutMySidebarSpaceRequestObject) (PutMySidebarSpaceResponseObject, error)
+	// ListMyTemplates List own personal templates
+	// (GET /me/templates)
+	ListMyTemplates(ctx context.Context, request ListMyTemplatesRequestObject) (ListMyTemplatesResponseObject, error)
+	// CreatePersonalTemplate Create a personal template
+	// (POST /me/templates)
+	CreatePersonalTemplate(ctx context.Context, request CreatePersonalTemplateRequestObject) (CreatePersonalTemplateResponseObject, error)
 	// ListOwners List owners
 	// (GET /owners)
 	ListOwners(ctx context.Context, request ListOwnersRequestObject) (ListOwnersResponseObject, error)
@@ -6871,6 +7190,12 @@ type StrictServerInterface interface {
 	// SetSpaceOperator Set the default operator of a space
 	// (PUT /spaces/{space_id}/operator)
 	SetSpaceOperator(ctx context.Context, request SetSpaceOperatorRequestObject) (SetSpaceOperatorResponseObject, error)
+	// DeleteTemplate Delete a template
+	// (DELETE /templates/{template_id})
+	DeleteTemplate(ctx context.Context, request DeleteTemplateRequestObject) (DeleteTemplateResponseObject, error)
+	// UpdateTemplate Change a template
+	// (PATCH /templates/{template_id})
+	UpdateTemplate(ctx context.Context, request UpdateTemplateRequestObject) (UpdateTemplateResponseObject, error)
 	// GetThread Read a thread
 	// (GET /threads/{thread_id})
 	GetThread(ctx context.Context, request GetThreadRequestObject) (GetThreadResponseObject, error)
@@ -8485,6 +8810,66 @@ func (sh *strictHandler) MoveForumTag(w http.ResponseWriter, r *http.Request, ch
 	}
 }
 
+// ListTemplates operation middleware
+func (sh *strictHandler) ListTemplates(w http.ResponseWriter, r *http.Request, channelId ChannelIdPath) {
+	var request ListTemplatesRequestObject
+
+	request.ChannelId = channelId
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.ListTemplates(ctx, request.(ListTemplatesRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "ListTemplates")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(ListTemplatesResponseObject); ok {
+		if err := validResponse.VisitListTemplatesResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// CreateChannelTemplate operation middleware
+func (sh *strictHandler) CreateChannelTemplate(w http.ResponseWriter, r *http.Request, channelId ChannelIdPath, params CreateChannelTemplateParams) {
+	var request CreateChannelTemplateRequestObject
+
+	request.ChannelId = channelId
+	request.Params = params
+
+	var body CreateChannelTemplateJSONRequestBody
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
+		return
+	}
+	request.Body = &body
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.CreateChannelTemplate(ctx, request.(CreateChannelTemplateRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "CreateChannelTemplate")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(CreateChannelTemplateResponseObject); ok {
+		if err := validResponse.VisitCreateChannelTemplateResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
 // ListChannelThreads operation middleware
 func (sh *strictHandler) ListChannelThreads(w http.ResponseWriter, r *http.Request, channelId ChannelIdPath, params ListChannelThreadsParams) {
 	var request ListChannelThreadsRequestObject
@@ -9904,6 +10289,32 @@ func (sh *strictHandler) SetMyLocalCredential(w http.ResponseWriter, r *http.Req
 	}
 }
 
+// ListMyMentions operation middleware
+func (sh *strictHandler) ListMyMentions(w http.ResponseWriter, r *http.Request, params ListMyMentionsParams) {
+	var request ListMyMentionsRequestObject
+
+	request.Params = params
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.ListMyMentions(ctx, request.(ListMyMentionsRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "ListMyMentions")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(ListMyMentionsResponseObject); ok {
+		if err := validResponse.VisitListMyMentionsResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
 // BeginPasskeyRegistration operation middleware
 func (sh *strictHandler) BeginPasskeyRegistration(w http.ResponseWriter, r *http.Request) {
 	var request BeginPasskeyRegistrationRequestObject
@@ -10075,6 +10486,63 @@ func (sh *strictHandler) PutMySidebarSpace(w http.ResponseWriter, r *http.Reques
 		sh.options.ResponseErrorHandlerFunc(w, r, err)
 	} else if validResponse, ok := response.(PutMySidebarSpaceResponseObject); ok {
 		if err := validResponse.VisitPutMySidebarSpaceResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// ListMyTemplates operation middleware
+func (sh *strictHandler) ListMyTemplates(w http.ResponseWriter, r *http.Request) {
+	var request ListMyTemplatesRequestObject
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.ListMyTemplates(ctx, request.(ListMyTemplatesRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "ListMyTemplates")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(ListMyTemplatesResponseObject); ok {
+		if err := validResponse.VisitListMyTemplatesResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// CreatePersonalTemplate operation middleware
+func (sh *strictHandler) CreatePersonalTemplate(w http.ResponseWriter, r *http.Request, params CreatePersonalTemplateParams) {
+	var request CreatePersonalTemplateRequestObject
+
+	request.Params = params
+
+	var body CreatePersonalTemplateJSONRequestBody
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
+		return
+	}
+	request.Body = &body
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.CreatePersonalTemplate(ctx, request.(CreatePersonalTemplateRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "CreatePersonalTemplate")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(CreatePersonalTemplateResponseObject); ok {
+		if err := validResponse.VisitCreatePersonalTemplateResponse(w); err != nil {
 			sh.options.ResponseErrorHandlerFunc(w, r, err)
 		}
 	} else if response != nil {
@@ -10618,6 +11086,66 @@ func (sh *strictHandler) SetSpaceOperator(w http.ResponseWriter, r *http.Request
 		sh.options.ResponseErrorHandlerFunc(w, r, err)
 	} else if validResponse, ok := response.(SetSpaceOperatorResponseObject); ok {
 		if err := validResponse.VisitSetSpaceOperatorResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// DeleteTemplate operation middleware
+func (sh *strictHandler) DeleteTemplate(w http.ResponseWriter, r *http.Request, templateId TemplateIdPath) {
+	var request DeleteTemplateRequestObject
+
+	request.TemplateId = templateId
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.DeleteTemplate(ctx, request.(DeleteTemplateRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "DeleteTemplate")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(DeleteTemplateResponseObject); ok {
+		if err := validResponse.VisitDeleteTemplateResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// UpdateTemplate operation middleware
+func (sh *strictHandler) UpdateTemplate(w http.ResponseWriter, r *http.Request, templateId TemplateIdPath, params UpdateTemplateParams) {
+	var request UpdateTemplateRequestObject
+
+	request.TemplateId = templateId
+	request.Params = params
+
+	var body UpdateTemplateJSONRequestBody
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
+		return
+	}
+	request.Body = &body
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.UpdateTemplate(ctx, request.(UpdateTemplateRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "UpdateTemplate")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(UpdateTemplateResponseObject); ok {
+		if err := validResponse.VisitUpdateTemplateResponse(w); err != nil {
 			sh.options.ResponseErrorHandlerFunc(w, r, err)
 		}
 	} else if response != nil {

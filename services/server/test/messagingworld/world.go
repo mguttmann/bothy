@@ -35,6 +35,7 @@ import (
 	instancepg "github.com/OWNER/bothy/services/server/internal/instance/adapters/postgres"
 	instanceapp "github.com/OWNER/bothy/services/server/internal/instance/app"
 	"github.com/OWNER/bothy/services/server/internal/kernel/actor"
+	"github.com/OWNER/bothy/services/server/internal/kernel/authorize"
 	"github.com/OWNER/bothy/services/server/internal/kernel/clock"
 	"github.com/OWNER/bothy/services/server/internal/kernel/ids"
 	"github.com/OWNER/bothy/services/server/internal/kernel/txn"
@@ -65,6 +66,9 @@ const (
 	MaxContent  = 4096
 	MaxMentions = 4
 	PayloadMax  = 2048
+	// TemplateNameMax and TemplateMax are template.name_max_chars and template.max_per_scope.
+	TemplateNameMax = 20
+	TemplateMax     = 5
 )
 
 // testKEK is the key-encryption key of the audit recorder in these tests.
@@ -123,6 +127,8 @@ type World struct {
 	// Svc is the messaging use cases; Threads the threads of chat.
 	Svc     *messagingapp.Service
 	Threads chat.Threads
+	// Authorizer is the real Authorizer of the world (Scope for CountUnread, M1-60).
+	Authorizer authorize.Authorizer
 
 	rec *Recorder
 }
@@ -181,12 +187,13 @@ func New(t *testing.T, subscribe Subscribe) *World {
 	if err != nil {
 		t.Fatal(err)
 	}
-	m, err := wire.NewMessaging(messagingapp.Config{MaxContentBytes: MaxContent, MaxMentions: MaxMentions, EventPayloadMaxBytes: PayloadMax},
+	m, err := wire.NewMessaging(messagingapp.Config{MaxContentBytes: MaxContent, MaxMentions: MaxMentions, EventPayloadMaxBytes: PayloadMax,
+		TemplateNameMaxChars: TemplateNameMax, TemplateMaxPerScope: TemplateMax, PageSizeDefault: 20, PageSizeMax: 50},
 		pool, uow, az, appender, c.Service, w.Clock)
 	if err != nil {
 		t.Fatal(err)
 	}
-	w.Svc, w.Threads = m.Service, c.Service
+	w.Svc, w.Threads, w.Authorizer = m.Service, c.Service, az
 	w.H = harness(t, pool, uow, w.actors, wire.Handlers{Spaces: c.Handlers, Channels: c.ChannelHandlers, Threads: c.ThreadHandlers, Messages: m.Handlers}, w.Clock)
 	w.OwnerID = w.Person("owner", true)
 	return w
