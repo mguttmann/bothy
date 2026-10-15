@@ -78,8 +78,11 @@ Der Rahmen entsteht mit dem ersten Verbraucher (Webhooks, Bau-Ticket M2-01), nic
 - Schlecht, weil Folgen eine Verzögerung bis zur nächsten Runde haben; `perf.push_handoff_p95`
   hält sie fest.
 - Schlecht, weil ein Verbraucher, der länger als `sync.event_retention` steht, Ereignisse verliert,
-  sobald ihre Partition abgehängt ist. Für Webhook-Abos erkennt `last_delivered_seq` die Lücke und
-  schaltet das Abo mit Hinweis ab (11, Abschnitt 6). For the consumer itself the gauges
+  sobald ihre Partition abgehängt ist. For webhook subscriptions the gap is detected at two
+  points (M2-26): at the head of a subscription, when the event of its lowest pending delivery left
+  the log, and in the round of the consumer `webhooks`, which reports the range retention removed
+  before it read it (`sync.ConsumerLossHandler`); both disable the subscription with cause `gap`
+  (11, Abschnitt 6). For the consumer itself the gauges
   `bothy.event.consumer.lag` and `bothy.event.consumer.pending_age` and the alarm
   `BothyEventConsumerLag` at `consumer.pending_alert_after`, strictly below
   `sync.event_retention`, report the stall long before (M2-01, see More Information).
@@ -95,7 +98,9 @@ Der Rahmen entsteht mit dem ersten Verbraucher (Webhooks, Bau-Ticket M2-01), nic
   `TestConsumerRoundLockedEndsAtOnce` in `services/server/internal/sync/adapters/postgres`; the
   lag gauges by `TestConsumerLagGauges`, the alarm by the promtool cases of
   `BothyEventConsumerLag`.
-- Test: Ein Rechte-Entzug zwischen Runde und Job verhindert den Versand.
+- Test: Ein Rechte-Entzug zwischen Runde und Job verhindert den Versand. Built in M2-26 as
+  `TestDeliveryRevokedRightIsDeadWithoutRequest` and `TestDeliveryScopeRemovedIsDead`; the loss of
+  the consumer itself by `TestConsumerLossDisablesSubscriptions` and `TestRoundCallsHandleLost`.
 - Lasttest `perf/push_handoff` mit `perf.push_handoff_p95` (Bau-Ticket M3-24).
 - Wiederherstellungstest: Nach `bothy restore finalize` steht jeder Cursor auf `head_seq`
   (ADR 0059).

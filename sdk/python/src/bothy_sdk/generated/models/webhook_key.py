@@ -18,7 +18,8 @@ class WebhookKey:
     """
     Attributes:
         kid (str):
-        public_key (str): Ed25519 public key, base64, with prefix `whpk_`.
+        public_key (str): Ed25519 public key with prefix `whpk_`, followed by the standard base64 (with padding) of its
+            DER-encoded SubjectPublicKeyInfo (RFC 8410).
         state (WebhookKeyState):
         not_after (datetime.datetime | Unset): RFC 3339 timestamp in UTC with millisecond precision and suffix `Z`.
     """

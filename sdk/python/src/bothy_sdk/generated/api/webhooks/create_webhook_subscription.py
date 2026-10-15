@@ -105,7 +105,9 @@ def sync_detailed(
 ) -> Response[Problem | WebhookSubscriptionCreated]:
     """Subscribe a URL to events
 
-     The host must be in `webhook.allowed_hosts`; otherwise 400 `webhook_host_not_allowed`.
+     The host and port must be in `webhook.allowed_hosts`; otherwise 400 `webhook_host_not_allowed`. With
+    `enable_hmac` the response carries the `v1` secret once; it is a one-time secret, so a replay with
+    the same `Idempotency-Key` answers 409 `conflict` with `reason` `one_time_secret`.
 
     Args:
         app_id (UUID): UUIDv7 (RFC 9562), lowercase canonical form.
@@ -142,7 +144,9 @@ def sync(
 ) -> Problem | WebhookSubscriptionCreated | None:
     """Subscribe a URL to events
 
-     The host must be in `webhook.allowed_hosts`; otherwise 400 `webhook_host_not_allowed`.
+     The host and port must be in `webhook.allowed_hosts`; otherwise 400 `webhook_host_not_allowed`. With
+    `enable_hmac` the response carries the `v1` secret once; it is a one-time secret, so a replay with
+    the same `Idempotency-Key` answers 409 `conflict` with `reason` `one_time_secret`.
 
     Args:
         app_id (UUID): UUIDv7 (RFC 9562), lowercase canonical form.
@@ -174,7 +178,9 @@ async def asyncio_detailed(
 ) -> Response[Problem | WebhookSubscriptionCreated]:
     """Subscribe a URL to events
 
-     The host must be in `webhook.allowed_hosts`; otherwise 400 `webhook_host_not_allowed`.
+     The host and port must be in `webhook.allowed_hosts`; otherwise 400 `webhook_host_not_allowed`. With
+    `enable_hmac` the response carries the `v1` secret once; it is a one-time secret, so a replay with
+    the same `Idempotency-Key` answers 409 `conflict` with `reason` `one_time_secret`.
 
     Args:
         app_id (UUID): UUIDv7 (RFC 9562), lowercase canonical form.
@@ -209,7 +215,9 @@ async def asyncio(
 ) -> Problem | WebhookSubscriptionCreated | None:
     """Subscribe a URL to events
 
-     The host must be in `webhook.allowed_hosts`; otherwise 400 `webhook_host_not_allowed`.
+     The host and port must be in `webhook.allowed_hosts`; otherwise 400 `webhook_host_not_allowed`. With
+    `enable_hmac` the response carries the `v1` secret once; it is a one-time secret, so a replay with
+    the same `Idempotency-Key` answers 409 `conflict` with `reason` `one_time_secret`.
 
     Args:
         app_id (UUID): UUIDv7 (RFC 9562), lowercase canonical form.

@@ -143,7 +143,7 @@ func identityConfigKeys() []config.Key {
 			Chapter: chapter08,
 		},
 		{
-			Name: "auth.device_pending_ttl", Kind: config.KindDuration, Default: "24h", Min: "1m",
+			Name: "auth.device_pending_ttl", Kind: config.KindDuration, Default: defaultDay, Min: "1m",
 			Doc:     "Age after which a pending device without approval counts as revoked.",
 			Chapter: chapter08,
 		},

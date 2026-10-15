@@ -398,7 +398,14 @@ func TestConfigPrintShowsSourcePerKey(t *testing.T) {
 		"thread.title_max_chars = 200  # default\n" +
 		"voice.max_duration = 15m  # default\n" +
 		"webhook.allowed_hosts =   # default\n" +
-		"webhook.delivery_timeout = 15s  # default\n"
+		"webhook.delivery_timeout = 15s  # default\n" +
+		"webhook.hmac_master_key_ref = file:/run/bothy/secrets/webhook_hmac_master_key  # default\n" +
+		"webhook.max_consecutive_failures = 20  # default\n" +
+		"webhook.max_pending_per_subscription = 10000  # default\n" +
+		"webhook.retry_backoff_base = 10s  # default\n" +
+		"webhook.retry_backoff_cap = 1h  # default\n" +
+		"webhook.retry_max_age = 3d  # default\n" +
+		"webhook.secret_rotation_overlap = 1d  # default\n"
 	if code != 0 || stdout != want || stderr != "" {
 		t.Fatalf("exit %d, stderr %q, stdout\n%s\nwant\n%s", code, stderr, stdout, want)
 	}

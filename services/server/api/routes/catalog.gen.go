@@ -207,4 +207,5 @@ var catalogEntries = []CatalogEntry{
 	{ID: "webhook_out.manage", Right: "owner", RateLimitClass: "rl.admin"},
 	{ID: "webhook_out.read", Right: "owner", RateLimitClass: "rl.read"},
 	{ID: "webhook_out.redeliver", Right: "owner", RateLimitClass: "rl.admin"},
+	{ID: "webhook_out.transition", Right: "system", RateLimitClass: "none"},
 }

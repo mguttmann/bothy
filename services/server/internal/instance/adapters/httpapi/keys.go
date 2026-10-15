@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: Apache-2.0
 
 // Package httpapi holds the REST handlers of the instance module (adapters/httpapi, 02 "5.
-// Schichten im Modul"): getJwks and rotateSigningKey of the generated strict server over the port
-// instance.Keys (M1-32).
+// Schichten im Modul"): getJwks, getWebhookKeys and rotateSigningKey of the generated strict server
+// over the port instance.Keys (M1-32, M2-26).
 //
 // Example:
 //
@@ -25,7 +25,8 @@ import (
 // jwkSetContentType is the media type of a JWK set (RFC 7517 section 8.5).
 const jwkSetContentType = "application/jwk-set+json"
 
-// Keys implements getJwks and rotateSigningKey of rest.StrictServerInterface over instance.Keys.
+// Keys implements getJwks, getWebhookKeys and rotateSigningKey of rest.StrictServerInterface over
+// instance.Keys.
 // The use cases authorize; the handlers only convert. Errors go to the problem writer of the chain
 // unchanged.
 type Keys struct {
@@ -65,6 +66,47 @@ func (r jwksResponse) VisitGetJwksResponse(w http.ResponseWriter) error {
 		return err
 	}
 	w.Header().Set("Content-Type", jwkSetContentType)
+	w.Header().Set("Cache-Control", "public, max-age="+strconv.FormatInt(r.maxAge, 10))
+	w.WriteHeader(http.StatusOK)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+// GetWebhookKeys implements rest.StrictServerInterface (GET /instance/webhook-keys, M2-26): the
+// published webhook_out keys (states next, active and retiring) in the form whpk_ (D-M2-26-11),
+// ordered by state and kid, not_after only when set, with the Cache-Control of getJwks. The route
+// is public (security: []); the CORS stage answers its action instance.discovery.read with
+// Access-Control-Allow-Origin: * (SEC-CORS-2).
+func (h *Keys) GetWebhookKeys(ctx context.Context, _ rest.GetWebhookKeysRequestObject) (rest.GetWebhookKeysResponseObject, error) {
+	keys, err := h.keys.PublicKeys(ctx, instance.PurposeWebhookOut)
+	if err != nil {
+		return nil, err
+	}
+	body := rest.WebhookKeys{Keys: make([]rest.WebhookKey, 0, len(keys))}
+	for _, k := range keys {
+		item := rest.WebhookKey{Kid: k.KID, PublicKey: instance.FormatWebhookPublicKey(k.Key), State: rest.WebhookKeyState(k.State)}
+		if !k.NotAfter.IsZero() {
+			at := k.NotAfter.UTC().Truncate(time.Millisecond)
+			item.NotAfter = &at
+		}
+		body.Keys = append(body.Keys, item)
+	}
+	return webhookKeysResponse{body: body, maxAge: int64(h.maxAge / time.Second)}, nil
+}
+
+// webhookKeysResponse writes the webhook keys with the caching header of the JWKS.
+type webhookKeysResponse struct {
+	body   rest.WebhookKeys
+	maxAge int64
+}
+
+// VisitGetWebhookKeysResponse writes 200 with the keys.
+func (r webhookKeysResponse) VisitGetWebhookKeysResponse(w http.ResponseWriter) error {
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(r.body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
 	w.Header().Set("Cache-Control", "public, max-age="+strconv.FormatInt(r.maxAge, 10))
 	w.WriteHeader(http.StatusOK)
 	_, err := buf.WriteTo(w)

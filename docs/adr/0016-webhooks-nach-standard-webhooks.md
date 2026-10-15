@@ -63,6 +63,10 @@ Gate G10: Testvektoren (Schlüssel, Zeitstempel, Körper, erwartete Signaturen) 
 Zustellung im Integrationstest wird mit der Referenzbibliothek (`v1`) und mit Ed25519 aus der
 Standardbibliothek (`v1a`) geprüft. Lint (G1) hält die Ereignis-Schemas unter `webhooks:`, G2 die
 Empfangs-Aktionen gegen 05-aktionen.md.
+Built in M2-26: the vectors are [docs/api/webhook-test-vectors.json](../api/webhook-test-vectors.json)
+(webhooks.md section 2.2), reproduced byte for byte and verified with `crypto/ed25519` and the
+Standard Webhooks reference library by `TestWebhookTestVectors`; a real delivery through River is
+verified the same way by `TestWebhookDeliveryG10` (`services/server/internal/apps/app`).
 
 ## Pros and Cons of the Options
 

@@ -25,7 +25,7 @@ func syncConfigKeys() []config.Key {
 			Doc: "Events per read of the log tail."},
 		{Name: "sync.partition_maintenance_interval", Kind: config.KindDuration, Default: "10m", Min: "1s", Chapter: chapter02,
 			Doc: "Interval of the job sync.partition_maintenance."},
-		{Name: "sync.idempotency_key_ttl", Kind: config.KindDuration, Default: "24h", Min: "1s", Chapter: chapter04,
+		{Name: "sync.idempotency_key_ttl", Kind: config.KindDuration, Default: defaultDay, Min: "1s", Chapter: chapter04,
 			Doc: "How long an Idempotency-Key and its stored response stay valid per principal."},
 		{Name: "sync.idempotency_cleanup_interval", Kind: config.KindDuration, Default: "1h", Min: "1s", Chapter: chapter02,
 			Doc: "Interval of the job sync.idempotency_cleanup."},

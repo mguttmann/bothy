@@ -2022,6 +2022,21 @@ actions:
   rl_class: none
   delivery_check: true
   effect: read
+- id: webhook_out.transition
+  section: apps
+  description: 'automatic state change of an outgoing subscription by the consumer `webhooks` or the
+    job `apps.webhook_deliver`: `disabled` after `410`, after `webhook.max_consecutive_failures` failures
+    in a row, after a delivery that fails until `webhook.retry_max_age`, or on a gap in the event log;
+    `paused` by the delivery quota `webhook.max_pending_per_subscription` ([11-erweiterungen.md](11-erweiterungen.md),
+    sections 6 and 7; [webhooks.md](../api/webhooks.md), sections 4 and 5)'
+  resource: app, agent
+  right: system
+  owner: false
+  step_up: false
+  audit: always
+  rights_change: false
+  rl_class: none
+  effect: write
 - id: webhook_in.read
   section: apps
   description: Eingangs-Webhooks eines Kanals lesen (ohne Token)

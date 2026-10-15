@@ -13,4 +13,3 @@ interaction.create
 run.followup.create
 run.start
 webhook_in.post
-webhook_out.deliver

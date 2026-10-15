@@ -1,6 +1,6 @@
 # Modul `apps`
 
-Status: M2-24 brings the app manifest, the installation, upgrade, scope change, suspend, resume and uninstall of apps with their nine REST operations (section "Apps (M2-24)" below). Webhooks, incoming webhooks, commands and components of apps come with M2-25 to M2-27.
+Status: M2-24 brings the app manifest, the installation, upgrade, scope change, suspend, resume and uninstall of apps with their nine REST operations (section "Apps (M2-24)" below). M2-26 brings the outgoing webhooks (section "Outgoing webhooks (M2-26)" below). Incoming webhooks, commands and components of apps come with M2-25 and M2-27.
 Normativ ist [docs/spec/02-architektur.md](../../../../docs/spec/02-architektur.md); bei Abweichung gilt das Kapitel.
 
 ## Zweck
@@ -15,6 +15,14 @@ Apps und Manifeste, Installationen, Scopes, ausgehende Webhooks mit Verbraucher 
 - `adapters/postgres/` (M2-24): sqlc queries in `queries/`, generated code in `sqlcgen/`, `Repository`.
 - `adapters/httpapi/` (M2-24): the strict-server handlers of the nine operations and `Cursors`.
 - `adapters/identitysource/` (M2-24): `Source`, the implementation of `identity.AppInstallations`.
+- `internal/apps` (`webhooks.go`, M2-26): the port `Webhooks` with `CreateSubscription`, `UpdateSubscription`, `DeleteSubscription`, `ListSubscriptions`, `ListDeliveries`, `Redeliver`, `ResumeInstallation`, its DTOs and the constants of the subscription states, delivery statuses and `last_error` codes.
+- `domain/` (M2-26): `subscription.go` (states, `NextSubscriptionState`, `ParseAllowedHosts`, `ValidateTarget`, `AllowsHost`, `ValidateEventTypes`, `AppSubscribable`), `delivery.go` (`Classify`, `Backoff`, `ParseRetryAfter`, `NextAttempt`), `signature.go` (`SignedContent`, `DeriveHMACKey`, `FormatSecret`, `ParseSecret`, `HMACSignature`, `SignatureHeader`, `HMACGenerations`).
+- `app/` (M2-26): `WebhookService` (`webhooks.go`, the use cases of the port), `Consumer` (`consumer.go`, the handler of the worker consumer `webhooks` with the loss hook), `Deliver` (`deliver.go`, the attempt of the job) and the outgoing ports in `webhookports.go` (`WebhookStore`, `DeliveryScheduler`, `WebhookSender`, `HMACMasterKey`, `Signers`).
+- `adapters/postgres/` (M2-26): `queries/webhooks.sql` and `webhooks.go`, the `WebhookStore` of `Repository`.
+- `adapters/jobs/` (M2-26): the job `apps.webhook_deliver` (`WebhookDeliver`, `Register`) and `Scheduler`, the `DeliveryScheduler` over `jobs.Inserter.InsertTx`.
+- `adapters/webhookhttp/` (M2-26): `Sender`, the `WebhookSender` over one egress client with the span `webhook.deliver`.
+- `adapters/hmackey/` (M2-26): `Master`, the `HMACMasterKey` over `webhook.hmac_master_key_ref`.
+- `adapters/httpapi/` (M2-26): `Webhooks`, the strict-server handlers of the six webhook operations.
 - `adapters/appstest/` (M2-24): `Install` and `Manifest` for the tests of M2-24 to M2-28; only `_test.go` files import it.
 - `services/server/test/appsworld/` (M2-24): the integration world (PostgreSQL, the real modules, the full HTTP chain); the integration tests of `app`, `adapters/httpapi` and `adapters/postgres` share it, so each package is measured by its own tests (D-M2-24-23).
 - Their components come from `tools/archgen` and `architecture/modules.yaml`; a package outside these layers fails in `make arch`.
@@ -43,7 +51,7 @@ Nur dieses Modul schreibt und liest diese Tabellen per SQL (03-datenmodell.md, G
 
 ## Aktionen (05-aktionen.md)
 
-`app.read`, `app.install`, `app.scopes.update`, `app.suspend`, `app.resume`, `app.uninstall`, `webhook_out.read`, `webhook_out.manage`, `webhook_out.redeliver`, `webhook_out.deliver`, `webhook_in.read`, `webhook_in.create`, `webhook_in.revoke`, `webhook_in.post`.
+`app.read`, `app.install`, `app.scopes.update`, `app.suspend`, `app.resume`, `app.uninstall`, `webhook_out.read`, `webhook_out.manage`, `webhook_out.redeliver`, `webhook_out.deliver`, `webhook_out.transition`, `webhook_in.read`, `webhook_in.create`, `webhook_in.revoke`, `webhook_in.post`.
 
 ## Ereignisse und WebSocket-Ops
 
@@ -55,7 +63,7 @@ Nur dieses Modul schreibt und liest diese Tabellen per SQL (03-datenmodell.md, G
 
 | Job | Auslöser | Warteschlange |
 |---|---|---|
-| `apps.webhook_deliver` | Verbraucher `webhooks`, `webhook_out.redeliver` | `delivery` |
+| `apps.webhook_deliver` | one attempt of a subscription: a round of the consumer `webhooks`, the chain after a finished delivery, a scheduled retry, the lease wake-up, an owner resume or re-enable, `webhook_out.redeliver`, `app.resume` | `delivery` |
 
 ## Hinweise für den Bau
 
@@ -104,5 +112,47 @@ Normative: [11-erweiterungen.md](../../../../docs/spec/11-erweiterungen.md) sect
   `owner_only` for a non-owner); `getApp` on the app (404 for a non-owner, like an unknown id).
 
 Later tickets extend these use cases with their parts of 11 section 4.3: M2-25 commands and
-components (hide on suspend, remove on uninstall), M2-26 deliveries and subscriptions (pause on
-suspend, disable on uninstall), M2-27 incoming webhooks (revoke on uninstall).
+components (hide on suspend, remove on uninstall), M2-27 incoming webhooks (revoke on uninstall).
+M2-26 added the deliveries and subscriptions (below).
+
+## Outgoing webhooks (M2-26)
+
+Normative: [docs/api/webhooks.md](../../../../docs/api/webhooks.md), [11-erweiterungen.md](../../../../docs/spec/11-erweiterungen.md)
+sections 6 and 7, ADR 0016 and 0051. Rulings: `docs/DECISIONS.md` D-M2-26-1 to D-M2-26-20.
+
+- **Subscriptions** (`webhook_subscriptions`, retention class `config`): created, changed, paused,
+  resumed, rotated and deleted by an owner with step-up (`webhook_out.manage`, audited with the
+  host only); lists and deliveries need `webhook_out.read`; `redeliverWebhook` needs
+  `webhook_out.redeliver`. The address is `https`, its host and port an entry `host[:port]` of
+  `webhook.allowed_hosts` (`domain.ValidateTarget`, the same rule for manifest addresses and the
+  egress policy). `event_types` are subscribable by apps and granted to the installation. A
+  manifest with `delivery.mode = webhook` gets its subscription in the install transaction;
+  uninstall disables every subscription; suspend keeps them and sends nothing; resume makes the
+  heads due.
+- **States**: `active`, `paused`, `disabled`. The owner pauses, resumes and re-enables (failures
+  reset, the head due now). The system disables after `410` (cause `gone`), after
+  `webhook.max_consecutive_failures` counted failures (`max_consecutive_failures`; the head stays
+  pending), after `webhook.retry_max_age` (`retry_max_age`) and on a gap (`gap`), and pauses at the
+  delivery quota `webhook.max_pending_per_subscription` (`max_pending`); each system change is one
+  entry of `webhook_out.transition` without an actor.
+- **Consumer** `webhooks`: in the round's transaction one `pending` row per matching `active` or
+  `paused` subscription of an `active` or `suspended` installation (a personal event only for its
+  audience), the quota on the crossing, one job per active subscription; a range lost to
+  retention disables every live subscription (`HandleLost`).
+- **Deliveries** (`webhook_deliveries`, retention class `transient`): statuses `pending`,
+  `succeeded`, `failed` (after `410`), `dead` (after `webhook.retry_max_age`, `not_authorized`,
+  `not_subscribed`, `event_expired`); `last_error` is a code of `apps.LastErrorCodes`, never a
+  response body. Retention (M7-05) may delete only `succeeded`, `failed` and `dead` rows older than
+  `retention.webhook_deliveries`, never `pending` ones.
+- **Attempt** (job `apps.webhook_deliver`): claim the due head under the subscription lock, check
+  routing and `webhook_out.deliver` in filter mode with the current grants and scopes (no request
+  without access), sign, take a lease of `webhook.delivery_timeout` with a wake-up job, send
+  through the egress client outside any transaction, record the outcome and chain the next job.
+  Strictly in `seq` order; at least once with the same `webhook-id`.
+- **Signatures**: `v1a` with every signer of the purpose `webhook_out` (`instance.Keys.Signers`);
+  `v1` per subscription with the key `HMAC-SHA256(master, "webhook-v1:" + id + ":" + generation)`,
+  never stored, shown once as `whsec_`; inside `webhook.secret_rotation_overlap` the previous
+  generation signs too. The master key is the value of `webhook.hmac_master_key_ref` (secret
+  `webhook_hmac_master_key`, generator `key`); changing it changes every derived secret, owners
+  then rotate (`rotate_hmac_secret`). Committed test vectors:
+  [docs/api/webhook-test-vectors.json](../../../../docs/api/webhook-test-vectors.json).

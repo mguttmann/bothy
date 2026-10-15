@@ -159,9 +159,15 @@ func (s *Sync) NewConsumerRunner() (*syncapp.ConsumerRunner, error) {
 		syncapp.RunnerOptions{Logger: s.log})
 }
 
-// consumerHandlers returns the production worker consumers of the event log: empty in M2-01.
-// M2-26 registers webhooks and M3-19 registers push here (ADR 0051, PLAN P-13).
-func consumerHandlers() map[sync.ConsumerName]sync.ConsumerHandler { return nil }
+// consumerHandlers returns the production worker consumers of the event log: webhooks over the
+// apps step (M2-26); M3-19 registers push here (ADR 0051, PLAN P-13). A nil ap (the apps step did
+// not run) registers none.
+func consumerHandlers(ap *Apps) map[sync.ConsumerName]sync.ConsumerHandler {
+	if ap == nil {
+		return nil
+	}
+	return map[sync.ConsumerName]sync.ConsumerHandler{sync.ConsumerWebhooks: ap.Consumer()}
+}
 
 // startConsumers is the start of the worker consumers in worker and all after River (02
 // "Start" step 8): it registers handlers, inserts their cursor rows at the head (Ensure),
@@ -200,6 +206,9 @@ func consumerStopStep(runner *syncapp.ConsumerRunner) lifecycle.StopStep {
 // Redactor returns the redactor of stored event payloads behind the kernel port (02 "Ports,
 // Ereignisse und Quellen je Modul": sync implements eventlog.Redactor, M1-58).
 func (s *Sync) Redactor() eventlog.Redactor { return syncpg.NewRedactor(s.pool) }
+
+// LogReader returns the log reader of the delivery jobs (sync.LogReader, M2-26).
+func (s *Sync) LogReader() sync.LogReader { return s.repo }
 
 // Appender returns the appender of durable events for the module constructors.
 func (s *Sync) Appender() eventlog.Appender { return s.appender }

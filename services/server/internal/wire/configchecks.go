@@ -53,6 +53,27 @@ var configChecks = []configCheck{
 	{name: "webauthn_relying_party", keys: []string{keyPublicURL, keyWebAuthnRPID, keyWebAuthnOrigins}, fn: webAuthnRelyingParty},
 	{name: "search_languages", keys: []string{keySearchLanguages}, fn: searchLanguagesCheck},
 	{name: "search_locale_map", keys: []string{keySearchLanguages, keySearchLocaleMap}, fn: searchLocaleMapCheck},
+	{name: "webhook_backoff_order", keys: []string{keyWebhookBackoffBase, keyWebhookBackoffCap}, fn: webhookBackoffOrder},
+	{name: "webhook_retry_within_retention", keys: []string{keyWebhookRetryMaxAge, keySyncEventRetention}, fn: webhookRetryWithinRetention},
+}
+
+// webhookBackoffOrder requires webhook.retry_backoff_base to be at most webhook.retry_backoff_cap
+// (M2-26): the backoff lies between them. The error names the keys, never a value.
+func webhookBackoffOrder(v *config.Values) error {
+	if v.Duration(keyWebhookBackoffBase) > v.Duration(keyWebhookBackoffCap) {
+		return errors.New(keyWebhookBackoffBase + " must be at most " + keyWebhookBackoffCap)
+	}
+	return nil
+}
+
+// webhookRetryWithinRetention requires webhook.retry_max_age to be strictly below
+// sync.event_retention (M2-26): a retry needs its event in the event log. The error names the
+// keys, never a value.
+func webhookRetryWithinRetention(v *config.Values) error {
+	if v.Duration(keyWebhookRetryMaxAge) >= v.Duration(keySyncEventRetention) {
+		return errors.New(keyWebhookRetryMaxAge + " must be less than " + keySyncEventRetention)
+	}
+	return nil
 }
 
 // webAuthnRelyingParty holds auth.webauthn_rp_id and auth.webauthn_origins to the rules of the

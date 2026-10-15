@@ -54,6 +54,9 @@ type Deps struct {
 	Rights     Rights
 	Scopes     Scopes
 	Cursors    Cursors
+	// Webhooks are the outgoing webhooks: install creates the manifest subscription, uninstall
+	// disables the subscriptions and resume makes their heads due (M2-26 design note 14).
+	Webhooks *WebhookService
 	// SpecVersion is the version of the API contract (routes.SpecVersion) min_api_version is
 	// compared with.
 	SpecVersion string
@@ -65,16 +68,18 @@ type Deps struct {
 type Service struct {
 	cfg Config
 	d   Deps
+	// hosts are the parsed entries of webhook.allowed_hosts (host[:port], D-M2-26-8).
+	hosts []domain.AllowedHost
 }
 
 // Compile-time check: Service is the incoming port.
 var _ apps.Apps = (*Service)(nil)
 
-// New returns the use cases. Errors: a missing collaborator, a limit below 1 or a spec version
-// that is no SemVer.
+// New returns the use cases. Errors: a missing collaborator, a limit below 1, a spec version that
+// is no SemVer or an entry of webhook.allowed_hosts that is no host[:port].
 func New(cfg Config, d Deps) (*Service, error) {
 	if d.Repo == nil || d.UoW == nil || d.Authorizer == nil || d.Audit == nil || d.Principals == nil || d.Tokens == nil ||
-		d.Grants == nil || d.Rights == nil || d.Scopes == nil || d.Cursors == nil {
+		d.Grants == nil || d.Rights == nil || d.Scopes == nil || d.Cursors == nil || d.Webhooks == nil {
 		return nil, errors.New("apps: New needs every collaborator")
 	}
 	if cfg.ManifestMaxBytes < 1 || cfg.CommandMax < 1 || cfg.CommandDescriptionMaxChars < 1 || cfg.HandleMaxChars < 1 ||
@@ -88,7 +93,11 @@ func New(cfg Config, d Deps) (*Service, error) {
 		d.Clock = clock.System()
 	}
 	cfg.AllowedHosts = slices.Clone(cfg.AllowedHosts)
-	return &Service{cfg: cfg, d: d}, nil
+	hosts, err := domain.ParseAllowedHosts(cfg.AllowedHosts)
+	if err != nil {
+		return nil, err
+	}
+	return &Service{cfg: cfg, d: d, hosts: hosts}, nil
 }
 
 // now is the time of the clock at the precision of PostgreSQL.
@@ -100,7 +109,7 @@ func (s *Service) env() domain.Env {
 	return domain.Env{
 		MaxBytes: s.cfg.ManifestMaxBytes, HandleMaxChars: s.cfg.HandleMaxChars, DisplayNameMaxChars: s.cfg.DisplayNameMaxChars,
 		MaxCommands: s.cfg.CommandMax, CommandDescriptionMaxChars: s.cfg.CommandDescriptionMaxChars, SpecVersion: s.d.SpecVersion,
-		AllowedHosts: s.cfg.AllowedHosts,
+		AllowedHosts: s.hosts,
 		KnownScope:   func(sc string) bool { return slices.Contains(known, sc) },
 		EventScope:   s.eventScope,
 	}

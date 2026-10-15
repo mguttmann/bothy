@@ -82,7 +82,7 @@ var requirementGroups = []struct {
 	{"agent-self (Runner der Umgebung)", AgentSelf, []string{"dev_environment.report"}},
 	{"system", System, []string{
 		"device.expire", "grant.expire", "group.member.expire", "group.member.sync",
-		"instance.bootstrap", "owner.recover", "signing_key.transition", "terminal.terminate",
+		"instance.bootstrap", "owner.recover", "signing_key.transition", "terminal.terminate", "webhook_out.transition",
 	}},
 	{"self oder owner", Any(Self, Owner), []string{
 		"device.list", "device.revoke", "gdpr.request.create", "gdpr.request.read", "identity.read",
@@ -164,7 +164,7 @@ var requirementGroups = []struct {
 	{"human und write", All(Human, AtLeast(LevelWrite)), []string{"typing.start"}},
 	{"human; Apps mit Scope", Any(Human, AppKind), []string{"user.read"}},
 	{"public mit Token; App braucht write", Deferred("M2"), []string{"webhook_in.post"}},
-	{"Freigaben und Scope des Empfängers", Deferred("M2"), []string{"webhook_out.deliver"}},
+	{"Freigaben und Scope des Empfängers", Delivery, []string{"webhook_out.deliver"}},
 }
 
 // requirements indexes requirementGroups by action id.

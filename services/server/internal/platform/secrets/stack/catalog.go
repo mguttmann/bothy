@@ -87,6 +87,8 @@ var catalog = []Entry{
 	{Name: "telemetry_pseudonym_key", Origin: OriginGenerated, Generator: GeneratorKey, Services: []string{serviceServer, serviceCollector}},
 	{Name: "audit_ip_kek", Origin: OriginGenerated, Generator: GeneratorKey, Services: []string{serviceServer}},
 	{Name: "file_ticket_key", Origin: OriginGenerated, Generator: GeneratorKey, Services: []string{serviceServer}},
+	// The master key of the derived v1 secrets of the outgoing webhooks (M2-26): 32 bytes as hex.
+	{Name: "webhook_hmac_master_key", Origin: OriginGenerated, Generator: GeneratorKey, Services: []string{serviceServer}},
 	{Name: "pgbackrest_cipher_pass", Origin: OriginGenerated, Generator: GeneratorToken, Services: []string{serviceBackup}},
 	// The own CA for mutual TLS between database and repository host (brief M7-01).
 	{Name: "pgbackrest_tls/", Origin: OriginGenerated, Generator: GeneratorPGBackRestTLS, Services: []string{servicePostgres, serviceBackup}},

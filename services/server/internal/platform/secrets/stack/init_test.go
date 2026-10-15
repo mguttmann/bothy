@@ -29,7 +29,7 @@ var (
 		"db_superuser_password", "db_owner_password", "db_app_password", "db_maint_password",
 		"db_monitor_password", "pgbackrest_cipher_pass", "restic_password", "grafana_admin_password",
 	}
-	keyEntries = []string{"token_pepper", "totp_key", "telemetry_pseudonym_key", "audit_ip_kek", "file_ticket_key"}
+	keyEntries = []string{"token_pepper", "totp_key", "telemetry_pseudonym_key", "audit_ip_kek", "file_ticket_key", "webhook_hmac_master_key"}
 )
 
 // freshLines is the report of a run on an empty target and an empty source, in catalog order
@@ -45,6 +45,7 @@ var freshLines = []string{
 	"generated telemetry_pseudonym_key",
 	"generated audit_ip_kek",
 	"generated file_ticket_key",
+	"generated webhook_hmac_master_key",
 	"generated pgbackrest_cipher_pass",
 	"generated pgbackrest_tls/",
 	"generated restic_password",
@@ -78,7 +79,8 @@ var freshServiceFiles = map[string][]string{
 	"migrate":      {"db_app_password", "db_maint_password", "db_monitor_password", "db_owner_password", "db_superuser_password"},
 	"postgres":     {"db_superuser_password", "pgbackrest_tls/backup.crt", "pgbackrest_tls/backup.key", "pgbackrest_tls/ca.crt", "pgbackrest_tls/postgres.crt", "pgbackrest_tls/postgres.key"},
 	"seaweedfs":    nil,
-	"server":       {"audit_ip_kek", "db_app_password", "db_maint_password", "file_ticket_key", "telemetry_pseudonym_key", "token_pepper", "totp_key"},
+	"server": {"audit_ip_kek", "db_app_password", "db_maint_password", "file_ticket_key", "telemetry_pseudonym_key", "token_pepper", "totp_key",
+		"webhook_hmac_master_key"},
 }
 
 func TestInitFreshTarget(t *testing.T) {

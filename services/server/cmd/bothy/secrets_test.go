@@ -132,6 +132,8 @@ func TestConfigPrintNeverShowsSecrets(t *testing.T) {
 	writeSecret(t, dir, "token_pepper", strings.Repeat("7c", 32), 0o600)
 	// and auth.totp_key_ref (M1-39).
 	writeSecret(t, dir, "totp_key", strings.Repeat("5d", 32), 0o600)
+	// and webhook.hmac_master_key_ref (M2-26).
+	writeSecret(t, dir, "webhook_hmac_master_key", strings.Repeat("4e", 32), 0o600)
 	for _, args := range [][]string{{"config", "print", "--redacted"}, {"config", "check", "--secrets"}} {
 		code, stdout, stderr = runBothy(t, []string{"BOTHY_SECRETS__DIR=" + dir}, args...)
 		if code != 0 || stderr != "" {
@@ -165,6 +167,7 @@ func TestConfigPrintNeverShowsSecrets(t *testing.T) {
 		"secret server.tls_cert_ref: not set\n" +
 		"secret server.tls_key_ref: not set\n" +
 		"secret telemetry.pseudonym_key_ref: ok\n" +
+		"secret webhook.hmac_master_key_ref: ok\n" +
 		"configuration ok\n"
 	if stdout != want {
 		t.Errorf("run config check --secrets with the server schema: stdout\n%s\nwant\n%s", stdout, want)

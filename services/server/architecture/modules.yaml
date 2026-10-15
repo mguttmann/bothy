@@ -236,7 +236,7 @@ modules:
   apps:
     tables: [apps, app_installations, webhook_subscriptions, webhook_deliveries, incoming_webhooks]
     actions: [app.read, app.install, app.scopes.update, app.suspend, app.resume, app.uninstall,
-              webhook_out.read, webhook_out.manage, webhook_out.redeliver, webhook_out.deliver,
+              webhook_out.read, webhook_out.manage, webhook_out.redeliver, webhook_out.deliver, webhook_out.transition,
               webhook_in.read, webhook_in.create, webhook_in.revoke, webhook_in.post]
     events: []
     ephemeral_events: []
@@ -244,7 +244,7 @@ modules:
     # authz (M2-24): uninstall revokes the grants of the app; the scope table decides which events
     # an app may subscribe to.
     depends_on: [instance, identity, authz, chat, agents, messaging, sync]
-    adapter_vendors: [pgx]   # sqlc code and the repository (M2-24)
+    adapter_vendors: [pgx, otel]   # sqlc code and the repository (M2-24); the span webhook.deliver (M2-26)
   gateway:
     tables: []
     actions: [gateway.connect, gateway.focus, typing.start]

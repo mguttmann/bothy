@@ -14981,8 +14981,10 @@ type WebhookDelivery struct {
 	EventId  Uuid  `json:"event_id"`
 	EventSeq int64 `json:"event_seq"`
 
-	// EventType Examples: message.created
-	EventType string `json:"event_type"`
+	// EventType Type of the event, read from the event log; absent once the event left the event log (`sync.event_retention`).
+	//
+	// Examples: message.created
+	EventType *string `json:"event_type,omitempty"`
 
 	// Id UUIDv7 (RFC 9562), lowercase canonical form.
 	Id Uuid `json:"id"`
@@ -15020,7 +15022,7 @@ type WebhookKey struct {
 	// NotAfter RFC 3339 timestamp in UTC with millisecond precision and suffix `Z`.
 	NotAfter *Timestamp `json:"not_after,omitempty"`
 
-	// PublicKey Ed25519 public key, base64, with prefix `whpk_`.
+	// PublicKey Ed25519 public key with prefix `whpk_`, followed by the standard base64 (with padding) of its DER-encoded SubjectPublicKeyInfo (RFC 8410).
 	//
 	// Examples: whpk_MCowBQYDK2VwAyEA6h3uZ0Q4i1Yv1o1Wg8bQq3c0o8bq9oQm3Kc8n3m3v0I=
 	PublicKey string          `json:"public_key"`
@@ -15406,6 +15408,12 @@ type SuspendAppParams struct {
 
 // UninstallAppParams defines parameters for UninstallApp.
 type UninstallAppParams struct {
+	// IdempotencyKey UUIDv7 chosen by the client per logical operation. A repeat with the same request returns the stored response; a different request gives 422 `idempotency_key_reuse`; a repeat while the first is running gives 409 `request_in_progress`. Kept for `sync.idempotency_key_ttl`.
+	IdempotencyKey *IdempotencyKey `json:"Idempotency-Key,omitempty"`
+}
+
+// CreateWebhookSubscriptionParams defines parameters for CreateWebhookSubscription.
+type CreateWebhookSubscriptionParams struct {
 	// IdempotencyKey UUIDv7 chosen by the client per logical operation. A repeat with the same request returns the stored response; a different request gives 422 `idempotency_key_reuse`; a repeat while the first is running gives 409 `request_in_progress`. Kept for `sync.idempotency_key_ttl`.
 	IdempotencyKey *IdempotencyKey `json:"Idempotency-Key,omitempty"`
 }
@@ -15981,6 +15989,28 @@ type ListUserSessionsParams struct {
 	Limit  *Limit  `form:"limit,omitempty" json:"limit,omitempty"`
 }
 
+// RedeliverWebhookParams defines parameters for RedeliverWebhook.
+type RedeliverWebhookParams struct {
+	// IdempotencyKey UUIDv7 chosen by the client per logical operation. A repeat with the same request returns the stored response; a different request gives 422 `idempotency_key_reuse`; a repeat while the first is running gives 409 `request_in_progress`. Kept for `sync.idempotency_key_ttl`.
+	IdempotencyKey *IdempotencyKey `json:"Idempotency-Key,omitempty"`
+}
+
+// UpdateWebhookSubscriptionParams defines parameters for UpdateWebhookSubscription.
+type UpdateWebhookSubscriptionParams struct {
+	// IdempotencyKey UUIDv7 chosen by the client per logical operation. A repeat with the same request returns the stored response; a different request gives 422 `idempotency_key_reuse`; a repeat while the first is running gives 409 `request_in_progress`. Kept for `sync.idempotency_key_ttl`.
+	IdempotencyKey *IdempotencyKey `json:"Idempotency-Key,omitempty"`
+}
+
+// ListWebhookDeliveriesParams defines parameters for ListWebhookDeliveries.
+type ListWebhookDeliveriesParams struct {
+	// Cursor Cursor from `next_cursor` of the previous page.
+	Cursor *Cursor `form:"cursor,omitempty" json:"cursor,omitempty"`
+	Limit  *Limit  `form:"limit,omitempty" json:"limit,omitempty"`
+
+	// Status Filter by status.
+	Status *WebhookDeliveryStatus `form:"status,omitempty" json:"status,omitempty"`
+}
+
 // CreateAgentJSONRequestBody defines body for CreateAgent for application/json ContentType.
 type CreateAgentJSONRequestBody = AgentCreate
 
@@ -16016,6 +16046,9 @@ type SetAppScopesJSONRequestBody = AppScopesPut
 
 // UninstallAppJSONRequestBody defines body for UninstallApp for application/json ContentType.
 type UninstallAppJSONRequestBody = ReasonBody
+
+// CreateWebhookSubscriptionJSONRequestBody defines body for CreateWebhookSubscription for application/json ContentType.
+type CreateWebhookSubscriptionJSONRequestBody = WebhookSubscriptionCreate
 
 // VerifyAuditChainJSONRequestBody defines body for VerifyAuditChain for application/json ContentType.
 type VerifyAuditChainJSONRequestBody = AuditVerifyRequest
@@ -16235,6 +16268,9 @@ type DisableUserJSONRequestBody = ReasonBody
 
 // EnableUserJSONRequestBody defines body for EnableUser for application/json ContentType.
 type EnableUserJSONRequestBody = ReasonBody
+
+// UpdateWebhookSubscriptionJSONRequestBody defines body for UpdateWebhookSubscription for application/json ContentType.
+type UpdateWebhookSubscriptionJSONRequestBody = WebhookSubscriptionUpdate
 
 // AsMessageCreatedEvent returns the union data inside the Event as a MessageCreatedEvent
 func (t Event) AsMessageCreatedEvent() (MessageCreatedEvent, error) {

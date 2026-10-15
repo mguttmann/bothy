@@ -45,6 +45,7 @@ const (
 	opHumanSession
 	opAssignee
 	opTerminal
+	opDelivery
 )
 
 // Fact names a fact of the resource descriptor that a conditional capability depends on.
@@ -101,6 +102,11 @@ var (
 	Preview = Expr{op: opPreview}
 	// System marks an action only the server runs (05 rule 10); not evaluable.
 	System = Expr{op: opSystem}
+	// Delivery is the requirement of webhook_out.deliver (M2-26 design note 8): an app principal
+	// with events:subscribe, then the audience of a personal event or the full decision of the
+	// receive action of the event on the same resource (DecideDelivery). It is never evaluated as
+	// an atom, so a call that bypasses DecideDelivery fails closed.
+	Delivery = Expr{op: opDelivery}
 	// HumanSession is true for a person acting in a session, not with an API token (M2-39, 05
 	// section 4.14: agents, apps and personal tokens reach no host action). As the first part of
 	// All it is the gate of 07 section 4.2 (HumanGated).
@@ -136,6 +142,9 @@ func ByKind(m map[string]Expr) Expr { return Expr{op: opByKind, byKind: m} }
 // Deferred marks an action whose requirement needs facts of a later etappe (07 section 4.2). It
 // behaves like an unknown action.
 func Deferred(etappe string) Expr { return Expr{op: opDeferred, etappe: etappe} }
+
+// IsDelivery reports whether e is the Delivery requirement of webhook_out.deliver.
+func (e Expr) IsDelivery() bool { return e.op == opDelivery }
 
 // IsSystem reports whether e is the System marker.
 func (e Expr) IsSystem() bool { return e.op == opSystem }
@@ -178,6 +187,7 @@ var exprNames = map[op]string{
 	opThreadOperator: "ThreadOperator", opChannelOperator: "ChannelOperator",
 	opReadOnOperatedChannel: "ReadOnOperatedChannel", opGroupMember: "GroupMember", opPreview: "Preview",
 	opSystem: "System", opHumanSession: "HumanSession", opAssignee: "Assignee", opTerminal: "Terminal",
+	opDelivery: "Delivery",
 }
 
 // capOpNames are the names of the nodes with a capability.

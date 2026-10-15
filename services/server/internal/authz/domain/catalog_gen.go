@@ -208,6 +208,7 @@ var actionSpecs = map[string]ActionSpec{
 	"webhook_out.manage":           {ID: "webhook_out.manage", Resources: []string{"app", "agent"}, Right: "owner", Owner: true, StepUp: true, Audit: "ja", RateLimitClass: "rl.admin", Effect: "write"},
 	"webhook_out.read":             {ID: "webhook_out.read", Resources: []string{"app", "agent"}, Right: "owner", Owner: true, Audit: "nein", RateLimitClass: "rl.read", Effect: "read"},
 	"webhook_out.redeliver":        {ID: "webhook_out.redeliver", Resources: []string{"webhook_delivery"}, Right: "owner", Owner: true, Audit: "ja", RateLimitClass: "rl.admin", Effect: "write"},
+	"webhook_out.transition":       {ID: "webhook_out.transition", Resources: []string{"app", "agent"}, Right: "system", Audit: "ja", System: true, Effect: "write"},
 }
 
 // actionIDs are the ids of actionSpecs, sorted ascending.
@@ -414,6 +415,7 @@ var actionIDs = []string{
 	"webhook_out.manage",
 	"webhook_out.read",
 	"webhook_out.redeliver",
+	"webhook_out.transition",
 }
 
 // eventSpecs are the event types of the catalogue by type.

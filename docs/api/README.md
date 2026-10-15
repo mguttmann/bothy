@@ -8,6 +8,7 @@ Dart-Paket der Apps werden daraus erzeugt. Konventionen: [docs/spec/06-api.md](.
 | [openapi.yaml](openapi.yaml) | REST-API unter `/api/v1` (OpenAPI 3.1), Webhook-Ereignisse (`webhooks:`), alle Schemas, auch die des Gateways |
 | [asyncapi.yaml](asyncapi.yaml) | Gateway-WebSocket (AsyncAPI 3.0): Ops, Ereignisse, Schließ-Codes; Körper per `$ref` auf openapi.yaml |
 | [webhooks.md](webhooks.md) | Zustellung, Signatur, Wiederholung und Prüfung von Webhooks; Eingangs-Webhooks |
+| [webhook-test-vectors.json](webhook-test-vectors.json) | Test vectors of the webhook signatures (`v1a`, `v1`) and of the HMAC derivation; the contract of every verifier (M2-26, webhooks.md 2.2) |
 | [redocly.yaml](redocly.yaml) | Lint-Regeln für beide Dateien, inklusive Pflicht von `x-authz-action` und Abgleich mit dem Aktionskatalog |
 
 ## Prüfen

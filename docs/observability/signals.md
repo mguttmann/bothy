@@ -242,7 +242,7 @@ vergleicht `le` in den SLO-Dateien mit dieser Tabelle.
 | `event.fanout` | INTERNAL | api, mit Links auf die Anfragen der Ereignisse | `bothy.event.seq` (erste Nummer), Anzahl |
 | `agent.dispatch` | PRODUCER | api | `bothy.run.id`, `bothy.agent.handle`, `bothy.decision` |
 | `push.send` | CLIENT | worker | `bothy.push.provider`, `bothy.outcome` |
-| `webhook.deliver` | CLIENT | worker | `server.address`, `http.response.status_code`, `bothy.outcome` |
+| `webhook.deliver` | CLIENT | worker | `server.address` (host only), `http.response.status_code` (when a response arrived), `bothy.outcome` (`succeeded`, `throttled`, `gone`, `failed`, `blocked`; M2-26) |
 | `file.scan` | CLIENT | worker | `bothy.file.id`, `bothy.outcome` |
 | `job <bothy.job.kind>` | CONSUMER | worker (River) | `bothy.job.kind`, `bothy.outcome` (`completed`, `failed`, `cancelled`, `snoozed`) |
 | `txn.subscribe <Abonnent>` | INTERNAL | api, worker: je In-Tx-Abonnent ([02-architektur.md](../spec/02-architektur.md) 8.3) | `bothy.outcome` (`ok`, `veto`) |
@@ -287,6 +287,7 @@ Diese Liste ist gleich der Allowlist in [infra/otel/collector.yaml](../../infra/
 | `bothy.signing_key.from_state`, `bothy.signing_key.to_state` | `none`, `next`, `active`, `retiring`, `retired` | nur in Logs der Schlüsselwechsel |
 | `bothy.step.kind` | `tool_call`, `status`, `subagent`, `workflow`, `background_job` | |
 | `bothy.version.own`, `bothy.version.required` | SemVer der eigenen Server-Version und `instance.min_server_version` | nur in der Startzeile der Schema-Prüfung ([02-architektur.md](../spec/02-architektur.md) 15.1, Schritt 5) |
+| `bothy.webhook_subscription.id` | UUID of an outgoing webhook subscription; never on metrics | logs `webhook delivery failed` (info) and `webhook subscription state changed` (warn) of the apps module (M2-26), with `bothy.event.seq`, `bothy.event.type`, `bothy.reason` (the `last_error` code or the cause) and `server.address` |
 
 ## 6. GenAI-Konventionen (gekapselt)
 

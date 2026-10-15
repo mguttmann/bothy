@@ -2869,7 +2869,7 @@
       "min": "",
       "max": "",
       "chapter": "03-datenmodell.md",
-      "doc": "Hosts an app manifest may name in its delivery addresses and outgoing webhooks may reach; exact host names, compared without regard to case."
+      "doc": "Targets an app manifest may name in its delivery addresses and outgoing webhooks may reach: entries host[:port], the host compared without regard to case, without a port only 443."
     },
     {
       "name": "webhook.delivery_timeout",
@@ -2882,6 +2882,90 @@
       "max": "",
       "chapter": "11-erweiterungen.md",
       "doc": "Time limit of one webhook delivery."
+    },
+    {
+      "name": "webhook.hmac_master_key_ref",
+      "env": "BOTHY_WEBHOOK__HMAC_MASTER_KEY_REF",
+      "kind": "secret_ref",
+      "default": "file:<secrets.dir>/webhook_hmac_master_key",
+      "required": false,
+      "enum": [],
+      "min": "",
+      "max": "",
+      "chapter": "11-erweiterungen.md",
+      "doc": "Secret reference of the master key from which the HMAC secrets of the subscriptions are derived."
+    },
+    {
+      "name": "webhook.max_consecutive_failures",
+      "env": "BOTHY_WEBHOOK__MAX_CONSECUTIVE_FAILURES",
+      "kind": "int",
+      "default": "20",
+      "required": false,
+      "enum": [],
+      "min": "1",
+      "max": "",
+      "chapter": "03-datenmodell.md",
+      "doc": "Failures in a row after which a subscription is disabled."
+    },
+    {
+      "name": "webhook.max_pending_per_subscription",
+      "env": "BOTHY_WEBHOOK__MAX_PENDING_PER_SUBSCRIPTION",
+      "kind": "int",
+      "default": "10000",
+      "required": false,
+      "enum": [],
+      "min": "1",
+      "max": "",
+      "chapter": "11-erweiterungen.md",
+      "doc": "Open deliveries per subscription; reaching it pauses the subscription."
+    },
+    {
+      "name": "webhook.retry_backoff_base",
+      "env": "BOTHY_WEBHOOK__RETRY_BACKOFF_BASE",
+      "kind": "duration",
+      "default": "10s",
+      "required": false,
+      "enum": [],
+      "min": "1ms",
+      "max": "",
+      "chapter": "03-datenmodell.md",
+      "doc": "Base of the backoff between delivery attempts."
+    },
+    {
+      "name": "webhook.retry_backoff_cap",
+      "env": "BOTHY_WEBHOOK__RETRY_BACKOFF_CAP",
+      "kind": "duration",
+      "default": "1h",
+      "required": false,
+      "enum": [],
+      "min": "1ms",
+      "max": "",
+      "chapter": "03-datenmodell.md",
+      "doc": "Largest backoff between delivery attempts."
+    },
+    {
+      "name": "webhook.retry_max_age",
+      "env": "BOTHY_WEBHOOK__RETRY_MAX_AGE",
+      "kind": "duration",
+      "default": "72h",
+      "required": false,
+      "enum": [],
+      "min": "1ms",
+      "max": "",
+      "chapter": "11-erweiterungen.md",
+      "doc": "Time after which a failing delivery is dead and its subscription disabled."
+    },
+    {
+      "name": "webhook.secret_rotation_overlap",
+      "env": "BOTHY_WEBHOOK__SECRET_ROTATION_OVERLAP",
+      "kind": "duration",
+      "default": "24h",
+      "required": false,
+      "enum": [],
+      "min": "1ms",
+      "max": "",
+      "chapter": "11-erweiterungen.md",
+      "doc": "How long the server signs with the old and the new HMAC generation after a rotation."
     }
   ]
 }

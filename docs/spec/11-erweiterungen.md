@@ -210,15 +210,19 @@ aber ohne `messages:read`, kann posten, ohne mitzulesen.
 | Eigener Prozess | außerhalb des Servers, beliebige Sprache, beliebiger Ort |
 | Eigenes Token | nur Hash gespeichert; optional DPoP-gebunden ([08-identitaet.md](08-identitaet.md)) |
 | Rate-Limits | Klassen aus 05 je Prinzipal; Eingangs-Webhooks je Webhook (`rl.webhook_in`) |
-| Zustell-Quote | höchstens `webhook.max_pending_per_subscription` offene Zustellungen je Abo; darüber wird das Abo `paused` und der Owner benachrichtigt |
+| Zustell-Quote | Delivery quota: at most `webhook.max_pending_per_subscription` open (`pending`) deliveries per subscription; the round whose insert reaches the quota sets an `active` subscription `paused` and audits `webhook_out.transition` with cause `max_pending`; rows keep being created while paused, so no event is lost; the owner learns it from the audit entry and the state in `listWebhookSubscriptions` ([DECISIONS.md](../DECISIONS.md) D-M2-26-2) |
 | Zeitgrenzen | `webhook.delivery_timeout` je Zustellung, `app.interaction_timeout` je synchroner Anfrage |
 | Abschalten | `app.suspend`, `app.uninstall`; automatisch `disabled` nach `webhook.max_consecutive_failures` |
 | Nie erlaubt | Agenten auslösen (`origin = app`), Step-up-Aktionen (R-AZ-03), DM-Kanäle, Kanal-Prompts, `manage`, `trigger` |
 
-Zustellungen kommen aus dem Ereignis-Log, nicht aus einer Kopie: Ein pausiertes Abo setzt bei
-`last_delivered_seq` fort. Liegt dieser Stand vor dem Aufbewahrungsfenster
-(`sync.event_retention`), wird das Abo `disabled` mit dem Hinweis "Lücke", statt still Ereignisse
-zu überspringen.
+Deliveries come from the event log, not from a copy: a paused subscription continues with its
+pending deliveries where it stood. A gap is detected at two points ([DECISIONS.md](../DECISIONS.md)
+D-M2-26-5): at the head of a subscription, when the event of its lowest pending delivery is no
+longer in the log (`sync.event_retention`), and in the round of the worker consumer `webhooks`,
+when retention removed events before the consumer read them (the lost range of the round). In both
+cases the subscription becomes `disabled` with cause `gap` instead of skipping events silently, its
+expired pending deliveries become `dead` with `last_error = event_expired`, and the audit entry of
+`webhook_out.transition` names the lost range.
 
 ## 7. Ausgehende Webhooks
 
@@ -229,8 +233,8 @@ zu überspringen.
 | Signatur | Standard Webhooks, Kopfzeilen `webhook-id` (= Ereignis-ID), `webhook-timestamp`, `webhook-signature` mit Schema `v1a` (Ed25519) |
 | Schlüssel | `server_signing_keys` mit Zweck `webhook_out` und `alg = 'EdDSA'`; ES256 ist für diesen Zweck nicht erlaubt, weil `v1a` nur Ed25519 kennt |
 | Reihenfolge | je Abo streng nach `seq`; das nächste Ereignis erst nach Erfolg des vorigen |
-| Prüfung | vor jeder Zustellung `webhook_out.deliver` mit den aktuellen Rechten und Scopes der App; nicht mehr sichtbare Ereignisse werden übersprungen, nicht als Fehler gezählt |
-| Erfolg | nur `2xx`; `410` schaltet das Abo ab; `429`, `502`, `504` drosseln und beachten `retry-after` |
+| Prüfung | Check: before every attempt `webhook_out.deliver` with the current grants and scopes of the app (filter mode, no denial in the audit); an event the app may no longer receive ends `dead` with `last_error = not_authorized`, without a request and without counting as a failure |
+| Erfolg | Success: only `2xx`; `410` disables the subscription; `429`, `502`, `503` and `504` throttle and honour `Retry-After`; redirects are never followed, a `3xx` is a failure ([../api/webhooks.md](../api/webhooks.md), section 4) |
 | Wiederholung | Backoff mit Zufall zwischen `webhook.retry_backoff_base` und `webhook.retry_backoff_cap` (03) |
 | Zeitgrenze | `webhook.delivery_timeout`; der Antwortkörper wird nicht gespeichert |
 | SSRF-Schutz | nur `https`, Host in `webhook.allowed_hosts`, Zustellung über den Egress-Client mit Adressprüfung nach der DNS-Auflösung ([19-sicherheit.md](19-sicherheit.md), SEC-NET-1 bis SEC-NET-5), Verbindung an die geprüfte Adresse gebunden, keine Weiterleitungen |
@@ -502,6 +506,9 @@ Die beim Entwurf beantragten Ergänzungen sind entschieden (Integration vom 2026
 | `app.interaction_timeout` | Server | `3s` | Frist für synchrone Antworten über `interactions_url` |
 | `webhook.delivery_timeout` | Server | `15s` | Zeitgrenze einer Zustellung |
 | `webhook.max_pending_per_subscription` | Server | `10000` | offene Zustellungen je Abo, darüber `paused` |
+| `webhook.retry_max_age` | Server | `72h` | after that a delivery becomes `dead` ([webhooks.md](../api/webhooks.md), section 4) |
+| `webhook.secret_rotation_overlap` | Server | `24h` | how long the server signs with the old and the new HMAC generation |
+| `webhook.hmac_master_key_ref` | Server | `file:<secrets.dir>/webhook_hmac_master_key` | reference to the master key from which the HMAC secrets of the subscriptions are derived ([webhooks.md](../api/webhooks.md), section 2.1) |
 | `webhook_in.max_body_bytes` | Server | `1048576` | Größe eines eingehenden Körpers |
 | `webhook_in.formats_enabled` | Server | `native, alertmanager` | eingeschaltete Eingangsformate |
 | `sdk.http_timeout` | SDK | `30s` | Zeitgrenze einer REST-Anfrage |

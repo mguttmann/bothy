@@ -24,6 +24,18 @@ Ereignissen zu erfahren.
    sonst `400 webhook_host_not_allowed`.
 3. Je Abo gilt eine Teilmenge der abonnierten Typen (`event_types`). Ein Abo kann pausiert
    (`state = paused`) und wieder aktiviert werden.
+4. Validation (M2-26, [DECISIONS.md](../DECISIONS.md) D-M2-26-8 and D-M2-26-18): entries of
+   `webhook.allowed_hosts` have the form `host[:port]` (without a port only `443`); the address
+   must parse, use `https`, have no user info and no fragment, and its canonical host (lower case,
+   no trailing dot) and port must match an entry, otherwise `400 webhook_host_not_allowed` for a
+   host or port outside the list and `400 validation_failed` at `/url` for every other defect.
+   `event_types` is not empty, has no duplicate (`invalid`), and each type is subscribable by apps
+   (`not_subscribable`, section 7) and in the `event_subscriptions` of the installation
+   (`not_granted`), each at `/event_types/<index>`. An app without an `active` or `suspended`
+   installation answers `409 conflict` with `reason: app_not_installed`. `rotate_hmac_secret`
+   without HMAC is `400 validation_failed` with `hmac_not_enabled`. A response with a `whsec_`
+   secret is a one-time secret: a replay with the same `Idempotency-Key` answers `409 conflict`
+   with `reason: one_time_secret`.
 
 ## 2. Zustellung
 
@@ -65,9 +77,34 @@ webhook-signature: v1a,<Ed25519-Signatur in Base64> v1,<HMAC-SHA256 in Base64>
    `whsec_<base64>` an. `rotate_hmac_secret` erhöht die Generation; für
    `webhook.secret_rotation_overlap` signiert der Server mit alter und neuer Generation
    (03 `webhook_subscriptions.hmac_generation` und `hmac_rotated_at`).
-4. Grund für zwei Verfahren: Standard Webhooks empfiehlt asymmetrische Signaturen [belegt, W1];
+4. Signing set and encodings (M2-26, D-M2-26-10 and D-M2-26-11): `v1a` carries one signature per
+   signer of the purpose `webhook_out`: the `active` key first, then every `retiring` key whose
+   `not_after` lies ahead. `v1` uses the key of `hmac_generation` and, while `hmac_rotated_at +
+   webhook.secret_rotation_overlap` lies ahead, the key of the previous generation; never an older
+   one. Entries are separated by one space, all `v1a` entries first in signer order, then the `v1`
+   entries newest generation first, each `<scheme>,<standard base64 with padding>`. The HMAC
+   derivation takes the subscription ID in canonical lower-case hyphenated form and the generation
+   in decimal ASCII; the master key is the hex-decoded value of `webhook.hmac_master_key_ref`; the
+   derived 32 bytes are the HMAC key, and `whsec_` plus their standard base64 is the secret shown
+   once. A public key is `whpk_` plus the standard base64 of its DER-encoded SubjectPublicKeyInfo
+   (RFC 8410).
+5. Grund für zwei Verfahren: Standard Webhooks empfiehlt asymmetrische Signaturen [belegt, W1];
    die Referenzbibliotheken nennen in ihren Beschreibungen aber HMAC, `v1a` ist dort nicht belegt
    [vermutet, W2]. HMAC hält die Hürde für Empfänger niedrig.
+
+### 2.2 Test vectors
+
+[webhook-test-vectors.json](webhook-test-vectors.json) is the contract file for every verifier
+(server, SDKs; D-M2-26-12): `{"version": 1, "derivation": [...], "signatures": [...]}`. A
+derivation case is `{master_hex, subscription_id, generation, derived_hex}` with `derived_hex` the
+lower-case hex of the 32 derived bytes; the secret shown to the owner is `whsec_` plus their
+standard base64 and is not stored in the file. A signature case is `{name, webhook_id, timestamp,
+body, ed25519_seed_base64, public_key, hmac_secrets, signature_header}`; `ed25519_seed_base64` and
+`public_key` are lists in signer order (one entry per `v1a` signer), `hmac_secrets` lists the
+`whsec_` secrets newest generation first (each carries the marker `EXAMPLE`), and
+`signature_header` is the value of `webhook-signature` byte for byte. The cases cover one key and
+one secret, two `v1a` signers, two HMAC generations, a body with non-ASCII characters and escapes,
+and a body with `truncated: true`.
 
 ## 3. Prüfung beim Empfänger
 
@@ -105,6 +142,31 @@ webhook-signature: v1a,<Ed25519-Signatur in Base64> v1,<HMAC-SHA256 in Base64>
 4. Ein Owner kann jede Zustellung erneut anstoßen (`redeliverWebhook`); sie trägt dieselbe
    `webhook-id`.
 5. Antwortkörper werden nicht gespeichert (03, `webhook_deliveries.last_error`).
+6. Statuses (M2-26, D-M2-26-6): `pending` waits for its first or next attempt (also after a failed
+   attempt, with `next_attempt_at`); `succeeded` got a `2xx`; `failed` ended with `410` (terminal,
+   the owner may redeliver); `dead` ended after `webhook.retry_max_age`, without access
+   (`not_authorized`), because the type left `event_types` or the installation's
+   `event_subscriptions` (`not_subscribed`), or because its event left the log
+   (`event_expired`). `last_error` is a code of the closed list `timeout`, `connection_failed`,
+   `tls_failed`, `address_blocked`, `host_not_allowed`, `http_status`, `throttled`, `gone`,
+   `not_authorized`, `not_subscribed`, `event_expired`.
+7. Only failures count towards `webhook.max_consecutive_failures`: other statuses, `3xx`,
+   timeouts, refused or failed connections. A throttle (`429`, `502`, `503`, `504`) and an ending
+   without a request (`not_authorized`, `not_subscribed`) do not count. After the n-th failed or
+   throttled attempt the pause is uniform in [`webhook.retry_backoff_base`,
+   min(`webhook.retry_backoff_cap`, `webhook.retry_backoff_base` * 2^(n-1))]; for a throttle with a
+   valid `Retry-After` (delta-seconds or HTTP-date; a past date counts as zero) the larger of
+   backoff and `Retry-After` applies. No retry is scheduled after `created_at +
+   webhook.retry_max_age` (a later time is cut to it), and a failure at or after it makes the
+   delivery `dead` and the subscription `disabled` (D-M2-26-7).
+8. A redelivery (`redeliverWebhook`, D-M2-26-14) makes a `pending` row due at once; a `succeeded`,
+   `failed` or `dead` row becomes `pending` again with `last_error` and `response_code` cleared,
+   `attempt` kept and `created_at` set to now, so the window of `webhook.retry_max_age` starts
+   again. It goes out before the later pending rows of the subscription; a paused or disabled
+   subscription keeps it waiting. An event that is no longer in the log answers `409 conflict`
+   with `reason: event_expired`.
+9. Retention (M7-05) may delete only `succeeded`, `failed` and `dead` rows older than
+   `retention.webhook_deliveries`, never `pending` ones.
 
 ## 5. Reihenfolge und Doppel
 
@@ -117,6 +179,14 @@ webhook-signature: v1a,<Ed25519-Signatur in Base64> v1,<HMAC-SHA256 in Base64>
 3. `webhook_subscriptions.last_delivered_seq` ist die höchste mit `2xx` angenommene `seq`.
    Scheitert ein Ereignis bis `webhook.retry_max_age`, wird die Zustellung `dead` und das Abo
    `disabled`; nach dem Wiedereinschalten durch den Owner geht es mit dem Folgeereignis weiter.
+4. While a subscription is `paused`, its deliveries are still created and wait; a resume
+   continues with them in `seq` order. While it is `disabled`, no delivery is created: events of
+   that time are not delivered (D-M2-26-1); a re-enable continues with the remaining pending rows
+   (the head first) and then with events committed after it.
+5. Gap (D-M2-26-5): when the event of the head left the log, or when the consumer `webhooks` lost
+   a range to retention before reading it, the subscription becomes `disabled` with cause `gap`,
+   its expired pending deliveries become `dead` with `event_expired`, and the audit entry names the
+   lost range; nothing is skipped silently.
 
 ## 6. Sicherheit der Zustellung
 

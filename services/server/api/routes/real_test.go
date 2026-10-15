@@ -209,6 +209,34 @@ func (stubServer) UpdateUser(context.Context, rest.UpdateUserRequestObject) (res
 	return nil, nil
 }
 
+func (stubServer) ListWebhookSubscriptions(context.Context, rest.ListWebhookSubscriptionsRequestObject) (rest.ListWebhookSubscriptionsResponseObject, error) {
+	return nil, nil
+}
+
+func (stubServer) CreateWebhookSubscription(context.Context, rest.CreateWebhookSubscriptionRequestObject) (rest.CreateWebhookSubscriptionResponseObject, error) {
+	return nil, nil
+}
+
+func (stubServer) UpdateWebhookSubscription(context.Context, rest.UpdateWebhookSubscriptionRequestObject) (rest.UpdateWebhookSubscriptionResponseObject, error) {
+	return nil, nil
+}
+
+func (stubServer) DeleteWebhookSubscription(context.Context, rest.DeleteWebhookSubscriptionRequestObject) (rest.DeleteWebhookSubscriptionResponseObject, error) {
+	return nil, nil
+}
+
+func (stubServer) ListWebhookDeliveries(context.Context, rest.ListWebhookDeliveriesRequestObject) (rest.ListWebhookDeliveriesResponseObject, error) {
+	return nil, nil
+}
+
+func (stubServer) RedeliverWebhook(context.Context, rest.RedeliverWebhookRequestObject) (rest.RedeliverWebhookResponseObject, error) {
+	return nil, nil
+}
+
+func (stubServer) GetWebhookKeys(context.Context, rest.GetWebhookKeysRequestObject) (rest.GetWebhookKeysResponseObject, error) {
+	return nil, nil
+}
+
 func (stubServer) GetJwks(context.Context, rest.GetJwksRequestObject) (rest.GetJwksResponseObject, error) {
 	return nil, nil
 }
@@ -822,6 +850,14 @@ func TestRealTable_Enabled(t *testing.T) {
 		"suspendApp":         {"POST /api/v1/apps/{app_id}/suspend", "app.suspend", "rl.admin"},
 		"resumeApp":          {"POST /api/v1/apps/{app_id}/resume", "app.resume", "rl.admin"},
 		"uninstallApp":       {"POST /api/v1/apps/{app_id}/uninstall", "app.uninstall", "rl.admin"},
+		// M2-26
+		"getWebhookKeys":            {"GET /api/v1/instance/webhook-keys", "instance.discovery.read", "rl.public_auth"},
+		"listWebhookSubscriptions":  {"GET /api/v1/apps/{app_id}/webhooks", "webhook_out.read", "rl.read"},
+		"createWebhookSubscription": {"POST /api/v1/apps/{app_id}/webhooks", "webhook_out.manage", "rl.admin"},
+		"updateWebhookSubscription": {"PATCH /api/v1/webhooks/{subscription_id}", "webhook_out.manage", "rl.admin"},
+		"deleteWebhookSubscription": {"DELETE /api/v1/webhooks/{subscription_id}", "webhook_out.manage", "rl.admin"},
+		"listWebhookDeliveries":     {"GET /api/v1/webhooks/{subscription_id}/deliveries", "webhook_out.read", "rl.read"},
+		"redeliverWebhook":          {"POST /api/v1/webhook-deliveries/{delivery_id}/redeliver", "webhook_out.redeliver", "rl.admin"},
 	}
 	ops := routes.Enabled()
 	if len(ops) != len(want) {

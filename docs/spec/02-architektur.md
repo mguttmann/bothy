@@ -185,7 +185,7 @@ tieferer Module, die das Modul implementiert.
 
 | Modul | Port (Auszug) | Gibt aus (In-Tx) | Abonniert (In-Tx) | Implementiert Quellen |
 |---|---|---|---|---|
-| `instance` | `Settings`, `Flags`, `Keys` (Signer je Zweck, JWKS, Rotation), `Counters` (nur für die Phasen-Hooks von `authz`, `sync`, `audit`), `Versions` (Zählerstände ohne Sperre lesen, z. B. `permission_version` für den Rechte-Cache, `event_seq` für Catch-up); deklariert `LoginOptionsSource` (Anmelde-Treiber und Passwortweg für die Discovery), `FlagUserSource` (Menschen eines Rollouts), `FlagGroupSource` (gültige Gruppen eines Menschen für die Auswertung) | | | |
+| `instance` | `Settings`, `Flags`, `Keys` (Signer je Zweck, `Signers` and `PublicKeys` of a purpose for the outgoing webhooks, JWKS, Rotation), `Counters` (nur für die Phasen-Hooks von `authz`, `sync`, `audit`), `Versions` (Zählerstände ohne Sperre lesen, z. B. `permission_version` für den Rechte-Cache, `event_seq` für Catch-up); deklariert `LoginOptionsSource` (Anmelde-Treiber und Passwortweg für die Discovery), `FlagUserSource` (Menschen eines Rollouts), `FlagGroupSource` (gültige Gruppen eines Menschen für die Auswertung) | | | |
 | `audit` | `Log` (Abfrage, Prüfung) | | | kernel `auditing.Recorder` |
 | `authz` | `Admin` (Gruppen, Freigaben, Abgleich der Claim-Gruppen, Erklärung, Vorschau, Ansicht als Person, Widerruf aller Freigaben eines Subjekts in der Rechte-Änderung des Aufrufers), `AppScopes` (Scope-Tabelle für die Ereignis-Abos einer App); deklariert `PrincipalSource`, `CredentialSource`, `StructureSource`, `AgentPolicySource`, `HostSource` | kernel `authorize.AccessChanged` (mit der auslösenden Aktion; `runs` bricht bei `user.disable` mit Grund `user_disabled` ab, sonst mit `access_revoked`) | | kernel `authorize.Authorizer`, `instance.FlagGroupSource` |
 | `billing` | `Costs` (Buchen, Korrektur, Summen), `Prices` | | | |
@@ -195,12 +195,12 @@ tieferer Module, die das Modul implementiert.
 | `files` | `Uploads` (Sitzungen, Teile), `Files` (Lesen, Öffnen, Vorschau, Abruf-Tickets, Löschen), `Attachments`, `Transcripts`, `TextExtracts`; deklariert `AttachmentLocator` | `FileFinalized` (Scan und gegebenenfalls Transkript endgültig) | | `identity.AvatarFiles`, kernel `personaldata.Participant` |
 | `messaging` | `Messages` (Anlegen, Thread mit erster Nachricht anlegen, Bearbeiten, Löschen, Verlauf, `SetTriggerState`, Anker), `Reactions`, `Pins`, `Templates`, `Mentions` (Liste, ungelesene je Thread), `Export`; deklariert `ComponentReader` | `MessagePosted`, `MessageDeleted` | `chat.ThreadMoved` | `files.AttachmentLocator`, kernel `personaldata.Participant` |
 | `runs` | `Runs` (Lesen, Kontext, Start, Wiederaufnahme, Patch, Ende, Abbruch, Übersicht), `Delivery` (Zustellvorbereitung mit I2, Schutzregeln und Marke), `Interactions`, `CommandExec` (inklusive Autovervollständigung) | | `messaging.MessagePosted`, `messaging.MessageDeleted`, `files.FileFinalized` (zurückgehaltenen Aufruf schreiben), `agents.AgentDisabled`, `chat.ChannelReadOnlySet`, kernel `authorize.AccessChanged` | `messaging.ComponentReader`, kernel `personaldata.Participant` |
-| `sync` | `Tail`, `CatchUp`, `Snapshot`, `Consumers` (Worker-Cursor), `ReadStates`, `Drafts`, `Settings` | | `messaging.MessagePosted` (Entwurf leeren), `chat.ThreadMoved` (Kopien von `channel_id`) | kernel `eventlog.Appender`, kernel `eventlog.Redactor`, kernel `idempotency.Store`, kernel `personaldata.Participant` |
+| `sync` | `Tail`, `CatchUp`, `Snapshot`, `Consumers` (Worker-Cursor, with `ConsumerLossHandler` for a retention loss), `LogReader` (one event by `seq` and the smallest retained `seq` for delivery jobs), `ReadStates`, `Drafts`, `Settings` | | `messaging.MessagePosted` (Entwurf leeren), `chat.ThreadMoved` (Kopien von `channel_id`) | kernel `eventlog.Appender`, kernel `eventlog.Redactor`, kernel `idempotency.Store`, kernel `personaldata.Participant` |
 | `notify` | `Preferences`, `QuietHours`, `PushRegistrations` | | `identity.DeviceRevoked`, `identity.SessionEnded` (Registrierungen der Sitzung deaktivieren), `chat.ChannelArchived`, `chat.SpaceArchived` | kernel `personaldata.Participant` |
 | `gateway` | keiner für andere Module | | | kernel `eventlog.EphemeralPublisher` |
 | `search` | `Search` | | | |
 | `stats` | `Stats` (Abfragen, Timeline, Ampel, Backend-Ansicht), `Live` (Basis-Rahmen je Intervall, Filter je Empfänger) | | | kernel `measure.Recorder` |
-| `apps` | `Apps`, `Webhooks`, `IncomingWebhooks` | | `chat.ChannelArchived` | `identity.AppInstallations` |
+| `apps` | `Apps`, `Webhooks` (`apps.Webhooks`: subscriptions, deliveries, redelivery, `ResumeInstallation`), `IncomingWebhooks` | | `chat.ChannelArchived` | `identity.AppInstallations` |
 | `importer` | `Imports` (Quellen, Stapel über `import.apply`) | | | |
 | `privacy` | `Requests` | | | sammelt alle kernel `personaldata.Participant` |
 | `status` | `Status`, `BackupRuns` (für `bothy-backupd`) | | `agents.AgentDisabled` | |
@@ -295,7 +295,7 @@ Tabelle mit dem Katalog (Abschnitt 7.3).
 | `gateway` | `gateway.connect`, `gateway.focus`, `typing.start` |
 | `search` | `search.query` |
 | `stats` | `stats.read`, `client_metrics.submit` |
-| `apps` | `app.read`, `app.install`, `app.scopes.update`, `app.suspend`, `app.resume`, `app.uninstall`, `webhook_out.read`, `webhook_out.manage`, `webhook_out.redeliver`, `webhook_out.deliver`, `webhook_in.read`, `webhook_in.create`, `webhook_in.revoke`, `webhook_in.post` |
+| `apps` | `app.read`, `app.install`, `app.scopes.update`, `app.suspend`, `app.resume`, `app.uninstall`, `webhook_out.read`, `webhook_out.manage`, `webhook_out.redeliver`, `webhook_out.deliver`, `webhook_out.transition`, `webhook_in.read`, `webhook_in.create`, `webhook_in.revoke`, `webhook_in.post` |
 | `importer` | `import.read`, `import.manage`, `import.apply` |
 | `privacy` | `gdpr.request.create`, `gdpr.request.read`, `gdpr.request.decide`, `gdpr.export.download` |
 | `status` | `status.public.read`, `status.read`, `status.manage` |
@@ -993,7 +993,7 @@ Grund: Jeder andere Job schriebe Zustand, der auf dem Ziel fehlen würde.
 | `files.cleanup_pending` | `files` | periodisch | `maintenance` | 12 |
 | `files.purge_objects` | `files` | periodisch, gelöschte Dateien | `maintenance` | 12, 20 |
 | `notify.push_send` | `notify` | Verbraucher `push` | `delivery` | 13 |
-| `apps.webhook_deliver` | `apps` | Verbraucher `webhooks`, `webhook_out.redeliver` | `delivery` | 11 |
+| `apps.webhook_deliver` | `apps` | one attempt of a subscription (args: the subscription only, M2-26): a round of the consumer `webhooks`, the chain after a finished delivery, a scheduled retry, the lease wake-up after `webhook.delivery_timeout`, an owner resume or re-enable, `webhook_out.redeliver` and `app.resume`; jobs of one subscription serialize on its row lock | `delivery` | 11 |
 | `runs.cancel_timeout` | `runs` | periodisch, `agent.cancel_grace` | `maintenance` | 09 |
 | `runs.stall_check` | `runs` | periodisch, `run.stall_after` | `maintenance` | 09 |
 | `runs.component_expiry` | `runs` | periodisch, `component.default_ttl` | `maintenance` | 09 |
@@ -1067,7 +1067,10 @@ Server lädt.
    IPv4-gemappte IPv6-Adresse zählt als ihre IPv4-Adresse). Port `0` darf doppelt vorkommen, weil
    Tests Port 0 binden. `consumer.pending_alert_after` is strictly below `sync.event_retention`
    (cross-check `consumer_alert_below_retention`, M2-01), so the alarm `BothyEventConsumerLag`
-   fires while a stalled worker consumer can still catch up. With `file.storage.driver = fs`, `file.fs.root` is an absolute path in
+   fires while a stalled worker consumer can still catch up. `webhook.retry_backoff_base` is at
+   most `webhook.retry_backoff_cap` (cross-check `webhook_backoff_order`, M2-26), and
+   `webhook.retry_max_age` is strictly below `sync.event_retention` (cross-check
+   `webhook_retry_within_retention`, M2-26), because a retry needs its event in the log. With `file.storage.driver = fs`, `file.fs.root` is an absolute path in
    clean form (no `.` or `..` element, no trailing `/`; cross-check `file_fs_root_absolute`,
    M3-01), because a relative root would depend on the working directory of the process; with
    `s3` the root is not read. With `file.storage.driver = s3` the cross-check `file_s3` (M3-02)

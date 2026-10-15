@@ -245,9 +245,9 @@ Quelle: [03-datenmodell.md](../spec/03-datenmodell.md), Abschnitt 9.
 | `component.default_ttl` | `BOTHY_COMPONENT__DEFAULT_TTL` | Server |  | `24h` | Ablauf einer Komponente ohne eigene Angabe | geplant (M2) |
 | `push.max_consecutive_failures` | `BOTHY_PUSH__MAX_CONSECUTIVE_FAILURES` | Server |  | `5` | danach wird eine Push-Registrierung deaktiviert | geplant (M3) |
 | `webhook.allowed_hosts` | `BOTHY_WEBHOOK__ALLOWED_HOSTS` | Server | list(string) | leer | erlaubte Ziel-Hosts für ausgehende Webhooks | aktiv |
-| `webhook.max_consecutive_failures` | `BOTHY_WEBHOOK__MAX_CONSECUTIVE_FAILURES` | Server |  | `20` | danach wird ein Abo deaktiviert | geplant (M2) |
-| `webhook.retry_backoff_base` | `BOTHY_WEBHOOK__RETRY_BACKOFF_BASE` | Server |  | `10s` | Basis des Backoffs | geplant (M2) |
-| `webhook.retry_backoff_cap` | `BOTHY_WEBHOOK__RETRY_BACKOFF_CAP` | Server |  | `1h` | größter Abstand | geplant (M2) |
+| `webhook.max_consecutive_failures` | `BOTHY_WEBHOOK__MAX_CONSECUTIVE_FAILURES` | Server | int | `20` | danach wird ein Abo deaktiviert | aktiv |
+| `webhook.retry_backoff_base` | `BOTHY_WEBHOOK__RETRY_BACKOFF_BASE` | Server | duration | `10s` | Basis des Backoffs | aktiv |
+| `webhook.retry_backoff_cap` | `BOTHY_WEBHOOK__RETRY_BACKOFF_CAP` | Server | duration | `1h` | größter Abstand | aktiv |
 | `sync.event_log_partition_size` | `BOTHY_SYNC__EVENT_LOG_PARTITION_SIZE` | Server | int | `1000000` | Sequenznummern je Partition | aktiv |
 
 ### 04 Ereignis- und Sync-Protokoll
@@ -464,7 +464,10 @@ Quelle: [11-erweiterungen.md](../spec/11-erweiterungen.md), Abschnitt 16.
 | `app.manifest_max_bytes` | `BOTHY_APP__MANIFEST_MAX_BYTES` | Server | int | `65536` | Größe eines Manifests | aktiv |
 | `app.interaction_timeout` | `BOTHY_APP__INTERACTION_TIMEOUT` | Server |  | `3s` | Frist für synchrone Antworten über `interactions_url` | geplant (M2) |
 | `webhook.delivery_timeout` | `BOTHY_WEBHOOK__DELIVERY_TIMEOUT` | Server | duration | `15s` | Zeitgrenze einer Zustellung | aktiv |
-| `webhook.max_pending_per_subscription` | `BOTHY_WEBHOOK__MAX_PENDING_PER_SUBSCRIPTION` | Server |  | `10000` | offene Zustellungen je Abo, darüber `paused` | geplant (M2) |
+| `webhook.max_pending_per_subscription` | `BOTHY_WEBHOOK__MAX_PENDING_PER_SUBSCRIPTION` | Server | int | `10000` | offene Zustellungen je Abo, darüber `paused` | aktiv |
+| `webhook.retry_max_age` | `BOTHY_WEBHOOK__RETRY_MAX_AGE` | Server | duration | `72h` | after that a delivery becomes `dead` ([webhooks.md](../api/webhooks.md), section 4) | aktiv |
+| `webhook.secret_rotation_overlap` | `BOTHY_WEBHOOK__SECRET_ROTATION_OVERLAP` | Server | duration | `24h` | how long the server signs with the old and the new HMAC generation | aktiv |
+| `webhook.hmac_master_key_ref` | `BOTHY_WEBHOOK__HMAC_MASTER_KEY_REF` | Server | secret_ref | `file:<secrets.dir>/webhook_hmac_master_key` | reference to the master key from which the HMAC secrets of the subscriptions are derived ([webhooks.md](../api/webhooks.md), section 2.1) | aktiv |
 | `webhook_in.max_body_bytes` | `BOTHY_WEBHOOK_IN__MAX_BODY_BYTES` | Server |  | `1048576` | Größe eines eingehenden Körpers | geplant (M2) |
 | `webhook_in.formats_enabled` | `BOTHY_WEBHOOK_IN__FORMATS_ENABLED` | Server |  | `native, alertmanager` | eingeschaltete Eingangsformate | geplant (M2) |
 | `sdk.http_timeout` |  | SDK |  | `30s` | Zeitgrenze einer REST-Anfrage |  |
@@ -873,6 +876,7 @@ kopiert.
 | `telemetry_pseudonym_key` | erzeugt, mindestens 32 Byte | server, collector | `telemetry.pseudonym_key_ref`, `hmac_key` der Allowlist |
 | `audit_ip_kek` | erzeugt, 32 Byte | server | `privacy.audit_ip_kek_ref`: verschlüsselt die IP-Schlüssel in `audit_ip_keys` |
 | `file_ticket_key` | erzeugt, 32 Byte | server | `file.ticket_key_ref`: HMAC der Abruf-Tickets ([12-dateien.md](../spec/12-dateien.md) 9.2) |
+| `webhook_hmac_master_key` | erzeugt, 32 Byte | server | `webhook.hmac_master_key_ref`: master key of the derived webhook secrets ([webhooks.md](../api/webhooks.md) 2.1) |
 | `pgbackrest_cipher_pass` | erzeugt | backup | Verschlüsselung der pgBackRest-Repositorys |
 | `pgbackrest_tls/` | erzeugt (eigene CA) | postgres, backup | gegenseitiges TLS zwischen Datenbank und Repository-Host: `ca.crt`, `postgres.crt` and `postgres.key`, `backup.crt` and `backup.key` (ECDSA P-256, valid for `stack.PGBackRestTLSValidity`; the CA key is not kept) |
 | `restic_password` | erzeugt | backup | Verschlüsselung des restic-Repositorys |
@@ -903,7 +907,8 @@ Erzeuger späterer Etappen: die erzeugte Form von
 `s3_access_key` und `s3_secret_key` (Profil s3, M3). Bis dahin meldet `bothy secrets init` diese
 Einträge als `pending`, solange weder Ablage noch Quelle sie enthält; `s3_*` gelten so lange als
 geliefert. Erzeugt werden Passwörter als 32 Zufallsbyte in base64url ohne Auffüllung (43 Zeichen)
-und Schlüssel (`token_pepper`, `totp_key`, `telemetry_pseudonym_key`, `audit_ip_kek`, `file_ticket_key`) als
+und Schlüssel (`token_pepper`, `totp_key`, `telemetry_pseudonym_key`, `audit_ip_kek`, `file_ticket_key`,
+`webhook_hmac_master_key`) als
 32 Zufallsbyte in Hex-Kleinschreibung (64 Zeichen); Nutzer, die rohe Schlüsselbytes brauchen,
 dekodieren den Hex-Text.
 

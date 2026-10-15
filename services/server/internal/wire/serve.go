@@ -802,21 +802,43 @@ func (s *server) startTerminal(context.Context) error {
 	return nil
 }
 
-// startApps is start step 6h (M2-24): the module apps over the pool, the unit of work, rights hook
-// and recorder of the audit step, the Authorizer and identity.
-func (s *server) startApps(context.Context) error {
+// startApps is start step 6h (M2-24, M2-26): the module apps over the pool, the unit of work,
+// rights hook and recorder of the audit step, the Authorizer and identity, with the outgoing
+// webhooks over the egress configuration, the master key of the v1 secrets (resolved once, so a
+// missing or malformed key ends the start), the instance row and the log reader of sync. The
+// signing keys and the job runtime start later and are bound then (BindKeys, BindJobs).
+func (s *server) startApps(ctx context.Context) error {
 	cfg, err := AppsConfig(s.values)
 	if err != nil {
 		return err
 	}
-	s.mu.Lock()
-	pool, a, az, admin, id := s.pool, s.audit, s.authorizer, s.authzAdmin, s.identity
-	s.mu.Unlock()
-	if a == nil || az == nil || admin == nil || id == nil {
-		return errors.New("wire: the apps step needs the audit step, the Authorizer, the authz Admin and identity")
+	wcfg, masterRef, err := WebhooksConfig(s.values)
+	if err != nil {
+		return err
 	}
+	eg, err := EgressConfig(s.values)
+	if err != nil {
+		return err
+	}
+	sender, err := NewWebhookSender(eg, wcfg, egress.Deps{Logger: s.logger()})
+	if err != nil {
+		return err
+	}
+	master := NewHMACMasterKey(s.sp, masterRef)
+	if err := master.Check(ctx); err != nil {
+		return err
+	}
+	s.mu.Lock()
+	pool, a, az, admin, id, sy := s.pool, s.audit, s.authorizer, s.authzAdmin, s.identity, s.sync
+	s.mu.Unlock()
+	if a == nil || az == nil || admin == nil || id == nil || sy == nil {
+		return errors.New("wire: the apps step needs the audit step, sync, the Authorizer, the authz Admin and identity")
+	}
+	state := instanceapp.NewState(instancepg.NewRepository(pool), a.UoW())
 	ap, err := NewApps(cfg, pool, AppsDeps{UoW: a.UoW(), Rights: a.RightsHook(), Authorizer: az, Audit: a.Recorder(), Identity: id,
-		Grants: admin.Admin, Clock: s.deps.Clock})
+		Grants: admin.Admin, Clock: s.deps.Clock, Webhooks: WebhookDeps{
+			Config: wcfg, State: state, Log: sy.LogReader(), Master: master, Sender: sender, Logger: s.logger(),
+		}})
 	if err != nil {
 		return err
 	}
@@ -1126,9 +1148,9 @@ func (s *server) startSync(context.Context) error {
 // (startConsumers) with the production handlers or those of Deps.ConsumerHandlers.
 func (s *server) startEventConsumers(ctx context.Context) error {
 	s.mu.Lock()
-	sy := s.sync
+	sy, ap := s.sync, s.apps
 	s.mu.Unlock()
-	handlers := consumerHandlers()
+	handlers := consumerHandlers(ap)
 	if s.deps.ConsumerHandlers != nil {
 		handlers = s.deps.ConsumerHandlers
 	}
@@ -1148,10 +1170,13 @@ func (s *server) startLogTail(ctx context.Context) error {
 // on its own ends the process.
 func (s *server) startJobs(ctx context.Context) error {
 	s.mu.Lock()
-	pool, sy, a, keys, keyCheck, id := s.pool, s.sync, s.audit, s.signingKeys, s.keyCheck, s.identity
+	pool, sy, a, keys, keyCheck, id, ap := s.pool, s.sync, s.audit, s.signingKeys, s.keyCheck, s.identity, s.apps
 	s.mu.Unlock()
 	if err := jobs.ValidateMigrations(ctx, pool, s.jobsCfg.Schema); err != nil {
 		return err
+	}
+	if ap == nil {
+		return errors.New("wire: the jobs step needs the apps step")
 	}
 	if keys == nil {
 		return errors.New("wire: the jobs step needs the signing keys step")
@@ -1177,6 +1202,7 @@ func (s *server) startJobs(ctx context.Context) error {
 		KeyRotation: keys.Keys, KeyRotationInterval: keyCheck,
 		AuthCleanup: id.AuthCleanup, AuthCleanupInterval: id.cfg.CleanupInterval,
 		ChainVerify: a.Log(), ChainVerifyInterval: a.cfg.CheckpointInterval,
+		Deliveries: ap.Webhooks,
 	})
 	if err != nil {
 		return err
@@ -1185,6 +1211,7 @@ func (s *server) startJobs(ctx context.Context) error {
 	if err != nil {
 		return err
 	}
+	ap.BindJobs(rt.Inserter())
 	s.mu.Lock()
 	s.jobsRT = rt
 	s.mu.Unlock()

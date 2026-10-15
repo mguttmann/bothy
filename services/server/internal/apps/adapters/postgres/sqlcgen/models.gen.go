@@ -678,3 +678,35 @@ type UserSpaceState struct {
 	UpdatedByDeviceID pgtype.UUID
 	UpdatedAt         pgtype.Timestamptz
 }
+
+type WebhookDelivery struct {
+	ID             pgtype.UUID
+	SubscriptionID pgtype.UUID
+	EventSeq       int64
+	EventID        pgtype.UUID
+	Attempt        int32
+	Status         string
+	ResponseCode   pgtype.Int2
+	LastError      pgtype.Text
+	NextAttemptAt  pgtype.Timestamptz
+	CreatedAt      pgtype.Timestamptz
+	DeliveredAt    pgtype.Timestamptz
+}
+
+type WebhookSubscription struct {
+	ID                  pgtype.UUID
+	AppInstallationID   pgtype.UUID
+	AgentID             pgtype.UUID
+	Url                 string
+	EventTypes          []string
+	SigningKeyKid       string
+	HmacEnabled         bool
+	HmacGeneration      int32
+	HmacRotatedAt       pgtype.Timestamptz
+	State               string
+	ConsecutiveFailures int32
+	LastDeliveredSeq    int64
+	CreatedBy           pgtype.UUID
+	CreatedAt           pgtype.Timestamptz
+	DisabledAt          pgtype.Timestamptz
+}

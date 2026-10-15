@@ -34,9 +34,18 @@ func eventScope(t string) (string, bool) {
 func testEnv() domain.Env {
 	return domain.Env{
 		MaxBytes: 65536, HandleMaxChars: 32, DisplayNameMaxChars: 64, MaxCommands: 3, CommandDescriptionMaxChars: 100,
-		SpecVersion: "1.4.2", AllowedHosts: []string{"bridge.example.com", "Hooks.Example.com"},
+		SpecVersion: "1.4.2", AllowedHosts: mustHosts("bridge.example.com", "Hooks.Example.com"),
 		KnownScope: func(s string) bool { return slices.Contains(catalogueScopes, s) }, EventScope: eventScope,
 	}
+}
+
+// mustHosts parses entries of webhook.allowed_hosts for the tests.
+func mustHosts(entries ...string) []domain.AllowedHost {
+	h, err := domain.ParseAllowedHosts(entries)
+	if err != nil {
+		panic(err)
+	}
+	return h
 }
 
 // exampleManifest is the example of 11 section 3.3 as M2-24 changed it, as a JSON object.
@@ -159,6 +168,8 @@ func TestValidateManifest_Rules(t *testing.T) {
 			mutate: func(m map[string]any) { at(m, "delivery")["events_url"] = "https://alex@bridge.example.com/e" }},
 		{name: "host not allowed", pointer: "/delivery/events_url", code: "webhook_host_not_allowed", value: "hooks.other.example.com",
 			mutate: func(m map[string]any) { at(m, "delivery")["events_url"] = "https://hooks.other.example.com/e" }},
+		{name: "listed host with an unlisted port", pointer: "/delivery/events_url", code: "webhook_host_not_allowed",
+			mutate: func(m map[string]any) { at(m, "delivery")["events_url"] = "https://bridge.example.com:8443/e" }},
 		{name: "homepage_url with http", pointer: "/homepage_url", code: "invalid", value: "http://bridge.example.com",
 			mutate: func(m map[string]any) { m["homepage_url"] = "http://bridge.example.com" }},
 		{name: "requested grant with manage", pointer: "/requested_grants/0/capabilities/0", code: "invalid",

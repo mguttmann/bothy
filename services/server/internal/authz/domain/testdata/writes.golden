@@ -146,3 +146,4 @@ webhook_in.post
 webhook_in.revoke
 webhook_out.manage
 webhook_out.redeliver
+webhook_out.transition

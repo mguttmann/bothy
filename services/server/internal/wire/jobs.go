@@ -9,6 +9,7 @@ import (
 	"io/fs"
 	"time"
 
+	appsjobs "github.com/OWNER/bothy/services/server/internal/apps/adapters/jobs"
 	auditjobs "github.com/OWNER/bothy/services/server/internal/audit/adapters/jobs"
 	authzjobs "github.com/OWNER/bothy/services/server/internal/authz/adapters/jobs"
 	identityjobs "github.com/OWNER/bothy/services/server/internal/identity/adapters/jobs"
@@ -67,8 +68,8 @@ func JobRole(r Role) jobs.Role {
 
 // JobModules are the module objects whose jobs the job registry takes: the partition maintenance
 // (M1-16) and the idempotency key cleanup (M1-20) of sync, the expiry jobs of authz (M1-30), the
-// rotation of the signing keys of instance (M1-32), the cleanup of identity (M1-35) and the chain
-// verification of audit (M1-50). The use cases may be nil where no job runs
+// rotation of the signing keys of instance (M1-32), the cleanup of identity (M1-35), the chain
+// verification of audit (M1-50) and the webhook delivery of apps (M2-26). The use cases may be nil where no job runs
 // (tests of the registration); a worker always passes them.
 type JobModules struct {
 	// Partitions is the use case of sync.partition_maintenance.
@@ -95,13 +96,16 @@ type JobModules struct {
 	ChainVerify auditjobs.Verifier
 	// ChainVerifyInterval is audit.checkpoint_interval.
 	ChainVerifyInterval time.Duration
+	// Deliveries is the use case of apps.webhook_deliver (M2-26).
+	Deliveries appsjobs.Deliverer
 }
 
 // NewJobRegistry returns the job registry of a process: every role (api, worker, all) builds
 // the same one here, so an api process accepts exactly the kinds a worker runs. It registers
 // sync.partition_maintenance (M1-16), sync.idempotency_cleanup (M1-20), authz.expiry_sweep and
 // authz.expiry_reminder (M1-30), instance.key_rotation (M1-32), identity.auth_cleanup (M1-35) and
-// audit.chain_verify (M1-50); the error is the first rejected registration.
+// audit.chain_verify (M1-50) and apps.webhook_deliver on the queue delivery (M2-26); the error is
+// the first rejected registration.
 func NewJobRegistry(m *JobModules) (*jobs.Registry, error) {
 	if m == nil {
 		return nil, errors.New("wire: NewJobRegistry needs the job modules")
@@ -123,6 +127,9 @@ func NewJobRegistry(m *JobModules) (*jobs.Registry, error) {
 		return nil, err
 	}
 	if err := auditjobs.Register(reg, m.ChainVerify, m.ChainVerifyInterval); err != nil {
+		return nil, err
+	}
+	if err := appsjobs.Register(reg, m.Deliveries); err != nil {
 		return nil, err
 	}
 	return reg, nil

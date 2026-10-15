@@ -417,6 +417,8 @@ const (
 	ActionWebhookOutRead Action = "webhook_out.read"
 	// ActionWebhookOutRedeliver is the action webhook_out.redeliver.
 	ActionWebhookOutRedeliver Action = "webhook_out.redeliver"
+	// ActionWebhookOutTransition is the action webhook_out.transition.
+	ActionWebhookOutTransition Action = "webhook_out.transition"
 )
 
 // actionByID maps every id to its constant.
@@ -623,6 +625,7 @@ var actionByID = map[string]Action{
 	"webhook_out.manage":           ActionWebhookOutManage,
 	"webhook_out.read":             ActionWebhookOutRead,
 	"webhook_out.redeliver":        ActionWebhookOutRedeliver,
+	"webhook_out.transition":       ActionWebhookOutTransition,
 }
 
 // actionList holds every constant, sorted ascending.
@@ -829,6 +832,7 @@ var actionList = []Action{
 	ActionWebhookOutManage,
 	ActionWebhookOutRead,
 	ActionWebhookOutRedeliver,
+	ActionWebhookOutTransition,
 }
 
 // ParseAction returns the action named s; ok is false when the catalogue has no such action.
