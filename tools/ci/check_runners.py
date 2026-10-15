@@ -22,6 +22,9 @@ only runs for release tags. Every finding names a rule:
   unpinned-action               `uses:` not pinned to a full commit SHA (or image digest)
   missing-timeout               a job without timeout-minutes (reusable calls excepted)
   runner-without-switch         a runner chosen outside the rules above
+
+A public-only or release job may also name its runner as `${{ matrix.<key> }}` when every
+value of that matrix key is a GitHub-hosted label (native builds per architecture).
 """
 
 from __future__ import annotations
@@ -51,6 +54,7 @@ _SWITCH = re.compile(
     r"\|\|\s*'(?:ubuntu|macos)-[0-9a-z.]+(?:-arm)?'\s*\}\}$"
 )
 _HOSTED_LABEL = re.compile(rf"^{_HOSTED}$")
+_MATRIX_RUNNER = re.compile(r"^\$\{\{\s*matrix\.([A-Za-z0-9_-]+)\s*\}\}$")
 _PINNED = re.compile(r"^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+(?:/[^@\s]+)?@[0-9a-f]{40}$")
 _DOCKER_PINNED = re.compile(r"^docker://[^@\s]+@sha256:[0-9a-f]{64}$")
 
@@ -168,9 +172,30 @@ def _check_job(
     runs_on = _runs_on_text(job.get("runs-on", ""))
     if _SWITCH.match(runs_on):
         return
-    if _HOSTED_LABEL.match(runs_on) and (guarded or file in RELEASE_WORKFLOWS):
+    hosted = _HOSTED_LABEL.match(runs_on) is not None or _hosted_matrix(job, runs_on)
+    if hosted and (guarded or file in RELEASE_WORKFLOWS):
         return
     out.append(Finding(file, where, "runner-without-switch", runs_on))
+
+
+def _hosted_matrix(job: dict[str, Any], runs_on: str) -> bool:
+    """Return whether `runs_on` is `${{ matrix.<key> }}` over GitHub-hosted labels only.
+
+    A job that builds natively per architecture (one runner per platform, B12) names its runner
+    through the matrix; it counts as a hosted runner when every value of that matrix key is a
+    hosted label, so the same rules as for a written-out label apply.
+    """
+    m = _MATRIX_RUNNER.match(runs_on)
+    if m is None:
+        return False
+    strategy = job.get("strategy")
+    matrix = strategy.get("matrix") if isinstance(strategy, dict) else None
+    values = matrix.get(m.group(1)) if isinstance(matrix, dict) else None
+    return (
+        isinstance(values, list)
+        and bool(values)
+        and all(isinstance(v, str) and _HOSTED_LABEL.match(v) for v in values)
+    )
 
 
 def check_workflow(file: str, text: str) -> list[Finding]:

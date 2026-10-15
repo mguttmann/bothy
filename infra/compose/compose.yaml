@@ -94,8 +94,11 @@ services:
   # ./secrets und legt je Dienst ein Unterverzeichnis an (nur Lesen für den Dienst).
   secrets-init:
     image: ${BOTHY_REGISTRY}/bothy-server:${BOTHY_VERSION}
+    # postgres and backup run as the user postgres of bothy-postgres (999); pgBackRest accepts
+    # TLS keys only when no other user can read them.
     command: ["secrets", "init", "--source", "/input", "--target", "/run/bothy/secrets",
-              "--owner", "server=65532:65532", "--owner", "migrate=65532:65532"]
+              "--owner", "server=65532:65532", "--owner", "migrate=65532:65532",
+              "--owner", "postgres=999:999", "--owner", "backup=999:999"]
     user: "0:0"
     restart: "no"
     network_mode: none
@@ -251,6 +254,7 @@ services:
     restart: unless-stopped
     logging: *logging
     environment:
+      BOTHY_PGBACKREST_PG_HOST: postgres
       BOTHY_BACKUP__OFFSITE__TARGET: ${BOTHY_BACKUP_OFFSITE_TARGET:-}
       BOTHY_FILE__STORAGE__DRIVER: ${BOTHY_STORAGE_DRIVER:-fs}
       OTEL_EXPORTER_OTLP_ENDPOINT: http://otel-collector:4317
@@ -267,6 +271,13 @@ services:
         volume:
           subpath: backup
     networks: [internal, default]
+    # TLS handshake with the pgBackRest server of the repository host (bothy-backupd healthcheck).
+    healthcheck:
+      test: ["CMD", "bothy-backupd", "healthcheck"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 30s
     depends_on:
       postgres:
         condition: service_healthy

@@ -83,6 +83,20 @@ documented in this file. The format is based on
   one Argon2id computation. The credential overview fills `local_password_set` and
   `totp_enrolled`.
 
+- Image `bothy-postgres` (M7-01): `postgres:18` pinned by digest plus pgBackRest 2.59.3 from the
+  PostgreSQL project's Debian repository (key checked by fingerprint, a version below 2.59.3 fails
+  the build and the start) and `bothy-backupd`, built for linux/amd64 and linux/arm64 without
+  emulation (`make postgres-image`). The service `postgres` archives WAL with `archive-push` over
+  pgBackRest TLS to the repository host `backup` and has no egress; `backup` holds the encrypted
+  repository. `make postgres-image-test` proves archive-push, a full backup, a point-in-time
+  restore and `pgbackrest verify` with two containers; the CI job `postgres-image` runs it on both
+  architectures.
+- `bothy-backupd` (M7-01): a second program of the server module that supervises the pgBackRest
+  TLS server of the repository host, creates the stanza on its first start, stops on `SIGTERM`,
+  and offers `healthcheck` (TLS handshake with the stack's CA) and `version`.
+- `bothy secrets init` generates `pgbackrest_tls/` (M7-01): an own CA and ECDSA P-256 certificates
+  for `postgres` and `backup`, copied only to those two services; the CA key is not kept.
+
 - Operators with invariant I1 (M1-54): `setSpaceOperator` and `setChannelOperator` (owner,
   step-up, If-Match, audited) set the default operator of a space (none or an agent) and the
   operator of a channel (inherit, none or an agent). Every change is a rights change: it raises

@@ -208,6 +208,38 @@ def test_public_only_job_may_use_hosted_runner() -> None:
     assert check(text) == []
 
 
+def matrix_job(runners: str, condition: str = GUARD) -> str:
+    """A job that picks its runner from a matrix (the native build per architecture)."""
+    guard = f"    if: {condition}\n" if condition else ""
+    return ok_job().replace(
+        f"    runs-on: {SWITCH}\n",
+        f"{guard}    strategy:\n      matrix:\n        runner: {runners}\n"
+        "    runs-on: ${{ matrix.runner }}\n",
+    )
+
+
+def test_public_only_matrix_of_hosted_runners() -> None:
+    assert check(matrix_job("[ubuntu-24.04, ubuntu-24.04-arm]")) == []
+
+
+@pytest.mark.parametrize(
+    "runners", ["[ubuntu-24.04, self-hosted]", "[]", "ubuntu-24.04", "[ubuntu-24.04, 3]"]
+)
+def test_matrix_runner_values_must_be_hosted_labels(runners: str) -> None:
+    assert check(matrix_job(runners)) == ["runner-without-switch"]
+
+
+def test_matrix_of_hosted_runners_needs_the_public_guard() -> None:
+    assert check(matrix_job("[ubuntu-24.04, ubuntu-24.04-arm]", condition="")) == [
+        "runner-without-switch"
+    ]
+
+
+def test_matrix_runner_key_must_exist() -> None:
+    text = matrix_job("[ubuntu-24.04]").replace("matrix.runner }}", "matrix.other }}")
+    assert check(text) == ["runner-without-switch"]
+
+
 def test_public_guard_must_not_be_weakened() -> None:
     weak = f"{GUARD} || true"
     text = ok_job().replace(

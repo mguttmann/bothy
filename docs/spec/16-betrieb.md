@@ -39,6 +39,13 @@ in Abschnitt 14 und gesammelt in der [Konfigurationsreferenz](../operations/conf
 eigenes Image ist nötig, weil `archive_command` im Datenbank-Container läuft (Abschnitt 8.2).
 Beide Bothy-Images entstehen in der Release-Kette aus [18-release.md](18-release.md).
 
+As built (M7-01, [image README](../../services/server/images/bothy-postgres/README.md)): the image
+runs both roles as the user `postgres` of the base image (uid and gid `999`); its entry point
+writes the pgBackRest configuration of the role. Besides PostgreSQL, the container `postgres` runs
+a pgBackRest TLS server through which the repository host `backup` runs its backups; `backup`
+runs `bothy-backupd`, which supervises the TLS server of the repository and creates the stanza
+`bothy` on its first start.
+
 Die Compose-Datei [infra/compose/compose.yaml](../../infra/compose/compose.yaml) ist die
 Referenz dieser Bausteine. Profile schalten optionale Teile zu: `direct` oder `tailscale` (Rand),
 `scan`, `s3`, `observability`.
@@ -280,9 +287,11 @@ brauchen neue Schlüssel ohne Handgriff auf dem Host.
    `0500` und Dateien `0400` mit diesem Besitzer; `server` und `migrate` brauchen ihn, weil der
    Datei-Treiber nur eigene Dateien mit `0400` oder `0600` liest (SEC-SEC-1). Das Image
    `bothy-server` läuft als uid und gid `65532` ([18-release.md](18-release.md), Abschnitt 7).
-   Fremddienste ohne `--owner` (Datenbank, Sicherung, Collector) bekommen Kopien im Besitz von
-   root mit Verzeichnis `0755` und Dateien `0444`, weil ihre Images eigene Benutzer haben; jeder
-   sieht trotzdem nur sein Unterverzeichnis.
+   `postgres` and `backup` get the owner `999:999`, the user `postgres` of `bothy-postgres`,
+   because pgBackRest refuses TLS keys that another user can read (M7-01). Third-party services
+   without `--owner` (collector and the others) get copies owned by root with directory `0755`
+   and files `0444`, because their images have their own users; each one still sees only its
+   own subdirectory.
 5. `secrets-init` gibt am Ende die Fingerabdrücke aus, nie die Werte, und erinnert an die
    Hinterlegung (5.4). Katalogeinträge, deren Erzeuger eine spätere Etappe baut, meldet es als
    `pending` (Konfigurationsreferenz, Abschnitt "Geheimnisse"). Je Eintrag steht eine Zeile
@@ -455,7 +464,9 @@ Begründungen:
 
 1. `postgres` schiebt jedes WAL-Segment mit `archive-push` über das TLS-Protokoll von pgBackRest
    an den Repository-Host `backup`. Der Datenbank-Container braucht dafür keinen Ausgang und
-   keine Zugangsdaten des Off-site-Ziels.
+   keine Zugangsdaten des Off-site-Ziels. Both sides authenticate with certificates of the
+   stack's own CA (`pgbackrest_tls/`) and accept only the peer's name; the repository is
+   encrypted with `pgbackrest_cipher_pass`, which only `backup` holds.
 2. `bothy-backupd` startet Voll- und Differenzsicherungen, `pg_dump`, die Objektsicherung und
    `expire` nach Plan. Jeder Lauf schreibt ein Manifest: Zeilenzahl je Tabelle, `head_seq` des
    Ereignis-Logs, letzter `seq` und `hash` des Audit-Logs, Schema-Version, Server-Version, Zahl

@@ -866,7 +866,7 @@ kopiert.
 | `audit_ip_kek` | erzeugt, 32 Byte | server | `privacy.audit_ip_kek_ref`: verschlüsselt die IP-Schlüssel in `audit_ip_keys` |
 | `file_ticket_key` | erzeugt, 32 Byte | server | `file.ticket_key_ref`: HMAC der Abruf-Tickets ([12-dateien.md](../spec/12-dateien.md) 9.2) |
 | `pgbackrest_cipher_pass` | erzeugt | backup | Verschlüsselung der pgBackRest-Repositorys |
-| `pgbackrest_tls/` | erzeugt (eigene CA) | postgres, backup | gegenseitiges TLS zwischen Datenbank und Repository-Host |
+| `pgbackrest_tls/` | erzeugt (eigene CA) | postgres, backup | gegenseitiges TLS zwischen Datenbank und Repository-Host: `ca.crt`, `postgres.crt` and `postgres.key`, `backup.crt` and `backup.key` (ECDSA P-256, valid for `stack.PGBackRestTLSValidity`; the CA key is not kept) |
 | `restic_password` | erzeugt | backup | Verschlüsselung des restic-Repositorys |
 | `s3_access_key`, `s3_secret_key` | erzeugt (Profil s3) oder geliefert (externer Dienst) | server, seaweedfs, backup | S3-Zugang, `file.s3.access_key_ref` und `file.s3.secret_key_ref` |
 | `grafana_admin_password` | erzeugt | grafana | Admin-Konto im lokalen Grafana |
@@ -890,13 +890,21 @@ Volume `signing-keys` (`secrets.signing_key_dir`, ADR 0066); `server_signing_key
 zeigt dorthin. `bothy secrets export` sichert beide Orte; den Schlüsselspeicher nimmt es mit M1-32
 auf, das die Signierschlüssel erzeugt.
 
-Erzeuger späterer Etappen: `pgbackrest_tls/` (M7-01) und die erzeugte Form von
+Erzeuger späterer Etappen: die erzeugte Form von
 `s3_access_key` und `s3_secret_key` (Profil s3, M3). Bis dahin meldet `bothy secrets init` diese
 Einträge als `pending`, solange weder Ablage noch Quelle sie enthält; `s3_*` gelten so lange als
 geliefert. Erzeugt werden Passwörter als 32 Zufallsbyte in base64url ohne Auffüllung (43 Zeichen)
 und Schlüssel (`token_pepper`, `totp_key`, `telemetry_pseudonym_key`, `audit_ip_kek`, `file_ticket_key`) als
 32 Zufallsbyte in Hex-Kleinschreibung (64 Zeichen); Nutzer, die rohe Schlüsselbytes brauchen,
 dekodieren den Hex-Text.
+
+`pgbackrest_tls/` (M7-01) is generated as a directory: a self-signed CA that may sign only leaf
+certificates, and one certificate per pgBackRest host (`postgres`, `backup`) with the host name as
+common name and DNS name and both TLS server and client use. The CA key exists only during the
+run, so no service can issue further certificates; a rotation removes the directory from `_store`
+and runs `secrets init` again, then restarts `postgres` and `backup`. Compose runs `secrets-init`
+with `--owner postgres=999:999 --owner backup=999:999`, because pgBackRest reads keys only with
+mode `0600` or stricter.
 
 ## 6. Instanz-Einstellungen
 
@@ -999,6 +1007,16 @@ Diese Variablen sind keine Server-Konfiguration; Compose setzt daraus Werte der 
 | `BOTHY_CLAMAV_MEMORY_LIMIT` | `4g` | Speichergrenze des ClamAV-Containers |
 | `BOTHY_LOG_MAX_SIZE` | `20m` | Größe einer Container-Logdatei bis zur Rotation |
 | `BOTHY_LOG_MAX_FILE` | `5` | behaltene Container-Logdateien je Dienst |
+
+Variables of the image `bothy-postgres` (M7-01) that `infra/compose/compose.yaml` sets itself,
+not through `.env`; only the entry point of the image reads them
+([image README](../../services/server/images/bothy-postgres/README.md)):
+
+| Variable | Service | Meaning |
+|---|---|---|
+| `BOTHY_PGBACKREST_REPO_HOST` | postgres | host name of the pgBackRest repository host (`backup`); required |
+| `BOTHY_PG_ARCHIVE_TIMEOUT` | postgres | `archive_timeout` of PostgreSQL, from the row above; required |
+| `BOTHY_PGBACKREST_PG_HOST` | backup | host name of the database host (`postgres`); required |
 
 ## 10. Pflege
 

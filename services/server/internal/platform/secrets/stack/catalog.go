@@ -30,6 +30,9 @@ const (
 	// GeneratorKey is 32 random bytes as lowercase hex (64 ASCII characters); consumers that need
 	// raw key bytes hex-decode it, and the collector's HMAC key gets at least 32 bytes either way.
 	GeneratorKey Generator = "key"
+	// GeneratorPGBackRestTLS creates the directory entry pgbackrest_tls/: an own CA and one ECDSA
+	// P-256 key pair per pgBackRest host, valid for PGBackRestTLSValidity (pgbackrest_tls.go).
+	GeneratorPGBackRestTLS Generator = "pgbackrest-tls"
 	// GeneratorPending marks an entry whose generator a later ticket builds (Entry.PendingOn);
 	// secrets init reports it as pending until then instead of inventing a format.
 	GeneratorPending Generator = "pending"
@@ -85,8 +88,8 @@ var catalog = []Entry{
 	{Name: "audit_ip_kek", Origin: OriginGenerated, Generator: GeneratorKey, Services: []string{serviceServer}},
 	{Name: "file_ticket_key", Origin: OriginGenerated, Generator: GeneratorKey, Services: []string{serviceServer}},
 	{Name: "pgbackrest_cipher_pass", Origin: OriginGenerated, Generator: GeneratorToken, Services: []string{serviceBackup}},
-	// The own CA for mutual TLS between database and repository host comes with M7-01.
-	{Name: "pgbackrest_tls/", Origin: OriginGenerated, Generator: GeneratorPending, PendingOn: "M7-01", Services: []string{servicePostgres, serviceBackup}},
+	// The own CA for mutual TLS between database and repository host (brief M7-01).
+	{Name: "pgbackrest_tls/", Origin: OriginGenerated, Generator: GeneratorPGBackRestTLS, Services: []string{servicePostgres, serviceBackup}},
 	{Name: "restic_password", Origin: OriginGenerated, Generator: GeneratorToken, Services: []string{serviceBackup}},
 	// Generated only with the s3 profile, whose generator M3 builds; until then supplied.
 	{Name: "s3_access_key", Origin: OriginSupplied, Generator: GeneratorPending, PendingOn: "M3", Services: []string{serviceServer, serviceSeaweedfs, serviceBackup}},

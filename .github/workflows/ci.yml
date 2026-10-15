@@ -224,9 +224,42 @@ jobs:
           SONAR_PROJECT_KEY: ${{ vars.SONAR_PROJECT_KEY }}
         run: make sonar COMPONENTS="$COMPONENTS" SONAR_HOST_URL="${SONAR_HOST_URL:-http://127.0.0.1:9000}" SONAR_ORGANIZATION="$SONAR_ORGANIZATION" SONAR_PROJECT_KEY="${SONAR_PROJECT_KEY:-bothy}"
 
+  # bothy-postgres built natively on each architecture and proven with its two-container test
+  # (brief M7-01, 18 "Server-Images" rule 2): no QEMU, because no build step runs on the target
+  # platform and each runner tests its own. Only when the component server changed; public phase
+  # only, because the arm64 runner is GitHub-hosted (ADR 0039).
+  postgres-image:
+    name: postgres-image (${{ matrix.runner }})
+    needs: plan
+    if: >-
+      (github.event.repository.visibility == 'public' || (github.event_name == 'schedule' && vars.BOTHY_VISIBILITY == 'public'))
+      && (needs.plan.outputs.components == 'all' || contains(format(' {0} ', needs.plan.outputs.components), ' server '))
+    strategy:
+      fail-fast: false
+      matrix:
+        runner: [ubuntu-24.04, ubuntu-24.04-arm]
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: astral-sh/setup-uv@1c37ad07a6a961277cf70c0d37d6f313000f5884 # v10.3.0
+        with:
+          enable-cache: true
+          cache-dependency-glob: tools/uv.lock
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version-file: services/server/go.mod
+          cache-dependency-path: services/server/go.sum
+      # A docker-container builder writes the multi-platform OCI archive; it emulates nothing.
+      - uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
+      - name: make postgres-image postgres-image-test
+        run: make postgres-image postgres-image-test
+
   ci-ok:
     name: ci-ok
-    needs: [plan, gates, denylist, denylist-fork, sonar]
+    needs: [plan, gates, denylist, denylist-fork, sonar, postgres-image]
     if: always()
     runs-on: ${{ github.event.repository.private && fromJSON('["self-hosted","bothy-ci"]') || 'ubuntu-24.04' }}
     timeout-minutes: 5
@@ -238,12 +271,15 @@ jobs:
           DENY: ${{ needs.denylist.result }}
           DENY_FORK: ${{ needs.denylist-fork.result }}
           SONAR: ${{ needs.sonar.result }}
+          POSTGRES_IMAGE: ${{ needs.postgres-image.result }}
         # Explicit checks: a failing test inside an && list would not stop `bash -e`.
         run: |
-          echo "plan=$PLAN gates=$GATES denylist=$DENY denylist-fork=$DENY_FORK sonar=$SONAR"
+          echo "plan=$PLAN gates=$GATES denylist=$DENY denylist-fork=$DENY_FORK sonar=$SONAR postgres-image=$POSTGRES_IMAGE"
           fail=0
           if [ "$PLAN" != success ]; then fail=1; fi
           if [ "$GATES" != success ]; then fail=1; fi
           if [ "$DENY" != success ] && [ "$DENY_FORK" != success ]; then fail=1; fi
           case "$SONAR" in success|skipped) ;; *) fail=1 ;; esac
+          # Skipped when the component server did not change (job postgres-image).
+          case "$POSTGRES_IMAGE" in success|skipped) ;; *) fail=1 ;; esac
           exit "$fail"
