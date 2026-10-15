@@ -529,16 +529,94 @@ func (k *Keys) Signer(ctx context.Context, p instance.Purpose) (instance.Signer,
 	if !found {
 		return nil, errs.New(errs.CodeUnavailable, "No active signing key; the server creates one at start.")
 	}
+	return k.signerOf(ctx, row)
+}
+
+// signerOf loads the private key of row and checks that it belongs to the public key of the row.
+func (k *Keys) signerOf(ctx context.Context, row KeyRow) (instance.Signer, error) {
 	priv, err := k.d.Store.Load(ctx, row.Ref)
 	if err == nil && !priv.Public().Equal(row.Public) {
 		err = errors.New("instance: the key file does not belong to the public key of the row")
 	}
 	if err != nil {
-		k.d.Log.ErrorContext(ctx, msgKeyLoadFailed, slog.String(keyLogPurpose, string(p)), slog.String(keyLogKID, row.KID),
+		k.d.Log.ErrorContext(ctx, msgKeyLoadFailed, slog.String(keyLogPurpose, string(row.Purpose)), slog.String(keyLogKID, row.KID),
 			slog.String(keyLogErrorType, "keystore"))
 		return nil, errs.Wrap(errs.CodeUnavailable, err, "The signing key cannot be read.")
 	}
 	return signer{kid: row.KID, key: priv}, nil
+}
+
+// Signers returns the signing set of p, read fresh (instance.Keys): the active key, then every
+// retiring key whose not_after lies after now in kid order (webhooks.md section 2.1 point 2). With
+// the promotion rule of the rotation (not_after is the time of the promotion) the set is the active
+// key alone; the rule stays general so a later signing window needs no change in the callers.
+func (k *Keys) Signers(ctx context.Context, p instance.Purpose) ([]instance.Signer, error) {
+	active, err := k.Signer(ctx, p)
+	if err != nil {
+		return nil, err
+	}
+	rows, err := k.d.Repo.ListKeys(ctx, p)
+	if err != nil {
+		return nil, err
+	}
+	now := k.d.Clock.Now()
+	rows = slices.DeleteFunc(rows, func(r KeyRow) bool { return r.State != instance.KeyRetiring || !r.NotAfter.After(now) })
+	slices.SortFunc(rows, func(a, b KeyRow) int { return strings.Compare(a.KID, b.KID) })
+	out := []instance.Signer{active}
+	for _, r := range rows {
+		s, err := k.signerOf(ctx, r)
+		if err != nil {
+			return nil, err
+		}
+		out = append(out, s)
+	}
+	return out, nil
+}
+
+// PublicKeys returns the next, active and retiring keys of p, read fresh, ordered by state
+// (active, next, retiring) and kid (instance.Keys), after authorizing instance.discovery.read for
+// the principal of ctx like JWKS.
+func (k *Keys) PublicKeys(ctx context.Context, p instance.Purpose) ([]instance.PublicKey, error) {
+	if !p.Valid() {
+		return nil, errs.New(errs.CodeInternalError, fmt.Sprintf("instance: unknown signing key purpose %q", p))
+	}
+	if err := k.authorizeDiscovery(ctx); err != nil {
+		return nil, err
+	}
+	rows, err := k.d.Repo.ListKeys(ctx, p)
+	if err != nil {
+		return nil, err
+	}
+	rows = slices.DeleteFunc(rows, func(r KeyRow) bool { _, published := publishedOrder[r.State]; return !published })
+	slices.SortFunc(rows, func(a, b KeyRow) int {
+		if c := publishedOrder[a.State] - publishedOrder[b.State]; c != 0 {
+			return c
+		}
+		return strings.Compare(a.KID, b.KID)
+	})
+	out := make([]instance.PublicKey, 0, len(rows))
+	for _, r := range rows {
+		out = append(out, publicKey(r))
+	}
+	return out, nil
+}
+
+// publishedOrder is the order of the published states in JWKS and getWebhookKeys.
+var publishedOrder = map[instance.KeyState]int{instance.KeyActive: 0, instance.KeyNext: 1, instance.KeyRetiring: 2}
+
+// authorizeDiscovery authorizes the public action instance.discovery.read for the principal of ctx
+// (anonymous when there is none), so the proof of the check holds for the public key routes (02
+// "Nachweis der Prüfung").
+func (k *Keys) authorizeDiscovery(ctx context.Context) error {
+	a, ok := actor.FromContext(ctx)
+	if !ok {
+		a = actor.Anonymous()
+	}
+	d, err := k.d.Authorizer.Authorize(ctx, a, authorize.ActionInstanceDiscoveryRead, authorize.Resource{Kind: authorize.ResourceInstance})
+	if err != nil {
+		return err
+	}
+	return d.Err()
 }
 
 // signer signs with one loaded key.
@@ -627,31 +705,22 @@ var jwksPurposes = []instance.Purpose{instance.PurposeAccessToken, instance.Purp
 // It authorizes instance.discovery.read for the principal of ctx (anonymous when there is none),
 // a public action, so the proof of the check holds for this route too (02 "Proof of the check").
 func (k *Keys) JWKS(ctx context.Context) (instance.JWKSet, error) {
-	a, ok := actor.FromContext(ctx)
-	if !ok {
-		a = actor.Anonymous()
-	}
-	d, err := k.d.Authorizer.Authorize(ctx, a, authorize.ActionInstanceDiscoveryRead, authorize.Resource{Kind: authorize.ResourceInstance})
-	if err != nil {
-		return instance.JWKSet{}, err
-	}
-	if err := d.Err(); err != nil {
+	if err := k.authorizeDiscovery(ctx); err != nil {
 		return instance.JWKSet{}, err
 	}
 	rows, err := k.d.Repo.PublishedKeys(ctx)
 	if err != nil {
 		return instance.JWKSet{}, err
 	}
-	stateOrder := map[instance.KeyState]int{instance.KeyActive: 0, instance.KeyNext: 1, instance.KeyRetiring: 2}
 	rows = slices.DeleteFunc(rows, func(r KeyRow) bool {
-		_, published := stateOrder[r.State]
+		_, published := publishedOrder[r.State]
 		return !published || !slices.Contains(jwksPurposes, r.Purpose)
 	})
 	slices.SortFunc(rows, func(a, b KeyRow) int {
 		if c := strings.Compare(string(a.Purpose), string(b.Purpose)); c != 0 {
 			return c
 		}
-		if c := stateOrder[a.State] - stateOrder[b.State]; c != 0 {
+		if c := publishedOrder[a.State] - publishedOrder[b.State]; c != 0 {
 			return c
 		}
 		return strings.Compare(a.KID, b.KID)

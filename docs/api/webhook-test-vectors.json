@@ -1,0 +1,106 @@
+{
+  "version": 1,
+  "derivation": [
+    {
+      "master_hex": "000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f",
+      "subscription_id": "0192f4a0-7b1c-7e12-8162-c8db90be34b1",
+      "generation": 0,
+      "derived_hex": "7443d9f6429821585592849ab3b728d38f44927e79441ccccdf82591ae5fe03e"
+    },
+    {
+      "master_hex": "000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f",
+      "subscription_id": "0192f4a0-7b1c-7e12-8162-c8db90be34b1",
+      "generation": 1,
+      "derived_hex": "151770dd233741c0bacb17e1d145f1d616529acde1e5361472fb6628ce69d060"
+    },
+    {
+      "master_hex": "000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f",
+      "subscription_id": "0192f4a0-7b1c-7e12-8162-c8db90be34b2",
+      "generation": 0,
+      "derived_hex": "cf8d3b4c777a4e37c634359da3d9ce700e8f4ed7956d8e1fb7ff8ce6a0cdb669"
+    }
+  ],
+  "signatures": [
+    {
+      "name": "one key and one secret",
+      "webhook_id": "0192f4a0-7b1c-757c-87c8-267db4b2c89f",
+      "timestamp": 1760346000,
+      "body": "{\"id\":\"0192f4a0-7b1c-757c-87c8-267db4b2c89f\",\"type\":\"message.created\"}",
+      "ed25519_seed_base64": [
+        "AQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQE="
+      ],
+      "public_key": [
+        "whpk_MCowBQYDK2VwAyEAiojj3XQJ8ZX9UtstPLpdcspnCb8dlBIb83SIAbQPb1w="
+      ],
+      "hmac_secrets": [
+        "whsec_EXAMPLEvect1"
+      ],
+      "signature_header": "v1a,8i3MCw6N8b8QyOZyyJh+TO4K9JNyraA0kpZVWbaHY2XjMvpcsfyr6xLk0bLRI5/fJXCDcU69ZpVuxO3sT6kOAQ== v1,eI9tv75s0VloSbMLtX8CZoLXLYQvTWdIIQOlQbm4ubw="
+    },
+    {
+      "name": "two v1a signers",
+      "webhook_id": "0192f4a0-7b1c-757c-87c8-267db4b2c89f",
+      "timestamp": 1760346001,
+      "body": "{\"id\":\"0192f4a0-7b1c-757c-87c8-267db4b2c89f\",\"type\":\"instance.updated\"}",
+      "ed25519_seed_base64": [
+        "AgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgI=",
+        "AwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwM="
+      ],
+      "public_key": [
+        "whpk_MCowBQYDK2VwAyEAgTl3Dqh9F19Wo1Rmw0x+zMuNipG07jeiXfYPW4/Js5Q=",
+        "whpk_MCowBQYDK2VwAyEA7UkoxijRwsbq6QM4kFmVYSlZJzpcY/k2NsFGFKyHN9E="
+      ],
+      "hmac_secrets": [],
+      "signature_header": "v1a,xp3SkPEiPxPvmaJi9v0kTHdl190IXaM6mswAlchWXVScRl+5QgYRP77s9VXYzwghyhXbcTzERCRC+l/K0KkvCw== v1a,qFVTfkPzhXpHCKPUmDFEKT0Tnxfwi26sziZsBGXJWG5TSr6F8pGRCW9McqXS4UWwUWwVkdPHL/I/SoomP8BOCg=="
+    },
+    {
+      "name": "two hmac generations",
+      "webhook_id": "0192f4a0-7b1c-757c-87c8-267db4b2c89f",
+      "timestamp": 1760346002,
+      "body": "{\"id\":\"0192f4a0-7b1c-757c-87c8-267db4b2c89f\",\"type\":\"thread.created\"}",
+      "ed25519_seed_base64": [
+        "BAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQ="
+      ],
+      "public_key": [
+        "whpk_MCowBQYDK2VwAyEAypOsFwUYcHHWe4PH/w7+gQjo7EUwV113JoeTM9vavnw="
+      ],
+      "hmac_secrets": [
+        "whsec_EXAMPLEvect2",
+        "whsec_EXAMPLEvect1"
+      ],
+      "signature_header": "v1a,B6IYnJ60I805EPgk7KFMo71c8427QT1bf5Lo0RKEz/ty5cy+E3KXj4G4cEwMtF3ms8WJWHeeoRRMQlcvxJO6CQ== v1,fT1w6cobV0ir1wakm63U97SinQD8oYL5DT00fCkRDm4= v1,1yI+3k6of8cpwJPjFg2dPaJ/c4BKuYrFJC7Lr7/GRLI="
+    },
+    {
+      "name": "non-ascii and escapes",
+      "webhook_id": "0192f4a0-7b1c-757c-87c8-267db4b2c89f",
+      "timestamp": 1760346003,
+      "body": "{\"payload\":{\"content_md\":\"Grüße \\\"Alex\\\" \\\\ Robin 😀 ünïcödé\\n\"}}",
+      "ed25519_seed_base64": [
+        "BQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQU="
+      ],
+      "public_key": [
+        "whpk_MCowBQYDK2VwAyEAbnoc3Smwt4/ROvTFWY/v9O8qlxZuPKby5Pv8zYBQW/E="
+      ],
+      "hmac_secrets": [
+        "whsec_EXAMPLEvect1"
+      ],
+      "signature_header": "v1a,3k/fKsYWGfMEf9dcNB5Abi6ZIVTNJc0jkbt9f2kBihurW58hSQqcxLIqTTgx9otqcJLwrsGWhvg+QEnGissrCQ== v1,0h4GjtUGTI2oOrTPOr2zAOOQR2eEYGHO9i8DomcdPPA="
+    },
+    {
+      "name": "truncated payload",
+      "webhook_id": "0192f4a0-7b1c-757c-87c8-267db4b2c89f",
+      "timestamp": 1760346004,
+      "body": "{\"id\":\"0192f4a0-7b1c-757c-87c8-267db4b2c89f\",\"truncated\":true,\"payload\":{}}",
+      "ed25519_seed_base64": [
+        "BgYGBgYGBgYGBgYGBgYGBgYGBgYGBgYGBgYGBgYGBgY="
+      ],
+      "public_key": [
+        "whpk_MCowBQYDK2VwAyEAiodf/x6zhFFXes1a/uQFRWVo3XyJ4JCGOgVXvHr0nxc="
+      ],
+      "hmac_secrets": [
+        "whsec_EXAMPLEvect2"
+      ],
+      "signature_header": "v1a,mNJ0sXyT7UHCEl18HVvIu4a7X//16dimiqY0vLSBJ8HoXxw68+WvP7Buz/dOzgESze+XfsBBkyg04zDBvF3ACw== v1,7u+lf60cafi2Q5Ns8YHNokq+wKaUUjLuv6uMgJf4Qto="
+    }
+  ]
+}

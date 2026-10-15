@@ -5,6 +5,8 @@ package instance
 import (
 	"context"
 	"crypto/ed25519"
+	"crypto/x509"
+	"encoding/base64"
 	"errors"
 	"time"
 
@@ -169,6 +171,16 @@ type Keys interface {
 	// call. Errors: kind internal for an unknown purpose; kind unavailable when p has no active
 	// key (the start creates them) or its private key cannot be read; the database error.
 	Signer(ctx context.Context, p Purpose) (Signer, error)
+	// Signers returns the signing set of p, read fresh: the active key first, then every retiring
+	// key whose not_after lies after now, in kid order; never a next or retired key (webhooks.md
+	// section 2.1 point 2, M2-26). Errors: those of Signer, also for a retiring key whose private
+	// key cannot be read.
+	Signers(ctx context.Context, p Purpose) ([]Signer, error)
+	// PublicKeys returns the published keys of p (states next, active and retiring), read fresh,
+	// after authorizing the public action instance.discovery.read for the principal of ctx like
+	// JWKS (getWebhookKeys, M2-26). Errors: kind internal for an unknown purpose; the decision of
+	// authorize; the database error.
+	PublicKeys(ctx context.Context, p Purpose) ([]PublicKey, error)
 	// VerificationKey returns the next, active or retiring key kid of purpose p from a
 	// per-process cache refreshed after signing_key.cache_ttl; an unknown kid reloads at most once
 	// per signing_key.cache_ttl. A retired key, a key of another purpose and an unknown kid are
@@ -197,4 +209,25 @@ type Keys interface {
 	// calls it in every role (02 section 15.1), bothy setup bootstrap-owner later (M1-37).
 	// Concurrent calls create exactly one active key per purpose.
 	EnsureActive(ctx context.Context) error
+}
+
+// webhookKeyPrefix is the prefix of a published webhook_out key (getWebhookKeys).
+const webhookKeyPrefix = "whpk_"
+
+// FormatWebhookPublicKey returns the published form of a webhook_out key at getWebhookKeys:
+// whpk_ and the standard base64 (with padding) of its DER-encoded SubjectPublicKeyInfo (RFC 8410;
+// docs/DECISIONS.md D-M2-26-11). A key that cannot be encoded (not 32 bytes) gives "".
+//
+// Example:
+//
+//	s := instance.FormatWebhookPublicKey(pub) // "whpk_MCowBQYDK2VwAyEA..."
+func FormatWebhookPublicKey(k ed25519.PublicKey) string {
+	if len(k) != ed25519.PublicKeySize {
+		return ""
+	}
+	der, err := x509.MarshalPKIXPublicKey(k)
+	if err != nil {
+		return ""
+	}
+	return webhookKeyPrefix + base64.StdEncoding.EncodeToString(der)
 }

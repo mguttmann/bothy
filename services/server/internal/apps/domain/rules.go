@@ -3,6 +3,7 @@
 package domain
 
 import (
+	"errors"
 	"net/url"
 	"regexp"
 	"slices"
@@ -50,8 +51,8 @@ type Env struct {
 	CommandDescriptionMaxChars int
 	// SpecVersion is the version of the API contract the server implements (routes.SpecVersion).
 	SpecVersion string
-	// AllowedHosts is webhook.allowed_hosts.
-	AllowedHosts []string
+	// AllowedHosts are the parsed entries of webhook.allowed_hosts (ParseAllowedHosts).
+	AllowedHosts []AllowedHost
 	// KnownScope reports a scope of the catalogue (05 section 2.6).
 	KnownScope func(scope string) bool
 	// EventScope reports whether an app may subscribe to the event type t and the scope its
@@ -272,19 +273,20 @@ func (c *checker) deliveryMembers(m Manifest, d *Delivery) {
 	}
 }
 
-// address checks a delivery address: absolute https, a host, no user information, no fragment,
-// and its host in webhook.allowed_hosts (M2-24 design note 5).
+// address checks a delivery address with ValidateTarget, the rule of subscription addresses and of
+// the webhook egress client (docs/DECISIONS.md D-M2-26-8, replacing the host-without-port
+// comparison of M2-24 design note 5): a host or port outside webhook.allowed_hosts is
+// webhook_host_not_allowed, every other defect invalid.
 func (c *checker) address(pointer, raw string) {
 	if raw == "" {
 		return
 	}
-	u, ok := parseHTTPS(raw)
-	if !ok {
+	_, err := ValidateTarget(raw, c.env.AllowedHosts)
+	switch {
+	case errors.Is(err, ErrHostNotAllowed):
+		c.add(pointer, CodeHostNotAllowed, "The host or port is not in webhook.allowed_hosts ("+ruleHost+").")
+	case err != nil:
 		c.add(pointer, CodeInvalid, "The address is no absolute https address without user information and fragment ("+ruleHost+").")
-		return
-	}
-	if !HostAllowed(u.Hostname(), c.env.AllowedHosts) {
-		c.add(pointer, CodeHostNotAllowed, "The host is not in webhook.allowed_hosts ("+ruleHost+").")
 	}
 }
 
@@ -297,18 +299,6 @@ func parseHTTPS(raw string) (*url.URL, bool) {
 		return nil, false
 	}
 	return u, true
-}
-
-// HostAllowed reports whether host, lower-cased and without port, equals an entry of allowed
-// without regard to case (no wildcards; R-DM-17).
-func HostAllowed(host string, allowed []string) bool {
-	host = strings.ToLower(host)
-	for _, a := range allowed {
-		if strings.EqualFold(strings.TrimSpace(a), host) {
-			return true
-		}
-	}
-	return false
 }
 
 // The grant shapes a manifest may request (R-DM-08, R-DM-20, R-DM-35).

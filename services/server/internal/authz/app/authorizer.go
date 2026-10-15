@@ -383,6 +383,9 @@ func (a *Authorizer) buildLive(ctx context.Context, ref authz.CredentialRef, fac
 
 // authorize is Authorize without the check log and the audit.
 func (a *Authorizer) authorize(ctx context.Context, p authorize.Principal, act authorize.Action, r authorize.Resource) (authorize.Decision, error) {
+	if act == authorize.ActionWebhookOutDeliver {
+		return a.authorizeDelivery(ctx, p, r)
+	}
 	spec, req, preview, err := a.actionFor(act, r)
 	if err != nil {
 		return authorize.Decision{}, err
@@ -394,14 +397,26 @@ func (a *Authorizer) authorize(ctx context.Context, p authorize.Principal, act a
 		}
 		return authorize.Decision{Outcome: authorize.OutcomeUnauthenticated, Reason: authorize.Reason(domain.ReasonUnauthenticated)}, nil
 	}
-	v, err := a.version(ctx)
-	if err != nil {
-		return authorize.Decision{}, err
-	}
-	s, d, err := a.principalOf(ctx, p, spec.ID, v, t)
+	s, d, err := a.acting(ctx, p, spec.ID, t)
 	if err != nil || d.Outcome != domain.OutcomeAllow {
 		return outcome(d), err
 	}
+	return a.decideFor(ctx, s, act, r, spec, req, preview, t)
+}
+
+// acting loads the acting principal at the current rights version (principalOf).
+func (a *Authorizer) acting(ctx context.Context, p authorize.Principal, action string, t time.Time) (*actingPrincipal, domain.Decision, error) {
+	v, err := a.version(ctx)
+	if err != nil {
+		return nil, domain.Decision{}, err
+	}
+	return a.principalOf(ctx, p, action, v, t)
+}
+
+// decideFor is steps 5 to 9 of 07 section 4.2 for the acting principal s: the human gate,
+// resolving the resource, gathering the facts and Decide.
+func (a *Authorizer) decideFor(ctx context.Context, s *actingPrincipal, act authorize.Action, r authorize.Resource, spec domain.ActionSpec,
+	req domain.Expr, preview *domain.PreviewFacts, t time.Time) (authorize.Decision, error) {
 	if d := domain.GateHumanSession(req, s.domainPrincipal()); d.Outcome != domain.OutcomeAllow {
 		return outcome(d), nil
 	}
@@ -422,6 +437,44 @@ func (a *Authorizer) authorize(ctx context.Context, p authorize.Principal, act a
 		return authorize.Decision{}, err
 	}
 	return outcome(dd), nil
+}
+
+// authorizeDelivery decides webhook_out.deliver (M2-26 design note 8): the liveness check of the
+// receiving principal, the delivery gate of domain.DeliveryGate (app kind, events:subscribe, the
+// audience of a personal event), then the full decision of the receive action r.DeliveryOf on the
+// same resource, whose outcome is the result. An empty DeliveryOf, webhook_out.deliver itself or
+// "self" without an audience is an internal error.
+func (a *Authorizer) authorizeDelivery(ctx context.Context, p authorize.Principal, r authorize.Resource) (authorize.Decision, error) {
+	spec, req, err := a.requirement(authorize.ActionWebhookOutDeliver)
+	if err != nil {
+		return authorize.Decision{}, err
+	}
+	if !req.IsDelivery() {
+		return authorize.Decision{}, internal("webhook_out.deliver without the requirement Delivery")
+	}
+	of := r.DeliveryOf
+	if of == "" || of == authorize.ActionWebhookOutDeliver || (of == domain.ReceiveSelf && r.Audience.IsZero()) {
+		return authorize.Decision{}, internal("webhook_out.deliver needs the receive action of the event")
+	}
+	if p == nil || p.PrincipalKind() == domain.KindAnonymous {
+		return authorize.Decision{Outcome: authorize.OutcomeUnauthenticated, Reason: authorize.Reason(domain.ReasonUnauthenticated)}, nil
+	}
+	t := a.clock.Now()
+	s, d, err := a.acting(ctx, p, spec.ID, t)
+	if err != nil || d.Outcome != domain.OutcomeAllow {
+		return outcome(d), err
+	}
+	gate := domain.Principal{ID: s.id, Kind: s.kind, GrantedScopes: p.AppGrantedScopes()}
+	if d, done := domain.DeliveryGate(gate, r.Audience); done {
+		return outcome(d), nil
+	}
+	inner := r
+	inner.DeliveryOf, inner.Audience = "", ids.ID{}
+	ospec, oreq, preview, err := a.actionFor(of, inner)
+	if err != nil {
+		return authorize.Decision{}, err
+	}
+	return a.decideFor(ctx, s, of, inner, ospec, oreq, preview, t)
 }
 
 // actionFor returns spec and requirement of act, the previewed action of access.preview, and

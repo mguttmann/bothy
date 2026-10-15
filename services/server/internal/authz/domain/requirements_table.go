@@ -167,7 +167,7 @@ var requirementGroups = []struct {
 	{"human and write", All(Human, AtLeast(LevelWrite)), []string{"typing.start"}},
 	{"human; apps with scope", Any(Human, AppKind), []string{"user.read"}},
 	{"public with token; the app needs write", Deferred("M2"), []string{"webhook_in.post"}},
-	{"grants and scope of the receiver", Deferred("M2"), []string{"webhook_out.deliver"}},
+	{"grants and scope of the receiver", Delivery, []string{"webhook_out.deliver"}},
 }
 
 // requirements indexes requirementGroups by action id.

@@ -65,13 +65,15 @@ type Deps struct {
 type Service struct {
 	cfg Config
 	d   Deps
+	// hosts are the parsed entries of webhook.allowed_hosts (host[:port], D-M2-26-8).
+	hosts []domain.AllowedHost
 }
 
 // Compile-time check: Service is the incoming port.
 var _ apps.Apps = (*Service)(nil)
 
-// New returns the use cases. Errors: a missing collaborator, a limit below 1 or a spec version
-// that is no SemVer.
+// New returns the use cases. Errors: a missing collaborator, a limit below 1, a spec version that
+// is no SemVer or an entry of webhook.allowed_hosts that is no host[:port].
 func New(cfg Config, d Deps) (*Service, error) {
 	if d.Repo == nil || d.UoW == nil || d.Authorizer == nil || d.Audit == nil || d.Principals == nil || d.Tokens == nil ||
 		d.Grants == nil || d.Rights == nil || d.Scopes == nil || d.Cursors == nil {
@@ -88,7 +90,11 @@ func New(cfg Config, d Deps) (*Service, error) {
 		d.Clock = clock.System()
 	}
 	cfg.AllowedHosts = slices.Clone(cfg.AllowedHosts)
-	return &Service{cfg: cfg, d: d}, nil
+	hosts, err := domain.ParseAllowedHosts(cfg.AllowedHosts)
+	if err != nil {
+		return nil, err
+	}
+	return &Service{cfg: cfg, d: d, hosts: hosts}, nil
 }
 
 // now is the time of the clock at the precision of PostgreSQL.
@@ -100,7 +106,7 @@ func (s *Service) env() domain.Env {
 	return domain.Env{
 		MaxBytes: s.cfg.ManifestMaxBytes, HandleMaxChars: s.cfg.HandleMaxChars, DisplayNameMaxChars: s.cfg.DisplayNameMaxChars,
 		MaxCommands: s.cfg.CommandMax, CommandDescriptionMaxChars: s.cfg.CommandDescriptionMaxChars, SpecVersion: s.d.SpecVersion,
-		AllowedHosts: s.cfg.AllowedHosts,
+		AllowedHosts: s.hosts,
 		KnownScope:   func(sc string) bool { return slices.Contains(known, sc) },
 		EventScope:   s.eventScope,
 	}
