@@ -44,6 +44,8 @@ import (
 	"github.com/OWNER/bothy/services/server/internal/kernel/txn"
 	"github.com/OWNER/bothy/services/server/internal/messaging"
 	messagingapp "github.com/OWNER/bothy/services/server/internal/messaging/app"
+	notifypg "github.com/OWNER/bothy/services/server/internal/notify/adapters/postgres"
+	notifyapp "github.com/OWNER/bothy/services/server/internal/notify/app"
 	"github.com/OWNER/bothy/services/server/internal/platform/httpserver"
 	"github.com/OWNER/bothy/services/server/internal/platform/httpserver/httpservertest"
 	"github.com/OWNER/bothy/services/server/internal/platform/pg"
@@ -171,6 +173,8 @@ type World struct {
 	Sync *wire.SyncReads
 	// Maintenance is the partition maintenance of the world over its clock (M1-63 retention).
 	Maintenance *syncapp.PartitionMaintenance
+	// Notify is the notify module (M3-18); nil unless built by NewNotify.
+	Notify *notifyapp.Service
 }
 
 // SyncOptions are the limits of a world of NewSync: the catch-up keys and the partition size of
@@ -202,7 +206,7 @@ var syncPepper = []byte("0123456789abcdef0123456789abcdef")
 // subscriber of MessagePosted of the calling package; opts change the messaging configuration.
 func New(t *testing.T, subscribe Subscribe, opts ...Option) *World {
 	t.Helper()
-	return build(t, subscribe, false, nil, opts)
+	return build(t, subscribe, false, nil, nil, opts)
 }
 
 // NewPersonal builds the world of New with the personal data of sync (M1-61): its REST handlers in
@@ -210,7 +214,7 @@ func New(t *testing.T, subscribe Subscribe, opts ...Option) *World {
 // registry, bound to the appender of the world, as internal/wire registers it (INT-W25/2).
 func NewPersonal(t *testing.T, subscribe Subscribe, opts ...Option) *World {
 	t.Helper()
-	return build(t, subscribe, true, nil, opts)
+	return build(t, subscribe, true, nil, nil, opts)
 }
 
 // NewSync builds the world of NewPersonal with catch-up and snapshot of sync (M1-63) as
@@ -218,12 +222,21 @@ func NewPersonal(t *testing.T, subscribe Subscribe, opts ...Option) *World {
 // module for the principal directory and the agents module for the agent listing.
 func NewSync(t *testing.T, subscribe Subscribe, so SyncOptions, opts ...Option) *World {
 	t.Helper()
-	return build(t, subscribe, true, &so, opts)
+	return build(t, subscribe, true, &so, nil, opts)
+}
+
+// NewNotify builds the world of NewPersonal with the notify module of cfg (M3-18): its REST
+// handlers in the harness and its in-transaction subscribers of ChannelArchived and SpaceArchived
+// in the registry, before the test subscriber, bound to the appender and the chat service, as
+// internal/wire registers them.
+func NewNotify(t *testing.T, subscribe Subscribe, cfg notifyapp.Config, opts ...Option) *World {
+	t.Helper()
+	return build(t, subscribe, true, nil, &cfg, opts)
 }
 
 // build builds the world of New; personal adds the personal data of sync, so (not nil) catch-up
-// and snapshot.
-func build(t *testing.T, subscribe Subscribe, personal bool, so *SyncOptions, opts []Option) *World {
+// and snapshot, a non-nil notifyCfg the notify module.
+func build(t *testing.T, subscribe Subscribe, personal bool, so *SyncOptions, notifyCfg *notifyapp.Config, opts []Option) *World {
 	t.Helper()
 	db := pgtest.New(t)
 	cfg := db.Config(pg.RoleApp)
@@ -244,7 +257,11 @@ func build(t *testing.T, subscribe Subscribe, personal bool, so *SyncOptions, op
 	if personal {
 		subs = syncapp.NewSubscribers(syncpg.NewPersonalRepository(pool))
 	}
-	reg := registry(t, hook, wire.NewModules(pool, log), subscribe, w.rec, subs)
+	var nsubs *notifyapp.Subscribers
+	if notifyCfg != nil {
+		nsubs = notifyapp.NewSubscribers(notifypg.NewRepository(pool))
+	}
+	reg := registry(t, hook, wire.NewModules(pool, log), subscribe, w.rec, subs, nsubs)
 	uow := pg.NewUnitOfWork(pool, pg.UnitConfig{RetryMax: 3, StatementTimeout: 30 * time.Second, LockTimeout: 20 * time.Second, IdleInTxTimeout: 60 * time.Second}, reg)
 	rec, err := auditapp.NewRecorder(auditapp.Config{
 		DenyAggregateWindow: time.Hour, DenyAggregateMaxKeys: 100, IPKeyPeriod: 30 * 24 * time.Hour,
@@ -309,6 +326,9 @@ func build(t *testing.T, subscribe Subscribe, personal bool, so *SyncOptions, op
 	if so != nil {
 		w.syncReads(so.CatchUp, pool, uow, az, hook, rec, appender, c, m, &handlers)
 	}
+	if notifyCfg != nil {
+		w.notify(*notifyCfg, nsubs, pool, uow, az, appender, c, dir, log, &handlers)
+	}
 	w.H = harness(t, pool, uow, w.actors, handlers, w.Clock)
 	w.OwnerID = w.Person("owner", true)
 	return w
@@ -371,9 +391,25 @@ func (w *World) syncReads(cfg syncapp.CatchUpConfig, pool *pg.Pool, uow *pg.Unit
 	w.Sync, handlers.Sync = r, r.Handlers
 }
 
-// registry returns the sealed txn registry with the rights hooks, the sync and audit hooks and
-// the test subscriber of MessagePosted.
-func registry(t *testing.T, hook *authzapp.RightsHook, mods *wire.Modules, subscribe Subscribe, rec *Recorder, subs *syncapp.Subscribers) *txn.Registry {
+// notify binds the subscribers of notify and adds the notify module to the world and to handlers
+// (NewNotify).
+func (w *World) notify(cfg notifyapp.Config, subs *notifyapp.Subscribers, pool *pg.Pool, uow *pg.UnitOfWork, az authorize.Authorizer,
+	appender *syncapp.Appender, c *wire.Chat, dir *identityapp.Directory, log *slog.Logger, handlers *wire.Handlers) {
+	w.t.Helper()
+	if err := subs.Bind(appender, c.Service); err != nil {
+		w.t.Fatal(err)
+	}
+	n, err := wire.NewNotify(cfg, pool, uow, az, appender, wire.NotifyDeps{Chat: c.Service, Settings: w.Personal.Settings(), Users: dir}, w.Clock, log)
+	if err != nil {
+		w.t.Fatal(err)
+	}
+	w.Notify, handlers.Preferences = n.Service, n.Handlers
+}
+
+// registry returns the sealed txn registry with the rights hooks, the sync and audit hooks, the
+// subscribers of sync and notify when given and the test subscriber of MessagePosted.
+func registry(t *testing.T, hook *authzapp.RightsHook, mods *wire.Modules, subscribe Subscribe, rec *Recorder, subs *syncapp.Subscribers,
+	nsubs *notifyapp.Subscribers) *txn.Registry {
 	t.Helper()
 	reg := txn.NewRegistry()
 	for _, h := range []struct {
@@ -388,6 +424,16 @@ func registry(t *testing.T, hook *authzapp.RightsHook, mods *wire.Modules, subsc
 	// did (M1-61).
 	if subs != nil {
 		if err := txn.Subscribe(reg, subs.OnMessagePosted); err != nil {
+			t.Fatal(err)
+		}
+	}
+	// The subscribers of notify (M3-18) before the test subscriber, so its veto rolls back the
+	// cleanup of an archive.
+	if nsubs != nil {
+		if err := txn.Subscribe(reg, nsubs.OnChannelArchived); err != nil {
+			t.Fatal(err)
+		}
+		if err := txn.Subscribe(reg, nsubs.OnSpaceArchived); err != nil {
 			t.Fatal(err)
 		}
 	}
