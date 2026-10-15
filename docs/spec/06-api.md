@@ -86,7 +86,8 @@ Readiness gehören nicht zur öffentlichen API; sie liegen auf dem internen List
 | Anonym | keine | keine | keine | | nie |
 
 Anonym erreichbar sind nur Operationen mit `security: []`: Discovery, JWKS, Webhook-Schlüssel,
-Logo, Problem-Typen, öffentliche Statusseite, Anmeldeabläufe und Eingangs-Webhooks. Sie
+Logo, Problem-Typen, öffentliche Statusseite, Anmeldeabläufe, Eingangs-Webhooks und die
+Kopplung eines Rechners (`pairHost`, der Kopplungs-Code ist der Nachweis, 24 Abschnitt 3.2). Sie
 laufen trotzdem durch `authorize` mit dem Prinzipal `anonymous` (05, 2.1).
 
 ### 3.1 DPoP
@@ -217,7 +218,9 @@ Sitzung `auth.step_up_max_age` (03). Agenten- und App-Tokens bekommen bei solche
    Mengen-Grenze, `not_enabled` für ein Feld, dessen Funktion diese Server-Version noch nicht baut)
    und `detail`; `current` bei `version_conflict` und `base_version_conflict`;
    `reason` und `hint` bei Ablehnungen, Invarianten und Konflikten mit benanntem Grund (z. B.
-   `one_time_secret`, Abschnitt 7). `detail` enthält nie Inhalte, Geheimnisse oder interne Pfade.
+   `one_time_secret`, Abschnitt 7); `attempts_remaining` bei `fingerprint_mismatch` (verbleibende
+   Bestätigungen eines Rechners, `0` heißt Rückfall auf `pairing`, 24 Abschnitt 3.2). `detail`
+   enthält nie Inhalte, Geheimnisse oder interne Pfade.
 4. `400` steht für Schema- und Regelverstöße. `422` gibt es nur für `idempotency_key_reuse` (04,
    5.1). `409` für Zustandskonflikte, `412` für `If-Match`.
 5. Eine per Schalter ausgeschaltete Funktion antwortet angemeldeten Prinzipalen mit `403
@@ -262,7 +265,7 @@ alle Texte der YAML-Dateien (R-API-15); jede Antwort-Komponente nennt ihren Stat
 | `billing_mode_mismatch` | 409 | The reported actual mode differs from the target; the run becomes `failed`. | Check the adapter configuration. |
 | `tool_class_mismatch` | 409 | The reported tool class is above the one in the invocation token; the run becomes `failed`. | Check the adapter configuration. |
 | `host_unavailable` | 409 | The host is not `active` or its host service is not connected. | Show the host state; retry when `host.presence_changed` reports it connected. |
-| `fingerprint_mismatch` | 409 | The typed fingerprint prefix does not match the keys the host service registered. | Compare with the output of `bothy-host pair` and type it again; after too many failures pair again. |
+| `fingerprint_mismatch` | 409 | The typed fingerprint prefix does not match the keys the host service registered; `attempts_remaining` counts the confirmations left, `0` means the host fell back to `pairing` without keys. | Compare with the output of `bothy-host pair` and type it again; at `attempts_remaining` `0` issue a new pairing code. |
 | `invalid_state_transition` | 409 | The state machine does not allow the transition. | Reload the state. |
 | `base_version_conflict` | 409 | `base_version` of a run patch is outdated; `current` holds the document. | Rebase on `current`. |
 | `component_used` | 409 | The component is used, expired or disabled. | Refresh the view. |

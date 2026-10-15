@@ -569,6 +569,18 @@ func (stubServer) SetHostLlmCredentials(context.Context, rest.SetHostLlmCredenti
 	return nil, nil
 }
 
+func (stubServer) IssueHostPairingCode(context.Context, rest.IssueHostPairingCodeRequestObject) (rest.IssueHostPairingCodeResponseObject, error) {
+	return nil, nil
+}
+
+func (stubServer) PairHost(context.Context, rest.PairHostRequestObject) (rest.PairHostResponseObject, error) {
+	return nil, nil
+}
+
+func (stubServer) ConfirmHost(context.Context, rest.ConfirmHostRequestObject) (rest.ConfirmHostResponseObject, error) {
+	return nil, nil
+}
+
 func (stubServer) ListAgents(context.Context, rest.ListAgentsRequestObject) (rest.ListAgentsResponseObject, error) {
 	return nil, nil
 }
@@ -796,6 +808,10 @@ func TestRealTable_Enabled(t *testing.T) {
 		"updateHost":            {"PATCH /api/v1/hosts/{host_id}", "host.manage", "rl.admin"},
 		"setHostState":          {"POST /api/v1/hosts/{host_id}/state", "host.manage", "rl.admin"},
 		"setHostLlmCredentials": {"PUT /api/v1/hosts/{host_id}/llm-credentials", "host.manage", "rl.admin"},
+		// M2-41
+		"issueHostPairingCode": {"POST /api/v1/hosts/{host_id}/pairing-code", "host.manage", "rl.admin"},
+		"pairHost":             {"POST /api/v1/hosts/pair", "host.pair", "rl.public_auth"},
+		"confirmHost":          {"POST /api/v1/hosts/{host_id}/confirm", "host.manage", "rl.admin"},
 		// M2-24
 		"listApps":           {"GET /api/v1/apps", "app.read", "rl.read"},
 		"installApp":         {"POST /api/v1/apps", "app.install", "rl.admin"},

@@ -16,6 +16,7 @@ import (
 
 	"github.com/OWNER/bothy/services/server/internal/kernel/actor"
 	"github.com/OWNER/bothy/services/server/internal/kernel/clock"
+	"github.com/OWNER/bothy/services/server/internal/kernel/errs"
 	"github.com/OWNER/bothy/services/server/internal/kernel/idempotency"
 	"github.com/OWNER/bothy/services/server/internal/kernel/ids"
 	"github.com/OWNER/bothy/services/server/internal/kernel/txn"
@@ -425,5 +426,64 @@ func TestIgnored_InactiveCredential(t *testing.T) {
 	}
 	if runs != 2 || store.begins != 0 {
 		t.Errorf("runs %d, begins %d; want the header ignored for an inactive credential", runs, store.begins)
+	}
+}
+
+// effectKey marks the write of a handler in the attempt of memUoW: it commits only with the unit.
+var effectKey = memKey{principal: ids.MustParse("0192f4a0-7b1c-7000-8a00-0000000000e1"), key: ids.MustParse("0192f4a0-7b1c-7000-8a00-0000000000e2")}
+
+// effectHandler writes the effect into the attempt, marks KeepEffectOnFinal when keep is set and
+// answers err.
+func effectHandler(runs *int, keep bool, err error) http.HandlerFunc {
+	return httpservertest.Authorized("item.create", func(w http.ResponseWriter, r *http.Request) {
+		*runs++
+		if tx, ok := r.Context().Value(memTxKey{}).(*memTx); ok {
+			tx.writes[effectKey] = idempotency.Entry{Completed: true}
+		}
+		if keep {
+			idempotency.KeepEffectOnFinal(r.Context())
+		}
+		httpserver.WriteProblem(w, r, err)
+	})
+}
+
+// TestIdempotency_KeepEffectOnFinal (M2-41, Design note 7e): only a marked final error commits; a
+// marked 409 commits the handler's write with the stored answer, and its replay returns that
+// answer with Idempotent-Replay: true without running the handler; the same 409 without the
+// marker rolls the write back and is stored by SaveFinal; a marked 401 or 500 still rolls back
+// and stores nothing.
+func TestIdempotency_KeepEffectOnFinal(t *testing.T) {
+	t.Parallel()
+	mismatch := errs.New(errs.CodeFingerprintMismatch, "")
+	path := "/api/v1/groups/" + ids.New().String() + "/items"
+	for _, c := range []struct {
+		name         string
+		keep         bool
+		err          error
+		status, rows int
+		effect       bool
+	}{
+		{"marked 409", true, mismatch, http.StatusConflict, 2, true},
+		{"unmarked 409", false, mismatch, http.StatusConflict, 1, false},
+		{"marked 401", true, errs.New(errs.CodeUnauthenticated, ""), http.StatusUnauthorized, 0, false},
+		{"marked 500", true, errs.New(errs.CodeInternalError, ""), http.StatusInternalServerError, 0, false},
+	} {
+		runs := 0
+		e := newStageEnv(t, nil, httpservertest.Route{Op: createItem(), Handler: effectHandler(&runs, c.keep, c.err)})
+		key := ids.New().String()
+		first := e.post(path, key, `{}`)
+		e.store.mu.Lock()
+		_, effect := e.store.rows[effectKey]
+		e.store.mu.Unlock()
+		if first.StatusCode != c.status || e.store.count() != c.rows || effect != c.effect {
+			t.Fatalf("%s: status %d, rows %d, effect %v", c.name, first.StatusCode, e.store.count(), effect)
+		}
+		if c.rows == 0 {
+			continue
+		}
+		again := e.post(path, key, `{}`)
+		if again.StatusCode != c.status || again.Header.Get("Idempotent-Replay") != "true" || runs != 1 {
+			t.Fatalf("%s: replay status %d, replay header %q, runs %d", c.name, again.StatusCode, again.Header.Get("Idempotent-Replay"), runs)
+		}
 	}
 }

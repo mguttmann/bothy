@@ -2716,6 +2716,30 @@
       "doc": "Longest template name in Unicode characters."
     },
     {
+      "name": "terminal.fingerprint_confirm_chars",
+      "env": "BOTHY_TERMINAL__FINGERPRINT_CONFIRM_CHARS",
+      "kind": "int",
+      "default": "8",
+      "required": false,
+      "enum": [],
+      "min": "1",
+      "max": "",
+      "chapter": "24-terminal.md",
+      "doc": "Characters of the fingerprint the owner types at the confirmation of a host."
+    },
+    {
+      "name": "terminal.fingerprint_max_attempts",
+      "env": "BOTHY_TERMINAL__FINGERPRINT_MAX_ATTEMPTS",
+      "kind": "int",
+      "default": "3",
+      "required": false,
+      "enum": [],
+      "min": "1",
+      "max": "",
+      "chapter": "24-terminal.md",
+      "doc": "Failed confirmations of a host before it falls back to pairing."
+    },
+    {
       "name": "terminal.pairing_code_ttl",
       "env": "BOTHY_TERMINAL__PAIRING_CODE_TTL",
       "kind": "duration",
@@ -2738,6 +2762,30 @@
       "max": "",
       "chapter": "24-terminal.md",
       "doc": "Reattaching from the same device needs no new step-up within this time after the detachment."
+    },
+    {
+      "name": "terminal.report_label_max_chars",
+      "env": "BOTHY_TERMINAL__REPORT_LABEL_MAX_CHARS",
+      "kind": "int",
+      "default": "100",
+      "required": false,
+      "enum": [],
+      "min": "1",
+      "max": "",
+      "chapter": "24-terminal.md",
+      "doc": "Longest profile name, display name, working directory label and OS version a host reports, in characters."
+    },
+    {
+      "name": "terminal.report_max_entries",
+      "env": "BOTHY_TERMINAL__REPORT_MAX_ENTRIES",
+      "kind": "int",
+      "default": "64",
+      "required": false,
+      "enum": [],
+      "min": "1",
+      "max": "",
+      "chapter": "24-terminal.md",
+      "doc": "Most entries of each list a host reports: profiles, session users, working directories of one session user."
     },
     {
       "name": "terminal.session_token_ttl",

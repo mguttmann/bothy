@@ -29,6 +29,7 @@ enabled:             # operationIds that have a handler; sorted ascending
   - completePasskeyRegistration
   - completeStepUpWithDeviceKey
   - completeStepUpWithPasskey
+  - confirmHost
   - createAgent
   - createChannel
   - createChannelTemplate
@@ -79,6 +80,7 @@ enabled:             # operationIds that have a handler; sorted ascending
   - getUserCredentials
   - handleOidcCallback
   - installApp
+  - issueHostPairingCode
   - listAgents
   - listApps
   - listAuditEvents
@@ -111,6 +113,7 @@ enabled:             # operationIds that have a handler; sorted ascending
   - moveChannel
   - moveForumTag
   - moveSpace
+  - pairHost
   - previewGrant
   - putFeatureFlag
   - putInstanceSetting
@@ -207,9 +210,6 @@ later:               # every other operationId of docs/api/openapi.yaml; sorted 
   - operation_id: completeUpload
     etappe: M3
     ticket: M3-03
-  - operation_id: confirmHost
-    etappe: M2
-    ticket: M2-41
   - operation_id: createAgentWebhookSubscription
     etappe: M2
     ticket: M2-26
@@ -390,9 +390,6 @@ later:               # every other operationId of docs/api/openapi.yaml; sorted 
   - operation_id: invokeCommand
     etappe: M2
     ticket: M2-16
-  - operation_id: issueHostPairingCode
-    etappe: M2
-    ticket: M2-41
   - operation_id: leaveDm
     etappe: V3
     ticket: V3-01
@@ -476,9 +473,6 @@ later:               # every other operationId of docs/api/openapi.yaml; sorted 
   - operation_id: openTerminalSession
     etappe: M2
     ticket: M2-44
-  - operation_id: pairHost
-    etappe: M2
-    ticket: M2-41
   - operation_id: patchRun
     etappe: M2
     ticket: M2-10

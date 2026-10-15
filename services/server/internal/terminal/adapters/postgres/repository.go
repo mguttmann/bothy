@@ -273,7 +273,8 @@ func toHost(row sqlcgen.Host) domain.Host {
 		DisabledAt: timeOf(row.DisabledAt), RetiredAt: timeOf(row.RetiredAt), Platform: row.Platform.String,
 		AssignedUserID: idOf(row.AssignedUserID), LLMCredentials: row.LlmCredentials, CredentialHolderID: idOf(row.CredentialHolderID),
 		DeclaredServerHost: row.DeclaredServerHost, PairingCodeHash: row.PairingCodeHash, PairingExpiresAt: timeOf(row.PairingExpiresAt),
-		NoisePublicKey: row.NoisePublicKey, KeyFingerprint: row.KeyFingerprint.String, KeyGeneration: int64(row.KeyGeneration),
+		NoisePublicKey: row.NoisePublicKey, AuthJKT: row.AuthJkt.String, KeyFingerprint: row.KeyFingerprint.String,
+		KeyGeneration: int64(row.KeyGeneration), FingerprintFailures: int(row.FingerprintFailures),
 		PairedAt: timeOf(row.PairedAt), Profiles: domain.DecodeProfiles(row.ReportedProfiles),
 		ReportedUsers: domain.DecodeReportedSessionUsers(row.ReportedSessionUsers), Doctor: domain.DecodeDoctor(row.ReportedDoctor),
 		OSVersion: row.ReportedOsVersion.String, HostVersion: row.ReportedHostVersion.String, LastSeenAt: timeOf(row.LastSeenAt),
@@ -305,6 +306,7 @@ func idList(rows []pgtype.UUID, err error, what string) ([]ids.ID, error) {
 // The unique indexes the adapter maps to conflicts.
 const (
 	constraintHostName         = "hosts_name_live_key"
+	constraintAuthJKT          = "hosts_auth_jkt_key"
 	constraintSessionUserName  = "host_session_users_host_os_user_key"
 	constraintSessionUserValid = "host_session_users_host_user_valid_key"
 	sqlstateUniqueViolation    = "23505"
@@ -420,16 +422,9 @@ func (r *Repository) UpdateReportedSessionUsers(ctx context.Context, id ids.ID, 
 	if err != nil {
 		return err
 	}
-	list := make([]domain.ReportedSessionUser, 0, len(report))
-	for _, u := range report {
-		if u.Workdirs == nil {
-			u.Workdirs = []string{}
-		}
-		list = append(list, u)
-	}
-	raw, err := json.Marshal(list)
+	raw, err := encodeReport(report)
 	if err != nil {
-		return errs.Wrap(errs.CodeInternalError, err, "terminal: encoding the reported session users")
+		return err
 	}
 	n, err := q.UpdateReportedSessionUsers(ctx, sqlcgen.UpdateReportedSessionUsersParams{ID: uuid(id), ReportedSessionUsers: raw, Version: version})
 	if err == nil && n != 1 {
@@ -454,4 +449,101 @@ func (r *Repository) OwnSessionUsers(ctx context.Context, userID ids.ID) ([]doma
 		})
 	}
 	return out, nil
+}
+
+// HostByPairingHash implements app.Store.
+func (r *Repository) HostByPairingHash(ctx context.Context, hash []byte) (domain.Host, bool, error) {
+	row, err := r.read(ctx).HostByPairingCodeHash(ctx, hash)
+	return oneHost(row, err, "reading the host of a pairing code")
+}
+
+// SetPairingCode implements app.Store.
+func (r *Repository) SetPairingCode(ctx context.Context, id ids.ID, hash []byte, expires time.Time, dropKeys bool, version int64) error {
+	q, err := r.write(ctx)
+	if err != nil {
+		return err
+	}
+	n, err := q.SetHostPairingCode(ctx, sqlcgen.SetHostPairingCodeParams{
+		ID: uuid(id), PairingCodeHash: hash, PairingExpiresAt: optionalTime(expires), DropKeys: dropKeys, Version: version,
+	})
+	return oneRow(n, err, "setting a pairing code")
+}
+
+// StorePairing implements app.Store; the unique index on auth_jkt is 409 conflict with reason
+// host_key_in_use (the key belongs to another host, also a retired one).
+func (r *Repository) StorePairing(ctx context.Context, id ids.ID, p app.PairingWrite, version int64) error {
+	q, err := r.write(ctx)
+	if err != nil {
+		return err
+	}
+	profiles := p.Report.Profiles
+	if profiles == nil {
+		profiles = []domain.Profile{}
+	}
+	rawProfiles, err := json.Marshal(profiles)
+	if err != nil {
+		return errs.Wrap(errs.CodeInternalError, err, "terminal: encoding the reported profiles")
+	}
+	rawUsers, err := encodeReport(p.Report.SessionUsers)
+	if err != nil {
+		return err
+	}
+	n, err := q.StoreHostPairing(ctx, sqlcgen.StoreHostPairingParams{
+		ID: uuid(id), NoisePublicKey: p.Keys.Noise, AuthPublicJwk: p.Keys.JWK, AuthJkt: optionalText(p.Keys.JKT),
+		KeyFingerprint: optionalText(p.Fingerprint), PairedAt: optionalTime(p.PairedAt), Platform: optionalText(p.Report.Platform),
+		ReportedOsVersion: optionalText(p.Report.OSVersion), ReportedHostVersion: optionalText(p.Report.HostVersion),
+		ReportedProfiles: rawProfiles, ReportedSessionUsers: rawUsers, Version: version,
+	})
+	if isUnique(err, constraintAuthJKT) {
+		return errs.New(errs.CodeConflict, "The login key belongs to another host.").WithReason(domain.ReasonHostKeyInUse)
+	}
+	return oneRow(n, err, "storing a pairing")
+}
+
+// SetFingerprintFailures implements app.Store.
+func (r *Repository) SetFingerprintFailures(ctx context.Context, id ids.ID, n int) error {
+	q, err := r.write(ctx)
+	if err != nil {
+		return err
+	}
+	rows, err := q.SetHostFingerprintFailures(ctx, sqlcgen.SetHostFingerprintFailuresParams{ID: uuid(id), FingerprintFailures: int32(min(max(n, 0), math.MaxInt32))})
+	return oneRow(rows, err, "counting a failed confirmation")
+}
+
+// ConfirmPairing implements app.Store.
+func (r *Repository) ConfirmPairing(ctx context.Context, id ids.ID, declaredServerHost bool, by ids.ID, at time.Time, version int64) error {
+	q, err := r.write(ctx)
+	if err != nil {
+		return err
+	}
+	n, err := q.ConfirmHostPairing(ctx, sqlcgen.ConfirmHostPairingParams{
+		ID: uuid(id), DeclaredServerHost: declaredServerHost, ConfirmedBy: uuid(by), ConfirmedAt: optionalTime(at), Version: version,
+	})
+	return oneRow(n, err, "confirming a host")
+}
+
+// oneRow maps the result of a write that must change exactly one row.
+func oneRow(n int64, err error, what string) error {
+	if err == nil && n != 1 {
+		return errs.New(errs.CodeInternalError, "terminal: "+what+" changed no row")
+	}
+	return mapError(err, what)
+}
+
+// encodeReport encodes reported session users in the form of the schema
+// host_reported_session_users.v1 (an array of {os_user, workdirs}, the order kept); the one
+// encoding of pairing (M2-41) and of the report of M2-40 and M2-43.
+func encodeReport(report []domain.ReportedSessionUser) ([]byte, error) {
+	list := make([]domain.ReportedSessionUser, 0, len(report))
+	for _, u := range report {
+		if u.Workdirs == nil {
+			u.Workdirs = []string{}
+		}
+		list = append(list, u)
+	}
+	raw, err := json.Marshal(list)
+	if err != nil {
+		return nil, errs.Wrap(errs.CodeInternalError, err, "terminal: encoding the reported session users")
+	}
+	return raw, nil
 }

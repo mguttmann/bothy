@@ -115,14 +115,19 @@ def sync_detailed(
     """Confirm the fingerprint and declare the LLM login
 
      The owner types the first `terminal.fingerprint_confirm_chars` characters shown by `bothy-host
-    pair`. A mismatch gives `409 fingerprint_mismatch`; after `terminal.fingerprint_max_attempts`
-    failures the host falls back to `pairing`. I6 is checked in the same transaction (`409
-    i6_violation`). `session_users` assigns each person their own session user on this host (ruling T12,
-    24 section 2.2); a name that belongs or belonged to another person on this host, or a second valid
-    assignment of one person, gives `409 conflict` with `reason: session_user_taken`; a name the host
-    did not report (`reported_session_users`) gives `400 validation_failed` with `errors[].code`
-    `session_user_not_on_host`, and nothing is stored. Without an assignment a person gets no terminal
-    there (SR12). Needs step-up.
+    pair`, without separators, case-insensitive; a prefix of another length or with a character outside
+    the Crockford alphabet (also `I`, `L`, `O`, `U`) gives `400 validation_failed` with `errors[].code`
+    `invalid_format` and does not count. A mismatch gives `409 fingerprint_mismatch` with
+    `attempts_remaining`; the failure counter is not part of `Host`, so `version` and the `If-Match`
+    stay. After `terminal.fingerprint_max_attempts` failures the host falls back to `pairing` without
+    keys (`attempts_remaining` `0`), and a new pairing code is needed. A failed attempt counts also
+    under an `Idempotency-Key`; its replay returns the stored `409`. I6 is checked in the same
+    transaction (`409 i6_violation`). `session_users` assigns each person their own session user on this
+    host (ruling T12, 24 section 2.2); a name that belongs or belonged to another person on this host,
+    or a second valid assignment of one person, gives `409 conflict` with `reason: session_user_taken`;
+    a name the host did not report (`reported_session_users`) gives `400 validation_failed` with
+    `errors[].code` `session_user_not_on_host`, and nothing is stored. Without an assignment a person
+    gets no terminal there (SR12). Needs step-up.
 
     Args:
         host_id (UUID): UUIDv7 (RFC 9562), lowercase canonical form.
@@ -163,14 +168,19 @@ def sync(
     """Confirm the fingerprint and declare the LLM login
 
      The owner types the first `terminal.fingerprint_confirm_chars` characters shown by `bothy-host
-    pair`. A mismatch gives `409 fingerprint_mismatch`; after `terminal.fingerprint_max_attempts`
-    failures the host falls back to `pairing`. I6 is checked in the same transaction (`409
-    i6_violation`). `session_users` assigns each person their own session user on this host (ruling T12,
-    24 section 2.2); a name that belongs or belonged to another person on this host, or a second valid
-    assignment of one person, gives `409 conflict` with `reason: session_user_taken`; a name the host
-    did not report (`reported_session_users`) gives `400 validation_failed` with `errors[].code`
-    `session_user_not_on_host`, and nothing is stored. Without an assignment a person gets no terminal
-    there (SR12). Needs step-up.
+    pair`, without separators, case-insensitive; a prefix of another length or with a character outside
+    the Crockford alphabet (also `I`, `L`, `O`, `U`) gives `400 validation_failed` with `errors[].code`
+    `invalid_format` and does not count. A mismatch gives `409 fingerprint_mismatch` with
+    `attempts_remaining`; the failure counter is not part of `Host`, so `version` and the `If-Match`
+    stay. After `terminal.fingerprint_max_attempts` failures the host falls back to `pairing` without
+    keys (`attempts_remaining` `0`), and a new pairing code is needed. A failed attempt counts also
+    under an `Idempotency-Key`; its replay returns the stored `409`. I6 is checked in the same
+    transaction (`409 i6_violation`). `session_users` assigns each person their own session user on this
+    host (ruling T12, 24 section 2.2); a name that belongs or belonged to another person on this host,
+    or a second valid assignment of one person, gives `409 conflict` with `reason: session_user_taken`;
+    a name the host did not report (`reported_session_users`) gives `400 validation_failed` with
+    `errors[].code` `session_user_not_on_host`, and nothing is stored. Without an assignment a person
+    gets no terminal there (SR12). Needs step-up.
 
     Args:
         host_id (UUID): UUIDv7 (RFC 9562), lowercase canonical form.
@@ -206,14 +216,19 @@ async def asyncio_detailed(
     """Confirm the fingerprint and declare the LLM login
 
      The owner types the first `terminal.fingerprint_confirm_chars` characters shown by `bothy-host
-    pair`. A mismatch gives `409 fingerprint_mismatch`; after `terminal.fingerprint_max_attempts`
-    failures the host falls back to `pairing`. I6 is checked in the same transaction (`409
-    i6_violation`). `session_users` assigns each person their own session user on this host (ruling T12,
-    24 section 2.2); a name that belongs or belonged to another person on this host, or a second valid
-    assignment of one person, gives `409 conflict` with `reason: session_user_taken`; a name the host
-    did not report (`reported_session_users`) gives `400 validation_failed` with `errors[].code`
-    `session_user_not_on_host`, and nothing is stored. Without an assignment a person gets no terminal
-    there (SR12). Needs step-up.
+    pair`, without separators, case-insensitive; a prefix of another length or with a character outside
+    the Crockford alphabet (also `I`, `L`, `O`, `U`) gives `400 validation_failed` with `errors[].code`
+    `invalid_format` and does not count. A mismatch gives `409 fingerprint_mismatch` with
+    `attempts_remaining`; the failure counter is not part of `Host`, so `version` and the `If-Match`
+    stay. After `terminal.fingerprint_max_attempts` failures the host falls back to `pairing` without
+    keys (`attempts_remaining` `0`), and a new pairing code is needed. A failed attempt counts also
+    under an `Idempotency-Key`; its replay returns the stored `409`. I6 is checked in the same
+    transaction (`409 i6_violation`). `session_users` assigns each person their own session user on this
+    host (ruling T12, 24 section 2.2); a name that belongs or belonged to another person on this host,
+    or a second valid assignment of one person, gives `409 conflict` with `reason: session_user_taken`;
+    a name the host did not report (`reported_session_users`) gives `400 validation_failed` with
+    `errors[].code` `session_user_not_on_host`, and nothing is stored. Without an assignment a person
+    gets no terminal there (SR12). Needs step-up.
 
     Args:
         host_id (UUID): UUIDv7 (RFC 9562), lowercase canonical form.
@@ -252,14 +267,19 @@ async def asyncio(
     """Confirm the fingerprint and declare the LLM login
 
      The owner types the first `terminal.fingerprint_confirm_chars` characters shown by `bothy-host
-    pair`. A mismatch gives `409 fingerprint_mismatch`; after `terminal.fingerprint_max_attempts`
-    failures the host falls back to `pairing`. I6 is checked in the same transaction (`409
-    i6_violation`). `session_users` assigns each person their own session user on this host (ruling T12,
-    24 section 2.2); a name that belongs or belonged to another person on this host, or a second valid
-    assignment of one person, gives `409 conflict` with `reason: session_user_taken`; a name the host
-    did not report (`reported_session_users`) gives `400 validation_failed` with `errors[].code`
-    `session_user_not_on_host`, and nothing is stored. Without an assignment a person gets no terminal
-    there (SR12). Needs step-up.
+    pair`, without separators, case-insensitive; a prefix of another length or with a character outside
+    the Crockford alphabet (also `I`, `L`, `O`, `U`) gives `400 validation_failed` with `errors[].code`
+    `invalid_format` and does not count. A mismatch gives `409 fingerprint_mismatch` with
+    `attempts_remaining`; the failure counter is not part of `Host`, so `version` and the `If-Match`
+    stay. After `terminal.fingerprint_max_attempts` failures the host falls back to `pairing` without
+    keys (`attempts_remaining` `0`), and a new pairing code is needed. A failed attempt counts also
+    under an `Idempotency-Key`; its replay returns the stored `409`. I6 is checked in the same
+    transaction (`409 i6_violation`). `session_users` assigns each person their own session user on this
+    host (ruling T12, 24 section 2.2); a name that belongs or belonged to another person on this host,
+    or a second valid assignment of one person, gives `409 conflict` with `reason: session_user_taken`;
+    a name the host did not report (`reported_session_users`) gives `400 validation_failed` with
+    `errors[].code` `session_user_not_on_host`, and nothing is stored. Without an assignment a person
+    gets no terminal there (SR12). Needs step-up.
 
     Args:
         host_id (UUID): UUIDv7 (RFC 9562), lowercase canonical form.

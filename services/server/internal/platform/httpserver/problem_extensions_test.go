@@ -120,3 +120,24 @@ type internalExtenderError struct{}
 func (internalExtenderError) Error() string                     { return "internal" }
 func (internalExtenderError) Unwrap() error                     { return errs.New(errs.CodeInternalError, "") }
 func (internalExtenderError) ProblemExtensions() map[string]any { return map[string]any{"extra": "x"} }
+
+// TestProblem_AttemptsRemaining (M2-41, Design note 7e): fingerprint_mismatch carries
+// attempts_remaining, also the value 0, valid against Problem; no other problem carries it.
+func TestProblem_AttemptsRemaining(t *testing.T) {
+	t.Parallel()
+	for _, n := range []int{2, 0} {
+		rec := problemFor(t, fmt.Errorf("confirm: %w", errs.FingerprintMismatch(n)))
+		var p map[string]any
+		if err := json.Unmarshal(rec.Body.Bytes(), &p); err != nil {
+			t.Fatal(err)
+		}
+		if rec.Code != http.StatusConflict || p["code"] != "fingerprint_mismatch" || p["attempts_remaining"] != float64(n) {
+			t.Fatalf("status %d body %s", rec.Code, rec.Body.Bytes())
+		}
+		validateProblem(t, rec.Body.Bytes())
+	}
+	rec := problemFor(t, errs.New(errs.CodeFingerprintMismatch, ""))
+	if strings.Contains(rec.Body.String(), "attempts_remaining") {
+		t.Fatalf("a plain error carries attempts_remaining: %s", rec.Body.Bytes())
+	}
+}

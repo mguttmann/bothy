@@ -70,7 +70,7 @@ func (s *Service) Create(ctx context.Context, a actor.Actor, cmd terminal.Create
 	if err != nil {
 		return terminal.PairingCodeIssued{}, err
 	}
-	code, err := s.d.PairingCodes.Issue(ctx)
+	code, err := s.issueCode(ctx)
 	if err != nil {
 		return terminal.PairingCodeIssued{}, err
 	}

@@ -439,10 +439,12 @@ A host is a target outside the tree instance, space, channel (07 section 2.12):
   `host.manage` `All(HumanSession, Owner)`. A requirement whose first part is `HumanSession` is a
   gate: `authorize` and `Scope` refuse agents, apps and personal tokens with
   `subject_kind_not_allowed` right after the liveness checks, before any resource is resolved.
-  `host.pair` and `host.connect` stay deferred for M2-41 and M2-43; the terminal actions are real
+  `host.pair` is `Public` since M2-41 (the use case proves the pairing code before `authorize`, as
+  for the refresh token); `host.connect` stays deferred for M2-43; the terminal actions are real
   since M2-40 (section below).
 - **Visibility.** A host resource resolves through the source; it is visible to an effective
-  owner, its holder and a person with `TerminalOn`, with "view as" to both views.
+  owner, its holder and a person with `TerminalOn`, with "view as" to both views, and to any
+  principal for an action whose requirement is exactly `Public` (only `host.pair`, M2-41).
 - **Scope.** `Scope(host.read)` gives `AllHosts` to an effective owner, otherwise the ascending
   `HostIDs` of the terminal grants and the own hosts, intersected with "view as".
 - **access.changed.** `AccessView.Hosts` holds the hosts with `TerminalOn` (every host for an

@@ -68,13 +68,49 @@ type Store interface {
 	// OwnSessionUsers returns the valid assignments of userID with the names their hosts report,
 	// ascending by host (M2-40, 07 SR12).
 	OwnSessionUsers(ctx context.Context, userID ids.ID) ([]domain.OwnSessionUser, error)
+	// HostByPairingHash returns the host whose pairing_code_hash is hash, without a lock (M2-41);
+	// found is false when no host holds it.
+	HostByPairingHash(ctx context.Context, hash []byte) (h domain.Host, found bool, err error)
+	// SetPairingCode puts the host id into pairing with a new code (M2-41): the hash, its expiry,
+	// fingerprint_failures 0, the three key columns NULL when dropKeys (key_fingerprint stays),
+	// disabled_at and disabled_reason NULL, and version.
+	SetPairingCode(ctx context.Context, id ids.ID, hash []byte, expires time.Time, dropKeys bool, version int64) error
+	// StorePairing writes the redemption p of the host id (M2-41): keys, fingerprint, the next
+	// key generation, the report, the code used up, state confirming and version. A login key of
+	// another host (the unique index on auth_jkt) is 409 conflict with reason host_key_in_use.
+	StorePairing(ctx context.Context, id ids.ID, p PairingWrite, version int64) error
+	// SetFingerprintFailures writes the failure counter of the host id; the version stays.
+	SetFingerprintFailures(ctx context.Context, id ids.ID, n int) error
+	// ConfirmPairing writes the confirmation of the host id (M2-41): declared_server_host,
+	// confirmed_by, confirmed_at, fingerprint_failures 0, state active and version.
+	ConfirmPairing(ctx context.Context, id ids.ID, declaredServerHost bool, by ids.ID, at time.Time, version int64) error
 }
 
-// PairingCodes issues pairing codes of hosts; internal/wire binds it to identity.Tokens
-// (NewHostPairingCode). M2-41 reuses it for issueHostPairingCode.
+// PairingWrite is what host.pair stores (M2-41, Design note 3h): the checked keys, the
+// fingerprint and the checked report.
+type PairingWrite struct {
+	Keys        domain.HostKeys
+	Fingerprint string
+	PairedAt    time.Time
+	Report      domain.PairReport
+}
+
+// PairingCodes issues and hashes pairing codes of hosts; internal/wire binds it to
+// identity.Tokens (NewHostPairingCode, HashHostPairingCode), so the format and the hash
+// derivation exist once (M2-41, Design note 1).
 type PairingCodes interface {
 	// Issue returns a new code with its HMAC; it reads no database.
 	Issue(ctx context.Context) (identity.PairingCode, error)
+	// Hash returns the HMAC of raw; identity.ErrTokenMalformed for a value that is not a
+	// well-formed code of kind hpc, without any database access.
+	Hash(ctx context.Context, raw string) ([]byte, error)
+}
+
+// Instance gives the identity of the installation for the answer of pairHost (M2-41); internal/wire
+// binds it to instance.State.
+type Instance interface {
+	// InstanceID returns instance.instance_id.
+	InstanceID(ctx context.Context) (ids.ID, error)
 }
 
 // UserFacts are the facts of a principal that the holder and the session users need.

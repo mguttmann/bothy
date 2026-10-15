@@ -131,11 +131,9 @@ func TestHostRequirementEntries(t *testing.T) {
 			t.Errorf("%s is not gated by HumanSession", id)
 		}
 	}
-	for _, id := range []string{"host.pair", "host.connect"} {
-		req, _ := domain.RequirementOf(id)
-		if _, deferred := req.Expr.DeferredTo(); !deferred {
-			t.Errorf("%s must stay deferred until M2-41 and M2-43", id)
-		}
+	// host.pair is Public since M2-41 (TestHostPairRequirement); host.connect waits for M2-43.
+	if req, _ := domain.RequirementOf("host.connect"); !func() bool { _, d := req.Expr.DeferredTo(); return d }() {
+		t.Error("host.connect must stay deferred until M2-43")
 	}
 	if req, _ := domain.RequirementOf("terminal.terminate"); !req.Expr.IsSystem() {
 		t.Error("terminal.terminate must stay a system action")

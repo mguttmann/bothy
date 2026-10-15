@@ -1,0 +1,10 @@
+{
+  "description": "Fingerprints of 24 section 4.3 (Crockford base32 of SHA-256 over the label bothy-host-fp/1, the raw X25519 key and the raw Ed25519 key), computed independently for the brief of M2-41.",
+  "vectors": [
+    {
+      "noise_public": "000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f",
+      "ed25519_public": "202122232425262728292a2b2c2d2e2f303132333435363738393a3b3c3d3e3f",
+      "fingerprint": "F0CC-6QS6-RF5D-3BSH-CAZQ-PXMR-J8RA-AHK5-1HF0-9S02-1GW6-BW3J-HK90"
+    }
+  ]
+}

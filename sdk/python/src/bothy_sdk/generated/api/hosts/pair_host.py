@@ -82,7 +82,20 @@ def sync_detailed(
 
      Called by `bothy-host pair` without login. Registers the static X25519 key (Noise) and the Ed25519
     key (login) of the host, its profiles and the names of its session users (`reported_session_users`,
-    24 section 2.2). The host becomes `confirming`; an owner confirms the fingerprint (24, 3.2).
+    24 section 2.2). The host becomes `confirming`, `key_generation` rises; an owner confirms the
+    fingerprint (24, 3.2). Every code that does not work answers `401 unauthenticated` with the same
+    body: a wrong form or checksum (checked without database access), an unknown, used, replaced or
+    expired code; a retry after a lost answer gets `401` too, the operator asks for a new code. Key
+    rules (`400 validation_failed`, the code stays valid): `noise_public_key` strict base64url of 32
+    bytes and no low-order point (`errors[].code` `invalid_key`); `auth_public_jwk` exactly `kty` `OKP`,
+    `crv` `Ed25519` and `x` of 32 bytes (`invalid_key`), any other member such as the private `d` is
+    `unknown_member`. Report rules: at least one session user (`empty`), names distinct without regard
+    to case (`duplicate`) and at most `host.os_user_max_chars` characters (`too_long`), labels and
+    profile names at most `terminal.report_label_max_chars` characters (`too_long`), each list at most
+    `terminal.report_max_entries` entries (`limit_reached`), distinct profile names (`duplicate`),
+    `host_version` SemVer without `v` (`invalid_format`). `409 conflict` with `reason` `host_key_in_use`
+    when the login key belongs to another host, `host_key_reused` when the keys equal the keys a re-
+    pairing dropped; the code stays valid.
 
     Args:
         body (HostPairRequest):
@@ -115,7 +128,20 @@ def sync(
 
      Called by `bothy-host pair` without login. Registers the static X25519 key (Noise) and the Ed25519
     key (login) of the host, its profiles and the names of its session users (`reported_session_users`,
-    24 section 2.2). The host becomes `confirming`; an owner confirms the fingerprint (24, 3.2).
+    24 section 2.2). The host becomes `confirming`, `key_generation` rises; an owner confirms the
+    fingerprint (24, 3.2). Every code that does not work answers `401 unauthenticated` with the same
+    body: a wrong form or checksum (checked without database access), an unknown, used, replaced or
+    expired code; a retry after a lost answer gets `401` too, the operator asks for a new code. Key
+    rules (`400 validation_failed`, the code stays valid): `noise_public_key` strict base64url of 32
+    bytes and no low-order point (`errors[].code` `invalid_key`); `auth_public_jwk` exactly `kty` `OKP`,
+    `crv` `Ed25519` and `x` of 32 bytes (`invalid_key`), any other member such as the private `d` is
+    `unknown_member`. Report rules: at least one session user (`empty`), names distinct without regard
+    to case (`duplicate`) and at most `host.os_user_max_chars` characters (`too_long`), labels and
+    profile names at most `terminal.report_label_max_chars` characters (`too_long`), each list at most
+    `terminal.report_max_entries` entries (`limit_reached`), distinct profile names (`duplicate`),
+    `host_version` SemVer without `v` (`invalid_format`). `409 conflict` with `reason` `host_key_in_use`
+    when the login key belongs to another host, `host_key_reused` when the keys equal the keys a re-
+    pairing dropped; the code stays valid.
 
     Args:
         body (HostPairRequest):
@@ -143,7 +169,20 @@ async def asyncio_detailed(
 
      Called by `bothy-host pair` without login. Registers the static X25519 key (Noise) and the Ed25519
     key (login) of the host, its profiles and the names of its session users (`reported_session_users`,
-    24 section 2.2). The host becomes `confirming`; an owner confirms the fingerprint (24, 3.2).
+    24 section 2.2). The host becomes `confirming`, `key_generation` rises; an owner confirms the
+    fingerprint (24, 3.2). Every code that does not work answers `401 unauthenticated` with the same
+    body: a wrong form or checksum (checked without database access), an unknown, used, replaced or
+    expired code; a retry after a lost answer gets `401` too, the operator asks for a new code. Key
+    rules (`400 validation_failed`, the code stays valid): `noise_public_key` strict base64url of 32
+    bytes and no low-order point (`errors[].code` `invalid_key`); `auth_public_jwk` exactly `kty` `OKP`,
+    `crv` `Ed25519` and `x` of 32 bytes (`invalid_key`), any other member such as the private `d` is
+    `unknown_member`. Report rules: at least one session user (`empty`), names distinct without regard
+    to case (`duplicate`) and at most `host.os_user_max_chars` characters (`too_long`), labels and
+    profile names at most `terminal.report_label_max_chars` characters (`too_long`), each list at most
+    `terminal.report_max_entries` entries (`limit_reached`), distinct profile names (`duplicate`),
+    `host_version` SemVer without `v` (`invalid_format`). `409 conflict` with `reason` `host_key_in_use`
+    when the login key belongs to another host, `host_key_reused` when the keys equal the keys a re-
+    pairing dropped; the code stays valid.
 
     Args:
         body (HostPairRequest):
@@ -174,7 +213,20 @@ async def asyncio(
 
      Called by `bothy-host pair` without login. Registers the static X25519 key (Noise) and the Ed25519
     key (login) of the host, its profiles and the names of its session users (`reported_session_users`,
-    24 section 2.2). The host becomes `confirming`; an owner confirms the fingerprint (24, 3.2).
+    24 section 2.2). The host becomes `confirming`, `key_generation` rises; an owner confirms the
+    fingerprint (24, 3.2). Every code that does not work answers `401 unauthenticated` with the same
+    body: a wrong form or checksum (checked without database access), an unknown, used, replaced or
+    expired code; a retry after a lost answer gets `401` too, the operator asks for a new code. Key
+    rules (`400 validation_failed`, the code stays valid): `noise_public_key` strict base64url of 32
+    bytes and no low-order point (`errors[].code` `invalid_key`); `auth_public_jwk` exactly `kty` `OKP`,
+    `crv` `Ed25519` and `x` of 32 bytes (`invalid_key`), any other member such as the private `d` is
+    `unknown_member`. Report rules: at least one session user (`empty`), names distinct without regard
+    to case (`duplicate`) and at most `host.os_user_max_chars` characters (`too_long`), labels and
+    profile names at most `terminal.report_label_max_chars` characters (`too_long`), each list at most
+    `terminal.report_max_entries` entries (`limit_reached`), distinct profile names (`duplicate`),
+    `host_version` SemVer without `v` (`invalid_format`). `409 conflict` with `reason` `host_key_in_use`
+    when the login key belongs to another host, `host_key_reused` when the keys equal the keys a re-
+    pairing dropped; the code stays valid.
 
     Args:
         body (HostPairRequest):

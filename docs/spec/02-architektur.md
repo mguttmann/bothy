@@ -232,7 +232,7 @@ andere ist verboten und schlägt im Gate fehl (Abschnitt 7).
 | `notify` | `identity`, `chat`, `messaging`, `sync` | Geräte und Zeitzone; Ziel-Pfad für Einstellungen; Erwähnungen; Gelesen-Stand |
 | `apps` | `instance`, `identity`, `authz`, `chat`, `agents`, `messaging`, `sync` | Webhook-Signierschlüssel; App-Prinzipal und Tokens; Freigaben der App bei der Deinstallation widerrufen; Scope-Tabelle für Ereignis-Abos; Ziel der Eingangs-Webhooks; Befehle von Apps; Nachrichten aus Webhooks; Verbraucher für ausgehende Webhooks |
 | `gateway` | `chat`, `agents`, `runs`, `sync`, `stats` | Thread zu Kanal für Fokus und Tippen; Verbraucher-Cursor und Präsenz; Lauf-Patches und Zustellvorbereitung; Tail, Nachholen, Momentaufnahme; Live-Rahmen für `stats.subscribe` |
-| `terminal` | `instance`, `identity`, `authz`, `agents` | Signer für Sitzungs-Marken (Zweck `terminal`); Menschen, Geräte, Owner, Verbrauch des Step-up; Freigaben auf Rechner und I6; Bereitschaft der Dev-Umgebung (Etappe) |
+| `terminal` | `instance`, `identity`, `authz`, `agents` | Signer für Sitzungs-Marken (Zweck `terminal`) und `instance_id` der Antwort von `pairHost`; Menschen, Geräte, Owner, Verbrauch des Step-up, Kopplungs-Codes (Format und HMAC über `identity`, M2-41); Freigaben auf Rechner und I6; Bereitschaft der Dev-Umgebung (Etappe) |
 
 Ebenen (von unten): `instance`, `billing` · `audit`, `authz` · `identity` · `chat` · `agents`,
 `files` · `messaging`, `status`, `terminal` · `runs`, `search`, `importer`, `privacy` · `sync`,
@@ -726,6 +726,11 @@ die Wartezeit vervielfachen.
   gleichzeitige Wiederholung wartet am Primärschlüssel, bis die erste Transaktion endet, und liest
   dann die gespeicherte Antwort. Endet die Wartezeit mit `database.lock_timeout`, antwortet der
   Server `409 request_in_progress` (04, 5.2) und speichert nichts.
+- Ausnahme (M2-41): Eine endgültige Fehlerantwort, die der Handler mit
+  `idempotency.KeepEffectOnFinal` markiert, behält ihre Wirkung; die Stufe speichert sie mit
+  `Store.Complete` in derselben Transaktion und committet beides zusammen. Markiert wird nur
+  `409 fingerprint_mismatch` von `confirmHost`, weil jeder Fehlversuch auch mit Schlüssel zählen
+  muss (TM-T19); eine markierte `401` oder `5xx` rollt weiter zurück (docs/DECISIONS.md D-M2-41-7).
 - Rights changes behind the stage (M1-31): the stage opens its unit with
   `txn.AllowLateRightsChange()`. The use case declares its rights change in its nested unit as
   everywhere else; that nested unit then runs the rights begin hook (phase 1), its work and the

@@ -16,6 +16,7 @@ import (
 	"github.com/OWNER/bothy/services/server/internal/kernel/ids"
 	"github.com/OWNER/bothy/services/server/internal/kernel/txn"
 	"github.com/OWNER/bothy/services/server/internal/terminal"
+	"github.com/OWNER/bothy/services/server/internal/terminal/domain"
 )
 
 // Config holds the configuration of the host use cases, bound in internal/wire
@@ -29,6 +30,16 @@ type Config struct {
 	ReasonMaxChars int `config:"audit.reason_max_chars"`
 	// PairingCodeTTL is terminal.pairing_code_ttl, the validity of a pairing code.
 	PairingCodeTTL time.Duration `config:"terminal.pairing_code_ttl"`
+	// FingerprintConfirmChars is terminal.fingerprint_confirm_chars, the length of the typed
+	// prefix of the fingerprint (M2-41).
+	FingerprintConfirmChars int `config:"terminal.fingerprint_confirm_chars"`
+	// FingerprintMaxAttempts is terminal.fingerprint_max_attempts, the failed confirmations
+	// before the fallback to pairing.
+	FingerprintMaxAttempts int `config:"terminal.fingerprint_max_attempts"`
+	// ReportLabelMaxChars is terminal.report_label_max_chars, the longest label of a report.
+	ReportLabelMaxChars int `config:"terminal.report_label_max_chars"`
+	// ReportMaxEntries is terminal.report_max_entries, the longest list of a report.
+	ReportMaxEntries int `config:"terminal.report_max_entries"`
 	// PageSizeDefault is api.page_size_default; PageSizeMax is api.page_size_max.
 	PageSizeDefault int `config:"api.page_size_default"`
 	PageSizeMax     int `config:"api.page_size_max"`
@@ -38,8 +49,11 @@ type Config struct {
 type Deps struct {
 	// Store reads and writes the three tables of the module.
 	Store Store
-	// PairingCodes issues the pairing code of createHost.
+	// PairingCodes issues the pairing codes of createHost and issueHostPairingCode and hashes the
+	// code of pairHost.
 	PairingCodes PairingCodes
+	// Instance gives the instance_id of the answer of pairHost.
+	Instance Instance
 	// People checks the holder and the people of session users.
 	People People
 	// Presence gives HostView.connected; nil means NoConnections.
@@ -70,13 +84,15 @@ var _ terminal.Hosts = (*Service)(nil)
 // New returns the use cases. Errors: a missing collaborator or a configuration value below its
 // minimum.
 func New(cfg Config, d Deps) (*Service, error) {
-	if d.Store == nil || d.PairingCodes == nil || d.People == nil || d.UoW == nil || d.Authorizer == nil || d.Audit == nil ||
-		d.Events == nil || d.Cursors == nil {
+	if d.Store == nil || d.PairingCodes == nil || d.Instance == nil || d.People == nil || d.UoW == nil || d.Authorizer == nil ||
+		d.Audit == nil || d.Events == nil || d.Cursors == nil {
 		return nil, errors.New("terminal: New needs every collaborator")
 	}
 	if cfg.NameMaxChars < 1 || cfg.OSUserMaxChars < 1 || cfg.ReasonMaxChars < 1 || cfg.PairingCodeTTL <= 0 ||
-		cfg.PageSizeDefault < 1 || cfg.PageSizeMax < cfg.PageSizeDefault {
-		return nil, errors.New("terminal: the text limits, terminal.pairing_code_ttl and the page sizes must be positive")
+		cfg.PageSizeDefault < 1 || cfg.PageSizeMax < cfg.PageSizeDefault || cfg.FingerprintMaxAttempts < 1 ||
+		cfg.FingerprintConfirmChars < 1 || cfg.FingerprintConfirmChars > domain.FingerprintChars ||
+		cfg.ReportLabelMaxChars < 1 || cfg.ReportMaxEntries < 1 {
+		return nil, errors.New("terminal: the text limits, terminal.pairing_code_ttl, the fingerprint and report keys and the page sizes must be in range")
 	}
 	if d.Presence == nil {
 		d.Presence = NoConnections{}

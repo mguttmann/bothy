@@ -796,8 +796,10 @@ Quelle: [24-terminal.md](../spec/24-terminal.md), Abschnitt 17.
 | Schlüssel | Umgebung | Ort | Typ | Standard | Bedeutung | Stand |
 |---|---|---|---|---|---|---|
 | `terminal.pairing_code_ttl` | `BOTHY_TERMINAL__PAIRING_CODE_TTL` | Server | duration | `15m` | Gültigkeit eines Kopplungs-Codes für einen Rechner | aktiv |
-| `terminal.fingerprint_confirm_chars` | `BOTHY_TERMINAL__FINGERPRINT_CONFIRM_CHARS` | Server |  | `8` | so viele Zeichen des Fingerabdrucks tippt der Owner bei der Bestätigung | geplant (M2) |
-| `terminal.fingerprint_max_attempts` | `BOTHY_TERMINAL__FINGERPRINT_MAX_ATTEMPTS` | Server |  | `3` | Fehlversuche bei der Bestätigung, danach Rückfall auf `pairing` | geplant (M2) |
+| `terminal.fingerprint_confirm_chars` | `BOTHY_TERMINAL__FINGERPRINT_CONFIRM_CHARS` | Server | int | `8` | so viele Zeichen des Fingerabdrucks tippt der Owner bei der Bestätigung | aktiv |
+| `terminal.fingerprint_max_attempts` | `BOTHY_TERMINAL__FINGERPRINT_MAX_ATTEMPTS` | Server | int | `3` | Fehlversuche bei der Bestätigung, danach Rückfall auf `pairing` | aktiv |
+| `terminal.report_label_max_chars` | `BOTHY_TERMINAL__REPORT_LABEL_MAX_CHARS` | Server | int | `100` | längster Profilname, Anzeigename, Name eines Arbeitsordners und Betriebssystem-Version, die ein Rechner meldet (3.2) | aktiv |
+| `terminal.report_max_entries` | `BOTHY_TERMINAL__REPORT_MAX_ENTRIES` | Server | int | `64` | höchstens so viele Einträge je gemeldeter Liste: Profile, Sitzungsbenutzer, Arbeitsordner eines Sitzungsbenutzers (3.2) | aktiv |
 | `terminal.step_up_max_age` | `BOTHY_TERMINAL__STEP_UP_MAX_AGE` | Server | duration | `60s` | so jung muss der Step-up für `terminal.open` und `terminal.attach` sein | aktiv |
 | `terminal.session_token_ttl` | `BOTHY_TERMINAL__SESSION_TOKEN_TTL` | Server | duration | `30s` | Gültigkeit einer Sitzungs-Marke | aktiv |
 | `terminal.open_timeout` | `BOTHY_TERMINAL__OPEN_TIMEOUT` | Server |  | `20s` | Frist, bis beide Seiten im Relais verbunden sind und der Handshake steht | geplant (M2) |

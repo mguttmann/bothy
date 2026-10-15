@@ -117,6 +117,10 @@ func TestConfigSchemaBuilds(t *testing.T) {
 		"host.os_user_max_chars":                 {Kind: config.KindInt, Default: "64", Min: "1", Chapter: "03-datenmodell.md"},
 		"terminal.pairing_code_ttl":              {Kind: config.KindDuration, Default: "15m", Min: "1s", Chapter: "24-terminal.md"},
 		"terminal.session_token_ttl":             {Kind: config.KindDuration, Default: "30s", Min: "1s", Chapter: "24-terminal.md"},
+		"terminal.fingerprint_confirm_chars":     {Kind: config.KindInt, Default: "8", Min: "1", Chapter: "24-terminal.md"},
+		"terminal.fingerprint_max_attempts":      {Kind: config.KindInt, Default: "3", Min: "1", Chapter: "24-terminal.md"},
+		"terminal.report_label_max_chars":        {Kind: config.KindInt, Default: "100", Min: "1", Chapter: "24-terminal.md"},
+		"terminal.report_max_entries":            {Kind: config.KindInt, Default: "64", Min: "1", Chapter: "24-terminal.md"},
 		"terminal.step_up_max_age":               {Kind: config.KindDuration, Default: "60s", Min: "1s", Chapter: "24-terminal.md"},
 		"terminal.quick_reattach_window":         {Kind: config.KindDuration, Default: "60s", Min: "0s", Chapter: "24-terminal.md"},
 		"audit.reason_max_chars":                 {Kind: config.KindInt, Default: "500", Min: "1", Chapter: "19-sicherheit.md"},
@@ -927,5 +931,24 @@ func TestSearchLocaleMapCheck(t *testing.T) {
 	got := load(t, `BOTHY_SEARCH__LANGUAGES=["german","german"]`)
 	if len(got) != 1 || !strings.Contains(got[0].String(), "search_languages:") {
 		t.Errorf("problems %v, want one of search_languages", got)
+	}
+}
+// TestConfig_FingerprintKeysChecked (M2-41, Design note 12): terminal.fingerprint_confirm_chars
+// of 0 or above the length of the fingerprint and terminal.fingerprint_max_attempts of 0 are
+// start errors that name the key.
+func TestConfig_FingerprintKeysChecked(t *testing.T) {
+	t.Parallel()
+	if got := load(t, "BOTHY_TERMINAL__FINGERPRINT_CONFIRM_CHARS=52", "BOTHY_TERMINAL__FINGERPRINT_MAX_ATTEMPTS=1"); got != nil {
+		t.Fatalf("the bounds are refused: %v", got)
+	}
+	for env, key := range map[string]string{
+		"BOTHY_TERMINAL__FINGERPRINT_CONFIRM_CHARS=0":  "terminal.fingerprint_confirm_chars",
+		"BOTHY_TERMINAL__FINGERPRINT_CONFIRM_CHARS=53": "terminal.fingerprint_confirm_chars",
+		"BOTHY_TERMINAL__FINGERPRINT_MAX_ATTEMPTS=0":   "terminal.fingerprint_max_attempts",
+	} {
+		got := load(t, env)
+		if len(got) == 0 || !strings.Contains(got[0].Key+" "+got[0].Message, key) {
+			t.Errorf("%s: problems %v, want one naming %s", env, got, key)
+		}
 	}
 }

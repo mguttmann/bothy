@@ -9016,7 +9016,9 @@ type Host struct {
 	// Id UUIDv7 (RFC 9562), lowercase canonical form.
 	Id Uuid `json:"id"`
 
-	// KeyFingerprint Examples: 7K2Q-M9XD-0000-0000-0000-0000-0000-0000-0000-0000-0000-0000-0000
+	// KeyFingerprint Fingerprint of the stored keys (24, 4.3), 13 groups of four Crockford base32 characters; absent while the host has no keys.
+	//
+	// Examples: 7K2Q-M9XD-0000-0000-0000-0000-0000-0000-0000-0000-0000-0000-0000
 	KeyFingerprint *string `json:"key_fingerprint,omitempty"`
 
 	// KeyGeneration Examples: 1
@@ -9031,7 +9033,7 @@ type Host struct {
 	// Name Examples: Build server
 	Name string `json:"name"`
 
-	// NoisePublicKey Static X25519 key of the host, 32 bytes base64url without padding; absent before pairing.
+	// NoisePublicKey Static X25519 key of the host, 32 bytes base64url without padding; absent while the host has no keys (before pairing and after a re-pairing or the fallback of `confirmHost`).
 	//
 	// Examples: Zm9vYmFyZm9vYmFyZm9vYmFyZm9vYmFyZm9vYmFyMTI
 	NoisePublicKey *string `json:"noise_public_key,omitempty"`
@@ -11315,6 +11317,9 @@ type PrincipalRef struct {
 // Problem Error body after RFC 9457 (`application/problem+json`). `type` is a relative URI with full
 // path `/api/v1/problems/{code}`; `code` repeats its last segment for convenience.
 type Problem struct {
+	// AttemptsRemaining Present with `fingerprint_mismatch`; `0` means the host fell back to `pairing` and needs a new pairing code (24, 3.2).
+	AttemptsRemaining *int `json:"attempts_remaining,omitempty"`
+
 	// Code Stable machine code; the known values are `x-problem-codes` of this schema. Clients treat unknown codes by HTTP status.
 	//
 	// Examples: not_found
@@ -15693,10 +15698,25 @@ type UpdateHostParams struct {
 	IfMatch IfMatchRequired `json:"If-Match"`
 }
 
+// ConfirmHostParams defines parameters for ConfirmHost.
+type ConfirmHostParams struct {
+	// IdempotencyKey UUIDv7 chosen by the client per logical operation. A repeat with the same request returns the stored response; a different request gives 422 `idempotency_key_reuse`; a repeat while the first is running gives 409 `request_in_progress`. Kept for `sync.idempotency_key_ttl`.
+	IdempotencyKey *IdempotencyKey `json:"Idempotency-Key,omitempty"`
+
+	// IfMatch ETag of the version the change is based on, e.g. `"7"`. Mismatch gives 412 `version_conflict`.
+	IfMatch IfMatchRequired `json:"If-Match"`
+}
+
 // SetHostLlmCredentialsParams defines parameters for SetHostLlmCredentials.
 type SetHostLlmCredentialsParams struct {
 	// IfMatch ETag of the version the change is based on, e.g. `"7"`. Mismatch gives 412 `version_conflict`.
 	IfMatch IfMatchRequired `json:"If-Match"`
+}
+
+// IssueHostPairingCodeParams defines parameters for IssueHostPairingCode.
+type IssueHostPairingCodeParams struct {
+	// IdempotencyKey UUIDv7 chosen by the client per logical operation. A repeat with the same request returns the stored response; a different request gives 422 `idempotency_key_reuse`; a repeat while the first is running gives 409 `request_in_progress`. Kept for `sync.idempotency_key_ttl`.
+	IdempotencyKey *IdempotencyKey `json:"Idempotency-Key,omitempty"`
 }
 
 // SetHostStateParams defines parameters for SetHostState.
@@ -16099,11 +16119,20 @@ type AddGroupMemberJSONRequestBody = GroupMemberAdd
 // CreateHostJSONRequestBody defines body for CreateHost for application/json ContentType.
 type CreateHostJSONRequestBody = HostCreate
 
+// PairHostJSONRequestBody defines body for PairHost for application/json ContentType.
+type PairHostJSONRequestBody = HostPairRequest
+
 // UpdateHostJSONRequestBody defines body for UpdateHost for application/json ContentType.
 type UpdateHostJSONRequestBody = HostUpdate
 
+// ConfirmHostJSONRequestBody defines body for ConfirmHost for application/json ContentType.
+type ConfirmHostJSONRequestBody = HostConfirm
+
 // SetHostLlmCredentialsJSONRequestBody defines body for SetHostLlmCredentials for application/json ContentType.
 type SetHostLlmCredentialsJSONRequestBody = HostLlmCredentialsSet
+
+// IssueHostPairingCodeJSONRequestBody defines body for IssueHostPairingCode for application/json ContentType.
+type IssueHostPairingCodeJSONRequestBody = ReasonBody
 
 // SetHostStateJSONRequestBody defines body for SetHostState for application/json ContentType.
 type SetHostStateJSONRequestBody = HostStateSet

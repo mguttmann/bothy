@@ -236,15 +236,24 @@ type ServerInterface interface {
 	// CreateHost Register a host and issue its pairing code
 	// (POST /hosts)
 	CreateHost(w http.ResponseWriter, r *http.Request, params CreateHostParams)
+	// PairHost Redeem a pairing code from the host service
+	// (POST /hosts/pair)
+	PairHost(w http.ResponseWriter, r *http.Request)
 	// GetHost Read a host
 	// (GET /hosts/{host_id})
 	GetHost(w http.ResponseWriter, r *http.Request, hostId HostIdPath)
 	// UpdateHost Change name or assignee of a host
 	// (PATCH /hosts/{host_id})
 	UpdateHost(w http.ResponseWriter, r *http.Request, hostId HostIdPath, params UpdateHostParams)
+	// ConfirmHost Confirm the fingerprint and declare the LLM login
+	// (POST /hosts/{host_id}/confirm)
+	ConfirmHost(w http.ResponseWriter, r *http.Request, hostId HostIdPath, params ConfirmHostParams)
 	// SetHostLlmCredentials Declare the LLM login of a host
 	// (PUT /hosts/{host_id}/llm-credentials)
 	SetHostLlmCredentials(w http.ResponseWriter, r *http.Request, hostId HostIdPath, params SetHostLlmCredentialsParams)
+	// IssueHostPairingCode Issue a new pairing code (re-pairing)
+	// (POST /hosts/{host_id}/pairing-code)
+	IssueHostPairingCode(w http.ResponseWriter, r *http.Request, hostId HostIdPath, params IssueHostPairingCodeParams)
 	// SetHostState Disable, enable or retire a host
 	// (POST /hosts/{host_id}/state)
 	SetHostState(w http.ResponseWriter, r *http.Request, hostId HostIdPath, params SetHostStateParams)
@@ -3616,6 +3625,20 @@ func (siw *ServerInterfaceWrapper) CreateHost(w http.ResponseWriter, r *http.Req
 	handler.ServeHTTP(w, r)
 }
 
+// PairHost operation middleware
+func (siw *ServerInterfaceWrapper) PairHost(w http.ResponseWriter, r *http.Request) {
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.PairHost(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
 // GetHost operation middleware
 func (siw *ServerInterfaceWrapper) GetHost(w http.ResponseWriter, r *http.Request) {
 
@@ -3715,6 +3738,79 @@ func (siw *ServerInterfaceWrapper) UpdateHost(w http.ResponseWriter, r *http.Req
 	handler.ServeHTTP(w, r)
 }
 
+// ConfirmHost operation middleware
+func (siw *ServerInterfaceWrapper) ConfirmHost(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "host_id" -------------
+	var hostId HostIdPath
+
+	err = runtime.BindStyledParameterWithOptions("simple", "host_id", r.PathValue("host_id"), &hostId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "uuid", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "host_id", Err: err})
+		return
+	}
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params ConfirmHostParams
+
+	headers := r.Header
+
+	// ------------- Optional header parameter "Idempotency-Key" -------------
+	if valueList, found := headers[http.CanonicalHeaderKey("Idempotency-Key")]; found {
+		var IdempotencyKey IdempotencyKey
+		n := len(valueList)
+		if n != 1 {
+			siw.ErrorHandlerFunc(w, r, &TooManyValuesForParamError{ParamName: "Idempotency-Key", Count: n})
+			return
+		}
+
+		err = runtime.BindStyledParameterWithOptions("simple", "Idempotency-Key", valueList[0], &IdempotencyKey, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: "uuid"})
+		if err != nil {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "Idempotency-Key", Err: err})
+			return
+		}
+
+		params.IdempotencyKey = &IdempotencyKey
+
+	}
+
+	// ------------- Required header parameter "If-Match" -------------
+	if valueList, found := headers[http.CanonicalHeaderKey("If-Match")]; found {
+		var IfMatch IfMatchRequired
+		n := len(valueList)
+		if n != 1 {
+			siw.ErrorHandlerFunc(w, r, &TooManyValuesForParamError{ParamName: "If-Match", Count: n})
+			return
+		}
+
+		err = runtime.BindStyledParameterWithOptions("simple", "If-Match", valueList[0], &IfMatch, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: true, Type: "string", Format: ""})
+		if err != nil {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "If-Match", Err: err})
+			return
+		}
+
+		params.IfMatch = IfMatch
+
+	} else {
+		err := fmt.Errorf("Header parameter If-Match is required, but not found")
+		siw.ErrorHandlerFunc(w, r, &RequiredHeaderError{ParamName: "If-Match", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.ConfirmHost(w, r, hostId, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
 // SetHostLlmCredentials operation middleware
 func (siw *ServerInterfaceWrapper) SetHostLlmCredentials(w http.ResponseWriter, r *http.Request) {
 
@@ -3760,6 +3856,56 @@ func (siw *ServerInterfaceWrapper) SetHostLlmCredentials(w http.ResponseWriter, 
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		siw.Handler.SetHostLlmCredentials(w, r, hostId, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// IssueHostPairingCode operation middleware
+func (siw *ServerInterfaceWrapper) IssueHostPairingCode(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "host_id" -------------
+	var hostId HostIdPath
+
+	err = runtime.BindStyledParameterWithOptions("simple", "host_id", r.PathValue("host_id"), &hostId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "uuid", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "host_id", Err: err})
+		return
+	}
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params IssueHostPairingCodeParams
+
+	headers := r.Header
+
+	// ------------- Optional header parameter "Idempotency-Key" -------------
+	if valueList, found := headers[http.CanonicalHeaderKey("Idempotency-Key")]; found {
+		var IdempotencyKey IdempotencyKey
+		n := len(valueList)
+		if n != 1 {
+			siw.ErrorHandlerFunc(w, r, &TooManyValuesForParamError{ParamName: "Idempotency-Key", Count: n})
+			return
+		}
+
+		err = runtime.BindStyledParameterWithOptions("simple", "Idempotency-Key", valueList[0], &IdempotencyKey, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: "uuid"})
+		if err != nil {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "Idempotency-Key", Err: err})
+			return
+		}
+
+		params.IdempotencyKey = &IdempotencyKey
+
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.IssueHostPairingCode(w, r, hostId, params)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -6764,8 +6910,11 @@ func HandlerWithOptions(si ServerInterface, options StdHTTPServerOptions) http.H
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/audit/verify", wrapper.VerifyAuditChain)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/hosts", wrapper.ListHosts)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/hosts", wrapper.CreateHost)
+	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/hosts/pair", wrapper.PairHost)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/hosts/{host_id}", wrapper.GetHost)
 	m.HandleFunc(http.MethodPatch+" "+options.BaseURL+"/hosts/{host_id}", wrapper.UpdateHost)
+	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/hosts/{host_id}/pairing-code", wrapper.IssueHostPairingCode)
+	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/hosts/{host_id}/confirm", wrapper.ConfirmHost)
 	m.HandleFunc(http.MethodPut+" "+options.BaseURL+"/hosts/{host_id}/llm-credentials", wrapper.SetHostLlmCredentials)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/hosts/{host_id}/state", wrapper.SetHostState)
 
@@ -7134,15 +7283,24 @@ type StrictServerInterface interface {
 	// CreateHost Register a host and issue its pairing code
 	// (POST /hosts)
 	CreateHost(ctx context.Context, request CreateHostRequestObject) (CreateHostResponseObject, error)
+	// PairHost Redeem a pairing code from the host service
+	// (POST /hosts/pair)
+	PairHost(ctx context.Context, request PairHostRequestObject) (PairHostResponseObject, error)
 	// GetHost Read a host
 	// (GET /hosts/{host_id})
 	GetHost(ctx context.Context, request GetHostRequestObject) (GetHostResponseObject, error)
 	// UpdateHost Change name or assignee of a host
 	// (PATCH /hosts/{host_id})
 	UpdateHost(ctx context.Context, request UpdateHostRequestObject) (UpdateHostResponseObject, error)
+	// ConfirmHost Confirm the fingerprint and declare the LLM login
+	// (POST /hosts/{host_id}/confirm)
+	ConfirmHost(ctx context.Context, request ConfirmHostRequestObject) (ConfirmHostResponseObject, error)
 	// SetHostLlmCredentials Declare the LLM login of a host
 	// (PUT /hosts/{host_id}/llm-credentials)
 	SetHostLlmCredentials(ctx context.Context, request SetHostLlmCredentialsRequestObject) (SetHostLlmCredentialsResponseObject, error)
+	// IssueHostPairingCode Issue a new pairing code (re-pairing)
+	// (POST /hosts/{host_id}/pairing-code)
+	IssueHostPairingCode(ctx context.Context, request IssueHostPairingCodeRequestObject) (IssueHostPairingCodeResponseObject, error)
 	// SetHostState Disable, enable or retire a host
 	// (POST /hosts/{host_id}/state)
 	SetHostState(ctx context.Context, request SetHostStateRequestObject) (SetHostStateResponseObject, error)
@@ -9634,6 +9792,37 @@ func (sh *strictHandler) CreateHost(w http.ResponseWriter, r *http.Request, para
 	}
 }
 
+// PairHost operation middleware
+func (sh *strictHandler) PairHost(w http.ResponseWriter, r *http.Request) {
+	var request PairHostRequestObject
+
+	var body PairHostJSONRequestBody
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
+		return
+	}
+	request.Body = &body
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.PairHost(ctx, request.(PairHostRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "PairHost")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(PairHostResponseObject); ok {
+		if err := validResponse.VisitPairHostResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
 // GetHost operation middleware
 func (sh *strictHandler) GetHost(w http.ResponseWriter, r *http.Request, hostId HostIdPath) {
 	var request GetHostRequestObject
@@ -9694,6 +9883,40 @@ func (sh *strictHandler) UpdateHost(w http.ResponseWriter, r *http.Request, host
 	}
 }
 
+// ConfirmHost operation middleware
+func (sh *strictHandler) ConfirmHost(w http.ResponseWriter, r *http.Request, hostId HostIdPath, params ConfirmHostParams) {
+	var request ConfirmHostRequestObject
+
+	request.HostId = hostId
+	request.Params = params
+
+	var body ConfirmHostJSONRequestBody
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
+		return
+	}
+	request.Body = &body
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.ConfirmHost(ctx, request.(ConfirmHostRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "ConfirmHost")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(ConfirmHostResponseObject); ok {
+		if err := validResponse.VisitConfirmHostResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
 // SetHostLlmCredentials operation middleware
 func (sh *strictHandler) SetHostLlmCredentials(w http.ResponseWriter, r *http.Request, hostId HostIdPath, params SetHostLlmCredentialsParams) {
 	var request SetHostLlmCredentialsRequestObject
@@ -9721,6 +9944,40 @@ func (sh *strictHandler) SetHostLlmCredentials(w http.ResponseWriter, r *http.Re
 		sh.options.ResponseErrorHandlerFunc(w, r, err)
 	} else if validResponse, ok := response.(SetHostLlmCredentialsResponseObject); ok {
 		if err := validResponse.VisitSetHostLlmCredentialsResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// IssueHostPairingCode operation middleware
+func (sh *strictHandler) IssueHostPairingCode(w http.ResponseWriter, r *http.Request, hostId HostIdPath, params IssueHostPairingCodeParams) {
+	var request IssueHostPairingCodeRequestObject
+
+	request.HostId = hostId
+	request.Params = params
+
+	var body IssueHostPairingCodeJSONRequestBody
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
+		return
+	}
+	request.Body = &body
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.IssueHostPairingCode(ctx, request.(IssueHostPairingCodeRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "IssueHostPairingCode")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(IssueHostPairingCodeResponseObject); ok {
+		if err := validResponse.VisitIssueHostPairingCodeResponse(w); err != nil {
 			sh.options.ResponseErrorHandlerFunc(w, r, err)
 		}
 	} else if response != nil {

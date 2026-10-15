@@ -105,8 +105,12 @@ def sync_detailed(
 ) -> Response[HostPairingCode | Problem]:
     """Issue a new pairing code (re-pairing)
 
-     Sets the host to `pairing`, drops its keys at once, closes its connections and ends its sessions
-    (`host_rekeyed`). Every owner gets `host.updated` with `key_changed` (24, 3.3). Needs step-up. The
+     Sets the host to `pairing` from `pairing`, `confirming`, `active` or `disabled` (also
+    `duplicate_connection`, whose reason is cleared); `retired` gives `409 invalid_state_transition`.
+    From `confirming`, `active` and `disabled` it drops the stored keys at once; from `active` it ends
+    the sessions (`host_rekeyed`) and closes the connections. Every owner gets `host.updated`, with
+    `key_changed` exactly when stored keys were dropped (24, 3.3); `key_generation` rises at the next
+    `pairHost`. A repeated call issues another code and invalidates the previous one. Needs step-up. The
     code is a one-time secret: a replay with the same `Idempotency-Key` answers `409 conflict` with
     `reason` `one_time_secret` instead of repeating it (06, 7).
 
@@ -145,8 +149,12 @@ def sync(
 ) -> HostPairingCode | Problem | None:
     """Issue a new pairing code (re-pairing)
 
-     Sets the host to `pairing`, drops its keys at once, closes its connections and ends its sessions
-    (`host_rekeyed`). Every owner gets `host.updated` with `key_changed` (24, 3.3). Needs step-up. The
+     Sets the host to `pairing` from `pairing`, `confirming`, `active` or `disabled` (also
+    `duplicate_connection`, whose reason is cleared); `retired` gives `409 invalid_state_transition`.
+    From `confirming`, `active` and `disabled` it drops the stored keys at once; from `active` it ends
+    the sessions (`host_rekeyed`) and closes the connections. Every owner gets `host.updated`, with
+    `key_changed` exactly when stored keys were dropped (24, 3.3); `key_generation` rises at the next
+    `pairHost`. A repeated call issues another code and invalidates the previous one. Needs step-up. The
     code is a one-time secret: a replay with the same `Idempotency-Key` answers `409 conflict` with
     `reason` `one_time_secret` instead of repeating it (06, 7).
 
@@ -180,8 +188,12 @@ async def asyncio_detailed(
 ) -> Response[HostPairingCode | Problem]:
     """Issue a new pairing code (re-pairing)
 
-     Sets the host to `pairing`, drops its keys at once, closes its connections and ends its sessions
-    (`host_rekeyed`). Every owner gets `host.updated` with `key_changed` (24, 3.3). Needs step-up. The
+     Sets the host to `pairing` from `pairing`, `confirming`, `active` or `disabled` (also
+    `duplicate_connection`, whose reason is cleared); `retired` gives `409 invalid_state_transition`.
+    From `confirming`, `active` and `disabled` it drops the stored keys at once; from `active` it ends
+    the sessions (`host_rekeyed`) and closes the connections. Every owner gets `host.updated`, with
+    `key_changed` exactly when stored keys were dropped (24, 3.3); `key_generation` rises at the next
+    `pairHost`. A repeated call issues another code and invalidates the previous one. Needs step-up. The
     code is a one-time secret: a replay with the same `Idempotency-Key` answers `409 conflict` with
     `reason` `one_time_secret` instead of repeating it (06, 7).
 
@@ -218,8 +230,12 @@ async def asyncio(
 ) -> HostPairingCode | Problem | None:
     """Issue a new pairing code (re-pairing)
 
-     Sets the host to `pairing`, drops its keys at once, closes its connections and ends its sessions
-    (`host_rekeyed`). Every owner gets `host.updated` with `key_changed` (24, 3.3). Needs step-up. The
+     Sets the host to `pairing` from `pairing`, `confirming`, `active` or `disabled` (also
+    `duplicate_connection`, whose reason is cleared); `retired` gives `409 invalid_state_transition`.
+    From `confirming`, `active` and `disabled` it drops the stored keys at once; from `active` it ends
+    the sessions (`host_rekeyed`) and closes the connections. Every owner gets `host.updated`, with
+    `key_changed` exactly when stored keys were dropped (24, 3.3); `key_generation` rises at the next
+    `pairHost`. A repeated call issues another code and invalidates the previous one. Needs step-up. The
     code is a one-time secret: a replay with the same `Idempotency-Key` answers `409 conflict` with
     `reason` `one_time_secret` instead of repeating it (06, 7).
 

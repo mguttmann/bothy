@@ -94,6 +94,12 @@ Base62, CRC-32 in 6 Zeichen) nutzt GitHub für seine Tokens [Q1, belegt].
   (lookup counter stays 0). Identity does not cache token lookups (one indexed query per request);
   authz caches the token liveness with its rights snapshot per rights version, and every
   revocation raises that version, so a revocation holds at the next request in every process.
+- Kind `hpc` (M2-41, 2026-10-15): the vector of random part `EXAMPLEhostpairingcode000000000000000000000`
+  in `testdata/checksum_vectors.json`; `TestHostPairingCode_MintAndHash`,
+  `TestHashHostPairingCode_RejectsWithoutLookup` and `TestHostPairingCode_MatchesGitleaksRule` in
+  `services/server/internal/identity/app`; `test_pairing_code_with_valid_checksum_is_detected` with
+  the pinned gitleaks binary; `TestTMT20_WrongChecksumNoDatabase` (no unit of work and no query for
+  a wrong checksum or kind) and `TestTMT20_PairingCodeRejections` in the terminal module.
 
 ## Pros and Cons of the Options
 

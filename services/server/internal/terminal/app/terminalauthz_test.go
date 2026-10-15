@@ -563,8 +563,8 @@ func assertNoContent(t *testing.T, w *tworld) {
 }
 
 // TestAZP1_TerminalAuthzRoutes (AZ-P1, network point of D-W-101): setHostLlmCredentials is enabled
-// with host.manage and rl.admin, and no route with a terminal action, host.pair or host.connect is
-// enabled by this ticket.
+// with host.manage and rl.admin, and no route with a terminal action or host.connect is enabled
+// (host.pair is pairHost since M2-41, TestAZP1_HostRoutes).
 func TestAZP1_TerminalAuthzRoutes(t *testing.T) {
 	t.Parallel()
 	found := false
@@ -573,7 +573,7 @@ func TestAZP1_TerminalAuthzRoutes(t *testing.T) {
 			found = op.Action == "host.manage" && op.RateLimitClass == "rl.admin" && op.Pattern == "PUT /api/v1/hosts/{host_id}/llm-credentials"
 		}
 		if slices.Contains([]authorize.Action{authorize.ActionTerminalOpen, authorize.ActionTerminalAttach, authorize.ActionTerminalStream,
-			authorize.ActionTerminalReadOwn, authorize.ActionTerminalClose, authorize.ActionHostPair, authorize.ActionHostConnect},
+			authorize.ActionTerminalReadOwn, authorize.ActionTerminalClose, authorize.ActionHostConnect},
 			authorize.Action(op.Action)) {
 			t.Errorf("route %s with %s is enabled", op.ID, op.Action)
 		}

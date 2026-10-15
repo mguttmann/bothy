@@ -330,7 +330,9 @@ Prinzipale, Menschen, Owner, Anmelde-Treiber, Identitäten, lokale Anmeldedaten,
   `agt` (agent), `app` (app), `pat` (person), `whi` (incoming webhook, format only until M2-27),
   `hpc` (pairing code of a terminal host, M2-39: issued by `Tokens.NewHostPairingCode` as a
   redacting `Token` with its HMAC under the token pepper, without a database call; only
-  `host.pair` of M2-41 redeems it, and the authenticator refuses it before any lookup like `whi`).
+  `host.pair` of M2-41 redeems it, and the authenticator refuses it before any lookup like `whi`;
+  `Tokens.HashHostPairingCode` (M2-41) returns the same HMAC for a well-formed code and
+  `ErrTokenMalformed` for any other value before computing one, without a database call).
   The random part is 32 bytes from `crypto/rand` as a big-endian integer in Base62
   (`0-9A-Za-z`), left-padded to 43 digits; the checksum is CRC-32 (IEEE) of those 43 ASCII bytes
   in Base62, left-padded to 6 digits. `Parse` accepts exactly

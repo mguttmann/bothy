@@ -645,13 +645,65 @@ Ein falscher Fingerabdruck ergibt `409 fingerprint_mismatch`, der Rechner bleibt
 nach `terminal.fingerprint_max_attempts` Fehlversuchen fällt er auf `pairing` zurück, und die
 Schlüssel verfallen.
 
+Einzelheiten der Kopplung (M2-41, docs/DECISIONS.md D-M2-41-1 bis D-M2-41-16):
+
+- **Code.** Gespeichert wird `HMAC-SHA-256` mit dem Pepper aus `auth.token_pepper_ref` über die
+  ganze Zeichenkette des Codes, dieselbe Ableitung wie `api_tokens.token_hash`. Jeder Code, der
+  nicht wirkt, ergibt `401 unauthenticated` mit demselben Körper: falsche Form oder Prüfsumme (ohne
+  Datenbankzugriff abgewiesen), unbekannt, benutzt, ersetzt oder abgelaufen. Ablehnungen gehen
+  zusammengefasst ins Audit (`host.pair`, `unauthenticated`). Eine Wiederholung nach verlorener
+  Antwort bekommt ebenfalls `401`; der Betreiber bittet um einen neuen Code.
+- **Schlüssel.** `noise_public_key` ist striktes base64url ohne Auffüllung mit genau 32 Byte und
+  kein Punkt kleiner Ordnung (`errors[].code = invalid_key`); `auth_public_jwk` hat genau `kty`
+  (`OKP`), `crv` (`Ed25519`) und `x` (32 Byte, sonst `invalid_key`), jedes andere Glied, vor allem
+  das private `d`, ist `unknown_member` unter `/auth_public_jwk/<name>`. Gespeichert wird das JWK,
+  wie der Server es baut, und sein Fingerabdruck nach RFC 7638 als `auth_jkt`.
+- **Meldung.** Mindestens ein Sitzungsbenutzer (`empty`, sonst kann der Rechner nie ein Terminal
+  geben, HD1); Namen nach dem Muster von 03, höchstens `host.os_user_max_chars` Zeichen
+  (`too_long`), ohne Rücksicht auf Groß- und Kleinschreibung verschieden (`duplicate`);
+  Arbeitsordner, Profilnamen, Anzeigenamen und `os_version` Anzeigetexte (SEC-IN-4) mit höchstens
+  `terminal.report_label_max_chars` Zeichen; Profilnamen verschieden (`duplicate`); jede Liste
+  höchstens `terminal.report_max_entries` Einträge (`limit_reached`); `host_version` SemVer ohne
+  `v` (`invalid_format`). Jeder Befund ist `400 validation_failed` mit Zeiger in den Körper; der
+  Code bleibt gültig. `reported_session_users` wird genau wie gemeldet gespeichert, in der
+  gemeldeten Reihenfolge; `pairing_code_hash` und `pairing_expires_at` werden `NULL`.
+- **Präfix.** `fingerprint_prefix` wird in Großbuchstaben verglichen; er hat genau
+  `terminal.fingerprint_confirm_chars` Zeichen aus dem Crockford-Alphabet, sonst
+  `400 validation_failed` mit `errors[].code = invalid_format` unter `/fingerprint_prefix`, und
+  der Versuch zählt nicht. `I`, `L`, `O` und `U` werden nicht umgedeutet. Der Vergleich mit dem
+  Anfang des Fingerabdrucks ohne Bindestriche läuft in konstanter Zeit, vor jeder Zuordnung und
+  jeder Erklärung.
+- **Fehlversuche.** Ein falscher Präfix erhöht `hosts.fingerprint_failures` ohne neue Version (der
+  Zähler ist nicht Teil von `Host`, dasselbe `If-Match` gilt weiter) und antwortet mit
+  `attempts_remaining`. Der Versuch zählt auch mit `Idempotency-Key`; eine Wiederholung mit
+  demselben Schlüssel bekommt die gespeicherte Antwort und zählt nicht erneut (02 Abschnitt 8.4).
+- **Rückfall.** Beim Fehlversuch, der `terminal.fingerprint_max_attempts` erreicht, wird der
+  Rechner `pairing`: die drei Schlüsselspalten `NULL`, `key_fingerprint` bleibt (3.3),
+  `pairing_code_hash` ist der HMAC eines frischen Codes, der nie gezeigt wird, mit
+  `pairing_expires_at` gleich jetzt, `fingerprint_failures = 0`, neue Version, `host.updated` mit
+  `key_changed = true`, `attempts_remaining = 0`. Weiter geht es nur mit
+  `issueHostPairingCode`.
+
 ### 3.3 Neukopplung
 
 Ein neuer Kopplungs-Code für einen bestehenden Rechner (`host.manage`) setzt ihn auf `pairing`,
 verwirft die gespeicherten Schlüssel sofort, schließt seine Verbindungen und beendet seine
-Sitzungen (`host_rekeyed`). `hosts.key_generation` steigt. Der Audit-Eintrag nennt alten und neuen
+Sitzungen (`host_rekeyed`). `hosts.key_generation` steigt beim nächsten `host.pair`, weil sie die
+gespeicherten Schlüssel zählt, die Geräte zusammen mit `noise_public_key` pinnen. Der
+Audit-Eintrag `pairing_code` nennt den alten, der nächste `host.pair` alten und neuen
 Fingerabdruck; jeder aktive Owner bekommt das Ereignis `host.updated` mit `key_changed = true`.
 Clients sehen beim nächsten Öffnen einen anderen Schlüssel und warnen hart (Abschnitt 5.5).
+
+Einzelheiten (M2-41): Aus `pairing` ersetzt der neue Code nur den alten; aus `confirming`,
+`active` und `disabled` verwirft er auch die Schlüssel, aus `disabled` (auch
+`duplicate_connection`, 3.4) löscht er `disabled_reason` und `disabled_at`; `retired` ergibt
+`409 invalid_state_transition`. `key_changed` steht genau dann, wenn gespeicherte Schlüssel
+verworfen wurden. Ohne Schlüssel fehlen `key_fingerprint` und `noise_public_key` in `Host`;
+`key_fingerprint` bleibt aber gespeichert, und ein `host.pair` mit genau diesen Schlüsseln ergibt
+`409 conflict` mit `reason: host_key_reused` (der Code bleibt gültig). Ein Anmeldeschlüssel eines
+anderen Rechners ergibt `409 conflict` mit `reason: host_key_in_use`. Grenze: Der Server behält
+keinen verworfenen Schlüssel, ein Host-Dienst, der nur einen der beiden Schlüssel behält, fällt
+nicht auf; `bothy-host pair` erzeugt beide bei jeder Kopplung neu (M2-42).
 
 ### 3.4 Zweite Steuerverbindung
 
@@ -1293,8 +1345,8 @@ nicht für Byte-Ströme. Mit einem Knoten ist alles trivial.
 
 | Aktion | Wann | Details (`audit_details.v1`) |
 |---|---|---|
-| `host.manage` | jede Änderung | `host_id` (Ressource), `operation` (`create`, `update`, `pairing_code`, `confirm`, `llm_credentials`, `state`, `session_user`), alte und neue Werte als Codes (`from_assigned_user_id`, `to_assigned_user_id`, `name_changed`, `from_state`, `to_state`, `disabled_reason`), bei `session_user` je Zuordnung oder Ende ein Eintrag mit `change` (`assigned`, `revoked`), `user_id` und dem Namen des Sitzungsbenutzers im reservierten Feld `os_user`, Fingerabdrücke bei Neukopplung, `reason`; ohne Wirkung `no_change`; nie der Name des Rechners |
-| `host.pair` | Erlaubnis und Ablehnung | `host_id`, Fingerabdruck |
+| `host.manage` | jede Änderung | `host_id` (Ressource), `operation` (`create`, `update`, `pairing_code`, `confirm`, `llm_credentials`, `state`, `session_user`), alte und neue Werte als Codes (`from_assigned_user_id`, `to_assigned_user_id`, `name_changed`, `from_state`, `to_state`, `disabled_reason`), bei `session_user` je Zuordnung oder Ende ein Eintrag mit `change` (`assigned`, `revoked`), `user_id` und dem Namen des Sitzungsbenutzers im reservierten Feld `os_user`; bei `pairing_code` `from_state`, `to_state`, `old_fingerprint` (wenn Schlüssel verworfen wurden), `key_generation`, `sessions_ended`; bei `confirm` `result` (`confirmed`, `fingerprint_mismatch`, `fingerprint_max_attempts`), `fingerprint`, `key_generation`, `attempts_remaining` (bei Fehlversuchen), `llm_credentials`, `credential_holder_id`, `declared_server_host`; `reason`; ohne Wirkung `no_change`; nie der Name des Rechners, der Code, sein HMAC oder ein Schlüssel; Fingerabdrücke klein ohne Bindestriche |
+| `host.pair` | Erlaubnis und Ablehnung | `host_id`, `fingerprint`, `old_fingerprint` (wenn einer gespeichert war), `key_generation`, `platform`; Ablehnungen zusammengefasst mit `unauthenticated` |
 | `host.connect` | Ablehnungen; Erlaubnis nur beim Wechsel von `reported_is_server_host`, `reported_doctor` oder `reported_session_users`; zweite Steuerverbindung (3.4) | `host_id`, Prüfcodes, mit dem Namen jedes Kontos, das die Meldung nennt (Regel für Namen, 2.2: bei HD6, HD10 und HD11 Sitzungsbenutzer, bei HD9 frühere), hinzugekommene und weggefallene Namen der Sitzungsbenutzer, Code `duplicate_connection` |
 | `terminal.open`, `terminal.attach` | Erlaubnis und Ablehnung | `host_id`, `session_id`, `profile`, `device_id`, `pin_changed`, `foreign_assignee` |
 | `terminal.close` | Erlaubnis und Ablehnung | `session_id`, wer schloss |
@@ -1411,9 +1463,9 @@ verfügbar ab Windows 10 Version 1809 und Windows Server 2019
 | `terminal_denied` | `403` | Recht vorhanden, aber Schutzregel oder Grenze sperrt; `reason`: `not_host_assignee`, `server_host_owner_only`, `i6_holder_only`, `no_session_user`, `session_limit`, `profile_unknown` |
 | `step_up_required` | `401` | Step-up fehlt, ist älter als `terminal.step_up_max_age`, schon verbraucht oder in der Konsole nicht per Passkey (`reason: passkey_required`) |
 | `host_unavailable` | `409` | Rechner nicht `active` oder Host-Dienst nicht verbunden |
-| `fingerprint_mismatch` | `409` | Bestätigung mit falschem Fingerabdruck |
+| `fingerprint_mismatch` | `409` | Bestätigung mit falschem Fingerabdruck; `attempts_remaining` nennt die verbleibenden Versuche, `0` heißt Rückfall auf `pairing` (3.2) |
 | `i6_violation` | `409` | Änderung würde I6 verletzen (`hint`) |
-| `conflict` | `409` | Zuordnung eines Sitzungsbenutzers, der auf dem Rechner schon einer Person gehört oder gehörte, oder zweite gültige Zuordnung derselben Person (`reason: session_user_taken`, 2.2) |
+| `conflict` | `409` | Zuordnung eines Sitzungsbenutzers, der auf dem Rechner schon einer Person gehört oder gehörte, oder zweite gültige Zuordnung derselben Person (`reason: session_user_taken`, 2.2); `host.pair` mit dem Anmeldeschlüssel eines anderen Rechners (`reason: host_key_in_use`) oder mit den verworfenen Schlüsseln dieses Rechners (`reason: host_key_reused`, 3.3) |
 | `validation_failed` | `400` | Zuordnung eines Namens, den der Rechner nicht meldet (`errors[].code = session_user_not_on_host`, 2.2 Punkt 5); Inhaber, Person einer Zuordnung oder Inhaber der LLM-Anmeldung unbekannt, kein Mensch oder gelöscht (`errors[].code = unknown_user`); `assigned_user_id` zusammen mit `clear_assigned_user = true` (`errors[].code = mutually_exclusive`); `credential_holder_id` bei `none` oder `organization` (`errors[].code = not_allowed`, 7.2) |
 | `not_found` | `404` | kein Leserecht auf den Rechner oder die Sitzung |
 
@@ -1528,6 +1580,8 @@ Spalte "Ort": Server = Konfigurationsreferenz des Servers; Host-Dienst = Konfigu
 | `terminal.pairing_code_ttl` | Server | `15m` | Gültigkeit eines Kopplungs-Codes für einen Rechner |
 | `terminal.fingerprint_confirm_chars` | Server | `8` | so viele Zeichen des Fingerabdrucks tippt der Owner bei der Bestätigung |
 | `terminal.fingerprint_max_attempts` | Server | `3` | Fehlversuche bei der Bestätigung, danach Rückfall auf `pairing` |
+| `terminal.report_label_max_chars` | Server | `100` | längster Profilname, Anzeigename, Name eines Arbeitsordners und Betriebssystem-Version, die ein Rechner meldet (3.2) |
+| `terminal.report_max_entries` | Server | `64` | höchstens so viele Einträge je gemeldeter Liste: Profile, Sitzungsbenutzer, Arbeitsordner eines Sitzungsbenutzers (3.2) |
 | `terminal.step_up_max_age` | Server | `60s` | so jung muss der Step-up für `terminal.open` und `terminal.attach` sein |
 | `terminal.session_token_ttl` | Server | `30s` | Gültigkeit einer Sitzungs-Marke |
 | `terminal.open_timeout` | Server | `20s` | Frist, bis beide Seiten im Relais verbunden sind und der Handshake steht |

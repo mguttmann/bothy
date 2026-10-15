@@ -71,8 +71,9 @@ type Store interface {
 	SaveFinal(ctx context.Context, req Request, resp Response) error
 }
 
-// secretMark is the flag one stage attempt reads after the handler returned.
-type secretMark struct{ marked atomic.Bool }
+// secretMark holds the flags one stage attempt reads after the handler returned: a one-time
+// secret in the answer, and a final error answer whose effect commits (KeepEffectOnFinal).
+type secretMark struct{ marked, keep atomic.Bool }
 
 // secretKey is the context key of the mark.
 type secretKey struct{}
@@ -96,4 +97,23 @@ func MarkOneTimeSecret(ctx context.Context) {
 func OneTimeSecretMarked(ctx context.Context) bool {
 	m, ok := ctx.Value(secretKey{}).(*secretMark)
 	return ok && m.marked.Load()
+}
+
+// KeepEffectOnFinal records that the final error answer of the current request keeps its effect
+// (02 section 8.4, the exception of M2-41): the Idempotency-Key stage stores the answer with
+// Store.Complete in the same unit of work and commits it with the handler's writes, instead of
+// rolling back and storing it with SaveFinal. Only statuses the stage stores as final (06 section 7
+// point 2) are kept; a 401 or 5xx still rolls back. The one caller is confirmHost before its 409
+// fingerprint_mismatch, so every failed attempt counts also under a key (TM-T19). Outside a scope
+// of WithSecretScope the call does nothing: without a key the use case commits its own unit.
+func KeepEffectOnFinal(ctx context.Context) {
+	if m, ok := ctx.Value(secretKey{}).(*secretMark); ok {
+		m.keep.Store(true)
+	}
+}
+
+// EffectKept reports whether KeepEffectOnFinal was called in the scope of ctx.
+func EffectKept(ctx context.Context) bool {
+	m, ok := ctx.Value(secretKey{}).(*secretMark)
+	return ok && m.keep.Load()
 }

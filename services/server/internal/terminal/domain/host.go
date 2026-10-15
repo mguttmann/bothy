@@ -31,23 +31,33 @@ type Host struct {
 	PairingCodeHash  []byte
 	PairingExpiresAt time.Time
 	NoisePublicKey   []byte
-	KeyFingerprint   string
-	KeyGeneration    int64
-	PairedAt         time.Time
-	Profiles         []Profile
-	ReportedUsers    []ReportedSessionUser
-	Doctor           []DoctorCheck
-	OSVersion        string
-	HostVersion      string
-	LastSeenAt       time.Time
-	CreatedBy        ids.ID
-	CreatedAt        time.Time
-	Version          int64
+	// AuthJKT is the RFC 7638 thumbprint of the login key; "" while the host has no keys.
+	AuthJKT string
+	// KeyFingerprint is the fingerprint of the stored keys; after the keys are dropped it is kept
+	// as the digest of the dropped keys (M2-41, Design note 9), never shown without keys.
+	KeyFingerprint string
+	KeyGeneration  int64
+	// FingerprintFailures counts the failed confirmations since the last pairing (TM-T19).
+	FingerprintFailures int
+	PairedAt            time.Time
+	Profiles            []Profile
+	ReportedUsers       []ReportedSessionUser
+	Doctor              []DoctorCheck
+	OSVersion           string
+	HostVersion         string
+	LastSeenAt          time.Time
+	CreatedBy           ids.ID
+	CreatedAt           time.Time
+	Version             int64
 }
 
 // Paired reports a host that has been paired at least once (paired_at set): only such a host has
 // reported session users (schema Host, "Absent before pairing").
 func (h Host) Paired() bool { return !h.PairedAt.IsZero() }
+
+// HasKeys reports a host with stored keys (noise_public_key set): only then are the fingerprint
+// and the Noise key part of its representation (M2-41, Design note 9).
+func (h Host) HasKeys() bool { return len(h.NoisePublicKey) > 0 }
 
 // SessionUser is a valid assignment of a person to a session user on a host, for the view.
 type SessionUser struct {

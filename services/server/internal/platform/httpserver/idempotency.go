@@ -87,7 +87,9 @@ type idempotencyStage struct {
 //     of the route's action (02 9.3) or with a body the response writer refuses rolls back and
 //     answers 500, nothing stored;
 //   - 400, 403, 404, 409 (except request_in_progress), 410, 412, 413, 415 and 422 roll the unit
-//     back and are stored with Store.SaveFinal in their own transaction;
+//     back and are stored with Store.SaveFinal in their own transaction; when the handler called
+//     idempotency.KeepEffectOnFinal, such an answer is stored with Store.Complete instead and
+//     commits with the effect (02 8.4, only 409 fingerprint_mismatch of confirmHost, M2-41);
 //   - every other status rolls back and is not stored;
 //   - a wait for the first request that ends with database.lock_timeout is 409
 //     request_in_progress, nothing stored.
@@ -289,6 +291,14 @@ func (s *idempotencyStage) attempt(ctx context.Context, w http.ResponseWriter, r
 		if err != nil {
 			return outcome{}, err
 		}
+		if err := s.store.Complete(ctx, req, resp); err != nil {
+			return outcome{}, err
+		}
+		return outcome{kind: outSend, rec: rec}, nil
+	case storedFinal(status, rec.body.Bytes()) && idempotency.EffectKept(hctx):
+		// The marked final error keeps its effect (02 8.4, KeepEffectOnFinal): the answer is
+		// stored in the same unit, and both commit together.
+		resp := idempotency.Response{Status: status, Body: slices.Clone(rec.body.Bytes())}
 		if err := s.store.Complete(ctx, req, resp); err != nil {
 			return outcome{}, err
 		}

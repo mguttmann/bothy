@@ -144,17 +144,21 @@ func TestHostRequirement_HTTP(t *testing.T) {
 	}
 }
 
-// TestAZP1_HostRoutes (M2-39, AZ-P1): the five operations are registered on the API router with
-// host.read and host.manage and their rate-limit classes; host.read and host.manage are no longer
-// deferred; the server opens no other route of the module (24 section 1: no inbound path).
+// TestAZP1_HostRoutes (M2-39, AZ-P1) and TestPairingRoutes_AZP1 (M2-41): the host operations are
+// registered on the API router with host.read, host.manage and host.pair and their rate-limit
+// classes; the server opens no other route of the module (24 section 1: no inbound path; pairHost
+// is called outbound by the host service on the normal API listener).
 func TestAZP1_HostRoutes(t *testing.T) {
 	t.Parallel()
 	want := map[string][3]string{
-		"listHosts":    {"GET /api/v1/hosts", "host.read", "rl.read"},
-		"createHost":   {"POST /api/v1/hosts", "host.manage", "rl.admin"},
-		"getHost":      {"GET /api/v1/hosts/{host_id}", "host.read", "rl.read"},
-		"updateHost":   {"PATCH /api/v1/hosts/{host_id}", "host.manage", "rl.admin"},
-		"setHostState": {"POST /api/v1/hosts/{host_id}/state", "host.manage", "rl.admin"},
+		"listHosts":            {"GET /api/v1/hosts", "host.read", "rl.read"},
+		"createHost":           {"POST /api/v1/hosts", "host.manage", "rl.admin"},
+		"getHost":              {"GET /api/v1/hosts/{host_id}", "host.read", "rl.read"},
+		"updateHost":           {"PATCH /api/v1/hosts/{host_id}", "host.manage", "rl.admin"},
+		"setHostState":         {"POST /api/v1/hosts/{host_id}/state", "host.manage", "rl.admin"},
+		"issueHostPairingCode": {"POST /api/v1/hosts/{host_id}/pairing-code", "host.manage", "rl.admin"},
+		"pairHost":             {"POST /api/v1/hosts/pair", "host.pair", "rl.public_auth"},
+		"confirmHost":          {"POST /api/v1/hosts/{host_id}/confirm", "host.manage", "rl.admin"},
 	}
 	var hostRoutes int
 	for _, op := range routes.Enabled() {
@@ -166,6 +170,7 @@ func TestAZP1_HostRoutes(t *testing.T) {
 			continue
 		}
 		if op.Action == "host.pair" || op.Action == "host.connect" || len(op.Action) > 9 && op.Action[:9] == "terminal." {
+			// pairHost is in want; any other route with these actions belongs to a later ticket.
 			t.Errorf("operation %s of a later ticket is enabled", op.ID)
 		}
 	}

@@ -4407,7 +4407,7 @@ export interface paths {
         put?: never;
         /**
          * Redeem a pairing code from the host service
-         * @description Called by `bothy-host pair` without login. Registers the static X25519 key (Noise) and the Ed25519 key (login) of the host, its profiles and the names of its session users (`reported_session_users`, 24 section 2.2). The host becomes `confirming`; an owner confirms the fingerprint (24, 3.2).
+         * @description Called by `bothy-host pair` without login. Registers the static X25519 key (Noise) and the Ed25519 key (login) of the host, its profiles and the names of its session users (`reported_session_users`, 24 section 2.2). The host becomes `confirming`, `key_generation` rises; an owner confirms the fingerprint (24, 3.2). Every code that does not work answers `401 unauthenticated` with the same body: a wrong form or checksum (checked without database access), an unknown, used, replaced or expired code; a retry after a lost answer gets `401` too, the operator asks for a new code. Key rules (`400 validation_failed`, the code stays valid): `noise_public_key` strict base64url of 32 bytes and no low-order point (`errors[].code` `invalid_key`); `auth_public_jwk` exactly `kty` `OKP`, `crv` `Ed25519` and `x` of 32 bytes (`invalid_key`), any other member such as the private `d` is `unknown_member`. Report rules: at least one session user (`empty`), names distinct without regard to case (`duplicate`) and at most `host.os_user_max_chars` characters (`too_long`), labels and profile names at most `terminal.report_label_max_chars` characters (`too_long`), each list at most `terminal.report_max_entries` entries (`limit_reached`), distinct profile names (`duplicate`), `host_version` SemVer without `v` (`invalid_format`). `409 conflict` with `reason` `host_key_in_use` when the login key belongs to another host, `host_key_reused` when the keys equal the keys a re-pairing dropped; the code stays valid.
          */
         post: operations["pairHost"];
         delete?: never;
@@ -4448,7 +4448,7 @@ export interface paths {
         put?: never;
         /**
          * Issue a new pairing code (re-pairing)
-         * @description Sets the host to `pairing`, drops its keys at once, closes its connections and ends its sessions (`host_rekeyed`). Every owner gets `host.updated` with `key_changed` (24, 3.3). Needs step-up. The code is a one-time secret: a replay with the same `Idempotency-Key` answers `409 conflict` with `reason` `one_time_secret` instead of repeating it (06, 7).
+         * @description Sets the host to `pairing` from `pairing`, `confirming`, `active` or `disabled` (also `duplicate_connection`, whose reason is cleared); `retired` gives `409 invalid_state_transition`. From `confirming`, `active` and `disabled` it drops the stored keys at once; from `active` it ends the sessions (`host_rekeyed`) and closes the connections. Every owner gets `host.updated`, with `key_changed` exactly when stored keys were dropped (24, 3.3); `key_generation` rises at the next `pairHost`. A repeated call issues another code and invalidates the previous one. Needs step-up. The code is a one-time secret: a replay with the same `Idempotency-Key` answers `409 conflict` with `reason` `one_time_secret` instead of repeating it (06, 7).
          */
         post: operations["issueHostPairingCode"];
         delete?: never;
@@ -4468,7 +4468,7 @@ export interface paths {
         put?: never;
         /**
          * Confirm the fingerprint and declare the LLM login
-         * @description The owner types the first `terminal.fingerprint_confirm_chars` characters shown by `bothy-host pair`. A mismatch gives `409 fingerprint_mismatch`; after `terminal.fingerprint_max_attempts` failures the host falls back to `pairing`. I6 is checked in the same transaction (`409 i6_violation`). `session_users` assigns each person their own session user on this host (ruling T12, 24 section 2.2); a name that belongs or belonged to another person on this host, or a second valid assignment of one person, gives `409 conflict` with `reason: session_user_taken`; a name the host did not report (`reported_session_users`) gives `400 validation_failed` with `errors[].code` `session_user_not_on_host`, and nothing is stored. Without an assignment a person gets no terminal there (SR12). Needs step-up.
+         * @description The owner types the first `terminal.fingerprint_confirm_chars` characters shown by `bothy-host pair`, without separators, case-insensitive; a prefix of another length or with a character outside the Crockford alphabet (also `I`, `L`, `O`, `U`) gives `400 validation_failed` with `errors[].code` `invalid_format` and does not count. A mismatch gives `409 fingerprint_mismatch` with `attempts_remaining`; the failure counter is not part of `Host`, so `version` and the `If-Match` stay. After `terminal.fingerprint_max_attempts` failures the host falls back to `pairing` without keys (`attempts_remaining` `0`), and a new pairing code is needed. A failed attempt counts also under an `Idempotency-Key`; its replay returns the stored `409`. I6 is checked in the same transaction (`409 i6_violation`). `session_users` assigns each person their own session user on this host (ruling T12, 24 section 2.2); a name that belongs or belonged to another person on this host, or a second valid assignment of one person, gives `409 conflict` with `reason: session_user_taken`; a name the host did not report (`reported_session_users`) gives `400 validation_failed` with `errors[].code` `session_user_not_on_host`, and nothing is stored. Without an assignment a person gets no terminal there (SR12). Needs step-up.
          */
         post: operations["confirmHost"];
         delete?: never;
@@ -5372,6 +5372,8 @@ export interface components {
             errors?: components["schemas"]["FieldError"][];
             /** @description Current representation of the resource for `version_conflict` and `base_version_conflict`. */
             current?: components["schemas"]["JsonObject"];
+            /** @description Present with `fingerprint_mismatch`; `0` means the host fell back to `pairing` and needs a new pairing code (24, 3.2). */
+            attempts_remaining?: number;
             /** @description Present with `i1_violation` (one entry per agent, 10-backend-richtlinie, 5.4) and `i6_violation` (one entry per host, 24, 7.3). */
             conflicts?: components["schemas"]["InvariantViolation"][];
         };
@@ -9939,11 +9941,14 @@ export interface components {
             /** @description Report of the host service (24, 2.3); absent before the first report. */
             reported_is_server_host?: boolean;
             /**
-             * @description Static X25519 key of the host, 32 bytes base64url without padding; absent before pairing.
+             * @description Static X25519 key of the host, 32 bytes base64url without padding; absent while the host has no keys (before pairing and after a re-pairing or the fallback of `confirmHost`).
              * @example Zm9vYmFyZm9vYmFyZm9vYmFyZm9vYmFyZm9vYmFyMTI
              */
             noise_public_key?: string;
-            /** @example 7K2Q-M9XD-0000-0000-0000-0000-0000-0000-0000-0000-0000-0000-0000 */
+            /**
+             * @description Fingerprint of the stored keys (24, 4.3), 13 groups of four Crockford base32 characters; absent while the host has no keys.
+             * @example 7K2Q-M9XD-0000-0000-0000-0000-0000-0000-0000-0000-0000-0000-0000
+             */
             key_fingerprint?: string;
             /** @example 1 */
             key_generation: number;

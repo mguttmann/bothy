@@ -58,6 +58,22 @@ documented in this file. The format is based on
   `eventlog.Redactor`, implemented by sync with the column right `UPDATE (payload, redacted_at)` on
   `event_log` (migration `00037`); `chat.Threads` adds `LockForMessageChange` and
   `DecrementMessageCount`.
+- Host pairing (M2-41): `issueHostPairingCode` (re-pairing from `pairing`, `confirming`, `active`
+  or `disabled`: drops the stored keys at once, ends the sessions of an active host with
+  `host_rekeyed`, clears a disabled reason, `host.updated` with `key_changed`), the public
+  `pairHost` (redeems a pairing code of kind `hpc` once and before `terminal.pairing_code_ttl`
+  ends; every failing code is `401 unauthenticated` with one body, a wrong form or checksum without
+  any database access; stores both public keys, the fingerprint of 24 4.3, the next
+  `key_generation` and the report with `reported_session_users`; refuses a login key of another
+  host and the dropped keys of the same host) and `confirmHost` (step-up, typed prefix of
+  `terminal.fingerprint_confirm_chars` characters, `409 fingerprint_mismatch` with
+  `attempts_remaining`, fallback to `pairing` after `terminal.fingerprint_max_attempts` failures,
+  then session users only from the reported names, the LLM login with I6 and the server host in
+  one transaction). `host.pair` is a `Public` requirement. `identity.Tokens.HashHostPairingCode`,
+  `idempotency.KeepEffectOnFinal` (a marked final error commits under an `Idempotency-Key`),
+  `errs.FingerprintMismatch` and the new keys `terminal.fingerprint_confirm_chars`,
+  `terminal.fingerprint_max_attempts`, `terminal.report_label_max_chars` and
+  `terminal.report_max_entries` with the start check `fingerprint_keys`.
 
 - Sending messages (M1-56): `createMessage` and `createThread`. Migrations `00032` and `00033`
   create `messages` and `mentions` and give `threads.parent_message_id` its deferred foreign key.
