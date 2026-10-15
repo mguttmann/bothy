@@ -39,7 +39,8 @@ final class DsMessageAction {
 ///
 /// Variants (components.md section 1): text, continuation ([isContinuation], computed by the
 /// caller from `ui.message_group_window`: no avatar and header), voice, live box anchor
-/// ([liveBox] at this position), card (content plus [components] on `color.surface.raised`),
+/// ([liveBox] at this position), card ([components] on `color.surface.raised`, which draws the
+/// agent text below its header, so the content is not drawn a second time),
 /// system line, mention (tint `color.attention.subtle` and spine), sending, failed (reason with
 /// Resend, Edit, Discard), edited ("(edited)") and deleted ("Message deleted", no hover bar).
 ///
@@ -411,7 +412,10 @@ class DsMessageState extends State<DsMessage> {
     final out = <Widget>[];
     if (d.kind == DsMessageKind.voice && d.voice != null)
       out.add(_voice(context));
-    if (d.content.isNotEmpty) {
+    // A card draws its agent text inside [components], below the header built from server
+    // fields (SEC-OUT-4); drawing it here too would put agent text above that header.
+    final cardBody = d.kind == DsMessageKind.card && widget.components != null;
+    if (d.content.isNotEmpty && !cardBody) {
       final style = dsTextStyle(DsType.body).copyWith(
         color: colors.textPrimary,
         fontSize: context.dsDensity.messageFontSize,

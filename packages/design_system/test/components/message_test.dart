@@ -272,101 +272,103 @@ void main() {
     expect(calls, ['resend', 'edit', 'discard']);
   });
 
-  testWidgets(
-    'system, voice, run anchor, card, reply, attachments, reactions',
-    (tester) async {
-      final l = await en();
-      await pumpDs(
-        tester,
-        _message(
-          _with(
-            origin: DsMessageOrigin.system,
-            kind: DsMessageKind.system,
-            content: '',
-            systemCode: 'thread.reopened',
-            systemName: 'Sam',
+  testWidgets('system, voice, run anchor, card, reply, attachments, reactions', (
+    tester,
+  ) async {
+    final l = await en();
+    await pumpDs(
+      tester,
+      _message(
+        _with(
+          origin: DsMessageOrigin.system,
+          kind: DsMessageKind.system,
+          content: '',
+          systemCode: 'thread.reopened',
+          systemName: 'Sam',
+        ),
+      ),
+    );
+    expect(find.text(l.messageSystemThreadReopened('⁨Sam⁩')), findsOneWidget);
+    expect(find.byType(DsAvatar), findsNothing);
+
+    await pumpDs(
+      tester,
+      _message(
+        _with(
+          origin: DsMessageOrigin.system,
+          kind: DsMessageKind.system,
+          content: '',
+          systemCode: 'future.code',
+        ),
+      ),
+    );
+    expect(find.text(l.messageSystemUnknown('future.code')), findsOneWidget);
+
+    var played = 0;
+    await pumpDs(
+      tester,
+      DsMessage(
+        _with(
+          kind: DsMessageKind.voice,
+          content: '',
+          voice: const DsVoiceData(
+            duration: Duration(seconds: 42),
+            progress: 0.5,
+            transcript: 'Spoken words',
           ),
         ),
-      );
-      expect(find.text(l.messageSystemThreadReopened('⁨Sam⁩')), findsOneWidget);
-      expect(find.byType(DsAvatar), findsNothing);
+        collapseLines: 24,
+        onOpenLink: (_) {},
+        onPlayVoice: () => played++,
+      ),
+    );
+    expect(find.text('Spoken words'), findsOneWidget);
+    expect(find.byType(LinearProgressIndicator), findsOneWidget);
+    await tester.tap(find.bySemanticsLabel(l.messageVoicePlay));
+    expect(played, 1);
 
-      await pumpDs(
-        tester,
-        _message(
-          _with(
-            origin: DsMessageOrigin.system,
-            kind: DsMessageKind.system,
-            content: '',
-            systemCode: 'future.code',
-          ),
+    await pumpDs(
+      tester,
+      _message(
+        _with(
+          kind: DsMessageKind.run,
+          origin: DsMessageOrigin.agent,
+          content: '',
         ),
-      );
-      expect(find.text(l.messageSystemUnknown('future.code')), findsOneWidget);
+        liveBox: const Text('live box here'),
+      ),
+    );
+    expect(find.text('live box here'), findsOneWidget);
 
-      var played = 0;
-      await pumpDs(
-        tester,
-        DsMessage(
-          _with(
-            kind: DsMessageKind.voice,
-            content: '',
-            voice: const DsVoiceData(
-              duration: Duration(seconds: 42),
-              progress: 0.5,
-              transcript: 'Spoken words',
-            ),
-          ),
-          collapseLines: 24,
-          onOpenLink: (_) {},
-          onPlayVoice: () => played++,
-        ),
-      );
-      expect(find.text('Spoken words'), findsOneWidget);
-      expect(find.byType(LinearProgressIndicator), findsOneWidget);
-      await tester.tap(find.bySemanticsLabel(l.messageVoicePlay));
-      expect(played, 1);
+    await pumpDs(
+      tester,
+      _message(
+        _with(kind: DsMessageKind.card, origin: DsMessageOrigin.agent),
+        components: const Text('components here'),
+      ),
+    );
+    expect(find.text('components here'), findsOneWidget);
+    // The card body renders the agent text below its header (SEC-OUT-4), so the
+    // message does not draw the content a second time above the header.
+    expect(find.text('The build is green.'), findsNothing);
 
-      await pumpDs(
-        tester,
-        _message(
-          _with(
-            kind: DsMessageKind.run,
-            origin: DsMessageOrigin.agent,
-            content: '',
-          ),
-          liveBox: const Text('live box here'),
+    await pumpDs(
+      tester,
+      _message(
+        _with(
+          replyToName: 'Sam',
+          attachments: ['report.pdf'],
+          reactions: [const DsReaction('+1', 2, mine: true)],
         ),
-      );
-      expect(find.text('live box here'), findsOneWidget);
-
-      await pumpDs(
-        tester,
-        _message(
-          _with(kind: DsMessageKind.card, origin: DsMessageOrigin.agent),
-          components: const Text('components here'),
-        ),
-      );
-      expect(find.text('components here'), findsOneWidget);
-
-      await pumpDs(
-        tester,
-        _message(
-          _with(
-            replyToName: 'Sam',
-            attachments: ['report.pdf'],
-            reactions: [const DsReaction('+1', 2, mine: true)],
-          ),
-        ),
-      );
-      expect(find.bySemanticsLabel(l.messageReplyTo('Sam')), findsOneWidget);
-      expect(
-        find.bySemanticsLabel(l.messageAttachment('report.pdf')),
-        findsOneWidget,
-      );
-      expect(find.bySemanticsLabel(l.messageReaction(2, '+1')), findsOneWidget);
-    },
-  );
+      ),
+    );
+    expect(find.bySemanticsLabel(l.messageReplyTo('Sam')), findsOneWidget);
+    expect(
+      find.bySemanticsLabel(l.messageAttachment('report.pdf')),
+      findsOneWidget,
+    );
+    expect(find.bySemanticsLabel(l.messageReaction(2, '+1')), findsOneWidget);
+  });
 
   testWidgets('a trigger state shows after the time stamp', (tester) async {
     await pumpDs(tester, _message(_with(triggerState: DsTriggerState.working)));

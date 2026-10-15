@@ -24,7 +24,7 @@ export 'src/components/ds_common.dart';
 // TODO-M407 export 'src/components/ds_composer.dart';
 export 'src/components/ds_live_box.dart';
 export 'src/components/ds_message.dart';
-// TODO-M407 export 'src/components/ds_message_components.dart';
+export 'src/components/ds_message_components.dart';
 export 'src/components/ds_space_row.dart';
 export 'src/components/ds_status_line.dart';
 // TODO-M407 export 'src/components/ds_suggestion_list.dart';
