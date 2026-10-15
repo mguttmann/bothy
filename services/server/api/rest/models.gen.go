@@ -15921,6 +15921,9 @@ type PutFeatureFlagJSONRequestBody = FeatureFlagPut
 // CreateGrantJSONRequestBody defines body for CreateGrant for application/json ContentType.
 type CreateGrantJSONRequestBody = GrantCreate
 
+// PreviewGrantJSONRequestBody defines body for PreviewGrant for application/json ContentType.
+type PreviewGrantJSONRequestBody = GrantCreate
+
 // RevokeGrantJSONRequestBody defines body for RevokeGrant for application/json ContentType.
 type RevokeGrantJSONRequestBody = ReasonBody
 

@@ -13,8 +13,10 @@ import (
 // This file declares the source ports through which authz learns facts owned by other modules
 // (docs/spec/02-architecture.md section 4.1 rule 4, "Source port"). authz never reads their
 // tables. M1-28 adds CredentialSource, StructureSource and AgentPolicySource; M1-29 adds
-// StructureSource.ServedTargets, ChannelFacts.Archived and AgentPolicySource.PersonalAgents. Until
-// their owning modules have tables, internal/wire passes empty sources (ruling D2 of
+// StructureSource.ServedTargets, ChannelFacts.Archived and AgentPolicySource.PersonalAgents; M1-49
+// adds PrincipalSource.Profiles and OwnerIDs, StructureSource.SpaceDetails and ChannelDetails and
+// AgentPolicy.BillingModesSupported for "who has access", the preview and "view as". Until their
+// owning modules have tables, internal/wire passes empty sources (ruling D2 of
 // docs/briefs/M1-28-authz-core.md).
 
 // PrincipalStatus is the lifecycle state of a principal as authz sees it.
@@ -59,6 +61,17 @@ type PrincipalRef struct {
 	AvatarFileID ids.ID
 }
 
+// PrincipalProfile describes one principal for the answers of access.explain, access.preview and
+// access.view_as (M1-49): the public view, the status and, for people, users.locale and
+// users.time_zone (empty for agents and apps).
+type PrincipalProfile struct {
+	PrincipalRef
+	// Status is the lifecycle state.
+	Status PrincipalStatus
+	// Locale is the BCP 47 tag of users.locale; TimeZone the IANA name of users.time_zone.
+	Locale, TimeZone string
+}
+
 // PrincipalSource gives authz the facts of principals. The identity module implements it
 // (identity/app); internal/wire passes it to authz (M1-28).
 type PrincipalSource interface {
@@ -76,6 +89,13 @@ type PrincipalSource interface {
 	// an unknown id is absent from the map (M1-48, the members of a group). It reads inside the
 	// ambient transaction of ctx when there is one.
 	Refs(ctx context.Context, principals []ids.ID) (map[ids.ID]PrincipalRef, error)
+	// Profiles returns the profiles of the known principals among principals, whatever their
+	// status; an unknown id is absent from the map (M1-49). It reads inside the ambient
+	// transaction of ctx when there is one.
+	Profiles(ctx context.Context, principals []ids.ID) (map[ids.ID]PrincipalProfile, error)
+	// OwnerIDs returns the users with an owners row that is not revoked, whatever their status,
+	// ascending by id: "who has access" lists inactive owners too (07 section 9.1, M1-49).
+	OwnerIDs(ctx context.Context) ([]ids.ID, error)
 }
 
 // ChannelKind is channels.kind.
@@ -108,6 +128,56 @@ type ChannelFacts struct {
 	// Archived reports that the channel or its space is archived: every effective level there is
 	// at most read, owners included (07 section 4.5 point 1). chat reports it from M1-52 and M1-53.
 	Archived bool
+}
+
+// SpaceDetail is what the answers of authz show of a space (OpenAPI Space; M1-49): its name and
+// presentation, its default operator and its lifecycle.
+type SpaceDetail struct {
+	// ID is the space.
+	ID ids.ID
+	// Name, Icon, Color and SortKey are the columns of spaces; Icon and Color may be empty.
+	Name, Icon, Color, SortKey string
+	// DefaultOperatorID is spaces.default_operator_agent_id; zero for none.
+	DefaultOperatorID ids.ID
+	// ArchivedAt is zero for a live space.
+	ArchivedAt time.Time
+	// Version is spaces.version; CreatedAt its creation.
+	Version   int64
+	CreatedAt time.Time
+}
+
+// The operator modes of a channel (OpenAPI OperatorMode).
+const (
+	OperatorInherit = "inherit"
+	OperatorNone    = "none"
+	OperatorAgent   = "agent"
+)
+
+// ChannelDetail is what the answers of authz show of a channel (OpenAPI Channel; M1-49).
+type ChannelDetail struct {
+	// ID is the channel; SpaceID its space, zero for a dm channel.
+	ID, SpaceID ids.ID
+	// Kind is text, forum or dm.
+	Kind ChannelKind
+	// Name, Topic and SortKey are the columns of channels.
+	Name, Topic, SortKey string
+	// OperatorMode is inherit, none or agent; OperatorAgentID the agent of mode agent and
+	// EffectiveOperatorID the operator after inheritance (zero for none).
+	OperatorMode                         string
+	OperatorAgentID, EffectiveOperatorID ids.ID
+	// ForumDefaultSort and DefaultNotificationLevel are empty when not set.
+	ForumDefaultSort, DefaultNotificationLevel string
+	// ReadOnly is channels.read_only.
+	ReadOnly bool
+	// MainThreadID is the main thread of text and dm channels; zero for a forum.
+	MainThreadID ids.ID
+	// DMParticipantIDs are the participants of a dm channel, ascending.
+	DMParticipantIDs []ids.ID
+	// ArchivedAt is zero for a live channel.
+	ArchivedAt time.Time
+	// Version, SettingsVersion and CreatedAt are the columns of channels.
+	Version, SettingsVersion int64
+	CreatedAt                time.Time
 }
 
 // ChannelRef is one target an agent serves (10 section 5.2, 03 section 6.4): a channel with its
@@ -160,6 +230,12 @@ type StructureSource interface {
 	// Guest channels never count. Ascending by (SpaceID, ChannelID), without duplicates. chat
 	// implements it with M1-54 (M1-29).
 	ServedTargets(ctx context.Context, agentID ids.ID) ([]ChannelRef, error)
+	// SpaceDetails returns the details of the known spaces among spaceIDs, archived or not; an
+	// unknown id is absent (M1-49: names, default operators and the Space objects of "view as").
+	SpaceDetails(ctx context.Context, spaceIDs []ids.ID) (map[ids.ID]SpaceDetail, error)
+	// ChannelDetails returns the details of the known channels among channelIDs, archived or not;
+	// an unknown id is absent (M1-49).
+	ChannelDetails(ctx context.Context, channelIDs []ids.ID) (map[ids.ID]ChannelDetail, error)
 }
 
 // AgentPolicy are the backend policy and tool class of an agent (03 agents, 07 sections 2.11 and
@@ -173,6 +249,10 @@ type AgentPolicy struct {
 	ToolClass string
 	// ReportedToolClass is the class the last heartbeat reported; "" for none.
 	ReportedToolClass string
+	// BillingModesSupported are the billing modes the adapter reported it can prove
+	// (agents.reported_details); organization among them makes an I1 conflict organization_ready
+	// (10 section 11, M1-49).
+	BillingModesSupported []string
 }
 
 // PersonalAgent is an active agent with billing_mode = 'personal' and its credential holder

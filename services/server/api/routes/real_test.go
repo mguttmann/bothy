@@ -65,6 +65,22 @@ func (stubServer) RevokeGrant(context.Context, rest.RevokeGrantRequestObject) (r
 	return nil, nil
 }
 
+func (stubServer) ExplainSpaceAccess(context.Context, rest.ExplainSpaceAccessRequestObject) (rest.ExplainSpaceAccessResponseObject, error) {
+	return nil, nil
+}
+
+func (stubServer) ExplainChannelAccess(context.Context, rest.ExplainChannelAccessRequestObject) (rest.ExplainChannelAccessResponseObject, error) {
+	return nil, nil
+}
+
+func (stubServer) PreviewGrant(context.Context, rest.PreviewGrantRequestObject) (rest.PreviewGrantResponseObject, error) {
+	return nil, nil
+}
+
+func (stubServer) ViewAsUser(context.Context, rest.ViewAsUserRequestObject) (rest.ViewAsUserResponseObject, error) {
+	return nil, nil
+}
+
 func (stubServer) ListAuditEvents(context.Context, rest.ListAuditEventsRequestObject) (rest.ListAuditEventsResponseObject, error) {
 	return nil, nil
 }
@@ -433,7 +449,12 @@ func TestRealTable_Enabled(t *testing.T) {
 		"listGrants":        {"GET /api/v1/grants", "grant.read", "rl.read"},
 		"createGrant":       {"POST /api/v1/grants", "grant.create", "rl.admin"},
 		"getGrant":          {"GET /api/v1/grants/{grant_id}", "grant.read", "rl.read"},
-		"revokeGrant":       {"POST /api/v1/grants/{grant_id}/revoke", "grant.revoke", "rl.admin"},
+		// M1-49
+		"explainSpaceAccess":   {"GET /api/v1/spaces/{space_id}/access", "access.explain", "rl.read"},
+		"explainChannelAccess": {"GET /api/v1/channels/{channel_id}/access", "access.explain", "rl.read"},
+		"previewGrant":         {"POST /api/v1/grants/preview", "access.preview", "rl.admin"},
+		"viewAsUser":           {"GET /api/v1/users/{user_id}/view-as", "access.view_as", "rl.admin"},
+		"revokeGrant":          {"POST /api/v1/grants/{grant_id}/revoke", "grant.revoke", "rl.admin"},
 		// M1-51
 		"listAgents":              {"GET /api/v1/agents", "agent.read", "rl.read"},
 		"createAgent":             {"POST /api/v1/agents", "agent.create", "rl.admin"},

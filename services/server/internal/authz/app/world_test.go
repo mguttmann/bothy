@@ -104,8 +104,11 @@ type world struct {
 }
 
 func newWorld(t testing.TB) *world {
-	return newWorldWith(t, app.AuthorizerConfig{SnapshotCacheMaxEntries: 1000, StepUpMaxAge: 5 * time.Minute})
+	return newWorldWith(t, app.AuthorizerConfig{SnapshotCacheMaxEntries: 1000, StepUpMaxAge: 5 * time.Minute, ViewAsMaxDuration: viewAsMax})
 }
+
+// viewAsMax is authz.view_as_max_duration of the test worlds.
+const viewAsMax = 15 * time.Minute
 
 func newWorldWith(t testing.TB, cfg app.AuthorizerConfig) *world {
 	t.Helper()
