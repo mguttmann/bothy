@@ -15,7 +15,7 @@ import 'upsert.dart';
 
 /// Data access object of `search_index`.
 final class SearchDao {
-  /// Creates the DAO on [db]; use `LocalDatabase.searchDao`.
+  /// Creates the DAO on a database; use `LocalDatabase.searchDao`.
   SearchDao(this._db);
 
   final LocalDatabase _db;

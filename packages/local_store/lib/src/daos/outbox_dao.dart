@@ -13,7 +13,7 @@ import '../models.dart';
 
 /// Data access object of the outbox.
 final class OutboxDao {
-  /// Creates the DAO on [db]; use `LocalDatabase.outboxDao`.
+  /// Creates the DAO on a database; use `LocalDatabase.outboxDao`.
   OutboxDao(this._db);
 
   final LocalDatabase _db;

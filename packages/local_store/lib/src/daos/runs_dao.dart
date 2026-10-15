@@ -12,7 +12,7 @@ import 'upsert.dart';
 
 /// Data access object of runs; hands out domain types only.
 final class RunsDao {
-  /// Creates the DAO on [db]; use `LocalDatabase.runsDao`.
+  /// Creates the DAO on a database; use `LocalDatabase.runsDao`.
   RunsDao(this._db);
 
   final LocalDatabase _db;

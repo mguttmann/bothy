@@ -12,7 +12,7 @@ import 'upsert.dart';
 
 /// Data access object of commands; hands out domain types only.
 final class CommandsDao {
-  /// Creates the DAO on [db]; use `LocalDatabase.commandsDao`.
+  /// Creates the DAO on a database; use `LocalDatabase.commandsDao`.
   CommandsDao(this._db);
 
   final LocalDatabase _db;

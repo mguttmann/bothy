@@ -13,7 +13,7 @@ import '../models.dart';
 
 /// Data access object of the file cache rows.
 final class FileCacheDao {
-  /// Creates the DAO on [db]; use `LocalDatabase.fileCacheDao`.
+  /// Creates the DAO on a database; use `LocalDatabase.fileCacheDao`.
   FileCacheDao(this._db);
 
   final LocalDatabase _db;
