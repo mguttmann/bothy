@@ -59,6 +59,10 @@ type Resource struct {
 	Audience ids.ID
 }
 
+// DeliverySelf is Resource.DeliveryOf of a personal event, whose receive action is "self"
+// (event_log.receive_action; 05 section 6): only its audience receives it.
+const DeliverySelf Action = "self"
+
 // TerminalFacts describes a terminal session for the step-up rule of terminal.attach (08 section
 // 6.3 point 5): its state, the device and login session that opened it and the time it was
 // detached (zero when it is not detached).

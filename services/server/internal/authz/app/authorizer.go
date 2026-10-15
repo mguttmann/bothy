@@ -453,7 +453,7 @@ func (a *Authorizer) authorizeDelivery(ctx context.Context, p authorize.Principa
 		return authorize.Decision{}, internal("webhook_out.deliver without the requirement Delivery")
 	}
 	of := r.DeliveryOf
-	if of == "" || of == authorize.ActionWebhookOutDeliver || (of == domain.ReceiveSelf && r.Audience.IsZero()) {
+	if of == "" || of == authorize.ActionWebhookOutDeliver || (of == authorize.DeliverySelf && r.Audience.IsZero()) {
 		return authorize.Decision{}, internal("webhook_out.deliver needs the receive action of the event")
 	}
 	if p == nil || p.PrincipalKind() == domain.KindAnonymous {

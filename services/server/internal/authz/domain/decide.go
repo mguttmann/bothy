@@ -252,9 +252,6 @@ func GateHumanSession(req Expr, p Principal) Decision {
 	return Allow
 }
 
-// ReceiveSelf is the receive action of a personal event (event_log.receive_action).
-const ReceiveSelf = "self"
-
 // DeliveryGate is the first part of the requirement Delivery of webhook_out.deliver (M2-26
 // design note 8), after the liveness check: a principal that is not an app is forbidden
 // subject_kind_not_allowed (agents until the agent transport); an app without events:subscribe in

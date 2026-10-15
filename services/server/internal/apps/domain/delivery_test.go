@@ -8,8 +8,10 @@ import (
 	"crypto/x509"
 	"errors"
 	"fmt"
+	"math"
 	"net"
 	"net/http"
+	"strconv"
 	"syscall"
 	"testing"
 	"time"
@@ -182,7 +184,7 @@ func TestParseRetryAfter(t *testing.T) {
 }
 
 func FuzzParseRetryAfter(f *testing.F) {
-	for _, s := range []string{"120", "", "-1", "Tue, 13 Oct 2026 09:05:00 GMT", "9223372036854775807", "x"} {
+	for _, s := range []string{"120", "", "-1", "Tue, 13 Oct 2026 09:05:00 GMT", strconv.FormatInt(math.MaxInt64, 10), "x"} {
 		f.Add(s)
 	}
 	now := time.Date(2026, 10, 13, 9, 0, 0, 0, time.UTC)

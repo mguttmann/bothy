@@ -158,13 +158,25 @@ func (w *WebhookService) finishWithout(ctx context.Context, subscription ids.ID,
 }
 
 // mayReceive decides webhook_out.deliver for the app of inst on ev in filter mode with the current
-// grants and scopes (design note 4 d): allow is true; any other decision is false; an error is
-// no decision and returns.
+// grants and scopes (design note 4 d): allow is true; any other decision is false, also a stored
+// resource kind or receive action outside the catalogue (fail closed); an error is no decision
+// and returns.
 func (w *WebhookService) mayReceive(ctx context.Context, inst InstallationRecord, ev sync.Event) (bool, error) {
 	p := actor.Actor{ID: inst.AppID, Kind: actor.KindApp, InstallationID: inst.ID, GrantedScopes: slices.Clone(inst.GrantedScopes)}
+	kind, ok := authorize.ParseResourceKind(ev.ResourceKind)
+	if !ok {
+		// A stored kind outside the catalogue cannot be decided: fail closed, no request.
+		return false, nil
+	}
+	of := authorize.DeliverySelf
+	if ev.ReceiveAction != string(authorize.DeliverySelf) {
+		if of, ok = authorize.ParseAction(ev.ReceiveAction); !ok {
+			return false, nil
+		}
+	}
 	r := authorize.Resource{
-		Kind: authorize.ResourceKind(ev.ResourceKind), ID: ev.ResourceID, SpaceID: ev.SpaceID, ChannelID: ev.ChannelID, ThreadID: ev.ThreadID,
-		DeliveryOf: authorize.Action(ev.ReceiveAction), Audience: ev.AudiencePrincipalID,
+		Kind: kind, ID: ev.ResourceID, SpaceID: ev.SpaceID, ChannelID: ev.ChannelID, ThreadID: ev.ThreadID,
+		DeliveryOf: of, Audience: ev.AudiencePrincipalID,
 	}
 	d, err := w.d.Authorizer.Authorize(authorize.Filter(ctx), p, authorize.ActionWebhookOutDeliver, r)
 	if err != nil {

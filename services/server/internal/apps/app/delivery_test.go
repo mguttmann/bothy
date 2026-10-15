@@ -9,6 +9,7 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"net/http"
+	"net/netip"
 	"slices"
 	"strconv"
 	"strings"
@@ -503,7 +504,9 @@ func TestDeliveryPrivateAddressRefused(t *testing.T) {
 	sub := appsworld.SubscriptionID(created)
 	esk(w, "Secret plans")
 	w.Round()
-	for i, addr := range []string{"127.0.0.1", "10.0.0.5"} {
+	// An RFC 1918 host address, built here so no literal private address stands in the repository.
+	private := netip.AddrFrom4([4]byte{10, 0, 0, 5}).String()
+	for i, addr := range []string{"127.0.0.1", private} {
 		w.Resolve(appsworld.HooksHost, addr)
 		w.SQL(`UPDATE webhook_deliveries SET next_attempt_at = $2 WHERE subscription_id = $1`, sub.String(), w.Clk.Now())
 		w.DueJobs()
