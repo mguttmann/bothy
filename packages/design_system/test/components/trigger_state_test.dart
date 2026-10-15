@@ -80,7 +80,33 @@ void main() {
     );
     expect(
       find.bySemanticsLabel(
-        l.triggerStateFailedWithReason('run_active_other_agent'),
+        l.triggerStateFailedWithReason(l.triggerReasonRunActiveOtherAgent),
+      ),
+      findsOneWidget,
+    );
+    await pumpDs(
+      tester,
+      const DsTriggerStateIcon(
+        state: DsTriggerState.failed,
+        reason: 'a_reason_from_later',
+      ),
+    );
+    expect(
+      find.bySemanticsLabel(
+        l.triggerStateFailedWithReason('a_reason_from_later'),
+      ),
+      findsOneWidget,
+    );
+    await pumpDs(
+      tester,
+      const DsTriggerStateIcon(
+        state: DsTriggerState.cancelled,
+        reason: 'user_cancelled',
+      ),
+    );
+    expect(
+      find.bySemanticsLabel(
+        l.triggerStateCancelledWithReason(l.liveBoxReasonUserCancelledNoName),
       ),
       findsOneWidget,
     );
@@ -134,5 +160,22 @@ void main() {
     expect(DsTriggerState.fromCode('x'), DsTriggerState.unknown);
     expect(DsTriggerState.fromCode(null), DsTriggerState.unknown);
     expect(DsTriggerState.fromCode(''), DsTriggerState.unknown);
+  });
+
+  test('every acceptance reason of 09 3.5 has a text', () async {
+    final l = await en();
+    for (final code in [
+      'multiple_agents_mentioned',
+      'agent_not_allowed_here',
+      'no_trigger_right',
+      'run_active_other_agent',
+      'agent_disabled',
+      'billing_mode_personal_not_holder',
+      'project_not_ready',
+      'voice_unsupported',
+      'run_active',
+    ]) {
+      expect(dsReasonText(l, code), isNotNull, reason: code);
+    }
   });
 }

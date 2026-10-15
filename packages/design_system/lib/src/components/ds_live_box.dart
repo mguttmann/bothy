@@ -158,11 +158,23 @@ class DsLiveBoxState extends State<DsLiveBox> {
       questionId: run.questionId,
       question: l.liveBoxAnnounceQuestion(run.agentName),
     );
+    _scheduleFlush(announcer);
+  }
+
+  /// Arms the timer of a waiting announcement. A timer may fire a little early (it rounds to
+  /// whole milliseconds), in which case `flush` sends nothing; the timer is then armed again,
+  /// so a merged announcement is never lost.
+  void _scheduleFlush(LiveAnnouncer announcer) {
     _flush?.cancel();
     final due = announcer.pendingDue;
-    if (due != null) {
-      _flush = Timer(due.difference(DateTime.now()), announcer.flush);
-    }
+    if (due == null) return;
+    var wait = due.difference(DateTime.now());
+    if (wait.isNegative) wait = Duration.zero;
+    _flush = Timer(wait, () {
+      if (!mounted) return;
+      announcer.flush();
+      _scheduleFlush(announcer);
+    });
   }
 
   @override

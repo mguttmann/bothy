@@ -86,6 +86,9 @@ class DsThreadRowState extends State<DsThreadRow> {
     final unread = d.unreadCount > 0;
     final run = d.runState;
     final stateWord = switch (run) {
+      // The question may wait for someone else; only waitingForMe says "Waiting for you".
+      DsRunState.waitingInput =>
+        d.waitingForMe ? l.liveBoxStateWaitingForYou : l.threadRowStateWaiting,
       final DsRunState s? when s.isActive => dsRunStateWord(
         l,
         DsRunData(id: d.id, agentName: '', state: s),

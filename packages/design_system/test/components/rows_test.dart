@@ -240,4 +240,41 @@ void main() {
       expect(toggles.last, isTrue);
     });
   });
+
+  testWidgets('a run waiting for someone else is not "Waiting for you"', (
+    tester,
+  ) async {
+    final l = await en();
+    Future<void> show({required bool mine}) => pumpDs(
+      tester,
+      DsThreadRow(
+        DsThreadRowData(
+          id: 't',
+          title: 'Deploy question',
+          timeLabel: '10:00',
+          runState: DsRunState.waitingInput,
+          waitingForMe: mine,
+        ),
+        onOpen: () {},
+      ),
+    );
+    await show(mine: false);
+    expect(
+      find.bySemanticsLabel(
+        RegExp(
+          '^${RegExp.escape(l.threadRowLabel('Deploy question', l.threadRowStateWaiting, '10:00', l.threadRowUnread(0)))}',
+        ),
+      ),
+      findsOneWidget,
+    );
+    await show(mine: true);
+    expect(
+      find.bySemanticsLabel(
+        RegExp(
+          '^${RegExp.escape(l.threadRowLabel('Deploy question', l.liveBoxStateWaitingForYou, '10:00', l.threadRowUnread(0)))}',
+        ),
+      ),
+      findsOneWidget,
+    );
+  });
 }

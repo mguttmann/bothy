@@ -233,10 +233,20 @@ class _Builder {
   Widget _listItem(md.Element item, String marker) {
     final children = List<md.Node>.of(item.children ?? const []);
     Widget? lead;
-    if (children.isNotEmpty &&
-        children.first is md.Element &&
-        (children.first as md.Element).tag == 'input') {
-      final box = children.removeAt(0) as md.Element;
+    // In a loose list (blank lines between items) the box sits inside the first paragraph.
+    md.Element? box;
+    final first = children.isEmpty ? null : children.first;
+    if (first is md.Element && first.tag == 'input') {
+      box = children.removeAt(0) as md.Element;
+    } else if (first is md.Element &&
+        first.tag == 'p' &&
+        (first.children?.isNotEmpty ?? false) &&
+        first.children!.first is md.Element &&
+        (first.children!.first as md.Element).tag == 'input') {
+      box = first.children!.first as md.Element;
+      children[0] = md.Element(first.tag, first.children!.sublist(1));
+    }
+    if (box != null) {
       final checked = box.attributes['checked'] == 'true';
       lead = SizedBox.square(
         dimension: DsIconSize.sizeMd,
@@ -403,7 +413,8 @@ class _Builder {
   void _link(md.Element node, TextStyle style, List<InlineSpan> out) {
     final href = node.attributes['href'] ?? '';
     final target = dsClassifyLink(href);
-    final text = node.textContent;
+    // An image inside a link keeps its text form, so the link never ends up empty.
+    final text = _linkText(node);
     if (target == null) {
       out.add(TextSpan(text: text, style: style));
       return;
@@ -427,22 +438,34 @@ class _Builder {
     );
   }
 
+  String _linkText(md.Node node) {
+    if (node is md.Text) return node.text;
+    if (node is! md.Element) return '';
+    if (node.tag == 'img') return _imageText(node);
+    return (node.children ?? const <md.Node>[]).map(_linkText).join();
+  }
+
+  String _imageText(md.Element node) {
+    final l = dsL10n(context);
+    final alt = node.attributes['alt'] ?? node.textContent;
+    final uri = Uri.tryParse(node.attributes['src'] ?? '');
+    final domain = uri != null && uri.host.isNotEmpty ? uri.host : null;
+    return domain == null
+        ? l.markdownImageNoDomain(alt)
+        : l.markdownImage(alt, domain);
+  }
+
   void _image(md.Element node, TextStyle style, List<InlineSpan> out) {
     final src = node.attributes['src'] ?? '';
-    final alt = node.attributes['alt'] ?? node.textContent;
     final uri = Uri.tryParse(src);
     final resolved = uri == null ? null : attachments?.call(uri);
     if (resolved != null) {
       out.add(_BlockSpan(resolved));
       return;
     }
-    final l = dsL10n(context);
-    final domain = uri != null && uri.host.isNotEmpty ? uri.host : null;
     out.add(
       TextSpan(
-        text: domain == null
-            ? l.markdownImageNoDomain(alt)
-            : l.markdownImage(alt, domain),
+        text: _imageText(node),
         style: style.copyWith(color: context.dsColors.textSecondary),
       ),
     );
@@ -501,9 +524,13 @@ class _DsMarkdownLinkState extends State<DsMarkdownLink> {
       message: widget.target,
       excludeFromSemantics: true,
       child: Semantics(
+        // Its own node, so the link does not absorb the text of the paragraph around it.
+        container: true,
         link: true,
         label: widget.text,
         hint: widget.target,
+        // A screen reader activates the link deliberately with its own gesture.
+        onTap: () => widget.onOpen(widget.uri),
         excludeSemantics: true,
         child: FocusableActionDetector(
           mouseCursor: SystemMouseCursors.click,

@@ -377,4 +377,58 @@ void main() {
     await pumpDs(tester, _message(_with(triggerState: DsTriggerState.working)));
     expect(find.byType(DsTriggerStateIcon), findsOneWidget);
   });
+
+  testWidgets('links in the content stay reachable for screen readers', (
+    tester,
+  ) async {
+    final handle = tester.ensureSemantics();
+    final opened = <Uri>[];
+    await pumpDs(
+      tester,
+      DsMessage(
+        _with(content: 'see [docs](https://example.com/docs)'),
+        collapseLines: 24,
+        onOpenLink: opened.add,
+      ),
+    );
+    final link = find.bySemanticsLabel('docs');
+    expect(link, findsOneWidget);
+    expect(
+      tester.getSemantics(link),
+      isSemantics(isLink: true, hasTapAction: true),
+    );
+    tester.semantics.tap(find.semantics.byLabel('docs'));
+    expect(opened, [Uri.parse('https://example.com/docs')]);
+    handle.dispose();
+  });
+
+  testWidgets('the label separates list items and table cells', (tester) async {
+    final l = await en();
+    await pumpDs(
+      tester,
+      _message(
+        _with(
+          content:
+              '- Alpha\n- Beta\n\n| Name | Value |\n|---|---|\n| cpu | 3 |',
+        ),
+      ),
+    );
+    expect(
+      find.bySemanticsLabel(
+        l.messageSemanticsLabel('Alex', '10:42', 'Alpha Beta Name Value cpu 3'),
+      ),
+      findsOneWidget,
+    );
+  });
+
+  testWidgets('a continuation message keeps its trigger state', (tester) async {
+    await pumpDs(
+      tester,
+      _message(
+        _with(triggerState: DsTriggerState.failed),
+        isContinuation: true,
+      ),
+    );
+    expect(find.byType(DsTriggerStateIcon), findsOneWidget);
+  });
 }

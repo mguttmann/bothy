@@ -39,13 +39,26 @@ L10nFormat dsFormat(BuildContext context) =>
 /// The translated text of a run or trigger reason [code], or null for a code this app does
 /// not translate (the caller then shows the code in `type.code-sm`).
 ///
-/// [name] fills `user_cancelled` ("Canceled by Sam"); without it the reason has no text.
+/// Covers the run reasons of components.md 2.1 and the acceptance reasons of 09 3.5. [name]
+/// fills `user_cancelled` ("Canceled by Sam"); without it the text names no one.
 String? dsReasonText(AppLocalizations l, String? code, {String? name}) {
   return switch (code) {
     'billing_mode_mismatch' => l.liveBoxReasonBillingModeMismatch,
     'access_revoked' => l.liveBoxReasonAccessRevoked,
     'stale' => l.liveBoxReasonStale,
-    'user_cancelled' when name != null => l.liveBoxReasonUserCancelled(name),
+    'user_cancelled' =>
+      name == null
+          ? l.liveBoxReasonUserCancelledNoName
+          : l.liveBoxReasonUserCancelled(name),
+    'multiple_agents_mentioned' => l.triggerReasonMultipleAgentsMentioned,
+    'agent_not_allowed_here' => l.triggerReasonAgentNotAllowedHere,
+    'no_trigger_right' => l.triggerReasonNoTriggerRight,
+    'run_active_other_agent' => l.triggerReasonRunActiveOtherAgent,
+    'agent_disabled' => l.triggerReasonAgentDisabled,
+    'billing_mode_personal_not_holder' =>
+      l.triggerReasonBillingModePersonalNotHolder,
+    'voice_unsupported' => l.triggerReasonVoiceUnsupported,
+    'run_active' => l.triggerReasonRunActive,
     'adapter_error' => l.liveBoxReasonAdapterError,
     'cancel_timeout' => l.liveBoxReasonCancelTimeout,
     'project_not_ready' => l.liveBoxReasonProjectNotReady,
