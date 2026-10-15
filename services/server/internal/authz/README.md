@@ -163,8 +163,9 @@ subject_kind_not_allowed` (agents until the agent transport); an app without `ev
 in its granted scopes is `forbidden scope_missing`; a personal event (`Resource.Audience` set) is
 allowed for its audience and `not_found not_self` for anyone else; otherwise the full decision of
 the receive action `Resource.DeliveryOf` on the same resource (visibility, requirement and the app
-scope of the action, for example `messages:read` for `message.read`) is the result. An empty
-`DeliveryOf`, `webhook_out.deliver` itself and `self` without an audience are internal errors.
+scope of the action, for example `messages:read` for `message.read`) is the result. A personal
+event carries no `DeliveryOf` (its receive action is `self`); without an audience an empty
+`DeliveryOf` or `webhook_out.deliver` itself is an internal error.
 The delivery job calls it in filter mode, so no denial is written (AZ-P13).
 
 ### How a module builds a `Resource`

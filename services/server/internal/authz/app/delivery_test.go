@@ -34,8 +34,8 @@ func TestWebhookOutDeliverRequirement(t *testing.T) {
 	inEsk := delivery(w.msg(w.eskalation, w.alex), authorize.ActionMessageRead, ids.ID{})
 	inAll := delivery(w.msg(w.allgemein, w.alex), authorize.ActionMessageRead, ids.ID{})
 	instance := delivery(authorize.Resource{Kind: authorize.ResourceInstance}, authorize.ActionInstanceRead, ids.ID{})
-	self := delivery(authorize.Resource{Kind: authorize.ResourceInteraction, ID: ids.New()}, "self", w.tracker)
-	other := delivery(authorize.Resource{Kind: authorize.ResourceInteraction, ID: ids.New()}, "self", w.alex)
+	self := delivery(authorize.Resource{Kind: authorize.ResourceInteraction, ID: ids.New()}, "", w.tracker)
+	other := delivery(authorize.Resource{Kind: authorize.ResourceInteraction, ID: ids.New()}, "", w.alex)
 
 	ctx := authorize.Filter(context.Background())
 	cases := []struct {
@@ -62,9 +62,8 @@ func TestWebhookOutDeliverRequirement(t *testing.T) {
 		}
 	}
 	for name, r := range map[string]authorize.Resource{
-		"empty DeliveryOf":      delivery(w.msg(w.eskalation, w.alex), "", ids.ID{}),
-		"DeliveryOf itself":     delivery(w.msg(w.eskalation, w.alex), deliver, ids.ID{}),
-		"self without audience": delivery(w.msg(w.eskalation, w.alex), "self", ids.ID{}),
+		"empty DeliveryOf":  delivery(w.msg(w.eskalation, w.alex), "", ids.ID{}),
+		"DeliveryOf itself": delivery(w.msg(w.eskalation, w.alex), deliver, ids.ID{}),
 	} {
 		if _, err := w.az.Authorize(ctx, w.deliveryApp(sub, read), deliver, r); err == nil {
 			t.Errorf("%s: no internal error", name)

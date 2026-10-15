@@ -442,8 +442,8 @@ func (a *Authorizer) decideFor(ctx context.Context, s *actingPrincipal, act auth
 // authorizeDelivery decides webhook_out.deliver (M2-26 design note 8): the liveness check of the
 // receiving principal, the delivery gate of domain.DeliveryGate (app kind, events:subscribe, the
 // audience of a personal event), then the full decision of the receive action r.DeliveryOf on the
-// same resource, whose outcome is the result. An empty DeliveryOf, webhook_out.deliver itself or
-// "self" without an audience is an internal error.
+// same resource, whose outcome is the result. Without an audience an empty DeliveryOf or
+// webhook_out.deliver itself is an internal error.
 func (a *Authorizer) authorizeDelivery(ctx context.Context, p authorize.Principal, r authorize.Resource) (authorize.Decision, error) {
 	spec, req, err := a.requirement(authorize.ActionWebhookOutDeliver)
 	if err != nil {
@@ -453,7 +453,7 @@ func (a *Authorizer) authorizeDelivery(ctx context.Context, p authorize.Principa
 		return authorize.Decision{}, internal("webhook_out.deliver without the requirement Delivery")
 	}
 	of := r.DeliveryOf
-	if of == "" || of == authorize.ActionWebhookOutDeliver || (of == authorize.DeliverySelf && r.Audience.IsZero()) {
+	if r.Audience.IsZero() && (of == "" || of == authorize.ActionWebhookOutDeliver) {
 		return authorize.Decision{}, internal("webhook_out.deliver needs the receive action of the event")
 	}
 	if p == nil || p.PrincipalKind() == domain.KindAnonymous {

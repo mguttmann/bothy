@@ -168,8 +168,9 @@ func (w *WebhookService) mayReceive(ctx context.Context, inst InstallationRecord
 		// A stored kind outside the catalogue cannot be decided: fail closed, no request.
 		return false, nil
 	}
-	of := authorize.DeliverySelf
-	if ev.ReceiveAction != string(authorize.DeliverySelf) {
+	// A personal event (receive action "self") has no DeliveryOf: its audience decides.
+	var of authorize.Action
+	if ev.AudiencePrincipalID.IsZero() {
 		if of, ok = authorize.ParseAction(ev.ReceiveAction); !ok {
 			return false, nil
 		}

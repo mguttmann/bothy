@@ -51,17 +51,14 @@ type Resource struct {
 	// for terminal.attach, ignored otherwise.
 	Terminal *TerminalFacts
 	// DeliveryOf is the receive action of the event a webhook_out.deliver check delivers
-	// (event_log.receive_action, "self" for a personal event); used only by webhook_out.deliver
-	// (M2-26), which decides it on the same resource.
+	// (event_log.receive_action); empty for a personal event, whose receive action is "self" and
+	// whose Audience decides. Used only by webhook_out.deliver (M2-26), which decides it on the
+	// same resource.
 	DeliveryOf Action
 	// Audience is the audience principal of a personal event to deliver, zero otherwise; used
 	// only by webhook_out.deliver (M2-26).
 	Audience ids.ID
 }
-
-// DeliverySelf is Resource.DeliveryOf of a personal event, whose receive action is "self"
-// (event_log.receive_action; 05 section 6): only its audience receives it.
-const DeliverySelf Action = "self"
 
 // TerminalFacts describes a terminal session for the step-up rule of terminal.attach (08 section
 // 6.3 point 5): its state, the device and login session that opened it and the time it was
