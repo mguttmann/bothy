@@ -223,4 +223,32 @@ void main() {
       expect(await db.messagesDao.fileById(file(1).id), isNotNull);
     },
   );
+
+  test(
+    'removing a channel deletes messages whose thread row is not stored',
+    () async {
+      await fill(1);
+      await fill(2);
+      // The cleanup dropped the thread row; a later message.created stored a message again.
+      await db.transaction(
+        () => db.customStatement(
+          "DELETE FROM threads WHERE id = '${threadId(1).value}'",
+        ),
+      );
+      await db.messagesDao.upsertIfNewer(message(1, 3, text: 'secret three'));
+      await db.removeTargets([TargetRef.space(space(1).id)]);
+      for (final table in [
+        'messages',
+        'message_attachments',
+        'runs',
+        'read_states',
+        'reactions_summary',
+        'my_mentions',
+        'message_components',
+      ]) {
+        expect(await count(table), 0, reason: table);
+      }
+      expect(await db.searchDao.search('secret', limit: 10), isEmpty);
+    },
+  );
 }
