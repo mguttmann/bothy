@@ -271,7 +271,7 @@ func (c *CDN) answer(w http.ResponseWriter, r *http.Request, inj CDNResponse) {
 		body = "error for https://" + r.Host + r.URL.RequestURI()
 	}
 	w.WriteHeader(inj.Status)
-	_, _ = io.WriteString(w, body)
+	_, _ = io.WriteString(w, body) //nolint:gosec // G705: plain test bodies for the fetcher under test, never HTML in a browser
 }
 
 // serveFile writes the bytes of f.

@@ -202,23 +202,32 @@ func (f *Fetcher) reread(ctx context.Context, ref AttachmentRef) (Attachment, er
 		if m.ID != ref.MessageID {
 			continue
 		}
-		lists := [][]Attachment{m.Attachments}
-		for _, s := range m.MessageSnapshots {
-			lists = append(lists, s.Message.Attachments)
+		a, ok := findAttachment(m, ref.AttachmentID)
+		if !ok {
+			break
 		}
-		for _, list := range lists {
-			for _, a := range list {
-				if a.ID != ref.AttachmentID {
-					continue
-				}
-				if a.Size > f.maxBytes {
-					return Attachment{}, &CallError{Op: safeOp(a.URL.Raw()), Kind: ErrTooLarge}
-				}
-				return a, nil
+		if a.Size > f.maxBytes {
+			return Attachment{}, &CallError{Op: safeOp(a.URL.Raw()), Kind: ErrTooLarge}
+		}
+		return a, nil
+	}
+	return Attachment{}, &CallError{Op: safeOp(ref.URL.Raw()), Kind: ErrCDNGone}
+}
+
+// findAttachment returns the attachment with ID id of m or of one of its forwarded snapshots.
+func findAttachment(m Message, id string) (Attachment, bool) {
+	lists := [][]Attachment{m.Attachments}
+	for _, s := range m.MessageSnapshots {
+		lists = append(lists, s.Message.Attachments)
+	}
+	for _, list := range lists {
+		for _, a := range list {
+			if a.ID == id {
+				return a, true
 			}
 		}
 	}
-	return Attachment{}, &CallError{Op: safeOp(ref.URL.Raw()), Kind: ErrCDNGone}
+	return Attachment{}, false
 }
 
 // get fetches rawURL after the URL check, retrying after a 429 within the limits.
