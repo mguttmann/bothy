@@ -34,7 +34,13 @@ Planning stage (milestone M0). Nothing is installable yet.
   extensions and the color scheme mapping, `DsThemeScope` (no animated switch under reduced
   motion), the bundled variable fonts Atkinson Hyperlegible Next and Mono with their OFL texts and
   a checked manifest, and the alchemist golden setup with `dsGoldenMatrix` (M4-04).
-
+- Localization in `packages/l10n`: the ARB files `app_en.arb` (template) and `app_de.arb`
+  (default locale) with the first keys, the generated `AppLocalizations`, `problemText` for every
+  problem code with a fallback that shows the code, `L10nFormat` for money, numbers, durations
+  and times per locale, `resolveAppLocale` and the term table generated from 01 section 9. Tests
+  reject a missing translation, a placeholder mismatch, a missing description, en and em dashes,
+  emoji and a German text without the term of the table; `make codegen-check` regenerates in a
+  temporary copy and fails on untranslated messages or stale generated code (M4-06).
 - Design tokens: accent variants for every instance accent of `branding.accent_color` in light and
   dark. The generator swaps the accent roles for the same step of the chosen scale, moves a
   failing step, checks every pairing with a swapped role and writes `DsAccent` (Dart),

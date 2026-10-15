@@ -1,0 +1,5 @@
+{
+  "@@locale": "en",
+  "spaceTitle": "New space",
+  "@spaceTitle": {"description": "Title of the dialog that creates a space."}
+}

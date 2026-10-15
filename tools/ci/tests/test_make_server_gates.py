@@ -232,11 +232,15 @@ def _bash(
     )
 
 
-@pytest.mark.parametrize("selection", [["COMPONENTS=apps"], ["GO_MODS=", "COMPONENTS=all"]])
+# DART_PKGS= keeps the Dart parts of the gates (arch-dart, codegen-dart) out of this Go test;
+# test_make_dart_workspace.py covers them.
+@pytest.mark.parametrize(
+    "selection", [["COMPONENTS=apps", "DART_PKGS="], ["GO_MODS=", "DART_PKGS=", "COMPONENTS=all"]]
+)
 def test_server_gates_skip_without_selected_go_module(selection: list[str]) -> None:
     result = make(*SERVER_GATES, *selection)
     assert result.returncode == 0, result.stdout + result.stderr
-    skipped = _SKIP.findall(result.stdout)
+    skipped = [(name, why) for name, why in _SKIP.findall(result.stdout) if "-dart" not in name]
     assert [name for name, _ in skipped] == SERVER_GATES
     assert {reason for _, reason in skipped} == {"no Go module selected under services/"}
 

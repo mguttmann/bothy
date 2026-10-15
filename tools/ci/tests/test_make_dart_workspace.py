@@ -168,6 +168,38 @@ def test_arch_skips_dart_without_members(repo: Repo) -> None:
     assert repo.python_calls() == []
 
 
+def test_codegen_check_runs_l10n_check_in_members_with_l10n_yaml(repo: Repo) -> None:
+    repo.workspace()
+    repo.write("packages/beta/l10n.yaml", "arb-dir: lib/l10n\noutput-dir: lib/src/generated\n")
+    repo.commit()
+    result = repo.make("codegen-check", "COMPONENTS=apps")
+    assert result.returncode == 0, result.stdout + result.stderr
+    assert "codegen-dart" not in result.stdout
+    assert repo.python_calls() == [["tools/ci/l10n_check.py", "--dir", "packages/beta"]]
+
+
+def test_codegen_check_stops_when_the_l10n_check_fails(repo: Repo) -> None:
+    repo.workspace()
+    for name in ("alpha", "beta"):
+        repo.write(f"packages/{name}/l10n.yaml", "arb-dir: lib/l10n\n")
+    repo.write("tools/ci/l10n_check.py", "import sys\nsys.exit(1)\n")
+    repo.commit()
+    result = repo.make("codegen-check", "COMPONENTS=apps")
+    assert result.returncode != 0
+    assert repo.python_calls() == [["tools/ci/l10n_check.py", "--dir", "packages/alpha"]]
+
+
+def test_codegen_check_skips_dart_without_l10n_or_members(repo: Repo) -> None:
+    repo.workspace()
+    repo.commit()
+    result = repo.make("codegen-check", "COMPONENTS=apps")
+    assert result.returncode == 0, result.stdout + result.stderr
+    assert re.search(r"SKIP\s+codegen-dart\s+no Dart member with l10n.yaml", result.stdout)
+    server = repo.make("codegen-check", "COMPONENTS=server")
+    assert re.search(r"SKIP\s+codegen-dart\s+no Dart package selected", server.stdout)
+    assert repo.python_calls() == []
+
+
 def test_lint_runs_one_root_analyze(repo: Repo) -> None:
     repo.workspace()
     repo.commit()

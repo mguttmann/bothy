@@ -1,0 +1,5 @@
+{
+  "@@locale": "en",
+  "dashTitle": "Runs \u2014 today",
+  "@dashTitle": {"description": "A title with an em dash."}
+}
