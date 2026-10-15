@@ -15,15 +15,16 @@ import (
 
 // Placeholders that are non-nil collaborators; the constructors only check their presence.
 type (
-	stubChallenges struct{ app.ChallengeStore }
-	stubSessions   struct{ app.SessionStore }
-	stubDevices    struct{ app.DeviceStore }
-	stubAuth       struct{ identity.Auth }
-	stubUoW        struct{ txn.UnitOfWork }
-	stubAuthorizer struct{ authorize.Authorizer }
-	stubAudit      struct{ auditing.Recorder }
-	stubCleanup    struct{ app.CleanupStore }
-	stubExpiry     struct{ app.Expiry }
+	stubChallenges    struct{ app.ChallengeStore }
+	stubSessions      struct{ app.SessionStore }
+	stubDevices       struct{ app.DeviceStore }
+	stubAuth          struct{ identity.Auth }
+	stubUoW           struct{ txn.UnitOfWork }
+	stubAuthorizer    struct{ authorize.Authorizer }
+	stubAudit         struct{ auditing.Recorder }
+	stubDeviceExpirer struct{ app.DeviceExpirer }
+	stubCleanup       struct{ app.CleanupStore }
+	stubExpiry        struct{ app.Expiry }
 )
 
 // stepUpConfig returns the step-up and cleanup values the constructors accept.
@@ -69,15 +70,15 @@ func TestNewStepUps_Refuses(t *testing.T) {
 // errors; a nil clock is the system clock.
 func TestNewAuthCleanup_Refuses(t *testing.T) {
 	t.Parallel()
-	if _, err := app.NewAuthCleanup(stepUpConfig(), stubUoW{}, stubCleanup{}, stubExpiry{}, nil); err != nil {
+	if _, err := app.NewAuthCleanup(stepUpConfig(), stubUoW{}, stubCleanup{}, stubExpiry{}, stubDeviceExpirer{}, nil); err != nil {
 		t.Fatalf("NewAuthCleanup with valid values: %v", err)
 	}
-	if _, err := app.NewAuthCleanup(stepUpConfig(), nil, stubCleanup{}, stubExpiry{}, nil); err == nil {
+	if _, err := app.NewAuthCleanup(stepUpConfig(), nil, stubCleanup{}, stubExpiry{}, stubDeviceExpirer{}, nil); err == nil {
 		t.Error("NewAuthCleanup without a unit of work passed")
 	}
 	cfg := stepUpConfig()
 	cfg.CleanupInterval = 0
-	if _, err := app.NewAuthCleanup(cfg, stubUoW{}, stubCleanup{}, stubExpiry{}, nil); err == nil {
+	if _, err := app.NewAuthCleanup(cfg, stubUoW{}, stubCleanup{}, stubExpiry{}, stubDeviceExpirer{}, nil); err == nil {
 		t.Error("NewAuthCleanup with auth.cleanup_interval 0 passed")
 	}
 }
