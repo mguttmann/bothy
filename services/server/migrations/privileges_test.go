@@ -46,8 +46,10 @@ var appPrivileges = map[string][]string{
 	"groups":            {"SELECT", "INSERT", "UPDATE"},
 	"group_memberships": {"SELECT", "INSERT", "UPDATE"},
 	"grants":            {"SELECT", "INSERT", "UPDATE"},
-	// 03 event_log, R-DM-18: the envelope is append-only for bothy_app; redaction adds its column
-	// grant with M1-58, and partitions change only through the SECURITY DEFINER functions (M1-16).
+	// 03 event_log, R-DM-18: the envelope is append-only for bothy_app; redaction has the column
+	// right UPDATE (payload, redacted_at) since M1-58, which has_table_privilege does not show
+	// (TestEventLogRedactionGrant holds it), and partitions change only through the SECURITY
+	// DEFINER functions (M1-16).
 	"event_log": {"SELECT", "INSERT"},
 	// 03 idempotency_keys (M1-20): the stage inserts, completes and replaces expired rows, the
 	// cleanup job deletes them.
@@ -116,6 +118,9 @@ var appPrivileges = map[string][]string{
 	"mentions": {"SELECT", "INSERT", "DELETE"},
 	// M1-60: templates are deleted softly (deleted_at); no DELETE.
 	"message_templates": {"SELECT", "INSERT", "UPDATE"},
+	// 03 message_revisions (M1-58): an edit inserts the previous content, a deletion removes every
+	// revision of the message (03 section 6.5).
+	"message_revisions": {"SELECT", "INSERT", "DELETE"},
 	// 03 section 4.14 (M2-39): hosts and terminal sessions are security history; a session user
 	// row is never deleted while its host is not retired (ruling T12, R-DM-39). The retention
 	// job of class security grants its own DELETE (M7).

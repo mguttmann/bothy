@@ -63,6 +63,27 @@ type Store interface {
 	// VisibleMessage reads the message id when its channel is one of visible; found is false for
 	// an unknown id and for a message in another channel alike.
 	VisibleMessage(ctx context.Context, id ids.ID, visible []ids.ID) (m domain.Message, found bool, err error)
+
+	// The statements of editing and deleting (M1-58) carry the visible channels of the caller
+	// (07 section 7.4 rule 1): a message outside them reads like a missing one; they read with
+	// VisibleMessage above (INT-W22/4).
+
+	// LockMessage reads the message id like VisibleMessage and locks its row until the end of
+	// the unit of work.
+	LockMessage(ctx context.Context, id ids.ID, visible []ids.ID) (m domain.Message, found bool, err error)
+	// UpdateContent sets the content of the locked message id, edited_at to at and the next
+	// version, and returns the row.
+	UpdateContent(ctx context.Context, id ids.ID, visible []ids.ID, content string, at time.Time) (domain.Message, error)
+	// Tombstone deletes the locked message id (domain.Tombstone in SQL) and returns the row.
+	Tombstone(ctx context.Context, id ids.ID, visible []ids.ID, by ids.ID, at time.Time) (domain.Message, error)
+	// InsertRevision writes r with the next revision number of its message.
+	InsertRevision(ctx context.Context, r domain.Revision, visible []ids.ID) error
+	// Revisions returns the revisions of message in ascending order.
+	Revisions(ctx context.Context, message ids.ID, visible []ids.ID) ([]domain.Revision, error)
+	// DeleteRevisions removes every revision of message.
+	DeleteRevisions(ctx context.Context, message ids.ID, visible []ids.ID) error
+	// DeleteMentionsExcept removes the mentions of message whose principal is not in keep.
+	DeleteMentionsExcept(ctx context.Context, message ids.ID, visible, keep []ids.ID) error
 }
 
 // MentionQuery is one batch of the mention list (Store.MyMentions).

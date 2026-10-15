@@ -147,6 +147,9 @@ type Store interface {
 	// sets last_activity_at to at and with reopen opens it; it returns the stored row (03 section
 	// 6.2).
 	AppendToThread(ctx context.Context, id ids.ID, reopen bool, at time.Time) (domain.Thread, error)
+	// DecrementMessageCount lowers message_count of the locked thread id by one and raises its
+	// version (M1-58). Errors: internal when no row changed (unknown thread or a count of zero).
+	DecrementMessageCount(ctx context.Context, id ids.ID) error
 	// ListThreads returns the threads of q in the order of its sort.
 	ListThreads(ctx context.Context, q ThreadQuery) ([]domain.Thread, error)
 	// ThreadTags returns the live tags of each of threads in the order of the tags; a thread

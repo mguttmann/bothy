@@ -240,10 +240,10 @@ func newEmptyWorldWith(t *testing.T, search searchlang.Map) *world {
 		Directory: w.id.Directory}, nil, w.clk)
 	must(t, err)
 	// Messaging, threads and the instance settings serve the search tests of M3-13.
-	// The template, list and page limits are required since M1-57 and M1-60 (INT-W22/3).
+	// The template, list and page limits (M1-57, M1-60) and the write ports (M1-58) are required (INT-W22/3).
 	m, err := wire.NewMessaging(messagingapp.Config{MaxContentBytes: 4096, MaxMentions: 4, EventPayloadMaxBytes: 65536,
 		TemplateNameMaxChars: 64, TemplateMaxPerScope: 100, ListContentMaxBytes: 4096, PageSizeDefault: 20, PageSizeMax: 50},
-		pool, uow, w.az, appender, c.Service, w.id.Directory, w.clk, nil)
+		pool, uow, w.az, wire.MessagingWrites{Events: appender, Redactor: syncpg.NewRedactor(pool), Audit: w.rec}, c.Service, w.id.Directory, w.clk, nil)
 	must(t, err)
 	built, err := routes.Build(wire.Handlers{Access: authzhttp.New(w.admin), Agents: ag.Handlers, Spaces: c.Handlers, Channels: c.ChannelHandlers,
 		People: w.id.PeopleHandlers, Threads: c.ThreadHandlers, Messages: m.Handlers, Admin: settings.Handlers}, wire.RouteOptions(), routes.SpecCatalog())

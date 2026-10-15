@@ -74,3 +74,22 @@ SELECT sync_event_log_ensure_partitions(sqlc.arg(size)::bigint, sqlc.arg(ahead):
 -- name: DropExpiredPartitions :one
 -- Detaches and drops expired partitions through the SECURITY DEFINER function of bothy_owner.
 SELECT sync_event_log_drop_expired(sqlc.arg(cutoff)::timestamptz, sqlc.arg(head)::bigint, sqlc.arg(lock_timeout)::interval)::int;
+
+-- name: LockResourceEvents :many
+-- The stored events of one resource for the redaction of a deletion (03 section 6.5), locked in
+-- seq order through the index (resource_kind, resource_id).
+SELECT seq, type, schema_version, payload
+FROM event_log
+WHERE resource_kind = sqlc.arg(resource_kind)::text AND resource_id = sqlc.arg(resource_id)::uuid
+ORDER BY seq
+FOR UPDATE;
+
+-- name: RedactEvents :execrows
+-- Writes the redacted payloads of the locked events and sets redacted_at once (R-DM-18): bothy_app
+-- holds the column right UPDATE (payload, redacted_at) only, so no other column can change.
+UPDATE event_log AS e
+SET payload = r.payload::jsonb, redacted_at = COALESCE(e.redacted_at, now())
+FROM (
+    SELECT unnest(sqlc.arg(seqs)::bigint[]) AS seq, unnest(sqlc.arg(payloads)::text[]) AS payload
+) AS r
+WHERE e.seq = r.seq;

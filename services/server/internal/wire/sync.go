@@ -197,6 +197,10 @@ func consumerStopStep(runner *syncapp.ConsumerRunner) lifecycle.StopStep {
 	return lifecycle.StopStep{Name: "event_consumers", Phase: lifecycle.PhaseConsumers, Run: runner.Stop}
 }
 
+// Redactor returns the redactor of stored event payloads behind the kernel port (02 "Ports,
+// Ereignisse und Quellen je Modul": sync implements eventlog.Redactor, M1-58).
+func (s *Sync) Redactor() eventlog.Redactor { return syncpg.NewRedactor(s.pool) }
+
 // Appender returns the appender of durable events for the module constructors.
 func (s *Sync) Appender() eventlog.Appender { return s.appender }
 

@@ -484,6 +484,15 @@ type Message struct {
 	SearchVector        interface{}
 }
 
+type MessageRevision struct {
+	ID        pgtype.UUID
+	MessageID pgtype.UUID
+	Revision  int32
+	ContentMd string
+	EditedBy  pgtype.UUID
+	CreatedAt pgtype.Timestamptz
+}
+
 type MessageTemplate struct {
 	ID          pgtype.UUID
 	OwnerUserID pgtype.UUID

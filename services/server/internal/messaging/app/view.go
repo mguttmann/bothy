@@ -143,18 +143,22 @@ func messageBody(m messaging.Message) messageJSON {
 	}
 }
 
-// payload encodes the payload MessagePayload of body without HTML escaping, so the size is the
-// size of the content.
-func payload(body messageJSON) ([]byte, error) {
+// encode marshals v without HTML escaping, so the size of a payload is the size of its content.
+func encode(v any) ([]byte, error) {
 	var b bytes.Buffer
 	enc := json.NewEncoder(&b)
 	enc.SetEscapeHTML(false)
-	if err := enc.Encode(struct {
-		Message messageJSON `json:"message"`
-	}{body}); err != nil {
-		return nil, errs.Wrap(errs.CodeInternalError, err, "messaging: message.created payload")
+	if err := enc.Encode(v); err != nil {
+		return nil, errs.Wrap(errs.CodeInternalError, err, "messaging: encoding an event payload")
 	}
 	return bytes.TrimSuffix(b.Bytes(), []byte("\n")), nil
+}
+
+// payload encodes the payload MessagePayload of body.
+func payload(body messageJSON) ([]byte, error) {
+	return encode(struct {
+		Message messageJSON `json:"message"`
+	}{body})
 }
 
 // eventPayload returns the payload of m below sync.event_payload_max_bytes: whole when it fits,
@@ -179,7 +183,7 @@ func (s *Service) eventPayload(m messaging.Message) ([]byte, bool, error) {
 		return nil, false, err
 	}
 	if len(out) >= s.cfg.EventPayloadMaxBytes {
-		return nil, false, errs.New(errs.CodeInternalError, "messaging: message.created does not fit sync.event_payload_max_bytes")
+		return nil, false, errs.New(errs.CodeInternalError, "messaging: a message event does not fit sync.event_payload_max_bytes")
 	}
 	return out, true, nil
 }
@@ -188,13 +192,21 @@ func (s *Service) eventPayload(m messaging.Message) ([]byte, bool, error) {
 // message with version 1, scope space, channel and thread, receive action message.read and, for
 // a message of a client, the echo of client_msg_id.
 func (s *Service) emitCreated(ctx context.Context, info chat.ThreadInfo, m messaging.Message, echo bool) error {
+	return s.emitMessage(ctx, authorize.EventMessageCreated, info, m, echo)
+}
+
+// emitMessage appends the event typ with the payload {message} of m (message.created and, from
+// M1-58, message.updated): resource the message with its version after the change, scope space,
+// channel and thread, receive action message.read, the content cut by eventPayload, and with echo
+// the client_msg_id.
+func (s *Service) emitMessage(ctx context.Context, typ authorize.EventType, info chat.ThreadInfo, m messaging.Message, echo bool) error {
 	p, truncated, err := s.eventPayload(m)
 	if err != nil {
 		return err
 	}
 	kind, actorID := eventActor(ctx)
 	ev := eventlog.Event{
-		Type: string(authorize.EventMessageCreated), SchemaVersion: 1, ActorKind: kind, ActorPrincipalID: actorID,
+		Type: string(typ), SchemaVersion: 1, ActorKind: kind, ActorPrincipalID: actorID,
 		SpaceID: info.SpaceID, ChannelID: m.ChannelID, ThreadID: m.ThreadID, ResourceKind: resourceMessage, ResourceID: m.ID,
 		ResourceVersion: m.Version, ReceiveAction: receiveMessageRead, Payload: p, Truncated: truncated,
 	}

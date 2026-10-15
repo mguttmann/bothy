@@ -68,6 +68,26 @@ func (q *Queries) CountUnreadMentions(ctx context.Context, arg CountUnreadMentio
 	return items, nil
 }
 
+const deleteMentionsExcept = `-- name: DeleteMentionsExcept :exec
+DELETE FROM mentions AS mt
+USING messages AS m
+WHERE mt.message_id = m.id AND m.id = $1 AND m.channel_id = ANY($2::uuid[])
+  AND NOT (mt.principal_id = ANY($3::uuid[]))
+`
+
+type DeleteMentionsExceptParams struct {
+	MessageID pgtype.UUID
+	Visible   []pgtype.UUID
+	Keep      []pgtype.UUID
+}
+
+// An edit removes the mentions its content no longer resolves (M1-58); a deletion passes an empty
+// keep list and removes every row of the message.
+func (q *Queries) DeleteMentionsExcept(ctx context.Context, arg DeleteMentionsExceptParams) error {
+	_, err := q.db.Exec(ctx, deleteMentionsExcept, arg.MessageID, arg.Visible, arg.Keep)
+	return err
+}
+
 const insertMentions = `-- name: InsertMentions :exec
 
 INSERT INTO mentions (message_id, principal_id, thread_id, created_at)

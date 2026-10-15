@@ -48,3 +48,11 @@ WHERE mn.principal_id = @principal_id
   AND m.thread_seq > coalesce(r.last_read_seq, 0)
 GROUP BY m.thread_id, m.channel_id
 ORDER BY m.thread_id;
+
+-- name: DeleteMentionsExcept :exec
+-- An edit removes the mentions its content no longer resolves (M1-58); a deletion passes an empty
+-- keep list and removes every row of the message.
+DELETE FROM mentions AS mt
+USING messages AS m
+WHERE mt.message_id = m.id AND m.id = @message_id AND m.channel_id = ANY(@visible::uuid[])
+  AND NOT (mt.principal_id = ANY(@keep::uuid[]));

@@ -1,9 +1,9 @@
 // SPDX-License-Identifier: Apache-2.0
 
-// Package messagingworld is the HTTP test world of sending (M1-56): PostgreSQL 18 through pgtest
-// with the real chat, messaging, identity, authz, audit and sync modules behind the HTTP chain with
-// response validation, a fake clock, a test subscriber of MessagePosted and the helpers of the
-// tests of the brief. Only tests import it; it lives under services/server/test (test code, 02
+// Package messagingworld is the HTTP test world of sending (M1-56) and of editing and deleting
+// (M1-58): PostgreSQL 18 through pgtest with the real chat, messaging, identity, authz, audit and
+// sync modules behind the HTTP chain with response validation, a fake clock, test subscribers of
+// MessagePosted and MessageDeleted and the helpers of the tests of the briefs. Only tests import it; it lives under services/server/test (test code, 02
 // "Code-Layout"). Each test package calls pgtest.Main in its TestMain.
 package messagingworld
 
@@ -96,10 +96,22 @@ var errVeto = errors.New("veto")
 // can refuse them. The subscriber itself must be a method of a type in the test package: the txn
 // registry derives the module of a handler from its Go package (internal/<module>/...).
 type Recorder struct {
-	t      *testing.T
-	mu     sync.Mutex
-	posted []messaging.MessagePosted
-	veto   bool
+	t       *testing.T
+	mu      sync.Mutex
+	posted  []messaging.MessagePosted
+	deleted []messaging.MessageDeleted
+	veto    bool
+}
+
+// OnDeleted records ev (M1-58); it must run inside a unit of work.
+func (r *Recorder) OnDeleted(ctx context.Context, ev messaging.MessageDeleted) error {
+	if _, ok := txn.UnitFrom(ctx); !ok {
+		r.t.Error("MessageDeleted outside a unit of work")
+	}
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	r.deleted = append(r.deleted, ev)
+	return nil
 }
 
 // On records ev, or refuses it while the veto is set; it must run inside a unit of work.
@@ -145,6 +157,7 @@ type World struct {
 
 	rec      *Recorder
 	installs *installations
+	audit    *auditapp.Recorder
 }
 
 // installations is the identity.AppInstallations of the world: App registers an active
@@ -233,11 +246,12 @@ func New(t *testing.T, subscribe Subscribe, opts ...Option) *World {
 	for _, o := range opts {
 		o(&mcfg)
 	}
-	m, err := wire.NewMessaging(mcfg, pool, uow, az, appender, c.Service, dir, w.Clock, log)
+	m, err := wire.NewMessaging(mcfg, pool, uow, az, wire.MessagingWrites{Events: appender, Redactor: syncpg.NewRedactor(pool), Audit: rec},
+		c.Service, dir, w.Clock, log)
 	if err != nil {
 		t.Fatal(err)
 	}
-	w.Svc, w.Threads, w.Authorizer = m.Service, c.Service, az
+	w.Svc, w.Threads, w.Authorizer, w.audit = m.Service, c.Service, az, rec
 	w.H = harness(t, pool, uow, w.actors, wire.Handlers{Spaces: c.Handlers, Channels: c.ChannelHandlers, Threads: c.ThreadHandlers, Messages: m.Handlers}, w.Clock)
 	w.OwnerID = w.Person("owner", true)
 	return w
@@ -311,6 +325,22 @@ func (w *World) Posted() []messaging.MessagePosted {
 	w.rec.mu.Lock()
 	defer w.rec.mu.Unlock()
 	return append([]messaging.MessagePosted(nil), w.rec.posted...)
+}
+
+// FlushAudit writes the aggregated denials of the audit recorder now (M1-58), so a test can read
+// them in audit_events.
+func (w *World) FlushAudit() {
+	w.t.Helper()
+	if err := w.audit.Aggregator().Flush(context.Background()); err != nil {
+		w.t.Fatal(err)
+	}
+}
+
+// Deleted returns a copy of the MessageDeleted events seen so far (M1-58).
+func (w *World) Deleted() []messaging.MessageDeleted {
+	w.rec.mu.Lock()
+	defer w.rec.mu.Unlock()
+	return append([]messaging.MessageDeleted(nil), w.rec.deleted...)
 }
 
 // SQL runs stmt as the database owner (fixtures outside the use cases).

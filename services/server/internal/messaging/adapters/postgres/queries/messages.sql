@@ -31,3 +31,28 @@ SELECT id, thread_id, channel_id, thread_seq, author_principal_id, client_msg_id
     system_code, content_md, content_format, reply_to_message_id, run_id, trigger_state, trigger_state_reason, trigger_state_at,
     silent, import_item_id, version, edited_at, deleted_at, deleted_by, created_at
 FROM messages WHERE author_principal_id = @author_principal_id AND client_msg_id = @client_msg_id;
+
+-- name: LockVisibleMessage :one
+-- The visible message locked for an edit or a deletion (M1-58 lock order: thread row first,
+-- then the message row).
+SELECT id, thread_id, channel_id, thread_seq, author_principal_id, client_msg_id, client_payload_sha256, origin, kind,
+    system_code, content_md, content_format, reply_to_message_id, run_id, trigger_state, trigger_state_reason, trigger_state_at,
+    silent, import_item_id, version, edited_at, deleted_at, deleted_by, created_at
+FROM messages WHERE id = @id AND channel_id = ANY(@visible::uuid[]) FOR UPDATE;
+
+-- name: UpdateMessageContent :one
+-- An edit of the locked message: the new content, edited_at and the next version.
+UPDATE messages SET content_md = @content_md, edited_at = @edited_at, version = version + 1
+WHERE id = @id AND channel_id = ANY(@visible::uuid[]) AND deleted_at IS NULL
+RETURNING id, thread_id, channel_id, thread_seq, author_principal_id, client_msg_id, client_payload_sha256, origin, kind,
+    system_code, content_md, content_format, reply_to_message_id, run_id, trigger_state, trigger_state_reason, trigger_state_at,
+    silent, import_item_id, version, edited_at, deleted_at, deleted_by, created_at;
+
+-- name: TombstoneMessage :one
+-- The deletion of the locked message (03 section 6.5): the row and thread_seq stay, the content
+-- goes, deleted_at, deleted_by and the next version are set.
+UPDATE messages SET content_md = '', deleted_at = @deleted_at, deleted_by = @deleted_by, version = version + 1
+WHERE id = @id AND channel_id = ANY(@visible::uuid[]) AND deleted_at IS NULL
+RETURNING id, thread_id, channel_id, thread_seq, author_principal_id, client_msg_id, client_payload_sha256, origin, kind,
+    system_code, content_md, content_format, reply_to_message_id, run_id, trigger_state, trigger_state_reason, trigger_state_at,
+    silent, import_item_id, version, edited_at, deleted_at, deleted_by, created_at;

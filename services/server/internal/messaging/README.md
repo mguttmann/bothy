@@ -1,6 +1,6 @@
 # Modul `messaging`
 
-Status: sending built (M1-56): `createMessage` and `createThread`, the tables `messages` and `mentions`, the in-transaction event `MessagePosted` and the durable event `message.created`. Reading built (M1-57): `listThreadMessages` and `getMessage`. Mentions and templates built (M1-60): `listMyMentions`, the port `Mentions` with `CountUnread`, the table `message_templates` and its six operations. Editing, reactions, pins and the export follow with the tickets of the etappe.
+Status: sending built (M1-56): `createMessage` and `createThread`, the tables `messages` and `mentions`, the in-transaction event `MessagePosted` and the durable event `message.created`. Reading built (M1-57): `listThreadMessages` and `getMessage`. Editing, deleting and revisions built (M1-58): `updateMessage`, `deleteMessage`, `listMessageRevisions`, the table `message_revisions`, the in-transaction event `MessageDeleted` and the durable events `message.updated` and `message.deleted`. Mentions and templates built (M1-60): `listMyMentions`, the port `Mentions` with `CountUnread`, the table `message_templates` and its six operations. Reactions, pins and the export follow with the tickets of the etappe.
 Normativ ist [docs/spec/02-architektur.md](../../../../docs/spec/02-architektur.md); bei Abweichung gilt das Kapitel.
 
 ## Zweck
@@ -10,9 +10,12 @@ Nachrichten, Revisionen, Erwähnungen, Reaktionen, Anheften, Vorlagen, Kanal-Exp
 ## Code
 
 - `internal/messaging` (`messaging.go`, `mentions.go`, `templates.go`): the port. `Messages` with `Create`, `CreateThread`,
-  `History` and `Get`, the DTOs `Message`, `PrincipalRef`, `CreateMessageCmd`, `Created`,
-  `CreateThreadCmd`, `ThreadCreated`, `HistoryQuery` (with `HistoryMode`) and `HistoryPage`, the in-transaction event `MessagePosted`, and `Register` (declares
-  `message.created`). The port depends on no other module (02 section 7.2): `ThreadCreated` names
+  `History`, `Get`, `Update`, `Delete` and `Revisions`, the DTOs `Message`, `PrincipalRef`,
+  `CreateMessageCmd`, `Created`, `CreateThreadCmd`, `ThreadCreated`, `HistoryQuery` (with
+  `HistoryMode`), `HistoryPage`, `UpdateCommand` and `RevisionView`, the in-transaction events
+  `MessagePosted` and `MessageDeleted`, and `Register` (declares `message.created`,
+  `message.updated` and `message.deleted`). `Update`, `Delete` and `Revisions` read the caller
+  from the context (kernel `actor`). The port depends on no other module (02 section 7.2): `ThreadCreated` names
   the thread by id, and the handler reads it through `chat.Threads.View` (no `thread.read`, so
   an app with only `messages:write` gets the thread it created; a replay authorizes
   `message.create` on it first). `Mentions` (`ListMine`, `CountUnread`) and `Templates` (`List`,
@@ -22,27 +25,36 @@ Nachrichten, Revisionen, Erwähnungen, Reaktionen, Anheften, Vorlagen, Kanal-Exp
   `CheckContent`, `CheckMentionCount`, the mention scanner `ScanMentions` with `CodeMask` (the code
   structure of CommonMark 0.31.2), `RequestHash` (04 section 5.1 point 3), `SystemLine` and
   `TruncateForEvent` (04 payload rule 2); for reading `ValidateHistoryRequest`, `PickAround`,
-  `PageFlags` and `CutForList`; the template row `Template` with `Apply` (no-op
+  `PageFlags` and `CutForList`; for M1-58 `Revision`, the edit rules `Unchanged` and
+  `StoresRevision`, the one tombstone function `Tombstone` and `RedactPayload` (04 section 2.2
+  rule 5), the `eventlog.RedactFunc` of a deletion; the template row `Template` with `Apply` (no-op
   detection), `TemplateRules` (name and content), `LimitReached`, `ScopeLockKey` and the mention
   keyset `MentionKey` (M1-60).
-- `app/`: `Service` with `Create`, `CreateThread`, `History` and `Get`, `Service.Mentions()` and
+- `app/`: `Service` with `Create` and `CreateThread` (`create.go`, `threads.go`), `History` and
+  `Get`, `Update`, `Delete` and `Revisions` (`edit.go`), `Service.Mentions()` and
   `Service.Templates()` (the two other ports over the same service), the outgoing ports `Store`
   (with `HistoryRead` and `HistoryRows`), `Cursors` and `ErrorCounter`, and `ErrClientMsgIDTaken`.
-  `Config` binds `message.max_content_bytes`, `message.max_mentions`, `sync.event_payload_max_bytes`,
-  `message.list_content_max_bytes`, `template.name_max_chars`, `template.max_per_scope`,
-  `api.page_size_default` and `api.page_size_max` (`wire.MessagingConfig`).
-- `adapters/postgres/`: `queries/messages.sql`, `queries/mentions.sql`, `queries/templates.sql` and
-  `queries/history.sql` (`ListThreadNewest`, `ListThreadBefore`, `ListThreadAfter`,
-  `ListThreadAround`, `GetVisibleMessage`), the sqlc output in `sqlcgen/` and `Repository`
-  (implements `app.Store`); the mentions of a message are one `INSERT ... SELECT FROM unnest`.
-  `predicate_test.go` holds `TestQueriesCarryVisibleChannelPredicate` with its allowlist.
+  `Deps` holds the kernel ports `eventlog.Redactor` (implemented by sync) and `auditing.Recorder`
+  besides those of M1-56. `Config` binds `message.max_content_bytes`, `message.max_mentions`,
+  `sync.event_payload_max_bytes`, `message.list_content_max_bytes`, `template.name_max_chars`,
+  `template.max_per_scope`, `api.page_size_default` and `api.page_size_max`
+  (`wire.MessagingConfig`).
+- `adapters/postgres/`: `queries/messages.sql`, `queries/mentions.sql`, `queries/templates.sql`,
+  `queries/revisions.sql` and `queries/history.sql` (`ListThreadNewest`, `ListThreadBefore`,
+  `ListThreadAfter`, `ListThreadAround`, `GetVisibleMessage`), the sqlc output in `sqlcgen/` and
+  `Repository` (implements `app.Store`); the mentions of a message are one `INSERT ... SELECT FROM
+  unnest`. Every statement of M1-58 carries `channel_id = ANY(@visible)` or joins `messages` with
+  it. `predicate_test.go` holds `TestQueriesCarryVisibleChannelPredicate` with its allowlist.
 - `adapters/httpapi/`: `Messages`, the handlers of `createMessage`, `createThread`,
   `listThreadMessages`, `getMessage`, `listMyMentions` and the template operations (a repetition
-  answers `200` with `Idempotent-Replay: true`); `Cursors`, the cursor codec of platform/httpserver.
+  answers `200` with `Idempotent-Replay: true`) and of `updateMessage` (with `ETag`),
+  `deleteMessage` and `listMessageRevisions` (`edit.go`); `Cursors`, the cursor codec of
+  platform/httpserver.
 - Migrations `00032_messaging_messages.sql` (`messages` and `mentions` as 03 section 4.6 with
   the deviations its header names, and `threads.parent_message_id -> messages(id)` deferred and
-  `NOT VALID`), `00033_threads_parent_fk_validate.sql` (validates it) and
-  `00034_message_templates.sql` (`message_templates` as 03 section 4.6).
+  `NOT VALID`), `00033_threads_parent_fk_validate.sql` (validates it),
+  `00034_message_templates.sql` (`message_templates` as 03 section 4.6) and
+  `00038_messaging_message_revisions.sql` (`message_revisions` as 03 states it, M1-58).
 - The test world of both handlers is `services/server/test/messagingworld`.
 
 ## Port (Wurzelpaket `internal/messaging`)
@@ -239,13 +251,63 @@ empty vector. The queries list their columns, so no read carries `search_languag
 (`adapters/postgres`) fails when an `INSERT INTO messages` of `queries/*.sql` does not name
 `search_language` (later writers: M2 agent messages, M8-03 import, V3-01 DMs).
 
+## Editing, deleting and revisions (M1-58)
+
+Every operation first gets the visible channels of the caller (`Authorizer.Scope` for
+`message.read`) and reads the message only in them; a missing and an invisible message take the
+same path through `authorize` and give the same `404`. The message resource names thread, channel
+and author, so authz decides `write` and author (`message.update`) and `(write and author) or
+manage` (`message.delete`).
+
+`updateMessage` (precedence `428` > `404` > `403` > `410` > `412` > `413` > `400`): the HTTP chain
+answers a missing `If-Match` with `428` before any lookup; then `authorize(message.update)` (a
+read-only channel is `403 channel_read_only`, a system line `403`); in the unit of work the
+message row lock, `410 message_deleted`, `412 version_conflict` with the current message in
+`current` (an `If-Match` that is not a version never matches), the content rules of sending and
+the mentions resolved again from the resulting content (a given `mention_ids` must equal them).
+The same content and mention set, an empty body included, answers the current message and its
+`ETag` without a write. Otherwise the previous content becomes revision `max + 1` (revision 1 is
+the original; not for a run anchor), the row gets the content, `edited_at` and the next version,
+removed mentions go, added ones are inserted, and `message.updated` carries the message like
+`message.created` (cut above `sync.event_payload_max_bytes`, no `client_msg_id`). An edit never
+publishes `MessagePosted` and never changes `trigger_state`. The `Idempotency-Key` stage answers a
+repetition with the stored response.
+
+`deleteMessage`: `authorize(message.delete)`; an already deleted message is `204` without a
+write, an event or an audit entry. The unit of work locks the thread (`chat.Threads.
+LockForMessageChange`) and then the message row (a message deleted meanwhile ends it without a
+write), remembers the mentions, writes the tombstone (`content_md = ''`, `deleted_at`,
+`deleted_by`, next version), removes the revisions and mentions (M1-59 adds reactions and pins at
+the marked step), counts the message down (`chat.Threads.DecrementMessageCount`), redacts the
+payloads of every stored event with resource `message` and this id through
+`eventlog.Redactor` with `domain.RedactPayload`, publishes `MessageDeleted` and appends
+`message.deleted` (payload `MessageDeletedPayload`, after the redaction, so never redacted). A
+deletion of another principal's message writes an `allow` audit entry with only `thread_id`,
+`channel_id` and `author_principal_id`; denials take the deny path of authz.
+
+`listMessageRevisions`: `authorize(message.revisions.read)`, the revisions ascending and
+unpaginated, `{"items": []}` for a deleted message.
+
+Lock order: the thread row (through `chat`) before the message row; several message rows in
+ascending `id`; the counters last (03 section 6.3, enforced by the unit of work). A thread move
+(M1-62) also locks the thread first, so a deletion and a move cannot deadlock; an edit locks only
+the message row, which serialises edits, deletions and (from M1-59) reactions and pins of one
+message, and revision numbers come from `max(revision) + 1` under it.
+
+Redacted payloads (04 section 2.2 rule 5): `message.created` and `message.updated` become
+`{"message": T}` with `T` the event form of the tombstone (every stored field, `content_md` empty,
+no attachments, mentions, reactions or components, `pinned` false, `deleted_at` and the new
+version, no `my_reactions`, no `content_truncated`); `reaction.added` and `reaction.removed` keep
+`message_id`, `thread_id` and `principal_id` with `emoji: ""` and `count: 0`; `pin.added` and
+`pin.removed` stay; any other type fails the deletion. The envelope columns never change.
+
 ## Hinweise für den Bau
 
 - Idempotenz über das Paar aus Autor und `client_msg_id` (04, 5.1).
 - Löschen leert den Inhalt und schwärzt die Nutzlast der Ereignisse in derselben Transaktion (03, 6.5).
 - Eine Erwähnung eines Prinzipals ohne Leserecht wird gespeichert, löst aber nichts aus (03, `mentions`).
 
-Rulings: docs/DECISIONS.md M1-56, M1-57 and M1-60.
+Rulings: docs/DECISIONS.md M1-56, M1-57, M1-58 and M1-60.
 
 ## Kapitel
 

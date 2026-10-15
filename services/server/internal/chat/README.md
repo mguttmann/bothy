@@ -211,6 +211,8 @@ actions, explanation, preview and view-as with real sources).
 | `setThreadTags` | `thread.tags.set`, If-Match optional; restricted tags with the restricted flag (`manage`) | `thread.updated` |
 | `Threads.Create` | none (messaging authorized `thread.create`); restricted tags with `thread.tags.set` | `thread.created` |
 | `Threads.AppendToThread` | none (messaging authorized `message.create`); `thread.reopen` on an implicit reopen | `thread.reopened` on a reopen |
+| `Threads.LockForMessageChange` | none (messaging authorized `message.delete`) | |
+| `Threads.DecrementMessageCount` | none (messaging authorized `message.delete`) | |
 
 - Thread sequence (03 section 6.2): `AppendToThread` locks the row and runs one `UPDATE threads
   SET last_message_seq = last_message_seq + 1, ... RETURNING`; a rolled back unit returns the
@@ -234,6 +236,13 @@ actions, explanation, preview and view-as with real sources).
   channel, filters and sort; any other combination is `400 cursor_invalid`.
 - Archived channels: authz caps the level at `read`, so close, reopen, title and tags are `403
   channel_read_only` with `reason: channel_archived`; reading stays.
+
+- Message count (M1-58): a deletion in messaging locks the thread with `LockForMessageChange`
+  (`SELECT ... FOR UPDATE`, before the message row: lock order of the messaging README) and calls
+  `DecrementMessageCount`, one `UPDATE threads SET message_count = message_count - 1, version =
+  version + 1 WHERE message_count > 0`; no row (an unknown thread or a count of zero) is
+  `internal`, so the count never goes below zero. Both fail with `internal` outside a unit of
+  work. `message_count` thus counts messages without deleted ones (03 `threads`).
 
 Rulings: docs/DECISIONS.md M1-55. Tests: `domain/thread_test.go`,
 `adapters/httpapi/threads_test.go` (PostgreSQL 18, real authz and chat source, response

@@ -18195,6 +18195,169 @@ func (response CreatePersonalTemplatedefaultApplicationProblemPlusJSONResponse) 
 	return err
 }
 
+type DeleteMessageRequestObject struct {
+	MessageId MessageIdPath `json:"message_id"`
+}
+
+type DeleteMessageResponseObject interface {
+	VisitDeleteMessageResponse(w http.ResponseWriter) error
+}
+
+type DeleteMessage204ResponseHeaders struct {
+	CorrelationId   *CorrelationId
+	RateLimit       *string
+	RateLimitPolicy *string
+}
+
+type DeleteMessage204Response struct {
+	Headers DeleteMessage204ResponseHeaders
+}
+
+func (response DeleteMessage204Response) VisitDeleteMessageResponse(w http.ResponseWriter) error {
+	if response.Headers.CorrelationId != nil {
+		w.Header().Set("Correlation-Id", fmt.Sprint(*response.Headers.CorrelationId))
+	}
+	if response.Headers.RateLimit != nil {
+		w.Header().Set("RateLimit", fmt.Sprint(*response.Headers.RateLimit))
+	}
+	if response.Headers.RateLimitPolicy != nil {
+		w.Header().Set("RateLimit-Policy", fmt.Sprint(*response.Headers.RateLimitPolicy))
+	}
+	w.WriteHeader(204)
+	return nil
+}
+
+type DeleteMessage400ApplicationProblemPlusJSONResponse struct {
+	BadRequestApplicationProblemPlusJSONResponse
+}
+
+func (response DeleteMessage400ApplicationProblemPlusJSONResponse) VisitDeleteMessageResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	if response.Headers.CorrelationId != nil {
+		w.Header().Set("Correlation-Id", fmt.Sprint(*response.Headers.CorrelationId))
+	}
+	w.WriteHeader(400)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type DeleteMessage401ApplicationProblemPlusJSONResponse struct {
+	UnauthorizedApplicationProblemPlusJSONResponse
+}
+
+func (response DeleteMessage401ApplicationProblemPlusJSONResponse) VisitDeleteMessageResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	if response.Headers.CorrelationId != nil {
+		w.Header().Set("Correlation-Id", fmt.Sprint(*response.Headers.CorrelationId))
+	}
+	if response.Headers.DPoPNonce != nil {
+		w.Header().Set("DPoP-Nonce", fmt.Sprint(*response.Headers.DPoPNonce))
+	}
+	if response.Headers.WWWAuthenticate != nil {
+		w.Header().Set("WWW-Authenticate", fmt.Sprint(*response.Headers.WWWAuthenticate))
+	}
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type DeleteMessage403ApplicationProblemPlusJSONResponse struct {
+	ForbiddenApplicationProblemPlusJSONResponse
+}
+
+func (response DeleteMessage403ApplicationProblemPlusJSONResponse) VisitDeleteMessageResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	if response.Headers.CorrelationId != nil {
+		w.Header().Set("Correlation-Id", fmt.Sprint(*response.Headers.CorrelationId))
+	}
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type DeleteMessage404ApplicationProblemPlusJSONResponse struct {
+	NotFoundApplicationProblemPlusJSONResponse
+}
+
+func (response DeleteMessage404ApplicationProblemPlusJSONResponse) VisitDeleteMessageResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	if response.Headers.CorrelationId != nil {
+		w.Header().Set("Correlation-Id", fmt.Sprint(*response.Headers.CorrelationId))
+	}
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type DeleteMessage429ApplicationProblemPlusJSONResponse struct {
+	TooManyRequestsApplicationProblemPlusJSONResponse
+}
+
+func (response DeleteMessage429ApplicationProblemPlusJSONResponse) VisitDeleteMessageResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	if response.Headers.CorrelationId != nil {
+		w.Header().Set("Correlation-Id", fmt.Sprint(*response.Headers.CorrelationId))
+	}
+	if response.Headers.RateLimit != nil {
+		w.Header().Set("RateLimit", fmt.Sprint(*response.Headers.RateLimit))
+	}
+	if response.Headers.RateLimitPolicy != nil {
+		w.Header().Set("RateLimit-Policy", fmt.Sprint(*response.Headers.RateLimitPolicy))
+	}
+	if response.Headers.RetryAfter != nil {
+		w.Header().Set("Retry-After", fmt.Sprint(*response.Headers.RetryAfter))
+	}
+	w.WriteHeader(429)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type DeleteMessagedefaultApplicationProblemPlusJSONResponse struct {
+	Body       Problem
+	Headers    ErrorResponseHeaders
+	StatusCode int
+}
+
+func (response DeleteMessagedefaultApplicationProblemPlusJSONResponse) VisitDeleteMessageResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	if response.Headers.CorrelationId != nil {
+		w.Header().Set("Correlation-Id", fmt.Sprint(*response.Headers.CorrelationId))
+	}
+	w.WriteHeader(response.StatusCode)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
 type GetMessageRequestObject struct {
 	MessageId MessageIdPath `json:"message_id"`
 }
@@ -18356,6 +18519,449 @@ type GetMessagedefaultApplicationProblemPlusJSONResponse struct {
 }
 
 func (response GetMessagedefaultApplicationProblemPlusJSONResponse) VisitGetMessageResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	if response.Headers.CorrelationId != nil {
+		w.Header().Set("Correlation-Id", fmt.Sprint(*response.Headers.CorrelationId))
+	}
+	w.WriteHeader(response.StatusCode)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type UpdateMessageRequestObject struct {
+	MessageId MessageIdPath `json:"message_id"`
+	Params    UpdateMessageParams
+	Body      *UpdateMessageJSONRequestBody
+}
+
+type UpdateMessageResponseObject interface {
+	VisitUpdateMessageResponse(w http.ResponseWriter) error
+}
+
+type UpdateMessage200ResponseHeaders struct {
+	CorrelationId   *CorrelationId
+	ETag            *string
+	RateLimit       *string
+	RateLimitPolicy *string
+}
+
+type UpdateMessage200JSONResponse struct {
+	Body    Message
+	Headers UpdateMessage200ResponseHeaders
+}
+
+func (response UpdateMessage200JSONResponse) VisitUpdateMessageResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	if response.Headers.CorrelationId != nil {
+		w.Header().Set("Correlation-Id", fmt.Sprint(*response.Headers.CorrelationId))
+	}
+	if response.Headers.ETag != nil {
+		w.Header().Set("ETag", fmt.Sprint(*response.Headers.ETag))
+	}
+	if response.Headers.RateLimit != nil {
+		w.Header().Set("RateLimit", fmt.Sprint(*response.Headers.RateLimit))
+	}
+	if response.Headers.RateLimitPolicy != nil {
+		w.Header().Set("RateLimit-Policy", fmt.Sprint(*response.Headers.RateLimitPolicy))
+	}
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type UpdateMessage400ApplicationProblemPlusJSONResponse struct {
+	BadRequestApplicationProblemPlusJSONResponse
+}
+
+func (response UpdateMessage400ApplicationProblemPlusJSONResponse) VisitUpdateMessageResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	if response.Headers.CorrelationId != nil {
+		w.Header().Set("Correlation-Id", fmt.Sprint(*response.Headers.CorrelationId))
+	}
+	w.WriteHeader(400)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type UpdateMessage401ApplicationProblemPlusJSONResponse struct {
+	UnauthorizedApplicationProblemPlusJSONResponse
+}
+
+func (response UpdateMessage401ApplicationProblemPlusJSONResponse) VisitUpdateMessageResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	if response.Headers.CorrelationId != nil {
+		w.Header().Set("Correlation-Id", fmt.Sprint(*response.Headers.CorrelationId))
+	}
+	if response.Headers.DPoPNonce != nil {
+		w.Header().Set("DPoP-Nonce", fmt.Sprint(*response.Headers.DPoPNonce))
+	}
+	if response.Headers.WWWAuthenticate != nil {
+		w.Header().Set("WWW-Authenticate", fmt.Sprint(*response.Headers.WWWAuthenticate))
+	}
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type UpdateMessage403ApplicationProblemPlusJSONResponse struct {
+	ForbiddenApplicationProblemPlusJSONResponse
+}
+
+func (response UpdateMessage403ApplicationProblemPlusJSONResponse) VisitUpdateMessageResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	if response.Headers.CorrelationId != nil {
+		w.Header().Set("Correlation-Id", fmt.Sprint(*response.Headers.CorrelationId))
+	}
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type UpdateMessage404ApplicationProblemPlusJSONResponse struct {
+	NotFoundApplicationProblemPlusJSONResponse
+}
+
+func (response UpdateMessage404ApplicationProblemPlusJSONResponse) VisitUpdateMessageResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	if response.Headers.CorrelationId != nil {
+		w.Header().Set("Correlation-Id", fmt.Sprint(*response.Headers.CorrelationId))
+	}
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type UpdateMessage410ApplicationProblemPlusJSONResponse struct {
+	GoneApplicationProblemPlusJSONResponse
+}
+
+func (response UpdateMessage410ApplicationProblemPlusJSONResponse) VisitUpdateMessageResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	if response.Headers.CorrelationId != nil {
+		w.Header().Set("Correlation-Id", fmt.Sprint(*response.Headers.CorrelationId))
+	}
+	w.WriteHeader(410)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type UpdateMessage412ApplicationProblemPlusJSONResponse struct {
+	PreconditionFailedApplicationProblemPlusJSONResponse
+}
+
+func (response UpdateMessage412ApplicationProblemPlusJSONResponse) VisitUpdateMessageResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	if response.Headers.CorrelationId != nil {
+		w.Header().Set("Correlation-Id", fmt.Sprint(*response.Headers.CorrelationId))
+	}
+	w.WriteHeader(412)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type UpdateMessage413ApplicationProblemPlusJSONResponse struct {
+	PayloadTooLargeApplicationProblemPlusJSONResponse
+}
+
+func (response UpdateMessage413ApplicationProblemPlusJSONResponse) VisitUpdateMessageResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	if response.Headers.CorrelationId != nil {
+		w.Header().Set("Correlation-Id", fmt.Sprint(*response.Headers.CorrelationId))
+	}
+	w.WriteHeader(413)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type UpdateMessage422ApplicationProblemPlusJSONResponse struct {
+	UnprocessableEntityApplicationProblemPlusJSONResponse
+}
+
+func (response UpdateMessage422ApplicationProblemPlusJSONResponse) VisitUpdateMessageResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	if response.Headers.CorrelationId != nil {
+		w.Header().Set("Correlation-Id", fmt.Sprint(*response.Headers.CorrelationId))
+	}
+	w.WriteHeader(422)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type UpdateMessage428ApplicationProblemPlusJSONResponse struct {
+	PreconditionRequiredApplicationProblemPlusJSONResponse
+}
+
+func (response UpdateMessage428ApplicationProblemPlusJSONResponse) VisitUpdateMessageResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	if response.Headers.CorrelationId != nil {
+		w.Header().Set("Correlation-Id", fmt.Sprint(*response.Headers.CorrelationId))
+	}
+	w.WriteHeader(428)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type UpdateMessage429ApplicationProblemPlusJSONResponse struct {
+	TooManyRequestsApplicationProblemPlusJSONResponse
+}
+
+func (response UpdateMessage429ApplicationProblemPlusJSONResponse) VisitUpdateMessageResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	if response.Headers.CorrelationId != nil {
+		w.Header().Set("Correlation-Id", fmt.Sprint(*response.Headers.CorrelationId))
+	}
+	if response.Headers.RateLimit != nil {
+		w.Header().Set("RateLimit", fmt.Sprint(*response.Headers.RateLimit))
+	}
+	if response.Headers.RateLimitPolicy != nil {
+		w.Header().Set("RateLimit-Policy", fmt.Sprint(*response.Headers.RateLimitPolicy))
+	}
+	if response.Headers.RetryAfter != nil {
+		w.Header().Set("Retry-After", fmt.Sprint(*response.Headers.RetryAfter))
+	}
+	w.WriteHeader(429)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type UpdateMessagedefaultApplicationProblemPlusJSONResponse struct {
+	Body       Problem
+	Headers    ErrorResponseHeaders
+	StatusCode int
+}
+
+func (response UpdateMessagedefaultApplicationProblemPlusJSONResponse) VisitUpdateMessageResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	if response.Headers.CorrelationId != nil {
+		w.Header().Set("Correlation-Id", fmt.Sprint(*response.Headers.CorrelationId))
+	}
+	w.WriteHeader(response.StatusCode)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListMessageRevisionsRequestObject struct {
+	MessageId MessageIdPath `json:"message_id"`
+}
+
+type ListMessageRevisionsResponseObject interface {
+	VisitListMessageRevisionsResponse(w http.ResponseWriter) error
+}
+
+type ListMessageRevisions200ResponseHeaders struct {
+	CorrelationId   *CorrelationId
+	RateLimit       *string
+	RateLimitPolicy *string
+}
+
+type ListMessageRevisions200JSONResponse struct {
+	Body    MessageRevisionList
+	Headers ListMessageRevisions200ResponseHeaders
+}
+
+func (response ListMessageRevisions200JSONResponse) VisitListMessageRevisionsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	if response.Headers.CorrelationId != nil {
+		w.Header().Set("Correlation-Id", fmt.Sprint(*response.Headers.CorrelationId))
+	}
+	if response.Headers.RateLimit != nil {
+		w.Header().Set("RateLimit", fmt.Sprint(*response.Headers.RateLimit))
+	}
+	if response.Headers.RateLimitPolicy != nil {
+		w.Header().Set("RateLimit-Policy", fmt.Sprint(*response.Headers.RateLimitPolicy))
+	}
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListMessageRevisions400ApplicationProblemPlusJSONResponse struct {
+	BadRequestApplicationProblemPlusJSONResponse
+}
+
+func (response ListMessageRevisions400ApplicationProblemPlusJSONResponse) VisitListMessageRevisionsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	if response.Headers.CorrelationId != nil {
+		w.Header().Set("Correlation-Id", fmt.Sprint(*response.Headers.CorrelationId))
+	}
+	w.WriteHeader(400)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListMessageRevisions401ApplicationProblemPlusJSONResponse struct {
+	UnauthorizedApplicationProblemPlusJSONResponse
+}
+
+func (response ListMessageRevisions401ApplicationProblemPlusJSONResponse) VisitListMessageRevisionsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	if response.Headers.CorrelationId != nil {
+		w.Header().Set("Correlation-Id", fmt.Sprint(*response.Headers.CorrelationId))
+	}
+	if response.Headers.DPoPNonce != nil {
+		w.Header().Set("DPoP-Nonce", fmt.Sprint(*response.Headers.DPoPNonce))
+	}
+	if response.Headers.WWWAuthenticate != nil {
+		w.Header().Set("WWW-Authenticate", fmt.Sprint(*response.Headers.WWWAuthenticate))
+	}
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListMessageRevisions403ApplicationProblemPlusJSONResponse struct {
+	ForbiddenApplicationProblemPlusJSONResponse
+}
+
+func (response ListMessageRevisions403ApplicationProblemPlusJSONResponse) VisitListMessageRevisionsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	if response.Headers.CorrelationId != nil {
+		w.Header().Set("Correlation-Id", fmt.Sprint(*response.Headers.CorrelationId))
+	}
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListMessageRevisions404ApplicationProblemPlusJSONResponse struct {
+	NotFoundApplicationProblemPlusJSONResponse
+}
+
+func (response ListMessageRevisions404ApplicationProblemPlusJSONResponse) VisitListMessageRevisionsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	if response.Headers.CorrelationId != nil {
+		w.Header().Set("Correlation-Id", fmt.Sprint(*response.Headers.CorrelationId))
+	}
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListMessageRevisions429ApplicationProblemPlusJSONResponse struct {
+	TooManyRequestsApplicationProblemPlusJSONResponse
+}
+
+func (response ListMessageRevisions429ApplicationProblemPlusJSONResponse) VisitListMessageRevisionsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	if response.Headers.CorrelationId != nil {
+		w.Header().Set("Correlation-Id", fmt.Sprint(*response.Headers.CorrelationId))
+	}
+	if response.Headers.RateLimit != nil {
+		w.Header().Set("RateLimit", fmt.Sprint(*response.Headers.RateLimit))
+	}
+	if response.Headers.RateLimitPolicy != nil {
+		w.Header().Set("RateLimit-Policy", fmt.Sprint(*response.Headers.RateLimitPolicy))
+	}
+	if response.Headers.RetryAfter != nil {
+		w.Header().Set("Retry-After", fmt.Sprint(*response.Headers.RetryAfter))
+	}
+	w.WriteHeader(429)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListMessageRevisionsdefaultApplicationProblemPlusJSONResponse struct {
+	Body       Problem
+	Headers    ErrorResponseHeaders
+	StatusCode int
+}
+
+func (response ListMessageRevisionsdefaultApplicationProblemPlusJSONResponse) VisitListMessageRevisionsResponse(w http.ResponseWriter) error {
 
 	var buf bytes.Buffer
 	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {

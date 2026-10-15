@@ -549,6 +549,18 @@ func (stubServer) GetMessage(context.Context, rest.GetMessageRequestObject) (res
 	return nil, nil
 }
 
+func (stubServer) UpdateMessage(context.Context, rest.UpdateMessageRequestObject) (rest.UpdateMessageResponseObject, error) {
+	return nil, nil
+}
+
+func (stubServer) DeleteMessage(context.Context, rest.DeleteMessageRequestObject) (rest.DeleteMessageResponseObject, error) {
+	return nil, nil
+}
+
+func (stubServer) ListMessageRevisions(context.Context, rest.ListMessageRevisionsRequestObject) (rest.ListMessageRevisionsResponseObject, error) {
+	return nil, nil
+}
+
 func (stubServer) SetThreadTags(context.Context, rest.SetThreadTagsRequestObject) (rest.SetThreadTagsResponseObject, error) {
 	return nil, nil
 }
@@ -612,7 +624,7 @@ func (stubServer) SetMyLocalCredential(context.Context, rest.SetMyLocalCredentia
 // the enrollment codes (M1-37), the device approval and pairing (M1-38), the passkeys (M1-40),
 // the OIDC login (M1-41), the trusted header login (M1-43), the revocations (M1-45), the host
 // records (M2-39), the local accounts (M1-39), the nine app operations (M2-24), the threads
-// (M1-55) and sending (M1-56). A handler
+// (M1-55), sending (M1-56) and editing and deleting (M1-58). A handler
 // ticket that enables an operation changes this test together with
 // api/operations.yaml.
 func TestRealTable_Enabled(t *testing.T) {
@@ -773,6 +785,10 @@ func TestRealTable_Enabled(t *testing.T) {
 		// M1-57
 		"listThreadMessages": {"GET /api/v1/threads/{thread_id}/messages", "thread.read", "rl.read"},
 		"getMessage":         {"GET /api/v1/messages/{message_id}", "message.read", "rl.read"},
+		// M1-58
+		"updateMessage":        {"PATCH /api/v1/messages/{message_id}", "message.update", "rl.message"},
+		"deleteMessage":        {"DELETE /api/v1/messages/{message_id}", "message.delete", "rl.message"},
+		"listMessageRevisions": {"GET /api/v1/messages/{message_id}/revisions", "message.revisions.read", "rl.read"},
 		// M2-39
 		"listHosts":             {"GET /api/v1/hosts", "host.read", "rl.read"},
 		"createHost":            {"POST /api/v1/hosts", "host.manage", "rl.admin"},

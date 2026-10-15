@@ -332,9 +332,18 @@ type ServerInterface interface {
 	// CreatePersonalTemplate Create a personal template
 	// (POST /me/templates)
 	CreatePersonalTemplate(w http.ResponseWriter, r *http.Request, params CreatePersonalTemplateParams)
+	// DeleteMessage Delete a message
+	// (DELETE /messages/{message_id})
+	DeleteMessage(w http.ResponseWriter, r *http.Request, messageId MessageIdPath)
 	// GetMessage Read a message
 	// (GET /messages/{message_id})
 	GetMessage(w http.ResponseWriter, r *http.Request, messageId MessageIdPath)
+	// UpdateMessage Edit own message
+	// (PATCH /messages/{message_id})
+	UpdateMessage(w http.ResponseWriter, r *http.Request, messageId MessageIdPath, params UpdateMessageParams)
+	// ListMessageRevisions Read earlier versions
+	// (GET /messages/{message_id}/revisions)
+	ListMessageRevisions(w http.ResponseWriter, r *http.Request, messageId MessageIdPath)
 	// ListOwners List owners
 	// (GET /owners)
 	ListOwners(w http.ResponseWriter, r *http.Request)
@@ -4568,6 +4577,32 @@ func (siw *ServerInterfaceWrapper) CreatePersonalTemplate(w http.ResponseWriter,
 	handler.ServeHTTP(w, r)
 }
 
+// DeleteMessage operation middleware
+func (siw *ServerInterfaceWrapper) DeleteMessage(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "message_id" -------------
+	var messageId MessageIdPath
+
+	err = runtime.BindStyledParameterWithOptions("simple", "message_id", r.PathValue("message_id"), &messageId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "uuid", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "message_id", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.DeleteMessage(w, r, messageId)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
 // GetMessage operation middleware
 func (siw *ServerInterfaceWrapper) GetMessage(w http.ResponseWriter, r *http.Request) {
 
@@ -4585,6 +4620,105 @@ func (siw *ServerInterfaceWrapper) GetMessage(w http.ResponseWriter, r *http.Req
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		siw.Handler.GetMessage(w, r, messageId)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// UpdateMessage operation middleware
+func (siw *ServerInterfaceWrapper) UpdateMessage(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "message_id" -------------
+	var messageId MessageIdPath
+
+	err = runtime.BindStyledParameterWithOptions("simple", "message_id", r.PathValue("message_id"), &messageId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "uuid", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "message_id", Err: err})
+		return
+	}
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params UpdateMessageParams
+
+	headers := r.Header
+
+	// ------------- Optional header parameter "Idempotency-Key" -------------
+	if valueList, found := headers[http.CanonicalHeaderKey("Idempotency-Key")]; found {
+		var IdempotencyKey IdempotencyKey
+		n := len(valueList)
+		if n != 1 {
+			siw.ErrorHandlerFunc(w, r, &TooManyValuesForParamError{ParamName: "Idempotency-Key", Count: n})
+			return
+		}
+
+		err = runtime.BindStyledParameterWithOptions("simple", "Idempotency-Key", valueList[0], &IdempotencyKey, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: "uuid"})
+		if err != nil {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "Idempotency-Key", Err: err})
+			return
+		}
+
+		params.IdempotencyKey = &IdempotencyKey
+
+	}
+
+	// ------------- Required header parameter "If-Match" -------------
+	if valueList, found := headers[http.CanonicalHeaderKey("If-Match")]; found {
+		var IfMatch IfMatchRequired
+		n := len(valueList)
+		if n != 1 {
+			siw.ErrorHandlerFunc(w, r, &TooManyValuesForParamError{ParamName: "If-Match", Count: n})
+			return
+		}
+
+		err = runtime.BindStyledParameterWithOptions("simple", "If-Match", valueList[0], &IfMatch, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: true, Type: "string", Format: ""})
+		if err != nil {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "If-Match", Err: err})
+			return
+		}
+
+		params.IfMatch = IfMatch
+
+	} else {
+		err := fmt.Errorf("Header parameter If-Match is required, but not found")
+		siw.ErrorHandlerFunc(w, r, &RequiredHeaderError{ParamName: "If-Match", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.UpdateMessage(w, r, messageId, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// ListMessageRevisions operation middleware
+func (siw *ServerInterfaceWrapper) ListMessageRevisions(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "message_id" -------------
+	var messageId MessageIdPath
+
+	err = runtime.BindStyledParameterWithOptions("simple", "message_id", r.PathValue("message_id"), &messageId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "uuid", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "message_id", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.ListMessageRevisions(w, r, messageId)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -6603,7 +6737,10 @@ func HandlerWithOptions(si ServerInterface, options StdHTTPServerOptions) http.H
 	m.HandleFunc(http.MethodPut+" "+options.BaseURL+"/threads/{thread_id}/tags", wrapper.SetThreadTags)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/threads/{thread_id}/messages", wrapper.ListThreadMessages)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/threads/{thread_id}/messages", wrapper.CreateMessage)
+	m.HandleFunc(http.MethodDelete+" "+options.BaseURL+"/messages/{message_id}", wrapper.DeleteMessage)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/messages/{message_id}", wrapper.GetMessage)
+	m.HandleFunc(http.MethodPatch+" "+options.BaseURL+"/messages/{message_id}", wrapper.UpdateMessage)
+	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/messages/{message_id}/revisions", wrapper.ListMessageRevisions)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/agents", wrapper.ListAgents)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/agents", wrapper.CreateAgent)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/agents/{agent_id}", wrapper.GetAgent)
@@ -7093,9 +7230,18 @@ type StrictServerInterface interface {
 	// CreatePersonalTemplate Create a personal template
 	// (POST /me/templates)
 	CreatePersonalTemplate(ctx context.Context, request CreatePersonalTemplateRequestObject) (CreatePersonalTemplateResponseObject, error)
+	// DeleteMessage Delete a message
+	// (DELETE /messages/{message_id})
+	DeleteMessage(ctx context.Context, request DeleteMessageRequestObject) (DeleteMessageResponseObject, error)
 	// GetMessage Read a message
 	// (GET /messages/{message_id})
 	GetMessage(ctx context.Context, request GetMessageRequestObject) (GetMessageResponseObject, error)
+	// UpdateMessage Edit own message
+	// (PATCH /messages/{message_id})
+	UpdateMessage(ctx context.Context, request UpdateMessageRequestObject) (UpdateMessageResponseObject, error)
+	// ListMessageRevisions Read earlier versions
+	// (GET /messages/{message_id}/revisions)
+	ListMessageRevisions(ctx context.Context, request ListMessageRevisionsRequestObject) (ListMessageRevisionsResponseObject, error)
 	// ListOwners List owners
 	// (GET /owners)
 	ListOwners(ctx context.Context, request ListOwnersRequestObject) (ListOwnersResponseObject, error)
@@ -10414,6 +10560,32 @@ func (sh *strictHandler) CreatePersonalTemplate(w http.ResponseWriter, r *http.R
 	}
 }
 
+// DeleteMessage operation middleware
+func (sh *strictHandler) DeleteMessage(w http.ResponseWriter, r *http.Request, messageId MessageIdPath) {
+	var request DeleteMessageRequestObject
+
+	request.MessageId = messageId
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.DeleteMessage(ctx, request.(DeleteMessageRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "DeleteMessage")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(DeleteMessageResponseObject); ok {
+		if err := validResponse.VisitDeleteMessageResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
 // GetMessage operation middleware
 func (sh *strictHandler) GetMessage(w http.ResponseWriter, r *http.Request, messageId MessageIdPath) {
 	var request GetMessageRequestObject
@@ -10433,6 +10605,66 @@ func (sh *strictHandler) GetMessage(w http.ResponseWriter, r *http.Request, mess
 		sh.options.ResponseErrorHandlerFunc(w, r, err)
 	} else if validResponse, ok := response.(GetMessageResponseObject); ok {
 		if err := validResponse.VisitGetMessageResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// UpdateMessage operation middleware
+func (sh *strictHandler) UpdateMessage(w http.ResponseWriter, r *http.Request, messageId MessageIdPath, params UpdateMessageParams) {
+	var request UpdateMessageRequestObject
+
+	request.MessageId = messageId
+	request.Params = params
+
+	var body UpdateMessageJSONRequestBody
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
+		return
+	}
+	request.Body = &body
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.UpdateMessage(ctx, request.(UpdateMessageRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "UpdateMessage")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(UpdateMessageResponseObject); ok {
+		if err := validResponse.VisitUpdateMessageResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// ListMessageRevisions operation middleware
+func (sh *strictHandler) ListMessageRevisions(w http.ResponseWriter, r *http.Request, messageId MessageIdPath) {
+	var request ListMessageRevisionsRequestObject
+
+	request.MessageId = messageId
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.ListMessageRevisions(ctx, request.(ListMessageRevisionsRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "ListMessageRevisions")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(ListMessageRevisionsResponseObject); ok {
+		if err := validResponse.VisitListMessageRevisionsResponse(w); err != nil {
 			sh.options.ResponseErrorHandlerFunc(w, r, err)
 		}
 	} else if response != nil {

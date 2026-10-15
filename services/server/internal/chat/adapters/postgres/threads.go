@@ -91,6 +91,22 @@ func (r *Repository) AppendToThread(ctx context.Context, id ids.ID, reopen bool,
 	return toThread(threadRow(row)), nil
 }
 
+// DecrementMessageCount implements app.Store.
+func (r *Repository) DecrementMessageCount(ctx context.Context, id ids.ID) error {
+	q, err := r.write(ctx)
+	if err != nil {
+		return err
+	}
+	n, err := q.DecrementMessageCount(ctx, uuid(id))
+	if err != nil {
+		return mapError(err, "lowering the message count of a thread")
+	}
+	if n != 1 {
+		return errs.New(errs.CodeInternalError, "chat: no thread with a message to count down")
+	}
+	return nil
+}
+
 // ListThreads implements app.Store.
 func (r *Repository) ListThreads(ctx context.Context, tq app.ThreadQuery) ([]domain.Thread, error) {
 	if tq.Limit < 1 || tq.Limit > math.MaxInt32 {

@@ -151,6 +151,16 @@ type Threads interface {
 	// returns the number with it. Errors: not_found for an unknown thread, the refusal of
 	// thread.reopen.
 	AppendToThread(ctx context.Context, a actor.Actor, cmd AppendCmd) (Appended, error)
+	// LockForMessageChange locks the thread row (SELECT ... FOR UPDATE) for a change of one of
+	// its messages, before the message row (M1-58, lock order of the messaging README). It does
+	// not authorize; the caller has authorized the message action. It must run inside the
+	// caller's unit of work (internal otherwise). Errors: not_found for an unknown thread.
+	LockForMessageChange(ctx context.Context, threadID ids.ID) error
+	// DecrementMessageCount lowers message_count of the thread by one and raises its version, for
+	// a deleted message (M1-58, 03 threads: the count excludes deleted messages). The caller holds
+	// the lock of LockForMessageChange in its unit of work (internal otherwise). Errors: internal
+	// for an unknown thread or a count that would go below zero.
+	DecrementMessageCount(ctx context.Context, threadID ids.ID) error
 	// Info returns routing and state data of a thread without authorizing; callers authorize
 	// before they reveal anything derived from it. Errors: not_found for an unknown thread.
 	Info(ctx context.Context, threadID ids.ID) (ThreadInfo, error)

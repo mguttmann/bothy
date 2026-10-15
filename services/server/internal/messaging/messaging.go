@@ -12,9 +12,54 @@ import (
 )
 
 // Register declares the durable events messaging appends (M1-25, docs/spec/05-aktionen.md
-// section 6): message.created (M1-56). internal/wire lists it in moduleRegistrations.
+// section 6): message.created (M1-56), message.updated and message.deleted (M1-58). internal/wire
+// lists it in moduleRegistrations.
 func Register(r *authorize.Registry) {
 	r.Event("messaging", authorize.EventMessageCreated)
+	r.Event("messaging", authorize.EventMessageUpdated)
+	r.Event("messaging", authorize.EventMessageDeleted)
+}
+
+// MessageDeleted is published inside the deleting transaction, after the tombstone, the removal
+// of revisions and mentions and the redaction of the event payloads (M1-58, 02 section 4.3). runs
+// subscribes in M2 (cancel the run of a deleted trigger message, delete its components). It never
+// carries content.
+type MessageDeleted struct {
+	// MessageID is the deleted message; ThreadID and ChannelID its place.
+	MessageID, ThreadID, ChannelID ids.ID
+	// ThreadSeq is the position the tombstone keeps.
+	ThreadSeq int64
+	// AuthorID is the author; DeletedBy the principal who deleted (author or moderator).
+	AuthorID, DeletedBy ids.ID
+	// MentionedPrincipalIDs are the mentions the message had before the deletion, sorted.
+	MentionedPrincipalIDs []ids.ID
+	// Version is the version of the tombstone.
+	Version int64
+}
+
+// UpdateCommand is the request of updateMessage (schema MessageUpdate) with its precondition.
+// A pointer member is nil when the request leaves the field out; it never reaches JSON.
+type UpdateCommand struct {
+	MessageID ids.ID
+	// IfMatch is the version of the required If-Match header; 0 for a value that is not a
+	// version, which never matches.
+	IfMatch int64
+	// Content is the new content_md; nil keeps the current one.
+	Content *string
+	// MentionIDs is the optional check of the resolved mention set; nil when absent.
+	MentionIDs *[]ids.ID
+}
+
+// RevisionView is one earlier version of a message (schema MessageRevision).
+type RevisionView struct {
+	// Revision is 1 for the original content, then ascending.
+	Revision int
+	// ContentMD is the content before the edit.
+	ContentMD string
+	// EditedBy is the principal who edited.
+	EditedBy ids.ID
+	// CreatedAt is the time of the edit.
+	CreatedAt time.Time
 }
 
 // MessagePosted is published inside the writing transaction for every new message, including
@@ -212,4 +257,28 @@ type Messages interface {
 	// ctx; a tombstone is returned too. Errors: not_found for a missing and an invisible message
 	// alike; the refusal of message.read.
 	Get(ctx context.Context, messageID ids.ID) (Message, error)
+	// Update edits a message of the caller (the principal of ctx; message.update, M1-58): 428 is
+	// the HTTP chain's for a missing If-Match; 404 for a missing or invisible message, 403 for a
+	// caller who is not the author or a read-only channel, 410 message_deleted, 412
+	// version_conflict with the current representation, 413 and 400 for the content and
+	// mention_ids. The same content and mentions answer the current message without a write;
+	// otherwise the previous content becomes the next revision (not for a run anchor), the
+	// mentions are resolved again and message.updated is appended. An edit never publishes
+	// MessagePosted and never changes trigger_state.
+	//
+	// Example:
+	//
+	//	m, err := msgs.Update(ctx, messaging.UpdateCommand{MessageID: id, IfMatch: 3, Content: &text})
+	Update(ctx context.Context, c UpdateCommand) (Message, error)
+	// Delete deletes a message (message.delete, M1-58): the author with write, anyone else with
+	// manage, audited. It is idempotent: an already deleted message answers nil. In one unit of
+	// work the tombstone keeps the row and thread_seq, revisions and mentions go, the thread
+	// counts the message down, the payloads of the stored message events are redacted,
+	// MessageDeleted is published and message.deleted appended. Errors: 404 for a missing or
+	// invisible message, 403 without the right.
+	Delete(ctx context.Context, messageID ids.ID) error
+	// Revisions returns the earlier versions of a message in ascending order
+	// (message.revisions.read, M1-58); a deleted message has none. Errors: 404 for a missing or
+	// invisible message.
+	Revisions(ctx context.Context, messageID ids.ID) ([]RevisionView, error)
 }

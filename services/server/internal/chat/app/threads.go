@@ -515,6 +515,27 @@ func (s *Service) AppendToThread(ctx context.Context, a actor.Actor, cmd chat.Ap
 	return out, s.emitThread(ctx, authorize.EventThreadReopened, c.Channel.SpaceID, v)
 }
 
+// LockForMessageChange implements chat.Threads (M1-58) inside the caller's unit of work: the row
+// lock of the thread, taken before the message row (lock order of the messaging README), so a
+// deletion and a thread move (M1-62) of the same thread never deadlock. It does not authorize.
+func (s *Service) LockForMessageChange(ctx context.Context, threadID ids.ID) error {
+	if err := inUnit(ctx, "Threads.LockForMessageChange"); err != nil {
+		return err
+	}
+	_, err := s.lockThread(ctx, threadID)
+	return err
+}
+
+// DecrementMessageCount implements chat.Threads (M1-58) inside the caller's unit of work, which
+// holds the thread lock: message_count - 1 and version + 1 (03 threads). Errors: internal for an
+// unknown thread or a count of zero.
+func (s *Service) DecrementMessageCount(ctx context.Context, threadID ids.ID) error {
+	if err := inUnit(ctx, "Threads.DecrementMessageCount"); err != nil {
+		return err
+	}
+	return s.d.Store.DecrementMessageCount(ctx, threadID)
+}
+
 // threadsList is the list name of the cursors of listChannelThreads.
 const threadsList = "threads"
 

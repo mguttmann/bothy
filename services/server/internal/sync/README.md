@@ -1,6 +1,6 @@
 # Modul `sync`
 
-Status: built in part (M1-16, M1-20, M2-01): the event log with the commit-ordered sequence, the phase hook of `sync`, the log tail, the partitions of `event_log`, the one envelope of gateway, REST and webhooks, the idempotency keys behind `kernel/idempotency.Store` with the job `sync.idempotency_cleanup`, and the frame of the worker consumers with `event_consumer_cursors` (no production consumer yet: M2-26 registers `webhooks`, M3-19 `push`). Catch-up, snapshot, redaction, read states, drafts and settings come with M1-63, M1-58 and the tickets that need them.
+Status: built in part (M1-16, M1-20, M2-01, M1-58): the event log with the commit-ordered sequence, the phase hook of `sync`, the log tail, the partitions of `event_log`, the one envelope of gateway, REST and webhooks, the idempotency keys behind `kernel/idempotency.Store` with the job `sync.idempotency_cleanup`, and the frame of the worker consumers with `event_consumer_cursors` (no production consumer yet: M2-26 registers `webhooks`, M3-19 `push`). The redaction of a deletion (M1-58) implements `eventlog.Redactor`. Catch-up, snapshot, read states, drafts and settings come with M1-63 and the tickets that need them.
 Normativ ist [docs/spec/02-architektur.md](../../../../docs/spec/02-architektur.md); bei Abweichung gilt das Kapitel.
 
 ## Zweck
@@ -127,8 +127,21 @@ Migration `00006_sync_event_log.sql` creates `event_log` as in 03: `PARTITION BY
 primary key `(seq)`, unique `(id, seq)`, the checks of `actor_kind` (R-DM-29) and of `self`, the
 indexes `(channel_id, seq)`, `(space_id, seq)`, `(audience_principal_id, seq)` (partial),
 `(resource_kind, resource_id)` and BRIN `(occurred_at)`, no default partition and no foreign key.
-`bothy_app` has `SELECT, INSERT` on the table only (redaction adds its column grant with M1-58)
-and no right on the partitions, which it reaches only through `event_log`.
+`bothy_app` has `SELECT, INSERT` on the table, the column right `UPDATE (payload, redacted_at)`
+of the redaction (migration `00037_sync_event_log_redaction.sql`, M1-58) and no right on the
+partitions, which it reaches only through `event_log`.
+
+### Redaction (M1-58)
+
+`adapters/postgres.Redactor` implements the kernel port `eventlog.Redactor` (`wire.Sync.Redactor`
+gives it to messaging): inside the caller's unit of work it locks the stored events of one
+resource (`resource_kind`, `resource_id`; index `event_log_resource_idx`) `FOR UPDATE` in `seq`
+order, calls the `RedactFunc` of the caller per event with type, schema version and payload, and
+writes the results in one `UPDATE ... FROM unnest` that sets `payload` and `redacted_at` only if
+it was unset. A result that is not a JSON object or an error of the function fails the unit. The
+envelope maps `redacted_at IS NOT NULL` to `"redacted": true` (`TestEnvelope_RedactedFlag`).
+Events still buffered in the unit of work are not stored yet and are not redacted; messaging
+appends `message.deleted` after the redaction.
 
 Partitions change only through two `SECURITY DEFINER` functions of `bothy_owner` with
 `search_path = public, pg_temp`, `EXECUTE` revoked from `PUBLIC` and granted to `bothy_app`, which

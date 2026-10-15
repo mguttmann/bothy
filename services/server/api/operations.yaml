@@ -49,6 +49,7 @@ enabled:             # operationIds that have a handler; sorted ascending
   - deleteForumTag
   - deleteGroup
   - deleteIdentityProvider
+  - deleteMessage
   - deleteTemplate
   - disableAgent
   - disableUser
@@ -90,6 +91,7 @@ enabled:             # operationIds that have a handler; sorted ascending
   - listHosts
   - listIdentityProviders
   - listInstanceSettings
+  - listMessageRevisions
   - listMyDevices
   - listMyMentions
   - listMySessions
@@ -147,6 +149,7 @@ enabled:             # operationIds that have a handler; sorted ascending
   - updateGroup
   - updateHost
   - updateIdentityProvider
+  - updateMessage
   - updateMyProfile
   - updateSpace
   - updateTemplate
@@ -259,9 +262,6 @@ later:               # every other operationId of docs/api/openapi.yaml; sorted 
   - operation_id: deleteFile
     etappe: M3
     ticket: M3-08
-  - operation_id: deleteMessage
-    etappe: M1
-    ticket: M1-58
   - operation_id: deleteMyAvatar
     etappe: M3
     ticket: M3-10
@@ -422,9 +422,6 @@ later:               # every other operationId of docs/api/openapi.yaml; sorted 
   - operation_id: listIncomingWebhooks
     etappe: M2
     ticket: M2-27
-  - operation_id: listMessageRevisions
-    etappe: M1
-    ticket: M1-58
   - operation_id: listMyDms
     etappe: V3
     ticket: V3-01
@@ -605,9 +602,6 @@ later:               # every other operationId of docs/api/openapi.yaml; sorted 
   - operation_id: updateComponent
     etappe: M2
     ticket: M2-15
-  - operation_id: updateMessage
-    etappe: M1
-    ticket: M1-58
   - operation_id: updateStatusComponent
     etappe: M7
     ticket: M7-09

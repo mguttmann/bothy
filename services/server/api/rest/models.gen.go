@@ -15771,6 +15771,15 @@ type CreatePersonalTemplateParams struct {
 	IdempotencyKey *IdempotencyKey `json:"Idempotency-Key,omitempty"`
 }
 
+// UpdateMessageParams defines parameters for UpdateMessage.
+type UpdateMessageParams struct {
+	// IdempotencyKey UUIDv7 chosen by the client per logical operation. A repeat with the same request returns the stored response; a different request gives 422 `idempotency_key_reuse`; a repeat while the first is running gives 409 `request_in_progress`. Kept for `sync.idempotency_key_ttl`.
+	IdempotencyKey *IdempotencyKey `json:"Idempotency-Key,omitempty"`
+
+	// IfMatch ETag of the version the change is based on, e.g. `"7"`. Mismatch gives 412 `version_conflict`.
+	IfMatch IfMatchRequired `json:"If-Match"`
+}
+
 // AddOwnerParams defines parameters for AddOwner.
 type AddOwnerParams struct {
 	// IdempotencyKey UUIDv7 chosen by the client per logical operation. A repeat with the same request returns the stored response; a different request gives 422 `idempotency_key_reuse`; a repeat while the first is running gives 409 `request_in_progress`. Kept for `sync.idempotency_key_ttl`.
@@ -16140,6 +16149,9 @@ type PutMySidebarSpaceJSONRequestBody = SidebarStatePut
 
 // CreatePersonalTemplateJSONRequestBody defines body for CreatePersonalTemplate for application/json ContentType.
 type CreatePersonalTemplateJSONRequestBody = TemplateCreate
+
+// UpdateMessageJSONRequestBody defines body for UpdateMessage for application/json ContentType.
+type UpdateMessageJSONRequestBody = MessageUpdate
 
 // AddOwnerJSONRequestBody defines body for AddOwner for application/json ContentType.
 type AddOwnerJSONRequestBody = OwnerAdd

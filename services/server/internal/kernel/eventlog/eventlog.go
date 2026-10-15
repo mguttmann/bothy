@@ -4,6 +4,7 @@ package eventlog
 
 import (
 	"context"
+	"encoding/json"
 
 	"github.com/OWNER/bothy/services/server/internal/kernel/ids"
 )
@@ -95,4 +96,28 @@ type Appender interface {
 	//		return err
 	//	}
 	Append(ctx context.Context, events ...Event) error
+}
+
+// RedactFunc returns the redacted payload of one stored durable event of a deleted object from
+// its type, schema version and current payload (04 section 2.2 rule 5). The result must stay
+// valid against the schema of the type; an error fails the redaction and with it the deletion.
+type RedactFunc func(eventType string, schemaVersion int, payload json.RawMessage) (json.RawMessage, error)
+
+// Redactor replaces the payload of stored durable events of one resource (03 section 6.5,
+// R-DM-18): a deletion removes content from the log, while the envelope stays. sync implements
+// it; messaging receives it through its constructor, because messaging may not import sync (02
+// section 4.4).
+type Redactor interface {
+	// Redact calls fn for every stored event with resource (kind, id) in ascending seq, writes
+	// the returned payload, sets redacted_at if unset, and leaves every other column unchanged.
+	// Runs in the ambient transaction; returns the number of rows. Events still buffered in the
+	// unit of work are not stored yet and are not redacted.
+	//
+	// Errors: kind internal outside a unit of work, the error of fn unchanged, and an invalid
+	// result of fn (not a JSON object) as kind internal; the caller's unit then rolls back.
+	//
+	// Example:
+	//
+	//	n, err := redactor.Redact(ctx, "message", msgID, domain.RedactPayload(tombstone))
+	Redact(ctx context.Context, kind string, id ids.ID, fn RedactFunc) (int, error)
 }
