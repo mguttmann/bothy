@@ -81,7 +81,9 @@ final class BackendModel {
     VizNames names = const VizNames(),
     api.StatsLiveFrame? live,
   }) {
-    final agents = {for (final a in live?.agents ?? <api.StatsLiveAgent>[]) a.agentId: a};
+    final agents = {
+      for (final a in live?.agents ?? <api.StatsLiveAgent>[]) a.agentId: a,
+    };
     return BackendModel(
       rows: List.unmodifiable([
         for (final item in report.items)

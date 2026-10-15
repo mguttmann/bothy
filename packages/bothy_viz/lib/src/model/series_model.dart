@@ -33,6 +33,32 @@ final class SeriesModel {
     this.groupKey,
   }) : assert((metric == null) != (queryMetric == null), 'one name');
 
+  /// The series of a query response: one per metric name and group, in the order of the first
+  /// bucket, with the color roles counted from [firstColor].
+  static List<SeriesModel> fromStatsSeries(
+    api.StatsSeries series, {
+    int firstColor = 0,
+  }) {
+    final points = <(String, String?), List<SeriesPoint>>{};
+    for (final bucket in series.buckets) {
+      for (final MapEntry(:key, :value) in bucket.metrics.entries) {
+        points
+            .putIfAbsent((key, bucket.groupKey), () => [])
+            .add(SeriesPoint(bucket.start, value));
+      }
+    }
+    var index = firstColor;
+    return [
+      for (final MapEntry(key: (metric, group), value: list) in points.entries)
+        SeriesModel(
+          queryMetric: metric,
+          groupKey: group,
+          colorIndex: index++,
+          points: List.unmodifiable(list..sort((a, b) => a.at.compareTo(b.at))),
+        ),
+    ];
+  }
+
   /// Metric of the own measurement; its label comes from `l10n` (`vizMetricLabel`).
   final api.StatsMetric? metric;
 
@@ -70,15 +96,16 @@ final class RateModel {
   });
 
   /// Derives the rate of [rate]; [colorIndex] is its position in the frame.
-  factory RateModel.fromRate(api.StatsLiveRate rate, int colorIndex) => RateModel(
-    metric: rate.metric,
-    dimension: rate.dimension,
-    lastMinute: rate.lastMinute,
-    currentMinute: rate.currentMinute,
-    lastMinuteSum: rate.lastMinuteSum,
-    currency: rate.currency,
-    colorIndex: colorIndex,
-  );
+  factory RateModel.fromRate(api.StatsLiveRate rate, int colorIndex) =>
+      RateModel(
+        metric: rate.metric,
+        dimension: rate.dimension,
+        lastMinute: rate.lastMinute,
+        currentMinute: rate.currentMinute,
+        lastMinuteSum: rate.lastMinuteSum,
+        currency: rate.currency,
+        colorIndex: colorIndex,
+      );
 
   /// Metric.
   final api.StatsMetric metric;

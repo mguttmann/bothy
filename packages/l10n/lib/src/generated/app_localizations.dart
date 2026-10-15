@@ -869,14 +869,8 @@ abstract class AppLocalizations {
   /// Screen reader label of a lane of the live topology (25 section 6.1).
   ///
   /// In en, this message translates to:
-  /// **'{spaceName}, {channelName}, {count, plural, =0{no active runs} =1{1 active run} other{{count} active runs}}'**
-  String vizLaneLabel(
-    String space,
-    String channel,
-    int count,
-    Object channelName,
-    Object spaceName,
-  );
+  /// **'{space}, {channel}, {count, plural, =0{no active runs} =1{1 active run} other{{count} active runs}}'**
+  String vizLaneLabel(String space, String channel, int count);
 
   /// Screen reader label of one row of the bar mark of the timeline (25 section 6.5).
   ///

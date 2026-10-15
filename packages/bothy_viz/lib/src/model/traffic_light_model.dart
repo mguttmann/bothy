@@ -58,23 +58,24 @@ final class TrafficLightModel {
   });
 
   /// Maps one entry; a state of a newer server reads as "not enough data".
-  factory TrafficLightModel.fromEntry(api.StatsSloEntry entry) => TrafficLightModel(
-    slo: entry.slo,
-    metric: entry.metric,
-    status: switch (entry.state) {
-      api.StatsSloState.green => TrafficLightStatus.onTarget,
-      api.StatsSloState.amber => TrafficLightStatus.budgetTight,
-      api.StatsSloState.red => TrafficLightStatus.targetMissed,
-      _ => TrafficLightStatus.notEnoughData,
-    },
-    objective: entry.objective,
-    periodDays: entry.periodDays,
-    total: entry.total,
-    good: entry.good,
-    ratio: entry.ratio,
-    budgetRemaining: entry.budgetRemaining,
-    thresholdMs: entry.thresholdMs,
-  );
+  factory TrafficLightModel.fromEntry(api.StatsSloEntry entry) =>
+      TrafficLightModel(
+        slo: entry.slo,
+        metric: entry.metric,
+        status: switch (entry.state) {
+          api.StatsSloState.green => TrafficLightStatus.onTarget,
+          api.StatsSloState.amber => TrafficLightStatus.budgetTight,
+          api.StatsSloState.red => TrafficLightStatus.targetMissed,
+          _ => TrafficLightStatus.notEnoughData,
+        },
+        objective: entry.objective,
+        periodDays: entry.periodDays,
+        total: entry.total,
+        good: entry.good,
+        ratio: entry.ratio,
+        budgetRemaining: entry.budgetRemaining,
+        thresholdMs: entry.thresholdMs,
+      );
 
   /// Every entry of [report] in the order of the report.
   static List<TrafficLightModel> fromReport(api.StatsSloReport report) =>
