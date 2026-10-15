@@ -31,8 +31,8 @@ enum _Variant { full, collapsed, mobile }
 /// [DsRunData.stalled], and the footer with "Stop" and the follow-up note or, for
 /// `waiting_input`, the [question]. The spine on the left has the color of the state.
 ///
-/// Screen readers get a container labeled "Run of <Agent>: <State>, for <Duration>, context
-/// <n> percent"; state changes and new questions are announced politely through a
+/// Screen readers get a container labeled "Run of {Agent}: {State}, for {Duration}, context
+/// {n} percent"; state changes and new questions are announced politely through a
 /// [LiveAnnouncer], at most once per [announceMinInterval] (`a11y.live_announce_min_interval`);
 /// patches to steps and numbers never.
 ///
@@ -57,7 +57,7 @@ class DsLiveBox extends StatefulWidget {
        onExpand = null,
        onOpen = null;
 
-  /// The collapsed line of a finished run: icon, "Ran <Duration>", tools, subagents and the
+  /// The collapsed line of a finished run: icon, "Ran {Duration}", tools, subagents and the
   /// cost with "Estimate" while it is an estimate; [onExpand] loads the document (`run.read`).
   const DsLiveBox.collapsed(this.run, {super.key, this.onExpand})
     : _variant = _Variant.collapsed,

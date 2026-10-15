@@ -147,9 +147,9 @@ void main() {
     tester,
   ) async {
     final l = await en();
-    const evil = 'Sam‮gnp.exe';
+    const evil = 'Sam\u202Egnp.exe';
     await pumpDs(tester, _message(_with(authorName: evil)));
-    expect(find.text('⁨$evil⁩'), findsOneWidget);
+    expect(find.text('\u2068$evil\u2069'), findsOneWidget);
     expect(
       find.bySemanticsLabel(
         RegExp(
@@ -159,7 +159,7 @@ void main() {
       findsOneWidget,
     );
     final semantics = tester.getSemantics(find.byType(DsMessage)).label;
-    expect(semantics, isNot(contains('⁨')));
+    expect(semantics, isNot(contains('\u2068')));
   });
 
   testWidgets(
@@ -288,7 +288,10 @@ void main() {
         ),
       ),
     );
-    expect(find.text(l.messageSystemThreadReopened('⁨Sam⁩')), findsOneWidget);
+    expect(
+      find.text(l.messageSystemThreadReopened('\u2068Sam\u2069')),
+      findsOneWidget,
+    );
     expect(find.byType(DsAvatar), findsNothing);
 
     await pumpDs(

@@ -10,6 +10,7 @@ library;
 import 'package:alchemist/alchemist.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:l10n/l10n.dart';
 
 import 'design_system.dart';
 
@@ -124,9 +125,12 @@ class _DsGoldenCell extends StatelessWidget {
     final obscured =
         Theme.of(context).textTheme.bodyMedium?.fontFamily ==
         _obscuredFontFamily;
+    // The components read their texts from package:l10n; the golden app of alchemist has no
+    // delegates of its own, so the cell brings them with the locale.
     return Localizations.override(
       context: context,
       locale: locale,
+      delegates: AppLocalizations.localizationsDelegates,
       child: MediaQuery(
         data: MediaQuery.of(context)
             .copyWith(textScaler: TextScaler.linear(textScale)),

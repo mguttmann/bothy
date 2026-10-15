@@ -31,7 +31,8 @@ Color dsCategoryOnSidebar(BuildContext context, DsCategory category) {
 
 /// A space in the sidebar: an expandable tree node.
 ///
-/// The arrow (`action.collapse` when expanded, `action.expand` when collapsed), the space icon
+/// The arrow (`action.expand`, caret down, when expanded; `action.collapse`, caret right, when
+/// collapsed), the space icon
 /// of `space-icons` in `category.<name>.on-sidebar` on a lightly tinted tile of the same color,
 /// the name in `type.section` and `color.text.on-sidebar`, and on the right a dot labeled
 /// "Unread" when the space is collapsed and has unread items. A tap or Enter toggles; arrow
@@ -92,7 +93,7 @@ class DsSpaceRow extends StatelessWidget {
           child: Row(
             children: [
               DsIcon(
-                data.expanded ? DsIcons.actionCollapse : DsIcons.actionExpand,
+                data.expanded ? DsIcons.actionExpand : DsIcons.actionCollapse,
                 size: DsIconSizeRole.sm,
                 color: c.textOnSidebarSecondary,
                 decorative: true,

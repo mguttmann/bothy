@@ -128,8 +128,11 @@ void main() {
   ) async {
     final l = await en();
     await pumpDs(tester, _composer(typingNames: ['Sam']));
-    expect(find.text(l.composerMessageTo('⁨general⁩')), findsOneWidget);
-    expect(find.text(l.composerTyping('⁨Sam⁩')), findsOneWidget);
+    expect(
+      find.text(l.composerMessageTo('\u2068general\u2069')),
+      findsOneWidget,
+    );
+    expect(find.text(l.composerTyping('\u2068Sam\u2069')), findsOneWidget);
     final send = tester.getSemantics(find.bySemanticsLabel(l.composerSend));
     expect(
       send,
@@ -140,7 +143,10 @@ void main() {
       tester,
       _composer(followupAgentName: 'Robin', typingNames: ['Sam', 'Alex']),
     );
-    expect(find.text(l.composerFollowupTo('⁨Robin⁩')), findsOneWidget);
+    expect(
+      find.text(l.composerFollowupTo('\u2068Robin\u2069')),
+      findsOneWidget,
+    );
     expect(find.text(l.composerTypingSeveral), findsOneWidget);
   });
 

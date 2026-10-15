@@ -49,7 +49,7 @@ final class DsMessageAction {
 /// [actions] on hover and while focus is inside the message: focus the message, then Tab.
 /// Agents, apps, imports and the system get an origin badge after the name (SEC-OUT-3).
 /// Foreign names are isolated in the visual text (SEC-IN-4) and plain in the semantics label
-/// "<Mentions you>, <Name>, <Time>, <Text>".
+/// "{Mentions you}, {Name}, {Time}, {Text}".
 ///
 /// ```dart
 /// DsMessage(data, collapseLines: config.messageCollapseLines, onOpenLink: open,
@@ -410,8 +410,9 @@ class DsMessageState extends State<DsMessage> {
       ];
     }
     final out = <Widget>[];
-    if (d.kind == DsMessageKind.voice && d.voice != null)
+    if (d.kind == DsMessageKind.voice && d.voice != null) {
       out.add(_voice(context));
+    }
     // A card draws its agent text inside [components], below the header built from server
     // fields (SEC-OUT-4); drawing it here too would put agent text above that header.
     final cardBody = d.kind == DsMessageKind.card && widget.components != null;

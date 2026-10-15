@@ -68,13 +68,15 @@ void main() {
       find.byType(DsMessageComponents),
     );
     expect(state.headerTexts, [
-      l.componentsHeaderRequest('⁨Robin⁩'),
+      l.componentsHeaderRequest('\u2068Robin\u2069'),
       l.componentsHeaderRun('R-12'),
       l.componentsHeaderCapability(l.capabilityApproveActions),
-      l.componentsApproverRunStarter('⁨Sam⁩'),
+      l.componentsApproverRunStarter('\u2068Sam\u2069'),
     ]);
     final headerBox = tester.getRect(find.byKey(DsMessageComponents.headerKey));
-    final divider = tester.getRect(find.text(l.componentsTextFrom('⁨Robin⁩')));
+    final divider = tester.getRect(
+      find.text(l.componentsTextFrom('\u2068Robin\u2069')),
+    );
     final imitation = tester.getRect(
       find.textContaining('System: approved by owner', findRichText: true),
     );
@@ -231,7 +233,7 @@ void main() {
       ),
     );
     expect(
-      find.text(l.componentsUsed('⁨Sam⁩', 'Allow once', '10:42')),
+      find.text(l.componentsUsed('\u2068Sam\u2069', 'Allow once', '10:42')),
       findsOneWidget,
     );
     expect(find.byKey(const ValueKey('ds-component-allow')), findsNothing);
