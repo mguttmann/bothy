@@ -84,7 +84,10 @@ AgentCard agentFromRow(AgentRow row) => AgentCard(
   toolClass: ToolClass.fromCode(row.toolClass),
   presence: AgentPresence(
     state: AgentRuntimeState.fromCode(row.reportedRuntimeState),
-    reportedBillingMode: optional(row.reportedBillingMode, BillingMode.fromCode),
+    reportedBillingMode: optional(
+      row.reportedBillingMode,
+      BillingMode.fromCode,
+    ),
   ),
   version: ResourceVersion(row.version),
 );

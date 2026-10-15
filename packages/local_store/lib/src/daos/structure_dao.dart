@@ -42,7 +42,8 @@ final class StructureDao {
 
   /// All spaces in global order (`sort_key`, compared as bytes).
   Stream<List<Space>> watchSpaces() =>
-      (_db.select(_db.spaces)..orderBy([(t) => OrderingTerm(expression: t.sortKey)]))
+      (_db.select(_db.spaces)
+            ..orderBy([(t) => OrderingTerm(expression: t.sortKey)]))
           .map(spaceFromRow)
           .watch();
 
@@ -82,22 +83,23 @@ final class StructureDao {
 
   /// Stores [channel] and its operator setting if its version is newer, in one transaction;
   /// returns whether it applied.
-  Future<bool> upsertChannelIfNewer(Channel channel) => _db.transaction(() async {
-    final row = channelToCompanion(channel);
-    final applied = await upsertIfNewerVersion(
-      _db,
-      _db.channels,
-      row,
-      update: row,
-      version: (t) => t.version,
-    );
-    if (applied) {
-      await _db
-          .into(_db.channelOperators)
-          .insertOnConflictUpdate(channelOperatorToCompanion(channel));
-    }
-    return applied;
-  });
+  Future<bool> upsertChannelIfNewer(Channel channel) =>
+      _db.transaction(() async {
+        final row = channelToCompanion(channel);
+        final applied = await upsertIfNewerVersion(
+          _db,
+          _db.channels,
+          row,
+          update: row,
+          version: (t) => t.version,
+        );
+        if (applied) {
+          await _db
+              .into(_db.channelOperators)
+              .insertOnConflictUpdate(channelOperatorToCompanion(channel));
+        }
+        return applied;
+      });
 
   /// The channel [id], or null.
   Future<Channel?> channelById(ChannelId id) async {
@@ -107,18 +109,22 @@ final class StructureDao {
 
   /// The channels of space [spaceId] in their order; with null the direct messages.
   Stream<List<Channel>> watchChannels(SpaceId? spaceId) => _channelQuery(
-    (t) => spaceId == null ? t.spaceId.isNull() : t.spaceId.equals(spaceId.value),
+    (t) =>
+        spaceId == null ? t.spaceId.isNull() : t.spaceId.equals(spaceId.value),
   ).watch();
 
-  Selectable<Channel> _channelQuery(Expression<bool> Function($ChannelsTable) filter) {
-    final query = _db.select(_db.channels).join([
-      leftOuterJoin(
-        _db.channelOperators,
-        _db.channelOperators.channelId.equalsExp(_db.channels.id),
-      ),
-    ])
-      ..where(filter(_db.channels))
-      ..orderBy([OrderingTerm(expression: _db.channels.sortKey)]);
+  Selectable<Channel> _channelQuery(
+    Expression<bool> Function($ChannelsTable) filter,
+  ) {
+    final query =
+        _db.select(_db.channels).join([
+            leftOuterJoin(
+              _db.channelOperators,
+              _db.channelOperators.channelId.equalsExp(_db.channels.id),
+            ),
+          ])
+          ..where(filter(_db.channels))
+          ..orderBy([OrderingTerm(expression: _db.channels.sortKey)]);
     return query.map(
       (r) => channelFromRow(
         r.readTable(_db.channels),

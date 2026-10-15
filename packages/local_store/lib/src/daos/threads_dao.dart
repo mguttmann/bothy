@@ -76,7 +76,9 @@ final class ThreadsDao {
                     ),
                   ]))
                 .get();
-        return [for (final row in rows) threadFromRow(row, await _tags(row.id))];
+        return [
+          for (final row in rows) threadFromRow(row, await _tags(row.id)),
+        ];
       });
 
   /// Records that the person opened thread [id] now; the cleanup keeps recently opened threads

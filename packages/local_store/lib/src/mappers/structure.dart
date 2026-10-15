@@ -69,9 +69,7 @@ ChannelsCompanion channelToCompanion(Channel channel) =>
       name: channel.name,
       topic: channel.topic,
       sortKey: channel.sortKey,
-      effectiveOperatorAgentId: Value(
-        channel.operator.effectiveAgentId?.value,
-      ),
+      effectiveOperatorAgentId: Value(channel.operator.effectiveAgentId?.value),
       forumDefaultSort: Value(channel.forumDefaultSort?.code),
       defaultNotificationLevel: Value(channel.defaultNotificationLevel?.code),
       readOnly: channel.readOnly,

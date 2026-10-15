@@ -24,15 +24,15 @@ Future<bool> upsertIfNewerVersion<T extends Table, D>(
         insert,
         onConflict: DoUpdate.withExcluded(
           (old, excluded) => update,
-          where: (old, excluded) => version(excluded).isBiggerThan(version(old)),
+          where: (old, excluded) =>
+              version(excluded).isBiggerThan(version(old)),
         ),
       );
   return row != null;
 }
 
 /// Builds the placeholder list `(?, ?, ...)` for [count] values; [count] must be positive.
-String placeholders(int count) =>
-    '(${List.filled(count, '?').join(', ')})';
+String placeholders(int count) => '(${List.filled(count, '?').join(', ')})';
 
 /// Wraps [values] as SQL variables of text.
 List<Variable<Object>> textVariables(Iterable<String> values) => [

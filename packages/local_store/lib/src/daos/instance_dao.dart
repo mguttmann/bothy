@@ -30,8 +30,6 @@ final class InstanceDao {
   }
 
   /// The stored instance information on every change.
-  Stream<InstanceInfo?> watch() => _db
-      .select(_db.instanceTable)
-      .map(instanceFromRow)
-      .watchSingleOrNull();
+  Stream<InstanceInfo?> watch() =>
+      _db.select(_db.instanceTable).map(instanceFromRow).watchSingleOrNull();
 }
