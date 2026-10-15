@@ -157,7 +157,7 @@ DsGlyph dsToneGlyph(DsTone tone) => switch (tone) {
 /// when the child is smaller. Enter and Space activate the focused surface (the default
 /// `ActivateIntent` of the app); no other key does.
 ///
-/// [label] is the semantics label of the button; [selected] and [toggled] mark the states of
+/// [label] is the semantics label of the button; [selected] and [expanded] mark the states of
 /// tree and list rows; [onSidebar] draws the ring in `color.focus.ring-on-sidebar`.
 class DsTappable extends StatefulWidget {
   /// Creates the surface around [child].
