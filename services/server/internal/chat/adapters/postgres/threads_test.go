@@ -8,6 +8,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/OWNER/bothy/services/server/internal/chat/adapters/postgres"
 	"github.com/OWNER/bothy/services/server/internal/chat/app"
 	"github.com/OWNER/bothy/services/server/internal/chat/domain"
 	"github.com/OWNER/bothy/services/server/internal/kernel/errs"
@@ -30,7 +31,8 @@ func TestRepositoryThreads(t *testing.T) {
 	newThread := func(i int, parent ids.ID) domain.Thread {
 		at := t0.Add(time.Duration(i) * time.Minute)
 		return domain.Thread{ID: ids.New(), ChannelID: forum, Kind: domain.ThreadKindThread, ParentMessageID: parent, Title: "t",
-			TitleSource: domain.TitleAuto, State: domain.ThreadOpen, CreatedBy: alex, CreatedAt: at, LastActivityAt: at, Version: 1}
+			TitleSource: domain.TitleAuto, State: domain.ThreadOpen, CreatedBy: alex, CreatedAt: at, LastActivityAt: at, Version: 1,
+			SearchLanguage: "simple"}
 	}
 	if _, err := e.repo.InsertThread(ctx, newThread(0, ids.ID{})); err == nil {
 		t.Fatal("insert outside a unit of work")
@@ -137,5 +139,18 @@ func TestRepositoryThreads(t *testing.T) {
 	}
 	if tags, err := e.repo.ThreadTags(ctx, []ids.ID{made[2].ID}); err != nil || len(tags) != 0 {
 		t.Fatalf("tags after the delete %v, %v", tags, err)
+	}
+}
+
+// TestInsertWithoutSearchLanguageFails holds the fail-closed guard of the adapter: a thread
+// without its search language is refused before SQL (M3-13).
+func TestInsertWithoutSearchLanguageFails(t *testing.T) {
+	t.Parallel()
+	repo := postgres.NewRepository(nil)
+	if _, err := repo.InsertMainThread(context.Background(), domain.NewMainThread(ids.New(), ids.New(), ids.New(), t0)); errs.KindOf(err) != errs.KindInternal {
+		t.Errorf("InsertMainThread without language: %v, want internal", err)
+	}
+	if _, err := repo.InsertThread(context.Background(), domain.Thread{ID: ids.New()}); errs.KindOf(err) != errs.KindInternal {
+		t.Errorf("InsertThread without language: %v, want internal", err)
 	}
 }

@@ -195,3 +195,11 @@ func (e env) write2(t *testing.T, id ids.ID) (domain.Space, bool, error) {
 	})
 	return sp, found, err
 }
+
+// mainThread returns the main thread of channel by creator at t0 with a search language, as the
+// use case sets it before the insert (M3-13).
+func mainThread(channel, creator ids.ID) domain.Thread {
+	th := domain.NewMainThread(ids.New(), channel, creator, t0)
+	th.SearchLanguage = "german"
+	return th
+}

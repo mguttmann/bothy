@@ -75,6 +75,11 @@ const clientIDConstraint = "messages_author_client_msg_id_key"
 
 // InsertMessage implements app.Store.
 func (r *Repository) InsertMessage(ctx context.Context, m domain.Message) (domain.Message, error) {
+	// The use case sets the language before every insert (14 3.1); an empty value would end in
+	// a SQL error of the cast.
+	if m.SearchLanguage == "" {
+		return domain.Message{}, errs.New(errs.CodeInternalError, "messaging: a message without its search language")
+	}
 	q, err := r.write(ctx)
 	if err != nil {
 		return domain.Message{}, err

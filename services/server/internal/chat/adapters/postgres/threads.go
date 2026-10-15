@@ -42,6 +42,9 @@ func (r *Repository) LockThread(ctx context.Context, id ids.ID) (domain.Thread, 
 // InsertThread implements app.Store: a second thread of the same parent message is 409 conflict
 // on /parent_message_id.
 func (r *Repository) InsertThread(ctx context.Context, th domain.Thread) (domain.Thread, error) {
+	if err := searchLanguageSet(th); err != nil {
+		return domain.Thread{}, err
+	}
 	q, err := r.write(ctx)
 	if err != nil {
 		return domain.Thread{}, err
@@ -169,6 +172,15 @@ func (r *Repository) DeleteTagAssignments(ctx context.Context, tag ids.ID) error
 		return err
 	}
 	return mapError(q.DeleteTagAssignments(ctx, uuid(tag)), "deleting the assignments of a tag")
+}
+
+// searchLanguageSet refuses a thread without its search language: the use case sets it before
+// every insert (14 3.1), and an empty value would otherwise end in a SQL error of the cast.
+func searchLanguageSet(th domain.Thread) error {
+	if th.SearchLanguage == "" {
+		return errs.New(errs.CodeInternalError, "chat: a thread without its search language")
+	}
+	return nil
 }
 
 // threadRow is the column list every query of threads.sql and threads_main.sql returns: the
