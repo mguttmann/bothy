@@ -56,7 +56,7 @@ func TestQueries_RunAgainstTheSchema(t *testing.T) {
 	second, err := q.InsertMessage(ctx, sqlcgen.InsertMessageParams{
 		ID: uuid(ids.New()), ThreadID: uuid(main), ChannelID: uuid(ch), ThreadSeq: 100, AuthorPrincipalID: m.AuthorPrincipalID,
 		ClientMsgID: uuid(ids.New()), ClientPayloadSha256: []byte{1}, Origin: "human", Kind: "text", ContentMd: "@sam again",
-		ContentFormat: 1, CreatedAt: at,
+		ContentFormat: 1, CreatedAt: at, SearchLanguage: "simple",
 	})
 	if err != nil || second.Version != 1 {
 		t.Fatalf("InsertMessage %+v %v", second, err)
