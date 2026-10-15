@@ -241,6 +241,7 @@ class HarnessAppState extends State<HarnessApp> {
       costs: fixtureState == 'no_cost_permission'
           ? null
           : await _fixtures.costSeries((await _pick('CostSeries'))!),
+      names: harnessNames,
     );
     if (!mounted || generation != _generation) return;
     await _source?.stop();

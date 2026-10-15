@@ -34,6 +34,7 @@ class MarkModels {
       slo: await fixtures.sloReport('normal'),
       usage: await fixtures.series('normal', query: 'usage'),
       costs: await fixtures.costSeries('normal'),
+      names: names,
     );
     return MarkModels._(
       normal,

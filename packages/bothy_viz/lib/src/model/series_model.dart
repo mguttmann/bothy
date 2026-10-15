@@ -5,6 +5,8 @@ library;
 
 import 'package:api_client/api_client.dart' as api;
 
+import 'names.dart';
+
 /// Number of categorical series roles `color.viz.series.1` to `.8` (25 10).
 const int vizSeriesCount = 8;
 
@@ -31,13 +33,16 @@ final class SeriesModel {
     this.queryMetric,
     this.dimension,
     this.groupKey,
+    this.groupLabel,
   }) : assert((metric == null) != (queryMetric == null), 'one name');
 
   /// The series of a query response: one per metric name and group, in the order of the first
-  /// bucket, with the color roles counted from [firstColor].
+  /// bucket, with the color roles counted from [firstColor]; [names] resolves the group keys
+  /// into [groupLabel], so two groups of one metric read differently and not by color alone.
   static List<SeriesModel> fromStatsSeries(
     api.StatsSeries series, {
     int firstColor = 0,
+    VizNames names = const VizNames(),
   }) {
     final points = <(String, String?), List<SeriesPoint>>{};
     for (final bucket in series.buckets) {
@@ -53,6 +58,7 @@ final class SeriesModel {
         SeriesModel(
           queryMetric: metric,
           groupKey: group,
+          groupLabel: group == null ? null : names.any(group),
           colorIndex: index++,
           points: List.unmodifiable(list..sort((a, b) => a.at.compareTo(b.at))),
         ),
@@ -70,6 +76,9 @@ final class SeriesModel {
 
   /// Group of a grouped query (space or agent ID), `null` without grouping.
   final String? groupKey;
+
+  /// Display name of [groupKey]; `null` without grouping.
+  final String? groupLabel;
 
   /// Position in the fixed order of the series roles; the mark wraps it after
   /// [vizSeriesCount] (`color.viz.series.<colorIndex % 8 + 1>`).

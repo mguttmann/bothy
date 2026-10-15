@@ -41,6 +41,11 @@ final class VizNames {
   /// The name of channel [id], or its short form.
   String channel(String id) => channels[id] ?? short(id);
 
+  /// The name of [id] as an agent, a space or a channel, or its short form: the group key of a
+  /// query response, which can name any of them.
+  String any(String id) =>
+      agents[id] ?? spaces[id] ?? channels[id] ?? short(id);
+
   /// The last characters of [id]: the random part of a UUIDv7, which tells IDs apart.
   static String short(String id) =>
       id.length <= _shortLength ? id : id.substring(id.length - _shortLength);

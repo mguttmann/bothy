@@ -7,6 +7,7 @@ import 'package:api_client/api_client.dart' as api;
 
 import 'costs.dart';
 import 'metric_tile_model.dart';
+import 'names.dart';
 import 'series_model.dart';
 import 'traffic_light_model.dart';
 
@@ -25,7 +26,7 @@ final class ExecutiveModel {
 
   /// Derives the model from the responses of `getStatsSlo` ([slo]), `getUsageStats`
   /// ([usage]), `getRunStats` ([runs]), `getErrorStats` ([errors]) and `getCostStats`
-  /// ([costs]). Never calls the network.
+  /// ([costs]); [names] names the groups of the series. Never calls the network.
   ///
   /// Tiles: one per metric name of [usage], [runs] and [errors] in the order of the first
   /// bucket ([additiveMetrics] summed, levels from the latest bucket of a single group). Cost tiles: one per billing mode of [costs] with the summed
@@ -37,6 +38,7 @@ final class ExecutiveModel {
     api.StatsSeries? runs,
     api.StatsSeries? errors,
     api.CostSeries? costs,
+    VizNames names = const VizNames(),
   }) {
     final series = <SeriesModel>[];
     final tiles = <MetricTileModel>[];
@@ -46,6 +48,7 @@ final class ExecutiveModel {
       final parts = SeriesModel.fromStatsSeries(
         response,
         firstColor: series.length,
+        names: names,
       );
       series.addAll(parts);
       final byMetric = <String, List<SeriesModel>>{};

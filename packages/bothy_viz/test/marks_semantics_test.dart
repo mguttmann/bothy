@@ -89,6 +89,34 @@ void main() {
     },
   );
 
+  testWidgets(
+    'grouped series of one metric read differently, not by color alone',
+    (tester) async {
+      final handle = tester.ensureSemantics();
+      final executive = ExecutiveModel.from(
+        usage: await tester.runAsync(
+          () => fixtures.series('normal', query: 'usage'),
+        ),
+        runs: await tester.runAsync(
+          () => fixtures.series('normal', query: 'runs'),
+        ),
+        names: names,
+      );
+      await pump(tester, AreaMark(title: 'Rates', series: executive.series));
+      final rows = [
+        for (final s in executive.series)
+          AreaMark.seriesLabel(
+            VizTexts.of(tester.element(find.byType(AreaMark))),
+            s,
+          ),
+      ];
+      expect(rows.toSet(), hasLength(rows.length));
+      expect(rows, contains('Metric messages, Engineering'));
+      expect(rows, contains('Metric runs, dev-runner'));
+      handle.dispose();
+    },
+  );
+
   testWidgets('every run bar shows the icon of its state, not color alone', (
     tester,
   ) async {
