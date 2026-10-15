@@ -358,7 +358,7 @@ An event type has exactly one producing module. The receive action is in 05 sect
 | Layer | Package | Contains | May import | Must not |
 |---|---|---|---|---|
 | Port | `internal/<module>` | Inbound interfaces, command and result types (DTOs), in-tx events, declared source ports | `kernel` | `domain`, `app`, `adapters`, other modules, third-party libraries |
-| Domain | `internal/<module>/domain` | Entities, value objects, state machines (for example run transitions), invariants, pure functions | Packages from `kernel-core` (`kernel/ids`, `kernel/clock`, `kernel/errs`, `kernel/textcheck`, `kernel/reqmeta`, `kernel/jose`, `kernel/designkeys`) | Input and output, SQL, HTTP, context with a transaction, third-party libraries |
+| Domain | `internal/<module>/domain` | Entities, value objects, state machines (for example run transitions), invariants, pure functions | Packages from `kernel-core` (`kernel/ids`, `kernel/clock`, `kernel/errs`, `kernel/textcheck`, `kernel/reqmeta`, `kernel/jose`, `kernel/designkeys`, `kernel/searchlang`) | Input and output, SQL, HTTP, context with a transaction, third-party libraries |
 | Application | `internal/<module>/app` | Use cases: `authorize`, Unit of Work, call the domain, append events; outbound ports (repository, clock, external service) as interfaces | own port, own domain, `kernel`, ports of allowed modules | `adapters`, `platform`, `api`, third-party libraries |
 | Adapter | `internal/<module>/adapters/<kind>` | `postgres` (sqlc code and repository), `httpapi` (part of the generated server interface), others such as `objectstore`, `clamav`, `apns` | everything of the own module, `kernel`, `platform`, `api`, ports of allowed modules, approved third-party libraries | `app` or `domain` of other modules |
 
@@ -498,7 +498,7 @@ entries, never fields):
 version: 1
 exclude: [tools]                  # directories that go-arch-lint does not check (tools)
 kernel:
-  core: [ids, clock, errs, textcheck, reqmeta, jose, designkeys]   # usable by every package
+  core: [ids, clock, errs, textcheck, reqmeta, jose, designkeys, searchlang]   # usable by every package
   ports: [actor, authorize, txn, eventlog, auditing, idempotency, personaldata, measure]
 platform:                         # one component per platform package
   jobs: {depends_on: [pg], vendors: [river]}

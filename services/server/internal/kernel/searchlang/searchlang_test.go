@@ -26,8 +26,8 @@ func TestNew(t *testing.T) {
 		// wantKey and wantPos are the key and the position the error names; "" means valid.
 		wantKey string
 		wantPos string
-		// secret is a configured value that must not appear in the error.
-		secret string
+		// hidden is a configured value that must not appear in the error.
+		hidden string
 	}{
 		{name: "chapter defaults", languages: chapterLanguages, locales: chapterLocales},
 		{name: "empty", languages: nil, locales: nil},
@@ -36,22 +36,22 @@ func TestNew(t *testing.T) {
 		{name: "underscore and digits", languages: []string{"_x1", "de_2"}, locales: map[string]string{}},
 		{
 			name: "map value missing from languages", languages: chapterLanguages,
-			locales: map[string]string{"de": "german", "fr": "french"}, wantKey: "search.locale_map", wantPos: "entry 2", secret: "french",
+			locales: map[string]string{"de": "german", "fr": "french"}, wantKey: "search.locale_map", wantPos: "entry 2", hidden: "french",
 		},
 		{name: "simple in languages", languages: []string{"german", "simple"}, wantKey: "search.languages", wantPos: "entry 2"},
-		{name: "duplicate language", languages: []string{"german", "english", "german"}, wantKey: "search.languages", wantPos: "entry 3", secret: "german"},
-		{name: "upper case", languages: []string{"German"}, wantKey: "search.languages", wantPos: "entry 1", secret: "German"},
-		{name: "dash", languages: []string{"english", "pt-br"}, wantKey: "search.languages", wantPos: "entry 2", secret: "pt-br"},
-		{name: "leading digit", languages: []string{"1german"}, wantKey: "search.languages", wantPos: "entry 1", secret: "1german"},
+		{name: "duplicate language", languages: []string{"german", "english", "german"}, wantKey: "search.languages", wantPos: "entry 3", hidden: "german"},
+		{name: "upper case", languages: []string{"German"}, wantKey: "search.languages", wantPos: "entry 1", hidden: "German"},
+		{name: "dash", languages: []string{"english", "pt-br"}, wantKey: "search.languages", wantPos: "entry 2", hidden: "pt-br"},
+		{name: "leading digit", languages: []string{"1german"}, wantKey: "search.languages", wantPos: "entry 1", hidden: "1german"},
 		{name: "empty name", languages: []string{""}, wantKey: "search.languages", wantPos: "entry 1"},
-		{name: "too long", languages: []string{long}, wantKey: "search.languages", wantPos: "entry 1", secret: long},
-		{name: "schema qualified", languages: []string{"pg_catalog.german"}, wantKey: "search.languages", wantPos: "entry 1", secret: "pg_catalog.german"},
+		{name: "too long", languages: []string{long}, wantKey: "search.languages", wantPos: "entry 1", hidden: long},
+		{name: "schema qualified", languages: []string{"pg_catalog.german"}, wantKey: "search.languages", wantPos: "entry 1", hidden: "pg_catalog.german"},
 		{
 			name: "map value not an identifier", languages: chapterLanguages,
-			locales: map[string]string{"de": "German"}, wantKey: "search.locale_map", wantPos: "entry 1", secret: "German",
+			locales: map[string]string{"de": "German"}, wantKey: "search.locale_map", wantPos: "entry 1", hidden: "German",
 		},
-		{name: "map key with region", languages: chapterLanguages, locales: map[string]string{"de-AT": "german"}, wantKey: "search.locale_map", wantPos: "entry 1", secret: "de-AT"},
-		{name: "map key upper case", languages: chapterLanguages, locales: map[string]string{"DE": "german", "en": "english"}, wantKey: "search.locale_map", wantPos: "entry 1", secret: "DE"},
+		{name: "map key with region", languages: chapterLanguages, locales: map[string]string{"de-AT": "german"}, wantKey: "search.locale_map", wantPos: "entry 1", hidden: "de-AT"},
+		{name: "map key upper case", languages: chapterLanguages, locales: map[string]string{"DE": "german", "en": "english"}, wantKey: "search.locale_map", wantPos: "entry 1", hidden: "DE"},
 		{name: "empty map key", languages: chapterLanguages, locales: map[string]string{"": "german"}, wantKey: "search.locale_map", wantPos: "entry 1"},
 	}
 	for _, tc := range cases {
@@ -71,8 +71,8 @@ func TestNew(t *testing.T) {
 			if !strings.Contains(msg, tc.wantKey) || !strings.Contains(msg, tc.wantPos) {
 				t.Errorf("error %q does not name %s and %s", msg, tc.wantKey, tc.wantPos)
 			}
-			if tc.secret != "" && strings.Contains(msg, tc.secret) {
-				t.Errorf("error %q repeats the configured value %q", msg, tc.secret)
+			if tc.hidden != "" && strings.Contains(msg, tc.hidden) {
+				t.Errorf("error %q repeats the configured value %q", msg, tc.hidden)
 			}
 		})
 	}
