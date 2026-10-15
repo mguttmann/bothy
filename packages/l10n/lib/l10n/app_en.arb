@@ -389,5 +389,739 @@
         "example": "future_code"
       }
     }
+  },
+  "messageShowMore": "Show more",
+  "@messageShowMore": {
+    "description": "Text button under a collapsed long message (components.md section 1)."
+  },
+  "messageEdited": "(edited)",
+  "@messageEdited": {
+    "description": "Suffix after a message whose `edited_at` is set (components.md section 1)."
+  },
+  "messageDeleted": "Message deleted",
+  "@messageDeleted": {
+    "description": "Line that replaces a message whose `deleted_at` is set (components.md section 1)."
+  },
+  "messageResend": "Resend",
+  "@messageResend": {
+    "description": "Button of a message that failed permanently; sends it again with a new ID (components.md section 1)."
+  },
+  "messageEdit": "Edit",
+  "@messageEdit": {
+    "description": "Button of a failed message and action of the hover bar (components.md section 1)."
+  },
+  "messageDiscard": "Discard",
+  "@messageDiscard": {
+    "description": "Button of a failed message that removes it from the queue (components.md section 1)."
+  },
+  "messageActionReply": "Reply",
+  "@messageActionReply": {
+    "description": "Action of the hover bar of a message (components.md section 1)."
+  },
+  "messageActionReact": "React",
+  "@messageActionReact": {
+    "description": "Action of the hover bar of a message (components.md section 1)."
+  },
+  "messageActionPin": "Pin",
+  "@messageActionPin": {
+    "description": "Action of the hover bar of a message (components.md section 1)."
+  },
+  "messageActionMore": "More",
+  "@messageActionMore": {
+    "description": "Action of the hover bar that opens further actions (components.md section 1)."
+  },
+  "messageMentionsYou": "Mentions you",
+  "@messageMentionsYou": {
+    "description": "Start of the screen reader label of a message that mentions the reader (components.md section 1)."
+  },
+  "messageSemanticsLabel": "{name}, {time}, {text}",
+  "@messageSemanticsLabel": {
+    "description": "Screen reader label of a message (components.md section 1).",
+    "placeholders": {
+      "name": {
+        "type": "String",
+        "example": "Alex"
+      },
+      "time": {
+        "type": "String",
+        "example": "10:42"
+      },
+      "text": {
+        "type": "String",
+        "example": "The build is green"
+      }
+    }
+  },
+  "messageOriginAgent": "AGENT",
+  "@messageOriginAgent": {
+    "description": "Badge after the name of a message written by an agent (`origin = agent`, components.md section 1, SEC-OUT-3)."
+  },
+  "messageOriginApp": "APP",
+  "@messageOriginApp": {
+    "description": "Badge after the name of a message written by an app (`origin = app`, components.md section 1, SEC-OUT-3)."
+  },
+  "messageOriginImport": "IMPORT",
+  "@messageOriginImport": {
+    "description": "Badge after the name of an imported message (`origin = import`, components.md section 1, SEC-OUT-3)."
+  },
+  "messageOriginSystem": "SYSTEM",
+  "@messageOriginSystem": {
+    "description": "Badge of a message the server wrote (`origin = system`, components.md section 1, SEC-OUT-3)."
+  },
+  "messageReplyTo": "Reply to {name}",
+  "@messageReplyTo": {
+    "description": "Screen reader label of the quote line above a reply (components.md section 1).",
+    "placeholders": {
+      "name": {
+        "type": "String",
+        "example": "Sam"
+      }
+    }
+  },
+  "messageAttachment": "Attachment {name}",
+  "@messageAttachment": {
+    "description": "Screen reader label of an attachment of a message (components.md section 1).",
+    "placeholders": {
+      "name": {
+        "type": "String",
+        "example": "report.pdf"
+      }
+    }
+  },
+  "messageReaction": "{count, plural, =1{1 reaction {emoji}} other{{count} reactions {emoji}}}",
+  "@messageReaction": {
+    "description": "Screen reader label of a reaction chip under a message (components.md section 1).",
+    "placeholders": {
+      "count": {
+        "type": "int"
+      },
+      "emoji": {
+        "type": "String",
+        "example": "+1"
+      }
+    }
+  },
+  "messageVoicePlay": "Play voice message",
+  "@messageVoicePlay": {
+    "description": "Play button of a voice message (components.md section 1)."
+  },
+  "messageVoicePause": "Pause voice message",
+  "@messageVoicePause": {
+    "description": "Pause button of a playing voice message (components.md section 1)."
+  },
+  "messageVoiceTranscriptPending": "Transcript pending",
+  "@messageVoiceTranscriptPending": {
+    "description": "Line under a voice message while its transcript is not done (components.md section 1)."
+  },
+  "messageSystemThreadReopened": "Reopened by message from {name}",
+  "@messageSystemThreadReopened": {
+    "description": "System line `thread.reopened` (01 section 6.1, components.md section 1).",
+    "placeholders": {
+      "name": {
+        "type": "String",
+        "example": "Sam"
+      }
+    }
+  },
+  "messageSystemResumeFailed": "The agent session could not be resumed",
+  "@messageSystemResumeFailed": {
+    "description": "System line `agent_session.resume_failed` (components.md section 1)."
+  },
+  "messageSystemUnknown": "System message ({code})",
+  "@messageSystemUnknown": {
+    "description": "System line of a code the app does not know yet (components.md section 1).",
+    "placeholders": {
+      "code": {
+        "type": "String",
+        "example": "future.code"
+      }
+    }
+  },
+  "triggerStateCancelled": "Canceled",
+  "@triggerStateCancelled": {
+    "description": "Label of the trigger state `cancelled` on the triggering message (components.md section 5)."
+  },
+  "triggerStateCancelledWithReason": "Canceled: {reason}",
+  "@triggerStateCancelledWithReason": {
+    "description": "Tooltip and screen reader label of the trigger state `cancelled` with the translated reason (components.md section 5).",
+    "placeholders": {
+      "reason": {
+        "type": "String",
+        "example": "Canceled by Sam"
+      }
+    }
+  },
+  "triggerStateUnknown": "State {code}",
+  "@triggerStateUnknown": {
+    "description": "Label of a trigger state the app does not know yet (components.md section 5).",
+    "placeholders": {
+      "code": {
+        "type": "String",
+        "example": "future_state"
+      }
+    }
+  },
+  "liveBoxStateUnknown": "State {code}",
+  "@liveBoxStateUnknown": {
+    "description": "State word of the live box for a run state the app does not know yet (components.md section 2.1).",
+    "placeholders": {
+      "code": {
+        "type": "String",
+        "example": "future_state"
+      }
+    }
+  },
+  "liveBoxStopRun": "Stop run of {agent}",
+  "@liveBoxStopRun": {
+    "description": "Screen reader label of the stop button of the live box (components.md section 2.4).",
+    "placeholders": {
+      "agent": {
+        "type": "String",
+        "example": "Robin"
+      }
+    }
+  },
+  "liveBoxSemanticsLabel": "Run of {agent}: {state}, for {duration}, context {percent} percent",
+  "@liveBoxSemanticsLabel": {
+    "description": "Screen reader label of the live box container (components.md section 2.4).",
+    "placeholders": {
+      "agent": {
+        "type": "String",
+        "example": "Robin"
+      },
+      "state": {
+        "type": "String",
+        "example": "Running"
+      },
+      "duration": {
+        "type": "String",
+        "example": "4:12"
+      },
+      "percent": {
+        "type": "int"
+      }
+    }
+  },
+  "liveBoxFollowupHint": "Messages in this thread reach the agent as a follow-up",
+  "@liveBoxFollowupHint": {
+    "description": "Note in the footer of a running live box (components.md section 2.1)."
+  },
+  "liveBoxTokens": "{count} tokens",
+  "@liveBoxTokens": {
+    "description": "Token count in the header of the live box; the caller formats the number (components.md section 2.1).",
+    "placeholders": {
+      "count": {
+        "type": "String",
+        "example": "48,100"
+      }
+    }
+  },
+  "liveBoxContext": "Context {percent}",
+  "@liveBoxContext": {
+    "description": "Context use in the header of the live box; the caller formats the percent (components.md section 2.1).",
+    "placeholders": {
+      "percent": {
+        "type": "String",
+        "example": "62%"
+      }
+    }
+  },
+  "liveBoxRan": "Ran {duration}",
+  "@liveBoxRan": {
+    "description": "Start of the collapsed line of a finished run (components.md section 2.2).",
+    "placeholders": {
+      "duration": {
+        "type": "String",
+        "example": "28 min"
+      }
+    }
+  },
+  "liveBoxTools": "{count, plural, =1{1 tool} other{{count} tools}}",
+  "@liveBoxTools": {
+    "description": "Number of tools in the collapsed line of a run (components.md section 2.2).",
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "liveBoxSubagents": "{count, plural, =1{1 subagent} other{{count} subagents}}",
+  "@liveBoxSubagents": {
+    "description": "Number of subagents in the collapsed line of a run (components.md section 2.2).",
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "liveBoxExpand": "Show run details",
+  "@liveBoxExpand": {
+    "description": "Screen reader label of the expand arrow of the live box (components.md section 2.1 and 2.2)."
+  },
+  "liveBoxCollapse": "Hide run details",
+  "@liveBoxCollapse": {
+    "description": "Screen reader label of the collapse arrow of an expanded live box (components.md section 2.1)."
+  },
+  "liveBoxOpen": "Open live box",
+  "@liveBoxOpen": {
+    "description": "Screen reader label of the mobile line of the live box; tapping opens the sheet (components.md section 2.3)."
+  },
+  "liveBoxAnnounceQuestion": "Question from {agent}",
+  "@liveBoxAnnounceQuestion": {
+    "description": "Screen reader announcement of a new question of a run (components.md section 2.4).",
+    "placeholders": {
+      "agent": {
+        "type": "String",
+        "example": "Robin"
+      }
+    }
+  },
+  "liveBoxAnnounceState": "Run of {agent}: {state}",
+  "@liveBoxAnnounceState": {
+    "description": "Screen reader announcement of a state change of a run (components.md section 2.4).",
+    "placeholders": {
+      "agent": {
+        "type": "String",
+        "example": "Robin"
+      },
+      "state": {
+        "type": "String",
+        "example": "Done"
+      }
+    }
+  },
+  "toolChipWaiting": "waiting",
+  "@toolChipWaiting": {
+    "description": "Suffix of a pending step of the live box (components.md section 3)."
+  },
+  "toolChipRunning": "running {duration}",
+  "@toolChipRunning": {
+    "description": "Suffix of a running step with its run time (components.md section 3).",
+    "placeholders": {
+      "duration": {
+        "type": "String",
+        "example": "12 s"
+      }
+    }
+  },
+  "toolChipFailed": "failed",
+  "@toolChipFailed": {
+    "description": "Suffix of a failed step (components.md section 3)."
+  },
+  "toolChipCancelled": "canceled",
+  "@toolChipCancelled": {
+    "description": "Suffix of a canceled step (components.md section 3)."
+  },
+  "toolChipCompleted": "completed",
+  "@toolChipCompleted": {
+    "description": "Status word of a completed step in the screen reader label (components.md section 3)."
+  },
+  "toolChipUnknownStatus": "status {code}",
+  "@toolChipUnknownStatus": {
+    "description": "Suffix of a step status the app does not know yet (components.md section 3).",
+    "placeholders": {
+      "code": {
+        "type": "String",
+        "example": "future_status"
+      }
+    }
+  },
+  "toolChipKindToolCall": "Tool",
+  "@toolChipKindToolCall": {
+    "description": "Kind `tool_call` of a step in the screen reader label (components.md section 3)."
+  },
+  "toolChipKindStatus": "Status",
+  "@toolChipKindStatus": {
+    "description": "Kind `status` of a step in the screen reader label (components.md section 3)."
+  },
+  "toolChipKindSubagent": "Subagent",
+  "@toolChipKindSubagent": {
+    "description": "Kind `subagent` of a step in the screen reader label (components.md section 3)."
+  },
+  "toolChipKindWorkflow": "Workflow",
+  "@toolChipKindWorkflow": {
+    "description": "Kind `workflow` of a step in the screen reader label (components.md section 3)."
+  },
+  "toolChipKindBackgroundJob": "Background job",
+  "@toolChipKindBackgroundJob": {
+    "description": "Kind `background_job` of a step in the screen reader label (components.md section 3)."
+  },
+  "toolChipKindUnknown": "Step",
+  "@toolChipKindUnknown": {
+    "description": "Kind of a step the app does not know yet (components.md section 3)."
+  },
+  "toolChipLabel": "{kind} {name}, {status}",
+  "@toolChipLabel": {
+    "description": "Screen reader label of a tool chip; the status includes the duration where there is one (components.md section 3).",
+    "placeholders": {
+      "kind": {
+        "type": "String",
+        "example": "Tool"
+      },
+      "name": {
+        "type": "String",
+        "example": "grep"
+      },
+      "status": {
+        "type": "String",
+        "example": "completed, 2 s"
+      }
+    }
+  },
+  "toolChipDetails": "Show details",
+  "@toolChipDetails": {
+    "description": "Hint of a tool chip that opens the step detail (components.md section 3)."
+  },
+  "threadRowWaitingForYou": "Waiting for you",
+  "@threadRowWaitingForYou": {
+    "description": "Badge on the second line of a forum post that waits for the reader (components.md section 6)."
+  },
+  "threadRowStateOpen": "Open",
+  "@threadRowStateOpen": {
+    "description": "State word of an open post in the screen reader label (components.md section 6)."
+  },
+  "threadRowStateDone": "Done",
+  "@threadRowStateDone": {
+    "description": "State word of a done post in the screen reader label (components.md section 6)."
+  },
+  "threadRowUnread": "{count, plural, =0{no unread} =1{1 unread} other{{count} unread}}",
+  "@threadRowUnread": {
+    "description": "Unread count in the screen reader label of a forum post or channel (components.md sections 6 and 7).",
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "threadRowMentions": "{count, plural, =1{1 mention} other{{count} mentions}}",
+  "@threadRowMentions": {
+    "description": "Mention count of a forum post or channel (components.md sections 6 and 7).",
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "threadRowLabel": "{title}, {state}, {time}, {unread}",
+  "@threadRowLabel": {
+    "description": "Screen reader label of a forum post row (components.md section 6).",
+    "placeholders": {
+      "title": {
+        "type": "String",
+        "example": "Release notes"
+      },
+      "state": {
+        "type": "String",
+        "example": "Open"
+      },
+      "time": {
+        "type": "String",
+        "example": "10:42"
+      },
+      "unread": {
+        "type": "String",
+        "example": "2 unread"
+      }
+    }
+  },
+  "threadRowOperator": "Operator {name}",
+  "@threadRowOperator": {
+    "description": "Operator agent on the second line of a forum post (components.md section 6).",
+    "placeholders": {
+      "name": {
+        "type": "String",
+        "example": "Robin"
+      }
+    }
+  },
+  "channelRowRunActive": "run active",
+  "@channelRowRunActive": {
+    "description": "Part of the screen reader label of a channel with an active run (components.md section 7)."
+  },
+  "channelRowMuted": "muted",
+  "@channelRowMuted": {
+    "description": "Part of the screen reader label of a muted channel (components.md section 7)."
+  },
+  "spaceRowUnread": "Unread",
+  "@spaceRowUnread": {
+    "description": "Screen reader label of the dot of a collapsed space with unread items (components.md section 7)."
+  },
+  "spaceRowExpand": "Expand {name}",
+  "@spaceRowExpand": {
+    "description": "Screen reader hint of a collapsed space row (components.md section 7).",
+    "placeholders": {
+      "name": {
+        "type": "String",
+        "example": "Support"
+      }
+    }
+  },
+  "spaceRowCollapse": "Collapse {name}",
+  "@spaceRowCollapse": {
+    "description": "Screen reader hint of an expanded space row (components.md section 7).",
+    "placeholders": {
+      "name": {
+        "type": "String",
+        "example": "Support"
+      }
+    }
+  },
+  "componentsTextFrom": "Text from {agent}",
+  "@componentsTextFrom": {
+    "description": "Label of the divider above the agent's own text on a card (components.md section 8, SEC-OUT-4).",
+    "placeholders": {
+      "agent": {
+        "type": "String",
+        "example": "Robin"
+      }
+    }
+  },
+  "componentsHeaderRequest": "Request from {agent}",
+  "@componentsHeaderRequest": {
+    "description": "First line of the card header, built from server fields (components.md section 8, SEC-OUT-4).",
+    "placeholders": {
+      "agent": {
+        "type": "String",
+        "example": "Robin"
+      }
+    }
+  },
+  "componentsHeaderRun": "Run {run}",
+  "@componentsHeaderRun": {
+    "description": "Line of the card header naming the run, from server fields (components.md section 8, SEC-OUT-4).",
+    "placeholders": {
+      "run": {
+        "type": "String",
+        "example": "Release check"
+      }
+    }
+  },
+  "componentsHeaderCapability": "Requires the permission '{capability}'",
+  "@componentsHeaderCapability": {
+    "description": "Line of the card header naming the required capability (components.md section 8, SEC-OUT-4).",
+    "placeholders": {
+      "capability": {
+        "type": "String",
+        "example": "Approve actions"
+      }
+    }
+  },
+  "componentsApproverRunStarter": "Only {name} or an owner can approve this",
+  "@componentsApproverRunStarter": {
+    "description": "Who may approve: the person who triggered the run, or an owner (components.md section 8).",
+    "placeholders": {
+      "name": {
+        "type": "String",
+        "example": "Alex"
+      }
+    }
+  },
+  "componentsApproverOwner": "Only an owner can approve this",
+  "@componentsApproverOwner": {
+    "description": "Who may approve: an owner only (components.md section 8)."
+  },
+  "componentsApproverAny": "Anyone with access to this channel can answer",
+  "@componentsApproverAny": {
+    "description": "Who may approve: every person who may use the component (components.md section 8)."
+  },
+  "componentsDeniedCapability": "You do not have the permission '{capability}' for this",
+  "@componentsDeniedCapability": {
+    "description": "Lock note of an active card the reader may not use for lack of a capability (components.md section 8).",
+    "placeholders": {
+      "capability": {
+        "type": "String",
+        "example": "Approve actions"
+      }
+    }
+  },
+  "capabilityApproveActions": "Approve actions",
+  "@capabilityApproveActions": {
+    "description": "Name of the capability `approve_actions` (01 section 9 term table)."
+  },
+  "componentsUsed": "{name} chose '{choice}', {time}",
+  "@componentsUsed": {
+    "description": "Line of a used card (components.md section 8).",
+    "placeholders": {
+      "name": {
+        "type": "String",
+        "example": "Alex"
+      },
+      "choice": {
+        "type": "String",
+        "example": "Allow once"
+      },
+      "time": {
+        "type": "String",
+        "example": "10:42"
+      }
+    }
+  },
+  "componentsExpired": "Expired",
+  "@componentsExpired": {
+    "description": "Line of an expired card (components.md section 8)."
+  },
+  "componentsDisabled": "No longer available",
+  "@componentsDisabled": {
+    "description": "Line of a disabled card (components.md section 8)."
+  },
+  "componentsSending": "Sending your choice",
+  "@componentsSending": {
+    "description": "Screen reader label of the pressed button while the answer is pending (components.md section 8)."
+  },
+  "componentsSubmit": "Submit",
+  "@componentsSubmit": {
+    "description": "Submit button of a form or a multiple selection without its own label (components.md section 8)."
+  },
+  "componentsSelectPlaceholder": "Choose",
+  "@componentsSelectPlaceholder": {
+    "description": "Placeholder of a select field without its own placeholder (components.md section 8)."
+  },
+  "componentsFieldRequired": "Required",
+  "@componentsFieldRequired": {
+    "description": "Validation message of an empty required form field (components.md section 8)."
+  },
+  "componentsFieldTooLong": "At most {max} characters",
+  "@componentsFieldTooLong": {
+    "description": "Validation message of a too long form field; the limit comes from the definition (components.md section 8).",
+    "placeholders": {
+      "max": {
+        "type": "int"
+      }
+    }
+  },
+  "componentsFieldNumber": "Enter a number",
+  "@componentsFieldNumber": {
+    "description": "Validation message of a number field with other text (components.md section 8)."
+  },
+  "componentsUnsupported": "This element needs a newer app",
+  "@componentsUnsupported": {
+    "description": "Line for a component type the app does not know yet (components.md section 8)."
+  },
+  "composerMessageTo": "Message to {target}",
+  "@composerMessageTo": {
+    "description": "Placeholder and screen reader label of the input (components.md section 9).",
+    "placeholders": {
+      "target": {
+        "type": "String",
+        "example": "general"
+      }
+    }
+  },
+  "composerFollowupTo": "Follow-up to {agent}",
+  "@composerFollowupTo": {
+    "description": "Placeholder of the input during an active run (components.md section 9).",
+    "placeholders": {
+      "agent": {
+        "type": "String",
+        "example": "Robin"
+      }
+    }
+  },
+  "composerTyping": "{name} is typing",
+  "@composerTyping": {
+    "description": "Typing line above the input (components.md section 9).",
+    "placeholders": {
+      "name": {
+        "type": "String",
+        "example": "Sam"
+      }
+    }
+  },
+  "composerTypingSeveral": "Several people are typing",
+  "@composerTypingSeveral": {
+    "description": "Typing line above the input when more than one person types (components.md section 9)."
+  },
+  "composerSend": "Send",
+  "@composerSend": {
+    "description": "Send button of the input (components.md section 9)."
+  },
+  "composerAttach": "Attach file",
+  "@composerAttach": {
+    "description": "Attachment button of the input (components.md section 9)."
+  },
+  "composerVoice": "Record voice message",
+  "@composerVoice": {
+    "description": "Microphone button of the input (components.md section 9)."
+  },
+  "composerOptionMissing": "Missing option: {option}",
+  "@composerOptionMissing": {
+    "description": "Reason why sending is disabled while a required command option is empty (components.md section 9).",
+    "placeholders": {
+      "option": {
+        "type": "String",
+        "example": "target"
+      }
+    }
+  },
+  "composerOffline": "Offline: your message waits in the queue",
+  "@composerOffline": {
+    "description": "Hint in the input while offline (components.md section 9)."
+  },
+  "composerReadOnly": "Read only in this channel",
+  "@composerReadOnly": {
+    "description": "Note that replaces the input without write permission (components.md section 9)."
+  },
+  "composerSuggestions": "{count, plural, =0{No suggestions} =1{1 suggestion} other{{count} suggestions}}",
+  "@composerSuggestions": {
+    "description": "Announced number of suggestions of the suggestion list (components.md section 9).",
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "composerControlCommand": "Control command",
+  "@composerControlCommand": {
+    "description": "Hint on a suggestion row of a control command (`control = true`, components.md section 9)."
+  },
+  "billingPersonal": "Personal",
+  "@billingPersonal": {
+    "description": "Backend policy badge `personal` (components.md section 10)."
+  },
+  "billingOrganization": "Organization",
+  "@billingOrganization": {
+    "description": "Backend policy badge `organization` (components.md section 10)."
+  },
+  "billingUnknown": "Backend {code}",
+  "@billingUnknown": {
+    "description": "Backend policy badge of a mode the app does not know yet (components.md section 10).",
+    "placeholders": {
+      "code": {
+        "type": "String",
+        "example": "future_mode"
+      }
+    }
+  },
+  "billingReported": "Reported: {mode}",
+  "@billingReported": {
+    "description": "Warning badge when the reported mode differs from the configured one (components.md section 10).",
+    "placeholders": {
+      "mode": {
+        "type": "String",
+        "example": "Organization"
+      }
+    }
+  },
+  "billingLabelPersonal": "Backend: Personal, runs on the subscription of {name}",
+  "@billingLabelPersonal": {
+    "description": "Screen reader label of the badge `personal` (components.md section 10).",
+    "placeholders": {
+      "name": {
+        "type": "String",
+        "example": "Alex"
+      }
+    }
+  },
+  "billingLabelOrganization": "Backend: Organization",
+  "@billingLabelOrganization": {
+    "description": "Screen reader label of the badge `organization` (components.md section 10)."
+  },
+  "costEstimate": "Estimate",
+  "@costEstimate": {
+    "description": "Suffix of a cost in Organization mode until reconciled (components.md section 10, 01 section 6.7)."
+  },
+  "costInformationOnly": "for information only",
+  "@costInformationOnly": {
+    "description": "Suffix of a cost in Personal mode (components.md section 10, 01 section 6.7)."
   }
 }
