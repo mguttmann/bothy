@@ -3,3 +3,9 @@
 include:
   - package:lints/recommended.yaml
   - ../../analysis_options.yaml
+
+# The schema helpers that `dart run drift_dev schema generate` writes for the migration tests
+# are generated code like `*.drift.dart` (docs/DECISIONS.md D-M4-01-4); the root excludes stay.
+analyzer:
+  exclude:
+    - "test/drift/**/generated/**"
