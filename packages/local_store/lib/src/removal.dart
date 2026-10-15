@@ -55,12 +55,23 @@ extension LocalStoreRemoval on LocalDatabase {
       ).get();
       threadIds.addAll(rows.map((r) => r.read<String>('id')));
     }
-    final paths = await deleteThreads(
-      this,
-      threadIds.toList(),
-      withDrafts: true,
-    );
+    final paths = [
+      ...await deleteThreads(this, threadIds.toList(), withDrafts: true),
+    ];
     final channels = channelIds.toList();
+    if (channels.isNotEmpty) {
+      // Files of the channels that no message attaches any more (an edit dropped the
+      // attachment) still hold cached content of the target (04 8.3 item 3, T-DV-01).
+      final scoped = await customSelect(
+        'SELECT id FROM files WHERE scope_channel_id IN ${placeholders(channels.length)}',
+        variables: textVariables(channels),
+      ).get();
+      paths.addAll(
+        await deleteOrphanFiles(this, [
+          for (final r in scoped) r.read<String>('id'),
+        ]),
+      );
+    }
     await _deleteWhereIn(channels, 'drafts', 'channel_id', {drafts});
     await _deleteWhereIn(channels, 'forum_tags', 'channel_id', {forumTags});
     await _deleteWhereIn(channels, 'channel_operators', 'channel_id', {

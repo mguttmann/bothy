@@ -251,4 +251,16 @@ void main() {
       expect(await db.searchDao.search('secret', limit: 10), isEmpty);
     },
   );
+
+  test('removing a channel deletes its files when no message attaches them any more', () async {
+    await fill(1);
+    await fill(2);
+    // An edit dropped the attachment; metadata and cached bytes of the file stay.
+    await db.messagesDao.putAttachments(messageId(1, 1), const []);
+    final paths = await db.removeTargets([TargetRef.channel(channel(1).id)]);
+    expect(paths, ['cache/file-1']);
+    expect(await db.messagesDao.fileById(file(1).id), isNull);
+    expect(await db.fileCacheDao.entry(file(1).id, 'original'), isNull);
+    expect(await db.messagesDao.fileById(file(2).id), isNotNull);
+  });
 }
