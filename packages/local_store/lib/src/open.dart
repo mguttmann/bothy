@@ -54,8 +54,8 @@ Future<LocalDatabase> openLocalStore({
   if (key.length != databaseKeyBytes) {
     throw const LocalStoreSetupError('the database key must have 32 bytes');
   }
-  // A copy for the setup callback: it is sent to the database isolate, while the caller's list
-  // is cleared below once the connection is open.
+  // A copy for the setup callback, cleared below once the connection is open; the list of the
+  // key source stays with its owner (it may be unmodifiable).
   final keyCopy = Uint8List.fromList(key);
   void setup(Database database) => _setUp(database, keyCopy);
   final QueryExecutor executor = inBackground
