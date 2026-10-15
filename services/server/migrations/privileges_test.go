@@ -129,6 +129,11 @@ var appPrivileges = map[string][]string{
 	// state, a reinstall adds an installation.
 	"apps":              {"SELECT", "INSERT", "UPDATE"},
 	"app_installations": {"SELECT", "INSERT", "UPDATE"},
+	// 03 section 4.11 (M2-26): an owner deletes a subscription with its deliveries
+	// (deleteWebhookSubscription); the retention job of class transient deletes finished
+	// deliveries (M7-05).
+	"webhook_subscriptions": {"SELECT", "INSERT", "UPDATE", "DELETE"},
+	"webhook_deliveries":    {"SELECT", "INSERT", "UPDATE", "DELETE"},
 }
 
 // allPrivileges are the table rights PostgreSQL 18 knows (MAINTAIN since 17).
