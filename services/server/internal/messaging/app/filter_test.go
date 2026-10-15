@@ -10,6 +10,7 @@ import (
 
 	"github.com/OWNER/bothy/services/server/internal/chat"
 	"github.com/OWNER/bothy/services/server/internal/identity"
+	"github.com/OWNER/bothy/services/server/internal/kernel/auditing"
 	"github.com/OWNER/bothy/services/server/internal/kernel/authorize"
 	"github.com/OWNER/bothy/services/server/internal/kernel/errs"
 	"github.com/OWNER/bothy/services/server/internal/kernel/eventlog"
@@ -71,6 +72,10 @@ func (anyone) Principal(_ context.Context, id ids.ID) (identity.PrincipalView, e
 
 // counter (mentions_test.go) records CountError.
 
+// noCursors is the Cursors port that History and Get never call; New requires one since M1-60
+// (INT-W22/5).
+type noCursors struct{ app.Cursors }
+
 // noUoW and noEvents are never used by History.
 type (
 	noUoW    struct{ txn.UnitOfWork }
@@ -91,9 +96,10 @@ func TestHistory_FilterMismatchDropsLogsAndCounts(t *testing.T) {
 	az := &mismatchAuthz{deny: below[1].ID, filtered: true}
 	logs := &httpservertest.LogCapture{}
 	cnt := &counter{}
-	svc, err := app.New(app.Config{MaxContentBytes: 100, MaxMentions: 1, EventPayloadMaxBytes: 100, ListContentMaxBytes: 100, PageSizeDefault: 10, PageSizeMax: 10},
+	svc, err := app.New(app.Config{MaxContentBytes: 100, MaxMentions: 1, EventPayloadMaxBytes: 100, TemplateNameMaxChars: 10, TemplateMaxPerScope: 5, ListContentMaxBytes: 100, PageSizeDefault: 10, PageSizeMax: 10},
 		app.Deps{Store: rowsStore{rows: app.HistoryRows{Below: below}}, UoW: noUoW{}, Authorizer: az, Events: noEvents{},
-			Threads: oneThread{info: chat.ThreadInfo{ID: thread, ChannelID: ch}}, Directory: anyone{}, Log: slog.New(logs), Errors: cnt})
+			Threads: oneThread{info: chat.ThreadInfo{ID: thread, ChannelID: ch}}, Directory: anyone{}, Log: slog.New(logs), Errors: cnt,
+			Cursors: noCursors{}, Redactor: struct{ eventlog.Redactor }{}, Audit: struct{ auditing.Recorder }{}})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -181,8 +187,9 @@ func TestGet_Paths(t *testing.T) {
 		all:     map[ids.ID]domain.Message{visible.ID: visible, gone.ID: gone, scoped.ID: scoped, foreign.ID: foreign, contradicted.ID: contradicted},
 	}
 	az := &decideAuthz{outcomes: map[ids.ID]authorize.Outcome{scoped.ID: authorize.OutcomeForbidden, foreign.ID: authorize.OutcomeNotFound}}
-	svc, err := app.New(app.Config{MaxContentBytes: 100, MaxMentions: 1, EventPayloadMaxBytes: 100, ListContentMaxBytes: 2, PageSizeDefault: 10, PageSizeMax: 10},
-		app.Deps{Store: store, UoW: noUoW{}, Authorizer: az, Events: noEvents{}, Threads: oneThread{}, Directory: anyone{}})
+	svc, err := app.New(app.Config{MaxContentBytes: 100, MaxMentions: 1, EventPayloadMaxBytes: 100, TemplateNameMaxChars: 10, TemplateMaxPerScope: 5, ListContentMaxBytes: 2, PageSizeDefault: 10, PageSizeMax: 10},
+		app.Deps{Store: store, UoW: noUoW{}, Authorizer: az, Events: noEvents{}, Threads: oneThread{}, Directory: anyone{},
+			Cursors: noCursors{}, Redactor: struct{ eventlog.Redactor }{}, Audit: struct{ auditing.Recorder }{}})
 	if err != nil {
 		t.Fatal(err)
 	}

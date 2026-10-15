@@ -20,10 +20,25 @@ var visiblePredicateAllowlist = map[string]string{
 		"the use case authorizes message.create on the thread before it answers with the row",
 	"ListMentions": "the mentions of one message whose row the caller has already read with the visible predicate " +
 		"or written itself, and authorized with message.read or message.create",
+	// The template statements of M1-60 (INT-W22/5): personal templates belong to no channel, and the
+	// writes follow the locked visible read GetVisibleTemplate.
+	"ListPersonalTemplates": "the personal templates of the caller (owner_user_id), which belong to no channel; " +
+		"the use case authorizes template.read on the caller's own user resource",
+	"CountPersonalTemplates": "counts the caller's own personal templates for template.max_per_scope; returns no row content",
+	"CountChannelTemplates": "counts the templates of a channel on which the use case already authorized template.manage; " +
+		"returns no row content",
+	"UpdateTemplate": "writes the template that GetVisibleTemplate read and locked with the visible predicate in the same " +
+		"unit of work after template.manage",
+	"DeleteTemplate": "deletes the template that GetVisibleTemplate read and locked with the visible predicate in the same " +
+		"unit of work after template.manage",
 }
 
 // messagingTables are the tables of the module (03 Grundsatz 12).
 var messagingTables = regexp.MustCompile(`\b(messages|mentions|reactions|pins|message_revisions|message_templates)\b`)
+
+// visiblePredicate is channel_id = ANY( with any spacing; the queries of M1-60 write ANY (
+// (INT-W22/5).
+var visiblePredicate = regexp.MustCompile(`channel_id\s*=\s*ANY\s*\(`)
 
 // readOrChange matches the statements the rule covers.
 var readOrChange = regexp.MustCompile(`(?i)^\s*(WITH|SELECT|UPDATE|DELETE)\b`)
@@ -49,7 +64,7 @@ func TestQueriesCarryVisibleChannelPredicate(t *testing.T) {
 				continue
 			}
 			_, allowed := visiblePredicateAllowlist[name]
-			has := strings.Contains(stmt, "channel_id = ANY(")
+			has := visiblePredicate.MatchString(stmt)
 			if !has && !allowed {
 				t.Errorf("%s: statement %s names a messaging table without channel_id = ANY( and is not in the allowlist", f, name)
 			}

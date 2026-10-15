@@ -67,7 +67,8 @@ func TestMessageInsertsSetSearchLanguage(t *testing.T) {
 		t.Fatal(err)
 	}
 	for _, f := range generated {
-		if filepath.Base(f) == "models.go" {
+		// The table models hold every column; since M1-57 the file is models.gen.go (INT-W22/5).
+		if b := filepath.Base(f); b == "models.go" || b == "models.gen.go" {
 			continue
 		}
 		data, err := os.ReadFile(f) // #nosec G304 -- a generated file of this package.
