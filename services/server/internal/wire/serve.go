@@ -643,31 +643,31 @@ func (s *server) handlers() Handlers {
 	h := s.deps.Handlers
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	if h.Devices == nil && s.identity != nil {
-		h.Devices = s.identity.Handlers
-	}
-	if h.People == nil && s.identity != nil {
-		h.People = s.identity.PeopleHandlers
-	}
-	if h.Sessions == nil && s.identity != nil {
-		h.Sessions = s.identity.SessionHandlers
-	}
-	if h.StepUps == nil && s.identity != nil {
-		h.StepUps = s.identity.StepUpHandlers
-	}
-	if h.Providers == nil && s.identity != nil {
-		h.Providers = s.identity.ProviderHandlers
-	}
-	if h.Credentials == nil && s.identity != nil {
-		h.Credentials = s.identity.CredentialHandlers
-	}
-	if h.Tokens == nil && s.identity != nil {
-		h.Tokens = s.identity.TokenHandlers
+	if s.identity != nil {
+		s.identity.fillHandlers(&h)
 	}
 	if h.Keys == nil && s.signingKeys != nil {
 		h.Keys = s.signingKeys.Handlers
 	}
 	return h
+}
+
+// fillHandlers sets every nil identity handler of h to the one id built (M1-44/18).
+func (id *Identity) fillHandlers(h *Handlers) {
+	fill(&h.Devices, id.Handlers)
+	fill(&h.People, id.PeopleHandlers)
+	fill(&h.Sessions, id.SessionHandlers)
+	fill(&h.StepUps, id.StepUpHandlers)
+	fill(&h.Providers, id.ProviderHandlers)
+	fill(&h.Credentials, id.CredentialHandlers)
+	fill(&h.Tokens, id.TokenHandlers)
+}
+
+// fill sets *dst to built when *dst is nil, so an injected handler stays.
+func fill[T any](dst **T, built *T) {
+	if *dst == nil {
+		*dst = built
+	}
 }
 
 // authorizerOf returns the Authorizer of the process, nil before the step authz ran.
