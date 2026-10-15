@@ -504,6 +504,16 @@ If the counted failed attempts of the session within the window `auth.login_fail
 the limit `auth.step_up_fail_limit`, the server revokes the session (`step_up_failed`). Responses
 are in section 13.
 
+Details of the check (M1-35, docs/DECISIONS.md M1-35): `iat` is an integer NumericDate compared in
+whole seconds, so the lower bound is the issue of the challenge minus `auth.clock_leeway`, cut to the
+second. Unknown payload members are ignored. A header with `jwk`, an `alg` other than the one of the
+active `step_up` key, a signature by any other key, a wrong `challenge` or `sid` and an `iat`
+outside the bounds are wrong confirmations and count. A wrong confirmation answers
+`401 step_up_required` because the right reaction of the client is a new step-up; the one that
+reaches the limit answers `401 session_revoked`. A caller without a session, a session on a `cli`
+device and a device without an active `step_up` key get `403 forbidden` with reason
+`step_up_not_possible`.
+
 Web console: WebAuthn assertion with `userVerification = required` against the passkeys of the
 person. Without a passkey: a new OIDC login with `prompt=login` and `max_age=0`; the server
 requires an `auth_time` after the start of the challenge. Local accounts without a passkey:
@@ -794,6 +804,10 @@ Rules:
 - No information about accounts: an unknown login name and a wrong password give the same response
   in the same time (the server computes an Argon2id hash even for an unknown name).
 - Every lockout and every accumulation creates an audit entry; the owner sees them in the console.
+- Step-up failures are counted per session over `auth_challenges` (`status = 'failed'`,
+  `finished_at` inside `auth.login_fail_window`). The job `identity.auth_cleanup` deletes a
+  challenge after its `expires_at`, but a failed step-up challenge only once its `finished_at` has
+  left `auth.login_fail_window`; otherwise the cleanup would reset the count (M1-35).
 - The failure window of an account starts with the first failed attempt
   (`local_credentials.fail_window_started_at`); a failed attempt after it starts a new window.
   Every request computes exactly one Argon2id hash, also for an unknown name and during a lockout.

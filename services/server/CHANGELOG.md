@@ -22,6 +22,20 @@ documented in this file. The format is based on
   never retries `401` or `403` and ends a channel after its `403` for the run. The test fake
   `discordtest` (TLS on `127.0.0.1`, fixture guild, fault injection, token echo, request log)
   is for later import tickets and never reaches the binary.
+- Step-up with the device key (M1-35): the migration `00012_identity_step_up.sql`
+  (`auth_challenges` with every purpose of 03), the port `identity.StepUp` with
+  `CreateChallenge` and `CompleteWithDeviceKey`, and the operations `createStepUpChallenge` and
+  `completeStepUpWithDeviceKey` (action `auth.step_up`, no `Idempotency-Key`). A challenge is 256
+  random bits stored as HMAC, single use and valid `auth.step_up_challenge_ttl`; the confirmation
+  is a compact JWS by the active `step_up` key of the session's device over `{challenge, sid,
+  iat}` and sets `step_up_at` and `step_up_method = device_key` of that session only. A wrong
+  confirmation is `401 step_up_required` and counts; `auth.step_up_fail_limit` failures within
+  `auth.login_fail_window` revoke the session (`step_up_failed`, `session.revoked`, `401
+  session_revoked`); a caller without a session, a `cli` device and a device without `step_up`
+  key get `403 forbidden` (`step_up_not_possible`). The periodic job `identity.auth_cleanup` on
+  the queue `maintenance` deletes expired challenges and keeps failed step-ups while they count.
+  New configuration keys `auth.step_up_challenge_ttl`, `auth.step_up_fail_limit`,
+  `auth.login_fail_window` and `auth.cleanup_interval`.
 - Sessions, access tokens, refresh families and logout (M1-34): the migration
   `00011_identity_sessions.sql` (`auth_sessions`, `refresh_token_families`, `refresh_tokens`), the
   port `identity.Auth` with `StartSession`, `StartChildSession`, `CreateExtensionSession`,

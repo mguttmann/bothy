@@ -86,14 +86,22 @@ type Identity struct {
 	// SessionHandlers are the REST handlers of refreshToken, logout, listMySessions,
 	// listUserSessions and createExtensionSession; nil until BindSessions.
 	SessionHandlers *identityhttp.Sessions
-	cfg             app.Config
-	repo            *identitypg.Repository
-	uow             txn.UnitOfWork
-	az              authorize.Authorizer
-	writes          IdentityWrites
-	pepper          []byte
-	clk             clock.Clock
-	log             *slog.Logger
+	// StepUps implements the port identity.StepUp (M1-35); nil until BindSessions.
+	StepUps *app.StepUps
+	// StepUpHandlers are the REST handlers of createStepUpChallenge and
+	// completeStepUpWithDeviceKey; nil until BindSessions.
+	StepUpHandlers *identityhttp.StepUps
+	// AuthCleanup is the use case of the job identity.auth_cleanup (M1-35); nil until
+	// BindSessions.
+	AuthCleanup *app.AuthCleanup
+	cfg         app.Config
+	repo        *identitypg.Repository
+	uow         txn.UnitOfWork
+	az          authorize.Authorizer
+	writes      IdentityWrites
+	pepper      []byte
+	clk         clock.Clock
+	log         *slog.Logger
 }
 
 // IdentityWrites are the collaborators of the writing use cases of identity (M1-31): the
@@ -142,7 +150,8 @@ func NewIdentity(cfg app.Config, pool *pg.Pool, uow txn.UnitOfWork, az authorize
 
 // BindSessions builds the session part of identity (M1-34) over the signing keys of instance and
 // the instance id (the issuer of access tokens): the use cases of identity.Auth, the Authenticator
-// of the HTTP chain and the session handlers. The start calls it after the signing keys exist.
+// of the HTTP chain and the session handlers, and the step-up use cases with their handlers and
+// the use case of identity.auth_cleanup (M1-35). The start calls it after the signing keys exist.
 // Errors: a duration, URL or collaborator the use cases refuse.
 func (i *Identity) BindSessions(keys instance.Keys, instanceID ids.ID) error {
 	tokens, err := app.NewAccessTokens(app.AccessTokenConfig{
@@ -162,7 +171,19 @@ func (i *Identity) BindSessions(keys instance.Keys, instanceID ids.ID) error {
 	if err != nil {
 		return err
 	}
+	stepUps, err := app.NewStepUps(i.cfg, i.pepper, app.StepUpDeps{
+		Challenges: i.repo, Sessions: i.repo, Devices: i.repo, Auth: sessions, UoW: i.uow, Authorizer: i.az, Audit: i.writes.Audit,
+		Clock: i.clk,
+	})
+	if err != nil {
+		return err
+	}
+	cleanup, err := app.NewAuthCleanup(i.cfg, i.uow, i.repo, i.clk)
+	if err != nil {
+		return err
+	}
 	i.Sessions, i.Authenticator, i.SessionHandlers = sessions, auth, identityhttp.NewSessions(sessions, i.DPoP)
+	i.StepUps, i.StepUpHandlers, i.AuthCleanup = stepUps, identityhttp.NewStepUps(stepUps), cleanup
 	return nil
 }
 

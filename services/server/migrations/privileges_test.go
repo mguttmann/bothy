@@ -62,6 +62,9 @@ var appPrivileges = map[string][]string{
 	"auth_sessions":          {"SELECT", "INSERT", "UPDATE"},
 	"refresh_token_families": {"SELECT", "INSERT", "UPDATE"},
 	"refresh_tokens":         {"SELECT", "INSERT", "UPDATE"},
+	// 03 auth_challenges (M1-35): transient single-use challenges; the job identity.auth_cleanup
+	// deletes the expired rows.
+	"auth_challenges": {"SELECT", "INSERT", "UPDATE", "DELETE"},
 }
 
 // allPrivileges are the table rights PostgreSQL 18 knows (MAINTAIN since 17).
