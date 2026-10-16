@@ -77,7 +77,10 @@ func (s *Service) LoginWithTrustedHeader(ctx context.Context, in identity.Truste
 		_ = s.d.Audit.RecordDenial(ctx, headerDenial(causeHeaderAbsent, p.ID, ids.ID{}))
 		return identity.RedeemResult{}, errs.New(errs.CodeUnauthenticated, "")
 	}
-	proof, err := s.d.DPoP.Verify(ctx, in.Proof)
+	if in.Console && in.EnrollmentCode != "" {
+		return identity.RedeemResult{}, consoleFormRefused(fieldEnrollmentCode)
+	}
+	proof, err := s.verifyLoginProof(ctx, in.Console, in.Proof)
 	if err != nil {
 		return identity.RedeemResult{}, err
 	}
@@ -99,7 +102,7 @@ func (s *Service) LoginWithTrustedHeader(ctx context.Context, in identity.Truste
 	if err != nil {
 		return identity.RedeemResult{}, s.headerFailed(ctx, err, p.ID, matched.ID)
 	}
-	res := identity.RedeemResult{Tokens: out.Tokens}
+	res := out.Result()
 	if proof.NonceStale {
 		res.Nonce = s.d.DPoP.CurrentNonce()
 	}
@@ -119,7 +122,7 @@ func (s *Service) headerLogin(ctx context.Context, hl headerLoginInput, matched 
 	}
 	c := LoginCompletion{
 		AuthMethod: identity.AuthTrustedHeader, Device: hl.in.Device, ProofJKT: hl.jkt, Trust: TrustUnconfirmed,
-		ClientIP: hl.in.ClientIP, ProviderID: hl.provider.ID, AllowPending: true,
+		ClientIP: hl.in.ClientIP, ProviderID: hl.provider.ID, AllowPending: true, Console: hl.in.Console,
 	}
 	ident, found, err := s.d.Identities.ActiveIdentityBySubject(ctx, hl.provider.ID, hl.login)
 	switch {

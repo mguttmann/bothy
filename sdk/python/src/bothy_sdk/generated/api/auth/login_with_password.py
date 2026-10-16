@@ -4,19 +4,21 @@ from typing import Any
 import httpx
 
 from ...client import AuthenticatedClient, Client
+from ...models.console_session import ConsoleSession
 from ...models.password_login_request import PasswordLoginRequest
 from ...models.problem import Problem
 from ...models.token_response import TokenResponse
-from ...types import Response
+from ...types import UNSET, Response, Unset
 
 
 def _get_kwargs(
     *,
     body: PasswordLoginRequest,
-    d_po_p: str,
+    d_po_p: str | Unset = UNSET,
 ) -> dict[str, Any]:
     headers: dict[str, Any] = {}
-    headers["DPoP"] = d_po_p
+    if not isinstance(d_po_p, Unset):
+        headers["DPoP"] = d_po_p
 
     _kwargs: dict[str, Any] = {
         "method": "post",
@@ -33,7 +35,12 @@ def _get_kwargs(
 
 def _parse_response(
     *, client: AuthenticatedClient | Client, response: httpx.Response
-) -> Problem | TokenResponse:
+) -> ConsoleSession | Problem | TokenResponse:
+    if response.status_code == 200:
+        response_200 = ConsoleSession.from_dict(response.json())
+
+        return response_200
+
     if response.status_code == 201:
         response_201 = TokenResponse.from_dict(response.json())
 
@@ -66,7 +73,7 @@ def _parse_response(
 
 def _build_response(
     *, client: AuthenticatedClient | Client, response: httpx.Response
-) -> Response[Problem | TokenResponse]:
+) -> Response[ConsoleSession | Problem | TokenResponse]:
     return Response(
         status_code=HTTPStatus(response.status_code),
         content=response.content,
@@ -79,8 +86,8 @@ def sync_detailed(
     *,
     client: AuthenticatedClient | Client,
     body: PasswordLoginRequest,
-    d_po_p: str,
-) -> Response[Problem | TokenResponse]:
+    d_po_p: str | Unset = UNSET,
+) -> Response[ConsoleSession | Problem | TokenResponse]:
     """Log in with local password and TOTP
 
      Fallback for local accounts. 404 when `auth.local_password_enabled` is false. A new device stays
@@ -88,7 +95,7 @@ def sync_detailed(
     `401`.
 
     Args:
-        d_po_p (str):
+        d_po_p (str | Unset):
         body (PasswordLoginRequest):
 
     Raises:
@@ -96,7 +103,7 @@ def sync_detailed(
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        Response[Problem | TokenResponse]
+        Response[ConsoleSession | Problem | TokenResponse]
     """
 
     kwargs = _get_kwargs(
@@ -115,8 +122,8 @@ def sync(
     *,
     client: AuthenticatedClient | Client,
     body: PasswordLoginRequest,
-    d_po_p: str,
-) -> Problem | TokenResponse | None:
+    d_po_p: str | Unset = UNSET,
+) -> ConsoleSession | Problem | TokenResponse | None:
     """Log in with local password and TOTP
 
      Fallback for local accounts. 404 when `auth.local_password_enabled` is false. A new device stays
@@ -124,7 +131,7 @@ def sync(
     `401`.
 
     Args:
-        d_po_p (str):
+        d_po_p (str | Unset):
         body (PasswordLoginRequest):
 
     Raises:
@@ -132,7 +139,7 @@ def sync(
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        Problem | TokenResponse
+        ConsoleSession | Problem | TokenResponse
     """
 
     return sync_detailed(
@@ -146,8 +153,8 @@ async def asyncio_detailed(
     *,
     client: AuthenticatedClient | Client,
     body: PasswordLoginRequest,
-    d_po_p: str,
-) -> Response[Problem | TokenResponse]:
+    d_po_p: str | Unset = UNSET,
+) -> Response[ConsoleSession | Problem | TokenResponse]:
     """Log in with local password and TOTP
 
      Fallback for local accounts. 404 when `auth.local_password_enabled` is false. A new device stays
@@ -155,7 +162,7 @@ async def asyncio_detailed(
     `401`.
 
     Args:
-        d_po_p (str):
+        d_po_p (str | Unset):
         body (PasswordLoginRequest):
 
     Raises:
@@ -163,7 +170,7 @@ async def asyncio_detailed(
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        Response[Problem | TokenResponse]
+        Response[ConsoleSession | Problem | TokenResponse]
     """
 
     kwargs = _get_kwargs(
@@ -180,8 +187,8 @@ async def asyncio(
     *,
     client: AuthenticatedClient | Client,
     body: PasswordLoginRequest,
-    d_po_p: str,
-) -> Problem | TokenResponse | None:
+    d_po_p: str | Unset = UNSET,
+) -> ConsoleSession | Problem | TokenResponse | None:
     """Log in with local password and TOTP
 
      Fallback for local accounts. 404 when `auth.local_password_enabled` is false. A new device stays
@@ -189,7 +196,7 @@ async def asyncio(
     `401`.
 
     Args:
-        d_po_p (str):
+        d_po_p (str | Unset):
         body (PasswordLoginRequest):
 
     Raises:
@@ -197,7 +204,7 @@ async def asyncio(
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        Problem | TokenResponse
+        ConsoleSession | Problem | TokenResponse
     """
 
     return (

@@ -395,6 +395,12 @@ func (a *Authorizer) authorize(ctx context.Context, p authorize.Principal, act a
 		return authorize.Decision{}, err
 	}
 	t := a.clock.Now()
+	if p != nil && !p.ViewAsPerson().IsZero() &&
+		domain.ViewAsExempt(string(act), domain.ExemptTarget{Kind: string(r.Kind), ID: r.ID, OwnerID: r.OwnerID}, p.PrincipalID(), p.SessionRef()) {
+		// Ending the view, logging out, the step-up and reading oneself are decided without the
+		// stored view (R-AZ-32, M6-01).
+		p = withoutViewAs{p}
+	}
 	if d, anonymous := anonymousDecision(p, req); anonymous {
 		return d, nil
 	}
@@ -543,3 +549,21 @@ func anonymousDecision(p authorize.Principal, req domain.Expr) (d authorize.Deci
 
 // isPublic reports a requirement that is exactly Public.
 func isPublic(e domain.Expr) bool { return e.String() == domain.Public.String() }
+
+// withoutViewAs is a principal whose "View as person" is hidden from a decision (R-AZ-32); every
+// other fact, including the credential state the authenticator read, is the one of the principal.
+type withoutViewAs struct{ authorize.Principal }
+
+// ViewAsPerson implements authorize.Principal: none.
+func (withoutViewAs) ViewAsPerson() ids.ID { return ids.ID{} }
+
+// ViewAsStart implements authorize.Principal: none.
+func (withoutViewAs) ViewAsStart() time.Time { return time.Time{} }
+
+// CredentialState forwards authorize.CredentialObserver of the wrapped principal.
+func (w withoutViewAs) CredentialState() (sessionActive bool, deviceState string, deviceKeyActive, observed bool) {
+	if o, ok := w.Principal.(authorize.CredentialObserver); ok {
+		return o.CredentialState()
+	}
+	return false, "", false, false
+}

@@ -21,6 +21,7 @@ enabled:             # operationIds that have a handler; sorted ascending
   - beginPairing
   - beginPasskeyLogin
   - beginPasskeyRegistration
+  - beginStepUpOidcReauth
   - closeThread
   - completeEnrollment
   - completeIdentityLink
@@ -28,6 +29,7 @@ enabled:             # operationIds that have a handler; sorted ascending
   - completePairing
   - completePasskeyLogin
   - completePasskeyRegistration
+  - completeStepUpOidcReauth
   - completeStepUpWithDeviceKey
   - completeStepUpWithPasskey
   - confirmHost
@@ -65,12 +67,14 @@ enabled:             # operationIds that have a handler; sorted ascending
   - disableUser
   - enableAgent
   - enableUser
+  - endViewAs
   - explainChannelAccess
   - explainSpaceAccess
   - exportAuditEvents
   - getAgent
   - getApp
   - getChannel
+  - getConsoleSession
   - getDevice
   - getDiscovery
   - getGrant
@@ -175,6 +179,7 @@ enabled:             # operationIds that have a handler; sorted ascending
   - setSpaceOperator
   - setThreadTags
   - setThreadTitle
+  - stepUpWithPassword
   - suspendApp
   - uninstallApp
   - unlinkIdentity

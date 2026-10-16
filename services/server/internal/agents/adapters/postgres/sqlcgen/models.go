@@ -158,6 +158,8 @@ type AuthSession struct {
 	LastIp           *netip.Addr
 	RevokedAt        pgtype.Timestamptz
 	RevokeReason     pgtype.Text
+	ViewAsUserID     pgtype.UUID
+	ViewAsStartedAt  pgtype.Timestamptz
 }
 
 type Channel struct {

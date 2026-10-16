@@ -9,9 +9,11 @@ import 'package:built_value/serializer.dart';
 import 'package:dio/dio.dart';
 
 import 'package:api_client/src/generated/api_util.dart';
+import 'package:api_client/src/generated/model/console_session.dart';
 import 'package:api_client/src/generated/model/enroll_begin_request.dart';
 import 'package:api_client/src/generated/model/enroll_complete_request.dart';
 import 'package:api_client/src/generated/model/enroll_redeem_request.dart';
+import 'package:api_client/src/generated/model/identity_link_complete.dart';
 import 'package:api_client/src/generated/model/oidc_begin_request.dart';
 import 'package:api_client/src/generated/model/oidc_begin_response.dart';
 import 'package:api_client/src/generated/model/oidc_complete_request.dart';
@@ -25,7 +27,9 @@ import 'package:api_client/src/generated/model/password_login_request.dart';
 import 'package:api_client/src/generated/model/problem.dart';
 import 'package:api_client/src/generated/model/step_up_challenge.dart';
 import 'package:api_client/src/generated/model/step_up_device_key_request.dart';
+import 'package:api_client/src/generated/model/step_up_oidc_begin_request.dart';
 import 'package:api_client/src/generated/model/step_up_passkey_request.dart';
+import 'package:api_client/src/generated/model/step_up_password_request.dart';
 import 'package:api_client/src/generated/model/step_up_result.dart';
 import 'package:api_client/src/generated/model/token_refresh_request.dart';
 import 'package:api_client/src/generated/model/token_response.dart';
@@ -401,6 +405,113 @@ class AuthApi {
     );
   }
 
+  /// Start a console step-up with OIDC
+  ///
+  ///
+  /// Parameters:
+  /// * [stepUpOidcBeginRequest]
+  /// * [xConsoleRequest] - CSRF header of the console (SEC-CORS-4).
+  /// * [cancelToken] - A [CancelToken] that can be used to cancel the operation
+  /// * [headers] - Can be used to add additional headers to the request
+  /// * [extras] - Can be used to add flags to the request
+  /// * [validateStatus] - A [ValidateStatus] callback that can be used to determine request success based on the HTTP status of the response
+  /// * [onSendProgress] - A [ProgressCallback] that can be used to get the send progress
+  /// * [onReceiveProgress] - A [ProgressCallback] that can be used to get the receive progress
+  ///
+  /// Returns a [Future] containing a [Response] with a [OidcBeginResponse] as data
+  /// Throws [DioException] if API call or serialization fails
+  Future<Response<OidcBeginResponse>> beginStepUpOidcReauth({
+    required StepUpOidcBeginRequest stepUpOidcBeginRequest,
+    String? xConsoleRequest,
+    CancelToken? cancelToken,
+    Map<String, dynamic>? headers,
+    Map<String, dynamic>? extra,
+    ValidateStatus? validateStatus,
+    ProgressCallback? onSendProgress,
+    ProgressCallback? onReceiveProgress,
+  }) async {
+    final _path = r'/auth/step-up/oidc';
+    final _options = Options(
+      method: r'POST',
+      headers: <String, dynamic>{
+        if (xConsoleRequest != null) r'X-Console-Request': xConsoleRequest,
+        ...?headers,
+      },
+      extra: <String, dynamic>{
+        'secure': <Map<String, String>>[
+          {
+            'type': 'apiKey',
+            'name': 'consoleSession',
+            'keyName': '__Host-console_session',
+            'where': '',
+          },
+          {'type': 'http', 'scheme': 'DPoP', 'name': 'dpopAuth'},
+          {'type': 'http', 'scheme': 'bearer', 'name': 'bearerAuth'},
+        ],
+        ...?extra,
+      },
+      contentType: 'application/json',
+      validateStatus: validateStatus,
+    );
+
+    dynamic _bodyData;
+
+    try {
+      const _type = FullType(StepUpOidcBeginRequest);
+      _bodyData = _serializers.serialize(
+        stepUpOidcBeginRequest,
+        specifiedType: _type,
+      );
+    } catch (error, stackTrace) {
+      throw DioException(
+        requestOptions: _options.compose(_dio.options, _path),
+        type: DioExceptionType.unknown,
+        error: error,
+        stackTrace: stackTrace,
+      );
+    }
+
+    final _response = await _dio.request<Object>(
+      _path,
+      data: _bodyData,
+      options: _options,
+      cancelToken: cancelToken,
+      onSendProgress: onSendProgress,
+      onReceiveProgress: onReceiveProgress,
+    );
+
+    OidcBeginResponse? _responseData;
+
+    try {
+      final rawResponse = _response.data;
+      _responseData = rawResponse == null
+          ? null
+          : _serializers.deserialize(
+              rawResponse,
+              specifiedType: const FullType(OidcBeginResponse),
+            ) as OidcBeginResponse;
+    } catch (error, stackTrace) {
+      throw DioException(
+        requestOptions: _response.requestOptions,
+        response: _response,
+        type: DioExceptionType.unknown,
+        error: error,
+        stackTrace: stackTrace,
+      );
+    }
+
+    return Response<OidcBeginResponse>(
+      data: _responseData,
+      headers: _response.headers,
+      isRedirect: _response.isRedirect,
+      requestOptions: _response.requestOptions,
+      redirects: _response.redirects,
+      statusCode: _response.statusCode,
+      statusMessage: _response.statusMessage,
+      extra: _response.extra,
+    );
+  }
+
   /// Register the first passkey and log in
   /// Registers the first passkey and logs in; the enrollment code of the challenge is redeemed in the same transaction and the device becomes &#x60;active&#x60;. A failed verification counts as a failed attempt of the code. Every rejection gives &#x60;401&#x60;.
   ///
@@ -497,8 +608,8 @@ class AuthApi {
   ///
   ///
   /// Parameters:
-  /// * [dPoP] - DPoP proof (RFC 9449) signed with the device key that the new tokens will be bound to.
   /// * [oidcCompleteRequest]
+  /// * [dPoP] - As `DpopProof`; not for `client = console`.
   /// * [cancelToken] - A [CancelToken] that can be used to cancel the operation
   /// * [headers] - Can be used to add additional headers to the request
   /// * [extras] - Can be used to add flags to the request
@@ -506,11 +617,11 @@ class AuthApi {
   /// * [onSendProgress] - A [ProgressCallback] that can be used to get the send progress
   /// * [onReceiveProgress] - A [ProgressCallback] that can be used to get the receive progress
   ///
-  /// Returns a [Future] containing a [Response] with a [TokenResponse] as data
+  /// Returns a [Future] containing a [Response] with a [ConsoleSession] as data
   /// Throws [DioException] if API call or serialization fails
-  Future<Response<TokenResponse>> completeOidcLogin({
-    required String dPoP,
+  Future<Response<ConsoleSession>> completeOidcLogin({
     required OidcCompleteRequest oidcCompleteRequest,
+    String? dPoP,
     CancelToken? cancelToken,
     Map<String, dynamic>? headers,
     Map<String, dynamic>? extra,
@@ -521,7 +632,7 @@ class AuthApi {
     final _path = r'/auth/oidc/complete';
     final _options = Options(
       method: r'POST',
-      headers: <String, dynamic>{r'DPoP': dPoP, ...?headers},
+      headers: <String, dynamic>{if (dPoP != null) r'DPoP': dPoP, ...?headers},
       extra: <String, dynamic>{'secure': <Map<String, String>>[], ...?extra},
       contentType: 'application/json',
       validateStatus: validateStatus,
@@ -553,7 +664,7 @@ class AuthApi {
       onReceiveProgress: onReceiveProgress,
     );
 
-    TokenResponse? _responseData;
+    ConsoleSession? _responseData;
 
     try {
       final rawResponse = _response.data;
@@ -561,8 +672,8 @@ class AuthApi {
           ? null
           : _serializers.deserialize(
               rawResponse,
-              specifiedType: const FullType(TokenResponse),
-            ) as TokenResponse;
+              specifiedType: const FullType(ConsoleSession),
+            ) as ConsoleSession;
     } catch (error, stackTrace) {
       throw DioException(
         requestOptions: _response.requestOptions,
@@ -573,7 +684,7 @@ class AuthApi {
       );
     }
 
-    return Response<TokenResponse>(
+    return Response<ConsoleSession>(
       data: _responseData,
       headers: _response.headers,
       isRedirect: _response.isRedirect,
@@ -681,8 +792,8 @@ class AuthApi {
   /// Completes a passkey login with a DPoP proof of the device key. A new device stays &#x60;pending&#x60; until approved; a known active device stays active. Every rejection gives the same &#x60;401&#x60; body.
   ///
   /// Parameters:
-  /// * [dPoP] - DPoP proof (RFC 9449) signed with the device key that the new tokens will be bound to.
   /// * [passkeyLoginCompleteRequest]
+  /// * [dPoP] - As `DpopProof`; not for `client = console`.
   /// * [cancelToken] - A [CancelToken] that can be used to cancel the operation
   /// * [headers] - Can be used to add additional headers to the request
   /// * [extras] - Can be used to add flags to the request
@@ -690,11 +801,11 @@ class AuthApi {
   /// * [onSendProgress] - A [ProgressCallback] that can be used to get the send progress
   /// * [onReceiveProgress] - A [ProgressCallback] that can be used to get the receive progress
   ///
-  /// Returns a [Future] containing a [Response] with a [TokenResponse] as data
+  /// Returns a [Future] containing a [Response] with a [ConsoleSession] as data
   /// Throws [DioException] if API call or serialization fails
-  Future<Response<TokenResponse>> completePasskeyLogin({
-    required String dPoP,
+  Future<Response<ConsoleSession>> completePasskeyLogin({
     required PasskeyLoginCompleteRequest passkeyLoginCompleteRequest,
+    String? dPoP,
     CancelToken? cancelToken,
     Map<String, dynamic>? headers,
     Map<String, dynamic>? extra,
@@ -705,7 +816,7 @@ class AuthApi {
     final _path = r'/auth/passkey/complete';
     final _options = Options(
       method: r'POST',
-      headers: <String, dynamic>{r'DPoP': dPoP, ...?headers},
+      headers: <String, dynamic>{if (dPoP != null) r'DPoP': dPoP, ...?headers},
       extra: <String, dynamic>{'secure': <Map<String, String>>[], ...?extra},
       contentType: 'application/json',
       validateStatus: validateStatus,
@@ -737,7 +848,7 @@ class AuthApi {
       onReceiveProgress: onReceiveProgress,
     );
 
-    TokenResponse? _responseData;
+    ConsoleSession? _responseData;
 
     try {
       final rawResponse = _response.data;
@@ -745,8 +856,8 @@ class AuthApi {
           ? null
           : _serializers.deserialize(
               rawResponse,
-              specifiedType: const FullType(TokenResponse),
-            ) as TokenResponse;
+              specifiedType: const FullType(ConsoleSession),
+            ) as ConsoleSession;
     } catch (error, stackTrace) {
       throw DioException(
         requestOptions: _response.requestOptions,
@@ -757,7 +868,114 @@ class AuthApi {
       );
     }
 
-    return Response<TokenResponse>(
+    return Response<ConsoleSession>(
+      data: _responseData,
+      headers: _response.headers,
+      isRedirect: _response.isRedirect,
+      requestOptions: _response.requestOptions,
+      redirects: _response.redirects,
+      statusCode: _response.statusCode,
+      statusMessage: _response.statusMessage,
+      extra: _response.extra,
+    );
+  }
+
+  /// Finish a console step-up with OIDC
+  ///
+  ///
+  /// Parameters:
+  /// * [identityLinkComplete]
+  /// * [xConsoleRequest] - CSRF header of the console (SEC-CORS-4).
+  /// * [cancelToken] - A [CancelToken] that can be used to cancel the operation
+  /// * [headers] - Can be used to add additional headers to the request
+  /// * [extras] - Can be used to add flags to the request
+  /// * [validateStatus] - A [ValidateStatus] callback that can be used to determine request success based on the HTTP status of the response
+  /// * [onSendProgress] - A [ProgressCallback] that can be used to get the send progress
+  /// * [onReceiveProgress] - A [ProgressCallback] that can be used to get the receive progress
+  ///
+  /// Returns a [Future] containing a [Response] with a [StepUpResult] as data
+  /// Throws [DioException] if API call or serialization fails
+  Future<Response<StepUpResult>> completeStepUpOidcReauth({
+    required IdentityLinkComplete identityLinkComplete,
+    String? xConsoleRequest,
+    CancelToken? cancelToken,
+    Map<String, dynamic>? headers,
+    Map<String, dynamic>? extra,
+    ValidateStatus? validateStatus,
+    ProgressCallback? onSendProgress,
+    ProgressCallback? onReceiveProgress,
+  }) async {
+    final _path = r'/auth/step-up/oidc/complete';
+    final _options = Options(
+      method: r'POST',
+      headers: <String, dynamic>{
+        if (xConsoleRequest != null) r'X-Console-Request': xConsoleRequest,
+        ...?headers,
+      },
+      extra: <String, dynamic>{
+        'secure': <Map<String, String>>[
+          {
+            'type': 'apiKey',
+            'name': 'consoleSession',
+            'keyName': '__Host-console_session',
+            'where': '',
+          },
+          {'type': 'http', 'scheme': 'DPoP', 'name': 'dpopAuth'},
+          {'type': 'http', 'scheme': 'bearer', 'name': 'bearerAuth'},
+        ],
+        ...?extra,
+      },
+      contentType: 'application/json',
+      validateStatus: validateStatus,
+    );
+
+    dynamic _bodyData;
+
+    try {
+      const _type = FullType(IdentityLinkComplete);
+      _bodyData = _serializers.serialize(
+        identityLinkComplete,
+        specifiedType: _type,
+      );
+    } catch (error, stackTrace) {
+      throw DioException(
+        requestOptions: _options.compose(_dio.options, _path),
+        type: DioExceptionType.unknown,
+        error: error,
+        stackTrace: stackTrace,
+      );
+    }
+
+    final _response = await _dio.request<Object>(
+      _path,
+      data: _bodyData,
+      options: _options,
+      cancelToken: cancelToken,
+      onSendProgress: onSendProgress,
+      onReceiveProgress: onReceiveProgress,
+    );
+
+    StepUpResult? _responseData;
+
+    try {
+      final rawResponse = _response.data;
+      _responseData = rawResponse == null
+          ? null
+          : _serializers.deserialize(
+              rawResponse,
+              specifiedType: const FullType(StepUpResult),
+            ) as StepUpResult;
+    } catch (error, stackTrace) {
+      throw DioException(
+        requestOptions: _response.requestOptions,
+        response: _response,
+        type: DioExceptionType.unknown,
+        error: error,
+        stackTrace: stackTrace,
+      );
+    }
+
+    return Response<StepUpResult>(
       data: _responseData,
       headers: _response.headers,
       isRedirect: _response.isRedirect,
@@ -798,6 +1016,12 @@ class AuthApi {
       headers: <String, dynamic>{...?headers},
       extra: <String, dynamic>{
         'secure': <Map<String, String>>[
+          {
+            'type': 'apiKey',
+            'name': 'consoleSession',
+            'keyName': '__Host-console_session',
+            'where': '',
+          },
           {'type': 'http', 'scheme': 'DPoP', 'name': 'dpopAuth'},
           {'type': 'http', 'scheme': 'bearer', 'name': 'bearerAuth'},
         ],
@@ -870,6 +1094,7 @@ class AuthApi {
   ///
   /// Parameters:
   /// * [stepUpPasskeyRequest]
+  /// * [xConsoleRequest] - CSRF header of the console (SEC-CORS-4).
   /// * [cancelToken] - A [CancelToken] that can be used to cancel the operation
   /// * [headers] - Can be used to add additional headers to the request
   /// * [extras] - Can be used to add flags to the request
@@ -881,6 +1106,7 @@ class AuthApi {
   /// Throws [DioException] if API call or serialization fails
   Future<Response<StepUpResult>> completeStepUpWithPasskey({
     required StepUpPasskeyRequest stepUpPasskeyRequest,
+    String? xConsoleRequest,
     CancelToken? cancelToken,
     Map<String, dynamic>? headers,
     Map<String, dynamic>? extra,
@@ -891,9 +1117,18 @@ class AuthApi {
     final _path = r'/auth/step-up/passkey';
     final _options = Options(
       method: r'POST',
-      headers: <String, dynamic>{...?headers},
+      headers: <String, dynamic>{
+        if (xConsoleRequest != null) r'X-Console-Request': xConsoleRequest,
+        ...?headers,
+      },
       extra: <String, dynamic>{
         'secure': <Map<String, String>>[
+          {
+            'type': 'apiKey',
+            'name': 'consoleSession',
+            'keyName': '__Host-console_session',
+            'where': '',
+          },
           {'type': 'http', 'scheme': 'DPoP', 'name': 'dpopAuth'},
           {'type': 'http', 'scheme': 'bearer', 'name': 'bearerAuth'},
         ],
@@ -965,6 +1200,7 @@ class AuthApi {
   ///
   ///
   /// Parameters:
+  /// * [xConsoleRequest] - CSRF header of the console (SEC-CORS-4).
   /// * [cancelToken] - A [CancelToken] that can be used to cancel the operation
   /// * [headers] - Can be used to add additional headers to the request
   /// * [extras] - Can be used to add flags to the request
@@ -975,6 +1211,7 @@ class AuthApi {
   /// Returns a [Future] containing a [Response] with a [StepUpChallenge] as data
   /// Throws [DioException] if API call or serialization fails
   Future<Response<StepUpChallenge>> createStepUpChallenge({
+    String? xConsoleRequest,
     CancelToken? cancelToken,
     Map<String, dynamic>? headers,
     Map<String, dynamic>? extra,
@@ -985,9 +1222,18 @@ class AuthApi {
     final _path = r'/auth/step-up/challenge';
     final _options = Options(
       method: r'POST',
-      headers: <String, dynamic>{...?headers},
+      headers: <String, dynamic>{
+        if (xConsoleRequest != null) r'X-Console-Request': xConsoleRequest,
+        ...?headers,
+      },
       extra: <String, dynamic>{
         'secure': <Map<String, String>>[
+          {
+            'type': 'apiKey',
+            'name': 'consoleSession',
+            'keyName': '__Host-console_session',
+            'where': '',
+          },
           {'type': 'http', 'scheme': 'DPoP', 'name': 'dpopAuth'},
           {'type': 'http', 'scheme': 'bearer', 'name': 'bearerAuth'},
         ],
@@ -1025,6 +1271,144 @@ class AuthApi {
     }
 
     return Response<StepUpChallenge>(
+      data: _responseData,
+      headers: _response.headers,
+      isRedirect: _response.isRedirect,
+      requestOptions: _response.requestOptions,
+      redirects: _response.redirects,
+      statusCode: _response.statusCode,
+      statusMessage: _response.statusMessage,
+      extra: _response.extra,
+    );
+  }
+
+  /// End the stored view as person
+  ///
+  ///
+  /// Parameters:
+  /// * [xConsoleRequest] - CSRF header of the console (SEC-CORS-4).
+  /// * [cancelToken] - A [CancelToken] that can be used to cancel the operation
+  /// * [headers] - Can be used to add additional headers to the request
+  /// * [extras] - Can be used to add flags to the request
+  /// * [validateStatus] - A [ValidateStatus] callback that can be used to determine request success based on the HTTP status of the response
+  /// * [onSendProgress] - A [ProgressCallback] that can be used to get the send progress
+  /// * [onReceiveProgress] - A [ProgressCallback] that can be used to get the receive progress
+  ///
+  /// Returns a [Future]
+  /// Throws [DioException] if API call or serialization fails
+  Future<Response<void>> endViewAs({
+    String? xConsoleRequest,
+    CancelToken? cancelToken,
+    Map<String, dynamic>? headers,
+    Map<String, dynamic>? extra,
+    ValidateStatus? validateStatus,
+    ProgressCallback? onSendProgress,
+    ProgressCallback? onReceiveProgress,
+  }) async {
+    final _path = r'/console/session/view-as';
+    final _options = Options(
+      method: r'DELETE',
+      headers: <String, dynamic>{
+        if (xConsoleRequest != null) r'X-Console-Request': xConsoleRequest,
+        ...?headers,
+      },
+      extra: <String, dynamic>{
+        'secure': <Map<String, String>>[
+          {
+            'type': 'apiKey',
+            'name': 'consoleSession',
+            'keyName': '__Host-console_session',
+            'where': '',
+          },
+          {'type': 'http', 'scheme': 'DPoP', 'name': 'dpopAuth'},
+          {'type': 'http', 'scheme': 'bearer', 'name': 'bearerAuth'},
+        ],
+        ...?extra,
+      },
+      validateStatus: validateStatus,
+    );
+
+    final _response = await _dio.request<Object>(
+      _path,
+      options: _options,
+      cancelToken: cancelToken,
+      onSendProgress: onSendProgress,
+      onReceiveProgress: onReceiveProgress,
+    );
+
+    return _response;
+  }
+
+  /// Read the console session
+  ///
+  ///
+  /// Parameters:
+  /// * [cancelToken] - A [CancelToken] that can be used to cancel the operation
+  /// * [headers] - Can be used to add additional headers to the request
+  /// * [extras] - Can be used to add flags to the request
+  /// * [validateStatus] - A [ValidateStatus] callback that can be used to determine request success based on the HTTP status of the response
+  /// * [onSendProgress] - A [ProgressCallback] that can be used to get the send progress
+  /// * [onReceiveProgress] - A [ProgressCallback] that can be used to get the receive progress
+  ///
+  /// Returns a [Future] containing a [Response] with a [ConsoleSession] as data
+  /// Throws [DioException] if API call or serialization fails
+  Future<Response<ConsoleSession>> getConsoleSession({
+    CancelToken? cancelToken,
+    Map<String, dynamic>? headers,
+    Map<String, dynamic>? extra,
+    ValidateStatus? validateStatus,
+    ProgressCallback? onSendProgress,
+    ProgressCallback? onReceiveProgress,
+  }) async {
+    final _path = r'/console/session';
+    final _options = Options(
+      method: r'GET',
+      headers: <String, dynamic>{...?headers},
+      extra: <String, dynamic>{
+        'secure': <Map<String, String>>[
+          {
+            'type': 'apiKey',
+            'name': 'consoleSession',
+            'keyName': '__Host-console_session',
+            'where': '',
+          },
+          {'type': 'http', 'scheme': 'DPoP', 'name': 'dpopAuth'},
+          {'type': 'http', 'scheme': 'bearer', 'name': 'bearerAuth'},
+        ],
+        ...?extra,
+      },
+      validateStatus: validateStatus,
+    );
+
+    final _response = await _dio.request<Object>(
+      _path,
+      options: _options,
+      cancelToken: cancelToken,
+      onSendProgress: onSendProgress,
+      onReceiveProgress: onReceiveProgress,
+    );
+
+    ConsoleSession? _responseData;
+
+    try {
+      final rawResponse = _response.data;
+      _responseData = rawResponse == null
+          ? null
+          : _serializers.deserialize(
+              rawResponse,
+              specifiedType: const FullType(ConsoleSession),
+            ) as ConsoleSession;
+    } catch (error, stackTrace) {
+      throw DioException(
+        requestOptions: _response.requestOptions,
+        response: _response,
+        type: DioExceptionType.unknown,
+        error: error,
+        stackTrace: stackTrace,
+      );
+    }
+
+    return Response<ConsoleSession>(
       data: _responseData,
       headers: _response.headers,
       isRedirect: _response.isRedirect,
@@ -1140,8 +1524,8 @@ class AuthApi {
   /// Fallback for local accounts. 404 when &#x60;auth.local_password_enabled&#x60; is false. A new device stays &#x60;pending&#x60; until approved (08, 5.2). Unknown names, wrong passwords and locked accounts give the same &#x60;401&#x60;.
   ///
   /// Parameters:
-  /// * [dPoP] - DPoP proof (RFC 9449) signed with the device key that the new tokens will be bound to.
   /// * [passwordLoginRequest]
+  /// * [dPoP] - As `DpopProof`; not for `client = console`.
   /// * [cancelToken] - A [CancelToken] that can be used to cancel the operation
   /// * [headers] - Can be used to add additional headers to the request
   /// * [extras] - Can be used to add flags to the request
@@ -1149,11 +1533,11 @@ class AuthApi {
   /// * [onSendProgress] - A [ProgressCallback] that can be used to get the send progress
   /// * [onReceiveProgress] - A [ProgressCallback] that can be used to get the receive progress
   ///
-  /// Returns a [Future] containing a [Response] with a [TokenResponse] as data
+  /// Returns a [Future] containing a [Response] with a [ConsoleSession] as data
   /// Throws [DioException] if API call or serialization fails
-  Future<Response<TokenResponse>> loginWithPassword({
-    required String dPoP,
+  Future<Response<ConsoleSession>> loginWithPassword({
     required PasswordLoginRequest passwordLoginRequest,
+    String? dPoP,
     CancelToken? cancelToken,
     Map<String, dynamic>? headers,
     Map<String, dynamic>? extra,
@@ -1164,7 +1548,7 @@ class AuthApi {
     final _path = r'/auth/password/login';
     final _options = Options(
       method: r'POST',
-      headers: <String, dynamic>{r'DPoP': dPoP, ...?headers},
+      headers: <String, dynamic>{if (dPoP != null) r'DPoP': dPoP, ...?headers},
       extra: <String, dynamic>{'secure': <Map<String, String>>[], ...?extra},
       contentType: 'application/json',
       validateStatus: validateStatus,
@@ -1196,7 +1580,7 @@ class AuthApi {
       onReceiveProgress: onReceiveProgress,
     );
 
-    TokenResponse? _responseData;
+    ConsoleSession? _responseData;
 
     try {
       final rawResponse = _response.data;
@@ -1204,8 +1588,8 @@ class AuthApi {
           ? null
           : _serializers.deserialize(
               rawResponse,
-              specifiedType: const FullType(TokenResponse),
-            ) as TokenResponse;
+              specifiedType: const FullType(ConsoleSession),
+            ) as ConsoleSession;
     } catch (error, stackTrace) {
       throw DioException(
         requestOptions: _response.requestOptions,
@@ -1216,7 +1600,7 @@ class AuthApi {
       );
     }
 
-    return Response<TokenResponse>(
+    return Response<ConsoleSession>(
       data: _responseData,
       headers: _response.headers,
       isRedirect: _response.isRedirect,
@@ -1232,8 +1616,8 @@ class AuthApi {
   /// Only enabled when the server listens on loopback and a &#x60;trusted_header&#x60; provider is active; otherwise 404.
   ///
   /// Parameters:
-  /// * [dPoP] - DPoP proof (RFC 9449) signed with the device key that the new tokens will be bound to.
   /// * [trustedHeaderLoginRequest]
+  /// * [dPoP] - As `DpopProof`; not for `client = console`.
   /// * [cancelToken] - A [CancelToken] that can be used to cancel the operation
   /// * [headers] - Can be used to add additional headers to the request
   /// * [extras] - Can be used to add flags to the request
@@ -1241,11 +1625,11 @@ class AuthApi {
   /// * [onSendProgress] - A [ProgressCallback] that can be used to get the send progress
   /// * [onReceiveProgress] - A [ProgressCallback] that can be used to get the receive progress
   ///
-  /// Returns a [Future] containing a [Response] with a [TokenResponse] as data
+  /// Returns a [Future] containing a [Response] with a [ConsoleSession] as data
   /// Throws [DioException] if API call or serialization fails
-  Future<Response<TokenResponse>> loginWithTrustedHeader({
-    required String dPoP,
+  Future<Response<ConsoleSession>> loginWithTrustedHeader({
     required TrustedHeaderLoginRequest trustedHeaderLoginRequest,
+    String? dPoP,
     CancelToken? cancelToken,
     Map<String, dynamic>? headers,
     Map<String, dynamic>? extra,
@@ -1256,7 +1640,7 @@ class AuthApi {
     final _path = r'/auth/trusted-header/login';
     final _options = Options(
       method: r'POST',
-      headers: <String, dynamic>{r'DPoP': dPoP, ...?headers},
+      headers: <String, dynamic>{if (dPoP != null) r'DPoP': dPoP, ...?headers},
       extra: <String, dynamic>{'secure': <Map<String, String>>[], ...?extra},
       contentType: 'application/json',
       validateStatus: validateStatus,
@@ -1288,7 +1672,7 @@ class AuthApi {
       onReceiveProgress: onReceiveProgress,
     );
 
-    TokenResponse? _responseData;
+    ConsoleSession? _responseData;
 
     try {
       final rawResponse = _response.data;
@@ -1296,8 +1680,8 @@ class AuthApi {
           ? null
           : _serializers.deserialize(
               rawResponse,
-              specifiedType: const FullType(TokenResponse),
-            ) as TokenResponse;
+              specifiedType: const FullType(ConsoleSession),
+            ) as ConsoleSession;
     } catch (error, stackTrace) {
       throw DioException(
         requestOptions: _response.requestOptions,
@@ -1308,7 +1692,7 @@ class AuthApi {
       );
     }
 
-    return Response<TokenResponse>(
+    return Response<ConsoleSession>(
       data: _responseData,
       headers: _response.headers,
       isRedirect: _response.isRedirect,
@@ -1324,6 +1708,7 @@ class AuthApi {
   ///
   ///
   /// Parameters:
+  /// * [xConsoleRequest] - CSRF header of the console (SEC-CORS-4).
   /// * [cancelToken] - A [CancelToken] that can be used to cancel the operation
   /// * [headers] - Can be used to add additional headers to the request
   /// * [extras] - Can be used to add flags to the request
@@ -1334,6 +1719,7 @@ class AuthApi {
   /// Returns a [Future]
   /// Throws [DioException] if API call or serialization fails
   Future<Response<void>> logout({
+    String? xConsoleRequest,
     CancelToken? cancelToken,
     Map<String, dynamic>? headers,
     Map<String, dynamic>? extra,
@@ -1344,9 +1730,18 @@ class AuthApi {
     final _path = r'/auth/logout';
     final _options = Options(
       method: r'POST',
-      headers: <String, dynamic>{...?headers},
+      headers: <String, dynamic>{
+        if (xConsoleRequest != null) r'X-Console-Request': xConsoleRequest,
+        ...?headers,
+      },
       extra: <String, dynamic>{
         'secure': <Map<String, String>>[
+          {
+            'type': 'apiKey',
+            'name': 'consoleSession',
+            'keyName': '__Host-console_session',
+            'where': '',
+          },
           {'type': 'http', 'scheme': 'DPoP', 'name': 'dpopAuth'},
           {'type': 'http', 'scheme': 'bearer', 'name': 'bearerAuth'},
         ],
@@ -1539,6 +1934,113 @@ class AuthApi {
     }
 
     return Response<TokenResponse>(
+      data: _responseData,
+      headers: _response.headers,
+      isRedirect: _response.isRedirect,
+      requestOptions: _response.requestOptions,
+      redirects: _response.redirects,
+      statusCode: _response.statusCode,
+      statusMessage: _response.statusMessage,
+      extra: _response.extra,
+    );
+  }
+
+  /// Console step-up with password and TOTP
+  ///
+  ///
+  /// Parameters:
+  /// * [stepUpPasswordRequest]
+  /// * [xConsoleRequest] - CSRF header of the console (SEC-CORS-4).
+  /// * [cancelToken] - A [CancelToken] that can be used to cancel the operation
+  /// * [headers] - Can be used to add additional headers to the request
+  /// * [extras] - Can be used to add flags to the request
+  /// * [validateStatus] - A [ValidateStatus] callback that can be used to determine request success based on the HTTP status of the response
+  /// * [onSendProgress] - A [ProgressCallback] that can be used to get the send progress
+  /// * [onReceiveProgress] - A [ProgressCallback] that can be used to get the receive progress
+  ///
+  /// Returns a [Future] containing a [Response] with a [StepUpResult] as data
+  /// Throws [DioException] if API call or serialization fails
+  Future<Response<StepUpResult>> stepUpWithPassword({
+    required StepUpPasswordRequest stepUpPasswordRequest,
+    String? xConsoleRequest,
+    CancelToken? cancelToken,
+    Map<String, dynamic>? headers,
+    Map<String, dynamic>? extra,
+    ValidateStatus? validateStatus,
+    ProgressCallback? onSendProgress,
+    ProgressCallback? onReceiveProgress,
+  }) async {
+    final _path = r'/auth/step-up/password';
+    final _options = Options(
+      method: r'POST',
+      headers: <String, dynamic>{
+        if (xConsoleRequest != null) r'X-Console-Request': xConsoleRequest,
+        ...?headers,
+      },
+      extra: <String, dynamic>{
+        'secure': <Map<String, String>>[
+          {
+            'type': 'apiKey',
+            'name': 'consoleSession',
+            'keyName': '__Host-console_session',
+            'where': '',
+          },
+          {'type': 'http', 'scheme': 'DPoP', 'name': 'dpopAuth'},
+          {'type': 'http', 'scheme': 'bearer', 'name': 'bearerAuth'},
+        ],
+        ...?extra,
+      },
+      contentType: 'application/json',
+      validateStatus: validateStatus,
+    );
+
+    dynamic _bodyData;
+
+    try {
+      const _type = FullType(StepUpPasswordRequest);
+      _bodyData = _serializers.serialize(
+        stepUpPasswordRequest,
+        specifiedType: _type,
+      );
+    } catch (error, stackTrace) {
+      throw DioException(
+        requestOptions: _options.compose(_dio.options, _path),
+        type: DioExceptionType.unknown,
+        error: error,
+        stackTrace: stackTrace,
+      );
+    }
+
+    final _response = await _dio.request<Object>(
+      _path,
+      data: _bodyData,
+      options: _options,
+      cancelToken: cancelToken,
+      onSendProgress: onSendProgress,
+      onReceiveProgress: onReceiveProgress,
+    );
+
+    StepUpResult? _responseData;
+
+    try {
+      final rawResponse = _response.data;
+      _responseData = rawResponse == null
+          ? null
+          : _serializers.deserialize(
+              rawResponse,
+              specifiedType: const FullType(StepUpResult),
+            ) as StepUpResult;
+    } catch (error, stackTrace) {
+      throw DioException(
+        requestOptions: _response.requestOptions,
+        response: _response,
+        type: DioExceptionType.unknown,
+        error: error,
+        stackTrace: stackTrace,
+      );
+    }
+
+    return Response<StepUpResult>(
       data: _responseData,
       headers: _response.headers,
       isRedirect: _response.isRedirect,

@@ -5,6 +5,7 @@
 // ignore_for_file: unused_element
 import 'package:built_collection/built_collection.dart';
 import 'package:api_client/src/generated/model/device_registration.dart';
+import 'package:api_client/src/generated/model/login_client.dart';
 import 'package:built_value/json_object.dart';
 import 'package:built_value/built_value.dart';
 import 'package:built_value/serializer.dart';
@@ -14,6 +15,7 @@ part 'passkey_login_complete_request.g.dart';
 /// PasskeyLoginCompleteRequest
 ///
 /// Properties:
+/// * [client]
 /// * [challengeId] - UUIDv7 (RFC 9562), lowercase canonical form.
 /// * [credential] - WebAuthn `PublicKeyCredential` in JSON form.
 /// * [device]
@@ -21,6 +23,10 @@ part 'passkey_login_complete_request.g.dart';
 abstract class PasskeyLoginCompleteRequest
     implements
         Built<PasskeyLoginCompleteRequest, PasskeyLoginCompleteRequestBuilder> {
+  @BuiltValueField(wireName: r'client')
+  LoginClient? get client;
+  // enum clientEnum {  app,  console,  };
+
   /// UUIDv7 (RFC 9562), lowercase canonical form.
   @BuiltValueField(wireName: r'challenge_id')
   String get challengeId;
@@ -30,7 +36,7 @@ abstract class PasskeyLoginCompleteRequest
   BuiltMap<String, JsonObject?> get credential;
 
   @BuiltValueField(wireName: r'device')
-  DeviceRegistration get device;
+  DeviceRegistration? get device;
 
   PasskeyLoginCompleteRequest._();
 
@@ -62,6 +68,13 @@ class _$PasskeyLoginCompleteRequestSerializer
     PasskeyLoginCompleteRequest object, {
     FullType specifiedType = FullType.unspecified,
   }) sync* {
+    if (object.client != null) {
+      yield r'client';
+      yield serializers.serialize(
+        object.client,
+        specifiedType: const FullType(LoginClient),
+      );
+    }
     yield r'challenge_id';
     yield serializers.serialize(
       object.challengeId,
@@ -75,11 +88,13 @@ class _$PasskeyLoginCompleteRequestSerializer
         FullType.nullable(JsonObject),
       ]),
     );
-    yield r'device';
-    yield serializers.serialize(
-      object.device,
-      specifiedType: const FullType(DeviceRegistration),
-    );
+    if (object.device != null) {
+      yield r'device';
+      yield serializers.serialize(
+        object.device,
+        specifiedType: const FullType(DeviceRegistration),
+      );
+    }
   }
 
   @override
@@ -107,6 +122,14 @@ class _$PasskeyLoginCompleteRequestSerializer
       final key = serializedList[i] as String;
       final value = serializedList[i + 1];
       switch (key) {
+        case r'client':
+          final valueDes = serializers.deserialize(
+            value,
+            specifiedType: const FullType.nullable(LoginClient),
+          ) as LoginClient?;
+          if (valueDes == null) continue;
+          result.client = valueDes;
+          break;
         case r'challenge_id':
           final valueDes = serializers.deserialize(
             value,
@@ -127,8 +150,9 @@ class _$PasskeyLoginCompleteRequestSerializer
         case r'device':
           final valueDes = serializers.deserialize(
             value,
-            specifiedType: const FullType(DeviceRegistration),
-          ) as DeviceRegistration;
+            specifiedType: const FullType.nullable(DeviceRegistration),
+          ) as DeviceRegistration?;
+          if (valueDes == null) continue;
           result.device.replace(valueDes);
           break;
         default:

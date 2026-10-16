@@ -34,6 +34,9 @@ type LocalCredentialResult struct {
 // PasswordLogin is the input of LocalCredentials.LoginWithPassword (schema PasswordLoginRequest
 // plus the request facts).
 type PasswordLogin struct {
+	// Console selects the console form (client = console, M6-01): no Device and no Proof; the
+	// login registers a web device and starts a console session with a cookie instead of tokens.
+	Console bool
 	// LoginName is the subject of the local identity as typed; it is trimmed and lowercased.
 	LoginName string
 	// Password and TOTPCode are the secrets of the attempt; they are never logged.

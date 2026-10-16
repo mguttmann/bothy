@@ -66,8 +66,13 @@ func (h *Sessions) RefreshToken(ctx context.Context, req rest.RefreshTokenReques
 
 // Logout implements rest.StrictServerInterface (POST /auth/logout).
 func (h *Sessions) Logout(ctx context.Context, _ rest.LogoutRequestObject) (rest.LogoutResponseObject, error) {
-	if err := h.auth.Logout(ctx, principal(ctx)); err != nil {
+	a := principal(ctx)
+	if err := h.auth.Logout(ctx, a); err != nil {
 		return nil, err
+	}
+	if a.ClientComponent == string(identity.ComponentConsole) {
+		// The console cookie ends with its session (D-M6-01-2).
+		return rest.Logout204Response{Headers: rest.Logout204ResponseHeaders{SetCookie: clearCookie()}}, nil
 	}
 	return rest.Logout204Response{}, nil
 }

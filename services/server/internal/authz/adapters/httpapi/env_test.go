@@ -60,7 +60,8 @@ var idCfg = identityapp.Config{
 	HandleMaxChars: 32, DisplayNameMaxChars: 64, DPoPNonceTTL: 5 * time.Minute, DPoPProofMaxAge: time.Minute,
 	ClockLeeway: 30 * time.Second, PublicURL: httpservertest.PublicURL, PageSizeDefault: 2, PageSizeMax: 3,
 	StepUpMaxAge: 5 * time.Minute, AccessTokenTTL: 30 * time.Minute, RefreshTokenTTL: 14 * 24 * time.Hour,
-	SessionMaxAge: 30 * 24 * time.Hour, RefreshReuseGrace: 30 * time.Second, LastActiveGranularity: 5 * time.Minute,
+	SessionMaxAge: 30 * 24 * time.Hour, ConsoleSessionMaxAge: 12 * time.Hour,
+	ConsoleSessionIdleTimeout: 30 * time.Minute, ViewAsMaxDuration: 15 * time.Minute, RefreshReuseGrace: 30 * time.Second, LastActiveGranularity: 5 * time.Minute,
 	StepUpChallengeTTL: 2 * time.Minute, StepUpFailLimit: 3, LoginFailWindow: 15 * time.Minute, CleanupInterval: time.Hour,
 	APITokenMaxTTL: 365 * 24 * time.Hour, PersonalTokenMaxTTL: 90 * 24 * time.Hour, DPoPRequiredFor: []string{"agent"},
 	// The keys of M1-37, M1-38, M1-40, M1-41 and M1-45, which NewIdentity requires (INT-W14/7).

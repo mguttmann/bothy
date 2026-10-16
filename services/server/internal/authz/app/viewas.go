@@ -10,11 +10,17 @@ import (
 	"github.com/OWNER/bothy/services/server/internal/kernel/actor"
 	"github.com/OWNER/bothy/services/server/internal/kernel/auditing"
 	"github.com/OWNER/bothy/services/server/internal/kernel/authorize"
+	"github.com/OWNER/bothy/services/server/internal/kernel/errs"
 	"github.com/OWNER/bothy/services/server/internal/kernel/ids"
 )
 
 // The audit attributes of access.view_as (brief M1-49): ids and times, never names.
-const attrTargetUserID = "target_user_id"
+const (
+	attrTargetUserID = "target_user_id"
+	attrStartedAt    = "started_at"
+	// consoleComponent is actor.Actor.ClientComponent of a console session (M6-01).
+	consoleComponent = "console"
+)
 
 // ViewAs implements authz.Admin (access.view_as, 07 section 9.2, brief M1-49). authorize decides
 // access.view_as on the person (owner in a session, step-up; Authorize audits every denial); an
@@ -22,7 +28,9 @@ const attrTargetUserID = "target_user_id"
 // the caller gets actor.ViewAs, and Scope and the rights of authorize with that context give the
 // visible spaces and channels, so the rights are the intersection of owner and person (07 section
 // 4.2 step 4). Direct messages (SR6) and archived structure never appear. The allow entry with
-// target_user_id and expires_at is written in a unit of work. In M1 the view lives only in this
+// target_user_id and expires_at is written in a unit of work. Called from a console session, the
+// view is also stored on the session with its start in that unit of work (R-DM-49, M6-01), so
+// every later request of the session carries it; from any other session it lives only in this
 // request.
 func (s *AdminService) ViewAs(ctx context.Context, caller actor.Actor, userID ids.ID) (authz.ViewAsSnapshot, error) {
 	ctx, err := withCaller(ctx, caller)
@@ -53,10 +61,19 @@ func (s *AdminService) ViewAs(ctx context.Context, caller actor.Actor, userID id
 	if out.Spaces, out.Channels, err = viewOfPerson(ctx, eng, as); err != nil {
 		return authz.ViewAsSnapshot{}, err
 	}
+	console := caller.ClientComponent == consoleComponent
+	if console && s.d.Views == nil {
+		return authz.ViewAsSnapshot{}, errs.New(errs.CodeInternalError, "authz: a console view without the console view store")
+	}
 	err = s.d.UoW.Do(ctx, func(ctx context.Context) error {
-		return s.record(ctx, authorize.ActionAccessViewAs, authorize.ResourceUser, userID, auditing.Attrs{
-			attrTargetUserID: auditing.ID(userID), attrExpiresAt: auditing.Time(out.ExpiresAt),
-		})
+		attrs := auditing.Attrs{attrTargetUserID: auditing.ID(userID), attrExpiresAt: auditing.Time(out.ExpiresAt)}
+		if console {
+			if err := s.d.Views.StartView(ctx, caller.SessionID, userID, start); err != nil {
+				return err
+			}
+			attrs[attrStartedAt] = auditing.Time(start)
+		}
+		return s.record(ctx, authorize.ActionAccessViewAs, authorize.ResourceUser, userID, attrs)
 	})
 	if err != nil {
 		return authz.ViewAsSnapshot{}, err

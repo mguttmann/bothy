@@ -87,6 +87,8 @@ func TestConfigSchemaBuilds(t *testing.T) {
 		"auth.dpop_nonce_ttl":                  {Kind: config.KindDuration, Default: "5m", Min: "1s", Chapter: "08-identity.md"},
 		"auth.session_max_age":                 {Kind: config.KindDuration, Default: "30d", Min: "1m", Chapter: "03-data-model.md"},
 		"auth.refresh_token_ttl":               {Kind: config.KindDuration, Default: "14d", Min: "1m", Chapter: "03-data-model.md"},
+		"auth.console_session_max_age":         {Kind: config.KindDuration, Default: "12h", Min: "1m", Chapter: "08-identity.md"},
+		"auth.console_session_idle_timeout":    {Kind: config.KindDuration, Default: "30m", Min: "1m", Chapter: "08-identity.md"},
 		"auth.refresh_reuse_grace":             {Kind: config.KindDuration, Default: "30s", Min: "0s", Chapter: "03-data-model.md"},
 		"identity.last_active_granularity":     {Kind: config.KindDuration, Default: "5m", Min: "0s", Chapter: "03-data-model.md"},
 		"auth.step_up_challenge_ttl":           {Kind: config.KindDuration, Default: "2m", Min: "1s", Chapter: "08-identity.md"},

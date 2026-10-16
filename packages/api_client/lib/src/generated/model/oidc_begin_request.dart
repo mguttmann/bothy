@@ -3,6 +3,7 @@
 //
 
 // ignore_for_file: unused_element
+import 'package:api_client/src/generated/model/login_client.dart';
 import 'package:built_value/built_value.dart';
 import 'package:built_value/serializer.dart';
 
@@ -11,6 +12,7 @@ part 'oidc_begin_request.g.dart';
 /// OidcBeginRequest
 ///
 /// Properties:
+/// * [client]
 /// * [providerId] - UUIDv7 (RFC 9562), lowercase canonical form.
 /// * [appRedirectUri] - Redirect target of the app (loopback or claimed scheme, RFC 8252). Must match the allow-list of the provider.
 /// * [clientChallenge] - Base64url SHA-256 of a client verifier, binds the later `login_code` to this app instance.
@@ -18,6 +20,10 @@ part 'oidc_begin_request.g.dart';
 @BuiltValue()
 abstract class OidcBeginRequest
     implements Built<OidcBeginRequest, OidcBeginRequestBuilder> {
+  @BuiltValueField(wireName: r'client')
+  LoginClient? get client;
+  // enum clientEnum {  app,  console,  };
+
   /// UUIDv7 (RFC 9562), lowercase canonical form.
   @BuiltValueField(wireName: r'provider_id')
   String get providerId;
@@ -60,6 +66,13 @@ class _$OidcBeginRequestSerializer
     OidcBeginRequest object, {
     FullType specifiedType = FullType.unspecified,
   }) sync* {
+    if (object.client != null) {
+      yield r'client';
+      yield serializers.serialize(
+        object.client,
+        specifiedType: const FullType(LoginClient),
+      );
+    }
     yield r'provider_id';
     yield serializers.serialize(
       object.providerId,
@@ -109,6 +122,14 @@ class _$OidcBeginRequestSerializer
       final key = serializedList[i] as String;
       final value = serializedList[i + 1];
       switch (key) {
+        case r'client':
+          final valueDes = serializers.deserialize(
+            value,
+            specifiedType: const FullType.nullable(LoginClient),
+          ) as LoginClient?;
+          if (valueDes == null) continue;
+          result.client = valueDes;
+          break;
         case r'provider_id':
           final valueDes = serializers.deserialize(
             value,

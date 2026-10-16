@@ -128,7 +128,7 @@ func (q *Queries) LockLiveDevicesOfUser(ctx context.Context, userID pgtype.UUID)
 }
 
 const lockLiveSessionsOfDevice = `-- name: LockLiveSessionsOfDevice :many
-SELECT id, user_id, device_id, client_component, parent_session_id, identity_id, auth_method, cookie_hash, created_at, expires_at, step_up_at, step_up_method, step_up_consumed_at, last_seen_at, last_ip, revoked_at, revoke_reason FROM auth_sessions
+SELECT id, user_id, device_id, client_component, parent_session_id, identity_id, auth_method, cookie_hash, created_at, expires_at, step_up_at, step_up_method, step_up_consumed_at, last_seen_at, last_ip, revoked_at, revoke_reason, view_as_user_id, view_as_started_at FROM auth_sessions
 WHERE device_id = $1 AND revoked_at IS NULL
 ORDER BY id
 FOR UPDATE
@@ -162,6 +162,8 @@ func (q *Queries) LockLiveSessionsOfDevice(ctx context.Context, deviceID pgtype.
 			&i.LastIp,
 			&i.RevokedAt,
 			&i.RevokeReason,
+			&i.ViewAsUserID,
+			&i.ViewAsStartedAt,
 		); err != nil {
 			return nil, err
 		}
@@ -174,7 +176,7 @@ func (q *Queries) LockLiveSessionsOfDevice(ctx context.Context, deviceID pgtype.
 }
 
 const lockLiveSessionsOfUser = `-- name: LockLiveSessionsOfUser :many
-SELECT id, user_id, device_id, client_component, parent_session_id, identity_id, auth_method, cookie_hash, created_at, expires_at, step_up_at, step_up_method, step_up_consumed_at, last_seen_at, last_ip, revoked_at, revoke_reason FROM auth_sessions
+SELECT id, user_id, device_id, client_component, parent_session_id, identity_id, auth_method, cookie_hash, created_at, expires_at, step_up_at, step_up_method, step_up_consumed_at, last_seen_at, last_ip, revoked_at, revoke_reason, view_as_user_id, view_as_started_at FROM auth_sessions
 WHERE user_id = $1 AND revoked_at IS NULL
 ORDER BY id
 FOR UPDATE
@@ -208,6 +210,8 @@ func (q *Queries) LockLiveSessionsOfUser(ctx context.Context, userID pgtype.UUID
 			&i.LastIp,
 			&i.RevokedAt,
 			&i.RevokeReason,
+			&i.ViewAsUserID,
+			&i.ViewAsStartedAt,
 		); err != nil {
 			return nil, err
 		}

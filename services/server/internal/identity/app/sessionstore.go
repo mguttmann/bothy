@@ -27,6 +27,10 @@ type SessionRecord struct {
 	LastSeenAt       time.Time
 	RevokedAt        time.Time
 	RevokeReason     identity.SessionRevokeReason
+	// ViewAsUserID and ViewAsStartedAt are "View as person" stored on a console session
+	// (R-DM-49, M6-01); zero for none.
+	ViewAsUserID    ids.ID
+	ViewAsStartedAt time.Time
 	// LastIP is last_ip as InsertSession writes it; the zero Addr stands for NULL. Reads leave it
 	// zero (the session store reads no address).
 	LastIP netip.Addr

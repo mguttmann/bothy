@@ -83,6 +83,9 @@ from .auth_provider_info import AuthProviderInfo
 from .autocomplete_answer import AutocompleteAnswer
 from .autocomplete_query import AutocompleteQuery
 from .autocomplete_result import AutocompleteResult
+from .begin_step_up_oidc_reauth_x_console_request import (
+    BeginStepUpOidcReauthXConsoleRequest,
+)
 from .billing_evidence import BillingEvidence
 from .billing_evidence_key_type import BillingEvidenceKeyType
 from .billing_mode import BillingMode
@@ -143,6 +146,12 @@ from .command_option import CommandOption
 from .command_option_type import CommandOptionType
 from .command_option_value import CommandOptionValue
 from .command_register import CommandRegister
+from .complete_step_up_oidc_reauth_x_console_request import (
+    CompleteStepUpOidcReauthXConsoleRequest,
+)
+from .complete_step_up_with_passkey_x_console_request import (
+    CompleteStepUpWithPasskeyXConsoleRequest,
+)
 from .component import Component
 from .component_create import ComponentCreate
 from .component_restriction import ComponentRestriction
@@ -150,6 +159,12 @@ from .component_state import ComponentState
 from .component_type import ComponentType
 from .component_update import ComponentUpdate
 from .component_update_state import ComponentUpdateState
+from .console_session import ConsoleSession
+from .console_session_step_up_method import ConsoleSessionStepUpMethod
+from .console_session_step_up_methods_available_item import (
+    ConsoleSessionStepUpMethodsAvailableItem,
+)
+from .console_session_view_as import ConsoleSessionViewAs
 from .consumer_ack import ConsumerAck
 from .consumer_state import ConsumerState
 from .cost_breakdown import CostBreakdown
@@ -160,6 +175,9 @@ from .cost_reconcile import CostReconcile
 from .cost_reconcile_result import CostReconcileResult
 from .cost_report import CostReport
 from .cost_series import CostSeries
+from .create_step_up_challenge_x_console_request import (
+    CreateStepUpChallengeXConsoleRequest,
+)
 from .credential_holder_set import CredentialHolderSet
 from .credential_overview import CredentialOverview
 from .delete_notification_preference_target_kind import (
@@ -192,6 +210,7 @@ from .draft_put_result import DraftPutResult
 from .draft_ref import DraftRef
 from .draft_updated_event import DraftUpdatedEvent
 from .draft_updated_event_type import DraftUpdatedEventType
+from .end_view_as_x_console_request import EndViewAsXConsoleRequest
 from .enroll_begin_request import EnrollBeginRequest
 from .enroll_complete_request import EnrollCompleteRequest
 from .enroll_redeem_request import EnrollRedeemRequest
@@ -394,6 +413,8 @@ from .level_or_none import LevelOrNone
 from .llm_credentials import LlmCredentials
 from .local_credential_result import LocalCredentialResult
 from .local_credential_set import LocalCredentialSet
+from .login_client import LoginClient
+from .logout_x_console_request import LogoutXConsoleRequest
 from .manifest_validation import ManifestValidation
 from .me import Me
 from .mention_item import MentionItem
@@ -627,8 +648,11 @@ from .status_updated_event_type import StatusUpdatedEventType
 from .status_updated_payload import StatusUpdatedPayload
 from .step_up_challenge import StepUpChallenge
 from .step_up_device_key_request import StepUpDeviceKeyRequest
+from .step_up_oidc_begin_request import StepUpOidcBeginRequest
 from .step_up_passkey_request import StepUpPasskeyRequest
+from .step_up_password_request import StepUpPasswordRequest
 from .step_up_result import StepUpResult
+from .step_up_with_password_x_console_request import StepUpWithPasswordXConsoleRequest
 from .target_kind import TargetKind
 from .template import Template
 from .template_create import TemplateCreate
@@ -817,6 +841,7 @@ __all__ = (
     "AutocompleteAnswer",
     "AutocompleteQuery",
     "AutocompleteResult",
+    "BeginStepUpOidcReauthXConsoleRequest",
     "BillingEvidence",
     "BillingEvidenceKeyType",
     "BillingMode",
@@ -875,6 +900,8 @@ __all__ = (
     "CommandOptionType",
     "CommandOptionValue",
     "CommandRegister",
+    "CompleteStepUpOidcReauthXConsoleRequest",
+    "CompleteStepUpWithPasskeyXConsoleRequest",
     "Component",
     "ComponentCreate",
     "ComponentRestriction",
@@ -882,6 +909,10 @@ __all__ = (
     "ComponentType",
     "ComponentUpdate",
     "ComponentUpdateState",
+    "ConsoleSession",
+    "ConsoleSessionStepUpMethod",
+    "ConsoleSessionStepUpMethodsAvailableItem",
+    "ConsoleSessionViewAs",
     "ConsumerAck",
     "ConsumerState",
     "CostBreakdown",
@@ -892,6 +923,7 @@ __all__ = (
     "CostReconcileResult",
     "CostReport",
     "CostSeries",
+    "CreateStepUpChallengeXConsoleRequest",
     "CredentialHolderSet",
     "CredentialOverview",
     "DeleteNotificationPreferenceTargetKind",
@@ -922,6 +954,7 @@ __all__ = (
     "DraftRef",
     "DraftUpdatedEvent",
     "DraftUpdatedEventType",
+    "EndViewAsXConsoleRequest",
     "EnrollBeginRequest",
     "EnrollCompleteRequest",
     "EnrollRedeemRequest",
@@ -1122,6 +1155,8 @@ __all__ = (
     "LlmCredentials",
     "LocalCredentialResult",
     "LocalCredentialSet",
+    "LoginClient",
+    "LogoutXConsoleRequest",
     "ManifestValidation",
     "Me",
     "MentionItem",
@@ -1355,8 +1390,11 @@ __all__ = (
     "StatusUpdatedPayload",
     "StepUpChallenge",
     "StepUpDeviceKeyRequest",
+    "StepUpOidcBeginRequest",
     "StepUpPasskeyRequest",
+    "StepUpPasswordRequest",
     "StepUpResult",
+    "StepUpWithPasswordXConsoleRequest",
     "TargetKind",
     "Template",
     "TemplateCreate",

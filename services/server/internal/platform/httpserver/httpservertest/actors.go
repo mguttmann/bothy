@@ -14,8 +14,8 @@ import (
 )
 
 // Actors is a test actor.Authenticator over named bearer tokens: "Authorization: Bearer <name>"
-// authenticates as the actor registered under name, a request without Authorization is
-// anonymous, anything else 401 unauthenticated. Handler tests register the principals they need
+// authenticates as the actor registered under name, a console cookie registered with SetCookie as
+// its actor, a request without credentials is anonymous, anything else 401 unauthenticated. Handler tests register the principals they need
 // with the builders below (M1-31). It is safe for concurrent use.
 type Actors struct {
 	mu sync.Mutex
@@ -39,8 +39,26 @@ func (s *Actors) Get(name string) actor.Actor {
 	return s.m[name]
 }
 
+// SetCookie registers a under the console cookie value (M6-01): a request with that cookie and
+// without Authorization authenticates as a.
+func (s *Actors) SetCookie(value string, a actor.Actor) {
+	s.Set(cookiePrefix+value, a)
+}
+
+// cookiePrefix keeps the cookie values apart from the token names.
+const cookiePrefix = "cookie\x00"
+
 // Authenticate implements actor.Authenticator.
 func (s *Actors) Authenticate(_ context.Context, c actor.Credentials) (actor.Actor, error) {
+	if c.Authorization == "" && !c.ConsoleCookie.IsZero() {
+		s.mu.Lock()
+		a, ok := s.m[cookiePrefix+c.ConsoleCookie.Reveal()]
+		s.mu.Unlock()
+		if ok {
+			return a, nil
+		}
+		return actor.Actor{}, errs.New(errs.CodeUnauthenticated, "")
+	}
 	if c.Authorization == "" {
 		return actor.Anonymous(), nil
 	}

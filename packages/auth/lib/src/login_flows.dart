@@ -18,6 +18,7 @@ import 'package:auth/src/session_core.dart';
 import 'package:auth/src/tokens.dart';
 import 'package:built_collection/built_collection.dart';
 import 'package:built_value/json_object.dart';
+import 'package:built_value/serializer.dart';
 import 'package:dio/dio.dart';
 import 'package:domain/domain.dart';
 
@@ -267,9 +268,9 @@ final class LoginService {
     }
     final device = await registerDeviceFields();
     return _complete(
-      () => _auth.completeOidcLogin(
-        dPoP: proofFromInterceptor,
-        oidcCompleteRequest: OidcCompleteRequest(
+      () => _appLogin(
+        _oidcCompletePath,
+        OidcCompleteRequest(
           (b) => b
             ..loginCode = code
             ..clientVerifier = pkce.verifier
@@ -293,9 +294,9 @@ final class LoginService {
     if (totp == null || totp.isEmpty) return const LoginNeedsSecondFactor();
     final device = await registerDeviceFields();
     return _complete(
-      () => _auth.loginWithPassword(
-        dPoP: proofFromInterceptor,
-        passwordLoginRequest: PasswordLoginRequest(
+      () => _appLogin(
+        _passwordLoginPath,
+        PasswordLoginRequest(
           (b) => b
             ..loginName = loginName
             ..password = password
@@ -311,9 +312,9 @@ final class LoginService {
   Future<LoginOutcome> loginWithTrustedHeader({String? enrollmentCode}) async {
     final device = await registerDeviceFields();
     return _complete(
-      () => _auth.loginWithTrustedHeader(
-        dPoP: proofFromInterceptor,
-        trustedHeaderLoginRequest: TrustedHeaderLoginRequest(
+      () => _appLogin(
+        _trustedHeaderLoginPath,
+        TrustedHeaderLoginRequest(
           (b) => b
             ..device.replace(device)
             ..enrollmentCode = enrollmentCode == null
@@ -344,9 +345,9 @@ final class LoginService {
     final credential = await passkeys.getAssertion(_plain(challenge.publicKey));
     final device = await registerDeviceFields();
     return _complete(
-      () => _auth.completePasskeyLogin(
-        dPoP: proofFromInterceptor,
-        passkeyLoginCompleteRequest: PasskeyLoginCompleteRequest(
+      () => _appLogin(
+        _passkeyCompletePath,
+        PasskeyLoginCompleteRequest(
           (b) => b
             ..challengeId = challenge.challengeId
             ..credential.replace(_json(credential))
@@ -561,6 +562,62 @@ final class LoginService {
   Future<LoginOutcome> _complete(
     Future<Response<TokenResponse>> Function() call,
   ) async => (await _completeOrWait(call))!;
+
+  // The four login operations with a console form (docs/DECISIONS.md D-M6-01-11).
+  static const _oidcCompletePath = '/auth/oidc/complete';
+  static const _passwordLoginPath = '/auth/password/login';
+  static const _trustedHeaderLoginPath = '/auth/trusted-header/login';
+  static const _passkeyCompletePath = '/auth/passkey/complete';
+
+  /// Sends the app form of a login operation with a console form and reads its
+  /// `201 TokenResponse` (docs/DECISIONS.md D-M6-01-11): the generated client types these
+  /// operations with the `200 ConsoleSession` of the console form, because the generator takes
+  /// the lowest success code, so the app form posts [body] through the same Dio, interceptors
+  /// and serializers itself. The DPoP proof comes from the interceptor as for every login.
+  /// Errors: the [DioException] of the request, or one of type `unknown` when the answer is no
+  /// token response.
+  Future<Response<TokenResponse>> _appLogin<T extends Object>(
+    String path,
+    T body,
+  ) async {
+    final api = _core.api;
+    final options = Options(
+      method: 'POST',
+      headers: <String, dynamic>{'DPoP': proofFromInterceptor},
+      extra: <String, dynamic>{'secure': <Map<String, String>>[]},
+      contentType: 'application/json',
+    );
+    final response = await api.dio.request<Object>(
+      path,
+      data: api.serializers.serialize(body, specifiedType: FullType(T)),
+      options: options,
+    );
+    final TokenResponse data;
+    try {
+      data = api.serializers.deserialize(
+        response.data!,
+        specifiedType: const FullType(TokenResponse),
+      ) as TokenResponse;
+    } catch (error, stackTrace) {
+      throw DioException(
+        requestOptions: response.requestOptions,
+        response: response,
+        type: DioExceptionType.unknown,
+        error: error,
+        stackTrace: stackTrace,
+      );
+    }
+    return Response<TokenResponse>(
+      data: data,
+      headers: response.headers,
+      isRedirect: response.isRedirect,
+      requestOptions: response.requestOptions,
+      redirects: response.redirects,
+      statusCode: response.statusCode,
+      statusMessage: response.statusMessage,
+      extra: response.extra,
+    );
+  }
 
   LoginFailed _failed(DioException e) {
     final own = e.error;

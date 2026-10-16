@@ -51,6 +51,9 @@ type StepUpDeps struct {
 	// Fresh judges the fresh step-up of a terminal opening with the rule of authorize
 	// (terminal.step_up_max_age, M2-40); nil fails ConsumeFresh closed.
 	Fresh authz.FreshStepUpCheck
+	// Console rotates the cookie of a console session after its step-up (M6-01); a world without
+	// console sessions leaves it nil.
+	Console *Console
 }
 
 // StepUps implements identity.StepUp with the device key (08 section 6.2, brief M1-35 "Design
@@ -296,18 +299,19 @@ func (s *StepUps) CompleteWithDeviceKey(ctx context.Context, a actor.Actor, chal
 	return out.result, nil
 }
 
-// lockSession locks the session rows of a completion first (03 section 6.3) and checks that the
-// session sid is still active at now.
-func (s *StepUps) lockSession(ctx context.Context, sid ids.ID, now time.Time) error {
+// lockSession locks the session rows of a completion first (03 section 6.3), checks that the
+// session sid is still active at now and returns it.
+func (s *StepUps) lockSession(ctx context.Context, sid ids.ID, now time.Time) (SessionRecord, error) {
 	tree, err := s.d.Sessions.LockSessionTree(ctx, sid)
 	if err != nil {
-		return err
+		return SessionRecord{}, err
 	}
 	// authorize saw the session active; a revocation that committed since then ends here.
-	if sess, ok := find(tree, sid); !ok || !sess.Active(now) {
-		return denyStepUp(errs.New(errs.CodeSessionRevoked, ""), auditing.ReasonSessionRevoked, causeSessionEnded, sid)
+	sess, ok := find(tree, sid)
+	if !ok || !sess.Active(now) {
+		return SessionRecord{}, denyStepUp(errs.New(errs.CodeSessionRevoked, ""), auditing.ReasonSessionRevoked, causeSessionEnded, sid)
 	}
-	return nil
+	return sess, nil
 }
 
 // opened locks the challenge challengeID after the session rows and checks that it is an issued
@@ -334,7 +338,8 @@ func (s *StepUps) opened(ctx context.Context, sid, challengeID ids.ID, now time.
 func (s *StepUps) complete(ctx context.Context, a actor.Actor, challengeID ids.ID, signature string) (completion, error) {
 	sid := a.SessionID
 	now := s.now()
-	if err := s.lockSession(ctx, sid, now); err != nil {
+	sess, err := s.lockSession(ctx, sid, now)
+	if err != nil {
 		return completion{}, err
 	}
 	key, found, err := s.d.Devices.ActiveKey(ctx, a.DeviceID, identity.KeyPurposeStepUp)
@@ -359,12 +364,27 @@ func (s *StepUps) complete(ctx context.Context, a actor.Actor, challengeID ids.I
 	if cause != "" {
 		return s.fail(ctx, a, ch.ID, cause, now)
 	}
-	return s.confirmed(ctx, sid, ch.ID, identity.StepUpMethodDeviceKey, now)
+	return s.confirmed(ctx, sess, ch.ID, identity.StepUpMethodDeviceKey, now)
 }
 
-// confirmed ends the challenge as used, sets the step-up of the session with method and writes
-// the allow entry, in the ambient unit of work.
-func (s *StepUps) confirmed(ctx context.Context, sid, challengeID ids.ID, method string, now time.Time) (completion, error) {
+// confirmed ends the challenge as used, sets the step-up of the session sess with method, gives a
+// console session a new cookie value in the same transaction (session fixation, 08 section 7.5,
+// D-M6-01-2) and writes the allow entry, in the ambient unit of work.
+func (s *StepUps) confirmed(ctx context.Context, sess SessionRecord, challengeID ids.ID, method string, now time.Time) (completion, error) {
+	sid := sess.ID
+	var (
+		cookie identity.Token
+		maxAge time.Duration
+	)
+	if sess.Component == identity.ComponentConsole {
+		if s.d.Console == nil {
+			return completion{}, errs.New(errs.CodeInternalError, "identity: a console step-up without the console")
+		}
+		var err error
+		if cookie, maxAge, err = s.d.Console.rotate(ctx, sess); err != nil {
+			return completion{}, err
+		}
+	}
 	if err := s.d.Challenges.FinishChallenge(ctx, challengeID, ChallengeUsed, now); err != nil {
 		return completion{}, err
 	}
@@ -380,7 +400,7 @@ func (s *StepUps) confirmed(ctx context.Context, sid, challengeID ids.ID, method
 	if err != nil {
 		return completion{}, err
 	}
-	return completion{result: identity.StepUpResult{StepUpAt: now, ValidUntil: now.Add(s.cfg.StepUpMaxAge)}}, nil
+	return completion{result: identity.StepUpResult{StepUpAt: now, ValidUntil: now.Add(s.cfg.StepUpMaxAge), Cookie: cookie, CookieMaxAge: maxAge}}, nil
 }
 
 // fail records a wrong confirmation in the unit of work: the challenge becomes failed, the failed
@@ -458,7 +478,8 @@ func (s *StepUps) CompleteWithPasskey(ctx context.Context, a actor.Actor, challe
 func (s *StepUps) completePasskey(ctx context.Context, a actor.Actor, challengeID ids.ID, credential json.RawMessage) (completion, error) {
 	sid := a.SessionID
 	now := s.now()
-	if err := s.lockSession(ctx, sid, now); err != nil {
+	sess, err := s.lockSession(ctx, sid, now)
+	if err != nil {
 		return completion{}, err
 	}
 	ch, err := s.opened(ctx, sid, challengeID, now)
@@ -480,5 +501,5 @@ func (s *StepUps) completePasskey(ctx context.Context, a actor.Actor, challengeI
 	if err != nil {
 		return completion{}, err
 	}
-	return s.confirmed(ctx, sid, ch.ID, identity.StepUpMethodPasskey, now)
+	return s.confirmed(ctx, sess, ch.ID, identity.StepUpMethodPasskey, now)
 }
