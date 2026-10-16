@@ -168,3 +168,14 @@ func TestHandleWithSuffix(t *testing.T) {
 		t.Fatalf("cut suffix = %q", got)
 	}
 }
+
+// TestParseConfigRefusesAndShortHandles: an invalid configuration is an error, and a suffix longer
+// than the room for a handle is cut to the room.
+func TestParseConfigRefusesAndShortHandles(t *testing.T) {
+	if _, err := trustedheader.ParseConfig([]byte(`{"login_header":""}`)); err == nil {
+		t.Error("an empty login header passed")
+	}
+	if got := trustedheader.HandleWithSuffix("alex", "abcdef", 3); got != "abc" {
+		t.Errorf("HandleWithSuffix = %q, want abc", got)
+	}
+}
