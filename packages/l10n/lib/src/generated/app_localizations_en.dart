@@ -1062,4 +1062,230 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get threadRowStateWaiting => 'Waiting for an answer';
+
+  @override
+  String get vizViewLiveTopology => 'Live topology';
+
+  @override
+  String get vizViewBackend => 'Backend view';
+
+  @override
+  String get vizViewDelivery => 'Delivery and sync live';
+
+  @override
+  String get vizViewExecutive => 'Executive page';
+
+  @override
+  String get vizViewTimeline => 'Daily timeline';
+
+  @override
+  String get vizViewTv => 'TV mode';
+
+  @override
+  String get vizAsTable => 'As table';
+
+  @override
+  String get vizOpenGrafana => 'Open in Grafana';
+
+  @override
+  String get vizLoading => 'Loading';
+
+  @override
+  String get vizOnlyForOwner => 'Only for the owner';
+
+  @override
+  String vizSortBy(String column) {
+    return 'Sort by $column';
+  }
+
+  @override
+  String vizFrameTime(String time) {
+    return 'As of $time';
+  }
+
+  @override
+  String get vizNoActiveRuns => 'No active runs';
+
+  @override
+  String get vizRatesLastMinute => 'Last minute';
+
+  @override
+  String get vizNone => 'none';
+
+  @override
+  String get vizColSpace => 'Space';
+
+  @override
+  String get vizColChannel => 'Channel';
+
+  @override
+  String get vizColAgent => 'Agent';
+
+  @override
+  String get vizColState => 'State';
+
+  @override
+  String get vizColStep => 'Current step';
+
+  @override
+  String get vizColMode => 'Billing mode';
+
+  @override
+  String get vizColApproval => 'Approval';
+
+  @override
+  String get vizColCost => 'Cost so far';
+
+  @override
+  String get vizColMetric => 'Metric';
+
+  @override
+  String get vizColLastMinute => 'Last minute';
+
+  @override
+  String get vizColValue => 'Value';
+
+  @override
+  String get vizColNote => 'Note';
+
+  @override
+  String get vizColPresence => 'Presence';
+
+  @override
+  String get vizColConfiguredMode => 'Configured mode';
+
+  @override
+  String get vizColReportedMode => 'Reported mode';
+
+  @override
+  String get vizColSupportedModes => 'Supported modes';
+
+  @override
+  String get vizColSwitches => 'Mode switches';
+
+  @override
+  String get vizColI2Denied => 'Denied before delivery (I2)';
+
+  @override
+  String get vizColI3Denied => 'Failed on mode mismatch (I3)';
+
+  @override
+  String get vizColCosts => 'Costs per mode';
+
+  @override
+  String get vizColRateLimit => 'Rate limit';
+
+  @override
+  String get vizPresenceOnline => 'Online';
+
+  @override
+  String get vizPresenceDegraded => 'Degraded';
+
+  @override
+  String get vizPresenceOffline => 'Offline';
+
+  @override
+  String get vizPresenceUnknown => 'Unknown';
+
+  @override
+  String get vizFollowsRun => 'per run';
+
+  @override
+  String vizReportedMismatch(String mode) {
+    return 'Reported: $mode';
+  }
+
+  @override
+  String get vizRateLimitOk => 'within the limit';
+
+  @override
+  String get vizRateLimitNearLimit => 'near the limit';
+
+  @override
+  String get vizRateLimitLimited => 'limited';
+
+  @override
+  String get vizRateLimitUnknown => 'unknown';
+
+  @override
+  String vizRateLimitResets(String time) {
+    return 'resets at $time';
+  }
+
+  @override
+  String get vizSliNoEvents => 'no events';
+
+  @override
+  String vizSliValue(String count, String share) {
+    return '$count events, $share within the threshold';
+  }
+
+  @override
+  String vizCatchupValue(String count, String millis) {
+    return '$count, together $millis ms';
+  }
+
+  @override
+  String get vizConnectionsUser => 'Connections of people';
+
+  @override
+  String get vizConnectionsAgent => 'Connections of agents';
+
+  @override
+  String get vizConnectionsApp => 'Connections of apps';
+
+  @override
+  String get vizChartHistory => 'History';
+
+  @override
+  String get vizTileUsage => 'Usage';
+
+  @override
+  String get vizTileRuns => 'Runs and error rate';
+
+  @override
+  String get vizTileCosts => 'Costs per mode';
+
+  @override
+  String get vizTileSlo => 'SLO traffic light';
+
+  @override
+  String get vizColSlo => 'SLO';
+
+  @override
+  String get vizOwnMeasurementNote =>
+      'Values can differ from Prometheus: the own measurement counts in the process and can lose one flush interval in a crash.';
+
+  @override
+  String get vizColRun => 'Agent and channel';
+
+  @override
+  String get vizColStart => 'Start';
+
+  @override
+  String get vizColEnd => 'End';
+
+  @override
+  String vizPlayhead(String time) {
+    return 'Playhead $time';
+  }
+
+  @override
+  String get vizPlay => 'Play';
+
+  @override
+  String get vizPause => 'Pause';
+
+  @override
+  String vizSpeed(int speed) {
+    return '${speed}x';
+  }
+
+  @override
+  String get vizJump => 'Jump to a minute';
+
+  @override
+  String vizTvPosition(String title, int index, int count) {
+    return '$title ($index of $count)';
+  }
 }
