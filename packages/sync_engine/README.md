@@ -50,8 +50,9 @@ Life cycle of an entry:
   place; an attempted entry stays as it is and gets a follow-up `updateMessage` or
   `deleteMessage` that waits for it and receives its `message_id` and `version`; a failed entry
   edited or sent again becomes a new entry with a new ID, and the entries that waited for it
-  wait for the new one. An edit holds the changed members and is merged into the stored
-  payload.
+  wait for the new one (never sent follow-up edits behind it are dropped, the edit is newer).
+  An edit holds the changed members and is merged into the stored payload. Discarding an entry
+  fails every entry that waits for it, directly or through others (`dependency_discarded`).
 
 Error classes (`classify`, docs/DECISIONS.md D-M4-15-1):
 

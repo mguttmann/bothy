@@ -113,7 +113,22 @@ final class Outbox {
     final result = await _lock.run(() async {
       final e = await _require(id);
       if (e.state == OutboxState.failed) {
-        return _replaceFailed(e, payload);
+        // The person's edit is the newest text: follow-up edits queued behind the failed entry
+        // carry older texts and would overwrite it after the new entry (04 13.3).
+        final editKind = _executors
+            .lookup(e.kind)
+            ?.followUpEdit
+            ?.call(e, const {})
+            .kind;
+        final obsolete = [
+          for (final d in await _chain(e))
+            if (d.kind == editKind && d.attempts == 0 && !d.state.isFinal) d,
+        ];
+        final fresh = await _replaceFailed(e, payload);
+        for (final d in obsolete) {
+          await _bridge(d);
+        }
+        return fresh;
       }
       if (e.attempts == 0) {
         await _dao.updatePayload(
@@ -405,10 +420,43 @@ final class Outbox {
       for (final MapEntry(:key, :value) in decodePayload(e.payload).entries)
         key: ?value,
     };
-    for (final d in await _sender.dependentsOf(e.id)) {
+    // The whole chain behind it fails, not only the direct dependents: an entry that waits for
+    // a failed one would block its lane for good (04 13.2 item 2).
+    for (final d in await _chain(e)) {
       if (d.state.isFinal) continue;
       await _sender.fillSlots(d, bound);
       await _dao.recordFailure(d.id, code: 'dependency_discarded');
+    }
+    await _dao.delete(e.id);
+  }
+
+  /// Every entry that waits for [e], directly or through others, final ones included.
+  Future<List<OutboxEntry>> _chain(OutboxEntry e) async {
+    final found = <String, OutboxEntry>{};
+    final open = [e.id];
+    while (open.isNotEmpty) {
+      for (final d in await _sender.dependentsOf(open.removeLast())) {
+        if (d.id != e.id && found.putIfAbsent(d.id, () => d) == d) {
+          open.add(d.id);
+        }
+      }
+    }
+    return found.values.toList();
+  }
+
+  /// Deletes the never sent [e] and lets the entries that waited for it wait for what [e]
+  /// waited for.
+  Future<void> _bridge(OutboxEntry e) async {
+    final fresh = (await _dao.byId(e.id)) ?? e;
+    final parents = dependenciesOf(fresh);
+    for (final d in await _sender.dependentsOf(e.id)) {
+      await _dao.updateDependsOn(
+        d.id,
+        [
+          for (final id in dependenciesOf(d))
+            if (id == e.id) ...parents else id,
+        ].join(','),
+      );
     }
     await _dao.delete(e.id);
   }

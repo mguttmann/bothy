@@ -100,7 +100,9 @@ abstract final class MessageOps {
         final body = decodePayload(e.payload);
         final response = await messages.addReaction(
           messageId: _required<String>(body, 'message_id'),
-          emoji: _required<String>(body, 'emoji'),
+          // The generated client puts the emoji into the path as it is; `#` or `?` would end
+          // the path (06 EmojiPath is one percent-encoded segment).
+          emoji: Uri.encodeComponent(_required<String>(body, 'emoji')),
           extra: ctx.extra,
         );
         return OutboxResponse(status: response.statusCode);
@@ -109,7 +111,9 @@ abstract final class MessageOps {
         final body = decodePayload(e.payload);
         final response = await messages.removeReaction(
           messageId: _required<String>(body, 'message_id'),
-          emoji: _required<String>(body, 'emoji'),
+          // The generated client puts the emoji into the path as it is; `#` or `?` would end
+          // the path (06 EmojiPath is one percent-encoded segment).
+          emoji: Uri.encodeComponent(_required<String>(body, 'emoji')),
           extra: ctx.extra,
         );
         return OutboxResponse(status: response.statusCode);

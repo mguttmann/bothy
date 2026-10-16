@@ -94,6 +94,7 @@ final class OutboxSender {
   final Set<String> _busy = {};
   bool _started = false;
   bool _recovered = false;
+  bool _ready = false;
   bool _closed = false;
   bool _pumping = false;
   bool _again = false;
@@ -104,20 +105,24 @@ final class OutboxSender {
   bool get started => _started;
 
   /// Starts sending. The first start resets `sending` entries to `pending`: their request may
-  /// have reached the server, and the same ID makes the repeat safe (Design note 4).
+  /// have reached the server, and the same ID makes the repeat safe (Design note 4). A
+  /// [pause] while the reset runs holds: nothing is sent until the next start.
   Future<void> start() async {
     if (_closed) return;
+    _started = true;
     if (!_recovered) {
       _recovered = true;
+      // Queued on the lock before any schedule that this start allows, so no entry is claimed
+      // before the reset.
       await lock.run(() async {
         for (final e in await allEntries()) {
           if (e.state == OutboxState.sending) {
             await dao.markState(e.id, OutboxState.pending);
           }
         }
+        _ready = true;
       });
     }
-    _started = true;
     await pump();
   }
 
@@ -165,45 +170,70 @@ final class OutboxSender {
     }
   }
 
+  /// Picks the head of every idle lane and claims it, all under the lock on fresh data: a
+  /// change by the person (a replaced upload, a new entry) or the outcome of another request
+  /// can never slip between the choice and the claim (lane head, dependencies, due time).
   Future<void> _schedule() async {
-    final lanes = <String, List<OutboxEntry>>{};
-    for (final e in await allEntries()) {
-      if (e.state.isFinal) continue;
-      (lanes[executors.laneOf(e)] ??= []).add(e);
-    }
-    DateTime? nextWake;
-    final current = now();
-    for (final MapEntry(key: lane, value: entries) in lanes.entries) {
-      if (_busy.contains(lane)) continue;
-      // Strict FIFO: only the oldest entry of a lane may go; later ones never overtake it. A
-      // dependent never goes before its parent in the same lane, even when the clock stepped
-      // back between the two writes and gave the dependent the older `created_at`.
-      var head = entries.first;
-      final inLane = {for (final e in entries) e.id: e};
-      final seen = <String>{};
-      while (seen.add(head.id)) {
-        final parent = dependenciesOf(head)
-            .map((id) => inLane[id])
-            .whereType<OutboxEntry>()
-            .firstOrNull;
-        if (parent == null) break;
-        head = parent;
+    final claims = await lock.run(() async {
+      final claimed = <(String, OutboxEntry)>[];
+      if (!_started || !_ready || _closed) return claimed;
+      final lanes = <String, List<OutboxEntry>>{};
+      for (final e in await allEntries()) {
+        if (e.state.isFinal) continue;
+        (lanes[executors.laneOf(e)] ??= []).add(e);
       }
-      if (!await _dependenciesConfirmed(head)) continue;
-      final due = head.nextAttemptAt;
-      if (head.state == OutboxState.waiting &&
-          due != null &&
-          due.isAfter(current)) {
-        if (nextWake == null || due.isBefore(nextWake)) nextWake = due;
-        continue;
+      DateTime? nextWake;
+      final current = now();
+      for (final MapEntry(key: lane, value: entries) in lanes.entries) {
+        if (_busy.contains(lane)) continue;
+        final head = _headOf(entries);
+        if (!await _dependenciesConfirmed(head)) continue;
+        final due = head.nextAttemptAt;
+        if (head.state == OutboxState.waiting &&
+            due != null &&
+            due.isAfter(current)) {
+          if (nextWake == null || due.isBefore(nextWake)) nextWake = due;
+          continue;
+        }
+        if (executors.lookup(head.kind) == null) {
+          await dao.recordFailure(head.id, code: 'no_executor');
+          // The next entry of the lane may go now.
+          _again = true;
+          continue;
+        }
+        await dao.markState(head.id, OutboxState.sending);
+        _busy.add(lane);
+        claimed.add((lane, (await dao.byId(head.id))!));
       }
-      _busy.add(lane);
-      unawaited(_work(lane, head.id));
+      _wake?.cancel();
+      _wake = nextWake == null
+          ? null
+          : timer(nextWake.difference(current), () => unawaited(pump()));
+      return claimed;
+    });
+    if (claims.isEmpty) return;
+    onChanged();
+    for (final (lane, entry) in claims) {
+      unawaited(_send(lane, entry));
     }
-    _wake?.cancel();
-    _wake = nextWake == null
-        ? null
-        : timer(nextWake.difference(current), () => unawaited(pump()));
+  }
+
+  /// Strict FIFO: only the oldest entry of a lane may go; later ones never overtake it. A
+  /// dependent never goes before its parent in the same lane, even when the clock stepped back
+  /// between the two writes and gave the dependent the older `created_at`.
+  OutboxEntry _headOf(List<OutboxEntry> entries) {
+    var head = entries.first;
+    final inLane = {for (final e in entries) e.id: e};
+    final seen = <String>{};
+    while (seen.add(head.id)) {
+      final parent = dependenciesOf(head)
+          .map((id) => inLane[id])
+          .whereType<OutboxEntry>()
+          .firstOrNull;
+      if (parent == null) break;
+      head = parent;
+    }
+    return head;
   }
 
   /// A confirmed entry leaves the table, so a missing dependency counts as confirmed; a
@@ -216,35 +246,23 @@ final class OutboxSender {
     return true;
   }
 
-  Future<void> _work(String lane, String id) async {
+  /// Sends the claimed [entry] and applies the outcome; its lane is busy until then.
+  Future<void> _send(String lane, OutboxEntry entry) async {
     try {
-      final claimed = await lock.run(() async {
-        if (_closed) return null;
-        final e = await dao.byId(id);
-        if (e == null || e.state.isFinal || !_started) return null;
-        if (executors.lookup(e.kind) == null) {
-          await dao.recordFailure(id, code: 'no_executor');
-          return null;
-        }
-        await dao.markState(id, OutboxState.sending);
-        return dao.byId(id);
-      });
-      onChanged();
-      if (claimed == null) return;
-      final op = executors.lookup(claimed.kind)!;
+      final op = executors.lookup(entry.kind)!;
       Classification outcome;
       OutboxResponse? response;
       try {
         response = await op.send(
-          claimed,
-          ApiCallContext(idempotencyKey: claimed.id),
+          entry,
+          ApiCallContext(idempotencyKey: entry.id),
         );
         outcome = const Classification(OutcomeClass.confirmed);
       } on Object catch (error) {
         outcome = classify(error);
       }
       await lock.run(() async {
-        if (!_closed) await _apply(claimed, outcome, response);
+        if (!_closed) await _apply(entry, outcome, response);
       });
       onChanged();
     } finally {
