@@ -5,6 +5,7 @@
 // it.
 
 import 'package:domain/domain.dart';
+import 'package:sync_engine/sync_engine.dart';
 import 'package:test/test.dart';
 
 import 'support.dart';
@@ -55,4 +56,24 @@ void main() {
     );
     expect((await w.db.instanceDao.get())!.features, {'dm.enabled': true});
   });
+
+  test(
+    'the first connection is live right after ready, without catchup.complete',
+    () async {
+      await w.connect(headSeq: 40);
+      expect(w.h.phase, ConnectionPhase.live);
+      expect(w.liveCalls, 1);
+      await w.dispatch([threadCreated(41, 1), accessRemoved(42, 2)]);
+      expect(
+        await w.db.threadsDao.byId(ThreadId.parse(threadId(1))),
+        isNotNull,
+      );
+      expect(await w.cursor(), 42);
+      expect(
+        await w.db.structureDao.channelById(ChannelId.parse(channelId(2))),
+        isNull,
+      );
+      expect(w.notices.whereType<TargetsRemoved>(), hasLength(1));
+    },
+  );
 }

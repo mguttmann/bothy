@@ -199,6 +199,11 @@ final class CatchUpListener implements SessionListener {
       gaps.clear();
       await _db.syncStateDao.markSnapshot(_clock.now());
       control.lastProcessedSeq = head;
+      await _afterCommit(after);
+      // Without a cursor in identify the server sends no catch-up and no catchup.complete:
+      // the session is live right after ready (04 6.3 item 4).
+      _goLive(control);
+      return;
     } else {
       // The catch-up from the cursor delivers the events; only what is not an event comes
       // from the snapshot (Design note 1).

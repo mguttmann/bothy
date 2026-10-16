@@ -94,7 +94,8 @@ most `sync.max_focused_threads`, the complete set per frame with `idle`) and
 
 - `ready` without a stored cursor (the first connection, or a cursor dropped by a failed
   resync) empties the mirror and applies the whole snapshot in one transaction with
-  `cursor = head_seq` and the epoch; with a cursor only what is not an event (counters, agent
+  `cursor = head_seq` and the epoch, then goes `live` at once (no catch-up follows an `identify`
+  without a cursor); with a cursor only what is not an event (counters, agent
   presence, feature flags, active run summaries) and the catch-up delivers the rest.
 - A gateway page is the run of `dispatch` frames up to the next `cursor` frame or
   `catchup.complete`; it is applied with `SyncStateDao.commitPage` and the cursor of that frame
