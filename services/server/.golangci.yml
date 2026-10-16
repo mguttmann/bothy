@@ -162,12 +162,12 @@ linters:
       # TokenResponse carries access and refresh token by contract (openapi.yaml): the strict
       # server marshals them exactly once into the response of refreshToken and
       # createExtensionSession (M1-34, docs/DECISIONS.md M1-34). G117 sees the member name only.
-      - path: ^api/rest/(models|objects|rest)\.gen\.go$
+      - path: ^api/rest/(models|objects|objects2|rest)\.gen\.go$
         linters: [gosec]
         text: "G117:"
       # The strict server streams the NDJSON body of exportAuditEvents and closes a ReadCloser body
       # in a defer without checking the error (M1-50); the handler hands it no ReadCloser.
-      - path: ^api/rest/(models|objects|rest)\.gen\.go$
+      - path: ^api/rest/(models|objects|objects2|rest)\.gen\.go$
         linters: [errcheck]
         text: "closer.Close"
       # Query names and SQL of refresh_tokens contain "token"; G101 reads them as credentials. The

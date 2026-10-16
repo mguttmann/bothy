@@ -195,7 +195,7 @@ func (p *Passkeys) CompletePasskeyLogin(ctx context.Context, in identity.Passkey
 	if err := p.authorizeAnonymous(ctx, authorize.ActionAuthLoginComplete); err != nil {
 		return identity.RedeemResult{}, err
 	}
-	proof, err := p.d.Logins.d.DPoP.Verify(ctx, in.Proof)
+	proof, err := p.d.Logins.verifyLoginProof(ctx, in.Console, in.Proof)
 	if err != nil {
 		return identity.RedeemResult{}, err
 	}
@@ -211,7 +211,7 @@ func (p *Passkeys) CompletePasskeyLogin(ctx context.Context, in identity.Passkey
 	if err != nil {
 		return identity.RedeemResult{}, p.loginFailed(ctx, err, opened)
 	}
-	res := identity.RedeemResult{Tokens: out.Tokens}
+	res := out.Result()
 	if proof.NonceStale {
 		res.Nonce = p.d.Logins.d.DPoP.CurrentNonce()
 	}
@@ -246,7 +246,7 @@ func (p *Passkeys) login(ctx context.Context, in identity.PasskeyLogin, jkt stri
 	}
 	return p.d.Logins.completeLogin(ctx, LoginCompletion{
 		UserID: res.User.ID, IdentityID: local, AuthMethod: identity.AuthPasskey, Device: in.Device, ProofJKT: jkt,
-		Trust: TrustUnconfirmed, ClientIP: in.ClientIP,
+		Trust: TrustUnconfirmed, ClientIP: in.ClientIP, Console: in.Console,
 	})
 }
 

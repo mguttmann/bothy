@@ -4,6 +4,7 @@
 
 // ignore_for_file: unused_element
 import 'package:api_client/src/generated/model/device_registration.dart';
+import 'package:api_client/src/generated/model/login_client.dart';
 import 'package:built_value/built_value.dart';
 import 'package:built_value/serializer.dart';
 
@@ -12,14 +13,19 @@ part 'trusted_header_login_request.g.dart';
 /// TrustedHeaderLoginRequest
 ///
 /// Properties:
+/// * [client]
 /// * [device]
 /// * [enrollmentCode] - Optional enrollment code; links an unknown header login to the person of the code (08, 3.1).
 @BuiltValue()
 abstract class TrustedHeaderLoginRequest
     implements
         Built<TrustedHeaderLoginRequest, TrustedHeaderLoginRequestBuilder> {
+  @BuiltValueField(wireName: r'client')
+  LoginClient? get client;
+  // enum clientEnum {  app,  console,  };
+
   @BuiltValueField(wireName: r'device')
-  DeviceRegistration get device;
+  DeviceRegistration? get device;
 
   /// Optional enrollment code; links an unknown header login to the person of the code (08, 3.1).
   @BuiltValueField(wireName: r'enrollment_code')
@@ -55,11 +61,20 @@ class _$TrustedHeaderLoginRequestSerializer
     TrustedHeaderLoginRequest object, {
     FullType specifiedType = FullType.unspecified,
   }) sync* {
-    yield r'device';
-    yield serializers.serialize(
-      object.device,
-      specifiedType: const FullType(DeviceRegistration),
-    );
+    if (object.client != null) {
+      yield r'client';
+      yield serializers.serialize(
+        object.client,
+        specifiedType: const FullType(LoginClient),
+      );
+    }
+    if (object.device != null) {
+      yield r'device';
+      yield serializers.serialize(
+        object.device,
+        specifiedType: const FullType(DeviceRegistration),
+      );
+    }
     if (object.enrollmentCode != null) {
       yield r'enrollment_code';
       yield serializers.serialize(
@@ -94,11 +109,20 @@ class _$TrustedHeaderLoginRequestSerializer
       final key = serializedList[i] as String;
       final value = serializedList[i + 1];
       switch (key) {
+        case r'client':
+          final valueDes = serializers.deserialize(
+            value,
+            specifiedType: const FullType.nullable(LoginClient),
+          ) as LoginClient?;
+          if (valueDes == null) continue;
+          result.client = valueDes;
+          break;
         case r'device':
           final valueDes = serializers.deserialize(
             value,
-            specifiedType: const FullType(DeviceRegistration),
-          ) as DeviceRegistration;
+            specifiedType: const FullType.nullable(DeviceRegistration),
+          ) as DeviceRegistration?;
+          if (valueDes == null) continue;
           result.device.replace(valueDes);
           break;
         case r'enrollment_code':

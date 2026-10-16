@@ -22,6 +22,7 @@ import (
 
 	"github.com/OWNER/bothy/services/server/internal/gateway/app"
 	"github.com/OWNER/bothy/services/server/internal/gateway/domain"
+	"github.com/OWNER/bothy/services/server/internal/kernel/actor"
 	"github.com/OWNER/bothy/services/server/internal/kernel/authorize"
 	"github.com/OWNER/bothy/services/server/internal/kernel/clock"
 	"github.com/OWNER/bothy/services/server/internal/kernel/errs"
@@ -152,10 +153,13 @@ func port(u *url.URL) string {
 }
 
 // ServeHTTP implements http.Handler. A present Origin other than the origin of server.public_url
-// (several Origin headers included) answers 403 forbidden before the upgrade (SEC-CORS-3); nothing
-// else is checked there. After the upgrade the connection runs until it ends.
+// (several Origin headers included) answers 403 forbidden before the upgrade (SEC-CORS-3), and so
+// does a request with the console cookie and no Origin at all (a browser always sends one, so the
+// cookie without it is a forged request; M6-01, D-M6-01-5); nothing else is checked there. After
+// the upgrade the connection runs until it ends.
 func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
-	if origins := r.Header.Values("Origin"); len(origins) > 1 || len(origins) == 1 && !h.sameOrigin(origins[0]) {
+	origins := r.Header.Values("Origin")
+	if len(origins) > 1 || len(origins) == 1 && !h.sameOrigin(origins[0]) || len(origins) == 0 && hasConsoleCookie(r) {
 		httpserver.WriteProblem(w, r, errs.New(errs.CodeForbidden, ""))
 		return
 	}
@@ -303,4 +307,10 @@ func (h *Handler) deadlines(ctx context.Context, c *app.Connection, conn *wsConn
 		case <-timer.C:
 		}
 	}
+}
+
+// hasConsoleCookie reports a request that carries the cookie of the web console (M6-01).
+func hasConsoleCookie(r *http.Request) bool {
+	_, err := r.Cookie(actor.ConsoleCookieName)
+	return err == nil
 }

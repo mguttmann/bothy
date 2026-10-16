@@ -5,6 +5,7 @@ package app
 import (
 	"context"
 	"errors"
+	"strings"
 
 	"github.com/OWNER/bothy/services/server/internal/authz"
 	"github.com/OWNER/bothy/services/server/internal/identity"
@@ -26,6 +27,7 @@ const (
 	causeProviderOff      = "provider_disabled"
 	causePersonInactive   = "person_not_active"
 	causeOtherPerson      = "other_person"
+	causeConsoleFlow      = "console_flow_mismatch"
 )
 
 // flowRejectedError is a refused oidcCompletion: answer is the error of the response, cause the audit
@@ -57,7 +59,7 @@ func (o *OIDC) CompleteOIDCLogin(ctx context.Context, in identity.OIDCComplete) 
 	if err := o.authorize(ctx, actor.Anonymous(), authorize.ActionAuthLoginComplete, instanceResource); err != nil {
 		return identity.RedeemResult{}, err
 	}
-	proof, err := o.s.d.DPoP.Verify(ctx, in.Proof)
+	proof, err := o.s.verifyLoginProof(ctx, in.Console, in.Proof)
 	if err != nil {
 		return identity.RedeemResult{}, err
 	}
@@ -73,6 +75,11 @@ func (o *OIDC) CompleteOIDCLogin(ctx context.Context, in identity.OIDCComplete) 
 			return err
 		}
 		st.flow = f
+		// A flow begun by the console completes only in the console form and vice versa, so the
+		// tokens of an app login never reach the browser (D-M6-01-1).
+		if (f.AppRedirectURI == o.consoleLogin) != in.Console {
+			return &flowRejectedError{answer: consoleRedirectInvalid(), cause: causeConsoleFlow}
+		}
 		if !oidcflow.VerifierMatches(in.ClientVerifier, f.ClientChallenge) {
 			return &flowRejectedError{answer: errs.New(errs.CodeUnauthenticated, ""), cause: causeVerifierMismatch, fail: true}
 		}
@@ -85,7 +92,7 @@ func (o *OIDC) CompleteOIDCLogin(ctx context.Context, in identity.OIDCComplete) 
 	if err := o.runCompletion(ctx, unit, &st); err != nil {
 		return identity.RedeemResult{}, err
 	}
-	res := identity.RedeemResult{Tokens: out.Tokens}
+	res := out.Result()
 	if proof.NonceStale {
 		res.Nonce = o.s.d.DPoP.CurrentNonce()
 	}
@@ -157,6 +164,7 @@ func (o *OIDC) login(ctx context.Context, f LoginFlowRecord, in identity.OIDCCom
 	ext := *f.External
 	base := LoginCompletion{
 		AuthMethod: identity.AuthOIDC, Device: in.Device, ProofJKT: jkt, ClientIP: in.ClientIP, AllowPending: true, Trust: TrustUnconfirmed,
+		Console: in.Console,
 	}
 	if ext.GroupsState == oidcflow.GroupsPresent {
 		// Only a present claim changes memberships; absent and overage leave them to run out
@@ -417,6 +425,10 @@ func (o *OIDC) link(ctx context.Context, a actor.Actor, hash []byte, clientVerif
 	}
 	if f.UserID != a.ID {
 		return identity.Identity{}, &flowRejectedError{answer: invisible(), cause: causeOtherPerson}
+	}
+	if strings.HasPrefix(f.AppRedirectURI, o.consoleStepUp) {
+		// A console re-login (M6-01) is a step-up, never a link.
+		return identity.Identity{}, &flowRejectedError{answer: invisible(), cause: causeReauthFlow}
 	}
 	st.flow = f
 	if !oidcflow.VerifierMatches(clientVerifier, f.ClientChallenge) {

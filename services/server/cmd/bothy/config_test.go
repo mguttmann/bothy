@@ -184,6 +184,8 @@ func TestConfigPrintShowsSourcePerKey(t *testing.T) {
 		"auth.argon2id_parallelism = 1  # default\n" +
 		"auth.cleanup_interval = 1h  # default\n" +
 		"auth.clock_leeway = 30s  # default\n" +
+		"auth.console_session_idle_timeout = 30m  # default\n" +
+		"auth.console_session_max_age = 12h  # default\n" +
 		"auth.device_inactive_revoke_after = 180d  # default\n" +
 		"auth.device_pending_ttl = 1d  # default\n" +
 		"auth.device_verification_code_digits = 6  # default\n" +

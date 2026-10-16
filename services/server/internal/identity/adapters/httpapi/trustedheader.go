@@ -31,11 +31,12 @@ func (h *TrustedHeader) LoginWithTrustedHeader(ctx context.Context, req rest.Log
 	if req.Body == nil {
 		return nil, errs.New(errs.CodeValidationFailed, "")
 	}
-	reg, err := registration(req.Body.Device)
+	console := consoleForm(req.Body.Client)
+	reg, err := loginDevice(console, req.Body.Device)
 	if err != nil {
 		return nil, err
 	}
-	in := identity.TrustedHeaderLogin{Device: reg, Proof: loginProof(ctx, req.Params.DPoP)}
+	in := identity.TrustedHeaderLogin{Device: reg, Proof: loginProof(ctx, dpopHeader(req.Params.DPoP)), Console: console}
 	if req.Body.EnrollmentCode != nil {
 		in.EnrollmentCode = *req.Body.EnrollmentCode
 	}
@@ -48,6 +49,9 @@ func (h *TrustedHeader) LoginWithTrustedHeader(ctx context.Context, req rest.Log
 	out, err := h.logins.LoginWithTrustedHeader(ctx, in)
 	if err != nil {
 		return nil, err
+	}
+	if c := out.Console; c != nil {
+		return rest.LoginWithTrustedHeader200JSONResponse{ConsoleLoginJSONResponse: consoleLogin(c)}, nil
 	}
 	if out.Nonce != "" {
 		reqmeta.SetResponseHeader(ctx, headerDPoPNonce, out.Nonce)

@@ -3,8 +3,13 @@
 package actor_test
 
 import (
+	"bytes"
 	"context"
+	"encoding/json"
+	"fmt"
+	"log/slog"
 	"net/netip"
+	"strings"
 	"testing"
 
 	"github.com/OWNER/bothy/services/server/internal/kernel/actor"
@@ -43,6 +48,26 @@ func TestCredentialsPresent(t *testing.T) {
 	}
 	if !(actor.Credentials{Authorization: "DPoP x"}).Present() {
 		t.Fatal("an Authorization header means credentials")
+	}
+	if !(actor.Credentials{ConsoleCookie: actor.NewCookieValue("v")}).Present() {
+		t.Fatal("the console cookie means credentials (M6-01)")
+	}
+}
+
+// TestCookieValueRedacts: the console cookie never renders its value (SEC-LOG-1, M6-01).
+func TestCookieValueRedacts(t *testing.T) {
+	t.Parallel()
+	c := actor.NewCookieValue("canary-cookie-value")
+	var buf bytes.Buffer
+	slog.New(slog.NewJSONHandler(&buf, nil)).Info("x", slog.Any("cookie", c))
+	j, _ := json.Marshal(struct{ C actor.CookieValue }{c})
+	for _, out := range []string{fmt.Sprint(c), fmt.Sprintf("%v %+v %#v %s", c, c, c, c), buf.String(), string(j)} {
+		if strings.Contains(out, "canary") {
+			t.Fatalf("value rendered: %s", out)
+		}
+	}
+	if c.Reveal() != "canary-cookie-value" || c.IsZero() || !(actor.CookieValue{}).IsZero() {
+		t.Fatal("Reveal or IsZero")
 	}
 }
 

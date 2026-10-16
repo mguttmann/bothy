@@ -79,7 +79,7 @@ readiness are not part of the public API; they are on the internal listener
 | Principal | Login | Headers per request | Binding | Validity | Step-up |
 |---|---|---|---|---|---|
 | Person in an app | OIDC, header of a trusted reverse proxy, local account with passkey or password plus TOTP; the result is a token pair | `Authorization: DPoP <access_token>` and `DPoP: <proof>` | device key (`cnf.jkt`), RFC 9449 | access token `auth.access_token_ttl` (chapter 08), refresh `auth.refresh_token_ttl` | passkey or device key with user confirmation |
-| Person in the web console | as above; the result is a cookie session following the BFF pattern, no tokens in the browser ([08-identity.md](08-identity.md), section 7.5) | cookie `__Host-...` and a fixed CSRF header (M6-01 sets name and value in openapi.yaml) | cookie, as an HMAC on the session | `auth.console_session_max_age`, idle `auth.console_session_idle_timeout` | passkey, otherwise a new OIDC login or password with TOTP |
+| Person in the web console | as above; the result is a cookie session following the BFF pattern, no tokens in the browser ([08-identity.md](08-identity.md), section 7.5) | cookie `__Host-console_session` and the CSRF header `X-Console-Request: 1` with the own `Origin` on every request except `GET`, `HEAD`, `OPTIONS` (security scheme `consoleSession`, parameter `ConsoleRequest`) | cookie, as an HMAC on the session | `auth.console_session_max_age`, idle `auth.console_session_idle_timeout` | passkey, otherwise a new OIDC login or password with TOTP |
 | Agent | API token, created by the owner (`token.create`) | `Authorization: Bearer <token>`; for tokens with `dpop_jkt` `Authorization: DPoP` plus `DPoP` | optional `dpop_jkt` | until revocation or `expires_at` | never (R-AZ-03) |
 | App | API token with scopes (05, 2.6) | like agent | optional | like agent | never |
 | Incoming webhook | secret token in the path | none | none | until revocation | never |
@@ -376,6 +376,9 @@ all texts of the YAML files (R-API-15); every response component names its statu
 | `createStepUpChallenge` | POST | `/api/v1/auth/step-up/challenge` | login or session flow: one-time challenge or code, refresh rotation, replacement of the child session |
 | `completeStepUpWithPasskey` | POST | `/api/v1/auth/step-up/passkey` | login or session flow: one-time challenge or code, refresh rotation, replacement of the child session |
 | `completeStepUpWithDeviceKey` | POST | `/api/v1/auth/step-up/device-key` | login or session flow: one-time challenge or code, refresh rotation, replacement of the child session |
+| `stepUpWithPassword` | POST | `/api/v1/auth/step-up/password` | login or session flow: one-time challenge or code, refresh rotation, replacement of the child session |
+| `beginStepUpOidcReauth` | POST | `/api/v1/auth/step-up/oidc` | login or session flow: one-time challenge or code, refresh rotation, replacement of the child session |
+| `completeStepUpOidcReauth` | POST | `/api/v1/auth/step-up/oidc/complete` | login or session flow: one-time challenge or code, refresh rotation, replacement of the child session |
 | `beginIdentityLink` | POST | `/api/v1/me/identities/begin` | login or session flow: one-time challenge or code, refresh rotation, replacement of the child session |
 | `completeIdentityLink` | POST | `/api/v1/me/identities/complete` | login or session flow: one-time challenge or code, refresh rotation, replacement of the child session |
 | `beginPasskeyRegistration` | POST | `/api/v1/me/passkeys/begin` | login or session flow: one-time challenge or code, refresh rotation, replacement of the child session |
@@ -721,6 +724,11 @@ Generated from openapi.yaml.
 | POST | `/api/v1/auth/step-up/challenge` | `createStepUpChallenge` | `auth.step_up` | Create a step-up challenge |
 | POST | `/api/v1/auth/step-up/passkey` | `completeStepUpWithPasskey` | `auth.step_up` | Confirm step-up with a passkey |
 | POST | `/api/v1/auth/step-up/device-key` | `completeStepUpWithDeviceKey` | `auth.step_up` | Confirm step-up with the device key after user verification |
+| POST | `/api/v1/auth/step-up/password` | `stepUpWithPassword` | `auth.step_up` | Console step-up with password and TOTP |
+| POST | `/api/v1/auth/step-up/oidc` | `beginStepUpOidcReauth` | `auth.step_up` | Start a console step-up with OIDC |
+| POST | `/api/v1/auth/step-up/oidc/complete` | `completeStepUpOidcReauth` | `auth.step_up` | Finish a console step-up with OIDC |
+| GET | `/api/v1/console/session` | `getConsoleSession` | `self.read` | Read the console session |
+| DELETE | `/api/v1/console/session/view-as` | `endViewAs` | `access.view_as.end` | End the stored view as person |
 
 #### Me
 

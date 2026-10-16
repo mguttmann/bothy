@@ -228,5 +228,5 @@ func (s *Service) recordExpire(ctx context.Context, deviceID ids.ID, reason iden
 // invalidCode is the validation_failed of a malformed code at pointer.
 func invalidCode(pointer string) error {
 	return errs.New(errs.CodeValidationFailed, "").
-		WithFields(errs.FieldError{Pointer: pointer, Code: "invalid", Detail: "The code is not well-formed."})
+		WithFields(errs.FieldError{Pointer: pointer, Code: fieldCodeInvalid, Detail: "The code is not well-formed."})
 }

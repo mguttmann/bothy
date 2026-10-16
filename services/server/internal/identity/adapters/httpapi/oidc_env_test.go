@@ -19,6 +19,8 @@ import (
 	authzapp "github.com/OWNER/bothy/services/server/internal/authz/app"
 	"github.com/OWNER/bothy/services/server/internal/identity/adapters/identitytest"
 	"github.com/OWNER/bothy/services/server/internal/identity/adapters/oidc/oidctest"
+	"github.com/OWNER/bothy/services/server/internal/identity/adapters/postgres"
+	"github.com/OWNER/bothy/services/server/internal/identity/app"
 	"github.com/OWNER/bothy/services/server/internal/identity/domain/oidcflow"
 	"github.com/OWNER/bothy/services/server/internal/kernel/clock"
 	"github.com/OWNER/bothy/services/server/internal/kernel/ids"
@@ -94,10 +96,13 @@ func newOIDCWorld(t *testing.T, o oidcWorldOpts) *oworld {
 			UoW: w.uow, Authorizer: w.authz, Store: authzpg.NewRepository(w.pool), Principals: w.principals, Structure: w.structure,
 			Rights: w.rights, Audit: w.rec, Clock: w.clk, Events: w.appender, Scopes: w.authz, Cursors: authzhttp.Cursors{},
 			Config: authzapp.AdminConfig{GroupNameMaxChars: 100, GroupDescriptionMaxChars: 500, PageSizeDefault: 2, PageSizeMax: 3},
+			Views:  app.NewConsoleViews(postgres.NewRepository(w.pool)),
 		})
 		if err != nil {
 			t.Fatal(err)
 		}
+		// viewAsUser of the console tests (M6-01).
+		w.access = authzhttp.New(admin)
 		if err := w.id.BindOIDC(wire.OIDCDeps{Egress: eg, Secrets: fakeSecrets{clientSecretRef: []byte(secret)}, RootCAs: idp.RootCAs(),
 			ClaimGroups: admin}); err != nil {
 			t.Fatal(err)

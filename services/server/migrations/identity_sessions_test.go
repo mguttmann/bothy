@@ -21,7 +21,7 @@ import (
 // TestSessionsMigration_Schema holds auth_sessions, refresh_token_families and refresh_tokens
 // against docs/spec/03-data-model.md section 4.2 column by column, with every check, foreign key
 // and index (M1-34), including the foreign key auth_sessions.identity_id that the migration of
-// user_identities adds (M1-36).
+// user_identities adds (M1-36) and the view columns of the console (M6-01).
 func TestSessionsMigration_Schema(t *testing.T) {
 	t.Parallel()
 	conn := pgtest.New(t).SuperConn(t)
@@ -52,9 +52,15 @@ func TestSessionsMigration_Schema(t *testing.T) {
 				{"last_ip", "inet", true, ""},
 				{"revoked_at", ts, true, ""},
 				{"revoke_reason", "text", true, ""},
+				// "View as person" of the console (M6-01, R-DM-49).
+				{"view_as_user_id", "uuid", true, ""},
+				{"view_as_started_at", ts, true, ""},
 			},
 			constraints: []string{
 				"CHECK (((client_component = 'console'::text) = (cookie_hash IS NOT NULL)))",
+				"CHECK (((view_as_user_id IS NULL) = (view_as_started_at IS NULL)))",
+				"CHECK (((view_as_user_id IS NULL) OR (client_component = 'console'::text)))",
+				"FOREIGN KEY (view_as_user_id) REFERENCES users(principal_id) ON DELETE RESTRICT",
 				"CHECK (((parent_session_id IS NULL) OR (client_component = 'share_ext'::text)))",
 				"CHECK (((step_up_at IS NULL) = (step_up_method IS NULL)))",
 				"CHECK (((step_up_consumed_at IS NULL) OR (step_up_at IS NOT NULL)))",

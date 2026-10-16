@@ -4,17 +4,23 @@ from typing import Any
 import httpx
 
 from ...client import AuthenticatedClient, Client
+from ...models.complete_step_up_with_passkey_x_console_request import (
+    CompleteStepUpWithPasskeyXConsoleRequest,
+)
 from ...models.problem import Problem
 from ...models.step_up_passkey_request import StepUpPasskeyRequest
 from ...models.step_up_result import StepUpResult
-from ...types import Response
+from ...types import UNSET, Response, Unset
 
 
 def _get_kwargs(
     *,
     body: StepUpPasskeyRequest,
+    x_console_request: CompleteStepUpWithPasskeyXConsoleRequest | Unset = UNSET,
 ) -> dict[str, Any]:
     headers: dict[str, Any] = {}
+    if not isinstance(x_console_request, Unset):
+        headers["X-Console-Request"] = str(x_console_request)
 
     _kwargs: dict[str, Any] = {
         "method": "post",
@@ -77,6 +83,7 @@ def sync_detailed(
     *,
     client: AuthenticatedClient | Client,
     body: StepUpPasskeyRequest,
+    x_console_request: CompleteStepUpWithPasskeyXConsoleRequest | Unset = UNSET,
 ) -> Response[Problem | StepUpResult]:
     """Confirm step-up with a passkey
 
@@ -84,6 +91,7 @@ def sync_detailed(
     fails and counts toward `auth.step_up_fail_limit`.
 
     Args:
+        x_console_request (CompleteStepUpWithPasskeyXConsoleRequest | Unset):
         body (StepUpPasskeyRequest):
 
     Raises:
@@ -96,6 +104,7 @@ def sync_detailed(
 
     kwargs = _get_kwargs(
         body=body,
+        x_console_request=x_console_request,
     )
 
     response = client.get_httpx_client().request(
@@ -109,6 +118,7 @@ def sync(
     *,
     client: AuthenticatedClient | Client,
     body: StepUpPasskeyRequest,
+    x_console_request: CompleteStepUpWithPasskeyXConsoleRequest | Unset = UNSET,
 ) -> Problem | StepUpResult | None:
     """Confirm step-up with a passkey
 
@@ -116,6 +126,7 @@ def sync(
     fails and counts toward `auth.step_up_fail_limit`.
 
     Args:
+        x_console_request (CompleteStepUpWithPasskeyXConsoleRequest | Unset):
         body (StepUpPasskeyRequest):
 
     Raises:
@@ -129,6 +140,7 @@ def sync(
     return sync_detailed(
         client=client,
         body=body,
+        x_console_request=x_console_request,
     ).parsed
 
 
@@ -136,6 +148,7 @@ async def asyncio_detailed(
     *,
     client: AuthenticatedClient | Client,
     body: StepUpPasskeyRequest,
+    x_console_request: CompleteStepUpWithPasskeyXConsoleRequest | Unset = UNSET,
 ) -> Response[Problem | StepUpResult]:
     """Confirm step-up with a passkey
 
@@ -143,6 +156,7 @@ async def asyncio_detailed(
     fails and counts toward `auth.step_up_fail_limit`.
 
     Args:
+        x_console_request (CompleteStepUpWithPasskeyXConsoleRequest | Unset):
         body (StepUpPasskeyRequest):
 
     Raises:
@@ -155,6 +169,7 @@ async def asyncio_detailed(
 
     kwargs = _get_kwargs(
         body=body,
+        x_console_request=x_console_request,
     )
 
     response = await client.get_async_httpx_client().request(**kwargs)
@@ -166,6 +181,7 @@ async def asyncio(
     *,
     client: AuthenticatedClient | Client,
     body: StepUpPasskeyRequest,
+    x_console_request: CompleteStepUpWithPasskeyXConsoleRequest | Unset = UNSET,
 ) -> Problem | StepUpResult | None:
     """Confirm step-up with a passkey
 
@@ -173,6 +189,7 @@ async def asyncio(
     fails and counts toward `auth.step_up_fail_limit`.
 
     Args:
+        x_console_request (CompleteStepUpWithPasskeyXConsoleRequest | Unset):
         body (StepUpPasskeyRequest):
 
     Raises:
@@ -187,5 +204,6 @@ async def asyncio(
         await asyncio_detailed(
             client=client,
             body=body,
+            x_console_request=x_console_request,
         )
     ).parsed

@@ -373,6 +373,17 @@ docs/DECISIONS.md M1-49.
   as" with `view_as_read_only` and answers `step_up_required` from `StartedAt +
   authz.view_as_max_duration` on.
 
+### Stored view of the console (M6-01)
+
+`viewAsUser` called from a console session (`actor.Actor.ClientComponent = console`) also stores
+the view on the session through the port `authz.ConsoleViews` (identity implements it, R-DM-49), in
+the unit of work of its allow entry, which then carries `started_at`. The authenticator of identity
+sets `actor.ViewAs` from the stored view on every later request of that session, so `authorize`
+applies the intersection, `view_as_read_only` and SR6 exactly as for the snapshot. The rule
+`domain.ViewAsExempt` (R-AZ-32) makes `authorize` decide `access.view_as.end`, `auth.logout` and
+`auth.step_up` on the caller's own session and `self.read` on the caller without the view, so an
+owner can always leave the view, log out and confirm a step-up.
+
 ## Expiry (M1-30)
 
 Expiry is decided at every `authorize` call: a grant or membership is invalid from the second of

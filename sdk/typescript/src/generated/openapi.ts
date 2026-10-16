@@ -420,6 +420,91 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/auth/step-up/password": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Console step-up with password and TOTP */
+        post: operations["stepUpWithPassword"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/auth/step-up/oidc": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Start a console step-up with OIDC */
+        post: operations["beginStepUpOidcReauth"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/auth/step-up/oidc/complete": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Finish a console step-up with OIDC */
+        post: operations["completeStepUpOidcReauth"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/console/session": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Read the console session */
+        get: operations["getConsoleSession"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/console/session/view-as": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /** End the stored view as person */
+        delete: operations["endViewAs"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/me": {
         parameters: {
             query?: never;
@@ -5801,6 +5886,7 @@ export interface components {
             expires_at: components["schemas"]["Timestamp"];
         };
         OidcBeginRequest: {
+            client?: components["schemas"]["LoginClient"];
             provider_id: components["schemas"]["Uuid"];
             /**
              * @description Redirect target of the app (loopback or claimed scheme, RFC 8252). Must match the allow-list of the provider.
@@ -5828,6 +5914,7 @@ export interface components {
             expires_at: components["schemas"]["Timestamp"];
         };
         OidcCompleteRequest: {
+            client?: components["schemas"]["LoginClient"];
             /**
              * @description One-time code the server appended to `app_redirect_uri` after the provider callback.
              * @example lc_8f2d1c
@@ -5835,10 +5922,11 @@ export interface components {
             login_code: string;
             /** @example dBjftJeZ4CVP-mB92K27uhbUJU1p1r_wW1gFWFOEjXk */
             client_verifier: string;
-            device: components["schemas"]["DeviceRegistration"];
+            device?: components["schemas"]["DeviceRegistration"];
         };
         TrustedHeaderLoginRequest: {
-            device: components["schemas"]["DeviceRegistration"];
+            client?: components["schemas"]["LoginClient"];
+            device?: components["schemas"]["DeviceRegistration"];
             /**
              * @description Optional enrollment code; links an unknown header login to the person of the code (08, 3.1).
              * @example en_EXAMPLE
@@ -5871,10 +5959,11 @@ export interface components {
             login_name?: string;
         };
         PasskeyLoginCompleteRequest: {
+            client?: components["schemas"]["LoginClient"];
             challenge_id: components["schemas"]["Uuid"];
             /** @description WebAuthn `PublicKeyCredential` in JSON form. */
             credential: components["schemas"]["JsonObject"];
-            device: components["schemas"]["DeviceRegistration"];
+            device?: components["schemas"]["DeviceRegistration"];
         };
         EnrollBeginRequest: {
             /** @example en_4KX9-2MQA */
@@ -5888,13 +5977,14 @@ export interface components {
             device: components["schemas"]["DeviceRegistration"];
         };
         PasswordLoginRequest: {
+            client?: components["schemas"]["LoginClient"];
             /** @example alex */
             login_name: string;
             /** Format: password */
             password: string;
             /** @example 492039 */
             totp_code: string;
-            device: components["schemas"]["DeviceRegistration"];
+            device?: components["schemas"]["DeviceRegistration"];
         };
         TokenRefreshRequest: {
             /** @example rt_q2Z0 */
@@ -5916,6 +6006,40 @@ export interface components {
             refresh_expires_at: components["schemas"]["Timestamp"];
             session: components["schemas"]["Session"];
             device: components["schemas"]["Device"];
+        };
+        /**
+         * @description `console`: no `device` or DPoP; cookie, no token (08, 7.5).
+         * @enum {string}
+         */
+        LoginClient: "app" | "console";
+        ConsoleSession: {
+            user_id: components["schemas"]["Uuid"];
+            display_name: string;
+            expires_at: components["schemas"]["Timestamp"];
+            idle_timeout_seconds: number;
+            step_up_at?: components["schemas"]["Timestamp"];
+            /** @enum {string} */
+            step_up_method?: "passkey" | "password_totp" | "oidc_reauth";
+            step_up_valid_until?: components["schemas"]["Timestamp"];
+            step_up_methods_available: ("passkey" | "oidc_reauth" | "password_totp")[];
+            view_as?: {
+                user_id: components["schemas"]["Uuid"];
+                display_name: string;
+                started_at: components["schemas"]["Timestamp"];
+                ends_at: components["schemas"]["Timestamp"];
+            };
+        };
+        StepUpPasswordRequest: {
+            challenge_id: components["schemas"]["Uuid"];
+            /** Format: password */
+            password: string;
+            totp_code: string;
+        };
+        StepUpOidcBeginRequest: {
+            challenge_id: components["schemas"]["Uuid"];
+            provider_id: components["schemas"]["Uuid"];
+            app_redirect_uri: string;
+            client_challenge: string;
         };
         StepUpChallenge: {
             challenge_id: components["schemas"]["Uuid"];
@@ -10437,10 +10561,33 @@ export interface components {
                 "application/problem+json": components["schemas"]["Problem"];
             };
         };
+        /** @description Console session (08, 7.5). */
+        ConsoleLogin: {
+            headers: {
+                "Correlation-Id": components["headers"]["Correlation-Id"];
+                "Set-Cookie": components["headers"]["Set-Cookie"];
+                [name: string]: unknown;
+            };
+            content: {
+                "application/json": components["schemas"]["ConsoleSession"];
+            };
+        };
+        /** @description OK; a console session gets a new cookie (08, 7.5). */
+        StepUpDone: {
+            headers: {
+                "Correlation-Id": components["headers"]["Correlation-Id"];
+                "Set-Cookie": components["headers"]["Set-Cookie"];
+                [name: string]: unknown;
+            };
+            content: {
+                "application/json": components["schemas"]["StepUpResult"];
+            };
+        };
         /** @description Problem codes: `unauthenticated`, `token_expired`, `session_revoked`, `step_up_required`, `use_dpop_nonce`, `invalid_dpop_proof`. */
         Unauthorized: {
             headers: {
                 "Correlation-Id": components["headers"]["Correlation-Id"];
+                "Set-Cookie": components["headers"]["Set-Cookie"];
                 "WWW-Authenticate": components["headers"]["WWW-Authenticate"];
                 "DPoP-Nonce": components["headers"]["DPoP-Nonce"];
                 [name: string]: unknown;
@@ -10596,6 +10743,10 @@ export interface components {
         IfMatchOptional: string;
         /** @description DPoP proof (RFC 9449) signed with the device key that the new tokens will be bound to. */
         DpopProof: string;
+        /** @description As `DpopProof`; not for `client = console`. */
+        DpopProofLogin: string;
+        /** @description CSRF header of the console (SEC-CORS-4). */
+        ConsoleRequest: "1";
         /** @description Event ID; stable across retries, use it to deduplicate. */
         WebhookId: components["schemas"]["Uuid"];
         /** @description Unix seconds of this attempt. Reject values outside `webhook.receiver_tolerance`. */
@@ -10666,6 +10817,8 @@ export interface components {
         "Idempotent-Replay": boolean;
         /** @description Target of the redirect. */
         Location: string;
+        /** @description Console cookie or its clearing value (08, 7.5). */
+        "Set-Cookie": string;
         /** @description Authentication challenge, e.g. `DPoP error="use_dpop_nonce"` (RFC 9449). */
         "WWW-Authenticate": string;
         /** @description Fresh server nonce for the next DPoP proof (RFC 9449). */
@@ -10940,9 +11093,9 @@ export interface operations {
     completeOidcLogin: {
         parameters: {
             query?: never;
-            header: {
-                /** @description DPoP proof (RFC 9449) signed with the device key that the new tokens will be bound to. */
-                DPoP: components["parameters"]["DpopProof"];
+            header?: {
+                /** @description As `DpopProof`; not for `client = console`. */
+                DPoP?: components["parameters"]["DpopProofLogin"];
             };
             path?: never;
             cookie?: never;
@@ -10953,6 +11106,7 @@ export interface operations {
             };
         };
         responses: {
+            200: components["responses"]["ConsoleLogin"];
             /** @description Created. */
             201: {
                 headers: {
@@ -10975,9 +11129,9 @@ export interface operations {
     loginWithTrustedHeader: {
         parameters: {
             query?: never;
-            header: {
-                /** @description DPoP proof (RFC 9449) signed with the device key that the new tokens will be bound to. */
-                DPoP: components["parameters"]["DpopProof"];
+            header?: {
+                /** @description As `DpopProof`; not for `client = console`. */
+                DPoP?: components["parameters"]["DpopProofLogin"];
             };
             path?: never;
             cookie?: never;
@@ -10988,6 +11142,7 @@ export interface operations {
             };
         };
         responses: {
+            200: components["responses"]["ConsoleLogin"];
             /** @description Created. */
             201: {
                 headers: {
@@ -11041,9 +11196,9 @@ export interface operations {
     completePasskeyLogin: {
         parameters: {
             query?: never;
-            header: {
-                /** @description DPoP proof (RFC 9449) signed with the device key that the new tokens will be bound to. */
-                DPoP: components["parameters"]["DpopProof"];
+            header?: {
+                /** @description As `DpopProof`; not for `client = console`. */
+                DPoP?: components["parameters"]["DpopProofLogin"];
             };
             path?: never;
             cookie?: never;
@@ -11054,6 +11209,7 @@ export interface operations {
             };
         };
         responses: {
+            200: components["responses"]["ConsoleLogin"];
             /** @description Created. */
             201: {
                 headers: {
@@ -11256,9 +11412,9 @@ export interface operations {
     loginWithPassword: {
         parameters: {
             query?: never;
-            header: {
-                /** @description DPoP proof (RFC 9449) signed with the device key that the new tokens will be bound to. */
-                DPoP: components["parameters"]["DpopProof"];
+            header?: {
+                /** @description As `DpopProof`; not for `client = console`. */
+                DPoP?: components["parameters"]["DpopProofLogin"];
             };
             path?: never;
             cookie?: never;
@@ -11269,6 +11425,7 @@ export interface operations {
             };
         };
         responses: {
+            200: components["responses"]["ConsoleLogin"];
             /** @description Created. */
             201: {
                 headers: {
@@ -11325,7 +11482,10 @@ export interface operations {
     logout: {
         parameters: {
             query?: never;
-            header?: never;
+            header?: {
+                /** @description CSRF header of the console (SEC-CORS-4). */
+                "X-Console-Request"?: components["parameters"]["ConsoleRequest"];
+            };
             path?: never;
             cookie?: never;
         };
@@ -11335,6 +11495,7 @@ export interface operations {
             204: {
                 headers: {
                     "Correlation-Id": components["headers"]["Correlation-Id"];
+                    "Set-Cookie": components["headers"]["Set-Cookie"];
                     RateLimit: components["headers"]["RateLimit"];
                     "RateLimit-Policy": components["headers"]["RateLimit-Policy"];
                     [name: string]: unknown;
@@ -11350,7 +11511,10 @@ export interface operations {
     createStepUpChallenge: {
         parameters: {
             query?: never;
-            header?: never;
+            header?: {
+                /** @description CSRF header of the console (SEC-CORS-4). */
+                "X-Console-Request"?: components["parameters"]["ConsoleRequest"];
+            };
             path?: never;
             cookie?: never;
         };
@@ -11377,7 +11541,10 @@ export interface operations {
     completeStepUpWithPasskey: {
         parameters: {
             query?: never;
-            header?: never;
+            header?: {
+                /** @description CSRF header of the console (SEC-CORS-4). */
+                "X-Console-Request"?: components["parameters"]["ConsoleRequest"];
+            };
             path?: never;
             cookie?: never;
         };
@@ -11387,18 +11554,7 @@ export interface operations {
             };
         };
         responses: {
-            /** @description OK. */
-            200: {
-                headers: {
-                    "Correlation-Id": components["headers"]["Correlation-Id"];
-                    RateLimit: components["headers"]["RateLimit"];
-                    "RateLimit-Policy": components["headers"]["RateLimit-Policy"];
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["StepUpResult"];
-                };
-            };
+            200: components["responses"]["StepUpDone"];
             400: components["responses"]["BadRequest"];
             401: components["responses"]["Unauthorized"];
             403: components["responses"]["Forbidden"];
@@ -11435,6 +11591,121 @@ export interface operations {
             401: components["responses"]["Unauthorized"];
             403: components["responses"]["Forbidden"];
             429: components["responses"]["TooManyRequests"];
+            default: components["responses"]["Error"];
+        };
+    };
+    stepUpWithPassword: {
+        parameters: {
+            query?: never;
+            header?: {
+                /** @description CSRF header of the console (SEC-CORS-4). */
+                "X-Console-Request"?: components["parameters"]["ConsoleRequest"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["StepUpPasswordRequest"];
+            };
+        };
+        responses: {
+            200: components["responses"]["StepUpDone"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            default: components["responses"]["Error"];
+        };
+    };
+    beginStepUpOidcReauth: {
+        parameters: {
+            query?: never;
+            header?: {
+                /** @description CSRF header of the console (SEC-CORS-4). */
+                "X-Console-Request"?: components["parameters"]["ConsoleRequest"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["StepUpOidcBeginRequest"];
+            };
+        };
+        responses: {
+            /** @description OK. */
+            200: {
+                headers: {
+                    "Correlation-Id": components["headers"]["Correlation-Id"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["OidcBeginResponse"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            default: components["responses"]["Error"];
+        };
+    };
+    completeStepUpOidcReauth: {
+        parameters: {
+            query?: never;
+            header?: {
+                /** @description CSRF header of the console (SEC-CORS-4). */
+                "X-Console-Request"?: components["parameters"]["ConsoleRequest"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["IdentityLinkComplete"];
+            };
+        };
+        responses: {
+            200: components["responses"]["StepUpDone"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            default: components["responses"]["Error"];
+        };
+    };
+    getConsoleSession: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: components["responses"]["ConsoleLogin"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            default: components["responses"]["Error"];
+        };
+    };
+    endViewAs: {
+        parameters: {
+            query?: never;
+            header?: {
+                /** @description CSRF header of the console (SEC-CORS-4). */
+                "X-Console-Request"?: components["parameters"]["ConsoleRequest"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description No content. */
+            204: {
+                headers: {
+                    "Correlation-Id": components["headers"]["Correlation-Id"];
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
             default: components["responses"]["Error"];
         };
     };
