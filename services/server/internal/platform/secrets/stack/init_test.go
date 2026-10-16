@@ -46,7 +46,7 @@ var freshLines = []string{
 	"generated audit_ip_kek",
 	"generated file_ticket_key",
 	"generated pgbackrest_cipher_pass",
-	"pending pgbackrest_tls/",
+	"generated pgbackrest_tls/",
 	"generated restic_password",
 	"pending s3_access_key",
 	"pending s3_secret_key",
@@ -70,11 +70,11 @@ var freshLines = []string{
 // generated entries whose row in configuration.md lists the service.
 var freshServiceFiles = map[string][]string{
 	"alertmanager": nil,
-	"backup":       {"db_superuser_password", "pgbackrest_cipher_pass", "restic_password"},
+	"backup":       {"db_superuser_password", "pgbackrest_cipher_pass", "pgbackrest_tls/backup.crt", "pgbackrest_tls/backup.key", "pgbackrest_tls/ca.crt", "pgbackrest_tls/postgres.crt", "pgbackrest_tls/postgres.key", "restic_password"},
 	"collector":    {"db_monitor_password", "telemetry_pseudonym_key"},
 	"grafana":      {"grafana_admin_password"},
 	"migrate":      {"db_app_password", "db_maint_password", "db_monitor_password", "db_owner_password", "db_superuser_password"},
-	"postgres":     {"db_superuser_password"},
+	"postgres":     {"db_superuser_password", "pgbackrest_tls/backup.crt", "pgbackrest_tls/backup.key", "pgbackrest_tls/ca.crt", "pgbackrest_tls/postgres.crt", "pgbackrest_tls/postgres.key"},
 	"seaweedfs":    nil,
 	"server":       {"audit_ip_kek", "db_app_password", "db_maint_password", "file_ticket_key", "telemetry_pseudonym_key", "token_pepper"},
 }
@@ -116,7 +116,7 @@ func TestInitFreshTarget(t *testing.T) {
 			t.Errorf("_store/%s owner %v, want %v", name, got, me())
 		}
 	}
-	if got, want := files(t, store), slices.Sorted(slices.Values(append(slices.Clone(tokenEntries), keyEntries...))); !slices.Equal(got, want) {
+	if got, want := files(t, store), slices.Sorted(slices.Values(slices.Concat(tokenEntries, keyEntries, tlsFiles))); !slices.Equal(got, want) {
 		t.Errorf("_store holds %v, want %v", got, want)
 	}
 
@@ -152,11 +152,17 @@ func TestInitFreshTarget(t *testing.T) {
 	var got []string
 	for _, l := range r.Lines {
 		got = append(got, string(l.Status)+" "+l.Name)
-		if l.Status == stack.StatusGenerated {
+		switch {
+		case l.Status == stack.StatusGenerated && strings.HasSuffix(l.Name, "/"):
+			// A directory entry's fingerprint covers its files (TestPGBackRestTLSKeptOnSecondRun).
+			if !regexp.MustCompile(`^sha256:[0-9a-f]{12}$`).MatchString(l.Fingerprint) {
+				t.Errorf("%s fingerprint %q", l.Name, l.Fingerprint)
+			}
+		case l.Status == stack.StatusGenerated:
 			if want := fingerprint(read(t, store, l.Name)); l.Fingerprint != want {
 				t.Errorf("%s fingerprint %q, want %q", l.Name, l.Fingerprint, want)
 			}
-		} else if l.Fingerprint != "" {
+		case l.Fingerprint != "":
 			t.Errorf("%s %s has fingerprint %q", l.Status, l.Name, l.Fingerprint)
 		}
 	}

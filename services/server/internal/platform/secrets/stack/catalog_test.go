@@ -193,7 +193,7 @@ func TestCatalogIsValid(t *testing.T) {
 		}
 		switch e.Origin {
 		case stack.OriginGenerated:
-			if e.Generator != stack.GeneratorToken && e.Generator != stack.GeneratorKey && e.Generator != stack.GeneratorPending {
+			if e.Generator != stack.GeneratorToken && e.Generator != stack.GeneratorKey && e.Generator != stack.GeneratorPGBackRestTLS && e.Generator != stack.GeneratorPending {
 				t.Errorf("generated entry %s has generator %q", e.Name, e.Generator)
 			}
 		case stack.OriginSupplied:
@@ -230,7 +230,7 @@ func TestCatalogPendingAndGenerators(t *testing.T) {
 		"audit_ip_kek":            {stack.GeneratorKey, ""},
 		"file_ticket_key":         {stack.GeneratorKey, ""},
 		"totp_key":                {stack.GeneratorPending, "M1-39"},
-		"pgbackrest_tls/":         {stack.GeneratorPending, "M7-01"},
+		"pgbackrest_tls/":         {stack.GeneratorPGBackRestTLS, ""},
 		"s3_access_key":           {stack.GeneratorPending, "M3"},
 		"s3_secret_key":           {stack.GeneratorPending, "M3"},
 	}
@@ -314,7 +314,9 @@ func TestCatalogServicesMatchComposeSubpaths(t *testing.T) {
 	for _, m := range regexp.MustCompile(`"([^"]*)"`).FindAllStringSubmatch(command[1], -1) {
 		args = append(args, m[1])
 	}
-	for _, want := range []string{"server=65532:65532", "migrate=65532:65532"} {
+	// postgres and backup run as the user postgres of bothy-postgres (uid and gid 999): pgBackRest
+	// refuses TLS keys readable by others, so their copies need an owner too (brief M7-01).
+	for _, want := range []string{"server=65532:65532", "migrate=65532:65532", "postgres=999:999", "backup=999:999"} {
 		found := false
 		for i := 0; i+1 < len(args); i++ {
 			if args[i] == "--owner" && args[i+1] == want {

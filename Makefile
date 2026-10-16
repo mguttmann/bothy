@@ -95,7 +95,7 @@ TS_ON := $(and $(TS_PROJECTS),$(or $(call want,sdk-typescript),$(call want,plugi
         runners-check release-pins commitlint \
         review labels-check labels-sync tools-lock release-build clean \
         codegen-check arch register-check migrations-lint migrations-lock perf ops-check \
-        image image-test
+        image image-test postgres-image postgres-image-test
 
 help: ## Show the targets
 	@awk 'BEGIN {FS = ":.*## "} /^[a-zA-Z0-9_-]+:.*## / {printf "  %-20s %s\n", $$1, $$2}' $(MAKEFILE_LIST)
@@ -556,6 +556,35 @@ image-test: ## Structure tests of the image from make image (IMAGE=<ref> tests a
 	cd services/server && "$$gl" run --build-tags imagetest ./test/image/... || exit 1; \
 	BOTHY_TEST_IMAGE='$(or $(IMAGE),$(IMAGE_NAME):$(IMAGE_TAG))' BOTHY_TEST_IMAGE_OCI='$(abspath $(IMAGE_OCI))' \
 	  go test -tags imagetest -count=1 ./test/image/... || exit 1
+
+# ---- database image (brief M7-01; not part of `gates`: needs Docker with buildx) ------------------
+# bothy-postgres is postgres:18 plus pgBackRest and bothy-backupd; its tag is pg18-<server version>
+# (docs/spec/18-release.md "Server images" rule 4), locally with the suffix -local, never latest.
+# No build step runs on the target platform, so one host builds both platforms natively.
+POSTGRES_IMAGE_NAME ?= bothy-postgres
+POSTGRES_IMAGE_TAG ?= pg18-$(SERVER_VERSION)-local
+POSTGRES_IMAGE_OCI ?= .cache/image/bothy-postgres.oci.tar
+postgres_image_build = docker buildx build $(if $(IMAGE_BUILDER),--builder '$(IMAGE_BUILDER)') \
+  --file services/server/images/bothy-postgres/Dockerfile \
+  --build-arg VERSION='$(SERVER_VERSION)' --build-arg REVISION="$$rev"
+
+postgres-image: ## Build bothy-postgres for IMAGE_PLATFORMS into POSTGRES_IMAGE_OCI and load the host platform
+	@docker buildx version >/dev/null 2>&1 || { echo "postgres-image: docker buildx is required (Docker with the buildx plugin, CONTRIBUTING.md)" >&2; exit 1; }
+	@[ -n "$(SERVER_VERSION)" ] || { echo "postgres-image: services/server/VERSION is empty" >&2; exit 1; }
+	@case '$(POSTGRES_IMAGE_TAG)' in latest|*-latest) echo "postgres-image: the tag latest is not used (docs/spec/18-release.md \"Channels\" rule 3)" >&2; exit 1;; esac
+	@mkdir -p "$(dir $(POSTGRES_IMAGE_OCI))" || exit 1
+	@rev=$$(git rev-parse HEAD) || exit 1; \
+	$(postgres_image_build) --platform '$(IMAGE_PLATFORMS)' --output 'type=oci,dest=$(POSTGRES_IMAGE_OCI)' . || exit 1; \
+	$(postgres_image_build) --load --tag '$(POSTGRES_IMAGE_NAME):$(POSTGRES_IMAGE_TAG)' . || exit 1
+	@echo "  postgres-image: $(POSTGRES_IMAGE_NAME):$(POSTGRES_IMAGE_TAG) loaded (host platform), $(IMAGE_PLATFORMS) in $(POSTGRES_IMAGE_OCI)"
+
+postgres-image-test: ## Two-container test of bothy-postgres: archive-push, full backup, PITR, verify (after make postgres-image)
+	@docker info >/dev/null 2>&1 || { echo "postgres-image-test: no Docker runtime reachable; the image tests need one (P-09)" >&2; exit 1; }
+	@[ -f "$(POSTGRES_IMAGE_OCI)" ] || { echo "postgres-image-test: $(POSTGRES_IMAGE_OCI) is missing; run make postgres-image first" >&2; exit 1; }
+	@gl=$(call tool,golangci-lint) || exit 1; \
+	cd services/server && "$$gl" run --build-tags imagetest ./test/postgresimage/... || exit 1; \
+	BOTHY_TEST_IMAGE='$(or $(POSTGRES_IMAGE),$(POSTGRES_IMAGE_NAME):$(POSTGRES_IMAGE_TAG))' BOTHY_TEST_IMAGE_OCI='$(abspath $(POSTGRES_IMAGE_OCI))' \
+	  go test -tags imagetest -count=1 -v -timeout 20m ./test/postgresimage/... || exit 1
 
 portability: ## Full stack from images on this machine plus smoke test (contract: infra/compose/smoke.sh)
 	@[ -x infra/compose/smoke.sh ] || { echo "portability: infra/compose/smoke.sh is missing (docs/quality/gates.md)"; exit 1; }

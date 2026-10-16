@@ -11,6 +11,19 @@ documented in this file. The format is based on
 
 ### Added
 
+- Image `bothy-postgres` (M7-01): `postgres:18` pinned by digest plus pgBackRest 2.59.3 from the
+  PostgreSQL project's Debian repository (key checked by fingerprint, a version below 2.59.3 fails
+  the build and the start) and `bothy-backupd`, built for linux/amd64 and linux/arm64 without
+  emulation (`make postgres-image`). The service `postgres` archives WAL with `archive-push` over
+  pgBackRest TLS to the repository host `backup` and has no egress; `backup` holds the encrypted
+  repository. `make postgres-image-test` proves archive-push, a full backup, a point-in-time
+  restore and `pgbackrest verify` with two containers; the CI jobs `postgres-image (amd64)` and
+  `postgres-image (arm64)` run it on both architectures.
+- `bothy-backupd` (M7-01): a second program of the server module that supervises the pgBackRest
+  TLS server of the repository host, creates the stanza on its first start, stops on `SIGTERM`,
+  and offers `healthcheck` (TLS handshake with the stack's CA) and `version`.
+- `bothy secrets init` generates `pgbackrest_tls/` (M7-01): an own CA and ECDSA P-256 certificates
+  for `postgres` and `backup`, copied only to those two services; the CA key is not kept.
 - Discord read client of the import tool (M8-01): `cmd/bothy/importtool/discord` reads a Discord
   server through the `GET` calls of chapter 22 section 4.1 only (user, guild, channels, active
   and archived threads with the page loop by `archive_timestamp`, one channel, messages after,
