@@ -22,8 +22,13 @@ dependencies:
   l10n: any
 
 dev_dependencies:
+  flutter_driver:
+    sdk: flutter
   flutter_lints: ^6.0.0
   flutter_test:
+    sdk: flutter
+  # The performance test of the live topology (integration_test/, platform-tests.json).
+  integration_test:
     sdk: flutter
 
 # The Material icons of the toolbar (dropdown arrows).

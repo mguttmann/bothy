@@ -9,6 +9,7 @@ import 'package:design_system/design_system.dart';
 import 'package:flutter/material.dart';
 
 import '../marks/lane_mark.dart';
+import '../marks/run_card_mark.dart';
 import '../marks/viz_texts.dart';
 import '../model/live_topology_model.dart';
 import '../model/run_card_model.dart';
@@ -59,6 +60,7 @@ class _LiveTopologyViewState extends State<LiveTopologyView>
   LiveTopologyModel? _model;
   String? _queryError;
   final Map<(String, String), (LaneModel, Widget)> _lanes = {};
+  final Map<String, (RunCardModel, Widget)> _cards = {};
 
   @override
   void initState() {
@@ -102,19 +104,37 @@ class _LiveTopologyViewState extends State<LiveTopologyView>
   @override
   void didUpdateWidget(LiveTopologyView oldWidget) {
     super.didUpdateWidget(oldWidget);
-    if (oldWidget.onOpenThread != widget.onOpenThread) _lanes.clear();
+    if (oldWidget.onOpenThread != widget.onOpenThread) {
+      _lanes.clear();
+      _cards.clear();
+    }
   }
 
   void _open(String threadId) => widget.onOpenThread(threadId);
 
-  /// The widget of [lane]: the cached one while the lane is unchanged.
+  /// The widget of [card]: the one of the previous frame while the card is unchanged, so
+  /// the element skips its rebuild.
+  Widget _card(RunCardModel card) {
+    final cached = _cards[card.runId];
+    if (cached != null && cached.$1 == card) return cached.$2;
+    final built = RunCardMark(
+      key: ValueKey(card.runId),
+      model: card,
+      onTap: _open,
+    );
+    _cards[card.runId] = (card, built);
+    return built;
+  }
+
+  /// The widget of [lane]: the cached one while the lane is unchanged; a changed lane keeps
+  /// the widgets of its unchanged cards.
   Widget _lane(LaneModel lane) {
     final key = (lane.spaceId, lane.channelId);
     final cached = _lanes[key];
     if (cached != null && cached.$1 == lane) return cached.$2;
     final built = RepaintBoundary(
       key: ValueKey(key),
-      child: LaneMark(model: lane, onTapRun: _open),
+      child: LaneMark(model: lane, onTapRun: _open, cardBuilder: _card),
     );
     _lanes[key] = (lane, built);
     return built;
@@ -138,6 +158,8 @@ class _LiveTopologyViewState extends State<LiveTopologyView>
           ];
     final keys = {for (final l in lanes) (l.spaceId, l.channelId)};
     _lanes.removeWhere((k, _) => !keys.contains(k));
+    final runs = {for (final l in lanes) ...l.cards.map((c) => c.runId)};
+    _cards.removeWhere((k, _) => !runs.contains(k));
     return VizViewScaffold(
       title: l10n.vizViewLiveTopology,
       options: widget.options,

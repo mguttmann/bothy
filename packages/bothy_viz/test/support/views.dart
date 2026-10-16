@@ -88,13 +88,19 @@ final class ViewWorld {
   /// The opened threads.
   final List<String> opened = [];
 
+  /// The live fixture of [state]: its own file, else `normal`.
+  String get frameState =>
+      fixtureFiles.containsKey('StatsLiveFrame.$state.json') ? state : 'normal';
+
   /// Decodes the frame of [state] (or `normal`) and creates the live source.
   Future<void> load() async {
     if (!withLive) return;
-    final name = fixtureFiles.containsKey('StatsLiveFrame.$state.json')
-        ? state
-        : 'normal';
-    final frame = await memoryFixtures.liveFrame(name);
+    useFrame(await memoryFixtures.liveFrame(frameState));
+  }
+
+  /// Creates the live source that replays [frame] and then [replay].
+  void useFrame(api.StatsLiveFrame frame) {
+    if (!withLive) return;
     final interval = Duration(milliseconds: frame.intervalMs);
     live = FixtureLiveFrameSource(
       clock: clock,

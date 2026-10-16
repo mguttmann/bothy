@@ -255,12 +255,11 @@ class ExecutiveTileGroups extends StatelessWidget {
                   style: dsTextStyle(DsType.caption)
                       .copyWith(color: colors.textSecondary),
                 ),
-          children: tiles.sloOwnerOnly
-              ? [DsBanner(tone: DsTone.info, text: l10n.vizOnlyForOwner)]
-              : [
-                  for (final light in tiles.lights)
-                    TrafficLightMark(model: light),
-                ],
+          banner: tiles.sloOwnerOnly ? l10n.vizOnlyForOwner : null,
+          children: [
+            if (!tiles.sloOwnerOnly)
+              for (final light in tiles.lights) TrafficLightMark(model: light),
+          ],
         ),
       ],
     );
@@ -268,17 +267,25 @@ class ExecutiveTileGroups extends StatelessWidget {
 }
 
 class _Group extends StatelessWidget {
-  const _Group({required this.title, required this.children, this.footer});
+  const _Group({
+    required this.title,
+    required this.children,
+    this.footer,
+    this.banner,
+  });
 
   final String title;
   final List<Widget> children;
   final Widget? footer;
 
+  /// A note instead of the tiles, outside the wrap so it takes the full width.
+  final String? banner;
+
   @override
   Widget build(BuildContext context) => Padding(
     padding: const EdgeInsets.only(bottom: DsSpace.s16),
     child: Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
+      crossAxisAlignment: CrossAxisAlignment.stretch,
       mainAxisSize: MainAxisSize.min,
       children: [
         Semantics(
@@ -290,6 +297,7 @@ class _Group extends StatelessWidget {
           ),
         ),
         const SizedBox(height: DsSpace.s8),
+        if (banner != null) DsBanner(tone: DsTone.info, text: banner!),
         Wrap(spacing: DsSpace.s8, runSpacing: DsSpace.s8, children: children),
         if (footer != null) ...[const SizedBox(height: DsSpace.s4), footer!],
       ],

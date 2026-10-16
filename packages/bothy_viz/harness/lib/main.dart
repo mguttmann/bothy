@@ -6,8 +6,9 @@
 /// Run it with `flutter run -d macos`, `-d windows` or `-d chrome` from this folder after
 /// `flutter create --platforms=macos,windows,web .` (the platform folders are not checked in,
 /// see the README). The toolbar switches theme, density, text size, language and fixture
-/// state; the time-lapse slider moves the fake clock of the fixture live source, so frames
-/// and the stale state appear as they would over time. M6-12 adds the views to [harnessMarks].
+/// state; the time-lapse slider moves the fake clock of the fixture live sources, so frames,
+/// the stale state and the timeline playback appear as they would over time. After the marks,
+/// [harnessMarks] lists the six views of M6-12 ([harnessViews]), each on the fixture sources.
 library;
 
 import 'package:bothy_viz/bothy_viz.dart';
@@ -86,6 +87,36 @@ final List<HarnessEntry> harnessMarks = [
   ),
 ];
 
+/// The six views, built from the registry on the fixture sources of [HarnessData]; TV mode
+/// shows in a box and returns to the first entry on a key press or click.
+final List<HarnessEntry> harnessViews = [
+  for (final spec in vizViewRegistry)
+    (
+      label: spec.title,
+      build: (data) => spec.kind == VizViewKind.tvMode
+          ? SizedBox(
+              height: DsLayout.messageMaxWidth,
+              child: TvMode(
+                views: [
+                  for (final s in vizViewRegistry)
+                    if (s.kind != VizViewKind.tvMode) s.kind,
+                ],
+                options: data.options,
+                live: data.viewLive,
+                queries: data.queries,
+                onExit: data.onExitTv,
+              ),
+            )
+          : buildVizView(
+              spec.kind,
+              live: data.viewLive,
+              queries: data.queries,
+              options: data.options,
+              onOpenThread: data.onTapRun,
+            ),
+    ),
+];
+
 /// Fixture states the toolbar offers; a schema without a file of the state shows `normal`.
 const List<String> harnessStates = [
   'normal',
@@ -94,6 +125,24 @@ const List<String> harnessStates = [
   'no_cost_permission',
   'offline',
   'load',
+  'rate_limits',
+  'day_boundary',
+];
+
+/// Every fixture file name the harness may read; the query source falls back to `normal`
+/// for a state without its own file.
+final List<String> _fixtureNames = [
+  for (final state in harnessStates) ...[
+    'StatsLiveFrame.$state.json',
+    'StatsTimeline.$state.json',
+    'StatsSloReport.$state.json',
+    'StatsBackendReport.$state.json',
+    'CostSeries.$state.json',
+    'StatsSeries.$state.json',
+    'StatsSeries.usage.$state.json',
+    'StatsSeries.runs.$state.json',
+    'StatsSeries.errors.$state.json',
+  ],
 ];
 
 /// Text scales of the toolbar.
@@ -131,6 +180,10 @@ final class HarnessData {
     required this.timeline,
     required this.executive,
     required this.onTapRun,
+    required this.options,
+    required this.queries,
+    required this.viewLive,
+    required this.onExitTv,
   });
 
   /// Texts of the current language.
@@ -150,6 +203,18 @@ final class HarnessData {
 
   /// Shows the thread of a tapped run card.
   final RunTapCallback onTapRun;
+
+  /// Host options of the views (desktop, instance, the fake clock).
+  final VizHostOptions options;
+
+  /// The REST fixtures of the state.
+  final FixtureStatsQuerySource queries;
+
+  /// The live source of the views, replaying the frames of the state on the fake clock.
+  final LiveFrameSource viewLive;
+
+  /// Leaves TV mode.
+  final VoidCallback onExitTv;
 }
 
 /// The harness app; [reader] replaces the asset bundle (tests read the files directly).
@@ -198,6 +263,9 @@ class HarnessAppState extends State<HarnessApp> {
   FakeVizClock? _clock;
   Duration _step = Duration.zero;
   FixtureLiveFrameSource? _source;
+  FixtureLiveFrameSource? _viewSource;
+  FixtureStatsQuerySource? _queries;
+  VizHostOptions? _options;
   LiveTopologyModel? _live;
   bool _stale = false;
   TimelineModel? _timeline;
@@ -214,6 +282,7 @@ class HarnessAppState extends State<HarnessApp> {
   @override
   void dispose() {
     _source?.stop();
+    _viewSource?.stop();
     super.dispose();
   }
 
@@ -247,19 +316,38 @@ class HarnessAppState extends State<HarnessApp> {
     );
     if (!mounted || generation != _generation) return;
     await _source?.stop();
+    await _viewSource?.stop();
     final clock = FakeVizClock(frame.at);
     final step = Duration(milliseconds: frame.intervalMs);
+    // Two frames, then silence: the time-lapse shows the frames and then the stale state.
+    final steps = <ReplayStep>[
+      (after: Duration.zero, frame: frame),
+      (after: step, frame: empty),
+      (after: step, frame: frame),
+    ];
     final source = FixtureLiveFrameSource(
       clock: clock,
       staleAfter: _staleAfter,
       names: harnessNames,
-      // Two frames, then silence: the time-lapse shows the frames and then the stale state.
-      steps: [
-        (after: Duration.zero, frame: frame),
-        (after: step, frame: empty),
-        (after: step, frame: frame),
-      ],
+      steps: steps,
     );
+    // The views start and stop their own stream, so they get a source of their own.
+    final viewSource = FixtureLiveFrameSource(
+      clock: clock,
+      staleAfter: _staleAfter,
+      names: harnessNames,
+      steps: steps,
+    );
+    final files = <String>{};
+    for (final name in _fixtureNames) {
+      try {
+        await _fixtures.read(name);
+        files.add(name);
+      } on Object {
+        continue;
+      }
+    }
+    if (!mounted || generation != _generation) return;
     source.start().listen((event) {
       if (!mounted) return;
       setState(() {
@@ -279,6 +367,23 @@ class HarnessAppState extends State<HarnessApp> {
       _clock = clock;
       _step = step;
       _source = source;
+      _viewSource = viewSource;
+      _queries = FixtureStatsQuerySource(
+        _fixtures,
+        state: fixtureState,
+        available: files,
+      );
+      _options = VizHostOptions(
+        formFactor: VizFormFactor.desktop,
+        scope: const VizScope.instance(),
+        range: VizRange(
+          from: frame.at.subtract(const Duration(days: 1)),
+          to: frame.at,
+        ),
+        allowTvMode: true,
+        names: harnessNames,
+        clock: clock,
+      );
       _timeline = TimelineModel.fromTimeline(timeline, names: harnessNames);
       _executive = executive;
       timeLapse = 0;
@@ -324,6 +429,7 @@ class HarnessAppState extends State<HarnessApp> {
     final live = _live;
     final timeline = _timeline;
     final executive = _executive;
+    final entries = [...harnessMarks, ...harnessViews];
     return Scaffold(
       appBar: AppBar(title: Text(l10n.vizHarnessTitle)),
       body: Row(
@@ -333,11 +439,11 @@ class HarnessAppState extends State<HarnessApp> {
             width: DsLayout.sidebarWidth,
             child: ListView(
               children: [
-                for (var i = 0; i < harnessMarks.length; i++)
+                for (var i = 0; i < entries.length; i++)
                   ListTile(
                     key: ValueKey('mark-$i'),
                     selected: i == selected,
-                    title: Text(harnessMarks[i].label(l10n)),
+                    title: Text(entries[i].label(l10n)),
                     onTap: () => setState(() => selected = i),
                   ),
               ],
@@ -352,11 +458,16 @@ class HarnessAppState extends State<HarnessApp> {
                 Expanded(
                   child: SingleChildScrollView(
                     padding: const EdgeInsets.all(DsSpace.s16),
-                    child: live == null || timeline == null || executive == null
+                    child:
+                        live == null ||
+                            timeline == null ||
+                            executive == null ||
+                            _options == null
                         ? const SizedBox.shrink()
                         : KeyedSubtree(
-                            key: const ValueKey('harness-mark'),
-                            child: harnessMarks[selected].build(
+                            // A new fixture state builds the views anew on its sources.
+                            key: ValueKey('harness-mark-$_generation'),
+                            child: entries[selected].build(
                               HarnessData(
                                 l10n: l10n,
                                 live: live,
@@ -365,6 +476,10 @@ class HarnessAppState extends State<HarnessApp> {
                                 executive: executive,
                                 onTapRun: (thread) =>
                                     setState(() => _tapped = thread),
+                                options: _options!,
+                                queries: _queries!,
+                                viewLive: _viewSource!,
+                                onExitTv: () => setState(() => selected = 0),
                               ),
                             ),
                           ),
