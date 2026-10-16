@@ -11,8 +11,13 @@ environment:
   flutter: 3.47.7
 
 dependencies:
-  # A member of the workspace; pub resolves it to packages/domain (resolution: workspace).
+  # Members of the workspace; pub resolves them to packages/<name> (resolution: workspace).
+  api_client: any
   domain: any
+  local_store: any
+  # The outbox classifies the transport errors of the generated client (brief M4-15 Design
+  # note 2); the same constraint as in packages/api_client.
+  dio: ^5.11.1
 
 dev_dependencies:
   lints: ^6.1.0
