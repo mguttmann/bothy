@@ -5,12 +5,14 @@ import 'dart:convert';
 import 'dart:io';
 
 import 'package:alchemist/alchemist.dart';
+import 'package:design_system/testing.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 /// Golden setup of this package (docs/spec/15-client-architecture.md 20).
 ///
-/// CI goldens (text as blocks, Ahem) run on every machine and are compared everywhere;
+/// CI goldens (text as blocks, Ahem) run on every machine and are compared everywhere, within
+/// [dsCiGoldenDiffThreshold];
 /// platform goldens with the real fonts run only on macOS. The bundled fonts are loaded once
 /// so platform goldens and widget tests render Atkinson Hyperlegible.
 Future<void> testExecutable(FutureOr<void> Function() testMain) async {
@@ -21,6 +23,7 @@ Future<void> testExecutable(FutureOr<void> Function() testMain) async {
       ciGoldensConfig: const CiGoldensConfig(
         enabled: true,
         filePathResolver: _goldenPath,
+        diffThreshold: dsCiGoldenDiffThreshold,
       ),
       platformGoldensConfig: PlatformGoldensConfig(
         enabled: Platform.isMacOS,

@@ -12,6 +12,14 @@ import 'package:flutter/material.dart';
 
 import 'design_system.dart';
 
+/// Largest fraction of differing pixels a CI golden still passes with (0.02 %).
+///
+/// CI goldens recorded on macOS differ on the Linux runner in a few anti-aliased edge pixels
+/// (170 of 2.28 million in the sample page), so an exact match fails there. The bound stays
+/// below one full-width line of one pixel in that image, so a missing border or divider still
+/// fails (docs/DECISIONS.md D-M4-04-6). Every member passes it to `CiGoldensConfig`.
+const double dsCiGoldenDiffThreshold = 0.0002;
+
 /// The font family alchemist sets on the ambient theme for CI goldens (obscured text).
 const String _obscuredFontFamily = 'Ahem';
 
