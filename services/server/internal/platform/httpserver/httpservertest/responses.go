@@ -17,6 +17,8 @@ import (
 	validator "github.com/pb33f/libopenapi-validator"
 	"github.com/pb33f/libopenapi-validator/config"
 	v3 "github.com/pb33f/libopenapi/datamodel/high/v3"
+
+	"github.com/OWNER/bothy/services/server/internal/platform/httpserver"
 )
 
 // ResponseValidator checks finished responses against the response schemas of an OpenAPI 3.1
@@ -45,6 +47,24 @@ func SharedResponseValidator(spec []byte, operationIDs []string) (*ResponseValid
 		return NewResponseValidator(spec, ids)
 	}))
 	return build.(func() (*ResponseValidator, error))()
+}
+
+// requestValidators caches one request validator of the chain per contract and operation list,
+// like validators: every harness of a handler test built its own over the whole contract, which
+// made the HTTP test package of identity run past the time limit and raised its memory under
+// -race beyond what a CI runner holds (the class of M1-31/17 and M1-33/18, ruling PL/3).
+var requestValidators sync.Map // [sha256.Size]byte -> func() (*httpserver.Validator, error)
+
+// SharedValidator returns the request validator of the chain (httpserver.NewValidator) for spec
+// and operationIDs, built once per process, contract and list; httpserver.Validator is safe for
+// concurrent use. Errors: those of httpserver.NewValidator, also on later calls.
+func SharedValidator(spec []byte, operationIDs []string) (*httpserver.Validator, error) {
+	ids := slices.Sorted(slices.Values(operationIDs))
+	key := sha256.Sum256(append(append(slices.Clone(spec), 0), []byte(strings.Join(ids, "\x00"))...))
+	build, _ := requestValidators.LoadOrStore(key, sync.OnceValues(func() (*httpserver.Validator, error) {
+		return httpserver.NewValidator(spec, ids)
+	}))
+	return build.(func() (*httpserver.Validator, error))()
 }
 
 // NewResponseValidator builds the validator over spec, keeping only the operations operationIDs

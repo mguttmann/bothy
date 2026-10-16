@@ -17,6 +17,23 @@ import (
 	"github.com/OWNER/bothy/services/server/internal/platform/httpserver/httpservertest"
 )
 
+// TestSharedValidator: the request validator of a contract and operation list is built once per
+// process, whatever the order of the list; an unknown operation is an error.
+func TestSharedValidator(t *testing.T) {
+	t.Parallel()
+	a, err := httpservertest.SharedValidator(rest.Spec, []string{"getMe", "getUser"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	b, err := httpservertest.SharedValidator(rest.Spec, []string{"getUser", "getMe"})
+	if err != nil || a != b {
+		t.Fatalf("second call = %p, %v; want the cached %p", b, err, a)
+	}
+	if _, err := httpservertest.SharedValidator(rest.Spec, []string{"noSuchOperation"}); err == nil {
+		t.Fatal("an unknown operation gave a validator")
+	}
+}
+
 func TestActors(t *testing.T) {
 	t.Parallel()
 	s := httpservertest.NewActors()
