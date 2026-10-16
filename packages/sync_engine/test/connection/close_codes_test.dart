@@ -24,25 +24,22 @@ class Observed {
   final String? nextOp;
 }
 
-/// Brings [h] live, closes with [code] and [reason], waits up to [horizon] for the next
-/// connection and answers its `hello`.
-Future<Observed> closeLive(
-  Harness h,
-  int? code, {
-  String? reason,
-  Duration horizon = const Duration(minutes: 2),
-}) async {
+/// Brings [h] live, closes with [code] and [reason], lets 10 s pass (every wait of the table
+/// is shorter; the fake clock opens the next connection exactly at the end of its wait) and
+/// answers the `hello` of the next connection; without one, 2 more minutes must pass without
+/// a connection.
+Future<Observed> closeLive(Harness h, int? code, {String? reason}) async {
   final ch = await h.goLive();
   expect(h.phase, ConnectionPhase.live);
   final closedAt = h.clock.now();
   ch.serverClose(code, reason);
   await settle();
   final state = h.connection.state;
-  final until = closedAt.add(horizon);
-  while (h.transport.channels.length == 1 && h.clock.now().isBefore(until)) {
-    await h.clock.elapse(const Duration(milliseconds: 50));
+  await h.clock.elapse(const Duration(seconds: 10));
+  if (h.transport.channels.length == 1) {
+    await h.clock.elapse(const Duration(minutes: 2));
+    if (h.transport.channels.length == 1) return Observed(state, null, null);
   }
-  if (h.transport.channels.length == 1) return Observed(state, null, null);
   final next = h.transport.last;
   final wait = next.openedAt.difference(closedAt);
   final sent = await h.answerHello();
