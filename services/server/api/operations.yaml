@@ -49,11 +49,14 @@ enabled:             # operationIds that have a handler; sorted ascending
   - createToken
   - createUser
   - createWebhookSubscription
+  - deleteChannelDraft
   - deleteForumTag
   - deleteGroup
   - deleteIdentityProvider
   - deleteMessage
+  - deleteMySetting
   - deleteTemplate
+  - deleteThreadDraft
   - deleteWebhookSubscription
   - disableAgent
   - disableUser
@@ -76,6 +79,7 @@ enabled:             # operationIds that have a handler; sorted ascending
   - getMe
   - getMessage
   - getMyCredentials
+  - getMySidebar
   - getProblemType
   - getSpace
   - getThread
@@ -99,8 +103,11 @@ enabled:             # operationIds that have a handler; sorted ascending
   - listInstanceSettings
   - listMessageRevisions
   - listMyDevices
+  - listMyDrafts
   - listMyMentions
+  - listMyReadStates
   - listMySessions
+  - listMySettings
   - listMyTemplates
   - listOwners
   - listPins
@@ -118,15 +125,20 @@ enabled:             # operationIds that have a handler; sorted ascending
   - loginWithPassword
   - loginWithTrustedHeader
   - logout
+  - markThreadUnread
   - moveChannel
   - moveForumTag
   - moveSpace
   - pairHost
   - pinMessage
   - previewGrant
+  - putChannelDraft
   - putFeatureFlag
   - putInstanceSetting
+  - putMySetting
   - putMySidebarSpace
+  - putReadState
+  - putThreadDraft
   - redeemEnrollmentCode
   - redeliverWebhook
   - refreshToken
@@ -262,18 +274,12 @@ later:               # every other operationId of docs/api/openapi.yaml; sorted 
   - operation_id: deleteBrandingLogo
     milestone: M3
     ticket: M3-10
-  - operation_id: deleteChannelDraft
-    milestone: M1
-    ticket: M1-61
   - operation_id: deleteFile
     milestone: M3
     ticket: M3-08
   - operation_id: deleteMyAvatar
     milestone: M3
     ticket: M3-10
-  - operation_id: deleteMySetting
-    milestone: M1
-    ticket: M1-61
   - operation_id: deleteNotificationPreference
     milestone: M3
     ticket: M3-18
@@ -286,9 +292,6 @@ later:               # every other operationId of docs/api/openapi.yaml; sorted 
   - operation_id: deleteStatusComponent
     milestone: M7
     ticket: M7-09
-  - operation_id: deleteThreadDraft
-    milestone: M1
-    ticket: M1-61
   - operation_id: downloadFile
     milestone: M3
     ticket: M3-05
@@ -331,9 +334,6 @@ later:               # every other operationId of docs/api/openapi.yaml; sorted 
   - operation_id: getImport
     milestone: M8
     ticket: M8-03
-  - operation_id: getMySidebar
-    milestone: M1
-    ticket: M1-61
   - operation_id: getPublicStatus
     milestone: M7
     ticket: M7-09
@@ -424,21 +424,12 @@ later:               # every other operationId of docs/api/openapi.yaml; sorted 
   - operation_id: listMyDms
     milestone: V3
     ticket: V3-01
-  - operation_id: listMyDrafts
-    milestone: M1
-    ticket: M1-61
   - operation_id: listMyNotificationPreferences
     milestone: M3
     ticket: M3-18
   - operation_id: listMyQuietHours
     milestone: M3
     ticket: M3-18
-  - operation_id: listMyReadStates
-    milestone: M1
-    ticket: M1-61
-  - operation_id: listMySettings
-    milestone: M1
-    ticket: M1-61
   - operation_id: listPrices
     milestone: M2
     ticket: M2-22
@@ -454,9 +445,6 @@ later:               # every other operationId of docs/api/openapi.yaml; sorted 
   - operation_id: listThreadRuns
     milestone: M2
     ticket: M2-05
-  - operation_id: markThreadUnread
-    milestone: M1
-    ticket: M1-61
   - operation_id: moveThread
     milestone: M1
     ticket: M1-62
@@ -478,12 +466,6 @@ later:               # every other operationId of docs/api/openapi.yaml; sorted 
   - operation_id: putChannelBehavior
     milestone: M2
     ticket: M2-02
-  - operation_id: putChannelDraft
-    milestone: M1
-    ticket: M1-61
-  - operation_id: putMySetting
-    milestone: M1
-    ticket: M1-61
   - operation_id: putNotificationPreference
     milestone: M3
     ticket: M3-18
@@ -493,12 +475,6 @@ later:               # every other operationId of docs/api/openapi.yaml; sorted 
   - operation_id: putQuietHoursRule
     milestone: M3
     ticket: M3-18
-  - operation_id: putReadState
-    milestone: M1
-    ticket: M1-61
-  - operation_id: putThreadDraft
-    milestone: M1
-    ticket: M1-61
   - operation_id: reconcileCosts
     milestone: M2
     ticket: M2-28

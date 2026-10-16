@@ -1,6 +1,6 @@
 # Module `sync`
 
-Status: built in part (M1-16, M1-20, M2-01, M1-58): the event log with the commit-ordered sequence, the phase hook of `sync`, the log tail, the partitions of `event_log`, the one envelope of gateway, REST and webhooks, the idempotency keys behind `kernel/idempotency.Store` with the job `sync.idempotency_cleanup`, and the frame of the worker consumers with `event_consumer_cursors` (no production consumer yet: M2-26 registers `webhooks`, M3-19 `push`). The redaction of a deletion (M1-58) implements `eventlog.Redactor`. Catch-up, snapshot, read states, drafts and settings come with M1-63 and the tickets that need them.
+Status: built in part (M1-16, M1-20, M2-01, M1-58, M1-61): the event log with the commit-ordered sequence, the phase hook of `sync`, the log tail, the partitions of `event_log`, the one envelope of gateway, REST and webhooks, the idempotency keys behind `kernel/idempotency.Store` with the job `sync.idempotency_cleanup`, and the frame of the worker consumers with `event_consumer_cursors` (no production consumer yet: M2-26 registers `webhooks`, M3-19 `push`); the read states, drafts and personal settings with their twelve REST operations and the subscription `messaging.MessagePosted` (M1-61). The redaction of a deletion (M1-58) implements `eventlog.Redactor`. Catch-up and snapshot come with M1-63 and the tickets that need them.
 The normative source is [docs/spec/02-architecture.md](../../../../docs/spec/02-architecture.md); where they differ, the chapter applies.
 
 ## Purpose
@@ -15,6 +15,11 @@ Event log (append, tail, catch-up, redaction, partitions), snapshot, idempotency
 | `domain/` | event validation (`ValidateEvent`, `CheckPayload`), partition arithmetic (`PartitionLower`, `PartitionName`), the gap check of the tail (`CheckContiguous`, `GapError`) and the round plan of a worker consumer (`PlanRound`, `RoundPlan`, `ErrConsumerGap`) |
 | `app/` | `Appender` (implements `kernel/eventlog.Appender`), `PhaseHook` (phase `sync`), `PartitionMaintenance`, `IdempotencyStore` (implements `kernel/idempotency.Store`), `IdempotencyCleanup`, `ConsumerService` (implements `sync.Consumers`: `Register`, `Ensure`, `Round`, `States`) and `ConsumerRunner`; outgoing ports `Writer`, `Partitions`, `Correlator`, `KeyRows`, `ConsumerCursorStore`, `ConsumerLogReader`, `Waker` |
 | `adapters/postgres/` | `Repository` (writer, partitions, head, minimum, reads, the cursor store and log reader of the worker consumers) and `IdempotencyRepository` (`KeyRows`) over sqlc queries in `queries/`, generated code in `sqlcgen/` (entry in `services/server/sqlc.yaml`); `Tail` and `Waker`, each with its own `LISTEN` connection over one shared listening loop (`listener`) |
+| `internal/sync` | port: `Event` (a stored row, zero values for NULL), `DeliveryFields`, `Envelope` with `EnvelopeActor`, `EnvelopeScope`, `EnvelopeResource` and `Event.Envelope`, `Sink`, `Tail`, `ErrGap`; worker consumers: `ConsumerName` (`ConsumerPush`, `ConsumerWebhooks`, `ConsumerNames`, `Valid`), `ConsumerHandler`, `ConsumerState`, `Consumers`; personal data (M1-61, `personal.go`): `Register` (the four personal events), `ReadStates`, `Drafts`, `Settings` with the DTOs `ReadState`, `AdvanceReadState`, `MarkUnread`, `Precondition`, `Draft`, `PutDraft`, `DraftPutResult`, `UserSetting`, `SidebarState` |
+| `domain/` | event validation (`ValidateEvent`, `CheckPayload`), partition arithmetic (`PartitionLower`, `PartitionName`), the gap check of the tail (`CheckContiguous`, `GapError`) and the round plan of a worker consumer (`PlanRound`, `RoundPlan`, `ErrConsumerGap`); personal data (M1-61): `CheckReadSeq`, `Advance`, `MarkUnread` (`readstate.go`), `DraftInput` with `Empty`, `ValidateDraft`, `OverwroteNewer`, `TruncateContent` (`draft.go`) and the key registry `SettingSpec`, `Settings`, `KnownSetting`, `ValidateSetting` (`settings.go`) |
+| `app/` | `Appender` (implements `kernel/eventlog.Appender`), `PhaseHook` (phase `sync`), `PartitionMaintenance`, `IdempotencyStore` (implements `kernel/idempotency.Store`), `IdempotencyCleanup`, `ConsumerService` (implements `sync.Consumers`: `Register`, `Ensure`, `Round`, `States`) and `ConsumerRunner`; outgoing ports `Writer`, `Partitions`, `Correlator`, `KeyRows`, `ConsumerCursorStore`, `ConsumerLogReader`, `Waker`; personal data (M1-61): `Personal` (implements `sync.ReadStates`; `Personal.Drafts` and `Personal.Settings` the other two ports), `PersonalConfig`, `PersonalDeps`, outgoing ports `PersonalStore`, `DraftRows`, `ThreadSource`, `ChannelSource`, `MentionCounter`, and `Subscribers` with `OnMessagePosted` |
+| `adapters/postgres/` | `Repository` (writer, partitions, head, minimum, reads, the cursor store and log reader of the worker consumers) and `IdempotencyRepository` (`KeyRows`) over sqlc queries in `queries/`, generated code in `sqlcgen/` (entry in `services/server/sqlc.yaml`); `Tail` and `Waker`, each with its own `LISTEN` connection over one shared listening loop (`listener`); `PersonalRepository` (`PersonalStore`) over `queries/read_states.sql`, `drafts.sql` and `user_settings.sql` (M1-61) |
+| `adapters/httpapi/` | `Personal`, the handlers of `listMyReadStates`, `putReadState`, `markThreadUnread`, `putThreadDraft`, `deleteThreadDraft`, `putChannelDraft`, `deleteChannelDraft`, `listMyDrafts`, `listMySettings`, `putMySetting`, `deleteMySetting` and `getMySidebar` (M1-61) |
 | `adapters/otelmetrics/` | the lag gauges of the worker consumers (`RegisterConsumerGauges`) |
 | `adapters/telemetry/` | `Correlator`: `correlation_id` and `trace_context` from the trace context of the append |
 | `adapters/jobs/` | jobs `sync.partition_maintenance` and `sync.idempotency_cleanup`: arguments, handlers, periodic registrations |
@@ -229,6 +234,63 @@ cancellation it returns `ctx.Err()`. A repeated run is harmless.
 
 Configuration: `sync.idempotency_key_ttl` (04), `sync.idempotency_cleanup_interval` and
 `sync.idempotency_cleanup_batch_size` (02).
+
+### Read states, drafts and settings (M1-61)
+
+Migration `00042_sync_personal_data.sql` creates `read_states`, `drafts` and `user_settings` as
+03 section 4.10 (`bothy_app`: `SELECT`, `INSERT`, `UPDATE` on `read_states`, also `DELETE` on
+the other two). Every query names the person (`user_id`). Every operation authorizes its action
+of the catalogue on a resource owned by the caller; agents and apps get
+`403 forbidden` (reason `subject_kind_not_allowed`) from `authorize` (docs/DECISIONS.md M1-61/3), an unknown and an
+invisible thread or channel the same `404`.
+
+- **Read state.** `putReadState` (`read_state.update` on the thread): `0 <= last_read_seq <=
+  threads.last_message_seq` (else `400` on `/last_read_seq`, `out_of_range`) read under
+  `FOR SHARE` on the thread (`chat.Threads.InfoForShare`), then one upsert with GREATEST; no change
+  answers the current state (a thread without a row: position 0, version 0) without event.
+  `markThreadUnread` (`read_state.mark_unread`): `If-Match` required (`428`), the version of the
+  locked row (0 without one) or `412 version_conflict` with `current`, a value at most the
+  current one (else `400`), equal answers without event; the answer has the `ETag`.
+  `listMyReadStates` (`settings.read` on the caller): the rows of a channel in the visible set of
+  `thread.read`, each checked with `thread.read` in filter mode; a foreign and an unknown channel
+  give the same empty list. `mention_count` comes from `messaging.Mentions.CountUnread` above
+  `last_read_seq` when the answer or event is built and is never stored (R-DM-32, M1-61/5); a new
+  mention writes nothing.
+- **Drafts.** `draft.write` on the thread or on the channel (only a forum, else `400`), so
+  read-only and archived channels save drafts. Form only: `content_md` at most
+  `message.max_content_bytes` bytes (`413 payload_too_large` like sending) and without U+0000,
+  `file_ids` UUIDv7, without duplicates and at most `message.max_attachments`, a reply target of
+  the same thread (`messaging.ReplyTargets`, `not_in_thread`), none on a channel draft. A write is
+  one upsert on the partial unique index, so concurrent first writes do not fail; a returned
+  version 1 is new, a larger one replaced version - 1, and `overwrote_newer = existed AND
+  (base_version absent OR base_version < version - 1)`. An empty draft (whitespace only, no
+  files) is deleted like `DELETE` and answers the empty final state with the last version plus
+  one. `listMyDrafts` (`draft.read`): the drafts in the visible channels, each checked with
+  `thread.read` or `channel.read` in filter mode; drafts of lost channels stay stored.
+- **clear_draft.** `Subscribers.OnMessagePosted` runs in the message transaction: with
+  `ClearDraft` it deletes the author's draft of the thread, or for the first message of a new
+  thread the channel draft of the forum (M1-61/4), and appends `draft.deleted`; a rollback keeps
+  the draft. It writes no read state.
+- **Settings.** The registry of `domain/settings.go` holds exactly the keys of 01 section 11 and
+  13 section 3.3 (`TestSettingRegistryMatchesSpec` reads both tables). Unknown key `404`, invalid
+  value `400` on `/value`; the stored value (jsonb equality) answers without event and version;
+  delete appends `settings.updated` with the last value, version + 1 and `deleted`, and a later PUT
+  starts at version 1 (M1-61/1). Defaults are not stored. `getMySidebar` (`settings.read`) returns
+  `chat.Structure.ListSidebarStates`.
+- **Events.** Durable, audience and actor the person, receive action `self`, schema version 1:
+  `read_state.updated` (resource the thread without version, scope space, channel, thread,
+  `ReadStatePayload`), `draft.updated` (resource the draft with its version, scope with the thread
+  of a thread draft, `DraftPayload`; a payload not below `sync.event_payload_max_bytes` gets the
+  longest prefix of `content_md` that fits and `truncated`), `draft.deleted` (resource the draft
+  without version as the catalogue records, M1-61/2, `DraftDeletedPayload`), `settings.updated`
+  (resource the user without version, empty scope, `SettingsPayload`). Payloads carry
+  `updated_by_device_id` of the writing device and no JSON null.
+
+Rulings: docs/DECISIONS.md M1-61. Tests: `domain/*_test.go`, `app/subscribers_test.go` and
+`app/personal_test.go`, `adapters/postgres/personal_test.go`,
+`adapters/httpapi/personal_test.go` (PostgreSQL 18, the HTTP chain with response validation
+through `test/messagingworld` with `NewPersonal`) and
+`migrations/sync_personal_data_test.go`.
 
 ### Load test
 

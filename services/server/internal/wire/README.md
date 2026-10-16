@@ -70,6 +70,12 @@ which need the unit of work themselves, so the start step `authz` binds them
 change with kind internal (the registries of `bothy migrate up` and of the job registry check
 never run one). `authorize.AccessChanged` has no production subscriber in M1.
 
+The subscribers of sync (M1-61): `NewModules` builds `syncapp.Subscribers` over the personal
+repository and `NewTxnRegistry` subscribes `messaging.MessagePosted -> sync` (drafts with
+`clear_draft`); the start step `authz` and `bothy setup` bind its appender
+(`Audit.SyncSubscribers().Bind`). `personal.go` builds the personal data use cases and handlers
+of sync (`NewPersonal`, `PersonalConfig`) in the chat step after messaging.
+
 ## Instance and counters
 
 `MigrationSteps(pool, fsys)` gives `bothy migrate up` (and `pgtest.WithSteps` in tests) the

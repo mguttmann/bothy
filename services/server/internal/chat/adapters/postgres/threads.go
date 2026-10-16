@@ -39,6 +39,16 @@ func (r *Repository) LockThread(ctx context.Context, id ids.ID) (domain.Thread, 
 	return oneThread(threadRow(row), err, "locking a thread")
 }
 
+// ShareThread implements app.Store.
+func (r *Repository) ShareThread(ctx context.Context, id ids.ID) (domain.Thread, bool, error) {
+	q, err := r.write(ctx)
+	if err != nil {
+		return domain.Thread{}, false, err
+	}
+	row, err := q.ShareThread(ctx, uuid(id))
+	return oneThread(row, err, "share-locking a thread")
+}
+
 // InsertThread implements app.Store: a second thread of the same parent message is 409 conflict
 // on /parent_message_id.
 func (r *Repository) InsertThread(ctx context.Context, th domain.Thread) (domain.Thread, error) {

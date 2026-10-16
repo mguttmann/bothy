@@ -166,6 +166,8 @@ type server struct {
 	apps *Apps
 	// messaging is the messaging module (M1-56), built in the chat step over the threads of chat.
 	messaging *Messaging
+	// personal is the personal data of sync (M1-61), built in the chat step over chat and messaging.
+	personal *Personal
 	// signingKeys are the server signing keys (M1-32) and keyCheck the interval of their job.
 	signingKeys *SigningKeys
 	keyCheck    time.Duration
@@ -647,6 +649,9 @@ func (s *server) startAuthz(context.Context) error {
 	if err := a.RightsHook().Bind(authzapp.RightsBindings{Events: sy.Appender(), Audit: a.Recorder()}); err != nil {
 		return err
 	}
+	if err := a.SyncSubscribers().Bind(sy.Appender()); err != nil {
+		return err
+	}
 	s.mu.Lock()
 	s.authorizer, s.authzAdmin = az, admin
 	s.mu.Unlock()
@@ -772,8 +777,16 @@ func (s *server) startChat(context.Context) error {
 	if err != nil {
 		return err
 	}
+	pcfg, err := PersonalConfig(s.values)
+	if err != nil {
+		return err
+	}
+	p, err := NewPersonal(pcfg, pool, a.UoW(), az, sy.Appender(), c.Service, m.Service, s.deps.Clock)
+	if err != nil {
+		return err
+	}
 	s.mu.Lock()
-	s.chat, s.messaging = c, m
+	s.chat, s.messaging, s.personal = c, m, p
 	s.mu.Unlock()
 	return nil
 }
@@ -902,6 +915,7 @@ func (s *server) handlers() Handlers {
 		s.chat.fillHandlers(&h)
 	}
 	s.messaging.fillHandlers(&h)
+	s.personal.fillHandlers(&h)
 	if h.Hosts == nil && s.terminal != nil {
 		h.Hosts = s.terminal.Handlers
 	}

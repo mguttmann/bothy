@@ -155,13 +155,30 @@ func info(th domain.Thread, c ChannelRow) chat.ThreadInfo {
 	return chat.ThreadInfo{
 		ID: th.ID, ChannelID: th.ChannelID, SpaceID: c.Channel.SpaceID, ChannelKind: string(c.Channel.Kind), Kind: string(th.Kind),
 		State: string(th.State), OperatorAgentID: th.OperatorAgentID, CreatedBy: th.CreatedBy, Version: th.Version,
-		ChannelArchived: archived(c),
+		ChannelArchived: archived(c), LastMessageSeq: th.LastMessageSeq, UnreadFloorSeq: th.UnreadFloorSeq,
 	}
 }
 
 // Info implements chat.Threads: no authorization; callers authorize first.
 func (s *Service) Info(ctx context.Context, threadID ids.ID) (chat.ThreadInfo, error) {
 	th, found, err := s.d.Store.Thread(ctx, threadID)
+	if err != nil {
+		return chat.ThreadInfo{}, err
+	}
+	if !found {
+		return chat.ThreadInfo{}, invisible()
+	}
+	c, err := s.threadChannel(ctx, th)
+	if err != nil {
+		return chat.ThreadInfo{}, err
+	}
+	return info(th, c), nil
+}
+
+// InfoForShare implements chat.Threads: Info under FOR SHARE on the thread row (M1-61), without
+// authorization; callers authorize first.
+func (s *Service) InfoForShare(ctx context.Context, threadID ids.ID) (chat.ThreadInfo, error) {
+	th, found, err := s.d.Store.ShareThread(ctx, threadID)
 	if err != nil {
 		return chat.ThreadInfo{}, err
 	}

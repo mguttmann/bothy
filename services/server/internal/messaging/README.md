@@ -1,6 +1,6 @@
 # Module `messaging`
 
-Status: sending built (M1-56): `createMessage` and `createThread`, the tables `messages` and `mentions`, the in-transaction event `MessagePosted` and the durable event `message.created`. Reading built (M1-57): `listThreadMessages` and `getMessage`. Editing, deleting and revisions built (M1-58): `updateMessage`, `deleteMessage`, `listMessageRevisions`, the table `message_revisions`, the in-transaction event `MessageDeleted` and the durable events `message.updated` and `message.deleted`. Mentions and templates built (M1-60): `listMyMentions`, the port `Mentions` with `CountUnread`, the table `message_templates` and its six operations. Reactions and pins built (M1-59): `addReaction`, `removeReaction`, `listReactions`, `pinMessage`, `unpinMessage`, `listPins`, the tables `reactions` and `pins` and the durable events `reaction.added`, `reaction.removed`, `pin.added` and `pin.removed`. The export follows with its ticket.
+Status: sending built (M1-56): `createMessage` and `createThread`, the tables `messages` and `mentions`, the in-transaction event `MessagePosted` and the durable event `message.created`. Reading built (M1-57): `listThreadMessages` and `getMessage`. Editing, deleting and revisions built (M1-58): `updateMessage`, `deleteMessage`, `listMessageRevisions`, the table `message_revisions`, the in-transaction event `MessageDeleted` and the durable events `message.updated` and `message.deleted`. Mentions and templates built (M1-60): `listMyMentions`, the port `Mentions` with `CountUnread`, the table `message_templates` and its six operations. Reactions and pins built (M1-59): `addReaction`, `removeReaction`, `listReactions`, `pinMessage`, `unpinMessage`, `listPins`, the tables `reactions` and `pins` and the durable events `reaction.added`, `reaction.removed`, `pin.added` and `pin.removed`. The port `ReplyTargets` and the first subscriber of `MessagePosted`, sync for `clear_draft`, came with M1-61. The export follows with its ticket.
 The normative source is [docs/spec/02-architecture.md](../../../../docs/spec/02-architecture.md); if this file differs, the chapter applies.
 
 ## Purpose
@@ -162,7 +162,12 @@ In-transaction event `MessagePosted`: published for every new message, system li
 inside the writing transaction; a subscriber error rolls everything back. It carries ids, the
 thread kind and sequence, author and origin, `AuthorDeviceID` (people only), the reply target,
 the sorted mentions, `Silent`, `ClearDraft`, `CreatedThread` and `ReopenedThread`, never content.
-No module subscribes in M1-56 (sync in M1-61, runs in M2, notify in M3).
+sync subscribes since M1-61 (it deletes the author's draft for `ClearDraft`); runs follow in M2,
+notify in M3.
+
+`ReplyTargets.InThread` (M1-61, `replies.go`) answers whether a message lies in a thread, deleted
+ones included, with the rule of `createMessage`; an unknown id is false. It does not authorize:
+sync checks the reply target of a thread draft with it after `draft.write`.
 
 System codes (`messages.system_code`, CHECK of 03): `thread.reopened`, written when a message
 reopens a closed thread, with origin `system`, empty content, `silent`, the author of the

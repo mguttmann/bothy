@@ -76,6 +76,22 @@ func TestRepositoryThreads(t *testing.T) {
 	if _, _, err := e.repo.LockThread(ctx, made[0].ID); err == nil {
 		t.Fatal("lock outside a unit of work")
 	}
+	if _, _, err := e.repo.ShareThread(ctx, made[0].ID); err == nil {
+		t.Fatal("share lock outside a unit of work")
+	}
+	if err := e.write(t, func(ctx context.Context) error {
+		th, found, err := e.repo.ShareThread(ctx, made[0].ID)
+		if err != nil || !found || th.ID != made[0].ID {
+			t.Errorf("share lock %+v %v %v", th, found, err)
+		}
+		_, found, err = e.repo.ShareThread(ctx, ids.New())
+		if err != nil || found {
+			t.Errorf("share lock of an unknown thread %v %v", found, err)
+		}
+		return nil
+	}); err != nil {
+		t.Fatal(err)
+	}
 	if err := e.write(t, func(ctx context.Context) error {
 		th, found, err := e.repo.LockThread(ctx, made[0].ID)
 		if err != nil || !found {

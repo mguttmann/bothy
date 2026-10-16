@@ -149,6 +149,12 @@ type ServerInterface interface {
 	// ArchiveChannel Archive a channel
 	// (POST /channels/{channel_id}/archive)
 	ArchiveChannel(w http.ResponseWriter, r *http.Request, channelId ChannelIdPath, params ArchiveChannelParams)
+	// DeleteChannelDraft Delete the draft of a new forum post
+	// (DELETE /channels/{channel_id}/draft)
+	DeleteChannelDraft(w http.ResponseWriter, r *http.Request, channelId ChannelIdPath)
+	// PutChannelDraft Save the draft of a new forum post
+	// (PUT /channels/{channel_id}/draft)
+	PutChannelDraft(w http.ResponseWriter, r *http.Request, channelId ChannelIdPath)
 	// MoveChannel Change the position of a channel in its space
 	// (POST /channels/{channel_id}/move)
 	MoveChannel(w http.ResponseWriter, r *http.Request, channelId ChannelIdPath, params MoveChannelParams)
@@ -314,6 +320,9 @@ type ServerInterface interface {
 	// ApprovePairing Approve a device pairing with its code
 	// (POST /me/devices/pairings)
 	ApprovePairing(w http.ResponseWriter, r *http.Request, params ApprovePairingParams)
+	// ListMyDrafts List own drafts
+	// (GET /me/drafts)
+	ListMyDrafts(w http.ResponseWriter, r *http.Request)
 	// BeginIdentityLink Start linking another identity
 	// (POST /me/identities/begin)
 	BeginIdentityLink(w http.ResponseWriter, r *http.Request)
@@ -335,12 +344,27 @@ type ServerInterface interface {
 	// UpdateMyProfile Change own profile
 	// (PATCH /me/profile)
 	UpdateMyProfile(w http.ResponseWriter, r *http.Request, params UpdateMyProfileParams)
+	// ListMyReadStates List own read positions
+	// (GET /me/read-states)
+	ListMyReadStates(w http.ResponseWriter, r *http.Request, params ListMyReadStatesParams)
 	// ListMySessions List own sessions
 	// (GET /me/sessions)
 	ListMySessions(w http.ResponseWriter, r *http.Request, params ListMySessionsParams)
 	// CreateExtensionSession Create a child session for an app extension
 	// (POST /me/sessions/extensions)
 	CreateExtensionSession(w http.ResponseWriter, r *http.Request)
+	// ListMySettings List own settings
+	// (GET /me/settings)
+	ListMySettings(w http.ResponseWriter, r *http.Request)
+	// DeleteMySetting Reset an own setting to default
+	// (DELETE /me/settings/{key})
+	DeleteMySetting(w http.ResponseWriter, r *http.Request, key KeyPath)
+	// PutMySetting Set an own setting
+	// (PUT /me/settings/{key})
+	PutMySetting(w http.ResponseWriter, r *http.Request, key KeyPath)
+	// GetMySidebar Read own sidebar state
+	// (GET /me/sidebar)
+	GetMySidebar(w http.ResponseWriter, r *http.Request)
 	// PutMySidebarSpace Collapse or reorder a space for oneself
 	// (PUT /me/sidebar/spaces/{space_id})
 	PutMySidebarSpace(w http.ResponseWriter, r *http.Request, spaceId SpaceIdPath)
@@ -443,6 +467,12 @@ type ServerInterface interface {
 	// CloseThread Mark a thread as done
 	// (POST /threads/{thread_id}/close)
 	CloseThread(w http.ResponseWriter, r *http.Request, threadId ThreadIdPath, params CloseThreadParams)
+	// DeleteThreadDraft Delete the draft of a thread
+	// (DELETE /threads/{thread_id}/draft)
+	DeleteThreadDraft(w http.ResponseWriter, r *http.Request, threadId ThreadIdPath)
+	// PutThreadDraft Save the draft of a thread
+	// (PUT /threads/{thread_id}/draft)
+	PutThreadDraft(w http.ResponseWriter, r *http.Request, threadId ThreadIdPath)
 	// ListThreadMessages Read thread history
 	// (GET /threads/{thread_id}/messages)
 	ListThreadMessages(w http.ResponseWriter, r *http.Request, threadId ThreadIdPath, params ListThreadMessagesParams)
@@ -452,6 +482,12 @@ type ServerInterface interface {
 	// ListPins List pinned messages
 	// (GET /threads/{thread_id}/pins)
 	ListPins(w http.ResponseWriter, r *http.Request, threadId ThreadIdPath)
+	// PutReadState Advance the read position
+	// (PUT /threads/{thread_id}/read-state)
+	PutReadState(w http.ResponseWriter, r *http.Request, threadId ThreadIdPath)
+	// MarkThreadUnread Move the read position back
+	// (POST /threads/{thread_id}/read-state/mark-unread)
+	MarkThreadUnread(w http.ResponseWriter, r *http.Request, threadId ThreadIdPath, params MarkThreadUnreadParams)
 	// ReopenThread Reopen a thread
 	// (POST /threads/{thread_id}/reopen)
 	ReopenThread(w http.ResponseWriter, r *http.Request, threadId ThreadIdPath, params ReopenThreadParams)
@@ -2317,6 +2353,58 @@ func (siw *ServerInterfaceWrapper) ArchiveChannel(w http.ResponseWriter, r *http
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		siw.Handler.ArchiveChannel(w, r, channelId, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// DeleteChannelDraft operation middleware
+func (siw *ServerInterfaceWrapper) DeleteChannelDraft(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "channel_id" -------------
+	var channelId ChannelIdPath
+
+	err = runtime.BindStyledParameterWithOptions("simple", "channel_id", r.PathValue("channel_id"), &channelId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "uuid", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "channel_id", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.DeleteChannelDraft(w, r, channelId)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// PutChannelDraft operation middleware
+func (siw *ServerInterfaceWrapper) PutChannelDraft(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "channel_id" -------------
+	var channelId ChannelIdPath
+
+	err = runtime.BindStyledParameterWithOptions("simple", "channel_id", r.PathValue("channel_id"), &channelId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "uuid", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "channel_id", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.PutChannelDraft(w, r, channelId)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -4554,6 +4642,20 @@ func (siw *ServerInterfaceWrapper) ApprovePairing(w http.ResponseWriter, r *http
 	handler.ServeHTTP(w, r)
 }
 
+// ListMyDrafts operation middleware
+func (siw *ServerInterfaceWrapper) ListMyDrafts(w http.ResponseWriter, r *http.Request) {
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.ListMyDrafts(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
 // BeginIdentityLink operation middleware
 func (siw *ServerInterfaceWrapper) BeginIdentityLink(w http.ResponseWriter, r *http.Request) {
 
@@ -4711,6 +4813,39 @@ func (siw *ServerInterfaceWrapper) UpdateMyProfile(w http.ResponseWriter, r *htt
 	handler.ServeHTTP(w, r)
 }
 
+// ListMyReadStates operation middleware
+func (siw *ServerInterfaceWrapper) ListMyReadStates(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params ListMyReadStatesParams
+
+	// ------------- Required query parameter "channel_id" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, true, "channel_id", r.URL.Query(), &params.ChannelId, runtime.BindQueryParameterOptions{Type: "string", Format: "uuid"})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "channel_id"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "channel_id", Err: err})
+		}
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.ListMyReadStates(w, r, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
 // ListMySessions operation middleware
 func (siw *ServerInterfaceWrapper) ListMySessions(w http.ResponseWriter, r *http.Request) {
 
@@ -4762,6 +4897,86 @@ func (siw *ServerInterfaceWrapper) CreateExtensionSession(w http.ResponseWriter,
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		siw.Handler.CreateExtensionSession(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// ListMySettings operation middleware
+func (siw *ServerInterfaceWrapper) ListMySettings(w http.ResponseWriter, r *http.Request) {
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.ListMySettings(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// DeleteMySetting operation middleware
+func (siw *ServerInterfaceWrapper) DeleteMySetting(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "key" -------------
+	var key KeyPath
+
+	err = runtime.BindStyledParameterWithOptions("simple", "key", r.PathValue("key"), &key, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "key", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.DeleteMySetting(w, r, key)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// PutMySetting operation middleware
+func (siw *ServerInterfaceWrapper) PutMySetting(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "key" -------------
+	var key KeyPath
+
+	err = runtime.BindStyledParameterWithOptions("simple", "key", r.PathValue("key"), &key, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "key", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.PutMySetting(w, r, key)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// GetMySidebar operation middleware
+func (siw *ServerInterfaceWrapper) GetMySidebar(w http.ResponseWriter, r *http.Request) {
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.GetMySidebar(w, r)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -6105,6 +6320,58 @@ func (siw *ServerInterfaceWrapper) CloseThread(w http.ResponseWriter, r *http.Re
 	handler.ServeHTTP(w, r)
 }
 
+// DeleteThreadDraft operation middleware
+func (siw *ServerInterfaceWrapper) DeleteThreadDraft(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "thread_id" -------------
+	var threadId ThreadIdPath
+
+	err = runtime.BindStyledParameterWithOptions("simple", "thread_id", r.PathValue("thread_id"), &threadId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "uuid", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "thread_id", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.DeleteThreadDraft(w, r, threadId)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// PutThreadDraft operation middleware
+func (siw *ServerInterfaceWrapper) PutThreadDraft(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "thread_id" -------------
+	var threadId ThreadIdPath
+
+	err = runtime.BindStyledParameterWithOptions("simple", "thread_id", r.PathValue("thread_id"), &threadId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "uuid", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "thread_id", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.PutThreadDraft(w, r, threadId)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
 // ListThreadMessages operation middleware
 func (siw *ServerInterfaceWrapper) ListThreadMessages(w http.ResponseWriter, r *http.Request) {
 
@@ -6229,6 +6496,105 @@ func (siw *ServerInterfaceWrapper) ListPins(w http.ResponseWriter, r *http.Reque
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		siw.Handler.ListPins(w, r, threadId)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// PutReadState operation middleware
+func (siw *ServerInterfaceWrapper) PutReadState(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "thread_id" -------------
+	var threadId ThreadIdPath
+
+	err = runtime.BindStyledParameterWithOptions("simple", "thread_id", r.PathValue("thread_id"), &threadId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "uuid", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "thread_id", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.PutReadState(w, r, threadId)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// MarkThreadUnread operation middleware
+func (siw *ServerInterfaceWrapper) MarkThreadUnread(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "thread_id" -------------
+	var threadId ThreadIdPath
+
+	err = runtime.BindStyledParameterWithOptions("simple", "thread_id", r.PathValue("thread_id"), &threadId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "uuid", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "thread_id", Err: err})
+		return
+	}
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params MarkThreadUnreadParams
+
+	headers := r.Header
+
+	// ------------- Optional header parameter "Idempotency-Key" -------------
+	if valueList, found := headers[http.CanonicalHeaderKey("Idempotency-Key")]; found {
+		var IdempotencyKey IdempotencyKey
+		n := len(valueList)
+		if n != 1 {
+			siw.ErrorHandlerFunc(w, r, &TooManyValuesForParamError{ParamName: "Idempotency-Key", Count: n})
+			return
+		}
+
+		err = runtime.BindStyledParameterWithOptions("simple", "Idempotency-Key", valueList[0], &IdempotencyKey, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: "uuid"})
+		if err != nil {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "Idempotency-Key", Err: err})
+			return
+		}
+
+		params.IdempotencyKey = &IdempotencyKey
+
+	}
+
+	// ------------- Required header parameter "If-Match" -------------
+	if valueList, found := headers[http.CanonicalHeaderKey("If-Match")]; found {
+		var IfMatch IfMatchRequired
+		n := len(valueList)
+		if n != 1 {
+			siw.ErrorHandlerFunc(w, r, &TooManyValuesForParamError{ParamName: "If-Match", Count: n})
+			return
+		}
+
+		err = runtime.BindStyledParameterWithOptions("simple", "If-Match", valueList[0], &IfMatch, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: true, Type: "string", Format: ""})
+		if err != nil {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "If-Match", Err: err})
+			return
+		}
+
+		params.IfMatch = IfMatch
+
+	} else {
+		err := fmt.Errorf("Header parameter If-Match is required, but not found")
+		siw.ErrorHandlerFunc(w, r, &RequiredHeaderError{ParamName: "If-Match", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.MarkThreadUnread(w, r, threadId, params)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -7397,6 +7763,7 @@ func HandlerWithOptions(si ServerInterface, options StdHTTPServerOptions) http.H
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/spaces/{space_id}/move", wrapper.MoveSpace)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/spaces/{space_id}/archive", wrapper.ArchiveSpace)
 	m.HandleFunc(http.MethodPut+" "+options.BaseURL+"/spaces/{space_id}/operator", wrapper.SetSpaceOperator)
+	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/me/sidebar", wrapper.GetMySidebar)
 	m.HandleFunc(http.MethodPut+" "+options.BaseURL+"/me/sidebar/spaces/{space_id}", wrapper.PutMySidebarSpace)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/spaces/{space_id}/channels", wrapper.ListSpaceChannels)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/spaces/{space_id}/channels", wrapper.CreateChannel)
@@ -7422,6 +7789,12 @@ func HandlerWithOptions(si ServerInterface, options StdHTTPServerOptions) http.H
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/threads/{thread_id}/reopen", wrapper.ReopenThread)
 	m.HandleFunc(http.MethodPut+" "+options.BaseURL+"/threads/{thread_id}/tags", wrapper.SetThreadTags)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/threads/{thread_id}/pins", wrapper.ListPins)
+	m.HandleFunc(http.MethodPut+" "+options.BaseURL+"/threads/{thread_id}/read-state", wrapper.PutReadState)
+	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/threads/{thread_id}/read-state/mark-unread", wrapper.MarkThreadUnread)
+	m.HandleFunc(http.MethodDelete+" "+options.BaseURL+"/threads/{thread_id}/draft", wrapper.DeleteThreadDraft)
+	m.HandleFunc(http.MethodPut+" "+options.BaseURL+"/threads/{thread_id}/draft", wrapper.PutThreadDraft)
+	m.HandleFunc(http.MethodDelete+" "+options.BaseURL+"/channels/{channel_id}/draft", wrapper.DeleteChannelDraft)
+	m.HandleFunc(http.MethodPut+" "+options.BaseURL+"/channels/{channel_id}/draft", wrapper.PutChannelDraft)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/threads/{thread_id}/messages", wrapper.ListThreadMessages)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/threads/{thread_id}/messages", wrapper.CreateMessage)
 	m.HandleFunc(http.MethodDelete+" "+options.BaseURL+"/messages/{message_id}", wrapper.DeleteMessage)
@@ -7433,6 +7806,11 @@ func HandlerWithOptions(si ServerInterface, options StdHTTPServerOptions) http.H
 	m.HandleFunc(http.MethodPut+" "+options.BaseURL+"/messages/{message_id}/reactions/{emoji}", wrapper.AddReaction)
 	m.HandleFunc(http.MethodDelete+" "+options.BaseURL+"/messages/{message_id}/pin", wrapper.UnpinMessage)
 	m.HandleFunc(http.MethodPut+" "+options.BaseURL+"/messages/{message_id}/pin", wrapper.PinMessage)
+	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/me/read-states", wrapper.ListMyReadStates)
+	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/me/drafts", wrapper.ListMyDrafts)
+	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/me/settings", wrapper.ListMySettings)
+	m.HandleFunc(http.MethodDelete+" "+options.BaseURL+"/me/settings/{key}", wrapper.DeleteMySetting)
+	m.HandleFunc(http.MethodPut+" "+options.BaseURL+"/me/settings/{key}", wrapper.PutMySetting)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/agents", wrapper.ListAgents)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/agents", wrapper.CreateAgent)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/agents/{agent_id}", wrapper.GetAgent)
@@ -7748,6 +8126,12 @@ type StrictServerInterface interface {
 	// ArchiveChannel Archive a channel
 	// (POST /channels/{channel_id}/archive)
 	ArchiveChannel(ctx context.Context, request ArchiveChannelRequestObject) (ArchiveChannelResponseObject, error)
+	// DeleteChannelDraft Delete the draft of a new forum post
+	// (DELETE /channels/{channel_id}/draft)
+	DeleteChannelDraft(ctx context.Context, request DeleteChannelDraftRequestObject) (DeleteChannelDraftResponseObject, error)
+	// PutChannelDraft Save the draft of a new forum post
+	// (PUT /channels/{channel_id}/draft)
+	PutChannelDraft(ctx context.Context, request PutChannelDraftRequestObject) (PutChannelDraftResponseObject, error)
 	// MoveChannel Change the position of a channel in its space
 	// (POST /channels/{channel_id}/move)
 	MoveChannel(ctx context.Context, request MoveChannelRequestObject) (MoveChannelResponseObject, error)
@@ -7913,6 +8297,9 @@ type StrictServerInterface interface {
 	// ApprovePairing Approve a device pairing with its code
 	// (POST /me/devices/pairings)
 	ApprovePairing(ctx context.Context, request ApprovePairingRequestObject) (ApprovePairingResponseObject, error)
+	// ListMyDrafts List own drafts
+	// (GET /me/drafts)
+	ListMyDrafts(ctx context.Context, request ListMyDraftsRequestObject) (ListMyDraftsResponseObject, error)
 	// BeginIdentityLink Start linking another identity
 	// (POST /me/identities/begin)
 	BeginIdentityLink(ctx context.Context, request BeginIdentityLinkRequestObject) (BeginIdentityLinkResponseObject, error)
@@ -7934,12 +8321,27 @@ type StrictServerInterface interface {
 	// UpdateMyProfile Change own profile
 	// (PATCH /me/profile)
 	UpdateMyProfile(ctx context.Context, request UpdateMyProfileRequestObject) (UpdateMyProfileResponseObject, error)
+	// ListMyReadStates List own read positions
+	// (GET /me/read-states)
+	ListMyReadStates(ctx context.Context, request ListMyReadStatesRequestObject) (ListMyReadStatesResponseObject, error)
 	// ListMySessions List own sessions
 	// (GET /me/sessions)
 	ListMySessions(ctx context.Context, request ListMySessionsRequestObject) (ListMySessionsResponseObject, error)
 	// CreateExtensionSession Create a child session for an app extension
 	// (POST /me/sessions/extensions)
 	CreateExtensionSession(ctx context.Context, request CreateExtensionSessionRequestObject) (CreateExtensionSessionResponseObject, error)
+	// ListMySettings List own settings
+	// (GET /me/settings)
+	ListMySettings(ctx context.Context, request ListMySettingsRequestObject) (ListMySettingsResponseObject, error)
+	// DeleteMySetting Reset an own setting to default
+	// (DELETE /me/settings/{key})
+	DeleteMySetting(ctx context.Context, request DeleteMySettingRequestObject) (DeleteMySettingResponseObject, error)
+	// PutMySetting Set an own setting
+	// (PUT /me/settings/{key})
+	PutMySetting(ctx context.Context, request PutMySettingRequestObject) (PutMySettingResponseObject, error)
+	// GetMySidebar Read own sidebar state
+	// (GET /me/sidebar)
+	GetMySidebar(ctx context.Context, request GetMySidebarRequestObject) (GetMySidebarResponseObject, error)
 	// PutMySidebarSpace Collapse or reorder a space for oneself
 	// (PUT /me/sidebar/spaces/{space_id})
 	PutMySidebarSpace(ctx context.Context, request PutMySidebarSpaceRequestObject) (PutMySidebarSpaceResponseObject, error)
@@ -8042,6 +8444,12 @@ type StrictServerInterface interface {
 	// CloseThread Mark a thread as done
 	// (POST /threads/{thread_id}/close)
 	CloseThread(ctx context.Context, request CloseThreadRequestObject) (CloseThreadResponseObject, error)
+	// DeleteThreadDraft Delete the draft of a thread
+	// (DELETE /threads/{thread_id}/draft)
+	DeleteThreadDraft(ctx context.Context, request DeleteThreadDraftRequestObject) (DeleteThreadDraftResponseObject, error)
+	// PutThreadDraft Save the draft of a thread
+	// (PUT /threads/{thread_id}/draft)
+	PutThreadDraft(ctx context.Context, request PutThreadDraftRequestObject) (PutThreadDraftResponseObject, error)
 	// ListThreadMessages Read thread history
 	// (GET /threads/{thread_id}/messages)
 	ListThreadMessages(ctx context.Context, request ListThreadMessagesRequestObject) (ListThreadMessagesResponseObject, error)
@@ -8051,6 +8459,12 @@ type StrictServerInterface interface {
 	// ListPins List pinned messages
 	// (GET /threads/{thread_id}/pins)
 	ListPins(ctx context.Context, request ListPinsRequestObject) (ListPinsResponseObject, error)
+	// PutReadState Advance the read position
+	// (PUT /threads/{thread_id}/read-state)
+	PutReadState(ctx context.Context, request PutReadStateRequestObject) (PutReadStateResponseObject, error)
+	// MarkThreadUnread Move the read position back
+	// (POST /threads/{thread_id}/read-state/mark-unread)
+	MarkThreadUnread(ctx context.Context, request MarkThreadUnreadRequestObject) (MarkThreadUnreadResponseObject, error)
 	// ReopenThread Reopen a thread
 	// (POST /threads/{thread_id}/reopen)
 	ReopenThread(ctx context.Context, request ReopenThreadRequestObject) (ReopenThreadResponseObject, error)
@@ -9496,6 +9910,65 @@ func (sh *strictHandler) ArchiveChannel(w http.ResponseWriter, r *http.Request, 
 		sh.options.ResponseErrorHandlerFunc(w, r, err)
 	} else if validResponse, ok := response.(ArchiveChannelResponseObject); ok {
 		if err := validResponse.VisitArchiveChannelResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// DeleteChannelDraft operation middleware
+func (sh *strictHandler) DeleteChannelDraft(w http.ResponseWriter, r *http.Request, channelId ChannelIdPath) {
+	var request DeleteChannelDraftRequestObject
+
+	request.ChannelId = channelId
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.DeleteChannelDraft(ctx, request.(DeleteChannelDraftRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "DeleteChannelDraft")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(DeleteChannelDraftResponseObject); ok {
+		if err := validResponse.VisitDeleteChannelDraftResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// PutChannelDraft operation middleware
+func (sh *strictHandler) PutChannelDraft(w http.ResponseWriter, r *http.Request, channelId ChannelIdPath) {
+	var request PutChannelDraftRequestObject
+
+	request.ChannelId = channelId
+
+	var body PutChannelDraftJSONRequestBody
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
+		return
+	}
+	request.Body = &body
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.PutChannelDraft(ctx, request.(PutChannelDraftRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "PutChannelDraft")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(PutChannelDraftResponseObject); ok {
+		if err := validResponse.VisitPutChannelDraftResponse(w); err != nil {
 			sh.options.ResponseErrorHandlerFunc(w, r, err)
 		}
 	} else if response != nil {
@@ -11138,6 +11611,30 @@ func (sh *strictHandler) ApprovePairing(w http.ResponseWriter, r *http.Request, 
 	}
 }
 
+// ListMyDrafts operation middleware
+func (sh *strictHandler) ListMyDrafts(w http.ResponseWriter, r *http.Request) {
+	var request ListMyDraftsRequestObject
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.ListMyDrafts(ctx, request.(ListMyDraftsRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "ListMyDrafts")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(ListMyDraftsResponseObject); ok {
+		if err := validResponse.VisitListMyDraftsResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
 // BeginIdentityLink operation middleware
 func (sh *strictHandler) BeginIdentityLink(w http.ResponseWriter, r *http.Request) {
 	var request BeginIdentityLinkRequestObject
@@ -11345,6 +11842,32 @@ func (sh *strictHandler) UpdateMyProfile(w http.ResponseWriter, r *http.Request,
 	}
 }
 
+// ListMyReadStates operation middleware
+func (sh *strictHandler) ListMyReadStates(w http.ResponseWriter, r *http.Request, params ListMyReadStatesParams) {
+	var request ListMyReadStatesRequestObject
+
+	request.Params = params
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.ListMyReadStates(ctx, request.(ListMyReadStatesRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "ListMyReadStates")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(ListMyReadStatesResponseObject); ok {
+		if err := validResponse.VisitListMyReadStatesResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
 // ListMySessions operation middleware
 func (sh *strictHandler) ListMySessions(w http.ResponseWriter, r *http.Request, params ListMySessionsParams) {
 	var request ListMySessionsRequestObject
@@ -11395,6 +11918,113 @@ func (sh *strictHandler) CreateExtensionSession(w http.ResponseWriter, r *http.R
 		sh.options.ResponseErrorHandlerFunc(w, r, err)
 	} else if validResponse, ok := response.(CreateExtensionSessionResponseObject); ok {
 		if err := validResponse.VisitCreateExtensionSessionResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// ListMySettings operation middleware
+func (sh *strictHandler) ListMySettings(w http.ResponseWriter, r *http.Request) {
+	var request ListMySettingsRequestObject
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.ListMySettings(ctx, request.(ListMySettingsRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "ListMySettings")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(ListMySettingsResponseObject); ok {
+		if err := validResponse.VisitListMySettingsResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// DeleteMySetting operation middleware
+func (sh *strictHandler) DeleteMySetting(w http.ResponseWriter, r *http.Request, key KeyPath) {
+	var request DeleteMySettingRequestObject
+
+	request.Key = key
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.DeleteMySetting(ctx, request.(DeleteMySettingRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "DeleteMySetting")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(DeleteMySettingResponseObject); ok {
+		if err := validResponse.VisitDeleteMySettingResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// PutMySetting operation middleware
+func (sh *strictHandler) PutMySetting(w http.ResponseWriter, r *http.Request, key KeyPath) {
+	var request PutMySettingRequestObject
+
+	request.Key = key
+
+	var body PutMySettingJSONRequestBody
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
+		return
+	}
+	request.Body = &body
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.PutMySetting(ctx, request.(PutMySettingRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "PutMySetting")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(PutMySettingResponseObject); ok {
+		if err := validResponse.VisitPutMySettingResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// GetMySidebar operation middleware
+func (sh *strictHandler) GetMySidebar(w http.ResponseWriter, r *http.Request) {
+	var request GetMySidebarRequestObject
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.GetMySidebar(ctx, request.(GetMySidebarRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "GetMySidebar")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(GetMySidebarResponseObject); ok {
+		if err := validResponse.VisitGetMySidebarResponse(w); err != nil {
 			sh.options.ResponseErrorHandlerFunc(w, r, err)
 		}
 	} else if response != nil {
@@ -12393,6 +13023,65 @@ func (sh *strictHandler) CloseThread(w http.ResponseWriter, r *http.Request, thr
 	}
 }
 
+// DeleteThreadDraft operation middleware
+func (sh *strictHandler) DeleteThreadDraft(w http.ResponseWriter, r *http.Request, threadId ThreadIdPath) {
+	var request DeleteThreadDraftRequestObject
+
+	request.ThreadId = threadId
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.DeleteThreadDraft(ctx, request.(DeleteThreadDraftRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "DeleteThreadDraft")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(DeleteThreadDraftResponseObject); ok {
+		if err := validResponse.VisitDeleteThreadDraftResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// PutThreadDraft operation middleware
+func (sh *strictHandler) PutThreadDraft(w http.ResponseWriter, r *http.Request, threadId ThreadIdPath) {
+	var request PutThreadDraftRequestObject
+
+	request.ThreadId = threadId
+
+	var body PutThreadDraftJSONRequestBody
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
+		return
+	}
+	request.Body = &body
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.PutThreadDraft(ctx, request.(PutThreadDraftRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "PutThreadDraft")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(PutThreadDraftResponseObject); ok {
+		if err := validResponse.VisitPutThreadDraftResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
 // ListThreadMessages operation middleware
 func (sh *strictHandler) ListThreadMessages(w http.ResponseWriter, r *http.Request, threadId ThreadIdPath, params ListThreadMessagesParams) {
 	var request ListThreadMessagesRequestObject
@@ -12472,6 +13161,73 @@ func (sh *strictHandler) ListPins(w http.ResponseWriter, r *http.Request, thread
 		sh.options.ResponseErrorHandlerFunc(w, r, err)
 	} else if validResponse, ok := response.(ListPinsResponseObject); ok {
 		if err := validResponse.VisitListPinsResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// PutReadState operation middleware
+func (sh *strictHandler) PutReadState(w http.ResponseWriter, r *http.Request, threadId ThreadIdPath) {
+	var request PutReadStateRequestObject
+
+	request.ThreadId = threadId
+
+	var body PutReadStateJSONRequestBody
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
+		return
+	}
+	request.Body = &body
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.PutReadState(ctx, request.(PutReadStateRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "PutReadState")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(PutReadStateResponseObject); ok {
+		if err := validResponse.VisitPutReadStateResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// MarkThreadUnread operation middleware
+func (sh *strictHandler) MarkThreadUnread(w http.ResponseWriter, r *http.Request, threadId ThreadIdPath, params MarkThreadUnreadParams) {
+	var request MarkThreadUnreadRequestObject
+
+	request.ThreadId = threadId
+	request.Params = params
+
+	var body MarkThreadUnreadJSONRequestBody
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
+		return
+	}
+	request.Body = &body
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.MarkThreadUnread(ctx, request.(MarkThreadUnreadRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "MarkThreadUnread")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(MarkThreadUnreadResponseObject); ok {
+		if err := validResponse.VisitMarkThreadUnreadResponse(w); err != nil {
 			sh.options.ResponseErrorHandlerFunc(w, r, err)
 		}
 	} else if response != nil {

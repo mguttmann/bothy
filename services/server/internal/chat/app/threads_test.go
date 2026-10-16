@@ -146,6 +146,15 @@ func TestThreadUseCases(t *testing.T) {
 	}
 	_, err = e.svc.Info(ctx, ids.New())
 	wantCode(t, err, errs.CodeNotFound)
+	// InfoForShare (M1-61): the same routing data with the counters of the thread.
+	stored, _, _ := e.store.Thread(ctx, post.ID)
+	shared, err := e.svc.InfoForShare(ctx, post.ID)
+	if err != nil || shared.ChannelID != info.ChannelID || shared.ChannelKind != "forum" || shared.LastMessageSeq != stored.LastMessageSeq ||
+		shared.LastMessageSeq == 0 || shared.UnreadFloorSeq != stored.UnreadFloorSeq {
+		t.Fatalf("info for share %+v, %v", shared, err)
+	}
+	_, err = e.svc.InfoForShare(ctx, ids.New())
+	wantCode(t, err, errs.CodeNotFound)
 	if got, err := e.svc.Get(ctx, e.owner, post.ID); err != nil || got.ID != post.ID {
 		t.Fatalf("get %+v, %v", got, err)
 	}

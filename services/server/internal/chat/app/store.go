@@ -138,6 +138,9 @@ type Store interface {
 	Thread(ctx context.Context, id ids.ID) (th domain.Thread, found bool, err error)
 	// LockThread returns the thread id like Thread and locks its row until the end of the unit.
 	LockThread(ctx context.Context, id ids.ID) (th domain.Thread, found bool, err error)
+	// ShareThread returns the thread id like Thread and holds FOR SHARE on its row until the end
+	// of the unit (M1-61).
+	ShareThread(ctx context.Context, id ids.ID) (th domain.Thread, found bool, err error)
 	// InsertThread inserts the thread th of kind thread and returns the stored row. Errors:
 	// conflict on /parent_message_id when the parent message already started a thread.
 	InsertThread(ctx context.Context, th domain.Thread) (domain.Thread, error)

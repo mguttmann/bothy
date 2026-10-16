@@ -52,10 +52,14 @@ var requirementGroups = []struct {
 		"auth.login.begin", "auth.login.complete", "console.csp_report", "instance.discovery.read", "status.public.read",
 	}},
 	{"self", Self, []string{
-		"access.view_as.end", "auth.logout", "auth.step_up", "draft.read", "identity.link", "local_credential.set",
+		"access.view_as.end", "auth.logout", "auth.step_up", "identity.link", "local_credential.set",
 		"mention.list", "passkey.register", "push.register", "push.unregister", "quiet_hours.update",
-		"self.profile.update", "session.extension.create", "settings.read", "settings.update",
+		"self.profile.update", "session.extension.create",
 	}},
+	// The own read states, drafts and settings (M1-61 note 22): data of a person (03 read_states,
+	// drafts, user_settings reference users), so an agent or app naming itself gets
+	// subject_kind_not_allowed from authorize, never from the module.
+	{"self", All(Human, Self), []string{"draft.read", "settings.read", "settings.update"}},
 	{"public (valid refresh token and DPoP proof of the family)", Public, []string{"auth.token.refresh"}},
 	{"manage", HasCap(CapManage), []string{
 		"channel.archive", "channel.behavior.read", "channel.behavior.update", "channel.create",
@@ -92,9 +96,9 @@ var requirementGroups = []struct {
 	}},
 	{"participant", Participant, []string{"dm.leave"}},
 	{"self and read", All(Self, AtLeast(LevelRead)), []string{
-		"draft.write", "notification_pref.update", "read_state.mark_unread", "read_state.update",
-		"sidebar.update",
+		"notification_pref.update", "sidebar.update",
 	}},
+	{"self and read", All(Human, Self, AtLeast(LevelRead)), []string{"draft.write", "read_state.mark_unread", "read_state.update"}},
 	{"auth", Auth, []string{
 		"events.catch_up", "instance.read", "run.overview.read", "search.query", "status.read",
 		"sync.snapshot.read",
