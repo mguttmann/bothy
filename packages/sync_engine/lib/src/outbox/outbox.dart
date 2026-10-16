@@ -428,22 +428,22 @@ final class Outbox {
     for (final d in await _chain(e)) {
       if (d.state.isFinal) continue;
       await _sender.fillSlots(d, bound);
-      await _dao.recordFailure(d.id, code: 'dependency_discarded');
+      await _dao.recordFailure(d.id, code: _dependencyDiscarded);
     }
     await _dao.delete(e.id);
   }
 
   /// The dependencies an entry the outbox creates or re-points may wait for: [ids] with
-  /// every entry stored as `failed` replaced by what that entry waited for, recursively.
+  /// every entry that failed with its chain (`dependency_discarded`) replaced by what that
+  /// entry waited for, recursively.
   ///
-  /// A failed entry is never sent, so an entry waiting for it would block its lane for good
-  /// (04 13.2 item 2). A failed entry with a stored parent exists only after a discard failed
-  /// its chain (`dependency_discarded`); that parent is gone, and its bound members are filled
-  /// into the dependents already. Every path that writes dependencies of its own (retry,
-  /// edit, remove, the bridge over obsolete follow-ups) goes through here, so the replacement
-  /// of a chain-failed entry never waits for another chain-failed one. Dependencies the
-  /// caller names in [enqueue] stay as they are: a message waits for its failed upload until
-  /// the person retries or discards it.
+  /// Such an entry is never sent and its parent is gone, so an entry waiting for it would
+  /// block its lane for good (04 13.2 item 2); its bound members are filled into the
+  /// dependents already. An entry that failed for its own reason (a `413` upload) stays a
+  /// dependency: the person retries it (the dependents then wait for the new entry) or
+  /// discards it (they fail). Every path that writes dependencies of its own (retry, edit,
+  /// remove, the bridge over obsolete follow-ups) goes through here; dependencies named in
+  /// [enqueue] stay as they are.
   Future<List<String>> _waitable(List<String> ids) async {
     final result = <String>[];
     final seen = <String>{};
@@ -452,7 +452,9 @@ final class Outbox {
       final id = open.removeLast();
       if (!seen.add(id)) continue;
       final parent = await _dao.byId(id);
-      if (parent != null && parent.state == OutboxState.failed) {
+      if (parent != null &&
+          parent.state == OutboxState.failed &&
+          parent.lastErrorCode == _dependencyDiscarded) {
         open.addAll(dependenciesOf(parent).reversed);
       } else {
         result.add(id);
@@ -460,6 +462,8 @@ final class Outbox {
     }
     return result;
   }
+
+  static const _dependencyDiscarded = 'dependency_discarded';
 
   /// Every entry that waits for [e], directly or through others, final ones included.
   Future<List<OutboxEntry>> _chain(OutboxEntry e) async {

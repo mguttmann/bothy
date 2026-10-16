@@ -54,7 +54,9 @@ Life cycle of an entry:
   An edit holds the changed members and is merged into the stored payload. Discarding an entry
   fails every entry that waits for it, directly or through others (`dependency_discarded`).
   An entry the outbox writes itself (a retry, the replacement of an edit, a follow-up) never
-  waits for an entry stored as `failed`; it waits for what that entry waited for.
+  waits for an entry that failed with its chain (`dependency_discarded`); it waits for what
+  that entry waited for. An entry that failed for its own reason (an upload) stays a
+  dependency until the person retries or discards it.
 
 Error classes (`classify`, docs/DECISIONS.md D-M4-15-1):
 

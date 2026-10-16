@@ -181,4 +181,57 @@ void main() {
       expect(ops.ids, [a.id, a2, b.id, e.id]);
     });
   });
+
+  group('uploads', () {
+    late Harness h;
+    late ScriptedExecutor uploads;
+    late ScriptedExecutor messages;
+
+    setUp(() {
+      h = Harness.open();
+      uploads = h.fake('upload', lane: (e) => 'upload:${e.id}');
+      messages = h.fake('createMessage');
+    });
+    tearDown(() => h.close());
+
+    Future<OutboxEntry> upload(String name) => h.outbox.enqueue(
+      OutboxRequest(kind: 'upload', payload: {'name': name}),
+    );
+
+    for (final viaEdit in [false, true]) {
+      test(
+        '${viaEdit ? 'edit' : 'retry'} of a chain-failed message keeps waiting for its own failed upload',
+        () async {
+          uploads.then([
+            problem(413, 'payload_too_large'),
+            problem(422, 'validation_failed'),
+          ]);
+          final u1 = await upload('huge.mov');
+          final u2 = await upload('bad.png');
+          final m = await h.add(
+            'two files',
+            thread: threadA,
+            dependsOn: [u1.id, u2.id],
+          );
+          await h.outbox.start();
+          await settle();
+          await h.outbox.discard(u2.id);
+          final m2 = viaEdit
+              ? await h.outbox.edit(m.id, {'content_md': 'one file'})
+              : await h.outbox.retry(m.id);
+          await settle();
+          await h.time.advance(const Duration(hours: 1));
+          expect(messages.ids, isNot(contains(m2)));
+          expect(dependenciesOf((await h.entry(m2))!), contains(u1.id));
+
+          final u1b = await h.outbox.retry(u1.id);
+          expect(dependenciesOf((await h.entry(m2))!), contains(u1b));
+          await settle();
+          expect(messages.ids, [
+            m2,
+          ], reason: 'sent once the new upload is confirmed');
+        },
+      );
+    }
+  });
 }
