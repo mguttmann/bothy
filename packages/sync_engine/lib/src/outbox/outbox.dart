@@ -10,6 +10,7 @@ import 'dart:math';
 import 'package:domain/domain.dart';
 import 'package:local_store/local_store.dart';
 
+import 'dependencies.dart';
 import 'entry.dart';
 import 'executors.dart';
 import 'sender.dart';
@@ -57,7 +58,8 @@ final class Outbox {
        _config = config,
        _newId = ids.next,
        _now = db.clock,
-       _timer = timer ?? Timer.new {
+       _timer = timer ?? Timer.new,
+       _deps = OutboxDependencies(db.outboxDao) {
     _sender = OutboxSender(
       dao: _dao,
       executors: executors,
@@ -66,6 +68,7 @@ final class Outbox {
       timer: _timer,
       random: random ?? Random.secure(),
       lock: _lock,
+      dependencies: _deps,
       onChanged: _changed,
       onConfirmed: onConfirmed,
     );
@@ -78,6 +81,7 @@ final class Outbox {
   final DateTime Function() _now;
   final OutboxTimerFactory _timer;
   final SerialLock _lock = SerialLock();
+  final OutboxDependencies _deps;
   final StreamController<void> _changes = StreamController<void>.broadcast();
   late final OutboxSender _sender;
 
@@ -87,8 +91,19 @@ final class Outbox {
   /// The ID is `request.id` or a new UUIDv7; it is the `client_msg_id`,
   /// `client_interaction_id` or `Idempotency-Key` of every attempt (04 5). Throws when the ID
   /// exists already (sending again takes a new ID, 04 13.2 item 5).
+  ///
+  /// `request.dependsOn` names entries of this outbox: stored ones, or ones it confirmed,
+  /// replaced or discarded since it was created. A confirmed one is dropped and a replaced one
+  /// becomes its replacement; a discarded or unknown one is never taken as confirmed, so the
+  /// entry is stored as failed with `dependency_discarded` (D-M4-15-10).
   Future<OutboxEntry> enqueue(OutboxRequest request) async {
-    final entry = await _lock.run(() => _insert(request));
+    final entry = await _lock.run(() async {
+      final deps = await _deps.resolve(request.dependsOn, personRetries: false);
+      final e = await _insert(request.withDependsOn(deps));
+      if (await _deps.readiness(e) != Readiness.broken) return e;
+      await _dao.recordFailure(e.id, code: dependencyDiscarded);
+      return (await _dao.byId(e.id))!;
+    });
     _changed();
     unawaited(_sender.pump());
     return entry;
@@ -121,7 +136,7 @@ final class Outbox {
             ?.call(e, const {})
             .kind;
         final obsolete = [
-          for (final d in await _chain(e))
+          for (final d in await _deps.chainOf(e.id))
             if (d.kind == editKind && d.attempts == 0 && !d.state.isFinal) d,
         ];
         final fresh = await _replaceFailed(e, payload);
@@ -155,8 +170,11 @@ final class Outbox {
         await _dao.updatePayload(tail.id, jsonEncode(merged));
         return tail.id;
       }
-      return (await _insert(request.withDependsOn(await _waitable([tail.id]))))
-          .id;
+      return (await _insert(
+        request.withDependsOn(
+          await _deps.resolve([tail.id], personRetries: true),
+        ),
+      )).id;
     });
     _changed();
     unawaited(_sender.pump());
@@ -181,7 +199,8 @@ final class Outbox {
       }
       final tail = await _tail(e);
       return (await _insert(
-        followUp(e).withDependsOn(await _waitable([tail.id])),
+        followUp(e)
+            .withDependsOn(await _deps.resolve([tail.id], personRetries: true)),
       )).id;
     });
     _changed();
@@ -230,7 +249,7 @@ final class Outbox {
       final e = await _dao.byId(clientMsgId);
       if (e == null) return false;
       await _sender.confirm(e, result);
-      await _dao.replaceWithServer(e.id);
+      await _deps.removeEntry(e.id, into: const []);
       return true;
     });
     if (found) {
@@ -398,20 +417,13 @@ final class Outbox {
         kind: e.kind,
         payload: next,
         threadId: e.threadId,
-        dependsOn: await _waitable(dependenciesOf(e)),
+        dependsOn: await _deps.resolve(dependenciesOf(e), personRetries: true),
         expectedVersion: expected,
       ),
     );
-    // Entries that waited for the failed one now wait for its replacement (D-M4-15-6).
-    for (final d in await _sender.dependentsOf(e.id)) {
-      if (d.state.isFinal) continue;
-      await _dao.updateDependsOn(
-        d.id,
-        [for (final id in dependenciesOf(d)) id == e.id ? fresh.id : id]
-            .join(','),
-      );
-    }
-    await _dao.delete(e.id);
+    // Every entry that waited for the failed one, final ones included, now waits for its
+    // replacement (D-M4-15-6, D-M4-15-10).
+    await _deps.removeEntry(e.id, into: [fresh.id]);
     return fresh.id;
   }
 
@@ -425,75 +437,18 @@ final class Outbox {
     };
     // The whole chain behind it fails, not only the direct dependents: an entry that waits for
     // a failed one would block its lane for good (04 13.2 item 2).
-    for (final d in await _chain(e)) {
-      if (d.state.isFinal) continue;
-      await _sender.fillSlots(d, bound);
-      await _dao.recordFailure(d.id, code: _dependencyDiscarded);
-    }
-    await _dao.delete(e.id);
-  }
-
-  /// The dependencies an entry the outbox creates or re-points may wait for: [ids] with
-  /// every entry that failed with its chain (`dependency_discarded`) replaced by what that
-  /// entry waited for, recursively.
-  ///
-  /// Such an entry is never sent and its parent is gone, so an entry waiting for it would
-  /// block its lane for good (04 13.2 item 2); its bound members are filled into the
-  /// dependents already. An entry that failed for its own reason (a `413` upload) stays a
-  /// dependency: the person retries it (the dependents then wait for the new entry) or
-  /// discards it (they fail). Every path that writes dependencies of its own (retry, edit,
-  /// remove, the bridge over obsolete follow-ups) goes through here; dependencies named in
-  /// [enqueue] stay as they are.
-  Future<List<String>> _waitable(List<String> ids) async {
-    final result = <String>[];
-    final seen = <String>{};
-    final open = [...ids.reversed];
-    while (open.isNotEmpty) {
-      final id = open.removeLast();
-      if (!seen.add(id)) continue;
-      final parent = await _dao.byId(id);
-      if (parent != null &&
-          parent.state == OutboxState.failed &&
-          parent.lastErrorCode == _dependencyDiscarded) {
-        open.addAll(dependenciesOf(parent).reversed);
-      } else {
-        result.add(id);
-      }
-    }
-    return result;
-  }
-
-  static const _dependencyDiscarded = 'dependency_discarded';
-
-  /// Every entry that waits for [e], directly or through others, final ones included.
-  Future<List<OutboxEntry>> _chain(OutboxEntry e) async {
-    final found = <String, OutboxEntry>{};
-    final open = [e.id];
-    while (open.isNotEmpty) {
-      for (final d in await _sender.dependentsOf(open.removeLast())) {
-        if (d.id != e.id && found.putIfAbsent(d.id, () => d) == d) {
-          open.add(d.id);
-        }
-      }
-    }
-    return found.values.toList();
+    await _deps.failChain(e.id, before: (d) => _sender.fillSlots(d, bound));
+    await _deps.removeEntry(e.id, into: null);
   }
 
   /// Deletes the never sent [e] and lets the entries that waited for it wait for what [e]
   /// waited for.
   Future<void> _bridge(OutboxEntry e) async {
     final fresh = (await _dao.byId(e.id)) ?? e;
-    final parents = await _waitable(dependenciesOf(fresh));
-    for (final d in await _sender.dependentsOf(e.id)) {
-      await _dao.updateDependsOn(
-        d.id,
-        [
-          for (final id in dependenciesOf(d))
-            if (id == e.id) ...parents else id,
-        ].join(','),
-      );
-    }
-    await _dao.delete(e.id);
+    await _deps.removeEntry(
+      e.id,
+      into: await _deps.resolve(dependenciesOf(fresh), personRetries: true),
+    );
   }
 
   /// The newest entry of the follow-up chain of [e]: entries that wait for [e], then for that
@@ -501,7 +456,7 @@ final class Outbox {
   Future<OutboxEntry> _tail(OutboxEntry e) async {
     var tail = e;
     while (true) {
-      final next = (await _sender.dependentsOf(tail.id))
+      final next = (await _deps.dependentsOf(tail.id))
           .where((d) => !d.state.isFinal && d.threadId == e.threadId)
           .toList();
       if (next.isEmpty) return tail;

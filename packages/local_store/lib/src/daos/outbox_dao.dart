@@ -170,6 +170,11 @@ final class OutboxDao {
   Future<List<OutboxEntry>> entriesFor(ThreadId? threadId) =>
       _entries(threadId).get();
 
+  /// Every entry of the table, final ones included, in FIFO order (`created_at`, then `id`);
+  /// the outbox resolves dependencies across threads with it (docs/DECISIONS.md D-M4-15-10).
+  Future<List<OutboxEntry>> allEntries() =>
+      (_db.select(_db.outbox)..orderBy(_fifo)).map(_fromRow).get();
+
   /// [entriesFor] on every change.
   Stream<List<OutboxEntry>> watchEntriesFor(ThreadId? threadId) =>
       _entries(threadId).watch();

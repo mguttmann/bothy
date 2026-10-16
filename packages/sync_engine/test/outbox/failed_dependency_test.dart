@@ -1,11 +1,11 @@
 // SPDX-License-Identifier: Apache-2.0
 
-// An entry the outbox creates never waits for an entry stored as failed: a failed entry is
-// never sent, so its dependent would block the lane for good (04 13.2 item 2). The class
-// reached the thread three times (a delete behind a discarded edit, a retry after a discarded
-// create, a retry after a discarded edit); these tests hold it for retry and edit after a
-// discard.
+// Regressions of the failure class closed by one resolver (docs/DECISIONS.md D-M4-15-9,
+// D-M4-15-10): after failures, retries, edits, discards or removes an entry was sent before an
+// entry it depends on, or waited for good for one that could never finish. Each test is a
+// reproduced finding of a review or red team; dependency_model_test.dart checks the class.
 
+import 'package:domain/domain.dart';
 import 'package:local_store/local_store.dart';
 import 'package:sync_engine/sync_engine.dart';
 import 'package:test/test.dart';
@@ -182,6 +182,48 @@ void main() {
     });
   });
 
+  group('lanes', () {
+    late Harness h;
+    late ScriptedExecutor ops;
+
+    setUp(() {
+      h = Harness.open();
+      ops = h.fake('op');
+    });
+    tearDown(() => h.close());
+
+    Future<OutboxEntry> op(
+      String name,
+      ThreadId thread, {
+      List<String> after = const [],
+    }) async {
+      final e = await h.outbox.enqueue(
+        OutboxRequest(
+          kind: 'op',
+          threadId: thread,
+          payload: {'name': name},
+          dependsOn: after,
+        ),
+      );
+      h.time.now = h.time.now.add(const Duration(milliseconds: 1));
+      return e;
+    }
+
+    test('a replacement at the end of its lane never waits behind an entry that waits for it', () async {
+      ops.then([problem(422, 'validation_failed')]);
+      final a = await op('a', threadA);
+      await h.outbox.start();
+      await settle();
+      // b (thread B) waits for a; c (thread A) waits for b and is older than a's replacement.
+      final b = await op('b', threadB, after: [a.id]);
+      final c = await op('c', threadA, after: [b.id]);
+      final a2 = await h.outbox.retry(a.id);
+      await settle();
+      await h.time.advance(const Duration(hours: 1));
+      expect(ops.ids, [a.id, a2, b.id, c.id]);
+    });
+  });
+
   group('uploads', () {
     late Harness h;
     late ScriptedExecutor uploads;
@@ -233,5 +275,64 @@ void main() {
         },
       );
     }
+
+    for (final viaEdit in [false, true]) {
+      test(
+        '${viaEdit ? 'edit' : 'retry'} of a chain-failed message after retrying its upload waits for the new upload',
+        () async {
+          uploads.then([
+            problem(413, 'payload_too_large'),
+            problem(422, 'validation_failed'),
+            problem(503, 'unavailable'),
+          ]);
+          final u1 = await upload('huge.mov');
+          final u2 = await upload('bad.png');
+          final m = await h.add(
+            'two files',
+            thread: threadA,
+            dependsOn: [u1.id, u2.id],
+          );
+          await h.outbox.start();
+          await settle();
+          await h.outbox.discard(u2.id);
+          final u1b = await h.outbox.retry(u1.id);
+          await settle();
+          expect(uploads.ids, contains(u1b));
+          expect((await h.entry(u1b))!.state, OutboxState.waiting);
+          final m2 = viaEdit
+              ? await h.outbox.edit(m.id, {'content_md': 'one file'})
+              : await h.outbox.retry(m.id);
+          await settle();
+          expect(
+            messages.ids,
+            isNot(contains(m2)),
+            reason: 'the new upload is not confirmed yet',
+          );
+          expect(dependenciesOf((await h.entry(m2))!), [u1b]);
+          await h.time.advance(const Duration(hours: 1));
+          expect(messages.ids, [
+            m2,
+          ], reason: 'sent once the new upload is confirmed');
+        },
+      );
+    }
+
+    test('a message named after a discarded upload fails instead of going without it', () async {
+      uploads.then([problem(413, 'payload_too_large')]);
+      final u = await upload('huge.mov');
+      await h.outbox.start();
+      await settle();
+      await h.outbox.discard(u.id);
+      final m = await h.add('one file', thread: threadA, dependsOn: [u.id]);
+      await settle();
+      expect(messages.ids, isEmpty);
+      final stored = (await h.entry(m.id))!;
+      expect(stored.state, OutboxState.failed);
+      expect(stored.lastErrorCode, 'dependency_discarded');
+      // Sending it again is the person's choice to send it without the file.
+      final m2 = await h.outbox.retry(m.id);
+      await settle();
+      expect(messages.ids, [m2]);
+    });
   });
 }

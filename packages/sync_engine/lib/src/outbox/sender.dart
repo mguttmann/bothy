@@ -13,6 +13,7 @@ import 'package:local_store/local_store.dart';
 
 import 'backoff.dart';
 import 'classify.dart';
+import 'dependencies.dart';
 import 'executors.dart';
 
 /// Called with a confirmed entry and its response before the entry leaves the outbox; stores
@@ -27,14 +28,6 @@ typedef OutboxTimerFactory = Timer Function(
   Duration delay,
   void Function() callback,
 );
-
-/// The IDs [entry] waits for (stored comma-separated in `depends_on`, D-M4-15-6).
-List<String> dependenciesOf(OutboxEntry entry) =>
-    encodedDependencies(entry.dependsOn);
-
-/// Splits the stored `depends_on` value [stored].
-List<String> encodedDependencies(String? stored) =>
-    stored == null || stored.isEmpty ? const [] : stored.split(',');
 
 /// Runs async sections one after another, so a change by the person and a step of the sender
 /// never interleave (an edit must never change a payload that is being sent).
@@ -60,6 +53,7 @@ final class OutboxSender {
     required this.timer,
     required this.random,
     required this.lock,
+    required this.dependencies,
     required this.onChanged,
     this.onConfirmed,
   });
@@ -84,6 +78,9 @@ final class OutboxSender {
 
   /// The lock shared with `Outbox`.
   final SerialLock lock;
+
+  /// The dependency graph shared with `Outbox`.
+  final OutboxDependencies dependencies;
 
   /// Called after every change of the table by the sender.
   final void Function() onChanged;
@@ -143,11 +140,8 @@ final class OutboxSender {
     await lock.run(() async {});
   }
 
-  /// Every entry in the table, thread by thread in FIFO order.
-  Future<List<OutboxEntry>> allEntries() async {
-    final threads = <ThreadId?>{...await dao.pendingThreads(), null};
-    return [for (final t in threads) ...await dao.entriesFor(t)];
-  }
+  /// Every entry in the table in FIFO order, final ones included.
+  Future<List<OutboxEntry>> allEntries() => dependencies.all();
 
   /// Looks for lanes that can send and starts their workers; safe to call at any time.
   Future<void> pump() async {
@@ -178,16 +172,30 @@ final class OutboxSender {
       final claimed = <(String, OutboxEntry)>[];
       if (!_started || !_ready || _closed) return claimed;
       final lanes = <String, List<OutboxEntry>>{};
+      final open = <String, OutboxEntry>{};
       for (final e in await allEntries()) {
         if (e.state.isFinal) continue;
+        open[e.id] = e;
         (lanes[executors.laneOf(e)] ??= []).add(e);
       }
+      final order = _order(open);
       DateTime? nextWake;
       final current = now();
       for (final MapEntry(key: lane, value: entries) in lanes.entries) {
         if (_busy.contains(lane)) continue;
-        final head = _headOf(entries);
-        if (!await _dependenciesConfirmed(head)) continue;
+        final head = entries.reduce((a, b) => order(b, a) < 0 ? b : a);
+        switch (await dependencies.readiness(head)) {
+          case Readiness.waiting:
+            continue;
+          case Readiness.broken:
+            // A dependency is gone without a confirmation: the entry and its chain fail
+            // visibly instead of going without it (D-M4-15-10).
+            await dao.recordFailure(head.id, code: dependencyDiscarded);
+            await dependencies.failChain(head.id);
+            _again = true;
+            continue;
+          case Readiness.ready:
+        }
         final due = head.nextAttemptAt;
         if (head.state == OutboxState.waiting &&
             due != null &&
@@ -218,32 +226,57 @@ final class OutboxSender {
     }
   }
 
-  /// Strict FIFO: only the oldest entry of a lane may go; later ones never overtake it. A
-  /// dependent never goes before its parent in the same lane, even when the clock stepped back
-  /// between the two writes and gave the dependent the older `created_at`.
-  OutboxEntry _headOf(List<OutboxEntry> entries) {
-    var head = entries.first;
-    final inLane = {for (final e in entries) e.id: e};
-    final seen = <String>{};
-    while (seen.add(head.id)) {
-      final parent = dependenciesOf(head)
-          .map((id) => inLane[id])
-          .whereType<OutboxEntry>()
-          .firstOrNull;
-      if (parent == null) break;
-      head = parent;
+  /// Orders the entries [open] that are not final for [_schedule]: the first entry of a lane
+  /// in this order goes next.
+  ///
+  /// FIFO by `created_at`, with one exception: an entry goes no later than the oldest entry
+  /// that waits for it, directly or through others in any lane. So a dependent never goes
+  /// before its parent (also when a clock step gave it the older `created_at`), and a
+  /// replacement that `retry` or `edit` put at the end of its lane never waits behind an
+  /// entry that waits for it through another lane, which would block both lanes for good.
+  /// Ties go to the entry with the shorter chain of open dependencies, so a parent always
+  /// comes before its dependent (D-M4-15-10).
+  static Comparator<OutboxEntry> _order(Map<String, OutboxEntry> open) {
+    final waiters = <String, List<OutboxEntry>>{};
+    for (final e in open.values) {
+      for (final d in dependenciesOf(e)) {
+        if (open.containsKey(d)) (waiters[d] ??= []).add(e);
+      }
     }
-    return head;
-  }
+    final due = <String, DateTime>{};
+    DateTime dueOf(OutboxEntry e) {
+      final known = due[e.id];
+      if (known != null) return known;
+      due[e.id] = e.createdAt; // guards a cycle, which the outbox never writes
+      var at = e.createdAt;
+      for (final w in waiters[e.id] ?? const <OutboxEntry>[]) {
+        final other = dueOf(w);
+        if (other.isBefore(at)) at = other;
+      }
+      return due[e.id] = at;
+    }
 
-  /// A confirmed entry leaves the table, so a missing dependency counts as confirmed; a
-  /// discarded one fails its dependents first (`Outbox.discard`).
-  Future<bool> _dependenciesConfirmed(OutboxEntry entry) async {
-    for (final id in dependenciesOf(entry)) {
-      final parent = await dao.byId(id);
-      if (parent != null && parent.state != OutboxState.confirmed) return false;
+    final depth = <String, int>{};
+    int depthOf(OutboxEntry e) {
+      final known = depth[e.id];
+      if (known != null) return known;
+      depth[e.id] = 0;
+      var d = 0;
+      for (final id in dependenciesOf(e)) {
+        final parent = open[id];
+        if (parent != null) d = max(d, depthOf(parent) + 1);
+      }
+      return depth[e.id] = d;
     }
-    return true;
+
+    return (a, b) {
+      final byDue = dueOf(a).compareTo(dueOf(b));
+      if (byDue != 0) return byDue;
+      final byDepth = depthOf(a).compareTo(depthOf(b));
+      if (byDepth != 0) return byDepth;
+      final byAge = a.createdAt.compareTo(b.createdAt);
+      return byAge != 0 ? byAge : a.id.compareTo(b.id);
+    };
   }
 
   /// Sends the claimed [entry] and applies the outcome; its lane is busy until then.
@@ -290,7 +323,7 @@ final class OutboxSender {
           // The write is stored on the server; its echo or the catch-up brings the result
           // again, so a failing hook must not keep the entry and send it once more.
         }
-        await dao.replaceWithServer(stored.id);
+        await dependencies.removeEntry(stored.id, into: const []);
       case OutcomeClass.retry:
         final wait =
             outcome.retryAfter ??
@@ -346,9 +379,7 @@ final class OutboxSender {
     if (changed) await dao.updatePayload(entry.id, jsonEncode(payload));
   }
 
-  /// The entries that depend on [id].
-  Future<List<OutboxEntry>> dependentsOf(String id) async => [
-    for (final e in await allEntries())
-      if (dependenciesOf(e).contains(id)) e,
-  ];
+  /// The entries that depend on [id], final ones included.
+  Future<List<OutboxEntry>> dependentsOf(String id) =>
+      dependencies.dependentsOf(id);
 }

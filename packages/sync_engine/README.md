@@ -35,9 +35,19 @@ Life cycle of an entry:
 - One worker per FIFO lane sends the oldest entry and the next only after the response (04 13.2
   item 2). The lane is the thread, or the lane the executor names for writes outside a thread
   (`setting:<key>`, `message:<id>`, `upload:<id>`); lanes run in parallel, bounded only by the
-  HTTP client's connection limit.
+  HTTP client's connection limit. An entry goes no later than the oldest entry that waits for
+  it, also through other lanes, so a replacement at the end of a lane never waits behind its
+  own dependent.
 - An entry with `depends_on` (a message after its uploads) waits until each of them is confirmed;
-  a failed dependency keeps it waiting and visible with that reason (`blockedByCode`).
+  a failed dependency keeps it waiting and visible with that reason (`blockedByCode`). One
+  resolver (`dependencies.dart`) decides this for every path, over every stored entry: a row
+  that leaves the table re-points every entry that names it (confirmed: dropped; retried or
+  edited: its replacement; a dropped follow-up: what it waited for; discarded: dropped after
+  its chain failed), and a dependency that is gone without a recorded confirmation is never
+  taken as confirmed: the entry fails with `dependency_discarded` instead of going without it.
+  `enqueue` resolves the IDs it is given through the replacements and confirmations of the
+  running outbox; an ID gone before the outbox was created is unknown and fails the entry the
+  same way.
 - `start()` sends (M4-17 calls it after `catchup.complete`, 04 13.4), `pause()` lets running
   requests finish and starts none. The first `start()` resets `sending` entries of an earlier run
   to `pending`; they are sent again with their stored IDs.
