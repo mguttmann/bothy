@@ -74,16 +74,18 @@ Future<void> storeFetchedMessage(
   String? clientMsgId,
 }) async {
   final after = AfterCommit();
-  await sync.db.transaction(
-    () => _applyMessage(
+  final m = b.message;
+  await sync.db.transaction(() async {
+    if (!await sync.holdsContent(sync.db, m.channelId, m.threadId)) return;
+    await _applyMessage(
       sync,
       sync.db,
       after,
       b,
       created: created,
       clientMsgId: clientMsgId,
-    ),
-  );
+    );
+  });
   for (final step in after.steps) {
     await step();
   }

@@ -40,6 +40,11 @@ final class SnapshotApplier {
     AfterCommit after,
   ) async {
     final db = txn.db;
+    // What the snapshot lists is visible again.
+    sync.removedTargets.removeAll([
+      for (final v in s.spaces) v.space.id.value,
+      for (final v in s.channels) v.channel.id.value,
+    ]);
     for (final v in s.spaces) {
       await storeSpaceView(db, v);
     }
@@ -65,7 +70,9 @@ final class SnapshotApplier {
           final states = await sync.fetcher.myReadStates(channel);
           await sync.db.transaction(() async {
             for (final r in states) {
-              await sync.db.personalDao.applyReadState(r);
+              if (await sync.holdsChannel(sync.db, r.channelId)) {
+                await sync.db.personalDao.applyReadState(r);
+              }
             }
           });
         }
@@ -148,6 +155,7 @@ final class SnapshotApplier {
         )) {
           continue;
         }
+        if (!await sync.holdsChannel(sync.db, d.channelId)) continue;
         await sync.db.personalDao.upsertDraftIfNewer(d);
       }
     });

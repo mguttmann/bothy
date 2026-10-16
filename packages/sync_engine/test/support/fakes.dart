@@ -313,6 +313,9 @@ class FakeApi implements HttpClientAdapter {
   /// Routes by `METHOD /path`.
   final Map<String, FakeReply Function(SeenRequest r)> routes = {};
 
+  /// Futures by `METHOD /path` that a request waits for before it is answered.
+  final Map<String, Future<void>> gates = {};
+
   /// The requests to [path].
   int count(String path) => requests.where((r) => r.path == path).length;
 
@@ -330,6 +333,8 @@ class FakeApi implements HttpClientAdapter {
       options.uri.queryParameters,
     );
     requests.add(seen);
+    final gate = gates['${seen.method} $path'];
+    if (gate != null) await gate;
     final route = routes['${seen.method} $path'];
     final r = route == null ? FakeReply.problem(404, 'not_found') : route(seen);
     final problem = r.body is Map && (r.body! as Map)['code'] is String;

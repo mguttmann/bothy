@@ -107,9 +107,11 @@ most `sync.max_focused_threads`, the complete set per frame with `idle`) and
 - `resync_required` (any reason) keeps the connection: `getSnapshot`, then in one transaction
   `clearMirror` (outbox, drafts and share inbox stay) and the snapshot with its cursor and epoch;
   the threads in focus load their newest page; phase `live`, notice `Resynced`. Frames that
-  arrive meanwhile wait in the connection's queue and pass the duplicate rule afterwards. When
-  the snapshot cannot be loaded, the mirror goes, the cursor is dropped and the next connection
-  identifies without a cursor.
+  arrive meanwhile wait and pass the duplicate rule afterwards. When the snapshot cannot be
+  loaded, mirror and cursor stay and the snapshot is retried after the reconnect backoff on the
+  same connection.
+- REST reads after a commit store nothing for a target removed meanwhile (the channel row must
+  exist and no removal of the channel, its space or the thread may have happened).
 - `access.changed` stores `permission_version`; `removed` deletes the targets with
   `removeTargets` inside the page (rows, files, search entries, drafts; outbox entries stay),
   then deletes the file bytes through `FileCacheEraser` and emits `TargetsRemoved`; `added`

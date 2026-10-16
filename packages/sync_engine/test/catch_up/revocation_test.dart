@@ -6,6 +6,8 @@
 // emits targetsRemoved and keeps outbox entries; 4012 during a catch-up and session.revoked
 // wipe, stop the page and emit signedOut.
 
+import 'dart:async';
+
 import 'package:domain/domain.dart';
 import 'package:local_store/local_store.dart';
 import 'package:sync_engine/sync_engine.dart';
@@ -162,6 +164,35 @@ void main() {
         isNotNull,
       );
       expect(w.rest.requests.where((r) => r.path == '/events'), isEmpty);
+    },
+  );
+
+  test(
+    'a REST read in flight during a removal does not store the content again',
+    () async {
+      await w.connect(cursor: 30);
+      await w.push('catchup.complete', {'head_seq': 30});
+      await w.dispatch([threadCreated(31, 1), messageCreated(32, 1)]);
+      final release = Completer<void>();
+      w.rest.gates['GET /messages/${messageId(1, 2)}'] = release.future;
+      w.rest.routes['GET /messages/${messageId(1, 2)}'] = (_) =>
+          FakeReply(200, messageJson(1, 2, content: 'secret roadmap in full'));
+      final cut = messageCreated(33, 2, content: 'secret');
+      cut['truncated'] = true;
+      w.ch.push('dispatch', cut);
+      await settle();
+      w.ch.push('dispatch', accessRemoved(34, 1));
+      await settle();
+      expect(await w.db.structureDao.channelById(ch1), isNull);
+      release.complete();
+      await w.idle();
+      expect(w.rest.count('/messages/${messageId(1, 2)}'), 1);
+      expect(
+        await w.db.messagesDao.byId(MessageId.parse(messageId(1, 2))),
+        isNull,
+      );
+      expect(await w.db.searchDao.search('roadmap', limit: 5), isEmpty);
+      expect(await w.storedSeqs(1), isEmpty);
     },
   );
 }

@@ -23,6 +23,7 @@ import 'package:local_store/local_store.dart';
 
 import 'appliers/message_appliers.dart';
 import 'appliers/personal_appliers.dart';
+import 'backoff.dart';
 import 'connection_state.dart';
 import 'dispatcher.dart';
 import 'ephemeral_store.dart';
@@ -30,6 +31,7 @@ import 'fetcher.dart';
 import 'frames.dart';
 import 'gap_filler.dart';
 import 'isolate_decode.dart';
+import 'ports.dart';
 import 'session_listener.dart';
 import 'snapshot_applier.dart';
 import 'sync_events.dart';
@@ -65,8 +67,10 @@ final class CatchUpListener implements SessionListener {
   /// Creates the listener.
   ///
   /// [config] supplies `client.sync.parse_offload_bytes` and `sync.typing_ttl` (D-W-115);
-  /// [openThreads] names the threads in focus, reloaded after a resync; [logHook] receives one
-  /// line per notable step, never content.
+  /// [openThreads] names the threads in focus, reloaded after a resync; [random] draws the
+  /// jitter of the snapshot retries of a resync (`sync.reconnect_backoff_base`,
+  /// `sync.reconnect_backoff_cap`); [logHook] receives one line per notable step, never
+  /// content.
   CatchUpListener({
     required LocalDatabase db,
     required Fetcher fetcher,
@@ -80,6 +84,7 @@ final class CatchUpListener implements SessionListener {
     RunUpdatedHook? onRunUpdated,
     void Function()? onLive,
     this._logHook,
+    RandomSource? random,
   }) : _db = db,
        _clock = clock,
        _offloadBytes = config.syncParseOffloadBytes,
@@ -98,6 +103,11 @@ final class CatchUpListener implements SessionListener {
       onEcho: onEcho ?? (_, _) {},
       onRunUpdated: onRunUpdated ?? (_) {},
       log: _log,
+    );
+    _resyncBackoff = ReconnectBackoff(
+      base: config.reconnectBackoffBase,
+      cap: config.reconnectBackoffCap,
+      random: random ?? SystemRandomSource(),
     );
     _dispatcher = Dispatcher(_sync);
     _snapshots = SnapshotApplier(_sync);
@@ -129,6 +139,12 @@ final class CatchUpListener implements SessionListener {
   int _pendingReads = 0;
   bool _live = false;
   bool _halted = false;
+  bool _resyncing = false;
+  bool _draining = false;
+  int _session = 0;
+  String _resyncReason = '';
+  final List<GatewayFrame> _held = [];
+  late final ReconnectBackoff _resyncBackoff;
   bool _wiped = false;
 
   /// The notices to the app: removed targets, an overwritten draft, a resync, a sign-out.
@@ -202,7 +218,7 @@ final class CatchUpListener implements SessionListener {
   }
 
   void _startSession(SessionControl control) {
-    _page.clear();
+    _endSession();
     _live = false;
     _halted = false;
     control.setPhase(ConnectionPhase.catchingUp);
@@ -211,6 +227,14 @@ final class CatchUpListener implements SessionListener {
   @override
   Future<void> onFrame(GatewayFrame frame, SessionControl control) async {
     if (_wiped || _halted) return;
+    if (_resyncing || _draining) {
+      _held.add(frame);
+      return;
+    }
+    await _handle(frame, control);
+  }
+
+  Future<void> _handle(GatewayFrame frame, SessionControl control) async {
     switch (frame) {
       case DispatchFrame(:final envelope):
         if (!_live) {
@@ -242,9 +266,16 @@ final class CatchUpListener implements SessionListener {
   @override
   void onDisconnected() {
     // An unfinished page is dropped: its events come again from the stored cursor (04 9).
-    _page.clear();
-    _live = false;
+    _endSession();
     ephemeral.clearTyping();
+  }
+
+  void _endSession() {
+    _session++;
+    _page.clear();
+    _held.clear();
+    _live = false;
+    _resyncing = false;
   }
 
   List<Map<String, Object?>> _takePage() {
@@ -254,9 +285,10 @@ final class CatchUpListener implements SessionListener {
   }
 
   void _goLive(SessionControl control) {
+    final wasLive = _live;
     _live = true;
     control.setPhase(ConnectionPhase.live);
-    _onLive();
+    if (!wasLive) _onLive();
   }
 
   /// Applies [envelopes] in one transaction with the cursor [cursorSeq] (never below the
@@ -315,25 +347,41 @@ final class CatchUpListener implements SessionListener {
     control.setPhase(ConnectionPhase.resyncing);
     _page.clear();
     _live = false;
+    _resyncing = true;
+    _resyncBackoff.reset();
+    _resyncReason =
+        standardSerializers.serialize(
+              model.reason,
+              specifiedType: const FullType(GatewayResyncRequiredReasonEnum),
+            )!
+            as String;
+    await _attemptResync(control, _session);
+  }
+
+  /// Loads the snapshot and replaces the mirror. A failed load is retried after the reconnect
+  /// backoff on the same connection while frames wait in memory; mirror and cursor stay until
+  /// a snapshot arrives, and a disconnect ends the retries (the next session gets
+  /// `resync_required` again from its stored cursor) (D-M4-14-9).
+  Future<void> _attemptResync(SessionControl control, int session) async {
     final SnapshotData snapshot;
     try {
       snapshot = await _sync.fetcher.snapshot();
     } on Object catch (e) {
-      // Without the snapshot the stored state belongs to no time line the server follows:
-      // the mirror goes and the cursor is dropped, so the next connection identifies without
-      // a cursor and receives the snapshot of ready (D-M4-14-9).
-      _log('resync snapshot failed: ${e.runtimeType}');
-      if (_wiped) return;
-      await _db.syncStateDao.commitPage(
-        _db.syncStateDao.clearMirror,
-        cursor: const GlobalSeq(0),
+      if (_wiped || session != _session || !_resyncing) return;
+      final wait = _resyncBackoff.next();
+      _log(
+        'resync snapshot failed (${e.runtimeType}), '
+        'retry in ${wait.inMilliseconds} ms',
       );
-      await _db.syncStateDao.resetCursor();
-      gaps.clear();
-      _halted = true;
+      unawaited(
+        _clock.delay(wait).then((_) async {
+          if (_wiped || session != _session || !_resyncing) return;
+          await _attemptResync(control, session);
+        }),
+      );
       return;
     }
-    if (_wiped) return;
+    if (_wiped || session != _session) return;
     final after = AfterCommit();
     await _db.syncStateDao.commitPage(
       (txn) async {
@@ -350,16 +398,28 @@ final class CatchUpListener implements SessionListener {
       after.reads.add(() => _loadNewestPage(threadId));
     }
     await _afterCommit(after);
+    _resyncing = false;
     _goLive(control);
-    _notify(
-      Resynced(
-        standardSerializers.serialize(
-              model.reason,
-              specifiedType: const FullType(GatewayResyncRequiredReasonEnum),
-            )!
-            as String,
-      ),
-    );
+    _notify(Resynced(_resyncReason));
+    await _drainHeld(control, session);
+  }
+
+  /// Applies the frames that arrived during a resync, in order, with the duplicate rule (04
+  /// 7.3); new frames keep waiting behind them.
+  Future<void> _drainHeld(SessionControl control, int session) async {
+    if (_draining) return;
+    _draining = true;
+    try {
+      while (_held.isNotEmpty &&
+          !_resyncing &&
+          !_wiped &&
+          !_halted &&
+          session == _session) {
+        await _handle(_held.removeAt(0), control);
+      }
+    } finally {
+      _draining = false;
+    }
   }
 
   /// The newest page of [threadId] through REST, stored with its loaded range.
@@ -368,6 +428,8 @@ final class CatchUpListener implements SessionListener {
     if (page.messages.isEmpty) return;
     await _db.transaction(() async {
       for (final b in page.messages) {
+        final m = b.message;
+        if (!await _sync.holdsContent(_db, m.channelId, threadId)) return;
         await storeMessage(_db, b, me: _sync.me);
       }
       await _db.messagesDao.addLoadedRange(

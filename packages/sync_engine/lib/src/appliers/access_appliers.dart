@@ -49,31 +49,49 @@ Future<void> _accessChanged(ApplyContext c) async {
   final changed = _targets(p, 'changed').where(_structural).toList();
   final sync = c.sync;
   if (added.isNotEmpty) {
-    // 04 8.4: the structure of new targets through REST, no catch-up of older events.
+    sync.removedTargets.removeAll([for (final t in added) t.id]);
+    // 04 8.4: the structure of new targets through REST, no catch-up of older events. A
+    // removal while the reads run wins (04 8.3).
     c.after.reads.add(() async {
       final s = await sync.fetcher.loadStructure(added);
       await sync.db.transaction(() async {
         for (final v in s.spaces) {
-          await storeSpaceView(sync.db, v);
+          if (!sync.removedTargets.contains(v.space.id.value)) {
+            await storeSpaceView(sync.db, v);
+          }
         }
         for (final v in s.channels) {
-          await storeChannelView(sync.db, v);
+          if (sync.mayStoreChannel(v.channel.id, v.channel.spaceId)) {
+            await storeChannelView(sync.db, v);
+          }
         }
         for (final t in s.threads) {
-          await storeThread(sync.db, t);
+          if (await sync.holdsContent(sync.db, t.channelId, t.id)) {
+            await storeThread(sync.db, t);
+          }
         }
       });
     });
   }
   for (final t in changed) {
-    // The new level and capabilities come with the view; controls follow them (15 1).
+    // The new level and capabilities come with the view; controls follow them (15 1). Only a
+    // target still stored here is updated, so a later removal is not undone.
     c.after.reads.add(() async {
       if (t.kind == RemovedTargetKind.space) {
         final v = await sync.fetcher.space(SpaceId.parse(t.id));
-        await sync.db.transaction(() => storeSpaceView(sync.db, v));
+        await sync.db.transaction(() async {
+          final known = await sync.db.structureDao.spaceById(v.space.id);
+          if (known != null && !sync.removedTargets.contains(t.id)) {
+            await storeSpaceView(sync.db, v);
+          }
+        });
       } else {
         final v = await sync.fetcher.channel(ChannelId.parse(t.id));
-        await sync.db.transaction(() => storeChannelView(sync.db, v));
+        await sync.db.transaction(() async {
+          if (await sync.holdsChannel(sync.db, v.channel.id)) {
+            await storeChannelView(sync.db, v);
+          }
+        });
       }
     });
   }

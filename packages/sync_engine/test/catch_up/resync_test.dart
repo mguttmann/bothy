@@ -143,22 +143,40 @@ void main() {
   );
 
   test(
-    'a failed snapshot drops the mirror and the cursor; the next ready reloads',
+    'a failed snapshot is retried after the backoff on the same connection',
     () async {
       final w = World();
       addTearDown(w.dispose);
       await w.connect(cursor: 30);
       await w.dispatch([threadCreated(31, 1)]);
       await w.push('cursor', {'seq': 31});
-      w.rest.routes['GET /sync/snapshot'] = (_) =>
-          FakeReply.problem(503, 'unavailable');
+      var fail = true;
+      w.rest.routes['GET /sync/snapshot'] = (_) => fail
+          ? FakeReply.problem(503, 'unavailable')
+          : FakeReply(200, snapshotJson(headSeq: 90, epoch: 'epoch-2'));
       await w.push('resync_required', {
-        'reason': 'retention',
+        'reason': 'epoch_changed',
         'head_seq': 90,
-        'sync_epoch': 'epoch-1',
+        'sync_epoch': 'epoch-2',
       });
-      expect(await w.cursor(), isNull);
+      expect(w.h.phase, ConnectionPhase.resyncing);
+      expect(await w.cursor(), 31, reason: 'kept until a snapshot arrives');
+      // Live frames wait in memory meanwhile.
+      await w.dispatch([threadCreated(90, 3), threadCreated(91, 4)]);
+      expect(await w.db.threadsDao.byId(ThreadId.parse(threadId(4))), isNull);
+      fail = false;
+      await w.h.clock.elapse(const Duration(seconds: 2));
+      await w.idle();
+      expect(w.h.phase, ConnectionPhase.live);
+      expect(await w.cursor(), 91);
       expect(await w.db.threadsDao.byId(ThreadId.parse(threadId(1))), isNull);
+      expect(await w.db.threadsDao.byId(ThreadId.parse(threadId(3))), isNull);
+      expect(
+        await w.db.threadsDao.byId(ThreadId.parse(threadId(4))),
+        isNotNull,
+      );
+      expect(w.notices.whereType<Resynced>().single.reason, 'epoch_changed');
+      expect(w.h.transport.channels, hasLength(1), reason: 'no reconnect');
     },
   );
 }

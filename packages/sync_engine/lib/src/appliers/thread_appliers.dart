@@ -30,8 +30,12 @@ Future<void> storeThread(LocalDatabase db, Thread thread) async {
   await db.searchDao.indexThreadTitle(thread, spaceId: channel?.spaceId);
 }
 
-Future<void> _thread(ApplyContext c) =>
-    storeThread(c.db, threadFromJson(obj(c.payload, 'thread')));
+Future<void> _thread(ApplyContext c) {
+  final thread = threadFromJson(obj(c.payload, 'thread'));
+  // A thread that moves into a visible channel is visible again after a `thread.moved_out`.
+  c.sync.removedTargets.remove(thread.id.value);
+  return storeThread(c.db, thread);
+}
 
 /// `thread.moved_out` names only the source channel (API `ThreadMovedOutPayload`). When the
 /// thread is still stored in that channel, no `thread.moved` into a visible channel came before
@@ -51,6 +55,7 @@ Future<void> removeTargetsInPage(
   ApplyContext c,
   List<TargetRef> targets,
 ) async {
+  c.sync.removedTargets.addAll([for (final t in targets) t.id]);
   final paths = await c.db.removeTargets(targets);
   c.after.steps.add(() async {
     if (paths.isNotEmpty) await c.sync.eraser.erase(paths);

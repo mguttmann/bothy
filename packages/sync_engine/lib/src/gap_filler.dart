@@ -63,6 +63,9 @@ final class GapFiller {
     final bundles = await sync.fetcher.range(threadId, gap.from, gap.to);
     await sync.db.transaction(() async {
       for (final b in bundles) {
+        // A removal during the fetch wins (04 8.3).
+        final m = b.message;
+        if (!await sync.holdsContent(sync.db, m.channelId, threadId)) return;
         await storeMessage(sync.db, b, me: sync.me);
       }
       await sync.db.messagesDao.addLoadedRange(threadId, gap.from, gap.to);

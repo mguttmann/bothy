@@ -124,6 +124,37 @@ final class SyncContext {
   /// The threads [counter] holds values for, so a new snapshot can announce the ones it resets.
   final Set<ThreadId> countedThreads = {};
 
+  /// IDs of spaces, channels and threads removed in this process (04 8.3); a REST read that
+  /// was in flight during the removal must not store their content again (code review of
+  /// M4-14). An `access.changed` with `added` and a snapshot that lists a target take it out.
+  final Set<String> removedTargets = {};
+
+  /// Whether a background read may store content of [threadId] in [channelId]: the channel is
+  /// stored here and neither it nor the thread was removed. Call it inside the transaction of
+  /// the write, so a removal cannot slip in between.
+  Future<bool> holdsContent(
+    LocalDatabase db,
+    ChannelId channelId,
+    ThreadId threadId,
+  ) async =>
+      !removedTargets.contains(threadId.value) &&
+      await holdsChannel(db, channelId);
+
+  /// Whether the channel [id] is stored here and was not removed, nor its space.
+  Future<bool> holdsChannel(LocalDatabase db, ChannelId id) async {
+    if (removedTargets.contains(id.value)) return false;
+    final row = await db.structureDao.channelById(id);
+    if (row == null) return false;
+    final space = row.spaceId;
+    return space == null || !removedTargets.contains(space.value);
+  }
+
+  /// Whether a channel of [spaceId] (null for a direct message) with [channelId] may be stored
+  /// by a background read: neither was removed.
+  bool mayStoreChannel(ChannelId channelId, SpaceId? spaceId) =>
+      !removedTargets.contains(channelId.value) &&
+      (spaceId == null || !removedTargets.contains(spaceId.value));
+
   /// The person, from the snapshot of `ready`; null before the first `ready`.
   PrincipalId? me;
 
@@ -307,13 +338,27 @@ final class Dispatcher {
           );
         case 'thread':
           final thread = await sync.fetcher.thread(ThreadId.parse(id));
-          await sync.db.transaction(() => storeThread(sync.db, thread));
+          await sync.db.transaction(() async {
+            if (await sync.holdsContent(sync.db, thread.channelId, thread.id)) {
+              await storeThread(sync.db, thread);
+            }
+          });
         case 'channel':
           final view = await sync.fetcher.channel(ChannelId.parse(id));
-          await sync.db.transaction(() => storeChannelView(sync.db, view));
+          await sync.db.transaction(() async {
+            if (await sync.holdsChannel(sync.db, view.channel.id)) {
+              await storeChannelView(sync.db, view);
+            }
+          });
         case 'space':
           final view = await sync.fetcher.space(SpaceId.parse(id));
-          await sync.db.transaction(() => storeSpaceView(sync.db, view));
+          await sync.db.transaction(() async {
+            final known = await sync.db.structureDao.spaceById(view.space.id);
+            if (known != null &&
+                !sync.removedTargets.contains(view.space.id.value)) {
+              await storeSpaceView(sync.db, view);
+            }
+          });
         default:
           sync.log('truncated $type not reloaded: no read for $kind');
       }

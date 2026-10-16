@@ -495,7 +495,19 @@ class World {
     Map<String, Object?>? snapshot,
     int headSeq = 40,
   }) async {
-    if (cursor != null) await h.storeCursor(cursor);
+    if (cursor != null) {
+      // A device with a cursor holds the structure of its earlier sessions.
+      await h.storeCursor(cursor);
+      final s = snapshot ?? snapshotJson(headSeq: headSeq);
+      for (final v in s['spaces']! as List) {
+        final view = spaceViewFromJson((v as Map).cast<String, Object?>());
+        await db.structureDao.upsertSpaceIfNewer(view.space);
+      }
+      for (final v in s['channels']! as List) {
+        final view = channelViewFromJson((v as Map).cast<String, Object?>());
+        await db.structureDao.upsertChannelIfNewer(view.channel);
+      }
+    }
     await h.open();
     ch.push('hello', helloData());
     await idle();
