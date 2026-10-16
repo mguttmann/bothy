@@ -25,6 +25,13 @@ operated, and the order of the build.
 
 ### Added
 
+- Design system package: `packages/design_system` exports the generated token classes (a copy
+  that `tokens.py build` writes next to `design/build/dart/` and `make tokens` compares), a
+  settings resolver from `appearance.theme`, `appearance.density`, `appearance.reduce_motion` and
+  the instance accent to theme, density, motion and accent, a theme builder with the five token
+  extensions and the color scheme mapping, `DsThemeScope` (no animated switch under reduced
+  motion), the bundled variable fonts Atkinson Hyperlegible Next and Mono with their OFL texts and
+  a checked manifest, and the alchemist golden setup with `dsGoldenMatrix` (M4-04).
 - Release chain of the server (M7-10): `make release-prep COMPONENT=<name> [CHANNEL=beta]`
   computes the next version per component from its Conventional Commits (git-cliff, `cliff.toml`),
   renames the changelog section and writes `VERSION`; `make release-trial COMPONENT=server`

@@ -34,15 +34,16 @@ uv run --project tools --locked check-jsonschema --schemafile https://www.design
 |---|---|
 | `design/build/tokens.css` | CSS variables `--ds-*`; theme via `data-theme` or `prefers-color-scheme`, density via `data-density`, motion via `data-motion` or `prefers-reduced-motion`; instance accent over `data-accent="<key>"` on the same element as `data-theme` (only the swapped variables, per non-default accent and theme) |
 | `design/build/dart/design_tokens.g.dart` | `DsPalette`, `DsColors`, `DsAccent`, `DsElevation`, `DsDensity`, `DsMotion` (each a `ThemeExtension` with instances per context; `DsAccent` with one constant per theme and accent and `DsAccent.of(key, brightness)`, an unknown key gives the default), `DsSpace`, `DsRadius`, `DsBorderWidth`, `DsLayout`, `DsSize`, `DsIconSize`, `DsFonts`, `DsType`, `DsIcons` |
+| `packages/design_system/lib/src/generated/design_tokens.g.dart` | the same bytes as `design/build/dart/design_tokens.g.dart`: the package copy, because a package may not import a file outside its folder; `check` reports it as stale when it differs (docs/DECISIONS.md D-M4-04-1) |
 | `design/build/tokens.resolved.json` | all tokens resolved, per context, plus the icon mapping and the allowed space icons; member `accents`: default and, per accent and theme, every accent role with `hex`, `alias`, `moved_from` and `swapped` |
 | `design/build/preview.html` | standalone preview with embedded fonts and icons |
 | `design/build/README.md` | note "generated" |
 | `docs/design/palette.md`, `contrast.md`, `tokens.md` | generated docs |
 
-The Dart file is not formatted with `dart format`; `packages/design_system` takes it over in its
-build and formats it there. It was checked with `dart analyze` (Dart 3.13.5) against stand-ins
-for the Flutter types it uses; it has not yet been compiled against the real Flutter SDK (ticket
-"design_system package").
+The Dart file is not `dart format`-formatted; as generated code the package copy is outside the
+format check, the doc and style lint and coverage (docs/DECISIONS.md D-M4-01-4). It compiles
+against the real Flutter SDK (3.47.7): `packages/design_system` exports it, `flutter analyze`
+analyzes its users and `flutter test` compiles it (M4-04).
 
 ## Gates
 

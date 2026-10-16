@@ -2,3 +2,15 @@ Bothy
 Copyright 2026 The Bothy Authors
 
 This product is licensed under the Apache License, Version 2.0 (see LICENSE).
+
+This product bundles the following fonts (packages/design_system/fonts/), each licensed
+under the SIL Open Font License, Version 1.1 (OFL-1.1); the license text ships next to the
+font files:
+
+Atkinson Hyperlegible Next
+Copyright 2020-2024 The Atkinson Hyperlegible Next Project Authors
+(https://github.com/googlefonts/atkinson-hyperlegible-next)
+
+Atkinson Hyperlegible Mono
+Copyright 2020-2024 The Atkinson Hyperlegible Mono Project Authors
+(https://github.com/googlefonts/atkinson-hyperlegible-next-mono)

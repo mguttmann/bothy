@@ -1,0 +1,51 @@
+{
+  "$comment": "Bundled font files of packages/design_system: source, commit and sha256 of every file; test/fonts_test.dart checks them (docs/DECISIONS.md D-M4-04-4). Font version 2.001 (name table), fetched 2026-10-15 from the default branch; the repositories have no release tags. The upstream names carry the axis in brackets (\"[wght]\"); the files are stored under the Google Fonts download names (\"-VariableFont_wght\"), because the font loader of alchemist does not decode the URL-encoded asset keys of names with brackets (docs/DECISIONS.md D-M4-04-4). sha256 is taken over the stored bytes: the hygiene hook of the repository removed the trailing spaces of one line in each OFL text; the text is otherwise as published.",
+  "files": {
+    "AtkinsonHyperlegibleMono-Italic-VariableFont_wght.ttf": {
+      "source": "https://github.com/googlefonts/atkinson-hyperlegible-next-mono/blob/154d50362016cc3e873eb21d242cd0772384c8f9/fonts/variable/AtkinsonHyperlegibleMono-Italic[wght].ttf",
+      "commit": "154d50362016cc3e873eb21d242cd0772384c8f9",
+      "sha256": "e18f523877530e4abe229df6a36d394326254da488a7f5abb9b7b5ea8f780cd4",
+      "license": "OFL-1.1",
+      "license_file": "AtkinsonHyperlegibleMono.OFL.txt",
+      "bytes": 56364
+    },
+    "AtkinsonHyperlegibleMono-VariableFont_wght.ttf": {
+      "source": "https://github.com/googlefonts/atkinson-hyperlegible-next-mono/blob/154d50362016cc3e873eb21d242cd0772384c8f9/fonts/variable/AtkinsonHyperlegibleMono[wght].ttf",
+      "commit": "154d50362016cc3e873eb21d242cd0772384c8f9",
+      "sha256": "5ce8b1698d1ded7dff2178c1a3ad159470085a58ea239e8b2cb88f4fb4a6f646",
+      "license": "OFL-1.1",
+      "license_file": "AtkinsonHyperlegibleMono.OFL.txt",
+      "bytes": 53960
+    },
+    "AtkinsonHyperlegibleMono.OFL.txt": {
+      "source": "https://github.com/googlefonts/atkinson-hyperlegible-next-mono/blob/154d50362016cc3e873eb21d242cd0772384c8f9/OFL.txt",
+      "commit": "154d50362016cc3e873eb21d242cd0772384c8f9",
+      "sha256": "6d1bdbc9e8488e3911ff2d6714c68780cf4ef82ec6c9fc9e67c1e3f6303883ef",
+      "license": "OFL-1.1",
+      "bytes": 4435
+    },
+    "AtkinsonHyperlegibleNext-Italic-VariableFont_wght.ttf": {
+      "source": "https://github.com/googlefonts/atkinson-hyperlegible-next/blob/7925f50f649b3813257faf2f4c0b381011f434f1/fonts/variable/AtkinsonHyperlegibleNext-Italic[wght].ttf",
+      "commit": "7925f50f649b3813257faf2f4c0b381011f434f1",
+      "sha256": "ce9cffed32742ad2d9238c561a93220385e5934cdc02b8eb4097a50efa957dc6",
+      "license": "OFL-1.1",
+      "license_file": "AtkinsonHyperlegibleNext.OFL.txt",
+      "bytes": 123916
+    },
+    "AtkinsonHyperlegibleNext-VariableFont_wght.ttf": {
+      "source": "https://github.com/googlefonts/atkinson-hyperlegible-next/blob/7925f50f649b3813257faf2f4c0b381011f434f1/fonts/variable/AtkinsonHyperlegibleNext[wght].ttf",
+      "commit": "7925f50f649b3813257faf2f4c0b381011f434f1",
+      "sha256": "5a455d1cfa099b601ab70751bb9673e8fe1854dc4500c80e1a220d0d75e31745",
+      "license": "OFL-1.1",
+      "license_file": "AtkinsonHyperlegibleNext.OFL.txt",
+      "bytes": 114552
+    },
+    "AtkinsonHyperlegibleNext.OFL.txt": {
+      "source": "https://github.com/googlefonts/atkinson-hyperlegible-next/blob/7925f50f649b3813257faf2f4c0b381011f434f1/OFL.txt",
+      "commit": "7925f50f649b3813257faf2f4c0b381011f434f1",
+      "sha256": "09636801ed3e868736cc359bb1c819c5ef76529cbb41473cb1f602ef166dad0a",
+      "license": "OFL-1.1",
+      "bytes": 4430
+    }
+  }
+}

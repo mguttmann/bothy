@@ -1,0 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
+# alchemist tags every golden test with `golden` (docs/DECISIONS.md D-M4-04-5).
+tags:
+  golden:

@@ -43,6 +43,13 @@ license.override = ["BSD-3-Clause"]
 reason = "deps.dev knows no license for this pub package; its LICENSE file on pub.dev is BSD-3-Clause. Transitive package of cryptography, test or lints."
 
 [[PackageOverrides]]
+name = "alchemist"
+version = "0.14.1"
+ecosystem = "Pub"
+license.override = ["MIT"]
+reason = "deps.dev knows no license for this pub package; its LICENSE file on pub.dev is MIT. Golden test library; a regular dependency of design_system for its testing.dart (docs/DECISIONS.md D-M4-04-5)."
+
+[[PackageOverrides]]
 name = "analyzer"
 version = "13.3.0"
 ecosystem = "Pub"
@@ -132,6 +139,13 @@ version = "2.9.0"
 ecosystem = "Pub"
 license.override = ["Apache-2.0"]
 reason = "deps.dev knows no license for this pub package; its LICENSE file on pub.dev is Apache-2.0. Runtime dependency."
+
+[[PackageOverrides]]
+name = "equatable"
+version = "3.0.0"
+ecosystem = "Pub"
+license.override = ["MIT"]
+reason = "deps.dev knows no license for this pub package; its LICENSE file on pub.dev is MIT. Transitive package of alchemist."
 
 [[PackageOverrides]]
 name = "fake_async"
