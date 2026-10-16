@@ -1,22 +1,50 @@
 # SPDX-License-Identifier: Apache-2.0
 #
-# OSV-Scanner overrides of packages/bothy_noise (docs/quality/licenses.md, "License gate" item 3):
-# deps.dev has no license data for these pub packages, so OSV-Scanner reports UNKNOWN. One entry
-# per package and version, each checked against the LICENSE file of that version on pub.dev
-# (checked 2026-10-12, M2-38). Never a blanket override; a new version needs a new check.
-# Only cryptography ships in the apps; the others are dev dependencies (test, lints) and their
-# transitive packages, which the gate checks as well.
+# OSV-Scanner overrides of the root pubspec.lock of the Dart workspace (docs/quality/licenses.md,
+# "License gate" item 3): deps.dev has no license data for these pub packages, so OSV-Scanner
+# reports UNKNOWN. One entry per package and version, each checked against the LICENSE file of
+# that version as pub.dev ships it (checked 2026-10-12 for M2-38, the new packages and versions
+# on 2026-10-14 for M4-01). Never a blanket override; a new version needs a new check.
+# Runtime packages of the apps today: cryptography (bothy_noise) and its transitive packages,
+# characters, collection, material_color_utilities, meta and vector_math (Flutter); the others
+# are dev dependencies (test, lints, flutter_lints, flutter_test) and their transitive packages,
+# which the gate checks as well.
+
+# Packages of the Flutter SDK (source: sdk, version 0.0.0 in pubspec.lock): they are not on
+# pub.dev, so deps.dev cannot know them. Checked against the LICENSE files of Flutter 3.47.7
+# on 2026-10-14 (M4-01, docs/DECISIONS.md D-M4-01-9).
+
+[[PackageOverrides]]
+name = "flutter"
+version = "0.0.0"
+ecosystem = "Pub"
+license.override = ["BSD-3-Clause"]
+reason = "Flutter SDK package (packages/flutter of the SDK); its LICENSE file is BSD-3-Clause, the license of the Flutter repository. Runtime dependency of every Flutter member."
+
+[[PackageOverrides]]
+name = "flutter_test"
+version = "0.0.0"
+ecosystem = "Pub"
+license.override = ["BSD-3-Clause"]
+reason = "Flutter SDK package (packages/flutter_test of the SDK) without a LICENSE file of its own; the LICENSE of the Flutter repository it belongs to is BSD-3-Clause. Dev dependency."
+
+[[PackageOverrides]]
+name = "sky_engine"
+version = "0.0.0"
+ecosystem = "Pub"
+license.override = ["BSD-3-Clause"]
+reason = "Flutter SDK package (bin/cache/pkg/sky_engine): the dart:ui interface of the Flutter engine, BSD-3-Clause like the SDK. Its LICENSE file also collects the notices of the third-party code compiled into the engine that every Flutter app ships (ADR 0027), among them Apache-2.0, MIT, BSD, Zlib, Unicode, IJG and FreeType texts; the review of these notices is the ScanCode step before a release (docs/quality/licenses.md item 4)."
 
 [[PackageOverrides]]
 name = "_fe_analyzer_shared"
-version = "109.0.0"
+version = "103.0.0"
 ecosystem = "Pub"
 license.override = ["BSD-3-Clause"]
 reason = "deps.dev knows no license for this pub package; its LICENSE file on pub.dev is BSD-3-Clause. Transitive package of cryptography, test or lints."
 
 [[PackageOverrides]]
 name = "analyzer"
-version = "14.5.0"
+version = "13.3.0"
 ecosystem = "Pub"
 license.override = ["BSD-3-Clause"]
 reason = "deps.dev knows no license for this pub package; its LICENSE file on pub.dev is BSD-3-Clause. Transitive package of cryptography, test or lints."
@@ -43,11 +71,32 @@ license.override = ["BSD-3-Clause"]
 reason = "deps.dev knows no license for this pub package; its LICENSE file on pub.dev is BSD-3-Clause. Transitive package of cryptography, test or lints."
 
 [[PackageOverrides]]
+name = "characters"
+version = "1.4.1"
+ecosystem = "Pub"
+license.override = ["BSD-3-Clause"]
+reason = "deps.dev knows no license for this pub package; its LICENSE file on pub.dev is BSD-3-Clause. Transitive runtime package of flutter."
+
+[[PackageOverrides]]
 name = "cli_config"
 version = "0.2.0"
 ecosystem = "Pub"
 license.override = ["BSD-3-Clause"]
 reason = "deps.dev knows no license for this pub package; its LICENSE file on pub.dev is BSD-3-Clause. Transitive package of cryptography, test or lints."
+
+[[PackageOverrides]]
+name = "cli_util"
+version = "0.6.0"
+ecosystem = "Pub"
+license.override = ["BSD-3-Clause"]
+reason = "deps.dev knows no license for this pub package; its LICENSE file on pub.dev is BSD-3-Clause. Transitive package of flutter_test, test or lints."
+
+[[PackageOverrides]]
+name = "clock"
+version = "1.1.3"
+ecosystem = "Pub"
+license.override = ["Apache-2.0"]
+reason = "deps.dev knows no license for this pub package; its LICENSE file on pub.dev is Apache-2.0. Transitive package of flutter_test, test or lints."
 
 [[PackageOverrides]]
 name = "collection"
@@ -65,7 +114,7 @@ reason = "deps.dev knows no license for this pub package; its LICENSE file on pu
 
 [[PackageOverrides]]
 name = "coverage"
-version = "1.15.1"
+version = "1.16.0"
 ecosystem = "Pub"
 license.override = ["BSD-3-Clause"]
 reason = "deps.dev knows no license for this pub package; its LICENSE file on pub.dev is BSD-3-Clause. Transitive package of cryptography, test or lints."
@@ -85,6 +134,13 @@ license.override = ["Apache-2.0"]
 reason = "deps.dev knows no license for this pub package; its LICENSE file on pub.dev is Apache-2.0. Runtime dependency."
 
 [[PackageOverrides]]
+name = "fake_async"
+version = "1.3.3"
+ecosystem = "Pub"
+license.override = ["Apache-2.0"]
+reason = "deps.dev knows no license for this pub package; its LICENSE file on pub.dev is Apache-2.0. Transitive package of flutter_test, test or lints."
+
+[[PackageOverrides]]
 name = "ffi"
 version = "2.2.0"
 ecosystem = "Pub"
@@ -97,6 +153,13 @@ version = "7.0.1"
 ecosystem = "Pub"
 license.override = ["BSD-3-Clause"]
 reason = "deps.dev knows no license for this pub package; its LICENSE file on pub.dev is BSD-3-Clause. Transitive package of cryptography, test or lints."
+
+[[PackageOverrides]]
+name = "flutter_lints"
+version = "6.0.0"
+ecosystem = "Pub"
+license.override = ["BSD-3-Clause"]
+reason = "deps.dev knows no license for this pub package; its LICENSE file on pub.dev is BSD-3-Clause. Dev dependency."
 
 [[PackageOverrides]]
 name = "frontend_server_client"
@@ -134,6 +197,27 @@ license.override = ["BSD-3-Clause"]
 reason = "deps.dev knows no license for this pub package; its LICENSE file on pub.dev is BSD-3-Clause. Transitive package of cryptography, test or lints."
 
 [[PackageOverrides]]
+name = "leak_tracker"
+version = "11.0.2"
+ecosystem = "Pub"
+license.override = ["BSD-3-Clause"]
+reason = "deps.dev knows no license for this pub package; its LICENSE file on pub.dev is BSD-3-Clause. Transitive package of flutter_test, test or lints."
+
+[[PackageOverrides]]
+name = "leak_tracker_flutter_testing"
+version = "3.0.10"
+ecosystem = "Pub"
+license.override = ["BSD-3-Clause"]
+reason = "deps.dev knows no license for this pub package; its LICENSE file on pub.dev is BSD-3-Clause. Transitive package of flutter_test, test or lints."
+
+[[PackageOverrides]]
+name = "leak_tracker_testing"
+version = "3.0.2"
+ecosystem = "Pub"
+license.override = ["BSD-3-Clause"]
+reason = "deps.dev knows no license for this pub package; its LICENSE file on pub.dev is BSD-3-Clause. Transitive package of flutter_test, test or lints."
+
+[[PackageOverrides]]
 name = "lints"
 version = "6.1.0"
 ecosystem = "Pub"
@@ -153,6 +237,13 @@ version = "0.12.20"
 ecosystem = "Pub"
 license.override = ["BSD-3-Clause"]
 reason = "deps.dev knows no license for this pub package; its LICENSE file on pub.dev is BSD-3-Clause. Transitive package of cryptography, test or lints."
+
+[[PackageOverrides]]
+name = "material_color_utilities"
+version = "0.13.0"
+ecosystem = "Pub"
+license.override = ["Apache-2.0"]
+reason = "deps.dev knows no license for this pub package; its LICENSE file on pub.dev is Apache-2.0. Transitive runtime package of flutter."
 
 [[PackageOverrides]]
 name = "meta"
@@ -177,7 +268,7 @@ reason = "deps.dev knows no license for this pub package; its LICENSE file on pu
 
 [[PackageOverrides]]
 name = "package_config"
-version = "3.0.0"
+version = "2.2.0"
 ecosystem = "Pub"
 license.override = ["BSD-3-Clause"]
 reason = "deps.dev knows no license for this pub package; its LICENSE file on pub.dev is BSD-3-Clause. Transitive package of cryptography, test or lints."
@@ -282,21 +373,21 @@ reason = "deps.dev knows no license for this pub package; its LICENSE file on pu
 
 [[PackageOverrides]]
 name = "test"
-version = "1.33.0"
+version = "1.31.1"
 ecosystem = "Pub"
 license.override = ["BSD-3-Clause"]
 reason = "deps.dev knows no license for this pub package; its LICENSE file on pub.dev is BSD-3-Clause. Dev dependency."
 
 [[PackageOverrides]]
 name = "test_api"
-version = "0.7.15"
+version = "0.7.12"
 ecosystem = "Pub"
 license.override = ["BSD-3-Clause"]
 reason = "deps.dev knows no license for this pub package; its LICENSE file on pub.dev is BSD-3-Clause. Transitive package of cryptography, test or lints."
 
 [[PackageOverrides]]
 name = "test_core"
-version = "0.6.21"
+version = "0.6.18"
 ecosystem = "Pub"
 license.override = ["BSD-3-Clause"]
 reason = "deps.dev knows no license for this pub package; its LICENSE file on pub.dev is BSD-3-Clause. Transitive package of cryptography, test or lints."
@@ -307,6 +398,13 @@ version = "1.4.0"
 ecosystem = "Pub"
 license.override = ["BSD-3-Clause"]
 reason = "deps.dev knows no license for this pub package; its LICENSE file on pub.dev is BSD-3-Clause. Transitive runtime package of cryptography."
+
+[[PackageOverrides]]
+name = "vector_math"
+version = "2.4.3"
+ecosystem = "Pub"
+license.override = ["BSD-3-Clause"]
+reason = "deps.dev knows no license for this pub package; its LICENSE file on pub.dev is BSD-3-Clause. Transitive runtime package of flutter."
 
 [[PackageOverrides]]
 name = "vm_service"

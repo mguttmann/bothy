@@ -10,10 +10,13 @@ You need git, GNU make, [uv](https://docs.astral.sh/uv/) and Node.js (an LTS rel
 `make bootstrap` checks the minimum version). Working on the server or the host service needs
 Go, working on the apps or any Dart package needs Flutter. Go comes from the `go` and
 `toolchain` lines of `services/*/go.mod` (every module has the same lines); Flutter from the
-exact `environment.flutter` version of the pinned `pubspec.yaml` (the app's, until it exists the
-one of `packages/bothy_noise`). The host service (`services/host`) is a Go module of its own and
-the Dart packages under `packages/` run their tests with `flutter test`; a Dart package needs a
-`test/` directory and reaches the coverage threshold. A Docker-compatible runtime is needed for the local SonarQube and for server
+exact `environment.flutter` version of the root `pubspec.yaml`. The host service
+(`services/host`) is a Go module of its own. The apps and packages form one Dart pub workspace
+at the repository root: run `flutter pub get` there once (one `pubspec.lock`), and the gates
+run `flutter analyze` at the root and `flutter test` per member; every member needs a `test/`
+directory and reaches the coverage threshold, and `make arch` checks the dependency rules of
+docs/spec/15-client-architecture.md 3.1. Platform tests of the apps run with
+`make apps-platform` on macOS or Windows. A Docker-compatible runtime is needed for the local SonarQube and for server
 work: integration tests run against PostgreSQL in throwaway containers, and `make perf` runs
 the load tests. As soon as a Go module exists, every server gate fails without Go, a
 Docker-compatible runtime or the pinned tools; there is no skip. Windows contributors use WSL.

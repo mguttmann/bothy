@@ -1,0 +1,5 @@
+# SPDX-License-Identifier: Apache-2.0
+# The shared rules of the workspace come from the root file (docs/DECISIONS.md D-M4-01-4).
+include:
+  - package:flutter_lints/flutter.yaml
+  - ../../analysis_options.yaml

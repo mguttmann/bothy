@@ -1,0 +1,20 @@
+# SPDX-License-Identifier: Apache-2.0
+name: l10n
+description: >-
+  ARB files in German and English and the generated localization of the apps.
+version: 0.0.0
+publish_to: none
+resolution: workspace
+
+environment:
+  sdk: ^3.13.5
+  flutter: 3.47.7
+
+dependencies:
+  flutter:
+    sdk: flutter
+
+dev_dependencies:
+  flutter_lints: ^6.0.0
+  flutter_test:
+    sdk: flutter

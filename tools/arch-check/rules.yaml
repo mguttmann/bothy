@@ -1,0 +1,114 @@
+# SPDX-License-Identifier: Apache-2.0
+#
+# Dependency rules of the Dart workspace: the single source of tools/arch-check/arch_check.py
+# (docs/spec/15-client-architecture.md, sections 3 and 3.1; brief M4-01).
+#
+# The members are listed in the order of 15 3, which is also the order of the root
+# `workspace:` list. `edges` are the arrows of the diagram of 15 3.1; a member may depend on
+# and import exactly the members these arrows reach from it, directly or through other members
+# (an allow list, docs/DECISIONS.md D-M4-01-3). A new edge changes 15 3.1 and this file in the
+# same change; a test holds both equal.
+#
+# Fields per member:
+#   kind        dart (pure Dart), flutter (Flutter package), plugin (Flutter plugin), app
+#   edges       arrows of the diagram that start at the member
+#   forbidden   imports the member must not have, with the rule of 15 3.1 that forbids them; a URI
+#               ending in "/" is a prefix, any other URI is exact; `dirs` limits the check to
+#               these top-level folders of the member (default: every source folder)
+#   never       members the member must not reach through any dependency, with the rule
+#   runtime_dependencies
+#               the only packages the member may list under `dependencies`, with the rule
+#   platform_code
+#               top-level folders of the member that may hold native sources (rule 4); without
+#               this field the member holds no native source at all
+
+members:
+  - name: client
+    path: apps/client
+    kind: app
+    edges: [admin_ui, sync_engine, design_system, device_key, terminal_ui]
+    platform_code: [ios, macos, android, windows]
+
+  - name: console
+    path: apps/console
+    kind: app
+    edges: [admin_ui, device_key, terminal_ui]
+    never: {rule: 3, members: [sync_engine, local_store]}
+
+  - name: design_system
+    path: packages/design_system
+    kind: flutter
+    edges: [l10n, domain]
+
+  - name: l10n
+    path: packages/l10n
+    kind: flutter
+    edges: []
+
+  - name: domain
+    path: packages/domain
+    kind: dart
+    edges: []
+    forbidden:
+      - {rule: 1, uris: ["package:flutter/", "dart:ui"]}
+
+  - name: api_client
+    path: packages/api_client
+    kind: dart
+    edges: []
+    forbidden:
+      - {rule: 1, uris: ["package:flutter/", "dart:ui"]}
+
+  - name: auth
+    path: packages/auth
+    kind: dart
+    edges: [api_client, domain]
+    forbidden:
+      - {rule: 1, uris: ["package:flutter/", "dart:ui"]}
+
+  - name: device_key
+    path: packages/device_key
+    kind: plugin
+    edges: []
+    platform_code: [ios, macos, android, windows, linux, web]
+
+  - name: local_store
+    path: packages/local_store
+    kind: dart
+    edges: [domain]
+    forbidden:
+      - {rule: 1, uris: ["package:flutter/", "dart:ui"]}
+
+  - name: sync_engine
+    path: packages/sync_engine
+    kind: dart
+    edges: [local_store, auth, api_client, domain]
+    forbidden:
+      - {rule: 1, uris: ["package:flutter/", "dart:ui"]}
+
+  - name: admin_ui
+    path: packages/admin_ui
+    kind: flutter
+    edges: [design_system, auth, api_client, bothy_viz]
+
+  - name: bothy_viz
+    path: packages/bothy_viz
+    kind: flutter
+    edges: [design_system, api_client, domain]
+    never: {rule: 6, members: [sync_engine, local_store]}
+
+  - name: bothy_noise
+    path: packages/bothy_noise
+    kind: dart
+    edges: []
+    forbidden:
+      - {rule: 7, uris: ["package:flutter/", "dart:ui"]}
+      # The tests read the vector files with dart:io (brief M2-38); the library must not.
+      - {rule: 7, uris: ["dart:io"], dirs: [lib]}
+    runtime_dependencies: {rule: 7, allowed: [cryptography]}
+
+  - name: terminal_ui
+    path: packages/terminal_ui
+    kind: flutter
+    edges: [design_system, auth, api_client, bothy_noise, domain]
+    never: {rule: 7, members: [sync_engine, local_store]}

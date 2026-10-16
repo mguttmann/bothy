@@ -17,6 +17,16 @@ import pytest
         (["services/server/internal/chat/x.go"], ["server"]),
         (["apps/client/lib/main.dart", "packages/design_system/lib/a.dart"], ["apps"]),
         (["design/tokens/color.json"], ["apps"]),
+        # The root files of the Dart workspace and its architecture test run the Dart gates
+        # (docs/DECISIONS.md D-M4-01-8).
+        (["pubspec.yaml"], ["apps"]),
+        (["pubspec.lock"], ["apps"]),
+        (["analysis_options.yaml"], ["apps"]),
+        (["tools/arch-check/rules.yaml"], ["apps"]),
+        (["tools/arch-check/arch_check.py", "packages/domain/lib/domain.dart"], ["apps"]),
+        (["tools/arch-checker/x.py"], ["all"]),
+        (["packages/pubspec.yaml.bak"], ["apps"]),
+        (["docs/pubspec.yaml"], []),
         # The Dart tests of packages/bothy_noise read the shared Noise test data of the host
         # service, so a change there runs the Go and the Dart gates (docs/DECISIONS.md D-M2-38-5).
         (["services/host/testdata/noise/recordings/go.json"], ["apps", "server"]),

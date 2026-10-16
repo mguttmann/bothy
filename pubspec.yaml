@@ -1,0 +1,30 @@
+# SPDX-License-Identifier: Apache-2.0
+#
+# Root of the Dart pub workspace (docs/spec/15-client-architecture.md 3, R-CL-02): one
+# resolution and one pubspec.lock for every package and app; no Melos, tasks run through the
+# make targets. This file is not a member itself. The members are listed in the order of 15 3;
+# tools/arch-check/rules.yaml names the same members with their dependency rules.
+name: bothy_workspace
+publish_to: none
+
+environment:
+  sdk: ^3.13.5
+  # The Flutter pin of the repository: CI installs this version (flutter-version-file:
+  # pubspec.yaml), and every member repeats the same exact line (docs/DECISIONS.md D-M4-01-1).
+  flutter: 3.47.7
+
+workspace:
+  - apps/client
+  - apps/console
+  - packages/design_system
+  - packages/l10n
+  - packages/domain
+  - packages/api_client
+  - packages/auth
+  - packages/device_key
+  - packages/local_store
+  - packages/sync_engine
+  - packages/admin_ui
+  - packages/bothy_viz
+  - packages/bothy_noise
+  - packages/terminal_ui

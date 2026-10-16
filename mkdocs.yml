@@ -3,7 +3,8 @@
 # Documentation site (ADR 0045). Build: `make docs` (mkdocs build --strict); versions are
 # pinned in tools/uv.lock. The navigation lists every page under docs/ except the single
 # ADRs: they are reached through the ADR index, which tools/docs/adr_index.py --check keeps
-# complete, and `not_in_nav` names them. Any other page missing from the navigation and
+# complete, and `not_in_nav` names them, and the generated Dart API pages under api/dart/,
+# which docs/reference/dart-api.md links (M4-01). Any other page missing from the navigation and
 # any navigation entry without a page fail the strict build (`omitted_files: warn`).
 
 site_name: Bothy
@@ -103,6 +104,7 @@ validation:
 # Deliberately outside the navigation: single ADRs (linked from the ADR index).
 not_in_nav: |
   /adr/0*.md
+  /api/dart/
 
 nav:
   - Home: index.md
@@ -146,6 +148,7 @@ nav:
       - Schemas: api/reference/schemas.md
       - Gateway reference: api/reference/gateway.md
       - Webhooks: api/webhooks.md
+      - Dart API reference: reference/dart-api.md
   - Security:
       - Threat model: security/threat-model.md
   - Compliance:

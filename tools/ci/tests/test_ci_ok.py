@@ -27,6 +27,8 @@ GREEN = {
     "sonar": "success",
     "postgres-image (amd64)": "success",
     "postgres-image (arm64)": "success",
+    "apps (macOS)": "success",
+    "apps (Windows)": "success",
 }
 
 
@@ -54,6 +56,13 @@ def test_postgres_image_jobs_may_be_skipped_but_not_fail() -> None:
     skipped = {**GREEN, "postgres-image (amd64)": "skipped", "postgres-image (arm64)": "skipped"}
     assert ci_ok.evaluate(jobs(skipped), "runner-9")[0] == "pass"
     failed = {**GREEN, "postgres-image (arm64)": "failure"}
+    assert ci_ok.evaluate(jobs(failed), "runner-9")[0] == "fail"
+
+
+def test_apps_platform_jobs_may_be_skipped_but_not_fail() -> None:
+    skipped = {**GREEN, "apps (macOS)": "skipped", "apps (Windows)": "skipped"}
+    assert ci_ok.evaluate(jobs(skipped), "runner-9")[0] == "pass"
+    failed = {**GREEN, "apps (Windows)": "failure"}
     assert ci_ok.evaluate(jobs(failed), "runner-9")[0] == "fail"
 
 
