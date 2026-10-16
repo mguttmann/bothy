@@ -607,6 +607,27 @@ Fehlt eine Bedingung, antwortet der Server `401 step_up_required` (Grund
 Andere Step-up-Aktionen verbrauchen den Step-up nicht; ein für das Terminal verbrauchter Step-up
 gilt für sie bis `auth.step_up_max_age` weiter.
 
+### 6.4 Command-line tools
+
+Command-line tools log in as a device with `platform = 'cli'` (03 `devices`).
+The general rules of sections 5 to 7 apply to them (approval, DPoP, revocation). For
+step-up the same rule applies as for API tokens (section 12): no step-up on this path.
+
+1. A `cli` device has no `step_up` key. The server rejects a registration with `step_up_jwk` and
+   `platform = 'cli'` with `400 validation_failed`.
+2. A session of a `cli` device cannot provide step-up. Already the challenge
+   (`POST /api/v1/auth/step-up/challenge`) and every confirmation, with device key or passkey,
+   end with `403 forbidden` (audit reason `step_up_not_possible`), as for a principal without a
+   session.
+3. The person completes actions with step-up (05, section 2.4) in the app or the web console;
+   from the tool they end with `401 step_up_required`.
+
+Reason: A tool keeps its key in a file or in memory and signs without user
+verification. Without attestation the server cannot tell this apart from a key in secure
+storage; otherwise malicious code with the permissions of the person would have the step-up. A
+passkey via a tool would have no checked origin. The safer choice is therefore no step-up on the
+command line.
+
 ## 7. Token-Modell
 
 ### 7.1 Übersicht

@@ -6,7 +6,9 @@
 // when its ticket builds it.
 //
 // The code of `bothy import` lives in packages under cmd/bothy/importtool (D-W-124): the
-// read-only Discord client cmd/bothy/importtool/discord and its test fake discordtest.
+// read-only Discord client cmd/bothy/importtool/discord and its test fake discordtest, and the
+// authenticated API client cmd/bothy/importtool/bothyapi (login, session file, DPoP
+// transport) with its test fake bothytest; import.go holds the command group.
 //
 // Exit codes: 0 success, 1 failure, 2 usage error. Codes from 3 upwards are specific to a
 // command and documented in its help, so orchestrators and scripts can tell "called wrongly"

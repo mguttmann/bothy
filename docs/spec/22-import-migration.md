@@ -428,8 +428,13 @@ Lese-Spiegel tagelang läuft. Ein Stapel betrifft genau einen Thread und hat hö
 Forum-Tags, Personen) kommen in eigenen Stapeln ohne Thread. Jeder Stapel schreibt `import.progress`
 und `thread.updated` (Abschnitt 6.4). Start, Abbruch und Abschluss stehen im Audit-Log.
 
-Wie die Kommandozeile sich als Owner anmeldet und Step-up leistet (Gerät `platform = cli`), legt
-[08-identitaet.md](08-identitaet.md) fest.
+The command line logs in as a device with `platform = cli` through device pairing
+(`bothy import login`, [08-identitaet.md](08-identitaet.md) sections 5.3 and 6.4). Such a session
+can never provide step-up, so every step that needs `import.manage` (create a source with its
+mapping file, start, pause, cancel, complete, ownership list) is done by the owner in the web
+console ([01-produkt.md](01-produkt.md) section 3.7, row "Import aus Discord"), and so are
+`channel.operator.set` and `channel.read_only.set`. The tool uses only `import.read`,
+`import.apply` and read actions.
 
 ## 9. Bindung an frühere Agenten-Sitzungen
 
@@ -475,6 +480,8 @@ Wer binden darf, regelt `agent.invoke`: Die Bindung entsteht nur aus einer erlau
 
 | Befehl | Wirkung |
 |---|---|
+| `bothy import login --server <url>` | logs the tool in as a `cli` device through device pairing; the owner approves the pairing code in the app or the web console; writes only the session file of the tool |
+| `bothy import logout` | ends the session on the server and deletes the session file |
 | `bothy import discord --guild <id> --map <datei>` | Trockenlauf: nur `GET` gegen Discord und Bothy, schreibt nichts, auch keine lokale Datei; druckt den Prüfbericht |
 | `… --apply` | legt die Quelle an oder setzt sie fort und importiert |
 | `… --apply --follow` | Lese-Spiegel als Schleife (Abschnitt 12); ohne `--apply` eine lesende Runde je Intervall mit "würde kopieren" |
@@ -488,6 +495,18 @@ Weitere Optionen: `--channel <id>` (wiederholbar) grenzt ein; `--only-thread <id
 wählt genau diese Threads; `--sessions <datei>` (Abschnitt 9); `--report text|json`;
 `--takeover` (7.4); `--discord-token-file <pfad>`.
 
+Session file: `bothy import login` stores device ID, DPoP key (Ed25519) and token pair in
+`<user configuration directory>/bothy/import-session.json` (`os.UserConfigDir`); every
+`bothy import` command takes `--session-file <path>` instead. The file has mode `0600` in a
+directory with mode `0700`; a file or directory that group or others can read or write is refused
+(on Windows the file lives in the user profile and the mode check is skipped). It is written
+atomically (temporary file in the same directory, `fsync`, rename). Every refresh holds an
+exclusive lock of `<file>.lock` and reads the file again after taking it, so two tool processes
+never rotate the same refresh token ([08-identitaet.md](08-identitaet.md) section 7.4); the new
+refresh token is stored before the new access token is used. `bothy import logout` deletes the
+session file under that lock and keeps the lock file. A missing file means "not logged in". No
+output, log line or error carries a token, the key or the content of the file.
+
 ### 10.2 Regeln
 
 1. Trockenlauf ist der Standard. Ein vergessener Schalter liest nur.
@@ -496,6 +515,11 @@ wählt genau diese Threads; `--sessions <datei>` (Abschnitt 9); `--report text|j
 3. Widersprüchliche Optionen (`--follow` mit `--once`, `--only-thread` mit `--follow`) enden mit
    Exit-Code `2` ohne Aufruf an Discord oder Bothy.
 4. Ausgabe enthält nie Nachrichteninhalte, Dateinamen von Anhängen, Tokens oder signierte URLs.
+5. The only call of a dry run to Bothy that is not a `GET` is `refreshToken` when the access
+   token of the session has expired, and the only file it may write is the session file of
+   `bothy import login`, to store the rotated refresh token (otherwise the next run would reuse
+   a consumed token and revoke the session, [08-identitaet.md](08-identitaet.md) section 7.4). Neither
+   is import data.
 
 ### 10.3 Exit-Codes
 
@@ -730,7 +754,8 @@ Servers steht in [05-aktionen.md](05-aktionen.md), Abschnitt 10.
 | `import.discord.preflight_sample` | `20` | Nachrichten für die Intent-Probe |
 | `import.discord.closed_tags` | leer | Forum-Tags, die einen Thread zusätzlich als erledigt markieren |
 | `import.attachment_max_bytes` | wie `file.max_upload_bytes` | größter übernommener Anhang |
-| `import.http_timeout` | `60s` | Zeitlimit je Aufruf an Discord und CDN |
+| `import.http_timeout` | `60s` | Zeitlimit je Aufruf an Discord und CDN; also the time limit of each call of the tool to Bothy |
+| `import.login_poll_interval` | `5s` | interval between polls of `completePairing` during `bothy import login`; the server limits public auth calls by `ratelimit.rl.public_auth.*` |
 | `import.batch_max_items` | `100` | Objekte je Stapel an den Server |
 | `import.reply_quote_max_chars` | `100` | Länge der Zitatzeile bei Antworten über Threads hinweg |
 | `import.follow.poll_interval` | `30s` | Abstand der Spiegel-Runden |

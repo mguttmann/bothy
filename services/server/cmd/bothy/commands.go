@@ -71,6 +71,14 @@ var commands = []command{
 		},
 	},
 	{
+		name:    "import",
+		summary: "Log the import tool in or out (device pairing as a cli device)",
+		// The tool reads no server configuration; M8-04 adds its own loader (22 19).
+		run: func(ctx context.Context, args, _ []string, stdout, stderr io.Writer) int {
+			return importCommand(ctx, args, stdout, stderr, defaultImportDeps())
+		},
+	},
+	{
 		name:    "telemetry",
 		summary: "Map a principal id to its telemetry pseudonym for the owner",
 		run: func(ctx context.Context, args, env []string, stdout, stderr io.Writer) int {

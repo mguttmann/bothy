@@ -226,7 +226,9 @@ func deps(r *register) []dep {
 	wire := slices.Concat([]string{"wire"}, all, platforms, []string{"kernel-ports"}, api, migrations)
 	list = append(list,
 		dep{name: "wire", mayDependOn: wire, canUse: vendorNames(r.Wire.Vendors)},
-		dep{name: "cmd", mayDependOn: slices.Concat([]string{"cmd", "wire"}, platforms, []string{"kernel-ports"}, migrations), canUse: vendorNames(r.Cmd.Vendors)},
+		// cmd may use api: the tools of the binary (bothy import) call the server through the
+		// generated client api/restclient (docs/DECISIONS.md D-M8-10-8).
+		dep{name: "cmd", mayDependOn: slices.Concat([]string{"cmd", "wire"}, platforms, []string{"kernel-ports"}, api, migrations), canUse: vendorNames(r.Cmd.Vendors)},
 	)
 	if r.API != nil {
 		list = append(list, dep{name: "api", mayDependOn: api, canUse: vendorNames(r.API.Vendors)})
