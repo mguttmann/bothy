@@ -474,6 +474,7 @@ func TestBootstrapIsAtomic(t *testing.T) {
 		People: repo, Devices: repo, Providers: repo, Identities: repo, Enrollment: w.id.Enrollment, Auth: w.id.Sessions, DPoP: w.id.DPoP,
 		Instance: instanceapp.NewState(instancepg.NewRepository(w.pool), w.uow), Keys: noKeys{}, Locales: locale.Parser{}, UoW: w.uow,
 		Authorizer: w.az, Audit: failingAudit{Recorder: w.rec, action: "instance.bootstrap"}, Clock: w.clk,
+		Sessions: repo, Pairings: repo, Pepper: testPepper,
 	})
 	if err != nil {
 		t.Fatal(err)

@@ -9,6 +9,10 @@
 version: 1
 enabled:             # operationIds that have a handler; sorted ascending
   - addOwner
+  - approveDevice
+  - approvePairing
+  - beginPairing
+  - completePairing
   - completeStepUpWithDeviceKey
   - createEnrollmentCode
   - createExtensionSession
@@ -74,12 +78,6 @@ later:               # every other operationId of docs/api/openapi.yaml; sorted 
   - operation_id: applyImportBatch
     milestone: M8
     ticket: M8-03
-  - operation_id: approveDevice
-    milestone: M1
-    ticket: M1-38
-  - operation_id: approvePairing
-    milestone: M1
-    ticket: M1-38
   - operation_id: archiveChannel
     milestone: M1
     ticket: M1-53
@@ -104,9 +102,6 @@ later:               # every other operationId of docs/api/openapi.yaml; sorted 
   - operation_id: beginOidcLogin
     milestone: M1
     ticket: M1-41
-  - operation_id: beginPairing
-    milestone: M1
-    ticket: M1-38
   - operation_id: beginPasskeyLogin
     milestone: M1
     ticket: M1-40
@@ -143,9 +138,6 @@ later:               # every other operationId of docs/api/openapi.yaml; sorted 
   - operation_id: completeOidcLogin
     milestone: M1
     ticket: M1-41
-  - operation_id: completePairing
-    milestone: M1
-    ticket: M1-38
   - operation_id: completePasskeyLogin
     milestone: M1
     ticket: M1-40

@@ -65,8 +65,8 @@ func NewSessions(cfg Config, pepper []byte, d SessionsDeps) (*Sessions, error) {
 		d.Authorizer == nil || d.Audit == nil || d.Events == nil || d.Cursors == nil {
 		return nil, errors.New("identity: NewSessions needs every collaborator")
 	}
-	if len(pepper) == 0 || cfg.RefreshTokenTTL <= 0 || cfg.SessionMaxAge <= 0 || cfg.RefreshReuseGrace < 0 {
-		return nil, errors.New("identity: sessions need the token pepper, auth.refresh_token_ttl and auth.session_max_age above 0 and auth.refresh_reuse_grace not negative")
+	if len(pepper) == 0 || cfg.RefreshTokenTTL <= 0 || cfg.SessionMaxAge <= 0 || cfg.RefreshReuseGrace < 0 || cfg.DevicePendingTTL <= 0 {
+		return nil, errors.New("identity: sessions need the token pepper, auth.refresh_token_ttl, auth.session_max_age and auth.device_pending_ttl above 0 and auth.refresh_reuse_grace not negative")
 	}
 	if cfg.PageSizeDefault < 1 || cfg.PageSizeMax < cfg.PageSizeDefault {
 		return nil, errors.New("identity: api.page_size_default must be at least 1 and not above api.page_size_max")

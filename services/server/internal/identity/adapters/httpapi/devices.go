@@ -101,6 +101,7 @@ func toREST(d identity.Device) rest.Device {
 		StepUpKeyThumbprint: optional(d.StepUpKeyThumbprint),
 		RevokeReason:        (*rest.DeviceRevokeReason)(optional(d.RevokeReason)),
 		ApprovedAt:          optionalTime(d.ApprovedAt), RevokedAt: optionalTime(d.RevokedAt), LastSeenAt: optionalTime(d.LastSeenAt),
+		VerificationCode: optional(d.VerificationCode),
 	}
 }
 

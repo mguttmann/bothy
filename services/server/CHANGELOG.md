@@ -51,6 +51,20 @@ documented in this file. The format is based on
   never retries `401` or `403` and ends a channel after its `403` for the run. The test fake
   `discordtest` (TLS on `127.0.0.1`, fixture guild, fault injection, token echo, request log)
   is for later import tickets and never reaches the binary.
+- Device approval and pairing (M1-38): a device that logs in without an enrollment code stays
+  `pending` with tokens but no access beyond reading itself and shows a verification code
+  derived from the token pepper, its id and its DPoP key (never stored). `approveDevice` (owner or
+  the person from an active device, step-up) activates it with the typed code; a wrong code
+  revokes it with its keys and sessions and answers `200` with `state: revoked`. Pairing:
+  `beginPairing` registers the keys of a new device and shows a pairing code of
+  `auth.pairing_code_chars` Crockford characters, `approvePairing` creates the device as an
+  active device of the caller (an unknown code ends the step-up of the session) and
+  `completePairing` hands out the tokens under a proof of the registered key (another key rejects
+  the pairing). Pending devices past `auth.device_pending_ttl` count as revoked at once and are
+  revoked by `identity.auth_cleanup` (`pending_expired`), like approved pairings never collected
+  (`pairing_expired`); both are audited as the system action `device.expire`. New migration
+  `00018_identity_device_pairings.sql` and the keys `auth.device_pending_ttl`,
+  `auth.device_verification_code_digits`, `auth.pairing_code_ttl` and `auth.pairing_code_chars`.
 - Instance settings, branding and discovery (M1-46): the migration `00017_instance_settings.sql`,
   the settings registry of configuration.md section 6, the generated design keys
   `kernel/designkeys` (category colours and space icons from the design tokens, the accent list of

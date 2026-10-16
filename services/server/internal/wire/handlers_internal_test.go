@@ -23,6 +23,7 @@ func TestHandlers_FillsBuiltAndKeepsInjected(t *testing.T) {
 		CredentialHandlers: &identityhttp.Credentials{},
 		TokenHandlers:      &identityhttp.Tokens{},
 		EnrollmentHandlers: &identityhttp.Enrollment{},
+		ApprovalHandlers:   &identityhttp.Approval{},
 	}
 	keys := &SigningKeys{Handlers: &instancehttp.Keys{}}
 	log := &audithttp.Log{}
@@ -44,6 +45,7 @@ func TestHandlers_FillsBuiltAndKeepsInjected(t *testing.T) {
 		{"Credentials", h.Credentials, id.CredentialHandlers},
 		{"Tokens", h.Tokens, injected},
 		{"Enrollment", h.Enrollment, id.EnrollmentHandlers},
+		{"Approval", h.Approval, id.ApprovalHandlers},
 		{"Keys", h.Keys, keys.Handlers},
 		{"Log", h.Log, log},
 	}

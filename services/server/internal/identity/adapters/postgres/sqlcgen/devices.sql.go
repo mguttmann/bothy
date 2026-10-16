@@ -11,6 +11,25 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
+const activateDevice = `-- name: ActivateDevice :execrows
+UPDATE devices SET state = 'active', approved_by = $1, approved_at = $2
+WHERE id = $3 AND state = 'pending'
+`
+
+type ActivateDeviceParams struct {
+	ApprovedBy pgtype.UUID
+	ApprovedAt pgtype.Timestamptz
+	ID         pgtype.UUID
+}
+
+func (q *Queries) ActivateDevice(ctx context.Context, arg ActivateDeviceParams) (int64, error) {
+	result, err := q.db.Exec(ctx, activateDevice, arg.ApprovedBy, arg.ApprovedAt, arg.ID)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
+}
+
 const getActiveDeviceKey = `-- name: GetActiveDeviceKey :one
 SELECT id, device_id, purpose, jkt, public_jwk, alg, attestation, created_at, revoked_at FROM device_keys
 WHERE device_id = $1 AND purpose = $2 AND revoked_at IS NULL
@@ -100,9 +119,10 @@ func (q *Queries) GetDeviceKeyByJKT(ctx context.Context, jkt string) (DeviceKey,
 
 const insertDevice = `-- name: InsertDevice :one
 
-INSERT INTO devices (id, user_id, name, platform, state, app_version, approved_by, approved_at)
+INSERT INTO devices (id, user_id, name, platform, state, app_version, approved_by, approved_at, created_at)
 VALUES ($1, $2, $3, $4, $5, $6, $7,
-        CASE WHEN $7::uuid IS NULL THEN NULL ELSE now() END)
+        CASE WHEN $7::uuid IS NULL THEN NULL ELSE coalesce($8::timestamptz, now()) END,
+        coalesce($8::timestamptz, now()))
 RETURNING created_at, approved_at
 `
 
@@ -114,6 +134,7 @@ type InsertDeviceParams struct {
 	State      string
 	AppVersion pgtype.Text
 	ApprovedBy pgtype.UUID
+	CreatedAt  pgtype.Timestamptz
 }
 
 type InsertDeviceRow struct {
@@ -124,6 +145,8 @@ type InsertDeviceRow struct {
 // SPDX-License-Identifier: Apache-2.0
 // Queries on devices and device_keys (identity, docs/spec/03-data-model.md section 4.2). A device
 // row comes with the thumbprints of its active dpop and step_up keys (schema Device).
+// created_at is the time of the login request when given (the pending window counts from it,
+// M1-38), else the database time; an active device is approved at its creation.
 func (q *Queries) InsertDevice(ctx context.Context, arg InsertDeviceParams) (InsertDeviceRow, error) {
 	row := q.db.QueryRow(ctx, insertDevice,
 		arg.ID,
@@ -133,6 +156,7 @@ func (q *Queries) InsertDevice(ctx context.Context, arg InsertDeviceParams) (Ins
 		arg.State,
 		arg.AppVersion,
 		arg.ApprovedBy,
+		arg.CreatedAt,
 	)
 	var i InsertDeviceRow
 	err := row.Scan(&i.CreatedAt, &i.ApprovedAt)
@@ -227,4 +251,144 @@ func (q *Queries) ListDevicesOfUser(ctx context.Context, arg ListDevicesOfUserPa
 		return nil, err
 	}
 	return items, nil
+}
+
+const listPendingDevicesCreatedBefore = `-- name: ListPendingDevicesCreatedBefore :many
+SELECT d.id, d.user_id, d.name, d.platform, d.state, d.app_version, d.approved_by, d.approved_at, d.revoked_by, d.revoked_at, d.revoke_reason, d.created_at, d.last_seen_at,
+       kd.jkt AS key_thumbprint,
+       ks.jkt AS step_up_key_thumbprint
+FROM devices d
+LEFT JOIN device_keys kd ON kd.device_id = d.id AND kd.purpose = 'dpop' AND kd.revoked_at IS NULL
+LEFT JOIN device_keys ks ON ks.device_id = d.id AND ks.purpose = 'step_up' AND ks.revoked_at IS NULL
+WHERE d.state = 'pending' AND d.created_at <= $1
+ORDER BY d.created_at, d.id
+LIMIT $2
+`
+
+type ListPendingDevicesCreatedBeforeParams struct {
+	CreatedBefore pgtype.Timestamptz
+	RowLimit      int32
+}
+
+type ListPendingDevicesCreatedBeforeRow struct {
+	Device              Device
+	KeyThumbprint       pgtype.Text
+	StepUpKeyThumbprint pgtype.Text
+}
+
+// The expiry of the job identity.auth_cleanup: pending devices past auth.device_pending_ttl.
+func (q *Queries) ListPendingDevicesCreatedBefore(ctx context.Context, arg ListPendingDevicesCreatedBeforeParams) ([]ListPendingDevicesCreatedBeforeRow, error) {
+	rows, err := q.db.Query(ctx, listPendingDevicesCreatedBefore, arg.CreatedBefore, arg.RowLimit)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []ListPendingDevicesCreatedBeforeRow
+	for rows.Next() {
+		var i ListPendingDevicesCreatedBeforeRow
+		if err := rows.Scan(
+			&i.Device.ID,
+			&i.Device.UserID,
+			&i.Device.Name,
+			&i.Device.Platform,
+			&i.Device.State,
+			&i.Device.AppVersion,
+			&i.Device.ApprovedBy,
+			&i.Device.ApprovedAt,
+			&i.Device.RevokedBy,
+			&i.Device.RevokedAt,
+			&i.Device.RevokeReason,
+			&i.Device.CreatedAt,
+			&i.Device.LastSeenAt,
+			&i.KeyThumbprint,
+			&i.StepUpKeyThumbprint,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const lockDevice = `-- name: LockDevice :one
+SELECT d.id, d.user_id, d.name, d.platform, d.state, d.app_version, d.approved_by, d.approved_at, d.revoked_by, d.revoked_at, d.revoke_reason, d.created_at, d.last_seen_at,
+       kd.jkt AS key_thumbprint,
+       ks.jkt AS step_up_key_thumbprint
+FROM devices d
+LEFT JOIN device_keys kd ON kd.device_id = d.id AND kd.purpose = 'dpop' AND kd.revoked_at IS NULL
+LEFT JOIN device_keys ks ON ks.device_id = d.id AND ks.purpose = 'step_up' AND ks.revoked_at IS NULL
+WHERE d.id = $1
+FOR UPDATE OF d
+`
+
+type LockDeviceRow struct {
+	Device              Device
+	KeyThumbprint       pgtype.Text
+	StepUpKeyThumbprint pgtype.Text
+}
+
+// The device row of an approval or expiry, locked until the end of the unit of work (M1-38).
+func (q *Queries) LockDevice(ctx context.Context, id pgtype.UUID) (LockDeviceRow, error) {
+	row := q.db.QueryRow(ctx, lockDevice, id)
+	var i LockDeviceRow
+	err := row.Scan(
+		&i.Device.ID,
+		&i.Device.UserID,
+		&i.Device.Name,
+		&i.Device.Platform,
+		&i.Device.State,
+		&i.Device.AppVersion,
+		&i.Device.ApprovedBy,
+		&i.Device.ApprovedAt,
+		&i.Device.RevokedBy,
+		&i.Device.RevokedAt,
+		&i.Device.RevokeReason,
+		&i.Device.CreatedAt,
+		&i.Device.LastSeenAt,
+		&i.KeyThumbprint,
+		&i.StepUpKeyThumbprint,
+	)
+	return i, err
+}
+
+const revokeDevice = `-- name: RevokeDevice :one
+UPDATE devices SET state = 'revoked', revoked_at = $1, revoked_by = $2, revoke_reason = $3
+WHERE id = $4 AND state <> 'revoked'
+RETURNING user_id
+`
+
+type RevokeDeviceParams struct {
+	RevokedAt    pgtype.Timestamptz
+	RevokedBy    pgtype.UUID
+	RevokeReason pgtype.Text
+	ID           pgtype.UUID
+}
+
+func (q *Queries) RevokeDevice(ctx context.Context, arg RevokeDeviceParams) (pgtype.UUID, error) {
+	row := q.db.QueryRow(ctx, revokeDevice,
+		arg.RevokedAt,
+		arg.RevokedBy,
+		arg.RevokeReason,
+		arg.ID,
+	)
+	var user_id pgtype.UUID
+	err := row.Scan(&user_id)
+	return user_id, err
+}
+
+const revokeDeviceKeys = `-- name: RevokeDeviceKeys :exec
+UPDATE device_keys SET revoked_at = $1 WHERE device_id = $2 AND revoked_at IS NULL
+`
+
+type RevokeDeviceKeysParams struct {
+	RevokedAt pgtype.Timestamptz
+	DeviceID  pgtype.UUID
+}
+
+func (q *Queries) RevokeDeviceKeys(ctx context.Context, arg RevokeDeviceKeysParams) error {
+	_, err := q.db.Exec(ctx, revokeDeviceKeys, arg.RevokedAt, arg.DeviceID)
+	return err
 }

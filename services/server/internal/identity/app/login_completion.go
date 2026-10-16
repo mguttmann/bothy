@@ -5,6 +5,7 @@ package app
 import (
 	"context"
 	"errors"
+	"io"
 	"net/netip"
 	"slices"
 
@@ -98,6 +99,14 @@ type ServiceDeps struct {
 	Audit auditing.Recorder
 	// Clock is the time of logins and setup; nil means clock.System().
 	Clock clock.Clock
+	// Sessions lists the sessions of a revoked device and ends the step-up of a session (M1-38).
+	Sessions SessionStore
+	// Pairings reads and writes device_pairings (M1-38).
+	Pairings PairingStore
+	// Pepper is the raw token pepper: the HMAC key of verification and pairing codes.
+	Pepper []byte
+	// Random is the source of pairing codes; nil means domain.EnrollmentRandom (crypto/rand).
+	Random io.Reader
 }
 
 // Service holds the login use cases every login path shares (CompleteLogin), the enrollment code
@@ -115,15 +124,24 @@ var _ identity.Enrollment = (*Service)(nil)
 // collaborator or a limit below 1.
 func NewService(cfg Config, d ServiceDeps) (*Service, error) {
 	if d.People == nil || d.Devices == nil || d.Providers == nil || d.Identities == nil || d.Enrollment == nil || d.Auth == nil ||
-		d.DPoP == nil || d.Instance == nil || d.Keys == nil || d.Locales == nil || d.UoW == nil || d.Authorizer == nil || d.Audit == nil {
-		return nil, errors.New("identity: NewService needs every collaborator")
+		d.DPoP == nil || d.Instance == nil || d.Keys == nil || d.Locales == nil || d.UoW == nil || d.Authorizer == nil || d.Audit == nil ||
+		d.Sessions == nil || d.Pairings == nil || len(d.Pepper) == 0 {
+		return nil, errors.New("identity: NewService needs every collaborator and the token pepper")
 	}
 	if cfg.HandleMaxChars < 1 || cfg.DisplayNameMaxChars < 1 {
 		return nil, errors.New("identity: principal limits must be at least 1")
 	}
+	if cfg.DevicePendingTTL <= 0 || cfg.PairingCodeTTL <= 0 || cfg.PairingCodeChars < 1 ||
+		cfg.DeviceVerificationCodeDigits < 1 || cfg.DeviceVerificationCodeDigits > domain.MaxVerificationDigits {
+		return nil, errors.New("identity: auth.device_pending_ttl, auth.pairing_code_ttl, auth.pairing_code_chars and auth.device_verification_code_digits out of range")
+	}
 	if d.Clock == nil {
 		d.Clock = clock.System()
 	}
+	if d.Random == nil {
+		d.Random = domain.EnrollmentRandom
+	}
+	d.Pepper = append([]byte(nil), d.Pepper...)
 	return &Service{cfg: cfg, d: d}, nil
 }
 
@@ -206,6 +224,9 @@ func (s *Service) completeLogin(ctx context.Context, in LoginCompletion) (LoginR
 	if err != nil {
 		return LoginResult{}, err
 	}
+	// A device that stays pending shows its verification code; the answer goes to that device
+	// only (08 section 5.2).
+	set.Device.VerificationCode = s.verificationCode(set.Device)
 	return LoginResult{Session: set.Session, Device: set.Device, Tokens: set, NewDevice: isNew}, nil
 }
 
@@ -229,6 +250,8 @@ func (s *Service) loginDevice(ctx context.Context, in LoginCompletion) (identity
 	if err != nil {
 		return identity.Device{}, false, err
 	}
+	// The pending window counts from the clock of the request (auth.device_pending_ttl).
+	d.CreatedAt = s.d.Clock.Now()
 	if d.Keys[0].JKT != in.ProofJKT {
 		return identity.Device{}, false, &identity.DPoPError{Code: identity.DPoPInvalidProof, Nonce: s.d.DPoP.CurrentNonce()}
 	}
@@ -237,7 +260,9 @@ func (s *Service) loginDevice(ctx context.Context, in LoginCompletion) (identity
 		return identity.Device{}, false, err
 	}
 	if found {
-		if known.UserID != in.UserID || known.State == identity.DeviceStateRevoked || known.KeyThumbprint != in.ProofJKT {
+		// A pending device past auth.device_pending_ttl counts as revoked (08 section 5.2).
+		if known.UserID != in.UserID || known.State == identity.DeviceStateRevoked || known.KeyThumbprint != in.ProofJKT ||
+			pendingExpired(known, s.d.Clock.Now(), s.cfg.DevicePendingTTL) {
 			return identity.Device{}, false, errs.New(errs.CodeConflict, "").
 				WithFields(errs.FieldError{Pointer: fieldDeviceID, Code: "taken", Detail: "The device id is taken."})
 		}

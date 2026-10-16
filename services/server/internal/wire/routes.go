@@ -70,6 +70,9 @@ type Handlers struct {
 	*identityhttp.Tokens
 	// Enrollment implements redeemEnrollmentCode and createEnrollmentCode (identity, M1-37).
 	*identityhttp.Enrollment
+	// Approval implements approveDevice, beginPairing, approvePairing and completePairing
+	// (identity, M1-38).
+	*identityhttp.Approval
 }
 
 // routeBuilder builds and verifies the routes of one REST surface against a catalogue with the

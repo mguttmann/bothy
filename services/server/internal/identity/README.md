@@ -1,6 +1,6 @@
 # Module `identity`
 
-Status: principal tables and directory built (M1-26); devices, device keys and the DPoP verifier built (M1-33); people, owners and the own profile built (M1-31); sessions, access tokens, refresh families, logout and the Authenticator built (M1-34); step-up with the device key and the job `identity.auth_cleanup` built (M1-35); identity providers, the mapping of external identities, the credential overview and unlinking built (M1-36); API tokens with prefix and checksum built (M1-44); first setup, enrollment codes, the shared login completion and the setup lock built (M1-37); logins and step-up with a passkey follow with the tickets of the milestone.
+Status: principal tables and directory built (M1-26); devices, device keys and the DPoP verifier built (M1-33); people, owners and the own profile built (M1-31); sessions, access tokens, refresh families, logout and the Authenticator built (M1-34); step-up with the device key and the job `identity.auth_cleanup` built (M1-35); identity providers, the mapping of external identities, the credential overview and unlinking built (M1-36); API tokens with prefix and checksum built (M1-44); first setup, enrollment codes, the shared login completion and the setup lock built (M1-37); device approval with the verification code, device pairing and the expiry of unconfirmed devices built (M1-38); logins and step-up with a passkey follow with the tickets of the milestone.
 The normative source is [docs/spec/02-architecture.md](../../../../docs/spec/02-architecture.md); if this file differs, the chapter applies.
 
 ## Purpose
@@ -450,6 +450,63 @@ Principals, people, owners, login drivers, identities, local credentials, enroll
   rules, rights, one-time secrets, bootstrap audit and atomicity, recovery), `internal/wire`
   (`TestIDT06_RequestsBeforeSetupGet503`), `cmd/bothy/setup_test.go` (ID-T07, output, exit codes,
   concurrency). Rulings: docs/DECISIONS.md M1-37.
+
+### Device approval and pairing (M1-38)
+
+- Port (`approval.go`): `DeviceApproval` (`ApproveDevice`, `BeginPairing`, `ApprovePairing`,
+  `CompletePairing`; the caller comes from the context) with `PairingStarted` (the code behind the
+  redacting `Token`) and `PairingOutcome`; the in-transaction event `DeviceRevoked` and the
+  revoke reasons `verification_failed`, `pending_expired` and `pairing_expired`. `Device` carries
+  `VerificationCode`.
+- `domain`: `verification.go` (`DeriveVerificationCode`: HMAC-SHA-256 with the token pepper over
+  `device-verification/v1`, the device id and the `jkt` of its `dpop` key, the first 8 bytes
+  modulo `10^digits`, zero-padded; `VerificationCodeEqual` in constant time, spaces ignored) and
+  `pairing.go` (`NewPairingCode` from `crypto/rand`, `DisplayPairingCode` in two groups,
+  `NormalizePairingCode` as for enrollment codes without prefix, `PairingCodeHash` with context
+  `pairing-code/v1`, the state machine `requested -> approved -> completed`, `requested ->
+  rejected | expired`, `approved -> expired`, the JSON type `DeviceRegistrationV1`).
+- `app`: `approval.go` (`ApproveDevice`, `revokeUnconfirmedDevice`), `pairing.go`
+  (`BeginPairing`, `ApprovePairing`, `CompletePairing`), `expiry.go` (`ExpirePendingDevices`,
+  `ExpirePairings`, run by `AuthCleanup`), outgoing port `PairingStore`. The verification code is
+  derived, never stored, and set only in answers to the pending device itself: the
+  `TokenResponse` of a login that leaves it pending and `getDevice` of its own entry
+  (`listMyDevices` of a pending device is `403 device_pending`, docs/DECISIONS.md M1-38/3).
+- Pending devices (08 section 5.2): tokens, but every action except `self.read`, `device.list`
+  for the own device, `auth.token.refresh` and `auth.logout` is `403 device_pending` (authz,
+  M1-28). A pending device older than `auth.device_pending_ttl` counts as revoked in the
+  Authenticator (`401 session_revoked`, reason `device_inactive`), in the refresh and in a new
+  login, before the job revokes it.
+- Revoking an unconfirmed device (`revokeUnconfirmedDevice`): `devices` revoked with reason and
+  `revoked_by` (NULL for the system), every key revoked, every open session of the device revoked
+  with `device_revoked` through `Auth.RevokeSession` (families `session_revoked`, one
+  `session.revoked` each, `SessionEnded`), then `DeviceRevoked`. M1-45 revokes active devices.
+- Operations (`adapters/httpapi/approval.go`):
+
+  | Operation | Action and resource | Audit | Answer |
+  |---|---|---|---|
+  | `approveDevice` | `device.approve` on the device (owner or self, step-up, `rl.admin`), rights change of the device's person | allow `{device_id, result}` with `approved` or `rejected_wrong_code` | `200 Device` (`active`, or `revoked` with `verification_failed` after a wrong code); active device unchanged `200`; revoked or expired pending `409 invalid_state_transition` |
+  | `beginPairing` | `auth.login.begin`, anonymous (`rl.public_auth` per IP) | none | `201 PairingStarted`; `401 invalid_dpop_proof` when the proof key is not the registered `dpop` key; `409` for a device id in use |
+  | `approvePairing` | `device.approve` on a device of the caller (step-up, `rl.admin`), rights change of the caller | allow `{pairing_id, device_id}`; an unknown code deny `no_grant` `{result: pairing_code_unknown}` | `201 Device` (`active`, the caller's); malformed code `400`; unknown code `404` and the step-up of the session ends |
+  | `completePairing` | `auth.login.complete`, anonymous (`rl.public_auth` per IP) | `auth.login.complete` of the login completion | `202 PairingStatus` while requested; `201 TokenResponse` (`device_pairing`) once approved; another key `401 invalid_dpop_proof` (a requested pairing becomes `rejected`); unknown, expired, rejected or completed `410 gone` |
+
+- Expiry: a `requested` pairing past `expires_at` becomes `expired`; an `approved` one too, and its
+  never collected device is revoked with `pairing_expired`; pending devices past
+  `auth.device_pending_ttl` are revoked with `pending_expired`. Both apply on access and in the
+  job `identity.auth_cleanup`, each device in its own unit of work declared as the rights change
+  `device.expire` and audited as that system action without actor.
+- `adapters/postgres`: `queries/device_pairings.sql`, `pairings.go`; device lock, activation,
+  revocation and the expiry list in `devices.sql`; the open sessions of a device and the end of a
+  step-up in `sessions.sql`. A device row takes `created_at` from the login (the pending window
+  counts from the clock of the request).
+- Migration `migrations/00018_identity_device_pairings.sql`: `device_pairings` as 03 section 4.2;
+  `bothy_app` may read, insert and update pairings (not delete).
+- Configuration: `auth.device_pending_ttl`, `auth.device_verification_code_digits`,
+  `auth.pairing_code_ttl`, `auth.pairing_code_chars`, `auth.token_pepper_ref`,
+  `auth.step_up_max_age`, `auth.cleanup_interval`.
+- Tests: `domain/verification_test.go`, `domain/pairing_test.go`,
+  `adapters/httpapi/approval_test.go` (ID-T12, ID-T13, approval rights, expiry with and without
+  the job, pairing end to end, wrong code, other key, rate limit per IP, no code in logs),
+  `migrations/identity_device_pairings_test.go`. Rulings: docs/DECISIONS.md M1-38.
 
 ### Discovery source and the language of new people (M1-46)
 

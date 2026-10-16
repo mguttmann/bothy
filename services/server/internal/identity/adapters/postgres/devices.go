@@ -5,6 +5,7 @@ package postgres
 import (
 	"context"
 	"errors"
+	"time"
 
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgtype"
@@ -31,6 +32,7 @@ func (r *Repository) InsertDevice(ctx context.Context, d device.Device) (identit
 	row, err := q.InsertDevice(ctx, sqlcgen.InsertDeviceParams{
 		ID: uuid(d.ID), UserID: uuid(d.UserID), Name: d.Name, Platform: string(d.Platform), State: string(d.State),
 		AppVersion: pgtype.Text{String: d.AppVersion, Valid: d.AppVersion != ""}, ApprovedBy: optionalUUID(d.ApprovedBy),
+		CreatedAt: pgtype.Timestamptz{Time: d.CreatedAt, Valid: !d.CreatedAt.IsZero()},
 	})
 	if err != nil {
 		return identity.Device{}, mapError(err, "inserting a device")
@@ -135,4 +137,69 @@ func toKey(k sqlcgen.DeviceKey) identity.DeviceKey {
 		ID: idOf(k.ID), DeviceID: idOf(k.DeviceID), Purpose: identity.KeyPurpose(k.Purpose), JKT: k.Jkt, Alg: k.Alg,
 		PublicJWK: k.PublicJwk, RevokedAt: timeOf(k.RevokedAt),
 	}
+}
+
+// LockDevice implements app.DeviceStore inside the ambient unit of work.
+func (r *Repository) LockDevice(ctx context.Context, id ids.ID) (identity.Device, bool, error) {
+	q, err := r.write(ctx)
+	if err != nil {
+		return identity.Device{}, false, err
+	}
+	row, err := q.LockDevice(ctx, uuid(id))
+	if errors.Is(err, pgx.ErrNoRows) {
+		return identity.Device{}, false, nil
+	}
+	if err != nil {
+		return identity.Device{}, false, mapError(err, "locking a device")
+	}
+	return toDevice(row.Device, row.KeyThumbprint, row.StepUpKeyThumbprint), true, nil
+}
+
+// ActivateDevice implements app.DeviceStore.
+func (r *Repository) ActivateDevice(ctx context.Context, id, by ids.ID, at time.Time) (bool, error) {
+	q, err := r.write(ctx)
+	if err != nil {
+		return false, err
+	}
+	n, err := q.ActivateDevice(ctx, sqlcgen.ActivateDeviceParams{ID: uuid(id), ApprovedBy: uuid(by), ApprovedAt: ts(at)})
+	if err != nil {
+		return false, mapError(err, "activating a device")
+	}
+	return n == 1, nil
+}
+
+// RevokeDevice implements app.DeviceStore: the device row, then its active keys.
+func (r *Repository) RevokeDevice(ctx context.Context, id ids.ID, reason identity.DeviceRevokeReason, by ids.ID, at time.Time) (ids.ID, bool, error) {
+	q, err := r.write(ctx)
+	if err != nil {
+		return ids.ID{}, false, err
+	}
+	user, err := q.RevokeDevice(ctx, sqlcgen.RevokeDeviceParams{
+		ID: uuid(id), RevokedAt: ts(at), RevokedBy: optionalUUID(by), RevokeReason: pgtype.Text{String: string(reason), Valid: true},
+	})
+	if errors.Is(err, pgx.ErrNoRows) {
+		return ids.ID{}, false, nil
+	}
+	if err != nil {
+		return ids.ID{}, false, mapError(err, "revoking a device")
+	}
+	if err := q.RevokeDeviceKeys(ctx, sqlcgen.RevokeDeviceKeysParams{DeviceID: uuid(id), RevokedAt: ts(at)}); err != nil {
+		return ids.ID{}, false, mapError(err, "revoking the keys of a device")
+	}
+	return idOf(user), true, nil
+}
+
+// PendingDevicesCreatedBefore implements app.DeviceStore.
+func (r *Repository) PendingDevicesCreatedBefore(ctx context.Context, before time.Time, limit int) ([]identity.Device, error) {
+	rows, err := r.read(ctx).ListPendingDevicesCreatedBefore(ctx, sqlcgen.ListPendingDevicesCreatedBeforeParams{
+		CreatedBefore: ts(before), RowLimit: int32(min(limit, 1<<30)), //nolint:gosec // G115: capped above
+	})
+	if err != nil {
+		return nil, mapError(err, "listing expired pending devices")
+	}
+	out := make([]identity.Device, 0, len(rows))
+	for _, row := range rows {
+		out = append(out, toDevice(row.Device, row.KeyThumbprint, row.StepUpKeyThumbprint))
+	}
+	return out, nil
 }

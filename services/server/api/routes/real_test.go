@@ -193,11 +193,27 @@ func (stubServer) CreateEnrollmentCode(context.Context, rest.CreateEnrollmentCod
 	return nil, nil
 }
 
+func (stubServer) ApproveDevice(context.Context, rest.ApproveDeviceRequestObject) (rest.ApproveDeviceResponseObject, error) {
+	return nil, nil
+}
+
+func (stubServer) BeginPairing(context.Context, rest.BeginPairingRequestObject) (rest.BeginPairingResponseObject, error) {
+	return nil, nil
+}
+
+func (stubServer) ApprovePairing(context.Context, rest.ApprovePairingRequestObject) (rest.ApprovePairingResponseObject, error) {
+	return nil, nil
+}
+
+func (stubServer) CompletePairing(context.Context, rest.CompletePairingRequestObject) (rest.CompletePairingResponseObject, error) {
+	return nil, nil
+}
+
 // TestRealTable_Enabled pins the enabled operations (P-04) with action and rate-limit class
 // (AZ-P1): the three device reads of M1-33, the ten people, owner and self operations of M1-31
 // and the JWKS and the rotation of the signing keys (M1-32), the sessions (M1-34), the step-up
-// (M1-35), the providers and credentials (M1-36), the API tokens (M1-44), the audit log (M1-50)
-// and the enrollment codes (M1-37). A handler ticket that enables an operation changes this test
+// (M1-35), the providers and credentials (M1-36), the API tokens (M1-44), the audit log (M1-50),
+// the enrollment codes (M1-37) and the device approval and pairing (M1-38). A handler ticket that enables an operation changes this test
 // together with
 // api/operations.yaml.
 func TestRealTable_Enabled(t *testing.T) {
@@ -247,6 +263,11 @@ func TestRealTable_Enabled(t *testing.T) {
 		// M1-37
 		"redeemEnrollmentCode": {"POST /api/v1/auth/enroll/redeem", "auth.login.complete", "rl.public_auth"},
 		"createEnrollmentCode": {"POST /api/v1/users/{user_id}/enrollment-codes", "user.update", "rl.admin"},
+		// M1-38
+		"approveDevice":   {"POST /api/v1/devices/{device_id}/approve", "device.approve", "rl.admin"},
+		"approvePairing":  {"POST /api/v1/me/devices/pairings", "device.approve", "rl.admin"},
+		"beginPairing":    {"POST /api/v1/auth/pairing/begin", "auth.login.begin", "rl.public_auth"},
+		"completePairing": {"POST /api/v1/auth/pairing/complete", "auth.login.complete", "rl.public_auth"},
 		// M1-46
 		"getDiscovery":         {"GET /api/v1/instance/discovery", "instance.discovery.read", "rl.public_auth"},
 		"getInstance":          {"GET /api/v1/instance", "instance.read", "rl.read"},
