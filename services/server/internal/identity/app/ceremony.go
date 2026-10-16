@@ -240,6 +240,11 @@ func (c *ceremonies) recordUse(ctx context.Context, res AssertionResult, act aut
 	if !found {
 		return refused(causeCredentialUnknown)
 	}
+	// The lookup of the verifier reads without a lock; a revocation committed since then is
+	// seen here under the row lock.
+	if !pk.RevokedAt.IsZero() {
+		return refused(causeCredentialRevoked)
+	}
 	keep, regression := domain.SignCount(pk.SignCount, res.SignCount)
 	if regression {
 		as := ctx
