@@ -1,0 +1,5 @@
+# 06 13 row 1: rename an operation (its operationId names the generated client method).
+patch:
+- {op: set, path: "/paths/~1things~1{thing_id}/get/operationId", value: readThing}
+expect:
+- [removed, "GET /things/{thing_id}"]

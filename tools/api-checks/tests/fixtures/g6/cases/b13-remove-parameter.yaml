@@ -1,0 +1,5 @@
+# 06 13 row 1: remove a parameter.
+patch:
+- {op: delete, path: /paths/~1things/get/parameters/2}
+expect:
+- [removed, GET /things parameter query sort]

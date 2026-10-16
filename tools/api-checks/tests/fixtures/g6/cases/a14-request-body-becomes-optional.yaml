@@ -1,0 +1,4 @@
+# Additive: a required request body becomes optional.
+patch:
+- {op: set, path: /paths/~1things/post/requestBody/required, value: false}
+expect: []

@@ -1,0 +1,12 @@
+# 06 13 row 5: the success status of an existing situation changes from 201 to 200.
+patch:
+- op: set
+  path: /paths/~1things/post/responses/200
+  value:
+    description: Created.
+    content:
+      application/json:
+        schema: {$ref: '#/components/schemas/Thing'}
+- {op: delete, path: /paths/~1things/post/responses/201}
+expect:
+- [status, POST /things response 201]

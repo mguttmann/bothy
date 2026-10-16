@@ -1,0 +1,6 @@
+# 06 13 additive: a new field in a server-sent event (asyncapi.yaml sends the union), even
+# when the event always carries it.
+patch:
+- {op: set, path: /components/schemas/ThingRenamedEvent/properties/new_name, value: {type: string}}
+- {op: append, path: /components/schemas/ThingRenamedEvent/required, value: new_name}
+expect: []

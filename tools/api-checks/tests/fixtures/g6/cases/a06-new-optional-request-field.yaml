@@ -1,0 +1,4 @@
+# 06 13 additive: a new optional request field.
+patch:
+- {op: set, path: /components/schemas/ThingCreate/properties/color, value: {type: string}}
+expect: []

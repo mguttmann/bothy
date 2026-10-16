@@ -1,0 +1,9 @@
+# 06 13 row 3: a response no longer offers its media type.
+patch:
+- op: set
+  path: /paths/~1things~1{thing_id}/get/responses/200/content
+  value:
+    application/xml:
+      schema: {$ref: '#/components/schemas/Thing'}
+expect:
+- [type, "GET /things/{thing_id} response 200 application/json"]

@@ -1,0 +1,6 @@
+# 06 13 row 6: the default sort order of a list changes (and with it the default of the field).
+patch:
+- {op: set, path: /components/schemas/ThingSort/default, value: name}
+expect:
+- [type, components/schemas/ThingSort]
+- [op-rule, GET /things parameter query sort]

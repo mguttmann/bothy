@@ -1,0 +1,7 @@
+# 06 13 row 6: the pagination kind of an operation changes (sequence history gains a cursor).
+patch:
+- op: append
+  path: /paths/~1things~1{thing_id}~1history/get/parameters
+  value: {$ref: '#/components/parameters/Cursor'}
+expect:
+- [op-rule, "GET /things/{thing_id}/history"]

@@ -1,0 +1,5 @@
+# 06 13 row 1: remove a response header.
+patch:
+- {op: delete, path: /paths/~1things/post/responses/201/headers/Location}
+expect:
+- [removed, POST /things response 201 header Location]

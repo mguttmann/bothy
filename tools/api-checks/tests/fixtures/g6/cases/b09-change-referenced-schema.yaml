@@ -1,0 +1,7 @@
+# 06 13 row 3: a field points to a different schema.
+patch:
+- op: set
+  path: /components/schemas/Thing/properties/status
+  value: {$ref: '#/components/schemas/ThingSort'}
+expect:
+- [type, components/schemas/Thing/properties/status]

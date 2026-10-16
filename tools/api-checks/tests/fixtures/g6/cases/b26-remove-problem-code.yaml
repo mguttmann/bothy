@@ -1,0 +1,5 @@
+# 06 13 row 1: remove a problem code.
+patch:
+- {op: delete, path: /components/schemas/Problem/x-problem-codes/0}
+expect:
+- [removed, components/schemas/Problem/x-problem-codes/conflict]

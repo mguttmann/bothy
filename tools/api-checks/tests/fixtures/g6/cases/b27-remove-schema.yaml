@@ -1,0 +1,7 @@
+# 06 13 row 1: remove a named schema (a type of every generated client).
+patch:
+- {op: delete, path: /components/schemas/ThingStatus}
+- {op: set, path: /components/schemas/Thing/properties/status, value: {type: string, enum: [active, archived]}}
+expect:
+- [removed, components/schemas/ThingStatus]
+- [type, components/schemas/Thing/properties/status]

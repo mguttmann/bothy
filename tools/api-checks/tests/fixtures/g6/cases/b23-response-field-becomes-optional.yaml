@@ -1,0 +1,5 @@
+# 06 13 row 1: a response field the server always sent may now be absent.
+patch:
+- {op: delete, path: /components/schemas/Thing/required/2}
+expect:
+- [removed, components/schemas/Thing/properties/status]

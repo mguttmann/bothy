@@ -131,3 +131,34 @@ rest of the line a line of its own, in the worst case a marker.
 - No server reads the fields `x-problem-codes`, `x-status`, `x-idempotency-exempt` and
   `x-deprecated-at` before M1-17 and M1-18; `catalog-check` (M1-02) holds the lists in
   `docs/api/redocly.yaml`.
+## Breaking change check `api-breaking` (G6)
+
+`breaking.py check` (`make api-breaking`, in `make gates` when the component `server` is
+selected) compares `docs/api/openapi.yaml` of the working tree with the same file of the base
+tag and prints one line per finding, `api-breaking: <06 rule>: <location>: <detail>`, exit 1.
+The base is the newest stable tag `server/vX.Y.Z` merged into `HEAD`; a pre-release tag only
+while no stable tag exists; without a tag the gate passes with a notice. When `info.version`
+raised its major version against the base, every finding is printed as `accepted` and the gate
+passes (06 13 items 4 and 5). Tests: `uv run --project tools --locked pytest -q
+tools/api-checks/tests/test_breaking.py`; every file in `tests/fixtures/g6/cases/` patches
+`tests/fixtures/g6/base.yaml` and lists its findings exactly.
+
+| Row of the 06 13 table | Finding |
+|---|---|
+| 1 remove or rename | a removed operation, webhook, parameter, property, named schema, response header, discriminator value, `oneOf`/`anyOf` variant or problem code; a changed `operationId`; a response property that is no longer required |
+| 2 newly required | a new required parameter, request property or request body; an optional one that becomes required (request direction only) |
+| 3 type, format or meaning | a changed `type`, `format`, `const`, `default` or `$ref` target (in bodies, parameters and response headers), a removed media type, a changed number of `allOf` parts |
+| 4 enum value removed | an enum value missing from the revision |
+| 5 status code | a removed response status of an operation, a changed `x-status` of a response component, a changed status of a problem code |
+| 6 sort order, pagination or idempotency | a changed default of a `sort` parameter, a changed pagination kind (`cursor`, the sequence parameters, an integer `after`; a time filter `after` is no pagination), a changed `x-idempotency-exempt` |
+| 7 `x-authz-action` | a changed action of an operation |
+
+The direction of a named schema decides row 2: request parameters and bodies are requests,
+responses are responses, `webhooks` the other way round, and `docs/api/asyncapi.yaml`
+(`receive` a request, `send` a response, a reply the opposite) gives the gateway frames and events
+theirs. A schema without a direction counts as both.
+
+Not covered: a meaning or sort order that only a description states, tighter limits
+(`maxLength`, `minimum` and the like), a narrower `additionalProperties`, a new enum on an existing
+field, and every change of `asyncapi.yaml` itself (channels, operations, messages); the review
+checks those against the table.

@@ -98,7 +98,7 @@ TS_ON := $(and $(TS_PROJECTS),$(or $(call want,sdk-typescript),$(call want,plugi
 .PHONY: help bootstrap bootstrap-ci check gates fmt fmt-check lint typecheck test coverage \
         sonar sonar-up sonar-down sonar-config sonar-config-check semgrep trivy osv gitleaks \
         gitleaks-staged denylist denylist-history licenses docs adr-index config-reference config-doc-check catalog catalog-check linkcheck \
-        trivy-image portability linkcheck-external diagrams tokens api-lint api-checks api-tables api-clients \
+        trivy-image portability linkcheck-external diagrams tokens api-lint api-checks api-breaking api-tables api-clients \
         runners-check release-pins commitlint \
         review labels-check labels-sync tools-lock release-build release-prep release-trial scancode clean \
         codegen-check arch register-check migrations-lint migrations-lock perf ops-check \
@@ -143,7 +143,7 @@ gates: ## All gates except denylist and sonar (CI job "gates")
 # Generated code is checked before lint and type checks, so that stale generator output is
 # reported as drift and not as a confusing compile error. `perf` is not a gate (P-07).
 gates: fmt-check codegen-check lint typecheck arch register-check migrations-lint test coverage commitlint \
-       docs config-doc-check linkcheck diagrams catalog-check api-lint api-checks ops-check \
+       docs config-doc-check linkcheck diagrams catalog-check api-lint api-checks api-breaking ops-check \
        api-clients tokens runners-check labels-check release-pins gitleaks semgrep trivy osv licenses
 
 # ---- code quality ---------------------------------------------------------------------
@@ -413,6 +413,13 @@ api-checks: ## API contract copies equal their sources (06 G2, G3)
 
 api-tables: ## Regenerate the generated tables of chapter 06 and webhooks.md
 	$(UVRUN) python tools/api-checks/api_checks.py generate
+
+api-breaking: ## G6: no breaking change of the API against the last server release (06 13)
+	@# The API contract ships with the server (RELEASE_EXTRA_PATHS of tools/ci/components.py),
+	@# and a change under docs/api/ selects every gate component, the server included.
+	@if [ -z "$(call want,server)" ]; then $(call skip,api-breaking,component server not selected); \
+	elif [ ! -f docs/api/openapi.yaml ]; then $(call skip,api-breaking,docs/api/openapi.yaml does not exist yet); \
+	else $(UVRUN) python tools/api-checks/breaking.py check; fi
 
 ops-check: ## Operations configuration valid with the pinned upstream tools; derived values equal their sources
 	@# Collector, Prometheus, Alertmanager, Loki, Tempo, Sloth and OpenTofu files exist, so there

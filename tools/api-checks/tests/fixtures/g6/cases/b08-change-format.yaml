@@ -1,0 +1,5 @@
+# 06 13 row 3: change the format of a field.
+patch:
+- {op: set, path: /components/schemas/Thing/properties/size/format, value: int64}
+expect:
+- [type, components/schemas/Thing/properties/size]

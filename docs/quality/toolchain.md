@@ -156,3 +156,6 @@ binary via `tools/bin/fetch_tools.py`.
 * Without `GH_TOKEN`, zizmor checks only offline; online audits (for example fake commits
   behind a SHA) run in CI with the workflow token.
 * There are no binary pins for Windows hosts; contributors use WSL.
+* oasdiff is not a gate tool. The breaking change check G6 (`make api-breaking`) is the own
+  comparison `tools/api-checks/breaking.py` over PyYAML, because oasdiff 1.33.0 missed rows of the
+  06 13 table on `docs/api/openapi.yaml` (docs/DECISIONS.md D-M7-11-1); nothing new is pinned.

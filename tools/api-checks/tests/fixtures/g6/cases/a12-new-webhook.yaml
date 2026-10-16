@@ -1,0 +1,17 @@
+# 06 13 additive: a new webhook type.
+patch:
+- op: set
+  path: /webhooks/thing.renamed
+  value:
+    post:
+      operationId: thingRenamedWebhook
+      x-authz-action: webhook_out.deliver
+      x-rate-limit-class: none
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/ThingRenamedEvent'}
+      responses:
+        '200': {description: Received.}
+expect: []
