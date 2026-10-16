@@ -238,7 +238,7 @@ type Fake struct {
 // New starts a fake for fixture on 127.0.0.1 with a free port; the test cleanup stops it.
 func New(t testing.TB, fixture *Fixture) *Fake {
 	t.Helper()
-	cert, pool := newCertificate(t)
+	cert, pool := newCertificate(t, Host)
 	f := &Fake{fixture: fixture, RootCAs: pool, queued: map[string][]Response{}, always: map[string]Response{}}
 	srv := httptest.NewUnstartedServer(http.HandlerFunc(f.serve))
 	ln, err := (&net.ListenConfig{}).Listen(t.Context(), "tcp", "127.0.0.1:0")
@@ -572,8 +572,9 @@ func (resolver) LookupNetIP(_ context.Context, _, host string) ([]netip.Addr, er
 	return nil, &net.DNSError{Err: "no such host", Name: host, IsNotFound: true}
 }
 
-// newCertificate creates a self-signed certificate for Host and a pool that trusts it.
-func newCertificate(t testing.TB) (tls.Certificate, *x509.CertPool) {
+// newCertificate creates a self-signed certificate for the host names and a pool that trusts
+// it.
+func newCertificate(t testing.TB, names ...string) (tls.Certificate, *x509.CertPool) {
 	t.Helper()
 	key, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
 	if err != nil {
@@ -584,8 +585,8 @@ func newCertificate(t testing.TB) (tls.Certificate, *x509.CertPool) {
 	now := time.Now()
 	tmpl := &x509.Certificate{
 		SerialNumber:          big.NewInt(1),
-		Subject:               pkix.Name{CommonName: Host},
-		DNSNames:              []string{Host},
+		Subject:               pkix.Name{CommonName: names[0]},
+		DNSNames:              names,
 		NotBefore:             now.Add(-time.Hour),
 		NotAfter:              now.Add(24 * time.Hour),
 		KeyUsage:              x509.KeyUsageDigitalSignature | x509.KeyUsageCertSign,

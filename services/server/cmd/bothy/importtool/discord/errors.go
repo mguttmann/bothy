@@ -37,6 +37,22 @@ var (
 	// ErrTokenHostMismatch: the token was about to go to another host, scheme or port than
 	// import.discord.api_base; the request is not sent.
 	ErrTokenHostMismatch = errors.New("discord: request target is not the API base, token withheld")
+
+	// ErrCDNHostNotAllowed: an attachment link has user info, no usable host, a host outside
+	// import.discord.cdn_hosts or a port other than the one of the matching entry (443 when it
+	// names none); no connection was opened (22 6.5 item 2).
+	ErrCDNHostNotAllowed = errors.New("discord: attachment host not in import.discord.cdn_hosts")
+	// ErrCDNScheme: an attachment link is not https; no connection was opened.
+	ErrCDNScheme = errors.New("discord: attachment link is not https")
+	// ErrCDNRedirect: the CDN answered a redirect, which the fetcher never follows; the target
+	// is not named.
+	ErrCDNRedirect = errors.New("discord: the CDN answered a redirect, not followed")
+	// ErrTooLarge: the attachment is larger than import.attachment_max_bytes, by its declared
+	// size, its Content-Length or the bytes read (22 6.5 items 1 and 6).
+	ErrTooLarge = errors.New("discord: attachment larger than import.attachment_max_bytes")
+	// ErrCDNGone: the link expired and the message, read again once, no longer has the
+	// attachment, or its fresh link failed with 403 or 404 too (22 6.5 item 3).
+	ErrCDNGone = errors.New("discord: attachment no longer available")
 )
 
 // CallError is the error of one call. Its text is "discord: <op>: <status text>", where op is

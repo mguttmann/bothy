@@ -29,6 +29,13 @@
 // policy of exactly the API host, no environment proxy and https only. The package imports no
 // server module; the tool talks to the server only through the public API.
 //
+// Fetcher loads attachments from the CDN (22 6.5): GET only, https only, hosts of
+// import.discord.cdn_hosts only (exact match, port 443 unless the entry names one), no token
+// or cookie, no redirects, a size limit of import.attachment_max_bytes on the declared size, the
+// Content-Length and the bytes read, and on 403 or 404 one re-read of the message for a fresh
+// link and one more try. Its errors and logs name scheme, host and path only (SafeURL), and the
+// body streams to the caller, never to disk.
+//
 // Example:
 //
 //	tok, err := discord.NewToken(tokenText)
