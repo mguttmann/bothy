@@ -8,12 +8,12 @@ import 'dart:ui' show Brightness;
 import '../generated/design_tokens.g.dart';
 import 'ds_context.dart';
 
-/// The default accent of the instance setting `branding.accent_color` (docs/spec/01-produkt.md 12).
+/// The default accent of the instance setting `branding.accent_color` (docs/spec/01-product.md 12).
 ///
 /// The generated `DsAccent.of` falls back to the same accent for an unknown key.
 const String dsDefaultAccent = 'spruce';
 
-// Values of the personal settings (docs/spec/01-produkt.md 11, `appearance.*`).
+// Values of the personal settings (docs/spec/01-product.md 11, `appearance.*`).
 const String _light = 'light';
 const String _dark = 'dark';
 const String _compact = 'compact';

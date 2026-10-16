@@ -8,7 +8,7 @@ import 'package:alchemist/alchemist.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 
-/// Golden setup of this package (docs/spec/15-client-architektur.md 20).
+/// Golden setup of this package (docs/spec/15-client-architecture.md 20).
 ///
 /// CI goldens (text as blocks, Ahem) run on every machine and are compared everywhere;
 /// platform goldens with the real fonts run only on macOS. The bundled fonts are loaded once

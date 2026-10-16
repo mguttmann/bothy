@@ -17,7 +17,7 @@ enum DsThemeMode {
 /// Density context of the tokens (`DsDensity`).
 ///
 /// `comfortable` and `compact` are the desktop choices of `appearance.density`;
-/// `touch` is fixed on touch platforms (docs/spec/01-produkt.md 11).
+/// `touch` is fixed on touch platforms (docs/spec/01-product.md 11).
 enum DsDensityMode {
   /// Desktop default.
   comfortable,

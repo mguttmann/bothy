@@ -27,7 +27,7 @@ size, color, duration or curve in widget code except `0`. Type roles only, never
 
 ## Resolver
 
-`resolveDsContext` (docs/spec/01-produkt.md 8 and 11; docs/DECISIONS.md D-M4-04-2):
+`resolveDsContext` (docs/spec/01-product.md 8 and 11; docs/DECISIONS.md D-M4-04-2):
 
 | Input | Value | Result |
 |---|---|---|
@@ -108,7 +108,7 @@ differ (docs/DECISIONS.md D-M4-04-1).
 
 `test/flutter_test_config.dart` loads the bundled fonts and configures alchemist: CI goldens
 (text as blocks, Ahem) run on every machine; platform goldens with the real fonts run only on
-macOS (docs/spec/15-client-architektur.md 20). Golden tests live in `test/goldens/`, their
+macOS (docs/spec/15-client-architecture.md 20). Golden tests live in `test/goldens/`, their
 images in `test/goldens/ci/` and `test/goldens/macos/`. Another member copies the same
 `flutter_test_config.dart`, keeps `alchemist` as a dev dependency and builds its matrix with
 `dsGoldenMatrix` (docs/DECISIONS.md D-M4-04-5).

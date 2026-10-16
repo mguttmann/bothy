@@ -35,7 +35,7 @@ BUILD = ROOT / "design" / "build"
 DOCS = ROOT / "docs" / "design"
 VENDOR = HERE / "vendor"
 # The package copy of the Dart output: a package may not import a file outside its folder
-# (docs/spec/15-client-architektur.md 3.1), so `build` writes the same bytes twice and `check`
+# (docs/spec/15-client-architecture.md 3.1), so `build` writes the same bytes twice and `check`
 # compares both (docs/DECISIONS.md D-M4-04-1).
 PACKAGE_DART = ROOT / "packages" / "design_system" / "lib" / "src" / "generated" / "design_tokens.g.dart"
 HEADER = (
