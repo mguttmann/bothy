@@ -203,6 +203,17 @@ final class MessagesDao {
         );
   }
 
+  /// The reaction summaries of [messageId], ordered by emoji, once (usable inside a
+  /// transaction, where a stream would wait for its end).
+  Future<List<ReactionSummary>> reactionsOf(MessageId messageId) async {
+    final rows =
+        await (_db.select(_db.reactionsSummary)
+              ..where((t) => t.messageId.equals(messageId.value))
+              ..orderBy([(t) => OrderingTerm(expression: t.emoji)]))
+            .get();
+    return [for (final row in rows) reactionFromRow(row)];
+  }
+
   /// The reaction summaries of [messageId], ordered by emoji.
   Stream<List<ReactionSummary>> watchReactions(MessageId messageId) =>
       (_db.select(_db.reactionsSummary)
