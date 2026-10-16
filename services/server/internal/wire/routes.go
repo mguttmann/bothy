@@ -67,8 +67,8 @@ type Handlers struct {
 	// Threads implements listChannelThreads, getThread, setThreadTitle, closeThread, reopenThread
 	// and setThreadTags (chat, M1-55).
 	*chathttp.Threads
-	// Messages implements createMessage and createThread (messaging, M1-56), listMyMentions and
-	// the template operations (M1-60).
+	// Messages implements createMessage and createThread (messaging, M1-56), listThreadMessages
+	// and getMessage (M1-57), listMyMentions and the template operations (M1-60).
 	*messaginghttp.Messages
 	// Log implements listAuditEvents, exportAuditEvents and verifyAuditChain (audit, M1-50).
 	*audithttp.Log

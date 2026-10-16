@@ -67,7 +67,9 @@ type PrincipalRef struct {
 }
 
 // Message is a message as the API shows it (schema Message) without attachments, reactions,
-// components and pins, which later tickets add. Zero values are absent members.
+// components and pins, which later tickets add. Zero values are absent members. It is the one
+// message DTO of the port (the MessageView of brief M1-57): Create, CreateThread, History and Get
+// return it. A deleted message is a tombstone: empty content, no mentions, DeletedAt set.
 type Message struct {
 	ID, ThreadID, ChannelID ids.ID
 	ThreadSeq               int64
@@ -75,9 +77,12 @@ type Message struct {
 	ClientMsgID             ids.ID
 	// Origin and Kind are the column values; SystemCode is set exactly for kind system.
 	Origin, Kind, SystemCode string
-	// ContentMD is the full content; ContentFormat its dialect version.
+	// ContentMD is the content, full except in History; ContentFormat its dialect version.
 	ContentMD     string
 	ContentFormat int
+	// ContentTruncated reports that History cut ContentMD at message.list_content_max_bytes; Get
+	// reloads the full content (06 section 6 item 5).
+	ContentTruncated bool
 	// ReplyToID is the quoted message; zero for none.
 	ReplyToID ids.ID
 	Silent    bool
@@ -137,7 +142,45 @@ type ThreadCreated struct {
 	Replay       bool
 }
 
-// Messages is the incoming port of sending (M1-56). The caller a is the principal of the request;
+// HistoryMode is the window of a History page (06 section 6 item 5); the zero value is the newest
+// page.
+type HistoryMode int
+
+// The windows of listThreadMessages.
+const (
+	// HistoryNewest is the page without an anchor: the newest messages of the thread.
+	HistoryNewest HistoryMode = iota
+	// HistoryBefore (before_seq) is the highest messages with thread_seq below Anchor.
+	HistoryBefore
+	// HistoryAfter (after_seq) is the lowest messages with thread_seq above Anchor.
+	HistoryAfter
+	// HistoryAround (around_seq) is at most (limit - 1) / 2 messages below Anchor and the rest from
+	// Anchor on; a short side gives its share to the other.
+	HistoryAround
+)
+
+// HistoryQuery is the query of Messages.History (listThreadMessages).
+type HistoryQuery struct {
+	ThreadID ids.ID
+	Mode     HistoryMode
+	// Anchor is the thread_seq of the mode: at least 0 for HistoryAfter, at least 1 for
+	// HistoryBefore and HistoryAround, below 2^53; ignored for HistoryNewest.
+	Anchor int64
+	// Limit is the page size; 0 means api.page_size_default, larger values are capped at
+	// api.page_size_max.
+	Limit int
+}
+
+// HistoryPage is one page of a thread's history: the items ascending by thread_seq without a gap,
+// tombstones at the positions of deleted messages, and whether messages exist before the first and
+// after the last item. Items and flags come from one snapshot.
+type HistoryPage struct {
+	Items         []Message
+	HasMoreBefore bool
+	HasMoreAfter  bool
+}
+
+// Messages is the incoming port of sending (M1-56) and reading (M1-57). The caller a is the principal of the request;
 // errors are kernel/errs errors, and an unknown and an invisible thread or channel give the same
 // 404 not_found.
 type Messages interface {
@@ -153,4 +196,20 @@ type Messages interface {
 	// CreateThread creates a forum post or a thread from a message of the main thread
 	// (thread.create on the channel), with an optional first message in the same transaction.
 	CreateThread(ctx context.Context, a actor.Actor, cmd CreateThreadCmd) (ThreadCreated, error)
+	// History returns one page of the history of a thread (listThreadMessages, thread.read; 06
+	// section 6 item 5) for the principal of ctx (kernel/actor; anonymous when none). The page is a
+	// keyset page over thread_seq, so a new message never changes it; every item passed
+	// message.read in filter mode, and content above message.list_content_max_bytes is cut with
+	// ContentTruncated. Errors: validation_failed for an anchor out of range; not_found for a
+	// missing and an invisible thread alike; the refusal of thread.read. Callers: the REST handler,
+	// runs (run context, M2) and search (M3).
+	//
+	// Example:
+	//
+	//	page, err := msgs.History(ctx, messaging.HistoryQuery{ThreadID: th, Mode: messaging.HistoryBefore, Anchor: 21, Limit: 10})
+	History(ctx context.Context, q HistoryQuery) (HistoryPage, error)
+	// Get returns one message with its full content (getMessage, message.read) for the principal of
+	// ctx; a tombstone is returned too. Errors: not_found for a missing and an invisible message
+	// alike; the refusal of message.read.
+	Get(ctx context.Context, messageID ids.ID) (Message, error)
 }

@@ -207,7 +207,9 @@ func TestConfigSchemaBuilds(t *testing.T) {
 		"branding.product_name_max_chars": {Kind: config.KindInt, Default: "64", Min: "1", Chapter: "03-data-model.md"},
 		"message.max_attachments":         {Kind: config.KindInt, Default: "10", Min: "0", Chapter: "03-data-model.md"},
 		// M1-56: the mention limit of sending.
-		"message.max_mentions":               {Kind: config.KindInt, Default: "50", Min: "1", Chapter: "03-data-model.md"},
+		"message.max_mentions": {Kind: config.KindInt, Default: "50", Min: "1", Chapter: "03-data-model.md"},
+		// M1-57: the content limit of the history lists.
+		"message.list_content_max_bytes":     {Kind: config.KindInt, Default: "16384", Min: "1", Chapter: "06-api.md"},
 		"thread.title_max_chars":             {Kind: config.KindInt, Default: "200", Min: "1", Chapter: "03-data-model.md"},
 		"template.name_max_chars":            {Kind: config.KindInt, Default: "100", Min: "1", Chapter: "03-data-model.md"},
 		"template.max_per_scope":             {Kind: config.KindInt, Default: "100", Min: "1", Chapter: "03-data-model.md"},

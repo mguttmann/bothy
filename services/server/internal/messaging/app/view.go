@@ -49,10 +49,16 @@ func (s *Service) stored(ctx context.Context, m domain.Message) (messaging.Messa
 	return view(m, author, mentions), nil
 }
 
-// view converts a row into the port DTO; the mentions are never nil.
+// view converts a row into the port DTO; the mentions are never nil. It is the one representation
+// of a message (brief M1-57 note 6, also for M1-58): a deleted message is a tombstone with empty
+// content and no mentions, every other field as stored (attachments, reactions and components stay
+// empty and pinned false in the REST and event forms).
 func view(m domain.Message, author messaging.PrincipalRef, mentions []ids.ID) messaging.Message {
-	if mentions == nil {
+	if mentions == nil || !m.DeletedAt.IsZero() {
 		mentions = []ids.ID{}
+	}
+	if !m.DeletedAt.IsZero() {
+		m.ContentMD = ""
 	}
 	return messaging.Message{
 		ID: m.ID, ThreadID: m.ThreadID, ChannelID: m.ChannelID, ThreadSeq: m.ThreadSeq, Author: author, ClientMsgID: m.ClientMsgID,

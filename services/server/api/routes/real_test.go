@@ -521,6 +521,14 @@ func (stubServer) DeleteTemplate(context.Context, rest.DeleteTemplateRequestObje
 	return nil, nil
 }
 
+func (stubServer) ListThreadMessages(context.Context, rest.ListThreadMessagesRequestObject) (rest.ListThreadMessagesResponseObject, error) {
+	return nil, nil
+}
+
+func (stubServer) GetMessage(context.Context, rest.GetMessageRequestObject) (rest.GetMessageResponseObject, error) {
+	return nil, nil
+}
+
 func (stubServer) SetThreadTags(context.Context, rest.SetThreadTagsRequestObject) (rest.SetThreadTagsResponseObject, error) {
 	return nil, nil
 }
@@ -797,6 +805,9 @@ func TestRealTable_Enabled(t *testing.T) {
 		"createChannelTemplate":  {"POST /api/v1/channels/{channel_id}/templates", "template.manage", "rl.write"},
 		"updateTemplate":         {"PATCH /api/v1/templates/{template_id}", "template.manage", "rl.write"},
 		"deleteTemplate":         {"DELETE /api/v1/templates/{template_id}", "template.manage", "rl.write"},
+		// M1-57
+		"listThreadMessages": {"GET /api/v1/threads/{thread_id}/messages", "thread.read", "rl.read"},
+		"getMessage":         {"GET /api/v1/messages/{message_id}", "message.read", "rl.read"},
 	}
 	ops := routes.Enabled()
 	if len(ops) != len(want) {

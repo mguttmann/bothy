@@ -57,6 +57,12 @@ type Store interface {
 	UpdateTemplate(ctx context.Context, t domain.Template) (domain.Template, error)
 	// DeleteTemplate sets deleted_at of the template id and raises the version.
 	DeleteTemplate(ctx context.Context, id ids.ID, at time.Time) error
+
+	// History runs the one statement of q.Mode (brief M1-57 note 4) and returns its rows.
+	History(ctx context.Context, q HistoryRead) (HistoryRows, error)
+	// VisibleMessage reads the message id when its channel is one of visible; found is false for
+	// an unknown id and for a message in another channel alike.
+	VisibleMessage(ctx context.Context, id ids.ID, visible []ids.ID) (m domain.Message, found bool, err error)
 }
 
 // MentionQuery is one batch of the mention list (Store.MyMentions).
@@ -74,4 +80,26 @@ type MentionQuery struct {
 type MentionRow struct {
 	Message     domain.Message
 	MentionedAt time.Time
+}
+
+// HistoryRead is the input of Store.History.
+type HistoryRead struct {
+	ThreadID ids.ID
+	// Visible are the visible channels of message.read (Authorizer.Scope); every read carries
+	// channel_id = ANY(Visible).
+	Visible []ids.ID
+	Mode    domain.HistoryMode
+	Anchor  int64
+	// RowLimit is the most rows per side: the page size plus one.
+	RowLimit int
+}
+
+// HistoryRows are the rows of one history statement, all from one snapshot.
+type HistoryRows struct {
+	// Below are the rows below the anchor (the newest page and before_seq: all rows), descending
+	// by thread_seq; Above the rows from the anchor on (after_seq: above it), ascending.
+	Below, Above []domain.Message
+	// Opposite is the EXISTS of the side the mode does not read (before_seq: thread_seq >= anchor;
+	// after_seq: thread_seq <= anchor); false for the other modes.
+	Opposite bool
 }

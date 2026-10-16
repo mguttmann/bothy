@@ -754,7 +754,7 @@ func (s *server) startChat(context.Context) error {
 	if err != nil {
 		return err
 	}
-	m, err := NewMessaging(mcfg, pool, a.UoW(), az, sy.Appender(), c.Service, s.deps.Clock)
+	m, err := NewMessaging(mcfg, pool, a.UoW(), az, sy.Appender(), c.Service, s.deps.Clock, s.logger())
 	if err != nil {
 		return err
 	}

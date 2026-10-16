@@ -290,6 +290,7 @@ func TestConfigPrintShowsSourcePerKey(t *testing.T) {
 		"jobs.queue.maintenance.max_workers = 2  # default\n" +
 		"jobs.queue.privacy.max_workers = 1  # default\n" +
 		"jobs.schema = jobs  # default\n" +
+		"message.list_content_max_bytes = 16384  # default\n" +
 		"message.max_attachments = 10  # default\n" +
 		"message.max_content_bytes = 2048  # env BOTHY_MESSAGE__MAX_CONTENT_BYTES\n" +
 		"message.max_mentions = 50  # default\n" +
