@@ -51,10 +51,7 @@ List<DeliveryLine> deliveryLines(VizTexts texts, DeliveryModel model) {
           label: texts.metric(sli.metric),
           value: sli.ratio == null
               ? l10n.vizSliNoEvents
-              : l10n.vizSliValue(
-                  texts.format.count(sli.total),
-                  deliveryShare(texts, sli.ratio!),
-                ),
+              : l10n.vizSliValue(sli.total, deliveryShare(texts, sli.ratio!)),
           sortBy: sli.ratio ?? -1,
         ),
     for (final rate in model.gatewayRates)

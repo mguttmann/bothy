@@ -1216,8 +1216,18 @@ class AppLocalizationsEn extends AppLocalizations {
   String get vizSliNoEvents => 'no events';
 
   @override
-  String vizSliValue(String count, String share) {
-    return '$count events, $share within the threshold';
+  String vizSliValue(int count, String share) {
+    final intl.NumberFormat countNumberFormat =
+        intl.NumberFormat.decimalPattern(localeName);
+    final String countString = countNumberFormat.format(count);
+
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$countString events',
+      one: '1 event',
+    );
+    return '$_temp0, $share within the threshold';
   }
 
   @override

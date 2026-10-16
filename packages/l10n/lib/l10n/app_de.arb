@@ -323,7 +323,7 @@
   "vizRateLimitUnknown": "unbekannt",
   "vizRateLimitResets": "wieder frei um {time}",
   "vizSliNoEvents": "keine Ereignisse",
-  "vizSliValue": "{count} Ereignisse, {share} innerhalb der Schwelle",
+  "vizSliValue": "{count, plural, =1{1 Ereignis} other{{count} Ereignisse}}, {share} innerhalb der Schwelle",
   "vizCatchupValue": "{count}, zusammen {millis} ms",
   "vizConnectionsUser": "Verbindungen von Personen",
   "vizConnectionsAgent": "Verbindungen von Agenten",

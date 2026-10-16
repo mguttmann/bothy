@@ -51,6 +51,17 @@ void main() {
     });
   }
 
+  testWidgets('the timeline shows no cost series, as count or as amount', (
+    tester,
+  ) async {
+    // The timeline of a person with cost.read.aggregate carries `cost` buckets; their count
+    // is no amount, so the view never draws them as a rate.
+    final world = ViewWorld(state: 'with_costs');
+    await pumpWorld(tester, world, world.view(VizViewKind.timeline));
+    expect(find.byType(AreaMark), findsOneWidget);
+    expect(renderedTexts(tester).where(costPattern.hasMatch), isEmpty);
+  });
+
   testWidgets('estimates carry "Estimate"', (tester) async {
     final world = ViewWorld();
     await tester.runAsync(world.load);

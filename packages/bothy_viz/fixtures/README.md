@@ -36,6 +36,7 @@ file, a file missing from the table below and a listed schema without a file. Th
 | `StatsTimeline.load.json` | `StatsTimeline` | load | timeline (a full day) |
 | `StatsTimeline.truncated.json` | `StatsTimeline` | truncated | timeline |
 | `StatsTimeline.day_boundary.json` | `StatsTimeline` | day_boundary (a period over midnight) | timeline |
+| `StatsTimeline.with_costs.json` | `StatsTimeline` | with_costs (`cost` buckets, as with `cost.read.aggregate`) | timeline (no cost series) |
 | `StatsSloReport.normal.json` | `StatsSloReport` | normal (all four states) | executive page, traffic light mark |
 | `StatsSloReport.empty.json` | `StatsSloReport` | empty | executive page |
 | `StatsBackendReport.normal.json` | `StatsBackendReport` | normal | backend view |

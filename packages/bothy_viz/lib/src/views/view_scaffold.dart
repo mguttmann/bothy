@@ -311,21 +311,37 @@ mixin VizLiveSubscription<T extends StatefulWidget> on State<T> {
   void startLive(LiveFrameSource? source, VizScope scope) {
     _source = source;
     if (source == null) return;
-    _subscription = source.start(spaceId: scope.spaceId).listen((event) {
-      if (!mounted) return;
-      setState(() {
-        switch (event) {
-          case LiveFrameFrame():
-            liveFrame = event;
-            liveStale = false;
-          case LiveFrameStale():
-            liveStale = true;
-          case LiveFrameError(:final code):
-            liveError = code;
-            unawaited(stopLive());
-        }
-        onLiveChanged();
-      });
+    late final StreamSubscription<LiveFrameEvent> subscription;
+    subscription = source
+        .start(spaceId: scope.spaceId)
+        .listen(
+          _onEvent,
+          // A newer start of the same source (the next view of TV mode or a tab switch, which
+          // Flutter builds before it disposes this one) closed this stream: the source belongs
+          // to the newer view now, so this view must not stop it on dispose.
+          onDone: () {
+            if (!identical(_subscription, subscription)) return;
+            _subscription = null;
+            _source = null;
+          },
+        );
+    _subscription = subscription;
+  }
+
+  void _onEvent(LiveFrameEvent event) {
+    if (!mounted) return;
+    setState(() {
+      switch (event) {
+        case LiveFrameFrame():
+          liveFrame = event;
+          liveStale = false;
+        case LiveFrameStale():
+          liveStale = true;
+        case LiveFrameError(:final code):
+          liveError = code;
+          unawaited(stopLive());
+      }
+      onLiveChanged();
     });
   }
 

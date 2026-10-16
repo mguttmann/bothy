@@ -1227,8 +1227,18 @@ class AppLocalizationsDe extends AppLocalizations {
   String get vizSliNoEvents => 'keine Ereignisse';
 
   @override
-  String vizSliValue(String count, String share) {
-    return '$count Ereignisse, $share innerhalb der Schwelle';
+  String vizSliValue(int count, String share) {
+    final intl.NumberFormat countNumberFormat =
+        intl.NumberFormat.decimalPattern(localeName);
+    final String countString = countNumberFormat.format(count);
+
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$countString Ereignisse',
+      one: '1 Ereignis',
+    );
+    return '$_temp0, $share innerhalb der Schwelle';
   }
 
   @override

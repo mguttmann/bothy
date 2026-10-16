@@ -5,6 +5,7 @@ library;
 
 import 'dart:async';
 
+import 'package:api_client/api_client.dart' as api;
 import 'package:design_system/design_system.dart';
 import 'package:domain/domain.dart';
 import 'package:flutter/material.dart';
@@ -28,7 +29,7 @@ import 'viz_host_options.dart';
 /// options. Day boundaries come from the response (the server applies `stats.time_zone`);
 /// `runs_truncated` shows "More runs than shown". In the reduced motion context the
 /// playhead jumps from minute to minute without a transition. In TV mode there are no
-/// controls and the playback starts by itself.
+/// controls: the playhead stays at the end, so the screen shows the whole period.
 class TimelineView extends StatefulWidget {
   /// Creates the view.
   const TimelineView({
@@ -75,9 +76,21 @@ class _TimelineViewState extends State<TimelineView> {
         spaceId: widget.options.scope.spaceId,
       );
       if (!mounted) return;
-      final model = TimelineModel.fromTimeline(
+      final all = TimelineModel.fromTimeline(
         timeline,
         names: widget.options.names,
+      );
+      // The `cost` buckets count bookings; a count is no amount and has neither currency nor
+      // label, so the rates of the timeline leave them out (25 4 rule 2; D-M6-12-8).
+      final model = TimelineModel(
+        from: all.from,
+        to: all.to,
+        bars: all.bars,
+        runsTruncated: all.runsTruncated,
+        series: [
+          for (final s in all.series)
+            if (s.metric != api.StatsMetric.cost) s,
+        ],
       );
       final playback = TimelinePlayback(
         from: model.from,
@@ -91,8 +104,6 @@ class _TimelineViewState extends State<TimelineView> {
         _model = model;
         _playback = playback;
       });
-      // TV mode has no controls: the playback runs by itself.
-      if (!VizTvScope.controlsVisible(context)) playback.play();
     } on Object catch (error) {
       if (mounted) setState(() => _error = vizProblemCode(error));
     }

@@ -71,6 +71,43 @@ void main() {
     expect(find.byType(LiveTopologyView), findsOneWidget);
   });
 
+  testWidgets(
+    'the live source keeps running when TV mode rotates between live views',
+    (tester) async {
+      final (world, _) = await pumpTv(
+        tester,
+        kinds: const [VizViewKind.liveTopology, VizViewKind.backend],
+      );
+      final live = world.live!;
+      expect(live.isRunning, isTrue);
+      await rotate(tester, world);
+      expect(find.byType(BackendView), findsOneWidget);
+      expect(live.isRunning, isTrue, reason: 'the old view must not stop it');
+      expect(
+        find.text('Online'),
+        findsOneWidget,
+        reason: 'presence from the frame',
+      );
+      await rotate(tester, world);
+      expect(live.isRunning, isTrue);
+      expect(find.byType(RunCardMark), findsWidgets);
+    },
+  );
+
+  testWidgets('the timeline in TV mode shows the whole period', (tester) async {
+    final (world, _) = await pumpTv(
+      tester,
+      kinds: const [VizViewKind.timeline, VizViewKind.backend],
+    );
+    String playhead() =>
+        tester.widget<Text>(find.textContaining('Playhead')).data!;
+    final first = playhead();
+    world.clock.advance(rotation - const Duration(seconds: 1));
+    await tester.pump();
+    expect(playhead(), first, reason: 'the playhead stays at the end');
+    expect(first, contains('11:00'));
+  });
+
   testWidgets('dark, comfortable, one font step larger and no controls', (
     tester,
   ) async {

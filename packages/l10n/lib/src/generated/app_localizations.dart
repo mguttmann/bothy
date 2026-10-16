@@ -2044,8 +2044,8 @@ abstract class AppLocalizations {
   /// Value of an SLI of the live frame: number of events and the good share.
   ///
   /// In en, this message translates to:
-  /// **'{count} events, {share} within the threshold'**
-  String vizSliValue(String count, String share);
+  /// **'{count, plural, =1{1 event} other{{count} events}}, {share} within the threshold'**
+  String vizSliValue(int count, String share);
 
   /// Catch-ups of the last minute with their summed duration in milliseconds.
   ///

@@ -3,6 +3,8 @@
 /// The table view of the live topology (docs/spec/25-visualisierung.md 6.1, 7.4).
 library;
 
+import 'package:api_client/api_client.dart' as api;
+
 import '../../marks/viz_texts.dart';
 import '../../model/run_card_model.dart';
 import '../../model/series_model.dart';
@@ -65,7 +67,9 @@ List<VizTableData> liveTopologyTables(
             VizCell(vizRateLabel(texts, rate)),
             VizCell(
               vizRateValue(texts, rate),
-              sortBy: rate.lastMinuteSum ?? rate.lastMinute,
+              sortBy: rate.metric == api.StatsMetric.cost
+                  ? rate.lastMinuteSum ?? rate.lastMinute
+                  : rate.lastMinute,
             ),
           ],
       ],

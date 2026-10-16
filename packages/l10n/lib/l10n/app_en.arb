@@ -1764,13 +1764,14 @@
   "@vizSliNoEvents": {
     "description": "Value of an SLI without events in the window."
   },
-  "vizSliValue": "{count} events, {share} within the threshold",
+  "vizSliValue": "{count, plural, =1{1 event} other{{count} events}}, {share} within the threshold",
   "@vizSliValue": {
     "description": "Value of an SLI of the live frame: number of events and the good share.",
     "placeholders": {
       "count": {
-        "type": "String",
-        "example": "5,400"
+        "type": "int",
+        "format": "decimalPattern",
+        "example": "5400"
       },
       "share": {
         "type": "String",
