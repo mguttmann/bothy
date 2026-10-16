@@ -2,8 +2,8 @@
 
 Gateway connection, catch-up, outbox, reconciliation, run documents and focus, without Flutter.
 
-Status: the gateway connection with focus and typing (M4-13), the outbox (M4-15) and the run
-documents of the live box (M4-16) are built; catch-up follows with M4-14 and M4-17. Kind: pure Dart package, a member of the Dart
+Status: the gateway connection with focus and typing (M4-13), catch-up and reconciliation
+(M4-14), the outbox (M4-15) and the run documents of the live box (M4-16) are built. Kind: pure Dart package, a member of the Dart
 workspace at the repository root (`resolution: workspace`, `publish_to: none`).
 
 ## Dependencies
@@ -87,6 +87,98 @@ which also sends frames and sets `lastProcessedSeq` for the heartbeat. M4-15 (ou
 `connection.states` to know when the gateway is live. `connection.focus` (`FocusManager`, at
 most `sync.max_focused_threads`, the complete set per frame with `idle`) and
 `connection.typing` (`TypingThrottle`, `sync.typing_min_interval`) are called by the interface.
+
+## Catch-up and reconciliation (M4-14)
+
+`CatchUpListener` is the `SessionListener` of the connection (15 7.3, 04 7):
+
+- `ready` without a stored cursor (the first connection, or a cursor dropped by a failed
+  resync) empties the mirror and applies the whole snapshot in one transaction with
+  `cursor = head_seq` and the epoch; with a cursor only what is not an event (counters, agent
+  presence, feature flags, active run summaries) and the catch-up delivers the rest.
+- A gateway page is the run of `dispatch` frames up to the next `cursor` frame or
+  `catchup.complete`; it is applied with `SyncStateDao.commitPage` and the cursor of that frame
+  (never below the stored one) and the epoch. Pages above `client.sync.parse_offload_bytes`
+  decode in a background isolate (`decodeEnvelopes`). A failing page leaves rows and cursor as
+  they were and the listener applies nothing more until the next `ready` or `resumed`.
+- After `catchup.complete` the phase is `live` and `onLive` runs; every live durable event is its
+  own transaction with `cursor = seq`; ephemeral events go to the `EphemeralStore` (typing capped
+  at `sync.typing_ttl`, presence seeded from `ready`) or raw to `onRunUpdated`.
+- `resync_required` (any reason) keeps the connection: `getSnapshot`, then in one transaction
+  `clearMirror` (outbox, drafts and share inbox stay) and the snapshot with its cursor and epoch;
+  the threads in focus load their newest page; phase `live`, notice `Resynced`. Frames that
+  arrive meanwhile wait in the connection's queue and pass the duplicate rule afterwards. When
+  the snapshot cannot be loaded, the mirror goes, the cursor is dropped and the next connection
+  identifies without a cursor.
+- `access.changed` stores `permission_version`; `removed` deletes the targets with
+  `removeTargets` inside the page (rows, files, search entries, drafts; outbox entries stay),
+  then deletes the file bytes through `FileCacheEraser` and emits `TargetsRemoved`; `added`
+  loads the structure through `Fetcher.loadStructure`; `changed` reloads the view with the new
+  level and capabilities. The rest of the page applies after it.
+- `4012` (`ConnectionState` `signedOut`/`revoked`, watched with `watchConnection`) and
+  `session.revoked` of this device's session wipe the database, stop the page and emit
+  `SignedOutNotice(deleteLocalData: true)`; `session.revoked` of another session of the person
+  changes nothing.
+- A new message that does not continue the loaded range of its thread is stored, the gap is
+  recorded and loaded with `Fetcher.range`; `MessagesDao.watchContiguous` hides it until then. A
+  failed fill stays recorded; `onFocus` retries it.
+
+### Appliers
+
+Rule "version": `resource.version` must be greater than the stored version (the conditional
+upsert of `local_store`); "seq": no `resource.version`, applied in `seq` order with absolute
+values (04 9 item 3). A `truncated` durable event loads its message, thread, channel or space
+through the `Fetcher` instead.
+
+| Event type | Local tables | Rule |
+|---|---|---|
+| `message.created`, `message.updated` | `messages`, `principals` (author), `files`, `message_attachments`, `reactions_summary`, `message_components`, `my_mentions`, `search_index`; `loaded_ranges` for `created`; a tombstone clears content and search row | version |
+| `message.deleted` | `messages` (tombstone), `reactions_summary`, `my_mentions`, `message_components`, `message_attachments`, `search_index` | version |
+| `reaction.added`, `reaction.removed` | `reactions_summary` | seq |
+| `pin.added`, `pin.removed` | `messages.pinned` | seq |
+| `thread.created`, `thread.updated`, `thread.closed`, `thread.reopened`, `thread.moved` | `threads`, `thread_tags`, `search_index` (title) | version |
+| `thread.moved_out` | everything of the thread (`removeTargets`) when it is still in the source channel | seq |
+| `space.created`, `space.updated`, `space.archived` | `spaces` | version |
+| `channel.created`, `channel.updated`, `channel.archived` | `channels`, `channel_operators` | version |
+| `run.state_changed` | `runs` | version |
+| `user.updated` | `principals` | seq |
+| `agent.updated` | `agents`, `principals` | version |
+| `read_state.updated` | `read_states` (`mergeReadState`), counters | version of the read state |
+| `draft.updated` | `drafts` (not the echo of this device, not while typed here) | version |
+| `draft.deleted` | `drafts` (not while typed here) | seq |
+| `settings.updated` | `user_settings` (`deleted: true` removes the key) | version of the setting |
+| `sidebar.updated` | `user_space_states` | version of the state |
+| `notification_pref.updated` | `notification_preferences` | version of the preference |
+| `quiet_hours.updated` | `quiet_hours_rules` (rules missing from the payload are deleted) | version per rule |
+| `file.updated` | `files` | seq |
+| `command.changed` | `commands` (`removed` deletes) | version |
+| `instance.updated` | `instance` (reloaded with `getInstance`) | seq |
+| `access.changed` | `sync_state.permission_version`, removal, REST structure | seq |
+| `session.revoked` | the whole database (wipe) | seq |
+
+In memory: `typing.started` and `agent.presence_changed` (`EphemeralStore`), `run.updated`
+(`onRunUpdated`, raw, also when truncated). Skipped, the cursor advances (no local table):
+`access.expiring`, `agent.config_changed`, `agent.followup`, `agent.invocation`,
+`agent_session.changed`, `channel.settings_changed`, `command.invoked`, `gdpr.request_updated`,
+`grant.changed`, `group.changed`, `host.updated` (M4-36), `import.progress`,
+`interaction.created`, `run.cancel_requested`, `status.updated`, `terminal_session.changed`
+(M4-36), and every type the catalogue does not know. `test/catch_up/catalogue_test.dart` holds
+these sets equal to the catalogue.
+
+### Ports and hooks
+
+| Port or hook | Production (M4-17, M4-18, M4-22) | Tests |
+|---|---|---|
+| `Fetcher` | `ApiFetcher` over `api_client` (this package) | `ApiFetcher` on a fake REST adapter with recorded responses |
+| `LocalIdentity` | `AuthIdentity` over the `AuthSession` | `FixedIdentity` |
+| `FileCacheEraser` | the file cache of M4-22 | a recording eraser |
+| `DraftEditing` | the composer of the app | a switch |
+| `onEcho`, `onRunUpdated`, `onLive` | outbox (M4-15), `RunStore.onRunUpdated` (M4-16), outbox start | recorders |
+
+Notices on `notices`: `TargetsRemoved`, `DraftOverwritten` (from `applyDraftPutResult`, the
+answer of `putThreadDraft`), `Resynced`, `SignedOutNotice`. Counters: `countsOf(threadId)` and
+`countChanges`, reset from each snapshot and `read_state.updated`, counted from `message.*` in
+between (04 14).
 
 ## Outbox (M4-15)
 
@@ -217,9 +309,11 @@ comes from the table `runs`. A `Notifier` per run listens to `watch`.
 |---|---|
 | `lib/sync_engine.dart` | the public library; every public symbol has a doc comment (`make lint`, `public_member_api_docs`) |
 | `lib/src/*.dart` | the gateway connection: ports, `dart:io` transport, frames, states, close table, backoff, heartbeat, session, connection, focus, typing, listener (M4-13) |
-| `lib/src/outbox/` | `Outbox`, the sender, `classify`, the backoff, the executor registry and the operations (M4-15) |
+| `lib/src/catch_up.dart`, `dispatcher.dart`, `appliers/`, `snapshot_applier.dart`, `fetcher.dart`, `gap_filler.dart`, `ephemeral_store.dart`, `sync_events.dart`, `isolate_decode.dart`, `wire.dart` | catch-up, dispatcher, appliers per resource group, REST reads, gaps, ephemeral store, notices and ports, decoding, the wire mappers (M4-14) |
 | `lib/src/runs/` | `RunStore`, `applyRunPatch`, `RunDocument` and the ports (M4-16) |
+| `lib/src/outbox/` | `Outbox`, the sender, `classify`, the backoff, the executor registry and the operations (M4-15) |
 | `test/connection/` | tests of the gateway connection, one per close code, with the fakes of `test/support/` |
+| `test/catch_up/` | tests of the catch-up on the connection fakes, an in-memory store and recorded REST responses |
 | `test/outbox/` | tests of the outbox on an in-memory database with scripted executors, a fake clock and a seeded jitter |
 | `test/runs/` | tests of the run documents, fixtures of a document at versions 1 to 4 under `fixtures/` |
 | `test/` | tests, run by `make test` with coverage (`quality.coverage.dart_min_percent`) |

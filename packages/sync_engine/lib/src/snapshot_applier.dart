@@ -59,7 +59,7 @@ final class SnapshotApplier {
     after.reads
       ..add(() async {
         // `listMyReadStates` reads one channel; the channels with unread threads are the ones
-        // whose read position the interface shows (D-M4-14-10).
+        // whose read position the interface shows (D-M4-14-2).
         final channels = {for (final u in s.unreadThreads) u.channelId};
         for (final channel in channels) {
           final states = await sync.fetcher.myReadStates(channel);

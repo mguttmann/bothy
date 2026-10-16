@@ -43,6 +43,18 @@ operated, and the order of the build.
   the foreground, `4018` for user action, `4008` for `retry_after`); `ConnectionState` exposes
   the phases of 15 7.2 with a reason, `FocusManager` and `TypingThrottle` send `focus` and
   typing within their limits, and `SessionListener` is where catch-up plugs in (M4-13).
+- Sync engine catch-up and reconciliation: `CatchUpListener` applies the snapshot of `ready`
+  (the whole snapshot without a cursor, otherwise counters, presence, flags and run summaries),
+  catch-up pages up to each `cursor` frame or `catchup.complete` in one transaction with their
+  cursor and epoch, live events one transaction each, and `resync_required` on the same
+  connection (mirror emptied, outbox, drafts and share inbox kept, snapshot, focused threads
+  reloaded); the `Dispatcher` discards duplicates by the cursor, skips unknown types and types
+  without a local table, applies the version rule or the `seq` rule per the catalogue and writes
+  through one applier per resource group; `truncated` events reload through REST; gaps in
+  `thread_seq` load through the `Fetcher` before the message shows; `access.changed` removes or
+  loads targets; `4012` and `session.revoked` of this session wipe the local database; typing
+  and agent presence live in the `EphemeralStore`; personal data follow the echo, typing and
+  monotonic read rules of 04 14.
 - Design system core components: message (every variant, collapse with "Show more", origin
   badges, isolated foreign names), a safe Markdown renderer that runs and loads nothing, live box
   with collapsed and mobile lines and a throttled announcer, tool chip, status line, trigger

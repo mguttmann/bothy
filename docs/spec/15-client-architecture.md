@@ -371,7 +371,10 @@ connected as long as the app runs.
 ### 7.3 Catch-up and reconciliation
 
 1. Connect with the stored cursor; apply pages; store the cursor after each page in the same
-   transaction as the page.
+   transaction as the page. A gateway page is the run of `dispatch` frames up to the
+   next `cursor` frame or `catchup.complete`; it is applied with the cursor of that frame
+   (D-M4-14-1). An event whose type has no local table (for example `host.updated` before M4-36)
+   or that the client does not know advances the cursor and is skipped (04 6.1).
 2. On `resync_required`: empty the mirror tables (not the outbox, drafts, share inbox),
    `GET /api/v1/sync/snapshot`, cursor to `head_seq`, reload open threads. The connection
    stays open and is live from `head_seq`; no reconnect (04, 7.3).
