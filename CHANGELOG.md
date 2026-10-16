@@ -20,6 +20,18 @@ Planning stage (milestone M0). Nothing is installable yet.
 
 ### Added
 
+- Sync engine catch-up and reconciliation: `CatchUpListener` applies the snapshot of `ready`
+  (the whole snapshot without a cursor, otherwise counters, presence, flags and run summaries),
+  catch-up pages up to each `cursor` frame or `catchup.complete` in one transaction with their
+  cursor and epoch, live events one transaction each, and `resync_required` on the same
+  connection (mirror emptied, outbox, drafts and share inbox kept, snapshot, focused threads
+  reloaded); the `Dispatcher` discards duplicates by the cursor, skips unknown types and types
+  without a local table, applies the version rule or the `seq` rule per the catalogue and writes
+  through one applier per resource group; `truncated` events reload through REST; gaps in
+  `thread_seq` load through the `Fetcher` before the message shows; `access.changed` removes or
+  loads targets; `4012` and `session.revoked` of this session wipe the local database; typing
+  and agent presence live in the `EphemeralStore`; personal data follow the echo, typing and
+  monotonic read rules of 04 14.
 - Sync engine gateway connection: `GatewayConnection` holds the one WebSocket of a device
   (transport port with a `dart:io` implementation), answers `hello` with `identify` or `resume`
   and a gateway DPoP proof over the `hello` nonce, stores the session fields of `ready`, renews

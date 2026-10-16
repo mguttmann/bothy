@@ -371,7 +371,10 @@ verbunden, solange die App läuft.
 ### 7.3 Nachholen und Abgleich
 
 1. Verbinden mit gespeichertem Cursor; Seiten anwenden; Cursor nach jeder Seite in derselben
-   Transaktion wie die Seite speichern.
+   Transaktion wie die Seite speichern. A gateway page is the run of `dispatch` frames up to the
+   next `cursor` frame or `catchup.complete`; it is applied with the cursor of that frame
+   (D-M4-14-1). An event whose type has no local table (for example `host.updated` before M4-36)
+   or that the client does not know advances the cursor and is skipped (04 6.1).
 2. Bei `resync_required`: Spiegel-Tabellen leeren (nicht Ausgangsfach, Entwürfe, Teilen-Eingang),
    `GET /api/v1/sync/snapshot`, Cursor auf `head_seq`, geöffnete Threads neu laden. Die Verbindung
    bleibt offen und ist ab `head_seq` live; kein Neuverbinden (04, 7.3).
