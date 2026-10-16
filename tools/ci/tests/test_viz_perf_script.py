@@ -31,6 +31,8 @@ if args[:1] == ["create"]:
     for name in ("pubspec.lock", ".metadata", ".gitignore", "bothy_viz_harness.iml"):
         open(name, "w").write("x")
     os.makedirs(".idea", exist_ok=True)
+    with open("analysis_options.yaml", "a") as fh:
+        fh.write("analyzer:\\n  exclude:\\n    - macos/**\\n")
     sys.exit(0)
 if args[:1] == ["drive"]:
     open(".flutter-plugins-dependencies", "w").write("{{}}")
@@ -47,6 +49,7 @@ def harness(tmp_path: Path) -> Path:
     (root / "test").mkdir()
     (root / "test" / "harness_test.dart").write_text("void main() {}\n", encoding="utf-8")
     (root / "pubspec.yaml").write_text("name: bothy_viz_harness\n", encoding="utf-8")
+    (root / "analysis_options.yaml").write_text("include: shared.yaml\n", encoding="utf-8")
     shutil.copy(SCRIPT, root / "tool" / "perf_macos.sh")
     bin_dir = tmp_path / "bin"
     bin_dir.mkdir()
@@ -83,6 +86,14 @@ def test_runs_the_profile_drive_and_removes_what_it_added(harness: Path) -> None
     assert "--target=integration_test/topology_perf_test.dart" in args
     (harness / "drive.args").unlink()
     assert _tree(harness) == before
+
+
+def test_restores_the_analysis_options_that_create_edits(harness: Path) -> None:
+    result = _run(harness, FAKE_DRIVE_EXIT="1")
+    assert result.returncode == 1
+    assert (harness / "analysis_options.yaml").read_text(encoding="utf-8") == (
+        "include: shared.yaml\n"
+    )
 
 
 def test_keeps_the_exit_code_of_the_drive_and_still_cleans_up(harness: Path) -> None:
