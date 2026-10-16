@@ -105,6 +105,16 @@ void main() {
     expect(await dao.byId(uuid(1)), isNull);
   });
 
+  test('updateDependsOn re-points an entry to another dependency', () async {
+    final dao = db.outboxDao;
+    await add(uuid(1), null);
+    await add(uuid(2), threadId(1), dependsOn: uuid(1));
+    await dao.updateDependsOn(uuid(2), uuid(3));
+    expect((await dao.byId(uuid(2)))!.dependsOn, uuid(3));
+    await dao.updateDependsOn(uuid(2), null);
+    expect((await dao.byId(uuid(2)))!.dependsOn, isNull);
+  });
+
   test(
     'a new ID is a new row; an existing ID is never updated by enqueue',
     () async {

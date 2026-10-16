@@ -49,14 +49,16 @@ Life cycle of an entry:
 - Editing and deleting follow 04 13.3: an entry with `attempts == 0` is changed or removed in
   place; an attempted entry stays as it is and gets a follow-up `updateMessage` or
   `deleteMessage` that waits for it and receives its `message_id` and `version`; a failed entry
-  edited or sent again becomes a new entry with a new ID.
+  edited or sent again becomes a new entry with a new ID, and the entries that waited for it
+  wait for the new one. An edit holds the changed members and is merged into the stored
+  payload.
 
 Error classes (`classify`, docs/DECISIONS.md D-M4-15-1):
 
 | Response | Class |
 |---|---|
 | `2xx`, `200` with `Idempotent-Replay: true`, `204` | confirmed |
-| network error, timeout, `5xx` except `503 setup_required`, `429`, `409 request_in_progress` | retry with full jitter between `client.outbox_retry_base` and `client.outbox_retry_cap`; `429` and `503` wait `Retry-After` |
+| network error (also a TLS error), timeout, `5xx` except `503 setup_required`, `429`, `409 request_in_progress` | retry with full jitter between `client.outbox_retry_base` and `client.outbox_retry_cap`; `429` and `503` wait `Retry-After` |
 | `412 version_conflict` | conflict: `failed` with the `current` revision |
 | `400`, `401`, `403`, `404`, any other `409`, `410`, `413`, `415`, `422`, `428`, `503 setup_required` | final: `failed` with code and reason |
 | an error that is no transport error and no response (a bug in an executor) | final: `executor_error` |

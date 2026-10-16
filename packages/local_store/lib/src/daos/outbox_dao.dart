@@ -114,6 +114,14 @@ final class OutboxDao {
     );
   }
 
+  /// Sets the `depends_on` value of entry [id] to [dependsOn]; the outbox re-points the entries
+  /// that waited for an entry it replaced with a new ID (docs/DECISIONS.md D-M4-15-6).
+  Future<void> updateDependsOn(String id, String? dependsOn) async {
+    await (_db.update(_db.outbox)..where((t) => t.id.equals(id))).write(
+      OutboxCompanion(dependsOn: Value(dependsOn)),
+    );
+  }
+
   /// Deletes entry [id] (discarded by the person).
   Future<void> delete(String id) async {
     await (_db.delete(_db.outbox)..where((t) => t.id.equals(id))).go();

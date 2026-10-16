@@ -97,10 +97,13 @@ final class Outbox {
   /// Applies the edit [payload] to entry [id] after 04 13.3 and returns the ID of the entry
   /// that now carries the change.
   ///
-  /// - Never attempted (`attempts == 0`): the payload is replaced in place; same ID.
-  /// - Failed: a new entry with a new ID and [payload] replaces it; after a
-  ///   `412 version_conflict` the new entry targets the version of the kept `current`
-  ///   revision (members `version` and the expected version).
+  /// [payload] holds the changed members; they are merged into the stored payload.
+  ///
+  /// - Never attempted (`attempts == 0`): the payload is changed in place; same ID.
+  /// - Failed: a new entry with a new ID and the merged payload replaces it, and the entries
+  ///   that waited for the failed one wait for the new one; after a `412 version_conflict` the
+  ///   new entry targets the version of the kept `current` revision (member `version` and the
+  ///   expected version).
   /// - Attempted and not failed: the entry may be stored on the server, so it stays as it is;
   ///   a follow-up of its operation (`followUpEdit`) waits for it, or the follow-up that has
   ///   not been sent yet is changed in place.
@@ -113,7 +116,10 @@ final class Outbox {
         return _replaceFailed(e, payload);
       }
       if (e.attempts == 0) {
-        await _dao.updatePayload(id, jsonEncode(payload));
+        await _dao.updatePayload(
+          id,
+          jsonEncode({...decodePayload(e.payload), ...payload}),
+        );
         return id;
       }
       final followUp = _executors.lookup(e.kind)?.followUpEdit;
@@ -126,7 +132,12 @@ final class Outbox {
           tail.attempts == 0 &&
           tail.kind == request.kind &&
           tail.state == OutboxState.pending) {
-        await _dao.updatePayload(tail.id, jsonEncode(request.payload));
+        // The slots the outbox fills (null in a new follow-up) keep what is bound already.
+        final merged = decodePayload(tail.payload);
+        for (final MapEntry(:key, :value) in request.payload.entries) {
+          if (value != null || !merged.containsKey(key)) merged[key] = value;
+        }
+        await _dao.updatePayload(tail.id, jsonEncode(merged));
         return tail.id;
       }
       return (await _insert(request.withDependsOn([tail.id]))).id;
@@ -161,7 +172,7 @@ final class Outbox {
   }
 
   /// Sends the failed entry [id] again with a new ID and discards the old one (04 13.2
-  /// item 5); returns the new ID. Throws a [StateError] when the entry does not exist or has
+  /// item 5); the entries that waited for it wait for the new one. Returns the new ID. Throws a [StateError] when the entry does not exist or has
   /// not failed.
   Future<String> retry(String id) async {
     final result = await _lock.run(() async {
@@ -220,7 +231,7 @@ final class Outbox {
 
   /// Stops the outbox and its streams; the stored entries stay.
   Future<void> close() async {
-    _sender.close();
+    await _sender.close();
     await _changes.close();
   }
 
@@ -354,7 +365,8 @@ final class Outbox {
     Map<String, Object?> payload,
   ) async {
     var expected = e.expectedVersion;
-    final next = Map<String, Object?>.of(payload);
+    // The edit is merged into the stored payload, so `message_id` and similar members stay.
+    final next = {...decodePayload(e.payload), ...payload};
     final current = e.conflictCurrent;
     if (current != null) {
       final version = (jsonDecode(current) as Map)['version'];
@@ -372,8 +384,16 @@ final class Outbox {
         expectedVersion: expected,
       ),
     );
-    // Entries that waited for the failed one fail visibly instead of going without it.
-    await _discard(e);
+    // Entries that waited for the failed one now wait for its replacement (D-M4-15-6).
+    for (final d in await _sender.dependentsOf(e.id)) {
+      if (d.state.isFinal) continue;
+      await _dao.updateDependsOn(
+        d.id,
+        [for (final id in dependenciesOf(d)) id == e.id ? fresh.id : id]
+            .join(','),
+      );
+    }
+    await _dao.delete(e.id);
     return fresh.id;
   }
 

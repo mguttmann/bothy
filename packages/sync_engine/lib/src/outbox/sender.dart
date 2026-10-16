@@ -98,6 +98,7 @@ final class OutboxSender {
   bool _pumping = false;
   bool _again = false;
   Timer? _wake;
+  Future<void> _pumpDone = Future<void>.value();
 
   /// Whether the sender may start requests.
   bool get started => _started;
@@ -127,10 +128,14 @@ final class OutboxSender {
     _wake = null;
   }
 
-  /// Stops for good.
-  void close() {
+  /// Stops for good and waits until no step of the sender touches the database any more;
+  /// requests in flight are left alone and their entries stay `sending`, so the next run
+  /// sends them again with the same ID.
+  Future<void> close() async {
     pause();
     _closed = true;
+    await _pumpDone;
+    await lock.run(() async {});
   }
 
   /// Every entry in the table, thread by thread in FIFO order.
@@ -146,6 +151,8 @@ final class OutboxSender {
       return;
     }
     _pumping = true;
+    final done = Completer<void>();
+    _pumpDone = done.future;
     try {
       do {
         _again = false;
@@ -154,6 +161,7 @@ final class OutboxSender {
       } while (_again);
     } finally {
       _pumping = false;
+      done.complete();
     }
   }
 
@@ -167,8 +175,20 @@ final class OutboxSender {
     final current = now();
     for (final MapEntry(key: lane, value: entries) in lanes.entries) {
       if (_busy.contains(lane)) continue;
-      // Strict FIFO: only the oldest entry of a lane may go; later ones never overtake it.
-      final head = entries.first;
+      // Strict FIFO: only the oldest entry of a lane may go; later ones never overtake it. A
+      // dependent never goes before its parent in the same lane, even when the clock stepped
+      // back between the two writes and gave the dependent the older `created_at`.
+      var head = entries.first;
+      final inLane = {for (final e in entries) e.id: e};
+      final seen = <String>{};
+      while (seen.add(head.id)) {
+        final parent = dependenciesOf(head)
+            .map((id) => inLane[id])
+            .whereType<OutboxEntry>()
+            .firstOrNull;
+        if (parent == null) break;
+        head = parent;
+      }
       if (!await _dependenciesConfirmed(head)) continue;
       final due = head.nextAttemptAt;
       if (head.state == OutboxState.waiting &&
@@ -199,6 +219,7 @@ final class OutboxSender {
   Future<void> _work(String lane, String id) async {
     try {
       final claimed = await lock.run(() async {
+        if (_closed) return null;
         final e = await dao.byId(id);
         if (e == null || e.state.isFinal || !_started) return null;
         if (executors.lookup(e.kind) == null) {
@@ -222,11 +243,13 @@ final class OutboxSender {
       } on Object catch (error) {
         outcome = classify(error);
       }
-      await lock.run(() => _apply(claimed, outcome, response));
+      await lock.run(() async {
+        if (!_closed) await _apply(claimed, outcome, response);
+      });
       onChanged();
     } finally {
       _busy.remove(lane);
-      unawaited(pump());
+      if (!_closed) unawaited(pump());
     }
   }
 

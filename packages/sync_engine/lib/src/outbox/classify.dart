@@ -57,8 +57,8 @@ final class Classification {
 /// Classifies an [error] an executor threw.
 ///
 /// Accepts a `DioException` of the generated client (with or without an [ApiProblem]), an
-/// [ApiProblem], a [TimeoutException], a [SocketException], an [HttpException] or any other
-/// object. Rules (Design note 2): transport errors, timeouts, `5xx`, `429` and
+/// [ApiProblem], a [TimeoutException], an [IOException] (socket, HTTP and TLS errors) or any
+/// other object. Rules (Design note 2): transport errors, timeouts, `5xx`, `429` and
 /// `409 request_in_progress` retry; `429` and `503` carry `Retry-After`; `503 setup_required`
 /// is final; `412` is a conflict; every other status is final with its problem code and
 /// reason. `401` is handled by the interceptors of `auth` before the outbox sees it, so one
@@ -91,7 +91,8 @@ Classification classify(Object error) {
   if (error is TimeoutException) {
     return const Classification(OutcomeClass.retry, code: 'timeout');
   }
-  if (error is SocketException || error is HttpException) {
+  // SocketException, HttpException and the TLS errors (HandshakeException) are IOExceptions.
+  if (error is IOException) {
     return const Classification(OutcomeClass.retry, code: 'network');
   }
   return const Classification(OutcomeClass.failed, code: 'executor_error');
@@ -109,10 +110,7 @@ Classification _unknown(DioException error) {
     );
   }
   final inner = error.error;
-  if (inner == null ||
-      inner is SocketException ||
-      inner is HttpException ||
-      inner is TimeoutException) {
+  if (inner == null || inner is IOException || inner is TimeoutException) {
     return const Classification(OutcomeClass.retry, code: 'network');
   }
   return const Classification(OutcomeClass.failed, code: 'executor_error');
