@@ -265,3 +265,237 @@ func (q *Queries) InsertMessage(ctx context.Context, arg InsertMessageParams) (I
 	)
 	return i, err
 }
+
+const lockVisibleMessage = `-- name: LockVisibleMessage :one
+SELECT id, thread_id, channel_id, thread_seq, author_principal_id, client_msg_id, client_payload_sha256, origin, kind,
+    system_code, content_md, content_format, reply_to_message_id, run_id, trigger_state, trigger_state_reason, trigger_state_at,
+    silent, import_item_id, version, edited_at, deleted_at, deleted_by, created_at
+FROM messages WHERE id = $1 AND channel_id = ANY($2::uuid[]) FOR UPDATE
+`
+
+type LockVisibleMessageParams struct {
+	ID      pgtype.UUID
+	Visible []pgtype.UUID
+}
+
+type LockVisibleMessageRow struct {
+	ID                  pgtype.UUID
+	ThreadID            pgtype.UUID
+	ChannelID           pgtype.UUID
+	ThreadSeq           int64
+	AuthorPrincipalID   pgtype.UUID
+	ClientMsgID         pgtype.UUID
+	ClientPayloadSha256 []byte
+	Origin              string
+	Kind                string
+	SystemCode          pgtype.Text
+	ContentMd           string
+	ContentFormat       int16
+	ReplyToMessageID    pgtype.UUID
+	RunID               pgtype.UUID
+	TriggerState        pgtype.Text
+	TriggerStateReason  pgtype.Text
+	TriggerStateAt      pgtype.Timestamptz
+	Silent              bool
+	ImportItemID        pgtype.UUID
+	Version             int64
+	EditedAt            pgtype.Timestamptz
+	DeletedAt           pgtype.Timestamptz
+	DeletedBy           pgtype.UUID
+	CreatedAt           pgtype.Timestamptz
+}
+
+// The visible message locked for an edit or a deletion (M1-58 lock order: thread row first,
+// then the message row).
+func (q *Queries) LockVisibleMessage(ctx context.Context, arg LockVisibleMessageParams) (LockVisibleMessageRow, error) {
+	row := q.db.QueryRow(ctx, lockVisibleMessage, arg.ID, arg.Visible)
+	var i LockVisibleMessageRow
+	err := row.Scan(
+		&i.ID,
+		&i.ThreadID,
+		&i.ChannelID,
+		&i.ThreadSeq,
+		&i.AuthorPrincipalID,
+		&i.ClientMsgID,
+		&i.ClientPayloadSha256,
+		&i.Origin,
+		&i.Kind,
+		&i.SystemCode,
+		&i.ContentMd,
+		&i.ContentFormat,
+		&i.ReplyToMessageID,
+		&i.RunID,
+		&i.TriggerState,
+		&i.TriggerStateReason,
+		&i.TriggerStateAt,
+		&i.Silent,
+		&i.ImportItemID,
+		&i.Version,
+		&i.EditedAt,
+		&i.DeletedAt,
+		&i.DeletedBy,
+		&i.CreatedAt,
+	)
+	return i, err
+}
+
+const tombstoneMessage = `-- name: TombstoneMessage :one
+UPDATE messages SET content_md = '', deleted_at = $1, deleted_by = $2, version = version + 1
+WHERE id = $3 AND channel_id = ANY($4::uuid[]) AND deleted_at IS NULL
+RETURNING id, thread_id, channel_id, thread_seq, author_principal_id, client_msg_id, client_payload_sha256, origin, kind,
+    system_code, content_md, content_format, reply_to_message_id, run_id, trigger_state, trigger_state_reason, trigger_state_at,
+    silent, import_item_id, version, edited_at, deleted_at, deleted_by, created_at
+`
+
+type TombstoneMessageParams struct {
+	DeletedAt pgtype.Timestamptz
+	DeletedBy pgtype.UUID
+	ID        pgtype.UUID
+	Visible   []pgtype.UUID
+}
+
+type TombstoneMessageRow struct {
+	ID                  pgtype.UUID
+	ThreadID            pgtype.UUID
+	ChannelID           pgtype.UUID
+	ThreadSeq           int64
+	AuthorPrincipalID   pgtype.UUID
+	ClientMsgID         pgtype.UUID
+	ClientPayloadSha256 []byte
+	Origin              string
+	Kind                string
+	SystemCode          pgtype.Text
+	ContentMd           string
+	ContentFormat       int16
+	ReplyToMessageID    pgtype.UUID
+	RunID               pgtype.UUID
+	TriggerState        pgtype.Text
+	TriggerStateReason  pgtype.Text
+	TriggerStateAt      pgtype.Timestamptz
+	Silent              bool
+	ImportItemID        pgtype.UUID
+	Version             int64
+	EditedAt            pgtype.Timestamptz
+	DeletedAt           pgtype.Timestamptz
+	DeletedBy           pgtype.UUID
+	CreatedAt           pgtype.Timestamptz
+}
+
+// The deletion of the locked message (03 section 6.5): the row and thread_seq stay, the content
+// goes, deleted_at, deleted_by and the next version are set.
+func (q *Queries) TombstoneMessage(ctx context.Context, arg TombstoneMessageParams) (TombstoneMessageRow, error) {
+	row := q.db.QueryRow(ctx, tombstoneMessage,
+		arg.DeletedAt,
+		arg.DeletedBy,
+		arg.ID,
+		arg.Visible,
+	)
+	var i TombstoneMessageRow
+	err := row.Scan(
+		&i.ID,
+		&i.ThreadID,
+		&i.ChannelID,
+		&i.ThreadSeq,
+		&i.AuthorPrincipalID,
+		&i.ClientMsgID,
+		&i.ClientPayloadSha256,
+		&i.Origin,
+		&i.Kind,
+		&i.SystemCode,
+		&i.ContentMd,
+		&i.ContentFormat,
+		&i.ReplyToMessageID,
+		&i.RunID,
+		&i.TriggerState,
+		&i.TriggerStateReason,
+		&i.TriggerStateAt,
+		&i.Silent,
+		&i.ImportItemID,
+		&i.Version,
+		&i.EditedAt,
+		&i.DeletedAt,
+		&i.DeletedBy,
+		&i.CreatedAt,
+	)
+	return i, err
+}
+
+const updateMessageContent = `-- name: UpdateMessageContent :one
+UPDATE messages SET content_md = $1, edited_at = $2, version = version + 1
+WHERE id = $3 AND channel_id = ANY($4::uuid[]) AND deleted_at IS NULL
+RETURNING id, thread_id, channel_id, thread_seq, author_principal_id, client_msg_id, client_payload_sha256, origin, kind,
+    system_code, content_md, content_format, reply_to_message_id, run_id, trigger_state, trigger_state_reason, trigger_state_at,
+    silent, import_item_id, version, edited_at, deleted_at, deleted_by, created_at
+`
+
+type UpdateMessageContentParams struct {
+	ContentMd string
+	EditedAt  pgtype.Timestamptz
+	ID        pgtype.UUID
+	Visible   []pgtype.UUID
+}
+
+type UpdateMessageContentRow struct {
+	ID                  pgtype.UUID
+	ThreadID            pgtype.UUID
+	ChannelID           pgtype.UUID
+	ThreadSeq           int64
+	AuthorPrincipalID   pgtype.UUID
+	ClientMsgID         pgtype.UUID
+	ClientPayloadSha256 []byte
+	Origin              string
+	Kind                string
+	SystemCode          pgtype.Text
+	ContentMd           string
+	ContentFormat       int16
+	ReplyToMessageID    pgtype.UUID
+	RunID               pgtype.UUID
+	TriggerState        pgtype.Text
+	TriggerStateReason  pgtype.Text
+	TriggerStateAt      pgtype.Timestamptz
+	Silent              bool
+	ImportItemID        pgtype.UUID
+	Version             int64
+	EditedAt            pgtype.Timestamptz
+	DeletedAt           pgtype.Timestamptz
+	DeletedBy           pgtype.UUID
+	CreatedAt           pgtype.Timestamptz
+}
+
+// An edit of the locked message: the new content, edited_at and the next version.
+func (q *Queries) UpdateMessageContent(ctx context.Context, arg UpdateMessageContentParams) (UpdateMessageContentRow, error) {
+	row := q.db.QueryRow(ctx, updateMessageContent,
+		arg.ContentMd,
+		arg.EditedAt,
+		arg.ID,
+		arg.Visible,
+	)
+	var i UpdateMessageContentRow
+	err := row.Scan(
+		&i.ID,
+		&i.ThreadID,
+		&i.ChannelID,
+		&i.ThreadSeq,
+		&i.AuthorPrincipalID,
+		&i.ClientMsgID,
+		&i.ClientPayloadSha256,
+		&i.Origin,
+		&i.Kind,
+		&i.SystemCode,
+		&i.ContentMd,
+		&i.ContentFormat,
+		&i.ReplyToMessageID,
+		&i.RunID,
+		&i.TriggerState,
+		&i.TriggerStateReason,
+		&i.TriggerStateAt,
+		&i.Silent,
+		&i.ImportItemID,
+		&i.Version,
+		&i.EditedAt,
+		&i.DeletedAt,
+		&i.DeletedBy,
+		&i.CreatedAt,
+	)
+	return i, err
+}

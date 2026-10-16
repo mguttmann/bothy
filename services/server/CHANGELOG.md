@@ -114,6 +114,20 @@ documented in this file. The format is based on
   `message.list_content_max_bytes` (now an active key) with `content_truncated`; `limit` defaults
   to `api.page_size_default` and is capped at `api.page_size_max`. The port
   `messaging.Messages` adds `History` and `Get` for later callers.
+- Editing, deleting and revisions of messages (M1-58): `updateMessage`, `deleteMessage` and
+  `listMessageRevisions`. Only the author edits, with `If-Match` (missing `428`, stale `412
+  version_conflict` with the current message, deleted `410 message_deleted`); every edit stores
+  the previous content as the next revision in the new table `message_revisions` (migration
+  `00040`), resolves the mentions again and appends `message.updated`; the same content and
+  mentions answer without a write. An edit never triggers an agent and never changes
+  `trigger_state`. Deleting is idempotent (`204`): the author with `write`, anyone else with
+  `manage` and an audit entry. The tombstone keeps the row and `thread_seq`; content, revisions and
+  mentions go, `threads.message_count` drops by one, the payloads of every stored event of the
+  message are redacted with the envelope unchanged, the in-transaction event `MessageDeleted` is
+  published and `message.deleted` appended, all in one transaction. New kernel port
+  `eventlog.Redactor`, implemented by sync with the column right `UPDATE (payload, redacted_at)` on
+  `event_log` (migration `00039`); `chat.Threads` adds `LockForMessageChange` and
+  `DecrementMessageCount`.
 
 - Sending messages (M1-56): `createMessage` and `createThread`. Migrations `00032` and `00033`
   create `messages` and `mentions` and give `threads.parent_message_id` its deferred foreign key.

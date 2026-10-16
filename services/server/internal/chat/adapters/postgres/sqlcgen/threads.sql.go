@@ -78,6 +78,21 @@ func (q *Queries) AppendToThread(ctx context.Context, arg AppendToThreadParams) 
 	return i, err
 }
 
+const decrementMessageCount = `-- name: DecrementMessageCount :execrows
+UPDATE threads SET message_count = message_count - 1, version = version + 1
+WHERE id = $1 AND message_count > 0
+`
+
+// One message of the locked thread was deleted (M1-58, 03 threads: message_count counts messages
+// without deleted ones); a count of zero is left alone, so the caller sees no row and fails.
+func (q *Queries) DecrementMessageCount(ctx context.Context, id pgtype.UUID) (int64, error) {
+	result, err := q.db.Exec(ctx, decrementMessageCount, id)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
+}
+
 const getThread = `-- name: GetThread :one
 
 SELECT id, channel_id, kind, parent_message_id, title, title_source, state, closed_at, closed_by, operator_agent_id,

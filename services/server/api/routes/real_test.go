@@ -557,6 +557,18 @@ func (stubServer) GetMessage(context.Context, rest.GetMessageRequestObject) (res
 	return nil, nil
 }
 
+func (stubServer) UpdateMessage(context.Context, rest.UpdateMessageRequestObject) (rest.UpdateMessageResponseObject, error) {
+	return nil, nil
+}
+
+func (stubServer) DeleteMessage(context.Context, rest.DeleteMessageRequestObject) (rest.DeleteMessageResponseObject, error) {
+	return nil, nil
+}
+
+func (stubServer) ListMessageRevisions(context.Context, rest.ListMessageRevisionsRequestObject) (rest.ListMessageRevisionsResponseObject, error) {
+	return nil, nil
+}
+
 func (stubServer) SetThreadTags(context.Context, rest.SetThreadTagsRequestObject) (rest.SetThreadTagsResponseObject, error) {
 	return nil, nil
 }
@@ -651,8 +663,8 @@ func (stubServer) SetMyLocalCredential(context.Context, rest.SetMyLocalCredentia
 // (M1-35), the providers and credentials (M1-36), the API tokens (M1-44), the audit log (M1-50),
 // the enrollment codes (M1-37), the device approval and pairing (M1-38), the passkeys (M1-40),
 // the OIDC login (M1-41), the trusted header login (M1-43), the revocations (M1-45), the host
-// records (M2-39), the local accounts (M1-39), the nine app operations (M2-24) and sending
-// (M1-56). A handler
+// records (M2-39), the local accounts (M1-39), the nine app operations (M2-24), sending (M1-56)
+// and editing and deleting (M1-58). A handler
 // ticket that enables an operation changes this test together with
 // api/operations.yaml.
 func TestRealTable_Enabled(t *testing.T) {
@@ -845,6 +857,11 @@ func TestRealTable_Enabled(t *testing.T) {
 		"deleteWebhookSubscription": {"DELETE /api/v1/webhooks/{subscription_id}", "webhook_out.manage", "rl.admin"},
 		"listWebhookDeliveries":     {"GET /api/v1/webhooks/{subscription_id}/deliveries", "webhook_out.read", "rl.read"},
 		"redeliverWebhook":          {"POST /api/v1/webhook-deliveries/{delivery_id}/redeliver", "webhook_out.redeliver", "rl.admin"},
+
+		// M1-58
+		"updateMessage":        {"PATCH /api/v1/messages/{message_id}", "message.update", "rl.message"},
+		"deleteMessage":        {"DELETE /api/v1/messages/{message_id}", "message.delete", "rl.message"},
+		"listMessageRevisions": {"GET /api/v1/messages/{message_id}/revisions", "message.revisions.read", "rl.read"},
 	}
 	ops := routes.Enabled()
 	if len(ops) != len(want) {

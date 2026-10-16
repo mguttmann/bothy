@@ -279,6 +279,53 @@ func (q *Queries) InsertEvents(ctx context.Context, arg InsertEventsParams) (Ins
 	return i, err
 }
 
+const lockResourceEvents = `-- name: LockResourceEvents :many
+SELECT seq, type, schema_version, payload
+FROM event_log
+WHERE resource_kind = $1::text AND resource_id = $2::uuid
+ORDER BY seq
+FOR UPDATE
+`
+
+type LockResourceEventsParams struct {
+	ResourceKind string
+	ResourceID   pgtype.UUID
+}
+
+type LockResourceEventsRow struct {
+	Seq           int64
+	Type          string
+	SchemaVersion int16
+	Payload       []byte
+}
+
+// The stored events of one resource for the redaction of a deletion (03 section 6.5), locked in
+// seq order through the index (resource_kind, resource_id).
+func (q *Queries) LockResourceEvents(ctx context.Context, arg LockResourceEventsParams) ([]LockResourceEventsRow, error) {
+	rows, err := q.db.Query(ctx, lockResourceEvents, arg.ResourceKind, arg.ResourceID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []LockResourceEventsRow
+	for rows.Next() {
+		var i LockResourceEventsRow
+		if err := rows.Scan(
+			&i.Seq,
+			&i.Type,
+			&i.SchemaVersion,
+			&i.Payload,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const minRetainedSeq = `-- name: MinRetainedSeq :one
 SELECT COALESCE(min(seq), 0)::bigint FROM event_log
 `
@@ -289,4 +336,28 @@ func (q *Queries) MinRetainedSeq(ctx context.Context) (int64, error) {
 	var column_1 int64
 	err := row.Scan(&column_1)
 	return column_1, err
+}
+
+const redactEvents = `-- name: RedactEvents :execrows
+UPDATE event_log AS e
+SET payload = r.payload::jsonb, redacted_at = COALESCE(e.redacted_at, now())
+FROM (
+    SELECT unnest($1::bigint[]) AS seq, unnest($2::text[]) AS payload
+) AS r
+WHERE e.seq = r.seq
+`
+
+type RedactEventsParams struct {
+	Seqs     []int64
+	Payloads []string
+}
+
+// Writes the redacted payloads of the locked events and sets redacted_at once (R-DM-18): bothy_app
+// holds the column right UPDATE (payload, redacted_at) only, so no other column can change.
+func (q *Queries) RedactEvents(ctx context.Context, arg RedactEventsParams) (int64, error) {
+	result, err := q.db.Exec(ctx, redactEvents, arg.Seqs, arg.Payloads)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
 }
