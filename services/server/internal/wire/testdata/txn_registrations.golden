@@ -6,3 +6,5 @@ hook audit audit github.com/OWNER/bothy/services/server/internal/audit/app.(*Cha
 subscribe messaging.MessagePosted -> sync github.com/OWNER/bothy/services/server/internal/sync/app.(*Subscribers).OnMessagePosted-fm
 subscribe chat.ChannelArchived -> notify github.com/OWNER/bothy/services/server/internal/notify/app.(*Subscribers).OnChannelArchived-fm
 subscribe chat.SpaceArchived -> notify github.com/OWNER/bothy/services/server/internal/notify/app.(*Subscribers).OnSpaceArchived-fm
+subscribe chat.ThreadMoved -> messaging github.com/OWNER/bothy/services/server/internal/messaging/app.(*Subscribers).OnThreadMoved-fm
+subscribe chat.ThreadMoved -> sync github.com/OWNER/bothy/services/server/internal/sync/app.(*Subscribers).OnThreadMoved-fm

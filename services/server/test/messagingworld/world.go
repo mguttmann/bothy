@@ -277,7 +277,8 @@ func build(t *testing.T, subscribe Subscribe, personal bool, notifyCfg *notifyap
 	}
 	var subs *syncapp.Subscribers
 	if personal {
-		subs = syncapp.NewSubscribers(syncpg.NewPersonalRepository(pool))
+		rows := syncpg.NewPersonalRepository(pool)
+		subs = syncapp.NewSubscribers(rows, rows)
 	}
 	var nsubs *notifyapp.Subscribers
 	if notifyCfg != nil {

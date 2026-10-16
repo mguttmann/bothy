@@ -91,3 +91,14 @@ func (m *Messaging) fillHandlers(h *Handlers) {
 		h.Messages = m.Handlers
 	}
 }
+
+// newMessagingSubscribers returns the in-transaction subscribers of messaging over pool
+// (ThreadMoved moves messages.channel_id, M1-62). It opens no connection.
+func newMessagingSubscribers(pool *pg.Pool) *messagingapp.Subscribers {
+	subs, err := messagingapp.NewSubscribers(messagingpg.NewRepository(pool))
+	if err != nil {
+		// The repository is never nil, so this is a programming error.
+		panic(err)
+	}
+	return subs
+}

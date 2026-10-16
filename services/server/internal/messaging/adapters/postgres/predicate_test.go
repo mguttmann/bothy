@@ -20,6 +20,8 @@ var visiblePredicateAllowlist = map[string]string{
 		"the use case authorizes message.create on the thread before it answers with the row",
 	"ListMentions": "the mentions of one message whose row the caller has already read with the visible predicate " +
 		"or written itself, and authorized with message.read or message.create",
+	"MoveThreadMessages": "the copy messages.channel_id of thread.move (M1-62): writes only the rows of the thread that chat " +
+		"locked and authorized with thread.move in the same unit of work; returns no row content",
 	// The template statements of M1-60 (INT-W22/5): personal templates belong to no channel, and the
 	// writes follow the locked visible read GetVisibleTemplate.
 	"ListPersonalTemplates": "the personal templates of the caller (owner_user_id), which belong to no channel; " +

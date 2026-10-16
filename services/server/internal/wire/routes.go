@@ -67,7 +67,7 @@ type Handlers struct {
 	// deleteForumTag (chat, M1-53).
 	*chathttp.Channels
 	// Threads implements listChannelThreads, getThread, setThreadTitle, closeThread, reopenThread
-	// and setThreadTags (chat, M1-55).
+	// and setThreadTags (chat, M1-55) and moveThread (M1-62).
 	*chathttp.Threads
 	// Messages implements createMessage and createThread (messaging, M1-56), listThreadMessages
 	// and getMessage (M1-57), listMyMentions and the template operations (M1-60).

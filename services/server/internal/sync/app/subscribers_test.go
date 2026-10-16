@@ -64,7 +64,7 @@ func TestOnMessagePostedWritesNoReadState(t *testing.T) {
 	t.Parallel()
 	rows := &fakeDraftRows{drafts: map[[3]ids.ID]syncmod.Draft{}}
 	ev := &recordingAppender{}
-	sub := app.NewSubscribers(rows)
+	sub := app.NewSubscribers(rows, nil)
 	if err := sub.Bind(ev); err != nil {
 		t.Fatal(err)
 	}
@@ -92,7 +92,7 @@ func TestOnMessagePostedClearDraftThreadAndForumPost(t *testing.T) {
 		{alex, thread, {}}: threadDraft, {alex, {}, forum}: forumDraft, {sam, thread, {}}: {ID: ids.New(), ThreadID: thread, ChannelID: text},
 	}}
 	ev := &recordingAppender{}
-	sub := app.NewSubscribers(rows)
+	sub := app.NewSubscribers(rows, nil)
 	ctx := workCtx()
 	if err := sub.OnMessagePosted(ctx, messaging.MessagePosted{ThreadID: thread, ChannelID: text, SpaceID: space, AuthorID: alex,
 		AuthorKind: "user", ClearDraft: true}); err == nil {

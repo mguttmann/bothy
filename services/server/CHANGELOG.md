@@ -35,6 +35,14 @@ documented in this file. The format is based on
   thread contents. Both are the sync ports `CatchUp` and `Snapshot`, which the gateway reuses;
   `authorize.ResourceFromEvent` describes a stored event for its delivery check,
   `instance.Versions.EventSeq` reads the head and `chat.Threads.Counters` the thread counters.
+- Moving threads (M1-62): `moveThread` moves a thread into another channel whose effective
+  operator equals the thread's fixed operator (otherwise `409 operator_mismatch`); it needs
+  `manage` on source and target (an invisible target is the same `404` as an unknown one), is
+  audited with from, to and reason, uses `rl.admin` and accepts `Idempotency-Key`. The thread id
+  stays; `messages.channel_id`, `read_states.channel_id` and `drafts.channel_id` follow in the same
+  transaction through the new in-transaction event `chat.ThreadMoved`, and the tags are removed.
+  `thread.moved_out` (source, never naming the target) and `thread.moved` (target) are appended in
+  this order. Main threads, the same channel, archived targets and dm channels are refused.
 
 - CDN fetch of the import tool (M8-02): `discord.Fetcher` loads one Discord attachment with
   `GET` only when the link is `https` on a host of `import.discord.cdn_hosts` (exact match, port

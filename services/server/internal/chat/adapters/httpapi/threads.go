@@ -14,7 +14,7 @@ import (
 )
 
 // Threads implements the six thread operations of M1-55 (listChannelThreads, getThread,
-// setThreadTitle, closeThread, reopenThread, setThreadTags) as part of
+// setThreadTitle, closeThread, reopenThread, setThreadTags) and moveThread (M1-62) as part of
 // rest.StrictServerInterface. createThread follows with M1-56, because its request carries the
 // first message. The use cases authorize; the handlers only convert and set ETag.
 type Threads struct {
@@ -127,6 +127,21 @@ func (h *Threads) SetThreadTags(ctx context.Context, req rest.SetThreadTagsReque
 		return nil, err
 	}
 	return rest.SetThreadTags200JSONResponse{Body: threadREST(th), Headers: rest.SetThreadTags200ResponseHeaders{ETag: etag(th.Version)}}, nil
+}
+
+// MoveThread implements rest.StrictServerInterface (POST /threads/{thread_id}/move, M1-62). The
+// request validator of the chain guarantees the body; Idempotency-Key is handled by the
+// idempotency stage of the chain (M1-20).
+func (h *Threads) MoveThread(ctx context.Context, req rest.MoveThreadRequestObject) (rest.MoveThreadResponseObject, error) {
+	cmd := chat.MoveThread{ThreadID: ids.ID(req.ThreadId)}
+	if req.Body != nil {
+		cmd.TargetChannelID, cmd.Reason = ids.ID(req.Body.TargetChannelId), req.Body.Reason
+	}
+	th, err := h.threads.Move(ctx, principal(ctx), cmd)
+	if err != nil {
+		return nil, err
+	}
+	return rest.MoveThread200JSONResponse{Body: threadREST(th)}, nil
 }
 
 // threadREST converts a thread (schema Thread, brief D7): empty values become absent members,

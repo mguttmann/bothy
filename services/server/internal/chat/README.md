@@ -1,6 +1,6 @@
 # Modul `chat`
 
-Status: spaces and the sidebar (M1-52), channels and forum tags (M1-53), operators with I1 (M1-54) and threads (M1-55) built; `createThread` is built in `messaging` (M1-56); `Threads.InfoForShare` for the read states and drafts of sync (M1-61); `Threads.Counters` for the unread counters of the snapshot of sync (M1-63).
+Status: spaces and the sidebar (M1-52), channels and forum tags (M1-53), operators with I1 (M1-54), threads (M1-55) and moving threads (M1-62) built; `createThread` is built in `messaging` (M1-56); `Threads.InfoForShare` for the read states and drafts of sync (M1-61); `Threads.Counters` for the unread counters of the snapshot of sync (M1-63).
 Normativ ist [docs/spec/02-architektur.md](../../../../docs/spec/02-architektur.md); bei Abweichung gilt das Kapitel.
 
 ## Zweck
@@ -257,6 +257,39 @@ actions, explanation, preview and view-as with real sources).
 Rulings: docs/DECISIONS.md M1-55. Tests: `domain/thread_test.go`,
 `adapters/httpapi/threads_test.go` (PostgreSQL 18, real authz and chat source, response
 validation) and `migrations/chat_thread_tags_test.go`.
+
+## Moving threads (M1-62)
+
+- Port: `Threads.Move(ctx, a, MoveThread{ThreadID, TargetChannelID, Reason})` returns the thread
+  after the move; handler `MoveThread` in `adapters/httpapi` (`moveThread`, rate-limit class
+  `rl.admin`, `Idempotency-Key` through the idempotency stage of the chain). In-transaction event
+  `chat.ThreadMoved{ThreadID, FromChannelID, FromSpaceID, ToChannelID, ToSpaceID, ThreadVersion}`;
+  internal/wire subscribes `messaging.OnThreadMoved` and then `sync.OnThreadMoved`, which change
+  the copies `messages.channel_id`, `read_states.channel_id` and `drafts.channel_id` in the same
+  transaction (no version, no event). `Register` adds `thread.moved` and `thread.moved_out`.
+- Order in one unit of work: read the thread and authorize `thread.move` with the descriptor
+  `{kind: thread, id, TargetChannelID}` (manage on source and target; an invisible or unknown
+  target is the same `404` as an unknown thread); lock the thread `FOR UPDATE` (a concurrent move
+  committed in between makes it authorize again on the new place); hold the target channel and,
+  when it inherits, its space `FOR SHARE` (`queries/threads_move.sql`) and compute the effective
+  operator after these locks, so `channel.operator.set` and `space.operator.set` are serialized
+  with the check and I1 holds (03 "I1 check"); `domain.CanMove` (`domain/move.go`): main thread
+  `409 conflict`, same channel `400` on `/target_channel_id` (`same_channel`), archived target
+  `409 conflict`, a dm channel `409 conflict`, another effective operator `409
+  operator_mismatch` (a thread without operator moves only into a channel without one); the
+  reason (`CheckReason`, SEC-IN-4); then `channel_id`, `moved_at`, `version + 1`, every
+  `thread_tags` row deleted, `ThreadMoved`, `thread.moved_out` (source channel as resource without
+  a version, it never names the target) and `thread.moved` (the thread with its new version, the
+  full `Thread` and `from_channel_id`) in this order, and the audit entry `thread.move` with
+  `from_channel_id`, `to_channel_id` and `reason`.
+- No permission version and no `access.changed` (05: Permissions `no`). `parent_message_id` stays
+  and then points into the source channel (03 `threads`).
+- Out of scope: delivery of the two events and the permission cache of the gateway (M1-65),
+  `message_attachments.channel_id` (M3-07).
+
+Rulings: docs/DECISIONS.md M1-62. Tests: `domain/move_test.go`, `register_test.go` and the
+integration tests `test/integration/move_test.go` (PostgreSQL 18, real modules through
+internal/wire, HTTP through the chain with response validation).
 
 ## Search language of threads (M3-13)
 

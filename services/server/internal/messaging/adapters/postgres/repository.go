@@ -305,3 +305,16 @@ func timeOf(t pgtype.Timestamptz) time.Time {
 	}
 	return t.Time.UTC()
 }
+
+// Compile-time check: the repository is the port of the subscriber of chat.ThreadMoved.
+var _ app.ThreadMoveRows = (*Repository)(nil)
+
+// MoveThreadMessages implements app.ThreadMoveRows (M1-62).
+func (r *Repository) MoveThreadMessages(ctx context.Context, thread, channel ids.ID) error {
+	q, err := r.write(ctx)
+	if err != nil {
+		return err
+	}
+	return mapError(q.MoveThreadMessages(ctx, sqlcgen.MoveThreadMessagesParams{ThreadID: uuid(thread), ChannelID: uuid(channel)}),
+		"moving the messages of a thread")
+}
