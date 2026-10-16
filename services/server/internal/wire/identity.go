@@ -94,14 +94,25 @@ type Identity struct {
 	// AuthCleanup is the use case of the job identity.auth_cleanup (M1-35); nil until
 	// BindSessions.
 	AuthCleanup *app.AuthCleanup
-	cfg         app.Config
-	repo        *identitypg.Repository
-	uow         txn.UnitOfWork
-	az          authorize.Authorizer
-	writes      IdentityWrites
-	pepper      []byte
-	clk         clock.Clock
-	log         *slog.Logger
+	// Providers implements the port identity.Providers (M1-36); nil until BindSessions, because
+	// disabling a provider revokes sessions through identity.Auth.
+	Providers *app.Providers
+	// Identities implements the port identity.Identities (M1-36); nil until BindSessions.
+	Identities *app.Identities
+	// ProviderHandlers are the REST handlers of the five provider operations; nil until
+	// BindSessions.
+	ProviderHandlers *identityhttp.Providers
+	// CredentialHandlers are the REST handlers of getMyCredentials, getUserCredentials and
+	// unlinkIdentity; nil until BindSessions.
+	CredentialHandlers *identityhttp.Credentials
+	cfg                app.Config
+	repo               *identitypg.Repository
+	uow                txn.UnitOfWork
+	az                 authorize.Authorizer
+	writes             IdentityWrites
+	pepper             []byte
+	clk                clock.Clock
+	log                *slog.Logger
 }
 
 // IdentityWrites are the collaborators of the writing use cases of identity (M1-31): the
@@ -182,9 +193,41 @@ func (i *Identity) BindSessions(keys instance.Keys, instanceID ids.ID) error {
 	if err != nil {
 		return err
 	}
+	providers, err := app.NewProviders(i.cfg, app.ProvidersDeps{
+		Store: i.repo, Rules: app.DefaultProviderRules(SecretRefSyntax{}), UoW: i.uow, Authorizer: i.az, Audit: i.writes.Audit,
+		Auth: sessions, Clock: i.clk,
+	})
+	if err != nil {
+		return err
+	}
+	identities, err := app.NewIdentities(app.IdentitiesDeps{
+		Providers: i.repo, Identities: i.repo, People: i.repo, UoW: i.uow, Authorizer: i.az, Audit: i.writes.Audit,
+		Auth: sessions, Clock: i.clk,
+	})
+	if err != nil {
+		return err
+	}
 	i.Sessions, i.Authenticator, i.SessionHandlers = sessions, auth, identityhttp.NewSessions(sessions, i.DPoP)
 	i.StepUps, i.StepUpHandlers, i.AuthCleanup = stepUps, identityhttp.NewStepUps(stepUps), cleanup
+	i.Providers, i.ProviderHandlers = providers, identityhttp.NewProviders(providers)
+	i.Identities, i.CredentialHandlers = identities, identityhttp.NewCredentials(identities)
 	return nil
+}
+
+// secretsDirStandIn replaces the placeholder <secrets.dir> while a reference is only checked: the
+// syntax of a reference does not depend on the real directory, and the check never resolves it.
+const secretsDirStandIn = "/secrets-dir"
+
+// SecretRefSyntax implements app.SecretRefs with the parser of platform/secrets (M1-36): a
+// reference is valid when secrets.ParseRef accepts it, with the schemes file and env this server
+// version resolves; azkv and awssm have no driver yet and are refused, because a provider with
+// them could never sign in. Nothing is resolved, and the error never repeats the reference.
+type SecretRefSyntax struct{}
+
+// Valid implements app.SecretRefs.
+func (SecretRefSyntax) Valid(ref string) error {
+	_, err := secrets.ParseRef(ref, secretsDirStandIn)
+	return err
 }
 
 // Start runs the sweeper of the jti store every auth.dpop_proof_max_age (the length of the replay

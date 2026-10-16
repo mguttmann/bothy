@@ -30,6 +30,7 @@ const (
 const (
 	fieldUserID    = "/user_id"
 	fieldRevokedBy = "/revoked_by"
+	fieldKind      = "/kind"
 )
 
 // uniqueFields maps the unique indexes and primary keys of the migration to the field a
@@ -44,12 +45,17 @@ var uniqueFields = map[string]string{
 	// and a thumbprint belongs to one key for good.
 	"devices_pkey":        "/device_id",
 	"device_keys_jkt_key": "/public_jwk",
+	// M1-36: names are unique without regard to case, trusted_header and local exist once, and a
+	// subject has one active link per provider.
+	"identity_providers_name_lower_key":  "/name",
+	"identity_providers_single_kind_key": fieldKind,
+	"user_identities_active_subject_key": "/subject",
 }
 
 // constraintFields maps checks and foreign keys to the column they guard. Triggers raise with
 // the column set (COLUMN in RAISE), so they need no entry.
 var constraintFields = map[string]string{
-	"principals_kind_check":   "/kind",
+	"principals_kind_check":   fieldKind,
 	"principals_status_check": "/status",
 	"principals_handle_check": "/handle",
 	"users_principal_id_fkey": "/principal_id",
@@ -68,6 +74,11 @@ var constraintFields = map[string]string{
 	"device_keys_purpose_check":         "/purpose",
 	"device_keys_alg_check":             "/alg",
 	"device_keys_device_id_fkey":        "/device_id",
+	// M1-36
+	"identity_providers_kind_check":    "/kind",
+	"user_identities_user_id_fkey":     fieldUserID,
+	"user_identities_provider_id_fkey": "/provider_id",
+	"auth_sessions_identity_id_fkey":   "/identity_id",
 }
 
 // mapError turns a database error of the operation what into a kernel/errs error (brief M1-26

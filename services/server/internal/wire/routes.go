@@ -54,6 +54,12 @@ type Handlers struct {
 	*identityhttp.Sessions
 	// StepUps implements createStepUpChallenge and completeStepUpWithDeviceKey (identity, M1-35).
 	*identityhttp.StepUps
+	// Providers implements listIdentityProviders, createIdentityProvider, getIdentityProvider,
+	// updateIdentityProvider and deleteIdentityProvider (identity, M1-36).
+	*identityhttp.Providers
+	// Credentials implements getMyCredentials, getUserCredentials and unlinkIdentity (identity,
+	// M1-36).
+	*identityhttp.Credentials
 }
 
 // routeBuilder builds and verifies the routes of one REST surface against a catalogue with the

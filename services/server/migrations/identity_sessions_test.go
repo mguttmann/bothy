@@ -20,7 +20,8 @@ import (
 
 // TestSessionsMigration_Schema holds auth_sessions, refresh_token_families and refresh_tokens
 // against docs/spec/03-data-model.md section 4.2 column by column, with every check, foreign key
-// and index (M1-34). The foreign key auth_sessions.identity_id comes with user_identities (M1-36).
+// and index (M1-34), including the foreign key auth_sessions.identity_id that the migration of
+// user_identities adds (M1-36).
 func TestSessionsMigration_Schema(t *testing.T) {
 	t.Parallel()
 	conn := pgtest.New(t).SuperConn(t)
@@ -62,6 +63,7 @@ func TestSessionsMigration_Schema(t *testing.T) {
 				"CHECK ((revoke_reason = ANY (ARRAY['logout'::text, 'admin'::text, 'device_revoked'::text, 'refresh_reuse'::text, 'user_disabled'::text, 'expired'::text, 'inactive'::text, 'step_up_failed'::text, 'trusted_header_mismatch'::text])))",
 				"CHECK ((step_up_method = ANY (ARRAY['passkey'::text, 'device_key'::text, 'password_totp'::text, 'oidc_reauth'::text])))",
 				"FOREIGN KEY (device_id) REFERENCES devices(id) ON DELETE RESTRICT",
+				"FOREIGN KEY (identity_id) REFERENCES user_identities(id) ON DELETE SET NULL",
 				"FOREIGN KEY (parent_session_id) REFERENCES auth_sessions(id) ON DELETE CASCADE",
 				"FOREIGN KEY (user_id) REFERENCES users(principal_id) ON DELETE RESTRICT",
 				"PRIMARY KEY (id)",

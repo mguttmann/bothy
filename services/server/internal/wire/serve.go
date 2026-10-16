@@ -655,6 +655,12 @@ func (s *server) handlers() Handlers {
 	if h.StepUps == nil && s.identity != nil {
 		h.StepUps = s.identity.StepUpHandlers
 	}
+	if h.Providers == nil && s.identity != nil {
+		h.Providers = s.identity.ProviderHandlers
+	}
+	if h.Credentials == nil && s.identity != nil {
+		h.Credentials = s.identity.CredentialHandlers
+	}
 	if h.Keys == nil && s.signingKeys != nil {
 		h.Keys = s.signingKeys.Handlers
 	}

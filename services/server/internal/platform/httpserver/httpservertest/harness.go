@@ -136,7 +136,7 @@ func New(t testing.TB, opts Options) *Harness {
 	for _, rt := range opts.Routes {
 		idList = append(idList, rt.Op.ID)
 	}
-	v, err := httpserver.NewValidator(contract, idList)
+	v, err := SharedValidator(contract, idList)
 	if err != nil {
 		t.Fatalf("httpservertest: validator: %v", err)
 	}
