@@ -217,3 +217,15 @@ func TestWebAuthnConfigValidation(t *testing.T) {
 		t.Fatal("broken public URL accepted")
 	}
 }
+
+// TestResolveRelyingPartyLowercasesTheDerivedOrigin: an upper-case host in server.public_url gives
+// the origin in lower case, as browsers send it, like the RP ID.
+func TestResolveRelyingPartyLowercasesTheDerivedOrigin(t *testing.T) {
+	rp, err := domain.ResolveRelyingParty("https://Chat.Example.com", "", nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if rp.ID != "chat.example.com" || len(rp.Origins) != 1 || rp.Origins[0] != "https://chat.example.com" {
+		t.Fatalf("relying party = %+v", rp)
+	}
+}

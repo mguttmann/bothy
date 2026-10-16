@@ -64,7 +64,7 @@ func ResolveRelyingParty(publicURL, rpID string, origins []string) (RelyingParty
 		return RelyingParty{}, errors.New(keyWebAuthnRPID + " must be a domain name in lower case, for example chat.example.com")
 	}
 	if len(origins) == 0 {
-		origins = []string{pub.Scheme + "://" + pub.Host}
+		origins = []string{strings.ToLower(pub.Scheme + "://" + pub.Host)}
 	}
 	for i, o := range origins {
 		if err := checkOrigin(rpID, o); err != nil {
