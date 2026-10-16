@@ -1,6 +1,6 @@
 # SPDX-License-Identifier: Apache-2.0
-"""`make -C services/server release-build` (component contract of docs/spec/23-qualitaet.md 3,
-docs/spec/18-release.md "Komponenten" row server): usage and version errors, and one static
+"""`make -C services/server release-build` (component contract of docs/spec/23-quality.md 3,
+docs/spec/18-release.md "Components" row server): usage and version errors, and one static
 binary `bothy` per image platform (linux/amd64, linux/arm64). GNU make reports every failed
 recipe with status 2, so the tests tell the usage error from the version mismatch by the message.
 """

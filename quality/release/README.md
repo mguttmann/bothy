@@ -1,7 +1,7 @@
 # Release signing keys
 
 `cosign-private-phase.pub` is the public key of the cosign key pair that signs releases while
-the repository is private ([ADR 0062](../../docs/adr/0062-release-signaturen-solange-das-repo-privat-ist.md)).
+the repository is private ([ADR 0062](../../docs/adr/0062-release-signatures-while-the-repo-is-private.md)).
 The owner creates the key pair once and commits only this public key here; the private key and
 its password exist only as the secrets `COSIGN_PRIVATE_KEY` and `COSIGN_PASSWORD` of the GitHub
 environment `release` ([release.md](../../docs/operations/release.md) section 2.2). Until the

@@ -44,7 +44,7 @@ by a product release; existing installations raise `BOTHY_VERSION` themselves
 2. `make release-prep COMPONENT=server [CHANNEL=beta]` writes `services/server/VERSION`, renames
    the section "Unreleased" of `services/server/CHANGELOG.md` to `[X.Y.Z] - <date>` and prints
    the commits without a changelog entry as a checklist
-   ([ADR 0060](../adr/0060-release-automatisierung-im-monorepo.md)); review the section, add the
+   ([ADR 0060](../adr/0060-release-automation-in-the-monorepo.md)); review the section, add the
    mandatory parts of the release notes ([18-release.md](../spec/18-release.md) 4), commit
    `chore(release): server vX.Y.Z` and land it through a pull request.
 3. `make release-trial COMPONENT=server` on the build host (section 2.3) with the release
@@ -146,7 +146,7 @@ Download the release assets of the tag into one directory (`gh release download 
 take the digests from `images.txt`, and run the commands of the current phase. Every command
 must succeed; `sha256sum --check` lists every file with `OK`.
 
-Private phase ([ADR 0062](../adr/0062-release-signaturen-solange-das-repo-privat-ist.md),
+Private phase ([ADR 0062](../adr/0062-release-signatures-while-the-repo-is-private.md),
 cosign 3.1.3, key pair without a transparency log, so `--insecure-ignore-tlog`):
 
 ```

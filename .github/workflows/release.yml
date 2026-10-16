@@ -565,7 +565,7 @@ jobs:
           subject-digest: ${{ steps.join.outputs.digest }}
           push-to-registry: true
       # The only place that tags: after scan, ScanCode (a job this one needs), SBOMs, signatures
-      # and verification. compose.yaml pulls exactly these tags (18 "Server-Images" rule 4).
+      # and verification. compose.yaml pulls exactly these tags (18 "Server images" rule 4).
       - name: Version tags
         env:
           VERSION: ${{ steps.info.outputs.version }}

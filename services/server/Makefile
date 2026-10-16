@@ -1,7 +1,7 @@
 # SPDX-License-Identifier: Apache-2.0
 #
-# Component Makefile of the server (docs/spec/23-qualitaet.md "Komponenten-Vertrag",
-# docs/spec/18-release.md "Komponenten" row server). The gates run from the root Makefile, and so
+# Component Makefile of the server (docs/spec/23-quality.md "Component contract",
+# docs/spec/18-release.md "Components" row server). The gates run from the root Makefile, and so
 # do the image builds (`make image`, `make postgres-image`); this file holds the release build of
 # the binary `bothy` that release.yml and `make release-trial` call.
 
@@ -15,7 +15,7 @@ endif
 .DEFAULT_GOAL := help
 MAKEFLAGS += --no-builtin-rules --no-print-directory
 
-# The platforms of the server images (docs/spec/18-release.md "Server-Images" rule 1).
+# The platforms of the server images (docs/spec/18-release.md "Server images" rule 1).
 PLATFORMS := linux/amd64 linux/arm64
 
 .PHONY: help release-build
