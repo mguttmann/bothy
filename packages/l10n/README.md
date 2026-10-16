@@ -5,7 +5,7 @@ helpers every screen needs: problem code texts, formatting per locale, the langu
 the fixed term table.
 
 Kind: Flutter package, a member of the Dart workspace at the repository root
-(`resolution: workspace`, `publish_to: none`). Specification: docs/spec/01-produkt.md
+(`resolution: workspace`, `publish_to: none`). Specification: docs/spec/01-product.md
 section 9; rulings D-M4-06-1 to D-M4-06-7 in docs/DECISIONS.md.
 
 ## Dependencies

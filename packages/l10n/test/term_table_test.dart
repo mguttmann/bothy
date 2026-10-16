@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 // The term table (brief M4-06 Design note 4): lib/src/term_table.dart equals the table of
-// docs/spec/01-produkt.md section 9, and every English message that uses an English term has
+// docs/spec/01-product.md section 9, and every English message that uses an English term has
 // the German term of the same row in its German message (direction English to German, the
 // template is English).
 

@@ -1,6 +1,6 @@
 # SPDX-License-Identifier: Apache-2.0
 #
-# Options of `flutter gen-l10n` (docs/spec/01-produkt.md section 9, docs/DECISIONS.md
+# Options of `flutter gen-l10n` (docs/spec/01-product.md section 9, docs/DECISIONS.md
 # D-M4-06-1). English is the template because code and reviewers read English; German is the
 # default locale of the app and comes first in supportedLocales. `make codegen-check` runs the
 # generator in a temporary copy with an untranslated-messages-file and compares the output

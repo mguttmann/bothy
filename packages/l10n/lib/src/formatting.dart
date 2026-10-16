@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
 
-/// Numbers, money, durations and times per app locale (docs/spec/01-produkt.md section 9).
+/// Numbers, money, durations and times per app locale (docs/spec/01-product.md section 9).
 library;
 
 import 'dart:ui';

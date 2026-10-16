@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
 
-// The rules the ARB gates check (docs/spec/01-produkt.md section 9, brief M4-06 Design notes
+// The rules the ARB gates check (docs/spec/01-product.md section 9, brief M4-06 Design notes
 // 2 to 4). They live with the tests because they are gates over the source files, not code
 // the apps ship.
 

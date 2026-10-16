@@ -7,7 +7,7 @@
 /// - [problemText]: the text of a server problem code with a generic fallback.
 /// - [L10nFormat]: numbers, money, durations and times per locale.
 /// - [resolveAppLocale]: the language the app shows.
-/// - [termTable]: the fixed German and English terms of docs/spec/01-produkt.md section 9.
+/// - [termTable]: the fixed German and English terms of docs/spec/01-product.md section 9.
 ///
 /// The package README describes how to add a text and the gates that check it.
 library;

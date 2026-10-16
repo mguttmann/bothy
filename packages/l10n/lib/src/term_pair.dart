@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
 
-/// A fixed pair of terms from the term table of docs/spec/01-produkt.md section 9.
+/// A fixed pair of terms from the term table of docs/spec/01-product.md section 9.
 library;
 
 /// One German term and the English term that means the same, with the code name where the

@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
 
-// Formatting per locale (brief M4-06 Design note 6, docs/spec/01-produkt.md section 9).
+// Formatting per locale (brief M4-06 Design note 6, docs/spec/01-product.md section 9).
 //
 // `L10nFormat` puts a non-breaking space (U+00A0) between number and currency or unit, so a
 // line break never separates them; the assertions normalize it to a plain space with `n`.

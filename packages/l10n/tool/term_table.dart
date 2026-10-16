@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
 
-/// Generates lib/src/term_table.dart from the term table of docs/spec/01-produkt.md
+/// Generates lib/src/term_table.dart from the term table of docs/spec/01-product.md
 /// section 9 (brief M4-06 Design note 4, docs/DECISIONS.md D-M4-06-5).
 ///
 /// The source is the table between the `language-check: off` and `language-check: on`
@@ -18,7 +18,7 @@ import 'package:l10n/src/term_pair.dart';
 /// the integration bases in German.
 const List<String> specCandidates = [
   'docs/spec/01-product.md',
-  'docs/spec/01-produkt.md',
+  'docs/spec/01-product.md',
 ];
 
 /// The product chapter below [root]; throws a [StateError] when none of [specCandidates]

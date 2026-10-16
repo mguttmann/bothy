@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
 
-/// The text of a server problem code (docs/spec/01-produkt.md section 9, docs/spec/06-api.md
+/// The text of a server problem code (docs/spec/01-product.md section 9, docs/spec/06-api.md
 /// section 5).
 library;
 

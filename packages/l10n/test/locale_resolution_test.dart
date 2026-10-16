@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
 
-// Locale resolution (brief M4-06 Design note 7, docs/spec/01-produkt.md section 9).
+// Locale resolution (brief M4-06 Design note 7, docs/spec/01-product.md section 9).
 
 import 'dart:ui';
 

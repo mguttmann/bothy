@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
 
-/// The language the app shows (docs/spec/01-produkt.md section 9).
+/// The language the app shows (docs/spec/01-product.md section 9).
 library;
 
 import 'dart:ui';
