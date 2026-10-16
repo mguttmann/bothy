@@ -293,6 +293,11 @@ push provider (`sli.push_acceptance`) and, with one node, the open connections
 (`connections`). Instance scope only (owner). Data: `stats.live`, for the history
 `getStatsTimeline`.
 
+Build note (M6-12): the live frame gives the deliveries of the last `stats.live_sli_window`
+without the length of that window, which is a server value. The view therefore shows the count
+of the window with its good share, and the deliveries per minute as the history from
+`getStatsTimeline`; it computes no rate per second.
+
 ### 6.4 Executive page
 
 One page for the overview, also on mobile:

@@ -136,6 +136,12 @@ are under `<module>/perf/` and do not count toward coverage. Without a Go module
 from `PERF_MODULES` without `perf/` is an error. Like the server gates,
 `make perf` needs go, a Docker-compatible runtime and the pins.
 
+Dart members (M6-12): a member with `tool/perf_macos.sh` runs its performance test in profile
+mode on macOS, today the live topology of `packages/bothy_viz/harness` against
+`viz.perf.frame_build_p95`. On another host `make perf` prints `SKIP perf-dart needs macOS`;
+the CI job `apps-macos` runs the same script through `platform-tests.json` (`make
+apps-platform`). The variable `PERF_HOST` (default `uname -s`) names the host system.
+
 ## Migrations
 
 Flow for the migrations of a Go module (ADR 0007, gate `migrations-lint`):
