@@ -74,22 +74,22 @@ Palette guards (ban list as a test): all met.
 | `color.success.fg` | `color.surface.list` | text | `#137337` on `#eff6f7` | 5.43 | 4.5 | passed | State texts in banners and the live box |
 | `color.success.fg` | `color.surface.raised` | text | `#137337` on `#f5fbfc` | 5.68 | 4.5 | passed | State texts in banners and the live box |
 | `color.success.fg` | `color.surface.overlay` | text | `#137337` on `#fbfeff` | 5.86 | 4.5 | passed | State texts in banners and the live box |
-| `color.warning.fg` | `color.surface.canvas` | text | `#8c4f10` on `#fbfeff` | 6.39 | 4.5 | passed | State texts in banners and the live box |
-| `color.warning.fg` | `color.surface.list` | text | `#8c4f10` on `#eff6f7` | 5.92 | 4.5 | passed | State texts in banners and the live box |
-| `color.warning.fg` | `color.surface.raised` | text | `#8c4f10` on `#f5fbfc` | 6.20 | 4.5 | passed | State texts in banners and the live box |
-| `color.warning.fg` | `color.surface.overlay` | text | `#8c4f10` on `#fbfeff` | 6.39 | 4.5 | passed | State texts in banners and the live box |
-| `color.danger.fg` | `color.surface.canvas` | text | `#b21622` on `#fbfeff` | 6.84 | 4.5 | passed | State texts in banners and the live box |
-| `color.danger.fg` | `color.surface.list` | text | `#b21622` on `#eff6f7` | 6.33 | 4.5 | passed | State texts in banners and the live box |
-| `color.danger.fg` | `color.surface.raised` | text | `#b21622` on `#f5fbfc` | 6.63 | 4.5 | passed | State texts in banners and the live box |
-| `color.danger.fg` | `color.surface.overlay` | text | `#b21622` on `#fbfeff` | 6.84 | 4.5 | passed | State texts in banners and the live box |
+| `color.warning.fg` | `color.surface.canvas` | text | `#6b3b09` on `#fbfeff` | 9.19 | 4.5 | passed | State texts in banners and the live box |
+| `color.warning.fg` | `color.surface.list` | text | `#6b3b09` on `#eff6f7` | 8.51 | 4.5 | passed | State texts in banners and the live box |
+| `color.warning.fg` | `color.surface.raised` | text | `#6b3b09` on `#f5fbfc` | 8.91 | 4.5 | passed | State texts in banners and the live box |
+| `color.warning.fg` | `color.surface.overlay` | text | `#6b3b09` on `#fbfeff` | 9.19 | 4.5 | passed | State texts in banners and the live box |
+| `color.danger.fg` | `color.surface.canvas` | text | `#63080e` on `#fbfeff` | 13.19 | 4.5 | passed | State texts in banners and the live box |
+| `color.danger.fg` | `color.surface.list` | text | `#63080e` on `#eff6f7` | 12.21 | 4.5 | passed | State texts in banners and the live box |
+| `color.danger.fg` | `color.surface.raised` | text | `#63080e` on `#f5fbfc` | 12.78 | 4.5 | passed | State texts in banners and the live box |
+| `color.danger.fg` | `color.surface.overlay` | text | `#63080e` on `#fbfeff` | 13.19 | 4.5 | passed | State texts in banners and the live box |
 | `color.info.fg` | `color.surface.canvas` | text | `#12659d` on `#fbfeff` | 6.14 | 4.5 | passed | State texts in banners and the live box |
 | `color.info.fg` | `color.surface.list` | text | `#12659d` on `#eff6f7` | 5.69 | 4.5 | passed | State texts in banners and the live box |
 | `color.info.fg` | `color.surface.raised` | text | `#12659d` on `#f5fbfc` | 5.95 | 4.5 | passed | State texts in banners and the live box |
 | `color.info.fg` | `color.surface.overlay` | text | `#12659d` on `#fbfeff` | 6.14 | 4.5 | passed | State texts in banners and the live box |
 | `color.attention.fg` | `color.attention.subtle` | text | `#735e10` on `#fef5aa` | 5.65 | 4.5 | passed | State text on its own tinted background |
 | `color.success.fg` | `color.success.subtle` | text | `#137337` on `#e4fde8` | 5.52 | 4.5 | passed | State text on its own tinted background |
-| `color.warning.fg` | `color.warning.subtle` | text | `#8c4f10` on `#fee6d4` | 5.39 | 4.5 | passed | State text on its own tinted background |
-| `color.danger.fg` | `color.danger.subtle` | text | `#b21622` on `#fef2f0` | 6.33 | 4.5 | passed | State text on its own tinted background |
+| `color.warning.fg` | `color.warning.subtle` | text | `#6b3b09` on `#fee6d4` | 7.75 | 4.5 | passed | State text on its own tinted background |
+| `color.danger.fg` | `color.danger.subtle` | text | `#63080e` on `#fef2f0` | 12.20 | 4.5 | passed | State text on its own tinted background |
 | `color.info.fg` | `color.info.subtle` | text | `#12659d` on `#eef6fe` | 5.70 | 4.5 | passed | State text on its own tinted background |
 | `color.attention.on-bg` | `color.attention.bg` | text | `#291f02` on `#eddc59` | 11.60 | 4.5 | passed | Strong badges and buttons |
 | `color.success.on-bg` | `color.success.bg` | text | `#fbfeff` on `#137337` | 5.86 | 4.5 | passed | Strong badges and buttons |
@@ -253,18 +253,18 @@ Palette guards (ban list as a test): all met.
 | `color.viz.series.2` | `color.surface.canvas` | ui | `#ae6416` on `#fbfeff` | 4.47 | 3 | passed | Charts: series and axes against the surface |
 | `color.viz.series.2` | `color.surface.list` | ui | `#ae6416` on `#eff6f7` | 4.14 | 3 | passed | Charts: series and axes against the surface |
 | `color.viz.series.2` | `color.surface.raised` | ui | `#ae6416` on `#f5fbfc` | 4.33 | 3 | passed | Charts: series and axes against the surface |
-| `color.viz.series.3` | `color.surface.canvas` | ui | `#1b8a83` on `#fbfeff` | 4.14 | 3 | passed | Charts: series and axes against the surface |
-| `color.viz.series.3` | `color.surface.list` | ui | `#1b8a83` on `#eff6f7` | 3.83 | 3 | passed | Charts: series and axes against the surface |
-| `color.viz.series.3` | `color.surface.raised` | ui | `#1b8a83` on `#f5fbfc` | 4.01 | 3 | passed | Charts: series and axes against the surface |
+| `color.viz.series.3` | `color.surface.canvas` | ui | `#136f69` on `#fbfeff` | 5.91 | 3 | passed | Charts: series and axes against the surface |
+| `color.viz.series.3` | `color.surface.list` | ui | `#136f69` on `#eff6f7` | 5.48 | 3 | passed | Charts: series and axes against the surface |
+| `color.viz.series.3` | `color.surface.raised` | ui | `#136f69` on `#f5fbfc` | 5.73 | 3 | passed | Charts: series and axes against the surface |
 | `color.viz.series.4` | `color.surface.canvas` | ui | `#c53a88` on `#fbfeff` | 4.78 | 3 | passed | Charts: series and axes against the surface |
 | `color.viz.series.4` | `color.surface.list` | ui | `#c53a88` on `#eff6f7` | 4.43 | 3 | passed | Charts: series and axes against the surface |
 | `color.viz.series.4` | `color.surface.raised` | ui | `#c53a88` on `#f5fbfc` | 4.63 | 3 | passed | Charts: series and axes against the surface |
 | `color.viz.series.5` | `color.surface.canvas` | ui | `#8d7716` on `#fbfeff` | 4.33 | 3 | passed | Charts: series and axes against the surface |
 | `color.viz.series.5` | `color.surface.list` | ui | `#8d7716` on `#eff6f7` | 4.01 | 3 | passed | Charts: series and axes against the surface |
 | `color.viz.series.5` | `color.surface.raised` | ui | `#8d7716` on `#f5fbfc` | 4.20 | 3 | passed | Charts: series and axes against the surface |
-| `color.viz.series.6` | `color.surface.canvas` | ui | `#1b9046` on `#fbfeff` | 4.04 | 3 | passed | Charts: series and axes against the surface |
-| `color.viz.series.6` | `color.surface.list` | ui | `#1b9046` on `#eff6f7` | 3.75 | 3 | passed | Charts: series and axes against the surface |
-| `color.viz.series.6` | `color.surface.raised` | ui | `#1b9046` on `#f5fbfc` | 3.92 | 3 | passed | Charts: series and axes against the surface |
+| `color.viz.series.6` | `color.surface.canvas` | ui | `#063e1a` on `#fbfeff` | 12.11 | 3 | passed | Charts: series and axes against the surface |
+| `color.viz.series.6` | `color.surface.list` | ui | `#063e1a` on `#eff6f7` | 11.21 | 3 | passed | Charts: series and axes against the surface |
+| `color.viz.series.6` | `color.surface.raised` | ui | `#063e1a` on `#f5fbfc` | 11.74 | 3 | passed | Charts: series and axes against the surface |
 | `color.viz.series.7` | `color.surface.canvas` | ui | `#d43538` on `#fbfeff` | 4.75 | 3 | passed | Charts: series and axes against the surface |
 | `color.viz.series.7` | `color.surface.list` | ui | `#d43538` on `#eff6f7` | 4.40 | 3 | passed | Charts: series and axes against the surface |
 | `color.viz.series.7` | `color.surface.raised` | ui | `#d43538` on `#f5fbfc` | 4.60 | 3 | passed | Charts: series and axes against the surface |
@@ -342,10 +342,10 @@ Palette guards (ban list as a test): all met.
 | `color.warning.fg` | `color.surface.list` | text | `#fcaf6f` on `#102326` | 8.91 | 4.5 | passed | State texts in banners and the live box |
 | `color.warning.fg` | `color.surface.raised` | text | `#fcaf6f` on `#1b2e31` | 7.76 | 4.5 | passed | State texts in banners and the live box |
 | `color.warning.fg` | `color.surface.overlay` | text | `#fcaf6f` on `#24363a` | 6.91 | 4.5 | passed | State texts in banners and the live box |
-| `color.danger.fg` | `color.surface.canvas` | text | `#fcaaa3` on `#15282b` | 8.33 | 4.5 | passed | State texts in banners and the live box |
-| `color.danger.fg` | `color.surface.list` | text | `#fcaaa3` on `#102326` | 8.85 | 4.5 | passed | State texts in banners and the live box |
-| `color.danger.fg` | `color.surface.raised` | text | `#fcaaa3` on `#1b2e31` | 7.71 | 4.5 | passed | State texts in banners and the live box |
-| `color.danger.fg` | `color.surface.overlay` | text | `#fcaaa3` on `#24363a` | 6.86 | 4.5 | passed | State texts in banners and the live box |
+| `color.danger.fg` | `color.surface.canvas` | text | `#fb827a` on `#15282b` | 6.26 | 4.5 | passed | State texts in banners and the live box |
+| `color.danger.fg` | `color.surface.list` | text | `#fb827a` on `#102326` | 6.65 | 4.5 | passed | State texts in banners and the live box |
+| `color.danger.fg` | `color.surface.raised` | text | `#fb827a` on `#1b2e31` | 5.79 | 4.5 | passed | State texts in banners and the live box |
+| `color.danger.fg` | `color.surface.overlay` | text | `#fb827a` on `#24363a` | 5.15 | 4.5 | passed | State texts in banners and the live box |
 | `color.info.fg` | `color.surface.canvas` | text | `#8ec9fb` on `#15282b` | 8.68 | 4.5 | passed | State texts in banners and the live box |
 | `color.info.fg` | `color.surface.list` | text | `#8ec9fb` on `#102326` | 9.22 | 4.5 | passed | State texts in banners and the live box |
 | `color.info.fg` | `color.surface.raised` | text | `#8ec9fb` on `#1b2e31` | 8.03 | 4.5 | passed | State texts in banners and the live box |
@@ -353,7 +353,7 @@ Palette guards (ban list as a test): all met.
 | `color.attention.fg` | `color.attention.subtle` | text | `#d9c42b` on `#291f02` | 9.20 | 4.5 | passed | State text on its own tinted background |
 | `color.success.fg` | `color.success.subtle` | text | `#89d89a` on `#03280f` | 9.40 | 4.5 | passed | State text on its own tinted background |
 | `color.warning.fg` | `color.warning.subtle` | text | `#fcaf6f` on `#331902` | 8.98 | 4.5 | passed | State text on its own tinted background |
-| `color.danger.fg` | `color.danger.subtle` | text | `#fcaaa3` on `#430307` | 9.10 | 4.5 | passed | State text on its own tinted background |
+| `color.danger.fg` | `color.danger.subtle` | text | `#fb827a` on `#430307` | 6.83 | 4.5 | passed | State text on its own tinted background |
 | `color.info.fg` | `color.info.subtle` | text | `#8ec9fb` on `#02223a` | 9.21 | 4.5 | passed | State text on its own tinted background |
 | `color.attention.on-bg` | `color.attention.bg` | text | `#291f02` on `#d9c42b` | 9.20 | 4.5 | passed | Strong badges and buttons |
 | `color.success.on-bg` | `color.success.bg` | text | `#03280f` on `#89d89a` | 9.40 | 4.5 | passed | Strong badges and buttons |
@@ -517,9 +517,9 @@ Palette guards (ban list as a test): all met.
 | `color.viz.series.2` | `color.surface.canvas` | ui | `#ec9340` on `#15282b` | 6.43 | 3 | passed | Charts: series and axes against the surface |
 | `color.viz.series.2` | `color.surface.list` | ui | `#ec9340` on `#102326` | 6.83 | 3 | passed | Charts: series and axes against the surface |
 | `color.viz.series.2` | `color.surface.raised` | ui | `#ec9340` on `#1b2e31` | 5.95 | 3 | passed | Charts: series and axes against the surface |
-| `color.viz.series.3` | `color.surface.canvas` | ui | `#49c0b7` on `#15282b` | 6.94 | 3 | passed | Charts: series and axes against the surface |
-| `color.viz.series.3` | `color.surface.list` | ui | `#49c0b7` on `#102326` | 7.37 | 3 | passed | Charts: series and axes against the surface |
-| `color.viz.series.3` | `color.surface.raised` | ui | `#49c0b7` on `#1b2e31` | 6.42 | 3 | passed | Charts: series and axes against the surface |
+| `color.viz.series.3` | `color.surface.canvas` | ui | `#7cd5cd` on `#15282b` | 8.94 | 3 | passed | Charts: series and axes against the surface |
+| `color.viz.series.3` | `color.surface.list` | ui | `#7cd5cd` on `#102326` | 9.50 | 3 | passed | Charts: series and axes against the surface |
+| `color.viz.series.3` | `color.surface.raised` | ui | `#7cd5cd` on `#1b2e31` | 8.27 | 3 | passed | Charts: series and axes against the surface |
 | `color.viz.series.4` | `color.surface.canvas` | ui | `#f878ba` on `#15282b` | 6.12 | 3 | passed | Charts: series and axes against the surface |
 | `color.viz.series.4` | `color.surface.list` | ui | `#f878ba` on `#102326` | 6.50 | 3 | passed | Charts: series and axes against the surface |
 | `color.viz.series.4` | `color.surface.raised` | ui | `#f878ba` on `#1b2e31` | 5.66 | 3 | passed | Charts: series and axes against the surface |
@@ -529,9 +529,9 @@ Palette guards (ban list as a test): all met.
 | `color.viz.series.6` | `color.surface.canvas` | ui | `#62c37a` on `#15282b` | 7.01 | 3 | passed | Charts: series and axes against the surface |
 | `color.viz.series.6` | `color.surface.list` | ui | `#62c37a` on `#102326` | 7.44 | 3 | passed | Charts: series and axes against the surface |
 | `color.viz.series.6` | `color.surface.raised` | ui | `#62c37a` on `#1b2e31` | 6.48 | 3 | passed | Charts: series and axes against the surface |
-| `color.viz.series.7` | `color.surface.canvas` | ui | `#fb827a` on `#15282b` | 6.26 | 3 | passed | Charts: series and axes against the surface |
-| `color.viz.series.7` | `color.surface.list` | ui | `#fb827a` on `#102326` | 6.65 | 3 | passed | Charts: series and axes against the surface |
-| `color.viz.series.7` | `color.surface.raised` | ui | `#fb827a` on `#1b2e31` | 5.79 | 3 | passed | Charts: series and axes against the surface |
+| `color.viz.series.7` | `color.surface.canvas` | ui | `#f15653` on `#15282b` | 4.52 | 3 | passed | Charts: series and axes against the surface |
+| `color.viz.series.7` | `color.surface.list` | ui | `#f15653` on `#102326` | 4.80 | 3 | passed | Charts: series and axes against the surface |
+| `color.viz.series.7` | `color.surface.raised` | ui | `#f15653` on `#1b2e31` | 4.18 | 3 | passed | Charts: series and axes against the surface |
 | `color.viz.series.8` | `color.surface.canvas` | ui | `#8f9fa1` on `#15282b` | 5.58 | 3 | passed | Charts: series and axes against the surface |
 | `color.viz.series.8` | `color.surface.list` | ui | `#8f9fa1` on `#102326` | 5.92 | 3 | passed | Charts: series and axes against the surface |
 | `color.viz.series.8` | `color.surface.raised` | ui | `#8f9fa1` on `#1b2e31` | 5.16 | 3 | passed | Charts: series and axes against the surface |
@@ -1029,3 +1029,85 @@ Accent `spruce` is the default: its variants are the base roles of the theme sec
 | `color.run.running` (moss.400) | `color.surface.canvas` | ui | `#62c37a` on `#15282b` | 7.01 | 3 | passed | Live box spine and run icons |
 | `color.run.running` (moss.400) | `color.surface.sunken` | ui | `#62c37a` on `#0c1e21` | 7.85 | 3 | passed | Live box spine and run icons |
 | `color.run.running` (moss.400) | `color.surface.list` | ui | `#62c37a` on `#102326` | 7.44 | 3 | passed | Live box spine and run icons |
+
+## Color vision deficiency
+
+Model: Machado, Oliveira and Fernandes 2009, severity 1.0, applied in linear sRGB (IEEE TVCG 15(6), 2009, doi:10.1109/TVCG.2009.113). Each colour is decoded to linear sRGB, multiplied with
+the matrix of the deficiency, clipped to [0, 1] and encoded again. Measure: OKLab distance
+(`delta_e_ok`) of the two simulated colours. Minimum `cvd_min_delta_e_ok` of
+`design/design-rules.json`: 0.05. Source: Just noticeable difference 0.02 of deltaE OK in CSS Color Module Level 4 (https://www.w3.org/TR/css-color-4/#binsearch), the value tokenkit/color.py names; Szafir, Modeling Color Difference for Visualization Design, IEEE TVCG 24(1), 2018, doi:10.1109/TVCG.2017.2744359. Reason: 2.5 times the just noticeable difference: chart marks are small (bars, 10 px legend squares, 2 px lines; components.md section 11), and Szafir 2018 measured that the noticeable difference grows as marks get smaller. The factor is a stated design choice, not a measured value.
+
+The pairs (`cvd_pairs`): adjacent chart series in their fixed order, series 8 with series 1
+because the order wraps, and the three traffic light pairs. A simulation is a model, not a
+test with people; series and states always carry a label or an icon with text as well.
+
+Result: 66 rows checked, 0 below the minimum.
+
+| Theme | Deficiency | Role A | Role B | Values | Simulated | delta_e_ok | Minimum | Result | Usage |
+|---|---|---|---|---|---|---|---|---|---|
+| light | protanopia | `color.viz.series.1` | `color.viz.series.2` | `#197fc3` and `#ae6416` | `#5e82c6` and `#7b6c02` | 0.233 | 0.05 | passed | Chart series, adjacent in the fixed order; series 8 with series 1 because the order wraps |
+| light | protanopia | `color.viz.series.2` | `color.viz.series.3` | `#ae6416` and `#136f69` | `#7b6c02` and `#686869` | 0.110 | 0.05 | passed | Chart series, adjacent in the fixed order; series 8 with series 1 because the order wraps |
+| light | protanopia | `color.viz.series.3` | `color.viz.series.4` | `#136f69` and `#c53a88` | `#686869` and `#4f628a` | 0.071 | 0.05 | passed | Chart series, adjacent in the fixed order; series 8 with series 1 because the order wraps |
+| light | protanopia | `color.viz.series.4` | `color.viz.series.5` | `#c53a88` and `#8d7716` | `#4f628a` and `#857500` | 0.193 | 0.05 | passed | Chart series, adjacent in the fixed order; series 8 with series 1 because the order wraps |
+| light | protanopia | `color.viz.series.5` | `color.viz.series.6` | `#8d7716` and `#063e1a` | `#857500` and `#3e3817` | 0.230 | 0.05 | passed | Chart series, adjacent in the fixed order; series 8 with series 1 because the order wraps |
+| light | protanopia | `color.viz.series.6` | `color.viz.series.7` | `#063e1a` and `#d43538` | `#3e3817` and `#655c36` | 0.136 | 0.05 | passed | Chart series, adjacent in the fixed order; series 8 with series 1 because the order wraps |
+| light | protanopia | `color.viz.series.7` | `color.viz.series.8` | `#d43538` and `#748486` | `#655c36` and `#818286` | 0.148 | 0.05 | passed | Chart series, adjacent in the fixed order; series 8 with series 1 because the order wraps |
+| light | protanopia | `color.viz.series.8` | `color.viz.series.1` | `#748486` and `#197fc3` | `#818286` and `#5e82c6` | 0.106 | 0.05 | passed | Chart series, adjacent in the fixed order; series 8 with series 1 because the order wraps |
+| light | deuteranopia | `color.viz.series.1` | `color.viz.series.2` | `#197fc3` and `#ae6416` | `#4673c2` and `#8c7d16` | 0.245 | 0.05 | passed | Chart series, adjacent in the fixed order; series 8 with series 1 because the order wraps |
+| light | deuteranopia | `color.viz.series.2` | `color.viz.series.3` | `#ae6416` and `#136f69` | `#8c7d16` and `#5c5f6a` | 0.165 | 0.05 | passed | Chart series, adjacent in the fixed order; series 8 with series 1 because the order wraps |
+| light | deuteranopia | `color.viz.series.3` | `color.viz.series.4` | `#136f69` and `#c53a88` | `#5c5f6a` and `#777b85` | 0.094 | 0.05 | passed | Chart series, adjacent in the fixed order; series 8 with series 1 because the order wraps |
+| light | deuteranopia | `color.viz.series.4` | `color.viz.series.5` | `#c53a88` and `#8d7716` | `#777b85` and `#8a7b1d` | 0.126 | 0.05 | passed | Chart series, adjacent in the fixed order; series 8 with series 1 because the order wraps |
+| light | deuteranopia | `color.viz.series.5` | `color.viz.series.6` | `#8d7716` and `#063e1a` | `#8a7b1d` and `#38331d` | 0.270 | 0.05 | passed | Chart series, adjacent in the fixed order; series 8 with series 1 because the order wraps |
+| light | deuteranopia | `color.viz.series.6` | `color.viz.series.7` | `#063e1a` and `#d43538` | `#38331d` and `#8c7e32` | 0.278 | 0.05 | passed | Chart series, adjacent in the fixed order; series 8 with series 1 because the order wraps |
+| light | deuteranopia | `color.viz.series.7` | `color.viz.series.8` | `#d43538` and `#748486` | `#8c7e32` and `#7e8086` | 0.108 | 0.05 | passed | Chart series, adjacent in the fixed order; series 8 with series 1 because the order wraps |
+| light | deuteranopia | `color.viz.series.8` | `color.viz.series.1` | `#748486` and `#197fc3` | `#7e8086` and `#4673c2` | 0.128 | 0.05 | passed | Chart series, adjacent in the fixed order; series 8 with series 1 because the order wraps |
+| light | tritanopia | `color.viz.series.1` | `color.viz.series.2` | `#197fc3` and `#ae6416` | `#009098` and `#bf5356` | 0.240 | 0.05 | passed | Chart series, adjacent in the fixed order; series 8 with series 1 because the order wraps |
+| light | tritanopia | `color.viz.series.2` | `color.viz.series.3` | `#ae6416` and `#136f69` | `#bf5356` and `#00726d` | 0.239 | 0.05 | passed | Chart series, adjacent in the fixed order; series 8 with series 1 because the order wraps |
+| light | tritanopia | `color.viz.series.3` | `color.viz.series.4` | `#136f69` and `#c53a88` | `#00726d` and `#d3325c` | 0.294 | 0.05 | passed | Chart series, adjacent in the fixed order; series 8 with series 1 because the order wraps |
+| light | tritanopia | `color.viz.series.4` | `color.viz.series.5` | `#c53a88` and `#8d7716` | `#d3325c` and `#996d65` | 0.143 | 0.05 | passed | Chart series, adjacent in the fixed order; series 8 with series 1 because the order wraps |
+| light | tritanopia | `color.viz.series.5` | `color.viz.series.6` | `#8d7716` and `#063e1a` | `#996d65` and `#003d36` | 0.279 | 0.05 | passed | Chart series, adjacent in the fixed order; series 8 with series 1 because the order wraps |
+| light | tritanopia | `color.viz.series.6` | `color.viz.series.7` | `#063e1a` and `#d43538` | `#003d36` and `#e90038` | 0.397 | 0.05 | passed | Chart series, adjacent in the fixed order; series 8 with series 1 because the order wraps |
+| light | tritanopia | `color.viz.series.7` | `color.viz.series.8` | `#d43538` and `#748486` | `#e90038` and `#6f8585` | 0.264 | 0.05 | passed | Chart series, adjacent in the fixed order; series 8 with series 1 because the order wraps |
+| light | tritanopia | `color.viz.series.8` | `color.viz.series.1` | `#748486` and `#197fc3` | `#6f8585` and `#009098` | 0.076 | 0.05 | passed | Chart series, adjacent in the fixed order; series 8 with series 1 because the order wraps |
+| light | protanopia | `color.success.fg` | `color.warning.fg` | `#137337` and `#6b3b09` | `#746832` and `#4a4001` | 0.146 | 0.05 | passed | SLO traffic light on the state roles |
+| light | protanopia | `color.warning.fg` | `color.danger.fg` | `#6b3b09` and `#63080e` | `#4a4001` and `#27230d` | 0.123 | 0.05 | passed | SLO traffic light on the state roles |
+| light | protanopia | `color.success.fg` | `color.danger.fg` | `#137337` and `#63080e` | `#746832` and `#27230d` | 0.265 | 0.05 | passed | SLO traffic light on the state roles |
+| light | deuteranopia | `color.success.fg` | `color.warning.fg` | `#137337` and `#6b3b09` | `#69613b` and `#554b09` | 0.083 | 0.05 | passed | SLO traffic light on the state roles |
+| light | deuteranopia | `color.warning.fg` | `color.danger.fg` | `#6b3b09` and `#63080e` | `#554b09` and `#3d360a` | 0.083 | 0.05 | passed | SLO traffic light on the state roles |
+| light | deuteranopia | `color.success.fg` | `color.danger.fg` | `#137337` and `#63080e` | `#69613b` and `#3d360a` | 0.159 | 0.05 | passed | SLO traffic light on the state roles |
+| light | tritanopia | `color.success.fg` | `color.warning.fg` | `#137337` and `#6b3b09` | `#007165` and `#763032` | 0.202 | 0.05 | passed | SLO traffic light on the state roles |
+| light | tritanopia | `color.warning.fg` | `color.danger.fg` | `#6b3b09` and `#63080e` | `#763032` and `#6e000c` | 0.079 | 0.05 | passed | SLO traffic light on the state roles |
+| light | tritanopia | `color.success.fg` | `color.danger.fg` | `#137337` and `#63080e` | `#007165` and `#6e000c` | 0.269 | 0.05 | passed | SLO traffic light on the state roles |
+| dark | protanopia | `color.viz.series.1` | `color.viz.series.2` | `#58b3fa` and `#ec9340` | `#93b5fd` and `#ae9c36` | 0.246 | 0.05 | passed | Chart series, adjacent in the fixed order; series 8 with series 1 because the order wraps |
+| dark | protanopia | `color.viz.series.2` | `color.viz.series.3` | `#ec9340` and `#7cd5cd` | `#ae9c36` and `#cccccd` | 0.199 | 0.05 | passed | Chart series, adjacent in the fixed order; series 8 with series 1 because the order wraps |
+| dark | protanopia | `color.viz.series.3` | `color.viz.series.4` | `#7cd5cd` and `#f878ba` | `#cccccd` and `#8696bc` | 0.182 | 0.05 | passed | Chart series, adjacent in the fixed order; series 8 with series 1 because the order wraps |
+| dark | protanopia | `color.viz.series.4` | `color.viz.series.5` | `#f878ba` and `#d9c42b` | `#8696bc` and `#d7be00` | 0.257 | 0.05 | passed | Chart series, adjacent in the fixed order; series 8 with series 1 because the order wraps |
+| dark | protanopia | `color.viz.series.5` | `color.viz.series.6` | `#d9c42b` and `#62c37a` | `#d7be00` and `#c4b575` | 0.086 | 0.05 | passed | Chart series, adjacent in the fixed order; series 8 with series 1 because the order wraps |
+| dark | protanopia | `color.viz.series.6` | `color.viz.series.7` | `#62c37a` and `#f15653` | `#c4b575` and `#807651` | 0.208 | 0.05 | passed | Chart series, adjacent in the fixed order; series 8 with series 1 because the order wraps |
+| dark | protanopia | `color.viz.series.7` | `color.viz.series.8` | `#f15653` and `#8f9fa1` | `#807651` and `#9c9da1` | 0.145 | 0.05 | passed | Chart series, adjacent in the fixed order; series 8 with series 1 because the order wraps |
+| dark | protanopia | `color.viz.series.8` | `color.viz.series.1` | `#8f9fa1` and `#58b3fa` | `#9c9da1` and `#93b5fd` | 0.131 | 0.05 | passed | Chart series, adjacent in the fixed order; series 8 with series 1 because the order wraps |
+| dark | deuteranopia | `color.viz.series.1` | `color.viz.series.2` | `#58b3fa` and `#ec9340` | `#7da5f9` and `#c3b041` | 0.260 | 0.05 | passed | Chart series, adjacent in the fixed order; series 8 with series 1 because the order wraps |
+| dark | deuteranopia | `color.viz.series.2` | `color.viz.series.3` | `#ec9340` and `#7cd5cd` | `#c3b041` and `#bdc1ce` | 0.161 | 0.05 | passed | Chart series, adjacent in the fixed order; series 8 with series 1 because the order wraps |
+| dark | deuteranopia | `color.viz.series.3` | `color.viz.series.4` | `#7cd5cd` and `#f878ba` | `#bdc1ce` and `#a9acb7` | 0.067 | 0.05 | passed | Chart series, adjacent in the fixed order; series 8 with series 1 because the order wraps |
+| dark | deuteranopia | `color.viz.series.4` | `color.viz.series.5` | `#f878ba` and `#d9c42b` | `#a9acb7` and `#ddc638` | 0.188 | 0.05 | passed | Chart series, adjacent in the fixed order; series 8 with series 1 because the order wraps |
+| dark | deuteranopia | `color.viz.series.5` | `color.viz.series.6` | `#d9c42b` and `#62c37a` | `#ddc638` and `#b6ac7f` | 0.124 | 0.05 | passed | Chart series, adjacent in the fixed order; series 8 with series 1 because the order wraps |
+| dark | deuteranopia | `color.viz.series.6` | `color.viz.series.7` | `#62c37a` and `#f15653` | `#b6ac7f` and `#a6984f` | 0.073 | 0.05 | passed | Chart series, adjacent in the fixed order; series 8 with series 1 because the order wraps |
+| dark | deuteranopia | `color.viz.series.7` | `color.viz.series.8` | `#f15653` and `#8f9fa1` | `#a6984f` and `#999ba1` | 0.106 | 0.05 | passed | Chart series, adjacent in the fixed order; series 8 with series 1 because the order wraps |
+| dark | deuteranopia | `color.viz.series.8` | `color.viz.series.1` | `#8f9fa1` and `#58b3fa` | `#999ba1` and `#7da5f9` | 0.127 | 0.05 | passed | Chart series, adjacent in the fixed order; series 8 with series 1 because the order wraps |
+| dark | tritanopia | `color.viz.series.1` | `color.viz.series.2` | `#58b3fa` and `#ec9340` | `#00c4cc` and `#ff7f81` | 0.283 | 0.05 | passed | Chart series, adjacent in the fixed order; series 8 with series 1 because the order wraps |
+| dark | tritanopia | `color.viz.series.2` | `color.viz.series.3` | `#ec9340` and `#7cd5cd` | `#ff7f81` and `#56d9d2` | 0.277 | 0.05 | passed | Chart series, adjacent in the fixed order; series 8 with series 1 because the order wraps |
+| dark | tritanopia | `color.viz.series.3` | `color.viz.series.4` | `#7cd5cd` and `#f878ba` | `#56d9d2` and `#ff7491` | 0.296 | 0.05 | passed | Chart series, adjacent in the fixed order; series 8 with series 1 because the order wraps |
+| dark | tritanopia | `color.viz.series.4` | `color.viz.series.5` | `#f878ba` and `#d9c42b` | `#ff7491` and `#eab5a8` | 0.145 | 0.05 | passed | Chart series, adjacent in the fixed order; series 8 with series 1 because the order wraps |
+| dark | tritanopia | `color.viz.series.5` | `color.viz.series.6` | `#d9c42b` and `#62c37a` | `#eab5a8` and `#4ec0b1` | 0.182 | 0.05 | passed | Chart series, adjacent in the fixed order; series 8 with series 1 because the order wraps |
+| dark | tritanopia | `color.viz.series.6` | `color.viz.series.7` | `#62c37a` and `#f15653` | `#4ec0b1` and `#ff3157` | 0.350 | 0.05 | passed | Chart series, adjacent in the fixed order; series 8 with series 1 because the order wraps |
+| dark | tritanopia | `color.viz.series.7` | `color.viz.series.8` | `#f15653` and `#8f9fa1` | `#ff3157` and `#8aa0a0` | 0.264 | 0.05 | passed | Chart series, adjacent in the fixed order; series 8 with series 1 because the order wraps |
+| dark | tritanopia | `color.viz.series.8` | `color.viz.series.1` | `#8f9fa1` and `#58b3fa` | `#8aa0a0` and `#00c4cc` | 0.116 | 0.05 | passed | Chart series, adjacent in the fixed order; series 8 with series 1 because the order wraps |
+| dark | protanopia | `color.success.fg` | `color.warning.fg` | `#89d89a` and `#fcaf6f` | `#d9cc96` and `#c6b56a` | 0.075 | 0.05 | passed | SLO traffic light on the state roles |
+| dark | protanopia | `color.warning.fg` | `color.danger.fg` | `#fcaf6f` and `#fb827a` | `#c6b56a` and `#9e9679` | 0.115 | 0.05 | passed | SLO traffic light on the state roles |
+| dark | protanopia | `color.success.fg` | `color.danger.fg` | `#89d89a` and `#fb827a` | `#d9cc96` and `#9e9679` | 0.172 | 0.05 | passed | SLO traffic light on the state roles |
+| dark | deuteranopia | `color.success.fg` | `color.warning.fg` | `#89d89a` and `#fcaf6f` | `#cdc39e` and `#d9c770` | 0.059 | 0.05 | passed | SLO traffic light on the state roles |
+| dark | deuteranopia | `color.warning.fg` | `color.danger.fg` | `#fcaf6f` and `#fb827a` | `#d9c770` and `#bcaf78` | 0.081 | 0.05 | passed | SLO traffic light on the state roles |
+| dark | deuteranopia | `color.success.fg` | `color.danger.fg` | `#89d89a` and `#fb827a` | `#cdc39e` and `#bcaf78` | 0.068 | 0.05 | passed | SLO traffic light on the state roles |
+| dark | tritanopia | `color.success.fg` | `color.warning.fg` | `#89d89a` and `#fcaf6f` | `#7dd5c7` and `#ff9fa0` | 0.202 | 0.05 | passed | SLO traffic light on the state roles |
+| dark | tritanopia | `color.warning.fg` | `color.danger.fg` | `#fcaf6f` and `#fb827a` | `#ff9fa0` and `#ff7081` | 0.099 | 0.05 | passed | SLO traffic light on the state roles |
+| dark | tritanopia | `color.success.fg` | `color.danger.fg` | `#89d89a` and `#fb827a` | `#7dd5c7` and `#ff7081` | 0.278 | 0.05 | passed | SLO traffic light on the state roles |

@@ -59,10 +59,27 @@ for the Flutter types it uses; it has not yet been compiled against the real Flu
    pairing that contains a swapped role is checked per accent and theme with the same
    thresholds; a variant below them, or a scale without a passing step, fails `build` and `check`.
    An invalid member (default not an accent, accent not a scale, role missing) is an error (exit 2).
-3. **Palette guards:** forbidden reference colors (OKLab distance), forbidden hue ranges,
+3. **Color vision deficiency** (`tokenkit/cvd.py`, members `cvd_min_delta_e_ok` and `cvd_pairs`
+   of `design/design-rules.json`): every listed pair is simulated for protanopia, deuteranopia and
+   tritanopia in each theme with the matrices of Machado, Oliveira and Fernandes 2009 at severity
+   1.0 (decode sRGB, multiply in linear sRGB, clip to [0, 1], encode), and the OKLab distance
+   (`delta_e_ok`) of the two simulated colours must reach `cvd_min_delta_e_ok`; the value, its
+   source and its reason stand next to it in the rules file. The pairs: adjacent chart series in
+   the fixed order of components.md section 11 (`sequence`, with `wrap` for series 8 with series
+   1) and the traffic light pairs of `color.success.fg`, `color.warning.fg` and
+   `color.danger.fg` (`pairs`). A failure reads
+   `gate: [light, deuteranopia] color.viz.series.3 and color.viz.series.4: deltaE_ok <distance> < <minimum> (<hex a> and <hex b>, simulated <hex> and <hex>)`:
+   theme, deficiency, both roles, the measured distance, the minimum, the source colours and what
+   they look like under the simulation. Fix it by moving one of the two roles along its scale
+   (lightness first, so the hue order stays recognisable) and keep the contrast pairings green.
+   An unknown role or deficiency is an error of the rules file (exit 2). `contrast.md` lists every
+   row in the section "Color vision deficiency", `tokens.resolved.json` in the member `cvd`.
+   The accents of M4-03 swap none of these roles, so the check runs once per theme (a test holds
+   this).
+4. **Palette guards:** forbidden reference colors (OKLab distance), forbidden hue ranges,
    minimum chroma for neutrals. Rules and sources are in `design/design-rules.json`.
-4. **Freshness:** `check` compares every generated file byte for byte.
-5. **Provenance:** `check` compares every file under `vendor/fonts/` and `vendor/phosphor/` with its
+5. **Freshness:** `check` compares every generated file byte for byte.
+6. **Provenance:** `check` compares every file under `vendor/fonts/` and `vendor/phosphor/` with its
    SHA-256 in `vendor/MANIFEST.json`; a missing, extra or changed file fails.
 
 ## Deliberate limitations

@@ -207,7 +207,7 @@ Each role points to a step of the palette per theme. Translucent roles carry the
 | `color.code.fg` | `#102326` granite.900 | `#e5eef0` granite.100 |
 | `color.danger.bg` | `#b21622` rowan.700 | `#fb827a` rowan.400 |
 | `color.danger.border` | `#d43538` rowan.600 | `#fb827a` rowan.400 |
-| `color.danger.fg` | `#b21622` rowan.700 | `#fcaaa3` rowan.300 |
+| `color.danger.fg` | `#63080e` rowan.900 | `#fb827a` rowan.400 |
 | `color.danger.on-bg` | `#fbfeff` granite.0 | `#430307` rowan.950 |
 | `color.danger.subtle` | `#fef2f0` rowan.50 | `#430307` rowan.950 |
 | `color.focus.ring` | `#1b8a83` spruce.600 | `#d9c42b` gorse.300 |
@@ -281,14 +281,14 @@ Each role points to a step of the palette per theme. Translucent roles carry the
 | `color.viz.grid` | `#dae5e7` granite.150 | `#24363a` granite.800 |
 | `color.viz.series.1` | `#197fc3` loch.600 | `#58b3fa` loch.400 |
 | `color.viz.series.2` | `#ae6416` amber.600 | `#ec9340` amber.400 |
-| `color.viz.series.3` | `#1b8a83` spruce.600 | `#49c0b7` spruce.400 |
+| `color.viz.series.3` | `#136f69` spruce.700 | `#7cd5cd` spruce.300 |
 | `color.viz.series.4` | `#c53a88` heather.600 | `#f878ba` heather.400 |
 | `color.viz.series.5` | `#8d7716` gorse.600 | `#d9c42b` gorse.300 |
-| `color.viz.series.6` | `#1b9046` moss.600 | `#62c37a` moss.400 |
-| `color.viz.series.7` | `#d43538` rowan.600 | `#fb827a` rowan.400 |
+| `color.viz.series.6` | `#063e1a` moss.900 | `#62c37a` moss.400 |
+| `color.viz.series.7` | `#d43538` rowan.600 | `#f15653` rowan.500 |
 | `color.viz.series.8` | `#748486` granite.500 | `#8f9fa1` granite.400 |
 | `color.warning.bg` | `#fcaf6f` amber.300 | `#fcaf6f` amber.300 |
 | `color.warning.border` | `#ae6416` amber.600 | `#ec9340` amber.400 |
-| `color.warning.fg` | `#8c4f10` amber.700 | `#fcaf6f` amber.300 |
+| `color.warning.fg` | `#6b3b09` amber.800 | `#fcaf6f` amber.300 |
 | `color.warning.on-bg` | `#331902` amber.950 | `#331902` amber.950 |
 | `color.warning.subtle` | `#fee6d4` amber.100 | `#331902` amber.950 |

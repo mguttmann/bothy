@@ -337,7 +337,14 @@ Rules:
   ([contrast.md](contrast.md)). `grid` and `area-fill` carry no information alone and therefore
   have no contrast requirement. The order of the series starts with blue and orange, which stay
   distinguishable with red-green color blindness; a second feature (label or pattern) is
-  still required. The check with simulated color blindness is built by M6-10.
+  still required. `make tokens` also checks every adjacent pair of series (1 with 2 up to 7
+  with 8, and 8 with 1 because the order wraps when a view needs more than eight groups) under
+  simulated protanopia, deuteranopia and tritanopia: the OKLab distance of the simulated colours
+  must reach `cvd_min_delta_e_ok` of `design/design-rules.json` (section "Color vision
+  deficiency" of [contrast.md](contrast.md)).
+- The SLO traffic light uses only `color.success.*`, `color.warning.*` and `color.danger.*`; the
+  same check holds `success.fg`, `warning.fg` and `danger.fg` pairwise apart by
+  `cvd_min_delta_e_ok`, and every state carries an icon and text as well.
 - TV mode: dark theme, density `comfortable`, font sizes one step larger; no motion in the
   `reduced` context.
 
