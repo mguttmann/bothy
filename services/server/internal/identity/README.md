@@ -153,7 +153,8 @@ Prinzipale, Menschen, Owner, Anmelde-Treiber, Identitäten, lokale Anmeldedaten,
   the API token path of M1-44 under either scheme;
   an access token as Bearer `401 invalid_dpop_proof`; `DPoP`: token, proof, then one query for
   session, device and active key into the actor; a stale nonce gets `DPoP-Nonce`; activity at most
-  once per `identity.last_active_granularity`), `CredentialSource` (sessions part:
+  once per `identity.last_active_granularity`; the actor carries `CredentialExpiresAt`, the exp of
+  the access token or the `expires_at` of the API token, for the gateway of M1-64), `CredentialSource` (sessions part:
   `SessionActive`, `SessionExpiresAt`), the outgoing port `SessionStore`. The Authenticator never
   rejects on session or device state: `authorize` does in `check_active` with the facts the actor
   carries (`authorize.CredentialObserver`), so the denial is audited and a revocation takes effect

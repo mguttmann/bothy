@@ -29,6 +29,7 @@ var configKeyGroups = []func() []config.Key{
 	jobsConfigKeys,
 	rateLimitConfigKeys,
 	syncConfigKeys,
+	gatewayConfigKeys,
 	filesConfigKeys,
 	consumerConfigKeys,
 	instanceConfigKeys,

@@ -27,6 +27,8 @@ type renderData struct {
 	SpecVersion     string
 	Problems        []problemType
 	GatewayVersions []int
+	// GatewayOps fill GatewayOps in meta.gen.go (M1-64).
+	GatewayOps []gatewayOp
 }
 
 var funcs = template.FuncMap{
@@ -153,6 +155,22 @@ func GatewayProtocolVersions() []int {
 	return {{ints .GatewayVersions}}
 }
 
+// GatewayOps returns the enabled ops of the section gateway_ops of the enable list, each with the
+// action of its x-authz-action and the schema of its body in the AsyncAPI document, sorted by op
+// (04 section 6.2, 05 "WebSocket ops and action"); a fresh slice per call, nil when the generator
+// read no AsyncAPI document. The gateway dispatcher registers exactly these ops (M1-64).
+func GatewayOps() []{{.Q}}GatewayOp {
+{{- if .GatewayOps}}
+	return []{{.Q}}GatewayOp{
+{{- range .GatewayOps}}
+		{Op: {{quote .Op}}, Action: {{quote .Action}}, Schema: {{quote .Schema}}},
+{{- end}}
+	}
+{{- else}}
+	return nil
+{{- end}}
+}
+
 // ProblemTypes returns x-problem-codes of the schema Problem, the one catalogue of problem codes
 // (06 section 5, R-API-23), sorted by code; a fresh slice per call.
 func ProblemTypes() []{{.Q}}ProblemType {
@@ -175,6 +193,7 @@ func renderRoutes(in *inputs, corePkg, restPkg string) (map[string][]byte, error
 	data := renderData{
 		Header: header, CorePkg: corePkg, RestPkg: restPkg, Actions: in.actions,
 		SpecVersion: in.specVersion, Problems: in.problems, GatewayVersions: in.gatewayVersions,
+		GatewayOps: in.gatewayOps,
 	}
 	if corePkg != "" {
 		data.Q = "routes."

@@ -42,8 +42,13 @@ func TestAuthenticate_Valid(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	// The expiry of the access token rides along (M1-64).
+	if a.CredentialExpiresAt.IsZero() {
+		t.Fatalf("CredentialExpiresAt %v", a.CredentialExpiresAt)
+	}
 	want := actor.Actor{ID: alex, Kind: actor.KindUser, SessionID: c.session, SessionActive: true, DeviceID: c.device,
-		DeviceState: actor.DeviceActive, DeviceKeyActive: true, KeyThumbprint: c.key.Thumbprint, AuthMethod: "passkey", ClientComponent: "app"}
+		DeviceState: actor.DeviceActive, DeviceKeyActive: true, KeyThumbprint: c.key.Thumbprint, AuthMethod: "passkey", ClientComponent: "app",
+		CredentialExpiresAt: a.CredentialExpiresAt}
 	if fmt.Sprint(a) != fmt.Sprint(want) {
 		t.Fatalf("actor\n got %+v\nwant %+v", a, want)
 	}

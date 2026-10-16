@@ -45,6 +45,16 @@ const (
 	classNone   = "none"
 )
 
+// GatewayOp is one enabled client-to-server op of the WebSocket gateway (section gateway_ops of
+// api/operations.yaml, M1-64): the op name, the action of its x-authz-action, which the dispatcher
+// requires each handler to authorize, and the name of the schema of its body d in openapi.yaml,
+// against which the frame codec validates the body.
+type GatewayOp struct {
+	Op     string // op name, for example identify
+	Action string // x-authz-action, for example gateway.connect
+	Schema string // body schema, for example GatewayIdentify
+}
+
 // ProblemType documents one problem code of x-problem-codes (06 section 5): getProblemType
 // serves it at the type URI /api/v1/problems/{code} (M1-46). ClientAction is "" when the
 // contract names none.

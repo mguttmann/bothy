@@ -166,7 +166,7 @@ Quelle: [02-architektur.md](../spec/02-architektur.md), Abschnitt 22.
 | `sync.tail_batch_size` | `BOTHY_SYNC__TAIL_BATCH_SIZE` | Server | int | `1000` | Ereignisse je Lesevorgang des Log-Tails | aktiv |
 | `sync.partition_maintenance_interval` | `BOTHY_SYNC__PARTITION_MAINTENANCE_INTERVAL` | Server | duration | `10m` | Abstand des Jobs `sync.partition_maintenance` | aktiv |
 | `sync.event_log_partitions_ahead` | `BOTHY_SYNC__EVENT_LOG_PARTITIONS_AHEAD` | Server | int | `3` | Partitionen von `event_log`, die vor dem Kopf bereitstehen; mit `sync.event_log_partition_size` reichen sie bei `perf.event_commit_min_per_s` länger als zwei Abstände `sync.partition_maintenance_interval` | aktiv |
-| `gateway.write_timeout` | `BOTHY_GATEWAY__WRITE_TIMEOUT` | Server |  | `10s` | Frist für einen WebSocket-Schreibvorgang | geplant (M1) |
+| `gateway.write_timeout` | `BOTHY_GATEWAY__WRITE_TIMEOUT` | Server | duration | `10s` | Frist für einen WebSocket-Schreibvorgang | aktiv |
 | `consumer.batch_size` | `BOTHY_CONSUMER__BATCH_SIZE` | Server | int | `500` | Ereignisse je Runde eines Worker-Verbrauchers | aktiv |
 | `consumer.poll_interval` | `BOTHY_CONSUMER__POLL_INTERVAL` | Server | duration | `1s` | Poll eines Worker-Verbrauchers ohne `NOTIFY` | aktiv |
 | `consumer.pending_alert_after` | `BOTHY_CONSUMER__PENDING_ALERT_AFTER` | Server | duration | `15m` | age of the oldest unprocessed event of a worker consumer that raises the alarm `BothyEventConsumerLag`; strictly below `sync.event_retention` (13, item 4) | aktiv |
@@ -258,18 +258,18 @@ Quelle: [04-sync-protokoll.md](../spec/04-sync-protokoll.md), Abschnitt 18.
 |---|---|---|---|---|---|---|
 | `sync.event_retention` | `BOTHY_SYNC__EVENT_RETENTION` | Server | duration | `30d` | so lange bleiben dauerhafte Ereignisse nachholbar | aktiv |
 | `sync.event_payload_max_bytes` | `BOTHY_SYNC__EVENT_PAYLOAD_MAX_BYTES` | Server | int | `65536` | größte Nutzlast eines Ereignisses | aktiv |
-| `sync.ws_max_frame_bytes` | `BOTHY_SYNC__WS_MAX_FRAME_BYTES` | Server |  | `1048576` | größter WebSocket-Rahmen | geplant (M1) |
-| `sync.identify_timeout` | `BOTHY_SYNC__IDENTIFY_TIMEOUT` | Server |  | `10s` | Zeit zwischen `hello` und `identify` | geplant (M1) |
-| `sync.heartbeat_interval` | `BOTHY_SYNC__HEARTBEAT_INTERVAL` | Server |  | `30s` | Abstand der Heartbeats (in `hello` gemeldet) | geplant (M1) |
-| `sync.heartbeat_miss_limit` | `BOTHY_SYNC__HEARTBEAT_MISS_LIMIT` | Server |  | `2` | fehlende Heartbeats bis zum Schließen | geplant (M1) |
-| `sync.resume_window` | `BOTHY_SYNC__RESUME_WINDOW` | Server |  | `5m` | so lange ist `resume` nach Trennung möglich | geplant (M1) |
-| `sync.reauth_lead_time` | `BOTHY_SYNC__REAUTH_LEAD_TIME` | Server |  | `60s` | Vorlauf von `reauth_required` vor Token-Ablauf | geplant (M1) |
+| `sync.ws_max_frame_bytes` | `BOTHY_SYNC__WS_MAX_FRAME_BYTES` | Server | int | `1048576` | größter WebSocket-Rahmen | aktiv |
+| `sync.identify_timeout` | `BOTHY_SYNC__IDENTIFY_TIMEOUT` | Server | duration | `10s` | Zeit zwischen `hello` und `identify` | aktiv |
+| `sync.heartbeat_interval` | `BOTHY_SYNC__HEARTBEAT_INTERVAL` | Server | duration | `30s` | Abstand der Heartbeats (in `hello` gemeldet) | aktiv |
+| `sync.heartbeat_miss_limit` | `BOTHY_SYNC__HEARTBEAT_MISS_LIMIT` | Server | int | `2` | fehlende Heartbeats bis zum Schließen | aktiv |
+| `sync.resume_window` | `BOTHY_SYNC__RESUME_WINDOW` | Server | duration | `5m` | so lange ist `resume` nach Trennung möglich | aktiv |
+| `sync.reauth_lead_time` | `BOTHY_SYNC__REAUTH_LEAD_TIME` | Server | duration | `60s` | Vorlauf von `reauth_required` vor Token-Ablauf | aktiv |
 | `sync.reconnect_backoff_base` | `BOTHY_SYNC__RECONNECT_BACKOFF_BASE` | Server |  | `1s` | Basis des Backoffs beim Wiederverbinden | geplant (M2) |
 | `sync.reconnect_backoff_cap` | `BOTHY_SYNC__RECONNECT_BACKOFF_CAP` | Server |  | `60s` | größter Abstand beim Wiederverbinden | geplant (M2) |
 | `sync.catchup_page_size` | `BOTHY_SYNC__CATCHUP_PAGE_SIZE` | Server | int | `500` | Ereignisse je Nachhol-Seite | aktiv |
 | `sync.catchup_max_events` | `BOTHY_SYNC__CATCHUP_MAX_EVENTS` | Server | int | `50000` | mehr Rückstand ergibt `resync_required` | aktiv |
 | `sync.cursor_advance_every` | `BOTHY_SYNC__CURSOR_ADVANCE_EVERY` | Server |  | `1000` | nach so vielen übersprungenen Ereignissen ein `cursor`-Rahmen | geplant (M1) |
-| `sync.outbound_queue_max` | `BOTHY_SYNC__OUTBOUND_QUEUE_MAX` | Server |  | `10000` | Rahmen im Ausgang einer Verbindung bis `4014` | geplant (M1) |
+| `sync.outbound_queue_max` | `BOTHY_SYNC__OUTBOUND_QUEUE_MAX` | Server | int | `10000` | Rahmen im Ausgang einer Verbindung bis `4014` | aktiv |
 | `sync.idempotency_key_ttl` | `BOTHY_SYNC__IDEMPOTENCY_KEY_TTL` | Server | duration | `24h` | Aufbewahrung von `Idempotency-Key` | aktiv |
 | `sync.max_focused_threads` | `BOTHY_SYNC__MAX_FOCUSED_THREADS` | Server |  | `20` | Threads im `focus` je Verbindung | geplant (M1) |
 | `sync.run_patch_coalesce_interval` | `BOTHY_SYNC__RUN_PATCH_COALESCE_INTERVAL` | Server |  | `250ms` | Sammelfenster für `run.updated` | geplant (M2) |

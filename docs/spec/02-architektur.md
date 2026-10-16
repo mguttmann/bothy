@@ -811,6 +811,13 @@ Antworten ab `400` gehen unverändert durch. Grund für den Ort: Die Strict-Midd
 typisiertes Antwortobjekt, nicht den Status. Grund: B7 verlangt, dass jede Route
 prüft. Die Lint-Regel in der Spec hält nur die Deklaration; dieser Nachweis hält die Ausführung.
 
+The gateway upgrade `GET /api/v1/gateway` is the one route marked as authorized in-band
+(`AuthorizedInBand`, M1-64): it passes only steps 1 to 4, because `identify` and `resume`
+authenticate and authorize on the connection (R-SY-01). The same proof applies per op there: the
+gateway dispatcher runs every op with its own check log and, after a successful handler, requires a
+check of the op's action (05 "WebSocket-Ops und Aktion"); a missing check closes the connection with
+`4000` and raises `bothy.authz.errors` with `bothy.reason = authz_not_checked`.
+
 ## 10. Gateway
 
 Das Gateway ist Teil der Rolle `api`. Je Verbindung laufen eine Lese- und eine Schreib-Goroutine. Der

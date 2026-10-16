@@ -33,6 +33,12 @@ chapters win on any difference. Rulings: [DECISIONS.md](../../../../../docs/DECI
   the audit log).
 - `WriteProblem(w, r, err)`, `ValidationErrorHandler`, `MalformedRequestHandler`: the error
   writers; `internal/wire` passes them to `routes.Build`.
+- `NewSchemaValidator(spec, names)` and `SchemaValidator.Validate(name, body)`: a JSON value
+  against one named schema of the contract with the field codes of the request validator; the
+  gateway checks the body of every client frame with it (M1-64).
+- `Operation.AuthorizedInBand`: the one route that authenticates and authorizes on the connection
+  it opens (`GET /api/v1/gateway`, M1-64); `Chain.Wrap` runs no per-route stage for it, only the
+  outer steps 1 to 4, and puts the operation into the context.
 - `NewValidator(spec, operationIDs)`, `CheckJSON`, `SanitizeJSON`, `ClientIP`, `CheckOrigin`,
   `FormatETag`, `ParseIfMatch`, `EncodeCursor`, `DecodeCursor`, `OperationFrom`.
 - `NewIdempotencyStage(cfg, store, uow, clock)`, `IdempotencyConfig`, `Fingerprint`,

@@ -206,7 +206,8 @@ func (a *Authenticator) person(ctx context.Context, creds actor.Credentials, tok
 	if err != nil {
 		return actor.Actor{}, err
 	}
-	out := actor.Actor{ID: sub, Kind: actor.KindUser, SessionID: sid, DeviceID: did, KeyThumbprint: c.Cnf.JKT, DeviceState: actor.DeviceUnknown}
+	out := actor.Actor{ID: sub, Kind: actor.KindUser, SessionID: sid, DeviceID: did, KeyThumbprint: c.Cnf.JKT, DeviceState: actor.DeviceUnknown,
+		CredentialExpiresAt: time.Unix(c.Expiry, 0).UTC()}
 	if len(c.AMR) == 1 {
 		out.AuthMethod = c.AMR[0]
 	}

@@ -269,8 +269,9 @@ dem Problem-Code aus [06-api.md](06-api.md) (z. B. `rate_limited`, `forbidden`,
 1. **Upgrade.** Der Client öffnet die Verbindung. Der Server prüft beim Upgrade nichts außer
    der Herkunft. Die Rate-Limit-Klasse `rl.gateway_connect` zählt bei `identify` und `resume`,
    sobald Gerät bzw. Token geprüft sind (05, Abschnitt 3); erschöpft: Schließen mit `4008`.
-2. **`hello`.** Der Server sendet sofort `{heartbeat_interval_ms, resume_window_ms, protocol_versions,
-   dpop_nonce, server_time, sync_epoch}`. `dpop_nonce` ist frisch und gilt `auth.dpop_nonce_ttl`
+2. **`hello`.** Der Server sendet sofort `{heartbeat_interval_ms, resume_window_ms,
+   protocol_versions, dpop_nonce, server_time, sync_epoch}` (Schema `GatewayHello`; die Werte kommen
+   aus `sync.heartbeat_interval` und `sync.resume_window`). `dpop_nonce` ist frisch und gilt `auth.dpop_nonce_ttl`
    ([08-identitaet.md](08-identitaet.md)).
 3. **`identify`.** Innerhalb von `sync.identify_timeout` sendet der Client:
    - Menschen: `access_token`, `dpop` (DPoP-Beweis nach RFC 9449 mit `htm = "GET"`, `htu` =
@@ -296,11 +297,11 @@ dem Problem-Code aus [06-api.md](06-api.md) (z. B. `rate_limited`, `forbidden`,
    spätere Ereignis wird gepuffert oder gesendet, jedes frühere steckt in Momentaufnahme oder
    Nachholen. So geht zwischen `ready` und Live-Betrieb nichts verloren.
    Hat der Client einen `cursor` gesendet, beginnt danach das Nachholen (Abschnitt 7).
-5. **Heartbeat.** Der Client sendet alle `heartbeat_interval` ein `heartbeat {last_seq}`. Den
-   ersten Heartbeat verzögert er um einen Zufallsanteil von `heartbeat_interval`, damit nach
+5. **Heartbeat.** Der Client sendet alle `heartbeat_interval_ms` ein `heartbeat {last_seq}`. Den
+   ersten Heartbeat verzögert er um einen Zufallsanteil von `heartbeat_interval_ms`, damit nach
    einem Server-Neustart nicht alle gleichzeitig senden. Der Server antwortet `heartbeat_ack`.
    Fehlen `sync.heartbeat_miss_limit` Heartbeats in Folge, schließt der Server mit `4009`.
-   Fehlt dem Client ein `heartbeat_ack` innerhalb von `heartbeat_interval`, schließt er selbst
+   Fehlt dem Client ein `heartbeat_ack` innerhalb von `heartbeat_interval_ms`, schließt er selbst
    und verbindet neu.
 6. **Token-Erneuerung.** Vor Ablauf des Zugriffstokens sendet der Server `reauth_required`
    (Vorlauf `sync.reauth_lead_time`). Der Client holt per Refresh einen neuen Token und sendet
@@ -308,7 +309,7 @@ dem Problem-Code aus [06-api.md](06-api.md) (z. B. `rate_limited`, `forbidden`,
    schließt der Server mit `4011`. Agenten und Apps bekommen kein `reauth_required`; ihr API-Token
    hat ein festes `expires_at`, bei dem der Server mit `4011` schließt. Weiter geht es nur mit
    einem neuen Token, das der Owner ausstellt.
-7. **`resume`.** Nach einer Trennung innerhalb von `resume_window` sendet der Client statt
+7. **`resume`.** Nach einer Trennung innerhalb von `resume_window_ms` sendet der Client statt
    `identify` ein `resume {gateway_session_id, access_token, dpop, cursor, sync_epoch}`. Der Server
    prüft Token und Sitzung wie bei `identify`, stellt Fokus und Abos wieder her und antwortet
    `resumed`, dann folgt das Nachholen ab `cursor`. Kurzlebige Ereignisse der Pause sind
@@ -339,7 +340,7 @@ dem Problem-Code aus [06-api.md](06-api.md) (z. B. `rate_limited`, `forbidden`,
 | `4015` | consumer_replaced | nur Agenten: ein anderer Prozess hat denselben Verbraucher übernommen; nicht neu verbinden |
 | `4016` | device_pending | Gerät wartet auf Freigabe: nicht neu verbinden, bis `GET /api/v1/devices/{id}` den Zustand `active` meldet |
 | `4017` | device_replaced | eine neuere Verbindung desselben Geräts ist aktiv: nicht von selbst neu verbinden, erst bei Rückkehr in den Vordergrund oder auf Bedienung |
-| `4018` | forbidden | the login is valid, but `gateway.connect` is denied (for example `scope_missing` of an app): show the error, do not renew the token, do not reconnect on its own |
+| `4018` | forbidden | Anmeldung gültig, aber `gateway.connect` verweigert (z. B. `scope_missing` einer App): Fehler anzeigen, Token nicht erneuern, nicht von selbst neu verbinden |
 
 Die Terminal-Verbindungen (Strom des Geräts, Steuer- und Datenverbindung des Host-Dienstes) sind
 eigene WebSocket-Kanäle mit eigenen Schließ-Codes `4100` bis `4114`
@@ -353,7 +354,7 @@ Zuordnung beim Verbindungsaufbau (Grund: ein Code je Ursache, damit der Client r
 | kein `identify` und kein `resume` innerhalb von `sync.identify_timeout` | `4003` |
 | Rahmen über `sync.ws_max_frame_bytes`, Binärrahmen, ungültiges JSON oder UTF-8, doppelter Schlüssel, unbekanntes Feld | `4002` |
 | Token oder DPoP-Beweis ungültig, `device_id` passt nicht | `4004` |
-| the login is valid, but another rejection `forbidden` (for example `scope_missing`); a new token does not help | `4018` |
+| Anmeldung gültig, aber sonstige Ablehnung `forbidden` (z. B. `scope_missing`); ein neues Token hilft nicht | `4018` |
 | Zugriffstoken abgelaufen | `4011` |
 | Sitzung, Gerät, Token, Prinzipal oder App-Installation widerrufen bzw. nicht aktiv | `4012` |
 | Gerät oder bereitgestellter Mensch wartet auf Freigabe | `4016` |
@@ -926,7 +927,7 @@ sequenceDiagram
     participant AZ as authz
     participant DB as PostgreSQL
     C->>GW: Upgrade
-    GW-->>C: hello (heartbeat_interval, resume_window, dpop_nonce)
+    GW-->>C: hello (heartbeat_interval_ms, resume_window_ms, dpop_nonce)
     C->>GW: identify (access_token, dpop, device_id, cursor = 1200)
     GW->>AZ: authorize(gateway.connect), sichtbare Kanäle
     AZ-->>GW: Rechte-Stand (permission_version)

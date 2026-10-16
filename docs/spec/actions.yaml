@@ -2788,10 +2788,11 @@ ws_ops:
   action: gateway.connect
   also_actions:
   - agent.heartbeat
-  action_text: '`gateway.connect` (Sitzung muss gültig sein); bei Agenten zusätzlich `agent.heartbeat`'
+  action_text: '`gateway.connect` (Sitzung muss gültig sein, verbraucht nichts aus `rl.gateway_connect`); bei Agenten zusätzlich `agent.heartbeat`'
 - op: reauth
   direction: client_to_server
   action: gateway.connect
+  action_text: '`gateway.connect` (verbraucht nichts aus `rl.gateway_connect`)'
 - op: focus
   direction: client_to_server
   action: gateway.focus

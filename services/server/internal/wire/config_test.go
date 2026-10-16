@@ -265,6 +265,15 @@ func TestConfigSchemaBuilds(t *testing.T) {
 			Chapter: "11-erweiterungen.md"},
 		// M3-18
 		"notify.user_default_level": {Kind: config.KindEnum, Default: "mentions", Enum: []string{"all", "mentions", "mute"}, Chapter: "13-push-benachrichtigungen.md"},
+		// M1-64
+		"sync.ws_max_frame_bytes":   {Kind: config.KindInt, Default: "1048576", Min: "1024", Max: "16777216", Chapter: "04-sync-protokoll.md"},
+		"sync.identify_timeout":     {Kind: config.KindDuration, Default: "10s", Min: "1ms", Chapter: "04-sync-protokoll.md"},
+		"sync.heartbeat_interval":   {Kind: config.KindDuration, Default: "30s", Min: "1ms", Chapter: "04-sync-protokoll.md"},
+		"sync.heartbeat_miss_limit": {Kind: config.KindInt, Default: "2", Min: "0", Max: "100", Chapter: "04-sync-protokoll.md"},
+		"sync.resume_window":        {Kind: config.KindDuration, Default: "5m", Min: "1ms", Chapter: "04-sync-protokoll.md"},
+		"sync.reauth_lead_time":     {Kind: config.KindDuration, Default: "60s", Min: "1ms", Chapter: "04-sync-protokoll.md"},
+		"sync.outbound_queue_max":   {Kind: config.KindInt, Default: "10000", Min: "1", Max: "1000000", Chapter: "04-sync-protokoll.md"},
+		"gateway.write_timeout":     {Kind: config.KindDuration, Default: "10s", Min: "1ms", Chapter: "02-architektur.md"},
 	}
 	// Two keys per class of 05 "Rate-Limit-Klassen" (M1-19), with the defaults of 05 section 10.
 	for class, def := range map[string][2]string{

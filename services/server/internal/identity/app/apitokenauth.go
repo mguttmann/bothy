@@ -48,7 +48,7 @@ func (a *Authenticator) AuthenticateAPIToken(ctx context.Context, token string, 
 	if !found || rec.PrincipalKind != wantKind {
 		return actor.Actor{}, unauthenticated()
 	}
-	out := actor.Actor{ID: rec.PrincipalID, Kind: kind, TokenID: rec.ID, Scopes: rec.Scopes}
+	out := actor.Actor{ID: rec.PrincipalID, Kind: kind, TokenID: rec.ID, Scopes: rec.Scopes, CredentialExpiresAt: rec.ExpiresAt}
 	now := a.clk.Now()
 	if !rec.Active(now) {
 		out.CredentialInactive = true

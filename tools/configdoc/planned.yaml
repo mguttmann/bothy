@@ -51,8 +51,6 @@ rules:
     etappe: M7
   - match: "file."  # M3-01 to M3-08
     etappe: M3
-  - match: "gateway."  # M1-64
-    etappe: M1
   - match: "interaction."  # M2-15
     etappe: M2
   - match: migrate.recent_backup_max_age  # M7-02

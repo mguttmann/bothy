@@ -1,0 +1,303 @@
+// SPDX-License-Identifier: Apache-2.0
+
+package app
+
+import (
+	"context"
+	"encoding/json"
+	"errors"
+	"fmt"
+	"log/slog"
+	"slices"
+	"time"
+
+	"github.com/OWNER/bothy/services/server/internal/gateway/domain"
+	"github.com/OWNER/bothy/services/server/internal/kernel/actor"
+	"github.com/OWNER/bothy/services/server/internal/kernel/authorize"
+	"github.com/OWNER/bothy/services/server/internal/kernel/clock"
+	"github.com/OWNER/bothy/services/server/internal/kernel/ids"
+	"github.com/OWNER/bothy/services/server/internal/sync"
+)
+
+// Log keys of the gateway; constants for sloglint, names of the signals catalogue.
+const (
+	logKeyAction    = "bothy.action"
+	logKeyReason    = "bothy.reason"
+	logKeyErrorType = "error.type"
+)
+
+// Config holds the configuration keys of the gateway use cases.
+type Config struct {
+	// HTU is the htu every proof must name: the HTTPS form of the origin of server.public_url
+	// plus /api/v1/gateway, also behind TLS termination (04 section 6.3 step 3).
+	HTU string
+	// IdentifyTimeout is sync.identify_timeout.
+	IdentifyTimeout time.Duration
+	// HeartbeatInterval is sync.heartbeat_interval.
+	HeartbeatInterval time.Duration
+	// HeartbeatMissLimit is sync.heartbeat_miss_limit.
+	HeartbeatMissLimit int
+	// ResumeWindow is sync.resume_window.
+	ResumeWindow time.Duration
+	// ReauthLeadTime is sync.reauth_lead_time.
+	ReauthLeadTime time.Duration
+	// ProtocolVersions are the protocol versions this server speaks (info.x-protocol-versions).
+	ProtocolVersions []int
+}
+
+// validate names every invalid value.
+func (c Config) validate() error {
+	var problems []error
+	if c.HTU == "" {
+		problems = append(problems, errors.New("the gateway htu is empty"))
+	}
+	for name, d := range map[string]time.Duration{
+		"sync.identify_timeout": c.IdentifyTimeout, "sync.heartbeat_interval": c.HeartbeatInterval,
+		"sync.resume_window": c.ResumeWindow, "sync.reauth_lead_time": c.ReauthLeadTime,
+	} {
+		if d <= 0 {
+			problems = append(problems, fmt.Errorf("%s must be positive", name))
+		}
+	}
+	if c.HeartbeatMissLimit < 0 {
+		problems = append(problems, errors.New("sync.heartbeat_miss_limit must not be negative"))
+	}
+	if len(c.ProtocolVersions) == 0 {
+		problems = append(problems, errors.New("no protocol version"))
+	}
+	return errors.Join(problems...)
+}
+
+// Deps are the collaborators of the gateway.
+type Deps struct {
+	// Authenticator verifies token and proof of identify, resume and reauth (identity, M1-34).
+	Authenticator actor.Authenticator
+	// Authorizer decides gateway.connect.
+	Authorizer authorize.Authorizer
+	// Nonces is the current DPoP nonce of identity.
+	Nonces NonceSource
+	// Limiter is rl.gateway_connect.
+	Limiter ConnectLimiter
+	// Snapshot builds the snapshot of ready (sync, M1-63).
+	Snapshot sync.Snapshot
+	// CatchUp checks the cursor of identify and resume (sync, M1-63).
+	CatchUp sync.CatchUp
+	// Epoch reads the sync epoch for hello.
+	Epoch EpochSource
+	// Delivery registers and attaches sessions (M1-65; a no-op until then).
+	Delivery Delivery
+	// Decoder checks and decodes the bodies of client ops (adapters/ws).
+	Decoder FrameDecoder
+	// Alarm counts handlers without an authorization check.
+	Alarm ProofAlarm
+	// Clock is the time of deadlines and frames; nil means clock.System().
+	Clock clock.Clock
+	// Log receives the errors of ops; nil means slog.Default(). It never receives tokens,
+	// proofs, nonces or snapshots.
+	Log *slog.Logger
+}
+
+// Gateway holds the use cases of the WebSocket gateway (docs/spec/04-sync-protokoll.md section
+// 6): hello, identify, resume, heartbeat, reauth, the deadlines of a connection and the session
+// store. It is safe for concurrent use.
+type Gateway struct {
+	cfg      Config
+	d        Deps
+	sessions *Sessions
+	ops      *Dispatcher
+	handlers map[string]OpHandler
+}
+
+// New returns the gateway over d with the configuration cfg. Errors: an invalid value of cfg or
+// a missing collaborator.
+func New(cfg Config, d Deps) (*Gateway, error) {
+	if err := cfg.validate(); err != nil {
+		return nil, fmt.Errorf("gateway: %w", err)
+	}
+	if d.Authenticator == nil || d.Authorizer == nil || d.Nonces == nil || d.Limiter == nil || d.Snapshot == nil || d.CatchUp == nil ||
+		d.Epoch == nil || d.Delivery == nil || d.Decoder == nil || d.Alarm == nil {
+		return nil, errors.New("gateway: New needs every collaborator")
+	}
+	if d.Clock == nil {
+		d.Clock = clock.System()
+	}
+	if d.Log == nil {
+		d.Log = slog.Default()
+	}
+	cfg.ProtocolVersions = slices.Clone(cfg.ProtocolVersions)
+	g := &Gateway{cfg: cfg, d: d, sessions: newSessions(cfg.ResumeWindow, d.Clock), ops: newDispatcher(d.Decoder, d.Alarm, d.Log)}
+	g.handlers = map[string]OpHandler{opIdentify: g.identify, opResume: g.resume, "heartbeat": g.heartbeat, "reauth": g.reauth}
+	return g, nil
+}
+
+// Register registers the gateway's own handler of op with action in the dispatcher. Errors: an
+// op the gateway has no handler for (its ticket has not built it yet), or a second registration.
+// internal/wire calls it for every op of routes.GatewayOps with the action of its x-authz-action.
+func (g *Gateway) Register(op string, action authorize.Action) error {
+	h, ok := g.handlers[op]
+	if !ok {
+		return fmt.Errorf("gateway: no handler for the op %q", op)
+	}
+	return g.ops.Register(op, action, h)
+}
+
+// Dispatcher returns the op registry, for handlers of later tickets.
+func (g *Gateway) Dispatcher() *Dispatcher { return g.ops }
+
+// Sessions returns the session store; the lifecycle runs its sweeper.
+func (g *Gateway) Sessions() *Sessions { return g.sessions }
+
+// SessionOf returns the session of c, or nil before identify or resume.
+func (g *Gateway) SessionOf(c *Connection) *Session {
+	s, _ := c.current()
+	return s
+}
+
+// Open starts a connection on conn right after the upgrade and sends hello (04 section 6.3 step
+// 2): heartbeat interval and resume window, protocol versions, the current nonce, the server time
+// and the sync epoch. Errors: the epoch cannot be read; the caller closes with 4000.
+func (g *Gateway) Open(ctx context.Context, conn Conn) (*Connection, error) {
+	epoch, err := g.d.Epoch.SyncEpoch(ctx)
+	if err != nil {
+		return nil, err
+	}
+	now := g.d.Clock.Now()
+	c := &Connection{id: ids.New(), conn: conn, opened: now, state: domain.StateAwaitingIdentify}
+	err = conn.Send(Hello{
+		HeartbeatInterval: g.cfg.HeartbeatInterval, ResumeWindow: g.cfg.ResumeWindow, ProtocolVersions: slices.Clone(g.cfg.ProtocolVersions),
+		DPoPNonce: g.d.Nonces.CurrentNonce(), ServerTime: now, SyncEpoch: epoch,
+	})
+	return c, err
+}
+
+// Handle dispatches the client op op with the raw body d on c (Dispatcher.Dispatch).
+func (g *Gateway) Handle(ctx context.Context, c *Connection, op string, d json.RawMessage) {
+	g.ops.Dispatch(ctx, c, op, d)
+}
+
+// Tick applies the deadlines of c at now and returns the instant it wants the next tick, zero
+// once the connection is closed: 4003 without identify or resume within sync.identify_timeout;
+// 4009 at the heartbeat deadline (domain.HeartbeatDeadline); 4011 at the expiry of the
+// credential; for people one reauth_required at sync.reauth_lead_time before it, with the
+// current nonce. Agents and apps get no reauth_required.
+func (g *Gateway) Tick(_ context.Context, c *Connection, now time.Time) time.Time {
+	c.mu.Lock()
+	var t tick
+	switch c.state {
+	case domain.StateAwaitingIdentify:
+		t = g.tickAwaiting(c, now)
+	case domain.StateReady:
+		t = g.tickReady(c, now)
+	case domain.StateDetached, domain.StateClosed:
+		c.mu.Unlock()
+		return time.Time{}
+	}
+	c.mu.Unlock()
+	if t.close != 0 {
+		c.Close(t.close, "")
+		return time.Time{}
+	}
+	if t.reauth != nil {
+		_ = c.conn.Send(*t.reauth)
+	}
+	return t.next
+}
+
+// tick is the result of one deadline check: a close, a reauth_required to send, the next instant.
+type tick struct {
+	close  domain.CloseCode
+	reauth *ReauthRequired
+	next   time.Time
+}
+
+// tickAwaiting is the deadline of a connection before identify; c.mu is held.
+func (g *Gateway) tickAwaiting(c *Connection, now time.Time) tick {
+	deadline := c.opened.Add(g.cfg.IdentifyTimeout)
+	if !now.Before(deadline) {
+		return tick{close: domain.CloseNotIdentified}
+	}
+	return tick{next: deadline}
+}
+
+// tickReady are the deadlines of a ready connection; c.mu is held.
+func (g *Gateway) tickReady(c *Connection, now time.Time) tick {
+	beat := domain.HeartbeatDeadline(c.lastBeat, g.cfg.HeartbeatInterval, g.cfg.HeartbeatMissLimit)
+	switch {
+	case !now.Before(beat):
+		return tick{close: domain.CloseHeartbeatTimeout}
+	case c.expiresAt.IsZero():
+		return tick{next: beat}
+	case !now.Before(c.expiresAt):
+		return tick{close: domain.CloseTokenExpired}
+	}
+	t := tick{next: earliest(beat, c.expiresAt)}
+	if c.actor.Kind != actor.KindUser || c.reauthSent {
+		return t
+	}
+	at := domain.ReauthAt(c.expiresAt, g.cfg.ReauthLeadTime)
+	if now.Before(at) {
+		t.next = earliest(t.next, at)
+		return t
+	}
+	c.reauthSent = true
+	t.reauth = &ReauthRequired{ExpiresAt: c.expiresAt, DPoPNonce: g.d.Nonces.CurrentNonce()}
+	return t
+}
+
+// earliest returns the earlier of a and b.
+func earliest(a, b time.Time) time.Time {
+	if b.Before(a) {
+		return b
+	}
+	return a
+}
+
+// resumableEnds are the close codes after which the session stays resumable: the client is told
+// to reconnect and try resume, or the connection simply went away (0).
+var resumableEnds = map[domain.CloseCode]bool{
+	0: true, domain.CloseNormal: true, domain.CloseGoingAway: true, domain.CloseUnknownError: true, domain.CloseUnknownOp: true,
+	domain.CloseDecodeError: true, domain.CloseHeartbeatTimeout: true, domain.CloseTokenExpired: true,
+	domain.CloseServerRestart: true, domain.CloseSlowConsumer: true,
+}
+
+// Closed ends c after its connection is gone: its session is detached from delivery and stays
+// resumable for sync.resume_window after a resumable end; after 4004, 4012, 4016, 4017, 4018 and
+// the other final ends it is removed. A session that a newer connection took over is left alone.
+func (g *Gateway) Closed(c *Connection) {
+	c.mu.Lock()
+	s, code := c.session, c.code
+	c.state = domain.StateClosed
+	c.mu.Unlock()
+	if s == nil {
+		return
+	}
+	if g.sessions.release(s, c, resumableEnds[code]) {
+		g.d.Delivery.Detach(s)
+	}
+}
+
+// replace closes every connection of old with 4017 (one connection per device, 04 section 6.1).
+func replace(old []*Connection) {
+	for _, o := range old {
+		o.Close(domain.CloseDeviceReplaced, "")
+	}
+}
+
+// attach is note 12 of the brief: with a cursor, catch-up decides; a reason sends
+// resync_required and delivery starts at head (the connection stays live from there, 04 section
+// 7.3); otherwise delivery starts at the cursor; without a cursor at head.
+func (g *Gateway) attach(ctx context.Context, c *Connection, s *Session, cursor *int64, epoch *ids.ID, head int64) error {
+	from := head
+	if cursor != nil {
+		res, err := g.d.CatchUp.Check(ctx, sync.CheckInput{After: *cursor, Epoch: epoch})
+		if err != nil {
+			return err
+		}
+		if res.Reason != "" {
+			_ = c.conn.Send(ResyncRequired{Reason: res.Reason, HeadSeq: head, SyncEpoch: res.SyncEpoch})
+		} else {
+			from = *cursor
+		}
+	}
+	return g.d.Delivery.Attach(ctx, s, from)
+}

@@ -84,6 +84,15 @@ type Operation struct {
 	// Download is true when a success streams a body that is not JSON (an export, a file): the
 	// route class of downloads, whose deadline is http.transfer_timeout (02 section 14.2).
 	Download bool
+	// AuthorizedInBand marks the one route whose handler authorizes its action on the connection
+	// it opens instead of in the request: GET /api/v1/gateway (M1-64), which upgrades to a
+	// WebSocket and authenticates and authorizes gateway.connect with the identify or resume
+	// frame (04 section 6.3, R-SY-01). Chain.Wrap then runs no per-route stage for it: no
+	// authentication of the upgrade request, no rate limit, body limit or deadline and no proof
+	// of an authorize check for the 101 response; the outer steps 1 to 4 still apply. The
+	// registration check counts the route with its action and class (AZ-P1), and a test in
+	// internal/wire holds that no other route sets the marker.
+	AuthorizedInBand bool
 }
 
 // transfer reports whether the route class of op is that of transfers (uploads and downloads):

@@ -144,6 +144,8 @@ E = Elevation of Privilege. "Register" verweist auf Abschnitt 6.
 | T | Wiedereinspielen von `identify` | DPoP mit Server-Nonce aus `hello` (04, R-SY-01) | T-TK-01 |
 | I | Zustellung nach Entzug | Rechte zur Zustellzeit, `access.changed` in Log-Reihenfolge (07, 8.2) | T-AZ-03 |
 | D | Langsamer Verbraucher | Ausgangspuffer-Grenze, `4014` (04) | T-DS-01 |
+| D | Connections held open without `identify` until `sync.identify_timeout`, oversized or malformed frames | Close `4003` after `sync.identify_timeout`; the upgrade reads no database; frames above `sync.ws_max_frame_bytes` and frames failing the JSON guard or the schema close with `4002` before any use case runs (M1-64) | T-DS-01 |
+| D | Draining the `rl.gateway_connect` bucket of a foreign device | The bucket counts only after the credentials of `identify` or `resume` are verified, keyed by the verified device or token (05, M1-64) | T-DS-01 |
 | E | Fokus auf fremde Threads | `gateway.focus` prüft je Thread (05) | T-AZ-01 |
 
 ### 5.6 authz und identity

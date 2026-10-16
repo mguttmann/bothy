@@ -485,7 +485,7 @@ operations:
     action: receive
     channel:
       $ref: '#/channels/gateway'
-    summary: Liveness signal with the last processed `seq`. Agents add their state; then `agent.heartbeat` is checked as well.
+    summary: Liveness signal with the last processed `seq`. Agents add their state; then `agent.heartbeat` is checked as well. Does not consume the `rl.gateway_connect` bucket, which counts only `identify` and `resume` (05 section 3).
     messages:
     - $ref: '#/channels/gateway/messages/op.heartbeat'
     x-authz-action: gateway.connect
@@ -499,7 +499,7 @@ operations:
     action: receive
     channel:
       $ref: '#/channels/gateway'
-    summary: Hand over a new access token during the connection.
+    summary: Hand over a new access token during the connection. Does not consume the `rl.gateway_connect` bucket (05 section 3).
     messages:
     - $ref: '#/channels/gateway/messages/op.reauth'
     x-authz-action: gateway.connect
@@ -955,7 +955,7 @@ components:
     op.heartbeat:
       name: heartbeat
       title: heartbeat
-      summary: Liveness signal with the last processed `seq`. Agents add their state; then `agent.heartbeat` is checked as well.
+      summary: Liveness signal with the last processed `seq`. Agents add their state; then `agent.heartbeat` is checked as well. Does not consume the `rl.gateway_connect` bucket, which counts only `identify` and `resume` (05 section 3).
       payload:
         type: object
         required: [op, d]
@@ -968,7 +968,7 @@ components:
     op.reauth:
       name: reauth
       title: reauth
-      summary: Hand over a new access token during the connection.
+      summary: Hand over a new access token during the connection. Does not consume the `rl.gateway_connect` bucket (05 section 3).
       payload:
         type: object
         required: [op, d]

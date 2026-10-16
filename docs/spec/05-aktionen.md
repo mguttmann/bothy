@@ -736,8 +736,8 @@ Ausgehende Webhooks und Push nutzen dieselbe Empfangs-Aktion (`webhook_out.deliv
 |---|---|---|
 | `identify` | Client an Server | `gateway.connect` |
 | `resume` | Client an Server | `gateway.connect` |
-| `heartbeat` | Client an Server | `gateway.connect` (Sitzung muss gültig sein); bei Agenten zusätzlich `agent.heartbeat` |
-| `reauth` | Client an Server | `gateway.connect` |
+| `heartbeat` | Client an Server | `gateway.connect` (Sitzung muss gültig sein, verbraucht nichts aus `rl.gateway_connect`); bei Agenten zusätzlich `agent.heartbeat` |
+| `reauth` | Client an Server | `gateway.connect` (verbraucht nichts aus `rl.gateway_connect`) |
 | `focus` | Client an Server | `gateway.focus` je Thread |
 | `typing.start` | Client an Server | `typing.start` |
 | `typing.stop` | Client an Server | `typing.start` |
