@@ -170,6 +170,5 @@ void main() {
     h.connection.typing.onInput(thread(1));
     expect(ch.sentOps, ['identify', 'typing.start']);
     expect(ch.lastData('typing.start'), {'thread_id': thread(1).value});
-    expect(const GlobalSeq(1).value, 1);
   });
 }

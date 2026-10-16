@@ -237,6 +237,13 @@ final class GatewayConnection {
   void _connect() {
     if (_stopped || _attempting) return;
     _waitGen++;
+    if (!_keepConnectedInBackground && !_foreground) {
+      // Mobile has no WebSocket in the background (15 7.2 `Suspended`); every path that would
+      // reconnect there (a backoff timer, a token renewal, an approved device) waits for the
+      // foreground instead.
+      _set(ConnectionPhase.suspended);
+      return;
+    }
     if (!_network.online) {
       _set(ConnectionPhase.offline, ConnectionReason.networkUnavailable);
       return;
@@ -383,8 +390,8 @@ final class GatewayConnection {
 
   Future<void> _onResumed(int gen, GatewayResumed resumed) async {
     _session.onResumed(resumed);
-    await _sessionStarted();
     if (gen != _channelGen) return;
+    await _sessionStarted();
     focus.onResumed();
     final listener = _listener;
     if (listener == null) {
@@ -395,7 +402,7 @@ final class GatewayConnection {
     await listener.onResumed(resumed, _control);
   }
 
-  /// Common part of `ready` and `resumed`: backoff and 4004 count reset (04 6.5), heartbeat.
+  /// Common part of `ready` and `resumed`: backoff and renewal count reset (04 6.5), heartbeat.
   Future<void> _sessionStarted() async {
     _identified = true;
     _backoff.reset();
@@ -470,12 +477,16 @@ final class GatewayConnection {
 
   /// Closes the socket with `1000` from the client side and applies [reaction] when it is done.
   Future<void> _closeOwn(CloseReaction reaction) async {
+    final ch = _channel;
+    // A socket with a close code was already closed by the server; its code wins (for example
+    // 4012 arriving just before the app goes to the background).
+    if (ch == null || ch.closeCode != null) return;
     _ownReaction = reaction;
     _heartbeat?.stop();
     if (reaction.phase != ConnectionPhase.backoff) {
       _set(reaction.phase, reaction.reason);
     }
-    await _channel?.close(1000);
+    await ch.close(1000);
   }
 
   Future<void> _onDone(int gen) async {
@@ -527,16 +538,21 @@ final class GatewayConnection {
       case Reconnect.afterPendingDevice:
         _set(reaction.phase, reaction.reason);
         unawaited(_pollPendingDevice());
+      case Reconnect.onForeground
+          when reaction.phase == ConnectionPhase.suspended && _foreground:
+        // The app came back while its own background close was still running.
+        _connect();
       case Reconnect.onForeground || Reconnect.onUserAction || Reconnect.never:
         _set(reaction.phase, reaction.reason);
     }
   }
 
-  /// `4004` and `4011`: renew the token once, then reconnect at once; a second `4004` before
-  /// the next `ready` waits the backoff, so a server that keeps rejecting is not flooded.
+  /// `4004` and `4011`: renew the token once, then reconnect at once; a second renewal before
+  /// the next `ready` or `resumed` waits the backoff, so a server that keeps rejecting is not
+  /// flooded.
   Future<void> _renewThenConnect(CloseReaction reaction) async {
     _set(ConnectionPhase.backoff, reaction.reason);
-    if (reaction.code == 4004) _authFailures++;
+    _authFailures++;
     try {
       await _auth.refresh.refreshNow();
     } on SessionEnded {

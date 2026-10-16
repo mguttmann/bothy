@@ -174,6 +174,23 @@ void main() {
     expect(o.nextOp, 'resume');
   });
 
+  test('a second 4011 before resumed waits the backoff', () async {
+    final ch = await h.goLive();
+    ch.serverClose(4011);
+    await settle();
+    expect(h.transport.channels, hasLength(2));
+    await h.answerHello();
+    final closedAt = h.clock.now();
+    h.transport.last.serverClose(4011);
+    await settle();
+    expect(h.refreshes, 2);
+    expect(h.phase, ConnectionPhase.backoff);
+    while (h.transport.channels.length == 2) {
+      await h.clock.elapse(const Duration(milliseconds: 50));
+    }
+    expect(h.transport.last.openedAt.difference(closedAt), within(base * 2));
+  });
+
   test('4012 signs out with deletion of local data and stays down', () async {
     final o = await closeLive(h, 4012);
     expect(o.state.phase, ConnectionPhase.signedOut);

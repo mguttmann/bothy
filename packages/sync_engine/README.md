@@ -42,7 +42,8 @@ fields are ignored.
 `deviceReplaced`, `forbidden`, `rateLimited`, `revoked`, `protocolUnsupported`,
 `closedByServer(code)`. On mobile the connection closes with `1000` in the background
 (`suspended`) and resumes in the foreground; with `keepConnectedInBackground` (desktop) it
-stays connected.
+stays connected; no reconnect path (backoff timer, token renewal, approved device) opens a
+socket in the background on mobile.
 
 ### Close codes
 
@@ -53,11 +54,11 @@ D-M4-13-2). "Next frame" is the answer to the next `hello`.
 |---|---|---|---|
 | `1000` | foreground: `backoff`; background: `offline`, `closedByServer(1000)` | `resume` | backoff; in the background until the foreground |
 | `1001`, `4000` to `4003`, `4005`, `4009`, `4014` | `backoff`, `closedByServer(code)` | `resume` | backoff |
-| `4004` | `backoff` after one `refreshNow`; failed refresh: `signedOut` | `resume` | none (a second `4004` before `ready`: backoff) |
+| `4004` | `backoff` after one `refreshNow`; failed refresh: `signedOut` | `resume` | none (a second renewal before `ready` or `resumed`: backoff) |
 | `4006` | `backoff` | `identify` | backoff |
 | `4007` | `updateRequired`, `protocolUnsupported` | none | never |
 | `4008` | `backoff`, `rateLimited` | `resume` | `retry_after=<seconds>` of the reason, else backoff |
-| `4011` | `backoff` after one `refreshNow` | `resume` | none |
+| `4011` | `backoff` after one `refreshNow`; failed refresh: `signedOut` | `resume` | none (a second renewal before `ready` or `resumed`: backoff) |
 | `4012` | `signedOut`, `revoked`; `AuthSession.sessionRevoked` (`SignedOut.deleteLocalData`) | none | never |
 | `4013` | `backoff`, `closedByServer(4013)` | `resume` | uniform in `[0, base]`, counter unchanged |
 | `4015` | `offline`, `closedByServer(4015)`, logged as unexpected | none | `connectNow` |

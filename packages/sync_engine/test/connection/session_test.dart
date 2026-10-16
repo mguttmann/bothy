@@ -246,4 +246,56 @@ void main() {
     expect(h.phase, ConnectionPhase.suspended);
     expect(h.transport.attempts, 0);
   });
+
+  test('a return to the foreground before the background close is handled reconnects', () async {
+    await h.goLive();
+    h.lifecycle.set(AppActivity.background);
+    h.lifecycle.set(AppActivity.foreground);
+    await settle();
+    expect(h.transport.channels, hasLength(2));
+    expect(h.phase, ConnectionPhase.connecting);
+  });
+
+  test('no socket opens in the background after a token renewal', () async {
+    final ch = await h.goLive();
+    ch.serverClose(4011);
+    h.lifecycle.set(AppActivity.background);
+    await settle();
+    expect(h.refreshes, 1);
+    expect(h.transport.channels, hasLength(1));
+    expect(h.phase, ConnectionPhase.suspended);
+    h.lifecycle.set(AppActivity.foreground);
+    await settle();
+    expect(h.transport.channels, hasLength(2));
+  });
+
+  test(
+    'no socket opens in the background after the pending device is approved',
+    () async {
+      var polls = 0;
+      h.api.routes['GET /devices/$deviceId'] = (_) {
+        polls++;
+        return FakeReply(200, deviceBody(polls < 2 ? 'pending' : 'active'));
+      };
+      final ch = await h.goLive();
+      ch.serverClose(4016);
+      await settle();
+      h.lifecycle.set(AppActivity.background);
+      await h.clock.elapse(const Duration(seconds: 10));
+      expect(polls, 2);
+      expect(h.transport.channels, hasLength(1));
+      expect(h.phase, ConnectionPhase.suspended);
+      h.lifecycle.set(AppActivity.foreground);
+      await settle();
+      expect(h.transport.channels, hasLength(2));
+    },
+  );
+
+  test('a server close that arrives before the background close keeps its reaction', () async {
+    final ch = await h.goLive();
+    ch.serverClose(4012);
+    h.lifecycle.set(AppActivity.background);
+    await settle();
+    expect(h.phase, ConnectionPhase.signedOut);
+  });
 }
