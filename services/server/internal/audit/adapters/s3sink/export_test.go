@@ -24,22 +24,39 @@ func APIMethods() []string {
 	return out
 }
 
+// GetCounters counts the GetObject calls of a CountingAPI and the most that ran at once.
+type GetCounters struct {
+	Gets, Peak atomic.Int64
+	inFlight   atomic.Int64
+}
+
+// ReadParallel is the bound of concurrent GETs of one List.
+const ReadParallel = readParallel
+
 // CountingAPI wraps the API of s: every GetObject is counted and delayed by delay, as a remote
-// object store answers.
-func CountingAPI(s *Sink, delay time.Duration) *atomic.Int64 {
-	n := &atomic.Int64{}
-	s.api = slowAPI{objectAPI: s.api, gets: n, delay: delay}
-	return n
+// object store answers, and the peak of concurrent calls is kept.
+func CountingAPI(s *Sink, delay time.Duration) *GetCounters {
+	c := &GetCounters{}
+	s.api = slowAPI{objectAPI: s.api, c: c, delay: delay}
+	return c
 }
 
 type slowAPI struct {
 	objectAPI
-	gets  *atomic.Int64
+	c     *GetCounters
 	delay time.Duration
 }
 
 func (a slowAPI) GetObject(ctx context.Context, in *awss3.GetObjectInput, opts ...func(*awss3.Options)) (*awss3.GetObjectOutput, error) {
-	a.gets.Add(1)
+	a.c.Gets.Add(1)
+	now := a.c.inFlight.Add(1)
+	defer a.c.inFlight.Add(-1)
+	for {
+		peak := a.c.Peak.Load()
+		if now <= peak || a.c.Peak.CompareAndSwap(peak, now) {
+			break
+		}
+	}
 	time.Sleep(a.delay)
 	return a.objectAPI.GetObject(ctx, in, opts...)
 }

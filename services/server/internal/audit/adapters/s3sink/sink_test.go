@@ -319,7 +319,7 @@ func TestAPIMethodSet(t *testing.T) {
 // TestListScalesWithManyCheckpoints: the job audit.chain_verify lists the sink on every run, so
 // List reads every stored version once per process (a version never changes) and reads new ones
 // in parallel; with a remote store answering each GET after a delay, a cold List of many
-// checkpoints stays far below the sequential time, and a second List reads nothing again.
+// checkpoints runs several GETs at once within the bound, and a second List reads nothing again.
 func TestListScalesWithManyCheckpoints(t *testing.T) {
 	t.Parallel()
 	const n, delay = 120, 25 * time.Millisecond
@@ -330,30 +330,30 @@ func TestListScalesWithManyCheckpoints(t *testing.T) {
 		}
 	}
 	gets := s3sink.CountingAPI(s.Sink, delay)
-	start := time.Now()
 	list, err := s.List(t.Context())
-	cold := time.Since(start)
 	if err != nil || len(list) != n || list[n-1].Seq != n || string(list[0].JWS) != "a.1.c" {
 		t.Fatalf("List: %d checkpoints, %v", len(list), err)
 	}
-	if sequential := time.Duration(n) * delay; cold > sequential/4 {
-		t.Errorf("cold List took %v, the sequential reads alone %v", cold, sequential)
+	// The cold List reads in parallel within the bound; counted, not timed, so a loaded host
+	// cannot fail it.
+	if peak := gets.Peak.Load(); peak < 2 || peak > s3sink.ReadParallel {
+		t.Errorf("cold List ran %d GETs at once, want between 2 and %d", peak, s3sink.ReadParallel)
 	}
-	before := gets.Load()
+	before := gets.Gets.Load()
 	if _, err := s.List(t.Context()); err != nil {
 		t.Fatal(err)
 	}
-	if again := gets.Load() - before; again != 0 {
+	if again := gets.Gets.Load() - before; again != 0 {
 		t.Errorf("the second List read %d objects again, want 0", again)
 	}
 	if err := s.Put(t.Context(), app.SignedCheckpoint{Seq: n + 1, JWS: []byte("new.jws.x")}); err != nil {
 		t.Fatal(err)
 	}
-	before = gets.Load()
+	before = gets.Gets.Load()
 	if list, err := s.List(t.Context()); err != nil || len(list) != n+1 || string(list[n].JWS) != "new.jws.x" {
 		t.Fatalf("List after a new checkpoint: %d, %v", len(list), err)
 	}
-	if read := gets.Load() - before; read != 1 {
+	if read := gets.Gets.Load() - before; read != 1 {
 		t.Errorf("List after one new checkpoint read %d objects, want 1", read)
 	}
 }
