@@ -139,6 +139,51 @@ final class RunCardModel {
 
   /// Cost so far; `null` when not shown.
   final VizCost? cost;
+
+  /// This card without its cost: TV mode without `viz.tv_show_costs` (25 6.6).
+  RunCardModel withoutCost() => cost == null
+      ? this
+      : RunCardModel(
+          runId: runId,
+          threadId: threadId,
+          agentId: agentId,
+          agentName: agentName,
+          state: state,
+          billingMode: billingMode,
+          approvalPending: approvalPending,
+          stepKind: stepKind,
+          stepName: stepName,
+        );
+
+  // Value equality lets the live topology reuse the widget of an unchanged card between two
+  // frames instead of rebuilding it (25 7.3, performance).
+  @override
+  bool operator ==(Object other) =>
+      other is RunCardModel &&
+      other.runId == runId &&
+      other.threadId == threadId &&
+      other.agentId == agentId &&
+      other.agentName == agentName &&
+      other.state == state &&
+      other.billingMode == billingMode &&
+      other.approvalPending == approvalPending &&
+      other.stepKind == stepKind &&
+      other.stepName == stepName &&
+      other.cost == cost;
+
+  @override
+  int get hashCode => Object.hash(
+    runId,
+    threadId,
+    agentId,
+    agentName,
+    state,
+    billingMode,
+    approvalPending,
+    stepKind,
+    stepName,
+    cost,
+  );
 }
 
 /// One lane of the live topology: the active runs of one channel of one space.
@@ -166,6 +211,40 @@ final class LaneModel {
 
   /// The run cards in the order of the frame.
   final List<RunCardModel> cards;
+
+  /// This lane with every card [RunCardModel.withoutCost].
+  LaneModel withoutCosts() => LaneModel(
+    spaceId: spaceId,
+    spaceName: spaceName,
+    channelId: channelId,
+    channelName: channelName,
+    cards: List.unmodifiable(cards.map((c) => c.withoutCost())),
+  );
+
+  @override
+  bool operator ==(Object other) {
+    if (other is! LaneModel ||
+        other.spaceId != spaceId ||
+        other.spaceName != spaceName ||
+        other.channelId != channelId ||
+        other.channelName != channelName ||
+        other.cards.length != cards.length) {
+      return false;
+    }
+    for (var i = 0; i < cards.length; i++) {
+      if (other.cards[i] != cards[i]) return false;
+    }
+    return true;
+  }
+
+  @override
+  int get hashCode => Object.hash(
+    spaceId,
+    channelId,
+    spaceName,
+    channelName,
+    Object.hashAll(cards),
+  );
 
   /// Groups [runs] into lanes by space and channel, in the order the frame gives: a lane
   /// appears where its first run appears, and its cards keep the frame order.

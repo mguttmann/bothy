@@ -74,8 +74,12 @@ final class FixtureLiveFrameSource extends LiveFrameSourceBase {
 ///
 /// [state] picks the fixture state of every answer (`normal`, `empty`, `no_cost_permission`
 /// and so on) where a file for it exists, else `normal`; [failWith] makes every call throw
-/// the problem instead, as a server would answer with it. The filter parameters are accepted
-/// and ignored: a fixture is one answer.
+/// the problem instead, as a server would answer with it, and [failOn] does so for single
+/// operations (`slo`, `costs` and so on, the method names). In the state
+/// `no_cost_permission` `getCostStats` answers `forbidden`, as the server does without
+/// `cost.read.aggregate`. `timeline` keeps only the buckets of the requested `metrics`, as the
+/// server filters them; the other filter parameters are accepted and ignored: a fixture is
+/// one answer. [calls] records the name of every call.
 final class FixtureStatsQuerySource implements StatsQuerySource {
   /// Creates the source on [fixtures].
   FixtureStatsQuerySource(
@@ -97,21 +101,28 @@ final class FixtureStatsQuerySource implements StatsQuerySource {
   /// When set, every call throws this problem.
   api.ApiProblem? failWith;
 
+  /// Problems per operation name, for example `{'slo': forbidden}`.
+  final Map<String, api.ApiProblem> failOn = {};
+
+  /// The operation names of every call, in order.
+  final List<String> calls = [];
+
   String _pick(String prefix) {
     final exists =
         available.isEmpty || available.contains('$prefix.$state.json');
     return exists ? state : 'normal';
   }
 
-  Future<T> _answer<T>(Future<T> Function() load) async {
-    final problem = failWith;
+  Future<T> _answer<T>(String operation, Future<T> Function() load) async {
+    calls.add(operation);
+    final problem = failWith ?? failOn[operation];
     if (problem != null) throw problem;
     return load();
   }
 
   @override
   Future<api.StatsLiveFrame> live({String? spaceId}) =>
-      _answer(() => fixtures.liveFrame(_pick('StatsLiveFrame')));
+      _answer('live', () => fixtures.liveFrame(_pick('StatsLiveFrame')));
 
   @override
   Future<api.StatsTimeline> timeline({
@@ -119,18 +130,27 @@ final class FixtureStatsQuerySource implements StatsQuerySource {
     required DateTime to,
     String? spaceId,
     List<api.StatsMetric>? metrics,
-  }) => _answer(() => fixtures.timeline(_pick('StatsTimeline')));
+  }) => _answer('timeline', () async {
+    final timeline = await fixtures.timeline(_pick('StatsTimeline'));
+    if (metrics == null) return timeline;
+    return timeline.rebuild(
+      (b) => b.buckets.where((bucket) => metrics.contains(bucket.metric)),
+    );
+  });
 
   @override
   Future<api.StatsSloReport> slo() =>
-      _answer(() => fixtures.sloReport(_pick('StatsSloReport')));
+      _answer('slo', () => fixtures.sloReport(_pick('StatsSloReport')));
 
   @override
   Future<api.StatsBackendReport> backends({
     required DateTime from,
     required DateTime to,
     String? spaceId,
-  }) => _answer(() => fixtures.backendReport(_pick('StatsBackendReport')));
+  }) => _answer(
+    'backends',
+    () => fixtures.backendReport(_pick('StatsBackendReport')),
+  );
 
   @override
   Future<api.StatsSeries> usage({
@@ -165,10 +185,15 @@ final class FixtureStatsQuerySource implements StatsQuerySource {
     String? groupBy,
     String? spaceId,
     String? agentId,
-  }) => _answer(() => fixtures.costSeries(_pick('CostSeries')));
+  }) => _answer('costs', () {
+    if (state == 'no_cost_permission') {
+      throw const api.ApiProblem(status: 403, code: 'forbidden');
+    }
+    return fixtures.costSeries(_pick('CostSeries'));
+  });
 
   /// `StatsSeries.<query>.<state>.json`; the state `empty` is shared by every query.
-  Future<api.StatsSeries> _series(String query) => _answer(() {
+  Future<api.StatsSeries> _series(String query) => _answer(query, () {
     if (state == 'empty') return fixtures.series('empty');
     final pick = _pick('StatsSeries.$query');
     return fixtures.series(pick, query: query);
