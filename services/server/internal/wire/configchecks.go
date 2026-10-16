@@ -10,6 +10,7 @@ import (
 	"net/url"
 	"time"
 
+	auditdomain "github.com/OWNER/bothy/services/server/internal/audit/domain"
 	identityapp "github.com/OWNER/bothy/services/server/internal/identity/app"
 	"github.com/OWNER/bothy/services/server/internal/platform/config"
 	"github.com/OWNER/bothy/services/server/internal/platform/httpserver"
@@ -37,6 +38,7 @@ var configChecks = []configCheck{
 	{name: "tls_https", keys: []string{keyPublicURL, keyTLSCertRef, keyTLSKeyRef}, fn: tlsHTTPS},
 	{name: "hsts_whole_seconds", keys: []string{"http.hsts_max_age"}, fn: hstsWholeSeconds},
 	{name: "audit_ip_key_retention", keys: []string{"privacy.audit_ip_key_period", "privacy.audit_ip_key_retention"}, fn: auditIPKeyRetention},
+	{name: "audit_checkpoint_sink", keys: []string{keyCheckpointSink}, fn: auditCheckpointSink},
 	{name: "file_fs_root_absolute", keys: []string{keyStorageDriver, "file.fs.root"}, fn: fileFSRootAbsolute},
 	{name: "file_s3", keys: []string{keyStorageDriver, "file.s3.endpoint", "file.s3.region", "file.s3.bucket", "file.s3.prefix",
 		"file.s3.use_path_style", "file.s3.checksum_mode", keyEgressAllowedHosts}, fn: fileS3},
@@ -121,6 +123,13 @@ func auditIPKeyRetention(v *config.Values) error {
 		return errors.New("privacy.audit_ip_key_retention must be at least privacy.audit_ip_key_period")
 	}
 	return nil
+}
+
+// auditCheckpointSink requires audit.checkpoint_sink to be empty or file://<absolute path> (19
+// section 16, M1-50); the message names the supported scheme and never the value.
+func auditCheckpointSink(v *config.Values) error {
+	_, err := auditdomain.ParseSink(v.String(keyCheckpointSink))
+	return err
 }
 
 // publicURLOrigin requires server.public_url to be an origin: scheme, host, optional port and

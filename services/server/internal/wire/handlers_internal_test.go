@@ -5,11 +5,12 @@ package wire
 import (
 	"testing"
 
+	audithttp "github.com/OWNER/bothy/services/server/internal/audit/adapters/httpapi"
 	identityhttp "github.com/OWNER/bothy/services/server/internal/identity/adapters/httpapi"
 	instancehttp "github.com/OWNER/bothy/services/server/internal/instance/adapters/httpapi"
 )
 
-// TestHandlers_FillsBuiltAndKeepsInjected holds handlers() (M1-44/18): every nil module
+// TestHandlers_FillsBuiltAndKeepsInjected holds handlers() (INT-W12/3): every nil module
 // handler becomes the one the start built, an injected one stays, and nothing is filled before
 // its module started.
 func TestHandlers_FillsBuiltAndKeepsInjected(t *testing.T) {
@@ -23,9 +24,10 @@ func TestHandlers_FillsBuiltAndKeepsInjected(t *testing.T) {
 		TokenHandlers:      &identityhttp.Tokens{},
 	}
 	keys := &SigningKeys{Handlers: &instancehttp.Keys{}}
+	log := &audithttp.Log{}
 	injected := &identityhttp.Tokens{}
 
-	s := &server{identity: id, signingKeys: keys}
+	s := &server{identity: id, signingKeys: keys, audit: &Audit{handlers: log}}
 	s.deps.Handlers.Tokens = injected
 	h := s.handlers()
 
@@ -41,6 +43,7 @@ func TestHandlers_FillsBuiltAndKeepsInjected(t *testing.T) {
 		{"Credentials", h.Credentials, id.CredentialHandlers},
 		{"Tokens", h.Tokens, injected},
 		{"Keys", h.Keys, keys.Handlers},
+		{"Log", h.Log, log},
 	}
 	for _, c := range checks {
 		if c.got != c.want {
@@ -49,7 +52,7 @@ func TestHandlers_FillsBuiltAndKeepsInjected(t *testing.T) {
 	}
 
 	empty := (&server{}).handlers()
-	if empty.Devices != nil || empty.Tokens != nil || empty.Providers != nil || empty.Keys != nil {
+	if empty.Devices != nil || empty.Tokens != nil || empty.Providers != nil || empty.Keys != nil || empty.Log != nil {
 		t.Errorf("handlers() before the start = %+v, want only nil handlers", empty)
 	}
 }

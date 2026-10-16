@@ -34,10 +34,13 @@ var methods = []string{
 // Media types of request bodies and the body kind the route table records for each (06
 // "Basic rules", row "Media types").
 var bodyKinds = map[string]bodyKind{
-	"application/json":         bodyJSON,
+	mediaJSON:                  bodyJSON,
 	"multipart/form-data":      bodyMultipart,
 	"application/octet-stream": bodyOctetStream,
 }
+
+// mediaJSON is the media type of JSON bodies and answers.
+const mediaJSON = "application/json"
 
 // ifMatch is the If-Match mode of an operation, as rendered into the route table.
 type ifMatch string
@@ -75,6 +78,7 @@ type opMeta struct {
 	RequestBody    bodyKind
 	BodyRequired   bool
 	ETagStatuses   []int
+	Download       bool
 }
 
 // specWalk reads the operations of one spec and reports its problems.
@@ -271,6 +275,7 @@ func (w *specWalk) operation(method, path string, node *openapi3.Operation) (op 
 	op.IdempotencyKey, op.IfMatch = w.parameters(at, node.Parameters)
 	op.RequestBody, op.BodyRequired = w.requestBody(at, node.RequestBody)
 	op.ETagStatuses = w.etagStatuses(at, node.Responses)
+	op.Download = downloads(node.Responses)
 	if op.IdempotencyKey {
 		w.checkKeyed(at, op, node)
 	}
@@ -308,14 +313,14 @@ func (w *specWalk) checkKeyed(at string, op opMeta, node *openapi3.Operation) {
 // the response declares ETag.
 func (w *specWalk) checkKeyedSuccess(at, key string, etag bool, resp *openapi3.Response) {
 	for _, media := range slices.Sorted(maps.Keys(resp.Content)) {
-		if media != "application/json" {
+		if media != mediaJSON {
 			w.p.add(at, "declares Idempotency-Key and response %s with %s; a stored response is application/json or empty", key, media)
 		}
 	}
 	if !etag {
 		return
 	}
-	if body := resp.Content["application/json"]; body == nil || !requiredInteger(body.Schema, "version", 0) {
+	if body := resp.Content[mediaJSON]; body == nil || !requiredInteger(body.Schema, "version", 0) {
 		w.p.add(at, "declares Idempotency-Key and ETag on response %s without a required integer member version; a replay derives the ETag from it", key)
 	}
 }
@@ -503,6 +508,29 @@ func (w *specWalk) etagStatuses(at string, responses *openapi3.Responses) []int 
 	}
 	slices.Sort(out)
 	return out
+}
+
+// downloads reports whether a 2xx response of the operation streams a body that is not JSON
+// (application/x-ndjson, application/octet-stream, image/*, application/zip): such an operation
+// is in the route class of downloads, whose deadline is http.transfer_timeout (02 section 14.2).
+// application/json and every +json type (RFC 6839) are JSON answers of the normal class.
+func downloads(responses *openapi3.Responses) bool {
+	if responses == nil {
+		return false
+	}
+	for key, ref := range responses.Map() {
+		code, isRange, ok := responseStatus(key)
+		success := isRange && key[0] == '2' || code >= 200 && code < 300
+		if !ok || ref == nil || ref.Value == nil || !success {
+			continue
+		}
+		for media := range ref.Value.Content {
+			if media != mediaJSON && !strings.HasSuffix(media, "+json") {
+				return true
+			}
+		}
+	}
+	return false
 }
 
 // responseStatus reads a response key other than default: a status code from 100 to 599 in

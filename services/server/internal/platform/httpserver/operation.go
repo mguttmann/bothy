@@ -81,7 +81,14 @@ type Operation struct {
 	// ETagStatuses are the 2xx statuses whose response declares ETag; a replay of the
 	// Idempotency-Key stage derives the ETag of these statuses from version in the stored body.
 	ETagStatuses []int
+	// Download is true when a success streams a body that is not JSON (an export, a file): the
+	// route class of downloads, whose deadline is http.transfer_timeout (02 section 14.2).
+	Download bool
 }
+
+// transfer reports whether the route class of op is that of transfers (uploads and downloads):
+// the deadline is http.transfer_timeout and it bounds the write as well.
+func (op Operation) transfer() bool { return op.Download || op.RequestBody.transfer() }
 
 // Route is one operation with the handler to mount for it; Chain.Wrap puts the per-route stages
 // around Handler.

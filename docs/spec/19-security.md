@@ -289,7 +289,7 @@ Format of the checkpoints (03, `audit_checkpoints`):
 |---|---|
 | Payload | `{instance_id, seq, hash, occurred_at, previous_checkpoint_hash}` according to RFC 8785 (JCS); `seq`, `hash` and `occurred_at` belong to the captured row of `audit_events`, time in the form of SEC-AUD-4; `hash` and `previous_checkpoint_hash` as hex in lowercase; `previous_checkpoint_hash` is the SHA-256 of the canonical payload of the previous checkpoint and is absent for the first one |
 | Signature | compact JWS with header `{alg, kid, typ: "audit-checkpoint+json"}`, key with purpose `audit_checkpoint` ([ADR 0066](../adr/0066-signing-keys-in-the-writable-key-store.md)); `audit_checkpoints.signature` stores the whole JWS as UTF-8; verification accepts only the algorithms from 03 `server_signing_keys`, never `none` |
-| Storage with `file://` | file `<path>/<instance_id>/<seq with 20 digits, zero-padded>.jws` with the JWS; directory `0700`, file `0600`; created via a temporary file in the same directory with `O_EXCL`, rename and `fsync` of file and directory; an existing file with different content is an error and is never overwritten |
+| Storage with `file://` | file `<path>/<instance_id>/<seq with 20 digits, zero-padded>.jws` with the JWS; directory `0700`, file `0600`; written once (M1-50): a temporary file in the same directory created with `O_EXCL` and synced, then a hard link to the name, which fails when the name exists (a rename would replace a file a concurrent writer just stored), then `fsync` of the directory; an existing file with different content is an error and is never overwritten; the directory `<path>` itself must exist, the server never creates it |
 
 ## 13. Penetration test plan
 

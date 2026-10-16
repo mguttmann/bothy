@@ -153,6 +153,11 @@ linters:
       - path: ^api/rest/rest\.gen\.go$
         linters: [gosec]
         text: "G117:"
+      # The strict server streams the NDJSON body of exportAuditEvents and closes a ReadCloser body
+      # in a defer without checking the error (M1-50); the handler hands it no ReadCloser.
+      - path: ^api/rest/rest\.gen\.go$
+        linters: [errcheck]
+        text: "closer.Close"
       # Query names and SQL of refresh_tokens contain "token"; G101 reads them as credentials. The
       # queries hold no secret: tokens are bound as HMAC parameters (M1-34).
       - path: ^internal/identity/adapters/postgres/sqlcgen/refresh\.sql\.go$

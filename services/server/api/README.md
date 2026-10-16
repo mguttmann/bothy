@@ -124,7 +124,9 @@ oapi-codegen, which writes the error text with 400 or 500. M1-18 puts in the pro
 (`security: []`), `IdempotencyKey` (header `Idempotency-Key`, in the spec
 `#/components/parameters/IdempotencyKey`), `IfMatch` (header `If-Match`: `IfMatchRequired` with
 `required: true`, otherwise `IfMatchOptional`), `RequestBody` and `BodyRequired` as well as
-`ETagStatuses` (2xx statuses whose response names `ETag`). Lookup through `routes.ByPattern` (the
+`ETagStatuses` (2xx statuses whose response names `ETag`) and `Download` (a 2xx response streams a
+body that is not JSON, neither `application/json` nor a `+json` type, M1-50: the route class of
+downloads with the deadline `http.transfer_timeout`). Lookup through `routes.ByPattern` (the
 value of `http.Request.Pattern`) and `routes.ByID`; the HTTP chain (M1-18 to M1-20) reads from it.
 
 ## Limits

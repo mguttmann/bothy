@@ -82,6 +82,23 @@ documented in this file. The format is based on
   `auth.api_token_max_ttl`, `auth.personal_token_max_ttl` and `auth.dpop_required_for` with the
   cross-check `dpop_required_for`; the gitleaks test builds a runtime token and recomputes the Go
   checksum vectors.
+- Audit verification, checkpoints and queries (M1-50): the migration
+  `00015_audit_checkpoints.sql` (`audit_checkpoints`, append-only with a once-only `exported_at`),
+  the port `audit.Log` with `List`, `Export` and `Verify`, and the operations `listAuditEvents`,
+  `exportAuditEvents` and `verifyAuditChain` (actions `audit.read` and `audit.verify`, owner with
+  fresh step-up, every call audited). The periodic job `audit.chain_verify` on the queue
+  `maintenance` recomputes the chain since the last checkpoint, signs the next checkpoint (compact
+  JWS, purpose `audit_checkpoint`, payload linked to the previous one) only over a verified segment
+  and hands it to `audit.checkpoint_sink`; a break counts in `bothy.audit.verify.failures`, is
+  audited with decision `error` and is never signed, a success sets
+  `bothy.audit.verify.last_success.timestamp`. Verification reads checkpoints only from the sink,
+  so a changed row (`hash_mismatch`) and a rewritten chain (`checkpoint_mismatch`) are detected
+  (SEC-T16); without a sink every result and every job run carries the warning
+  `checkpoint_sink_not_configured`. The export streams NDJSON lines that verify offline with RFC
+  8785 and SHA-256, in the route class of downloads (`http.transfer_timeout`). New: the file sink
+  `file://<absolute path>`, `instance.Keys.Verify`, the route table field `Download`, and the
+  configuration keys `audit.checkpoint_interval` and `audit.checkpoint_sink`, whose value `bothy
+  config check` refuses unless it is empty or `file://`.
 - Step-up with the device key (M1-35): the migration `00012_identity_step_up.sql`
   (`auth_challenges` with every purpose of 03), the port `identity.StepUp` with
   `CreateChallenge` and `CompleteWithDeviceKey`, and the operations `createStepUpChallenge` and

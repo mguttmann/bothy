@@ -20,6 +20,7 @@ var operations = []routes.Operation{
 		RequestBody:    routes.BodyJSON,
 		BodyRequired:   true,
 		ETagStatuses:   nil,
+		Download:       false,
 	},
 	{
 		ID:             "getThing",
@@ -34,6 +35,7 @@ var operations = []routes.Operation{
 		RequestBody:    routes.BodyNone,
 		BodyRequired:   false,
 		ETagStatuses:   nil,
+		Download:       false,
 	},
 	{
 		ID:             "updateThing",
@@ -48,5 +50,6 @@ var operations = []routes.Operation{
 		RequestBody:    routes.BodyJSON,
 		BodyRequired:   true,
 		ETagStatuses:   []int{200},
+		Download:       false,
 	},
 }

@@ -28,7 +28,10 @@ chapters win on any difference. Rulings: [DECISIONS.md](../../../../../docs/DECI
   `Chain.SetCredentialsPrecheck` for M1-19 (installed by `ratelimit.Install`; its settle function
   gets the result of the `Authenticator`, and `401 unauthenticated` for an actor with
   `CredentialInactive`, M1-44), `Chain.SetFailedCredentialsHook`, `Chain.Order()` for the documented order. `Operation.RateLimitClass` is
-  the class `StageRateLimit` counts.
+  the class `StageRateLimit` counts. The route class of transfers (`http.transfer_timeout` for the
+  context and the write deadline) holds for a multipart or octet-stream request body and, since
+  M1-50, for `Operation.Download`, a success that streams a body that is not JSON (the export of
+  the audit log).
 - `WriteProblem(w, r, err)`, `ValidationErrorHandler`, `MalformedRequestHandler`: the error
   writers; `internal/wire` passes them to `routes.Build`.
 - `NewValidator(spec, operationIDs)`, `CheckJSON`, `SanitizeJSON`, `ClientIP`, `CheckOrigin`,

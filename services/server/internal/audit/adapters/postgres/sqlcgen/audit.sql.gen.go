@@ -11,6 +11,23 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
+const bounds = `-- name: Bounds :one
+SELECT coalesce(min(seq), 0)::bigint AS first_seq, coalesce(max(seq), 0)::bigint AS head_seq FROM audit_events
+`
+
+type BoundsRow struct {
+	FirstSeq int64
+	HeadSeq  int64
+}
+
+// The smallest retained and the largest seq; both 0 for an empty log (seq starts at 1; M1-50).
+func (q *Queries) Bounds(ctx context.Context) (BoundsRow, error) {
+	row := q.db.QueryRow(ctx, bounds)
+	var i BoundsRow
+	err := row.Scan(&i.FirstSeq, &i.HeadSeq)
+	return i, err
+}
+
 const currentIPKey = `-- name: CurrentIPKey :one
 SELECT id, valid_from, valid_until, key_ciphertext, key_ref
 FROM audit_ip_keys
@@ -38,6 +55,31 @@ func (q *Queries) CurrentIPKey(ctx context.Context, at pgtype.Timestamptz) (Curr
 		&i.KeyCiphertext,
 		&i.KeyRef,
 	)
+	return i, err
+}
+
+const exportSpan = `-- name: ExportSpan :one
+SELECT coalesce(min(seq), 0)::bigint AS first_seq, coalesce(max(seq), 0)::bigint AS last_seq
+FROM audit_events
+WHERE occurred_at >= $1 AND occurred_at < $2
+`
+
+type ExportSpanParams struct {
+	FromAt pgtype.Timestamptz
+	ToAt   pgtype.Timestamptz
+}
+
+type ExportSpanRow struct {
+	FirstSeq int64
+	LastSeq  int64
+}
+
+// The smallest and the largest seq with occurred_at in [from_at, to_at); both 0 for none
+// (M1-50, exportAuditEvents).
+func (q *Queries) ExportSpan(ctx context.Context, arg ExportSpanParams) (ExportSpanRow, error) {
+	row := q.db.QueryRow(ctx, exportSpan, arg.FromAt, arg.ToAt)
+	var i ExportSpanRow
+	err := row.Scan(&i.FirstSeq, &i.LastSeq)
 	return i, err
 }
 
@@ -77,6 +119,31 @@ func (q *Queries) IPKeyByID(ctx context.Context, id pgtype.UUID) (IPKeyByIDRow, 
 		&i.KeyRef,
 	)
 	return i, err
+}
+
+const insertCheckpoint = `-- name: InsertCheckpoint :exec
+INSERT INTO audit_checkpoints (seq, hash, previous_checkpoint_hash, signature, kid)
+VALUES ($1, $2, $3, $4, $5)
+`
+
+type InsertCheckpointParams struct {
+	Seq                    int64
+	Hash                   []byte
+	PreviousCheckpointHash []byte
+	Signature              []byte
+	Kid                    string
+}
+
+// A checkpoint the job signed after it recomputed the chain up to seq.
+func (q *Queries) InsertCheckpoint(ctx context.Context, arg InsertCheckpointParams) error {
+	_, err := q.db.Exec(ctx, insertCheckpoint,
+		arg.Seq,
+		arg.Hash,
+		arg.PreviousCheckpointHash,
+		arg.Signature,
+		arg.Kid,
+	)
+	return err
 }
 
 const insertIPKey = `-- name: InsertIPKey :exec
@@ -179,6 +246,136 @@ func (q *Queries) InsertRows(ctx context.Context, arg InsertRowsParams) error {
 	return err
 }
 
+const lastCheckpoint = `-- name: LastCheckpoint :one
+SELECT seq, hash, previous_checkpoint_hash, signature, kid
+FROM audit_checkpoints
+ORDER BY seq DESC
+LIMIT 1
+`
+
+type LastCheckpointRow struct {
+	Seq                    int64
+	Hash                   []byte
+	PreviousCheckpointHash []byte
+	Signature              []byte
+	Kid                    string
+}
+
+// The checkpoint with the largest seq (M1-50, audit.chain_verify).
+func (q *Queries) LastCheckpoint(ctx context.Context) (LastCheckpointRow, error) {
+	row := q.db.QueryRow(ctx, lastCheckpoint)
+	var i LastCheckpointRow
+	err := row.Scan(
+		&i.Seq,
+		&i.Hash,
+		&i.PreviousCheckpointHash,
+		&i.Signature,
+		&i.Kid,
+	)
+	return i, err
+}
+
+const listEvents = `-- name: ListEvents :many
+SELECT seq, id, occurred_at, actor_principal_id, actor_device_id, actor_session_id, action, decision,
+       deny_reason, resource_kind, resource_id, details, correlation_id, prev_hash, hash
+FROM audit_events
+WHERE ($1::uuid IS NULL OR actor_principal_id = $1)
+  AND ($2::text IS NULL OR action = $2)
+  AND ($3::text IS NULL OR decision = $3)
+  AND ($4::text IS NULL OR resource_kind = $4)
+  AND ($5::uuid IS NULL OR resource_id = $5)
+  AND ($6::timestamptz IS NULL OR occurred_at >= $6)
+  AND ($7::timestamptz IS NULL OR occurred_at < $7)
+  AND ($8::bigint IS NULL OR seq < $8)
+ORDER BY seq DESC
+LIMIT $9
+`
+
+type ListEventsParams struct {
+	ActorID      pgtype.UUID
+	Action       pgtype.Text
+	Decision     pgtype.Text
+	ResourceKind pgtype.Text
+	ResourceID   pgtype.UUID
+	FromAt       pgtype.Timestamptz
+	ToAt         pgtype.Timestamptz
+	BeforeSeq    pgtype.Int8
+	RowLimit     int32
+}
+
+// One page of listAuditEvents, newest first by seq after the keyset before_seq (M1-50). Every
+// filter is optional; NULL filters nothing.
+func (q *Queries) ListEvents(ctx context.Context, arg ListEventsParams) ([]AuditEvent, error) {
+	rows, err := q.db.Query(ctx, listEvents,
+		arg.ActorID,
+		arg.Action,
+		arg.Decision,
+		arg.ResourceKind,
+		arg.ResourceID,
+		arg.FromAt,
+		arg.ToAt,
+		arg.BeforeSeq,
+		arg.RowLimit,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []AuditEvent
+	for rows.Next() {
+		var i AuditEvent
+		if err := rows.Scan(
+			&i.Seq,
+			&i.ID,
+			&i.OccurredAt,
+			&i.ActorPrincipalID,
+			&i.ActorDeviceID,
+			&i.ActorSessionID,
+			&i.Action,
+			&i.Decision,
+			&i.DenyReason,
+			&i.ResourceKind,
+			&i.ResourceID,
+			&i.Details,
+			&i.CorrelationID,
+			&i.PrevHash,
+			&i.Hash,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const lockCheckpoints = `-- name: LockCheckpoints :exec
+SELECT pg_advisory_xact_lock(hashtext('bothy.audit_checkpoints'))
+`
+
+// Serialises the insert of checkpoints until the commit, so two runs never fork the chain.
+func (q *Queries) LockCheckpoints(ctx context.Context) error {
+	_, err := q.db.Exec(ctx, lockCheckpoints)
+	return err
+}
+
+const markExported = `-- name: MarkExported :exec
+UPDATE audit_checkpoints SET exported_at = $1 WHERE seq = $2 AND exported_at IS NULL
+`
+
+type MarkExportedParams struct {
+	ExportedAt pgtype.Timestamptz
+	Seq        int64
+}
+
+// The sink took checkpoint seq.
+func (q *Queries) MarkExported(ctx context.Context, arg MarkExportedParams) error {
+	_, err := q.db.Exec(ctx, markExported, arg.ExportedAt, arg.Seq)
+	return err
+}
+
 const rows = `-- name: Rows :many
 SELECT seq, id, occurred_at, actor_principal_id, actor_device_id, actor_session_id, action, decision,
        deny_reason, resource_kind, resource_id, details, correlation_id, prev_hash, hash
@@ -192,7 +389,7 @@ type RowsParams struct {
 	ToSeq   int64
 }
 
-// The rows from_seq .. to_seq in chain order, for recomputing the chain (tests, M1-50).
+// The rows from_seq .. to_seq in chain order: the chain walk and the export (M1-50).
 func (q *Queries) Rows(ctx context.Context, arg RowsParams) ([]AuditEvent, error) {
 	rows, err := q.db.Query(ctx, rows, arg.FromSeq, arg.ToSeq)
 	if err != nil {
@@ -218,6 +415,49 @@ func (q *Queries) Rows(ctx context.Context, arg RowsParams) ([]AuditEvent, error
 			&i.CorrelationID,
 			&i.PrevHash,
 			&i.Hash,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const unexportedCheckpoints = `-- name: UnexportedCheckpoints :many
+SELECT seq, hash, previous_checkpoint_hash, signature, kid
+FROM audit_checkpoints
+WHERE exported_at IS NULL
+ORDER BY seq
+LIMIT $1
+`
+
+type UnexportedCheckpointsRow struct {
+	Seq                    int64
+	Hash                   []byte
+	PreviousCheckpointHash []byte
+	Signature              []byte
+	Kid                    string
+}
+
+// The checkpoints not yet at the sink, in seq order (index audit_checkpoints_unexported_idx).
+func (q *Queries) UnexportedCheckpoints(ctx context.Context, rowLimit int32) ([]UnexportedCheckpointsRow, error) {
+	rows, err := q.db.Query(ctx, unexportedCheckpoints, rowLimit)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []UnexportedCheckpointsRow
+	for rows.Next() {
+		var i UnexportedCheckpointsRow
+		if err := rows.Scan(
+			&i.Seq,
+			&i.Hash,
+			&i.PreviousCheckpointHash,
+			&i.Signature,
+			&i.Kid,
 		); err != nil {
 			return nil, err
 		}

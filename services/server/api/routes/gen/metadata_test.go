@@ -250,6 +250,19 @@ func TestOperationMetadata_FollowsWhatOapiCodegenSees(t *testing.T) {
 			"      - $ref: '#/components/parameters/IfMatchRequired'\n",
 			"      - name: If-Match\n        in: header\n        schema:\n          type: string\n",
 		}, "updateThing", func(o opMeta) bool { return o.IfMatch == ifMatchOptional }},
+		{"JSON success is no download", nil, "getThing", func(o opMeta) bool { return !o.Download }},
+		{"ndjson success is a download", []string{
+			"          description: The thing.\n          content:\n            application/json:",
+			"          description: The thing.\n          content:\n            application/x-ndjson:",
+		}, "getThing", func(o opMeta) bool { return o.Download }},
+		{"octet-stream success is a download", []string{
+			"          description: The thing.\n          content:\n            application/json:",
+			"          description: The thing.\n          content:\n            application/octet-stream:",
+		}, "getThing", func(o opMeta) bool { return o.Download }},
+		{"a +json success is no download", []string{
+			"          description: The thing.\n          content:\n            application/json:",
+			"          description: The thing.\n          content:\n            application/jwk-set+json:",
+		}, "getThing", func(o opMeta) bool { return !o.Download }},
 	}
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {

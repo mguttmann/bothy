@@ -1,6 +1,6 @@
 # Module `audit`
 
-Status: built in part (M1-24): the hash chain of `audit_events`, the recorder behind the kernel port `auditing.Recorder` with the audit phase hook, the aggregation of identical denials and the keys of the IP pseudonyms (`audit_ip_keys`). Verification, checkpoints (`audit_checkpoints`), the job `audit.chain_verify`, the port `Log` and the operations `listAuditEvents`, `exportAuditEvents`, `verifyAuditChain` come with M1-50; truncation with an anchor and the destruction of IP keys with M7.
+Status: built in part (M1-24, M1-50): the hash chain of `audit_events`, the recorder behind the kernel port `auditing.Recorder` with the audit phase hook, the aggregation of identical denials and the keys of the IP pseudonyms (`audit_ip_keys`) (M1-24); the port `Log` with query, export and verification, the signed checkpoints (`audit_checkpoints`) with the file sink, the job `audit.chain_verify` and the operations `listAuditEvents`, `exportAuditEvents`, `verifyAuditChain` (M1-50). Truncation with an anchor and the destruction of IP keys come with M7, an object storage sink with retention lock with M7-22.
 The normative source is [docs/spec/02-architecture.md](../../../../docs/spec/02-architecture.md); if this file differs, the chapter applies.
 
 ## Purpose
@@ -11,17 +11,26 @@ Audit log with hash chain, signed checkpoints, keys of the IP pseudonyms, query,
 
 | Package | Content |
 |---|---|
-| `internal/audit` | port root package; `Log` comes with M1-50 |
+| `internal/audit` | port root package: `Log` (`List`, `Export`, `Verify`) with `Query`, `Page`, `Event`, `EventWriter`, `VerifyRequest`, `VerifyResult`, `WarningSinkNotConfigured` (M1-50) |
 | `internal/kernel/auditing` | the cross-cutting port: `Recorder`, `Entry`, `Decision`, `Reason` with `KnownReasons` (the closed list of 07 "4.1"), the typed values `ID`, `Code`, `Int`, `Bool`, `Time`, `List`, `ReasonText`, `Violations` |
-| `domain/` | `Row`, `CanonicalRow`, `ChainHash`, `ZeroHash`, `DetailsV1` with `Validate`, `IPHMAC`, `KeyPeriod`, `SealIPKey` and `OpenIPKey` (AES-256-GCM), `DecodeKEK`, the aggregation `Aggregation` with `AggregateKey` and `Bucket` (time always passed in) |
-| `app/` | `Recorder` (implements `auditing.Recorder`), `Chain` (audit phase hook), `Aggregator` (`Run`, `FlushDue`, `Flush`), `Keyring`; outgoing ports `Store`, `KEKSource`, `Reporter` |
+| `domain/` | `Row`, `CanonicalRow`, `EventJSON`, `ChainHash`, `ZeroHash`, `DetailsV1` with `Validate`, `IPHMAC`, `KeyPeriod`, `SealIPKey` and `OpenIPKey` (AES-256-GCM), `DecodeKEK`, the aggregation `Aggregation` with `AggregateKey` and `Bucket` (time always passed in); the chain walk `Walk` with `Failure`, `FailureReason` and `FirstFailure` (`verify.go`), the checkpoint payload `Checkpoint` with `NewCheckpoint`, `Canonical`, `ParseCheckpoint`, `CheckpointDigest` and the check of the sink chain `CheckCheckpoints` (`checkpoint.go`), `ParseSink` (`sink.go`) |
+| `app/` | `Recorder` (implements `auditing.Recorder`), `Chain` (audit phase hook), `Aggregator` (`Run`, `FlushDue`, `Flush`), `Keyring`; `Log` (implements `audit.Log`: `query.go`, `export.go`, `verify.go`, and `RunCheckpoint`, the job, in `checkpoint_job.go`), `NoSink`; outgoing ports `Store`, `KEKSource`, `Reporter`, `CheckpointSink`, `Cursors`, `Metrics` |
 | `adapters/postgres/` | `Repository` over `platform/pg`, sqlc queries in `queries/audit.sql`, generated code in `sqlcgen/` (entry in `services/server/sqlc.yaml`) |
 | `adapters/logs/` | `Reporter` over the server logger: constant messages, catalogue keys only |
+| `adapters/filesink/` | `Sink`, the `file://` implementation of `CheckpointSink` |
+| `adapters/jobs/` | the periodic job `audit.chain_verify` on the queue `maintenance` |
+| `adapters/httpapi/` | the handlers of `listAuditEvents`, `exportAuditEvents`, `verifyAuditChain` and the cursor codec `Cursors` |
+| `adapters/otelmetrics/` | `bothy.audit.verify.failures` and `bothy.audit.verify.last_success.timestamp` |
 
 `internal/wire` (`audit.go`) builds the module (`wire.NewAudit`), registers `(*Chain).Hook` as the
 hook of phase 3.3 in `wire.NewTxnRegistry` (golden file `testdata/txn_registrations.golden`),
 starts the aggregator in start step 6a of `bothy serve` (both roles) and registers the stop step
-`audit_denials`, which flushes the open aggregations before the pool closes.
+`audit_denials`, which flushes the open aggregations before the pool closes. The start step
+`audit_log` after `signing_keys` builds `Log` over the signing keys, the Authorizer and the
+instance ID (`Audit.BindLog`, every role) and, in the roles `worker` and `all`, writes the warning
+`audit_checkpoint_sink_not_configured` once when no sink is set; `wire.Handlers` embeds the
+handlers, and the job registry of every role holds `audit.chain_verify` every
+`audit.checkpoint_interval`.
 
 ### Tables and grants
 
@@ -114,8 +123,89 @@ key-encryption key at start, so a missing or malformed secret ends the start.
   a second pool connection while the caller holds one.
 - Logs of the module carry action, reason and `error.type`; the count of dropped denials and the
   number of a missing row are not logged, because the attribute catalogue has no key for them.
-- Not proven here: end-to-end AZ-P13 through `authorize` (M1-28, M1-29) and the rest of SEC-T16
-  (detection of a changed row and a rewritten chain, M1-50).
+- Not proven here: end-to-end AZ-P13 through `authorize` (M1-28, M1-29). SEC-T16 is complete
+  since M1-50 (`adapters/httpapi`, `migrations`).
+
+### Checkpoints and the sink (M1-50)
+
+Migration `00015_audit_checkpoints.sql` creates `audit_checkpoints` as 03 states it. `bothy_app`
+may `SELECT`, `INSERT` and `UPDATE (exported_at)`; the trigger `audit_checkpoints_append_only`
+refuses for every role every `UPDATE` except setting `exported_at` once with nothing else changed,
+every `DELETE` except one by `bothy_maint` and every `TRUNCATE`.
+
+A checkpoint (19 SEC-AUD-7) is a compact JWS with header `{alg, kid, typ: "audit-checkpoint+json"}`,
+signed with the active key of purpose `audit_checkpoint` (`instance.Keys.Signer`), over the RFC
+8785 payload `{instance_id, seq, hash, occurred_at, previous_checkpoint_hash}` of the covered row;
+`previous_checkpoint_hash` is the SHA-256 of the previous canonical payload and absent for the
+first. `audit_checkpoints.signature` holds the whole JWS.
+
+`audit.checkpoint_sink` is empty (`NoSink`) or `file://<absolute path>` (`ParseSink`; the cross-check
+`audit_checkpoint_sink` of `bothy config check` refuses every other value, also percent escapes and names the supported
+scheme). The file sink writes `<path>/<instance_id>/<seq with 20 digits>.jws`, directory `0700`,
+file `0600`: a temporary file with `O_EXCL`, synced, then a hard link to the name, which fails when
+the name exists, then `fsync` of the directory. The same content again is accepted, other content
+is an error and the file stays. `<path>` must exist: the sink never creates it. The file system
+must support hard links; a link in place of the directory or of a file is refused.
+
+### Job `audit.chain_verify`
+
+`Log.RunCheckpoint`, every `audit.checkpoint_interval` on the queue `maintenance` (only `worker`
+and `all` run River): without a sink it logs the warning; it checks the signature, the payload and
+the row of the last checkpoint of `audit_checkpoints`, walks the rows after it (or from the first
+row) to the head; on a failure it adds one to `bothy.audit.verify.failures`, records `audit.verify`
+with decision `error`, no actor and `{first_broken_seq, failure_reason}`, logs `audit chain
+verification failed` and ends without error (no retry, the alert `BothyAuditChainBroken` takes
+over). Otherwise it signs the next checkpoint before the transaction and inserts it under an
+advisory transaction lock (a checkpoint of a concurrent run in between makes it skip), then exports
+every checkpoint with `exported_at IS NULL` in `seq` order and sets `exported_at`; a sink error fails
+the run, River retries, nothing is signed twice. Last it sets
+`bothy.audit.verify.last_success.timestamp`.
+
+### Operations (05 `audit.read`, `audit.verify`)
+
+All three authorize on the instance (owner with fresh step-up, `rl.admin`) and record their own
+allow entry (20: every read of the log is audited).
+
+- `listAuditEvents`: every item is the stored row as `EventJSON`, newest first by `seq`, keyset cursor bound to the caller and every filter
+  (`actor_id`, `action`, `decision`, `resource_kind`, `resource_id`, `from` inclusive, `to`
+  exclusive); `limit` per `api.page_size_default` and `api.page_size_max`; `action` and
+  `resource_kind` must be codes. Details of the entry: the filters that are set.
+- `exportAuditEvents`: `from` and `to` required; `application/x-ndjson`, one `EventJSON` line per
+  row (the canonical row plus `hash`, so a line without `hash` is the input of its hash) in
+  ascending `seq`, batches of `api.page_size_max`, flushed per batch, route class of downloads
+  (deadline `http.transfer_timeout`). The stream is the contiguous `seq` span of the rows with
+  `occurred_at` in the range, so every line links the previous one. An error after the first line
+  aborts the response. Details: `{from, to}`.
+- `verifyAuditChain`: reads the checkpoints only from the sink, checks typ, signature (any state of
+  the key, `instance.Keys.Verify`), `instance_id` and the links (`checkpoint_invalid` at the first
+  that fails), walks the range in batches of `api.page_size_max` (`hash_mismatch`,
+  `link_mismatch`, `seq_gap`, `checkpoint_mismatch`), reports a trusted checkpoint whose row is gone
+  as `checkpoint_mismatch`, and returns the failure with the smallest `seq`. `from_seq` defaults to
+  the first retained row (and is raised to it), `to_seq` to the head (and is capped); a range that
+  starts later trusts the stored hash of row `from_seq - 1`. Without a sink the result carries
+  `checkpoint_sink_not_configured` and compares nothing; a sink that cannot be read is `503
+  unavailable` (`dependency_unavailable`). Details: `{from_seq, to_seq, ok}`.
+
+### Limits of the verification
+
+- The job recomputes only the segment since the last checkpoint (SEC-AUD-2); a change to an older
+  row is found by `verifyAuditChain` against the sink, not by the job and its alert.
+- Whoever controls both the database and the sink can rewrite both (threat model T-DB-01); the
+  removal of the newest checkpoint files together with a rewrite of the rows after the remaining
+  ones is not detectable. An object storage sink with retention lock (M7-22) closes this.
+- Until the anchors of M7 every walk from the first retained row starts at row 1, so a log whose
+  first rows are gone is `seq_gap` at 1; the retention trim of M7 changes this rule with its
+  anchors.
+- Rows deleted after the newest sink checkpoint (the newest rows) leave a shorter chain that
+  verifies; nothing outside the database knows them yet. The next checkpoint narrows this window
+  to `audit.checkpoint_interval`.
+- A row with a `seq` below 1 lies outside the chain and is `seq_gap` at that `seq`.
+- With a sink the job reads the sink every run, before the last checkpoint of the database, so an
+  overlapping run of another worker is no break: a sink that cannot be read fails the run before
+  it signs, and a sink checkpoint newer than the database, an invalid unexported checkpoint or
+  other content in the sink under its seq are breaks (DECISIONS M1-50/16, M1-50/18).
+- When the audit entry of a verification cannot be written (a deleted newest row breaks the audit
+  hook of M1-24), the result is still returned and the failure is logged.
 
 ## Port (root package `internal/audit`)
 
@@ -129,7 +219,7 @@ key-encryption key at start, so a missing or malformed secret ends the start.
 
 May use the ports of these modules: `instance`.
 
-Reason: counter `audit_seq`.
+Reason: counter `audit_seq`; the signing keys of purpose `audit_checkpoint` (`instance.Keys`, M1-50).
 
 In addition, for all modules: `internal/kernel`; `internal/platform` and `api/` only in `adapters/`.
 Checked by go-arch-lint (ADR 0008).

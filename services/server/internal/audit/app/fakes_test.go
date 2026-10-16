@@ -23,6 +23,9 @@ import (
 // fakeStore is app.Store in memory with transaction semantics: rows inserted inside a unit of
 // the fakeUoW become visible at its commit.
 type fakeStore struct {
+	// Store holds the methods of M1-50 these unit tests never call (nil: a call panics); the
+	// integration tests of the verification run them on PostgreSQL.
+	app.Store
 	mu       sync.Mutex
 	rows     []domain.Row
 	keys     []domain.IPKey
@@ -211,6 +214,12 @@ func (r *reporter) UnknownReason(_ context.Context, _, reason string) {
 }
 func (r *reporter) WriteFailed(context.Context, error) { r.add("write_failed") }
 func (r *reporter) IPKeyFailed(context.Context, error) { r.add("ip_key_failed") }
+func (r *reporter) SinkNotConfigured(context.Context)  { r.add("sink_not_configured") }
+func (r *reporter) VerifyFailed(_ context.Context, reason domain.FailureReason) {
+	r.add("verify_failed " + string(reason))
+}
+func (r *reporter) ExportCut(context.Context, error)    { r.add("export_cut") }
+func (r *reporter) RecordFailed(context.Context, error) { r.add("record_failed") }
 func (r *reporter) DenialsDropped(_ context.Context, action, reason string, count int64) {
 	r.mu.Lock()
 	r.dropped += count

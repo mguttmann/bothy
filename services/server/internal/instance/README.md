@@ -11,7 +11,7 @@ Instance identity, sync epoch, minimum server version, settings and branding, fe
 
 | Package | Content |
 |---|---|
-| `internal/instance` | port: `CounterName` and the three counter constants, `Counters`, `Record` (`SetupCompleted`), `State`, `Versions`; signing keys (`keys.go`): `Purpose`, `KeyState`, `RotateMode`, `Signer`, `PublicKey`, `JWK`, `JWKSet`, `RotateCommand`, `Rotation`, `Keys` |
+| `internal/instance` | port: `CounterName` and the three counter constants, `Counters`, `Record` (`SetupCompleted`), `State`, `Versions`; signing keys (`keys.go`): `Purpose`, `KeyState`, `RotateMode`, `Signer`, `PublicKey`, `JWK`, `JWKSet`, `RotateCommand`, `Rotation`, `Keys`, `ErrJWSInvalid`, `SignatureAlgs` |
 | `domain/` | counter names and the phase rule (`CheckAdvance`, `CheckRead`, `CheckAdvanceCount`), `CompareSemVer`, `ValidateSemVer`, `CheckServerVersion` (SemVer 2.0.0 precedence, hand-written: the domain layer imports no third-party library); the transitions of the signing keys (`signingkey.go`: `DueTransitions`, `EmergencyTransitions`, `LostTransitions`, `PendingNext`, `ActiveKey`, `Window`) |
 | `app/` | `NewCounters` (phase guard, then the repository) and `NewState` (row in a unit of work), outgoing port `Repository`; `NewKeys` (`Keys`, `KeysConfig`) with the outgoing ports `KeyRepository` and `KeyStore` |
 | `adapters/postgres/` | `Repository` over `platform/pg` (both outgoing ports), sqlc queries in `queries/`, generated code in `sqlcgen/` (entry in `services/server/sqlc.yaml`) |
@@ -97,7 +97,7 @@ errors and responses name purpose and `kid` only.
 passed: `auth.access_token_ttl` + `auth.clock_leeway` (`access_token`),
 `agent.invocation_token_ttl` + `auth.clock_leeway` (`invocation`), `webhook.delivery_timeout` +
 `auth.clock_leeway` (`webhook_out`, every attempt signs anew), zero for `audit_checkpoint` (old
-checkpoints verify through `PublicKey` in any state).
+checkpoints verify through `Verify` in any state).
 
 **Transitions** (pure functions in `domain`, applied in `app`):
 
@@ -129,7 +129,11 @@ from a per-process cache of the `next`, `active` and `retiring` keys, refreshed 
 `signing_key.cache_ttl`; an unknown `kid` reloads at most once per `signing_key.cache_ttl`, and
 every transition of the own process drops the cache, so an emergency rotation withdraws the old
 key at once in the same process and within `signing_key.cache_ttl` in others. `PublicKey`
-returns a key in any state. `JWKS` authorizes `instance.discovery.read` and publishes the `next`,
+returns a key in any state. `Verify(ctx, purpose, compactJWS)` (M1-50) parses a compact JWS with
+`kernel/jose` (algorithms of `server_signing_keys` only, never `none`), reads the key its header
+`kid` names fresh from the database in any state including `retired`, requires the purpose and the
+algorithm of the row and returns payload and `kid`; every failure about the JWS wraps
+`instance.ErrJWSInvalid`, a database error does not. The audit checkpoints verify through it. `JWKS` authorizes `instance.discovery.read` and publishes the `next`,
 `active` and `retiring` keys of `access_token` and `invocation`, ordered by purpose, state
 (`active`, `next`, `retiring`) and `kid`; `webhook_out` keys go out through `getWebhookKeys` (M2),
 `audit_checkpoint` keys never.
