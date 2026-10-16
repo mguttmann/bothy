@@ -132,6 +132,15 @@ void main() {
     }
   });
 
+  test('pubspec.yaml bundles every OFL text as an asset', () {
+    final pubspec = File('pubspec.yaml').readAsStringSync();
+    final texts = _files().keys.where((n) => n.endsWith('.OFL.txt')).toList();
+    expect(texts, hasLength(2));
+    for (final name in texts) {
+      expect(pubspec, contains('    - fonts/$name\n'));
+    }
+  });
+
   testWidgets(
     'font family resolves: DsType.body uses Atkinson Hyperlegible Next',
     (tester) async {

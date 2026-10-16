@@ -24,9 +24,13 @@ dev_dependencies:
     sdk: flutter
 
 # The variable font files and their OFL texts (fonts/MANIFEST.json, docs/design/typography.md
-# "Einbindung"). The weight drives the `wght` axis (dsTextStyle).
+# "Integration"). The weight drives the `wght` axis (dsTextStyle).
 flutter:
   uses-material-design: true
+  # The OFL texts ship with the fonts in every app bundle (OFL-1.1 condition 2).
+  assets:
+    - fonts/AtkinsonHyperlegibleNext.OFL.txt
+    - fonts/AtkinsonHyperlegibleMono.OFL.txt
   fonts:
     - family: Atkinson Hyperlegible Next
       fonts:
