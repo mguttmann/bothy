@@ -14,12 +14,8 @@ import 'dart:io';
 
 import 'package:l10n/src/term_pair.dart';
 
-/// The chapter files that may hold the table, in order: `main` names the chapter in English,
-/// the integration bases in German.
-const List<String> specCandidates = [
-  'docs/spec/01-product.md',
-  'docs/spec/01-product.md',
-];
+/// The chapter files that may hold the table, in order.
+const List<String> specCandidates = ['docs/spec/01-product.md'];
 
 /// The product chapter below [root]; throws a [StateError] when none of [specCandidates]
 /// exists.
