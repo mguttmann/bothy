@@ -407,6 +407,22 @@ func (l *LogCapture) Has(message string) bool {
 	return false
 }
 
+// Contains reports whether a message or an attribute value of a captured record contains s; the
+// canary tests use it to prove that a secret never reached a log (SEC-T10).
+func (l *LogCapture) Contains(s string) bool {
+	for _, r := range l.Records() {
+		if strings.Contains(r.Message, s) {
+			return true
+		}
+		for _, v := range r.Attrs {
+			if strings.Contains(v, s) {
+				return true
+			}
+		}
+	}
+	return false
+}
+
 // Find returns the first record with the message and true, or false.
 func (l *LogCapture) Find(message string) (Record, bool) {
 	for _, r := range l.Records() {

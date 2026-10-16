@@ -36,7 +36,8 @@ const (
 var loginCfg = app.Config{
 	HandleMaxChars: 32, DisplayNameMaxChars: 64, DPoPNonceTTL: 5 * time.Minute, DPoPProofMaxAge: time.Minute,
 	ClockLeeway: 30 * time.Second, PublicURL: loginURL, PageSizeDefault: 2, PageSizeMax: 3, StepUpMaxAge: 5 * time.Minute,
-	AccessTokenTTL: 10 * time.Minute, RefreshTokenTTL: 14 * 24 * time.Hour, SessionMaxAge: 30 * 24 * time.Hour,
+	AccessTokenTTL: 10 * time.Minute, RefreshTokenTTL: 14 * 24 * time.Hour, SessionMaxAge: 30 * 24 * time.Hour, ConsoleSessionMaxAge: 12 * time.Hour,
+	ConsoleSessionIdleTimeout: 30 * time.Minute, ViewAsMaxDuration: 15 * time.Minute,
 	RefreshReuseGrace: 30 * time.Second, LastActiveGranularity: 5 * time.Minute, StepUpChallengeTTL: 2 * time.Minute,
 	StepUpFailLimit: 3, LoginFailWindow: 15 * time.Minute, CleanupInterval: time.Hour,
 	EnrollmentCodeTTL: 72 * time.Hour, EnrollmentCodeMaxAttempts: 2, LoginFlowTTL: 10 * time.Minute,

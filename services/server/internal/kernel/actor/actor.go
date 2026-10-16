@@ -4,6 +4,7 @@ package actor
 
 import (
 	"context"
+	"log/slog"
 	"net/netip"
 	"slices"
 	"time"
@@ -240,6 +241,42 @@ func cloneViewAs(v *ViewAs) *ViewAs {
 	return &c
 }
 
+// ConsoleCookieName is the name of the session cookie of the web console (docs/spec/08-identity.md
+// section 7.5, M6-01). The HTTP chain reads it into Credentials.ConsoleCookie and the gateway
+// refuses an upgrade that carries it without the own Origin (SEC-CORS-3).
+const ConsoleCookieName = "__Host-console_session"
+
+// redacted is the only rendering of a CookieValue.
+const redacted = "[redacted]"
+
+// CookieValue is the value of the console cookie of a request. It renders as "[redacted]" through
+// fmt, slog and encoding/json, so it never reaches a log, an audit entry or an error by accident
+// (SEC-LOG-1); only Reveal hands out the value.
+type CookieValue struct {
+	v string
+}
+
+// NewCookieValue wraps v.
+func NewCookieValue(v string) CookieValue { return CookieValue{v: v} }
+
+// Reveal returns the value; "" for none.
+func (c CookieValue) Reveal() string { return c.v }
+
+// IsZero reports a request without the cookie.
+func (c CookieValue) IsZero() bool { return c.v == "" }
+
+// String returns "[redacted]".
+func (CookieValue) String() string { return redacted }
+
+// GoString returns "[redacted]".
+func (CookieValue) GoString() string { return redacted }
+
+// LogValue implements slog.LogValuer.
+func (CookieValue) LogValue() slog.Value { return slog.StringValue(redacted) }
+
+// MarshalJSON returns the JSON string "[redacted]".
+func (CookieValue) MarshalJSON() ([]byte, error) { return []byte(`"` + redacted + `"`), nil }
+
 // Credentials is what the HTTP chain hands to the Authenticator for one request
 // (docs/spec/02-architecture.md 9.1 step 7, 06 section 3.1).
 type Credentials struct {
@@ -258,12 +295,15 @@ type Credentials struct {
 	// ClientIP is the client IP the chain resolved (06 "Basic rules", row Client IP); the
 	// identity module counts failed proofs against rl.public_auth with it.
 	ClientIP netip.Addr
+	// ConsoleCookie is the value of the cookie ConsoleCookieName, the second credential kind of a
+	// person in the web console (M6-01); zero without the cookie.
+	ConsoleCookie CookieValue
 }
 
-// Present reports whether the request carries credentials: an Authorization header. A request
-// without one is anonymous; a DPoP header alone is not a credential.
+// Present reports whether the request carries credentials: an Authorization header or the console
+// cookie. A request without either is anonymous; a DPoP header alone is not a credential.
 func (c Credentials) Present() bool {
-	return c.Authorization != ""
+	return c.Authorization != "" || !c.ConsoleCookie.IsZero()
 }
 
 // Authenticator checks the credentials of a request and the principal behind them. The identity

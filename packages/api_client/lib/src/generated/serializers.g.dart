@@ -157,6 +157,10 @@ Serializers _$serializers =
           ..add(ComponentType.serializer)
           ..add(ComponentUpdate.serializer)
           ..add(ComponentUpdateStateEnum.serializer)
+          ..add(ConsoleSession.serializer)
+          ..add(ConsoleSessionStepUpMethodEnum.serializer)
+          ..add(ConsoleSessionStepUpMethodsAvailableEnum.serializer)
+          ..add(ConsoleSessionViewAs.serializer)
           ..add(ConsumerAck.serializer)
           ..add(ConsumerState.serializer)
           ..add(CostBreakdown.serializer)
@@ -391,6 +395,7 @@ Serializers _$serializers =
           ..add(LlmCredentials.serializer)
           ..add(LocalCredentialResult.serializer)
           ..add(LocalCredentialSet.serializer)
+          ..add(LoginClient.serializer)
           ..add(ManifestValidation.serializer)
           ..add(Me.serializer)
           ..add(MentionItem.serializer)
@@ -619,7 +624,9 @@ Serializers _$serializers =
           ..add(StatusUpdatedPayload.serializer)
           ..add(StepUpChallenge.serializer)
           ..add(StepUpDeviceKeyRequest.serializer)
+          ..add(StepUpOidcBeginRequest.serializer)
           ..add(StepUpPasskeyRequest.serializer)
+          ..add(StepUpPasswordRequest.serializer)
           ..add(StepUpResult.serializer)
           ..add(TargetKind.serializer)
           ..add(Template.serializer)
@@ -975,6 +982,12 @@ Serializers _$serializers =
               const FullType(CommandOptionValue),
             ]),
             () => ListBuilder<CommandOptionValue>(),
+          )
+          ..addBuilderFactory(
+            const FullType(BuiltList, const [
+              const FullType(ConsoleSessionStepUpMethodsAvailableEnum),
+            ]),
+            () => ListBuilder<ConsoleSessionStepUpMethodsAvailableEnum>(),
           )
           ..addBuilderFactory(
             const FullType(BuiltList, const [const FullType(CostBucket)]),

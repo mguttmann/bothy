@@ -314,6 +314,30 @@
       "doc": "Allowed clock skew for exp, nbf and iat."
     },
     {
+      "name": "auth.console_session_idle_timeout",
+      "env": "BOTHY_AUTH__CONSOLE_SESSION_IDLE_TIMEOUT",
+      "kind": "duration",
+      "default": "30m",
+      "required": false,
+      "enum": [],
+      "min": "1m",
+      "max": "",
+      "chapter": "08-identity.md",
+      "doc": "Time without a request after which a web console session ends."
+    },
+    {
+      "name": "auth.console_session_max_age",
+      "env": "BOTHY_AUTH__CONSOLE_SESSION_MAX_AGE",
+      "kind": "duration",
+      "default": "12h",
+      "required": false,
+      "enum": [],
+      "min": "1m",
+      "max": "",
+      "chapter": "08-identity.md",
+      "doc": "Absolute end of a web console session after its login."
+    },
+    {
       "name": "auth.device_inactive_revoke_after",
       "env": "BOTHY_AUTH__DEVICE_INACTIVE_REVOKE_AFTER",
       "kind": "duration",

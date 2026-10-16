@@ -8,20 +8,23 @@ part of 'oidc_complete_request.dart';
 
 class _$OidcCompleteRequest extends OidcCompleteRequest {
   @override
+  final LoginClient? client;
+  @override
   final String loginCode;
   @override
   final String clientVerifier;
   @override
-  final DeviceRegistration device;
+  final DeviceRegistration? device;
 
   factory _$OidcCompleteRequest([
     void Function(OidcCompleteRequestBuilder)? updates,
   ]) => (OidcCompleteRequestBuilder()..update(updates))._build();
 
   _$OidcCompleteRequest._({
+    this.client,
     required this.loginCode,
     required this.clientVerifier,
-    required this.device,
+    this.device,
   }) : super._();
   @override
   OidcCompleteRequest rebuild(
@@ -36,6 +39,7 @@ class _$OidcCompleteRequest extends OidcCompleteRequest {
   bool operator ==(Object other) {
     if (identical(other, this)) return true;
     return other is OidcCompleteRequest &&
+        client == other.client &&
         loginCode == other.loginCode &&
         clientVerifier == other.clientVerifier &&
         device == other.device;
@@ -44,6 +48,7 @@ class _$OidcCompleteRequest extends OidcCompleteRequest {
   @override
   int get hashCode {
     var _$hash = 0;
+    _$hash = $jc(_$hash, client.hashCode);
     _$hash = $jc(_$hash, loginCode.hashCode);
     _$hash = $jc(_$hash, clientVerifier.hashCode);
     _$hash = $jc(_$hash, device.hashCode);
@@ -54,6 +59,7 @@ class _$OidcCompleteRequest extends OidcCompleteRequest {
   @override
   String toString() {
     return (newBuiltValueToStringHelper(r'OidcCompleteRequest')
+          ..add('client', client)
           ..add('loginCode', loginCode)
           ..add('clientVerifier', clientVerifier)
           ..add('device', device))
@@ -64,6 +70,10 @@ class _$OidcCompleteRequest extends OidcCompleteRequest {
 class OidcCompleteRequestBuilder
     implements Builder<OidcCompleteRequest, OidcCompleteRequestBuilder> {
   _$OidcCompleteRequest? _$v;
+
+  LoginClient? _client;
+  LoginClient? get client => _$this._client;
+  set client(LoginClient? client) => _$this._client = client;
 
   String? _loginCode;
   String? get loginCode => _$this._loginCode;
@@ -86,9 +96,10 @@ class OidcCompleteRequestBuilder
   OidcCompleteRequestBuilder get _$this {
     final $v = _$v;
     if ($v != null) {
+      _client = $v.client;
       _loginCode = $v.loginCode;
       _clientVerifier = $v.clientVerifier;
-      _device = $v.device.toBuilder();
+      _device = $v.device?.toBuilder();
       _$v = null;
     }
     return this;
@@ -113,6 +124,7 @@ class OidcCompleteRequestBuilder
       _$result =
           _$v ??
           _$OidcCompleteRequest._(
+            client: client,
             loginCode: BuiltValueNullFieldError.checkNotNull(
               loginCode,
               r'OidcCompleteRequest',
@@ -123,13 +135,13 @@ class OidcCompleteRequestBuilder
               r'OidcCompleteRequest',
               'clientVerifier',
             ),
-            device: device.build(),
+            device: _device?.build(),
           );
     } catch (_) {
       late String _$failedField;
       try {
         _$failedField = 'device';
-        device.build();
+        _device?.build();
       } catch (e) {
         throw BuiltValueNestedFieldError(
           r'OidcCompleteRequest',

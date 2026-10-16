@@ -49,7 +49,8 @@ connections.
 ## Connection
 
 1. Upgrade: a present `Origin` other than the origin of `server.public_url` answers `403
-   forbidden` (SEC-CORS-3); nothing else is checked. Compression is off.
+   forbidden` (SEC-CORS-3), and so does a request with the console cookie
+   `__Host-console_session` and no `Origin` (M6-01); nothing else is checked. Compression is off.
 2. `hello` with `heartbeat_interval_ms`, `resume_window_ms`, `protocol_versions`, the current DPoP
    nonce, `server_time` and `sync_epoch`.
 3. `identify` or `resume` within `sync.identify_timeout`: token and proof are checked by the

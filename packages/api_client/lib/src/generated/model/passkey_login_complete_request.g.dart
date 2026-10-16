@@ -8,20 +8,23 @@ part of 'passkey_login_complete_request.dart';
 
 class _$PasskeyLoginCompleteRequest extends PasskeyLoginCompleteRequest {
   @override
+  final LoginClient? client;
+  @override
   final String challengeId;
   @override
   final BuiltMap<String, JsonObject?> credential;
   @override
-  final DeviceRegistration device;
+  final DeviceRegistration? device;
 
   factory _$PasskeyLoginCompleteRequest([
     void Function(PasskeyLoginCompleteRequestBuilder)? updates,
   ]) => (PasskeyLoginCompleteRequestBuilder()..update(updates))._build();
 
   _$PasskeyLoginCompleteRequest._({
+    this.client,
     required this.challengeId,
     required this.credential,
-    required this.device,
+    this.device,
   }) : super._();
   @override
   PasskeyLoginCompleteRequest rebuild(
@@ -36,6 +39,7 @@ class _$PasskeyLoginCompleteRequest extends PasskeyLoginCompleteRequest {
   bool operator ==(Object other) {
     if (identical(other, this)) return true;
     return other is PasskeyLoginCompleteRequest &&
+        client == other.client &&
         challengeId == other.challengeId &&
         credential == other.credential &&
         device == other.device;
@@ -44,6 +48,7 @@ class _$PasskeyLoginCompleteRequest extends PasskeyLoginCompleteRequest {
   @override
   int get hashCode {
     var _$hash = 0;
+    _$hash = $jc(_$hash, client.hashCode);
     _$hash = $jc(_$hash, challengeId.hashCode);
     _$hash = $jc(_$hash, credential.hashCode);
     _$hash = $jc(_$hash, device.hashCode);
@@ -54,6 +59,7 @@ class _$PasskeyLoginCompleteRequest extends PasskeyLoginCompleteRequest {
   @override
   String toString() {
     return (newBuiltValueToStringHelper(r'PasskeyLoginCompleteRequest')
+          ..add('client', client)
           ..add('challengeId', challengeId)
           ..add('credential', credential)
           ..add('device', device))
@@ -68,6 +74,10 @@ class PasskeyLoginCompleteRequestBuilder
           PasskeyLoginCompleteRequestBuilder
         > {
   _$PasskeyLoginCompleteRequest? _$v;
+
+  LoginClient? _client;
+  LoginClient? get client => _$this._client;
+  set client(LoginClient? client) => _$this._client = client;
 
   String? _challengeId;
   String? get challengeId => _$this._challengeId;
@@ -91,9 +101,10 @@ class PasskeyLoginCompleteRequestBuilder
   PasskeyLoginCompleteRequestBuilder get _$this {
     final $v = _$v;
     if ($v != null) {
+      _client = $v.client;
       _challengeId = $v.challengeId;
       _credential = $v.credential.toBuilder();
-      _device = $v.device.toBuilder();
+      _device = $v.device?.toBuilder();
       _$v = null;
     }
     return this;
@@ -118,13 +129,14 @@ class PasskeyLoginCompleteRequestBuilder
       _$result =
           _$v ??
           _$PasskeyLoginCompleteRequest._(
+            client: client,
             challengeId: BuiltValueNullFieldError.checkNotNull(
               challengeId,
               r'PasskeyLoginCompleteRequest',
               'challengeId',
             ),
             credential: credential.build(),
-            device: device.build(),
+            device: _device?.build(),
           );
     } catch (_) {
       late String _$failedField;
@@ -132,7 +144,7 @@ class PasskeyLoginCompleteRequestBuilder
         _$failedField = 'credential';
         credential.build();
         _$failedField = 'device';
-        device.build();
+        _device?.build();
       } catch (e) {
         throw BuiltValueNestedFieldError(
           r'PasskeyLoginCompleteRequest',

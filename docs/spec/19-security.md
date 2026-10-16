@@ -53,7 +53,7 @@ come from the instance's own origin (section 5).
 | SEC-CORS-1 | The API sends no CORS allow headers. Native apps need no CORS; the console is same-origin. |
 | SEC-CORS-2 | Only exception: public, non-personal responses without login (`instance.discovery.read`, JWKS) with `Access-Control-Allow-Origin: *` and without credentials. |
 | SEC-CORS-3 | WebSocket upgrade: if an `Origin` header is present, it must equal the origin of the instance; otherwise `403` before the upgrade. Native clients send no foreign `Origin`. Reason: protection of the console session (cookie) against cross-site WebSocket hijacking. |
-| SEC-CORS-4 | State-changing requests of the console carry a dedicated mandatory header and a matching `Origin` (08, section 7.5). |
+| SEC-CORS-4 | State-changing requests of the console carry a dedicated mandatory header and a matching `Origin` (08, section 7.5). The header is `X-Console-Request: 1`; a request with the console cookie and without it or with another `Origin` gets `403 forbidden` with reason `csrf_check_failed` (M6-01). |
 
 ## 5. Content Security Policy of the web console
 

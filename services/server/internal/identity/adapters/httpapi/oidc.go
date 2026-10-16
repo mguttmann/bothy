@@ -31,6 +31,7 @@ func (h *OIDC) BeginOidcLogin(ctx context.Context, req rest.BeginOidcLoginReques
 	}
 	in := identity.OIDCBegin{
 		ProviderID: ids.ID(req.Body.ProviderId), AppRedirectURI: req.Body.AppRedirectUri, ClientChallenge: req.Body.ClientChallenge,
+		Console: consoleForm(req.Body.Client),
 	}
 	if req.Body.EnrollmentCode != nil {
 		in.EnrollmentCode = *req.Body.EnrollmentCode
@@ -67,12 +68,14 @@ func (h *OIDC) CompleteOidcLogin(ctx context.Context, req rest.CompleteOidcLogin
 	if req.Body == nil {
 		return nil, errs.New(errs.CodeValidationFailed, "")
 	}
-	reg, err := registration(req.Body.Device)
+	console := consoleForm(req.Body.Client)
+	reg, err := loginDevice(console, req.Body.Device)
 	if err != nil {
 		return nil, err
 	}
 	in := identity.OIDCComplete{
-		LoginCode: req.Body.LoginCode, ClientVerifier: req.Body.ClientVerifier, Device: reg, Proof: loginProof(ctx, req.Params.DPoP),
+		LoginCode: req.Body.LoginCode, ClientVerifier: req.Body.ClientVerifier, Device: reg, Proof: loginProof(ctx, dpopHeader(req.Params.DPoP)),
+		Console: console,
 	}
 	if ip, ok := reqmeta.ClientIP(ctx); ok {
 		in.ClientIP = ip
@@ -80,6 +83,9 @@ func (h *OIDC) CompleteOidcLogin(ctx context.Context, req rest.CompleteOidcLogin
 	out, err := h.oidc.CompleteOIDCLogin(ctx, in)
 	if err != nil {
 		return nil, err
+	}
+	if c := out.Console; c != nil {
+		return rest.CompleteOidcLogin200JSONResponse{ConsoleLoginJSONResponse: consoleLogin(c)}, nil
 	}
 	if out.Nonce != "" {
 		reqmeta.SetResponseHeader(ctx, headerDPoPNonce, out.Nonce)

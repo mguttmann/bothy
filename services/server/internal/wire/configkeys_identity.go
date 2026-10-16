@@ -59,6 +59,19 @@ func identityConfigKeys() []config.Key {
 			Chapter: chapter03,
 		},
 		{
+			// M6-01: the absolute end of a console session; the cookie's Max-Age never exceeds it.
+			Name: "auth.console_session_max_age", Kind: config.KindDuration, Default: "12h", Min: "1m",
+			Doc:     "Absolute end of a web console session after its login.",
+			Chapter: chapter08,
+		},
+		{
+			// M6-01: at least 1m, so its hundredth (the write bound of last_seen_at, D-M6-01-3) is
+			// not zero.
+			Name: "auth.console_session_idle_timeout", Kind: config.KindDuration, Default: "30m", Min: "1m",
+			Doc:     "Time without a request after which a web console session ends.",
+			Chapter: chapter08,
+		},
+		{
 			Name: "auth.refresh_token_ttl", Kind: config.KindDuration, Default: "14d", Min: "1m",
 			Doc:     "Lifetime of a refresh token, never beyond the end of its session.",
 			Chapter: chapter03,

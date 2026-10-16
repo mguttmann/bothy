@@ -1,0 +1,8 @@
+from enum import StrEnum
+
+
+class LogoutXConsoleRequest(StrEnum):
+    VALUE_0 = "1"
+
+    def __str__(self) -> str:
+        return str(self.value)

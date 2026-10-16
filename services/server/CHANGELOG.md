@@ -242,6 +242,27 @@ documented in this file. The format is based on
   close with `4012`; shutdown closes every connection with `4013 server_restart`; the liveness
   check `event_tail` fails once the tail and hub goroutine has ended. `sync.cursor_advance_every`
   is an active key.
+- Console session of the web console (M6-01, 08 section 7.5): the login operations
+  `completeOidcLogin`, `completePasskeyLogin`, `loginWithPassword` and `loginWithTrustedHeader`
+  take `client: console` and answer `200 ConsoleSession` with the cookie `__Host-console_session`
+  (`Secure; HttpOnly; SameSite=Strict; Path=/`, 256 random bits, stored only as HMAC) on an active
+  web device without keys and without tokens. The cookie is a second credential kind of the
+  authenticator; a request with the cookie and `Authorization` is `400`. ConsoleGuard of the HTTP
+  chain requires `X-Console-Request: 1` and the own `Origin` on every cookie request except `GET`,
+  `HEAD`, `OPTIONS` (`403 csrf_check_failed`); the gateway refuses a cookie upgrade without the
+  own `Origin`. Before the first step-up a console session reaches only its own profile. New
+  operations `getConsoleSession`, `endViewAs` (`access.view_as.end`), `stepUpWithPassword`,
+  `beginStepUpOidcReauth` and `completeStepUpOidcReauth`; every console step-up rotates the
+  cookie. Idle (`auth.console_session_idle_timeout`) and absolute
+  (`auth.console_session_max_age`) ends revoke the session with `expired`, also from the job
+  `identity.auth_cleanup`. `viewAsUser` from the console stores the view on the session
+  (migration `00049_identity_console_session.sql`, R-DM-49) with audit at start and end; ending
+  the view, logging out, the step-up and reading oneself are decided without the view (R-AZ-32).
+  The configuration keys `auth.console_session_max_age` and `auth.console_session_idle_timeout`
+  are active.
+- The route generator writes the strict response objects to `objects.gen.go` and
+  `objects2.gen.go`, so no generated file reaches `repo.max_file_kb`.
+
 - WebSocket gateway connection and session (M1-64): `GET /api/v1/gateway` checks the `Origin`
   (`403 forbidden` for a foreign one, SEC-CORS-3), upgrades with `github.com/coder/websocket`,
   sends `hello` with the current DPoP nonce and authenticates in-band with `identify` (access

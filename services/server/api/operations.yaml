@@ -23,6 +23,7 @@ enabled:             # operationIds that have a handler; sorted ascending
   - beginPairing
   - beginPasskeyLogin
   - beginPasskeyRegistration
+  - beginStepUpOidcReauth
   - closeThread
   - completeEnrollment
   - completeIdentityLink
@@ -30,6 +31,7 @@ enabled:             # operationIds that have a handler; sorted ascending
   - completePairing
   - completePasskeyLogin
   - completePasskeyRegistration
+  - completeStepUpOidcReauth
   - completeStepUpWithDeviceKey
   - completeStepUpWithPasskey
   - completeUpload
@@ -70,6 +72,7 @@ enabled:             # operationIds that have a handler; sorted ascending
   - disableUser
   - enableAgent
   - enableUser
+  - endViewAs
   - explainChannelAccess
   - explainSpaceAccess
   - exportAuditEvents
@@ -78,6 +81,7 @@ enabled:             # operationIds that have a handler; sorted ascending
   - getChannel
   - getChannelBehavior
   - getConsumerState
+  - getConsoleSession
   - getDevice
   - getDiscovery
   - getFile
@@ -189,6 +193,7 @@ enabled:             # operationIds that have a handler; sorted ascending
   - setSpaceOperator
   - setThreadTags
   - setThreadTitle
+  - stepUpWithPassword
   - submitClientMetrics
   - suspendApp
   - uninstallApp

@@ -50,19 +50,20 @@ const (
 // cached here, so a revocation holds at the next request in every process (AZ-P9). It is safe for
 // concurrent use.
 type Authenticator struct {
-	cfg    Config
-	tokens *AccessTokens
-	dpop   identity.DPoP
-	store  SessionStore
-	api    APITokenStore
-	pepper []byte
-	apps   identity.AppInstallations
-	clk    clock.Clock
-	log    *slog.Logger
-	bind   SessionBinding
-	revoke identity.Auth
-	uow    txn.UnitOfWork
-	audit  auditing.Recorder
+	cfg     Config
+	tokens  *AccessTokens
+	dpop    identity.DPoP
+	store   SessionStore
+	api     APITokenStore
+	pepper  []byte
+	apps    identity.AppInstallations
+	clk     clock.Clock
+	log     *slog.Logger
+	bind    SessionBinding
+	revoke  identity.Auth
+	uow     txn.UnitOfWork
+	audit   auditing.Recorder
+	console *Console
 }
 
 // Compile-time check: the Authenticator is the kernel port.
@@ -96,6 +97,9 @@ type AuthenticatorDeps struct {
 	UoW txn.UnitOfWork
 	// Audit records the denial of a failed binding.
 	Audit auditing.Recorder
+	// Console authenticates the console cookie, the second credential kind of people (M6-01);
+	// nil refuses every cookie with 401 unauthenticated.
+	Console *Console
 }
 
 // NewAuthenticator returns the Authenticator with identity.last_active_granularity of cfg (not
@@ -122,7 +126,7 @@ func NewAuthenticator(cfg Config, d AuthenticatorDeps) (*Authenticator, error) {
 	}
 	return &Authenticator{
 		cfg: cfg, tokens: d.AccessTokens, dpop: d.DPoP, store: d.Sessions, api: d.APITokens, pepper: append([]byte(nil), d.Pepper...),
-		apps: d.Apps, clk: d.Clock, log: d.Log, bind: d.Binding, revoke: d.Revoker, uow: d.UoW, audit: d.Audit,
+		apps: d.Apps, clk: d.Clock, log: d.Log, bind: d.Binding, revoke: d.Revoker, uow: d.UoW, audit: d.Audit, console: d.Console,
 	}, nil
 }
 
@@ -131,14 +135,26 @@ func unauthenticated() error {
 	return errs.New(errs.CodeUnauthenticated, "").WithHeader("WWW-Authenticate", schemeChallenge)
 }
 
-// Authenticate implements actor.Authenticator in the order of the brief: no Authorization header
-// is anonymous; more than one header or another scheme is unauthenticated; a token with the
-// prefix bothy_ takes the API token path under either scheme (AuthenticateAPIToken); otherwise
-// Bearer with this server's access token fails with invalid_dpop_proof (RFC 9449 section 7.2) and
-// DPoP checks the access token, then the proof, then reads session, device and key.
+// Authenticate implements actor.Authenticator in the order of the brief: no credentials are
+// anonymous; an Authorization header together with the console cookie is 400 validation_failed
+// (one credential per request, D-M6-01-4); the cookie alone takes the console path
+// (Console.Authenticate, M6-01); more than one header or another scheme is unauthenticated; a
+// token with the prefix bothy_ takes the API token path under either scheme
+// (AuthenticateAPIToken); otherwise Bearer with this server's access token fails with
+// invalid_dpop_proof (RFC 9449 section 7.2) and DPoP checks the access token, then the proof, then
+// reads session, device and key.
 func (a *Authenticator) Authenticate(ctx context.Context, creds actor.Credentials) (actor.Actor, error) {
 	if !creds.Present() {
 		return actor.Anonymous(), nil
+	}
+	if !creds.ConsoleCookie.IsZero() {
+		if creds.Authorization != "" {
+			return actor.Actor{}, errs.New(errs.CodeValidationFailed, "Send either the console cookie or an Authorization header.")
+		}
+		if a.console == nil {
+			return actor.Actor{}, cookieRefused(errs.CodeUnauthenticated)
+		}
+		return a.console.Authenticate(ctx, creds)
 	}
 	scheme, token, ok := splitAuthorization(creds.Authorization)
 	if !ok || scheme != schemeBearer && scheme != schemeDPoP {
@@ -327,6 +343,9 @@ func (a *Authenticator) Revalidate(ctx context.Context, p actor.Actor) error {
 	if p.Kind != actor.KindUser || p.SessionID.IsZero() {
 		return unauthenticated()
 	}
+	if p.ClientComponent == string(identity.ComponentConsole) {
+		return a.revalidateConsole(ctx, p)
+	}
 	st, found, err := a.store.AuthState(ctx, p.SessionID)
 	if err != nil {
 		return err
@@ -338,6 +357,22 @@ func (a *Authenticator) Revalidate(ctx context.Context, p actor.Actor) error {
 	a.describe(&check, st)
 	if !check.SessionActive || !check.DeviceKeyActive ||
 		check.DeviceState != actor.DeviceActive && check.DeviceState != actor.DevicePending {
+		return errs.New(errs.CodeSessionRevoked, "")
+	}
+	return nil
+}
+
+// revalidateConsole checks a console principal again (M6-01): its session must still be open,
+// before its end and on an active device; the console holds no gateway connection, so this only
+// guards a principal some caller kept.
+func (a *Authenticator) revalidateConsole(ctx context.Context, p actor.Actor) error {
+	st, found, err := a.store.AuthState(ctx, p.SessionID)
+	if err != nil {
+		return err
+	}
+	s := st.Session
+	if !found || s.UserID != p.ID || s.Component != identity.ComponentConsole || !s.Active(a.clk.Now()) ||
+		st.DeviceState != identity.DeviceStateActive {
 		return errs.New(errs.CodeSessionRevoked, "")
 	}
 	return nil

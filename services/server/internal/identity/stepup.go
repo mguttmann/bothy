@@ -34,6 +34,11 @@ type StepUpResult struct {
 	// StepUpAt is the new auth_sessions.step_up_at; ValidUntil is StepUpAt plus
 	// auth.step_up_max_age.
 	StepUpAt, ValidUntil time.Time
+	// Cookie is the new value of the console cookie after the step-up of a console session
+	// (session fixation, 08 section 7.5, M6-01); the zero Token for every other session.
+	// CookieMaxAge is its Max-Age.
+	Cookie       Token
+	CookieMaxAge time.Duration
 }
 
 // StepUp is the step-up port of identity (PLAN M1-35; 08 section 6.2, 07 SR5): a person in a

@@ -30,13 +30,14 @@ func (h *Local) LoginWithPassword(ctx context.Context, req rest.LoginWithPasswor
 	if req.Body == nil {
 		return nil, errs.New(errs.CodeValidationFailed, "")
 	}
-	reg, err := registration(req.Body.Device)
+	console := consoleForm(req.Body.Client)
+	reg, err := loginDevice(console, req.Body.Device)
 	if err != nil {
 		return nil, err
 	}
 	in := identity.PasswordLogin{
 		LoginName: req.Body.LoginName, Password: req.Body.Password, TOTPCode: req.Body.TotpCode, Device: reg,
-		Proof: loginProof(ctx, req.Params.DPoP),
+		Proof: loginProof(ctx, dpopHeader(req.Params.DPoP)), Console: console,
 	}
 	if ip, ok := reqmeta.ClientIP(ctx); ok {
 		in.ClientIP = ip
@@ -44,6 +45,9 @@ func (h *Local) LoginWithPassword(ctx context.Context, req rest.LoginWithPasswor
 	out, err := h.local.LoginWithPassword(ctx, in)
 	if err != nil {
 		return nil, err
+	}
+	if c := out.Console; c != nil {
+		return rest.LoginWithPassword200JSONResponse{ConsoleLoginJSONResponse: consoleLogin(c)}, nil
 	}
 	if out.Nonce != "" {
 		reqmeta.SetResponseHeader(ctx, headerDPoPNonce, out.Nonce)

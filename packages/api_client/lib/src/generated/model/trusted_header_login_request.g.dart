@@ -8,7 +8,9 @@ part of 'trusted_header_login_request.dart';
 
 class _$TrustedHeaderLoginRequest extends TrustedHeaderLoginRequest {
   @override
-  final DeviceRegistration device;
+  final LoginClient? client;
+  @override
+  final DeviceRegistration? device;
   @override
   final String? enrollmentCode;
 
@@ -16,7 +18,7 @@ class _$TrustedHeaderLoginRequest extends TrustedHeaderLoginRequest {
     void Function(TrustedHeaderLoginRequestBuilder)? updates,
   ]) => (TrustedHeaderLoginRequestBuilder()..update(updates))._build();
 
-  _$TrustedHeaderLoginRequest._({required this.device, this.enrollmentCode})
+  _$TrustedHeaderLoginRequest._({this.client, this.device, this.enrollmentCode})
     : super._();
   @override
   TrustedHeaderLoginRequest rebuild(
@@ -31,6 +33,7 @@ class _$TrustedHeaderLoginRequest extends TrustedHeaderLoginRequest {
   bool operator ==(Object other) {
     if (identical(other, this)) return true;
     return other is TrustedHeaderLoginRequest &&
+        client == other.client &&
         device == other.device &&
         enrollmentCode == other.enrollmentCode;
   }
@@ -38,6 +41,7 @@ class _$TrustedHeaderLoginRequest extends TrustedHeaderLoginRequest {
   @override
   int get hashCode {
     var _$hash = 0;
+    _$hash = $jc(_$hash, client.hashCode);
     _$hash = $jc(_$hash, device.hashCode);
     _$hash = $jc(_$hash, enrollmentCode.hashCode);
     _$hash = $jf(_$hash);
@@ -47,6 +51,7 @@ class _$TrustedHeaderLoginRequest extends TrustedHeaderLoginRequest {
   @override
   String toString() {
     return (newBuiltValueToStringHelper(r'TrustedHeaderLoginRequest')
+          ..add('client', client)
           ..add('device', device)
           ..add('enrollmentCode', enrollmentCode))
         .toString();
@@ -57,6 +62,10 @@ class TrustedHeaderLoginRequestBuilder
     implements
         Builder<TrustedHeaderLoginRequest, TrustedHeaderLoginRequestBuilder> {
   _$TrustedHeaderLoginRequest? _$v;
+
+  LoginClient? _client;
+  LoginClient? get client => _$this._client;
+  set client(LoginClient? client) => _$this._client = client;
 
   DeviceRegistrationBuilder? _device;
   DeviceRegistrationBuilder get device =>
@@ -75,7 +84,8 @@ class TrustedHeaderLoginRequestBuilder
   TrustedHeaderLoginRequestBuilder get _$this {
     final $v = _$v;
     if ($v != null) {
-      _device = $v.device.toBuilder();
+      _client = $v.client;
+      _device = $v.device?.toBuilder();
       _enrollmentCode = $v.enrollmentCode;
       _$v = null;
     }
@@ -101,14 +111,15 @@ class TrustedHeaderLoginRequestBuilder
       _$result =
           _$v ??
           _$TrustedHeaderLoginRequest._(
-            device: device.build(),
+            client: client,
+            device: _device?.build(),
             enrollmentCode: enrollmentCode,
           );
     } catch (_) {
       late String _$failedField;
       try {
         _$failedField = 'device';
-        device.build();
+        _device?.build();
       } catch (e) {
         throw BuiltValueNestedFieldError(
           r'TrustedHeaderLoginRequest',

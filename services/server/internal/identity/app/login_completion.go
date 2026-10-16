@@ -66,6 +66,10 @@ type LoginCompletion struct {
 	// session are written: the claim group sync of an OIDC login (M1-42); nil for none. Its
 	// error fails the login.
 	Sync func(ctx context.Context, userID ids.ID) error
+	// Console selects the console form (M6-01, D-M6-01-1): Device, ProofJKT and Trust are
+	// ignored; the login registers an active web device without keys and starts a console session
+	// with a cookie, never tokens. A pending person does not log in to the console.
+	Console bool
 }
 
 // LoginResult is a completed login: the session, its device and the token pair. NewDevice reports
@@ -75,6 +79,14 @@ type LoginResult struct {
 	Device    identity.Device
 	Tokens    identity.TokenSet
 	NewDevice bool
+	// Console is the result of the console form; nil for the app form.
+	Console *identity.ConsoleLogin
+}
+
+// Result returns the answer of the login port: the token pair of the app form or the console
+// session of the console form.
+func (r LoginResult) Result() identity.RedeemResult {
+	return identity.RedeemResult{Tokens: r.Tokens, Console: r.Console}
 }
 
 // SigningKeys is the part of instance.Keys that bothy setup needs: the active keys must exist
@@ -127,6 +139,8 @@ type ServiceDeps struct {
 	// Random is the source of pairing codes (M1-38) and of the handle suffixes of people the header
 	// login provisions (M1-43); nil means domain.EnrollmentRandom (crypto/rand).
 	Random io.Reader
+	// Console starts the console sessions of the console form (M6-01); nil refuses that form.
+	Console *Console
 }
 
 // Service holds the login use cases every login path shares (CompleteLogin), the enrollment code
@@ -205,6 +219,9 @@ func (s *Service) CompleteLogin(ctx context.Context, in LoginCompletion) (LoginR
 
 // completeLogin is CompleteLogin inside its unit of work.
 func (s *Service) completeLogin(ctx context.Context, in LoginCompletion) (LoginResult, error) {
+	if in.Console {
+		return s.completeConsoleLogin(ctx, in)
+	}
 	if in.Trust != TrustConfirmed && in.Trust != TrustUnconfirmed || !in.AuthMethod.Valid() {
 		return LoginResult{}, errs.New(errs.CodeInternalError, "identity: login completion without trust or auth method")
 	}
@@ -336,4 +353,52 @@ func (s *Service) loginDevice(ctx context.Context, in LoginCompletion) (identity
 // rejection of the request (a failed attempt of the code), not a failure of the server.
 func countsAsAttempt(err error) bool {
 	return slices.Contains([]errs.Kind{errs.KindBadRequest, errs.KindUnauthenticated, errs.KindConflict, errs.KindUnprocessable}, errs.KindOf(err))
+}
+
+// completeConsoleLogin is completeLogin for the console form (D-M6-01-1): the person must be
+// active, then Console.Start registers the web device and starts the console session, the
+// identity's last_login_at is set and the same allow entry as an app login is written with
+// client_component console.
+func (s *Service) completeConsoleLogin(ctx context.Context, in LoginCompletion) (LoginResult, error) {
+	if s.d.Console == nil || !in.AuthMethod.Valid() {
+		return LoginResult{}, errs.New(errs.CodeInternalError, "identity: a console login without the console")
+	}
+	in.AllowPending = false
+	if err := s.loginPerson(ctx, in); err != nil {
+		return LoginResult{}, err
+	}
+	started, err := s.d.Console.Start(ctx, ConsoleStart{UserID: in.UserID, AuthMethod: in.AuthMethod, IdentityID: in.IdentityID, ClientIP: in.ClientIP})
+	if err != nil {
+		return LoginResult{}, err
+	}
+	if in.IdentityID != nil {
+		ok, err := s.d.Identities.MarkIdentityLogin(ctx, *in.IdentityID, s.d.Clock.Now())
+		if err != nil {
+			return LoginResult{}, err
+		}
+		if !ok {
+			return LoginResult{}, errs.New(errs.CodeInternalError, "identity: the identity of the login is missing")
+		}
+	}
+	set := identity.TokenSet{Session: started.Session, Device: started.Device}
+	attrs := loginAttrs(in, set, true)
+	attrs[attrClientComponent] = auditing.Code(string(identity.ComponentConsole))
+	err = s.d.Audit.Record(loginActor(ctx, in.UserID, set), auditing.Entry{
+		Action: string(authorize.ActionAuthLoginComplete), Decision: auditing.DecisionAllow,
+		ResourceKind: resourceAuthSession, ResourceID: started.Session.ID, Attrs: attrs,
+	})
+	if err != nil {
+		return LoginResult{}, err
+	}
+	cl := started.Login
+	return LoginResult{Session: started.Session, Device: started.Device, NewDevice: true, Console: &cl}, nil
+}
+
+// verifyLoginProof verifies the DPoP proof of an app login; the console form carries none
+// (D-M6-01-1) and gets the zero proof.
+func (s *Service) verifyLoginProof(ctx context.Context, console bool, p identity.ProofRequest) (identity.VerifiedProof, error) {
+	if console {
+		return identity.VerifiedProof{}, nil
+	}
+	return s.d.DPoP.Verify(ctx, p)
 }
