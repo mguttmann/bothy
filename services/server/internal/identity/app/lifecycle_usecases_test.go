@@ -22,7 +22,9 @@ type noDPoP struct{ identity.DPoP }
 // the same through the chain with real tokens).
 type lifeWorld struct {
 	*peopleWorld
-	l *app.Lifecycle
+	l    *app.Lifecycle
+	cfg  app.Config
+	deps app.LifecycleDeps
 }
 
 func newLifeWorld(t *testing.T) *lifeWorld {
@@ -47,11 +49,12 @@ func newLifeWorld(t *testing.T) *lifeWorld {
 	if err != nil {
 		t.Fatal(err)
 	}
-	l, err := app.NewLifecycle(cfg, app.LifecycleDeps{Store: w.repo, People: w.p, Sessions: sessions, Tokens: tokens, Clock: w.clk})
+	deps := app.LifecycleDeps{Store: w.repo, People: w.p, Sessions: sessions, Tokens: tokens, Clock: w.clk}
+	l, err := app.NewLifecycle(cfg, deps)
 	if err != nil {
 		t.Fatal(err)
 	}
-	return &lifeWorld{peopleWorld: w, l: l}
+	return &lifeWorld{peopleWorld: w, l: l, cfg: cfg, deps: deps}
 }
 
 // device inserts a device of user in state with a dpop key, created at seen and, when active,
