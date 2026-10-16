@@ -165,6 +165,11 @@ linters:
       - path: ^api/rest/(models|objects|rest)\.gen\.go$
         linters: [gosec]
         text: "G117:"
+      # The generated API client (M8-10, docs/DECISIONS.md D-M8-10-1) returns every response to
+      # its caller, who closes the body, and builds requests with http.NewRequest before it sets
+      # the context of the call with req.WithContext; both are the shape oapi-codegen writes.
+      - path: ^api/restclient/restclient(_[0-9]{2})?\.gen\.go$
+        linters: [bodyclose, noctx]
       # The strict server streams the NDJSON body of exportAuditEvents and closes a ReadCloser body
       # in a defer without checking the error (M1-50); the handler hands it no ReadCloser.
       - path: ^api/rest/(models|objects|rest)\.gen\.go$

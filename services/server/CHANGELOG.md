@@ -11,6 +11,16 @@ documented in this file. The format is based on
 
 ### Added
 
+- `bothy import login` and `bothy import logout` (M8-10): the import tool logs in as a `cli`
+  device through device pairing (Ed25519 DPoP key, no step-up key), prints the pairing code alone
+  on stdout and polls `completePairing` every `import.login_poll_interval` (new tool key) until the
+  owner approves; the session file (`--session-file`, mode `0600` in `0700`) holds device, key and
+  tokens. `cmd/bothy/importtool/bothyapi` is the authenticated client for the later import
+  commands: DPoP proofs on every request with one `use_dpop_nonce` retry, refresh under the lock
+  of the session file with the rotated token stored before use, `429` within the tool's limits,
+  no redirects, all through `platform/egress`, and no secret in output, log or error. The API
+  client `api/restclient` is generated from the whole `docs/api/openapi.yaml` and split below
+  `repo.max_file_kb`.
 - Notification levels and quiet hours (M3-18): the module `notify` owns `notification_preferences`
   and `quiet_hours` and serves `listMyNotificationPreferences`, `putNotificationPreference`,
   `deleteNotificationPreference`, `listMyQuietHours`, `createQuietHoursRule`, `putQuietHoursRule`

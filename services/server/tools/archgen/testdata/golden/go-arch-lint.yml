@@ -73,7 +73,7 @@ deps:
     mayDependOn: [wire, identity, identity-domain, identity-app, identity-adapters, chat, chat-domain, chat-app, chat-adapters, agents, agents-domain, agents-app, agents-adapters, platform-jobs, platform-pg, kernel-ports, api, migrations]
     canUse: [v-otel]
   cmd:
-    mayDependOn: [cmd, wire, platform-jobs, platform-pg, kernel-ports, migrations]
+    mayDependOn: [cmd, wire, platform-jobs, platform-pg, kernel-ports, api, migrations]
     canUse: [v-otel]
   api:
     mayDependOn: [api]

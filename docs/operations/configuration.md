@@ -793,7 +793,8 @@ Source: [22-import-migration.md](../spec/22-import-migration.md), section 19.
 | `import.discord.preflight_sample` |  | Tool `bothy import` |  | `20` | messages for the intent probe |  |
 | `import.discord.closed_tags` |  | Tool `bothy import` |  | empty | forum tags that additionally mark a thread as done |  |
 | `import.attachment_max_bytes` |  | Tool `bothy import` |  | same as `file.max_upload_bytes` | largest imported attachment |  |
-| `import.http_timeout` |  | Tool `bothy import` |  | `60s` | time limit per call to Discord and the CDN |  |
+| `import.http_timeout` |  | Tool `bothy import` |  | `60s` | time limit per call to Discord and the CDN; also the time limit of each call of the tool to Bothy |  |
+| `import.login_poll_interval` |  | Tool `bothy import` |  | `5s` | interval between polls of `completePairing` during `bothy import login`; the server limits public auth calls by `ratelimit.rl.public_auth.*` |  |
 | `import.batch_max_items` |  | Tool `bothy import` |  | `100` | items per batch sent to the server |  |
 | `import.reply_quote_max_chars` |  | Tool `bothy import` |  | `100` | length of the quote line for replies across threads |  |
 | `import.follow.poll_interval` |  | Tool `bothy import` |  | `30s` | interval between mirror rounds |  |

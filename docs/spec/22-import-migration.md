@@ -503,6 +503,18 @@ Further options: `--channel <id>` (repeatable) narrows the scope; `--only-thread
 selects exactly these threads; `--sessions <file>` (section 9); `--report text|json`;
 `--takeover` (7.4); `--discord-token-file <path>`; `--config <file>` (values from section 19).
 
+Session file: `bothy import login` stores device ID, DPoP key (Ed25519) and token pair in
+`<user configuration directory>/bothy/import-session.json` (`os.UserConfigDir`); every
+`bothy import` command takes `--session-file <path>` instead. The file has mode `0600` in a
+directory with mode `0700`; a file or directory that group or others can read or write is refused
+(on Windows the file lives in the user profile and the mode check is skipped). It is written
+atomically (temporary file in the same directory, `fsync`, rename). Every refresh holds an
+exclusive lock of `<file>.lock` and reads the file again after taking it, so two tool processes
+never rotate the same refresh token ([08-identity.md](08-identity.md) section 7.4); the new
+refresh token is stored before the new access token is used. `bothy import logout` deletes the
+session file under that lock and keeps the lock file. A missing file means "not logged in". No
+output, log line or error carries a token, the key or the content of the file.
+
 ### 10.2 Rules
 
 1. Dry run is the default. A forgotten switch only reads.
@@ -759,7 +771,8 @@ section 10.
 | `import.discord.preflight_sample` | `20` | messages for the intent probe |
 | `import.discord.closed_tags` | empty | forum tags that additionally mark a thread as done |
 | `import.attachment_max_bytes` | same as `file.max_upload_bytes` | largest imported attachment |
-| `import.http_timeout` | `60s` | time limit per call to Discord and the CDN |
+| `import.http_timeout` | `60s` | time limit per call to Discord and the CDN; also the time limit of each call of the tool to Bothy |
+| `import.login_poll_interval` | `5s` | interval between polls of `completePairing` during `bothy import login`; the server limits public auth calls by `ratelimit.rl.public_auth.*` |
 | `import.batch_max_items` | `100` | items per batch sent to the server |
 | `import.reply_quote_max_chars` | `100` | length of the quote line for replies across threads |
 | `import.follow.poll_interval` | `30s` | interval between mirror rounds |

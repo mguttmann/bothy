@@ -17,6 +17,11 @@ names (PLAN P-04). The normative sources are [06-api.md](../../../docs/spec/06-a
 | `rest/rest.gen.go` | Server of the enabled operations (from `ServerInterface` on) | generated |
 | `rest/objects.gen.go` | Request and response objects of the strict server (from the first `*RequestObject` up to `StrictServerInterface`, INT-W17/4) | generated |
 | `rest/openapi.gen.yaml` | byte-identical copy of `docs/api/openapi.yaml`; `rest.Spec` (`rest/spec.go`) embeds it for the request validator of the HTTP chain (M1-18) | generated |
+| `restclient/oapi-codegen.yaml` | settings of the API client (`client`, `models`, `skip-prune`; D-M8-10-1) | yes |
+| `restclient/restclient.gen.go`, `restclient_NN.gen.go` | client and models of every operation of `docs/api/openapi.yaml`, cut below `repo.max_file_kb` (`internal/gosplit`) | generated |
+| `restclient/doer.go` | `DoerFunc`, the only hand-written part: a transport as a function value (D-M8-10-8) | yes |
+| `restclient/gen/` | generator of the client (runs oapi-codegen, splits the output) | yes |
+| `internal/gosplit/` | splits a generated Go file at top-level declarations; used by both generators | yes |
 | `routes/routes.go` | types, `Table`, `Recorder`, `Verify`, `Build`, lookup | yes |
 | `routes/routes.gen.go`, `catalog.gen.go`, `build.gen.go` | operation table, action catalogue, link to the generated server | generated |
 | `routes/gen/` | generator with tests and `testdata/` (fixture and negative fixtures) | yes |
@@ -28,6 +33,18 @@ Component in the module register: `api` with the vendor groups `oapi` (runtime o
 `openapi` (kin-openapi, loader of the generator), `yaml` (generator) and `jsonschema` (`specschema`, M1-67). Tool: oapi-codegen
 v2.8.0, pinned as a `tool` in [go.mod](../go.mod), runtime `github.com/oapi-codegen/runtime`
 v1.7.0.
+
+## API client (`restclient`)
+
+`restclient` is generated straight from `docs/api/openapi.yaml` with every operation, not from the
+filtered copy of the server: a tool calls the public API of a server that may serve other
+operations than this build (D-M8-10-1). `go run ./restclient/gen` runs the pinned oapi-codegen
+with `restclient/oapi-codegen.yaml` (`generate: {client: true, models: true}`, `skip-prune`, no
+embedded spec) in a temporary directory and cuts the output at top-level declarations into
+`restclient.gen.go`, `restclient_02.gen.go` and so on, each below `repo.max_file_kb`; parts of an
+earlier run that are not written again are removed. `make codegen-check` holds it like the
+server. Users: `cmd/bothy/importtool/bothyapi` (the import tool); the component `cmd` may use
+`api` for this (D-M8-10-8).
 
 ## Generate again
 
