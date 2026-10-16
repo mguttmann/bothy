@@ -141,6 +141,7 @@ def test_schema_change_makes_the_real_fixture_fail(tree: Path) -> None:
         "StatsBackendReport.empty.json",
         "StatsBackendReport.no_cost_permission.json",
         "StatsBackendReport.normal.json",
+        "StatsBackendReport.rate_limits.json",
     }
 
 

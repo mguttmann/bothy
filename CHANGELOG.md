@@ -43,6 +43,19 @@ Planning stage (milestone M0). Nothing is installable yet.
   enrollment code, pairing, pending device, logout), the signed-out event for a revoked session,
   and Dio interceptors for the slot of `createApiClient`; no secret in any `toString`, error or
   log line (M4-09).
+- Visualization views (M6-12): `packages/bothy_viz` gets the six views of 25 6, built only on
+  the models, ports and basic forms of M6-11: live topology (lanes, run cards, rates of the last
+  minute, stale and "More runs than shown"), backend view (configured and reported mode with the
+  mismatch marker, supported modes, switches, I2 and I3 denials, costs per mode, every
+  rate-limit state), delivery and sync live (instance scope only), executive page (usage, runs
+  and error rate, costs per mode, SLO traffic light "own measurement"), the replayable daily
+  timeline with play, pause, jump and the speeds of `viz.timeline_speeds`, and TV mode (dark,
+  one font step larger, rotation every `viz.tv_rotation_interval`, costs only with
+  `viz.tv_show_costs`, ended by a key or a click). Every view has the switch "As table" with
+  sortable tables, follows reduced motion and is pinned by goldens in the full matrix; the
+  registry `vizViewRegistry` lists the views for the hosts, and the harness shows them all.
+  A performance test of the live topology with the `load` frame runs in profile mode on macOS
+  through `make apps-platform` and `make perf` (`viz.perf.frame_build_p95`).
 - Visualization package (M6-11): `packages/bothy_viz` gets view models from the generated
   statistics types, the ports `LiveFrameSource` (with the stale rule on an injected clock) and
   `StatsQuerySource` with fixture implementations, the basic forms lane, run card, area, bar,

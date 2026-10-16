@@ -71,6 +71,20 @@ def test_runs_commands_for_host_system(
     assert "SKIP apps-platform packages/device_key windows: other host" in out
 
 
+def test_finds_a_nested_harness_member(
+    tmp_path: Path, fake_flutter: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    # The harness of bothy_viz is a workspace member one level below its package
+    # (docs/DECISIONS.md D-M6-11-6); its performance test runs on macOS (brief M6-12).
+    root = tmp_path / "repo"
+    member = _member(root, "packages/bothy_viz/harness", {"macos": [["flutter", "drive", "perf"]]})
+    assert apps_platform.main(["--root", str(root), "--system", "macos"]) == 0
+    assert _calls(fake_flutter) == [{"args": ["drive", "perf"], "cwd": str(member.resolve())}]
+    assert "apps-platform packages/bothy_viz/harness macos: 1 commands ok" in (
+        capsys.readouterr().out
+    )
+
+
 def test_prints_skip_for_other_system(
     tmp_path: Path, fake_flutter: Path, capsys: pytest.CaptureFixture[str]
 ) -> None:

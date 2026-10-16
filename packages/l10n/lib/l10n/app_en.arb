@@ -1547,5 +1547,352 @@
   "threadRowStateWaiting": "Waiting for an answer",
   "@threadRowStateWaiting": {
     "description": "State word of a forum post whose run waits for an answer from someone other than the reader (components.md section 6)."
+  },
+  "vizViewLiveTopology": "Live topology",
+  "@vizViewLiveTopology": {
+    "description": "Title and tab of the live topology view (25 section 6.1, screen D12)."
+  },
+  "vizViewBackend": "Backend view",
+  "@vizViewBackend": {
+    "description": "Title and tab of the backend view (25 section 6.2)."
+  },
+  "vizViewDelivery": "Delivery and sync live",
+  "@vizViewDelivery": {
+    "description": "Title and tab of the delivery and sync view (25 section 6.3)."
+  },
+  "vizViewExecutive": "Executive page",
+  "@vizViewExecutive": {
+    "description": "Title and tab of the executive page (25 section 6.4)."
+  },
+  "vizViewTimeline": "Daily timeline",
+  "@vizViewTimeline": {
+    "description": "Title and tab of the replayable daily timeline (25 section 6.5)."
+  },
+  "vizViewTv": "TV mode",
+  "@vizViewTv": {
+    "description": "Name of TV mode in the view registry (25 section 6.6, screen D13)."
+  },
+  "vizAsTable": "As table",
+  "@vizAsTable": {
+    "description": "Label of the switch in every view header that shows the same values as a table (25 section 7.4)."
+  },
+  "vizOpenGrafana": "Open in Grafana",
+  "@vizOpenGrafana": {
+    "description": "Link of a view that opens the dashboard in the system browser; only when the instance sets a dashboard URL (25 section 9.1)."
+  },
+  "vizLoading": "Loading",
+  "@vizLoading": {
+    "description": "Screen reader label of a view while its data loads."
+  },
+  "vizOnlyForOwner": "Only for the owner",
+  "@vizOnlyForOwner": {
+    "description": "Note of a view or tile that only the owner of the instance sees, shown instead of its data in a space scope (25 sections 6.3 and 6.4)."
+  },
+  "vizSortBy": "Sort by {column}",
+  "@vizSortBy": {
+    "description": "Screen reader label of a column header of a table view; a tap sorts by the column.",
+    "placeholders": {
+      "column": {
+        "type": "String",
+        "example": "Agent"
+      }
+    }
+  },
+  "vizFrameTime": "As of {time}",
+  "@vizFrameTime": {
+    "description": "Time of the shown live frame under the view title.",
+    "placeholders": {
+      "time": {
+        "type": "String",
+        "example": "12:04 PM"
+      }
+    }
+  },
+  "vizNoActiveRuns": "No active runs",
+  "@vizNoActiveRuns": {
+    "description": "Live topology without an active run."
+  },
+  "vizRatesLastMinute": "Last minute",
+  "@vizRatesLastMinute": {
+    "description": "Heading of the rates of the last full minute in the live topology (screen D12)."
+  },
+  "vizNone": "none",
+  "@vizNone": {
+    "description": "Table cell of a value that does not exist for this row, for example no current step."
+  },
+  "vizColSpace": "Space",
+  "@vizColSpace": {
+    "description": "Column header: the space of a run."
+  },
+  "vizColChannel": "Channel",
+  "@vizColChannel": {
+    "description": "Column header: the channel of a run."
+  },
+  "vizColAgent": "Agent",
+  "@vizColAgent": {
+    "description": "Column header: the agent."
+  },
+  "vizColState": "State",
+  "@vizColState": {
+    "description": "Column header: the state of a run or a traffic light."
+  },
+  "vizColStep": "Current step",
+  "@vizColStep": {
+    "description": "Column header: the current step of a run (tool chip)."
+  },
+  "vizColMode": "Billing mode",
+  "@vizColMode": {
+    "description": "Column header: the billing mode badge of a run."
+  },
+  "vizColApproval": "Approval",
+  "@vizColApproval": {
+    "description": "Column header: whether an approval card of the run waits."
+  },
+  "vizColCost": "Cost so far",
+  "@vizColCost": {
+    "description": "Column header: the cost of a run so far."
+  },
+  "vizColMetric": "Metric",
+  "@vizColMetric": {
+    "description": "Column header: the metric of a row."
+  },
+  "vizColLastMinute": "Last minute",
+  "@vizColLastMinute": {
+    "description": "Column header: the value of the last full minute."
+  },
+  "vizColValue": "Value",
+  "@vizColValue": {
+    "description": "Column header: the value of a row."
+  },
+  "vizColNote": "Note",
+  "@vizColNote": {
+    "description": "Column header: comparison or cost label of a tile, or the label own measurement."
+  },
+  "vizColPresence": "Presence",
+  "@vizColPresence": {
+    "description": "Column header: presence of an agent from its heartbeats."
+  },
+  "vizColConfiguredMode": "Configured mode",
+  "@vizColConfiguredMode": {
+    "description": "Column header and label: billing mode set for the agent (25 section 6.2)."
+  },
+  "vizColReportedMode": "Reported mode",
+  "@vizColReportedMode": {
+    "description": "Column header and label: billing mode the adapter reports (25 section 6.2)."
+  },
+  "vizColSupportedModes": "Supported modes",
+  "@vizColSupportedModes": {
+    "description": "Column header and label: billing modes the agent supports."
+  },
+  "vizColSwitches": "Mode switches",
+  "@vizColSwitches": {
+    "description": "Column header and label: billing mode switches in the period."
+  },
+  "vizColI2Denied": "Denied before delivery (I2)",
+  "@vizColI2Denied": {
+    "description": "Column header and label: invocations denied before delivery by invariant I2."
+  },
+  "vizColI3Denied": "Failed on mode mismatch (I3)",
+  "@vizColI3Denied": {
+    "description": "Column header and label: runs failed with billing_mode_mismatch by invariant I3."
+  },
+  "vizColCosts": "Costs per mode",
+  "@vizColCosts": {
+    "description": "Column header and label: costs of an agent per billing mode."
+  },
+  "vizColRateLimit": "Rate limit",
+  "@vizColRateLimit": {
+    "description": "Column header and label: rate-limit state the adapter reports."
+  },
+  "vizPresenceOnline": "Online",
+  "@vizPresenceOnline": {
+    "description": "Presence of an agent: online."
+  },
+  "vizPresenceDegraded": "Degraded",
+  "@vizPresenceDegraded": {
+    "description": "Presence of an agent: degraded."
+  },
+  "vizPresenceOffline": "Offline",
+  "@vizPresenceOffline": {
+    "description": "Presence of an agent: offline."
+  },
+  "vizPresenceUnknown": "Unknown",
+  "@vizPresenceUnknown": {
+    "description": "Presence of an agent without a live frame or with an unknown state."
+  },
+  "vizFollowsRun": "per run",
+  "@vizFollowsRun": {
+    "description": "Reported mode of an adapter that follows the configured mode per run and reports none."
+  },
+  "vizReportedMismatch": "Reported: {mode}",
+  "@vizReportedMismatch": {
+    "description": "Warning badge when the reported billing mode differs from the configured one (components.md section 10).",
+    "placeholders": {
+      "mode": {
+        "type": "String",
+        "example": "Personal"
+      }
+    }
+  },
+  "vizRateLimitOk": "within the limit",
+  "@vizRateLimitOk": {
+    "description": "Rate-limit state ok."
+  },
+  "vizRateLimitNearLimit": "near the limit",
+  "@vizRateLimitNearLimit": {
+    "description": "Rate-limit state near_limit."
+  },
+  "vizRateLimitLimited": "limited",
+  "@vizRateLimitLimited": {
+    "description": "Rate-limit state limited."
+  },
+  "vizRateLimitUnknown": "unknown",
+  "@vizRateLimitUnknown": {
+    "description": "Rate-limit state unknown or not reported."
+  },
+  "vizRateLimitResets": "resets at {time}",
+  "@vizRateLimitResets": {
+    "description": "Time at which the rate limit resets.",
+    "placeholders": {
+      "time": {
+        "type": "String",
+        "example": "10:20 AM"
+      }
+    }
+  },
+  "vizSliNoEvents": "no events",
+  "@vizSliNoEvents": {
+    "description": "Value of an SLI without events in the window."
+  },
+  "vizSliValue": "{count, plural, =1{1 event} other{{count} events}}, {share} within the threshold",
+  "@vizSliValue": {
+    "description": "Value of an SLI of the live frame: number of events and the good share.",
+    "placeholders": {
+      "count": {
+        "type": "int",
+        "format": "decimalPattern",
+        "example": "5400"
+      },
+      "share": {
+        "type": "String",
+        "example": "99.83%"
+      }
+    }
+  },
+  "vizCatchupValue": "{count}, together {millis} ms",
+  "@vizCatchupValue": {
+    "description": "Catch-ups of the last minute with their summed duration in milliseconds.",
+    "placeholders": {
+      "count": {
+        "type": "String",
+        "example": "3"
+      },
+      "millis": {
+        "type": "String",
+        "example": "1,200"
+      }
+    }
+  },
+  "vizConnectionsUser": "Connections of people",
+  "@vizConnectionsUser": {
+    "description": "Open gateway connections of kind user on this node."
+  },
+  "vizConnectionsAgent": "Connections of agents",
+  "@vizConnectionsAgent": {
+    "description": "Open gateway connections of kind agent on this node."
+  },
+  "vizConnectionsApp": "Connections of apps",
+  "@vizConnectionsApp": {
+    "description": "Open gateway connections of kind app on this node."
+  },
+  "vizChartHistory": "History",
+  "@vizChartHistory": {
+    "description": "Heading of the history chart of the delivery view."
+  },
+  "vizTileUsage": "Usage",
+  "@vizTileUsage": {
+    "description": "Tile group of the executive page: messages, new threads, active people."
+  },
+  "vizTileRuns": "Runs and error rate",
+  "@vizTileRuns": {
+    "description": "Tile group of the executive page: runs and error rates."
+  },
+  "vizTileCosts": "Costs per mode",
+  "@vizTileCosts": {
+    "description": "Tile group of the executive page: costs per billing mode."
+  },
+  "vizTileSlo": "SLO traffic light",
+  "@vizTileSlo": {
+    "description": "Tile group of the executive page: the SLO traffic lights."
+  },
+  "vizColSlo": "SLO",
+  "@vizColSlo": {
+    "description": "Column header: the SLO of a traffic light."
+  },
+  "vizOwnMeasurementNote": "Values can differ from Prometheus: the own measurement counts in the process and can lose one flush interval in a crash.",
+  "@vizOwnMeasurementNote": {
+    "description": "Note under the SLO traffic lights (25 section 6.4)."
+  },
+  "vizColRun": "Agent and channel",
+  "@vizColRun": {
+    "description": "Column header: row of a run bar of the timeline."
+  },
+  "vizColStart": "Start",
+  "@vizColStart": {
+    "description": "Column header: start of a run."
+  },
+  "vizColEnd": "End",
+  "@vizColEnd": {
+    "description": "Column header: end of a run, or the playhead while it runs."
+  },
+  "vizPlayhead": "Playhead {time}",
+  "@vizPlayhead": {
+    "description": "Position of the timeline playback under the view title.",
+    "placeholders": {
+      "time": {
+        "type": "String",
+        "example": "Today, 10:42 AM"
+      }
+    }
+  },
+  "vizPlay": "Play",
+  "@vizPlay": {
+    "description": "Button of the timeline that starts the playback."
+  },
+  "vizPause": "Pause",
+  "@vizPause": {
+    "description": "Button of the timeline that stops the playback."
+  },
+  "vizSpeed": "{speed}x",
+  "@vizSpeed": {
+    "description": "Speed of the timeline playback in seconds of time of day per second (viz.timeline_speeds).",
+    "placeholders": {
+      "speed": {
+        "type": "int",
+        "example": "60"
+      }
+    }
+  },
+  "vizJump": "Jump to a minute",
+  "@vizJump": {
+    "description": "Label of the slider that moves the playhead of the timeline."
+  },
+  "vizTvPosition": "{title} ({index} of {count})",
+  "@vizTvPosition": {
+    "description": "Header of TV mode: the shown view and its place in the rotation (screen D13).",
+    "placeholders": {
+      "title": {
+        "type": "String",
+        "example": "Live topology"
+      },
+      "index": {
+        "type": "int",
+        "example": "1"
+      },
+      "count": {
+        "type": "int",
+        "example": "3"
+      }
+    }
   }
 }

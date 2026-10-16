@@ -1072,4 +1072,241 @@ class AppLocalizationsDe extends AppLocalizations {
 
   @override
   String get threadRowStateWaiting => 'Wartet auf Antwort';
+
+  @override
+  String get vizViewLiveTopology => 'Live-Topologie';
+
+  @override
+  String get vizViewBackend => 'Backend-Ansicht';
+
+  @override
+  String get vizViewDelivery => 'Zustellung und Sync live';
+
+  @override
+  String get vizViewExecutive => 'Executive-Seite';
+
+  @override
+  String get vizViewTimeline => 'Tages-Timeline';
+
+  @override
+  String get vizViewTv => 'TV-Modus';
+
+  @override
+  String get vizAsTable => 'Als Tabelle';
+
+  @override
+  String get vizOpenGrafana => 'In Grafana öffnen';
+
+  @override
+  String get vizLoading => 'Wird geladen';
+
+  @override
+  String get vizOnlyForOwner => 'Nur für den Eigentümer';
+
+  @override
+  String vizSortBy(String column) {
+    return 'Sortieren nach $column';
+  }
+
+  @override
+  String vizFrameTime(String time) {
+    return 'Stand $time';
+  }
+
+  @override
+  String get vizNoActiveRuns => 'Keine aktiven Läufe';
+
+  @override
+  String get vizRatesLastMinute => 'Letzte Minute';
+
+  @override
+  String get vizNone => 'keine';
+
+  @override
+  String get vizColSpace => 'Bereich';
+
+  @override
+  String get vizColChannel => 'Kanal';
+
+  @override
+  String get vizColAgent => 'Agent';
+
+  @override
+  String get vizColState => 'Zustand';
+
+  @override
+  String get vizColStep => 'Aktueller Schritt';
+
+  @override
+  String get vizColMode => 'Abrechnungsart';
+
+  @override
+  String get vizColApproval => 'Bestätigung';
+
+  @override
+  String get vizColCost => 'Bisherige Kosten';
+
+  @override
+  String get vizColMetric => 'Kennzahl';
+
+  @override
+  String get vizColLastMinute => 'Letzte Minute';
+
+  @override
+  String get vizColValue => 'Wert';
+
+  @override
+  String get vizColNote => 'Hinweis';
+
+  @override
+  String get vizColPresence => 'Anwesenheit';
+
+  @override
+  String get vizColConfiguredMode => 'Eingestellte Abrechnungsart';
+
+  @override
+  String get vizColReportedMode => 'Gemeldete Abrechnungsart';
+
+  @override
+  String get vizColSupportedModes => 'Unterstützte Abrechnungsarten';
+
+  @override
+  String get vizColSwitches => 'Wechsel der Abrechnungsart';
+
+  @override
+  String get vizColI2Denied => 'Vor der Zustellung abgelehnt (I2)';
+
+  @override
+  String get vizColI3Denied =>
+      'An abweichender Abrechnungsart gescheitert (I3)';
+
+  @override
+  String get vizColCosts => 'Kosten je Abrechnungsart';
+
+  @override
+  String get vizColRateLimit => 'Ratenlimit';
+
+  @override
+  String get vizPresenceOnline => 'Online';
+
+  @override
+  String get vizPresenceDegraded => 'Eingeschränkt';
+
+  @override
+  String get vizPresenceOffline => 'Offline';
+
+  @override
+  String get vizPresenceUnknown => 'Unbekannt';
+
+  @override
+  String get vizFollowsRun => 'je Lauf';
+
+  @override
+  String vizReportedMismatch(String mode) {
+    return 'Gemeldet: $mode';
+  }
+
+  @override
+  String get vizRateLimitOk => 'im Rahmen';
+
+  @override
+  String get vizRateLimitNearLimit => 'nahe am Limit';
+
+  @override
+  String get vizRateLimitLimited => 'begrenzt';
+
+  @override
+  String get vizRateLimitUnknown => 'unbekannt';
+
+  @override
+  String vizRateLimitResets(String time) {
+    return 'wieder frei um $time';
+  }
+
+  @override
+  String get vizSliNoEvents => 'keine Ereignisse';
+
+  @override
+  String vizSliValue(int count, String share) {
+    final intl.NumberFormat countNumberFormat =
+        intl.NumberFormat.decimalPattern(localeName);
+    final String countString = countNumberFormat.format(count);
+
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$countString Ereignisse',
+      one: '1 Ereignis',
+    );
+    return '$_temp0, $share innerhalb der Schwelle';
+  }
+
+  @override
+  String vizCatchupValue(String count, String millis) {
+    return '$count, zusammen $millis ms';
+  }
+
+  @override
+  String get vizConnectionsUser => 'Verbindungen von Personen';
+
+  @override
+  String get vizConnectionsAgent => 'Verbindungen von Agenten';
+
+  @override
+  String get vizConnectionsApp => 'Verbindungen von Apps';
+
+  @override
+  String get vizChartHistory => 'Verlauf';
+
+  @override
+  String get vizTileUsage => 'Nutzung';
+
+  @override
+  String get vizTileRuns => 'Läufe und Fehlerquote';
+
+  @override
+  String get vizTileCosts => 'Kosten je Abrechnungsart';
+
+  @override
+  String get vizTileSlo => 'SLO-Ampel';
+
+  @override
+  String get vizColSlo => 'SLO';
+
+  @override
+  String get vizOwnMeasurementNote =>
+      'Werte können von Prometheus abweichen: die eigene Messung zählt im Prozess und kann bei einem Absturz ein Schreibintervall verlieren.';
+
+  @override
+  String get vizColRun => 'Agent und Kanal';
+
+  @override
+  String get vizColStart => 'Beginn';
+
+  @override
+  String get vizColEnd => 'Ende';
+
+  @override
+  String vizPlayhead(String time) {
+    return 'Abspielposition $time';
+  }
+
+  @override
+  String get vizPlay => 'Abspielen';
+
+  @override
+  String get vizPause => 'Anhalten';
+
+  @override
+  String vizSpeed(int speed) {
+    return '${speed}x';
+  }
+
+  @override
+  String get vizJump => 'Zu einer Minute springen';
+
+  @override
+  String vizTvPosition(String title, int index, int count) {
+    return '$title ($index von $count)';
+  }
 }

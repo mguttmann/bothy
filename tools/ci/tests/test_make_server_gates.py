@@ -526,13 +526,15 @@ def test_perf_requires_the_perf_directory(fakes: Fakes) -> None:
 
 def test_perf_runs_the_tagged_load_tests(fakes: Fakes) -> None:
     (fakes.module / "perf").mkdir()
-    result = fakes.make("perf", "PERF_TIMEOUT=7m")
+    # PERF_HOST=Linux: on a Mac the Dart step of `make perf` (brief M6-12) would run the real
+    # performance script of the harness.
+    result = fakes.make("perf", "PERF_TIMEOUT=7m", "PERF_HOST=Linux")
     assert result.returncode == 0, result.stderr
     assert "perf: targets hold only on perf.reference_profile" in result.stdout
     [call] = fakes.calls("go")
     assert call["args"] == ["test", "-tags", "perf", "-count=1", "-timeout", "7m", "./perf/..."]
     assert call["cwd"] == str(fakes.module.resolve())
-    assert fakes.make("perf", FAKE_GO_EXIT="1").returncode != 0
+    assert fakes.make("perf", "PERF_HOST=Linux", FAKE_GO_EXIT="1").returncode != 0
 
 
 def test_codegen_check_runs_sqlc_and_go_generate(fakes: Fakes) -> None:

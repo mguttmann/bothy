@@ -291,6 +291,11 @@ Grund (`resyncs`), Schließungen wegen langsamer Clients (`slow_consumer_closes`
 Push-Anbieter (`sli.push_acceptance`) und, mit einem Knoten, die offenen Verbindungen
 (`connections`). Nur Instanz-Sicht (Owner). Daten: `stats.live`, für den Verlauf `getStatsTimeline`.
 
+Build note (M6-12): the live frame gives the deliveries of the last `stats.live_sli_window`
+without the length of that window, which is a server value. The view therefore shows the count
+of the window with its good share, and the deliveries per minute as the history from
+`getStatsTimeline`; it computes no rate per second.
+
 ### 6.4 Executive-Seite
 
 Eine Seite für den Überblick, auch mobil:
