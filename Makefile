@@ -29,6 +29,8 @@ COVERAGE_DART_MIN ?= 80
 PERF_TIMEOUT ?= 60m
 # Time limit of each Go test binary in `make test` (named value quality.test.go_timeout).
 GO_TEST_TIMEOUT ?= 20m
+# Host system of the Dart performance tests: they run in profile mode on macOS only.
+PERF_HOST ?= $(shell uname -s)
 SONAR_HOST_URL ?= http://127.0.0.1:9000
 SONAR_ORGANIZATION ?=
 SONAR_PROJECT_KEY ?= bothy
@@ -392,6 +394,15 @@ perf: ## Load tests against the performance targets (end of a milestone and rele
 	    echo "  perf: targets hold only on perf.reference_profile"; \
 	    (cd $$m && go test -tags perf -count=1 -timeout $(PERF_TIMEOUT) ./perf/...) || exit 1; \
 	  done; fi
+	@# Dart members run their performance test in profile mode on macOS (`tool/perf_macos.sh`
+	@# of the member, for example the live topology of bothy_viz, brief M6-12 design note 6);
+	@# other hosts print a SKIP line, the CI job apps-macos is the evidence there.
+	@if [ -z "$(DART_ON)" ]; then $(call skip,perf-dart,no Dart package selected); \
+	else found=""; for p in $(DART_PKGS); do \
+	    if [ -f $$p/tool/perf_macos.sh ]; then found="$$found $$p"; fi; done; \
+	  if [ -z "$$found" ]; then $(call skip,perf-dart,no Dart member with tool/perf_macos.sh); \
+	  elif [ "$(PERF_HOST)" != Darwin ]; then $(call skip,perf-dart,needs macOS (CI job apps-macos)); \
+	  else for p in $$found; do sh $$p/tool/perf_macos.sh || exit 1; done; fi; fi
 
 # ---- documentation --------------------------------------------------------------------
 docs: ## Documentation site builds strictly with the API references and the Dart API pages; ADR index is current; problem codes registered; brief dependencies consistent; register IDs unique; risk ranking and the list behind its last rank follow the register ratings; no German text in tracked files (D-W-94); no external assets

@@ -420,6 +420,51 @@ def test_apps_platform_not_in_gates(repo: Repo) -> None:
     assert repo.python_calls() == [["tools/ci/apps_platform.py"]]
 
 
+PERF_SCRIPT = (
+    "#!/bin/sh\n"
+    "# SPDX-License-Identifier: Apache-2.0\n"
+    'echo "perf script of $(basename $(dirname $(dirname $0)))" >> "$FAKE_LOG.perf"\n'
+)
+
+
+def _perf_member(repo: Repo) -> None:
+    repo.workspace()
+    repo.write("packages/beta/tool/perf_macos.sh", PERF_SCRIPT)
+    repo.commit()
+
+
+def test_perf_runs_the_dart_performance_tests_on_macos(repo: Repo) -> None:
+    # Brief M6-12, design note 6: `make perf` reaches the Dart members on macOS.
+    _perf_member(repo)
+    result = repo.make("perf", "COMPONENTS=apps", "PERF_HOST=Darwin")
+    assert result.returncode == 0, result.stdout + result.stderr
+    assert Path(f"{repo.log}.perf").read_text(encoding="utf-8") == "perf script of beta\n"
+
+
+def test_perf_prints_a_skip_line_for_dart_elsewhere(repo: Repo) -> None:
+    _perf_member(repo)
+    result = repo.make("perf", "COMPONENTS=apps", "PERF_HOST=Linux")
+    assert result.returncode == 0, result.stdout + result.stderr
+    assert re.search(r"SKIP\s+perf-dart\s+needs macOS", result.stdout)
+    assert not Path(f"{repo.log}.perf").exists()
+
+
+def test_perf_fails_when_a_dart_performance_test_fails(repo: Repo) -> None:
+    repo.workspace()
+    repo.write("packages/beta/tool/perf_macos.sh", "#!/bin/sh\nexit 4\n")
+    repo.commit()
+    result = repo.make("perf", "COMPONENTS=apps", "PERF_HOST=Darwin")
+    assert result.returncode != 0
+
+
+def test_perf_skips_dart_without_a_performance_test(repo: Repo) -> None:
+    repo.workspace()
+    repo.commit()
+    result = repo.make("perf", "COMPONENTS=apps", "PERF_HOST=Darwin")
+    assert result.returncode == 0, result.stdout + result.stderr
+    assert re.search(r"SKIP\s+perf-dart\s+no Dart member with tool/perf_macos.sh", result.stdout)
+
+
 @pytest.mark.skipif(
     shutil.which("flutter") is None,
     reason="needs the Flutter SDK on PATH; the gate hosts and CI have it (brief M4-01)",
