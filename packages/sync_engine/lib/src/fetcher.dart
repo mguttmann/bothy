@@ -102,7 +102,7 @@ abstract interface class Fetcher {
 /// final snapshot = await fetcher.snapshot();
 /// ```
 final class ApiFetcher implements Fetcher {
-  /// Reads through [client], whose interceptors add DPoP, tracing and the read retry.
+  /// Reads through the [ApiClient], whose interceptors add DPoP, tracing and the read retry.
   ApiFetcher(this._client);
 
   final ApiClient _client;

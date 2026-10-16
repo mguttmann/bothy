@@ -202,7 +202,7 @@ func (v *Validator) Validate(r *http.Request, op Operation) error {
 	if !ok {
 		return fmt.Errorf("httpserver: operation %s is not in the validator", op.ID)
 	}
-	found := v.parameterErrors(r, entry)
+	found := append(v.parameterErrors(r, entry), emptyEnumHeaders(r, entry.item)...)
 	if op.RequestBody == BodyJSON && r.ContentLength != 0 && r.Body != nil && r.Body != http.NoBody {
 		list, err := v.bodyErrors(r, entry)
 		if err != nil {
@@ -249,6 +249,44 @@ func (v *Validator) parameterErrors(r *http.Request, entry opEntry) []*verrors.V
 		}
 	}
 	return found
+}
+
+// emptyEnumHeaders reports the header parameters of the operation of r that arrive with only an
+// empty value although their enum does not list "" (INT-W33/2): the validator library treats an
+// empty header as absent, so an optional X-Console-Request: with no value would pass where "2" is
+// 400 invalid_enum.
+func emptyEnumHeaders(r *http.Request, item *v3.PathItem) []*verrors.ValidationError {
+	op, ok := item.GetOperations().Get(strings.ToLower(r.Method))
+	if !ok || op == nil {
+		return nil
+	}
+	var found []*verrors.ValidationError
+	for _, p := range slices.Concat(item.Parameters, op.Parameters) {
+		if p == nil || p.In != "header" || p.Schema == nil || !onlyEmpty(r.Header.Values(p.Name)) {
+			continue
+		}
+		s := p.Schema.Schema()
+		if s == nil || len(s.Enum) == 0 {
+			continue
+		}
+		emptyAllowed := false
+		for _, n := range s.Enum {
+			emptyAllowed = emptyAllowed || (n != nil && n.Value == "")
+		}
+		if !emptyAllowed {
+			found = append(found, &verrors.ValidationError{
+				ValidationType: "parameter", ValidationSubType: "header", ParameterName: p.Name,
+				Message:                "header value is empty",
+				SchemaValidationErrors: []*verrors.SchemaValidationFailure{{KeywordLocation: "/enum"}},
+			})
+		}
+	}
+	return found
+}
+
+// onlyEmpty reports a header that is present and carries only empty values.
+func onlyEmpty(values []string) bool {
+	return len(values) > 0 && !slices.ContainsFunc(values, func(v string) bool { return strings.TrimSpace(v) != "" })
 }
 
 // bodyErrors validates the JSON body and restores it for the next stages.
