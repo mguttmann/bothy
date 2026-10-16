@@ -142,6 +142,56 @@ void main() {
     expect(exits, [1], reason: 'ends once');
   });
 
+  testWidgets('a key press ends it as an overlay over a focused host button', (
+    tester,
+  ) async {
+    // Design note 4: the host places TV mode as a route-less overlay over its screen, where
+    // a host control may already hold the focus (red team of M6-12).
+    final world = ViewWorld();
+    await tester.runAsync(world.load);
+    final exits = <int>[];
+    var opened = 0;
+    OverlayEntry? entry;
+    await pumpWorld(
+      tester,
+      world,
+      Builder(
+        builder: (context) => TextButton(
+          autofocus: true,
+          onPressed: () {
+            opened++;
+            entry = OverlayEntry(
+              builder: (_) => TvMode(
+                views: const [VizViewKind.backend],
+                options: world.options,
+                live: world.live,
+                queries: world.queries,
+                onExit: () {
+                  exits.add(1);
+                  entry?.remove();
+                },
+              ),
+            );
+            Overlay.of(context).insert(entry!);
+          },
+          child: const Text('Open TV'),
+        ),
+      ),
+    );
+    await tester.tap(find.text('Open TV'));
+    await settleWorld(tester, world);
+    expect(find.byType(TvMode), findsOneWidget);
+    await tester.sendKeyEvent(LogicalKeyboardKey.enter);
+    await tester.pump();
+    expect(exits, [1]);
+    expect(
+      opened,
+      1,
+      reason: 'Enter must not reach the host button behind TV mode',
+    );
+    expect(find.byType(TvMode), findsNothing);
+  });
+
   testWidgets('a click ends it', (tester) async {
     final (_, exits) = await pumpTv(tester);
     await tester.tapAt(const Offset(800, 600));

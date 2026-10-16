@@ -80,6 +80,12 @@ class _TvModeState extends State<TvMode> {
   void initState() {
     super.initState();
     _schedule();
+    // Autofocus does not take the focus from a host control that already holds it, which is
+    // the normal case for an overlay over a screen; TV mode takes it explicitly, so every key
+    // press reaches it and none reaches the host behind it.
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted && !_ended) _focus.requestFocus();
+    });
   }
 
   void _schedule() {
