@@ -20,6 +20,15 @@ const (
 	chapter12 = "12-files.md"
 	chapter16 = "16-operations.md"
 	chapter17 = "17-observability.md"
+	chapter18 = "18-release.md"
 	chapter19 = "19-security.md"
 	chapter20 = "20-privacy.md"
+)
+
+// Defaults that several keys share; goconst asks for one constant each.
+const (
+	// defaultTrue is the default of a switch that is on.
+	defaultTrue = "true"
+	// defaultQuarterHour is a default of 15 minutes.
+	defaultQuarterHour = "15m"
 )

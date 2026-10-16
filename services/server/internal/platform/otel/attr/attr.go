@@ -51,7 +51,7 @@ const (
 	CodeFunctionName = "code.function.name"
 )
 
-// Bothy keys of signals.md "Attributes in spans and logs" (span and log).
+// Server keys of signals.md "Attributes in spans and logs" (span and log).
 const (
 	// Action is an action id of 05-actions.md.
 	Action = "bothy.action"

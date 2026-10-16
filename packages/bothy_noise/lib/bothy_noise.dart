@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
 
-/// The end-to-end layer of the Bothy terminal in pure Dart: the handshake
+/// The end-to-end layer of the terminal in pure Dart: the handshake
 /// `Noise_NK_25519_ChaChaPoly_SHA256` (initiator), the transport, the prologue, the frames and
 /// the host key fingerprint (docs/spec/24-terminal.md 4.3, 5.2 to 5.4).
 ///

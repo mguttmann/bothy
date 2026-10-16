@@ -66,18 +66,20 @@ var testPepper = []byte("0123456789abcdef0123456789abcdef")
 // Authenticator), authz with the credential source of identity, sync, audit and the signing keys
 // of instance behind the full HTTP chain (brief M1-34 "Integration tests").
 type sworld struct {
-	t      *testing.T
-	db     *pgtest.DB
-	pool   *pg.Pool
-	owner  *pg.Pool
-	uow    *pg.UnitOfWork
-	rec    *auditapp.Recorder
-	clk    *clock.Fake
-	id     *wire.Identity
-	h      *httpservertest.Harness
-	logs   *httpservertest.LogCapture
-	ended  *[]identity.SessionEnded
-	instID ids.ID
+	t     *testing.T
+	db    *pgtest.DB
+	pool  *pg.Pool
+	owner *pg.Pool
+	uow   *pg.UnitOfWork
+	rec   *auditapp.Recorder
+	clk   *clock.Fake
+	id    *wire.Identity
+	// settings are the instance settings, branding and discovery (M1-46).
+	settings *wire.InstanceSettings
+	h        *httpservertest.Harness
+	logs     *httpservertest.LogCapture
+	ended    *[]identity.SessionEnded
+	instID   ids.ID
 	// az is the real authorizer; structure the fake structure source behind it (M1-35).
 	az        authorize.Authorizer
 	structure *fake.Structure
@@ -196,7 +198,11 @@ func newSessionWorldOn(t *testing.T, db *pgtest.DB, clk *clock.Fake, instID ids.
 	if err := keys.Keys.EnsureActive(context.Background()); err != nil {
 		t.Fatal(err)
 	}
-	w.id, err = wire.NewIdentity(sessCfg, pool, w.uow, az, wire.IdentityWrites{Audit: w.rec, Events: appender, PersonalTokens: w.personal}, testPepper, clk, log)
+	w.settings, err = wire.NewInstanceSettings(wire.DefaultInstanceConfig(), true, pool, w.uow, az, wire.SettingsWrites{Audit: w.rec, Events: appender}, clk)
+	if err != nil {
+		t.Fatal(err)
+	}
+	w.id, err = wire.NewIdentity(sessCfg, pool, w.uow, az, wire.IdentityWrites{Audit: w.rec, Events: appender, PersonalTokens: w.personal, Settings: w.settings.Admin}, testPepper, clk, log)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -205,7 +211,7 @@ func newSessionWorldOn(t *testing.T, db *pgtest.DB, clk *clock.Fake, instID ids.
 	}
 	built, err := routes.Build(wire.Handlers{Sessions: w.id.SessionHandlers, StepUps: w.id.StepUpHandlers, Devices: w.id.Handlers, People: w.id.PeopleHandlers,
 		Providers: w.id.ProviderHandlers, Credentials: w.id.CredentialHandlers,
-		Tokens: w.id.TokenHandlers, Enrollment: w.id.EnrollmentHandlers},
+		Tokens: w.id.TokenHandlers, Enrollment: w.id.EnrollmentHandlers, Admin: w.settings.Handlers},
 		wire.RouteOptions(), routes.SpecCatalog())
 	if err != nil {
 		t.Fatal(err)

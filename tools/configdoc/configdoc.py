@@ -1291,8 +1291,8 @@ def _words(value: object) -> list[str]:
 def runs_serve(service: Mapping[str, Any]) -> bool:
     """Does a Compose service run the server?
 
-    It does when `entrypoint` plus `command` start with `serve` (the image's entrypoint is bothy)
-    or with the binary `bothy` (any path) followed by `serve`.
+    It does when `entrypoint` plus `command` start with `serve` (the image's entrypoint is the
+    binary) or with the binary `bothy` (any path) followed by `serve`.
     """
     words = _words(service.get("entrypoint")) + _words(service.get("command"))
     if not words:

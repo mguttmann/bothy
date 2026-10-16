@@ -20,14 +20,18 @@ enabled:             # operationIds that have a handler; sorted ascending
   - enableUser
   - exportAuditEvents
   - getDevice
+  - getDiscovery
   - getIdentityProvider
+  - getInstance
   - getJwks
   - getMe
   - getMyCredentials
+  - getProblemType
   - getUser
   - getUserCredentials
   - listAuditEvents
   - listIdentityProviders
+  - listInstanceSettings
   - listMyDevices
   - listMySessions
   - listOwners
@@ -36,12 +40,14 @@ enabled:             # operationIds that have a handler; sorted ascending
   - listUserSessions
   - listUsers
   - logout
+  - putInstanceSetting
   - redeemEnrollmentCode
   - refreshToken
   - revokeOwner
   - revokeToken
   - rotateSigningKey
   - unlinkIdentity
+  - updateBranding
   - updateIdentityProvider
   - updateMyProfile
   - updateUser
@@ -331,9 +337,6 @@ later:               # every other operationId of docs/api/openapi.yaml; sorted 
   - operation_id: getCostStats
     milestone: M6
     ticket: M6-05
-  - operation_id: getDiscovery
-    milestone: M1
-    ticket: M1-46
   - operation_id: getErrorStats
     milestone: M6
     ticket: M6-05
@@ -354,18 +357,12 @@ later:               # every other operationId of docs/api/openapi.yaml; sorted 
   - operation_id: getImport
     milestone: M8
     ticket: M8-03
-  - operation_id: getInstance
-    milestone: M1
-    ticket: M1-46
   - operation_id: getMessage
     milestone: M1
     ticket: M1-57
   - operation_id: getMySidebar
     milestone: M1
     ticket: M1-61
-  - operation_id: getProblemType
-    milestone: M1
-    ticket: M1-46
   - operation_id: getPublicStatus
     milestone: M7
     ticket: M7-09
@@ -499,9 +496,6 @@ later:               # every other operationId of docs/api/openapi.yaml; sorted 
   - operation_id: listIncomingWebhooks
     milestone: M2
     ticket: M2-27
-  - operation_id: listInstanceSettings
-    milestone: M1
-    ticket: M1-46
   - operation_id: listMessageRevisions
     milestone: M1
     ticket: M1-58
@@ -622,9 +616,6 @@ later:               # every other operationId of docs/api/openapi.yaml; sorted 
   - operation_id: putFeatureFlag
     milestone: M1
     ticket: M1-47
-  - operation_id: putInstanceSetting
-    milestone: M1
-    ticket: M1-46
   - operation_id: putMySetting
     milestone: M1
     ticket: M1-61
@@ -791,9 +782,6 @@ later:               # every other operationId of docs/api/openapi.yaml; sorted 
   - operation_id: updateAgent
     milestone: M1
     ticket: M1-51
-  - operation_id: updateBranding
-    milestone: M1
-    ticket: M1-46
   - operation_id: updateChannel
     milestone: M1
     ticket: M1-53

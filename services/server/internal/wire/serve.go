@@ -142,6 +142,9 @@ type server struct {
 	sync    *Sync
 	// identity is the identity module (M1-33): devices, the DPoP verifier and the REST handlers.
 	identity *Identity
+	// settings are the instance settings, branding and discovery (M1-46); identity reads
+	// locale.default through them.
+	settings *InstanceSettings
 	// signingKeys are the server signing keys (M1-32) and keyCheck the interval of their job.
 	signingKeys *SigningKeys
 	keyCheck    time.Duration
@@ -173,7 +176,9 @@ type server struct {
 //     partition maintenance; startSync),
 //     6c. authz (M1-28): build the Authorizer with the recorder of audit and bind the rights
 //     hooks to the appender of sync and the recorder (M1-29; startAuthz),
-//     6d. identity (M1-33): resolve auth.token_pepper_ref once (a missing or malformed pepper ends
+//     6d. settings (M1-46): build the instance settings, branding and discovery over the unit of
+//     work, the recorder, the appender and the Authorizer (startSettings),
+//     6e. identity (M1-33): resolve auth.token_pepper_ref once (a missing or malformed pepper ends
 //     the start), build the devices, the DPoP verifier with its jti store and the device handlers,
 //     and start the sweeper of the jti store; its stop step runs in the HTTP phase (startIdentity),
 //  7. extension points, in this order: signing keys (M1-32), routes (the catalogue check of
@@ -333,6 +338,7 @@ func (s *server) components() []lifecycle.Component {
 		step("audit", s.startAudit),
 		step("sync", s.startSync),
 		step("authz", s.startAuthz),
+		step("settings", s.startSettings),
 		step("identity", s.startIdentity),
 		step("signing_keys", s.startSigningKeys),
 		step("audit_log", s.startAuditLog),
@@ -587,7 +593,33 @@ func (s *server) startAuthz(context.Context) error {
 	return nil
 }
 
-// startIdentity is start step 6d (M1-33): the identity module over the pool, the unit of work and
+// startSettings is start step 6d (M1-46): the instance settings,
+// branding and discovery over the pool, the unit of work and recorder of audit, the appender of
+// sync and the Authorizer. It comes before identity, because createUser reads locale.default
+// through the port instance.Settings.
+func (s *server) startSettings(context.Context) error {
+	cfg, err := InstanceConfig(s.values)
+	if err != nil {
+		return err
+	}
+	s.mu.Lock()
+	pool, a, az, sy := s.pool, s.audit, s.authorizer, s.sync
+	s.mu.Unlock()
+	if a == nil || az == nil || sy == nil {
+		return errors.New("wire: the settings step needs the unit of work and recorder of audit, the appender of sync and the Authorizer")
+	}
+	st, err := NewInstanceSettings(cfg, LocalPasswordEnabled(s.values), pool, a.UoW(), az,
+		SettingsWrites{Audit: a.Recorder(), Events: sy.Appender()}, s.deps.Clock)
+	if err != nil {
+		return err
+	}
+	s.mu.Lock()
+	s.settings = st
+	s.mu.Unlock()
+	return nil
+}
+
+// startIdentity is start step 6e (M1-33): the identity module over the pool, the unit of work and
 // the recorder of the audit step, the appender of the sync step (M1-31) and the Authorizer of
 // step 6c, with the token pepper resolved once.
 func (s *server) startIdentity(ctx context.Context) error {
@@ -600,12 +632,12 @@ func (s *server) startIdentity(ctx context.Context) error {
 		return err
 	}
 	s.mu.Lock()
-	pool, a, az, sy := s.pool, s.audit, s.authorizer, s.sync
+	pool, a, az, sy, st := s.pool, s.audit, s.authorizer, s.sync, s.settings
 	s.mu.Unlock()
-	if a == nil || az == nil || sy == nil {
-		return errors.New("wire: the identity step needs the unit of work and recorder of audit, the appender of sync and the Authorizer")
+	if a == nil || az == nil || sy == nil || st == nil {
+		return errors.New("wire: the identity step needs the unit of work and recorder of audit, the appender of sync, the Authorizer and the instance settings")
 	}
-	id, err := NewIdentity(cfg, pool, a.UoW(), az, IdentityWrites{Audit: a.Recorder(), Events: sy.Appender()}, pepper, s.deps.Clock, s.logger())
+	id, err := NewIdentity(cfg, pool, a.UoW(), az, IdentityWrites{Audit: a.Recorder(), Events: sy.Appender(), Settings: st.Admin}, pepper, s.deps.Clock, s.logger())
 	if err != nil {
 		return err
 	}
@@ -654,6 +686,9 @@ func (s *server) handlers() Handlers {
 	}
 	if h.Log == nil && s.audit != nil {
 		h.Log = s.audit.Handlers()
+	}
+	if h.Admin == nil && s.settings != nil {
+		h.Admin = s.settings.Handlers
 	}
 	return h
 }

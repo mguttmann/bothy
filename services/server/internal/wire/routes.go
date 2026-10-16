@@ -52,6 +52,9 @@ type Handlers struct {
 	*identityhttp.People
 	// Keys implements getJwks and rotateSigningKey (instance, M1-32).
 	*instancehttp.Keys
+	// Admin implements getDiscovery, getInstance, listInstanceSettings, putInstanceSetting,
+	// updateBranding and getProblemType (instance, M1-46).
+	*instancehttp.Admin
 	// Sessions implements refreshToken, logout, listMySessions, listUserSessions and
 	// createExtensionSession (identity, M1-34).
 	*identityhttp.Sessions

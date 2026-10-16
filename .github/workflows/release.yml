@@ -802,7 +802,7 @@ jobs:
 
   # Portability test of a product release (docs/spec/16-operations.md, 11.1): only after
   # publish, because install.sh and the bundle exist under the tag only from then on; only
-  # for the component bothy (tag vX.Y.Z), the only one with an install.sh. The tag comes from
+  # for the product component (tag vX.Y.Z), the only one with an install.sh. The tag comes from
   # github.ref_name, not from the resolve job; its output only steers the condition.
   portability:
     name: portability

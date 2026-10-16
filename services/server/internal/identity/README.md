@@ -451,6 +451,18 @@ Principals, people, owners, login drivers, identities, local credentials, enroll
   (`TestIDT06_RequestsBeforeSetupGet503`), `cmd/bothy/setup_test.go` (ID-T07, output, exit codes,
   concurrency). Rulings: docs/DECISIONS.md M1-37.
 
+### Discovery source and the language of new people (M1-46)
+
+- `adapters/loginoptions`: `Source` implements `instance.LoginOptionsSource` over the provider
+  store (`Providers(ctx, true)`, ordered by `lower(name)`, `id`) and `auth.local_password_enabled`;
+  `internal/wire` builds it for the instance settings. Discovery reports the enabled providers and
+  offers the password only with an enabled provider of kind `local` (docs/DECISIONS.md M1-46/6).
+- `createUser` stores `locale.default` of the instance settings (port `instance.Settings`,
+  `PeopleDeps.Settings`) when the request names no `locale`; an explicit locale wins
+  (`TestCreateUser_UsesLocaleDefault`).
+- The integration tests of the instance operations run in the session world of this package
+  (`adapters/httpapi/instance_settings_test.go`, docs/DECISIONS.md M1-46/11).
+
 ## Port (root package `internal/identity`)
 
 - Inbound: `Auth` (login, refresh, logout, child sessions), `StepUp` (step-up, M1-35), `Providers` and `Identities` (M1-36), `Enrollment` (M1-37), `Directory`, `Devices`, `Tokens` and `TokenAdmin` (M1-44), `Owners`; declares `AvatarFiles`.

@@ -129,6 +129,30 @@ func (stubServer) RotateSigningKey(context.Context, rest.RotateSigningKeyRequest
 	return nil, nil
 }
 
+func (stubServer) GetDiscovery(context.Context, rest.GetDiscoveryRequestObject) (rest.GetDiscoveryResponseObject, error) {
+	return nil, nil
+}
+
+func (stubServer) GetInstance(context.Context, rest.GetInstanceRequestObject) (rest.GetInstanceResponseObject, error) {
+	return nil, nil
+}
+
+func (stubServer) ListInstanceSettings(context.Context, rest.ListInstanceSettingsRequestObject) (rest.ListInstanceSettingsResponseObject, error) {
+	return nil, nil
+}
+
+func (stubServer) PutInstanceSetting(context.Context, rest.PutInstanceSettingRequestObject) (rest.PutInstanceSettingResponseObject, error) {
+	return nil, nil
+}
+
+func (stubServer) UpdateBranding(context.Context, rest.UpdateBrandingRequestObject) (rest.UpdateBrandingResponseObject, error) {
+	return nil, nil
+}
+
+func (stubServer) GetProblemType(context.Context, rest.GetProblemTypeRequestObject) (rest.GetProblemTypeResponseObject, error) {
+	return nil, nil
+}
+
 func (stubServer) ListIdentityProviders(context.Context, rest.ListIdentityProvidersRequestObject) (rest.ListIdentityProvidersResponseObject, error) {
 	return nil, nil
 }
@@ -223,6 +247,13 @@ func TestRealTable_Enabled(t *testing.T) {
 		// M1-37
 		"redeemEnrollmentCode": {"POST /api/v1/auth/enroll/redeem", "auth.login.complete", "rl.public_auth"},
 		"createEnrollmentCode": {"POST /api/v1/users/{user_id}/enrollment-codes", "user.update", "rl.admin"},
+		// M1-46
+		"getDiscovery":         {"GET /api/v1/instance/discovery", "instance.discovery.read", "rl.public_auth"},
+		"getInstance":          {"GET /api/v1/instance", "instance.read", "rl.read"},
+		"listInstanceSettings": {"GET /api/v1/instance/settings", "instance.settings.read", "rl.read"},
+		"putInstanceSetting":   {"PUT /api/v1/instance/settings/{key}", "instance.settings.update", "rl.admin"},
+		"updateBranding":       {"PUT /api/v1/instance/branding", "instance.branding.update", "rl.admin"},
+		"getProblemType":       {"GET /api/v1/problems/{code}", "instance.discovery.read", "rl.public_auth"},
 	}
 	ops := routes.Enabled()
 	if len(ops) != len(want) {
@@ -250,7 +281,7 @@ func TestRealTable_Enabled(t *testing.T) {
 	if err := routes.Verify([]string{"GET /api/v1/discovery"}, routes.SpecCatalog()); err == nil {
 		t.Error("Verify accepted a pattern of no enabled operation")
 	}
-	if _, ok := routes.ByID("getDiscovery"); ok {
+	if _, ok := routes.ByID("abortUpload"); ok {
 		t.Error("ByID found an operation that is not enabled")
 	}
 	if _, ok := routes.ByPattern("GET /api/v1/discovery"); ok {

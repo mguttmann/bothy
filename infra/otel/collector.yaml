@@ -1,4 +1,4 @@
-# OpenTelemetry Collector: base configuration for Bothy (otelcol-contrib, pinned version see
+# OpenTelemetry Collector: base configuration for the server (otelcol-contrib, pinned version see
 # infra/compose/.env.example). Explanation: docs/observability/collector.md.
 #
 # Structure:
@@ -75,7 +75,7 @@ processors:
           - delete_key(attributes, "url.query")
           - delete_key(attributes, "exception.message")
 
-  # Metrics: Bothy's own attributes are bounded in code. Foreign sources (e.g. the
+  # Metrics: the server's own attributes are bounded in code. Foreign sources (e.g. the
   # OTel data of an agent runtime via an adapter) can bring person attributes;
   # they are dropped here.
   transform/scrub_metrics:
@@ -144,7 +144,7 @@ processors:
       - gen_ai.agent.name
       - gen_ai.conversation.id
       - gen_ai.tool.name
-      # Bothy attributes
+      # Server attributes
       - bothy.action
       - bothy.agent.handle
       - bothy.agent.adapter_kind

@@ -61,7 +61,7 @@ func TestConfigValidate(t *testing.T) {
 		{"endpoint port zero", func(c *s3.Config) { c.Endpoint = "https://" + canary + ".example.com:0" }, nil, "file.s3.endpoint"},
 		{"endpoint bad host", func(c *s3.Config) { c.Endpoint = "https://" + canary + "_x.example.com" }, nil, "file.s3.endpoint"},
 		{"bucket empty", func(c *s3.Config) { c.Bucket = "" }, nil, "file.s3.bucket"},
-		{"bucket upper case", func(c *s3.Config) { c.Bucket = "Bothy-" + canary }, nil, "file.s3.bucket"},
+		{"bucket upper case", func(c *s3.Config) { c.Bucket = "Upper-" + canary }, nil, "file.s3.bucket"},
 		{"bucket too short", func(c *s3.Config) { c.Bucket = "ab" }, nil, "file.s3.bucket"},
 		{"bucket too long", func(c *s3.Config) { c.Bucket = strings.Repeat("a", 64) }, nil, "file.s3.bucket"},
 		{"bucket ip", func(c *s3.Config) { c.Bucket = "192.0.2.1" }, nil, "file.s3.bucket"},
