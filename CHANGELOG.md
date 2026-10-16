@@ -20,6 +20,17 @@ Planning stage (milestone M0). Nothing is installable yet.
 
 ### Added
 
+- Sync engine gateway connection: `GatewayConnection` holds the one WebSocket of a device
+  (transport port with a `dart:io` implementation), answers `hello` with `identify` or `resume`
+  and a gateway DPoP proof over the `hello` nonce, stores the session fields of `ready`, renews
+  the token on `reauth_required`, sends heartbeats with a random first delay and reconnects when
+  an acknowledgement is missing, waits by full-jitter backoff that a network change or the
+  foreground cuts short, and reacts to every close code of 04 6.4 through one table
+  (`4012` signs out with deletion of local data, `4016` waits for the pending device, `4017` for
+  the foreground, `4018` for user action, `4008` for `retry_after`); `ConnectionState` exposes
+  the phases of 15 7.2 with a reason, `FocusManager` and `TypingThrottle` send `focus` and
+  typing within their limits, and `SessionListener` is where catch-up plugs in. The gateway
+  close code `4018 forbidden` of D-W-24 is ported to 04 6.4 and the AsyncAPI contract (M4-13).
 - Sync engine run documents: `RunStore` keeps the live box document of every focused run in
   memory, applies `run.updated` by the client rule of 04 11.3 item 4 (equal `base_version`
   applies, a stale frame is ignored, a gap, a truncated frame or an invalid patch refetches the

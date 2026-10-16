@@ -517,7 +517,7 @@ def test_close_code_missing_fails(tmp_path: Path) -> None:
     root = _copy_inputs(tmp_path)
     _mutate(root, ASYNCAPI, lambda d: _close_codes(d).pop())
     assert _sync(root, "close-codes") == [
-        f"{SYNC_RULE}: close-codes: 4017 device_replaced: in {SYNC_TABLE} but not in {ASYNC_CODES}"
+        f"{SYNC_RULE}: close-codes: 4018 forbidden: in {SYNC_TABLE} but not in {ASYNC_CODES}"
     ]
 
 

@@ -61,7 +61,7 @@ Allowlist des Collectors, Dashboards, Regeln und SLOs nutzen nur Namen von hier.
 | `bothy.gateway.close` | Zähler | `{connection}` | `bothy.close.code` | api | `bothy_gateway_close_total` |
 | `bothy.gateway.outbound.dropped` | Zähler | `{frame}` | `bothy.reason` (`patch_replaced_by_snapshot`, `slow_consumer`) | api | `bothy_gateway_outbound_dropped_total` |
 
-`client_error` umfasst die Schließ-Codes `4001` bis `4008`, `4011`, `4012`, `4016`, `4017` und
+`client_error` umfasst die Schließ-Codes `4001` bis `4008`, `4011`, `4012`, `4016` bis `4018` und
 Abbrüche des Clients vor `ready`; alles andere ohne `ready` oder `resumed` ist `server_error` (z. B.
 `4000`, `4013`). Grund: Wartende Geräte, widerrufene Sitzungen und Protokollfehler des Clients
 dürfen das Fehlerbudget von `bothy-sync/reconnect` nicht verbrauchen.

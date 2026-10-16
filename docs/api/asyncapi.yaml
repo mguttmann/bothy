@@ -253,6 +253,9 @@ channels:
     - code: 4017
       name: device_replaced
       client_action: 'a newer connection of the same device is active: do not reconnect on your own, only when the app returns to the foreground or on user action'
+    - code: 4018
+      name: forbidden
+      client_action: 'credentials are valid, but `gateway.connect` is denied (for example `scope_missing` of an app): show the error, do not renew the token, do not reconnect on its own'
 
   terminalStream:
     address: /terminal/sessions/{session_id}/stream

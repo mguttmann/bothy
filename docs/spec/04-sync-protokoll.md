@@ -269,7 +269,7 @@ dem Problem-Code aus [06-api.md](06-api.md) (z. B. `rate_limited`, `forbidden`,
 1. **Upgrade.** Der Client öffnet die Verbindung. Der Server prüft beim Upgrade nichts außer
    der Herkunft. Die Rate-Limit-Klasse `rl.gateway_connect` zählt bei `identify` und `resume`,
    sobald Gerät bzw. Token geprüft sind (05, Abschnitt 3); erschöpft: Schließen mit `4008`.
-2. **`hello`.** Der Server sendet sofort `{heartbeat_interval, resume_window, protocol_versions,
+2. **`hello`.** Der Server sendet sofort `{heartbeat_interval_ms, resume_window_ms, protocol_versions,
    dpop_nonce, server_time, sync_epoch}`. `dpop_nonce` ist frisch und gilt `auth.dpop_nonce_ttl`
    ([08-identitaet.md](08-identitaet.md)).
 3. **`identify`.** Innerhalb von `sync.identify_timeout` sendet der Client:
@@ -339,6 +339,7 @@ dem Problem-Code aus [06-api.md](06-api.md) (z. B. `rate_limited`, `forbidden`,
 | `4015` | consumer_replaced | nur Agenten: ein anderer Prozess hat denselben Verbraucher übernommen; nicht neu verbinden |
 | `4016` | device_pending | Gerät wartet auf Freigabe: nicht neu verbinden, bis `GET /api/v1/devices/{id}` den Zustand `active` meldet |
 | `4017` | device_replaced | eine neuere Verbindung desselben Geräts ist aktiv: nicht von selbst neu verbinden, erst bei Rückkehr in den Vordergrund oder auf Bedienung |
+| `4018` | forbidden | the login is valid, but `gateway.connect` is denied (for example `scope_missing` of an app): show the error, do not renew the token, do not reconnect on its own |
 
 Die Terminal-Verbindungen (Strom des Geräts, Steuer- und Datenverbindung des Host-Dienstes) sind
 eigene WebSocket-Kanäle mit eigenen Schließ-Codes `4100` bis `4114`
@@ -351,7 +352,8 @@ Zuordnung beim Verbindungsaufbau (Grund: ein Code je Ursache, damit der Client r
 |---|---|
 | kein `identify` und kein `resume` innerhalb von `sync.identify_timeout` | `4003` |
 | Rahmen über `sync.ws_max_frame_bytes`, Binärrahmen, ungültiges JSON oder UTF-8, doppelter Schlüssel, unbekanntes Feld | `4002` |
-| Token oder DPoP-Beweis ungültig, `device_id` passt nicht, sonstige Ablehnung `forbidden` (z. B. `scope_missing`) | `4004` |
+| Token oder DPoP-Beweis ungültig, `device_id` passt nicht | `4004` |
+| the login is valid, but another rejection `forbidden` (for example `scope_missing`); a new token does not help | `4018` |
 | Zugriffstoken abgelaufen | `4011` |
 | Sitzung, Gerät, Token, Prinzipal oder App-Installation widerrufen bzw. nicht aktiv | `4012` |
 | Gerät oder bereitgestellter Mensch wartet auf Freigabe | `4016` |
