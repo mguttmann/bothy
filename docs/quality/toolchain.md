@@ -22,6 +22,8 @@ selben make-Ziel in GitHub Actions. Alle Gate-Werkzeuge laufen an beiden Orten.
 | `pytest` | `9.1.1` | Tests der Werkzeuge | MIT | Standard |
 | `pytest-cov` | `7.1.0` | Abdeckung in pytest | MIT | Standard |
 | `coverage` | `7.16.2` | Abdeckungsschwelle | Apache-2.0 | Grundlage von pytest-cov |
+| `schemathesis` | `4.30.1` | property-based contract tests G7 against the server of the working tree (`make contract-test`, `tools/contract/`) | MIT | 06 "Contract tests and gate": the version probed there; derives cases and stateful sequences from openapi.yaml and takes a custom auth for the DPoP proofs |
+| `cryptography` | `50.0.2` | ES256 signatures of the DPoP proofs of G7 (`tools/contract/dpop.py`) | Apache-2.0 OR BSD-3-Clause | the maintained OpenSSL binding of Python; the standard library has no ECDSA |
 | `markdown-it-py` | `4.2.0` | CommonMark-Parser als Orakel in den Tests von `tools/configdoc` (Code-Spans und Code-Blöcke für Regel D7) | MIT | Referenz-Implementierung von CommonMark mit GFM-Tabellen; nur in Tests, das Werkzeug selbst bleibt bei Standardbibliothek und PyYAML |
 | `pre-commit` | `4.6.2` | Hooks für commit, commit-msg, pre-push | MIT | verbreitet, Hooks als Datei im Repository |
 | `pre-commit-hooks` | `v6.0.0` | Datei-Hygiene-Hooks | MIT | gepflegte Standard-Hooks, per Commit-SHA gepinnt |

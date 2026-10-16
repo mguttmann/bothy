@@ -28,7 +28,14 @@ documented in this file. The format is based on
 - `httpserver.NewSchemaValidator` checks a JSON value against a named schema of the contract;
   `httpserver.Operation.AuthorizedInBand` marks the one route that authorizes on its connection.
 - `actor.Actor.CredentialExpiresAt`: the expiry of the access token or API token of a request.
-
+- Contract tests G7 and G8 (M1-71): `make contract-test` runs Schemathesis against the server of
+  this tree with a throwaway PostgreSQL and the matrix world (every enabled operation as owner and as
+  a plain user, the stateful phase, SEC-T06, the project checks problem format, `Correlation-Id`, no
+  JSON `null` and 404 equality); `go test -tags contract_validate` validates every response of
+  every integration test against `docs/api/openapi.yaml` (`internal/platform/httpserver/contractcheck`,
+  exit code 3 on a violation, absent from the production build). The shared test harness
+  `test/harness` runs the real server in the test process, and `egress.Deps.DenyAll` with
+  `wire.Deps.EgressDenyAll` keeps a test server off the network.
 - SLI bounds (M6-11): `internal/stats/domain/slibounds.gen.go`, generated from the Sloth files by
   `tools/observability/sli_bounds.py`, maps each `sli.*` metric to its SLO, objective, threshold
   and period; the Prometheus SLO rules carry the label `bothy_sli_metric`.

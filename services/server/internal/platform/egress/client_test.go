@@ -160,6 +160,38 @@ func TestAllowPrivateRuleReachesLoopbackService(t *testing.T) {
 	}
 }
 
+// TestDenyAllRefusesEveryTarget: with Deps.DenyAll even a target that a rule with allow_private
+// and the consumer policy allow is refused before any resolution or dial (M1-71, the contract
+// server of G7 runs with it).
+func TestDenyAllRefusesEveryTarget(t *testing.T) {
+	t.Parallel()
+	srv := newServer(t, ok)
+	port := srv.port(t)
+	h := newHarness(t, setup{
+		rules:   []egress.Rule{{Host: "127.0.0.1", Port: port, AllowPrivate: true}, {Host: "svc.example.com", Port: port, AllowPrivate: true}},
+		policy:  func(context.Context, string, string, uint16) bool { return true },
+		answers: map[string][]netip.Addr{"svc.example.com": {loopback4}},
+		denyAll: true,
+	})
+	for _, target := range []string{
+		"http://127.0.0.1:" + strconv.Itoa(int(port)) + "/",
+		"http://svc.example.com:" + strconv.Itoa(int(port)) + "/",
+		"https://192.0.2.1/",
+	} {
+		_, err := h.fetch(t, target)
+		var blocked *egress.BlockedError
+		if !errors.As(err, &blocked) || blocked.Reason != egress.ReasonHostNotAllowed {
+			t.Fatalf("%s: %v, want host_not_allowed", target, err)
+		}
+	}
+	if n := h.res.calls.Load(); n != 0 {
+		t.Errorf("%d resolutions", n)
+	}
+	if n := srv.count.Load(); n != 0 {
+		t.Errorf("server saw %d requests", n)
+	}
+}
+
 // TestRulePortZeroMatchesOnlyDefaultPort: a rule without port allows only the default port of
 // the scheme, so a request to another port of the same host is allowed only by the consumer
 // policy and gets no access to private addresses.

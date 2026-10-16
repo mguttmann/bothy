@@ -31,6 +31,10 @@ Planning stage (milestone M0). Nothing is installable yet.
   the phases of 15 7.2 with a reason, `FocusManager` and `TypingThrottle` send `focus` and
   typing within their limits, and `SessionListener` is where catch-up plugs in. The gateway
   close code `4018 forbidden` of D-W-24 is ported to 04 6.4 and the AsyncAPI contract (M4-13).
+- Contract tests (M1-71): the gate `contract-test` (G7, Schemathesis 4.30.1 from `tools/contract/`
+  with ES256 DPoP proofs built with `cryptography`), G8 in `make test` through the build tag
+  `contract_validate`, and the named values `quality.contract.max_examples` and
+  `quality.contract.timeout`.
 - Sync engine run documents: `RunStore` keeps the live box document of every focused run in
   memory, applies `run.updated` by the client rule of 04 11.3 item 4 (equal `base_version`
   applies, a stale frame is ignored, a gap, a truncated frame or an invalid patch refetches the

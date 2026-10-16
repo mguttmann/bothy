@@ -176,6 +176,7 @@ type setup struct {
 	roots     bool           // RootCAs from tlsServer
 	tlsServer *server
 	intercept bool // every dial fails with errIntercepted instead of connecting
+	denyAll   bool // Deps.DenyAll
 }
 
 func newHarness(t *testing.T, s setup) *harness {
@@ -195,6 +196,7 @@ func newHarness(t *testing.T, s setup) *harness {
 		Resolver: h.res,
 		Logger:   slog.New(slog.NewJSONHandler(h.log, nil)),
 		Metrics:  h.metrics,
+		DenyAll:  s.denyAll,
 	}
 	if s.roots {
 		pool := x509CertPool(t, s.tlsServer)

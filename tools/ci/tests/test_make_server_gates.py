@@ -585,6 +585,8 @@ def test_go_tests_check_prerequisites_first(fakes: Fakes, shell: list[str]) -> N
     assert go["args"] == [
         "test",
         "-race",
+        "-tags",
+        "contract_validate",
         "-covermode=atomic",
         "-coverprofile=coverage.out",
         "./...",
@@ -743,10 +745,15 @@ def test_go_lint_runs_vet_and_the_pinned_golangci_lint(fakes: Fakes, shell: list
     result = _bash(command, fakes, shell)
     assert result.returncode == 0, result.stdout + result.stderr
     module = str(fakes.module.resolve())
-    assert [(c["args"], c["cwd"]) for c in fakes.calls("go")] == [(["vet", "./..."], module)]
+    assert [(c["args"], c["cwd"]) for c in fakes.calls("go")] == [
+        (["vet", "-tags", "contract_validate,contract_live", "./..."], module)
+    ]
     [lint] = fakes.calls("golangci-lint")
     assert lint["exe"] == str(fakes.pins / "golangci-lint" / "golangci-lint")
-    assert (lint["args"], lint["cwd"]) == (["run", "./..."], module)
+    assert (lint["args"], lint["cwd"]) == (
+        ["run", "--build-tags", "contract_validate,contract_live", "./..."],
+        module,
+    )
     assert {c["cwd"] for c in fakes.calls("fetch")} == {str(REPO)}
 
 

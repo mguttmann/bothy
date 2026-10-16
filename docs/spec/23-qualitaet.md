@@ -182,6 +182,8 @@ oder NEIN. Bei NEIN wird behoben und das Delta erneut geprüft; das Bedrohungsmo
 | `quality.coverage.dart_min_percent` | `80` | Prozent | Mindestabdeckung je Dart-Paket | `Makefile` (`COVERAGE_DART_MIN`) |
 | `quality.coverage.python_min_percent` | `80` | Prozent | Minimum coverage per Python project under `sdk/` and `plugins/` | the project's `pyproject.toml` (`fail_under` in `[tool.coverage.report]`) |
 | `quality.coverage.typescript_min_percent` | `80` | Prozent | Minimum coverage per TypeScript project | the project's `vitest.config.ts` (`coverage.thresholds`) |
+| `quality.contract.max_examples` | `100` | count | examples per operation in G7 | `Makefile` (`CONTRACT_MAX_EXAMPLES`) |
+| `quality.contract.timeout` | `180m` | duration | time limit of `make contract-test` (G7) | `Makefile` (`CONTRACT_TIMEOUT`) |
 | `quality.perf.timeout` | `60m` | Dauer | Zeitlimit von `make perf` je Go-Modul | `Makefile` (`PERF_TIMEOUT`) |
 | `quality.sonar.new_issues_max` | `0` | Anzahl | Neue Befunde im neuen Code | `quality/sonar/quality-gate.json` |
 | `quality.sonar.new_hotspots_reviewed_min_percent` | `100` | Prozent | Geprüfte Security Hotspots im neuen Code | `quality/sonar/quality-gate.json` |

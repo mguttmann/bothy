@@ -4,6 +4,7 @@ package httpserver
 
 import (
 	"bytes"
+	"crypto/sha256"
 	"errors"
 	"fmt"
 	"io"
@@ -95,6 +96,9 @@ type Validator struct {
 	ops map[string]opEntry
 	// base is the server URL of the contract (/api/v1), cut from Operation.Path.
 	base string
+	// specSum is the SHA-256 of the contract the validator was built from; the response check of
+	// the test build (G8, M1-71) runs only for the contract of the repository.
+	specSum [sha256.Size]byte
 }
 
 // NewValidator loads the OpenAPI 3.1 document spec, keeps the operations with the given IDs and
@@ -117,7 +121,7 @@ func NewValidator(spec []byte, operationIDs []string) (*Validator, error) {
 	if len(m.Servers) != 1 {
 		return nil, errors.New("httpserver: contract must declare exactly one server")
 	}
-	v := &Validator{ops: map[string]opEntry{}, base: strings.TrimSuffix(m.Servers[0].URL, "/")}
+	v := &Validator{ops: map[string]opEntry{}, base: strings.TrimSuffix(m.Servers[0].URL, "/"), specSum: sha256.Sum256(spec)}
 	keep, err := idSet(operationIDs)
 	if err != nil {
 		return nil, err
