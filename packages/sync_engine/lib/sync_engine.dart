@@ -6,8 +6,11 @@
 /// [GatewayConnection] holds the one WebSocket of the device, answers `hello` through
 /// [GatewaySession], sends heartbeats ([Heartbeat]), waits by [ReconnectBackoff] and reacts to
 /// every close code by [reactTo]; its [ConnectionState] follows 15 7.2, [FocusManager] and
-/// [TypingThrottle] send the ephemeral ops, and catch-up plugs in through [SessionListener]
-/// (M4-14). The outside world comes in through [GatewayTransport], [NetworkStatus],
+/// [TypingThrottle] send the ephemeral ops, and catch-up plugs in through [SessionListener].
+/// Catch-up and reconciliation (M4-14): [CatchUpListener] applies the snapshot, catch-up pages,
+/// live events, `cursor`, `catchup.complete` and `resync_required` through the [Dispatcher],
+/// loads gaps and truncated objects through the [Fetcher] ([ApiFetcher] over `api_client`),
+/// keeps typing and presence in the [EphemeralStore] and emits [SyncNotice]s. The outside world comes in through [GatewayTransport], [NetworkStatus],
 /// [AppLifecycle] and [RandomSource]. The outbox (M4-15): [Outbox] is the
 /// one write path of the apps (04 13.2, 15 7.5), [OutboxExecutors] the registry of the
 /// operations ([MessageOps], [PersonalOps]), [classify] the outcome classes. The run documents of the live box
@@ -18,12 +21,28 @@
 library;
 
 export 'src/backoff.dart';
+export 'src/catch_up.dart';
 export 'src/close_codes.dart';
 export 'src/connection.dart';
 export 'src/connection_state.dart';
+export 'src/dispatcher.dart'
+    show
+        AfterCommit,
+        ApplyContext,
+        ApplyOutcome,
+        Applier,
+        Dispatcher,
+        EchoHook,
+        RunUpdatedHook,
+        SyncContext,
+        appliedEventTypes;
+export 'src/ephemeral_store.dart';
+export 'src/fetcher.dart';
 export 'src/focus_manager.dart';
 export 'src/frames.dart';
+export 'src/gap_filler.dart';
 export 'src/heartbeat.dart';
+export 'src/isolate_decode.dart';
 export 'src/outbox/backoff.dart' show fullJitterBackoff;
 export 'src/outbox/classify.dart' show Classification, OutcomeClass, classify;
 export 'src/outbox/entry.dart' show OutboxEntryView, OutboxStateLabel;
@@ -60,5 +79,19 @@ export 'src/runs/run_document.dart'
 export 'src/runs/run_store.dart' show RunStore;
 export 'src/session.dart';
 export 'src/session_listener.dart';
+export 'src/snapshot_applier.dart';
+export 'src/sync_events.dart';
 export 'src/transport_io.dart';
 export 'src/typing_throttle.dart';
+export 'src/wire.dart'
+    show
+        ChannelWithAccess,
+        DraftRef,
+        MessageBundle,
+        SnapshotData,
+        SpaceWithAccess,
+        UnreadThread,
+        channelViewFromJson,
+        messageFromJson,
+        snapshotFromJson,
+        spaceViewFromJson;
