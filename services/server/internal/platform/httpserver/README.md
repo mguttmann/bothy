@@ -96,6 +96,18 @@ otherwise the header has no effect. A key that is not one UUIDv7 is `400 validat
 The tests are `idempotency_test.go` (stage over an in-memory store) and
 `internal/sync/adapters/postgres/idempotency_http_test.go` (the full chain on PostgreSQL 18).
 
+## Setup gate (M1-37)
+
+`SetupGate(state SetupState, routes RouteLookup)` keeps a fresh instance closed until the first
+owner exists (08 "Initial installation"): only operations whose action is `instance.discovery.read`
+pass; every other request, unknown paths and the gateway path included, gets `503
+setup_required` without `Retry-After`. A failing `SetupState` is `503 unavailable`; the first
+`true` is cached for the process. `Chain.UseGate` installs it in step 4 in front of the mux, so it
+answers before authentication and rate limiting; `MuxLookup` resolves the action from the mounted
+patterns with `(*http.ServeMux).Handler`, and `SetupStateFunc` adapts a function.
+`internal/wire` connects it to the instance row (`InstallSetupGate`). Tests: `setupgate_test.go`
+and `TestIDT06_RequestsBeforeSetupGet503` in `internal/wire`.
+
 ## Transport protection (M1-21)
 
 | Mode | When | Public listener |
@@ -178,6 +190,7 @@ operation ID must be in it. A handler that sends JSON `null` fails the test unle
 | `stages.go` | CORS, authentication, body, preconditions, validation stages |
 | `problem.go` | `WriteProblem` and the error mapping |
 | `idempotency.go` | `StageIdempotency`: fingerprint, unit of work, replay, buffered response |
+| `setupgate.go` | `SetupGate`, `SetupState`, `SetupStateFunc`, `RouteLookup`, `MuxLookup` (M1-37) |
 | `validate.go` | `Validator` (libopenapi-validator) and the FieldError mapping |
 | `jsonguard.go`, `sanitize.go` | JSON guard (SEC-IN-2), null and integer scan (ADR 0053) |
 | `clientip.go`, `etag.go`, `cursor.go`, `config.go`, `operation.go` | helpers and types |

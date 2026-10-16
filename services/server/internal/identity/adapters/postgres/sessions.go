@@ -30,7 +30,7 @@ func (r *Repository) InsertSession(ctx context.Context, s app.SessionRecord) err
 	err = q.InsertSession(ctx, sqlcgen.InsertSessionParams{
 		ID: uuid(s.ID), UserID: uuid(s.UserID), DeviceID: uuid(s.DeviceID), ClientComponent: string(s.Component),
 		ParentSessionID: optionalUUID(s.ParentID), IdentityID: optionalUUID(s.IdentityID), AuthMethod: string(s.AuthMethod),
-		CreatedAt: ts(s.CreatedAt), ExpiresAt: ts(s.ExpiresAt),
+		CreatedAt: ts(s.CreatedAt), ExpiresAt: ts(s.ExpiresAt), LastIp: optionalAddr(s.LastIP),
 	})
 	return mapError(err, "inserting a session")
 }
@@ -153,12 +153,8 @@ func (r *Repository) AuthState(ctx context.Context, id ids.ID) (app.AuthState, b
 
 // Touch implements app.SessionStore. It runs on the pool, never in the request's unit of work.
 func (r *Repository) Touch(ctx context.Context, sessionID, deviceID ids.ID, ip netip.Addr, at, threshold time.Time) error {
-	var addr *netip.Addr
-	if ip.IsValid() {
-		addr = &ip
-	}
 	err := sqlcgen.New(r.pool).TouchSession(ctx, sqlcgen.TouchSessionParams{
-		SeenAt: ts(at), DeviceID: uuid(deviceID), Threshold: ts(threshold), ClientIp: addr, SessionID: uuid(sessionID),
+		SeenAt: ts(at), DeviceID: uuid(deviceID), Threshold: ts(threshold), ClientIp: optionalAddr(ip), SessionID: uuid(sessionID),
 	})
 	return mapError(err, "recording activity")
 }
@@ -282,4 +278,12 @@ func uuids(list []ids.ID) []pgtype.UUID {
 		out = append(out, uuid(id))
 	}
 	return out
+}
+
+// optionalAddr returns ip for an inet column, nil (NULL) for the zero Addr.
+func optionalAddr(ip netip.Addr) *netip.Addr {
+	if !ip.IsValid() {
+		return nil
+	}
+	return &ip
 }

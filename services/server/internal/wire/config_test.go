@@ -82,6 +82,8 @@ func TestConfigSchemaBuilds(t *testing.T) {
 		"auth.step_up_fail_limit":            {Kind: config.KindInt, Default: "5", Min: "1", Chapter: "08-identity.md"},
 		"auth.login_fail_window":             {Kind: config.KindDuration, Default: "15m", Min: "1s", Chapter: "08-identity.md"},
 		"auth.cleanup_interval":              {Kind: config.KindDuration, Default: "1h", Min: "1s", Chapter: "08-identity.md"},
+		"auth.enrollment_code_ttl":           {Kind: config.KindDuration, Default: "72h", Min: "1m", Chapter: "08-identity.md"},
+		"auth.enrollment_code_max_attempts":  {Kind: config.KindInt, Default: "5", Min: "1", Chapter: "08-identity.md"},
 		"auth.dpop_proof_max_age":            {Kind: config.KindDuration, Default: "60s", Min: "1s", Chapter: "08-identity.md"},
 		"auth.clock_leeway":                  {Kind: config.KindDuration, Default: "30s", Min: "0s", Chapter: "08-identity.md"},
 		"auth.token_pepper_ref":              {Kind: config.KindSecretRef, Default: "file:<secrets.dir>/token_pepper", Chapter: "08-identity.md"},

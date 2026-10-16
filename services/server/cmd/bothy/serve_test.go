@@ -238,7 +238,16 @@ func TestServeHealthOnlyOnInternalListener(t *testing.T) {
 	waitHTTP(t, internal, "/readyz", http.StatusOK)
 	waitHTTP(t, internal, "/healthz", http.StatusOK)
 	for _, path := range []string{"/healthz", "/readyz"} {
-		// Since M1-18 an unmatched path is a 404 problem that never echoes the path.
+		// Before setup every path but discovery is 503 setup_required (M1-37), after the setup an
+		// unmatched path is a 404 problem (M1-18); neither echoes the path.
+		if code, body := httpGet(public, path); code != http.StatusServiceUnavailable || !strings.Contains(body, `"code":"setup_required"`) || strings.Contains(body, path) {
+			t.Fatalf("public %s before setup = %d %q", path, code, body)
+		}
+	}
+	if _, err := db.Pool(t, pg.RoleOwner).Exec(context.Background(), `UPDATE instance SET setup_completed_at = now() WHERE id = 1`); err != nil {
+		t.Fatal(err)
+	}
+	for _, path := range []string{"/healthz", "/readyz"} {
 		if code, body := httpGet(public, path); code != http.StatusNotFound || !strings.Contains(body, `"code":"not_found"`) || strings.Contains(body, path) {
 			t.Fatalf("public %s = %d %q", path, code, body)
 		}

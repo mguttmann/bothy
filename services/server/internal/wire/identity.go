@@ -109,14 +109,24 @@ type Identity struct {
 	Tokens *app.Tokens
 	// TokenHandlers are the REST handlers of listTokens, createToken and revokeToken.
 	TokenHandlers *identityhttp.Tokens
-	cfg           app.Config
-	repo          *identitypg.Repository
-	uow           txn.UnitOfWork
-	az            authorize.Authorizer
-	writes        IdentityWrites
-	pepper        []byte
-	clk           clock.Clock
-	log           *slog.Logger
+	// Enrollment issues and matches the enrollment codes (M1-37); createUser with local_account
+	// uses it too.
+	Enrollment *app.EnrollmentCodes
+	// Logins is the login completion shared by every login path, the enrollment code operations
+	// and the use cases of bothy setup (M1-37); nil until BindSessions.
+	Logins *app.Service
+	// EnrollmentHandlers are the REST handlers of redeemEnrollmentCode and createEnrollmentCode;
+	// nil until BindSessions.
+	EnrollmentHandlers *identityhttp.Enrollment
+	cfg                app.Config
+	state              instance.State
+	repo               *identitypg.Repository
+	uow                txn.UnitOfWork
+	az                 authorize.Authorizer
+	writes             IdentityWrites
+	pepper             []byte
+	clk                clock.Clock
+	log                *slog.Logger
 }
 
 // IdentityWrites are the collaborators of the writing use cases of identity (M1-31): the
@@ -152,9 +162,15 @@ func NewIdentity(cfg app.Config, pool *pg.Pool, uow txn.UnitOfWork, az authorize
 	if err != nil {
 		return nil, err
 	}
+	enrollment, err := app.NewEnrollmentCodes(cfg, pepper, app.EnrollmentDeps{Codes: repo, People: repo, UoW: uow, Clock: clk})
+	if err != nil {
+		return nil, err
+	}
+	instanceRepo := instancepg.NewRepository(pool)
 	people, err := app.NewPeople(cfg, app.PeopleDeps{
 		Store: repo, UoW: uow, Authorizer: az, Audit: w.Audit, Events: w.Events, Cursors: identityhttp.Cursors{},
-		Versions: instanceapp.NewVersions(instancepg.NewRepository(pool)), Locales: locale.Parser{}, Clock: clk,
+		Versions: instanceapp.NewVersions(instanceRepo), Locales: locale.Parser{}, Providers: repo, Identities: repo,
+		Enrollment: enrollment, Clock: clk,
 	})
 	if err != nil {
 		return nil, err
@@ -172,15 +188,16 @@ func NewIdentity(cfg app.Config, pool *pg.Pool, uow txn.UnitOfWork, az authorize
 	return &Identity{
 		Devices: devices, People: people, PeopleHandlers: identityhttp.NewPeople(people, people), DPoP: verifier, Replay: store,
 		Handlers: identityhttp.NewDevices(devices), Tokens: tokens, TokenHandlers: identityhttp.NewTokens(tokens),
-		cfg: cfg, repo: repo, uow: uow, az: az, writes: w,
-		pepper: append([]byte(nil), pepper...), clk: clk, log: orDiscard(log),
+		Enrollment: enrollment, cfg: cfg, state: instanceapp.NewState(instanceRepo, uow),
+		repo: repo, uow: uow, az: az, writes: w, pepper: append([]byte(nil), pepper...), clk: clk, log: orDiscard(log),
 	}, nil
 }
 
 // BindSessions builds the session part of identity (M1-34) over the signing keys of instance and
 // the instance id (the issuer of access tokens): the use cases of identity.Auth, the Authenticator
-// of the HTTP chain and the session handlers, and the step-up use cases with their handlers and
-// the use case of identity.auth_cleanup (M1-35). The start calls it after the signing keys exist.
+// of the HTTP chain and the session handlers, the step-up use cases with their handlers and
+// the use case of identity.auth_cleanup (M1-35), the providers and identities (M1-36), and the
+// login service with the enrollment code handlers and the use cases of bothy setup (M1-37). The start calls it after the signing keys exist.
 // Errors: a duration, URL or collaborator the use cases refuse.
 func (i *Identity) BindSessions(keys instance.Keys, instanceID ids.ID) error {
 	tokens, err := app.NewAccessTokens(app.AccessTokenConfig{
@@ -231,6 +248,15 @@ func (i *Identity) BindSessions(keys instance.Keys, instanceID ids.ID) error {
 	i.StepUps, i.StepUpHandlers, i.AuthCleanup = stepUps, identityhttp.NewStepUps(stepUps), cleanup
 	i.Providers, i.ProviderHandlers = providers, identityhttp.NewProviders(providers)
 	i.Identities, i.CredentialHandlers = identities, identityhttp.NewCredentials(identities)
+	logins, err := app.NewService(i.cfg, app.ServiceDeps{
+		People: i.repo, Devices: i.repo, Providers: i.repo, Identities: i.repo, Enrollment: i.Enrollment, Auth: sessions,
+		DPoP: i.DPoP, Instance: i.state, Keys: keys, Locales: locale.Parser{}, UoW: i.uow, Authorizer: i.az, Audit: i.writes.Audit,
+		Clock: i.clk,
+	})
+	if err != nil {
+		return err
+	}
+	i.Logins, i.EnrollmentHandlers = logins, identityhttp.NewEnrollment(logins)
 	return nil
 }
 

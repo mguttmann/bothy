@@ -24,6 +24,9 @@ type SessionRecord struct {
 	LastSeenAt           time.Time
 	RevokedAt            time.Time
 	RevokeReason         identity.SessionRevokeReason
+	// LastIP is last_ip as InsertSession writes it; the zero Addr stands for NULL. Reads leave it
+	// zero (the session store reads no address).
+	LastIP netip.Addr
 }
 
 // Active reports a session that is not revoked and has not reached its end at now.
@@ -75,7 +78,7 @@ const (
 // ambient transaction of ctx when there is one; writes and locks run only inside a unit of work.
 // Errors are kernel/errs errors without SQL, tokens or hashes.
 type SessionStore interface {
-	// InsertSession inserts s (created_at and expires_at as given).
+	// InsertSession inserts s (created_at, expires_at and last_ip as given).
 	InsertSession(ctx context.Context, s SessionRecord) error
 	// InsertFamily inserts f.
 	InsertFamily(ctx context.Context, f FamilyRecord) error

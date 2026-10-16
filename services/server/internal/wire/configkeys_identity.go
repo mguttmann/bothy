@@ -18,8 +18,9 @@ const (
 // display names from docs/spec/03-data-model.md that the domain checks (M1-26), the session and
 // refresh durations of 03 section 9 (M1-34), the DPoP windows and the token pepper from
 // docs/spec/08-identity.md section 18 (M1-33), and the step-up challenge lifetime, failure limit
-// and window and the cleanup interval of 08 section 18 (M1-35), and the API token limits and the
-// DPoP requirement of 08 section 18 (M1-44). The page sizes of
+// and window and the cleanup interval of 08 section 18 (M1-35), the API token limits and the
+// DPoP requirement of 08 section 18 (M1-44), and the enrollment code lifetime and attempt limit of
+// 08 section 18 (M1-37). The page sizes of
 // 06-api.md live in apiConfigKeys, because every list reads them.
 func identityConfigKeys() []config.Key {
 	return []config.Key{
@@ -82,6 +83,16 @@ func identityConfigKeys() []config.Key {
 		{
 			Name: "auth.login_fail_window", Kind: config.KindDuration, Default: "15m", Min: "1s",
 			Doc:     "Window in which failed attempts count.",
+			Chapter: chapter08,
+		},
+		{
+			Name: "auth.enrollment_code_ttl", Kind: config.KindDuration, Default: "72h", Min: "1m",
+			Doc:     "Validity of an enrollment code from its issue.",
+			Chapter: chapter08,
+		},
+		{
+			Name: "auth.enrollment_code_max_attempts", Kind: config.KindInt, Default: "5", Min: "1",
+			Doc:     "Failed attempts with a matching enrollment code; then the code is invalid.",
 			Chapter: chapter08,
 		},
 		{

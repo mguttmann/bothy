@@ -10,6 +10,7 @@ version: 1
 enabled:             # operationIds that have a handler; sorted ascending
   - addOwner
   - completeStepUpWithDeviceKey
+  - createEnrollmentCode
   - createExtensionSession
   - createIdentityProvider
   - createStepUpChallenge
@@ -35,6 +36,7 @@ enabled:             # operationIds that have a handler; sorted ascending
   - listUserSessions
   - listUsers
   - logout
+  - redeemEnrollmentCode
   - refreshToken
   - revokeOwner
   - revokeToken
@@ -168,9 +170,6 @@ later:               # every other operationId of docs/api/openapi.yaml; sorted 
   - operation_id: createDm
     milestone: V3
     ticket: V3-01
-  - operation_id: createEnrollmentCode
-    milestone: M1
-    ticket: M1-37
   - operation_id: createFileTicket
     milestone: M3
     ticket: M3-05
@@ -650,9 +649,6 @@ later:               # every other operationId of docs/api/openapi.yaml; sorted 
   - operation_id: reconcileCosts
     milestone: M2
     ticket: M2-28
-  - operation_id: redeemEnrollmentCode
-    milestone: M1
-    ticket: M1-37
   - operation_id: redeliverWebhook
     milestone: M2
     ticket: M2-26

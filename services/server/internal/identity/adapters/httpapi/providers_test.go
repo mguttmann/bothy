@@ -44,11 +44,11 @@ func identityPath(user, id ids.ID) string {
 	return "/api/v1/users/" + user.String() + "/identities/" + id.String()
 }
 
-// callWith sends an authenticated request with extra header pairs.
-func (c *client) callWith(method, path, body string, headers ...string) *httpservertest.Response {
+// postWith sends an authenticated POST with extra header pairs.
+func (c *client) postWith(path, body string, headers ...string) *httpservertest.Response {
 	c.w.t.Helper()
-	hs := append([]string{"Authorization", "DPoP " + c.access, "DPoP", c.proof(c.key, method, path, c.access)}, headers...)
-	return c.w.h.Do(c.w.h.NewRequest(method, path, body, hs...))
+	hs := append([]string{"Authorization", "DPoP " + c.access, "DPoP", c.proof(c.key, http.MethodPost, path, c.access)}, headers...)
+	return c.w.h.Do(c.w.h.NewRequest(http.MethodPost, path, body, hs...))
 }
 
 // admin returns the owner Alex on a phone with a fresh step-up.
@@ -254,8 +254,8 @@ func TestProviders_Idempotency(t *testing.T) {
 	c := w.admin()
 	key := ids.New().String()
 	body := `{"kind":"oidc","name":"Company SSO","config":` + oidcConfig + `}`
-	first := w.want(c.callWith(http.MethodPost, providersPath, body, "Idempotency-Key", key), http.StatusCreated, "")
-	again := w.want(c.callWith(http.MethodPost, providersPath, body, "Idempotency-Key", key), http.StatusCreated, "")
+	first := w.want(c.postWith(providersPath, body, "Idempotency-Key", key), http.StatusCreated, "")
+	again := w.want(c.postWith(providersPath, body, "Idempotency-Key", key), http.StatusCreated, "")
 	if first["id"] != again["id"] {
 		t.Fatalf("replay created another provider: %v and %v", first["id"], again["id"])
 	}

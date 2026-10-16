@@ -52,6 +52,18 @@ func (f *fakeRepo) LoadInstance(context.Context) (instance.Record, bool, error) 
 	return *f.row, true, nil
 }
 
+func (f *fakeRepo) LockInstance(ctx context.Context) (instance.Record, bool, error) {
+	return f.LoadInstance(ctx)
+}
+
+func (f *fakeRepo) CompleteSetup(_ context.Context, at time.Time) (bool, error) {
+	if f.err != nil || f.row == nil || f.row.SetupCompleted() {
+		return false, f.err
+	}
+	f.row.SetupCompletedAt = at
+	return true, nil
+}
+
 func (f *fakeRepo) EnsureInstance(_ context.Context, instanceID, syncEpoch ids.ID) error {
 	f.ensured++
 	if f.row == nil {
@@ -215,5 +227,38 @@ func TestState_RecordMigrationKeepsIdentity(t *testing.T) {
 		if _, err := s.RecordMigration(context.Background(), bad.v, bad.min); errs.KindOf(err) != errs.KindInternal {
 			t.Errorf("RecordMigration(%d, %q) = %v, want kind internal", bad.v, bad.min, err)
 		}
+	}
+}
+
+// TestState_SetupLockAndComplete holds the setup part of instance.State (M1-37): both methods need
+// a unit of work, a missing row is not_found, and setup_completed_at is set once.
+func TestState_SetupLockAndComplete(t *testing.T) {
+	t.Parallel()
+	repo := newFakeRepo()
+	s := app.NewState(repo, &fakeUOW{})
+	ctx := inPhase(txn.PhaseWork)
+	if _, err := s.LockForSetup(context.Background()); errs.KindOf(err) != errs.KindInternal {
+		t.Fatalf("LockForSetup outside a unit = %v, want kind internal", err)
+	}
+	if err := s.CompleteSetup(context.Background(), time.Unix(5, 0)); errs.KindOf(err) != errs.KindInternal {
+		t.Fatalf("CompleteSetup outside a unit = %v, want kind internal", err)
+	}
+	if _, err := s.LockForSetup(ctx); errs.KindOf(err) != errs.KindNotFound {
+		t.Fatalf("LockForSetup without a row = %v, want kind not_found", err)
+	}
+	repo.row = &instance.Record{InstanceID: ids.New()}
+	rec, err := s.LockForSetup(ctx)
+	if err != nil || rec.SetupCompleted() {
+		t.Fatalf("LockForSetup = %+v, %v", rec, err)
+	}
+	at := time.Unix(7, 0).UTC()
+	if err := s.CompleteSetup(ctx, at); err != nil {
+		t.Fatal(err)
+	}
+	if err := s.CompleteSetup(ctx, at.Add(time.Hour)); errs.KindOf(err) != errs.KindConflict {
+		t.Fatalf("second CompleteSetup = %v, want kind conflict", err)
+	}
+	if !repo.row.SetupCompletedAt.Equal(at) {
+		t.Fatalf("setup_completed_at = %v, want %v", repo.row.SetupCompletedAt, at)
 	}
 }

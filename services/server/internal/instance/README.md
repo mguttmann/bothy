@@ -56,6 +56,13 @@ and `min_server_version`. It never changes `instance_id`, `sync_epoch`, `setup_c
 undo the newer lock. Two binaries at the same schema version may overwrite each other's
 `min_server_version`; under rule M1 of upgrade.md both constants are valid for that schema. `Load(ctx)` returns the row or kind `not_found`.
 
+`LockForSetup(ctx)` and `CompleteSetup(ctx, at)` (M1-37) run inside the caller's unit of work for
+`bothy setup bootstrap-owner`: the first locks the row (`SELECT ... FOR UPDATE`), so two runs
+serialise, the second sets `setup_completed_at` once (a set value never changes, kind `conflict`).
+`bothy_app` may do both through its column right `UPDATE (setup_completed_at)` (migration
+`00016_identity_enrollment_codes.sql`); every other column stays read only. The setup gate of the
+public listener reads the state through `Load` (`wire.InstallSetupGate`).
+
 `bothy migrate up` calls it through the after-step of `wire.MigrationSteps` with the goose
 version and `migrations.MinServerVersion`, only when the database is at the newest migration the
 binary knows; a newer database keeps its row (upgrade.md "Rollback").

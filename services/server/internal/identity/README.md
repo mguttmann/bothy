@@ -1,6 +1,6 @@
 # Module `identity`
 
-Status: principal tables and directory built (M1-26); devices, device keys and the DPoP verifier built (M1-33); people, owners and the own profile built (M1-31); sessions, access tokens, refresh families, logout and the Authenticator built (M1-34); step-up with the device key and the job `identity.auth_cleanup` built (M1-35); identity providers, the mapping of external identities, the credential overview and unlinking built (M1-36); API tokens with prefix and checksum built (M1-44); logins and step-up with a passkey follow with the tickets of the milestone.
+Status: principal tables and directory built (M1-26); devices, device keys and the DPoP verifier built (M1-33); people, owners and the own profile built (M1-31); sessions, access tokens, refresh families, logout and the Authenticator built (M1-34); step-up with the device key and the job `identity.auth_cleanup` built (M1-35); identity providers, the mapping of external identities, the credential overview and unlinking built (M1-36); API tokens with prefix and checksum built (M1-44); first setup, enrollment codes, the shared login completion and the setup lock built (M1-37); logins and step-up with a passkey follow with the tickets of the milestone.
 The normative source is [docs/spec/02-architecture.md](../../../../docs/spec/02-architecture.md); if this file differs, the chapter applies.
 
 ## Purpose
@@ -101,8 +101,8 @@ Principals, people, owners, login drivers, identities, local credentials, enroll
   `golang.org/x/text/language`), time zone one of the IANA names of the toolchain's tzdata
   (`domain/zones.gen.go`, written by `tools/zonegen`; never `Local` or `Factory`, the same on every
   host), loaded with `time/tzdata` embedded; duplicates of handle or
-  e-mail are `409 conflict`; `local_account: true` is `400` (`/local_account`, `not_enabled`)
-  until M1-37. `enableUser` moves `pending` and `disabled` to `active` (clears `disabled_at`,
+  e-mail are `409 conflict`; `local_account: true` also creates the local identity and a
+  `first_login` code (M1-37). `enableUser` moves `pending` and `disabled` to `active` (clears `disabled_at`,
   restores no device or session), an active person is a call without effect (`200`, audit
   `no_change`, no event, no rights version), `deleted` is `409 invalid_state_transition`.
   `addOwner` needs an active person that is no owner (`409 conflict`), `revokeOwner` an active
@@ -390,9 +390,70 @@ Principals, people, owners, login drivers, identities, local credentials, enroll
   the switch, `not_self`, AZ-M35, SR5, revocation, `RevokeAllForPrincipal`, `last_used_at` and
   no secret in logs or audit. Rulings: docs/DECISIONS.md M1-44.
 
+### First setup, enrollment codes and login completion (M1-37)
+
+- Port (`enrollment.go`): `Enrollment` (`RedeemEnrollmentCode`, `CreateEnrollmentCode`) with
+  `EnrollmentCode` (the code behind the redacting `Token`), `RedeemEnrollment` and `RedeemResult`.
+  `People.CreateUser` returns `CreatedUser` with the code of `local_account`. `StartSession`
+  takes `ClientIP`, stored as `auth_sessions.last_ip`.
+- `domain` (`enrollment.go`): `NewEnrollmentCode` (20 bytes of `crypto/rand`, 32 Crockford Base32
+  characters), `DisplayEnrollmentCode` (`en_` plus eight groups of four), `NormalizeEnrollmentCode`
+  (case, `en_`, `-` and spaces do not count; `O` is `0`, `I` and `L` are `1`),
+  `EnrollmentCodeHash` (HMAC-SHA-256 with the token pepper, context `enrollment-code/v1`), the
+  purposes with `IssuePurpose` and `ConsumablePurposes`, `EnrollmentCodeState.Usable`.
+- `app`: `EnrollmentCodes` (`Issue` locks the person and ends its other codes, `Match` locks the
+  row in the ambient unit, `RecordFailedAttempt` in an own transaction after the rollback,
+  `MarkUsed`); `Service` with `CompleteLogin` (the only place that creates devices, sessions and
+  tokens for logins: `TrustConfirmed` makes a new device `active`, `TrustUnconfirmed` `pending`; a
+  known device of the same person with the same active key is reused unchanged, any other known
+  device id is `409`; the proof key must be the registered `dpop` key; one allow entry of
+  `auth.login.complete` with the person as actor), `RedeemEnrollmentCode`,
+  `CreateEnrollmentCode`, `BootstrapOwner` and `IssueRecoveryCode`; outgoing port
+  `EnrollmentStore`.
+- Purposes (08 section 3.2):
+
+  | Purpose | Issued by | Redeemed by |
+  |---|---|---|
+  | `first_login` | `bootstrap-owner`; `createUser` with `local_account`; `createEnrollmentCode` for a person with a local identity and no device | `redeemEnrollmentCode`, `completeEnrollment` (M1-40), OIDC or header linking (M1-41, M1-43) |
+  | `recovery` | `bothy setup issue-enrollment-code`; `createEnrollmentCode` for a person with a local identity and a device | as `first_login` |
+  | `identity_link` | `createEnrollmentCode` for a person without a local identity | OIDC or header linking only |
+
+- Operations (`adapters/httpapi/enrollment.go`):
+
+  | Operation | Action and resource | Audit | Answer |
+  |---|---|---|---|
+  | `redeemEnrollmentCode` | `auth.login.complete`, anonymous, instance (`rl.public_auth`, no `Idempotency-Key`) | allow with the person as actor `{auth_method, device_id, session_id, new_device, device_state}`; denials with cause and code id | `201 TokenResponse`; every rejected code the same `401 unauthenticated` |
+  | `createEnrollmentCode` | `user.update` on the person (owner with step-up) | allow `{purpose, enrollment_code_id}` | `201 EnrollmentCode` (one-time secret), `409 conflict` (reason `user_not_active`) |
+
+  `createUser` with `local_account` needs an enabled `local` provider (else `409 conflict`
+  (reason `local_provider_disabled`)); a disabled `local` provider also rejects the redemption of a person
+  with a local identity (the same `401`) and `createEnrollmentCode` for that person (`409`), except
+  a recovery code issued on the host, which logs in without the identity (docs/DECISIONS.md
+  M1-37/12); both responses with a code are one-time secrets: the
+  Idempotency-Key stage stores `{"one_time_secret": true}` and a replay is `409 conflict` (reason `one_time_secret`).
+- Commands (`cmd/bothy setup`, assembled by `wire.Setup` as `bothy_app`): `bootstrap-owner --handle
+  --display-name [--locale de] [--time-zone UTC]` creates, in one unit declared as the rights change
+  `instance.bootstrap`, the local provider if missing, the person, its owner row (`granted_by`
+  NULL, reason `bootstrap`), its local identity (subject = handle), a `first_login` code, the audit
+  entry without actor and `setup_completed_at`; `issue-enrollment-code --user` issues a `recovery`
+  code for an active owner with the audit entry `owner.recover` without actor. Each prints the
+  code as the only line on stdout. Exit codes: `0`, `1` infrastructure, `2` arguments or no
+  active owner, `3` setup already complete, `4` setup pending.
+- `adapters/postgres`: `queries/enrollment_codes.sql`, `enrollment.go`.
+- Migration `migrations/00016_identity_enrollment_codes.sql`: `enrollment_codes` as 03 section
+  4.2, the deferred foreign key `auth_challenges.enrollment_code_id`, `bothy_app` may read, insert
+  and update codes (not delete) and set `instance.setup_completed_at`.
+- Configuration: `auth.enrollment_code_ttl`, `auth.enrollment_code_max_attempts`,
+  `auth.token_pepper_ref` and the session keys of M1-34.
+- Tests: `domain/enrollment_test.go` (format, normalisation, ID-T27, purposes),
+  `adapters/httpapi/enrollment_test.go` (ID-T11, redemption, failed attempts, concurrency, device
+  rules, rights, one-time secrets, bootstrap audit and atomicity, recovery), `internal/wire`
+  (`TestIDT06_RequestsBeforeSetupGet503`), `cmd/bothy/setup_test.go` (ID-T07, output, exit codes,
+  concurrency). Rulings: docs/DECISIONS.md M1-37.
+
 ## Port (root package `internal/identity`)
 
-- Inbound: `Auth` (login, refresh, logout, child sessions), `StepUp` (step-up, M1-35), `Providers` and `Identities` (M1-36), `Directory`, `Devices`, `Tokens` and `TokenAdmin` (M1-44), `Owners`; declares `AvatarFiles`.
+- Inbound: `Auth` (login, refresh, logout, child sessions), `StepUp` (step-up, M1-35), `Providers` and `Identities` (M1-36), `Enrollment` (M1-37), `Directory`, `Devices`, `Tokens` and `TokenAdmin` (M1-44), `Owners`; declares `AvatarFiles`.
 - Emits in-tx events: `DeviceRevoked`, `SessionEnded`.
 - Subscribes to in-tx events: none.
 - Implements source ports and cross-cutting ports: kernel `actor.Authenticator`, `authz.PrincipalSource`, `authz.CredentialSource` (session, device, token for the check `check_active`, 07 section 4.2), `instance.LoginOptionsSource`, `instance.FlagUserSource`, kernel `personaldata.Participant`.

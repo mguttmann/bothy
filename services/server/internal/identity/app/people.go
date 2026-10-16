@@ -114,42 +114,102 @@ func (s *People) GetUser(ctx context.Context, a actor.Actor, userID ids.ID) (ide
 }
 
 // CreateUser implements identity.People (no self registration: user.create is an owner action).
-func (s *People) CreateUser(ctx context.Context, a actor.Actor, cmd identity.CreateUserCmd) (identity.UserView, error) {
+// With local_account the person gets its local identity (subject = handle) at the enabled local
+// provider and a first_login code in the same unit of work (08 section 4, M1-37).
+func (s *People) CreateUser(ctx context.Context, a actor.Actor, cmd identity.CreateUserCmd) (identity.CreatedUser, error) {
 	ctx, err := withCaller(ctx, a)
 	if err != nil {
-		return identity.UserView{}, err
+		return identity.CreatedUser{}, err
 	}
-	var out identity.UserView
+	var out identity.CreatedUser
 	err = s.d.UoW.Do(ctx, func(ctx context.Context) error {
 		if err := s.check(ctx, a, authorize.ActionUserCreate, authorize.Resource{Kind: authorize.ResourceInstance}); err != nil {
 			return err
 		}
-		u, err := s.newUser(cmd)
+		u, err := s.insertUser(ctx, cmd)
 		if err != nil {
 			return err
 		}
-		if err := s.d.Store.InsertPrincipal(ctx, &u.Principal); err != nil {
+		out = identity.CreatedUser{User: userView(UserRecord{User: u})}
+		var attrs auditing.Attrs
+		if cmd.LocalAccount {
+			if attrs, err = s.withLocalAccount(ctx, a, u, &out); err != nil {
+				return err
+			}
+		}
+		if err := s.record(ctx, authorize.ActionUserCreate, u.Principal.ID, attrs); err != nil {
 			return err
 		}
-		if err := s.d.Store.InsertUser(ctx, u); err != nil {
-			return err
-		}
-		out = userView(UserRecord{User: u})
-		if err := s.record(ctx, authorize.ActionUserCreate, u.Principal.ID, nil); err != nil {
-			return err
-		}
-		return s.emitUpdated(ctx, out)
+		return s.emitUpdated(ctx, out.User)
 	})
 	return out, err
 }
 
+// insertUser validates cmd and inserts the principal and the users row of the new person.
+func (s *People) insertUser(ctx context.Context, cmd identity.CreateUserCmd) (domain.User, error) {
+	u, err := s.newUser(cmd)
+	if err != nil {
+		return domain.User{}, err
+	}
+	if err := s.d.Store.InsertPrincipal(ctx, &u.Principal); err != nil {
+		return domain.User{}, err
+	}
+	return u, s.d.Store.InsertUser(ctx, u)
+}
+
+// withLocalAccount creates the local account of u (localAccount), puts its code into out and
+// returns the audit details {purpose, enrollment_code_id}.
+func (s *People) withLocalAccount(ctx context.Context, a actor.Actor, u domain.User, out *identity.CreatedUser) (auditing.Attrs, error) {
+	code, err := s.localAccount(ctx, a, u)
+	if err != nil {
+		return nil, err
+	}
+	view := enrollmentView(code)
+	out.Enrollment = &view
+	return auditing.Attrs{attrPurpose: auditing.Code(string(code.Purpose)), attrEnrollmentCodeID: auditing.ID(code.ID)}, nil
+}
+
+// reasonLocalProviderDisabled is the reason of 409 conflict for local_account without an enabled
+// local provider.
+const reasonLocalProviderDisabled = "local_provider_disabled"
+
+// localAccount links the local identity of u (subject = handle) at the enabled local provider and
+// issues its first_login code with the caller as creator. Errors: conflict with reason
+// local_provider_disabled; the store errors.
+func (s *People) localAccount(ctx context.Context, a actor.Actor, u domain.User) (IssuedEnrollmentCode, error) {
+	list, err := s.d.Providers.Providers(ctx, true)
+	if err != nil {
+		return IssuedEnrollmentCode{}, err
+	}
+	var local *identity.Provider
+	for i := range list {
+		if list[i].Kind == identity.ProviderLocal {
+			local = &list[i]
+		}
+	}
+	if local == nil {
+		return IssuedEnrollmentCode{}, errs.New(errs.CodeConflict, "").WithReason(reasonLocalProviderDisabled)
+	}
+	// The share lock keeps a concurrent disable of the provider waiting until this unit commits.
+	if _, found, err := s.d.Providers.EnabledProvider(ctx, local.ID); err != nil || !found {
+		if err == nil {
+			err = errs.New(errs.CodeConflict, "").WithReason(reasonLocalProviderDisabled)
+		}
+		return IssuedEnrollmentCode{}, err
+	}
+	_, err = s.d.Identities.InsertIdentity(ctx, identity.Identity{
+		ID: ids.New(), UserID: u.Principal.ID, ProviderID: local.ID, ProviderKind: identity.ProviderLocal,
+		Subject: u.Principal.Handle.String(), LinkedAt: s.d.Clock.Now(),
+	})
+	if err != nil {
+		return IssuedEnrollmentCode{}, err
+	}
+	creator := a.ID
+	return s.d.Enrollment.Issue(ctx, u.Principal.ID, PurposeFirstLogin, &creator)
+}
+
 // newUser validates cmd and returns the new active person.
 func (s *People) newUser(cmd identity.CreateUserCmd) (domain.User, error) {
-	if cmd.LocalAccount {
-		// Enrollment codes come with M1-37 (docs/DECISIONS.md M1-31).
-		return domain.User{}, errs.New(errs.CodeValidationFailed, "local accounts are not available yet").
-			WithFields(errs.FieldError{Pointer: "/local_account", Code: "not_enabled", Detail: "local accounts are not available yet"})
-	}
 	h, err := domain.NewHandle(cmd.Handle, s.cfg.HandleMaxChars)
 	if err != nil {
 		return domain.User{}, err

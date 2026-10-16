@@ -5,6 +5,7 @@ package postgres_test
 import (
 	"context"
 	"testing"
+	"time"
 
 	"github.com/OWNER/bothy/services/server/internal/instance"
 	"github.com/OWNER/bothy/services/server/internal/instance/adapters/postgres"
@@ -121,5 +122,44 @@ func TestState_LoadMissingRow(t *testing.T) {
 	_, err := stateOf(t, db, pg.RoleApp).Load(context.Background())
 	if errs.KindOf(err) != errs.KindNotFound {
 		t.Fatalf("Load = %v, want kind not_found", err)
+	}
+}
+
+// TestState_SetupAsApp runs the setup part of instance.State as bothy_app, the role of bothy setup
+// (16 section 7.1): the row is locked, setup_completed_at is set once and a second completion
+// fails with conflict; Load sees the value afterwards (M1-37).
+func TestState_SetupAsApp(t *testing.T) {
+	t.Parallel()
+	ctx := context.Background()
+	db := pgtest.New(t)
+	if _, err := stateOf(t, db, pg.RoleOwner).RecordMigration(ctx, 2, "0.0.0"); err != nil {
+		t.Fatal(err)
+	}
+	pool := db.Pool(t, pg.RoleApp)
+	reg := txn.NewRegistry()
+	reg.Seal()
+	uow := pg.NewUnitOfWork(pool, pg.UnitConfig{}, reg)
+	s := app.NewState(postgres.NewRepository(pool), uow)
+	at := time.Date(2026, 10, 13, 9, 0, 0, 0, time.UTC)
+	err := uow.Do(ctx, func(ctx context.Context) error {
+		rec, err := s.LockForSetup(ctx)
+		if err != nil {
+			return err
+		}
+		if rec.SetupCompleted() {
+			t.Fatalf("fresh row %+v reports setup complete", rec)
+		}
+		return s.CompleteSetup(ctx, at)
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	err = uow.Do(ctx, func(ctx context.Context) error { return s.CompleteSetup(ctx, at.Add(time.Hour)) })
+	if errs.KindOf(err) != errs.KindConflict {
+		t.Fatalf("second CompleteSetup = %v, want kind conflict", err)
+	}
+	rec, err := s.Load(ctx)
+	if err != nil || !rec.SetupCompletedAt.Equal(at) {
+		t.Fatalf("Load = %+v, %v; want setup_completed_at %v", rec, err, at)
 	}
 }

@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"io"
 	"log/slog"
+	"net/netip"
 	"time"
 
 	"github.com/OWNER/bothy/services/server/internal/kernel/actor"
@@ -139,6 +140,9 @@ type StartSession struct {
 	AuthMethod AuthMethod
 	// IdentityID is the external identity used for the login; nil for none.
 	IdentityID *ids.ID
+	// ClientIP is the client address of the login request, stored as auth_sessions.last_ip; the
+	// zero Addr for none (M1-37).
+	ClientIP netip.Addr
 }
 
 // Session is a session as the API shows it (schema Session). Zero values are absent members;
