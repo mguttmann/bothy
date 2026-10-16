@@ -518,6 +518,13 @@ CSP). Conditions:
    theme, font families, font sizes, radii as TypeScript constants) and copies the
    font files to `design/build/ts/fonts/`. The plugin imports only this file; `tokens.py
    check` compares it like all outputs. Reason: tokens are generated, not copied.
+   Shape (docs/DECISIONS.md D-M7-24-1): `light` and `dark` carry every colour role of the themes
+   (the roles of `DsColors`, including `color.viz.*` and the state roles), nested by role without
+   the prefix `color`, keys camelCase and numeric segments as numeric keys; values are the hex
+   strings of `tokens.resolved.json`, translucent roles `{ hex, alpha }`; the type `Theme` is
+   derived from `light` and `dark` must satisfy it; `fonts`, `sizes` (px) and `radii` (px)
+   follow. The license texts (`<family>.OFL.txt`) lie next to the fonts, and `make tokens`
+   compiles the file with `tsc --strict`.
 4. The plugin adapts to the light or dark theme of Grafana and then takes the matching
    theme of the tokens; the font is Atkinson Hyperlegible from the bundled files (OFL).
 5. Component notes: [components.md](../design/components.md), section 11.

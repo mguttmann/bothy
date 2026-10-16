@@ -25,6 +25,11 @@ operated, and the order of the build.
 
 ### Added
 
+- Design tokens: `tools/design-tokens` writes `design/build/ts/tokens.gen.ts` for the Grafana
+  panel plugin (colour roles of both themes including the chart and state roles, font families,
+  font sizes and radii as typed constants) and copies the vendored Atkinson Hyperlegible fonts
+  with their SIL Open Font License to `design/build/ts/fonts/`; `make tokens` fails on a stale or
+  hand-edited file, a missing font or licence, and compiles the file with `tsc --strict` (M7-24).
 - Design system package: `packages/design_system` exports the generated token classes (a copy
   that `tokens.py build` writes next to `design/build/dart/` and `make tokens` compares), a
   settings resolver from `appearance.theme`, `appearance.density`, `appearance.reduce_motion` and

@@ -13,13 +13,21 @@ MAKEFLAGS += --no-builtin-rules --no-print-directory
 
 UV ?= uv
 PYTHON := $(UV) run --project ../../tools --locked --quiet python
+# The TypeScript of sdk/typescript/package-lock.json (installed by `make bootstrap-ci`);
+# docs/DECISIONS.md D-M7-24-2.
+TSC := ../../sdk/typescript/node_modules/.bin/tsc
+TSC_FLAGS := --strict --noEmit --target es2022 --module es2022 --lib es2022
 
-.PHONY: check test gate
+.PHONY: check test gate ts
 
-check: test gate ## Unit and gate tests, then the token gate on the repository state
+check: test gate ts ## Unit and gate tests, the token gate on the repository state, the TypeScript compile check
 
 test: ## Unit tests and end-to-end tests of the gate (tests/)
 	$(PYTHON) -W error -m unittest discover -s tests -t .
 
 gate: ## Structure, contrast, palette guards, generated files current, vendor/ matches MANIFEST.json
 	$(PYTHON) tokens.py check
+
+ts: ## tsc --strict --noEmit over design/build/ts/tokens.gen.ts (flags as emit_ts.TSC_FLAGS)
+	@[ -x $(TSC) ] || { echo "ts: $(TSC) not found; run \`make bootstrap\`" >&2; exit 2; }
+	$(TSC) $(TSC_FLAGS) ../../design/build/ts/tokens.gen.ts
