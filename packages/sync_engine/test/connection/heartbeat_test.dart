@@ -3,6 +3,8 @@
 // Heartbeat of 04 6.3 item 5: a random first delay, then one heartbeat per interval with
 // `last_seq`; a missing acknowledgement closes and reconnects (brief M4-13, Tests).
 
+import 'dart:async';
+
 import 'package:domain/domain.dart';
 import 'package:sync_engine/sync_engine.dart';
 import 'package:test/test.dart';
@@ -79,4 +81,41 @@ void main() {
     await h.clock.elapse(heartbeatInterval * 3);
     expect(ch.sentOps, ['identify']);
   });
+
+  test(
+    'a heartbeat_ack is taken while a listener step is still running',
+    () async {
+      final listener = _SlowListener();
+      final h = Harness(listener: listener);
+      addTearDown(h.dispose);
+      final ch = await h.goLive();
+      listener.hold = Completer<void>();
+      ch.push('resync_required', {
+        'reason': 'retention',
+        'head_seq': 50,
+        'sync_epoch': 'epoch-1',
+      });
+      await settle();
+      for (var i = 0; i < 6; i++) {
+        await h.clock.elapse(heartbeatInterval);
+        ch.push('heartbeat_ack', {'server_time': '2026-10-15T10:00:10.000Z'});
+        await settle();
+      }
+      expect(ch.isClosed, isFalse, reason: 'acks arrived in time');
+      listener.hold!.complete();
+      await settle();
+      expect(listener.frames.single.op, 'resync_required');
+    },
+  );
+}
+
+/// A listener whose frame step waits for [hold], like a long snapshot load of M4-14.
+class _SlowListener extends RecordingListener {
+  Completer<void>? hold;
+
+  @override
+  Future<void> onFrame(GatewayFrame frame, SessionControl control) async {
+    await super.onFrame(frame, control);
+    await hold?.future;
+  }
 }

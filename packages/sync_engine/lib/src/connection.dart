@@ -273,7 +273,7 @@ final class GatewayConnection {
     }
     _channel = ch;
     _frameSub = ch.frames.listen(
-      (text) => _enqueue(() => _onText(gen, text)),
+      (text) => _onText(gen, text),
       onError: (Object e) => _log('socket error: ${e.runtimeType}'),
       onDone: () => _enqueue(() => _onDone(gen)),
     );
@@ -293,7 +293,11 @@ final class GatewayConnection {
   // -------------------------------------------------------------------------------------------
   // Frames
 
-  Future<void> _onText(int gen, String text) async {
+  /// Decodes [text] at once; the control frames `heartbeat_ack` and `reauth_required` act
+  /// directly, every other frame waits in the ordered queue behind the listener steps, so a
+  /// long snapshot or catch-up step of M4-14 cannot delay them past their deadlines (04 6.3
+  /// items 5 and 6; red team of M4-13).
+  void _onText(int gen, String text) {
     if (gen != _channelGen) return;
     final GatewayFrame? frame;
     try {
@@ -304,7 +308,25 @@ final class GatewayConnection {
       _log('frame skipped: ${e.cause}');
       return;
     }
-    if (frame == null) return;
+    switch (frame) {
+      case null:
+        return;
+      case HeartbeatAckFrame():
+        _heartbeat?.acknowledge();
+      case ReauthRequiredFrame(:final model):
+        unawaited(
+          _onReauth(
+            gen,
+            model,
+          ).catchError((Object e) => _log('reauth failed: ${e.runtimeType}')),
+        );
+      case _:
+        _enqueue(() => _onFrame(gen, frame!));
+    }
+  }
+
+  Future<void> _onFrame(int gen, GatewayFrame frame) async {
+    if (gen != _channelGen) return;
     switch (frame) {
       case HelloFrame(:final model):
         await _onHello(gen, model);
@@ -312,10 +334,9 @@ final class GatewayConnection {
         await _onReady(gen, model);
       case ResumedFrame(:final model):
         await _onResumed(gen, model);
-      case HeartbeatAckFrame():
-        _heartbeat?.acknowledge();
-      case ReauthRequiredFrame(:final model):
-        await _onReauth(gen, model);
+      case HeartbeatAckFrame() || ReauthRequiredFrame():
+        // Handled in _onText, outside the queue.
+        break;
       case ErrorFrame(:final model):
         if (model.op == 'focus' && model.code == 'validation_failed') {
           focus.onRejected();
@@ -500,8 +521,13 @@ final class GatewayConnection {
     final wasIdentified = _identified;
     _identified = false;
     if (wasIdentified) {
-      await _session.markDisconnected();
-      _listener?.onDisconnected();
+      // A failing store or listener must not keep the connection from reacting to the close.
+      try {
+        await _session.markDisconnected();
+        _listener?.onDisconnected();
+      } on Object catch (e) {
+        _log('disconnect bookkeeping failed: ${e.runtimeType}');
+      }
     }
     final reaction =
         _ownReaction ??

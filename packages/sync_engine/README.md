@@ -80,7 +80,8 @@ D-M4-13-2). "Next frame" is the answer to the next `hello`.
 ### What M4-14 and M4-15 plug in
 
 `SessionListener` (`onReady`, `onResumed`, `onFrame`, `onDisconnected`) receives the frames in
-order; M4-14 applies the snapshot, catch-up pages, `cursor`, `catchup.complete` and
+order (the control frames `heartbeat_ack` and `reauth_required` act outside that queue, so a long
+listener step cannot delay them); M4-14 applies the snapshot, catch-up pages, `cursor`, `catchup.complete` and
 `resync_required`, and sets `catchingUp`, `resyncing` or `live` through `SessionControl`,
 which also sends frames and sets `lastProcessedSeq` for the heartbeat. M4-15 (outbox) reads
 `connection.states` to know when the gateway is live. `connection.focus` (`FocusManager`, at
