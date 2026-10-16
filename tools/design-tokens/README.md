@@ -36,6 +36,8 @@ uv run --project tools --locked check-jsonschema --schemafile https://www.design
 | `design/build/dart/design_tokens.g.dart` | `DsPalette`, `DsColors`, `DsAccent`, `DsElevation`, `DsDensity`, `DsMotion` (each a `ThemeExtension` with instances per context; `DsAccent` with one constant per theme and accent and `DsAccent.of(key, brightness)`, an unknown key gives the default), `DsSpace`, `DsRadius`, `DsBorderWidth`, `DsLayout`, `DsSize`, `DsIconSize`, `DsFonts`, `DsType`, `DsIcons` |
 | `packages/design_system/lib/src/generated/design_tokens.g.dart` | the same bytes as `design/build/dart/design_tokens.g.dart`: the package copy, because a package may not import a file outside its folder; `check` reports it as stale when it differs (docs/DECISIONS.md D-M4-04-1) |
 | `design/build/tokens.resolved.json` | all tokens resolved, per context, plus the icon mapping and the allowed space icons; member `accents`: default and, per accent and theme, every accent role with `hex`, `alias`, `moved_from` and `swapped` |
+| `design/build/ts/tokens.gen.ts` | plain TypeScript without imports for the Grafana panel plugin (M7-25): `light` and `dark` with every colour role of the themes (the same roles as `DsColors`, nested by role, keys camelCase, numeric segments as numeric keys: `color.accent.bg-hover` is `light.accent.bgHover`, `color.viz.series.1` is `light.viz.series[1]`), hex strings as in `tokens.resolved.json` (translucent roles as `{ hex, alpha }`), the type `Theme` that `dark` must satisfy, `fonts` (families with fallbacks), `sizes` (font sizes in px) and `radii` (px); every object `as const` |
+| `design/build/ts/fonts/` | byte-identical copies of every file under `vendor/fonts/`: the WOFF2 files of Atkinson Hyperlegible Next and Mono and their SIL Open Font License texts (`<family>.OFL.txt`) |
 | `design/build/preview.html` | standalone preview with embedded fonts and icons |
 | `design/build/README.md` | note "generated" |
 | `docs/design/palette.md`, `contrast.md`, `tokens.md` | generated docs |
@@ -80,6 +82,13 @@ analyzes its users and `flutter test` compiles it (M4-04).
 4. **Palette guards:** forbidden reference colors (OKLab distance), forbidden hue ranges,
    minimum chroma for neutrals. Rules and sources are in `design/design-rules.json`.
 5. **Freshness:** `check` compares every generated file byte for byte.
+   The font copies under `design/build/ts/fonts/` are compared with `vendor/fonts/` byte for
+   byte; a missing copy (font or licence), a changed copy or a file that is no copy fails as
+   `stale:`, and `build` removes such a file. A vendored font without its `<family>.OFL.txt` is an
+   error (exit 2). The target `ts` of the Makefile (part of `check`) then compiles
+   `tokens.gen.ts` with `tsc --strict --noEmit` (TypeScript 5.9.3 of
+   `sdk/typescript/package-lock.json`, installed by `make bootstrap-ci`; without it the target
+   fails with a hint).
 6. **Provenance:** `check` compares every file under `vendor/fonts/` and `vendor/phosphor/` with its
    SHA-256 in `vendor/MANIFEST.json`; a missing, extra or changed file fails.
 

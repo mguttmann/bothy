@@ -169,6 +169,68 @@ class CheckGateTest(GateTreeMixin, unittest.TestCase):
         self.assertIn("vendor: phosphor/LICENSE: sha256 differs from MANIFEST.json", proc.stderr)
 
 
+class TsOutputGateTest(GateTreeMixin, unittest.TestCase):
+    """The TypeScript output and its font copies under design/build/ts/ are part of the gate."""
+
+    TS = Path("design/build/ts/tokens.gen.ts")
+    FONTS = Path("design/build/ts/fonts")
+
+    def test_changed_token_without_rebuild_fails(self):
+        def rounder(data):
+            data["radius"]["md"]["$value"]["value"] = 7
+
+        self._edit_json("design/tokens/space.tokens.json", rounder)
+        proc = self._check()
+        self.assertEqual(proc.returncode, 1)
+        self.assertIn(f"stale: {self.TS}", proc.stderr)
+
+    def test_hand_edit_fails(self):
+        path = self.root / self.TS
+        path.write_text(path.read_text(encoding="utf-8").replace("#", "#0", 1), encoding="utf-8")
+        proc = self._check()
+        self.assertEqual(proc.returncode, 1)
+        self.assertIn(f"stale: {self.TS}", proc.stderr)
+
+    def test_missing_font_fails(self):
+        (self.root / self.FONTS / "atkinson-hyperlegible-next-latin-wght-normal.woff2").unlink()
+        proc = self._check()
+        self.assertEqual(proc.returncode, 1)
+        self.assertIn(f"stale: {self.FONTS}/atkinson-hyperlegible-next-latin-wght-normal.woff2", proc.stderr)
+
+    def test_missing_license_fails(self):
+        (self.root / self.FONTS / "atkinson-hyperlegible-mono.OFL.txt").unlink()
+        proc = self._check()
+        self.assertEqual(proc.returncode, 1)
+        self.assertIn(f"stale: {self.FONTS}/atkinson-hyperlegible-mono.OFL.txt", proc.stderr)
+
+    def test_changed_or_extra_font_fails(self):
+        (self.root / self.FONTS / "atkinson-hyperlegible-mono-latin-wght-normal.woff2").write_bytes(b"wOF2\0")
+        (self.root / self.FONTS / "other.woff2").write_bytes(b"wOF2\0")
+        proc = self._check()
+        self.assertEqual(proc.returncode, 1)
+        self.assertIn(f"stale: {self.FONTS}/atkinson-hyperlegible-mono-latin-wght-normal.woff2", proc.stderr)
+        self.assertIn(f"stale: {self.FONTS}/other.woff2", proc.stderr)
+
+    def test_build_copies_fonts_byte_identical_and_removes_extra(self):
+        shutil.rmtree(self.root / self.FONTS)
+        (self.root / self.FONTS).mkdir(parents=True)
+        (self.root / self.FONTS / "other.woff2").write_bytes(b"wOF2\0")
+        proc = subprocess.run(
+            [sys.executable, str(self.root / "tools" / "design-tokens" / "tokens.py"), "build"],
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+        self.assertEqual(proc.returncode, 0, proc.stderr)
+        vendor = self.root / "tools" / "design-tokens" / "vendor"
+        manifest = json.loads((vendor / "MANIFEST.json").read_text(encoding="utf-8"))["sha256"]
+        copied = sorted(p.name for p in (self.root / self.FONTS).iterdir())
+        self.assertEqual(copied, sorted(p.name for p in (vendor / "fonts").iterdir()))
+        for name in copied:
+            self.assertEqual(_sha256(self.root / self.FONTS / name), manifest[f"fonts/{name}"], name)
+        self.assertEqual(self._check().returncode, 0)
+
+
 class VendorManifestTest(unittest.TestCase):
     def setUp(self):
         self._tmp = tempfile.TemporaryDirectory(prefix="design-tokens-vendor-")
