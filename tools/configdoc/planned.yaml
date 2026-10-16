@@ -61,8 +61,6 @@ rules:
     milestone: M7
   - match: "notify."  # M3-17, M3-22, M3-23; milestone of the chapter for badge_sync_min_interval (no ticket names it)
     milestone: M3
-  - match: "pin."  # M1-59
-    milestone: M1
   - match: "privacy."  # M7-06, M7-07; milestone of the chapter for ai_notice_enabled, notice_url (no ticket names it)
     milestone: M7
   - match: privacy.object_delete_delay  # M3-08
@@ -73,8 +71,6 @@ rules:
     milestone: M6
   - match: "push."  # M3-20, M3-21
     milestone: M3
-  - match: "reaction."  # M1-59
-    milestone: M1
   - match: "retention."  # M7-05
     milestone: M7
   - match: retention.stats_minutes  # M6-13

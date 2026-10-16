@@ -127,6 +127,10 @@ var appPrivileges = map[string][]string{
 	// 03 message_revisions (M1-58): an edit inserts the previous content, a deletion removes every
 	// revision of the message (03 section 6.5).
 	"message_revisions": {"SELECT", "INSERT", "DELETE"},
+	// 03 reactions and pins (M1-59): a reaction or a pin is added or removed, never changed; a
+	// deletion of the message removes both (03 messages).
+	"reactions": {"SELECT", "INSERT", "DELETE"},
+	"pins":      {"SELECT", "INSERT", "DELETE"},
 	// 03 local_credentials (M1-39): one row per local identity, changed in place; it goes with
 	// its identity (ON DELETE CASCADE).
 	"local_credentials": {"SELECT", "INSERT", "UPDATE"},

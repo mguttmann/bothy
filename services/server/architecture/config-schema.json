@@ -1695,6 +1695,18 @@
       "doc": "Secret reference of the password bothy migrate up --bootstrap sets for bothy_owner."
     },
     {
+      "name": "pin.max_per_thread",
+      "env": "BOTHY_PIN__MAX_PER_THREAD",
+      "kind": "int",
+      "default": "50",
+      "required": false,
+      "enum": [],
+      "min": "1",
+      "max": "",
+      "chapter": "03-data-model.md",
+      "doc": "Most pins per thread; listPins is not paginated."
+    },
+    {
       "name": "principal.display_name_max_chars",
       "env": "BOTHY_PRINCIPAL__DISPLAY_NAME_MAX_CHARS",
       "kind": "int",
@@ -2197,6 +2209,30 @@
       "max": "1h",
       "chapter": "02-architecture.md",
       "doc": "Interval in which full rate-limit buckets are removed; a full bucket decides like a missing one."
+    },
+    {
+      "name": "reaction.emoji_max_bytes",
+      "env": "BOTHY_REACTION__EMOJI_MAX_BYTES",
+      "kind": "int",
+      "default": "64",
+      "required": false,
+      "enum": [],
+      "min": "1",
+      "max": "",
+      "chapter": "03-data-model.md",
+      "doc": "Largest reaction emoji in bytes (one grapheme cluster has no other bound)."
+    },
+    {
+      "name": "reaction.max_distinct_per_message",
+      "env": "BOTHY_REACTION__MAX_DISTINCT_PER_MESSAGE",
+      "kind": "int",
+      "default": "20",
+      "required": false,
+      "enum": [],
+      "min": "1",
+      "max": "",
+      "chapter": "03-data-model.md",
+      "doc": "Most distinct emoji per message; bounds Message.reactions and the event payloads."
     },
     {
       "name": "retention.audit",

@@ -236,9 +236,9 @@ Source: [03-data-model.md](../spec/03-data-model.md), section 9.
 | `message.max_content_bytes` | `BOTHY_MESSAGE__MAX_CONTENT_BYTES` | Server | int | `262144` | size of a message (long answers without splitting) | active |
 | `message.max_attachments` | `BOTHY_MESSAGE__MAX_ATTACHMENTS` | Server | int | `10` | attachments per message | active |
 | `message.max_mentions` | `BOTHY_MESSAGE__MAX_MENTIONS` | Server | int | `50` | distinct mention handles per message (content format, `messages`) | active |
-| `reaction.emoji_max_bytes` | `BOTHY_REACTION__EMOJI_MAX_BYTES` | Server |  | `64` | largest length of a reaction emoji in bytes (otherwise a grapheme cluster has no limit) | planned (M1) |
-| `reaction.max_distinct_per_message` | `BOTHY_REACTION__MAX_DISTINCT_PER_MESSAGE` | Server |  | `20` | distinct emoji per message; limits `Message.reactions` and the payload of the events | planned (M1) |
-| `pin.max_per_thread` | `BOTHY_PIN__MAX_PER_THREAD` | Server |  | `50` | pins per thread; `listPins` is not paginated | planned (M1) |
+| `reaction.emoji_max_bytes` | `BOTHY_REACTION__EMOJI_MAX_BYTES` | Server | int | `64` | largest length of a reaction emoji in bytes (otherwise a grapheme cluster has no limit) | active |
+| `reaction.max_distinct_per_message` | `BOTHY_REACTION__MAX_DISTINCT_PER_MESSAGE` | Server | int | `20` | distinct emoji per message; limits `Message.reactions` and the payload of the events | active |
+| `pin.max_per_thread` | `BOTHY_PIN__MAX_PER_THREAD` | Server | int | `50` | pins per thread; `listPins` is not paginated | active |
 | `template.name_max_chars` | `BOTHY_TEMPLATE__NAME_MAX_CHARS` | Server | int | `100` | length of a template name in Unicode characters | active |
 | `template.max_per_scope` | `BOTHY_TEMPLATE__MAX_PER_SCOPE` | Server | int | `100` | templates per person or per channel; `listTemplates` is not paginated | active |
 | `file.max_upload_bytes` | `BOTHY_FILE__MAX_UPLOAD_BYTES` | Server | int | `104857600` | size of a file | active |

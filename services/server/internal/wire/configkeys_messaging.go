@@ -9,7 +9,8 @@ import "github.com/OWNER/bothy/services/server/internal/platform/config"
 // now because the cross-check json_limit_above_message reads it, and the attachment count and
 // the thread title length because getInstance reports them as client limits (M1-46). Sending
 // (M1-56) adds the mention limit, reading (M1-57) the list content limit of docs/spec/06-api.md,
-// the templates (M1-60) their name length and count bound.
+// the templates (M1-60) their name length and count bound, reactions and pins (M1-59) the symbol
+// size and the bounds of distinct symbols and pins.
 func messagingConfigKeys() []config.Key {
 	return []config.Key{
 		{
@@ -40,6 +41,21 @@ func messagingConfigKeys() []config.Key {
 		{
 			Name: "template.max_per_scope", Kind: config.KindInt, Default: "100", Min: "1",
 			Doc:     "Most templates per person or per channel; listTemplates is not paginated.",
+			Chapter: chapter03,
+		},
+		{
+			Name: "reaction.emoji_max_bytes", Kind: config.KindInt, Default: "64", Min: "1",
+			Doc:     "Largest reaction emoji in bytes (one grapheme cluster has no other bound).",
+			Chapter: chapter03,
+		},
+		{
+			Name: "reaction.max_distinct_per_message", Kind: config.KindInt, Default: "20", Min: "1",
+			Doc:     "Most distinct emoji per message; bounds Message.reactions and the event payloads.",
+			Chapter: chapter03,
+		},
+		{
+			Name: "pin.max_per_thread", Kind: config.KindInt, Default: "50", Min: "1",
+			Doc:     "Most pins per thread; listPins is not paginated.",
 			Chapter: chapter03,
 		},
 		{

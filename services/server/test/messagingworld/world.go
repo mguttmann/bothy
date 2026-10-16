@@ -76,6 +76,11 @@ const (
 	// PageSizeDefault and PageSizeMax are api.page_size_default and api.page_size_max.
 	PageSizeDefault = 20
 	PageSizeMax     = 50
+	// EmojiMax, MaxDistinctReactions and MaxPins are reaction.emoji_max_bytes,
+	// reaction.max_distinct_per_message and pin.max_per_thread (the defaults of 03 section 9).
+	EmojiMax             = 64
+	MaxDistinctReactions = 20
+	MaxPins              = 50
 )
 
 // Option changes the messaging configuration of a world (brief M1-57: small test values).
@@ -220,7 +225,8 @@ func New(t *testing.T, subscribe Subscribe, opts ...Option) *World {
 	}
 	mcfg := messagingapp.Config{MaxContentBytes: MaxContent, MaxMentions: MaxMentions, EventPayloadMaxBytes: PayloadMax,
 		TemplateNameMaxChars: TemplateNameMax, TemplateMaxPerScope: TemplateMax,
-		ListContentMaxBytes: ListContentMax, PageSizeDefault: PageSizeDefault, PageSizeMax: PageSizeMax}
+		ListContentMaxBytes: ListContentMax, PageSizeDefault: PageSizeDefault, PageSizeMax: PageSizeMax,
+		EmojiMaxBytes: EmojiMax, MaxDistinctReactions: MaxDistinctReactions, MaxPinsPerThread: MaxPins}
 	for _, o := range opts {
 		o(&mcfg)
 	}

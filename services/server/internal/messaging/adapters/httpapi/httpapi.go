@@ -2,14 +2,15 @@
 
 // Package httpapi holds the REST handlers of the messaging module as part of
 // rest.StrictServerInterface: createMessage and createThread (M1-56), listThreadMessages and
-// getMessage (M1-57), listMyMentions and the six template operations (M1-60) of
-// docs/api/openapi.yaml. The use cases authorize; the handlers only convert, set Idempotent-Replay
+// getMessage (M1-57), updateMessage, deleteMessage and listMessageRevisions (M1-58),
+// listMyMentions and the six template operations (M1-60), the three reaction and the three pin
+// operations (M1-59) of docs/api/openapi.yaml. The use cases authorize; the handlers only convert, set Idempotent-Replay
 // on a repetition and ETag on a template change, and pass errors to the problem writer of the
 // chain unchanged.
 //
 // Example:
 //
-//	h := httpapi.New(svc, svc, svc, threads)
+//	h := httpapi.New(svc, svc.Mentions(), svc.Templates(), svc.Reactions(), svc.Pins(), threads)
 //	built, err := routes.Build(wire.Handlers{Messages: h}, wire.RouteOptions(), cat)
 package httpapi
 
@@ -29,13 +30,16 @@ type Messages struct {
 	messages  messaging.Messages
 	mentions  messaging.Mentions
 	templates messaging.Templates
+	reactions messaging.Reactions
+	pins      messaging.Pins
 	threads   chat.Threads
 }
 
 // New returns the handlers over the use cases of messaging (sending m, mentions mn, templates
-// tp) and the thread port of chat, which gives the thread of a createThread answer.
-func New(m messaging.Messages, mn messaging.Mentions, tp messaging.Templates, t chat.Threads) *Messages {
-	return &Messages{messages: m, mentions: mn, templates: tp, threads: t}
+// tp, reactions rc, pins pn) and the thread port of chat, which gives the thread of a
+// createThread answer.
+func New(m messaging.Messages, mn messaging.Mentions, tp messaging.Templates, rc messaging.Reactions, pn messaging.Pins, t chat.Threads) *Messages {
+	return &Messages{messages: m, mentions: mn, templates: tp, reactions: rc, pins: pn, threads: t}
 }
 
 // principal returns the actor of the request; anonymous when the chain set none.
@@ -142,8 +146,9 @@ func idList(list []rest.Uuid) []ids.ID {
 }
 
 // MessageREST converts a message (schema Message): empty values become absent members, never
-// null (ADR 0053); attachments, reactions and components are empty and pinned is false until
-// their tickets (M3-07, M1-59, M2-15).
+// null (ADR 0053); attachments and components are empty until their tickets (M3-07, M2-15). The
+// reaction summary, my_reactions (always present in REST, possibly empty) and pinned come from
+// the message (M1-59).
 func MessageREST(m messaging.Message) rest.Message {
 	mentions := make([]rest.Uuid, 0, len(m.MentionIDs))
 	for _, id := range m.MentionIDs {
@@ -157,7 +162,8 @@ func MessageREST(m messaging.Message) rest.Message {
 		},
 		ClientMsgId: rest.Uuid(m.ClientMsgID), Origin: rest.MessageOrigin(m.Origin), Kind: rest.MessageKind(m.Kind),
 		ContentMd: m.ContentMD, ContentFormat: m.ContentFormat, ReplyToMessageId: optionalID(m.ReplyToID), Silent: m.Silent,
-		Attachments: []rest.Attachment{}, MentionIds: mentions, Reactions: []rest.ReactionSummary{}, Components: []rest.Component{},
+		Attachments: []rest.Attachment{}, MentionIds: mentions, Reactions: reactionsREST(m.Reactions), Components: []rest.Component{},
+		MyReactions: myReactions(m.MyReactions), Pinned: m.Pinned,
 		Version: m.Version, EditedAt: optionalTime(m.EditedAt), DeletedAt: optionalTime(m.DeletedAt),
 		CreatedAt: m.CreatedAt.UTC().Truncate(time.Millisecond),
 	}
@@ -170,6 +176,13 @@ func MessageREST(m messaging.Message) rest.Message {
 		out.ContentTruncated = &cut
 	}
 	return out
+}
+
+// myReactions returns the own symbols for the member my_reactions; never nil, so REST always
+// carries it.
+func myReactions(list []string) *[]string {
+	out := append([]string{}, list...)
+	return &out
 }
 
 // threadREST converts a thread (schema Thread) like the thread handlers of chat: empty values
