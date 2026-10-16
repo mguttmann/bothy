@@ -147,6 +147,15 @@ operated, and the order of the build.
   `sli-bounds` and `sli-labels` of `make ops-check` hold them (VZ-T03).
 - Architecture test `tools/arch-check` in `make arch`: the dependency rules of 15 3.1 for every
   member, with the reach of the diagram as an allow list (M4-01).
+- Sync engine outbox: `Outbox` stores every write with its own UUIDv7 before sending, sends
+  strictly FIFO per thread or per lane with lanes in parallel, retries network errors, timeouts,
+  `5xx`, `429` and `409 request_in_progress` with full jitter between `client.outbox_retry_base`
+  and `client.outbox_retry_cap` (or `Retry-After`) and the same ID, keeps final errors and
+  `412 version_conflict` as failed entries with their reason, confirms entries by the echo,
+  sends a message only after its uploads, follows 04 13.3 for edits and deletes, survives a
+  restart, sends only while started, and reports "Sending delayed" after
+  `client.outbox_stuck_after`; executors for the message and personal writes are registered per
+  operation (M4-15).
 - Documentation in code as a gate for Dart: `public_member_api_docs` as an error in every
   member, and `make docs` puts the `dart doc` pages of every package into the site
   (`docs/reference/dart-api.md`) (M4-01).

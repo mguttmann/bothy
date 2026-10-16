@@ -162,6 +162,7 @@ final class Harness {
     FakeTime? time,
     OutboxExecutors? executors,
     int seed = 7,
+    bool hookFails = false,
   }) {
     final t = time ?? FakeTime();
     final d = db ?? openInMemoryForTests(clock: t.clock);
@@ -178,7 +179,10 @@ final class Harness {
       ),
       timer: t.timer,
       random: Random(seed),
-      onConfirmed: (entry, response) async => confirmed.add(entry.id),
+      onConfirmed: (entry, response) async {
+        if (hookFails) throw StateError('storage failed');
+        confirmed.add(entry.id);
+      },
     );
     return Harness._(d, t, registry, outbox, confirmed);
   }

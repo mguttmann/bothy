@@ -101,4 +101,15 @@ void main() {
     expect(depths.first, 0);
     await sub.cancel();
   });
+
+  test('a failing confirmation hook does not send the entry again', () async {
+    await h.close();
+    h = Harness.open(hookFails: true);
+    final exec = h.fake('createMessage');
+    final e = await h.add('a1', thread: threadA);
+    await h.outbox.start();
+    await settle();
+    expect(exec.ids, [e.id]);
+    expect(await h.entry(e.id), isNull);
+  });
 }

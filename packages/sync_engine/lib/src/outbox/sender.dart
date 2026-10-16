@@ -243,7 +243,12 @@ final class OutboxSender {
       case OutcomeClass.confirmed:
         final r = response ?? const OutboxResponse();
         await confirm(stored, r.result);
-        await onConfirmed?.call(stored, r);
+        try {
+          await onConfirmed?.call(stored, r);
+        } on Object {
+          // The write is stored on the server; its echo or the catch-up brings the result
+          // again, so a failing hook must not keep the entry and send it once more.
+        }
         await dao.replaceWithServer(stored.id);
       case OutcomeClass.retry:
         final wait =

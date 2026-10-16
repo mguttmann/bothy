@@ -387,9 +387,10 @@ stateDiagram-v2
   [*] --> Pending: entry with client_msg_id, client_interaction_id or Idempotency-Key
   Pending --> Sending: predecessor in the thread confirmed
   Sending --> Confirmed: response 2xx or echo in the event stream
-  Sending --> Waiting: network error, timeout, 5xx, 429
+  Sending --> Waiting: network error, timeout, 5xx, 429, 409 request_in_progress
   Waiting --> Sending: backoff with full jitter
   Sending --> Failed: 400, 404, 410, 413, 422
+  Sending --> Failed: 412 version_conflict (both revisions kept)
   Failed --> Pending: send again with a new ID or edited
   Failed --> [*]: discarded by the person
   Confirmed --> [*]
@@ -399,6 +400,12 @@ Rules from [04](04-sync-protocol.md) sections 13.2 and 13.3; in addition: after
 `client.outbox_stuck_after` in the state `Waiting`, an entry shows the notice "Sending delayed". File uploads are
 separate entries before the message that attaches them; the message waits until its files are
 `complete`.
+
+`409 request_in_progress` (the first request with the same `Idempotency-Key` is still running,
+04 5.2) is retried like a `5xx` with the same ID. `412 version_conflict` ends in `Failed` with the
+`current` revision of the problem kept in the entry; the interface shows both revisions and the
+person decides, without an automatic merge (04 13.3). The outcome classes of every other status
+are in docs/DECISIONS.md D-M4-15-1.
 
 ## 8. Network and login
 
