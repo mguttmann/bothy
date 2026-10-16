@@ -1,0 +1,5 @@
+# 06 13 row 4: remove an enum value.
+patch:
+- {op: delete, path: /components/schemas/ThingStatus/enum/1}
+expect:
+- [enum, components/schemas/ThingStatus]

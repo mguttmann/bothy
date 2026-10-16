@@ -1,0 +1,7 @@
+# 06 13 additive: a new optional time filter named `after`; only an integer `after` is the
+# global sequence of 06 section 6 item 5.
+patch:
+- op: append
+  path: /paths/~1things/get/parameters
+  value: {name: after, in: query, schema: {type: string, format: date-time}}
+expect: []

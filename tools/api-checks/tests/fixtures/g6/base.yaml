@@ -1,0 +1,266 @@
+# SPDX-License-Identifier: Apache-2.0
+# Base document of the G6 mutation fixtures (ticket M7-11): a small valid OpenAPI 3.1 document
+# with one example of every construct the breaking check compares. Every file in cases/ patches
+# a copy of it and names the findings the check must report, exactly.
+openapi: 3.1.0
+info:
+  title: Example API
+  version: 1.2.0
+  license:
+    name: Apache-2.0
+    identifier: Apache-2.0
+servers:
+- url: /api/v1
+paths:
+  /things:
+    get:
+      operationId: listThings
+      summary: List things.
+      x-authz-action: thing.read
+      x-rate-limit-class: rl.read
+      parameters:
+      - $ref: '#/components/parameters/Cursor'
+      - $ref: '#/components/parameters/Limit'
+      - name: sort
+        in: query
+        required: false
+        schema:
+          $ref: '#/components/schemas/ThingSort'
+      responses:
+        '200':
+          description: One page.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ThingPage'
+    post:
+      operationId: createThing
+      summary: Create a thing.
+      x-authz-action: thing.create
+      x-rate-limit-class: rl.write
+      parameters:
+      - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ThingCreate'
+      responses:
+        '201':
+          description: Created.
+          headers:
+            Location:
+              schema:
+                type: string
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Thing'
+        '409':
+          $ref: '#/components/responses/Conflict'
+  /things/{thing_id}:
+    parameters:
+    - name: thing_id
+      in: path
+      required: true
+      schema:
+        type: string
+    get:
+      operationId: getThing
+      summary: Read a thing.
+      x-authz-action: thing.read
+      x-rate-limit-class: rl.read
+      responses:
+        '200':
+          description: The thing.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Thing'
+  /things/{thing_id}/history:
+    parameters:
+    - name: thing_id
+      in: path
+      required: true
+      schema:
+        type: string
+    get:
+      operationId: listThingHistory
+      summary: History of a thing by sequence.
+      x-authz-action: thing.read
+      x-rate-limit-class: rl.read
+      parameters:
+      - name: before_seq
+        in: query
+        schema:
+          type: integer
+      responses:
+        '200':
+          description: Entries.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Thing'
+    delete:
+      operationId: clearThingHistory
+      summary: Clear the history.
+      x-authz-action: thing.delete
+      x-rate-limit-class: rl.write
+      x-idempotency-exempt: naturally_idempotent
+      responses:
+        '204':
+          description: Cleared.
+webhooks:
+  thing.created:
+    post:
+      operationId: thingCreatedWebhook
+      x-authz-action: webhook_out.deliver
+      x-rate-limit-class: none
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ThingCreatedEvent'
+      responses:
+        '200':
+          description: Received.
+components:
+  parameters:
+    Cursor:
+      name: cursor
+      in: query
+      required: false
+      schema:
+        type: string
+    Limit:
+      name: limit
+      in: query
+      required: false
+      schema:
+        type: integer
+        minimum: 1
+    IdempotencyKey:
+      name: Idempotency-Key
+      in: header
+      required: true
+      schema:
+        type: string
+  responses:
+    Conflict:
+      x-status: 409
+      description: 'Problem codes: `conflict`.'
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/Problem'
+  schemas:
+    ThingSort:
+      type: string
+      enum:
+      - created
+      - name
+      default: created
+    ThingStatus:
+      type: string
+      enum:
+      - active
+      - archived
+    Thing:
+      type: object
+      required:
+      - id
+      - name
+      - status
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        status:
+          $ref: '#/components/schemas/ThingStatus'
+        size:
+          type: integer
+          format: int32
+        tags:
+          type: array
+          items:
+            type: string
+    ThingCreate:
+      type: object
+      required:
+      - name
+      properties:
+        name:
+          type: string
+          maxLength: 80
+        note:
+          type: string
+    ThingPage:
+      type: object
+      required:
+      - items
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/Thing'
+        next_cursor:
+          type: string
+    ThingCreatedPayload:
+      type: object
+      required:
+      - thing
+      properties:
+        thing:
+          $ref: '#/components/schemas/Thing'
+    ThingCreatedEvent:
+      type: object
+      required:
+      - type
+      - d
+      properties:
+        type:
+          type: string
+          enum:
+          - thing.created
+        d:
+          $ref: '#/components/schemas/ThingCreatedPayload'
+    ThingRenamedEvent:
+      type: object
+      description: Gateway event that no path references; the check compares it as well.
+      required:
+      - type
+      - thing_id
+      properties:
+        type:
+          type: string
+          enum:
+          - thing.renamed
+        thing_id:
+          type: string
+        old_name:
+          type: string
+    Event:
+      oneOf:
+      - $ref: '#/components/schemas/ThingCreatedEvent'
+      - $ref: '#/components/schemas/ThingRenamedEvent'
+      discriminator:
+        propertyName: type
+        mapping:
+          thing.created: '#/components/schemas/ThingCreatedEvent'
+          thing.renamed: '#/components/schemas/ThingRenamedEvent'
+    Problem:
+      type: object
+      required:
+      - code
+      properties:
+        code:
+          type: string
+      x-problem-codes:
+      - code: conflict
+        status: 409
+        title: Conflict

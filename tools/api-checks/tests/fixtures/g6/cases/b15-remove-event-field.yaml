@@ -1,0 +1,5 @@
+# 06 13 row 1: remove a field of an event that no path references.
+patch:
+- {op: delete, path: /components/schemas/ThingRenamedEvent/properties/old_name}
+expect:
+- [removed, components/schemas/ThingRenamedEvent/properties/old_name]

@@ -1,0 +1,15 @@
+# 06 13 additive: a new endpoint.
+patch:
+- op: set
+  path: /paths/~1things~1{thing_id}~1archive
+  value:
+    post:
+      operationId: archiveThing
+      x-authz-action: thing.update
+      x-rate-limit-class: rl.write
+      x-idempotency-exempt: naturally_idempotent
+      parameters:
+      - {name: thing_id, in: path, required: true, schema: {type: string}}
+      responses:
+        '204': {description: Archived.}
+expect: []

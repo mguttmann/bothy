@@ -1,0 +1,7 @@
+# 06 13 row 1: remove an event type from the event union.
+patch:
+- {op: delete, path: /components/schemas/Event/oneOf/1}
+- {op: delete, path: /components/schemas/Event/discriminator/mapping/thing.renamed}
+expect:
+- [removed, components/schemas/Event/discriminator/mapping/thing.renamed]
+- [removed, components/schemas/Event/oneOf]

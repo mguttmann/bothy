@@ -1,0 +1,7 @@
+# 06 13 row 2: a new required query parameter.
+patch:
+- op: append
+  path: /paths/~1things/get/parameters
+  value: {name: owner, in: query, required: true, schema: {type: string}}
+expect:
+- [required, GET /things parameter query owner]

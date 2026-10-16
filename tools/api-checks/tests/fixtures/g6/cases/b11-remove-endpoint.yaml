@@ -1,0 +1,5 @@
+# 06 13 row 1: remove an endpoint.
+patch:
+- {op: delete, path: "/paths/~1things~1{thing_id}/get"}
+expect:
+- [removed, "GET /things/{thing_id}"]

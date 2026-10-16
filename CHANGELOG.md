@@ -59,6 +59,14 @@ Planning stage (milestone M0). Nothing is installable yet.
   banners; view models with `unknown` members, texts in German and English, a golden matrix in
   light and dark, three densities, text scale 1 and 2, de and en, and guideline tests for contrast,
   tap targets and labels (M4-07).
+- API breaking change check (gate G6 of chapter 06): `make api-breaking`, part of `make check`
+  when the server component is selected, compares `docs/api/openapi.yaml` and its frame and event
+  schemas with the document of the newest stable `server/v*` tag and fails on every breaking row of
+  06 section 13 (removed or renamed parts, newly required request fields and parameters, type and
+  format changes, removed enum values, changed status codes, sort order, pagination and
+  idempotency changes, a changed `x-authz-action`); a major step of `info.version` accepts a
+  break, and without a tag the gate passes with a notice. Own comparison instead of oasdiff, which
+  missed rows on this document (M7-11).
 - Design tokens: `tools/design-tokens` writes `design/build/ts/tokens.gen.ts` for the Grafana
   panel plugin (colour roles of both themes including the chart and state roles, font families,
   font sizes and radii as typed constants) and copies the vendored Atkinson Hyperlegible fonts

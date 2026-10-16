@@ -1,0 +1,5 @@
+# 06 13 row 2: an optional request field becomes required.
+patch:
+- {op: append, path: /components/schemas/ThingCreate/required, value: note}
+expect:
+- [required, components/schemas/ThingCreate/properties/note]

@@ -581,10 +581,20 @@ Wunsch je Abo. Zustellung, Wiederholung, Prüfung beim Empfänger und Eingangs-W
    Stores und selbst gehostete Server werden nicht gleichzeitig aktualisiert.
 6. **Ausnahme Sicherheit.** Eine Sicherheitslücke darf Verhalten sofort ändern; das steht im
    Sicherheitshinweis und im Changelog.
-7. **Prüfung.** Das Gate vergleicht die Spec mit der zuletzt veröffentlichten Fassung (G6). oasdiff
-   (Apache-2.0) erkennt Brüche; seine OpenAPI-3.1-Unterstützung ist nur als Beta-Stand zu sehen
-   [vermutet, Q8]. Ob es mit dieser Spec arbeitet, klärt Ticket B-6; bis dahin prüft das Review die
-   Tabelle oben.
+7. **Check (G6, as built by M7-11).** `make api-breaking` compares `docs/api/openapi.yaml` of the
+   working tree, including the frame and event schemas in its `components.schemas`, with the same
+   file of the base tag and fails on every row of the right column of the table above. The base is
+   the newest stable tag `server/vX.Y.Z` merged into `HEAD`, read with `git show`; a pre-release tag
+   (`-beta.N`) is the base only while no stable tag exists; without any tag the gate passes with a
+   notice. A break passes only when `info.version` raised its major version against the base
+   (items 4 and 5); nothing else lowers the gate. The tool is the own comparison
+   `tools/api-checks/breaking.py` over the parsed YAML, not oasdiff: oasdiff 1.33.0 parses this
+   OpenAPI 3.1 document, but reported neither a removed field of an event schema that no path
+   references nor a changed `x-authz-action`, and a removed parameter only as a warning [verified,
+   own probe 2026-10-15, Q8]. Not detectable from the document and left to the review: a changed
+   meaning or sort order that only a description states, and changes to `asyncapi.yaml` itself
+   (channels, operations, messages); `asyncapi.yaml` only gives the gateway schemas their direction
+   (docs/DECISIONS.md D-M7-11-1 to D-M7-11-3).
 
 ## 14. Codegenerierung
 
@@ -633,7 +643,7 @@ Wunsch je Abo. Zustellung, Wiederholung, Prüfung beim Empfänger und Eingangs-W
 | G3 | Erzeugte Tabellen dieses Kapitels `api-tables` | `tools/api-checks` (M1-03), `make api-tables` | Blöcke der Abschnitte 5, 7, 16 und 17 und `webhook_events` in webhooks.md entsprechen den YAML-Dateien |
 | G4 | Codegenerierung | vier Generatoren aus Abschnitt 14 | erzeugen, kompilieren, keine Abweichung zum eingecheckten Code |
 | G5 | Toleranz-Test | je SDK ein Test mit Fixture (shared fixtures in `sdk/testdata/tolerance/`) | an unknown field is ignored, an unknown enum value is kept as its raw value (Dart: the generated unknown default case), an event of unknown type is skipped while the cursor still advances, a received `null` counts as an absent field; all without an error |
-| G6 | Bruch-Prüfung gegen die letzte Veröffentlichung | oasdiff, falls Ticket B-6 es belegt | Tabelle in Abschnitt 13 |
+| G6 | Breaking change check against the last release | `tools/api-checks/breaking.py` (`make api-breaking`; oasdiff missed rows, 13.7) | every row of the right column of the table in section 13, against the newest stable tag `server/v*` (13.7); a major step of `info.version` accepts a break |
 | G7 | Eigenschaftsbasierte Tests gegen den laufenden Server | Schemathesis gegen den Server aus dem Arbeitsbaum mit Wegwerf-PostgreSQL (`make contract-test`); den Compose-Stack prüft der Rauchtest (`make portability`) | Statuscodes, Medientypen, Antwort-Schemas und Kopfzeilen jeder Op; zustandsbehaftete Folgen über die Links, die Schemathesis ableitet (die Spec hat keine `links`; leitet die gepinnte Version keine Übergänge ab, gilt dieser Teil als nicht bewiesen); eigene Prüfungen: Problem-Format, `Correlation-Id`, kein `null`, 404-Gleichheit für fremde und fehlende IDs |
 | G8 | Antwort-Validierung in Integrationstests | Middleware im Test-Build | jede Antwort jedes Integrationstests passt zur Spec |
 | G9 | Gateway-Rahmen | Integrationstests mit Mitschnitt | jeder gesendete Rahmen passt zu seinem Schema; Register von Ops und Ereignistypen gleich 05 (05, Abschnitt 9) |
@@ -1324,7 +1334,7 @@ Alle abgerufen am 2026-10-10.
 | Q5 | https://datatracker.ietf.org/doc/draft-ietf-httpapi-ratelimit-headers/ | Entwurf -11 (Mai 2026), Felder `RateLimit-Policy` und `RateLimit` | [belegt] |
 | Q6 | https://github.com/OpenAPITools/openapi-generator | Version 7.26.0, Apache-2.0; OpenAPI 3.1 "beta support" (auch als Warnung der Generator-Ausgabe in der eigenen Probe) | [belegt] |
 | Q7 | https://www.rfc-editor.org/rfc/rfc9745.html | `Deprecation` als Structured-Field-Datum, `Sunset` nicht früher, Link-Relation `deprecation` | [belegt] |
-| Q8 | https://github.com/oasdiff/oasdiff | Lizenz Apache-2.0; OpenAPI-3.1-Arbeit nur als Beta-Stände sichtbar | [vermutet] |
+| Q8 | https://github.com/oasdiff/oasdiff | License Apache-2.0; release 1.33.0 parses this OpenAPI 3.1 document; own probe on 2026-10-15: no finding for a removed field of an event schema without a path and for a changed `x-authz-action`, a removed parameter only as a warning | [verified] |
 | Q9 | https://www.rfc-editor.org/rfc/rfc9110.html | `If-Match` scheitert: `412`; `Retry-After` | [belegt] |
 | Q10 | https://datatracker.ietf.org/doc/draft-ietf-httpapi-idempotency-key-header/ | Entwurf -07 abgelaufen; Kopfzeile `Idempotency-Key` als verbreitetes Muster | [belegt] |
 | Q11 | https://github.com/schemathesis/schemathesis | MIT, zustandsbehaftete Tests über abgeleitete Links, eigene Anmelde-Logik | [belegt] |

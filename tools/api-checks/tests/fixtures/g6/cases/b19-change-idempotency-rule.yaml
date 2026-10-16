@@ -1,0 +1,5 @@
+# 06 13 row 6: the idempotency rule of an operation changes.
+patch:
+- {op: delete, path: "/paths/~1things~1{thing_id}~1history/delete/x-idempotency-exempt"}
+expect:
+- [op-rule, "DELETE /things/{thing_id}/history"]

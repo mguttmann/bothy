@@ -1,0 +1,5 @@
+# 06 13 additive: a new header and a response for a new situation.
+patch:
+- {op: set, path: "/paths/~1things~1{thing_id}/get/responses/200/headers", value: {ETag: {schema: {type: string}}}}
+- {op: set, path: "/paths/~1things~1{thing_id}/get/responses/404", value: {description: Not found.}}
+expect: []
