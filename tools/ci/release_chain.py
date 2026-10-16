@@ -370,7 +370,7 @@ def verify(
         if not key.is_file():
             raise ChainError(
                 f"public key {key} is missing: the key pair of the private phase is an owner "
-                "step (docs/operations/release.md section 2.2)"
+                "step (docs/operations/release.md section 2.4)"
             )
         args = ["--key", str(key), "--insecure-ignore-tlog"]
     elif mode == "public":
