@@ -37,11 +37,20 @@ Rules:
 1. Every component has a file `VERSION` (one line, SemVer without `v`) and a `CHANGELOG.md` in
    its directory. The repo structure defines the directories (team H).
 2. Tags are named `<prefix>v<SemVer>`, for example `server/v1.2.3`; the prefix is a rule of this
-   repository. For a module in a subdirectory, Go requires the directory as the prefix
-   (`services/server/v1.2.3`) and, from major version 2 on, a module path ending in `/v2`, only if
-   the module is loaded as a dependency (https://go.dev/ref/mod, section "Module paths", retrieved
-   2026-10-10) [verified]. The server module is a main module that is never loaded (PLAN P-05);
-   therefore neither applies to it. Tags are signed.
+   repository. The Go modules reference states two rules without a condition: a module in a
+   subdirectory of its repository has tags prefixed with that subdirectory ("each tag name must
+   be prefixed with the module subdirectory, followed by a slash", here
+   `services/server/v1.2.3`), and from major version 2 on "the module path must end with a
+   major version suffix like `/v2`". It names their purpose in the same section: "If a module
+   might be depended on by other modules, these rules must be followed so that the go command
+   can find and download the module", and "A module that will never be fetched as a dependency
+   of any other module may use any valid package path for its module path"
+   (https://go.dev/ref/mod, sections "Module paths" and "Mapping versions to commits", retrieved
+   2026-10-15) [verified]. The server module `github.com/OWNER/bothy/services/server` is a main
+   module that no other module requires (PLAN P-05): the go command never maps one of its
+   versions to a tag, and the version of the binary comes from `VERSION` (rule 5), not from a
+   tag. So neither rule takes effect, and `server/vX.Y.Z` stays (docs/DECISIONS.md D-M7-10-4).
+   Tags are signed.
 3. Should the server module ever become usable as a dependency, that is a separate decision
    (tag form and `/v2` path according to the Go rule).
 4. The file `VERSION` and the tag match; a gate check verifies this.
@@ -171,7 +180,7 @@ Rules:
 
 | Step | Tool | Result |
 |---|---|---|
-| SBOM | Syft (via anchore/sbom-action) | SPDX JSON and CycloneDX JSON per image and binary, attached to the release |
+| SBOM | Syft (server: the pinned binary through `tools/ci/release_chain.py sbom`; other components: anchore/sbom-action until their release tickets) | SPDX JSON and CycloneDX JSON per image and platform and per binary, attached to the release |
 | Signing images | public: cosign keyless (Fulcio, Rekor), identity = release workflow; private: cosign key pair without a transparency log ([ADR 0062](../adr/0062-release-signatures-while-the-repo-is-private.md)) | signature per digest |
 | Signing files | cosign `sign-blob` with a bundle, same procedure as for the images | `*.sigstore.json` next to every file |
 | Provenance | `actions/attest` (SLSA Build Provenance) | attestation in the repository |
@@ -198,13 +207,70 @@ gh attestation verify oci://ghcr.io/<owner>/bothy-server@sha256:<digest> --repo 
 The issuer `https://token.actions.githubusercontent.com` is not confirmed in the sources read
 [assumed]; the release ticket checks it at the first real release.
 
+### 6.1 Server release chain (as built by M7-10)
+
+`release.yml` runs these steps for a tag `server/vX.Y.Z`, in this order; the steps after the
+image builds are commands of `tools/ci/release_chain.py`, which `make release-trial` runs the
+same way against a local registry (section 6.2):
+
+1. `resolve`: `tools/ci/components.py release` rejects the tag if `services/server/VERSION`
+   differs from it or `services/server/CHANGELOG.md` has no section `[X.Y.Z]`; nothing is built
+   then. The full gate (`ci.yml`) follows.
+2. `build`: the binaries `bothy_<version>_linux_amd64` and `..._linux_arm64` from
+   `make -C services/server release-build`, and `bothy-server` for both platforms in one build
+   (it cross compiles), pushed by digest without a tag. `postgres-build-amd64` and
+   `postgres-build-arm64`: `bothy-postgres` per platform on a native runner (`ubuntu-24.04`,
+   `ubuntu-24.04-arm`), pushed by digest, each passing the id of its digest artifact.
+   `scancode`: ScanCode over the tracked tree with the license gate (`make scancode`,
+   [licenses.md](../quality/licenses.md) section 4); its report is a release artifact.
+3. `supply-chain` (environment `release`, after `scancode`): join the two `bothy-postgres`
+   digests into one multi-arch index (by digest, no tag); vulnerability scan of both images
+   (`make trivy-image`); SBOMs; signatures of both image digests, both binaries and
+   `SHA256SUMS` (computed over every file of the release except the signature bundles), with a
+   `.sigstore.json` bundle each; a missing SBOM stops this step before the first signature. In
+   the private phase every bundle is checked to carry no transparency log entry. Then the
+   verification of section 6 or 6.2 against the result, and only then the version tags
+   `bothy-server:X.Y.Z` and `bothy-postgres:pg18-X.Y.Z`.
+4. `publish`: the GitHub release with the binaries, SBOMs, signature bundles, `images.txt`
+   (name and digest per image), `SHA256SUMS` and the ScanCode report; Build Provenance only in
+   the public phase.
+
+Signing paths ([ADR 0062](../adr/0062-release-signatures-while-the-repo-is-private.md)): in
+the private phase cosign signs with the key pair whose private key and password are the
+secrets `COSIGN_PRIVATE_KEY` and `COSIGN_PASSWORD` of the environment `release`, and with a
+signing configuration from `cosign signing-config create --no-default-rekor
+--no-default-fulcio --no-default-tsa --no-default-oidc`; the public key is
+`quality/release/cosign-private-phase.pub`. In the public phase (`github.event.repository.visibility`)
+cosign signs keyless with the workflow identity, and `actions/attest` adds Build Provenance per
+image digest. `tools/ci/check_runners.py` (rule `signing-outside-release`) rejects a signing
+step in a job without `environment: release`.
+
+### 6.2 Trial release
+
+`make release-trial COMPONENT=server` (docs/DECISIONS.md D-W-127, D-M7-10-1) runs the steps of
+6.1 on the build host against throwaway local targets: a registry container pinned by digest
+on `127.0.0.1` with a random port, a cosign key pair generated for the run, the signing
+configuration of the private phase, SBOMs, `SHA256SUMS` and its signature in a temporary
+directory, then `cosign verify --key`, `cosign verify-blob` and `sha256sum --check`, the
+version tags, and a check that every image `infra/compose/compose.yaml` names with
+`${BOTHY_VERSION}` exists under that version with the signed digest. Three probes must fail: a
+changed file against `SHA256SUMS`, an unsigned digest against `cosign verify`, a release without
+one SBOM against the signing step. It never pushes to another registry, never tags the
+repository or creates a release, and refuses to run when `GITHUB_ACTIONS` is set. Vulnerability
+scan and ScanCode are separate targets and not part of the trial. Not proven by the trial:
+the keyless path and the attestations of the public phase, and a push to `ghcr.io`; both run
+first with the owner's first tag.
+
 ## 7. Server images
 
 1. Platforms linux/amd64 and linux/arm64, as one multi-arch manifest (B12).
 2. Never built via emulation: `bothy-server` compiles the Go binary in the builder step on the
    build platform for the target architecture (without cgo, `--platform=$BUILDPLATFORM`); images
    with steps that must run on the target architecture (`bothy-postgres`) are built per
-   architecture on their own runner.
+   architecture on their own runner. In `release.yml` `bothy-postgres` is built per architecture
+   on a native runner and pushed by digest; the release joins both digests into one multi-arch
+   index (section 6.1). Images are pushed by digest only; the version tag comes last, after the
+   vulnerability scan, ScanCode, SBOMs, signatures and verification.
 3. `bothy-server` is a static Go binary (without cgo) on a minimal base image without a
    shell. It runs as an unprivileged user with uid and gid `65532`; `bothy secrets init`
    sets this owner for the secrets of `server` and `migrate` (16, section 5.3), and
@@ -214,7 +280,7 @@ The issuer `https://token.actions.githubusercontent.com` is not confirmed in the
 4. `bothy-postgres` builds on the official `postgres:18` image and contains pgBackRest from
    2.59.3 on and `bothy-backupd` ([16-operations.md](16-operations.md) 8). Its tag is
    `pg18-<version>` with the server version, as `infra/compose/compose.yaml` names it
-   (section 2.1).
+   (section 2.1); the tag of `bothy-server` is `<version>`.
 5. Base images are pinned by digest; Renovate keeps them current; a check in the gate rejects every
    `FROM` without a digest (SEC-SC-4).
 6. Labels according to OCI (`org.opencontainers.image.source`, `.version`, `.revision`, `.licenses`);

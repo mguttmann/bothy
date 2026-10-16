@@ -37,15 +37,27 @@ by a product release; existing installations raise `BOTHY_VERSION` themselves
 
 ### 2.1 Server
 
-1. `make release-prep COMPONENT=server [CHANNEL=beta]` sets `VERSION` and closes the
-   changelog section ([ADR 0060](../adr/0060-release-automation-in-the-monorepo.md)); commit
-   on a branch, pull request to `main` ([push-discipline.md](../quality/push-discipline.md)).
-2. After the merge, set the signed tag on the squash commit on `main`: `server/vX.Y.Z`
-   (beta: `server/vX.Y.Z-beta.N`).
-3. The release pipeline builds per architecture, creates the multi-arch manifest, SBOMs, signatures,
-   checksums and (in the public repository) the attestation, and publishes to `ghcr.io`.
-4. Check like an instance operator (section 5).
-5. Beta: to `staging`; stable: mark the release as "latest release", inform the instance operators.
+1. Once before the first tag of the private phase (owner step): create the key pair of the
+   private phase (section 2.4), commit its public key as
+   `quality/release/cosign-private-phase.pub`, and store the private key and its password as the
+   secrets `COSIGN_PRIVATE_KEY` and `COSIGN_PASSWORD` of the environment `release`.
+2. `make release-prep COMPONENT=server [CHANNEL=beta]` writes `services/server/VERSION`, renames
+   the section "Unreleased" of `services/server/CHANGELOG.md` to `[X.Y.Z] - <date>` and prints
+   the commits without a changelog entry as a checklist
+   ([ADR 0060](../adr/0060-release-automation-in-the-monorepo.md)); review the section, add the
+   mandatory parts of the release notes ([18-release.md](../spec/18-release.md) 4), commit
+   `chore(release): server vX.Y.Z` and land it through a pull request.
+3. `make release-trial COMPONENT=server` on the build host (section 2.3) with the release
+   commit; it must pass.
+4. Signed tag on the squash commit on `main`: `git tag -s server/vX.Y.Z <commit>` (beta:
+   `server/vX.Y.Z-beta.N`), then push the tag.
+5. `release.yml` resolves the tag (VERSION and changelog section), runs the gates, builds the
+   binaries and both images by digest, scans the tree with ScanCode, joins, scans, writes the
+   SBOMs, signs, verifies and only then sets the version tags; `publish` creates the release
+   with binaries, SBOMs, signature bundles, `images.txt`, `SHA256SUMS` and the ScanCode report
+   ([18-release.md](../spec/18-release.md) 6.1).
+6. Check like an instance operator (section 5).
+7. Beta: to `staging`; stable: mark the release as "latest release", inform the operators.
 
 ### 2.2 Product (component `bothy`)
 
@@ -72,6 +84,36 @@ by a product release; existing installations raise `BOTHY_VERSION` themselves
 5. After `publish`, `release.yml` starts the portability test with the tag
    ([16-operations.md](../spec/16-operations.md) 11.1); it must be green. Then check like an
    instance operator (section 5).
+
+### 2.3 Trial release
+
+```
+make release-trial COMPONENT=server [TRIAL_PLATFORMS=linux/amd64,linux/arm64]
+```
+
+Runs on the build host with Docker and buildx, never under GitHub Actions (the target refuses
+when `GITHUB_ACTIONS` is set). It starts a registry container pinned by digest on `127.0.0.1`
+with a random port, builds the binaries and both images for both platforms (no emulation: both
+Dockerfiles build the target platform on the build platform), pushes them by digest, joins
+`bothy-postgres`, generates a cosign key pair for this run only, writes SBOMs, signs with the
+signing configuration of the private phase, writes and signs `SHA256SUMS`, verifies with the
+commands of section 5 (private phase), sets the version tags, checks the images that
+`infra/compose/compose.yaml` pulls, and runs three probes that must fail (changed file, unsigned
+digest, missing SBOM). It prints the digests and `SHA256SUMS`. The registry, the buildx builder,
+the key pair and the temporary directory are removed at the end, also after a failure. It needs
+no account and costs nothing ([18-release.md](../spec/18-release.md) 6.2).
+
+### 2.4 Key pair of the private phase (owner)
+
+```
+COSIGN_PASSWORD='<new password>' cosign generate-key-pair
+mv cosign.pub quality/release/cosign-private-phase.pub
+```
+
+with the pinned cosign (`uv run --project tools --locked python tools/bin/fetch_tools.py path
+cosign`). Store the content of `cosign.key` as the secret `COSIGN_PRIVATE_KEY` and the password
+as `COSIGN_PASSWORD` of the environment `release`, then delete `cosign.key` locally. A release
+without the public key file stops at the verification, before any tag.
 
 ## 3. SDKs and adapters
 
@@ -100,21 +142,42 @@ crash reports is configured) and no open bugs of severity critical.
 
 ## 5. Check like an instance operator
 
+Download the release assets of the tag into one directory (`gh release download server/vX.Y.Z`),
+take the digests from `images.txt`, and run the commands of the current phase. Every command
+must succeed; `sha256sum --check` lists every file with `OK`.
+
+Private phase ([ADR 0062](../adr/0062-release-signatures-while-the-repo-is-private.md),
+cosign 3.1.3, key pair without a transparency log, so `--insecure-ignore-tlog`):
+
+```
+cosign verify --key quality/release/cosign-private-phase.pub --insecure-ignore-tlog \
+  ghcr.io/<owner>/bothy-server@sha256:<digest>
+cosign verify --key quality/release/cosign-private-phase.pub --insecure-ignore-tlog \
+  ghcr.io/<owner>/bothy-postgres@sha256:<digest>
+cosign verify-blob --key quality/release/cosign-private-phase.pub --insecure-ignore-tlog \
+  --bundle SHA256SUMS.sigstore.json SHA256SUMS
+cosign verify-blob --key quality/release/cosign-private-phase.pub --insecure-ignore-tlog \
+  --bundle bothy_X.Y.Z_linux_amd64.sigstore.json bothy_X.Y.Z_linux_amd64
+sha256sum --check --strict SHA256SUMS
+```
+
+Public phase (keyless with the identity of the release workflow, plus attestations):
+
 ```
 cosign verify ghcr.io/<owner>/bothy-server@sha256:<digest> \
-  --certificate-identity-regexp '^https://github.com/<owner>/bothy/.github/workflows/release.yml@refs/tags/server/v' \
+  --certificate-identity-regexp '^https://github\.com/<owner>/bothy/\.github/workflows/release\.yml@refs/tags/server/v' \
   --certificate-oidc-issuer https://token.actions.githubusercontent.com
 gh attestation verify oci://ghcr.io/<owner>/bothy-server@sha256:<digest> --repo <owner>/bothy
 cosign verify-blob SHA256SUMS --bundle SHA256SUMS.sigstore.json \
-  --certificate-identity-regexp '^https://github.com/<owner>/bothy/' \
+  --certificate-identity-regexp '^https://github\.com/<owner>/bothy/\.github/workflows/release\.yml@refs/tags/server/v' \
   --certificate-oidc-issuer https://token.actions.githubusercontent.com
-sha256sum --check SHA256SUMS
+sha256sum --check --strict SHA256SUMS
 ```
 
-These commands apply in the public state (keyless). In the private state, the instance operator
-checks with the public key from the repository (`cosign verify --key`, without a transparency log;
-the exact command for the pinned cosign version will be here after M7-10, [ADR 0062](../adr/0062-release-signatures-while-the-repo-is-private.md)). The
-release workflow is `.github/workflows/release.yml`.
+The same for `bothy-postgres` and each binary. The public path and the attestations run first
+with the owner's first public release; the trial release proves the private path only. The
+release workflow is `.github/workflows/release.yml`; the commands of both phases are those of
+`tools/ci/release_chain.py verify`.
 
 ## 6. Recall
 

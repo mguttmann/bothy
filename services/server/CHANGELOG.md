@@ -11,6 +11,13 @@ documented in this file. The format is based on
 
 ### Added
 
+- Release chain (M7-10): `make -C services/server release-build VERSION=<v> OUT=<dir>` builds the
+  static binaries `bothy_<v>_linux_amd64` and `bothy_<v>_linux_arm64`. A tag `server/vX.Y.Z`
+  publishes `bothy-server:X.Y.Z` and `bothy-postgres:pg18-X.Y.Z` (multi-arch, built without
+  emulation) only after the vulnerability scan, ScanCode, SBOMs (SPDX and CycloneDX per image
+  platform and binary), signatures of every digest, binary and `SHA256SUMS`, and their
+  verification; `make release-trial COMPONENT=server` runs the same steps locally.
+  `docs/operations/release.md` section 5 names the verification commands of both phases.
 - CDN fetch of the import tool (M8-02): `discord.Fetcher` loads one Discord attachment with
   `GET` only when the link is `https` on a host of `import.discord.cdn_hosts` (exact match, port
   `443` unless the entry names one), without token or cookie, without redirects or an

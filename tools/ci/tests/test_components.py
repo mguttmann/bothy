@@ -65,7 +65,21 @@ def _repo_with_version(tmp_path: Path, rel: str, version: str) -> Path:
     path = tmp_path / rel
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(version + "\n")
+    (path.parent / "CHANGELOG.md").write_text(
+        f"# Changelog\n\n## [Unreleased]\n\n## [{version}] - 2026-10-15\n\n- Entry.\n"
+    )
     return tmp_path
+
+
+def test_release_rejects_a_missing_changelog_section(tmp_path: Path) -> None:
+    repo = _repo_with_version(tmp_path, "services/server/VERSION", "1.4.0")
+    changelog = repo / "services/server/CHANGELOG.md"
+    changelog.write_text("# Changelog\n\n## [Unreleased]\n\n- Entry.\n\n## [1.4.0-beta.1]\n")
+    with pytest.raises(components.ReleaseError, match=r"no section \[1\.4\.0\]"):
+        components.release_info("server/v1.4.0", repo)
+    changelog.unlink()
+    with pytest.raises(components.ReleaseError, match=r"CHANGELOG\.md is missing"):
+        components.release_info("server/v1.4.0", repo)
 
 
 def test_release_resolves_component_tag(tmp_path: Path) -> None:

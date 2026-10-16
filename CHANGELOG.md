@@ -25,6 +25,17 @@ operated, and the order of the build.
 
 ### Added
 
+- Release chain of the server (M7-10): `make release-prep COMPONENT=<name> [CHANNEL=beta]`
+  computes the next version per component from its Conventional Commits (git-cliff, `cliff.toml`),
+  renames the changelog section and writes `VERSION`; `make release-trial COMPONENT=server`
+  proves the chain on the build host against a local registry with a throwaway key pair
+  (build, SBOMs, signatures, `SHA256SUMS`, `cosign verify`, `sha256sum --check`, version tags);
+  `make scancode` scans the tracked tree with ScanCode and a license gate. `release.yml` builds
+  `bothy-postgres` per architecture, joins it, scans, runs ScanCode, writes SBOMs, signs every
+  digest, binary and `SHA256SUMS` (key pair in the private phase, keyless in the public phase),
+  verifies and only then tags. cosign, syft and git-cliff are pinned; `check_runners.py` rejects
+  signing steps outside the environment `release`; a tag without a changelog section stops in
+  `resolve`.
 - One Dart pub workspace at the repository root (`pubspec.yaml`, one `pubspec.lock`) with the
   fourteen members of docs/spec/15-client-architecture.md 3: the apps `apps/client` and
   `apps/console` and the packages under `packages/` as skeletons, `bothy_noise` taken over;

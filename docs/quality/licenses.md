@@ -57,13 +57,24 @@ planning basis names River (MPL-2.0) for background jobs.
    never as a blanket rule for all packages.
 4. Before every release and before going public: ScanCode over the whole tree
    (license texts and copyright notices in files), result in the release record. ScanCode
-   is not a pull request gate, because a run over the whole tree takes a long time; the
-   procedure is a ticket of the release milestone.
+   is not a pull request gate, because a run over the whole tree takes a long time. As built
+   (M7-10): `make scancode` scans the tracked tree (`git archive HEAD`) with ScanCode Toolkit
+   32.5.0 in a container built from `tools/scancode/Dockerfile` (base image pinned by digest,
+   release archive by sha256; linux/amd64 only, emulated on arm64 hosts), writes
+   `scancode.json` and runs `tools/ci/scancode_policy.py`: every file whose detected license
+   expression the list above does not satisfy (`OR` needs one allowed side, `AND` both,
+   `WITH` its license; `LicenseRef-*` never) and every file ScanCode could not scan is a
+   finding, except paths listed with a reason in `quality/licenses/scancode-exceptions.txt`
+   (text that names or quotes a license without licensing the file). In `release.yml` the job
+   `scancode` runs it for every server tag; a finding stops the release before any image tag,
+   and the report is attached to the release.
 
 ## SBOM and checking releases
 
 * Every release contains `sbom.spdx.json` (SPDX, generated with Syft via
-  `anchore/sbom-action`) and `SHA256SUMS`.
+  `anchore/sbom-action`) and `SHA256SUMS`. Server releases (M7-10) instead carry SPDX and
+  CycloneDX SBOMs per image platform and per binary from the pinned Syft, signature bundles and
+  a signed `SHA256SUMS` ([18-release.md](../spec/18-release.md) 6.1).
 * Server images carry provenance and SBOM as an attestation in the registry entry
   (Buildx, `provenance: mode=max`, `sbom: true`).
 * In addition, signed build provenance and SBOM attestation via GitHub Artifact

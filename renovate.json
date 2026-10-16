@@ -162,6 +162,12 @@
       "matchStrings": [
         "// renovate: datasource=(?<datasource>\\S+) depName=(?<depName>\\S+)\\nconst Image = \"[^:\"]+:(?<currentValue>[^@\"]+)@(?<currentDigest>sha256:[0-9a-f]{64})\""
       ]
+    },
+    {
+      "customType": "regex",
+      "description": "Registry image of the trial release (tools/ci/release_trial.py), pinned by digest",
+      "managerFilePatterns": ["/^tools/ci/release_trial\\.py$/"],
+      "matchStrings": ["# renovate: datasource=(?<datasource>\\S+) depName=(?<depName>\\S+)\\nREGISTRY_IMAGE = \\(\\n\\s+\"[^:\"]+:(?<currentValue>[^@\"]+)@(?<currentDigest>sha256:[0-9a-f]{64})\""]
     }
   ]
 }
