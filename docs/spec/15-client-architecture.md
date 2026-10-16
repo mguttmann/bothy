@@ -345,13 +345,22 @@ stateDiagram-v2
   Live --> SignedOut: 4012 revoked
   Identifying --> UpdateRequired: 4007
   Identifying --> Offline: 4018 forbidden
+  Identifying --> Offline: 4016 device_pending
+  Live --> Offline: 4017 device_replaced
+  Identifying --> Backoff: 4008 rate_limited, wait retry_after
+  Offline --> Connecting: device active (4016), foreground or user action (4017), user action (4018)
   SignedOut --> [*]
   UpdateRequired --> [*]
 ```
 
 `4004`: the app renews the access token and reconnects; if the refresh fails, it logs out.
 `4018`: the app shows the reason and reconnects only on user action; a new token does not help.
+`4016`: the device waits for approval; the app polls `GET /api/v1/devices/{id}` (`LoginService.pollPendingDevice`) and reconnects when the device is `active`.
+`4017`: a newer connection of the same device is active; the app reconnects only on the return to the foreground or on user action.
+`4008`: the app waits the seconds of `retry_after=<seconds>` in the close reason instead of the jitter; without a readable value the normal backoff applies.
 `4006`: the app connects with `identify` instead of `resume`.
+
+Every state carries a reason beside its phase (`ConnectionState(phase, reason)` of `sync_engine`): `none`, `networkUnavailable`, `devicePending`, `deviceReplaced`, `forbidden`, `rateLimited`, `revoked`, `protocolUnsupported` or `closedByServer(code)`; the interface explains `Offline` and `Backoff` with it. `Offline` with `networkUnavailable` connects when the network returns. The close reactions are one table in code (`closeCodeTable`, docs/DECISIONS.md D-M4-13-2).
 
 `Suspended`: on iOS there is no WebSocket in the background; the app closes with `1000` and
 reconnects in the foreground with `resume` (Apple DTS in the forum: "WebSocket tasks are not supported in
