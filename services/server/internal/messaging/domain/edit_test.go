@@ -157,3 +157,14 @@ func TestRedactPayload(t *testing.T) {
 		}
 	}
 }
+
+// TestUnchangedMentionSets: the same number of mentions with another member is a change.
+func TestUnchangedMentionSets(t *testing.T) {
+	a, b, c := ids.New(), ids.New(), ids.New()
+	if domain.Unchanged("x", []ids.ID{a, b}, "x", []ids.ID{a, c}) {
+		t.Error("another mention set counted as unchanged")
+	}
+	if !domain.Unchanged("x", []ids.ID{a, b}, "x", []ids.ID{b, a}) {
+		t.Error("the same mention set in another order counted as a change")
+	}
+}

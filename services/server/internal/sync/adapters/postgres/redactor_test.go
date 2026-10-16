@@ -223,3 +223,25 @@ func TestEnvelope_RedactedFlag(t *testing.T) {
 		}
 	}
 }
+
+// TestRedactor_Refusals: outside a unit of work Redact fails, an error of the redaction function
+// and a result that is no JSON object fail the unit, and a resource without events is 0.
+func TestRedactor_Refusals(t *testing.T) {
+	t.Parallel()
+	e := newEnv(t, envOptions{})
+	msg := ids.New()
+	r := redactEnv(t, e, msg)
+	if _, err := r.Redact(context.Background(), "message", msg, constant(new([]string), `{}`)); err == nil {
+		t.Error("Redact outside a unit of work passed")
+	}
+	fail := errors.New("redaction refused")
+	if _, err := redact(e, r, msg, func(string, int, json.RawMessage) (json.RawMessage, error) { return nil, fail }); !errors.Is(err, fail) {
+		t.Errorf("failing redaction = %v", err)
+	}
+	if _, err := redact(e, r, msg, constant(new([]string), `[]`)); err == nil {
+		t.Error("a redacted payload that is no object passed")
+	}
+	if n, err := redact(e, r, ids.New(), constant(new([]string), `{}`)); err != nil || n != 0 {
+		t.Errorf("unknown resource = %d, %v", n, err)
+	}
+}
