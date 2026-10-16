@@ -19,6 +19,7 @@ import (
 	"os"
 	"strconv"
 	"strings"
+	"sync"
 	"sync/atomic"
 	"testing"
 	"time"
@@ -940,11 +941,16 @@ func TestRedirectWithInvalidLocation(t *testing.T) {
 
 func TestCloseIdleConnectionsReachesTheTransport(t *testing.T) {
 	t.Parallel()
+	// Only connections that carried a request count: a parallel test may dial a port this server
+	// reused (its stale connection never sends a request), which StateNew would count too.
 	var conns atomic.Int64
+	var seen sync.Map
 	srv := httptest.NewUnstartedServer(http.HandlerFunc(ok))
-	srv.Config.ConnState = func(_ net.Conn, state http.ConnState) {
-		if state == http.StateNew {
-			conns.Add(1)
+	srv.Config.ConnState = func(c net.Conn, state http.ConnState) {
+		if state == http.StateActive {
+			if _, loaded := seen.LoadOrStore(c, true); !loaded {
+				conns.Add(1)
+			}
 		}
 	}
 	srv.Start()
