@@ -94,3 +94,12 @@ WHERE id = @id AND message_count > 0;
 -- Every thread of the channels, ascending: the targets of the cleanup of notification
 -- preferences when a channel or space is archived (M3-18).
 SELECT id FROM threads WHERE channel_id = ANY (@channel_ids::uuid[]) ORDER BY id;
+-- name: ThreadCounters :many
+-- The counters of the snapshot of sync (M1-63, 07 section 7.4 "unread counter"): the threads of
+-- the given channels (the visible set of the caller) with a message above unread_floor_seq, so
+-- somebody may have something unread there. The read positions live in sync, which combines both
+-- in Go (07 7.4 rule 6, no join across modules).
+SELECT id, channel_id, last_message_seq, unread_floor_seq
+FROM threads
+WHERE channel_id = ANY(sqlc.arg(channel_ids)::uuid[]) AND last_message_seq > unread_floor_seq
+ORDER BY id;

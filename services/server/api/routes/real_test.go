@@ -689,6 +689,14 @@ func (stubServer) GetMySidebar(context.Context, rest.GetMySidebarRequestObject) 
 	return nil, nil
 }
 
+func (stubServer) ListEvents(context.Context, rest.ListEventsRequestObject) (rest.ListEventsResponseObject, error) {
+	return nil, nil
+}
+
+func (stubServer) GetSnapshot(context.Context, rest.GetSnapshotRequestObject) (rest.GetSnapshotResponseObject, error) {
+	return nil, nil
+}
+
 func (stubServer) SetThreadTags(context.Context, rest.SetThreadTagsRequestObject) (rest.SetThreadTagsResponseObject, error) {
 	return nil, nil
 }
@@ -986,6 +994,9 @@ func TestRealTable_Enabled(t *testing.T) {
 		"deleteWebhookSubscription": {"DELETE /api/v1/webhooks/{subscription_id}", "webhook_out.manage", "rl.admin"},
 		"listWebhookDeliveries":     {"GET /api/v1/webhooks/{subscription_id}/deliveries", "webhook_out.read", "rl.read"},
 		"redeliverWebhook":          {"POST /api/v1/webhook-deliveries/{delivery_id}/redeliver", "webhook_out.redeliver", "rl.admin"},
+		// M1-63
+		"listEvents":  {"GET /api/v1/events", "events.catch_up", "rl.read"},
+		"getSnapshot": {"GET /api/v1/sync/snapshot", "sync.snapshot.read", "rl.read"},
 	}
 	ops := routes.Enabled()
 	if len(ops) != len(want) {

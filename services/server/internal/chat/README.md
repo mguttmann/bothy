@@ -1,6 +1,6 @@
 # Modul `chat`
 
-Status: spaces and the sidebar (M1-52), channels and forum tags (M1-53), operators with I1 (M1-54) and threads (M1-55) built; `createThread` is built in `messaging` (M1-56); `Threads.InfoForShare` for the read states and drafts of sync (M1-61).
+Status: spaces and the sidebar (M1-52), channels and forum tags (M1-53), operators with I1 (M1-54) and threads (M1-55) built; `createThread` is built in `messaging` (M1-56); `Threads.InfoForShare` for the read states and drafts of sync (M1-61); `Threads.Counters` for the unread counters of the snapshot of sync (M1-63).
 Normativ ist [docs/spec/02-architektur.md](../../../../docs/spec/02-architektur.md); bei Abweichung gilt das Kapitel.
 
 ## Zweck
@@ -190,6 +190,11 @@ actions, explanation, preview and view-as with real sources).
   concurrent move (M1-62) changes before its commit; `ThreadInfo` carries `LastMessageSeq` and
   `UnreadFloorSeq`. sync reads the sidebar through `Structure.ListSidebarStates` and the kind and
   space of a channel draft through `Structure.GetChannel`.
+- `Counters` (M1-63, `ThreadCounter`) returns `thread_id`, `channel_id`, `last_message_seq` and
+  `unread_floor_seq` of the threads of the given channels with `last_message_seq >
+  unread_floor_seq` (query `ThreadCounters`, `channel_id = ANY($1)`), without authorization: sync
+  passes only the visible channels of the caller and checks `thread.read` per thread it lists. The
+  read positions live in sync, which combines both in Go (07 section 7.4 rule 6).
 - Domain (`domain/thread.go`): `Thread` with `ThreadKind`, `ThreadState`, `TitleSource`; `Close`
   (a main thread is `409 invalid_state_transition`, a closed thread unchanged), `Reopen`,
   `SetTitle`; `CheckThreadTitle` (`thread.title_max_chars` Unicode characters, SEC-IN-4 through

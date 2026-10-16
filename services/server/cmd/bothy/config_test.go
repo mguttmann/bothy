@@ -371,6 +371,8 @@ func TestConfigPrintShowsSourcePerKey(t *testing.T) {
 		"signing_key.rotation_check_interval = 1m  # default\n" +
 		"space.name_max_chars = 100  # default\n" +
 		"startup.dependency_wait = 1m  # default\n" +
+		"sync.catchup_max_events = 50000  # default\n" +
+		"sync.catchup_page_size = 500  # default\n" +
 		"sync.event_log_partition_size = 1000000  # default\n" +
 		"sync.event_log_partitions_ahead = 3  # default\n" +
 		"sync.event_payload_max_bytes = 65536  # default\n" +

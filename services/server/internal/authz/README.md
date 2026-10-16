@@ -154,6 +154,18 @@ The snapshot (`domain.Snapshot`) holds the direct grant maxima per target, the o
 
 The requirement entries of `domain.DeferredActions()` (held by `domain/testdata/deferred_actions.golden`) need facts of a later etappe. `Authorize` and `Scope` answer them like an unknown action, and `VerifyRegistrations` rejects a route, op, channel op or event type that names one (D3). The ticket that builds one replaces its row in the table and removes it from the golden file.
 
+### Stored events (M1-63)
+
+`authorize.ResourceFromEvent` describes a stored event for the check of its receive action at
+delivery (REST catch-up, gateway, webhooks): a thread, channel or space by its id, any other kind
+with its most specific scope, and `Resource.Event` with the full scope. When the receive action
+does not take the stored kind, `eventTarget` (`app/eventtarget.go`) decides on the first object
+it does take: the target of a grant (for an instance grant its subject principal), then the
+thread, channel and space of the scope. No fitting object, or a receive action whose requirement
+is still deferred, is `not_found` without an error line, so one event never stops a reader
+(`TestResourceFromEventCatalogue` decides every durable event type; docs/DECISIONS.md M1-63/9,
+M1-63/12).
+
 ### Delivery check `webhook_out.deliver` (M2-26)
 
 `webhook_out.deliver` is no longer deferred: its requirement is `Delivery`, decided by

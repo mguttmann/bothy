@@ -12,6 +12,7 @@ import (
 	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/jackc/pgx/v5/pgtype"
 
+	"github.com/OWNER/bothy/services/server/internal/chat"
 	"github.com/OWNER/bothy/services/server/internal/chat/adapters/postgres/sqlcgen"
 	"github.com/OWNER/bothy/services/server/internal/chat/app"
 	"github.com/OWNER/bothy/services/server/internal/chat/domain"
@@ -115,6 +116,20 @@ func (r *Repository) DecrementMessageCount(ctx context.Context, id ids.ID) error
 		return errs.New(errs.CodeInternalError, "chat: no thread with a message to count down")
 	}
 	return nil
+}
+
+// ThreadCounters implements app.Store; outside a unit of work it reads on the pool.
+func (r *Repository) ThreadCounters(ctx context.Context, channels []ids.ID) ([]chat.ThreadCounter, error) {
+	rows, err := r.read(ctx).ThreadCounters(ctx, uuids(channels))
+	if err != nil {
+		return nil, mapError(err, "reading thread counters")
+	}
+	out := make([]chat.ThreadCounter, len(rows))
+	for i, row := range rows {
+		out[i] = chat.ThreadCounter{ThreadID: idOf(row.ID), ChannelID: idOf(row.ChannelID), LastMessageSeq: row.LastMessageSeq,
+			UnreadFloorSeq: row.UnreadFloorSeq}
+	}
+	return out, nil
 }
 
 // ListThreads implements app.Store.

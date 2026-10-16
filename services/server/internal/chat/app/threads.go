@@ -192,6 +192,15 @@ func (s *Service) InfoForShare(ctx context.Context, threadID ids.ID) (chat.Threa
 	return info(th, c), nil
 }
 
+// Counters implements chat.Threads: the counters of the threads of channelIDs with something
+// unread for somebody, without authorization (M1-63); no channel returns none without a query.
+func (s *Service) Counters(ctx context.Context, channelIDs []ids.ID) ([]chat.ThreadCounter, error) {
+	if len(channelIDs) == 0 {
+		return []chat.ThreadCounter{}, nil
+	}
+	return s.d.Store.ThreadCounters(ctx, channelIDs)
+}
+
 // Get implements chat.Threads: thread.read, then 404 for an unknown id.
 func (s *Service) Get(ctx context.Context, a actor.Actor, threadID ids.ID) (chat.Thread, error) {
 	th, err := s.loadThread(ctx, a, authorize.ActionThreadRead, threadID)

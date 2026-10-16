@@ -31,6 +31,7 @@ import (
 	"github.com/OWNER/bothy/services/server/internal/kernel/authorize"
 	"github.com/OWNER/bothy/services/server/internal/kernel/clock"
 	"github.com/OWNER/bothy/services/server/internal/kernel/searchlang"
+	"github.com/OWNER/bothy/services/server/internal/kernel/txn"
 	"github.com/OWNER/bothy/services/server/internal/platform/buildinfo"
 	"github.com/OWNER/bothy/services/server/internal/platform/config"
 	"github.com/OWNER/bothy/services/server/internal/platform/egress"
@@ -166,6 +167,8 @@ type server struct {
 	personal *Personal
 	// notify is the notify module (M3-18), built in the chat step over chat, sync and identity.
 	notify *Notify
+	// syncReads is catch-up and snapshot of sync (M1-63), built in the chat step after personal.
+	syncReads *SyncReads
 	// terminal is the terminal module (M2-39): the host records and their REST handlers.
 	terminal *Terminal
 	// apps is the module apps (M2-24): the app use cases and their REST handlers.
@@ -791,8 +794,12 @@ func (s *server) startChat(context.Context) error {
 	if err != nil {
 		return err
 	}
+	r, err := s.buildSyncReads(pool, a.UoW(), az, c, m, p)
+	if err != nil {
+		return err
+	}
 	s.mu.Lock()
-	s.chat, s.messaging, s.personal, s.notify = c, m, p, n
+	s.chat, s.messaging, s.personal, s.notify, s.syncReads = c, m, p, n, r
 	s.mu.Unlock()
 	return nil
 }
@@ -814,6 +821,24 @@ func (s *server) startNotify(pool *pg.Pool, a *Audit, az authorize.Authorizer, s
 		return nil, err
 	}
 	return n, nil
+}
+
+// buildSyncReads builds catch-up and snapshot of sync (M1-63) over the chat and messaging modules
+// and the personal data of the chat step, the agents and identity steps and the instance
+// settings (feature flags).
+func (s *server) buildSyncReads(pool *pg.Pool, uow txn.UnitOfWork, az authorize.Authorizer, c *Chat, m *Messaging, p *Personal) (*SyncReads, error) {
+	cfg, err := CatchUpConfig(s.values)
+	if err != nil {
+		return nil, err
+	}
+	s.mu.Lock()
+	ag, id, st := s.agents, s.identity, s.settings
+	s.mu.Unlock()
+	if ag == nil || id == nil || st == nil {
+		return nil, errors.New("wire: catch-up and snapshot need the agents, identity and settings steps")
+	}
+	return NewSyncReads(cfg, SyncReadDeps{Pool: pool, UoW: uow, Authorizer: az, Chat: c.Service, Messaging: m.Service, Personal: p.Service,
+		Agents: ag.Service, Directory: id.Directory, Flags: st.Admin})
 }
 
 // startTerminal is start step 6g (M2-39): the terminal module over the pool, the unit of work and
@@ -942,6 +967,7 @@ func (s *server) handlers() Handlers {
 	s.messaging.fillHandlers(&h)
 	s.personal.fillHandlers(&h)
 	s.notify.fillHandlers(&h)
+	s.syncReads.fillHandlers(&h)
 	if h.Hosts == nil && s.terminal != nil {
 		h.Hosts = s.terminal.Handlers
 	}

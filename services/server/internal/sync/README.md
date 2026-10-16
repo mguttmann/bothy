@@ -1,6 +1,6 @@
 # Modul `sync`
 
-Status: built in part (M1-16, M1-20, M2-01, M1-58, M1-61): the event log with the commit-ordered sequence, the phase hook of `sync`, the log tail, the partitions of `event_log`, the one envelope of gateway, REST and webhooks, the idempotency keys behind `kernel/idempotency.Store` with the job `sync.idempotency_cleanup`, and the frame of the worker consumers with `event_consumer_cursors` (no production consumer yet: M2-26 registers `webhooks`, M3-19 `push`); the read states, drafts and personal settings with their twelve REST operations and the subscription `messaging.MessagePosted` (M1-61). The redaction of a deletion (M1-58) implements `eventlog.Redactor`. Catch-up and snapshot come with M1-63 and the tickets that need them.
+Status: built in part (M1-16, M1-20, M2-01, M1-58, M1-61, M1-63): the event log with the commit-ordered sequence, the phase hook of `sync`, the log tail, the partitions of `event_log`, the one envelope of gateway, REST and webhooks, the idempotency keys behind `kernel/idempotency.Store` with the job `sync.idempotency_cleanup`, and the frame of the worker consumers with `event_consumer_cursors` (no production consumer yet: M2-26 registers `webhooks`, M3-19 `push`); the read states, drafts and personal settings with their twelve REST operations and the subscription `messaging.MessagePosted` (M1-61). The redaction of a deletion (M1-58) implements `eventlog.Redactor`. Catch-up and snapshot (M1-63): the ports `CatchUp` and `Snapshot` with `GET /api/v1/events` and `GET /api/v1/sync/snapshot`, which the gateway reuses (M1-64, M1-65).
 Normativ ist [docs/spec/02-architektur.md](../../../../docs/spec/02-architektur.md); bei Abweichung gilt das Kapitel.
 
 ## Zweck
@@ -11,11 +11,12 @@ Ereignis-Log (Anhängen, Tail, Nachholen, Schwärzen, Partitionen), Momentaufnah
 
 | Package | Content |
 |---|---|
-| `internal/sync` | port: `Event` (a stored row, zero values for NULL), `DeliveryFields`, `Envelope` with `EnvelopeActor`, `EnvelopeScope`, `EnvelopeResource` and `Event.Envelope`, `Sink`, `Tail`, `ErrGap`; worker consumers: `ConsumerName` (`ConsumerPush`, `ConsumerWebhooks`, `ConsumerNames`, `Valid`), `ConsumerHandler`, `ConsumerLossHandler`, `ConsumerState`, `Consumers`, `LogReader`; personal data (M1-61, `personal.go`): `Register` (the four personal events), `ReadStates`, `Drafts`, `Settings` with the DTOs `ReadState`, `AdvanceReadState`, `MarkUnread`, `Precondition`, `Draft`, `PutDraft`, `DraftPutResult`, `UserSetting`, `SidebarState` |
-| `domain/` | event validation (`ValidateEvent`, `CheckPayload`), partition arithmetic (`PartitionLower`, `PartitionName`), the gap check of the tail (`CheckContiguous`, `GapError`) and the round plan of a worker consumer (`PlanRound`, `RoundPlan`, `ErrConsumerGap`); personal data (M1-61): `CheckReadSeq`, `Advance`, `MarkUnread` (`readstate.go`), `DraftInput` with `Empty`, `ValidateDraft`, `OverwroteNewer`, `TruncateContent` (`draft.go`) and the key registry `SettingSpec`, `Settings`, `KnownSetting`, `ValidateSetting` (`settings.go`) |
-| `app/` | `Appender` (implements `kernel/eventlog.Appender`), `PhaseHook` (phase `sync`), `PartitionMaintenance`, `IdempotencyStore` (implements `kernel/idempotency.Store`), `IdempotencyCleanup`, `ConsumerService` (implements `sync.Consumers`: `Register`, `Ensure`, `Round`, `States`) and `ConsumerRunner`; outgoing ports `Writer`, `Partitions`, `Correlator`, `KeyRows`, `ConsumerCursorStore`, `ConsumerLogReader`, `Waker`; personal data (M1-61): `Personal` (implements `sync.ReadStates`; `Personal.Drafts` and `Personal.Settings` the other two ports), `PersonalConfig`, `PersonalDeps`, outgoing ports `PersonalStore`, `DraftRows`, `ThreadSource`, `ChannelSource`, `MentionCounter`, and `Subscribers` with `OnMessagePosted` |
-| `adapters/postgres/` | `Repository` (writer, partitions, head, minimum, reads, the cursor store and log reader of the worker consumers) and `IdempotencyRepository` (`KeyRows`) over sqlc queries in `queries/`, generated code in `sqlcgen/` (entry in `services/server/sqlc.yaml`); `Tail` and `Waker`, each with its own `LISTEN` connection over one shared listening loop (`listener`); `PersonalRepository` (`PersonalStore`) over `queries/read_states.sql`, `drafts.sql` and `user_settings.sql` (M1-61) |
-| `adapters/httpapi/` | `Personal`, the handlers of `listMyReadStates`, `putReadState`, `markThreadUnread`, `putThreadDraft`, `deleteThreadDraft`, `putChannelDraft`, `deleteChannelDraft`, `listMyDrafts`, `listMySettings`, `putMySetting`, `deleteMySetting` and `getMySidebar` (M1-61) |
+| `internal/sync` | port: `Event` (a stored row, zero values for NULL), `DeliveryFields`, `Envelope` with `EnvelopeActor`, `EnvelopeScope`, `EnvelopeResource` and `Event.Envelope`, `Sink`, `Tail`, `ErrGap`; worker consumers: `ConsumerName` (`ConsumerPush`, `ConsumerWebhooks`, `ConsumerNames`, `Valid`), `ConsumerHandler`, `ConsumerLossHandler`, `ConsumerState`, `Consumers`, `LogReader`; personal data (M1-61, `personal.go`): `Register` (the four personal events), `ReadStates`, `Drafts`, `Settings` with the DTOs `ReadState`, `AdvanceReadState`, `MarkUnread`, `Precondition`, `Draft`, `PutDraft`, `DraftPutResult`, `UserSetting`, `SidebarState`; catch-up and snapshot (M1-63, `catchup.go`): `CatchUp` with `CheckInput`, `CheckResult`, `ResyncReason`, `PageInput`, `PageResult`, `EnvelopeJSON`, and `Snapshot` with `SnapshotView` and its parts `SnapshotPrincipal`, `SnapshotSpace`, `SnapshotChannel`, `UnreadThread`, `RunSummary`, `Money`, `AgentPresence`, `DraftRef`, `EvaluatedFlag` |
+| `domain/` | event validation (`ValidateEvent`, `CheckPayload`), partition arithmetic (`PartitionLower`, `PartitionName`), the gap check of the tail (`CheckContiguous`, `GapError`) and the round plan of a worker consumer (`PlanRound`, `RoundPlan`, `ErrConsumerGap`); personal data (M1-61): `CheckReadSeq`, `Advance`, `MarkUnread` (`readstate.go`), `DraftInput` with `Empty`, `ValidateDraft`, `OverwroteNewer`, `TruncateContent` (`draft.go`) and the key registry `SettingSpec`, `Settings`, `KnownSetting`, `ValidateSetting` (`settings.go`); catch-up (M1-63): `ResyncReason` with `Reason` and `NextCursor` (`catchup.go`) |
+| `app/` | `Appender` (implements `kernel/eventlog.Appender`), `PhaseHook` (phase `sync`), `PartitionMaintenance`, `IdempotencyStore` (implements `kernel/idempotency.Store`), `IdempotencyCleanup`, `ConsumerService` (implements `sync.Consumers`: `Register`, `Ensure`, `Round`, `States`) and `ConsumerRunner`; outgoing ports `Writer`, `Partitions`, `Correlator`, `KeyRows`, `ConsumerCursorStore`, `ConsumerLogReader`, `Waker`; personal data (M1-61): `Personal` (implements `sync.ReadStates`; `Personal.Drafts` and `Personal.Settings` the other two ports), `PersonalConfig`, `PersonalDeps`, outgoing ports `PersonalStore`, `DraftRows`, `ThreadSource`, `ChannelSource`, `MentionCounter`, and `Subscribers` with `OnMessagePosted`; catch-up and snapshot (M1-63): `CatchUpService` (`NewCatchUp`, `CatchUpConfig`, `CatchUpDeps`) and `SnapshotService` (`NewSnapshot`, `SnapshotDeps`), outgoing ports `CatchUpLog` with `VisibleQuery`, `HeadSource`, `EpochSource`, `SnapshotStructure`, `ThreadCounters`, `SnapshotStore`, `AgentLister`, `PrincipalDirectory`, `FlagEvaluator` and `RunSummarySource` |
+| `adapters/postgres/` | `Repository` (writer, partitions, head, minimum, reads, the cursor store and log reader of the worker consumers) and `IdempotencyRepository` (`KeyRows`) over sqlc queries in `queries/`, generated code in `sqlcgen/` (entry in `services/server/sqlc.yaml`); `Tail` and `Waker`, each with its own `LISTEN` connection over one shared listening loop (`listener`); `PersonalRepository` (`PersonalStore`) over `queries/read_states.sql`, `drafts.sql` and `user_settings.sql` (M1-61), also `SnapshotStore` (M1-63); the page query of catch-up `queries/catchup.sql` (`Repository.VisibleEvents`, M1-63) |
+| `adapters/httpapi/` | `Personal`, the handlers of `listMyReadStates`, `putReadState`, `markThreadUnread`, `putThreadDraft`, `deleteThreadDraft`, `putChannelDraft`, `deleteChannelDraft`, `listMyDrafts`, `listMySettings`, `putMySetting`, `deleteMySetting` and `getMySidebar` (M1-61); `Sync`, the handlers of `listEvents` and `getSnapshot`, and `SnapshotREST` (M1-63) |
+| `adapters/noruns/` | `Source`, the M1 binding of `app.RunSummarySource`: no running run, because the table `runs` exists only from M2-05, which binds the runs port instead (M1-63) |
 | `adapters/otelmetrics/` | the lag gauges of the worker consumers (`RegisterConsumerGauges`) |
 | `adapters/telemetry/` | `Correlator`: `correlation_id` and `trace_context` from the trace context of the append |
 | `adapters/jobs/` | jobs `sync.partition_maintenance` and `sync.idempotency_cleanup`: arguments, handlers, periodic registrations |
@@ -286,6 +287,51 @@ Rulings: docs/DECISIONS.md M1-61. Tests: `domain/*_test.go`, `app/subscribers_te
 `adapters/httpapi/personal_test.go` (PostgreSQL 18, the HTTP chain with response validation
 through `test/messagingworld` with `NewPersonal`) and
 `migrations/sync_personal_data_test.go`.
+
+### Catch-up and snapshot (M1-63)
+
+- **Head.** `head_seq` is the committed value of `event_seq`, read without a lock through
+  `instance.Versions.EventSeq`, never `max(seq)`: after retention the log can be empty while the
+  counter is not. A commit is visible before its counter lock is released, so every `seq <=
+  head_seq` is visible (04 section 3.2). `min_retained_seq` is `min(seq)`, `head_seq + 1` for an
+  empty log; `sync_epoch` comes from `instance.State` (docs/DECISIONS.md M1-63/1).
+- **Check.** `CatchUp.Check` authorizes `events.catch_up` on the instance (an app needs
+  `events:subscribe`) and decides in this order, first match wins: an `epoch` that differs from
+  `sync_epoch` gives `epoch_changed`; a cursor above the head `cursor_ahead`; a cursor below
+  `min_retained_seq - 1` `retention`; more than `sync.catchup_max_events` behind
+  `too_far_behind` (`domain.ResyncReason`, M1-63/2). Without `epoch` there is no epoch check.
+- **Page.** `CatchUp.Page` takes the visible sets of `Authorizer.Scope` (`channel.read`), runs the
+  predicate of 04 section 7.2 point 1 with `seq > after AND seq <= head ORDER BY seq LIMIT limit`
+  (`queries/catchup.sql`), then per row: a personal event only to its audience, any other only
+  when `authorize(actor, receive_action, authorize.ResourceFromEvent(...))` allows it in filter
+  mode (no denial audit); authz decides an event whose stored kind the receive action does not take on the object it takes (M1-63/12). It reads no content table per event. `next_cursor` is the `seq` of the
+  last row of a full page, otherwise the head; rows dropped by the audience rule or `authorize`
+  count as checked (R-SY-03). The envelope is `Event.Envelope`; `trace_context` only for agents.
+  A limit of 0 or above `sync.catchup_page_size` is that key.
+- **`listEvents`.** `Check`, then `410 resync_required` with `reason`, or one page up to the head
+  of `Check`: `200 EventPage {events, next_cursor, head_seq, sync_epoch}`, `next_cursor` also on
+  an empty page.
+- **Snapshot.** `Snapshot.Build` authorizes `sync.snapshot.read` (a pending device gets `403
+  device_pending`), reads `head_seq` and `sync_epoch` first and every other part after them (READ
+  COMMITTED), so every change up to `head_seq` is contained and later ones arrive by catch-up:
+  `permission_version` from `Authorizer.Scope`; `principal` and `is_owner` from
+  `identity.Directory`; `spaces` and `channels` through the chat listings of `listSpaces` and
+  `listSpaceChannels` (visible, not archived); `sidebar`, `settings` and `drafts` through the
+  personal data ports of M1-61; `unread_threads` from `chat.Threads.Counters` of the listed
+  channels and the person's `read_states` there, combined in Go: unread =
+  `last_message_seq - GREATEST(last_read_seq, unread_floor_seq)`, the mentions from
+  `messaging.Mentions.CountUnread` above the same position, each listed thread checked with
+  `thread.read` in filter mode (M1-63/4); `active_runs` from `RunSummarySource` (in M1
+  `adapters/noruns`, empty); `agents` from the listing behind `listAgents`, each `state: unknown`
+  without `reported_billing_mode` until heartbeats exist (M2-20, M1-63/3); `features` from
+  `instance.Flags`. Agents and apps get empty `sidebar`, `unread_threads`, `settings` and
+  `drafts`. The snapshot carries no thread content.
+- **Configuration.** `sync.catchup_page_size`, `sync.catchup_max_events` (04).
+
+Rulings: docs/DECISIONS.md M1-63. Tests: `domain/catchup_test.go`, `app/catchup_test.go`,
+`adapters/noruns`, `adapters/httpapi/sync_test.go` and `snapshot_test.go` (PostgreSQL 18, the HTTP
+chain with response validation through `test/messagingworld.NewSync`, including AZ-P5 for the
+snapshot), `internal/authz/app/eventresource_test.go` (`authorize.ResourceFromEvent`).
 
 ### Load test
 

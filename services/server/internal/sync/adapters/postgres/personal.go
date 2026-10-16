@@ -112,6 +112,20 @@ func (r *PersonalRepository) ReadStatesOfChannel(ctx context.Context, user, chan
 	return out, nil
 }
 
+// ReadStatesInChannels implements app.SnapshotStore: the rows of user in channels, ascending by
+// thread (M1-63).
+func (r *PersonalRepository) ReadStatesInChannels(ctx context.Context, user ids.ID, channels []ids.ID) ([]sync.ReadState, error) {
+	rows, err := r.read(ctx).ListReadStatesInChannels(ctx, sqlcgen.ListReadStatesInChannelsParams{UserID: uuid(user), ChannelIds: uuids(channels)})
+	if err != nil {
+		return nil, failed(err, "listing read states")
+	}
+	out := make([]sync.ReadState, 0, len(rows))
+	for _, row := range rows {
+		out = append(out, readStateOf(row))
+	}
+	return out, nil
+}
+
 // oneReadState converts the result of a single-row query; no row is found false.
 func oneReadState(row sqlcgen.ReadState, err error, what string) (sync.ReadState, bool, error) {
 	if errors.Is(err, pgx.ErrNoRows) {

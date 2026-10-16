@@ -155,6 +155,30 @@ func (r *Repository) EventsAfter(ctx context.Context, after int64, limit int) ([
 	return out, nil
 }
 
+// Compile-time check: Repository is the log of catch-up.
+var _ app.CatchUpLog = (*Repository)(nil)
+
+// VisibleEvents runs the page query of catch-up (app.CatchUpLog, queries/catchup.sql). Outside a
+// unit of work it reads on the pool. Errors: kind internal for a limit outside int32.
+func (r *Repository) VisibleEvents(ctx context.Context, q app.VisibleQuery) ([]sync.Event, error) {
+	if q.Limit < 1 || q.Limit > math.MaxInt32 {
+		return nil, errs.New(errs.CodeInternalError, "sync: page size outside int")
+	}
+	rows, err := r.queries(ctx).CatchUpPage(ctx, sqlcgen.CatchUpPageParams{
+		AfterSeq: q.After, HeadSeq: q.Head, VisibleChannels: uuids(q.ChannelIDs), FullyVisibleSpaces: uuids(q.FullyVisibleSpaceIDs),
+		VisibleSpaces: uuids(q.SpaceIDs), InstanceWide: q.InstanceWide, Principal: uuid(q.Principal),
+		MaxRows: int32(q.Limit), // #nosec G115 -- checked above
+	})
+	if err != nil {
+		return nil, err
+	}
+	out := make([]sync.Event, len(rows))
+	for i, row := range rows {
+		out[i] = toEvent(row)
+	}
+	return out, nil
+}
+
 // Compile-time check: Repository is the log reader of the delivery jobs.
 var _ sync.LogReader = (*Repository)(nil)
 

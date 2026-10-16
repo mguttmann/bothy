@@ -266,8 +266,8 @@ Quelle: [04-sync-protokoll.md](../spec/04-sync-protokoll.md), Abschnitt 18.
 | `sync.reauth_lead_time` | `BOTHY_SYNC__REAUTH_LEAD_TIME` | Server |  | `60s` | Vorlauf von `reauth_required` vor Token-Ablauf | geplant (M1) |
 | `sync.reconnect_backoff_base` | `BOTHY_SYNC__RECONNECT_BACKOFF_BASE` | Server |  | `1s` | Basis des Backoffs beim Wiederverbinden | geplant (M2) |
 | `sync.reconnect_backoff_cap` | `BOTHY_SYNC__RECONNECT_BACKOFF_CAP` | Server |  | `60s` | größter Abstand beim Wiederverbinden | geplant (M2) |
-| `sync.catchup_page_size` | `BOTHY_SYNC__CATCHUP_PAGE_SIZE` | Server |  | `500` | Ereignisse je Nachhol-Seite | geplant (M1) |
-| `sync.catchup_max_events` | `BOTHY_SYNC__CATCHUP_MAX_EVENTS` | Server |  | `50000` | mehr Rückstand ergibt `resync_required` | geplant (M1) |
+| `sync.catchup_page_size` | `BOTHY_SYNC__CATCHUP_PAGE_SIZE` | Server | int | `500` | Ereignisse je Nachhol-Seite | aktiv |
+| `sync.catchup_max_events` | `BOTHY_SYNC__CATCHUP_MAX_EVENTS` | Server | int | `50000` | mehr Rückstand ergibt `resync_required` | aktiv |
 | `sync.cursor_advance_every` | `BOTHY_SYNC__CURSOR_ADVANCE_EVERY` | Server |  | `1000` | nach so vielen übersprungenen Ereignissen ein `cursor`-Rahmen | geplant (M1) |
 | `sync.outbound_queue_max` | `BOTHY_SYNC__OUTBOUND_QUEUE_MAX` | Server |  | `10000` | Rahmen im Ausgang einer Verbindung bis `4014` | geplant (M1) |
 | `sync.idempotency_key_ttl` | `BOTHY_SYNC__IDEMPOTENCY_KEY_TTL` | Server | duration | `24h` | Aufbewahrung von `Idempotency-Key` | aktiv |

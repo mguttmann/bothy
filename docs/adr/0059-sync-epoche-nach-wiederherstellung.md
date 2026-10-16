@@ -89,6 +89,9 @@ Nummern erkennt und nur bei einer echten Wiederherstellung wechselt. Normativ in
 - Test: Eine Webhook-Zustellung nach dem Restore trägt die neue Epoche.
 - Wiederherstellungstest (ADR 0058) und Portabilitätstest (16, Abschnitt 11.1): Manifest nennt
   `sync_epoch`.
+- Test `TestListEventsResync` (M1-63, `services/server/internal/sync/adapters/httpapi`), case
+  `epoch_changed`: `GET /api/v1/events` with an `epoch` other than `instance.sync_epoch` answers
+  `410 resync_required` with `reason = epoch_changed`, also when the cursor is above `head_seq`.
 
 ## Pros and Cons of the Options
 

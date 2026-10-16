@@ -58,6 +58,16 @@ type Resource struct {
 	// Audience is the audience principal of a personal event to deliver, zero otherwise; used
 	// only by webhook_out.deliver (M2-26).
 	Audience ids.ID
+	// Event marks the descriptor of a stored event (ResourceFromEvent) and carries its full
+	// scope. When the stored resource kind is not a resource of the receive action (pin.added
+	// names a message, thread.read takes a thread), authz decides on the object of the scope the
+	// action takes instead, and on the target of a grant for grant.read (M1-63).
+	Event *EventScope
+}
+
+// EventScope is the scope of a stored event (event_log.space_id, channel_id, thread_id).
+type EventScope struct {
+	SpaceID, ChannelID, ThreadID ids.ID
 }
 
 // TerminalFacts describes a terminal session for the step-up rule of terminal.attach (08 section
@@ -104,4 +114,37 @@ type InvokeFacts struct {
 	// ActiveRunAgentID is the agent of the active run of the thread; zero for none (set by runs
 	// from M2).
 	ActiveRunAgentID ids.ID
+}
+
+// ResourceFromEvent returns the descriptor of a stored event for the check of its receive action
+// at delivery (docs/spec/04-sync-protokoll.md "Ablauf" point 2, 07 section 8.1): REST catch-up
+// (M1-63) and the gateway hub (M1-65) build it from the columns resource_kind, resource_id,
+// space_id, channel_id and thread_id of event_log. A thread, channel or space names itself in ID
+// and carries no hint; any other kind carries only its most specific scope (the thread, else the
+// channel, else the space). Reason: the scope of an event is a copy from the time of the event,
+// and a thread moved since then would contradict it, which authz treats as an internal error;
+// the most specific hint lets authz read the current path from the structure, so the rights at
+// delivery decide (04 "Grundregel"). Event carries the whole scope, so authz can decide an
+// event whose resource kind the receive action does not take on the object it does take.
+//
+// Example:
+//
+//	r := authorize.ResourceFromEvent(ev.ResourceKind, ev.ResourceID, ev.SpaceID, ev.ChannelID, ev.ThreadID)
+//	d, err := az.Authorize(authorize.Filter(ctx), p, authorize.Action(ev.ReceiveAction), r)
+func ResourceFromEvent(kind string, id, spaceID, channelID, threadID ids.ID) Resource {
+	// An unknown kind stays empty, which Authorize refuses as an internal error (fail closed).
+	k, _ := ParseResourceKind(kind)
+	r := Resource{Kind: k, ID: id, Event: &EventScope{SpaceID: spaceID, ChannelID: channelID, ThreadID: threadID}}
+	if k == ResourceThread || k == ResourceChannel || k == ResourceSpace {
+		return r
+	}
+	switch {
+	case !threadID.IsZero():
+		r.ThreadID = threadID
+	case !channelID.IsZero():
+		r.ChannelID = channelID
+	default:
+		r.SpaceID = spaceID
+	}
+	return r
 }

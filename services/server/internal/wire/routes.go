@@ -134,6 +134,8 @@ type Handlers struct {
 	// deleteNotificationPreference, listMyQuietHours, createQuietHoursRule, putQuietHoursRule and
 	// deleteQuietHoursRule (notify, M3-18).
 	*notifyhttp.Preferences
+	// Sync implements listEvents and getSnapshot (sync, M1-63).
+	*synchttp.Sync
 }
 
 // routeBuilder builds and verifies the routes of one REST surface against a catalogue with the

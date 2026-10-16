@@ -13,6 +13,7 @@ import (
 	"time"
 
 	"github.com/OWNER/bothy/services/server/internal/authz"
+	"github.com/OWNER/bothy/services/server/internal/chat"
 	"github.com/OWNER/bothy/services/server/internal/chat/app"
 	"github.com/OWNER/bothy/services/server/internal/chat/domain"
 	"github.com/OWNER/bothy/services/server/internal/identity"
@@ -493,6 +494,20 @@ func (s *store) LockThread(ctx context.Context, id ids.ID) (domain.Thread, bool,
 
 func (s *store) ShareThread(ctx context.Context, id ids.ID) (domain.Thread, bool, error) {
 	return s.Thread(ctx, id)
+}
+
+func (s *store) ThreadCounters(_ context.Context, channels []ids.ID) ([]chat.ThreadCounter, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.ensureThreads()
+	var out []chat.ThreadCounter
+	for _, th := range s.threads {
+		if slices.Contains(channels, th.ChannelID) && th.LastMessageSeq > th.UnreadFloorSeq {
+			out = append(out, chat.ThreadCounter{ThreadID: th.ID, ChannelID: th.ChannelID, LastMessageSeq: th.LastMessageSeq,
+				UnreadFloorSeq: th.UnreadFloorSeq})
+		}
+	}
+	return out, s.fail
 }
 
 func (s *store) InsertThread(_ context.Context, th domain.Thread) (domain.Thread, error) {

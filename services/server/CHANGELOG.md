@@ -23,6 +23,19 @@ documented in this file. The format is based on
   transaction. `Facts.LevelFacts` and `Facts.QuietRules` gather the facts of the push path in one
   query each. New configuration key `notify.user_default_level`. Agents and apps get
   `subject_kind_not_allowed` for `notification_pref.update` and `quiet_hours.update`.
+- Catch-up over REST and the snapshot (M1-63): `listEvents` (`GET /api/v1/events`) delivers every
+  durable event after a cursor that the caller may receive at delivery time (personal events only
+  to their audience, every other event through `authorize` with its receive action) with a cursor
+  that means "last checked", or `410 resync_required` with the reason `epoch_changed`,
+  `cursor_ahead`, `retention` or `too_far_behind`; the optional query parameter `epoch` and the
+  keys `sync.catchup_page_size` and `sync.catchup_max_events` are read. `getSnapshot`
+  (`GET /api/v1/sync/snapshot`) returns the visible spaces and channels with versions, the
+  sidebar, unread and mention counters, running runs (none before M2-05), agent presence
+  (`unknown` before M2-20), settings, draft versions and the evaluated feature flags, without
+  thread contents. Both are the sync ports `CatchUp` and `Snapshot`, which the gateway reuses;
+  `authorize.ResourceFromEvent` describes a stored event for its delivery check,
+  `instance.Versions.EventSeq` reads the head and `chat.Threads.Counters` the thread counters.
+
 - CDN fetch of the import tool (M8-02): `discord.Fetcher` loads one Discord attachment with
   `GET` only when the link is `https` on a host of `import.discord.cdn_hosts` (exact match, port
   `443` unless the entry names one), without token or cookie, without redirects or an
