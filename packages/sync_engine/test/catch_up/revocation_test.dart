@@ -195,4 +195,52 @@ void main() {
       expect(await w.storedSeqs(1), isEmpty);
     },
   );
+
+  test(
+    'a thread moved out and later visible again through added is stored',
+    () async {
+      await w.connect(cursor: 30);
+      await w.dispatch([
+        threadCreated(31, 70),
+        envelope(
+          'thread.moved_out',
+          seq: 32,
+          payload: {'thread_id': threadId(70), 'channel_id': channelId(1)},
+          resourceKind: 'channel',
+          resourceId: channelId(1),
+        ),
+      ]);
+      await w.push('cursor', {'seq': 32});
+      final t70 = ThreadId.parse(threadId(70));
+      expect(await w.db.threadsDao.byId(t70), isNull);
+      expect(w.notices.whereType<TargetsRemoved>().single.targets, [
+        TargetRef.thread(t70),
+      ]);
+      w.rest.routes['GET /channels/${channelId(7)}'] = (_) =>
+          FakeReply(200, channelView(7));
+      w.rest.routes['GET /channels/${channelId(7)}/threads'] = (_) =>
+          FakeReply(200, {
+            'items': [threadJson(70, channelN: 7, version: 2)],
+          });
+      await w.dispatch([
+        envelope(
+          'access.changed',
+          seq: 33,
+          payload: {
+            'permission_version': 5,
+            'added': [
+              {'kind': 'channel', 'id': channelId(7), 'level': 'write'},
+            ],
+            'removed': <Object?>[],
+            'changed': <Object?>[],
+          },
+          resourceKind: 'principal',
+          resourceId: alexId,
+          personal: true,
+        ),
+      ]);
+      await w.push('cursor', {'seq': 33});
+      expect((await w.db.threadsDao.byId(t70))!.channelId.value, channelId(7));
+    },
+  );
 }

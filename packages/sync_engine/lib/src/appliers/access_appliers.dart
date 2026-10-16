@@ -66,6 +66,11 @@ Future<void> _accessChanged(ApplyContext c) async {
           }
         }
         for (final t in s.threads) {
+          // The server lists the thread in a channel the person sees now: a moved-out thread
+          // that moved into it is visible again.
+          if (sync.mayStoreChannel(t.channelId, null)) {
+            sync.removedTargets.remove(t.id.value);
+          }
           if (await sync.holdsContent(sync.db, t.channelId, t.id)) {
             await storeThread(sync.db, t);
           }
