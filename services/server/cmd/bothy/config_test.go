@@ -301,6 +301,7 @@ func TestConfigPrintShowsSourcePerKey(t *testing.T) {
 		"migrate.maint_password_ref = file:/run/bothy/secrets/db_maint_password  # default\n" +
 		"migrate.monitor_password_ref = file:/run/bothy/secrets/db_monitor_password  # default\n" +
 		"migrate.owner_password_ref = file:/run/bothy/secrets/db_owner_password  # default\n" +
+		"notify.user_default_level = mentions  # default\n" +
 		"pin.max_per_thread = 50  # default\n" +
 		"principal.display_name_max_chars = 64  # default\n" +
 		"principal.handle_max_chars = 32  # default\n" +
