@@ -2814,7 +2814,10 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** List notification levels */
+        /**
+         * List notification levels
+         * @description The caller's own levels, ordered by target kind, then target id. Only targets the caller can still read are listed; rows on targets the caller lost stay stored and appear again when the right returns.
+         */
         get: operations["listMyNotificationPreferences"];
         put?: never;
         post?: never;
@@ -2832,10 +2835,16 @@ export interface paths {
             cookie?: never;
         };
         get?: never;
-        /** Set the notification level of a target */
+        /**
+         * Set the notification level of a target
+         * @description Sets the caller's level on a space, channel or thread the caller can read, the main thread of a text channel included. An unknown target, an id of another kind and a target without read right give the same 404. An archived target (or a channel in an archived space) takes no new preference: 409 conflict with reason target_archived. muted_until is stored as given (whole microseconds), also when it has passed; a passed value has no effect. A write that changes nothing answers 200 without event and without a new version.
+         */
         put: operations["putNotificationPreference"];
         post?: never;
-        /** Inherit the notification level again */
+        /**
+         * Inherit the notification level again
+         * @description Removes the caller's level on the target, so it inherits again. Answers 204 also when no row is stored (then without event); deleting stays possible on an archived target. A later put starts again at version 1.
+         */
         delete: operations["deleteNotificationPreference"];
         options?: never;
         head?: never;
@@ -2852,7 +2861,10 @@ export interface paths {
         /** List quiet hours */
         get: operations["listMyQuietHours"];
         put?: never;
-        /** Add a quiet hours rule */
+        /**
+         * Add a quiet hours rule
+         * @description Adds a rule. time_zone must be an IANA zone name (400 validation_failed with errors[].code unknown_time_zone); absent means the person's time zone. Every write sends the complete list in quiet_hours.updated; a write that would make that list larger than sync.event_payload_max_bytes is refused with 400 validation_failed and errors[].code limit_reached.
+         */
         post: operations["createQuietHoursRule"];
         delete?: never;
         options?: never;
@@ -2868,7 +2880,10 @@ export interface paths {
             cookie?: never;
         };
         get?: never;
-        /** Change a quiet hours rule */
+        /**
+         * Change a quiet hours rule
+         * @description Replaces the whole rule; an absent time_zone clears it (the rule then follows the person's time zone). Equal values answer 200 without event and without a new version. time_zone and the list size are checked as for createQuietHoursRule (unknown_time_zone, limit_reached).
+         */
         put: operations["putQuietHoursRule"];
         post?: never;
         /** Delete a quiet hours rule */
@@ -7075,7 +7090,10 @@ export interface components {
             start_local: string;
             /** @example 07:00 */
             end_local: string;
-            /** @example Europe/Berlin */
+            /**
+             * @description IANA time zone name; absent means the person's time zone (users.time_zone).
+             * @example Europe/Berlin
+             */
             time_zone?: string;
             enabled: boolean;
             /** Format: int64 */
@@ -7088,7 +7106,10 @@ export interface components {
             start_local: string;
             /** @example 07:00 */
             end_local: string;
-            /** @example Europe/Berlin */
+            /**
+             * @description IANA time zone name; absent means the person's time zone (users.time_zone).
+             * @example Europe/Berlin
+             */
             time_zone?: string;
             enabled: boolean;
         };
@@ -8467,7 +8488,7 @@ export interface components {
             deleted?: boolean;
         };
         QuietHoursPayload: {
-            /** @description Complete list after the change. */
+            /** @description Complete list after the change, ascending by id. */
             rules: components["schemas"]["QuietHoursRule"][];
         };
         GdprRequestPayload: {
@@ -17122,6 +17143,7 @@ export interface operations {
             401: components["responses"]["Unauthorized"];
             403: components["responses"]["Forbidden"];
             404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
             429: components["responses"]["TooManyRequests"];
             default: components["responses"]["Error"];
         };

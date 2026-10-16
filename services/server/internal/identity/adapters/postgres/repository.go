@@ -127,6 +127,26 @@ func (r *Repository) User(ctx context.Context, id ids.ID) (app.UserRecord, bool,
 	return userRecord(row.Principal, row.User, row.IsOwner), true, nil
 }
 
+// Users implements app.Store with one query.
+func (r *Repository) Users(ctx context.Context, list []ids.ID) ([]app.UserRecord, error) {
+	if len(list) == 0 {
+		return nil, nil
+	}
+	keys := make([]pgtype.UUID, 0, len(list))
+	for _, id := range slices.Compact(slices.SortedFunc(slices.Values(list), compareIDs)) {
+		keys = append(keys, uuid(id))
+	}
+	rows, err := r.read(ctx).ListUsersByIDs(ctx, keys)
+	if err != nil {
+		return nil, mapError(err, "reading people")
+	}
+	out := make([]app.UserRecord, 0, len(rows))
+	for _, row := range rows {
+		out = append(out, userRecord(row.Principal, row.User, row.IsOwner))
+	}
+	return out, nil
+}
+
 // ActiveOwners implements app.Store.
 func (r *Repository) ActiveOwners(ctx context.Context) ([]app.OwnerRecord, error) {
 	rows, err := r.read(ctx).ListActiveOwners(ctx)

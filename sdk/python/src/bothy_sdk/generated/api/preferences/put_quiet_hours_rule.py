@@ -91,6 +91,10 @@ def sync_detailed(
 ) -> Response[Problem | QuietHoursRule]:
     """Change a quiet hours rule
 
+     Replaces the whole rule; an absent time_zone clears it (the rule then follows the person's time
+    zone). Equal values answer 200 without event and without a new version. time_zone and the list size
+    are checked as for createQuietHoursRule (unknown_time_zone, limit_reached).
+
     Args:
         rule_id (UUID): UUIDv7 (RFC 9562), lowercase canonical form.
         body (QuietHoursRuleInput):
@@ -123,6 +127,10 @@ def sync(
 ) -> Problem | QuietHoursRule | None:
     """Change a quiet hours rule
 
+     Replaces the whole rule; an absent time_zone clears it (the rule then follows the person's time
+    zone). Equal values answer 200 without event and without a new version. time_zone and the list size
+    are checked as for createQuietHoursRule (unknown_time_zone, limit_reached).
+
     Args:
         rule_id (UUID): UUIDv7 (RFC 9562), lowercase canonical form.
         body (QuietHoursRuleInput):
@@ -149,6 +157,10 @@ async def asyncio_detailed(
     body: QuietHoursRuleInput,
 ) -> Response[Problem | QuietHoursRule]:
     """Change a quiet hours rule
+
+     Replaces the whole rule; an absent time_zone clears it (the rule then follows the person's time
+    zone). Equal values answer 200 without event and without a new version. time_zone and the list size
+    are checked as for createQuietHoursRule (unknown_time_zone, limit_reached).
 
     Args:
         rule_id (UUID): UUIDv7 (RFC 9562), lowercase canonical form.
@@ -179,6 +191,10 @@ async def asyncio(
     body: QuietHoursRuleInput,
 ) -> Problem | QuietHoursRule | None:
     """Change a quiet hours rule
+
+     Replaces the whole rule; an absent time_zone clears it (the rule then follows the person's time
+    zone). Equal values answer 200 without event and without a new version. time_zone and the list size
+    are checked as for createQuietHoursRule (unknown_time_zone, limit_reached).
 
     Args:
         rule_id (UUID): UUIDv7 (RFC 9562), lowercase canonical form.

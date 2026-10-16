@@ -13,11 +13,11 @@ part 'quiet_hours_payload.g.dart';
 /// QuietHoursPayload
 ///
 /// Properties:
-/// * [rules] - Complete list after the change.
+/// * [rules] - Complete list after the change, ascending by id.
 @BuiltValue()
 abstract class QuietHoursPayload
     implements Built<QuietHoursPayload, QuietHoursPayloadBuilder> {
-  /// Complete list after the change.
+  /// Complete list after the change, ascending by id.
   @BuiltValueField(wireName: r'rules')
   BuiltList<QuietHoursRule> get rules;
 

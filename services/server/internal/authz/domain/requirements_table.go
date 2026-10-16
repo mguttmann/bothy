@@ -53,13 +53,14 @@ var requirementGroups = []struct {
 	}},
 	{"self", Self, []string{
 		"auth.logout", "auth.step_up", "identity.link", "local_credential.set",
-		"mention.list", "passkey.register", "push.register", "push.unregister", "quiet_hours.update",
+		"mention.list", "passkey.register", "push.register", "push.unregister",
 		"self.profile.update", "session.extension.create",
 	}},
 	// The own read states, drafts and settings (M1-61 note 22): data of a person (03 read_states,
 	// drafts, user_settings reference users), so an agent or app naming itself gets
 	// subject_kind_not_allowed from authorize, never from the module.
-	{"self", All(Human, Self), []string{"draft.read", "settings.read", "settings.update"}},
+	// The quiet hours of M3-18 are a person's data the same way (03 quiet_hours references users).
+	{"self", All(Human, Self), []string{"draft.read", "quiet_hours.update", "settings.read", "settings.update"}},
 	{"public (gültiges Refresh-Token und DPoP-Beweis der Familie)", Public, []string{"auth.token.refresh"}},
 	{"manage", HasCap(CapManage), []string{
 		"channel.archive", "channel.behavior.read", "channel.behavior.update", "channel.create",
@@ -93,10 +94,12 @@ var requirementGroups = []struct {
 		"identity.unlink", "passkey.revoke", "session.list", "session.revoke",
 	}},
 	{"participant", Participant, []string{"dm.leave"}},
-	{"self und read", All(Self, AtLeast(LevelRead)), []string{
-		"notification_pref.update", "sidebar.update",
+	{"self und read", All(Self, AtLeast(LevelRead)), []string{"sidebar.update"}},
+	// notification_pref.update is a person's data too (M3-18, 03 notification_preferences
+	// references users): agents and apps get subject_kind_not_allowed from authorize.
+	{"self und read", All(Human, Self, AtLeast(LevelRead)), []string{
+		"draft.write", "notification_pref.update", "read_state.mark_unread", "read_state.update",
 	}},
-	{"self und read", All(Human, Self, AtLeast(LevelRead)), []string{"draft.write", "read_state.mark_unread", "read_state.update"}},
 	{"auth", Auth, []string{
 		"events.catch_up", "instance.read", "run.overview.read", "search.query", "status.read",
 		"sync.snapshot.read",

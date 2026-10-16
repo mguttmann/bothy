@@ -265,6 +265,11 @@ an agent or app), in the unit of work of the insert ([14-suche.md](../../../../d
 (`adapters/postgres`) fails when an `INSERT INTO threads` of `queries/*.sql` does not name
 `search_language`. `wire.NewChat` takes the directory in `ChatWrites.Directory`.
 
+## Notification paths (M3-18)
+
+- Port: `Structure` adds `NotificationPath` and `LockNotificationPath` (the path of a notification preference target as `chat.NotificationPath`: kind, space, channel, thread, channel kind, `default_notification_level`, archived; the lock form takes `FOR SHARE` on thread, then channel, then space), `ChannelIDsOfSpace` (archived channels included) and `ThreadIDsOfChannels`, all ascending. None of them authorizes: `notify` authorizes the target with the returned path, and the two id lists run inside an archive that `space.archive` or `channel.archive` allowed. An id of another kind than the requested one is `not_found`.
+- Code: `chat/notification.go`, `app/notification.go`, `adapters/postgres/notification.go`; queries `ShareSpace`, `ShareChannel`, `ChannelIDsOfSpace`, `ThreadIDsOfChannels`.
+
 ## Port (Wurzelpaket `internal/chat`)
 
 - Eingehend: `Structure` (Bereiche, Kanäle, Schreibschutz), `Threads` (Anlegen für `messaging`, `AppendToThread`, Nachrichtenzahl bei Löschung, Schließen, Öffnen, Verschieben, Info), `AgentConfig`.

@@ -234,7 +234,7 @@ modules:
     ephemeral_events: [notification.created]
     ws_ops: []
     depends_on: [identity, chat, messaging, sync]
-    adapter_vendors: []
+    adapter_vendors: [pgx]   # sqlc code and the repository (M3-18)
   apps:
     tables: [apps, app_installations, webhook_subscriptions, webhook_deliveries, incoming_webhooks]
     actions: [app.read, app.install, app.scopes.update, app.suspend, app.resume, app.uninstall,

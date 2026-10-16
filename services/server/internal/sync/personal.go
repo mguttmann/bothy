@@ -176,4 +176,15 @@ type Settings interface {
 	// ListSidebar returns the sidebar states of the caller for the spaces it may read that are
 	// not archived (settings.read, R-AZ-21).
 	ListSidebar(ctx context.Context) ([]SidebarState, error)
+	// ValuesFor returns the stored values of keys for the people userIDs in one read, keyed by
+	// person and key (M3-18: notify gathers notify.default_level for every candidate of a thread;
+	// M3-19 reads its switches the same way). It does not authorize: the caller asks for facts of
+	// people it already selected and reveals none of them. Defaults are never filled in (04
+	// section 14); a person or key without a stored row is absent. It reads in the ambient
+	// transaction of ctx when there is one.
+	//
+	// Example:
+	//
+	//	vals, err := settings.ValuesFor(ctx, people, []string{"notify.default_level"})
+	ValuesFor(ctx context.Context, userIDs []ids.ID, keys []string) (map[ids.ID]map[string]json.RawMessage, error)
 }

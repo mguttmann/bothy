@@ -18,7 +18,7 @@ class QuietHoursRuleInput:
         start_local (str):
         end_local (str):
         enabled (bool):
-        time_zone (str | Unset):
+        time_zone (str | Unset): IANA time zone name; absent means the person's time zone (users.time_zone).
     """
 
     weekdays: int

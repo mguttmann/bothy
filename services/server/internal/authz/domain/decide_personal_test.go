@@ -10,7 +10,7 @@ import (
 )
 
 // TestDecide_PersonalDataOnlyForPeople (M1-61 note 22): the actions of the own read states,
-// drafts and settings are open to people (in a session or with a personal token) and refused to
+// drafts and settings, and the notification levels and quiet hours of M3-18, are open to people (in a session or with a personal token) and refused to
 // agents and apps with subject_kind_not_allowed, even when the resource names the agent itself
 // and the agent may read the channel.
 func TestDecide_PersonalDataOnlyForPeople(t *testing.T) {
@@ -21,6 +21,9 @@ func TestDecide_PersonalDataOnlyForPeople(t *testing.T) {
 	}{
 		{"read_state.update", "channel"}, {"read_state.mark_unread", "channel"}, {"draft.write", "channel"},
 		{"draft.read", "user"}, {"settings.read", "user"}, {"settings.update", "user"},
+		// M3-18: the notification levels and quiet hours of a person.
+		{"notification_pref.update", "space"}, {"notification_pref.update", "channel"}, {"notification_pref.update", "thread"},
+		{"quiet_hours.update", "user"},
 	} {
 		for _, p := range []struct {
 			name string

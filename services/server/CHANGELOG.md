@@ -14,6 +14,15 @@ documented in this file. The format is based on
 - SLI bounds (M6-11): `internal/stats/domain/slibounds.gen.go`, generated from the Sloth files by
   `tools/observability/sli_bounds.py`, maps each `sli.*` metric to its SLO, objective, threshold
   and period; the Prometheus SLO rules carry the label `bothy_sli_metric`.
+- Notification levels and quiet hours (M3-18): the module `notify` owns `notification_preferences`
+  and `quiet_hours` and serves `listMyNotificationPreferences`, `putNotificationPreference`,
+  `deleteNotificationPreference`, `listMyQuietHours`, `createQuietHoursRule`, `putQuietHoursRule`
+  and `deleteQuietHoursRule`. Every change writes one `notification_pref.updated` or
+  `quiet_hours.updated` for the person; an archived target refuses a new level with `409`
+  `target_archived`; archiving a space or channel removes the levels below it in the same
+  transaction. `Facts.LevelFacts` and `Facts.QuietRules` gather the facts of the push path in one
+  query each. New configuration key `notify.user_default_level`. Agents and apps get
+  `subject_kind_not_allowed` for `notification_pref.update` and `quiet_hours.update`.
 - CDN fetch of the import tool (M8-02): `discord.Fetcher` loads one Discord attachment with
   `GET` only when the link is `https` on a host of `import.discord.cdn_hosts` (exact match, port
   `443` unless the entry names one), without token or cookie, without redirects or an

@@ -89,3 +89,8 @@ LIMIT @max_rows;
 -- without deleted ones); a count of zero is left alone, so the caller sees no row and fails.
 UPDATE threads SET message_count = message_count - 1, version = version + 1
 WHERE id = @id AND message_count > 0;
+
+-- name: ThreadIDsOfChannels :many
+-- Every thread of the channels, ascending: the targets of the cleanup of notification
+-- preferences when a channel or space is archived (M3-18).
+SELECT id FROM threads WHERE channel_id = ANY (@channel_ids::uuid[]) ORDER BY id;

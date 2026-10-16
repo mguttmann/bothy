@@ -1,6 +1,6 @@
 # Modul `notify`
 
-Status: Gerüst (M1-05) plus the decision per recipient as pure functions in `domain/` (M3-17). Interfaces, use cases, tables and the push consumer come with M3-18 to M3-24.
+Status: Gerüst (M1-05), the decision per recipient as pure functions in `domain/` (M3-17), and the notification levels and quiet hours with their tables, use cases, REST operations, archive cleanup and the reads of the push path (M3-18). Push registrations, the push consumer and delivery come with M3-19 to M3-24.
 Normativ ist [docs/spec/02-architektur.md](../../../../docs/spec/02-architektur.md); bei Abweichung gilt das Kapitel.
 
 ## Zweck
@@ -9,9 +9,12 @@ Benachrichtigungsstufen, Ruhezeiten, Push-Registrierungen, Push-Verbraucher und 
 
 ## Code
 
-- `internal/notify` (`doc.go`): Port als Wurzelpaket, bisher nur mit Paketkommentar. Schnittstellen, DTOs und In-Tx-Ereignisse kommen mit dem Ticket, das sie umsetzt.
+- `internal/notify` (`doc.go`, `preferences.go`): the port as root package: `Preferences` and `QuietHours` with their DTOs `Target`, `PutPreference`, `Preference`, `QuietHoursInput`, `QuietHoursRule` (M3-18).
 - `internal/notify/domain` (M3-17): the decision per recipient of 13 section 4 as side-effect-free functions: `ResolveLevel` (`level.go`), `InQuietHours` and `ParseLocalTime` (`quiet.go`), `Decide` (`decide.go`), `Flush` (`flush.go`), `ReleaseDelayed` (`delay.go`), the enums in `kinds.go`. It imports only the standard library without I/O and `kernel-core`; `TestDomainPurity` and `make arch` hold that. The golden table is `domain/testdata/decision_table.golden`.
-- `app/` und `adapters/<art>/` entstehen mit dem ersten Anwendungsfall. Ihre Komponenten erzeugt `tools/archgen` aus `architecture/modules.yaml`; ein Paket außerhalb dieser Schichten scheitert in `make arch`.
+- `internal/notify/domain` (M3-18): `TargetKind` and `PreferenceUnchanged` (`target.go`), `RuleInput`, `ValidateRuleInput` and `RuleUnchanged` (`rule.go`).
+- `internal/notify/app` (M3-18): the use cases (`preferences.go`, `quiethours.go`), the two event builders (`events.go`), the in-transaction subscribers (`subscribers.go`) and the reads of the push path (`facts.go`).
+- `internal/notify/adapters/postgres` (M3-18): the repository over the sqlc queries in `queries/`; `adapters/httpapi`: the seven REST operations of the group Preferences.
+- `app/` and `adapters/<art>/`: Ihre Komponenten erzeugt `tools/archgen` aus `architecture/modules.yaml`; ein Paket außerhalb dieser Schichten scheitert in `make arch`.
 
 ## Decision per recipient (Entscheidung je Empfänger)
 
@@ -77,6 +80,17 @@ Evaluated in this order; the first row that decides wins.
 ### Rulings
 
 D-M3-17-1 to D-M3-17-8 in [docs/DECISIONS.md](../../../../docs/DECISIONS.md), section "M3-17 Notification decision".
+
+## Notification levels and quiet hours (M3-18)
+
+- Tables: `notification_preferences` (PK `(user_id, target_kind, target_id)`, no foreign key on the target, R-DM-16) and `quiet_hours` (weekday bit mask, local start and end, `time_zone` NULL for `users.time_zone`), both `ON DELETE CASCADE` from `users`, retention class `personal_sync`.
+- Port `Preferences` (`listMyNotificationPreferences`, `putNotificationPreference`, `deleteNotificationPreference`) and port `QuietHours` (`listMyQuietHours`, `createQuietHoursRule`, `putQuietHoursRule`, `deleteQuietHoursRule`); actions `settings.read`, `notification_pref.update` ("self and read" on the target), `quiet_hours.update` ("self"); agents and apps get `403` with `subject_kind_not_allowed`.
+- Events: every change writes one `notification_pref.updated` (`NotificationPrefPayload`, `deleted: true` on removal) or `quiet_hours.updated` (`QuietHoursPayload`, the complete list ascending by `id`), resource `user` without version, empty scope, audience the person; a no-op writes none.
+- Subscriptions: `chat.ChannelArchived -> OnChannelArchived`, `chat.SpaceArchived -> OnSpaceArchived` remove the preferences of the archived target and everything below it in the archive's transaction, one event per row.
+- `upsertPreference` (exported as `Service.UpsertPreference`) is the single write path of `notification_preferences`; it neither authorizes nor locks. M3-19 calls it for the automatic following of 13 3.2 inside the message transaction.
+- `Facts.LevelFacts(ctx, threadID, userIDs)`: the facts of 13 3.1 for many people in one preference query; the caller resolves with `domain.ResolveLevel`. `Facts.QuietRules(ctx, userIDs)`: the rules with their zones loaded (rule zone, else `users.time_zone`, a zone that no longer loads counts as UTC). Both are for M3-19 and do not authorize.
+- Configuration: `notify.user_default_level`; the list of rules is bounded by `sync.event_payload_max_bytes`.
+- Rulings: D-M3-18-1 to D-M3-18-11 in [docs/DECISIONS.md](../../../../docs/DECISIONS.md), section "M3-18 Notification preferences and quiet hours".
 
 ## Port (Wurzelpaket `internal/notify`)
 

@@ -15,7 +15,7 @@ part 'quiet_hours_rule.g.dart';
 /// * [weekdays] - Bit mask, bit 0 = Monday.
 /// * [startLocal] - Local time `HH:MM`.
 /// * [endLocal]
-/// * [timeZone]
+/// * [timeZone] - IANA time zone name; absent means the person's time zone (users.time_zone).
 /// * [enabled]
 /// * [version]
 @BuiltValue()
@@ -36,6 +36,7 @@ abstract class QuietHoursRule
   @BuiltValueField(wireName: r'end_local')
   String get endLocal;
 
+  /// IANA time zone name; absent means the person's time zone (users.time_zone).
   @BuiltValueField(wireName: r'time_zone')
   String? get timeZone;
 

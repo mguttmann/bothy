@@ -88,6 +88,10 @@ type Directory interface {
 	// User returns the person id. Errors: kind not_found for an unknown id and for a principal
 	// that is not a person.
 	User(ctx context.Context, id ids.ID) (UserView, error)
+	// Users returns the people among ids in one read, keyed by id (M3-18: notify loads the time
+	// zones of the quiet hours of many people); unknown ids and principals that are not people
+	// are absent, like Principals.
+	Users(ctx context.Context, ids []ids.ID) (map[ids.ID]UserView, error)
 	// ActiveOwners returns the owners with revoked_at IS NULL, ordered by granted_at, then id.
 	ActiveOwners(ctx context.Context) ([]OwnerView, error)
 	// SearchLanguage returns the text search configuration of a new message or thread by the

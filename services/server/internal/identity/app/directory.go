@@ -172,14 +172,23 @@ func (d *Directory) User(ctx context.Context, id ids.ID) (identity.UserView, err
 	if !found {
 		return identity.UserView{}, notFound("person")
 	}
-	u := rec.User
-	return identity.UserView{
-		PrincipalView: principalView(u.Principal),
-		Email:         u.Email,
-		Locale:        u.Locale,
-		TimeZone:      u.TimeZone,
-		IsOwner:       rec.IsOwner,
-	}, nil
+	return userView(rec), nil
+}
+
+// Users implements identity.Directory: one read for the list; an empty list reads nothing.
+func (d *Directory) Users(ctx context.Context, list []ids.ID) (map[ids.ID]identity.UserView, error) {
+	out := map[ids.ID]identity.UserView{}
+	if len(list) == 0 {
+		return out, nil
+	}
+	recs, err := d.store.Users(ctx, list)
+	if err != nil {
+		return nil, err
+	}
+	for _, rec := range recs {
+		out[rec.User.Principal.ID] = userView(rec)
+	}
+	return out, nil
 }
 
 // ActiveOwners implements identity.Directory: owners rows with revoked_at IS NULL, ordered by

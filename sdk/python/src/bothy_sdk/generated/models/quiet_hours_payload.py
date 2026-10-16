@@ -17,7 +17,7 @@ T = TypeVar("T", bound="QuietHoursPayload")
 class QuietHoursPayload:
     """
     Attributes:
-        rules (list[QuietHoursRule]): Complete list after the change.
+        rules (list[QuietHoursRule]): Complete list after the change, ascending by id.
     """
 
     rules: list[QuietHoursRule]

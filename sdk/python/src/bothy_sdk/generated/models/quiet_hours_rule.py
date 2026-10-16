@@ -22,7 +22,7 @@ class QuietHoursRule:
         end_local (str):
         enabled (bool):
         version (int):
-        time_zone (str | Unset):
+        time_zone (str | Unset): IANA time zone name; absent means the person's time zone (users.time_zone).
     """
 
     id: UUID

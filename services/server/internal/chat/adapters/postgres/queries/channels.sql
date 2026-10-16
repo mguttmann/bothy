@@ -67,3 +67,19 @@ SET name = @name, topic = @topic, forum_default_sort = sqlc.narg(forum_default_s
     default_notification_level = sqlc.narg(default_notification_level), sort_key = @sort_key,
     archived_at = sqlc.narg(archived_at), version = @version
 WHERE id = @id;
+
+-- name: ShareChannel :one
+-- The channel held FOR SHARE while notify writes a preference on it or below it (M3-18); the
+-- columns of GetChannel. The space row is not locked here: the caller shares it next.
+SELECT sqlc.embed(c), s.default_operator_agent_id AS space_operator_id,
+       (s.archived_at IS NOT NULL)::boolean AS space_archived, t.id AS main_thread_id
+FROM channels c
+LEFT JOIN spaces s ON s.id = c.space_id
+LEFT JOIN threads t ON t.channel_id = c.id AND t.kind = 'main'
+WHERE c.id = @id
+FOR SHARE OF c;
+
+-- name: ChannelIDsOfSpace :many
+-- Every channel of a space, archived ones included, ascending: the targets of the cleanup of
+-- notification preferences when the space is archived (M3-18).
+SELECT id FROM channels WHERE space_id = @space_id ORDER BY id;

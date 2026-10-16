@@ -45,3 +45,8 @@ UPDATE spaces SET sort_key = @sort_key, version = @version WHERE id = @id;
 
 -- name: ArchiveSpace :exec
 UPDATE spaces SET archived_at = @archived_at, version = @version WHERE id = @id;
+
+-- name: ShareSpace :one
+-- The space held FOR SHARE while notify writes a preference below it (M3-18): an archive holds
+-- the row FOR UPDATE, so the write either commits before it or sees the archive.
+SELECT * FROM spaces WHERE id = @id FOR SHARE;

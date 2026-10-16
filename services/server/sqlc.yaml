@@ -121,3 +121,17 @@ sql:
         output_querier_file_name: querier.gen.go
         output_files_suffix: .gen
         emit_interface: false
+  # notify (M3-18): file names end in .gen.go (docs/DECISIONS.md M1-05/7).
+  - engine: postgresql
+    schema: migrations
+    queries: internal/notify/adapters/postgres/queries
+    gen:
+      go:
+        package: sqlcgen
+        out: internal/notify/adapters/postgres/sqlcgen
+        sql_package: pgx/v5
+        output_db_file_name: db.gen.go
+        output_models_file_name: models.gen.go
+        output_querier_file_name: querier.gen.go
+        output_files_suffix: .gen
+        emit_interface: false

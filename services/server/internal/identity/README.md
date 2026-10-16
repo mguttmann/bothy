@@ -897,6 +897,10 @@ fail closed with `internal`, so a writer wired without the configuration never w
 by accident. `wire.NewIdentity` builds its `Directory` that way from `IdentityWrites.Search` and
 `Settings` (`wire.NewSearchDirectory`).
 
+## People by id list (M3-18)
+
+- Port: `Directory.Users(ctx, ids)` returns the people among a list of ids in one read (`ListUsersByIDs`), keyed by id; unknown ids and principals that are not people are absent, like `Principals`. It does not authorize: `notify` loads `users.time_zone` for the quiet hours of people it already selected.
+
 ## Port (Wurzelpaket `internal/identity`)
 
 - Eingehend: `Auth` (Anmeldung, Refresh, Logout, Kind-Sitzungen), `StepUp` (Step-up, M1-35), `Providers` and `Identities` (M1-36), `Enrollment` (M1-37), `LocalCredentials` (M1-39), `Passkeys` (M1-40), `OIDCLogin` (M1-41), `TrustedHeaderLogins` (M1-43), `Directory`, `Devices`, `Tokens` and `TokenAdmin` (M1-44), `PrincipalWriter` (M1-51), `Lifecycle` (M1-45), `Owners`, `PrincipalWrites` (M2-24); deklariert `AvatarFiles`, `AppInstallations` (M2-24).

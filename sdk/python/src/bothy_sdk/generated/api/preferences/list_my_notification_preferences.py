@@ -64,6 +64,10 @@ def sync_detailed(
 ) -> Response[NotificationPreferenceList | Problem]:
     """List notification levels
 
+     The caller's own levels, ordered by target kind, then target id. Only targets the caller can still
+    read are listed; rows on targets the caller lost stay stored and appear again when the right
+    returns.
+
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
         httpx.TimeoutException: If the request takes longer than Client.timeout.
@@ -87,6 +91,10 @@ def sync(
 ) -> NotificationPreferenceList | Problem | None:
     """List notification levels
 
+     The caller's own levels, ordered by target kind, then target id. Only targets the caller can still
+    read are listed; rows on targets the caller lost stay stored and appear again when the right
+    returns.
+
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
         httpx.TimeoutException: If the request takes longer than Client.timeout.
@@ -105,6 +113,10 @@ async def asyncio_detailed(
     client: AuthenticatedClient | Client,
 ) -> Response[NotificationPreferenceList | Problem]:
     """List notification levels
+
+     The caller's own levels, ordered by target kind, then target id. Only targets the caller can still
+    read are listed; rows on targets the caller lost stay stored and appear again when the right
+    returns.
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
@@ -126,6 +138,10 @@ async def asyncio(
     client: AuthenticatedClient | Client,
 ) -> NotificationPreferenceList | Problem | None:
     """List notification levels
+
+     The caller's own levels, ordered by target kind, then target id. Only targets the caller can still
+    read are listed; rows on targets the caller lost stay stored and appear again when the right
+    returns.
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.

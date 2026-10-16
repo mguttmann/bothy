@@ -243,6 +243,59 @@ func (q *Queries) ListPrincipalsByIDs(ctx context.Context, ids []pgtype.UUID) ([
 	return items, nil
 }
 
+const listUsersByIDs = `-- name: ListUsersByIDs :many
+SELECT p.id, p.kind, p.status, p.handle, p.display_name, p.avatar_file_id, p.created_at, p.disabled_at, p.deleted_at, u.principal_id, u.email, u.locale, u.time_zone, u.last_active_at,
+       EXISTS (SELECT 1 FROM owners o WHERE o.user_id = p.id AND o.revoked_at IS NULL) AS is_owner
+FROM principals p
+JOIN users u ON u.principal_id = p.id
+WHERE p.id = ANY ($1::uuid[])
+ORDER BY p.id
+`
+
+type ListUsersByIDsRow struct {
+	Principal Principal
+	User      User
+	IsOwner   bool
+}
+
+// The people among a list of ids in one read (M3-18: the time zones of the quiet hours of many
+// people); agents, apps and unknown ids have no row.
+func (q *Queries) ListUsersByIDs(ctx context.Context, ids []pgtype.UUID) ([]ListUsersByIDsRow, error) {
+	rows, err := q.db.Query(ctx, listUsersByIDs, ids)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []ListUsersByIDsRow
+	for rows.Next() {
+		var i ListUsersByIDsRow
+		if err := rows.Scan(
+			&i.Principal.ID,
+			&i.Principal.Kind,
+			&i.Principal.Status,
+			&i.Principal.Handle,
+			&i.Principal.DisplayName,
+			&i.Principal.AvatarFileID,
+			&i.Principal.CreatedAt,
+			&i.Principal.DisabledAt,
+			&i.Principal.DeletedAt,
+			&i.User.PrincipalID,
+			&i.User.Email,
+			&i.User.Locale,
+			&i.User.TimeZone,
+			&i.User.LastActiveAt,
+			&i.IsOwner,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const lockPrincipal = `-- name: LockPrincipal :one
 SELECT p.id, p.kind, p.status, p.handle, p.display_name, p.avatar_file_id, p.created_at, p.disabled_at, p.deleted_at
 FROM principals p

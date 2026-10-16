@@ -25,6 +25,7 @@ import (
 	"github.com/OWNER/bothy/services/server/internal/kernel/clock"
 	"github.com/OWNER/bothy/services/server/internal/kernel/ids"
 	"github.com/OWNER/bothy/services/server/internal/kernel/txn"
+	notifyapp "github.com/OWNER/bothy/services/server/internal/notify/app"
 	"github.com/OWNER/bothy/services/server/internal/platform/config"
 	"github.com/OWNER/bothy/services/server/internal/platform/egress"
 	"github.com/OWNER/bothy/services/server/internal/platform/lifecycle"
@@ -239,6 +240,10 @@ func (a *Audit) RightsHook() *authzapp.RightsHook { return a.modules.Authz }
 // SyncSubscribers returns the in-transaction subscribers of sync of the registry of the unit of
 // work; the start binds their appender (M1-61).
 func (a *Audit) SyncSubscribers() *syncapp.Subscribers { return a.modules.SyncSubscribers }
+
+// NotifySubscribers returns the in-transaction subscribers of notify of the registry of the unit
+// of work; the chat step binds their appender and the chat paths (M3-18).
+func (a *Audit) NotifySubscribers() *notifyapp.Subscribers { return a.modules.NotifySubscribers }
 
 // Recorder returns the recorder; it implements auditing.Recorder.
 func (a *Audit) Recorder() *auditapp.Recorder { return a.recorder }

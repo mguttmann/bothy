@@ -90,6 +90,11 @@ def sync_detailed(
 ) -> Response[Problem | QuietHoursRule]:
     """Add a quiet hours rule
 
+     Adds a rule. time_zone must be an IANA zone name (400 validation_failed with errors[].code
+    unknown_time_zone); absent means the person's time zone. Every write sends the complete list in
+    quiet_hours.updated; a write that would make that list larger than sync.event_payload_max_bytes is
+    refused with 400 validation_failed and errors[].code limit_reached.
+
     Args:
         idempotency_key (UUID | Unset): UUIDv7 (RFC 9562), lowercase canonical form.
         body (QuietHoursRuleInput):
@@ -122,6 +127,11 @@ def sync(
 ) -> Problem | QuietHoursRule | None:
     """Add a quiet hours rule
 
+     Adds a rule. time_zone must be an IANA zone name (400 validation_failed with errors[].code
+    unknown_time_zone); absent means the person's time zone. Every write sends the complete list in
+    quiet_hours.updated; a write that would make that list larger than sync.event_payload_max_bytes is
+    refused with 400 validation_failed and errors[].code limit_reached.
+
     Args:
         idempotency_key (UUID | Unset): UUIDv7 (RFC 9562), lowercase canonical form.
         body (QuietHoursRuleInput):
@@ -148,6 +158,11 @@ async def asyncio_detailed(
     idempotency_key: UUID | Unset = UNSET,
 ) -> Response[Problem | QuietHoursRule]:
     """Add a quiet hours rule
+
+     Adds a rule. time_zone must be an IANA zone name (400 validation_failed with errors[].code
+    unknown_time_zone); absent means the person's time zone. Every write sends the complete list in
+    quiet_hours.updated; a write that would make that list larger than sync.event_payload_max_bytes is
+    refused with 400 validation_failed and errors[].code limit_reached.
 
     Args:
         idempotency_key (UUID | Unset): UUIDv7 (RFC 9562), lowercase canonical form.
@@ -178,6 +193,11 @@ async def asyncio(
     idempotency_key: UUID | Unset = UNSET,
 ) -> Problem | QuietHoursRule | None:
     """Add a quiet hours rule
+
+     Adds a rule. time_zone must be an IANA zone name (400 validation_failed with errors[].code
+    unknown_time_zone); absent means the person's time zone. Every write sends the complete list in
+    quiet_hours.updated; a write that would make that list larger than sync.event_payload_max_bytes is
+    refused with 400 validation_failed and errors[].code limit_reached.
 
     Args:
         idempotency_key (UUID | Unset): UUIDv7 (RFC 9562), lowercase canonical form.

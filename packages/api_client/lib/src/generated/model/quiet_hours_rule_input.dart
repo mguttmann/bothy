@@ -14,7 +14,7 @@ part 'quiet_hours_rule_input.g.dart';
 /// * [weekdays]
 /// * [startLocal]
 /// * [endLocal]
-/// * [timeZone]
+/// * [timeZone] - IANA time zone name; absent means the person's time zone (users.time_zone).
 /// * [enabled]
 @BuiltValue()
 abstract class QuietHoursRuleInput
@@ -28,6 +28,7 @@ abstract class QuietHoursRuleInput
   @BuiltValueField(wireName: r'end_local')
   String get endLocal;
 
+  /// IANA time zone name; absent means the person's time zone (users.time_zone).
   @BuiltValueField(wireName: r'time_zone')
   String? get timeZone;
 

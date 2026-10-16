@@ -91,6 +91,17 @@ Stufe eines Menschen für einen Thread ist der erste vorhandene Wert in dieser R
 Ist bei der gewählten Zeile `muted_until` in der Zukunft, gilt `mute`. Dieselbe Reihenfolge steht
 in [03-datenmodell.md](03-datenmodell.md) (`notification_preferences`).
 
+Preferences are set on spaces, channels and threads the person can read, the main thread of a
+text channel included. An archived target (an archived space or channel, or a channel in an
+archived space) takes no new preference: `409 conflict` with `reason` `target_archived`; deleting
+stays possible (docs/DECISIONS.md D-M3-18-2). `muted_until` is stored as given in whole
+microseconds, also when it has passed, and has no effect once passed (D-M3-18-3). A write that
+changes nothing writes no event and keeps the version. Deleting writes `notification_pref.updated`
+with `deleted: true` and the last version plus one; a later write starts at version 1. Archiving a
+space or channel removes, in the same transaction, the preferences of it and of every channel and
+thread below it, of every person, with one `notification_pref.updated` per removed row (D-M3-18-5).
+Lists name only targets the person can still read; the other rows stay stored.
+
 ### 3.2 Automatisches Folgen
 
 Schreibt ein Mensch in einem Thread mit `kind = 'thread'` (nicht im Hauptverlauf) oder legt er
@@ -129,6 +140,13 @@ Zeilen in `quiet_hours`: Wochentage als Bitmaske (Bit 0 = Montag), `start_local`
    With `start_local = end_local` this is a window of 24 hours from `start_local` on each set
    weekday; screen D9 "ganztags" stores `00:00` to `00:00` (docs/DECISIONS.md D-M3-17-4).
 4. Eine Person ist in Ruhezeit, wenn eine aktivierte Zeile passt.
+
+`time_zone` must be an IANA zone name (`400 validation_failed` with `errors[].code`
+`unknown_time_zone`); absent means `users.time_zone`. A put replaces the whole rule. Every write
+sends the complete list, ascending by `id`, in `quiet_hours.updated`; the writes of one person run
+one after the other (D-M3-18-7). A write that would make that list larger than
+`sync.event_payload_max_bytes` is refused with `400 validation_failed` and `errors[].code`
+`limit_reached`. A stored zone that no longer loads counts as UTC (D-M3-18-8).
 
 Folge der Ruhezeit: Der Hinweis wird leise zugestellt (iOS `interruption-level: passive` und
 Priorität 5, Android ohne Ton mit niedriger Priorität, Desktop ohne Ton). Er erscheint in der
@@ -557,6 +575,8 @@ keine Personen-, Geräte- oder Thread-IDs.
 2. `notify_fanout` ermittelt die Kandidaten: Menschen mit Leserecht auf den Kanal (aus `authz`),
    Erwähnte, Lauf-Auslöser. Die Stufen holt eine gebündelte Abfrage auf
    `notification_preferences` für alle Kandidaten und die drei Ziele (Thread, Kanal, Bereich).
+   `notify` gathers the facts for all candidates of a thread in one query and resolves the level
+   with the pure function of point 3 (docs/DECISIONS.md D-M3-18-9).
 3. Die Entscheidung je Empfänger (Abschnitt 4) ist eine reine Funktion im Domänen-Teil von
    `notify`. Sie bekommt Fakten (Stufe, Ruhezeit, Aktivität, Fensterzustand) und liefert eine
    Entscheidung. Tests prüfen sie als Tabelle.

@@ -61,6 +61,9 @@ type Store interface {
 	// User returns the person id with its owner flag; found is false for an unknown id and for a
 	// principal without a users row.
 	User(ctx context.Context, id ids.ID) (rec UserRecord, found bool, err error)
+	// Users returns the people among list with their owner flags, ascending by id; unknown ids and
+	// principals without a users row are absent.
+	Users(ctx context.Context, list []ids.ID) ([]UserRecord, error)
 	// ActiveOwners returns the owners rows with revoked_at IS NULL, ordered by granted_at, id.
 	ActiveOwners(ctx context.Context) ([]OwnerRecord, error)
 	// ActiveOwnerIDs returns the persons with an active owners row and principal status

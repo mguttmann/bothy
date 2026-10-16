@@ -67,3 +67,13 @@ WHERE id = @id AND kind IN ('agent', 'app');
 -- The display name of an agent or app principal (M2-24: an upgraded manifest renames the app).
 UPDATE principals SET display_name = @display_name
 WHERE id = @id AND kind IN ('agent', 'app');
+
+-- name: ListUsersByIDs :many
+-- The people among a list of ids in one read (M3-18: the time zones of the quiet hours of many
+-- people); agents, apps and unknown ids have no row.
+SELECT sqlc.embed(p), sqlc.embed(u),
+       EXISTS (SELECT 1 FROM owners o WHERE o.user_id = p.id AND o.revoked_at IS NULL) AS is_owner
+FROM principals p
+JOIN users u ON u.principal_id = p.id
+WHERE p.id = ANY (@ids::uuid[])
+ORDER BY p.id;

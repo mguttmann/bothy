@@ -294,6 +294,10 @@ database from `pgtest.Durable()` (`fsync` and `synchronous_commit` on, ADR 0063 
 below the value of 02; the threshold comes from the table of 02 through
 `perf/internal/report`.
 
+## Stored settings of many people (M3-18)
+
+- Port: `Settings.ValuesFor(ctx, userIDs, keys)` returns the stored values of the keys for many people in one query (`SettingValues`), without defaults and without `authorize`: `notify` reads `notify.default_level` of every candidate of a thread (M3-18), and M3-19 reads its switches the same way.
+
 ## Port (Wurzelpaket `internal/sync`)
 
 - Eingehend: `Tail`, `CatchUp`, `Snapshot`, `Consumers` (Worker-Cursor), `ReadStates`, `Drafts`, `Settings`.

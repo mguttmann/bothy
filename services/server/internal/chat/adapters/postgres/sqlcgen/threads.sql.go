@@ -561,3 +561,29 @@ func (q *Queries) ShareThread(ctx context.Context, id pgtype.UUID) (ShareThreadR
 	)
 	return i, err
 }
+
+const threadIDsOfChannels = `-- name: ThreadIDsOfChannels :many
+SELECT id FROM threads WHERE channel_id = ANY ($1::uuid[]) ORDER BY id
+`
+
+// Every thread of the channels, ascending: the targets of the cleanup of notification
+// preferences when a channel or space is archived (M3-18).
+func (q *Queries) ThreadIDsOfChannels(ctx context.Context, channelIds []pgtype.UUID) ([]pgtype.UUID, error) {
+	rows, err := q.db.Query(ctx, threadIDsOfChannels, channelIds)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []pgtype.UUID
+	for rows.Next() {
+		var id pgtype.UUID
+		if err := rows.Scan(&id); err != nil {
+			return nil, err
+		}
+		items = append(items, id)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}

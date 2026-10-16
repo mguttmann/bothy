@@ -164,6 +164,8 @@ type server struct {
 	messaging *Messaging
 	// personal is the personal data of sync (M1-61), built in the chat step over chat and messaging.
 	personal *Personal
+	// notify is the notify module (M3-18), built in the chat step over chat, sync and identity.
+	notify *Notify
 	// terminal is the terminal module (M2-39): the host records and their REST handlers.
 	terminal *Terminal
 	// apps is the module apps (M2-24): the app use cases and their REST handlers.
@@ -785,10 +787,33 @@ func (s *server) startChat(context.Context) error {
 	if err != nil {
 		return err
 	}
+	n, err := s.startNotify(pool, a, az, sy, c, p, id)
+	if err != nil {
+		return err
+	}
 	s.mu.Lock()
-	s.chat, s.messaging, s.personal = c, m, p
+	s.chat, s.messaging, s.personal, s.notify = c, m, p, n
 	s.mu.Unlock()
 	return nil
+}
+
+// startNotify builds the notify module (M3-18) in the chat step over the chat service, the
+// settings of the personal data of sync and the directory of identity, and binds the
+// in-transaction subscribers of notify of the unit of work to the appender and the chat paths.
+func (s *server) startNotify(pool *pg.Pool, a *Audit, az authorize.Authorizer, sy *Sync, c *Chat, p *Personal, id *Identity) (*Notify, error) {
+	cfg, err := NotifyConfig(s.values)
+	if err != nil {
+		return nil, err
+	}
+	n, err := NewNotify(cfg, pool, a.UoW(), az, sy.Appender(), NotifyDeps{Chat: c.Service, Settings: p.Service.Settings(), Users: id.Directory},
+		s.deps.Clock, s.logger())
+	if err != nil {
+		return nil, err
+	}
+	if err := a.NotifySubscribers().Bind(sy.Appender(), c.Service); err != nil {
+		return nil, err
+	}
+	return n, nil
 }
 
 // startTerminal is start step 6g (M2-39): the terminal module over the pool, the unit of work and
@@ -916,6 +941,7 @@ func (s *server) handlers() Handlers {
 	}
 	s.messaging.fillHandlers(&h)
 	s.personal.fillHandlers(&h)
+	s.notify.fillHandlers(&h)
 	if h.Hosts == nil && s.terminal != nil {
 		h.Hosts = s.terminal.Handlers
 	}
