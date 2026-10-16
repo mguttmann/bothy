@@ -371,7 +371,8 @@ def test_public_symbol_without_doc_fails_lint(tmp_path: Path) -> None:
             timeout=600,
         )
 
-    got = flutter("pub", "get", "--offline")
+    # Not --offline: a gate job may run this before any pub get filled the cache.
+    got = flutter("pub", "get")
     assert got.returncode == 0, got.stdout + got.stderr
     clean = flutter("analyze", "--fatal-infos")
     assert clean.returncode == 0, clean.stdout + clean.stderr
