@@ -5,21 +5,27 @@
 # note 6): platform-tests.json (`make apps-platform`) and `make perf` call it.
 #
 # The platform folders of the harness are not checked in (docs/DECISIONS.md D-M6-11-6), so the
-# first run makes macos/ with `flutter create`. That command also writes a sample test, a
-# member lock file and its own metadata next to it; they would break the workspace, so the
-# ones it added are removed again. macos/ stays and is ignored by git.
+# script makes macos/ with `flutter create` for the run. That command and `flutter drive` also
+# write a sample test, a member lock file, metadata and IDE files. Everything the run added is
+# removed afterwards, also after a failed run: a native folder under packages/ fails rule 4 of
+# `make arch`, and the sample test would break `flutter test`. The exit code is the one of
+# `flutter drive`.
 set -eu
 cd "$(dirname "$0")/.."
-if [ ! -d macos ]; then
-  added=""
-  for f in test/widget_test.dart pubspec.lock .metadata .gitignore bothy_viz_harness.iml; do
-    [ -e "$f" ] || added="$added $f"
-  done
-  flutter create --platforms=macos --no-pub .
+added=""
+for f in macos test/widget_test.dart pubspec.lock .metadata .gitignore bothy_viz_harness.iml \
+  .idea .flutter-plugins-dependencies; do
+  [ -e "$f" ] || added="$added $f"
+done
+cleanup() {
   for f in $added; do
-    rm -f "./$f"
+    rm -rf "./$f"
   done
-fi
-exec flutter drive --profile -d macos \
+}
+trap cleanup EXIT
+flutter create --platforms=macos --no-pub .
+status=0
+flutter drive --profile -d macos \
   --driver=test_driver/integration_test.dart \
-  --target=integration_test/topology_perf_test.dart
+  --target=integration_test/topology_perf_test.dart || status=$?
+exit "$status"

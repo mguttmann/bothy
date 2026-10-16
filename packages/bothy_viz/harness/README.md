@@ -37,5 +37,6 @@ every view; run it with `make test COMPONENTS=apps` or `flutter test` in this fo
 replays frames on the fixture clock; it fails when the p95 of `FrameTiming.buildDuration` is
 above `viz.perf.frame_build_p95`. It needs macOS and runs in profile mode through
 `tool/perf_macos.sh` (listed in `platform-tests.json`), so `make apps-platform` and `make perf`
-run it on a Mac and print a SKIP line elsewhere. The script makes the ignored `macos/` folder
-with `flutter create` on its first run and removes the other files that command adds.
+run it on a Mac and print a SKIP line elsewhere. The script makes the `macos/` folder with
+`flutter create` for the run and removes everything the run added afterwards, also after a
+failure, because a native folder under `packages/` fails rule 4 of `make arch`.
