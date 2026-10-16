@@ -98,6 +98,18 @@
       "doc": "Lifetime of an access token."
     },
     {
+      "name": "auth.api_token_max_ttl",
+      "env": "BOTHY_AUTH__API_TOKEN_MAX_TTL",
+      "kind": "duration",
+      "default": "365d",
+      "required": false,
+      "enum": [],
+      "min": "1s",
+      "max": "",
+      "chapter": "08-identity.md",
+      "doc": "Longest lifetime of an agent or app token."
+    },
+    {
       "name": "auth.cleanup_interval",
       "env": "BOTHY_AUTH__CLEANUP_INTERVAL",
       "kind": "duration",
@@ -146,6 +158,18 @@
       "doc": "Oldest iat a DPoP proof may have."
     },
     {
+      "name": "auth.dpop_required_for",
+      "env": "BOTHY_AUTH__DPOP_REQUIRED_FOR",
+      "kind": "list(string)",
+      "default": "[\"agent\"]",
+      "required": false,
+      "enum": [],
+      "min": "",
+      "max": "",
+      "chapter": "08-identity.md",
+      "doc": "Token kinds (agent, app, personal) whose API tokens must be DPoP-bound."
+    },
+    {
       "name": "auth.login_fail_window",
       "env": "BOTHY_AUTH__LOGIN_FAIL_WINDOW",
       "kind": "duration",
@@ -156,6 +180,18 @@
       "max": "",
       "chapter": "08-identity.md",
       "doc": "Window in which failed attempts count."
+    },
+    {
+      "name": "auth.personal_token_max_ttl",
+      "env": "BOTHY_AUTH__PERSONAL_TOKEN_MAX_TTL",
+      "kind": "duration",
+      "default": "90d",
+      "required": false,
+      "enum": [],
+      "min": "1s",
+      "max": "",
+      "chapter": "08-identity.md",
+      "doc": "Longest lifetime of a personal token."
     },
     {
       "name": "auth.refresh_reuse_grace",

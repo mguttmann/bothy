@@ -384,6 +384,20 @@ func TestKeys_AnonymousUsesClientIP(t *testing.T) {
 	}
 }
 
+// TestKeys_InactiveCredentialUsesClientIP (M1-44, red team round 2): a revoked or expired API
+// token never spends the bucket of its principal; its requests count against the client IP.
+func TestKeys_InactiveCredentialUsesClientIP(t *testing.T) {
+	t.Parallel()
+	dead := actor.Actor{ID: ids.MustParse("0192f4a0-7b1c-7577-8bf0-c4f4ee4f887e"), Kind: actor.KindAgent,
+		TokenID: ids.MustParse("0192f4a0-7b1c-7577-8bf0-c4f4ee4f8881"), CredentialInactive: true}
+	for _, class := range []ratelimit.Class{"rl.read", "rl.write", "rl.agent_runtime", "rl.host", "rl.terminal"} {
+		got, err := ratelimit.RequestKey(keyRequest("2001:db8:7:8::1", &dead, ""), class)
+		if err != nil || got != "ip:2001:db8:7:8::/64" {
+			t.Errorf("%s inactive credential: %q, %v", class, got, err)
+		}
+	}
+}
+
 func TestKeys_WebhookPathValue(t *testing.T) {
 	t.Parallel()
 	const hook1, hook2 = "0192f4a0-7b1c-7000-8a00-000000000901", "0192f4a0-7b1c-7000-8a00-000000000902"

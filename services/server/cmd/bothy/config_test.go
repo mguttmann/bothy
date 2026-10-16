@@ -165,11 +165,14 @@ func TestConfigPrintShowsSourcePerKey(t *testing.T) {
 		"audit.deny_aggregate_max_keys = 10000  # default\n" +
 		"audit.deny_aggregate_window = 1m  # default\n" +
 		"auth.access_token_ttl = 10m  # default\n" +
+		"auth.api_token_max_ttl = 365d  # default\n" +
 		"auth.cleanup_interval = 1h  # default\n" +
 		"auth.clock_leeway = 30s  # default\n" +
 		"auth.dpop_nonce_ttl = 5m  # default\n" +
 		"auth.dpop_proof_max_age = 1m  # default\n" +
+		"auth.dpop_required_for = agent  # default\n" +
 		"auth.login_fail_window = 15m  # default\n" +
+		"auth.personal_token_max_ttl = 90d  # default\n" +
 		"auth.refresh_reuse_grace = 30s  # default\n" +
 		"auth.refresh_token_ttl = 14d  # default\n" +
 		"auth.session_max_age = 30d  # default\n" +

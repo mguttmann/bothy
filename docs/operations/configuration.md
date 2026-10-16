@@ -403,9 +403,9 @@ Source: [08-identity.md](../spec/08-identity.md), section 18.
 | `auth.login_fail_limit` | `BOTHY_AUTH__LOGIN_FAIL_LIMIT` | Server |  | `10` | Failed attempts per account and window | planned (M1) |
 | `auth.login_fail_window` | `BOTHY_AUTH__LOGIN_FAIL_WINDOW` | Server | duration | `15m` | Window for failed attempts | active |
 | `auth.login_lock_duration` | `BOTHY_AUTH__LOGIN_LOCK_DURATION` | Server |  | `15m` | Lockout of the password path | planned (M1) |
-| `auth.dpop_required_for` | `BOTHY_AUTH__DPOP_REQUIRED_FOR` | Server |  | `["agent"]` | Token kinds that must be DPoP-bound | planned (M1) |
-| `auth.api_token_max_ttl` | `BOTHY_AUTH__API_TOKEN_MAX_TTL` | Server |  | `365d` | Maximum duration of an agent or app token | planned (M1) |
-| `auth.personal_token_max_ttl` | `BOTHY_AUTH__PERSONAL_TOKEN_MAX_TTL` | Server |  | `90d` | Maximum duration of a personal token | planned (M1) |
+| `auth.dpop_required_for` | `BOTHY_AUTH__DPOP_REQUIRED_FOR` | Server | list(string) | `["agent"]` | Token kinds that must be DPoP-bound | active |
+| `auth.api_token_max_ttl` | `BOTHY_AUTH__API_TOKEN_MAX_TTL` | Server | duration | `365d` | Maximum duration of an agent or app token | active |
+| `auth.personal_token_max_ttl` | `BOTHY_AUTH__PERSONAL_TOKEN_MAX_TTL` | Server | duration | `90d` | Maximum duration of a personal token | active |
 | `client.app_lock_after` | `BOTHY_CLIENT__APP_LOCK_AFTER` | Server |  | `5m` | time without use until the app lock | planned (M5) |
 | `security.app_lock_required` | `BOTHY_SECURITY__APP_LOCK_REQUIRED` | Server |  | `false` | Require the app lock instance-wide | planned (M5) |
 

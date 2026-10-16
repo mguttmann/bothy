@@ -93,7 +93,7 @@ func newEnv(t *testing.T, cfg app.Config) *env {
 	versions.Set(1)
 	az, err := authzapp.NewAuthorizer(authzapp.AuthorizerConfig{SnapshotCacheMaxEntries: 100, StepUpMaxAge: 5 * time.Minute}, authzapp.AuthorizerDeps{
 		Catalog: authzapp.NewCatalog(slog.New(slog.DiscardHandler)), Store: fake.NewStore(),
-		Principals: app.NewPrincipalSource(repo), Credentials: liveSessions{devices: app.NewCredentialSource(repo, repo)},
+		Principals: app.NewPrincipalSource(repo), Credentials: liveSessions{devices: app.NewCredentialSource(repo, repo, repo)},
 		Structure: fake.NewStructure(), Policies: fake.NewPolicies(), Versions: versions, Recorder: nopRecorder{},
 		Clock: clock.System(), Log: slog.New(slog.DiscardHandler),
 	})

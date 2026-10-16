@@ -1,6 +1,6 @@
 # Module `identity`
 
-Status: principal tables and directory built (M1-26); devices, device keys and the DPoP verifier built (M1-33); people, owners and the own profile built (M1-31); sessions, access tokens, refresh families, logout and the Authenticator built (M1-34); step-up with the device key and the job `identity.auth_cleanup` built (M1-35); identity providers, the mapping of external identities, the credential overview and unlinking built (M1-36); logins, step-up with a passkey and API tokens follow with the tickets of the milestone.
+Status: principal tables and directory built (M1-26); devices, device keys and the DPoP verifier built (M1-33); people, owners and the own profile built (M1-31); sessions, access tokens, refresh families, logout and the Authenticator built (M1-34); step-up with the device key and the job `identity.auth_cleanup` built (M1-35); identity providers, the mapping of external identities, the credential overview and unlinking built (M1-36); API tokens with prefix and checksum built (M1-44); logins and step-up with a passkey follow with the tickets of the milestone.
 The normative source is [docs/spec/02-architecture.md](../../../../docs/spec/02-architecture.md); if this file differs, the chapter applies.
 
 ## Purpose
@@ -54,8 +54,8 @@ Principals, people, owners, login drivers, identities, local credentials, enroll
   info `dpop-nonce/v1`, window `unix / auth.dpop_nonce_ttl`, current and previous window) and the
   replay key `SHA-256(htu || 0x00 || jti)`.
 - `app`: `Devices`, `DPoPVerifier` (checks in the order of the brief, nothing remembered on a
-  failure), `CredentialSource` (device state; the session part follows with M1-34, tokens stay not
-  active until M1-44), the outgoing ports `DeviceStore`, `Cursors` and `ReplayStore`; `Config` binds
+  failure), `CredentialSource` (device state; the session part since M1-34, the token part since
+  M1-44), the outgoing ports `DeviceStore`, `Cursors` and `ReplayStore`; `Config` binds
   `auth.dpop_nonce_ttl`, `auth.dpop_proof_max_age`, `auth.clock_leeway`, `auth.token_pepper_ref`,
   `server.public_url`, `api.page_size_default`, `api.page_size_max`.
 - `adapters/postgres`: `queries/devices.sql` and the device methods of `Repository`; a reused
@@ -149,7 +149,8 @@ Principals, people, owners, login drivers, identities, local credentials, enroll
   signature, `iss`, `aud`, `nbf` and `exp` with `auth.clock_leeway`), `Sessions` (implements
   `identity.Auth`; refresh in one unit of work with the session rows locked in ascending id, then
   the family), `Authenticator` (implements `kernel/actor.Authenticator`: no header anonymous;
-  several headers or another scheme `401 unauthenticated`; `Bearer bothy_...` waits for M1-44;
+  several headers or another scheme `401 unauthenticated`; a value starting with `bothy_` takes
+  the API token path of M1-44 under either scheme;
   an access token as Bearer `401 invalid_dpop_proof`; `DPoP`: token, proof, then one query for
   session, device and active key into the actor; a stale nonce gets `DPoP-Nonce`; activity at most
   once per `identity.last_active_granularity`), `CredentialSource` (sessions part:
@@ -304,9 +305,94 @@ Principals, people, owners, login drivers, identities, local credentials, enroll
   values, issuer, link conflicts, credentials, last method, concurrent unlink, sessions of unlink
   and disable, discovery). Rulings: docs/DECISIONS.md M1-36.
 
+### API tokens (M1-44)
+
+- Format (`domain/apitoken`, ADR 0061): `bothy_<kind>_<random>_<checksum>`, 60 characters. Kinds
+  `agt` (agent), `app` (app), `pat` (person), `whi` (incoming webhook, format only until M2-27).
+  The random part is 32 bytes from `crypto/rand` as a big-endian integer in Base62
+  (`0-9A-Za-z`), left-padded to 43 digits; the checksum is CRC-32 (IEEE) of those 43 ASCII bytes
+  in Base62, left-padded to 6 digits. `Parse` accepts exactly
+  `^bothy_(agt|app|pat|whi)_[0-9A-Za-z]{43}_[0-9A-Za-z]{6}$` with an equal checksum and a random
+  value below 2^256. `token_prefix` is `bothy_<kind>_` plus the first 6 random characters,
+  `token_hash` is HMAC-SHA-256 with the pepper of `auth.token_pepper_ref` over the whole token.
+  The constant `bothy` is written once (`product`). Test vectors:
+  `domain/apitoken/testdata/checksum_vectors.json`, recomputed in Python by
+  `tools/ci/tests/test_gitleaks_rules.py`.
+- Port (`tokens.go`): `Tokens` (`Issue`, `List`, `Revoke`, `RevokeAllForPrincipal`; none
+  authorizes, all join the ambient unit of work) and `TokenAdmin` (`CreateToken`, `ListTokens`,
+  `RevokeToken`, the use cases of the three operations). `IssuedToken.Secret` is an
+  `identity.Token`, which prints `[redacted]` through fmt, slog and JSON; only the `createToken`
+  handler calls `Reveal`. `Revoke` outside a unit runs its own rights change; inside one, and
+  `RevokeAllForPrincipal` always, need a unit declared as a rights change (else
+  `internal_error`), because authz caches token liveness per rights version. M1-45
+  (`user.disable`) and M1-51 (`agent.disable`) call `RevokeAllForPrincipal` in their own rights
+  change and write their own audit.
+- `app`: `Tokens` (implements both ports), the outgoing port `APITokenStore`, the consumer port
+  `PersonalTokenSwitch` (`PersonalTokensEnabled(ctx, principalID)`) and `PersonalTokensDefault`
+  (always off, bound by `internal/wire` until M1-47 rebinds it over the feature flags).
+  `CreateToken`: `authorize(token.create)` on the principal (requirement `owner` first, then
+  `self`; step-up; a personal token for another person is `forbidden not_self`, for an owner
+  through the authz guard), then `404` for an unknown principal, `409 conflict app_not_installed`
+  for an app until M2-24, `403 feature_disabled` for a personal token while the switch is off,
+  the body rules (`/name`, `/scopes` empty for `agt` and `pat`, `/expires_at` after now and at
+  most `auth.api_token_max_ttl` or `auth.personal_token_max_ttl` ahead, `/dpop_jkt` 43 base64url
+  characters and required for the kinds in `auth.dpop_required_for`), the insert and the allow
+  entry `{token_id, kind, principal_id, dpop_bound, expires_at}` in one unit. `ListTokens`: the
+  unrevoked tokens (expired ones included), newest first, cursor bound to caller and principal;
+  a principal the caller may not list is `404`. `RevokeToken`: authorizes in a first unit (a
+  refusal never raises the rights version), an already revoked token is `204` without a new
+  entry, else a rights change revokes, audits and raises `permission_version`; `access.changed`
+  follows only where the rights path computes a difference (a token changes no grant).
+- Authentication (`app/apitokenauth.go`, `Authenticator.AuthenticateAPIToken`, also the entry
+  of the gateway `identify` of M1-64): `Bearer` or `DPoP` with a value that starts with `bothy_`.
+  Format, checksum and kind `whi` fail with `401 unauthenticated` before any query; then one
+  query by `token_hash` joined with the principal kind, which must fit the token kind. A revoked
+  or expired token yields the actor of its principal with the token id and `CredentialInactive`,
+  so `authorize` refuses it in `check_active` with `401 unauthenticated` and the audit reason
+  `token_revoked`, and the Idempotency-Key stage never replays a stored answer to it. A bound token
+  needs the scheme `DPoP` and a proof of exactly `dpop_jkt` whose `ath` is the hash of the token
+  (`401 invalid_dpop_proof` with `WWW-Authenticate: DPoP`, or `use_dpop_nonce`); `Bearer` with a
+  bound token is `invalid_dpop_proof` (RFC 9449 section 7.2), an unbound token under `DPoP` is
+  `401 unauthenticated`. The actor has no session and no device, so a personal token never has
+  owner rights and never provides step-up (SR5, `step_up_not_possible`). Nothing is cached in
+  identity; `last_used_at` is written at most once per `identity.last_active_granularity` on the
+  pool, a failure is logged with the token id and never fails the request. `Revalidate` reads the
+  token again.
+- `CredentialSource` reports `TokenActive` (exists, belongs to the principal, not revoked) and
+  `TokenExpiresAt` for authz.
+- Operations (`adapters/httpapi/tokens.go`):
+
+  | Operation | Action and resource | Class | Answer |
+  |---|---|---|---|
+  | `listTokens` | `token.list` on the principal | `rl.read` | `200 ApiTokenPage` |
+  | `createToken` | `token.create` on the principal, step-up, `Idempotency-Key` | `rl.admin` | `201 ApiTokenCreated`, `Cache-Control: no-store` |
+  | `revokeToken` | `token.revoke` on the token (owner: its principal) | `rl.admin` | `204` |
+
+  `createToken` calls `idempotency.MarkOneTimeSecret`: the stored idempotency row holds no part
+  of the answer and a replay answers `409 conflict one_time_secret` with `Idempotent-Replay:
+  true` (R-API-26).
+- `adapters/postgres`: `queries/apitokens.sql`, `apitokens.go`. Migration
+  `migrations/00014_identity_api_tokens.sql`: `api_tokens` as 03 section 4.2 (`expires_at NOT
+  NULL`, unique `token_hash`, partial index of the active tokens per principal); `bothy_app` may
+  read, insert and update.
+- Configuration: `auth.api_token_max_ttl` (`365d`), `auth.personal_token_max_ttl` (`90d`),
+  `auth.dpop_required_for` (`["agent"]`, values `agent`, `app`, `personal`, cross-check
+  `dpop_required_for`), `identity.last_active_granularity`, `auth.token_pepper_ref`.
+- Tests: `domain/apitoken` (`TestFormat_RoundTrip`, `TestFormat_ChecksumVectors`,
+  `TestParse_Rejects`, `TestGenerate_ReadsExactly32BytesFromCryptoRand`, `TestTokenPrefix`),
+  `domain` (`TestCheckToken*`), `app/apitokens_test.go`
+  (`TestIDT23_WrongChecksumRejectedWithoutLookup`, `TestAuthenticateAPIToken_Actor`,
+  `TestIssuedToken_Redacted`, `TestCredentialSource_Tokens` on PostgreSQL 18),
+  `migrations/identity_api_tokens_test.go`, and `adapters/httpapi/tokens_env_test.go` (subtests named
+  after the brief in three groups `TestAPITokens_*`, one world per group) over
+  PostgreSQL 18 with the real chain, Authenticator, authz, audit and idempotency stage: ID-T23
+  (only the hash stored, shown once, expired, revoked, DPoP binding), the body rules, step-up,
+  the switch, `not_self`, AZ-M35, SR5, revocation, `RevokeAllForPrincipal`, `last_used_at` and
+  no secret in logs or audit. Rulings: docs/DECISIONS.md M1-44.
+
 ## Port (root package `internal/identity`)
 
-- Inbound: `Auth` (login, refresh, logout, child sessions), `StepUp` (step-up, M1-35), `Providers` and `Identities` (M1-36), `Directory`, `Devices`, `Tokens`, `Owners`; declares `AvatarFiles`.
+- Inbound: `Auth` (login, refresh, logout, child sessions), `StepUp` (step-up, M1-35), `Providers` and `Identities` (M1-36), `Directory`, `Devices`, `Tokens` and `TokenAdmin` (M1-44), `Owners`; declares `AvatarFiles`.
 - Emits in-tx events: `DeviceRevoked`, `SessionEnded`.
 - Subscribes to in-tx events: none.
 - Implements source ports and cross-cutting ports: kernel `actor.Authenticator`, `authz.PrincipalSource`, `authz.CredentialSource` (session, device, token for the check `check_active`, 07 section 4.2), `instance.LoginOptionsSource`, `instance.FlagUserSource`, kernel `personaldata.Participant`.

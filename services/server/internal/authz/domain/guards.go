@@ -61,12 +61,18 @@ const (
 	actionAgentInvoke = "agent.invoke"
 	actionGrantCreate = "grant.create"
 	actionGrantRevoke = "grant.revoke"
+	actionTokenCreate = "token.create"
 )
 
-// guards applies the guards of the action (07 section 4.2 step 9): agent.invoke, grant.create and
-// grant.revoke. Other actions have no guard in M1.
+// guards applies the guards of the action (07 section 4.2 step 9): agent.invoke, grant.create,
+// grant.revoke and token.create. Other actions have no guard in M1.
 func guards(in *Input) (Decision, error) {
 	switch in.Action {
+	case actionTokenCreate:
+		if in.Token == nil {
+			return Decision{}, internalError("token.create without the holder")
+		}
+		return tokenCreateGuard(in, in.Token), nil
 	case actionAgentInvoke:
 		if in.Invoke == nil {
 			return Decision{}, internalError("agent.invoke without its trigger")
@@ -88,6 +94,27 @@ func guards(in *Input) (Decision, error) {
 		}
 	}
 	return Allow, nil
+}
+
+// tokenCreateGuard gives a personal token only to the person itself (brief M1-44): a personal
+// token is the person's own credential, so an owner who minted one for someone else could act as
+// that person. Tokens for agents and an unknown holder (the use case answers 404) pass.
+func tokenCreateGuard(in *Input, f *TokenFacts) Decision {
+	if f.HolderFound && f.HolderKind == KindUser && in.Resource.ID != in.Principal.ID {
+		return deny(OutcomeForbidden, ReasonNotSelf)
+	}
+	return Allow
+}
+
+// notSelfForPersonalToken is the reason of a refused token.create requirement: not_self when the
+// holder is a person other than the caller (08 section 12, brief M1-44), else reason unchanged
+// (owner_only for an agent or app holder).
+func notSelfForPersonalToken(in *Input, reason Reason) Reason {
+	if in.Action == actionTokenCreate && in.Token != nil && in.Token.HolderFound && in.Token.HolderKind == KindUser &&
+		in.Resource.ID != in.Principal.ID {
+		return ReasonNotSelf
+	}
+	return reason
 }
 
 // invokeGuard applies 05 section 5 points 1 to 5, 7 and 8 in this order (brief M1-28 "Guards").

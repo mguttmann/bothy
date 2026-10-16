@@ -42,8 +42,10 @@ at `identify` and `resume` once the credentials are verified, M1-66 calls
 | `rl.typing` | connection | `c:<connection id>` (gateway only) |
 | `rl.webhook_in` | incoming webhook | `w:<path value webhook_id>` |
 
-A principal, agent or host class with the anonymous actor counts by the client IP instead (IPv6 by
-/64): unauthenticated calls never share one bucket and never borrow a principal's. The client IP
+A principal, agent or host class with the anonymous actor, or with an actor whose API token the
+authenticator found revoked or expired (`CredentialInactive`, M1-44), counts by the client IP
+instead (IPv6 by /64): unauthenticated calls and dead tokens never share one bucket and never
+borrow a principal's. The client IP
 is the one `platform/httpserver` resolved into `kernel/reqmeta`: forwarding headers count only from
 peers in `server.trusted_proxies` (ID-T25). The internal map key is `<class>|<key>`, so classes
 never share buckets. `TestKeyKinds_MatchChapter05` holds the hand-written class table against the
@@ -64,7 +66,8 @@ nanosecond), so every value is an exact integer.
 Before the credentials of a request are verified, the precheck reserves one token of
 `rl.public_auth` of its client IP; while that bucket is empty, requests with credentials from the IP
 get `429` and nothing is verified. The token stays taken when the credentials fail with `401`
-(except `token_expired` and `use_dpop_nonce`) and goes back otherwise: valid credentials, the two
+(except `token_expired` and `use_dpop_nonce`) or name a revoked or expired API token (the stage
+settles such an actor as `401 unauthenticated`, M1-44) and goes back otherwise: valid credentials, the two
 normal flows and errors of other kinds (for example a `503` of the identity store) cost nothing.
 Because the token is reserved before the verification, concurrent requests of one client IP cannot
 all pass on the same token: at most `burst` verifications run per refill. The price: more than

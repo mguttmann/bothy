@@ -151,7 +151,10 @@ var requirementGroups = []struct {
 	{"write and (creator or manage or operator agent)", All(AtLeast(LevelWrite), Any(Self, HasCap(CapManage), ThreadOperator)), []string{
 		"thread.title.update",
 	}},
-	{"owner; self for own token", Any(Self, Owner), []string{"token.create", "token.revoke"}},
+	// token.create names the owner first, so a caller without either right is refused with
+	// owner_only (brief M1-44: a personal token of an owner has no owner rights, SR5).
+	{"owner; self for own token", Any(Owner, Self), []string{"token.create"}},
+	{"owner; self for own token", Any(Self, Owner), []string{"token.revoke"}},
 	{"owner; self for own tokens", Any(Self, Owner), []string{"token.list"}},
 	{"human and write", All(Human, AtLeast(LevelWrite)), []string{"typing.start"}},
 	{"human; apps with scope", Any(Human, AppKind), []string{"user.read"}},

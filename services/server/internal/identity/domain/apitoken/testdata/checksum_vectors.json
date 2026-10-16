@@ -1,0 +1,29 @@
+{
+  "description": "CRC-32 (IEEE) checksums of API token random parts in Base62, 6 digits with leading zeros (ADR 0061). Every random part starts with the marker EXAMPLE. Shared by domain/apitoken and tools/ci/tests/test_gitleaks_rules.py.",
+  "vectors": [
+    {
+      "random": "EXAMPLEOnlyNotARealTokenForTheChecksumTests",
+      "checksum": "3NymP3"
+    },
+    {
+      "random": "EXAMPLE000000000000000000000000000000000000",
+      "checksum": "2WwD3e"
+    },
+    {
+      "random": "EXAMPLEzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzz",
+      "checksum": "4TLUBi"
+    },
+    {
+      "random": "EXAMPLEabcdefghijklmnopqrstuvwxyzABCDEFGHIJ",
+      "checksum": "4CR9lk"
+    },
+    {
+      "random": "EXAMPLEPadded2xxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+      "checksum": "0LVP05"
+    },
+    {
+      "random": "EXAMPLEPadded3xxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+      "checksum": "0qsJzd"
+    }
+  ]
+}
