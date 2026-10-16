@@ -398,8 +398,16 @@ final class Outbox {
   }
 
   Future<void> _discard(OutboxEntry e) async {
+    // What the discarded entry had bound (a follow-up edit holds the server's `message_id`)
+    // goes to the slots its dependents still hold as null, so sending one of them again later
+    // reaches the same message (04 13.3).
+    final bound = <String, Object?>{
+      for (final MapEntry(:key, :value) in decodePayload(e.payload).entries)
+        key: ?value,
+    };
     for (final d in await _sender.dependentsOf(e.id)) {
       if (d.state.isFinal) continue;
+      await _sender.fillSlots(d, bound);
       await _dao.recordFailure(d.id, code: 'dependency_discarded');
     }
     await _dao.delete(e.id);

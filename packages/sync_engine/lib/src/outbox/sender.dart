@@ -311,16 +311,21 @@ final class OutboxSender {
     if (result.isEmpty) return;
     for (final d in await dependentsOf(entry.id)) {
       if (d.state.isFinal) continue;
-      final payload = decodePayload(d.payload);
-      var changed = false;
-      for (final MapEntry(:key, :value) in result.entries) {
-        if (payload.containsKey(key) && payload[key] == null) {
-          payload[key] = value;
-          changed = true;
-        }
-      }
-      if (changed) await dao.updatePayload(d.id, jsonEncode(payload));
+      await fillSlots(d, result);
     }
+  }
+
+  /// Fills [values] into the members [entry] holds as null. Runs inside the lock.
+  Future<void> fillSlots(OutboxEntry entry, Map<String, Object?> values) async {
+    final payload = decodePayload(entry.payload);
+    var changed = false;
+    for (final MapEntry(:key, :value) in values.entries) {
+      if (payload.containsKey(key) && payload[key] == null) {
+        payload[key] = value;
+        changed = true;
+      }
+    }
+    if (changed) await dao.updatePayload(entry.id, jsonEncode(payload));
   }
 
   /// The entries that depend on [id].

@@ -154,4 +154,27 @@ void main() {
     expect(c.outcome, OutcomeClass.retry);
     expect(classify(const TlsException('reset')).outcome, OutcomeClass.retry);
   });
+
+  test('a delete behind a discarded edit keeps the bound message ID', () async {
+    final held = Completer<OutboxResponse>();
+    creates.then([held]);
+    updates.then([
+      problem(412, 'version_conflict', current: {'id': serverId, 'version': 3}),
+    ]);
+    final c = await h.add('hello', thread: threadA);
+    await h.outbox.start();
+    await settle();
+    final u = await h.outbox.edit(c.id, {'content_md': 'edited'});
+    final d = await h.outbox.remove(c.id);
+    held.complete(
+      const OutboxResponse(result: {'message_id': serverId, 'version': 1}),
+    );
+    await settle();
+    await h.outbox.discard(u);
+    final failed = (await h.entry(d!))!;
+    expect(failed.lastErrorCode, 'dependency_discarded');
+    await h.outbox.retry(d);
+    await settle();
+    expect(deletes.calls.single.payload, {'message_id': serverId});
+  });
 }
