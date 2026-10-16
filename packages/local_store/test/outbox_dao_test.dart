@@ -123,11 +123,10 @@ void main() {
     await dao.recordFailure(uuid(1), code: 'validation_failed');
     // Thread 1 holds only a failed entry, so pendingThreads no longer names it.
     expect(await dao.pendingThreads(), [null, threadId(2)]);
-    expect([for (final e in await dao.allEntries()) e.id], [
-      uuid(1),
-      uuid(2),
-      uuid(3),
-    ]);
+    expect(
+      [for (final e in await dao.allEntries()) e.id],
+      [uuid(1), uuid(2), uuid(3)],
+    );
   });
 
   test(
