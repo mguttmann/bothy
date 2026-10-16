@@ -189,3 +189,16 @@ def test_flutter_and_dart_run_without_the_git_variables_of_a_hook(
         monkeypatch.setenv(name, str(repo / ".git"))
     assert _run(repo) == 0
     assert not (repo.parent / "calls.jsonl.git").exists()
+
+
+@pytest.mark.parametrize("out", ["packages", "packages/domain", "packages/domain/doc", "apps"])
+def test_out_overlapping_a_member_is_refused(repo: Path, out: str) -> None:
+    # The generator deletes <out>/<package> before it writes; an output folder in or above a
+    # member would delete its source.
+    domain = repo / "packages" / "domain" / "lib.dart"
+    domain.write_text("// source\n", encoding="utf-8")
+    code = dart_api_docs.main(
+        ["--root", str(repo), "--rules", str(repo / "rules.yaml"), "--out", out]
+    )
+    assert code == 2
+    assert domain.is_file()

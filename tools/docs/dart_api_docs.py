@@ -61,6 +61,12 @@ _GIT_LOCATION_VARIABLES = frozenset(
 )
 
 
+def _member_paths(rules: Path) -> list[str]:
+    """Folders of every member of the rules, apps included."""
+    data = yaml.safe_load(rules.read_text(encoding="utf-8"))
+    return [m["path"] for m in data["members"]]
+
+
 def _run(command: list[str], cwd: Path) -> tuple[int, str]:
     env = {k: v for k, v in os.environ.items() if k not in _GIT_LOCATION_VARIABLES}
     result = subprocess.run(
@@ -85,6 +91,13 @@ def main(argv: list[str] | None = None) -> int:
         print(f"dart-api-docs: --out {args.out} must lie inside the repository", file=sys.stderr)
         return 2
     rules = args.rules or root / "tools" / "arch-check" / "rules.yaml"
+    # The generator deletes <out>/<package> before it writes, so an output folder in or above a
+    # member of the workspace would delete its source.
+    for member in _member_paths(rules):
+        folder = (root / member).resolve()
+        if out == folder or out in folder.parents or folder in out.parents:
+            print(f"dart-api-docs: --out {args.out} overlaps the member {member}", file=sys.stderr)
+            return 2
     code, _ = _run(["flutter", "pub", "get", "--enforce-lockfile"], root)
     if code != 0:
         print(f"dart-api-docs: flutter pub get failed with exit code {code}", file=sys.stderr)
