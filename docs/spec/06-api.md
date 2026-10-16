@@ -79,7 +79,7 @@ Readiness gehören nicht zur öffentlichen API; sie liegen auf dem internen List
 | Prinzipal | Anmeldung | Kopfzeilen je Anfrage | Bindung | Gültigkeit | Step-up |
 |---|---|---|---|---|---|
 | Mensch in einer App | OIDC, Header eines vertrauenswürdigen Reverse-Proxys, lokales Konto mit Passkey oder Passwort plus TOTP; Ergebnis ist ein Token-Paar | `Authorization: DPoP <access_token>` und `DPoP: <Beweis>` | Geräteschlüssel (`cnf.jkt`), RFC 9449 | Zugriffstoken `auth.access_token_ttl` (Kapitel 08), Refresh `auth.refresh_token_ttl` | Passkey oder Geräteschlüssel mit Nutzerbestätigung |
-| Mensch in der Web-Konsole | wie oben; Ergebnis ist eine Cookie-Sitzung nach dem BFF-Muster, keine Tokens im Browser ([08-identitaet.md](08-identitaet.md), Abschnitt 7.5) | Cookie `__Host-...` und eine feste CSRF-Kopfzeile (Name und Wert legt M6-01 in openapi.yaml fest) | Cookie, als HMAC an der Sitzung | `auth.console_session_max_age`, Leerlauf `auth.console_session_idle_timeout` | Passkey, sonst erneute OIDC-Anmeldung bzw. Passwort mit TOTP |
+| Mensch in der Web-Konsole | wie oben; Ergebnis ist eine Cookie-Sitzung nach dem BFF-Muster, keine Tokens im Browser ([08-identitaet.md](08-identitaet.md), Abschnitt 7.5) | Cookie `__Host-console_session` and the CSRF header `X-Console-Request: 1` with the own `Origin` on every request except `GET`, `HEAD`, `OPTIONS` (security scheme `consoleSession`, parameter `ConsoleRequest`) | Cookie, als HMAC an der Sitzung | `auth.console_session_max_age`, Leerlauf `auth.console_session_idle_timeout` | Passkey, sonst erneute OIDC-Anmeldung bzw. Passwort mit TOTP |
 | Agent | API-Token, vom Owner erzeugt (`token.create`) | `Authorization: Bearer <token>`; bei Token mit `dpop_jkt` `Authorization: DPoP` plus `DPoP` | optional `dpop_jkt` | bis Widerruf oder `expires_at` | nie (R-AZ-03) |
 | App | API-Token mit Scopes (05, 2.6) | wie Agent | optional | wie Agent | nie |
 | Eingangs-Webhook | geheimer Token im Pfad | keine | keine | bis Widerruf | nie |
@@ -363,6 +363,9 @@ alle Texte der YAML-Dateien (R-API-15); jede Antwort-Komponente nennt ihren Stat
 | `createStepUpChallenge` | POST | `/api/v1/auth/step-up/challenge` | Anmelde- oder Sitzungsablauf: einmalige Challenge oder Code, Refresh-Rotation, Ersatz der Kind-Sitzung |
 | `completeStepUpWithPasskey` | POST | `/api/v1/auth/step-up/passkey` | Anmelde- oder Sitzungsablauf: einmalige Challenge oder Code, Refresh-Rotation, Ersatz der Kind-Sitzung |
 | `completeStepUpWithDeviceKey` | POST | `/api/v1/auth/step-up/device-key` | Anmelde- oder Sitzungsablauf: einmalige Challenge oder Code, Refresh-Rotation, Ersatz der Kind-Sitzung |
+| `stepUpWithPassword` | POST | `/api/v1/auth/step-up/password` | Anmelde- oder Sitzungsablauf: einmalige Challenge oder Code, Refresh-Rotation, Ersatz der Kind-Sitzung |
+| `beginStepUpOidcReauth` | POST | `/api/v1/auth/step-up/oidc` | Anmelde- oder Sitzungsablauf: einmalige Challenge oder Code, Refresh-Rotation, Ersatz der Kind-Sitzung |
+| `completeStepUpOidcReauth` | POST | `/api/v1/auth/step-up/oidc/complete` | Anmelde- oder Sitzungsablauf: einmalige Challenge oder Code, Refresh-Rotation, Ersatz der Kind-Sitzung |
 | `beginIdentityLink` | POST | `/api/v1/me/identities/begin` | Anmelde- oder Sitzungsablauf: einmalige Challenge oder Code, Refresh-Rotation, Ersatz der Kind-Sitzung |
 | `completeIdentityLink` | POST | `/api/v1/me/identities/complete` | Anmelde- oder Sitzungsablauf: einmalige Challenge oder Code, Refresh-Rotation, Ersatz der Kind-Sitzung |
 | `beginPasskeyRegistration` | POST | `/api/v1/me/passkeys/begin` | Anmelde- oder Sitzungsablauf: einmalige Challenge oder Code, Refresh-Rotation, Ersatz der Kind-Sitzung |
@@ -700,6 +703,11 @@ Erzeugt aus openapi.yaml.
 | POST | `/api/v1/auth/step-up/challenge` | `createStepUpChallenge` | `auth.step_up` | Create a step-up challenge |
 | POST | `/api/v1/auth/step-up/passkey` | `completeStepUpWithPasskey` | `auth.step_up` | Confirm step-up with a passkey |
 | POST | `/api/v1/auth/step-up/device-key` | `completeStepUpWithDeviceKey` | `auth.step_up` | Confirm step-up with the device key after user verification |
+| POST | `/api/v1/auth/step-up/password` | `stepUpWithPassword` | `auth.step_up` | Console step-up with password and TOTP |
+| POST | `/api/v1/auth/step-up/oidc` | `beginStepUpOidcReauth` | `auth.step_up` | Start a console step-up with OIDC |
+| POST | `/api/v1/auth/step-up/oidc/complete` | `completeStepUpOidcReauth` | `auth.step_up` | Finish a console step-up with OIDC |
+| GET | `/api/v1/console/session` | `getConsoleSession` | `self.read` | Read the console session |
+| DELETE | `/api/v1/console/session/view-as` | `endViewAs` | `access.view_as.end` | End the stored view as person |
 
 #### Me
 

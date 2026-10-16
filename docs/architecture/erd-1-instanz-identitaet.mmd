@@ -85,6 +85,7 @@ erDiagram
     timestamptz step_up_at
     text step_up_method
     timestamptz step_up_consumed_at
+    uuid view_as_user_id FK "console, View as person"
     timestamptz revoked_at
   }
   refresh_token_families {
@@ -164,6 +165,7 @@ erDiagram
   users ||--o{ devices : "hat"
   devices ||--o{ device_keys : "hat"
   users ||--o{ auth_sessions : "hat"
+  users |o--o{ auth_sessions : "viewed as"
   devices ||--o{ auth_sessions : "trägt"
   user_identities |o--o{ auth_sessions : "meldet an"
   auth_sessions |o--o{ auth_sessions : "Kind-Sitzung"

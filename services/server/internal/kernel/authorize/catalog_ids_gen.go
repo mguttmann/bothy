@@ -19,6 +19,8 @@ const (
 	ActionAccessPreview Action = "access.preview"
 	// ActionAccessViewAs is the action access.view_as.
 	ActionAccessViewAs Action = "access.view_as"
+	// ActionAccessViewAsEnd is the action access.view_as.end.
+	ActionAccessViewAsEnd Action = "access.view_as.end"
 	// ActionAgentBillingModeSet is the action agent.billing_mode.set.
 	ActionAgentBillingModeSet Action = "agent.billing_mode.set"
 	// ActionAgentBillingModeSetAll is the action agent.billing_mode.set_all.
@@ -426,6 +428,7 @@ var actionByID = map[string]Action{
 	"access.explain":               ActionAccessExplain,
 	"access.preview":               ActionAccessPreview,
 	"access.view_as":               ActionAccessViewAs,
+	"access.view_as.end":           ActionAccessViewAsEnd,
 	"agent.billing_mode.set":       ActionAgentBillingModeSet,
 	"agent.billing_mode.set_all":   ActionAgentBillingModeSetAll,
 	"agent.config.read":            ActionAgentConfigRead,
@@ -633,6 +636,7 @@ var actionList = []Action{
 	ActionAccessExplain,
 	ActionAccessPreview,
 	ActionAccessViewAs,
+	ActionAccessViewAsEnd,
 	ActionAgentBillingModeSet,
 	ActionAgentBillingModeSetAll,
 	ActionAgentConfigRead,

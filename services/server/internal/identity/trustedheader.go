@@ -10,6 +10,9 @@ import (
 // TrustedHeaderLogin is the input of TrustedHeaderLogins.LoginWithTrustedHeader (schema
 // TrustedHeaderLoginRequest plus the request facts of the HTTP chain).
 type TrustedHeaderLogin struct {
+	// Console selects the console form (client = console, M6-01): no Device and no Proof; the
+	// login registers a web device and starts a console session with a cookie instead of tokens.
+	Console bool
 	// Peer is the IP of the TCP connection, never a forwarded address; the identity headers count
 	// only when it lies in server.trusted_proxies (08 section 2.4 rule 2).
 	Peer netip.Addr

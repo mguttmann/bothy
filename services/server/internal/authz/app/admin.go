@@ -81,6 +81,9 @@ type AdminDeps struct {
 	// when they are these types. Without them those three use cases fail with kind internal.
 	Engine *Authorizer
 	Hook   *RightsHook
+	// Views stores the view of viewAsUser called from a console session (M6-01); nil refuses that
+	// call with kind internal, so a console view is never only a snapshot.
+	Views authz.ConsoleViews
 }
 
 // AdminService implements authz.Admin (brief M1-29 scope 5). It is safe for concurrent use.

@@ -282,6 +282,7 @@ func toSession(s sqlcgen.AuthSession) app.SessionRecord {
 		StepUpMethod: s.StepUpMethod.String, StepUpConsumedAt: timeOf(s.StepUpConsumedAt), LastSeenAt: timeOf(s.LastSeenAt),
 		RevokedAt:    timeOf(s.RevokedAt),
 		RevokeReason: identity.SessionRevokeReason(s.RevokeReason.String),
+		ViewAsUserID: idOf(s.ViewAsUserID), ViewAsStartedAt: timeOf(s.ViewAsStartedAt),
 	}
 }
 

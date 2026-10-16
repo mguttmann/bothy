@@ -152,6 +152,11 @@ type Identity struct {
 	TrustedHeaderHandlers *identityhttp.TrustedHeader
 	// Principals implements the port identity.PrincipalWriter for the agents module (M1-51).
 	Principals *app.PrincipalWriter
+	// Console implements the console session of the web console (M6-01); nil until BindSessions.
+	Console *app.Console
+	// ConsoleHandlers are the REST handlers of getConsoleSession, endViewAs, stepUpWithPassword,
+	// beginStepUpOidcReauth and completeStepUpOidcReauth; nil until BindSessions.
+	ConsoleHandlers *identityhttp.Console
 	// Lifecycle implements the port identity.Lifecycle and the inactive device sweep (M1-45);
 	// nil until BindSessions.
 	Lifecycle *app.Lifecycle
@@ -299,25 +304,36 @@ func (i *Identity) BindSessions(keys instance.Keys, instanceID ids.ID) error {
 	if err != nil {
 		return err
 	}
-	auth, err := app.NewAuthenticator(i.cfg, app.AuthenticatorDeps{
-		AccessTokens: tokens, DPoP: i.DPoP, Sessions: i.repo, APITokens: i.repo, Pepper: i.pepper, Clock: i.clk, Log: i.log,
-		Binding: i.TrustedHeader, Revoker: sessions, UoW: i.uow, Audit: i.writes.Audit,
-		Apps: i.writes.Apps,
+	rp, verifier, err := relyingParty(i.cfg)
+	if err != nil {
+		return err
+	}
+	// The console session (M6-01): the cookie is the second credential kind of the Authenticator,
+	// the step-ups rotate it, the login service starts it and the cleanup job ends it.
+	console, err := app.NewConsole(i.cfg, i.pepper, app.ConsoleDeps{
+		Store: i.repo, Sessions: sessions, Devices: i.repo, People: i.repo, Identities: i.repo, UoW: i.uow, Authorizer: i.az,
+		Audit: i.writes.Audit, Binding: i.TrustedHeader, PasskeysEnabled: rp.Enabled, Clock: i.clk, Log: i.log,
 	})
 	if err != nil {
 		return err
 	}
-	rp, verifier, err := relyingParty(i.cfg)
+	auth, err := app.NewAuthenticator(i.cfg, app.AuthenticatorDeps{
+		AccessTokens: tokens, DPoP: i.DPoP, Sessions: i.repo, APITokens: i.repo, Pepper: i.pepper, Clock: i.clk, Log: i.log,
+		Binding: i.TrustedHeader, Revoker: sessions, UoW: i.uow, Audit: i.writes.Audit,
+		Apps: i.writes.Apps, Console: console,
+	})
 	if err != nil {
 		return err
 	}
 	stepUps, err := app.NewStepUps(i.cfg, i.pepper, app.StepUpDeps{
 		Challenges: i.repo, Sessions: i.repo, Devices: i.repo, Auth: sessions, UoW: i.uow, Authorizer: i.az, Audit: i.writes.Audit,
-		Clock: i.clk, Passkeys: i.repo, People: i.repo, Verifier: verifier, RelyingParty: rp, Fresh: i.writes.Fresh,
+		Clock: i.clk, Passkeys: i.repo, People: i.repo, Verifier: verifier, RelyingParty: rp, Fresh: i.writes.Fresh, Console: console,
 	})
 	if err != nil {
 		return err
 	}
+	console.BindStepUps(stepUps, nil, nil)
+	i.Console, i.ConsoleHandlers = console, identityhttp.NewConsole(console)
 	lifecycle, err := app.NewLifecycle(i.cfg, app.LifecycleDeps{Store: i.repo, People: i.People, Sessions: sessions, Tokens: i.Tokens, Clock: i.clk})
 	if err != nil {
 		return err
@@ -344,6 +360,7 @@ func (i *Identity) BindSessions(keys instance.Keys, instanceID ids.ID) error {
 		People: i.repo, Devices: i.repo, Providers: i.repo, Identities: i.repo, Enrollment: i.Enrollment, Auth: sessions,
 		DPoP: i.DPoP, Instance: i.state, Keys: keys, Locales: locale.Parser{}, UoW: i.uow, Authorizer: i.az, Audit: i.writes.Audit,
 		Clock: i.clk, Sessions: i.repo, Pairings: i.repo, Pepper: i.pepper, TrustedHeader: i.TrustedHeader, Events: i.writes.Events,
+		Console: console,
 	})
 	if err != nil {
 		return err
@@ -354,6 +371,7 @@ func (i *Identity) BindSessions(keys instance.Keys, instanceID ids.ID) error {
 	if err != nil {
 		return err
 	}
+	cleanup.WithConsole(console)
 	i.Logins, i.EnrollmentHandlers, i.AuthCleanup = logins, identityhttp.NewEnrollment(logins), cleanup
 	i.ApprovalHandlers = identityhttp.NewApproval(logins, i.DPoP)
 	i.TrustedHeaderHandlers = identityhttp.NewTrustedHeader(logins)
@@ -419,6 +437,7 @@ func (i *Identity) BindOIDC(d OIDCDeps) error {
 		return err
 	}
 	i.OIDC, i.OIDCHandlers = o, identityhttp.NewOIDC(o)
+	i.Console.BindStepUps(nil, nil, o)
 	return nil
 }
 
@@ -542,6 +561,7 @@ func (i *Identity) BindLocal(sealer app.SecretSealer, hasher app.PasswordHasher)
 		return err
 	}
 	i.Local, i.LocalHandlers = local, identityhttp.NewLocal(local)
+	i.Console.BindStepUps(nil, local, nil)
 	return nil
 }
 

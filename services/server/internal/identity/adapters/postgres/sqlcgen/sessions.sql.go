@@ -23,7 +23,7 @@ func (q *Queries) ClearSessionStepUp(ctx context.Context, id pgtype.UUID) error 
 }
 
 const getAuthState = `-- name: GetAuthState :one
-SELECT s.id, s.user_id, s.device_id, s.client_component, s.parent_session_id, s.identity_id, s.auth_method, s.cookie_hash, s.created_at, s.expires_at, s.step_up_at, s.step_up_method, s.step_up_consumed_at, s.last_seen_at, s.last_ip, s.revoked_at, s.revoke_reason,
+SELECT s.id, s.user_id, s.device_id, s.client_component, s.parent_session_id, s.identity_id, s.auth_method, s.cookie_hash, s.created_at, s.expires_at, s.step_up_at, s.step_up_method, s.step_up_consumed_at, s.last_seen_at, s.last_ip, s.revoked_at, s.revoke_reason, s.view_as_user_id, s.view_as_started_at,
        d.state        AS device_state,
        d.last_seen_at AS device_last_seen_at,
        d.approved_at  AS device_approved_at,
@@ -67,6 +67,8 @@ func (q *Queries) GetAuthState(ctx context.Context, id pgtype.UUID) (GetAuthStat
 		&i.AuthSession.LastIp,
 		&i.AuthSession.RevokedAt,
 		&i.AuthSession.RevokeReason,
+		&i.AuthSession.ViewAsUserID,
+		&i.AuthSession.ViewAsStartedAt,
 		&i.DeviceState,
 		&i.DeviceLastSeenAt,
 		&i.DeviceApprovedAt,
@@ -77,7 +79,7 @@ func (q *Queries) GetAuthState(ctx context.Context, id pgtype.UUID) (GetAuthStat
 }
 
 const getSession = `-- name: GetSession :one
-SELECT id, user_id, device_id, client_component, parent_session_id, identity_id, auth_method, cookie_hash, created_at, expires_at, step_up_at, step_up_method, step_up_consumed_at, last_seen_at, last_ip, revoked_at, revoke_reason FROM auth_sessions WHERE id = $1
+SELECT id, user_id, device_id, client_component, parent_session_id, identity_id, auth_method, cookie_hash, created_at, expires_at, step_up_at, step_up_method, step_up_consumed_at, last_seen_at, last_ip, revoked_at, revoke_reason, view_as_user_id, view_as_started_at FROM auth_sessions WHERE id = $1
 `
 
 func (q *Queries) GetSession(ctx context.Context, id pgtype.UUID) (AuthSession, error) {
@@ -101,6 +103,8 @@ func (q *Queries) GetSession(ctx context.Context, id pgtype.UUID) (AuthSession, 
 		&i.LastIp,
 		&i.RevokedAt,
 		&i.RevokeReason,
+		&i.ViewAsUserID,
+		&i.ViewAsStartedAt,
 	)
 	return i, err
 }
@@ -146,7 +150,7 @@ func (q *Queries) InsertSession(ctx context.Context, arg InsertSessionParams) er
 }
 
 const listActiveSessionsOfUser = `-- name: ListActiveSessionsOfUser :many
-SELECT id, user_id, device_id, client_component, parent_session_id, identity_id, auth_method, cookie_hash, created_at, expires_at, step_up_at, step_up_method, step_up_consumed_at, last_seen_at, last_ip, revoked_at, revoke_reason FROM auth_sessions
+SELECT id, user_id, device_id, client_component, parent_session_id, identity_id, auth_method, cookie_hash, created_at, expires_at, step_up_at, step_up_method, step_up_consumed_at, last_seen_at, last_ip, revoked_at, revoke_reason, view_as_user_id, view_as_started_at FROM auth_sessions
 WHERE user_id = $1 AND revoked_at IS NULL AND expires_at > $2
   AND ($3::uuid IS NULL OR id < $3::uuid)
 ORDER BY id DESC
@@ -193,6 +197,8 @@ func (q *Queries) ListActiveSessionsOfUser(ctx context.Context, arg ListActiveSe
 			&i.LastIp,
 			&i.RevokedAt,
 			&i.RevokeReason,
+			&i.ViewAsUserID,
+			&i.ViewAsStartedAt,
 		); err != nil {
 			return nil, err
 		}
@@ -230,7 +236,7 @@ func (q *Queries) ListOpenSessionsOfDevice(ctx context.Context, deviceID pgtype.
 }
 
 const lockChildren = `-- name: LockChildren :many
-SELECT id, user_id, device_id, client_component, parent_session_id, identity_id, auth_method, cookie_hash, created_at, expires_at, step_up_at, step_up_method, step_up_consumed_at, last_seen_at, last_ip, revoked_at, revoke_reason FROM auth_sessions WHERE parent_session_id = $1 ORDER BY id FOR UPDATE
+SELECT id, user_id, device_id, client_component, parent_session_id, identity_id, auth_method, cookie_hash, created_at, expires_at, step_up_at, step_up_method, step_up_consumed_at, last_seen_at, last_ip, revoked_at, revoke_reason, view_as_user_id, view_as_started_at FROM auth_sessions WHERE parent_session_id = $1 ORDER BY id FOR UPDATE
 `
 
 // The children of a session, locked in ascending id after their parent.
@@ -261,6 +267,8 @@ func (q *Queries) LockChildren(ctx context.Context, parentID pgtype.UUID) ([]Aut
 			&i.LastIp,
 			&i.RevokedAt,
 			&i.RevokeReason,
+			&i.ViewAsUserID,
+			&i.ViewAsStartedAt,
 		); err != nil {
 			return nil, err
 		}
@@ -273,7 +281,7 @@ func (q *Queries) LockChildren(ctx context.Context, parentID pgtype.UUID) ([]Aut
 }
 
 const lockSession = `-- name: LockSession :one
-SELECT id, user_id, device_id, client_component, parent_session_id, identity_id, auth_method, cookie_hash, created_at, expires_at, step_up_at, step_up_method, step_up_consumed_at, last_seen_at, last_ip, revoked_at, revoke_reason FROM auth_sessions WHERE id = $1 FOR UPDATE
+SELECT id, user_id, device_id, client_component, parent_session_id, identity_id, auth_method, cookie_hash, created_at, expires_at, step_up_at, step_up_method, step_up_consumed_at, last_seen_at, last_ip, revoked_at, revoke_reason, view_as_user_id, view_as_started_at FROM auth_sessions WHERE id = $1 FOR UPDATE
 `
 
 // The session row, locked first: a transaction that adds a child holds this lock, so the children
@@ -299,6 +307,8 @@ func (q *Queries) LockSession(ctx context.Context, id pgtype.UUID) (AuthSession,
 		&i.LastIp,
 		&i.RevokedAt,
 		&i.RevokeReason,
+		&i.ViewAsUserID,
+		&i.ViewAsStartedAt,
 	)
 	return i, err
 }

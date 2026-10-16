@@ -31,7 +31,21 @@ type AuthCleanup struct {
 	store   CleanupStore
 	expiry  Expiry
 	devices DeviceExpirer
+	console ConsoleExpirer
 	clock   clock.Clock
+}
+
+// ConsoleExpirer revokes the console sessions past their end or idle (Console, M6-01).
+type ConsoleExpirer interface {
+	// ExpireConsoleSessions revokes them and returns their number.
+	ExpireConsoleSessions(ctx context.Context) (int, error)
+}
+
+// WithConsole makes the cleanup also end the idle and expired console sessions through c
+// (D-M6-01-3); internal/wire calls it once while it builds identity. It returns the cleanup.
+func (c *AuthCleanup) WithConsole(e ConsoleExpirer) *AuthCleanup {
+	c.console = e
+	return c
 }
 
 // Expiry is the device and pairing expiry the cleanup runs (Service implements it, M1-38).
@@ -68,8 +82,8 @@ func NewAuthCleanup(cfg Config, uow txn.UnitOfWork, store CleanupStore, expiry E
 // Run deletes in one unit of work every challenge whose expires_at has passed at the time of the
 // clock, except failed step-up challenges that still count inside auth.login_fail_window (08
 // section 13) and every login flow past its expires_at, then revokes the expired pending devices,
-// expires the due pairings (M1-38) and revokes the inactive devices (M1-45), each in its own unit
-// of work. It returns how many rows it ended. Errors: the first failing step; the steps before it
+// expires the due pairings (M1-38), revokes the inactive devices (M1-45) and ends the idle and
+// expired console sessions (M6-01), each in its own unit of work. It returns how many rows it ended. Errors: the first failing step; the steps before it
 // stay committed and a retry continues.
 func (c *AuthCleanup) Run(ctx context.Context) (int64, error) {
 	now := c.clock.Now()
@@ -97,5 +111,10 @@ func (c *AuthCleanup) Run(ctx context.Context) (int64, error) {
 		return n, err
 	}
 	revoked, err := c.devices.ExpireInactiveDevices(ctx)
-	return n + int64(revoked), err
+	n += int64(revoked)
+	if err != nil || c.console == nil {
+		return n, err
+	}
+	ended, err := c.console.ExpireConsoleSessions(ctx)
+	return n + int64(ended), err
 }

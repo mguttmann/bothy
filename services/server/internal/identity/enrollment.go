@@ -41,8 +41,11 @@ type RedeemEnrollment struct {
 
 // RedeemResult is the answer of a redemption: the tokens of the new session on the active device.
 type RedeemResult struct {
-	// Tokens are the token pair with session and device (schema TokenResponse).
+	// Tokens are the token pair with session and device (schema TokenResponse); zero for the
+	// console form.
 	Tokens TokenSet
+	// Console is the result of the console form of a login (M6-01); nil for the app form.
+	Console *ConsoleLogin
 	// Nonce is the current DPoP nonce when the proof used the previous one, for the DPoP-Nonce
 	// header of the response; "" otherwise.
 	Nonce string

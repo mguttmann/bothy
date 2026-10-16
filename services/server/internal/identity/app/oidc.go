@@ -78,8 +78,11 @@ type OIDC struct {
 	cfg      Config
 	pepper   []byte
 	callback string
-	d        OIDCDeps
-	s        *Service
+	// consoleLogin and consoleStepUp are the console callbacks on the origin of server.public_url
+	// (M6-01).
+	consoleLogin, consoleStepUp string
+	d                           OIDCDeps
+	s                           *Service
 }
 
 // Compile-time check: the incoming port.
@@ -114,7 +117,9 @@ func NewOIDC(cfg Config, pepper []byte, d OIDCDeps) (*OIDC, error) {
 		d.Log = slog.New(slog.DiscardHandler)
 	}
 	return &OIDC{
-		cfg: cfg, pepper: append([]byte(nil), pepper...), callback: u.Scheme + "://" + u.Host + callbackPath, d: d, s: d.Logins,
+		cfg: cfg, pepper: append([]byte(nil), pepper...), callback: u.Scheme + "://" + u.Host + callbackPath,
+		consoleLogin: u.Scheme + "://" + u.Host + consoleLoginCallback, consoleStepUp: u.Scheme + "://" + u.Host + consoleStepUpCallback,
+		d: d, s: d.Logins,
 	}, nil
 }
 
@@ -138,11 +143,23 @@ func (o *OIDC) authorize(ctx context.Context, a actor.Actor, act authorize.Actio
 }
 
 // BeginOIDCLogin implements identity.OIDCLogin (brief M1-41 "beginOidcLogin").
+// The console form (M6-01) needs the console login callback as redirect and no enrollment code
+// (400 otherwise); its flow skips the provider's app_redirect_uris.
 func (o *OIDC) BeginOIDCLogin(ctx context.Context, in identity.OIDCBegin) (identity.OIDCBeginResult, error) {
 	if err := o.authorize(ctx, actor.Anonymous(), authorize.ActionAuthLoginBegin, instanceResource); err != nil {
 		return identity.OIDCBeginResult{}, err
 	}
-	return o.begin(ctx, in, oidcflow.ModeLogin, actor.Actor{})
+	var opt beginOpts
+	if in.Console {
+		if in.AppRedirectURI != o.consoleLogin {
+			return identity.OIDCBeginResult{}, consoleRedirectInvalid()
+		}
+		if in.EnrollmentCode != "" {
+			return identity.OIDCBeginResult{}, consoleFormRefused(fieldEnrollmentCode)
+		}
+		opt.redirect = o.consoleLogin
+	}
+	return o.begin(ctx, in, oidcflow.ModeLogin, actor.Actor{}, opt)
 }
 
 // BeginIdentityLink implements identity.OIDCLogin (brief M1-41 "Link mode").
@@ -155,17 +172,18 @@ func (o *OIDC) BeginIdentityLink(ctx context.Context, a actor.Actor, in identity
 		return identity.OIDCBeginResult{}, err
 	}
 	in.EnrollmentCode = ""
-	return o.begin(ctx, in, oidcflow.ModeLink, a)
+	return o.begin(ctx, in, oidcflow.ModeLink, a, beginOpts{})
 }
 
 // begin checks the request, loads the provider metadata and inserts the flow (steps 2 to 7 of
 // beginOidcLogin). A link flow belongs to linker and records its allow entry.
-func (o *OIDC) begin(ctx context.Context, in identity.OIDCBegin, mode oidcflow.Mode, linker actor.Actor) (identity.OIDCBeginResult, error) {
+func (o *OIDC) begin(ctx context.Context, in identity.OIDCBegin, mode oidcflow.Mode, linker actor.Actor, opt beginOpts) (identity.OIDCBeginResult, error) {
 	p, conf, err := o.provider(ctx, in.ProviderID)
 	if err != nil {
 		return identity.OIDCBeginResult{}, err
 	}
-	if err := oidcflow.CheckAppRedirectURI(in.AppRedirectURI, conf.AppRedirectURIs); err != nil {
+	redirect, err := flowRedirect(in, conf, opt)
+	if err != nil {
 		return identity.OIDCBeginResult{}, err
 	}
 	if err := oidcflow.CheckClientChallenge(in.ClientChallenge); err != nil {
@@ -193,33 +211,59 @@ func (o *OIDC) begin(ctx context.Context, in identity.OIDCBegin, mode oidcflow.M
 	now := o.s.d.Clock.Now()
 	rec := LoginFlowRecord{
 		ID: ids.New(), ProviderID: p.ID, Mode: mode, UserID: linker.ID, StateHash: oidcflow.Hash(o.pepper, oidcflow.HashState, state),
-		NonceHash: oidcflow.Hash(o.pepper, oidcflow.HashNonce, nonce), ClientChallenge: in.ClientChallenge, AppRedirectURI: in.AppRedirectURI,
+		NonceHash: oidcflow.Hash(o.pepper, oidcflow.HashNonce, nonce), ClientChallenge: in.ClientChallenge, AppRedirectURI: redirect,
 		EnrollmentCodeID: codeID, Status: oidcflow.StatusStarted, CreatedAt: now, ExpiresAt: now.Add(o.cfg.LoginFlowTTL),
 	}
-	err = o.s.d.UoW.Do(ctx, func(ctx context.Context) error {
-		if err := o.d.Flows.InsertLoginFlow(ctx, rec); err != nil {
-			return err
-		}
-		if mode != oidcflow.ModeLink {
-			return nil
-		}
-		return o.s.d.Audit.Record(ctx, auditing.Entry{
-			Action: string(authorize.ActionIdentityLink), Decision: auditing.DecisionAllow, ResourceKind: resourceUser, ResourceID: linker.ID,
-			Attrs: auditing.Attrs{attrStep: auditing.Code("begin"), attrProviderID: auditing.ID(p.ID), attrLoginAttemptID: auditing.ID(rec.ID)},
-		})
-	})
-	if err != nil {
+	if err := o.insertFlow(ctx, rec, linker, opt, p.ID); err != nil {
 		return identity.OIDCBeginResult{}, err
 	}
-	authURL, err := withQuery(meta.AuthorizationEndpoint, url.Values{
+	params := url.Values{
 		"response_type": {"code"}, "client_id": {conf.ClientID}, "redirect_uri": {o.callback}, "scope": {"openid profile email"},
 		"state": {state}, "nonce": {nonce}, "code_challenge": {oidcflow.S256(oidcflow.ServerVerifier(o.pepper, rec.ID))},
 		"code_challenge_method": {"S256"},
-	})
+	}
+	if !opt.reauth.IsZero() {
+		// A new sign-in at the provider, never a silent one (08 section 6.2, D-M6-01-6).
+		params.Set("prompt", "login")
+		params.Set("max_age", "0")
+	}
+	authURL, err := withQuery(meta.AuthorizationEndpoint, params)
 	if err != nil {
 		return identity.OIDCBeginResult{}, err
 	}
 	return identity.OIDCBeginResult{LoginAttemptID: rec.ID, AuthorizationURL: authURL, ExpiresAt: rec.ExpiresAt}, nil
+}
+
+// flowRedirect returns the redirect a flow stores: the console redirect of opt (M6-01), else the
+// app redirect of in after the check against the provider's app_redirect_uris.
+func flowRedirect(in identity.OIDCBegin, conf provider.OIDCConfig, opt beginOpts) (string, error) {
+	if opt.redirect != "" {
+		return opt.redirect, nil
+	}
+	if err := oidcflow.CheckAppRedirectURI(in.AppRedirectURI, conf.AppRedirectURIs); err != nil {
+		return "", err
+	}
+	return in.AppRedirectURI, nil
+}
+
+// insertFlow inserts the flow rec and, for a link flow, its allow entry in one unit of work: the
+// start of a console re-login records auth.step_up (M6-01), any other link identity.link.
+func (o *OIDC) insertFlow(ctx context.Context, rec LoginFlowRecord, linker actor.Actor, opt beginOpts, providerID ids.ID) error {
+	return o.s.d.UoW.Do(ctx, func(ctx context.Context) error {
+		if err := o.d.Flows.InsertLoginFlow(ctx, rec); err != nil {
+			return err
+		}
+		switch {
+		case rec.Mode != oidcflow.ModeLink:
+			return nil
+		case !opt.reauth.IsZero():
+			return o.s.d.Audit.Record(ctx, reauthEntry(linker.SessionID, opt.reauth, providerID, rec.ID))
+		}
+		return o.s.d.Audit.Record(ctx, auditing.Entry{
+			Action: string(authorize.ActionIdentityLink), Decision: auditing.DecisionAllow, ResourceKind: resourceUser, ResourceID: linker.ID,
+			Attrs: auditing.Attrs{attrStep: auditing.Code("begin"), attrProviderID: auditing.ID(providerID), attrLoginAttemptID: auditing.ID(rec.ID)},
+		})
+	})
 }
 
 // provider returns the enabled OIDC provider id with its configuration; a missing, disabled or

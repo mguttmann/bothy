@@ -398,6 +398,8 @@ Zweck: Anmeldesitzung eines Menschen auf einem Gerät. Jeder Zugriffstoken träg
 | `step_up_at` | `timestamptz` | ja | | letzte frische Bestätigung durch den Menschen; gültig für `auth.step_up_max_age` |
 | `step_up_method` | `text` | ja | | `CHECK (step_up_method IN ('passkey','device_key','password_totp','oidc_reauth'))`; gesetzt mit `step_up_at` |
 | `step_up_consumed_at` | `timestamptz` | ja | | gesetzt, wenn `terminal.open` oder `terminal.attach` den Step-up mit `step_up_at` verbraucht hat; ein verbrauchter Step-up (`step_up_consumed_at >= step_up_at`) erlaubt keine weitere Terminal-Öffnung ([08-identitaet.md](08-identitaet.md), Abschnitt 6.3) |
+| `view_as_user_id` | `uuid` | yes | | console only: the person whose view an owner looks at with "View as person" ([07-rechte.md](07-rechte.md), section 9.2); set by `access.view_as`, cleared by `access.view_as.end` or by the first request after `authz.view_as_max_duration` (R-DM-49) |
+| `view_as_started_at` | `timestamptz` | yes | | start of the stored view; set and cleared together with `view_as_user_id` |
 | `last_seen_at` | `timestamptz` | ja | | |
 | `last_ip` | `inet` | ja | | nur für Sicherheitsansicht, Klasse `security` |
 | `revoked_at` | `timestamptz` | ja | | |
@@ -405,10 +407,11 @@ Zweck: Anmeldesitzung eines Menschen auf einem Gerät. Jeder Zugriffstoken träg
 
 PK: `id`. FK: `user_id` -> `users(principal_id)` ON DELETE RESTRICT; `device_id` ->
 `devices(id)` ON DELETE RESTRICT; `identity_id` -> `user_identities(id)` ON DELETE SET NULL;
-`parent_session_id` -> `auth_sessions(id)` ON DELETE CASCADE.
+`parent_session_id` -> `auth_sessions(id)` ON DELETE CASCADE; `view_as_user_id` -> `users(principal_id)` ON DELETE RESTRICT.
 Checks: `(client_component = 'console') = (cookie_hash IS NOT NULL)`; `parent_session_id IS NULL OR
 client_component = 'share_ext'`; `(step_up_at IS NULL) = (step_up_method IS
-NULL)`; `step_up_consumed_at IS NULL OR step_up_at IS NOT NULL`. Unique: `cookie_hash` als Teilindex `WHERE cookie_hash IS NOT NULL`.
+NULL)`; `step_up_consumed_at IS NULL OR step_up_at IS NOT NULL`; `(view_as_user_id IS NULL) =
+(view_as_started_at IS NULL)`; `view_as_user_id IS NULL OR client_component = 'console'`. Unique: `cookie_hash` als Teilindex `WHERE cookie_hash IS NOT NULL`.
 Indexe: `(user_id) WHERE revoked_at IS NULL` für "alle Sitzungen beenden"; `(device_id)`;
 `(parent_session_id) WHERE parent_session_id IS NOT NULL`; `(expires_at)` für den Aufräumjob.
 Aufbewahrung: `security`.
@@ -3385,6 +3388,7 @@ erDiagram
 | R-DM-39 | Sitzungsbenutzer je Person in `host_session_users`, Name je Rechner eindeutig über alle Zeilen, auch beendete. | Ruling T12: Anmeldedaten eines Sitzungsbenutzers gehören genau einer Person; ein wieder vergebener Name gäbe der nächsten Person die Anmeldungen und Dauerläufer der vorigen ([24-terminal.md](24-terminal.md), Abschnitt 2.2). |
 | R-DM-40 | `terminal_sessions` verweist mit `(host_session_user_id, host_id, user_id)` auf `host_session_users(id, host_id, user_id)`. | Ein Fremdschlüssel nur auf `id` ließe einen Sitzungsbenutzer eines anderen Rechners oder einer anderen Person zu; der Host-Dienst bände einen neuen Namen dann an die falsche Person (D-W-66). |
 | R-DM-41 | `hosts.reported_session_users` hält die gemeldeten Namen der Sitzungsbenutzer mit den Anzeigenamen ihrer Arbeitsordner. | Der Server ordnet nur Namen zu, die der Rechner kennt, und bietet je Person nur ihre eigenen Arbeitsordner an (Rulings T12 und T13; D-W-62, D-W-63). |
+| R-DM-49 | `auth_sessions` stores "View as person" of a console session in `view_as_user_id` and `view_as_started_at` (console sessions only, both set or both empty); `access.view_as` from a console session sets them in the transaction of its audit entry, `access.view_as.end` or the first request after `authz.view_as_max_duration` clears them with an audit entry of the end. | [07-rechte.md](07-rechte.md) section 9.2 requires state on the console session (target person, start) and operations to start and end it, added to the core contract before PLAN M6-01 builds the console session (D-W-100 extended to M5 and M6). |
 
 ## 9. Konfigurationswerte dieses Kapitels
 

@@ -376,6 +376,10 @@ authorize(p, action, ref) -> Decision:
   return ALLOW
 ```
 
+While a view is stored on a console session, `access.view_as.end`, `auth.logout` and
+`auth.step_up` on the person's own session and `self.read` on the person themselves are decided
+without `view_as` (R-AZ-32; steps 4 and 7 would otherwise deny them).
+
 Danach, nicht in `authorize`, folgen Audit und Rate-Limit-Zählung nach den Spalten in 05.
 Rate-Limits prüft eine eigene Schicht vor `authorize` (05, Abschnitt 2.5).
 
@@ -913,11 +917,16 @@ gäben. Die Ansicht braucht `owner` oder `manage` (05).
   jede Entscheidung mit `step_up_required`.
 - Die Konsole zeigt durchgehend einen Hinweisbalken mit Name und Restzeit.
 - Zweck: prüfen, was eine Person sieht und auslösen kann, ohne ihre Zugangsdaten zu kennen.
-- In M1 ist "Als Person ansehen" eine Momentaufnahme: `viewAsUser` liefert die Bereiche und
-  Kanäle, die die Person sieht, mit Stufe und `expires_at`; `view_as` lebt nur innerhalb dieser
-  Anfrage. Das Durchblättern von Inhalten als andere Person in der Konsole braucht einen Zustand an
-  der Konsolen-Sitzung (Ziel-Person, Beginn) und Operationen zum Starten und Beenden; beides
-  ergänzt die Konsolen-Sitzung (PLAN M6-01) im Kern-Vertrag, bevor sie gebaut wird.
+- Stored view (M6-01, R-DM-49, R-AZ-32): `viewAsUser` called from a console session stores the
+  target person and the start on the session (`auth_sessions.view_as_user_id`,
+  `view_as_started_at`) in the transaction of its audit entry (`target_user_id`, `started_at`,
+  `expires_at`). Every later request of that session carries `view_as` until `endViewAs`
+  (`access.view_as.end`, audit `ended_reason = ended`) or until `authz.view_as_max_duration` has
+  passed; the first request after that ends the view (audit `ended_reason = expired`) and answers
+  `401 step_up_required`. Starting a new view while one is stored is a write and is denied; the
+  console ends the current view first. Called from any other session, `viewAsUser` stays a
+  snapshot that lives only in that request. `getConsoleSession` shows the stored view with its
+  end.
 
 ### 9.3 Vorschau in Klartext
 

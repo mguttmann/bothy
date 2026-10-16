@@ -164,7 +164,7 @@ func (q *Queries) LockChallenge(ctx context.Context, id pgtype.UUID) (AuthChalle
 }
 
 const lockSessionForStepUpConsumption = `-- name: LockSessionForStepUpConsumption :one
-SELECT id, user_id, device_id, client_component, parent_session_id, identity_id, auth_method, cookie_hash, created_at, expires_at, step_up_at, step_up_method, step_up_consumed_at, last_seen_at, last_ip, revoked_at, revoke_reason FROM auth_sessions WHERE id = $1 AND user_id = $2 FOR UPDATE
+SELECT id, user_id, device_id, client_component, parent_session_id, identity_id, auth_method, cookie_hash, created_at, expires_at, step_up_at, step_up_method, step_up_consumed_at, last_seen_at, last_ip, revoked_at, revoke_reason, view_as_user_id, view_as_started_at FROM auth_sessions WHERE id = $1 AND user_id = $2 FOR UPDATE
 `
 
 type LockSessionForStepUpConsumptionParams struct {
@@ -196,6 +196,8 @@ func (q *Queries) LockSessionForStepUpConsumption(ctx context.Context, arg LockS
 		&i.LastIp,
 		&i.RevokedAt,
 		&i.RevokeReason,
+		&i.ViewAsUserID,
+		&i.ViewAsStartedAt,
 	)
 	return i, err
 }

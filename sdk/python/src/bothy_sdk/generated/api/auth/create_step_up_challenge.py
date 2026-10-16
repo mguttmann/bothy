@@ -4,18 +4,28 @@ from typing import Any
 import httpx
 
 from ...client import AuthenticatedClient, Client
+from ...models.create_step_up_challenge_x_console_request import (
+    CreateStepUpChallengeXConsoleRequest,
+)
 from ...models.problem import Problem
 from ...models.step_up_challenge import StepUpChallenge
-from ...types import Response
+from ...types import UNSET, Response, Unset
 
 
-def _get_kwargs() -> dict[str, Any]:
+def _get_kwargs(
+    *,
+    x_console_request: CreateStepUpChallengeXConsoleRequest | Unset = UNSET,
+) -> dict[str, Any]:
+    headers: dict[str, Any] = {}
+    if not isinstance(x_console_request, Unset):
+        headers["X-Console-Request"] = str(x_console_request)
 
     _kwargs: dict[str, Any] = {
         "method": "post",
         "url": "/auth/step-up/challenge",
     }
 
+    _kwargs["headers"] = headers
     return _kwargs
 
 
@@ -61,8 +71,12 @@ def _build_response(
 def sync_detailed(
     *,
     client: AuthenticatedClient | Client,
+    x_console_request: CreateStepUpChallengeXConsoleRequest | Unset = UNSET,
 ) -> Response[Problem | StepUpChallenge]:
     """Create a step-up challenge
+
+    Args:
+        x_console_request (CreateStepUpChallengeXConsoleRequest | Unset):
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
@@ -72,7 +86,9 @@ def sync_detailed(
         Response[Problem | StepUpChallenge]
     """
 
-    kwargs = _get_kwargs()
+    kwargs = _get_kwargs(
+        x_console_request=x_console_request,
+    )
 
     response = client.get_httpx_client().request(
         **kwargs,
@@ -84,8 +100,12 @@ def sync_detailed(
 def sync(
     *,
     client: AuthenticatedClient | Client,
+    x_console_request: CreateStepUpChallengeXConsoleRequest | Unset = UNSET,
 ) -> Problem | StepUpChallenge | None:
     """Create a step-up challenge
+
+    Args:
+        x_console_request (CreateStepUpChallengeXConsoleRequest | Unset):
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
@@ -97,14 +117,19 @@ def sync(
 
     return sync_detailed(
         client=client,
+        x_console_request=x_console_request,
     ).parsed
 
 
 async def asyncio_detailed(
     *,
     client: AuthenticatedClient | Client,
+    x_console_request: CreateStepUpChallengeXConsoleRequest | Unset = UNSET,
 ) -> Response[Problem | StepUpChallenge]:
     """Create a step-up challenge
+
+    Args:
+        x_console_request (CreateStepUpChallengeXConsoleRequest | Unset):
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
@@ -114,7 +139,9 @@ async def asyncio_detailed(
         Response[Problem | StepUpChallenge]
     """
 
-    kwargs = _get_kwargs()
+    kwargs = _get_kwargs(
+        x_console_request=x_console_request,
+    )
 
     response = await client.get_async_httpx_client().request(**kwargs)
 
@@ -124,8 +151,12 @@ async def asyncio_detailed(
 async def asyncio(
     *,
     client: AuthenticatedClient | Client,
+    x_console_request: CreateStepUpChallengeXConsoleRequest | Unset = UNSET,
 ) -> Problem | StepUpChallenge | None:
     """Create a step-up challenge
+
+    Args:
+        x_console_request (CreateStepUpChallengeXConsoleRequest | Unset):
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
@@ -138,5 +169,6 @@ async def asyncio(
     return (
         await asyncio_detailed(
             client=client,
+            x_console_request=x_console_request,
         )
     ).parsed

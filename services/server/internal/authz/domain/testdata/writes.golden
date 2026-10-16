@@ -1,5 +1,6 @@
 # Actions for which writes(a) is true (brief M1-28, "view as" read-only rule).
 access.view_as
+access.view_as.end
 agent.billing_mode.set
 agent.billing_mode.set_all
 agent.create

@@ -75,7 +75,7 @@ func (o *OIDC) unknownFlow(ctx context.Context) error {
 		ResourceKind: string(authorize.ResourceInstance), Attrs: auditing.Attrs{attrCause: auditing.Code(causeUnknownFlow)},
 	})
 	return errs.New(errs.CodeValidationFailed, "").
-		WithFields(errs.FieldError{Pointer: fieldState, Code: "invalid", Detail: "The login flow is unknown, used or expired."})
+		WithFields(errs.FieldError{Pointer: fieldState, Code: fieldCodeInvalid, Detail: "The login flow is unknown, used or expired."})
 }
 
 // verifyCallback runs the checks of steps 3 to 6 and returns the verified identity with the group

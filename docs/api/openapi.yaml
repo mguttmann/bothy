@@ -30,6 +30,7 @@ servers:
 security:
 - dpopAuth: []
 - bearerAuth: []
+- consoleSession: []
 
 tags:
 - name: Discovery
@@ -473,7 +474,7 @@ paths:
       x-rate-limit-class: rl.public_auth
       x-idempotency-exempt: auth_flow
       parameters:
-      - $ref: '#/components/parameters/DpopProof'
+      - $ref: '#/components/parameters/DpopProofLogin'
       requestBody:
         required: true
         content:
@@ -494,6 +495,8 @@ paths:
                     public_jwk: {}
                     alg: ES256
       responses:
+        '200':
+          $ref: '#/components/responses/ConsoleLogin'
         '201':
           description: Created.
           headers:
@@ -556,7 +559,7 @@ paths:
       x-rate-limit-class: rl.public_auth
       x-idempotency-exempt: auth_flow
       parameters:
-      - $ref: '#/components/parameters/DpopProof'
+      - $ref: '#/components/parameters/DpopProofLogin'
       requestBody:
         required: true
         content:
@@ -575,6 +578,8 @@ paths:
                     public_jwk: {}
                     alg: ES256
       responses:
+        '200':
+          $ref: '#/components/responses/ConsoleLogin'
         '201':
           description: Created.
           headers:
@@ -686,7 +691,7 @@ paths:
       x-rate-limit-class: rl.public_auth
       x-idempotency-exempt: auth_flow
       parameters:
-      - $ref: '#/components/parameters/DpopProof'
+      - $ref: '#/components/parameters/DpopProofLogin'
       requestBody:
         required: true
         content:
@@ -707,6 +712,8 @@ paths:
                     public_jwk: {}
                     alg: ES256
       responses:
+        '200':
+          $ref: '#/components/responses/ConsoleLogin'
         '201':
           description: Created.
           headers:
@@ -1127,7 +1134,7 @@ paths:
       x-rate-limit-class: rl.public_auth
       x-idempotency-exempt: auth_flow
       parameters:
-      - $ref: '#/components/parameters/DpopProof'
+      - $ref: '#/components/parameters/DpopProofLogin'
       requestBody:
         required: true
         content:
@@ -1149,6 +1156,8 @@ paths:
                     public_jwk: {}
                     alg: ES256
       responses:
+        '200':
+          $ref: '#/components/responses/ConsoleLogin'
         '201':
           description: Created.
           headers:
@@ -1282,12 +1291,16 @@ paths:
       x-authz-action: auth.logout
       x-rate-limit-class: rl.write
       x-idempotency-exempt: auth_flow
+      parameters:
+      - $ref: '#/components/parameters/ConsoleRequest'
       responses:
         '204':
           description: No content.
           headers:
             Correlation-Id:
               $ref: '#/components/headers/Correlation-Id'
+            Set-Cookie:
+              $ref: '#/components/headers/Set-Cookie'
             RateLimit:
               $ref: '#/components/headers/RateLimit'
             RateLimit-Policy:
@@ -1309,6 +1322,8 @@ paths:
       x-authz-action: auth.step_up
       x-rate-limit-class: rl.public_auth
       x-idempotency-exempt: auth_flow
+      parameters:
+      - $ref: '#/components/parameters/ConsoleRequest'
       responses:
         '200':
           description: OK.
@@ -1348,6 +1363,8 @@ paths:
       x-authz-action: auth.step_up
       x-rate-limit-class: rl.public_auth
       x-idempotency-exempt: auth_flow
+      parameters:
+      - $ref: '#/components/parameters/ConsoleRequest'
       requestBody:
         required: true
         content:
@@ -1362,24 +1379,7 @@ paths:
                   credential: {}
       responses:
         '200':
-          description: OK.
-          headers:
-            Correlation-Id:
-              $ref: '#/components/headers/Correlation-Id'
-            RateLimit:
-              $ref: '#/components/headers/RateLimit'
-            RateLimit-Policy:
-              $ref: '#/components/headers/RateLimit-Policy'
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/StepUpResult'
-              examples:
-                default:
-                  summary: Response
-                  value:
-                    step_up_at: '2026-10-10T09:30:00.000Z'
-                    valid_until: '2026-10-10T09:30:00.000Z'
+          $ref: '#/components/responses/StepUpDone'
         '400':
           $ref: '#/components/responses/BadRequest'
         '401':
@@ -1439,6 +1439,130 @@ paths:
           $ref: '#/components/responses/Forbidden'
         '429':
           $ref: '#/components/responses/TooManyRequests'
+        default:
+          $ref: '#/components/responses/Error'
+
+  /auth/step-up/password:
+    post:
+      operationId: stepUpWithPassword
+      summary: Console step-up with password and TOTP
+      tags: [Auth]
+      x-authz-action: auth.step_up
+      x-rate-limit-class: rl.public_auth
+      x-idempotency-exempt: auth_flow
+      parameters:
+      - $ref: '#/components/parameters/ConsoleRequest'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/StepUpPasswordRequest'
+      responses:
+        '200':
+          $ref: '#/components/responses/StepUpDone'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        default:
+          $ref: '#/components/responses/Error'
+
+  /auth/step-up/oidc:
+    post:
+      operationId: beginStepUpOidcReauth
+      summary: Start a console step-up with OIDC
+      tags: [Auth]
+      x-authz-action: auth.step_up
+      x-rate-limit-class: rl.public_auth
+      x-idempotency-exempt: auth_flow
+      parameters:
+      - $ref: '#/components/parameters/ConsoleRequest'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/StepUpOidcBeginRequest'
+      responses:
+        '200':
+          description: OK.
+          headers:
+            Correlation-Id:
+              $ref: '#/components/headers/Correlation-Id'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OidcBeginResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        default:
+          $ref: '#/components/responses/Error'
+
+  /auth/step-up/oidc/complete:
+    post:
+      operationId: completeStepUpOidcReauth
+      summary: Finish a console step-up with OIDC
+      tags: [Auth]
+      x-authz-action: auth.step_up
+      x-rate-limit-class: rl.public_auth
+      x-idempotency-exempt: auth_flow
+      parameters:
+      - $ref: '#/components/parameters/ConsoleRequest'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/IdentityLinkComplete'
+      responses:
+        '200':
+          $ref: '#/components/responses/StepUpDone'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        default:
+          $ref: '#/components/responses/Error'
+
+  /console/session:
+    get:
+      operationId: getConsoleSession
+      summary: Read the console session
+      tags: [Auth]
+      x-authz-action: self.read
+      x-rate-limit-class: rl.read
+      responses:
+        '200':
+          $ref: '#/components/responses/ConsoleLogin'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        default:
+          $ref: '#/components/responses/Error'
+
+  /console/session/view-as:
+    delete:
+      operationId: endViewAs
+      summary: End the stored view as person
+      tags: [Auth]
+      x-authz-action: access.view_as.end
+      x-rate-limit-class: rl.admin
+      parameters:
+      - $ref: '#/components/parameters/ConsoleRequest'
+      responses:
+        '204':
+          description: No content.
+          headers:
+            Correlation-Id:
+              $ref: '#/components/headers/Correlation-Id'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
         default:
           $ref: '#/components/responses/Error'
 
@@ -19939,6 +20063,11 @@ components:
       description: |-
         API token of an agent, app or personal tool without key binding (`Authorization: Bearer
         <token>`).
+    consoleSession:
+      type: apiKey
+      in: cookie
+      name: __Host-console_session
+      description: 'Web console cookie; CSRF header `ConsoleRequest` and own `Origin` on writes (08, 7.5).'
     fileTicket:
       type: apiKey
       in: query
@@ -19987,6 +20116,19 @@ components:
       description: DPoP proof (RFC 9449) signed with the device key that the new tokens will be bound to.
       schema:
         type: string
+    DpopProofLogin:
+      name: DPoP
+      in: header
+      description: As `DpopProof`; not for `client = console`.
+      schema:
+        type: string
+    ConsoleRequest:
+      name: X-Console-Request
+      in: header
+      description: CSRF header of the console (SEC-CORS-4).
+      schema:
+        type: string
+        enum: ['1']
     WebhookId:
       name: webhook-id
       in: header
@@ -20321,6 +20463,10 @@ components:
       schema:
         type: string
         format: uri
+    Set-Cookie:
+      description: Console cookie or its clearing value (08, 7.5).
+      schema:
+        type: string
     WWW-Authenticate:
       description: Authentication challenge, e.g. `DPoP error="use_dpop_nonce"` (RFC 9449).
       schema:
@@ -20366,6 +20512,30 @@ components:
       headers:
         Correlation-Id:
           $ref: '#/components/headers/Correlation-Id'
+    ConsoleLogin:
+      x-status: 200
+      description: Console session (08, 7.5).
+      headers:
+        Correlation-Id:
+          $ref: '#/components/headers/Correlation-Id'
+        Set-Cookie:
+          $ref: '#/components/headers/Set-Cookie'
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ConsoleSession'
+    StepUpDone:
+      x-status: 200
+      description: OK; a console session gets a new cookie (08, 7.5).
+      headers:
+        Correlation-Id:
+          $ref: '#/components/headers/Correlation-Id'
+        Set-Cookie:
+          $ref: '#/components/headers/Set-Cookie'
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/StepUpResult'
     Unauthorized:
       x-status: 401
       description: 'Problem codes: `unauthenticated`, `token_expired`, `session_revoked`, `step_up_required`, `use_dpop_nonce`, `invalid_dpop_proof`.'
@@ -20386,6 +20556,8 @@ components:
       headers:
         Correlation-Id:
           $ref: '#/components/headers/Correlation-Id'
+        Set-Cookie:
+          $ref: '#/components/headers/Set-Cookie'
         WWW-Authenticate:
           $ref: '#/components/headers/WWW-Authenticate'
         DPoP-Nonce:
@@ -21660,6 +21832,8 @@ components:
       additionalProperties: false
       required: [provider_id, app_redirect_uri, client_challenge]
       properties:
+        client:
+          $ref: '#/components/schemas/LoginClient'
         provider_id:
           $ref: '#/components/schemas/Uuid'
         app_redirect_uri:
@@ -21689,8 +21863,10 @@ components:
     OidcCompleteRequest:
       type: object
       additionalProperties: false
-      required: [login_code, client_verifier, device]
+      required: [login_code, client_verifier]
       properties:
+        client:
+          $ref: '#/components/schemas/LoginClient'
         login_code:
           type: string
           description: One-time code the server appended to `app_redirect_uri` after the provider callback.
@@ -21703,8 +21879,9 @@ components:
     TrustedHeaderLoginRequest:
       type: object
       additionalProperties: false
-      required: [device]
       properties:
+        client:
+          $ref: '#/components/schemas/LoginClient'
         device:
           $ref: '#/components/schemas/DeviceRegistration'
         enrollment_code:
@@ -21754,8 +21931,10 @@ components:
     PasskeyLoginCompleteRequest:
       type: object
       additionalProperties: false
-      required: [challenge_id, credential, device]
+      required: [challenge_id, credential]
       properties:
+        client:
+          $ref: '#/components/schemas/LoginClient'
         challenge_id:
           $ref: '#/components/schemas/Uuid'
         credential:
@@ -21788,8 +21967,10 @@ components:
     PasswordLoginRequest:
       type: object
       additionalProperties: false
-      required: [login_name, password, totp_code, device]
+      required: [login_name, password, totp_code]
       properties:
+        client:
+          $ref: '#/components/schemas/LoginClient'
         login_name:
           type: string
           examples: [alex]
@@ -21840,6 +22021,71 @@ components:
           $ref: '#/components/schemas/Session'
         device:
           $ref: '#/components/schemas/Device'
+    LoginClient:
+      type: string
+      enum: [app, console]
+      description: '`console`: no `device` or DPoP; cookie, no token (08, 7.5).'
+    ConsoleSession:
+      type: object
+      required: [user_id, display_name, expires_at, idle_timeout_seconds, step_up_methods_available]
+      properties:
+        user_id:
+          $ref: '#/components/schemas/Uuid'
+        display_name:
+          type: string
+        expires_at:
+          $ref: '#/components/schemas/Timestamp'
+        idle_timeout_seconds:
+          type: integer
+        step_up_at:
+          $ref: '#/components/schemas/Timestamp'
+        step_up_method:
+          type: string
+          enum: [passkey, password_totp, oidc_reauth]
+        step_up_valid_until:
+          $ref: '#/components/schemas/Timestamp'
+        step_up_methods_available:
+          type: array
+          items:
+            type: string
+            enum: [passkey, oidc_reauth, password_totp]
+        view_as:
+          type: object
+          required: [user_id, display_name, started_at, ends_at]
+          properties:
+            user_id:
+              $ref: '#/components/schemas/Uuid'
+            display_name:
+              type: string
+            started_at:
+              $ref: '#/components/schemas/Timestamp'
+            ends_at:
+              $ref: '#/components/schemas/Timestamp'
+    StepUpPasswordRequest:
+      type: object
+      additionalProperties: false
+      required: [challenge_id, password, totp_code]
+      properties:
+        challenge_id:
+          $ref: '#/components/schemas/Uuid'
+        password:
+          type: string
+          format: password
+        totp_code:
+          type: string
+    StepUpOidcBeginRequest:
+      type: object
+      additionalProperties: false
+      required: [challenge_id, provider_id, app_redirect_uri, client_challenge]
+      properties:
+        challenge_id:
+          $ref: '#/components/schemas/Uuid'
+        provider_id:
+          $ref: '#/components/schemas/Uuid'
+        app_redirect_uri:
+          type: string
+        client_challenge:
+          type: string
     StepUpChallenge:
       type: object
       required: [challenge_id, challenge, expires_at]

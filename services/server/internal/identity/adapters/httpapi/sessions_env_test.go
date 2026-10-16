@@ -23,6 +23,7 @@ import (
 	auditapp "github.com/OWNER/bothy/services/server/internal/audit/app"
 	"github.com/OWNER/bothy/services/server/internal/authz"
 	"github.com/OWNER/bothy/services/server/internal/authz/adapters/fake"
+	authzhttp "github.com/OWNER/bothy/services/server/internal/authz/adapters/httpapi"
 	authzpg "github.com/OWNER/bothy/services/server/internal/authz/adapters/postgres"
 	authzapp "github.com/OWNER/bothy/services/server/internal/authz/app"
 	"github.com/OWNER/bothy/services/server/internal/identity"
@@ -66,6 +67,8 @@ var sessCfg = app.Config{
 	ServerCodeTTL: time.Minute, OIDCJWKSCacheTTL: time.Hour, OIDCClientAssertionTTL: 2 * time.Minute,
 	IDPRecheckInterval: 7 * 24 * time.Hour, GroupClaimMaxAge: 30 * 24 * time.Hour,
 	DeviceInactiveRevokeAfter: 180 * 24 * time.Hour,
+	// The console session (M6-01) with the standards of 08 section 18 and 07.
+	ConsoleSessionMaxAge: 12 * time.Hour, ConsoleSessionIdleTimeout: 30 * time.Minute, ViewAsMaxDuration: 15 * time.Minute,
 	// Local accounts (M1-39): the Argon2id floor parameters keep the tests fast.
 	LocalPasswordEnabled: true, PasswordMinLength: 12, Argon2idMemoryKiB: 19456, Argon2idIterations: 2, Argon2idParallelism: 1,
 	LoginFailLimit: 3, LoginLockDuration: 10 * time.Minute, TOTPKeyRef: testTOTPKeyRef,
@@ -146,6 +149,9 @@ type sworld struct {
 	// harness with further stages (the rate limit of M1-38).
 	routes      []httpservertest.Route
 	idempotency func(http.Handler) http.Handler
+	// access are the authz handlers (viewAsUser) a bind mounts beside identity (M6-01); nil
+	// mounts none.
+	access *authzhttp.Access
 
 	// devicesRevoked are the DeviceRevoked events (M1-45); evMu guards both event lists while
 	// units of work run concurrently.
@@ -263,7 +269,8 @@ func newSessionWorldWith(t *testing.T, db *pgtest.DB, clk *clock.Fake, instID id
 	if _, err := maint.Run(context.Background()); err != nil {
 		t.Fatal(err)
 	}
-	az, err := authzapp.NewAuthorizer(authzapp.AuthorizerConfig{SnapshotCacheMaxEntries: 1000, StepUpMaxAge: cfg.StepUpMaxAge}, authzapp.AuthorizerDeps{
+	az, err := authzapp.NewAuthorizer(authzapp.AuthorizerConfig{SnapshotCacheMaxEntries: 1000, StepUpMaxAge: cfg.StepUpMaxAge,
+		ViewAsMaxDuration: cfg.ViewAsMaxDuration}, authzapp.AuthorizerDeps{
 		Catalog: authzapp.NewCatalog(log), Store: authzpg.NewRepository(pool), Principals: principals,
 		Credentials: app.NewCredentialSource(repo, repo, repo), Structure: structure, Policies: policies,
 		Versions: instanceapp.NewVersions(instancepg.NewRepository(pool)), Recorder: w.rec, Clock: clk, Log: log,
@@ -318,7 +325,8 @@ func newSessionWorldWith(t *testing.T, db *pgtest.DB, clk *clock.Fake, instID id
 		Providers: w.id.ProviderHandlers, Credentials: w.id.CredentialHandlers,
 		Tokens: w.id.TokenHandlers, Enrollment: w.id.EnrollmentHandlers, Approval: w.id.ApprovalHandlers, Admin: w.settings.Handlers,
 		Passkeys: w.id.PasskeyHandlers, OIDC: w.id.OIDCHandlers,
-		TrustedHeader: w.id.TrustedHeaderHandlers, Lifecycle: w.id.LifecycleHandlers, Local: w.id.LocalHandlers},
+		TrustedHeader: w.id.TrustedHeaderHandlers, Lifecycle: w.id.LifecycleHandlers, Local: w.id.LocalHandlers,
+		Console: w.id.ConsoleHandlers, Access: w.access},
 		wire.RouteOptions(), routes.SpecCatalog())
 	if err != nil {
 		t.Fatal(err)

@@ -183,3 +183,77 @@ func usedPackages(pkg string, body []byte) (map[string]bool, error) {
 	})
 	return used, nil
 }
+
+// splitAll splits the package oapi-codegen wrote into models, server and the two halves of the
+// strict objects (splitRest, then halveObjects). Errors: those of both.
+func splitAll(src []byte) (models, server, objects, objects2 []byte, err error) {
+	models, server, objects, err = splitRest(src)
+	if err != nil {
+		return nil, nil, nil, nil, err
+	}
+	objects, objects2, err = halveObjects(objects)
+	return models, server, objects, objects2, err
+}
+
+// halveObjects cuts objects.gen.go (the output of splitRest) into two files at the start of the
+// operation group nearest its middle: the type declaration named *RequestObject, other than the
+// first, closest to half of its body. Each file keeps the header and only the imports it uses, so neither reaches
+// repo.max_file_kb as the contract grows (M6-01). With one group only the first file keeps
+// everything and the second holds only the package clause. Errors: objects is
+// not valid Go.
+func halveObjects(objects []byte) (head, tail []byte, err error) {
+	fset := token.NewFileSet()
+	f, err := parser.ParseFile(fset, "objects.gen.go", objects, parser.ParseComments)
+	if err != nil {
+		return nil, nil, fmt.Errorf("split objects.gen.go: %w", err)
+	}
+	header := objects[:fset.Position(f.Package).Offset]
+	bodyStart := fset.Position(f.Name.End()).Offset
+	for _, d := range f.Decls {
+		if g, ok := d.(*ast.GenDecl); ok && g.Tok == token.IMPORT {
+			bodyStart = fset.Position(g.End()).Offset
+		}
+	}
+	cut := groupNearest(fset, f, bodyStart+(len(objects)-bodyStart)/2, len(objects))
+	if head, err = assemble(header, f, objects[bodyStart:cut]); err != nil {
+		return nil, nil, err
+	}
+	if tail, err = assemble(header, f, objects[cut:]); err != nil {
+		return nil, nil, err
+	}
+	return head, tail, nil
+}
+
+// groupNearest returns the offset of the operation group of f (a type declaration named
+// *RequestObject with its doc comment) nearest to middle, never the first group; end when f has
+// only one group.
+func groupNearest(fset *token.FileSet, f *ast.File, middle, end int) int {
+	cut, first := end, true
+	for _, d := range f.Decls {
+		g, ok := d.(*ast.GenDecl)
+		if !ok || g.Tok != token.TYPE || !strings.HasSuffix(g.Specs[0].(*ast.TypeSpec).Name.Name, "RequestObject") {
+			continue
+		}
+		if first {
+			// The first group starts the file; cutting there would leave the first file empty.
+			first = false
+			continue
+		}
+		start := g.Pos()
+		if g.Doc != nil {
+			start = g.Doc.Pos()
+		}
+		if off := fset.Position(start).Offset; cut == end || abs(off-middle) < abs(cut-middle) {
+			cut = off
+		}
+	}
+	return cut
+}
+
+// abs returns the distance of n from zero.
+func abs(n int) int {
+	if n < 0 {
+		return -n
+	}
+	return n
+}

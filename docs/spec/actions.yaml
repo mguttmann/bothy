@@ -387,6 +387,18 @@ actions:
   rights_change: false
   rl_class: rl.admin
   effect: write
+- id: access.view_as.end
+  section: instance
+  description: end "View as person" stored on one's own console session before its end time
+    ([07-rechte.md](07-rechte.md), section 9.2; R-AZ-32)
+  resource: auth_session
+  right: self
+  owner: false
+  step_up: false
+  audit: always
+  rights_change: false
+  rl_class: rl.admin
+  effect: write
 - id: self.read
   section: identity
   description: eigenen Prinzipal lesen (`GET /me`), für Menschen, Agenten und Apps; auch für ein wartendes

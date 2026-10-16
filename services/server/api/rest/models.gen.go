@@ -547,13 +547,13 @@ func (e AppManifestDeliveryMode) Valid() bool {
 
 // Defines values for AppManifestSchemaVersion.
 const (
-	N1 AppManifestSchemaVersion = 1
+	AppManifestSchemaVersionN1 AppManifestSchemaVersion = 1
 )
 
 // Valid indicates whether the value is a known member of the AppManifestSchemaVersion enum.
 func (e AppManifestSchemaVersion) Valid() bool {
 	switch e {
-	case N1:
+	case AppManifestSchemaVersionN1:
 		return true
 	default:
 		return false
@@ -1202,6 +1202,48 @@ func (e ComponentUpdateState) Valid() bool {
 	case ComponentUpdateStateActive:
 		return true
 	case ComponentUpdateStateDisabled:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for ConsoleSessionStepUpMethod.
+const (
+	ConsoleSessionStepUpMethodOidcReauth   ConsoleSessionStepUpMethod = "oidc_reauth"
+	ConsoleSessionStepUpMethodPasskey      ConsoleSessionStepUpMethod = "passkey"
+	ConsoleSessionStepUpMethodPasswordTotp ConsoleSessionStepUpMethod = "password_totp"
+)
+
+// Valid indicates whether the value is a known member of the ConsoleSessionStepUpMethod enum.
+func (e ConsoleSessionStepUpMethod) Valid() bool {
+	switch e {
+	case ConsoleSessionStepUpMethodOidcReauth:
+		return true
+	case ConsoleSessionStepUpMethodPasskey:
+		return true
+	case ConsoleSessionStepUpMethodPasswordTotp:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for ConsoleSessionStepUpMethodsAvailable.
+const (
+	ConsoleSessionStepUpMethodsAvailableOidcReauth   ConsoleSessionStepUpMethodsAvailable = "oidc_reauth"
+	ConsoleSessionStepUpMethodsAvailablePasskey      ConsoleSessionStepUpMethodsAvailable = "passkey"
+	ConsoleSessionStepUpMethodsAvailablePasswordTotp ConsoleSessionStepUpMethodsAvailable = "password_totp"
+)
+
+// Valid indicates whether the value is a known member of the ConsoleSessionStepUpMethodsAvailable enum.
+func (e ConsoleSessionStepUpMethodsAvailable) Valid() bool {
+	switch e {
+	case ConsoleSessionStepUpMethodsAvailableOidcReauth:
+		return true
+	case ConsoleSessionStepUpMethodsAvailablePasskey:
+		return true
+	case ConsoleSessionStepUpMethodsAvailablePasswordTotp:
 		return true
 	default:
 		return false
@@ -2531,6 +2573,24 @@ func (e LlmCredentials) Valid() bool {
 	case LlmCredentialsOrganization:
 		return true
 	case LlmCredentialsPersonal:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for LoginClient.
+const (
+	LoginClientApp     LoginClient = "app"
+	LoginClientConsole LoginClient = "console"
+)
+
+// Valid indicates whether the value is a known member of the LoginClient enum.
+func (e LoginClient) Valid() bool {
+	switch e {
+	case LoginClientApp:
+		return true
+	case LoginClientConsole:
 		return true
 	default:
 		return false
@@ -5078,6 +5138,21 @@ func (e WebhookSubscriptionUpdateState) Valid() bool {
 	}
 }
 
+// Defines values for ConsoleRequest.
+const (
+	ConsoleRequestN1 ConsoleRequest = "1"
+)
+
+// Valid indicates whether the value is a known member of the ConsoleRequest enum.
+func (e ConsoleRequest) Valid() bool {
+	switch e {
+	case ConsoleRequestN1:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for TargetKindPath.
 const (
 	TargetKindPathChannel TargetKindPath = "channel"
@@ -5117,6 +5192,111 @@ func (e VariantPath) Valid() bool {
 	case VariantPathPoster:
 		return true
 	case VariantPathSmall:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for LogoutParamsXConsoleRequest.
+const (
+	LogoutParamsXConsoleRequestN1 LogoutParamsXConsoleRequest = "1"
+)
+
+// Valid indicates whether the value is a known member of the LogoutParamsXConsoleRequest enum.
+func (e LogoutParamsXConsoleRequest) Valid() bool {
+	switch e {
+	case LogoutParamsXConsoleRequestN1:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for CreateStepUpChallengeParamsXConsoleRequest.
+const (
+	CreateStepUpChallengeParamsXConsoleRequestN1 CreateStepUpChallengeParamsXConsoleRequest = "1"
+)
+
+// Valid indicates whether the value is a known member of the CreateStepUpChallengeParamsXConsoleRequest enum.
+func (e CreateStepUpChallengeParamsXConsoleRequest) Valid() bool {
+	switch e {
+	case CreateStepUpChallengeParamsXConsoleRequestN1:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for BeginStepUpOidcReauthParamsXConsoleRequest.
+const (
+	BeginStepUpOidcReauthParamsXConsoleRequestN1 BeginStepUpOidcReauthParamsXConsoleRequest = "1"
+)
+
+// Valid indicates whether the value is a known member of the BeginStepUpOidcReauthParamsXConsoleRequest enum.
+func (e BeginStepUpOidcReauthParamsXConsoleRequest) Valid() bool {
+	switch e {
+	case BeginStepUpOidcReauthParamsXConsoleRequestN1:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for CompleteStepUpOidcReauthParamsXConsoleRequest.
+const (
+	CompleteStepUpOidcReauthParamsXConsoleRequestN1 CompleteStepUpOidcReauthParamsXConsoleRequest = "1"
+)
+
+// Valid indicates whether the value is a known member of the CompleteStepUpOidcReauthParamsXConsoleRequest enum.
+func (e CompleteStepUpOidcReauthParamsXConsoleRequest) Valid() bool {
+	switch e {
+	case CompleteStepUpOidcReauthParamsXConsoleRequestN1:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for CompleteStepUpWithPasskeyParamsXConsoleRequest.
+const (
+	CompleteStepUpWithPasskeyParamsXConsoleRequestN1 CompleteStepUpWithPasskeyParamsXConsoleRequest = "1"
+)
+
+// Valid indicates whether the value is a known member of the CompleteStepUpWithPasskeyParamsXConsoleRequest enum.
+func (e CompleteStepUpWithPasskeyParamsXConsoleRequest) Valid() bool {
+	switch e {
+	case CompleteStepUpWithPasskeyParamsXConsoleRequestN1:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for StepUpWithPasswordParamsXConsoleRequest.
+const (
+	StepUpWithPasswordParamsXConsoleRequestN1 StepUpWithPasswordParamsXConsoleRequest = "1"
+)
+
+// Valid indicates whether the value is a known member of the StepUpWithPasswordParamsXConsoleRequest enum.
+func (e StepUpWithPasswordParamsXConsoleRequest) Valid() bool {
+	switch e {
+	case StepUpWithPasswordParamsXConsoleRequestN1:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for EndViewAsParamsXConsoleRequest.
+const (
+	EndViewAsParamsXConsoleRequestN1 EndViewAsParamsXConsoleRequest = "1"
+)
+
+// Valid indicates whether the value is a known member of the EndViewAsParamsXConsoleRequest enum.
+func (e EndViewAsParamsXConsoleRequest) Valid() bool {
+	switch e {
+	case EndViewAsParamsXConsoleRequestN1:
 		return true
 	default:
 		return false
@@ -7396,6 +7576,44 @@ type ComponentUpdate struct {
 
 // ComponentUpdateState defines model for ComponentUpdate.State.
 type ComponentUpdateState string
+
+// ConsoleSession defines model for ConsoleSession.
+type ConsoleSession struct {
+	DisplayName string `json:"display_name"`
+
+	// ExpiresAt RFC 3339 timestamp in UTC with millisecond precision and suffix `Z`.
+	ExpiresAt          Timestamp `json:"expires_at"`
+	IdleTimeoutSeconds int       `json:"idle_timeout_seconds"`
+
+	// StepUpAt RFC 3339 timestamp in UTC with millisecond precision and suffix `Z`.
+	StepUpAt               *Timestamp                             `json:"step_up_at,omitempty"`
+	StepUpMethod           *ConsoleSessionStepUpMethod            `json:"step_up_method,omitempty"`
+	StepUpMethodsAvailable []ConsoleSessionStepUpMethodsAvailable `json:"step_up_methods_available"`
+
+	// StepUpValidUntil RFC 3339 timestamp in UTC with millisecond precision and suffix `Z`.
+	StepUpValidUntil *Timestamp `json:"step_up_valid_until,omitempty"`
+
+	// UserId UUIDv7 (RFC 9562), lowercase canonical form.
+	UserId Uuid `json:"user_id"`
+	ViewAs *struct {
+		DisplayName string `json:"display_name"`
+
+		// EndsAt RFC 3339 timestamp in UTC with millisecond precision and suffix `Z`.
+		EndsAt Timestamp `json:"ends_at"`
+
+		// StartedAt RFC 3339 timestamp in UTC with millisecond precision and suffix `Z`.
+		StartedAt Timestamp `json:"started_at"`
+
+		// UserId UUIDv7 (RFC 9562), lowercase canonical form.
+		UserId Uuid `json:"user_id"`
+	} `json:"view_as,omitempty"`
+}
+
+// ConsoleSessionStepUpMethod defines model for ConsoleSession.StepUpMethod.
+type ConsoleSessionStepUpMethod string
+
+// ConsoleSessionStepUpMethodsAvailable defines model for ConsoleSession.StepUpMethodsAvailable.
+type ConsoleSessionStepUpMethodsAvailable string
 
 // ConsumerAck defines model for ConsumerAck.
 type ConsumerAck struct {
@@ -10290,6 +10508,9 @@ type LocalCredentialSet struct {
 	TotpEnroll *bool   `json:"totp_enroll,omitempty"`
 }
 
+// LoginClient `console`: no `device` or DPoP; cookie, no token (08, 7.5).
+type LoginClient string
+
 // ManifestValidation defines model for ManifestValidation.
 type ManifestValidation struct {
 	Errors []FieldError `json:"errors"`
@@ -10906,6 +11127,9 @@ type OidcBeginRequest struct {
 	// Examples: com.example.teamchat:/login
 	AppRedirectUri string `json:"app_redirect_uri"`
 
+	// Client `console`: no `device` or DPoP; cookie, no token (08, 7.5).
+	Client *LoginClient `json:"client,omitempty"`
+
 	// ClientChallenge Base64url SHA-256 of a client verifier, binds the later `login_code` to this app instance.
 	//
 	// Examples: E9Melhoa2OwvFrEMTJguCHaoeK1t8URWbuGJSstw-cM
@@ -10934,11 +11158,14 @@ type OidcBeginResponse struct {
 
 // OidcCompleteRequest defines model for OidcCompleteRequest.
 type OidcCompleteRequest struct {
+	// Client `console`: no `device` or DPoP; cookie, no token (08, 7.5).
+	Client *LoginClient `json:"client,omitempty"`
+
 	// ClientVerifier Examples: dBjftJeZ4CVP-mB92K27uhbUJU1p1r_wW1gFWFOEjXk
 	ClientVerifier string `json:"client_verifier"`
 
 	// Device Device and device keys sent with every login completion. The DPoP proof of the request must be signed with the `dpop` key (`public_jwk`); `step_up_key` is the second key with user verification (08, 6.1), absent where no secure key store exists.
-	Device DeviceRegistration `json:"device"`
+	Device *DeviceRegistration `json:"device,omitempty"`
 
 	// LoginCode One-time code the server appended to `app_redirect_uri` after the provider callback.
 	//
@@ -11070,11 +11297,14 @@ type PasskeyLoginCompleteRequest struct {
 	// ChallengeId UUIDv7 (RFC 9562), lowercase canonical form.
 	ChallengeId Uuid `json:"challenge_id"`
 
+	// Client `console`: no `device` or DPoP; cookie, no token (08, 7.5).
+	Client *LoginClient `json:"client,omitempty"`
+
 	// Credential WebAuthn `PublicKeyCredential` in JSON form.
 	Credential JsonObject `json:"credential"`
 
 	// Device Device and device keys sent with every login completion. The DPoP proof of the request must be signed with the `dpop` key (`public_jwk`); `step_up_key` is the second key with user verification (08, 6.1), absent where no secure key store exists.
-	Device DeviceRegistration `json:"device"`
+	Device *DeviceRegistration `json:"device,omitempty"`
 }
 
 // PasskeyRegisterComplete defines model for PasskeyRegisterComplete.
@@ -11091,8 +11321,11 @@ type PasskeyRegisterComplete struct {
 
 // PasswordLoginRequest defines model for PasswordLoginRequest.
 type PasswordLoginRequest struct {
+	// Client `console`: no `device` or DPoP; cookie, no token (08, 7.5).
+	Client *LoginClient `json:"client,omitempty"`
+
 	// Device Device and device keys sent with every login completion. The DPoP proof of the request must be signed with the `dpop` key (`public_jwk`); `step_up_key` is the second key with user verification (08, 6.1), absent where no secure key store exists.
-	Device DeviceRegistration `json:"device"`
+	Device *DeviceRegistration `json:"device,omitempty"`
 
 	// LoginName Examples: alex
 	LoginName string `json:"login_name"`
@@ -13794,6 +14027,18 @@ type StepUpDeviceKeyRequest struct {
 	Signature string `json:"signature"`
 }
 
+// StepUpOidcBeginRequest defines model for StepUpOidcBeginRequest.
+type StepUpOidcBeginRequest struct {
+	AppRedirectUri string `json:"app_redirect_uri"`
+
+	// ChallengeId UUIDv7 (RFC 9562), lowercase canonical form.
+	ChallengeId     Uuid   `json:"challenge_id"`
+	ClientChallenge string `json:"client_challenge"`
+
+	// ProviderId UUIDv7 (RFC 9562), lowercase canonical form.
+	ProviderId Uuid `json:"provider_id"`
+}
+
 // StepUpPasskeyRequest defines model for StepUpPasskeyRequest.
 type StepUpPasskeyRequest struct {
 	// ChallengeId UUIDv7 (RFC 9562), lowercase canonical form.
@@ -13801,6 +14046,14 @@ type StepUpPasskeyRequest struct {
 
 	// Credential Free-form JSON object whose schema is named in the field description.
 	Credential JsonObject `json:"credential"`
+}
+
+// StepUpPasswordRequest defines model for StepUpPasswordRequest.
+type StepUpPasswordRequest struct {
+	// ChallengeId UUIDv7 (RFC 9562), lowercase canonical form.
+	ChallengeId Uuid   `json:"challenge_id"`
+	Password    string `json:"password"`
+	TotpCode    string `json:"totp_code"`
 }
 
 // StepUpResult defines model for StepUpResult.
@@ -14648,8 +14901,11 @@ type TriggerState string
 
 // TrustedHeaderLoginRequest defines model for TrustedHeaderLoginRequest.
 type TrustedHeaderLoginRequest struct {
+	// Client `console`: no `device` or DPoP; cookie, no token (08, 7.5).
+	Client *LoginClient `json:"client,omitempty"`
+
 	// Device Device and device keys sent with every login completion. The DPoP proof of the request must be signed with the `dpop` key (`public_jwk`); `step_up_key` is the second key with user verification (08, 6.1), absent where no secure key store exists.
-	Device DeviceRegistration `json:"device"`
+	Device *DeviceRegistration `json:"device,omitempty"`
 
 	// EnrollmentCode Optional enrollment code; links an unknown header login to the person of the code (08, 3.1).
 	//
@@ -15172,6 +15428,9 @@ type CommandIdPath = Uuid
 // ComponentIdPath UUIDv7 (RFC 9562), lowercase canonical form.
 type ComponentIdPath = Uuid
 
+// ConsoleRequest defines model for ConsoleRequest.
+type ConsoleRequest string
+
 // ConsumerPath Examples: default
 type ConsumerPath = string
 
@@ -15183,6 +15442,9 @@ type DeviceIdPath = Uuid
 
 // DpopProof defines model for DpopProof.
 type DpopProof = string
+
+// DpopProofLogin defines model for DpopProofLogin.
+type DpopProofLogin = string
 
 // EmojiPath One Unicode grapheme cluster, percent-encoded.
 //
@@ -15323,6 +15585,9 @@ type BadRequest = Problem
 // path `/api/v1/problems/{code}`; `code` repeats its last segment for convenience.
 type Conflict = Problem
 
+// ConsoleLogin defines model for ConsoleLogin.
+type ConsoleLogin = ConsoleSession
+
 // Error Error body after RFC 9457 (`application/problem+json`). `type` is a relative URI with full
 // path `/api/v1/problems/{code}`; `code` repeats its last segment for convenience.
 type Error = Problem
@@ -15358,6 +15623,9 @@ type RangeNotSatisfiable = Problem
 // ServiceUnavailable Error body after RFC 9457 (`application/problem+json`). `type` is a relative URI with full
 // path `/api/v1/problems/{code}`; `code` repeats its last segment for convenience.
 type ServiceUnavailable = Problem
+
+// StepUpDone defines model for StepUpDone.
+type StepUpDone = StepUpResult
 
 // TooManyRequests Error body after RFC 9457 (`application/problem+json`). `type` is a relative URI with full
 // path `/api/v1/problems/{code}`; `code` repeats its last segment for convenience.
@@ -15513,6 +15781,15 @@ type RedeemEnrollmentCodeParams struct {
 	DPoP DpopProof `json:"DPoP"`
 }
 
+// LogoutParams defines parameters for Logout.
+type LogoutParams struct {
+	// XConsoleRequest CSRF header of the console (SEC-CORS-4).
+	XConsoleRequest *LogoutParamsXConsoleRequest `json:"X-Console-Request,omitempty"`
+}
+
+// LogoutParamsXConsoleRequest defines parameters for Logout.
+type LogoutParamsXConsoleRequest string
+
 // HandleOidcCallbackParams defines parameters for HandleOidcCallback.
 type HandleOidcCallbackParams struct {
 	// State State from the authorization request.
@@ -15530,8 +15807,8 @@ type HandleOidcCallbackParams struct {
 
 // CompleteOidcLoginParams defines parameters for CompleteOidcLogin.
 type CompleteOidcLoginParams struct {
-	// DPoP DPoP proof (RFC 9449) signed with the device key that the new tokens will be bound to.
-	DPoP DpopProof `json:"DPoP"`
+	// DPoP As `DpopProof`; not for `client = console`.
+	DPoP *DpopProofLogin `json:"DPoP,omitempty"`
 }
 
 // BeginPairingParams defines parameters for BeginPairing.
@@ -15548,15 +15825,60 @@ type CompletePairingParams struct {
 
 // CompletePasskeyLoginParams defines parameters for CompletePasskeyLogin.
 type CompletePasskeyLoginParams struct {
-	// DPoP DPoP proof (RFC 9449) signed with the device key that the new tokens will be bound to.
-	DPoP DpopProof `json:"DPoP"`
+	// DPoP As `DpopProof`; not for `client = console`.
+	DPoP *DpopProofLogin `json:"DPoP,omitempty"`
 }
 
 // LoginWithPasswordParams defines parameters for LoginWithPassword.
 type LoginWithPasswordParams struct {
-	// DPoP DPoP proof (RFC 9449) signed with the device key that the new tokens will be bound to.
-	DPoP DpopProof `json:"DPoP"`
+	// DPoP As `DpopProof`; not for `client = console`.
+	DPoP *DpopProofLogin `json:"DPoP,omitempty"`
 }
+
+// CreateStepUpChallengeParams defines parameters for CreateStepUpChallenge.
+type CreateStepUpChallengeParams struct {
+	// XConsoleRequest CSRF header of the console (SEC-CORS-4).
+	XConsoleRequest *CreateStepUpChallengeParamsXConsoleRequest `json:"X-Console-Request,omitempty"`
+}
+
+// CreateStepUpChallengeParamsXConsoleRequest defines parameters for CreateStepUpChallenge.
+type CreateStepUpChallengeParamsXConsoleRequest string
+
+// BeginStepUpOidcReauthParams defines parameters for BeginStepUpOidcReauth.
+type BeginStepUpOidcReauthParams struct {
+	// XConsoleRequest CSRF header of the console (SEC-CORS-4).
+	XConsoleRequest *BeginStepUpOidcReauthParamsXConsoleRequest `json:"X-Console-Request,omitempty"`
+}
+
+// BeginStepUpOidcReauthParamsXConsoleRequest defines parameters for BeginStepUpOidcReauth.
+type BeginStepUpOidcReauthParamsXConsoleRequest string
+
+// CompleteStepUpOidcReauthParams defines parameters for CompleteStepUpOidcReauth.
+type CompleteStepUpOidcReauthParams struct {
+	// XConsoleRequest CSRF header of the console (SEC-CORS-4).
+	XConsoleRequest *CompleteStepUpOidcReauthParamsXConsoleRequest `json:"X-Console-Request,omitempty"`
+}
+
+// CompleteStepUpOidcReauthParamsXConsoleRequest defines parameters for CompleteStepUpOidcReauth.
+type CompleteStepUpOidcReauthParamsXConsoleRequest string
+
+// CompleteStepUpWithPasskeyParams defines parameters for CompleteStepUpWithPasskey.
+type CompleteStepUpWithPasskeyParams struct {
+	// XConsoleRequest CSRF header of the console (SEC-CORS-4).
+	XConsoleRequest *CompleteStepUpWithPasskeyParamsXConsoleRequest `json:"X-Console-Request,omitempty"`
+}
+
+// CompleteStepUpWithPasskeyParamsXConsoleRequest defines parameters for CompleteStepUpWithPasskey.
+type CompleteStepUpWithPasskeyParamsXConsoleRequest string
+
+// StepUpWithPasswordParams defines parameters for StepUpWithPassword.
+type StepUpWithPasswordParams struct {
+	// XConsoleRequest CSRF header of the console (SEC-CORS-4).
+	XConsoleRequest *StepUpWithPasswordParamsXConsoleRequest `json:"X-Console-Request,omitempty"`
+}
+
+// StepUpWithPasswordParamsXConsoleRequest defines parameters for StepUpWithPassword.
+type StepUpWithPasswordParamsXConsoleRequest string
 
 // RefreshTokenParams defines parameters for RefreshToken.
 type RefreshTokenParams struct {
@@ -15566,8 +15888,8 @@ type RefreshTokenParams struct {
 
 // LoginWithTrustedHeaderParams defines parameters for LoginWithTrustedHeader.
 type LoginWithTrustedHeaderParams struct {
-	// DPoP DPoP proof (RFC 9449) signed with the device key that the new tokens will be bound to.
-	DPoP DpopProof `json:"DPoP"`
+	// DPoP As `DpopProof`; not for `client = console`.
+	DPoP *DpopProofLogin `json:"DPoP,omitempty"`
 }
 
 // UpdateChannelParams defines parameters for UpdateChannel.
@@ -15642,6 +15964,15 @@ type CreateThreadParams struct {
 	// IdempotencyKey UUIDv7 chosen by the client per logical operation. A repeat with the same request returns the stored response; a different request gives 422 `idempotency_key_reuse`; a repeat while the first is running gives 409 `request_in_progress`. Kept for `sync.idempotency_key_ttl`.
 	IdempotencyKey *IdempotencyKey `json:"Idempotency-Key,omitempty"`
 }
+
+// EndViewAsParams defines parameters for EndViewAs.
+type EndViewAsParams struct {
+	// XConsoleRequest CSRF header of the console (SEC-CORS-4).
+	XConsoleRequest *EndViewAsParamsXConsoleRequest `json:"X-Console-Request,omitempty"`
+}
+
+// EndViewAsParamsXConsoleRequest defines parameters for EndViewAs.
+type EndViewAsParamsXConsoleRequest string
 
 // ApproveDeviceParams defines parameters for ApproveDevice.
 type ApproveDeviceParams struct {
@@ -16187,8 +16518,17 @@ type LoginWithPasswordJSONRequestBody = PasswordLoginRequest
 // CompleteStepUpWithDeviceKeyJSONRequestBody defines body for CompleteStepUpWithDeviceKey for application/json ContentType.
 type CompleteStepUpWithDeviceKeyJSONRequestBody = StepUpDeviceKeyRequest
 
+// BeginStepUpOidcReauthJSONRequestBody defines body for BeginStepUpOidcReauth for application/json ContentType.
+type BeginStepUpOidcReauthJSONRequestBody = StepUpOidcBeginRequest
+
+// CompleteStepUpOidcReauthJSONRequestBody defines body for CompleteStepUpOidcReauth for application/json ContentType.
+type CompleteStepUpOidcReauthJSONRequestBody = IdentityLinkComplete
+
 // CompleteStepUpWithPasskeyJSONRequestBody defines body for CompleteStepUpWithPasskey for application/json ContentType.
 type CompleteStepUpWithPasskeyJSONRequestBody = StepUpPasskeyRequest
+
+// StepUpWithPasswordJSONRequestBody defines body for StepUpWithPassword for application/json ContentType.
+type StepUpWithPasswordJSONRequestBody = StepUpPasswordRequest
 
 // RefreshTokenJSONRequestBody defines body for RefreshToken for application/json ContentType.
 type RefreshTokenJSONRequestBody = TokenRefreshRequest

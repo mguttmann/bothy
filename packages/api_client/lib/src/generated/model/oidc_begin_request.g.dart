@@ -8,6 +8,8 @@ part of 'oidc_begin_request.dart';
 
 class _$OidcBeginRequest extends OidcBeginRequest {
   @override
+  final LoginClient? client;
+  @override
   final String providerId;
   @override
   final String appRedirectUri;
@@ -21,6 +23,7 @@ class _$OidcBeginRequest extends OidcBeginRequest {
   ]) => (OidcBeginRequestBuilder()..update(updates))._build();
 
   _$OidcBeginRequest._({
+    this.client,
     required this.providerId,
     required this.appRedirectUri,
     required this.clientChallenge,
@@ -38,6 +41,7 @@ class _$OidcBeginRequest extends OidcBeginRequest {
   bool operator ==(Object other) {
     if (identical(other, this)) return true;
     return other is OidcBeginRequest &&
+        client == other.client &&
         providerId == other.providerId &&
         appRedirectUri == other.appRedirectUri &&
         clientChallenge == other.clientChallenge &&
@@ -47,6 +51,7 @@ class _$OidcBeginRequest extends OidcBeginRequest {
   @override
   int get hashCode {
     var _$hash = 0;
+    _$hash = $jc(_$hash, client.hashCode);
     _$hash = $jc(_$hash, providerId.hashCode);
     _$hash = $jc(_$hash, appRedirectUri.hashCode);
     _$hash = $jc(_$hash, clientChallenge.hashCode);
@@ -58,6 +63,7 @@ class _$OidcBeginRequest extends OidcBeginRequest {
   @override
   String toString() {
     return (newBuiltValueToStringHelper(r'OidcBeginRequest')
+          ..add('client', client)
           ..add('providerId', providerId)
           ..add('appRedirectUri', appRedirectUri)
           ..add('clientChallenge', clientChallenge)
@@ -69,6 +75,10 @@ class _$OidcBeginRequest extends OidcBeginRequest {
 class OidcBeginRequestBuilder
     implements Builder<OidcBeginRequest, OidcBeginRequestBuilder> {
   _$OidcBeginRequest? _$v;
+
+  LoginClient? _client;
+  LoginClient? get client => _$this._client;
+  set client(LoginClient? client) => _$this._client = client;
 
   String? _providerId;
   String? get providerId => _$this._providerId;
@@ -96,6 +106,7 @@ class OidcBeginRequestBuilder
   OidcBeginRequestBuilder get _$this {
     final $v = _$v;
     if ($v != null) {
+      _client = $v.client;
       _providerId = $v.providerId;
       _appRedirectUri = $v.appRedirectUri;
       _clientChallenge = $v.clientChallenge;
@@ -122,6 +133,7 @@ class OidcBeginRequestBuilder
     final _$result =
         _$v ??
         _$OidcBeginRequest._(
+          client: client,
           providerId: BuiltValueNullFieldError.checkNotNull(
             providerId,
             r'OidcBeginRequest',

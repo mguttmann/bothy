@@ -14,6 +14,9 @@ import (
 // OIDCBegin is the input of OIDCLogin.BeginOIDCLogin and BeginIdentityLink (schemas
 // OidcBeginRequest and IdentityLinkBegin).
 type OIDCBegin struct {
+	// Console selects the console form (client = console, M6-01): AppRedirectURI must be the
+	// console callback /console/login/callback on the origin of server.public_url.
+	Console bool
 	// ProviderID is an enabled provider of kind oidc.
 	ProviderID ids.ID
 	// AppRedirectURI is the loopback callback of the app or an entry of the provider's
@@ -46,6 +49,9 @@ type OIDCCallback struct {
 // OIDCComplete is the input of OIDCLogin.CompleteOIDCLogin (schema OidcCompleteRequest plus the
 // request facts).
 type OIDCComplete struct {
+	// Console selects the console form (client = console, M6-01): no Device and no Proof; the
+	// login registers a web device and starts a console session with a cookie instead of tokens.
+	Console bool
 	// LoginCode is the one-time code of the callback redirect.
 	LoginCode string
 	// ClientVerifier is the PKCE verifier of the app instance that began the flow.

@@ -41,6 +41,15 @@ type Config struct {
 	RefreshTokenTTL time.Duration `config:"auth.refresh_token_ttl"`
 	// SessionMaxAge is auth.session_max_age, the absolute end of an app session after its start.
 	SessionMaxAge time.Duration `config:"auth.session_max_age"`
+	// ConsoleSessionMaxAge is auth.console_session_max_age, the absolute end of a console session
+	// after its login (M6-01).
+	ConsoleSessionMaxAge time.Duration `config:"auth.console_session_max_age"`
+	// ConsoleSessionIdleTimeout is auth.console_session_idle_timeout: a console session ends after
+	// this time without a request (M6-01, D-M6-01-3).
+	ConsoleSessionIdleTimeout time.Duration `config:"auth.console_session_idle_timeout"`
+	// ViewAsMaxDuration is authz.view_as_max_duration, how long "View as person" stored on a
+	// console session lasts (07 section 9.2, M6-01); authz reads the same key.
+	ViewAsMaxDuration time.Duration `config:"authz.view_as_max_duration"`
 	// RefreshReuseGrace is auth.refresh_reuse_grace, how long the generation just before the
 	// current one may rotate again with the family key (03 refresh_tokens item 2).
 	RefreshReuseGrace time.Duration `config:"auth.refresh_reuse_grace"`

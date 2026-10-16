@@ -53,7 +53,7 @@ eigenen Origin kommen (Abschnitt 5).
 | SEC-CORS-1 | Die API sendet keine CORS-Freigaben. Native Apps brauchen kein CORS; die Konsole ist same-origin. |
 | SEC-CORS-2 | Einzige Ausnahme: öffentliche, nicht personenbezogene Antworten ohne Anmeldung (`instance.discovery.read`, JWKS) mit `Access-Control-Allow-Origin: *` und ohne Credentials. |
 | SEC-CORS-3 | WebSocket-Upgrade: ist eine `Origin`-Kopfzeile vorhanden, muss sie gleich dem Origin der Instanz sein; sonst `403` vor dem Upgrade. Native Clients senden keine fremde `Origin`. Grund: Schutz der Konsolen-Sitzung (Cookie) vor Cross-Site-WebSocket-Hijacking. |
-| SEC-CORS-4 | Ändernde Anfragen der Konsole tragen eine eigene Pflicht-Kopfzeile und ein passendes `Origin` (08, Abschnitt 7.5). |
+| SEC-CORS-4 | Ändernde Anfragen der Konsole tragen eine eigene Pflicht-Kopfzeile und ein passendes `Origin` (08, Abschnitt 7.5). The header is `X-Console-Request: 1`; a request with the console cookie and without it or with another `Origin` gets `403 forbidden` with reason `csrf_check_failed` (M6-01). |
 
 ## 5. Content Security Policy der Web-Konsole
 

@@ -125,6 +125,8 @@ import 'package:api_client/src/generated/model/component_create.dart';
 import 'package:api_client/src/generated/model/component_restriction.dart';
 import 'package:api_client/src/generated/model/component_type.dart';
 import 'package:api_client/src/generated/model/component_update.dart';
+import 'package:api_client/src/generated/model/console_session.dart';
+import 'package:api_client/src/generated/model/console_session_view_as.dart';
 import 'package:api_client/src/generated/model/consumer_ack.dart';
 import 'package:api_client/src/generated/model/consumer_state.dart';
 import 'package:api_client/src/generated/model/cost_breakdown.dart';
@@ -310,6 +312,7 @@ import 'package:api_client/src/generated/model/level_or_none.dart';
 import 'package:api_client/src/generated/model/llm_credentials.dart';
 import 'package:api_client/src/generated/model/local_credential_result.dart';
 import 'package:api_client/src/generated/model/local_credential_set.dart';
+import 'package:api_client/src/generated/model/login_client.dart';
 import 'package:api_client/src/generated/model/manifest_validation.dart';
 import 'package:api_client/src/generated/model/me.dart';
 import 'package:api_client/src/generated/model/mention_item.dart';
@@ -492,7 +495,9 @@ import 'package:api_client/src/generated/model/status_updated_event.dart';
 import 'package:api_client/src/generated/model/status_updated_payload.dart';
 import 'package:api_client/src/generated/model/step_up_challenge.dart';
 import 'package:api_client/src/generated/model/step_up_device_key_request.dart';
+import 'package:api_client/src/generated/model/step_up_oidc_begin_request.dart';
 import 'package:api_client/src/generated/model/step_up_passkey_request.dart';
+import 'package:api_client/src/generated/model/step_up_password_request.dart';
 import 'package:api_client/src/generated/model/step_up_result.dart';
 import 'package:api_client/src/generated/model/target_kind.dart';
 import 'package:api_client/src/generated/model/template.dart';
@@ -688,6 +693,8 @@ part 'serializers.g.dart';
   ComponentRestriction,
   ComponentType,
   ComponentUpdate,
+  ConsoleSession,
+  ConsoleSessionViewAs,
   ConsumerAck,
   ConsumerState,
   CostBreakdown,
@@ -874,6 +881,7 @@ part 'serializers.g.dart';
   LlmCredentials,
   LocalCredentialResult,
   LocalCredentialSet,
+  LoginClient,
   ManifestValidation,
   Me,
   MentionItem,
@@ -1056,7 +1064,9 @@ part 'serializers.g.dart';
   StatusUpdatedPayload,
   StepUpChallenge,
   StepUpDeviceKeyRequest,
+  StepUpOidcBeginRequest,
   StepUpPasskeyRequest,
+  StepUpPasswordRequest,
   StepUpResult,
   TargetKind,
   Template,

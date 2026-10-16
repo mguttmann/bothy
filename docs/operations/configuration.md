@@ -387,8 +387,8 @@ Quelle: [08-identitaet.md](../spec/08-identitaet.md), Abschnitt 18.
 | `auth.step_up_challenge_ttl` | `BOTHY_AUTH__STEP_UP_CHALLENGE_TTL` | Server | duration | `2m` | Gültigkeit einer Step-up-Herausforderung | aktiv |
 | `auth.step_up_fail_limit` | `BOTHY_AUTH__STEP_UP_FAIL_LIMIT` | Server | int | `5` | Fehlversuche beim Step-up je Fenster | aktiv |
 | `auth.require_key_attestation` | `BOTHY_AUTH__REQUIRE_KEY_ATTESTATION` | Server |  | `false` | Plattform-Attestierung der Geräteschlüssel verlangen | geplant (V3) |
-| `auth.console_session_max_age` | `BOTHY_AUTH__CONSOLE_SESSION_MAX_AGE` | Server |  | `12h` | absolute Dauer einer Konsolen-Sitzung | geplant (M6) |
-| `auth.console_session_idle_timeout` | `BOTHY_AUTH__CONSOLE_SESSION_IDLE_TIMEOUT` | Server |  | `30m` | Leerlauf bis zum Ende der Konsolen-Sitzung | geplant (M6) |
+| `auth.console_session_max_age` | `BOTHY_AUTH__CONSOLE_SESSION_MAX_AGE` | Server | duration | `12h` | absolute Dauer einer Konsolen-Sitzung | aktiv |
+| `auth.console_session_idle_timeout` | `BOTHY_AUTH__CONSOLE_SESSION_IDLE_TIMEOUT` | Server | duration | `30m` | Leerlauf bis zum Ende der Konsolen-Sitzung | aktiv |
 | `auth.local_password_enabled` | `BOTHY_AUTH__LOCAL_PASSWORD_ENABLED` | Server | bool | `true` | Passwort mit TOTP als Rückfall für lokale Konten | aktiv |
 | `auth.totp_key_ref` | `BOTHY_AUTH__TOTP_KEY_REF` | Server | secret_ref | `file:<secrets.dir>/totp_key` | Verweis auf den Schlüssel (32 Byte), mit dem TOTP-Geheimnisse verschlüsselt werden | aktiv |
 | `auth.webauthn_rp_id` | `BOTHY_AUTH__WEBAUTHN_RP_ID` | Server | string | leer | RP-ID der Passkeys; leer heißt Host von `server.public_url` | aktiv |
