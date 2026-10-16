@@ -468,7 +468,12 @@ func (s *StepUps) completePasskey(ctx context.Context, a actor.Actor, challengeI
 	if err != nil {
 		return completion{}, err
 	}
-	if err := s.c.recordUse(ctx, res, authorize.ActionAuthStepUp, now); err != nil {
+	err = s.c.recordUse(ctx, res, authorize.ActionAuthStepUp, now)
+	if cause, ok := refusalCause(err); ok {
+		// A passkey revoked since the lookup counts like a refused assertion.
+		return s.fail(ctx, a, ch.ID, stepup.Cause(cause), now)
+	}
+	if err != nil {
 		return completion{}, err
 	}
 	return s.confirmed(ctx, sid, ch.ID, identity.StepUpMethodPasskey, now)
