@@ -411,9 +411,8 @@ func TestConsumerWakesOnNotify(t *testing.T) {
 	before := counting.rounds.Load()
 	e.appendSettings(t, 1)
 	waitFor(t, 5*time.Second, "the jobs of the notified event", func() bool { return len(e.probeJobs(t)) == 1 })
-	if counting.rounds.Load() <= before {
-		t.Fatal("no round ran after the notification")
-	}
+	// The jobs are visible when the round commits, the count only when Round returns.
+	waitFor(t, 5*time.Second, "a round after the notification", func() bool { return counting.rounds.Load() > before })
 	e.exactlyTwoJobs(t, 1, 1)
 }
 
