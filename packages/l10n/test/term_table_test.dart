@@ -21,6 +21,8 @@ const Map<String, String> exceptions = {
   'vizMetricRunsFinished': 'plural Läufe of Lauf',
   'vizMoreRunsThanShown': 'plural Läufe of Lauf',
   'vizChartRuns': 'plural Läufe of Lauf',
+  // {space} and {channel} are placeholders that carry the names, not the terms (INT-W27/4).
+  'vizLaneLabel': 'placeholders {space} and {channel}, not the terms',
 };
 
 void main() {
