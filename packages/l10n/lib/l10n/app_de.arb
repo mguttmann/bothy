@@ -416,5 +416,6 @@
   "shellColumnHistory": "Verlauf",
   "shellColumnSession": "Sitzung",
   "shellResizeColumn": "Spaltenbreite ändern",
-  "shellUpdateRequired": "Update erforderlich. Installiere die neue Version, um dich wieder zu verbinden."
+  "shellUpdateRequired": "Update erforderlich. Installiere die neue Version, um dich wieder zu verbinden.",
+  "shellStepUpTitle": "Bestätige, dass du es bist"
 }

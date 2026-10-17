@@ -2604,6 +2604,12 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Update required. Install the new version to connect again.'**
   String get shellUpdateRequired;
+
+  /// Title of the system dialog that confirms a step-up signature with biometrics or the device password (08 section 6.1).
+  ///
+  /// In en, this message translates to:
+  /// **'Confirm it is you'**
+  String get shellStepUpTitle;
 }
 
 class _AppLocalizationsDelegate

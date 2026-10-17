@@ -1574,4 +1574,7 @@ class AppLocalizationsDe extends AppLocalizations {
   @override
   String get shellUpdateRequired =>
       'Update erforderlich. Installiere die neue Version, um dich wieder zu verbinden.';
+
+  @override
+  String get shellStepUpTitle => 'Bestätige, dass du es bist';
 }

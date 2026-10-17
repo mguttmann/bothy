@@ -1,5 +1,17 @@
 # SPDX-License-Identifier: Apache-2.0
 # The shared rules of the workspace come from the root file (docs/DECISIONS.md D-M4-01-4).
+# The Flutter tool adds the platform folders to the excludes of an app with platform folders;
+# a list in this file replaces the list of the included file, so the excludes of the root file
+# are repeated here.
+analyzer:
+  exclude:
+    - "**/*.g.dart"
+    - "**/*.freezed.dart"
+    - "**/*.drift.dart"
+    - "**/lib/src/generated/**"
+    - "build/**"
+    - windows/**
+    - macos/**
 include:
   - package:flutter_lints/flutter.yaml
   - ../../analysis_options.yaml

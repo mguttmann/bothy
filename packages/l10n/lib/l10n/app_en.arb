@@ -2240,5 +2240,9 @@
   "shellUpdateRequired": "Update required. Install the new version to connect again.",
   "@shellUpdateRequired": {
     "description": "Banner after the close code 4007 (15 section 15)."
+  },
+  "shellStepUpTitle": "Confirm it is you",
+  "@shellStepUpTitle": {
+    "description": "Title of the system dialog that confirms a step-up signature with biometrics or the device password (08 section 6.1)."
   }
 }

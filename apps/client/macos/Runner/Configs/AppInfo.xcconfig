@@ -1,0 +1,17 @@
+// SPDX-License-Identifier: Apache-2.0
+// Application-level settings for the Runner target.
+//
+// Name, bundle identifier and URL scheme come from the build branding: Branding.xcconfig is
+// written by `dart run tool/branding_defines.dart` from branding.example.yaml (or the
+// branding.yaml of an instance), the same file the Dart side reads through
+// --dart-define-from-file (docs/DECISIONS.md D-M4-18-7).
+#include "Branding.xcconfig"
+
+// The application's name. By default this is also the title of the Flutter window.
+PRODUCT_NAME = $(BRANDING_APP_NAME)
+
+// The application's bundle identifier
+PRODUCT_BUNDLE_IDENTIFIER = $(BRANDING_BUNDLE_ID)
+
+// The copyright displayed in application information
+PRODUCT_COPYRIGHT = Copyright 2026 The Bothy Authors. Licensed under Apache-2.0.
