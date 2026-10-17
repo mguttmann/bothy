@@ -293,9 +293,9 @@ codegen-check: ## Generated code equals a fresh generation (sqlc, go generate, f
 	  else for p in $$l10n; do $(UVRUN) python tools/ci/l10n_check.py --dir $$p || exit 1; done; fi; fi
 	@# Pigeon channels of the Dart members (brief M4-10): every tracked pigeons/*.dart is generated
 	@# again and the Dart output formatted, as the generation step in the member's README does.
-	@if [ -z "$(DART_ON)" ]; then $(call skip,dart-codegen,no Dart package selected under apps/ or packages/); \
+	@if [ -z "$(DART_ON)" ]; then $(call skip,codegen-pigeon-dart,no Dart package selected under apps/ or packages/); \
 	else inputs=$$(git ls-files -- $(foreach p,$(DART_PKGS),'$(p)/pigeons/*.dart')) || exit 1; \
-	  if [ -z "$$inputs" ]; then $(call skip,dart-codegen,no Pigeon input under pigeons/); \
+	  if [ -z "$$inputs" ]; then $(call skip,codegen-pigeon-dart,no Pigeon input under pigeons/); \
 	  else flutter pub get --enforce-lockfile >/dev/null || exit 1; \
 	    for f in $$inputs; do p=$${f%/pigeons/*}; \
 	      $(CODEGEN_CHECK) --dir $$p -- sh -c 'dart run pigeon --input "$$1" && dart format lib/src/generated >/dev/null' pigeon "$${f#$$p/}" || exit 1; \
