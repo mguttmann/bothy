@@ -70,6 +70,12 @@ operated, and the order of the build.
   reject a missing translation, a placeholder mismatch, a missing description, en and em dashes,
   emoji and a German text without the term of the table; `make codegen-check` regenerates in a
   temporary copy and fails on untranslated messages or stale generated code (M4-06).
+- Dart REST client `packages/api_client`: generated from `docs/api/openapi.yaml` with the pinned
+  openapi-generator `dart-dio` image and checked in, plus a hand layer with `createApiClient`,
+  `traceparent` and `Idempotency-Key` headers, retry for reads only, `ApiProblem` and tolerant
+  event decoding; `make api-clients` regenerates it in a temporary copy, compares and analyses it
+  (G4 for Dart), and a G5 test proves that unknown fields, enum values and event types are
+  skipped (M4-02).
 - One Dart pub workspace at the repository root (`pubspec.yaml`, one `pubspec.lock`) with the
   fourteen members of docs/spec/15-client-architecture.md 3: the apps `apps/client` and
   `apps/console` and the packages under `packages/` as skeletons, `bothy_noise` taken over;

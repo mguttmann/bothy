@@ -621,19 +621,28 @@ request per subscription. Delivery, retry, verification at the receiver and inco
 | Go server (module `api`) | oapi-codegen v2.8.0, runtime `oapi-codegen/runtime` from v1.6.0, Go from 1.25 [verified, Q1] | `std-http-server`, `strict-server`, `models`, `output-options.skip-prune: true` (gateway types) | generated, `go vet` without findings, test of the `Event` union green; an unknown type returns an error from `ValueByDiscriminator`, the page still decodes |
 | TypeScript SDK | openapi-typescript 7.13.0, runtime client openapi-fetch 0.17.0 | default | `tsc --strict` without errors; the union is narrowed by `type` |
 | Python SDK and Hermes adapter | openapi-python-client 0.29.1 | default | generated, compiles, importable; `image/*`, `application/zip` and NDJSON stay without a typed response (the endpoints exist, the hand-written layer streams); strict enums and unions (see 13.3) |
-| Dart package of the apps | openapi-generator 7.26.0 `dart-dio` (built_value) | `enumUnknownDefaultCase=true`, `legacyDiscriminatorBehavior=false` | generated, `build_runner` successful, `dart analyze` without errors (only warnings in the generated code); the generator does not support the DPoP scheme and `application/octet-stream` bodies, the hand-written layer takes over both; OpenAPI 3.1 there only beta [verified, Q6] |
+| Dart package of the apps | openapi-generator 7.26.0 `dart-dio` (built_value), image `openapitools/openapi-generator-cli:v7.26.0` pinned by digest in `packages/api_client/Makefile`, run with `docker run --network none` | `enumUnknownDefaultCase=true`, `legacyDiscriminatorBehavior=false`, `sourceFolder=src/generated`, `pubName=api_client`; the paths it must never write are in `packages/api_client/.openapi-generator-ignore` | generated, `build_runner` successful, `dart analyze` without errors (only warnings in the generated code); the generator does not support the DPoP scheme and `application/octet-stream` bodies, the hand-written layer takes over both; OpenAPI 3.1 there only beta [verified, Q6] |
 
 1. Generated code is checked in. The gate generates it again and fails on a difference
    (G4). Reason: the review sees the effect of a spec change, and builds need no generator.
    Where the generated code lives: Python SDK in the subpackage `bothy_sdk.generated`
    (`sdk/python/src/bothy_sdk/generated/`), TypeScript SDK in
-   `sdk/typescript/src/generated/openapi.ts`; each generator is pinned inside its component
-   (`make -C sdk/<language> generate`, `generate-check`).
+   `sdk/typescript/src/generated/openapi.ts`, Dart package in `packages/api_client/lib/src/generated/`
+   (the generator's library entry as `generated_api.dart` there); each generator is pinned inside
+   its component (`make -C sdk/<language> generate`, `make -C packages/api_client generate`,
+   `generate-check`). The Dart check generates into a temporary copy and never writes into the
+   working tree.
 2. Every SDK has a hand-written layer over the generated core (ADR 0026, Team D): DPoP proofs and
    nonce retry, IDs for the outbox, tolerance for unknown content, pagination iterators,
    mapping of the problem codes, gateway frames.
    In the Python SDK the hand layer installs the tolerance on import (`bothy_sdk.tolerance`);
    the generator keeps its standard settings, without custom templates.
+   In the Dart package the hand layer lives in `packages/api_client/lib/src/hand/` and is
+   exported with the generated API from `lib/api_client.dart`: `createApiClient` with the
+   interceptor slot for DPoP of the `auth` package, `traceparent` on every request,
+   `Idempotency-Key` from the caller, retry for `GET` and `HEAD` only, `ApiProblem`, and
+   `EventsPageDecoder`, which keeps an event of unknown type as `UnknownEvent` because the
+   generated union throws on it.
 3. There is no generator for AsyncAPI in the gate. The types come from openapi.yaml; every SDK
    writes the frame router by hand.
 4. Schemas stay conservative (lint): no `null`, no type arrays, no `anyOf`, `oneOf` only
@@ -651,7 +660,7 @@ request per subscription. Delivery, retry, verification at the receiver and inco
 | G2 | Catalogue sync `api-catalogue-sync` | `tools/api-checks` (M1-03), `make api-checks` | `x-authz-action` and `x-rate-limit-class` equal to `docs/spec/actions.yaml` ([ADR 0049](../adr/0049-machine-readable-action-catalogue-as-the-single-source.md)); ops, events and receive actions in asyncapi.yaml equal to actions.yaml; close codes equal to 04 (6.4, code and name); every POST and PATCH operation has `Idempotency-Key` or `x-idempotency-exempt` with a known reason; deprecation data per 13.4; `x-problem-codes` and `x-status` complete; the enum `AppScope` equal to the scopes of the catalogue (05 section 2.6). `catalog-check` (M1-02) holds the lists in redocly.yaml |
 | G3 | Generated tables of this chapter `api-tables` | `tools/api-checks` (M1-03), `make api-tables` | the blocks of sections 5, 7, 16 and 17 and `webhook_events` in webhooks.md match the YAML files |
 | G4 | Code generation | the four generators from section 14 | generate, compile, no difference from the checked-in code |
-| G5 | Tolerance test | one test with a fixture per SDK (shared fixtures in `sdk/testdata/tolerance/`) | an unknown field is ignored, an unknown enum value is kept as its raw value, an event of unknown type is skipped while the cursor still advances, a received `null` counts as an absent field; all without an error |
+| G5 | Tolerance test | one test with a fixture per SDK (shared fixtures in `sdk/testdata/tolerance/`) | an unknown field is ignored, an unknown enum value is kept as its raw value (Dart: the generated unknown default case), an event of unknown type is skipped while the cursor still advances, a received `null` counts as an absent field; all without an error |
 | G6 | Breaking change check against the last release | `tools/api-checks/breaking.py` (`make api-breaking`; oasdiff missed rows, 13.7) | every row of the right column of the table in section 13, against the newest stable tag `server/v*` (13.7); a major step of `info.version` accepts a break |
 | G7 | Property-based tests against the running server | Schemathesis against the server from the working tree with a throwaway PostgreSQL (`make contract-test`); the smoke test (`make portability`) checks the Compose stack | status codes, media types, response schemas and headers of every op; stateful sequences over the links that Schemathesis derives (the spec has no `links`; if the pinned version derives no transitions, this part counts as not proven); own checks: problem format, `Correlation-Id`, no `null`, 404 equality for foreign and missing IDs |
 | G8 | Response validation in integration tests | middleware in the test build | every response of every integration test matches the spec |
