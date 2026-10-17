@@ -7,6 +7,9 @@
 /// (docs/DECISIONS.md D-M4-04-5).
 library;
 
+import 'dart:typed_data';
+import 'dart:ui' as ui;
+
 import 'package:alchemist/alchemist.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -18,8 +21,82 @@ import 'design_system.dart';
 /// CI goldens recorded on macOS differ on the Linux runner in a few anti-aliased edge pixels
 /// (170 of 2.28 million in the sample page), so an exact match fails there. The bound stays
 /// below one full-width line of one pixel in that image, so a missing border or divider still
-/// fails (docs/DECISIONS.md D-M4-04-6). Every member passes it to `CiGoldensConfig`.
+/// fails (docs/DECISIONS.md D-M4-04-6). [DsGoldenFileComparator] applies it, counting only
+/// pixels beyond [dsCiGoldenChannelTolerance] (PL/5).
 const double dsCiGoldenDiffThreshold = 0.0002;
+
+/// Largest difference of one color channel (0 to 255) at which two pixels still count as
+/// equal in [DsGoldenFileComparator].
+///
+/// Hosts rasterize anti-aliased edges, icons and borders slightly differently: CI goldens
+/// recorded on macOS differ on the Linux runner in many pixels, nearly all by a few steps of
+/// one channel. A changed color, a missing border or a moved element differs by far more
+/// (docs/DECISIONS.md PL/5).
+const int dsCiGoldenChannelTolerance = 16;
+
+/// Golden comparator of the members with design-system goldens: a pixel differs only when
+/// one channel differs by more than [dsCiGoldenChannelTolerance], and the image passes while
+/// at most [dsCiGoldenDiffThreshold] of its pixels differ; a different size always fails.
+///
+/// Install it in `test/flutter_test_config.dart` and pass no `diffThreshold` to alchemist,
+/// which then keeps this comparator (docs/DECISIONS.md PL/5).
+///
+/// ```dart
+/// goldenFileComparator = DsGoldenFileComparator(
+///     (goldenFileComparator as LocalFileComparator).basedir.resolve('test.dart'));
+/// ```
+class DsGoldenFileComparator extends LocalFileComparator {
+  /// Compares against the golden files next to [testFile].
+  DsGoldenFileComparator(super.testFile);
+
+  @override
+  Future<bool> compare(Uint8List imageBytes, Uri golden) async {
+    final goldenBytes = await getGoldenBytes(golden);
+    if (await _withinTolerance(imageBytes, goldenBytes)) {
+      return true;
+    }
+    final result = await GoldenFileComparator.compareLists(
+      imageBytes,
+      goldenBytes,
+    );
+    await generateFailureOutput(result, golden, basedir);
+    return false;
+  }
+
+  static Future<bool> _withinTolerance(Uint8List a, List<int> b) async {
+    final first = await _decode(a);
+    final second = await _decode(Uint8List.fromList(b));
+    try {
+      if (first.width != second.width || first.height != second.height) {
+        return false;
+      }
+      final pa = (await first.toByteData())!.buffer.asUint8List();
+      final pb = (await second.toByteData())!.buffer.asUint8List();
+      var differing = 0;
+      for (var i = 0; i < pa.length; i += 4) {
+        for (var c = 0; c < 4; c++) {
+          if ((pa[i + c] - pb[i + c]).abs() > dsCiGoldenChannelTolerance) {
+            differing++;
+            break;
+          }
+        }
+      }
+      return differing <= dsCiGoldenDiffThreshold * first.width * first.height;
+    } finally {
+      first.dispose();
+      second.dispose();
+    }
+  }
+
+  static Future<ui.Image> _decode(Uint8List bytes) async {
+    final codec = await ui.instantiateImageCodec(bytes);
+    try {
+      return (await codec.getNextFrame()).image;
+    } finally {
+      codec.dispose();
+    }
+  }
+}
 
 /// The font family alchemist sets on the ambient theme for CI goldens (obscured text).
 const String _obscuredFontFamily = 'Ahem';
