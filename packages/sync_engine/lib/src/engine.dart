@@ -8,7 +8,13 @@ import 'dart:async';
 import 'dart:math';
 
 import 'package:api_client/api_client.dart'
-    show ApiClient, GatewayClientInfo, GatewayReady, GatewayResumed, Run, standardSerializers;
+    show
+        ApiClient,
+        GatewayClientInfo,
+        GatewayReady,
+        GatewayResumed,
+        Run,
+        standardSerializers;
 import 'package:auth/auth.dart';
 import 'package:built_value/serializer.dart';
 import 'package:domain/domain.dart';
@@ -115,7 +121,10 @@ final class SyncEngine {
     bool allowPlainHttpForTests = false,
     void Function(String line)? logHook,
   }) {
-    final gatewayUrl = gatewayUrlOf(baseUrl, allowPlainHttp: allowPlainHttpForTests);
+    final gatewayUrl = gatewayUrlOf(
+      baseUrl,
+      allowPlainHttp: allowPlainHttpForTests,
+    );
     final time = clock ?? const SystemClock();
     final rnd = random ?? SystemRandomSource();
     final api = auth.api;
@@ -333,7 +342,9 @@ final class _EngineListener implements SessionListener {
   @override
   Future<void> onFrame(GatewayFrame frame, SessionControl control) async {
     await _inner.onFrame(frame, control);
-    if (frame is! DispatchFrame || frame.envelope['type'] != 'run.state_changed') return;
+    if (frame is! DispatchFrame ||
+        frame.envelope['type'] != 'run.state_changed')
+      return;
     final payload = frame.envelope['payload'];
     final run = payload is Map ? payload['run'] : null;
     if (run is! Map || !_endStates.contains(run['state'])) return;
@@ -374,8 +385,12 @@ final class _ApiRunFetcher implements RunDocumentFetcher {
   Future<Map<String, Object?>> fetchRun(RunId id) async {
     final run = (await _api.getRunsApi().getRun(runId: id.value)).data;
     if (run == null) throw const FormatException('an empty run');
-    final json = standardSerializers.serialize(run, specifiedType: const FullType(Run));
-    if (json is! Map) throw const FormatException('a run that is not an object');
+    final json = standardSerializers.serialize(
+      run,
+      specifiedType: const FullType(Run),
+    );
+    if (json is! Map)
+      throw const FormatException('a run that is not an object');
     return json.cast<String, Object?>();
   }
 }

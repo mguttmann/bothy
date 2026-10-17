@@ -129,7 +129,9 @@ final class ContractSchemas {
       }
       final parent = dir.parent;
       if (parent.path == dir.path) {
-        throw StateError('no docs/api/openapi.yaml above the working directory');
+        throw StateError(
+          'no docs/api/openapi.yaml above the working directory',
+        );
       }
       dir = parent;
     }
@@ -138,7 +140,11 @@ final class ContractSchemas {
   /// The operation [operationId]; throws an [ArgumentError] for an unknown ID.
   ContractOperation operation(String operationId) =>
       _operations[operationId] ??
-      (throw ArgumentError.value(operationId, 'operationId', 'not in openapi.yaml'));
+      (throw ArgumentError.value(
+        operationId,
+        'operationId',
+        'not in openapi.yaml',
+      ));
 
   /// Every operation of `openapi.yaml`.
   Iterable<ContractOperation> get operations => _operations.values;
@@ -167,7 +173,11 @@ final class ContractSchemas {
 
   /// Validates the response [body] of [operationId] with [status]; a status the operation does
   /// not list is a violation.
-  List<ContractViolation> response(String operationId, int status, Object? body) {
+  List<ContractViolation> response(
+    String operationId,
+    int status,
+    Object? body,
+  ) {
     final responses = operation(operationId).responseSchemas;
     final key = responses.containsKey('$status')
         ? '$status'
@@ -218,7 +228,10 @@ final class ContractSchemas {
       final type = d is Map ? d['type'] : null;
       schema = type is String ? _events[type] : null;
       if (schema == null) {
-        return [...out, ContractViolation('/d/type', 'invalid_enum', 'a known event type')];
+        return [
+          ...out,
+          ContractViolation('/d/type', 'invalid_enum', 'a known event type'),
+        ];
       }
     } else {
       schema = ops[op];
@@ -251,7 +264,8 @@ final class ContractSchemas {
           requestSchema: _bodySchema(op['requestBody']),
           responseSchemas: {
             for (final MapEntry(:key, :value)
-                in (op['responses'] as Map<String, Object?>? ?? const {}).entries)
+                in (op['responses'] as Map<String, Object?>? ?? const {})
+                    .entries)
               key: _bodySchema(value),
           },
         );
@@ -282,9 +296,12 @@ final class ContractSchemas {
   }
 
   void _indexMessages(Map<String, Object?> asyncapi) {
-    final components = asyncapi['components'] as Map<String, Object?>? ?? const {};
-    final messages = components['messages'] as Map<String, Object?>? ?? const {};
-    final operations = asyncapi['operations'] as Map<String, Object?>? ?? const {};
+    final components =
+        asyncapi['components'] as Map<String, Object?>? ?? const {};
+    final messages =
+        components['messages'] as Map<String, Object?>? ?? const {};
+    final operations =
+        asyncapi['operations'] as Map<String, Object?>? ?? const {};
     // Which ops the client sends: the messages of `receive` operations of the gateway.
     final received = <String>{};
     for (final op in operations.values) {
@@ -319,7 +336,10 @@ final class ContractSchemas {
     }
     Object? node = _openapi;
     for (final part in ref.substring(2).split('/')) {
-      node = (node as Map<String, Object?>?)?[part.replaceAll('~1', '/').replaceAll('~0', '~')];
+      node =
+          (node as Map<String, Object?>?)?[part
+              .replaceAll('~1', '/')
+              .replaceAll('~0', '~')];
     }
     if (node == null) throw ArgumentError.value(ref, 'ref', 'does not resolve');
     return node;
@@ -361,7 +381,9 @@ final class ContractSchemas {
     }
     final allowed = schema['enum'];
     if (allowed is List<Object?> && !allowed.contains(value)) {
-      out.add(ContractViolation(at, 'invalid_enum', 'one of the listed values'));
+      out.add(
+        ContractViolation(at, 'invalid_enum', 'one of the listed values'),
+      );
     }
     switch (value) {
       case final String s:
@@ -373,7 +395,9 @@ final class ContractSchemas {
       case final Map<String, Object?> map:
         _object(map, schema, at, out);
       case null when type == null && schema.isNotEmpty:
-        out.add(ContractViolation(at, 'invalid_type', 'no JSON null (ADR 0053)'));
+        out.add(
+          ContractViolation(at, 'invalid_type', 'no JSON null (ADR 0053)'),
+        );
     }
   }
 
@@ -385,12 +409,20 @@ final class ContractSchemas {
     List<ContractViolation> out,
   ) {
     final discriminator = schema['discriminator'];
-    if (discriminator is Map<String, Object?> && value is Map<String, Object?>) {
+    if (discriminator is Map<String, Object?> &&
+        value is Map<String, Object?>) {
       final name = discriminator['propertyName']! as String;
-      final mapping = discriminator['mapping'] as Map<String, Object?>? ?? const {};
+      final mapping =
+          discriminator['mapping'] as Map<String, Object?>? ?? const {};
       final ref = mapping[value[name]];
       if (ref is! String) {
-        out.add(ContractViolation('$at/$name', 'invalid_enum', 'a mapped discriminator'));
+        out.add(
+          ContractViolation(
+            '$at/$name',
+            'invalid_enum',
+            'a mapped discriminator',
+          ),
+        );
         return;
       }
       _check(value, {r'$ref': ref}, at, out);
@@ -403,7 +435,13 @@ final class ContractSchemas {
       if (inner.isEmpty) matches++;
     }
     if (matches != 1) {
-      out.add(ContractViolation(at, 'invalid', 'exactly one oneOf option ($matches matched)'));
+      out.add(
+        ContractViolation(
+          at,
+          'invalid',
+          'exactly one oneOf option ($matches matched)',
+        ),
+      );
     }
   }
 
@@ -411,7 +449,8 @@ final class ContractSchemas {
     if (type is List<Object?>) return type.any((t) => _typeMatches(value, t!));
     return switch (type) {
       'string' => value is String,
-      'integer' => value is int || (value is double && value == value.truncateToDouble()),
+      'integer' =>
+        value is int || (value is double && value == value.truncateToDouble()),
       'number' => value is num,
       'boolean' => value is bool,
       'object' => value is Map<String, Object?>,
@@ -430,7 +469,8 @@ final class ContractSchemas {
     switch (schema['format']) {
       case 'uuid' when !_uuid.hasMatch(s):
         out.add(ContractViolation(at, 'invalid_format', 'uuid'));
-      case 'date-time' when !_dateTime.hasMatch(s) || DateTime.tryParse(s) == null:
+      case 'date-time'
+          when !_dateTime.hasMatch(s) || DateTime.tryParse(s) == null:
         out.add(ContractViolation(at, 'invalid_format', 'date-time'));
     }
     final min = schema['minLength'];
@@ -443,7 +483,9 @@ final class ContractSchemas {
     }
     final pattern = schema['pattern'];
     if (pattern is String && !RegExp(pattern).hasMatch(s)) {
-      out.add(ContractViolation(at, 'pattern_mismatch', 'the pattern of the schema'));
+      out.add(
+        ContractViolation(at, 'pattern_mismatch', 'the pattern of the schema'),
+      );
     }
   }
 
@@ -454,9 +496,11 @@ final class ContractSchemas {
     List<ContractViolation> out,
   ) {
     final min = schema['minimum'];
-    if (min is num && n < min) out.add(ContractViolation(at, 'too_small', 'at least $min'));
+    if (min is num && n < min)
+      out.add(ContractViolation(at, 'too_small', 'at least $min'));
     final max = schema['maximum'];
-    if (max is num && n > max) out.add(ContractViolation(at, 'too_large', 'at most $max'));
+    if (max is num && n > max)
+      out.add(ContractViolation(at, 'too_large', 'at most $max'));
   }
 
   void _array(
@@ -487,10 +531,17 @@ final class ContractSchemas {
     String at,
     List<ContractViolation> out,
   ) {
-    final properties = schema['properties'] as Map<String, Object?>? ?? const {};
+    final properties =
+        schema['properties'] as Map<String, Object?>? ?? const {};
     for (final name in (schema['required'] as List<Object?>? ?? const [])) {
       if (!map.containsKey(name)) {
-        out.add(ContractViolation('$at/${_escape(name! as String)}', 'required', 'present'));
+        out.add(
+          ContractViolation(
+            '$at/${_escape(name! as String)}',
+            'required',
+            'present',
+          ),
+        );
       }
     }
     final extra = schema['additionalProperties'];
@@ -500,14 +551,17 @@ final class ContractSchemas {
       if (property is Map<String, Object?>) {
         _check(value, property, pointer, out);
       } else if (extra == false) {
-        out.add(ContractViolation(pointer, 'unknown_member', 'not in the schema'));
+        out.add(
+          ContractViolation(pointer, 'unknown_member', 'not in the schema'),
+        );
       } else if (extra is Map<String, Object?>) {
         _check(value, extra, pointer, out);
       }
     }
   }
 
-  static String _escape(String name) => name.replaceAll('~', '~0').replaceAll('/', '~1');
+  static String _escape(String name) =>
+      name.replaceAll('~', '~0').replaceAll('/', '~1');
 
   /// [node] of `package:yaml` as plain maps and lists.
   static Object? _plain(Object? node) => switch (node) {

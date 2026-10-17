@@ -21,7 +21,9 @@ void registerMessageHandlers(RestFake rest) {
   final world = rest.world;
   rest
     ..handle('listThreadMessages', (r) {
-      final all = world.messagesOf(world.visibleThread(r.person.id, r.param('thread_id'))['id']! as String);
+      final all = world.messagesOf(
+        world.visibleThread(r.person.id, r.param('thread_id'))['id']! as String,
+      );
       final limit = int.tryParse(r.query('limit') ?? '') ?? defaultMessagePage;
       final before = int.tryParse(r.query('before_seq') ?? '');
       final after = int.tryParse(r.query('after_seq') ?? '');
@@ -34,27 +36,43 @@ void registerMessageHandlers(RestFake rest) {
         final from = around - limit ~/ 2;
         page = all.where((m) => seq(m) >= from).take(limit).toList();
       } else {
-        final upTo = all.where((m) => before == null || seq(m) < before).toList();
+        final upTo = all
+            .where((m) => before == null || seq(m) < before)
+            .toList();
         page = upTo.sublist(upTo.length > limit ? upTo.length - limit : 0);
       }
       return FakeResponse(200, {
         'items': page,
-        'has_more_before': page.isNotEmpty && all.isNotEmpty && seq(page.first) > seq(all.first),
-        'has_more_after': page.isNotEmpty && all.isNotEmpty && seq(page.last) < seq(all.last),
+        'has_more_before':
+            page.isNotEmpty &&
+            all.isNotEmpty &&
+            seq(page.first) > seq(all.first),
+        'has_more_after':
+            page.isNotEmpty && all.isNotEmpty && seq(page.last) < seq(all.last),
       });
     })
     ..handle(
       'getMessage',
-      (r) => FakeResponse(200, world.visibleMessage(r.person.id, r.param('message_id'))),
+      (r) => FakeResponse(
+        200,
+        world.visibleMessage(r.person.id, r.param('message_id')),
+      ),
     )
     ..handle('createMessage', (r) {
-      final result = world.createMessage(r.person.id, r.param('thread_id'), r.json);
+      final result = world.createMessage(
+        r.person.id,
+        r.param('thread_id'),
+        r.json,
+      );
       return result.replay
-          ? FakeResponse(200, result.message, const {'Idempotent-Replay': 'true'})
+          ? FakeResponse(200, result.message, const {
+              'Idempotent-Replay': 'true',
+            })
           : FakeResponse(201, result.message);
     })
     ..handle('updateMessage', (r) {
-      final match = RegExp(r'^"?(\d+)"?$').firstMatch(r.headers['if-match'] ?? '');
+      final match = RegExp(r'^"?(\d+)"?$')
+          .firstMatch(r.headers['if-match'] ?? '');
       if (match == null) throw const FakeProblem(428, 'precondition_required');
       final m = world.updateMessage(
         r.person.id,
@@ -69,11 +87,21 @@ void registerMessageHandlers(RestFake rest) {
       return const FakeResponse.noContent();
     })
     ..handle('addReaction', (r) {
-      world.react(r.person.id, r.param('message_id'), r.param('emoji'), add: true);
+      world.react(
+        r.person.id,
+        r.param('message_id'),
+        r.param('emoji'),
+        add: true,
+      );
       return const FakeResponse.noContent();
     })
     ..handle('removeReaction', (r) {
-      world.react(r.person.id, r.param('message_id'), r.param('emoji'), add: false);
+      world.react(
+        r.person.id,
+        r.param('message_id'),
+        r.param('emoji'),
+        add: false,
+      );
       return const FakeResponse.noContent();
     });
 }

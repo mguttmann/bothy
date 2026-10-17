@@ -206,14 +206,24 @@ final class RestFake {
     final method = request.method.toUpperCase();
     final path = request.uri.path;
     final headers = <String, String>{};
-    request.headers.forEach((name, values) => headers[name.toLowerCase()] = values.join(','));
+    request.headers.forEach(
+      (name, values) => headers[name.toLowerCase()] = values.join(','),
+    );
     final raw = await utf8.decoder.bind(request).join();
     Object? body;
     if (raw.isNotEmpty) {
       try {
         body = jsonDecode(raw);
       } on FormatException {
-        await _send(request, 'unknown', method, path, null, headers, _problem(400, 'malformed_request'));
+        await _send(
+          request,
+          'unknown',
+          method,
+          path,
+          null,
+          headers,
+          _problem(400, 'malformed_request'),
+        );
         return;
       }
     }
@@ -230,13 +240,29 @@ final class RestFake {
       break;
     }
     if (route == null) {
-      await _send(request, 'unknown', method, path, body, headers, _problem(404, 'not_found'));
+      await _send(
+        request,
+        'unknown',
+        method,
+        path,
+        body,
+        headers,
+        _problem(404, 'not_found'),
+      );
       return;
     }
     final op = route.op.operationId;
     final handler = _handlers[op];
     if (handler == null) {
-      await _send(request, op, method, path, body, headers, _problem(501, 'internal_error', detail: 'not implemented by the fake'));
+      await _send(
+        request,
+        op,
+        method,
+        path,
+        body,
+        headers,
+        _problem(501, 'internal_error', detail: 'not implemented by the fake'),
+      );
       return;
     }
     final htu = '${baseUri.origin}$path';
@@ -252,7 +278,8 @@ final class RestFake {
           400,
           'validation_failed',
           errors: [
-            for (final v in requestViolations) {'pointer': v.pointer, 'code': v.code},
+            for (final v in requestViolations)
+              {'pointer': v.pointer, 'code': v.code},
           ],
         );
       }
@@ -270,19 +297,41 @@ final class RestFake {
       );
       final fault = faults.take(op);
       if (fault is AnswerFault) {
-        response = _problem(fault.status, fault.code, retryAfter: fault.retryAfter);
+        response = _problem(
+          fault.status,
+          fault.code,
+          retryAfter: fault.retryAfter,
+        );
       } else {
         response = await _idempotent(fake, handler);
         if (fault is DelayFault) await Future<void>.delayed(fault.duration);
         if (fault is DropResponseFault) {
-          requests.add(FakeRequestRecord(operationId: op, method: method, path: path, status: 0, body: body, headers: headers));
-          final socket = await request.response.detachSocket(writeHeaders: false);
+          requests.add(
+            FakeRequestRecord(
+              operationId: op,
+              method: method,
+              path: path,
+              status: 0,
+              body: body,
+              headers: headers,
+            ),
+          );
+          final socket = await request.response.detachSocket(
+            writeHeaders: false,
+          );
           socket.destroy();
           return;
         }
       }
     } on FakeProblem catch (p) {
-      response = _problem(p.status, p.code, current: p.current, reason: p.reason, retryAfter: p.retryAfter, errors: p.errors);
+      response = _problem(
+        p.status,
+        p.code,
+        current: p.current,
+        reason: p.reason,
+        retryAfter: p.retryAfter,
+        errors: p.errors,
+      );
     } on _Unauthorized catch (u) {
       response = u.response;
     }
@@ -313,7 +362,8 @@ final class RestFake {
     final session = _sessionOf(token);
     if (session == null) throw _Unauthorized(_problem(401, 'unauthenticated'));
     if (session.revoked) throw _Unauthorized(_problem(401, 'session_revoked'));
-    if (tokenExpired(token)) throw _Unauthorized(_problem(401, 'token_expired'));
+    if (tokenExpired(token))
+      throw _Unauthorized(_problem(401, 'token_expired'));
     final result = verifier.verify(
       proof,
       method: method,
@@ -323,8 +373,10 @@ final class RestFake {
     );
     final jkt = _accept(result);
     final device = world.devices[session.deviceId]!;
-    if (device.state == 'revoked') throw _Unauthorized(_problem(401, 'session_revoked'));
-    if (device.state == 'pending' && !_pendingAllowed.contains(op.operationId)) {
+    if (device.state == 'revoked')
+      throw _Unauthorized(_problem(401, 'session_revoked'));
+    if (device.state == 'pending' &&
+        !_pendingAllowed.contains(op.operationId)) {
       throw const FakeProblem(403, 'device_pending');
     }
     return (session, jkt);
@@ -337,7 +389,8 @@ final class RestFake {
 
   FakeSession? _sessionOf(String token) {
     for (final s in world.sessions.values) {
-      if (s.accessToken == token || s.olderAccessTokens.contains(token)) return s;
+      if (s.accessToken == token || s.olderAccessTokens.contains(token))
+        return s;
     }
     return null;
   }
@@ -347,8 +400,9 @@ final class RestFake {
     final parts = token.split('.');
     if (parts.length != 3) return true;
     try {
-      final payload =
-          jsonDecode(utf8.decode(base64Url.decode(base64Url.normalize(parts[1])))) as JsonMap;
+      final payload = jsonDecode(
+        utf8.decode(base64Url.decode(base64Url.normalize(parts[1]))),
+      ) as JsonMap;
       final exp = payload['exp']! as int;
       return world.now().millisecondsSinceEpoch ~/ 1000 >= exp;
     } on Object {
@@ -361,11 +415,14 @@ final class RestFake {
     if (key == null || r.session == null || r.operationId == 'createMessage') {
       return handler(r);
     }
-    final hash = sha256.convert(utf8.encode('${r.method} ${r.uri.path} ${jsonEncode(r.body)}')).toString();
+    final hash = sha256
+        .convert(utf8.encode('${r.method} ${r.uri.path} ${jsonEncode(r.body)}'))
+        .toString();
     final slot = '${r.session!.userId}|$key';
     final stored = world.idempotency[slot];
     if (stored != null) {
-      if (stored.hash != hash) throw const FakeProblem(422, 'idempotency_key_reuse');
+      if (stored.hash != hash)
+        throw const FakeProblem(422, 'idempotency_key_reuse');
       return FakeResponse(stored.status, stored.body);
     }
     FakeResponse response;
@@ -373,12 +430,20 @@ final class RestFake {
       response = await handler(r);
     } on FakeProblem catch (p) {
       if (p.status < 500) {
-        world.idempotency[slot] = StoredResponse(hash, p.status, _problemBody(p.status, p.code, current: p.current, reason: p.reason));
+        world.idempotency[slot] = StoredResponse(
+          hash,
+          p.status,
+          _problemBody(p.status, p.code, current: p.current, reason: p.reason),
+        );
       }
       rethrow;
     }
     if (response.status < 500) {
-      world.idempotency[slot] = StoredResponse(hash, response.status, response.body);
+      world.idempotency[slot] = StoredResponse(
+        hash,
+        response.status,
+        response.body,
+      );
     }
     return response;
   }
@@ -403,7 +468,14 @@ final class RestFake {
     Map<String, String> headers = const {},
   }) => FakeResponse(
     status,
-    _problemBody(status, code, current: current, reason: reason, detail: detail, errors: errors),
+    _problemBody(
+      status,
+      code,
+      current: current,
+      reason: reason,
+      detail: detail,
+      errors: errors,
+    ),
     {
       ...headers,
       if (retryAfter != null)
@@ -444,7 +516,11 @@ final class RestFake {
       final problems = contract.response(op, out.status, out.body);
       if (problems.isNotEmpty) {
         violations.add('response $op ${out.status}: ${problems.join('; ')}');
-        out = _problem(500, 'internal_error', detail: 'the fake broke the contract');
+        out = _problem(
+          500,
+          'internal_error',
+          detail: 'the fake broke the contract',
+        );
       }
     }
     requests.add(
@@ -461,7 +537,10 @@ final class RestFake {
     res.headers.set('Correlation-Id', world.nextId());
     out.headers.forEach(res.headers.set);
     if (out.body != null) {
-      final problem = out.body is JsonMap && (out.body! as JsonMap)['correlation_id'] != null && out.status >= 400;
+      final problem =
+          out.body is JsonMap &&
+          (out.body! as JsonMap)['correlation_id'] != null &&
+          out.status >= 400;
       res.headers.contentType = problem
           ? ContentType('application', 'problem+json', charset: 'utf-8')
           : ContentType.json;

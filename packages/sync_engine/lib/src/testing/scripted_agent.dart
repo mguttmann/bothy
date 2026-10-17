@@ -80,7 +80,10 @@ final class _Finish extends AgentStep {
 /// The steps of a run and the pause before each one.
 final class AgentScript {
   /// Creates the script.
-  const AgentScript(this.steps, {this.pause = const Duration(milliseconds: 20)});
+  const AgentScript(
+    this.steps, {
+    this.pause = const Duration(milliseconds: 20),
+  });
 
   /// The steps in order.
   final List<AgentStep> steps;
@@ -90,38 +93,41 @@ final class AgentScript {
 
   /// The flow of 04 16.5: queue, start, a status line and a step, a follow-up delivered and
   /// absorbed, a reply and the end.
-  static AgentScript followUpRun(String stepId, String startedAt, {String reply = 'Done.'}) =>
-      AgentScript([
-        const AgentStep.queue(),
-        const AgentStep.start(),
-        const AgentStep.patch([
-          {'op': 'add', 'path': '/status_line', 'value': 'Reading the thread'},
-        ]),
-        AgentStep.patch([
-          {
-            'op': 'add',
-            'path': '/steps/$stepId',
-            'value': {
-              'id': stepId,
-              'ordinal': 1,
-              'kind': 'tool_call',
-              'name': 'search',
-              'title': 'Search the notes',
-              'status': 'running',
-              'started_at': startedAt,
-            },
-          },
-        ]),
-        const AgentStep.awaitFollowup(),
-        const AgentStep.deliverFollowup(),
-        const AgentStep.absorbFollowup(),
-        AgentStep.patch([
-          {'op': 'replace', 'path': '/steps/$stepId/status', 'value': 'completed'},
-          {'op': 'replace', 'path': '/status_line', 'value': 'Writing the answer'},
-        ]),
-        AgentStep.reply(reply),
-        const AgentStep.finish(),
-      ]);
+  static AgentScript followUpRun(
+    String stepId,
+    String startedAt, {
+    String reply = 'Done.',
+  }) => AgentScript([
+    const AgentStep.queue(),
+    const AgentStep.start(),
+    const AgentStep.patch([
+      {'op': 'add', 'path': '/status_line', 'value': 'Reading the thread'},
+    ]),
+    AgentStep.patch([
+      {
+        'op': 'add',
+        'path': '/steps/$stepId',
+        'value': {
+          'id': stepId,
+          'ordinal': 1,
+          'kind': 'tool_call',
+          'name': 'search',
+          'title': 'Search the notes',
+          'status': 'running',
+          'started_at': startedAt,
+        },
+      },
+    ]),
+    const AgentStep.awaitFollowup(),
+    const AgentStep.deliverFollowup(),
+    const AgentStep.absorbFollowup(),
+    AgentStep.patch([
+      {'op': 'replace', 'path': '/steps/$stepId/status', 'value': 'completed'},
+      {'op': 'replace', 'path': '/status_line', 'value': 'Writing the answer'},
+    ]),
+    AgentStep.reply(reply),
+    const AgentStep.finish(),
+  ]);
 }
 
 /// An agent of the world that answers mentions with the run of its [script].
@@ -187,19 +193,25 @@ final class ScriptedAgent {
 
   bool _isFollowup(JsonMap message, FakePerson author) {
     final run = _ownActiveRun(message);
-    return run != null && run['triggered_by'] == author.id && !_mentions(message);
+    return run != null &&
+        run['triggered_by'] == author.id &&
+        !_mentions(message);
   }
 
   String? _triggerState(JsonMap message, FakePerson author) {
     if (author.id == agentId || author.kind != 'user') return null;
-    return _mentions(message) || _isFollowup(message, author) ? 'received' : null;
+    return _mentions(message) || _isFollowup(message, author)
+        ? 'received'
+        : null;
   }
 
   void _onMessage(JsonMap message, FakePerson author) {
     if (author.id == agentId || message['trigger_state'] != 'received') return;
     final id = message['id']! as String;
     final active = _ownActiveRun(message);
-    if (active != null && active['triggered_by'] == author.id && !_mentions(message)) {
+    if (active != null &&
+        active['triggered_by'] == author.id &&
+        !_mentions(message)) {
       final runId = active['id']! as String;
       _followups.putIfAbsent(runId, () => []).add(id);
       world.patchRun(runId, [
@@ -228,7 +240,10 @@ final class ScriptedAgent {
       for (final step in script.steps) {
         await Future<void>.delayed(script.pause);
         if (!_attached) return;
-        if (world.activeRunOf(world.runs[runId]!['thread_id']! as String)?['id'] != runId) {
+        if (world.activeRunOf(
+              world.runs[runId]!['thread_id']! as String,
+            )?['id'] !=
+            runId) {
           return;
         }
         await _apply(step, runId, messageId);
@@ -256,7 +271,11 @@ final class ScriptedAgent {
       case _DeliverFollowup():
         final f = _followups[runId]!.first;
         world.patchRun(runId, [
-          {'op': 'replace', 'path': '/followups/$f/state', 'value': 'delivered'},
+          {
+            'op': 'replace',
+            'path': '/followups/$f/state',
+            'value': 'delivered',
+          },
         ]);
         world.setTriggerState(f, 'followup_delivered', actor: agentId);
       case _AbsorbFollowup():

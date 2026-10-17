@@ -21,12 +21,16 @@ void registerStructureHandlers(RestFake rest) {
 
   String visibleChannel(FakeRequest r) {
     final id = r.param('channel_id');
-    if (!world.seesChannel(r.person.id, id)) throw const FakeProblem(404, 'not_found');
+    if (!world.seesChannel(r.person.id, id))
+      throw const FakeProblem(404, 'not_found');
     return id;
   }
 
   rest
-    ..handle('listSpaces', (r) => FakeResponse(200, {'items': world.spaceViews(r.person.id)}))
+    ..handle(
+      'listSpaces',
+      (r) => FakeResponse(200, {'items': world.spaceViews(r.person.id)}),
+    )
     ..handle(
       'getSpace',
       (r) => FakeResponse(200, world.spaceView(r.person.id, visibleSpace(r))),
@@ -39,7 +43,8 @@ void registerStructureHandlers(RestFake rest) {
     )
     ..handle(
       'getChannel',
-      (r) => FakeResponse(200, world.channelView(r.person.id, visibleChannel(r))),
+      (r) =>
+          FakeResponse(200, world.channelView(r.person.id, visibleChannel(r))),
     )
     ..handle('listChannelThreads', (r) {
       final channel = visibleChannel(r);
@@ -52,6 +57,9 @@ void registerStructureHandlers(RestFake rest) {
     })
     ..handle(
       'getThread',
-      (r) => FakeResponse(200, world.visibleThread(r.person.id, r.param('thread_id'))),
+      (r) => FakeResponse(
+        200,
+        world.visibleThread(r.person.id, r.param('thread_id')),
+      ),
     );
 }

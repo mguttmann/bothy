@@ -327,8 +327,12 @@ typedef EventHook = void Function(FakeEvent event);
 
 /// Called after the run document [runId] changed from [baseVersion] to [version] by [ops]
 /// (04 11.2); the gateway turns it into coalesced `run.updated` frames.
-typedef RunPatchHook =
-    void Function(String runId, int baseVersion, int version, List<JsonMap> ops);
+typedef RunPatchHook = void Function(
+  String runId,
+  int baseVersion,
+  int version,
+  List<JsonMap> ops,
+);
 
 /// The in-memory model of the fake server.
 ///
@@ -442,7 +446,8 @@ final class FakeWorld {
 
   /// Checks before a message is stored: the first non-null answer is its `trigger_state`
   /// (`received` for a message that triggers an agent, 04 16.5).
-  final List<String? Function(JsonMap message, FakePerson author)> triggerChecks = [];
+  final List<String? Function(JsonMap message, FakePerson author)>
+  triggerChecks = [];
 
   // -------------------------------------------------------------------------------------------
   // IDs and time
@@ -528,7 +533,11 @@ final class FakeWorld {
   }
 
   /// Adds a thread to [channelId] and returns its ID.
-  String addThread(String channelId, String title, {required String createdBy}) {
+  String addThread(
+    String channelId,
+    String title, {
+    required String createdBy,
+  }) {
     final id = nextId();
     threads[id] = {
       'id': id,
@@ -585,7 +594,8 @@ final class FakeWorld {
 
   /// The thread [threadId] when [principalId] sees it; else `404 not_found`.
   JsonMap visibleThread(String principalId, String threadId) {
-    if (!seesThread(principalId, threadId)) throw const FakeProblem(404, 'not_found');
+    if (!seesThread(principalId, threadId))
+      throw const FakeProblem(404, 'not_found');
     return threads[threadId]!;
   }
 
@@ -606,7 +616,8 @@ final class FakeWorld {
     'space': spaces[spaceId],
     'level': _highest([
       for (final c in channels.values)
-        if (c.spaceId == spaceId && c.access[principalId] != null) c.access[principalId]!,
+        if (c.spaceId == spaceId && c.access[principalId] != null)
+          c.access[principalId]!,
     ]),
     'capabilities': <Object?>[],
   };
@@ -633,13 +644,15 @@ final class FakeWorld {
   /// The visible channels of [principalId], optionally of one space, as `ChannelView`s.
   List<JsonMap> channelViews(String principalId, {String? spaceId}) => [
     for (final c in channels.values)
-      if (c.access.containsKey(principalId) && (spaceId == null || c.spaceId == spaceId))
+      if (c.access.containsKey(principalId) &&
+          (spaceId == null || c.spaceId == spaceId))
         channelView(principalId, c.id),
   ];
 
   /// The messages of [threadId] in `thread_seq` order.
   List<JsonMap> messagesOf(String threadId) => [
-    for (final id in _threadMessages[threadId] ?? const <String>[]) messages[id]!,
+    for (final id in _threadMessages[threadId] ?? const <String>[])
+      messages[id]!,
   ];
 
   /// The API `Snapshot` of [principalId] (04 6.3 item 4, 04 7.3).
@@ -657,7 +670,8 @@ final class FakeWorld {
       'unread_threads': <Object?>[],
       'active_runs': [
         for (final r in runs.values)
-          if (_active(r) && seesChannel(principalId, r['channel_id']! as String))
+          if (_active(r) &&
+              seesChannel(principalId, r['channel_id']! as String))
             runSummary(r),
       ],
       'agents': <Object?>[],
@@ -698,7 +712,8 @@ final class FakeWorld {
       'type': type,
       'schema_version': 1,
       'occurred_at': stamp(),
-      if (actor != null) 'actor': {'id': actor, 'kind': people[actor]?.kind ?? 'user'},
+      if (actor != null)
+        'actor': {'id': actor, 'kind': people[actor]?.kind ?? 'user'},
       'scope': scope,
       'resource': resource,
       if (audience != null) 'audience': 'self',
@@ -723,28 +738,31 @@ final class FakeWorld {
     JsonMap scope = const {},
     String? audience,
   }) {
-    final event = FakeEvent(_copy({
-      'id': nextId(),
-      'type': type,
-      'schema_version': 1,
-      'occurred_at': stamp(),
-      'scope': scope,
-      'resource': resource,
-      if (audience != null) 'audience': 'self',
-      'payload': payload,
-    }), audience: audience);
+    final event = FakeEvent(
+      _copy({
+        'id': nextId(),
+        'type': type,
+        'schema_version': 1,
+        'occurred_at': stamp(),
+        'scope': scope,
+        'resource': resource,
+        if (audience != null) 'audience': 'self',
+        'payload': payload,
+      }),
+      audience: audience,
+    );
     for (final hook in List.of(eventHooks)) {
       hook(event);
     }
     return event;
   }
 
-  static JsonMap _copy(JsonMap value) => jsonDecode(jsonEncode(value)) as JsonMap;
+  static JsonMap _copy(JsonMap value) =>
+      jsonDecode(jsonEncode(value)) as JsonMap;
 
   /// The events with `after < seq <= upTo` still in the log.
-  Iterable<FakeEvent> eventsAfter(int after, {int? upTo}) => log.where(
-    (e) => e.seq! > after && e.seq! <= (upTo ?? headSeq),
-  );
+  Iterable<FakeEvent> eventsAfter(int after, {int? upTo}) =>
+      log.where((e) => e.seq! > after && e.seq! <= (upTo ?? headSeq));
 
   /// Removes the events up to [seq] from the log, as `sync.event_retention` does, so a cursor
   /// below them gets `resync_required` with `retention` (04 7.3).
@@ -809,13 +827,16 @@ final class FakeWorld {
         .toString();
     final known = _clientMsgIds['$authorId|$cmid'];
     if (known != null) {
-      if (known.hash != hash) throw const FakeProblem(422, 'idempotency_key_reuse');
+      if (known.hash != hash)
+        throw const FakeProblem(422, 'idempotency_key_reuse');
       return (message: messages[known.id]!, replay: true);
     }
     final author = people[authorId]!;
     final seq = (thread['last_message_seq']! as int) + 1;
     final id = nextId();
-    final mentions = [...?(body['mention_ids'] as List<Object?>?)?.cast<String>()];
+    final mentions = [
+      ...?(body['mention_ids'] as List<Object?>?)?.cast<String>(),
+    ];
     final message = <String, Object?>{
       'id': id,
       'thread_id': threadId,
@@ -879,7 +900,8 @@ final class FakeWorld {
     JsonMap body,
   ) {
     final m = visibleMessage(principalId, messageId);
-    if (m['deleted_at'] != null) throw const FakeProblem(410, 'message_deleted');
+    if (m['deleted_at'] != null)
+      throw const FakeProblem(410, 'message_deleted');
     if ((m['author']! as JsonMap)['id'] != principalId) {
       throw const FakeProblem(403, 'forbidden');
     }
@@ -932,16 +954,25 @@ final class FakeWorld {
 
   /// Adds or removes the reaction [emoji] of [principalId] on [messageId]; a repeat changes
   /// nothing. Throws `404`, `410 message_deleted` when adding to a deleted message.
-  void react(String principalId, String messageId, String emoji, {required bool add}) {
+  void react(
+    String principalId,
+    String messageId,
+    String emoji, {
+    required bool add,
+  }) {
     final m = visibleMessage(principalId, messageId);
-    if (add && m['deleted_at'] != null) throw const FakeProblem(410, 'message_deleted');
+    if (add && m['deleted_at'] != null)
+      throw const FakeProblem(410, 'message_deleted');
     final key = '$messageId|$emoji';
     final who = _reactions.putIfAbsent(key, () => {});
     if (add ? !who.add(principalId) : !who.remove(principalId)) return;
     m['reactions'] = [
       for (final e in _reactions.entries)
         if (e.key.startsWith('$messageId|') && e.value.isNotEmpty)
-          {'emoji': e.key.substring(messageId.length + 1), 'count': e.value.length},
+          {
+            'emoji': e.key.substring(messageId.length + 1),
+            'count': e.value.length,
+          },
     ];
     m['version'] = (m['version']! as int) + 1;
     append(
@@ -990,7 +1021,12 @@ final class FakeWorld {
   // Personal state
 
   /// Sets the read state of [principalId] in [threadId] and appends `read_state.updated`.
-  JsonMap putReadState(String principalId, String threadId, int lastRead, {String? deviceId}) {
+  JsonMap putReadState(
+    String principalId,
+    String threadId,
+    int lastRead, {
+    String? deviceId,
+  }) {
     final thread = visibleThread(principalId, threadId);
     final key = '$principalId|$threadId';
     final previous = readStates[key];
@@ -1017,7 +1053,12 @@ final class FakeWorld {
 
   /// Stores the draft of [principalId] in [threadId] from a `DraftPut` [body]; returns the
   /// `DraftPutResult` (`overwrote_newer` when `base_version` was older, 04 14).
-  JsonMap putDraft(String principalId, String threadId, JsonMap body, {String? deviceId}) {
+  JsonMap putDraft(
+    String principalId,
+    String threadId,
+    JsonMap body, {
+    String? deviceId,
+  }) {
     final thread = visibleThread(principalId, threadId);
     final key = '$principalId|$threadId';
     final previous = drafts[key];
@@ -1037,7 +1078,11 @@ final class FakeWorld {
     drafts[key] = draft;
     append(
       'draft.updated',
-      resource: {'kind': 'draft', 'id': draft['id'], 'version': draft['version']},
+      resource: {
+        'kind': 'draft',
+        'id': draft['id'],
+        'version': draft['version'],
+      },
       scope: _scopeOf(threadId),
       payload: {'draft': draft},
       actor: principalId,
@@ -1045,7 +1090,8 @@ final class FakeWorld {
     );
     return {
       'draft': draft,
-      'overwrote_newer': base != null && previous != null && base < previousVersion,
+      'overwrote_newer':
+          base != null && previous != null && base < previousVersion,
     };
   }
 
@@ -1069,7 +1115,12 @@ final class FakeWorld {
   }
 
   /// Stores the setting [key] of [principalId] and appends `settings.updated`.
-  JsonMap putSetting(String principalId, String key, Object? value, {String? deviceId}) {
+  JsonMap putSetting(
+    String principalId,
+    String key,
+    Object? value, {
+    String? deviceId,
+  }) {
     final mine = settings.putIfAbsent(principalId, () => {});
     final setting = <String, Object?>{
       'key': key,
@@ -1091,9 +1142,17 @@ final class FakeWorld {
     _settingEvent(principalId, setting, deleted: true);
   }
 
-  void _settingEvent(String principalId, JsonMap setting, {required bool deleted}) => append(
+  void _settingEvent(
+    String principalId,
+    JsonMap setting, {
+    required bool deleted,
+  }) => append(
     'settings.updated',
-    resource: {'kind': 'user', 'id': principalId, 'version': setting['version']},
+    resource: {
+      'kind': 'user',
+      'id': principalId,
+      'version': setting['version'],
+    },
     payload: {'setting': setting, if (deleted) 'deleted': true},
     actor: principalId,
     audience: principalId,
@@ -1126,8 +1185,10 @@ final class FakeWorld {
       payload: {
         'permission_version': permissionVersion,
         'added': [
-          if (previous == null) {'kind': 'channel', 'id': channelId, 'level': level},
-          if (!sawSpace && seesSpaceNow) {'kind': 'space', 'id': space, 'level': level},
+          if (previous == null)
+            {'kind': 'channel', 'id': channelId, 'level': level},
+          if (!sawSpace && seesSpaceNow)
+            {'kind': 'space', 'id': space, 'level': level},
         ],
         'removed': [
           if (level == null) {'kind': 'channel', 'id': channelId},
@@ -1195,7 +1256,12 @@ final class FakeWorld {
 
   /// Moves [runId] to [state] (`running`, `completed`, `failed`, `cancelled`) and appends
   /// `run.state_changed` with the summary (04 11.3 item 1).
-  void setRunState(String runId, String state, {String? triggerState, String? reason}) {
+  void setRunState(
+    String runId,
+    String state, {
+    String? triggerState,
+    String? reason,
+  }) {
     final run = runs[runId]!;
     run
       ..['state'] = state
@@ -1313,7 +1379,8 @@ final class FakeWorld {
       ..state = 'revoked'
       ..revokeReason = reason
       ..revokedAt = stamp();
-    for (final s in sessions.values.where((s) => s.deviceId == deviceId).toList()) {
+    for (final s
+        in sessions.values.where((s) => s.deviceId == deviceId).toList()) {
       revokeSession(s.id, reason: 'device_revoked');
     }
   }

@@ -46,7 +46,9 @@ void registerAuthHandlers(RestFake rest, {required Duration accessTokenTtl}) {
     ..handle('loginWithPassword', (r) {
       final body = r.json;
       final person = world.people.values
-          .where((p) => p.loginName != null && p.loginName == body['login_name'])
+          .where(
+            (p) => p.loginName != null && p.loginName == body['login_name'],
+          )
           .firstOrNull;
       if (person == null ||
           person.password != body['password'] ||
@@ -121,7 +123,11 @@ void registerAuthHandlers(RestFake rest, {required Duration accessTokenTtl}) {
       }
       pairing.state = 'completed';
       final device = world.devices[(pairing.registration['device_id'])]!;
-      final session = tokens.open(pairing.approvedBy!, device, 'device_pairing');
+      final session = tokens.open(
+        pairing.approvedBy!,
+        device,
+        'device_pairing',
+      );
       return FakeResponse(201, tokens.response(session, device));
     })
     ..handle('refreshToken', (r) {
@@ -137,7 +143,10 @@ void registerAuthHandlers(RestFake rest, {required Duration accessTokenTtl}) {
         throw const FakeProblem(401, 'invalid_dpop_proof');
       }
       tokens.rotate(session);
-      return FakeResponse(200, tokens.response(session, world.devices[session.deviceId]!));
+      return FakeResponse(
+        200,
+        tokens.response(session, world.devices[session.deviceId]!),
+      );
     })
     ..handle('logout', (r) {
       world.revokeSession(r.session!.id, reason: 'logout');
@@ -148,11 +157,15 @@ void registerAuthHandlers(RestFake rest, {required Duration accessTokenTtl}) {
       if (device == null || device.userId != r.person.id) {
         throw const FakeProblem(404, 'not_found');
       }
-      return FakeResponse(200, device.toJson(self: device.id == r.session!.deviceId));
+      return FakeResponse(
+        200,
+        device.toJson(self: device.id == r.session!.deviceId),
+      );
     })
     ..handle('approveDevice', (r) {
       final device = world.devices[r.param('device_id')];
-      if (device == null || (device.userId != r.person.id && !r.person.isOwner)) {
+      if (device == null ||
+          (device.userId != r.person.id && !r.person.isOwner)) {
         throw const FakeProblem(404, 'not_found');
       }
       if (device.state != 'pending') throw const FakeProblem(409, 'conflict');
@@ -278,11 +291,19 @@ final class _Tokens {
       session.olderAccessTokens.add(session.accessToken);
     }
     final exp = _world.now().add(_ttl).millisecondsSinceEpoch ~/ 1000;
-    String enc(JsonMap m) => base64Url.encode(utf8.encode(jsonEncode(m))).replaceAll('=', '');
+    String enc(JsonMap m) =>
+        base64Url.encode(utf8.encode(jsonEncode(m))).replaceAll('=', '');
     session
       ..accessToken =
           '${enc({'alg': 'none', 'typ': 'at+jwt'})}.'
-          '${enc({'sub': session.userId, 'sid': session.id, 'did': session.deviceId, 'jti': _world.nextId(), 'exp': exp, 'cnf': {'jkt': session.jkt}})}.'
+          '${enc({
+            'sub': session.userId,
+            'sid': session.id,
+            'did': session.deviceId,
+            'jti': _world.nextId(),
+            'exp': exp,
+            'cnf': {'jkt': session.jkt},
+          })}.'
           'ZmFrZQ'
       ..refreshToken = 'rt-${_world.nextId()}';
   }

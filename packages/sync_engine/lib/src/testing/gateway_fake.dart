@@ -116,8 +116,8 @@ class _Conn implements FakeGatewayConnection {
 
   final WebSocket socket;
 
-  /// The nonce of `hello` (and of a later `reauth_required`).
-  String nonce;
+  /// The nonce of `hello`.
+  final String nonce;
 
   @override
   String? deviceId;
@@ -193,7 +193,6 @@ final class GatewayFake implements GatewayFaultTarget {
 
   final List<_Conn> _conns = [];
   final Map<String, _GatewaySession> _sessions = {};
-  int _nonces = 0;
   bool _duplicateNext = false;
   String? _forcedResync;
   bool _holding = false;
@@ -208,12 +207,15 @@ final class GatewayFake implements GatewayFaultTarget {
   List<FakeGatewayConnection> get connections => List.unmodifiable(_conns);
 
   /// The frames the server sent on connection [number].
-  List<GatewayFrameRecord> sentOn(int number) =>
-      [for (final f in frames) if (f.connection == number && f.fromServer) f];
+  List<GatewayFrameRecord> sentOn(int number) => [
+    for (final f in frames)
+      if (f.connection == number && f.fromServer) f,
+  ];
 
   /// Takes over [socket] after the upgrade and sends `hello`.
   void accept(WebSocket socket) {
-    final conn = _Conn(_conns.length + 1, socket, 'gw-nonce-${++_nonces}');
+    // The nonces of the gateway are those of REST (08 7.3: stateless, current and previous).
+    final conn = _Conn(_conns.length + 1, socket, verifier.currentNonce);
     _conns.add(conn);
     socket.listen(
       (data) => _onFrame(conn, data),
@@ -233,7 +235,9 @@ final class GatewayFake implements GatewayFaultTarget {
   /// Ends the connections of [deviceId] (every connection when null) without a close code,
   /// as a lost network does.
   void disconnect({String? deviceId}) {
-    for (final c in _open.where((c) => deviceId == null || c.deviceId == deviceId)) {
+    for (final c in _open.where(
+      (c) => deviceId == null || c.deviceId == deviceId,
+    )) {
       c.open = false;
       unawaited(c.socket.close());
     }
@@ -269,7 +273,9 @@ final class GatewayFake implements GatewayFaultTarget {
   @override
   void revoke(String? deviceId) {
     final sessions = world.sessions.values
-        .where((s) => !s.revoked && (deviceId == null || s.deviceId == deviceId))
+        .where(
+          (s) => !s.revoked && (deviceId == null || s.deviceId == deviceId),
+        )
         .toList();
     for (final s in sessions) {
       // 04 8.5: the connections close at once with 4012; the event follows in the log.
@@ -318,8 +324,18 @@ final class GatewayFake implements GatewayFaultTarget {
     frames.add(GatewayFrameRecord(c.number, false, decoded));
     final op = decoded['op'];
     const known = {
-      'identify', 'resume', 'heartbeat', 'reauth', 'focus', 'typing.start', 'typing.stop',
-      'ack', 'run.update', 'command.autocomplete_result', 'stats.subscribe', 'stats.unsubscribe',
+      'identify',
+      'resume',
+      'heartbeat',
+      'reauth',
+      'focus',
+      'typing.start',
+      'typing.stop',
+      'ack',
+      'run.update',
+      'command.autocomplete_result',
+      'stats.subscribe',
+      'stats.unsubscribe',
     };
     if (op is! String || !known.contains(op)) {
       _close(c, 4001, 'unknown op');
@@ -365,7 +381,9 @@ final class GatewayFake implements GatewayFaultTarget {
       return null;
     }
     final session = world.sessions.values
-        .where((s) => s.accessToken == token || s.olderAccessTokens.contains(token))
+        .where(
+          (s) => s.accessToken == token || s.olderAccessTokens.contains(token),
+        )
         .firstOrNull;
     if (session == null) {
       _close(c, 4004, 'unknown token');
@@ -386,7 +404,6 @@ final class GatewayFake implements GatewayFaultTarget {
       htu: '${base.origin}/api/v1/gateway',
       accessToken: token,
       expectedJkt: session.jkt,
-      nonces: {c.nonce},
     );
     if (result is DpopRejected) {
       _close(c, 4004, result.code);
@@ -406,10 +423,11 @@ final class GatewayFake implements GatewayFaultTarget {
 
   bool _expired(String token) {
     try {
-      final payload =
-          jsonDecode(utf8.decode(base64Url.decode(base64Url.normalize(token.split('.')[1]))))
-              as JsonMap;
-      return world.now().millisecondsSinceEpoch ~/ 1000 >= (payload['exp']! as int);
+      final payload = jsonDecode(
+        utf8.decode(base64Url.decode(base64Url.normalize(token.split('.')[1]))),
+      ) as JsonMap;
+      return world.now().millisecondsSinceEpoch ~/ 1000 >=
+          (payload['exp']! as int);
     } on Object {
       return true;
     }
@@ -446,7 +464,9 @@ final class GatewayFake implements GatewayFaultTarget {
       }
     }
     // One connection per device (04 6.1).
-    for (final other in _open.where((o) => o != c && o.deviceId == session.deviceId)) {
+    for (final other in _open.where(
+      (o) => o != c && o.deviceId == session.deviceId,
+    )) {
       _close(other, 4017, 'device replaced');
     }
     c
@@ -533,7 +553,10 @@ final class GatewayFake implements GatewayFaultTarget {
       return;
     }
     // Unreadable threads are ignored silently (asyncapi `focus`).
-    final next = {for (final id in ids) if (world.seesThread(c.principalId!, id)) id};
+    final next = {
+      for (final id in ids)
+        if (world.seesThread(c.principalId!, id)) id,
+    };
     final before = c.session!.focus;
     c.session!.focus = next;
     for (final thread in next.difference(before)) {
@@ -558,7 +581,8 @@ final class GatewayFake implements GatewayFaultTarget {
     final thread = world.threads[threadId]!;
     final expires = world.stamp(world.now().add(timings.typingTtl));
     for (final other in _open) {
-      if (other == c || !other.live || other.principalId == c.principalId) continue;
+      if (other == c || !other.live || other.principalId == c.principalId)
+        continue;
       if (!other.focus.contains(threadId)) continue;
       _send(other, 'dispatch', {
         'id': world.nextId(),
@@ -587,7 +611,8 @@ final class GatewayFake implements GatewayFaultTarget {
       if (e.type == 'access.changed') {
         // 04 8.3 item 2: the focus of removed targets ends.
         c.session!.focus = {
-          for (final t in c.session!.focus) if (world.seesThread(c.principalId!, t)) t,
+          for (final t in c.session!.focus)
+            if (world.seesThread(c.principalId!, t)) t,
         };
       }
       if (e.type == 'session.revoked' &&
@@ -621,7 +646,9 @@ final class GatewayFake implements GatewayFaultTarget {
         // Later `replace` operations on the same path replace earlier ones (04 11.3 item 3).
         for (final op in ops) {
           if (op['op'] == 'replace') {
-            pending.ops.removeWhere((o) => o['op'] == 'replace' && o['path'] == op['path']);
+            pending.ops.removeWhere(
+              (o) => o['op'] == 'replace' && o['path'] == op['path'],
+            );
           }
           pending.ops.add(op);
         }
@@ -648,15 +675,19 @@ final class GatewayFake implements GatewayFaultTarget {
     }
   }
 
-  void _ephemeral(_Conn c, String type, JsonMap run, JsonMap payload) => _send(c, 'dispatch', {
-    'id': world.nextId(),
-    'type': type,
-    'schema_version': 1,
-    'occurred_at': world.stamp(),
-    'scope': {'channel_id': run['channel_id'], 'thread_id': run['thread_id']},
-    'resource': {'kind': 'run', 'id': run['id'], 'version': run['version']},
-    'payload': jsonDecode(jsonEncode(payload)),
-  });
+  void _ephemeral(_Conn c, String type, JsonMap run, JsonMap payload) => _send(
+    c,
+    'dispatch',
+    {
+      'id': world.nextId(),
+      'type': type,
+      'schema_version': 1,
+      'occurred_at': world.stamp(),
+      'scope': {'channel_id': run['channel_id'], 'thread_id': run['thread_id']},
+      'resource': {'kind': 'run', 'id': run['id'], 'version': run['version']},
+      'payload': jsonDecode(jsonEncode(payload)),
+    },
+  );
 
   // -------------------------------------------------------------------------------------------
   // Sending and closing
@@ -666,7 +697,9 @@ final class GatewayFake implements GatewayFaultTarget {
     final frame = <String, Object?>{'op': op, 'd': d};
     final problems = contract.serverFrame(frame);
     if (problems.isNotEmpty) {
-      violations.add('server frame $op ${d['type'] ?? ''}: ${problems.join('; ')}');
+      violations.add(
+        'server frame $op ${d['type'] ?? ''}: ${problems.join('; ')}',
+      );
       throw ContractError('frame $op', problems);
     }
     frames.add(GatewayFrameRecord(c.number, true, frame));

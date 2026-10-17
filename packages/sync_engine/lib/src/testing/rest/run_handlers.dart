@@ -16,7 +16,8 @@ void registerRunHandlers(RestFake rest) {
 
   JsonMap visibleRun(FakeRequest r) {
     final run = world.runs[r.param('run_id')];
-    if (run == null || !world.seesChannel(r.person.id, run['channel_id']! as String)) {
+    if (run == null ||
+        !world.seesChannel(r.person.id, run['channel_id']! as String)) {
       throw const FakeProblem(404, 'not_found');
     }
     return run;
@@ -29,7 +30,8 @@ void registerRunHandlers(RestFake rest) {
     })
     ..handle('cancelRun', (r) {
       final run = visibleRun(r);
-      if (world.levelOf(r.person.id, run['channel_id']! as String) != 'trigger' ||
+      if (world.levelOf(r.person.id, run['channel_id']! as String) !=
+              'trigger' ||
           run['triggered_by'] != r.person.id) {
         throw const FakeProblem(403, 'forbidden');
       }

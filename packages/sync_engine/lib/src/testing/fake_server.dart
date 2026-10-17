@@ -60,7 +60,14 @@ final class FakeServerOptions {
 /// await server.stop();
 /// ```
 final class FakeServer {
-  FakeServer._(this._http, this.world, this.rest, this.gateway, this.faults, this.verifier);
+  FakeServer._(
+    this._http,
+    this.world,
+    this.rest,
+    this.gateway,
+    this.faults,
+    this.verifier,
+  );
 
   final HttpServer _http;
 
@@ -103,7 +110,12 @@ final class FakeServer {
       baseUri: () => base,
     );
     final faults = FaultPlan(gateway);
-    final rest = RestFake(world: world, contract: contract, verifier: verifier, faults: faults);
+    final rest = RestFake(
+      world: world,
+      contract: contract,
+      verifier: verifier,
+      faults: faults,
+    );
     registerAuthHandlers(rest, accessTokenTtl: options.accessTokenTtl);
     registerSyncHandlers(rest);
     registerStructureHandlers(rest);
@@ -119,7 +131,8 @@ final class FakeServer {
   Uri get baseUri => Uri.parse('http://127.0.0.1:${_http.port}');
 
   /// The gateway address, `ws://127.0.0.1:<port>/api/v1/gateway`.
-  Uri get gatewayUri => Uri.parse('ws://127.0.0.1:${_http.port}/api/v1/gateway');
+  Uri get gatewayUri =>
+      Uri.parse('ws://127.0.0.1:${_http.port}/api/v1/gateway');
 
   /// Every contract violation of a request, response or frame, with its JSON Pointer; a test
   /// expects this list to be empty.
@@ -129,15 +142,19 @@ final class FakeServer {
   List<FakeRequestRecord> get requests => rest.requests;
 
   /// The requests of [operationId].
-  List<FakeRequestRecord> requestsOf(String operationId) =>
-      [for (final r in rest.requests) if (r.operationId == operationId) r];
+  List<FakeRequestRecord> requestsOf(String operationId) => [
+    for (final r in rest.requests)
+      if (r.operationId == operationId) r,
+  ];
 
   /// Registers [handler] for [operationId] (the handler registry of Design note 3).
-  void handle(String operationId, FakeHandler handler) => rest.handle(operationId, handler);
+  void handle(String operationId, FakeHandler handler) =>
+      rest.handle(operationId, handler);
 
   /// Adds and attaches a scripted agent for [agentId] that plays [script] on every mention.
   ScriptedAgent addAgent(String agentId, AgentScript script) {
-    final agent = ScriptedAgent(world, agentId: agentId, script: script)..attach();
+    final agent = ScriptedAgent(world, agentId: agentId, script: script)
+      ..attach();
     _agents.add(agent);
     return agent;
   }

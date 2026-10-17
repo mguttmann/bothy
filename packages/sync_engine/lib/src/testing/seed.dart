@@ -92,7 +92,11 @@ final class WorldSeed {
       password: password,
       totpCode: totp,
     );
-    s.robin = world.addPerson(handle: 'robin', displayName: 'Robin', kind: 'agent');
+    s.robin = world.addPerson(
+      handle: 'robin',
+      displayName: 'Robin',
+      kind: 'agent',
+    );
     s.space = world.addSpace('Team');
     s.general = world.addChannel(s.space, 'general', {
       s.alex.id: 'trigger',
@@ -104,7 +108,11 @@ final class WorldSeed {
       s.sam.id: 'write',
     });
     s.private = world.addChannel(s.space, 'private', {s.sam.id: 'write'});
-    s.releaseNotes = world.addThread(s.general, 'Release notes', createdBy: s.alex.id);
+    s.releaseNotes = world.addThread(
+      s.general,
+      'Release notes',
+      createdBy: s.alex.id,
+    );
     s.printer = world.addThread(s.support, 'Printer', createdBy: s.sam.id);
     s.budget = world.addThread(s.private, 'Budget', createdBy: s.sam.id);
     return s;
@@ -112,10 +120,9 @@ final class WorldSeed {
 
   /// Posts [text] as [author] into [threadId] through the write path of the world (as if the
   /// author's client sent it) and returns the stored message.
-  JsonMap post(FakePerson author, String threadId, String text) => world
-      .createMessage(author.id, threadId, {
+  JsonMap post(FakePerson author, String threadId, String text) =>
+      world.createMessage(author.id, threadId, {
         'client_msg_id': world.nextId(),
         'content_md': text,
-      })
-      .message;
+      }).message;
 }

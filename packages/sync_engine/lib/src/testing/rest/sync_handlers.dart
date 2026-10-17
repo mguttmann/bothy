@@ -14,7 +14,10 @@ import '../world.dart';
 void registerSyncHandlers(RestFake rest) {
   final world = rest.world;
   rest
-    ..handle('getSnapshot', (r) => FakeResponse(200, world.snapshot(r.person.id)))
+    ..handle(
+      'getSnapshot',
+      (r) => FakeResponse(200, world.snapshot(r.person.id)),
+    )
     ..handle('listEvents', (r) {
       final after = int.tryParse(r.query('after') ?? '');
       if (after == null) {
@@ -27,8 +30,10 @@ void registerSyncHandlers(RestFake rest) {
         );
       }
       final reason = resyncReason(world, after, r.query('epoch'));
-      if (reason != null) throw FakeProblem(410, 'resync_required', reason: reason);
-      final requested = int.tryParse(r.query('limit') ?? '') ?? world.catchupPageSize;
+      if (reason != null)
+        throw FakeProblem(410, 'resync_required', reason: reason);
+      final requested =
+          int.tryParse(r.query('limit') ?? '') ?? world.catchupPageSize;
       final limit = requested.clamp(1, world.catchupPageSize);
       final checked = world.eventsAfter(after).take(limit).toList();
       return FakeResponse(200, {

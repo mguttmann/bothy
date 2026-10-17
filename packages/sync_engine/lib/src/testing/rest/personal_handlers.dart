@@ -25,7 +25,12 @@ void registerPersonalHandlers(RestFake rest) {
       'putThreadDraft',
       (r) => FakeResponse(
         200,
-        world.putDraft(r.person.id, r.param('thread_id'), r.json, deviceId: r.session!.deviceId),
+        world.putDraft(
+          r.person.id,
+          r.param('thread_id'),
+          r.json,
+          deviceId: r.session!.deviceId,
+        ),
       ),
     )
     ..handle('deleteThreadDraft', (r) {
@@ -37,7 +42,9 @@ void registerPersonalHandlers(RestFake rest) {
       return FakeResponse(200, {
         'items': [
           for (final MapEntry(:key, :value) in world.readStates.entries)
-            if (key.startsWith('${r.person.id}|') && value['channel_id'] == channel) value,
+            if (key.startsWith('${r.person.id}|') &&
+                value['channel_id'] == channel)
+              value,
         ],
       });
     })
@@ -60,7 +67,12 @@ void registerPersonalHandlers(RestFake rest) {
       'putMySetting',
       (r) => FakeResponse(
         200,
-        world.putSetting(r.person.id, r.param('key'), r.json['value'], deviceId: r.session!.deviceId),
+        world.putSetting(
+          r.person.id,
+          r.param('key'),
+          r.json['value'],
+          deviceId: r.session!.deviceId,
+        ),
       ),
     )
     ..handle('deleteMySetting', (r) {

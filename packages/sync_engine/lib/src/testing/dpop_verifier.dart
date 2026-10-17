@@ -136,13 +136,18 @@ final class DpopVerifier {
     if (jwk.containsKey('d')) {
       return const DpopRejected('invalid_dpop_proof', 'private key in jwk');
     }
-    final signingInput = Uint8List.fromList(ascii.encode('${parts[0]}.${parts[1]}'));
+    final signingInput = Uint8List.fromList(
+      ascii.encode('${parts[0]}.${parts[1]}'),
+    );
     if (!_verifyEs256(jwk, signingInput, signature)) {
       return const DpopRejected('invalid_dpop_proof', 'signature');
     }
     final jkt = thumbprint(jwk);
     if (expectedJkt != null && jkt != expectedJkt) {
-      return const DpopRejected('invalid_dpop_proof', 'key is not the bound key');
+      return const DpopRejected(
+        'invalid_dpop_proof',
+        'key is not the bound key',
+      );
     }
     if (payload['htm'] != method.toUpperCase()) {
       return const DpopRejected('invalid_dpop_proof', 'htm');
@@ -172,7 +177,10 @@ final class DpopVerifier {
     if (!_seen.add('$htu|$jti')) {
       return const DpopRejected('invalid_dpop_proof', 'jti reused');
     }
-    return DpopAccepted(jkt, previousNonce: nonces == null && nonce != _current);
+    return DpopAccepted(
+      jkt,
+      previousNonce: nonces == null && nonce != _current,
+    );
   }
 
   /// The `ath` of [accessToken]: base64url of its SHA-256 (RFC 9449 4.2).
@@ -205,7 +213,10 @@ final class DpopVerifier {
         ..init(false, PublicKeyParameter<ECPublicKey>(ECPublicKey(q, _p256)));
       return verifier.verifySignature(
         input,
-        ECSignature(_int(signature.sublist(0, 32)), _int(signature.sublist(32))),
+        ECSignature(
+          _int(signature.sublist(0, 32)),
+          _int(signature.sublist(32)),
+        ),
       );
     } on Object {
       return false;
@@ -221,7 +232,8 @@ final class DpopVerifier {
   static Uint8List _b64(String text) =>
       base64Url.decode(text.padRight((text.length + 3) ~/ 4 * 4, '='));
 
-  static String _encode(List<int> bytes) => base64Url.encode(bytes).replaceAll('=', '');
+  static String _encode(List<int> bytes) =>
+      base64Url.encode(bytes).replaceAll('=', '');
 
   static BigInt _int(List<int> bytes) {
     var r = BigInt.zero;
