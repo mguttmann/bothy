@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import 'package:design_system/design_system.dart';
+import 'package:design_system/testing.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/scheduler.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -149,5 +150,57 @@ void main() {
       tester.state<DsIconState>(find.byType(DsIcon)).asset,
       'assets/icons/fill/${DsIcons.actionAttach.name}.vec',
     );
+  });
+
+  testWidgets('a glyph without an asset fails with a StateError', (
+    tester,
+  ) async {
+    await _pump(
+      tester,
+      DsIcon(
+        const DsGlyph('no-such-glyph', DsIconWeight.regular),
+        label: _label,
+      ),
+    );
+    expect(tester.takeException(), isA<StateError>());
+  });
+
+  testWidgets('a new pulse duration restarts the spin with it', (tester) async {
+    Widget withPulse(Duration pulse) => Builder(
+      builder: (context) {
+        final theme = Theme.of(context);
+        return Theme(
+          data: theme.copyWith(
+            extensions: [
+              for (final e in theme.extensions.values)
+                if (e is! DsMotion) e,
+              DsMotion.full.copyWith(durationPulse: pulse),
+            ],
+          ),
+          child: DsIcon(DsIcons.triggerWorking, label: _label),
+        );
+      },
+    );
+    final pulse = DsMotion.full.durationPulse;
+    await _pump(tester, withPulse(pulse));
+    final turns = tester.widget<RotationTransition>(_rotation()).turns;
+    expect((turns as AnimationController).duration, pulse);
+    await _pump(tester, withPulse(pulse * 2));
+    expect(turns.duration, pulse * 2);
+    expect(turns.isAnimating, isTrue);
+    await tester.pumpWidget(const SizedBox.shrink());
+  });
+
+  testWidgets('dsPumpIcons gives up on an icon that never loads', (
+    tester,
+  ) async {
+    await _pump(tester, const DsIconPlaceholder(size: 16));
+    StateError? error;
+    try {
+      await dsPumpIcons(tester, timeout: const Duration(milliseconds: 20));
+    } on StateError catch (e) {
+      error = e;
+    }
+    expect(error?.message, contains('still loading'));
   });
 }
