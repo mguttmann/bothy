@@ -1,0 +1,49 @@
+{
+  "run_id": "0192f4a0-7b1c-7000-8a00-000000000001",
+  "base_version": 2,
+  "version": 3,
+  "ops": [
+    {
+      "op": "add",
+      "path": "/steps/0192f4a0-7b1c-7000-8a00-0000000000a3",
+      "value": {
+        "id": "0192f4a0-7b1c-7000-8a00-0000000000a3",
+        "ordinal": 3,
+        "kind": "subagent",
+        "name": "reviewer",
+        "title": "Reviewing the fix",
+        "status": "running",
+        "started_at": "2026-10-15T09:00:06Z"
+      }
+    },
+    {
+      "op": "add",
+      "path": "/steps/0192f4a0-7b1c-7000-8a00-0000000000a4",
+      "value": {
+        "id": "0192f4a0-7b1c-7000-8a00-0000000000a4",
+        "ordinal": 4,
+        "parent_step_id": "0192f4a0-7b1c-7000-8a00-0000000000a3",
+        "kind": "tool_call",
+        "name": "run_tests",
+        "title": "Running the tests",
+        "status": "running",
+        "started_at": "2026-10-15T09:00:07Z"
+      }
+    },
+    {
+      "op": "replace",
+      "path": "/followups/0192f4a0-7b1c-7000-8a00-0000000000b1/state",
+      "value": "delivered"
+    },
+    {
+      "op": "add",
+      "path": "/last_text_excerpt",
+      "value": "The export fails on empty rows."
+    },
+    {
+      "op": "add",
+      "path": "/metrics/tokens_cache_read",
+      "value": 800
+    }
+  ]
+}

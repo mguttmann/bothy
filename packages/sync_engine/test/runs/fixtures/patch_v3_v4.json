@@ -1,0 +1,40 @@
+{
+  "run_id": "0192f4a0-7b1c-7000-8a00-000000000001",
+  "base_version": 3,
+  "version": 4,
+  "ops": [
+    {
+      "op": "replace",
+      "path": "/followups/0192f4a0-7b1c-7000-8a00-0000000000b1/state",
+      "value": "absorbed"
+    },
+    {
+      "op": "replace",
+      "path": "/steps/0192f4a0-7b1c-7000-8a00-0000000000a4/status",
+      "value": "completed"
+    },
+    {
+      "op": "remove",
+      "path": "/status_line"
+    },
+    {
+      "op": "add",
+      "path": "/metrics/last_api_retry",
+      "value": {
+        "attempt": 2,
+        "max_retries": 5,
+        "retry_delay_ms": 4000,
+        "error": "overloaded"
+      }
+    },
+    {
+      "op": "replace",
+      "path": "/cost",
+      "value": {
+        "amount_micros": 2500000,
+        "currency": "USD",
+        "is_estimate": true
+      }
+    }
+  ]
+}

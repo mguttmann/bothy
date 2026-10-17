@@ -1,0 +1,93 @@
+{
+  "id": "0192f4a0-7b1c-7000-8a00-000000000001",
+  "thread_id": "0192f4a0-7b1c-7000-8a00-000000000002",
+  "channel_id": "0192f4a0-7b1c-7000-8a00-000000000003",
+  "agent_id": "0192f4a0-7b1c-7000-8a00-000000000004",
+  "triggered_by": "0192f4a0-7b1c-7000-8a00-000000000005",
+  "trigger_kind": "message",
+  "state": "running",
+  "version": 4,
+  "billing_mode_expected": "organization",
+  "billing_mode_used": "organization",
+  "model": "model-large",
+  "metrics": {
+    "context_pct": 21.0,
+    "tokens_in": 1200,
+    "tokens_out": 300,
+    "tokens_cache_read": 800,
+    "last_api_retry": {
+      "attempt": 2,
+      "max_retries": 5,
+      "retry_delay_ms": 4000,
+      "error": "overloaded"
+    }
+  },
+  "cost": {
+    "amount_micros": 2500000,
+    "currency": "USD",
+    "is_estimate": true
+  },
+  "steps": {
+    "0192f4a0-7b1c-7000-8a00-0000000000a1": {
+      "id": "0192f4a0-7b1c-7000-8a00-0000000000a1",
+      "ordinal": 1,
+      "kind": "tool_call",
+      "name": "read_file",
+      "title": "Reading export.log",
+      "status": "completed",
+      "started_at": "2026-10-15T09:00:01Z",
+      "finished_at": "2026-10-15T09:00:03Z"
+    },
+    "0192f4a0-7b1c-7000-8a00-0000000000a2": {
+      "id": "0192f4a0-7b1c-7000-8a00-0000000000a2",
+      "ordinal": 2,
+      "kind": "tool_call",
+      "name": "grep",
+      "title": "Searching for the error",
+      "status": "running",
+      "started_at": "2026-10-15T09:00:04Z"
+    },
+    "0192f4a0-7b1c-7000-8a00-0000000000a3": {
+      "id": "0192f4a0-7b1c-7000-8a00-0000000000a3",
+      "ordinal": 3,
+      "kind": "subagent",
+      "name": "reviewer",
+      "title": "Reviewing the fix",
+      "status": "running",
+      "started_at": "2026-10-15T09:00:06Z"
+    },
+    "0192f4a0-7b1c-7000-8a00-0000000000a4": {
+      "id": "0192f4a0-7b1c-7000-8a00-0000000000a4",
+      "ordinal": 4,
+      "parent_step_id": "0192f4a0-7b1c-7000-8a00-0000000000a3",
+      "kind": "tool_call",
+      "name": "run_tests",
+      "title": "Running the tests",
+      "status": "completed",
+      "started_at": "2026-10-15T09:00:07Z"
+    }
+  },
+  "followups": {
+    "0192f4a0-7b1c-7000-8a00-0000000000b1": {
+      "message_id": "0192f4a0-7b1c-7000-8a00-0000000000b1",
+      "state": "absorbed"
+    }
+  },
+  "queued_at": "2026-10-15T09:00:00Z",
+  "started_at": "2026-10-15T09:00:00.500Z",
+  "plan": {
+    "items": [
+      {
+        "id": "step-1",
+        "text": "Reproduce the export error",
+        "status": "in_progress"
+      },
+      {
+        "id": "step-2",
+        "text": "Fix the export",
+        "status": "pending"
+      }
+    ]
+  },
+  "last_text_excerpt": "The export fails on empty rows."
+}
