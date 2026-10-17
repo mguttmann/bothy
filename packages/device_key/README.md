@@ -59,6 +59,8 @@ The item holds the enclave-wrapped blob of the key (useless on another device) o
 the public key sits in `kSecAttrGeneric`, so it is readable without a prompt. Service is the label
 prefix (`device_key`), account `<sha256(scope)>.<purpose>`, label `<prefix>.<account>`.
 
+| Platform | Hardware-backed Keystore | Without secure hardware |
+|---|---|---|
 | Android: `dpop` | Android Keystore, P-256, StrongBox where the device has it, otherwise the trusted execution environment; no user authentication | (emulators, devices without secure hardware) software Keystore key, `hardwareBound = false` |
 | Android: `step_up` | as `dpop`, plus authentication for every signature through `BiometricPrompt`: from API 30 strong biometrics or the device credential, on API 26 to 29 strong biometrics only; invalidated by new biometrics | same rule; on API 26 to 29 without enrolled biometrics there is no step-up key (`notAvailable`) |
 
