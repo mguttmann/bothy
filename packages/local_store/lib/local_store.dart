@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
 
-/// The encrypted local database of the apps (docs/spec/15-client-architektur.md 6, ADR 0029,
+/// The encrypted local database of the apps (docs/spec/15-client-architecture.md 6, ADR 0029,
 /// R-CL-08): drift on SQLite3MultipleCiphers, schema version 1 with the mirror tables of 15 6.1
 /// and the local-only tables, data access objects that hand out the domain types of
 /// `package:domain`, removal of targets, the cache cleanup and offline search. No Flutter

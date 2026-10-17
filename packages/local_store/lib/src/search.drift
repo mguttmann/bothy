@@ -1,5 +1,5 @@
 -- SPDX-License-Identifier: Apache-2.0
--- Offline search (docs/spec/14-suche.md 6; brief M4-12 Design note 5): FTS5 over the cached
+-- Offline search (docs/spec/14-search.md 6; brief M4-12 Design note 5): FTS5 over the cached
 -- messages, thread titles and transcripts. Only `body` is indexed; the other columns locate the
 -- hit and drive the removal of 04 8.3. `unicode61 remove_diacritics 2` folds umlauts and accents
 -- without a stemmer, so German and English match without their diacritics (14 6 accepts other

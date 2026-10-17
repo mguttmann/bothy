@@ -3,7 +3,7 @@
 The encrypted local database of the apps: drift on SQLite3MultipleCiphers, schema version 1
 with the mirror tables and the local-only tables, data access objects that hand out the domain
 types of `packages/domain`, removal and wipe, the cache cleanup and offline search
-(docs/spec/15-client-architektur.md 6, ADR 0029, R-CL-08). The interface reads only from this
+(docs/spec/15-client-architecture.md 6, ADR 0029, R-CL-08). The interface reads only from this
 database (15 1 principle 2). Kind: pure Dart package, a member of the Dart workspace at the
 repository root (`resolution: workspace`, `publish_to: none`).
 

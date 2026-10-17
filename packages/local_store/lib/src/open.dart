@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
 
-/// Opening the encrypted local database (docs/spec/15-client-architektur.md 6.3, R-CL-08,
+/// Opening the encrypted local database (docs/spec/15-client-architecture.md 6.3, R-CL-08,
 /// T-DV-01): a 256-bit key from the [DatabaseKeySource] port, SQLite3MultipleCiphers with its
 /// default cipher ChaCha20-Poly1305, and the database in its own isolate (15 7.1).
 library;
