@@ -60,7 +60,7 @@ Diagramm: [c4-2-container.svg](../architecture/c4-2-container.svg)
 | ClamAV `clamd` | eigener Prozess, optional | Malware-Scan per `INSTREAM` | Signaturen | eigener Container |
 | OTel Collector | eigener Prozess | nimmt OTLP an, exportiert je Backend | Puffer | eigener Container |
 | Apps | Flutter (iOS, Android, macOS, Windows) | Chat, Ausgangsfach, lokale Datenbank, Notification Service Extension | lokaler Cache, nie maßgeblich | je Gerät |
-| Web-Konsole | Flutter Web | Verwaltung, Statistik und Terminal (B5, [ADR 0070](../adr/0070-terminal-in-der-web-konsole.md)); kein Chat | keiner | statische Dateien |
+| Web-Konsole | Flutter Web | Verwaltung, Statistik und Terminal (B5, [ADR 0070](../adr/0070-terminal-in-der-web-konsole.md)); kein Chat | keiner | static files in the server image, served by the api process under `/console/` from `console.assets_dir` ([16-betrieb.md](16-betrieb.md) 14; M6-02) |
 | Agenten-Adapter | außerhalb des Servers (Referenz: Hermes-Agent-Plugin, Claude-Code-Runner) | Verbraucher mit dauerhaftem Cursor, prüft Aufruf-Marke, meldet Läufe | eigener | beim Betreiber der Laufzeit |
 | Host-Dienst `bothy-host` | eigenes Go-Binary (`services/host`), auf jedem angebundenen Rechner | PTY je Terminal-Sitzung, Noise-Gegenstelle, Profile, Selbstprüfung ([24-terminal.md](24-terminal.md)) | Schlüssel und Rückblick-Puffer auf dem Rechner | je Rechner |
 

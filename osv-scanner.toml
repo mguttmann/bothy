@@ -57,6 +57,13 @@ license.override = ["BSD-3-Clause"]
 reason = "Flutter SDK package (packages/fuchsia_remote_debug_protocol of the SDK) without a LICENSE file of its own; the LICENSE of the Flutter repository it belongs to is BSD-3-Clause (checked against Flutter 3.47.7 on 2026-10-16 for M6-12). Transitive dev dependency of flutter_driver."
 
 [[PackageOverrides]]
+name = "flutter_web_plugins"
+version = "0.0.0"
+ecosystem = "Pub"
+license.override = ["BSD-3-Clause"]
+reason = "Flutter SDK package (packages/flutter_web_plugins of the SDK) without a LICENSE file of its own; the LICENSE of the Flutter repository it belongs to is BSD-3-Clause (checked against Flutter 3.47.7 on 2026-10-17 for M6-02). Runtime dependency of apps/console for the path URL strategy."
+
+[[PackageOverrides]]
 name = "flutter_localizations"
 version = "0.0.0"
 ecosystem = "Pub"

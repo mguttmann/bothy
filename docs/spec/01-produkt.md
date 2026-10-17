@@ -974,6 +974,205 @@ gelten dafür nicht ([ADR 0070](../adr/0070-terminal-in-der-web-konsole.md)).
 +--------------------------+------------------------------------------------------------------------+
 ```
 
+### 5.6 Onboarding and sign-in (all apps)
+
+Screens E1 to E7 apply equally to desktop, iPhone and Android; the flows behind them are in
+[08-identitaet.md](08-identitaet.md). On the phone they fill the screen; on the desktop they appear
+as a card in the center of an empty window with the branding of the instance. The wireframes show
+the phone form, E2 also the desktop form. The web console uses only E2 and E7: it has
+no device confirmation, but requires a step-up after the login (08, section 7.5).
+
+Rules for all onboarding screens:
+
+- No content of the instance before the login, only name, logo and accent from
+  `getDiscovery` (`branding`).
+- Every code is set in groups, in a mono font (`font.family.mono`), can be copied and
+  is read character by character by the screen reader. Input fields for codes accept pasting and
+  ignore case, spaces and hyphens (08, section 3.2).
+- Remaining times appear as text, not only as bars; the screen reader announces them at most once
+  per `a11y.live_announce_min_interval`.
+- Error texts name the cause and the next step; the response to a wrong code is
+  always the same (08, section 3.2).
+- Keyboard: Enter triggers the main action, Esc goes back one step; the focus order follows the
+  reading direction.
+
+**E1 Server address (first start).** One field for the address of the instance. "Connect" calls
+`getDiscovery`. Results: on to E2; "No instance at this address" (no
+valid response); "Certificate invalid" (no continue, no exception button); "Instance not set up
+yet" on `setup_required` with a pointer to the setup wizard on the host
+([16-betrieb.md](16-betrieb.md), section 3.1); "App too old" below `min_client_versions` with the
+update path ([18-release.md](18-release.md)). The app remembers the address; a second server is
+not planned (B13).
+
+```text
++--------------------------------------+
+|                                      |
+|              [Logo]                  |
+|   Connect to your instance           |
+|                                      |
+|   Server address                     |
+|   [https://chat.example.com      ]   |
+|                                      |
+|   [          Connect            ]    |
+|                                      |
+|   Instance not set up yet:           |
+|   The owner sets it up on the        |
+|   host (install.sh). [More]          |
++--------------------------------------+
+```
+
+**E2 Login.** Name and logo of the instance at the top. Below them, one button per provider from
+`auth_providers` with its `name`: OIDC opens the system browser (08, section 14.1); a proxy provider
+(`trusted_header`) logs in without input (08, section 2.4). If a `local` driver is active: a field
+for the login name, "Log in with passkey" (native apps only with a public domain, 08,
+section 2.5) and, if `local_password_enabled`, "Password and one-time code" with a second step for
+the TOTP code (autofill for the system's one-time codes on). At the bottom always "I have an
+enrollment code" (E3) and "Pair with another device" (E5). If no method exists, it says
+"No login is set up for this instance" with a pointer to the owner.
+
+```text
++--------------------------------------+
+| < Server        chat.example.com     |
++--------------------------------------+
+|              [Logo]                  |
+|        Log in to Team Chat           |
+|                                      |
+|   [   Log in with Company SSO    ]   |
+|   -------------- or --------------   |
+|   Login name  [alex             ]    |
+|   [     Log in with passkey      ]   |
+|   [  Password and one-time code  ]   |
+|                                      |
+|   I have an enrollment code          |
+|   Pair with another device           |
++--------------------------------------+
+```
+
+Desktop: the same card in the center; the sidebar stays empty until the login succeeds.
+
+```text
++------------------------------------------------------------------------------------+
+|                                                                                    |
+|                    +----------------------------------------+                      |
+|                    |                [Logo]                  |                      |
+|                    |        Log in to Team Chat             |                      |
+|                    |   [     Log in with Company SSO      ] |                      |
+|                    |   ---------------- or ---------------- |                      |
+|                    |   Login name [alex                   ] |                      |
+|                    |   [       Log in with passkey        ] |                      |
+|                    |   [    Password and one-time code    ] |                      |
+|                    |   Enrollment code   Pair device        |                      |
+|                    |   Server: chat.example.com  [Change]   |                      |
+|                    +----------------------------------------+                      |
+|                                                                                    |
++------------------------------------------------------------------------------------+
+```
+
+**E3 Redeem enrollment code.** For the first device and for recovery (08, section 3.2).
+First the code, then the method that the instance offers: "Create passkey", "Set up password and
+one-time code" (two steps with a QR code of the one-time code and confirmation, 08, section 2.5) or
+"Link with login service" (OIDC or proxy). A redeemed code makes this device
+`active` immediately; the app goes straight to the main view.
+
+```text
++--------------------------------------+
+| < Login        Enrollment code       |
++--------------------------------------+
+|   Code from the owner                |
+|   [en_ 7K2M-9QXA-...            ]    |
+|                                      |
+|   How do you want to log in?         |
+|   (x) Create passkey                 |
+|   ( ) Password and one-time code     |
+|   ( ) Link with Company SSO          |
+|                                      |
+|   [          Continue           ]    |
+|   The code is valid once.            |
++--------------------------------------+
+```
+
+**E4 Device waiting for confirmation.** After a login on a new device (08, section
+5.2). The confirmation code appears large in the center (`auth.device_verification_code_digits`
+digits), below it the instructions: type in the code on an active device under Settings, Devices,
+or ask an owner. The remaining time until `auth.device_pending_ttl` appears as text.
+"Cancel" logs out and deletes the keys of the device. The app polls the state; after the
+confirmation it goes to the main view, after rejection or expiry to E7.
+
+```text
++--------------------------------------+
+|     Device waiting for confirmation  |
++--------------------------------------+
+|                                      |
+|           4 8 1   2 0 7              |
+|                                      |
+|   Type this code on one of your      |
+|   active devices: Settings,          |
+|   Devices and sessions, Confirm.     |
+|   No active device: ask the owner.   |
+|                                      |
+|   Valid for 23 more minutes          |
+|   [          Cancel             ]    |
++--------------------------------------+
+```
+
+**E5 Pair with another device.** The new device shows a pairing code with
+`auth.pairing_code_chars` characters and the remaining time until `auth.pairing_code_ttl` (08, section
+5.3). On the active device, "Add device" (D8, Devices and sessions) opens a field for the
+code and the step-up. After that the new device is `active`.
+
+```text
++--------------------------------------+
+| < Login        Pair device           |
++--------------------------------------+
+|   On an active device:               |
+|   Settings > Devices >               |
+|   Add device, then enter:            |
+|                                      |
+|           HQ7P - 3MXR                |
+|                                      |
+|   Valid for 4 more minutes           |
+|   [          New code           ]    |
++--------------------------------------+
+```
+
+**E6 App lock.** After `client.app_lock_after` without use and at start, if the person has turned
+it on or `security.app_lock_required` applies (08, section 9). The content is
+hidden, also in the app switcher. A button calls the system's biometrics or device PIN; after
+a failure the lock stays with "Try again". "Log out" leads to E7 and deletes the
+local data. The lock detaches terminal sessions (they keep running on the host, 5.3, M8).
+
+```text
++--------------------------------------+
+|                                      |
+|              [Logo]                  |
+|           Team Chat is locked        |
+|                                      |
+|   [    Unlock with Face ID      ]    |
+|                                      |
+|              Log out                 |
++--------------------------------------+
+```
+
+**E7 Logged out.** After logout, revocation of the device, expiry of the session
+(`auth.session_max_age`), disabling of the person or rejection in E4. The reason appears as text
+(`devices.revoke_reason` or the code of the session, without internal names), together with the
+sentence "The data of this device has been deleted" (04, section 8.5, R-SY-14) and "Log in again"
+(E2). For a disabled person there is no login button, only "Contact the owner".
+
+```text
++--------------------------------------+
+|                                      |
+|   You are logged out.                |
+|   Reason: This device was revoked    |
+|   by another device.                 |
+|                                      |
+|   The data of this device has        |
+|   been deleted.                      |
+|                                      |
+|   [         Log in again        ]    |
++--------------------------------------+
+```
+
 ## 6. Interaktionsregeln
 
 ### 6.1 Erledigt und Wiederöffnen
@@ -1280,6 +1479,7 @@ Regeln:
 | R-PR-11 | Mobil eine Sondertasten-Leiste mit einmal wirkenden Modifikatoren statt einer eigenen Tastatur. | Die System-Tastatur bleibt (Diktat, Sprachen, Barrierefreiheit); es fehlen nur die Tasten, die eine Shell braucht. |
 | R-PR-12 | Die App trennt das Terminal beim Wechsel in den Hintergrund und verdeckt es im App-Umschalter. | Mobile Systeme beenden Verbindungen im Hintergrund ohnehin; das Bild im App-Umschalter würde Terminal-Inhalte zeigen. |
 | R-PR-13 | Produktbeschreibung "Kommandozentrale für KI-Agenten in Chat-Form" mit sechs Säulen (Chat, Live-Ansicht, Freigaben, Terminal, Kosten, Statistik). | Vorgabe des Owners (Nachtrag vom 2026-10-10); sie bestimmt Startseite, Doku und Schaufenster. |
+| R-PR-14 | Onboarding screens E1 to E7 shared by all apps; before login only the branding of the instance; with an invalid certificate no continue and no exception button. | One flow for all platforms keeps the security rules from 08 in one place; an exception button would let an attacker in the middle defeat DPoP and device binding. |
 
 ## 14. Konfigurationswerte dieses Kapitels
 

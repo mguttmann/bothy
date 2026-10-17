@@ -1,0 +1,246 @@
+// SPDX-License-Identifier: Apache-2.0
+
+/// The console app: theme from `design_system`, texts from `l10n`, and a router whose only
+/// configuration is [ConsolePage] (brief M6-02 Design notes 1 and 3).
+library;
+
+import 'package:design_system/design_system.dart';
+import 'package:flutter/foundation.dart';
+import 'package:flutter/material.dart';
+import 'package:l10n/l10n.dart';
+
+import 'login/logged_out_view.dart';
+import 'login/login_view.dart';
+import 'login/step_up_view.dart';
+import 'platform/browser.dart';
+import 'routes.dart';
+import 'session/console_controller.dart';
+import 'shell/console_shell.dart';
+import 'shell/status_view.dart';
+
+/// The root widget of the console.
+class ConsoleApp extends StatefulWidget {
+  /// Creates the app for [environment]. [initialLocation] replaces the browser's location (the
+  /// path below `/console` with its query) and [locale] the browser's language; both for tests.
+  const ConsoleApp({
+    super.key,
+    required this.environment,
+    this.initialLocation,
+    this.locale,
+  });
+
+  /// The browser ports and the origin.
+  final ConsoleEnvironment environment;
+
+  /// The location to start at, or null for the browser's.
+  final Uri? initialLocation;
+
+  /// The language, or null to follow the browser.
+  final Locale? locale;
+
+  /// The controller of the console that [context] belongs to.
+  static ConsoleController controllerOf(BuildContext context) =>
+      context.findAncestorStateOfType<_ConsoleAppState>()!._controller;
+
+  @override
+  State<ConsoleApp> createState() => _ConsoleAppState();
+}
+
+class _ConsoleAppState extends State<ConsoleApp> {
+  late final ConsoleController _controller = ConsoleController(
+    widget.environment,
+  );
+  late final _ConsoleRouterDelegate _delegate = _ConsoleRouterDelegate(
+    _controller,
+  );
+  late final PlatformRouteInformationProvider? _provider =
+      widget.initialLocation == null
+      ? null
+      : PlatformRouteInformationProvider(
+          initialRouteInformation: RouteInformation(
+            uri: widget.initialLocation,
+          ),
+        );
+
+  @override
+  void dispose() {
+    _delegate.dispose();
+    _provider?.dispose();
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return ListenableBuilder(
+      listenable: _controller,
+      builder: (context, _) {
+        final branding = _controller.discovery?.branding;
+        final platform = MediaQuery.platformBrightnessOf(context);
+        DsContext dsFor(Brightness brightness) => resolveDsContext(
+          appearanceTheme: null,
+          appearanceDensity: null,
+          appearanceReduceMotion: null,
+          platformBrightness: brightness,
+          platformReduceMotion: MediaQuery.disableAnimationsOf(context),
+          isTouchPlatform: false,
+          accentKey: branding?.accentColor,
+        );
+        final locale =
+            widget.locale ??
+            resolveAppLocale(
+              systemLocales: WidgetsBinding.instance.platformDispatcher.locales,
+            );
+        return MaterialApp.router(
+          debugShowCheckedModeBanner: false,
+          onGenerateTitle: (context) =>
+              AppLocalizations.of(context)
+                  .consoleTitle(branding?.productName ?? ''),
+          locale: locale,
+          localizationsDelegates: AppLocalizations.localizationsDelegates,
+          supportedLocales: AppLocalizations.supportedLocales,
+          theme: buildDsTheme(dsFor(Brightness.light)),
+          darkTheme: buildDsTheme(dsFor(Brightness.dark)),
+          themeMode: platform == Brightness.dark
+              ? ThemeMode.dark
+              : ThemeMode.light,
+          routerDelegate: _delegate,
+          routeInformationParser: const _ConsoleRouteParser(),
+          routeInformationProvider: _provider,
+          builder: (context, child) {
+            // The language of the document follows the app language, so screen readers read
+            // the semantics tree in it (brief M6-02 Design note 3).
+            widget.environment.navigation.setDocumentLanguage(
+              locale.toLanguageTag(),
+            );
+            return child ?? const SizedBox.shrink();
+          },
+        );
+      },
+    );
+  }
+}
+
+/// Route information is the location below `/console` as it is.
+class _ConsoleRouteParser extends RouteInformationParser<Uri> {
+  const _ConsoleRouteParser();
+
+  @override
+  Future<Uri> parseRouteInformation(RouteInformation routeInformation) =>
+      SynchronousFuture(routeInformation.uri);
+
+  @override
+  RouteInformation restoreRouteInformation(Uri configuration) =>
+      RouteInformation(uri: configuration);
+}
+
+/// Shows the page of the controller's state and reports its path to the browser; a path the
+/// person enters only counts when the state allows it (an administration page needs a step-up).
+class _ConsoleRouterDelegate extends RouterDelegate<Uri>
+    with ChangeNotifier, PopNavigatorRouterDelegateMixin<Uri> {
+  _ConsoleRouterDelegate(this.controller) {
+    controller.addListener(notifyListeners);
+  }
+
+  final ConsoleController controller;
+
+  @override
+  final GlobalKey<NavigatorState> navigatorKey = GlobalKey<NavigatorState>();
+
+  @override
+  Uri? get currentConfiguration {
+    final page = controller.page;
+    // While starting, the browser keeps its location (the callback query is still needed).
+    if (controller.state is ConsoleStarting || page == null) return null;
+    return Uri(path: page.path);
+  }
+
+  @override
+  Future<void> setInitialRoutePath(Uri configuration) =>
+      controller.start(configuration);
+
+  @override
+  Future<void> setNewRoutePath(Uri configuration) {
+    final page = ConsolePage.fromPath(configuration.path);
+    if (page != null) controller.open(page);
+    return SynchronousFuture(null);
+  }
+
+  @override
+  void dispose() {
+    controller.removeListener(notifyListeners);
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Navigator(
+      key: navigatorKey,
+      pages: [
+        MaterialPage<void>(
+          key: ValueKey(controller.page),
+          child: Scaffold(body: _page(context)),
+        ),
+      ],
+      onDidRemovePage: (_) {},
+    );
+  }
+
+  Widget _page(BuildContext context) {
+    final l = AppLocalizations.of(context);
+    final c = controller;
+    final product = c.discovery?.branding.productName ?? '';
+    final oidc = [
+      for (final p in c.providers)
+        if (p.kind == ConsoleProviderKind.oidc) p,
+    ];
+    return switch (c.state) {
+      ConsoleStarting() => StatusView(
+        working:
+            c.page == ConsolePage.loginCallback ||
+                c.page == ConsolePage.stepUpCallback
+            ? l.consoleCallbackWorking
+            : null,
+      ),
+      ConsoleUnavailable() => StatusView(
+        message: l.consoleLoginUnavailable,
+        onReload: c.reload,
+      ),
+      ConsoleOutdated() => StatusView(
+        message: l.consoleUpdatedReload,
+        onReload: c.reload,
+      ),
+      ConsoleSignedOut() => LoginView(
+        productName: product,
+        providers: c.providers,
+        localEnabled: c.localEnabled,
+        passwordEnabled: c.passwordEnabled,
+        notice: c.notice,
+        busy: c.busy,
+        onProvider: c.loginWithProvider,
+        onPasskey: c.loginWithPasskey,
+        onPassword: c.loginWithPassword,
+      ),
+      ConsoleNeedsStepUp() => StepUpView(
+        methods: c.stepUpMethods,
+        oidcProviders: oidc,
+        notice: c.notice,
+        busy: c.busy,
+        onPasskey: c.stepUpWithPasskey,
+        onOidc: c.stepUpWithOidc,
+        onPassword: c.stepUpWithPassword,
+      ),
+      ConsoleLoggedOut(:final reasonCode) => LoggedOutView(
+        reasonCode: reasonCode,
+        onLogInAgain: c.logInAgain,
+      ),
+      ConsoleSignedIn(:final session) => ConsoleShell(
+        productName: product,
+        displayName: session.displayName,
+        page: c.page!,
+        onOpen: c.open,
+        onLogout: c.logout,
+      ),
+    };
+  }
+}

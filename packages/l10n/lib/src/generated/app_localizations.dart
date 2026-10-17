@@ -2166,6 +2166,318 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'{title} ({index} of {count})'**
   String vizTvPosition(String title, int index, int count);
+
+  /// Web console screen 01 section 5.5: navigation entry.
+  ///
+  /// In en, this message translates to:
+  /// **'Live'**
+  String get consoleNavLive;
+
+  /// Web console screen 01 section 5.5: navigation entry.
+  ///
+  /// In en, this message translates to:
+  /// **'Statistics'**
+  String get consoleNavStats;
+
+  /// Web console screen 01 section 5.5: navigation entry.
+  ///
+  /// In en, this message translates to:
+  /// **'Hosts and terminal'**
+  String get consoleNavHosts;
+
+  /// Web console screen 01 section 5.5: navigation entry.
+  ///
+  /// In en, this message translates to:
+  /// **'People'**
+  String get consoleNavPeople;
+
+  /// Web console screen 01 section 5.5: navigation entry.
+  ///
+  /// In en, this message translates to:
+  /// **'Groups and access grants'**
+  String get consoleNavGroups;
+
+  /// Web console screen 01 section 5.5: navigation entry.
+  ///
+  /// In en, this message translates to:
+  /// **'Devices'**
+  String get consoleNavDevices;
+
+  /// Web console screen 01 section 5.5: navigation entry.
+  ///
+  /// In en, this message translates to:
+  /// **'Agents and costs'**
+  String get consoleNavAgents;
+
+  /// Web console screen 01 section 5.5: navigation entry.
+  ///
+  /// In en, this message translates to:
+  /// **'Apps and webhooks'**
+  String get consoleNavApps;
+
+  /// Web console screen 01 section 5.5: navigation entry.
+  ///
+  /// In en, this message translates to:
+  /// **'Audit'**
+  String get consoleNavAudit;
+
+  /// Web console screen 01 section 5.5: navigation entry.
+  ///
+  /// In en, this message translates to:
+  /// **'Import'**
+  String get consoleNavImport;
+
+  /// Web console screen 01 section 5.5: navigation entry.
+  ///
+  /// In en, this message translates to:
+  /// **'Instance and branding'**
+  String get consoleNavInstance;
+
+  /// Web console screen 01 section 5.5: navigation entry.
+  ///
+  /// In en, this message translates to:
+  /// **'Status'**
+  String get consoleNavStatus;
+
+  /// Web console screen 01 section 5.5: screen reader label of the navigation rail.
+  ///
+  /// In en, this message translates to:
+  /// **'Console navigation'**
+  String get consoleNavigationLabel;
+
+  /// Web console screen 01 section 5.5: title of the console with the product name of the branding.
+  ///
+  /// In en, this message translates to:
+  /// **'{product} console'**
+  String consoleTitle(String product);
+
+  /// Web console screen 01 section 5.5: body of a navigation entry whose screen is not built yet.
+  ///
+  /// In en, this message translates to:
+  /// **'This page comes with a later version of the console.'**
+  String get consolePlaceholderPage;
+
+  /// Web console screen 01 section 5.5: header line with the signed-in person.
+  ///
+  /// In en, this message translates to:
+  /// **'Signed in: {name}'**
+  String consoleSignedInAs(String name);
+
+  /// Web console screen 01 section 5.5: button that ends the console session.
+  ///
+  /// In en, this message translates to:
+  /// **'Log out'**
+  String get consoleLogout;
+
+  /// Web console screen 01 section 5.5: a thread when the instance announces no deep link scheme.
+  ///
+  /// In en, this message translates to:
+  /// **'Thread {id}: there is no chat in the browser. Open it in the app.'**
+  String consoleThreadInApp(String id);
+
+  /// Web console screen 01 section 5.5: action that copies the ID of a thread.
+  ///
+  /// In en, this message translates to:
+  /// **'Copy thread ID'**
+  String get consoleCopyThreadId;
+
+  /// Web console screen 01 section 5.5: confirmation after a copy action.
+  ///
+  /// In en, this message translates to:
+  /// **'Copied'**
+  String get consoleCopied;
+
+  /// Web console screen 01 section 5.5: progress while the console loads or sends.
+  ///
+  /// In en, this message translates to:
+  /// **'One moment'**
+  String get consoleWorking;
+
+  /// Web console login E2 (01 section 5.6, brief M6-02): title with the product name of the branding.
+  ///
+  /// In en, this message translates to:
+  /// **'Log in to {product}'**
+  String consoleLoginTitle(String product);
+
+  /// Web console login E2 (01 section 5.6, brief M6-02): button of a login provider.
+  ///
+  /// In en, this message translates to:
+  /// **'Log in with {provider}'**
+  String consoleLoginWithProvider(String provider);
+
+  /// Web console login E2 (01 section 5.6, brief M6-02): divider between the provider buttons and the local login.
+  ///
+  /// In en, this message translates to:
+  /// **'or'**
+  String get consoleLoginOr;
+
+  /// Web console login E2 (01 section 5.6, brief M6-02): field of the login name.
+  ///
+  /// In en, this message translates to:
+  /// **'Login name'**
+  String get consoleLoginName;
+
+  /// Web console login E2 (01 section 5.6, brief M6-02): button of the passkey login.
+  ///
+  /// In en, this message translates to:
+  /// **'Log in with passkey'**
+  String get consoleLoginWithPasskey;
+
+  /// Web console login E2 (01 section 5.6, brief M6-02): button that opens the password login.
+  ///
+  /// In en, this message translates to:
+  /// **'Password and one-time code'**
+  String get consoleLoginPasswordAndCode;
+
+  /// Web console login E2 (01 section 5.6, brief M6-02): password field.
+  ///
+  /// In en, this message translates to:
+  /// **'Password'**
+  String get consoleLoginPassword;
+
+  /// Web console login E2 (01 section 5.6, brief M6-02): field of the TOTP code.
+  ///
+  /// In en, this message translates to:
+  /// **'One-time code'**
+  String get consoleLoginOneTimeCode;
+
+  /// Web console login E2 (01 section 5.6, brief M6-02): button that sends the password login.
+  ///
+  /// In en, this message translates to:
+  /// **'Log in'**
+  String get consoleLoginSubmit;
+
+  /// Web console login E2 (01 section 5.6, brief M6-02): when discovery offers no method.
+  ///
+  /// In en, this message translates to:
+  /// **'No login is set up for this instance. Ask the owner to set one up.'**
+  String get consoleLoginNoMethod;
+
+  /// Web console login E2 (01 section 5.6, brief M6-02): a refused password login.
+  ///
+  /// In en, this message translates to:
+  /// **'The login failed. Check the login name, password and one-time code and try again.'**
+  String get consoleLoginFailed;
+
+  /// Web console login E2 (01 section 5.6, brief M6-02): a refused or cancelled passkey login.
+  ///
+  /// In en, this message translates to:
+  /// **'The passkey was not accepted. Try again or choose another way.'**
+  String get consoleLoginPasskeyFailed;
+
+  /// Web console login E2 (01 section 5.6, brief M6-02): an OIDC callback that failed.
+  ///
+  /// In en, this message translates to:
+  /// **'The login service did not confirm the login. Start the login again.'**
+  String get consoleLoginOidcFailed;
+
+  /// Web console login E2 (01 section 5.6, brief M6-02): an OIDC callback with access_denied.
+  ///
+  /// In en, this message translates to:
+  /// **'The login was cancelled at the login service. Start it again or choose another way.'**
+  String get consoleLoginOidcCancelled;
+
+  /// Web console login E2 (01 section 5.6, brief M6-02): an OIDC callback with flow_expired or without its stored flow.
+  ///
+  /// In en, this message translates to:
+  /// **'The login took too long. Start it again.'**
+  String get consoleLoginOidcExpired;
+
+  /// Web console login E2 (01 section 5.6, brief M6-02): a network error or a server error during login.
+  ///
+  /// In en, this message translates to:
+  /// **'The server cannot be reached. Check the connection and try again.'**
+  String get consoleLoginUnavailable;
+
+  /// Web console login E2 (01 section 5.6, brief M6-02): progress on the callback page.
+  ///
+  /// In en, this message translates to:
+  /// **'Completing the login'**
+  String get consoleCallbackWorking;
+
+  /// Web console step-up after login (08 section 7.5, brief M6-02): title.
+  ///
+  /// In en, this message translates to:
+  /// **'Confirm that it is you'**
+  String get consoleStepUpTitle;
+
+  /// Web console step-up after login (08 section 7.5, brief M6-02): explanation below the title.
+  ///
+  /// In en, this message translates to:
+  /// **'The console asks for a fresh confirmation before any administration.'**
+  String get consoleStepUpExplanation;
+
+  /// Web console step-up after login (08 section 7.5, brief M6-02): button of the passkey step-up.
+  ///
+  /// In en, this message translates to:
+  /// **'Confirm with passkey'**
+  String get consoleStepUpPasskey;
+
+  /// Web console step-up after login (08 section 7.5, brief M6-02): button of the OIDC re-login.
+  ///
+  /// In en, this message translates to:
+  /// **'Log in again with {provider}'**
+  String consoleStepUpOidc(String provider);
+
+  /// Web console step-up after login (08 section 7.5, brief M6-02): button that opens the password step-up.
+  ///
+  /// In en, this message translates to:
+  /// **'Confirm with password and one-time code'**
+  String get consoleStepUpPassword;
+
+  /// Web console step-up after login (08 section 7.5, brief M6-02): button that sends the password step-up.
+  ///
+  /// In en, this message translates to:
+  /// **'Confirm'**
+  String get consoleStepUpConfirm;
+
+  /// Web console step-up after login (08 section 7.5, brief M6-02): a refused confirmation.
+  ///
+  /// In en, this message translates to:
+  /// **'The confirmation failed. Try again or choose another way.'**
+  String get consoleStepUpFailed;
+
+  /// Web console step-up after login (08 section 7.5, brief M6-02): a session without step-up methods.
+  ///
+  /// In en, this message translates to:
+  /// **'No way to confirm is set up for you. Ask the owner to set up a passkey for you.'**
+  String get consoleStepUpNoMethod;
+
+  /// Web console E7 logged out (01 section 5.6, brief M6-02): title.
+  ///
+  /// In en, this message translates to:
+  /// **'You are logged out.'**
+  String get consoleLoggedOutTitle;
+
+  /// Web console E7 logged out (01 section 5.6, brief M6-02): the reason, a problem text.
+  ///
+  /// In en, this message translates to:
+  /// **'Reason: {reason}'**
+  String consoleLoggedOutReason(String reason);
+
+  /// Web console E7 logged out (01 section 5.6, brief M6-02): reason after the own logout.
+  ///
+  /// In en, this message translates to:
+  /// **'You logged out of the console.'**
+  String get consoleLoggedOutByYou;
+
+  /// Web console E7 logged out (01 section 5.6, brief M6-02): button to E2.
+  ///
+  /// In en, this message translates to:
+  /// **'Log in again'**
+  String get consoleLogInAgain;
+
+  /// Web console version check (brief M6-02 Design note 5): the console version differs from the API version of the server.
+  ///
+  /// In en, this message translates to:
+  /// **'The console was updated. Reload the page to continue.'**
+  String get consoleUpdatedReload;
+
+  /// Web console version check (brief M6-02 Design note 5): button that reloads the page.
+  ///
+  /// In en, this message translates to:
+  /// **'Reload'**
+  String get consoleReload;
 }
 
 class _AppLocalizationsDelegate

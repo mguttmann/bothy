@@ -20,6 +20,16 @@ Planning stage (milestone M0). Nothing is installable yet.
 
 ### Added
 
+- Web console app and serving (M6-02, ADR 0028): `apps/console` is a Flutter Web app with the
+  navigation of 01 5.5 (placeholder pages), the login E2 against the console form of the login
+  operations (OIDC with the callback `/console/login/callback` and the verifier in
+  `sessionStorage`, passkey through WebAuthn, password with the one-time code, proxy login),
+  the step-up directly after the login (passkey, new OIDC login or password with TOTP), E7 with
+  the reason, and the version check against `Discovery.spec_version`. Its HTTP layer uses the
+  generated `api_client` with the session cookie and `X-Console-Request: 1`, never a token or
+  DPoP. Semantics are on at start. The server serves the build under `/console/` from
+  `console.assets_dir` with SPA fallback, cache rules and the headers of SEC-HDR-1 and part of
+  SEC-HDR-3; the server image builds and carries it.
 - Sync engine catch-up and reconciliation: `CatchUpListener` applies the snapshot of `ready`
   (the whole snapshot without a cursor, otherwise counters, presence, flags and run summaries),
   catch-up pages up to each `cursor` frame or `catchup.complete` in one transaction with their

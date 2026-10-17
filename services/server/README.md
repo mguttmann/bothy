@@ -120,6 +120,12 @@ make trivy-image IMAGE=bothy-server:<VERSION>-local
   declares no `VOLUME`; it runs with a read-only root file system, without capabilities and
   with `no-new-privileges` (Compose `x-hardening`, `/tmp` as tmpfs). `secrets-init` overrides the
   user with `0:0`.
+- The console stage (M6-02) runs on the build platform on the same builder image, clones Flutter
+  at the version of the workspace (`pubspec.yaml`) and checks its revision, and builds
+  `apps/console` (`flutter build web --release --base-href /console/ --no-web-resources-cdn`)
+  plus its `version.json`. The final stage copies the build to `/usr/share/bothy/console`
+  (owner `0:0`, read-only) and sets `BOTHY_CONSOLE__ASSETS_DIR` to it, so the api process serves
+  the console under `/console/`.
 - `/var/lib/bothy/signing-keys` (`secrets.signing_key_dir`) exists empty with owner `65532:65532`
   and mode `0700`, so a named volume mounted there takes that owner.
 - Health check: `/usr/local/bin/bothy healthcheck --url http://127.0.0.1:8081/readyz`, interval
@@ -137,7 +143,7 @@ digests, and the golang tag follows the `toolchain` of [go.mod](go.mod)):
 
 | Stage | Tag | Digest (image index) |
 |---|---|---|
-| build | `golang:1.27.2-trixie` | `sha256:e58d6f83b3416618d8bcac2b3dde1b7f7e3c4a77d25e88637f8bbae81536c48d` |
+| build, console | `golang:1.27.2-trixie` | `sha256:e58d6f83b3416618d8bcac2b3dde1b7f7e3c4a77d25e88637f8bbae81536c48d` |
 | final | `gcr.io/distroless/static-debian13:nonroot` | `sha256:e2e927ec666bae08560abb3c55d0659eceabb657f56b6782ab500a9fc7f555e3` |
 
 `make image` builds several platforms at once. Docker Engine with the containerd image store does

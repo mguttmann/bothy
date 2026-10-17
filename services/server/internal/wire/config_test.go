@@ -132,6 +132,7 @@ func TestConfigSchemaBuilds(t *testing.T) {
 		"secrets.dir":                            {Kind: config.KindString, Default: "/run/bothy/secrets", Chapter: "16-betrieb.md"},
 		"secrets.cache_ttl":                      {Kind: config.KindDuration, Default: "5m", Min: "1s", Chapter: "16-betrieb.md"},
 		"secrets.signing_key_dir":                {Kind: config.KindString, Default: "/var/lib/bothy/signing-keys", Chapter: "16-betrieb.md"},
+		"console.assets_dir":                     {Kind: config.KindString, Default: "", Chapter: "16-betrieb.md"},
 
 		"signing_key.cache_ttl":                      {Kind: config.KindDuration, Default: "30s", Min: "1s", Chapter: "19-sicherheit.md"},
 		"signing_key.rotation_check_interval":        {Kind: config.KindDuration, Default: "1m", Min: "1s", Chapter: "19-sicherheit.md"},

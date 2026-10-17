@@ -1,0 +1,22 @@
+<!DOCTYPE html>
+<!-- SPDX-License-Identifier: Apache-2.0 -->
+<!--
+  Entry document of the web console (brief M6-02). The server serves it for every path below
+  /console/ that is no file of the build, with Cache-Control: no-store. `flutter build web
+  --base-href /console/` fills the base href, so every asset URL stays on the own origin. The
+  console sets the lang attribute to the app language at start; German is the default locale.
+  M6-03 adds the CSP and its nonce to the loader configuration in flutter_bootstrap.js.
+-->
+<html lang="de">
+<head>
+  <base href="$FLUTTER_BASE_HREF">
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="referrer" content="no-referrer">
+  <link rel="icon" type="image/png" href="favicon.png">
+  <title>Console</title>
+</head>
+<body>
+  <script src="flutter_bootstrap.js" async></script>
+</body>
+</html>

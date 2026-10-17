@@ -603,6 +603,17 @@ Von außen: `<scheme>://t/{thread_id}?m={message_id}` mit dem URL-Schema aus der
 auf etwas Unsichtbares zeigt "Nicht gefunden oder kein Zugriff". Ein Link aus dem Push wartet, bis
 der Thread lokal oder per REST geladen ist, und springt dann an die Nachricht.
 
+Web console (M6-02, docs/DECISIONS.md D-M6-02-1): the server serves it under `/console/` on the
+origin of the API, and its paths are `/console/login`, `/console/login/callback` (OIDC login),
+`/console/step-up`, `/console/step-up/callback` (OIDC re-login of the step-up),
+`/console/logged-out` (E7) and one path per navigation entry of 01 5.5: `/console/live`,
+`/console/stats`, `/console/hosts`, `/console/people`, `/console/groups`, `/console/devices`,
+`/console/agents`, `/console/apps`, `/console/audit`, `/console/import`, `/console/instance`,
+`/console/status`. The table of these paths (`ConsolePage` in `apps/console/lib/routes.dart`) is
+the whole router configuration of the console; it has no path for spaces, channels, threads or
+messages (ADR 0028), which a test holds. A thread in the console shows its ID with a copy action
+and the note to open it in the app, because `getDiscovery` names no URL scheme of the apps.
+
 ## 12. Teilen aus anderen Apps
 
 | Plattform | Weg | Ziel-Auswahl | Senden |
