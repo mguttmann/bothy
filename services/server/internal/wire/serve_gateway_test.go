@@ -46,10 +46,15 @@ type gwWorld struct {
 	id     *wire.Identity
 	pepper []byte
 	cfg    wire.GatewayConfig
+	// env is the environment of the process, for a second process on the same database.
+	env []string
 	// secrets are every token, proof and nonce of the world; reasons every close reason seen.
 	mu      gosync.Mutex
 	secrets []string
 	reasons []string
+	// owner is the pool of sql, opened once: a pool per statement would hold its idle
+	// connection until the test ends and use up the slots of the shared test container.
+	owner *pg.Pool
 }
 
 // newGatewayWorld starts an api process with the gateway windows of extra (environment entries).
@@ -123,13 +128,19 @@ func newGatewayWorld(t *testing.T, extra ...string) *gwWorld {
 	if err != nil {
 		t.Fatal(err)
 	}
-	return &gwWorld{t: t, db: db, p: p, base: "http://127.0.0.1:" + strconv.Itoa(public), id: id, pepper: pepper, cfg: gcfg}
+	return &gwWorld{t: t, db: db, p: p, base: "http://127.0.0.1:" + strconv.Itoa(public), id: id, pepper: pepper, cfg: gcfg, env: env}
 }
 
 // sql runs a statement as the schema owner.
 func (w *gwWorld) sql(query string, args ...any) {
 	w.t.Helper()
-	if _, err := w.db.Pool(w.t, pg.RoleOwner).Exec(context.Background(), query, args...); err != nil {
+	w.mu.Lock()
+	if w.owner == nil {
+		w.owner = w.db.Pool(w.t, pg.RoleOwner)
+	}
+	pool := w.owner
+	w.mu.Unlock()
+	if _, err := pool.Exec(context.Background(), query, args...); err != nil {
 		w.t.Fatal(err)
 	}
 }

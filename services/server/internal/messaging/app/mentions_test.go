@@ -69,6 +69,9 @@ func (d denyOne) Scope(context.Context, authorize.Principal, authorize.Action) (
 	return authorize.Scope{ChannelIDs: []ids.ID{d.channel}}, nil
 }
 
+// Observe implements authorize.Authorizer; the fake keeps no cache.
+func (denyOne) Observe(context.Context, authorize.LogEvent) {}
+
 // fakeDirectory knows every principal as Sam.
 type fakeDirectory struct{ identity.Directory }
 

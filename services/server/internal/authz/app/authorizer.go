@@ -81,6 +81,7 @@ type Authorizer struct {
 	clock     clock.Clock
 	log       *slog.Logger
 	cache     *snapshotCache
+	delivery  *deliveryState
 }
 
 // Compile-time check: the Authorizer is the kernel port.
@@ -121,6 +122,7 @@ func NewAuthorizer(cfg AuthorizerConfig, d AuthorizerDeps) (*Authorizer, error) 
 		cfg: cfg, catalog: d.Catalog, store: d.Store, principal: d.Principals, creds: d.Credentials,
 		structure: d.Structure, policies: d.Policies, hosts: hostsOrNone(d.Hosts), versions: d.Versions, recorder: d.Recorder,
 		clock: d.Clock, log: log, cache: newSnapshotCache(cfg.SnapshotCacheMaxEntries),
+		delivery: newDeliveryState(cfg.SnapshotCacheMaxEntries),
 	}, nil
 }
 
@@ -311,7 +313,8 @@ func (a *Authorizer) viewAsEnded(start, t time.Time) bool {
 	return start.IsZero() || !t.Before(start.Add(a.cfg.ViewAsMaxDuration))
 }
 
-// load returns the snapshot entry of ref at version v, from the cache when it is valid at t.
+// load returns the snapshot entry of ref at version v, from the cache when it is valid at t; in
+// delivery mode (authorize.Delivery) v is not used and loadDelivery decides.
 // Inside a unit of work declared as a rights change the cache is neither read nor written: the
 // unit sees its own uncommitted rights version and state, and a rollback would leave an entry for
 // a version another change commits later (07 section 7.3, M1-29).
@@ -319,6 +322,9 @@ func (a *Authorizer) load(ctx context.Context, ref authz.CredentialRef, v int64,
 	key := cacheKey{principal: ref.PrincipalID, session: ref.SessionID, device: ref.DeviceID, token: ref.TokenID, version: v}
 	if txn.InRightsChange(ctx) {
 		return a.build(ctx, key, ref, t)
+	}
+	if authorize.IsDelivery(ctx) {
+		return a.loadDelivery(ctx, ref, t)
 	}
 	if e, ok := a.cache.get(key, t); ok {
 		return e, nil

@@ -79,6 +79,9 @@ func (allowAll) Scope(context.Context, authorize.Principal, authorize.Action) (a
 	return authorize.Scope{}, nil
 }
 
+// Observe implements authorize.Authorizer; the fake keeps no cache.
+func (allowAll) Observe(context.Context, authorize.LogEvent) {}
+
 type nonce struct{}
 
 func (nonce) CurrentNonce() string { return "n-1" }
@@ -106,6 +109,12 @@ func (catchUp) Page(context.Context, sync.PageInput) (sync.PageResult, error) {
 	return sync.PageResult{}, nil
 }
 
+func (catchUp) PageEvents(context.Context, sync.PageInput) (sync.EventPage, error) {
+	return sync.EventPage{}, nil
+}
+
+func (catchUp) Admit(context.Context, actor.Actor, sync.Event) (bool, error) { return true, nil }
+
 var testEpoch = ids.MustParse("0192f4a0-7b1c-7577-8bf0-c4f4ee4f8001")
 
 type epochSource struct{}
@@ -115,12 +124,12 @@ func (epochSource) SyncEpoch(context.Context) (ids.ID, error) { return testEpoch
 // delivery records Register and Attach in o.
 type delivery struct{ o *order }
 
-func (d delivery) Register(*app.Session) { d.o.add("register") }
-func (d delivery) Attach(_ context.Context, _ *app.Session, _ int64) error {
+func (d delivery) Register(context.Context, *app.Connection, *app.Session) { d.o.add("register") }
+func (d delivery) Attach(context.Context, *app.Connection, int64, int64) error {
 	d.o.add("attach")
 	return nil
 }
-func (d delivery) Detach(*app.Session) { d.o.add("detach") }
+func (d delivery) Detach(*app.Connection) { d.o.add("detach") }
 
 type noAlarm struct{}
 

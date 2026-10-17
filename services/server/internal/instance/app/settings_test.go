@@ -105,6 +105,9 @@ func (decide) Scope(context.Context, authorize.Principal, authorize.Action) (aut
 	return authorize.Scope{}, nil
 }
 
+// Observe implements authorize.Authorizer; the fake keeps no cache.
+func (decide) Observe(context.Context, authorize.LogEvent) {}
+
 // directUoW runs fn directly; a real unit of work is not needed for the logic.
 type directUoW struct{}
 

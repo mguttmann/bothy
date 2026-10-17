@@ -22,6 +22,7 @@ import (
 	"github.com/OWNER/bothy/services/server/api/routes"
 	"github.com/OWNER/bothy/services/server/internal/authz"
 	authzapp "github.com/OWNER/bothy/services/server/internal/authz/app"
+	gatewayapp "github.com/OWNER/bothy/services/server/internal/gateway/app"
 	"github.com/OWNER/bothy/services/server/internal/identity/adapters/secretbox"
 	"github.com/OWNER/bothy/services/server/internal/identity/domain/trustedheader"
 	"github.com/OWNER/bothy/services/server/internal/instance"
@@ -174,6 +175,9 @@ type server struct {
 	notify *Notify
 	// syncReads is catch-up and snapshot of sync (M1-63), built in the chat step after personal.
 	syncReads *SyncReads
+	// gateway is the WebSocket gateway of api and all (M1-64) with the hub the log tail feeds
+	// (M1-65).
+	gateway *Gateway
 	// terminal is the terminal module (M2-39): the host records and their REST handlers.
 	terminal *Terminal
 	// apps is the module apps (M2-24): the app use cases and their REST handlers.
@@ -1173,6 +1177,10 @@ func (s *server) mountGateway(mux Mux, chain *httpserver.Chain, limiter *ratelim
 	}
 	gw.Mount(mux, chain)
 	s.runner.OnStop(gw.StartSweeper())
+	s.runner.OnStop(gw.StopConnections())
+	s.mu.Lock()
+	s.gateway = gw
+	s.mu.Unlock()
 	return nil
 }
 
@@ -1284,9 +1292,14 @@ func (s *server) startEventConsumers(ctx context.Context) error {
 // startLogTail starts the log tail of api and all (02 "Start" step 8, startTail).
 func (s *server) startLogTail(ctx context.Context) error {
 	s.mu.Lock()
-	sy := s.sync
+	pool, sy, az, gw := s.pool, s.sync, s.authorizer, s.gateway
 	s.mu.Unlock()
-	return startTail(ctx, s.runner, sy.NewTail(tailSinks()...))
+	var hub *gatewayapp.Hub
+	if gw != nil {
+		hub = gw.Hub
+	}
+	versions := instanceapp.NewVersions(instancepg.NewRepository(pool))
+	return startTail(ctx, s.runner, s.reg, sy.NewTail(DeliverySink(az, hub, versions)))
 }
 
 // startJobs checks River's migrations, builds the job registry with the jobs of the modules and

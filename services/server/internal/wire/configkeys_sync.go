@@ -36,6 +36,8 @@ func syncConfigKeys() []config.Key {
 			Doc: "Events per catch-up page; the default and the largest limit of GET /api/v1/events."},
 		{Name: "sync.catchup_max_events", Kind: config.KindInt, Default: "50000", Min: "1", Max: "1000000000000", Chapter: chapter04,
 			Doc: "A client further behind the head than this many events gets resync_required with too_far_behind."},
+		{Name: "sync.cursor_advance_every", Kind: config.KindInt, Default: "1000", Min: "1", Max: "2147483647", Chapter: chapter04,
+			Doc: "Skipped events after which the gateway sends a cursor frame (catch-up and live)."},
 		{Name: "sync.event_log_partitions_ahead", Kind: config.KindInt, Default: "3", Min: "1", Max: "1000", Chapter: chapter02,
 			Doc: "Partitions of event_log that stand ready above the head."},
 	}

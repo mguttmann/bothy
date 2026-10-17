@@ -125,10 +125,30 @@ func (s *CatchUpService) Check(ctx context.Context, in sync.CheckInput) (sync.Ch
 	return sync.CheckResult{HeadSeq: head, MinRetainedSeq: minSeq, SyncEpoch: epoch, Reason: sync.ResyncReason(r)}, nil
 }
 
-// Page implements sync.CatchUp (04 section 7.2): the visible sets of Authorizer.Scope, the page
-// query, then per row the audience rule or authorize with the receive action in filter mode, and
-// the cursor of domain.NextCursor. It reads no content table per event.
+// Page implements sync.CatchUp (04 section 7.2): PageEvents, then the envelope of every admitted
+// event. It reads no content table per event.
 func (s *CatchUpService) Page(ctx context.Context, in sync.PageInput) (sync.PageResult, error) {
+	page, err := s.PageEvents(ctx, in)
+	if err != nil {
+		return sync.PageResult{}, err
+	}
+	out := sync.PageResult{Events: make([]sync.EnvelopeJSON, 0, len(page.Events)), NextCursor: page.NextCursor}
+	// trace_context only in deliveries to agents (04 "Umschlag"; docs/DECISIONS.md M1-63/5).
+	fields := sync.DeliveryFields{IncludeTraceContext: caller(ctx).Kind == actor.KindAgent}
+	for _, ev := range page.Events {
+		raw, err := json.Marshal(ev.Envelope(fields))
+		if err != nil {
+			return sync.PageResult{}, errs.Wrap(errs.CodeInternalError, err, "sync: encoding an envelope")
+		}
+		out.Events = append(out.Events, raw)
+	}
+	return out, nil
+}
+
+// PageEvents implements sync.CatchUp: the visible sets of Authorizer.Scope, the page query, then
+// per row the audience rule or authorize with the receive action in filter mode, and the cursor
+// of domain.NextCursor.
+func (s *CatchUpService) PageEvents(ctx context.Context, in sync.PageInput) (sync.EventPage, error) {
 	a := caller(ctx)
 	limit := in.Limit
 	if limit < 1 || limit > s.cfg.PageSize {
@@ -136,55 +156,71 @@ func (s *CatchUpService) Page(ctx context.Context, in sync.PageInput) (sync.Page
 	}
 	sc, err := s.d.Authorizer.Scope(ctx, a, authorize.ActionChannelRead)
 	if err != nil {
-		return sync.PageResult{}, err
+		return sync.EventPage{}, err
 	}
 	rows, err := s.d.Log.VisibleEvents(ctx, VisibleQuery{
 		After: in.After, Head: in.Head, Limit: limit, Principal: a.ID, ChannelIDs: sc.ChannelIDs, SpaceIDs: sc.SpaceIDs,
 		FullyVisibleSpaceIDs: sc.FullyVisibleSpaceIDs, InstanceWide: sc.InstanceWide,
 	})
 	if err != nil {
-		return sync.PageResult{}, err
+		return sync.EventPage{}, err
 	}
-	out := sync.PageResult{Events: make([]sync.EnvelopeJSON, 0, len(rows))}
+	out := sync.EventPage{Events: make([]sync.Event, 0, len(rows))}
 	fctx := authorize.Filter(ctx)
-	// trace_context only in deliveries to agents (04 "Umschlag"; docs/DECISIONS.md M1-63/5).
-	fields := sync.DeliveryFields{IncludeTraceContext: a.Kind == actor.KindAgent}
 	var last int64
 	for _, ev := range rows {
 		last = ev.Seq
-		ok, err := admit(fctx, s.d.Authorizer, a, ev)
+		ok, _, err := admit(fctx, s.d.Authorizer, a, ev)
 		if err != nil {
-			return sync.PageResult{}, err
+			return sync.EventPage{}, err
 		}
-		if !ok {
-			continue
+		if ok {
+			out.Events = append(out.Events, ev)
 		}
-		raw, err := json.Marshal(ev.Envelope(fields))
-		if err != nil {
-			return sync.PageResult{}, errs.Wrap(errs.CodeInternalError, err, "sync: encoding an envelope")
-		}
-		out.Events = append(out.Events, raw)
 	}
 	out.NextCursor = domain.NextCursor(in.Head, limit, len(rows), last)
 	return out, nil
 }
 
+// Admit implements sync.CatchUp: admit in filter mode; an unauthenticated decision is its error.
+// An own personal event, which needs no receive action, is checked against the credential with
+// gateway.connect on the instance, so a revoked credential (for example an API token whose
+// revocation changed no visible target and wrote no access.changed) gets the unauthenticated error
+// instead of its events; any other answer of that check leaves the event admitted.
+func (s *CatchUpService) Admit(ctx context.Context, a actor.Actor, ev sync.Event) (bool, error) {
+	fctx := authorize.Filter(ctx)
+	ok, d, err := admit(fctx, s.d.Authorizer, a, ev)
+	if err != nil {
+		return false, err
+	}
+	if ok && !ev.AudiencePrincipalID.IsZero() {
+		if d, err = s.d.Authorizer.Authorize(fctx, a, authorize.ActionGatewayConnect, authorize.Resource{Kind: authorize.ResourceInstance}); err != nil {
+			return false, err
+		}
+	}
+	if d.Outcome == authorize.OutcomeUnauthenticated {
+		return false, d.Err()
+	}
+	return ok, nil
+}
+
 // admit is the delivery rule of one stored event for a (07 section 8.1): a personal event only to
 // its audience, any other only when authorize allows its receive action on the event's resource at
-// delivery time. ctx is in filter mode, so a refusal writes no audit entry.
-func admit(ctx context.Context, az authorize.Authorizer, a actor.Actor, ev sync.Event) (bool, error) {
+// delivery time, with the decision of authorize (zero for a personal event). ctx is in filter
+// mode, so a refusal writes no audit entry.
+func admit(ctx context.Context, az authorize.Authorizer, a actor.Actor, ev sync.Event) (bool, authorize.Decision, error) {
 	if !ev.AudiencePrincipalID.IsZero() {
-		return ev.AudiencePrincipalID == a.ID, nil
+		return ev.AudiencePrincipalID == a.ID, authorize.Decision{}, nil
 	}
 	act, ok := authorize.ParseAction(ev.ReceiveAction)
 	if !ok {
 		// A receive action outside the catalogue of this build cannot be decided: fail closed.
-		return false, nil
+		return false, authorize.Decision{}, nil
 	}
 	r := authorize.ResourceFromEvent(ev.ResourceKind, ev.ResourceID, ev.SpaceID, ev.ChannelID, ev.ThreadID)
 	d, err := az.Authorize(ctx, a, act, r)
 	if err != nil {
-		return false, err
+		return false, authorize.Decision{}, err
 	}
-	return d.Allowed(), nil
+	return d.Allowed(), d, nil
 }

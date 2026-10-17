@@ -361,6 +361,9 @@ func (a *authorizer) Scope(context.Context, authorize.Principal, authorize.Actio
 	return a.scope, a.err
 }
 
+// Observe implements authorize.Authorizer; the fake keeps no cache.
+func (*authorizer) Observe(context.Context, authorize.LogEvent) {}
+
 // rights answers a fixed level and capabilities.
 type rights struct {
 	r   authz.EffectiveRights

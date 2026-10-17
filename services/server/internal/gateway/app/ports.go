@@ -23,6 +23,14 @@ type Conn interface {
 	// Close closes the connection with code and reason (machine data only, at most 123 bytes).
 	// Calls after the first have no effect.
 	Close(code domain.CloseCode, reason string)
+	// Offer queues the encoded entry e of the hub (dispatch, cursor, catchup.complete) when the
+	// outbound queue has room and reports false otherwise; it never blocks and never closes.
+	Offer(e domain.Entry) bool
+	// WaitSpace blocks until the outbound queue has room, the connection closes (an error) or
+	// ctx ends (its error). Only the catch-up runner of the connection waits (04 section 7.2).
+	WaitSpace(ctx context.Context) error
+	// Purge drops the queued dispatch entries of the removed targets t (04 section 8.3 item 2).
+	Purge(t domain.Targets)
 }
 
 // FrameDecoder is the outgoing port of the frame codec (adapters/ws): it checks the body d of a

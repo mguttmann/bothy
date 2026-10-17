@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"log/slog"
 	"slices"
+	gosync "sync"
 	"time"
 
 	"github.com/OWNER/bothy/services/server/internal/gateway/domain"
@@ -106,6 +107,12 @@ type Gateway struct {
 	sessions *Sessions
 	ops      *Dispatcher
 	handlers map[string]OpHandler
+
+	// mu guards the open connections and the drain state of the shutdown (shutdown.go).
+	mu       gosync.Mutex
+	open     map[*Connection]struct{}
+	draining bool
+	gone     chan struct{}
 }
 
 // New returns the gateway over d with the configuration cfg. Errors: an invalid value of cfg or
@@ -125,7 +132,8 @@ func New(cfg Config, d Deps) (*Gateway, error) {
 		d.Log = slog.Default()
 	}
 	cfg.ProtocolVersions = slices.Clone(cfg.ProtocolVersions)
-	g := &Gateway{cfg: cfg, d: d, sessions: newSessions(cfg.ResumeWindow, d.Clock), ops: newDispatcher(d.Decoder, d.Alarm, d.Log)}
+	g := &Gateway{cfg: cfg, d: d, sessions: newSessions(cfg.ResumeWindow, d.Clock), ops: newDispatcher(d.Decoder, d.Alarm, d.Log),
+		open: map[*Connection]struct{}{}, gone: make(chan struct{})}
 	g.handlers = map[string]OpHandler{opIdentify: g.identify, opResume: g.resume, "heartbeat": g.heartbeat, "reauth": g.reauth}
 	return g, nil
 }
@@ -163,6 +171,10 @@ func (g *Gateway) Open(ctx context.Context, conn Conn) (*Connection, error) {
 	}
 	now := g.d.Clock.Now()
 	c := &Connection{id: ids.New(), conn: conn, opened: now, state: domain.StateAwaitingIdentify}
+	if !g.track(c) {
+		conn.Close(domain.CloseServerRestart, domain.CloseServerRestart.Name())
+		return c, errDraining
+	}
 	err = conn.Send(Hello{
 		HeartbeatInterval: g.cfg.HeartbeatInterval, ResumeWindow: g.cfg.ResumeWindow, ProtocolVersions: slices.Clone(g.cfg.ProtocolVersions),
 		DPoPNonce: g.d.Nonces.CurrentNonce(), ServerTime: now, SyncEpoch: epoch,
@@ -260,7 +272,7 @@ var resumableEnds = map[domain.CloseCode]bool{
 	domain.CloseServerRestart: true, domain.CloseSlowConsumer: true,
 }
 
-// Closed ends c after its connection is gone: its session is detached from delivery and stays
+// Closed ends c after its connection is gone: the connection leaves delivery, and its session stays
 // resumable for sync.resume_window after a resumable end; after 4004, 4012, 4016, 4017, 4018 and
 // the other final ends it is removed. A session that a newer connection took over is left alone.
 func (g *Gateway) Closed(c *Connection) {
@@ -268,12 +280,12 @@ func (g *Gateway) Closed(c *Connection) {
 	s, code := c.session, c.code
 	c.state = domain.StateClosed
 	c.mu.Unlock()
+	g.untrack(c)
 	if s == nil {
 		return
 	}
-	if g.sessions.release(s, c, resumableEnds[code]) {
-		g.d.Delivery.Detach(s)
-	}
+	g.d.Delivery.Detach(c)
+	g.sessions.release(s, c, resumableEnds[code])
 }
 
 // replace closes every connection of old with 4017 (one connection per device, 04 section 6.1).
@@ -286,7 +298,7 @@ func replace(old []*Connection) {
 // attach is note 12 of the brief: with a cursor, catch-up decides; a reason sends
 // resync_required and delivery starts at head (the connection stays live from there, 04 section
 // 7.3); otherwise delivery starts at the cursor; without a cursor at head.
-func (g *Gateway) attach(ctx context.Context, c *Connection, s *Session, cursor *int64, epoch *ids.ID, head int64) error {
+func (g *Gateway) attach(ctx context.Context, c *Connection, cursor *int64, epoch *ids.ID, head int64) error {
 	from := head
 	if cursor != nil {
 		res, err := g.d.CatchUp.Check(ctx, sync.CheckInput{After: *cursor, Epoch: epoch})
@@ -299,5 +311,5 @@ func (g *Gateway) attach(ctx context.Context, c *Connection, s *Session, cursor 
 			from = *cursor
 		}
 	}
-	return g.d.Delivery.Attach(ctx, s, from)
+	return g.d.Delivery.Attach(ctx, c, from, head)
 }

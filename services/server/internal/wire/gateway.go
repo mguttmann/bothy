@@ -25,6 +25,7 @@ import (
 	"github.com/OWNER/bothy/services/server/internal/platform/httpserver"
 	"github.com/OWNER/bothy/services/server/internal/platform/lifecycle"
 	"github.com/OWNER/bothy/services/server/internal/platform/ratelimit"
+	"github.com/OWNER/bothy/services/server/internal/sync"
 	synchttp "github.com/OWNER/bothy/services/server/internal/sync/adapters/httpapi"
 )
 
@@ -64,6 +65,11 @@ type GatewayConfig struct {
 	OutboundQueueMax   int           `config:"sync.outbound_queue_max"`
 	WriteTimeout       time.Duration `config:"gateway.write_timeout"`
 	MaxJSONDepth       int           `config:"http.max_json_depth"`
+	// The keys of delivery (M1-65).
+	CatchUpPageSize     int           `config:"sync.catchup_page_size"`
+	CursorAdvanceEvery  int           `config:"sync.cursor_advance_every"`
+	LogPollInterval     time.Duration `config:"sync.log_poll_interval"`
+	ReconnectBackoffCap time.Duration `config:"database.listen_reconnect_backoff_cap"`
 }
 
 // GatewayConfigFrom binds GatewayConfig from v. The error names the key whose binding failed,
@@ -90,7 +96,8 @@ type GatewayDeps struct {
 	Reads *SyncReads
 	// Instance reads the sync epoch for hello.
 	Instance InstanceLoader
-	// Delivery nil means the delivery that delivers nothing until M1-65.
+	// Delivery nil means the hub of M1-65 over the authenticator, the authorizer and catch-up;
+	// tests of the connection pass their own.
 	Delivery gatewayapp.Delivery
 	// Clock nil means clock.System(); Log nil means slog.Default().
 	Clock clock.Clock
@@ -103,10 +110,12 @@ type InstanceLoader interface {
 }
 
 // Gateway is the gateway of an api process: the use cases with the four ops of
-// gateway_ops.enabled registered, and the WebSocket handler of GET /api/v1/gateway.
+// gateway_ops.enabled registered, the WebSocket handler of GET /api/v1/gateway and the hub that
+// the log tail feeds (nil when GatewayDeps.Delivery was given).
 type Gateway struct {
 	App     *gatewayapp.Gateway
 	Handler *gatewayws.Handler
+	Hub     *gatewayapp.Hub
 }
 
 // NewGateway builds the gateway over d with cfg and registers exactly the ops of
@@ -116,8 +125,9 @@ func NewGateway(cfg GatewayConfig, d GatewayDeps) (*Gateway, error) {
 	if d.Authenticator == nil || d.Authorizer == nil || d.Nonces == nil || d.Limiter == nil || d.Reads == nil || d.Instance == nil {
 		return nil, errors.New("wire: the gateway needs the authenticator, the authorizer, the nonces, the limiter, catch-up and snapshot and the instance")
 	}
-	if d.Delivery == nil {
-		d.Delivery = noDelivery{}
+	hub, err := newHub(cfg, &d)
+	if err != nil {
+		return nil, err
 	}
 	htu, err := gatewayws.HTU(cfg.PublicURL)
 	if err != nil {
@@ -163,7 +173,24 @@ func NewGateway(cfg GatewayConfig, d GatewayDeps) (*Gateway, error) {
 	if err != nil {
 		return nil, err
 	}
-	return &Gateway{App: gw, Handler: h}, nil
+	return &Gateway{App: gw, Handler: h, Hub: hub}, nil
+}
+
+// newHub builds the hub of M1-65 and makes it the delivery of d when d brings none; otherwise it
+// returns nil (tests of the connection pass their own delivery).
+func newHub(cfg GatewayConfig, d *GatewayDeps) (*gatewayapp.Hub, error) {
+	if d.Delivery != nil {
+		return nil, nil
+	}
+	h, err := gatewayapp.NewHub(gatewayapp.HubConfig{
+		QueueMax: cfg.OutboundQueueMax, PageSize: cfg.CatchUpPageSize, CursorEvery: cfg.CursorAdvanceEvery,
+		RetryBase: cfg.LogPollInterval, RetryCap: cfg.ReconnectBackoffCap,
+	}, gatewayapp.HubDeps{Authenticator: d.Authenticator, Authorizer: d.Authorizer, CatchUp: d.Reads.CatchUp, Log: orDiscard(d.Log)})
+	if err != nil {
+		return nil, err
+	}
+	d.Delivery = h
+	return h, nil
 }
 
 // Mount mounts the gateway route on mux through chain (only the outer steps run for it, see
@@ -202,18 +229,38 @@ var frameValidator = stdsync.OnceValues(func() (*httpserver.SchemaValidator, err
 	return httpserver.NewSchemaValidator(rest.Spec, names)
 })
 
-// noDelivery is the delivery of M1-64: it registers and attaches nothing and delivers no event.
-// M1-65 replaces it with the hub; until then a connection receives no dispatch frames.
-type noDelivery struct{}
+// StopConnections is the stop step of PhaseConnections (02 "Shutdown" step 3): every connection
+// closes with 4013 and new identify and resume are refused, within the rest of
+// shutdown.total_timeout.
+func (g *Gateway) StopConnections() lifecycle.StopStep {
+	return lifecycle.StopStep{Name: "gateway_connections", Phase: lifecycle.PhaseConnections, Run: g.App.Shutdown}
+}
 
-// Register does nothing.
-func (noDelivery) Register(*gatewayapp.Session) {}
-
-// Attach does nothing.
-func (noDelivery) Attach(context.Context, *gatewayapp.Session, int64) error { return nil }
-
-// Detach does nothing.
-func (noDelivery) Detach(*gatewayapp.Session) {}
+// DeliverySink returns the sink of the log tail of an api process (02 "Log tail per api
+// process"): every event goes to Authorizer.Observe and then to the hub, in seq order and in the
+// goroutine of the tail. hub nil observes only.
+//
+// Before a batch it observes the committed rights version read after the batch (an event without
+// type). An event carries the version its transaction read before commit, so a rights change
+// without an event (the revocation of an API token) that commits between that read and the commit
+// of the event is not in the event's version; the version read here is, because the batch was
+// read after its events committed (M1-65/14). A failed read only skips that step.
+func DeliverySink(az authorize.Authorizer, hub *gatewayapp.Hub, versions instance.Versions) sync.Sink {
+	return func(ctx context.Context, batch []sync.Event) error {
+		if len(batch) > 0 && versions != nil {
+			if pv, err := versions.PermissionVersion(ctx); err == nil {
+				az.Observe(ctx, authorize.LogEvent{Seq: batch[0].Seq, PermissionVersion: pv})
+			}
+		}
+		for _, ev := range batch {
+			az.Observe(ctx, authorize.LogEvent{Seq: ev.Seq, Type: ev.Type, PermissionVersion: ev.PermissionVersion, Audience: ev.AudiencePrincipalID})
+			if hub != nil {
+				hub.Dispatch(ctx, ev)
+			}
+		}
+		return nil
+	}
+}
 
 // connectLimiter adapts the limiter to the class rl.gateway_connect, keyed by device or token.
 type connectLimiter struct{ l *ratelimit.Limiter }
@@ -251,8 +298,5 @@ func (p proofAlarm) NotChecked(ctx context.Context, _ string, _ authorize.Action
 	p.c.CountError(ctx, errs.CauseAuthzNotChecked)
 }
 
-// Compile-time checks of the adapters.
-var (
-	_ gatewayapp.Delivery       = noDelivery{}
-	_ gatewayapp.ConnectLimiter = connectLimiter{}
-)
+// Compile-time check of the adapter.
+var _ gatewayapp.ConnectLimiter = connectLimiter{}

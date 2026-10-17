@@ -62,6 +62,9 @@ func (allow) Scope(context.Context, authorize.Principal, authorize.Action) (auth
 	return authorize.Scope{}, nil
 }
 
+// Observe implements authorize.Authorizer; the fake keeps no cache.
+func (allow) Observe(context.Context, authorize.LogEvent) {}
+
 // keysEnv is a database, a key store directory, a fake clock and the audit module.
 type keysEnv struct {
 	db    *pgtest.DB

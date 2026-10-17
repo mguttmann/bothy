@@ -102,4 +102,10 @@ type Authorizer interface {
 	// a channel path, space.read, or host.read for the hosts). A principal that fails the liveness checks gets the error of
 	// its decision (Decision.Err), not an empty scope.
 	Scope(ctx context.Context, p Principal, a Action) (Scope, error)
+	// Observe applies one durable event of the log to the process-local rights cache (02
+	// "Permission cache"). The log tail calls it in seq order, before the hub sees the event:
+	// an event with a newer rights version than a cached snapshot makes that snapshot be rebuilt in
+	// delivery mode, and so do the structure events (channel.created, channel.updated,
+	// channel.archived, space.archived, thread.moved).
+	Observe(ctx context.Context, ev LogEvent)
 }
