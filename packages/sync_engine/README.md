@@ -3,7 +3,7 @@
 Gateway connection, catch-up, outbox, reconciliation, run documents and focus, without Flutter.
 
 Status: the gateway connection with focus and typing (M4-13), catch-up and reconciliation
-(M4-14) and the run documents of the live box (M4-16) are built; the outbox follows with M4-15. Kind: pure Dart package, a member of the Dart
+(M4-14), the outbox (M4-15) and the run documents of the live box (M4-16) are built. Kind: pure Dart package, a member of the Dart
 workspace at the repository root (`resolution: workspace`, `publish_to: none`).
 
 ## Dependencies
@@ -183,6 +183,90 @@ answer of `putThreadDraft`), `Resynced`, `SignedOutNotice`. Counters: `countsOf(
 `countChanges`, reset from each snapshot and `read_state.updated`, counted from `message.*` in
 between (04 14).
 
+## Outbox (M4-15)
+
+`Outbox` is the one write path of the apps (15 1 principle 3, 04 13.2, 15 7.5). Every write is
+stored in the table `outbox` of `local_store` before anything is sent, with its own UUIDv7: the
+`client_msg_id` of a message, the `client_interaction_id` of an interaction, the
+`Idempotency-Key` of every other write (04 5). The ID never changes on retry.
+
+Life cycle of an entry:
+
+| State | Meaning | Next |
+|---|---|---|
+| `pending` | stored, waits for its turn in its lane or for an entry it depends on | `sending` |
+| `sending` | the executor runs | confirmed (row deleted), `waiting`, `failed` |
+| `waiting` | backing off until `next_attempt_at` | `sending` |
+| `failed` | refused for good, with the problem code and reason; after `412` also the `current` revision | edited, sent again with a new ID, or discarded by the person |
+
+- One worker per FIFO lane sends the oldest entry and the next only after the response (04 13.2
+  item 2). The lane is the thread, or the lane the executor names for writes outside a thread
+  (`setting:<key>`, `message:<id>`, `upload:<id>`); lanes run in parallel, bounded only by the
+  HTTP client's connection limit. An entry goes no later than the oldest entry that waits for
+  it, also through other lanes, so a replacement at the end of a lane never waits behind its
+  own dependent.
+- An entry with `depends_on` (a message after its uploads) waits until each of them is confirmed;
+  a failed dependency keeps it waiting and visible with that reason (`blockedByCode`). One
+  resolver (`dependencies.dart`) decides this for every path, over every stored entry: a row
+  that leaves the table re-points every entry that names it (confirmed: dropped; retried or
+  edited: its replacement; a dropped follow-up: what it waited for; discarded: dropped after
+  its chain failed), and a dependency that is gone without a recorded confirmation is never
+  taken as confirmed: the entry fails with `dependency_discarded` instead of going without it.
+  `enqueue` resolves the IDs it is given through the replacements and confirmations of the
+  running outbox; an ID gone before the outbox was created is unknown and fails the entry the
+  same way.
+- `start()` sends (M4-17 calls it after `catchup.complete`, 04 13.4), `pause()` lets running
+  requests finish and starts none. The first `start()` resets `sending` entries of an earlier run
+  to `pending`; they are sent again with their stored IDs.
+- `confirmByEcho(clientMsgId)` confirms an entry when its echo `message.created` arrives, also
+  before the response (04 16.2); the late response then changes nothing.
+- `watchThread(threadId)` streams the entries of a thread for the display; an entry in
+  `waiting` for longer than `client.outbox_stuck_after` since it was written reports `delayed`
+  ("Sending delayed"). `depth` streams the number of entries that are not final.
+- Editing and deleting follow 04 13.3: an entry with `attempts == 0` is changed or removed in
+  place; an attempted entry stays as it is and gets a follow-up `updateMessage` or
+  `deleteMessage` that waits for it and receives its `message_id` and `version`; a failed entry
+  edited or sent again becomes a new entry with a new ID, and the entries that waited for it
+  wait for the new one (never sent follow-up edits behind it are dropped, the edit is newer).
+  An edit holds the changed members and is merged into the stored payload. Discarding an entry
+  fails every entry that waits for it, directly or through others (`dependency_discarded`).
+  An entry the outbox writes itself (a retry, the replacement of an edit, a follow-up) never
+  waits for an entry that failed with its chain (`dependency_discarded`); it waits for what
+  that entry waited for. An entry that failed for its own reason (an upload) stays a
+  dependency until the person retries or discards it.
+
+Error classes (`classify`, docs/DECISIONS.md D-M4-15-1):
+
+| Response | Class |
+|---|---|
+| `2xx`, `200` with `Idempotent-Replay: true`, `204` | confirmed |
+| network error (also a TLS error), timeout, `5xx` except `503 setup_required`, `429`, `409 request_in_progress` | retry with full jitter between `client.outbox_retry_base` and `client.outbox_retry_cap`; `429` and `503` wait `Retry-After` |
+| `412 version_conflict` | conflict: `failed` with the `current` revision |
+| `400`, `401`, `403`, `404`, any other `409`, `410`, `413`, `415`, `422`, `428`, `503 setup_required` | final: `failed` with code and reason |
+| an error that is no transport error and no response (a bug in an executor) | final: `executor_error` |
+| a kind without an executor | final: `no_executor` |
+
+How a feature registers a write: an executor sends one entry through the generated client and
+returns an `OutboxResponse` on `2xx`; it passes `ctx.extra` so `api_client` writes the
+`Idempotency-Key`.
+
+```dart
+executors.register(
+  'upload',
+  (entry, ctx) async {
+    final body = decodePayload(entry.payload);
+    // ... call the generated API with extra: ctx.extra ...
+    return const OutboxResponse();
+  },
+  lane: (entry) => 'upload:${entry.id}', // null: the entry's thread
+);
+```
+
+Registered by this package: `MessageOps.register` (`createMessage`, `updateMessage`,
+`deleteMessage`, `addReaction`, `removeReaction`) and `PersonalOps.register` (`putReadState`,
+`putThreadDraft`, `deleteThreadDraft`, `putMySetting`, `deleteMySetting`). M4-21 adds the
+interactions and commands, M4-22 the uploads.
+
 ## Run documents (M4-16)
 
 `RunStore` keeps the document (`run_document.v1`, API schema `Run`) of every focused run in
@@ -229,9 +313,11 @@ comes from the table `runs`. A `Notifier` per run listens to `watch`.
 | `lib/sync_engine.dart` | the public library; every public symbol has a doc comment (`make lint`, `public_member_api_docs`) |
 | `lib/src/*.dart` | the gateway connection: ports, `dart:io` transport, frames, states, close table, backoff, heartbeat, session, connection, focus, typing, listener (M4-13) |
 | `lib/src/catch_up.dart`, `dispatcher.dart`, `appliers/`, `snapshot_applier.dart`, `fetcher.dart`, `gap_filler.dart`, `ephemeral_store.dart`, `sync_events.dart`, `isolate_decode.dart`, `wire.dart` | catch-up, dispatcher, appliers per resource group, REST reads, gaps, ephemeral store, notices and ports, decoding, the wire mappers (M4-14) |
+| `lib/src/outbox/` | `Outbox`, the sender, `classify`, the backoff, the executor registry and the operations (M4-15) |
 | `lib/src/runs/` | `RunStore`, `applyRunPatch`, `RunDocument` and the ports (M4-16) |
 | `test/connection/` | tests of the gateway connection, one per close code, with the fakes of `test/support/` |
 | `test/catch_up/` | tests of the catch-up on the connection fakes, an in-memory store and recorded REST responses |
+| `test/outbox/` | tests of the outbox on an in-memory database with scripted executors, a fake clock and a seeded jitter |
 | `test/runs/` | tests of the run documents, fixtures of a document at versions 1 to 4 under `fixtures/` |
 | `test/` | tests, run by `make test` with coverage (`quality.coverage.dart_min_percent`) |
 

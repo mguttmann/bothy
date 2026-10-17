@@ -21,6 +21,10 @@ dependencies:
     path: ../auth
   built_collection: ^5.1.2
   built_value: ^8.13.0
+  # The outbox classifies the transport errors of the generated client (brief M4-15 Design
+  # note 2); the same constraint as in packages/api_client. Also the fake API of the auth
+  # session in the tests (test/support/), as in packages/auth.
+  dio: ^5.11.1
   # A member of the workspace; pub resolves it to packages/domain (resolution: workspace).
   domain: any
   local_store:
@@ -30,8 +34,6 @@ dependencies:
 dev_dependencies:
   # SHA-256 of the software P-256 signer of the tests (test/support/).
   crypto: ^3.0.7
-  # The fake API of the auth session in the tests (test/support/), as in packages/auth.
-  dio: ^5.11.1
   lints: ^6.1.0
   # Only the software P-256 signer of the tests (test/support/), never in the library.
   pointycastle: ^4.0.0

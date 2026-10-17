@@ -11,7 +11,9 @@
 /// live events, `cursor`, `catchup.complete` and `resync_required` through the [Dispatcher],
 /// loads gaps and truncated objects through the [Fetcher] ([ApiFetcher] over `api_client`),
 /// keeps typing and presence in the [EphemeralStore] and emits [SyncNotice]s. The outside world comes in through [GatewayTransport], [NetworkStatus],
-/// [AppLifecycle] and [RandomSource]. The run documents of the live box
+/// [AppLifecycle] and [RandomSource]. The outbox (M4-15): [Outbox] is the
+/// one write path of the apps (04 13.2, 15 7.5), [OutboxExecutors] the registry of the
+/// operations ([MessageOps], [PersonalOps]), [classify] the outcome classes. The run documents of the live box
 /// (M4-16): [RunStore] keeps the document of every focused run in memory and applies
 /// `run.updated` by the client rule of 04 11.3 item 4, [applyRunPatch] applies RFC 6902
 /// patches restricted to `add`, `replace` and `remove`, [RunDocument] reads the fields of
@@ -41,6 +43,25 @@ export 'src/frames.dart';
 export 'src/gap_filler.dart';
 export 'src/heartbeat.dart';
 export 'src/isolate_decode.dart';
+export 'src/outbox/backoff.dart' show fullJitterBackoff;
+export 'src/outbox/classify.dart' show Classification, OutcomeClass, classify;
+export 'src/outbox/entry.dart' show OutboxEntryView, OutboxStateLabel;
+export 'src/outbox/executors.dart'
+    show
+        ApiCallContext,
+        OutboxExecutor,
+        OutboxExecutors,
+        OutboxFollowUpEdit,
+        OutboxFollowUpRemove,
+        OutboxLaneOf,
+        OutboxOperation,
+        OutboxRequest,
+        OutboxResponse,
+        decodePayload;
+export 'src/outbox/operations/message_ops.dart' show MessageOps;
+export 'src/outbox/operations/personal_ops.dart' show PersonalOps;
+export 'src/outbox/outbox.dart' show Outbox;
+export 'src/outbox/sender.dart' show OutboxConfirmationHook, OutboxTimerFactory;
 export 'src/ports.dart';
 export 'src/runs/json_patch.dart' show RunPatchError, applyRunPatch;
 export 'src/runs/ports.dart' show FrameTicker, RunDocumentFetcher;

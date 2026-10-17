@@ -105,6 +105,30 @@ void main() {
     expect(await dao.byId(uuid(1)), isNull);
   });
 
+  test('updateDependsOn re-points an entry to another dependency', () async {
+    final dao = db.outboxDao;
+    await add(uuid(1), null);
+    await add(uuid(2), threadId(1), dependsOn: uuid(1));
+    await dao.updateDependsOn(uuid(2), uuid(3));
+    expect((await dao.byId(uuid(2)))!.dependsOn, uuid(3));
+    await dao.updateDependsOn(uuid(2), null);
+    expect((await dao.byId(uuid(2)))!.dependsOn, isNull);
+  });
+
+  test('allEntries reads every entry of every thread, final ones included', () async {
+    final dao = db.outboxDao;
+    await add(uuid(1), threadId(1));
+    await add(uuid(2), null);
+    await add(uuid(3), threadId(2));
+    await dao.recordFailure(uuid(1), code: 'validation_failed');
+    // Thread 1 holds only a failed entry, so pendingThreads no longer names it.
+    expect(await dao.pendingThreads(), [null, threadId(2)]);
+    expect(
+      [for (final e in await dao.allEntries()) e.id],
+      [uuid(1), uuid(2), uuid(3)],
+    );
+  });
+
   test(
     'a new ID is a new row; an existing ID is never updated by enqueue',
     () async {

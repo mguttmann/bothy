@@ -20,6 +20,15 @@ Planning stage (milestone M0). Nothing is installable yet.
 
 ### Added
 
+- Sync engine outbox: `Outbox` stores every write with its own UUIDv7 before sending, sends
+  strictly FIFO per thread or per lane with lanes in parallel, retries network errors, timeouts,
+  `5xx`, `429` and `409 request_in_progress` with full jitter between `client.outbox_retry_base`
+  and `client.outbox_retry_cap` (or `Retry-After`) and the same ID, keeps final errors and
+  `412 version_conflict` as failed entries with their reason, confirms entries by the echo,
+  sends a message only after its uploads, follows 04 13.3 for edits and deletes, survives a
+  restart, sends only while started, and reports "Sending delayed" after
+  `client.outbox_stuck_after`; executors for the message and personal writes are registered per
+  operation (M4-15).
 - Web console app and serving (M6-02, ADR 0028): `apps/console` is a Flutter Web app with the
   navigation of 01 5.5 (placeholder pages), the login E2 against the console form of the login
   operations (OIDC with the callback `/console/login/callback` and the verifier in
