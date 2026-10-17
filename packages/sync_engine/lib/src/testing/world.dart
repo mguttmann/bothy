@@ -8,6 +8,7 @@ library;
 import 'dart:convert';
 
 import 'package:crypto/crypto.dart';
+import 'package:domain/domain.dart' show EventCatalog;
 
 /// A JSON object of the API.
 typedef JsonMap = Map<String, Object?>;
@@ -707,6 +708,18 @@ final class FakeWorld {
     String? audience,
     String? clientMsgId,
   }) {
+    // 04 9.3: `resource.version` is present exactly for the types the catalogue marks, so the
+    // fake cannot report a foreign version that would make a client drop later changes.
+    final info = EventCatalog.lookup(type);
+    if (info == null) {
+      throw ArgumentError.value(type, 'type', 'not in the event catalogue');
+    }
+    if (info.carriesResourceVersion && !resource.containsKey('version')) {
+      throw ArgumentError.value(type, 'type', 'needs resource.version');
+    }
+    final res = info.carriesResourceVersion
+        ? resource
+        : ({...resource}..remove('version'));
     final envelope = <String, Object?>{
       'id': nextId(),
       'seq': ++headSeq,
@@ -716,7 +729,7 @@ final class FakeWorld {
       if (actor != null)
         'actor': {'id': actor, 'kind': people[actor]?.kind ?? 'user'},
       'scope': scope,
-      'resource': resource,
+      'resource': res,
       if (audience != null) 'audience': 'self',
       'payload': payload,
       'client_msg_id': ?clientMsgId,
@@ -978,10 +991,10 @@ final class FakeWorld {
             'count': e.value.length,
           },
     ];
-    m['version'] = (m['version']! as int) + 1;
+    // Reactions never raise the message version (04 9.3); the payload carries the count.
     append(
       add ? 'reaction.added' : 'reaction.removed',
-      resource: {'kind': 'message', 'id': messageId, 'version': m['version']},
+      resource: {'kind': 'message', 'id': messageId},
       scope: _scopeOf(m['thread_id']! as String),
       payload: {
         'message_id': messageId,

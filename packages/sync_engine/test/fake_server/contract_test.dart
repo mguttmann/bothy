@@ -8,6 +8,7 @@ import 'package:api_client/api_client.dart';
 import 'package:auth/auth.dart';
 import 'package:built_value/json_object.dart';
 import 'package:dio/dio.dart';
+import 'package:domain/domain.dart' show EventCatalog;
 import 'package:sync_engine/testing.dart';
 import 'package:test/test.dart';
 
@@ -167,6 +168,16 @@ void main() {
     await api.getMeApi().getMe();
     await alex.auth.login.logout();
 
+    // 04 9.3: resource.version is present exactly for the types the catalogue marks.
+    for (final e in h.server.world.log) {
+      final info = EventCatalog.lookup(e.type)!;
+      expect(
+        (e.envelope['resource']! as Map).containsKey('version'),
+        info.carriesResourceVersion,
+        reason: e.type,
+      );
+    }
+
     final served = {
       for (final r in h.server.requests)
         if (r.status >= 200 && r.status < 300) r.operationId,
@@ -250,6 +261,19 @@ void main() {
     await other.close();
     raw.close();
     expect(h.server.violations, isEmpty);
+  });
+
+  test('a reaction does not raise the message version (04 9.3)', () async {
+    final w = h.seed;
+    final m = w.post(w.alex, w.releaseNotes, 'Hello Sam');
+    h.server.world.react(w.sam.id, m['id']! as String, 'thumbsup', add: true);
+    final edited = h.server.world.updateMessage(
+      w.alex.id,
+      m['id']! as String,
+      1,
+      {'content_md': 'Hello Sam and Robin'},
+    );
+    expect(edited['version'], 2);
   });
 
   test('an invalid body fails with the pointer', () async {
