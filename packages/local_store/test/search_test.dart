@@ -23,11 +23,14 @@ void main() {
   test(
     'German words with umlauts and accents are found without them',
     () async {
+      // A German sample is the point of this test (search folds umlauts and accents).
+      // language-check: off
       await db.searchDao.indexMessage(
         message(1, 1, text: 'Größere Änderungen im Café übernommen'),
         spaceId: space(1).id,
       );
       for (final query in ['anderungen', 'Änderungen', 'cafe', 'ubernommen']) {
+        // language-check: on
         final hits = await db.searchDao.search(query, limit: 10);
         expect(hits, hasLength(1), reason: query);
         expect(hits.single.kind, SearchKind.message);
