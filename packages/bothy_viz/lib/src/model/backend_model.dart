@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
 
-/// The backend view (docs/spec/25-visualisierung.md 6.2).
+/// The backend view (docs/spec/25-visualization.md 6.2).
 library;
 
 import 'package:api_client/api_client.dart' as api;

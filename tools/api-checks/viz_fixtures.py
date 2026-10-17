@@ -1,7 +1,7 @@
 # SPDX-License-Identifier: Apache-2.0
 """Check `viz-fixtures`: every fixture of bothy_viz is valid against its OpenAPI schema (VZ-T11).
 
-docs/spec/25-visualisierung.md 7.2 item 2: the fixtures of `packages/bothy_viz/fixtures/` are
+docs/spec/25-visualization.md 7.2 item 2: the fixtures of `packages/bothy_viz/fixtures/` are
 checked in the gate against the schemas of docs/api/openapi.yaml, so a schema change fails until
 the fixtures follow it. A file `<schema>.<state>.json` names its schema before the first dot.
 

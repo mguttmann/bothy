@@ -1,7 +1,7 @@
 # tools/observability
 
 Generators of the observability sources. Today one: `sli_bounds.py`, the SLI bounds from the
-Sloth files (docs/spec/25-visualisierung.md 3.3, R-VZ-03, VZ-T03).
+Sloth files (docs/spec/25-visualization.md 3.3, R-VZ-03, VZ-T03).
 
 ## `sli_bounds.py`
 
@@ -19,7 +19,7 @@ Both files carry a `DO NOT EDIT` header naming the generator.
 
 Label rules, checked by the generator and by the check `sli-labels` of `make ops-check`: every
 SLO has exactly one label `bothy_sli_metric`; its value is one of the `sli.*` values of the
-`CHECK` of `stats_minutes.metric` in docs/spec/03-datenmodell.md (read with a narrow parser);
+`CHECK` of `stats_minutes.metric` in docs/spec/03-data-model.md (read with a narrow parser);
 every such value belongs to exactly one SLO. A missing label, an unknown metric, two SLOs with the
 same metric and an `sli.*` metric without an SLO each fail with a message.
 

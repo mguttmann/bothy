@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
 
-/// The port of the statistics queries (docs/spec/25-visualisierung.md 5, 7.1).
+/// The port of the statistics queries (docs/spec/25-visualization.md 5, 7.1).
 library;
 
 import 'package:api_client/api_client.dart' as api;

@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
 
-/// The SLO traffic light (components.md 11; docs/spec/25-visualisierung.md 6.4, 7.4).
+/// The SLO traffic light (components.md 11; docs/spec/25-visualization.md 6.4, 7.4).
 library;
 
 import 'package:design_system/design_system.dart';

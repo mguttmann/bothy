@@ -1,6 +1,6 @@
 # bothy_viz_harness
 
-Harness app of [`bothy_viz`](../README.md) (docs/spec/25-visualisierung.md 7.1, row `harness/`):
+Harness app of [`bothy_viz`](../README.md) (docs/spec/25-visualization.md 7.1, row `harness/`):
 it renders every basic form (and, from M6-12, every view) from the fixtures of
 [`../fixtures/`](../fixtures/README.md), without a server and without network.
 

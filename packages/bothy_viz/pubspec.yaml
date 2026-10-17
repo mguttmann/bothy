@@ -10,7 +10,7 @@ environment:
   sdk: ^3.13.5
   flutter: 3.47.7
 
-# Only the members of docs/spec/15-client-architektur.md 3.1 rule 6 (tools/arch-check/rules.yaml);
+# Only the members of docs/spec/15-client-architecture.md 3.1 rule 6 (tools/arch-check/rules.yaml);
 # never sync_engine, local_store, a WebView or an iframe.
 dependencies:
   api_client: any

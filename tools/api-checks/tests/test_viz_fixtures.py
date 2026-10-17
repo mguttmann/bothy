@@ -1,5 +1,5 @@
 # SPDX-License-Identifier: Apache-2.0
-"""Tests of the check `viz-fixtures` (docs/spec/25-visualisierung.md 7.2, VZ-T11, brief M6-11).
+"""Tests of the check `viz-fixtures` (docs/spec/25-visualization.md 7.2, VZ-T11, brief M6-11).
 
 Every negative case copies the real fixtures, their README and openapi.yaml into `tmp_path`,
 changes one thing and expects the named finding; the repository itself must stay clean.

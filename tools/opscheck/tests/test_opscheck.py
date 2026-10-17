@@ -56,7 +56,7 @@ SUBTREES = (
     "docs/observability",
     "docs/operations/configuration.md",
     "tools/bin/tools.lock.json",
-    "docs/spec/03-datenmodell.md",
+    "docs/spec/03-data-model.md",
     "services/server/internal/stats/domain/slibounds.gen.go",
     "packages/bothy_viz/lib/src/slo/slo_catalog.g.dart",
 )
@@ -1913,7 +1913,7 @@ def test_sli_labels_reports_a_missing_label(tree: Path) -> None:
         "infra/observability/slo/push.yaml: bothy-push/provider-acceptance: no label"
         " bothy_sli_metric",
         "sli.push_acceptance: no SLO carries it",
-        "bothy-push/provider-acceptance: Metrik der eigenen Messung is `sli.push_acceptance`,"
+        "bothy-push/provider-acceptance: Metric of the own measurement is `sli.push_acceptance`,"
         " the Sloth file says no label",
     )
 
@@ -1921,12 +1921,12 @@ def test_sli_labels_reports_a_missing_label(tree: Path) -> None:
 def test_sli_labels_reports_a_table_that_differs_from_the_label(tree: Path) -> None:
     edit(tree / SLOS_MD, "| `sli.reconnect` |", "| `sli.run_start` |")
     assert findings(tree, "sli-labels") == (
-        "bothy-sync/reconnect: Metrik der eigenen Messung is `sli.run_start`, the Sloth file"
+        "bothy-sync/reconnect: Metric of the own measurement is `sli.run_start`, the Sloth file"
         " says `sli.reconnect`",
     )
 
 
 def test_sli_labels_needs_the_metric_column(tree: Path) -> None:
-    edit(tree / SLOS_MD, "| Metrik der eigenen Messung |", "| Metrik |")
+    edit(tree / SLOS_MD, "| Metric of the own measurement |", "| Metric |")
     [finding] = findings(tree, "sli-labels")
     assert "has no column" in finding

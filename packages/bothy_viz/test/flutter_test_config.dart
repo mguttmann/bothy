@@ -8,7 +8,7 @@ import 'package:alchemist/alchemist.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 
-/// Golden setup of this package, the same as design_system (docs/spec/15-client-architektur.md 20;
+/// Golden setup of this package, the same as design_system (docs/spec/15-client-architecture.md 20;
 /// docs/DECISIONS.md D-M4-04-5).
 ///
 /// CI goldens (text as blocks, Ahem) run on every machine and are compared everywhere;

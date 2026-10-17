@@ -5,7 +5,7 @@ library;
 
 /// Names of agents, spaces and channels by ID, supplied by the app or the harness.
 ///
-/// The statistics types carry only IDs (docs/spec/25-visualisierung.md 5.2); the names come from
+/// The statistics types carry only IDs (docs/spec/25-visualization.md 5.2); the names come from
 /// the local data of the app. An ID without a name shows its last [_shortLength] characters, so a
 /// card stays readable before the directory has loaded.
 ///

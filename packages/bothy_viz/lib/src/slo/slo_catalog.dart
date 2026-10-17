@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
 
-/// Display names of the SLOs through `l10n` (docs/spec/25-visualisierung.md 3.3).
+/// Display names of the SLOs through `l10n` (docs/spec/25-visualization.md 3.3).
 library;
 
 import 'package:l10n/l10n.dart';

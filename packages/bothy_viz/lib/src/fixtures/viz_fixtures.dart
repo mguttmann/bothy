@@ -16,7 +16,7 @@ typedef FixtureReader = Future<String> Function(String name);
 /// The reader decides where the files come from: the harness reads the asset bundle
 /// (`packages/bothy_viz/fixtures/<name>`), the tests read the files of the package. Decoding
 /// uses the generated serializers, so a fixture that the client cannot read fails here as it
-/// would on a server response (docs/spec/25-visualisierung.md 7.2, VZ-T11).
+/// would on a server response (docs/spec/25-visualization.md 7.2, VZ-T11).
 ///
 /// ```dart
 /// final fixtures = VizFixtures((name) => rootBundle.loadString('packages/bothy_viz/fixtures/$name'));

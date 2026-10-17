@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
 
-/// The port of the live stream (docs/spec/15-client-architektur.md 3.1 rule 6; 25 5.1).
+/// The port of the live stream (docs/spec/15-client-architecture.md 3.1 rule 6; 25 5.1).
 library;
 
 import 'dart:async';
