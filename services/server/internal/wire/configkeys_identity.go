@@ -182,6 +182,11 @@ func identityConfigKeys() []config.Key {
 			Chapter: chapter08,
 		},
 		{
+			Name: "auth.group_claim_max_age", Kind: config.KindDuration, Default: sessionMaxAgeDefault, Min: "1m",
+			Doc:     "Expiry of a membership from a group claim after the last OIDC login that carried it.",
+			Chapter: chapter08,
+		},
+		{
 			Name: "auth.idp_recheck_interval", Kind: config.KindDuration, Default: sessionMaxAgeDefault, Min: "1m",
 			Doc:     "Age of an OIDC session after which the next refresh needs a new login at the provider.",
 			Chapter: chapter08,

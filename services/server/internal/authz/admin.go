@@ -4,6 +4,7 @@ package authz
 
 import (
 	"context"
+	"errors"
 	"time"
 
 	"github.com/OWNER/bothy/services/server/internal/kernel/actor"
@@ -229,4 +230,59 @@ type Admin interface {
 	// section 2.6 point 3; an already revoked grant succeeds without change and is returned as
 	// stored.
 	RevokeGrant(ctx context.Context, caller actor.Actor, grantID ids.ID, reason string) (Grant, error)
+	// ClaimSync reconciles the claim groups at an OIDC login (M1-42).
+	ClaimSync
+}
+
+// SyncClaimGroupsCmd is the input of SyncClaimGroups (brief M1-42).
+type SyncClaimGroupsCmd struct {
+	// UserID is the person of the login; ProviderID the OIDC provider whose claim groups take part.
+	UserID     ids.ID
+	ProviderID ids.ID
+	// ClaimValues are the values of the group claim; order and duplicates do not matter. They can
+	// be names, so they are never logged and never written to audit details.
+	ClaimValues []string
+	// Now is the request time of the login; MaxAge is auth.group_claim_max_age.
+	Now    time.Time
+	MaxAge time.Duration
+}
+
+// SyncClaimGroupsResult names the groups whose membership the sync added, removed or extended,
+// each sorted by id; all empty for a login without change.
+type SyncClaimGroupsResult struct {
+	Added, Removed, Extended []ids.ID
+}
+
+// ErrClaimSyncNeedsRightsChange is returned by SyncClaimGroups inside a unit of work that is not
+// declared as a rights change when the claim would change a membership: the caller rolls the unit
+// back and runs it again declared with txn.DeclareRightsChange for authorize.ActionGroupMemberSync,
+// so permission_version is locked before any domain row (03 section 6.3) and only a change raises
+// it (08 section 3.4 item 3).
+var ErrClaimSyncNeedsRightsChange = errors.New("authz: the claim sync changes memberships; run the unit as a rights change")
+
+// ClaimSync is the part of the Admin port that identity calls inside the unit of work of
+// completeOidcLogin (08 section 3.4, system action group.member.sync).
+//
+// Example (identity, M1-42):
+//
+//	res, err := claims.SyncClaimGroups(ctx, authz.SyncClaimGroupsCmd{UserID: person, ProviderID: provider,
+//		ClaimValues: groups, Now: now, MaxAge: maxAge})
+//	if errors.Is(err, authz.ErrClaimSyncNeedsRightsChange) {
+//		// roll back and run the unit again with txn.DeclareRightsChange(group.member.sync)
+//	}
+type ClaimSync interface {
+	// SyncClaimGroups makes the memberships of cmd.UserID in the live oidc_claim groups of
+	// cmd.ProviderID follow the claim: matched groups without a membership get one with
+	// expires_at = Now + MaxAge, present ones (also expired) are extended to it, memberships whose
+	// group the claim no longer names are removed; added_by and removed_by are the person. Local
+	// groups and claim groups of other providers are never touched, unknown values are ignored.
+	// It runs only inside a unit of work (kind internal otherwise). Without a change it writes
+	// nothing. With a change in a unit not declared as a rights change it writes nothing and
+	// returns ErrClaimSyncNeedsRightsChange; in a unit declared for group.member.sync it applies
+	// the change, appends group.changed per added or removed membership and records one allow
+	// entry with the person as actor. An I1 violation then fails the unit in the rights check
+	// with an InvariantError (409 i1_violation, hint HintI1ClaimSync) and a deny entry naming
+	// provider, groups and agents. Errors: kind internal for a malformed command or a unit
+	// declared for another action; store errors.
+	SyncClaimGroups(ctx context.Context, cmd SyncClaimGroupsCmd) (SyncClaimGroupsResult, error)
 }

@@ -176,6 +176,49 @@ func (r *Repository) ActiveMembershipsOfUser(ctx context.Context, userID ids.ID)
 	return out, nil
 }
 
+// LockClaimMembershipsOfUser implements app.Store.
+func (r *Repository) LockClaimMembershipsOfUser(ctx context.Context, userID, providerID ids.ID) ([]domain.MembershipWithGroup, error) {
+	rows, err := r.read(ctx).LockClaimMembershipsOfUser(ctx, sqlcgen.LockClaimMembershipsOfUserParams{UserID: uuid(userID), ProviderID: uuid(providerID)})
+	if err != nil {
+		return nil, mapError(err, "locking the claim memberships of a person")
+	}
+	out := make([]domain.MembershipWithGroup, 0, len(rows))
+	for _, row := range rows {
+		out = append(out, domain.MembershipWithGroup{Membership: toMembership(row.GroupMembership), Group: toGroup(row.Group)})
+	}
+	return out, nil
+}
+
+// ClaimGroupsByRefs implements app.Store.
+func (r *Repository) ClaimGroupsByRefs(ctx context.Context, providerID ids.ID, refs []string) ([]domain.Group, error) {
+	if len(refs) == 0 {
+		return nil, nil
+	}
+	keys := slices.Compact(slices.Sorted(slices.Values(refs)))
+	rows, err := r.read(ctx).ListClaimGroupsByRefs(ctx, sqlcgen.ListClaimGroupsByRefsParams{ProviderID: uuid(providerID), ExternalRefs: keys})
+	if err != nil {
+		return nil, mapError(err, "reading the claim groups of a provider")
+	}
+	out := make([]domain.Group, 0, len(rows))
+	for _, row := range rows {
+		out = append(out, toGroup(row.Group))
+	}
+	return out, nil
+}
+
+// ExtendMembership implements app.Store.
+func (r *Repository) ExtendMembership(ctx context.Context, id ids.ID, expiresAt, at time.Time) (bool, error) {
+	q, err := r.rightsWrite(ctx, at)
+	if err != nil {
+		return false, err
+	}
+	n, err := q.ExtendMembership(ctx, sqlcgen.ExtendMembershipParams{ID: uuid(id), ExpiresAt: optionalTimestamp(expiresAt)})
+	if err != nil {
+		return false, mapError(err, "extending a group membership")
+	}
+	return n > 0, nil
+}
+
 // InsertGrant implements app.Store.
 func (r *Repository) InsertGrant(ctx context.Context, g domain.Grant) error {
 	q, err := r.rightsWrite(ctx, g.GrantedAt)

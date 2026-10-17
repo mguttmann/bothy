@@ -314,6 +314,18 @@
       "doc": "Validity of an enrollment code from its issue."
     },
     {
+      "name": "auth.group_claim_max_age",
+      "env": "BOTHY_AUTH__GROUP_CLAIM_MAX_AGE",
+      "kind": "duration",
+      "default": "30d",
+      "required": false,
+      "enum": [],
+      "min": "1m",
+      "max": "",
+      "chapter": "08-identity.md",
+      "doc": "Expiry of a membership from a group claim after the last OIDC login that carried it."
+    },
+    {
       "name": "auth.idp_recheck_interval",
       "env": "BOTHY_AUTH__IDP_RECHECK_INTERVAL",
       "kind": "duration",

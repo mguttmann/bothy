@@ -85,3 +85,19 @@ func TestInvariantError_LastOwner(t *testing.T) {
 		t.Fatalf("extensions %v", err.ProblemExtensions())
 	}
 }
+
+// TestInvariantError_WithHint: WithHint returns a copy with the new hint and the same code and
+// conflicts, and leaves the original unchanged (M1-42).
+func TestInvariantError_WithHint(t *testing.T) {
+	t.Parallel()
+	agent := ids.New()
+	orig := authz.NewI1Violation([]authz.I1Conflict{{AgentID: agent}})
+	got := orig.WithHint(authz.HintI1ClaimSync)
+	e, _ := errs.As(got)
+	if e.Hint != authz.HintI1ClaimSync || got.Code != errs.CodeI1Violation || len(got.Conflicts) != 1 || got.Conflicts[0].AgentID != agent {
+		t.Fatalf("copy %+v %+v", got, e)
+	}
+	if o, _ := errs.As(orig); o.Hint != authz.HintI1 {
+		t.Fatalf("the original changed: %q", o.Hint)
+	}
+}

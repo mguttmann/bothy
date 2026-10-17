@@ -58,6 +58,17 @@ type Store interface {
 	// MembershipsOfUserInGroup returns every membership of userID in groupID, removed ones
 	// included, ordered by id.
 	MembershipsOfUserInGroup(ctx context.Context, groupID, userID ids.ID) ([]domain.Membership, error)
+	// LockClaimMembershipsOfUser returns the memberships of userID that are not removed (expired
+	// ones included) in the live oidc_claim groups of providerID, each with its group, ordered by
+	// membership id and locked FOR UPDATE inside the ambient transaction (the claim sync, M1-42).
+	LockClaimMembershipsOfUser(ctx context.Context, userID, providerID ids.ID) ([]domain.MembershipWithGroup, error)
+	// ClaimGroupsByRefs returns the live oidc_claim groups of providerID whose external_ref is one
+	// of refs, ordered by id; an empty list gives none without a query.
+	ClaimGroupsByRefs(ctx context.Context, providerID ids.ID, refs []string) ([]domain.Group, error)
+	// ExtendMembership sets expires_at of a membership that is not removed and clears
+	// expiry_reminded_at and expiry_reported_at, so the new expiry is reminded and reported once;
+	// it reports whether a row changed. at is the time of the change. Rights change.
+	ExtendMembership(ctx context.Context, id ids.ID, expiresAt, at time.Time) (bool, error)
 
 	// InsertGrant inserts g with g.GrantedAt as granted_at. The checks of grants (bot limits,
 	// shapes, host rules) are the last line behind domain.NewGrant. Rights change.

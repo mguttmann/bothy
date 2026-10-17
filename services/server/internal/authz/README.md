@@ -1,6 +1,6 @@
 # Module `authz`
 
-Status: skeleton (M1-05); M1-26 brings the principal source port, M1-25 the closed action catalogue and the start check (section "Action catalogue" below), M1-27 the grant model storage: tables, domain rules and the store port with its PostgreSQL adapter. M1-28 brings the permission snapshot, the cache and the one authorization function `Authorize` with `Scope` (section "Authorize" below). M1-29 brings the one transactional path of every rights change (rights hooks, `access.changed`, I1 and SR8) and the `Admin` use cases for groups, memberships and grants (section "Rights changes" below). M1-48 brings the twelve REST operations of groups and grants with their reads, events and the manage scope (section "Groups and grants over the API (M1-48)" below). M1-30 brings the expiry jobs `authz.expiry_sweep` and `authz.expiry_reminder` (section "Expiry (M1-30)" below).
+Status: skeleton (M1-05); M1-26 brings the principal source port, M1-25 the closed action catalogue and the start check (section "Action catalogue" below), M1-27 the grant model storage: tables, domain rules and the store port with its PostgreSQL adapter. M1-28 brings the permission snapshot, the cache and the one authorization function `Authorize` with `Scope` (section "Authorize" below). M1-29 brings the one transactional path of every rights change (rights hooks, `access.changed`, I1 and SR8) and the `Admin` use cases for groups, memberships and grants (section "Rights changes" below). M1-48 brings the twelve REST operations of groups and grants with their reads, events and the manage scope (section "Groups and grants over the API (M1-48)" below). M1-30 brings the expiry jobs `authz.expiry_sweep` and `authz.expiry_reminder` (section "Expiry (M1-30)" below). M1-42 brings the claim group sync of OIDC logins (section "Claim groups (M1-42)" below).
 The normative source is [docs/spec/02-architecture.md](../../../../docs/spec/02-architecture.md); if this file differs, the chapter applies.
 
 ## Purpose
@@ -354,3 +354,37 @@ to a user, agent or app; all active owners and `granted_by` for a grant to a gro
 channel grants. `expiry_reminded_at = t` is set in the same transaction, so each row is
 reminded once; a grant created with less than the lead left is reminded on the next run.
 Reminders write no audit entry and send no e-mail.
+
+## Claim groups (M1-42)
+
+Groups with `source = oidc_claim` follow the group claim of their provider at every OIDC login
+(08 section 3.4, system action `group.member.sync`).
+
+- Port: `ClaimSync` with `SyncClaimGroups(ctx, SyncClaimGroupsCmd) (SyncClaimGroupsResult, error)`,
+  part of `Admin`; `ErrClaimSyncNeedsRightsChange`; `HintI1ClaimSync`; `InvariantError.WithHint`.
+  identity calls it inside the unit of work of `completeOidcLogin`.
+- Domain (`domain/claimsync.go`): `ReconcileClaimMemberships(provider, current, matched, claim, now,
+  maxAge)` returns `ClaimDiff{Add, Extend, Remove, ExpiresAt}` (group ids sorted). Only live claim
+  groups of the login's provider take part; local groups, deleted groups and claim groups of other
+  providers are never touched; unknown values are ignored; an expired membership is extended,
+  never duplicated.
+- Use case (`app/claimsync.go`): locks the person's claim memberships of the provider
+  (`Store.LockClaimMembershipsOfUser`, `FOR UPDATE` in ascending id), reads the matched groups
+  (`ClaimGroupsByRefs`) and computes the diff. An empty diff writes nothing. In a unit without a
+  rights change a non-empty diff returns `ErrClaimSyncNeedsRightsChange` and writes nothing; in a
+  unit declared for `group.member.sync` it names the person as affected, removes (`removed_by` the
+  person), extends (`Store.ExtendMembership`: new `expires_at`, `expiry_reminded_at` and
+  `expiry_reported_at` cleared, so the new expiry is reminded and reported once) and adds
+  (`added_by` the person, `expires_at = now + auth.group_claim_max_age`), appends `group.changed`
+  (`member_added`, `member_removed`) per addition and removal and records one allow entry
+  (resource the person, actor the person, details `provider_id`, `added`, `removed`, `extended`:
+  group ids only, never a claim value).
+- Rights hook: the use case leaves a per-unit state, so the rights check of the unit names the
+  person as actor of `access.changed`, and on an I1 violation writes the deny entry with the
+  person as actor and resource and the details `provider_id`, `group_ids`, `agent_ids` beside the
+  violations, and answers with `HintI1ClaimSync`.
+- Tests: `domain` (`TestReconcileClaimMemberships`), `app` (`TestSyncClaimGroups_AddExtendRemove`,
+  `TestSyncClaimGroups_NeedsRightsChange`, `TestGroupClaimSync_OtherProviderUntouched`,
+  `TestGroupClaimSync_ConcurrentLoginsSerialise`, `TestGroupClaimSync_ExpiryWithoutJob` and the
+  AZ-P7 case `group.member.sync` of `TestAZ_P7_I1PerAction`). The login path is tested in
+  identity (`adapters/httpapi/oidc_groups_test.go`). Rulings: docs/DECISIONS.md M1-42.

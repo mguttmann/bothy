@@ -14,6 +14,9 @@ import (
 	"testing"
 	"time"
 
+	authzhttp "github.com/OWNER/bothy/services/server/internal/authz/adapters/httpapi"
+	authzpg "github.com/OWNER/bothy/services/server/internal/authz/adapters/postgres"
+	authzapp "github.com/OWNER/bothy/services/server/internal/authz/app"
 	"github.com/OWNER/bothy/services/server/internal/identity/adapters/identitytest"
 	"github.com/OWNER/bothy/services/server/internal/identity/adapters/oidc/oidctest"
 	"github.com/OWNER/bothy/services/server/internal/identity/domain/oidcflow"
@@ -53,6 +56,8 @@ type oworld struct {
 	*sworld
 	idp  *oidctest.IDP
 	prov ids.ID
+	// admin are the authz Admin use cases behind the claim group sync (M1-42).
+	admin *authzapp.AdminService
 }
 
 // oidcWorldOpts change the provider of an OIDC world.
@@ -62,6 +67,8 @@ type oidcWorldOpts struct {
 	tenants      []string
 	noAllow      bool
 	issuer       string
+	// groupsClaim is groups_claim of the provider; "" configures none (M1-42).
+	groupsClaim string
 }
 
 // newOIDCWorld starts a fake provider and a world whose OIDC provider points to it; the provider
@@ -80,12 +87,24 @@ func newOIDCWorld(t *testing.T, o oidcWorldOpts) *oworld {
 	if !o.noAllow {
 		eg.AllowedHosts = []egress.Rule{{Host: "127.0.0.1", Port: uint16(port), AllowPrivate: true}}
 	}
+	var admin *authzapp.AdminService
 	bind := func(w *sworld) {
-		if err := w.id.BindOIDC(wire.OIDCDeps{Egress: eg, Secrets: fakeSecrets{clientSecretRef: []byte(secret)}, RootCAs: idp.RootCAs()}); err != nil {
+		var err error
+		admin, err = authzapp.NewAdminService(authzapp.AdminDeps{
+			UoW: w.uow, Authorizer: w.authz, Store: authzpg.NewRepository(w.pool), Principals: w.principals, Structure: w.structure,
+			Rights: w.rights, Audit: w.rec, Clock: w.clk, Events: w.appender, Scopes: w.authz, Cursors: authzhttp.Cursors{},
+			Config: authzapp.AdminConfig{GroupNameMaxChars: 100, GroupDescriptionMaxChars: 500, PageSizeDefault: 2, PageSizeMax: 3},
+		})
+		if err != nil {
+			t.Fatal(err)
+		}
+		if err := w.id.BindOIDC(wire.OIDCDeps{Egress: eg, Secrets: fakeSecrets{clientSecretRef: []byte(secret)}, RootCAs: idp.RootCAs(),
+			ClaimGroups: admin}); err != nil {
 			t.Fatal(err)
 		}
 	}
 	w := &oworld{sworld: newSessionWorldOn(t, pgtest.New(t), clk, ids.New(), keyDir(t), bind), idp: idp, prov: ids.New()}
+	w.admin = admin
 	// The callback answers 302 to the app; the harness client must hand it back, not follow it.
 	w.h.Server.Client().CheckRedirect = func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse }
 	issuer := idp.Issuer()
@@ -96,6 +115,9 @@ func newOIDCWorld(t *testing.T, o oidcWorldOpts) *oworld {
 		"app_redirect_uris": []string{"com.example.chat:/oidc"}}
 	if len(o.tenants) > 0 {
 		conf["allowed_tenant_ids"] = o.tenants
+	}
+	if o.groupsClaim != "" {
+		conf["groups_claim"] = o.groupsClaim
 	}
 	raw, _ := json.Marshal(conf)
 	w.sql(`INSERT INTO identity_providers (id, kind, name, config, allow_provisioning) VALUES ($1, 'oidc', 'Company', $2, $3)`,

@@ -1,6 +1,6 @@
 # Module `identity`
 
-Status: principal tables and directory built (M1-26); devices, device keys and the DPoP verifier built (M1-33); people, owners and the own profile built (M1-31); sessions, access tokens, refresh families, logout and the Authenticator built (M1-34); step-up with the device key and the job `identity.auth_cleanup` built (M1-35); identity providers, the mapping of external identities, the credential overview and unlinking built (M1-36); API tokens with prefix and checksum built (M1-44); first setup, enrollment codes, the shared login completion and the setup lock built (M1-37); device approval with the verification code, device pairing and the expiry of unconfirmed devices built (M1-38); passkey login, enrollment, registration and step-up built (M1-40); the OIDC login with PKCE, identity linking, provisioning and the re-login rule built (M1-41); the login with the trusted proxy header and its per-request binding built (M1-43); the principal writer for agent principals built (M1-51); disabling a person, revoking a device, ending a session and the inactive device sweep built (M1-45).
+Status: principal tables and directory built (M1-26); devices, device keys and the DPoP verifier built (M1-33); people, owners and the own profile built (M1-31); sessions, access tokens, refresh families, logout and the Authenticator built (M1-34); step-up with the device key and the job `identity.auth_cleanup` built (M1-35); identity providers, the mapping of external identities, the credential overview and unlinking built (M1-36); API tokens with prefix and checksum built (M1-44); first setup, enrollment codes, the shared login completion and the setup lock built (M1-37); device approval with the verification code, device pairing and the expiry of unconfirmed devices built (M1-38); passkey login, enrollment, registration and step-up built (M1-40); the OIDC login with PKCE, identity linking, provisioning and the re-login rule built (M1-41); the login with the trusted proxy header and its per-request binding built (M1-43); the principal writer for agent principals built (M1-51); disabling a person, revoking a device, ending a session and the inactive device sweep built (M1-45); groups from the OIDC group claim built (M1-42).
 The normative source is [docs/spec/02-architecture.md](../../../../docs/spec/02-architecture.md); if this file differs, the chapter applies.
 
 ## Purpose
@@ -654,6 +654,31 @@ Principals, people, owners, login drivers, identities, local credentials, enroll
   `TestOIDCEgress_PrivateTargetsRejected` (ID-T01 to ID-T05, leaked authorization URL,
   provisioning, link mode, private egress targets, no secrets in logs, re-login, cleanup).
   Rulings: docs/DECISIONS.md M1-41.
+
+### Groups from the OIDC group claim (M1-42)
+
+- Callback (`app/oidc_callback.go`): for a provider with `groups_claim` the callback reads the claim
+  with `oidcflow.GroupsFromClaims` into `external_identity.v1` (`groups_state` `present` with the
+  sorted values, `absent`, or `overage` when the claim name is a key of `_claim_names`, 08 section
+  2.3); another JSON type or a non-string element ends the flow with `error=login_failed` (cause
+  `groups_claim` in the log). The values are never logged or audited. `oidcflow.Claims.Members`
+  keeps every payload member for such configured claims.
+- Complete (`app/oidc_complete.go`, `app/login_completion.go`): only `groups_state = present` sets
+  `LoginCompletion.Sync`, which `completeLogin` calls after the person check (also for a person
+  provisioned as `pending`) and before device and session. It calls the port `authz.ClaimSync`
+  (`OIDCDeps.ClaimGroups`, the authz Admin use cases from `internal/wire`) with the time of the
+  request and `auth.group_claim_max_age` (`Config.GroupClaimMaxAge`). The unit of work runs first
+  without a rights change; when the sync answers `authz.ErrClaimSyncNeedsRightsChange` it rolls
+  back and runs once more declared as a rights change of `group.member.sync`, so
+  `permission_version` is locked first (03 section 6.3) and only a change raises it. An
+  `authz.InvariantError` (I1) leaves nothing of the login, ends the flow as `failed` in its own
+  unit and answers `409 i1_violation` with the hint of `authz.HintI1ClaimSync`; the deny entry is
+  written by the rights hook of authz.
+- Fake provider: `oidctest.IDP.SetGroups` and `SetGroupsOverage`.
+- Tests: `domain/oidcflow` (`TestGroupsClaimParsing`), `adapters/httpapi/oidc_groups_test.go`
+  (`TestGroupClaimSync` with the add, extend, remove, absent, overage, wrong type, concurrent and
+  logging cases, `TestGroupClaimSync_I1` with the AZ-P7 case through the login,
+  `TestGroupClaimSync_NoGroupsClaim`). Rulings: docs/DECISIONS.md M1-42.
 
 ### Trusted proxy header login (M1-43)
 

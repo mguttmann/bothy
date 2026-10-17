@@ -703,10 +703,10 @@ func (s *server) startAgents(context.Context) error {
 // tokens. From here on the HTTP chain authenticates people with identity's Authenticator.
 func (s *server) startSessions(context.Context) error {
 	s.mu.Lock()
-	id, keys, rec := s.identity, s.signingKeys, s.instance
+	id, keys, rec, admin := s.identity, s.signingKeys, s.instance, s.authzAdmin
 	s.mu.Unlock()
-	if id == nil || keys == nil {
-		return errors.New("wire: the sessions need the identity step and the signing keys")
+	if id == nil || keys == nil || admin == nil {
+		return errors.New("wire: the sessions need the identity step, the signing keys and the authz admin")
 	}
 	if err := id.BindSessions(keys.Keys, rec.InstanceID); err != nil {
 		return err
@@ -719,7 +719,7 @@ func (s *server) startSessions(context.Context) error {
 	if err != nil {
 		return err
 	}
-	return id.BindOIDC(OIDCDeps{Egress: eg, Secrets: sec})
+	return id.BindOIDC(OIDCDeps{Egress: eg, Secrets: sec, ClaimGroups: admin.Admin})
 }
 
 // authenticator returns the Authenticator of the HTTP chain: identity's after startSessions,

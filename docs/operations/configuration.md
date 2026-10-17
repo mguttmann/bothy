@@ -376,7 +376,7 @@ Source: [08-identity.md](../spec/08-identity.md), section 18.
 | `auth.server_code_ttl` | `BOTHY_AUTH__SERVER_CODE_TTL` | Server | duration | `60s` | Validity of the one-time server code | active |
 | `auth.oidc_jwks_cache_ttl` | `BOTHY_AUTH__OIDC_JWKS_CACHE_TTL` | Server | duration | `1h` | Cache of the provider metadata (discovery) and provider keys (JWKS) | active |
 | `auth.oidc_client_assertion_ttl` | `BOTHY_AUTH__OIDC_CLIENT_ASSERTION_TTL` | Server | duration | `2m` | Validity of a client assertion with `private_key_jwt` | active |
-| `auth.group_claim_max_age` | `BOTHY_AUTH__GROUP_CLAIM_MAX_AGE` | Server |  | `30d` | Expiry of memberships from group claims after the last login | planned (M1) |
+| `auth.group_claim_max_age` | `BOTHY_AUTH__GROUP_CLAIM_MAX_AGE` | Server | duration | `30d` | Expiry of memberships from group claims after the last login | active |
 | `auth.idp_recheck_interval` | `BOTHY_AUTH__IDP_RECHECK_INTERVAL` | Server | duration | `30d` | new login at the provider at the latest after this | active |
 | `auth.trusted_header_bind_requests` | `BOTHY_AUTH__TRUSTED_HEADER_BIND_REQUESTS` | Server | bool | `true` | every request must carry the same header login | active |
 | `auth.enrollment_code_ttl` | `BOTHY_AUTH__ENROLLMENT_CODE_TTL` | Server | duration | `72h` | Validity of an enrollment code | active |

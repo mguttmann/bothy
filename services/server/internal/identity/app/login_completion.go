@@ -62,6 +62,10 @@ type LoginCompletion struct {
 	// Provisioned marks a login that created the person (08 section 3.1 step 3); the allow entry
 	// says so.
 	Provisioned bool
+	// Sync runs inside the unit of work after the person check and before the device and the
+	// session are written: the claim group sync of an OIDC login (M1-42); nil for none. Its
+	// error fails the login.
+	Sync func(ctx context.Context, userID ids.ID) error
 }
 
 // LoginResult is a completed login: the session, its device and the token pair. NewDevice reports
@@ -204,12 +208,8 @@ func (s *Service) completeLogin(ctx context.Context, in LoginCompletion) (LoginR
 	if in.Trust != TrustConfirmed && in.Trust != TrustUnconfirmed || !in.AuthMethod.Valid() {
 		return LoginResult{}, errs.New(errs.CodeInternalError, "identity: login completion without trust or auth method")
 	}
-	rec, found, err := s.d.People.User(ctx, in.UserID)
-	if err != nil {
+	if err := s.loginPerson(ctx, in); err != nil {
 		return LoginResult{}, err
-	}
-	if !found || !mayLogIn(rec.User.Principal.Status, in.AllowPending) {
-		return LoginResult{}, errs.New(errs.CodeUnauthenticated, "")
 	}
 	dev, isNew, err := s.loginDevice(ctx, in)
 	if err != nil {
@@ -243,6 +243,22 @@ func (s *Service) completeLogin(ctx context.Context, in LoginCompletion) (LoginR
 	// only (08 section 5.2).
 	set.Device.VerificationCode = s.verificationCode(set.Device)
 	return LoginResult{Session: set.Session, Device: set.Device, Tokens: set, NewDevice: isNew}, nil
+}
+
+// loginPerson checks that the person of in may log in (unauthenticated otherwise) and runs
+// in.Sync, the claim group sync of an OIDC login (M1-42), before the device and the session.
+func (s *Service) loginPerson(ctx context.Context, in LoginCompletion) error {
+	rec, found, err := s.d.People.User(ctx, in.UserID)
+	if err != nil {
+		return err
+	}
+	if !found || !mayLogIn(rec.User.Principal.Status, in.AllowPending) {
+		return errs.New(errs.CodeUnauthenticated, "")
+	}
+	if in.Sync == nil {
+		return nil
+	}
+	return in.Sync(ctx, in.UserID)
 }
 
 // mayLogIn reports a person status that may log in: active, and pending when allowPending.

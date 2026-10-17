@@ -11,6 +11,7 @@ import (
 	"log/slog"
 	"net/url"
 
+	"github.com/OWNER/bothy/services/server/internal/authz"
 	"github.com/OWNER/bothy/services/server/internal/identity"
 	"github.com/OWNER/bothy/services/server/internal/identity/domain"
 	"github.com/OWNER/bothy/services/server/internal/identity/domain/oidcflow"
@@ -60,6 +61,9 @@ type OIDCDeps struct {
 	Flows LoginFlowStore
 	// Client talks to the providers.
 	Client OIDCProviderClient
+	// ClaimGroups reconciles the claim groups of authz at the completion of a login whose provider
+	// has groups_claim (M1-42).
+	ClaimGroups authz.ClaimSync
 	// Random is the source of state, nonce, login_code and handle suffixes; nil means
 	// crypto/rand.
 	Random io.Reader
@@ -85,12 +89,16 @@ var _ identity.OIDCLogin = (*OIDC)(nil)
 const callbackPath = "/api/v1/auth/oidc/callback"
 
 // NewOIDC returns the OIDC use cases with auth.login_flow_ttl, auth.server_code_ttl,
-// auth.clock_leeway, server.public_url and the principal limits of cfg and the raw token pepper.
+// auth.clock_leeway, auth.group_claim_max_age, server.public_url and the principal limits of cfg
+// and the raw token pepper.
 // Errors: a missing collaborator, an empty pepper, a lifetime that is not positive, a public URL
 // without scheme and host.
 func NewOIDC(cfg Config, pepper []byte, d OIDCDeps) (*OIDC, error) {
-	if d.Logins == nil || d.Flows == nil || d.Client == nil {
-		return nil, errors.New("identity: NewOIDC needs the login service, the flow store and the provider client")
+	if d.Logins == nil || d.Flows == nil || d.Client == nil || d.ClaimGroups == nil {
+		return nil, errors.New("identity: NewOIDC needs the login service, the flow store, the provider client and the claim sync")
+	}
+	if cfg.GroupClaimMaxAge <= 0 {
+		return nil, errors.New("identity: OIDC needs auth.group_claim_max_age above 0")
 	}
 	if len(pepper) == 0 || cfg.LoginFlowTTL <= 0 || cfg.ServerCodeTTL <= 0 || cfg.ClockLeeway < 0 {
 		return nil, errors.New("identity: OIDC needs the token pepper, auth.login_flow_ttl and auth.server_code_ttl above 0")
