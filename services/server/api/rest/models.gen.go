@@ -15463,6 +15463,58 @@ type UnprocessableEntity = Problem
 // path `/api/v1/problems/{code}`; `code` repeats its last segment for convenience.
 type UnsupportedMediaType = Problem
 
+// ListAgentsParams defines parameters for ListAgents.
+type ListAgentsParams struct {
+	// Cursor Cursor from `next_cursor` of the previous page.
+	Cursor *Cursor `form:"cursor,omitempty" json:"cursor,omitempty"`
+	Limit  *Limit  `form:"limit,omitempty" json:"limit,omitempty"`
+}
+
+// CreateAgentParams defines parameters for CreateAgent.
+type CreateAgentParams struct {
+	// IdempotencyKey UUIDv7 chosen by the client per logical operation. A repeat with the same request returns the stored response; a different request gives 422 `idempotency_key_reuse`; a repeat while the first is running gives 409 `request_in_progress`. Kept for `sync.idempotency_key_ttl`.
+	IdempotencyKey *IdempotencyKey `json:"Idempotency-Key,omitempty"`
+}
+
+// UpdateAgentParams defines parameters for UpdateAgent.
+type UpdateAgentParams struct {
+	// IdempotencyKey UUIDv7 chosen by the client per logical operation. A repeat with the same request returns the stored response; a different request gives 422 `idempotency_key_reuse`; a repeat while the first is running gives 409 `request_in_progress`. Kept for `sync.idempotency_key_ttl`.
+	IdempotencyKey *IdempotencyKey `json:"Idempotency-Key,omitempty"`
+
+	// IfMatch ETag of the version the change is based on, e.g. `"7"`. Mismatch gives 412 `version_conflict`.
+	IfMatch IfMatchRequired `json:"If-Match"`
+}
+
+// SetAgentBillingModeParams defines parameters for SetAgentBillingMode.
+type SetAgentBillingModeParams struct {
+	// IfMatch ETag of the version the change is based on, e.g. `"7"`. Mismatch gives 412 `version_conflict`.
+	IfMatch IfMatchRequired `json:"If-Match"`
+}
+
+// SetCredentialHolderParams defines parameters for SetCredentialHolder.
+type SetCredentialHolderParams struct {
+	// IfMatch ETag of the version the change is based on, e.g. `"7"`. Mismatch gives 412 `version_conflict`.
+	IfMatch IfMatchRequired `json:"If-Match"`
+}
+
+// DisableAgentParams defines parameters for DisableAgent.
+type DisableAgentParams struct {
+	// IdempotencyKey UUIDv7 chosen by the client per logical operation. A repeat with the same request returns the stored response; a different request gives 422 `idempotency_key_reuse`; a repeat while the first is running gives 409 `request_in_progress`. Kept for `sync.idempotency_key_ttl`.
+	IdempotencyKey *IdempotencyKey `json:"Idempotency-Key,omitempty"`
+}
+
+// EnableAgentParams defines parameters for EnableAgent.
+type EnableAgentParams struct {
+	// IdempotencyKey UUIDv7 chosen by the client per logical operation. A repeat with the same request returns the stored response; a different request gives 422 `idempotency_key_reuse`; a repeat while the first is running gives 409 `request_in_progress`. Kept for `sync.idempotency_key_ttl`.
+	IdempotencyKey *IdempotencyKey `json:"Idempotency-Key,omitempty"`
+}
+
+// SetAgentToolClassParams defines parameters for SetAgentToolClass.
+type SetAgentToolClassParams struct {
+	// IfMatch ETag of the version the change is based on, e.g. `"7"`. Mismatch gives 412 `version_conflict`.
+	IfMatch IfMatchRequired `json:"If-Match"`
+}
+
 // ListAuditEventsParams defines parameters for ListAuditEvents.
 type ListAuditEventsParams struct {
 	// Cursor Cursor from `next_cursor` of the previous page.
@@ -15776,6 +15828,27 @@ type ListUserSessionsParams struct {
 	Limit  *Limit  `form:"limit,omitempty" json:"limit,omitempty"`
 }
 
+// CreateAgentJSONRequestBody defines body for CreateAgent for application/json ContentType.
+type CreateAgentJSONRequestBody = AgentCreate
+
+// UpdateAgentJSONRequestBody defines body for UpdateAgent for application/json ContentType.
+type UpdateAgentJSONRequestBody = AgentUpdate
+
+// SetAgentBillingModeJSONRequestBody defines body for SetAgentBillingMode for application/json ContentType.
+type SetAgentBillingModeJSONRequestBody = BillingModeSet
+
+// SetCredentialHolderJSONRequestBody defines body for SetCredentialHolder for application/json ContentType.
+type SetCredentialHolderJSONRequestBody = CredentialHolderSet
+
+// DisableAgentJSONRequestBody defines body for DisableAgent for application/json ContentType.
+type DisableAgentJSONRequestBody = ReasonBody
+
+// EnableAgentJSONRequestBody defines body for EnableAgent for application/json ContentType.
+type EnableAgentJSONRequestBody = ReasonBody
+
+// SetAgentToolClassJSONRequestBody defines body for SetAgentToolClass for application/json ContentType.
+type SetAgentToolClassJSONRequestBody = ToolClassSet
+
 // VerifyAuditChainJSONRequestBody defines body for VerifyAuditChain for application/json ContentType.
 type VerifyAuditChainJSONRequestBody = AuditVerifyRequest
 
@@ -15844,6 +15917,9 @@ type CreateIdentityProviderJSONRequestBody = IdentityProviderCreate
 
 // UpdateIdentityProviderJSONRequestBody defines body for UpdateIdentityProvider for application/json ContentType.
 type UpdateIdentityProviderJSONRequestBody = IdentityProviderUpdate
+
+// SetAllAgentsBillingModeJSONRequestBody defines body for SetAllAgentsBillingMode for application/json ContentType.
+type SetAllAgentsBillingModeJSONRequestBody = BillingModeSetAll
 
 // UpdateBrandingJSONRequestBody defines body for UpdateBranding for application/json ContentType.
 type UpdateBrandingJSONRequestBody = BrandingUpdate

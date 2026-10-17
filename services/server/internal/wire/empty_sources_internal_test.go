@@ -10,9 +10,9 @@ import (
 	"github.com/OWNER/bothy/services/server/internal/kernel/ids"
 )
 
-// TestEmptySourcesKnowNothing holds that the empty sources report an instance without spaces,
-// channels, threads, served targets, agent policies and personal agents, so authorize decides
-// fail closed until the owning modules replace them (ruling D2 of the M1-28 brief).
+// TestEmptySourcesKnowNothing holds that the empty structure source reports an instance without
+// spaces, channels, threads and served targets, so authorize decides fail closed until the owning
+// modules replace it (ruling D2 of the M1-28 brief). The agent policy comes from agents since M1-51.
 func TestEmptySourcesKnowNothing(t *testing.T) {
 	t.Parallel()
 	ctx, id := context.Background(), ids.New()
@@ -43,16 +43,6 @@ func TestEmptySourcesKnowNothing(t *testing.T) {
 	}
 	if got, err := s.ServedTargets(ctx, id); got != nil || err != nil {
 		t.Errorf("ServedTargets = %v, %v", got, err)
-	}
-	p := emptyPolicies{}
-	if _, ok, err := p.AgentPolicy(ctx, id); ok || err != nil {
-		t.Errorf("AgentPolicy = %v, %v", ok, err)
-	}
-	if ok, err := p.DevEnvironmentReady(ctx, id, id); ok || err != nil {
-		t.Errorf("DevEnvironmentReady = %v, %v", ok, err)
-	}
-	if got, err := p.PersonalAgents(ctx); got != nil || err != nil {
-		t.Errorf("PersonalAgents = %v, %v", got, err)
 	}
 	var _ authz.StructureSource = s
 }

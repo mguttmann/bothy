@@ -66,3 +66,12 @@ sql:
         output_querier_file_name: querier.gen.go
         output_files_suffix: .gen
         emit_interface: false
+  # agents (M1-51)
+  - engine: postgresql
+    schema: migrations
+    queries: internal/agents/adapters/postgres/queries
+    gen:
+      go:
+        package: sqlcgen
+        out: internal/agents/adapters/postgres/sqlcgen
+        sql_package: pgx/v5

@@ -10,6 +10,7 @@ import (
 	"slices"
 
 	"github.com/OWNER/bothy/services/server/api/routes"
+	agentshttp "github.com/OWNER/bothy/services/server/internal/agents/adapters/httpapi"
 	audithttp "github.com/OWNER/bothy/services/server/internal/audit/adapters/httpapi"
 	authzhttp "github.com/OWNER/bothy/services/server/internal/authz/adapters/httpapi"
 	identityhttp "github.com/OWNER/bothy/services/server/internal/identity/adapters/httpapi"
@@ -48,6 +49,10 @@ type Handlers struct {
 	// listGroupMembers, addGroupMember, removeGroupMember, listGrants, createGrant, getGrant and
 	// revokeGrant (authz, M1-48).
 	*authzhttp.Access
+	// Agents implements listAgents, createAgent, getAgent, updateAgent, disableAgent, enableAgent,
+	// setAgentBillingMode, setAllAgentsBillingMode, setCredentialHolder and setAgentToolClass
+	// (agents, M1-51).
+	*agentshttp.Agents
 	// Log implements listAuditEvents, exportAuditEvents and verifyAuditChain (audit, M1-50).
 	*audithttp.Log
 	// Devices implements listMyDevices, listUserDevices and getDevice (identity, M1-33).

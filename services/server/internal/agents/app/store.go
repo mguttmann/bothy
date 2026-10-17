@@ -1,0 +1,57 @@
+// SPDX-License-Identifier: Apache-2.0
+
+package app
+
+import (
+	"context"
+
+	"github.com/OWNER/bothy/services/server/internal/agents/domain"
+	"github.com/OWNER/bothy/services/server/internal/kernel/ids"
+)
+
+// Store is the outgoing port of the agents application layer over the table agents (implemented
+// by adapters/postgres). Reads run in the ambient transaction of ctx when there is one and on the
+// pool otherwise; writes and locks run only inside a unit of work of kernel/txn and fail with kind
+// internal outside one. Errors are kernel/errs errors without SQL text or values.
+type Store interface {
+	// Agent returns the record id; found is false for an unknown id.
+	Agent(ctx context.Context, id ids.ID) (a domain.Agent, found bool, err error)
+	// LockAgent returns the record id like Agent and locks its row until the end of the unit of
+	// work (03 section 6.3).
+	LockAgent(ctx context.Context, id ids.ID) (a domain.Agent, found bool, err error)
+	// LockAgents locks the records of list in ascending id and returns the known ones in that
+	// order; unknown ids are left out.
+	LockAgents(ctx context.Context, list []ids.ID) ([]domain.Agent, error)
+	// LockPersonalAgents locks every record with billing_mode personal in ascending id, disabled
+	// agents included (the emergency switch of 10 section 9.1).
+	LockPersonalAgents(ctx context.Context) ([]domain.Agent, error)
+	// ListAgents returns up to limit records with an id above after (the zero ID for the first
+	// page), ascending by id.
+	ListAgents(ctx context.Context, after ids.ID, limit int) ([]domain.Agent, error)
+	// PersonalAgents returns every record with billing_mode personal, ascending by id, without
+	// regard to the principal status; the policy source filters by status through identity.
+	PersonalAgents(ctx context.Context) ([]domain.Agent, error)
+	// InsertAgent inserts the record a; its principal must exist (identity, same unit of work).
+	InsertAgent(ctx context.Context, a domain.Agent) error
+	// UpdateAgent writes description, operator configuration, policy, tool class and version of
+	// a. agent.update needs a unit of work; the policy, holder and tool class need a declared
+	// rights change, which the caller owns.
+	UpdateAgent(ctx context.Context, a domain.Agent) error
+}
+
+// Cursors is the outgoing port that encodes and checks the opaque cursors of listAgents
+// (implemented by adapters/httpapi with platform/httpserver).
+type Cursors interface {
+	// Encode returns the cursor of key for list and binding.
+	Encode(list string, binding []byte, key any) (string, error)
+	// Decode checks s against list and binding and unmarshals its key into key. Errors:
+	// cursor_invalid.
+	Decode(list string, binding []byte, s string, key any) error
+}
+
+// TokenRevoker is the part of identity.Tokens that agent.disable uses: every active API token of
+// the agent ends inside the rights change (09 section 2.1).
+type TokenRevoker interface {
+	// RevokeAllForPrincipal revokes every active token of principalID and returns their number.
+	RevokeAllForPrincipal(ctx context.Context, principalID, by ids.ID) (int, error)
+}
