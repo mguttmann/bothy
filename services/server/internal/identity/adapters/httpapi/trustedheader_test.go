@@ -387,6 +387,16 @@ func TestTrustedHeaderProvisioning(t *testing.T) {
 		if n := w.count(`SELECT count(*) FROM users WHERE principal_id = $1 AND email IS NULL`, user); n != 1 {
 			t.Fatal("provisioned person has an e-mail")
 		}
+		// The allow entry records that the login created the person (08 section 3.1 step 3).
+		found := false
+		for _, a := range w.audits("auth.login.complete") {
+			if a.Details["session_id"] == m["session"].(map[string]any)["id"] && a.Details["provisioned"] == true {
+				found = true
+			}
+		}
+		if !found {
+			t.Fatal("the allow entry does not say provisioned")
+		}
 	})
 	t.Run("TestTrustedHeaderNeverLogged", func(t *testing.T) { neverLogged(t, w) })
 }

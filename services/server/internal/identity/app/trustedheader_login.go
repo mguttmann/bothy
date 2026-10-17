@@ -148,7 +148,7 @@ func (s *Service) headerLogin(ctx context.Context, hl headerLoginInput, matched 
 		if err != nil {
 			return LoginResult{}, err
 		}
-		c.UserID, c.IdentityID = user, &id
+		c.UserID, c.IdentityID, c.Provisioned = user, &id, true
 	default:
 		return LoginResult{}, &headerRejectedError{cause: causeNoMapping}
 	}
