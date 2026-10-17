@@ -79,7 +79,9 @@ repos:
         stages: [pre-push]
       - id: make-check
         name: make check (every gate, as in CI)
-        entry: make check
+        # Without the variables git exports to hooks, so every gate sees the repository as in CI
+        # (docs/DECISIONS.md D-M4-05-6).
+        entry: env -u GIT_DIR -u GIT_WORK_TREE -u GIT_INDEX_FILE -u GIT_COMMON_DIR -u GIT_PREFIX make check
         language: system
         pass_filenames: false
         always_run: true

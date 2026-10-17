@@ -38,6 +38,13 @@ operated, and the order of the build.
   idempotency changes, a changed `x-authz-action`); a major step of `info.version` accepts a
   break, and without a tag the gate passes with a notice. Own comparison instead of oasdiff, which
   missed rows on this document (M7-11).
+- Design system icons: `DsIcon` draws every semantic icon of `icon.tokens.json` from Phosphor
+  2.1.1 vectors compiled by `vector_graphics_compiler` (chosen over an icon font after a
+  sharpness and size measurement, docs/design/icons.md), at the `icon.size.*` tokens, with a
+  required label or `decorative: true` and the spin of `trigger.working`, `run.running` and
+  `state.reconnecting` only in full motion. `tokens.py icons` (part of `build`) generates the
+  assets, their lookup, the MIT text and a manifest, and `make tokens` fails on a missing glyph
+  or a stale asset; a golden shows every icon in its weight and in fill (M4-05).
 - Design system package: `packages/design_system` exports the generated token classes (a copy
   that `tokens.py build` writes next to `design/build/dart/` and `make tokens` compares), a
   settings resolver from `appearance.theme`, `appearance.density`, `appearance.reduce_motion` and
