@@ -93,7 +93,7 @@ class _Rule {
 /// server.faults.closeGateway(4000);
 /// ```
 final class FaultPlan {
-  /// Creates the plan acting on [gateway].
+  /// Creates the plan acting on the gateway of the fake server.
   FaultPlan(this._gateway);
 
   final GatewayFaultTarget _gateway;
