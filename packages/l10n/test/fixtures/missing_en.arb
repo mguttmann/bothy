@@ -1,0 +1,7 @@
+{
+  "@@locale": "en",
+  "shared": "Shared",
+  "@shared": {"description": "In both files."},
+  "onlyEnglish": "Only English",
+  "@onlyEnglish": {"description": "Missing in the German file."}
+}

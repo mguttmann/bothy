@@ -1,0 +1,5 @@
+{
+  "@@locale": "en",
+  "rocketTitle": "Launch \ud83d\ude80",
+  "@rocketTitle": {"description": "A title with an emoji."}
+}
