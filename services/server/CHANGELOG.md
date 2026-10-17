@@ -127,6 +127,12 @@ documented in this file. The format is based on
   close with `4012`; shutdown closes every connection with `4013 server_restart`; the liveness
   check `event_tail` fails once the tail and hub goroutine has ended. `sync.cursor_advance_every`
   is an active key.
+- Web console serving (M6-02): `console.assets_dir` names the built console, which the api
+  process serves under `/console/` (exact files with their type, `index.html` for every other
+  path below `/console/`, traversal refused, `index.html` never stored, hashed assets immutable,
+  others revalidated by a content `ETag`, `Cross-Origin-Opener-Policy`, `X-Frame-Options: DENY` and
+  `Permissions-Policy`); empty means no console. The image builds the console with the pinned
+  Flutter on the build platform and sets the key to `/usr/share/bothy/console`.
 - Console session of the web console (M6-01, 08 section 7.5): the login operations
   `completeOidcLogin`, `completePasskeyLogin`, `loginWithPassword` and `loginWithTrustedHeader`
   take `client: console` and answer `200 ConsoleSession` with the cookie `__Host-console_session`

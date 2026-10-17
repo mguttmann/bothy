@@ -51,6 +51,13 @@ func serverConfigKeys() []config.Key {
 			Chapter: chapter16,
 		},
 		{
+			// Empty disables the console (brief M6-02 Design note 4); the image sets the path its
+			// console stage copies the build to (services/server/Dockerfile).
+			Name: "console.assets_dir", Kind: config.KindString, Default: "",
+			Doc:     "Directory of the built web console that the api process serves under /console/; empty means no console.",
+			Chapter: chapter16,
+		},
+		{
 			Name: keyTLSKeyRef, Kind: config.KindSecretRef, Default: "",
 			Doc:     "Reference to the PEM private key of the certificate; only together with server.tls_cert_ref.",
 			Chapter: chapter16,

@@ -3,7 +3,10 @@
 # Build context of services/server/Dockerfile (the repository root, as in release.yml). BuildKit
 # reads this file instead of a root .dockerignore, so other builds are not affected. Everything
 # is ignored except the sources the binary is built from; tests and test data never enter the
-# context. Embedded files live in migrations/ (migrations/embed.go), which is allowed.
+# context. Embedded files live in migrations/ (migrations/embed.go), which is allowed. The console
+# stage (brief M6-02, docs/spec/18-release.md 7 rule 7) also reads the root files of the pub
+# workspace, every member pubspec.yaml, the console and the lib/ of the packages it uses, the
+# assets and fonts of design_system, the OpenAPI document for version.json; no tests.
 *
 !services/server/go.mod
 !services/server/go.sum
@@ -12,5 +15,24 @@
 !services/server/cmd/
 !services/server/internal/
 !services/server/migrations/
+!pubspec.yaml
+!pubspec.lock
+!analysis_options.yaml
+!apps/*/pubspec.yaml
+!packages/*/pubspec.yaml
+!packages/bothy_viz/harness/pubspec.yaml
+!apps/console/
+!packages/api_client/lib/
+!packages/auth/lib/
+!packages/design_system/lib/
+!packages/design_system/assets/
+!packages/design_system/fonts/
+!packages/domain/lib/
+!packages/l10n/lib/
+!docs/api/openapi.yaml
+apps/console/test/
+apps/console/build/
+apps/console/coverage/
+**/.dart_tool/
 **/*_test.go
 **/testdata/

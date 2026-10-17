@@ -442,3 +442,26 @@ def test_main_reports_invalid_rules(tmp_path: Path, capsys: pytest.CaptureFixtur
     bad.write_text("members: nope\n", encoding="utf-8")
     assert arch_check.main(["--root", str(tmp_path), "--rules", str(bad)]) == 2
     assert "arch-check: rules.yaml: members must be a list" in capsys.readouterr().err
+
+
+@pytest.mark.parametrize("member", ["sync_engine", "local_store"])
+def test_real_console_importing_a_forbidden_member_fails(tree: Tree, member: str) -> None:
+    """The real console member (manifest and sources, brief M6-02) with one import of a member
+    of rule 3 fails, both through the import and as an undeclared dependency."""
+    console = REPO / "apps" / "console"
+    tree.write("apps/console/pubspec.yaml", (console / "pubspec.yaml").read_text(encoding="utf-8"))
+    for source in sorted((console / "lib").rglob("*.dart")):
+        rel = source.relative_to(REPO).as_posix()
+        tree.write(rel, source.read_text(encoding="utf-8"))
+    code, lines = tree.run()
+    assert code == 0, lines
+    app = tree.root / "apps" / "console" / "lib" / "app.dart"
+    app.write_text(
+        f"import 'package:{member}/{member}.dart';\n" + app.read_text(encoding="utf-8"),
+        encoding="utf-8",
+    )
+    code, lines = tree.run()
+    assert code == 1
+    assert any(
+        line.startswith("apps/console/lib/app.dart:1:") and member in line for line in _only(lines)
+    ), lines

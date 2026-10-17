@@ -38,6 +38,57 @@ RUN --mount=type=cache,target=/go/pkg/mod \
 # mounted there takes owner 65532 and mode 0700 from the image on first use.
 RUN mkdir -p /out/signing-keys
 
+# The web console (brief M6-02, docs/spec/18-release.md 7 rule 7): built with the pinned Flutter
+# of the workspace (pubspec.yaml) on the build platform, because its output is platform
+# independent; the final stage copies build/web to the path BOTHY_CONSOLE__ASSETS_DIR names.
+# No Flutter image exists for the pinned version, so the stage clones the SDK at the tag and
+# checks the revision; the SDK fetches its Dart SDK and web artifacts by the engine hash of that
+# revision. The base is the pinned builder image of the server.
+FROM --platform=$BUILDPLATFORM golang:1.27.3-trixie@sha256:1896654cfc5c2b5ad74c07f29cb36f5d2d1cbed42e3054070fbfe444e521e83c AS console
+ARG FLUTTER_VERSION=3.47.7
+ARG FLUTTER_REVISION=abaf9c523780a608bd46686fd5e53740a07077f8
+RUN apt-get update -qq \
+    && apt-get install -y -qq --no-install-recommends unzip xz-utils \
+    && rm -rf /var/lib/apt/lists/*
+RUN git clone --quiet --depth 1 --branch "$FLUTTER_VERSION" https://github.com/flutter/flutter.git /opt/flutter \
+    && test "$(git -C /opt/flutter rev-parse HEAD)" = "$FLUTTER_REVISION"
+ENV PATH=/opt/flutter/bin:$PATH
+# The build fetches only the web artifacts it needs, by the engine hash of the revision.
+RUN flutter --disable-analytics >/dev/null
+WORKDIR /src
+# The root resolution of the pub workspace needs every member pubspec.yaml; the lock file is
+# enforced, so the image builds exactly the packages the tests ran with.
+COPY pubspec.yaml pubspec.lock analysis_options.yaml ./
+COPY apps/client/pubspec.yaml apps/client/
+COPY apps/console/pubspec.yaml apps/console/
+COPY packages/admin_ui/pubspec.yaml packages/admin_ui/
+COPY packages/api_client/pubspec.yaml packages/api_client/
+COPY packages/auth/pubspec.yaml packages/auth/
+COPY packages/bothy_noise/pubspec.yaml packages/bothy_noise/
+COPY packages/bothy_viz/pubspec.yaml packages/bothy_viz/
+COPY packages/bothy_viz/harness/pubspec.yaml packages/bothy_viz/harness/
+COPY packages/design_system/pubspec.yaml packages/design_system/
+COPY packages/device_key/pubspec.yaml packages/device_key/
+COPY packages/domain/pubspec.yaml packages/domain/
+COPY packages/l10n/pubspec.yaml packages/l10n/
+COPY packages/local_store/pubspec.yaml packages/local_store/
+COPY packages/sync_engine/pubspec.yaml packages/sync_engine/
+COPY packages/terminal_ui/pubspec.yaml packages/terminal_ui/
+RUN flutter pub get --enforce-lockfile >/dev/null
+COPY packages/api_client/lib packages/api_client/lib
+COPY packages/auth/lib packages/auth/lib
+COPY packages/design_system/lib packages/design_system/lib
+COPY packages/design_system/assets packages/design_system/assets
+COPY packages/design_system/fonts packages/design_system/fonts
+COPY packages/domain/lib packages/domain/lib
+COPY packages/l10n/lib packages/l10n/lib
+COPY apps/console ./apps/console
+COPY docs/api/openapi.yaml docs/api/
+COPY services/server/VERSION services/server/
+WORKDIR /src/apps/console
+RUN flutter build web --release --base-href /console/ --no-web-resources-cdn --no-pub --no-wasm-dry-run \
+    && sh tool/version_json.sh ../../docs/api/openapi.yaml ../../services/server/VERSION build/web/version.json
+
 FROM gcr.io/distroless/static-debian13:nonroot@sha256:e2e927ec666bae08560abb3c55d0659eceabb657f56b6782ab500a9fc7f555e3
 ARG VERSION REVISION
 ARG SOURCE_URL=https://github.com/OWNER/bothy
@@ -49,6 +100,9 @@ LABEL org.opencontainers.image.title="bothy-server" \
 # Owned by root and not writable, so the running user cannot replace the binary.
 COPY --from=build --chown=0:0 --chmod=0555 /out/bothy /usr/local/bin/bothy
 COPY --from=build --chown=65532:65532 --chmod=0700 /out/signing-keys /var/lib/bothy/signing-keys
+# The console build, owned by root and read-only for the running user (console.assets_dir).
+COPY --from=console --chown=0:0 --chmod=0555 /src/apps/console/build/web /usr/share/bothy/console
+ENV BOTHY_CONSOLE__ASSETS_DIR=/usr/share/bothy/console
 # Numeric, so runtimes that enforce "run as non-root" can verify it without /etc/passwd.
 USER 65532:65532
 ENTRYPOINT ["/usr/local/bin/bothy"]

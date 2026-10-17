@@ -60,7 +60,7 @@ Diagram: [c4-2-container.svg](../architecture/c4-2-container.svg)
 | ClamAV `clamd` | separate process, optional | malware scan via `INSTREAM` | signatures | own container |
 | OTel Collector | separate process | accepts OTLP, exports per backend | buffer | own container |
 | Apps | Flutter (iOS, Android, macOS, Windows) | chat, outbox, local database, Notification Service Extension | local cache, never authoritative | per device |
-| Web console | Flutter Web | administration, statistics and terminal (B5, [ADR 0070](../adr/0070-terminal-in-the-web-console.md)); no chat | none | static files |
+| Web console | Flutter Web | administration, statistics and terminal (B5, [ADR 0070](../adr/0070-terminal-in-the-web-console.md)); no chat | none | static files in the server image, served by the api process under `/console/` from `console.assets_dir` ([16-operations.md](16-operations.md) 14; M6-02) |
 | Agent adapter | outside the server (reference: Hermes agent plugin, Claude Code runner) | consumer with a durable cursor, checks the invocation token, reports runs | own | run by whoever runs the runtime |
 | Host service `bothy-host` | separate Go binary (`services/host`), on every connected host | PTY per terminal session, Noise peer, profiles, self-check ([24-terminal.md](24-terminal.md)) | keys and scrollback buffer on the host | per host |
 
