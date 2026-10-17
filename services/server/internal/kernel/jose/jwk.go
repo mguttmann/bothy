@@ -7,24 +7,33 @@ import (
 	"crypto/ecdsa"
 	"crypto/ed25519"
 	"crypto/elliptic"
+	"crypto/rsa"
 	"crypto/sha256"
 	"encoding/json"
 	"errors"
 	"fmt"
+	"math/big"
 )
 
-// The algorithms of the profile (ADR 0067). M1-41 adds RS256 and PS256.
+// The algorithms of the profile (ADR 0067).
 const (
 	// AlgES256 is ECDSA with P-256 and SHA-256, signature R || S with 64 bytes.
 	AlgES256 = "ES256"
 	// AlgEdDSA is Ed25519 (RFC 8037).
 	AlgEdDSA = "EdDSA"
+	// AlgRS256 is RSASSA-PKCS1-v1_5 with SHA-256 (RFC 7518 section 3.3): ID tokens of identity
+	// providers and client assertions only (M1-41).
+	AlgRS256 = "RS256"
+	// AlgPS256 is RSASSA-PSS with SHA-256, MGF1 with SHA-256 and a salt of 32 bytes (RFC 7518
+	// section 3.5): ID tokens and client assertions only (M1-41).
+	AlgPS256 = "PS256"
 )
 
 // The key types and curves of the profile.
 const (
 	ktyEC     = "EC"
 	ktyOKP    = "OKP"
+	ktyRSA    = "RSA"
 	crvP256   = "P-256"
 	crvEd     = "Ed25519"
 	coordSize = 32
@@ -38,20 +47,40 @@ var ErrInvalidJWK = errors.New("jose: invalid JWK")
 // sections 6.2.2, 6.3.2 and 6.4.1); a public key never has them.
 var privateMembers = []string{"d", "p", "q", "dp", "dq", "qi", "k", "oth"}
 
-// JWK is a validated public key of the profile: EC P-256 or OKP Ed25519. Build it with ParseJWK
+// JWK is a validated public key of the profile: EC P-256 or OKP Ed25519, and RSA for the keys of
+// identity providers (ParseVerificationJWK, M1-41). Build it with ParseJWK, ParseVerificationJWK
 // or JWKFromPublicKey; the zero value is no key.
 type JWK struct {
-	// Kty is EC or OKP.
+	// Kty is EC, OKP or RSA.
 	Kty string
-	// Crv is P-256 or Ed25519.
+	// Crv is P-256 or Ed25519; empty for RSA.
 	Crv string
-	// X and Y are the base64url coordinates; Y is empty for OKP.
+	// X and Y are the base64url coordinates; Y is empty for OKP, both are empty for RSA.
 	X, Y string
+	// N and E are the base64url modulus and exponent of an RSA key; empty otherwise.
+	N, E string
 	// Alg is the alg member of the JWK, "" when absent.
 	Alg string
-	// pub is *ecdsa.PublicKey or ed25519.PublicKey.
+	// pub is *ecdsa.PublicKey, ed25519.PublicKey or *rsa.PublicKey.
 	pub any
 }
+
+// rsaMembers is the wire form of an RSA key in the member order of RFC 7638 (e, kty, n).
+type rsaMembers struct {
+	E   string `json:"e"`
+	Kty string `json:"kty"`
+	N   string `json:"n"`
+	Alg string `json:"alg,omitempty"`
+}
+
+// The bounds of an RSA key of an identity provider: at least 2048 bits (NIST SP 800-131A), at
+// most 8192 so that one key cannot make a check expensive, and a public exponent that is odd and
+// fits crypto/rsa.
+const (
+	rsaMinBits = 2048
+	rsaMaxBits = 8192
+	rsaMaxE    = 1<<31 - 1
+)
 
 // jwkMembers is the wire form of the members the profile reads; Y and Alg stay out when empty.
 type jwkMembers struct {
@@ -100,6 +129,61 @@ func ParseJWK(raw []byte) (JWK, error) {
 	return k, nil
 }
 
+// ParseVerificationJWK validates raw as a public key that verifies signatures of an identity
+// provider (ID tokens, ADR 0067, M1-41): every key ParseJWK accepts, and kty RSA with n of 2048 to
+// 8192 bits (odd, no leading zero byte) and e odd between 3 and 2^31-1 (no leading zero byte); an
+// alg member of an RSA key is RS256 or PS256. Private members are refused for every kty. Device
+// keys and DPoP proofs keep ParseJWK, which refuses RSA.
+//
+// Errors wrap ErrInvalidJWK.
+//
+// Example:
+//
+//	k, err := jose.ParseVerificationJWK(jwksEntry)
+//	if err == nil {
+//		err = idToken.Verify(k) // wraps jose.ErrSignature
+//	}
+func ParseVerificationJWK(raw []byte) (JWK, error) {
+	if err := checkObject(raw); err != nil {
+		return JWK{}, fmt.Errorf("%w: %w", ErrInvalidJWK, err)
+	}
+	k, err := readMembers(raw)
+	if err != nil {
+		return JWK{}, err
+	}
+	if k.Kty != ktyRSA {
+		return ParseJWK(raw)
+	}
+	if err := k.parseRSA(); err != nil {
+		return JWK{}, err
+	}
+	if k.Alg != "" && k.Alg != AlgRS256 && k.Alg != AlgPS256 {
+		return JWK{}, fmt.Errorf("%w: alg member does not match the key type", ErrInvalidJWK)
+	}
+	return k, nil
+}
+
+// parseRSA checks an RSA key: n and e as unsigned big-endian integers without leading zero bytes,
+// the size and exponent bounds above, and an odd modulus.
+func (k *JWK) parseRSA() error {
+	n, okN := decodeSegment(k.N)
+	e, okE := decodeSegment(k.E)
+	if !okN || !okE || len(n) == 0 || len(e) == 0 || n[0] == 0 || e[0] == 0 {
+		return fmt.Errorf("%w: n and e must be unsigned integers in base64url without padding", ErrInvalidJWK)
+	}
+	mod := new(big.Int).SetBytes(n)
+	if bits := mod.BitLen(); bits < rsaMinBits || bits > rsaMaxBits || mod.Bit(0) == 0 {
+		return fmt.Errorf("%w: the modulus must be odd and have 2048 to 8192 bits", ErrInvalidJWK)
+	}
+	exp := new(big.Int).SetBytes(e)
+	if !exp.IsInt64() || exp.Int64() < 3 || exp.Int64() > rsaMaxE || exp.Bit(0) == 0 {
+		return fmt.Errorf("%w: the exponent must be odd and between 3 and 2^31-1", ErrInvalidJWK)
+	}
+	k.Crv, k.X, k.Y = "", "", ""
+	k.pub = &rsa.PublicKey{N: mod, E: int(exp.Int64())}
+	return nil
+}
+
 // readMembers reads kty, crv, x, y and alg of raw (a checked JSON object) and refuses private
 // and symmetric members.
 func readMembers(raw []byte) (JWK, error) {
@@ -116,7 +200,7 @@ func readMembers(raw []byte) (JWK, error) {
 	for _, f := range []struct {
 		name string
 		dst  *string
-	}{{"kty", &k.Kty}, {"crv", &k.Crv}, {"x", &k.X}, {"y", &k.Y}, {"alg", &k.Alg}} {
+	}{{"kty", &k.Kty}, {"crv", &k.Crv}, {"x", &k.X}, {"y", &k.Y}, {"n", &k.N}, {"e", &k.E}, {"alg", &k.Alg}} {
 		v, ok := all[f.name]
 		if !ok {
 			continue
@@ -176,9 +260,14 @@ func (k JWK) keyAlg() string {
 }
 
 // Canonical returns the input of the RFC 7638 thumbprint: the required members in lexicographic
-// order without whitespace, for example {"crv":"P-256","kty":"EC","x":"...","y":"..."}. The
-// server stores this form as the public JWK (device_keys.public_jwk).
+// order without whitespace, for example {"crv":"P-256","kty":"EC","x":"...","y":"..."} or
+// {"e":"AQAB","kty":"RSA","n":"..."}. The server stores this form as the public JWK
+// (device_keys.public_jwk).
 func (k JWK) Canonical() []byte {
+	if k.Kty == ktyRSA {
+		b, _ := json.Marshal(rsaMembers{E: k.E, Kty: k.Kty, N: k.N}) // strings only: never fails
+		return b
+	}
 	b, _ := json.Marshal(jwkMembers{Crv: k.Crv, Kty: k.Kty, X: k.X, Y: k.Y}) // strings only: never fails
 	return b
 }
@@ -192,16 +281,27 @@ func (k JWK) Thumbprint() string {
 
 // MarshalJSON writes the required members and alg when set, never private material.
 func (k JWK) MarshalJSON() ([]byte, error) {
+	if k.Kty == ktyRSA {
+		return json.Marshal(rsaMembers{E: k.E, Kty: k.Kty, N: k.N, Alg: k.Alg})
+	}
 	return json.Marshal(jwkMembers{Crv: k.Crv, Kty: k.Kty, X: k.X, Y: k.Y, Alg: k.Alg})
 }
 
-// PublicKey returns *ecdsa.PublicKey for EC and ed25519.PublicKey for OKP; nil for the zero JWK.
+// PublicKey returns *ecdsa.PublicKey for EC, ed25519.PublicKey for OKP and *rsa.PublicKey for RSA;
+// nil for the zero JWK.
 func (k JWK) PublicKey() any { return k.pub }
 
-// JWKFromPublicKey builds the JWK of a public key: *ecdsa.PublicKey on P-256 or
-// ed25519.PublicKey. The result has no alg member. Errors wrap ErrInvalidJWK.
+// JWKFromPublicKey builds the JWK of a public key: *ecdsa.PublicKey on P-256,
+// ed25519.PublicKey, or *rsa.PublicKey within the bounds of ParseVerificationJWK. The result has
+// no alg member. Errors wrap ErrInvalidJWK.
 func JWKFromPublicKey(pub any) (JWK, error) {
 	switch p := pub.(type) {
+	case *rsa.PublicKey:
+		if p == nil || p.N == nil {
+			return JWK{}, fmt.Errorf("%w: invalid RSA public key", ErrInvalidJWK)
+		}
+		e := big.NewInt(int64(p.E)).Bytes()
+		return ParseVerificationJWK(mustMarshal(rsaMembers{E: encodeSegment(e), Kty: ktyRSA, N: encodeSegment(p.N.Bytes())}))
 	case *ecdsa.PublicKey:
 		if p == nil || p.Curve != elliptic.P256() {
 			return JWK{}, fmt.Errorf("%w: EC keys must use P-256", ErrInvalidJWK)

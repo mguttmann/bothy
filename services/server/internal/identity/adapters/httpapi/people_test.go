@@ -138,10 +138,8 @@ func TestLastOwner(t *testing.T) {
 	}
 }
 
-// TestOwnerRace (test 5): two owners revoke each other at the same time: exactly one 204, and the
-// other request is 409 last_owner when both passed authorize, or 403 forbidden when the first
-// revoke committed before the second was authorized (its caller is no owner any more). Exactly
-// one owner is left either way.
+// TestOwnerRace (test 5): two owners revoke each other at the same time: exactly one 204 and one
+// 409 last_owner, or 403 forbidden when the loser authorized after the winner committed.
 func TestOwnerRace(t *testing.T) {
 	t.Parallel()
 	w := newWorld(t)
@@ -170,6 +168,10 @@ func TestOwnerRace(t *testing.T) {
 		}
 		wg.Wait()
 		slices.Sort(statuses)
+		// The loser gets 409 last_owner when both authorized before either committed, and 403
+		// forbidden when it authorized after the winner's commit took its owner role (a loaded
+		// machine serialises the two requests; docs/DECISIONS.md M1-41/15). Either way exactly one
+		// revocation wins.
 		raced := slices.Equal(statuses, []int{http.StatusNoContent, http.StatusConflict}) && slices.Contains(codes, "last_owner")
 		serial := slices.Equal(statuses, []int{http.StatusNoContent, http.StatusForbidden}) && slices.Contains(codes, "forbidden")
 		if !raced && !serial {

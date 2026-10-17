@@ -19,8 +19,9 @@ const (
 // refresh durations of 03 section 9 (M1-34), the DPoP windows and the token pepper from
 // docs/spec/08-identity.md section 18 (M1-33), and the step-up challenge lifetime, failure limit
 // and window and the cleanup interval of 08 section 18 (M1-35), the API token limits and the
-// DPoP requirement of 08 section 18 (M1-44), and the enrollment code lifetime and attempt limit of
-// 08 section 18 (M1-37). The page sizes of
+// DPoP requirement of 08 section 18 (M1-44), the enrollment code lifetime and attempt limit of
+// 08 section 18 (M1-37), and the OIDC flow, code, cache, assertion and recheck durations of 08
+// section 18 (M1-41). The page sizes of
 // 06-api.md live in apiConfigKeys, because every list reads them.
 func identityConfigKeys() []config.Key {
 	return []config.Key{
@@ -150,7 +151,7 @@ func identityConfigKeys() []config.Key {
 		},
 		{
 			Name: "auth.login_flow_ttl", Kind: config.KindDuration, Default: defaultLoginFlowTTL, Min: "1s",
-			Doc:     "Validity of a login flow and of a passkey ceremony (login, enrollment, registration).",
+			Doc:     "Validity of an OIDC login flow and of a passkey ceremony (login, enrollment, registration).",
 			Chapter: chapter08,
 		},
 		{
@@ -162,6 +163,26 @@ func identityConfigKeys() []config.Key {
 		{
 			Name: keyWebAuthnOrigins, Kind: config.KindStringList, Default: "",
 			Doc:     "Allowed origins of the passkeys; empty means the origin of server.public_url; entries may be app origins such as android:apk-key-hash:...",
+			Chapter: chapter08,
+		},
+		{
+			Name: "auth.server_code_ttl", Kind: config.KindDuration, Default: denyAggregateWindowDefault, Min: "1s",
+			Doc:     "Validity of the one-time login_code of the OIDC callback.",
+			Chapter: chapter08,
+		},
+		{
+			Name: "auth.oidc_jwks_cache_ttl", Kind: config.KindDuration, Default: "1h", Min: "1s",
+			Doc:     "Cache of the provider metadata (discovery) and keys (JWKS).",
+			Chapter: chapter08,
+		},
+		{
+			Name: "auth.oidc_client_assertion_ttl", Kind: config.KindDuration, Default: "2m", Min: "1s",
+			Doc:     "Lifetime of a private_key_jwt client assertion.",
+			Chapter: chapter08,
+		},
+		{
+			Name: "auth.idp_recheck_interval", Kind: config.KindDuration, Default: sessionMaxAgeDefault, Min: "1m",
+			Doc:     "Age of an OIDC session after which the next refresh needs a new login at the provider.",
 			Chapter: chapter08,
 		},
 	}

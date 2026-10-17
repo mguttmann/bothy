@@ -12,10 +12,14 @@ enabled:             # operationIds that have a handler; sorted ascending
   - approveDevice
   - approvePairing
   - beginEnrollment
+  - beginIdentityLink
+  - beginOidcLogin
   - beginPairing
   - beginPasskeyLogin
   - beginPasskeyRegistration
   - completeEnrollment
+  - completeIdentityLink
+  - completeOidcLogin
   - completePairing
   - completePasskeyLogin
   - completePasskeyRegistration
@@ -40,6 +44,7 @@ enabled:             # operationIds that have a handler; sorted ascending
   - getProblemType
   - getUser
   - getUserCredentials
+  - handleOidcCallback
   - listAuditEvents
   - listIdentityProviders
   - listInstanceSettings
@@ -101,12 +106,6 @@ later:               # every other operationId of docs/api/openapi.yaml; sorted 
   - operation_id: awaitRunInput
     milestone: M2
     ticket: M2-09
-  - operation_id: beginIdentityLink
-    milestone: M1
-    ticket: M1-41
-  - operation_id: beginOidcLogin
-    milestone: M1
-    ticket: M1-41
   - operation_id: bindAgentSession
     milestone: M2
     ticket: M2-12
@@ -125,15 +124,9 @@ later:               # every other operationId of docs/api/openapi.yaml; sorted 
   - operation_id: closeThread
     milestone: M1
     ticket: M1-55
-  - operation_id: completeIdentityLink
-    milestone: M1
-    ticket: M1-41
   - operation_id: completeImport
     milestone: M8
     ticket: M8-03
-  - operation_id: completeOidcLogin
-    milestone: M1
-    ticket: M1-41
   - operation_id: completeUpload
     milestone: M3
     ticket: M3-03
@@ -404,9 +397,6 @@ later:               # every other operationId of docs/api/openapi.yaml; sorted 
   - operation_id: getWebhookKeys
     milestone: M2
     ticket: M2-26
-  - operation_id: handleOidcCallback
-    milestone: M1
-    ticket: M1-41
   - operation_id: installApp
     milestone: M2
     ticket: M2-24

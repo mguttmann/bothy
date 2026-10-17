@@ -89,6 +89,9 @@ var appPrivileges = map[string][]string{
 	"device_pairings": {"SELECT", "INSERT", "UPDATE"},
 	// 03 passkey_credentials (M1-40): a passkey ends by revoked_at; the rows are security history.
 	"passkey_credentials": {"SELECT", "INSERT", "UPDATE"},
+	// 03 auth_login_flows (M1-41): transient OIDC login flows; the job identity.auth_cleanup
+	// deletes the expired ones.
+	"auth_login_flows": {"SELECT", "INSERT", "UPDATE", "DELETE"},
 }
 
 // allPrivileges are the table rights PostgreSQL 18 knows (MAINTAIN since 17).

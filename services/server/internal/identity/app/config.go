@@ -82,7 +82,8 @@ type Config struct {
 	// tokens must be DPoP-bound.
 	DPoPRequiredFor []string `config:"auth.dpop_required_for"`
 	// LoginFlowTTL is auth.login_flow_ttl, how long a passkey ceremony (login, enrollment,
-	// registration) may be completed after its begin (M1-40).
+	// registration, M1-40) may be completed after its begin and how long an OIDC login flow lives
+	// from its begin (M1-41, 08 section 18).
 	LoginFlowTTL time.Duration `config:"auth.login_flow_ttl"`
 	// WebAuthnRPID is auth.webauthn_rp_id, the RP ID of the passkeys; "" means the host of
 	// server.public_url (domain.ResolveRelyingParty).
@@ -90,4 +91,16 @@ type Config struct {
 	// WebAuthnOrigins is auth.webauthn_origins, the allowed origins of the passkeys; empty means
 	// the origin of server.public_url.
 	WebAuthnOrigins []string `config:"auth.webauthn_origins"`
+	// ServerCodeTTL is auth.server_code_ttl, how long the login_code of a callback may be redeemed.
+	ServerCodeTTL time.Duration `config:"auth.server_code_ttl"`
+	// OIDCJWKSCacheTTL is auth.oidc_jwks_cache_ttl, how long the discovery document and the keys
+	// of a provider are cached.
+	OIDCJWKSCacheTTL time.Duration `config:"auth.oidc_jwks_cache_ttl"`
+	// OIDCClientAssertionTTL is auth.oidc_client_assertion_ttl, the lifetime of a private_key_jwt
+	// client assertion.
+	OIDCClientAssertionTTL time.Duration `config:"auth.oidc_client_assertion_ttl"`
+	// IDPRecheckInterval is auth.idp_recheck_interval: an OIDC session this old needs a new login
+	// at the provider before its next refresh (08 section 3.5). Zero switches the rule off, which
+	// only tests do; the schema refuses it.
+	IDPRecheckInterval time.Duration `config:"auth.idp_recheck_interval"`
 }
