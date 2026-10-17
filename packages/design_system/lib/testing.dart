@@ -30,13 +30,16 @@ const double dsCiGoldenDiffThreshold = 0.0002;
 ///
 /// Hosts rasterize anti-aliased edges, icons and borders slightly differently: CI goldens
 /// recorded on macOS differ on the Linux runner in many pixels, nearly all by a few steps of
-/// one channel. A changed color, a missing border or a moved element differs by far more
-/// (docs/DECISIONS.md PL/5).
-const int dsCiGoldenChannelTolerance = 16;
+/// one channel. The bound stays below the closest token pairs of the dark theme (a subtle
+/// border on a raised surface differs by 9 steps); a background that differs from its
+/// neighbour by less still fails the exact platform golden on macOS (docs/DECISIONS.md PL/5).
+const int dsCiGoldenChannelTolerance = 8;
 
-/// Golden comparator of the members with design-system goldens: a pixel differs only when
-/// one channel differs by more than [dsCiGoldenChannelTolerance], and the image passes while
-/// at most [dsCiGoldenDiffThreshold] of its pixels differ; a different size always fails.
+/// Golden comparator of the members with design-system goldens. In a CI golden (a file under
+/// `ci/`, the path of D-M4-04-5) a pixel differs only when one channel differs by more than
+/// [dsCiGoldenChannelTolerance], and the image passes while at most [dsCiGoldenDiffThreshold]
+/// of its pixels differ; a platform golden must match exactly, as it is recorded and compared
+/// on macOS only. A different size always fails.
 ///
 /// Install it in `test/flutter_test_config.dart` and pass no `diffThreshold` to alchemist,
 /// which then keeps this comparator (docs/DECISIONS.md PL/5).
@@ -52,13 +55,17 @@ class DsGoldenFileComparator extends LocalFileComparator {
   @override
   Future<bool> compare(Uint8List imageBytes, Uri golden) async {
     final goldenBytes = await getGoldenBytes(golden);
-    if (await _withinTolerance(imageBytes, goldenBytes)) {
+    final ci = golden.pathSegments.first == 'ci';
+    if (ci && await _withinTolerance(imageBytes, goldenBytes)) {
       return true;
     }
     final result = await GoldenFileComparator.compareLists(
       imageBytes,
       goldenBytes,
     );
+    if (result.passed) {
+      return true;
+    }
     await generateFailureOutput(result, golden, basedir);
     return false;
   }

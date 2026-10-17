@@ -1,13 +1,15 @@
 // SPDX-License-Identifier: Apache-2.0
 
 // The golden comparator of the design system (docs/DECISIONS.md PL/5): small
-// anti-aliasing noise between hosts passes, a changed line or size does not.
+// anti-aliasing noise between hosts passes in a CI golden, a changed line or size does not,
+// and a platform golden matches exactly.
 
 import 'dart:async';
 import 'dart:io';
 import 'dart:typed_data';
 import 'dart:ui' as ui;
 
+import 'package:design_system/design_system.dart';
 import 'package:design_system/testing.dart';
 import 'package:flutter_test/flutter_test.dart';
 
@@ -51,11 +53,14 @@ void main() {
 
   tearDown(() => dir.deleteSync(recursive: true));
 
-  Future<bool> compare(Uint8List image) =>
-      comparator.compare(image, Uri.parse('g.png'));
+  Future<bool> compare(Uint8List image, [String golden = 'ci/g.png']) =>
+      comparator.compare(image, Uri.parse(golden));
 
-  Future<void> writeGolden(Uint8List golden) =>
-      File('${dir.path}/g.png').writeAsBytes(golden);
+  Future<void> writeGolden(Uint8List golden, [String path = 'ci/g.png']) async {
+    final file = File('${dir.path}/$path');
+    await file.parent.create(recursive: true);
+    await file.writeAsBytes(golden);
+  }
 
   testWidgets('anti-aliasing noise on many pixels passes', (tester) async {
     await tester.runAsync(() async {
@@ -93,6 +98,30 @@ void main() {
         }
       });
       expect(await compare(shifted), isFalse);
+    });
+  });
+
+  test('a subtle dark border on a raised surface differs by more than the tolerance', () {
+    int channel(ui.Color c, double Function(ui.Color) f) =>
+        (f(c) * 255).round();
+    const dark = DsColors.dark;
+    final steps = [
+      for (final f in <double Function(ui.Color)>[
+        (c) => c.r,
+        (c) => c.g,
+        (c) => c.b,
+      ])
+        (channel(dark.borderSubtle, f) - channel(dark.surfaceRaised, f)).abs(),
+    ];
+    expect(steps.reduce((a, b) => a > b ? a : b), 9);
+    expect(steps.any((s) => s > dsCiGoldenChannelTolerance), isTrue);
+  });
+
+  testWidgets('a platform golden still matches exactly', (tester) async {
+    await tester.runAsync(() async {
+      await writeGolden(await _png(), 'macos/g.png');
+      final pixel = await _png((rgba, width) => rgba[0] += 1);
+      expect(await compare(pixel, 'macos/g.png'), isFalse);
     });
   });
 
