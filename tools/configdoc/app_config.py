@@ -57,7 +57,7 @@ _KINDS: tuple[tuple[str, re.Pattern[str]], ...] = (
     ("pixels", re.compile(r"^(0|[1-9][0-9]*)px$")),
     ("integer", re.compile(r"^-?(0|[1-9][0-9]*)$")),
     ("decimal", re.compile(r"^-?([0-9]+(\.[0-9]*)?|\.[0-9]+)([eE][-+]?[0-9]+)?$")),
-    ("list", re.compile(r"^[^,]+(, *[^,]+)+$")),
+    ("list", re.compile(r"^[^,]+(,[^,]+)+$")),
 )
 
 

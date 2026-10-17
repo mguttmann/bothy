@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import importlib.util
 import sys
+import time
 from pathlib import Path
 
 import pytest
@@ -82,6 +83,14 @@ def _repo(tmp_path: Path, reference: str) -> Path:
 )
 def test_kind_of(default: str, kind: str | None) -> None:
     assert app_config.kind_of(default) == kind
+
+
+def test_kind_of_a_list_does_not_backtrack() -> None:
+    # A default of many ", " separated parts without a closing part must fail fast: the list
+    # pattern allowed spaces both after the comma and in the part (CodeQL, inefficient regex).
+    started = time.monotonic()
+    assert app_config.kind_of("+," + " +," * 24) is None
+    assert time.monotonic() - started < 0.5
 
 
 def test_getter_name_drops_the_first_segment() -> None:
