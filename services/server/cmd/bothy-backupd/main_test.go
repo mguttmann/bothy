@@ -50,10 +50,22 @@ stanza-create)
 esac
 `
 	bin = filepath.Join(dir, "pgbackrest")
-	if err := os.WriteFile(bin, []byte(script), 0o700); err != nil { //nolint:gosec // G306: the fake must be executable.
+	writeExecutable(t, bin, script)
+	return bin, dir
+}
+
+// writeExecutable writes an executable file while no other goroutine of the test binary can
+// fork. A child forked by a parallel test while the file is still open for writing inherits
+// that descriptor, and exec of the file then fails on Linux with ETXTBSY ("text file busy",
+// golang.org/issue/22315). os/exec holds syscall.ForkLock for reading while it forks.
+func writeExecutable(t *testing.T, path, script string) {
+	t.Helper()
+	syscall.ForkLock.Lock()
+	err := os.WriteFile(path, []byte(script), 0o700) //nolint:gosec // G306: the fake must be executable.
+	syscall.ForkLock.Unlock()
+	if err != nil {
 		t.Fatal(err)
 	}
-	return bin, dir
 }
 
 // waitFile waits until path exists, failing the test after a few seconds.
@@ -313,9 +325,7 @@ func TestServeAcceptsAServerEndedBySIGTERM(t *testing.T) {
 	script := "#!/bin/sh\nfor a in \"$@\"; do last=$a; done\n" +
 		"case \"$last\" in\nserver) exec sleep 60 ;;\nstanza-create) echo ok > '" + dir + "/stanza' ;;\nesac\n"
 	bin := filepath.Join(dir, "pgbackrest")
-	if err := os.WriteFile(bin, []byte(script), 0o700); err != nil { //nolint:gosec // G306: the fake must be executable.
-		t.Fatal(err)
-	}
+	writeExecutable(t, bin, script)
 	signals := make(chan os.Signal, 1)
 	var stderr bytes.Buffer
 	done := make(chan int, 1)
