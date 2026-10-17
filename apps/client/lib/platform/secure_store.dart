@@ -127,7 +127,8 @@ final class SecureDatabaseKeySource implements DatabaseKeySource {
   }
 }
 
-/// What the app remembers outside every instance: only the server address (01 5.6, B13).
+/// What the app remembers outside every instance: the server address (01 5.6, B13) and the
+/// public description of its instance (name, accent, login methods), no secret.
 final class AppPreferences {
   /// Creates the preferences on [backend].
   AppPreferences(this._backend);
@@ -145,4 +146,14 @@ final class AppPreferences {
   /// Remembers [address].
   Future<void> setServerAddress(Uri address) =>
       _backend.write(_serverAddressKey, address.toString());
+
+  static const String _instanceKey = 'app/instance';
+
+  /// The public description of the last instance discovery found, as JSON, or null: lets a
+  /// signed-in app start without network (docs/DECISIONS.md D-M4-18-13).
+  Future<String?> instanceJson() => _backend.read(_instanceKey);
+
+  /// Remembers the description of the instance.
+  Future<void> setInstanceJson(String json) =>
+      _backend.write(_instanceKey, json);
 }

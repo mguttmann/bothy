@@ -242,5 +242,28 @@ void main() {
         greaterThanOrEqualTo(DsLayout.columnMin - 1),
       );
     });
+
+    testWidgets(
+      'stored widths wider than the window are fitted; history keeps its minimum',
+      (tester) async {
+        wide(tester);
+        final stored = ColumnWidths.fromSetting({
+          'post_list': 1164,
+          'sidebar': 600,
+        });
+        for (final width in [
+          config.desktopMinWidthFourColumns.toDouble(),
+          config.desktopMinWidthThreeColumns.toDouble(),
+        ]) {
+          await tester.pumpWidget(host(layout(widths: stored), width));
+          expect(tester.takeException(), isNull, reason: '$width');
+          expect(
+            tester.getSize(column('history')).width,
+            greaterThanOrEqualTo(DsLayout.columnMin - 1),
+            reason: '$width',
+          );
+        }
+      },
+    );
   });
 }

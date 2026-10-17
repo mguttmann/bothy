@@ -257,6 +257,27 @@ void main() {
   });
 
   test(
+    'a stored session starts signed in while the server is unreachable',
+    () async {
+      final control = await connected(c, f);
+      await loginAsAlex(control);
+      await eventually(
+        'live',
+        () => state().services?.engine.state.phase == ConnectionPhase.live,
+      );
+      c.dispose();
+      await f.server.stop();
+      c = appContainer(f);
+      c.read(onboardingControllerProvider);
+      await eventually(
+        'signed in offline',
+        () => state().step == OnboardingStep.signedIn,
+      );
+      expect(state().instance?.instanceId, f.server.world.instanceId);
+    },
+  );
+
+  test(
     'a stored session restarts signed in; a revoked one ends in E7',
     () async {
       final control = await connected(c, f);

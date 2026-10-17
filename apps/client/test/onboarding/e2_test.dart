@@ -157,4 +157,26 @@ void main() {
       expect(find.byKey(ValueKey('notice.${n.name}')), findsOneWidget);
     }
   });
+
+  testWidgets(
+    'Enter on a focused button activates that button, not the main action',
+    (tester) async {
+      final calls = await pumpE2(tester, oidcOnly);
+      for (final (text, expected) in [
+        (en.onboardingEnrollmentCodeLink, 'enroll'),
+        (en.onboardingPairLink, 'pair'),
+        (
+          en.onboardingLoginWithProvider('Office proxy'),
+          'provider Office proxy',
+        ),
+      ]) {
+        Focus.of(tester.element(find.text(text))).requestFocus();
+        await tester.pump();
+        await tester.sendKeyEvent(LogicalKeyboardKey.enter);
+        await tester.pump();
+        expect(calls.log.last, expected, reason: text);
+      }
+      expect(calls.log, isNot(contains('provider Company SSO')));
+    },
+  );
 }

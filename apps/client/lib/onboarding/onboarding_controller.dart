@@ -5,6 +5,7 @@
 library;
 
 import 'dart:async';
+import 'dart:convert';
 
 import 'package:api_client/api_client.dart' show DeviceStateEnum;
 import 'package:auth/auth.dart';
@@ -233,12 +234,14 @@ class OnboardingController extends _$OnboardingController {
       state = state.next(address: _ports.branding.defaultServer);
       return;
     }
-    await connect(remembered.toString(), resume: true);
+    await connect(remembered.toString());
   }
 
-  /// E1 "Connect": discovery at [typed]; on success the address is remembered, the services
-  /// are composed and E2 shows (or the main view, with [resume] and a stored session).
-  Future<void> connect(String typed, {bool resume = false}) async {
+  /// E1 "Connect": discovery at [typed]; on success the address and the instance are
+  /// remembered, the services are composed and E2 shows, or the main view (or E4) when a
+  /// session of the instance is stored. Without any answer from the server a stored session of
+  /// the remembered instance starts from the local data (D-M4-18-13).
+  Future<void> connect(String typed) async {
     final address = normalizeServerAddress(typed);
     if (address == null) {
       state = state.next(
@@ -258,23 +261,19 @@ class OnboardingController extends _$OnboardingController {
     switch (outcome) {
       case DiscoveryFound(:final instance):
         await _prefs.setServerAddress(address);
-        await _closeServices();
-        final InstanceServices services;
-        try {
-          services = await InstanceServices.open(_ports, instance);
-        } on Object {
-          state = state
-              .withInstance(null)
-              .next(serverStatus: ServerStatus.noInstance, clearServices: true);
+        await _prefs.setInstanceJson(jsonEncode(instance.toJson()));
+        await _openInstance(instance);
+      case DiscoveryUnreachable():
+        final known = InstanceInfo.fromJson(
+          _decode(await _prefs.instanceJson()),
+        );
+        if (known == null ||
+            known.address != address ||
+            !await _hasSession(known)) {
+          state = state.next(serverStatus: ServerStatus.noInstance);
           return;
         }
-        _watch(services);
-        state = state
-            .withInstance(instance)
-            .next(step: OnboardingStep.login, services: services);
-        if (resume && await services.hasStoredSession()) {
-          await _resume(services);
-        }
+        await _openInstance(known);
       case DiscoveryNoInstance():
         state = state.next(serverStatus: ServerStatus.noInstance);
       case DiscoveryCertificateInvalid():
@@ -289,6 +288,46 @@ class OnboardingController extends _$OnboardingController {
     }
   }
 
+  /// Composes the services of [instance] and shows E2, or resumes a stored session.
+  Future<void> _openInstance(InstanceInfo instance) async {
+    await _closeServices();
+    final InstanceServices services;
+    try {
+      services = await InstanceServices.open(_ports, instance);
+    } on Object {
+      state = state
+          .withInstance(null)
+          .next(serverStatus: ServerStatus.noInstance, clearServices: true);
+      return;
+    }
+    _watch(services);
+    state = state
+        .withInstance(instance)
+        .next(
+          step: OnboardingStep.login,
+          services: services,
+          serverStatus: ServerStatus.idle,
+        );
+    if (await services.hasStoredSession()) await _resume(services);
+  }
+
+  /// Whether a refresh token of [instance] is stored, without opening anything.
+  Future<bool> _hasSession(InstanceInfo instance) async =>
+      await InstanceSecrets(
+        _ports.secureBackend,
+        instance.instanceId,
+      ).read('auth/${instance.address.origin}/refresh_token') !=
+      null;
+
+  static Object? _decode(String? json) {
+    if (json == null) return null;
+    try {
+      return jsonDecode(json);
+    } on FormatException {
+      return null;
+    }
+  }
+
   /// E2 "Change": back to E1 with the current address.
   Future<void> changeServer() async {
     _flow++;
@@ -298,6 +337,7 @@ class OnboardingController extends _$OnboardingController {
         .next(
           step: OnboardingStep.server,
           clearServices: true,
+          serverStatus: ServerStatus.idle,
           address: state.instance?.address.toString() ?? state.address,
         );
   }

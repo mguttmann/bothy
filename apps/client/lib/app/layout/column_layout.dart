@@ -104,7 +104,15 @@ class _ColumnLayoutState extends State<ColumnLayout> {
       final total = constraints.maxWidth;
       final four = total >= widget.minWidthFourColumns;
       final stacked = total < widget.minWidthThreeColumns;
-      final widths = _widths;
+      final widths = fitColumns(
+        _widths,
+        sized: [
+          AppColumn.sidebar,
+          if (!stacked) AppColumn.postList,
+          if (four) AppColumn.session,
+        ],
+        total: total,
+      );
       final sized = <String>[
         AppColumn.sidebar,
         if (!stacked) AppColumn.postList,
@@ -211,4 +219,32 @@ class _DragHandle extends StatelessWidget {
       ),
     ),
   );
+}
+
+/// [widths] fitted to a window of [total] pixels: when the [sized] columns, their handles and
+/// the minimum of the history do not fit, the sized columns shrink in proportion to what they
+/// have above `DsLayout.columnMin` (a stored width may come from a larger screen, 01 11).
+///
+/// Example: `fitColumns(stored, sized: [AppColumn.sidebar], total: 800)`.
+ColumnWidths fitColumns(
+  ColumnWidths widths, {
+  required List<String> sized,
+  required double total,
+}) {
+  final available = total - sized.length * DsSpace.s4 - DsLayout.columnMin;
+  final used = sized.fold<double>(0, (sum, c) => sum + widths.of(c));
+  final excess = used - available;
+  if (excess <= 0) return widths;
+  final slack = sized.fold<double>(
+    0,
+    (sum, c) => sum + widths.of(c) - DsLayout.columnMin,
+  );
+  if (slack <= 0) return widths;
+  final keep = excess >= slack ? 0.0 : 1 - excess / slack;
+  var fitted = widths;
+  for (final c in sized) {
+    final extra = widths.of(c) - DsLayout.columnMin;
+    fitted = fitted.withWidth(c, DsLayout.columnMin + extra * keep);
+  }
+  return fitted;
 }

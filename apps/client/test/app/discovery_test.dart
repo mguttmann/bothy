@@ -212,7 +212,7 @@ void main() {
   test('no valid answer is "no instance"', () async {
     expect(
       await run((_) async => throw const SocketException('refused')),
-      isA<DiscoveryNoInstance>(),
+      isA<DiscoveryUnreachable>(),
     );
     expect(
       await run((_) async => json(200, {'hello': 1})),

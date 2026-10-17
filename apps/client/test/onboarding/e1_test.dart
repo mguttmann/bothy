@@ -135,6 +135,7 @@ void main() {
       () async {
         final cases = <DiscoveryOutcome, ServerStatus>{
           const DiscoveryNoInstance(): ServerStatus.noInstance,
+          const DiscoveryUnreachable(): ServerStatus.noInstance,
           const DiscoveryCertificateInvalid(): ServerStatus.certificateInvalid,
           const DiscoverySetupRequired(): ServerStatus.notSetUp,
           const DiscoveryAppTooOld('3.0.0'): ServerStatus.appTooOld,
@@ -181,8 +182,16 @@ void main() {
         await AppPreferences(secure).serverAddress(),
         Uri.parse('https://chat.example.com'),
       );
+      expect(
+        c.read(onboardingControllerProvider).serverStatus,
+        ServerStatus.idle,
+      );
       await c.read(onboardingControllerProvider.notifier).changeServer();
       expect(c.read(onboardingControllerProvider).step, OnboardingStep.server);
+      expect(
+        c.read(onboardingControllerProvider).serverStatus,
+        ServerStatus.idle,
+      );
       expect(
         c.read(onboardingControllerProvider).address,
         'https://chat.example.com',

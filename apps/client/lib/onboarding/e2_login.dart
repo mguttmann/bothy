@@ -179,7 +179,6 @@ class _LoginScreenState extends State<LoginScreen> {
               autofillHints: const [AutofillHints.oneTimeCode],
               keyboardType: TextInputType.number,
               decoration: InputDecoration(labelText: l.onboardingOneTimeCode),
-              onSubmitted: (_) => _submitPassword(),
             ),
             controlGap,
             FilledButton(

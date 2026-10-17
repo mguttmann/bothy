@@ -109,7 +109,6 @@ class _EnrollmentCodeScreenState extends State<EnrollmentCodeScreen> {
           enabled: enabled,
           autocorrect: false,
           decoration: InputDecoration(labelText: l.onboardingEnrollCode),
-          onSubmitted: (_) => _continue(),
         ),
         cardGap,
         CardText(l.onboardingEnrollHow),

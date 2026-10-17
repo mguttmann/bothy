@@ -84,6 +84,53 @@ final class InstanceInfo {
 
   /// Whether the instance offers any login method (E2 says so otherwise).
   bool get hasLoginMethod => providers.isNotEmpty || localEnabled;
+
+  /// The JSON the app remembers for a start without network (D-M4-18-13); the logo is not
+  /// kept.
+  Map<String, Object?> toJson() => {
+    'address': address.toString(),
+    'instance_id': instanceId,
+    'product_name': productName,
+    'accent_color': accentColor,
+    'providers': [
+      for (final p in providers) {'id': p.id, 'kind': p.kind, 'name': p.name},
+    ],
+    'local_enabled': localEnabled,
+    'password_enabled': passwordEnabled,
+  };
+
+  /// Reads [toJson]; returns null for anything else.
+  static InstanceInfo? fromJson(Object? json) {
+    if (json is! Map) return null;
+    final address = Uri.tryParse('${json['address']}');
+    final id = json['instance_id'];
+    final name = json['product_name'];
+    final providers = json['providers'];
+    if (address == null || id is! String || name is! String) return null;
+    return InstanceInfo(
+      address: address,
+      instanceId: id,
+      productName: name,
+      accentColor: json['accent_color'] is String
+          ? json['accent_color']! as String
+          : null,
+      providers: [
+        if (providers is List)
+          for (final p in providers)
+            if (p is Map &&
+                p['id'] is String &&
+                p['kind'] is String &&
+                p['name'] is String)
+              LoginProvider(
+                id: p['id']! as String,
+                kind: p['kind']! as String,
+                name: p['name']! as String,
+              ),
+      ],
+      localEnabled: json['local_enabled'] == true,
+      passwordEnabled: json['password_enabled'] == true,
+    );
+  }
 }
 
 /// The result of E1.
@@ -104,6 +151,13 @@ final class DiscoveryFound extends DiscoveryOutcome {
 final class DiscoveryNoInstance extends DiscoveryOutcome {
   /// Creates the outcome.
   const DiscoveryNoInstance();
+}
+
+/// No answer at all (no network, the host is down): the app may start from its local data
+/// when it knows the instance (D-M4-18-13); E1 shows it like [DiscoveryNoInstance].
+final class DiscoveryUnreachable extends DiscoveryOutcome {
+  /// Creates the outcome.
+  const DiscoveryUnreachable();
 }
 
 /// The TLS handshake failed; there is no way to continue and no exception (R-PR-14).
@@ -235,6 +289,14 @@ final class ApiDiscoveryClient implements DiscoveryClient {
         e.error is TlsException ||
         e.error is HandshakeException) {
       return const DiscoveryCertificateInvalid();
+    }
+    if (e.response == null &&
+        (e.type == DioExceptionType.connectionError ||
+            e.type == DioExceptionType.connectionTimeout ||
+            e.type == DioExceptionType.receiveTimeout ||
+            e.type == DioExceptionType.sendTimeout ||
+            e.error is SocketException)) {
+      return const DiscoveryUnreachable();
     }
     if (ApiProblem.of(e)?.code == 'setup_required' ||
         (e.response != null &&

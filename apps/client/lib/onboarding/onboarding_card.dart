@@ -31,40 +31,52 @@ class OnboardingCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final colors = context.dsColors;
-    return CallbackShortcuts(
-      bindings: {
-        const SingleActivator(LogicalKeyboardKey.enter): ?onEnter,
-        const SingleActivator(LogicalKeyboardKey.escape): ?onEscape,
+    return Focus(
+      autofocus: true,
+      // Enter runs the main action only from the card itself or from a text field; a focused
+      // button or radio keeps Enter for its own activation (01 5.6 "Keyboard").
+      onKeyEvent: (node, event) {
+        if (event is! KeyDownEvent) return KeyEventResult.ignored;
+        final key = event.logicalKey;
+        if (key == LogicalKeyboardKey.escape && onEscape != null) {
+          onEscape!();
+          return KeyEventResult.handled;
+        }
+        if ((key == LogicalKeyboardKey.enter ||
+                key == LogicalKeyboardKey.numpadEnter) &&
+            onEnter != null &&
+            _enterIsMine(node)) {
+          onEnter!();
+          return KeyEventResult.handled;
+        }
+        return KeyEventResult.ignored;
       },
-      child: Focus(
-        autofocus: true,
-        child: Material(
-          color: colors.surfaceCanvas,
-          child: Center(
-            child: SingleChildScrollView(
-              padding: const EdgeInsets.all(DsSpace.s24),
-              child: ConstrainedBox(
-                constraints: const BoxConstraints(
-                  maxWidth: DsLayout.overlayWidth,
-                ),
-                // A Material, so list tiles and ink of the card paint on the card itself.
-                child: Material(
-                  color: colors.surfaceRaised,
-                  shape: RoundedRectangleBorder(
-                    side: BorderSide(
-                      color: colors.borderSubtle,
-                      width: DsBorderWidth.hairline,
-                    ),
-                    borderRadius: BorderRadius.circular(DsRadius.lg),
+      child: Material(
+        color: colors.surfaceCanvas,
+        child: Center(
+          child: SingleChildScrollView(
+            padding: const EdgeInsets.all(DsSpace.s24),
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(
+                maxWidth: DsLayout.overlayWidth,
+              ),
+              // A Material, so list tiles and ink of the card paint on the card itself.
+              child: Material(
+                color: colors.surfaceRaised,
+                shape: RoundedRectangleBorder(
+                  side: BorderSide(
+                    color: colors.borderSubtle,
+                    width: DsBorderWidth.hairline,
                   ),
-                  child: Padding(
-                    padding: const EdgeInsets.all(DsSpace.s24),
-                    child: FocusTraversalGroup(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.stretch,
-                        mainAxisSize: MainAxisSize.min,
-                        children: children,
-                      ),
+                  borderRadius: BorderRadius.circular(DsRadius.lg),
+                ),
+                child: Padding(
+                  padding: const EdgeInsets.all(DsSpace.s24),
+                  child: FocusTraversalGroup(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      mainAxisSize: MainAxisSize.min,
+                      children: children,
                     ),
                   ),
                 ),
@@ -74,6 +86,13 @@ class OnboardingCard extends StatelessWidget {
         ),
       ),
     );
+  }
+
+  /// Whether Enter belongs to the card: the card itself or a text field has the focus.
+  static bool _enterIsMine(FocusNode card) {
+    final focus = FocusManager.instance.primaryFocus;
+    if (focus == null || identical(focus, card)) return true;
+    return focus.context?.findAncestorWidgetOfExactType<EditableText>() != null;
   }
 }
 

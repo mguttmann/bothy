@@ -47,6 +47,13 @@ class _ServerAddressScreenState extends State<ServerAddressScreen> {
   );
 
   @override
+  void didUpdateWidget(ServerAddressScreen old) {
+    super.didUpdateWidget(old);
+    // The suggested or remembered address arrives after the first frame.
+    if (old.address != widget.address) _address.text = widget.address;
+  }
+
+  @override
   void dispose() {
     _address.dispose();
     super.dispose();
@@ -92,7 +99,6 @@ class _ServerAddressScreenState extends State<ServerAddressScreen> {
           keyboardType: TextInputType.url,
           autocorrect: false,
           decoration: InputDecoration(labelText: l.onboardingServerAddress),
-          onSubmitted: (_) => _connect(),
         ),
         cardGap,
         FilledButton(

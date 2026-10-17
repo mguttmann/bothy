@@ -131,4 +131,20 @@ void main() {
     );
     expect(SignOutCause.ofRevokeReason(null), SignOutCause.sessionRevoked);
   });
+
+  test('the remembered instance survives its JSON; garbage gives null', () {
+    final info = InstanceInfo(
+      address: Uri.parse('https://chat.example.com'),
+      instanceId: instanceId,
+      productName: 'Team Chat',
+      accentColor: 'loch',
+      providers: const [LoginProvider(id: 'p', kind: 'oidc', name: 'SSO')],
+      localEnabled: true,
+      passwordEnabled: true,
+    );
+    final back = InstanceInfo.fromJson(info.toJson())!;
+    expect(back.toJson(), info.toJson());
+    expect(InstanceInfo.fromJson('x'), isNull);
+    expect(InstanceInfo.fromJson({'address': 'https://a.example.com'}), isNull);
+  });
 }
