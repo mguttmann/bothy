@@ -20,6 +20,19 @@ Planning stage (milestone M0). Nothing is installable yet.
 
 ### Added
 
+- Desktop app shell (M4-18): `apps/client` builds for macOS and Windows with platform folders,
+  the build branding of `branding.example.yaml` (URL scheme, app name, bundle identifier, default
+  server) and deep links of that scheme on both platforms. One composition root per server
+  address wires the device keys, the secrets in secure storage, the encrypted local database,
+  the auth session and the sync engine; Riverpod providers over the database and the engine feed
+  the widgets. The onboarding screens E1 to E7 run the login flows (OIDC in the system browser
+  with a loopback redirect, proxy, password with one-time code, enrollment code, waiting device
+  with its verification code, pairing), and every end of an account (logout, cancel, rejection,
+  expiry, revocation, `4012`) deletes the local database, the file cache, the keys and the
+  tokens. The router has one path per target with "Not found or no access", and the main view
+  has four resizable column frames whose widths are stored as `layout.column_widths`. Widget,
+  golden and flow tests run against the fake server of M4-17; the integration tests run on the
+  desktop runners of CI.
 - Sync engine composition root and fake server (M4-17): `SyncEngine.create` builds the gateway
   connection, catch-up and dispatcher, outbox and run store and wires their hooks (echo to the
   outbox, outbox start after `catchup.complete` and pause on every disconnect, `run.updated` and

@@ -1492,4 +1492,272 @@ class AppLocalizationsDe extends AppLocalizations {
 
   @override
   String get consoleReload => 'Neu laden';
+
+  @override
+  String get onboardingConnectTitle => 'Mit deiner Instanz verbinden';
+
+  @override
+  String get onboardingServerAddress => 'Serveradresse';
+
+  @override
+  String get onboardingConnect => 'Verbinden';
+
+  @override
+  String get onboardingConnecting => 'Verbindung wird hergestellt';
+
+  @override
+  String get onboardingAddressInvalid =>
+      'Gib die vollständige Adresse der Instanz ein, zum Beispiel https://chat.example.com.';
+
+  @override
+  String get onboardingNoInstance =>
+      'Unter dieser Adresse gibt es keine Instanz. Prüfe die Adresse und versuche es erneut.';
+
+  @override
+  String get onboardingCertificateInvalid =>
+      'Zertifikat ungültig. Die Verbindung ist nicht sicher, deshalb verbindet sich die App nicht. Bitte den Owner der Instanz, das Zertifikat zu erneuern.';
+
+  @override
+  String get onboardingNotSetUp =>
+      'Instanz noch nicht eingerichtet. Der Owner richtet sie auf dem Rechner mit dem Einrichtungsassistenten ein (install.sh).';
+
+  @override
+  String onboardingAppTooOld(String version) {
+    return 'App zu alt. Diese Instanz braucht Version $version oder neuer. Installiere das Update und verbinde dich dann erneut.';
+  }
+
+  @override
+  String onboardingLoginTitle(String productName) {
+    return 'Bei $productName anmelden';
+  }
+
+  @override
+  String onboardingLoginWithProvider(String name) {
+    return 'Mit $name anmelden';
+  }
+
+  @override
+  String get onboardingOr => 'oder';
+
+  @override
+  String get onboardingLoginName => 'Anmeldename';
+
+  @override
+  String get onboardingLoginWithPasskey => 'Mit Passkey anmelden';
+
+  @override
+  String get onboardingPasswordAndCode => 'Passwort und Einmalcode';
+
+  @override
+  String get onboardingPassword => 'Passwort';
+
+  @override
+  String get onboardingOneTimeCode => 'Einmalcode';
+
+  @override
+  String get onboardingLogIn => 'Anmelden';
+
+  @override
+  String get onboardingEnrollmentCodeLink => 'Ich habe einen Einladungs-Code';
+
+  @override
+  String get onboardingPairLink => 'Mit anderem Gerät koppeln';
+
+  @override
+  String get onboardingNoMethod =>
+      'Für diese Instanz ist keine Anmeldung eingerichtet. Wende dich an den Owner der Instanz.';
+
+  @override
+  String onboardingServerHost(String address) {
+    return 'Server: $address';
+  }
+
+  @override
+  String get onboardingChangeServer => 'Ändern';
+
+  @override
+  String get onboardingBack => 'Zurück';
+
+  @override
+  String get onboardingLoginFailed =>
+      'Anmeldung fehlgeschlagen. Prüfe deine Angaben und versuche es erneut.';
+
+  @override
+  String get onboardingUnreachable =>
+      'Die Instanz ist nicht erreichbar. Prüfe das Netzwerk und versuche es erneut.';
+
+  @override
+  String get onboardingBrowserCancelled =>
+      'Die Anmeldung im Browser wurde abgebrochen. Starte sie erneut.';
+
+  @override
+  String get onboardingBrowserExpired =>
+      'Die Anmeldung im Browser hat zu lange gedauert. Starte sie erneut.';
+
+  @override
+  String get onboardingEnrollTitle => 'Einladungs-Code';
+
+  @override
+  String get onboardingEnrollCode => 'Code vom Owner';
+
+  @override
+  String get onboardingEnrollHow => 'Wie möchtest du dich anmelden?';
+
+  @override
+  String get onboardingEnrollThisDevice => 'Dieses Gerät verwenden';
+
+  @override
+  String get onboardingEnrollCreatePasskey => 'Passkey erstellen';
+
+  @override
+  String onboardingEnrollLink(String name) {
+    return 'Mit $name verknüpfen';
+  }
+
+  @override
+  String get onboardingContinue => 'Weiter';
+
+  @override
+  String get onboardingEnrollOnce => 'Der Code gilt einmal.';
+
+  @override
+  String get onboardingPendingTitle => 'Gerät wartet auf Bestätigung';
+
+  @override
+  String get onboardingPendingExplain =>
+      'Gib diesen Code auf einem deiner aktiven Geräte ein: Einstellungen, Geräte und Sitzungen, Bestätigen. Kein aktives Gerät: frag den Owner.';
+
+  @override
+  String get onboardingCancel => 'Abbrechen';
+
+  @override
+  String onboardingValidFor(int minutes) {
+    String _temp0 = intl.Intl.pluralLogic(
+      minutes,
+      locale: localeName,
+      other: 'Noch $minutes Minuten gültig',
+      one: 'Noch 1 Minute gültig',
+      zero: 'Noch weniger als eine Minute gültig',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get onboardingPairTitle => 'Gerät koppeln';
+
+  @override
+  String get onboardingPairExplain =>
+      'Auf einem aktiven Gerät: Einstellungen, Geräte, Gerät hinzufügen, dann eingeben:';
+
+  @override
+  String get onboardingPairNewCode => 'Neuer Code';
+
+  @override
+  String get onboardingPairExpired =>
+      'Der Code ist abgelaufen. Hol dir einen neuen Code.';
+
+  @override
+  String onboardingLockedTitle(String productName) {
+    return '$productName ist gesperrt';
+  }
+
+  @override
+  String get onboardingUnlock => 'Entsperren';
+
+  @override
+  String get onboardingUnlockFailed => 'Entsperren fehlgeschlagen.';
+
+  @override
+  String get onboardingTryAgain => 'Erneut versuchen';
+
+  @override
+  String get onboardingLogOut => 'Abmelden';
+
+  @override
+  String get onboardingSignedOutTitle => 'Du bist abgemeldet.';
+
+  @override
+  String onboardingSignedOutReason(String reason) {
+    return 'Grund: $reason';
+  }
+
+  @override
+  String get onboardingReasonLoggedOut => 'Du hast dich abgemeldet.';
+
+  @override
+  String get onboardingReasonRevokedBySelf =>
+      'Dieses Gerät wurde von einem anderen Gerät widerrufen.';
+
+  @override
+  String get onboardingReasonRevokedByOwner =>
+      'Der Owner hat dieses Gerät widerrufen.';
+
+  @override
+  String get onboardingReasonUserDisabled => 'Dein Konto wurde deaktiviert.';
+
+  @override
+  String get onboardingReasonInactive =>
+      'Dieses Gerät wurde lange nicht verwendet.';
+
+  @override
+  String get onboardingReasonRejected =>
+      'Die Bestätigung dieses Geräts wurde abgelehnt.';
+
+  @override
+  String get onboardingReasonPendingExpired =>
+      'Dieses Gerät wurde nicht rechtzeitig bestätigt.';
+
+  @override
+  String get onboardingReasonSessionRevoked =>
+      'Deine Sitzung wurde auf dem Server beendet.';
+
+  @override
+  String get onboardingReasonSessionExpired => 'Deine Sitzung ist abgelaufen.';
+
+  @override
+  String get onboardingDataDeleted =>
+      'Die Daten dieses Geräts wurden gelöscht.';
+
+  @override
+  String get onboardingLogInAgain => 'Erneut anmelden';
+
+  @override
+  String get onboardingContactOwner => 'Wende dich an den Owner der Instanz.';
+
+  @override
+  String get onboardingCopy => 'Kopieren';
+
+  @override
+  String get onboardingCopied => 'Kopiert';
+
+  @override
+  String onboardingCodeLabel(String characters) {
+    return 'Code: $characters';
+  }
+
+  @override
+  String get onboardingLoopbackDone =>
+      'Die Anmeldung ist abgeschlossen. Du kannst dieses Fenster schließen.';
+
+  @override
+  String get shellColumnSidebar => 'Bereiche und Kanäle';
+
+  @override
+  String get shellColumnPostList => 'Beitragsliste';
+
+  @override
+  String get shellColumnHistory => 'Verlauf';
+
+  @override
+  String get shellColumnSession => 'Sitzung';
+
+  @override
+  String get shellResizeColumn => 'Spaltenbreite ändern';
+
+  @override
+  String get shellUpdateRequired =>
+      'Update erforderlich. Installiere die neue Version, um dich wieder zu verbinden.';
+
+  @override
+  String get shellStepUpTitle => 'Bestätige, dass du es bist';
 }

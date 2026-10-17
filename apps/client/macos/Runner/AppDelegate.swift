@@ -1,0 +1,63 @@
+// SPDX-License-Identifier: Apache-2.0
+
+import Cocoa
+import FlutterMacOS
+
+/// The application delegate of the desktop app on macOS.
+///
+/// Links of the URL scheme of the build branding (`BRANDING_URL_SCHEME`, docs/spec/
+/// 15-client-architektur.md 11) arrive through `application(_:open:)` and go to Dart over the
+/// channel of `DeepLinkChannel`.
+@main
+class AppDelegate: FlutterAppDelegate {
+  override func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool {
+    return true
+  }
+
+  override func applicationSupportsSecureRestorableState(_ app: NSApplication) -> Bool {
+    return true
+  }
+
+  override func application(_ application: NSApplication, open urls: [URL]) {
+    for url in urls {
+      DeepLinkChannel.shared.receive(url.absoluteString)
+    }
+  }
+}
+
+/// Forwards deep links to Dart over the method channel `bothy/deep_links`.
+///
+/// A link that arrives before the Flutter engine runs (the app was started by the link) waits
+/// in `pending` until Dart asks for it with `takePending`; later links go out at once with
+/// `open`. Only the Dart side parses the link (`lib/app/deep_links.dart`).
+final class DeepLinkChannel {
+  /// The one instance of the app.
+  static let shared = DeepLinkChannel()
+
+  private var channel: FlutterMethodChannel?
+  private var pending: [String] = []
+
+  /// Connects the channel to the engine of the main window.
+  func attach(messenger: FlutterBinaryMessenger) {
+    let channel = FlutterMethodChannel(name: "bothy/deep_links", binaryMessenger: messenger)
+    channel.setMethodCallHandler { [weak self] call, result in
+      guard call.method == "takePending" else {
+        result(FlutterMethodNotImplemented)
+        return
+      }
+      let links = self?.pending ?? []
+      self?.pending.removeAll()
+      result(links)
+    }
+    self.channel = channel
+  }
+
+  /// Hands a link to Dart, or keeps it until Dart asks.
+  func receive(_ link: String) {
+    guard let channel = channel else {
+      pending.append(link)
+      return
+    }
+    channel.invokeMethod("open", arguments: link)
+  }
+}

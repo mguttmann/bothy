@@ -533,6 +533,19 @@ D-M5-01-3.
 Weil der Refresh-Token an den Geräteschlüssel gebunden ist (DPoP), ist ein gestohlener Token ohne
 das Gerät wertlos; das senkt die Anforderung an den Speicher der Token, nicht an den Schlüssel.
 
+Desktop app (M4-18, docs/DECISIONS.md D-M4-18-1): `apps/client/lib/platform/secure_store.dart`
+keeps the refresh token, the device ID and the database key of each instance in
+`flutter_secure_storage`, every key prefixed with `instance/<instance_id>/`; the only key outside
+an instance is the remembered server address (`app/server_address`). On macOS a release build uses
+the Data Protection keychain, not synchronized, with `first_unlock_this_device` and the keychain
+access group `$(AppIdentifierPrefix)<bundle identifier>`; a local debug or profile build has no
+team signature and so no access group, and keeps the items in the login keychain under the app's
+own access list. On Windows the package default applies (Credential Manager plus AES-GCM files).
+The database key is 32 bytes from `Random.secure()`, created at the first start of an instance;
+the database is `<application support>/instances/<instance_id>/local.db`, the file cache lives
+in the same folder, and the device keys of `packages/device_key` use the `instance_id` as scope.
+A wipe (R-SY-14) deletes that folder, both device keys and every secret with the prefix.
+
 ## 10. Hintergrundverhalten und Push
 
 Der Push trägt nur IDs und einen neutralen Platzhalter (Baseline R-Push, ADR 0031). Format und
@@ -618,6 +631,20 @@ Von außen: `<scheme>://t/{thread_id}?m={message_id}` mit dem URL-Schema aus der
 (ADR 0044); bei Instanzen mit öffentlicher Domain zusätzlich Universal Links bzw. App Links. Ein Link
 auf etwas Unsichtbares zeigt "Nicht gefunden oder kein Zugriff". Ein Link aus dem Push wartet, bis
 der Thread lokal oder per REST geladen ist, und springt dann an die Nachricht.
+
+Desktop app (M4-18, docs/DECISIONS.md D-M4-18-4 and D-M4-18-7): besides the paths above the
+router has `/onboarding/<step>` for E1 to E7 (`server`, `login`, `enroll`, `pending`, `pair`,
+`locked`, `signed-out`) and `/settings/...`; every other path needs a login and leads to the
+current onboarding screen before it, and a path that arrives before the login is kept and opened
+after it. A path that names no target, an ID that is no valid ID and a target that is neither in
+the local database nor returned by REST (`404`, `403`) show "Not found or no access". Until the
+distribution of M7 reads `branding.yaml`, a desktop build takes its URL scheme, app name, bundle
+identifier and default server from `apps/client/branding.example.yaml` (neutral values under
+`example.com`, scheme `chat-example`) through `tool/branding_defines.dart`, which writes the
+`--dart-define-from-file` input and the native settings: macOS registers the scheme as a URL type
+in `Info.plist` and the app delegate hands links to Dart; the Windows runner registers it under
+`HKEY_CURRENT_USER\Software\Classes` and a second start with a link hands it to the running window
+(`WM_COPYDATA`); both forward over the method channel `bothy/deep_links`.
 
 Web console (M6-02, docs/DECISIONS.md D-M6-02-1): the server serves it under `/console/` on the
 origin of the API, and its paths are `/console/login`, `/console/login/callback` (OIDC login),

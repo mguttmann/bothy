@@ -846,3 +846,300 @@ version = "2.2.4"
 ecosystem = "Pub"
 license.override = ["BSD-3-Clause"]
 reason = "deps.dev knows no license for this pub package; its LICENSE file on pub.dev is BSD-3-Clause. Comes with the local database of the apps, a dependency of the drift generator (docs/DECISIONS.md D-M4-12-9)."
+
+# Packages of the desktop app shell (M4-18, docs/DECISIONS.md D-M4-18-12): state, router, secure
+# storage, browser and folders of apps/client and their transitive packages. Each checked
+# against the LICENSE file of that version as pub.dev ships it, on 2026-10-17.
+
+[[PackageOverrides]]
+name = "analyzer_buffer"
+version = "0.3.4"
+ecosystem = "Pub"
+license.override = ["MIT"]
+reason = "LICENSE of this version is the MIT License text. Dev dependency (code generation of apps/client) or transitive of it."
+
+[[PackageOverrides]]
+name = "flutter_riverpod"
+version = "3.4.3"
+ecosystem = "Pub"
+license.override = ["MIT"]
+reason = "LICENSE of this version is the MIT License text. Runtime dependency of apps/client or transitive of one."
+
+[[PackageOverrides]]
+name = "freezed_annotation"
+version = "3.1.0"
+ecosystem = "Pub"
+license.override = ["MIT"]
+reason = "LICENSE of this version is the MIT License text. Dev dependency (code generation of apps/client) or transitive of it."
+
+[[PackageOverrides]]
+name = "riverpod"
+version = "3.4.3"
+ecosystem = "Pub"
+license.override = ["MIT"]
+reason = "LICENSE of this version is the MIT License text. Runtime dependency of apps/client or transitive of one."
+
+[[PackageOverrides]]
+name = "riverpod_analyzer_utils"
+version = "1.0.0-dev.12"
+ecosystem = "Pub"
+license.override = ["MIT"]
+reason = "LICENSE of this version is the MIT License text. Dev dependency (code generation of apps/client) or transitive of it."
+
+[[PackageOverrides]]
+name = "riverpod_annotation"
+version = "4.0.7"
+ecosystem = "Pub"
+license.override = ["MIT"]
+reason = "LICENSE of this version is the MIT License text. Runtime dependency of apps/client or transitive of one."
+
+[[PackageOverrides]]
+name = "riverpod_generator"
+version = "4.0.9"
+ecosystem = "Pub"
+license.override = ["MIT"]
+reason = "LICENSE of this version is the MIT License text. Dev dependency (code generation of apps/client) or transitive of it."
+
+[[PackageOverrides]]
+name = "state_notifier"
+version = "1.0.0"
+ecosystem = "Pub"
+license.override = ["MIT"]
+reason = "LICENSE of this version is the MIT License text. Runtime dependency of apps/client or transitive of one."
+
+[[PackageOverrides]]
+name = "uuid"
+version = "4.6.0"
+ecosystem = "Pub"
+license.override = ["MIT"]
+reason = "LICENSE of this version is the MIT License text. Runtime dependency of apps/client or transitive of one."
+
+[[PackageOverrides]]
+name = "mockito"
+version = "5.8.1"
+ecosystem = "Pub"
+license.override = ["Apache-2.0"]
+reason = "LICENSE of this version is the Apache License 2.0 text. Dev dependency (code generation of apps/client) or transitive of it."
+
+[[PackageOverrides]]
+name = "cupertino_ui"
+version = "1.1.3"
+ecosystem = "Pub"
+license.override = ["BSD-3-Clause"]
+reason = "LICENSE of this version is the three-clause BSD text. Runtime dependency of apps/client or transitive of one."
+
+[[PackageOverrides]]
+name = "ffi_leak_tracker"
+version = "0.1.2"
+ecosystem = "Pub"
+license.override = ["BSD-3-Clause"]
+reason = "LICENSE of this version is the three-clause BSD text. Runtime dependency of apps/client or transitive of one."
+
+[[PackageOverrides]]
+name = "flutter_secure_storage"
+version = "11.2.0"
+ecosystem = "Pub"
+license.override = ["BSD-3-Clause"]
+reason = "LICENSE of this version is the three-clause BSD text. Runtime dependency of apps/client or transitive of one."
+
+[[PackageOverrides]]
+name = "flutter_secure_storage_darwin"
+version = "0.4.3"
+ecosystem = "Pub"
+license.override = ["BSD-3-Clause"]
+reason = "LICENSE of this version is the three-clause BSD text. Runtime dependency of apps/client or transitive of one."
+
+[[PackageOverrides]]
+name = "flutter_secure_storage_linux"
+version = "3.0.3"
+ecosystem = "Pub"
+license.override = ["BSD-3-Clause"]
+reason = "LICENSE of this version is the three-clause BSD text. Runtime dependency of apps/client or transitive of one."
+
+[[PackageOverrides]]
+name = "flutter_secure_storage_platform_interface"
+version = "2.1.1"
+ecosystem = "Pub"
+license.override = ["BSD-3-Clause"]
+reason = "LICENSE of this version is the three-clause BSD text. Runtime dependency of apps/client or transitive of one."
+
+[[PackageOverrides]]
+name = "flutter_secure_storage_web"
+version = "2.1.1"
+ecosystem = "Pub"
+license.override = ["BSD-3-Clause"]
+reason = "LICENSE of this version is the three-clause BSD text. Runtime dependency of apps/client or transitive of one."
+
+[[PackageOverrides]]
+name = "flutter_secure_storage_windows"
+version = "4.2.2"
+ecosystem = "Pub"
+license.override = ["BSD-3-Clause"]
+reason = "LICENSE of this version is the three-clause BSD text. Runtime dependency of apps/client or transitive of one."
+
+[[PackageOverrides]]
+name = "go_router"
+version = "18.1.0"
+ecosystem = "Pub"
+license.override = ["BSD-3-Clause"]
+reason = "LICENSE of this version is the three-clause BSD text. Runtime dependency of apps/client or transitive of one."
+
+[[PackageOverrides]]
+name = "jni"
+version = "1.1.0"
+ecosystem = "Pub"
+license.override = ["BSD-3-Clause"]
+reason = "LICENSE of this version is the three-clause BSD text. Runtime dependency of apps/client or transitive of one."
+
+[[PackageOverrides]]
+name = "jni_flutter"
+version = "1.0.4+1"
+ecosystem = "Pub"
+license.override = ["BSD-3-Clause"]
+reason = "LICENSE of this version is the three-clause BSD text. Runtime dependency of apps/client or transitive of one."
+
+[[PackageOverrides]]
+name = "jni_util"
+version = "1.0.0"
+ecosystem = "Pub"
+license.override = ["BSD-3-Clause"]
+reason = "LICENSE of this version is the three-clause BSD text. Runtime dependency of apps/client or transitive of one."
+
+[[PackageOverrides]]
+name = "listen"
+version = "1.0.1"
+ecosystem = "Pub"
+license.override = ["BSD-3-Clause"]
+reason = "LICENSE of this version is the three-clause BSD text. Runtime dependency of apps/client or transitive of one."
+
+[[PackageOverrides]]
+name = "material_ui"
+version = "1.7.0"
+ecosystem = "Pub"
+license.override = ["BSD-3-Clause"]
+reason = "LICENSE of this version is the three-clause BSD text. Runtime dependency of apps/client or transitive of one."
+
+[[PackageOverrides]]
+name = "objective_c"
+version = "9.6.2"
+ecosystem = "Pub"
+license.override = ["BSD-3-Clause"]
+reason = "LICENSE of this version is the three-clause BSD text. Runtime dependency of apps/client or transitive of one."
+
+[[PackageOverrides]]
+name = "path_provider"
+version = "2.1.6"
+ecosystem = "Pub"
+license.override = ["BSD-3-Clause"]
+reason = "LICENSE of this version is the three-clause BSD text. Runtime dependency of apps/client or transitive of one."
+
+[[PackageOverrides]]
+name = "path_provider_android"
+version = "2.3.1"
+ecosystem = "Pub"
+license.override = ["BSD-3-Clause"]
+reason = "LICENSE of this version is the three-clause BSD text. Runtime dependency of apps/client or transitive of one."
+
+[[PackageOverrides]]
+name = "path_provider_foundation"
+version = "2.6.0"
+ecosystem = "Pub"
+license.override = ["BSD-3-Clause"]
+reason = "LICENSE of this version is the three-clause BSD text. Runtime dependency of apps/client or transitive of one."
+
+[[PackageOverrides]]
+name = "path_provider_linux"
+version = "2.2.2"
+ecosystem = "Pub"
+license.override = ["BSD-3-Clause"]
+reason = "LICENSE of this version is the three-clause BSD text. Runtime dependency of apps/client or transitive of one."
+
+[[PackageOverrides]]
+name = "path_provider_platform_interface"
+version = "2.1.3"
+ecosystem = "Pub"
+license.override = ["BSD-3-Clause"]
+reason = "LICENSE of this version is the three-clause BSD text. Runtime dependency of apps/client or transitive of one."
+
+[[PackageOverrides]]
+name = "path_provider_windows"
+version = "2.3.0"
+ecosystem = "Pub"
+license.override = ["BSD-3-Clause"]
+reason = "LICENSE of this version is the three-clause BSD text. Runtime dependency of apps/client or transitive of one."
+
+[[PackageOverrides]]
+name = "plugin_platform_interface"
+version = "2.1.8"
+ecosystem = "Pub"
+license.override = ["BSD-3-Clause"]
+reason = "LICENSE of this version is the three-clause BSD text. Runtime dependency of apps/client or transitive of one."
+
+[[PackageOverrides]]
+name = "url_launcher"
+version = "6.3.3"
+ecosystem = "Pub"
+license.override = ["BSD-3-Clause"]
+reason = "LICENSE of this version is the three-clause BSD text. Runtime dependency of apps/client or transitive of one."
+
+[[PackageOverrides]]
+name = "url_launcher_android"
+version = "6.3.33"
+ecosystem = "Pub"
+license.override = ["BSD-3-Clause"]
+reason = "LICENSE of this version is the three-clause BSD text. Runtime dependency of apps/client or transitive of one."
+
+[[PackageOverrides]]
+name = "url_launcher_ios"
+version = "6.4.2"
+ecosystem = "Pub"
+license.override = ["BSD-3-Clause"]
+reason = "LICENSE of this version is the three-clause BSD text. Runtime dependency of apps/client or transitive of one."
+
+[[PackageOverrides]]
+name = "url_launcher_linux"
+version = "3.2.3"
+ecosystem = "Pub"
+license.override = ["BSD-3-Clause"]
+reason = "LICENSE of this version is the three-clause BSD text. Runtime dependency of apps/client or transitive of one."
+
+[[PackageOverrides]]
+name = "url_launcher_macos"
+version = "3.2.6"
+ecosystem = "Pub"
+license.override = ["BSD-3-Clause"]
+reason = "LICENSE of this version is the three-clause BSD text. Runtime dependency of apps/client or transitive of one."
+
+[[PackageOverrides]]
+name = "url_launcher_platform_interface"
+version = "2.3.2"
+ecosystem = "Pub"
+license.override = ["BSD-3-Clause"]
+reason = "LICENSE of this version is the three-clause BSD text. Runtime dependency of apps/client or transitive of one."
+
+[[PackageOverrides]]
+name = "url_launcher_web"
+version = "2.4.3"
+ecosystem = "Pub"
+license.override = ["BSD-3-Clause"]
+reason = "LICENSE of this version is the three-clause BSD text. Runtime dependency of apps/client or transitive of one."
+
+[[PackageOverrides]]
+name = "url_launcher_windows"
+version = "3.1.6"
+ecosystem = "Pub"
+license.override = ["BSD-3-Clause"]
+reason = "LICENSE of this version is the three-clause BSD text. Runtime dependency of apps/client or transitive of one."
+
+[[PackageOverrides]]
+name = "xdg_directories"
+version = "1.1.0"
+ecosystem = "Pub"
+license.override = ["BSD-3-Clause"]
+reason = "LICENSE of this version is the three-clause BSD text. Runtime dependency of apps/client or transitive of one."
+[[PackageOverrides]]
+name = "win32"
+version = "6.4.0"
+ecosystem = "Pub"
+license.override = ["BSD-3-Clause"]
+reason = "LICENSE of this version is the three-clause BSD text. Runtime dependency of apps/client or transitive of one."

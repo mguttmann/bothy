@@ -22,6 +22,8 @@ const Map<String, String> exceptions = {
   'vizMoreRunsThanShown': 'plural Läufe of Lauf',
   'vizChartRuns': 'plural Läufe of Lauf',
   'vizNoActiveRuns': 'plural Läufe of Lauf',
+  // The German plural of Kanal is Kanäle (M4-18).
+  'shellColumnSidebar': 'plural Kanäle of Kanal',
   'vizTileRuns': 'plural Läufe of Lauf',
   // {space} and {channel} are placeholders that carry the names, not the terms (INT-W27/4).
   'vizLaneLabel': 'placeholders {space} and {channel}, not the terms',
