@@ -93,6 +93,15 @@ Die Ausnahme schränkt Owner ein und erweitert nichts; L22 bleibt für I1 unver�
   `TestRecordingsTMT02Negative` in Go und `test/recordings_test.dart` in Dart, über die
   Aufzeichnungen beider Sprachen in beiden Rollen.
 * Trennung der Benutzer und Sperre bei zweiter Steuerverbindung (TM-T22, TM-T23).
+* Since M2-42 the host side of TM-T13, TM-T22, TM-T24, TM-T26, TM-T27 and the TM-T29 parts (a),
+  (b), (c), (d), (e), (f), (h), (i), (j) holds the platform suite of `services/host/test/platform`
+  (`TestPlatform_TMT13`, `TestPlatform_TMT22`, `TestPlatform_TMT24`, `TestPlatform_TMT26`,
+  `TestPlatform_TMT27`, `TestPlatform_TMT29_Parts`, `TestPlatform_TMT21_SessionUserAddRemove`)
+  on disposable GitHub-hosted runners; the unit tests `TestHD1` to `TestHD11`,
+  `TestEntryScanSemantics`, `TestReportNamesRule`, the peer checks of `internal/localchan` and
+  `TestHostPairAgainstServer` in `services/server/test/terminal` hold the rules on every build
+  host. Until a recorded platform run proves a platform, HD10 fails there with
+  `peer_check_unavailable` and the host gives no terminal (docs/DECISIONS.md D-M2-42-19).
 * Wiedereinspiel- und Marken-Tests im Host-Dienst (TM-T03 bis TM-T05).
 * Kanarien-Test über Relais, Logs, Datenbank und Telemetrie (TM-T06).
 * Rechte-Testmatrix AZ-M54 bis AZ-M60 und I6-Tests (TM-T09) in `make test`.

@@ -321,7 +321,7 @@ channels:
   hostControl:
     address: /hosts/connect
     title: Control connection of a host service
-    description: 'Outgoing connection of `bothy-host`, one per host. A second connection with the same keys makes the server probe the older one: if the older does not answer it is closed with `4009`; if it answers, both are closed with `4112` and the host is disabled (24, 3.4). Login with the Ed25519 key registered at pairing. The server sends `session.open` per session; the host service answers with a data connection.'
+    description: 'Outgoing connection of `bothy-host`, one per host. A second connection with the same keys makes the server probe the older one: if the older does not answer it is closed with `4009`; if it answers, both are closed with `4112` and the host is disabled (24, 3.4). Login with the Ed25519 key registered at pairing. The server sends `ready` after the login and again on every change of the declaration `llm_credentials`; the host service treats each `ready` as the current declaration and evaluates check HD6 with it (24, 2.2 and 7.4). The server sends `session.open` per session; the host service answers with a data connection.'
     x-protocol-versions: [1]
     messages:
       host.hello:

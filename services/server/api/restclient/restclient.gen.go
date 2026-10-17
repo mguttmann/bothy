@@ -9645,10 +9645,13 @@ type HostProfile struct {
 // HostProfileKind defines model for HostProfile.Kind.
 type HostProfileKind string
 
-// HostReady defines model for HostReady.
+// HostReady Sent after login and again on every change of `llm_credentials`; the host service treats each `ready` as the current declaration (24, 2.2 and 7.4).
 type HostReady struct {
 	// HostId UUIDv7 (RFC 9562), lowercase canonical form.
 	HostId Uuid `json:"host_id"`
+
+	// LlmCredentials Owner declaration of the LLM login on a host (24, 7.2). `personal` needs `credential_holder_id` (I6).
+	LlmCredentials LlmCredentials `json:"llm_credentials"`
 
 	// State Life cycle of a host (24, 3.1). Only `active` allows sessions.
 	State HostState `json:"state"`
@@ -26088,21 +26091,6 @@ func (c *Client) PutFeatureFlag(ctx context.Context, key KeyPath, params *PutFea
 // Corresponds with DELETE /files/{file_id} (the `DeleteFile` operationId).
 func (c *Client) DeleteFile(ctx context.Context, fileId FileIdPath, reqEditors ...RequestEditorFn) (*http.Response, error) {
 	req, err := NewDeleteFileRequest(c.Server, fileId)
-	if err != nil {
-		return nil, err
-	}
-	req = req.WithContext(ctx)
-	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
-		return nil, err
-	}
-	return c.Client.Do(req)
-}
-
-// GetFile Read file metadata
-//
-// Corresponds with GET /files/{file_id} (the `GetFile` operationId).
-func (c *Client) GetFile(ctx context.Context, fileId FileIdPath, reqEditors ...RequestEditorFn) (*http.Response, error) {
-	req, err := NewGetFileRequest(c.Server, fileId)
 	if err != nil {
 		return nil, err
 	}

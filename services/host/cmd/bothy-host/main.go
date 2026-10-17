@@ -2,12 +2,12 @@
 
 // Command bothy-host is the host service of the terminal (docs/spec/24-terminal.md 2.2). Every
 // task runs as a subcommand ("bothy-host <command> [arguments]"); the register of command names
-// is docs/spec/02-architektur.md "Code-Layout", and a command is only added here when its
-// ticket builds it (M2-42 registers install, pair, doctor, run, restart, session-user and
-// pty-helper).
+// is docs/spec/02-architektur.md "Code-Layout": install, session-user, restart, pair, doctor, run
+// and pty-helper (M2-42).
 //
-// Exit codes: 0 success, 1 failure, 2 usage error. Codes from 3 upwards are specific to a
-// command and documented in its help.
+// Exit codes: 0 success, 1 failure (a failed check of doctor, a runtime failure), 2 usage or
+// environment error (unknown flag, missing administrator rights, unreadable configuration), 78 a
+// refused start of run (EX_CONFIG, after which no service manager restarts it).
 //
 // Example:
 //
@@ -71,9 +71,6 @@ func dispatch(ctx context.Context, table []command, args []string, stdout, stder
 func writeUsage(w io.Writer, table []command) {
 	var b strings.Builder
 	b.WriteString("Usage: bothy-host <command> [arguments]\n\nCommands:\n")
-	if len(table) == 0 {
-		b.WriteString("  (none in this build)\n")
-	}
 	sorted := slices.Clone(table)
 	slices.SortFunc(sorted, func(a, b command) int { return strings.Compare(a.name, b.name) })
 	width := 0
@@ -81,7 +78,7 @@ func writeUsage(w io.Writer, table []command) {
 		width = max(width, len(c.name))
 	}
 	for _, c := range sorted {
-		fmt.Fprintf(&b, "  %-*s  %s\n", width, c.name, c.summary)
+		_, _ = fmt.Fprintf(&b, "  %-*s  %s\n", width, c.name, c.summary)
 	}
 	_, _ = io.WriteString(w, b.String())
 }

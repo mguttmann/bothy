@@ -416,9 +416,14 @@ services/server/
   sqlc.yaml                   ein Eintrag je Modul, Schema aus migrations/
   .go-arch-lint.yml           generiert aus architecture/modules.yaml
 services/host/                Host-Dienst bothy-host (eigenes Go-Modul, eigene Version; 24-terminal.md)
-  cmd/bothy-host/             main: Unterbefehle install, pair, doctor, run
-  internal/                   noise, frame, fingerprint, control, pty (unix, windows), profiles, doctor, state
+  cmd/bothy-host/             main: commands install, session-user, restart, pair, doctor, run, pty-helper (M2-42)
+  internal/                   noise, frame, fingerprint (M2-38); buildinfo, clock (+ clocktest), config, state,
+                              hostos (+ hostostest: the fake operating system), doctor (HD1 to HD11), localchan
+                              (local channel, admin endpoint), helper (pty-helper), install (plans, units/),
+                              startup (run, the Control port), pairing (M2-42); control, pty, profiles follow
+  test/platform/              platform suite (build tag platform), only on disposable machines (M2-42)
   testdata/noise/             Testvektoren, Aufzeichnungen Go und Dart, Fingerabdruck-Vektoren (24, 5.2, 14)
+  testdata/fakeclaude/        stand-in for claude auth status in the tests of HD6 (M2-42)
   .go-arch-lint.yml           von Hand gepflegt, eine Komponente je Paket (kein Modulregister)
 ```
 
@@ -442,7 +447,15 @@ nach Art:
 - Host-Dienst ([24-terminal.md](24-terminal.md)): Go-Modulpfad unter `services/host`; Binary,
   Dienst- und Benutzername `bothy-host`; Zustandsordner (`/var/lib/bothy-host`,
   `%ProgramData%\bothy-host`); Protokoll-Kennungen `bothy-terminal/1` (Noise-Prolog) und
-  `bothy-host-fp/1` (Fingerabdruck); Release-Komponente `host`.
+  `bothy-host-fp/1` (Fingerabdruck); Release-Komponente `host`. Since M2-42: program folders
+  `/opt/bothy-host/bin/`, `/Library/Application Support/bothy-host/bin/` and
+  `%ProgramFiles%\bothy-host\`; configuration folders `/etc/bothy-host/`,
+  `/Library/Application Support/bothy-host/` and `%ProgramFiles%\bothy-host\`; systemd units
+  `bothy-host.service`, `bothy-host-helper-<name>.socket` and `.service`; launchd labels
+  `bothy-host` and `bothy-host.helper.<name>`; Windows services `bothy-host` and
+  `bothy-host-helper-<name>` and the virtual account `NT SERVICE\bothy-host`; channel endpoints
+  `/run/bothy-host/`, `/Library/Application Support/bothy-host/run/` and the pipes
+  `bothy-host-admin` and `bothy-host-helper-<name>`.
 - Pakete der Apps: Dart-Pakete mit Präfix `bothy_` (`bothy_viz`, `bothy_noise`).
 - SDKs: Python distribution `bothy-sdk`, import package `bothy_sdk`, npm package `bothy-sdk` (not
   published until OQ-17 is decided).

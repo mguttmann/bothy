@@ -1,0 +1,5 @@
+config.remove /Library/Application Support/bothy-host/config.yaml bothy-s-sam
+run /bin/launchctl bootout system/bothy-host.helper.bothy-s-sam
+remove /Library/LaunchDaemons/bothy-host.helper.bothy-s-sam.plist
+chmod ~bothy-s-sam 0700 bothy-s-sam
+run /bin/launchctl kickstart -k system/bothy-host

@@ -72,6 +72,11 @@ allowed_licenses = allowed=$$(awk '!/^\#/ && NF' $(LICENSE_ALLOWLIST) | paste -s
 
 # ---- component discovery (tracked files only, like CI) --------------------------------
 GO_MODS := $(patsubst %/,%,$(sort $(dir $(shell git ls-files -- 'services/*go.mod' 2>/dev/null))))
+# Modules with code per platform (the host service runs on Linux, macOS and Windows): typecheck
+# and lint check them for every GOOS, so code for another platform is checked on every build host
+# (docs/DECISIONS.md D-M2-42-21).
+GO_CROSS_MODULES := services/host
+GO_CROSS_OS := linux darwin windows
 # Members of the Dart workspace; the root pubspec.yaml is the workspace itself, not a member.
 DART_PKGS := $(filter-out .,$(patsubst %/,%,$(sort $(dir $(shell git ls-files -- 'apps/*pubspec.yaml' 'packages/*pubspec.yaml' 2>/dev/null)))))
 # Generated Dart files: out of the format check, the doc and style lint (root
@@ -187,7 +192,9 @@ lint: ## Linters: file hygiene hooks, ruff, bandit, Dockerfile pins, actionlint,
 	@if [ -z "$(GO_ON)" ]; then $(call skip,go-lint,no Go module selected); \
 	else gl=$(call tool,golangci-lint) || exit 1; \
 	  for m in $(GO_MODS); do (cd $$m && go vet -tags contract_validate,contract_live ./... && \
-	    "$$gl" run --build-tags contract_validate,contract_live ./...) || exit 1; done; fi
+	    "$$gl" run --build-tags contract_validate,contract_live ./...) || exit 1; done; \
+	  for m in $(filter $(GO_CROSS_MODULES),$(GO_MODS)); do for os in $(GO_CROSS_OS); do \
+	    (cd $$m && GOOS=$$os go vet ./... && GOOS=$$os "$$gl" run ./...) || exit 1; done; done; fi
 	@# One analysis at the root covers every member of the workspace (docs/DECISIONS.md D-M4-01-5).
 	@if [ -z "$(DART_ON)" ]; then $(call skip,dart-lint,no Dart package selected); \
 	else flutter pub get --enforce-lockfile && flutter analyze --fatal-infos || exit 1; \
@@ -202,7 +209,9 @@ lint: ## Linters: file hygiene hooks, ruff, bandit, Dockerfile pins, actionlint,
 typecheck: ## Type checks: mypy (strict), go build, flutter analyze, tsc
 	cd tools && uv run --locked --quiet mypy
 	@if [ -z "$(GO_ON)" ]; then $(call skip,go-build,no Go module selected); \
-	else for m in $(GO_MODS); do (cd $$m && go build ./...) || exit 1; done; fi
+	else for m in $(GO_MODS); do (cd $$m && go build ./...) || exit 1; done; \
+	  for m in $(filter $(GO_CROSS_MODULES),$(GO_MODS)); do for os in $(GO_CROSS_OS); do \
+	    (cd $$m && GOOS=$$os go vet ./...) || exit 1; done; done; fi
 	@if [ -z "$(DART_ON)" ]; then $(call skip,dart-types,no Dart package selected); \
 	else echo "  dart types: covered by flutter analyze in make lint"; fi
 	@# Inside each project: mypy finds its configuration and targets only from there.

@@ -29737,12 +29737,15 @@ components:
             $ref: '#/components/schemas/Uuid'
     HostReady:
       type: object
-      required: [host_id, state]
+      description: Sent after login and again on every change of `llm_credentials`; the host service treats each `ready` as the current declaration (24, 2.2 and 7.4).
+      required: [host_id, state, llm_credentials]
       properties:
         host_id:
           $ref: '#/components/schemas/Uuid'
         state:
           $ref: '#/components/schemas/HostState'
+        llm_credentials:
+          $ref: '#/components/schemas/LlmCredentials'
     HostHeartbeat:
       type: object
       required: [active_sessions]

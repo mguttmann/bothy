@@ -7,6 +7,16 @@ import (
 	"net/http"
 )
 
+// GetApplicationproblemJSON422 returns the response for an HTTP 422 `application/problem+json` response
+func (r InstallAppResponse) GetApplicationproblemJSON422() *UnprocessableEntity {
+	return r.ApplicationproblemJSON422
+}
+
+// GetApplicationproblemJSON429 returns the response for an HTTP 429 `application/problem+json` response
+func (r InstallAppResponse) GetApplicationproblemJSON429() *TooManyRequests {
+	return r.ApplicationproblemJSON429
+}
+
 // GetApplicationproblemJSONDefault returns the response for an HTTP default `application/problem+json` response
 func (r InstallAppResponse) GetApplicationproblemJSONDefault() *Error {
 	return r.ApplicationproblemJSONDefault
@@ -25976,20 +25986,4 @@ func (r PinMessageResponse) Status() string {
 		return r.HTTPResponse.Status
 	}
 	return http.StatusText(0)
-}
-
-// StatusCode returns HTTPResponse.StatusCode
-func (r PinMessageResponse) StatusCode() int {
-	if r.HTTPResponse != nil {
-		return r.HTTPResponse.StatusCode
-	}
-	return 0
-}
-
-// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
-func (r PinMessageResponse) ContentType() string {
-	if r.HTTPResponse != nil {
-		return r.HTTPResponse.Header.Get("Content-Type")
-	}
-	return ""
 }

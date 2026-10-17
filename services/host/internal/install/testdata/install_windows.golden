@@ -1,0 +1,12 @@
+win.service bothy-host (680 bytes)
+mkdir C:\ProgramData\bothy-host 0700 NT SERVICE\bothy-host
+win.acl C:\ProgramData\bothy-host D:P(A;OICI;FA;;;SY)(A;OICI;FA;;;BA)(A;OICI;FA;;;<service-sid>)
+mkdir C:\Program Files\bothy-host 0755 Administrators
+copy /tmp/download/bothy-host -> C:\Program Files\bothy-host\bothy-host.exe 0755 Administrators
+win.user bothy-s-alex
+win.profile bothy-s-alex
+win.service bothy-host-helper-bothy-s-alex (716 bytes)
+win.user bothy-s-sam
+win.profile bothy-s-sam
+win.service bothy-host-helper-bothy-s-sam (711 bytes)
+win.restart bothy-host

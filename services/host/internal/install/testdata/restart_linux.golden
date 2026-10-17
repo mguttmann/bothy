@@ -1,0 +1,2 @@
+run /usr/bin/systemctl reset-failed bothy-host.service
+run /usr/bin/systemctl restart bothy-host.service

@@ -8,20 +8,26 @@ from attrs import define as _attrs_define
 from attrs import field as _attrs_field
 
 from ..models.host_state import HostState
+from ..models.llm_credentials import LlmCredentials
 
 T = TypeVar("T", bound="HostReady")
 
 
 @_attrs_define
 class HostReady:
-    """
-    Attributes:
-        host_id (UUID): UUIDv7 (RFC 9562), lowercase canonical form.
-        state (HostState): Life cycle of a host (24, 3.1). Only `active` allows sessions.
+    """Sent after login and again on every change of `llm_credentials`; the host service treats each `ready` as the current
+    declaration (24, 2.2 and 7.4).
+
+        Attributes:
+            host_id (UUID): UUIDv7 (RFC 9562), lowercase canonical form.
+            state (HostState): Life cycle of a host (24, 3.1). Only `active` allows sessions.
+            llm_credentials (LlmCredentials): Owner declaration of the LLM login on a host (24, 7.2). `personal` needs
+                `credential_holder_id` (I6).
     """
 
     host_id: UUID
     state: HostState
+    llm_credentials: LlmCredentials
     additional_properties: dict[str, Any] = _attrs_field(init=False, factory=dict)
 
     def to_dict(self) -> dict[str, Any]:
@@ -29,12 +35,15 @@ class HostReady:
 
         state = self.state.value
 
+        llm_credentials = self.llm_credentials.value
+
         field_dict: dict[str, Any] = {}
         field_dict.update(self.additional_properties)
         field_dict.update(
             {
                 "host_id": host_id,
                 "state": state,
+                "llm_credentials": llm_credentials,
             }
         )
 
@@ -47,9 +56,12 @@ class HostReady:
 
         state = HostState(d.pop("state"))
 
+        llm_credentials = LlmCredentials(d.pop("llm_credentials"))
+
         host_ready = cls(
             host_id=host_id,
             state=state,
+            llm_credentials=llm_credentials,
         )
 
         host_ready.additional_properties = d

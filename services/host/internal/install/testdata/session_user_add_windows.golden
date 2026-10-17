@@ -1,0 +1,5 @@
+win.user bothy-s-robin
+win.profile bothy-s-robin
+win.service bothy-host-helper-bothy-s-robin (721 bytes)
+config.add C:\Program Files\bothy-host\config.yaml bothy-s-robin
+win.restart bothy-host

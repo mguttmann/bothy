@@ -16,6 +16,21 @@ import (
 	"github.com/oapi-codegen/runtime"
 )
 
+// GetFile Read file metadata
+//
+// Corresponds with GET /files/{file_id} (the `GetFile` operationId).
+func (c *Client) GetFile(ctx context.Context, fileId FileIdPath, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewGetFileRequest(c.Server, fileId)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
 // DownloadFile Download a file
 //
 // Answers 200 with the bytes (supports `Range`); there are no presigned GET URLs (ADR 0048).
@@ -27506,14 +27521,4 @@ func (r InstallAppResponse) GetApplicationproblemJSON403() *Forbidden {
 // GetApplicationproblemJSON409 returns the response for an HTTP 409 `application/problem+json` response
 func (r InstallAppResponse) GetApplicationproblemJSON409() *Conflict {
 	return r.ApplicationproblemJSON409
-}
-
-// GetApplicationproblemJSON422 returns the response for an HTTP 422 `application/problem+json` response
-func (r InstallAppResponse) GetApplicationproblemJSON422() *UnprocessableEntity {
-	return r.ApplicationproblemJSON422
-}
-
-// GetApplicationproblemJSON429 returns the response for an HTTP 429 `application/problem+json` response
-func (r InstallAppResponse) GetApplicationproblemJSON429() *TooManyRequests {
-	return r.ApplicationproblemJSON429
 }

@@ -161,23 +161,56 @@ Rand und Proxy:
 3. Der Rand puffert diese Verbindungen nicht und schreibt keine Inhalte in Logs (Zugriffslog nur mit
    Routen-Muster, [19-sicherheit.md](19-sicherheit.md), SEC-LOG-*).
 
-Installation des Host-Dienstes auf einem Rechner:
+Installation of the host service on a host (M2-42; [24-terminal.md](24-terminal.md) 2.2; the
+rows `D-M2-42-<n>` of [DECISIONS.md](../DECISIONS.md) give the reasons):
 
-1. Zwei Benutzer ohne Administratorrechte: der Dienstbenutzer `bothy-host` mit dem Zustandsordner
-   `host_service.state_dir` (Modus `0700`) und der Sitzungsbenutzer `host_service.session_user`
-   ohne Leserecht darauf (24, Abschnitt 2.2). Keiner der beiden in `docker`, `lxd`, `libvirt`,
-   `disk` oder einer Admin-Gruppe (HD2).
-2. Dienste des Betriebssystems: launchd (macOS), systemd (Linux), Windows-Dienst; einer für den
-   Host-Dienst, einer für den PTY-Helfer; Neustart bei Absturz. Der Installationsbefehl
-   `bothy-host install` legt Benutzer, Ordner, lokalen Kanal und Dienste an und braucht dafür
-   einmal Administratorrechte; die Dienste laufen danach ohne sie.
-3. `bothy-host pair --server <url> --code <code>` koppelt (24, Abschnitt 3.2); `bothy-host doctor`
-   prüft HD1 bis HD8 vor jedem Start.
-4. Nicht auf dem Server-Host installieren. Wo es doch nötig ist, erklärt der Owner den Rechner als
-   Server-Host; dann bekommen nur Owner ein Terminal dort (07, SR10).
-5. Für das Profil `claude` legt der Betreiber je nach LLM-Erklärung den API-Schlüssel oder das
-   langlebige Token des Inhabers als Datei mit Modus `0600` in den Zustandsordner
-   ([24-terminal.md](24-terminal.md), Abschnitt 7.4). Nie als Umgebungsvariable des Dienstes.
+1. Users without administrator rights. `bothy-host install` (once, as root or an elevated member of
+   `Administrators`) creates the service user `bothy-host` with the state directory
+   `host_service.state_dir` (mode `0700`, on Windows a protected DACL for the virtual account
+   `NT SERVICE\bothy-host`, `SYSTEM` and `Administrators`), one session user per person from
+   `host_service.session_users` with a home only for that user (on macOS hidden, with an own
+   primary group and not in `staff`), one PTY helper per session user as a system service under
+   that user, and the host service. Program folder: Linux `/opt/bothy-host/bin/`, macOS
+   `/Library/Application Support/bothy-host/bin/` (the binary is signed ad hoc with the hardened
+   runtime unless it already carries a signature with it), Windows `%ProgramFiles%\bothy-host\`.
+   Configuration file: Linux `/etc/bothy-host/config.yaml`, macOS
+   `/Library/Application Support/bothy-host/config.yaml`, Windows
+   `%ProgramFiles%\bothy-host\config.yaml`; `install` writes it only when it is missing.
+   `bothy-host session-user add <name>` adds a person later and refuses a name the state directory
+   already binds to a person; `bothy-host session-user remove <name>` takes a name out, removes its
+   helper and closes its home, keeps the binding and ends no process of the user. Right after
+   `remove` the operator deletes the user with its long runners (crontab entries, scheduled tasks,
+   user services), because a long runner can reopen the home and stop the host through HD9, and
+   never gives the name to another person.
+2. Services of the operating system: systemd (Linux: `bothy-host.service`,
+   `bothy-host-helper-<name>.socket` and `.service`), launchd (macOS: `bothy-host` and
+   `bothy-host.helper.<name>` in `/Library/LaunchDaemons`), Windows services (`bothy-host` and
+   `bothy-host-helper-<name>`). A crash is restarted; a refused start (exit code `78`) is not.
+3. `bothy-host pair --server <url> --code <code> [--ca-file <pem>]` pairs the host (24, 3.2) with
+   the identity of the service user: as an administrator it goes through the running service
+   (Windows: the service must run) and restarts it afterwards; it prints the fingerprint in groups
+   of four. `bothy-host doctor` runs HD1 to HD11 before every start and on command; as an
+   administrator it runs the full run inside the running service. Exit codes: `0` passed (warnings
+   allowed), `1` a check failed, `2` usage or environment error (missing administrator rights,
+   unreadable configuration).
+4. Not on the server host. Where it is needed anyway, the owner declares the host as server host;
+   then only owners get a terminal there (07, SR10).
+5. For the profile `claude` at `organization` the operator puts the API key as the file
+   `claude_api_key` with mode `0600` into the state directory
+   ([24-terminal.md](24-terminal.md), section 7.4). Never as an environment variable of the
+   service.
+6. After a refused start the host service stays stopped. The operator fixes the finding that
+   `bothy-host doctor` names and runs `bothy-host restart`; the same command makes a changed
+   configuration take effect.
+
+Windows drive root: `install` asks before it removes the entry `Authenticated Users:(AD)` from the
+root of the system drive and of every drive with a place; `--drive-root-confirm yes|no` answers
+for unattended installs, and without a terminal and without the flag the answer is no.
+`bothy-host install --drive-root <drive>` does only this step for a drive that gets a place later.
+
+Peer check: on a platform whose platform run has not proven the peer check of the local channel,
+HD10 fails with `peer_check_unavailable` and the host gives no terminal (RK-23); the operator
+waits for a release with the recorded platform run.
 
 ## 5. Konfiguration und Geheimnisse
 
