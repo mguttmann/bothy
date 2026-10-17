@@ -323,6 +323,11 @@ final class InstanceServices {
       await secrets.read('auth/${instance.address.origin}/refresh_token') !=
       null;
 
+  /// The ID of this device at the instance, kept by `AuthSession` (`auth/<origin>/device_id`,
+  /// M4-09), or null before the first registration.
+  Future<String?> storedDeviceId() =>
+      secrets.read('auth/${instance.address.origin}/device_id');
+
   /// Stops the engine and closes the database without deleting anything (the app quits or
   /// switches to another address).
   Future<void> close() async {

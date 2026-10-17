@@ -6,9 +6,10 @@ library;
 
 import 'dart:async';
 
+import 'package:api_client/api_client.dart' show DeviceStateEnum;
 import 'package:auth/auth.dart';
 import 'package:dio/dio.dart';
-import 'package:domain/domain.dart' show AppConfigValues;
+import 'package:domain/domain.dart' show AppConfigValues, DeviceId;
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 import 'package:sync_engine/sync_engine.dart';
 
@@ -213,7 +214,9 @@ class OnboardingController extends _$OnboardingController {
     ref.onDispose(() {
       unawaited(_authEvents?.cancel());
       unawaited(_notices?.cancel());
-      // The app quits (or a test ends): stop the engine and close the database, delete nothing.
+      // The app quits (or a test ends): the running polls stop, the engine stops and the
+      // database closes; nothing is deleted.
+      _flow++;
       final open = _open;
       _open = null;
       if (open != null) unawaited(open.close());
@@ -269,7 +272,9 @@ class OnboardingController extends _$OnboardingController {
         state = state
             .withInstance(instance)
             .next(step: OnboardingStep.login, services: services);
-        if (resume && await services.hasStoredSession()) _signedIn();
+        if (resume && await services.hasStoredSession()) {
+          await _resume(services);
+        }
       case DiscoveryNoInstance():
         state = state.next(serverStatus: ServerStatus.noInstance);
       case DiscoveryCertificateInvalid():
@@ -367,6 +372,15 @@ class OnboardingController extends _$OnboardingController {
             ? LoginNotice.unreachable
             : LoginNotice.failed,
       );
+      return;
+    } on Object {
+      // A device key the system refused: the same text as a rejected request.
+      if (flow == _flow) {
+        state = state.next(
+          step: OnboardingStep.pair,
+          notice: LoginNotice.failed,
+        );
+      }
       return;
     }
     if (flow != _flow) return;
@@ -495,6 +509,9 @@ class OnboardingController extends _$OnboardingController {
         device.deviceId,
         isCancelled: () => flow != _flow,
       );
+    } on Object {
+      // The session was closed under the poll (the app quits); nothing to show.
+      return;
     } finally {
       _flowOwnsSignOut = false;
     }
@@ -520,6 +537,37 @@ class OnboardingController extends _$OnboardingController {
     return deadline != null && !_ports.clock.now().isBefore(deadline)
         ? SignOutCause.pendingExpired
         : SignOutCause.rejected;
+  }
+
+  /// A start with a stored session: a device that still waits for its confirmation goes back
+  /// to E4 with its code (08 5.2: the waiting device has tokens and polls); any other goes to
+  /// the main view. Offline the app starts signed in and the engine reconnects later.
+  Future<void> _resume(InstanceServices services) async {
+    final flow = ++_flow;
+    final id = await services.storedDeviceId();
+    if (id != null) {
+      try {
+        final device = (await services.auth.api.getDevicesApi().getDevice(
+          deviceId: id,
+        )).data;
+        if (flow != _flow) return;
+        if (device != null && device.state == DeviceStateEnum.pending) {
+          await _pending(
+            services,
+            PendingDevice(
+              deviceId: DeviceId.parse(id),
+              verificationCode: device.verificationCode,
+            ),
+            flow,
+          );
+          return;
+        }
+      } on DioException {
+        // No answer: the main view from the local data; a revoked session ends through the
+        // session's events.
+      }
+    }
+    if (flow == _flow) _signedIn();
   }
 
   void _signedIn() {

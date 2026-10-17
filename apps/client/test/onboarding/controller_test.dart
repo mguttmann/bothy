@@ -108,6 +108,30 @@ void main() {
     });
 
     test(
+      'a restart while the device waits shows E4 with its code again',
+      () async {
+        final control = await connected(c, f);
+        await loginAsAlex(control);
+        expect(state().step, OnboardingStep.pending);
+        final code = state().code;
+        final id = deviceId();
+        c.dispose();
+        c = appContainer(f);
+        c.read(onboardingControllerProvider);
+        await eventually(
+          'E4 again',
+          () => state().step == OnboardingStep.pending,
+        );
+        expect(state().code, code);
+        await other.confirm(id, code!);
+        await eventually(
+          'signed in',
+          () => state().step == OnboardingStep.signedIn,
+        );
+      },
+    );
+
+    test(
       'a wrong code on the other device rejects it: E7 and a wiped store',
       () async {
         final control = await connected(c, f);

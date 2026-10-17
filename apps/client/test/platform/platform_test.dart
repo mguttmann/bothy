@@ -308,6 +308,23 @@ void main() {
       messenger.setMockMethodCallHandler(channel, null);
     });
 
+    test('a link that arrives before the app listens is kept for it', () async {
+      final messenger =
+          TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger;
+      final links = MethodChannelDeepLinks();
+      await messenger.handlePlatformMessage(
+        channel.name,
+        const StandardMethodCodec().encodeMethodCall(
+          const MethodCall('open', 'chat-example://t/early'),
+        ),
+        (_) {},
+      );
+      final got = <Uri>[];
+      links.links.listen(got.add);
+      await Future<void>.delayed(Duration.zero);
+      expect(got, [Uri.parse('chat-example://t/early')]);
+    });
+
     test('a host without the runner channel has no pending links', () async {
       expect(await MethodChannelDeepLinks().takePending(), isEmpty);
     });

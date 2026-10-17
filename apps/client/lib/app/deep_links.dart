@@ -34,8 +34,12 @@ final class MethodChannelDeepLinks implements DeepLinkSource {
   }
 
   final MethodChannel _channel;
-  final StreamController<Uri> _links = StreamController<Uri>.broadcast();
+  // Single-subscription: a link that arrives before the app listens (macOS hands the start link
+  // over the channel as soon as the engine runs) waits in the controller's buffer.
+  final StreamController<Uri> _links = StreamController<Uri>();
 
+  /// The links that arrive while the app runs; one listener (the app), which also gets every
+  /// link that arrived before it listened.
   @override
   Stream<Uri> get links => _links.stream;
 
