@@ -26,6 +26,9 @@ def _record(path: str, found: int, hit: int) -> str:
         "build/x.dart",
         "/abs/member/lib/src/generated/api.dart",
         "/abs/member/lib/x.g.dart",
+        # drift table definitions: input of the generator, never run (D-M4-12-11)
+        "lib/src/tables/structure.dart",
+        "/abs/member/lib/src/tables/threads_messages.dart",
     ],
 )
 def test_generated_records_are_dropped(path: str) -> None:
@@ -36,7 +39,14 @@ def test_generated_records_are_dropped(path: str) -> None:
 
 @pytest.mark.parametrize(
     "path",
-    ["lib/src/hand.dart", "lib/src/generator.dart", "lib/generated.dart", "lib/src/build/x.dart"],
+    [
+        "lib/src/hand.dart",
+        "lib/src/generator.dart",
+        "lib/generated.dart",
+        "lib/src/build/x.dart",
+        "lib/tables.dart",
+        "lib/src/daos/tables_dao.dart",
+    ],
 )
 def test_hand_written_records_are_kept(path: str) -> None:
     assert not lcov_filter.is_generated(path)
