@@ -191,6 +191,15 @@ threat model T-TM-13).
   `TestRecordingsTMT02Negative` in Go and `test/recordings_test.dart` in Dart, over the
   recordings of both languages in both roles.
 * Separation of users and disabling on a second control connection (TM-T22, TM-T23).
+* Since M2-42 the host side of TM-T13, TM-T22, TM-T24, TM-T26, TM-T27 and the TM-T29 parts (a),
+  (b), (c), (d), (e), (f), (h), (i), (j) holds the platform suite of `services/host/test/platform`
+  (`TestPlatform_TMT13`, `TestPlatform_TMT22`, `TestPlatform_TMT24`, `TestPlatform_TMT26`,
+  `TestPlatform_TMT27`, `TestPlatform_TMT29_Parts`, `TestPlatform_TMT21_SessionUserAddRemove`)
+  on disposable GitHub-hosted runners; the unit tests `TestHD1` to `TestHD11`,
+  `TestEntryScanSemantics`, `TestReportNamesRule`, the peer checks of `internal/localchan` and
+  `TestHostPairAgainstServer` in `services/server/test/terminal` hold the rules on every build
+  host. Until a recorded platform run proves a platform, HD10 fails there with
+  `peer_check_unavailable` and the host gives no terminal (docs/DECISIONS.md D-M2-42-19).
 * Replay and token tests in the host service (TM-T03 to TM-T05).
 * Canary test over relay, logs, database and telemetry (TM-T06).
 * Permission test matrix AZ-M54 to AZ-M61 and I6 tests (TM-T09) in `make test`.

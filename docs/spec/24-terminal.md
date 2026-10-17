@@ -129,7 +129,9 @@ flowchart LR
        session user (HD9). That is why `bothy-host session-user remove` closes the home
        of the user it takes out (item 3). A long-running process of this user (6.5) can reopen
        it afterwards; that is why the instance operator deletes the user after `remove` ("Reason
-       for HD9" below the table of checks).
+       for HD9" below the table of checks). "All other users" in HD9 means `root`, the service
+       user, every former session user and every person account of the platform; other system
+       accounts (Linux below `UID_MIN`, macOS below 501, `nobody`) are skipped (D-M2-42-6).
     5. The host service reports the names from `host_service.session_users` when redeeming the
        pairing code (`host.pair`) and with every `report` (`hosts.reported_session_users`, only names
        and the display names of the working directories according to HD7, never paths). It reads its configuration,
@@ -446,7 +448,7 @@ flowchart LR
 | HD6 LLM login | section 7.4, in the account of every session user; additional check, not the load-bearing boundary (T12) | with `none` or `organization` and a detected subscription login: start refused or sessions ended, respectively (7.4); the message names every affected session user with its own entry |
 | HD7 Profiles | every profile refers to an existing program, profiles `command` with an absolute path, the profile `claude` with `organization` to `host_service.claude_bin` (empty or counting as empty according to 7.4: the profile is dropped, 11.1); every key in `host_service.claude_workdirs` is a name from `host_service.session_users`, the PTY helper of its session user can resolve every working directory, and each is listed for exactly one session user, compared after resolution and by the identity in the file system that each helper reports for its list (2.2 item 6) | Profile is dropped, warning; with `host_service.claude_workdirs` only the wrong part is dropped: a key that is not a name from `host_service.session_users`, with its list; a folder that the helper of its session user cannot resolve, from that user's list; a folder with two session users, from both lists. The lists after this step are reported and used for `wdi` (2.2 items 5 and 6) |
 | HD8 Separation | the service user itself checks ownership, mode and ACL of `host_service.state_dir` and the key file (no entry for a session user or one of its groups); in addition every PTY helper tries at start to read both, and fails | Start refused |
-| HD9 Other users' home folders | every PTY helper tries at start to list the content of every home folder of another local user that the operating system keeps and that is not a session user (including that of the service user and that of a former session user), and fails for each; the home of a session user is checked by HD11 as its location (2.2 item 4) | Start refused; the local output of `bothy-host doctor` names every user whose home can be listed; of these, the message to the server names only former session users, each with its own entry, otherwise only the code (below the table) |
+| HD9 Other users' home folders | every PTY helper tries at start to list the content of every home folder of another local user that the operating system keeps and that is not a session user (including that of the service user and that of a former session user), and fails for each; the home of a session user is checked by HD11 as its location (2.2 item 4). Accounts checked (D-M2-42-6): `root`, the service user, every former session user and every person account (Linux: a UID from `UID_MIN` to `UID_MAX` of `/etc/login.defs`; macOS: a `UniqueID` of at least 501; Windows: every account with a profile under `ProfileList`); all other system accounts are skipped, because their homes are system folders every user may list by design | Start refused; the local output of `bothy-host doctor` names every user whose home can be listed; of these, the message to the server names only former session users, each with its own entry, otherwise only the code (below the table) |
 | HD10 Helper integrity | the service user checks: the binary of the helper, every service definition, every folder of a channel endpoint and, if set, `host_service.claude_bin` (the program for HD6 and, with `organization`, of the profile `claude`, 7.4; under Windows an `.exe`) with every folder on the path to it and, if the file begins with `#!`, the interpreter that the fixed search list from 7.4 finds, and every folder of this search list, belong after resolution to a trusted owner and are writable by no session user (both per platform according to 2.2 item 6); the peer of every channel is the process that the service manager reports for the helper of this session user; under Linux `kernel.yama.ptrace_scope` is at least `1` | Start refused; on a violation during operation as with HD6 (7.4): no new sessions, running ones end with `host_policy_violation` and `close_detail = helper_untrusted`; with a wrong peer the message names the session user of this channel (below the table) |
 | HD11 Shared locations | one rule for every path from the configuration of the host service (working directories, `host_service.claude_bin` and programs of the profiles, plus the binary of the helper; the state directory is checked by HD4 and HD8) and every location of a session user (2.2 item 6; the `CLAUDE_CONFIG_DIR` with `personal` is covered by the home, 7.4); every path after resolution, "writable" and "trusted owner" per platform according to 2.2 item 6; a writable drive root under Windows with the code `drive_root_writable`. Location of a session user: ownership, mode, ACL and groups of the location, of every folder on the path to it and of the chain files in these folders give no other session user write permission and belong to no other; the location itself also gives other session users no read or execute permission; its PTY helper checks this. Location for all: the location and every folder on the path to it belong to a trusted owner and are writable by no session user (like HD10); the service user checks this. At the start of the service and on command, in addition, the check of the entries: no entry in a location of a session user belongs to another session user; it runs per session user in its PTY helper, limited by `host_service.entry_scan_timeout` (below the table) | Violation at a location of a session user: this user gets no sessions, running ones end with `host_policy_violation` and `close_detail = shared_location`, until HD11 passes for it; the message names it. Violation at a location for all: start refused; during operation no new sessions, and all running ones end with `host_policy_violation` and `close_detail = shared_location`, until HD11 passes; the message names no session user. A finding of the check of the entries stands until a later full run no longer finds it (below the table) |
 
@@ -478,6 +480,12 @@ flowchart LR
   access to storage media) are on the list for the same reason [derived]. The instance operator cannot
   shorten the fixed list; `host_service.extra_forbidden_groups` extends it because distributions
   have further such groups.
+
+  Which accounts count (D-M2-42-6): `root`, the service user, every former session user and every
+  person account; system accounts below `UID_MIN` (Linux) or below 501 (macOS) and `nobody` are
+  skipped, because their homes are system folders that every user may list by design (macOS
+  `nobody` `/var/empty`, `_www` `/Library/WebServer`; Debian `daemon` `/usr/sbin`) and hold no
+  files of a person.
 
   Reason for HD9: The shell of a person must not read files of other users of the host.
   Under macOS, users are in the group `staff` by default, and the CIS checklist states:
@@ -569,6 +577,64 @@ flowchart LR
 
 - Connection only outbound from the host service to the server, via WebSocket with TLS. The host opens
   no port. Reason: works the same behind NAT, in the private network and in the cloud.
+
+#### Build details of the host service (M2-42)
+
+The following paragraphs record how `bothy-host` implements this section; the rows
+`D-M2-42-<n>` in docs/DECISIONS.md give the reasons.
+
+- **Configuration file** (D-M2-42-3): one YAML file nested like the key names
+  (`host_service: {session_users: [...], ...}`), decoded strictly like the server configuration;
+  unknown keys, duplicate keys and wrong types are errors naming the key, never the value. Paths:
+  Linux `/etc/bothy-host/config.yaml`, macOS `/Library/Application Support/bothy-host/config.yaml`,
+  Windows `%ProgramFiles%\bothy-host\config.yaml`. The file chooses every program of every session
+  user, so the file and every folder on the way are a place HD10 checks (trusted owner, writable by
+  no session user). An invalid file makes `run` log `config_invalid` with the key and exit `78`.
+- **State directory** (D-M2-42-4): besides the keys, the bindings and the API key of
+  `organization` (`claude_api_key`, read by the sessions), it holds the pairing record
+  (`pairing.json`: server URL, host ID, instance ID, fingerprint) and the last declaration
+  (`declaration.json`), both without secrets and without a subscription login, and on Linux and
+  macOS the admin endpoint `admin.sock`. Every file is written atomically with mode `0600`.
+- **Declaration from `ready`** (D-M2-42-15): the host service learns `hosts.llm_credentials` only
+  from `ready`; the server sends `ready` again on every change of the declaration, and the host
+  service treats each `ready` as the current declaration and evaluates HD6 again. Until a `ready`
+  was ever stored the declaration is unknown, and no session is possible.
+- **Peer check of the local channel** (D-M2-42-11): with socket activation the operating system
+  reports the service manager as the peer of a connecting client. On Linux and macOS the helper
+  therefore creates a `socketpair`, passes one end with `SCM_RIGHTS` over the accepted connection,
+  and all further messages run over that pair; `bothy-host` compares user ID and process ID of
+  the peer of its end (`SO_PEERCRED`, `LOCAL_PEERCRED` with `LOCAL_PEERPID`) with the session user
+  and the main PID the service manager reports. On Windows it compares
+  `GetNamedPipeServerProcessId` and the owner of the pipe (the account that created the server
+  end) with the process ID of `QueryServiceStatusEx` and the session user. No message flows before the check. A platform whose
+  platform run of TM-T26 has not proven the mechanism fails HD10 with `peer_check_unavailable`.
+- **Exit policy** (D-M2-42-14): a refused start ends with exit code `78` (`EX_CONFIG`). systemd:
+  `Restart=on-failure` with `RestartPreventExitStatus=78`, and no `NoNewPrivileges=` or any option
+  that implies it, because under the no_new_privs flag every `sudo -n true` fails and would hide a
+  sudo rule from HD3. launchd: `KeepAlive` `{Crashed: true}` with `GOTRACEBACK=crash`, so a Go
+  crash is restarted and an exit with a code is not. Windows: failure actions restart a crash,
+  `FailureActionsOnNonCrashFailures` is false, and a refused start stops with
+  `ERROR_SERVICE_SPECIFIC_ERROR` and the service-specific code `78`.
+
+**Codes of `doctor`** (D-M2-42-6, -8, -9, -10). One entry per check, or per named account by the
+rule for names, with the first code that applies in the order of the list. A warning keeps the
+check passed.
+
+| Check | Codes |
+|---|---|
+| HD1 | `session_users_empty`, `session_user_duplicate` (names compared without case), `session_user_is_service_user`, `privileged_user`, `user_missing`, `session_user_name_invalid` |
+| HD2 | `forbidden_group`, `docker_socket_writable` |
+| HD3 | `passwordless_sudo` (Windows: no probe, passes without code) |
+| HD4 | `state_dir_owner`, `state_dir_mode`, `key_file_unprotected` |
+| HD5 | warning `server_host_detected` |
+| HD6 | `subscription_login_detected`, `auth_status_unknown`, warning `declaration_unknown`, warning `auth_status_unchecked` |
+| HD7 | warnings `workdir_dropped`, `claude_profile_unavailable`, `profile_dropped` |
+| HD8 | `state_access_for_session_user`, `helper_reads_state` |
+| HD9 | `foreign_home_listable` |
+| HD10 | `helper_untrusted`, `claude_bin_untrusted`, `peer_mismatch`, `helper_unreachable`, `peer_check_unavailable`, `ptrace_scope_low`, `helper_unprotected` |
+| HD11 | `home_unresolvable`, `shared_location`, `foreign_entry`, `entry_scan_timeout`, `entry_scan_running` (per session user); `drive_root_writable`, `program_location_untrusted` (place for all) |
+
+`peer_mismatch` and `helper_unreachable` name the session user of that channel.
 
 ### 2.3 Server host
 
@@ -745,6 +811,12 @@ No session user can read the state directory (HD8). Anyone who escalates to the
 service user on the host still has the keys; then 3.4 reveals the second host service
 as soon as both are connected at the same time. If the real host is off during that time, the
 theft stays unnoticed until it returns (threat model T-TM-05).
+
+Files of the state directory (D-M2-42-4): `keys` (both private keys; on Windows a DPAPI blob of
+`CryptProtectData` without `CRYPTPROTECT_LOCAL_MACHINE`), `pairing.json`, `bindings.json`,
+`declaration.json`, `claude_api_key` (only at `organization`) and on Linux and macOS `admin.sock`.
+`pair` generates both key pairs locally and stores them only after the server accepted them.
+
 
 ### 4.3 Fingerprint
 
@@ -1251,6 +1323,13 @@ records this.
   no; then the path through the token remains]. Whether the token is intended for an interactive
   session of the same person, the source does not say either; that is the owner question OQ-03
   (Ruling T10, narrowed in D-W-17).
+- Fail closed and unknown declaration (D-M2-42-9): a value of `authMethod` outside the six of
+  the list, an output that is not JSON, a timeout after `host_service.auth_status_timeout` or an
+  exit code other than `0` and `1` gives `auth_status_unknown`, which counts like a finding. Before
+  any `ready` was stored the declaration is unknown: a finding then gives the warning
+  `declaration_unknown`, and the local output names the accounts. `host_service.auth_status_timeout`
+  also bounds the probe of the login shell, which prints only whether `CLAUDE_CODE_OAUTH_TOKEN` is
+  set.
 - Reason: the product does not collect, store or broker Claude.ai credentials
   ([10-backend-policy.md](10-backend-policy.md), section 2, consequence 3; I5). A token in
   the state directory of the host service that the host service passes into the session would be
@@ -1555,7 +1634,7 @@ Red team points at the end of M2, M4, M5 and M6 (threat model, section 6.7).
 | R-TM-14 | HD6 before every PTY and periodically; a hit ends all sessions of the host; the report names every affected session user with its own entry. | A subscription login can come into being during a session (I6, Ruling T2). Because one person can thus bring the host to a standstill for everyone, the instance operator must know in which account to search (D-W-64, threat model T-TM-14). |
 | R-TM-15 | Every session in its own process group, cgroup or Job Object; the end ends the whole tree. | Revocation should also end background processes; long-running processes remain as an honestly stated limit. |
 | R-TM-16 | Expired or consumed token `4101`, every other error of the token or of the handshake `4104`. | A case without an attack must not be reported as tampering. |
-| R-TM-17 | HD9 checks with a read test that the session user cannot list the home folder of any user who is not a session user, instead of checking groups; HD11 checks the home of a session user as that user's location. | Under macOS the default group `staff` opens foreign home folders; which group or which permissions do that on other platforms differs per host, the result of the read test does not. An open home of a session user is an error in that user's account: HD11 blocks only that user and names them, instead of HD9 refusing the start of the whole host (D-W-88). |
+| R-TM-17 | HD9 checks with a read test that the session user cannot list the home folder of any user who is not a session user, instead of checking groups; HD11 checks the home of a session user as that user's location. | Under macOS the default group `staff` opens foreign home folders; which group or which permissions do that on other platforms differs per host, the result of the read test does not. An open home of a session user is an error in that user's account: HD11 blocks only that user and names them, instead of HD9 refusing the start of the whole host (D-W-88). HD9 lists the homes of `root`, the service user, every former session user and every person account; other system accounts have system folders as homes that every user may list by design (D-M2-42-6). |
 | R-TM-18 | The PTY helper is a system service under the session user, with binary, definition and channel endpoint owned by a trusted owner (2.2 item 6); `bothy-host` verifies the peer through user and process ID from the service manager (HD10); owners get a warning with confirmation on another person's host. | A helper that the session user can replace forges checks and reads later sessions along; the same user ID remains a shared trust zone (D-W-18). |
 | R-TM-19 | With `personal`, `bothy-host` does not touch any subscription login; the holder logs in themselves in the account of their session user. | The product stores and brokers no Claude.ai credentials (10, consequence 3; D-W-17). |
 | R-TM-20 | HD6 queries the coding agent only through the absolute path `host_service.claude_bin` with a fixed search list; HD10 checks file, folder chain and interpreter like the helper. | The session user can replace a program in their `PATH` themselves and make it conceal the subscription login (D-W-45, D-W-57). |
@@ -1598,7 +1677,8 @@ Column "Place": Server = configuration reference of the server; Host service = c
 | `terminal.host_auth_timeout` | Server | `10s` | Deadline between `hello` and `identify` of the control and data connection |
 | `terminal.sweep_interval` | Server | `30s` | Interval of the job `terminal.sweep` ([02-architecture.md](02-architecture.md), section 12.3) |
 | `terminal.host_duplicate_probe_timeout` | Server | `5s` | this long the server waits for the answer of the older control connection (3.4) |
-| `host_service.state_dir` | Host service | `/var/lib/bothy-host` (Windows: `%ProgramData%\bothy-host`) | State directory with the keys of the host, the bindings of the session users to people and, with `organization`, the API key of the profile `claude`; never a subscription login (7.4) |
+| `host_service.state_dir` | Host service | `/var/lib/bothy-host` (Windows: `%ProgramData%\bothy-host`) | State directory with the keys of the host, the bindings of the session users to people and, with `organization`, the API key of the profile `claude`; also the pairing record and the last declaration from `ready`, both without secrets (D-M2-42-4); never a subscription login (7.4) |
+| `host_service.auth_status_timeout` | Host service | `30s` | bound of one call of `claude auth status` and of the login shell probe of HD6; a timeout gives `auth_status_unknown` (7.4, D-M2-42-3) |
 | `host_service.session_users` | Host service | empty | Session users of this host, one per person; one PTY helper per entry; never the service user; empty means: HD1 not passed; read only at start, changed with `bothy-host session-user add` and `remove`, which restart the host service for this (2.2) |
 | `host_service.extra_forbidden_groups` | Host service | empty | further groups that HD2 blocks in addition to the fixed list |
 | `host_service.credential_check_interval` | Host service | `60s` | Interval of the checks HD6 and HD11 during operation (2.2, 7.4) |

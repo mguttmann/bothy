@@ -1,0 +1,6 @@
+{
+  "loggedIn": true,
+  "authMethod": "unknown_method",
+  "apiProvider": "firstParty",
+  "configDirectory": "/home/bothy-s-alex/.claude"
+}

@@ -1,0 +1,36 @@
+run /usr/bin/dscl . -create /Groups/bothy-host
+run /usr/bin/dscl . -create /Groups/bothy-host PrimaryGroupID 400
+run /usr/bin/dscl . -create /<Users>/bothy-host
+run /usr/bin/dscl . -create /<Users>/bothy-host UniqueID 400
+run /usr/bin/dscl . -create /<Users>/bothy-host PrimaryGroupID 400
+run /usr/bin/dscl . -create /<Users>/bothy-host UserShell /usr/bin/false
+run /usr/bin/dscl . -create /<Users>/bothy-host NFSHomeDirectory /var/lib/bothy-host
+run /usr/bin/dscl . -create /<Users>/bothy-host IsHidden 1
+mkdir /var/lib/bothy-host 0700 bothy-host
+mkdir /Library/Application Support/bothy-host/bin 0755 root
+copy /tmp/download/bothy-host -> /Library/Application Support/bothy-host/bin/bothy-host 0755 root
+run /usr/bin/codesign --force --sign - --options runtime /Library/Application Support/bothy-host/bin/bothy-host
+mkdir /Library/Application Support/bothy-host/run 0755 root
+mkdir /Library/Application Support/bothy-host 0755 root
+write /Library/Application Support/bothy-host/config.yaml 0644 root (134 bytes)
+run /usr/bin/dscl . -create /Groups/bothy-s-alex
+run /usr/bin/dscl . -create /Groups/bothy-s-alex PrimaryGroupID 501
+run /usr/bin/dscl . -create /<Users>/bothy-s-alex
+run /usr/bin/dscl . -create /<Users>/bothy-s-alex UniqueID 501
+run /usr/bin/dscl . -create /<Users>/bothy-s-alex PrimaryGroupID 501
+run /usr/bin/dscl . -create /<Users>/bothy-s-alex UserShell /bin/zsh
+run /usr/bin/dscl . -create /<Users>/bothy-s-alex NFSHomeDirectory /<Users>/bothy-s-alex
+run /usr/bin/dscl . -create /<Users>/bothy-s-alex IsHidden 1
+run /usr/sbin/createhomedir -c -u bothy-s-alex
+chmod ~bothy-s-alex 0700 bothy-s-alex
+write /Library/LaunchDaemons/bothy-host.helper.bothy-s-alex.plist 0644 root (1352 bytes)
+chmod ~bothy-s-sam 0700 bothy-s-sam
+write /Library/LaunchDaemons/bothy-host.helper.bothy-s-sam.plist 0644 root (1347 bytes)
+write /Library/LaunchDaemons/bothy-host.plist 0644 root (967 bytes)
+run? /bin/launchctl bootout system/bothy-host.helper.bothy-s-alex
+run /bin/launchctl bootstrap system /Library/LaunchDaemons/bothy-host.helper.bothy-s-alex.plist
+run? /bin/launchctl bootout system/bothy-host.helper.bothy-s-sam
+run /bin/launchctl bootstrap system /Library/LaunchDaemons/bothy-host.helper.bothy-s-sam.plist
+run? /bin/launchctl bootout system/bothy-host
+run /bin/launchctl bootstrap system /Library/LaunchDaemons/bothy-host.plist
+run /bin/launchctl kickstart -k system/bothy-host

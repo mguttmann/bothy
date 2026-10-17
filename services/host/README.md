@@ -1,46 +1,128 @@
 # services/host
 
-Host service `bothy-host`: its own Go binary on connected hosts for the terminal.
+The host service `bothy-host`: an own Go binary on connected hosts for the terminal.
 Normative: [24 Terminal](../../docs/spec/24-terminal.md),
 [ADR 0068](../../docs/adr/0068-terminal-through-a-host-service-with-noise-stream-and-invariant-i6.md).
+Installation and operation: [16 Operations, 4.4](../../docs/spec/16-operations.md).
 
-It runs as a user without administrator permissions, connects to the server only outbound, is the
-Noise peer of the device and starts one PTY per terminal session (macOS, Linux, Windows through
-ConPTY).
+It runs as users without administrator rights, connects only outwards to the server, is the
+Noise peer of the device and, per terminal session, starts a PTY in the helper of the person's
+own session user.
 
-## Status
+## State
 
-With M2-38 there is the Go module `github.com/OWNER/bothy/services/host` with the Noise core. The
-binary has no commands yet; M2-42 adds `install`, `pair`, `doctor`, `run`, `restart`,
-`session-user` and `pty-helper`, the key storage and the local channel. M2-43 builds the control
-and data connections, M2-45 the check of the terminal session token and the PTY.
+M2-38 built the Noise core. M2-42 adds installation, the configuration file, the state
+directory, the self-checks HD1 to HD11 (`doctor`), the local channel to the PTY helpers with its
+peer check, the start sequence of `run` and `pair`. M2-43 implements the `Control` port (control
+connection, `ready`, `report`), M2-44 the data connections and M2-45 the sessions with PTY,
+profiles and the periodic runs of HD6 and HD11.
+
+## Commands
+
+| Command | Who runs it | Exit codes |
+|---|---|---|
+| `install [--session-user <name>] [--drive-root <drive>] [--drive-root-confirm yes\|no] [--config <path>]` | administrator | `0`, `1`, `2` |
+| `session-user add <name>`, `session-user remove <name>` | administrator | `0`, `1` (bound name), `2` |
+| `restart` | administrator | `0`, `1`, `2` |
+| `pair --server <url> --code <code> [--ca-file <pem>]` | service user, or an administrator through the service | `0`, `1`, `2` |
+| `doctor` | service user, or an administrator through the service | `0` passed, `1` a check failed, `2` |
+| `run` | the service manager, as the service user | `0`, `1`, `78` refused start |
+| `pty-helper --session-user <name>` | the service manager, as the session user | `0`, `1`, `2` |
+
+A command that needs administrator rights and lacks them exits `2` with
+`bothy-host <command>: administrator rights required`. A refused start exits `78`; no service
+definition restarts it, only `bothy-host restart` does.
+
+## Identities, files and paths
+
+| | Linux | macOS | Windows |
+|---|---|---|---|
+| service user | `bothy-host` (system user) | hidden user `bothy-host` | virtual account `NT SERVICE\bothy-host` |
+| session users | `useradd --create-home --user-group`, home `0700` | hidden users, own primary group, not in `staff`, home `0700` | local accounts, password only for the service control manager, profile ACL only for the user |
+| program | `/opt/bothy-host/bin/bothy-host` | `/Library/Application Support/bothy-host/bin/bothy-host` (ad hoc signed with the hardened runtime) | `%ProgramFiles%\bothy-host\bothy-host.exe` |
+| configuration | `/etc/bothy-host/config.yaml` | `/Library/Application Support/bothy-host/config.yaml` | `%ProgramFiles%\bothy-host\config.yaml` |
+| state directory | `/var/lib/bothy-host` | `/var/lib/bothy-host` | `%ProgramData%\bothy-host` (protected DACL) |
+| host service | `bothy-host.service` | LaunchDaemon `bothy-host` | service `bothy-host` |
+| helper per session user | `bothy-host-helper-<name>.socket` and `.service` | LaunchDaemon `bothy-host.helper.<name>` with `Sockets` | service `bothy-host-helper-<name>` |
+| channel endpoint | `/run/bothy-host/helper-<name>.sock` | `/Library/Application Support/bothy-host/run/helper-<name>.sock` | pipe `\\.\pipe\bothy-host-helper-<name>` |
+| admin endpoint | `<state>/admin.sock` (uid 0 only) | `<state>/admin.sock` (uid 0 only) | pipe `\\.\pipe\bothy-host-admin` (elevated only) |
+
+State directory (`internal/state`): `keys` (both private keys, mode `0600`, on Windows a DPAPI
+blob), `pairing.json`, `bindings.json`, `declaration.json`, `claude_api_key` (only at
+`organization`, read by the sessions of M2-45). Every file is written atomically.
+
+## Configuration file
+
+```yaml
+host_service:
+  session_users: [bothy-s-alex, bothy-s-sam]
+  claude_bin: /opt/claude/bin/claude
+  claude_workdirs:
+    bothy-s-alex:
+      - {display_name: Project A, path: /home/bothy-s-alex/project-a}
+  profiles: [shell, claude, {name: top, display_name: Top, kind: command, program: /usr/bin/top}]
+  auth_status_timeout: 30s
+```
+
+Every key is `host_service.<name>` of [24, section 17](../../docs/spec/24-terminal.md); unknown or
+duplicate keys and wrong types are errors naming the key. The configuration is read at start only.
+
+## Doctor
+
+`doctor` prints one line per entry (`HD<n> ok`, `HD<n> WARN <code>`, `HD<n> FAIL <code>` with
+`session_user=`, `user=`, `drive=` or `item=`), the summary and the declaration in use; never a
+path, a content or a value. The codes are the table "Codes of `doctor`" in 24 2.2. The report to
+the server carries codes and, by the rule for names, the names of session users only.
+
+## Exit policy and the way per platform
+
+- systemd: `Restart=on-failure`, `RestartPreventExitStatus=78`, no `NoNewPrivileges=` (HD3 must see
+  a sudo rule); the helper sockets are created by systemd (`SocketUser=root`,
+  `SocketGroup=bothy-host`, `SocketMode=0660`).
+- launchd: `KeepAlive` `{Crashed: true}` and `GOTRACEBACK=crash`; the helper gets its listening
+  socket on standard input (`inetdCompatibility`, `Wait = true`).
+- Windows: failure actions on crashes only; a refused start stops with the service-specific code
+  `78`; helper pipes are created with `FILE_FLAG_FIRST_PIPE_INSTANCE` and
+  `PIPE_REJECT_REMOTE_CLIENTS`; the DACL of a helper service lets its session user only query it.
+- Peer check: the helper passes one end of a `socketpair` (Linux, macOS); the service compares
+  uid and PID of that end with the session user and the main PID of the helper service. Until a
+  recorded platform run proves a platform, HD10 fails there with `peer_check_unavailable`.
 
 ## Layout
 
 | Path | Content |
 |---|---|
-| `cmd/bothy-host/` | command dispatcher without commands (usage, exit codes 0, 1 and 2) |
-| `internal/noise/` | handshake `Noise_NK_25519_ChaChaPoly_SHA256` over `github.com/flynn/noise`, prologue, transport with the limits of the Noise specification, hash of the ephemeral key for `cek` (24 5.2, 5.3) |
-| `internal/frame/` | frames `start` to `replay_end` with byte order, content rules and directions (24 5.4), fuzzed parser |
-| `internal/fingerprint/` | fingerprint of the host in Crockford Base32 with its display form (24 4.3) |
-| `testdata/noise/` | public test vectors, recordings of Go and Dart, fingerprint vectors ([README](testdata/noise/README.md)) |
+| `cmd/bothy-host/` | the commands |
+| `internal/noise/`, `internal/frame/`, `internal/fingerprint/` | Noise core (M2-38) |
+| `internal/buildinfo/` | version and platform, the list of platforms with a proven peer check |
+| `internal/clock/` (+ `clocktest`) | time source and fake clock |
+| `internal/config/` | the configuration file, editing that keeps comments |
+| `internal/state/` | the state directory |
+| `internal/hostos/` (+ `hostostest`) | port to the operating system and its fake |
+| `internal/doctor/` | HD1 to HD11, report, local output, the entry scan |
+| `internal/localchan/` | local channel, peer check, admin endpoint, codec |
+| `internal/helper/` | the `pty-helper` process |
+| `internal/install/` | plans and executors, service definitions in `units/` |
+| `internal/startup/` | `run`, the `Control` port and `NoControl` |
+| `internal/pairing/` | `pair` |
+| `testdata/fakeclaude/` | stand-in for `claude auth status` ([README](testdata/fakeclaude/README.md)) |
+| `test/platform/` | the platform suite (build tag `platform`) |
 | `.go-arch-lint.yml` | architecture rules, maintained by hand, one component per package |
 
-What the packages guarantee: no network, no process start, no logs; error texts name codes,
-lengths and type bytes, never payload, plaintext, keys or tokens. After a failed handshake step or
-a failed decryption the object refuses every further call.
+What the Noise core packages guarantee: no network, no process start, no logs; error texts name
+codes, lengths and type bytes, never payload, plaintext, keys or tokens. After a failed handshake
+step or a failed decryption the object refuses every further call.
 
-## Commands
+## Development
 
 ```sh
 cd services/host
-GOTOOLCHAIN=local go test -race ./...                         # tests, also TM-T01 and TM-T02
-make recordings                                               # rewrite recordings/go.json and fingerprint.json
-make release-build VERSION=$(cat VERSION) OUT=<directory>     # unsigned binaries for five platforms
-GOTOOLCHAIN=local go test -run='^$' -fuzz=FuzzDecode -fuzztime=60s ./internal/frame
+GOTOOLCHAIN=local go test -race ./...
+GOTOOLCHAIN=local go test -run='^$' -fuzz=FuzzDecodeMessage -fuzztime=60s ./internal/localchan
+make release-build VERSION=$(cat VERSION) OUT=<dir>   # unsigned binaries for five platforms
+make platform-test                                   # only on a disposable machine, see below
 ```
 
-`release-build` builds `bothy-host_<version>_<os>_<arch>` (Windows with `.exe`) without cgo for
-darwin/arm64, darwin/amd64, linux/amd64, linux/arm64 and windows/amd64
-([18 Release](../../docs/spec/18-release.md), row `host`). Signature, SBOM, checksums and
-installation packages are added by M7-23; releases carry tags `host/v<version>`.
+The platform suite needs administrator rights and creates and deletes users, services and ACLs.
+It runs only in the workflow `host-platform.yml` on throwaway GitHub-hosted runners
+(docs/DECISIONS.md D-M2-42-19), never on a workstation.

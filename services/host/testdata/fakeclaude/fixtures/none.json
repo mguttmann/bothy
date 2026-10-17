@@ -1,0 +1,8 @@
+{
+  "loggedIn": false,
+  "authMethod": "none",
+  "apiProvider": "firstParty",
+  "analyticsDisabled": true,
+  "projectsDirectory": "/home/bothy-s-alex/.config/bothy-host/claude/projects",
+  "configDirectory": "/home/bothy-s-alex/.config/bothy-host/claude"
+}

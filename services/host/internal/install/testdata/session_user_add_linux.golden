@@ -1,0 +1,9 @@
+run /usr/sbin/useradd --create-home --user-group --shell /bin/bash bothy-s-robin
+chmod ~bothy-s-robin 0700 bothy-s-robin
+write /etc/systemd/system/bothy-host-helper-bothy-s-robin.socket 0644 root (423 bytes)
+write /etc/systemd/system/bothy-host-helper-bothy-s-robin.service 0644 root (423 bytes)
+run /usr/bin/systemctl daemon-reload
+run /usr/bin/systemctl enable --now bothy-host-helper-bothy-s-robin.socket
+config.add /etc/bothy-host/config.yaml bothy-s-robin
+run /usr/bin/systemctl reset-failed bothy-host.service
+run /usr/bin/systemctl restart bothy-host.service
