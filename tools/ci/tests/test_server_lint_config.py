@@ -43,6 +43,11 @@ OTHER = {
     # The embedded copy of the API document (api/rest/openapi.gen.yaml), written by the route
     # generator; docs/api/openapi.yaml is its source.
     "**/*.gen.yaml",
+    # The Pigeon output of the plugin members, Swift, Kotlin and C++ (docs/DECISIONS.md D-M4-10-7).
+    "**/*.g.swift",
+    "**/*.g.kt",
+    "**/*.g.cpp",
+    "**/*.g.h",
 }
 # Files whose path looks like generated code. Each one that a lint rule exempts must be one that
 # sonar.exclusions leaves out too: dropping an entry there must narrow the rule.

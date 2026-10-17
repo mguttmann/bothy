@@ -89,14 +89,14 @@ name = "built_collection"
 version = "5.1.2"
 ecosystem = "Pub"
 license.override = ["BSD-3-Clause"]
-reason = "deps.dev knows no license for this pub package; its LICENSE file on pub.dev is BSD-3-Clause. Runtime package of api_client (the generated code or its serializers)."
+reason = "deps.dev knows no license for this pub package; its LICENSE file on pub.dev is BSD-3-Clause. Runtime package of api_client (the generated code or its serializers). Also: transitive dev package of pigeon (device_key)."
 
 [[PackageOverrides]]
 name = "built_value"
 version = "8.13.0"
 ecosystem = "Pub"
 license.override = ["BSD-3-Clause"]
-reason = "deps.dev knows no license for this pub package; its LICENSE file on pub.dev is BSD-3-Clause. Runtime package of api_client (the generated code or its serializers)."
+reason = "deps.dev knows no license for this pub package; its LICENSE file on pub.dev is BSD-3-Clause. Runtime package of api_client (the generated code or its serializers). Also: transitive dev package of pigeon (device_key)."
 
 [[PackageOverrides]]
 name = "characters"
@@ -127,6 +127,13 @@ license.override = ["Apache-2.0"]
 reason = "deps.dev knows no license for this pub package; its LICENSE file on pub.dev is Apache-2.0. Transitive package of flutter_test, test or lints."
 
 [[PackageOverrides]]
+name = "code_builder"
+version = "4.13.0"
+ecosystem = "Pub"
+license.override = ["BSD-3-Clause"]
+reason = "deps.dev knows no license for this pub package; its LICENSE file on pub.dev is BSD-3-Clause. Transitive dev package of pigeon (device_key)."
+
+[[PackageOverrides]]
 name = "collection"
 version = "1.19.1"
 ecosystem = "Pub"
@@ -152,7 +159,7 @@ name = "crypto"
 version = "3.0.7"
 ecosystem = "Pub"
 license.override = ["BSD-3-Clause"]
-reason = "deps.dev knows no license for this pub package; its LICENSE file on pub.dev is BSD-3-Clause. Transitive runtime package of cryptography."
+reason = "deps.dev knows no license for this pub package; its LICENSE file on pub.dev is BSD-3-Clause. Runtime package of device_key (thumbprint) and of cryptography."
 
 [[PackageOverrides]]
 name = "cryptography"
@@ -166,7 +173,7 @@ name = "dart_style"
 version = "3.1.14"
 ecosystem = "Pub"
 license.override = ["BSD-3-Clause"]
-reason = "deps.dev knows no license for this pub package; its LICENSE file on pub.dev is BSD-3-Clause. Dev package of api_client (build_runner or built_value_generator) or one of its transitive packages."
+reason = "deps.dev knows no license for this pub package; its LICENSE file on pub.dev is BSD-3-Clause. Dev package of api_client (build_runner or built_value_generator) or one of its transitive packages. Also: transitive dev package of pigeon (device_key)."
 
 [[PackageOverrides]]
 name = "equatable"
@@ -201,7 +208,7 @@ name = "fixnum"
 version = "1.1.1"
 ecosystem = "Pub"
 license.override = ["BSD-3-Clause"]
-reason = "deps.dev knows no license for this pub package; its LICENSE file on pub.dev is BSD-3-Clause. Runtime package of api_client (the generated code or its serializers)."
+reason = "deps.dev knows no license for this pub package; its LICENSE file on pub.dev is BSD-3-Clause. Runtime package of api_client (the generated code or its serializers). Also: transitive dev package of pigeon (device_key)."
 
 [[PackageOverrides]]
 name = "flutter_lints"
@@ -229,7 +236,7 @@ name = "graphs"
 version = "2.3.2"
 ecosystem = "Pub"
 license.override = ["BSD-3-Clause"]
-reason = "deps.dev knows no license for this pub package; its LICENSE file on pub.dev is BSD-3-Clause. Dev package of api_client (build_runner or built_value_generator) or one of its transitive packages."
+reason = "deps.dev knows no license for this pub package; its LICENSE file on pub.dev is BSD-3-Clause. Dev package of api_client (build_runner or built_value_generator) or one of its transitive packages. Also: transitive dev package of pigeon (device_key)."
 
 [[PackageOverrides]]
 name = "http_multi_server"
@@ -349,6 +356,13 @@ version = "7.1.0"
 ecosystem = "Pub"
 license.override = ["MIT"]
 reason = "deps.dev knows no license for this pub package; its LICENSE file on pub.dev is MIT. Transitive package of xml, which vector_graphics_compiler uses to read SVGs."
+
+[[PackageOverrides]]
+name = "pigeon"
+version = "29.0.10"
+ecosystem = "Pub"
+license.override = ["BSD-3-Clause"]
+reason = "deps.dev knows no license for this pub package; its LICENSE file on pub.dev is BSD-3-Clause. Dev package of device_key (code generator)."
 
 [[PackageOverrides]]
 name = "pool"

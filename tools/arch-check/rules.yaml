@@ -70,7 +70,8 @@ members:
     path: packages/device_key
     kind: plugin
     edges: []
-    platform_code: [ios, macos, android, windows, linux, web]
+    # darwin/: the Swift sources iOS and macOS share (sharedDarwinSource, brief M4-10).
+    platform_code: [darwin, ios, macos, android, windows, linux, web]
 
   - name: local_store
     path: packages/local_store

@@ -52,6 +52,13 @@ operated, and the order of the build.
   extensions and the color scheme mapping, `DsThemeScope` (no animated switch under reduced
   motion), the bundled variable fonts Atkinson Hyperlegible Next and Mono with their OFL texts and
   a checked manifest, and the alchemist golden setup with `dsGoldenMatrix` (M4-04).
+- `packages/device_key` for iOS and macOS: two ES256 device keys per server (`dpop` without a
+  prompt, `step_up` with biometrics or the device password) in the Secure Enclave where there is
+  one, otherwise a software key in the Data Protection keychain reported as not hardware-bound;
+  never synchronizable, always `ThisDeviceOnly`. A Pigeon channel, a Dart API with the public JWK,
+  the RFC 7638 thumbprint and `R || S` signatures, and the Swift package `DeviceKeyCore` that the
+  app extensions reuse. `make codegen-check` regenerates the Pigeon code, `make apps-platform`
+  runs the Swift tests on macOS and in the iOS simulator (M4-10).
 - Release chain of the server (M7-10): `make release-prep COMPONENT=<name> [CHANNEL=beta]`
   computes the next version per component from its Conventional Commits (git-cliff, `cliff.toml`),
   renames the changelog section and writes `VERSION`; `make release-trial COMPONENT=server`
