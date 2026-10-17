@@ -105,6 +105,11 @@ def sync_detailed(
 ) -> Response[IdentityProvider | Problem]:
     """Change an identity provider
 
+     Changes an identity provider; absent members stay. Setting `enabled` to true on a `trusted_header`
+    provider while the public listener is not bound to a loopback address is refused with `409
+    conflict`, `reason: trusted_header_requires_loopback` and a `hint` naming `server.listen_addr` (08,
+    2.4 rule 1). Disabling a provider ends the sessions of its identities (08, 3.3).
+
     Args:
         provider_id (UUID): UUIDv7 (RFC 9562), lowercase canonical form.
         idempotency_key (UUID | Unset): UUIDv7 (RFC 9562), lowercase canonical form.
@@ -140,6 +145,11 @@ def sync(
 ) -> IdentityProvider | Problem | None:
     """Change an identity provider
 
+     Changes an identity provider; absent members stay. Setting `enabled` to true on a `trusted_header`
+    provider while the public listener is not bound to a loopback address is refused with `409
+    conflict`, `reason: trusted_header_requires_loopback` and a `hint` naming `server.listen_addr` (08,
+    2.4 rule 1). Disabling a provider ends the sessions of its identities (08, 3.3).
+
     Args:
         provider_id (UUID): UUIDv7 (RFC 9562), lowercase canonical form.
         idempotency_key (UUID | Unset): UUIDv7 (RFC 9562), lowercase canonical form.
@@ -169,6 +179,11 @@ async def asyncio_detailed(
     idempotency_key: UUID | Unset = UNSET,
 ) -> Response[IdentityProvider | Problem]:
     """Change an identity provider
+
+     Changes an identity provider; absent members stay. Setting `enabled` to true on a `trusted_header`
+    provider while the public listener is not bound to a loopback address is refused with `409
+    conflict`, `reason: trusted_header_requires_loopback` and a `hint` naming `server.listen_addr` (08,
+    2.4 rule 1). Disabling a provider ends the sessions of its identities (08, 3.3).
 
     Args:
         provider_id (UUID): UUIDv7 (RFC 9562), lowercase canonical form.
@@ -202,6 +217,11 @@ async def asyncio(
     idempotency_key: UUID | Unset = UNSET,
 ) -> IdentityProvider | Problem | None:
     """Change an identity provider
+
+     Changes an identity provider; absent members stay. Setting `enabled` to true on a `trusted_header`
+    provider while the public listener is not bound to a loopback address is refused with `409
+    conflict`, `reason: trusted_header_requires_loopback` and a `hint` naming `server.listen_addr` (08,
+    2.4 rule 1). Disabling a provider ends the sessions of its identities (08, 3.3).
 
     Args:
         provider_id (UUID): UUIDv7 (RFC 9562), lowercase canonical form.

@@ -72,3 +72,24 @@ func TestResponseHeader(t *testing.T) {
 		t.Fatalf("headers %v", got)
 	}
 }
+
+func TestTransportRoundTrip(t *testing.T) {
+	t.Parallel()
+	if _, ok := reqmeta.TransportOf(context.Background()); ok {
+		t.Fatal("empty context has a transport")
+	}
+	want := reqmeta.Transport{
+		Peer: netip.MustParseAddr("127.0.0.1"), Action: "auth.login.complete",
+		Header: map[string][]string{"Tailscale-User-Login": {"alex@example.com"}},
+	}
+	got, ok := reqmeta.TransportOf(reqmeta.WithTransport(context.Background(), want))
+	if !ok || got.Peer != want.Peer || got.Action != want.Action {
+		t.Fatalf("TransportOf = %+v, %v", got, ok)
+	}
+	if v := got.Values("tailscale-user-login"); len(v) != 1 || v[0] != "alex@example.com" {
+		t.Fatalf("Values without regard to case = %q", v)
+	}
+	if v := got.Values("X-Other"); v != nil {
+		t.Fatalf("Values of a missing header = %q", v)
+	}
+}

@@ -128,9 +128,17 @@ func keyDir(t *testing.T) string {
 // provider client there).
 func newSessionWorldOn(t *testing.T, db *pgtest.DB, clk *clock.Fake, instID ids.ID, dir string, binds ...func(*sworld)) *sworld {
 	t.Helper()
-	cfg := db.Config(pg.RoleApp)
-	cfg.MaxConns = 12
-	pool := db.OpenPool(t, cfg)
+	return newSessionWorldWith(t, db, clk, instID, dir, sessCfg, binds...)
+}
+
+// newSessionWorldWith is newSessionWorldOn with the identity configuration cfg (M1-43). The public
+// listener of the world is the loopback test server, so the flag of the trusted header driver is
+// set; a test of the off state clears it. The binds run as in newSessionWorldOn.
+func newSessionWorldWith(t *testing.T, db *pgtest.DB, clk *clock.Fake, instID ids.ID, dir string, cfg app.Config, binds ...func(*sworld)) *sworld {
+	t.Helper()
+	pcfg := db.Config(pg.RoleApp)
+	pcfg.MaxConns = 12
+	pool := db.OpenPool(t, pcfg)
 	capture := &httpservertest.LogCapture{}
 	log := slog.New(capture)
 	ended := &[]identity.SessionEnded{}
@@ -184,7 +192,7 @@ func newSessionWorldOn(t *testing.T, db *pgtest.DB, clk *clock.Fake, instID ids.
 	if _, err := maint.Run(context.Background()); err != nil {
 		t.Fatal(err)
 	}
-	az, err := authzapp.NewAuthorizer(authzapp.AuthorizerConfig{SnapshotCacheMaxEntries: 1000, StepUpMaxAge: sessCfg.StepUpMaxAge}, authzapp.AuthorizerDeps{
+	az, err := authzapp.NewAuthorizer(authzapp.AuthorizerConfig{SnapshotCacheMaxEntries: 1000, StepUpMaxAge: cfg.StepUpMaxAge}, authzapp.AuthorizerDeps{
 		Catalog: authzapp.NewCatalog(log), Store: authzpg.NewRepository(pool), Principals: principals,
 		Credentials: app.NewCredentialSource(repo, repo, repo), Structure: structure, Policies: policies,
 		Versions: instanceapp.NewVersions(instancepg.NewRepository(pool)), Recorder: w.rec, Clock: clk, Log: log,
@@ -199,7 +207,7 @@ func newSessionWorldOn(t *testing.T, db *pgtest.DB, clk *clock.Fake, instID ids.
 	}
 	keys, err := wire.NewSigningKeys(wire.SigningKeyConfig{Keys: instanceapp.KeysConfig{
 		CacheTTL: time.Minute, InvocationRotation: 30 * 24 * time.Hour, AccessTokenRotation: 30 * 24 * time.Hour,
-		JWKSMaxAge: time.Hour, AccessTokenTTL: sessCfg.AccessTokenTTL, ClockLeeway: sessCfg.ClockLeeway,
+		JWKSMaxAge: time.Hour, AccessTokenTTL: cfg.AccessTokenTTL, ClockLeeway: cfg.ClockLeeway,
 	}, Dir: dir}, pool, sp, w.uow, az, w.rec, clk, log)
 	if err != nil {
 		t.Fatal(err)
@@ -211,7 +219,7 @@ func newSessionWorldOn(t *testing.T, db *pgtest.DB, clk *clock.Fake, instID ids.
 	if err != nil {
 		t.Fatal(err)
 	}
-	w.id, err = wire.NewIdentity(sessCfg, pool, w.uow, az, wire.IdentityWrites{Audit: w.rec, Events: appender, PersonalTokens: w.personal, Settings: w.settings.Admin}, testPepper, clk, log)
+	w.id, err = wire.NewIdentity(cfg, pool, w.uow, az, wire.IdentityWrites{Audit: w.rec, Events: appender, PersonalTokens: w.personal, Settings: w.settings.Admin}, testPepper, clk, log)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -221,10 +229,12 @@ func newSessionWorldOn(t *testing.T, db *pgtest.DB, clk *clock.Fake, instID ids.
 	for _, bind := range binds {
 		bind(w)
 	}
+	w.id.SetPublicListenerLoopback(true)
 	built, err := routes.Build(wire.Handlers{Sessions: w.id.SessionHandlers, StepUps: w.id.StepUpHandlers, Devices: w.id.Handlers, People: w.id.PeopleHandlers,
 		Providers: w.id.ProviderHandlers, Credentials: w.id.CredentialHandlers,
 		Tokens: w.id.TokenHandlers, Enrollment: w.id.EnrollmentHandlers, Approval: w.id.ApprovalHandlers, Admin: w.settings.Handlers,
-		Passkeys: w.id.PasskeyHandlers, OIDC: w.id.OIDCHandlers},
+		Passkeys: w.id.PasskeyHandlers, OIDC: w.id.OIDCHandlers,
+		TrustedHeader: w.id.TrustedHeaderHandlers},
 		wire.RouteOptions(), routes.SpecCatalog())
 	if err != nil {
 		t.Fatal(err)

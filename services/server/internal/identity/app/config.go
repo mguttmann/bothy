@@ -2,7 +2,10 @@
 
 package app
 
-import "time"
+import (
+	"net/netip"
+	"time"
+)
 
 // Config holds the configuration of the identity module, bound in internal/wire from the keys of
 // docs/spec/03-data-model.md section 9, docs/spec/08-identity.md section 18, docs/spec/06-api.md
@@ -103,4 +106,10 @@ type Config struct {
 	// at the provider before its next refresh (08 section 3.5). Zero switches the rule off, which
 	// only tests do; the schema refuses it.
 	IDPRecheckInterval time.Duration `config:"auth.idp_recheck_interval"`
+	// TrustedProxies is server.trusted_proxies: only a TCP peer inside it may set the identity
+	// headers of the trusted_header driver (M1-43, 08 section 2.4 rule 2, SEC-TLS-1).
+	TrustedProxies []netip.Prefix `config:"server.trusted_proxies"`
+	// TrustedHeaderBindRequests is auth.trusted_header_bind_requests: every later request of a
+	// session started with the header must carry the same login (08 section 2.4 rule 5).
+	TrustedHeaderBindRequests bool `config:"auth.trusted_header_bind_requests"`
 }

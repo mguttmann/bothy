@@ -378,7 +378,7 @@ Source: [08-identity.md](../spec/08-identity.md), section 18.
 | `auth.oidc_client_assertion_ttl` | `BOTHY_AUTH__OIDC_CLIENT_ASSERTION_TTL` | Server | duration | `2m` | Validity of a client assertion with `private_key_jwt` | active |
 | `auth.group_claim_max_age` | `BOTHY_AUTH__GROUP_CLAIM_MAX_AGE` | Server |  | `30d` | Expiry of memberships from group claims after the last login | planned (M1) |
 | `auth.idp_recheck_interval` | `BOTHY_AUTH__IDP_RECHECK_INTERVAL` | Server | duration | `30d` | new login at the provider at the latest after this | active |
-| `auth.trusted_header_bind_requests` | `BOTHY_AUTH__TRUSTED_HEADER_BIND_REQUESTS` | Server |  | `true` | every request must carry the same header login | planned (M1) |
+| `auth.trusted_header_bind_requests` | `BOTHY_AUTH__TRUSTED_HEADER_BIND_REQUESTS` | Server | bool | `true` | every request must carry the same header login | active |
 | `auth.enrollment_code_ttl` | `BOTHY_AUTH__ENROLLMENT_CODE_TTL` | Server | duration | `72h` | Validity of an enrollment code | active |
 | `auth.enrollment_code_max_attempts` | `BOTHY_AUTH__ENROLLMENT_CODE_MAX_ATTEMPTS` | Server | int | `5` | Failed attempts per enrollment code | active |
 | `auth.device_pending_ttl` | `BOTHY_AUTH__DEVICE_PENDING_TTL` | Server | duration | `24h` | after this, a pending device is revoked | active |

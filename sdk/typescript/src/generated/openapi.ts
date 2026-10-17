@@ -1430,7 +1430,10 @@ export interface paths {
         /** List identity providers */
         get: operations["listIdentityProviders"];
         put?: never;
-        /** Add an identity provider */
+        /**
+         * Add an identity provider
+         * @description Adds an identity provider (08, 2.6). A `trusted_header` provider that would be enabled (the default) while the public listener is not bound to a loopback address is refused with `409 conflict`, `reason: trusted_header_requires_loopback` and a `hint` naming `server.listen_addr` (08, 2.4 rule 1).
+         */
         post: operations["createIdentityProvider"];
         delete?: never;
         options?: never;
@@ -1456,7 +1459,10 @@ export interface paths {
         delete: operations["deleteIdentityProvider"];
         options?: never;
         head?: never;
-        /** Change an identity provider */
+        /**
+         * Change an identity provider
+         * @description Changes an identity provider; absent members stay. Setting `enabled` to true on a `trusted_header` provider while the public listener is not bound to a loopback address is refused with `409 conflict`, `reason: trusted_header_requires_loopback` and a `hint` naming `server.listen_addr` (08, 2.4 rule 1). Disabling a provider ends the sessions of its identities (08, 3.3).
+         */
         patch: operations["updateIdentityProvider"];
         trace?: never;
     };

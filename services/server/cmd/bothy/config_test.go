@@ -203,6 +203,7 @@ func TestConfigPrintShowsSourcePerKey(t *testing.T) {
 		"auth.step_up_fail_limit = 5  # default\n" +
 		"auth.step_up_max_age = 5m  # default\n" +
 		"auth.token_pepper_ref = file:/run/bothy/secrets/token_pepper  # default\n" +
+		"auth.trusted_header_bind_requests = true  # default\n" +
 		"auth.webauthn_origins =   # default\n" +
 		"auth.webauthn_rp_id =   # default\n" +
 		"authz.expiry_reminder_lead = 2d  # default\n" +

@@ -20,8 +20,9 @@ const (
 // docs/spec/08-identity.md section 18 (M1-33), and the step-up challenge lifetime, failure limit
 // and window and the cleanup interval of 08 section 18 (M1-35), the API token limits and the
 // DPoP requirement of 08 section 18 (M1-44), the enrollment code lifetime and attempt limit of
-// 08 section 18 (M1-37), and the OIDC flow, code, cache, assertion and recheck durations of 08
-// section 18 (M1-41). The page sizes of
+// 08 section 18 (M1-37), the OIDC flow, code, cache, assertion and recheck durations of 08
+// section 18 (M1-41), and the binding switch of the trusted_header driver of 08 section 18
+// (M1-43). The page sizes of
 // 06-api.md live in apiConfigKeys, because every list reads them.
 func identityConfigKeys() []config.Key {
 	return []config.Key{
@@ -183,6 +184,11 @@ func identityConfigKeys() []config.Key {
 		{
 			Name: "auth.idp_recheck_interval", Kind: config.KindDuration, Default: sessionMaxAgeDefault, Min: "1m",
 			Doc:     "Age of an OIDC session after which the next refresh needs a new login at the provider.",
+			Chapter: chapter08,
+		},
+		{
+			Name: "auth.trusted_header_bind_requests", Kind: config.KindBool, Default: defaultTrue,
+			Doc:     "Every later request of a session started with the trusted_header driver must carry the same header login.",
 			Chapter: chapter08,
 		},
 	}

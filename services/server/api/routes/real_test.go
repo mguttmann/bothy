@@ -261,12 +261,17 @@ func (stubServer) CompleteIdentityLink(context.Context, rest.CompleteIdentityLin
 	return nil, nil
 }
 
+func (stubServer) LoginWithTrustedHeader(context.Context, rest.LoginWithTrustedHeaderRequestObject) (rest.LoginWithTrustedHeaderResponseObject, error) {
+	return nil, nil
+}
+
 // TestRealTable_Enabled pins the enabled operations (P-04) with action and rate-limit class
 // (AZ-P1): the three device reads of M1-33, the ten people, owner and self operations of M1-31
 // and the JWKS and the rotation of the signing keys (M1-32), the sessions (M1-34), the step-up
 // (M1-35), the providers and credentials (M1-36), the API tokens (M1-44), the audit log (M1-50),
-// the enrollment codes (M1-37), the device approval and pairing (M1-38), the passkeys (M1-40) and
-// the OIDC login (M1-41). A handler ticket that enables an operation changes this test together with
+// the enrollment codes (M1-37), the device approval and pairing (M1-38), the passkeys (M1-40),
+// the OIDC login (M1-41) and the trusted header login (M1-43). A handler ticket that enables an
+// operation changes this test together with
 // api/operations.yaml.
 func TestRealTable_Enabled(t *testing.T) {
 	type entry struct{ pattern, action, class string }
@@ -342,6 +347,8 @@ func TestRealTable_Enabled(t *testing.T) {
 		"completeOidcLogin":    {"POST /api/v1/auth/oidc/complete", "auth.login.complete", "rl.public_auth"},
 		"beginIdentityLink":    {"POST /api/v1/me/identities/begin", "identity.link", "rl.admin"},
 		"completeIdentityLink": {"POST /api/v1/me/identities/complete", "identity.link", "rl.admin"},
+		// M1-43
+		"loginWithTrustedHeader": {"POST /api/v1/auth/trusted-header/login", "auth.login.complete", "rl.public_auth"},
 	}
 	ops := routes.Enabled()
 	if len(ops) != len(want) {

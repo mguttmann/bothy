@@ -95,6 +95,11 @@ def sync_detailed(
 ) -> Response[IdentityProvider | Problem]:
     """Add an identity provider
 
+     Adds an identity provider (08, 2.6). A `trusted_header` provider that would be enabled (the default)
+    while the public listener is not bound to a loopback address is refused with `409 conflict`,
+    `reason: trusted_header_requires_loopback` and a `hint` naming `server.listen_addr` (08, 2.4 rule
+    1).
+
     Args:
         idempotency_key (UUID | Unset): UUIDv7 (RFC 9562), lowercase canonical form.
         body (IdentityProviderCreate):
@@ -127,6 +132,11 @@ def sync(
 ) -> IdentityProvider | Problem | None:
     """Add an identity provider
 
+     Adds an identity provider (08, 2.6). A `trusted_header` provider that would be enabled (the default)
+    while the public listener is not bound to a loopback address is refused with `409 conflict`,
+    `reason: trusted_header_requires_loopback` and a `hint` naming `server.listen_addr` (08, 2.4 rule
+    1).
+
     Args:
         idempotency_key (UUID | Unset): UUIDv7 (RFC 9562), lowercase canonical form.
         body (IdentityProviderCreate):
@@ -153,6 +163,11 @@ async def asyncio_detailed(
     idempotency_key: UUID | Unset = UNSET,
 ) -> Response[IdentityProvider | Problem]:
     """Add an identity provider
+
+     Adds an identity provider (08, 2.6). A `trusted_header` provider that would be enabled (the default)
+    while the public listener is not bound to a loopback address is refused with `409 conflict`,
+    `reason: trusted_header_requires_loopback` and a `hint` naming `server.listen_addr` (08, 2.4 rule
+    1).
 
     Args:
         idempotency_key (UUID | Unset): UUIDv7 (RFC 9562), lowercase canonical form.
@@ -183,6 +198,11 @@ async def asyncio(
     idempotency_key: UUID | Unset = UNSET,
 ) -> IdentityProvider | Problem | None:
     """Add an identity provider
+
+     Adds an identity provider (08, 2.6). A `trusted_header` provider that would be enabled (the default)
+    while the public listener is not bound to a loopback address is refused with `409 conflict`,
+    `reason: trusted_header_requires_loopback` and a `hint` naming `server.listen_addr` (08, 2.4 rule
+    1).
 
     Args:
         idempotency_key (UUID | Unset): UUIDv7 (RFC 9562), lowercase canonical form.

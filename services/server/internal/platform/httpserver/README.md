@@ -49,7 +49,7 @@ chapters win on any difference. Rulings: [DECISIONS.md](../../../../../docs/DECI
 | 4 | mux | routing; no pattern: `404 not_found`, wrong method: `405 method_not_allowed` with `Allow` |
 | 5 | `StageRoute` | operation into the context, `Cache-Control: no-store`, CORP, body limit, deadline, response writer |
 | 6 | `StageCORS` | none by default; `*` for `instance.discovery.read`; exact origins of `api.cors_allowed_origins` |
-| 7 | `StageAuthenticate` | precheck for requests with credentials (M1-19: `429` while `rl.public_auth` of the client IP is empty), `actor.Authenticator` with method, htu from `server.public_url`, `Authorization`, `DPoP`, client IP; failed-credentials hook |
+| 7 | `StageAuthenticate` | precheck for requests with credentials (M1-19: `429` while `rl.public_auth` of the client IP is empty), `actor.Authenticator` with method, htu from `server.public_url`, `Authorization`, `DPoP`, client IP; `reqmeta.Transport` (TCP peer from `RemoteAddr`, header, action) into the context for the trusted header driver (M1-43); failed-credentials hook |
 | 8 | `StageRateLimit` | token bucket of the operation's class (`platform/ratelimit`, M1-19): `RateLimit-Policy`, `RateLimit`; exhausted: `429 rate_limited` with `Retry-After` |
 | 9 | `StageMaintenance` | slot (M7-08) |
 | 10 | `StageIdempotency` | `Idempotency-Key` in the unit of work (M1-20, below) |

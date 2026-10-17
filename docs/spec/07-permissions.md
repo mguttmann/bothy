@@ -307,6 +307,7 @@ reveals nothing (never with `404`).
 | `host_not_active` | `forbidden` | host not `active` or host service not connected; problem code `host_unavailable` (`409`) |
 | `host_auth_failed` | `unauthenticated` | login of a host with an unknown key or a wrong signature |
 | `unknown_action` | error `500` | program error, alert |
+| `trusted_header_requires_loopback` | no `authorize` result | Reason of the audit entry of `identity_provider.manage` when enabling the driver `trusted_header` is refused because the public listener is not bound to loopback; problem code `conflict` (`409`) with `reason: trusted_header_requires_loopback` ([08-identity.md](08-identity.md), section 2.4, PLAN W4) |
 
 ### 4.2 Flow
 

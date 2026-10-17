@@ -87,6 +87,36 @@ process of the host may be able to send headers to this port.
 Without `Tailscale-User-Login` (tagged device, Funnel), the request is unauthenticated. Non-ASCII
 can be RFC-2047-encoded; the server decodes it before the comparison.
 
+Provider configuration (M1-43). The owner creates the provider with `createIdentityProvider`
+(step-up); the config names the headers, everything else is the same for every driver:
+
+```json
+{
+  "kind": "trusted_header",
+  "name": "Tailnet",
+  "allow_provisioning": false,
+  "config": {
+    "login_header": "Tailscale-User-Login",
+    "name_header": "Tailscale-User-Name"
+  }
+}
+```
+
+Rules the server enforces (08 section 2.4):
+
+- The driver works only while the public listener is bound to a loopback address
+  (`server.listen_addr` such as `127.0.0.1:8080` in the sidecar namespace). Otherwise
+  `POST /api/v1/auth/trusted-header/login` answers `404`, `/readyz` fails with
+  `trusted_header_requires_loopback`, and enabling the provider answers `409 conflict` with that
+  reason.
+- The headers count only when the TCP peer is in `server.trusted_proxies` (the default holds
+  `127.0.0.1/32` and `::1/128`); a forwarded address never counts.
+- A login without a known identity needs an `enrollment_code` in the request body or
+  `allow_provisioning = true` (the person then waits as `pending` until the owner enables them).
+- With `auth.trusted_header_bind_requests = true` (default) every later request and every refresh
+  of the session must carry the same login; a different or missing login revokes the session
+  (`401 session_revoked`, reason `trusted_header_mismatch`).
+
 WebSocket via `tailscale serve`: not confirmed in the documentation [assumed]. The
 portability test with profile `tailscale` checks the gateway explicitly.
 

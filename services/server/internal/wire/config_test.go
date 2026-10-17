@@ -191,6 +191,7 @@ func TestConfigSchemaBuilds(t *testing.T) {
 		"auth.server_code_ttl":               {Kind: config.KindDuration, Default: "60s", Min: "1s", Chapter: "08-identity.md"},
 		"auth.oidc_jwks_cache_ttl":           {Kind: config.KindDuration, Default: "1h", Min: "1s", Chapter: "08-identity.md"},
 		"auth.oidc_client_assertion_ttl":     {Kind: config.KindDuration, Default: "2m", Min: "1s", Chapter: "08-identity.md"},
+		"auth.trusted_header_bind_requests":  {Kind: config.KindBool, Default: "true", Chapter: "08-identity.md"},
 		"auth.idp_recheck_interval":          {Kind: config.KindDuration, Default: "30d", Min: "1m", Chapter: "08-identity.md"},
 		"client.min_version.ios":             {Kind: config.KindString, Default: "", Chapter: "18-release.md"},
 		"client.min_version.android":         {Kind: config.KindString, Default: "", Chapter: "18-release.md"},

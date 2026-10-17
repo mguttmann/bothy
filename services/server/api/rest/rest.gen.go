@@ -73,6 +73,9 @@ type ServerInterface interface {
 	// RefreshToken Rotate the refresh token
 	// (POST /auth/token/refresh)
 	RefreshToken(w http.ResponseWriter, r *http.Request, params RefreshTokenParams)
+	// LoginWithTrustedHeader Log in with the identity header of a trusted reverse proxy
+	// (POST /auth/trusted-header/login)
+	LoginWithTrustedHeader(w http.ResponseWriter, r *http.Request, params LoginWithTrustedHeaderParams)
 	// GetDevice Read a device
 	// (GET /devices/{device_id})
 	GetDevice(w http.ResponseWriter, r *http.Request, deviceId DeviceIdPath)
@@ -886,6 +889,51 @@ func (siw *ServerInterfaceWrapper) RefreshToken(w http.ResponseWriter, r *http.R
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		siw.Handler.RefreshToken(w, r, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// LoginWithTrustedHeader operation middleware
+func (siw *ServerInterfaceWrapper) LoginWithTrustedHeader(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params LoginWithTrustedHeaderParams
+
+	headers := r.Header
+
+	// ------------- Required header parameter "DPoP" -------------
+	if valueList, found := headers[http.CanonicalHeaderKey("DPoP")]; found {
+		var DPoP DpopProof
+		n := len(valueList)
+		if n != 1 {
+			siw.ErrorHandlerFunc(w, r, &TooManyValuesForParamError{ParamName: "DPoP", Count: n})
+			return
+		}
+
+		err = runtime.BindStyledParameterWithOptions("simple", "DPoP", valueList[0], &DPoP, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: true, Type: "string", Format: ""})
+		if err != nil {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "DPoP", Err: err})
+			return
+		}
+
+		params.DPoP = DPoP
+
+	} else {
+		err := fmt.Errorf("Header parameter DPoP is required, but not found")
+		siw.ErrorHandlerFunc(w, r, &RequiredHeaderError{ParamName: "DPoP", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.LoginWithTrustedHeader(w, r, params)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -2475,6 +2523,7 @@ func HandlerWithOptions(si ServerInterface, options StdHTTPServerOptions) http.H
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/auth/oidc/begin", wrapper.BeginOidcLogin)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/auth/oidc/callback", wrapper.HandleOidcCallback)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/auth/oidc/complete", wrapper.CompleteOidcLogin)
+	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/auth/trusted-header/login", wrapper.LoginWithTrustedHeader)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/auth/passkey/begin", wrapper.BeginPasskeyLogin)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/auth/passkey/complete", wrapper.CompletePasskeyLogin)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/auth/enroll/begin", wrapper.BeginEnrollment)
@@ -5278,6 +5327,159 @@ type RefreshTokendefaultApplicationProblemPlusJSONResponse struct {
 }
 
 func (response RefreshTokendefaultApplicationProblemPlusJSONResponse) VisitRefreshTokenResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	if response.Headers.CorrelationId != nil {
+		w.Header().Set("Correlation-Id", fmt.Sprint(*response.Headers.CorrelationId))
+	}
+	w.WriteHeader(response.StatusCode)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type LoginWithTrustedHeaderRequestObject struct {
+	Params LoginWithTrustedHeaderParams
+	Body   *LoginWithTrustedHeaderJSONRequestBody
+}
+
+type LoginWithTrustedHeaderResponseObject interface {
+	VisitLoginWithTrustedHeaderResponse(w http.ResponseWriter) error
+}
+
+type LoginWithTrustedHeader201ResponseHeaders struct {
+	CorrelationId   *CorrelationId
+	RateLimit       *string
+	RateLimitPolicy *string
+}
+
+type LoginWithTrustedHeader201JSONResponse struct {
+	Body    TokenResponse
+	Headers LoginWithTrustedHeader201ResponseHeaders
+}
+
+func (response LoginWithTrustedHeader201JSONResponse) VisitLoginWithTrustedHeaderResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	if response.Headers.CorrelationId != nil {
+		w.Header().Set("Correlation-Id", fmt.Sprint(*response.Headers.CorrelationId))
+	}
+	if response.Headers.RateLimit != nil {
+		w.Header().Set("RateLimit", fmt.Sprint(*response.Headers.RateLimit))
+	}
+	if response.Headers.RateLimitPolicy != nil {
+		w.Header().Set("RateLimit-Policy", fmt.Sprint(*response.Headers.RateLimitPolicy))
+	}
+	w.WriteHeader(201)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type LoginWithTrustedHeader400ApplicationProblemPlusJSONResponse struct {
+	BadRequestApplicationProblemPlusJSONResponse
+}
+
+func (response LoginWithTrustedHeader400ApplicationProblemPlusJSONResponse) VisitLoginWithTrustedHeaderResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	if response.Headers.CorrelationId != nil {
+		w.Header().Set("Correlation-Id", fmt.Sprint(*response.Headers.CorrelationId))
+	}
+	w.WriteHeader(400)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type LoginWithTrustedHeader401ApplicationProblemPlusJSONResponse struct {
+	UnauthorizedApplicationProblemPlusJSONResponse
+}
+
+func (response LoginWithTrustedHeader401ApplicationProblemPlusJSONResponse) VisitLoginWithTrustedHeaderResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	if response.Headers.CorrelationId != nil {
+		w.Header().Set("Correlation-Id", fmt.Sprint(*response.Headers.CorrelationId))
+	}
+	if response.Headers.DPoPNonce != nil {
+		w.Header().Set("DPoP-Nonce", fmt.Sprint(*response.Headers.DPoPNonce))
+	}
+	if response.Headers.WWWAuthenticate != nil {
+		w.Header().Set("WWW-Authenticate", fmt.Sprint(*response.Headers.WWWAuthenticate))
+	}
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type LoginWithTrustedHeader404ApplicationProblemPlusJSONResponse struct {
+	NotFoundApplicationProblemPlusJSONResponse
+}
+
+func (response LoginWithTrustedHeader404ApplicationProblemPlusJSONResponse) VisitLoginWithTrustedHeaderResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	if response.Headers.CorrelationId != nil {
+		w.Header().Set("Correlation-Id", fmt.Sprint(*response.Headers.CorrelationId))
+	}
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type LoginWithTrustedHeader429ApplicationProblemPlusJSONResponse struct {
+	TooManyRequestsApplicationProblemPlusJSONResponse
+}
+
+func (response LoginWithTrustedHeader429ApplicationProblemPlusJSONResponse) VisitLoginWithTrustedHeaderResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	if response.Headers.CorrelationId != nil {
+		w.Header().Set("Correlation-Id", fmt.Sprint(*response.Headers.CorrelationId))
+	}
+	if response.Headers.RateLimit != nil {
+		w.Header().Set("RateLimit", fmt.Sprint(*response.Headers.RateLimit))
+	}
+	if response.Headers.RateLimitPolicy != nil {
+		w.Header().Set("RateLimit-Policy", fmt.Sprint(*response.Headers.RateLimitPolicy))
+	}
+	if response.Headers.RetryAfter != nil {
+		w.Header().Set("Retry-After", fmt.Sprint(*response.Headers.RetryAfter))
+	}
+	w.WriteHeader(429)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type LoginWithTrustedHeaderdefaultApplicationProblemPlusJSONResponse struct {
+	Body       Problem
+	Headers    ErrorResponseHeaders
+	StatusCode int
+}
+
+func (response LoginWithTrustedHeaderdefaultApplicationProblemPlusJSONResponse) VisitLoginWithTrustedHeaderResponse(w http.ResponseWriter) error {
 
 	var buf bytes.Buffer
 	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
@@ -12521,6 +12723,9 @@ type StrictServerInterface interface {
 	// RefreshToken Rotate the refresh token
 	// (POST /auth/token/refresh)
 	RefreshToken(ctx context.Context, request RefreshTokenRequestObject) (RefreshTokenResponseObject, error)
+	// LoginWithTrustedHeader Log in with the identity header of a trusted reverse proxy
+	// (POST /auth/trusted-header/login)
+	LoginWithTrustedHeader(ctx context.Context, request LoginWithTrustedHeaderRequestObject) (LoginWithTrustedHeaderResponseObject, error)
 	// GetDevice Read a device
 	// (GET /devices/{device_id})
 	GetDevice(ctx context.Context, request GetDeviceRequestObject) (GetDeviceResponseObject, error)
@@ -13227,6 +13432,39 @@ func (sh *strictHandler) RefreshToken(w http.ResponseWriter, r *http.Request, pa
 		sh.options.ResponseErrorHandlerFunc(w, r, err)
 	} else if validResponse, ok := response.(RefreshTokenResponseObject); ok {
 		if err := validResponse.VisitRefreshTokenResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// LoginWithTrustedHeader operation middleware
+func (sh *strictHandler) LoginWithTrustedHeader(w http.ResponseWriter, r *http.Request, params LoginWithTrustedHeaderParams) {
+	var request LoginWithTrustedHeaderRequestObject
+
+	request.Params = params
+
+	var body LoginWithTrustedHeaderJSONRequestBody
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
+		return
+	}
+	request.Body = &body
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.LoginWithTrustedHeader(ctx, request.(LoginWithTrustedHeaderRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "LoginWithTrustedHeader")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(LoginWithTrustedHeaderResponseObject); ok {
+		if err := validResponse.VisitLoginWithTrustedHeaderResponse(w); err != nil {
 			sh.options.ResponseErrorHandlerFunc(w, r, err)
 		}
 	} else if response != nil {
