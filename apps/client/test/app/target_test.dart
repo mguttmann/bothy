@@ -28,7 +28,10 @@ class StatusAdapter implements HttpClientAdapter {
     paths.add(options.uri.path);
     final s = status;
     if (s == null) {
-      throw DioException.connectionError(requestOptions: options, reason: 'offline');
+      throw DioException.connectionError(
+        requestOptions: options,
+        reason: 'offline',
+      );
     }
     return ResponseBody.fromString(
       s == 404 ? '{"code":"not_found","status":404}' : '{}',
@@ -46,7 +49,11 @@ class StatusAdapter implements HttpClientAdapter {
 ApiClient api(StatusAdapter adapter) => createApiClient(
   baseUrl: Uri.parse('https://chat.example.com'),
   traceContext: () => TraceContext(traceId: '1' * 32, sampled: false),
-  readRetry: ReadRetryPolicy(base: Duration.zero, cap: Duration.zero, maxAttempts: 1),
+  readRetry: ReadRetryPolicy(
+    base: Duration.zero,
+    cap: Duration.zero,
+    maxAttempts: 1,
+  ),
   adapter: adapter,
 );
 
@@ -57,16 +64,33 @@ void main() {
   setUp(() => db = openInMemoryForTests());
   tearDown(() => db.close());
 
-  Future<TargetStatus> resolve(String path, int? status, [StatusAdapter? seen]) =>
-      TargetResolver(db, api(seen ?? StatusAdapter(status))).resolve(parseLocation(Uri.parse(path)));
+  Future<TargetStatus> resolve(
+    String path,
+    int? status, [
+    StatusAdapter? seen,
+  ]) => TargetResolver(
+    db,
+    api(seen ?? StatusAdapter(status)),
+  ).resolve(parseLocation(Uri.parse(path)));
 
   test('a target REST answers with 404 or 403 is not found, one it returns is visible', () async {
     for (final kind in ['s', 'c', 't']) {
-      expect(await resolve('/$kind/$id', 404), TargetStatus.notFound, reason: kind);
-      expect(await resolve('/$kind/$id', 403), TargetStatus.notFound, reason: kind);
+      expect(
+        await resolve('/$kind/$id', 404),
+        TargetStatus.notFound,
+        reason: kind,
+      );
+      expect(
+        await resolve('/$kind/$id', 403),
+        TargetStatus.notFound,
+        reason: kind,
+      );
     }
     final adapter = StatusAdapter(200);
-    expect(await resolve('/t/$id?m=$id', 200, adapter), isNot(TargetStatus.notFound));
+    expect(
+      await resolve('/t/$id?m=$id', 200, adapter),
+      isNot(TargetStatus.notFound),
+    );
     expect(adapter.paths.single, '/api/v1/threads/$id');
   });
 
@@ -74,12 +98,21 @@ void main() {
     expect(await resolve('/c/$id', null), TargetStatus.unknown);
   });
 
-  test('locations without a target are visible, an unknown one is not found', () async {
-    for (final path in ['/', '/running', '/search?q=x', '/admin/x', '/onboarding/login']) {
-      expect(await resolve(path, 500), TargetStatus.visible, reason: path);
-    }
-    expect(await resolve('/x', 200), TargetStatus.notFound);
-  });
+  test(
+    'locations without a target are visible, an unknown one is not found',
+    () async {
+      for (final path in [
+        '/',
+        '/running',
+        '/search?q=x',
+        '/admin/x',
+        '/onboarding/login',
+      ]) {
+        expect(await resolve(path, 500), TargetStatus.visible, reason: path);
+      }
+      expect(await resolve('/x', 200), TargetStatus.notFound);
+    },
+  );
 
   test('a target in the local database needs no REST call', () async {
     final adapter = StatusAdapter(404);

@@ -131,12 +131,18 @@ final class Branding {
 /// Throws a [FormatException] when the pubspec has no version.
 String pubspecVersion(String pubspecText) {
   final version = (loadYaml(pubspecText) as YamlMap)['version'];
-  if (version is! String) throw const FormatException('pubspec without version');
+  if (version is! String) {
+    throw const FormatException('pubspec without version');
+  }
   return version.split('+').first;
 }
 
 /// Runs the tool in [appDir]; returns the exit code. [out] receives the messages.
-int run(List<String> args, {required Directory appDir, required StringSink out}) {
+int run(
+  List<String> args, {
+  required Directory appDir,
+  required StringSink out,
+}) {
   var input = 'branding.example.yaml';
   var check = false;
   for (var i = 0; i < args.length; i++) {

@@ -68,15 +68,30 @@ Finder column(String name) => find.byKey(ValueKey('column.$name'));
 
 void main() {
   group('ColumnWidths', () {
-    test('defaults are the layout tokens; a stored value replaces its default', () {
-      expect(ColumnWidths.defaults.of(AppColumn.sidebar), DsLayout.sidebarWidth);
-      expect(ColumnWidths.defaults.of(AppColumn.postList), DsLayout.listWidth);
-      expect(ColumnWidths.defaults.of(AppColumn.session), DsLayout.sessionWidth);
-      final stored = ColumnWidths.fromSetting({'sidebar': 300, 'session': 320});
-      expect(stored.of(AppColumn.sidebar), 300);
-      expect(stored.of(AppColumn.postList), DsLayout.listWidth);
-      expect(stored.toSetting(), {'sidebar': 300, 'session': 320});
-    });
+    test(
+      'defaults are the layout tokens; a stored value replaces its default',
+      () {
+        expect(
+          ColumnWidths.defaults.of(AppColumn.sidebar),
+          DsLayout.sidebarWidth,
+        );
+        expect(
+          ColumnWidths.defaults.of(AppColumn.postList),
+          DsLayout.listWidth,
+        );
+        expect(
+          ColumnWidths.defaults.of(AppColumn.session),
+          DsLayout.sessionWidth,
+        );
+        final stored = ColumnWidths.fromSetting({
+          'sidebar': 300,
+          'session': 320,
+        });
+        expect(stored.of(AppColumn.sidebar), 300);
+        expect(stored.of(AppColumn.postList), DsLayout.listWidth);
+        expect(stored.toSetting(), {'sidebar': 300, 'session': 320});
+      },
+    );
 
     test('unknown names, negative and non-numeric values are skipped; widths have a floor', () {
       final w = ColumnWidths.fromSetting({
@@ -88,31 +103,40 @@ void main() {
       expect(w.toSetting(), {'session': DsLayout.columnMin.round()});
       expect(ColumnWidths.fromSetting('x'), ColumnWidths.defaults);
       expect(
-        ColumnWidths.defaults.withWidth(AppColumn.sidebar, 1).of(AppColumn.sidebar),
+        ColumnWidths.defaults
+            .withWidth(AppColumn.sidebar, 1)
+            .of(AppColumn.sidebar),
         DsLayout.columnMin,
       );
     });
 
-    test('the writer puts and deletes layout.column_widths through the outbox', () async {
-      final db = openInMemoryForTests();
-      final idle = idleEngine(db);
-      final writer = ColumnWidthsWriter(idle.engine);
-      await writer.save(ColumnWidths.defaults.withWidth(AppColumn.sidebar, 312));
-      await writer.reset();
-      final entries = await db.outboxDao.allEntries();
-      expect(entries.map((e) => e.kind), [
-        PersonalOps.putMySetting,
-        PersonalOps.deleteMySetting,
-      ]);
-      expect(jsonDecode(entries.first.payload), {
-        'key': 'layout.column_widths',
-        'value': {'sidebar': 312},
-      });
-      expect(jsonDecode(entries.last.payload), {'key': 'layout.column_widths'});
-      await idle.engine.dispose();
-      await idle.auth.dispose();
-      await db.close();
-    });
+    test(
+      'the writer puts and deletes layout.column_widths through the outbox',
+      () async {
+        final db = openInMemoryForTests();
+        final idle = idleEngine(db);
+        final writer = ColumnWidthsWriter(idle.engine);
+        await writer.save(
+          ColumnWidths.defaults.withWidth(AppColumn.sidebar, 312),
+        );
+        await writer.reset();
+        final entries = await db.outboxDao.allEntries();
+        expect(entries.map((e) => e.kind), [
+          PersonalOps.putMySetting,
+          PersonalOps.deleteMySetting,
+        ]);
+        expect(jsonDecode(entries.first.payload), {
+          'key': 'layout.column_widths',
+          'value': {'sidebar': 312},
+        });
+        expect(jsonDecode(entries.last.payload), {
+          'key': 'layout.column_widths',
+        });
+        await idle.engine.dispose();
+        await idle.auth.dispose();
+        await db.close();
+      },
+    );
 
     test('the stored setting is restored from user_settings', () async {
       final db = openInMemoryForTests();
@@ -136,9 +160,13 @@ void main() {
   });
 
   group('ColumnLayout', () {
-    testWidgets('four columns at ui.desktop_min_width_four_columns', (tester) async {
+    testWidgets('four columns at ui.desktop_min_width_four_columns', (
+      tester,
+    ) async {
       wide(tester);
-      await tester.pumpWidget(host(layout(), config.desktopMinWidthFourColumns.toDouble()));
+      await tester.pumpWidget(
+        host(layout(), config.desktopMinWidthFourColumns.toDouble()),
+      );
       for (final c in ['sidebar', 'post_list', 'history', 'session']) {
         expect(column(c), findsOneWidget, reason: c);
       }
@@ -146,51 +174,60 @@ void main() {
 
     testWidgets('below it the session column collapses', (tester) async {
       wide(tester);
-      await tester.pumpWidget(host(layout(), config.desktopMinWidthFourColumns - 1));
+      await tester.pumpWidget(
+        host(layout(), config.desktopMinWidthFourColumns - 1),
+      );
       expect(column('session'), findsNothing);
       expect(column('post_list'), findsOneWidget);
     });
 
-    testWidgets('below ui.desktop_min_width_three_columns the post list becomes a stack', (
+    testWidgets(
+      'below ui.desktop_min_width_three_columns the post list becomes a stack',
+      (tester) async {
+        wide(tester);
+        final width = config.desktopMinWidthThreeColumns - 1.0;
+        await tester.pumpWidget(host(layout(), width));
+        expect(column('post_list'), findsOneWidget);
+        expect(column('history'), findsNothing);
+        await tester.pumpWidget(host(layout(stackShowsHistory: true), width));
+        expect(column('post_list'), findsNothing);
+        expect(column('history'), findsOneWidget);
+      },
+    );
+
+    testWidgets(
+      'a drag changes the width at once and reports it once at the end',
+      (tester) async {
+        wide(tester);
+        final reported = <ColumnWidths>[];
+        await tester.pumpWidget(
+          host(
+            layout(onChanged: reported.add),
+            config.desktopMinWidthFourColumns.toDouble(),
+          ),
+        );
+        final before = tester.getSize(column('sidebar')).width;
+        await tester.drag(
+          find.byKey(const ValueKey('column.handle.sidebar')),
+          const Offset(40, 0),
+        );
+        await tester.pump();
+        expect(tester.getSize(column('sidebar')).width, greaterThan(before));
+        expect(reported, hasLength(1));
+        expect(reported.single.of(AppColumn.sidebar), greaterThan(before));
+        final session = tester.getSize(column('session')).width;
+        await tester.drag(
+          find.byKey(const ValueKey('column.handle.session')),
+          const Offset(-30, 0),
+        );
+        await tester.pump();
+        expect(tester.getSize(column('session')).width, greaterThan(session));
+      },
+    );
+
+    testWidgets('a drag never squeezes the history below its minimum', (
       tester,
     ) async {
-      wide(tester);
-      final width = config.desktopMinWidthThreeColumns - 1.0;
-      await tester.pumpWidget(host(layout(), width));
-      expect(column('post_list'), findsOneWidget);
-      expect(column('history'), findsNothing);
-      await tester.pumpWidget(host(layout(stackShowsHistory: true), width));
-      expect(column('post_list'), findsNothing);
-      expect(column('history'), findsOneWidget);
-    });
-
-    testWidgets('a drag changes the width at once and reports it once at the end', (
-      tester,
-    ) async {
-      wide(tester);
-      final reported = <ColumnWidths>[];
-      await tester.pumpWidget(
-        host(layout(onChanged: reported.add), config.desktopMinWidthFourColumns.toDouble()),
-      );
-      final before = tester.getSize(column('sidebar')).width;
-      await tester.drag(
-        find.byKey(const ValueKey('column.handle.sidebar')),
-        const Offset(40, 0),
-      );
-      await tester.pump();
-      expect(tester.getSize(column('sidebar')).width, greaterThan(before));
-      expect(reported, hasLength(1));
-      expect(reported.single.of(AppColumn.sidebar), greaterThan(before));
-      final session = tester.getSize(column('session')).width;
-      await tester.drag(
-        find.byKey(const ValueKey('column.handle.session')),
-        const Offset(-30, 0),
-      );
-      await tester.pump();
-      expect(tester.getSize(column('session')).width, greaterThan(session));
-    });
-
-    testWidgets('a drag never squeezes the history below its minimum', (tester) async {
       wide(tester);
       final reported = <ColumnWidths>[];
       final width = config.desktopMinWidthFourColumns.toDouble();

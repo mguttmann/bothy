@@ -6,7 +6,6 @@
 
 import 'package:alchemist/alchemist.dart';
 import 'package:client/app/account_wiper.dart';
-import 'package:client/app/discovery.dart';
 import 'package:client/onboarding/e1_server_address.dart';
 import 'package:client/onboarding/e2_login.dart';
 import 'package:client/onboarding/e3_enrollment_code.dart';
@@ -124,6 +123,4 @@ void main() {
       ),
     );
   }
-  // Keeps the analyzer from flagging the fixture type as unused in this file.
-  assert(nothing is InstanceInfo);
 }

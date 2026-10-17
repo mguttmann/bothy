@@ -15,21 +15,24 @@ import '../support/fake_instance.dart';
 import '../support/fakes.dart';
 
 void main() {
-  final scenarios = <String, Future<void> Function(FakeServer, WorldSeed, ScenarioClient)>{
-    '16.1 send online': scenarioSendOnline,
-    '16.2 send offline': scenarioSendOffline,
-    '16.3 catch-up': scenarioCatchUp,
-    '16.3 resync': scenarioResync,
-    '16.4 access removal': scenarioAccessRemoval,
-    '16.5 agent run': scenarioAgentRun,
-  };
+  final scenarios =
+      <String, Future<void> Function(FakeServer, WorldSeed, ScenarioClient)>{
+        '16.1 send online': scenarioSendOnline,
+        '16.2 send offline': scenarioSendOffline,
+        '16.3 catch-up': scenarioCatchUp,
+        '16.3 resync': scenarioResync,
+        '16.4 access removal': scenarioAccessRemoval,
+        '16.5 agent run': scenarioAgentRun,
+      };
   for (final MapEntry(key: name, value: run) in scenarios.entries) {
     test(name, () async {
       final saved = HttpOverrides.current;
       HttpOverrides.global = null;
       final f = await FakeInstance.start();
       final network = f.ports.network as SwitchNetwork;
-      final c = ProviderContainer(overrides: [appPortsProvider.overrideWithValue(f.ports)]);
+      final c = ProviderContainer(
+        overrides: [appPortsProvider.overrideWithValue(f.ports)],
+      );
       final client = AppScenarioClient(c, f.server, network);
       try {
         await run(f.server, f.seed, client);

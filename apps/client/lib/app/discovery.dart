@@ -14,7 +14,11 @@ import 'package:dio/dio.dart';
 /// A login method of the instance as E2 offers it.
 final class LoginProvider {
   /// Creates the provider.
-  const LoginProvider({required this.id, required this.kind, required this.name});
+  const LoginProvider({
+    required this.id,
+    required this.kind,
+    required this.name,
+  });
 
   /// The provider ID for `beginOidcLogin`.
   final String id;

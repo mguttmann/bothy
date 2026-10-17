@@ -36,10 +36,15 @@ ColumnWidths columnWidths(Ref ref) {
 /// The design context from `appearance.*`, the system brightness and the accent of the
 /// instance (01 11, 01 12).
 @riverpod
-DsContext appearance(Ref ref, Brightness platformBrightness, bool platformReduceMotion) {
+DsContext appearance(
+  Ref ref,
+  Brightness platformBrightness,
+  bool platformReduceMotion,
+) {
   final settings = ref.watch(userSettingsProvider).value ?? const {};
   final accent = ref.watch(currentInstanceProvider)?.accentColor;
-  String? text(String key) => settings[key] is String ? settings[key]! as String : null;
+  String? text(String key) =>
+      settings[key] is String ? settings[key]! as String : null;
   return resolveDsContext(
     appearanceTheme: text('appearance.theme'),
     appearanceDensity: text('appearance.density'),

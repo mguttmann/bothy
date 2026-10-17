@@ -68,8 +68,7 @@ class DesktopShell extends ConsumerWidget {
           Expanded(
             child: ColumnLayout(
               widths: widths,
-              minWidthFourColumns: config.desktopMinWidthFourColumns
-                  .toDouble(),
+              minWidthFourColumns: config.desktopMinWidthFourColumns.toDouble(),
               minWidthThreeColumns: config.desktopMinWidthThreeColumns
                   .toDouble(),
               stackShowsHistory: parsed is ThreadLocation,
@@ -119,9 +118,8 @@ class _TargetView extends ConsumerWidget {
       child: Text(
         AppLocalizations.of(context).accessNotFoundOrNoAccess,
         key: const ValueKey('target.notFound'),
-        style: dsTextStyle(
-          DsType.body,
-        ).copyWith(color: context.dsColors.textSecondary),
+        style: dsTextStyle(DsType.body)
+            .copyWith(color: context.dsColors.textSecondary),
       ),
     );
   }

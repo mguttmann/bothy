@@ -37,7 +37,11 @@ class OtherDevice {
       buildClient: (interceptors) => createApiClient(
         baseUrl: server.baseUri,
         traceContext: () => TraceContext(traceId: '2' * 32, sampled: false),
-        readRetry: ReadRetryPolicy(base: Duration.zero, cap: Duration.zero, maxAttempts: 1),
+        readRetry: ReadRetryPolicy(
+          base: Duration.zero,
+          cap: Duration.zero,
+          maxAttempts: 1,
+        ),
         authInterceptors: interceptors,
       ),
     );
@@ -76,7 +80,8 @@ class OtherDevice {
         idempotencyKey: _key(),
       );
 
-  String _key() => '0193f2a7-0000-7000-8000-${(_keys++).toRadixString(16).padLeft(12, '0')}';
+  String _key() =>
+      '0193f2a7-0000-7000-8000-${(_keys++).toRadixString(16).padLeft(12, '0')}';
 
   /// Releases the session.
   Future<void> dispose() => auth.dispose();

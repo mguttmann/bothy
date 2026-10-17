@@ -15,8 +15,16 @@ final InstanceInfo oidcOnly = InstanceInfo(
   productName: 'Team Chat',
   accentColor: 'loch',
   providers: const [
-    LoginProvider(id: '0193f2a7-0000-7000-8000-0000000000b1', kind: 'oidc', name: 'Company SSO'),
-    LoginProvider(id: '0193f2a7-0000-7000-8000-0000000000b2', kind: 'trusted_header', name: 'Office proxy'),
+    LoginProvider(
+      id: '0193f2a7-0000-7000-8000-0000000000b1',
+      kind: 'oidc',
+      name: 'Company SSO',
+    ),
+    LoginProvider(
+      id: '0193f2a7-0000-7000-8000-0000000000b2',
+      kind: 'trusted_header',
+      name: 'Office proxy',
+    ),
   ],
 );
 

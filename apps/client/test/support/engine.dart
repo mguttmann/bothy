@@ -36,7 +36,11 @@ import 'software_keys.dart';
     buildClient: (interceptors) => createApiClient(
       baseUrl: base,
       traceContext: () => TraceContext(traceId: '1' * 32, sampled: false),
-      readRetry: ReadRetryPolicy(base: Duration.zero, cap: Duration.zero, maxAttempts: 1),
+      readRetry: ReadRetryPolicy(
+        base: Duration.zero,
+        cap: Duration.zero,
+        maxAttempts: 1,
+      ),
       authInterceptors: interceptors,
     ),
   );

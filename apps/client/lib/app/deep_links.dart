@@ -49,8 +49,7 @@ final class MethodChannelDeepLinks implements DeepLinkSource {
       return const [];
     }
     return [
-      for (final item in raw ?? const <Object?>[])
-        ?Uri.tryParse('$item'),
+      for (final item in raw ?? const <Object?>[]) ?Uri.tryParse('$item'),
     ];
   }
 }

@@ -36,8 +36,10 @@ import 'deep_links.dart';
 import 'discovery.dart';
 
 /// Opens the local database of an instance; the production value is `openLocalStore`.
-typedef DatabaseOpener =
-    Future<LocalDatabase> Function(io.File file, DatabaseKeySource keys);
+typedef DatabaseOpener = Future<LocalDatabase> Function(
+  io.File file,
+  DatabaseKeySource keys,
+);
 
 /// The outside world of the app. Riverpod hands it out through `appPortsProvider`, and tests
 /// override it (15 4: "Tests replace providers").
@@ -151,14 +153,15 @@ final class ConfirmingStepUpPrompt implements StepUpPrompt {
 /// system browser, a loopback receiver per login, the `dart:io` WebSocket transport, the
 /// lifecycle of Flutter with the derived network status (D-M4-18-8), the scheduler's frames
 /// and the deep link channel of the runner.
-AppPorts productionPorts({BuildBranding branding = BuildBranding.fromEnvironment}) {
+AppPorts productionPorts({
+  BuildBranding branding = BuildBranding.fromEnvironment,
+}) {
   final lifecycle = FlutterAppLifecycle();
-  AppLocalizations texts() =>
-      lookupAppLocalizations(
-        resolveAppLocale(
-          systemLocales: WidgetsBinding.instance.platformDispatcher.locales,
-        ),
-      );
+  AppLocalizations texts() => lookupAppLocalizations(
+    resolveAppLocale(
+      systemLocales: WidgetsBinding.instance.platformDispatcher.locales,
+    ),
+  );
   return AppPorts(
     branding: branding,
     platform: Platform.isWindows ? 'windows' : 'macos',
@@ -177,8 +180,9 @@ AppPorts productionPorts({BuildBranding branding = BuildBranding.fromEnvironment
     ),
     dataRoot: getApplicationSupportDirectory,
     browser: SystemBrowserLauncher(),
-    redirects: () =>
-        LoopbackRedirectReceiver(doneText: () => texts().onboardingLoopbackDone),
+    redirects: () => LoopbackRedirectReceiver(
+      doneText: () => texts().onboardingLoopbackDone,
+    ),
     transport: IoGatewayTransport(),
     lifecycle: lifecycle,
     network: LifecycleNetworkStatus(lifecycle),

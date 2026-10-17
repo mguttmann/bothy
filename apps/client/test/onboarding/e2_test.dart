@@ -54,21 +54,29 @@ List<String> buttonTexts(WidgetTester tester) => [
 ];
 
 void main() {
-  testWidgets('OIDC only: one button per provider, the code and pairing links', (tester) async {
-    await pumpE2(tester, oidcOnly);
-    expect(buttonTexts(tester), [
-      en.onboardingLoginWithProvider('Company SSO'),
-      en.onboardingLoginWithProvider('Office proxy'),
-      en.onboardingEnrollmentCodeLink,
-      en.onboardingPairLink,
-      en.onboardingChangeServer,
-    ]);
-    expect(find.byKey(const ValueKey('e2.loginName')), findsNothing);
-    expect(find.text(en.onboardingLoginTitle('Team Chat')), findsOneWidget);
-    expect(find.text(en.onboardingServerHost('chat.example.com')), findsOneWidget);
-  });
+  testWidgets(
+    'OIDC only: one button per provider, the code and pairing links',
+    (tester) async {
+      await pumpE2(tester, oidcOnly);
+      expect(buttonTexts(tester), [
+        en.onboardingLoginWithProvider('Company SSO'),
+        en.onboardingLoginWithProvider('Office proxy'),
+        en.onboardingEnrollmentCodeLink,
+        en.onboardingPairLink,
+        en.onboardingChangeServer,
+      ]);
+      expect(find.byKey(const ValueKey('e2.loginName')), findsNothing);
+      expect(find.text(en.onboardingLoginTitle('Team Chat')), findsOneWidget);
+      expect(
+        find.text(en.onboardingServerHost('chat.example.com')),
+        findsOneWidget,
+      );
+    },
+  );
 
-  testWidgets('local with password: login name, passkey, password and code', (tester) async {
+  testWidgets('local with password: login name, passkey, password and code', (
+    tester,
+  ) async {
     final calls = await pumpE2(tester, localWithPassword);
     expect(buttonTexts(tester), [
       en.onboardingLoginWithPasskey,
@@ -87,7 +95,9 @@ void main() {
     expect(calls.log, ['passkey alex', 'password alex pw 123456']);
   });
 
-  testWidgets('without the passkey port the passkey button is not offered', (tester) async {
+  testWidgets('without the passkey port the passkey button is not offered', (
+    tester,
+  ) async {
     await pumpE2(tester, localWithPassword, passkeys: false);
     expect(find.byKey(const ValueKey('e2.passkey')), findsNothing);
     final noPassword = InstanceInfo(
@@ -101,7 +111,9 @@ void main() {
     expect(find.byKey(const ValueKey('e2.passkey')), findsOneWidget);
   });
 
-  testWidgets('nothing: "No login is set up", enrollment and pairing stay', (tester) async {
+  testWidgets('nothing: "No login is set up", enrollment and pairing stay', (
+    tester,
+  ) async {
     await pumpE2(tester, nothing);
     expect(find.text(en.onboardingNoMethod), findsOneWidget);
     expect(buttonTexts(tester), [
@@ -111,7 +123,9 @@ void main() {
     ]);
   });
 
-  testWidgets('Enter triggers the main action and Esc goes back', (tester) async {
+  testWidgets('Enter triggers the main action and Esc goes back', (
+    tester,
+  ) async {
     var calls = await pumpE2(tester, oidcOnly);
     await tester.sendKeyEvent(LogicalKeyboardKey.enter);
     await tester.sendKeyEvent(LogicalKeyboardKey.escape);
@@ -133,7 +147,9 @@ void main() {
     await tester.tap(find.byKey(const ValueKey('e2.change')));
     expect(calls.log, ['enroll', 'pair', 'change']);
     calls = await pumpE2(tester, oidcOnly, busy: true);
-    await tester.tap(find.byKey(ValueKey('e2.provider.${oidcOnly.providers.first.id}')));
+    await tester.tap(
+      find.byKey(ValueKey('e2.provider.${oidcOnly.providers.first.id}')),
+    );
     await tester.sendKeyEvent(LogicalKeyboardKey.enter);
     expect(calls.log, isEmpty);
     for (final n in LoginNotice.values) {

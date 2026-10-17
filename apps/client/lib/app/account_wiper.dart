@@ -77,7 +77,6 @@ final class AccountWiper {
        _keys = keys,
        _secrets = secrets;
 
-
   /// The instance whose data goes.
   final String instanceId;
 

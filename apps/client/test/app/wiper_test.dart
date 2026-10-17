@@ -33,22 +33,36 @@ void main() {
   test('after wipe no file and no secret of the instance remains; the address stays', () async {
     final backend = MemorySecureBackend();
     final keys = SoftwareKeyStore();
-    final ports = testPorts(dataRoot: root, secureBackend: backend, deviceKeys: keys);
-    await AppPreferences(backend).setServerAddress(Uri.parse('https://chat.example.com'));
+    final ports = testPorts(
+      dataRoot: root,
+      secureBackend: backend,
+      deviceKeys: keys,
+    );
+    await AppPreferences(backend)
+        .setServerAddress(Uri.parse('https://chat.example.com'));
     final services = await InstanceServices.open(ports, instance());
-    await services.secrets.write('auth/https://chat.example.com/refresh_token', 'rt');
+    await services.secrets.write(
+      'auth/https://chat.example.com/refresh_token',
+      'rt',
+    );
     final folder = Directory('${root.path}/instances/$instanceId');
     await File('${folder.path}/files/cached.bin').create(recursive: true);
     expect(File('${folder.path}/local.db').existsSync(), isTrue);
     expect(keys.scopes, {instanceId});
-    expect(backend.values.keys.where((k) => k.contains(instanceId)), isNotEmpty);
+    expect(
+      backend.values.keys.where((k) => k.contains(instanceId)),
+      isNotEmpty,
+    );
 
     await services.wiper.wipe();
 
     expect(folder.existsSync(), isFalse);
     expect(keys.scopes, isEmpty);
     expect(backend.values.keys.where((k) => k.contains(instanceId)), isEmpty);
-    expect(await AppPreferences(backend).serverAddress(), Uri.parse('https://chat.example.com'));
+    expect(
+      await AppPreferences(backend).serverAddress(),
+      Uri.parse('https://chat.example.com'),
+    );
     await services.auth.dispose();
   });
 
@@ -58,7 +72,8 @@ void main() {
     final secrets = InstanceSecrets(backend, instanceId);
     await secrets.write('device_id', 'd');
     await keys.ensure(instanceId);
-    final folder = await Directory('${root.path}/instances/$instanceId').create(recursive: true);
+    final folder = await Directory('${root.path}/instances/$instanceId')
+        .create(recursive: true);
     final wiper = AccountWiper(
       instanceId: instanceId,
       folder: folder,
@@ -89,13 +104,31 @@ void main() {
   });
 
   test('every revoke reason has its cause; an unknown one counts as a revoked session', () {
-    expect(SignOutCause.ofRevokeReason('revoked_by_self'), SignOutCause.revokedBySelf);
-    expect(SignOutCause.ofRevokeReason('revoked_by_owner'), SignOutCause.revokedByOwner);
-    expect(SignOutCause.ofRevokeReason('user_disabled'), SignOutCause.userDisabled);
+    expect(
+      SignOutCause.ofRevokeReason('revoked_by_self'),
+      SignOutCause.revokedBySelf,
+    );
+    expect(
+      SignOutCause.ofRevokeReason('revoked_by_owner'),
+      SignOutCause.revokedByOwner,
+    );
+    expect(
+      SignOutCause.ofRevokeReason('user_disabled'),
+      SignOutCause.userDisabled,
+    );
     expect(SignOutCause.ofRevokeReason('inactive'), SignOutCause.inactive);
-    expect(SignOutCause.ofRevokeReason('verification_failed'), SignOutCause.rejected);
-    expect(SignOutCause.ofRevokeReason('pending_expired'), SignOutCause.pendingExpired);
-    expect(SignOutCause.ofRevokeReason('something_new'), SignOutCause.sessionRevoked);
+    expect(
+      SignOutCause.ofRevokeReason('verification_failed'),
+      SignOutCause.rejected,
+    );
+    expect(
+      SignOutCause.ofRevokeReason('pending_expired'),
+      SignOutCause.pendingExpired,
+    );
+    expect(
+      SignOutCause.ofRevokeReason('something_new'),
+      SignOutCause.sessionRevoked,
+    );
     expect(SignOutCause.ofRevokeReason(null), SignOutCause.sessionRevoked);
   });
 }

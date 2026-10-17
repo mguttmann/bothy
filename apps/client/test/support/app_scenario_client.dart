@@ -39,7 +39,8 @@ class AppScenarioClient implements ScenarioClient {
   final List<String> notices = [];
 
   @override
-  bool get live => container.read(syncEngineProvider)?.state.phase == ConnectionPhase.live;
+  bool get live =>
+      container.read(syncEngineProvider)?.state.phase == ConnectionPhase.live;
 
   @override
   Future<void> start() async {
@@ -47,8 +48,13 @@ class AppScenarioClient implements ScenarioClient {
     await Future<void>.delayed(Duration.zero);
     final control = container.read(onboardingControllerProvider.notifier);
     await control.connect(server.baseUri.toString());
-    await control.loginWithPassword(WorldSeed.alexLogin, WorldSeed.password, WorldSeed.totp);
-    if (container.read(onboardingControllerProvider).step != OnboardingStep.signedIn) {
+    await control.loginWithPassword(
+      WorldSeed.alexLogin,
+      WorldSeed.password,
+      WorldSeed.totp,
+    );
+    if (container.read(onboardingControllerProvider).step !=
+        OnboardingStep.signedIn) {
       throw StateError('sign-in failed');
     }
     _engine.notices.listen(
@@ -65,19 +71,32 @@ class AppScenarioClient implements ScenarioClient {
   }
 
   @override
-  Future<String> send(String threadId, String text, {List<String> mentionIds = const []}) async =>
-      (await _engine.outbox.enqueue(
-        OutboxRequest(
-          kind: MessageOps.createMessage,
-          threadId: ThreadId.parse(threadId),
-          payload: {'content_md': text, if (mentionIds.isNotEmpty) 'mention_ids': mentionIds},
-        ),
-      )).id;
+  Future<String> send(
+    String threadId,
+    String text, {
+    List<String> mentionIds = const [],
+  }) async => (await _engine.outbox.enqueue(
+    OutboxRequest(
+      kind: MessageOps.createMessage,
+      threadId: ThreadId.parse(threadId),
+      payload: {
+        'content_md': text,
+        if (mentionIds.isNotEmpty) 'mention_ids': mentionIds,
+      },
+    ),
+  )).id;
 
   @override
   Future<void> goOffline() async {
     network.set(false);
-    server.disconnect(deviceId: container.read(signedInServicesProvider)!.auth.session!.deviceId.value);
+    server.disconnect(
+      deviceId: container
+          .read(signedInServicesProvider)!
+          .auth
+          .session!
+          .deviceId
+          .value,
+    );
     await waitFor('offline', () => !live);
   }
 
@@ -89,7 +108,11 @@ class AppScenarioClient implements ScenarioClient {
 
   @override
   Future<List<ScenarioMessage>> messages(String threadId) async => [
-    for (final m in await _db.messagesDao.pageBefore(ThreadId.parse(threadId), null, 1000))
+    for (final m in await _db.messagesDao.pageBefore(
+      ThreadId.parse(threadId),
+      null,
+      1000,
+    ))
       ScenarioMessage(
         id: m.id.value,
         clientMsgId: m.clientMsgId.value,
@@ -104,7 +127,11 @@ class AppScenarioClient implements ScenarioClient {
   Future<List<ScenarioOutboxEntry>> outbox() async => [
     for (final e in await _db.outboxDao.allEntries())
       if (e.state != OutboxState.confirmed)
-        ScenarioOutboxEntry(id: e.id, failed: e.state == OutboxState.failed, code: e.lastErrorCode),
+        ScenarioOutboxEntry(
+          id: e.id,
+          failed: e.state == OutboxState.failed,
+          code: e.lastErrorCode,
+        ),
   ];
 
   @override
@@ -118,7 +145,10 @@ class AppScenarioClient implements ScenarioClient {
   Future<void> focusThread(String threadId) async {
     _visible = {..._visible, ThreadId.parse(threadId)};
     _engine.focus.setVisible(_visible, idle: false);
-    await waitFor('focus sent', () => _engine.focus.current.contains(ThreadId.parse(threadId)));
+    await waitFor(
+      'focus sent',
+      () => _engine.focus.current.contains(ThreadId.parse(threadId)),
+    );
   }
 
   @override
@@ -129,7 +159,8 @@ class AppScenarioClient implements ScenarioClient {
   }
 
   @override
-  Map<String, Object?>? runDocument(String runId) => _documents[RunId.parse(runId)]?.raw;
+  Map<String, Object?>? runDocument(String runId) =>
+      _documents[RunId.parse(runId)]?.raw;
 
   @override
   Future<String?> runState(String runId) async =>

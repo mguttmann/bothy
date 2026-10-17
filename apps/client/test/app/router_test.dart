@@ -18,7 +18,10 @@ void main() {
     test('every path of 15 11 gives its location', () {
       expect(parse('/'), isA<HomeLocation>());
       expect((parse('/s/$space') as SpaceLocation).spaceId.value, space);
-      expect((parse('/c/$channel') as ChannelLocation).channelId.value, channel);
+      expect(
+        (parse('/c/$channel') as ChannelLocation).channelId.value,
+        channel,
+      );
       final t = parse('/t/$thread?m=$message') as ThreadLocation;
       expect(t.threadId.value, thread);
       expect(t.messageId?.value, message);
@@ -65,11 +68,17 @@ void main() {
         '/t/$thread?m=$message',
       );
       expect(
-        pathOfExternalLink(Uri.parse('Chat-Example:/c/$channel'), 'chat-example'),
+        pathOfExternalLink(
+          Uri.parse('Chat-Example:/c/$channel'),
+          'chat-example',
+        ),
         '/c/$channel',
       );
       expect(
-        pathOfExternalLink(Uri.parse('chat-example://s/$space'), 'chat-example'),
+        pathOfExternalLink(
+          Uri.parse('chat-example://s/$space'),
+          'chat-example',
+        ),
         '/s/$space',
       );
     });
@@ -79,7 +88,10 @@ void main() {
         pathOfExternalLink(Uri.parse('https://t/$thread'), 'chat-example'),
         isNull,
       );
-      expect(pathOfExternalLink(Uri.parse('chat-example:'), 'chat-example'), isNull);
+      expect(
+        pathOfExternalLink(Uri.parse('chat-example:'), 'chat-example'),
+        isNull,
+      );
     });
   });
 
@@ -98,10 +110,16 @@ void main() {
 
     setUp(() => kept = null);
 
-    test('signed out, a content path goes to the current screen and is kept', () {
-      expect(go('/t/$thread?m=$message', OnboardingStep.login), '/onboarding/login');
-      expect(kept, '/t/$thread?m=$message');
-    });
+    test(
+      'signed out, a content path goes to the current screen and is kept',
+      () {
+        expect(
+          go('/t/$thread?m=$message', OnboardingStep.login),
+          '/onboarding/login',
+        );
+        expect(kept, '/t/$thread?m=$message');
+      },
+    );
 
     test('a link before the login opens after it', () {
       go('/c/$channel', OnboardingStep.server);
@@ -111,7 +129,10 @@ void main() {
 
     test('the current onboarding screen stays, another one is replaced', () {
       expect(go('/onboarding/pending', OnboardingStep.pending), isNull);
-      expect(go('/onboarding/login', OnboardingStep.pending), '/onboarding/pending');
+      expect(
+        go('/onboarding/login', OnboardingStep.pending),
+        '/onboarding/pending',
+      );
       expect(kept, isNull);
     });
 

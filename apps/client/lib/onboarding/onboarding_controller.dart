@@ -260,10 +260,9 @@ class OnboardingController extends _$OnboardingController {
         try {
           services = await InstanceServices.open(_ports, instance);
         } on Object {
-          state = state.withInstance(null).next(
-            serverStatus: ServerStatus.noInstance,
-            clearServices: true,
-          );
+          state = state
+              .withInstance(null)
+              .next(serverStatus: ServerStatus.noInstance, clearServices: true);
           return;
         }
         _watch(services);
@@ -289,11 +288,13 @@ class OnboardingController extends _$OnboardingController {
   Future<void> changeServer() async {
     _flow++;
     await _closeServices();
-    state = state.withInstance(null).next(
-      step: OnboardingStep.server,
-      clearServices: true,
-      address: state.instance?.address.toString() ?? state.address,
-    );
+    state = state
+        .withInstance(null)
+        .next(
+          step: OnboardingStep.server,
+          clearServices: true,
+          address: state.instance?.address.toString() ?? state.address,
+        );
   }
 
   /// E2: login with an OIDC provider in the system browser or behind a proxy.
@@ -395,7 +396,10 @@ class OnboardingController extends _$OnboardingController {
     _flow++;
     final services = _services;
     if (services == null) return;
-    await _endAccount(SignOutCause.loggedOut, before: services.auth.login.logout);
+    await _endAccount(
+      SignOutCause.loggedOut,
+      before: services.auth.login.logout,
+    );
   }
 
   /// E7 "Log in again": composes the services again (new device keys) and shows E2.
@@ -411,10 +415,12 @@ class OnboardingController extends _$OnboardingController {
       _watch(services);
       state = state.next(step: OnboardingStep.login, services: services);
     } on Object {
-      state = state.withInstance(null).next(
-        step: OnboardingStep.server,
-        serverStatus: ServerStatus.noInstance,
-      );
+      state = state
+          .withInstance(null)
+          .next(
+            step: OnboardingStep.server,
+            serverStatus: ServerStatus.noInstance,
+          );
     }
   }
 

@@ -39,27 +39,38 @@ void main() {
 
   OnboardingState state() => c.read(onboardingControllerProvider);
 
-  Future<void> loginAsAlex(OnboardingController control) => control.loginWithPassword(
-    WorldSeed.alexLogin,
-    WorldSeed.password,
-    WorldSeed.totp,
-  );
+  Future<void> loginAsAlex(OnboardingController control) =>
+      control.loginWithPassword(
+        WorldSeed.alexLogin,
+        WorldSeed.password,
+        WorldSeed.totp,
+      );
 
   String deviceId() => state().services!.auth.session!.deviceId.value;
 
-  test('password login without a pending rule goes straight to the main view', () async {
-    final control = await connected(c, f);
-    expect(state().step, OnboardingStep.login);
-    expect(state().instance?.productName, f.server.world.productName);
-    await loginAsAlex(control);
-    expect(state().step, OnboardingStep.signedIn);
-    await eventually('live', () => state().services?.engine.state.phase == ConnectionPhase.live);
-    expect(f.server.violations, isEmpty);
-  });
+  test(
+    'password login without a pending rule goes straight to the main view',
+    () async {
+      final control = await connected(c, f);
+      expect(state().step, OnboardingStep.login);
+      expect(state().instance?.productName, f.server.world.productName);
+      await loginAsAlex(control);
+      expect(state().step, OnboardingStep.signedIn);
+      await eventually(
+        'live',
+        () => state().services?.engine.state.phase == ConnectionPhase.live,
+      );
+      expect(f.server.violations, isEmpty);
+    },
+  );
 
   test('a wrong password shows the failure text and stays on E2', () async {
     final control = await connected(c, f);
-    await control.loginWithPassword(WorldSeed.alexLogin, 'wrong', WorldSeed.totp);
+    await control.loginWithPassword(
+      WorldSeed.alexLogin,
+      'wrong',
+      WorldSeed.totp,
+    );
     expect(state().step, OnboardingStep.login);
     expect(state().notice, LoginNotice.failed);
   });
@@ -86,19 +97,28 @@ void main() {
       );
       expect(state().deadline, created.add(f.ports.config.devicePendingTtl));
       await other.confirm(deviceId(), code);
-      await eventually('signed in', () => state().step == OnboardingStep.signedIn);
-      await eventually('live', () => state().services?.engine.state.phase == ConnectionPhase.live);
+      await eventually(
+        'signed in',
+        () => state().step == OnboardingStep.signedIn,
+      );
+      await eventually(
+        'live',
+        () => state().services?.engine.state.phase == ConnectionPhase.live,
+      );
     });
 
-    test('a wrong code on the other device rejects it: E7 and a wiped store', () async {
-      final control = await connected(c, f);
-      await loginAsAlex(control);
-      expect(state().step, OnboardingStep.pending);
-      await other.confirm(deviceId(), '000000');
-      await eventually('E7', () => state().step == OnboardingStep.signedOut);
-      expect(state().cause, SignOutCause.rejected);
-      expect(await f.wiped(), isTrue);
-    });
+    test(
+      'a wrong code on the other device rejects it: E7 and a wiped store',
+      () async {
+        final control = await connected(c, f);
+        await loginAsAlex(control);
+        expect(state().step, OnboardingStep.pending);
+        await other.confirm(deviceId(), '000000');
+        await eventually('E7', () => state().step == OnboardingStep.signedOut);
+        expect(state().cause, SignOutCause.rejected);
+        expect(await f.wiped(), isTrue);
+      },
+    );
 
     test('expiry: E7 with its reason and a wiped store', () async {
       // A short auth.device_pending_ttl, so the deadline of E4 passes in the test.
@@ -179,41 +199,63 @@ void main() {
     });
   });
 
-  test('logout deletes database, file cache, keys and tokens (R-SY-14)', () async {
-    final control = await connected(c, f);
-    await loginAsAlex(control);
-    await eventually('live', () => state().services?.engine.state.phase == ConnectionPhase.live);
-    await File('${f.instanceFolder.path}/files/a.bin').create(recursive: true);
-    expect(File('${f.instanceFolder.path}/local.db').existsSync(), isTrue);
-    await control.logout();
-    expect(state().step, OnboardingStep.signedOut);
-    expect(state().cause, SignOutCause.loggedOut);
-    expect(await f.wiped(), isTrue);
-    expect(f.server.requestsOf('logout'), hasLength(1));
-  });
+  test(
+    'logout deletes database, file cache, keys and tokens (R-SY-14)',
+    () async {
+      final control = await connected(c, f);
+      await loginAsAlex(control);
+      await eventually(
+        'live',
+        () => state().services?.engine.state.phase == ConnectionPhase.live,
+      );
+      await File('${f.instanceFolder.path}/files/a.bin')
+          .create(recursive: true);
+      expect(File('${f.instanceFolder.path}/local.db').existsSync(), isTrue);
+      await control.logout();
+      expect(state().step, OnboardingStep.signedOut);
+      expect(state().cause, SignOutCause.loggedOut);
+      expect(await f.wiped(), isTrue);
+      expect(f.server.requestsOf('logout'), hasLength(1));
+    },
+  );
 
   test('4012 from the fake does the same', () async {
     final control = await connected(c, f);
     await loginAsAlex(control);
-    await eventually('live', () => state().services?.engine.state.phase == ConnectionPhase.live);
+    await eventually(
+      'live',
+      () => state().services?.engine.state.phase == ConnectionPhase.live,
+    );
     f.server.faults.revoke(deviceId: deviceId());
     await eventually('E7', () => state().step == OnboardingStep.signedOut);
     expect(state().cause, SignOutCause.sessionRevoked);
     expect(await f.wiped(), isTrue);
   });
 
-  test('a stored session restarts signed in; a revoked one ends in E7', () async {
-    final control = await connected(c, f);
-    await loginAsAlex(control);
-    await eventually('live', () => state().services?.engine.state.phase == ConnectionPhase.live);
-    final id = deviceId();
-    c.dispose();
-    c = appContainer(f);
-    c.read(onboardingControllerProvider);
-    await eventually('signed in again', () => state().step == OnboardingStep.signedIn);
-    await eventually('live again', () => state().services?.engine.state.phase == ConnectionPhase.live);
-    f.server.world.revokeDevice(id);
-    await eventually('E7', () => state().step == OnboardingStep.signedOut);
-    expect(await f.wiped(), isTrue);
-  });
+  test(
+    'a stored session restarts signed in; a revoked one ends in E7',
+    () async {
+      final control = await connected(c, f);
+      await loginAsAlex(control);
+      await eventually(
+        'live',
+        () => state().services?.engine.state.phase == ConnectionPhase.live,
+      );
+      final id = deviceId();
+      c.dispose();
+      c = appContainer(f);
+      c.read(onboardingControllerProvider);
+      await eventually(
+        'signed in again',
+        () => state().step == OnboardingStep.signedIn,
+      );
+      await eventually(
+        'live again',
+        () => state().services?.engine.state.phase == ConnectionPhase.live,
+      );
+      f.server.world.revokeDevice(id);
+      await eventually('E7', () => state().step == OnboardingStep.signedOut);
+      expect(await f.wiped(), isTrue);
+    },
+  );
 }

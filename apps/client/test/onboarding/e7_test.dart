@@ -12,7 +12,9 @@ import 'package:flutter_test/flutter_test.dart';
 import '../support/widgets.dart';
 
 void main() {
-  testWidgets('every cause shows its reason and the deletion sentence', (tester) async {
+  testWidgets('every cause shows its reason and the deletion sentence', (
+    tester,
+  ) async {
     desktopWindow(tester);
     final texts = {
       SignOutCause.loggedOut: en.onboardingReasonLoggedOut,
@@ -35,25 +37,34 @@ void main() {
     expect(texts.keys.toSet(), SignOutCause.values.toSet());
   });
 
-  testWidgets('"Log in again" by button and Enter; a disabled person gets none', (tester) async {
-    desktopWindow(tester);
-    var again = 0;
-    await tester.pumpWidget(
-      hostScreen(
-        SignedOutScreen(cause: SignOutCause.revokedBySelf, onLoginAgain: () => again++),
-      ),
-    );
-    await tester.tap(find.byKey(const ValueKey('e7.loginAgain')));
-    await tester.sendKeyEvent(LogicalKeyboardKey.enter);
-    expect(again, 2);
-    await tester.pumpWidget(
-      hostScreen(
-        SignedOutScreen(cause: SignOutCause.userDisabled, onLoginAgain: () => again++),
-      ),
-    );
-    expect(find.byKey(const ValueKey('e7.loginAgain')), findsNothing);
-    expect(find.text(en.onboardingContactOwner), findsOneWidget);
-    await tester.sendKeyEvent(LogicalKeyboardKey.enter);
-    expect(again, 2);
-  });
+  testWidgets(
+    '"Log in again" by button and Enter; a disabled person gets none',
+    (tester) async {
+      desktopWindow(tester);
+      var again = 0;
+      await tester.pumpWidget(
+        hostScreen(
+          SignedOutScreen(
+            cause: SignOutCause.revokedBySelf,
+            onLoginAgain: () => again++,
+          ),
+        ),
+      );
+      await tester.tap(find.byKey(const ValueKey('e7.loginAgain')));
+      await tester.sendKeyEvent(LogicalKeyboardKey.enter);
+      expect(again, 2);
+      await tester.pumpWidget(
+        hostScreen(
+          SignedOutScreen(
+            cause: SignOutCause.userDisabled,
+            onLoginAgain: () => again++,
+          ),
+        ),
+      );
+      expect(find.byKey(const ValueKey('e7.loginAgain')), findsNothing);
+      expect(find.text(en.onboardingContactOwner), findsOneWidget);
+      await tester.sendKeyEvent(LogicalKeyboardKey.enter);
+      expect(again, 2);
+    },
+  );
 }

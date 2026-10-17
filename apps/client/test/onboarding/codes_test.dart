@@ -22,21 +22,26 @@ void main() {
     expect(spellCode('48-12 07'), '4, 8, 1, 2, 0, 7');
   });
 
-  testWidgets('a code is grouped in the mono font and spelled for screen readers', (
-    tester,
-  ) async {
-    final semantics = tester.ensureSemantics();
-    await tester.pumpWidget(hostScreen(const Center(child: CodeText('HQ7P3MXR'))));
-    final text = tester.widget<Text>(find.byKey(const ValueKey('code.groups')));
-    expect(text.data, 'HQ7P  3MXR');
-    expect(text.style?.fontFamily, DsType.code.fontFamily);
-    expect(
-      find.bySemanticsLabel(en.onboardingCodeLabel('H, Q, 7, P, 3, M, X, R')),
-      findsOneWidget,
-    );
-    expect(find.bySemanticsLabel(RegExp('HQ7P')), findsNothing);
-    semantics.dispose();
-  });
+  testWidgets(
+    'a code is grouped in the mono font and spelled for screen readers',
+    (tester) async {
+      final semantics = tester.ensureSemantics();
+      await tester.pumpWidget(
+        hostScreen(const Center(child: CodeText('HQ7P3MXR'))),
+      );
+      final text = tester.widget<Text>(
+        find.byKey(const ValueKey('code.groups')),
+      );
+      expect(text.data, 'HQ7P  3MXR');
+      expect(text.style?.fontFamily, DsType.code.fontFamily);
+      expect(
+        find.bySemanticsLabel(en.onboardingCodeLabel('H, Q, 7, P, 3, M, X, R')),
+        findsOneWidget,
+      );
+      expect(find.bySemanticsLabel(RegExp('HQ7P')), findsNothing);
+      semantics.dispose();
+    },
+  );
 
   testWidgets('the code can be copied without its spaces', (tester) async {
     final copied = <String>[];
@@ -49,7 +54,9 @@ void main() {
         return null;
       },
     );
-    await tester.pumpWidget(hostScreen(const Center(child: CodeText('481 207', groupSize: 3))));
+    await tester.pumpWidget(
+      hostScreen(const Center(child: CodeText('481 207', groupSize: 3))),
+    );
     await tester.tap(find.byKey(const ValueKey('code.copy')));
     await tester.pump();
     expect(copied, ['481207']);
@@ -60,7 +67,9 @@ void main() {
     );
   });
 
-  testWidgets('a pasted enrollment code is normalized before it is sent', (tester) async {
+  testWidgets('a pasted enrollment code is normalized before it is sent', (
+    tester,
+  ) async {
     desktopWindow(tester);
     final sent = <(String, EnrollMethod)>[];
     await tester.pumpWidget(
@@ -73,7 +82,10 @@ void main() {
         ),
       ),
     );
-    await tester.enterText(find.byKey(const ValueKey('e3.code')), 'en_ 7k2m-9qxa');
+    await tester.enterText(
+      find.byKey(const ValueKey('e3.code')),
+      'en_ 7k2m-9qxa',
+    );
     await tester.tap(find.byKey(const ValueKey('e3.continue')));
     expect(sent.single.$1, 'en_7K2M9QXA');
     expect(sent.single.$2, isA<EnrollThisDevice>());

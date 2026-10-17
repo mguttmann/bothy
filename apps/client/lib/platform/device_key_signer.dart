@@ -85,10 +85,6 @@ final class DeviceKeySignerAdapter implements DeviceKeySigner {
   String get thumbprint => _info.thumbprint;
 
   @override
-  Future<Uint8List> sign(Uint8List signingInput) => _client.sign(
-    _scope,
-    _purpose,
-    signingInput,
-    prompt: _prompt?.call(),
-  );
+  Future<Uint8List> sign(Uint8List signingInput) =>
+      _client.sign(_scope, _purpose, signingInput, prompt: _prompt?.call());
 }

@@ -79,44 +79,62 @@ Future<DiscoveryOutcome> run(
 ).discover(Uri.parse(address));
 
 void main() {
-  test('a valid answer gives the instance with its methods and branding', () async {
-    final outcome = await run(
-      (o) async => o.path.endsWith('/branding/logo')
-          ? ResponseBody.fromBytes([1, 2, 3], 200)
-          : json(
-              200,
-              discovery(
-                providers: [
-                  {'id': '0193f2a7-0000-7000-8000-0000000000b1', 'kind': 'oidc', 'name': 'Company SSO'},
-                  {'id': '0193f2a7-0000-7000-8000-0000000000b2', 'kind': 'trusted_header', 'name': 'Proxy'},
-                  {'id': '0193f2a7-0000-7000-8000-0000000000b3', 'kind': 'local', 'name': 'Local'},
-                ],
-                password: true,
-                logoUrl: '/api/v1/instance/branding/logo',
+  test(
+    'a valid answer gives the instance with its methods and branding',
+    () async {
+      final outcome = await run(
+        (o) async => o.path.endsWith('/branding/logo')
+            ? ResponseBody.fromBytes([1, 2, 3], 200)
+            : json(
+                200,
+                discovery(
+                  providers: [
+                    {
+                      'id': '0193f2a7-0000-7000-8000-0000000000b1',
+                      'kind': 'oidc',
+                      'name': 'Company SSO',
+                    },
+                    {
+                      'id': '0193f2a7-0000-7000-8000-0000000000b2',
+                      'kind': 'trusted_header',
+                      'name': 'Proxy',
+                    },
+                    {
+                      'id': '0193f2a7-0000-7000-8000-0000000000b3',
+                      'kind': 'local',
+                      'name': 'Local',
+                    },
+                  ],
+                  password: true,
+                  logoUrl: '/api/v1/instance/branding/logo',
+                ),
               ),
-            ),
-    );
-    final instance = (outcome as DiscoveryFound).instance;
-    expect(instance.productName, 'Team Chat');
-    expect(instance.accentColor, 'loch');
-    expect(instance.logo, [1, 2, 3]);
-    expect(instance.providers.map((p) => p.name), ['Company SSO', 'Proxy']);
-    expect(instance.providers.last.isProxy, isTrue);
-    expect(instance.localEnabled, isTrue);
-    expect(instance.passwordEnabled, isTrue);
-    expect(instance.hasLoginMethod, isTrue);
-  });
+      );
+      final instance = (outcome as DiscoveryFound).instance;
+      expect(instance.productName, 'Team Chat');
+      expect(instance.accentColor, 'loch');
+      expect(instance.logo, [1, 2, 3]);
+      expect(instance.providers.map((p) => p.name), ['Company SSO', 'Proxy']);
+      expect(instance.providers.last.isProxy, isTrue);
+      expect(instance.localEnabled, isTrue);
+      expect(instance.passwordEnabled, isTrue);
+      expect(instance.hasLoginMethod, isTrue);
+    },
+  );
 
-  test('a missing logo falls back to the mark; no method means no login', () async {
-    final outcome = await run(
-      (o) async => o.path.endsWith('/branding/logo')
-          ? json(404, {'code': 'not_found', 'status': 404})
-          : json(200, discovery(logoUrl: '/api/v1/instance/branding/logo')),
-    );
-    final instance = (outcome as DiscoveryFound).instance;
-    expect(instance.logo, isNull);
-    expect(instance.hasLoginMethod, isFalse);
-  });
+  test(
+    'a missing logo falls back to the mark; no method means no login',
+    () async {
+      final outcome = await run(
+        (o) async => o.path.endsWith('/branding/logo')
+            ? json(404, {'code': 'not_found', 'status': 404})
+            : json(200, discovery(logoUrl: '/api/v1/instance/branding/logo')),
+      );
+      final instance = (outcome as DiscoveryFound).instance;
+      expect(instance.logo, isNull);
+      expect(instance.hasLoginMethod, isFalse);
+    },
+  );
 
   test('setup_required gives "not set up", by flag and by problem', () async {
     expect(
@@ -136,65 +154,79 @@ void main() {
     );
   });
 
-  test('below min_client_versions of the platform the app is too old', () async {
-    final outcome = await run(
-      (_) async => json(
-        200,
-        discovery(
-          minVersions: [
-            {'platform': 'windows', 'min_version': '9.0.0'},
-            {'platform': 'macos', 'min_version': '1.10.0'},
-          ],
-        ),
-      ),
-      version: '1.9.3',
-    );
-    expect((outcome as DiscoveryAppTooOld).minVersion, '1.10.0');
-    expect(
-      await run(
+  test(
+    'below min_client_versions of the platform the app is too old',
+    () async {
+      final outcome = await run(
         (_) async => json(
           200,
           discovery(
             minVersions: [
+              {'platform': 'windows', 'min_version': '9.0.0'},
               {'platform': 'macos', 'min_version': '1.10.0'},
             ],
           ),
         ),
-        version: '1.10.0',
-      ),
-      isA<DiscoveryFound>(),
-    );
-  });
+        version: '1.9.3',
+      );
+      expect((outcome as DiscoveryAppTooOld).minVersion, '1.10.0');
+      expect(
+        await run(
+          (_) async => json(
+            200,
+            discovery(
+              minVersions: [
+                {'platform': 'macos', 'min_version': '1.10.0'},
+              ],
+            ),
+          ),
+          version: '1.10.0',
+        ),
+        isA<DiscoveryFound>(),
+      );
+    },
+  );
 
-  test('a TLS error is "certificate invalid", never anything to continue with', () async {
-    expect(
-      await run((_) async => throw const HandshakeException('bad certificate')),
-      isA<DiscoveryCertificateInvalid>(),
-    );
-    expect(
-      await run((_) async => throw const TlsException('expired')),
-      isA<DiscoveryCertificateInvalid>(),
-    );
-    expect(
-      await run(
-        (o) async => throw DioException.badCertificate(requestOptions: o),
-      ),
-      isA<DiscoveryCertificateInvalid>(),
-    );
-  });
+  test(
+    'a TLS error is "certificate invalid", never anything to continue with',
+    () async {
+      expect(
+        await run(
+          (_) async => throw const HandshakeException('bad certificate'),
+        ),
+        isA<DiscoveryCertificateInvalid>(),
+      );
+      expect(
+        await run((_) async => throw const TlsException('expired')),
+        isA<DiscoveryCertificateInvalid>(),
+      );
+      expect(
+        await run(
+          (o) async => throw DioException.badCertificate(requestOptions: o),
+        ),
+        isA<DiscoveryCertificateInvalid>(),
+      );
+    },
+  );
 
   test('no valid answer is "no instance"', () async {
     expect(
       await run((_) async => throw const SocketException('refused')),
       isA<DiscoveryNoInstance>(),
     );
-    expect(await run((_) async => json(200, {'hello': 1})), isA<DiscoveryNoInstance>());
+    expect(
+      await run((_) async => json(200, {'hello': 1})),
+      isA<DiscoveryNoInstance>(),
+    );
     expect(
       await run((_) async => ResponseBody.fromString('<html>', 200)),
       isA<DiscoveryNoInstance>(),
     );
     expect(
-      await run((_) async => json(200, discovery()), address: 'http://chat.example.com'),
+      await run(
+        (_) async => json(200, discovery()),
+        address: 'http://chat.example.com',
+      ),
       isA<DiscoveryNoInstance>(),
     );
     expect(
@@ -238,7 +270,10 @@ void main() {
   test('LoginProvider compares by value', () {
     const a = LoginProvider(id: '1', kind: 'oidc', name: 'A');
     expect(a, const LoginProvider(id: '1', kind: 'oidc', name: 'A'));
-    expect(a.hashCode, const LoginProvider(id: '1', kind: 'oidc', name: 'A').hashCode);
+    expect(
+      a.hashCode,
+      const LoginProvider(id: '1', kind: 'oidc', name: 'A').hashCode,
+    );
     expect(a == const LoginProvider(id: '2', kind: 'oidc', name: 'A'), isFalse);
   });
 }

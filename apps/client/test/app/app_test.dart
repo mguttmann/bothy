@@ -48,7 +48,9 @@ void main() {
 
   Future<(ScriptedOnboarding, ManualDeepLinks)> pumpApp(
     WidgetTester tester, {
-    OnboardingState initial = const OnboardingState(step: OnboardingStep.server),
+    OnboardingState initial = const OnboardingState(
+      step: OnboardingStep.server,
+    ),
     List<Override> extra = const [],
     List<Uri> pending = const [],
   }) async {
@@ -58,7 +60,9 @@ void main() {
     await tester.pumpWidget(
       ProviderScope(
         overrides: [
-          appPortsProvider.overrideWithValue(testPorts(dataRoot: root, deepLinks: links)),
+          appPortsProvider.overrideWithValue(
+            testPorts(dataRoot: root, deepLinks: links),
+          ),
           onboardingControllerProvider.overrideWith(() => control),
           ...extra,
         ],
@@ -69,10 +73,15 @@ void main() {
     return (control, links);
   }
 
-  testWidgets('before the login E1 shows and the title is the build name', (tester) async {
+  testWidgets('before the login E1 shows and the title is the build name', (
+    tester,
+  ) async {
     await pumpApp(tester);
     expect(find.byKey(const ValueKey('screen.e1')), findsOneWidget);
-    expect(tester.widget<MaterialApp>(find.byType(MaterialApp)).title, testBranding.appName);
+    expect(
+      tester.widget<MaterialApp>(find.byType(MaterialApp)).title,
+      testBranding.appName,
+    );
   });
 
   testWidgets('each step of the controller has its screen', (tester) async {
@@ -95,15 +104,22 @@ void main() {
       await tester.pumpAndSettle();
       expect(find.byKey(ValueKey(key)), findsOneWidget, reason: step.name);
     }
-    expect(tester.widget<MaterialApp>(find.byType(MaterialApp)).title, 'Team Chat');
+    expect(
+      tester.widget<MaterialApp>(find.byType(MaterialApp)).title,
+      'Team Chat',
+    );
   });
 
-  testWidgets('a link before the login is kept and opened after it', (tester) async {
+  testWidgets('a link before the login is kept and opened after it', (
+    tester,
+  ) async {
     final (control, links) = await pumpApp(
       tester,
       pending: [Uri.parse('chat-example://t/$thread')],
       extra: [
-        targetStatusProvider.overrideWith((ref, path) async => TargetStatus.notFound),
+        targetStatusProvider.overrideWith(
+          (ref, path) async => TargetStatus.notFound,
+        ),
       ],
     );
     expect(find.byKey(const ValueKey('screen.e1')), findsOneWidget);
@@ -116,34 +132,39 @@ void main() {
     expect(find.text(en.accessNotFoundOrNoAccess), findsOneWidget);
   });
 
-  testWidgets('signed in, a link goes to its target; an invisible one is not found', (
+  testWidgets(
+    'signed in, a link goes to its target; an invisible one is not found',
+    (tester) async {
+      final (_, links) = await pumpApp(
+        tester,
+        initial: const OnboardingState(step: OnboardingStep.signedIn),
+        extra: [
+          targetStatusProvider.overrideWith(
+            (ref, path) async => path == '/' || path.contains(thread)
+                ? TargetStatus.visible
+                : TargetStatus.notFound,
+          ),
+        ],
+      );
+      expect(find.byKey(const ValueKey('column.history')), findsOneWidget);
+      expect(find.byKey(const ValueKey('target.notFound')), findsNothing);
+      links.send(
+        Uri.parse('chat-example://t/0193f2a7-0000-7000-8000-0000000000ff'),
+      );
+      await tester.pumpAndSettle();
+      expect(find.byKey(const ValueKey('target.notFound')), findsOneWidget);
+      links.send(Uri.parse('chat-example://t/$thread'));
+      await tester.pumpAndSettle();
+      expect(find.byKey(const ValueKey('target.notFound')), findsNothing);
+      links.send(Uri.parse('chat-example://nowhere'));
+      await tester.pumpAndSettle();
+      expect(find.byKey(const ValueKey('target.notFound')), findsOneWidget);
+    },
+  );
+
+  testWidgets('the offline banner, the update banner and the logout button', (
     tester,
   ) async {
-    final (_, links) = await pumpApp(
-      tester,
-      initial: const OnboardingState(step: OnboardingStep.signedIn),
-      extra: [
-        targetStatusProvider.overrideWith(
-          (ref, path) async => path == '/' || path.contains(thread)
-              ? TargetStatus.visible
-              : TargetStatus.notFound,
-        ),
-      ],
-    );
-    expect(find.byKey(const ValueKey('column.history')), findsOneWidget);
-    expect(find.byKey(const ValueKey('target.notFound')), findsNothing);
-    links.send(Uri.parse('chat-example://t/0193f2a7-0000-7000-8000-0000000000ff'));
-    await tester.pumpAndSettle();
-    expect(find.byKey(const ValueKey('target.notFound')), findsOneWidget);
-    links.send(Uri.parse('chat-example://t/$thread'));
-    await tester.pumpAndSettle();
-    expect(find.byKey(const ValueKey('target.notFound')), findsNothing);
-    links.send(Uri.parse('chat-example://nowhere'));
-    await tester.pumpAndSettle();
-    expect(find.byKey(const ValueKey('target.notFound')), findsOneWidget);
-  });
-
-  testWidgets('the offline banner, the update banner and the logout button', (tester) async {
     final (control, _) = await pumpApp(
       tester,
       initial: const OnboardingState(step: OnboardingStep.signedIn),
@@ -172,7 +193,9 @@ void main() {
       initial: const OnboardingState(step: OnboardingStep.signedIn),
       extra: [
         connectionStateProvider.overrideWith(
-          (ref) => Stream.value(const ConnectionState(ConnectionPhase.updateRequired)),
+          (ref) => Stream.value(
+            const ConnectionState(ConnectionPhase.updateRequired),
+          ),
         ),
       ],
     );
@@ -185,7 +208,8 @@ void main() {
         appPortsProvider.overrideWithValue(testPorts(dataRoot: root)),
         onboardingControllerProvider.overrideWith(
           () => ScriptedOnboarding(
-            const OnboardingState(step: OnboardingStep.login).withInstance(nothing),
+            const OnboardingState(step: OnboardingStep.login)
+                .withInstance(nothing),
           ),
         ),
       ],

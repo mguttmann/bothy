@@ -16,7 +16,11 @@ void main() {
 
   test('the checked-in native files equal the example branding', () {
     final out = StringBuffer();
-    expect(tool.run(['--check'], appDir: app, out: out), 0, reason: '$out');
+    expect(
+      tool.run(['--check'], appDir: app, out: out),
+      0,
+      reason: '$out',
+    );
   });
 
   test('the defaults of the build equal the example branding', () {
@@ -35,7 +39,8 @@ void main() {
   test('a run writes the defines and the native files', () async {
     final dir = await Directory.systemTemp.createTemp('branding');
     addTearDown(() => dir.delete(recursive: true));
-    File('${dir.path}/pubspec.yaml').writeAsStringSync('name: x\nversion: 1.2.3+4\n');
+    File('${dir.path}/pubspec.yaml')
+        .writeAsStringSync('name: x\nversion: 1.2.3+4\n');
     File('${dir.path}/b.yaml').writeAsStringSync(
       'app_name: Team Chat\nurl_scheme: team-chat\nbundle_id: com.example.team\n'
       'default_server: https://team.example.com\n',
@@ -53,16 +58,23 @@ void main() {
       'BRANDING_APP_VERSION': '1.2.3',
     });
     expect(
-      File('${dir.path}/macos/Runner/Configs/Branding.xcconfig').readAsStringSync(),
+      File('${dir.path}/macos/Runner/Configs/Branding.xcconfig')
+          .readAsStringSync(),
       contains('BRANDING_URL_SCHEME = team-chat'),
     );
     expect(
       File('${dir.path}/windows/runner/branding.h').readAsStringSync(),
       contains('#define BRANDING_APP_NAME_W L"Team Chat"'),
     );
-    expect(tool.run(['--input', 'b.yaml', '--check'], appDir: dir, out: out), 0);
+    expect(
+      tool.run(['--input', 'b.yaml', '--check'], appDir: dir, out: out),
+      0,
+    );
     File('${dir.path}/windows/runner/branding.h').writeAsStringSync('x');
-    expect(tool.run(['--input', 'b.yaml', '--check'], appDir: dir, out: out), 1);
+    expect(
+      tool.run(['--input', 'b.yaml', '--check'], appDir: dir, out: out),
+      1,
+    );
     expect(tool.run(['--bogus'], appDir: dir, out: out), 2);
   });
 
@@ -84,8 +96,14 @@ void main() {
     expect(reason('app_name: A\n'), contains('url_scheme'));
     expect(reason(ok.replaceFirst('A\n', 'A"; rm\n')), contains('app_name'));
     expect(reason(ok.replaceFirst('a-b', 'A_B')), contains('url_scheme'));
-    expect(reason(ok.replaceFirst('com.example.a', 'nodots')), contains('bundle_id'));
-    expect(reason(ok.replaceFirst('https://a', 'http://a')), contains('default_server'));
+    expect(
+      reason(ok.replaceFirst('com.example.a', 'nodots')),
+      contains('bundle_id'),
+    );
+    expect(
+      reason(ok.replaceFirst('https://a', 'http://a')),
+      contains('default_server'),
+    );
     expect(() => tool.pubspecVersion('name: x\n'), throwsFormatException);
   });
 }

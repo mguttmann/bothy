@@ -93,7 +93,11 @@ class BrandMark extends StatelessWidget {
       child: SizedBox.square(
         dimension: DsSize.avatarLg,
         child: bytes != null
-            ? Image.memory(bytes, fit: BoxFit.contain, excludeFromSemantics: true)
+            ? Image.memory(
+                bytes,
+                fit: BoxFit.contain,
+                excludeFromSemantics: true,
+              )
             : DecoratedBox(
                 decoration: BoxDecoration(
                   color: context.dsAccent.accentBg,
@@ -118,9 +122,8 @@ class CardTitle extends StatelessWidget {
     header: true,
     child: Text(
       text,
-      style: dsTextStyle(
-        DsType.title,
-      ).copyWith(color: context.dsColors.textPrimary),
+      style: dsTextStyle(DsType.title)
+          .copyWith(color: context.dsColors.textPrimary),
       textAlign: TextAlign.center,
     ),
   );
@@ -140,9 +143,8 @@ class CardText extends StatelessWidget {
   @override
   Widget build(BuildContext context) => Text(
     text,
-    style: dsTextStyle(
-      DsType.body,
-    ).copyWith(color: context.dsColors.textSecondary),
+    style: dsTextStyle(DsType.body)
+        .copyWith(color: context.dsColors.textSecondary),
     textAlign: center ? TextAlign.center : TextAlign.start,
   );
 }

@@ -107,7 +107,7 @@ final class CurrentInstanceProvider
   }
 }
 
-String _$currentInstanceHash() => r'3f9c9e230fee3d7a34ea0ef183307d5e350141f7';
+String _$currentInstanceHash() => r'e82a078451f44442b5ce44386eab051c42ddcb24';
 
 /// The local database of the signed-in instance.
 

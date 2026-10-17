@@ -193,6 +193,7 @@ AppPorts testPorts({
   clock: clock ?? const SystemClock(),
   openDatabase:
       openDatabase ??
-      (file, keys) => openLocalStore(file: file, keys: keys, inBackground: false),
+      (file, keys) =>
+          openLocalStore(file: file, keys: keys, inBackground: false),
   allowPlainHttpForTests: true,
 );

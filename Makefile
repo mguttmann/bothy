@@ -288,7 +288,7 @@ commitlint: ## Conventional Commits and DCO sign-off for commits not yet on the 
 # of go-arch-lint and sqlc; tools/ci/go_prereqs.py). Every step ends with `|| exit 1`, so a
 # recipe stops on its own even in a shell without errexit (docs/DECISIONS.md M1-01/8); the
 # flags in SHELL (top of this file, also for GNU make 3.81) are the second line of defence.
-codegen-check: ## Generated code equals a fresh generation (sqlc, go generate, flutter gen-l10n, Pigeon, drift, the domain tables)
+codegen-check: ## Generated code equals a fresh generation (sqlc, go generate, flutter gen-l10n, Pigeon, drift, Riverpod, the domain tables)
 	@if [ -z "$(GO_ON)" ]; then $(call skip,codegen-check,no Go module selected under services/); \
 	else $(GO_PREREQS) codegen-check || exit 1; \
 	  gal=$(call tool,go-arch-lint) || exit 1; sqlc=$(call tool,sqlc) || exit 1; \
@@ -322,6 +322,16 @@ codegen-check: ## Generated code equals a fresh generation (sqlc, go generate, f
 	  else flutter pub get --enforce-lockfile >/dev/null || exit 1; \
 	    for p in $$drift; do \
 	      $(CODEGEN_CHECK) --dir $$p -- sh -c 'dart run build_runner build && dart run drift_dev make-migrations' || exit 1; \
+	    done; fi; fi
+	@# Riverpod providers of the Dart members with riverpod_generator (brief M4-18): build_runner
+	@# writes the *.g.dart files of the providers, formatted as `make fmt` formats them; they must
+	@# equal a fresh generation, so a changed provider without regeneration fails.
+	@if [ -z "$(DART_ON)" ]; then $(call skip,dart-riverpod-codegen,no Dart package selected under apps/ or packages/); \
+	else rp=""; for p in $(DART_PKGS); do ! grep -qs 'riverpod_generator:' $$p/pubspec.yaml || rp="$$rp $$p"; done; \
+	  if [ -z "$$rp" ]; then $(call skip,dart-riverpod-codegen,no Dart member with riverpod_generator); \
+	  else flutter pub get --enforce-lockfile >/dev/null || exit 1; \
+	    for p in $$rp; do \
+	      $(CODEGEN_CHECK) --dir $$p -- sh -c 'dart run build_runner build && dart format lib >/dev/null' || exit 1; \
 	    done; fi; fi
 	@# The tables of packages/domain: AppConfig from the configuration reference and the event
 	@# catalogue from actions.yaml (docs/DECISIONS.md D-M4-08-3, D-M4-08-5). Python only, so

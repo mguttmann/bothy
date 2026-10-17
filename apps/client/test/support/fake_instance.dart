@@ -32,7 +32,14 @@ Future<void> eventually(
 
 /// One fake server, its world and the app's ports and controller.
 class FakeInstance {
-  FakeInstance._(this.server, this.seed, this.root, this.ports, this.keys, this.secure);
+  FakeInstance._(
+    this.server,
+    this.seed,
+    this.root,
+    this.ports,
+    this.keys,
+    this.secure,
+  );
 
   /// Starts a fake with the standard world and a container over test ports.
   static Future<FakeInstance> start({
@@ -102,7 +109,10 @@ ProviderContainer appContainer(FakeInstance instance) => ProviderContainer(
 );
 
 /// Connects [c] to the fake and waits for E2.
-Future<OnboardingController> connected(ProviderContainer c, FakeInstance f) async {
+Future<OnboardingController> connected(
+  ProviderContainer c,
+  FakeInstance f,
+) async {
   c.read(onboardingControllerProvider);
   await Future<void>.delayed(Duration.zero);
   final control = c.read(onboardingControllerProvider.notifier);

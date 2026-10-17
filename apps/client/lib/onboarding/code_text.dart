@@ -207,9 +207,8 @@ class _RemainingTimeTextState extends State<RemainingTimeText> {
       text,
       key: const ValueKey('remaining.time'),
       textAlign: TextAlign.center,
-      style: dsTextStyle(
-        DsType.body,
-      ).copyWith(color: context.dsColors.textSecondary),
+      style: dsTextStyle(DsType.body)
+          .copyWith(color: context.dsColors.textSecondary),
     );
   }
 }
