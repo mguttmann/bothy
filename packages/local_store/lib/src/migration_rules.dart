@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
 
-/// The migration rule of docs/spec/15-client-architektur.md 6.2 as a helper for the steps of
+/// The migration rule of docs/spec/15-client-architecture.md 6.2 as a helper for the steps of
 /// `stepByStep`: the cache may be discarded and reloaded on any step, unsent work never.
 library;
 

@@ -1,5 +1,5 @@
 # SPDX-License-Identifier: Apache-2.0
-# drift code generation and the migration workflow of local_store (docs/spec/15-client-architektur.md
+# drift code generation and the migration workflow of local_store (docs/spec/15-client-architecture.md
 # 6.2, brief M4-12 Design note 4). `make codegen-check` runs both generators and fails on drift.
 targets:
   $default:
