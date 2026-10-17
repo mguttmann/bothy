@@ -594,8 +594,9 @@ final class FakeWorld {
 
   /// The thread [threadId] when [principalId] sees it; else `404 not_found`.
   JsonMap visibleThread(String principalId, String threadId) {
-    if (!seesThread(principalId, threadId))
+    if (!seesThread(principalId, threadId)) {
       throw const FakeProblem(404, 'not_found');
+    }
     return threads[threadId]!;
   }
 
@@ -827,8 +828,9 @@ final class FakeWorld {
         .toString();
     final known = _clientMsgIds['$authorId|$cmid'];
     if (known != null) {
-      if (known.hash != hash)
+      if (known.hash != hash) {
         throw const FakeProblem(422, 'idempotency_key_reuse');
+      }
       return (message: messages[known.id]!, replay: true);
     }
     final author = people[authorId]!;
@@ -900,8 +902,9 @@ final class FakeWorld {
     JsonMap body,
   ) {
     final m = visibleMessage(principalId, messageId);
-    if (m['deleted_at'] != null)
+    if (m['deleted_at'] != null) {
       throw const FakeProblem(410, 'message_deleted');
+    }
     if ((m['author']! as JsonMap)['id'] != principalId) {
       throw const FakeProblem(403, 'forbidden');
     }
@@ -961,8 +964,9 @@ final class FakeWorld {
     required bool add,
   }) {
     final m = visibleMessage(principalId, messageId);
-    if (add && m['deleted_at'] != null)
+    if (add && m['deleted_at'] != null) {
       throw const FakeProblem(410, 'message_deleted');
+    }
     final key = '$messageId|$emoji';
     final who = _reactions.putIfAbsent(key, () => {});
     if (add ? !who.add(principalId) : !who.remove(principalId)) return;

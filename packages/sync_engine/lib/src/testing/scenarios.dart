@@ -137,8 +137,9 @@ Future<void> waitFor(
 }) async {
   final end = DateTime.now().add(timeout);
   while (!await condition()) {
-    if (DateTime.now().isAfter(end))
+    if (DateTime.now().isAfter(end)) {
       throw ScenarioFailure('timed out waiting for $what');
+    }
     await Future<void>.delayed(const Duration(milliseconds: 5));
   }
 }

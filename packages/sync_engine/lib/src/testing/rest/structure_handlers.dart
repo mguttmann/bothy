@@ -21,8 +21,9 @@ void registerStructureHandlers(RestFake rest) {
 
   String visibleChannel(FakeRequest r) {
     final id = r.param('channel_id');
-    if (!world.seesChannel(r.person.id, id))
+    if (!world.seesChannel(r.person.id, id)) {
       throw const FakeProblem(404, 'not_found');
+    }
     return id;
   }
 

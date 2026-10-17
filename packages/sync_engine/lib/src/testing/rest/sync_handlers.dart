@@ -30,8 +30,9 @@ void registerSyncHandlers(RestFake rest) {
         );
       }
       final reason = resyncReason(world, after, r.query('epoch'));
-      if (reason != null)
+      if (reason != null) {
         throw FakeProblem(410, 'resync_required', reason: reason);
+      }
       final requested =
           int.tryParse(r.query('limit') ?? '') ?? world.catchupPageSize;
       final limit = requested.clamp(1, world.catchupPageSize);

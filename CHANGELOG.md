@@ -55,6 +55,19 @@ operated, and the order of the build.
   loads targets; `4012` and `session.revoked` of this session wipe the local database; typing
   and agent presence live in the `EphemeralStore`; personal data follow the echo, typing and
   monotonic read rules of 04 14.
+- Sync engine composition root and fake server (M4-17): `SyncEngine.create` builds the gateway
+  connection, catch-up and dispatcher, outbox and run store and wires their hooks (echo to the
+  outbox, outbox start after `catchup.complete` and pause on every disconnect, `run.updated` and
+  the run end to the run store, focused runs into the gateway focus); only test builds accept a
+  plain `http` server. The separate library `package:sync_engine/testing.dart` is the one Dart
+  fake of the server for every integration test: REST subset and gateway on `127.0.0.1`, an
+  in-memory world with event log and sync epoch, DPoP checks, contract validation of every
+  request, response and frame against `docs/api/`, deterministic fault injection (any close
+  code, duplicate delivery, delay, `resync_required`, `4012`, `409`, `410`, `412`, `429`,
+  `5xx`, a lost response after the commit), a scripted agent and the scenarios of 04 16 as
+  drivers. The headless scenarios 16.1 to 16.5 run against `SyncEngine` with its local
+  database. `make arch` gains rule 10: a `testing.dart` library is imported only from `test/`
+  and `integration_test/` folders.
 - Design system core components: message (every variant, collapse with "Show more", origin
   badges, isolated foreign names), a safe Markdown renderer that runs and loads nothing, live box
   with collapsed and mobile lines and a throttled announcer, tool chip, status line, trigger

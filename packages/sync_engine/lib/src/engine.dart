@@ -343,8 +343,9 @@ final class _EngineListener implements SessionListener {
   Future<void> onFrame(GatewayFrame frame, SessionControl control) async {
     await _inner.onFrame(frame, control);
     if (frame is! DispatchFrame ||
-        frame.envelope['type'] != 'run.state_changed')
+        frame.envelope['type'] != 'run.state_changed') {
       return;
+    }
     final payload = frame.envelope['payload'];
     final run = payload is Map ? payload['run'] : null;
     if (run is! Map || !_endStates.contains(run['state'])) return;
@@ -389,8 +390,9 @@ final class _ApiRunFetcher implements RunDocumentFetcher {
       run,
       specifiedType: const FullType(Run),
     );
-    if (json is! Map)
+    if (json is! Map) {
       throw const FormatException('a run that is not an object');
+    }
     return json.cast<String, Object?>();
   }
 }

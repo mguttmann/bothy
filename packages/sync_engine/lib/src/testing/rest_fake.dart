@@ -362,8 +362,9 @@ final class RestFake {
     final session = _sessionOf(token);
     if (session == null) throw _Unauthorized(_problem(401, 'unauthenticated'));
     if (session.revoked) throw _Unauthorized(_problem(401, 'session_revoked'));
-    if (tokenExpired(token))
+    if (tokenExpired(token)) {
       throw _Unauthorized(_problem(401, 'token_expired'));
+    }
     final result = verifier.verify(
       proof,
       method: method,
@@ -373,8 +374,9 @@ final class RestFake {
     );
     final jkt = _accept(result);
     final device = world.devices[session.deviceId]!;
-    if (device.state == 'revoked')
+    if (device.state == 'revoked') {
       throw _Unauthorized(_problem(401, 'session_revoked'));
+    }
     if (device.state == 'pending' &&
         !_pendingAllowed.contains(op.operationId)) {
       throw const FakeProblem(403, 'device_pending');
@@ -389,8 +391,9 @@ final class RestFake {
 
   FakeSession? _sessionOf(String token) {
     for (final s in world.sessions.values) {
-      if (s.accessToken == token || s.olderAccessTokens.contains(token))
+      if (s.accessToken == token || s.olderAccessTokens.contains(token)) {
         return s;
+      }
     }
     return null;
   }
@@ -421,8 +424,9 @@ final class RestFake {
     final slot = '${r.session!.userId}|$key';
     final stored = world.idempotency[slot];
     if (stored != null) {
-      if (stored.hash != hash)
+      if (stored.hash != hash) {
         throw const FakeProblem(422, 'idempotency_key_reuse');
+      }
       return FakeResponse(stored.status, stored.body);
     }
     FakeResponse response;

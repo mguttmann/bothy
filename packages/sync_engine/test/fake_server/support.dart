@@ -209,3 +209,107 @@ class RawResponse {
   /// The problem code of the body.
   String? get code => body is Map ? (body! as Map)['code'] as String? : null;
 }
+
+/// A gateway client that speaks the frames by hand.
+class RawGateway {
+  RawGateway._(this._socket, this._client) {
+    _socket.listen(
+      (data) => frames.add(jsonDecode(data as String) as Map<String, Object?>),
+      onDone: () => _done = true,
+    );
+  }
+
+  /// Connects to the gateway of [server] and waits for `hello`.
+  static Future<RawGateway> connect(Uri gatewayUri, RawClient client) async {
+    final g = RawGateway._(
+      await WebSocket.connect(gatewayUri.toString()),
+      client,
+    );
+    await g.waitFor('hello');
+    return g;
+  }
+
+  final WebSocket _socket;
+  final RawClient _client;
+  bool _done = false;
+
+  /// Every frame of the server, decoded.
+  final List<Map<String, Object?>> frames = [];
+
+  /// Whether the server closed.
+  bool get done => _done;
+
+  /// The close code.
+  int? get closeCode => _socket.closeCode;
+
+  /// The ops received.
+  List<String> get ops => [for (final f in frames) f['op']! as String];
+
+  /// The `d` of the frames with [op].
+  List<Map<String, Object?>> data(String op) => [
+    for (final f in frames)
+      if (f['op'] == op) f['d']! as Map<String, Object?>,
+  ];
+
+  /// The nonce of `hello`.
+  String get nonce => data('hello').first['dpop_nonce']! as String;
+
+  /// Sends a raw frame.
+  void send(String op, Map<String, Object?> d) =>
+      _socket.add(jsonEncode({'op': op, 'd': d}));
+
+  /// Sends `identify` with [token] and a proof over the `hello` nonce (or [nonce]).
+  Future<void> identify(
+    String token,
+    String deviceId, {
+    int? cursor,
+    String? epoch,
+    String? nonce,
+    String? htu,
+  }) async {
+    final origin = _client.baseUri.origin;
+    send('identify', {
+      'protocol_version': 1,
+      'access_token': token,
+      'dpop': await _client.proof(
+        method: 'GET',
+        htu: htu ?? '$origin/api/v1/gateway',
+        accessToken: token,
+        nonce: nonce ?? this.nonce,
+      ),
+      'device_id': deviceId,
+      'cursor': ?cursor,
+      'sync_epoch': ?epoch,
+      'client': {'platform': 'macos', 'version': '1.0.0'},
+    });
+  }
+
+  /// Waits until a frame with [op] arrived (or [count] of them).
+  Future<void> waitFor(String op, {int count = 1}) =>
+      _until(() => ops.where((o) => o == op).length >= count, 'frame $op');
+
+  /// Waits until the server closed the socket.
+  Future<void> waitClosed() => _until(() => _done, 'close');
+
+  Future<void> _until(bool Function() ok, String what) async {
+    final end = DateTime.now().add(const Duration(seconds: 10));
+    while (!ok()) {
+      if (DateTime.now().isAfter(end)) throw StateError('timed out: $what');
+      await Future<void>.delayed(const Duration(milliseconds: 5));
+    }
+  }
+
+  /// Closes from the client side.
+  Future<void> close() => _socket.close(1000);
+}
+
+/// Signs [device] in and returns the access token and device ID the fake issued.
+Future<({String token, String deviceId})> signedIn(
+  FakeWorldHarness h,
+  TestDevice device,
+) async {
+  final outcome = await device.signIn();
+  if (outcome is! LoginSignedIn) throw StateError('sign-in failed: $outcome');
+  final session = h.server.world.sessions[outcome.tokens.session.sid]!;
+  return (token: session.accessToken, deviceId: session.deviceId);
+}

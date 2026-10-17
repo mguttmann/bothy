@@ -496,11 +496,13 @@ final class ContractSchemas {
     List<ContractViolation> out,
   ) {
     final min = schema['minimum'];
-    if (min is num && n < min)
+    if (min is num && n < min) {
       out.add(ContractViolation(at, 'too_small', 'at least $min'));
+    }
     final max = schema['maximum'];
-    if (max is num && n > max)
+    if (max is num && n > max) {
       out.add(ContractViolation(at, 'too_large', 'at most $max'));
+    }
   }
 
   void _array(

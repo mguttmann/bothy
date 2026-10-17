@@ -581,8 +581,9 @@ final class GatewayFake implements GatewayFaultTarget {
     final thread = world.threads[threadId]!;
     final expires = world.stamp(world.now().add(timings.typingTtl));
     for (final other in _open) {
-      if (other == c || !other.live || other.principalId == c.principalId)
+      if (other == c || !other.live || other.principalId == c.principalId) {
         continue;
+      }
       if (!other.focus.contains(threadId)) continue;
       _send(other, 'dispatch', {
         'id': world.nextId(),
