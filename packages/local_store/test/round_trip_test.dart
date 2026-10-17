@@ -18,7 +18,7 @@ void main() {
     final info = InstanceInfo(
       instanceId: uuid(0x900),
       branding: Branding(
-        productName: 'Bothy',
+        productName: 'Example Chat',
         version: const ResourceVersion(3),
         accentColor: '#136F69',
         logoFileId: FileId.parse(uuid(0x901)),
@@ -41,7 +41,7 @@ void main() {
     final next = InstanceInfo(
       instanceId: info.instanceId,
       branding: const Branding(
-        productName: 'Bothy',
+        productName: 'Example Chat',
         version: ResourceVersion(4),
       ),
       localeDefault: 'en',
