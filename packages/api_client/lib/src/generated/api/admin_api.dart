@@ -34,7 +34,7 @@ class AdminApi {
   const AdminApi(this._dio, this._serializers);
 
   /// Add an identity provider
-  ///
+  /// Adds an identity provider (08, 2.6). A &#x60;trusted_header&#x60; provider that would be enabled (the default) while the public listener is not bound to a loopback address is refused with &#x60;409 conflict&#x60;, &#x60;reason: trusted_header_requires_loopback&#x60; and a &#x60;hint&#x60; naming &#x60;server.listen_addr&#x60; (08, 2.4 rule 1).
   ///
   /// Parameters:
   /// * [identityProviderCreate]
@@ -1041,7 +1041,7 @@ class AdminApi {
   }
 
   /// Change an identity provider
-  ///
+  /// Changes an identity provider; absent members stay. Setting &#x60;enabled&#x60; to true on a &#x60;trusted_header&#x60; provider while the public listener is not bound to a loopback address is refused with &#x60;409 conflict&#x60;, &#x60;reason: trusted_header_requires_loopback&#x60; and a &#x60;hint&#x60; naming &#x60;server.listen_addr&#x60; (08, 2.4 rule 1). Disabling a provider ends the sessions of its identities (08, 3.3).
   ///
   /// Parameters:
   /// * [providerId]
