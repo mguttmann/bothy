@@ -1,0 +1,1520 @@
+{
+  "from": "2026-10-15T10:00:00.000Z",
+  "to": "2026-10-15T11:00:00.000Z",
+  "buckets": [
+    {
+      "start": "2026-10-15T10:00:00.000Z",
+      "metric": "messages_created",
+      "dimension": "",
+      "count": 0,
+      "sum": 0,
+      "good": 0
+    },
+    {
+      "start": "2026-10-15T10:00:00.000Z",
+      "metric": "runs_started",
+      "dimension": "",
+      "count": 3,
+      "sum": 0,
+      "good": 0
+    },
+    {
+      "start": "2026-10-15T10:00:00.000Z",
+      "metric": "tool_calls",
+      "dimension": "",
+      "count": 6,
+      "sum": 0,
+      "good": 0
+    },
+    {
+      "start": "2026-10-15T10:01:00.000Z",
+      "metric": "messages_created",
+      "dimension": "",
+      "count": 7,
+      "sum": 0,
+      "good": 0
+    },
+    {
+      "start": "2026-10-15T10:01:00.000Z",
+      "metric": "runs_started",
+      "dimension": "",
+      "count": 10,
+      "sum": 0,
+      "good": 0
+    },
+    {
+      "start": "2026-10-15T10:01:00.000Z",
+      "metric": "tool_calls",
+      "dimension": "",
+      "count": 2,
+      "sum": 0,
+      "good": 0
+    },
+    {
+      "start": "2026-10-15T10:02:00.000Z",
+      "metric": "messages_created",
+      "dimension": "",
+      "count": 3,
+      "sum": 0,
+      "good": 0
+    },
+    {
+      "start": "2026-10-15T10:02:00.000Z",
+      "metric": "runs_started",
+      "dimension": "",
+      "count": 6,
+      "sum": 0,
+      "good": 0
+    },
+    {
+      "start": "2026-10-15T10:02:00.000Z",
+      "metric": "tool_calls",
+      "dimension": "",
+      "count": 9,
+      "sum": 0,
+      "good": 0
+    },
+    {
+      "start": "2026-10-15T10:03:00.000Z",
+      "metric": "messages_created",
+      "dimension": "",
+      "count": 10,
+      "sum": 0,
+      "good": 0
+    },
+    {
+      "start": "2026-10-15T10:03:00.000Z",
+      "metric": "runs_started",
+      "dimension": "",
+      "count": 2,
+      "sum": 0,
+      "good": 0
+    },
+    {
+      "start": "2026-10-15T10:03:00.000Z",
+      "metric": "tool_calls",
+      "dimension": "",
+      "count": 5,
+      "sum": 0,
+      "good": 0
+    },
+    {
+      "start": "2026-10-15T10:04:00.000Z",
+      "metric": "messages_created",
+      "dimension": "",
+      "count": 6,
+      "sum": 0,
+      "good": 0
+    },
+    {
+      "start": "2026-10-15T10:04:00.000Z",
+      "metric": "runs_started",
+      "dimension": "",
+      "count": 9,
+      "sum": 0,
+      "good": 0
+    },
+    {
+      "start": "2026-10-15T10:04:00.000Z",
+      "metric": "tool_calls",
+      "dimension": "",
+      "count": 1,
+      "sum": 0,
+      "good": 0
+    },
+    {
+      "start": "2026-10-15T10:05:00.000Z",
+      "metric": "messages_created",
+      "dimension": "",
+      "count": 2,
+      "sum": 0,
+      "good": 0
+    },
+    {
+      "start": "2026-10-15T10:05:00.000Z",
+      "metric": "runs_started",
+      "dimension": "",
+      "count": 5,
+      "sum": 0,
+      "good": 0
+    },
+    {
+      "start": "2026-10-15T10:05:00.000Z",
+      "metric": "tool_calls",
+      "dimension": "",
+      "count": 8,
+      "sum": 0,
+      "good": 0
+    },
+    {
+      "start": "2026-10-15T10:06:00.000Z",
+      "metric": "messages_created",
+      "dimension": "",
+      "count": 9,
+      "sum": 0,
+      "good": 0
+    },
+    {
+      "start": "2026-10-15T10:06:00.000Z",
+      "metric": "runs_started",
+      "dimension": "",
+      "count": 1,
+      "sum": 0,
+      "good": 0
+    },
+    {
+      "start": "2026-10-15T10:06:00.000Z",
+      "metric": "tool_calls",
+      "dimension": "",
+      "count": 4,
+      "sum": 0,
+      "good": 0
+    },
+    {
+      "start": "2026-10-15T10:07:00.000Z",
+      "metric": "messages_created",
+      "dimension": "",
+      "count": 5,
+      "sum": 0,
+      "good": 0
+    },
+    {
+      "start": "2026-10-15T10:07:00.000Z",
+      "metric": "runs_started",
+      "dimension": "",
+      "count": 8,
+      "sum": 0,
+      "good": 0
+    },
+    {
+      "start": "2026-10-15T10:07:00.000Z",
+      "metric": "tool_calls",
+      "dimension": "",
+      "count": 0,
+      "sum": 0,
+      "good": 0
+    },
+    {
+      "start": "2026-10-15T10:08:00.000Z",
+      "metric": "messages_created",
+      "dimension": "",
+      "count": 1,
+      "sum": 0,
+      "good": 0
+    },
+    {
+      "start": "2026-10-15T10:08:00.000Z",
+      "metric": "runs_started",
+      "dimension": "",
+      "count": 4,
+      "sum": 0,
+      "good": 0
+    },
+    {
+      "start": "2026-10-15T10:08:00.000Z",
+      "metric": "tool_calls",
+      "dimension": "",
+      "count": 7,
+      "sum": 0,
+      "good": 0
+    },
+    {
+      "start": "2026-10-15T10:09:00.000Z",
+      "metric": "messages_created",
+      "dimension": "",
+      "count": 8,
+      "sum": 0,
+      "good": 0
+    },
+    {
+      "start": "2026-10-15T10:09:00.000Z",
+      "metric": "runs_started",
+      "dimension": "",
+      "count": 0,
+      "sum": 0,
+      "good": 0
+    },
+    {
+      "start": "2026-10-15T10:09:00.000Z",
+      "metric": "tool_calls",
+      "dimension": "",
+      "count": 3,
+      "sum": 0,
+      "good": 0
+    },
+    {
+      "start": "2026-10-15T10:10:00.000Z",
+      "metric": "messages_created",
+      "dimension": "",
+      "count": 4,
+      "sum": 0,
+      "good": 0
+    },
+    {
+      "start": "2026-10-15T10:10:00.000Z",
+      "metric": "runs_started",
+      "dimension": "",
+      "count": 7,
+      "sum": 0,
+      "good": 0
+    },
+    {
+      "start": "2026-10-15T10:10:00.000Z",
+      "metric": "tool_calls",
+      "dimension": "",
+      "count": 10,
+      "sum": 0,
+      "good": 0
+    },
+    {
+      "start": "2026-10-15T10:11:00.000Z",
+      "metric": "messages_created",
+      "dimension": "",
+      "count": 0,
+      "sum": 0,
+      "good": 0
+    },
+    {
+      "start": "2026-10-15T10:11:00.000Z",
+      "metric": "runs_started",
+      "dimension": "",
+      "count": 3,
+      "sum": 0,
+      "good": 0
+    },
+    {
+      "start": "2026-10-15T10:11:00.000Z",
+      "metric": "tool_calls",
+      "dimension": "",
+      "count": 6,
+      "sum": 0,
+      "good": 0
+    },
+    {
+      "start": "2026-10-15T10:12:00.000Z",
+      "metric": "messages_created",
+      "dimension": "",
+      "count": 7,
+      "sum": 0,
+      "good": 0
+    },
+    {
+      "start": "2026-10-15T10:12:00.000Z",
+      "metric": "runs_started",
+      "dimension": "",
+      "count": 10,
+      "sum": 0,
+      "good": 0
+    },
+    {
+      "start": "2026-10-15T10:12:00.000Z",
+      "metric": "tool_calls",
+      "dimension": "",
+      "count": 2,
+      "sum": 0,
+      "good": 0
+    },
+    {
+      "start": "2026-10-15T10:13:00.000Z",
+      "metric": "messages_created",
+      "dimension": "",
+      "count": 3,
+      "sum": 0,
+      "good": 0
+    },
+    {
+      "start": "2026-10-15T10:13:00.000Z",
+      "metric": "runs_started",
+      "dimension": "",
+      "count": 6,
+      "sum": 0,
+      "good": 0
+    },
+    {
+      "start": "2026-10-15T10:13:00.000Z",
+      "metric": "tool_calls",
+      "dimension": "",
+      "count": 9,
+      "sum": 0,
+      "good": 0
+    },
+    {
+      "start": "2026-10-15T10:14:00.000Z",
+      "metric": "messages_created",
+      "dimension": "",
+      "count": 10,
+      "sum": 0,
+      "good": 0
+    },
+    {
+      "start": "2026-10-15T10:14:00.000Z",
+      "metric": "runs_started",
+      "dimension": "",
+      "count": 2,
+      "sum": 0,
+      "good": 0
+    },
+    {
+      "start": "2026-10-15T10:14:00.000Z",
+      "metric": "tool_calls",
+      "dimension": "",
+      "count": 5,
+      "sum": 0,
+      "good": 0
+    },
+    {
+      "start": "2026-10-15T10:15:00.000Z",
+      "metric": "messages_created",
+      "dimension": "",
+      "count": 6,
+      "sum": 0,
+      "good": 0
+    },
+    {
+      "start": "2026-10-15T10:15:00.000Z",
+      "metric": "runs_started",
+      "dimension": "",
+      "count": 9,
+      "sum": 0,
+      "good": 0
+    },
+    {
+      "start": "2026-10-15T10:15:00.000Z",
+      "metric": "tool_calls",
+      "dimension": "",
+      "count": 1,
+      "sum": 0,
+      "good": 0
+    },
+    {
+      "start": "2026-10-15T10:16:00.000Z",
+      "metric": "messages_created",
+      "dimension": "",
+      "count": 2,
+      "sum": 0,
+      "good": 0
+    },
+    {
+      "start": "2026-10-15T10:16:00.000Z",
+      "metric": "runs_started",
+      "dimension": "",
+      "count": 5,
+      "sum": 0,
+      "good": 0
+    },
+    {
+      "start": "2026-10-15T10:16:00.000Z",
+      "metric": "tool_calls",
+      "dimension": "",
+      "count": 8,
+      "sum": 0,
+      "good": 0
+    },
+    {
+      "start": "2026-10-15T10:17:00.000Z",
+      "metric": "messages_created",
+      "dimension": "",
+      "count": 9,
+      "sum": 0,
+      "good": 0
+    },
+    {
+      "start": "2026-10-15T10:17:00.000Z",
+      "metric": "runs_started",
+      "dimension": "",
+      "count": 1,
+      "sum": 0,
+      "good": 0
+    },
+    {
+      "start": "2026-10-15T10:17:00.000Z",
+      "metric": "tool_calls",
+      "dimension": "",
+      "count": 4,
+      "sum": 0,
+      "good": 0
+    },
+    {
+      "start": "2026-10-15T10:18:00.000Z",
+      "metric": "messages_created",
+      "dimension": "",
+      "count": 5,
+      "sum": 0,
+      "good": 0
+    },
+    {
+      "start": "2026-10-15T10:18:00.000Z",
+      "metric": "runs_started",
+      "dimension": "",
+      "count": 8,
+      "sum": 0,
+      "good": 0
+    },
+    {
+      "start": "2026-10-15T10:18:00.000Z",
+      "metric": "tool_calls",
+      "dimension": "",
+      "count": 0,
+      "sum": 0,
+      "good": 0
+    },
+    {
+      "start": "2026-10-15T10:19:00.000Z",
+      "metric": "messages_created",
+      "dimension": "",
+      "count": 1,
+      "sum": 0,
+      "good": 0
+    },
+    {
+      "start": "2026-10-15T10:19:00.000Z",
+      "metric": "runs_started",
+      "dimension": "",
+      "count": 4,
+      "sum": 0,
+      "good": 0
+    },
+    {
+      "start": "2026-10-15T10:19:00.000Z",
+      "metric": "tool_calls",
+      "dimension": "",
+      "count": 7,
+      "sum": 0,
+      "good": 0
+    },
+    {
+      "start": "2026-10-15T10:20:00.000Z",
+      "metric": "messages_created",
+      "dimension": "",
+      "count": 8,
+      "sum": 0,
+      "good": 0
+    },
+    {
+      "start": "2026-10-15T10:20:00.000Z",
+      "metric": "runs_started",
+      "dimension": "",
+      "count": 0,
+      "sum": 0,
+      "good": 0
+    },
+    {
+      "start": "2026-10-15T10:20:00.000Z",
+      "metric": "tool_calls",
+      "dimension": "",
+      "count": 3,
+      "sum": 0,
+      "good": 0
+    },
+    {
+      "start": "2026-10-15T10:21:00.000Z",
+      "metric": "messages_created",
+      "dimension": "",
+      "count": 4,
+      "sum": 0,
+      "good": 0
+    },
+    {
+      "start": "2026-10-15T10:21:00.000Z",
+      "metric": "runs_started",
+      "dimension": "",
+      "count": 7,
+      "sum": 0,
+      "good": 0
+    },
+    {
+      "start": "2026-10-15T10:21:00.000Z",
+      "metric": "tool_calls",
+      "dimension": "",
+      "count": 10,
+      "sum": 0,
+      "good": 0
+    },
+    {
+      "start": "2026-10-15T10:22:00.000Z",
+      "metric": "messages_created",
+      "dimension": "",
+      "count": 0,
+      "sum": 0,
+      "good": 0
+    },
+    {
+      "start": "2026-10-15T10:22:00.000Z",
+      "metric": "runs_started",
+      "dimension": "",
+      "count": 3,
+      "sum": 0,
+      "good": 0
+    },
+    {
+      "start": "2026-10-15T10:22:00.000Z",
+      "metric": "tool_calls",
+      "dimension": "",
+      "count": 6,
+      "sum": 0,
+      "good": 0
+    },
+    {
+      "start": "2026-10-15T10:23:00.000Z",
+      "metric": "messages_created",
+      "dimension": "",
+      "count": 7,
+      "sum": 0,
+      "good": 0
+    },
+    {
+      "start": "2026-10-15T10:23:00.000Z",
+      "metric": "runs_started",
+      "dimension": "",
+      "count": 10,
+      "sum": 0,
+      "good": 0
+    },
+    {
+      "start": "2026-10-15T10:23:00.000Z",
+      "metric": "tool_calls",
+      "dimension": "",
+      "count": 2,
+      "sum": 0,
+      "good": 0
+    },
+    {
+      "start": "2026-10-15T10:24:00.000Z",
+      "metric": "messages_created",
+      "dimension": "",
+      "count": 3,
+      "sum": 0,
+      "good": 0
+    },
+    {
+      "start": "2026-10-15T10:24:00.000Z",
+      "metric": "runs_started",
+      "dimension": "",
+      "count": 6,
+      "sum": 0,
+      "good": 0
+    },
+    {
+      "start": "2026-10-15T10:24:00.000Z",
+      "metric": "tool_calls",
+      "dimension": "",
+      "count": 9,
+      "sum": 0,
+      "good": 0
+    },
+    {
+      "start": "2026-10-15T10:25:00.000Z",
+      "metric": "messages_created",
+      "dimension": "",
+      "count": 10,
+      "sum": 0,
+      "good": 0
+    },
+    {
+      "start": "2026-10-15T10:25:00.000Z",
+      "metric": "runs_started",
+      "dimension": "",
+      "count": 2,
+      "sum": 0,
+      "good": 0
+    },
+    {
+      "start": "2026-10-15T10:25:00.000Z",
+      "metric": "tool_calls",
+      "dimension": "",
+      "count": 5,
+      "sum": 0,
+      "good": 0
+    },
+    {
+      "start": "2026-10-15T10:26:00.000Z",
+      "metric": "messages_created",
+      "dimension": "",
+      "count": 6,
+      "sum": 0,
+      "good": 0
+    },
+    {
+      "start": "2026-10-15T10:26:00.000Z",
+      "metric": "runs_started",
+      "dimension": "",
+      "count": 9,
+      "sum": 0,
+      "good": 0
+    },
+    {
+      "start": "2026-10-15T10:26:00.000Z",
+      "metric": "tool_calls",
+      "dimension": "",
+      "count": 1,
+      "sum": 0,
+      "good": 0
+    },
+    {
+      "start": "2026-10-15T10:27:00.000Z",
+      "metric": "messages_created",
+      "dimension": "",
+      "count": 2,
+      "sum": 0,
+      "good": 0
+    },
+    {
+      "start": "2026-10-15T10:27:00.000Z",
+      "metric": "runs_started",
+      "dimension": "",
+      "count": 5,
+      "sum": 0,
+      "good": 0
+    },
+    {
+      "start": "2026-10-15T10:27:00.000Z",
+      "metric": "tool_calls",
+      "dimension": "",
+      "count": 8,
+      "sum": 0,
+      "good": 0
+    },
+    {
+      "start": "2026-10-15T10:28:00.000Z",
+      "metric": "messages_created",
+      "dimension": "",
+      "count": 9,
+      "sum": 0,
+      "good": 0
+    },
+    {
+      "start": "2026-10-15T10:28:00.000Z",
+      "metric": "runs_started",
+      "dimension": "",
+      "count": 1,
+      "sum": 0,
+      "good": 0
+    },
+    {
+      "start": "2026-10-15T10:28:00.000Z",
+      "metric": "tool_calls",
+      "dimension": "",
+      "count": 4,
+      "sum": 0,
+      "good": 0
+    },
+    {
+      "start": "2026-10-15T10:29:00.000Z",
+      "metric": "messages_created",
+      "dimension": "",
+      "count": 5,
+      "sum": 0,
+      "good": 0
+    },
+    {
+      "start": "2026-10-15T10:29:00.000Z",
+      "metric": "runs_started",
+      "dimension": "",
+      "count": 8,
+      "sum": 0,
+      "good": 0
+    },
+    {
+      "start": "2026-10-15T10:29:00.000Z",
+      "metric": "tool_calls",
+      "dimension": "",
+      "count": 0,
+      "sum": 0,
+      "good": 0
+    },
+    {
+      "start": "2026-10-15T10:30:00.000Z",
+      "metric": "messages_created",
+      "dimension": "",
+      "count": 1,
+      "sum": 0,
+      "good": 0
+    },
+    {
+      "start": "2026-10-15T10:30:00.000Z",
+      "metric": "runs_started",
+      "dimension": "",
+      "count": 4,
+      "sum": 0,
+      "good": 0
+    },
+    {
+      "start": "2026-10-15T10:30:00.000Z",
+      "metric": "tool_calls",
+      "dimension": "",
+      "count": 7,
+      "sum": 0,
+      "good": 0
+    },
+    {
+      "start": "2026-10-15T10:31:00.000Z",
+      "metric": "messages_created",
+      "dimension": "",
+      "count": 8,
+      "sum": 0,
+      "good": 0
+    },
+    {
+      "start": "2026-10-15T10:31:00.000Z",
+      "metric": "runs_started",
+      "dimension": "",
+      "count": 0,
+      "sum": 0,
+      "good": 0
+    },
+    {
+      "start": "2026-10-15T10:31:00.000Z",
+      "metric": "tool_calls",
+      "dimension": "",
+      "count": 3,
+      "sum": 0,
+      "good": 0
+    },
+    {
+      "start": "2026-10-15T10:32:00.000Z",
+      "metric": "messages_created",
+      "dimension": "",
+      "count": 4,
+      "sum": 0,
+      "good": 0
+    },
+    {
+      "start": "2026-10-15T10:32:00.000Z",
+      "metric": "runs_started",
+      "dimension": "",
+      "count": 7,
+      "sum": 0,
+      "good": 0
+    },
+    {
+      "start": "2026-10-15T10:32:00.000Z",
+      "metric": "tool_calls",
+      "dimension": "",
+      "count": 10,
+      "sum": 0,
+      "good": 0
+    },
+    {
+      "start": "2026-10-15T10:33:00.000Z",
+      "metric": "messages_created",
+      "dimension": "",
+      "count": 0,
+      "sum": 0,
+      "good": 0
+    },
+    {
+      "start": "2026-10-15T10:33:00.000Z",
+      "metric": "runs_started",
+      "dimension": "",
+      "count": 3,
+      "sum": 0,
+      "good": 0
+    },
+    {
+      "start": "2026-10-15T10:33:00.000Z",
+      "metric": "tool_calls",
+      "dimension": "",
+      "count": 6,
+      "sum": 0,
+      "good": 0
+    },
+    {
+      "start": "2026-10-15T10:34:00.000Z",
+      "metric": "messages_created",
+      "dimension": "",
+      "count": 7,
+      "sum": 0,
+      "good": 0
+    },
+    {
+      "start": "2026-10-15T10:34:00.000Z",
+      "metric": "runs_started",
+      "dimension": "",
+      "count": 10,
+      "sum": 0,
+      "good": 0
+    },
+    {
+      "start": "2026-10-15T10:34:00.000Z",
+      "metric": "tool_calls",
+      "dimension": "",
+      "count": 2,
+      "sum": 0,
+      "good": 0
+    },
+    {
+      "start": "2026-10-15T10:35:00.000Z",
+      "metric": "messages_created",
+      "dimension": "",
+      "count": 3,
+      "sum": 0,
+      "good": 0
+    },
+    {
+      "start": "2026-10-15T10:35:00.000Z",
+      "metric": "runs_started",
+      "dimension": "",
+      "count": 6,
+      "sum": 0,
+      "good": 0
+    },
+    {
+      "start": "2026-10-15T10:35:00.000Z",
+      "metric": "tool_calls",
+      "dimension": "",
+      "count": 9,
+      "sum": 0,
+      "good": 0
+    },
+    {
+      "start": "2026-10-15T10:36:00.000Z",
+      "metric": "messages_created",
+      "dimension": "",
+      "count": 10,
+      "sum": 0,
+      "good": 0
+    },
+    {
+      "start": "2026-10-15T10:36:00.000Z",
+      "metric": "runs_started",
+      "dimension": "",
+      "count": 2,
+      "sum": 0,
+      "good": 0
+    },
+    {
+      "start": "2026-10-15T10:36:00.000Z",
+      "metric": "tool_calls",
+      "dimension": "",
+      "count": 5,
+      "sum": 0,
+      "good": 0
+    },
+    {
+      "start": "2026-10-15T10:37:00.000Z",
+      "metric": "messages_created",
+      "dimension": "",
+      "count": 6,
+      "sum": 0,
+      "good": 0
+    },
+    {
+      "start": "2026-10-15T10:37:00.000Z",
+      "metric": "runs_started",
+      "dimension": "",
+      "count": 9,
+      "sum": 0,
+      "good": 0
+    },
+    {
+      "start": "2026-10-15T10:37:00.000Z",
+      "metric": "tool_calls",
+      "dimension": "",
+      "count": 1,
+      "sum": 0,
+      "good": 0
+    },
+    {
+      "start": "2026-10-15T10:38:00.000Z",
+      "metric": "messages_created",
+      "dimension": "",
+      "count": 2,
+      "sum": 0,
+      "good": 0
+    },
+    {
+      "start": "2026-10-15T10:38:00.000Z",
+      "metric": "runs_started",
+      "dimension": "",
+      "count": 5,
+      "sum": 0,
+      "good": 0
+    },
+    {
+      "start": "2026-10-15T10:38:00.000Z",
+      "metric": "tool_calls",
+      "dimension": "",
+      "count": 8,
+      "sum": 0,
+      "good": 0
+    },
+    {
+      "start": "2026-10-15T10:39:00.000Z",
+      "metric": "messages_created",
+      "dimension": "",
+      "count": 9,
+      "sum": 0,
+      "good": 0
+    },
+    {
+      "start": "2026-10-15T10:39:00.000Z",
+      "metric": "runs_started",
+      "dimension": "",
+      "count": 1,
+      "sum": 0,
+      "good": 0
+    },
+    {
+      "start": "2026-10-15T10:39:00.000Z",
+      "metric": "tool_calls",
+      "dimension": "",
+      "count": 4,
+      "sum": 0,
+      "good": 0
+    },
+    {
+      "start": "2026-10-15T10:40:00.000Z",
+      "metric": "messages_created",
+      "dimension": "",
+      "count": 5,
+      "sum": 0,
+      "good": 0
+    },
+    {
+      "start": "2026-10-15T10:40:00.000Z",
+      "metric": "runs_started",
+      "dimension": "",
+      "count": 8,
+      "sum": 0,
+      "good": 0
+    },
+    {
+      "start": "2026-10-15T10:40:00.000Z",
+      "metric": "tool_calls",
+      "dimension": "",
+      "count": 0,
+      "sum": 0,
+      "good": 0
+    },
+    {
+      "start": "2026-10-15T10:41:00.000Z",
+      "metric": "messages_created",
+      "dimension": "",
+      "count": 1,
+      "sum": 0,
+      "good": 0
+    },
+    {
+      "start": "2026-10-15T10:41:00.000Z",
+      "metric": "runs_started",
+      "dimension": "",
+      "count": 4,
+      "sum": 0,
+      "good": 0
+    },
+    {
+      "start": "2026-10-15T10:41:00.000Z",
+      "metric": "tool_calls",
+      "dimension": "",
+      "count": 7,
+      "sum": 0,
+      "good": 0
+    },
+    {
+      "start": "2026-10-15T10:42:00.000Z",
+      "metric": "messages_created",
+      "dimension": "",
+      "count": 8,
+      "sum": 0,
+      "good": 0
+    },
+    {
+      "start": "2026-10-15T10:42:00.000Z",
+      "metric": "runs_started",
+      "dimension": "",
+      "count": 0,
+      "sum": 0,
+      "good": 0
+    },
+    {
+      "start": "2026-10-15T10:42:00.000Z",
+      "metric": "tool_calls",
+      "dimension": "",
+      "count": 3,
+      "sum": 0,
+      "good": 0
+    },
+    {
+      "start": "2026-10-15T10:43:00.000Z",
+      "metric": "messages_created",
+      "dimension": "",
+      "count": 4,
+      "sum": 0,
+      "good": 0
+    },
+    {
+      "start": "2026-10-15T10:43:00.000Z",
+      "metric": "runs_started",
+      "dimension": "",
+      "count": 7,
+      "sum": 0,
+      "good": 0
+    },
+    {
+      "start": "2026-10-15T10:43:00.000Z",
+      "metric": "tool_calls",
+      "dimension": "",
+      "count": 10,
+      "sum": 0,
+      "good": 0
+    },
+    {
+      "start": "2026-10-15T10:44:00.000Z",
+      "metric": "messages_created",
+      "dimension": "",
+      "count": 0,
+      "sum": 0,
+      "good": 0
+    },
+    {
+      "start": "2026-10-15T10:44:00.000Z",
+      "metric": "runs_started",
+      "dimension": "",
+      "count": 3,
+      "sum": 0,
+      "good": 0
+    },
+    {
+      "start": "2026-10-15T10:44:00.000Z",
+      "metric": "tool_calls",
+      "dimension": "",
+      "count": 6,
+      "sum": 0,
+      "good": 0
+    },
+    {
+      "start": "2026-10-15T10:45:00.000Z",
+      "metric": "messages_created",
+      "dimension": "",
+      "count": 7,
+      "sum": 0,
+      "good": 0
+    },
+    {
+      "start": "2026-10-15T10:45:00.000Z",
+      "metric": "runs_started",
+      "dimension": "",
+      "count": 10,
+      "sum": 0,
+      "good": 0
+    },
+    {
+      "start": "2026-10-15T10:45:00.000Z",
+      "metric": "tool_calls",
+      "dimension": "",
+      "count": 2,
+      "sum": 0,
+      "good": 0
+    },
+    {
+      "start": "2026-10-15T10:46:00.000Z",
+      "metric": "messages_created",
+      "dimension": "",
+      "count": 3,
+      "sum": 0,
+      "good": 0
+    },
+    {
+      "start": "2026-10-15T10:46:00.000Z",
+      "metric": "runs_started",
+      "dimension": "",
+      "count": 6,
+      "sum": 0,
+      "good": 0
+    },
+    {
+      "start": "2026-10-15T10:46:00.000Z",
+      "metric": "tool_calls",
+      "dimension": "",
+      "count": 9,
+      "sum": 0,
+      "good": 0
+    },
+    {
+      "start": "2026-10-15T10:47:00.000Z",
+      "metric": "messages_created",
+      "dimension": "",
+      "count": 10,
+      "sum": 0,
+      "good": 0
+    },
+    {
+      "start": "2026-10-15T10:47:00.000Z",
+      "metric": "runs_started",
+      "dimension": "",
+      "count": 2,
+      "sum": 0,
+      "good": 0
+    },
+    {
+      "start": "2026-10-15T10:47:00.000Z",
+      "metric": "tool_calls",
+      "dimension": "",
+      "count": 5,
+      "sum": 0,
+      "good": 0
+    },
+    {
+      "start": "2026-10-15T10:48:00.000Z",
+      "metric": "messages_created",
+      "dimension": "",
+      "count": 6,
+      "sum": 0,
+      "good": 0
+    },
+    {
+      "start": "2026-10-15T10:48:00.000Z",
+      "metric": "runs_started",
+      "dimension": "",
+      "count": 9,
+      "sum": 0,
+      "good": 0
+    },
+    {
+      "start": "2026-10-15T10:48:00.000Z",
+      "metric": "tool_calls",
+      "dimension": "",
+      "count": 1,
+      "sum": 0,
+      "good": 0
+    },
+    {
+      "start": "2026-10-15T10:49:00.000Z",
+      "metric": "messages_created",
+      "dimension": "",
+      "count": 2,
+      "sum": 0,
+      "good": 0
+    },
+    {
+      "start": "2026-10-15T10:49:00.000Z",
+      "metric": "runs_started",
+      "dimension": "",
+      "count": 5,
+      "sum": 0,
+      "good": 0
+    },
+    {
+      "start": "2026-10-15T10:49:00.000Z",
+      "metric": "tool_calls",
+      "dimension": "",
+      "count": 8,
+      "sum": 0,
+      "good": 0
+    },
+    {
+      "start": "2026-10-15T10:50:00.000Z",
+      "metric": "messages_created",
+      "dimension": "",
+      "count": 9,
+      "sum": 0,
+      "good": 0
+    },
+    {
+      "start": "2026-10-15T10:50:00.000Z",
+      "metric": "runs_started",
+      "dimension": "",
+      "count": 1,
+      "sum": 0,
+      "good": 0
+    },
+    {
+      "start": "2026-10-15T10:50:00.000Z",
+      "metric": "tool_calls",
+      "dimension": "",
+      "count": 4,
+      "sum": 0,
+      "good": 0
+    },
+    {
+      "start": "2026-10-15T10:51:00.000Z",
+      "metric": "messages_created",
+      "dimension": "",
+      "count": 5,
+      "sum": 0,
+      "good": 0
+    },
+    {
+      "start": "2026-10-15T10:51:00.000Z",
+      "metric": "runs_started",
+      "dimension": "",
+      "count": 8,
+      "sum": 0,
+      "good": 0
+    },
+    {
+      "start": "2026-10-15T10:51:00.000Z",
+      "metric": "tool_calls",
+      "dimension": "",
+      "count": 0,
+      "sum": 0,
+      "good": 0
+    },
+    {
+      "start": "2026-10-15T10:52:00.000Z",
+      "metric": "messages_created",
+      "dimension": "",
+      "count": 1,
+      "sum": 0,
+      "good": 0
+    },
+    {
+      "start": "2026-10-15T10:52:00.000Z",
+      "metric": "runs_started",
+      "dimension": "",
+      "count": 4,
+      "sum": 0,
+      "good": 0
+    },
+    {
+      "start": "2026-10-15T10:52:00.000Z",
+      "metric": "tool_calls",
+      "dimension": "",
+      "count": 7,
+      "sum": 0,
+      "good": 0
+    },
+    {
+      "start": "2026-10-15T10:53:00.000Z",
+      "metric": "messages_created",
+      "dimension": "",
+      "count": 8,
+      "sum": 0,
+      "good": 0
+    },
+    {
+      "start": "2026-10-15T10:53:00.000Z",
+      "metric": "runs_started",
+      "dimension": "",
+      "count": 0,
+      "sum": 0,
+      "good": 0
+    },
+    {
+      "start": "2026-10-15T10:53:00.000Z",
+      "metric": "tool_calls",
+      "dimension": "",
+      "count": 3,
+      "sum": 0,
+      "good": 0
+    },
+    {
+      "start": "2026-10-15T10:54:00.000Z",
+      "metric": "messages_created",
+      "dimension": "",
+      "count": 4,
+      "sum": 0,
+      "good": 0
+    },
+    {
+      "start": "2026-10-15T10:54:00.000Z",
+      "metric": "runs_started",
+      "dimension": "",
+      "count": 7,
+      "sum": 0,
+      "good": 0
+    },
+    {
+      "start": "2026-10-15T10:54:00.000Z",
+      "metric": "tool_calls",
+      "dimension": "",
+      "count": 10,
+      "sum": 0,
+      "good": 0
+    },
+    {
+      "start": "2026-10-15T10:55:00.000Z",
+      "metric": "messages_created",
+      "dimension": "",
+      "count": 0,
+      "sum": 0,
+      "good": 0
+    },
+    {
+      "start": "2026-10-15T10:55:00.000Z",
+      "metric": "runs_started",
+      "dimension": "",
+      "count": 3,
+      "sum": 0,
+      "good": 0
+    },
+    {
+      "start": "2026-10-15T10:55:00.000Z",
+      "metric": "tool_calls",
+      "dimension": "",
+      "count": 6,
+      "sum": 0,
+      "good": 0
+    },
+    {
+      "start": "2026-10-15T10:56:00.000Z",
+      "metric": "messages_created",
+      "dimension": "",
+      "count": 7,
+      "sum": 0,
+      "good": 0
+    },
+    {
+      "start": "2026-10-15T10:56:00.000Z",
+      "metric": "runs_started",
+      "dimension": "",
+      "count": 10,
+      "sum": 0,
+      "good": 0
+    },
+    {
+      "start": "2026-10-15T10:56:00.000Z",
+      "metric": "tool_calls",
+      "dimension": "",
+      "count": 2,
+      "sum": 0,
+      "good": 0
+    },
+    {
+      "start": "2026-10-15T10:57:00.000Z",
+      "metric": "messages_created",
+      "dimension": "",
+      "count": 3,
+      "sum": 0,
+      "good": 0
+    },
+    {
+      "start": "2026-10-15T10:57:00.000Z",
+      "metric": "runs_started",
+      "dimension": "",
+      "count": 6,
+      "sum": 0,
+      "good": 0
+    },
+    {
+      "start": "2026-10-15T10:57:00.000Z",
+      "metric": "tool_calls",
+      "dimension": "",
+      "count": 9,
+      "sum": 0,
+      "good": 0
+    },
+    {
+      "start": "2026-10-15T10:58:00.000Z",
+      "metric": "messages_created",
+      "dimension": "",
+      "count": 10,
+      "sum": 0,
+      "good": 0
+    },
+    {
+      "start": "2026-10-15T10:58:00.000Z",
+      "metric": "runs_started",
+      "dimension": "",
+      "count": 2,
+      "sum": 0,
+      "good": 0
+    },
+    {
+      "start": "2026-10-15T10:58:00.000Z",
+      "metric": "tool_calls",
+      "dimension": "",
+      "count": 5,
+      "sum": 0,
+      "good": 0
+    },
+    {
+      "start": "2026-10-15T10:59:00.000Z",
+      "metric": "messages_created",
+      "dimension": "",
+      "count": 6,
+      "sum": 0,
+      "good": 0
+    },
+    {
+      "start": "2026-10-15T10:59:00.000Z",
+      "metric": "runs_started",
+      "dimension": "",
+      "count": 9,
+      "sum": 0,
+      "good": 0
+    },
+    {
+      "start": "2026-10-15T10:59:00.000Z",
+      "metric": "tool_calls",
+      "dimension": "",
+      "count": 1,
+      "sum": 0,
+      "good": 0
+    }
+  ],
+  "runs": [
+    {
+      "run_id": "0192f4a0-7b1c-7000-8a00-000000005000",
+      "channel_id": "0192f4a0-7b1c-7000-8a00-000000000101",
+      "agent_id": "0192f4a0-7b1c-7000-8a00-000000000201",
+      "queued_at": "2026-10-15T10:00:00.000Z",
+      "started_at": "2026-10-15T10:00:03.000Z",
+      "state": "completed",
+      "finished_at": "2026-10-15T10:04:00.000Z"
+    },
+    {
+      "run_id": "0192f4a0-7b1c-7000-8a00-000000005001",
+      "channel_id": "0192f4a0-7b1c-7000-8a00-000000000102",
+      "agent_id": "0192f4a0-7b1c-7000-8a00-000000000202",
+      "queued_at": "2026-10-15T10:07:00.000Z",
+      "started_at": "2026-10-15T10:07:03.000Z",
+      "state": "failed",
+      "finished_at": "2026-10-15T10:12:00.000Z"
+    },
+    {
+      "run_id": "0192f4a0-7b1c-7000-8a00-000000005002",
+      "channel_id": "0192f4a0-7b1c-7000-8a00-000000000103",
+      "agent_id": "0192f4a0-7b1c-7000-8a00-000000000202",
+      "queued_at": "2026-10-15T10:15:00.000Z",
+      "started_at": "2026-10-15T10:15:03.000Z",
+      "state": "cancelled",
+      "finished_at": "2026-10-15T10:21:00.000Z"
+    },
+    {
+      "run_id": "0192f4a0-7b1c-7000-8a00-000000005003",
+      "channel_id": "0192f4a0-7b1c-7000-8a00-000000000101",
+      "agent_id": "0192f4a0-7b1c-7000-8a00-000000000201",
+      "queued_at": "2026-10-15T10:22:00.000Z",
+      "started_at": "2026-10-15T10:22:03.000Z",
+      "state": "completed",
+      "finished_at": "2026-10-15T10:29:00.000Z"
+    },
+    {
+      "run_id": "0192f4a0-7b1c-7000-8a00-000000005004",
+      "channel_id": "0192f4a0-7b1c-7000-8a00-000000000102",
+      "agent_id": "0192f4a0-7b1c-7000-8a00-000000000202",
+      "queued_at": "2026-10-15T10:30:00.000Z",
+      "started_at": "2026-10-15T10:30:03.000Z",
+      "state": "running"
+    },
+    {
+      "run_id": "0192f4a0-7b1c-7000-8a00-000000005005",
+      "channel_id": "0192f4a0-7b1c-7000-8a00-000000000103",
+      "agent_id": "0192f4a0-7b1c-7000-8a00-000000000202",
+      "queued_at": "2026-10-15T10:37:00.000Z",
+      "started_at": "2026-10-15T10:37:03.000Z",
+      "state": "completed",
+      "finished_at": "2026-10-15T10:46:00.000Z"
+    },
+    {
+      "run_id": "0192f4a0-7b1c-7000-8a00-000000005006",
+      "channel_id": "0192f4a0-7b1c-7000-8a00-000000000101",
+      "agent_id": "0192f4a0-7b1c-7000-8a00-000000000201",
+      "queued_at": "2026-10-15T10:45:00.000Z",
+      "started_at": "2026-10-15T10:45:03.000Z",
+      "state": "failed",
+      "finished_at": "2026-10-15T10:49:00.000Z"
+    },
+    {
+      "run_id": "0192f4a0-7b1c-7000-8a00-000000005007",
+      "channel_id": "0192f4a0-7b1c-7000-8a00-000000000102",
+      "agent_id": "0192f4a0-7b1c-7000-8a00-000000000202",
+      "queued_at": "2026-10-15T10:52:00.000Z",
+      "started_at": "2026-10-15T10:52:03.000Z",
+      "state": "cancelled",
+      "finished_at": "2026-10-15T10:57:00.000Z"
+    }
+  ],
+  "runs_truncated": true
+}

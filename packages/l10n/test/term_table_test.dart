@@ -15,7 +15,15 @@ import 'support/arb_rules.dart';
 import 'support/repo.dart';
 
 /// Keys allowed to use an English term without the German one, each with its reason.
-const Map<String, String> exceptions = {};
+const Map<String, String> exceptions = {
+  // The German plural of the term Run changes its vowel; the stem check does not see that.
+  'vizMetricRunsStarted': 'German plural of the term Run',
+  'vizMetricRunsFinished': 'German plural of the term Run',
+  'vizMoreRunsThanShown': 'German plural of the term Run',
+  'vizChartRuns': 'German plural of the term Run',
+  // {space} and {channel} are placeholders that carry the names, not the terms (INT-W27/4).
+  'vizLaneLabel': 'placeholders {space} and {channel}, not the terms',
+};
 
 void main() {
   test('the checked-in table equals the generation from 01 section 9', () {

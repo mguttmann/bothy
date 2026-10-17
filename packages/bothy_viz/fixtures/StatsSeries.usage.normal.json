@@ -1,0 +1,145 @@
+{
+  "granularity": "day",
+  "buckets": [
+    {
+      "start": "2026-10-09T00:00:00.000Z",
+      "metrics": {
+        "messages": 3.0,
+        "threads_created": 6.0,
+        "active_people": 9.0,
+        "runs": 12.0
+      },
+      "group_key": "0192f4a0-7b1c-7000-8a00-000000000001"
+    },
+    {
+      "start": "2026-10-09T00:00:00.000Z",
+      "metrics": {
+        "messages": 3.0,
+        "threads_created": 6.0,
+        "active_people": 9.0,
+        "runs": 12.0
+      },
+      "group_key": "0192f4a0-7b1c-7000-8a00-000000000002"
+    },
+    {
+      "start": "2026-10-10T00:00:00.000Z",
+      "metrics": {
+        "messages": 8.0,
+        "threads_created": 11.0,
+        "active_people": 14.0,
+        "runs": 17.0
+      },
+      "group_key": "0192f4a0-7b1c-7000-8a00-000000000001"
+    },
+    {
+      "start": "2026-10-10T00:00:00.000Z",
+      "metrics": {
+        "messages": 8.0,
+        "threads_created": 11.0,
+        "active_people": 14.0,
+        "runs": 17.0
+      },
+      "group_key": "0192f4a0-7b1c-7000-8a00-000000000002"
+    },
+    {
+      "start": "2026-10-11T00:00:00.000Z",
+      "metrics": {
+        "messages": 13.0,
+        "threads_created": 16.0,
+        "active_people": 2.0,
+        "runs": 5.0
+      },
+      "group_key": "0192f4a0-7b1c-7000-8a00-000000000001"
+    },
+    {
+      "start": "2026-10-11T00:00:00.000Z",
+      "metrics": {
+        "messages": 13.0,
+        "threads_created": 16.0,
+        "active_people": 2.0,
+        "runs": 5.0
+      },
+      "group_key": "0192f4a0-7b1c-7000-8a00-000000000002"
+    },
+    {
+      "start": "2026-10-12T00:00:00.000Z",
+      "metrics": {
+        "messages": 1.0,
+        "threads_created": 4.0,
+        "active_people": 7.0,
+        "runs": 10.0
+      },
+      "group_key": "0192f4a0-7b1c-7000-8a00-000000000001"
+    },
+    {
+      "start": "2026-10-12T00:00:00.000Z",
+      "metrics": {
+        "messages": 1.0,
+        "threads_created": 4.0,
+        "active_people": 7.0,
+        "runs": 10.0
+      },
+      "group_key": "0192f4a0-7b1c-7000-8a00-000000000002"
+    },
+    {
+      "start": "2026-10-13T00:00:00.000Z",
+      "metrics": {
+        "messages": 6.0,
+        "threads_created": 9.0,
+        "active_people": 12.0,
+        "runs": 15.0
+      },
+      "group_key": "0192f4a0-7b1c-7000-8a00-000000000001"
+    },
+    {
+      "start": "2026-10-13T00:00:00.000Z",
+      "metrics": {
+        "messages": 6.0,
+        "threads_created": 9.0,
+        "active_people": 12.0,
+        "runs": 15.0
+      },
+      "group_key": "0192f4a0-7b1c-7000-8a00-000000000002"
+    },
+    {
+      "start": "2026-10-14T00:00:00.000Z",
+      "metrics": {
+        "messages": 11.0,
+        "threads_created": 14.0,
+        "active_people": 17.0,
+        "runs": 3.0
+      },
+      "group_key": "0192f4a0-7b1c-7000-8a00-000000000001"
+    },
+    {
+      "start": "2026-10-14T00:00:00.000Z",
+      "metrics": {
+        "messages": 11.0,
+        "threads_created": 14.0,
+        "active_people": 17.0,
+        "runs": 3.0
+      },
+      "group_key": "0192f4a0-7b1c-7000-8a00-000000000002"
+    },
+    {
+      "start": "2026-10-15T00:00:00.000Z",
+      "metrics": {
+        "messages": 16.0,
+        "threads_created": 2.0,
+        "active_people": 5.0,
+        "runs": 8.0
+      },
+      "group_key": "0192f4a0-7b1c-7000-8a00-000000000001"
+    },
+    {
+      "start": "2026-10-15T00:00:00.000Z",
+      "metrics": {
+        "messages": 16.0,
+        "threads_created": 2.0,
+        "active_people": 5.0,
+        "runs": 8.0
+      },
+      "group_key": "0192f4a0-7b1c-7000-8a00-000000000002"
+    }
+  ]
+}

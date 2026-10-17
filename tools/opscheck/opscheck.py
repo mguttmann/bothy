@@ -54,8 +54,11 @@ import yaml
 # The Makefile runs this file as a script, so Python puts only tools/opscheck on sys.path;
 # the pin reader lives in tools/bin (pytest finds it through its pythonpath setting).
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "bin"))
+# The SLI bounds generator lives in tools/observability (brief M6-11).
+sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "observability"))
 
 import fetch_tools
+import sli_bounds
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 """Default `--root`: the checkout this file belongs to."""
@@ -587,6 +590,44 @@ def check_slo_docs(ctx: Context) -> list[str]:
     return sorted(found, key=lambda f: f.startswith("`"))
 
 
+def check_sli_bounds(ctx: Context) -> list[str]:
+    """The generated Go and Dart SLO files equal a fresh run of `sli_bounds.py` (VZ-T03).
+
+    The generator compares in its own temporary folder and quotes a diff per differing file;
+    a broken label rule is reported too, because then there is no fresh run to compare with.
+    """
+    return sli_bounds.check(ctx.root)
+
+
+SLI_METRIC_COLUMNS = ("Metrik der eigenen Messung", "Metric of the own measurement")
+"""Header of the column of slos.md "SLOs" that repeats the label `bothy_sli_metric`."""
+
+
+def check_sli_labels(ctx: Context) -> list[str]:
+    """Label rules of 25 3.3, and the metric column of slos.md "SLOs" equals the labels.
+
+    Every SLO carries exactly one `bothy_sli_metric`, its value is an `sli.*` value of the
+    CHECK of `stats_minutes.metric`, and every such value belongs to exactly one SLO
+    (`sli_bounds.label_findings`). The table row of each SLO names the same metric.
+    """
+    found = sli_bounds.label_findings(ctx.root)
+    labels = {slo.slo: slo.metric for slo in sli_bounds.read_slos(ctx.root)}
+    rows = markdown_table((ctx.root / SLOS_DOC).read_text(encoding="utf-8"), "SLOs")
+    column = next((c for c in SLI_METRIC_COLUMNS if rows and c in rows[0]), None)
+    if column is None:
+        names = " or ".join(SLI_METRIC_COLUMNS)
+        return [*found, f'{SLOS_DOC} "SLOs" has no column {names}']
+    for row in rows:
+        match = re.fullmatch(r"`([^`]+)`", next(iter(row.values()), ""))
+        if match is None or match.group(1) not in labels:
+            continue  # slo-docs reports rows without an SLO
+        metric = labels[match.group(1)]
+        want = f"`{metric}`" if metric is not None else "no label"
+        if row[column] != want:
+            found.append(f"{match.group(1)}: {column} is {row[column]}, the Sloth file says {want}")
+    return found
+
+
 def check_alert_thresholds(ctx: Context) -> list[str]:
     """Alerts of alerting.md "Further alerts" equal bothy-alerts.yaml; thresholds follow config.
 
@@ -932,6 +973,8 @@ CHECKS: Mapping[str, Check] = {
     "tempo": check_tempo,
     "sloth": check_sloth,
     "slo-docs": check_slo_docs,
+    "sli-bounds": check_sli_bounds,
+    "sli-labels": check_sli_labels,
     "alert-thresholds": check_alert_thresholds,
     "tofu": check_tofu,
 }

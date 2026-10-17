@@ -19,6 +19,8 @@ operation, and keeps derived values equal to their source (PLAN M1-04, chapter 1
 | `tempo` | `tempo -config.verify=true` |
 | `sloth` | every `rules/slo-<n>.yaml` equal to a fresh `sloth generate` from `slo/<n>.yaml`, byte for byte; no generated file without a source |
 | `slo-docs` | table "SLOs" in `docs/observability/slos.md` equal to the Sloth files (rows, Target, Threshold, Alert) |
+| `sli-bounds` | `services/server/internal/stats/domain/slibounds.gen.go` and `packages/bothy_viz/lib/src/slo/slo_catalog.g.dart` equal a fresh run of `tools/observability/sli_bounds.py` ([README](../observability/README.md)) |
+| `sli-labels` | every SLO of the Sloth files has exactly one label `bothy_sli_metric` with an `sli.*` value of the `CHECK` of `stats_minutes.metric` (03), every such value belongs to exactly one SLO, and the column "Metric of the own measurement" of `docs/observability/slos.md` equals the labels |
 | `alert-thresholds` | alerts of the table "Further alerts" in `docs/observability/alerting.md` equal to `bothy-alerts.yaml`; thresholds equal to (`` `<name>` ``) or strictly greater than (``above `<name>` ``) the default of the configuration value in `docs/operations/configuration.md` |
 | `tofu` | `tofu init -backend=false` and `tofu validate` for each module under `infra/tofu/modules/` (a directory with `.tf`, `.tf.json`, `.tofu` or `.tofu.json` files), all modules in one copy of `infra/tofu/` |
 

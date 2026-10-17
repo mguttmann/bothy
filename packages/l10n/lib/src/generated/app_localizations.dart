@@ -631,6 +631,402 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Something went wrong ({code})'**
   String problemFallback(String code);
+
+  /// Label of the metric `messages_created` in charts and tiles (25 section 3.2).
+  ///
+  /// In en, this message translates to:
+  /// **'Messages'**
+  String get vizMetricMessagesCreated;
+
+  /// Label of the metric `threads_created` (25 section 3.2).
+  ///
+  /// In en, this message translates to:
+  /// **'New threads'**
+  String get vizMetricThreadsCreated;
+
+  /// Label of the metric `runs_started` (25 section 3.2).
+  ///
+  /// In en, this message translates to:
+  /// **'Runs started'**
+  String get vizMetricRunsStarted;
+
+  /// Label of the metric `runs_finished` (25 section 3.2).
+  ///
+  /// In en, this message translates to:
+  /// **'Runs finished'**
+  String get vizMetricRunsFinished;
+
+  /// Label of the metric `tool_calls` (25 section 3.2).
+  ///
+  /// In en, this message translates to:
+  /// **'Tool calls'**
+  String get vizMetricToolCalls;
+
+  /// Label of the metric `approval_cards` (25 section 3.2).
+  ///
+  /// In en, this message translates to:
+  /// **'Approval cards'**
+  String get vizMetricApprovalCards;
+
+  /// Label of the metric `cost` (25 section 3.2).
+  ///
+  /// In en, this message translates to:
+  /// **'Costs'**
+  String get vizMetricCost;
+
+  /// Label of the metric `invocations_denied` (25 section 3.2).
+  ///
+  /// In en, this message translates to:
+  /// **'Denied invocations'**
+  String get vizMetricInvocationsDenied;
+
+  /// Label of the metric `billing_mode_switches` (25 section 3.2).
+  ///
+  /// In en, this message translates to:
+  /// **'Billing mode switches'**
+  String get vizMetricBillingModeSwitches;
+
+  /// Label of the metric `catchups` (25 section 3.2).
+  ///
+  /// In en, this message translates to:
+  /// **'Catch-ups'**
+  String get vizMetricCatchups;
+
+  /// Label of the metric `resyncs` (25 section 3.2).
+  ///
+  /// In en, this message translates to:
+  /// **'Resyncs'**
+  String get vizMetricResyncs;
+
+  /// Label of the metric `slow_consumer_closes` (25 section 3.2).
+  ///
+  /// In en, this message translates to:
+  /// **'Closes of slow clients'**
+  String get vizMetricSlowConsumerCloses;
+
+  /// Label of a metric the app does not know yet; shows its code.
+  ///
+  /// In en, this message translates to:
+  /// **'Metric {code}'**
+  String vizMetricUnknown(String code);
+
+  /// Display name of the SLO of `sli.api_availability` (slos.md section 2).
+  ///
+  /// In en, this message translates to:
+  /// **'API availability'**
+  String get vizSliApiAvailability;
+
+  /// Display name of the SLO of `sli.delivery_latency` (slos.md section 2).
+  ///
+  /// In en, this message translates to:
+  /// **'Delivery latency'**
+  String get vizSliDeliveryLatency;
+
+  /// Display name of the SLO of `sli.reconnect` (slos.md section 2).
+  ///
+  /// In en, this message translates to:
+  /// **'Reconnect'**
+  String get vizSliReconnect;
+
+  /// Display name of the SLO of `sli.push_acceptance` (slos.md section 2).
+  ///
+  /// In en, this message translates to:
+  /// **'Push acceptance'**
+  String get vizSliPushAcceptance;
+
+  /// Display name of the SLO of `sli.run_start` (slos.md section 2).
+  ///
+  /// In en, this message translates to:
+  /// **'Run start'**
+  String get vizSliRunStart;
+
+  /// Display name of the SLO of `sli.turn_duration` (slos.md section 2).
+  ///
+  /// In en, this message translates to:
+  /// **'Turn duration'**
+  String get vizSliTurnDuration;
+
+  /// Text of the SLO traffic light in state `green` (25 section 6.4).
+  ///
+  /// In en, this message translates to:
+  /// **'on target'**
+  String get vizSloOnTarget;
+
+  /// Text of the SLO traffic light in state `amber` (25 section 6.4).
+  ///
+  /// In en, this message translates to:
+  /// **'budget tight'**
+  String get vizSloBudgetTight;
+
+  /// Text of the SLO traffic light in state `red` (25 section 6.4).
+  ///
+  /// In en, this message translates to:
+  /// **'target missed'**
+  String get vizSloTargetMissed;
+
+  /// Text of the SLO traffic light in state `insufficient_data` (25 section 6.4).
+  ///
+  /// In en, this message translates to:
+  /// **'not enough data'**
+  String get vizSloNotEnoughData;
+
+  /// Label of the SLO traffic light: the values come from the own measurement (25 section 6.4).
+  ///
+  /// In en, this message translates to:
+  /// **'Own measurement'**
+  String get vizOwnMeasurement;
+
+  /// Screen reader label of one SLO traffic light (25 section 7.4).
+  ///
+  /// In en, this message translates to:
+  /// **'{slo}: {state}, own measurement'**
+  String vizTrafficLightLabel(String slo, String state);
+
+  /// Polite announcement when the state of an SLO traffic light changes; never on an unchanged frame (25 section 7.4).
+  ///
+  /// In en, this message translates to:
+  /// **'{slo} is now {state}'**
+  String vizTrafficLightChanged(String slo, String state);
+
+  /// Note on a cost in mode `organization` while `cost_is_estimate` is true (components.md section 10).
+  ///
+  /// In en, this message translates to:
+  /// **'Estimate'**
+  String get vizCostEstimate;
+
+  /// Note on every cost in mode `personal` (25 section 4 rule 2).
+  ///
+  /// In en, this message translates to:
+  /// **'information only'**
+  String get vizCostInformationOnly;
+
+  /// Backend policy badge for mode `personal` (components.md section 10).
+  ///
+  /// In en, this message translates to:
+  /// **'Personal'**
+  String get vizBadgePersonal;
+
+  /// Backend policy badge for mode `organization` (components.md section 10).
+  ///
+  /// In en, this message translates to:
+  /// **'Organization'**
+  String get vizBadgeOrganization;
+
+  /// Note on a run card while an approval card of the run waits for a decision (25 section 6.1).
+  ///
+  /// In en, this message translates to:
+  /// **'Approval waiting'**
+  String get vizApprovalWaiting;
+
+  /// Marker when the live frame or the timeline has `runs_truncated` (25 section 5.2).
+  ///
+  /// In en, this message translates to:
+  /// **'More runs than shown'**
+  String get vizMoreRunsThanShown;
+
+  /// State word of a run card for `waiting_input` (components.md section 2).
+  ///
+  /// In en, this message translates to:
+  /// **'Waiting for input'**
+  String get vizRunStateWaitingInput;
+
+  /// State word of a run card for a state the app does not know yet.
+  ///
+  /// In en, this message translates to:
+  /// **'Unknown state'**
+  String get vizRunStateUnknown;
+
+  /// Tool chip of a run card: current step of kind `tool_call` with the tool name (components.md section 3).
+  ///
+  /// In en, this message translates to:
+  /// **'Tool {name}'**
+  String vizStepToolCall(String name);
+
+  /// Tool chip of a run card: current step of kind `status`.
+  ///
+  /// In en, this message translates to:
+  /// **'Status {name}'**
+  String vizStepStatus(String name);
+
+  /// Tool chip of a run card: current step of kind `subagent`.
+  ///
+  /// In en, this message translates to:
+  /// **'Subagent {name}'**
+  String vizStepSubagent(String name);
+
+  /// Tool chip of a run card: current step of kind `workflow`.
+  ///
+  /// In en, this message translates to:
+  /// **'Workflow {name}'**
+  String vizStepWorkflow(String name);
+
+  /// Tool chip of a run card: current step of kind `background_job`.
+  ///
+  /// In en, this message translates to:
+  /// **'Background job {name}'**
+  String vizStepBackgroundJob(String name);
+
+  /// Screen reader label of a lane of the live topology (25 section 6.1).
+  ///
+  /// In en, this message translates to:
+  /// **'{space}, {channel}, {count, plural, =0{no active runs} =1{1 active run} other{{count} active runs}}'**
+  String vizLaneLabel(String space, String channel, int count);
+
+  /// Screen reader label of one row of the bar mark of the timeline (25 section 6.5).
+  ///
+  /// In en, this message translates to:
+  /// **'{row}, {count, plural, =1{1 run} other{{count} runs}}'**
+  String vizBarRowLabel(String row, int count);
+
+  /// Title of the area chart of rates (25 section 6.5).
+  ///
+  /// In en, this message translates to:
+  /// **'Rates'**
+  String get vizChartRates;
+
+  /// Title of the bar chart of runs (25 section 6.5).
+  ///
+  /// In en, this message translates to:
+  /// **'Runs'**
+  String get vizChartRuns;
+
+  /// Comparison of a metric tile with the previous period when the value rose (components.md section 11).
+  ///
+  /// In en, this message translates to:
+  /// **'{delta} more than the previous period'**
+  String vizTileUp(String delta);
+
+  /// Comparison of a metric tile with the previous period when the value fell (components.md section 11).
+  ///
+  /// In en, this message translates to:
+  /// **'{delta} less than the previous period'**
+  String vizTileDown(String delta);
+
+  /// Comparison of a metric tile with the previous period when the value did not change (components.md section 11).
+  ///
+  /// In en, this message translates to:
+  /// **'same as the previous period'**
+  String get vizTileSame;
+
+  /// Screen reader text for a value the server did not deliver (no permission); never read as zero (25 section 4 rule 5).
+  ///
+  /// In en, this message translates to:
+  /// **'not shown'**
+  String get vizNotShown;
+
+  /// Marker of a live view when no frame arrived for viz.stale_after (25 section 5.1).
+  ///
+  /// In en, this message translates to:
+  /// **'No new data'**
+  String get vizStale;
+
+  /// Title of the harness app of bothy_viz (25 section 7.1).
+  ///
+  /// In en, this message translates to:
+  /// **'Visualization harness'**
+  String get vizHarnessTitle;
+
+  /// Toolbar label of the harness: light or dark theme.
+  ///
+  /// In en, this message translates to:
+  /// **'Theme'**
+  String get vizHarnessTheme;
+
+  /// Harness choice: light theme.
+  ///
+  /// In en, this message translates to:
+  /// **'Light'**
+  String get vizHarnessThemeLight;
+
+  /// Harness choice: dark theme.
+  ///
+  /// In en, this message translates to:
+  /// **'Dark'**
+  String get vizHarnessThemeDark;
+
+  /// Toolbar label of the harness: density context.
+  ///
+  /// In en, this message translates to:
+  /// **'Density'**
+  String get vizHarnessDensity;
+
+  /// Harness choice: density `comfortable`.
+  ///
+  /// In en, this message translates to:
+  /// **'Comfortable'**
+  String get vizHarnessDensityComfortable;
+
+  /// Harness choice: density `compact`.
+  ///
+  /// In en, this message translates to:
+  /// **'Compact'**
+  String get vizHarnessDensityCompact;
+
+  /// Harness choice: density `touch`.
+  ///
+  /// In en, this message translates to:
+  /// **'Touch'**
+  String get vizHarnessDensityTouch;
+
+  /// Toolbar label of the harness: text scaling.
+  ///
+  /// In en, this message translates to:
+  /// **'Text size'**
+  String get vizHarnessTextScale;
+
+  /// Toolbar label of the harness: language of the texts.
+  ///
+  /// In en, this message translates to:
+  /// **'Language'**
+  String get vizHarnessLanguage;
+
+  /// Toolbar label of the harness: state of the fixtures (normal, empty, ...).
+  ///
+  /// In en, this message translates to:
+  /// **'Fixture state'**
+  String get vizHarnessFixtureState;
+
+  /// Label of the slider that advances the fake clock of the fixture sources.
+  ///
+  /// In en, this message translates to:
+  /// **'Time-lapse'**
+  String get vizHarnessTimeLapse;
+
+  /// Name of the lane mark in the harness list.
+  ///
+  /// In en, this message translates to:
+  /// **'Lane'**
+  String get vizMarkLane;
+
+  /// Name of the run card mark in the harness list.
+  ///
+  /// In en, this message translates to:
+  /// **'Run card'**
+  String get vizMarkRunCard;
+
+  /// Name of the area mark in the harness list.
+  ///
+  /// In en, this message translates to:
+  /// **'Area'**
+  String get vizMarkArea;
+
+  /// Name of the bar mark in the harness list.
+  ///
+  /// In en, this message translates to:
+  /// **'Bar'**
+  String get vizMarkBar;
+
+  /// Name of the traffic light mark in the harness list.
+  ///
+  /// In en, this message translates to:
+  /// **'Traffic light'**
+  String get vizMarkTrafficLight;
+
+  /// Name of the metric tile mark in the harness list.
+  ///
+  /// In en, this message translates to:
+  /// **'Metric tile'**
+  String get vizMarkMetricTile;
 }
 
 class _AppLocalizationsDelegate

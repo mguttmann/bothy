@@ -1,0 +1,24 @@
+{
+  "at": "2026-10-15T10:00:00.000Z",
+  "interval_ms": 1000,
+  "scope": {
+    "kind": "space",
+    "space_id": "0192f4a0-7b1c-7000-8a00-000000000002"
+  },
+  "runs": [],
+  "runs_truncated": false,
+  "agents": [
+    {
+      "agent_id": "0192f4a0-7b1c-7000-8a00-000000000202",
+      "presence": "offline",
+      "billing_mode": "organization"
+    }
+  ],
+  "rates": [
+    {
+      "metric": "messages_created",
+      "last_minute": 0,
+      "current_minute": 0
+    }
+  ]
+}

@@ -114,6 +114,14 @@ operated, and the order of the build.
   fourteen members of docs/spec/15-client-architecture.md 3: the apps `apps/client` and
   `apps/console` and the packages under `packages/` as skeletons, `bothy_noise` taken over;
   the Flutter pin moves to the root `pubspec.yaml` (M4-01).
+- Visualization package (M6-11): `packages/bothy_viz` gets view models from the generated
+  statistics types, the ports `LiveFrameSource` (with the stale rule on an injected clock) and
+  `StatsQuerySource` with fixture implementations, the basic forms lane, run card, area, bar,
+  traffic light and metric tile as `CustomPainter`s with semantics and goldens, JSON fixtures per
+  schema and state with the check `viz-fixtures` of `make api-checks` (VZ-T11), and the harness
+  app `bothy_viz_harness`. `tools/observability/sli_bounds.py` generates the SLI bounds of server
+  and apps from the Sloth files, every SLO carries the label `bothy_sli_metric`, and the checks
+  `sli-bounds` and `sli-labels` of `make ops-check` hold them (VZ-T03).
 - Architecture test `tools/arch-check` in `make arch`: the dependency rules of 15 3.1 for every
   member, with the reach of the diagram as an allow list (M4-01).
 - Documentation in code as a gate for Dart: `public_member_api_docs` as an error in every

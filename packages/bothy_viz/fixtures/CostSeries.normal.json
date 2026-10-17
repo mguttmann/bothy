@@ -1,0 +1,90 @@
+{
+  "granularity": "day",
+  "currency": "USD",
+  "buckets": [
+    {
+      "start": "2026-10-09T00:00:00.000Z",
+      "billing_mode": "organization",
+      "amount_micros": 2500000,
+      "is_estimate": false
+    },
+    {
+      "start": "2026-10-09T00:00:00.000Z",
+      "billing_mode": "personal",
+      "amount_micros": 600000,
+      "is_estimate": true
+    },
+    {
+      "start": "2026-10-10T00:00:00.000Z",
+      "billing_mode": "organization",
+      "amount_micros": 2610000,
+      "is_estimate": false
+    },
+    {
+      "start": "2026-10-10T00:00:00.000Z",
+      "billing_mode": "personal",
+      "amount_micros": 620000,
+      "is_estimate": true
+    },
+    {
+      "start": "2026-10-11T00:00:00.000Z",
+      "billing_mode": "organization",
+      "amount_micros": 2720000,
+      "is_estimate": false
+    },
+    {
+      "start": "2026-10-11T00:00:00.000Z",
+      "billing_mode": "personal",
+      "amount_micros": 640000,
+      "is_estimate": true
+    },
+    {
+      "start": "2026-10-12T00:00:00.000Z",
+      "billing_mode": "organization",
+      "amount_micros": 2830000,
+      "is_estimate": false
+    },
+    {
+      "start": "2026-10-12T00:00:00.000Z",
+      "billing_mode": "personal",
+      "amount_micros": 660000,
+      "is_estimate": true
+    },
+    {
+      "start": "2026-10-13T00:00:00.000Z",
+      "billing_mode": "organization",
+      "amount_micros": 2940000,
+      "is_estimate": false
+    },
+    {
+      "start": "2026-10-13T00:00:00.000Z",
+      "billing_mode": "personal",
+      "amount_micros": 680000,
+      "is_estimate": true
+    },
+    {
+      "start": "2026-10-14T00:00:00.000Z",
+      "billing_mode": "organization",
+      "amount_micros": 3050000,
+      "is_estimate": true
+    },
+    {
+      "start": "2026-10-14T00:00:00.000Z",
+      "billing_mode": "personal",
+      "amount_micros": 700000,
+      "is_estimate": true
+    },
+    {
+      "start": "2026-10-15T00:00:00.000Z",
+      "billing_mode": "organization",
+      "amount_micros": 3160000,
+      "is_estimate": true
+    },
+    {
+      "start": "2026-10-15T00:00:00.000Z",
+      "billing_mode": "personal",
+      "amount_micros": 720000,
+      "is_estimate": true
+    }
+  ]
+}

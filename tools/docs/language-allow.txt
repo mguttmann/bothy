@@ -20,6 +20,8 @@ path: tools/ci/tests/test_scancode_policy.py
 # German product strings of the `de` locale (D-W-94, M4-06).
 path: packages/l10n/lib/l10n/app_de.arb
 path: packages/l10n/lib/src/generated/app_localizations_de.dart
+# The harness test of bothy_viz asserts German product strings after switching to `de` (M6-11).
+path: packages/bothy_viz/harness/test/harness_test.dart
 # Third-party files, kept byte for byte as published.
 path: tools/design-tokens/vendor/fonts/*
 path: tools/design-tokens/vendor/phosphor/*
