@@ -53,9 +53,11 @@ final class DeviceKeyHostApiImpl: DeviceKeyHostApi {
         try Self.bridged { try manager.keyInfo(scope: scope, purpose: purpose.core).map(Self.message) }
     }
 
-    func sign(scope: String, purpose: KeyPurposeMessage, data: FlutterStandardTypedData) async throws
-        -> FlutterStandardTypedData
-    {
+    /// Signs `data`; `prompt` is ignored here, because iOS and macOS show the system's own text
+    /// (it carries the Android prompt texts, brief M5-01 Design note 1).
+    func sign(
+        scope: String, purpose: KeyPurposeMessage, data: FlutterStandardTypedData, prompt: PromptTextsMessage?
+    ) async throws -> FlutterStandardTypedData {
         let box = ManagerBox(manager: manager)
         let bytes = data.data
         let core = purpose.core

@@ -29,7 +29,10 @@ GO_VERSION_FILE = (
 FLUTTER_IF = "hashFiles('apps/*/pubspec.yaml', 'packages/*/pubspec.yaml') != ''"
 # The root pubspec.yaml of the workspace carries the pin (docs/DECISIONS.md D-M4-01-1).
 FLUTTER_VERSION_FILE = "pubspec.yaml"
-APPS_JOBS = ("apps-macos", "apps-windows")
+APPS_JOBS = ("apps-macos", "apps-windows", "apps-android-26", "apps-android-36")
+# The JVM tests of the Android core run in `make test` (brief M5-01): gates and sonar install a
+# JDK and the Android SDK when a Gradle project of a member is tracked.
+ANDROID_IF = "hashFiles('packages/*/android/gradlew') != ''"
 
 
 def _tracked(*patterns: str) -> list[str]:
@@ -127,6 +130,43 @@ def test_ci_ok_requires_the_apps_jobs_by_name() -> None:
     rules = {n: rule.ok for rule in ci_ok.RULES for n in rule.names}
     for name in names:
         assert rules[name] == frozenset({"success", "skipped"}), name
+
+
+@pytest.mark.parametrize("level", [26, 36])
+def test_apps_android_runs_the_instrumented_tests_on_an_emulator(level: int) -> None:
+    # 26 is the minimum API level of 15 2, 36 the current stable one; one job per level, because
+    # ci-ok requires its jobs by name (docs/DECISIONS.md D-M7-01-7).
+    spec = _jobs()[f"apps-android-{level}"]
+    assert spec["name"] == f"apps (Android API {level})"
+    assert spec["runs-on"] == "ubuntu-24.04"
+    assert spec["needs"] == "plan"
+    assert spec["permissions"] == {"contents": "read"}
+    assert isinstance(spec["timeout-minutes"], int)
+    assert "needs.plan.outputs.components" in spec["if"]
+    assert spec["if"].startswith("(github.event.repository.visibility == 'public'")
+    steps = spec["steps"]
+    assert any("kvm" in str(s.get("run", "")) for s in steps), "hardware acceleration"
+    assert any(_uses(s, "actions/setup-java") for s in steps)
+    [emulator] = [s for s in steps if _uses(s, "reactivecircus/android-emulator-runner")]
+    assert emulator["with"]["api-level"] == level
+    assert emulator["with"]["arch"] == "x86_64"
+    assert emulator["with"]["target"] == "google_apis"
+    platform = "uv run --project tools --locked --quiet python tools/ci/apps_platform.py"
+    assert emulator["with"]["script"] == f"{platform} --system android"
+
+
+@pytest.mark.parametrize("job", ["gates", "sonar"])
+def test_jdk_and_android_sdk_for_the_jvm_tests(job: str) -> None:
+    steps = _steps(job)
+    [java] = [s for s in steps if _uses(s, "actions/setup-java")]
+    assert java["if"] == ANDROID_IF
+    assert java["with"]["java-version"] == "17"
+    [sdk] = [s for s in steps if _uses(s, "android-actions/setup-android")]
+    assert sdk["if"] == ANDROID_IF
+    make = next(i for i, s in enumerate(steps) if str(s.get("run", "")).startswith("make "))
+    assert steps.index(sdk) < make
+    for gradlew in _tracked("packages/*gradlew"):
+        assert re.fullmatch(r"packages/[^/]+/android/gradlew", gradlew), gradlew
 
 
 def _directive(go_mod: str, name: str) -> str:

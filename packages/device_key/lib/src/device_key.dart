@@ -131,6 +131,31 @@ class DeviceKeyInfo {
 String _base64Url(List<int> bytes) =>
     base64Url.encode(bytes).replaceAll('=', '');
 
+/// The texts of the step-up prompt on Android (brief M5-01, Design note 1).
+///
+/// They come from `packages/l10n`, never from native code. iOS and macOS
+/// ignore them, because the system shows its own text there.
+@immutable
+class StepUpPrompt {
+  /// Creates the texts; [subtitle] is optional.
+  const StepUpPrompt({
+    required this.title,
+    this.subtitle,
+    required this.negativeButton,
+  });
+
+  /// The prompt's title.
+  final String title;
+
+  /// An optional second line.
+  final String? subtitle;
+
+  /// The cancel button; Android shows it where the prompt accepts biometrics
+  /// only (API 26 to 29), because a prompt that also accepts the device
+  /// credential offers that instead.
+  final String negativeButton;
+}
+
 /// Creates, uses and deletes the device keys through the native plugin.
 ///
 /// `scope` separates the keys per server (for example the server's origin);
@@ -161,20 +186,42 @@ class DeviceKeyClient {
   /// Signs [data] with ES256 and returns the JOSE form `R || S` (64 bytes,
   /// RFC 7518 3.4).
   ///
-  /// The step-up key shows the system prompt first. Throws a
-  /// [DeviceKeyException], with [DeviceKeyError.userCancelled] when the user
-  /// cancels and [DeviceKeyError.keyInvalidated] when the key is gone for good.
-  Future<Uint8List> sign(String scope, KeyPurpose purpose, Uint8List data) =>
-      _guard(() async {
-        final signature = await _api.sign(scope, purpose._message, data);
-        if (signature.length != 64) {
-          throw const DeviceKeyException(DeviceKeyError.internal);
-        }
-        return signature;
-      });
+  /// The step-up key shows the system prompt first; on Android it needs
+  /// [prompt] (without it the call fails with [DeviceKeyError.internal]).
+  /// Throws a [DeviceKeyException], with [DeviceKeyError.userCancelled] when
+  /// the user cancels and [DeviceKeyError.keyInvalidated] when the key is gone
+  /// for good.
+  Future<Uint8List> sign(
+    String scope,
+    KeyPurpose purpose,
+    Uint8List data, {
+    StepUpPrompt? prompt,
+  }) => _guard(() async {
+    final signature = await _api.sign(
+      scope,
+      purpose._message,
+      data,
+      prompt == null
+          ? null
+          : PromptTextsMessage(
+              title: prompt.title,
+              subtitle: prompt.subtitle,
+              negativeButton: prompt.negativeButton,
+            ),
+    );
+    if (signature.length != 64) {
+      throw const DeviceKeyException(DeviceKeyError.internal);
+    }
+    return signature;
+  });
 
   /// Returns an attestation of the key over [challenge], or null where the
   /// platform has none (iOS and macOS in this version).
+  ///
+  /// On Android the attestation is the certificate chain of the key (DER
+  /// certificates, leaf first, concatenated). Android binds the challenge when
+  /// it creates the key, so this call returns one only when it creates the
+  /// key; call it before [ensure] when registering the device.
   ///
   /// Throws a [DeviceKeyException] on failure.
   Future<Uint8List?> attestation(

@@ -174,3 +174,119 @@ def test_missing_program_fails(tmp_path: Path, capsys: pytest.CaptureFixture[str
         "apps-platform apps/client macos: no-such-program-m401 is not on PATH"
         in capsys.readouterr().err
     )
+
+
+ADB = """#!{python}
+import os, sys
+if sys.argv[1:] != ["devices"]:
+    sys.exit(9)
+sys.stdout.write("List of devices attached\\n")
+for serial in filter(None, os.environ.get("FAKE_ADB_DEVICES", "").split(",")):
+    name, _, state = serial.partition(":")
+    sys.stdout.write(f"{{name}}\\t{{state or 'device'}}\\n")
+sys.stdout.write("\\n")
+"""
+
+
+@pytest.fixture
+def fake_adb(fake_flutter: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
+    """An `adb` next to the fake flutter; FAKE_ADB_DEVICES lists `serial[:state]` entries."""
+    bin_dir = Path(os.environ["PATH"].split(os.pathsep)[0])
+    adb = bin_dir / "adb"
+    adb.write_text(ADB.format(python=sys.executable), encoding="utf-8")
+    adb.chmod(0o755)
+    monkeypatch.setenv("FAKE_ADB_DEVICES", "")
+    return fake_flutter
+
+
+def _android_member(root: Path) -> Path:
+    return _member(
+        root,
+        "packages/device_key",
+        {
+            "macos": [["flutter", "test", "mac"]],
+            "android": [["flutter", "test", "android"]],
+        },
+    )
+
+
+def test_android_runs_with_one_device(
+    tmp_path: Path,
+    fake_adb: Path,
+    capsys: pytest.CaptureFixture[str],
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    root = tmp_path / "repo"
+    member = _android_member(root)
+    # A device in another state (offline, unauthorized) is not a target.
+    monkeypatch.setenv("FAKE_ADB_DEVICES", "emulator-5554,R58M1234:offline")
+    assert apps_platform.main(["--root", str(root), "--system", "macos"]) == 0
+    assert _calls(fake_adb) == [
+        {"args": ["test", "mac"], "cwd": str(member.resolve())},
+        {"args": ["test", "android"], "cwd": str(member.resolve())},
+    ]
+    out = capsys.readouterr().out
+    assert "apps-platform packages/device_key android: 1 commands ok" in out
+
+
+def test_android_skips_without_device(
+    tmp_path: Path, fake_adb: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    root = tmp_path / "repo"
+    _android_member(root)
+    assert apps_platform.main(["--root", str(root), "--system", "android"]) == 0
+    assert _calls(fake_adb) == []
+    out = capsys.readouterr().out
+    assert "SKIP apps-platform packages/device_key android: no device" in out
+    assert "SKIP apps-platform packages/device_key macos: other host" in out
+
+
+def test_android_skips_without_adb(
+    tmp_path: Path,
+    fake_flutter: Path,
+    capsys: pytest.CaptureFixture[str],
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    root = tmp_path / "repo"
+    _android_member(root)
+    monkeypatch.setattr(apps_platform.shutil, "which", lambda name: None if name == "adb" else name)
+    assert apps_platform.main(["--root", str(root), "--system", "linux"]) == 0
+    assert "SKIP apps-platform packages/device_key android: no device" in capsys.readouterr().out
+
+
+def test_android_fails_with_two_devices(
+    tmp_path: Path,
+    fake_adb: Path,
+    capsys: pytest.CaptureFixture[str],
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    root = tmp_path / "repo"
+    _android_member(root)
+    monkeypatch.setenv("FAKE_ADB_DEVICES", "emulator-5554,emulator-5556")
+    assert apps_platform.main(["--root", str(root), "--system", "android"]) == 1
+    assert _calls(fake_adb) == []
+    err = capsys.readouterr().err
+    assert "apps-platform packages/device_key android: 2 devices attached" in err
+
+
+def test_explicit_system_argument(
+    tmp_path: Path,
+    fake_adb: Path,
+    capsys: pytest.CaptureFixture[str],
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """`--system android` runs only the Android commands, on any host (CI job apps-android)."""
+    root = tmp_path / "repo"
+    member = _android_member(root)
+    monkeypatch.setenv("FAKE_ADB_DEVICES", "emulator-5554")
+    monkeypatch.setattr(apps_platform.sys, "platform", "darwin")
+    assert apps_platform.main(["--root", str(root), "--system", "android"]) == 0
+    assert _calls(fake_adb) == [{"args": ["test", "android"], "cwd": str(member.resolve())}]
+    out = capsys.readouterr().out
+    assert "SKIP apps-platform packages/device_key macos: other host" in out
+
+
+def test_android_is_a_known_system(tmp_path: Path) -> None:
+    path = tmp_path / "platform-tests.json"
+    path.write_text(json.dumps({"android": [["sh", "android/run.sh"]]}), encoding="utf-8")
+    assert apps_platform.load(path) == {"android": [["sh", "android/run.sh"]]}

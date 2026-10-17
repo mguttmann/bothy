@@ -424,7 +424,7 @@ That is why all clients use **ES256** for DPoP and step-up, although the data mo
 |---|---|---|---|
 | iOS | Secure Enclave, P-256, without user confirmation, keychain access group with the extensions, `AfterFirstUnlockThisDeviceOnly` | Secure Enclave, P-256, `.biometryCurrentSet` when biometrics are enrolled (new biometrics invalidate the key, [08](08-identity.md) 6.1), otherwise `.userPresence` (device password); `WhenPasscodeSetThisDeviceOnly` | Keychain through `flutter_secure_storage` (publisher steenbakker.dev); tokens for the extensions in the shared access group with `AfterFirstUnlockThisDeviceOnly`, DB key `WhenUnlockedThisDeviceOnly` |
 | macOS | Secure Enclave (Macs with an Apple chip or with Touch Bar and Touch ID according to the Apple documentation), otherwise a keychain key without the enclave, reported to the server as "not hardware-bound" | like iOS; without an enclave a software key whose keychain item carries `.userPresence` | Data Protection keychain |
-| Android | Android Keystore, StrongBox if available (`setIsStrongBoxBacked`, fallback on `StrongBoxUnavailableException`), P-256 | Keystore key with user authentication per operation through `BiometricPrompt` | `flutter_secure_storage` (RSA-OAEP plus AES-GCM, key in the Keystore according to the package documentation) |
+| Android | Android Keystore, StrongBox if available (`setIsStrongBoxBacked`, fallback on `StrongBoxUnavailableException`), P-256; without StrongBox and trusted execution environment (emulators) a software Keystore key, reported as not hardware-bound | Keystore key with user authentication per operation through `BiometricPrompt`: from API 30 strong biometrics or the device credential (PIN, pattern, password), on API 26 to 29 strong biometrics only, because a per-operation key cannot be unlocked with the device credential there; without enrolled biometrics on those levels there is no step-up key (`not_available`). Invalidated by new biometrics (`setInvalidatedByBiometricEnrollment`) | `flutter_secure_storage` (RSA-OAEP plus AES-GCM, key in the Keystore according to the package documentation) |
 | Windows | CNG with Microsoft Platform Crypto Provider (TPM), ECDSA P-256 after a check with `NCryptIsAlgSupported`; without a TPM a software key, reported as not hardware-bound | TPM key with Windows Hello confirmation [assumed, details not verified] | `flutter_secure_storage` (Windows Credential Manager plus AES-GCM files according to the package README [verified through search, source code not read]) |
 | Web (console) | none: cookie session according to the backend-for-frontend pattern, tokens only in the server ([08](08-identity.md) section 7.5) | WebAuthn passkey, otherwise a renewed OIDC login or password with TOTP | none in the browser; cookie `HttpOnly` |
 
@@ -450,6 +450,21 @@ extensions, which the app names in its Info.plist key `DeviceKeyAccessGroup`. St
 control: `.biometryCurrentSet` where biometrics are enrolled, `.userPresence` otherwise (D-M4-10-3),
 so a Mac without Touch ID still confirms with the device password. App Attest is not used yet;
 the attestation stays empty on iOS and macOS.
+
+On Android the key code is the Kotlin module `devicekeycore`
+(`packages/device_key/android/devicekeycore`, class `DeviceKeyCore`, docs/DECISIONS.md D-M5-01-6).
+The plugin library compiles the module's sources into itself, so the app's push service (10.2)
+and share activity reach the same classes through their dependency on the plugin, without a
+second Gradle project. Keys live in the `AndroidKeyStore` under the alias
+`<prefix>.<sha256(scope)>.<purpose>`, ES256 only, not exportable; the Keystore is excluded from
+backups by the system. `hardwareBound` reports `KeyInfo.securityLevel` (StrongBox or trusted
+execution environment) from API 31 and `isInsideSecureHardware` before it (D-M5-01-4). The
+attestation is the key's certificate chain from `setAttestationChallenge`, DER certificates leaf
+first and concatenated; Android binds the challenge when it creates the key, so the attestation
+exists only when the call creates the key (D-M5-01-2). The step-up prompt texts come from Dart
+(`packages/l10n`), and `BiometricPrompt` needs the app's activity to be a `FragmentActivity`
+(`FlutterFragmentActivity`); the device credential rule per API level of the table above is
+D-M5-01-3.
 
 Because the refresh token is bound to the device key (DPoP), a stolen token is worthless without
 the device; that lowers the requirement on the storage of the tokens, not on the key.

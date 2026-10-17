@@ -117,6 +117,15 @@ jobs:
           channel: stable
           flutter-version-file: pubspec.yaml
           cache: true
+      # JDK and Android SDK for the JVM tests of the Android core that `make test` runs
+      # (brief M5-01; docs/DECISIONS.md D-M5-01-5).
+      - if: hashFiles('packages/*/android/gradlew') != ''
+        uses: actions/setup-java@b843ebf9b913146b38da2eaa7aeddf76074ae1ad # v6.1.0
+        with:
+          distribution: temurin
+          java-version: "17"
+      - if: hashFiles('packages/*/android/gradlew') != ''
+        uses: android-actions/setup-android@be39fa834029ff78f1a44aa3bb0819b8fc2bd8fd # v4.0.4
       - name: Restore pinned binaries and hook environments
         uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
@@ -228,6 +237,15 @@ jobs:
           channel: stable
           flutter-version-file: pubspec.yaml
           cache: true
+      # JDK and Android SDK for the JVM tests of the Android core that `make test` runs
+      # (brief M5-01; docs/DECISIONS.md D-M5-01-5).
+      - if: hashFiles('packages/*/android/gradlew') != ''
+        uses: actions/setup-java@b843ebf9b913146b38da2eaa7aeddf76074ae1ad # v6.1.0
+        with:
+          distribution: temurin
+          java-version: "17"
+      - if: hashFiles('packages/*/android/gradlew') != ''
+        uses: android-actions/setup-android@be39fa834029ff78f1a44aa3bb0819b8fc2bd8fd # v4.0.4
       - run: make bootstrap-ci
       - name: make sonar
         env:
@@ -293,9 +311,10 @@ jobs:
         run: make postgres-image postgres-image-test
 
   # Platform tests of the apps (make apps-platform, docs/DECISIONS.md D-M4-01-7): native code
-  # and desktop integration tests need macOS and Windows (ADR 0039), the pure gates run on
-  # Linux. Only when the apps component is selected; ci-ok (tools/ci/ci_ok.py) requires each
-  # job to pass or be skipped.
+  # and desktop integration tests need macOS and Windows (ADR 0039), Android code an emulator
+  # (apps-android-*, D-M5-01-5), the pure gates run on Linux. Only when the apps component is
+  # selected (Android only in the public phase); ci-ok (tools/ci/ci_ok.py) requires each job to
+  # pass or be skipped.
   apps-macos:
     name: apps (macOS)
     needs: plan
@@ -343,6 +362,81 @@ jobs:
       - name: make apps-platform
         shell: bash
         run: uv run --project tools --locked --quiet python tools/ci/apps_platform.py
+
+  apps-android-26:
+    name: apps (Android API 26)
+    needs: plan
+    if: (github.event.repository.visibility == 'public' || (github.event_name == 'schedule' && vars.BOTHY_VISIBILITY == 'public')) && (needs.plan.outputs.components == 'all' || contains(format(' {0} ', needs.plan.outputs.components), ' apps '))
+    # The instrumented tests of the Android code on an emulator (brief M5-01, Design note 5): the
+    # minimum API level of 15 2 and the current stable one, x86_64 Google APIs images without
+    # the Play Store. Emulators have no StrongBox, so that test reports a skip. One job per level
+    # instead of a matrix, because ci-ok requires its jobs by name (D-M7-01-7).
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Enable hardware acceleration (kvm)
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
+      - uses: actions/setup-java@b843ebf9b913146b38da2eaa7aeddf76074ae1ad # v6.1.0
+        with:
+          distribution: temurin
+          java-version: "17"
+      - uses: astral-sh/setup-uv@1c37ad07a6a961277cf70c0d37d6f313000f5884 # v10.3.0
+        with:
+          enable-cache: false
+      - name: make apps-platform (Android)
+        uses: reactivecircus/android-emulator-runner@a421e43855164a8197daf9d8d40fe71c6996bb0d # v2.38.0
+        with:
+          api-level: 26
+          arch: x86_64
+          target: google_apis
+          disable-animations: true
+          emulator-options: -no-window -gpu swiftshader_indirect -no-snapshot -noaudio -no-boot-anim
+          script: uv run --project tools --locked --quiet python tools/ci/apps_platform.py --system android
+
+  apps-android-36:
+    name: apps (Android API 36)
+    needs: plan
+    if: (github.event.repository.visibility == 'public' || (github.event_name == 'schedule' && vars.BOTHY_VISIBILITY == 'public')) && (needs.plan.outputs.components == 'all' || contains(format(' {0} ', needs.plan.outputs.components), ' apps '))
+    # The instrumented tests of the Android code on an emulator (brief M5-01, Design note 5): the
+    # minimum API level of 15 2 and the current stable one, x86_64 Google APIs images without
+    # the Play Store. Emulators have no StrongBox, so that test reports a skip.
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Enable hardware acceleration (kvm)
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
+      - uses: actions/setup-java@b843ebf9b913146b38da2eaa7aeddf76074ae1ad # v6.1.0
+        with:
+          distribution: temurin
+          java-version: "17"
+      - uses: astral-sh/setup-uv@1c37ad07a6a961277cf70c0d37d6f313000f5884 # v10.3.0
+        with:
+          enable-cache: false
+      - name: make apps-platform (Android)
+        uses: reactivecircus/android-emulator-runner@a421e43855164a8197daf9d8d40fe71c6996bb0d # v2.38.0
+        with:
+          api-level: 36
+          arch: x86_64
+          target: google_apis
+          disable-animations: true
+          emulator-options: -no-window -gpu swiftshader_indirect -no-snapshot -noaudio -no-boot-anim
+          script: uv run --project tools --locked --quiet python tools/ci/apps_platform.py --system android
 
   ci-ok:
     name: ci-ok
