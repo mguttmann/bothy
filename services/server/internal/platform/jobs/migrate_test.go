@@ -96,6 +96,11 @@ func TestMigrateStopsWaitingForTheLockWhenTheContextEnds(t *testing.T) {
 	defer func() {
 		_, _ = holder.Exec(context.WithoutCancel(hctx), "SELECT pg_advisory_unlock($1)", jobs.MigrateLockIDForTest)
 	}()
+	// An idle connection waits in the pool, so the deadline below runs out in the lock wait
+	// and not while a loaded host is still dialing the database for Migrate.
+	if err := pool.PGX().Ping(hctx); err != nil {
+		t.Fatal(err)
+	}
 	ctx, cancel := context.WithTimeout(t.Context(), 300*time.Millisecond)
 	defer cancel()
 	_, err = jobs.Migrate(ctx, pool, testSchema)
