@@ -24,3 +24,7 @@ UPDATE enrollment_codes SET attempts = attempts + 1 WHERE id = @id AND used_at I
 -- name: MarkEnrollmentCodeUsed :execrows
 UPDATE enrollment_codes SET used_at = @used_at, used_by_device_id = @device_id
 WHERE id = @id AND used_at IS NULL;
+
+-- name: LockEnrollmentCode :one
+-- The row of the code a passkey enrollment checked at begin, locked again at complete (M1-40).
+SELECT * FROM enrollment_codes WHERE id = @id FOR UPDATE;

@@ -59,6 +59,8 @@ type Principals struct {
 	failer
 	mu   sync.Mutex
 	rows map[ids.ID]authz.PrincipalFacts
+	// passkeys are the people with an active passkey (M1-40).
+	passkeys map[ids.ID]bool
 }
 
 // Compile-time check.
@@ -83,6 +85,26 @@ func (s *Principals) Principal(_ context.Context, id ids.ID) (authz.PrincipalFac
 	defer s.mu.Unlock()
 	f, ok := s.rows[id]
 	return f, ok, nil
+}
+
+// SetPasskey records whether userID has an active passkey (HasActivePasskey, M1-40).
+func (s *Principals) SetPasskey(userID ids.ID, has bool) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if s.passkeys == nil {
+		s.passkeys = map[ids.ID]bool{}
+	}
+	s.passkeys[userID] = has
+}
+
+// HasActivePasskey implements authz.PrincipalSource.
+func (s *Principals) HasActivePasskey(_ context.Context, userID ids.ID) (bool, error) {
+	if err := s.err(); err != nil {
+		return false, err
+	}
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return s.passkeys[userID], nil
 }
 
 // ActiveOwnerIDs implements authz.PrincipalSource.

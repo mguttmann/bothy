@@ -12,10 +12,18 @@ import (
 // ChallengePurpose is auth_challenges.purpose.
 type ChallengePurpose string
 
-// The purposes of a challenge (03 auth_challenges): step_up here, the passkey ceremonies with M1-40.
+// The purposes of a challenge (03 auth_challenges): step_up (M1-35) and the passkey ceremonies
+// (M1-40).
 const (
 	// PurposeStepUp is a step-up challenge of a session.
 	PurposeStepUp ChallengePurpose = "step_up"
+	// PurposePasskeyLogin is a passkey login; it is bound to nothing, the credential names the
+	// person.
+	PurposePasskeyLogin ChallengePurpose = "passkey_login"
+	// PurposePasskeyEnroll is the first passkey with an enrollment code; it carries the code.
+	PurposePasskeyEnroll ChallengePurpose = "passkey_enroll"
+	// PurposePasskeyRegister is a further passkey of a person in a session; it carries the session.
+	PurposePasskeyRegister ChallengePurpose = "passkey_register"
 )
 
 // ChallengeStatus is auth_challenges.status.
@@ -34,7 +42,12 @@ const (
 // ChallengeRecord is a row of auth_challenges. Zero values stand for NULL.
 type ChallengeRecord struct {
 	ID, SessionID ids.ID
-	Purpose       ChallengePurpose
+	// EnrollmentCodeID is the checked code of a passkey_enroll challenge (M1-40).
+	EnrollmentCodeID ids.ID
+	Purpose          ChallengePurpose
+	// WebAuthnSession is webauthn_session (schema webauthn_session.v1, domain.WebAuthnSession) of a
+	// WebAuthn ceremony; nil for a step-up without passkey options.
+	WebAuthnSession []byte
 	// Hash is challenge_hash, the HMAC of the value with the token pepper.
 	Hash                 []byte
 	Status               ChallengeStatus

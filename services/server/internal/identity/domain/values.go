@@ -163,3 +163,17 @@ func fieldError(pointer, code, detail string) *errs.Error {
 	return errs.New(errs.CodeValidationFailed, detail).
 		WithFields(errs.FieldError{Pointer: pointer, Code: code, Detail: detail})
 }
+
+// CheckPasskeyName validates the name a person gives a passkey (03 passkey_credentials.name,
+// M1-40) with the rules of a display name: SEC-IN-4, not blank, at most maxChars runes
+// (principal.display_name_max_chars). pointer is the field of the request (/name or
+// /passkey_name). Errors: validation_failed on pointer.
+func CheckPasskeyName(pointer, s string, maxChars int) error {
+	if err := displayText(pointer, "passkey name", s); err != nil {
+		return err
+	}
+	if utf8.RuneCountInString(s) > maxChars {
+		return fieldError(pointer, FieldTooLong, "the passkey name has more than "+strconv.Itoa(maxChars)+" characters")
+	}
+	return nil
+}

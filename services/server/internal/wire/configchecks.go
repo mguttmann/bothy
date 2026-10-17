@@ -12,6 +12,7 @@ import (
 
 	auditdomain "github.com/OWNER/bothy/services/server/internal/audit/domain"
 	identityapp "github.com/OWNER/bothy/services/server/internal/identity/app"
+	identitydomain "github.com/OWNER/bothy/services/server/internal/identity/domain"
 	"github.com/OWNER/bothy/services/server/internal/platform/config"
 	"github.com/OWNER/bothy/services/server/internal/platform/httpserver"
 	"github.com/OWNER/bothy/services/server/internal/platform/jobs"
@@ -46,6 +47,15 @@ var configChecks = []configCheck{
 	{name: "dpop_required_for", keys: []string{keyDPoPRequiredFor}, fn: dpopRequiredFor},
 	{name: "client_versions_semver", keys: clientVersionKeys, fn: clientVersionsSemVer},
 	{name: "jwks_max_age_below_rotation", keys: []string{keyJWKSMaxAge, keyInvocationRotation, keyAccessRotation}, fn: jwksMaxAgeBelowRotation},
+	{name: "webauthn_relying_party", keys: []string{keyPublicURL, keyWebAuthnRPID, keyWebAuthnOrigins}, fn: webAuthnRelyingParty},
+}
+
+// webAuthnRelyingParty holds auth.webauthn_rp_id and auth.webauthn_origins to the rules of the
+// relying party (M1-40, 08 "2.5"): the RP ID is a domain and the host or a registrable suffix of
+// the host of every http(s) origin, http only for localhost. The error names keys, never values.
+func webAuthnRelyingParty(v *config.Values) error {
+	_, err := identitydomain.ResolveRelyingParty(v.String(keyPublicURL), v.String(keyWebAuthnRPID), v.Strings(keyWebAuthnOrigins))
+	return err
 }
 
 // The keys of the cross-check jwks_max_age_below_rotation.

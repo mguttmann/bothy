@@ -281,6 +281,22 @@ type Owner struct {
 	Reason    string
 }
 
+type PasskeyCredential struct {
+	ID             pgtype.UUID
+	UserID         pgtype.UUID
+	CredentialID   []byte
+	PublicKeyCose  []byte
+	SignCount      int64
+	Aaguid         pgtype.UUID
+	Transports     []string
+	BackupEligible bool
+	BackupState    bool
+	Name           string
+	CreatedAt      pgtype.Timestamptz
+	LastUsedAt     pgtype.Timestamptz
+	RevokedAt      pgtype.Timestamptz
+}
+
 type Principal struct {
 	ID           pgtype.UUID
 	Kind         string

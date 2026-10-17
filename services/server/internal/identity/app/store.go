@@ -58,6 +58,9 @@ type Store interface {
 	// ActiveOwnerIDs returns the persons with an active owners row and principal status
 	// active, ascending by id.
 	ActiveOwnerIDs(ctx context.Context) ([]ids.ID, error)
+	// HasActivePasskey reports whether the person userID has a passkey with revoked_at IS NULL
+	// (authz.PrincipalSource, M1-40).
+	HasActivePasskey(ctx context.Context, userID ids.ID) (bool, error)
 
 	// InsertPrincipal inserts p and sets p.CreatedAt from the database. The caller runs it inside
 	// a unit of work.

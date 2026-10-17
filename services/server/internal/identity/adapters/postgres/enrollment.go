@@ -57,6 +57,22 @@ func (r *Repository) LockEnrollmentCodeByHash(ctx context.Context, hash []byte) 
 	return toEnrollmentCode(row), true, nil
 }
 
+// LockEnrollmentCode implements app.EnrollmentStore.
+func (r *Repository) LockEnrollmentCode(ctx context.Context, id ids.ID) (app.EnrollmentCodeRecord, bool, error) {
+	q, err := r.write(ctx)
+	if err != nil {
+		return app.EnrollmentCodeRecord{}, false, err
+	}
+	row, err := q.LockEnrollmentCode(ctx, uuid(id))
+	if errors.Is(err, pgx.ErrNoRows) {
+		return app.EnrollmentCodeRecord{}, false, nil
+	}
+	if err != nil {
+		return app.EnrollmentCodeRecord{}, false, mapError(err, "locking an enrollment code")
+	}
+	return toEnrollmentCode(row), true, nil
+}
+
 // IncrementEnrollmentAttempts implements app.EnrollmentStore.
 func (r *Repository) IncrementEnrollmentAttempts(ctx context.Context, id ids.ID) error {
 	q, err := r.write(ctx)

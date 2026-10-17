@@ -181,6 +181,10 @@ type Input struct {
 	// Now is the time of the call; StepUpMaxAge is auth.step_up_max_age.
 	Now          time.Time
 	StepUpMaxAge time.Duration
+	// StepUpWaived reports a conditional step-up ("bedingt") whose condition is false: the person
+	// has no sign-in data of the kind the action guards yet (hat_anmeldedaten, 07 section 4.2 step
+	// 8; M1-40), so a human session suffices.
+	StepUpWaived bool
 	Principal    Principal
 	Resource     ResourceFacts
 	Path         Path
@@ -287,7 +291,7 @@ func decideArchived(in *Input) (Decision, bool, error) {
 }
 
 // decidePrincipalRules are steps 7 and 8: "view as" is read-only, step-up needs a fresh
-// confirmation in a session of a person.
+// confirmation in a session of a person; a waived conditional step-up needs only the session.
 func decidePrincipalRules(in *Input) (Decision, bool) {
 	p := in.Principal
 	if p.ViewAs && Writes(in.Action) {
@@ -298,6 +302,10 @@ func decidePrincipalRules(in *Input) (Decision, bool) {
 	}
 	if p.Kind != KindUser || !p.HasSession {
 		return deny(OutcomeForbidden, ReasonStepUpNotPossible), true
+	}
+	if in.StepUpWaived {
+		// The first setup needs only a human with a session (07 section 4.2 step 8).
+		return Decision{}, false
 	}
 	if p.StepUpAt.IsZero() || in.Now.Sub(p.StepUpAt) > in.StepUpMaxAge {
 		return deny(OutcomeStepUpRequired, ReasonStepUpRequired), true

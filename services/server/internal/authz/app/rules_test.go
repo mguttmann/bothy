@@ -378,3 +378,35 @@ func TestTokenCreateGuard_NotSelf(t *testing.T) {
 	w.expect(t, sam, authorize.ActionTokenCreate, principal(w.alex), forbidden, "not_self")
 	w.expect(t, sam, authorize.ActionTokenCreate, principal(w.lotse), forbidden, "owner_only")
 }
+
+// TestConditionalStepUp: passkey.register needs step-up only once the person has an active
+// passkey (07 section 4.2 step 8, hat_anmeldedaten; M1-40); a human with a session stays required.
+func TestConditionalStepUp(t *testing.T) {
+	w := newWorld(t)
+	self := authorize.Resource{Kind: authorize.ResourceUser, ID: w.alex, OwnerID: w.alex}
+	alex := w.user(w.alex)
+	alex.StepUpAt = time.Time{}
+	// First passkey: no step-up.
+	w.allow(t, alex, authorize.ActionPasskeyRegister, self)
+	// A passkey exists: step-up, and a fresh one passes.
+	w.principals.SetPasskey(w.alex, true)
+	w.expect(t, alex, authorize.ActionPasskeyRegister, self, stepUpNeeded, "step_up_required")
+	alex.StepUpAt = w.clk.Now()
+	w.allow(t, alex, authorize.ActionPasskeyRegister, self)
+	// Without a session (a personal token) step-up is impossible, with or without a passkey.
+	tok := actor.Actor{ID: w.alex, Kind: actor.KindUser, TokenID: ids.New()}
+	w.creds.PutToken(tok.TokenID, fakeToken(w.alex))
+	w.expect(t, tok, authorize.ActionPasskeyRegister, self, forbidden, "step_up_not_possible")
+	w.principals.SetPasskey(w.alex, false)
+	w.expect(t, tok, authorize.ActionPasskeyRegister, self, forbidden, "step_up_not_possible")
+	// passkey.revoke has step-up "ja": always required.
+	stale := w.user(w.alex)
+	stale.StepUpAt = time.Time{}
+	w.expect(t, stale, authorize.ActionPasskeyRevoke, authorize.Resource{Kind: authorize.ResourcePasskey, ID: ids.New(), OwnerID: w.alex},
+		stepUpNeeded, "step_up_required")
+	// A failing source fails the call, never an allow.
+	w.principals.Fail(true)
+	if _, err := w.az.Authorize(context.Background(), alex, authorize.ActionPasskeyRegister, self); err == nil {
+		t.Fatal("source error ignored")
+	}
+}

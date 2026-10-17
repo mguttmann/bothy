@@ -150,12 +150,12 @@ linters:
       # TokenResponse carries access and refresh token by contract (openapi.yaml): the strict
       # server marshals them exactly once into the response of refreshToken and
       # createExtensionSession (M1-34, docs/DECISIONS.md M1-34). G117 sees the member name only.
-      - path: ^api/rest/rest\.gen\.go$
+      - path: ^api/rest/(models|rest)\.gen\.go$
         linters: [gosec]
         text: "G117:"
       # The strict server streams the NDJSON body of exportAuditEvents and closes a ReadCloser body
       # in a defer without checking the error (M1-50); the handler hands it no ReadCloser.
-      - path: ^api/rest/rest\.gen\.go$
+      - path: ^api/rest/(models|rest)\.gen\.go$
         linters: [errcheck]
         text: "closer.Close"
       # Query names and SQL of refresh_tokens contain "token"; G101 reads them as credentials. The
@@ -165,6 +165,10 @@ linters:
         text: "G101:"
       # The same for api_tokens (M1-44): the lookup binds token_hash, never the token itself.
       - path: ^internal/identity/adapters/postgres/sqlcgen/apitokens\.sql\.go$
+        linters: [gosec]
+        text: "G101:"
+      # The same for passkey_credentials (M1-40): the rows hold public keys and counters only.
+      - path: ^internal/identity/adapters/postgres/sqlcgen/passkey_credentials\.sql\.go$
         linters: [gosec]
         text: "G101:"
       # oapi-codegen writes capitalized error strings ("Header parameter ... is required"); only

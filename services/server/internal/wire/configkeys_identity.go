@@ -148,8 +148,34 @@ func identityConfigKeys() []config.Key {
 			Doc:     "Longest lifetime of a personal token.",
 			Chapter: chapter08,
 		},
+		{
+			Name: "auth.login_flow_ttl", Kind: config.KindDuration, Default: defaultLoginFlowTTL, Min: "1s",
+			Doc:     "Validity of a login flow and of a passkey ceremony (login, enrollment, registration).",
+			Chapter: chapter08,
+		},
+		{
+			// The cross-check webauthn_relying_party holds it against the origins (M1-40).
+			Name: keyWebAuthnRPID, Kind: config.KindString, Default: "",
+			Doc:     "RP ID of the passkeys; empty means the host of server.public_url (an IP address there means no passkeys).",
+			Chapter: chapter08,
+		},
+		{
+			Name: keyWebAuthnOrigins, Kind: config.KindStringList, Default: "",
+			Doc:     "Allowed origins of the passkeys; empty means the origin of server.public_url; entries may be app origins such as android:apk-key-hash:...",
+			Chapter: chapter08,
+		},
 	}
 }
+
+// The keys of the WebAuthn relying party (M1-40); the cross-check webauthn_relying_party reads
+// them.
+const (
+	keyWebAuthnRPID    = "auth.webauthn_rp_id"
+	keyWebAuthnOrigins = "auth.webauthn_origins"
+)
+
+// defaultLoginFlowTTL is the standard of auth.login_flow_ttl (08 section 18).
+const defaultLoginFlowTTL = "10m"
 
 // keyDPoPRequiredFor names the token kinds that must be DPoP-bound; the cross-check
 // dpop_required_for reads it.

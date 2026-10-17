@@ -13,7 +13,9 @@ import (
 	"github.com/OWNER/bothy/services/server/internal/identity/adapters/locale"
 	identitypg "github.com/OWNER/bothy/services/server/internal/identity/adapters/postgres"
 	"github.com/OWNER/bothy/services/server/internal/identity/adapters/replay"
+	identitywebauthn "github.com/OWNER/bothy/services/server/internal/identity/adapters/webauthn"
 	"github.com/OWNER/bothy/services/server/internal/identity/app"
+	identitydomain "github.com/OWNER/bothy/services/server/internal/identity/domain"
 	"github.com/OWNER/bothy/services/server/internal/instance"
 	instancepg "github.com/OWNER/bothy/services/server/internal/instance/adapters/postgres"
 	instanceapp "github.com/OWNER/bothy/services/server/internal/instance/app"
@@ -121,15 +123,20 @@ type Identity struct {
 	// ApprovalHandlers are the REST handlers of approveDevice, beginPairing, approvePairing and
 	// completePairing (M1-38); nil until BindSessions.
 	ApprovalHandlers *identityhttp.Approval
-	cfg              app.Config
-	state            instance.State
-	repo             *identitypg.Repository
-	uow              txn.UnitOfWork
-	az               authorize.Authorizer
-	writes           IdentityWrites
-	pepper           []byte
-	clk              clock.Clock
-	log              *slog.Logger
+	// Passkeys implements the port identity.Passkeys (M1-40); nil until BindSessions.
+	Passkeys *app.Passkeys
+	// PasskeyHandlers are the REST handlers of the seven passkey operations and
+	// completeStepUpWithPasskey; nil until BindSessions.
+	PasskeyHandlers *identityhttp.Passkeys
+	cfg             app.Config
+	state           instance.State
+	repo            *identitypg.Repository
+	uow             txn.UnitOfWork
+	az              authorize.Authorizer
+	writes          IdentityWrites
+	pepper          []byte
+	clk             clock.Clock
+	log             *slog.Logger
 }
 
 // IdentityWrites are the collaborators of the writing use cases of identity (M1-31): the
@@ -226,9 +233,13 @@ func (i *Identity) BindSessions(keys instance.Keys, instanceID ids.ID) error {
 	if err != nil {
 		return err
 	}
+	rp, verifier, err := relyingParty(i.cfg)
+	if err != nil {
+		return err
+	}
 	stepUps, err := app.NewStepUps(i.cfg, i.pepper, app.StepUpDeps{
 		Challenges: i.repo, Sessions: i.repo, Devices: i.repo, Auth: sessions, UoW: i.uow, Authorizer: i.az, Audit: i.writes.Audit,
-		Clock: i.clk,
+		Clock: i.clk, Passkeys: i.repo, People: i.repo, Verifier: verifier, RelyingParty: rp,
 	})
 	if err != nil {
 		return err
@@ -242,7 +253,7 @@ func (i *Identity) BindSessions(keys instance.Keys, instanceID ids.ID) error {
 	}
 	identities, err := app.NewIdentities(app.IdentitiesDeps{
 		Providers: i.repo, Identities: i.repo, People: i.repo, UoW: i.uow, Authorizer: i.az, Audit: i.writes.Audit,
-		Auth: sessions, Clock: i.clk,
+		Auth: sessions, Clock: i.clk, Sources: []app.LoginMethodSource{app.NewPasskeySource(i.repo, i.repo)},
 	})
 	if err != nil {
 		return err
@@ -267,7 +278,30 @@ func (i *Identity) BindSessions(keys instance.Keys, instanceID ids.ID) error {
 	}
 	i.Logins, i.EnrollmentHandlers, i.AuthCleanup = logins, identityhttp.NewEnrollment(logins), cleanup
 	i.ApprovalHandlers = identityhttp.NewApproval(logins, i.DPoP)
+	passkeys, err := app.NewPasskeys(i.cfg, i.pepper, app.PasskeysDeps{
+		Passkeys: i.repo, Challenges: i.repo, Verifier: verifier, RelyingParty: rp, Logins: logins, UoW: i.uow, Authorizer: i.az,
+		Audit: i.writes.Audit, Clock: i.clk,
+	})
+	if err != nil {
+		return err
+	}
+	i.Passkeys, i.PasskeyHandlers = passkeys, identityhttp.NewPasskeys(passkeys, stepUps)
 	return nil
+}
+
+// relyingParty resolves the WebAuthn relying party of cfg and builds its verifier (M1-40); the
+// verifier stays nil (no passkeys) when server.public_url names an IP address and
+// auth.webauthn_rp_id is empty. Errors: a relying party the cross-check or go-webauthn refuses.
+func relyingParty(cfg app.Config) (identitydomain.RelyingParty, app.PasskeyVerifier, error) {
+	rp, err := identitydomain.ResolveRelyingParty(cfg.PublicURL, cfg.WebAuthnRPID, cfg.WebAuthnOrigins)
+	if err != nil || !rp.Enabled {
+		return rp, nil, err
+	}
+	v, err := identitywebauthn.New(rp, cfg.LoginFlowTTL)
+	if err != nil {
+		return identitydomain.RelyingParty{}, nil, err
+	}
+	return rp, v, nil
 }
 
 // secretsDirStandIn replaces the placeholder <secrets.dir> while a reference is only checked: the

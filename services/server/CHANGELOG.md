@@ -65,6 +65,19 @@ documented in this file. The format is based on
   (`pairing_expired`); both are audited as the system action `device.expire`. New migration
   `00018_identity_device_pairings.sql` and the keys `auth.device_pending_ttl`,
   `auth.device_verification_code_digits`, `auth.pairing_code_ttl` and `auth.pairing_code_chars`.
+- Passkeys (M1-40): the migration `00019_identity_passkey_credentials.sql` and the operations
+  `beginPasskeyLogin`, `completePasskeyLogin` (login of local accounts, new devices `pending`, a
+  decoy credential ID for unknown names), `beginEnrollment`, `completeEnrollment` (the first
+  passkey with an enrollment code, device `active`), `beginPasskeyRegistration`,
+  `completePasskeyRegistration` (step-up once an active passkey exists, decided in `authz`),
+  `revokePasskey` and `completeStepUpWithPasskey`; `createStepUpChallenge` adds `passkey_options`.
+  The state of every ceremony is a single-use row of `auth_challenges`, so begin and complete may
+  run on different nodes; user verification is required, attestation is not requested, only
+  ES256, EdDSA and RS256 are accepted, and a falling signature counter is audited. New keys
+  `auth.login_flow_ttl`, `auth.webauthn_rp_id` and `auth.webauthn_origins` with the cross-check
+  `webauthn_relying_party`; the credential overview lists the passkeys. Dependency:
+  `github.com/go-webauthn/webauthn` `v0.18.2` (BSD-3-Clause), only in `identity/adapters/webauthn`,
+  with the software authenticator `virtualauthn` for tests.
 - Instance settings, branding and discovery (M1-46): the migration `00017_instance_settings.sql`,
   the settings registry of configuration.md section 6, the generated design keys
   `kernel/designkeys` (category colours and space icons from the design tokens, the accent list of
