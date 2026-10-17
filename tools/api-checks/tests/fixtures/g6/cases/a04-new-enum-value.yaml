@@ -1,0 +1,4 @@
+# 06 13 additive: a new enum value in a response.
+patch:
+- {op: append, path: /components/schemas/ThingStatus/enum, value: deleted}
+expect: []

@@ -1,0 +1,7 @@
+# 06 13 row 6: an integer `after` (global sequence) changes the pagination kind.
+patch:
+- op: append
+  path: /paths/~1things/get/parameters
+  value: {name: after, in: query, schema: {type: integer, format: int64}}
+expect:
+- [op-rule, GET /things]

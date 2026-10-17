@@ -1,0 +1,5 @@
+# 06 13 row 5: a problem code (an existing situation) gets a different status.
+patch:
+- {op: set, path: /components/schemas/Problem/x-problem-codes/0/status, value: 410}
+expect:
+- [status, components/schemas/Problem/x-problem-codes/conflict]

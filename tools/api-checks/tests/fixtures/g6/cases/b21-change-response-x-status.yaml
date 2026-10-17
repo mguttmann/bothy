@@ -1,0 +1,5 @@
+# 06 13 row 5: a response component changes its status.
+patch:
+- {op: set, path: /components/responses/Conflict/x-status, value: 410}
+expect:
+- [status, components/responses/Conflict]

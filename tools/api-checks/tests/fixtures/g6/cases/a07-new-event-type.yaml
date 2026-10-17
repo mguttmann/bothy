@@ -1,0 +1,13 @@
+# 06 13 additive: a new event type.
+patch:
+- op: set
+  path: /components/schemas/ThingArchivedEvent
+  value:
+    type: object
+    required: [type, thing_id]
+    properties:
+      type: {type: string, enum: [thing.archived]}
+      thing_id: {type: string}
+- {op: append, path: /components/schemas/Event/oneOf, value: {$ref: '#/components/schemas/ThingArchivedEvent'}}
+- {op: set, path: /components/schemas/Event/discriminator/mapping/thing.archived, value: '#/components/schemas/ThingArchivedEvent'}
+expect: []

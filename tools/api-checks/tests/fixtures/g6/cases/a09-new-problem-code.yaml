@@ -1,0 +1,6 @@
+# 06 13 additive: a new problem code for an existing status.
+patch:
+- op: append
+  path: /components/schemas/Problem/x-problem-codes
+  value: {code: already_archived, status: 409, title: Already archived}
+expect: []

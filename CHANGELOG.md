@@ -30,6 +30,14 @@ operated, and the order of the build.
   font sizes and radii as typed constants) and copies the vendored Atkinson Hyperlegible fonts
   with their SIL Open Font License to `design/build/ts/fonts/`; `make tokens` fails on a stale or
   hand-edited file, a missing font or licence, and compiles the file with `tsc --strict` (M7-24).
+- API breaking change check (gate G6 of chapter 06): `make api-breaking`, part of `make check`
+  when the server component is selected, compares `docs/api/openapi.yaml` and its frame and event
+  schemas with the document of the newest stable `server/v*` tag and fails on every breaking row of
+  06 section 13 (removed or renamed parts, newly required request fields and parameters, type and
+  format changes, removed enum values, changed status codes, sort order, pagination and
+  idempotency changes, a changed `x-authz-action`); a major step of `info.version` accepts a
+  break, and without a tag the gate passes with a notice. Own comparison instead of oasdiff, which
+  missed rows on this document (M7-11).
 - Design system package: `packages/design_system` exports the generated token classes (a copy
   that `tokens.py build` writes next to `design/build/dart/` and `make tokens` compares), a
   settings resolver from `appearance.theme`, `appearance.density`, `appearance.reduce_motion` and

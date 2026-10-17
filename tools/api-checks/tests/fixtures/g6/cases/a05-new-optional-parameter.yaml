@@ -1,0 +1,6 @@
+# 06 13 additive: a new optional query parameter.
+patch:
+- op: append
+  path: /paths/~1things/get/parameters
+  value: {name: q, in: query, schema: {type: string}}
+expect: []

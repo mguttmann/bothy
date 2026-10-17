@@ -1,0 +1,5 @@
+# 06 13 additive: a new response field the server always sends.
+patch:
+- {op: set, path: /components/schemas/Thing/properties/color, value: {type: string}}
+- {op: append, path: /components/schemas/Thing/required, value: color}
+expect: []

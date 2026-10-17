@@ -1,0 +1,25 @@
+# SPDX-License-Identifier: Apache-2.0
+# AsyncAPI companion of base.yaml: the server sends the union `Event`, so the event schemas are
+# server-sent (response direction) for the breaking check.
+asyncapi: 3.0.0
+info:
+  title: Example gateway
+  version: 1.2.0
+channels:
+  gateway:
+    address: /gateway
+    messages:
+      dispatch:
+        $ref: '#/components/messages/dispatch'
+operations:
+  send.dispatch:
+    action: send
+    channel:
+      $ref: '#/channels/gateway'
+    messages:
+    - $ref: '#/channels/gateway/messages/dispatch'
+components:
+  messages:
+    dispatch:
+      payload:
+        $ref: ./openapi.yaml#/components/schemas/Event
