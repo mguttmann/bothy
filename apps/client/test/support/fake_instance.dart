@@ -41,9 +41,11 @@ class FakeInstance {
     this.secure,
   );
 
-  /// Starts a fake with the standard world and a container over test ports.
+  /// Starts a fake with the standard world and a container over test ports; [discovery]
+  /// wraps the discovery client of the app (a network the test switches).
   static Future<FakeInstance> start({
     Map<String, String> config = fastConfig,
+    DiscoveryClient Function(DiscoveryClient real)? discovery,
   }) async {
     final server = await FakeServer.start(
       options: const FakeServerOptions(
@@ -54,16 +56,17 @@ class FakeInstance {
     final root = await Directory.systemTemp.createTemp('client-flow');
     final keys = SoftwareKeyStore();
     final secure = MemorySecureBackend();
+    final DiscoveryClient real = ApiDiscoveryClient(
+      platform: 'macos',
+      appVersion: testBranding.appVersion,
+      allowPlainHttp: true,
+    );
     final ports = testPorts(
       dataRoot: root,
       config: config,
       secureBackend: secure,
       deviceKeys: keys,
-      discovery: ApiDiscoveryClient(
-        platform: 'macos',
-        appVersion: testBranding.appVersion,
-        allowPlainHttp: true,
-      ),
+      discovery: discovery == null ? real : discovery(real),
     );
     return FakeInstance._(server, seed, root, ports, keys, secure);
   }

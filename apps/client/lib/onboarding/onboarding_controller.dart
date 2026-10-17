@@ -7,7 +7,7 @@ library;
 import 'dart:async';
 import 'dart:convert';
 
-import 'package:api_client/api_client.dart' show DeviceStateEnum;
+import 'package:api_client/api_client.dart' show Device;
 import 'package:auth/auth.dart';
 import 'package:dio/dio.dart';
 import 'package:domain/domain.dart' show AppConfigValues, DeviceId;
@@ -20,34 +20,12 @@ import '../app/discovery.dart';
 import '../app/providers/ports.dart';
 import '../app/router.dart';
 import '../platform/secure_store.dart';
+import 'start_route.dart';
 
 export '../app/router.dart' show OnboardingStep;
+export 'start_route.dart' show ServerStatus;
 
 part 'onboarding_controller.g.dart';
-
-/// What E1 shows below the address field.
-enum ServerStatus {
-  /// Nothing yet.
-  idle,
-
-  /// `getDiscovery` runs.
-  connecting,
-
-  /// The text is no address.
-  invalidAddress,
-
-  /// No instance at this address.
-  noInstance,
-
-  /// The TLS handshake failed; no way to continue (R-PR-14).
-  certificateInvalid,
-
-  /// `setup_required`.
-  notSetUp,
-
-  /// Below `min_client_versions`.
-  appTooOld,
-}
 
 /// The error a login screen shows (E2, E3, E5).
 enum LoginNotice {
@@ -238,9 +216,10 @@ class OnboardingController extends _$OnboardingController {
   }
 
   /// E1 "Connect": discovery at [typed]; on success the address and the instance are
-  /// remembered, the services are composed and E2 shows, or the main view (or E4) when a
-  /// session of the instance is stored. Without any answer from the server a stored session of
-  /// the remembered instance starts from the local data (D-M4-18-13).
+  /// remembered. [routeStart] decides the screen from what is stored for the instance and
+  /// what discovery answered: E1 with its text, E2, or the stored session from its local data
+  /// (the main view or E4), also when discovery got no usable answer (D-M4-18-13,
+  /// D-M4-18-15).
   Future<void> connect(String typed) async {
     final address = normalizeServerAddress(typed);
     if (address == null) {
@@ -258,38 +237,35 @@ class OnboardingController extends _$OnboardingController {
       busy: true,
     );
     final outcome = await _ports.discovery.discover(address);
-    switch (outcome) {
-      case DiscoveryFound(:final instance):
-        await _prefs.setServerAddress(address);
-        await _prefs.setInstanceJson(jsonEncode(instance.toJson()));
-        await _openInstance(instance);
-      case DiscoveryUnreachable():
-        final known = InstanceInfo.fromJson(
-          _decode(await _prefs.instanceJson()),
-        );
-        if (known == null ||
-            known.address != address ||
-            !await _hasSession(known)) {
-          state = state.next(serverStatus: ServerStatus.noInstance);
-          return;
-        }
-        await _openInstance(known);
-      case DiscoveryNoInstance():
-        state = state.next(serverStatus: ServerStatus.noInstance);
-      case DiscoveryCertificateInvalid():
-        state = state.next(serverStatus: ServerStatus.certificateInvalid);
-      case DiscoverySetupRequired():
-        state = state.next(serverStatus: ServerStatus.notSetUp);
-      case DiscoveryAppTooOld(:final minVersion):
-        state = state.next(
-          serverStatus: ServerStatus.appTooOld,
-          minVersion: minVersion,
-        );
+    final InstanceInfo? instance;
+    if (outcome is DiscoveryFound) {
+      instance = outcome.instance;
+      await _prefs.setServerAddress(address);
+      await _prefs.setInstanceJson(jsonEncode(instance.toJson()));
+    } else {
+      final known = InstanceInfo.fromJson(_decode(await _prefs.instanceJson()));
+      instance = known?.address == address ? known : null;
     }
+    final stored = instance == null
+        ? StoredAccount.none
+        : await _storedAccount(instance);
+    final route = routeStart(stored: stored, discovery: outcome);
+    if (instance == null || route.step == OnboardingStep.server) {
+      state = state.next(
+        serverStatus: route.serverStatus,
+        minVersion: route.minVersion,
+      );
+      return;
+    }
+    await _openInstance(instance, stored, outcome);
   }
 
-  /// Composes the services of [instance] and shows E2, or resumes a stored session.
-  Future<void> _openInstance(InstanceInfo instance) async {
+  /// Composes the services of [instance] and shows E2, or resumes the [stored] session.
+  Future<void> _openInstance(
+    InstanceInfo instance,
+    StoredAccount stored,
+    DiscoveryOutcome outcome,
+  ) async {
     await _closeServices();
     final InstanceServices services;
     try {
@@ -308,16 +284,25 @@ class OnboardingController extends _$OnboardingController {
           services: services,
           serverStatus: ServerStatus.idle,
         );
-    if (await services.hasStoredSession()) await _resume(services);
+    if (stored != StoredAccount.none) await _resume(services, stored, outcome);
   }
 
-  /// Whether a refresh token of [instance] is stored, without opening anything.
-  Future<bool> _hasSession(InstanceInfo instance) async =>
-      await InstanceSecrets(
-        _ports.secureBackend,
-        instance.instanceId,
-      ).read('auth/${instance.address.origin}/refresh_token') !=
-      null;
+  /// What is stored for [instance], without opening anything: a refresh token, and whether the
+  /// device waited for its confirmation ([_pendingKey]).
+  Future<StoredAccount> _storedAccount(InstanceInfo instance) async {
+    final secrets = InstanceSecrets(_ports.secureBackend, instance.instanceId);
+    if (await secrets.read('auth/${instance.address.origin}/refresh_token') ==
+        null) {
+      return StoredAccount.none;
+    }
+    return await secrets.read(_pendingKey) == null
+        ? StoredAccount.signedIn
+        : StoredAccount.devicePending;
+  }
+
+  /// The instance secret that marks a waiting device: its verification code and `created_at`
+  /// as JSON, written when E4 shows and deleted at the login (D-M4-18-15).
+  static const _pendingKey = 'onboarding/pending_device';
 
   static Object? _decode(String? json) {
     if (json == null) return null;
@@ -516,22 +501,33 @@ class OnboardingController extends _$OnboardingController {
   Future<void> _pending(
     InstanceServices services,
     PendingDevice device,
-    int flow,
-  ) async {
-    var createdAt = _ports.clock.now();
-    try {
-      final info = (await services.auth.api.getDevicesApi().getDevice(
-        deviceId: device.deviceId.value,
-      )).data;
-      if (info != null) createdAt = info.createdAt;
-    } on DioException {
-      // The remaining time is display only (D-W-116); the poll reports the expiry.
+    int flow, {
+    DateTime? createdAt,
+  }) async {
+    var since = createdAt;
+    if (since == null) {
+      try {
+        since = (await services.auth.api.getDevicesApi().getDevice(
+          deviceId: device.deviceId.value,
+        )).data?.createdAt;
+      } on DioException {
+        // The remaining time is display only (D-W-116); the poll reports the expiry.
+      }
     }
+    since ??= _ports.clock.now();
+    if (flow != _flow) return;
+    await services.secrets.write(
+      _pendingKey,
+      jsonEncode({
+        'code': device.verificationCode,
+        'created_at': since.toUtc().toIso8601String(),
+      }),
+    );
     if (flow != _flow) return;
     state = state.next(
       step: OnboardingStep.pending,
       code: device.verificationCode,
-      deadline: createdAt.add(_ports.config.devicePendingTtl),
+      deadline: since.add(_ports.config.devicePendingTtl),
     );
     // The login call returns once E4 shows; the poll runs on (08 5.2).
     unawaited(_pollPending(services, device, flow));
@@ -579,41 +575,60 @@ class OnboardingController extends _$OnboardingController {
         : SignOutCause.rejected;
   }
 
-  /// A start with a stored session: a device that still waits for its confirmation goes back
-  /// to E4 with its code (08 5.2: the waiting device has tokens and polls); any other goes to
-  /// the main view. Offline the app starts signed in and the engine reconnects later.
-  Future<void> _resume(InstanceServices services) async {
+  /// A start with a [stored] session: [routeStart] with what `getDevice` says about this device
+  /// decides between E4 (the waiting device with its code; 08 5.2) and the main view. Without
+  /// an answer the stored state decides: a device that waited shows E4 with its stored code and
+  /// polls until the network returns, any other starts signed in and the engine reconnects
+  /// later (D-M4-18-15).
+  Future<void> _resume(
+    InstanceServices services,
+    StoredAccount stored,
+    DiscoveryOutcome outcome,
+  ) async {
     final flow = ++_flow;
     final id = await services.storedDeviceId();
+    Device? device;
     if (id != null) {
       try {
-        final device = (await services.auth.api.getDevicesApi().getDevice(
+        device = (await services.auth.api.getDevicesApi().getDevice(
           deviceId: id,
         )).data;
-        if (flow != _flow) return;
-        if (device != null && device.state == DeviceStateEnum.pending) {
-          await _pending(
-            services,
-            PendingDevice(
-              deviceId: DeviceId.parse(id),
-              verificationCode: device.verificationCode,
-            ),
-            flow,
-          );
-          return;
-        }
       } on DioException {
-        // No answer: the main view from the local data; a revoked session ends through the
+        // No usable answer: the stored state decides; a revoked session ends through the
         // session's events.
       }
     }
-    if (flow == _flow) _signedIn();
+    if (flow != _flow) return;
+    final route = routeStart(
+      stored: stored,
+      discovery: outcome,
+      device: device?.state,
+    );
+    if (route.step != OnboardingStep.pending || id == null) {
+      _signedIn();
+      return;
+    }
+    final saved = _decode(await services.secrets.read(_pendingKey));
+    final savedMap = saved is Map ? saved : const <Object?, Object?>{};
+    final code = device?.verificationCode ?? savedMap['code'];
+    if (flow != _flow) return;
+    await _pending(
+      services,
+      PendingDevice(
+        deviceId: DeviceId.parse(id),
+        verificationCode: code is String ? code : null,
+      ),
+      flow,
+      createdAt:
+          device?.createdAt ?? DateTime.tryParse('${savedMap['created_at']}'),
+    );
   }
 
   void _signedIn() {
     final services = _services;
     if (services == null) return;
     state = state.next(step: OnboardingStep.signedIn);
+    unawaited(services.secrets.delete(_pendingKey));
     services.engine.start();
   }
 

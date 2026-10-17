@@ -153,8 +153,9 @@ final class DiscoveryNoInstance extends DiscoveryOutcome {
   const DiscoveryNoInstance();
 }
 
-/// No answer at all (no network, the host is down): the app may start from its local data
-/// when it knows the instance (D-M4-18-13); E1 shows it like [DiscoveryNoInstance].
+/// No answer at all (no network, the host is down). The start routing treats it like
+/// [DiscoveryNoInstance]: a stored session opens its local data, otherwise E1 shows "No
+/// instance at this address" (D-M4-18-13, D-M4-18-15).
 final class DiscoveryUnreachable extends DiscoveryOutcome {
   /// Creates the outcome.
   const DiscoveryUnreachable();
