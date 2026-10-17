@@ -109,6 +109,9 @@ type ServerInterface interface {
 	// ApproveDevice Approve a pending device
 	// (POST /devices/{device_id}/approve)
 	ApproveDevice(w http.ResponseWriter, r *http.Request, deviceId DeviceIdPath, params ApproveDeviceParams)
+	// RevokeDevice Revoke a device
+	// (POST /devices/{device_id}/revoke)
+	RevokeDevice(w http.ResponseWriter, r *http.Request, deviceId DeviceIdPath, params RevokeDeviceParams)
 	// ListFeatureFlags List feature flags
 	// (GET /feature-flags)
 	ListFeatureFlags(w http.ResponseWriter, r *http.Request)
@@ -238,6 +241,9 @@ type ServerInterface interface {
 	// GetProblemType Documentation of a problem type
 	// (GET /problems/{code})
 	GetProblemType(w http.ResponseWriter, r *http.Request, code CodePath)
+	// RevokeSession End a session
+	// (POST /sessions/{session_id}/revoke)
+	RevokeSession(w http.ResponseWriter, r *http.Request, sessionId SessionIdPath, params RevokeSessionParams)
 	// RotateSigningKey Rotate a server signing key
 	// (POST /signing-keys/rotate)
 	RotateSigningKey(w http.ResponseWriter, r *http.Request, params RotateSigningKeyParams)
@@ -262,6 +268,9 @@ type ServerInterface interface {
 	// ListUserDevices List devices of a person
 	// (GET /users/{user_id}/devices)
 	ListUserDevices(w http.ResponseWriter, r *http.Request, userId UserIdPath, params ListUserDevicesParams)
+	// DisableUser Disable a person
+	// (POST /users/{user_id}/disable)
+	DisableUser(w http.ResponseWriter, r *http.Request, userId UserIdPath, params DisableUserParams)
 	// EnableUser Enable a person
 	// (POST /users/{user_id}/enable)
 	EnableUser(w http.ResponseWriter, r *http.Request, userId UserIdPath, params EnableUserParams)
@@ -1530,6 +1539,56 @@ func (siw *ServerInterfaceWrapper) ApproveDevice(w http.ResponseWriter, r *http.
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		siw.Handler.ApproveDevice(w, r, deviceId, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// RevokeDevice operation middleware
+func (siw *ServerInterfaceWrapper) RevokeDevice(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "device_id" -------------
+	var deviceId DeviceIdPath
+
+	err = runtime.BindStyledParameterWithOptions("simple", "device_id", r.PathValue("device_id"), &deviceId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "uuid", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "device_id", Err: err})
+		return
+	}
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params RevokeDeviceParams
+
+	headers := r.Header
+
+	// ------------- Optional header parameter "Idempotency-Key" -------------
+	if valueList, found := headers[http.CanonicalHeaderKey("Idempotency-Key")]; found {
+		var IdempotencyKey IdempotencyKey
+		n := len(valueList)
+		if n != 1 {
+			siw.ErrorHandlerFunc(w, r, &TooManyValuesForParamError{ParamName: "Idempotency-Key", Count: n})
+			return
+		}
+
+		err = runtime.BindStyledParameterWithOptions("simple", "Idempotency-Key", valueList[0], &IdempotencyKey, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: "uuid"})
+		if err != nil {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "Idempotency-Key", Err: err})
+			return
+		}
+
+		params.IdempotencyKey = &IdempotencyKey
+
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.RevokeDevice(w, r, deviceId, params)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -3003,6 +3062,56 @@ func (siw *ServerInterfaceWrapper) GetProblemType(w http.ResponseWriter, r *http
 	handler.ServeHTTP(w, r)
 }
 
+// RevokeSession operation middleware
+func (siw *ServerInterfaceWrapper) RevokeSession(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "session_id" -------------
+	var sessionId SessionIdPath
+
+	err = runtime.BindStyledParameterWithOptions("simple", "session_id", r.PathValue("session_id"), &sessionId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "uuid", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "session_id", Err: err})
+		return
+	}
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params RevokeSessionParams
+
+	headers := r.Header
+
+	// ------------- Optional header parameter "Idempotency-Key" -------------
+	if valueList, found := headers[http.CanonicalHeaderKey("Idempotency-Key")]; found {
+		var IdempotencyKey IdempotencyKey
+		n := len(valueList)
+		if n != 1 {
+			siw.ErrorHandlerFunc(w, r, &TooManyValuesForParamError{ParamName: "Idempotency-Key", Count: n})
+			return
+		}
+
+		err = runtime.BindStyledParameterWithOptions("simple", "Idempotency-Key", valueList[0], &IdempotencyKey, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: "uuid"})
+		if err != nil {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "Idempotency-Key", Err: err})
+			return
+		}
+
+		params.IdempotencyKey = &IdempotencyKey
+
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.RevokeSession(w, r, sessionId, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
 // RotateSigningKey operation middleware
 func (siw *ServerInterfaceWrapper) RotateSigningKey(w http.ResponseWriter, r *http.Request) {
 
@@ -3331,6 +3440,56 @@ func (siw *ServerInterfaceWrapper) ListUserDevices(w http.ResponseWriter, r *htt
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		siw.Handler.ListUserDevices(w, r, userId, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// DisableUser operation middleware
+func (siw *ServerInterfaceWrapper) DisableUser(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "user_id" -------------
+	var userId UserIdPath
+
+	err = runtime.BindStyledParameterWithOptions("simple", "user_id", r.PathValue("user_id"), &userId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "uuid", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "user_id", Err: err})
+		return
+	}
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params DisableUserParams
+
+	headers := r.Header
+
+	// ------------- Optional header parameter "Idempotency-Key" -------------
+	if valueList, found := headers[http.CanonicalHeaderKey("Idempotency-Key")]; found {
+		var IdempotencyKey IdempotencyKey
+		n := len(valueList)
+		if n != 1 {
+			siw.ErrorHandlerFunc(w, r, &TooManyValuesForParamError{ParamName: "Idempotency-Key", Count: n})
+			return
+		}
+
+		err = runtime.BindStyledParameterWithOptions("simple", "Idempotency-Key", valueList[0], &IdempotencyKey, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: "uuid"})
+		if err != nil {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "Idempotency-Key", Err: err})
+			return
+		}
+
+		params.IdempotencyKey = &IdempotencyKey
+
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.DisableUser(w, r, userId, params)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -3715,6 +3874,7 @@ func HandlerWithOptions(si ServerInterface, options StdHTTPServerOptions) http.H
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/users", wrapper.CreateUser)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/users/{user_id}", wrapper.GetUser)
 	m.HandleFunc(http.MethodPatch+" "+options.BaseURL+"/users/{user_id}", wrapper.UpdateUser)
+	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/users/{user_id}/disable", wrapper.DisableUser)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/users/{user_id}/enable", wrapper.EnableUser)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/users/{user_id}/enrollment-codes", wrapper.CreateEnrollmentCode)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/users/{user_id}/credentials", wrapper.GetUserCredentials)
@@ -3729,8 +3889,10 @@ func HandlerWithOptions(si ServerInterface, options StdHTTPServerOptions) http.H
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/me/devices/pairings", wrapper.ApprovePairing)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/devices/{device_id}", wrapper.GetDevice)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/devices/{device_id}/approve", wrapper.ApproveDevice)
+	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/devices/{device_id}/revoke", wrapper.RevokeDevice)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/me/sessions", wrapper.ListMySessions)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/me/sessions/extensions", wrapper.CreateExtensionSession)
+	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/sessions/{session_id}/revoke", wrapper.RevokeSession)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/principals/{principal_id}/tokens", wrapper.ListTokens)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/principals/{principal_id}/tokens", wrapper.CreateToken)
 	m.HandleFunc(http.MethodDelete+" "+options.BaseURL+"/tokens/{token_id}", wrapper.RevokeToken)
@@ -8911,6 +9073,198 @@ type ApproveDevicedefaultApplicationProblemPlusJSONResponse struct {
 }
 
 func (response ApproveDevicedefaultApplicationProblemPlusJSONResponse) VisitApproveDeviceResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	if response.Headers.CorrelationId != nil {
+		w.Header().Set("Correlation-Id", fmt.Sprint(*response.Headers.CorrelationId))
+	}
+	w.WriteHeader(response.StatusCode)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type RevokeDeviceRequestObject struct {
+	DeviceId DeviceIdPath `json:"device_id"`
+	Params   RevokeDeviceParams
+	Body     *RevokeDeviceJSONRequestBody
+}
+
+type RevokeDeviceResponseObject interface {
+	VisitRevokeDeviceResponse(w http.ResponseWriter) error
+}
+
+type RevokeDevice200ResponseHeaders struct {
+	CorrelationId   *CorrelationId
+	RateLimit       *string
+	RateLimitPolicy *string
+}
+
+type RevokeDevice200JSONResponse struct {
+	Body    Device
+	Headers RevokeDevice200ResponseHeaders
+}
+
+func (response RevokeDevice200JSONResponse) VisitRevokeDeviceResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	if response.Headers.CorrelationId != nil {
+		w.Header().Set("Correlation-Id", fmt.Sprint(*response.Headers.CorrelationId))
+	}
+	if response.Headers.RateLimit != nil {
+		w.Header().Set("RateLimit", fmt.Sprint(*response.Headers.RateLimit))
+	}
+	if response.Headers.RateLimitPolicy != nil {
+		w.Header().Set("RateLimit-Policy", fmt.Sprint(*response.Headers.RateLimitPolicy))
+	}
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type RevokeDevice400ApplicationProblemPlusJSONResponse struct {
+	BadRequestApplicationProblemPlusJSONResponse
+}
+
+func (response RevokeDevice400ApplicationProblemPlusJSONResponse) VisitRevokeDeviceResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	if response.Headers.CorrelationId != nil {
+		w.Header().Set("Correlation-Id", fmt.Sprint(*response.Headers.CorrelationId))
+	}
+	w.WriteHeader(400)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type RevokeDevice401ApplicationProblemPlusJSONResponse struct {
+	UnauthorizedApplicationProblemPlusJSONResponse
+}
+
+func (response RevokeDevice401ApplicationProblemPlusJSONResponse) VisitRevokeDeviceResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	if response.Headers.CorrelationId != nil {
+		w.Header().Set("Correlation-Id", fmt.Sprint(*response.Headers.CorrelationId))
+	}
+	if response.Headers.DPoPNonce != nil {
+		w.Header().Set("DPoP-Nonce", fmt.Sprint(*response.Headers.DPoPNonce))
+	}
+	if response.Headers.WWWAuthenticate != nil {
+		w.Header().Set("WWW-Authenticate", fmt.Sprint(*response.Headers.WWWAuthenticate))
+	}
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type RevokeDevice403ApplicationProblemPlusJSONResponse struct {
+	ForbiddenApplicationProblemPlusJSONResponse
+}
+
+func (response RevokeDevice403ApplicationProblemPlusJSONResponse) VisitRevokeDeviceResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	if response.Headers.CorrelationId != nil {
+		w.Header().Set("Correlation-Id", fmt.Sprint(*response.Headers.CorrelationId))
+	}
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type RevokeDevice404ApplicationProblemPlusJSONResponse struct {
+	NotFoundApplicationProblemPlusJSONResponse
+}
+
+func (response RevokeDevice404ApplicationProblemPlusJSONResponse) VisitRevokeDeviceResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	if response.Headers.CorrelationId != nil {
+		w.Header().Set("Correlation-Id", fmt.Sprint(*response.Headers.CorrelationId))
+	}
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type RevokeDevice422ApplicationProblemPlusJSONResponse struct {
+	UnprocessableEntityApplicationProblemPlusJSONResponse
+}
+
+func (response RevokeDevice422ApplicationProblemPlusJSONResponse) VisitRevokeDeviceResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	if response.Headers.CorrelationId != nil {
+		w.Header().Set("Correlation-Id", fmt.Sprint(*response.Headers.CorrelationId))
+	}
+	w.WriteHeader(422)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type RevokeDevice429ApplicationProblemPlusJSONResponse struct {
+	TooManyRequestsApplicationProblemPlusJSONResponse
+}
+
+func (response RevokeDevice429ApplicationProblemPlusJSONResponse) VisitRevokeDeviceResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	if response.Headers.CorrelationId != nil {
+		w.Header().Set("Correlation-Id", fmt.Sprint(*response.Headers.CorrelationId))
+	}
+	if response.Headers.RateLimit != nil {
+		w.Header().Set("RateLimit", fmt.Sprint(*response.Headers.RateLimit))
+	}
+	if response.Headers.RateLimitPolicy != nil {
+		w.Header().Set("RateLimit-Policy", fmt.Sprint(*response.Headers.RateLimitPolicy))
+	}
+	if response.Headers.RetryAfter != nil {
+		w.Header().Set("Retry-After", fmt.Sprint(*response.Headers.RetryAfter))
+	}
+	w.WriteHeader(429)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type RevokeDevicedefaultApplicationProblemPlusJSONResponse struct {
+	Body       Problem
+	Headers    ErrorResponseHeaders
+	StatusCode int
+}
+
+func (response RevokeDevicedefaultApplicationProblemPlusJSONResponse) VisitRevokeDeviceResponse(w http.ResponseWriter) error {
 
 	var buf bytes.Buffer
 	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
@@ -16070,6 +16424,189 @@ func (response GetProblemTypedefaultApplicationProblemPlusJSONResponse) VisitGet
 	return err
 }
 
+type RevokeSessionRequestObject struct {
+	SessionId SessionIdPath `json:"session_id"`
+	Params    RevokeSessionParams
+}
+
+type RevokeSessionResponseObject interface {
+	VisitRevokeSessionResponse(w http.ResponseWriter) error
+}
+
+type RevokeSession204ResponseHeaders struct {
+	CorrelationId   *CorrelationId
+	RateLimit       *string
+	RateLimitPolicy *string
+}
+
+type RevokeSession204Response struct {
+	Headers RevokeSession204ResponseHeaders
+}
+
+func (response RevokeSession204Response) VisitRevokeSessionResponse(w http.ResponseWriter) error {
+	if response.Headers.CorrelationId != nil {
+		w.Header().Set("Correlation-Id", fmt.Sprint(*response.Headers.CorrelationId))
+	}
+	if response.Headers.RateLimit != nil {
+		w.Header().Set("RateLimit", fmt.Sprint(*response.Headers.RateLimit))
+	}
+	if response.Headers.RateLimitPolicy != nil {
+		w.Header().Set("RateLimit-Policy", fmt.Sprint(*response.Headers.RateLimitPolicy))
+	}
+	w.WriteHeader(204)
+	return nil
+}
+
+type RevokeSession400ApplicationProblemPlusJSONResponse struct {
+	BadRequestApplicationProblemPlusJSONResponse
+}
+
+func (response RevokeSession400ApplicationProblemPlusJSONResponse) VisitRevokeSessionResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	if response.Headers.CorrelationId != nil {
+		w.Header().Set("Correlation-Id", fmt.Sprint(*response.Headers.CorrelationId))
+	}
+	w.WriteHeader(400)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type RevokeSession401ApplicationProblemPlusJSONResponse struct {
+	UnauthorizedApplicationProblemPlusJSONResponse
+}
+
+func (response RevokeSession401ApplicationProblemPlusJSONResponse) VisitRevokeSessionResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	if response.Headers.CorrelationId != nil {
+		w.Header().Set("Correlation-Id", fmt.Sprint(*response.Headers.CorrelationId))
+	}
+	if response.Headers.DPoPNonce != nil {
+		w.Header().Set("DPoP-Nonce", fmt.Sprint(*response.Headers.DPoPNonce))
+	}
+	if response.Headers.WWWAuthenticate != nil {
+		w.Header().Set("WWW-Authenticate", fmt.Sprint(*response.Headers.WWWAuthenticate))
+	}
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type RevokeSession403ApplicationProblemPlusJSONResponse struct {
+	ForbiddenApplicationProblemPlusJSONResponse
+}
+
+func (response RevokeSession403ApplicationProblemPlusJSONResponse) VisitRevokeSessionResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	if response.Headers.CorrelationId != nil {
+		w.Header().Set("Correlation-Id", fmt.Sprint(*response.Headers.CorrelationId))
+	}
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type RevokeSession404ApplicationProblemPlusJSONResponse struct {
+	NotFoundApplicationProblemPlusJSONResponse
+}
+
+func (response RevokeSession404ApplicationProblemPlusJSONResponse) VisitRevokeSessionResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	if response.Headers.CorrelationId != nil {
+		w.Header().Set("Correlation-Id", fmt.Sprint(*response.Headers.CorrelationId))
+	}
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type RevokeSession422ApplicationProblemPlusJSONResponse struct {
+	UnprocessableEntityApplicationProblemPlusJSONResponse
+}
+
+func (response RevokeSession422ApplicationProblemPlusJSONResponse) VisitRevokeSessionResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	if response.Headers.CorrelationId != nil {
+		w.Header().Set("Correlation-Id", fmt.Sprint(*response.Headers.CorrelationId))
+	}
+	w.WriteHeader(422)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type RevokeSession429ApplicationProblemPlusJSONResponse struct {
+	TooManyRequestsApplicationProblemPlusJSONResponse
+}
+
+func (response RevokeSession429ApplicationProblemPlusJSONResponse) VisitRevokeSessionResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	if response.Headers.CorrelationId != nil {
+		w.Header().Set("Correlation-Id", fmt.Sprint(*response.Headers.CorrelationId))
+	}
+	if response.Headers.RateLimit != nil {
+		w.Header().Set("RateLimit", fmt.Sprint(*response.Headers.RateLimit))
+	}
+	if response.Headers.RateLimitPolicy != nil {
+		w.Header().Set("RateLimit-Policy", fmt.Sprint(*response.Headers.RateLimitPolicy))
+	}
+	if response.Headers.RetryAfter != nil {
+		w.Header().Set("Retry-After", fmt.Sprint(*response.Headers.RetryAfter))
+	}
+	w.WriteHeader(429)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type RevokeSessiondefaultApplicationProblemPlusJSONResponse struct {
+	Body       Problem
+	Headers    ErrorResponseHeaders
+	StatusCode int
+}
+
+func (response RevokeSessiondefaultApplicationProblemPlusJSONResponse) VisitRevokeSessionResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	if response.Headers.CorrelationId != nil {
+		w.Header().Set("Correlation-Id", fmt.Sprint(*response.Headers.CorrelationId))
+	}
+	w.WriteHeader(response.StatusCode)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
 type RotateSigningKeyRequestObject struct {
 	Params RotateSigningKeyParams
 	Body   *RotateSigningKeyJSONRequestBody
@@ -17454,6 +17991,217 @@ func (response ListUserDevicesdefaultApplicationProblemPlusJSONResponse) VisitLi
 	return err
 }
 
+type DisableUserRequestObject struct {
+	UserId UserIdPath `json:"user_id"`
+	Params DisableUserParams
+	Body   *DisableUserJSONRequestBody
+}
+
+type DisableUserResponseObject interface {
+	VisitDisableUserResponse(w http.ResponseWriter) error
+}
+
+type DisableUser200ResponseHeaders struct {
+	CorrelationId   *CorrelationId
+	RateLimit       *string
+	RateLimitPolicy *string
+}
+
+type DisableUser200JSONResponse struct {
+	Body    User
+	Headers DisableUser200ResponseHeaders
+}
+
+func (response DisableUser200JSONResponse) VisitDisableUserResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	if response.Headers.CorrelationId != nil {
+		w.Header().Set("Correlation-Id", fmt.Sprint(*response.Headers.CorrelationId))
+	}
+	if response.Headers.RateLimit != nil {
+		w.Header().Set("RateLimit", fmt.Sprint(*response.Headers.RateLimit))
+	}
+	if response.Headers.RateLimitPolicy != nil {
+		w.Header().Set("RateLimit-Policy", fmt.Sprint(*response.Headers.RateLimitPolicy))
+	}
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type DisableUser400ApplicationProblemPlusJSONResponse struct {
+	BadRequestApplicationProblemPlusJSONResponse
+}
+
+func (response DisableUser400ApplicationProblemPlusJSONResponse) VisitDisableUserResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	if response.Headers.CorrelationId != nil {
+		w.Header().Set("Correlation-Id", fmt.Sprint(*response.Headers.CorrelationId))
+	}
+	w.WriteHeader(400)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type DisableUser401ApplicationProblemPlusJSONResponse struct {
+	UnauthorizedApplicationProblemPlusJSONResponse
+}
+
+func (response DisableUser401ApplicationProblemPlusJSONResponse) VisitDisableUserResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	if response.Headers.CorrelationId != nil {
+		w.Header().Set("Correlation-Id", fmt.Sprint(*response.Headers.CorrelationId))
+	}
+	if response.Headers.DPoPNonce != nil {
+		w.Header().Set("DPoP-Nonce", fmt.Sprint(*response.Headers.DPoPNonce))
+	}
+	if response.Headers.WWWAuthenticate != nil {
+		w.Header().Set("WWW-Authenticate", fmt.Sprint(*response.Headers.WWWAuthenticate))
+	}
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type DisableUser403ApplicationProblemPlusJSONResponse struct {
+	ForbiddenApplicationProblemPlusJSONResponse
+}
+
+func (response DisableUser403ApplicationProblemPlusJSONResponse) VisitDisableUserResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	if response.Headers.CorrelationId != nil {
+		w.Header().Set("Correlation-Id", fmt.Sprint(*response.Headers.CorrelationId))
+	}
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type DisableUser404ApplicationProblemPlusJSONResponse struct {
+	NotFoundApplicationProblemPlusJSONResponse
+}
+
+func (response DisableUser404ApplicationProblemPlusJSONResponse) VisitDisableUserResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	if response.Headers.CorrelationId != nil {
+		w.Header().Set("Correlation-Id", fmt.Sprint(*response.Headers.CorrelationId))
+	}
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type DisableUser409ApplicationProblemPlusJSONResponse struct {
+	ConflictApplicationProblemPlusJSONResponse
+}
+
+func (response DisableUser409ApplicationProblemPlusJSONResponse) VisitDisableUserResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	if response.Headers.CorrelationId != nil {
+		w.Header().Set("Correlation-Id", fmt.Sprint(*response.Headers.CorrelationId))
+	}
+	w.WriteHeader(409)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type DisableUser422ApplicationProblemPlusJSONResponse struct {
+	UnprocessableEntityApplicationProblemPlusJSONResponse
+}
+
+func (response DisableUser422ApplicationProblemPlusJSONResponse) VisitDisableUserResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	if response.Headers.CorrelationId != nil {
+		w.Header().Set("Correlation-Id", fmt.Sprint(*response.Headers.CorrelationId))
+	}
+	w.WriteHeader(422)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type DisableUser429ApplicationProblemPlusJSONResponse struct {
+	TooManyRequestsApplicationProblemPlusJSONResponse
+}
+
+func (response DisableUser429ApplicationProblemPlusJSONResponse) VisitDisableUserResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	if response.Headers.CorrelationId != nil {
+		w.Header().Set("Correlation-Id", fmt.Sprint(*response.Headers.CorrelationId))
+	}
+	if response.Headers.RateLimit != nil {
+		w.Header().Set("RateLimit", fmt.Sprint(*response.Headers.RateLimit))
+	}
+	if response.Headers.RateLimitPolicy != nil {
+		w.Header().Set("RateLimit-Policy", fmt.Sprint(*response.Headers.RateLimitPolicy))
+	}
+	if response.Headers.RetryAfter != nil {
+		w.Header().Set("Retry-After", fmt.Sprint(*response.Headers.RetryAfter))
+	}
+	w.WriteHeader(429)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type DisableUserdefaultApplicationProblemPlusJSONResponse struct {
+	Body       Problem
+	Headers    ErrorResponseHeaders
+	StatusCode int
+}
+
+func (response DisableUserdefaultApplicationProblemPlusJSONResponse) VisitDisableUserResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	if response.Headers.CorrelationId != nil {
+		w.Header().Set("Correlation-Id", fmt.Sprint(*response.Headers.CorrelationId))
+	}
+	w.WriteHeader(response.StatusCode)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
 type EnableUserRequestObject struct {
 	UserId UserIdPath `json:"user_id"`
 	Params EnableUserParams
@@ -18505,6 +19253,9 @@ type StrictServerInterface interface {
 	// ApproveDevice Approve a pending device
 	// (POST /devices/{device_id}/approve)
 	ApproveDevice(ctx context.Context, request ApproveDeviceRequestObject) (ApproveDeviceResponseObject, error)
+	// RevokeDevice Revoke a device
+	// (POST /devices/{device_id}/revoke)
+	RevokeDevice(ctx context.Context, request RevokeDeviceRequestObject) (RevokeDeviceResponseObject, error)
 	// ListFeatureFlags List feature flags
 	// (GET /feature-flags)
 	ListFeatureFlags(ctx context.Context, request ListFeatureFlagsRequestObject) (ListFeatureFlagsResponseObject, error)
@@ -18634,6 +19385,9 @@ type StrictServerInterface interface {
 	// GetProblemType Documentation of a problem type
 	// (GET /problems/{code})
 	GetProblemType(ctx context.Context, request GetProblemTypeRequestObject) (GetProblemTypeResponseObject, error)
+	// RevokeSession End a session
+	// (POST /sessions/{session_id}/revoke)
+	RevokeSession(ctx context.Context, request RevokeSessionRequestObject) (RevokeSessionResponseObject, error)
 	// RotateSigningKey Rotate a server signing key
 	// (POST /signing-keys/rotate)
 	RotateSigningKey(ctx context.Context, request RotateSigningKeyRequestObject) (RotateSigningKeyResponseObject, error)
@@ -18658,6 +19412,9 @@ type StrictServerInterface interface {
 	// ListUserDevices List devices of a person
 	// (GET /users/{user_id}/devices)
 	ListUserDevices(ctx context.Context, request ListUserDevicesRequestObject) (ListUserDevicesResponseObject, error)
+	// DisableUser Disable a person
+	// (POST /users/{user_id}/disable)
+	DisableUser(ctx context.Context, request DisableUserRequestObject) (DisableUserResponseObject, error)
 	// EnableUser Enable a person
 	// (POST /users/{user_id}/enable)
 	EnableUser(ctx context.Context, request EnableUserRequestObject) (EnableUserResponseObject, error)
@@ -19632,6 +20389,40 @@ func (sh *strictHandler) ApproveDevice(w http.ResponseWriter, r *http.Request, d
 		sh.options.ResponseErrorHandlerFunc(w, r, err)
 	} else if validResponse, ok := response.(ApproveDeviceResponseObject); ok {
 		if err := validResponse.VisitApproveDeviceResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// RevokeDevice operation middleware
+func (sh *strictHandler) RevokeDevice(w http.ResponseWriter, r *http.Request, deviceId DeviceIdPath, params RevokeDeviceParams) {
+	var request RevokeDeviceRequestObject
+
+	request.DeviceId = deviceId
+	request.Params = params
+
+	var body RevokeDeviceJSONRequestBody
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
+		return
+	}
+	request.Body = &body
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.RevokeDevice(ctx, request.(RevokeDeviceRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "RevokeDevice")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(RevokeDeviceResponseObject); ok {
+		if err := validResponse.VisitRevokeDeviceResponse(w); err != nil {
 			sh.options.ResponseErrorHandlerFunc(w, r, err)
 		}
 	} else if response != nil {
@@ -20878,6 +21669,33 @@ func (sh *strictHandler) GetProblemType(w http.ResponseWriter, r *http.Request, 
 	}
 }
 
+// RevokeSession operation middleware
+func (sh *strictHandler) RevokeSession(w http.ResponseWriter, r *http.Request, sessionId SessionIdPath, params RevokeSessionParams) {
+	var request RevokeSessionRequestObject
+
+	request.SessionId = sessionId
+	request.Params = params
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.RevokeSession(ctx, request.(RevokeSessionRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "RevokeSession")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(RevokeSessionResponseObject); ok {
+		if err := validResponse.VisitRevokeSessionResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
 // RotateSigningKey operation middleware
 func (sh *strictHandler) RotateSigningKey(w http.ResponseWriter, r *http.Request, params RotateSigningKeyParams) {
 	var request RotateSigningKeyRequestObject
@@ -21102,6 +21920,40 @@ func (sh *strictHandler) ListUserDevices(w http.ResponseWriter, r *http.Request,
 		sh.options.ResponseErrorHandlerFunc(w, r, err)
 	} else if validResponse, ok := response.(ListUserDevicesResponseObject); ok {
 		if err := validResponse.VisitListUserDevicesResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// DisableUser operation middleware
+func (sh *strictHandler) DisableUser(w http.ResponseWriter, r *http.Request, userId UserIdPath, params DisableUserParams) {
+	var request DisableUserRequestObject
+
+	request.UserId = userId
+	request.Params = params
+
+	var body DisableUserJSONRequestBody
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
+		return
+	}
+	request.Body = &body
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.DisableUser(ctx, request.(DisableUserRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "DisableUser")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(DisableUserResponseObject); ok {
+		if err := validResponse.VisitDisableUserResponse(w); err != nil {
 			sh.options.ResponseErrorHandlerFunc(w, r, err)
 		}
 	} else if response != nil {

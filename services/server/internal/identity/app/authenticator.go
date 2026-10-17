@@ -7,6 +7,7 @@ import (
 	"errors"
 	"log/slog"
 	"strings"
+	"time"
 
 	"github.com/OWNER/bothy/services/server/internal/identity"
 	"github.com/OWNER/bothy/services/server/internal/identity/domain/apitoken"
@@ -203,9 +204,15 @@ func (a *Authenticator) person(ctx context.Context, creds actor.Credentials, tok
 		out.AuthMethod = c.AMR[0]
 	}
 	if !found {
+		out.CredentialInactive = true
 		return out, nil
 	}
 	a.describe(&out, st)
+	// A revoked session, device or key is a dead credential like a revoked API token: authorize
+	// still refuses and audits it, but no stage before it replays a stored answer to it (07 SR7,
+	// 06 section 7, M1-45).
+	out.CredentialInactive = !out.SessionActive || !out.DeviceKeyActive ||
+		out.DeviceState != string(identity.DeviceStateActive) && out.DeviceState != string(identity.DeviceStatePending)
 	if out.SessionActive && a.bind != nil {
 		ok, err := a.bind.Bound(ctx, st.Session)
 		if err != nil {
@@ -215,7 +222,11 @@ func (a *Authenticator) person(ctx context.Context, creds actor.Credentials, tok
 			return actor.Actor{}, a.unbind(ctx, out)
 		}
 	}
-	a.touch(ctx, st, creds)
+	// An inactive device stays inactive: recording this request as contact would revive it
+	// before identity.auth_cleanup revokes it (08 section 5.4).
+	if !a.inactive(st) {
+		a.touch(ctx, st, creds)
+	}
 	return out, nil
 }
 
@@ -246,11 +257,22 @@ func (a *Authenticator) unbind(ctx context.Context, p actor.Actor) error {
 	return errs.New(errs.CodeSessionRevoked, "")
 }
 
+// inactive reports an active device without contact for auth.device_inactive_revoke_after
+// (last_seen_at, else approved_at; 08 section 5.4): authentication treats it as inactive before
+// the job revokes it, so no request waits for the job (M1-45). Zero switches the check off.
+func (a *Authenticator) inactive(st AuthState) bool {
+	if a.cfg.DeviceInactiveRevokeAfter <= 0 || st.DeviceState != identity.DeviceStateActive {
+		return false
+	}
+	return inactiveSince(st.DeviceLastSeenAt, st.DeviceApprovedAt, time.Time{}, a.clk.Now().Add(-a.cfg.DeviceInactiveRevokeAfter))
+}
+
 // describe fills the actor from the session, device and key read for this request. The session is
 // active only when it is not revoked, has not ended and belongs to sub and did; the device state
 // counts only for the device of the token, and a pending device past auth.device_pending_ttl is
 // revoked, so authorize answers 401 (device_inactive) even before the cleanup job revokes it
-// (M1-38); the key is active only when cnf.jkt is the device's active dpop key.
+// (M1-38); the key is active only when cnf.jkt is the device's active dpop key and the device is
+// not inactive (M1-45; authorize then answers device_inactive).
 func (a *Authenticator) describe(out *actor.Actor, st AuthState) {
 	s := st.Session
 	now := a.clk.Now()
@@ -262,7 +284,7 @@ func (a *Authenticator) describe(out *actor.Actor, st AuthState) {
 			out.DeviceState = actor.DeviceRevoked
 		}
 	}
-	out.DeviceKeyActive = own && st.DeviceKeyJKT != "" && st.DeviceKeyJKT == out.KeyThumbprint
+	out.DeviceKeyActive = own && st.DeviceKeyJKT != "" && st.DeviceKeyJKT == out.KeyThumbprint && !a.inactive(st)
 	out.StepUpAt, out.StepUpMethod = s.StepUpAt, s.StepUpMethod
 	out.AuthMethod, out.ClientComponent = string(s.AuthMethod), string(s.Component)
 }

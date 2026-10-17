@@ -147,7 +147,8 @@ func (r *Repository) AuthState(ctx context.Context, id ids.ID) (app.AuthState, b
 	}
 	return app.AuthState{
 		Session: toSession(row.AuthSession), DeviceState: identity.DeviceState(row.DeviceState),
-		DeviceLastSeenAt: timeOf(row.DeviceLastSeenAt), DeviceKeyJKT: row.DpopJkt.String, DeviceCreatedAt: timeOf(row.DeviceCreatedAt),
+		DeviceLastSeenAt: timeOf(row.DeviceLastSeenAt), DeviceApprovedAt: timeOf(row.DeviceApprovedAt), DeviceKeyJKT: row.DpopJkt.String,
+		DeviceCreatedAt: timeOf(row.DeviceCreatedAt),
 	}, true, nil
 }
 

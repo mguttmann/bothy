@@ -43,7 +43,7 @@ var loginCfg = app.Config{
 	DevicePendingTTL: 24 * time.Hour, DeviceVerificationCodeDigits: 6, PairingCodeTTL: 5 * time.Minute, PairingCodeChars: 8,
 	APITokenMaxTTL: 365 * 24 * time.Hour, PersonalTokenMaxTTL: 90 * 24 * time.Hour, DPoPRequiredFor: []string{"agent"},
 	ServerCodeTTL: time.Minute, OIDCJWKSCacheTTL: time.Hour, OIDCClientAssertionTTL: 2 * time.Minute,
-	IDPRecheckInterval: 7 * 24 * time.Hour,
+	IDPRecheckInterval: 7 * 24 * time.Hour, DeviceInactiveRevokeAfter: 180 * 24 * time.Hour,
 }
 
 // identityOf builds the identity module with its login service over the people world, with real

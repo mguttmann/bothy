@@ -374,8 +374,16 @@ func familyReason(reason identity.SessionRevokeReason) FamilyRevokeReason {
 
 // revoke revokes the sessions of list (already locked, in ascending id) that are not revoked yet,
 // with reason, by the principal by (nil for none): revoked_at and revoke_reason, their active
-// families, one session.revoked per session and SessionEnded. Revoked sessions stay unchanged.
+// families, one session.revoked per session and one SessionEnded per device. Revoked sessions
+// stay unchanged.
 func (s *Sessions) revoke(ctx context.Context, list []SessionRecord, reason identity.SessionRevokeReason, by *ids.ID) error {
+	_, err := s.revokeCounted(ctx, list, reason, by)
+	return err
+}
+
+// revokeCounted is revoke and returns the number of sessions it revoked (M1-45 counts them in
+// the audit details).
+func (s *Sessions) revokeCounted(ctx context.Context, list []SessionRecord, reason identity.SessionRevokeReason, by *ids.ID) (int, error) {
 	var open []ids.ID
 	for _, r := range list {
 		if r.RevokedAt.IsZero() {
@@ -383,35 +391,55 @@ func (s *Sessions) revoke(ctx context.Context, list []SessionRecord, reason iden
 		}
 	}
 	if len(open) == 0 {
-		return nil
+		return 0, nil
 	}
 	now := s.d.Clock.Now()
 	revoked, err := s.d.Store.RevokeSessions(ctx, open, reason, now)
 	if err != nil || len(revoked) == 0 {
-		return err
+		return 0, err
 	}
 	if err := s.d.Store.RevokeActiveFamilies(ctx, revoked, familyReason(reason), now); err != nil {
-		return err
+		return 0, err
 	}
-	first, _ := find(list, revoked[0])
 	kind, actorID := revokeActor(ctx, by)
+	// One SessionEnded per device, in the order of the first session of each device, so a
+	// subscriber that works per device (notify, M3-22) sees the device of every session.
+	var devices []ids.ID
+	byDevice := map[ids.ID]*identity.SessionEnded{}
 	for _, id := range revoked {
-		payload, err := json.Marshal(struct {
-			SessionID string `json:"session_id"`
-			Reason    string `json:"reason"`
-		}{id.String(), string(reason)})
-		if err != nil {
-			return errs.Wrap(errs.CodeInternalError, err, "identity: session.revoked payload")
+		r, _ := find(list, id)
+		if err := s.appendRevoked(ctx, r, reason, kind, actorID); err != nil {
+			return 0, err
 		}
-		err = s.d.Events.Append(ctx, eventlog.Event{
-			Type: eventSessionRevoked, SchemaVersion: 1, ActorKind: kind, ActorPrincipalID: actorID,
-			ResourceKind: resourceAuthSession, ResourceID: id, AudiencePrincipalID: first.UserID, ReceiveAction: receiveSelf, Payload: payload,
-		})
-		if err != nil {
-			return err
+		ev, ok := byDevice[r.DeviceID]
+		if !ok {
+			ev = &identity.SessionEnded{UserID: r.UserID, DeviceID: r.DeviceID, Reason: reason, At: now}
+			byDevice[r.DeviceID] = ev
+			devices = append(devices, r.DeviceID)
+		}
+		ev.SessionIDs = append(ev.SessionIDs, id)
+	}
+	for _, d := range devices {
+		if err := txn.Publish(ctx, *byDevice[d]); err != nil {
+			return 0, err
 		}
 	}
-	return txn.Publish(ctx, identity.SessionEnded{SessionIDs: revoked, UserID: first.UserID, DeviceID: first.DeviceID, Reason: reason})
+	return len(revoked), nil
+}
+
+// appendRevoked appends session.revoked for the session r (audience self, its person).
+func (s *Sessions) appendRevoked(ctx context.Context, r SessionRecord, reason identity.SessionRevokeReason, kind eventlog.ActorKind, actorID ids.ID) error {
+	payload, err := json.Marshal(struct {
+		SessionID string `json:"session_id"`
+		Reason    string `json:"reason"`
+	}{r.ID.String(), string(reason)})
+	if err != nil {
+		return errs.Wrap(errs.CodeInternalError, err, "identity: session.revoked payload")
+	}
+	return s.d.Events.Append(ctx, eventlog.Event{
+		Type: eventSessionRevoked, SchemaVersion: 1, ActorKind: kind, ActorPrincipalID: actorID,
+		ResourceKind: resourceAuthSession, ResourceID: r.ID, AudiencePrincipalID: r.UserID, ReceiveAction: receiveSelf, Payload: payload,
+	})
 }
 
 // revokeActor is the actor of session.revoked: by with the kind of the request's principal when

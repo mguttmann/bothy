@@ -176,7 +176,8 @@ func (s *Service) revokeUnconfirmedDevice(ctx context.Context, deviceID ids.ID, 
 	if by != nil {
 		byID = *by
 	}
-	userID, revoked, err := s.d.Devices.RevokeDevice(ctx, deviceID, reason, byID, s.d.Clock.Now())
+	at := s.d.Clock.Now()
+	userID, revoked, err := s.d.Devices.RevokeDevice(ctx, deviceID, reason, byID, at)
 	if err != nil || !revoked {
 		return err
 	}
@@ -189,7 +190,7 @@ func (s *Service) revokeUnconfirmedDevice(ctx context.Context, deviceID ids.ID, 
 			return err
 		}
 	}
-	return txn.Publish(ctx, identity.DeviceRevoked{DeviceID: deviceID, UserID: userID, Reason: reason})
+	return txn.Publish(ctx, identity.DeviceRevoked{DeviceID: deviceID, UserID: userID, Reason: reason, At: at})
 }
 
 // expireChange declares the rights change of the system action device.expire for the person of a

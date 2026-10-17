@@ -755,6 +755,21 @@ documented in this file. The format is based on
   `bothy config check --secrets` resolves the two S3 references only with that driver.
 - Lint: depguard allows the AWS SDK only in `internal/files/adapters/s3`, forbidigo forbids
   `DeleteObjects` and `PresignGetObject`; the module register has the vendor group `awssdk`.
+- Disable a person, revoke a device, end a session (M1-45): the port `identity.Lifecycle`
+  (`DisableUser`, `RevokeDevice`, `RevokeSession`), the in-transaction event
+  `identity.DeviceRevoked` and the operations `disableUser` (owner, step-up), `revokeDevice`
+  (self or owner, step-up) and `revokeSession` (self or owner). Each runs in one rights change in
+  the order of 08 sections 10 and 11: the person `disabled` with all sessions, families, devices,
+  keys and personal API tokens revoked (the last active owner gets `409 last_owner` and nothing
+  changes); the device with its keys, sessions and families revoked; the session and its child
+  sessions ended (`logout` for the own session, `admin` otherwise). Every ended session appends
+  one `session.revoked`, `permission_version` rises, and from the commit on every request with a
+  token of the person, device or session is `401 session_revoked`, also with an
+  `Idempotency-Key` whose answer was stored before (the actor is `CredentialInactive`, so no
+  stored answer is replayed to it). Repeating a revocation
+  succeeds without effect (audit `no_change`). The new key `auth.device_inactive_revoke_after`
+  (`180d`): an active device without contact for that long is refused at once and revoked by
+  `identity.auth_cleanup` (`device.expire`, reason `inactive`).
 
 ### Changed
 
@@ -786,6 +801,9 @@ documented in this file. The format is based on
 - Go coverage of the module leaves generated files (`*.gen.go`) out of the total.
 - `wire.MigrateUpSteps` takes `wire.MigrateUpConfig` (jobs schema and the event log values) and
   `wire.NewJobRegistry` takes `wire.JobModules`; the txn registry needs the sync hook as well.
+- `identity.SessionEnded` carries `At`, and a revocation that ends sessions on several devices
+  publishes one event per device (M1-45). `app.NewAuthCleanup` takes the device sweep
+  (`app.DeviceExpirer`), and `AuthCleanup.Run` returns deleted challenges plus revoked devices.
 
 ### Fixed
 

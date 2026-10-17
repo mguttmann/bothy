@@ -385,7 +385,7 @@ Source: [08-identity.md](../spec/08-identity.md), section 18.
 | `auth.device_verification_code_digits` | `BOTHY_AUTH__DEVICE_VERIFICATION_CODE_DIGITS` | Server | int | `6` | Length of the verification code | active |
 | `auth.pairing_code_ttl` | `BOTHY_AUTH__PAIRING_CODE_TTL` | Server | duration | `5m` | Validity of a pairing code | active |
 | `auth.pairing_code_chars` | `BOTHY_AUTH__PAIRING_CODE_CHARS` | Server | int | `8` | Length of the pairing code (Crockford Base32, 40 bits) | active |
-| `auth.device_inactive_revoke_after` | `BOTHY_AUTH__DEVICE_INACTIVE_REVOKE_AFTER` | Server |  | `180d` | a device without contact is revoked | planned (M1) |
+| `auth.device_inactive_revoke_after` | `BOTHY_AUTH__DEVICE_INACTIVE_REVOKE_AFTER` | Server | duration | `180d` | a device without contact is revoked | active |
 | `auth.cleanup_interval` | `BOTHY_AUTH__CLEANUP_INTERVAL` | Server | duration | `1h` | Interval of the job `identity.auth_cleanup` (delete expired challenges, login flows and pairings, revoke pending and unused devices) | active |
 | `auth.step_up_challenge_ttl` | `BOTHY_AUTH__STEP_UP_CHALLENGE_TTL` | Server | duration | `2m` | Validity of a step-up challenge | active |
 | `auth.step_up_fail_limit` | `BOTHY_AUTH__STEP_UP_FAIL_LIMIT` | Server | int | `5` | Failed step-up attempts per window | active |

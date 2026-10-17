@@ -15621,6 +15621,12 @@ type ApproveDeviceParams struct {
 	IdempotencyKey *IdempotencyKey `json:"Idempotency-Key,omitempty"`
 }
 
+// RevokeDeviceParams defines parameters for RevokeDevice.
+type RevokeDeviceParams struct {
+	// IdempotencyKey UUIDv7 chosen by the client per logical operation. A repeat with the same request returns the stored response; a different request gives 422 `idempotency_key_reuse`; a repeat while the first is running gives 409 `request_in_progress`. Kept for `sync.idempotency_key_ttl`.
+	IdempotencyKey *IdempotencyKey `json:"Idempotency-Key,omitempty"`
+}
+
 // PutFeatureFlagParams defines parameters for PutFeatureFlag.
 type PutFeatureFlagParams struct {
 	// IfMatch Optional ETag; when given, a mismatch gives 412 `version_conflict`.
@@ -15771,6 +15777,12 @@ type CreateTokenParams struct {
 	IdempotencyKey *IdempotencyKey `json:"Idempotency-Key,omitempty"`
 }
 
+// RevokeSessionParams defines parameters for RevokeSession.
+type RevokeSessionParams struct {
+	// IdempotencyKey UUIDv7 chosen by the client per logical operation. A repeat with the same request returns the stored response; a different request gives 422 `idempotency_key_reuse`; a repeat while the first is running gives 409 `request_in_progress`. Kept for `sync.idempotency_key_ttl`.
+	IdempotencyKey *IdempotencyKey `json:"Idempotency-Key,omitempty"`
+}
+
 // RotateSigningKeyParams defines parameters for RotateSigningKey.
 type RotateSigningKeyParams struct {
 	// IdempotencyKey UUIDv7 chosen by the client per logical operation. A repeat with the same request returns the stored response; a different request gives 422 `idempotency_key_reuse`; a repeat while the first is running gives 409 `request_in_progress`. Kept for `sync.idempotency_key_ttl`.
@@ -15807,6 +15819,12 @@ type ListUserDevicesParams struct {
 	// Cursor Cursor from `next_cursor` of the previous page.
 	Cursor *Cursor `form:"cursor,omitempty" json:"cursor,omitempty"`
 	Limit  *Limit  `form:"limit,omitempty" json:"limit,omitempty"`
+}
+
+// DisableUserParams defines parameters for DisableUser.
+type DisableUserParams struct {
+	// IdempotencyKey UUIDv7 chosen by the client per logical operation. A repeat with the same request returns the stored response; a different request gives 422 `idempotency_key_reuse`; a repeat while the first is running gives 409 `request_in_progress`. Kept for `sync.idempotency_key_ttl`.
+	IdempotencyKey *IdempotencyKey `json:"Idempotency-Key,omitempty"`
 }
 
 // EnableUserParams defines parameters for EnableUser.
@@ -15894,6 +15912,9 @@ type LoginWithTrustedHeaderJSONRequestBody = TrustedHeaderLoginRequest
 // ApproveDeviceJSONRequestBody defines body for ApproveDevice for application/json ContentType.
 type ApproveDeviceJSONRequestBody = DeviceApprove
 
+// RevokeDeviceJSONRequestBody defines body for RevokeDevice for application/json ContentType.
+type RevokeDeviceJSONRequestBody = ReasonBody
+
 // PutFeatureFlagJSONRequestBody defines body for PutFeatureFlag for application/json ContentType.
 type PutFeatureFlagJSONRequestBody = FeatureFlagPut
 
@@ -15962,6 +15983,9 @@ type CreateUserJSONRequestBody = UserCreate
 
 // UpdateUserJSONRequestBody defines body for UpdateUser for application/json ContentType.
 type UpdateUserJSONRequestBody = UserUpdate
+
+// DisableUserJSONRequestBody defines body for DisableUser for application/json ContentType.
+type DisableUserJSONRequestBody = ReasonBody
 
 // EnableUserJSONRequestBody defines body for EnableUser for application/json ContentType.
 type EnableUserJSONRequestBody = ReasonBody

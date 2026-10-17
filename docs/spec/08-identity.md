@@ -753,6 +753,20 @@ most secure one and recommends it for applications with personal data
 5. Residual risk: a device that never makes contact again keeps the local cache. Protection then only
    through the device lock, the disk encryption of the operating system and the app lock.
 
+Stored codes (M1-45, [docs/DECISIONS.md](../DECISIONS.md) M1-45): `devices.revoke_reason` is a
+machine code, `revoked_by_self` when the device's own person revokes it, `revoked_by_owner` when an
+owner revokes the device of another person, `user_disabled` from section 11 and `inactive` from
+the job (section 5.4); the free text of the request goes only into the audit entry. The sessions
+of the device (child sessions included) get `auth_sessions.revoke_reason = 'device_revoked'`
+(`inactive` from the job), their families `refresh_token_families.revoke_reason =
+'session_revoked'`. `session.revoke` ends the session and every live child session
+(`parent_session_id`) with `logout` when the session's own person ends it and `admin` otherwise;
+it needs no step-up. Every ended session gives one `session.revoked`, every revoked device one
+in-transaction event `DeviceRevoked`; step 2 for push registrations is a subscriber of
+`DeviceRevoked` and `SessionEnded` (M3-22). Revoking or ending something already revoked succeeds
+without effect: `200` with the device (`204` for a session), an audit entry with `no_change`, no
+new rights version.
+
 ## 11. Disabling a person
 
 `user.disable` (owner, step-up) does the following in **one** transaction, in this order:
@@ -776,6 +790,17 @@ After the commit: the gateway closes connections with `4012`; agents abort. Gran
 group memberships remain in place but have no effect; the console offers "revoke all
 grants" as a separate, deliberate step. Content remains. Disabling, revoking and ending
 something already disabled or revoked succeeds without effect (06, section 2 "No effect").
+
+Stored codes and later steps (M1-45, [docs/DECISIONS.md](../DECISIONS.md) M1-45): sessions get
+`auth_sessions.revoke_reason = 'user_disabled'`, their families `session_revoked`, devices
+(pending ones included) `devices.revoke_reason = 'user_disabled'` with `revoked_by` the owner; the
+owners row, grants and group memberships stay. Step 1 is checked by the invariant check of the
+rights change before the commit (07 section 4.4): the last active owner gets `409 last_owner` and
+nothing of the transaction stays. Step 5 for push registrations is carried out by a subscriber of
+the in-transaction events `DeviceRevoked` and `SessionEnded` (M3-22); step 7 by subscribers of
+`AccessChanged` for runs (M2) and dev environments (V2). Disabling a disabled person succeeds
+without effect (`200`, audit `no_change`, no new rights version); a deleted person gives `409
+invalid_state_transition`.
 
 Afterwards the console shows a list of the steps outside the product: disable the account at the
 identity provider, withdraw network access, replace API keys of external systems that
