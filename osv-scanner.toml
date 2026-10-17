@@ -197,13 +197,6 @@ license.override = ["BSD-3-Clause"]
 reason = "deps.dev knows no license for this pub package; its LICENSE file on pub.dev is BSD-3-Clause. Transitive package of cryptography, test or lints."
 
 [[PackageOverrides]]
-name = "http"
-version = "1.6.0"
-ecosystem = "Pub"
-license.override = ["BSD-3-Clause"]
-reason = "deps.dev knows no license for this pub package; its LICENSE file on pub.dev is BSD-3-Clause. Transitive package of vector_graphics (its network loader), which draws the icon assets of design_system."
-
-[[PackageOverrides]]
 name = "http_multi_server"
 version = "3.2.2"
 ecosystem = "Pub"
@@ -547,4 +540,4 @@ name = "http"
 version = "1.6.0"
 ecosystem = "Pub"
 license.override = ["BSD-3-Clause"]
-reason = "deps.dev knows no license for this pub package; its LICENSE file on pub.dev is BSD-3-Clause. Transitive package of timezone."
+reason = "deps.dev knows no license for this pub package; its LICENSE file on pub.dev is BSD-3-Clause. Transitive package of timezone. Also: Transitive package of vector_graphics (its network loader), which draws the icon assets of design_system."
