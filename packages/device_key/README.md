@@ -8,8 +8,9 @@ Pigeon interface. Two keys per device and server (docs/spec/08-identity.md 6.1, 
 | `dpop` | every DPoP proof | never; the app extensions use it too |
 | `step_up` | step-up confirmations | on every signature (biometrics or device password) |
 
-Status: iOS and macOS (M4-10), Android (M5-01). Windows follows in M4-11; on other platforms
-every call fails with `DeviceKeyError.notAvailable`. Kind: Flutter plugin, a member of the Dart
+Status: iOS and macOS (M4-10), Android (M5-01), Windows (M4-11; the `dpop` key only, see
+"Step-up key on Windows"); on other platforms every call fails with
+`DeviceKeyError.notAvailable`. Kind: Flutter plugin, a member of the Dart
 workspace at the repository root (`resolution: workspace`, `publish_to: none`).
 
 ## API
@@ -41,10 +42,11 @@ await keys.delete(scope); // removes both keys; there is no key change (08 5.4)
 | `StepUpPrompt` | `title`, `subtitle`, `negativeButton` of the Android prompt, from `packages/l10n`; iOS and macOS ignore it |
 | `DeviceKeyException`, `DeviceKeyError` | `userCancelled`, `keyInvalidated` (register as a new device), `notAvailable`, `internal`; never a platform message or key material |
 
-`attestation` returns null on iOS and macOS (App Attest is planned with
-`auth.require_key_attestation`). On Android it returns the key's certificate chain (DER
-certificates, leaf first, concatenated) only when the call creates the key, because Android binds
-the challenge at creation; call it before `ensure` when registering (docs/DECISIONS.md D-M5-01-2).
+`attestation` returns null on iOS, macOS and Windows (App Attest and TPM key attestation are
+planned with `auth.require_key_attestation`). On Android it returns the key's certificate chain
+(DER certificates, leaf first, concatenated) only when the call creates the key, because Android
+binds the challenge at creation; call it before `ensure` when registering (docs/DECISIONS.md
+D-M5-01-2).
 
 ## Storage per platform
 
@@ -53,7 +55,12 @@ the challenge at creation; call it before `ensure` when registering (docs/DECISI
 | iOS, macOS: `dpop` | enclave key, `[.privateKeyUsage]`, `AfterFirstUnlockThisDeviceOnly`, shared access group | software P-256 key in the keychain item, same accessibility and group, `hardwareBound = false` |
 | iOS, macOS: `step_up` | enclave key, `[.privateKeyUsage, .biometryCurrentSet]` with enrolled biometrics, otherwise `[.privateKeyUsage, .userPresence]`; `WhenPasscodeSetThisDeviceOnly` | software key, the keychain item carries `.userPresence`, `WhenPasscodeSetThisDeviceOnly`, `hardwareBound = false` |
 
-Every key is a generic password item in the Data Protection keychain (`kSecUseDataProtectionKeychain`,
+| Platform | TPM 2.0 with P-256 | Without a TPM or without P-256 |
+|---|---|---|
+| Windows: `dpop` | TPM 2.0 key of the Microsoft Platform Crypto Provider after `NCryptIsAlgSupported` confirmed `ECDSA_P256` | key of the Microsoft Software Key Storage Provider, `hardwareBound = false` |
+| Windows: `step_up` | not offered: `ensure` fails with `notAvailable` (see below) | the same |
+
+Every key on Apple platforms is a generic password item in the Data Protection keychain (`kSecUseDataProtectionKeychain`,
 also on macOS), `kSecAttrSynchronizable = false`, so no key reaches a backup or the iCloud keychain.
 The item holds the enclave-wrapped blob of the key (useless on another device) or the software key;
 the public key sits in `kSecAttrGeneric`, so it is readable without a prompt. Service is the label
@@ -79,17 +86,38 @@ The access group of the `dpop` key comes from the app's build configuration: set
 `DeviceKeyAccessGroup` to the group of the entitlements (for example
 `$(AppIdentifierPrefix)com.example.shared`). Without it the key stays in the app's default group.
 
+On Windows every key is a persisted CNG key of the current user (no `NCRYPT_MACHINE_KEY_FLAG`),
+ECDSA P-256, export policy `0` set before `NCryptFinalizeKey`, named
+`device-key.<sha256(scope)>.<purpose>`. A software key is a file of the user profile, so on a
+machine with roaming profiles it can follow the profile; only the TPM key is bound to the
+machine. A key stays in the provider it was created in (D-M4-11-1). When the plugin creates a key it writes a marker with the provider into the user's
+Credential Manager (generic credential named like the key, `CRED_PERSIST_LOCAL_MACHINE`, no key
+material): a marker without an openable key (for example after a TPM clear) reports
+`keyInvalidated` and the key is never recreated silently; the app registers as a new device
+(08 5.4). The `dpop` key signs with `NCRYPT_SILENT_FLAG`, so it can never show a dialog.
+
+### Step-up key on Windows
+
+08 6.1 requires a confirmation per use that comes from the person, not from code in the process.
+Windows offers none for a P-256 key: strong key protection (`NCRYPT_UI_POLICY_PROPERTY`) is a
+password that the Microsoft providers cache per process and that the process can supply itself
+(`NCRYPT_PIN_PROPERTY`), and Windows Hello's `KeyCredentialManager` creates RSA keys only. So
+`ensure(scope, KeyPurpose.stepUp)` fails with `notAvailable` on Windows, and the step-up of the
+instance falls back to the other methods of 08 6 (D-M4-11-2).
+
 ## Layout
 
 | Path | Content |
 |---|---|
 | `lib/device_key.dart`, `lib/src/device_key.dart` | the Dart API |
 | `pigeons/device_key_api.dart` | the Pigeon source of the channel |
-| `lib/src/generated/`, `darwin/device_key/Sources/device_key/DeviceKeyApi.g.swift`, `android/src/main/kotlin/devicekey/flutter/DeviceKeyApi.g.kt` | generated by Pigeon, checked in |
+| `lib/src/generated/`, `darwin/device_key/Sources/device_key/DeviceKeyApi.g.swift`, `android/src/main/kotlin/devicekey/flutter/DeviceKeyApi.g.kt`, `windows/device_key_api.g.*` | generated by Pigeon, checked in |
 | `darwin/device_key/` | the Swift package of the plugin (Swift Package Manager; `sharedDarwinSource` for iOS and macOS), `DeviceKeyPlugin.swift` connects the channel to the core |
 | `darwin/device_key/DeviceKeyCore/` | the Swift package `DeviceKeyCore` with the key code and its tests |
 | `android/` | the Gradle project of the plugin (`build.gradle.kts`, Gradle wrapper), `DeviceKeyPlugin.kt` connects the channel to the core |
 | `android/devicekeycore/` | the Kotlin core module `DeviceKeyCore` with its JVM tests (`src/test`) and instrumented tests (`src/androidTest`) |
+| `windows/` | the CMake project of the Windows plugin; `device_key_plugin.cpp` connects the channel to the core |
+| `windows/core/` | the static library `device_key_core` (CNG, no Flutter dependency) and its CTest suite in `tests/` |
 | `darwin/run_core_tests.sh`, `darwin/run_ios_sim_tests.sh`, `android/run_instrumented_tests.sh`, `platform-tests.json` | the native tests (`make apps-platform`) |
 | `test/` | Dart tests against a fake host API |
 
@@ -162,14 +190,30 @@ Android, with a JDK 17 and the Android SDK (`ANDROID_HOME`), from `android/`:
   (API 26 to 29 without enrolled biometrics), and `stepUpNotAvailableWithoutAnAuthenticator` runs
   there instead. The CI job `apps-android` runs them on emulators with API 26 and 36.
 
-Every test key has a unique `test.device_key.` prefix and is deleted by the test, also after a
-failure (on Android in an `@After` method).
+Every Swift and Android test key has a unique `test.device_key.` prefix and is deleted by the
+test, also after a failure (on Android in an `@After` method).
+
+On Windows (Visual Studio C++ build tools, CMake) `make apps-platform` builds `windows/core` into
+`build/core-tests` and runs its CTest suite (`check.h` is the whole harness, D-M4-11-3); the CI
+job `apps-windows` does the same. By hand, from this folder:
+
+```sh
+cmake -S windows/core -B build/core-tests
+cmake --build build/core-tests --config Debug
+ctest --test-dir build/core-tests -C Debug --output-on-failure
+```
+
+`tpm_path_when_available` reports a skip with `platform crypto provider not available on this
+host` where there is no TPM 2.0 with P-256 (CI virtual machines); the fallback tests always run,
+through a fake provider that hides the TPM and against the real software provider. Every test key
+and marker starts with `device-key-test-` and is deleted before and after each test, also after a
+failure. No test shows a prompt.
 
 ## Dependencies
 
 Allowed members (docs/spec/15-client-architecture.md, 3.1; `tools/arch-check/rules.yaml`): none: no
 arrow of the diagram leaves this package. Runtime dependency: `crypto` (SHA-256 of the thumbprint);
-dev dependency: `pigeon`. Android: `androidx.biometric` and `kotlinx-coroutines-android`. Native sources only in `darwin/`, `ios/`, `macos/`, `android/`,
+dev dependency: `pigeon`. Android: `androidx.biometric` and `kotlinx-coroutines-android`. Windows links `ncrypt`, `bcrypt` and `advapi32`. Native sources only in `darwin/`, `ios/`, `macos/`, `android/`,
 `windows/`, `linux/`, `web/` (rule 4, checked by `make arch`).
 
 Run from the repository root: `make lint test coverage arch codegen-check COMPONENTS=apps`. The

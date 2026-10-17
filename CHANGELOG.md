@@ -79,6 +79,13 @@ operated, and the order of the build.
   CI jobs `apps (Android API 26)` and `apps (Android API 36)` run the instrumented tests on
   emulators and feed `ci-ok`, and `make test` runs the JVM tests of the Gradle modules under
   `packages/*/android` (M5-01).
+- Device key for Windows: `packages/device_key` gains its Windows part, a C++ Pigeon host and the
+  static library `device_key_core` over CNG. The `dpop` key is an ECDSA P-256 key of the user in the
+  TPM (Platform Crypto Provider, after `NCryptIsAlgSupported`) or, without a TPM or without P-256,
+  in the software key storage provider and reported as not hardware-bound; export policy `0`, the
+  provider fixed at creation, a lost key reported as `key_invalidated`. There is no step-up key on
+  Windows, because Windows enforces no confirmation per use for a P-256 key (08 6.1, D-M4-11-2);
+  `make apps-platform` runs the CTest suite on Windows (M4-11).
 - Release chain of the server (M7-10): `make release-prep COMPONENT=<name> [CHANNEL=beta]`
   computes the next version per component from its Conventional Commits (git-cliff, `cliff.toml`),
   renames the changelog section and writes `VERSION`; `make release-trial COMPONENT=server`

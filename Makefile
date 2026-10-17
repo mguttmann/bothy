@@ -300,8 +300,9 @@ codegen-check: ## Generated code equals a fresh generation (sqlc, go generate, f
 	else l10n=""; for p in $(DART_PKGS); do [ ! -f $$p/l10n.yaml ] || l10n="$$l10n $$p"; done; \
 	  if [ -z "$$l10n" ]; then $(call skip,codegen-dart,no Dart member with l10n.yaml); \
 	  else for p in $$l10n; do $(UVRUN) python tools/ci/l10n_check.py --dir $$p || exit 1; done; fi; fi
-	@# Pigeon channels of the Dart members (brief M4-10): every tracked pigeons/*.dart is generated
+	@# Pigeon channels of the Dart members (briefs M4-10, M4-11): every tracked pigeons/*.dart is generated
 	@# again and the Dart output formatted, as the generation step in the member's README does.
+	@# The comparison covers every output under the member (Dart, Swift and the C++ of windows/).
 	@if [ -z "$(DART_ON)" ]; then $(call skip,codegen-pigeon-dart,no Dart package selected under apps/ or packages/); \
 	else inputs=$$(git ls-files -- $(foreach p,$(DART_PKGS),'$(p)/pigeons/*.dart')) || exit 1; \
 	  if [ -z "$$inputs" ]; then $(call skip,codegen-pigeon-dart,no Pigeon input under pigeons/); \
