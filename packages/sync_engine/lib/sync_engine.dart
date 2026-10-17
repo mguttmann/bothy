@@ -17,7 +17,10 @@
 /// (M4-16): [RunStore] keeps the document of every focused run in memory and applies
 /// `run.updated` by the client rule of 04 11.3 item 4, [applyRunPatch] applies RFC 6902
 /// patches restricted to `add`, `replace` and `remove`, [RunDocument] reads the fields of
-/// 09 5.4, and [RunDocumentFetcher] and [FrameTicker] are the ports M4-17 wires.
+/// 09 5.4, and [RunDocumentFetcher] and [FrameTicker] are the ports M4-17 wires. The
+/// composition root (M4-17): [SyncEngine] builds and wires all of them, the one entry point of
+/// the apps; the fake server of the integration tests is the separate library
+/// `package:sync_engine/testing.dart`, which this library never exports.
 library;
 
 export 'src/backoff.dart';
@@ -36,6 +39,7 @@ export 'src/dispatcher.dart'
         RunUpdatedHook,
         SyncContext,
         appliedEventTypes;
+export 'src/engine.dart';
 export 'src/ephemeral_store.dart';
 export 'src/fetcher.dart';
 export 'src/focus_manager.dart';
