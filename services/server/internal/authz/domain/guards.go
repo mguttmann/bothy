@@ -64,8 +64,9 @@ const (
 	actionTokenCreate = "token.create"
 )
 
-// guards applies the guards of the action (07 section 4.2 step 9): agent.invoke, grant.create,
-// grant.revoke and token.create. Other actions have no guard in M1.
+// guards applies the guards of the action (07 section 4.2 step 9): agent.invoke and token.create.
+// The delegation limits of grant.create and grant.revoke belong to the requirement
+// (decideDelegation). Other actions have no guard in M1.
 func guards(in *Input) (Decision, error) {
 	switch in.Action {
 	case actionTokenCreate:
@@ -78,22 +79,32 @@ func guards(in *Input) (Decision, error) {
 			return Decision{}, internalError("agent.invoke without its trigger")
 		}
 		return invokeGuard(in, in.Invoke), nil
-	case actionGrantCreate, actionGrantRevoke:
-		if in.Grant == nil {
-			return Decision{}, internalError(in.Action + " without the grant")
-		}
-		d := Delegator{IsOwner: in.Eff.Owner, Level: in.Eff.Level, Caps: in.Eff.Caps}
-		var r Reason
-		if in.Action == actionGrantCreate {
-			r = CheckCreate(d, in.Grant.Shape)
-		} else {
-			r = CheckRevoke(d, in.Grant.Shape)
-		}
-		if r != "" {
-			return deny(OutcomeForbidden, r), nil
-		}
 	}
 	return Allow, nil
+}
+
+// decideDelegation applies the delegation limits of 07 section 2.6 (CheckCreate for grant.create,
+// CheckRevoke for grant.revoke) as part of the requirement step 6 of 07 section 4.2, so a caller
+// beyond the limits is refused with the delegation reason before any step-up is asked for (brief
+// M1-48 scope 3: "requirement before step-up"). Other actions pass.
+func decideDelegation(in *Input) (Decision, bool, error) {
+	if in.Action != actionGrantCreate && in.Action != actionGrantRevoke {
+		return Decision{}, false, nil
+	}
+	if in.Grant == nil {
+		return Decision{}, true, internalError(in.Action + " without the grant")
+	}
+	d := Delegator{IsOwner: in.Eff.Owner, Level: in.Eff.Level, Caps: in.Eff.Caps}
+	var r Reason
+	if in.Action == actionGrantCreate {
+		r = CheckCreate(d, in.Grant.Shape)
+	} else {
+		r = CheckRevoke(d, in.Grant.Shape)
+	}
+	if r != "" {
+		return deny(OutcomeForbidden, r), true, nil
+	}
+	return Decision{}, false, nil
 }
 
 // tokenCreateGuard gives a personal token only to the person itself (brief M1-44): a personal

@@ -52,3 +52,23 @@ func (s *PrincipalSource) ActiveOwnerIDs(ctx context.Context) ([]ids.ID, error) 
 func (s *PrincipalSource) HasActivePasskey(ctx context.Context, userID ids.ID) (bool, error) {
 	return s.store.HasActivePasskey(ctx, userID)
 }
+
+// Refs implements authz.PrincipalSource (M1-48): the public views (handle, display name, avatar)
+// of the known principals among principals, whatever their status; unknown ids are absent.
+// Errors: those of the Store.
+func (s *PrincipalSource) Refs(ctx context.Context, principals []ids.ID) (map[ids.ID]authz.PrincipalRef, error) {
+	out := map[ids.ID]authz.PrincipalRef{}
+	if len(principals) == 0 {
+		return out, nil
+	}
+	rows, err := s.store.Principals(ctx, principals)
+	if err != nil {
+		return nil, err
+	}
+	for _, p := range rows {
+		out[p.ID] = authz.PrincipalRef{
+			ID: p.ID, Kind: actor.Kind(p.Kind), Handle: p.Handle.String(), DisplayName: p.DisplayName.String(), AvatarFileID: p.AvatarFileID,
+		}
+	}
+	return out, nil
+}

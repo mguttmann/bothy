@@ -26,6 +26,15 @@ func wantErr(t *testing.T, err error, code errs.Code, reason string) {
 	}
 }
 
+// wantField checks that err is validation_failed with a field error of pointer and code.
+func wantField(t *testing.T, err error, pointer, code string) {
+	t.Helper()
+	e, ok := errs.As(err)
+	if !ok || e.Code != errs.CodeValidationFailed || len(e.Fields) != 1 || e.Fields[0].Pointer != pointer || e.Fields[0].Code != code {
+		t.Fatalf("error %v, want validation_failed on %s with %s", err, pointer, code)
+	}
+}
+
 func reasonOf(e *errs.Error) string {
 	if e == nil {
 		return ""
@@ -105,7 +114,7 @@ func TestAZ_M36_StaleStepUp(t *testing.T) {
 func (w *pgWorld) withManager(t *testing.T, level string) {
 	t.Helper()
 	ctx := context.Background()
-	_, err := w.admin.RevokeGrant(ctx, w.user(w.owner), w.g1, "")
+	_, err := w.admin.RevokeGrant(ctx, w.user(w.owner), w.g1, "test")
 	mustOK(t, err)
 	_, err = w.admin.CreateGrant(ctx, w.user(w.owner), authz.CreateGrantCmd{SubjectKind: "user", SubjectID: w.alex, TargetKind: "space",
 		TargetID: w.support, Level: level, Capabilities: []string{"manage", "upload"}, Reason: "team lead"})
@@ -147,7 +156,7 @@ func TestAZ_M39_RevokeAboveOwnLevel(t *testing.T) {
 	mustOK(t, err)
 	w.withManager(t, "write")
 	v := w.version(t)
-	_, err = w.admin.RevokeGrant(ctx, w.user(w.alex), g.ID, "")
+	_, err = w.admin.RevokeGrant(ctx, w.user(w.alex), g.ID, "test")
 	wantErr(t, err, errs.CodeForbidden, "delegation_exceeds_own_level")
 	if w.version(t) != v {
 		t.Fatal("a denied revocation raised the rights version")
@@ -165,10 +174,10 @@ func TestGroupDelete_RevokesGrantsAndMembersLoseAccess(t *testing.T) {
 		t.Fatal("Sam does not read Allgemein before")
 	}
 	seq := w.lastSeq(t)
-	mustOK(t, w.admin.DeleteGroup(ctx, w.user(w.owner), w.leser, "reorganised"))
+	mustOK(t, w.admin.DeleteGroup(ctx, w.user(w.owner), w.leser))
 	g4, _, err := w.store.GetGrant(ctx, w.g4)
 	mustOK(t, err)
-	if g4.RevokedAt.IsZero() || g4.RevokedBy != w.owner || g4.RevokeReason != "reorganised" {
+	if g4.RevokedAt.IsZero() || g4.RevokedBy != w.owner || g4.RevokeReason != "group_deleted" {
 		t.Fatalf("G-4 %+v", g4)
 	}
 	if d, _ := w.az.Authorize(ctx, w.user(w.sam), authorize.ActionChannelRead, res); d.Outcome != authorize.OutcomeNotFound {
@@ -180,14 +189,14 @@ func TestGroupDelete_RevokesGrantsAndMembersLoseAccess(t *testing.T) {
 	}
 	// Deleting again is a call without effect.
 	v := w.version(t)
-	mustOK(t, w.admin.DeleteGroup(ctx, w.user(w.owner), w.leser, ""))
+	mustOK(t, w.admin.DeleteGroup(ctx, w.user(w.owner), w.leser))
 	if w.version(t) != v {
 		t.Fatal("deleting a deleted group raised the rights version")
 	}
 }
 
-// TestGroupMembers: duplicate membership is conflict, an agent or unknown person not found, an
-// expiry in the past validation_failed; removing a person that never was a member is not found,
+// TestGroupMembers: duplicate membership is conflict, an agent or unknown person 400 unknown_user
+// (brief M1-48), an expiry in the past validation_failed; removing a person that never was a member is not found,
 // removing twice is without effect (no rights version, audit no_change).
 func TestGroupMembers(t *testing.T) {
 	t.Parallel()
@@ -197,9 +206,9 @@ func TestGroupMembers(t *testing.T) {
 	_, err := w.admin.AddGroupMember(ctx, owner, w.leser, authz.AddMemberCmd{UserID: w.sam})
 	wantErr(t, err, errs.CodeConflict, "")
 	_, err = w.admin.AddGroupMember(ctx, owner, w.leser, authz.AddMemberCmd{UserID: w.lotse})
-	wantErr(t, err, errs.CodeNotFound, "")
+	wantField(t, err, "/user_id", "unknown_user")
 	_, err = w.admin.AddGroupMember(ctx, owner, w.leser, authz.AddMemberCmd{UserID: ids.New()})
-	wantErr(t, err, errs.CodeNotFound, "")
+	wantField(t, err, "/user_id", "unknown_user")
 	_, err = w.admin.AddGroupMember(ctx, owner, w.leser, authz.AddMemberCmd{UserID: w.robin, ExpiresAt: w.clk.Now()})
 	wantErr(t, err, errs.CodeValidationFailed, "")
 	m, err := w.admin.AddGroupMember(ctx, owner, w.leser, authz.AddMemberCmd{UserID: w.robin, ExpiresAt: w.clk.Now().Add(time.Hour)})
@@ -253,13 +262,15 @@ func TestGrantTargets(t *testing.T) {
 	_, err = w.admin.CreateGrant(ctx, owner, noReason)
 	wantErr(t, err, errs.CodeValidationFailed, "")
 	_, err = w.admin.CreateGrant(ctx, owner, authz.CreateGrantCmd{SubjectKind: "user", SubjectID: w.lotse, TargetKind: "space", TargetID: w.support, Level: "read", Reason: "x"})
+	wantField(t, err, "/subject_id", "unknown_subject")
+	_, err = w.admin.RevokeGrant(ctx, owner, ids.New(), "test")
 	wantErr(t, err, errs.CodeNotFound, "")
-	_, err = w.admin.RevokeGrant(ctx, owner, ids.New(), "")
-	wantErr(t, err, errs.CodeNotFound, "")
-	_, err = w.admin.RevokeGrant(ctx, owner, w.g2, "")
+	_, err = w.admin.RevokeGrant(ctx, owner, w.g2, " ")
+	wantField(t, err, "/reason", "required")
+	_, err = w.admin.RevokeGrant(ctx, owner, w.g2, "test")
 	mustOK(t, err)
 	v, seq := w.version(t), w.lastSeq(t)
-	g, err := w.admin.RevokeGrant(ctx, owner, w.g2, "")
+	g, err := w.admin.RevokeGrant(ctx, owner, w.g2, "test")
 	mustOK(t, err)
 	if g.RevokedAt.IsZero() || w.version(t) != v || len(w.events(t, seq)) != 0 {
 		t.Fatalf("second revocation: %+v, version %d (was %d)", g, w.version(t), v)
@@ -358,7 +369,7 @@ func TestAdminAudit(t *testing.T) {
 			return group
 		}},
 		{"group.delete", "group", func() ids.ID {
-			mustOK(t, w.admin.DeleteGroup(ctx, owner, group, "closed"))
+			mustOK(t, w.admin.DeleteGroup(ctx, owner, group))
 			return group
 		}},
 	}

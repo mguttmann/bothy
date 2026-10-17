@@ -961,7 +961,7 @@ section 4).
 ### 9.5 Further obligations
 
 - Revoking takes effect immediately and says so in the confirmation.
-- Every grant needs a reason (03, `grants.reason`).
+- Every grant and every revocation needs a reason (03, `grants.reason` and `grants.revoke_reason`); deleting a group revokes its grants with the reason `group_deleted` (M1-48).
 - List "Permission hints": H1, grants to disabled principals, `trigger` without possible
   triggering (SR2, SR3), agents with `personal` and their trigger set.
 - Filterable log from the audit log (`audit.read`), [ADR 0021](../adr/0021-hash-chained-audit-log-separate-from-telemetry.md).

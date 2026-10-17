@@ -315,6 +315,98 @@ func (q *Queries) ListActiveTriggerGrants(ctx context.Context) ([]ListActiveTrig
 	return items, nil
 }
 
+const listGrantsPage = `-- name: ListGrantsPage :many
+SELECT g.id, g.subject_kind, g.subject_principal_id, g.subject_group_id, g.target_kind, g.target_space_id, g.target_channel_id, g.target_host_id, g.level, g.capabilities, g.expires_at, g.expiry_reminded_at, g.expiry_reported_at, g.reason, g.granted_by, g.granted_at, g.revoked_at, g.revoked_by, g.revoke_reason
+FROM grants g
+WHERE g.id > $1
+  AND ($2::boolean OR (g.revoked_at IS NULL AND (g.expires_at IS NULL OR g.expires_at > $3)))
+  AND ($4::text IS NULL OR g.target_kind = $4::text)
+  AND ($5::uuid IS NULL OR g.target_space_id = $5::uuid
+       OR g.target_channel_id = $5::uuid OR g.target_host_id = $5::uuid)
+  AND ($6::text IS NULL OR g.subject_kind = $6::text)
+  AND ($7::uuid IS NULL OR g.subject_principal_id = $7::uuid
+       OR g.subject_group_id = $7::uuid)
+  AND ($8::boolean
+       OR (g.target_kind = 'space' AND g.target_space_id = ANY ($9::uuid[]))
+       OR (g.target_kind = 'channel' AND g.target_channel_id = ANY ($10::uuid[])))
+ORDER BY g.id
+LIMIT $11
+`
+
+type ListGrantsPageParams struct {
+	AfterID        pgtype.UUID
+	IncludeRevoked bool
+	At             pgtype.Timestamptz
+	TargetKind     pgtype.Text
+	TargetID       pgtype.UUID
+	SubjectKind    pgtype.Text
+	SubjectID      pgtype.UUID
+	AllTargets     bool
+	ManageSpaces   []pgtype.UUID
+	ManageChannels []pgtype.UUID
+	MaxRows        int32
+}
+
+type ListGrantsPageRow struct {
+	Grant Grant
+}
+
+// One keyset page of grants ascending by id (listGrants, M1-48). Without include_revoked only the
+// grants in effect at @at (not revoked, not expired); the filters are optional; without
+// all_targets only grants on the spaces and channels of the caller's manage scope, so the scope
+// is applied in the query and a filter never widens it (07 section 2.6 item 6).
+func (q *Queries) ListGrantsPage(ctx context.Context, arg ListGrantsPageParams) ([]ListGrantsPageRow, error) {
+	rows, err := q.db.Query(ctx, listGrantsPage,
+		arg.AfterID,
+		arg.IncludeRevoked,
+		arg.At,
+		arg.TargetKind,
+		arg.TargetID,
+		arg.SubjectKind,
+		arg.SubjectID,
+		arg.AllTargets,
+		arg.ManageSpaces,
+		arg.ManageChannels,
+		arg.MaxRows,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []ListGrantsPageRow
+	for rows.Next() {
+		var i ListGrantsPageRow
+		if err := rows.Scan(
+			&i.Grant.ID,
+			&i.Grant.SubjectKind,
+			&i.Grant.SubjectPrincipalID,
+			&i.Grant.SubjectGroupID,
+			&i.Grant.TargetKind,
+			&i.Grant.TargetSpaceID,
+			&i.Grant.TargetChannelID,
+			&i.Grant.TargetHostID,
+			&i.Grant.Level,
+			&i.Grant.Capabilities,
+			&i.Grant.ExpiresAt,
+			&i.Grant.ExpiryRemindedAt,
+			&i.Grant.ExpiryReportedAt,
+			&i.Grant.Reason,
+			&i.Grant.GrantedBy,
+			&i.Grant.GrantedAt,
+			&i.Grant.RevokedAt,
+			&i.Grant.RevokedBy,
+			&i.Grant.RevokeReason,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const revokeGrant = `-- name: RevokeGrant :one
 UPDATE grants
 SET revoked_at = $1, revoked_by = $2, revoke_reason = $3

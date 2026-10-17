@@ -31,3 +31,13 @@ SELECT sqlc.embed(m)
 FROM group_memberships m
 WHERE m.group_id = @group_id AND m.user_id = @user_id
 ORDER BY m.id;
+
+-- name: ListMembersInEffect :many
+-- One keyset page of the memberships of a group in effect at @at, ascending by membership id
+-- (listGroupMembers, M1-48).
+SELECT sqlc.embed(m)
+FROM group_memberships m
+WHERE m.group_id = @group_id AND m.removed_at IS NULL
+  AND (m.expires_at IS NULL OR m.expires_at > @at) AND m.id > @after_id
+ORDER BY m.id
+LIMIT @max_rows;

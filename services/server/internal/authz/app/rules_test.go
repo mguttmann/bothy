@@ -4,6 +4,7 @@ package app_test
 
 import (
 	"context"
+	"slices"
 	"testing"
 	"time"
 
@@ -317,7 +318,8 @@ func TestGrantRevokeGuard(t *testing.T) {
 	w.expect(t, w.user(w.robin), authorize.ActionGrantRevoke, g(strong), forbidden, "delegation_exceeds_own_level")
 	w.allow(t, w.user(w.robin), authorize.ActionGrantRevoke, g(weak))
 	w.allow(t, w.user(w.owner), authorize.ActionGrantRevoke, g(strong))
-	w.expect(t, w.user(w.sam), authorize.ActionGrantRevoke, g(w.g2), forbidden, "owner_only")
+	// Sam reads Marketing but holds no manage there: the grant is invisible (brief M1-48).
+	w.expect(t, w.user(w.sam), authorize.ActionGrantRevoke, g(w.g2), notFound, "no_grant")
 	w.expect(t, w.user(w.alex), authorize.ActionGrantRevoke, g(w.g2), notFound, "no_grant")
 	w.expect(t, w.user(w.owner), authorize.ActionGrantRevoke, g(ids.New()), notFound, "no_grant")
 }
@@ -408,5 +410,79 @@ func TestConditionalStepUp(t *testing.T) {
 	w.principals.Fail(true)
 	if _, err := w.az.Authorize(context.Background(), alex, authorize.ActionPasskeyRegister, self); err == nil {
 		t.Fatal("source error ignored")
+	}
+}
+
+// TestDelegationBeforeStepUp (07 section 4.2 step 6, brief M1-48 scope 3): the delegation reasons
+// of grant.create and grant.revoke are part of the requirement, so a caller without a fresh
+// step-up learns them before step_up_required.
+func TestDelegationBeforeStepUp(t *testing.T) {
+	w := newWorld(t)
+	w.grant(t, userSubject(w.robin), domain.Target{Kind: domain.TargetSpace, SpaceID: w.support}, domain.LevelWrite, time.Time{}, domain.CapManage)
+	robin := w.user(w.robin)
+	robin.StepUpAt = time.Time{}
+	create := func(level string, caps ...string) authorize.Resource {
+		return authorize.Resource{Kind: authorize.ResourceSpace, ID: w.support, Grant: &authorize.GrantFacts{
+			SubjectKind: "user", Level: level, Caps: caps, TargetKind: "space", TargetSpaceID: w.support}}
+	}
+	w.expect(t, robin, authorize.ActionGrantCreate, create("trigger"), forbidden, "delegation_exceeds_own_level")
+	w.expect(t, robin, authorize.ActionGrantCreate, create("read", "export"), forbidden, "delegation_exceeds_own_capabilities")
+	agent := create("read")
+	agent.Grant.SubjectKind = "agent"
+	w.expect(t, robin, authorize.ActionGrantCreate, agent, forbidden, "subject_kind_not_allowed")
+	// Within the limits the step-up is what is missing.
+	w.expect(t, robin, authorize.ActionGrantCreate, create("write"), stepUpNeeded, "step_up_required")
+	// Revoking the owner's stronger grant: the delegation reason first, too (AZ-M39).
+	strong := w.grant(t, userSubject(w.sam), domain.Target{Kind: domain.TargetSpace, SpaceID: w.support}, domain.LevelTrigger, time.Time{})
+	w.expect(t, robin, authorize.ActionGrantRevoke, authorize.Resource{Kind: authorize.ResourceGrant, ID: strong}, forbidden, "delegation_exceeds_own_level")
+}
+
+// TestGrantVisibleOnlyWithManage (brief M1-48 "Visibility"): a grant is visible to owners and to
+// holders of manage on its target (a channel inherits manage from its space); reading the target
+// is not enough, and instance grants are owner only.
+func TestGrantVisibleOnlyWithManage(t *testing.T) {
+	w := newWorld(t)
+	onSpace := w.grant(t, userSubject(w.sam), domain.Target{Kind: domain.TargetSpace, SpaceID: w.support}, domain.LevelRead, time.Time{})
+	onChannel := w.grant(t, userSubject(w.sam), domain.Target{Kind: domain.TargetChannel, ChannelID: w.allgemein}, domain.LevelRead, time.Time{})
+	onInstance := w.grant(t, userSubject(w.sam), domain.Target{Kind: domain.TargetInstance}, domain.LevelRead, time.Time{})
+	revoke := func(id ids.ID) authorize.Resource { return authorize.Resource{Kind: authorize.ResourceGrant, ID: id} }
+	// Alex reads Support (G-1, trigger) but has no manage: the grants on it are invisible.
+	w.expect(t, w.user(w.alex), authorize.ActionGrantRevoke, revoke(onSpace), notFound, "no_grant")
+	w.expect(t, w.user(w.alex), authorize.ActionGrantRevoke, revoke(onChannel), notFound, "no_grant")
+	// Robin with manage on Support sees both, the channel through its space, but not the instance grant.
+	w.grant(t, userSubject(w.robin), domain.Target{Kind: domain.TargetSpace, SpaceID: w.support}, domain.LevelTrigger, time.Time{}, domain.CapManage)
+	w.allow(t, w.user(w.robin), authorize.ActionGrantRevoke, revoke(onSpace))
+	w.allow(t, w.user(w.robin), authorize.ActionGrantRevoke, revoke(onChannel))
+	w.expect(t, w.user(w.robin), authorize.ActionGrantRevoke, revoke(onInstance), notFound, "no_grant")
+	w.allow(t, w.user(w.owner), authorize.ActionGrantRevoke, revoke(onInstance))
+}
+
+// TestAdminScope (M1-48): the owner role, the manage scope through a space grant (its channels
+// included) and through a channel grant alone, an app refused by the scope rule and an unknown
+// action refused.
+func TestAdminScope(t *testing.T) {
+	w := newWorld(t)
+	ctx := context.Background()
+	sc, err := w.az.AdminScope(ctx, w.user(w.owner), authorize.ActionGrantRead)
+	if err != nil || !sc.Owner || len(sc.ManageSpaces) != 0 {
+		t.Fatalf("owner scope %+v, %v", sc, err)
+	}
+	w.grant(t, userSubject(w.robin), domain.Target{Kind: domain.TargetSpace, SpaceID: w.support}, domain.LevelRead, time.Time{}, domain.CapManage)
+	w.grant(t, userSubject(w.robin), domain.Target{Kind: domain.TargetChannel, ChannelID: w.kampagnen}, domain.LevelRead, time.Time{}, domain.CapManage)
+	w.versions.Bump()
+	sc, err = w.az.AdminScope(ctx, w.user(w.robin), authorize.ActionGrantRead)
+	if err != nil || sc.Owner || len(sc.ManageSpaces) != 1 || sc.ManageSpaces[0] != w.support ||
+		!slices.Contains(sc.ManageChannels, w.allgemein) || !slices.Contains(sc.ManageChannels, w.eskalation) ||
+		!slices.Contains(sc.ManageChannels, w.kampagnen) || slices.Contains(sc.ManageChannels, w.notizen) {
+		t.Fatalf("Robin's scope %+v, %v", sc, err)
+	}
+	if sc, err = w.az.AdminScope(ctx, w.user(w.alex), authorize.ActionGroupRead); err != nil || sc.Owner || len(sc.ManageSpaces) != 0 {
+		t.Fatalf("Alex's scope %+v, %v", sc, err)
+	}
+	if _, err := w.az.AdminScope(ctx, w.app(), authorize.ActionGrantRead); err == nil {
+		t.Fatal("an app got the scope of grant.read")
+	}
+	if _, err := w.az.AdminScope(ctx, w.user(w.owner), authorize.ActionMessageRead); err == nil {
+		t.Fatal("AdminScope served message.read")
 	}
 }

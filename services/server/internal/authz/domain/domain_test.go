@@ -442,3 +442,30 @@ func TestGrantShapeOf(t *testing.T) {
 		t.Errorf("Shape() = %+v, want %+v", got, want)
 	}
 }
+
+// TestNewClaimGroup (M1-48): a claim group needs its provider and a claim value that is not blank
+// and free of control and bidi characters; the name follows the rules of NewGroup.
+func TestNewClaimGroup(t *testing.T) {
+	t.Parallel()
+	by, p := ids.New(), ids.New()
+	limits := domain.GroupLimits{NameMaxChars: 10}
+	g, err := domain.NewClaimGroup(ids.New(), "Staff", "", limits, p, "staff", by, t0)
+	if err != nil || g.Source != domain.GroupSourceOIDCClaim || g.ProviderID != p || g.ExternalRef != "staff" {
+		t.Fatalf("claim group %+v, %v", g, err)
+	}
+	for _, c := range []struct {
+		name, ref string
+		provider  ids.ID
+		pointer   string
+	}{
+		{"Staff", "staff", ids.ID{}, "/provider_id"},
+		{"Staff", " ", p, "/external_ref"},
+		{"Staff", "st\u202eaff", p, "/external_ref"},
+		{"A very long name", "staff", p, "/name"},
+	} {
+		_, err := domain.NewClaimGroup(ids.New(), c.name, "", limits, c.provider, c.ref, by, t0)
+		if e, ok := errs.As(err); !ok || e.Code != errs.CodeValidationFailed || e.Fields[0].Pointer != c.pointer {
+			t.Errorf("%+v: %v", c, err)
+		}
+	}
+}

@@ -351,7 +351,7 @@ func TestExpirySweep_NoDueRowsKeepsVersion(t *testing.T) {
 func TestExpirySweep_RevokedBeforeSweep(t *testing.T) {
 	t.Parallel()
 	w := newPGWorld(t)
-	_, err := w.admin.RevokeGrant(context.Background(), w.user(w.owner), w.g3, "")
+	_, err := w.admin.RevokeGrant(context.Background(), w.user(w.owner), w.g3, "test")
 	mustOK(t, err)
 	audit, seq := w.auditSeq(t), w.lastSeq(t)
 	if res := w.sweepAt(t, g3Expiry.Add(sweepInterval)); res.Grants != 0 {
@@ -656,7 +656,7 @@ func TestExpiryWindow_RevokeAfterExpiry(t *testing.T) {
 	w := newPGWorld(t)
 	seq := w.lastSeq(t)
 	w.clk.Set(g3Expiry.Add(10 * time.Second))
-	_, err := w.admin.RevokeGrant(context.Background(), w.user(w.owner), w.g3, "")
+	_, err := w.admin.RevokeGrant(context.Background(), w.user(w.owner), w.g3, "test")
 	mustOK(t, err)
 	if n := w.robinRemovals(t, seq, w.projektA); n != 1 {
 		t.Fatalf("the revocation wrote %d removals, want 1", n)
@@ -676,7 +676,7 @@ func TestExpiryWindow_GroupGrantRevokedAfterMembershipExpiry(t *testing.T) {
 		domain.Target{Kind: domain.TargetChannel, ChannelID: w.kampagnen}, domain.LevelRead, time.Time{})
 	seq := w.lastSeq(t)
 	w.clk.Set(exp.Add(10 * time.Second))
-	_, err := w.admin.RevokeGrant(context.Background(), w.user(w.owner), gr, "")
+	_, err := w.admin.RevokeGrant(context.Background(), w.user(w.owner), gr, "test")
 	mustOK(t, err)
 	w.windowSweeps(t, exp)
 	if n := w.robinRemovals(t, seq, w.kampagnen); n != 1 {
@@ -768,7 +768,7 @@ func TestExpiryWindow_GroupDeleteAndReAdd(t *testing.T) {
 			mustOK(t, err)
 			want = 0
 		} else {
-			mustOK(t, w.admin.DeleteGroup(context.Background(), w.user(w.owner), g, ""))
+			mustOK(t, w.admin.DeleteGroup(context.Background(), w.user(w.owner), g))
 		}
 		w.windowSweeps(t, exp)
 		if n := w.robinRemovals(t, seq, w.kampagnen); n != want {

@@ -156,6 +156,21 @@ documented in this file. The format is based on
   responses with a code are never stored for an `Idempotency-Key` replay (`409 conflict` (reason `one_time_secret`)).
   Migration `00016_identity_enrollment_codes.sql`. The shared login completion of every later login
   path creates devices, sessions and tokens in one place.
+- Groups and grants over the API (M1-48): the operations `listGroups`, `createGroup`,
+  `getGroup`, `updateGroup`, `deleteGroup`, `listGroupMembers`, `addGroupMember`,
+  `removeGroupMember`, `listGrants`, `createGrant`, `getGrant` and `revokeGrant` in
+  `internal/authz/adapters/httpapi`, the read use cases of the port `authz.Admin`, the list
+  queries of `adapters/postgres` and `Authorizer.AdminScope`. Group writes are owner only with
+  step-up; `grant.create` and `grant.revoke` need owner or `manage` within the delegation limits
+  (agents and apps only by owners, never `trigger` or a capability beyond `upload`), checked
+  before step-up. Non-owners read only grants inside their `manage` scope and only groups they are
+  a member of; everything else answers like a random id. Every write appends `grant.changed` or
+  `group.changed` and an audit entry; rights changes raise `permission_version`, check I1 and SR8
+  and write `access.changed` in the same transaction. Claim groups (`source = oidc_claim`) can be
+  created with `provider_id` and `external_ref`; their members are not changed by hand (`409
+  conflict`, reason `claim_managed_group`). New configuration keys `group.name_max_chars` and
+  `group.description_max_chars`; `authz.PrincipalSource.Refs` gives the public views of members.
+
 - Identity provider port and provider management (M1-36): the migration
   `00013_identity_providers.sql` (`identity_providers`, `user_identities`, and the deferred foreign
   keys `auth_sessions.identity_id` and `groups.provider_id`), the ports `identity.Providers` and
@@ -731,6 +746,13 @@ documented in this file. The format is based on
 
 - `createToken` decides personal tokens by the feature flag `tokens.personal_enabled` evaluated
   for the caller (M1-47); the always-off stand-in of M1-44 is removed.
+- authz (M1-48): the delegation limits of `grant.create` and `grant.revoke` are part of the
+  requirement step, so they come before `step_up_required`; a grant is visible only to owners
+  and to holders of `manage` on its target (before: anyone who reads the target).
+  `Admin.DeleteGroup` takes no reason (`group_deleted`), `Admin.RevokeGrant` needs one, an unknown
+  subject or member is `400 validation_failed` with `unknown_subject` or `unknown_user` instead of
+  `404`, an expiry that is not in the future has the field code `in_past`, and the audit entry of
+  `grant.create` names a group subject as `subject_id`.
 - `ObjectStore.PresignUploadPart` (M3-02) takes the part size before the validity, so the
   signature can bind the length (12 "3.3"); the file system driver refuses a size below 1 with
   `ErrSizeMismatch` and keeps answering `ErrNotSupported`.

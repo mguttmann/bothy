@@ -9,6 +9,7 @@ import (
 
 	"github.com/OWNER/bothy/services/server/api/routes"
 	"github.com/OWNER/bothy/services/server/internal/authz"
+	authzhttp "github.com/OWNER/bothy/services/server/internal/authz/adapters/httpapi"
 	authzpg "github.com/OWNER/bothy/services/server/internal/authz/adapters/postgres"
 	"github.com/OWNER/bothy/services/server/internal/authz/adapters/telemetry"
 	authzapp "github.com/OWNER/bothy/services/server/internal/authz/app"
@@ -231,4 +232,50 @@ func NewExpiryService(pool *pg.Pool, a *Audit, sy *Sync, cfg authzapp.ExpiryConf
 		Principals: identityapp.NewPrincipalSource(identitypg.NewRepository(pool)),
 		Events:     sy.Appender(), Clock: clock.System(), Log: orDiscard(log),
 	})
+}
+
+// AuthzAdminConfig binds group.name_max_chars, group.description_max_chars, api.page_size_default
+// and api.page_size_max into the configuration of the Admin use cases (M1-48). The error names
+// the key whose binding failed, never a value.
+func AuthzAdminConfig(v *config.Values) (authzapp.AdminConfig, error) {
+	var c authzapp.AdminConfig
+	if err := config.Bind(v, &c); err != nil {
+		return authzapp.AdminConfig{}, err
+	}
+	return c, nil
+}
+
+// AuthzAdmin is the group and grant management of authz (M1-48): the use cases of the port
+// authz.Admin and the REST handlers of its twelve operations.
+type AuthzAdmin struct {
+	// Admin implements authz.Admin.
+	Admin *authzapp.AdminService
+	// Handlers are the REST handlers of the twelve operations of 06 "Groups" and "Access".
+	Handlers *authzhttp.Access
+}
+
+// NewAuthzAdmin builds the Admin use cases over pool (M1-48): the unit of work and the rights hook
+// of the audit step a (the hook must be bound), the Authorizer az (also the manage scope of the
+// lists), the PrincipalSource of identity, the structure source until M1-52 and M1-53 (empty),
+// the recorder of a, the appender of sy, the cursor codec of platform/httpserver and the clock clk
+// (nil for the system clock). It opens no connection.
+//
+// Errors: a missing audit or sync step, and those of authzapp.NewAdminService.
+func NewAuthzAdmin(pool *pg.Pool, cfg authzapp.AdminConfig, a *Audit, sy *Sync, az *authzapp.Authorizer, clk clock.Clock) (*AuthzAdmin, error) {
+	if a == nil || sy == nil || az == nil {
+		return nil, errors.New("wire: NewAuthzAdmin needs the audit and the sync step and the Authorizer")
+	}
+	if clk == nil {
+		clk = clock.System()
+	}
+	admin, err := authzapp.NewAdminService(authzapp.AdminDeps{
+		UoW: a.UoW(), Authorizer: az, Store: authzpg.NewRepository(pool),
+		Principals: identityapp.NewPrincipalSource(identitypg.NewRepository(pool)), Structure: emptyStructure{},
+		Rights: a.RightsHook(), Audit: a.Recorder(), Clock: clk, Events: sy.Appender(), Scopes: az, Cursors: authzhttp.Cursors{},
+		Config: cfg,
+	})
+	if err != nil {
+		return nil, err
+	}
+	return &AuthzAdmin{Admin: admin, Handlers: authzhttp.New(admin)}, nil
 }

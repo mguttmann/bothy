@@ -16,6 +16,7 @@ import (
 	"bytes"
 	"context"
 	"errors"
+	"math"
 	"slices"
 	"time"
 
@@ -348,6 +349,86 @@ func (r *Repository) ActiveGrantsOnTargets(ctx context.Context, spaceIDs, channe
 	})
 	if err != nil {
 		return nil, mapError(err, "reading the grants on targets")
+	}
+	out := make([]domain.Grant, 0, len(rows))
+	for _, row := range rows {
+		g, err := toGrant(row.Grant)
+		if err != nil {
+			return nil, err
+		}
+		out = append(out, g)
+	}
+	return out, nil
+}
+
+// maxRows converts a page limit for LIMIT; the use cases cap it at api.page_size_max.
+func maxRows(limit int) int32 {
+	if limit < 0 {
+		return 0
+	}
+	if limit > math.MaxInt32 {
+		return math.MaxInt32
+	}
+	return int32(limit)
+}
+
+// ListLiveGroups implements app.Store.
+func (r *Repository) ListLiveGroups(ctx context.Context, after, memberID ids.ID, t time.Time, limit int) ([]domain.Group, error) {
+	rows, err := r.read(ctx).ListLiveGroups(ctx, sqlcgen.ListLiveGroupsParams{
+		AfterID: uuid(after), OnlyMember: !memberID.IsZero(), MemberID: uuid(memberID), At: timestamp(t), MaxRows: maxRows(limit),
+	})
+	if err != nil {
+		return nil, mapError(err, "listing groups")
+	}
+	out := make([]domain.Group, 0, len(rows))
+	for _, row := range rows {
+		out = append(out, toGroup(row.Group))
+	}
+	return out, nil
+}
+
+// CountMembersInEffect implements app.Store.
+func (r *Repository) CountMembersInEffect(ctx context.Context, groupIDs []ids.ID, t time.Time) (map[ids.ID]int, error) {
+	out := map[ids.ID]int{}
+	if len(groupIDs) == 0 {
+		return out, nil
+	}
+	rows, err := r.read(ctx).CountMembersInEffect(ctx, sqlcgen.CountMembersInEffectParams{GroupIds: uuids(groupIDs), At: timestamp(t)})
+	if err != nil {
+		return nil, mapError(err, "counting group members")
+	}
+	for _, row := range rows {
+		out[idOf(row.GroupID)] = int(row.Members)
+	}
+	return out, nil
+}
+
+// ListMembersInEffect implements app.Store.
+func (r *Repository) ListMembersInEffect(ctx context.Context, groupID, after ids.ID, t time.Time, limit int) ([]domain.Membership, error) {
+	rows, err := r.read(ctx).ListMembersInEffect(ctx, sqlcgen.ListMembersInEffectParams{
+		GroupID: uuid(groupID), At: timestamp(t), AfterID: uuid(after), MaxRows: maxRows(limit),
+	})
+	if err != nil {
+		return nil, mapError(err, "listing group members")
+	}
+	out := make([]domain.Membership, 0, len(rows))
+	for _, row := range rows {
+		out = append(out, toMembership(row.GroupMembership))
+	}
+	return out, nil
+}
+
+// ListGrants implements app.Store.
+func (r *Repository) ListGrants(ctx context.Context, f app.GrantFilter, after ids.ID, t time.Time, limit int) ([]domain.Grant, error) {
+	rows, err := r.read(ctx).ListGrantsPage(ctx, sqlcgen.ListGrantsPageParams{
+		AfterID: uuid(after), IncludeRevoked: f.IncludeRevoked, At: timestamp(t),
+		TargetKind: optionalText(string(f.TargetKind)), TargetID: optionalUUID(f.TargetID),
+		SubjectKind: optionalText(string(f.SubjectKind)), SubjectID: optionalUUID(f.SubjectID),
+		AllTargets: f.AllTargets, ManageSpaces: uuids(f.ManageSpaces), ManageChannels: uuids(f.ManageChannels),
+		MaxRows: maxRows(limit),
+	})
+	if err != nil {
+		return nil, mapError(err, "listing grants")
 	}
 	out := make([]domain.Grant, 0, len(rows))
 	for _, row := range rows {

@@ -19,6 +19,7 @@ import (
 	auditapp "github.com/OWNER/bothy/services/server/internal/audit/app"
 	"github.com/OWNER/bothy/services/server/internal/authz"
 	"github.com/OWNER/bothy/services/server/internal/authz/adapters/fake"
+	authzhttp "github.com/OWNER/bothy/services/server/internal/authz/adapters/httpapi"
 	authzpg "github.com/OWNER/bothy/services/server/internal/authz/adapters/postgres"
 	"github.com/OWNER/bothy/services/server/internal/authz/app"
 	"github.com/OWNER/bothy/services/server/internal/authz/domain"
@@ -178,7 +179,8 @@ func newPGWorld(t *testing.T) *pgWorld {
 	w.az = w.newAuthorizer(t)
 	w.admin, err = app.NewAdminService(app.AdminDeps{
 		UoW: w.uow, Authorizer: w.az, Store: w.store, Principals: w.principals, Structure: w.structure, Rights: hook,
-		Audit: w.rec, Clock: w.clk, Limits: domain.GroupLimits{NameMaxChars: 100, DescriptionMaxChars: 500},
+		Audit: w.rec, Clock: w.clk, Events: w.appender, Scopes: w.az, Cursors: authzhttp.Cursors{},
+		Config: app.AdminConfig{GroupNameMaxChars: 100, GroupDescriptionMaxChars: 500, PageSizeDefault: 2, PageSizeMax: 3},
 	})
 	if err != nil {
 		t.Fatal(err)

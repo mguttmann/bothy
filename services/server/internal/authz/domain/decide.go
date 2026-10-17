@@ -208,7 +208,8 @@ type Input struct {
 
 // Decide decides one call from the facts of in, steps 5 to 9 of 07 section 4.2 in the order of the
 // brief M1-28: visibility (not_found), requirement (forbidden with the atom's reason), app scope,
-// read-only channel, "view as" read-only, step-up, guards. Liveness and pending checks run
+// read-only channel, the delegation limits of grant.create and grant.revoke (part of the
+// requirement, brief M1-48), "view as" read-only, step-up, guards. Liveness and pending checks run
 // before (CheckLiveness, CheckPending). The error reports facts that cannot be evaluated (an
 // unknown resource kind, a deferred or system requirement, a missing descriptor); it is never an
 // allow.
@@ -217,6 +218,9 @@ func Decide(in Input) (Decision, error) {
 		return d, err
 	}
 	if d, done, err := decideRequirement(&in); done || err != nil {
+		return d, err
+	}
+	if d, done, err := decideDelegation(&in); done || err != nil {
 		return d, err
 	}
 	if d, done := decidePrincipalRules(&in); done {

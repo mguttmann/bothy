@@ -11,6 +11,7 @@ import (
 
 	"github.com/OWNER/bothy/services/server/api/routes"
 	audithttp "github.com/OWNER/bothy/services/server/internal/audit/adapters/httpapi"
+	authzhttp "github.com/OWNER/bothy/services/server/internal/authz/adapters/httpapi"
 	identityhttp "github.com/OWNER/bothy/services/server/internal/identity/adapters/httpapi"
 	instancehttp "github.com/OWNER/bothy/services/server/internal/instance/adapters/httpapi"
 	"github.com/OWNER/bothy/services/server/internal/platform/httpserver"
@@ -43,6 +44,10 @@ type Mux interface { // NOSONAR: names the public mux it stands for; see M1-17/3
 // twice. The compiler proves only the method set: the start (wire.Serve) fills every nil module
 // handler with the one it builds from its dependencies before MountRoutes.
 type Handlers struct {
+	// Access implements listGroups, createGroup, getGroup, updateGroup, deleteGroup,
+	// listGroupMembers, addGroupMember, removeGroupMember, listGrants, createGrant, getGrant and
+	// revokeGrant (authz, M1-48).
+	*authzhttp.Access
 	// Log implements listAuditEvents, exportAuditEvents and verifyAuditChain (audit, M1-50).
 	*audithttp.Log
 	// Devices implements listMyDevices, listUserDevices and getDevice (identity, M1-33).
