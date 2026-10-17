@@ -15,7 +15,10 @@ import 'support/arb_rules.dart';
 import 'support/repo.dart';
 
 /// Keys allowed to use an English term without the German one, each with its reason.
-const Map<String, String> exceptions = {};
+const Map<String, String> exceptions = {
+  // "runs on the subscription" is the verb, not the term Run (components.md section 10).
+  'billingLabelPersonal': 'verb "runs", not the term Run',
+};
 
 void main() {
   test('the checked-in table equals the generation from 01 section 9', () {
