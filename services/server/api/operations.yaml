@@ -46,6 +46,7 @@ enabled:             # operationIds that have a handler; sorted ascending
   - getUserCredentials
   - handleOidcCallback
   - listAuditEvents
+  - listFeatureFlags
   - listIdentityProviders
   - listInstanceSettings
   - listMyDevices
@@ -57,6 +58,7 @@ enabled:             # operationIds that have a handler; sorted ascending
   - listUsers
   - loginWithTrustedHeader
   - logout
+  - putFeatureFlag
   - putInstanceSetting
   - redeemEnrollmentCode
   - refreshToken
@@ -437,9 +439,6 @@ later:               # every other operationId of docs/api/openapi.yaml; sorted 
   - operation_id: listEvents
     milestone: M1
     ticket: M1-63
-  - operation_id: listFeatureFlags
-    milestone: M1
-    ticket: M1-47
   - operation_id: listForumTags
     milestone: M1
     ticket: M1-53
@@ -580,9 +579,6 @@ later:               # every other operationId of docs/api/openapi.yaml; sorted 
   - operation_id: putChannelDraft
     milestone: M1
     ticket: M1-61
-  - operation_id: putFeatureFlag
-    milestone: M1
-    ticket: M1-47
   - operation_id: putMySetting
     milestone: M1
     ticket: M1-61

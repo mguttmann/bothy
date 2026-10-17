@@ -90,7 +90,7 @@ func (c *stepClient) agentToken(agent ids.ID) issued {
 // personalToken creates a personal token of c's person (switch on) and returns it.
 func (c *stepClient) personalToken() issued {
 	c.w.t.Helper()
-	c.w.personal.on.Store(true)
+	c.w.setPersonal(true)
 	m := c.w.want(c.create(c.user, tokenBody("Laptop", c.w.clk.Now().Add(24*time.Hour), "")), http.StatusCreated, "")
 	return issued{id: m["token"].(map[string]any)["id"].(string), secret: m["secret"].(string)}
 }
@@ -392,7 +392,7 @@ func wantPointer(t *testing.T, m map[string]any, pointer string) {
 // auth.api_token_max_ttl (agent) or auth.personal_token_max_ttl (personal) ahead.
 func caseCreateTokenExpiryRequiredAndBounded(t *testing.T, w *sworld) {
 	o := w.ownerWithStepUp()
-	w.personal.on.Store(true)
+	w.setPersonal(true)
 	agent := w.agentPrincipal("lotse")
 	key, _ := identitytest.NewDeviceKey(jose.AlgES256)
 	now := w.clk.Now()
@@ -412,7 +412,7 @@ func caseCreateTokenExpiryRequiredAndBounded(t *testing.T, w *sworld) {
 // tokens (400 on /scopes).
 func caseCreateTokenScopesRejectedForAgentAndPersonal(t *testing.T, w *sworld) {
 	o := w.ownerWithStepUp()
-	w.personal.on.Store(true)
+	w.setPersonal(true)
 	agent := w.agentPrincipal("lotse")
 	key, _ := identitytest.NewDeviceKey(jose.AlgES256)
 	at := w.clk.Now().Add(time.Hour)
@@ -450,12 +450,12 @@ func caseCreateTokenStepUpRequired(t *testing.T, w *sworld) {
 // caseCreateTokenPersonalDisabled403: a personal token while tokens.personal_enabled is off is
 // 403 feature_disabled.
 func caseCreateTokenPersonalDisabled403(t *testing.T, w *sworld) {
-	w.personal.on.Store(false)
+	w.setPersonal(false)
 	sam := w.phone(w.person(w.handle("sam"), false))
 	sam.stepUp()
 	at := w.clk.Now().Add(time.Hour)
 	w.want(sam.create(sam.user, tokenBody("Laptop", at, "")), http.StatusForbidden, "feature_disabled")
-	w.personal.on.Store(true)
+	w.setPersonal(true)
 	m := w.want(sam.create(sam.user, tokenBody("Laptop", at, "")), http.StatusCreated, "")
 	if p, err := apitoken.Parse(m["secret"].(string)); err != nil || p.Kind != apitoken.KindPersonal {
 		t.Fatalf("no personal token: %v", err)
@@ -465,7 +465,7 @@ func caseCreateTokenPersonalDisabled403(t *testing.T, w *sworld) {
 // caseCreateTokenPersonalForOtherPerson403: nobody creates a personal token for another person
 // (403 not_self, owners included); a person creates none for an agent (403 owner_only).
 func caseCreateTokenPersonalForOtherPerson403(t *testing.T, w *sworld) {
-	w.personal.on.Store(true)
+	w.setPersonal(true)
 	o := w.ownerWithStepUp()
 	sam := w.phone(w.person(w.handle("sam"), false))
 	sam.stepUp()

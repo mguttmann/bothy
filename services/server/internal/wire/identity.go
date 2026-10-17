@@ -12,6 +12,7 @@ import (
 	"strings"
 
 	identityhttp "github.com/OWNER/bothy/services/server/internal/identity/adapters/httpapi"
+	"github.com/OWNER/bothy/services/server/internal/identity/adapters/instanceflags"
 	"github.com/OWNER/bothy/services/server/internal/identity/adapters/locale"
 	"github.com/OWNER/bothy/services/server/internal/identity/adapters/oidc"
 	identitypg "github.com/OWNER/bothy/services/server/internal/identity/adapters/postgres"
@@ -155,15 +156,15 @@ type Identity struct {
 }
 
 // IdentityWrites are the collaborators of the writing use cases of identity (M1-31): the
-// recorder of audit, the appender of sync and the switch tokens.personal_enabled (M1-44).
+// recorder of audit, the appender of sync, the settings and the feature flags of instance.
 type IdentityWrites struct {
 	// Audit records the allow entries.
 	Audit auditing.Recorder
 	// Events appends user.updated.
 	Events eventlog.Appender
-	// PersonalTokens is the switch tokens.personal_enabled; nil binds app.PersonalTokensDefault
-	// (off) until M1-47 rebinds it over the feature flags of instance.
-	PersonalTokens app.PersonalTokenSwitch
+	// Flags are the feature flags of instance (M1-47); createToken asks tokens.personal_enabled
+	// through them (identity/adapters/instanceflags).
+	Flags instance.Flags
 	// Settings reads locale.default, the language createUser stores when the request names none
 	// (M1-46).
 	Settings instance.Settings
@@ -172,7 +173,7 @@ type IdentityWrites struct {
 // NewIdentity builds the identity module over pool with the unit of work uow, the Authorizer az,
 // the recorder and appender of w, the token pepper (raw bytes), the clock (nil means
 // clock.System()) and log. It opens no connection and starts nothing. Errors: a window, limit or
-// page size outside its range, an empty pepper, a missing recorder or appender.
+// page size outside its range, an empty pepper, a missing recorder, appender or feature flags.
 func NewIdentity(cfg app.Config, pool *pg.Pool, uow txn.UnitOfWork, az authorize.Authorizer, w IdentityWrites, pepper []byte,
 	clk clock.Clock, log *slog.Logger) (*Identity, error) {
 	if clk == nil {
@@ -203,8 +204,9 @@ func NewIdentity(cfg app.Config, pool *pg.Pool, uow txn.UnitOfWork, az authorize
 	if err != nil {
 		return nil, err
 	}
-	if w.PersonalTokens == nil {
-		w.PersonalTokens = app.PersonalTokensDefault{}
+	personal, err := instanceflags.New(w.Flags)
+	if err != nil {
+		return nil, err
 	}
 	driver, err := app.NewTrustedHeaderDriver(cfg, repo, repo, orDiscard(log))
 	if err != nil {
@@ -212,7 +214,7 @@ func NewIdentity(cfg app.Config, pool *pg.Pool, uow txn.UnitOfWork, az authorize
 	}
 	tokens, err := app.NewTokens(cfg, pepper, app.TokensDeps{
 		Store: repo, Principals: repo, UoW: uow, Authorizer: az, Audit: w.Audit, Cursors: identityhttp.Cursors{},
-		Switch: w.PersonalTokens, Clock: clk,
+		Switch: personal, Clock: clk,
 	})
 	if err != nil {
 		return nil, err

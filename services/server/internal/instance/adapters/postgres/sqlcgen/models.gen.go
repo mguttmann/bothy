@@ -202,6 +202,15 @@ type EventLog struct {
 	PermissionVersion   int64
 }
 
+type FeatureFlag struct {
+	Key       string
+	Enabled   bool
+	Rollout   []byte
+	Version   int64
+	UpdatedBy pgtype.UUID
+	UpdatedAt pgtype.Timestamptz
+}
+
 type Grant struct {
 	ID                 pgtype.UUID
 	SubjectKind        string

@@ -82,9 +82,16 @@ day; the version changes only with a release and can be checked in the repositor
 - Build ticket M1-47 in [PLAN.md](../PLAN.md): evaluation globally, per person and per group with
   an expired membership; unknown keys are off; changes only by an owner with step-up
   and audit.
-- `make flag-check` (tool `tools/flagcheck`, part of `gates`): fails when `VERSION` reaches
-  `remove_by` of a registered `release` flag; also fails for `release` without
-  `remove_by` and for `option` with `remove_by`.
+- `make flag-check` (tool `services/server/tools/flagcheck`, part of `gates`): fails when
+  `VERSION` reaches `remove_by` of a registered `release` flag (a pre-release such as
+  `1.4.0-beta.1` has not reached `1.4.0`); also fails for `release` without `remove_by`, for
+  `option` with `remove_by`, for every other breach of the registration rules and when the
+  table in [configuration.md](../operations/configuration.md) 7 differs from the registration
+  in key, kind or default. Held by the tests `TestFlagCheck*` (`tools/flagcheck`),
+  `TestCheckRegistry`, `TestReachedRemoveBy`, `TestEvaluate`, `TestInRollout`
+  (`internal/instance/domain`), `TestRegisteredFlagsValid` (`internal/instance`) and the
+  integration tests `TestFlags_*`, `TestPutFeatureFlag_*`, `TestPersonalToken_*`
+  (`internal/identity/adapters/httpapi`).
 - Held by the form: a flag is only a switch (`feature_flags.enabled boolean`); a flag cannot carry
   numbers, lists or secrets. Whether a switch touches a security boundary is checked by the review
   of every ticket and by the red team gate

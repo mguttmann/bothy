@@ -67,6 +67,14 @@ for the console), default, for `release` the version `remove_by`, and the respon
 The server evaluates unknown keys in the table `feature_flags` as off and shows them in
 the console as "orphaned".
 
+The registration lives in `services/server/internal/instance/flags.go` (`RegisteredFlags`); how
+to add and remove a flag is described in the
+[module README](../../services/server/internal/instance/README.md) in the section "Feature
+flags". `make flag-check` (tool `services/server/tools/flagcheck`, part of `make gates`)
+checks the registration, fails as soon as `services/server/VERSION` reaches the `remove_by` of a
+registered `release` flag, and compares the registration with
+[configuration.md](configuration.md) 7.
+
 ### 2.3 Evaluation
 
 ```

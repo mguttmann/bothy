@@ -130,15 +130,9 @@ type Info struct {
 	Branding      Branding
 	LocaleDefault string
 	SpecVersion   string
-	// Features are the flags evaluated for the caller; empty until M1-47.
+	// Features are the registered flags evaluated for the caller, in key order (M1-47).
 	Features []EvaluatedFlag
 	Limits   Limits
-}
-
-// EvaluatedFlag is one feature flag evaluated for a caller (M1-47 fills the list).
-type EvaluatedFlag struct {
-	Key     string
-	Enabled bool
 }
 
 // ClientVersion is one entry of Discovery.min_client_versions.
@@ -182,10 +176,11 @@ type ProblemType struct {
 }
 
 // Admin is the incoming port of the six REST operations of M1-46: discovery, the instance view,
-// the settings, the branding and the problem types. Each use case authorizes its action of
-// docs/spec/05-actions.md 4.1 and 4.2 first; owner, step-up and the deny audit come from the
-// Authorizer.
+// the settings, the branding and the problem types, and of the two flag operations of M1-47
+// (FlagAdmin). Each use case authorizes its action of docs/spec/05-actions.md 4.1 and 4.2 first;
+// owner, step-up and the deny audit come from the Authorizer.
 type Admin interface {
+	FlagAdmin
 	// Discovery serves getDiscovery (instance.discovery.read, public, also before setup).
 	Discovery(ctx context.Context) (Discovery, error)
 	// Info serves getInstance (instance.read, any active principal).
