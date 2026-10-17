@@ -785,7 +785,7 @@ final class FakeWorld {
     minRetainedSeq = seq + 1;
   }
 
-  /// Starts a new time line as `bothy restore finalize` does (04 7.5): a new epoch, so a
+  /// Starts a new time line as the final step of a restore does (04 7.5): a new epoch, so a
   /// client with the old one gets `resync_required` with `epoch_changed`.
   void changeEpoch() => syncEpoch = nextId();
 
