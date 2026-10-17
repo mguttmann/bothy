@@ -2166,6 +2166,444 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'{title} ({index} of {count})'**
   String vizTvPosition(String title, int index, int count);
+
+  /// Title of screen E1, the server address (01 section 5.6).
+  ///
+  /// In en, this message translates to:
+  /// **'Connect to your instance'**
+  String get onboardingConnectTitle;
+
+  /// Label of the address field on E1 (01 section 5.6).
+  ///
+  /// In en, this message translates to:
+  /// **'Server address'**
+  String get onboardingServerAddress;
+
+  /// Main button of E1; calls getDiscovery (01 section 5.6).
+  ///
+  /// In en, this message translates to:
+  /// **'Connect'**
+  String get onboardingConnect;
+
+  /// State of E1 while getDiscovery runs (01 section 5.6).
+  ///
+  /// In en, this message translates to:
+  /// **'Connecting'**
+  String get onboardingConnecting;
+
+  /// E1 error for an address that is no http or https URL (01 section 5.6).
+  ///
+  /// In en, this message translates to:
+  /// **'Enter the full address of the instance, for example https://chat.example.com.'**
+  String get onboardingAddressInvalid;
+
+  /// E1 result without a valid discovery answer (01 section 5.6).
+  ///
+  /// In en, this message translates to:
+  /// **'No instance at this address. Check the address and try again.'**
+  String get onboardingNoInstance;
+
+  /// E1 result for a TLS error; there is no way to continue (01 section 5.6, R-PR-14).
+  ///
+  /// In en, this message translates to:
+  /// **'Certificate invalid. The connection is not secure, so the app does not connect. Ask the owner of the instance to renew the certificate.'**
+  String get onboardingCertificateInvalid;
+
+  /// E1 result on setup_required with the pointer to the setup wizard (01 section 5.6, 16 section 3.1).
+  ///
+  /// In en, this message translates to:
+  /// **'Instance not set up yet. The owner sets it up on the host with the setup wizard (install.sh).'**
+  String get onboardingNotSetUp;
+
+  /// E1 result below min_client_versions with the update path (01 section 5.6, 18).
+  ///
+  /// In en, this message translates to:
+  /// **'App too old. This instance needs version {version} or newer. Install the update, then connect again.'**
+  String onboardingAppTooOld(String version);
+
+  /// Title of E2 with branding.product_name of the instance (01 section 5.6).
+  ///
+  /// In en, this message translates to:
+  /// **'Log in to {productName}'**
+  String onboardingLoginTitle(String productName);
+
+  /// Button of E2 for an OIDC or proxy provider of discovery (01 section 5.6).
+  ///
+  /// In en, this message translates to:
+  /// **'Log in with {name}'**
+  String onboardingLoginWithProvider(String name);
+
+  /// Separator on E2 between the providers and the local login (01 section 5.6).
+  ///
+  /// In en, this message translates to:
+  /// **'or'**
+  String get onboardingOr;
+
+  /// Field of E2 for the local login name (01 section 5.6).
+  ///
+  /// In en, this message translates to:
+  /// **'Login name'**
+  String get onboardingLoginName;
+
+  /// Button of E2 for the passkey login (01 section 5.6).
+  ///
+  /// In en, this message translates to:
+  /// **'Log in with passkey'**
+  String get onboardingLoginWithPasskey;
+
+  /// Button of E2 and option of E3 for the password with TOTP (01 section 5.6).
+  ///
+  /// In en, this message translates to:
+  /// **'Password and one-time code'**
+  String get onboardingPasswordAndCode;
+
+  /// Password field of E2 (01 section 5.6).
+  ///
+  /// In en, this message translates to:
+  /// **'Password'**
+  String get onboardingPassword;
+
+  /// TOTP field of E2 (01 section 5.6).
+  ///
+  /// In en, this message translates to:
+  /// **'One-time code'**
+  String get onboardingOneTimeCode;
+
+  /// Button of E2 that sends the password and one-time code (01 section 5.6).
+  ///
+  /// In en, this message translates to:
+  /// **'Log in'**
+  String get onboardingLogIn;
+
+  /// Link of E2 to E3 (01 section 5.6).
+  ///
+  /// In en, this message translates to:
+  /// **'I have an enrollment code'**
+  String get onboardingEnrollmentCodeLink;
+
+  /// Link of E2 to E5 (01 section 5.6).
+  ///
+  /// In en, this message translates to:
+  /// **'Pair with another device'**
+  String get onboardingPairLink;
+
+  /// E2 text when discovery names no login method (01 section 5.6).
+  ///
+  /// In en, this message translates to:
+  /// **'No login is set up for this instance. Ask the owner of the instance.'**
+  String get onboardingNoMethod;
+
+  /// Line of E2 with the address of the instance (01 section 5.6).
+  ///
+  /// In en, this message translates to:
+  /// **'Server: {address}'**
+  String onboardingServerHost(String address);
+
+  /// Button of E2 back to E1 (01 section 5.6).
+  ///
+  /// In en, this message translates to:
+  /// **'Change'**
+  String get onboardingChangeServer;
+
+  /// Back button of E3 and E5 (01 section 5.6).
+  ///
+  /// In en, this message translates to:
+  /// **'Back'**
+  String get onboardingBack;
+
+  /// E2 and E3 error after a rejected login or code; always the same text (01 section 5.6, 08 section 3.2).
+  ///
+  /// In en, this message translates to:
+  /// **'Login failed. Check your details and try again.'**
+  String get onboardingLoginFailed;
+
+  /// E2 to E5 error without an answer of the server (01 section 5.6).
+  ///
+  /// In en, this message translates to:
+  /// **'The instance is not reachable. Check the network and try again.'**
+  String get onboardingUnreachable;
+
+  /// E2 error after an OIDC redirect with an error (01 section 5.6).
+  ///
+  /// In en, this message translates to:
+  /// **'The login in the browser was cancelled. Start it again.'**
+  String get onboardingBrowserCancelled;
+
+  /// E2 error after an OIDC attempt expired (01 section 5.6).
+  ///
+  /// In en, this message translates to:
+  /// **'The login in the browser took too long. Start it again.'**
+  String get onboardingBrowserExpired;
+
+  /// Title of E3 (01 section 5.6).
+  ///
+  /// In en, this message translates to:
+  /// **'Enrollment code'**
+  String get onboardingEnrollTitle;
+
+  /// Field of E3 for the enrollment code (01 section 5.6).
+  ///
+  /// In en, this message translates to:
+  /// **'Code from the owner'**
+  String get onboardingEnrollCode;
+
+  /// Question of E3 above the methods (01 section 5.6).
+  ///
+  /// In en, this message translates to:
+  /// **'How do you want to log in?'**
+  String get onboardingEnrollHow;
+
+  /// E3 method that redeems the code with the device keys only (08 section 3.2).
+  ///
+  /// In en, this message translates to:
+  /// **'Use this device'**
+  String get onboardingEnrollThisDevice;
+
+  /// E3 method that redeems the code with a new passkey (01 section 5.6).
+  ///
+  /// In en, this message translates to:
+  /// **'Create passkey'**
+  String get onboardingEnrollCreatePasskey;
+
+  /// E3 method that links a login service with the code (01 section 5.6).
+  ///
+  /// In en, this message translates to:
+  /// **'Link with {name}'**
+  String onboardingEnrollLink(String name);
+
+  /// Main button of E3 (01 section 5.6).
+  ///
+  /// In en, this message translates to:
+  /// **'Continue'**
+  String get onboardingContinue;
+
+  /// Note of E3 (01 section 5.6).
+  ///
+  /// In en, this message translates to:
+  /// **'The code is valid once.'**
+  String get onboardingEnrollOnce;
+
+  /// Title of E4 (01 section 5.6).
+  ///
+  /// In en, this message translates to:
+  /// **'Device waiting for confirmation'**
+  String get onboardingPendingTitle;
+
+  /// Instructions of E4 below the verification code (01 section 5.6).
+  ///
+  /// In en, this message translates to:
+  /// **'Type this code on one of your active devices: Settings, Devices and sessions, Confirm. No active device: ask the owner.'**
+  String get onboardingPendingExplain;
+
+  /// Button of E4 that logs out and deletes the keys (01 section 5.6).
+  ///
+  /// In en, this message translates to:
+  /// **'Cancel'**
+  String get onboardingCancel;
+
+  /// Remaining time of a code on E4 and E5 as text (01 section 5.6).
+  ///
+  /// In en, this message translates to:
+  /// **'{minutes, plural, =0{Valid for less than a minute} =1{Valid for 1 more minute} other{Valid for {minutes} more minutes}}'**
+  String onboardingValidFor(int minutes);
+
+  /// Title of E5 (01 section 5.6).
+  ///
+  /// In en, this message translates to:
+  /// **'Pair device'**
+  String get onboardingPairTitle;
+
+  /// Instructions of E5 above the pairing code (01 section 5.6).
+  ///
+  /// In en, this message translates to:
+  /// **'On an active device: Settings, Devices, Add device, then enter:'**
+  String get onboardingPairExplain;
+
+  /// Button of E5 that starts a new pairing (01 section 5.6).
+  ///
+  /// In en, this message translates to:
+  /// **'New code'**
+  String get onboardingPairNewCode;
+
+  /// E5 text after the pairing expired (08 section 5.3).
+  ///
+  /// In en, this message translates to:
+  /// **'The code has expired. Get a new code.'**
+  String get onboardingPairExpired;
+
+  /// Title of E6 (01 section 5.6).
+  ///
+  /// In en, this message translates to:
+  /// **'{productName} is locked'**
+  String onboardingLockedTitle(String productName);
+
+  /// Button of E6 that asks for biometrics or the device password (01 section 5.6).
+  ///
+  /// In en, this message translates to:
+  /// **'Unlock'**
+  String get onboardingUnlock;
+
+  /// E6 text after a failed unlock (01 section 5.6).
+  ///
+  /// In en, this message translates to:
+  /// **'Unlocking failed.'**
+  String get onboardingUnlockFailed;
+
+  /// Button of E6 after a failed unlock (01 section 5.6).
+  ///
+  /// In en, this message translates to:
+  /// **'Try again'**
+  String get onboardingTryAgain;
+
+  /// Button of E6 and of the desktop shell that logs out and deletes the local data (01 section 5.6).
+  ///
+  /// In en, this message translates to:
+  /// **'Log out'**
+  String get onboardingLogOut;
+
+  /// Title of E7 (01 section 5.6).
+  ///
+  /// In en, this message translates to:
+  /// **'You are logged out.'**
+  String get onboardingSignedOutTitle;
+
+  /// Line of E7 with the reason text (01 section 5.6).
+  ///
+  /// In en, this message translates to:
+  /// **'Reason: {reason}'**
+  String onboardingSignedOutReason(String reason);
+
+  /// E7 reason after the person logged out or cancelled E4 (01 section 5.6).
+  ///
+  /// In en, this message translates to:
+  /// **'You logged out.'**
+  String get onboardingReasonLoggedOut;
+
+  /// E7 reason for devices.revoke_reason revoked_by_self (01 section 5.6).
+  ///
+  /// In en, this message translates to:
+  /// **'This device was revoked by another device.'**
+  String get onboardingReasonRevokedBySelf;
+
+  /// E7 reason for devices.revoke_reason revoked_by_owner (01 section 5.6).
+  ///
+  /// In en, this message translates to:
+  /// **'The owner revoked this device.'**
+  String get onboardingReasonRevokedByOwner;
+
+  /// E7 reason for devices.revoke_reason user_disabled (01 section 5.6).
+  ///
+  /// In en, this message translates to:
+  /// **'Your account has been disabled.'**
+  String get onboardingReasonUserDisabled;
+
+  /// E7 reason for devices.revoke_reason inactive (01 section 5.6).
+  ///
+  /// In en, this message translates to:
+  /// **'This device was not used for a long time.'**
+  String get onboardingReasonInactive;
+
+  /// E7 reason for devices.revoke_reason verification_failed (rejected in E4).
+  ///
+  /// In en, this message translates to:
+  /// **'The confirmation of this device was rejected.'**
+  String get onboardingReasonRejected;
+
+  /// E7 reason for devices.revoke_reason pending_expired (E4 expired).
+  ///
+  /// In en, this message translates to:
+  /// **'This device was not confirmed in time.'**
+  String get onboardingReasonPendingExpired;
+
+  /// E7 reason for a revoked session (4012, session.revoked, 401 session_revoked).
+  ///
+  /// In en, this message translates to:
+  /// **'Your session was ended on the server.'**
+  String get onboardingReasonSessionRevoked;
+
+  /// E7 reason when the server no longer accepts the refresh token (auth.session_max_age).
+  ///
+  /// In en, this message translates to:
+  /// **'Your session has expired.'**
+  String get onboardingReasonSessionExpired;
+
+  /// Sentence of E7 after the wipe (04 section 8.5, R-SY-14).
+  ///
+  /// In en, this message translates to:
+  /// **'The data of this device has been deleted.'**
+  String get onboardingDataDeleted;
+
+  /// Button of E7 that leads to E2 (01 section 5.6).
+  ///
+  /// In en, this message translates to:
+  /// **'Log in again'**
+  String get onboardingLogInAgain;
+
+  /// E7 text for a disabled person instead of the login button (01 section 5.6).
+  ///
+  /// In en, this message translates to:
+  /// **'Contact the owner of the instance.'**
+  String get onboardingContactOwner;
+
+  /// Button that copies a code (01 section 5.6).
+  ///
+  /// In en, this message translates to:
+  /// **'Copy'**
+  String get onboardingCopy;
+
+  /// Confirmation after a code was copied (01 section 5.6).
+  ///
+  /// In en, this message translates to:
+  /// **'Copied'**
+  String get onboardingCopied;
+
+  /// Semantics label of a code, spelled character by character (01 section 5.6, 8).
+  ///
+  /// In en, this message translates to:
+  /// **'Code: {characters}'**
+  String onboardingCodeLabel(String characters);
+
+  /// Text of the browser page the loopback redirect answers with (15 section 8).
+  ///
+  /// In en, this message translates to:
+  /// **'The login is complete. You can close this window.'**
+  String get onboardingLoopbackDone;
+
+  /// Semantics label of the sidebar column frame (01 section 5.1).
+  ///
+  /// In en, this message translates to:
+  /// **'Spaces and channels'**
+  String get shellColumnSidebar;
+
+  /// Semantics label of the post list column frame (01 section 5.1).
+  ///
+  /// In en, this message translates to:
+  /// **'Post list'**
+  String get shellColumnPostList;
+
+  /// Semantics label of the history column frame (01 section 5.1).
+  ///
+  /// In en, this message translates to:
+  /// **'History'**
+  String get shellColumnHistory;
+
+  /// Semantics label of the session column frame (01 section 5.1).
+  ///
+  /// In en, this message translates to:
+  /// **'Session'**
+  String get shellColumnSession;
+
+  /// Semantics label of the drag handle between two columns (01 section 5.1).
+  ///
+  /// In en, this message translates to:
+  /// **'Resize column'**
+  String get shellResizeColumn;
+
+  /// Banner after the close code 4007 (15 section 15).
+  ///
+  /// In en, this message translates to:
+  /// **'Update required. Install the new version to connect again.'**
+  String get shellUpdateRequired;
 }
 
 class _AppLocalizationsDelegate

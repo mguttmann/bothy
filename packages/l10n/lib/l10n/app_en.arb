@@ -1894,5 +1894,351 @@
         "example": "3"
       }
     }
+  },
+  "onboardingConnectTitle": "Connect to your instance",
+  "@onboardingConnectTitle": {
+    "description": "Title of screen E1, the server address (01 section 5.6)."
+  },
+  "onboardingServerAddress": "Server address",
+  "@onboardingServerAddress": {
+    "description": "Label of the address field on E1 (01 section 5.6)."
+  },
+  "onboardingConnect": "Connect",
+  "@onboardingConnect": {
+    "description": "Main button of E1; calls getDiscovery (01 section 5.6)."
+  },
+  "onboardingConnecting": "Connecting",
+  "@onboardingConnecting": {
+    "description": "State of E1 while getDiscovery runs (01 section 5.6)."
+  },
+  "onboardingAddressInvalid": "Enter the full address of the instance, for example https://chat.example.com.",
+  "@onboardingAddressInvalid": {
+    "description": "E1 error for an address that is no http or https URL (01 section 5.6)."
+  },
+  "onboardingNoInstance": "No instance at this address. Check the address and try again.",
+  "@onboardingNoInstance": {
+    "description": "E1 result without a valid discovery answer (01 section 5.6)."
+  },
+  "onboardingCertificateInvalid": "Certificate invalid. The connection is not secure, so the app does not connect. Ask the owner of the instance to renew the certificate.",
+  "@onboardingCertificateInvalid": {
+    "description": "E1 result for a TLS error; there is no way to continue (01 section 5.6, R-PR-14)."
+  },
+  "onboardingNotSetUp": "Instance not set up yet. The owner sets it up on the host with the setup wizard (install.sh).",
+  "@onboardingNotSetUp": {
+    "description": "E1 result on setup_required with the pointer to the setup wizard (01 section 5.6, 16 section 3.1)."
+  },
+  "onboardingAppTooOld": "App too old. This instance needs version {version} or newer. Install the update, then connect again.",
+  "@onboardingAppTooOld": {
+    "description": "E1 result below min_client_versions with the update path (01 section 5.6, 18).",
+    "placeholders": {
+      "version": {
+        "type": "String",
+        "example": "1.2.0"
+      }
+    }
+  },
+  "onboardingLoginTitle": "Log in to {productName}",
+  "@onboardingLoginTitle": {
+    "description": "Title of E2 with branding.product_name of the instance (01 section 5.6).",
+    "placeholders": {
+      "productName": {
+        "type": "String",
+        "example": "Team Chat"
+      }
+    }
+  },
+  "onboardingLoginWithProvider": "Log in with {name}",
+  "@onboardingLoginWithProvider": {
+    "description": "Button of E2 for an OIDC or proxy provider of discovery (01 section 5.6).",
+    "placeholders": {
+      "name": {
+        "type": "String",
+        "example": "Company SSO"
+      }
+    }
+  },
+  "onboardingOr": "or",
+  "@onboardingOr": {
+    "description": "Separator on E2 between the providers and the local login (01 section 5.6)."
+  },
+  "onboardingLoginName": "Login name",
+  "@onboardingLoginName": {
+    "description": "Field of E2 for the local login name (01 section 5.6)."
+  },
+  "onboardingLoginWithPasskey": "Log in with passkey",
+  "@onboardingLoginWithPasskey": {
+    "description": "Button of E2 for the passkey login (01 section 5.6)."
+  },
+  "onboardingPasswordAndCode": "Password and one-time code",
+  "@onboardingPasswordAndCode": {
+    "description": "Button of E2 and option of E3 for the password with TOTP (01 section 5.6)."
+  },
+  "onboardingPassword": "Password",
+  "@onboardingPassword": {
+    "description": "Password field of E2 (01 section 5.6)."
+  },
+  "onboardingOneTimeCode": "One-time code",
+  "@onboardingOneTimeCode": {
+    "description": "TOTP field of E2 (01 section 5.6)."
+  },
+  "onboardingLogIn": "Log in",
+  "@onboardingLogIn": {
+    "description": "Button of E2 that sends the password and one-time code (01 section 5.6)."
+  },
+  "onboardingEnrollmentCodeLink": "I have an enrollment code",
+  "@onboardingEnrollmentCodeLink": {
+    "description": "Link of E2 to E3 (01 section 5.6)."
+  },
+  "onboardingPairLink": "Pair with another device",
+  "@onboardingPairLink": {
+    "description": "Link of E2 to E5 (01 section 5.6)."
+  },
+  "onboardingNoMethod": "No login is set up for this instance. Ask the owner of the instance.",
+  "@onboardingNoMethod": {
+    "description": "E2 text when discovery names no login method (01 section 5.6)."
+  },
+  "onboardingServerHost": "Server: {address}",
+  "@onboardingServerHost": {
+    "description": "Line of E2 with the address of the instance (01 section 5.6).",
+    "placeholders": {
+      "address": {
+        "type": "String",
+        "example": "chat.example.com"
+      }
+    }
+  },
+  "onboardingChangeServer": "Change",
+  "@onboardingChangeServer": {
+    "description": "Button of E2 back to E1 (01 section 5.6)."
+  },
+  "onboardingBack": "Back",
+  "@onboardingBack": {
+    "description": "Back button of E3 and E5 (01 section 5.6)."
+  },
+  "onboardingLoginFailed": "Login failed. Check your details and try again.",
+  "@onboardingLoginFailed": {
+    "description": "E2 and E3 error after a rejected login or code; always the same text (01 section 5.6, 08 section 3.2)."
+  },
+  "onboardingUnreachable": "The instance is not reachable. Check the network and try again.",
+  "@onboardingUnreachable": {
+    "description": "E2 to E5 error without an answer of the server (01 section 5.6)."
+  },
+  "onboardingBrowserCancelled": "The login in the browser was cancelled. Start it again.",
+  "@onboardingBrowserCancelled": {
+    "description": "E2 error after an OIDC redirect with an error (01 section 5.6)."
+  },
+  "onboardingBrowserExpired": "The login in the browser took too long. Start it again.",
+  "@onboardingBrowserExpired": {
+    "description": "E2 error after an OIDC attempt expired (01 section 5.6)."
+  },
+  "onboardingEnrollTitle": "Enrollment code",
+  "@onboardingEnrollTitle": {
+    "description": "Title of E3 (01 section 5.6)."
+  },
+  "onboardingEnrollCode": "Code from the owner",
+  "@onboardingEnrollCode": {
+    "description": "Field of E3 for the enrollment code (01 section 5.6)."
+  },
+  "onboardingEnrollHow": "How do you want to log in?",
+  "@onboardingEnrollHow": {
+    "description": "Question of E3 above the methods (01 section 5.6)."
+  },
+  "onboardingEnrollThisDevice": "Use this device",
+  "@onboardingEnrollThisDevice": {
+    "description": "E3 method that redeems the code with the device keys only (08 section 3.2)."
+  },
+  "onboardingEnrollCreatePasskey": "Create passkey",
+  "@onboardingEnrollCreatePasskey": {
+    "description": "E3 method that redeems the code with a new passkey (01 section 5.6)."
+  },
+  "onboardingEnrollLink": "Link with {name}",
+  "@onboardingEnrollLink": {
+    "description": "E3 method that links a login service with the code (01 section 5.6).",
+    "placeholders": {
+      "name": {
+        "type": "String",
+        "example": "Company SSO"
+      }
+    }
+  },
+  "onboardingContinue": "Continue",
+  "@onboardingContinue": {
+    "description": "Main button of E3 (01 section 5.6)."
+  },
+  "onboardingEnrollOnce": "The code is valid once.",
+  "@onboardingEnrollOnce": {
+    "description": "Note of E3 (01 section 5.6)."
+  },
+  "onboardingPendingTitle": "Device waiting for confirmation",
+  "@onboardingPendingTitle": {
+    "description": "Title of E4 (01 section 5.6)."
+  },
+  "onboardingPendingExplain": "Type this code on one of your active devices: Settings, Devices and sessions, Confirm. No active device: ask the owner.",
+  "@onboardingPendingExplain": {
+    "description": "Instructions of E4 below the verification code (01 section 5.6)."
+  },
+  "onboardingCancel": "Cancel",
+  "@onboardingCancel": {
+    "description": "Button of E4 that logs out and deletes the keys (01 section 5.6)."
+  },
+  "onboardingValidFor": "{minutes, plural, =0{Valid for less than a minute} =1{Valid for 1 more minute} other{Valid for {minutes} more minutes}}",
+  "@onboardingValidFor": {
+    "description": "Remaining time of a code on E4 and E5 as text (01 section 5.6).",
+    "placeholders": {
+      "minutes": {
+        "type": "int",
+        "example": "23"
+      }
+    }
+  },
+  "onboardingPairTitle": "Pair device",
+  "@onboardingPairTitle": {
+    "description": "Title of E5 (01 section 5.6)."
+  },
+  "onboardingPairExplain": "On an active device: Settings, Devices, Add device, then enter:",
+  "@onboardingPairExplain": {
+    "description": "Instructions of E5 above the pairing code (01 section 5.6)."
+  },
+  "onboardingPairNewCode": "New code",
+  "@onboardingPairNewCode": {
+    "description": "Button of E5 that starts a new pairing (01 section 5.6)."
+  },
+  "onboardingPairExpired": "The code has expired. Get a new code.",
+  "@onboardingPairExpired": {
+    "description": "E5 text after the pairing expired (08 section 5.3)."
+  },
+  "onboardingLockedTitle": "{productName} is locked",
+  "@onboardingLockedTitle": {
+    "description": "Title of E6 (01 section 5.6).",
+    "placeholders": {
+      "productName": {
+        "type": "String",
+        "example": "Team Chat"
+      }
+    }
+  },
+  "onboardingUnlock": "Unlock",
+  "@onboardingUnlock": {
+    "description": "Button of E6 that asks for biometrics or the device password (01 section 5.6)."
+  },
+  "onboardingUnlockFailed": "Unlocking failed.",
+  "@onboardingUnlockFailed": {
+    "description": "E6 text after a failed unlock (01 section 5.6)."
+  },
+  "onboardingTryAgain": "Try again",
+  "@onboardingTryAgain": {
+    "description": "Button of E6 after a failed unlock (01 section 5.6)."
+  },
+  "onboardingLogOut": "Log out",
+  "@onboardingLogOut": {
+    "description": "Button of E6 and of the desktop shell that logs out and deletes the local data (01 section 5.6)."
+  },
+  "onboardingSignedOutTitle": "You are logged out.",
+  "@onboardingSignedOutTitle": {
+    "description": "Title of E7 (01 section 5.6)."
+  },
+  "onboardingSignedOutReason": "Reason: {reason}",
+  "@onboardingSignedOutReason": {
+    "description": "Line of E7 with the reason text (01 section 5.6).",
+    "placeholders": {
+      "reason": {
+        "type": "String",
+        "example": "This device was revoked by another device."
+      }
+    }
+  },
+  "onboardingReasonLoggedOut": "You logged out.",
+  "@onboardingReasonLoggedOut": {
+    "description": "E7 reason after the person logged out or cancelled E4 (01 section 5.6)."
+  },
+  "onboardingReasonRevokedBySelf": "This device was revoked by another device.",
+  "@onboardingReasonRevokedBySelf": {
+    "description": "E7 reason for devices.revoke_reason revoked_by_self (01 section 5.6)."
+  },
+  "onboardingReasonRevokedByOwner": "The owner revoked this device.",
+  "@onboardingReasonRevokedByOwner": {
+    "description": "E7 reason for devices.revoke_reason revoked_by_owner (01 section 5.6)."
+  },
+  "onboardingReasonUserDisabled": "Your account has been disabled.",
+  "@onboardingReasonUserDisabled": {
+    "description": "E7 reason for devices.revoke_reason user_disabled (01 section 5.6)."
+  },
+  "onboardingReasonInactive": "This device was not used for a long time.",
+  "@onboardingReasonInactive": {
+    "description": "E7 reason for devices.revoke_reason inactive (01 section 5.6)."
+  },
+  "onboardingReasonRejected": "The confirmation of this device was rejected.",
+  "@onboardingReasonRejected": {
+    "description": "E7 reason for devices.revoke_reason verification_failed (rejected in E4)."
+  },
+  "onboardingReasonPendingExpired": "This device was not confirmed in time.",
+  "@onboardingReasonPendingExpired": {
+    "description": "E7 reason for devices.revoke_reason pending_expired (E4 expired)."
+  },
+  "onboardingReasonSessionRevoked": "Your session was ended on the server.",
+  "@onboardingReasonSessionRevoked": {
+    "description": "E7 reason for a revoked session (4012, session.revoked, 401 session_revoked)."
+  },
+  "onboardingReasonSessionExpired": "Your session has expired.",
+  "@onboardingReasonSessionExpired": {
+    "description": "E7 reason when the server no longer accepts the refresh token (auth.session_max_age)."
+  },
+  "onboardingDataDeleted": "The data of this device has been deleted.",
+  "@onboardingDataDeleted": {
+    "description": "Sentence of E7 after the wipe (04 section 8.5, R-SY-14)."
+  },
+  "onboardingLogInAgain": "Log in again",
+  "@onboardingLogInAgain": {
+    "description": "Button of E7 that leads to E2 (01 section 5.6)."
+  },
+  "onboardingContactOwner": "Contact the owner of the instance.",
+  "@onboardingContactOwner": {
+    "description": "E7 text for a disabled person instead of the login button (01 section 5.6)."
+  },
+  "onboardingCopy": "Copy",
+  "@onboardingCopy": {
+    "description": "Button that copies a code (01 section 5.6)."
+  },
+  "onboardingCopied": "Copied",
+  "@onboardingCopied": {
+    "description": "Confirmation after a code was copied (01 section 5.6)."
+  },
+  "onboardingCodeLabel": "Code: {characters}",
+  "@onboardingCodeLabel": {
+    "description": "Semantics label of a code, spelled character by character (01 section 5.6, 8).",
+    "placeholders": {
+      "characters": {
+        "type": "String",
+        "example": "4, 8, 1, 2, 0, 7"
+      }
+    }
+  },
+  "onboardingLoopbackDone": "The login is complete. You can close this window.",
+  "@onboardingLoopbackDone": {
+    "description": "Text of the browser page the loopback redirect answers with (15 section 8)."
+  },
+  "shellColumnSidebar": "Spaces and channels",
+  "@shellColumnSidebar": {
+    "description": "Semantics label of the sidebar column frame (01 section 5.1)."
+  },
+  "shellColumnPostList": "Post list",
+  "@shellColumnPostList": {
+    "description": "Semantics label of the post list column frame (01 section 5.1)."
+  },
+  "shellColumnHistory": "History",
+  "@shellColumnHistory": {
+    "description": "Semantics label of the history column frame (01 section 5.1)."
+  },
+  "shellColumnSession": "Session",
+  "@shellColumnSession": {
+    "description": "Semantics label of the session column frame (01 section 5.1)."
+  },
+  "shellResizeColumn": "Resize column",
+  "@shellResizeColumn": {
+    "description": "Semantics label of the drag handle between two columns (01 section 5.1)."
+  },
+  "shellUpdateRequired": "Update required. Install the new version to connect again.",
+  "@shellUpdateRequired": {
+    "description": "Banner after the close code 4007 (15 section 15)."
   }
 }
