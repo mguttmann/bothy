@@ -395,6 +395,10 @@ operated, and the order of the build.
 - `make test` gives each Go test binary the time limit `quality.test.go_timeout` instead of the
   default ten, because the module-wide coverage instrumentation slows the larger packages down
   (PL/2 in [DECISIONS.md](docs/DECISIONS.md)).
+- Golden tests of the design system compare with `DsGoldenFileComparator`
+  (`package:design_system/testing.dart`): a pixel counts as different only when one color
+  channel differs by more than `dsCiGoldenChannelTolerance`, so the anti-aliasing of another
+  host no longer fails a CI golden recorded on macOS (PL/5 in [DECISIONS.md](docs/DECISIONS.md)).
 - CodeRabbit reviews with the `chill` profile and reports bugs, security issues, broken
   contracts and problems that break CI, without style, wording or formatting nits; it asks
   for a source URL and retrieval date only in `docs/spec/**`, `docs/security/**` and
