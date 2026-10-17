@@ -7,8 +7,10 @@
 import 'package:design_system/design_system.dart';
 import 'package:flutter/material.dart';
 
-/// The width of a sheet; narrow enough to keep the golden files small.
-const double sheetWidth = 420;
+/// The width of a sheet; narrow enough to keep the golden files small, and whole pixels wider
+/// than the longest scenario label of alchemist, so the golden width is a whole number of
+/// pixels on every host (docs/DECISIONS.md D-M4-07-10).
+const double sheetWidth = 460;
 
 /// One scenario sheet: [children] stacked with a gap on the canvas.
 class Sheet extends StatelessWidget {
