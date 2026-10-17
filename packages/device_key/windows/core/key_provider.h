@@ -22,7 +22,7 @@ namespace device_key {
 /// A byte string (public key blob, hash, signature).
 using Bytes = std::vector<uint8_t>;
 
-/// The two key storage providers the plugin uses (docs/spec/15-client-architektur.md 9).
+/// The two key storage providers the plugin uses (docs/spec/15-client-architecture.md 9).
 enum class ProviderKind {
   /// `MS_PLATFORM_CRYPTO_PROVIDER`: keys in the TPM 2.0, hardware-bound.
   kPlatform,

@@ -11,7 +11,7 @@
 
 namespace device_key {
 
-/// The purpose of a device key (docs/spec/08-identitaet.md 6.1, D-L10).
+/// The purpose of a device key (docs/spec/08-identity.md 6.1, D-L10).
 enum class KeyPurpose {
   /// Signs every DPoP proof; never asks the user.
   kDpop,
@@ -72,7 +72,7 @@ struct KeyInfo {
 };
 
 /// Creates, uses and deletes the two device keys of one Windows user for each server
-/// (brief M4-11, Design note 2; docs/spec/15-client-architektur.md 9).
+/// (brief M4-11, Design note 2; docs/spec/15-client-architecture.md 9).
 ///
 /// A new `dpop` key is created in the Platform Crypto Provider (TPM) when the provider opens and
 /// `NCryptIsAlgSupported` confirms `BCRYPT_ECDSA_P256_ALGORITHM`, otherwise in the Software Key
