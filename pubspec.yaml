@@ -28,3 +28,11 @@ workspace:
   - packages/bothy_viz
   - packages/bothy_noise
   - packages/terminal_ui
+
+# Build hooks read user defines only from the workspace root (docs/DECISIONS.md D-M4-12-2):
+# the hook of `sqlite3` then compiles SQLite3MultipleCiphers instead of plain SQLite, so the
+# local database of the apps is encrypted (docs/spec/15-client-architecture.md 6, R-CL-08).
+hooks:
+  user_defines:
+    sqlite3:
+      source: sqlite3mc
