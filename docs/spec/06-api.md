@@ -601,15 +601,17 @@ request per subscription. Delivery, retry, verification at the receiver and inco
    working tree, including the frame and event schemas in its `components.schemas`, with the same
    file of the base tag and fails on every row of the right column of the table above. The base is
    the newest stable tag `server/vX.Y.Z` merged into `HEAD`, read with `git show`; a pre-release tag
-   (`-beta.N`) is the base only while no stable tag exists; without any tag the gate passes with a
+   (for example `-beta.N`) is the base only while no stable tag exists; without any tag the gate passes with a
    notice. A break passes only when `info.version` raised its major version against the base
    (items 4 and 5); nothing else lowers the gate. The tool is the own comparison
    `tools/api-checks/breaking.py` over the parsed YAML, not oasdiff: oasdiff 1.33.0 parses this
    OpenAPI 3.1 document, but reported neither a removed field of an event schema that no path
    references nor a changed `x-authz-action`, and a removed parameter only as a warning [verified,
-   own probe 2026-10-15, Q8]. Not detectable from the document and left to the review: a changed
-   meaning or sort order that only a description states, and changes to `asyncapi.yaml` itself
-   (channels, operations, messages); `asyncapi.yaml` only gives the gateway schemas their direction
+   own probe 2026-10-15, Q8]. Left to the review: a changed meaning or sort order that only a
+   description states, changes to `asyncapi.yaml` itself (channels, operations, messages), and
+   the narrowing changes the tool does not compare (tighter limits such as `maxLength` or
+   `minimum`, a narrower `additionalProperties`, a new `enum` on an existing field; the list in
+   `tools/api-checks/README.md`); `asyncapi.yaml` only gives the gateway schemas their direction
    (docs/DECISIONS.md D-M7-11-1 to D-M7-11-3).
 
 ## 14. Code generation
