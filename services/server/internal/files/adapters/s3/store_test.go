@@ -559,8 +559,8 @@ func containsAll(have []string, want ...string) bool {
 }
 
 // TestS3SDKOnlyInAdapter holds 12 "15" and ADR 0048 "Confirmation": no package of the module but
-// internal/files/adapters/s3 imports a path below github.com/aws/, in production code, tests or
-// external tests.
+// internal/files/adapters/s3 and the checkpoint sink internal/audit/adapters/s3sink (M7-22)
+// imports a path below github.com/aws/, in production code, tests or external tests.
 func TestS3SDKOnlyInAdapter(t *testing.T) {
 	t.Parallel()
 	out, err := exec.CommandContext(t.Context(), "go", "list", "-test=false",
@@ -574,6 +574,7 @@ func TestS3SDKOnlyInAdapter(t *testing.T) {
 		t.Fatalf("go list: %v", err)
 	}
 	const adapter = "github.com/OWNER/bothy/services/server/internal/files/adapters/s3"
+	const sink = "github.com/OWNER/bothy/services/server/internal/audit/adapters/s3sink"
 	seen := false
 	for _, line := range strings.Split(strings.TrimSpace(string(out)), "\n") {
 		fields := strings.Fields(line)
@@ -583,7 +584,7 @@ func TestS3SDKOnlyInAdapter(t *testing.T) {
 		pkg := fields[0]
 		seen = seen || pkg == adapter
 		for _, imp := range fields[1:] {
-			if strings.HasPrefix(imp, "github.com/aws/") && pkg != adapter {
+			if strings.HasPrefix(imp, "github.com/aws/") && pkg != adapter && pkg != sink {
 				t.Errorf("%s imports %s", pkg, imp)
 			}
 		}

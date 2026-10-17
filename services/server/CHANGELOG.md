@@ -88,6 +88,23 @@ documented in this file. The format is based on
   `GatewayProtocolVersions` and the problem catalogue; the configuration gains the client limits
   and the client version keys; `createUser` stores `locale.default` when the request names no
   locale; `tools/ci/tests/test_product_name_places.py` holds the places of the working name.
+- Audit checkpoints in object storage (M7-22): `audit.checkpoint_sink` accepts
+  `s3://<bucket>[/<prefix>]` next to `file://`. The new sink `internal/audit/adapters/s3sink`
+  stores every signed checkpoint as the object `[<prefix>/]<instance_id>/<seq>.jws`, written once
+  (`If-None-Match: *` after a read of the key; other bytes under a stored `seq` fail with the
+  checkpoint conflict and the stored object stays), lists them in `seq` order from the oldest
+  version of every key (each version read once per process, new ones in parallel) and pages
+  through `ListObjectVersions`. New keys
+  `audit.checkpoint_s3_endpoint`, `audit.checkpoint_s3_region`,
+  `audit.checkpoint_s3_use_path_style`, `audit.checkpoint_s3_access_key_ref` and
+  `audit.checkpoint_s3_secret_key_ref` (own endpoint and credentials, through the egress client
+  with purpose `audit_checkpoint`), and `retention.audit` enters the schema. `bothy config check`
+  and the server start read the Object Lock configuration of the bucket and fail unless it has a
+  default retention in mode `COMPLIANCE` of at least `retention.audit`. A conformance suite
+  (`internal/audit/app/sinktest`) runs against the file sink and the object store sink; the
+  secret catalogue gains the supplied files `audit_checkpoint_s3_access_key` and
+  `audit_checkpoint_s3_secret_key` (server only).
+
 - First setup, enrollment codes and setup lock (M1-37): until `bothy setup bootstrap-owner` has
   run on the host, the public listener answers every request except the discovery reads with
   `503 setup_required`, before authentication and rate limiting; the bootstrap takes effect

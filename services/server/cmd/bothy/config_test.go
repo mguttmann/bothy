@@ -6,9 +6,13 @@ import (
 	"bytes"
 	"context"
 	"errors"
+	"io"
+	"net/http"
+	"net/http/httptest"
 	"os"
 	"path/filepath"
 	"slices"
+	"strconv"
 	"strings"
 	"testing"
 
@@ -163,6 +167,11 @@ func TestConfigPrintShowsSourcePerKey(t *testing.T) {
 		"api.page_size_default = 50  # default\n" +
 		"api.page_size_max = 200  # default\n" +
 		"audit.checkpoint_interval = 1h  # default\n" +
+		"audit.checkpoint_s3_access_key_ref = file:/run/bothy/secrets/audit_checkpoint_s3_access_key  # default\n" +
+		"audit.checkpoint_s3_endpoint =   # default\n" +
+		"audit.checkpoint_s3_region = us-east-1  # default\n" +
+		"audit.checkpoint_s3_secret_key_ref = file:/run/bothy/secrets/audit_checkpoint_s3_secret_key  # default\n" +
+		"audit.checkpoint_s3_use_path_style = true  # default\n" +
 		"audit.checkpoint_sink =   # default\n" +
 		"audit.deny_aggregate_max_keys = 10000  # default\n" +
 		"audit.deny_aggregate_window = 1m  # default\n" +
@@ -304,6 +313,7 @@ func TestConfigPrintShowsSourcePerKey(t *testing.T) {
 		"ratelimit.rl.write.burst = 30  # default\n" +
 		"ratelimit.rl.write.per_minute = 120  # default\n" +
 		"ratelimit.sweep_interval = 1m  # default\n" +
+		"retention.audit = 365d  # default\n" +
 		"secrets.cache_ttl = 5m  # default\n" +
 		"secrets.dir = /run/bothy/secrets  # default\n" +
 		"secrets.signing_key_dir = /var/lib/bothy/signing-keys  # default\n" +
@@ -426,20 +436,113 @@ func withPublicURL(env []string) []string {
 }
 
 // TestSinkConfigRejectsUnknownScheme: bothy config check refuses an audit.checkpoint_sink with a
-// scheme other than file:// and names the supported scheme, never the value (19 section 16,
-// M1-50); file:// with an absolute path and the empty value pass.
+// scheme other than file:// and s3:// and names the supported schemes, never the value (19
+// section 16, M1-50, M7-22); file:// with an absolute path and the empty value pass.
 func TestSinkConfigRejectsUnknownScheme(t *testing.T) {
 	t.Parallel()
-	code, stdout, stderr := runConfig(t, wire.ConfigSchema, []string{"BOTHY_AUDIT__CHECKPOINT_SINK=s3://bucket/prefix"}, "check")
-	if code != 1 || stdout != "" || !strings.Contains(stderr, "audit.checkpoint_sink") || !strings.Contains(stderr, "file://") {
-		t.Fatalf("exit %d, stdout %q, stderr %q; want 1 and a problem naming audit.checkpoint_sink and file://", code, stdout, stderr)
+	code, stdout, stderr := runConfig(t, wire.ConfigSchema, []string{"BOTHY_AUDIT__CHECKPOINT_SINK=gs://bucket/prefix"}, "check")
+	if code != 1 || stdout != "" || !strings.Contains(stderr, "audit.checkpoint_sink") || !strings.Contains(stderr, "file://") || !strings.Contains(stderr, "s3://") {
+		t.Fatalf("exit %d, stdout %q, stderr %q; want 1 and a problem naming audit.checkpoint_sink, file:// and s3://", code, stdout, stderr)
 	}
-	if strings.Contains(stderr, "bucket") {
+	if strings.Contains(stderr, "gs://") {
 		t.Errorf("the problem echoes the value: %q", stderr)
 	}
 	for _, ok := range []string{"file:///var/lib/bothy-checkpoints", ""} {
 		if code, _, stderr := runConfig(t, wire.ConfigSchema, []string{"BOTHY_AUDIT__CHECKPOINT_SINK=" + ok}, "check"); code != 0 {
 			t.Errorf("%q: exit %d, stderr %q", ok, code, stderr)
 		}
+	}
+}
+
+// lockFake is an S3 endpoint that answers GetObjectLockConfiguration of the bucket bothy-audit
+// with status and body, and 404 to everything else. It binds 127.0.0.1 on a random port
+// (httptest).
+func lockFake(t *testing.T, status int, body string) *httptest.Server {
+	t.Helper()
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Method == http.MethodGet && r.URL.Path == "/bothy-audit" && r.URL.Query().Has("object-lock") {
+			w.Header().Set("Content-Type", "application/xml")
+			w.WriteHeader(status)
+			_, _ = io.WriteString(w, body)
+			return
+		}
+		http.NotFound(w, r)
+	}))
+	t.Cleanup(srv.Close)
+	return srv
+}
+
+// lockBody is the answer of GetObjectLockConfiguration with a default retention.
+func lockBody(mode string, days int) string {
+	return `<?xml version="1.0" encoding="UTF-8"?><ObjectLockConfiguration xmlns="http://s3.amazonaws.com/doc/2006-03-01/">` +
+		`<ObjectLockEnabled>Enabled</ObjectLockEnabled><Rule><DefaultRetention><Mode>` + mode + `</Mode><Days>` +
+		strconv.Itoa(days) + `</Days></DefaultRetention></Rule></ObjectLockConfiguration>`
+}
+
+// noLockBody is the S3 error of a bucket without Object Lock.
+const noLockBody = `<?xml version="1.0" encoding="UTF-8"?><Error><Code>ObjectLockConfigurationNotFoundError</Code>` +
+	`<Message>Object Lock configuration does not exist for this bucket</Message></Error>`
+
+// sinkEnv is the configuration of an object store sink on srv with the key files in a fresh
+// secrets directory.
+func sinkEnv(t *testing.T, srv *httptest.Server) []string {
+	t.Helper()
+	dir := t.TempDir()
+	writeSecret(t, dir, "audit_checkpoint_s3_access_key", "AKSINKEXAMPLE", 0o600)
+	writeSecret(t, dir, "audit_checkpoint_s3_secret_key", "SINKSECRETEXAMPLE", 0o600)
+	host := strings.TrimPrefix(srv.URL, "http://")
+	return []string{
+		"BOTHY_SECRETS__DIR=" + dir,
+		"BOTHY_AUDIT__CHECKPOINT_SINK=s3://bothy-audit",
+		"BOTHY_AUDIT__CHECKPOINT_S3_ENDPOINT=" + srv.URL,
+		"BOTHY_EGRESS__ALLOWED_HOSTS=" + host + ";allow_private",
+	}
+}
+
+// TestConfigCheck_CheckpointSinkWithoutLock: bothy config check reads the Object Lock
+// configuration of an object store target and fails, naming audit.checkpoint_sink, when the
+// bucket has no lock, a Governance lock or a Compliance lock shorter than retention.audit (M7-22,
+// runbook backup-restore 8). The endpoint and the keys never appear in the output.
+func TestConfigCheck_CheckpointSinkWithoutLock(t *testing.T) {
+	t.Parallel()
+	for name, fake := range map[string]struct {
+		status int
+		body   string
+		want   string
+	}{
+		"no lock":    {http.StatusNotFound, noLockBody, "Object Lock"},
+		"governance": {http.StatusOK, lockBody("GOVERNANCE", 400), "COMPLIANCE"},
+		"too short":  {http.StatusOK, lockBody("COMPLIANCE", 30), "retention.audit"},
+	} {
+		t.Run(name, func(t *testing.T) {
+			t.Parallel()
+			srv := lockFake(t, fake.status, fake.body)
+			code, stdout, stderr := runConfig(t, wire.ConfigSchema, sinkEnv(t, srv), "check")
+			if code != 1 || strings.Contains(stdout, "configuration ok") || !strings.Contains(stderr, "audit.checkpoint_sink") || !strings.Contains(stderr, fake.want) {
+				t.Fatalf("exit %d, stdout %q, stderr %q; want 1 naming audit.checkpoint_sink and %q", code, stdout, stderr, fake.want)
+			}
+			noCanary(t, []string{srv.URL, strings.TrimPrefix(srv.URL, "http://"), "AKSINKEXAMPLE", "SINKSECRETEXAMPLE"}, stdout, stderr)
+		})
+	}
+}
+
+// TestConfigCheck_CheckpointSinkWithLock: a bucket with Object Lock and a default retention in
+// mode Compliance of at least retention.audit passes bothy config check.
+func TestConfigCheck_CheckpointSinkWithLock(t *testing.T) {
+	t.Parallel()
+	srv := lockFake(t, http.StatusOK, lockBody("COMPLIANCE", 400))
+	code, stdout, stderr := runConfig(t, wire.ConfigSchema, sinkEnv(t, srv), "check")
+	if code != 0 || stdout != "configuration ok\n" {
+		t.Fatalf("exit %d, stdout %q, stderr %q; want 0 and configuration ok", code, stdout, stderr)
+	}
+	// retention.audit above the period of the lock fails the same bucket.
+	env := append(sinkEnv(t, srv), "BOTHY_RETENTION__AUDIT=500d")
+	if code, _, stderr := runConfig(t, wire.ConfigSchema, env, "check"); code != 1 || !strings.Contains(stderr, "retention.audit") {
+		t.Errorf("retention.audit above the lock: exit %d, stderr %q", code, stderr)
+	}
+	// An http endpoint without an allow_private entry fails at load, before any request.
+	env = slices.DeleteFunc(sinkEnv(t, srv), func(e string) bool { return strings.HasPrefix(e, "BOTHY_EGRESS__ALLOWED_HOSTS=") })
+	if code, _, stderr := runConfig(t, wire.ConfigSchema, env, "check"); code != 1 || !strings.Contains(stderr, "egress.allowed_hosts") {
+		t.Errorf("http endpoint without allow_private: exit %d, stderr %q", code, stderr)
 	}
 }

@@ -8,6 +8,7 @@ import (
 	"context"
 	"encoding/base64"
 	"encoding/json"
+	"fmt"
 	"log/slog"
 	"net/http"
 	"os"
@@ -51,7 +52,18 @@ import (
 	"github.com/OWNER/bothy/services/server/internal/wire"
 )
 
-func TestMain(m *testing.M) { os.Exit(pgtest.Main(m)) }
+// TestMain runs the tests with the throwaway PostgreSQL of pgtest and stops the SeaweedFS of the
+// object store tests afterwards.
+func TestMain(m *testing.M) {
+	code := pgtest.Main(m)
+	if err := stopSeaweed(); err != nil {
+		_, _ = fmt.Fprintf(os.Stderr, "httpapi tests: %v\n", err)
+		if code == 0 {
+			code = 1
+		}
+	}
+	os.Exit(code)
+}
 
 // pageMax is api.page_size_max of these tests: small, so a walk and an export run in several
 // batches.
@@ -158,8 +170,25 @@ type env struct {
 	superConn *pgx.Conn
 }
 
-// newEnv builds the environment; withSink false leaves audit.checkpoint_sink empty.
+// newEnv builds the environment; withSink false leaves audit.checkpoint_sink empty, true puts the
+// file sink on a temporary directory.
 func newEnv(t *testing.T, withSink bool) *env {
+	t.Helper()
+	if !withSink {
+		return newEnvWithSink(t, nil)
+	}
+	return newEnvWithSink(t, func(dir string, inst ids.ID) auditapp.CheckpointSink {
+		sink, err := filesink.New(dir, inst)
+		if err != nil {
+			t.Fatal(err)
+		}
+		return sink
+	})
+}
+
+// newEnvWithSink builds the environment with the sink that newSink returns for the temporary
+// directory sinkDir and the instance; nil leaves audit.checkpoint_sink empty.
+func newEnvWithSink(t *testing.T, newSink func(sinkDir string, inst ids.ID) auditapp.CheckpointSink) *env {
 	t.Helper()
 	db := pgtest.New(t)
 	cfg := db.Config(pg.RoleApp)
@@ -212,10 +241,8 @@ func newEnv(t *testing.T, withSink bool) *env {
 	inst := ids.New()
 	var sink auditapp.CheckpointSink = auditapp.NoSink{}
 	sinkDir := t.TempDir()
-	if withSink {
-		if sink, err = filesink.New(sinkDir, inst); err != nil {
-			t.Fatal(err)
-		}
+	if newSink != nil {
+		sink = newSink(sinkDir, inst)
 	}
 	reader := sdkmetric.NewManualReader()
 	metrics, err := otelmetrics.New(sdkmetric.NewMeterProvider(sdkmetric.WithReader(reader)))

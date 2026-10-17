@@ -11,6 +11,14 @@ const denyAggregateWindowDefault = "60s"
 // keyCheckpointSink is audit.checkpoint_sink; the cross-check audit_checkpoint_sink reads it.
 const keyCheckpointSink = "audit.checkpoint_sink"
 
+// The keys of the object store target of audit.checkpoint_sink (M7-22); the cross-check
+// audit_checkpoint_sink reads the three that are no secret reference.
+const (
+	keyCheckpointS3Endpoint  = "audit.checkpoint_s3_endpoint"
+	keyCheckpointS3Region    = "audit.checkpoint_s3_region"
+	keyCheckpointS3PathStyle = "audit.checkpoint_s3_use_path_style"
+)
+
 // auditConfigKeys returns the keys of the audit module (M1-24): the aggregation of identical
 // denials from docs/spec/05-actions.md and the IP pseudonym keys from 20-privacy.md
 // "Configuration values of this chapter", and the checkpoints from 19-security.md "16." (M1-50).
@@ -49,8 +57,42 @@ func auditConfigKeys() []config.Key {
 			// A string, not a URL key: the schema allows an empty default only for string and list
 			// keys; the cross-check audit_checkpoint_sink parses it.
 			Name: keyCheckpointSink, Kind: config.KindString, Default: "",
-			Doc:     "Where the signed audit checkpoints are stored outside the database: empty (a permanent warning) or file://<absolute path> on storage outside the database volume.",
+			Doc:     "Where the signed audit checkpoints are stored outside the database: empty (a permanent warning), file://<absolute path> on storage outside the database volume, or s3://<bucket>[/<prefix>] in an object store with a retention lock.",
 			Chapter: chapter19,
+		},
+		{
+			// A string, not a URL key: the schema allows an empty default only for string and list
+			// keys; the cross-check audit_checkpoint_sink parses it.
+			Name: keyCheckpointS3Endpoint, Kind: config.KindString, Default: "",
+			Doc:     "Endpoint of the object store of the audit checkpoints, an absolute http or https URL without path, required with an s3:// sink.",
+			Chapter: chapter19,
+		},
+		{
+			Name: keyCheckpointS3Region, Kind: config.KindString, Default: "us-east-1",
+			Doc:     "Region of the S3 signature of the object store of the audit checkpoints.",
+			Chapter: chapter19,
+		},
+		{
+			Name: keyCheckpointS3PathStyle, Kind: config.KindBool, Default: defaultTrue,
+			Doc:     "Path-style requests to the object store of the audit checkpoints instead of virtual-hosted requests on <bucket>.<endpoint host>.",
+			Chapter: chapter19,
+		},
+		{
+			Name: "audit.checkpoint_s3_access_key_ref", Kind: config.KindSecretRef, Default: "file:<secrets.dir>/audit_checkpoint_s3_access_key",
+			Doc:     "Secret reference of the access key ID of the object store of the audit checkpoints, read only with an s3:// sink.",
+			Chapter: chapter19,
+		},
+		{
+			Name: "audit.checkpoint_s3_secret_key_ref", Kind: config.KindSecretRef, Default: "file:<secrets.dir>/audit_checkpoint_s3_secret_key",
+			Doc:     "Secret reference of the secret access key of the object store of the audit checkpoints, read only with an s3:// sink.",
+			Chapter: chapter19,
+		},
+		{
+			// M7-22 is the first reader: the retention lock of an s3:// sink must hold at least
+			// this long; the trim of the log comes with M7-05.
+			Name: "retention.audit", Kind: config.KindDuration, Default: "365d", Min: "1d",
+			Doc:     "How long the audit log is kept before it is trimmed with an anchor.",
+			Chapter: chapter20,
 		},
 		{
 			Name: "privacy.audit_ip_kek_ref", Kind: config.KindSecretRef, Default: "file:<secrets.dir>/audit_ip_kek",

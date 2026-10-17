@@ -88,6 +88,9 @@ a symmetric key is shorter and faster, and nobody outside needs a public key.
 - Architecture rule: only `internal/files/adapters/s3` imports the S3 SDK, and the port
   `ObjectStore` has no operation for signed download URLs (check of the port interface in the
   driver conformance test).
+  The audit checkpoint sink `internal/audit/adapters/s3sink` (M7-22) is the one other package
+  that imports the SDK; it serves no file and holds no presign client, so the rule of this ADR is
+  unchanged.
 - Canary test from [17-observability.md](../spec/17-observability.md), section 10: a ticket
   appears in no export.
 - SEC-T03 (headers for HTML and SVG: `attachment`, `nosniff`, sandbox CSP).

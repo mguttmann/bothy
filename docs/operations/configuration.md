@@ -724,7 +724,12 @@ Source: [19-security.md](../spec/19-security.md), section 16.
 | `egress.timeout` | `BOTHY_EGRESS__TIMEOUT` | Server | duration | `15s` | time limit of an outgoing request | active |
 | `egress.max_response_bytes` | `BOTHY_EGRESS__MAX_RESPONSE_BYTES` | Server | int | `1048576` | largest response of an outgoing request | active |
 | `audit.checkpoint_interval` | `BOTHY_AUDIT__CHECKPOINT_INTERVAL` | Server | duration | `1h` | interval of the signed checkpoints of the audit log | active |
-| `audit.checkpoint_sink` | `BOTHY_AUDIT__CHECKPOINT_SINK` | Server | string | empty | storage target of the checkpoints outside the database: empty (warning, SEC-AUD-2) or `file://<absolute path>` on storage outside the database volume; `bothy config check` rejects other schemes. An object store with a retention lock is the recommended target for production and comes with PLAN M7-22 | active |
+| `audit.checkpoint_sink` | `BOTHY_AUDIT__CHECKPOINT_SINK` | Server | string | empty | storage target of the checkpoints outside the database: empty (warning, SEC-AUD-2), `file://<absolute path>` on storage outside the database volume, or `s3://<bucket>[/<prefix>]` (M7-22), an S3-compatible object store with a retention lock, the recommended target for production: a bucket in the S3 bucket naming rules, an optional prefix of segments of `[a-z0-9-]` joined by single `/`. `bothy config check` refuses every other form; for `s3://` it and the server start read the Object Lock configuration of the bucket and fail unless Object Lock is enabled with a default retention in mode `COMPLIANCE` of at least `retention.audit` (`GOVERNANCE` fails) | active |
+| `audit.checkpoint_s3_endpoint` | `BOTHY_AUDIT__CHECKPOINT_S3_ENDPOINT` | Server | string | empty | endpoint of the object store of an `s3://` sink, an absolute `http` or `https` URL without path; its own endpoint, separate from `file.s3.endpoint` and the backup; `http` only with an `egress.allowed_hosts` entry with `allow_private` | active |
+| `audit.checkpoint_s3_region` | `BOTHY_AUDIT__CHECKPOINT_S3_REGION` | Server | string | `us-east-1` | region of the S3 signature of an `s3://` sink | active |
+| `audit.checkpoint_s3_use_path_style` | `BOTHY_AUDIT__CHECKPOINT_S3_USE_PATH_STYLE` | Server | bool | `true` | path-style requests of an `s3://` sink instead of `<bucket>.<endpoint host>` | active |
+| `audit.checkpoint_s3_access_key_ref` | `BOTHY_AUDIT__CHECKPOINT_S3_ACCESS_KEY_REF` | Server | secret_ref | `file:<secrets.dir>/audit_checkpoint_s3_access_key` | secret reference of the own access key ID of an `s3://` sink, read only with an `s3://` sink; supplied by the owner from a separate account ([backup-restore.md](../operations/backup-restore.md) 8) | active |
+| `audit.checkpoint_s3_secret_key_ref` | `BOTHY_AUDIT__CHECKPOINT_S3_SECRET_KEY_REF` | Server | secret_ref | `file:<secrets.dir>/audit_checkpoint_s3_secret_key` | secret reference of the own secret access key of an `s3://` sink, read only with an `s3://` sink | active |
 | `audit.reason_max_chars` | `BOTHY_AUDIT__REASON_MAX_CHARS` | Server |  | `500` | maximum length of a mandatory reason of an administrative action in Unicode characters (SEC-AUD-5) | planned (M1) |
 | `signing_key.cache_ttl` | `BOTHY_SIGNING_KEY__CACHE_TTL` | Server | duration | `30s` | longest time a process still accepts a retired key or does not know a new one | active |
 | `signing_key.rotation_check_interval` | `BOTHY_SIGNING_KEY__ROTATION_CHECK_INTERVAL` | Server | duration | `1m` | interval of the job `instance.key_rotation` | active |
@@ -739,7 +744,7 @@ Source: [20-privacy.md](../spec/20-privacy.md), section 13.
 | `retention.content` | `BOTHY_RETENTION__CONTENT` | Server |  | `none` | period for contents; `none` means no automatic deletion (without `retention.content_none_reason` a warning, 4.1) | planned (M7) |
 | `retention.content_none_reason` | `BOTHY_RETENTION__CONTENT_NONE_REASON` | Server |  | empty | reason of the instance operator for `retention.content = none`; empty means a warning in `bothy config check` and in the startup log (4.1) | planned (M7) |
 | `retention.security_after_end` | `BOTHY_RETENTION__SECURITY_AFTER_END` | Server |  | `90d` | security data after end, expiry or revocation | planned (M7) |
-| `retention.audit` | `BOTHY_RETENTION__AUDIT` | Server |  | `365d` | audit log (Study C suggested twelve months) | planned (M7) |
+| `retention.audit` | `BOTHY_RETENTION__AUDIT` | Server | duration | `365d` | audit log (Study C suggested twelve months) | active |
 | `retention.cost` | `BOTHY_RETENTION__COST` | Server |  | `395d` | costs and prices | planned (M7) |
 | `retention.import_after_completion` | `BOTHY_RETENTION__IMPORT_AFTER_COMPLETION` | Server |  | `90d` | import state after completion | planned (M7) |
 | `retention.privacy_job` | `BOTHY_RETENTION__PRIVACY_JOB` | Server |  | `1095d` | privacy requests (without export packages) | planned (M7) |
@@ -880,6 +885,7 @@ into which `secrets-init` copies the file.
 | `pgbackrest_tls/` | generated (own CA) | postgres, backup | mutual TLS between the database and the repository host: `ca.crt`, `postgres.crt` and `postgres.key`, `backup.crt` and `backup.key` (ECDSA P-256, valid for `stack.PGBackRestTLSValidity`; the CA key is not kept) |
 | `restic_password` | generated | backup | encryption of the restic repository |
 | `s3_access_key`, `s3_secret_key` | generated (profile s3) or supplied (external service) | server, seaweedfs, backup | S3 access, `file.s3.access_key_ref` and `file.s3.secret_key_ref` |
+| `audit_checkpoint_s3_access_key`, `audit_checkpoint_s3_secret_key` | supplied | server | own access key of the object store of the audit checkpoints, `audit.checkpoint_s3_access_key_ref` and `audit.checkpoint_s3_secret_key_ref`; read only with an `s3://` `audit.checkpoint_sink`, from a separate account ([backup-restore.md](backup-restore.md) 8) |
 | `grafana_admin_password` | generated | grafana | admin account in the local Grafana |
 | `apns_key.p8` | supplied | server | push for iOS and macOS, `push.apns.private_key_ref` |
 | `fcm_service_account.json` | supplied | server | push for Android |
