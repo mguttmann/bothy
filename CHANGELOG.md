@@ -25,13 +25,6 @@ operated, and the order of the build.
 
 ### Added
 
-- Sync engine run documents: `RunStore` keeps the live box document of every focused run in
-  memory, applies `run.updated` by the client rule of 04 11.3 item 4 (equal `base_version`
-  applies, a stale frame is ignored, a gap, a truncated frame or an invalid patch refetches the
-  whole document through a port, a `snapshot` replaces it), queues patches during a refetch,
-  publishes at most one state per frame and discards the document at the end of the run;
-  `applyRunPatch` applies RFC 6902 `add`, `replace` and `remove` with copy on write, and
-  `RunDocument` reads the live box fields of 09 5.4 (M4-16).
 - Design tokens: `tools/design-tokens` writes `design/build/ts/tokens.gen.ts` for the Grafana
   panel plugin (colour roles of both themes including the chart and state roles, font families,
   font sizes and radii as typed constants) and copies the vendored Atkinson Hyperlegible fonts
@@ -45,6 +38,13 @@ operated, and the order of the build.
   idempotency changes, a changed `x-authz-action`); a major step of `info.version` accepts a
   break, and without a tag the gate passes with a notice. Own comparison instead of oasdiff, which
   missed rows on this document (M7-11).
+- Sync engine run documents: `RunStore` keeps the live box document of every focused run in
+  memory, applies `run.updated` by the client rule of 04 11.3 item 4 (equal `base_version`
+  applies, a stale frame is ignored, a gap, a truncated frame or an invalid patch refetches the
+  whole document through a port, a `snapshot` replaces it), queues patches during a refetch,
+  publishes at most one state per frame and discards the document at the end of the run;
+  `applyRunPatch` applies RFC 6902 `add`, `replace` and `remove` with copy on write, and
+  `RunDocument` reads the live box fields of 09 5.4 (M4-16).
 - Design system icons: `DsIcon` draws every semantic icon of `icon.tokens.json` from Phosphor
   2.1.1 vectors compiled by `vector_graphics_compiler` (chosen over an icon font after a
   sharpness and size measurement, docs/design/icons.md), at the `icon.size.*` tokens, with a
