@@ -49,7 +49,9 @@ class _ClientAppState extends ConsumerState<ClientApp> {
     super.initState();
     _step.value = ref.read(onboardingControllerProvider).step;
     _router = GoRouter(
-      initialLocation: _step.value.path,
+      initialLocation: _step.value == OnboardingStep.signedIn
+          ? '/'
+          : _step.value.path,
       refreshListenable: _step,
       redirect: (context, state) => redirectFor(
         state.uri,

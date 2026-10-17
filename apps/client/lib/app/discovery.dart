@@ -209,7 +209,14 @@ final class ApiDiscoveryClient implements DiscoveryClient {
         providers: [
           for (final p in providers)
             if (p.kind != IdentityProviderKind.local)
-              LoginProvider(id: p.id, kind: p.kind.name, name: p.name),
+              LoginProvider(
+                id: p.id,
+                // The wire code; the Dart name of the generated enum is camelCase.
+                kind: p.kind == IdentityProviderKind.trustedHeader
+                    ? 'trusted_header'
+                    : 'oidc',
+                name: p.name,
+              ),
         ],
         localEnabled: providers.any(
           (p) => p.kind == IdentityProviderKind.local,

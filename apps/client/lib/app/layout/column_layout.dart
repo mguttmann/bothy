@@ -16,7 +16,8 @@ import 'column_widths.dart';
 /// collapses; below [minWidthThreeColumns] (`ui.desktop_min_width_three_columns`) the post
 /// list and the history share one place like the navigation stack of the phone, and
 /// [stackShowsHistory] decides which one is on top. A drag changes the width at once and calls
-/// [onWidthsChanged] when the drag ends, so one drag is one write.
+/// [onWidthsChanged] when the drag ends, so one drag is one write; the dragged widths stay
+/// until [widths] changes.
 class ColumnLayout extends StatefulWidget {
   /// Creates the layout.
   const ColumnLayout({
@@ -65,28 +66,36 @@ class ColumnLayout extends StatefulWidget {
 
 class _ColumnLayoutState extends State<ColumnLayout> {
   ColumnWidths? _dragging;
+  double _total = 0;
+  List<String> _sized = const [];
 
   ColumnWidths get _widths => _dragging ?? widget.widths;
 
-  void _drag(String column, double delta, double room) {
-    final current = _widths.of(column);
+  void _drag(String column, double delta) {
+    final widths = _widths;
+    final current = widths.of(column);
+    // The history keeps at least `DsLayout.columnMin`; the room is computed from the widths of
+    // this update, since several updates can arrive before the next build.
+    final used = _sized.fold<double>(0, (sum, c) => sum + widths.of(c));
+    final room =
+        _total - used - _sized.length * DsSpace.s4 - DsLayout.columnMin;
     var next = current + delta;
-    final max = room + current - DsLayout.columnMin;
+    final max = current + (room > 0 ? room : 0);
     if (next > max) next = max;
-    setState(() => _dragging = _widths.withWidth(column, next));
+    setState(() => _dragging = widths.withWidth(column, next));
   }
 
   void _end() {
     final widths = _dragging;
-    if (widths == null) return;
-    widget.onWidthsChanged(widths);
-    setState(() => _dragging = null);
+    if (widths != null) widget.onWidthsChanged(widths);
   }
 
   @override
   void didUpdateWidget(ColumnLayout old) {
     super.didUpdateWidget(old);
-    if (old.widths != widget.widths && _dragging == null) setState(() {});
+    // The dragged widths stay until the stored setting comes back (or another device changes
+    // it), so the columns do not jump back while the write travels.
+    if (old.widths != widget.widths) _dragging = null;
   }
 
   @override
@@ -101,15 +110,15 @@ class _ColumnLayoutState extends State<ColumnLayout> {
         if (!stacked) AppColumn.postList,
         if (four) AppColumn.session,
       ];
-      final used = sized.fold<double>(0, (sum, c) => sum + widths.of(c));
-      final room = total - used - DsLayout.columnMin;
+      _total = total;
+      _sized = sized;
       Widget fixed(String column, Widget child) => SizedBox(
         width: widths.of(column),
         child: _ColumnFrame(column: column, child: child),
       );
       Widget handle(String column, {bool growsLeft = false}) => _DragHandle(
         key: ValueKey('column.handle.$column'),
-        onDrag: (dx) => _drag(column, growsLeft ? -dx : dx, room),
+        onDrag: (dx) => _drag(column, growsLeft ? -dx : dx),
         onEnd: _end,
       );
       final middle = stacked

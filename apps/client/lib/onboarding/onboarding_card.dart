@@ -47,10 +47,11 @@ class OnboardingCard extends StatelessWidget {
                 constraints: const BoxConstraints(
                   maxWidth: DsLayout.overlayWidth,
                 ),
-                child: DecoratedBox(
-                  decoration: BoxDecoration(
-                    color: colors.surfaceRaised,
-                    border: Border.all(
+                // A Material, so list tiles and ink of the card paint on the card itself.
+                child: Material(
+                  color: colors.surfaceRaised,
+                  shape: RoundedRectangleBorder(
+                    side: BorderSide(
                       color: colors.borderSubtle,
                       width: DsBorderWidth.hairline,
                     ),

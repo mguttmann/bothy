@@ -204,6 +204,7 @@ class OnboardingController extends _$OnboardingController {
   int _flow = 0;
   bool _flowOwnsSignOut = false;
   bool _ending = false;
+  InstanceServices? _open;
 
   @override
   OnboardingState build() {
@@ -212,6 +213,10 @@ class OnboardingController extends _$OnboardingController {
     ref.onDispose(() {
       unawaited(_authEvents?.cancel());
       unawaited(_notices?.cancel());
+      // The app quits (or a test ends): stop the engine and close the database, delete nothing.
+      final open = _open;
+      _open = null;
+      if (open != null) unawaited(open.close());
     });
     scheduleMicrotask(_start);
     return const OnboardingState(step: OnboardingStep.server);
@@ -468,6 +473,15 @@ class OnboardingController extends _$OnboardingController {
       code: device.verificationCode,
       deadline: createdAt.add(_ports.config.devicePendingTtl),
     );
+    // The login call returns once E4 shows; the poll runs on (08 5.2).
+    unawaited(_pollPending(services, device, flow));
+  }
+
+  Future<void> _pollPending(
+    InstanceServices services,
+    PendingDevice device,
+    int flow,
+  ) async {
     _flowOwnsSignOut = true;
     final LoginOutcome outcome;
     try {
@@ -483,10 +497,23 @@ class OnboardingController extends _$OnboardingController {
       case LoginSignedIn():
         _signedIn();
       case LoginFailed(:final reason):
-        await _endAccount(SignOutCause.ofRevokeReason(reason));
+        await _endAccount(_pendingEndCause(reason));
       case LoginPending() || LoginNeedsSecondFactor():
         break;
     }
+  }
+
+  /// The E7 cause when the poll of a waiting device ends without a login (D-M4-18-10): the
+  /// revoke reason when `getDevice` returned it; when the server ended the session with the
+  /// device first (`401 session_revoked`), the app only knows its own deadline, so before it
+  /// the confirmation was rejected and after it the device expired.
+  SignOutCause _pendingEndCause(String reason) {
+    final known = SignOutCause.ofRevokeReason(reason);
+    if (known != SignOutCause.sessionRevoked) return known;
+    final deadline = state.deadline;
+    return deadline != null && !_ports.clock.now().isBefore(deadline)
+        ? SignOutCause.pendingExpired
+        : SignOutCause.rejected;
   }
 
   void _signedIn() {
@@ -497,6 +524,7 @@ class OnboardingController extends _$OnboardingController {
   }
 
   void _watch(InstanceServices services) {
+    _open = services;
     unawaited(_authEvents?.cancel());
     unawaited(_notices?.cancel());
     _authEvents = services.auth.events.listen((event) {
@@ -526,6 +554,7 @@ class OnboardingController extends _$OnboardingController {
     final services = _services;
     if (_ending || services == null) return;
     _ending = true;
+    _open = null;
     _flow++;
     try {
       await _authEvents?.cancel();
@@ -559,6 +588,7 @@ class OnboardingController extends _$OnboardingController {
   Future<void> _closeServices() async {
     final services = _services;
     if (services == null) return;
+    _open = null;
     await _authEvents?.cancel();
     await _notices?.cancel();
     _authEvents = null;

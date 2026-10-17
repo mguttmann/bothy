@@ -161,8 +161,9 @@ class _RemainingTimeTextState extends State<RemainingTimeText> {
   @override
   void didUpdateWidget(RemainingTimeText old) {
     super.didUpdateWidget(old);
-    if (old.deadline != widget.deadline ||
-        old.announceInterval != widget.announceInterval) {
+    // A new deadline (a new pairing code) is a change like any other and goes through the same
+    // throttle; only a new interval needs a new announcer.
+    if (old.announceInterval != widget.announceInterval) {
       _announcer = _newAnnouncer();
     }
   }
