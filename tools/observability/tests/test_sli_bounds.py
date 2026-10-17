@@ -1,5 +1,5 @@
 # SPDX-License-Identifier: Apache-2.0
-"""Tests of the SLI bounds generator (docs/spec/25-visualisierung.md 3.3, VZ-T03, brief M6-11).
+"""Tests of the SLI bounds generator (docs/spec/25-visualization.md 3.3, VZ-T03, brief M6-11).
 
 Every negative case copies the real inputs into `tmp_path`, changes one thing and expects the
 named finding; the repository itself must give no difference.

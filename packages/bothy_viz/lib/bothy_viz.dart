@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 /// Visualizations of the statistics: view models, ports, basic forms, fixtures and harness
-/// support (docs/spec/25-visualisierung.md 7).
+/// support (docs/spec/25-visualization.md 7).
 ///
 /// * View models ([LiveTopologyModel], [BackendModel], [DeliveryModel], [ExecutiveModel],
 ///   [TimelineModel], [RunCardModel], [LaneModel], [SeriesModel], [TrafficLightModel]) are

@@ -1,7 +1,7 @@
 # Fixtures of `bothy_viz`
 
 JSON fixtures per schema and state for the views of
-[25-visualisierung.md](../../../docs/spec/25-visualisierung.md) (section 7.2). Tests, the
+[25-visualization.md](../../../docs/spec/25-visualization.md) (section 7.2). Tests, the
 harness and the fake server read them instead of a server.
 
 - Name: `<schema>.<state>.json`, or `<schema>.<query>.<state>.json` when one schema serves

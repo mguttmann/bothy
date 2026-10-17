@@ -4,7 +4,7 @@ import 'dart:io';
 
 import 'package:flutter_test/flutter_test.dart';
 
-/// The package part of VZ-T16 (docs/spec/25-visualisierung.md 12; SEC-VZ-1): no WebView, no
+/// The package part of VZ-T16 (docs/spec/25-visualization.md 12; SEC-VZ-1): no WebView, no
 /// HtmlElementView and no iframe in the sources of the package and its harness.
 void main() {
   test('no WebView, HtmlElementView or iframe in lib/, harness/ or test/', () {

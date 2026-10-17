@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
 
-/// The timeline of runs and minute counts (docs/spec/25-visualisierung.md 6.5).
+/// The timeline of runs and minute counts (docs/spec/25-visualization.md 6.5).
 library;
 
 import 'package:api_client/api_client.dart' as api;

@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
 
-/// A cost figure with its label (docs/spec/25-visualisierung.md 4 rule 2, 6.1).
+/// A cost figure with its label (docs/spec/25-visualization.md 4 rule 2, 6.1).
 library;
 
 import 'package:api_client/api_client.dart' as api;

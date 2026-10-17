@@ -10,7 +10,7 @@ import 'package:l10n/l10n.dart';
 
 import '../support/marks.dart';
 
-/// The golden matrix of every mark (brief M6-11, design note 8; docs/spec/15-client-architektur.md
+/// The golden matrix of every mark (brief M6-11, design note 8; docs/spec/15-client-architecture.md
 /// 20): light and dark, the three densities, text scale 1 and 2, de and en.
 GoldenTestGroup matrix(
   String name,

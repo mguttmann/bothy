@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 /// The harness of `bothy_viz`: every mark from the fixtures, without a server and without
-/// network (docs/spec/25-visualisierung.md 7.1 row `harness/`).
+/// network (docs/spec/25-visualization.md 7.1 row `harness/`).
 ///
 /// Run it with `flutter run -d macos`, `-d windows` or `-d chrome` from this folder after
 /// `flutter create --platforms=macos,windows,web .` (the platform folders are not checked in,

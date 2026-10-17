@@ -12,7 +12,7 @@ abstract interface class VizTimer {
 }
 
 /// Time and one-shot timers, injected into every source so that the stale rule behaves the
-/// same in every implementation and in tests (docs/spec/25-visualisierung.md 5.1).
+/// same in every implementation and in tests (docs/spec/25-visualization.md 5.1).
 abstract interface class VizClock {
   /// The current time.
   DateTime now();

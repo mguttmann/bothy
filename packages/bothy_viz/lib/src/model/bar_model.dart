@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
 
-/// Rows of bars over a time range: the runs of the timeline (docs/spec/25-visualisierung.md 6.5).
+/// Rows of bars over a time range: the runs of the timeline (docs/spec/25-visualization.md 6.5).
 library;
 
 import 'package:api_client/api_client.dart' as api;

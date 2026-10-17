@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
 
-/// Interface texts of the marks, all from `l10n` (docs/spec/25-visualisierung.md 7.4).
+/// Interface texts of the marks, all from `l10n` (docs/spec/25-visualization.md 7.4).
 library;
 
 import 'package:api_client/api_client.dart' as api;

@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 /// Color roles of the marks: only `color.viz.*`, the run state roles and the state roles
-/// (docs/spec/25-visualisierung.md 10; R-VZ-10).
+/// (docs/spec/25-visualization.md 10; R-VZ-10).
 library;
 
 import 'package:api_client/api_client.dart' as api;
