@@ -669,7 +669,7 @@ final class FakeWorld {
       'spaces': spaceViews(principalId),
       'channels': channelViews(principalId),
       'sidebar': <Object?>[],
-      'unread_threads': <Object?>[],
+      'unread_threads': unreadThreads(principalId),
       'active_runs': [
         for (final r in runs.values)
           if (_active(r) &&
@@ -691,6 +691,44 @@ final class FakeWorld {
       'features': <Object?>[],
     };
   }
+
+  /// The messages of [threadId] after [lastRead] that count as unread for [principalId]:
+  /// written by someone else and not deleted.
+  List<JsonMap> _unread(String principalId, String threadId, int lastRead) => [
+    for (final m in messagesOf(threadId))
+      if ((m['thread_seq']! as int) > lastRead &&
+          m['deleted_at'] == null &&
+          (m['author']! as JsonMap)['id'] != principalId)
+        m,
+  ];
+
+  static int _mentions(String principalId, List<JsonMap> messages) => messages
+      .where((m) => (m['mention_ids']! as List<Object?>).contains(principalId))
+      .length;
+
+  /// The API `UnreadThread`s of [principalId]: every visible thread with unread messages, with
+  /// the counts after its read state (04 14).
+  List<JsonMap> unreadThreads(String principalId) => [
+    for (final t in threads.values)
+      if (seesThread(principalId, t['id']! as String))
+        ...() {
+          final id = t['id']! as String;
+          final lastRead =
+              (readStates['$principalId|$id']?['last_read_seq'] as int?) ?? 0;
+          final unread = _unread(principalId, id, lastRead);
+          return [
+            if (unread.isNotEmpty)
+              {
+                'thread_id': id,
+                'channel_id': t['channel_id'],
+                'unread_count': unread.length,
+                'mention_count': _mentions(principalId, unread),
+                'last_message_seq': t['last_message_seq'],
+                'last_read_seq': lastRead,
+              },
+          ];
+        }(),
+  ];
 
   // -------------------------------------------------------------------------------------------
   // The event log
@@ -1051,7 +1089,10 @@ final class FakeWorld {
       'thread_id': threadId,
       'channel_id': thread['channel_id'],
       'last_read_seq': lastRead,
-      'mention_count': 0,
+      'mention_count': _mentions(
+        principalId,
+        _unread(principalId, threadId, lastRead),
+      ),
       'version': ((previous?['version'] as int?) ?? 0) + 1,
       'updated_by_device_id': ?deviceId,
       'updated_at': stamp(),

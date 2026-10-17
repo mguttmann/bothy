@@ -326,7 +326,10 @@ Hooks: the echo `message.created` calls `Outbox.confirmByEcho` with `message_id`
 `version`; the catch-up's live signal (`catchup.complete`, or `ready` without a cursor) calls
 `Outbox.start`, every disconnect `Outbox.pause` (04 13.4); `run.updated` goes to
 `RunStore.onRunUpdated`, a `run.state_changed` to `completed`, `failed` or `cancelled` to
-`RunStore.onRunEnded`. `EngineFocus` joins the visible threads and the threads of focused runs
+`RunStore.onRunEnded`; after a resync the focused runs that the new snapshot no longer lists
+as active end too. A confirmed `createMessage` or `updateMessage` stores the returned message
+at once (`CatchUpListener.storeConfirmedMessage`), so the entry is replaced before its echo
+(04 13.2 item 6). `EngineFocus` joins the visible threads and the threads of focused runs
 into the gateway focus, so `focusRun(run, thread)` both fetches the document and lets
 `run.updated` arrive. `baseUrl` must be `https`; only `allowPlainHttpForTests: true` (the
 headless tests and the app's test entry point) accepts `http` with a `ws` gateway
@@ -440,6 +443,9 @@ documents once per isolate, walking up from the working directory.
 - Events: `agent.invocation` and the agent consumer side are not modelled; `device.pending` is
   not written (it is not in the API documents of this base); `typing.stop` has no effect.
 - `cancelRun` ends the run at once with `cancelled`.
+- Snapshot: `unread_threads` and the read state's `mention_count` are computed (messages of
+  others after the read position, not deleted); `sidebar` and the agent presence (`agents`) are
+  always empty.
 
 ## Layout
 

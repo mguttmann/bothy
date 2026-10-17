@@ -68,6 +68,54 @@ void main() {
   });
 
   test(
+    'a confirmed response stores the message before its echo (04 13.2 item 6)',
+    () async {
+      await withScenario((server, w, client) async {
+        await client.start();
+        server.faults.holdDispatches();
+        final id = await client.send(w.releaseNotes, 'Visible at once');
+        await waitFor('confirmed', () async => (await client.outbox()).isEmpty);
+        final local = await client.messages(w.releaseNotes);
+        expect([for (final m in local) m.clientMsgId], [id]);
+        server.faults.releaseDispatches();
+        await Future<void>.delayed(const Duration(milliseconds: 200));
+        expect(await client.messages(w.releaseNotes), hasLength(1));
+      });
+    },
+  );
+
+  test('a run that ended during a gap closed by resync_required drops its document', () async {
+    await withScenario((server, w, client) async {
+      await client.start();
+      final message = w.post(w.alex, w.releaseNotes, 'Start a run');
+      final run = server.world.createRun(
+        agentId: w.robin.id,
+        triggeringMessageId: message['id']! as String,
+        triggeredBy: w.alex.id,
+      );
+      final runId = run['id']! as String;
+      final id = RunId.parse(runId);
+      await client.focusRun(runId, w.releaseNotes);
+      await waitFor(
+        'the document',
+        () => client.engine.runs.documentOf(id) != null,
+      );
+      await client.goOffline();
+      server.world.setRunState(runId, 'completed', triggerState: 'done');
+      server.faults.resyncRequired('too_far_behind');
+      await client.goOnline();
+      await waitFor(
+        'resync',
+        () => client.notices.contains('resynced:too_far_behind'),
+      );
+      await waitFor(
+        'the dropped document',
+        () => client.engine.runs.documentOf(id) == null,
+      );
+    });
+  });
+
+  test(
     'run patches reach the run store and the run end discards the document',
     () async {
       await withScenario((server, w, client) async {

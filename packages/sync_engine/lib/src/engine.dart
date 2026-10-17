@@ -7,6 +7,7 @@ library;
 import 'dart:async';
 import 'dart:math';
 
+import 'package:api_client/api_client.dart' as api_model show Message;
 import 'package:api_client/api_client.dart'
     show
         ApiClient,
@@ -85,7 +86,10 @@ final class SyncEngine {
     required this.outbox,
     required this.runs,
     required this.focus,
+    required this._resyncs,
   });
+
+  final StreamSubscription<SyncNotice> _resyncs;
 
   /// Builds the engine on the signed-in [auth] session.
   ///
@@ -131,10 +135,25 @@ final class SyncEngine {
     final executors = OutboxExecutors();
     MessageOps.register(executors, api);
     PersonalOps.register(executors, api);
+    late final CatchUpListener catchUp;
     final outbox = Outbox(
       db: store,
       executors: executors,
       config: config,
+      // 04 13.2 item 6: the server message replaces the entry at once, not only at its echo.
+      onConfirmed: (entry, response) async {
+        final body = response.body;
+        if (body is! api_model.Message) return;
+        final json = standardSerializers.serialize(
+          body,
+          specifiedType: const FullType(api_model.Message),
+        );
+        if (json is! Map) return;
+        await catchUp.storeConfirmedMessage(
+          json.cast<String, Object?>(),
+          created: entry.kind == MessageOps.createMessage,
+        );
+      },
       ids:
           ids ??
           Uuid7Generator(
@@ -144,7 +163,7 @@ final class SyncEngine {
     );
     final runs = RunStore(fetch: _ApiRunFetcher(api), ticker: ticker);
     late final EngineFocus focus;
-    final catchUp = CatchUpListener(
+    catchUp = CatchUpListener(
       db: store,
       fetcher: ApiFetcher(api),
       config: config,
@@ -184,6 +203,11 @@ final class SyncEngine {
     );
     catchUp.watchConnection(connection.states);
     focus = EngineFocus._(connection.focus, runs, catchUp);
+    // 04 7.3: a resync skips the events of the gap, so a focused run that ended there gets no
+    // run.state_changed; the new snapshot's runs decide (15 7.4).
+    final resyncs = catchUp.notices.listen((n) {
+      if (n is Resynced) unawaited(focus._dropEndedRuns(store));
+    });
     return SyncEngine._(
       api: api,
       connection: connection,
@@ -191,6 +215,7 @@ final class SyncEngine {
       outbox: outbox,
       runs: runs,
       focus: focus,
+      resyncs: resyncs,
     );
   }
 
@@ -259,6 +284,7 @@ final class SyncEngine {
 
   /// Stops the connection and closes every part; the stored outbox entries stay.
   Future<void> dispose() async {
+    await _resyncs.cancel();
     await connection.dispose();
     await outbox.close();
     await catchUp.dispose();
@@ -320,6 +346,17 @@ final class EngineFocus {
   }
 
   Set<ThreadId> _push() => _manager.setVisible(threads, idle: _idle);
+
+  /// Ends the documents of focused runs that the local run summaries list as ended or no longer
+  /// hold (after a resync replaced the mirror).
+  Future<void> _dropEndedRuns(LocalDatabase db) async {
+    for (final run in List.of(_focusedRuns.keys)) {
+      final summary = await db.runsDao.byId(run);
+      if (summary == null || _endStates.contains(summary.state.code)) {
+        _runs.onRunEnded(run);
+      }
+    }
+  }
 }
 
 /// Wraps the catch-up listener: pauses the outbox on every disconnect and ends the run

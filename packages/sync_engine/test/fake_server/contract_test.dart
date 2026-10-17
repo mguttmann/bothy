@@ -263,6 +263,40 @@ void main() {
     expect(h.server.violations, isEmpty);
   });
 
+  test('the snapshot and read states carry the unread and mention counts', () {
+    final w = h.seed;
+    final world = h.server.world;
+    w.post(w.sam, w.releaseNotes, 'One');
+    world.createMessage(w.sam.id, w.releaseNotes, {
+      'client_msg_id': world.nextId(),
+      'content_md': 'Alex, look',
+      'mention_ids': [w.alex.id],
+    });
+    w.post(w.alex, w.releaseNotes, 'Mine');
+    final unread =
+        world.snapshot(w.alex.id)['unread_threads']! as List<Object?>;
+    expect(unread, [
+      {
+        'thread_id': w.releaseNotes,
+        'channel_id': w.general,
+        'unread_count': 2,
+        'mention_count': 1,
+        'last_message_seq': 3,
+        'last_read_seq': 0,
+      },
+    ]);
+    expect(
+      world.putReadState(w.alex.id, w.releaseNotes, 1)['mention_count'],
+      1,
+    );
+    world.putReadState(w.alex.id, w.releaseNotes, 3);
+    expect(world.snapshot(w.alex.id)['unread_threads'], isEmpty);
+    expect(
+      ContractSchemas.load().validate(world.snapshot(w.sam.id), 'Snapshot'),
+      isEmpty,
+    );
+  });
+
   test('a reaction does not raise the message version (04 9.3)', () async {
     final w = h.seed;
     final m = w.post(w.alex, w.releaseNotes, 'Hello Sam');
