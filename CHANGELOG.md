@@ -97,6 +97,14 @@ operated, and the order of the build.
   verifies and only then tags. cosign, syft and git-cliff are pinned; `check_runners.py` rejects
   signing steps outside the environment `release`; a tag without a changelog section stops in
   `resolve`.
+- Login core of the apps (`packages/auth`, pure Dart): DPoP proofs after RFC 9449 signed through
+  a device key port (ES256, `ath`, server nonce, the gateway form), one repeat on
+  `use_dpop_nonce`, refresh as a single flight per family that stores the new refresh token
+  before the access token is used, step-up with the step-up key and a repeat with the same
+  `Idempotency-Key`, the login flows (OIDC with PKCE, password with TOTP, proxy header, passkey,
+  enrollment code, pairing, pending device, logout), the signed-out event for a revoked session,
+  and Dio interceptors for the slot of `createApiClient`; no secret in any `toString`, error or
+  log line (M4-09).
 - Localization in `packages/l10n`: the ARB files `app_en.arb` (template) and `app_de.arb`
   (default locale) with the first keys, the generated `AppLocalizations`, `problemText` for every
   problem code with a fallback that shows the code, `L10nFormat` for money, numbers, durations
