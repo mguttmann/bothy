@@ -207,7 +207,7 @@ func verifyRSA(alg string, k JWK, input, sig []byte) error {
 	sum := sha256.Sum256(input)
 	var err error
 	if alg == AlgRS256 {
-		err = rsa.VerifyPKCS1v15(pub, crypto.SHA256, sum[:], sig)
+		err = rsa.VerifyPKCS1v15(pub, crypto.SHA256, sum[:], sig) // NOSONAR: RS256 signature, not encryption (M1-41/17)
 	} else {
 		err = rsa.VerifyPSS(pub, crypto.SHA256, sum[:], sig, &pssOptions)
 	}
@@ -312,7 +312,7 @@ func (s RS256Signer) Sign(signingInput []byte) ([]byte, error) {
 		return nil, err
 	}
 	sum := sha256.Sum256(signingInput)
-	return rsa.SignPKCS1v15(rand.Reader, s.Key, crypto.SHA256, sum[:])
+	return rsa.SignPKCS1v15(rand.Reader, s.Key, crypto.SHA256, sum[:]) // NOSONAR: RS256 signature, not encryption (M1-41/17)
 }
 
 // PS256Signer signs with an RSA private key of at least 2048 bits (client assertions of
