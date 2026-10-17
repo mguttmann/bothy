@@ -205,15 +205,16 @@ final class UnreadCounter {
     ThreadSeq unreadFloorSeq = const ThreadSeq(0),
   }) {
     final t = _threads.putIfAbsent(state.threadId, _Thread.new);
-    t.baseMentions = state.mentionCount;
-    t.mentions.removeWhere((_, seq) => seq <= lastMessageSeq);
     final floor = state.lastReadSeq > unreadFloorSeq
         ? state.lastReadSeq
         : unreadFloorSeq;
+    // A buffered entry stays counted on top only above both the server's count and the new
+    // read boundary; anything at or below either is covered or no longer unread.
+    bool covered(ThreadSeq seq) => seq <= lastMessageSeq || seq <= floor;
+    t.baseMentions = state.mentionCount;
+    t.mentions.removeWhere((_, seq) => covered(seq));
     final computed = lastMessageSeq.value - floor.value;
     t.baseUnread = state.unreadCount ?? (computed > 0 ? computed : 0);
-    t.unread.removeWhere(
-      (_, seq) => seq <= lastMessageSeq || seq <= state.lastReadSeq,
-    );
+    t.unread.removeWhere((_, seq) => covered(seq));
   }
 }

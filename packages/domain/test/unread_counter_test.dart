@@ -152,6 +152,29 @@ void main() {
     );
   });
 
+  test('resetFrom drops buffered entries the new read boundary covers', () {
+    // Seen live above the stored last_message_seq, then read elsewhere: the server's
+    // read state (last_read_seq 15) covers both, so neither may stay counted on top.
+    apply(MessageCreated(message(12, mentions: [alex])));
+    apply(MessageCreated(message(13)));
+    counter.resetFrom(
+      readState(15, mentions: 0, unread: 0),
+      lastMessageSeq: const ThreadSeq(10),
+    );
+    expect(counter.countsOf(thread1), ThreadCounts.zero);
+  });
+
+  test('resetFrom drops buffered entries below a raised unread floor', () {
+    apply(MessageCreated(message(12, mentions: [alex])));
+    apply(MessageCreated(message(13)));
+    counter.resetFrom(
+      readState(3, mentions: 0, unread: 0),
+      lastMessageSeq: const ThreadSeq(10),
+      unreadFloorSeq: const ThreadSeq(14),
+    );
+    expect(counter.countsOf(thread1), ThreadCounts.zero);
+  });
+
   test(
     'resetFrom without an unread count computes it as 03 read_states does',
     () {
