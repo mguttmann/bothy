@@ -163,6 +163,10 @@ Regeln (geprüft durch einen Architekturtest im Gate, Ticket "Abhängigkeitsrege
 9. Every `pubspec.yaml` under `apps/` and `packages/` is a member of the workspace (root
    `workspace:` list) and of `tools/arch-check/rules.yaml`, and every member listed there has
    its manifest.
+10. A library named `testing.dart` of any member (and its `lib/src/testing/` folder) is test
+    support, for example the fake server `package:sync_engine/testing.dart` and
+    `package:design_system/testing.dart`; only the `test/` and `integration_test/` folders
+    import or export it, also inside its own member (brief M4-17).
 
 Rule 4 in the check: native sources (`*.swift`, `*.m`, `*.mm`, `*.kt`, `*.java`, `*.cpp`,
 `*.cc`, `*.h`) lie only in `packages/device_key` and in `apps/client/{ios,macos,android,windows}`;
@@ -321,6 +325,11 @@ und hat Ports für Uhr, Netzstatus, Transport (WebSocket, HTTP) und Anmeldung.
 | `FocusManager` | sichtbare Threads an das Gateway melden (höchstens `sync.max_focused_threads`) |
 | `RunStore` | Lauf-Dokumente im Speicher; Patches nach RFC 6902 (`add`, `replace`, `remove`), Regel aus [04](04-sync-protokoll.md) Abschnitt 11.3 Punkt 4 |
 | `EphemeralStore` | Tippen (`sync.typing_ttl`), Agenten-Präsenz |
+
+`SyncEngine` (`lib/src/engine.dart`) is the one composition root the apps use: it builds these
+parts and wires their hooks (echo to the outbox, outbox start after `catchup.complete` and pause
+on every disconnect, `run.updated` and the run end to the `RunStore`, focused runs into the
+focus), so no app wires them itself (M4-17).
 
 Große Nachhol-Seiten werden in einem Hintergrund-Isolate dekodiert, sobald eine Seite
 `client.sync.parse_offload_bytes` überschreitet; die Datenbank läuft in ihrem eigenen Isolate
@@ -755,7 +764,7 @@ Standardwerte stehen in Abschnitt 22.
 | Widget | Komponenten, Zustände, Semantik, Richtlinien `textContrastGuideline`, `androidTapTargetGuideline`, `iOSTapTargetGuideline`, `labeledTapTargetGuideline` (https://api.flutter.dev/flutter/flutter_test/meetsGuideline.html, abgerufen 2026-10-10 [belegt]) | `flutter test` | jeder Lauf |
 | Golden | jede Kern-Komponente und jede Ansicht von `bothy_viz` mit ihren Fixtures in hell und dunkel, `comfortable`, `compact`, `touch`, Textskalierung 1 und 2, de und en | `alchemist` (MIT, betterment.dev): CI-Goldens mit Ahem-Schrift sind auf allen Hosts gleich; Plattform-Goldens nur auf macOS (https://pub.dev/packages/alchemist, abgerufen 2026-10-10 [belegt]) | jeder Lauf (CI-Goldens), macOS-Runner (Plattform-Goldens) |
 | Migration | erzeugte drift-Migrationstests plus "Ausgangsfach überlebt" | `drift_dev make-migrations` | jeder Lauf |
-| Integration | ganze App gegen einen Fake-Server in Dart (Gateway und REST, Teilmenge mit Fehler-Einspielung: Trennung, Doppel, Verzögerung, `resync_required`, `4012`, `409`, `410`) | `integration_test` | Desktop-Runner je Plattform |
+| Integration | ganze App gegen einen Fake-Server in Dart (Gateway und REST, Teilmenge mit Fehler-Einspielung: Trennung, Doppel, Verzögerung, `resync_required`, `4012`, `409`, `410`). The fake lives in `packages/sync_engine` as the separate library `package:sync_engine/testing.dart` (world, fault plan, DPoP and contract checks, the scenarios of 04 16 as drivers); the headless tests of `sync_engine` run the same scenarios against `SyncEngine` (M4-17) | `integration_test` | Desktop-Runner je Plattform |
 | E2E auf Geräten | Anmeldung, Push-Erlaubnis, Antippen einer Mitteilung, Teilen, Offline-Senden, Terminal öffnen, trennen und wiederanhängen gegen einen Host-Dienst im Container, gegen den echten Server im Compose-Stack | `patrol` (Apache-2.0, leancode.co; Android, iOS, macOS, Web; https://pub.dev/packages/patrol, abgerufen 2026-10-10 [belegt]) für Mobil, macOS, Konsole; `integration_test` für Windows, weil `patrol` Windows nicht unterstützt | nächtlich und vor Release |
 | Leistung | Ziele aus Abschnitt 19 mit Profil-Build und Timeline-Auswertung | `flutter drive --profile` | nächtlich |
 | Barrierefreiheit von Hand | VoiceOver, TalkBack, Narrator je Release mit Prüfliste | Prüfliste | vor Release |

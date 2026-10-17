@@ -13,7 +13,10 @@ reads the manifest and every `import` and `export` directive under `lib/`, `test
 - rule 4: a native source outside `device_key` and `apps/client/{ios,macos,android,windows}`;
 - rule 8: a dependency or import of a member that the diagram does not reach (allow list);
 - rule 9: a manifest under `apps/` or `packages/` that is not a member of the rules and of the
-  root `workspace:` list, or a member without its manifest.
+  root `workspace:` list, or a member without its manifest;
+- rule 10: a test library (`package:<member>/testing.dart` or its `src/testing/` folder,
+  brief M4-17) imported or exported outside the `test/` and `integration_test/` folders, also
+  relatively inside its own member.
 
 Usage: arch_check.py [--root <repository>] [--rules <rules.yaml>]
 Exit 0 prints `arch-check: <n> members, <m> files, ok`; exit 1 prints one line per finding
@@ -100,12 +103,31 @@ class Member:
         return None
 
 
+@dataclass(frozen=True)
+class TestLibraries:
+    """Test support libraries: where a library with this file name may be imported."""
+
+    rule: int
+    library: str
+    dirs: frozenset[str]
+
+    @property
+    def folder(self) -> str:
+        """The source folder of the library below `lib/` (`src/testing/` for `testing.dart`)."""
+        return f"src/{self.library.removesuffix('.dart')}/"
+
+    def is_test_library(self, rel: str) -> bool:
+        """Whether `rel` (a path below a member's `lib/`) is the test library or its folder."""
+        return rel == self.library or rel.startswith(self.folder)
+
+
 @dataclass
 class Rules:
     """The members in the order of 15 3 and the reach of the diagram."""
 
     members: dict[str, Member]
     _reach: dict[str, frozenset[str]] = field(default_factory=dict)
+    test_libraries: TestLibraries | None = None
 
     def reach(self, name: str) -> frozenset[str]:
         """Every member the diagram reaches from `name`, without `name` itself."""
@@ -214,7 +236,24 @@ def load_rules(path: Path) -> Rules:
     for name, member in members.items():
         if any(name in _closure(e, lambda n: members[n].edges) | {e} for e in member.edges):
             raise RulesError(f"{name}: the edges form a cycle")
-    return Rules(members)
+    return Rules(members, test_libraries=_test_libraries(data.get("test_libraries")))
+
+
+def _test_libraries(value: Any) -> TestLibraries | None:
+    if value is None:
+        return None
+    if (
+        not isinstance(value, dict)
+        or not isinstance(value.get("rule"), int)
+        or not isinstance(value.get("library"), str)
+        or not value["library"].endswith(".dart")
+    ):
+        raise RulesError("test_libraries needs a rule number and a library file name")
+    return TestLibraries(
+        value["rule"],
+        value["library"],
+        frozenset(_names(value.get("dirs"), "test_libraries.dirs")),
+    )
 
 
 def directives(text: str) -> Iterator[tuple[int, str]]:
@@ -378,7 +417,38 @@ class _Checker:
                 for line, uri in directives(text):
                     self.uri(member, rel, line, uri, top)
 
+    def test_library(self, member: Member, rel: str, line: int, uri: str, top: str) -> bool:
+        """Report a test library reached from outside the test folders (rule 10)."""
+        tests = self.rules.test_libraries
+        if tests is None or top in tests.dirs:
+            return False
+        if uri.startswith("package:"):
+            package, _, inner = uri[len("package:") :].partition("/")
+            target = f"package:{package}/{tests.library}"
+        elif re.match(r"^[a-z][a-z0-9+.-]*:", uri):
+            return False
+        else:
+            lib = f"{member.path}/lib/"
+            resolved = posixpath.normpath(posixpath.join(posixpath.dirname(rel), uri))
+            own = rel.removeprefix(lib) if rel.startswith(lib) else None
+            if not resolved.startswith(lib) or (own is not None and tests.is_test_library(own)):
+                return False
+            inner = resolved.removeprefix(lib)
+            target = f"package:{member.name}/{tests.library}"
+        if not tests.is_test_library(inner):
+            return False
+        allowed = " and ".join(f"{d}/" for d in sorted(tests.dirs))
+        self.add(
+            rel,
+            line,
+            tests.rule,
+            f"{member.name} reaches the test library {target} outside {allowed}",
+        )
+        return True
+
     def uri(self, member: Member, rel: str, line: int, uri: str, top: str) -> None:
+        if self.test_library(member, rel, line, uri, top):
+            return
         for entry in member.forbidden:
             if entry.matches(uri, top):
                 self.add(rel, line, entry.rule, f"{member.name} must not import {uri}")

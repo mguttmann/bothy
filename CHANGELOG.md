@@ -20,6 +20,19 @@ Planning stage (milestone M0). Nothing is installable yet.
 
 ### Added
 
+- Sync engine composition root and fake server (M4-17): `SyncEngine.create` builds the gateway
+  connection, catch-up and dispatcher, outbox and run store and wires their hooks (echo to the
+  outbox, outbox start after `catchup.complete` and pause on every disconnect, `run.updated` and
+  the run end to the run store, focused runs into the gateway focus); only test builds accept a
+  plain `http` server. The separate library `package:sync_engine/testing.dart` is the one Dart
+  fake of the server for every integration test: REST subset and gateway on `127.0.0.1`, an
+  in-memory world with event log and sync epoch, DPoP checks, contract validation of every
+  request, response and frame against `docs/api/`, deterministic fault injection (any close
+  code, duplicate delivery, delay, `resync_required`, `4012`, `409`, `410`, `412`, `429`,
+  `5xx`, a lost response after the commit), a scripted agent and the scenarios of 04 16 as
+  drivers. The headless scenarios 16.1 to 16.5 run against `SyncEngine` with its local
+  database. `make arch` gains rule 10: a `testing.dart` library is imported only from `test/`
+  and `integration_test/` folders.
 - Sync engine outbox: `Outbox` stores every write with its own UUIDv7 before sending, sends
   strictly FIFO per thread or per lane with lanes in parallel, retries network errors, timeouts,
   `5xx`, `429` and `409 request_in_progress` with full jitter between `client.outbox_retry_base`

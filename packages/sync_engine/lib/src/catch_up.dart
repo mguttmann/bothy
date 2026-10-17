@@ -451,6 +451,23 @@ final class CatchUpListener implements SessionListener {
     await _inBackground(() => gaps.fill(_sync, threadId));
   }
 
+  /// Stores the server message a confirmed write returned (API `Message` of `createMessage`
+  /// or `updateMessage`), so the entry that leaves the outbox is replaced by it at once and
+  /// not only by its echo (04 13.2 item 6). The version rule applies; a message of a removed
+  /// channel or thread is not stored; after a wipe nothing happens. [created] marks the answer
+  /// of a new message (gap and counter rules of `message.created`).
+  Future<void> storeConfirmedMessage(
+    Map<String, Object?> message, {
+    required bool created,
+  }) async {
+    if (_wiped) return;
+    await storeFetchedMessage(
+      _sync,
+      messageFromJson(message),
+      created: created,
+    );
+  }
+
   /// Stores the answer of `putThreadDraft` of the app's write path (API `DraftPutResult`) and
   /// emits [DraftOverwritten] when it reports `overwrote_newer` (04 14).
   Future<void> applyDraftPutResult(Map<String, Object?> result) =>
