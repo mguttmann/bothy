@@ -3,7 +3,7 @@
 package devicekey.core
 
 /**
- * The purpose of a device key (docs/spec/08-identitaet.md 6.1, R-CL-05).
+ * The purpose of a device key (docs/spec/08-identity.md 6.1, R-CL-05).
  *
  * @property wire the purpose as it appears in the key alias.
  */
