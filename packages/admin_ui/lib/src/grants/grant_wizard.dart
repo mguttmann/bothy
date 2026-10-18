@@ -248,14 +248,17 @@ class _GrantWizardState extends State<GrantWizard>
   void _changed() {
     if (!mounted) return;
     setState(() {});
-    _timer?.cancel();
     final request = _request();
     if (request == null) {
+      _timer?.cancel();
       _asked = null;
       return;
     }
     final key = _keyOf(request);
+    // A notification without a change (cursor, selection, trailing space) keeps the preview
+    // that is pending or shown for this request.
     if (key == _asked) return;
+    _timer?.cancel();
     _asked = key;
     if (widget.debounce == Duration.zero) {
       unawaited(_ask(request, key));
@@ -279,6 +282,8 @@ class _GrantWizardState extends State<GrantWizard>
       setState(() {
         _preview = null;
         _shownFor = null;
+        // The next change asks again, even for the same request.
+        _asked = null;
         _previewFailure = adminFailure(l, e);
       });
     }

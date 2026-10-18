@@ -340,4 +340,43 @@ void main() {
       const AdminLocation(AdminSection.grants, id: 'space.marketing'),
     ]);
   });
+
+  testWidgets('a notification without a change keeps the pending preview', (
+    tester,
+  ) async {
+    await pumpInApp(
+      tester,
+      GrantWizard(
+        repository: repository,
+        subject: const GrantSubjectChoice(AdminSubjectKind.user, 'sam', 'Sam'),
+        target: campaigns,
+        level: AccessLevel.write,
+        step: 2,
+        timeZone: 'Europe/Berlin',
+        clock: testClock,
+        debounce: const Duration(milliseconds: 300),
+      ),
+      navigatorKey: navigator,
+    );
+    await tester.enterText(
+      find.byKey(const ValueKey('wizard.reason')),
+      'Campaign work',
+    );
+    await tester.pump(const Duration(milliseconds: 100));
+    // Moving the cursor notifies the controller without changing the request.
+    final field = tester.widget<TextField>(
+      find.byKey(const ValueKey('wizard.reason')),
+    );
+    field.controller!.selection = const TextSelection.collapsed(offset: 3);
+    await tester.pump(const Duration(milliseconds: 400));
+    await tester.pumpAndSettle();
+
+    expect(repository.previews.last.reason, 'Campaign work');
+    expect(
+      tester
+          .widget<FilledButton>(find.byKey(const ValueKey('wizard.confirm')))
+          .onPressed,
+      isNotNull,
+    );
+  });
 }
