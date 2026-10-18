@@ -136,3 +136,30 @@ func (c *Coverage) Missing(enabled []string, exempt map[string]string) []string 
 	}
 	return out
 }
+
+// known reports whether the contract has an operation with id (a check of the enabled list).
+func (c *Coverage) known(id string) bool {
+	ops, err := contractOperations()
+	return err == nil && ops[id]
+}
+
+// contractOperations returns the operation IDs of the contract.
+var contractOperations = sync.OnceValues(func() (map[string]bool, error) {
+	var doc struct {
+		Paths map[string]map[string]struct {
+			ID string `yaml:"operationId"`
+		} `yaml:"paths"`
+	}
+	out := map[string]bool{}
+	if err := yaml.Unmarshal(rest.Spec, &doc); err != nil {
+		return nil, err
+	}
+	for _, item := range doc.Paths {
+		for _, op := range item {
+			if op.ID != "" {
+				out[op.ID] = true
+			}
+		}
+	}
+	return out, nil
+})

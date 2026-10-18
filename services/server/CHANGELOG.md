@@ -61,6 +61,15 @@ documented in this file. The format is based on
   `depguard` rule forbids the package `plugin` in the server module (ADR 0022). Manifests with
   the escape of NUL or of an unpaired surrogate are refused, and manifest values that are no audit
   code enter the audit hashed, so no checked manifest makes install or upgrade fail with 500.
+- Canary test across all outputs, SEC-T10 and DP-T09 (M1-69): the package `test/canary` drives
+  every enabled operation and every M1 client gateway op with run-unique canary values (content,
+  reasons, secrets, client addresses, IDs) and scans the logs (stdout at debug and OTLP), traces,
+  metrics, audit rows, error responses and the events of observers without read permission; a new
+  operation without a call fails the coverage test. The request span now carries
+  `bothy.principal.kind` and, for a person, `bothy.principal.pseudo_id` (`otel.AnnotatePrincipal`).
+  Test seams: `otel.Deps.Exporters`, `wire.Deps.TelemetryExporters` and `wire.Deps.OIDCRootCAs`;
+  the harness gained telemetry sinks, secret files, a public host name, a proof observer, device
+  clients, anonymous requests and the gateway resume.
 - Core metrics per catalogue (M1-68): one Go declaration per instrument
   (`internal/platform/otel/metrics`) with checks for closed attribute sets, no person or ID
   attribute and bucket bounds, and the SDK view that keeps only catalogue instruments and keys
