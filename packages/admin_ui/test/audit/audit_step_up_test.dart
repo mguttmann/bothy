@@ -116,4 +116,28 @@ void main() {
     await confirm(tester, 'Read the audit log');
     expect(find.byKey(const ValueKey('audit.entry.3')), findsOneWidget);
   });
+
+  testWidgets('a step-up cancelled on a new filter keeps that filter visible', (
+    tester,
+  ) async {
+    await pumpAudit(tester, repository, navigatorKey: navigator);
+    await confirm(tester, 'Read the audit log');
+    repository.stepUpFresh = false;
+    await tester.enterText(
+      find.byKey(const ValueKey('audit.filter.kind')),
+      'run',
+    );
+    await tester.testTextInput.receiveAction(TextInputAction.done);
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey('stepUp.cancel')));
+    await tester.pumpAndSettle();
+
+    expect(find.byKey(const ValueKey('audit.stepUpNeeded')), findsOneWidget);
+    expect(find.widgetWithText(TextField, 'run'), findsOneWidget);
+    await tester.tap(find.text('Try again'));
+    await confirm(tester, 'Read the audit log');
+    expect(repository.auditRequests.last, contains('kind=run '));
+    expect(find.byKey(const ValueKey('audit.entry.2')), findsOneWidget);
+    expect(find.byKey(const ValueKey('audit.entry.3')), findsNothing);
+  });
 }

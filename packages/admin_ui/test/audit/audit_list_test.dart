@@ -229,4 +229,41 @@ void main() {
     );
     expect(buttons, findsOneWidget, reason: 'only "Close"');
   });
+
+  testWidgets('a refused filter keeps the filters, so it can be changed', (
+    tester,
+  ) async {
+    await pumpAudit(tester, repository);
+    repository.refuse['auditEvents'] = const ApiProblem(
+      status: 400,
+      code: 'validation_failed',
+    );
+    await submit(tester, 'audit.filter.id', 'not a uuid');
+    expect(find.byKey(const ValueKey('admin.loadFailed')), findsOneWidget);
+    expect(find.byKey(const ValueKey('audit.filter.id')), findsOneWidget);
+
+    repository.refuse.clear();
+    await submit(tester, 'audit.filter.id', '');
+    expect(find.byKey(const ValueKey('admin.loadFailed')), findsNothing);
+    expect(find.byKey(const ValueKey('audit.entry.3')), findsOneWidget);
+  });
+
+  testWidgets('a failed next page keeps the loaded entries', (tester) async {
+    repository.auditPageSize = 2;
+    await pumpAudit(tester, repository);
+    repository.refuse['auditEvents'] = const ApiProblem(
+      status: 500,
+      code: 'internal_error',
+    );
+    await tester.tap(find.byKey(const ValueKey('audit.more')));
+    await tester.pumpAndSettle();
+    expect(find.byKey(const ValueKey('audit.entry.3')), findsOneWidget);
+    expect(find.byKey(const ValueKey('admin.loadFailed')), findsOneWidget);
+
+    repository.refuse.clear();
+    await tester.tap(find.text('Try again'));
+    await tester.pumpAndSettle();
+    expect(repository.auditRequests.last, endsWith('cursor=2'));
+    expect(find.byKey(const ValueKey('audit.entry.1')), findsOneWidget);
+  });
 }

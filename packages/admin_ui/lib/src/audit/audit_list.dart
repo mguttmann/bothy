@@ -68,6 +68,7 @@ class _AuditLogViewState extends State<AuditLogView> {
   ApiProblem? _problem;
   bool _cancelled = false;
   bool _loading = false;
+  bool _lastMore = false;
   Map<String, String> _names = const {};
   List<AdminPerson> _people = const [];
 
@@ -103,6 +104,7 @@ class _AuditLogViewState extends State<AuditLogView> {
   Future<void> _load({bool more = false}) async {
     final l = AppLocalizations.of(context);
     final filter = _filter;
+    _lastMore = more;
     setState(() => _loading = true);
     try {
       final page = await widget.repository.auditEvents(
@@ -118,9 +120,19 @@ class _AuditLogViewState extends State<AuditLogView> {
         _cancelled = false;
       });
     } on StepUpCancelled {
-      if (mounted) setState(() => _cancelled = _entries == null);
+      if (mounted) {
+        setState(() {
+          _cancelled = true;
+          _problem = null;
+        });
+      }
     } on Object catch (e) {
-      if (mounted) setState(() => _problem = loadProblem(e));
+      if (mounted) {
+        setState(() {
+          _problem = loadProblem(e);
+          _cancelled = false;
+        });
+      }
     } finally {
       if (mounted) setState(() => _loading = false);
     }
@@ -175,29 +187,16 @@ class _AuditLogViewState extends State<AuditLogView> {
         style: dsTextStyle(DsType.title).copyWith(color: colors.textPrimary),
       ),
     );
-    if (_problem case final problem?) {
+    // A refusal (403, or 404 for no access) shows the server's reason and nothing else; any
+    // other failure keeps the filters, so a filter the server rejected can be changed.
+    if (_problem case final problem?
+        when problem.status == 403 || problem.status == 404) {
       return Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           title,
           const SizedBox(height: DsSpace.s12),
           ProblemBanner(problem: problem, onRetry: _load),
-        ],
-      );
-    }
-    if (_cancelled) {
-      return Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          title,
-          const SizedBox(height: DsSpace.s12),
-          DsBanner(
-            key: const ValueKey('audit.stepUpNeeded'),
-            tone: DsTone.info,
-            text: l.auditStepUpNeeded,
-            actionLabel: l.selfRetry,
-            onAction: _load,
-          ),
         ],
       );
     }
@@ -219,7 +218,12 @@ class _AuditLogViewState extends State<AuditLogView> {
           spacing: DsSpace.s12,
           runSpacing: DsSpace.s8,
           children: [
-            AuditChainCheckButton(repository: widget.repository, range: _range),
+            AuditChainCheckButton(
+              // A new filter starts without the result of the old one.
+              key: ValueKey(identityHashCode(_filter)),
+              repository: widget.repository,
+              range: _range,
+            ),
             if (save != null)
               AuditExportBar(
                 repository: widget.repository,
@@ -230,6 +234,25 @@ class _AuditLogViewState extends State<AuditLogView> {
           ],
         ),
         const SizedBox(height: DsSpace.s12),
+        if (_problem case final problem?)
+          Padding(
+            padding: const EdgeInsets.only(bottom: DsSpace.s8),
+            child: ProblemBanner(
+              problem: problem,
+              onRetry: () => _load(more: _lastMore),
+            ),
+          )
+        else if (_cancelled)
+          Padding(
+            padding: const EdgeInsets.only(bottom: DsSpace.s8),
+            child: DsBanner(
+              key: const ValueKey('audit.stepUpNeeded'),
+              tone: DsTone.info,
+              text: l.auditStepUpNeeded,
+              actionLabel: l.selfRetry,
+              onAction: () => _load(more: _lastMore),
+            ),
+          ),
         Expanded(
           child: entries == null
               ? const SizedBox.shrink()
