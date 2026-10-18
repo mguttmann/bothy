@@ -408,6 +408,9 @@ enum DsDelivery {
   /// In the outbox, not confirmed yet.
   sending,
 
+  /// In the outbox for longer than `client.outbox_stuck_after`: "Sending delayed" (15 7.5).
+  delayed,
+
   /// Failed permanently; the message shows the reason and Resend, Edit, Discard.
   failed,
 }
@@ -639,6 +642,7 @@ final class DsMessageData {
     this.voice,
     this.systemCode,
     this.systemName,
+    this.mentionHandles = const {},
   });
 
   /// The message ID.
@@ -701,6 +705,10 @@ final class DsMessageData {
   /// The name the system line names (`thread.reopened`: the author of the reopening
   /// message), or null.
   final String? systemName;
+
+  /// The handles (lower case, without `@`) whose principals the server resolved into
+  /// `mention_ids`; only their tokens render as mentions (03 content format item 4).
+  final Set<String> mentionHandles;
 }
 
 /// One button, select or form of a card (`message_components`, `component.v1`).

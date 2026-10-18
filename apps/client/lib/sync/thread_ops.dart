@@ -15,6 +15,10 @@ import 'package:sync_engine/sync_engine.dart';
 /// | Kind | Payload | Lane |
 /// |---|---|---|
 /// | `createThread` | `channel_id`, `title`, `content_md`, `tag_ids` | `forum:<channel_id>` |
+/// | `createThread` from a message | `channel_id`, `parent_message_id` | `forum:<channel_id>` |
+///
+/// A thread from a message of the main history (M4-20, 01 3.1) carries `parent_message_id`
+/// and no first message; the server titles it from the message (`title_source = auto`).
 ///
 /// A forum post needs its first message (the server refuses one without, `ThreadCreate`); the
 /// first message carries the entry's ID as its `client_msg_id`, which never changes on retry,
@@ -39,9 +43,14 @@ abstract final class ThreadOps {
     registry.register(createThread, (e, ctx) async {
       final body = decodePayload(e.payload);
       final tags = body['tag_ids'];
+      final parent = body['parent_message_id'];
       final response = await threads.createThread(
         channelId: _channelOf(body),
         threadCreate: ThreadCreate((b) {
+          if (parent is String) {
+            b.parentMessageId = parent;
+            return;
+          }
           b
             ..title = body['title'] as String?
             ..firstMessage.clientMsgId = ctx.idempotencyKey
@@ -80,6 +89,22 @@ abstract final class ThreadOps {
         'title': title,
         'content_md': contentMd,
         'tag_ids': [for (final t in tagIds) t.value],
+      },
+    ),
+  );
+
+  /// Puts a new thread from [message] of the main history of the text channel [channel]
+  /// into the outbox of [engine] (01 3.1, brief M4-20 Design note 4).
+  static Future<OutboxEntry> enqueueFromMessage(
+    SyncEngine engine, {
+    required ChannelId channel,
+    required MessageId message,
+  }) => engine.outbox.enqueue(
+    OutboxRequest(
+      kind: createThread,
+      payload: {
+        'channel_id': channel.value,
+        'parent_message_id': message.value,
       },
     ),
   );

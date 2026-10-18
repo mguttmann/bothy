@@ -24,6 +24,7 @@ import 'package:local_store/local_store.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:sync_engine/sync_engine.dart';
 
+import '../composer/draft_sync.dart';
 import '../platform/app_lifecycle.dart';
 import '../platform/browser_launcher.dart';
 import '../platform/device_key_signer.dart';
@@ -31,6 +32,7 @@ import '../platform/frame_ticker.dart';
 import '../platform/loopback_redirect.dart';
 import '../platform/network_status.dart';
 import '../platform/secure_store.dart';
+import '../sync/message_ops_app.dart';
 import '../sync/sidebar_ops.dart';
 import '../sync/thread_ops.dart';
 import 'account_wiper.dart';
@@ -202,6 +204,7 @@ final class InstanceServices {
     required this.wiper,
     required this.secrets,
     required this.ids,
+    required this.draftEditing,
   });
 
   /// Builds the services of [instance] (Design note 1): the device keys with the instance ID as
@@ -258,6 +261,7 @@ final class InstanceServices {
       redirects: ports.redirects(),
       passkeys: ports.passkeys,
     );
+    final draftEditing = DraftEditingRegistry();
     late final SyncEngine engine;
     engine = SyncEngine.create(
       baseUrl: instance.address,
@@ -277,7 +281,10 @@ final class InstanceServices {
       ids: ids,
       keepConnectedInBackground: true,
       allowPlainHttpForTests: ports.allowPlainHttpForTests,
-      // The app's own writes (M4-19): the personal sidebar and new forum posts.
+      // 04 14: a draft being typed here is not overwritten by another device (M4-20).
+      draftEditing: draftEditing,
+      // The app's own writes: the personal sidebar and new forum posts (M4-19), the writes of
+      // the thread view (M4-20).
       registerExecutors: (executors, api) {
         SidebarOps.register(executors, api, database);
         // The executor runs only after the engine exists, so `engine` is set by then.
@@ -285,6 +292,11 @@ final class InstanceServices {
           executors,
           api,
           (thread) => engine.catchUp.storeConfirmedThread(thread),
+        );
+        AppMessageOps.register(
+          executors,
+          api,
+          AppOpsStore.of(() => engine, database),
         );
       },
     );
@@ -309,6 +321,7 @@ final class InstanceServices {
       wiper: wiper,
       secrets: secrets,
       ids: ids,
+      draftEditing: draftEditing,
     );
   }
 
@@ -332,6 +345,9 @@ final class InstanceServices {
 
   /// The UUIDv7 source of the instance (idempotency keys of the REST actions).
   final Uuid7Generator ids;
+
+  /// The drafts being edited on this device (the `DraftEditing` port of the engine, 04 14).
+  final DraftEditingRegistry draftEditing;
 
   /// Whether a refresh token of an earlier login is stored, so the app can start signed in.
   ///

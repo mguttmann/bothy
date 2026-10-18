@@ -247,6 +247,10 @@ void main() {
 
     await pumpDs(tester, _message(_with(delivery: DsDelivery.sending)));
     expect(find.text(l.messageSending), findsOneWidget);
+
+    await pumpDs(tester, _message(_with(delivery: DsDelivery.delayed)));
+    expect(find.text(l.messageSendingDelayed), findsOneWidget);
+    expect(find.text(l.messageSending), findsNothing);
     expect(
       tester.widgetList<DsIcon>(find.byType(DsIcon)).map((i) => i.glyph),
       contains(DsIcons.triggerQueued),

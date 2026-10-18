@@ -32,6 +32,7 @@ class ColumnLayout extends StatefulWidget {
     required this.session,
     this.stackShowsHistory = false,
     this.showPostList = true,
+    this.showSession = true,
   });
 
   /// The stored widths.
@@ -64,6 +65,10 @@ class ColumnLayout extends StatefulWidget {
   /// Whether the post list column shows; only a forum has one (01 5.1: D2, a text channel,
   /// shows no post list; brief M4-19 Design note 5).
   final bool showPostList;
+
+  /// Whether the session column shows when the window is wide enough; the header button
+  /// "Column" hides it, and a thread of a text channel collapses it (01 5.1 D1, D2; M4-20).
+  final bool showSession;
 
   @override
   State<ColumnLayout> createState() => _ColumnLayoutState();
@@ -107,7 +112,7 @@ class _ColumnLayoutState extends State<ColumnLayout> {
   Widget build(BuildContext context) => LayoutBuilder(
     builder: (context, constraints) {
       final total = constraints.maxWidth;
-      final four = total >= widget.minWidthFourColumns;
+      final four = total >= widget.minWidthFourColumns && widget.showSession;
       final stacked = total < widget.minWidthThreeColumns;
       final list = widget.showPostList;
       final widths = fitColumns(

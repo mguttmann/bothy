@@ -272,7 +272,7 @@ class DsMessageState extends State<DsMessage> {
         ],
       ],
     );
-    if (d.delivery == DsDelivery.sending) {
+    if (d.delivery == DsDelivery.sending || d.delivery == DsDelivery.delayed) {
       // Reduced opacity marks the unconfirmed message; the line "Sending" says it in text.
       row = Opacity(opacity: _sendingOpacity, child: row);
     }
@@ -481,6 +481,7 @@ class DsMessageState extends State<DsMessage> {
         onOpenLink: widget.onOpenLink,
         attachments: widget.attachments,
         style: style,
+        mentionHandles: d.mentionHandles,
       );
       out.add(
         _expanded
@@ -680,7 +681,7 @@ class DsMessageState extends State<DsMessage> {
     final l = dsL10n(context);
     final colors = context.dsColors;
     final d = widget.data;
-    if (d.delivery == DsDelivery.sending) {
+    if (d.delivery == DsDelivery.sending || d.delivery == DsDelivery.delayed) {
       return Row(
         children: [
           DsIcon(
@@ -691,7 +692,9 @@ class DsMessageState extends State<DsMessage> {
           ),
           const SizedBox(width: DsSpace.s4),
           Text(
-            l.messageSending,
+            d.delivery == DsDelivery.delayed
+                ? l.messageSendingDelayed
+                : l.messageSending,
             style: dsTextStyle(DsType.caption)
                 .copyWith(color: colors.textSecondary),
           ),

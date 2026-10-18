@@ -20,6 +20,19 @@ Planning stage (milestone M0). Nothing is installable yet.
 
 ### Added
 
+- Desktop thread view (M4-20): the history column shows a thread or the main history of a text
+  channel from the local database with grouping, origin badges, safe Markdown, "Show more",
+  tombstones and system lines, loads older pages and fills gaps, focuses the visible threads and
+  marks them read; the header names the operator or "No agent answers here", marks automatic
+  titles and offers Done, reopen, title, move, pin and the session column; the composer sends
+  through the outbox with Enter or Shift+Enter, keeps the draft in sync, suggests mentions, inserts
+  templates and shows who is typing; messages offer reply with quote, start thread, reactions, pin,
+  edit with the conflict view, versions, delete, mark as unread and copy; every offline state of
+  01 6.6 is visible, and a removed thread closes with "No access anymore". The session column has
+  its frame with the pinned messages. The thread, thread list and history window streams of the
+  local store have their own trigger statements, so a history next to a post list shows new
+  messages.
+
 - Gate `sql-visibility` (M1-70, AZ-P12): `tools/lint/sql_visibility.py` rejects every reading
   sqlc query on a content table without `channel_id = ANY(...)` or `space_id = ANY(...)` unless it
   stands with a category and a reason on `tools/lint/sql_visibility.yaml`; stale, duplicate and

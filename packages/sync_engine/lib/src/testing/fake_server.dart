@@ -19,6 +19,7 @@ import 'rest/run_handlers.dart';
 import 'rest/self_handlers.dart';
 import 'rest/structure_handlers.dart';
 import 'rest/sync_handlers.dart';
+import 'rest/thread_view_handlers.dart';
 import 'rest_fake.dart';
 import 'schema_validator.dart';
 import 'scripted_agent.dart';
@@ -144,6 +145,7 @@ final class FakeServer {
     registerPersonalHandlers(rest);
     registerRunHandlers(rest);
     registerSelfHandlers(rest);
+    registerThreadViewHandlers(rest);
     final actions = ActionCatalog.load();
     registerAdminHandlers(rest, actions);
     final server = FakeServer._(

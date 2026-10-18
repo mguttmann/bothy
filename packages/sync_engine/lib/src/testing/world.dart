@@ -3,7 +3,9 @@
 /// The in-memory world of the fake server (brief M4-17 Design note 3): instance, people with
 /// devices and sessions, spaces, channels, threads, messages with `thread_seq`, the event log
 /// with a global `seq` and a sync epoch, read states, drafts, settings and runs; since M4-19
-/// also forums with tags, sidebar states and the instance logo.
+/// also forums with tags, sidebar states and the instance logo; since M4-20 message
+/// revisions, pins, templates, the capabilities of a channel view, main threads, threads from
+/// a message, title, close, reopen, move and mark unread.
 library;
 
 import 'dart:convert';
@@ -11,6 +13,8 @@ import 'dart:typed_data';
 
 import 'package:crypto/crypto.dart';
 import 'package:domain/domain.dart' show EventCatalog, FractionalIndex;
+
+part 'world_thread_view.dart';
 
 /// A JSON object of the API.
 typedef JsonMap = Map<String, Object?>;
@@ -325,6 +329,11 @@ final class FakePairing {
 final class FakeChannel {
   /// Creates the channel from its API `Channel`.
   FakeChannel(this.json, this.access);
+
+  /// The capabilities (API `Capability`, for example `manage`) per principal ID next to its
+  /// level; the channel view reports them (brief M4-20: actions follow the server's
+  /// capabilities).
+  final Map<String, Set<String>> capabilities = {};
 
   /// The API `Channel`.
   final JsonMap json;
@@ -757,8 +766,15 @@ final class FakeWorld {
   JsonMap channelView(String principalId, String channelId) => {
     'channel': channels[channelId]!.json,
     'level': levelOf(principalId, channelId),
-    'capabilities': <Object?>[],
+    'capabilities': [
+      ...?channels[channelId]!.capabilities[principalId]?.toList()?..sort(),
+    ],
   };
+
+  /// Whether [principalId] holds the capability `manage` in [channelId].
+  bool manages(String principalId, String channelId) =>
+      channels[channelId]?.capabilities[principalId]?.contains('manage') ??
+      false;
 
   static String _highest(List<String> levels) => levels.contains('trigger')
       ? 'trigger'
@@ -1014,7 +1030,10 @@ final class FakeWorld {
       return (message: messages[known.id]!, replay: true);
     }
     final author = people[authorId]!;
-    if (thread['state'] == 'closed') _reopen(threadId, authorId);
+    if (thread['state'] == 'closed') {
+      _reopen(threadId, authorId);
+      _systemLine(threadId, 'thread.reopened', authorId);
+    }
     final seq = (thread['last_message_seq']! as int) + 1;
     final id = nextId();
     final mentions = [
@@ -1092,6 +1111,13 @@ final class FakeWorld {
     if (m['version'] != expectedVersion) {
       throw FakeProblem(412, 'version_conflict', current: Map.of(m));
     }
+    final earlier = revisions.putIfAbsent(messageId, () => []);
+    earlier.add({
+      'revision': earlier.length + 1,
+      'content_md': m['content_md'],
+      'edited_by': principalId,
+      'created_at': m['edited_at'] ?? m['created_at'],
+    });
     if (body.containsKey('content_md')) m['content_md'] = body['content_md'];
     if (body.containsKey('mention_ids')) m['mention_ids'] = body['mention_ids'];
     m
@@ -1135,6 +1161,19 @@ final class FakeWorld {
   }
 
   final Map<String, Set<String>> _reactions = {};
+
+  /// The earlier revisions (API `MessageRevision`) of each edited message, oldest first.
+  final Map<String, List<JsonMap>> revisions = {};
+
+  /// Who pinned a message and when (API `Pin`), by message ID.
+  final Map<String, JsonMap> pins = {};
+
+  /// Templates (API `Template`) by ID; a personal template also names its owner in
+  /// [templateOwners].
+  final Map<String, JsonMap> templates = {};
+
+  /// The owner of each personal template, by template ID.
+  final Map<String, String> templateOwners = {};
 
   /// Adds or removes the reaction [emoji] of [principalId] on [messageId]; a repeat changes
   /// nothing. Throws `404`, `410 message_deleted` when adding to a deleted message.
@@ -1482,6 +1521,47 @@ final class FakeWorld {
       scope: _scopeOf(threadId),
       payload: {'thread': thread},
       actor: actor,
+    );
+  }
+
+  /// Writes the system line [code] (`kind = system`, `origin = system`) into [threadId] with
+  /// [authorId] as its author and appends `message.created` (03: the author of
+  /// `thread.reopened` is the person whose message reopened the thread).
+  void _systemLine(String threadId, String code, String authorId) {
+    final thread = threads[threadId]!;
+    final seq = (thread['last_message_seq']! as int) + 1;
+    final id = nextId();
+    final message = <String, Object?>{
+      'id': id,
+      'thread_id': threadId,
+      'channel_id': thread['channel_id'],
+      'thread_seq': seq,
+      'author': people[authorId]!.ref,
+      'client_msg_id': nextId(),
+      'origin': 'system',
+      'kind': 'system',
+      'system_code': code,
+      'content_md': '',
+      'content_format': 1,
+      'silent': true,
+      'attachments': <Object?>[],
+      'mention_ids': <Object?>[],
+      'reactions': <Object?>[],
+      'pinned': false,
+      'components': <Object?>[],
+      'version': 1,
+      'created_at': stamp(),
+    };
+    messages[id] = message;
+    _threadMessages[threadId]!.add(id);
+    thread
+      ..['last_message_seq'] = seq
+      ..['message_count'] = (thread['message_count']! as int) + 1;
+    append(
+      'message.created',
+      resource: {'kind': 'message', 'id': id, 'version': 1},
+      scope: _scopeOf(threadId),
+      payload: {'message': message},
     );
   }
 

@@ -4070,5 +4070,292 @@
         "example": "Sam"
       }
     }
+  },
+  "threadNoOperator": "No agent answers here",
+  "@threadNoOperator": {
+    "description": "Header of a thread or channel without an operator (01 section 6.7)."
+  },
+  "threadOperator": "Operator: {name}",
+  "@threadOperator": {
+    "description": "Header of a thread naming its operator agent (01 section 6.7).",
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "threadTitleAutomatic": "automatic",
+  "@threadTitleAutomatic": {
+    "description": "Small mark after a thread title that the server set automatically (01 section 6.7)."
+  },
+  "threadDone": "Done",
+  "@threadDone": {
+    "description": "Header button that marks the thread done (01 section 6.1)."
+  },
+  "threadReopen": "Reopen",
+  "@threadReopen": {
+    "description": "Header button that opens a done thread again (01 section 6.1)."
+  },
+  "threadMove": "Move",
+  "@threadMove": {
+    "description": "Header button that opens the dialog to move the thread (01 section 6.7)."
+  },
+  "threadPin": "Pin",
+  "@threadPin": {
+    "description": "Header button that shows the pinned messages of the thread in the session column (01 section 5.1 D1)."
+  },
+  "threadColumn": "Column",
+  "@threadColumn": {
+    "description": "Header button that shows or hides the session column (01 section 5.1 D1)."
+  },
+  "threadEditTitle": "Edit title",
+  "@threadEditTitle": {
+    "description": "Header button and dialog title to change the thread title (01 section 6.7)."
+  },
+  "threadTitleLabel": "Title",
+  "@threadTitleLabel": {
+    "description": "Label of the title field of the title dialog."
+  },
+  "threadSave": "Save",
+  "@threadSave": {
+    "description": "Save button of the title dialog, the inline editor and the template dialog."
+  },
+  "threadCancel": "Cancel",
+  "@threadCancel": {
+    "description": "Cancel button of the dialogs and the inline editor of the thread view."
+  },
+  "threadStarter": "Thread: {title}, {count, plural, =1{1 reply} other{{count} replies}}",
+  "@threadStarter": {
+    "description": "Line under a message of the main history that started a thread; opens it (01 section 5.1 D2).",
+    "placeholders": {
+      "title": {
+        "type": "String"
+      },
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "threadLoadingOlder": "Loading earlier messages",
+  "@threadLoadingOlder": {
+    "description": "Row at the top of the history while older messages or a gap load (04 section 4)."
+  },
+  "threadLoadingNewer": "Loading missing messages",
+  "@threadLoadingNewer": {
+    "description": "Row at the end of the history while a gap before newer messages loads (04 section 4)."
+  },
+  "threadEmpty": "No messages yet",
+  "@threadEmpty": {
+    "description": "History of a thread without messages."
+  },
+  "threadNoAccess": "No access anymore",
+  "@threadNoAccess": {
+    "description": "Text that replaces an open thread or channel whose access was removed (01 section 6.6)."
+  },
+  "threadNoAccessWaiting": "Messages that were not sent, to copy:",
+  "@threadNoAccessWaiting": {
+    "description": "Heading above the waiting messages kept as text after the access was removed (01 section 6.6)."
+  },
+  "messageActionStartThread": "Start thread",
+  "@messageActionStartThread": {
+    "description": "Action of a message in the main history of a text channel (01 section 3.1)."
+  },
+  "messageActionUnpin": "Unpin",
+  "@messageActionUnpin": {
+    "description": "Action of a pinned message (01 section 3.3)."
+  },
+  "messageActionVersions": "View versions",
+  "@messageActionVersions": {
+    "description": "Action of an edited message (01 section 3.3)."
+  },
+  "messageActionDelete": "Delete",
+  "@messageActionDelete": {
+    "description": "Action of a message and confirm button of the delete dialog (01 section 6.7)."
+  },
+  "messageActionMarkUnread": "Mark as unread",
+  "@messageActionMarkUnread": {
+    "description": "Action of a message; moves the read position before it (04 section 14)."
+  },
+  "messageActionCopyText": "Copy text",
+  "@messageActionCopyText": {
+    "description": "Action of a message that copies its text."
+  },
+  "messageActionCopyLink": "Copy link",
+  "@messageActionCopyLink": {
+    "description": "Action of a message that copies its link."
+  },
+  "messageMenuLabel": "Actions of the message",
+  "@messageMenuLabel": {
+    "description": "Screen reader label of the action menu of a message."
+  },
+  "messageDeleteTitle": "Delete message?",
+  "@messageDeleteTitle": {
+    "description": "Title of the confirmation before a message is deleted (01 section 6.7)."
+  },
+  "messageDeleteBody": "The message is replaced by \"Message deleted\" for everyone.",
+  "@messageDeleteBody": {
+    "description": "Text of the confirmation before a message is deleted (01 section 6.7)."
+  },
+  "messageVersionsTitle": "Versions",
+  "@messageVersionsTitle": {
+    "description": "Title of the dialog with the earlier versions of a message (01 section 3.3)."
+  },
+  "messageVersionsCurrent": "Current version",
+  "@messageVersionsCurrent": {
+    "description": "Heading of the current text in the versions dialog."
+  },
+  "messageVersionsRevision": "Version {number}",
+  "@messageVersionsRevision": {
+    "description": "Heading of an earlier version in the versions dialog.",
+    "placeholders": {
+      "number": {
+        "type": "int"
+      }
+    }
+  },
+  "messageVersionsEmpty": "No earlier versions",
+  "@messageVersionsEmpty": {
+    "description": "Versions dialog of a message without earlier versions."
+  },
+  "messageVersionsFailed": "The versions could not be loaded: {reason}",
+  "@messageVersionsFailed": {
+    "description": "Versions dialog after the request failed.",
+    "placeholders": {
+      "reason": {
+        "type": "String"
+      }
+    }
+  },
+  "messageConflictTitle": "The message was changed elsewhere",
+  "@messageConflictTitle": {
+    "description": "Title of the dialog after an edit met a newer version (04 section 13.3)."
+  },
+  "messageConflictMine": "Your version",
+  "@messageConflictMine": {
+    "description": "Heading of the local text in the conflict dialog (04 section 13.3)."
+  },
+  "messageConflictTheirs": "Current version",
+  "@messageConflictTheirs": {
+    "description": "Heading of the server text in the conflict dialog (04 section 13.3)."
+  },
+  "messageConflictKeepMine": "Keep mine",
+  "@messageConflictKeepMine": {
+    "description": "Button of the conflict dialog: send the local text on the current version (04 section 13.3)."
+  },
+  "messageConflictTakeTheirs": "Take theirs",
+  "@messageConflictTakeTheirs": {
+    "description": "Button of the conflict dialog: keep the server text and drop the local edit (04 section 13.3)."
+  },
+  "messageEditLabel": "Edit message",
+  "@messageEditLabel": {
+    "description": "Label of the inline editor of a message."
+  },
+  "messageReactionTitle": "React",
+  "@messageReactionTitle": {
+    "description": "Title of the reaction picker (01 section 3.3)."
+  },
+  "messageReactionInput": "Any character",
+  "@messageReactionInput": {
+    "description": "Label of the field of the reaction picker that takes any Unicode character (01 section 3.3)."
+  },
+  "messageReactionAdd": "Add",
+  "@messageReactionAdd": {
+    "description": "Button of the reaction picker that adds the typed character."
+  },
+  "messageCopied": "Copied",
+  "@messageCopied": {
+    "description": "Short note after text or a link was copied."
+  },
+  "outboxFailedAction": "Not saved: {reason}",
+  "@outboxFailedAction": {
+    "description": "Row of a write of the thread that the server refused for good (04 section 13.2 item 5).",
+    "placeholders": {
+      "reason": {
+        "type": "String"
+      }
+    }
+  },
+  "outboxCompare": "Compare",
+  "@outboxCompare": {
+    "description": "Button of a refused edit that opens both versions (04 section 13.3)."
+  },
+  "outboxCopy": "Copy",
+  "@outboxCopy": {
+    "description": "Button of a refused edit of a deleted message that copies its text (04 section 13.3)."
+  },
+  "composerTooLong": "The message is too long: at most {limit} bytes",
+  "@composerTooLong": {
+    "description": "Reason why a message is not sent; the limit comes from the instance (D-W-115).",
+    "placeholders": {
+      "limit": {
+        "type": "int"
+      }
+    }
+  },
+  "composerDraftOverwritten": "This draft replaced a newer version from another device",
+  "@composerDraftOverwritten": {
+    "description": "Note after a draft write reported overwrote_newer (04 section 14)."
+  },
+  "composerReplyTo": "Reply to {name}",
+  "@composerReplyTo": {
+    "description": "Line above the input while a reply is prepared.",
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "composerCancelReply": "Cancel reply",
+  "@composerCancelReply": {
+    "description": "Button that drops the prepared reply."
+  },
+  "composerTemplates": "Templates",
+  "@composerTemplates": {
+    "description": "Button that opens the templates menu of the input (01 section 3.3)."
+  },
+  "composerTemplatesPersonal": "Your templates",
+  "@composerTemplatesPersonal": {
+    "description": "Group of the personal templates in the templates menu (01 section 3.3)."
+  },
+  "composerTemplatesChannel": "Templates of this channel",
+  "@composerTemplatesChannel": {
+    "description": "Group of the channel templates in the templates menu (01 section 3.3)."
+  },
+  "composerTemplatesEmpty": "No templates",
+  "@composerTemplatesEmpty": {
+    "description": "Templates menu without templates."
+  },
+  "composerTemplatesSave": "Save as template",
+  "@composerTemplatesSave": {
+    "description": "Entry of the templates menu that saves the current text as a personal template (01 section 3.3)."
+  },
+  "composerTemplatesName": "Name",
+  "@composerTemplatesName": {
+    "description": "Label of the name field when saving a template."
+  },
+  "sessionPinned": "Pinned ({count})",
+  "@sessionPinned": {
+    "description": "Section of the session column with the pinned messages of the thread (01 section 5.1 D1).",
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "sessionPinnedEmpty": "No pinned messages",
+  "@sessionPinnedEmpty": {
+    "description": "Section \"Pinned\" of the session column without pinned messages."
+  },
+  "sessionNoThread": "Open a thread to see its session",
+  "@sessionNoThread": {
+    "description": "Session column while no thread is open."
+  },
+  "threadMoveNoTarget": "No channel with the same operator",
+  "@threadMoveNoTarget": {
+    "description": "Move dialog without a valid target (01 section 6.7)."
+  },
+  "threadMoveReason": "Reason",
+  "@threadMoveReason": {
+    "description": "Label of the reason field of the move dialog (ThreadMove.reason)."
   }
 }

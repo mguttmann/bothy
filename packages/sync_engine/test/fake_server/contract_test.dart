@@ -131,6 +131,78 @@ void main() {
           ..firstMessage.contentMd = 'Since Monday',
       ),
     );
+    // The thread view (M4-20): revisions, read position back, pins, state, title, move,
+    // templates and a thread from a message.
+    final world = h.server.world;
+    final revised = w.post(w.alex, w.releaseNotes, 'first draft');
+    await messages.updateMessage(
+      messageId: revised['id']! as String,
+      ifMatch: '"1"',
+      messageUpdate: MessageUpdate((b) => b..contentMd = 'second draft'),
+    );
+    await messages.listMessageRevisions(messageId: revised['id']! as String);
+    final personal = api.getPreferencesApi();
+    final read = (await personal.putReadState(
+      threadId: w.releaseNotes,
+      readStatePut: ReadStatePut(
+        (b) => b..lastReadSeq = revised['thread_seq']! as int,
+      ),
+    )).data!;
+    await personal.markThreadUnread(
+      threadId: w.releaseNotes,
+      ifMatch: '"${read.version}"',
+      readStatePut: ReadStatePut((b) => b..lastReadSeq = 0),
+    );
+    world
+      ..grantCapability(w.alex.id, w.general, 'manage')
+      ..grantCapability(w.alex.id, w.support, 'manage');
+    await messages.pinMessage(messageId: revised['id']! as String);
+    await messages.listPins(threadId: w.releaseNotes);
+    await messages.unpinMessage(messageId: revised['id']! as String);
+    final threadsApi = api.getThreadsApi();
+    await threadsApi.closeThread(threadId: w.releaseNotes);
+    await threadsApi.reopenThread(threadId: w.releaseNotes);
+    await threadsApi.setThreadTitle(
+      threadId: w.releaseNotes,
+      ifMatch: '"${world.threads[w.releaseNotes]!['version']}"',
+      threadTitlePut: ThreadTitlePut((b) => b..title = 'Release plan'),
+    );
+    final movable = world.addThread(
+      w.general,
+      'Wrong place',
+      createdBy: w.alex.id,
+    );
+    await threadsApi.moveThread(
+      threadId: movable,
+      threadMove: ThreadMove(
+        (b) => b
+          ..targetChannelId = w.support
+          ..reason = 'Belongs to support',
+      ),
+    );
+    world.addTemplate(
+      scope: 'channel',
+      channelId: w.general,
+      name: 'Escalation',
+      contentMd: 'Please escalate.',
+    );
+    await api.getChannelsApi().listTemplates(channelId: w.general);
+    await api.getMeApi().createPersonalTemplate(
+      templateCreate: TemplateCreate(
+        (b) => b
+          ..name = 'Greeting'
+          ..contentMd = 'Hello Sam',
+      ),
+    );
+    await api.getMeApi().listMyTemplates();
+    final main = world.addMainThread(w.general, createdBy: w.alex.id);
+    final parent = w.post(w.alex, main, 'A question');
+    await threadsApi.createThread(
+      channelId: w.general,
+      threadCreate: ThreadCreate(
+        (b) => b..parentMessageId = parent['id']! as String,
+      ),
+    );
     h.server.world.logo = Uint8List.fromList([137, 80, 78, 71]);
     await api.getDiscoveryApi().getBrandingLogo();
 
