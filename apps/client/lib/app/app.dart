@@ -12,6 +12,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:l10n/l10n.dart';
 
+import '../admin/admin_route.dart';
 import '../onboarding/onboarding_controller.dart';
 import '../onboarding/onboarding_screen.dart';
 import '../settings/settings_providers.dart';
@@ -89,6 +90,17 @@ class _ClientAppState extends ConsumerState<ClientApp> {
           builder: (context, state) =>
               SettingsShell(segment: state.pathParameters['section']),
         ),
+        // The administration of admin_ui (brief M4-26): the shell parses the rest of the
+        // path and shows "Not found or no access" for a path without a screen.
+        for (final path in const [
+          '/admin',
+          '/admin/:section',
+          '/admin/:section/:id',
+        ])
+          GoRoute(
+            path: path,
+            builder: (context, state) => AdminRoute(uri: state.uri),
+          ),
         for (final path in const [
           '/s/:id',
           '/c/:id',
@@ -99,8 +111,8 @@ class _ClientAppState extends ConsumerState<ClientApp> {
         ])
           GoRoute(path: path, builder: _shell),
       ],
-      // `/admin/...` and every unknown path: the shell parses them itself and
-      // shows "Not found or no access" for an unknown one (01 6.7).
+      // Every unknown path: the shell parses it and shows "Not found or no access"
+      // (01 6.7).
       errorBuilder: _shell,
     );
     final deepLinks = ref.read(appPortsProvider).deepLinks;
