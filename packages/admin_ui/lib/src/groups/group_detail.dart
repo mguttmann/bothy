@@ -14,7 +14,6 @@ import '../common/admin_action.dart';
 import '../common/confirm_change.dart';
 import '../common/problem_banner.dart';
 import '../data/admin_repository.dart';
-import '../self/device_tile.dart' show activityText;
 import '../self/self_feedback.dart';
 import 'groups_list.dart' show GroupNameDialog;
 import 'member_editor.dart';
@@ -85,10 +84,11 @@ class _GroupDetailState extends State<GroupDetail>
       return;
     }
     try {
-      final people = await widget.repository.people(
+      final people = await allPeople(
+        widget.repository,
         status: AdminPersonStatus.active,
       );
-      if (mounted) setState(() => _people = people.items);
+      if (mounted) setState(() => _people = people);
     } on Object {
       // Without the people list "Add member" has no candidates and is not offered.
     }
@@ -145,6 +145,7 @@ class _GroupDetailState extends State<GroupDetail>
     final request = await MemberEditor.show(
       context,
       groupName: group.name,
+      timeZone: widget.timeZone,
       candidates: [
         for (final p in _people)
           if (!members.contains(p.id)) p,
@@ -183,13 +184,26 @@ class _GroupDetailState extends State<GroupDetail>
     });
   }
 
+  String _lastDay(BuildContext context, DateTime end) {
+    final format = L10nFormat(Localizations.localeOf(context));
+    final last = end.subtract(const Duration(seconds: 1));
+    try {
+      return format.relativeDay(
+        last,
+        now: widget.clock(),
+        timeZone: widget.timeZone,
+      );
+    } on ArgumentError {
+      return format.relativeDay(last, now: widget.clock(), timeZone: 'UTC');
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final l = AppLocalizations.of(context);
     final colors = context.dsColors;
     final group = _group;
     final members = _members;
-    final now = widget.clock();
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       mainAxisSize: MainAxisSize.min,
@@ -300,12 +314,9 @@ class _GroupDetailState extends State<GroupDetail>
                         if (member.expiresAt case final until?)
                           Text(
                             l.adminMemberExpires(
-                              activityText(
-                                context,
-                                until,
-                                now: now,
-                                timeZone: widget.timeZone,
-                              ),
+                              // The membership holds through the day before the end
+                              // (MemberEditor), so that is the day shown.
+                              _lastDay(context, until),
                             ),
                             key: ValueKey('member.${member.userId}.expires'),
                             style: dsTextStyle(DsType.bodySm)

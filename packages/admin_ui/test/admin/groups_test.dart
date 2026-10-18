@@ -124,9 +124,17 @@ void main() {
     await tester.pump();
     await tap(tester, 'confirm.submit');
     await stepUp(tester, 'Add Sam to Support');
+    // 07 2.1: the membership holds through the typed day in the person's time zone
+    // (Europe/Berlin), so it ends at the start of 1 January there.
     expect(
       repository.calls.last,
-      'addMember support sam 2026-12-31T00:00:00.000Z',
+      'addMember support sam 2026-12-31T23:00:00.000Z',
+    );
+    expect(
+      tester
+          .widget<Text>(find.byKey(const ValueKey('member.sam.expires')))
+          .data,
+      'Until Dec 31, 2026',
     );
     expect(find.byKey(const ValueKey('member.sam.expires')), findsOneWidget);
     expect(find.text('Sam was added to Support.'), findsOneWidget);
@@ -136,6 +144,16 @@ void main() {
     await tap(tester, 'confirm.submit');
     await stepUp(tester, 'Remove Robin from Support');
     expect(find.byKey(const ValueKey('member.robin')), findsNothing);
+  });
+
+  testWidgets('add member offers people beyond the first page', (tester) async {
+    repository.pageSize = 1;
+    await detail(tester);
+
+    await tap(tester, 'group.addMember');
+    await tap(tester, 'member.person');
+    expect(find.text('Sam'), findsWidgets);
+    expect(find.text('Alex'), findsWidgets);
   });
 
   test('parseDay reads YYYY-MM-DD only', () {

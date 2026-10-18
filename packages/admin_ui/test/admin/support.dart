@@ -156,6 +156,9 @@ class FakeAdminRepository implements AdminRepository {
     ],
   };
 
+  /// People per page of `people` (an offset cursor).
+  int pageSize = 50;
+
   /// People whose enabling answers `409 i1_violation`.
   final Set<String> i1 = {};
 
@@ -216,12 +219,18 @@ class FakeAdminRepository implements AdminRepository {
     listRequests.add('${query ?? ''}|${status?.name ?? ''}');
     _refused('people');
     final q = query?.toLowerCase() ?? '';
-    return AdminPage([
+    final all = [
       for (final p in peopleById.values)
         if ((status == null || p.status == status) &&
             (q.isEmpty || p.displayName.toLowerCase().contains(q)))
           p,
-    ]);
+    ];
+    final start = int.tryParse(cursor ?? '') ?? 0;
+    final end = (start + pageSize).clamp(0, all.length);
+    return AdminPage(
+      all.sublist(start, end),
+      nextCursor: end < all.length ? '$end' : null,
+    );
   }
 
   @override

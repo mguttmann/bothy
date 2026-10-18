@@ -19,7 +19,9 @@ final class MemberRequest {
   /// The new member.
   final AdminPerson person;
 
-  /// The end of the membership (the start of that day in UTC), or null.
+  /// The end of the membership, or null: the start of the day after the typed day in the
+  /// person's time zone, so the membership holds through the typed day (07 2.1: valid while
+  /// `expires_at` lies in the future).
   final DateTime? expiresAt;
 }
 
@@ -47,7 +49,11 @@ class MemberEditor extends StatefulWidget {
     super.key,
     required this.groupName,
     required this.candidates,
+    this.timeZone = 'UTC',
   });
+
+  /// The time zone of the signed-in person, in which the typed day is read.
+  final String timeZone;
 
   /// The name of the group.
   final String groupName;
@@ -60,9 +66,14 @@ class MemberEditor extends StatefulWidget {
     BuildContext context, {
     required String groupName,
     required List<AdminPerson> candidates,
+    String timeZone = 'UTC',
   }) => showDialog<MemberRequest>(
     context: context,
-    builder: (_) => MemberEditor(groupName: groupName, candidates: candidates),
+    builder: (_) => MemberEditor(
+      groupName: groupName,
+      candidates: candidates,
+      timeZone: timeZone,
+    ),
   );
 
   @override
@@ -89,8 +100,23 @@ class _MemberEditorState extends State<MemberEditor> {
   Widget build(BuildContext context) {
     final l = AppLocalizations.of(context);
     final text = _until.text.trim();
-    final until = parseDay(text);
-    final validDate = text.isEmpty || until != null;
+    final day = parseDay(text);
+    final validDate = text.isEmpty || day != null;
+    DateTime? until;
+    if (day != null) {
+      final next = DateTime.utc(day.year, day.month, day.day + 1);
+      final format = L10nFormat(Localizations.localeOf(context));
+      try {
+        until = format.dayStart(
+          next.year,
+          next.month,
+          next.day,
+          timeZone: widget.timeZone,
+        );
+      } on ArgumentError {
+        until = next;
+      }
+    }
     return ConfirmChange(
       title: l.adminMemberAddTitle(widget.groupName),
       body: l.adminMemberAddBody,

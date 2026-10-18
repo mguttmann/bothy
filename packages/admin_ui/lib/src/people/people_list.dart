@@ -314,7 +314,6 @@ class _PeopleListState extends State<PeopleList>
           const SizedBox(height: DsSpace.s24),
           OwnersSection(
             repository: widget.repository,
-            people: people ?? const [],
             timeZone: widget.timeZone,
             onChanged: () {
               widget.onChanged?.call();

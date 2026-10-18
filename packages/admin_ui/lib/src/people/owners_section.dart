@@ -16,8 +16,8 @@ import '../data/admin_repository.dart';
 import '../self/device_tile.dart' show activityText;
 import '../self/self_feedback.dart';
 
-/// The owners of the instance with "Revoke" each and "Add owner" (a person of [people] who is
-/// not an owner yet).
+/// The owners of the instance with "Revoke" each and "Add owner" (any active person who is not
+/// an owner yet, from every page of `listUsers`).
 ///
 /// The screen never decides which owner may go: revoking the last one is sent, and the
 /// server's `409 last_owner` is shown with its text (07 SR8). A `403` of the list shows the
@@ -27,7 +27,6 @@ class OwnersSection extends StatefulWidget {
   const OwnersSection({
     super.key,
     required this.repository,
-    required this.people,
     this.timeZone = 'UTC',
     this.clock = DateTime.now,
     this.onChanged,
@@ -35,9 +34,6 @@ class OwnersSection extends StatefulWidget {
 
   /// The administration's calls.
   final AdminRepository repository;
-
-  /// The people the list has loaded, the candidates of "Add owner".
-  final List<AdminPerson> people;
 
   /// The time zone of the signed-in person.
   final String timeZone;
@@ -103,9 +99,24 @@ class _OwnersSectionState extends State<OwnersSection>
   Future<void> _add() async {
     final l = AppLocalizations.of(context);
     final owners = {for (final o in _owners ?? const <AdminOwner>[]) o.userId};
+    final List<AdminPerson> active;
+    try {
+      // Every active person, not only the page the list shows.
+      active = await allPeople(
+        widget.repository,
+        status: AdminPersonStatus.active,
+      );
+    } on Object catch (e) {
+      final failure = adminFailure(l, e);
+      if (mounted && failure != null) {
+        setState(() => notice = SelfNotice(failure.text, tone: DsTone.danger));
+      }
+      return;
+    }
+    if (!mounted) return;
     final candidates = [
-      for (final p in widget.people)
-        if (!owners.contains(p.id) && p.status == AdminPersonStatus.active) p,
+      for (final p in active)
+        if (!owners.contains(p.id)) p,
     ];
     final picked = await showDialog<(AdminPerson, String)>(
       context: context,

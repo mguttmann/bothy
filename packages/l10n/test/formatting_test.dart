@@ -102,6 +102,22 @@ void main() {
     });
   });
 
+  test('the start of a calendar day in a time zone, as UTC', () {
+    const f = L10nFormat(Locale('en'));
+    expect(
+      f.dayStart(2027, 1, 1, timeZone: 'America/New_York'),
+      DateTime.utc(2027, 1, 1, 5),
+    );
+    expect(
+      f.dayStart(2026, 7, 1, timeZone: 'Europe/Berlin'),
+      DateTime.utc(2026, 6, 30, 22),
+    );
+    expect(
+      () => f.dayStart(2026, 1, 1, timeZone: 'Mars/Base'),
+      throwsArgumentError,
+    );
+  });
+
   group('relative day in the time zone of the person', () {
     final now = DateTime.utc(2026, 10, 15, 10); // Thursday, 12:00 in Berlin
 

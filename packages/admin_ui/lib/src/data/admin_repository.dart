@@ -429,6 +429,23 @@ abstract interface class AdminRepository {
   });
 }
 
+/// Every person of [repository] in [status] (all states when null), following the cursor of
+/// `listUsers`: the pickers of "Add member" and "Add owner" offer people beyond the first
+/// page (brief M4-26 Design note 1).
+Future<List<AdminPerson>> allPeople(
+  AdminRepository repository, {
+  AdminPersonStatus? status,
+}) async {
+  final people = <AdminPerson>[];
+  String? cursor;
+  do {
+    final page = await repository.people(status: status, cursor: cursor);
+    people.addAll(page.items);
+    cursor = page.nextCursor;
+  } while (cursor != null);
+  return people;
+}
+
 /// [AdminRepository] over the generated client of `api_client`.
 ///
 /// The `api` argument is the client of the signed-in session (`AuthSession.api`), so DPoP,
@@ -667,13 +684,7 @@ final class ApiAdminRepository implements AdminRepository {
 
   @override
   Future<List<WaitingDevice>> waitingDevices() => _call(() async {
-    final people = <AdminPerson>[];
-    String? cursor;
-    do {
-      final page = await this.people(cursor: cursor);
-      people.addAll(page.items);
-      cursor = page.nextCursor;
-    } while (cursor != null);
+    final people = await allPeople(this);
     final out = <WaitingDevice>[];
     for (final person in people) {
       if (person.status == AdminPersonStatus.disabled ||
