@@ -159,37 +159,16 @@ func tokens(sql string) []token {
 		c := r[i]
 		switch {
 		case c == '-' && i+1 < len(r) && r[i+1] == '-':
-			for i < len(r) && r[i] != '\n' {
-				i++
-			}
+			i = skipLine(r, i)
 		case c == '/' && i+1 < len(r) && r[i+1] == '*':
-			j := i + 2
-			for j+1 < len(r) && (r[j] != '*' || r[j+1] != '/') {
-				j++
-			}
-			if j+1 >= len(r) {
+			if i = skipBlock(r, i); i >= len(r) {
 				return out
 			}
-			i = j + 1
 		case c == '\'':
-			j := i + 1
-			for j < len(r) {
-				if r[j] == '\'' {
-					if j+1 < len(r) && r[j+1] == '\'' {
-						j += 2
-						continue
-					}
-					break
-				}
-				j++
-			}
-			i = j
+			i = skipLiteral(r, i)
 		case c == '"':
-			j := i + 1
-			for j < len(r) && r[j] != '"' {
-				j++
-			}
-			out = append(out, token{text: string(r[i+1 : min(j, len(r))]), depth: depth, ident: true})
+			j := closingQuote(r, i)
+			out = append(out, token{text: string(r[i+1 : j]), depth: depth, ident: true})
 			i = j
 		case c == '(':
 			out = append(out, token{text: "(", depth: depth})
@@ -198,18 +177,72 @@ func tokens(sql string) []token {
 			depth--
 			out = append(out, token{text: ")", depth: depth})
 		case unicode.IsLetter(c) || c == '_':
-			j := i
-			for j < len(r) && (unicode.IsLetter(r[j]) || unicode.IsDigit(r[j]) || r[j] == '_' || r[j] == '$') {
-				j++
-			}
+			j := wordEnd(r, i)
 			out = append(out, token{text: string(r[i:j]), depth: depth, ident: true})
 			i = j - 1
-		case unicode.IsSpace(c):
-		default:
+		case !unicode.IsSpace(c):
 			out = append(out, token{text: string(c), depth: depth})
 		}
 	}
 	return out
+}
+
+// skipLine returns the index of the end of the line comment at i.
+func skipLine(r []rune, i int) int {
+	for i < len(r) && r[i] != '\n' {
+		i++
+	}
+	return i
+}
+
+// skipBlock returns the index of the closing slash of the block comment at i, len(r) when it is
+// not closed.
+func skipBlock(r []rune, i int) int {
+	j := i + 2
+	for j+1 < len(r) && (r[j] != '*' || r[j+1] != '/') {
+		j++
+	}
+	if j+1 >= len(r) {
+		return len(r)
+	}
+	return j + 1
+}
+
+// skipLiteral returns the index of the closing quote of the string literal at i; two quotes in a
+// row stand for one quote inside the literal.
+func skipLiteral(r []rune, i int) int {
+	j := i + 1
+	for j < len(r) {
+		if r[j] != '\'' {
+			j++
+			continue
+		}
+		if j+1 < len(r) && r[j+1] == '\'' {
+			j += 2
+			continue
+		}
+		break
+	}
+	return j
+}
+
+// closingQuote returns the index of the double quote that closes the identifier at i, len(r) when
+// there is none.
+func closingQuote(r []rune, i int) int {
+	j := i + 1
+	for j < len(r) && r[j] != '"' {
+		j++
+	}
+	return j
+}
+
+// wordEnd returns the index after the identifier that starts at i.
+func wordEnd(r []rune, i int) int {
+	j := i
+	for j < len(r) && (unicode.IsLetter(r[j]) || unicode.IsDigit(r[j]) || r[j] == '_' || r[j] == '$') {
+		j++
+	}
+	return j
 }
 
 // mainStatements are the keywords that start the main statement after the CTEs of WITH.

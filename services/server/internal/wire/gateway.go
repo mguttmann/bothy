@@ -155,22 +155,9 @@ func NewGateway(cfg GatewayConfig, d GatewayDeps) (*Gateway, error) {
 		return nil, errors.New("wire: the gateway needs the authenticator, the authorizer, the nonces, the limiter, catch-up and snapshot, " +
 			"the instance and the threads of chat")
 	}
-	if d.Metrics == nil {
-		m, err := gatewaymetrics.New(nil)
-		if err != nil {
-			return nil, err
-		}
-		d.Metrics = m
-	}
-	hub, err := newHub(cfg, &d)
+	hub, err := newMeasuredHub(cfg, &d)
 	if err != nil {
 		return nil, err
-	}
-	if hub != nil {
-		// bothy.event.fanout.lag over the hub; the registration lives as long as the process.
-		if _, err := gatewaymetrics.RegisterFanoutLag(nil, hub.FanoutLag); err != nil {
-			return nil, err
-		}
 	}
 	var publisher eventlog.EphemeralPublisher = noPublisher{}
 	if hub != nil {
@@ -223,6 +210,27 @@ func NewGateway(cfg GatewayConfig, d GatewayDeps) (*Gateway, error) {
 		return nil, err
 	}
 	return &Gateway{App: gw, Handler: h, Hub: hub, Publisher: publisher}, nil
+}
+
+// newMeasuredHub sets the gateway metrics of d (adapters/otelmetrics on the global meter
+// provider when d brings none) and builds the hub (newHub) with bothy.event.fanout.lag over it;
+// the registration of the gauge lives as long as the process (M1-68).
+func newMeasuredHub(cfg GatewayConfig, d *GatewayDeps) (*gatewayapp.Hub, error) {
+	if d.Metrics == nil {
+		m, err := gatewaymetrics.New(nil)
+		if err != nil {
+			return nil, err
+		}
+		d.Metrics = m
+	}
+	hub, err := newHub(cfg, d)
+	if err != nil || hub == nil {
+		return hub, err
+	}
+	if _, err := gatewaymetrics.RegisterFanoutLag(nil, hub.FanoutLag); err != nil {
+		return nil, err
+	}
+	return hub, nil
 }
 
 // newHub builds the hub of M1-65 and makes it the delivery of d when d brings none; otherwise it

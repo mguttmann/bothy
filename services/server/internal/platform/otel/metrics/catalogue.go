@@ -27,6 +27,14 @@ const LibraryOtelPGX = "github.com/exaring/otelpgx"
 // droppedScopes are the instrumentation scopes whose instruments never leave the process.
 var droppedScopes = map[string]bool{LibraryOtelPGX: true}
 
+// Attribute keys and units several instruments share.
+const (
+	keyReason        = "bothy.reason"
+	keyOutcome       = "bothy.outcome"
+	keyPrincipalKind = "bothy.principal.kind"
+	unitConnection   = "{connection}"
+)
+
 // Closed literal sets shared by several instruments.
 var (
 	// principalKinds are bothy.principal.kind of an identified connection.
@@ -67,7 +75,7 @@ var (
 	AuthzErrors = Spec{
 		Name: "bothy.authz.errors", Kind: KindCounter, Unit: "{check}",
 		Description: "Programming errors of the rights check.",
-		Attrs:       []Attr{{Key: "bothy.reason", Values: []string{"unknown_action", "authz_not_checked", "filter_mismatch"}}},
+		Attrs:       []Attr{{Key: keyReason, Values: []string{"unknown_action", "authz_not_checked", "filter_mismatch"}}},
 	}
 	// RateLimitRejected is bothy.ratelimit.rejected (4.1).
 	RateLimitRejected = Spec{
@@ -78,9 +86,9 @@ var (
 	// GatewayConnectionsActive is bothy.gateway.connections.active (4.1): +1 at ready or
 	// resumed, -1 when such a connection closes.
 	GatewayConnectionsActive = Spec{
-		Name: "bothy.gateway.connections.active", Kind: KindUpDownCounter, Unit: "{connection}",
+		Name: "bothy.gateway.connections.active", Kind: KindUpDownCounter, Unit: unitConnection,
 		Description: "Gateway connections that reached ready or resumed and are still open.",
-		Attrs:       []Attr{{Key: "bothy.principal.kind", Values: principalKinds}},
+		Attrs:       []Attr{{Key: keyPrincipalKind, Values: principalKinds}},
 	}
 	// GatewayConnectDuration is bothy.gateway.connect.duration (4.1): upgrade to ready or
 	// resumed, or to the close before it.
@@ -88,8 +96,8 @@ var (
 		Name: "bothy.gateway.connect.duration", Kind: KindHistogram, Unit: "s",
 		Description: "Time from the WebSocket upgrade to ready or resumed, or to the close before it.",
 		Attrs: []Attr{
-			{Key: "bothy.outcome", Values: []string{"ok", "client_error", "server_error"}},
-			{Key: "bothy.principal.kind", Values: append(slices.Clone(principalKinds), "anonymous")},
+			{Key: keyOutcome, Values: []string{"ok", "client_error", "server_error"}},
+			{Key: keyPrincipalKind, Values: append(slices.Clone(principalKinds), "anonymous")},
 		},
 		Buckets: BucketsSeconds,
 	}
@@ -97,18 +105,18 @@ var (
 	GatewayCatchupDuration = Spec{
 		Name: "bothy.gateway.catchup.duration", Kind: KindHistogram, Unit: "s",
 		Description: "Time from ready or resumed to catchup.complete or resync_required.",
-		Attrs:       []Attr{{Key: "bothy.outcome", Values: []string{"complete", "resync_required"}}},
+		Attrs:       []Attr{{Key: keyOutcome, Values: []string{"complete", "resync_required"}}},
 		Buckets:     BucketsLong,
 	}
 	// GatewayResync is bothy.gateway.resync (4.1): the reasons of 04 "resync_required".
 	GatewayResync = Spec{
-		Name: "bothy.gateway.resync", Kind: KindCounter, Unit: "{connection}",
+		Name: "bothy.gateway.resync", Kind: KindCounter, Unit: unitConnection,
 		Description: "Connections told to resynchronise instead of catching up.",
-		Attrs:       []Attr{{Key: "bothy.reason", Values: []string{"retention", "too_far_behind", "cursor_ahead", "epoch_changed"}}},
+		Attrs:       []Attr{{Key: keyReason, Values: []string{"retention", "too_far_behind", "cursor_ahead", "epoch_changed"}}},
 	}
 	// GatewayClose is bothy.gateway.close (4.1): every close in both directions.
 	GatewayClose = Spec{
-		Name: "bothy.gateway.close", Kind: KindCounter, Unit: "{connection}",
+		Name: "bothy.gateway.close", Kind: KindCounter, Unit: unitConnection,
 		Description: "Closes of gateway connections by close code, in both directions.",
 		Attrs:       []Attr{{Key: "bothy.close.code", Source: SourceCloseCodes}},
 	}
@@ -116,7 +124,7 @@ var (
 	GatewayOutboundDropped = Spec{
 		Name: "bothy.gateway.outbound.dropped", Kind: KindCounter, Unit: "{frame}",
 		Description: "Outbound frames the gateway discarded.",
-		Attrs:       []Attr{{Key: "bothy.reason", Values: []string{"patch_replaced_by_snapshot", "slow_consumer"}}},
+		Attrs:       []Attr{{Key: keyReason, Values: []string{"patch_replaced_by_snapshot", "slow_consumer"}}},
 	}
 	// MessageCreated is bothy.message.created (4.2), counted after commit.
 	MessageCreated = Spec{
@@ -163,7 +171,7 @@ var (
 		Description: "Time from occurred_at of an event to the write of its frame, live delivery only.",
 		Attrs: []Attr{
 			{Key: "bothy.event.durability", Values: []string{"durable", "ephemeral"}},
-			{Key: "bothy.principal.kind", Values: principalKinds},
+			{Key: keyPrincipalKind, Values: principalKinds},
 		},
 		Buckets: BucketsSeconds,
 	}
@@ -173,7 +181,7 @@ var (
 		Description: "Duration of one job attempt.",
 		Attrs: []Attr{
 			{Key: "bothy.job.kind", Source: SourceJobKinds},
-			{Key: "bothy.outcome", Values: []string{"completed", "failed", "cancelled", "snoozed"}},
+			{Key: keyOutcome, Values: []string{"completed", "failed", "cancelled", "snoozed"}},
 		},
 		Buckets: BucketsLong,
 	}
@@ -188,7 +196,7 @@ var (
 	EgressBlocked = Spec{
 		Name: "bothy.egress.blocked", Kind: KindCounter, Unit: "{request}",
 		Description: "Connections the egress client refused.",
-		Attrs: []Attr{{Key: "bothy.reason", Values: []string{
+		Attrs: []Attr{{Key: keyReason, Values: []string{
 			"url_not_allowed", "scheme_not_allowed", "host_not_allowed", "address_blocked", "redirect_not_allowed"}}},
 	}
 	// DBClientOperationDuration is db.client.operation.duration (4.5), recorded by the query
@@ -205,7 +213,7 @@ var (
 	}
 	// DBPoolConnections is bothy.db.pool.connections (4.5).
 	DBPoolConnections = Spec{
-		Name: "bothy.db.pool.connections", Kind: KindGauge, Unit: "{connection}",
+		Name: "bothy.db.pool.connections", Kind: KindGauge, Unit: unitConnection,
 		Description: "Connections of the database pool by state.",
 		Attrs:       []Attr{{Key: "bothy.pool.state", Values: []string{"idle", "acquired", "max"}}},
 	}
@@ -245,13 +253,4 @@ func All() []Spec {
 		DBClientOperationDuration, DBPoolConnections,
 		AuditVerifyFailures, AuditVerifyLastSuccess, TelemetryDropped, SecretsRefreshFailures,
 	}
-}
-
-// byName returns the spec of name in specs.
-func byName(specs []Spec, name string) (Spec, bool) {
-	i := slices.IndexFunc(specs, func(s Spec) bool { return s.Name == name })
-	if i < 0 {
-		return Spec{}, false
-	}
-	return specs[i], true
 }

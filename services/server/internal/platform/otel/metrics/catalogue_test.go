@@ -70,7 +70,7 @@ func readCatalogue(t *testing.T) docCatalogue {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer f.Close()
+	defer func() { _ = f.Close() }()
 	cat := docCatalogue{rows: map[string]docRow{}, buckets: map[string][]float64{}}
 	section := ""
 	sc := bufio.NewScanner(f)

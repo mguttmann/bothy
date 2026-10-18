@@ -246,10 +246,7 @@ func (h *Handler) read(ctx context.Context, c *app.Connection, conn *wsConn, pok
 	for !c.Closing() {
 		typ, rd, err := conn.ws.Reader(ctx)
 		if err != nil {
-			// A close frame of the client counts in bothy.gateway.close with its code.
-			if code := websocket.CloseStatus(err); code != -1 {
-				c.PeerClosed(int(code))
-			}
+			peerClosed(c, err)
 			return
 		}
 		if typ != websocket.MessageText {
@@ -278,6 +275,14 @@ func (h *Handler) read(ctx context.Context, c *app.Connection, conn *wsConn, pok
 	// After the close the reader stops: the close handshake of coder/websocket reads until the
 	// peer's close frame itself, and a frame left half read (binary or too large) must not be
 	// parsed as the next one.
+}
+
+// peerClosed hands the code of a client's close frame that ended the reader (err) to the
+// connection, for bothy.gateway.close.
+func peerClosed(c *app.Connection, err error) {
+	if code := websocket.CloseStatus(err); code != -1 {
+		c.PeerClosed(int(code))
+	}
 }
 
 // deadlines is the deadline goroutine: it ticks the gateway at the instant the connection asks
