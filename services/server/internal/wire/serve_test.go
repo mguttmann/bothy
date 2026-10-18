@@ -234,11 +234,17 @@ func (p *process) exit(t *testing.T) int {
 	}
 }
 
+// startupWait bounds how long a test waits for a started server to log its listeners, to
+// report its start or to answer /readyz. A server under -race on a loaded host needs well
+// over 30 seconds for the start (migrations, key check, warming the validators); the shared
+// harness waits as long (M1-71/10). A server that never gets ready still fails the test.
+const startupWait = 3 * time.Minute
+
 // waitInternal waits for the line of the internal listener and returns its port.
 func (p *process) waitInternal(t *testing.T) int {
 	t.Helper()
 	const msg = "internal listener started"
-	deadline := time.Now().Add(30 * time.Second)
+	deadline := time.Now().Add(startupWait)
 	for time.Now().Before(deadline) {
 		if port := p.logs.port(msg); port != 0 {
 			return port
@@ -268,7 +274,7 @@ func get(t *testing.T, port int, path string) (int, string) {
 func waitReadyz(t *testing.T, port int, code int) string {
 	t.Helper()
 	const path = "/readyz"
-	deadline := time.Now().Add(30 * time.Second)
+	deadline := time.Now().Add(startupWait)
 	var got int
 	var body string
 	for time.Now().Before(deadline) {
