@@ -1164,20 +1164,26 @@ func (s *server) mountGateway(mux Mux, chain *httpserver.Chain, limiter *ratelim
 		return err
 	}
 	s.mu.Lock()
-	id, az, reads, pool, a, ch := s.identity, s.authorizer, s.syncReads, s.pool, s.audit, s.chat
+	id, az, reads, pool, a, ch, ag := s.identity, s.authorizer, s.syncReads, s.pool, s.audit, s.chat, s.agents
 	s.mu.Unlock()
-	if id == nil || id.Authenticator == nil || az == nil || reads == nil || a == nil || ch == nil {
-		return errors.New("wire: the gateway needs identity, the Authorizer, catch-up and snapshot, the unit of work and chat")
+	if id == nil || id.Authenticator == nil || az == nil || reads == nil || a == nil || ch == nil || ag == nil {
+		return errors.New("wire: the gateway needs identity, the Authorizer, catch-up and snapshot, the unit of work, chat and agents")
 	}
 	gw, err := NewGateway(cfg, GatewayDeps{
 		Authenticator: id.Authenticator, Authorizer: az, Nonces: id.DPoP, Limiter: limiter, Reads: reads,
-		Instance: instanceapp.NewState(instancepg.NewRepository(pool), a.UoW()), Threads: ch.Service, Clock: s.deps.Clock, Log: log,
+		Instance: instanceapp.NewState(instancepg.NewRepository(pool), a.UoW()), Threads: ch.Service, Consumers: ag.Consumers,
+		Clock: s.deps.Clock, Log: log,
 	})
 	if err != nil {
 		return err
 	}
+	if gw.Engine != nil {
+		// The REST consumer operations read through the engine (agents.ConsumerFeed, M2-07).
+		ag.Consumers.SetFeed(gw.Engine)
+	}
 	gw.Mount(mux, chain)
 	s.runner.OnStop(gw.StartSweeper())
+	s.runner.OnStop(gw.StartConsumerSaver())
 	s.runner.OnStop(gw.StopConnections())
 	s.mu.Lock()
 	s.gateway = gw
@@ -1300,7 +1306,15 @@ func (s *server) startLogTail(ctx context.Context) error {
 		hub = gw.Hub
 	}
 	versions := instanceapp.NewVersions(instancepg.NewRepository(pool))
-	return startTail(ctx, s.runner, s.reg, sy.NewTail(DeliverySink(az, hub, versions)))
+	tail := sy.NewTail(DeliverySink(az, hub, versions))
+	if err := startTail(ctx, s.runner, s.reg, tail); err != nil {
+		return err
+	}
+	if hub != nil {
+		// The hub position starts at the head the tail started at (agent consumers, M2-07).
+		hub.Seed(tail.Head())
+	}
+	return nil
 }
 
 // startJobs checks River's migrations, builds the job registry with the jobs of the modules and

@@ -220,11 +220,13 @@ func (w *gwWorld) apiToken(kind apitoken.Kind, principal ids.ID, key *identityte
 	return tok
 }
 
-// newAgent creates an agent principal.
+// newAgent creates an agent principal with its agents record.
 func (w *gwWorld) newAgent() ids.ID {
 	w.t.Helper()
 	id := ids.New()
 	w.sql(`INSERT INTO principals (id, kind, status, handle, display_name) VALUES ($1, 'agent', 'active', $2, $2)`, id.String(), "agent"+strings.ReplaceAll(id.String()[24:], "-", ""))
+	// Every agent principal has its record (M1-51); the consumer cursor of M2-07 refers to it.
+	w.sql(`INSERT INTO agents (principal_id, adapter_kind) VALUES ($1, 'custom')`, id.String())
 	return id
 }
 

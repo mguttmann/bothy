@@ -7,7 +7,7 @@
 //
 // Example:
 //
-//	h := httpapi.New(svc)
+//	h := httpapi.New(svc, consumers)
 //	built, err := routes.Build(wire.Handlers{Agents: h}, wire.RouteOptions(), cat)
 package httpapi
 
@@ -25,13 +25,15 @@ import (
 )
 
 // Agents implements listAgents, createAgent, getAgent, updateAgent, disableAgent, enableAgent,
-// setAgentBillingMode, setAllAgentsBillingMode, setCredentialHolder and setAgentToolClass.
+// setAgentBillingMode, setAllAgentsBillingMode, setCredentialHolder and setAgentToolClass, and the
+// consumer operations getConsumerState, pollAgentEvents and ackAgentEvents (M2-07).
 type Agents struct {
-	agents agents.Agents
+	agents    agents.Agents
+	consumers agents.ConsumerAPI
 }
 
-// New returns the handlers over the use cases.
-func New(a agents.Agents) *Agents { return &Agents{agents: a} }
+// New returns the handlers over the use cases of the records a and of the consumers c.
+func New(a agents.Agents, c agents.ConsumerAPI) *Agents { return &Agents{agents: a, consumers: c} }
 
 // Cursors is the codec of the list cursors (platform/httpserver), the outgoing port app.Cursors.
 type Cursors struct{}

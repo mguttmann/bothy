@@ -108,6 +108,11 @@ type Deps struct {
 	OpLimiter OpLimiter
 	// Publisher relays typing.started (the hub of this process, M1-66).
 	Publisher eventlog.EphemeralPublisher
+	// Consumers is the delivery engine of agent consumers (M2-07); nil leaves agent sessions on
+	// the delivery of people (tests of the connection) and registers no handler of ack.
+	Consumers *ConsumerEngine
+	// AgentLimiter is rl.agent_runtime of the ack op; nil applies no limit (tests).
+	AgentLimiter AgentLimiter
 	// Clock is the time of deadlines and frames; nil means clock.System().
 	Clock clock.Clock
 	// Log receives the errors of ops; nil means slog.Default(). It never receives tokens,
@@ -153,6 +158,9 @@ func New(cfg Config, d Deps) (*Gateway, error) {
 		open: map[*Connection]struct{}{}, gone: make(chan struct{})}
 	g.handlers = map[string]OpHandler{opIdentify: g.identify, opResume: g.resume, "heartbeat": g.heartbeat, "reauth": g.reauth,
 		opFocus: g.focus, opTypingStart: g.typingStart, opTypingStop: g.typingStop}
+	if d.Consumers != nil {
+		g.handlers["ack"] = g.ack
+	}
 	return g, nil
 }
 
@@ -306,11 +314,23 @@ func (g *Gateway) Closed(c *Connection) {
 	g.sessions.release(s, c, resumableEnds[code])
 }
 
-// replace closes every connection of old with 4017 (one connection per device, 04 section 6.1).
-func replace(old []*Connection) {
-	for _, o := range old {
-		o.Close(domain.CloseDeviceReplaced, "")
+// replace closes every connection of old: with 4015 for the session of an agent consumer (another
+// connection took the consumer over; agent connections have no device, brief M2-07 note 4), else
+// with 4017 (one connection per device, 04 section 6.1).
+func (g *Gateway) replace(s *Session, old []*Connection) {
+	code := domain.CloseDeviceReplaced
+	if g.consumerSession(s.PrincipalKind) {
+		code = domain.CloseConsumerReplaced
 	}
+	for _, o := range old {
+		o.Close(code, "")
+	}
+}
+
+// consumerSession reports whether a session of kind is an agent consumer: its durable cursor
+// decides where delivery starts, so the client cursor and epoch are ignored (brief M2-07 note 4).
+func (g *Gateway) consumerSession(kind actor.Kind) bool {
+	return kind == actor.KindAgent && g.d.Consumers != nil
 }
 
 // attach is note 12 of the brief: with a cursor, catch-up decides; a reason sends
@@ -318,6 +338,9 @@ func replace(old []*Connection) {
 // 7.3); otherwise delivery starts at the cursor; without a cursor at head.
 func (g *Gateway) attach(ctx context.Context, c *Connection, cursor *int64, epoch *ids.ID, head int64) error {
 	from := head
+	if _, a := c.current(); g.consumerSession(a.Kind) {
+		cursor = nil
+	}
 	if cursor != nil {
 		res, err := g.d.CatchUp.Check(ctx, sync.CheckInput{After: *cursor, Epoch: epoch})
 		if err != nil {

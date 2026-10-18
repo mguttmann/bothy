@@ -45,6 +45,17 @@ documented in this file. The format is based on
   counters, the snapshot (REST and gateway `ready`), the personal lists and catch-up on random
   worlds (seed printed, replay with `LEAK_SEED`), with noise in unreadable channels changing
   nothing; AZ-M52. The shared harness gains `Client.Gateway` and `World.Owner`.
+- Agent consumers (M2-07, 04 section 15): table `agent_consumer_cursors` (migration `00046`) with
+  one durable cursor per agent and consumer name; the first connection starts at `head_seq`,
+  later ones at `acked_seq + 1`. The gateway serves agent connections through a consumer engine:
+  at most `agent.max_inflight_events` unacknowledged events, redelivery from `acked_seq + 1` with
+  `redelivered: true` after `agent.ack_timeout`, the op `ack` (`agent.events.consume`,
+  `rl.agent_runtime`), saves of `acked_seq` every `agent.ack_persist_interval`, on close and at
+  shutdown before `4013`, and the newest connection wins with `4015 consumer_replaced`, fenced by
+  `holder_session_id` across server instances. The REST operations `getConsumerState`,
+  `pollAgentEvents` (`410 resync_required` for `retention` and `cursor_ahead`) and
+  `ackAgentEvents` give adapters without a WebSocket the same stream. New configuration keys
+  `agent.ack_timeout`, `agent.ack_persist_interval`, `agent.max_inflight_events`.
 - Web console serving (M6-02): `console.assets_dir` names the built console, which the api
   process serves under `/console/` (exact files with their type, `index.html` for every other
   path below `/console/`, traversal refused, `index.html` never stored, hashed assets immutable,

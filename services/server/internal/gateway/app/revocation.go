@@ -127,6 +127,9 @@ func (h *Hub) purge(m *member, removed domain.Targets) {
 	}
 	m.mu.Unlock()
 	m.c.conn.Purge(removed)
+	if m.consumer {
+		h.consumers.Purge(m.c, removed)
+	}
 }
 
 // sessionRevokedPayload is the part of the payload of session.revoked the hub reads.

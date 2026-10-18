@@ -15659,6 +15659,12 @@ type CreateAgentParams struct {
 	IdempotencyKey *IdempotencyKey `json:"Idempotency-Key,omitempty"`
 }
 
+// PollAgentEventsParams defines parameters for PollAgentEvents.
+type PollAgentEventsParams struct {
+	// Limit At most `agent.max_inflight_events`.
+	Limit *int `form:"limit,omitempty" json:"limit,omitempty"`
+}
+
 // UpdateAgentParams defines parameters for UpdateAgent.
 type UpdateAgentParams struct {
 	// IdempotencyKey UUIDv7 chosen by the client per logical operation. A repeat with the same request returns the stored response; a different request gives 422 `idempotency_key_reuse`; a repeat while the first is running gives 409 `request_in_progress`. Kept for `sync.idempotency_key_ttl`.
@@ -16448,6 +16454,9 @@ type ListWebhookDeliveriesParams struct {
 
 // CreateAgentJSONRequestBody defines body for CreateAgent for application/json ContentType.
 type CreateAgentJSONRequestBody = AgentCreate
+
+// AckAgentEventsJSONRequestBody defines body for AckAgentEvents for application/json ContentType.
+type AckAgentEventsJSONRequestBody = ConsumerAck
 
 // UpdateAgentJSONRequestBody defines body for UpdateAgent for application/json ContentType.
 type UpdateAgentJSONRequestBody = AgentUpdate

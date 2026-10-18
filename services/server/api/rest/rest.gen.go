@@ -23,6 +23,15 @@ type ServerInterface interface {
 	// CreateAgent Create an agent
 	// (POST /agents)
 	CreateAgent(w http.ResponseWriter, r *http.Request, params CreateAgentParams)
+	// GetConsumerState Read the cursor of a consumer
+	// (GET /agents/me/consumers/{consumer})
+	GetConsumerState(w http.ResponseWriter, r *http.Request, consumer ConsumerPath)
+	// AckAgentEvents Acknowledge events up to a sequence
+	// (POST /agents/me/consumers/{consumer}/ack)
+	AckAgentEvents(w http.ResponseWriter, r *http.Request, consumer ConsumerPath)
+	// PollAgentEvents Fetch events for a consumer without WebSocket
+	// (GET /agents/me/consumers/{consumer}/events)
+	PollAgentEvents(w http.ResponseWriter, r *http.Request, consumer ConsumerPath, params PollAgentEventsParams)
 	// GetAgent Read an agent with reported state
 	// (GET /agents/{agent_id})
 	GetAgent(w http.ResponseWriter, r *http.Request, agentId AgentIdPath)
@@ -685,6 +694,100 @@ func (siw *ServerInterfaceWrapper) CreateAgent(w http.ResponseWriter, r *http.Re
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		siw.Handler.CreateAgent(w, r, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// GetConsumerState operation middleware
+func (siw *ServerInterfaceWrapper) GetConsumerState(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "consumer" -------------
+	var consumer ConsumerPath
+
+	err = runtime.BindStyledParameterWithOptions("simple", "consumer", r.PathValue("consumer"), &consumer, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "consumer", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.GetConsumerState(w, r, consumer)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// AckAgentEvents operation middleware
+func (siw *ServerInterfaceWrapper) AckAgentEvents(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "consumer" -------------
+	var consumer ConsumerPath
+
+	err = runtime.BindStyledParameterWithOptions("simple", "consumer", r.PathValue("consumer"), &consumer, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "consumer", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.AckAgentEvents(w, r, consumer)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// PollAgentEvents operation middleware
+func (siw *ServerInterfaceWrapper) PollAgentEvents(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "consumer" -------------
+	var consumer ConsumerPath
+
+	err = runtime.BindStyledParameterWithOptions("simple", "consumer", r.PathValue("consumer"), &consumer, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "consumer", Err: err})
+		return
+	}
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params PollAgentEventsParams
+
+	// ------------- Optional query parameter "limit" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "limit", r.URL.Query(), &params.Limit, runtime.BindQueryParameterOptions{Type: "integer", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "limit"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "limit", Err: err})
+		}
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.PollAgentEvents(w, r, consumer, params)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -8437,6 +8540,9 @@ func HandlerWithOptions(si ServerInterface, options StdHTTPServerOptions) http.H
 	m.HandleFunc(http.MethodPut+" "+options.BaseURL+"/agents/{agent_id}/billing-mode", wrapper.SetAgentBillingMode)
 	m.HandleFunc(http.MethodPut+" "+options.BaseURL+"/agents/{agent_id}/credential-holder", wrapper.SetCredentialHolder)
 	m.HandleFunc(http.MethodPut+" "+options.BaseURL+"/agents/{agent_id}/tool-class", wrapper.SetAgentToolClass)
+	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/agents/me/consumers/{consumer}", wrapper.GetConsumerState)
+	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/agents/me/consumers/{consumer}/events", wrapper.PollAgentEvents)
+	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/agents/me/consumers/{consumer}/ack", wrapper.AckAgentEvents)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/apps", wrapper.ListApps)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/apps", wrapper.InstallApp)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/app-manifests/validate", wrapper.ValidateManifest)
@@ -8638,6 +8744,15 @@ type StrictServerInterface interface {
 	// CreateAgent Create an agent
 	// (POST /agents)
 	CreateAgent(ctx context.Context, request CreateAgentRequestObject) (CreateAgentResponseObject, error)
+	// GetConsumerState Read the cursor of a consumer
+	// (GET /agents/me/consumers/{consumer})
+	GetConsumerState(ctx context.Context, request GetConsumerStateRequestObject) (GetConsumerStateResponseObject, error)
+	// AckAgentEvents Acknowledge events up to a sequence
+	// (POST /agents/me/consumers/{consumer}/ack)
+	AckAgentEvents(ctx context.Context, request AckAgentEventsRequestObject) (AckAgentEventsResponseObject, error)
+	// PollAgentEvents Fetch events for a consumer without WebSocket
+	// (GET /agents/me/consumers/{consumer}/events)
+	PollAgentEvents(ctx context.Context, request PollAgentEventsRequestObject) (PollAgentEventsResponseObject, error)
 	// GetAgent Read an agent with reported state
 	// (GET /agents/{agent_id})
 	GetAgent(ctx context.Context, request GetAgentRequestObject) (GetAgentResponseObject, error)
@@ -9304,6 +9419,92 @@ func (sh *strictHandler) CreateAgent(w http.ResponseWriter, r *http.Request, par
 		sh.options.ResponseErrorHandlerFunc(w, r, err)
 	} else if validResponse, ok := response.(CreateAgentResponseObject); ok {
 		if err := validResponse.VisitCreateAgentResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// GetConsumerState operation middleware
+func (sh *strictHandler) GetConsumerState(w http.ResponseWriter, r *http.Request, consumer ConsumerPath) {
+	var request GetConsumerStateRequestObject
+
+	request.Consumer = consumer
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.GetConsumerState(ctx, request.(GetConsumerStateRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "GetConsumerState")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(GetConsumerStateResponseObject); ok {
+		if err := validResponse.VisitGetConsumerStateResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// AckAgentEvents operation middleware
+func (sh *strictHandler) AckAgentEvents(w http.ResponseWriter, r *http.Request, consumer ConsumerPath) {
+	var request AckAgentEventsRequestObject
+
+	request.Consumer = consumer
+
+	var body AckAgentEventsJSONRequestBody
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
+		return
+	}
+	request.Body = &body
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.AckAgentEvents(ctx, request.(AckAgentEventsRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "AckAgentEvents")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(AckAgentEventsResponseObject); ok {
+		if err := validResponse.VisitAckAgentEventsResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// PollAgentEvents operation middleware
+func (sh *strictHandler) PollAgentEvents(w http.ResponseWriter, r *http.Request, consumer ConsumerPath, params PollAgentEventsParams) {
+	var request PollAgentEventsRequestObject
+
+	request.Consumer = consumer
+	request.Params = params
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.PollAgentEvents(ctx, request.(PollAgentEventsRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "PollAgentEvents")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(PollAgentEventsResponseObject); ok {
+		if err := validResponse.VisitPollAgentEventsResponse(w); err != nil {
 			sh.options.ResponseErrorHandlerFunc(w, r, err)
 		}
 	} else if response != nil {

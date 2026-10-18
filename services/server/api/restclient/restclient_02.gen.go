@@ -25338,6 +25338,11 @@ type PollAgentEventsResponse404Headers struct {
 	CorrelationId *CorrelationId
 }
 
+// PollAgentEventsResponse410Headers the declared response headers of an HTTP 410 response for PollAgentEvents
+type PollAgentEventsResponse410Headers struct {
+	CorrelationId *CorrelationId
+}
+
 // PollAgentEventsResponse429Headers the declared response headers of an HTTP 429 response for PollAgentEvents
 type PollAgentEventsResponse429Headers struct {
 	CorrelationId   *CorrelationId
@@ -25364,6 +25369,8 @@ type PollAgentEventsResponse struct {
 	ApplicationproblemJSON403 *Forbidden
 	// ApplicationproblemJSON404 the response for an HTTP 404 `application/problem+json` response
 	ApplicationproblemJSON404 *NotFound
+	// ApplicationproblemJSON410 the response for an HTTP 410 `application/problem+json` response
+	ApplicationproblemJSON410 *Gone
 	// ApplicationproblemJSON429 the response for an HTTP 429 `application/problem+json` response
 	ApplicationproblemJSON429 *TooManyRequests
 	// ApplicationproblemJSONDefault the response for an HTTP default `application/problem+json` response
@@ -25378,6 +25385,8 @@ type PollAgentEventsResponse struct {
 	Headers403 *PollAgentEventsResponse403Headers
 	// Headers404 the parsed response headers for an HTTP 404 response
 	Headers404 *PollAgentEventsResponse404Headers
+	// Headers410 the parsed response headers for an HTTP 410 response
+	Headers410 *PollAgentEventsResponse410Headers
 	// Headers429 the parsed response headers for an HTTP 429 response
 	Headers429 *PollAgentEventsResponse429Headers
 	// HeadersDefault the parsed response headers for an HTTP default response
@@ -25407,6 +25416,11 @@ func (r PollAgentEventsResponse) GetApplicationproblemJSON403() *Forbidden {
 // GetApplicationproblemJSON404 returns the response for an HTTP 404 `application/problem+json` response
 func (r PollAgentEventsResponse) GetApplicationproblemJSON404() *NotFound {
 	return r.ApplicationproblemJSON404
+}
+
+// GetApplicationproblemJSON410 returns the response for an HTTP 410 `application/problem+json` response
+func (r PollAgentEventsResponse) GetApplicationproblemJSON410() *Gone {
+	return r.ApplicationproblemJSON410
 }
 
 // GetApplicationproblemJSON429 returns the response for an HTTP 429 `application/problem+json` response
@@ -27506,19 +27520,4 @@ func (r InstallAppResponse) GetJSON201() *App {
 // GetApplicationproblemJSON400 returns the response for an HTTP 400 `application/problem+json` response
 func (r InstallAppResponse) GetApplicationproblemJSON400() *BadRequest {
 	return r.ApplicationproblemJSON400
-}
-
-// GetApplicationproblemJSON401 returns the response for an HTTP 401 `application/problem+json` response
-func (r InstallAppResponse) GetApplicationproblemJSON401() *Unauthorized {
-	return r.ApplicationproblemJSON401
-}
-
-// GetApplicationproblemJSON403 returns the response for an HTTP 403 `application/problem+json` response
-func (r InstallAppResponse) GetApplicationproblemJSON403() *Forbidden {
-	return r.ApplicationproblemJSON403
-}
-
-// GetApplicationproblemJSON409 returns the response for an HTTP 409 `application/problem+json` response
-func (r InstallAppResponse) GetApplicationproblemJSON409() *Conflict {
-	return r.ApplicationproblemJSON409
 }

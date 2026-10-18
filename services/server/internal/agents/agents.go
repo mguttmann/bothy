@@ -11,10 +11,12 @@ import (
 	"github.com/OWNER/bothy/services/server/internal/kernel/ids"
 )
 
-// Register declares what the agents module emits (M1-25, docs/spec/05-aktionen.md section 6): the
-// durable event agent.updated (M1-51). internal/wire lists it in moduleRegistrations.
+// Register declares what the agents module emits and accepts (M1-25, docs/spec/05-aktionen.md
+// sections 6 and 7): the durable event agent.updated (M1-51) and the client op ack of agent
+// consumers (M2-07). internal/wire lists it in moduleRegistrations.
 func Register(r *authorize.Registry) {
 	r.Event("agents", authorize.EventAgentUpdated)
+	r.Op("agents", authorize.OpAck)
 }
 
 // AgentDisabled is the in-transaction event of agent.disable (02 section 4.3): it is published

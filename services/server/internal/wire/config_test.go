@@ -269,6 +269,10 @@ func TestConfigSchemaBuilds(t *testing.T) {
 			Chapter: "11-erweiterungen.md"},
 		// M3-18
 		"notify.user_default_level": {Kind: config.KindEnum, Default: "mentions", Enum: []string{"all", "mentions", "mute"}, Chapter: "13-push-benachrichtigungen.md"},
+		// The agent consumers (M2-07, 04 "Konfigurationswerte dieses Kapitels").
+		"agent.ack_timeout":          {Kind: config.KindDuration, Default: "30s", Min: "1ms", Chapter: "04-sync-protokoll.md"},
+		"agent.ack_persist_interval": {Kind: config.KindDuration, Default: "1s", Min: "1ms", Chapter: "04-sync-protokoll.md"},
+		"agent.max_inflight_events":  {Kind: config.KindInt, Default: "100", Min: "1", Max: "2147483647", Chapter: "04-sync-protokoll.md"},
 		// M1-64
 		"sync.ws_max_frame_bytes":   {Kind: config.KindInt, Default: "1048576", Min: "1024", Max: "16777216", Chapter: "04-sync-protokoll.md"},
 		"sync.identify_timeout":     {Kind: config.KindDuration, Default: "10s", Min: "1ms", Chapter: "04-sync-protokoll.md"},

@@ -191,13 +191,13 @@ tieferer Module, die das Modul implementiert.
 | `billing` | `Costs` (Buchen, Korrektur, Summen), `Prices` | | | |
 | `identity` | `Auth` (Anmeldung, Refresh, Logout, Kind-Sitzungen, Step-up), `Directory`, `Devices`, `Tokens`, `Owners`, `PrincipalWrites` (Prinzipale von Agenten und Apps); deklariert `AvatarFiles`, `AppInstallations` (aktive Installation einer App) | `DeviceRevoked`, `SessionEnded` | | kernel `actor.Authenticator`, `authz.PrincipalSource`, `authz.CredentialSource` (Sitzung, Gerät, Token für die Prüfung `check_active`, 07 Abschnitt 4.2), `instance.LoginOptionsSource`, `instance.FlagUserSource`, kernel `personaldata.Participant` |
 | `chat` | `Structure` (Bereiche, Kanäle, Schreibschutz), `Threads` (Anlegen für `messaging`, `AppendToThread`, Nachrichtenzahl bei Löschung, Schließen, Öffnen, Verschieben, Info), `AgentConfig` | `ThreadMoved`, `ChannelArchived`, `ChannelReadOnlySet`, `SpaceArchived` | | `authz.StructureSource`, kernel `personaldata.Participant` |
-| `agents` | `Agents` (Verwaltung, Richtlinie, Werkzeugklasse), `Presence`, `Consumers` (Cursor, Bestätigung, Übernahme mit Fencing), `Commands` (Register), `Sessions`, `DevEnvironments` (Etappe) | `AgentDisabled` | | `authz.AgentPolicySource` (Richtlinie, Werkzeugklasse, Bereitschaft der Dev-Umgebung), kernel `personaldata.Participant` |
+| `agents` | `Agents` (Verwaltung, Richtlinie, Werkzeugklasse), `Presence`, `Consumers` (Cursor, Bestätigung, Übernahme mit Fencing), `Commands` (Register), `Sessions`, `DevEnvironments` (Etappe); declares `ConsumerFeed` (the stream of the REST consumer operations, M2-07) | `AgentDisabled` | | `authz.AgentPolicySource` (Richtlinie, Werkzeugklasse, Bereitschaft der Dev-Umgebung), kernel `personaldata.Participant` |
 | `files` | `Uploads` (Sitzungen, Teile), `Files` (Lesen, Öffnen, Vorschau, Abruf-Tickets, Löschen), `Attachments`, `Transcripts`, `TextExtracts`; deklariert `AttachmentLocator` | `FileFinalized` (Scan und gegebenenfalls Transkript endgültig) | | `identity.AvatarFiles`, kernel `personaldata.Participant` |
 | `messaging` | `Messages` (Anlegen, Thread mit erster Nachricht anlegen, Bearbeiten, Löschen, Verlauf, `SetTriggerState`, Anker), `Reactions`, `Pins`, `Templates`, `Mentions` (Liste, ungelesene je Thread), `Export`; deklariert `ComponentReader` | `MessagePosted`, `MessageDeleted` | `chat.ThreadMoved` | `files.AttachmentLocator`, kernel `personaldata.Participant` |
 | `runs` | `Runs` (Lesen, Kontext, Start, Wiederaufnahme, Patch, Ende, Abbruch, Übersicht), `Delivery` (Zustellvorbereitung mit I2, Schutzregeln und Marke), `Interactions`, `CommandExec` (inklusive Autovervollständigung) | | `messaging.MessagePosted`, `messaging.MessageDeleted`, `files.FileFinalized` (zurückgehaltenen Aufruf schreiben), `agents.AgentDisabled`, `chat.ChannelReadOnlySet`, kernel `authorize.AccessChanged` | `messaging.ComponentReader`, kernel `personaldata.Participant` |
 | `sync` | `Tail`, `CatchUp`, `Snapshot`, `Consumers` (Worker-Cursor, with `ConsumerLossHandler` for a retention loss), `LogReader` (one event by `seq` and the smallest retained `seq` for delivery jobs), `ReadStates`, `Drafts`, `Settings` | | `messaging.MessagePosted` (Entwurf leeren), `chat.ThreadMoved` (Kopien von `channel_id`) | kernel `eventlog.Appender`, kernel `eventlog.Redactor`, kernel `idempotency.Store`, kernel `personaldata.Participant` |
 | `notify` | `Preferences`, `QuietHours`, `PushRegistrations` | | `identity.DeviceRevoked`, `identity.SessionEnded` (Registrierungen der Sitzung deaktivieren), `chat.ChannelArchived`, `chat.SpaceArchived` | kernel `personaldata.Participant` |
-| `gateway` | keiner für andere Module | | | kernel `eventlog.EphemeralPublisher` |
+| `gateway` | keiner für andere Module | | | kernel `eventlog.EphemeralPublisher`; Implements sources: `agents.ConsumerFeed` (M2-07) |
 | `search` | `Search` | | | |
 | `stats` | `Stats` (Abfragen, Timeline, Ampel, Backend-Ansicht), `Live` (Basis-Rahmen je Intervall, Filter je Empfänger) | | | kernel `measure.Recorder` |
 | `apps` | `Apps`, `Webhooks` (`apps.Webhooks`: subscriptions, deliveries, redelivery, `ResumeInstallation`), `IncomingWebhooks` | | `chat.ChannelArchived` | `identity.AppInstallations` |
@@ -850,6 +850,9 @@ Agenten-Verbindungen sind Verbraucher mit dauerhaftem Cursor (`agent_consumer_cu
 `command.invoked`) gibt das Gateway vor dem Senden an `runs.Delivery`. Dort laufen `agent.invoke`
 mit aktuellen Rechten, I2 und das Signieren der Aufruf-Marke (04, 15.3). Scheitert die Prüfung,
 setzt `runs` den Lauf in einer eigenen Transaktion auf `failed` und das Gateway sendet nichts.
+An agent consumer connection reads the log through its own runner, up to the hub position (the
+highest `seq` the log tail of the process has passed), and is woken by the hub after each event
+(M2-07).
 
 ## 11. Ereignis-Pfad
 
@@ -891,6 +894,8 @@ neuer Kanäle nicht fehlen (04, Abschnitt 7.2).
   die Warteschlange der Verbindung. Der Hub blockiert nie auf einer Verbindung.
 - Verbindungen im Nachholen puffern Live-Ereignisse und senden sie nach `catchup.complete` (04,
   7.2).
+- Agent consumer connections take no durable dispatch from the hub: each reads the log through its
+  own runner up to the hub position and is woken by the hub after each event (M2-07).
 
 ### 11.5 Worker-Verbraucher (Push, Webhooks)
 

@@ -200,6 +200,7 @@ E = Elevation of Privilege. "Register" verweist auf Abschnitt 6.
 | I | Agent liest für Auslöser fremde Kanäle | Auftragsbindung SR9, Lesehorizont-Hinweis | T-AI-02 |
 | D | Schleifen, Kostenexplosion | Agenten lösen nie aus, Rate-Limits, Kostengrenzen | T-AI-07 |
 | E | Person mit wenig Rechten nutzt Agenten mit Shell | SR2 Werkzeugklasse, SR3 Dev-Abschottung | T-AI-02, T-DEV-01 |
+| S | Takeover of a consumer with a stolen agent token: an attacker identifies with the same consumer, takes the stream over, and the real adapter is closed with `4015` | DPoP binding of agent tokens (the token alone does not connect), revocation of the token and `agent.disable` close with `4012`, the takeover is logged with both gateway session ids, and `4015` tells the adapter not to reconnect, so the loss is visible (M2-07) | T-TK-02 |
 
 ### 5.11 Apps und Webhooks
 

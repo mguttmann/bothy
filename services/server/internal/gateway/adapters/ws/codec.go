@@ -122,6 +122,12 @@ func (d *Decoder) Decode(op string, raw json.RawMessage) (any, error) {
 			return nil, err
 		}
 		return app.Heartbeat{LastSeq: f.LastSeq, Agent: f.Agent != nil}, nil
+	case "ack":
+		var f rest.GatewayAck
+		if err := strictUnmarshal(raw, &f); err != nil {
+			return nil, err
+		}
+		return app.Ack{Seq: f.Seq}, nil
 	case "reauth":
 		var f rest.GatewayReauth
 		if err := strictUnmarshal(raw, &f); err != nil {

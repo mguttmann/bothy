@@ -99,6 +99,8 @@ var appPrivileges = map[string][]string{
 	"auth_login_flows": {"SELECT", "INSERT", "UPDATE", "DELETE"},
 	// 03 agents (M1-51): an agent principal is never hard deleted, its record lives with it.
 	"agents": {"SELECT", "INSERT", "UPDATE"},
+	// 03 agent_consumer_cursors (M2-07): the rows end with their agent through ON DELETE CASCADE.
+	"agent_consumer_cursors": {"SELECT", "INSERT", "UPDATE"},
 	// 03 spaces (M1-52): archiving is final and the data stays for retention and export, so a
 	// space is never deleted; a sidebar row is personal data that erasure deletes (M7-06).
 	"spaces":            {"SELECT", "INSERT", "UPDATE"},

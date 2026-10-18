@@ -296,6 +296,12 @@ func (jsonDecoder) Decode(op string, d json.RawMessage) (any, error) {
 			return nil, err
 		}
 		v = f
+	case "ack":
+		var f app.Ack
+		if err := json.Unmarshal(d, &f); err != nil {
+			return nil, err
+		}
+		v = f
 	case "focus":
 		var f app.Focus
 		if err := json.Unmarshal(d, &f); err != nil {

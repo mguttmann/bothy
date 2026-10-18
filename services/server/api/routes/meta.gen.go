@@ -19,6 +19,7 @@ func GatewayProtocolVersions() []int {
 // read no AsyncAPI document. The gateway dispatcher registers exactly these ops (M1-64).
 func GatewayOps() []GatewayOp {
 	return []GatewayOp{
+		{Op: "ack", Action: "agent.events.consume", Schema: "GatewayAck"},
 		{Op: "focus", Action: "gateway.focus", Schema: "GatewayFocus"},
 		{Op: "heartbeat", Action: "gateway.connect", Schema: "GatewayHeartbeat"},
 		{Op: "identify", Action: "gateway.connect", Schema: "GatewayIdentify"},

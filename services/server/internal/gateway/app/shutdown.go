@@ -61,6 +61,11 @@ func (g *Gateway) Shutdown(ctx context.Context) error {
 		all = append(all, c)
 	}
 	g.mu.Unlock()
+	if g.d.Consumers != nil {
+		// The acknowledgements of agent consumers are saved before the connections close (02
+		// section 15.3 step 3, brief M2-07 note 9).
+		g.d.Consumers.FlushAll(ctx)
+	}
 	for _, c := range all {
 		c.Close(domain.CloseServerRestart, "")
 	}

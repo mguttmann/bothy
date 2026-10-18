@@ -279,9 +279,9 @@ Quelle: [04-sync-protokoll.md](../spec/04-sync-protokoll.md), Abschnitt 18.
 | `client.outbox_retry_base` | `BOTHY_CLIENT__OUTBOX_RETRY_BASE` | Server |  | `2s` | Basis des Backoffs im Ausgangsfach | geplant (M4) |
 | `client.outbox_retry_cap` | `BOTHY_CLIENT__OUTBOX_RETRY_CAP` | Server |  | `5m` | größter Abstand im Ausgangsfach | geplant (M4) |
 | `agent.invocation_token_ttl` | `BOTHY_AGENT__INVOCATION_TOKEN_TTL` | Server | duration | `60s` | Gültigkeit einer Aufruf-Marke | aktiv |
-| `agent.ack_timeout` | `BOTHY_AGENT__ACK_TIMEOUT` | Server |  | `30s` | ohne `ack`: erneute Zustellung | geplant (M2) |
-| `agent.ack_persist_interval` | `BOTHY_AGENT__ACK_PERSIST_INTERVAL` | Server |  | `1s` | spätestens so oft wird `acked_seq` gespeichert | geplant (M2) |
-| `agent.max_inflight_events` | `BOTHY_AGENT__MAX_INFLIGHT_EVENTS` | Server |  | `100` | unbestätigte Ereignisse je Verbraucher | geplant (M2) |
+| `agent.ack_timeout` | `BOTHY_AGENT__ACK_TIMEOUT` | Server | duration | `30s` | ohne `ack`: erneute Zustellung | aktiv |
+| `agent.ack_persist_interval` | `BOTHY_AGENT__ACK_PERSIST_INTERVAL` | Server | duration | `1s` | spätestens so oft wird `acked_seq` gespeichert | aktiv |
+| `agent.max_inflight_events` | `BOTHY_AGENT__MAX_INFLIGHT_EVENTS` | Server | int | `100` | unbestätigte Ereignisse je Verbraucher | aktiv |
 | `agent.run_update_min_interval` | `BOTHY_AGENT__RUN_UPDATE_MIN_INTERVAL` | Server |  | `500ms` | Adapter-Drossel für `run.update` | geplant (M2) |
 | `agent.presence_timeout` | `BOTHY_AGENT__PRESENCE_TIMEOUT` | Server |  | `90s` | ohne Heartbeat gilt der Agent als `offline` | geplant (M2) |
 | `agent.cancel_grace` | `BOTHY_AGENT__CANCEL_GRACE` | Server |  | `30s` | Zeit für den Adapter, einen Abbruch zu melden | geplant (M2) |

@@ -35,6 +35,12 @@ type Session struct {
 	// Client is the client platform and version of identify, when sent.
 	Client ClientInfo
 
+	// consumerTaken and consumerAcked belong to the ConsumerEngine and are guarded by its mutex:
+	// whether this session took its consumer over (a resume keeps the holder and skips Take) and
+	// the acknowledgement it held when its last connection ended.
+	consumerTaken bool
+	consumerAcked int64
+
 	// state, detachedAt and conn belong to Sessions and are guarded by its mutex.
 	state      domain.State
 	detachedAt time.Time

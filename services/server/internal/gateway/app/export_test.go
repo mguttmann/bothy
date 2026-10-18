@@ -3,6 +3,8 @@
 package app
 
 import (
+	"time"
+
 	"github.com/OWNER/bothy/services/server/internal/gateway/domain"
 	"github.com/OWNER/bothy/services/server/internal/kernel/actor"
 	"github.com/OWNER/bothy/services/server/internal/kernel/ids"
@@ -54,3 +56,6 @@ func (h *Hub) ForceFocus(c *Connection, thread ids.ID) {
 
 // FocusState returns the stored focus of the session.
 func (s *Session) FocusState() domain.Focus { return s.focusState() }
+
+// Sweep runs the REST window sweeper of e at now, for the tests of the engine.
+func (e *ConsumerEngine) Sweep(now time.Time) { e.sweep(now) }

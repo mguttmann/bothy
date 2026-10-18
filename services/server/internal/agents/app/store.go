@@ -5,6 +5,7 @@ package app
 import (
 	"context"
 
+	"github.com/OWNER/bothy/services/server/internal/agents"
 	"github.com/OWNER/bothy/services/server/internal/agents/domain"
 	"github.com/OWNER/bothy/services/server/internal/kernel/ids"
 )
@@ -54,4 +55,24 @@ type Cursors interface {
 type TokenRevoker interface {
 	// RevokeAllForPrincipal revokes every active token of principalID and returns their number.
 	RevokeAllForPrincipal(ctx context.Context, principalID, by ids.ID) (int, error)
+}
+
+// ConsumerStore is the outgoing port over agent_consumer_cursors (implemented by
+// adapters/postgres). Every method is one statement on one row; it runs in the ambient transaction
+// of ctx when there is one and on the pool otherwise, because the save ticker of the gateway has no
+// request (docs/DECISIONS.md D-M2-07). Errors are kernel/errs errors without SQL text or values.
+type ConsumerStore interface {
+	// TakeConsumer creates the row of key at head with holder, or sets holder on the existing row,
+	// and returns acked_seq and whether the row was created.
+	TakeConsumer(ctx context.Context, key agents.ConsumerKey, holder ids.ID, head int64) (acked int64, created bool, err error)
+	// SaveConsumerAck raises acked_seq of key to acked while holder holds it; found is false when
+	// no row of key is held by holder.
+	SaveConsumerAck(ctx context.Context, key agents.ConsumerKey, holder ids.ID, acked int64) (found bool, err error)
+	// RestartConsumer sets acked_seq of key to seq while holder holds it; found as SaveConsumerAck.
+	RestartConsumer(ctx context.Context, key agents.ConsumerKey, holder ids.ID, seq int64) (found bool, err error)
+	// AckConsumer raises acked_seq of key to seq without a holder condition and returns the stored
+	// value; found is false for an unknown consumer.
+	AckConsumer(ctx context.Context, key agents.ConsumerKey, seq int64) (acked int64, found bool, err error)
+	// GetConsumer reads acked_seq of key; found is false for an unknown consumer.
+	GetConsumer(ctx context.Context, key agents.ConsumerKey) (acked int64, found bool, err error)
 }

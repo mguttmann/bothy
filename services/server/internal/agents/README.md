@@ -1,6 +1,6 @@
 # Modul `agents`
 
-Status: agent records, backend policy, credential holder and tool class built (M1-51); presence and heartbeat (M2-20), consumers, commands, agent sessions and dev environments follow with the tickets of the etappe.
+Status: agent records, backend policy, credential holder and tool class built (M1-51); consumer cursors with fencing, the op `ack` and the REST consumer operations built (M2-07); presence and heartbeat (M2-20), commands, agent sessions and dev environments follow with the tickets of the etappe.
 Normativ ist [docs/spec/02-architektur.md](../../../../docs/spec/02-architektur.md); bei Abweichung gilt das Kapitel.
 
 ## Zweck
@@ -38,6 +38,34 @@ Agenten, Backend-Richtlinie und Werkzeugklasse (Soll), gemeldeter Ist-Zustand, V
 - Migration `migrations/00022_agents.sql`: the table `agents` as 03 section 4.4 states it, with the
   trigger `agents_kind_check` (an agents row only for a principal of kind `agent`, SQLSTATE
   `23514`). `bothy_app` may read, insert and update, not delete.
+
+## Consumers (M2-07)
+
+- Port: `Consumers` (`Take`, `AcceptAck`, `Save`, `Restart`; the gateway reaches
+  `agent_consumer_cursors` only through it), `ConsumerAPI` (`State`, `Poll`, `Ack` of the three
+  REST operations), the declared source port `ConsumerFeed` (`Poll`, `Acked`, `Head`), which the
+  delivery engine of the gateway implements, `ConsumerKey`, `ConsumerState`, `ConsumerView`,
+  `FeedPage` and `ErrConsumerReplaced` (kind conflict). `Register` declares the op `ack`.
+- `domain/consumer.go`: `DefaultConsumer`, `ValidConsumerName` (the pattern of `ConsumerPath`),
+  `CheckAck` (below 0 or above the head is `validation_failed` on `/seq`, at or below the
+  acknowledgement no change).
+- `app/consumers.go`: `ConsumerService` implements `Consumers` and `ConsumerAPI`. Every call of an
+  actor authorizes `agent.events.consume` on the agent itself (agent-self, class
+  `rl.agent_runtime`, no audit of allows): an owner who is a person gets `403
+  subject_kind_not_allowed`, any other person or app `404` (visibility first). `Take` creates the
+  row at the given head or writes the holder; `Save` and `Restart` are fenced by the holder and
+  answer `ErrConsumerReplaced` without a row; `State` never creates a row (`404` for a consumer
+  that never connected); `Poll` delegates to the feed and answers `410 resync_required` with the
+  reason after a move to the head; `Ack` checks against the head of the serving process, writes
+  `GREATEST` without holder condition (idempotency-exempt) and tells the feed.
+- Table `agent_consumer_cursors` (migration `00046_agent_consumer_cursors.sql`, retention class
+  `security`, `ON DELETE CASCADE` with the agent); queries `TakeConsumer`, `SaveConsumerAck`,
+  `RestartConsumer`, `AckConsumer`, `GetConsumer` in `adapters/postgres/queries/consumer_cursors.sql`,
+  run on the pool or the ambient transaction (single-row statements, no event).
+- `adapters/httpapi/consumers.go`: `getConsumerState`, `pollAgentEvents`, `ackAgentEvents`.
+- Configuration keys: `agent.ack_timeout`, `agent.ack_persist_interval`,
+  `agent.max_inflight_events` (bound by the gateway engine).
+- Rulings: docs/DECISIONS.md M2-07.
 
 ## The use cases (M1-51)
 

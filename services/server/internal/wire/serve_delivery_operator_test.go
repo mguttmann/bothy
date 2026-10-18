@@ -140,8 +140,9 @@ func TestGateway_SpaceDefaultOperatorGetsNewChannelLive(t *testing.T) {
 func TestGateway_OperatorNewChannelWhileCatchingUp(t *testing.T) {
 	t.Parallel()
 	const backlog = 20000
+	// The agent is a consumer (M2-07): it acknowledges as it reads, so its window keeps paging.
 	w := newDeliveryWorld(t, "BOTHY_SYNC__CATCHUP_PAGE_SIZE=50", "BOTHY_SYNC__OUTBOUND_QUEUE_MAX=50",
-		"BOTHY_SYNC__TAIL_BATCH_SIZE=50000", "BOTHY_SYNC__CURSOR_ADVANCE_EVERY=1")
+		"BOTHY_SYNC__TAIL_BATCH_SIZE=50000", "BOTHY_SYNC__CURSOR_ADVANCE_EVERY=1", "BOTHY_AGENT__MAX_INFLIGHT_EVENTS=1000")
 	eng := w.newSpace("Engineering")
 	work := w.newChannel(eng, "work")
 	other := w.newChannel(eng, "other")
@@ -223,6 +224,9 @@ func TestGateway_OperatorNewChannelWhileCatchingUp(t *testing.T) {
 			n++
 			var ev event
 			_ = json.Unmarshal(d, &ev)
+			if n%200 == 0 {
+				_ = c2.Send("ack", map[string]any{"seq": ev.Seq})
+			}
 			if ev.ClientMsgID == cm2 {
 				got, msgSeq = true, ev.Seq
 			}
