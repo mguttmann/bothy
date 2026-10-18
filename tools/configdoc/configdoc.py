@@ -73,12 +73,13 @@ DEFAULT_PLACE = {
     "15-client-architektur.md": "App",
     "22-import-migration.md": "Werkzeug `bothy import`",
 }
-# Files that name retired names on purpose: the plan and the ruling log record W1, the brief of
-# M1-08 describes it, retired.yaml lists the names and the tests use them as fixtures.
-# A trailing "/" allows a whole directory.
+# Files that name retired names on purpose: the plan and the ruling log (with its companion
+# DECISIONS-EARLY.md, INT-W40/3) record W1, the brief of M1-08 describes it, retired.yaml lists
+# the names and the tests use them as fixtures. A trailing "/" allows a whole directory.
 RETIRED_ALLOWLIST = (
     "docs/PLAN.md",
     "docs/DECISIONS.md",
+    "docs/DECISIONS-EARLY.md",
     "docs/briefs/M1-08-config-reference.md",
     "tools/configdoc/retired.yaml",
     "tools/configdoc/tests/",

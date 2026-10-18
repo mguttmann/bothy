@@ -171,8 +171,9 @@ abstract interface class SelfRepository {
 
 /// [SelfRepository] over the generated client of `api_client`.
 ///
-/// [api] is the client of the signed-in session (`AuthSession.api`), so DPoP, refresh and the
-/// step-up interceptor apply; [newIdempotencyKey] returns a fresh UUIDv7 per action.
+/// The `api` argument is the client of the signed-in session (`AuthSession.api`), so DPoP,
+/// refresh and the step-up interceptor apply; [newIdempotencyKey] returns a fresh UUIDv7 per
+/// action.
 ///
 /// Example:
 /// ```dart
