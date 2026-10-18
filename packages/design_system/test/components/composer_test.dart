@@ -69,6 +69,37 @@ void main() {
     expect(sent, ['hello\n']);
   });
 
+  testWidgets(
+    'an own controller is cleared after a send, so Enter does not send twice',
+    (tester) async {
+      final sent = <String>[];
+      await pumpDs(tester, _composer(onSend: sent.add));
+      await _focus(tester);
+      await tester.enterText(find.byType(TextField), 'hello');
+      await tester.sendKeyEvent(LogicalKeyboardKey.enter);
+      await tester.pump();
+      await tester.sendKeyEvent(LogicalKeyboardKey.enter);
+      expect(sent, ['hello']);
+      expect(
+        tester.widget<TextField>(find.byType(TextField)).controller!.text,
+        isEmpty,
+      );
+    },
+  );
+
+  testWidgets('a controller of the caller keeps its text after a send', (
+    tester,
+  ) async {
+    final sent = <String>[];
+    final text = TextEditingController();
+    await pumpDs(tester, _composer(controller: text, onSend: sent.add));
+    await _focus(tester);
+    await tester.enterText(find.byType(TextField), 'hello');
+    await tester.sendKeyEvent(LogicalKeyboardKey.enter);
+    expect(sent, ['hello']);
+    expect(text.text, 'hello');
+  });
+
   testWidgets('with enterSends false the keys swap', (tester) async {
     final sent = <String>[];
     final text = TextEditingController();
