@@ -15636,6 +15636,12 @@ type MoveChannelParams struct {
 	IdempotencyKey *IdempotencyKey `json:"Idempotency-Key,omitempty"`
 }
 
+// SetChannelOperatorParams defines parameters for SetChannelOperator.
+type SetChannelOperatorParams struct {
+	// IfMatch ETag of the version the change is based on, e.g. `"7"`. Mismatch gives 412 `version_conflict`.
+	IfMatch IfMatchRequired `json:"If-Match"`
+}
+
 // CreateForumTagParams defines parameters for CreateForumTag.
 type CreateForumTagParams struct {
 	// IdempotencyKey UUIDv7 chosen by the client per logical operation. A repeat with the same request returns the stored response; a different request gives 422 `idempotency_key_reuse`; a repeat while the first is running gives 409 `request_in_progress`. Kept for `sync.idempotency_key_ttl`.
@@ -15861,6 +15867,12 @@ type MoveSpaceParams struct {
 	IdempotencyKey *IdempotencyKey `json:"Idempotency-Key,omitempty"`
 }
 
+// SetSpaceOperatorParams defines parameters for SetSpaceOperator.
+type SetSpaceOperatorParams struct {
+	// IfMatch ETag of the version the change is based on, e.g. `"7"`. Mismatch gives 412 `version_conflict`.
+	IfMatch IfMatchRequired `json:"If-Match"`
+}
+
 // ListUsersParams defines parameters for ListUsers.
 type ListUsersParams struct {
 	// Cursor Cursor from `next_cursor` of the previous page.
@@ -15990,6 +16002,9 @@ type ArchiveChannelJSONRequestBody = ReasonBody
 // MoveChannelJSONRequestBody defines body for MoveChannel for application/json ContentType.
 type MoveChannelJSONRequestBody = MovePosition
 
+// SetChannelOperatorJSONRequestBody defines body for SetChannelOperator for application/json ContentType.
+type SetChannelOperatorJSONRequestBody = OperatorSet
+
 // CreateForumTagJSONRequestBody defines body for CreateForumTag for application/json ContentType.
 type CreateForumTagJSONRequestBody = ForumTagCreate
 
@@ -16088,6 +16103,9 @@ type CreateChannelJSONRequestBody = ChannelCreate
 
 // MoveSpaceJSONRequestBody defines body for MoveSpace for application/json ContentType.
 type MoveSpaceJSONRequestBody = MovePosition
+
+// SetSpaceOperatorJSONRequestBody defines body for SetSpaceOperator for application/json ContentType.
+type SetSpaceOperatorJSONRequestBody = OperatorSet
 
 // CreateUserJSONRequestBody defines body for CreateUser for application/json ContentType.
 type CreateUserJSONRequestBody = UserCreate

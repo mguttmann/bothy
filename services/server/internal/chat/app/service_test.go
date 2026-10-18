@@ -12,6 +12,7 @@ import (
 	"github.com/OWNER/bothy/services/server/internal/authz"
 	"github.com/OWNER/bothy/services/server/internal/chat"
 	"github.com/OWNER/bothy/services/server/internal/chat/app"
+	"github.com/OWNER/bothy/services/server/internal/identity"
 	"github.com/OWNER/bothy/services/server/internal/kernel/actor"
 	"github.com/OWNER/bothy/services/server/internal/kernel/authorize"
 	"github.com/OWNER/bothy/services/server/internal/kernel/clock"
@@ -33,13 +34,17 @@ type env struct {
 	uow      *uow
 	archived *[]chat.SpaceArchived
 	owner    actor.Actor
+	affected *affected
+	dir      directory
+	pol      policies
 }
 
 func newEnv(t *testing.T) *env {
 	t.Helper()
 	e := &env{store: newStore(), az: &authorizer{rules: map[authorize.Action]func(authorize.Principal, authorize.Resource) authorize.Decision{}},
 		rights: &rights{r: authz.EffectiveRights{Level: "trigger", Capabilities: []string{"manage"}}}, rec: &recorder{}, events: &appender{},
-		archived: &[]chat.SpaceArchived{}, owner: actor.Actor{ID: ids.New(), Kind: actor.KindUser, SessionID: ids.New(), DeviceID: ids.New()}}
+		archived: &[]chat.SpaceArchived{}, owner: actor.Actor{ID: ids.New(), Kind: actor.KindUser, SessionID: ids.New(), DeviceID: ids.New()},
+		affected: &affected{}, dir: directory{principals: map[ids.ID]identity.PrincipalView{}}, pol: policies{rows: map[ids.ID]bool{}}}
 	reg := txn.NewRegistry()
 	if err := txn.Subscribe(reg, func(_ context.Context, ev chat.SpaceArchived) error {
 		*e.archived = append(*e.archived, ev)
@@ -51,7 +56,8 @@ func newEnv(t *testing.T) *env {
 	e.uow = &uow{reg: reg}
 	svc, err := app.New(testConfig(12), app.Deps{
 		Store: e.store, UoW: e.uow, Authorizer: e.az, Rights: rightsPort{e.rights}, Audit: e.rec, Events: e.events,
-		Clock: clock.NewFake(time.Date(2026, 10, 14, 9, 0, 0, 0, time.UTC)),
+		Clock:         clock.NewFake(time.Date(2026, 10, 14, 9, 0, 0, 0, time.UTC)),
+		RightsChanges: e.affected, Directory: e.dir, Policies: e.pol,
 	})
 	if err != nil {
 		t.Fatal(err)
@@ -109,7 +115,11 @@ func TestNew(t *testing.T) {
 	if _, err := app.New(app.Config{}, app.Deps{Store: e.store, UoW: e.uow, Authorizer: e.az, Rights: e.rights, Audit: e.rec, Events: e.events}); err == nil {
 		t.Fatal("name limit 0 accepted")
 	}
-	if _, err := app.New(testConfig(1), app.Deps{Store: e.store, UoW: e.uow, Authorizer: e.az, Rights: e.rights, Audit: e.rec, Events: e.events}); err != nil {
+	if _, err := app.New(testConfig(1), app.Deps{Store: e.store, UoW: e.uow, Authorizer: e.az, Rights: e.rights, Audit: e.rec, Events: e.events}); err == nil {
+		t.Fatal("missing operator collaborators accepted")
+	}
+	if _, err := app.New(testConfig(1), app.Deps{Store: e.store, UoW: e.uow, Authorizer: e.az, Rights: e.rights, Audit: e.rec, Events: e.events,
+		RightsChanges: e.affected, Directory: e.dir, Policies: e.pol}); err != nil {
 		t.Fatal(err)
 	}
 }

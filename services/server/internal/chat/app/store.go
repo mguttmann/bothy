@@ -25,6 +25,21 @@ type ChannelRow struct {
 	SpaceArchived bool
 }
 
+// ServedTarget is one target an agent serves for I1 (10 section 5.2): a channel with its space,
+// or a space alone (ChannelID zero) whose default operator is the agent.
+type ServedTarget struct {
+	ChannelID, SpaceID ids.ID
+}
+
+// ThreadRow is what authorize needs of a thread (07 section 7.2 step 4): its channel, whether it
+// is the main thread, its fixed operator (zero for none) and its creator.
+type ThreadRow struct {
+	ID, ChannelID   ids.ID
+	Main            bool
+	OperatorAgentID ids.ID
+	CreatedBy       ids.ID
+}
+
 // Store is the outgoing port of the chat application layer over spaces, user_space_states,
 // channels, forum_tags and the main threads (implemented by adapters/postgres). Reads run in the ambient transaction of ctx when there is
 // one and on the pool otherwise; writes and locks run only inside a unit of work of kernel/txn and
@@ -89,4 +104,23 @@ type Store interface {
 	// SaveForumTag writes name, color, sort key, restricted and deletion time of t. Errors:
 	// conflict on /name.
 	SaveForumTag(ctx context.Context, t domain.ForumTag) error
+
+	// SaveSpaceOperator writes the default operator and the version of s (M1-54).
+	SaveSpaceOperator(ctx context.Context, s domain.Space) error
+	// SaveChannelOperator writes the operator columns and the version of c (M1-54).
+	SaveChannelOperator(ctx context.Context, c domain.Channel) error
+	// TouchChannel writes only the version of c: an inheriting channel whose space got a new
+	// default operator (M1-54).
+	TouchChannel(ctx context.Context, c domain.Channel) error
+	// LockInheritingChannels locks and returns the channels of space that inherit the default
+	// operator and are not archived, ascending by id.
+	LockInheritingChannels(ctx context.Context, space ids.ID) ([]ChannelRow, error)
+	// ServedTargets returns the targets agent serves for I1 (10 sections 5.2 and 5.3): the
+	// channels that are not archived in spaces that are not archived whose effective operator is
+	// the agent or that hold a thread with the agent as fixed operator, and every space that is
+	// not archived with the agent as default operator (ChannelID zero); ascending by (SpaceID,
+	// ChannelID) without duplicates.
+	ServedTargets(ctx context.Context, agent ids.ID) ([]ServedTarget, error)
+	// Thread returns the facts of the thread id; found is false for an unknown id.
+	Thread(ctx context.Context, id ids.ID) (t ThreadRow, found bool, err error)
 }

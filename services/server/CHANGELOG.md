@@ -43,6 +43,17 @@ documented in this file. The format is based on
   and offers `healthcheck` (TLS handshake with the stack's CA) and `version`.
 - `bothy secrets init` generates `pgbackrest_tls/` (M7-01): an own CA and ECDSA P-256 certificates
   for `postgres` and `backup`, copied only to those two services; the CA key is not kept.
+- Operators with invariant I1 (M1-54): `setSpaceOperator` and `setChannelOperator` (owner,
+  step-up, If-Match, audited) set the default operator of a space (none or an agent) and the
+  operator of a channel (inherit, none or an agent). Every change is a rights change: it raises
+  `permission_version`, checks I1 in the same transaction (a violation answers
+  `409 i1_violation` with hint and `conflicts` and leaves a deny audit entry) and writes
+  `access.changed` for the old and the new operator. A new default bumps the version of every
+  inheriting channel with its own `channel.updated`. The chat structure source now answers the
+  served targets of I1 (including spaces whose default operator is the agent) and the facts of a
+  thread, so the operator rule gives the effective operator `write` without a grant. The same
+  assignment answers `200` without a change.
+
 - Channels and forum tags (M1-53): `listSpaceChannels`, `createChannel`, `getChannel`,
   `updateChannel`, `moveChannel`, `archiveChannel`, `listForumTags`, `createForumTag`,
   `updateForumTag`, `moveForumTag` and `deleteForumTag`. Migration `00025` creates `channels`,
