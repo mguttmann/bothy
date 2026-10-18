@@ -53,8 +53,9 @@ type GatewayConn struct {
 	err error // the end of the connection: a *wstest.CloseError or a read error
 }
 
-// Gateway opens a gateway connection for the person of c: upgrade, hello, identify with the
-// access token, the device and a DPoP proof for the nonce of hello, then ready. The error reports
+// Gateway opens a gateway connection as c: upgrade, hello, identify with the access token and
+// device of a person or the API token of an agent and a DPoP proof for the nonce of hello, then
+// ready. An agent's connection answers reauth_required with nothing (INT-W40/1). The error reports
 // a failed upgrade, a close of the server or another frame than ready.
 func (c *Client) Gateway(ctx context.Context) (*GatewayConn, error) { return c.gateway(ctx, nil) }
 
@@ -76,10 +77,13 @@ func (c *Client) gateway(ctx context.Context, cursor *int64) (*GatewayConn, erro
 		return nil, err
 	}
 	access, _ := c.Tokens()
-	ready, err := ws.Identify(ctx, wstest.IdentifyParams{
-		AccessToken: access, DeviceID: c.DeviceID, Cursor: cursor,
-		Proof: func(nonce string) string { return c.gatewayProof(nonce, access) },
-	})
+	p := wstest.IdentifyParams{Cursor: cursor, Proof: func(nonce string) string { return c.gatewayProof(nonce, access) }}
+	if c.apiToken {
+		p.APIToken = access
+	} else {
+		p.AccessToken, p.DeviceID = access, c.DeviceID
+	}
+	ready, err := ws.Identify(ctx, p)
 	if err != nil {
 		ws.Abort()
 		return nil, err

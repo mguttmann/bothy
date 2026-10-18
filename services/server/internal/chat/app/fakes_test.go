@@ -327,12 +327,12 @@ func (s *store) PutSidebarState(_ context.Context, st domain.SidebarState, keep 
 	return st, s.fail
 }
 
-func (s *store) SidebarStates(_ context.Context, user ids.ID) ([]domain.SidebarState, error) {
+func (s *store) SidebarStates(_ context.Context, user ids.ID, all bool, visible []ids.ID) ([]domain.SidebarState, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	var out []domain.SidebarState
 	for k, st := range s.sidebar {
-		if k[0] == user && !s.spaces[k[1]].Archived() {
+		if k[0] == user && !s.spaces[k[1]].Archived() && (all || slices.Contains(visible, k[1])) {
 			out = append(out, st)
 		}
 	}

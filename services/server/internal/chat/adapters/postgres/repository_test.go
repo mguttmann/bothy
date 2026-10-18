@@ -172,9 +172,16 @@ func TestRepositoryRoundTrip(t *testing.T) {
 		t.Fatalf("replace %+v", st)
 	}
 	put(domain.SidebarState{UserID: alex, SpaceID: support.ID, Collapsed: true}, false)
-	list, err := e.repo.SidebarStates(ctx, alex)
+	list, err := e.repo.SidebarStates(ctx, alex, true, nil)
 	if err != nil || len(list) != 1 || list[0].SpaceID != research.ID {
 		t.Fatalf("sidebar states %+v, %v", list, err)
+	}
+	// The visible spaces of Scope (07 section 7.4 rule 1, AZ-P12): a space outside them is no row.
+	if list, err := e.repo.SidebarStates(ctx, alex, false, []ids.ID{research.ID}); err != nil || len(list) != 1 {
+		t.Fatalf("scoped sidebar states %+v, %v", list, err)
+	}
+	if list, err := e.repo.SidebarStates(ctx, alex, false, []ids.ID{support.ID}); err != nil || len(list) != 0 {
+		t.Fatalf("sidebar states outside the scope %+v, %v", list, err)
 	}
 	if _, err := e.repo.PutSidebarState(ctx, st, false); err == nil {
 		t.Fatal("sidebar write outside a unit of work")
