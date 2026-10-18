@@ -326,9 +326,9 @@ codegen-check: ## Generated code equals a fresh generation (sqlc, go generate, f
 	@# Riverpod providers of the Dart members with riverpod_generator (brief M4-18): build_runner
 	@# writes the *.g.dart files of the providers, formatted as `make fmt` formats them; they must
 	@# equal a fresh generation, so a changed provider without regeneration fails.
-	@if [ -z "$(DART_ON)" ]; then $(call skip,dart-riverpod-codegen,no Dart package selected under apps/ or packages/); \
+	@if [ -z "$(DART_ON)" ]; then $(call skip,codegen-riverpod-dart,no Dart package selected under apps/ or packages/); \
 	else rp=""; for p in $(DART_PKGS); do ! grep -qs 'riverpod_generator:' $$p/pubspec.yaml || rp="$$rp $$p"; done; \
-	  if [ -z "$$rp" ]; then $(call skip,dart-riverpod-codegen,no Dart member with riverpod_generator); \
+	  if [ -z "$$rp" ]; then $(call skip,codegen-riverpod-dart,no Dart member with riverpod_generator); \
 	  else flutter pub get --enforce-lockfile >/dev/null || exit 1; \
 	    for p in $$rp; do \
 	      $(CODEGEN_CHECK) --dir $$p -- sh -c 'dart run build_runner build && dart format lib >/dev/null' || exit 1; \
