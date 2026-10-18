@@ -19,6 +19,7 @@ import (
 	"github.com/OWNER/bothy/services/server/internal/identity"
 	identitypg "github.com/OWNER/bothy/services/server/internal/identity/adapters/postgres"
 	identityapp "github.com/OWNER/bothy/services/server/internal/identity/app"
+	"github.com/OWNER/bothy/services/server/internal/instance"
 	instancepg "github.com/OWNER/bothy/services/server/internal/instance/adapters/postgres"
 	instanceapp "github.com/OWNER/bothy/services/server/internal/instance/app"
 	"github.com/OWNER/bothy/services/server/internal/kernel/auditing"
@@ -41,8 +42,9 @@ const msgRegistrationCheckFailed = "registration check failed"
 // agent.updated (M1-51), chat space.created, space.updated, space.archived and sidebar.updated
 // (M1-52), messaging message.created (M1-56), terminal (M2-39), sync read_state.updated,
 // draft.updated, draft.deleted and settings.updated (M1-61) and gateway the ops identify, resume,
-// heartbeat and reauth (M1-64); each module's ticket appends its function here.
-var moduleRegistrations = []func(*authorize.Registry){identity.Register, authz.Register, agents.Register, chat.Register,
+// heartbeat and reauth (M1-64), and instance instance.updated (M1-67); each module's ticket
+// appends its function here.
+var moduleRegistrations = []func(*authorize.Registry){instance.Register, identity.Register, authz.Register, agents.Register, chat.Register,
 	messaging.Register, terminal.Register, sync.Register, gateway.Register}
 
 // BuildRegistry returns a registry filled by every function of register; nil means the
