@@ -62,6 +62,7 @@ final class ContractOperation {
     required this.secured,
     required this.requestSchema,
     required this.responseSchemas,
+    this.authzAction,
   });
 
   /// The `operationId`.
@@ -82,6 +83,10 @@ final class ContractOperation {
   /// The schema name of the JSON body per status (`201`, `4XX`, `default`); null for a
   /// response without body.
   final Map<String, String?> responseSchemas;
+
+  /// The authorization action of `x-authz-action` (05), or null when the operation names
+  /// none.
+  final String? authzAction;
 }
 
 /// The API documents of the repository, loaded once per isolate.
@@ -279,6 +284,7 @@ final class ContractSchemas {
           path: path,
           secured: !(security is List && security.isEmpty),
           requestSchema: _bodySchema(op['requestBody']),
+          authzAction: op['x-authz-action'] as String?,
           responseSchemas: {
             for (final MapEntry(:key, :value)
                 in (op['responses'] as Map<String, Object?>? ?? const {})

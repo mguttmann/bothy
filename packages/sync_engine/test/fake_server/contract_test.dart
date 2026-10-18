@@ -217,6 +217,66 @@ void main() {
       profileUpdate: ProfileUpdate((b) => b..locale = 'en'),
     );
 
+    // Administration (M4-26): people, owners, credentials, devices and sessions of another
+    // person, groups with members.
+    final users = api.getUsersApi();
+    final why = ReasonBody((b) => b..reason = 'Check');
+    final robin = (await users.createUser(
+      userCreate: UserCreate(
+        (b) => b
+          ..handle = 'robin.k'
+          ..displayName = 'Robin K'
+          ..localAccount = true,
+      ),
+    )).data!.user;
+    await users.listUsers(q: 'rob');
+    await users.getUser(userId: robin.id);
+    await users.updateUser(
+      userId: robin.id,
+      userUpdate: UserUpdate((b) => b..email = 'robin@example.com'),
+    );
+    await users.createEnrollmentCode(userId: robin.id);
+    await users.disableUser(userId: robin.id, reasonBody: why);
+    await users.enableUser(userId: robin.id, reasonBody: why);
+    final world = h.server.world;
+    final passkey = world.addPasskey(w.sam.id, name: 'Sam laptop');
+    final identity = world.addIdentity(w.sam.id, subject: 'sam');
+    await users.getUserCredentials(userId: w.sam.id);
+    await users.revokePasskey(userId: w.sam.id, passkeyId: passkey);
+    await users.unlinkIdentity(userId: w.sam.id, identityId: identity);
+    await devicesApi.listUserDevices(userId: w.sam.id);
+    await devicesApi.listUserSessions(userId: w.sam.id);
+    await users.listOwners();
+    await users.addOwner(
+      ownerAdd: OwnerAdd(
+        (b) => b
+          ..userId = w.sam.id
+          ..reason = 'Deputy',
+      ),
+    );
+    await users.revokeOwner(userId: w.sam.id, reasonBody: why);
+    final groups = api.getGroupsApi();
+    final group = (await groups.createGroup(
+      groupCreate: GroupCreate((b) => b..name = 'Support'),
+    )).data!;
+    await groups.listGroups();
+    await groups.getGroup(groupId: group.id);
+    await groups.updateGroup(
+      groupId: group.id,
+      groupUpdate: GroupUpdate((b) => b..name = 'Help desk'),
+    );
+    await groups.addGroupMember(
+      groupId: group.id,
+      groupMemberAdd: GroupMemberAdd(
+        (b) => b
+          ..userId = w.sam.id
+          ..expiresAt = DateTime.utc(2026, 12, 31),
+      ),
+    );
+    await groups.listGroupMembers(groupId: group.id);
+    await groups.removeGroupMember(groupId: group.id, userId: w.sam.id);
+    await groups.deleteGroup(groupId: group.id);
+
     await alex.auth.refresh.refreshNow();
     await api.getMeApi().getMe();
     await alex.auth.login.logout();

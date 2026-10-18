@@ -15,6 +15,7 @@
 /// five flows of 04 16 as drivers over a [ScenarioClient].
 library;
 
+export 'src/testing/action_catalog.dart';
 export 'src/testing/dpop_verifier.dart';
 export 'src/testing/fake_server.dart';
 export 'src/testing/faults.dart';

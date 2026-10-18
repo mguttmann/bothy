@@ -402,7 +402,19 @@ only; without `first_message` `400 validation_failed` at `/first_message` with t
 `world.logo`, else `404`) and `listChannelThreads` with `state`, `tag_id`, `sort`, `limit` and
 an offset cursor; and from M4-25 in `rest/self_handlers.dart` `listMyDevices`, `revokeDevice`,
 `listMySessions` (with `current`), `revokeSession`, `updateMyProfile`, `createStepUpChallenge`
-and `completeStepUpWithDeviceKey`. The world has `addForum`, `addForumTag`, `closeThread` and
+and `completeStepUpWithDeviceKey`; from M4-26 in `rest/admin_handlers.dart` the administration
+of people (`listUsers` with `q` and `status`, `createUser`, `getUser`, `updateUser`,
+`disableUser`, `enableUser`, `createEnrollmentCode`), their credentials (`getUserCredentials`,
+`unlinkIdentity`, `revokePasskey`), devices and sessions (`listUserDevices`,
+`listUserSessions`; `revokeSession` also for an owner), owners (`listOwners`, `addOwner`,
+`revokeOwner` with `409 last_owner`) and groups (`listGroups` with `member_id`, `createGroup`,
+`getGroup`, `updateGroup`, `deleteGroup`, `listGroupMembers`, `addGroupMember` with
+`expires_at`, `removeGroupMember`). These ask for the step-up through `ActionCatalog`: the
+`step_up` value of the operation's `x-authz-action` in `docs/spec/actions.yaml`
+(`server.stepUpOf(operationId)`, `server.actionOf(operationId)`); `createUser` and
+`createEnrollmentCode` answer a replay with `409 conflict` and `reason: one_time_secret`
+(06 7). The world has `disablePerson`, `addPasskey`, `addIdentity`, `groups`, `groupMembers`
+and `i1OnEnable` (people whose `enableUser` answers `409 i1_violation`). The world has `addForum`, `addForumTag`, `closeThread` and
 `putSidebar`; a new message in a closed thread reopens it (`thread.reopened`, 01 6.1). Other
 writes with `Idempotency-Key` repeat their
 stored answer (04 5.2). Later tickets add operations with `server.handle(operationId,
@@ -458,7 +470,9 @@ above it (the app under test in the macOS app sandbox, M4-18), it uses the copy 
 ### What the fake simplifies
 
 - Permissions: only visibility and the level per channel; no grants, groups, `manage` or
-  scopes; no rate limits unless injected. Step-up (M4-25): `approveDevice`, `approvePairing`
+  scopes; no rate limits unless injected. Administration: an owner may do everything, anybody
+  else gets `403 forbidden` with `owner_only` outside the own person; lists have no paging;
+  members do not expire by time. Step-up (M4-25): `approveDevice`, `approvePairing`
   and `revokeDevice` answer `401 step_up_required` until the session confirmed with its
   `step_up` key (`createStepUpChallenge`, `completeStepUpWithDeviceKey`, ES256 signature over
   `challenge` and `sid`) within five minutes; a pairing code without an open pairing ends that

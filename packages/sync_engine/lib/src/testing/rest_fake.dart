@@ -200,6 +200,10 @@ final class RestFake {
   final List<_Route> _routes = [];
   final Map<String, FakeHandler> _handlers = {};
 
+  /// Operations whose successful answer carries a one-time secret: a replay of the same
+  /// `Idempotency-Key` answers `409 conflict` with `reason: one_time_secret` (06 7).
+  final Set<String> oneTimeSecrets = {};
+
   /// Every request answered, in order.
   final List<FakeRequestRecord> requests = [];
 
@@ -445,6 +449,10 @@ final class RestFake {
     if (stored != null) {
       if (stored.hash != hash) {
         throw const FakeProblem(422, 'idempotency_key_reuse');
+      }
+      // 06 7, R-API-26: a one-time secret is never repeated.
+      if (oneTimeSecrets.contains(r.operationId) && stored.status < 300) {
+        throw const FakeProblem(409, 'conflict', reason: 'one_time_secret');
       }
       return FakeResponse(stored.status, stored.body);
     }
