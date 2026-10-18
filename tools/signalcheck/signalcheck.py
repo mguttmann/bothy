@@ -110,7 +110,9 @@ LABEL_LISTS = frozenset({"by", "without", "on", "ignoring", "group_left", "group
 
 _BACKTICK = re.compile(r"`([^`]+)`")
 _SECTION4 = re.compile(r"^### 4\.(\d)([a-z]?)\b")
-_CLIENT_ATTR = re.compile(r"`(bothy\.client\.[a-z_]+)` \(")
+CLIENT_ATTR_PREFIX = "bothy.client."
+"""Prefix of the attributes every app metric of 4.6a carries."""
+_CLIENT_ATTR = re.compile("`(" + re.escape(CLIENT_ATTR_PREFIX) + r"[a-z_]+)` \(")
 _GRAFANA_VAR = re.compile(r"\$\{[A-Za-z0-9_:]+\}|\$[A-Za-z_][A-Za-z0-9_]*")
 _WINDOW = re.compile(r"\{\{\s*\.window\s*\}\}")
 _TOKEN = re.compile(
