@@ -25,6 +25,14 @@ operated, and the order of the build.
 
 ### Added
 
+- Local database of the apps: `packages/local_store` is a drift database on
+  SQLite3MultipleCiphers (cipher `chacha20`, 256-bit key from a key source port), schema
+  version 1 with the mirror tables of the client architecture chapter and the local tables
+  `outbox`, `sync_state`, `loaded_ranges`, `file_cache`, `share_inbox` and the FTS5
+  `search_index`; DAOs with the version rule on every upsert, the cursor stored in the page's
+  transaction, removal of targets and wipe, the cache cleanup by `client.cache_max_age` and
+  `client.cache_max_bytes`, and a migration survival test for outbox, drafts and share inbox;
+  `make codegen-check` compares the drift generation (M4-12).
 - Sync engine gateway connection: `GatewayConnection` holds the one WebSocket of a device
   (transport port with a `dart:io` implementation), answers `hello` with `identify` or `resume`
   and a gateway DPoP proof over the `hello` nonce, stores the session fields of `ready`, renews
@@ -35,14 +43,6 @@ operated, and the order of the build.
   the foreground, `4018` for user action, `4008` for `retry_after`); `ConnectionState` exposes
   the phases of 15 7.2 with a reason, `FocusManager` and `TypingThrottle` send `focus` and
   typing within their limits, and `SessionListener` is where catch-up plugs in (M4-13).
-- Local database of the apps: `packages/local_store` is a drift database on
-  SQLite3MultipleCiphers (cipher `chacha20`, 256-bit key from a key source port), schema
-  version 1 with the mirror tables of the client architecture chapter and the local tables
-  `outbox`, `sync_state`, `loaded_ranges`, `file_cache`, `share_inbox` and the FTS5
-  `search_index`; DAOs with the version rule on every upsert, the cursor stored in the page's
-  transaction, removal of targets and wipe, the cache cleanup by `client.cache_max_age` and
-  `client.cache_max_bytes`, and a migration survival test for outbox, drafts and share inbox;
-  `make codegen-check` compares the drift generation (M4-12).
 - Design system core components: message (every variant, collapse with "Show more", origin
   badges, isolated foreign names), a safe Markdown renderer that runs and loads nothing, live box
   with collapsed and mobile lines and a throttled announcer, tool chip, status line, trigger
