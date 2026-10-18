@@ -100,6 +100,18 @@ operated, and the order of the build.
   code, reject). Every change asks once and then for the step-up where the server demands it;
   the desktop app hosts the shell at `/admin`. The fake server answers these operations and
   takes the step-up of each from `docs/spec/actions.yaml`.
+- Desktop thread view (M4-20): the history column shows a thread or the main history of a text
+  channel from the local database with grouping, origin badges, safe Markdown, "Show more",
+  tombstones and system lines, loads older pages and fills gaps, focuses the visible threads and
+  marks them read; the header names the operator or "No agent answers here", marks automatic
+  titles and offers Done, reopen, title, move, pin and the session column; the composer sends
+  through the outbox with Enter or Shift+Enter, keeps the draft in sync, suggests mentions, inserts
+  templates and shows who is typing; messages offer reply with quote, start thread, reactions, pin,
+  edit with the conflict view, versions, delete, mark as unread and copy; every offline state of
+  01 6.6 is visible, and a removed thread closes with "No access anymore". The session column has
+  its frame with the pinned messages. The thread, thread list and history window streams of the
+  local store have their own trigger statements, so a history next to a post list shows new
+  messages.
 - Desktop settings, devices and sessions (M4-25): Settings has the sections of 01 5.1 D8
   (Appearance, Language, Keyboard, Devices and sessions, Privacy, About and the Notifications
   entry M4-33 fills) under `/settings/<section>`. The personal settings of 01 11 apply their
