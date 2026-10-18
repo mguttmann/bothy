@@ -277,6 +277,30 @@ void main() {
     await groups.removeGroupMember(groupId: group.id, userId: w.sam.id);
     await groups.deleteGroup(groupId: group.id);
 
+    // Grants (M4-27): preview, create, list, read, explain, view as, revoke.
+    final access = api.getAccessApi();
+    await api.getAgentsApi().listAgents();
+    final request = GrantCreate(
+      (b) => b
+        ..subjectKind = GrantSubjectKind.user
+        ..subjectId = w.sam.id
+        ..targetKind = TargetKind.channel
+        ..targetId = w.general
+        ..level = Level.trigger
+        ..reason = 'Release',
+    );
+    await access.previewGrant(grantCreate: request);
+    final grant = (await access.createGrant(grantCreate: request)).data!;
+    await access.listGrants(
+      targetKind: TargetKind.channel,
+      targetId: w.general,
+    );
+    await access.getGrant(grantId: grant.id);
+    await access.explainChannelAccess(channelId: w.general);
+    await access.explainSpaceAccess(spaceId: w.space);
+    await access.viewAsUser(userId: w.sam.id);
+    await access.revokeGrant(grantId: grant.id, reasonBody: why);
+
     await alex.auth.refresh.refreshNow();
     await api.getMeApi().getMe();
     await alex.auth.login.logout();
