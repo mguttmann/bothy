@@ -76,6 +76,11 @@ repository and `NewTxnRegistry` subscribes `messaging.MessagePosted -> sync` (dr
 (`Audit.SyncSubscribers().Bind`). `personal.go` builds the personal data use cases and handlers
 of sync (`NewPersonal`, `PersonalConfig`) in the chat step after messaging.
 
+Thread moves (M1-62): `NewModules` also builds `messagingapp.Subscribers` (required,
+`Modules.MessagingSubscribers`), and `NewTxnRegistry` subscribes `chat.ThreadMoved -> messaging`
+and then `chat.ThreadMoved -> sync`, which change `messages.channel_id` and
+`read_states.channel_id` and `drafts.channel_id` of the moved thread in its transaction.
+
 ## Instance and counters
 
 `MigrationSteps(pool, fsys)` gives `bothy migrate up` (and `pgtest.WithSteps` in tests) the

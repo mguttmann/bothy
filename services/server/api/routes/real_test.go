@@ -513,6 +513,10 @@ func (stubServer) ReopenThread(context.Context, rest.ReopenThreadRequestObject) 
 	return nil, nil
 }
 
+func (stubServer) MoveThread(context.Context, rest.MoveThreadRequestObject) (rest.MoveThreadResponseObject, error) {
+	return nil, nil
+}
+
 func (stubServer) CreateMessage(context.Context, rest.CreateMessageRequestObject) (rest.CreateMessageResponseObject, error) {
 	return nil, nil
 }
@@ -892,6 +896,8 @@ func TestRealTable_Enabled(t *testing.T) {
 		"closeThread":        {"POST /api/v1/threads/{thread_id}/close", "thread.close", "rl.write"},
 		"reopenThread":       {"POST /api/v1/threads/{thread_id}/reopen", "thread.reopen", "rl.write"},
 		"setThreadTags":      {"PUT /api/v1/threads/{thread_id}/tags", "thread.tags.set", "rl.write"},
+		// M1-62
+		"moveThread": {"POST /api/v1/threads/{thread_id}/move", "thread.move", "rl.admin"},
 
 		// M2-39
 		"listHosts":             {"GET /api/v1/hosts", "host.read", "rl.read"},

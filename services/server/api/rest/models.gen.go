@@ -16210,6 +16210,12 @@ type ListThreadMessagesParams struct {
 	Limit *PageLimit `form:"limit,omitempty" json:"limit,omitempty"`
 }
 
+// MoveThreadParams defines parameters for MoveThread.
+type MoveThreadParams struct {
+	// IdempotencyKey UUIDv7 chosen by the client per logical operation. A repeat with the same request returns the stored response; a different request gives 422 `idempotency_key_reuse`; a repeat while the first is running gives 409 `request_in_progress`. Kept for `sync.idempotency_key_ttl`.
+	IdempotencyKey *IdempotencyKey `json:"Idempotency-Key,omitempty"`
+}
+
 // MarkThreadUnreadParams defines parameters for MarkThreadUnread.
 type MarkThreadUnreadParams struct {
 	// IdempotencyKey UUIDv7 chosen by the client per logical operation. A repeat with the same request returns the stored response; a different request gives 422 `idempotency_key_reuse`; a repeat while the first is running gives 409 `request_in_progress`. Kept for `sync.idempotency_key_ttl`.
@@ -16564,6 +16570,9 @@ type PutThreadDraftJSONRequestBody = DraftPut
 
 // CreateMessageJSONRequestBody defines body for CreateMessage for application/json ContentType.
 type CreateMessageJSONRequestBody = MessageCreate
+
+// MoveThreadJSONRequestBody defines body for MoveThread for application/json ContentType.
+type MoveThreadJSONRequestBody = ThreadMove
 
 // PutReadStateJSONRequestBody defines body for PutReadState for application/json ContentType.
 type PutReadStateJSONRequestBody = ReadStatePut

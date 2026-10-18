@@ -292,6 +292,14 @@ invisible thread or channel the same `404`.
   (resource the user without version, empty scope, `SettingsPayload`). Payloads carry
   `updated_by_device_id` of the writing device and no JSON null.
 
+Thread moves (M1-62): `Subscribers.OnThreadMoved` is the in-transaction subscriber of
+`chat.ThreadMoved` (after the one of messaging); it runs `MoveThreadReadStates` and
+`MoveThreadDrafts` (`queries/threads_move.sql`) over the rows of every person for the thread,
+without a version and without an event, through the port `app.ThreadMoveRows` of
+`PersonalRepository`. A concurrent `putReadState` or `putThreadDraft` holds the thread `FOR
+SHARE` (`Threads.InfoForShare`), so it either committed before the move's update or writes the
+new channel (`TestMoveThreadConcurrentReadState` in `test/integration/move_test.go`).
+
 Rulings: docs/DECISIONS.md M1-61. Tests: `domain/*_test.go`, `app/subscribers_test.go` and
 `app/personal_test.go`, `adapters/postgres/personal_test.go`,
 `adapters/httpapi/personal_test.go` (PostgreSQL 18, the HTTP chain with response validation

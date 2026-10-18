@@ -4,3 +4,5 @@ hook rights_check authz github.com/OWNER/bothy/services/server/internal/authz/ap
 hook sync sync github.com/OWNER/bothy/services/server/internal/sync/app.(*PhaseHook).Run-fm
 hook audit audit github.com/OWNER/bothy/services/server/internal/audit/app.(*Chain).Hook-fm
 subscribe messaging.MessagePosted -> sync github.com/OWNER/bothy/services/server/internal/sync/app.(*Subscribers).OnMessagePosted-fm
+subscribe chat.ThreadMoved -> messaging github.com/OWNER/bothy/services/server/internal/messaging/app.(*Subscribers).OnThreadMoved-fm
+subscribe chat.ThreadMoved -> sync github.com/OWNER/bothy/services/server/internal/sync/app.(*Subscribers).OnThreadMoved-fm

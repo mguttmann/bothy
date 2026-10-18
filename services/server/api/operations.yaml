@@ -131,6 +131,7 @@ enabled:             # operationIds that have a handler; sorted ascending
   - moveChannel
   - moveForumTag
   - moveSpace
+  - moveThread
   - pairHost
   - pinMessage
   - previewGrant
@@ -441,9 +442,6 @@ later:               # every other operationId of docs/api/openapi.yaml; sorted 
   - operation_id: listThreadRuns
     milestone: M2
     ticket: M2-05
-  - operation_id: moveThread
-    milestone: M1
-    ticket: M1-62
   - operation_id: openTerminalSession
     milestone: M2
     ticket: M2-44

@@ -289,3 +289,30 @@ func settingOf(row sqlcgen.UserSetting) sync.UserSetting {
 		UpdatedAt: row.UpdatedAt.Time,
 	}
 }
+
+// Compile-time check: the repository is the port of the subscriber of chat.ThreadMoved.
+var _ app.ThreadMoveRows = (*PersonalRepository)(nil)
+
+// MoveThreadReadStates implements app.ThreadMoveRows (M1-62).
+func (r *PersonalRepository) MoveThreadReadStates(ctx context.Context, thread, channel ids.ID) error {
+	q, err := r.write(ctx)
+	if err != nil {
+		return err
+	}
+	if err := q.MoveThreadReadStates(ctx, sqlcgen.MoveThreadReadStatesParams{ThreadID: uuid(thread), ChannelID: uuid(channel)}); err != nil {
+		return failed(err, "moving the read states of a thread")
+	}
+	return nil
+}
+
+// MoveThreadDrafts implements app.ThreadMoveRows (M1-62).
+func (r *PersonalRepository) MoveThreadDrafts(ctx context.Context, thread, channel ids.ID) error {
+	q, err := r.write(ctx)
+	if err != nil {
+		return err
+	}
+	if err := q.MoveThreadDrafts(ctx, sqlcgen.MoveThreadDraftsParams{ThreadID: uuid(thread), ChannelID: uuid(channel)}); err != nil {
+		return failed(err, "moving the drafts of a thread")
+	}
+	return nil
+}

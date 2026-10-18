@@ -651,3 +651,30 @@ func (cursors) Decode(list string, binding []byte, s string, key any) error {
 	}
 	return nil
 }
+
+func (s *store) ShareChannel(ctx context.Context, id ids.ID) (app.ChannelRow, bool, error) {
+	return s.Channel(ctx, id)
+}
+
+func (s *store) ShareSpace(ctx context.Context, id ids.ID) (domain.Space, bool, error) {
+	return s.Space(ctx, id)
+}
+
+func (s *store) MoveThread(_ context.Context, id, channel ids.ID, at time.Time) (domain.Thread, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.ensureThreads()
+	th := s.threads[id]
+	th.ChannelID, th.MovedAt = channel, at
+	th.Version++
+	s.threads[id] = th
+	return th, s.fail
+}
+
+func (s *store) DeleteThreadTags(_ context.Context, thread ids.ID) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.ensureThreads()
+	delete(s.threadTags, thread)
+	return s.fail
+}

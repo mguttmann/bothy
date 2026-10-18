@@ -242,7 +242,8 @@ func build(t *testing.T, subscribe Subscribe, personal bool, so *SyncOptions, op
 	}
 	var subs *syncapp.Subscribers
 	if personal {
-		subs = syncapp.NewSubscribers(syncpg.NewPersonalRepository(pool))
+		rows := syncpg.NewPersonalRepository(pool)
+		subs = syncapp.NewSubscribers(rows, rows)
 	}
 	reg := registry(t, hook, wire.NewModules(pool, log), subscribe, w.rec, subs)
 	uow := pg.NewUnitOfWork(pool, pg.UnitConfig{RetryMax: 3, StatementTimeout: 30 * time.Second, LockTimeout: 20 * time.Second, IdleInTxTimeout: 60 * time.Second}, reg)
