@@ -414,7 +414,11 @@ of people (`listUsers` with `q` and `status`, `createUser`, `getUser`, `updateUs
 (`server.stepUpOf(operationId)`, `server.actionOf(operationId)`); `createUser` and
 `createEnrollmentCode` answer a replay with `409 conflict` and `reason: one_time_secret`
 (06 7). The world has `disablePerson`, `addPasskey`, `addIdentity`, `groups`, `groupMembers`
-and `i1OnEnable` (people whose `enableUser` answers `409 i1_violation`). The world has `addForum`, `addForumTag`, `closeThread` and
+and `i1OnEnable` (people whose `enableUser` answers `409 i1_violation`). From M4-29
+`rest/audit_handlers.dart` serves `listAuditEvents` (the filters of the operation, newest first,
+an offset cursor), `exportAuditEvents` (NDJSON of the contiguous `seq` span of the range) and
+`verifyAuditChain` over `server.audit`, a `FakeAuditLog` whose rows a test adds with `add` and
+breaks with `tamper(seq)`; all three are owner actions with the catalogue's step-up. The world has `addForum`, `addForumTag`, `closeThread` and
 `putSidebar`; a new message in a closed thread reopens it (`thread.reopened`, 01 6.1). Other
 writes with `Idempotency-Key` repeat their
 stored answer (04 5.2). Later tickets add operations with `server.handle(operationId,

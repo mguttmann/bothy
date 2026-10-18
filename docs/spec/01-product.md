@@ -641,7 +641,9 @@ right now (I1).
 +--------------------------------+----------------------------------------------------------------+
 ```
 
-**A6 Audit.** Filterable by action, person, result, time range; check of the hash chain.
+**A6 Audit.** Filterable by action, person, result, resource, time range; check of the hash chain.
+Export of a time range as the server's NDJSON with hashes (verifiable offline) and as CSV, which
+the device converts from the same stream.
 
 ```text
 +----------------------------------------------------------------------------------------------------+
@@ -654,7 +656,7 @@ right now (I1).
 | 09:57   Alex      auth.step_up              allowed   Session laptop                               |
 | 08:12   Sam       agent.invoke              denied    Run 0193..        Personal: not holder       |
 +----------------------------------------------------------------------------------------------------+
-| Chain checked up to no. 18 402: unchanged.          [Export CSV]  (owner only, step-up)            |
+| Chain checked up to no. 18 402: unchanged.  [Export] [Export as CSV]  (owner, step-up)             |
 +----------------------------------------------------------------------------------------------------+
 ```
 
