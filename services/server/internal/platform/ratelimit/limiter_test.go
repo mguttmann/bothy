@@ -14,7 +14,6 @@ import (
 	"testing"
 	"time"
 
-
 	"github.com/OWNER/bothy/services/server/internal/kernel/clock"
 	"github.com/OWNER/bothy/services/server/internal/kernel/ids"
 	"github.com/OWNER/bothy/services/server/internal/platform/otel/metrics/metricstest"

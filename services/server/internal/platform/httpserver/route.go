@@ -15,7 +15,6 @@ import (
 	"strconv"
 	"time"
 
-
 	"github.com/OWNER/bothy/services/server/internal/kernel/authorize"
 	"github.com/OWNER/bothy/services/server/internal/kernel/errs"
 	"github.com/OWNER/bothy/services/server/internal/kernel/reqmeta"
