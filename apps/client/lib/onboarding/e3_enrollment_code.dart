@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
 
-/// E3 Redeem enrollment code (docs/spec/01-produkt.md 5.6; 08 3.2).
+/// E3 Redeem enrollment code (docs/spec/01-product.md 5.6; 08 3.2).
 library;
 
 import 'package:auth/auth.dart' show normalizeCode;

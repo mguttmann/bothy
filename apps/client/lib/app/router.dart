@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
 
-/// The paths of the app and their parser (docs/spec/15-client-architektur.md 11; brief M4-18
+/// The paths of the app and their parser (docs/spec/15-client-architecture.md 11; brief M4-18
 /// Design note 4; docs/DECISIONS.md D-M4-18-4).
 library;
 

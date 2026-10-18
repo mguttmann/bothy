@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 /// The OIDC redirect of the desktop: a loopback listener on `127.0.0.1` with a free port
-/// (docs/spec/15-client-architektur.md 8, RFC 8252 7.3).
+/// (docs/spec/15-client-architecture.md 8, RFC 8252 7.3).
 library;
 
 import 'dart:async';

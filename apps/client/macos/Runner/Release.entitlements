@@ -2,7 +2,7 @@
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <!-- SPDX-License-Identifier: Apache-2.0 -->
 <!-- network.client: REST and gateway. network.server: the loopback listener of the OIDC
-     redirect on 127.0.0.1 with a free port (docs/spec/15-client-architektur.md 8, RFC 8252).
+     redirect on 127.0.0.1 with a free port (docs/spec/15-client-architecture.md 8, RFC 8252).
      keychain-access-groups: the Data Protection keychain of flutter_secure_storage and the
      device keys (15 9). -->
 <plist version="1.0">

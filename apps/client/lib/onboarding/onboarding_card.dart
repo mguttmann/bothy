@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
 
-/// The card the onboarding screens share on the desktop (docs/spec/01-produkt.md 5.6: a card
+/// The card the onboarding screens share on the desktop (docs/spec/01-product.md 5.6: a card
 /// in the center of an empty window with the branding of the instance).
 library;
 

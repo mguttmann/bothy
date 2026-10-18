@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
 
-/// E7 Logged out (docs/spec/01-produkt.md 5.6; 04 8.5, R-SY-14).
+/// E7 Logged out (docs/spec/01-product.md 5.6; 04 8.5, R-SY-14).
 library;
 
 import 'package:flutter/material.dart';

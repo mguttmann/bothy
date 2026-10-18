@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 /// The foreground and background state of the app for the sync engine (docs/spec/
-/// 15-client-architektur.md 7.2).
+/// 15-client-architecture.md 7.2).
 library;
 
 import 'dart:async';

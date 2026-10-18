@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 /// The composition root of the desktop app (brief M4-18 Design note 1; docs/spec/
-/// 15-client-architektur.md 4; docs/DECISIONS.md D-M4-18-1).
+/// 15-client-architecture.md 4; docs/DECISIONS.md D-M4-18-1).
 ///
 /// [AppPorts] is everything the app takes from the outside world; [productionPorts] builds the
 /// ports of a real desktop build and the integration test entry builds its own. Per server

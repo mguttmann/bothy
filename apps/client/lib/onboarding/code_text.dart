@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
 
-/// Codes and remaining times on the onboarding screens (docs/spec/01-produkt.md 5.6 and 8;
+/// Codes and remaining times on the onboarding screens (docs/spec/01-product.md 5.6 and 8;
 /// brief M4-18 Design note 6; docs/DECISIONS.md D-M4-18-6).
 library;
 

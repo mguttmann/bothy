@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 /// The onboarding screen of a route: reads the controller and the ports and shows E1 to E7
-/// (docs/spec/01-produkt.md 5.6).
+/// (docs/spec/01-product.md 5.6).
 library;
 
 import 'package:domain/domain.dart' show AppConfigValues;

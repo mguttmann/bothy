@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
 
-/// The app widget: theme, languages, router and deep links (docs/spec/15-client-architektur.md
+/// The app widget: theme, languages, router and deep links (docs/spec/15-client-architecture.md
 /// 4 and 11).
 library;
 

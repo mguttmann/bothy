@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 /// The main view of the desktop after the login: the connection banner and the four column
-/// frames that M4-19 to M4-25 fill (docs/spec/01-produkt.md 5.1, 6.6, 6.7).
+/// frames that M4-19 to M4-25 fill (docs/spec/01-product.md 5.1, 6.6, 6.7).
 library;
 
 import 'package:design_system/design_system.dart';

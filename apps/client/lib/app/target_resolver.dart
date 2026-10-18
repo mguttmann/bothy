@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
 
-/// Whether a target of a link may be shown (docs/spec/01-produkt.md 6.7; 15 11; brief M4-18
+/// Whether a target of a link may be shown (docs/spec/01-product.md 6.7; 15 11; brief M4-18
 /// Design note 4).
 library;
 

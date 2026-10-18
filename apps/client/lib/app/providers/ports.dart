@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
 
-/// The outside world of the app as providers (docs/spec/15-client-architektur.md 4).
+/// The outside world of the app as providers (docs/spec/15-client-architecture.md 4).
 library;
 
 import 'package:domain/domain.dart';

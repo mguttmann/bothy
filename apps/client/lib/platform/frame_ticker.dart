@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
 
-/// The frame pacing of the run documents (docs/spec/15-client-architektur.md 7.4).
+/// The frame pacing of the run documents (docs/spec/15-client-architecture.md 7.4).
 library;
 
 import 'package:flutter/scheduler.dart';

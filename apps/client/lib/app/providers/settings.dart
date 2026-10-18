@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 /// The personal settings of the signed-in person, read from `user_settings` in the local
-/// database (docs/spec/01-produkt.md 11; 15 4 "settings, theme, density, motion").
+/// database (docs/spec/01-product.md 11; 15 4 "settings, theme, density, motion").
 library;
 
 import 'package:design_system/design_system.dart';

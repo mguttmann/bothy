@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
 
-/// The system browser for the OIDC login (docs/spec/15-client-architektur.md 8; 08 2.2 item 3).
+/// The system browser for the OIDC login (docs/spec/15-client-architecture.md 8; 08 2.2 item 3).
 library;
 
 import 'package:auth/auth.dart';

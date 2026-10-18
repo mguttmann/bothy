@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
 
-/// The texts of the login errors (docs/spec/01-produkt.md 5.6: the cause and the next step).
+/// The texts of the login errors (docs/spec/01-product.md 5.6: the cause and the next step).
 library;
 
 import 'package:design_system/design_system.dart';

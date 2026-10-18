@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 /// Screen E1: what `getDiscovery` says about the address the person typed (docs/spec/
-/// 01-produkt.md 5.6, R-PR-14; brief M4-18 Design note 3).
+/// 01-product.md 5.6, R-PR-14; brief M4-18 Design note 3).
 library;
 
 import 'dart:io';

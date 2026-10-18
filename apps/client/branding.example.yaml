@@ -1,6 +1,6 @@
 # SPDX-License-Identifier: Apache-2.0
 #
-# Build branding of a neutral build (ADR 0044, docs/spec/01-produkt.md 12): the working app
+# Build branding of a neutral build (ADR 0044, docs/spec/01-product.md 12): the working app
 # name, the URL scheme of deep links, the bundle identifier and the default server. An instance
 # keeps its own branding.yaml in its operator's repository; the distribution of M7 reads more
 # keys from it (icons, update feeds, signing). Until then `dart run tool/branding_defines.dart`

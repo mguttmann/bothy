@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 /// The device keys of M4-10 and M4-11 behind the signer ports of `auth` (docs/spec/
-/// 15-client-architektur.md 9, brief M4-18 Design note 1).
+/// 15-client-architecture.md 9, brief M4-18 Design note 1).
 library;
 
 import 'dart:typed_data';

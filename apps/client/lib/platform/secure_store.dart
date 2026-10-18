@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
 
-/// Secrets of the app in the secure storage of the platform (docs/spec/15-client-architektur.md
+/// Secrets of the app in the secure storage of the platform (docs/spec/15-client-architecture.md
 /// 9; docs/DECISIONS.md D-M4-18-1): the refresh token, the device ID and the database key of
 /// each instance, and the remembered server address.
 library;

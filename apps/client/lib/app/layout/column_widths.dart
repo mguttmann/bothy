@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 /// The widths of the desktop columns and the personal setting that stores them (docs/spec/
-/// 01-produkt.md 5.1 and 11; brief M4-18 Design note 5; docs/DECISIONS.md D-M4-18-5).
+/// 01-product.md 5.1 and 11; brief M4-18 Design note 5; docs/DECISIONS.md D-M4-18-5).
 library;
 
 import 'package:design_system/design_system.dart';

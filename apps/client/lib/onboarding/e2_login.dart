@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
 
-/// E2 Login (docs/spec/01-produkt.md 5.6; 08 2.2, 2.4, 2.5).
+/// E2 Login (docs/spec/01-product.md 5.6; 08 2.2, 2.4, 2.5).
 library;
 
 import 'package:design_system/design_system.dart';

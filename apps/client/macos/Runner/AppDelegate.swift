@@ -6,7 +6,7 @@ import FlutterMacOS
 /// The application delegate of the desktop app on macOS.
 ///
 /// Links of the URL scheme of the build branding (`BRANDING_URL_SCHEME`, docs/spec/
-/// 15-client-architektur.md 11) arrive through `application(_:open:)` and go to Dart over the
+/// 15-client-architecture.md 11) arrive through `application(_:open:)` and go to Dart over the
 /// channel of `DeepLinkChannel`.
 @main
 class AppDelegate: FlutterAppDelegate {

@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
 
-/// The status of the target the router shows (docs/spec/01-produkt.md 6.7).
+/// The status of the target the router shows (docs/spec/01-product.md 6.7).
 library;
 
 import 'package:riverpod_annotation/riverpod_annotation.dart';

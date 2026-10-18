@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
 
-/// Login, store, engine and connection state as providers (docs/spec/15-client-architektur.md
+/// Login, store, engine and connection state as providers (docs/spec/15-client-architecture.md
 /// 4: "connection, sync state, login" are `Notifier`s over `sync_engine` and `auth`).
 library;
 

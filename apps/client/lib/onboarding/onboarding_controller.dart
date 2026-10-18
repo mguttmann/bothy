@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 /// The flow of the onboarding screens E1 to E7 over the login flows of `auth` (docs/spec/
-/// 01-produkt.md 5.6; 08 5 and 14; brief M4-18 Design note 3).
+/// 01-product.md 5.6; 08 5 and 14; brief M4-18 Design note 3).
 library;
 
 import 'dart:async';

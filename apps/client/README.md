@@ -60,7 +60,7 @@ M7 reads more of it). Without the defines a build uses the values of `branding.e
 The app shows `branding.product_name` of the instance after E1, never a name of its own.
 
 A release build on macOS needs a team signature: the release entitlements carry the keychain
-access group of `flutter_secure_storage` (docs/spec/15-client-architektur.md 9). Debug builds run
+access group of `flutter_secure_storage` (docs/spec/15-client-architecture.md 9). Debug builds run
 without one.
 
 ## Test

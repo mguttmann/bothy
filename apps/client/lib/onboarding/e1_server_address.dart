@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
 
-/// E1 Server address (docs/spec/01-produkt.md 5.6, R-PR-14).
+/// E1 Server address (docs/spec/01-product.md 5.6, R-PR-14).
 library;
 
 import 'package:design_system/design_system.dart';

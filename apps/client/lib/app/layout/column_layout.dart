@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
 
-/// The four columns of the desktop main view (docs/spec/01-produkt.md 5.1 D1 and D2, R-PR-01;
+/// The four columns of the desktop main view (docs/spec/01-product.md 5.1 D1 and D2, R-PR-01;
 /// brief M4-18 Design note 5).
 library;
 

@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
 
-/// E4 Device waiting for confirmation (docs/spec/01-produkt.md 5.6; 08 5.2).
+/// E4 Device waiting for confirmation (docs/spec/01-product.md 5.6; 08 5.2).
 library;
 
 import 'package:flutter/material.dart';

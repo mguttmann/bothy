@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
 
-/// E5 Pair with another device (docs/spec/01-produkt.md 5.6; 08 5.3).
+/// E5 Pair with another device (docs/spec/01-product.md 5.6; 08 5.3).
 library;
 
 import 'package:flutter/material.dart';

@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 //
 // Deep links of the URL scheme of the build branding on Windows (docs/spec/
-// 15-client-architektur.md 11, docs/DECISIONS.md D-M4-18-4): the runner registers the scheme
+// 15-client-architecture.md 11, docs/DECISIONS.md D-M4-18-4): the runner registers the scheme
 // for the current user, a second start with a link hands the link to the running window over
 // WM_COPYDATA and exits, and the window forwards links to Dart over the method channel
 // `bothy/deep_links`. Only the Dart side parses a link (lib/app/deep_links.dart).

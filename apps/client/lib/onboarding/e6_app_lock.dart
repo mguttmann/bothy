@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
 
-/// E6 App lock, the screen only (docs/spec/01-produkt.md 5.6; 08 9). The lock logic, its timer
+/// E6 App lock, the screen only (docs/spec/01-product.md 5.6; 08 9). The lock logic, its timer
 /// and the biometric check are M5-08.
 library;
 
