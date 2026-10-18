@@ -3,7 +3,6 @@
 package otel
 
 import (
-	otelapi "go.opentelemetry.io/otel"
 	"context"
 	"net"
 	"net/http"
@@ -14,6 +13,7 @@ import (
 	"testing"
 	"time"
 
+	otelapi "go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/sdk/metric/metricdata"
 	"go.opentelemetry.io/otel/trace"

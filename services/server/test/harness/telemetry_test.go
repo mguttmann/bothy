@@ -18,8 +18,13 @@ import (
 // server installs the global providers.
 func TestTelemetrySinks(t *testing.T) {
 	sinks := NewTelemetrySinks()
-	var proofs atomic.Int64
+	var proofs, tokens atomic.Int64
 	s := Start(t, Options{EgressDenyAll: true, Telemetry: sinks, ProofObserver: func(string) { proofs.Add(1) },
+		TokenObserver: func(access, refresh string) {
+			if access != "" && refresh != "" {
+				tokens.Add(1)
+			}
+		},
 		Config: map[string]string{"telemetry.traces.sampler_ratio": "1.0", "telemetry.logs.exporter": "both", "telemetry.logs.level": "debug"}})
 	MustDo(t, s.Owner, Request{Method: http.MethodGet, Path: "/me"}, http.StatusOK)
 	ctx, cancel := context.WithTimeout(t.Context(), 30*time.Second)
@@ -39,6 +44,9 @@ func TestTelemetrySinks(t *testing.T) {
 	}
 	if proofs.Load() == 0 {
 		t.Error("ProofObserver saw no proof")
+	}
+	if tokens.Load() == 0 {
+		t.Error("TokenObserver saw no token pair (the owner's enrollment)")
 	}
 	if s.SigningKeyDir == "" {
 		t.Error("SigningKeyDir is empty")

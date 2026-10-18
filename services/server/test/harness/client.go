@@ -88,8 +88,10 @@ type Client struct {
 	stepKey   *deviceKey
 	// apiToken marks the client of an agent: access is an API token, there is no device.
 	apiToken bool
-	// proofs is Options.ProofObserver of the server; nil sees nothing.
+	// proofs and tokens are Options.ProofObserver and Options.TokenObserver of the server; nil
+	// sees nothing.
 	proofs func(string)
+	tokens func(access, refresh string)
 	// tb is the test of the server: gateway connections report their frame violations to it (G9).
 	tb testing.TB
 
@@ -265,6 +267,9 @@ func (c *Client) Registration(name string) map[string]any { return c.registratio
 
 // adopt takes over a token pair.
 func (c *Client) adopt(p tokenPair) {
+	if c.tokens != nil {
+		c.tokens(p.AccessToken, p.RefreshToken)
+	}
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	c.access, c.refresh = p.AccessToken, p.RefreshToken

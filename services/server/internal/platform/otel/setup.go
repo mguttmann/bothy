@@ -80,7 +80,8 @@ type Deps struct {
 // Exporters are in-process replacements of the OTLP side, one per signal, for tests that read
 // what the server exports. A set field replaces the OTLP exporter of its signal: no OTLP
 // exporter of that signal is built, whatever the OTEL_* variables say, so the test opens no
-// connection. With telemetry.enabled false nothing is exported, as in production.
+// connection. With telemetry.enabled false spans and log records are not exported, as in
+// production; an injected MetricReader still reads the meter provider.
 type Exporters struct {
 	// Span receives the spans through the bounded queue and the attribute filter of D3.
 	Span sdktrace.SpanExporter
@@ -104,7 +105,7 @@ type Telemetry struct {
 }
 
 // setupOptions replace the OTLP side in tests: spanExporter and logExporter instead of the OTLP
-// exporters, metricReader as an additional reader of the meter provider.
+// exporters, metricReader instead of the OTLP metric reader.
 type setupOptions struct {
 	spanExporter sdktrace.SpanExporter
 	logExporter  sdklog.Exporter

@@ -90,6 +90,10 @@ func StartRun(t testing.TB, o RunOptions) *Run {
 	opts := harness.Options{
 		Config: cfg, LogWriter: r.Logs, Telemetry: r.Tel,
 		ProofObserver: func(p string) { r.Reg.Register(p, ClassSecret, "", "DPoP proof") },
+		TokenObserver: func(access, refresh string) {
+			r.Reg.Register(access, ClassSecret, "", "access token")
+			r.Reg.Register(refresh, ClassSecret, "", "refresh token")
+		},
 	}
 	if o.Harness != nil {
 		o.Harness(&opts)
@@ -108,6 +112,9 @@ func (r *Run) Watch(c *harness.Client, who string) *harness.Client {
 			r.harvest(resp.Body)
 		}
 	})
+	access, refresh := c.Tokens()
+	r.Reg.Register(access, ClassSecret, "", "access token")
+	r.Reg.Register(refresh, ClassSecret, "", "refresh token")
 	r.mu.Lock()
 	r.clients = append(r.clients, c)
 	r.mu.Unlock()
