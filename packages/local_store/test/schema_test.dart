@@ -267,6 +267,8 @@ const Map<String, List<String>> expected = {
     'file_paths',
     'created_at',
   ],
+  // Local only (M4-19): the Done section per forum on this device (01 6.1).
+  'forum_view_states': ['channel_id', 'done_collapsed'],
 };
 
 void main() {
@@ -279,21 +281,19 @@ void main() {
     return [for (final r in rows) r.read<String>('name')];
   }
 
-  test(
-    'schema version 1 has exactly the tables of 15 6.1 except host_key_pins',
-    () async {
-      expect(db.schemaVersion, 1);
-      final rows = await db
-          .customSelect(
-            "SELECT name FROM sqlite_master WHERE type = 'table' "
-            "AND name NOT LIKE 'sqlite_%' AND name NOT LIKE 'search_index_%'",
-          )
-          .get();
-      final tables = {for (final r in rows) r.read<String>('name')};
-      expect(tables, expected.keys.toSet());
-      expect(tables, isNot(contains('host_key_pins')));
-    },
-  );
+  test('schema version 2 has exactly the tables of 15 6.1 except host_key_pins, plus '
+      'forum_view_states', () async {
+    expect(db.schemaVersion, 2);
+    final rows = await db
+        .customSelect(
+          "SELECT name FROM sqlite_master WHERE type = 'table' "
+          "AND name NOT LIKE 'sqlite_%' AND name NOT LIKE 'search_index_%'",
+        )
+        .get();
+    final tables = {for (final r in rows) r.read<String>('name')};
+    expect(tables, expected.keys.toSet());
+    expect(tables, isNot(contains('host_key_pins')));
+  });
 
   for (final entry in expected.entries) {
     test('${entry.key} has the documented columns', () async {

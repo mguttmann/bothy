@@ -10,6 +10,7 @@ library;
 export 'src/cleanup.dart';
 export 'src/daos/commands_dao.dart';
 export 'src/daos/file_cache_dao.dart';
+export 'src/daos/forum_view_dao.dart';
 export 'src/daos/instance_dao.dart';
 export 'src/daos/messages_dao.dart';
 export 'src/daos/outbox_dao.dart';

@@ -38,6 +38,9 @@ and `riverpod_annotation` (state, with `riverpod_generator`), `go_router`, `flut
 | `lib/app/discovery.dart`, `target_resolver.dart` | E1's discovery, "Not found or no access" |
 | `lib/app/providers/` | Riverpod providers (generated `*.g.dart`): ports, session, engine, settings, targets |
 | `lib/app/layout/` | the desktop shell, the four columns and their stored widths |
+| `lib/sidebar/` | the sidebar column (M4-19): head, space tree, channel rows, foot, personal order, `SidebarNavigation` for M4-24 |
+| `lib/forum/` | the post list of a forum (M4-19): head with filters, rows, Done section, "New post" dialog, paging |
+| `lib/sync/` | the app's outbox executors: `putMySidebarSpace` (`sidebar_ops.dart`), `createThread` (`thread_ops.dart`) |
 | `lib/onboarding/` | E1 to E7, the controller of the flow, codes and remaining times |
 | `lib/settings/` | Settings (01 5.1 D8): the sections, the personal settings of 01 11 with their defaults, the profile and the devices section hosting `admin_ui` |
 | `lib/platform/` | secure storage, device key signers, loopback redirect, browser, lifecycle, network, frames |
@@ -78,3 +81,17 @@ without one.
   They start the app from `integration_test/support/test_app.dart`, the only entry that allows
   plain HTTP, with secrets in memory and software device keys, against `FakeServer` on
   `127.0.0.1`.
+  Without a desktop device each file also runs alone on the test runner, for example
+  `flutter test integration_test/forum_test.dart -d flutter-tester`.
+
+## Sidebar and post list
+
+The sidebar (`lib/sidebar/`) and the post list (`lib/forum/`) read the local database through
+Riverpod providers and never query it from a widget (R-CL-03). The person's order and collapse
+state of the spaces is written locally at once and sent through the outbox as
+`putMySidebarSpace`; another device's change arrives as `sidebar.updated` and wins by version
+(04 14). Order keys come from `FractionalIndex` in `domain`, the rule the server validates.
+Counters per channel come from the sync engine and the stored read states. A forum's post list
+pages through `listChannelThreads`, writes new posts as `createThread` through the outbox, and
+keeps the collapse state of its "Done (n)" section per device in `forum_view_states` (01 6.1;
+docs/DECISIONS.md D-M4-19-1 to D-M4-19-7).

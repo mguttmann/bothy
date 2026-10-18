@@ -2,13 +2,15 @@
 
 /// The in-memory world of the fake server (brief M4-17 Design note 3): instance, people with
 /// devices and sessions, spaces, channels, threads, messages with `thread_seq`, the event log
-/// with a global `seq` and a sync epoch, read states, drafts, settings and runs.
+/// with a global `seq` and a sync epoch, read states, drafts, settings and runs; since M4-19
+/// also forums with tags, sidebar states and the instance logo.
 library;
 
 import 'dart:convert';
+import 'dart:typed_data';
 
 import 'package:crypto/crypto.dart';
-import 'package:domain/domain.dart' show EventCatalog;
+import 'package:domain/domain.dart' show EventCatalog, FractionalIndex;
 
 /// A JSON object of the API.
 typedef JsonMap = Map<String, Object?>;
@@ -391,8 +393,15 @@ final class FakeWorld {
   /// The current sync epoch (04 7.5).
   late String syncEpoch;
 
+  /// The ID of the local identity provider that discovery lists.
+  final String localProviderId = '0193f2a7-0000-7000-8000-00000000f001';
+
   /// The product name the instance reports (`branding.product_name`).
   String productName = 'Chat';
+
+  /// The bytes of the instance logo (`getBrandingLogo`), or null when none is set; discovery
+  /// names its URL only when set.
+  Uint8List? logo;
 
   /// The permission version of the instance; every access change raises it (04 8.2).
   int permissionVersion = 1;
@@ -448,6 +457,12 @@ final class FakeWorld {
 
   /// Runs (API `Run`, the run document of 04 11.1) by ID.
   final Map<String, JsonMap> runs = {};
+
+  /// Forum tags by ID (API `ForumTag`).
+  final Map<String, JsonMap> forumTags = {};
+
+  /// Sidebar states (API `SidebarState`) by `<principal>|<space>`.
+  final Map<String, JsonMap> sidebarStates = {};
 
   /// Stored answers of `Idempotency-Key` writes by `<principal>|<key>`.
   final Map<String, StoredResponse> idempotency = {};
@@ -584,6 +599,49 @@ final class FakeWorld {
     return id;
   }
 
+  /// Adds a forum to [spaceId] that the principals of [access] see with their level, sorted by
+  /// [defaultSort] (`forum_default_sort`); returns the channel ID.
+  String addForum(
+    String spaceId,
+    String name,
+    Map<String, String> access, {
+    String defaultSort = 'last_activity',
+  }) {
+    final id = addChannel(spaceId, name, access);
+    channels[id]!.json
+      ..['kind'] = 'forum'
+      ..['forum_default_sort'] = defaultSort;
+    return id;
+  }
+
+  /// Adds the tag [name] to forum [channelId] with the category [color]; returns its ID.
+  String addForumTag(
+    String channelId,
+    String name, {
+    String? color,
+    bool restricted = false,
+  }) {
+    final id = nextId();
+    final order = forumTags.values.where((t) => t['channel_id'] == channelId);
+    forumTags[id] = {
+      'id': id,
+      'channel_id': channelId,
+      'name': name,
+      'color': ?color,
+      'sort_key': 'a${order.length}',
+      'restricted': restricted,
+    };
+    return id;
+  }
+
+  /// The tags of forum [channelId] in their order.
+  List<JsonMap> tagsOf(String channelId) =>
+      forumTags.values.where((t) => t['channel_id'] == channelId).toList()
+        ..sort(
+          (a, b) =>
+              (a['sort_key']! as String).compareTo(b['sort_key']! as String),
+        );
+
   // -------------------------------------------------------------------------------------------
   // Visibility
 
@@ -693,7 +751,7 @@ final class FakeWorld {
       'is_owner': person.isOwner,
       'spaces': spaceViews(principalId),
       'channels': channelViews(principalId),
-      'sidebar': <Object?>[],
+      'sidebar': sidebarOf(principalId),
       'unread_threads': unreadThreads(principalId),
       'active_runs': [
         for (final r in runs.values)
@@ -910,6 +968,7 @@ final class FakeWorld {
       return (message: messages[known.id]!, replay: true);
     }
     final author = people[authorId]!;
+    if (thread['state'] == 'closed') _reopen(threadId, authorId);
     final seq = (thread['last_message_seq']! as int) + 1;
     final id = nextId();
     final mentions = [
@@ -1240,6 +1299,166 @@ final class FakeWorld {
     actor: principalId,
     audience: principalId,
   );
+
+  /// The sidebar states of [principalId] for the spaces it sees (API `SidebarState`).
+  List<JsonMap> sidebarOf(String principalId) => [
+    for (final MapEntry(:key, :value) in sidebarStates.entries)
+      if (key.startsWith('$principalId|') &&
+          seesSpace(principalId, value['space_id']! as String))
+        value,
+  ];
+
+  /// Stores the sidebar state of [principalId] for [spaceId] from a `SidebarStatePut` [body]
+  /// and appends the personal `sidebar.updated` (04 14: last write wins per space).
+  ///
+  /// An absent `sort_key` keeps the stored one, `use_global_order` removes it. Throws
+  /// [FakeProblem]: `404` for a space the principal does not see, `400 validation_failed` for
+  /// a `sort_key` outside the fractional index (`/sort_key`, `invalid`, as the server's
+  /// `fracindex` check of M1-52) or together with `use_global_order`.
+  JsonMap putSidebar(
+    String principalId,
+    String spaceId,
+    JsonMap body, {
+    String? deviceId,
+  }) {
+    if (!spaces.containsKey(spaceId) || !seesSpace(principalId, spaceId)) {
+      throw const FakeProblem(404, 'not_found');
+    }
+    final key = body['sort_key'] as String?;
+    final global = body['use_global_order'] == true;
+    if (key != null && global) {
+      throw const FakeProblem(
+        400,
+        'validation_failed',
+        errors: [
+          {'pointer': '/use_global_order', 'code': 'not_allowed'},
+        ],
+      );
+    }
+    if (key != null && !FractionalIndex.isValid(key)) {
+      throw const FakeProblem(
+        400,
+        'validation_failed',
+        errors: [
+          {'pointer': '/sort_key', 'code': 'invalid'},
+        ],
+      );
+    }
+    final slot = '$principalId|$spaceId';
+    final previous = sidebarStates[slot];
+    final sortKey = global ? null : key ?? previous?['sort_key'];
+    final state = <String, Object?>{
+      'space_id': spaceId,
+      'collapsed': body['collapsed'] == true,
+      'sort_key': ?sortKey,
+      'version': ((previous?['version'] as int?) ?? 0) + 1,
+      'updated_by_device_id': ?deviceId,
+    };
+    sidebarStates[slot] = state;
+    append(
+      'sidebar.updated',
+      resource: {'kind': 'space', 'id': spaceId},
+      scope: {'space_id': spaceId},
+      payload: {'state': state},
+      actor: principalId,
+      audience: principalId,
+    );
+    return state;
+  }
+
+  /// Creates a forum post of [principalId] in [channelId] from a `ThreadCreate` [body]: the
+  /// thread, `thread.created`, then its first message through [createMessage]; returns the
+  /// API `ThreadCreated`.
+  ///
+  /// Throws [FakeProblem]: `404` for a channel the principal does not see, `403 forbidden`
+  /// below `write`, `400 validation_failed` for a forum post without `first_message`
+  /// (`required_for_forum_post`, as the server of M1-56), without a title, with a tag that is
+  /// not a tag of the forum, and for a thread from a message (`parent_message_id`), which the
+  /// fake does not model.
+  JsonMap createThread(String principalId, String channelId, JsonMap body) {
+    final channel = channels[channelId];
+    if (channel == null || !seesChannel(principalId, channelId)) {
+      throw const FakeProblem(404, 'not_found');
+    }
+    if (channel.access[principalId] == 'read') {
+      throw const FakeProblem(403, 'forbidden');
+    }
+    FakeProblem invalid(String pointer, String code) => FakeProblem(
+      400,
+      'validation_failed',
+      errors: [
+        {'pointer': pointer, 'code': code},
+      ],
+    );
+    if (channel.json['kind'] != 'forum' || body['parent_message_id'] != null) {
+      throw invalid('/parent_message_id', 'not_supported_by_fake');
+    }
+    final first = body['first_message'] as JsonMap?;
+    if (first == null) {
+      throw invalid('/first_message', 'required_for_forum_post');
+    }
+    final title = (body['title'] as String?)?.trim() ?? '';
+    if (title.isEmpty) throw invalid('/title', 'required');
+    final tagIds = [...?(body['tag_ids'] as List<Object?>?)?.cast<String>()];
+    for (final tag in tagIds) {
+      if (forumTags[tag]?['channel_id'] != channelId) {
+        throw invalid('/tag_ids', 'unknown_tag');
+      }
+    }
+    final id = addThread(channelId, title, createdBy: principalId);
+    final thread = threads[id]!..['tag_ids'] = tagIds;
+    append(
+      'thread.created',
+      resource: {'kind': 'thread', 'id': id, 'version': thread['version']},
+      scope: _scopeOf(id),
+      payload: {'thread': thread},
+      actor: principalId,
+    );
+    final message = createMessage(principalId, id, first).message;
+    return {'thread': thread, 'first_message': message};
+  }
+
+  /// Marks [threadId] done (`thread.close`) and appends `thread.closed`.
+  void closeThread(String threadId, {String? actor}) {
+    final thread = threads[threadId]!;
+    thread
+      ..['state'] = 'closed'
+      ..['closed_at'] = stamp()
+      ..['version'] = (thread['version']! as int) + 1;
+    if (actor != null) thread['closed_by'] = actor;
+    append(
+      'thread.closed',
+      resource: {
+        'kind': 'thread',
+        'id': threadId,
+        'version': thread['version'],
+      },
+      scope: _scopeOf(threadId),
+      payload: {'thread': thread},
+      actor: actor,
+    );
+  }
+
+  /// Opens the closed [threadId] again and appends `thread.reopened` (01 6.1: a new message
+  /// reopens a done thread).
+  void _reopen(String threadId, String actor) {
+    final thread = threads[threadId]!
+      ..['state'] = 'open'
+      ..remove('closed_at')
+      ..remove('closed_by');
+    thread['version'] = (thread['version']! as int) + 1;
+    append(
+      'thread.reopened',
+      resource: {
+        'kind': 'thread',
+        'id': threadId,
+        'version': thread['version'],
+      },
+      scope: _scopeOf(threadId),
+      payload: {'thread': thread},
+      actor: actor,
+    );
+  }
 
   // -------------------------------------------------------------------------------------------
   // Access

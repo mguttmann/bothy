@@ -37,12 +37,24 @@ void registerAuthHandlers(RestFake rest, {required Duration accessTokenTtl}) {
           'url': gateway.toString(),
           'protocol_versions': [1],
         },
-        'branding': {'product_name': world.productName},
-        'auth_providers': <Object?>[],
+        'branding': {
+          'product_name': world.productName,
+          if (world.logo != null) 'logo_url': '/api/v1/instance/branding/logo',
+        },
+        // The local accounts of Alex and Sam: E2 offers the login name only with a provider
+        // of kind `local` (08 3).
+        'auth_providers': [
+          {'id': world.localProviderId, 'kind': 'local', 'name': 'Local'},
+        ],
         'local_password_enabled': true,
         'jwks_uri': '/api/v1/auth/jwks',
         'webhook_keys_uri': '/api/v1/webhooks/keys',
       });
+    })
+    ..handle('getBrandingLogo', (r) {
+      final logo = world.logo;
+      if (logo == null) throw const FakeProblem(404, 'not_found');
+      return FakeResponse.bytes(logo, contentType: 'image/png');
     })
     ..handle('loginWithPassword', (r) {
       final body = r.json;

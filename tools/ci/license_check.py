@@ -33,6 +33,8 @@ GENERATED = (
     "*/node_modules/*",
     "*.g.dart",
     "*.freezed.dart",
+    # The migration steps `drift_dev make-migrations` writes, without a license header (M4-19).
+    "*.steps.dart",
     "*.gen.go",
     "*_gen.go",
     "*.pb.go",

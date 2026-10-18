@@ -72,6 +72,7 @@ Future<void> storeFetchedMessage(
   MessageBundle b, {
   required bool created,
   String? clientMsgId,
+  int? seq,
 }) async {
   final after = AfterCommit();
   final m = b.message;
@@ -84,6 +85,7 @@ Future<void> storeFetchedMessage(
       b,
       created: created,
       clientMsgId: clientMsgId,
+      seq: seq,
     );
   });
   for (final step in after.steps) {
@@ -101,6 +103,7 @@ Future<void> _message(ApplyContext c, {required bool created}) => _applyMessage(
   messageFromJson(obj(c.payload, 'message')),
   created: created,
   clientMsgId: c.clientMsgId,
+  seq: c.event.seq,
 );
 
 Future<void> _applyMessage(
@@ -110,6 +113,7 @@ Future<void> _applyMessage(
   MessageBundle b, {
   required bool created,
   required String? clientMsgId,
+  int? seq,
 }) async {
   final m = b.message;
   final me = sync.me;
@@ -133,6 +137,7 @@ Future<void> _applyMessage(
     db,
     after,
     created ? MessageCreated(m) : MessageUpdated(m, previous: previous),
+    seq: seq,
   );
 }
 
@@ -152,6 +157,7 @@ Future<void> _deleted(ApplyContext c) async {
     c.sync,
     c.db,
     c.after,
+    seq: c.event.seq,
     MessageDeleted(
       messageId: id,
       threadId: ThreadId.parse(str(p, 'thread_id')),
@@ -162,27 +168,37 @@ Future<void> _deleted(ApplyContext c) async {
 }
 
 /// Feeds the [UnreadCounter] after the commit with the read position and the import floor of
-/// the thread as stored now (04 14).
+/// the thread as stored now (04 14) and the global [seq] of the event; the counter skips an
+/// event its server values hold already (D-M4-19-10).
 Future<void> _count(
   SyncContext sync,
   LocalDatabase db,
   AfterCommit after,
-  MessageEvent event,
-) async {
+  MessageEvent event, {
+  int? seq,
+}) async {
   final me = sync.me;
   if (me == null) return;
   final read = await db.personalDao.readState(event.threadId);
   final thread = await db.threadsDao.byId(event.threadId);
   final lastRead = read?.lastReadSeq ?? const ThreadSeq(0);
   final floor = thread?.unreadFloorSeq ?? const ThreadSeq(0);
+  final channel = switch (event) {
+    MessageCreated(:final message) ||
+    MessageUpdated(:final message) => message.channelId,
+    MessageDeleted(:final previous) =>
+      thread?.channelId ?? previous?.channelId ?? read?.channelId,
+  };
   after.steps.add(() {
     sync.counter.apply(
       event,
       me: me,
       lastReadSeq: lastRead,
       unreadFloorSeq: floor,
+      at: seq == null ? null : GlobalSeq(seq),
     );
     sync.countedThreads.add(event.threadId);
+    if (channel != null) sync.counterChannels[event.threadId] = channel;
     sync.counterChanges.add(event.threadId);
   });
 }

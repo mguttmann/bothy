@@ -39,6 +39,8 @@ OTHER = {
     "**/*.freezed.dart",
     # Generated drift code of the Dart workspace (docs/DECISIONS.md D-M4-01-4).
     "**/*.drift.dart",
+    # The migration steps of drift_dev make-migrations (brief M4-19).
+    "**/*.steps.dart",
     "**/testdata/**",
 }
 # Files whose path looks like generated code. Each one that a lint rule exempts must be one that

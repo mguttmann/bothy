@@ -31,6 +31,7 @@ class ColumnLayout extends StatefulWidget {
     required this.history,
     required this.session,
     this.stackShowsHistory = false,
+    this.showPostList = true,
   });
 
   /// The stored widths.
@@ -59,6 +60,10 @@ class ColumnLayout extends StatefulWidget {
 
   /// In the stacked form: whether the history (a thread is open) or the post list shows.
   final bool stackShowsHistory;
+
+  /// Whether the post list column shows; only a forum has one (01 5.1: D2, a text channel,
+  /// shows no post list; brief M4-19 Design note 5).
+  final bool showPostList;
 
   @override
   State<ColumnLayout> createState() => _ColumnLayoutState();
@@ -104,18 +109,19 @@ class _ColumnLayoutState extends State<ColumnLayout> {
       final total = constraints.maxWidth;
       final four = total >= widget.minWidthFourColumns;
       final stacked = total < widget.minWidthThreeColumns;
+      final list = widget.showPostList;
       final widths = fitColumns(
         _widths,
         sized: [
           AppColumn.sidebar,
-          if (!stacked) AppColumn.postList,
+          if (!stacked && list) AppColumn.postList,
           if (four) AppColumn.session,
         ],
         total: total,
       );
       final sized = <String>[
         AppColumn.sidebar,
-        if (!stacked) AppColumn.postList,
+        if (!stacked && list) AppColumn.postList,
         if (four) AppColumn.session,
       ];
       _total = total;
@@ -129,7 +135,7 @@ class _ColumnLayoutState extends State<ColumnLayout> {
         onDrag: (dx) => _drag(column, growsLeft ? -dx : dx),
         onEnd: _end,
       );
-      final middle = stacked
+      final middle = stacked && list
           ? (widget.stackShowsHistory
                 ? _ColumnFrame(column: AppColumn.history, child: widget.history)
                 : _ColumnFrame(
@@ -142,7 +148,7 @@ class _ColumnLayoutState extends State<ColumnLayout> {
         children: [
           fixed(AppColumn.sidebar, widget.sidebar),
           handle(AppColumn.sidebar),
-          if (!stacked) ...[
+          if (!stacked && list) ...[
             fixed(AppColumn.postList, widget.postList),
             handle(AppColumn.postList),
           ],

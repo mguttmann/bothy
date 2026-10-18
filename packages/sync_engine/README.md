@@ -268,7 +268,14 @@ executors.register(
 Registered by this package: `MessageOps.register` (`createMessage`, `updateMessage`,
 `deleteMessage`, `addReaction`, `removeReaction`) and `PersonalOps.register` (`putReadState`,
 `putThreadDraft`, `deleteThreadDraft`, `putMySetting`, `deleteMySetting`). M4-21 adds the
-interactions and commands, M4-22 the uploads.
+interactions and commands, M4-22 the uploads. An app registers its own writes with the
+`registerExecutors` argument of `SyncEngine.create` (M4-19: `putMySidebarSpace` and
+`createThread` of `apps/client/lib/sync/`).
+
+The sidebar counters (M4-19, 04 14): `CatchUpListener.countsOfChannel` returns the counts of
+every thread of a channel the engine counts (the snapshot's `unread_threads`, read states and
+message events name the channel), and `loadThreadPage` stores one page of
+`listChannelThreads` and returns the next cursor (the paging of the post list).
 
 ## Run documents (M4-16)
 
@@ -381,9 +388,16 @@ the connections that may see them. Test controls: `addPerson`, `addSpace`, `addC
 `412 version_conflict` with `current`, `410 message_deleted`), `deleteMessage` (idempotent
 `204`), `addReaction`, `removeReaction`, `putReadState`, `putThreadDraft`,
 `deleteThreadDraft`, `listMyReadStates`, `listMyDrafts`, `listMySettings`, `putMySetting`,
-`deleteMySetting`, `getRun`, `cancelRun`, and from M4-25 in `rest/self_handlers.dart`
-`listMyDevices`, `revokeDevice`, `listMySessions` (with `current`), `revokeSession`,
-`updateMyProfile`, `createStepUpChallenge` and `completeStepUpWithDeviceKey`. Other writes with `Idempotency-Key` repeat their
+`deleteMySetting`, `getRun`, `cancelRun`; since M4-19 also `getMySidebar`,
+`putMySidebarSpace` (the `fracindex` check of the server: a `sort_key` outside the fractional
+index is `400 validation_failed` at `/sort_key`), `listForumTags`, `createThread` (forum posts
+only; without `first_message` `400 required_for_forum_post`), `getBrandingLogo` (bytes of
+`world.logo`, else `404`) and `listChannelThreads` with `state`, `tag_id`, `sort`, `limit` and
+an offset cursor; and from M4-25 in `rest/self_handlers.dart` `listMyDevices`, `revokeDevice`,
+`listMySessions` (with `current`), `revokeSession`, `updateMyProfile`, `createStepUpChallenge`
+and `completeStepUpWithDeviceKey`. The world has `addForum`, `addForumTag`, `closeThread` and
+`putSidebar`; a new message in a closed thread reopens it (`thread.reopened`, 01 6.1). Other
+writes with `Idempotency-Key` repeat their
 stored answer (04 5.2). Later tickets add operations with `server.handle(operationId,
 handler)` in their own `rest/` file (D-M4-17-2). Gateway: `hello`, `identify`, `resume`,
 `ready` with the snapshot, catch-up in pages with `cursor` frames, `catchup.complete`,

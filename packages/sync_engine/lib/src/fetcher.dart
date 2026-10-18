@@ -5,6 +5,7 @@
 /// after a truncated event, the structure of new targets and the personal lists.
 library;
 
+import 'package:api_client/api_client.dart' as api show ForumSort;
 import 'package:api_client/api_client.dart' show ApiClient, standardSerializers;
 import 'package:built_value/serializer.dart';
 import 'package:domain/domain.dart';
@@ -42,6 +43,18 @@ final class StructureData {
 
   /// Threads.
   final List<Thread> threads;
+}
+
+/// One page of `listChannelThreads` (API `ThreadPage`).
+final class ThreadListPage {
+  /// Creates a page.
+  const ThreadListPage({required this.threads, this.nextCursor});
+
+  /// The threads of the page, in the server's order.
+  final List<Thread> threads;
+
+  /// The cursor of the next page; null on the last page.
+  final String? nextCursor;
 }
 
 /// The REST reads of the sync engine. Errors are those of `api_client` (a `DioException`
@@ -83,6 +96,16 @@ abstract interface class Fetcher {
   /// and `listSpaceChannels` per space, `getChannel` per channel, and the first page of
   /// `listChannelThreads` of every channel found.
   Future<StructureData> loadStructure(List<TargetRef> targets);
+
+  /// One page of `listChannelThreads` of [channelId] sorted by [sort] (null: the server's
+  /// default), from [cursor] (null: the first page), at most [limit] threads (null: the
+  /// server's page size).
+  Future<ThreadListPage> channelThreads(
+    ChannelId channelId, {
+    String? cursor,
+    ForumSort? sort,
+    int? limit,
+  });
 
   /// `listMyDrafts`.
   Future<List<Draft>> myDrafts();
@@ -230,6 +253,31 @@ final class ApiFetcher implements Fetcher {
       ]);
     }
     return StructureData(spaces: spaces, channels: channels, threads: threads);
+  }
+
+  @override
+  Future<ThreadListPage> channelThreads(
+    ChannelId channelId, {
+    String? cursor,
+    ForumSort? sort,
+    int? limit,
+  }) async {
+    final page = _json(
+      (await _client.getThreadsApi().listChannelThreads(
+        channelId: channelId.value,
+        cursor: cursor,
+        limit: limit,
+        sort: sort == null || sort == ForumSort.unknown
+            ? null
+            : sort == ForumSort.created
+            ? api.ForumSort.created
+            : api.ForumSort.lastActivity,
+      )).data,
+    );
+    return ThreadListPage(
+      threads: [for (final t in objList(page, 'items')) threadFromJson(t)],
+      nextCursor: optStr(page, 'next_cursor'),
+    );
   }
 
   @override

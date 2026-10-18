@@ -3504,6 +3504,180 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Licenses'**
   String get settingsAboutLicenses;
+
+  /// Placeholder of the quick switcher field at the top of the sidebar; M4-23 opens the switcher (components.md section 7).
+  ///
+  /// In en, this message translates to:
+  /// **'Jump to'**
+  String get sidebarJumpTo;
+
+  /// Entry of the sidebar that opens the cross-cutting view of active runs; M4-23 wires it (01 section 4).
+  ///
+  /// In en, this message translates to:
+  /// **'Running now'**
+  String get sidebarRunningNow;
+
+  /// Button next to the own avatar at the bottom of the sidebar (components.md section 7).
+  ///
+  /// In en, this message translates to:
+  /// **'Settings'**
+  String get sidebarSettings;
+
+  /// Semantics label of the own avatar at the bottom of the sidebar.
+  ///
+  /// In en, this message translates to:
+  /// **'{name}, signed in'**
+  String sidebarOwnAvatar(String name);
+
+  /// Accessibility action of a space row that moves the space one place up in the personal order (components.md section 7).
+  ///
+  /// In en, this message translates to:
+  /// **'Move up'**
+  String get sidebarMoveUp;
+
+  /// Accessibility action of a space row that moves the space one place down in the personal order (components.md section 7).
+  ///
+  /// In en, this message translates to:
+  /// **'Move down'**
+  String get sidebarMoveDown;
+
+  /// Text of the sidebar while the person sees no space.
+  ///
+  /// In en, this message translates to:
+  /// **'No spaces yet'**
+  String get sidebarNoSpaces;
+
+  /// Primary button in the header of the post list and title of the dialog that creates a forum post (components.md section 6).
+  ///
+  /// In en, this message translates to:
+  /// **'New post'**
+  String get postListNewPost;
+
+  /// Filter chip of the post list: every open post (components.md section 6).
+  ///
+  /// In en, this message translates to:
+  /// **'Open'**
+  String get postListFilterOpen;
+
+  /// Filter chip of the post list: posts with a question of a run the reader started, or an unread mention of the reader (components.md section 6).
+  ///
+  /// In en, this message translates to:
+  /// **'Waiting for me'**
+  String get postListFilterWaitingForMe;
+
+  /// Filter chip of the post list that opens the tag selection (components.md section 6).
+  ///
+  /// In en, this message translates to:
+  /// **'Tags'**
+  String get postListFilterTags;
+
+  /// Filter chip of the post list with the number of selected tags.
+  ///
+  /// In en, this message translates to:
+  /// **'Tags ({count})'**
+  String postListFilterTagsCount(int count);
+
+  /// Sort chip of the post list: newest activity first.
+  ///
+  /// In en, this message translates to:
+  /// **'Last activity'**
+  String get postListSortLastActivity;
+
+  /// Sort chip of the post list: newest post first (sort by creation).
+  ///
+  /// In en, this message translates to:
+  /// **'Newest first'**
+  String get postListSortCreated;
+
+  /// Row that collapses or expands the section of done posts at the bottom of the post list (01 section 6.1).
+  ///
+  /// In en, this message translates to:
+  /// **'Done ({count})'**
+  String postListDone(int count);
+
+  /// Row of the done section while further pages of the forum are not loaded yet, so more done posts may exist (01 section 6.1).
+  ///
+  /// In en, this message translates to:
+  /// **'Done ({count}+)'**
+  String postListDoneMore(int count);
+
+  /// Text of the post list when no open post matches the filters.
+  ///
+  /// In en, this message translates to:
+  /// **'No open post here'**
+  String get postListEmpty;
+
+  /// Notice in the post list when the server refused a new post; the outbox keeps it until the person tries again or discards it.
+  ///
+  /// In en, this message translates to:
+  /// **'\"{title}\" could not be posted'**
+  String postListCreateFailed(String title);
+
+  /// Button of a refused new post: sends it again.
+  ///
+  /// In en, this message translates to:
+  /// **'Try again'**
+  String get postListTryAgain;
+
+  /// Button of a refused new post: deletes it.
+  ///
+  /// In en, this message translates to:
+  /// **'Discard'**
+  String get postListDiscard;
+
+  /// Row at the end of the post list when a page failed; its button tries again.
+  ///
+  /// In en, this message translates to:
+  /// **'More posts could not be loaded'**
+  String get postListLoadFailed;
+
+  /// Button of a refused new post: opens it in the New post dialog to change and send it again.
+  ///
+  /// In en, this message translates to:
+  /// **'Edit'**
+  String get postListEdit;
+
+  /// Second line of a refused new post with the server's reason.
+  ///
+  /// In en, this message translates to:
+  /// **'Reason: {reason}'**
+  String postListFailureReason(String reason);
+
+  /// Semantics label of the post list of a forum.
+  ///
+  /// In en, this message translates to:
+  /// **'Post list of {forum}'**
+  String postListLabel(String forum);
+
+  /// Label of the title field of the dialog that creates a forum post.
+  ///
+  /// In en, this message translates to:
+  /// **'Title'**
+  String get newPostTitle;
+
+  /// Label of the field for the first message of a new forum post.
+  ///
+  /// In en, this message translates to:
+  /// **'First message'**
+  String get newPostMessage;
+
+  /// Label of the tag selection of the dialog that creates a forum post.
+  ///
+  /// In en, this message translates to:
+  /// **'Tags'**
+  String get newPostTags;
+
+  /// Button of the dialog that creates the forum post.
+  ///
+  /// In en, this message translates to:
+  /// **'Create post'**
+  String get newPostCreate;
+
+  /// Button of the dialog that closes it without creating a post.
+  ///
+  /// In en, this message translates to:
+  /// **'Cancel'**
+  String get newPostCancel;
 }
 
 class _AppLocalizationsDelegate

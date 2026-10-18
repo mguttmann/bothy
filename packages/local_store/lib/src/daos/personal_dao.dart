@@ -52,6 +52,10 @@ final class PersonalDao {
           .map(readStateFromRow)
           .watch();
 
+  /// The read states of every thread (the counters of the sidebar, 04 14).
+  Stream<List<ReadState>> watchAllReadStates() =>
+      _db.select(_db.readStates).map(readStateFromRow).watch();
+
   /// Stores [draft] if its version is newer; returns whether it applied.
   Future<bool> upsertDraftIfNewer(Draft draft) {
     final row = draftToCompanion(draft);
@@ -162,6 +166,10 @@ final class PersonalDao {
     final rows = await _db.select(_db.notificationPreferences).get();
     return [for (final row in rows) preferenceFromRow(row)];
   }
+
+  /// Every notification preference, emitted on each change (the muted state of the sidebar).
+  Stream<List<NotificationPreference>> watchNotificationPreferences() =>
+      _db.select(_db.notificationPreferences).map(preferenceFromRow).watch();
 
   /// Stores the quiet hours [rule] if its version is newer; returns whether it applied.
   Future<bool> upsertQuietHoursIfNewer(QuietHours rule) {

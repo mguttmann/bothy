@@ -29,6 +29,7 @@ export 'src/rules/cost_label.dart';
 export 'src/rules/cursor_rule.dart';
 export 'src/rules/event_catalog.dart';
 export 'src/rules/forum_order.dart';
+export 'src/rules/fractional_index.dart';
 export 'src/rules/loaded_ranges.dart';
 export 'src/rules/message_grouping.dart';
 export 'src/rules/read_state_rule.dart';

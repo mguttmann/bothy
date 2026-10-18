@@ -77,6 +77,38 @@ final class StructureDao {
     );
   }
 
+  /// Writes the sidebar state of [spaceId] at once on this device, before the server confirms
+  /// it (brief M4-19 Design note 2): [collapsed], and [sortKey] when given (null keeps the
+  /// stored order). The version stays, so the server's state of the write (stored by the
+  /// executor) and a later change of another device win by version (04 14); a missing row
+  /// starts at version 0.
+  Future<void> putUserSpaceStateLocally(
+    SpaceId spaceId, {
+    required bool collapsed,
+    String? sortKey,
+  }) => _db.transaction(() async {
+    final updated =
+        await (_db.update(
+          _db.userSpaceStates,
+        )..where((t) => t.spaceId.equals(spaceId.value))).write(
+          UserSpaceStatesCompanion(
+            collapsed: Value(collapsed),
+            sortKey: sortKey == null ? const Value.absent() : Value(sortKey),
+          ),
+        );
+    if (updated > 0) return;
+    await _db
+        .into(_db.userSpaceStates)
+        .insert(
+          UserSpaceStatesCompanion.insert(
+            spaceId: spaceId.value,
+            collapsed: collapsed,
+            sortKey: Value(sortKey),
+            version: 0,
+          ),
+        );
+  });
+
   /// The sidebar states of all spaces.
   Stream<List<UserSpaceState>> watchUserSpaceStates() =>
       _db.select(_db.userSpaceStates).map(userSpaceStateFromRow).watch();
@@ -106,6 +138,10 @@ final class StructureDao {
     final rows = await _channelQuery((t) => t.id.equals(id.value)).get();
     return rows.isEmpty ? null : rows.first;
   }
+
+  /// The channel [id] on every change, null while it is not stored.
+  Stream<Channel?> watchChannel(ChannelId id) =>
+      _channelQuery((t) => t.id.equals(id.value)).watchSingleOrNull();
 
   /// The channels of space [spaceId] in their order; with null the direct messages.
   Stream<List<Channel>> watchChannels(SpaceId? spaceId) => _channelQuery(

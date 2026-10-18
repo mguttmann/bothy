@@ -2954,5 +2954,163 @@
   "settingsAboutLicenses": "Licenses",
   "@settingsAboutLicenses": {
     "description": "Button that opens the licenses page."
+  },
+  "sidebarJumpTo": "Jump to",
+  "@sidebarJumpTo": {
+    "description": "Placeholder of the quick switcher field at the top of the sidebar; M4-23 opens the switcher (components.md section 7)."
+  },
+  "sidebarRunningNow": "Running now",
+  "@sidebarRunningNow": {
+    "description": "Entry of the sidebar that opens the cross-cutting view of active runs; M4-23 wires it (01 section 4)."
+  },
+  "sidebarSettings": "Settings",
+  "@sidebarSettings": {
+    "description": "Button next to the own avatar at the bottom of the sidebar (components.md section 7)."
+  },
+  "sidebarOwnAvatar": "{name}, signed in",
+  "@sidebarOwnAvatar": {
+    "description": "Semantics label of the own avatar at the bottom of the sidebar.",
+    "placeholders": {
+      "name": {
+        "type": "String",
+        "example": "Alex"
+      }
+    }
+  },
+  "sidebarMoveUp": "Move up",
+  "@sidebarMoveUp": {
+    "description": "Accessibility action of a space row that moves the space one place up in the personal order (components.md section 7)."
+  },
+  "sidebarMoveDown": "Move down",
+  "@sidebarMoveDown": {
+    "description": "Accessibility action of a space row that moves the space one place down in the personal order (components.md section 7)."
+  },
+  "sidebarNoSpaces": "No spaces yet",
+  "@sidebarNoSpaces": {
+    "description": "Text of the sidebar while the person sees no space."
+  },
+  "postListNewPost": "New post",
+  "@postListNewPost": {
+    "description": "Primary button in the header of the post list and title of the dialog that creates a forum post (components.md section 6)."
+  },
+  "postListFilterOpen": "Open",
+  "@postListFilterOpen": {
+    "description": "Filter chip of the post list: every open post (components.md section 6)."
+  },
+  "postListFilterWaitingForMe": "Waiting for me",
+  "@postListFilterWaitingForMe": {
+    "description": "Filter chip of the post list: posts with a question of a run the reader started, or an unread mention of the reader (components.md section 6)."
+  },
+  "postListFilterTags": "Tags",
+  "@postListFilterTags": {
+    "description": "Filter chip of the post list that opens the tag selection (components.md section 6)."
+  },
+  "postListFilterTagsCount": "Tags ({count})",
+  "@postListFilterTagsCount": {
+    "description": "Filter chip of the post list with the number of selected tags.",
+    "placeholders": {
+      "count": {
+        "type": "int",
+        "example": "14"
+      }
+    }
+  },
+  "postListSortLastActivity": "Last activity",
+  "@postListSortLastActivity": {
+    "description": "Sort chip of the post list: newest activity first."
+  },
+  "postListSortCreated": "Newest first",
+  "@postListSortCreated": {
+    "description": "Sort chip of the post list: newest post first (sort by creation)."
+  },
+  "postListDone": "Done ({count})",
+  "@postListDone": {
+    "description": "Row that collapses or expands the section of done posts at the bottom of the post list (01 section 6.1).",
+    "placeholders": {
+      "count": {
+        "type": "int",
+        "example": "14"
+      }
+    }
+  },
+  "postListDoneMore": "Done ({count}+)",
+  "@postListDoneMore": {
+    "description": "Row of the done section while further pages of the forum are not loaded yet, so more done posts may exist (01 section 6.1).",
+    "placeholders": {
+      "count": {
+        "type": "int",
+        "example": "14"
+      }
+    }
+  },
+  "postListEmpty": "No open post here",
+  "@postListEmpty": {
+    "description": "Text of the post list when no open post matches the filters."
+  },
+  "postListCreateFailed": "\"{title}\" could not be posted",
+  "@postListCreateFailed": {
+    "description": "Notice in the post list when the server refused a new post; the outbox keeps it until the person tries again or discards it.",
+    "placeholders": {
+      "title": {
+        "type": "String",
+        "example": "Printer jam"
+      }
+    }
+  },
+  "postListTryAgain": "Try again",
+  "@postListTryAgain": {
+    "description": "Button of a refused new post: sends it again."
+  },
+  "postListDiscard": "Discard",
+  "@postListDiscard": {
+    "description": "Button of a refused new post: deletes it."
+  },
+  "postListLoadFailed": "More posts could not be loaded",
+  "@postListLoadFailed": {
+    "description": "Row at the end of the post list when a page failed; its button tries again."
+  },
+  "postListEdit": "Edit",
+  "@postListEdit": {
+    "description": "Button of a refused new post: opens it in the New post dialog to change and send it again."
+  },
+  "postListFailureReason": "Reason: {reason}",
+  "@postListFailureReason": {
+    "description": "Second line of a refused new post with the server's reason.",
+    "placeholders": {
+      "reason": {
+        "type": "String",
+        "example": "forbidden"
+      }
+    }
+  },
+  "postListLabel": "Post list of {forum}",
+  "@postListLabel": {
+    "description": "Semantics label of the post list of a forum.",
+    "placeholders": {
+      "forum": {
+        "type": "String",
+        "example": "questions"
+      }
+    }
+  },
+  "newPostTitle": "Title",
+  "@newPostTitle": {
+    "description": "Label of the title field of the dialog that creates a forum post."
+  },
+  "newPostMessage": "First message",
+  "@newPostMessage": {
+    "description": "Label of the field for the first message of a new forum post."
+  },
+  "newPostTags": "Tags",
+  "@newPostTags": {
+    "description": "Label of the tag selection of the dialog that creates a forum post."
+  },
+  "newPostCreate": "Create post",
+  "@newPostCreate": {
+    "description": "Button of the dialog that creates the forum post."
+  },
+  "newPostCancel": "Cancel",
+  "@newPostCancel": {
+    "description": "Button of the dialog that closes it without creating a post."
   }
 }

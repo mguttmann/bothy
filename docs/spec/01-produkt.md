@@ -1180,6 +1180,8 @@ sentence "The data of this device has been deleted" (04, section 8.5, R-SY-14) a
 - "Erledigt" (`thread.close`) im Thread-Kopf, im Kontextmenü der Beitragsliste und per Kürzel.
 - Erledigte Beiträge stehen unten im Bereich "Erledigt (n)", standardmäßig eingeklappt; der
   Zustand des Einklappens ist persönlich je Forum.
+  The collapse state is kept per forum on each device in the local database and is not
+  synchronized, because 11 has no setting key for it (docs/DECISIONS.md D-M4-19-4).
 - Eine neue Nachricht in einem erledigten Thread öffnet ihn wieder (`thread.reopen` implizit). Im
   Verlauf erscheint eine System-Zeile "Wieder geöffnet durch Nachricht von Sam".
 - Das Wort "erledigt" als Nachricht ist kein Befehl; der Weg ist der Knopf oder ein Befehl, den ein

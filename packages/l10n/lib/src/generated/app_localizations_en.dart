@@ -2069,4 +2069,105 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get settingsAboutLicenses => 'Licenses';
+
+  @override
+  String get sidebarJumpTo => 'Jump to';
+
+  @override
+  String get sidebarRunningNow => 'Running now';
+
+  @override
+  String get sidebarSettings => 'Settings';
+
+  @override
+  String sidebarOwnAvatar(String name) {
+    return '$name, signed in';
+  }
+
+  @override
+  String get sidebarMoveUp => 'Move up';
+
+  @override
+  String get sidebarMoveDown => 'Move down';
+
+  @override
+  String get sidebarNoSpaces => 'No spaces yet';
+
+  @override
+  String get postListNewPost => 'New post';
+
+  @override
+  String get postListFilterOpen => 'Open';
+
+  @override
+  String get postListFilterWaitingForMe => 'Waiting for me';
+
+  @override
+  String get postListFilterTags => 'Tags';
+
+  @override
+  String postListFilterTagsCount(int count) {
+    return 'Tags ($count)';
+  }
+
+  @override
+  String get postListSortLastActivity => 'Last activity';
+
+  @override
+  String get postListSortCreated => 'Newest first';
+
+  @override
+  String postListDone(int count) {
+    return 'Done ($count)';
+  }
+
+  @override
+  String postListDoneMore(int count) {
+    return 'Done ($count+)';
+  }
+
+  @override
+  String get postListEmpty => 'No open post here';
+
+  @override
+  String postListCreateFailed(String title) {
+    return '\"$title\" could not be posted';
+  }
+
+  @override
+  String get postListTryAgain => 'Try again';
+
+  @override
+  String get postListDiscard => 'Discard';
+
+  @override
+  String get postListLoadFailed => 'More posts could not be loaded';
+
+  @override
+  String get postListEdit => 'Edit';
+
+  @override
+  String postListFailureReason(String reason) {
+    return 'Reason: $reason';
+  }
+
+  @override
+  String postListLabel(String forum) {
+    return 'Post list of $forum';
+  }
+
+  @override
+  String get newPostTitle => 'Title';
+
+  @override
+  String get newPostMessage => 'First message';
+
+  @override
+  String get newPostTags => 'Tags';
+
+  @override
+  String get newPostCreate => 'Create post';
+
+  @override
+  String get newPostCancel => 'Cancel';
 }

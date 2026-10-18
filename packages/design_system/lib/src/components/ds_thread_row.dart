@@ -154,7 +154,13 @@ class DsThreadRowState extends State<DsThreadRow> {
               decorative: true,
             ),
             const SizedBox(width: DsSpace.s4),
-            Text(d.errorText!, style: caption.copyWith(color: colors.dangerFg)),
+            // A long reason wraps in a narrow column instead of overflowing it.
+            Flexible(
+              child: Text(
+                d.errorText!,
+                style: caption.copyWith(color: colors.dangerFg),
+              ),
+            ),
           ],
         ),
     ];
