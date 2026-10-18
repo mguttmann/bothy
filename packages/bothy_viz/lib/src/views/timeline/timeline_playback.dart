@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
 
-/// Playback of the daily timeline (docs/spec/25-visualisierung.md 6.5; brief M6-12, design
+/// Playback of the daily timeline (docs/spec/25-visualization.md 6.5; brief M6-12, design
 /// note 5).
 library;
 

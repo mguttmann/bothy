@@ -17,7 +17,7 @@ import 'live_topology_view.dart';
 import 'timeline_view.dart';
 import 'viz_host_options.dart';
 
-/// The views of docs/spec/25-visualisierung.md 6.
+/// The views of docs/spec/25-visualization.md 6.
 enum VizViewKind {
   /// Live topology (6.1).
   liveTopology,

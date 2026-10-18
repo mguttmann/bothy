@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
 
-/// What only the host of a view knows (docs/spec/25-visualisierung.md 6, 7.1; brief M6-12,
+/// What only the host of a view knows (docs/spec/25-visualization.md 6, 7.1; brief M6-12,
 /// design note 1).
 library;
 

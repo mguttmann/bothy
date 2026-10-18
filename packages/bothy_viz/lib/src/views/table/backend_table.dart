@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
 
-/// The table view of the backend view (docs/spec/25-visualisierung.md 6.2, 7.4).
+/// The table view of the backend view (docs/spec/25-visualization.md 6.2, 7.4).
 library;
 
 import '../../marks/viz_texts.dart';

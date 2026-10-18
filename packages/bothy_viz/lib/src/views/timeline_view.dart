@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
 
-/// The replayable daily timeline (docs/spec/25-visualisierung.md 6.5).
+/// The replayable daily timeline (docs/spec/25-visualization.md 6.5).
 library;
 
 import 'dart:async';

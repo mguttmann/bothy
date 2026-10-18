@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
 
-/// The table view of the executive page (docs/spec/25-visualisierung.md 6.4, 7.4).
+/// The table view of the executive page (docs/spec/25-visualization.md 6.4, 7.4).
 library;
 
 import '../../marks/metric_tile_mark.dart';

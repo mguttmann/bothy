@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
 
-/// TV mode (docs/spec/25-visualisierung.md 6.6; screen D13; brief M6-12, design note 4).
+/// TV mode (docs/spec/25-visualization.md 6.6; screen D13; brief M6-12, design note 4).
 library;
 
 import 'package:design_system/design_system.dart';

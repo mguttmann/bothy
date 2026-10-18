@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
 
-/// Delivery and sync live (docs/spec/25-visualisierung.md 6.3).
+/// Delivery and sync live (docs/spec/25-visualization.md 6.3).
 library;
 
 import 'dart:async';

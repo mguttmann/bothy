@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
 
-/// The executive page (docs/spec/25-visualisierung.md 6.4).
+/// The executive page (docs/spec/25-visualization.md 6.4).
 library;
 
 import 'dart:async';

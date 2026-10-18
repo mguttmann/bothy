@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
 
-/// The table view of every view (docs/spec/25-visualisierung.md 7.4; brief M6-12, design note 3).
+/// The table view of every view (docs/spec/25-visualization.md 7.4; brief M6-12, design note 3).
 library;
 
 import 'package:design_system/design_system.dart';

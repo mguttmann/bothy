@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
 
-/// The performance test of the live topology (docs/spec/25-visualisierung.md 7.3; brief
+/// The performance test of the live topology (docs/spec/25-visualization.md 7.3; brief
 /// M6-12, design note 6): the `load` frame with exactly the default of `stats.live_max_runs`
 /// runs, replayed every `stats.live_interval` of the fixture clock, builds a frame within
 /// `viz.perf.frame_build_p95` at p95.
