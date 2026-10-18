@@ -12,6 +12,7 @@ groups:
       /
       (sum(rate(bothy_run_start_latency_seconds_count{job="bothy/bothy-server",bothy_outcome!="cancelled"}[5m])))
     labels:
+      bothy_sli_metric: sli.run_start
       component: agents
       sloth_id: bothy-agents-run-start
       sloth_service: bothy-agents
@@ -23,6 +24,7 @@ groups:
       /
       (sum(rate(bothy_run_start_latency_seconds_count{job="bothy/bothy-server",bothy_outcome!="cancelled"}[30m])))
     labels:
+      bothy_sli_metric: sli.run_start
       component: agents
       sloth_id: bothy-agents-run-start
       sloth_service: bothy-agents
@@ -34,6 +36,7 @@ groups:
       /
       (sum(rate(bothy_run_start_latency_seconds_count{job="bothy/bothy-server",bothy_outcome!="cancelled"}[1h])))
     labels:
+      bothy_sli_metric: sli.run_start
       component: agents
       sloth_id: bothy-agents-run-start
       sloth_service: bothy-agents
@@ -45,6 +48,7 @@ groups:
       /
       (sum(rate(bothy_run_start_latency_seconds_count{job="bothy/bothy-server",bothy_outcome!="cancelled"}[2h])))
     labels:
+      bothy_sli_metric: sli.run_start
       component: agents
       sloth_id: bothy-agents-run-start
       sloth_service: bothy-agents
@@ -56,6 +60,7 @@ groups:
       /
       (sum(rate(bothy_run_start_latency_seconds_count{job="bothy/bothy-server",bothy_outcome!="cancelled"}[6h])))
     labels:
+      bothy_sli_metric: sli.run_start
       component: agents
       sloth_id: bothy-agents-run-start
       sloth_service: bothy-agents
@@ -67,6 +72,7 @@ groups:
       /
       (sum(rate(bothy_run_start_latency_seconds_count{job="bothy/bothy-server",bothy_outcome!="cancelled"}[1d])))
     labels:
+      bothy_sli_metric: sli.run_start
       component: agents
       sloth_id: bothy-agents-run-start
       sloth_service: bothy-agents
@@ -78,6 +84,7 @@ groups:
       /
       (sum(rate(bothy_run_start_latency_seconds_count{job="bothy/bothy-server",bothy_outcome!="cancelled"}[3d])))
     labels:
+      bothy_sli_metric: sli.run_start
       component: agents
       sloth_id: bothy-agents-run-start
       sloth_service: bothy-agents
@@ -89,6 +96,7 @@ groups:
       / ignoring (sloth_window)
       count_over_time(slo:sli_error:ratio_rate5m{sloth_id="bothy-agents-run-start", sloth_service="bothy-agents", sloth_slo="run-start"}[30d])
     labels:
+      bothy_sli_metric: sli.run_start
       component: agents
       sloth_id: bothy-agents-run-start
       sloth_service: bothy-agents
@@ -99,6 +107,7 @@ groups:
   - record: slo:objective:ratio
     expr: vector(0.99)
     labels:
+      bothy_sli_metric: sli.run_start
       component: agents
       sloth_id: bothy-agents-run-start
       sloth_service: bothy-agents
@@ -106,6 +115,7 @@ groups:
   - record: slo:error_budget:ratio
     expr: vector(1-0.99)
     labels:
+      bothy_sli_metric: sli.run_start
       component: agents
       sloth_id: bothy-agents-run-start
       sloth_service: bothy-agents
@@ -113,6 +123,7 @@ groups:
   - record: slo:time_period:days
     expr: vector(30)
     labels:
+      bothy_sli_metric: sli.run_start
       component: agents
       sloth_id: bothy-agents-run-start
       sloth_service: bothy-agents
@@ -123,6 +134,7 @@ groups:
       / on(sloth_id, sloth_slo, sloth_service) group_left
       slo:error_budget:ratio{sloth_id="bothy-agents-run-start", sloth_service="bothy-agents", sloth_slo="run-start"}
     labels:
+      bothy_sli_metric: sli.run_start
       component: agents
       sloth_id: bothy-agents-run-start
       sloth_service: bothy-agents
@@ -133,6 +145,7 @@ groups:
       / on(sloth_id, sloth_slo, sloth_service) group_left
       slo:error_budget:ratio{sloth_id="bothy-agents-run-start", sloth_service="bothy-agents", sloth_slo="run-start"}
     labels:
+      bothy_sli_metric: sli.run_start
       component: agents
       sloth_id: bothy-agents-run-start
       sloth_service: bothy-agents
@@ -141,6 +154,7 @@ groups:
     expr: 1 - slo:period_burn_rate:ratio{sloth_id="bothy-agents-run-start", sloth_service="bothy-agents",
       sloth_slo="run-start"}
     labels:
+      bothy_sli_metric: sli.run_start
       component: agents
       sloth_id: bothy-agents-run-start
       sloth_service: bothy-agents
@@ -148,6 +162,7 @@ groups:
   - record: sloth_slo_info
     expr: vector(1)
     labels:
+      bothy_sli_metric: sli.run_start
       component: agents
       sloth_id: bothy-agents-run-start
       sloth_mode: cli-gen-prom
@@ -210,6 +225,7 @@ groups:
       /
       (sum(rate(bothy_run_duration_seconds_count{job="bothy/bothy-server",bothy_run_state="completed"}[5m])))
     labels:
+      bothy_sli_metric: sli.turn_duration
       component: agents
       sloth_id: bothy-agents-turn-duration
       sloth_service: bothy-agents
@@ -221,6 +237,7 @@ groups:
       /
       (sum(rate(bothy_run_duration_seconds_count{job="bothy/bothy-server",bothy_run_state="completed"}[30m])))
     labels:
+      bothy_sli_metric: sli.turn_duration
       component: agents
       sloth_id: bothy-agents-turn-duration
       sloth_service: bothy-agents
@@ -232,6 +249,7 @@ groups:
       /
       (sum(rate(bothy_run_duration_seconds_count{job="bothy/bothy-server",bothy_run_state="completed"}[1h])))
     labels:
+      bothy_sli_metric: sli.turn_duration
       component: agents
       sloth_id: bothy-agents-turn-duration
       sloth_service: bothy-agents
@@ -243,6 +261,7 @@ groups:
       /
       (sum(rate(bothy_run_duration_seconds_count{job="bothy/bothy-server",bothy_run_state="completed"}[2h])))
     labels:
+      bothy_sli_metric: sli.turn_duration
       component: agents
       sloth_id: bothy-agents-turn-duration
       sloth_service: bothy-agents
@@ -254,6 +273,7 @@ groups:
       /
       (sum(rate(bothy_run_duration_seconds_count{job="bothy/bothy-server",bothy_run_state="completed"}[6h])))
     labels:
+      bothy_sli_metric: sli.turn_duration
       component: agents
       sloth_id: bothy-agents-turn-duration
       sloth_service: bothy-agents
@@ -265,6 +285,7 @@ groups:
       /
       (sum(rate(bothy_run_duration_seconds_count{job="bothy/bothy-server",bothy_run_state="completed"}[1d])))
     labels:
+      bothy_sli_metric: sli.turn_duration
       component: agents
       sloth_id: bothy-agents-turn-duration
       sloth_service: bothy-agents
@@ -276,6 +297,7 @@ groups:
       /
       (sum(rate(bothy_run_duration_seconds_count{job="bothy/bothy-server",bothy_run_state="completed"}[3d])))
     labels:
+      bothy_sli_metric: sli.turn_duration
       component: agents
       sloth_id: bothy-agents-turn-duration
       sloth_service: bothy-agents
@@ -287,6 +309,7 @@ groups:
       / ignoring (sloth_window)
       count_over_time(slo:sli_error:ratio_rate5m{sloth_id="bothy-agents-turn-duration", sloth_service="bothy-agents", sloth_slo="turn-duration"}[30d])
     labels:
+      bothy_sli_metric: sli.turn_duration
       component: agents
       sloth_id: bothy-agents-turn-duration
       sloth_service: bothy-agents
@@ -297,6 +320,7 @@ groups:
   - record: slo:objective:ratio
     expr: vector(0.95)
     labels:
+      bothy_sli_metric: sli.turn_duration
       component: agents
       sloth_id: bothy-agents-turn-duration
       sloth_service: bothy-agents
@@ -304,6 +328,7 @@ groups:
   - record: slo:error_budget:ratio
     expr: vector(1-0.95)
     labels:
+      bothy_sli_metric: sli.turn_duration
       component: agents
       sloth_id: bothy-agents-turn-duration
       sloth_service: bothy-agents
@@ -311,6 +336,7 @@ groups:
   - record: slo:time_period:days
     expr: vector(30)
     labels:
+      bothy_sli_metric: sli.turn_duration
       component: agents
       sloth_id: bothy-agents-turn-duration
       sloth_service: bothy-agents
@@ -321,6 +347,7 @@ groups:
       / on(sloth_id, sloth_slo, sloth_service) group_left
       slo:error_budget:ratio{sloth_id="bothy-agents-turn-duration", sloth_service="bothy-agents", sloth_slo="turn-duration"}
     labels:
+      bothy_sli_metric: sli.turn_duration
       component: agents
       sloth_id: bothy-agents-turn-duration
       sloth_service: bothy-agents
@@ -331,6 +358,7 @@ groups:
       / on(sloth_id, sloth_slo, sloth_service) group_left
       slo:error_budget:ratio{sloth_id="bothy-agents-turn-duration", sloth_service="bothy-agents", sloth_slo="turn-duration"}
     labels:
+      bothy_sli_metric: sli.turn_duration
       component: agents
       sloth_id: bothy-agents-turn-duration
       sloth_service: bothy-agents
@@ -339,6 +367,7 @@ groups:
     expr: 1 - slo:period_burn_rate:ratio{sloth_id="bothy-agents-turn-duration", sloth_service="bothy-agents",
       sloth_slo="turn-duration"}
     labels:
+      bothy_sli_metric: sli.turn_duration
       component: agents
       sloth_id: bothy-agents-turn-duration
       sloth_service: bothy-agents
@@ -346,6 +375,7 @@ groups:
   - record: sloth_slo_info
     expr: vector(1)
     labels:
+      bothy_sli_metric: sli.turn_duration
       component: agents
       sloth_id: bothy-agents-turn-duration
       sloth_mode: cli-gen-prom

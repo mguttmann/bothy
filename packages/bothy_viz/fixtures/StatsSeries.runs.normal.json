@@ -1,0 +1,173 @@
+{
+  "granularity": "day",
+  "buckets": [
+    {
+      "start": "2026-10-09T00:00:00.000Z",
+      "metrics": {
+        "runs": 3.0,
+        "completed": 6.0,
+        "failed": 9.0,
+        "cancelled": 12.0,
+        "duration_ms_p50": 15.0,
+        "duration_ms_p95": 1.0
+      },
+      "group_key": "0192f4a0-7b1c-7000-8a00-000000000201"
+    },
+    {
+      "start": "2026-10-09T00:00:00.000Z",
+      "metrics": {
+        "runs": 3.0,
+        "completed": 6.0,
+        "failed": 9.0,
+        "cancelled": 12.0,
+        "duration_ms_p50": 15.0,
+        "duration_ms_p95": 1.0
+      },
+      "group_key": "0192f4a0-7b1c-7000-8a00-000000000202"
+    },
+    {
+      "start": "2026-10-10T00:00:00.000Z",
+      "metrics": {
+        "runs": 8.0,
+        "completed": 11.0,
+        "failed": 14.0,
+        "cancelled": 17.0,
+        "duration_ms_p50": 3.0,
+        "duration_ms_p95": 6.0
+      },
+      "group_key": "0192f4a0-7b1c-7000-8a00-000000000201"
+    },
+    {
+      "start": "2026-10-10T00:00:00.000Z",
+      "metrics": {
+        "runs": 8.0,
+        "completed": 11.0,
+        "failed": 14.0,
+        "cancelled": 17.0,
+        "duration_ms_p50": 3.0,
+        "duration_ms_p95": 6.0
+      },
+      "group_key": "0192f4a0-7b1c-7000-8a00-000000000202"
+    },
+    {
+      "start": "2026-10-11T00:00:00.000Z",
+      "metrics": {
+        "runs": 13.0,
+        "completed": 16.0,
+        "failed": 2.0,
+        "cancelled": 5.0,
+        "duration_ms_p50": 8.0,
+        "duration_ms_p95": 11.0
+      },
+      "group_key": "0192f4a0-7b1c-7000-8a00-000000000201"
+    },
+    {
+      "start": "2026-10-11T00:00:00.000Z",
+      "metrics": {
+        "runs": 13.0,
+        "completed": 16.0,
+        "failed": 2.0,
+        "cancelled": 5.0,
+        "duration_ms_p50": 8.0,
+        "duration_ms_p95": 11.0
+      },
+      "group_key": "0192f4a0-7b1c-7000-8a00-000000000202"
+    },
+    {
+      "start": "2026-10-12T00:00:00.000Z",
+      "metrics": {
+        "runs": 1.0,
+        "completed": 4.0,
+        "failed": 7.0,
+        "cancelled": 10.0,
+        "duration_ms_p50": 13.0,
+        "duration_ms_p95": 16.0
+      },
+      "group_key": "0192f4a0-7b1c-7000-8a00-000000000201"
+    },
+    {
+      "start": "2026-10-12T00:00:00.000Z",
+      "metrics": {
+        "runs": 1.0,
+        "completed": 4.0,
+        "failed": 7.0,
+        "cancelled": 10.0,
+        "duration_ms_p50": 13.0,
+        "duration_ms_p95": 16.0
+      },
+      "group_key": "0192f4a0-7b1c-7000-8a00-000000000202"
+    },
+    {
+      "start": "2026-10-13T00:00:00.000Z",
+      "metrics": {
+        "runs": 6.0,
+        "completed": 9.0,
+        "failed": 12.0,
+        "cancelled": 15.0,
+        "duration_ms_p50": 1.0,
+        "duration_ms_p95": 4.0
+      },
+      "group_key": "0192f4a0-7b1c-7000-8a00-000000000201"
+    },
+    {
+      "start": "2026-10-13T00:00:00.000Z",
+      "metrics": {
+        "runs": 6.0,
+        "completed": 9.0,
+        "failed": 12.0,
+        "cancelled": 15.0,
+        "duration_ms_p50": 1.0,
+        "duration_ms_p95": 4.0
+      },
+      "group_key": "0192f4a0-7b1c-7000-8a00-000000000202"
+    },
+    {
+      "start": "2026-10-14T00:00:00.000Z",
+      "metrics": {
+        "runs": 11.0,
+        "completed": 14.0,
+        "failed": 17.0,
+        "cancelled": 3.0,
+        "duration_ms_p50": 6.0,
+        "duration_ms_p95": 9.0
+      },
+      "group_key": "0192f4a0-7b1c-7000-8a00-000000000201"
+    },
+    {
+      "start": "2026-10-14T00:00:00.000Z",
+      "metrics": {
+        "runs": 11.0,
+        "completed": 14.0,
+        "failed": 17.0,
+        "cancelled": 3.0,
+        "duration_ms_p50": 6.0,
+        "duration_ms_p95": 9.0
+      },
+      "group_key": "0192f4a0-7b1c-7000-8a00-000000000202"
+    },
+    {
+      "start": "2026-10-15T00:00:00.000Z",
+      "metrics": {
+        "runs": 16.0,
+        "completed": 2.0,
+        "failed": 5.0,
+        "cancelled": 8.0,
+        "duration_ms_p50": 11.0,
+        "duration_ms_p95": 14.0
+      },
+      "group_key": "0192f4a0-7b1c-7000-8a00-000000000201"
+    },
+    {
+      "start": "2026-10-15T00:00:00.000Z",
+      "metrics": {
+        "runs": 16.0,
+        "completed": 2.0,
+        "failed": 5.0,
+        "cancelled": 8.0,
+        "duration_ms_p50": 11.0,
+        "duration_ms_p95": 14.0
+      },
+      "group_key": "0192f4a0-7b1c-7000-8a00-000000000202"
+    }
+  ]
+}

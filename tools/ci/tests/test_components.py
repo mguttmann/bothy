@@ -45,6 +45,11 @@ import pytest
         (["docs/spec/05-actions.md"], []),
         # Chapter 09 is the contract of the adapters; its 17.10 is bound to their evidence.
         (["docs/spec/09-agents.md"], ["plugins"]),
+        # The SLI bounds generator and the Sloth files feed generated files of the server and
+        # of bothy_viz (brief M6-11); infra/ outside slo/ selects nothing.
+        (["tools/observability/sli_bounds.py"], ["apps", "server"]),
+        (["infra/observability/slo/api.yaml"], ["apps", "server"]),
+        (["infra/observability/prometheus/rules/slo-api.yaml"], []),
         (["Makefile"], ["all"]),
         (["tools/ci/check_runners.py"], ["all"]),
         ([".github/workflows/ci.yml"], ["all"]),

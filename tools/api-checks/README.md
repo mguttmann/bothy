@@ -12,7 +12,7 @@ needs only Python and PyYAML and reads the action catalogue through
 
 | Command | Effect |
 |---|---|
-| `make api-checks` | Gate: both rules, exit 1 with one line per finding (`api_checks.py check`; one rule alone with `--rule api-catalogue-sync` or `--rule api-tables`) |
+| `make api-checks` | Gate: all three rules, exit 1 with one line per finding (`api_checks.py check`; one rule alone with `--rule api-catalogue-sync`, `--rule api-tables` or `--rule viz-fixtures`) |
 | `make api-tables` | rewrite the generated blocks in 06 and `webhooks.md` (`api_checks.py generate`); writes nothing while an input is unreadable or malformed, a value cannot become a table cell, a marker is broken, unknown or missing, or one of the files to change cannot be written |
 | `uv run --project tools --locked pytest tools/api-checks/tests` | Tests: per sub-check and per block one mutation of a copy of the real inputs, which must be red; the repository itself is green |
 
@@ -131,6 +131,21 @@ rest of the line a line of its own, in the worst case a marker.
 - No server reads the fields `x-problem-codes`, `x-status`, `x-idempotency-exempt` and
   `x-deprecated-at` before M1-17 and M1-18; `catalog-check` (M1-02) holds the lists in
   `docs/api/redocly.yaml`.
+
+## Rule `viz-fixtures` (25 7.2, VZ-T11)
+
+`viz_fixtures.py` validates every fixture of
+[`packages/bothy_viz/fixtures/`](../../packages/bothy_viz/fixtures/README.md) against its schema in
+`openapi.yaml`: the file `<schema>.<state>.json` (or `<schema>.<query>.<state>.json`) names the
+schema before its first dot, and the schema is resolved with its references inside the whole
+document and checked with the JSON Schema 2020-12 validator `jsonschema` of the pinned tools
+environment (it comes with the pinned `check-jsonschema`). Sub-checks: `schema` (no such schema),
+`valid` (no JSON, or the first schema error with its JSON pointer), `readme` (a file missing from
+the table "Fixtures" of the fixtures README, or a row without a file) and `coverage` (a listed
+schema without a file). A schema change without adjusted fixtures therefore fails the gate; the
+tests in `tests/test_viz_fixtures.py` prove it on a copy of `openapi.yaml` with an added required
+member.
+
 ## Breaking change check `api-breaking` (G6)
 
 `breaking.py check` (`make api-breaking`, in `make gates` when the component `server` is

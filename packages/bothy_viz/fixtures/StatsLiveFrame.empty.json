@@ -1,0 +1,27 @@
+{
+  "at": "2026-10-15T10:00:00.000Z",
+  "interval_ms": 1000,
+  "scope": {
+    "kind": "instance"
+  },
+  "runs": [],
+  "runs_truncated": false,
+  "agents": [],
+  "rates": [
+    {
+      "metric": "messages_created",
+      "last_minute": 0,
+      "current_minute": 0
+    },
+    {
+      "metric": "runs_started",
+      "last_minute": 0,
+      "current_minute": 0
+    },
+    {
+      "metric": "tool_calls",
+      "last_minute": 0,
+      "current_minute": 0
+    }
+  ]
+}

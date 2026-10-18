@@ -98,6 +98,14 @@ members:
     edges: [design_system, api_client, domain]
     never: {rule: 6, members: [sync_engine, local_store]}
 
+  # The harness of bothy_viz (brief M6-11, design note 7): the members of bothy_viz plus
+  # bothy_viz itself; no platform folders are checked in (docs/DECISIONS.md D-M6-11-6).
+  - name: bothy_viz_harness
+    path: packages/bothy_viz/harness
+    kind: app
+    edges: [bothy_viz, design_system, api_client, domain]
+    never: {rule: 6, members: [sync_engine, local_store]}
+
   - name: bothy_noise
     path: packages/bothy_noise
     kind: dart

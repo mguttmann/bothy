@@ -11,6 +11,8 @@ slos:
   - name: "delivery-latency"
     objective: 99.5
     description: "Share of live deliveries written to the socket within 0.5 s after commit."
+    labels:
+      bothy_sli_metric: sli.delivery_latency
     sli:
       events:
         error_query: >-
@@ -37,6 +39,8 @@ slos:
   - name: "reconnect"
     objective: 99.0
     description: "Share of gateway connects that reach ready or resumed within 2.5 s."
+    labels:
+      bothy_sli_metric: sli.reconnect
     sli:
       events:
         error_query: >-

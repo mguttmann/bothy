@@ -363,6 +363,16 @@ The desktop app and the mobile app implement `LiveFrameSource` through `sync_eng
 the web console through REST polling of `getStatsLive` (5.1). Reason: the views know no
 transport; fixtures, fake server and real server are interchangeable.
 
+Built state (M6-11, docs/DECISIONS.md D-M6-11-1 to D-M6-11-7): `lib/src/model/` also holds
+`LiveTopologyModel`, `BackendModel`, `DeliveryModel`, `ExecutiveModel`, `TimelineModel`,
+`RunCardModel`, `LaneModel`, `SeriesModel` and `TrafficLightModel`, built from `StatsSeries` and
+`CostSeries` too; a missing cost member stays "not shown", never zero. `lib/src/sources/` holds
+the base class `LiveFrameSourceBase` with the stale rule (`viz.stale_after` on an injected
+`VizClock`), the error events `forbidden`, `not_found`, `feature_disabled` and `rate_limited`, and
+the fixture sources `FixtureLiveFrameSource` and `FixtureStatsQuerySource`. `lib/src/slo/` adds
+`slo_catalog.dart` (display names through `l10n`). `harness/` is the workspace member
+`bothy_viz_harness` without checked-in platform folders.
+
 No charting library: the basic forms are custom `CustomPainter`s. Reason: the forms (lanes,
 run cards with live box colors) exist in no library; custom forms keep tokens,
 semantics and golden tests under our control. The build ticket can propose a library with a license
@@ -376,6 +386,17 @@ check if a view would otherwise become disproportionate.
    [openapi.yaml](../api/openapi.yaml) (ticket "Fixture check"). If a schema changes, the check
    fails until the fixtures are adapted.
 3. The fake server of the integration tests delivers the same fixtures (15, section 20).
+4. Fixture names and the check (D-M6-11-4): one file per schema and state,
+   `<schema>.<state>.json`, or `<schema>.<query>.<state>.json` where one schema serves several
+   queries (`StatsSeries.usage.normal.json`); the part before the first dot names the schema in
+   `components.schemas`. States: `empty`, `normal`, `load`, `truncated`, `no_cost_permission`,
+   `offline`, where they apply; `StatsLiveFrame.load.json` has the default of
+   `stats.live_max_runs` runs, `StatsLiveFrame.truncated.json` has `runs_truncated = true`. The
+   check `viz-fixtures` of `make api-checks` (`tools/api-checks/viz_fixtures.py`) validates every
+   file against its schema with its references (JSON Schema 2020-12) and fails on an unknown
+   schema name, an invalid file, a file missing from the table of `fixtures/README.md` and a listed
+   schema without a file; `test/fixtures_decode_test.dart` decodes every file with the generated
+   serializers.
 
 ### 7.3 Tests
 

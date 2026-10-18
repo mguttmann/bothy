@@ -10,11 +10,29 @@ environment:
   sdk: ^3.13.5
   flutter: 3.47.7
 
+# Only the members of docs/spec/15-client-architecture.md 3.1 rule 6 (tools/arch-check/rules.yaml);
+# never sync_engine, local_store, a WebView or an iframe.
 dependencies:
+  api_client: any
+  # The generated types of api_client are built_value classes; the fixture decoder and the
+  # tests name their serializers and lists.
+  built_collection: ^5.1.2
+  built_value: ^8.13.0
+  design_system: any
+  domain: any
   flutter:
     sdk: flutter
+  l10n: any
 
 dev_dependencies:
+  # The golden setup of design_system (docs/DECISIONS.md D-M4-04-5).
+  alchemist: ^0.14.1
   flutter_lints: ^6.0.0
   flutter_test:
     sdk: flutter
+
+# The fixtures are assets, so the harness (desktop and web) and the tests read the same files
+# through the asset bundle (fixtures/README.md).
+flutter:
+  assets:
+    - fixtures/

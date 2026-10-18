@@ -18,6 +18,9 @@ documented in this file. The format is based on
   platform and binary), signatures of every digest, binary and `SHA256SUMS`, and their
   verification; `make release-trial COMPONENT=server` runs the same steps locally.
   `docs/operations/release.md` section 5 names the verification commands of both phases.
+- SLI bounds (M6-11): `internal/stats/domain/slibounds.gen.go`, generated from the Sloth files by
+  `tools/observability/sli_bounds.py`, maps each `sli.*` metric to its SLO, objective, threshold
+  and period; the Prometheus SLO rules carry the label `bothy_sli_metric`.
 - CDN fetch of the import tool (M8-02): `discord.Fetcher` loads one Discord attachment with
   `GET` only when the link is `https` on a host of `import.discord.cdn_hosts` (exact match, port
   `443` unless the entry names one), without token or cookie, without redirects or an

@@ -1,0 +1,75 @@
+{
+  "at": "2026-10-15T10:00:00.000Z",
+  "measured_by": "own",
+  "items": [
+    {
+      "slo": "bothy-api/requests-availability",
+      "metric": "sli.api_availability",
+      "objective": 99.9,
+      "period_days": 30,
+      "total": 1200000,
+      "good": 1199500,
+      "state": "green",
+      "ratio": 0.999583,
+      "budget_remaining": 0.583
+    },
+    {
+      "slo": "bothy-sync/delivery-latency",
+      "metric": "sli.delivery_latency",
+      "objective": 99.5,
+      "period_days": 30,
+      "total": 540000,
+      "good": 537600,
+      "state": "amber",
+      "threshold_ms": 500,
+      "ratio": 0.995556,
+      "budget_remaining": 0.111
+    },
+    {
+      "slo": "bothy-sync/reconnect",
+      "metric": "sli.reconnect",
+      "objective": 99.0,
+      "period_days": 30,
+      "total": 8000,
+      "good": 7880,
+      "state": "red",
+      "threshold_ms": 2500,
+      "ratio": 0.985,
+      "budget_remaining": -0.5
+    },
+    {
+      "slo": "bothy-push/provider-acceptance",
+      "metric": "sli.push_acceptance",
+      "objective": 99.5,
+      "period_days": 30,
+      "total": 40,
+      "good": 40,
+      "state": "insufficient_data",
+      "ratio": 1.0
+    },
+    {
+      "slo": "bothy-agents/run-start",
+      "metric": "sli.run_start",
+      "objective": 99.0,
+      "period_days": 30,
+      "total": 4000,
+      "good": 3990,
+      "state": "green",
+      "threshold_ms": 7500,
+      "ratio": 0.9975,
+      "budget_remaining": 0.75
+    },
+    {
+      "slo": "bothy-agents/turn-duration",
+      "metric": "sli.turn_duration",
+      "objective": 95.0,
+      "period_days": 30,
+      "total": 3600,
+      "good": 3480,
+      "state": "green",
+      "threshold_ms": 600000,
+      "ratio": 0.966667,
+      "budget_remaining": 0.333
+    }
+  ]
+}

@@ -1,0 +1,3670 @@
+{
+  "at": "2026-10-15T10:00:00.000Z",
+  "interval_ms": 1000,
+  "scope": {
+    "kind": "instance"
+  },
+  "runs": [
+    {
+      "run_id": "0192f4a0-7b1c-7000-8a00-000000001000",
+      "thread_id": "0192f4a0-7b1c-7000-8a00-000000002000",
+      "channel_id": "0192f4a0-7b1c-7000-8a00-000000000101",
+      "space_id": "0192f4a0-7b1c-7000-8a00-000000000001",
+      "agent_id": "0192f4a0-7b1c-7000-8a00-000000000201",
+      "state": "running",
+      "queued_at": "2026-10-15T09:59:50.000Z",
+      "billing_mode": "personal",
+      "approval_pending": false,
+      "cost_micros": 1000,
+      "currency": "USD",
+      "cost_is_estimate": true,
+      "started_at": "2026-10-15T09:59:55.000Z",
+      "step": {
+        "kind": "tool_call",
+        "name": "Bash"
+      }
+    },
+    {
+      "run_id": "0192f4a0-7b1c-7000-8a00-000000001001",
+      "thread_id": "0192f4a0-7b1c-7000-8a00-000000002001",
+      "channel_id": "0192f4a0-7b1c-7000-8a00-000000000102",
+      "space_id": "0192f4a0-7b1c-7000-8a00-000000000002",
+      "agent_id": "0192f4a0-7b1c-7000-8a00-000000000202",
+      "state": "queued",
+      "queued_at": "2026-10-15T09:59:49.000Z",
+      "billing_mode": "organization",
+      "approval_pending": false,
+      "cost_micros": 2000,
+      "currency": "USD",
+      "cost_is_estimate": true
+    },
+    {
+      "run_id": "0192f4a0-7b1c-7000-8a00-000000001002",
+      "thread_id": "0192f4a0-7b1c-7000-8a00-000000002002",
+      "channel_id": "0192f4a0-7b1c-7000-8a00-000000000103",
+      "space_id": "0192f4a0-7b1c-7000-8a00-000000000002",
+      "agent_id": "0192f4a0-7b1c-7000-8a00-000000000202",
+      "state": "waiting_input",
+      "queued_at": "2026-10-15T09:59:48.000Z",
+      "billing_mode": "organization",
+      "approval_pending": true,
+      "cost_micros": 3000,
+      "currency": "USD",
+      "cost_is_estimate": true,
+      "started_at": "2026-10-15T09:59:53.000Z",
+      "step": {
+        "kind": "tool_call",
+        "name": "Edit"
+      }
+    },
+    {
+      "run_id": "0192f4a0-7b1c-7000-8a00-000000001003",
+      "thread_id": "0192f4a0-7b1c-7000-8a00-000000002003",
+      "channel_id": "0192f4a0-7b1c-7000-8a00-000000000101",
+      "space_id": "0192f4a0-7b1c-7000-8a00-000000000001",
+      "agent_id": "0192f4a0-7b1c-7000-8a00-000000000201",
+      "state": "running",
+      "queued_at": "2026-10-15T09:59:47.000Z",
+      "billing_mode": "personal",
+      "approval_pending": false,
+      "cost_micros": 4000,
+      "currency": "USD",
+      "cost_is_estimate": true,
+      "started_at": "2026-10-15T09:59:52.000Z",
+      "step": {
+        "kind": "tool_call",
+        "name": "Grep"
+      }
+    },
+    {
+      "run_id": "0192f4a0-7b1c-7000-8a00-000000001004",
+      "thread_id": "0192f4a0-7b1c-7000-8a00-000000002004",
+      "channel_id": "0192f4a0-7b1c-7000-8a00-000000000102",
+      "space_id": "0192f4a0-7b1c-7000-8a00-000000000002",
+      "agent_id": "0192f4a0-7b1c-7000-8a00-000000000202",
+      "state": "running",
+      "queued_at": "2026-10-15T09:59:46.000Z",
+      "billing_mode": "organization",
+      "approval_pending": false,
+      "cost_micros": 5000,
+      "currency": "USD",
+      "cost_is_estimate": true,
+      "started_at": "2026-10-15T09:59:51.000Z",
+      "step": {
+        "kind": "tool_call",
+        "name": "WebFetch"
+      }
+    },
+    {
+      "run_id": "0192f4a0-7b1c-7000-8a00-000000001005",
+      "thread_id": "0192f4a0-7b1c-7000-8a00-000000002005",
+      "channel_id": "0192f4a0-7b1c-7000-8a00-000000000103",
+      "space_id": "0192f4a0-7b1c-7000-8a00-000000000002",
+      "agent_id": "0192f4a0-7b1c-7000-8a00-000000000202",
+      "state": "queued",
+      "queued_at": "2026-10-15T09:59:45.000Z",
+      "billing_mode": "organization",
+      "approval_pending": false,
+      "cost_micros": 6000,
+      "currency": "USD",
+      "cost_is_estimate": true
+    },
+    {
+      "run_id": "0192f4a0-7b1c-7000-8a00-000000001006",
+      "thread_id": "0192f4a0-7b1c-7000-8a00-000000002006",
+      "channel_id": "0192f4a0-7b1c-7000-8a00-000000000101",
+      "space_id": "0192f4a0-7b1c-7000-8a00-000000000001",
+      "agent_id": "0192f4a0-7b1c-7000-8a00-000000000201",
+      "state": "waiting_input",
+      "queued_at": "2026-10-15T09:59:44.000Z",
+      "billing_mode": "personal",
+      "approval_pending": true,
+      "cost_micros": 7000,
+      "currency": "USD",
+      "cost_is_estimate": true,
+      "started_at": "2026-10-15T09:59:49.000Z",
+      "step": {
+        "kind": "tool_call",
+        "name": "Read"
+      }
+    },
+    {
+      "run_id": "0192f4a0-7b1c-7000-8a00-000000001007",
+      "thread_id": "0192f4a0-7b1c-7000-8a00-000000002007",
+      "channel_id": "0192f4a0-7b1c-7000-8a00-000000000102",
+      "space_id": "0192f4a0-7b1c-7000-8a00-000000000002",
+      "agent_id": "0192f4a0-7b1c-7000-8a00-000000000202",
+      "state": "running",
+      "queued_at": "2026-10-15T09:59:43.000Z",
+      "billing_mode": "organization",
+      "approval_pending": false,
+      "cost_micros": 8000,
+      "currency": "USD",
+      "cost_is_estimate": true,
+      "started_at": "2026-10-15T09:59:48.000Z",
+      "step": {
+        "kind": "tool_call",
+        "name": "Edit"
+      }
+    },
+    {
+      "run_id": "0192f4a0-7b1c-7000-8a00-000000001008",
+      "thread_id": "0192f4a0-7b1c-7000-8a00-000000002008",
+      "channel_id": "0192f4a0-7b1c-7000-8a00-000000000103",
+      "space_id": "0192f4a0-7b1c-7000-8a00-000000000002",
+      "agent_id": "0192f4a0-7b1c-7000-8a00-000000000202",
+      "state": "running",
+      "queued_at": "2026-10-15T09:59:42.000Z",
+      "billing_mode": "organization",
+      "approval_pending": false,
+      "cost_micros": 9000,
+      "currency": "USD",
+      "cost_is_estimate": true,
+      "started_at": "2026-10-15T09:59:47.000Z",
+      "step": {
+        "kind": "tool_call",
+        "name": "Grep"
+      }
+    },
+    {
+      "run_id": "0192f4a0-7b1c-7000-8a00-000000001009",
+      "thread_id": "0192f4a0-7b1c-7000-8a00-000000002009",
+      "channel_id": "0192f4a0-7b1c-7000-8a00-000000000101",
+      "space_id": "0192f4a0-7b1c-7000-8a00-000000000001",
+      "agent_id": "0192f4a0-7b1c-7000-8a00-000000000201",
+      "state": "queued",
+      "queued_at": "2026-10-15T09:59:41.000Z",
+      "billing_mode": "personal",
+      "approval_pending": false,
+      "cost_micros": 10000,
+      "currency": "USD",
+      "cost_is_estimate": true
+    },
+    {
+      "run_id": "0192f4a0-7b1c-7000-8a00-00000000100a",
+      "thread_id": "0192f4a0-7b1c-7000-8a00-00000000200a",
+      "channel_id": "0192f4a0-7b1c-7000-8a00-000000000102",
+      "space_id": "0192f4a0-7b1c-7000-8a00-000000000002",
+      "agent_id": "0192f4a0-7b1c-7000-8a00-000000000202",
+      "state": "waiting_input",
+      "queued_at": "2026-10-15T09:59:40.000Z",
+      "billing_mode": "organization",
+      "approval_pending": true,
+      "cost_micros": 11000,
+      "currency": "USD",
+      "cost_is_estimate": true,
+      "started_at": "2026-10-15T09:59:45.000Z",
+      "step": {
+        "kind": "tool_call",
+        "name": "Bash"
+      }
+    },
+    {
+      "run_id": "0192f4a0-7b1c-7000-8a00-00000000100b",
+      "thread_id": "0192f4a0-7b1c-7000-8a00-00000000200b",
+      "channel_id": "0192f4a0-7b1c-7000-8a00-000000000103",
+      "space_id": "0192f4a0-7b1c-7000-8a00-000000000002",
+      "agent_id": "0192f4a0-7b1c-7000-8a00-000000000202",
+      "state": "running",
+      "queued_at": "2026-10-15T09:59:39.000Z",
+      "billing_mode": "organization",
+      "approval_pending": false,
+      "cost_micros": 12000,
+      "currency": "USD",
+      "cost_is_estimate": true,
+      "started_at": "2026-10-15T09:59:44.000Z",
+      "step": {
+        "kind": "tool_call",
+        "name": "Read"
+      }
+    },
+    {
+      "run_id": "0192f4a0-7b1c-7000-8a00-00000000100c",
+      "thread_id": "0192f4a0-7b1c-7000-8a00-00000000200c",
+      "channel_id": "0192f4a0-7b1c-7000-8a00-000000000101",
+      "space_id": "0192f4a0-7b1c-7000-8a00-000000000001",
+      "agent_id": "0192f4a0-7b1c-7000-8a00-000000000201",
+      "state": "running",
+      "queued_at": "2026-10-15T09:59:38.000Z",
+      "billing_mode": "personal",
+      "approval_pending": false,
+      "cost_micros": 13000,
+      "currency": "USD",
+      "cost_is_estimate": true,
+      "started_at": "2026-10-15T09:59:43.000Z",
+      "step": {
+        "kind": "tool_call",
+        "name": "Edit"
+      }
+    },
+    {
+      "run_id": "0192f4a0-7b1c-7000-8a00-00000000100d",
+      "thread_id": "0192f4a0-7b1c-7000-8a00-00000000200d",
+      "channel_id": "0192f4a0-7b1c-7000-8a00-000000000102",
+      "space_id": "0192f4a0-7b1c-7000-8a00-000000000002",
+      "agent_id": "0192f4a0-7b1c-7000-8a00-000000000202",
+      "state": "queued",
+      "queued_at": "2026-10-15T09:59:37.000Z",
+      "billing_mode": "organization",
+      "approval_pending": false,
+      "cost_micros": 14000,
+      "currency": "USD",
+      "cost_is_estimate": true
+    },
+    {
+      "run_id": "0192f4a0-7b1c-7000-8a00-00000000100e",
+      "thread_id": "0192f4a0-7b1c-7000-8a00-00000000200e",
+      "channel_id": "0192f4a0-7b1c-7000-8a00-000000000103",
+      "space_id": "0192f4a0-7b1c-7000-8a00-000000000002",
+      "agent_id": "0192f4a0-7b1c-7000-8a00-000000000202",
+      "state": "waiting_input",
+      "queued_at": "2026-10-15T09:59:36.000Z",
+      "billing_mode": "organization",
+      "approval_pending": true,
+      "cost_micros": 15000,
+      "currency": "USD",
+      "cost_is_estimate": true,
+      "started_at": "2026-10-15T09:59:41.000Z",
+      "step": {
+        "kind": "tool_call",
+        "name": "WebFetch"
+      }
+    },
+    {
+      "run_id": "0192f4a0-7b1c-7000-8a00-00000000100f",
+      "thread_id": "0192f4a0-7b1c-7000-8a00-00000000200f",
+      "channel_id": "0192f4a0-7b1c-7000-8a00-000000000101",
+      "space_id": "0192f4a0-7b1c-7000-8a00-000000000001",
+      "agent_id": "0192f4a0-7b1c-7000-8a00-000000000201",
+      "state": "running",
+      "queued_at": "2026-10-15T09:59:35.000Z",
+      "billing_mode": "personal",
+      "approval_pending": false,
+      "cost_micros": 16000,
+      "currency": "USD",
+      "cost_is_estimate": true,
+      "started_at": "2026-10-15T09:59:40.000Z",
+      "step": {
+        "kind": "tool_call",
+        "name": "Bash"
+      }
+    },
+    {
+      "run_id": "0192f4a0-7b1c-7000-8a00-000000001010",
+      "thread_id": "0192f4a0-7b1c-7000-8a00-000000002010",
+      "channel_id": "0192f4a0-7b1c-7000-8a00-000000000102",
+      "space_id": "0192f4a0-7b1c-7000-8a00-000000000002",
+      "agent_id": "0192f4a0-7b1c-7000-8a00-000000000202",
+      "state": "running",
+      "queued_at": "2026-10-15T09:59:34.000Z",
+      "billing_mode": "organization",
+      "approval_pending": false,
+      "cost_micros": 17000,
+      "currency": "USD",
+      "cost_is_estimate": true,
+      "started_at": "2026-10-15T09:59:39.000Z",
+      "step": {
+        "kind": "tool_call",
+        "name": "Read"
+      }
+    },
+    {
+      "run_id": "0192f4a0-7b1c-7000-8a00-000000001011",
+      "thread_id": "0192f4a0-7b1c-7000-8a00-000000002011",
+      "channel_id": "0192f4a0-7b1c-7000-8a00-000000000103",
+      "space_id": "0192f4a0-7b1c-7000-8a00-000000000002",
+      "agent_id": "0192f4a0-7b1c-7000-8a00-000000000202",
+      "state": "queued",
+      "queued_at": "2026-10-15T09:59:33.000Z",
+      "billing_mode": "organization",
+      "approval_pending": false,
+      "cost_micros": 18000,
+      "currency": "USD",
+      "cost_is_estimate": true
+    },
+    {
+      "run_id": "0192f4a0-7b1c-7000-8a00-000000001012",
+      "thread_id": "0192f4a0-7b1c-7000-8a00-000000002012",
+      "channel_id": "0192f4a0-7b1c-7000-8a00-000000000101",
+      "space_id": "0192f4a0-7b1c-7000-8a00-000000000001",
+      "agent_id": "0192f4a0-7b1c-7000-8a00-000000000201",
+      "state": "waiting_input",
+      "queued_at": "2026-10-15T09:59:32.000Z",
+      "billing_mode": "personal",
+      "approval_pending": true,
+      "cost_micros": 19000,
+      "currency": "USD",
+      "cost_is_estimate": true,
+      "started_at": "2026-10-15T09:59:37.000Z",
+      "step": {
+        "kind": "tool_call",
+        "name": "Grep"
+      }
+    },
+    {
+      "run_id": "0192f4a0-7b1c-7000-8a00-000000001013",
+      "thread_id": "0192f4a0-7b1c-7000-8a00-000000002013",
+      "channel_id": "0192f4a0-7b1c-7000-8a00-000000000102",
+      "space_id": "0192f4a0-7b1c-7000-8a00-000000000002",
+      "agent_id": "0192f4a0-7b1c-7000-8a00-000000000202",
+      "state": "running",
+      "queued_at": "2026-10-15T09:59:31.000Z",
+      "billing_mode": "organization",
+      "approval_pending": false,
+      "cost_micros": 20000,
+      "currency": "USD",
+      "cost_is_estimate": true,
+      "started_at": "2026-10-15T09:59:36.000Z",
+      "step": {
+        "kind": "tool_call",
+        "name": "WebFetch"
+      }
+    },
+    {
+      "run_id": "0192f4a0-7b1c-7000-8a00-000000001014",
+      "thread_id": "0192f4a0-7b1c-7000-8a00-000000002014",
+      "channel_id": "0192f4a0-7b1c-7000-8a00-000000000103",
+      "space_id": "0192f4a0-7b1c-7000-8a00-000000000002",
+      "agent_id": "0192f4a0-7b1c-7000-8a00-000000000202",
+      "state": "running",
+      "queued_at": "2026-10-15T09:59:30.000Z",
+      "billing_mode": "organization",
+      "approval_pending": false,
+      "cost_micros": 21000,
+      "currency": "USD",
+      "cost_is_estimate": true,
+      "started_at": "2026-10-15T09:59:35.000Z",
+      "step": {
+        "kind": "tool_call",
+        "name": "Bash"
+      }
+    },
+    {
+      "run_id": "0192f4a0-7b1c-7000-8a00-000000001015",
+      "thread_id": "0192f4a0-7b1c-7000-8a00-000000002015",
+      "channel_id": "0192f4a0-7b1c-7000-8a00-000000000101",
+      "space_id": "0192f4a0-7b1c-7000-8a00-000000000001",
+      "agent_id": "0192f4a0-7b1c-7000-8a00-000000000201",
+      "state": "queued",
+      "queued_at": "2026-10-15T09:59:29.000Z",
+      "billing_mode": "personal",
+      "approval_pending": false,
+      "cost_micros": 22000,
+      "currency": "USD",
+      "cost_is_estimate": true
+    },
+    {
+      "run_id": "0192f4a0-7b1c-7000-8a00-000000001016",
+      "thread_id": "0192f4a0-7b1c-7000-8a00-000000002016",
+      "channel_id": "0192f4a0-7b1c-7000-8a00-000000000102",
+      "space_id": "0192f4a0-7b1c-7000-8a00-000000000002",
+      "agent_id": "0192f4a0-7b1c-7000-8a00-000000000202",
+      "state": "waiting_input",
+      "queued_at": "2026-10-15T09:59:28.000Z",
+      "billing_mode": "organization",
+      "approval_pending": true,
+      "cost_micros": 23000,
+      "currency": "USD",
+      "cost_is_estimate": true,
+      "started_at": "2026-10-15T09:59:33.000Z",
+      "step": {
+        "kind": "tool_call",
+        "name": "Edit"
+      }
+    },
+    {
+      "run_id": "0192f4a0-7b1c-7000-8a00-000000001017",
+      "thread_id": "0192f4a0-7b1c-7000-8a00-000000002017",
+      "channel_id": "0192f4a0-7b1c-7000-8a00-000000000103",
+      "space_id": "0192f4a0-7b1c-7000-8a00-000000000002",
+      "agent_id": "0192f4a0-7b1c-7000-8a00-000000000202",
+      "state": "running",
+      "queued_at": "2026-10-15T09:59:27.000Z",
+      "billing_mode": "organization",
+      "approval_pending": false,
+      "cost_micros": 24000,
+      "currency": "USD",
+      "cost_is_estimate": true,
+      "started_at": "2026-10-15T09:59:32.000Z",
+      "step": {
+        "kind": "tool_call",
+        "name": "Grep"
+      }
+    },
+    {
+      "run_id": "0192f4a0-7b1c-7000-8a00-000000001018",
+      "thread_id": "0192f4a0-7b1c-7000-8a00-000000002018",
+      "channel_id": "0192f4a0-7b1c-7000-8a00-000000000101",
+      "space_id": "0192f4a0-7b1c-7000-8a00-000000000001",
+      "agent_id": "0192f4a0-7b1c-7000-8a00-000000000201",
+      "state": "running",
+      "queued_at": "2026-10-15T09:59:26.000Z",
+      "billing_mode": "personal",
+      "approval_pending": false,
+      "cost_micros": 25000,
+      "currency": "USD",
+      "cost_is_estimate": true,
+      "started_at": "2026-10-15T09:59:31.000Z",
+      "step": {
+        "kind": "tool_call",
+        "name": "WebFetch"
+      }
+    },
+    {
+      "run_id": "0192f4a0-7b1c-7000-8a00-000000001019",
+      "thread_id": "0192f4a0-7b1c-7000-8a00-000000002019",
+      "channel_id": "0192f4a0-7b1c-7000-8a00-000000000102",
+      "space_id": "0192f4a0-7b1c-7000-8a00-000000000002",
+      "agent_id": "0192f4a0-7b1c-7000-8a00-000000000202",
+      "state": "queued",
+      "queued_at": "2026-10-15T09:59:25.000Z",
+      "billing_mode": "organization",
+      "approval_pending": false,
+      "cost_micros": 26000,
+      "currency": "USD",
+      "cost_is_estimate": true
+    },
+    {
+      "run_id": "0192f4a0-7b1c-7000-8a00-00000000101a",
+      "thread_id": "0192f4a0-7b1c-7000-8a00-00000000201a",
+      "channel_id": "0192f4a0-7b1c-7000-8a00-000000000103",
+      "space_id": "0192f4a0-7b1c-7000-8a00-000000000002",
+      "agent_id": "0192f4a0-7b1c-7000-8a00-000000000202",
+      "state": "waiting_input",
+      "queued_at": "2026-10-15T09:59:24.000Z",
+      "billing_mode": "organization",
+      "approval_pending": true,
+      "cost_micros": 27000,
+      "currency": "USD",
+      "cost_is_estimate": true,
+      "started_at": "2026-10-15T09:59:29.000Z",
+      "step": {
+        "kind": "tool_call",
+        "name": "Read"
+      }
+    },
+    {
+      "run_id": "0192f4a0-7b1c-7000-8a00-00000000101b",
+      "thread_id": "0192f4a0-7b1c-7000-8a00-00000000201b",
+      "channel_id": "0192f4a0-7b1c-7000-8a00-000000000101",
+      "space_id": "0192f4a0-7b1c-7000-8a00-000000000001",
+      "agent_id": "0192f4a0-7b1c-7000-8a00-000000000201",
+      "state": "running",
+      "queued_at": "2026-10-15T09:59:23.000Z",
+      "billing_mode": "personal",
+      "approval_pending": false,
+      "cost_micros": 28000,
+      "currency": "USD",
+      "cost_is_estimate": true,
+      "started_at": "2026-10-15T09:59:28.000Z",
+      "step": {
+        "kind": "tool_call",
+        "name": "Edit"
+      }
+    },
+    {
+      "run_id": "0192f4a0-7b1c-7000-8a00-00000000101c",
+      "thread_id": "0192f4a0-7b1c-7000-8a00-00000000201c",
+      "channel_id": "0192f4a0-7b1c-7000-8a00-000000000102",
+      "space_id": "0192f4a0-7b1c-7000-8a00-000000000002",
+      "agent_id": "0192f4a0-7b1c-7000-8a00-000000000202",
+      "state": "running",
+      "queued_at": "2026-10-15T09:59:22.000Z",
+      "billing_mode": "organization",
+      "approval_pending": false,
+      "cost_micros": 29000,
+      "currency": "USD",
+      "cost_is_estimate": true,
+      "started_at": "2026-10-15T09:59:27.000Z",
+      "step": {
+        "kind": "tool_call",
+        "name": "Grep"
+      }
+    },
+    {
+      "run_id": "0192f4a0-7b1c-7000-8a00-00000000101d",
+      "thread_id": "0192f4a0-7b1c-7000-8a00-00000000201d",
+      "channel_id": "0192f4a0-7b1c-7000-8a00-000000000103",
+      "space_id": "0192f4a0-7b1c-7000-8a00-000000000002",
+      "agent_id": "0192f4a0-7b1c-7000-8a00-000000000202",
+      "state": "queued",
+      "queued_at": "2026-10-15T09:59:21.000Z",
+      "billing_mode": "organization",
+      "approval_pending": false,
+      "cost_micros": 30000,
+      "currency": "USD",
+      "cost_is_estimate": true
+    },
+    {
+      "run_id": "0192f4a0-7b1c-7000-8a00-00000000101e",
+      "thread_id": "0192f4a0-7b1c-7000-8a00-00000000201e",
+      "channel_id": "0192f4a0-7b1c-7000-8a00-000000000101",
+      "space_id": "0192f4a0-7b1c-7000-8a00-000000000001",
+      "agent_id": "0192f4a0-7b1c-7000-8a00-000000000201",
+      "state": "waiting_input",
+      "queued_at": "2026-10-15T09:59:20.000Z",
+      "billing_mode": "personal",
+      "approval_pending": true,
+      "cost_micros": 31000,
+      "currency": "USD",
+      "cost_is_estimate": true,
+      "started_at": "2026-10-15T09:59:25.000Z",
+      "step": {
+        "kind": "tool_call",
+        "name": "Bash"
+      }
+    },
+    {
+      "run_id": "0192f4a0-7b1c-7000-8a00-00000000101f",
+      "thread_id": "0192f4a0-7b1c-7000-8a00-00000000201f",
+      "channel_id": "0192f4a0-7b1c-7000-8a00-000000000102",
+      "space_id": "0192f4a0-7b1c-7000-8a00-000000000002",
+      "agent_id": "0192f4a0-7b1c-7000-8a00-000000000202",
+      "state": "running",
+      "queued_at": "2026-10-15T09:59:19.000Z",
+      "billing_mode": "organization",
+      "approval_pending": false,
+      "cost_micros": 32000,
+      "currency": "USD",
+      "cost_is_estimate": true,
+      "started_at": "2026-10-15T09:59:24.000Z",
+      "step": {
+        "kind": "tool_call",
+        "name": "Read"
+      }
+    },
+    {
+      "run_id": "0192f4a0-7b1c-7000-8a00-000000001020",
+      "thread_id": "0192f4a0-7b1c-7000-8a00-000000002020",
+      "channel_id": "0192f4a0-7b1c-7000-8a00-000000000103",
+      "space_id": "0192f4a0-7b1c-7000-8a00-000000000002",
+      "agent_id": "0192f4a0-7b1c-7000-8a00-000000000202",
+      "state": "running",
+      "queued_at": "2026-10-15T09:59:18.000Z",
+      "billing_mode": "organization",
+      "approval_pending": false,
+      "cost_micros": 33000,
+      "currency": "USD",
+      "cost_is_estimate": true,
+      "started_at": "2026-10-15T09:59:23.000Z",
+      "step": {
+        "kind": "tool_call",
+        "name": "Edit"
+      }
+    },
+    {
+      "run_id": "0192f4a0-7b1c-7000-8a00-000000001021",
+      "thread_id": "0192f4a0-7b1c-7000-8a00-000000002021",
+      "channel_id": "0192f4a0-7b1c-7000-8a00-000000000101",
+      "space_id": "0192f4a0-7b1c-7000-8a00-000000000001",
+      "agent_id": "0192f4a0-7b1c-7000-8a00-000000000201",
+      "state": "queued",
+      "queued_at": "2026-10-15T09:59:17.000Z",
+      "billing_mode": "personal",
+      "approval_pending": false,
+      "cost_micros": 34000,
+      "currency": "USD",
+      "cost_is_estimate": true
+    },
+    {
+      "run_id": "0192f4a0-7b1c-7000-8a00-000000001022",
+      "thread_id": "0192f4a0-7b1c-7000-8a00-000000002022",
+      "channel_id": "0192f4a0-7b1c-7000-8a00-000000000102",
+      "space_id": "0192f4a0-7b1c-7000-8a00-000000000002",
+      "agent_id": "0192f4a0-7b1c-7000-8a00-000000000202",
+      "state": "waiting_input",
+      "queued_at": "2026-10-15T09:59:16.000Z",
+      "billing_mode": "organization",
+      "approval_pending": true,
+      "cost_micros": 35000,
+      "currency": "USD",
+      "cost_is_estimate": true,
+      "started_at": "2026-10-15T09:59:21.000Z",
+      "step": {
+        "kind": "tool_call",
+        "name": "WebFetch"
+      }
+    },
+    {
+      "run_id": "0192f4a0-7b1c-7000-8a00-000000001023",
+      "thread_id": "0192f4a0-7b1c-7000-8a00-000000002023",
+      "channel_id": "0192f4a0-7b1c-7000-8a00-000000000103",
+      "space_id": "0192f4a0-7b1c-7000-8a00-000000000002",
+      "agent_id": "0192f4a0-7b1c-7000-8a00-000000000202",
+      "state": "running",
+      "queued_at": "2026-10-15T09:59:15.000Z",
+      "billing_mode": "organization",
+      "approval_pending": false,
+      "cost_micros": 36000,
+      "currency": "USD",
+      "cost_is_estimate": true,
+      "started_at": "2026-10-15T09:59:20.000Z",
+      "step": {
+        "kind": "tool_call",
+        "name": "Bash"
+      }
+    },
+    {
+      "run_id": "0192f4a0-7b1c-7000-8a00-000000001024",
+      "thread_id": "0192f4a0-7b1c-7000-8a00-000000002024",
+      "channel_id": "0192f4a0-7b1c-7000-8a00-000000000101",
+      "space_id": "0192f4a0-7b1c-7000-8a00-000000000001",
+      "agent_id": "0192f4a0-7b1c-7000-8a00-000000000201",
+      "state": "running",
+      "queued_at": "2026-10-15T09:59:14.000Z",
+      "billing_mode": "personal",
+      "approval_pending": false,
+      "cost_micros": 37000,
+      "currency": "USD",
+      "cost_is_estimate": true,
+      "started_at": "2026-10-15T09:59:19.000Z",
+      "step": {
+        "kind": "tool_call",
+        "name": "Read"
+      }
+    },
+    {
+      "run_id": "0192f4a0-7b1c-7000-8a00-000000001025",
+      "thread_id": "0192f4a0-7b1c-7000-8a00-000000002025",
+      "channel_id": "0192f4a0-7b1c-7000-8a00-000000000102",
+      "space_id": "0192f4a0-7b1c-7000-8a00-000000000002",
+      "agent_id": "0192f4a0-7b1c-7000-8a00-000000000202",
+      "state": "queued",
+      "queued_at": "2026-10-15T09:59:13.000Z",
+      "billing_mode": "organization",
+      "approval_pending": false,
+      "cost_micros": 38000,
+      "currency": "USD",
+      "cost_is_estimate": true
+    },
+    {
+      "run_id": "0192f4a0-7b1c-7000-8a00-000000001026",
+      "thread_id": "0192f4a0-7b1c-7000-8a00-000000002026",
+      "channel_id": "0192f4a0-7b1c-7000-8a00-000000000103",
+      "space_id": "0192f4a0-7b1c-7000-8a00-000000000002",
+      "agent_id": "0192f4a0-7b1c-7000-8a00-000000000202",
+      "state": "waiting_input",
+      "queued_at": "2026-10-15T09:59:12.000Z",
+      "billing_mode": "organization",
+      "approval_pending": true,
+      "cost_micros": 39000,
+      "currency": "USD",
+      "cost_is_estimate": true,
+      "started_at": "2026-10-15T09:59:17.000Z",
+      "step": {
+        "kind": "tool_call",
+        "name": "Grep"
+      }
+    },
+    {
+      "run_id": "0192f4a0-7b1c-7000-8a00-000000001027",
+      "thread_id": "0192f4a0-7b1c-7000-8a00-000000002027",
+      "channel_id": "0192f4a0-7b1c-7000-8a00-000000000101",
+      "space_id": "0192f4a0-7b1c-7000-8a00-000000000001",
+      "agent_id": "0192f4a0-7b1c-7000-8a00-000000000201",
+      "state": "running",
+      "queued_at": "2026-10-15T09:59:11.000Z",
+      "billing_mode": "personal",
+      "approval_pending": false,
+      "cost_micros": 40000,
+      "currency": "USD",
+      "cost_is_estimate": true,
+      "started_at": "2026-10-15T09:59:16.000Z",
+      "step": {
+        "kind": "tool_call",
+        "name": "WebFetch"
+      }
+    },
+    {
+      "run_id": "0192f4a0-7b1c-7000-8a00-000000001028",
+      "thread_id": "0192f4a0-7b1c-7000-8a00-000000002028",
+      "channel_id": "0192f4a0-7b1c-7000-8a00-000000000102",
+      "space_id": "0192f4a0-7b1c-7000-8a00-000000000002",
+      "agent_id": "0192f4a0-7b1c-7000-8a00-000000000202",
+      "state": "running",
+      "queued_at": "2026-10-15T09:59:10.000Z",
+      "billing_mode": "organization",
+      "approval_pending": false,
+      "cost_micros": 41000,
+      "currency": "USD",
+      "cost_is_estimate": true,
+      "started_at": "2026-10-15T09:59:15.000Z",
+      "step": {
+        "kind": "tool_call",
+        "name": "Bash"
+      }
+    },
+    {
+      "run_id": "0192f4a0-7b1c-7000-8a00-000000001029",
+      "thread_id": "0192f4a0-7b1c-7000-8a00-000000002029",
+      "channel_id": "0192f4a0-7b1c-7000-8a00-000000000103",
+      "space_id": "0192f4a0-7b1c-7000-8a00-000000000002",
+      "agent_id": "0192f4a0-7b1c-7000-8a00-000000000202",
+      "state": "queued",
+      "queued_at": "2026-10-15T09:59:09.000Z",
+      "billing_mode": "organization",
+      "approval_pending": false,
+      "cost_micros": 42000,
+      "currency": "USD",
+      "cost_is_estimate": true
+    },
+    {
+      "run_id": "0192f4a0-7b1c-7000-8a00-00000000102a",
+      "thread_id": "0192f4a0-7b1c-7000-8a00-00000000202a",
+      "channel_id": "0192f4a0-7b1c-7000-8a00-000000000101",
+      "space_id": "0192f4a0-7b1c-7000-8a00-000000000001",
+      "agent_id": "0192f4a0-7b1c-7000-8a00-000000000201",
+      "state": "waiting_input",
+      "queued_at": "2026-10-15T09:59:08.000Z",
+      "billing_mode": "personal",
+      "approval_pending": true,
+      "cost_micros": 43000,
+      "currency": "USD",
+      "cost_is_estimate": true,
+      "started_at": "2026-10-15T09:59:13.000Z",
+      "step": {
+        "kind": "tool_call",
+        "name": "Edit"
+      }
+    },
+    {
+      "run_id": "0192f4a0-7b1c-7000-8a00-00000000102b",
+      "thread_id": "0192f4a0-7b1c-7000-8a00-00000000202b",
+      "channel_id": "0192f4a0-7b1c-7000-8a00-000000000102",
+      "space_id": "0192f4a0-7b1c-7000-8a00-000000000002",
+      "agent_id": "0192f4a0-7b1c-7000-8a00-000000000202",
+      "state": "running",
+      "queued_at": "2026-10-15T09:59:07.000Z",
+      "billing_mode": "organization",
+      "approval_pending": false,
+      "cost_micros": 44000,
+      "currency": "USD",
+      "cost_is_estimate": true,
+      "started_at": "2026-10-15T09:59:12.000Z",
+      "step": {
+        "kind": "tool_call",
+        "name": "Grep"
+      }
+    },
+    {
+      "run_id": "0192f4a0-7b1c-7000-8a00-00000000102c",
+      "thread_id": "0192f4a0-7b1c-7000-8a00-00000000202c",
+      "channel_id": "0192f4a0-7b1c-7000-8a00-000000000103",
+      "space_id": "0192f4a0-7b1c-7000-8a00-000000000002",
+      "agent_id": "0192f4a0-7b1c-7000-8a00-000000000202",
+      "state": "running",
+      "queued_at": "2026-10-15T09:59:06.000Z",
+      "billing_mode": "organization",
+      "approval_pending": false,
+      "cost_micros": 45000,
+      "currency": "USD",
+      "cost_is_estimate": true,
+      "started_at": "2026-10-15T09:59:11.000Z",
+      "step": {
+        "kind": "tool_call",
+        "name": "WebFetch"
+      }
+    },
+    {
+      "run_id": "0192f4a0-7b1c-7000-8a00-00000000102d",
+      "thread_id": "0192f4a0-7b1c-7000-8a00-00000000202d",
+      "channel_id": "0192f4a0-7b1c-7000-8a00-000000000101",
+      "space_id": "0192f4a0-7b1c-7000-8a00-000000000001",
+      "agent_id": "0192f4a0-7b1c-7000-8a00-000000000201",
+      "state": "queued",
+      "queued_at": "2026-10-15T09:59:05.000Z",
+      "billing_mode": "personal",
+      "approval_pending": false,
+      "cost_micros": 46000,
+      "currency": "USD",
+      "cost_is_estimate": true
+    },
+    {
+      "run_id": "0192f4a0-7b1c-7000-8a00-00000000102e",
+      "thread_id": "0192f4a0-7b1c-7000-8a00-00000000202e",
+      "channel_id": "0192f4a0-7b1c-7000-8a00-000000000102",
+      "space_id": "0192f4a0-7b1c-7000-8a00-000000000002",
+      "agent_id": "0192f4a0-7b1c-7000-8a00-000000000202",
+      "state": "waiting_input",
+      "queued_at": "2026-10-15T09:59:04.000Z",
+      "billing_mode": "organization",
+      "approval_pending": true,
+      "cost_micros": 47000,
+      "currency": "USD",
+      "cost_is_estimate": true,
+      "started_at": "2026-10-15T09:59:09.000Z",
+      "step": {
+        "kind": "tool_call",
+        "name": "Read"
+      }
+    },
+    {
+      "run_id": "0192f4a0-7b1c-7000-8a00-00000000102f",
+      "thread_id": "0192f4a0-7b1c-7000-8a00-00000000202f",
+      "channel_id": "0192f4a0-7b1c-7000-8a00-000000000103",
+      "space_id": "0192f4a0-7b1c-7000-8a00-000000000002",
+      "agent_id": "0192f4a0-7b1c-7000-8a00-000000000202",
+      "state": "running",
+      "queued_at": "2026-10-15T09:59:03.000Z",
+      "billing_mode": "organization",
+      "approval_pending": false,
+      "cost_micros": 48000,
+      "currency": "USD",
+      "cost_is_estimate": true,
+      "started_at": "2026-10-15T09:59:08.000Z",
+      "step": {
+        "kind": "tool_call",
+        "name": "Edit"
+      }
+    },
+    {
+      "run_id": "0192f4a0-7b1c-7000-8a00-000000001030",
+      "thread_id": "0192f4a0-7b1c-7000-8a00-000000002030",
+      "channel_id": "0192f4a0-7b1c-7000-8a00-000000000101",
+      "space_id": "0192f4a0-7b1c-7000-8a00-000000000001",
+      "agent_id": "0192f4a0-7b1c-7000-8a00-000000000201",
+      "state": "running",
+      "queued_at": "2026-10-15T09:59:02.000Z",
+      "billing_mode": "personal",
+      "approval_pending": false,
+      "cost_micros": 49000,
+      "currency": "USD",
+      "cost_is_estimate": true,
+      "started_at": "2026-10-15T09:59:07.000Z",
+      "step": {
+        "kind": "tool_call",
+        "name": "Grep"
+      }
+    },
+    {
+      "run_id": "0192f4a0-7b1c-7000-8a00-000000001031",
+      "thread_id": "0192f4a0-7b1c-7000-8a00-000000002031",
+      "channel_id": "0192f4a0-7b1c-7000-8a00-000000000102",
+      "space_id": "0192f4a0-7b1c-7000-8a00-000000000002",
+      "agent_id": "0192f4a0-7b1c-7000-8a00-000000000202",
+      "state": "queued",
+      "queued_at": "2026-10-15T09:59:01.000Z",
+      "billing_mode": "organization",
+      "approval_pending": false,
+      "cost_micros": 50000,
+      "currency": "USD",
+      "cost_is_estimate": true
+    },
+    {
+      "run_id": "0192f4a0-7b1c-7000-8a00-000000001032",
+      "thread_id": "0192f4a0-7b1c-7000-8a00-000000002032",
+      "channel_id": "0192f4a0-7b1c-7000-8a00-000000000103",
+      "space_id": "0192f4a0-7b1c-7000-8a00-000000000002",
+      "agent_id": "0192f4a0-7b1c-7000-8a00-000000000202",
+      "state": "waiting_input",
+      "queued_at": "2026-10-15T09:59:00.000Z",
+      "billing_mode": "organization",
+      "approval_pending": true,
+      "cost_micros": 51000,
+      "currency": "USD",
+      "cost_is_estimate": true,
+      "started_at": "2026-10-15T09:59:05.000Z",
+      "step": {
+        "kind": "tool_call",
+        "name": "Bash"
+      }
+    },
+    {
+      "run_id": "0192f4a0-7b1c-7000-8a00-000000001033",
+      "thread_id": "0192f4a0-7b1c-7000-8a00-000000002033",
+      "channel_id": "0192f4a0-7b1c-7000-8a00-000000000101",
+      "space_id": "0192f4a0-7b1c-7000-8a00-000000000001",
+      "agent_id": "0192f4a0-7b1c-7000-8a00-000000000201",
+      "state": "running",
+      "queued_at": "2026-10-15T09:58:59.000Z",
+      "billing_mode": "personal",
+      "approval_pending": false,
+      "cost_micros": 52000,
+      "currency": "USD",
+      "cost_is_estimate": true,
+      "started_at": "2026-10-15T09:59:04.000Z",
+      "step": {
+        "kind": "tool_call",
+        "name": "Read"
+      }
+    },
+    {
+      "run_id": "0192f4a0-7b1c-7000-8a00-000000001034",
+      "thread_id": "0192f4a0-7b1c-7000-8a00-000000002034",
+      "channel_id": "0192f4a0-7b1c-7000-8a00-000000000102",
+      "space_id": "0192f4a0-7b1c-7000-8a00-000000000002",
+      "agent_id": "0192f4a0-7b1c-7000-8a00-000000000202",
+      "state": "running",
+      "queued_at": "2026-10-15T09:58:58.000Z",
+      "billing_mode": "organization",
+      "approval_pending": false,
+      "cost_micros": 53000,
+      "currency": "USD",
+      "cost_is_estimate": true,
+      "started_at": "2026-10-15T09:59:03.000Z",
+      "step": {
+        "kind": "tool_call",
+        "name": "Edit"
+      }
+    },
+    {
+      "run_id": "0192f4a0-7b1c-7000-8a00-000000001035",
+      "thread_id": "0192f4a0-7b1c-7000-8a00-000000002035",
+      "channel_id": "0192f4a0-7b1c-7000-8a00-000000000103",
+      "space_id": "0192f4a0-7b1c-7000-8a00-000000000002",
+      "agent_id": "0192f4a0-7b1c-7000-8a00-000000000202",
+      "state": "queued",
+      "queued_at": "2026-10-15T09:58:57.000Z",
+      "billing_mode": "organization",
+      "approval_pending": false,
+      "cost_micros": 54000,
+      "currency": "USD",
+      "cost_is_estimate": true
+    },
+    {
+      "run_id": "0192f4a0-7b1c-7000-8a00-000000001036",
+      "thread_id": "0192f4a0-7b1c-7000-8a00-000000002036",
+      "channel_id": "0192f4a0-7b1c-7000-8a00-000000000101",
+      "space_id": "0192f4a0-7b1c-7000-8a00-000000000001",
+      "agent_id": "0192f4a0-7b1c-7000-8a00-000000000201",
+      "state": "waiting_input",
+      "queued_at": "2026-10-15T09:58:56.000Z",
+      "billing_mode": "personal",
+      "approval_pending": true,
+      "cost_micros": 55000,
+      "currency": "USD",
+      "cost_is_estimate": true,
+      "started_at": "2026-10-15T09:59:01.000Z",
+      "step": {
+        "kind": "tool_call",
+        "name": "WebFetch"
+      }
+    },
+    {
+      "run_id": "0192f4a0-7b1c-7000-8a00-000000001037",
+      "thread_id": "0192f4a0-7b1c-7000-8a00-000000002037",
+      "channel_id": "0192f4a0-7b1c-7000-8a00-000000000102",
+      "space_id": "0192f4a0-7b1c-7000-8a00-000000000002",
+      "agent_id": "0192f4a0-7b1c-7000-8a00-000000000202",
+      "state": "running",
+      "queued_at": "2026-10-15T09:58:55.000Z",
+      "billing_mode": "organization",
+      "approval_pending": false,
+      "cost_micros": 56000,
+      "currency": "USD",
+      "cost_is_estimate": true,
+      "started_at": "2026-10-15T09:59:00.000Z",
+      "step": {
+        "kind": "tool_call",
+        "name": "Bash"
+      }
+    },
+    {
+      "run_id": "0192f4a0-7b1c-7000-8a00-000000001038",
+      "thread_id": "0192f4a0-7b1c-7000-8a00-000000002038",
+      "channel_id": "0192f4a0-7b1c-7000-8a00-000000000103",
+      "space_id": "0192f4a0-7b1c-7000-8a00-000000000002",
+      "agent_id": "0192f4a0-7b1c-7000-8a00-000000000202",
+      "state": "running",
+      "queued_at": "2026-10-15T09:58:54.000Z",
+      "billing_mode": "organization",
+      "approval_pending": false,
+      "cost_micros": 57000,
+      "currency": "USD",
+      "cost_is_estimate": true,
+      "started_at": "2026-10-15T09:58:59.000Z",
+      "step": {
+        "kind": "tool_call",
+        "name": "Read"
+      }
+    },
+    {
+      "run_id": "0192f4a0-7b1c-7000-8a00-000000001039",
+      "thread_id": "0192f4a0-7b1c-7000-8a00-000000002039",
+      "channel_id": "0192f4a0-7b1c-7000-8a00-000000000101",
+      "space_id": "0192f4a0-7b1c-7000-8a00-000000000001",
+      "agent_id": "0192f4a0-7b1c-7000-8a00-000000000201",
+      "state": "queued",
+      "queued_at": "2026-10-15T09:58:53.000Z",
+      "billing_mode": "personal",
+      "approval_pending": false,
+      "cost_micros": 58000,
+      "currency": "USD",
+      "cost_is_estimate": true
+    },
+    {
+      "run_id": "0192f4a0-7b1c-7000-8a00-00000000103a",
+      "thread_id": "0192f4a0-7b1c-7000-8a00-00000000203a",
+      "channel_id": "0192f4a0-7b1c-7000-8a00-000000000102",
+      "space_id": "0192f4a0-7b1c-7000-8a00-000000000002",
+      "agent_id": "0192f4a0-7b1c-7000-8a00-000000000202",
+      "state": "waiting_input",
+      "queued_at": "2026-10-15T09:58:52.000Z",
+      "billing_mode": "organization",
+      "approval_pending": true,
+      "cost_micros": 59000,
+      "currency": "USD",
+      "cost_is_estimate": true,
+      "started_at": "2026-10-15T09:58:57.000Z",
+      "step": {
+        "kind": "tool_call",
+        "name": "Grep"
+      }
+    },
+    {
+      "run_id": "0192f4a0-7b1c-7000-8a00-00000000103b",
+      "thread_id": "0192f4a0-7b1c-7000-8a00-00000000203b",
+      "channel_id": "0192f4a0-7b1c-7000-8a00-000000000103",
+      "space_id": "0192f4a0-7b1c-7000-8a00-000000000002",
+      "agent_id": "0192f4a0-7b1c-7000-8a00-000000000202",
+      "state": "running",
+      "queued_at": "2026-10-15T09:58:51.000Z",
+      "billing_mode": "organization",
+      "approval_pending": false,
+      "cost_micros": 60000,
+      "currency": "USD",
+      "cost_is_estimate": true,
+      "started_at": "2026-10-15T09:58:56.000Z",
+      "step": {
+        "kind": "tool_call",
+        "name": "WebFetch"
+      }
+    },
+    {
+      "run_id": "0192f4a0-7b1c-7000-8a00-00000000103c",
+      "thread_id": "0192f4a0-7b1c-7000-8a00-00000000203c",
+      "channel_id": "0192f4a0-7b1c-7000-8a00-000000000101",
+      "space_id": "0192f4a0-7b1c-7000-8a00-000000000001",
+      "agent_id": "0192f4a0-7b1c-7000-8a00-000000000201",
+      "state": "running",
+      "queued_at": "2026-10-15T09:58:50.000Z",
+      "billing_mode": "personal",
+      "approval_pending": false,
+      "cost_micros": 61000,
+      "currency": "USD",
+      "cost_is_estimate": true,
+      "started_at": "2026-10-15T09:58:55.000Z",
+      "step": {
+        "kind": "tool_call",
+        "name": "Bash"
+      }
+    },
+    {
+      "run_id": "0192f4a0-7b1c-7000-8a00-00000000103d",
+      "thread_id": "0192f4a0-7b1c-7000-8a00-00000000203d",
+      "channel_id": "0192f4a0-7b1c-7000-8a00-000000000102",
+      "space_id": "0192f4a0-7b1c-7000-8a00-000000000002",
+      "agent_id": "0192f4a0-7b1c-7000-8a00-000000000202",
+      "state": "queued",
+      "queued_at": "2026-10-15T09:58:49.000Z",
+      "billing_mode": "organization",
+      "approval_pending": false,
+      "cost_micros": 62000,
+      "currency": "USD",
+      "cost_is_estimate": true
+    },
+    {
+      "run_id": "0192f4a0-7b1c-7000-8a00-00000000103e",
+      "thread_id": "0192f4a0-7b1c-7000-8a00-00000000203e",
+      "channel_id": "0192f4a0-7b1c-7000-8a00-000000000103",
+      "space_id": "0192f4a0-7b1c-7000-8a00-000000000002",
+      "agent_id": "0192f4a0-7b1c-7000-8a00-000000000202",
+      "state": "waiting_input",
+      "queued_at": "2026-10-15T09:58:48.000Z",
+      "billing_mode": "organization",
+      "approval_pending": true,
+      "cost_micros": 63000,
+      "currency": "USD",
+      "cost_is_estimate": true,
+      "started_at": "2026-10-15T09:58:53.000Z",
+      "step": {
+        "kind": "tool_call",
+        "name": "Edit"
+      }
+    },
+    {
+      "run_id": "0192f4a0-7b1c-7000-8a00-00000000103f",
+      "thread_id": "0192f4a0-7b1c-7000-8a00-00000000203f",
+      "channel_id": "0192f4a0-7b1c-7000-8a00-000000000101",
+      "space_id": "0192f4a0-7b1c-7000-8a00-000000000001",
+      "agent_id": "0192f4a0-7b1c-7000-8a00-000000000201",
+      "state": "running",
+      "queued_at": "2026-10-15T09:58:47.000Z",
+      "billing_mode": "personal",
+      "approval_pending": false,
+      "cost_micros": 64000,
+      "currency": "USD",
+      "cost_is_estimate": true,
+      "started_at": "2026-10-15T09:58:52.000Z",
+      "step": {
+        "kind": "tool_call",
+        "name": "Grep"
+      }
+    },
+    {
+      "run_id": "0192f4a0-7b1c-7000-8a00-000000001040",
+      "thread_id": "0192f4a0-7b1c-7000-8a00-000000002040",
+      "channel_id": "0192f4a0-7b1c-7000-8a00-000000000102",
+      "space_id": "0192f4a0-7b1c-7000-8a00-000000000002",
+      "agent_id": "0192f4a0-7b1c-7000-8a00-000000000202",
+      "state": "running",
+      "queued_at": "2026-10-15T09:58:46.000Z",
+      "billing_mode": "organization",
+      "approval_pending": false,
+      "cost_micros": 65000,
+      "currency": "USD",
+      "cost_is_estimate": true,
+      "started_at": "2026-10-15T09:58:51.000Z",
+      "step": {
+        "kind": "tool_call",
+        "name": "WebFetch"
+      }
+    },
+    {
+      "run_id": "0192f4a0-7b1c-7000-8a00-000000001041",
+      "thread_id": "0192f4a0-7b1c-7000-8a00-000000002041",
+      "channel_id": "0192f4a0-7b1c-7000-8a00-000000000103",
+      "space_id": "0192f4a0-7b1c-7000-8a00-000000000002",
+      "agent_id": "0192f4a0-7b1c-7000-8a00-000000000202",
+      "state": "queued",
+      "queued_at": "2026-10-15T09:58:45.000Z",
+      "billing_mode": "organization",
+      "approval_pending": false,
+      "cost_micros": 66000,
+      "currency": "USD",
+      "cost_is_estimate": true
+    },
+    {
+      "run_id": "0192f4a0-7b1c-7000-8a00-000000001042",
+      "thread_id": "0192f4a0-7b1c-7000-8a00-000000002042",
+      "channel_id": "0192f4a0-7b1c-7000-8a00-000000000101",
+      "space_id": "0192f4a0-7b1c-7000-8a00-000000000001",
+      "agent_id": "0192f4a0-7b1c-7000-8a00-000000000201",
+      "state": "waiting_input",
+      "queued_at": "2026-10-15T09:58:44.000Z",
+      "billing_mode": "personal",
+      "approval_pending": true,
+      "cost_micros": 67000,
+      "currency": "USD",
+      "cost_is_estimate": true,
+      "started_at": "2026-10-15T09:58:49.000Z",
+      "step": {
+        "kind": "tool_call",
+        "name": "Read"
+      }
+    },
+    {
+      "run_id": "0192f4a0-7b1c-7000-8a00-000000001043",
+      "thread_id": "0192f4a0-7b1c-7000-8a00-000000002043",
+      "channel_id": "0192f4a0-7b1c-7000-8a00-000000000102",
+      "space_id": "0192f4a0-7b1c-7000-8a00-000000000002",
+      "agent_id": "0192f4a0-7b1c-7000-8a00-000000000202",
+      "state": "running",
+      "queued_at": "2026-10-15T09:58:43.000Z",
+      "billing_mode": "organization",
+      "approval_pending": false,
+      "cost_micros": 68000,
+      "currency": "USD",
+      "cost_is_estimate": true,
+      "started_at": "2026-10-15T09:58:48.000Z",
+      "step": {
+        "kind": "tool_call",
+        "name": "Edit"
+      }
+    },
+    {
+      "run_id": "0192f4a0-7b1c-7000-8a00-000000001044",
+      "thread_id": "0192f4a0-7b1c-7000-8a00-000000002044",
+      "channel_id": "0192f4a0-7b1c-7000-8a00-000000000103",
+      "space_id": "0192f4a0-7b1c-7000-8a00-000000000002",
+      "agent_id": "0192f4a0-7b1c-7000-8a00-000000000202",
+      "state": "running",
+      "queued_at": "2026-10-15T09:58:42.000Z",
+      "billing_mode": "organization",
+      "approval_pending": false,
+      "cost_micros": 69000,
+      "currency": "USD",
+      "cost_is_estimate": true,
+      "started_at": "2026-10-15T09:58:47.000Z",
+      "step": {
+        "kind": "tool_call",
+        "name": "Grep"
+      }
+    },
+    {
+      "run_id": "0192f4a0-7b1c-7000-8a00-000000001045",
+      "thread_id": "0192f4a0-7b1c-7000-8a00-000000002045",
+      "channel_id": "0192f4a0-7b1c-7000-8a00-000000000101",
+      "space_id": "0192f4a0-7b1c-7000-8a00-000000000001",
+      "agent_id": "0192f4a0-7b1c-7000-8a00-000000000201",
+      "state": "queued",
+      "queued_at": "2026-10-15T09:58:41.000Z",
+      "billing_mode": "personal",
+      "approval_pending": false,
+      "cost_micros": 70000,
+      "currency": "USD",
+      "cost_is_estimate": true
+    },
+    {
+      "run_id": "0192f4a0-7b1c-7000-8a00-000000001046",
+      "thread_id": "0192f4a0-7b1c-7000-8a00-000000002046",
+      "channel_id": "0192f4a0-7b1c-7000-8a00-000000000102",
+      "space_id": "0192f4a0-7b1c-7000-8a00-000000000002",
+      "agent_id": "0192f4a0-7b1c-7000-8a00-000000000202",
+      "state": "waiting_input",
+      "queued_at": "2026-10-15T09:58:40.000Z",
+      "billing_mode": "organization",
+      "approval_pending": true,
+      "cost_micros": 71000,
+      "currency": "USD",
+      "cost_is_estimate": true,
+      "started_at": "2026-10-15T09:58:45.000Z",
+      "step": {
+        "kind": "tool_call",
+        "name": "Bash"
+      }
+    },
+    {
+      "run_id": "0192f4a0-7b1c-7000-8a00-000000001047",
+      "thread_id": "0192f4a0-7b1c-7000-8a00-000000002047",
+      "channel_id": "0192f4a0-7b1c-7000-8a00-000000000103",
+      "space_id": "0192f4a0-7b1c-7000-8a00-000000000002",
+      "agent_id": "0192f4a0-7b1c-7000-8a00-000000000202",
+      "state": "running",
+      "queued_at": "2026-10-15T09:58:39.000Z",
+      "billing_mode": "organization",
+      "approval_pending": false,
+      "cost_micros": 72000,
+      "currency": "USD",
+      "cost_is_estimate": true,
+      "started_at": "2026-10-15T09:58:44.000Z",
+      "step": {
+        "kind": "tool_call",
+        "name": "Read"
+      }
+    },
+    {
+      "run_id": "0192f4a0-7b1c-7000-8a00-000000001048",
+      "thread_id": "0192f4a0-7b1c-7000-8a00-000000002048",
+      "channel_id": "0192f4a0-7b1c-7000-8a00-000000000101",
+      "space_id": "0192f4a0-7b1c-7000-8a00-000000000001",
+      "agent_id": "0192f4a0-7b1c-7000-8a00-000000000201",
+      "state": "running",
+      "queued_at": "2026-10-15T09:58:38.000Z",
+      "billing_mode": "personal",
+      "approval_pending": false,
+      "cost_micros": 73000,
+      "currency": "USD",
+      "cost_is_estimate": true,
+      "started_at": "2026-10-15T09:58:43.000Z",
+      "step": {
+        "kind": "tool_call",
+        "name": "Edit"
+      }
+    },
+    {
+      "run_id": "0192f4a0-7b1c-7000-8a00-000000001049",
+      "thread_id": "0192f4a0-7b1c-7000-8a00-000000002049",
+      "channel_id": "0192f4a0-7b1c-7000-8a00-000000000102",
+      "space_id": "0192f4a0-7b1c-7000-8a00-000000000002",
+      "agent_id": "0192f4a0-7b1c-7000-8a00-000000000202",
+      "state": "queued",
+      "queued_at": "2026-10-15T09:58:37.000Z",
+      "billing_mode": "organization",
+      "approval_pending": false,
+      "cost_micros": 74000,
+      "currency": "USD",
+      "cost_is_estimate": true
+    },
+    {
+      "run_id": "0192f4a0-7b1c-7000-8a00-00000000104a",
+      "thread_id": "0192f4a0-7b1c-7000-8a00-00000000204a",
+      "channel_id": "0192f4a0-7b1c-7000-8a00-000000000103",
+      "space_id": "0192f4a0-7b1c-7000-8a00-000000000002",
+      "agent_id": "0192f4a0-7b1c-7000-8a00-000000000202",
+      "state": "waiting_input",
+      "queued_at": "2026-10-15T09:58:36.000Z",
+      "billing_mode": "organization",
+      "approval_pending": true,
+      "cost_micros": 75000,
+      "currency": "USD",
+      "cost_is_estimate": true,
+      "started_at": "2026-10-15T09:58:41.000Z",
+      "step": {
+        "kind": "tool_call",
+        "name": "WebFetch"
+      }
+    },
+    {
+      "run_id": "0192f4a0-7b1c-7000-8a00-00000000104b",
+      "thread_id": "0192f4a0-7b1c-7000-8a00-00000000204b",
+      "channel_id": "0192f4a0-7b1c-7000-8a00-000000000101",
+      "space_id": "0192f4a0-7b1c-7000-8a00-000000000001",
+      "agent_id": "0192f4a0-7b1c-7000-8a00-000000000201",
+      "state": "running",
+      "queued_at": "2026-10-15T09:58:35.000Z",
+      "billing_mode": "personal",
+      "approval_pending": false,
+      "cost_micros": 76000,
+      "currency": "USD",
+      "cost_is_estimate": true,
+      "started_at": "2026-10-15T09:58:40.000Z",
+      "step": {
+        "kind": "tool_call",
+        "name": "Bash"
+      }
+    },
+    {
+      "run_id": "0192f4a0-7b1c-7000-8a00-00000000104c",
+      "thread_id": "0192f4a0-7b1c-7000-8a00-00000000204c",
+      "channel_id": "0192f4a0-7b1c-7000-8a00-000000000102",
+      "space_id": "0192f4a0-7b1c-7000-8a00-000000000002",
+      "agent_id": "0192f4a0-7b1c-7000-8a00-000000000202",
+      "state": "running",
+      "queued_at": "2026-10-15T09:58:34.000Z",
+      "billing_mode": "organization",
+      "approval_pending": false,
+      "cost_micros": 77000,
+      "currency": "USD",
+      "cost_is_estimate": true,
+      "started_at": "2026-10-15T09:58:39.000Z",
+      "step": {
+        "kind": "tool_call",
+        "name": "Read"
+      }
+    },
+    {
+      "run_id": "0192f4a0-7b1c-7000-8a00-00000000104d",
+      "thread_id": "0192f4a0-7b1c-7000-8a00-00000000204d",
+      "channel_id": "0192f4a0-7b1c-7000-8a00-000000000103",
+      "space_id": "0192f4a0-7b1c-7000-8a00-000000000002",
+      "agent_id": "0192f4a0-7b1c-7000-8a00-000000000202",
+      "state": "queued",
+      "queued_at": "2026-10-15T09:58:33.000Z",
+      "billing_mode": "organization",
+      "approval_pending": false,
+      "cost_micros": 78000,
+      "currency": "USD",
+      "cost_is_estimate": true
+    },
+    {
+      "run_id": "0192f4a0-7b1c-7000-8a00-00000000104e",
+      "thread_id": "0192f4a0-7b1c-7000-8a00-00000000204e",
+      "channel_id": "0192f4a0-7b1c-7000-8a00-000000000101",
+      "space_id": "0192f4a0-7b1c-7000-8a00-000000000001",
+      "agent_id": "0192f4a0-7b1c-7000-8a00-000000000201",
+      "state": "waiting_input",
+      "queued_at": "2026-10-15T09:58:32.000Z",
+      "billing_mode": "personal",
+      "approval_pending": true,
+      "cost_micros": 79000,
+      "currency": "USD",
+      "cost_is_estimate": true,
+      "started_at": "2026-10-15T09:58:37.000Z",
+      "step": {
+        "kind": "tool_call",
+        "name": "Grep"
+      }
+    },
+    {
+      "run_id": "0192f4a0-7b1c-7000-8a00-00000000104f",
+      "thread_id": "0192f4a0-7b1c-7000-8a00-00000000204f",
+      "channel_id": "0192f4a0-7b1c-7000-8a00-000000000102",
+      "space_id": "0192f4a0-7b1c-7000-8a00-000000000002",
+      "agent_id": "0192f4a0-7b1c-7000-8a00-000000000202",
+      "state": "running",
+      "queued_at": "2026-10-15T09:58:31.000Z",
+      "billing_mode": "organization",
+      "approval_pending": false,
+      "cost_micros": 80000,
+      "currency": "USD",
+      "cost_is_estimate": true,
+      "started_at": "2026-10-15T09:58:36.000Z",
+      "step": {
+        "kind": "tool_call",
+        "name": "WebFetch"
+      }
+    },
+    {
+      "run_id": "0192f4a0-7b1c-7000-8a00-000000001050",
+      "thread_id": "0192f4a0-7b1c-7000-8a00-000000002050",
+      "channel_id": "0192f4a0-7b1c-7000-8a00-000000000103",
+      "space_id": "0192f4a0-7b1c-7000-8a00-000000000002",
+      "agent_id": "0192f4a0-7b1c-7000-8a00-000000000202",
+      "state": "running",
+      "queued_at": "2026-10-15T09:58:30.000Z",
+      "billing_mode": "organization",
+      "approval_pending": false,
+      "cost_micros": 81000,
+      "currency": "USD",
+      "cost_is_estimate": true,
+      "started_at": "2026-10-15T09:58:35.000Z",
+      "step": {
+        "kind": "tool_call",
+        "name": "Bash"
+      }
+    },
+    {
+      "run_id": "0192f4a0-7b1c-7000-8a00-000000001051",
+      "thread_id": "0192f4a0-7b1c-7000-8a00-000000002051",
+      "channel_id": "0192f4a0-7b1c-7000-8a00-000000000101",
+      "space_id": "0192f4a0-7b1c-7000-8a00-000000000001",
+      "agent_id": "0192f4a0-7b1c-7000-8a00-000000000201",
+      "state": "queued",
+      "queued_at": "2026-10-15T09:58:29.000Z",
+      "billing_mode": "personal",
+      "approval_pending": false,
+      "cost_micros": 82000,
+      "currency": "USD",
+      "cost_is_estimate": true
+    },
+    {
+      "run_id": "0192f4a0-7b1c-7000-8a00-000000001052",
+      "thread_id": "0192f4a0-7b1c-7000-8a00-000000002052",
+      "channel_id": "0192f4a0-7b1c-7000-8a00-000000000102",
+      "space_id": "0192f4a0-7b1c-7000-8a00-000000000002",
+      "agent_id": "0192f4a0-7b1c-7000-8a00-000000000202",
+      "state": "waiting_input",
+      "queued_at": "2026-10-15T09:58:28.000Z",
+      "billing_mode": "organization",
+      "approval_pending": true,
+      "cost_micros": 83000,
+      "currency": "USD",
+      "cost_is_estimate": true,
+      "started_at": "2026-10-15T09:58:33.000Z",
+      "step": {
+        "kind": "tool_call",
+        "name": "Edit"
+      }
+    },
+    {
+      "run_id": "0192f4a0-7b1c-7000-8a00-000000001053",
+      "thread_id": "0192f4a0-7b1c-7000-8a00-000000002053",
+      "channel_id": "0192f4a0-7b1c-7000-8a00-000000000103",
+      "space_id": "0192f4a0-7b1c-7000-8a00-000000000002",
+      "agent_id": "0192f4a0-7b1c-7000-8a00-000000000202",
+      "state": "running",
+      "queued_at": "2026-10-15T09:58:27.000Z",
+      "billing_mode": "organization",
+      "approval_pending": false,
+      "cost_micros": 84000,
+      "currency": "USD",
+      "cost_is_estimate": true,
+      "started_at": "2026-10-15T09:58:32.000Z",
+      "step": {
+        "kind": "tool_call",
+        "name": "Grep"
+      }
+    },
+    {
+      "run_id": "0192f4a0-7b1c-7000-8a00-000000001054",
+      "thread_id": "0192f4a0-7b1c-7000-8a00-000000002054",
+      "channel_id": "0192f4a0-7b1c-7000-8a00-000000000101",
+      "space_id": "0192f4a0-7b1c-7000-8a00-000000000001",
+      "agent_id": "0192f4a0-7b1c-7000-8a00-000000000201",
+      "state": "running",
+      "queued_at": "2026-10-15T09:58:26.000Z",
+      "billing_mode": "personal",
+      "approval_pending": false,
+      "cost_micros": 85000,
+      "currency": "USD",
+      "cost_is_estimate": true,
+      "started_at": "2026-10-15T09:58:31.000Z",
+      "step": {
+        "kind": "tool_call",
+        "name": "WebFetch"
+      }
+    },
+    {
+      "run_id": "0192f4a0-7b1c-7000-8a00-000000001055",
+      "thread_id": "0192f4a0-7b1c-7000-8a00-000000002055",
+      "channel_id": "0192f4a0-7b1c-7000-8a00-000000000102",
+      "space_id": "0192f4a0-7b1c-7000-8a00-000000000002",
+      "agent_id": "0192f4a0-7b1c-7000-8a00-000000000202",
+      "state": "queued",
+      "queued_at": "2026-10-15T09:58:25.000Z",
+      "billing_mode": "organization",
+      "approval_pending": false,
+      "cost_micros": 86000,
+      "currency": "USD",
+      "cost_is_estimate": true
+    },
+    {
+      "run_id": "0192f4a0-7b1c-7000-8a00-000000001056",
+      "thread_id": "0192f4a0-7b1c-7000-8a00-000000002056",
+      "channel_id": "0192f4a0-7b1c-7000-8a00-000000000103",
+      "space_id": "0192f4a0-7b1c-7000-8a00-000000000002",
+      "agent_id": "0192f4a0-7b1c-7000-8a00-000000000202",
+      "state": "waiting_input",
+      "queued_at": "2026-10-15T09:58:24.000Z",
+      "billing_mode": "organization",
+      "approval_pending": true,
+      "cost_micros": 87000,
+      "currency": "USD",
+      "cost_is_estimate": true,
+      "started_at": "2026-10-15T09:58:29.000Z",
+      "step": {
+        "kind": "tool_call",
+        "name": "Read"
+      }
+    },
+    {
+      "run_id": "0192f4a0-7b1c-7000-8a00-000000001057",
+      "thread_id": "0192f4a0-7b1c-7000-8a00-000000002057",
+      "channel_id": "0192f4a0-7b1c-7000-8a00-000000000101",
+      "space_id": "0192f4a0-7b1c-7000-8a00-000000000001",
+      "agent_id": "0192f4a0-7b1c-7000-8a00-000000000201",
+      "state": "running",
+      "queued_at": "2026-10-15T09:58:23.000Z",
+      "billing_mode": "personal",
+      "approval_pending": false,
+      "cost_micros": 88000,
+      "currency": "USD",
+      "cost_is_estimate": true,
+      "started_at": "2026-10-15T09:58:28.000Z",
+      "step": {
+        "kind": "tool_call",
+        "name": "Edit"
+      }
+    },
+    {
+      "run_id": "0192f4a0-7b1c-7000-8a00-000000001058",
+      "thread_id": "0192f4a0-7b1c-7000-8a00-000000002058",
+      "channel_id": "0192f4a0-7b1c-7000-8a00-000000000102",
+      "space_id": "0192f4a0-7b1c-7000-8a00-000000000002",
+      "agent_id": "0192f4a0-7b1c-7000-8a00-000000000202",
+      "state": "running",
+      "queued_at": "2026-10-15T09:58:22.000Z",
+      "billing_mode": "organization",
+      "approval_pending": false,
+      "cost_micros": 89000,
+      "currency": "USD",
+      "cost_is_estimate": true,
+      "started_at": "2026-10-15T09:58:27.000Z",
+      "step": {
+        "kind": "tool_call",
+        "name": "Grep"
+      }
+    },
+    {
+      "run_id": "0192f4a0-7b1c-7000-8a00-000000001059",
+      "thread_id": "0192f4a0-7b1c-7000-8a00-000000002059",
+      "channel_id": "0192f4a0-7b1c-7000-8a00-000000000103",
+      "space_id": "0192f4a0-7b1c-7000-8a00-000000000002",
+      "agent_id": "0192f4a0-7b1c-7000-8a00-000000000202",
+      "state": "queued",
+      "queued_at": "2026-10-15T09:58:21.000Z",
+      "billing_mode": "organization",
+      "approval_pending": false,
+      "cost_micros": 90000,
+      "currency": "USD",
+      "cost_is_estimate": true
+    },
+    {
+      "run_id": "0192f4a0-7b1c-7000-8a00-00000000105a",
+      "thread_id": "0192f4a0-7b1c-7000-8a00-00000000205a",
+      "channel_id": "0192f4a0-7b1c-7000-8a00-000000000101",
+      "space_id": "0192f4a0-7b1c-7000-8a00-000000000001",
+      "agent_id": "0192f4a0-7b1c-7000-8a00-000000000201",
+      "state": "waiting_input",
+      "queued_at": "2026-10-15T09:58:20.000Z",
+      "billing_mode": "personal",
+      "approval_pending": true,
+      "cost_micros": 91000,
+      "currency": "USD",
+      "cost_is_estimate": true,
+      "started_at": "2026-10-15T09:58:25.000Z",
+      "step": {
+        "kind": "tool_call",
+        "name": "Bash"
+      }
+    },
+    {
+      "run_id": "0192f4a0-7b1c-7000-8a00-00000000105b",
+      "thread_id": "0192f4a0-7b1c-7000-8a00-00000000205b",
+      "channel_id": "0192f4a0-7b1c-7000-8a00-000000000102",
+      "space_id": "0192f4a0-7b1c-7000-8a00-000000000002",
+      "agent_id": "0192f4a0-7b1c-7000-8a00-000000000202",
+      "state": "running",
+      "queued_at": "2026-10-15T09:58:19.000Z",
+      "billing_mode": "organization",
+      "approval_pending": false,
+      "cost_micros": 92000,
+      "currency": "USD",
+      "cost_is_estimate": true,
+      "started_at": "2026-10-15T09:58:24.000Z",
+      "step": {
+        "kind": "tool_call",
+        "name": "Read"
+      }
+    },
+    {
+      "run_id": "0192f4a0-7b1c-7000-8a00-00000000105c",
+      "thread_id": "0192f4a0-7b1c-7000-8a00-00000000205c",
+      "channel_id": "0192f4a0-7b1c-7000-8a00-000000000103",
+      "space_id": "0192f4a0-7b1c-7000-8a00-000000000002",
+      "agent_id": "0192f4a0-7b1c-7000-8a00-000000000202",
+      "state": "running",
+      "queued_at": "2026-10-15T09:58:18.000Z",
+      "billing_mode": "organization",
+      "approval_pending": false,
+      "cost_micros": 93000,
+      "currency": "USD",
+      "cost_is_estimate": true,
+      "started_at": "2026-10-15T09:58:23.000Z",
+      "step": {
+        "kind": "tool_call",
+        "name": "Edit"
+      }
+    },
+    {
+      "run_id": "0192f4a0-7b1c-7000-8a00-00000000105d",
+      "thread_id": "0192f4a0-7b1c-7000-8a00-00000000205d",
+      "channel_id": "0192f4a0-7b1c-7000-8a00-000000000101",
+      "space_id": "0192f4a0-7b1c-7000-8a00-000000000001",
+      "agent_id": "0192f4a0-7b1c-7000-8a00-000000000201",
+      "state": "queued",
+      "queued_at": "2026-10-15T09:58:17.000Z",
+      "billing_mode": "personal",
+      "approval_pending": false,
+      "cost_micros": 94000,
+      "currency": "USD",
+      "cost_is_estimate": true
+    },
+    {
+      "run_id": "0192f4a0-7b1c-7000-8a00-00000000105e",
+      "thread_id": "0192f4a0-7b1c-7000-8a00-00000000205e",
+      "channel_id": "0192f4a0-7b1c-7000-8a00-000000000102",
+      "space_id": "0192f4a0-7b1c-7000-8a00-000000000002",
+      "agent_id": "0192f4a0-7b1c-7000-8a00-000000000202",
+      "state": "waiting_input",
+      "queued_at": "2026-10-15T09:58:16.000Z",
+      "billing_mode": "organization",
+      "approval_pending": true,
+      "cost_micros": 95000,
+      "currency": "USD",
+      "cost_is_estimate": true,
+      "started_at": "2026-10-15T09:58:21.000Z",
+      "step": {
+        "kind": "tool_call",
+        "name": "WebFetch"
+      }
+    },
+    {
+      "run_id": "0192f4a0-7b1c-7000-8a00-00000000105f",
+      "thread_id": "0192f4a0-7b1c-7000-8a00-00000000205f",
+      "channel_id": "0192f4a0-7b1c-7000-8a00-000000000103",
+      "space_id": "0192f4a0-7b1c-7000-8a00-000000000002",
+      "agent_id": "0192f4a0-7b1c-7000-8a00-000000000202",
+      "state": "running",
+      "queued_at": "2026-10-15T09:58:15.000Z",
+      "billing_mode": "organization",
+      "approval_pending": false,
+      "cost_micros": 96000,
+      "currency": "USD",
+      "cost_is_estimate": true,
+      "started_at": "2026-10-15T09:58:20.000Z",
+      "step": {
+        "kind": "tool_call",
+        "name": "Bash"
+      }
+    },
+    {
+      "run_id": "0192f4a0-7b1c-7000-8a00-000000001060",
+      "thread_id": "0192f4a0-7b1c-7000-8a00-000000002060",
+      "channel_id": "0192f4a0-7b1c-7000-8a00-000000000101",
+      "space_id": "0192f4a0-7b1c-7000-8a00-000000000001",
+      "agent_id": "0192f4a0-7b1c-7000-8a00-000000000201",
+      "state": "running",
+      "queued_at": "2026-10-15T09:58:14.000Z",
+      "billing_mode": "personal",
+      "approval_pending": false,
+      "cost_micros": 97000,
+      "currency": "USD",
+      "cost_is_estimate": true,
+      "started_at": "2026-10-15T09:58:19.000Z",
+      "step": {
+        "kind": "tool_call",
+        "name": "Read"
+      }
+    },
+    {
+      "run_id": "0192f4a0-7b1c-7000-8a00-000000001061",
+      "thread_id": "0192f4a0-7b1c-7000-8a00-000000002061",
+      "channel_id": "0192f4a0-7b1c-7000-8a00-000000000102",
+      "space_id": "0192f4a0-7b1c-7000-8a00-000000000002",
+      "agent_id": "0192f4a0-7b1c-7000-8a00-000000000202",
+      "state": "queued",
+      "queued_at": "2026-10-15T09:58:13.000Z",
+      "billing_mode": "organization",
+      "approval_pending": false,
+      "cost_micros": 98000,
+      "currency": "USD",
+      "cost_is_estimate": true
+    },
+    {
+      "run_id": "0192f4a0-7b1c-7000-8a00-000000001062",
+      "thread_id": "0192f4a0-7b1c-7000-8a00-000000002062",
+      "channel_id": "0192f4a0-7b1c-7000-8a00-000000000103",
+      "space_id": "0192f4a0-7b1c-7000-8a00-000000000002",
+      "agent_id": "0192f4a0-7b1c-7000-8a00-000000000202",
+      "state": "waiting_input",
+      "queued_at": "2026-10-15T09:58:12.000Z",
+      "billing_mode": "organization",
+      "approval_pending": true,
+      "cost_micros": 99000,
+      "currency": "USD",
+      "cost_is_estimate": true,
+      "started_at": "2026-10-15T09:58:17.000Z",
+      "step": {
+        "kind": "tool_call",
+        "name": "Grep"
+      }
+    },
+    {
+      "run_id": "0192f4a0-7b1c-7000-8a00-000000001063",
+      "thread_id": "0192f4a0-7b1c-7000-8a00-000000002063",
+      "channel_id": "0192f4a0-7b1c-7000-8a00-000000000101",
+      "space_id": "0192f4a0-7b1c-7000-8a00-000000000001",
+      "agent_id": "0192f4a0-7b1c-7000-8a00-000000000201",
+      "state": "running",
+      "queued_at": "2026-10-15T09:58:11.000Z",
+      "billing_mode": "personal",
+      "approval_pending": false,
+      "cost_micros": 100000,
+      "currency": "USD",
+      "cost_is_estimate": true,
+      "started_at": "2026-10-15T09:58:16.000Z",
+      "step": {
+        "kind": "tool_call",
+        "name": "WebFetch"
+      }
+    },
+    {
+      "run_id": "0192f4a0-7b1c-7000-8a00-000000001064",
+      "thread_id": "0192f4a0-7b1c-7000-8a00-000000002064",
+      "channel_id": "0192f4a0-7b1c-7000-8a00-000000000102",
+      "space_id": "0192f4a0-7b1c-7000-8a00-000000000002",
+      "agent_id": "0192f4a0-7b1c-7000-8a00-000000000202",
+      "state": "running",
+      "queued_at": "2026-10-15T09:58:10.000Z",
+      "billing_mode": "organization",
+      "approval_pending": false,
+      "cost_micros": 101000,
+      "currency": "USD",
+      "cost_is_estimate": true,
+      "started_at": "2026-10-15T09:58:15.000Z",
+      "step": {
+        "kind": "tool_call",
+        "name": "Bash"
+      }
+    },
+    {
+      "run_id": "0192f4a0-7b1c-7000-8a00-000000001065",
+      "thread_id": "0192f4a0-7b1c-7000-8a00-000000002065",
+      "channel_id": "0192f4a0-7b1c-7000-8a00-000000000103",
+      "space_id": "0192f4a0-7b1c-7000-8a00-000000000002",
+      "agent_id": "0192f4a0-7b1c-7000-8a00-000000000202",
+      "state": "queued",
+      "queued_at": "2026-10-15T09:58:09.000Z",
+      "billing_mode": "organization",
+      "approval_pending": false,
+      "cost_micros": 102000,
+      "currency": "USD",
+      "cost_is_estimate": true
+    },
+    {
+      "run_id": "0192f4a0-7b1c-7000-8a00-000000001066",
+      "thread_id": "0192f4a0-7b1c-7000-8a00-000000002066",
+      "channel_id": "0192f4a0-7b1c-7000-8a00-000000000101",
+      "space_id": "0192f4a0-7b1c-7000-8a00-000000000001",
+      "agent_id": "0192f4a0-7b1c-7000-8a00-000000000201",
+      "state": "waiting_input",
+      "queued_at": "2026-10-15T09:58:08.000Z",
+      "billing_mode": "personal",
+      "approval_pending": true,
+      "cost_micros": 103000,
+      "currency": "USD",
+      "cost_is_estimate": true,
+      "started_at": "2026-10-15T09:58:13.000Z",
+      "step": {
+        "kind": "tool_call",
+        "name": "Edit"
+      }
+    },
+    {
+      "run_id": "0192f4a0-7b1c-7000-8a00-000000001067",
+      "thread_id": "0192f4a0-7b1c-7000-8a00-000000002067",
+      "channel_id": "0192f4a0-7b1c-7000-8a00-000000000102",
+      "space_id": "0192f4a0-7b1c-7000-8a00-000000000002",
+      "agent_id": "0192f4a0-7b1c-7000-8a00-000000000202",
+      "state": "running",
+      "queued_at": "2026-10-15T09:58:07.000Z",
+      "billing_mode": "organization",
+      "approval_pending": false,
+      "cost_micros": 104000,
+      "currency": "USD",
+      "cost_is_estimate": true,
+      "started_at": "2026-10-15T09:58:12.000Z",
+      "step": {
+        "kind": "tool_call",
+        "name": "Grep"
+      }
+    },
+    {
+      "run_id": "0192f4a0-7b1c-7000-8a00-000000001068",
+      "thread_id": "0192f4a0-7b1c-7000-8a00-000000002068",
+      "channel_id": "0192f4a0-7b1c-7000-8a00-000000000103",
+      "space_id": "0192f4a0-7b1c-7000-8a00-000000000002",
+      "agent_id": "0192f4a0-7b1c-7000-8a00-000000000202",
+      "state": "running",
+      "queued_at": "2026-10-15T09:58:06.000Z",
+      "billing_mode": "organization",
+      "approval_pending": false,
+      "cost_micros": 105000,
+      "currency": "USD",
+      "cost_is_estimate": true,
+      "started_at": "2026-10-15T09:58:11.000Z",
+      "step": {
+        "kind": "tool_call",
+        "name": "WebFetch"
+      }
+    },
+    {
+      "run_id": "0192f4a0-7b1c-7000-8a00-000000001069",
+      "thread_id": "0192f4a0-7b1c-7000-8a00-000000002069",
+      "channel_id": "0192f4a0-7b1c-7000-8a00-000000000101",
+      "space_id": "0192f4a0-7b1c-7000-8a00-000000000001",
+      "agent_id": "0192f4a0-7b1c-7000-8a00-000000000201",
+      "state": "queued",
+      "queued_at": "2026-10-15T09:58:05.000Z",
+      "billing_mode": "personal",
+      "approval_pending": false,
+      "cost_micros": 106000,
+      "currency": "USD",
+      "cost_is_estimate": true
+    },
+    {
+      "run_id": "0192f4a0-7b1c-7000-8a00-00000000106a",
+      "thread_id": "0192f4a0-7b1c-7000-8a00-00000000206a",
+      "channel_id": "0192f4a0-7b1c-7000-8a00-000000000102",
+      "space_id": "0192f4a0-7b1c-7000-8a00-000000000002",
+      "agent_id": "0192f4a0-7b1c-7000-8a00-000000000202",
+      "state": "waiting_input",
+      "queued_at": "2026-10-15T09:58:04.000Z",
+      "billing_mode": "organization",
+      "approval_pending": true,
+      "cost_micros": 107000,
+      "currency": "USD",
+      "cost_is_estimate": true,
+      "started_at": "2026-10-15T09:58:09.000Z",
+      "step": {
+        "kind": "tool_call",
+        "name": "Read"
+      }
+    },
+    {
+      "run_id": "0192f4a0-7b1c-7000-8a00-00000000106b",
+      "thread_id": "0192f4a0-7b1c-7000-8a00-00000000206b",
+      "channel_id": "0192f4a0-7b1c-7000-8a00-000000000103",
+      "space_id": "0192f4a0-7b1c-7000-8a00-000000000002",
+      "agent_id": "0192f4a0-7b1c-7000-8a00-000000000202",
+      "state": "running",
+      "queued_at": "2026-10-15T09:58:03.000Z",
+      "billing_mode": "organization",
+      "approval_pending": false,
+      "cost_micros": 108000,
+      "currency": "USD",
+      "cost_is_estimate": true,
+      "started_at": "2026-10-15T09:58:08.000Z",
+      "step": {
+        "kind": "tool_call",
+        "name": "Edit"
+      }
+    },
+    {
+      "run_id": "0192f4a0-7b1c-7000-8a00-00000000106c",
+      "thread_id": "0192f4a0-7b1c-7000-8a00-00000000206c",
+      "channel_id": "0192f4a0-7b1c-7000-8a00-000000000101",
+      "space_id": "0192f4a0-7b1c-7000-8a00-000000000001",
+      "agent_id": "0192f4a0-7b1c-7000-8a00-000000000201",
+      "state": "running",
+      "queued_at": "2026-10-15T09:58:02.000Z",
+      "billing_mode": "personal",
+      "approval_pending": false,
+      "cost_micros": 109000,
+      "currency": "USD",
+      "cost_is_estimate": true,
+      "started_at": "2026-10-15T09:58:07.000Z",
+      "step": {
+        "kind": "tool_call",
+        "name": "Grep"
+      }
+    },
+    {
+      "run_id": "0192f4a0-7b1c-7000-8a00-00000000106d",
+      "thread_id": "0192f4a0-7b1c-7000-8a00-00000000206d",
+      "channel_id": "0192f4a0-7b1c-7000-8a00-000000000102",
+      "space_id": "0192f4a0-7b1c-7000-8a00-000000000002",
+      "agent_id": "0192f4a0-7b1c-7000-8a00-000000000202",
+      "state": "queued",
+      "queued_at": "2026-10-15T09:58:01.000Z",
+      "billing_mode": "organization",
+      "approval_pending": false,
+      "cost_micros": 110000,
+      "currency": "USD",
+      "cost_is_estimate": true
+    },
+    {
+      "run_id": "0192f4a0-7b1c-7000-8a00-00000000106e",
+      "thread_id": "0192f4a0-7b1c-7000-8a00-00000000206e",
+      "channel_id": "0192f4a0-7b1c-7000-8a00-000000000103",
+      "space_id": "0192f4a0-7b1c-7000-8a00-000000000002",
+      "agent_id": "0192f4a0-7b1c-7000-8a00-000000000202",
+      "state": "waiting_input",
+      "queued_at": "2026-10-15T09:58:00.000Z",
+      "billing_mode": "organization",
+      "approval_pending": true,
+      "cost_micros": 111000,
+      "currency": "USD",
+      "cost_is_estimate": true,
+      "started_at": "2026-10-15T09:58:05.000Z",
+      "step": {
+        "kind": "tool_call",
+        "name": "Bash"
+      }
+    },
+    {
+      "run_id": "0192f4a0-7b1c-7000-8a00-00000000106f",
+      "thread_id": "0192f4a0-7b1c-7000-8a00-00000000206f",
+      "channel_id": "0192f4a0-7b1c-7000-8a00-000000000101",
+      "space_id": "0192f4a0-7b1c-7000-8a00-000000000001",
+      "agent_id": "0192f4a0-7b1c-7000-8a00-000000000201",
+      "state": "running",
+      "queued_at": "2026-10-15T09:57:59.000Z",
+      "billing_mode": "personal",
+      "approval_pending": false,
+      "cost_micros": 112000,
+      "currency": "USD",
+      "cost_is_estimate": true,
+      "started_at": "2026-10-15T09:58:04.000Z",
+      "step": {
+        "kind": "tool_call",
+        "name": "Read"
+      }
+    },
+    {
+      "run_id": "0192f4a0-7b1c-7000-8a00-000000001070",
+      "thread_id": "0192f4a0-7b1c-7000-8a00-000000002070",
+      "channel_id": "0192f4a0-7b1c-7000-8a00-000000000102",
+      "space_id": "0192f4a0-7b1c-7000-8a00-000000000002",
+      "agent_id": "0192f4a0-7b1c-7000-8a00-000000000202",
+      "state": "running",
+      "queued_at": "2026-10-15T09:57:58.000Z",
+      "billing_mode": "organization",
+      "approval_pending": false,
+      "cost_micros": 113000,
+      "currency": "USD",
+      "cost_is_estimate": true,
+      "started_at": "2026-10-15T09:58:03.000Z",
+      "step": {
+        "kind": "tool_call",
+        "name": "Edit"
+      }
+    },
+    {
+      "run_id": "0192f4a0-7b1c-7000-8a00-000000001071",
+      "thread_id": "0192f4a0-7b1c-7000-8a00-000000002071",
+      "channel_id": "0192f4a0-7b1c-7000-8a00-000000000103",
+      "space_id": "0192f4a0-7b1c-7000-8a00-000000000002",
+      "agent_id": "0192f4a0-7b1c-7000-8a00-000000000202",
+      "state": "queued",
+      "queued_at": "2026-10-15T09:57:57.000Z",
+      "billing_mode": "organization",
+      "approval_pending": false,
+      "cost_micros": 114000,
+      "currency": "USD",
+      "cost_is_estimate": true
+    },
+    {
+      "run_id": "0192f4a0-7b1c-7000-8a00-000000001072",
+      "thread_id": "0192f4a0-7b1c-7000-8a00-000000002072",
+      "channel_id": "0192f4a0-7b1c-7000-8a00-000000000101",
+      "space_id": "0192f4a0-7b1c-7000-8a00-000000000001",
+      "agent_id": "0192f4a0-7b1c-7000-8a00-000000000201",
+      "state": "waiting_input",
+      "queued_at": "2026-10-15T09:57:56.000Z",
+      "billing_mode": "personal",
+      "approval_pending": true,
+      "cost_micros": 115000,
+      "currency": "USD",
+      "cost_is_estimate": true,
+      "started_at": "2026-10-15T09:58:01.000Z",
+      "step": {
+        "kind": "tool_call",
+        "name": "WebFetch"
+      }
+    },
+    {
+      "run_id": "0192f4a0-7b1c-7000-8a00-000000001073",
+      "thread_id": "0192f4a0-7b1c-7000-8a00-000000002073",
+      "channel_id": "0192f4a0-7b1c-7000-8a00-000000000102",
+      "space_id": "0192f4a0-7b1c-7000-8a00-000000000002",
+      "agent_id": "0192f4a0-7b1c-7000-8a00-000000000202",
+      "state": "running",
+      "queued_at": "2026-10-15T09:57:55.000Z",
+      "billing_mode": "organization",
+      "approval_pending": false,
+      "cost_micros": 116000,
+      "currency": "USD",
+      "cost_is_estimate": true,
+      "started_at": "2026-10-15T09:58:00.000Z",
+      "step": {
+        "kind": "tool_call",
+        "name": "Bash"
+      }
+    },
+    {
+      "run_id": "0192f4a0-7b1c-7000-8a00-000000001074",
+      "thread_id": "0192f4a0-7b1c-7000-8a00-000000002074",
+      "channel_id": "0192f4a0-7b1c-7000-8a00-000000000103",
+      "space_id": "0192f4a0-7b1c-7000-8a00-000000000002",
+      "agent_id": "0192f4a0-7b1c-7000-8a00-000000000202",
+      "state": "running",
+      "queued_at": "2026-10-15T09:57:54.000Z",
+      "billing_mode": "organization",
+      "approval_pending": false,
+      "cost_micros": 117000,
+      "currency": "USD",
+      "cost_is_estimate": true,
+      "started_at": "2026-10-15T09:57:59.000Z",
+      "step": {
+        "kind": "tool_call",
+        "name": "Read"
+      }
+    },
+    {
+      "run_id": "0192f4a0-7b1c-7000-8a00-000000001075",
+      "thread_id": "0192f4a0-7b1c-7000-8a00-000000002075",
+      "channel_id": "0192f4a0-7b1c-7000-8a00-000000000101",
+      "space_id": "0192f4a0-7b1c-7000-8a00-000000000001",
+      "agent_id": "0192f4a0-7b1c-7000-8a00-000000000201",
+      "state": "queued",
+      "queued_at": "2026-10-15T09:57:53.000Z",
+      "billing_mode": "personal",
+      "approval_pending": false,
+      "cost_micros": 118000,
+      "currency": "USD",
+      "cost_is_estimate": true
+    },
+    {
+      "run_id": "0192f4a0-7b1c-7000-8a00-000000001076",
+      "thread_id": "0192f4a0-7b1c-7000-8a00-000000002076",
+      "channel_id": "0192f4a0-7b1c-7000-8a00-000000000102",
+      "space_id": "0192f4a0-7b1c-7000-8a00-000000000002",
+      "agent_id": "0192f4a0-7b1c-7000-8a00-000000000202",
+      "state": "waiting_input",
+      "queued_at": "2026-10-15T09:57:52.000Z",
+      "billing_mode": "organization",
+      "approval_pending": true,
+      "cost_micros": 119000,
+      "currency": "USD",
+      "cost_is_estimate": true,
+      "started_at": "2026-10-15T09:57:57.000Z",
+      "step": {
+        "kind": "tool_call",
+        "name": "Grep"
+      }
+    },
+    {
+      "run_id": "0192f4a0-7b1c-7000-8a00-000000001077",
+      "thread_id": "0192f4a0-7b1c-7000-8a00-000000002077",
+      "channel_id": "0192f4a0-7b1c-7000-8a00-000000000103",
+      "space_id": "0192f4a0-7b1c-7000-8a00-000000000002",
+      "agent_id": "0192f4a0-7b1c-7000-8a00-000000000202",
+      "state": "running",
+      "queued_at": "2026-10-15T09:57:51.000Z",
+      "billing_mode": "organization",
+      "approval_pending": false,
+      "cost_micros": 120000,
+      "currency": "USD",
+      "cost_is_estimate": true,
+      "started_at": "2026-10-15T09:57:56.000Z",
+      "step": {
+        "kind": "tool_call",
+        "name": "WebFetch"
+      }
+    },
+    {
+      "run_id": "0192f4a0-7b1c-7000-8a00-000000001078",
+      "thread_id": "0192f4a0-7b1c-7000-8a00-000000002078",
+      "channel_id": "0192f4a0-7b1c-7000-8a00-000000000101",
+      "space_id": "0192f4a0-7b1c-7000-8a00-000000000001",
+      "agent_id": "0192f4a0-7b1c-7000-8a00-000000000201",
+      "state": "running",
+      "queued_at": "2026-10-15T09:57:50.000Z",
+      "billing_mode": "personal",
+      "approval_pending": false,
+      "cost_micros": 121000,
+      "currency": "USD",
+      "cost_is_estimate": true,
+      "started_at": "2026-10-15T09:57:55.000Z",
+      "step": {
+        "kind": "tool_call",
+        "name": "Bash"
+      }
+    },
+    {
+      "run_id": "0192f4a0-7b1c-7000-8a00-000000001079",
+      "thread_id": "0192f4a0-7b1c-7000-8a00-000000002079",
+      "channel_id": "0192f4a0-7b1c-7000-8a00-000000000102",
+      "space_id": "0192f4a0-7b1c-7000-8a00-000000000002",
+      "agent_id": "0192f4a0-7b1c-7000-8a00-000000000202",
+      "state": "queued",
+      "queued_at": "2026-10-15T09:57:49.000Z",
+      "billing_mode": "organization",
+      "approval_pending": false,
+      "cost_micros": 122000,
+      "currency": "USD",
+      "cost_is_estimate": true
+    },
+    {
+      "run_id": "0192f4a0-7b1c-7000-8a00-00000000107a",
+      "thread_id": "0192f4a0-7b1c-7000-8a00-00000000207a",
+      "channel_id": "0192f4a0-7b1c-7000-8a00-000000000103",
+      "space_id": "0192f4a0-7b1c-7000-8a00-000000000002",
+      "agent_id": "0192f4a0-7b1c-7000-8a00-000000000202",
+      "state": "waiting_input",
+      "queued_at": "2026-10-15T09:57:48.000Z",
+      "billing_mode": "organization",
+      "approval_pending": true,
+      "cost_micros": 123000,
+      "currency": "USD",
+      "cost_is_estimate": true,
+      "started_at": "2026-10-15T09:57:53.000Z",
+      "step": {
+        "kind": "tool_call",
+        "name": "Edit"
+      }
+    },
+    {
+      "run_id": "0192f4a0-7b1c-7000-8a00-00000000107b",
+      "thread_id": "0192f4a0-7b1c-7000-8a00-00000000207b",
+      "channel_id": "0192f4a0-7b1c-7000-8a00-000000000101",
+      "space_id": "0192f4a0-7b1c-7000-8a00-000000000001",
+      "agent_id": "0192f4a0-7b1c-7000-8a00-000000000201",
+      "state": "running",
+      "queued_at": "2026-10-15T09:57:47.000Z",
+      "billing_mode": "personal",
+      "approval_pending": false,
+      "cost_micros": 124000,
+      "currency": "USD",
+      "cost_is_estimate": true,
+      "started_at": "2026-10-15T09:57:52.000Z",
+      "step": {
+        "kind": "tool_call",
+        "name": "Grep"
+      }
+    },
+    {
+      "run_id": "0192f4a0-7b1c-7000-8a00-00000000107c",
+      "thread_id": "0192f4a0-7b1c-7000-8a00-00000000207c",
+      "channel_id": "0192f4a0-7b1c-7000-8a00-000000000102",
+      "space_id": "0192f4a0-7b1c-7000-8a00-000000000002",
+      "agent_id": "0192f4a0-7b1c-7000-8a00-000000000202",
+      "state": "running",
+      "queued_at": "2026-10-15T09:57:46.000Z",
+      "billing_mode": "organization",
+      "approval_pending": false,
+      "cost_micros": 125000,
+      "currency": "USD",
+      "cost_is_estimate": true,
+      "started_at": "2026-10-15T09:57:51.000Z",
+      "step": {
+        "kind": "tool_call",
+        "name": "WebFetch"
+      }
+    },
+    {
+      "run_id": "0192f4a0-7b1c-7000-8a00-00000000107d",
+      "thread_id": "0192f4a0-7b1c-7000-8a00-00000000207d",
+      "channel_id": "0192f4a0-7b1c-7000-8a00-000000000103",
+      "space_id": "0192f4a0-7b1c-7000-8a00-000000000002",
+      "agent_id": "0192f4a0-7b1c-7000-8a00-000000000202",
+      "state": "queued",
+      "queued_at": "2026-10-15T09:57:45.000Z",
+      "billing_mode": "organization",
+      "approval_pending": false,
+      "cost_micros": 126000,
+      "currency": "USD",
+      "cost_is_estimate": true
+    },
+    {
+      "run_id": "0192f4a0-7b1c-7000-8a00-00000000107e",
+      "thread_id": "0192f4a0-7b1c-7000-8a00-00000000207e",
+      "channel_id": "0192f4a0-7b1c-7000-8a00-000000000101",
+      "space_id": "0192f4a0-7b1c-7000-8a00-000000000001",
+      "agent_id": "0192f4a0-7b1c-7000-8a00-000000000201",
+      "state": "waiting_input",
+      "queued_at": "2026-10-15T09:57:44.000Z",
+      "billing_mode": "personal",
+      "approval_pending": true,
+      "cost_micros": 127000,
+      "currency": "USD",
+      "cost_is_estimate": true,
+      "started_at": "2026-10-15T09:57:49.000Z",
+      "step": {
+        "kind": "tool_call",
+        "name": "Read"
+      }
+    },
+    {
+      "run_id": "0192f4a0-7b1c-7000-8a00-00000000107f",
+      "thread_id": "0192f4a0-7b1c-7000-8a00-00000000207f",
+      "channel_id": "0192f4a0-7b1c-7000-8a00-000000000102",
+      "space_id": "0192f4a0-7b1c-7000-8a00-000000000002",
+      "agent_id": "0192f4a0-7b1c-7000-8a00-000000000202",
+      "state": "running",
+      "queued_at": "2026-10-15T09:57:43.000Z",
+      "billing_mode": "organization",
+      "approval_pending": false,
+      "cost_micros": 128000,
+      "currency": "USD",
+      "cost_is_estimate": true,
+      "started_at": "2026-10-15T09:57:48.000Z",
+      "step": {
+        "kind": "tool_call",
+        "name": "Edit"
+      }
+    },
+    {
+      "run_id": "0192f4a0-7b1c-7000-8a00-000000001080",
+      "thread_id": "0192f4a0-7b1c-7000-8a00-000000002080",
+      "channel_id": "0192f4a0-7b1c-7000-8a00-000000000103",
+      "space_id": "0192f4a0-7b1c-7000-8a00-000000000002",
+      "agent_id": "0192f4a0-7b1c-7000-8a00-000000000202",
+      "state": "running",
+      "queued_at": "2026-10-15T09:57:42.000Z",
+      "billing_mode": "organization",
+      "approval_pending": false,
+      "cost_micros": 129000,
+      "currency": "USD",
+      "cost_is_estimate": true,
+      "started_at": "2026-10-15T09:57:47.000Z",
+      "step": {
+        "kind": "tool_call",
+        "name": "Grep"
+      }
+    },
+    {
+      "run_id": "0192f4a0-7b1c-7000-8a00-000000001081",
+      "thread_id": "0192f4a0-7b1c-7000-8a00-000000002081",
+      "channel_id": "0192f4a0-7b1c-7000-8a00-000000000101",
+      "space_id": "0192f4a0-7b1c-7000-8a00-000000000001",
+      "agent_id": "0192f4a0-7b1c-7000-8a00-000000000201",
+      "state": "queued",
+      "queued_at": "2026-10-15T09:57:41.000Z",
+      "billing_mode": "personal",
+      "approval_pending": false,
+      "cost_micros": 130000,
+      "currency": "USD",
+      "cost_is_estimate": true
+    },
+    {
+      "run_id": "0192f4a0-7b1c-7000-8a00-000000001082",
+      "thread_id": "0192f4a0-7b1c-7000-8a00-000000002082",
+      "channel_id": "0192f4a0-7b1c-7000-8a00-000000000102",
+      "space_id": "0192f4a0-7b1c-7000-8a00-000000000002",
+      "agent_id": "0192f4a0-7b1c-7000-8a00-000000000202",
+      "state": "waiting_input",
+      "queued_at": "2026-10-15T09:57:40.000Z",
+      "billing_mode": "organization",
+      "approval_pending": true,
+      "cost_micros": 131000,
+      "currency": "USD",
+      "cost_is_estimate": true,
+      "started_at": "2026-10-15T09:57:45.000Z",
+      "step": {
+        "kind": "tool_call",
+        "name": "Bash"
+      }
+    },
+    {
+      "run_id": "0192f4a0-7b1c-7000-8a00-000000001083",
+      "thread_id": "0192f4a0-7b1c-7000-8a00-000000002083",
+      "channel_id": "0192f4a0-7b1c-7000-8a00-000000000103",
+      "space_id": "0192f4a0-7b1c-7000-8a00-000000000002",
+      "agent_id": "0192f4a0-7b1c-7000-8a00-000000000202",
+      "state": "running",
+      "queued_at": "2026-10-15T09:57:39.000Z",
+      "billing_mode": "organization",
+      "approval_pending": false,
+      "cost_micros": 132000,
+      "currency": "USD",
+      "cost_is_estimate": true,
+      "started_at": "2026-10-15T09:57:44.000Z",
+      "step": {
+        "kind": "tool_call",
+        "name": "Read"
+      }
+    },
+    {
+      "run_id": "0192f4a0-7b1c-7000-8a00-000000001084",
+      "thread_id": "0192f4a0-7b1c-7000-8a00-000000002084",
+      "channel_id": "0192f4a0-7b1c-7000-8a00-000000000101",
+      "space_id": "0192f4a0-7b1c-7000-8a00-000000000001",
+      "agent_id": "0192f4a0-7b1c-7000-8a00-000000000201",
+      "state": "running",
+      "queued_at": "2026-10-15T09:57:38.000Z",
+      "billing_mode": "personal",
+      "approval_pending": false,
+      "cost_micros": 133000,
+      "currency": "USD",
+      "cost_is_estimate": true,
+      "started_at": "2026-10-15T09:57:43.000Z",
+      "step": {
+        "kind": "tool_call",
+        "name": "Edit"
+      }
+    },
+    {
+      "run_id": "0192f4a0-7b1c-7000-8a00-000000001085",
+      "thread_id": "0192f4a0-7b1c-7000-8a00-000000002085",
+      "channel_id": "0192f4a0-7b1c-7000-8a00-000000000102",
+      "space_id": "0192f4a0-7b1c-7000-8a00-000000000002",
+      "agent_id": "0192f4a0-7b1c-7000-8a00-000000000202",
+      "state": "queued",
+      "queued_at": "2026-10-15T09:57:37.000Z",
+      "billing_mode": "organization",
+      "approval_pending": false,
+      "cost_micros": 134000,
+      "currency": "USD",
+      "cost_is_estimate": true
+    },
+    {
+      "run_id": "0192f4a0-7b1c-7000-8a00-000000001086",
+      "thread_id": "0192f4a0-7b1c-7000-8a00-000000002086",
+      "channel_id": "0192f4a0-7b1c-7000-8a00-000000000103",
+      "space_id": "0192f4a0-7b1c-7000-8a00-000000000002",
+      "agent_id": "0192f4a0-7b1c-7000-8a00-000000000202",
+      "state": "waiting_input",
+      "queued_at": "2026-10-15T09:57:36.000Z",
+      "billing_mode": "organization",
+      "approval_pending": true,
+      "cost_micros": 135000,
+      "currency": "USD",
+      "cost_is_estimate": true,
+      "started_at": "2026-10-15T09:57:41.000Z",
+      "step": {
+        "kind": "tool_call",
+        "name": "WebFetch"
+      }
+    },
+    {
+      "run_id": "0192f4a0-7b1c-7000-8a00-000000001087",
+      "thread_id": "0192f4a0-7b1c-7000-8a00-000000002087",
+      "channel_id": "0192f4a0-7b1c-7000-8a00-000000000101",
+      "space_id": "0192f4a0-7b1c-7000-8a00-000000000001",
+      "agent_id": "0192f4a0-7b1c-7000-8a00-000000000201",
+      "state": "running",
+      "queued_at": "2026-10-15T09:57:35.000Z",
+      "billing_mode": "personal",
+      "approval_pending": false,
+      "cost_micros": 136000,
+      "currency": "USD",
+      "cost_is_estimate": true,
+      "started_at": "2026-10-15T09:57:40.000Z",
+      "step": {
+        "kind": "tool_call",
+        "name": "Bash"
+      }
+    },
+    {
+      "run_id": "0192f4a0-7b1c-7000-8a00-000000001088",
+      "thread_id": "0192f4a0-7b1c-7000-8a00-000000002088",
+      "channel_id": "0192f4a0-7b1c-7000-8a00-000000000102",
+      "space_id": "0192f4a0-7b1c-7000-8a00-000000000002",
+      "agent_id": "0192f4a0-7b1c-7000-8a00-000000000202",
+      "state": "running",
+      "queued_at": "2026-10-15T09:57:34.000Z",
+      "billing_mode": "organization",
+      "approval_pending": false,
+      "cost_micros": 137000,
+      "currency": "USD",
+      "cost_is_estimate": true,
+      "started_at": "2026-10-15T09:57:39.000Z",
+      "step": {
+        "kind": "tool_call",
+        "name": "Read"
+      }
+    },
+    {
+      "run_id": "0192f4a0-7b1c-7000-8a00-000000001089",
+      "thread_id": "0192f4a0-7b1c-7000-8a00-000000002089",
+      "channel_id": "0192f4a0-7b1c-7000-8a00-000000000103",
+      "space_id": "0192f4a0-7b1c-7000-8a00-000000000002",
+      "agent_id": "0192f4a0-7b1c-7000-8a00-000000000202",
+      "state": "queued",
+      "queued_at": "2026-10-15T09:57:33.000Z",
+      "billing_mode": "organization",
+      "approval_pending": false,
+      "cost_micros": 138000,
+      "currency": "USD",
+      "cost_is_estimate": true
+    },
+    {
+      "run_id": "0192f4a0-7b1c-7000-8a00-00000000108a",
+      "thread_id": "0192f4a0-7b1c-7000-8a00-00000000208a",
+      "channel_id": "0192f4a0-7b1c-7000-8a00-000000000101",
+      "space_id": "0192f4a0-7b1c-7000-8a00-000000000001",
+      "agent_id": "0192f4a0-7b1c-7000-8a00-000000000201",
+      "state": "waiting_input",
+      "queued_at": "2026-10-15T09:57:32.000Z",
+      "billing_mode": "personal",
+      "approval_pending": true,
+      "cost_micros": 139000,
+      "currency": "USD",
+      "cost_is_estimate": true,
+      "started_at": "2026-10-15T09:57:37.000Z",
+      "step": {
+        "kind": "tool_call",
+        "name": "Grep"
+      }
+    },
+    {
+      "run_id": "0192f4a0-7b1c-7000-8a00-00000000108b",
+      "thread_id": "0192f4a0-7b1c-7000-8a00-00000000208b",
+      "channel_id": "0192f4a0-7b1c-7000-8a00-000000000102",
+      "space_id": "0192f4a0-7b1c-7000-8a00-000000000002",
+      "agent_id": "0192f4a0-7b1c-7000-8a00-000000000202",
+      "state": "running",
+      "queued_at": "2026-10-15T09:57:31.000Z",
+      "billing_mode": "organization",
+      "approval_pending": false,
+      "cost_micros": 140000,
+      "currency": "USD",
+      "cost_is_estimate": true,
+      "started_at": "2026-10-15T09:57:36.000Z",
+      "step": {
+        "kind": "tool_call",
+        "name": "WebFetch"
+      }
+    },
+    {
+      "run_id": "0192f4a0-7b1c-7000-8a00-00000000108c",
+      "thread_id": "0192f4a0-7b1c-7000-8a00-00000000208c",
+      "channel_id": "0192f4a0-7b1c-7000-8a00-000000000103",
+      "space_id": "0192f4a0-7b1c-7000-8a00-000000000002",
+      "agent_id": "0192f4a0-7b1c-7000-8a00-000000000202",
+      "state": "running",
+      "queued_at": "2026-10-15T09:57:30.000Z",
+      "billing_mode": "organization",
+      "approval_pending": false,
+      "cost_micros": 141000,
+      "currency": "USD",
+      "cost_is_estimate": true,
+      "started_at": "2026-10-15T09:57:35.000Z",
+      "step": {
+        "kind": "tool_call",
+        "name": "Bash"
+      }
+    },
+    {
+      "run_id": "0192f4a0-7b1c-7000-8a00-00000000108d",
+      "thread_id": "0192f4a0-7b1c-7000-8a00-00000000208d",
+      "channel_id": "0192f4a0-7b1c-7000-8a00-000000000101",
+      "space_id": "0192f4a0-7b1c-7000-8a00-000000000001",
+      "agent_id": "0192f4a0-7b1c-7000-8a00-000000000201",
+      "state": "queued",
+      "queued_at": "2026-10-15T09:57:29.000Z",
+      "billing_mode": "personal",
+      "approval_pending": false,
+      "cost_micros": 142000,
+      "currency": "USD",
+      "cost_is_estimate": true
+    },
+    {
+      "run_id": "0192f4a0-7b1c-7000-8a00-00000000108e",
+      "thread_id": "0192f4a0-7b1c-7000-8a00-00000000208e",
+      "channel_id": "0192f4a0-7b1c-7000-8a00-000000000102",
+      "space_id": "0192f4a0-7b1c-7000-8a00-000000000002",
+      "agent_id": "0192f4a0-7b1c-7000-8a00-000000000202",
+      "state": "waiting_input",
+      "queued_at": "2026-10-15T09:57:28.000Z",
+      "billing_mode": "organization",
+      "approval_pending": true,
+      "cost_micros": 143000,
+      "currency": "USD",
+      "cost_is_estimate": true,
+      "started_at": "2026-10-15T09:57:33.000Z",
+      "step": {
+        "kind": "tool_call",
+        "name": "Edit"
+      }
+    },
+    {
+      "run_id": "0192f4a0-7b1c-7000-8a00-00000000108f",
+      "thread_id": "0192f4a0-7b1c-7000-8a00-00000000208f",
+      "channel_id": "0192f4a0-7b1c-7000-8a00-000000000103",
+      "space_id": "0192f4a0-7b1c-7000-8a00-000000000002",
+      "agent_id": "0192f4a0-7b1c-7000-8a00-000000000202",
+      "state": "running",
+      "queued_at": "2026-10-15T09:57:27.000Z",
+      "billing_mode": "organization",
+      "approval_pending": false,
+      "cost_micros": 144000,
+      "currency": "USD",
+      "cost_is_estimate": true,
+      "started_at": "2026-10-15T09:57:32.000Z",
+      "step": {
+        "kind": "tool_call",
+        "name": "Grep"
+      }
+    },
+    {
+      "run_id": "0192f4a0-7b1c-7000-8a00-000000001090",
+      "thread_id": "0192f4a0-7b1c-7000-8a00-000000002090",
+      "channel_id": "0192f4a0-7b1c-7000-8a00-000000000101",
+      "space_id": "0192f4a0-7b1c-7000-8a00-000000000001",
+      "agent_id": "0192f4a0-7b1c-7000-8a00-000000000201",
+      "state": "running",
+      "queued_at": "2026-10-15T09:57:26.000Z",
+      "billing_mode": "personal",
+      "approval_pending": false,
+      "cost_micros": 145000,
+      "currency": "USD",
+      "cost_is_estimate": true,
+      "started_at": "2026-10-15T09:57:31.000Z",
+      "step": {
+        "kind": "tool_call",
+        "name": "WebFetch"
+      }
+    },
+    {
+      "run_id": "0192f4a0-7b1c-7000-8a00-000000001091",
+      "thread_id": "0192f4a0-7b1c-7000-8a00-000000002091",
+      "channel_id": "0192f4a0-7b1c-7000-8a00-000000000102",
+      "space_id": "0192f4a0-7b1c-7000-8a00-000000000002",
+      "agent_id": "0192f4a0-7b1c-7000-8a00-000000000202",
+      "state": "queued",
+      "queued_at": "2026-10-15T09:57:25.000Z",
+      "billing_mode": "organization",
+      "approval_pending": false,
+      "cost_micros": 146000,
+      "currency": "USD",
+      "cost_is_estimate": true
+    },
+    {
+      "run_id": "0192f4a0-7b1c-7000-8a00-000000001092",
+      "thread_id": "0192f4a0-7b1c-7000-8a00-000000002092",
+      "channel_id": "0192f4a0-7b1c-7000-8a00-000000000103",
+      "space_id": "0192f4a0-7b1c-7000-8a00-000000000002",
+      "agent_id": "0192f4a0-7b1c-7000-8a00-000000000202",
+      "state": "waiting_input",
+      "queued_at": "2026-10-15T09:57:24.000Z",
+      "billing_mode": "organization",
+      "approval_pending": true,
+      "cost_micros": 147000,
+      "currency": "USD",
+      "cost_is_estimate": true,
+      "started_at": "2026-10-15T09:57:29.000Z",
+      "step": {
+        "kind": "tool_call",
+        "name": "Read"
+      }
+    },
+    {
+      "run_id": "0192f4a0-7b1c-7000-8a00-000000001093",
+      "thread_id": "0192f4a0-7b1c-7000-8a00-000000002093",
+      "channel_id": "0192f4a0-7b1c-7000-8a00-000000000101",
+      "space_id": "0192f4a0-7b1c-7000-8a00-000000000001",
+      "agent_id": "0192f4a0-7b1c-7000-8a00-000000000201",
+      "state": "running",
+      "queued_at": "2026-10-15T09:57:23.000Z",
+      "billing_mode": "personal",
+      "approval_pending": false,
+      "cost_micros": 148000,
+      "currency": "USD",
+      "cost_is_estimate": true,
+      "started_at": "2026-10-15T09:57:28.000Z",
+      "step": {
+        "kind": "tool_call",
+        "name": "Edit"
+      }
+    },
+    {
+      "run_id": "0192f4a0-7b1c-7000-8a00-000000001094",
+      "thread_id": "0192f4a0-7b1c-7000-8a00-000000002094",
+      "channel_id": "0192f4a0-7b1c-7000-8a00-000000000102",
+      "space_id": "0192f4a0-7b1c-7000-8a00-000000000002",
+      "agent_id": "0192f4a0-7b1c-7000-8a00-000000000202",
+      "state": "running",
+      "queued_at": "2026-10-15T09:57:22.000Z",
+      "billing_mode": "organization",
+      "approval_pending": false,
+      "cost_micros": 149000,
+      "currency": "USD",
+      "cost_is_estimate": true,
+      "started_at": "2026-10-15T09:57:27.000Z",
+      "step": {
+        "kind": "tool_call",
+        "name": "Grep"
+      }
+    },
+    {
+      "run_id": "0192f4a0-7b1c-7000-8a00-000000001095",
+      "thread_id": "0192f4a0-7b1c-7000-8a00-000000002095",
+      "channel_id": "0192f4a0-7b1c-7000-8a00-000000000103",
+      "space_id": "0192f4a0-7b1c-7000-8a00-000000000002",
+      "agent_id": "0192f4a0-7b1c-7000-8a00-000000000202",
+      "state": "queued",
+      "queued_at": "2026-10-15T09:57:21.000Z",
+      "billing_mode": "organization",
+      "approval_pending": false,
+      "cost_micros": 150000,
+      "currency": "USD",
+      "cost_is_estimate": true
+    },
+    {
+      "run_id": "0192f4a0-7b1c-7000-8a00-000000001096",
+      "thread_id": "0192f4a0-7b1c-7000-8a00-000000002096",
+      "channel_id": "0192f4a0-7b1c-7000-8a00-000000000101",
+      "space_id": "0192f4a0-7b1c-7000-8a00-000000000001",
+      "agent_id": "0192f4a0-7b1c-7000-8a00-000000000201",
+      "state": "waiting_input",
+      "queued_at": "2026-10-15T09:57:20.000Z",
+      "billing_mode": "personal",
+      "approval_pending": true,
+      "cost_micros": 151000,
+      "currency": "USD",
+      "cost_is_estimate": true,
+      "started_at": "2026-10-15T09:57:25.000Z",
+      "step": {
+        "kind": "tool_call",
+        "name": "Bash"
+      }
+    },
+    {
+      "run_id": "0192f4a0-7b1c-7000-8a00-000000001097",
+      "thread_id": "0192f4a0-7b1c-7000-8a00-000000002097",
+      "channel_id": "0192f4a0-7b1c-7000-8a00-000000000102",
+      "space_id": "0192f4a0-7b1c-7000-8a00-000000000002",
+      "agent_id": "0192f4a0-7b1c-7000-8a00-000000000202",
+      "state": "running",
+      "queued_at": "2026-10-15T09:57:19.000Z",
+      "billing_mode": "organization",
+      "approval_pending": false,
+      "cost_micros": 152000,
+      "currency": "USD",
+      "cost_is_estimate": true,
+      "started_at": "2026-10-15T09:57:24.000Z",
+      "step": {
+        "kind": "tool_call",
+        "name": "Read"
+      }
+    },
+    {
+      "run_id": "0192f4a0-7b1c-7000-8a00-000000001098",
+      "thread_id": "0192f4a0-7b1c-7000-8a00-000000002098",
+      "channel_id": "0192f4a0-7b1c-7000-8a00-000000000103",
+      "space_id": "0192f4a0-7b1c-7000-8a00-000000000002",
+      "agent_id": "0192f4a0-7b1c-7000-8a00-000000000202",
+      "state": "running",
+      "queued_at": "2026-10-15T09:57:18.000Z",
+      "billing_mode": "organization",
+      "approval_pending": false,
+      "cost_micros": 153000,
+      "currency": "USD",
+      "cost_is_estimate": true,
+      "started_at": "2026-10-15T09:57:23.000Z",
+      "step": {
+        "kind": "tool_call",
+        "name": "Edit"
+      }
+    },
+    {
+      "run_id": "0192f4a0-7b1c-7000-8a00-000000001099",
+      "thread_id": "0192f4a0-7b1c-7000-8a00-000000002099",
+      "channel_id": "0192f4a0-7b1c-7000-8a00-000000000101",
+      "space_id": "0192f4a0-7b1c-7000-8a00-000000000001",
+      "agent_id": "0192f4a0-7b1c-7000-8a00-000000000201",
+      "state": "queued",
+      "queued_at": "2026-10-15T09:57:17.000Z",
+      "billing_mode": "personal",
+      "approval_pending": false,
+      "cost_micros": 154000,
+      "currency": "USD",
+      "cost_is_estimate": true
+    },
+    {
+      "run_id": "0192f4a0-7b1c-7000-8a00-00000000109a",
+      "thread_id": "0192f4a0-7b1c-7000-8a00-00000000209a",
+      "channel_id": "0192f4a0-7b1c-7000-8a00-000000000102",
+      "space_id": "0192f4a0-7b1c-7000-8a00-000000000002",
+      "agent_id": "0192f4a0-7b1c-7000-8a00-000000000202",
+      "state": "waiting_input",
+      "queued_at": "2026-10-15T09:57:16.000Z",
+      "billing_mode": "organization",
+      "approval_pending": true,
+      "cost_micros": 155000,
+      "currency": "USD",
+      "cost_is_estimate": true,
+      "started_at": "2026-10-15T09:57:21.000Z",
+      "step": {
+        "kind": "tool_call",
+        "name": "WebFetch"
+      }
+    },
+    {
+      "run_id": "0192f4a0-7b1c-7000-8a00-00000000109b",
+      "thread_id": "0192f4a0-7b1c-7000-8a00-00000000209b",
+      "channel_id": "0192f4a0-7b1c-7000-8a00-000000000103",
+      "space_id": "0192f4a0-7b1c-7000-8a00-000000000002",
+      "agent_id": "0192f4a0-7b1c-7000-8a00-000000000202",
+      "state": "running",
+      "queued_at": "2026-10-15T09:57:15.000Z",
+      "billing_mode": "organization",
+      "approval_pending": false,
+      "cost_micros": 156000,
+      "currency": "USD",
+      "cost_is_estimate": true,
+      "started_at": "2026-10-15T09:57:20.000Z",
+      "step": {
+        "kind": "tool_call",
+        "name": "Bash"
+      }
+    },
+    {
+      "run_id": "0192f4a0-7b1c-7000-8a00-00000000109c",
+      "thread_id": "0192f4a0-7b1c-7000-8a00-00000000209c",
+      "channel_id": "0192f4a0-7b1c-7000-8a00-000000000101",
+      "space_id": "0192f4a0-7b1c-7000-8a00-000000000001",
+      "agent_id": "0192f4a0-7b1c-7000-8a00-000000000201",
+      "state": "running",
+      "queued_at": "2026-10-15T09:57:14.000Z",
+      "billing_mode": "personal",
+      "approval_pending": false,
+      "cost_micros": 157000,
+      "currency": "USD",
+      "cost_is_estimate": true,
+      "started_at": "2026-10-15T09:57:19.000Z",
+      "step": {
+        "kind": "tool_call",
+        "name": "Read"
+      }
+    },
+    {
+      "run_id": "0192f4a0-7b1c-7000-8a00-00000000109d",
+      "thread_id": "0192f4a0-7b1c-7000-8a00-00000000209d",
+      "channel_id": "0192f4a0-7b1c-7000-8a00-000000000102",
+      "space_id": "0192f4a0-7b1c-7000-8a00-000000000002",
+      "agent_id": "0192f4a0-7b1c-7000-8a00-000000000202",
+      "state": "queued",
+      "queued_at": "2026-10-15T09:57:13.000Z",
+      "billing_mode": "organization",
+      "approval_pending": false,
+      "cost_micros": 158000,
+      "currency": "USD",
+      "cost_is_estimate": true
+    },
+    {
+      "run_id": "0192f4a0-7b1c-7000-8a00-00000000109e",
+      "thread_id": "0192f4a0-7b1c-7000-8a00-00000000209e",
+      "channel_id": "0192f4a0-7b1c-7000-8a00-000000000103",
+      "space_id": "0192f4a0-7b1c-7000-8a00-000000000002",
+      "agent_id": "0192f4a0-7b1c-7000-8a00-000000000202",
+      "state": "waiting_input",
+      "queued_at": "2026-10-15T09:57:12.000Z",
+      "billing_mode": "organization",
+      "approval_pending": true,
+      "cost_micros": 159000,
+      "currency": "USD",
+      "cost_is_estimate": true,
+      "started_at": "2026-10-15T09:57:17.000Z",
+      "step": {
+        "kind": "tool_call",
+        "name": "Grep"
+      }
+    },
+    {
+      "run_id": "0192f4a0-7b1c-7000-8a00-00000000109f",
+      "thread_id": "0192f4a0-7b1c-7000-8a00-00000000209f",
+      "channel_id": "0192f4a0-7b1c-7000-8a00-000000000101",
+      "space_id": "0192f4a0-7b1c-7000-8a00-000000000001",
+      "agent_id": "0192f4a0-7b1c-7000-8a00-000000000201",
+      "state": "running",
+      "queued_at": "2026-10-15T09:57:11.000Z",
+      "billing_mode": "personal",
+      "approval_pending": false,
+      "cost_micros": 160000,
+      "currency": "USD",
+      "cost_is_estimate": true,
+      "started_at": "2026-10-15T09:57:16.000Z",
+      "step": {
+        "kind": "tool_call",
+        "name": "WebFetch"
+      }
+    },
+    {
+      "run_id": "0192f4a0-7b1c-7000-8a00-0000000010a0",
+      "thread_id": "0192f4a0-7b1c-7000-8a00-0000000020a0",
+      "channel_id": "0192f4a0-7b1c-7000-8a00-000000000102",
+      "space_id": "0192f4a0-7b1c-7000-8a00-000000000002",
+      "agent_id": "0192f4a0-7b1c-7000-8a00-000000000202",
+      "state": "running",
+      "queued_at": "2026-10-15T09:57:10.000Z",
+      "billing_mode": "organization",
+      "approval_pending": false,
+      "cost_micros": 161000,
+      "currency": "USD",
+      "cost_is_estimate": true,
+      "started_at": "2026-10-15T09:57:15.000Z",
+      "step": {
+        "kind": "tool_call",
+        "name": "Bash"
+      }
+    },
+    {
+      "run_id": "0192f4a0-7b1c-7000-8a00-0000000010a1",
+      "thread_id": "0192f4a0-7b1c-7000-8a00-0000000020a1",
+      "channel_id": "0192f4a0-7b1c-7000-8a00-000000000103",
+      "space_id": "0192f4a0-7b1c-7000-8a00-000000000002",
+      "agent_id": "0192f4a0-7b1c-7000-8a00-000000000202",
+      "state": "queued",
+      "queued_at": "2026-10-15T09:57:09.000Z",
+      "billing_mode": "organization",
+      "approval_pending": false,
+      "cost_micros": 162000,
+      "currency": "USD",
+      "cost_is_estimate": true
+    },
+    {
+      "run_id": "0192f4a0-7b1c-7000-8a00-0000000010a2",
+      "thread_id": "0192f4a0-7b1c-7000-8a00-0000000020a2",
+      "channel_id": "0192f4a0-7b1c-7000-8a00-000000000101",
+      "space_id": "0192f4a0-7b1c-7000-8a00-000000000001",
+      "agent_id": "0192f4a0-7b1c-7000-8a00-000000000201",
+      "state": "waiting_input",
+      "queued_at": "2026-10-15T09:57:08.000Z",
+      "billing_mode": "personal",
+      "approval_pending": true,
+      "cost_micros": 163000,
+      "currency": "USD",
+      "cost_is_estimate": true,
+      "started_at": "2026-10-15T09:57:13.000Z",
+      "step": {
+        "kind": "tool_call",
+        "name": "Edit"
+      }
+    },
+    {
+      "run_id": "0192f4a0-7b1c-7000-8a00-0000000010a3",
+      "thread_id": "0192f4a0-7b1c-7000-8a00-0000000020a3",
+      "channel_id": "0192f4a0-7b1c-7000-8a00-000000000102",
+      "space_id": "0192f4a0-7b1c-7000-8a00-000000000002",
+      "agent_id": "0192f4a0-7b1c-7000-8a00-000000000202",
+      "state": "running",
+      "queued_at": "2026-10-15T09:57:07.000Z",
+      "billing_mode": "organization",
+      "approval_pending": false,
+      "cost_micros": 164000,
+      "currency": "USD",
+      "cost_is_estimate": true,
+      "started_at": "2026-10-15T09:57:12.000Z",
+      "step": {
+        "kind": "tool_call",
+        "name": "Grep"
+      }
+    },
+    {
+      "run_id": "0192f4a0-7b1c-7000-8a00-0000000010a4",
+      "thread_id": "0192f4a0-7b1c-7000-8a00-0000000020a4",
+      "channel_id": "0192f4a0-7b1c-7000-8a00-000000000103",
+      "space_id": "0192f4a0-7b1c-7000-8a00-000000000002",
+      "agent_id": "0192f4a0-7b1c-7000-8a00-000000000202",
+      "state": "running",
+      "queued_at": "2026-10-15T09:57:06.000Z",
+      "billing_mode": "organization",
+      "approval_pending": false,
+      "cost_micros": 165000,
+      "currency": "USD",
+      "cost_is_estimate": true,
+      "started_at": "2026-10-15T09:57:11.000Z",
+      "step": {
+        "kind": "tool_call",
+        "name": "WebFetch"
+      }
+    },
+    {
+      "run_id": "0192f4a0-7b1c-7000-8a00-0000000010a5",
+      "thread_id": "0192f4a0-7b1c-7000-8a00-0000000020a5",
+      "channel_id": "0192f4a0-7b1c-7000-8a00-000000000101",
+      "space_id": "0192f4a0-7b1c-7000-8a00-000000000001",
+      "agent_id": "0192f4a0-7b1c-7000-8a00-000000000201",
+      "state": "queued",
+      "queued_at": "2026-10-15T09:57:05.000Z",
+      "billing_mode": "personal",
+      "approval_pending": false,
+      "cost_micros": 166000,
+      "currency": "USD",
+      "cost_is_estimate": true
+    },
+    {
+      "run_id": "0192f4a0-7b1c-7000-8a00-0000000010a6",
+      "thread_id": "0192f4a0-7b1c-7000-8a00-0000000020a6",
+      "channel_id": "0192f4a0-7b1c-7000-8a00-000000000102",
+      "space_id": "0192f4a0-7b1c-7000-8a00-000000000002",
+      "agent_id": "0192f4a0-7b1c-7000-8a00-000000000202",
+      "state": "waiting_input",
+      "queued_at": "2026-10-15T09:57:04.000Z",
+      "billing_mode": "organization",
+      "approval_pending": true,
+      "cost_micros": 167000,
+      "currency": "USD",
+      "cost_is_estimate": true,
+      "started_at": "2026-10-15T09:57:09.000Z",
+      "step": {
+        "kind": "tool_call",
+        "name": "Read"
+      }
+    },
+    {
+      "run_id": "0192f4a0-7b1c-7000-8a00-0000000010a7",
+      "thread_id": "0192f4a0-7b1c-7000-8a00-0000000020a7",
+      "channel_id": "0192f4a0-7b1c-7000-8a00-000000000103",
+      "space_id": "0192f4a0-7b1c-7000-8a00-000000000002",
+      "agent_id": "0192f4a0-7b1c-7000-8a00-000000000202",
+      "state": "running",
+      "queued_at": "2026-10-15T09:57:03.000Z",
+      "billing_mode": "organization",
+      "approval_pending": false,
+      "cost_micros": 168000,
+      "currency": "USD",
+      "cost_is_estimate": true,
+      "started_at": "2026-10-15T09:57:08.000Z",
+      "step": {
+        "kind": "tool_call",
+        "name": "Edit"
+      }
+    },
+    {
+      "run_id": "0192f4a0-7b1c-7000-8a00-0000000010a8",
+      "thread_id": "0192f4a0-7b1c-7000-8a00-0000000020a8",
+      "channel_id": "0192f4a0-7b1c-7000-8a00-000000000101",
+      "space_id": "0192f4a0-7b1c-7000-8a00-000000000001",
+      "agent_id": "0192f4a0-7b1c-7000-8a00-000000000201",
+      "state": "running",
+      "queued_at": "2026-10-15T09:57:02.000Z",
+      "billing_mode": "personal",
+      "approval_pending": false,
+      "cost_micros": 169000,
+      "currency": "USD",
+      "cost_is_estimate": true,
+      "started_at": "2026-10-15T09:57:07.000Z",
+      "step": {
+        "kind": "tool_call",
+        "name": "Grep"
+      }
+    },
+    {
+      "run_id": "0192f4a0-7b1c-7000-8a00-0000000010a9",
+      "thread_id": "0192f4a0-7b1c-7000-8a00-0000000020a9",
+      "channel_id": "0192f4a0-7b1c-7000-8a00-000000000102",
+      "space_id": "0192f4a0-7b1c-7000-8a00-000000000002",
+      "agent_id": "0192f4a0-7b1c-7000-8a00-000000000202",
+      "state": "queued",
+      "queued_at": "2026-10-15T09:57:01.000Z",
+      "billing_mode": "organization",
+      "approval_pending": false,
+      "cost_micros": 170000,
+      "currency": "USD",
+      "cost_is_estimate": true
+    },
+    {
+      "run_id": "0192f4a0-7b1c-7000-8a00-0000000010aa",
+      "thread_id": "0192f4a0-7b1c-7000-8a00-0000000020aa",
+      "channel_id": "0192f4a0-7b1c-7000-8a00-000000000103",
+      "space_id": "0192f4a0-7b1c-7000-8a00-000000000002",
+      "agent_id": "0192f4a0-7b1c-7000-8a00-000000000202",
+      "state": "waiting_input",
+      "queued_at": "2026-10-15T09:57:00.000Z",
+      "billing_mode": "organization",
+      "approval_pending": true,
+      "cost_micros": 171000,
+      "currency": "USD",
+      "cost_is_estimate": true,
+      "started_at": "2026-10-15T09:57:05.000Z",
+      "step": {
+        "kind": "tool_call",
+        "name": "Bash"
+      }
+    },
+    {
+      "run_id": "0192f4a0-7b1c-7000-8a00-0000000010ab",
+      "thread_id": "0192f4a0-7b1c-7000-8a00-0000000020ab",
+      "channel_id": "0192f4a0-7b1c-7000-8a00-000000000101",
+      "space_id": "0192f4a0-7b1c-7000-8a00-000000000001",
+      "agent_id": "0192f4a0-7b1c-7000-8a00-000000000201",
+      "state": "running",
+      "queued_at": "2026-10-15T09:56:59.000Z",
+      "billing_mode": "personal",
+      "approval_pending": false,
+      "cost_micros": 172000,
+      "currency": "USD",
+      "cost_is_estimate": true,
+      "started_at": "2026-10-15T09:57:04.000Z",
+      "step": {
+        "kind": "tool_call",
+        "name": "Read"
+      }
+    },
+    {
+      "run_id": "0192f4a0-7b1c-7000-8a00-0000000010ac",
+      "thread_id": "0192f4a0-7b1c-7000-8a00-0000000020ac",
+      "channel_id": "0192f4a0-7b1c-7000-8a00-000000000102",
+      "space_id": "0192f4a0-7b1c-7000-8a00-000000000002",
+      "agent_id": "0192f4a0-7b1c-7000-8a00-000000000202",
+      "state": "running",
+      "queued_at": "2026-10-15T09:56:58.000Z",
+      "billing_mode": "organization",
+      "approval_pending": false,
+      "cost_micros": 173000,
+      "currency": "USD",
+      "cost_is_estimate": true,
+      "started_at": "2026-10-15T09:57:03.000Z",
+      "step": {
+        "kind": "tool_call",
+        "name": "Edit"
+      }
+    },
+    {
+      "run_id": "0192f4a0-7b1c-7000-8a00-0000000010ad",
+      "thread_id": "0192f4a0-7b1c-7000-8a00-0000000020ad",
+      "channel_id": "0192f4a0-7b1c-7000-8a00-000000000103",
+      "space_id": "0192f4a0-7b1c-7000-8a00-000000000002",
+      "agent_id": "0192f4a0-7b1c-7000-8a00-000000000202",
+      "state": "queued",
+      "queued_at": "2026-10-15T09:56:57.000Z",
+      "billing_mode": "organization",
+      "approval_pending": false,
+      "cost_micros": 174000,
+      "currency": "USD",
+      "cost_is_estimate": true
+    },
+    {
+      "run_id": "0192f4a0-7b1c-7000-8a00-0000000010ae",
+      "thread_id": "0192f4a0-7b1c-7000-8a00-0000000020ae",
+      "channel_id": "0192f4a0-7b1c-7000-8a00-000000000101",
+      "space_id": "0192f4a0-7b1c-7000-8a00-000000000001",
+      "agent_id": "0192f4a0-7b1c-7000-8a00-000000000201",
+      "state": "waiting_input",
+      "queued_at": "2026-10-15T09:56:56.000Z",
+      "billing_mode": "personal",
+      "approval_pending": true,
+      "cost_micros": 175000,
+      "currency": "USD",
+      "cost_is_estimate": true,
+      "started_at": "2026-10-15T09:57:01.000Z",
+      "step": {
+        "kind": "tool_call",
+        "name": "WebFetch"
+      }
+    },
+    {
+      "run_id": "0192f4a0-7b1c-7000-8a00-0000000010af",
+      "thread_id": "0192f4a0-7b1c-7000-8a00-0000000020af",
+      "channel_id": "0192f4a0-7b1c-7000-8a00-000000000102",
+      "space_id": "0192f4a0-7b1c-7000-8a00-000000000002",
+      "agent_id": "0192f4a0-7b1c-7000-8a00-000000000202",
+      "state": "running",
+      "queued_at": "2026-10-15T09:56:55.000Z",
+      "billing_mode": "organization",
+      "approval_pending": false,
+      "cost_micros": 176000,
+      "currency": "USD",
+      "cost_is_estimate": true,
+      "started_at": "2026-10-15T09:57:00.000Z",
+      "step": {
+        "kind": "tool_call",
+        "name": "Bash"
+      }
+    },
+    {
+      "run_id": "0192f4a0-7b1c-7000-8a00-0000000010b0",
+      "thread_id": "0192f4a0-7b1c-7000-8a00-0000000020b0",
+      "channel_id": "0192f4a0-7b1c-7000-8a00-000000000103",
+      "space_id": "0192f4a0-7b1c-7000-8a00-000000000002",
+      "agent_id": "0192f4a0-7b1c-7000-8a00-000000000202",
+      "state": "running",
+      "queued_at": "2026-10-15T09:56:54.000Z",
+      "billing_mode": "organization",
+      "approval_pending": false,
+      "cost_micros": 177000,
+      "currency": "USD",
+      "cost_is_estimate": true,
+      "started_at": "2026-10-15T09:56:59.000Z",
+      "step": {
+        "kind": "tool_call",
+        "name": "Read"
+      }
+    },
+    {
+      "run_id": "0192f4a0-7b1c-7000-8a00-0000000010b1",
+      "thread_id": "0192f4a0-7b1c-7000-8a00-0000000020b1",
+      "channel_id": "0192f4a0-7b1c-7000-8a00-000000000101",
+      "space_id": "0192f4a0-7b1c-7000-8a00-000000000001",
+      "agent_id": "0192f4a0-7b1c-7000-8a00-000000000201",
+      "state": "queued",
+      "queued_at": "2026-10-15T09:56:53.000Z",
+      "billing_mode": "personal",
+      "approval_pending": false,
+      "cost_micros": 178000,
+      "currency": "USD",
+      "cost_is_estimate": true
+    },
+    {
+      "run_id": "0192f4a0-7b1c-7000-8a00-0000000010b2",
+      "thread_id": "0192f4a0-7b1c-7000-8a00-0000000020b2",
+      "channel_id": "0192f4a0-7b1c-7000-8a00-000000000102",
+      "space_id": "0192f4a0-7b1c-7000-8a00-000000000002",
+      "agent_id": "0192f4a0-7b1c-7000-8a00-000000000202",
+      "state": "waiting_input",
+      "queued_at": "2026-10-15T09:56:52.000Z",
+      "billing_mode": "organization",
+      "approval_pending": true,
+      "cost_micros": 179000,
+      "currency": "USD",
+      "cost_is_estimate": true,
+      "started_at": "2026-10-15T09:56:57.000Z",
+      "step": {
+        "kind": "tool_call",
+        "name": "Grep"
+      }
+    },
+    {
+      "run_id": "0192f4a0-7b1c-7000-8a00-0000000010b3",
+      "thread_id": "0192f4a0-7b1c-7000-8a00-0000000020b3",
+      "channel_id": "0192f4a0-7b1c-7000-8a00-000000000103",
+      "space_id": "0192f4a0-7b1c-7000-8a00-000000000002",
+      "agent_id": "0192f4a0-7b1c-7000-8a00-000000000202",
+      "state": "running",
+      "queued_at": "2026-10-15T09:56:51.000Z",
+      "billing_mode": "organization",
+      "approval_pending": false,
+      "cost_micros": 180000,
+      "currency": "USD",
+      "cost_is_estimate": true,
+      "started_at": "2026-10-15T09:56:56.000Z",
+      "step": {
+        "kind": "tool_call",
+        "name": "WebFetch"
+      }
+    },
+    {
+      "run_id": "0192f4a0-7b1c-7000-8a00-0000000010b4",
+      "thread_id": "0192f4a0-7b1c-7000-8a00-0000000020b4",
+      "channel_id": "0192f4a0-7b1c-7000-8a00-000000000101",
+      "space_id": "0192f4a0-7b1c-7000-8a00-000000000001",
+      "agent_id": "0192f4a0-7b1c-7000-8a00-000000000201",
+      "state": "running",
+      "queued_at": "2026-10-15T09:56:50.000Z",
+      "billing_mode": "personal",
+      "approval_pending": false,
+      "cost_micros": 181000,
+      "currency": "USD",
+      "cost_is_estimate": true,
+      "started_at": "2026-10-15T09:56:55.000Z",
+      "step": {
+        "kind": "tool_call",
+        "name": "Bash"
+      }
+    },
+    {
+      "run_id": "0192f4a0-7b1c-7000-8a00-0000000010b5",
+      "thread_id": "0192f4a0-7b1c-7000-8a00-0000000020b5",
+      "channel_id": "0192f4a0-7b1c-7000-8a00-000000000102",
+      "space_id": "0192f4a0-7b1c-7000-8a00-000000000002",
+      "agent_id": "0192f4a0-7b1c-7000-8a00-000000000202",
+      "state": "queued",
+      "queued_at": "2026-10-15T09:56:49.000Z",
+      "billing_mode": "organization",
+      "approval_pending": false,
+      "cost_micros": 182000,
+      "currency": "USD",
+      "cost_is_estimate": true
+    },
+    {
+      "run_id": "0192f4a0-7b1c-7000-8a00-0000000010b6",
+      "thread_id": "0192f4a0-7b1c-7000-8a00-0000000020b6",
+      "channel_id": "0192f4a0-7b1c-7000-8a00-000000000103",
+      "space_id": "0192f4a0-7b1c-7000-8a00-000000000002",
+      "agent_id": "0192f4a0-7b1c-7000-8a00-000000000202",
+      "state": "waiting_input",
+      "queued_at": "2026-10-15T09:56:48.000Z",
+      "billing_mode": "organization",
+      "approval_pending": true,
+      "cost_micros": 183000,
+      "currency": "USD",
+      "cost_is_estimate": true,
+      "started_at": "2026-10-15T09:56:53.000Z",
+      "step": {
+        "kind": "tool_call",
+        "name": "Edit"
+      }
+    },
+    {
+      "run_id": "0192f4a0-7b1c-7000-8a00-0000000010b7",
+      "thread_id": "0192f4a0-7b1c-7000-8a00-0000000020b7",
+      "channel_id": "0192f4a0-7b1c-7000-8a00-000000000101",
+      "space_id": "0192f4a0-7b1c-7000-8a00-000000000001",
+      "agent_id": "0192f4a0-7b1c-7000-8a00-000000000201",
+      "state": "running",
+      "queued_at": "2026-10-15T09:56:47.000Z",
+      "billing_mode": "personal",
+      "approval_pending": false,
+      "cost_micros": 184000,
+      "currency": "USD",
+      "cost_is_estimate": true,
+      "started_at": "2026-10-15T09:56:52.000Z",
+      "step": {
+        "kind": "tool_call",
+        "name": "Grep"
+      }
+    },
+    {
+      "run_id": "0192f4a0-7b1c-7000-8a00-0000000010b8",
+      "thread_id": "0192f4a0-7b1c-7000-8a00-0000000020b8",
+      "channel_id": "0192f4a0-7b1c-7000-8a00-000000000102",
+      "space_id": "0192f4a0-7b1c-7000-8a00-000000000002",
+      "agent_id": "0192f4a0-7b1c-7000-8a00-000000000202",
+      "state": "running",
+      "queued_at": "2026-10-15T09:56:46.000Z",
+      "billing_mode": "organization",
+      "approval_pending": false,
+      "cost_micros": 185000,
+      "currency": "USD",
+      "cost_is_estimate": true,
+      "started_at": "2026-10-15T09:56:51.000Z",
+      "step": {
+        "kind": "tool_call",
+        "name": "WebFetch"
+      }
+    },
+    {
+      "run_id": "0192f4a0-7b1c-7000-8a00-0000000010b9",
+      "thread_id": "0192f4a0-7b1c-7000-8a00-0000000020b9",
+      "channel_id": "0192f4a0-7b1c-7000-8a00-000000000103",
+      "space_id": "0192f4a0-7b1c-7000-8a00-000000000002",
+      "agent_id": "0192f4a0-7b1c-7000-8a00-000000000202",
+      "state": "queued",
+      "queued_at": "2026-10-15T09:56:45.000Z",
+      "billing_mode": "organization",
+      "approval_pending": false,
+      "cost_micros": 186000,
+      "currency": "USD",
+      "cost_is_estimate": true
+    },
+    {
+      "run_id": "0192f4a0-7b1c-7000-8a00-0000000010ba",
+      "thread_id": "0192f4a0-7b1c-7000-8a00-0000000020ba",
+      "channel_id": "0192f4a0-7b1c-7000-8a00-000000000101",
+      "space_id": "0192f4a0-7b1c-7000-8a00-000000000001",
+      "agent_id": "0192f4a0-7b1c-7000-8a00-000000000201",
+      "state": "waiting_input",
+      "queued_at": "2026-10-15T09:56:44.000Z",
+      "billing_mode": "personal",
+      "approval_pending": true,
+      "cost_micros": 187000,
+      "currency": "USD",
+      "cost_is_estimate": true,
+      "started_at": "2026-10-15T09:56:49.000Z",
+      "step": {
+        "kind": "tool_call",
+        "name": "Read"
+      }
+    },
+    {
+      "run_id": "0192f4a0-7b1c-7000-8a00-0000000010bb",
+      "thread_id": "0192f4a0-7b1c-7000-8a00-0000000020bb",
+      "channel_id": "0192f4a0-7b1c-7000-8a00-000000000102",
+      "space_id": "0192f4a0-7b1c-7000-8a00-000000000002",
+      "agent_id": "0192f4a0-7b1c-7000-8a00-000000000202",
+      "state": "running",
+      "queued_at": "2026-10-15T09:56:43.000Z",
+      "billing_mode": "organization",
+      "approval_pending": false,
+      "cost_micros": 188000,
+      "currency": "USD",
+      "cost_is_estimate": true,
+      "started_at": "2026-10-15T09:56:48.000Z",
+      "step": {
+        "kind": "tool_call",
+        "name": "Edit"
+      }
+    },
+    {
+      "run_id": "0192f4a0-7b1c-7000-8a00-0000000010bc",
+      "thread_id": "0192f4a0-7b1c-7000-8a00-0000000020bc",
+      "channel_id": "0192f4a0-7b1c-7000-8a00-000000000103",
+      "space_id": "0192f4a0-7b1c-7000-8a00-000000000002",
+      "agent_id": "0192f4a0-7b1c-7000-8a00-000000000202",
+      "state": "running",
+      "queued_at": "2026-10-15T09:56:42.000Z",
+      "billing_mode": "organization",
+      "approval_pending": false,
+      "cost_micros": 189000,
+      "currency": "USD",
+      "cost_is_estimate": true,
+      "started_at": "2026-10-15T09:56:47.000Z",
+      "step": {
+        "kind": "tool_call",
+        "name": "Grep"
+      }
+    },
+    {
+      "run_id": "0192f4a0-7b1c-7000-8a00-0000000010bd",
+      "thread_id": "0192f4a0-7b1c-7000-8a00-0000000020bd",
+      "channel_id": "0192f4a0-7b1c-7000-8a00-000000000101",
+      "space_id": "0192f4a0-7b1c-7000-8a00-000000000001",
+      "agent_id": "0192f4a0-7b1c-7000-8a00-000000000201",
+      "state": "queued",
+      "queued_at": "2026-10-15T09:56:41.000Z",
+      "billing_mode": "personal",
+      "approval_pending": false,
+      "cost_micros": 190000,
+      "currency": "USD",
+      "cost_is_estimate": true
+    },
+    {
+      "run_id": "0192f4a0-7b1c-7000-8a00-0000000010be",
+      "thread_id": "0192f4a0-7b1c-7000-8a00-0000000020be",
+      "channel_id": "0192f4a0-7b1c-7000-8a00-000000000102",
+      "space_id": "0192f4a0-7b1c-7000-8a00-000000000002",
+      "agent_id": "0192f4a0-7b1c-7000-8a00-000000000202",
+      "state": "waiting_input",
+      "queued_at": "2026-10-15T09:56:40.000Z",
+      "billing_mode": "organization",
+      "approval_pending": true,
+      "cost_micros": 191000,
+      "currency": "USD",
+      "cost_is_estimate": true,
+      "started_at": "2026-10-15T09:56:45.000Z",
+      "step": {
+        "kind": "tool_call",
+        "name": "Bash"
+      }
+    },
+    {
+      "run_id": "0192f4a0-7b1c-7000-8a00-0000000010bf",
+      "thread_id": "0192f4a0-7b1c-7000-8a00-0000000020bf",
+      "channel_id": "0192f4a0-7b1c-7000-8a00-000000000103",
+      "space_id": "0192f4a0-7b1c-7000-8a00-000000000002",
+      "agent_id": "0192f4a0-7b1c-7000-8a00-000000000202",
+      "state": "running",
+      "queued_at": "2026-10-15T09:56:39.000Z",
+      "billing_mode": "organization",
+      "approval_pending": false,
+      "cost_micros": 192000,
+      "currency": "USD",
+      "cost_is_estimate": true,
+      "started_at": "2026-10-15T09:56:44.000Z",
+      "step": {
+        "kind": "tool_call",
+        "name": "Read"
+      }
+    },
+    {
+      "run_id": "0192f4a0-7b1c-7000-8a00-0000000010c0",
+      "thread_id": "0192f4a0-7b1c-7000-8a00-0000000020c0",
+      "channel_id": "0192f4a0-7b1c-7000-8a00-000000000101",
+      "space_id": "0192f4a0-7b1c-7000-8a00-000000000001",
+      "agent_id": "0192f4a0-7b1c-7000-8a00-000000000201",
+      "state": "running",
+      "queued_at": "2026-10-15T09:56:38.000Z",
+      "billing_mode": "personal",
+      "approval_pending": false,
+      "cost_micros": 193000,
+      "currency": "USD",
+      "cost_is_estimate": true,
+      "started_at": "2026-10-15T09:56:43.000Z",
+      "step": {
+        "kind": "tool_call",
+        "name": "Edit"
+      }
+    },
+    {
+      "run_id": "0192f4a0-7b1c-7000-8a00-0000000010c1",
+      "thread_id": "0192f4a0-7b1c-7000-8a00-0000000020c1",
+      "channel_id": "0192f4a0-7b1c-7000-8a00-000000000102",
+      "space_id": "0192f4a0-7b1c-7000-8a00-000000000002",
+      "agent_id": "0192f4a0-7b1c-7000-8a00-000000000202",
+      "state": "queued",
+      "queued_at": "2026-10-15T09:56:37.000Z",
+      "billing_mode": "organization",
+      "approval_pending": false,
+      "cost_micros": 194000,
+      "currency": "USD",
+      "cost_is_estimate": true
+    },
+    {
+      "run_id": "0192f4a0-7b1c-7000-8a00-0000000010c2",
+      "thread_id": "0192f4a0-7b1c-7000-8a00-0000000020c2",
+      "channel_id": "0192f4a0-7b1c-7000-8a00-000000000103",
+      "space_id": "0192f4a0-7b1c-7000-8a00-000000000002",
+      "agent_id": "0192f4a0-7b1c-7000-8a00-000000000202",
+      "state": "waiting_input",
+      "queued_at": "2026-10-15T09:56:36.000Z",
+      "billing_mode": "organization",
+      "approval_pending": true,
+      "cost_micros": 195000,
+      "currency": "USD",
+      "cost_is_estimate": true,
+      "started_at": "2026-10-15T09:56:41.000Z",
+      "step": {
+        "kind": "tool_call",
+        "name": "WebFetch"
+      }
+    },
+    {
+      "run_id": "0192f4a0-7b1c-7000-8a00-0000000010c3",
+      "thread_id": "0192f4a0-7b1c-7000-8a00-0000000020c3",
+      "channel_id": "0192f4a0-7b1c-7000-8a00-000000000101",
+      "space_id": "0192f4a0-7b1c-7000-8a00-000000000001",
+      "agent_id": "0192f4a0-7b1c-7000-8a00-000000000201",
+      "state": "running",
+      "queued_at": "2026-10-15T09:56:35.000Z",
+      "billing_mode": "personal",
+      "approval_pending": false,
+      "cost_micros": 196000,
+      "currency": "USD",
+      "cost_is_estimate": true,
+      "started_at": "2026-10-15T09:56:40.000Z",
+      "step": {
+        "kind": "tool_call",
+        "name": "Bash"
+      }
+    },
+    {
+      "run_id": "0192f4a0-7b1c-7000-8a00-0000000010c4",
+      "thread_id": "0192f4a0-7b1c-7000-8a00-0000000020c4",
+      "channel_id": "0192f4a0-7b1c-7000-8a00-000000000102",
+      "space_id": "0192f4a0-7b1c-7000-8a00-000000000002",
+      "agent_id": "0192f4a0-7b1c-7000-8a00-000000000202",
+      "state": "running",
+      "queued_at": "2026-10-15T09:56:34.000Z",
+      "billing_mode": "organization",
+      "approval_pending": false,
+      "cost_micros": 197000,
+      "currency": "USD",
+      "cost_is_estimate": true,
+      "started_at": "2026-10-15T09:56:39.000Z",
+      "step": {
+        "kind": "tool_call",
+        "name": "Read"
+      }
+    },
+    {
+      "run_id": "0192f4a0-7b1c-7000-8a00-0000000010c5",
+      "thread_id": "0192f4a0-7b1c-7000-8a00-0000000020c5",
+      "channel_id": "0192f4a0-7b1c-7000-8a00-000000000103",
+      "space_id": "0192f4a0-7b1c-7000-8a00-000000000002",
+      "agent_id": "0192f4a0-7b1c-7000-8a00-000000000202",
+      "state": "queued",
+      "queued_at": "2026-10-15T09:56:33.000Z",
+      "billing_mode": "organization",
+      "approval_pending": false,
+      "cost_micros": 198000,
+      "currency": "USD",
+      "cost_is_estimate": true
+    },
+    {
+      "run_id": "0192f4a0-7b1c-7000-8a00-0000000010c6",
+      "thread_id": "0192f4a0-7b1c-7000-8a00-0000000020c6",
+      "channel_id": "0192f4a0-7b1c-7000-8a00-000000000101",
+      "space_id": "0192f4a0-7b1c-7000-8a00-000000000001",
+      "agent_id": "0192f4a0-7b1c-7000-8a00-000000000201",
+      "state": "waiting_input",
+      "queued_at": "2026-10-15T09:56:32.000Z",
+      "billing_mode": "personal",
+      "approval_pending": true,
+      "cost_micros": 199000,
+      "currency": "USD",
+      "cost_is_estimate": true,
+      "started_at": "2026-10-15T09:56:37.000Z",
+      "step": {
+        "kind": "tool_call",
+        "name": "Grep"
+      }
+    },
+    {
+      "run_id": "0192f4a0-7b1c-7000-8a00-0000000010c7",
+      "thread_id": "0192f4a0-7b1c-7000-8a00-0000000020c7",
+      "channel_id": "0192f4a0-7b1c-7000-8a00-000000000102",
+      "space_id": "0192f4a0-7b1c-7000-8a00-000000000002",
+      "agent_id": "0192f4a0-7b1c-7000-8a00-000000000202",
+      "state": "running",
+      "queued_at": "2026-10-15T09:56:31.000Z",
+      "billing_mode": "organization",
+      "approval_pending": false,
+      "cost_micros": 200000,
+      "currency": "USD",
+      "cost_is_estimate": true,
+      "started_at": "2026-10-15T09:56:36.000Z",
+      "step": {
+        "kind": "tool_call",
+        "name": "WebFetch"
+      }
+    }
+  ],
+  "runs_truncated": false,
+  "agents": [
+    {
+      "agent_id": "0192f4a0-7b1c-7000-8a00-000000000201",
+      "presence": "online",
+      "billing_mode": "personal",
+      "rate_limit": {
+        "state": "near_limit",
+        "resets_at": "2026-10-15T10:20:00.000Z"
+      }
+    },
+    {
+      "agent_id": "0192f4a0-7b1c-7000-8a00-000000000202",
+      "presence": "degraded",
+      "billing_mode": "organization",
+      "reported_billing_mode": "organization",
+      "rate_limit": {
+        "state": "ok"
+      }
+    }
+  ],
+  "rates": [
+    {
+      "metric": "messages_created",
+      "last_minute": 14,
+      "current_minute": 5
+    },
+    {
+      "metric": "runs_started",
+      "last_minute": 3,
+      "current_minute": 1
+    },
+    {
+      "metric": "tool_calls",
+      "last_minute": 41,
+      "current_minute": 12,
+      "last_minute_sum": 9300
+    },
+    {
+      "metric": "invocations_denied",
+      "last_minute": 0,
+      "current_minute": 0
+    },
+    {
+      "metric": "catchups",
+      "last_minute": 2,
+      "current_minute": 0,
+      "last_minute_sum": 840
+    },
+    {
+      "metric": "resyncs",
+      "dimension": "too_far_behind",
+      "last_minute": 1,
+      "current_minute": 0
+    },
+    {
+      "metric": "slow_consumer_closes",
+      "last_minute": 0,
+      "current_minute": 0
+    },
+    {
+      "metric": "cost",
+      "dimension": "organization",
+      "last_minute": 3,
+      "current_minute": 1,
+      "last_minute_sum": 740000,
+      "currency": "USD"
+    }
+  ],
+  "sli": [
+    {
+      "metric": "sli.api_availability",
+      "total": 12000,
+      "good": 11994,
+      "ratio": 0.9995
+    },
+    {
+      "metric": "sli.delivery_latency",
+      "total": 5400,
+      "good": 5391,
+      "ratio": 0.99833
+    },
+    {
+      "metric": "sli.reconnect",
+      "total": 80,
+      "good": 79,
+      "ratio": 0.9875
+    },
+    {
+      "metric": "sli.push_acceptance",
+      "total": 0,
+      "good": 0
+    },
+    {
+      "metric": "sli.run_start",
+      "total": 40,
+      "good": 40,
+      "ratio": 1.0
+    },
+    {
+      "metric": "sli.turn_duration",
+      "total": 36,
+      "good": 33,
+      "ratio": 0.91667
+    }
+  ],
+  "connections": {
+    "user": 12,
+    "agent": 2,
+    "app": 1
+  }
+}
