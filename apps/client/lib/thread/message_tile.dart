@@ -6,6 +6,8 @@
 /// Design notes 1 and 4; components.md 1; SEC-OUT-3).
 library;
 
+import 'dart:async';
+
 import 'package:design_system/design_system.dart';
 import 'package:domain/domain.dart';
 import 'package:flutter/gestures.dart';
@@ -179,7 +181,13 @@ class MessageTile extends StatelessWidget {
             _menu(context, _anchor(context)),
       },
       child: Listener(
+        // Raw pointer events, outside the gesture arena: a recognizer of the content (a
+        // link, the text) must not swallow the right click.
         onPointerDown: (e) {
+          if (e.buttons == kSecondaryMouseButton) {
+            unawaited(_menu(context, e.position));
+            return;
+          }
           // 01 7: Option+Click (Alt+Click on Windows) marks unread from this message.
           if (e.buttons == kPrimaryButton &&
               HardwareKeyboard.instance.isAltPressed &&
@@ -187,14 +195,10 @@ class MessageTile extends StatelessWidget {
             onAction(MessageAction.markUnread);
           }
         },
-        child: GestureDetector(
-          behavior: HitTestBehavior.translucent,
-          onSecondaryTapDown: (d) => _menu(context, d.globalPosition),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            mainAxisSize: MainAxisSize.min,
-            children: [body, ...started],
-          ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          mainAxisSize: MainAxisSize.min,
+          children: [body, ...started],
         ),
       ),
     );

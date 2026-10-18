@@ -47,7 +47,9 @@ class HistoryArea extends ConsumerWidget {
     switch (parseLocation(location)) {
       case ThreadLocation(:final threadId, :final messageId):
         final thread = ref.watch(storedThreadProvider(threadId.value)).value;
-        if (thread == null) return const SizedBox.expand();
+        // Without a stored thread the column stays: it waits for the thread, or shows "No
+        // access anymore" after a removal deleted it (01 6.6).
+        if (thread == null) return history(threadId, jumpTo: messageId);
         final channel = ref
             .watch(storedChannelOfRouteProvider(thread.channelId.value))
             .value;

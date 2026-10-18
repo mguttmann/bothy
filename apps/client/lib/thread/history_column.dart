@@ -66,6 +66,12 @@ class HistoryColumnState extends ConsumerState<HistoryColumn> {
   MessageId? _editing;
   String? _editingEntry;
 
+  /// The thread as last stored, so a removal that deleted it is still recognized.
+  Thread? _lastThread;
+
+  /// The space of [_lastThread], kept for the same reason.
+  String? _lastSpace;
+
   /// The texts of the waiting messages when access was removed (01 6.6), or null while the
   /// thread is visible.
   List<(String, String)>? _removed;
@@ -158,14 +164,15 @@ class HistoryColumnState extends ConsumerState<HistoryColumn> {
 
   // ---- removal (Design note 6) ---------------------------------------------------------
 
-  void _onNotice(SyncNotice? notice, Thread? thread) {
+  void _onNotice(SyncNotice? notice) {
     if (notice is! TargetsRemoved || _removed != null) return;
-    final channel = thread?.channelId.value;
+    final channel = _lastThread?.channelId.value;
+    final space = _lastSpace;
     final hit = notice.targets.any(
       (t) =>
           t.id == _thread ||
           (channel != null && t.id == channel) ||
-          (thread != null && _spaceOf(thread) == t.id),
+          (space != null && t.id == space),
     );
     if (!hit) return;
     final waiting = ref.read(threadOutboxProvider(_thread)).value ?? const [];
@@ -177,12 +184,6 @@ class HistoryColumnState extends ConsumerState<HistoryColumn> {
       ],
     );
   }
-
-  String? _spaceOf(Thread thread) => ref
-      .read(storedChannelOfRouteProvider(thread.channelId.value))
-      .value
-      ?.spaceId
-      ?.value;
 
   // ---- actions (Design note 4) ---------------------------------------------------------
 
@@ -221,9 +222,11 @@ class HistoryColumnState extends ConsumerState<HistoryColumn> {
       case MessageAction.delete:
         if (await confirmDelete(context)) await actions.delete(message);
       case MessageAction.markUnread:
-        _markedSeq = message.threadSeq.value <= 1
-            ? const ThreadSeq(0)
-            : ThreadSeq(message.threadSeq.value - 1);
+        // The view does not mark the thread read again until a newer message arrives
+        // (Design note 2: at most once per newest message).
+        final newest = thread.lastMessageSeq;
+        final marked = _markedSeq;
+        if (marked == null || marked < newest) _markedSeq = newest;
         await actions.markUnread(
           message,
           ref.read(threadReadStateProvider(_thread)),
@@ -305,16 +308,17 @@ class HistoryColumnState extends ConsumerState<HistoryColumn> {
   Widget build(BuildContext context) {
     final l = AppLocalizations.of(context);
     final thread = ref.watch(storedThreadProvider(_thread)).value;
-    ref.listen(syncNoticesProvider, (_, next) => _onNotice(next.value, thread));
+    ref.listen(syncNoticesProvider, (_, next) => _onNotice(next.value));
+    if (thread != null) _lastThread = thread;
     final removed = _removed;
     if (removed != null) return _NoAccess(waiting: removed);
     if (thread == null) return const SizedBox.expand();
     final channelId = thread.channelId.value;
     final channel = ref.watch(storedChannelOfRouteProvider(channelId)).value;
+    _lastSpace = channel?.spaceId?.value ?? _lastSpace;
     final config = ref.watch(appConfigProvider);
     final windowValue = ref.watch(threadWindowProvider(_thread));
-    final window =
-        windowValue.value ?? const ContiguousWindow(messages: []);
+    final window = windowValue.value ?? const ContiguousWindow(messages: []);
     final outbox = ref.watch(threadOutboxProvider(_thread)).value ?? const [];
     final principals = ref.watch(principalsByIdProvider).value ?? const {};
     final me = ref.watch(myPrincipalIdProvider);
