@@ -16,6 +16,8 @@ const Set<String> skippedDurable = {
   'agent_session.changed',
   'channel.settings_changed',
   'command.invoked',
+  'device.pending',
+  'gdpr.request_due',
   'gdpr.request_updated',
   'grant.changed',
   'group.changed',

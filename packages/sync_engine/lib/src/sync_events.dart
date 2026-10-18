@@ -91,7 +91,7 @@ final class FixedIdentity implements LocalIdentity {
 
 /// The [LocalIdentity] of the signed-in [AuthSession]: its device and its `sid`.
 final class AuthIdentity implements LocalIdentity {
-  /// Reads the identity from [auth] on every call, so a new session is seen at once.
+  /// Reads the identity from the [AuthSession] on every call, so a new session is seen at once.
   const AuthIdentity(this._auth);
 
   final AuthSession _auth;

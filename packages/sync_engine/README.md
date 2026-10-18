@@ -162,8 +162,8 @@ through the `Fetcher` instead.
 In memory: `typing.started` and `agent.presence_changed` (`EphemeralStore`), `run.updated`
 (`onRunUpdated`, raw, also when truncated). Skipped, the cursor advances (no local table):
 `access.expiring`, `agent.config_changed`, `agent.followup`, `agent.invocation`,
-`agent_session.changed`, `channel.settings_changed`, `command.invoked`, `gdpr.request_updated`,
-`grant.changed`, `group.changed`, `host.updated` (M4-36), `import.progress`,
+`agent_session.changed`, `channel.settings_changed`, `command.invoked`, `device.pending`,
+`gdpr.request_due`, `gdpr.request_updated`, `grant.changed`, `group.changed`, `host.updated` (M4-36), `import.progress`,
 `interaction.created`, `run.cancel_requested`, `status.updated`, `terminal_session.changed`
 (M4-36), and every type the catalogue does not know. `test/catch_up/catalogue_test.dart` holds
 these sets equal to the catalogue.
