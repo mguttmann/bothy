@@ -104,6 +104,9 @@ type consumerConn struct {
 	win   *domain.ConsumerWindow
 	saved int64
 	gone  bool
+	// streaming is true once catchup.complete or resync_required was queued: from then on the
+	// hub may offer ephemeral frames to the connection (INT-W41/1).
+	streaming bool
 
 	wake   chan struct{}
 	cancel context.CancelFunc
@@ -497,7 +500,13 @@ func (e *ConsumerEngine) startCheck(ctx context.Context, cc *consumerConn) bool 
 		cc.win.Restart(res.HeadSeq)
 		cc.saved = max(cc.saved, res.HeadSeq)
 		cc.mu.Unlock()
-		return cc.c.conn.Send(ResyncRequired{Reason: res.Reason, HeadSeq: res.HeadSeq, SyncEpoch: res.SyncEpoch}) == nil
+		if cc.c.conn.Send(ResyncRequired{Reason: res.Reason, HeadSeq: res.HeadSeq, SyncEpoch: res.SyncEpoch}) != nil {
+			return false
+		}
+		cc.mu.Lock()
+		cc.streaming = true
+		cc.mu.Unlock()
+		return true
 	}
 }
 
@@ -650,8 +659,28 @@ func (e *ConsumerEngine) sendFrames(ctx context.Context, cc *consumerConn, frame
 		if !e.offer(ctx, cc, entry) {
 			return false
 		}
+		if f.Kind == domain.FrameComplete {
+			cc.mu.Lock()
+			cc.streaming = true
+			cc.mu.Unlock()
+		}
 	}
 	return true
+}
+
+// Streaming reports whether the consumer connection c queued catchup.complete or resync_required,
+// so ephemeral frames may follow (M1-66, INT-W41/1); false for a connection the engine does not
+// serve.
+func (e *ConsumerEngine) Streaming(c *Connection) bool {
+	e.mu.Lock()
+	cc := e.byConn[c]
+	e.mu.Unlock()
+	if cc == nil {
+		return false
+	}
+	cc.mu.Lock()
+	defer cc.mu.Unlock()
+	return cc.streaming
 }
 
 // sleepCtx waits d; false when ctx ends first.
