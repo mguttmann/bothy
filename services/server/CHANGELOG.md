@@ -53,6 +53,20 @@ documented in this file. The format is based on
   served targets of I1 (including spaces whose default operator is the agent) and the facts of a
   thread, so the operator rule gives the effective operator `write` without a grant. The same
   assignment answers `200` without a change.
+- Threads (M1-55): `listChannelThreads`, `getThread`, `setThreadTitle`, `closeThread`,
+  `reopenThread` and `setThreadTags`; `createThread` follows with M1-56. Migration `00027` creates
+  `thread_tags`. The port `chat.Threads` adds `Create` (inside the caller's unit of work; the
+  operator of the channel is fixed on the thread, R-DM-12), `AppendToThread` (the gapless thread
+  sequence under the row lock, with an implicit reopen and `thread.reopened`) and `Info`. Titles
+  keep their source: a person sets `manual`, a placeholder title stays `auto`, and agents and apps
+  get `409 title_manual` on a manual title. Close, reopen, title and tag changes write
+  `thread.closed`, `thread.reopened` and `thread.updated` once each, and nothing for a call without
+  effect. Restricted tags need `manage`; deleting a forum tag removes its assignments in the same
+  transaction. The post list filters by state and tag, sorts by `last_activity` or `created` and
+  pages with a cursor bound to caller, channel, filters and sort, without totals. The chat
+  structure source now answers threads; a thread created without an operator has none, also for
+  `authorize`, after the channel gets one. New keys `thread.max_tags` and
+  `thread.placeholder_titles`.
 
 - Channels and forum tags (M1-53): `listSpaceChannels`, `createChannel`, `getChannel`,
   `updateChannel`, `moveChannel`, `archiveChannel`, `listForumTags`, `createForumTag`,

@@ -4,6 +4,7 @@ package app
 
 import (
 	"context"
+	"time"
 
 	"github.com/OWNER/bothy/services/server/internal/chat/domain"
 	"github.com/OWNER/bothy/services/server/internal/kernel/ids"
@@ -31,17 +32,25 @@ type ServedTarget struct {
 	ChannelID, SpaceID ids.ID
 }
 
-// ThreadRow is what authorize needs of a thread (07 section 7.2 step 4): its channel, whether it
-// is the main thread, its fixed operator (zero for none) and its creator.
-type ThreadRow struct {
-	ID, ChannelID   ids.ID
-	Main            bool
-	OperatorAgentID ids.ID
-	CreatedBy       ids.ID
+// ThreadQuery is the keyset query of listChannelThreads (brief M1-55 D6): the threads of kind
+// thread of a channel, newest first.
+type ThreadQuery struct {
+	ChannelID ids.ID
+	// State is open, closed or "" for both; TagID zero for any tag.
+	State string
+	TagID ids.ID
+	// ByCreated sorts by (created_at DESC, id DESC), else by (last_activity_at DESC, id DESC).
+	ByCreated bool
+	// HasAfter starts after the position (AfterAt, AfterID) of the sort.
+	HasAfter bool
+	AfterAt  time.Time
+	AfterID  ids.ID
+	// Limit is the most rows to return.
+	Limit int
 }
 
 // Store is the outgoing port of the chat application layer over spaces, user_space_states,
-// channels, forum_tags and the main threads (implemented by adapters/postgres). Reads run in the ambient transaction of ctx when there is
+// channels, forum_tags, threads and thread_tags (implemented by adapters/postgres). Reads run in the ambient transaction of ctx when there is
 // one and on the pool otherwise; writes and locks run only inside a unit of work of kernel/txn and
 // fail with kind internal outside one. Errors are kernel/errs errors without SQL text or values.
 type Store interface {
@@ -121,6 +130,28 @@ type Store interface {
 	// not archived with the agent as default operator (ChannelID zero); ascending by (SpaceID,
 	// ChannelID) without duplicates.
 	ServedTargets(ctx context.Context, agent ids.ID) ([]ServedTarget, error)
-	// Thread returns the facts of the thread id; found is false for an unknown id.
-	Thread(ctx context.Context, id ids.ID) (t ThreadRow, found bool, err error)
+
+	// DeleteTagAssignments deletes every thread_tags row of tag (deleteForumTag, M1-55 D5).
+	DeleteTagAssignments(ctx context.Context, tag ids.ID) error
+
+	// Thread returns the thread id; found is false for an unknown id.
+	Thread(ctx context.Context, id ids.ID) (th domain.Thread, found bool, err error)
+	// LockThread returns the thread id like Thread and locks its row until the end of the unit.
+	LockThread(ctx context.Context, id ids.ID) (th domain.Thread, found bool, err error)
+	// InsertThread inserts the thread th of kind thread and returns the stored row. Errors:
+	// conflict on /parent_message_id when the parent message already started a thread.
+	InsertThread(ctx context.Context, th domain.Thread) (domain.Thread, error)
+	// SaveThread writes title, title source, state, closed_at, closed_by and version of th.
+	SaveThread(ctx context.Context, th domain.Thread) error
+	// AppendToThread raises last_message_seq, message_count and version of the locked thread id,
+	// sets last_activity_at to at and with reopen opens it; it returns the stored row (03 section
+	// 6.2).
+	AppendToThread(ctx context.Context, id ids.ID, reopen bool, at time.Time) (domain.Thread, error)
+	// ListThreads returns the threads of q in the order of its sort.
+	ListThreads(ctx context.Context, q ThreadQuery) ([]domain.Thread, error)
+	// ThreadTags returns the live tags of each of threads in the order of the tags; a thread
+	// without tags is absent.
+	ThreadTags(ctx context.Context, threads []ids.ID) (map[ids.ID][]ids.ID, error)
+	// ReplaceThreadTags replaces the tags of thread with tags, added by by at at.
+	ReplaceThreadTags(ctx context.Context, thread ids.ID, tags []ids.ID, by ids.ID, at time.Time) error
 }

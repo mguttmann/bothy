@@ -26,7 +26,7 @@ func TestRepositoryOperators(t *testing.T) {
 	t.Parallel()
 	e := newEnv(t)
 	ctx := context.Background()
-	alex, _ := e.person(t, "alex")
+	alex, _ := e.person(t)
 	lotse, assistent := e.agent(t, "lotse"), e.agent(t, "assistent")
 	sp := domain.NewSpace(ids.New(), "Support", "", "", "a0", alex)
 	empty := domain.NewSpace(ids.New(), "Labor", "", "", "a1", alex)
@@ -112,11 +112,11 @@ func TestRepositoryOperators(t *testing.T) {
 		t.Fatalf("lotse served %+v %v", served, err)
 	}
 	f, found, err := e.repo.Thread(ctx, th)
-	if err != nil || !found || f.Main || f.OperatorAgentID != assistent || f.ChannelID != inherit.ID || f.CreatedBy != alex {
+	if err != nil || !found || f.Main() || f.OperatorAgentID != assistent || f.ChannelID != inherit.ID || f.CreatedBy != alex {
 		t.Fatalf("thread %+v %v %v", f, found, err)
 	}
 	f, found, err = e.repo.Thread(ctx, main.ID)
-	if err != nil || !found || !f.Main || !f.OperatorAgentID.IsZero() {
+	if err != nil || !found || !f.Main() || !f.OperatorAgentID.IsZero() {
 		t.Fatalf("main thread %+v %v %v", f, found, err)
 	}
 	if _, found, err := e.repo.Thread(ctx, ids.New()); found || err != nil {

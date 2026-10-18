@@ -143,41 +143,60 @@ func TestSourceChannels(t *testing.T) {
 	}
 }
 
-// opStore answers the thread and served-target reads of the source (M1-54).
+// opStore answers the served-target reads of the source (M1-54).
 type opStore struct {
 	app.Store
-	thread app.ThreadRow
 	served []app.ServedTarget
-}
-
-func (s opStore) Thread(_ context.Context, id ids.ID) (app.ThreadRow, bool, error) {
-	return s.thread, id == s.thread.ID, nil
 }
 
 func (s opStore) ServedTargets(context.Context, ids.ID) ([]app.ServedTarget, error) {
 	return s.served, nil
 }
 
-// TestSourceOperators: Thread converts the facts of a known thread and ServedTargets the targets;
-// the zero agent serves nothing.
+// TestSourceOperators: ServedTargets converts the targets; the zero agent serves nothing. The
+// thread facts are TestSourceThread.
 func TestSourceOperators(t *testing.T) {
 	t.Parallel()
-	th := app.ThreadRow{ID: ids.New(), ChannelID: ids.New(), OperatorAgentID: ids.New(), CreatedBy: ids.New()}
 	space, channel := ids.New(), ids.New()
-	src := authzsource.New(opStore{thread: th, served: []app.ServedTarget{{SpaceID: space}, {ChannelID: channel, SpaceID: space}}})
+	src := authzsource.New(opStore{served: []app.ServedTarget{{SpaceID: space}, {ChannelID: channel, SpaceID: space}}})
 	ctx := context.Background()
-	f, ok, err := src.Thread(ctx, th.ID)
-	if err != nil || !ok || f != (authz.ThreadFacts{ID: th.ID, ChannelID: th.ChannelID, OperatorAgentID: th.OperatorAgentID, CreatedBy: th.CreatedBy}) {
-		t.Fatalf("thread %+v %v %v", f, ok, err)
-	}
-	if _, ok, err := src.Thread(ctx, ids.New()); ok || err != nil {
-		t.Fatalf("unknown thread %v %v", ok, err)
-	}
 	refs, err := src.ServedTargets(ctx, ids.New())
 	if err != nil || len(refs) != 2 || refs[0] != (authz.ChannelRef{SpaceID: space}) || refs[1] != (authz.ChannelRef{ChannelID: channel, SpaceID: space}) {
 		t.Fatalf("served %+v %v", refs, err)
 	}
 	if refs, err := src.ServedTargets(ctx, ids.ID{}); err != nil || refs != nil {
 		t.Fatalf("zero agent %+v %v", refs, err)
+	}
+}
+
+// threadStore answers the thread reads of the source.
+type threadStore struct {
+	app.Store
+	threads map[ids.ID]domain.Thread
+}
+
+func (s threadStore) Thread(_ context.Context, id ids.ID) (domain.Thread, bool, error) {
+	th, ok := s.threads[id]
+	return th, ok, nil
+}
+
+// TestSourceThread (M1-55 D8): the facts of a thread are its channel, kind, creator and fixed
+// operator; a main thread has no operator; an unknown thread is not found.
+func TestSourceThread(t *testing.T) {
+	t.Parallel()
+	at := time.Date(2026, 10, 14, 9, 0, 0, 0, time.UTC)
+	ch, by, op := ids.New(), ids.New(), ids.New()
+	main := domain.NewMainThread(ids.New(), ch, by, at)
+	post := domain.Thread{ID: ids.New(), ChannelID: ch, Kind: domain.ThreadKindThread, OperatorAgentID: op, CreatedBy: by}
+	src := authzsource.New(threadStore{threads: map[ids.ID]domain.Thread{main.ID: main, post.ID: post}})
+	ctx := context.Background()
+	if f, ok, err := src.Thread(ctx, main.ID); err != nil || !ok || f != (authz.ThreadFacts{ID: main.ID, ChannelID: ch, Main: true, CreatedBy: by}) {
+		t.Fatalf("main %+v %v %v", f, ok, err)
+	}
+	if f, ok, err := src.Thread(ctx, post.ID); err != nil || !ok || f != (authz.ThreadFacts{ID: post.ID, ChannelID: ch, OperatorAgentID: op, CreatedBy: by}) {
+		t.Fatalf("post %+v %v %v", f, ok, err)
+	}
+	if _, ok, err := src.Thread(ctx, ids.New()); ok || err != nil {
+		t.Fatal("unknown thread found")
 	}
 }

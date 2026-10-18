@@ -37,33 +37,6 @@ func (q *Queries) DefaultOperatedSpaces(ctx context.Context, agentID pgtype.UUID
 	return items, nil
 }
 
-const getThreadFacts = `-- name: GetThreadFacts :one
-SELECT id, channel_id, kind, operator_agent_id, created_by FROM threads WHERE id = $1
-`
-
-type GetThreadFactsRow struct {
-	ID              pgtype.UUID
-	ChannelID       pgtype.UUID
-	Kind            string
-	OperatorAgentID pgtype.UUID
-	CreatedBy       pgtype.UUID
-}
-
-// One thread for authorize resolution: its channel, kind, fixed operator and creator (07 section
-// 7.2 step 4, the operator rule of a thread).
-func (q *Queries) GetThreadFacts(ctx context.Context, id pgtype.UUID) (GetThreadFactsRow, error) {
-	row := q.db.QueryRow(ctx, getThreadFacts, id)
-	var i GetThreadFactsRow
-	err := row.Scan(
-		&i.ID,
-		&i.ChannelID,
-		&i.Kind,
-		&i.OperatorAgentID,
-		&i.CreatedBy,
-	)
-	return i, err
-}
-
 const lockInheritingChannels = `-- name: LockInheritingChannels :many
 SELECT c.id, c.space_id, c.kind, c.name, c.topic, c.sort_key, c.operator_inherit, c.operator_agent_id, c.require_mention, c.thread_require_mention, c.free_response, c.auto_thread, c.allow_mentioned_agents, c.history_backfill_limit, c.prompt, c.forum_default_sort, c.default_notification_level, c.read_only, c.created_by, c.created_at, c.archived_at, c.version, c.settings_version, s.default_operator_agent_id AS space_operator_id,
        (s.archived_at IS NOT NULL)::boolean AS space_archived, t.id AS main_thread_id

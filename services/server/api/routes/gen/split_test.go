@@ -68,9 +68,12 @@ func importsOf(t *testing.T, name string, src []byte) (imports, types []string, 
 }
 
 func TestSplitRest_ModelsAndServer(t *testing.T) {
-	models, server, err := splitRest([]byte(splitInput))
+	models, server, objects, err := splitRest([]byte(splitInput))
 	if err != nil {
 		t.Fatal(err)
+	}
+	if _, types, _ := importsOf(t, "objects.gen.go", objects); len(types) != 0 {
+		t.Errorf("objects types = %v, want none without a strict server", types)
 	}
 	mi, mt, mf := importsOf(t, "models.gen.go", models)
 	si, st, sf := importsOf(t, "rest.gen.go", server)
@@ -102,7 +105,7 @@ func TestSplitRest_ModelsAndServer(t *testing.T) {
 // TestSplitRest_NoServer: without ServerInterface everything is models and the server file holds
 // only the package clause, so both files always exist.
 func TestSplitRest_NoServer(t *testing.T) {
-	models, server, err := splitRest([]byte("package rest\n"))
+	models, server, objects, err := splitRest([]byte("package rest\n"))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -110,10 +113,13 @@ func TestSplitRest_NoServer(t *testing.T) {
 	if _, types, _ := importsOf(t, "rest.gen.go", server); len(types) != 0 {
 		t.Errorf("server types = %v, want none", types)
 	}
+	if _, types, _ := importsOf(t, "objects.gen.go", objects); len(types) != 0 {
+		t.Errorf("objects types = %v, want none", types)
+	}
 }
 
 func TestSplitRest_RejectsInvalidGo(t *testing.T) {
-	if _, _, err := splitRest([]byte("package rest\nfunc (")); err == nil {
+	if _, _, _, err := splitRest([]byte("package rest\nfunc (")); err == nil {
 		t.Fatal("splitRest = nil error for invalid Go")
 	}
 }
@@ -121,7 +127,7 @@ func TestSplitRest_RejectsInvalidGo(t *testing.T) {
 // TestRealRest_BelowMaxFileKB: each half of the real REST package stays below repo.max_file_kb
 // (1024 KiB, docs/spec/23-qualitaet.md), the limit the hook check-added-large-files holds.
 func TestRealRest_BelowMaxFileKB(t *testing.T) {
-	for _, name := range []string{"models.gen.go", "rest.gen.go"} {
+	for _, name := range []string{"models.gen.go", "rest.gen.go", "objects.gen.go"} {
 		info, err := os.Stat(filepath.Join("..", "..", "rest", name))
 		if err != nil {
 			t.Fatal(err)
@@ -136,4 +142,58 @@ func sortedCopy(s []string) []string {
 	c := slices.Clone(s)
 	slices.Sort(c)
 	return c
+}
+
+// splitStrictInput adds the strict server to splitInput: the request and response objects of
+// an operation and the strict interface after them.
+const splitStrictInput = splitInput + `
+type ListThingsRequestObject struct {
+	Since time.Time
+}
+
+// ListThings200JSONResponse is a response object.
+type ListThings200JSONResponse []Thing
+
+func (r ListThings200JSONResponse) VisitListThingsResponse(w http.ResponseWriter) error {
+	return json.NewEncoder(w).Encode(r)
+}
+
+// StrictServerInterface represents all server handlers.
+type StrictServerInterface interface {
+	ListThings(r ListThingsRequestObject) (ListThings200JSONResponse, error)
+}
+
+type strictHandler struct{ ssi StrictServerInterface }
+`
+
+// TestSplitRest_StrictObjects (INT-W17/4): the request and response objects of the strict server,
+// from the first RequestObject to StrictServerInterface, go to objects.gen.go; the strict
+// interface and handler stay with the server, and each file imports only what it uses.
+func TestSplitRest_StrictObjects(t *testing.T) {
+	models, server, objects, err := splitRest([]byte(splitStrictInput))
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, mt, _ := importsOf(t, "models.gen.go", models)
+	si, st, _ := importsOf(t, "rest.gen.go", server)
+	oi, ot, _ := importsOf(t, "objects.gen.go", objects)
+	if !slices.Equal(mt, []string{"Thing"}) {
+		t.Errorf("models types = %v", mt)
+	}
+	if want := []string{"ServerInterface", "StrictServerInterface", "strictHandler"}; !slices.Equal(st, want) {
+		t.Errorf("server types = %v, want %v", st, want)
+	}
+	if want := []string{"ListThingsRequestObject", "ListThings200JSONResponse"}; !slices.Equal(ot, want) {
+		t.Errorf("objects types = %v, want %v", ot, want)
+	}
+	if want := []string{"encoding/json", "net/http"}; !slices.Equal(sortedCopy(si), want) {
+		t.Errorf("server imports = %v, want %v", si, want)
+	}
+	if want := []string{"encoding/json", "net/http", "time"}; !slices.Equal(sortedCopy(oi), want) {
+		t.Errorf("objects imports = %v, want %v", oi, want)
+	}
+	if !strings.Contains(string(objects), "// ListThings200JSONResponse is a response object.") ||
+		!strings.Contains(string(server), "// StrictServerInterface represents all server handlers.") {
+		t.Error("a doc comment did not move with its declaration")
+	}
 }

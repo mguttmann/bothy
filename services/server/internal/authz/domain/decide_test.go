@@ -110,6 +110,37 @@ func TestEffectiveRules(t *testing.T) {
 	}
 }
 
+// TestPathThreadOperator (R-DM-12, 09 section 3.1, brief M1-55 D8): the operator of a thread of
+// kind thread is its fixed operator, none when it was created without one, even if the channel has
+// an operator now; a main thread and a channel follow the channel's effective operator.
+func TestPathThreadOperator(t *testing.T) {
+	t.Parallel()
+	fixed, channelOp := ids.New(), ids.New()
+	base := domain.Path{Kind: domain.PathChannel, SpaceID: ids.New(), ChannelID: ids.New(), ChannelOperatorID: channelOp}
+	for _, c := range []struct {
+		name string
+		mod  func(*domain.Path)
+		want ids.ID
+	}{
+		{"channel", func(*domain.Path) {}, channelOp},
+		{"main thread", func(p *domain.Path) { p.ThreadID, p.ThreadMain = ids.New(), true }, channelOp},
+		{"fixed operator", func(p *domain.Path) { p.ThreadID, p.ThreadOperatorID = ids.New(), fixed }, fixed},
+		{"thread without operator", func(p *domain.Path) { p.ThreadID = ids.New() }, ids.ID{}},
+	} {
+		p := base
+		c.mod(&p)
+		if got := p.ThreadOperator(); got != c.want {
+			t.Errorf("%s: %v, want %v", c.name, got, c.want)
+		}
+	}
+	// The channel operator keeps write on such a thread through the channel (05 section 2.3 point 4).
+	p := base
+	p.ThreadID = ids.New()
+	if r := domain.Effective(domain.Snapshot{}, domain.KindAgent, channelOp, p); r.Level != domain.LevelWrite {
+		t.Fatalf("channel operator on a thread without operator %+v", r)
+	}
+}
+
 func TestRightsIntersect(t *testing.T) {
 	t.Parallel()
 	a := domain.Rights{Level: domain.LevelTrigger, Caps: domain.CapsOf(domain.CapManage, domain.CapUpload), Owner: true}

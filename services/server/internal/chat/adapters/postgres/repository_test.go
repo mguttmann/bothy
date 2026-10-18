@@ -50,11 +50,12 @@ func (e env) exec(t *testing.T, sql string, args ...any) {
 	}
 }
 
-// person inserts a person with a device and returns both.
-func (e env) person(t *testing.T, handle string) (ids.ID, ids.ID) {
+// person inserts the person alex with a device and returns both (INT-W17/5: every caller used
+// the same handle).
+func (e env) person(t *testing.T) (ids.ID, ids.ID) {
 	t.Helper()
 	id, dev := ids.New(), ids.New()
-	e.exec(t, `INSERT INTO principals (id, kind, handle, display_name) VALUES ($1, 'user', $2, $2)`, id.String(), handle)
+	e.exec(t, `INSERT INTO principals (id, kind, handle, display_name) VALUES ($1, 'user', 'alex', 'alex')`, id.String())
 	e.exec(t, `INSERT INTO users (principal_id) VALUES ($1)`, id.String())
 	e.exec(t, `INSERT INTO devices (id, user_id, name, platform, state) VALUES ($1, $2, 'Laptop', 'web', 'active')`, dev.String(), id.String())
 	return id, dev
@@ -65,7 +66,7 @@ func TestRepositoryRoundTrip(t *testing.T) {
 	t.Parallel()
 	e := newEnv(t)
 	ctx := context.Background()
-	alex, dev := e.person(t, "alex")
+	alex, dev := e.person(t)
 	support := domain.NewSpace(ids.New(), "Support", "headset", "moss", "a1", alex)
 	support.CreatedAt = t0
 	research := domain.NewSpace(ids.New(), "Research", "", "", "a0", alex)

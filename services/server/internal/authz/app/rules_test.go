@@ -198,9 +198,10 @@ func TestAgentInvoke_MentionRule(t *testing.T) {
 	w.allow(t, alex, authorize.ActionAgentInvoke, w.invoke(w.allgemein, w.lotse, true))
 	w.setChannel(t, w.allgemein, func(c *authz.ChannelFacts) { c.FreeResponse = true })
 	w.allow(t, alex, authorize.ActionAgentInvoke, w.invoke(w.allgemein, w.lotse, false))
-	// A non-main thread follows thread_require_mention.
+	// A non-main thread follows thread_require_mention. It was created while Lotse operated the
+	// channel, so Lotse is its fixed operator (R-DM-12).
 	th := ids.New()
-	w.structure.PutThread(authz.ThreadFacts{ID: th, ChannelID: w.eskalation, CreatedBy: w.alex})
+	w.structure.PutThread(authz.ThreadFacts{ID: th, ChannelID: w.eskalation, CreatedBy: w.alex, OperatorAgentID: w.lotse})
 	w.setChannel(t, w.eskalation, func(c *authz.ChannelFacts) { c.ThreadRequireMention = true })
 	r := authorize.Resource{Kind: authorize.ResourceThread, ID: th, Invoke: &authorize.InvokeFacts{AgentID: w.lotse, TriggerOrigin: "human"}}
 	w.expect(t, alex, authorize.ActionAgentInvoke, r, forbidden, "agent_not_reachable")

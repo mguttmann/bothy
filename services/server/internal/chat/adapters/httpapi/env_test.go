@@ -57,7 +57,13 @@ const nameMax = 12
 var chatConfig = chatapp.Config{
 	SpaceNameMaxChars: nameMax, ChannelNameMaxChars: 10, ChannelTopicMaxChars: 16, TagNameMaxChars: 6,
 	HistoryBackfillLimitDefault: 20, HistoryBackfillLimitMax: 200,
+	ThreadTitleMaxChars: titleMax, ThreadMaxTags: 2,
+	PlaceholderTitles: []string{"Neuer Chat", "New chat", "Chat", "Ohne Titel", "Untitled", "Test"},
+	PageSizeDefault:   3, PageSizeMax: 4,
 }
+
+// titleMax is thread.title_max_chars of the world, small enough to test the limit (M1-55).
+const titleMax = 24
 
 // testKEK is the key-encryption key of the audit recorder in these tests.
 type testKEK struct{}
@@ -81,6 +87,11 @@ type world struct {
 	svc     *chatapp.Service
 	az      *authzapp.Authorizer
 	ownerID ids.ID
+	// policies are the agent policies authz and chat read (billing_mode of a thread operator).
+	policies *fake.Policies
+	// uow is the unit of work of the world, for the port calls of messaging (Threads.Create,
+	// AppendToThread).
+	uow *pg.UnitOfWork
 	// archived collects the SpaceArchived events a test subscriber saw inside the transactions.
 	archived *[]chat.SpaceArchived
 	// channelsArchived collects the ChannelArchived events a test subscriber saw (M1-53).
@@ -101,9 +112,10 @@ func newWorld(t *testing.T) *world {
 		actors: httpservertest.NewActors(), archived: &[]chat.SpaceArchived{}, channelsArchived: &[]chat.ChannelArchived{}, mu: &sync.Mutex{}}
 	repo := identitypg.NewRepository(pool)
 	principals := identityapp.NewPrincipalSource(repo)
-	// The structure source of the process: spaces and channels of chat, no threads yet (M1-53).
+	// The structure source of the process: spaces, channels and threads of chat (M1-55).
 	str := wire.NewStructureSource(pool)
 	policies := fake.NewPolicies()
+	w.policies = policies
 	hook, err := wire.NewRightsHook(pool, wire.RightsSources{Principals: principals, Structure: str, Policies: policies}, w.clk, log)
 	if err != nil {
 		t.Fatal(err)
@@ -127,6 +139,7 @@ func newWorld(t *testing.T) *world {
 	}
 	reg.Seal()
 	uow := pg.NewUnitOfWork(pool, pg.UnitConfig{RetryMax: 3, StatementTimeout: 30 * time.Second, LockTimeout: 20 * time.Second, IdleInTxTimeout: 60 * time.Second}, reg)
+	w.uow = uow
 	w.rec, err = auditapp.NewRecorder(auditapp.Config{
 		DenyAggregateWindow: time.Hour, DenyAggregateMaxKeys: 100, IPKeyPeriod: 30 * 24 * time.Hour,
 		IPKeyRetention: 90 * 24 * time.Hour, IPKEKRef: "file:<secrets.dir>/audit_ip_kek",
@@ -157,12 +170,12 @@ func newWorld(t *testing.T) *world {
 	if err != nil {
 		t.Fatal(err)
 	}
-	c, err := wire.NewChat(chatConfig, pool, uow, az, az, wire.ChatWrites{Audit: w.rec, Events: appender, Rights: hook}, w.clk)
+	c, err := wire.NewChat(chatConfig, pool, uow, az, az, wire.ChatWrites{Audit: w.rec, Events: appender, Rights: hook}, policies, w.clk)
 	if err != nil {
 		t.Fatal(err)
 	}
 	w.svc, w.az = c.Service, az
-	built, err := routes.Build(wire.Handlers{Spaces: c.Handlers, Channels: c.ChannelHandlers}, wire.RouteOptions(), routes.SpecCatalog())
+	built, err := routes.Build(wire.Handlers{Spaces: c.Handlers, Channels: c.ChannelHandlers, Threads: c.ThreadHandlers}, wire.RouteOptions(), routes.SpecCatalog())
 	if err != nil {
 		t.Fatal(err)
 	}

@@ -36,7 +36,6 @@ type env struct {
 	owner    actor.Actor
 	affected *affected
 	dir      directory
-	pol      policies
 }
 
 func newEnv(t *testing.T) *env {
@@ -44,7 +43,7 @@ func newEnv(t *testing.T) *env {
 	e := &env{store: newStore(), az: &authorizer{rules: map[authorize.Action]func(authorize.Principal, authorize.Resource) authorize.Decision{}},
 		rights: &rights{r: authz.EffectiveRights{Level: "trigger", Capabilities: []string{"manage"}}}, rec: &recorder{}, events: &appender{},
 		archived: &[]chat.SpaceArchived{}, owner: actor.Actor{ID: ids.New(), Kind: actor.KindUser, SessionID: ids.New(), DeviceID: ids.New()},
-		affected: &affected{}, dir: directory{principals: map[ids.ID]identity.PrincipalView{}}, pol: policies{rows: map[ids.ID]bool{}}}
+		affected: &affected{}, dir: directory{principals: map[ids.ID]identity.PrincipalView{}}}
 	reg := txn.NewRegistry()
 	if err := txn.Subscribe(reg, func(_ context.Context, ev chat.SpaceArchived) error {
 		*e.archived = append(*e.archived, ev)
@@ -56,8 +55,8 @@ func newEnv(t *testing.T) *env {
 	e.uow = &uow{reg: reg}
 	svc, err := app.New(testConfig(12), app.Deps{
 		Store: e.store, UoW: e.uow, Authorizer: e.az, Rights: rightsPort{e.rights}, Audit: e.rec, Events: e.events,
-		Clock:         clock.NewFake(time.Date(2026, 10, 14, 9, 0, 0, 0, time.UTC)),
-		RightsChanges: e.affected, Directory: e.dir, Policies: e.pol,
+		Policies: storePolicies{e.store}, Cursors: cursors{}, Clock: clock.NewFake(time.Date(2026, 10, 14, 9, 0, 0, 0, time.UTC)),
+		RightsChanges: e.affected, Directory: e.dir,
 	})
 	if err != nil {
 		t.Fatal(err)
@@ -112,14 +111,16 @@ func TestNew(t *testing.T) {
 		t.Fatal("missing collaborators accepted")
 	}
 	e := newEnv(t)
-	if _, err := app.New(app.Config{}, app.Deps{Store: e.store, UoW: e.uow, Authorizer: e.az, Rights: e.rights, Audit: e.rec, Events: e.events}); err == nil {
+	if _, err := app.New(app.Config{}, app.Deps{Store: e.store, UoW: e.uow, Authorizer: e.az, Rights: e.rights, Audit: e.rec, Events: e.events,
+		Policies: policies{}, Cursors: cursors{}, RightsChanges: e.affected, Directory: e.dir}); err == nil {
 		t.Fatal("name limit 0 accepted")
 	}
-	if _, err := app.New(testConfig(1), app.Deps{Store: e.store, UoW: e.uow, Authorizer: e.az, Rights: e.rights, Audit: e.rec, Events: e.events}); err == nil {
+	if _, err := app.New(testConfig(1), app.Deps{Store: e.store, UoW: e.uow, Authorizer: e.az, Rights: e.rights, Audit: e.rec, Events: e.events,
+		Policies: policies{}, Cursors: cursors{}}); err == nil {
 		t.Fatal("missing operator collaborators accepted")
 	}
 	if _, err := app.New(testConfig(1), app.Deps{Store: e.store, UoW: e.uow, Authorizer: e.az, Rights: e.rights, Audit: e.rec, Events: e.events,
-		RightsChanges: e.affected, Directory: e.dir, Policies: e.pol}); err != nil {
+		Policies: policies{}, Cursors: cursors{}, RightsChanges: e.affected, Directory: e.dir}); err != nil {
 		t.Fatal(err)
 	}
 }
@@ -425,5 +426,6 @@ func TestErrorsPass(t *testing.T) {
 // testConfig returns a valid configuration with the space name limit n.
 func testConfig(n int) app.Config {
 	return app.Config{SpaceNameMaxChars: n, ChannelNameMaxChars: 8, ChannelTopicMaxChars: 8, TagNameMaxChars: 8,
-		HistoryBackfillLimitDefault: 20, HistoryBackfillLimitMax: 200}
+		HistoryBackfillLimitDefault: 20, HistoryBackfillLimitMax: 200, ThreadTitleMaxChars: 200, ThreadMaxTags: 5,
+		PageSizeDefault: 50, PageSizeMax: 200}
 }

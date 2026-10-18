@@ -13,12 +13,13 @@ import (
 
 // Register declares the durable events chat appends (M1-25, docs/spec/05-actions.md section 6):
 // space.created, space.updated, space.archived and sidebar.updated (M1-52); channel.created,
-// channel.updated, channel.archived and thread.created for the main thread (M1-53). internal/wire
-// lists it in moduleRegistrations.
+// channel.updated, channel.archived and thread.created for the main thread (M1-53); thread.updated,
+// thread.closed and thread.reopened (M1-55). internal/wire lists it in moduleRegistrations.
 func Register(r *authorize.Registry) {
 	for _, t := range []authorize.EventType{
 		authorize.EventSpaceCreated, authorize.EventSpaceUpdated, authorize.EventSpaceArchived, authorize.EventSidebarUpdated,
 		authorize.EventChannelCreated, authorize.EventChannelUpdated, authorize.EventChannelArchived, authorize.EventThreadCreated,
+		authorize.EventThreadUpdated, authorize.EventThreadClosed, authorize.EventThreadReopened,
 	} {
 		r.Event("chat", t)
 	}

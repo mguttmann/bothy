@@ -107,6 +107,9 @@ var appPrivileges = map[string][]string{
 	"channel_skill_bindings": {"SELECT", "INSERT", "UPDATE", "DELETE"},
 	"forum_tags":             {"SELECT", "INSERT", "UPDATE"},
 	"threads":                {"SELECT", "INSERT", "UPDATE"},
+	// 03 thread_tags (M1-55): setThreadTags replaces the set and deleteForumTag drops the rows of
+	// its tag; a row is never updated.
+	"thread_tags": {"SELECT", "INSERT", "DELETE"},
 }
 
 // allPrivileges are the table rights PostgreSQL 18 knows (MAINTAIN since 17).

@@ -5,9 +5,12 @@ package app_test
 import (
 	"cmp"
 	"context"
+	"encoding/hex"
+	"encoding/json"
 	"slices"
 	"strings"
 	"sync"
+	"time"
 
 	"github.com/OWNER/bothy/services/server/internal/authz"
 	"github.com/OWNER/bothy/services/server/internal/chat/app"
@@ -29,12 +32,15 @@ type store struct {
 	sidebar  map[[2]ids.ID]domain.SidebarState
 	channels map[ids.ID]domain.Channel
 	tags     map[ids.ID]domain.ForumTag
+	threadStore
+	// policies are the agent policies storePolicies answers.
+	policies map[ids.ID]authz.AgentPolicy
 	fail     error
 }
 
 func newStore() *store {
 	return &store{spaces: map[ids.ID]domain.Space{}, sidebar: map[[2]ids.ID]domain.SidebarState{},
-		channels: map[ids.ID]domain.Channel{}, tags: map[ids.ID]domain.ForumTag{}}
+		channels: map[ids.ID]domain.Channel{}, tags: map[ids.ID]domain.ForumTag{}, policies: map[ids.ID]authz.AgentPolicy{}}
 }
 
 // row returns the channel c with the facts of its space.
@@ -140,6 +146,8 @@ func (s *store) InsertMainThread(_ context.Context, th domain.Thread) (domain.Th
 	c := s.channels[th.ChannelID]
 	c.MainThreadID = th.ID
 	s.channels[th.ChannelID] = c
+	s.ensureThreads()
+	s.threads[th.ID] = th
 	return th, s.fail
 }
 
@@ -417,16 +425,6 @@ func (d directory) Principal(_ context.Context, id ids.ID) (identity.PrincipalVi
 	return p, nil
 }
 
-// policies answers which agents have an agents row.
-type policies struct {
-	authz.AgentPolicySource
-	rows map[ids.ID]bool
-}
-
-func (p policies) AgentPolicy(_ context.Context, id ids.ID) (authz.AgentPolicy, bool, error) {
-	return authz.AgentPolicy{BillingMode: "organization"}, p.rows[id], nil
-}
-
 func (s *store) SaveSpaceOperator(ctx context.Context, sp domain.Space) error {
 	return s.MoveSpace(ctx, sp)
 }
@@ -451,10 +449,165 @@ func (s *store) LockInheritingChannels(_ context.Context, space ids.ID) ([]app.C
 	return out, s.fail
 }
 
+// threadStore is the in-memory thread part of store (M1-55): threads with their tags and the
+// unique parent message.
+type threadStore struct {
+	threads    map[ids.ID]domain.Thread
+	threadTags map[ids.ID][]ids.ID
+}
+
+func (s *store) ensureThreads() {
+	if s.threads == nil {
+		s.threads, s.threadTags = map[ids.ID]domain.Thread{}, map[ids.ID][]ids.ID{}
+	}
+}
+
+func (s *store) DeleteTagAssignments(_ context.Context, tag ids.ID) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.ensureThreads()
+	for th, tags := range s.threadTags {
+		s.threadTags[th] = slices.DeleteFunc(tags, func(t ids.ID) bool { return t == tag })
+	}
+	return s.fail
+}
+
+func (s *store) Thread(_ context.Context, id ids.ID) (domain.Thread, bool, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.ensureThreads()
+	th, ok := s.threads[id]
+	return th, ok, s.fail
+}
+
+func (s *store) LockThread(ctx context.Context, id ids.ID) (domain.Thread, bool, error) {
+	return s.Thread(ctx, id)
+}
+
+func (s *store) InsertThread(_ context.Context, th domain.Thread) (domain.Thread, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.ensureThreads()
+	for _, o := range s.threads {
+		if !th.ParentMessageID.IsZero() && o.ParentMessageID == th.ParentMessageID {
+			return domain.Thread{}, errs.New(errs.CodeConflict, "taken")
+		}
+	}
+	s.threads[th.ID] = th
+	return th, s.fail
+}
+
+func (s *store) SaveThread(_ context.Context, th domain.Thread) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.ensureThreads()
+	s.threads[th.ID] = th
+	return s.fail
+}
+
+func (s *store) AppendToThread(_ context.Context, id ids.ID, reopen bool, at time.Time) (domain.Thread, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.ensureThreads()
+	th := s.threads[id]
+	th.LastMessageSeq++
+	th.MessageCount++
+	th.Version++
+	th.LastActivityAt = at
+	if reopen {
+		th.State, th.ClosedAt, th.ClosedBy = domain.ThreadOpen, time.Time{}, ids.ID{}
+	}
+	s.threads[id] = th
+	return th, s.fail
+}
+
+func (s *store) ListThreads(_ context.Context, q app.ThreadQuery) ([]domain.Thread, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.ensureThreads()
+	at := func(th domain.Thread) time.Time {
+		if q.ByCreated {
+			return th.CreatedAt
+		}
+		return th.LastActivityAt
+	}
+	var out []domain.Thread
+	for _, th := range s.threads {
+		switch {
+		case th.ChannelID != q.ChannelID || th.Kind != domain.ThreadKindThread:
+		case q.State != "" && string(th.State) != q.State:
+		case !q.TagID.IsZero() && !slices.Contains(s.threadTags[th.ID], q.TagID):
+		case q.HasAfter && (at(th).After(q.AfterAt) || (at(th).Equal(q.AfterAt) && th.ID.String() >= q.AfterID.String())):
+		default:
+			out = append(out, th)
+		}
+	}
+	slices.SortFunc(out, func(a, b domain.Thread) int {
+		return cmp.Or(at(b).Compare(at(a)), strings.Compare(b.ID.String(), a.ID.String()))
+	})
+	return out[:min(len(out), q.Limit)], s.fail
+}
+
+func (s *store) ThreadTags(_ context.Context, threads []ids.ID) (map[ids.ID][]ids.ID, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.ensureThreads()
+	out := map[ids.ID][]ids.ID{}
+	for _, th := range threads {
+		if tags := s.threadTags[th]; len(tags) > 0 {
+			out[th] = slices.Clone(tags)
+		}
+	}
+	return out, s.fail
+}
+
 func (s *store) ServedTargets(context.Context, ids.ID) ([]app.ServedTarget, error) {
 	return nil, s.fail
 }
 
-func (s *store) Thread(context.Context, ids.ID) (app.ThreadRow, bool, error) {
-	return app.ThreadRow{}, false, s.fail
+func (s *store) ReplaceThreadTags(_ context.Context, thread ids.ID, tags []ids.ID, _ ids.ID, _ time.Time) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.ensureThreads()
+	s.threadTags[thread] = slices.Clone(tags)
+	return s.fail
+}
+
+// policies is an agent policy source that knows no agent.
+type policies struct{}
+
+func (policies) PersonalAgents(context.Context) ([]authz.PersonalAgent, error) { return nil, nil }
+func (policies) AgentPolicy(context.Context, ids.ID) (authz.AgentPolicy, bool, error) {
+	return authz.AgentPolicy{}, false, nil
+}
+func (policies) DevEnvironmentReady(context.Context, ids.ID, ids.ID) (bool, error) { return false, nil }
+
+// storePolicies answers the agent policies of the store.
+type storePolicies struct{ s *store }
+
+func (storePolicies) PersonalAgents(context.Context) ([]authz.PersonalAgent, error) { return nil, nil }
+func (p storePolicies) AgentPolicy(_ context.Context, id ids.ID) (authz.AgentPolicy, bool, error) {
+	p.s.mu.Lock()
+	defer p.s.mu.Unlock()
+	pol, ok := p.s.policies[id]
+	return pol, ok, nil
+}
+func (storePolicies) DevEnvironmentReady(context.Context, ids.ID, ids.ID) (bool, error) {
+	return false, nil
+}
+
+// cursors is a plain codec: the list and binding in hex, then the key as JSON.
+type cursors struct{}
+
+func (cursors) Encode(list string, binding []byte, key any) (string, error) {
+	k, err := json.Marshal(key)
+	return hex.EncodeToString([]byte(list)) + "." + hex.EncodeToString(binding) + "." + string(k), err
+}
+
+func (cursors) Decode(list string, binding []byte, s string, key any) error {
+	prefix := hex.EncodeToString([]byte(list)) + "." + hex.EncodeToString(binding) + "."
+	if !strings.HasPrefix(s, prefix) || json.Unmarshal([]byte(strings.TrimPrefix(s, prefix)), key) != nil {
+		return errs.New(errs.CodeCursorInvalid, "")
+	}
+	return nil
 }

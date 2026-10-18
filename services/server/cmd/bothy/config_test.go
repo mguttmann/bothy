@@ -366,6 +366,8 @@ func TestConfigPrintShowsSourcePerKey(t *testing.T) {
 		"telemetry.pseudonym_key_ref = file:/run/bothy/secrets/telemetry_pseudonym_key  # default\n" +
 		"telemetry.traces.sampler_ratio = 1  # default\n" +
 		"telemetry.traces.trust_remote_parent = false  # default\n" +
+		"thread.max_tags = 5  # default\n" +
+		"thread.placeholder_titles = Neuer Chat, New chat, Chat, Ohne Titel, Untitled, Test  # default\n" +
 		"thread.title_max_chars = 200  # default\n" +
 		"voice.max_duration = 15m  # default\n" +
 		"webhook.delivery_timeout = 15s  # default\n"
