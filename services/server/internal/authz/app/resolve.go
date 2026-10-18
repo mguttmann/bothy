@@ -67,16 +67,28 @@ func (a *Authorizer) resolve(ctx context.Context, act authorize.Action, r author
 	return resolved{path: domain.Path{Kind: domain.PathInstance}}, true, nil
 }
 
-// resolveSpace resolves a space.
+// resolveSpace resolves a space; an archived space caps every level at read (07 section 4.5).
 func (a *Authorizer) resolveSpace(ctx context.Context, id ids.ID) (resolved, bool, error) {
 	if id.IsZero() {
 		return resolved{}, false, internal("space resource without an id")
 	}
 	ok, err := a.structure.Space(ctx, id)
+	if err != nil || !ok {
+		return resolved{}, false, wrapSource(err)
+	}
+	archived, err := a.structure.SpaceArchived(ctx, id)
 	if err != nil {
 		return resolved{}, false, sourceError("structure source", err)
 	}
-	return resolved{path: domain.Path{Kind: domain.PathSpace, SpaceID: id}}, ok, nil
+	return resolved{path: domain.Path{Kind: domain.PathSpace, SpaceID: id, Archived: archived}}, true, nil
+}
+
+// wrapSource wraps a structure source error; nil stays nil.
+func wrapSource(err error) error {
+	if err == nil {
+		return nil
+	}
+	return sourceError("structure source", err)
 }
 
 // resolveChannel resolves a thread or channel and the channel's space.

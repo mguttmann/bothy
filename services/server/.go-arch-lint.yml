@@ -342,6 +342,7 @@ deps:
     mayDependOn: [chat-app, chat, chat-domain, kernel-ports, identity, authz]
   chat-adapters:
     mayDependOn: [chat-adapters, chat, chat-app, chat-domain, kernel-ports, platform-buildinfo, platform-config, platform-egress, platform-health, platform-httpserver, platform-jobs, platform-jsoncanon, platform-lifecycle, platform-otel, platform-pg, platform-ratelimit, platform-secrets, api, identity, authz]
+    canUse: [v-pgx]
   agents:
     mayDependOn: [agents, kernel-ports]
   agents-domain:

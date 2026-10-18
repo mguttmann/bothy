@@ -592,13 +592,15 @@ func triggerWorld(ctx context.Context, store Store, principals authz.PrincipalSo
 	return w, nil
 }
 
-// structureView is the structure read once per phase: the channel paths and the spaces.
+// structureView is the structure read once per phase: the channel paths and the space paths.
 type structureView struct {
 	channels []domain.Path
-	spaces   []ids.ID
+	spaces   []domain.Path
 }
 
-// structureNow reads the channels and spaces from the structure source.
+// structureNow reads the channels and spaces from the structure source; a space path carries
+// whether the space is archived, so archiving it changes the levels of the view (07 section 4.5
+// point 3).
 func (h *RightsHook) structureNow(ctx context.Context) (structureView, error) {
 	chans, err := h.d.Structure.Channels(ctx)
 	if err != nil {
@@ -608,7 +610,14 @@ func (h *RightsHook) structureNow(ctx context.Context) (structureView, error) {
 	if err != nil {
 		return structureView{}, sourceError("structure source", err)
 	}
-	w := structureView{spaces: spaces}
+	w := structureView{}
+	for _, id := range spaces {
+		archived, err := h.d.Structure.SpaceArchived(ctx, id)
+		if err != nil {
+			return structureView{}, sourceError("structure source", err)
+		}
+		w.spaces = append(w.spaces, domain.Path{Kind: domain.PathSpace, SpaceID: id, Archived: archived})
+	}
 	for _, c := range chans {
 		w.channels = append(w.channels, channelPath(c))
 	}

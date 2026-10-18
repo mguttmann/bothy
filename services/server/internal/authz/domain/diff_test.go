@@ -11,12 +11,20 @@ import (
 )
 
 func view(spaces []ids.ID, chans map[ids.ID]domain.Rights) domain.AccessView {
-	v := domain.AccessView{Spaces: map[ids.ID]bool{}, Channels: map[ids.ID]domain.Rights{}}
+	v := domain.AccessView{Spaces: map[ids.ID]bool{}, SpaceLevels: map[ids.ID]domain.Level{}, Channels: map[ids.ID]domain.Rights{}}
 	for _, s := range spaces {
 		v.Spaces[s] = true
 	}
 	for id, r := range chans {
 		v.Channels[id] = r
+	}
+	return v
+}
+
+// leveled sets the levels on the spaces themselves (pairs of space and level) in v.
+func leveled(v domain.AccessView, pairs ...any) domain.AccessView {
+	for i := 0; i+1 < len(pairs); i += 2 {
+		v.SpaceLevels[pairs[i].(ids.ID)] = pairs[i+1].(domain.Level)
 	}
 	return v
 }
@@ -53,6 +61,9 @@ func TestDiffVisible_Table(t *testing.T) {
 			domain.PrincipalDiff{Added: []domain.AccessEntry{
 				{Kind: domain.AccessKindChannel, ID: c1, Level: domain.LevelRead}, {Kind: domain.AccessKindChannel, ID: c2, Level: domain.LevelRead},
 				{Kind: domain.AccessKindChannel, ID: c3, Level: domain.LevelRead}, sp(sp1), sp(sp2)}}},
+		{"space level changed", leveled(view([]ids.ID{sp1, sp2}, nil), sp1, domain.LevelTrigger, sp2, domain.LevelRead),
+			leveled(view([]ids.ID{sp1, sp2}, nil), sp1, domain.LevelRead, sp2, domain.LevelRead),
+			domain.PrincipalDiff{Changed: []domain.AccessEntry{{Kind: domain.AccessKindSpace, ID: sp1, Level: domain.LevelRead, PreviousLevel: domain.LevelTrigger}}}},
 		{"empty difference", view([]ids.ID{sp1}, map[ids.ID]domain.Rights{c1: write}), view([]ids.ID{sp1}, map[ids.ID]domain.Rights{c1: write}), domain.PrincipalDiff{}},
 	}
 	for _, c := range cases {
@@ -82,8 +93,31 @@ func TestAccessViewOf(t *testing.T) {
 		{Kind: domain.PathChannel, SpaceID: sp1, ChannelID: c1},
 		{Kind: domain.PathChannel, SpaceID: sp2, ChannelID: c2},
 	}
-	v := domain.AccessViewOf(snap, domain.KindUser, alexID, paths, []ids.ID{sp1, sp2})
+	v := domain.AccessViewOf(snap, domain.KindUser, alexID, paths, []domain.Path{{Kind: domain.PathSpace, SpaceID: sp1}, {Kind: domain.PathSpace, SpaceID: sp2}})
 	if !reflect.DeepEqual(v, view([]ids.ID{sp1}, map[ids.ID]domain.Rights{c1: {Level: domain.LevelWrite, Caps: domain.CapsOf(domain.CapUpload)}})) {
 		t.Fatalf("view %+v", v)
+	}
+}
+
+// TestAccessViewOf_SpaceLevels: a grant on a space gives its level in SpaceLevels, capped at read
+// in an archived space (07 section 4.5 point 3, M1-52); a space seen only through a channel has
+// no level there.
+func TestAccessViewOf_SpaceLevels(t *testing.T) {
+	t.Parallel()
+	sp1, sp2, c1 := ids.New(), ids.New(), ids.New()
+	snap := domain.BuildSnapshot(domain.SnapshotInput{PrincipalID: alexID, At: t0, Active: true, Grants: []domain.Grant{
+		grantOn(t, domain.Subject{Kind: domain.SubjectUser, PrincipalID: alexID}, domain.Target{Kind: domain.TargetSpace, SpaceID: sp2}, domain.LevelTrigger, 0, t0.Add(1)),
+		grantOn(t, domain.Subject{Kind: domain.SubjectUser, PrincipalID: alexID}, domain.Target{Kind: domain.TargetChannel, ChannelID: c1}, domain.LevelRead, 0, t0.Add(1)),
+	}})
+	paths := []domain.Path{{Kind: domain.PathChannel, SpaceID: sp1, ChannelID: c1}}
+	spaces := []domain.Path{{Kind: domain.PathSpace, SpaceID: sp1}, {Kind: domain.PathSpace, SpaceID: sp2}}
+	v := domain.AccessViewOf(snap, domain.KindUser, alexID, paths, spaces)
+	if !reflect.DeepEqual(v.SpaceLevels, map[ids.ID]domain.Level{sp2: domain.LevelTrigger}) || !v.Spaces[sp1] || !v.Spaces[sp2] {
+		t.Fatalf("view %+v", v)
+	}
+	spaces[1].Archived = true
+	v = domain.AccessViewOf(snap, domain.KindUser, alexID, paths, spaces)
+	if !reflect.DeepEqual(v.SpaceLevels, map[ids.ID]domain.Level{sp2: domain.LevelRead}) {
+		t.Fatalf("archived view %+v", v)
 	}
 }

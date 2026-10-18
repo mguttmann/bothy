@@ -9,7 +9,8 @@ type AccessTargetKind string
 
 // The kinds of AccessTarget. host comes with M2-39 (the terminal right).
 const (
-	// AccessSpace is a space: it only appears or disappears, never changes.
+	// AccessSpace is a space: it appears or disappears, and it changes with its level when the
+	// level on the space itself changes (archiving, M1-52).
 	AccessSpace AccessTargetKind = "space"
 	// AccessChannel is a channel with its level and capabilities.
 	AccessChannel AccessTargetKind = "channel"
@@ -23,7 +24,8 @@ type AccessTarget struct {
 	// Kind and ID name the target.
 	Kind AccessTargetKind
 	ID   ids.ID
-	// Level is the new effective level of a channel (added and changed); empty otherwise.
+	// Level is the new effective level of a channel (added and changed) or of a space (changed);
+	// empty otherwise.
 	Level string
 	// PreviousLevel is the level before the change (changed only).
 	PreviousLevel string

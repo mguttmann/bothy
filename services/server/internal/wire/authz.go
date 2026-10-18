@@ -14,6 +14,7 @@ import (
 	authzpg "github.com/OWNER/bothy/services/server/internal/authz/adapters/postgres"
 	"github.com/OWNER/bothy/services/server/internal/authz/adapters/telemetry"
 	authzapp "github.com/OWNER/bothy/services/server/internal/authz/app"
+	"github.com/OWNER/bothy/services/server/internal/chat"
 	"github.com/OWNER/bothy/services/server/internal/identity"
 	identitypg "github.com/OWNER/bothy/services/server/internal/identity/adapters/postgres"
 	identityapp "github.com/OWNER/bothy/services/server/internal/identity/app"
@@ -33,8 +34,9 @@ const msgRegistrationCheckFailed = "registration check failed"
 // moduleRegistrations are the Register(r *authorize.Registry) functions of the module ports, in
 // the order of the module register. In M1 identity registers user.updated (M1-31), authz
 // access.changed (M1-29), grant.changed, group.changed and access.expiring (M1-30) and agents
-// agent.updated (M1-51); each module's ticket appends its function here.
-var moduleRegistrations = []func(*authorize.Registry){identity.Register, authz.Register, agents.Register}
+// agent.updated (M1-51) and chat space.created, space.updated, space.archived and sidebar.updated
+// (M1-52); each module's ticket appends its function here.
+var moduleRegistrations = []func(*authorize.Registry){identity.Register, authz.Register, agents.Register, chat.Register}
 
 // BuildRegistry returns a registry filled by every function of register; nil means the
 // production list of the module ports.
@@ -136,9 +138,9 @@ func AuthzConfig(v *config.Values) (authzapp.AuthorizerConfig, error) {
 // (M1-28), over pool: the PrincipalSource of identity (M1-26), the grant store of authz (M1-27),
 // the rights version of instance (instance.Versions), the recorder of audit (M1-24), the clock and
 // log, the CredentialSource of identity (devices since M1-33, sessions since M1-34, API tokens
-// since M1-44), the agent policy source of agents (M1-51) and the empty structure source until
-// M1-52 to M1-54 (empty_sources.go, ruling D2 of docs/briefs/M1-28-authz-core.md). It opens no
-// connection.
+// since M1-44), the agent policy source of agents (M1-51) and the structure source with the
+// spaces of chat (M1-52) and no channels until M1-53 (NewStructureSource).
+// It opens no connection.
 //
 // Errors: those of authzapp.NewAuthorizer (a cache bound below 1).
 func NewAuthorizer(pool *pg.Pool, cfg authzapp.AuthorizerConfig, cat *authzapp.Catalog, rec auditing.Recorder,
@@ -151,7 +153,7 @@ func NewAuthorizer(pool *pg.Pool, cfg authzapp.AuthorizerConfig, cat *authzapp.C
 		Store:       authzpg.NewRepository(pool),
 		Principals:  identityapp.NewPrincipalSource(identitypg.NewRepository(pool)),
 		Credentials: identityapp.NewCredentialSource(identitypg.NewRepository(pool), identitypg.NewRepository(pool), identitypg.NewRepository(pool)),
-		Structure:   emptyStructure{},
+		Structure:   NewStructureSource(pool),
 		Policies:    NewAgentPolicySource(pool),
 		Versions:    instanceapp.NewVersions(instancepg.NewRepository(pool)),
 		Recorder:    rec,
@@ -165,7 +167,7 @@ var _ authorize.Authorizer = (*authzapp.Authorizer)(nil)
 
 // RightsSources are the source ports of the rights hook that tests may replace; a nil field
 // means the production source: the PrincipalSource of identity, the agent policy source of agents
-// (M1-51) and the empty structure source until M1-54.
+// (M1-51) and the structure source of chat (spaces since M1-52, NewStructureSource).
 type RightsSources struct {
 	Principals authz.PrincipalSource
 	Structure  authz.StructureSource
@@ -183,7 +185,7 @@ func NewRightsHook(pool *pg.Pool, src RightsSources, clk clock.Clock, log *slog.
 		src.Principals = identityapp.NewPrincipalSource(identitypg.NewRepository(pool))
 	}
 	if src.Structure == nil {
-		src.Structure = emptyStructure{}
+		src.Structure = NewStructureSource(pool)
 	}
 	if src.Policies == nil {
 		src.Policies = NewAgentPolicySource(pool)
@@ -258,7 +260,7 @@ type AuthzAdmin struct {
 
 // NewAuthzAdmin builds the Admin use cases over pool (M1-48): the unit of work and the rights hook
 // of the audit step a (the hook must be bound), the Authorizer az (also the manage scope of the
-// lists), the PrincipalSource of identity, the structure source until M1-52 and M1-53 (empty),
+// lists), the PrincipalSource of identity, the structure source of chat (NewStructureSource),
 // the recorder of a, the appender of sy, the cursor codec of platform/httpserver and the clock clk
 // (nil for the system clock). It opens no connection.
 //
@@ -272,7 +274,7 @@ func NewAuthzAdmin(pool *pg.Pool, cfg authzapp.AdminConfig, a *Audit, sy *Sync, 
 	}
 	admin, err := authzapp.NewAdminService(authzapp.AdminDeps{
 		UoW: a.UoW(), Authorizer: az, Store: authzpg.NewRepository(pool),
-		Principals: identityapp.NewPrincipalSource(identitypg.NewRepository(pool)), Structure: emptyStructure{},
+		Principals: identityapp.NewPrincipalSource(identitypg.NewRepository(pool)), Structure: NewStructureSource(pool),
 		Rights: a.RightsHook(), Audit: a.Recorder(), Clock: clk, Events: sy.Appender(), Scopes: az, Cursors: authzhttp.Cursors{},
 		Config: cfg,
 	})

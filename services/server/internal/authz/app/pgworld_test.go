@@ -283,9 +283,11 @@ func (w *pgWorld) seed(t *testing.T) {
 	w.policies.Put(w.texter, authz.AgentPolicy{BillingMode: domain.BillingOrganization, ToolClass: domain.ToolScoped})
 	w.policies.Put(w.runner, authz.AgentPolicy{BillingMode: domain.BillingOrganization, ToolClass: domain.ToolHost})
 	w.policies.Put(w.assistent, authz.AgentPolicy{BillingMode: domain.BillingPersonal, CredentialHolderID: w.owner, ToolClass: domain.ToolScoped})
-	for _, s := range []*ids.ID{&w.support, &w.marketing, &w.engineering, &w.resea} {
+	for i, s := range []*ids.ID{&w.support, &w.marketing, &w.engineering, &w.resea} {
 		*s = ids.New()
 		w.structure.PutSpace(*s)
+		// The spaces row behind the foreign key of grants.target_space_id (M1-52).
+		w.sql(t, `INSERT INTO spaces (id, name, sort_key, created_by) VALUES ($1, $2, $3, $4)`, s.String(), s.String(), "a"+string(rune('0'+i)), w.owner.String())
 	}
 	ch := func(id *ids.ID, space ids.ID, kind authz.ChannelKind, op ids.ID) {
 		*id = ids.New()

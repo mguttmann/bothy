@@ -115,7 +115,7 @@ modules:
     ephemeral_events: []
     ws_ops: []
     depends_on: [identity, authz]
-    adapter_vendors: []
+    adapter_vendors: [pgx]   # sqlc code and the repository (M1-52)
   agents:
     tables: [agents, agent_consumer_cursors, commands, agent_sessions, dev_environments]
     actions: [agent.read, agent.create, agent.update, agent.disable, agent.enable,

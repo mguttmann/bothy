@@ -12,6 +12,7 @@ enabled:             # operationIds that have a handler; sorted ascending
   - addOwner
   - approveDevice
   - approvePairing
+  - archiveSpace
   - beginEnrollment
   - beginIdentityLink
   - beginOidcLogin
@@ -32,6 +33,7 @@ enabled:             # operationIds that have a handler; sorted ascending
   - createGrant
   - createGroup
   - createIdentityProvider
+  - createSpace
   - createStepUpChallenge
   - createToken
   - createUser
@@ -55,6 +57,7 @@ enabled:             # operationIds that have a handler; sorted ascending
   - getMe
   - getMyCredentials
   - getProblemType
+  - getSpace
   - getUser
   - getUserCredentials
   - handleOidcCallback
@@ -69,15 +72,18 @@ enabled:             # operationIds that have a handler; sorted ascending
   - listMyDevices
   - listMySessions
   - listOwners
+  - listSpaces
   - listTokens
   - listUserDevices
   - listUserSessions
   - listUsers
   - loginWithTrustedHeader
   - logout
+  - moveSpace
   - previewGrant
   - putFeatureFlag
   - putInstanceSetting
+  - putMySidebarSpace
   - redeemEnrollmentCode
   - refreshToken
   - removeGroupMember
@@ -98,6 +104,7 @@ enabled:             # operationIds that have a handler; sorted ascending
   - updateGroup
   - updateIdentityProvider
   - updateMyProfile
+  - updateSpace
   - updateUser
   - verifyAuditChain
   - viewAsUser
@@ -123,9 +130,6 @@ later:               # every other operationId of docs/api/openapi.yaml; sorted 
   - operation_id: archiveChannel
     milestone: M1
     ticket: M1-53
-  - operation_id: archiveSpace
-    milestone: M1
-    ticket: M1-52
   - operation_id: attachTerminalSession
     milestone: M2
     ticket: M2-44
@@ -209,9 +213,6 @@ later:               # every other operationId of docs/api/openapi.yaml; sorted 
   - operation_id: createQuietHoursRule
     milestone: M3
     ticket: M3-18
-  - operation_id: createSpace
-    milestone: M1
-    ticket: M1-52
   - operation_id: createStatusComponent
     milestone: M7
     ticket: M7-09
@@ -348,9 +349,6 @@ later:               # every other operationId of docs/api/openapi.yaml; sorted 
   - operation_id: getSnapshot
     milestone: M1
     ticket: M1-63
-  - operation_id: getSpace
-    milestone: M1
-    ticket: M1-52
   - operation_id: getStatsBackends
     milestone: M6
     ticket: M6-14
@@ -488,9 +486,6 @@ later:               # every other operationId of docs/api/openapi.yaml; sorted 
   - operation_id: listSpaceChannels
     milestone: M1
     ticket: M1-53
-  - operation_id: listSpaces
-    milestone: M1
-    ticket: M1-52
   - operation_id: listTemplates
     milestone: M1
     ticket: M1-60
@@ -521,9 +516,6 @@ later:               # every other operationId of docs/api/openapi.yaml; sorted 
   - operation_id: moveForumTag
     milestone: M1
     ticket: M1-53
-  - operation_id: moveSpace
-    milestone: M1
-    ticket: M1-52
   - operation_id: moveThread
     milestone: M1
     ticket: M1-62
@@ -557,9 +549,6 @@ later:               # every other operationId of docs/api/openapi.yaml; sorted 
   - operation_id: putMySetting
     milestone: M1
     ticket: M1-61
-  - operation_id: putMySidebarSpace
-    milestone: M1
-    ticket: M1-52
   - operation_id: putNotificationPreference
     milestone: M3
     ticket: M3-18
@@ -708,9 +697,6 @@ later:               # every other operationId of docs/api/openapi.yaml; sorted 
   - operation_id: updateMessage
     milestone: M1
     ticket: M1-58
-  - operation_id: updateSpace
-    milestone: M1
-    ticket: M1-52
   - operation_id: updateStatusComponent
     milestone: M7
     ticket: M7-09

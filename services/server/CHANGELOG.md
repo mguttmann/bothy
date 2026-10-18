@@ -83,6 +83,20 @@ documented in this file. The format is based on
   `discordtest` (TLS on `127.0.0.1`, fixture guild, fault injection, token echo, request log)
   is for later import tickets and never reaches the binary.
 
+- Spaces and the sidebar (M1-52): the tables `spaces` and `user_space_states` (migrations
+  `00023_chat_spaces.sql` and `00024_grants_space_fk_validate.sql`, which also give
+  `grants.target_space_id` its foreign key) and the operations `listSpaces`, `createSpace`,
+  `getSpace`, `updateSpace` (If-Match), `moveSpace`, `archiveSpace` and `putMySidebarSpace`.
+  The global order is a fractional index (`chat/domain/fracindex`), so a move writes one row;
+  create and move serialise on an order lock. Colour and icon accept only keys of the design
+  system, names are trimmed, limited by the new key `space.name_max_chars`, free of control and
+  bidi characters and unique case-insensitively among spaces that are not archived. Archiving is
+  final and a rights change: every level in the space is capped at `read` (owners included),
+  `access.changed` reports the space at level `read` to everyone above it, `SpaceArchived` is
+  published, the space leaves `listSpaces` and refuses management changes with `409`. The
+  sidebar row of a person (collapsed, own order) is last write wins with `sidebar.updated` to
+  the person. `chat` is now the space part of the structure source of authz, and `SpaceView`
+  reports the caller's effective level and capabilities.
 - Device approval and pairing (M1-38): a device that logs in without an enrollment code stays
   `pending` with tokens but no access beyond reading itself and shows a verification code
   derived from the token pepper, its id and its DPoP key (never stored). `approveDevice` (owner or

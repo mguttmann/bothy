@@ -104,6 +104,7 @@ func TestConfigSchemaBuilds(t *testing.T) {
 		"auth.step_up_max_age":                 {Kind: config.KindDuration, Default: "5m", Min: "1s", Chapter: "03-data-model.md"},
 		"group.name_max_chars":                 {Kind: config.KindInt, Default: "100", Min: "1", Chapter: "03-data-model.md"},
 		"group.description_max_chars":          {Kind: config.KindInt, Default: "500", Min: "1", Chapter: "03-data-model.md"},
+		"space.name_max_chars":                 {Kind: config.KindInt, Default: "100", Min: "1", Chapter: "03-data-model.md"},
 		"egress.allowed_hosts":                 {Kind: config.KindStringList, Default: "", Chapter: "19-security.md"},
 		"egress.timeout":                       {Kind: config.KindDuration, Default: "15s", Min: "1ms", Chapter: "19-security.md"},
 		"egress.max_response_bytes":            {Kind: config.KindInt, Default: "1048576", Min: "1", Chapter: "19-security.md"},

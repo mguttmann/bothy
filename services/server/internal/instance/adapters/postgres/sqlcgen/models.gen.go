@@ -394,6 +394,19 @@ type ServerSigningKey struct {
 	NotAfter      pgtype.Timestamptz
 }
 
+type Space struct {
+	ID                     pgtype.UUID
+	Name                   string
+	Icon                   pgtype.Text
+	Color                  pgtype.Text
+	SortKey                string
+	DefaultOperatorAgentID pgtype.UUID
+	CreatedBy              pgtype.UUID
+	CreatedAt              pgtype.Timestamptz
+	ArchivedAt             pgtype.Timestamptz
+	Version                int64
+}
+
 type User struct {
 	PrincipalID  pgtype.UUID
 	Email        pgtype.Text
@@ -412,4 +425,14 @@ type UserIdentity struct {
 	LinkedAt    pgtype.Timestamptz
 	LastLoginAt pgtype.Timestamptz
 	UnlinkedAt  pgtype.Timestamptz
+}
+
+type UserSpaceState struct {
+	UserID            pgtype.UUID
+	SpaceID           pgtype.UUID
+	Collapsed         bool
+	SortKey           pgtype.Text
+	Version           int64
+	UpdatedByDeviceID pgtype.UUID
+	UpdatedAt         pgtype.Timestamptz
 }

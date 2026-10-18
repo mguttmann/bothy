@@ -21,16 +21,20 @@ const (
 type AccessView struct {
 	// Spaces are the visible spaces: read on the space or on one of its channels.
 	Spaces map[ids.ID]bool
+	// SpaceLevels are the effective levels on the spaces with at least read on the space itself;
+	// a space visible only through a channel has no entry (M1-52: archiving a space changes them).
+	SpaceLevels map[ids.ID]Level
 	// Channels are the channels with at least read, with level and capabilities (Owner unused).
 	Channels map[ids.ID]Rights
 }
 
 // AccessViewOf returns the view of the principal with snapshot s and kind over channels (the
-// paths of every channel that is not a dm channel) and spaces (every space). A channel is visible
-// with level read or more; a space with read on itself or a visible channel in it (07 section
-// 7.2). dm channels are not part of the view: rights changes never change dm participation.
-func AccessViewOf(s Snapshot, kind string, principal ids.ID, channels []Path, spaces []ids.ID) AccessView {
-	v := AccessView{Spaces: map[ids.ID]bool{}, Channels: map[ids.ID]Rights{}}
+// paths of every channel that is not a dm channel) and spaces (the paths of every space, with
+// Archived set for an archived one). A channel is visible with level read or more; a space with
+// read on itself or a visible channel in it (07 section 7.2). dm channels are not part of the
+// view: rights changes never change dm participation.
+func AccessViewOf(s Snapshot, kind string, principal ids.ID, channels []Path, spaces []Path) AccessView {
+	v := AccessView{Spaces: map[ids.ID]bool{}, SpaceLevels: map[ids.ID]Level{}, Channels: map[ids.ID]Rights{}}
 	for _, p := range channels {
 		if p.DM || p.Kind != PathChannel {
 			continue
@@ -44,9 +48,13 @@ func AccessViewOf(s Snapshot, kind string, principal ids.ID, channels []Path, sp
 			v.Spaces[p.SpaceID] = true
 		}
 	}
-	for _, id := range spaces {
-		if Effective(s, kind, principal, Path{Kind: PathSpace, SpaceID: id}).Level >= LevelRead {
-			v.Spaces[id] = true
+	for _, p := range spaces {
+		if p.Kind != PathSpace || p.SpaceID.IsZero() {
+			continue
+		}
+		if l := Effective(s, kind, principal, p).Level; l >= LevelRead {
+			v.Spaces[p.SpaceID] = true
+			v.SpaceLevels[p.SpaceID] = l
 		}
 	}
 	return v
@@ -74,10 +82,11 @@ func (d PrincipalDiff) Empty() bool {
 	return len(d.Added) == 0 && len(d.Removed) == 0 && len(d.Changed) == 0
 }
 
-// DiffVisible returns the difference from before to after (04 section 8.2): spaces only appear or
-// disappear; channels appear with level and capabilities, disappear with kind and id, and change
-// when level or capabilities differ, with the new level, the previous level and the new
-// capabilities.
+// DiffVisible returns the difference from before to after (04 section 8.2): spaces appear and
+// disappear with kind and id, and change with the new and the previous level when the level on the
+// space itself differs in both views (archiving a space, M1-52); channels appear with level and
+// capabilities, disappear with kind and id, and change when level or capabilities differ, with
+// the new level, the previous level and the new capabilities.
 //
 // Example:
 //
@@ -99,6 +108,16 @@ func DiffVisible(before, after AccessView) PrincipalDiff {
 			d.Removed = append(d.Removed, AccessEntry{Kind: AccessKindChannel, ID: id})
 		}
 	}
+	diffSpaces(before, after, &d)
+	for _, l := range []*[]AccessEntry{&d.Added, &d.Removed, &d.Changed} {
+		slices.SortFunc(*l, func(a, b AccessEntry) int { return cmp.Or(cmp.Compare(a.Kind, b.Kind), compareIDs(a.ID, b.ID)) })
+	}
+	return d
+}
+
+// diffSpaces adds the space entries of the difference from before to after to d: added and
+// removed spaces with kind and id, and changed spaces whose own level differs in both views.
+func diffSpaces(before, after AccessView, d *PrincipalDiff) {
 	for id := range after.Spaces {
 		if !before.Spaces[id] {
 			d.Added = append(d.Added, AccessEntry{Kind: AccessKindSpace, ID: id})
@@ -109,8 +128,9 @@ func DiffVisible(before, after AccessView) PrincipalDiff {
 			d.Removed = append(d.Removed, AccessEntry{Kind: AccessKindSpace, ID: id})
 		}
 	}
-	for _, l := range []*[]AccessEntry{&d.Added, &d.Removed, &d.Changed} {
-		slices.SortFunc(*l, func(a, b AccessEntry) int { return cmp.Or(cmp.Compare(a.Kind, b.Kind), compareIDs(a.ID, b.ID)) })
+	for id, l := range after.SpaceLevels {
+		if old, ok := before.SpaceLevels[id]; ok && old != l {
+			d.Changed = append(d.Changed, AccessEntry{Kind: AccessKindSpace, ID: id, Level: l, PreviousLevel: old})
+		}
 	}
-	return d
 }

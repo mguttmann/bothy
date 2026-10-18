@@ -79,6 +79,15 @@ func (e env) principal(t *testing.T, kind, handle string) ids.ID {
 	return id
 }
 
+// space inserts a spaces row created by by, the target of the foreign key of
+// grants.target_space_id (M1-52), and returns its id.
+func (e env) space(t *testing.T, by ids.ID) ids.ID {
+	t.Helper()
+	id := ids.New()
+	e.mustExec(t, `INSERT INTO spaces (id, name, sort_key, created_by) VALUES ($1, $2, 'a0', $3)`, id.String(), id.String(), by.String())
+	return id
+}
+
 func (e env) group(t *testing.T, name string, by ids.ID) domain.Group {
 	t.Helper()
 	g, err := domain.NewGroup(ids.New(), name, "", limits, by, t0)
@@ -158,7 +167,7 @@ func TestGrantChecks(t *testing.T) {
 		level            any
 		caps             []string
 	}
-	space, channel, host := ids.New().String(), ids.New().String(), ids.New().String()
+	space, channel, host := e.space(t, alex).String(), ids.New().String(), ids.New().String()
 	for _, tt := range []struct {
 		name       string
 		r          row
@@ -213,7 +222,7 @@ func TestGrantImmutable(t *testing.T) {
 	alex := e.principal(t, "user", "alex")
 	sam := e.principal(t, "user", "sam")
 	g, err := domain.NewGrant(ids.New(), domain.Subject{Kind: domain.SubjectUser, PrincipalID: sam},
-		domain.Target{Kind: domain.TargetSpace, SpaceID: ids.New()}, domain.LevelRead, 0, t0.Add(48*time.Hour), "support rotation", alex, t0)
+		domain.Target{Kind: domain.TargetSpace, SpaceID: e.space(t, alex)}, domain.LevelRead, 0, t0.Add(48*time.Hour), "support rotation", alex, t0)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -438,7 +447,7 @@ func TestStoreRoundTrip(t *testing.T) {
 		return g
 	}
 	samS := domain.Subject{Kind: domain.SubjectUser, PrincipalID: sam}
-	space := domain.Target{Kind: domain.TargetSpace, SpaceID: ids.New()}
+	space := domain.Target{Kind: domain.TargetSpace, SpaceID: e.space(t, alex)}
 	g1 := mustGrant(samS, space, domain.LevelWrite, caps(t, "upload", "export"), t0.Add(24*time.Hour))
 	g2 := mustGrant(samS, domain.Target{Kind: domain.TargetInstance}, domain.LevelRead, 0, time.Time{})
 	g3 := mustGrant(samS, domain.Target{Kind: domain.TargetHost, HostID: ids.New()}, domain.LevelNone, caps(t, "terminal"), time.Time{})
