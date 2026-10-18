@@ -14,7 +14,7 @@ import (
 // The test build (tag contract_validate) validates every response of the public listener against
 // docs/api/openapi.yaml (G8, docs/spec/06-api.md "Contract tests and gate"); the production build
 // has no such file and no reference to contractcheck.
-func init() { responseCheck = installContractCheck }
+func init() { responseCheck, keepResponses = installContractCheck, true }
 
 // installContractCheck wraps h with G8 over the request validator of c: the same parsed contract
 // and the operations mounted on c, so the check costs no second build of the contract. A chain

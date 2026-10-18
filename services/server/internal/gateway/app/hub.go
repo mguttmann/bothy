@@ -278,8 +278,11 @@ func (h *Hub) Dispatch(ctx context.Context, ev sync.Event) {
 		h.structureChanged(ctx, ev)
 	}
 	enc := &encoded{ev: ev}
+	// One structure scope per event: the checks of every candidate read the thread and channel of
+	// the event once instead of once per connection (M1-72, perf.fanout_local_p99).
+	scoped := authorize.WithStructureScope(ctx)
 	for _, m := range h.candidates(ev) {
-		h.deliver(ctx, m, ev, enc)
+		h.deliver(scoped, m, ev, enc)
 	}
 	h.advance(ctx, ev.Seq)
 }

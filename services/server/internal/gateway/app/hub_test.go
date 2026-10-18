@@ -323,3 +323,33 @@ func TestHub_AdmitErrorClosesResumable(t *testing.T) {
 		t.Fatalf("close %d, frames %v; want 4000 and no frame after the failed check", code, got)
 	}
 }
+
+// TestHub_OneStructureScopePerEvent: the checks of every connection for one live event share one
+// structure memo, and the next event gets a new one, so the thread and channel of an event are
+// read once per event instead of once per connection (perf.fanout_local_p99, M1-72).
+func TestHub_OneStructureScopePerEvent(t *testing.T) {
+	t.Parallel()
+	w := newHubWorld()
+	support := ids.New()
+	allgemein := w.channel(support)
+	alex, sam := person(), person()
+	w.grantChannel(alex.ID, allgemein)
+	w.grantChannel(sam.ID, allgemein)
+	h := newHub(t, w, hubCfg)
+	connect(t, h, alex, 100, 0, 0)
+	connect(t, h, sam, 100, 0, 0)
+	h.Dispatch(context.Background(), msg(1, support, allgemein))
+	h.Dispatch(context.Background(), msg(2, support, allgemein))
+	w.mu.Lock()
+	defer w.mu.Unlock()
+	first, second := w.memos[1], w.memos[2]
+	if len(first) != 2 || len(second) != 2 {
+		t.Fatalf("structure memos per event: %d and %d, want one per connection", len(first), len(second))
+	}
+	if first[0] != first[1] || second[0] != second[1] {
+		t.Error("the connections of one event did not share the structure memo")
+	}
+	if first[0] == second[0] {
+		t.Error("two events shared a structure memo")
+	}
+}

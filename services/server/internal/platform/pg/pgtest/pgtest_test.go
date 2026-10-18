@@ -7,9 +7,12 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
+	"strconv"
 	"strings"
 	"testing"
 	"testing/fstest"
+
+	"github.com/moby/moby/api/types/network"
 
 	"github.com/OWNER/bothy/services/server/internal/platform/pg"
 	"github.com/OWNER/bothy/services/server/internal/platform/testkit"
@@ -78,7 +81,7 @@ func TestPgtestBindsLoopbackOnly(t *testing.T) {
 func TestNewRequiresMain(t *testing.T) {
 	// Not parallel: it switches the package state that New reads.
 	setActive(false)
-	_, err := sharedCluster(false)
+	_, err := sharedCluster(clusterKey{})
 	setActive(true)
 	if err == nil || !strings.Contains(err.Error(), "pgtest.Main") {
 		t.Fatalf("New without Main: error %v, want one naming pgtest.Main", err)
@@ -145,7 +148,7 @@ func TestFailedTemplateIsDropped(t *testing.T) {
 	testkit.Integration(t)
 	t.Parallel()
 	broken := fstest.MapFS{"00001_broken.sql": {Data: []byte("-- +goose Up\nSELECT * FROM no_such_table;\n")}}
-	c, err := sharedCluster(false)
+	c, err := sharedCluster(clusterKey{})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -224,5 +227,45 @@ func TestDurableKeepsDurabilitySettings(t *testing.T) {
 	durable, plain := New(t, Durable(), WithoutMigrations()), New(t, WithoutMigrations())
 	if durable.Config(pg.RoleApp).Port == plain.Config(pg.RoleApp).Port {
 		t.Error("durable and speed databases share one server")
+	}
+}
+
+// TestRestartKeepsHostPort: a durable database survives a restart of its container on the same
+// loopback host port with its data, and a database with Limits runs with those container limits.
+func TestRestartKeepsHostPort(t *testing.T) {
+	t.Parallel()
+	db := New(t, WithoutMigrations(), Durable(), Limits(1, 512<<20))
+	ctx := context.Background()
+	before := db.Config(pg.RoleOwner).Port
+	owner := db.Pool(t, pg.RoleOwner)
+	if _, err := owner.Exec(ctx, "CREATE TABLE kept (n int); INSERT INTO kept VALUES (7)"); err != nil {
+		t.Fatal(err)
+	}
+	info, err := db.c.ctr.Inspect(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if info.HostConfig.NanoCPUs != 1e9 || info.HostConfig.Memory != 512<<20 {
+		t.Errorf("limits: %d nano CPUs, %d bytes; want 1e9 and %d", info.HostConfig.NanoCPUs, info.HostConfig.Memory, 512<<20)
+	}
+	if err := db.Restart(ctx); err != nil {
+		t.Fatal(err)
+	}
+	if after := db.Config(pg.RoleOwner).Port; after != before {
+		t.Fatalf("host port %d after the restart, want %d", after, before)
+	}
+	conn := db.SuperConn(t)
+	var n int
+	if err := conn.QueryRow(ctx, "SELECT n FROM kept").Scan(&n); err != nil || n != 7 {
+		t.Fatalf("data after the restart: %d, %v", n, err)
+	}
+	info, err = db.c.ctr.Inspect(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, b := range info.NetworkSettings.Ports[network.MustParsePort("5432/tcp")] {
+		if b.HostIP.String() != "127.0.0.1" || b.HostPort != strconv.Itoa(before) {
+			t.Errorf("published %s:%s after the restart, want 127.0.0.1:%d", b.HostIP, b.HostPort, before)
+		}
 	}
 }

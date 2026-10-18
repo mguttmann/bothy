@@ -90,6 +90,26 @@ repeatable. Basis: [02-architecture.md](../spec/02-architecture.md), section 17,
 - Test of the tool: the modes `match`, `emulated` and `below` result from fixed
   example machines; a run in mode `below` or with `synchronous_commit = off` does not end green;
   `results.json` names the mode (build ticket M1-72).
+- Built by M1-72: `make perf` measures every M1 target of 02 section 17 on the profile of
+  point 3: `perf.message_create_p99` under `perf.sustained_messages_per_s`
+  (`TestPerf_MessageCreateP99`), `perf.fanout_local_p99` (`TestPerf_FanoutLocalP99`),
+  `perf.catchup_page_p99` with a fractional and a large visible set (`TestPerf_CatchupPageP99`,
+  `TestPerf_CatchupPageP99LargeVisibleSet`), `perf.authorize_cached_p99`
+  (`TestPerf_AuthorizeCachedP99` over `BenchmarkAuthorizeCached`), `perf.ws_connections_per_node`
+  and `perf.ws_idle_conn_mem_max` (`TestPerf_WSConnectionsPerNode`), `perf.startup_ready_max` and
+  `perf.idle_rss_max` (`TestPerf_StartupReadyAndIdleRSS`), and `perf.event_commit_min_per_s`
+  (`TestEventCommitThroughput`). One results file `.cache/perf/results.json` holds value,
+  threshold, comparison and pass per target, the profile with its mode and the durability settings;
+  `perfreport` prints the table and exits non-zero on a miss (`TestExitFailsOnMissedTarget`).
+- The modes come from fixture hosts in `TestProfileModes`; the container runtime of the database
+  counts as well, so a large host whose Docker VM is below the profile is `below`.
+  `TestProfileRejectsNonDurable` shows that a run with `fsync = off` or `synchronous_commit = off`
+  does not end green although every target passes.
+- Chaos tests of the event path (M1-72, `services/server/test/chaos`): `TestChaos_ListenConnectionLoss`,
+  `TestChaos_DatabaseRestartDuringTail` and `TestChaos_SigkillDuringCommit` check under load that
+  `seq` stays gapless, the counter equals its maximum, every acknowledged message exists once with
+  one `message.created`, no idempotency key stays `in_progress`, the audit chain is valid and every
+  receiver gets every event once in order.
 - Exit criterion of every milestone ([PLAN.md](../PLAN.md), section 4, item 3).
 
 ## Pros and Cons of the Options
@@ -127,3 +147,8 @@ repeatable. Basis: [02-architecture.md](../spec/02-architecture.md), section 17,
 - Related: ADR 0004 (modular monolith), ADR 0009 (event log), ADR 0038 (local gates).
 - Further performance targets of the server core (`perf.*` in 02, section 22) run in the same
   `make perf` (build ticket M1-72); this ADR justifies the form with its most important target.
+- M1-72 measures every target of M1 in `make perf` with the same rules: thresholds only from the
+  table of 02, one tag `perf` for load and chaos tests, packages one after another, durable
+  databases only. The modes `match` and `emulated` are evidence; `below` prints the values as not
+  proven. `services/server/perf/README.md` names each test, its parameters and how to read the
+  table; the milestone-close run on the reference host is an owner operation.

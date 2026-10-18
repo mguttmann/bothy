@@ -21,6 +21,8 @@ type catchAuthz struct {
 	allowed map[ids.ID]bool
 	checks  int
 	filters int
+	// memos records the structure memo of every receive check (M1-72).
+	memos []*authorize.RequestMemo
 }
 
 func (f *catchAuthz) Authorize(ctx context.Context, _ authorize.Principal, a authorize.Action, r authorize.Resource) (authorize.Decision, error) {
@@ -31,6 +33,8 @@ func (f *catchAuthz) Authorize(ctx context.Context, _ authorize.Principal, a aut
 	if authorize.IsFilter(ctx) {
 		f.filters++
 	}
+	m, _ := authorize.StructureMemoFrom(ctx)
+	f.memos = append(f.memos, m)
 	if f.allowed[r.ChannelID] {
 		return authorize.Decision{Outcome: authorize.OutcomeAllow}, nil
 	}
@@ -195,5 +199,32 @@ func TestCatchUpPageLimit(t *testing.T) {
 		if err != nil || log.query.Limit != 4 || page.NextCursor != 4 || len(page.Events) != 0 {
 			t.Fatalf("limit %d: %+v %v (query limit %d)", limit, page, err, log.query.Limit)
 		}
+	}
+}
+
+// TestCatchUpPageOneStructureScope: the receive checks of one page share one structure memo and
+// the next page gets a new one, so a page reads the thread and channel of its events once each
+// instead of once per event (perf.catchup_page_p99, M1-72).
+func TestCatchUpPageOneStructureScope(t *testing.T) {
+	t.Parallel()
+	ch := ids.New()
+	log := &catchLog{min: 1}
+	for i := int64(1); i <= 6; i++ {
+		log.events = append(log.events, sync.Event{Seq: i, ID: ids.New(), Type: "message.created", SchemaVersion: 1, ChannelID: ch,
+			ResourceKind: "message", ResourceID: ids.New(), ReceiveAction: "message.read"})
+	}
+	az := &catchAuthz{allowed: map[ids.ID]bool{ch: true}}
+	s := newCatchUp(t, log, az, 6, 3)
+	ctx := actor.WithActor(context.Background(), actor.Actor{ID: ids.New(), Kind: actor.KindUser})
+	for _, after := range []int64{0, 3} {
+		if _, err := s.Page(ctx, sync.PageInput{After: after, Head: 6, Limit: 3}); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if len(az.memos) != 6 || az.memos[0] == nil {
+		t.Fatalf("%d checks, first memo %p; want 6 checks in a structure scope", len(az.memos), az.memos[0])
+	}
+	if az.memos[0] != az.memos[2] || az.memos[3] != az.memos[5] || az.memos[0] == az.memos[3] {
+		t.Error("want one structure memo per page")
 	}
 }

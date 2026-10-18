@@ -200,6 +200,8 @@ type hubWorld struct {
 	fail  int
 	// admitFail makes Admit answer unavailable for these seqs (a database that is briefly gone).
 	admitFail map[int64]bool
+	// memos records, per seq, the structure memo of every Admit of the event.
+	memos map[int64][]*authorize.RequestMemo
 	// pageModes records, per catch-up page, whether its context was in delivery mode and
 	// the request memo it carried.
 	pageModes []pageMode
@@ -367,10 +369,16 @@ func (w *hubWorld) PageEvents(ctx context.Context, in sync.PageInput) (sync.Even
 	return page, nil
 }
 
-// Admit is the admission rule of the world.
-func (w *hubWorld) Admit(_ context.Context, a actor.Actor, ev sync.Event) (bool, error) {
+// Admit is the admission rule of the world; it records the structure memo of each check.
+func (w *hubWorld) Admit(ctx context.Context, a actor.Actor, ev sync.Event) (bool, error) {
 	w.mu.Lock()
 	defer w.mu.Unlock()
+	if m, ok := authorize.StructureMemoFrom(ctx); ok {
+		if w.memos == nil {
+			w.memos = map[int64][]*authorize.RequestMemo{}
+		}
+		w.memos[ev.Seq] = append(w.memos[ev.Seq], m)
+	}
 	if w.revoked[a.ID] {
 		return false, errs.New(errs.CodeSessionRevoked, "")
 	}

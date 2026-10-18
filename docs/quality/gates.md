@@ -177,6 +177,26 @@ apps-platform`), there against the CI budget `viz.perf.frame_build_p95_ci`, beca
 reference budget holds on reference hardware only (`make perf` sets
 `BOTHY_PERF_BUDGET=reference`; docs/DECISIONS.md D-M6-12-10). The variable `PERF_HOST` (default `uname -s`) names the host system.
 
+Since M1-72 `make perf` runs the load tests and the chaos tests (`<module>/test/chaos`, same tag)
+one package after another (`go test -p 1`), then `perf/internal/report/perfreport`: it prints the
+profile mode (`match`, `emulated` or `below`, ADR 0063) and one line per target with value,
+threshold, comparison and pass, writes nothing but `.cache/perf/results.json`, and exits non-zero
+when a target is missed or missing, the mode is `below`, or a measured database ran without
+`fsync` or `synchronous_commit`. A failed chaos test fails `make perf` as well.
+`services/server/perf/README.md` describes every test. `make lint` vets and lints the tagged code
+(`go vet` and golangci-lint with the tag `perf` next to `contract_validate,contract_live`), so it
+cannot rot between milestones.
+
+## Not in `make check`
+
+Two targets check the whole system and run only at their occasion, never in `make check`, `gates`
+or the pre-push hook:
+
+| Target | What it checks | When |
+|---|---|---|
+| `perf` | load tests of the performance targets of 02 and the chaos tests of the event path, on `perf.reference_profile` (section above, ADR 0063) | end of a milestone, release, tickets that touch a performance target (PLAN P-07) |
+| `portability` | the whole stack from images on a fresh machine plus the smoke test (`infra/compose/smoke.sh`) | release workflow |
+
 ## Migrations
 
 Flow for the migrations of a Go module (ADR 0007, gate `migrations-lint`):

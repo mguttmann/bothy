@@ -969,6 +969,12 @@ status page. Their state is in the admin console (`backup_runs`) and in the aler
 
 ## 13. Capacity and resources
 
+The measurement is `make perf` (M1-72, ADR 0063): it records the pool occupancy under
+`perf.sustained_messages_per_s` and the growth of the database and its indexes per thousand
+messages in `.cache/perf/results.json`; `services/server/perf/README.md` describes how to read
+them. `database.max_conns` keeps its start value until a run on `perf.reference_profile` (mode
+`match` or `emulated`) confirms or changes it; a run in mode `below` is no evidence for it.
+
 Fixed sizes exist only after the load test: M1-72 confirms or changes `database.max_conns` with
 measured values, M7-18 fills the capacity table. Until then, start values from the configuration
 and this model apply:

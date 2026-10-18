@@ -528,9 +528,22 @@ def test_perf_runs_the_tagged_load_tests(fakes: Fakes) -> None:
     result = fakes.make("perf", "PERF_TIMEOUT=7m", "PERF_HOST=Linux")
     assert result.returncode == 0, result.stderr
     assert "perf: targets hold only on perf.reference_profile" in result.stdout
-    [call] = fakes.calls("go")
-    assert call["args"] == ["test", "-tags", "perf", "-count=1", "-timeout", "7m", "./perf/..."]
-    assert call["cwd"] == str(fakes.module.resolve())
+    # M1-72: load and chaos tests one package after another, then the report of the results file.
+    test, report = fakes.calls("go")
+    assert test["args"] == [
+        "test",
+        "-tags",
+        "perf",
+        "-count=1",
+        "-p",
+        "1",
+        "-timeout",
+        "7m",
+        "./perf/...",
+        "./test/chaos/...",
+    ]
+    assert report["args"] == ["run", "./perf/internal/report/perfreport"]
+    assert test["cwd"] == report["cwd"] == str(fakes.module.resolve())
     assert fakes.make("perf", "PERF_HOST=Linux", FAKE_GO_EXIT="1").returncode != 0
 
 
@@ -745,12 +758,12 @@ def test_go_lint_runs_vet_and_the_pinned_golangci_lint(fakes: Fakes, shell: list
     assert result.returncode == 0, result.stdout + result.stderr
     module = str(fakes.module.resolve())
     assert [(c["args"], c["cwd"]) for c in fakes.calls("go")] == [
-        (["vet", "-tags", "contract_validate,contract_live", "./..."], module)
+        (["vet", "-tags", "contract_validate,contract_live,perf", "./..."], module)
     ]
     [lint] = fakes.calls("golangci-lint")
     assert lint["exe"] == str(fakes.pins / "golangci-lint" / "golangci-lint")
     assert (lint["args"], lint["cwd"]) == (
-        ["run", "--build-tags", "contract_validate,contract_live", "./..."],
+        ["run", "--build-tags", "contract_validate,contract_live,perf", "./..."],
         module,
     )
     assert {c["cwd"] for c in fakes.calls("fetch")} == {str(REPO)}
