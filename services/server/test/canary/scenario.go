@@ -59,8 +59,6 @@ type RunOptions struct {
 	// Defaults starts the server with the harness defaults (no ScenarioConfig), for the rate
 	// limit test.
 	Defaults bool
-	// Env are extra process environment entries of the server.
-	Env []string
 	// Harness changes the harness options after StartRun filled them.
 	Harness func(*harness.Options)
 }
@@ -90,7 +88,7 @@ func StartRun(t testing.TB, o RunOptions) *Run {
 	}
 	redirectStdLoggers(t, NewLineWriter(r.Sinks, SinkLog, "std logger"))
 	opts := harness.Options{
-		Config: cfg, LogWriter: r.Logs, Telemetry: r.Tel, Env: o.Env,
+		Config: cfg, LogWriter: r.Logs, Telemetry: r.Tel,
 		ProofObserver: func(p string) { r.Reg.Register(p, ClassSecret, "", "DPoP proof") },
 	}
 	if o.Harness != nil {
@@ -343,4 +341,13 @@ func (sc *Scenario) FinishObservers() {
 		snap := sc.get(c, "/sync/snapshot", ok...)
 		sc.Sinks.AddJSON(SinkForeign, name+" getSnapshot", name, "", snap.Body)
 	}
+}
+
+// randomSecret returns 32 random bytes as hex (the client secret of the fake provider).
+func randomSecret() string {
+	b := make([]byte, 32)
+	if _, err := rand.Read(b); err != nil {
+		panic(err)
+	}
+	return fmt.Sprintf("%x", b)
 }

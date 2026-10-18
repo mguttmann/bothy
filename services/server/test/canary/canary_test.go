@@ -111,7 +111,8 @@ type scenarioResult struct {
 // runScenario runs the whole scenario once per test binary run and collects every sink.
 func runScenario(t *testing.T) scenarioResult {
 	t.Helper()
-	r := StartRun(t, RunOptions{})
+	idp := NewIDP(t, randomSecret())
+	r := StartRun(t, IDPRunOptions(idp))
 	ctx := t.Context()
 	sc := NewScenario(ctx, r)
 	sc.content()
@@ -119,6 +120,7 @@ func runScenario(t *testing.T) scenarioResult {
 	sc.agents()
 	sc.settings()
 	sc.instance()
+	sc.auth(idp)
 	sc.FinishObservers()
 	cctx, cancel := context.WithTimeout(ctx, collectWait)
 	defer cancel()

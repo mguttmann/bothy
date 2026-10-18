@@ -177,3 +177,22 @@ func TestClientIdempotencyKey(t *testing.T) {
 		t.Errorf("key on an exempt or GET request: %v", got)
 	}
 }
+
+// TestClientDoAnonymous: DoAnonymous sends a DPoP proof of the client's key without the access
+// token and hands the exchange to the Observer.
+func TestClientDoAnonymous(t *testing.T) {
+	t.Parallel()
+	var auth, proof string
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		auth, proof = r.Header.Get("Authorization"), r.Header.Get("DPoP")
+		w.WriteHeader(http.StatusNoContent)
+	}))
+	t.Cleanup(srv.Close)
+	seen := 0
+	c := &Client{publicURL: srv.URL, http: srv.Client(), key: newDeviceKey(), access: "tok", nonce: "n",
+		Observer: func(Request, Response) { seen++ }}
+	r := c.DoAnonymous(context.Background(), Request{Method: http.MethodPost, Path: "/auth/token/refresh"})
+	if r.Status != http.StatusNoContent || auth != "" || proof == "" || seen != 1 {
+		t.Fatalf("status %d, Authorization %q, proof %v, observed %d", r.Status, auth, proof != "", seen)
+	}
+}
