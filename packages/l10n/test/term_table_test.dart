@@ -24,6 +24,8 @@ const Map<String, String> exceptions = {
   'vizNoActiveRuns': 'plural Läufe of Lauf',
   // The German plural of Kanal is Kanäle (M4-18).
   'shellColumnSidebar': 'plural Kanäle of Kanal',
+  // The German plural of Beitrag is Beiträge (M4-19, INT-W40/5).
+  'postListLoadFailed': 'plural Beiträge of Beitrag',
   'vizTileRuns': 'plural Läufe of Lauf',
   // {space} and {channel} are placeholders that carry the names, not the terms (INT-W27/4).
   'vizLaneLabel': 'placeholders {space} and {channel}, not the terms',
