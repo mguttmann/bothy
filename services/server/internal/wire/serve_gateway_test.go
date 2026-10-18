@@ -230,17 +230,17 @@ func (w *gwWorld) newAgent() ids.ID {
 	return id
 }
 
-// dial connects with the instance origin.
-func (w *gwWorld) dial(opts ...wstest.Option) *wstest.Client {
-	w.t.Helper()
+// dial connects with the instance origin through the harness, which validates every frame of
+// the connection for t (G9) and drops it in t's cleanup.
+func (w *gwWorld) dial(t testing.TB, opts ...wstest.Option) *wstest.Client {
+	t.Helper()
 	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
 	defer cancel()
-	c, err := wstest.Dial(ctx, w.base, append([]wstest.Option{wstest.WithOrigin(gwPublicURL)}, opts...)...)
+	c, err := wstest.Dial(t, ctx, w.base, append([]wstest.Option{wstest.WithOrigin(gwPublicURL), wstest.WithMaxFrameBytes(w.cfg.MaxFrameBytes)}, opts...)...)
 	if err != nil {
-		w.t.Fatal(err)
+		t.Fatal(err)
 	}
 	w.remember(c.Hello().DpopNonce)
-	w.t.Cleanup(c.Abort)
 	return c
 }
 
@@ -268,7 +268,7 @@ func (w *gwWorld) expectClose(t *testing.T, c *wstest.Client, code int) string {
 // identifyErr identifies on a fresh connection and requires the close code.
 func (w *gwWorld) identifyErr(t *testing.T, p wstest.IdentifyParams, code int) {
 	t.Helper()
-	c := w.dial()
+	c := w.dial(t)
 	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
 	defer cancel()
 	_, err := c.Identify(ctx, p)
@@ -287,7 +287,7 @@ func (w *gwWorld) identifyErr(t *testing.T, p wstest.IdentifyParams, code int) {
 // ready identifies on a fresh connection and returns the client and ready.
 func (w *gwWorld) ready(t *testing.T, p wstest.IdentifyParams, opts ...wstest.Option) (*wstest.Client, rest.GatewayReady) {
 	t.Helper()
-	c := w.dial(opts...)
+	c := w.dial(t, opts...)
 	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
 	defer cancel()
 	r, err := c.Identify(ctx, p)
@@ -346,8 +346,8 @@ func TestGateway(t *testing.T) {
 				t.Errorf("origin %s: status %d, %v", o, status, err)
 			}
 		}
-		w.dial()
-		c, err := wstest.Dial(ctx, w.base)
+		w.dial(t)
+		c, err := wstest.Dial(t, ctx, w.base, wstest.WithMaxFrameBytes(w.cfg.MaxFrameBytes))
 		if err != nil {
 			t.Fatalf("without Origin: %v", err)
 		}
@@ -355,7 +355,7 @@ func TestGateway(t *testing.T) {
 	})
 
 	t.Run("TestHelloFields", func(t *testing.T) {
-		c := w.dial()
+		c := w.dial(t)
 		h := c.Hello()
 		var epoch string
 		if err := w.db.Pool(t, pg.RoleOwner).QueryRow(ctx, `SELECT sync_epoch::text FROM instance`).Scan(&epoch); err != nil {
@@ -394,7 +394,8 @@ func TestGateway(t *testing.T) {
 	})
 
 	t.Run("TestClose4001UnknownOp", func(t *testing.T) {
-		c := w.dial()
+		// nope is no op of the contract: a negative test, so only server frames are validated.
+		c := w.dial(t, wstest.WithRawClientFrames())
 		if err := c.Send("nope", map[string]any{}); err != nil {
 			t.Fatal(err)
 		}
@@ -427,7 +428,8 @@ func TestGateway(t *testing.T) {
 		}
 		for name, send := range cases {
 			t.Run(name, func(t *testing.T) {
-				c := w.dial()
+				// Invalid on purpose: only the server frames are validated.
+				c := w.dial(t, wstest.WithRawClientFrames())
 				if err := send(c); err != nil {
 					t.Fatal(err)
 				}
@@ -440,7 +442,7 @@ func TestGateway(t *testing.T) {
 	})
 
 	t.Run("TestClose4003OpBeforeIdentify", func(t *testing.T) {
-		c := w.dial()
+		c := w.dial(t)
 		if err := c.Send("heartbeat", map[string]any{"last_seq": 0}); err != nil {
 			t.Fatal(err)
 		}
@@ -448,7 +450,7 @@ func TestGateway(t *testing.T) {
 	})
 
 	t.Run("TestClose4003IdentifyTimeout", func(t *testing.T) {
-		c := w.dial()
+		c := w.dial(t)
 		start := time.Now()
 		w.expectClose(t, c, 4003)
 		if d := time.Since(start); d < time.Second {
@@ -492,7 +494,7 @@ func TestGateway(t *testing.T) {
 
 	t.Run("TestClose4006ResumeUnknown", func(t *testing.T) {
 		p := w.newPerson("alex", identity.DeviceStateActive)
-		c := w.dial()
+		c := w.dial(t)
 		cctx, cancel := context.WithTimeout(ctx, 15*time.Second)
 		defer cancel()
 		_, err := c.Resume(cctx, wstest.ResumeParams{SessionID: ids.New().String(), AccessToken: p.access, Proof: w.proofFor(p.key, p.access, gwHTU)})
@@ -506,7 +508,7 @@ func TestGateway(t *testing.T) {
 		c, r := w.ready(t, w.params(p))
 		c.Abort()
 		time.Sleep(100 * time.Millisecond)
-		n := w.dial()
+		n := w.dial(t)
 		cctx, cancel := context.WithTimeout(ctx, 15*time.Second)
 		defer cancel()
 		res, err := n.Resume(cctx, wstest.ResumeParams{SessionID: r.GatewaySessionId.String(), AccessToken: p.access, Proof: w.proofFor(p.key, p.access, gwHTU), Cursor: r.HeadSeq})
@@ -523,7 +525,7 @@ func TestGateway(t *testing.T) {
 		c, r := w.ready(t, w.params(p))
 		c.Abort()
 		time.Sleep(3500 * time.Millisecond)
-		n := w.dial()
+		n := w.dial(t)
 		cctx, cancel := context.WithTimeout(ctx, 15*time.Second)
 		defer cancel()
 		_, err := n.Resume(cctx, wstest.ResumeParams{SessionID: r.GatewaySessionId.String(), AccessToken: p.access, Proof: w.proofFor(p.key, p.access, gwHTU)})
@@ -543,7 +545,7 @@ func TestGateway(t *testing.T) {
 		p := w.newPerson("alex", identity.DeviceStateActive)
 		var last *wstest.Client
 		for i := 0; ; i++ {
-			c := w.dial()
+			c := w.dial(t)
 			cctx, cancel := context.WithTimeout(ctx, 15*time.Second)
 			_, err := c.Identify(cctx, w.params(p))
 			cancel()
@@ -632,7 +634,7 @@ func TestGateway(t *testing.T) {
 		second, r2 := w.ready(t, w.params(p))
 		sessions.Store(second, r2.GatewaySessionId.String())
 		w.expectClose(t, first, 4017)
-		third := w.dial()
+		third := w.dial(t)
 		cctx, cancel := context.WithTimeout(ctx, 15*time.Second)
 		defer cancel()
 		_, err := third.Resume(cctx, wstest.ResumeParams{SessionID: r.GatewaySessionId.String(), AccessToken: p.access, Proof: w.proofFor(p.key, p.access, gwHTU)})
@@ -640,7 +642,7 @@ func TestGateway(t *testing.T) {
 			t.Fatalf("resume of the replaced session: %v", err)
 		}
 		// Resume of the live session replaces its connection with 4017 before resumed.
-		fourth := w.dial()
+		fourth := w.dial(t)
 		cctx2, cancel2 := context.WithTimeout(ctx, 15*time.Second)
 		defer cancel2()
 		if _, err := fourth.Resume(cctx2, wstest.ResumeParams{SessionID: liveSession(t, second), AccessToken: p.access,

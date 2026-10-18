@@ -219,11 +219,10 @@ func (s *testServer) dial(t *testing.T, opts ...wstest.Option) *wstest.Client {
 	t.Helper()
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
-	c, err := wstest.Dial(ctx, s.srv.URL, append([]wstest.Option{wstest.WithOrigin(publicURL)}, opts...)...)
+	c, err := wstest.Dial(t, ctx, s.srv.URL, append([]wstest.Option{wstest.WithOrigin(publicURL), wstest.WithMaxFrameBytes(1 << 16)}, opts...)...)
 	if err != nil {
 		t.Fatal(err)
 	}
-	t.Cleanup(c.Abort)
 	return c
 }
 

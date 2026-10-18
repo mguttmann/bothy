@@ -35,7 +35,9 @@ platform:                   # <name>: {depends_on: [<platform names>], vendors: 
   jobs: {depends_on: [pg, otel], vendors: [river, pgx, otel]}
 wire: {vendors: []}
 cmd: {vendors: []}
-api: {vendors: [oapi, openapi, yaml]}   # generated REST layer (runtime of oapi-codegen) and its generator
+# generated REST layer (runtime of oapi-codegen) and its generator; jsonschema for the contract
+# validator api/specschema of gate G9, which only tests import (M1-67)
+api: {vendors: [oapi, openapi, yaml, jsonschema]}
 # The embedded SQL migrations (package migrations, ADR 0007): wire and cmd may use them, and
 # the platform packages in used_by (pg runs them and builds the test databases from them).
 migrations: {used_by: [pg]}
@@ -276,6 +278,8 @@ vendors:                    # <group>: [<import path>, <import path>/**]
   xcrypto: [golang.org/x/crypto/argon2]
   libopenapi: [github.com/pb33f/libopenapi, github.com/pb33f/libopenapi/**, github.com/pb33f/libopenapi-validator,
                github.com/pb33f/libopenapi-validator/**]
+  # JSON Schema 2020-12 validator of api/specschema, the frame check of gate G9 (M1-67).
+  jsonschema: [github.com/santhosh-tekuri/jsonschema/v6, github.com/santhosh-tekuri/jsonschema/v6/**]
   # WebSocket server and test client of the gateway (gateway adapters only, M1-64).
   websocket: [github.com/coder/websocket, github.com/coder/websocket/**]
   pgx: [github.com/jackc/pgx/v5, github.com/jackc/pgx/v5/**]

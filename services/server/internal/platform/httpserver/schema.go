@@ -20,7 +20,9 @@ import (
 // SchemaValidator checks a JSON value against one named schema of components.schemas of the
 // contract, with the engine and the field codes of the request Validator (SEC-IN-1, W7): the
 // gateway validates the body d of every client frame with it (M1-64), where no HTTP operation
-// exists. It knows only the schemas it was built for and is safe for concurrent use.
+// exists. It knows only the schemas it was built for and is safe for concurrent use: libopenapi
+// renders a schema while it validates and writes into the shared schema model, so one check runs
+// at a time (a race under -race with several connections, M1-67).
 type SchemaValidator struct {
 	// mu serializes validation: libopenapi renders a schema for validation by writing into the
 	// shared schema model, so two connections validating the same frame type would race.

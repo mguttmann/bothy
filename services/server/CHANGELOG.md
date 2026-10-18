@@ -11,6 +11,18 @@ documented in this file. The format is based on
 
 ### Added
 
+- Gateway frame conformance, gate G9 (M1-67): the test harness `wstest` validates every frame of
+  the gateway integration tests as it arrives against `docs/api/asyncapi.yaml` and the body
+  schemas of `openapi.yaml` (new test package `api/specschema`: one JSON Schema 2020-12 bundle,
+  strict about undeclared members, no `null`, integers below 2^53, at most
+  `sync.ws_max_frame_bytes`, `seq` and `permission_version` exactly on durable events,
+  `resource.version` as the catalogue says), each client frame on send, the order per connection
+  and every close code against `x-close-codes`; a violation fails the test. The register of ops and
+  event types and the enable list `gateway_ops` are compared with actions.yaml and asyncapi.yaml,
+  a corpus test observes every M1 event type and server op, and a parser test keeps the harness
+  the only WebSocket client of the tests. New direct dependency
+  `github.com/santhosh-tekuri/jsonschema/v6` (test code only).
+
 - Gateway focus and typing (M1-66): the ops `focus {thread_ids, idle}` (`gateway.focus` per
   thread, `rl.read` per principal, at most `sync.max_focused_threads` threads, unreadable and
   unknown threads dropped silently), `typing.start` and `typing.stop` (`typing.start`, people
@@ -1257,6 +1269,11 @@ documented in this file. The format is based on
 - `identity.SessionEnded` carries `At`, and a revocation that ends sessions on several devices
   publishes one event per device (M1-45). `app.NewAuthCleanup` takes the device sweep
   (`app.DeviceExpirer`), and `AuthCleanup.Run` returns deleted challenges plus revoked devices.
+
+### Fixed
+
+- `instance` registers the event type `instance.updated` it emits, so the start check and gate G9
+  see it (M1-67).
 
 ### Security
 

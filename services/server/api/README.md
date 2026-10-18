@@ -27,9 +27,10 @@ nennt (PLAN P-04). Normativ sind [06-api.md](../../../docs/spec/06-api.md), Absc
 | `routes/gen/` | Generator mit Tests und `testdata/` (Fixture und Negativ-Fixtures) | ja |
 | `routes/internal/fixture/` | Fixture mit drei Operationen, vom selben Generator erzeugt | erzeugt, außer `fixture.go` |
 | `routes/routestest/` | Fixture-Oberfläche mit Stub für Tests außerhalb von `api/routes` | ja, nur für `_test.go` |
+| `specschema/` | Contract validator of gate G9 (M1-67): one JSON Schema 2020-12 bundle of openapi.yaml and asyncapi.yaml, frame checks of the gateway and `Compare` of the runtime register; only tests import it | yes, test support only |
 
 Komponente im Modulregister: `api` mit den Vendor-Gruppen `oapi` (Laufzeit von oapi-codegen),
-`openapi` (kin-openapi, Lader des Generators) und `yaml` (Generator). Werkzeug: oapi-codegen v2.8.0, als `tool` in [go.mod](../go.mod) gepinnt,
+`openapi` (kin-openapi, Lader des Generators), `yaml` (Generator) and `jsonschema` (`specschema`, M1-67). Werkzeug: oapi-codegen v2.8.0, als `tool` in [go.mod](../go.mod) gepinnt,
 Laufzeit `github.com/oapi-codegen/runtime` v1.7.0.
 
 ## API client (`restclient`)
