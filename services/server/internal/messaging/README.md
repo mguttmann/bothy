@@ -268,6 +268,18 @@ empty vector. The queries list their columns, so no read carries `search_languag
 `search_vector` (docs/DECISIONS.md D-M3-13-10). `TestMessageInsertsSetSearchLanguage`
 (`adapters/postgres`) fails when an `INSERT INTO messages` of `queries/*.sql` does not name
 `search_language` (later writers: M2 agent messages, M8-03 import, V3-01 DMs).
+## Thread moves (M1-62)
+
+`Subscribers.OnThreadMoved` (`app/subscribers.go`) is the in-transaction subscriber of
+`chat.ThreadMoved` (internal/wire registers it before the one of sync): it runs `MoveThreadMessages`
+(`queries/threads_move.sql`, `UPDATE messages SET channel_id = $to WHERE thread_id = $thread`) in
+the transaction of the move, deleted messages included. A copy only: no version, no event; clients
+learn the new channel from `thread.moved`. The statement carries no visible-channel predicate by
+design and stands in the allowlist of `adapters/postgres/predicate_test.go`: it writes only the
+rows of the thread that chat locked and authorized with `thread.move` in the same unit of work
+(07 section 7.4 rule 1: writes are outside the lint). A message sent after the move gets the
+channel of the thread then (`Threads.AppendToThread`), the target. Tests:
+`test/integration/move_test.go`.
 
 ## Editing, deleting and revisions (M1-58)
 

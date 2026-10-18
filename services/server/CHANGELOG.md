@@ -70,6 +70,14 @@ documented in this file. The format is based on
   `depguard` rule forbids the package `plugin` in the server module (ADR 0022). Manifests with
   the escape of NUL or of an unpaired surrogate are refused, and manifest values that are no audit
   code enter the audit hashed, so no checked manifest makes install or upgrade fail with 500.
+- Moving threads (M1-62): `moveThread` moves a thread into another channel whose effective
+  operator equals the thread's fixed operator (otherwise `409 operator_mismatch`); it needs
+  `manage` on source and target (an invisible target is the same `404` as an unknown one), is
+  audited with from, to and reason, uses `rl.admin` and accepts `Idempotency-Key`. The thread id
+  stays; `messages.channel_id`, `read_states.channel_id` and `drafts.channel_id` follow in the same
+  transaction through the new in-transaction event `chat.ThreadMoved`, and the tags are removed.
+  `thread.moved_out` (source, never naming the target) and `thread.moved` (target) are appended in
+  this order. Main threads, the same channel, archived targets and dm channels are refused.
 - Catch-up over REST and the snapshot (M1-63): `listEvents` (`GET /api/v1/events`) delivers every
   durable event after a cursor that the caller may receive at delivery time (personal events only
   to their audience, every other event through `authorize` with its receive action) with a cursor

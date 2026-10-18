@@ -174,4 +174,18 @@ type Store interface {
 	ThreadTags(ctx context.Context, threads []ids.ID) (map[ids.ID][]ids.ID, error)
 	// ReplaceThreadTags replaces the tags of thread with tags, added by by at at.
 	ReplaceThreadTags(ctx context.Context, thread ids.ID, tags []ids.ID, by ids.ID, at time.Time) error
+
+	// ShareChannel returns the channel id like Channel and holds FOR SHARE on its row until the
+	// end of the unit (thread.move, M1-62): channel.operator.set and channel.archive update the
+	// row, so they wait for the move or the move reads their committed state.
+	ShareChannel(ctx context.Context, id ids.ID) (c ChannelRow, found bool, err error)
+	// ShareSpace returns the space id like Space and holds FOR SHARE on its row until the end of
+	// the unit (thread.move into an inheriting channel against space.operator.set, M1-62).
+	ShareSpace(ctx context.Context, id ids.ID) (s domain.Space, found bool, err error)
+	// MoveThread writes channel_id = channel, moved_at = at and version + 1 of the locked thread
+	// id and returns the stored row (M1-62). Errors: internal for an unknown thread.
+	MoveThread(ctx context.Context, id, channel ids.ID, at time.Time) (domain.Thread, error)
+	// DeleteThreadTags deletes every thread_tags row of thread: a tag belongs to the channel of
+	// its thread, so no tag survives a move (03 thread_tags, M1-62).
+	DeleteThreadTags(ctx context.Context, thread ids.ID) error
 }

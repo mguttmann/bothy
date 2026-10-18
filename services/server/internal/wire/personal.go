@@ -67,7 +67,9 @@ func (p *Personal) fillHandlers(h *Handlers) {
 }
 
 // newSyncSubscribers returns the in-transaction subscribers of sync over pool (MessagePosted
-// clears drafts, M1-61). It opens no connection; the start binds the appender (Subscribers.Bind).
+// clears drafts, M1-61; ThreadMoved moves the read states and drafts of a thread, M1-62). It opens
+// no connection; the start binds the appender (Subscribers.Bind).
 func newSyncSubscribers(pool *pg.Pool) *syncapp.Subscribers {
-	return syncapp.NewSubscribers(syncpg.NewPersonalRepository(pool))
+	rows := syncpg.NewPersonalRepository(pool)
+	return syncapp.NewSubscribers(rows, rows)
 }

@@ -136,6 +136,10 @@ type world struct {
 	hook   *authzapp.RightsHook
 	// structure is the production structure source of chat the hook and authorize read.
 	structure authz.StructureSource
+	// azConfig and azDeps built az; newAuthorizer builds a second instance from them, the
+	// Authorizer of another process (M1-62).
+	azConfig authzapp.AuthorizerConfig
+	azDeps   authzapp.AuthorizerDeps
 
 	owner, alex, sam, robin                    ids.ID
 	support, marketing, engineering, research  ids.ID
@@ -200,6 +204,11 @@ func newEmptyWorldWith(t *testing.T, search searchlang.Map) *world {
 	}{{txn.PhaseRightsBegin, hook.Begin}, {txn.PhaseRightsCheck, hook.BeforeCommit}, {txn.PhaseSync, mods.Sync.Run}, {txn.PhaseAudit, mods.Audit.Hook}} {
 		must(t, reg.SetHook(h.p, h.f))
 	}
+	// The subscriptions of internal/wire in its order (M1-61, M1-62): drafts with clear_draft,
+	// then the copies of channel_id on a thread move.
+	must(t, txn.Subscribe(reg, mods.SyncSubscribers.OnMessagePosted))
+	must(t, txn.Subscribe(reg, mods.MessagingSubscribers.OnThreadMoved))
+	must(t, txn.Subscribe(reg, mods.SyncSubscribers.OnThreadMoved))
 	reg.Seal()
 	uow := pg.NewUnitOfWork(pool, pg.UnitConfig{RetryMax: 3, StatementTimeout: 30 * time.Second, LockTimeout: 20 * time.Second, IdleInTxTimeout: 60 * time.Second}, reg)
 	w.rec, err = auditapp.NewRecorder(auditapp.Config{
@@ -210,17 +219,19 @@ func newEmptyWorldWith(t *testing.T, search searchlang.Map) *world {
 	appender, err := syncapp.NewAppender(syncapp.AppenderConfig{PayloadMaxBytes: 65536}, telemetry.Correlator{})
 	must(t, err)
 	must(t, hook.Bind(authzapp.RightsBindings{Events: appender, Audit: w.rec}))
+	must(t, mods.SyncSubscribers.Bind(appender))
 	maint, err := syncapp.NewPartitionMaintenance(syncapp.PartitionConfig{Size: 1000, Ahead: 2, Retention: 30 * 24 * time.Hour, LockTimeout: 2 * time.Second},
 		uow, syncpg.NewRepository(pool, log), w.clk)
 	must(t, err)
 	_, err = maint.Run(context.Background())
 	must(t, err)
-	w.az, err = authzapp.NewAuthorizer(authzapp.AuthorizerConfig{SnapshotCacheMaxEntries: 1000, StepUpMaxAge: idConfig.StepUpMaxAge,
-		ViewAsMaxDuration: 15 * time.Minute}, authzapp.AuthorizerDeps{
+	w.azConfig = authzapp.AuthorizerConfig{SnapshotCacheMaxEntries: 1000, StepUpMaxAge: idConfig.StepUpMaxAge, ViewAsMaxDuration: 15 * time.Minute}
+	w.azDeps = authzapp.AuthorizerDeps{
 		Catalog: authzapp.NewCatalog(log), Store: authzpg.NewRepository(pool), Principals: principals,
 		Credentials: w.creds, Structure: structure, Policies: policies,
 		Versions: instanceapp.NewVersions(instancepg.NewRepository(pool)), Recorder: w.rec, Clock: w.clk, Log: log,
-	})
+	}
+	w.az, err = authzapp.NewAuthorizer(w.azConfig, w.azDeps)
 	must(t, err)
 	settings, err := wire.NewInstanceSettings(wire.DefaultInstanceConfig(), true, pool, uow, w.az, wire.SettingsWrites{Audit: w.rec, Events: appender}, w.clk)
 	must(t, err)
@@ -244,8 +255,19 @@ func newEmptyWorldWith(t *testing.T, search searchlang.Map) *world {
 		EmojiMaxBytes: 64, MaxDistinctReactions: 20, MaxPinsPerThread: 50},
 		pool, uow, w.az, wire.MessagingWrites{Events: appender, Redactor: syncpg.NewRedactor(pool), Audit: w.rec}, c.Service, w.id.Directory, w.clk, nil)
 	must(t, err)
+	// Messaging writes the messages a moved thread carries (M1-62).
+	m, err := wire.NewMessaging(messagingapp.Config{MaxContentBytes: 4096, MaxMentions: 4, EventPayloadMaxBytes: 65536,
+		TemplateNameMaxChars: 64, TemplateMaxPerScope: 100, ListContentMaxBytes: 4096, PageSizeDefault: 20, PageSizeMax: 50,
+		EmojiMaxBytes: 64, MaxDistinctReactions: 20, MaxPinsPerThread: 50},
+		pool, uow, w.az, wire.MessagingWrites{Events: appender, Redactor: syncpg.NewRedactor(pool), Audit: w.rec}, c.Service, w.clk, nil)
+	must(t, err)
+	// The personal data of sync (read states and drafts, M1-61) serve the move tests of M1-62.
+	personal, err := wire.NewPersonal(syncapp.PersonalConfig{MaxContentBytes: 4096, MaxAttachments: 3, EventPayloadMaxBytes: 65536},
+		pool, uow, w.az, appender, c.Service, m.Service, w.clk)
+	must(t, err)
 	built, err := routes.Build(wire.Handlers{Access: authzhttp.New(w.admin), Agents: ag.Handlers, Spaces: c.Handlers, Channels: c.ChannelHandlers,
-		People: w.id.PeopleHandlers, Threads: c.ThreadHandlers, Messages: m.Handlers, Admin: settings.Handlers}, wire.RouteOptions(), routes.SpecCatalog())
+		People: w.id.PeopleHandlers, Threads: c.ThreadHandlers, Messages: m.Handlers, Personal: personal.Handlers, Admin: settings.Handlers},
+		wire.RouteOptions(), routes.SpecCatalog())
 	must(t, err)
 	var rs []httpservertest.Route
 	for _, r := range built {
@@ -364,9 +386,11 @@ func (w *world) person(name string, owner bool) ids.ID {
 }
 
 // session registers token name as id in a new session on an active device with step-up at stepUp
-// (zero for none).
+// (zero for none). The device row exists in devices too, because read states and drafts name the
+// device of the change (M1-61, 03 read_states.updated_by_device_id).
 func (w *world) session(name string, id ids.ID, stepUp time.Time) {
 	s, d := ids.New(), ids.New()
+	w.sql(`INSERT INTO devices (id, user_id, name, platform, state) VALUES ($1, $2, 'Laptop', 'web', 'active')`, d.String(), id.String())
 	w.creds.fake.PutDevice(d, fake.Device{PrincipalID: id, State: authz.DeviceActive})
 	w.creds.fake.PutSession(s, fake.Session{PrincipalID: id, DeviceID: d, ExpiresAt: start.Add(365 * 24 * time.Hour)})
 	w.setActor(name, httpservertest.InSession(id, s, d, stepUp))

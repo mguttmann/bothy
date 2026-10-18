@@ -312,10 +312,13 @@ func (a *Authorizer) readsOperatedChannel(ctx context.Context, s *actingPrincipa
 	return final, base, nil
 }
 
-// target resolves the destination channel of thread.move.
+// target resolves the destination channel of thread.move. The zero id names no channel: it is
+// the nil UUID a client may send in target_channel_id, so it is an unknown and thus invisible
+// target like any other id without a channel (not_found, the same answer as an unknown thread,
+// M1-62).
 func (a *Authorizer) target(ctx context.Context, s *actingPrincipal, channel ids.ID) (*domain.TargetFacts, error) {
 	if channel.IsZero() {
-		return nil, internal("thread.move without a target channel")
+		return &domain.TargetFacts{}, nil
 	}
 	res, found, err := a.resolveChannel(ctx, ids.ID{}, channel, ids.ID{})
 	if err != nil {
