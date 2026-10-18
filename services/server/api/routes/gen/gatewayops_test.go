@@ -176,7 +176,8 @@ func TestGatewayOps_Rules(t *testing.T) {
 // TestRealInputs_GatewayOps is the gate check of gateway_ops (M1-64): every client-to-server op of
 // the channel gateway in docs/api/asyncapi.yaml is listed exactly once, every listed op is one,
 // every body of a client frame refuses unknown members (W7, SEC-IN-1), and the enabled ops are
-// identify, resume, heartbeat and reauth with the action gateway.connect.
+// identify, resume, heartbeat and reauth with the action gateway.connect (M1-64) and focus,
+// typing.start and typing.stop with gateway.focus and typing.start (M1-66).
 func TestRealInputs_GatewayOps(t *testing.T) {
 	in, err := realInputs()
 	if err != nil {
@@ -187,10 +188,13 @@ func TestRealInputs_GatewayOps(t *testing.T) {
 		t.Fatalf("gateway ops: %v", err)
 	}
 	want := []gatewayOp{
+		{Op: "focus", Action: "gateway.focus", Schema: "GatewayFocus"},
 		{Op: "heartbeat", Action: "gateway.connect", Schema: "GatewayHeartbeat"},
 		{Op: "identify", Action: "gateway.connect", Schema: "GatewayIdentify"},
 		{Op: "reauth", Action: "gateway.connect", Schema: "GatewayReauth"},
 		{Op: "resume", Action: "gateway.connect", Schema: "GatewayResume"},
+		{Op: "typing.start", Action: "typing.start", Schema: "GatewayTyping"},
+		{Op: "typing.stop", Action: "typing.start", Schema: "GatewayTyping"},
 	}
 	if !reflect.DeepEqual(ops, want) {
 		t.Errorf("enabled gateway ops = %+v, want %+v", ops, want)

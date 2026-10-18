@@ -398,7 +398,8 @@ func TestGateway(t *testing.T) {
 	t.Run("TestGatewayOpsEnableList", func(t *testing.T) {
 		p := w.newPerson("robin", identity.DeviceStateActive)
 		c, _ := w.ready(t, w.params(p))
-		if err := c.Send("focus", map[string]any{"thread_ids": []string{}}); err != nil {
+		// focus is enabled since M1-66; ack still waits for M2.
+		if err := c.Send("ack", map[string]any{"seq": 1}); err != nil {
 			t.Fatal(err)
 		}
 		w.expectClose(t, c, 4001)

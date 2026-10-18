@@ -12,12 +12,14 @@ import (
 
 	"github.com/OWNER/bothy/services/server/api/rest"
 	"github.com/OWNER/bothy/services/server/api/routes"
+	"github.com/OWNER/bothy/services/server/internal/chat"
 	"github.com/OWNER/bothy/services/server/internal/gateway/adapters/wstest"
 	"github.com/OWNER/bothy/services/server/internal/gateway/app"
 	"github.com/OWNER/bothy/services/server/internal/gateway/domain"
 	"github.com/OWNER/bothy/services/server/internal/kernel/actor"
 	"github.com/OWNER/bothy/services/server/internal/kernel/authorize"
 	"github.com/OWNER/bothy/services/server/internal/kernel/errs"
+	"github.com/OWNER/bothy/services/server/internal/kernel/eventlog"
 	"github.com/OWNER/bothy/services/server/internal/kernel/ids"
 	"github.com/OWNER/bothy/services/server/internal/kernel/reqmeta"
 	"github.com/OWNER/bothy/services/server/internal/platform/httpserver"
@@ -132,6 +134,26 @@ func (d delivery) Attach(context.Context, *app.Connection, int64, int64) error {
 }
 func (d delivery) Detach(*app.Connection) { d.o.add("detach") }
 
+func (d delivery) Focus(*app.Connection, domain.Focus) { d.o.add("focus") }
+
+// noThreads knows no thread.
+type noThreads struct{}
+
+func (noThreads) Info(context.Context, ids.ID) (chat.ThreadInfo, error) {
+	return chat.ThreadInfo{}, errs.New(errs.CodeNotFound, "")
+}
+
+// noLimits never limits.
+type noLimits struct{}
+
+func (noLimits) AllowRead(ids.ID) (bool, error)   { return true, nil }
+func (noLimits) AllowTyping(ids.ID) (bool, error) { return true, nil }
+
+// noPublisher drops every ephemeral event.
+type noPublisher struct{}
+
+func (noPublisher) PublishEphemeral(context.Context, eventlog.EphemeralEvent) error { return nil }
+
 type noAlarm struct{}
 
 func (noAlarm) NotChecked(context.Context, string, authorize.Action) {}
@@ -154,7 +176,9 @@ func newTestServer(t *testing.T, queueMax int, mod func(*Handler)) *testServer {
 	var names []string
 	schemas := map[string]string{}
 	for _, op := range routes.GatewayOps() {
-		names = append(names, op.Schema)
+		if !slices.Contains(names, op.Schema) {
+			names = append(names, op.Schema)
+		}
 		schemas[op.Op] = op.Schema
 	}
 	check, err := httpserver.NewSchemaValidator(rest.Spec, names)
@@ -162,9 +186,11 @@ func newTestServer(t *testing.T, queueMax int, mod func(*Handler)) *testServer {
 		t.Fatal(err)
 	}
 	gw, err := app.New(app.Config{HTU: publicURL + "/api/v1/gateway", IdentifyTimeout: 5 * time.Second, HeartbeatInterval: time.Second,
-		HeartbeatMissLimit: 2, ResumeWindow: time.Minute, ReauthLeadTime: time.Second, ProtocolVersions: []int{1}},
+		HeartbeatMissLimit: 2, ResumeWindow: time.Minute, ReauthLeadTime: time.Second, ProtocolVersions: []int{1},
+		MaxFocusedThreads: 20, TypingMinInterval: 5 * time.Second, TypingTTL: 8 * time.Second},
 		app.Deps{Authenticator: agentAuth{agent: agent, transports: transports}, Authorizer: allowAll{}, Nonces: nonce{}, Limiter: unlimited{}, Snapshot: snapshot{o},
-			CatchUp: catchUp{}, Epoch: epochSource{}, Delivery: delivery{o}, Decoder: NewDecoder(schemas, check), Alarm: noAlarm{}})
+			CatchUp: catchUp{}, Epoch: epochSource{}, Delivery: delivery{o}, Decoder: NewDecoder(schemas, check), Alarm: noAlarm{},
+			Threads: noThreads{}, OpLimiter: noLimits{}, Publisher: noPublisher{}})
 	if err != nil {
 		t.Fatal(err)
 	}

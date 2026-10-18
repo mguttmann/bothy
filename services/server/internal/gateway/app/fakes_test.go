@@ -17,6 +17,7 @@ import (
 	"github.com/OWNER/bothy/services/server/internal/kernel/authorize"
 	"github.com/OWNER/bothy/services/server/internal/kernel/clock"
 	"github.com/OWNER/bothy/services/server/internal/kernel/errs"
+	"github.com/OWNER/bothy/services/server/internal/kernel/eventlog"
 	"github.com/OWNER/bothy/services/server/internal/kernel/ids"
 	"github.com/OWNER/bothy/services/server/internal/sync"
 )
@@ -253,7 +254,13 @@ func (d fakeDelivery) Attach(_ context.Context, _ *app.Connection, from, _ int64
 	d.log.add(fmt.Sprintf("attach %d", from))
 	return nil
 }
-func (d fakeDelivery) Detach(*app.Connection) { d.log.add("detach") }
+func (d fakeDelivery) Detach(*app.Connection)              { d.log.add("detach") }
+func (d fakeDelivery) Focus(*app.Connection, domain.Focus) { d.log.add("focus") }
+
+// nopPublisher accepts every ephemeral event and sends nothing.
+type nopPublisher struct{}
+
+func (nopPublisher) PublishEphemeral(context.Context, eventlog.EphemeralEvent) error { return nil }
 
 // fakeAlarm counts unproven ops.
 type fakeAlarm struct {
@@ -295,6 +302,18 @@ func (jsonDecoder) Decode(op string, d json.RawMessage) (any, error) {
 		v = f
 	case "reauth":
 		var f app.Reauth
+		if err := json.Unmarshal(d, &f); err != nil {
+			return nil, err
+		}
+		v = f
+	case "focus":
+		var f app.Focus
+		if err := json.Unmarshal(d, &f); err != nil {
+			return nil, err
+		}
+		v = f
+	case "typing.start", "typing.stop":
+		var f app.Typing
 		if err := json.Unmarshal(d, &f); err != nil {
 			return nil, err
 		}
@@ -341,11 +360,13 @@ func newEnv(t *testing.T, mod func(*app.Config, *app.Deps)) *env {
 	e.cfg = app.Config{
 		HTU: "https://chat.example.com/api/v1/gateway", IdentifyTimeout: 10 * time.Second, HeartbeatInterval: 30 * time.Second,
 		HeartbeatMissLimit: 2, ResumeWindow: 5 * time.Minute, ReauthLeadTime: time.Minute, ProtocolVersions: []int{1},
+		MaxFocusedThreads: maxFocused, TypingMinInterval: typingInterval, TypingTTL: typingTTL,
 	}
 	d := app.Deps{
 		Authenticator: e.auth, Authorizer: e.authz, Nonces: staticNonce("nonce-1"), Limiter: e.limiter,
 		Snapshot: e.snapshot, CatchUp: fakeCatchUp{head: 41}, Epoch: staticEpoch{}, Delivery: fakeDelivery{log: e.log},
 		Decoder: jsonDecoder{}, Alarm: e.alarm, Clock: e.clk,
+		Threads: newFocusWorld(), OpLimiter: &fakeOpLimiter{}, Publisher: nopPublisher{},
 	}
 	if mod != nil {
 		mod(&e.cfg, &d)

@@ -7,6 +7,7 @@ import (
 	"errors"
 	"log/slog"
 	"net/http"
+	"slices"
 	stdsync "sync"
 	"time"
 
@@ -20,6 +21,7 @@ import (
 	"github.com/OWNER/bothy/services/server/internal/kernel/authorize"
 	"github.com/OWNER/bothy/services/server/internal/kernel/clock"
 	"github.com/OWNER/bothy/services/server/internal/kernel/errs"
+	"github.com/OWNER/bothy/services/server/internal/kernel/eventlog"
 	"github.com/OWNER/bothy/services/server/internal/kernel/ids"
 	"github.com/OWNER/bothy/services/server/internal/platform/config"
 	"github.com/OWNER/bothy/services/server/internal/platform/httpserver"
@@ -70,6 +72,11 @@ type GatewayConfig struct {
 	CursorAdvanceEvery  int           `config:"sync.cursor_advance_every"`
 	LogPollInterval     time.Duration `config:"sync.log_poll_interval"`
 	ReconnectBackoffCap time.Duration `config:"database.listen_reconnect_backoff_cap"`
+	// The keys of focus, typing and the ephemeral publisher (M1-66).
+	MaxFocusedThreads int           `config:"sync.max_focused_threads"`
+	TypingMinInterval time.Duration `config:"sync.typing_min_interval"`
+	TypingTTL         time.Duration `config:"sync.typing_ttl"`
+	PayloadMax        int           `config:"sync.event_payload_max_bytes"`
 }
 
 // GatewayConfigFrom binds GatewayConfig from v. The error names the key whose binding failed,
@@ -96,6 +103,8 @@ type GatewayDeps struct {
 	Reads *SyncReads
 	// Instance reads the sync epoch for hello.
 	Instance InstanceLoader
+	// Threads is the chat port of the threads (chat.Threads) for focus and typing (M1-66).
+	Threads gatewayapp.Threads
 	// Delivery nil means the hub of M1-65 over the authenticator, the authorizer and catch-up;
 	// tests of the connection pass their own.
 	Delivery gatewayapp.Delivery
@@ -109,25 +118,46 @@ type InstanceLoader interface {
 	Load(ctx context.Context) (instance.Record, error)
 }
 
-// Gateway is the gateway of an api process: the use cases with the four ops of
-// gateway_ops.enabled registered, the WebSocket handler of GET /api/v1/gateway and the hub that
-// the log tail feeds (nil when GatewayDeps.Delivery was given).
+// Gateway is the gateway of an api process: the use cases with the ops of gateway_ops.enabled
+// registered, the WebSocket handler of GET /api/v1/gateway, the hub that the log tail feeds (nil
+// when GatewayDeps.Delivery was given) and the process's kernel/eventlog.EphemeralPublisher, the
+// hub (M1-66), which runs, agents and notify use from M2 and M3 on.
 type Gateway struct {
-	App     *gatewayapp.Gateway
-	Handler *gatewayws.Handler
-	Hub     *gatewayapp.Hub
+	App       *gatewayapp.Gateway
+	Handler   *gatewayws.Handler
+	Hub       *gatewayapp.Hub
+	Publisher eventlog.EphemeralPublisher
+}
+
+// The rate-limit classes of the client ops the gateway counts itself (x-rate-limit-class of
+// asyncapi.yaml; TestGatewayOpRateClasses): focus is keyed by the principal, typing by the
+// connection. identify and resume count rl.gateway_connect in the handshake.
+const (
+	focusClass  = "rl.read"
+	typingClass = "rl.typing"
+)
+
+// GatewayOpClasses returns the rate-limit class of each client op of M1-66, for the contract test.
+func GatewayOpClasses() map[string]string {
+	return map[string]string{"focus": focusClass, "typing.start": typingClass, "typing.stop": typingClass}
 }
 
 // NewGateway builds the gateway over d with cfg and registers exactly the ops of
 // routes.GatewayOps with their actions (gateway_ops.enabled of api/operations.yaml). Errors: a
 // missing collaborator, an invalid value, an enabled op without a handler or an unknown action.
 func NewGateway(cfg GatewayConfig, d GatewayDeps) (*Gateway, error) {
-	if d.Authenticator == nil || d.Authorizer == nil || d.Nonces == nil || d.Limiter == nil || d.Reads == nil || d.Instance == nil {
-		return nil, errors.New("wire: the gateway needs the authenticator, the authorizer, the nonces, the limiter, catch-up and snapshot and the instance")
+	if d.Authenticator == nil || d.Authorizer == nil || d.Nonces == nil || d.Limiter == nil || d.Reads == nil || d.Instance == nil ||
+		d.Threads == nil {
+		return nil, errors.New("wire: the gateway needs the authenticator, the authorizer, the nonces, the limiter, catch-up and snapshot, " +
+			"the instance and the threads of chat")
 	}
 	hub, err := newHub(cfg, &d)
 	if err != nil {
 		return nil, err
+	}
+	var publisher eventlog.EphemeralPublisher = noPublisher{}
+	if hub != nil {
+		publisher = hub
 	}
 	htu, err := gatewayws.HTU(cfg.PublicURL)
 	if err != nil {
@@ -149,10 +179,12 @@ func NewGateway(cfg GatewayConfig, d GatewayDeps) (*Gateway, error) {
 	gw, err := gatewayapp.New(gatewayapp.Config{
 		HTU: htu, IdentifyTimeout: cfg.IdentifyTimeout, HeartbeatInterval: cfg.HeartbeatInterval, HeartbeatMissLimit: cfg.HeartbeatMissLimit,
 		ResumeWindow: cfg.ResumeWindow, ReauthLeadTime: cfg.ReauthLeadTime, ProtocolVersions: routes.GatewayProtocolVersions(),
+		MaxFocusedThreads: cfg.MaxFocusedThreads, TypingMinInterval: cfg.TypingMinInterval, TypingTTL: cfg.TypingTTL,
 	}, gatewayapp.Deps{
 		Authenticator: d.Authenticator, Authorizer: d.Authorizer, Nonces: d.Nonces, Limiter: connectLimiter{l: d.Limiter},
 		Snapshot: d.Reads.Snapshot, CatchUp: d.Reads.CatchUp, Epoch: epochSource{d.Instance}, Delivery: d.Delivery,
 		Decoder: gatewayws.NewDecoder(schemas, check), Alarm: proofAlarm{alarm}, Clock: d.Clock, Log: orDiscard(d.Log),
+		Threads: d.Threads, OpLimiter: opLimiter{l: d.Limiter}, Publisher: publisher,
 	})
 	if err != nil {
 		return nil, err
@@ -173,7 +205,7 @@ func NewGateway(cfg GatewayConfig, d GatewayDeps) (*Gateway, error) {
 	if err != nil {
 		return nil, err
 	}
-	return &Gateway{App: gw, Handler: h, Hub: hub}, nil
+	return &Gateway{App: gw, Handler: h, Hub: hub, Publisher: publisher}, nil
 }
 
 // newHub builds the hub of M1-65 and makes it the delivery of d when d brings none; otherwise it
@@ -184,8 +216,9 @@ func newHub(cfg GatewayConfig, d *GatewayDeps) (*gatewayapp.Hub, error) {
 	}
 	h, err := gatewayapp.NewHub(gatewayapp.HubConfig{
 		QueueMax: cfg.OutboundQueueMax, PageSize: cfg.CatchUpPageSize, CursorEvery: cfg.CursorAdvanceEvery,
-		RetryBase: cfg.LogPollInterval, RetryCap: cfg.ReconnectBackoffCap,
-	}, gatewayapp.HubDeps{Authenticator: d.Authenticator, Authorizer: d.Authorizer, CatchUp: d.Reads.CatchUp, Log: orDiscard(d.Log)})
+		RetryBase: cfg.LogPollInterval, RetryCap: cfg.ReconnectBackoffCap, PayloadMax: cfg.PayloadMax,
+	}, gatewayapp.HubDeps{Authenticator: d.Authenticator, Authorizer: d.Authorizer, CatchUp: d.Reads.CatchUp, Log: orDiscard(d.Log),
+		Clock: d.Clock})
 	if err != nil {
 		return nil, err
 	}
@@ -224,7 +257,10 @@ func (g *Gateway) StartSweeper() lifecycle.StopStep {
 var frameValidator = stdsync.OnceValues(func() (*httpserver.SchemaValidator, error) {
 	var names []string
 	for _, op := range routes.GatewayOps() {
-		names = append(names, op.Schema)
+		// typing.start and typing.stop share GatewayTyping; the validator takes each name once.
+		if !slices.Contains(names, op.Schema) {
+			names = append(names, op.Schema)
+		}
 	}
 	return httpserver.NewSchemaValidator(rest.Spec, names)
 })
@@ -278,6 +314,28 @@ func (c connectLimiter) AllowConnect(a actor.Actor) (bool, int, error) {
 	return d.Allowed, d.RetryAfterSeconds, nil
 }
 
+// opLimiter adapts the limiter to the classes of focus and typing (GatewayOpClasses).
+type opLimiter struct{ l *ratelimit.Limiter }
+
+// AllowRead implements gatewayapp.OpLimiter: rl.read keyed by the principal.
+func (o opLimiter) AllowRead(principal ids.ID) (bool, error) {
+	d, err := o.l.Allow(focusClass, ratelimit.KeyForPrincipal(principal))
+	return d.Allowed, err
+}
+
+// AllowTyping implements gatewayapp.OpLimiter: rl.typing keyed by the connection.
+func (o opLimiter) AllowTyping(conn ids.ID) (bool, error) {
+	d, err := o.l.Allow(typingClass, ratelimit.KeyForConnection(conn.String()))
+	return d.Allowed, err
+}
+
+// noPublisher is the publisher of a gateway whose tests bring their own delivery: it relays
+// nothing.
+type noPublisher struct{}
+
+// PublishEphemeral implements eventlog.EphemeralPublisher.
+func (noPublisher) PublishEphemeral(context.Context, eventlog.EphemeralEvent) error { return nil }
+
 // epochSource reads sync_epoch of the instance row.
 type epochSource struct{ i InstanceLoader }
 
@@ -298,5 +356,8 @@ func (p proofAlarm) NotChecked(ctx context.Context, _ string, _ authorize.Action
 	p.c.CountError(ctx, errs.CauseAuthzNotChecked)
 }
 
-// Compile-time check of the adapter.
-var _ gatewayapp.ConnectLimiter = connectLimiter{}
+// Compile-time check of the adapters.
+var (
+	_ gatewayapp.ConnectLimiter = connectLimiter{}
+	_ gatewayapp.OpLimiter      = opLimiter{}
+)

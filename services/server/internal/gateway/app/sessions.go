@@ -4,6 +4,7 @@ package app
 
 import (
 	"context"
+	"slices"
 	gosync "sync"
 	"time"
 
@@ -38,6 +39,25 @@ type Session struct {
 	state      domain.State
 	detachedAt time.Time
 	conn       *Connection
+
+	// focus is the last accepted focus of the session (M1-66), which resume restores after a
+	// re-check (04 section 6.3 step 7); focusMu guards it.
+	focusMu gosync.Mutex
+	focus   domain.Focus
+}
+
+// focusState returns a copy of the stored focus.
+func (s *Session) focusState() domain.Focus {
+	s.focusMu.Lock()
+	defer s.focusMu.Unlock()
+	return domain.Focus{Entries: slices.Clone(s.focus.Entries), Idle: s.focus.Idle}
+}
+
+// setFocus stores f as the focus of the session.
+func (s *Session) setFocus(f domain.Focus) {
+	s.focusMu.Lock()
+	defer s.focusMu.Unlock()
+	s.focus = domain.Focus{Entries: slices.Clone(f.Entries), Idle: f.Idle}
 }
 
 // Sessions is the store of the gateway sessions of this process (R-AR-11): a map by id, an index

@@ -1142,23 +1142,24 @@ func (s *server) mountAPI(cat *authzapp.Catalog, log *slog.Logger) error {
 }
 
 // mountGateway builds the WebSocket gateway (M1-64) over identity's Authenticator and DPoP
-// nonces, the Authorizer, the limiter of the chain (class rl.gateway_connect), catch-up and
-// snapshot of sync and the instance row, mounts GET /api/v1/gateway on mux and starts the sweeper
-// of the gateway sessions with its stop step.
+// nonces, the Authorizer, the limiter of the chain (classes rl.gateway_connect, rl.read and
+// rl.typing), catch-up and snapshot of sync, the instance row and the threads of chat (M1-66),
+// mounts GET /api/v1/gateway on mux and starts the sweeper of the gateway sessions with its stop
+// step.
 func (s *server) mountGateway(mux Mux, chain *httpserver.Chain, limiter *ratelimit.Limiter, log *slog.Logger) error {
 	cfg, err := GatewayConfigFrom(s.values)
 	if err != nil {
 		return err
 	}
 	s.mu.Lock()
-	id, az, reads, pool, a := s.identity, s.authorizer, s.syncReads, s.pool, s.audit
+	id, az, reads, pool, a, ch := s.identity, s.authorizer, s.syncReads, s.pool, s.audit, s.chat
 	s.mu.Unlock()
-	if id == nil || id.Authenticator == nil || az == nil || reads == nil || a == nil {
-		return errors.New("wire: the gateway needs identity, the Authorizer, catch-up and snapshot and the unit of work")
+	if id == nil || id.Authenticator == nil || az == nil || reads == nil || a == nil || ch == nil {
+		return errors.New("wire: the gateway needs identity, the Authorizer, catch-up and snapshot, the unit of work and chat")
 	}
 	gw, err := NewGateway(cfg, GatewayDeps{
 		Authenticator: id.Authenticator, Authorizer: az, Nonces: id.DPoP, Limiter: limiter, Reads: reads,
-		Instance: instanceapp.NewState(instancepg.NewRepository(pool), a.UoW()), Clock: s.deps.Clock, Log: log,
+		Instance: instanceapp.NewState(instancepg.NewRepository(pool), a.UoW()), Threads: ch.Service, Clock: s.deps.Clock, Log: log,
 	})
 	if err != nil {
 		return err

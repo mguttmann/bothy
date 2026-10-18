@@ -387,11 +387,14 @@ func TestConfigPrintShowsSourcePerKey(t *testing.T) {
 		"sync.idempotency_key_ttl = 1d  # default\n" +
 		"sync.identify_timeout = 10s  # default\n" +
 		"sync.log_poll_interval = 1s  # default\n" +
+		"sync.max_focused_threads = 20  # default\n" +
 		"sync.outbound_queue_max = 10000  # default\n" +
 		"sync.partition_maintenance_interval = 10m  # default\n" +
 		"sync.reauth_lead_time = 1m  # default\n" +
 		"sync.resume_window = 5m  # default\n" +
 		"sync.tail_batch_size = 1000  # default\n" +
+		"sync.typing_min_interval = 5s  # default\n" +
+		"sync.typing_ttl = 8s  # default\n" +
 		"sync.ws_max_frame_bytes = 1048576  # default\n" +
 		"telemetry.enabled = true  # default\n" +
 		"telemetry.logs.exporter = both  # default\n" +

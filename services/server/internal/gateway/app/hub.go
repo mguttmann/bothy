@@ -13,6 +13,7 @@ import (
 	"github.com/OWNER/bothy/services/server/internal/gateway/domain"
 	"github.com/OWNER/bothy/services/server/internal/kernel/actor"
 	"github.com/OWNER/bothy/services/server/internal/kernel/authorize"
+	"github.com/OWNER/bothy/services/server/internal/kernel/clock"
 	"github.com/OWNER/bothy/services/server/internal/kernel/errs"
 	"github.com/OWNER/bothy/services/server/internal/kernel/ids"
 	"github.com/OWNER/bothy/services/server/internal/sync"
@@ -26,6 +27,10 @@ const (
 	// rights change and without a visible target in its space (the default operator agent of the
 	// space, M1-65/13).
 	eventChannelCreated = "channel.created"
+	// The structure events after which the focused threads they affect are re-checked (M1-66).
+	eventThreadMoved     = "thread.moved"
+	eventChannelArchived = "channel.archived"
+	eventSpaceArchived   = "space.archived"
 )
 
 // HubConfig holds the configuration keys of delivery.
@@ -42,13 +47,16 @@ type HubConfig struct {
 	RetryBase time.Duration
 	// RetryCap is database.listen_reconnect_backoff_cap.
 	RetryCap time.Duration
+	// PayloadMax is sync.event_payload_max_bytes: the payload of an ephemeral event must be
+	// smaller (M1-66).
+	PayloadMax int
 }
 
 // validate names every invalid value.
 func (c HubConfig) validate() error {
-	if c.QueueMax < 1 || c.PageSize < 1 || c.CursorEvery < 1 || c.RetryBase <= 0 || c.RetryCap <= 0 {
+	if c.QueueMax < 1 || c.PageSize < 1 || c.CursorEvery < 1 || c.RetryBase <= 0 || c.RetryCap <= 0 || c.PayloadMax < 1 {
 		return errors.New("gateway: sync.outbound_queue_max, sync.catchup_page_size, sync.cursor_advance_every, " +
-			"sync.log_poll_interval and database.listen_reconnect_backoff_cap must be positive")
+			"sync.log_poll_interval, database.listen_reconnect_backoff_cap and sync.event_payload_max_bytes must be positive")
 	}
 	return nil
 }
@@ -64,6 +72,8 @@ type HubDeps struct {
 	// Log receives failures of revalidation, of the index and of catch-up; nil means
 	// slog.Default(). It never receives event contents.
 	Log *slog.Logger
+	// Clock stamps ephemeral events without a time; nil means clock.System().
+	Clock clock.Clock
 }
 
 // member is the hub's state of one registered connection. The hub's mutex guards the index
@@ -92,6 +102,12 @@ type member struct {
 	// to the events before it; the catch-up runner drops their events (04 section 8.3 item 2).
 	removed []domain.Targets
 	cancel  context.CancelFunc
+
+	// focus are the focused threads of the connection (M1-66) and focusGen counts their
+	// replacements, so a re-check never overwrites a newer focus; both are guarded by the hub's
+	// mutex like the indices.
+	focus    []domain.FocusEntry
+	focusGen uint64
 }
 
 // Hub implements Delivery and delivers the durable events of the log to the registered
@@ -111,6 +127,8 @@ type Hub struct {
 	byChannel    map[ids.ID]map[*member]struct{}
 	instanceWide map[*member]struct{}
 	pending      map[*member]struct{}
+	// byThread is the focus index thread -> connections that focus it (M1-66).
+	byThread map[ids.ID]map[*member]struct{}
 	// notLive are the connections from Register until they go live: each is a candidate of every
 	// event of a space or channel, so its live buffer holds everything it may be entitled to,
 	// and the flush decides with the rights of that moment (M1-65/15).
@@ -132,10 +150,14 @@ func NewHub(cfg HubConfig, d HubDeps) (*Hub, error) {
 	if d.Log == nil {
 		d.Log = slog.Default()
 	}
+	if d.Clock == nil {
+		d.Clock = clock.System()
+	}
 	return &Hub{
 		cfg: cfg, d: d, members: map[*Connection]*member{}, byPrincipal: map[ids.ID]map[*member]struct{}{},
 		bySpace: map[ids.ID]map[*member]struct{}{}, byChannel: map[ids.ID]map[*member]struct{}{},
 		instanceWide: map[*member]struct{}{}, pending: map[*member]struct{}{}, notLive: map[*member]struct{}{},
+		byThread: map[ids.ID]map[*member]struct{}{},
 	}, nil
 }
 
@@ -158,7 +180,10 @@ const (
 // Register implements Delivery: c enters the hub in phase catching_up as a candidate of every
 // event, then its visible sets are read (Authorizer.Scope in delivery mode) and the indices set,
 // unless an access.changed of the principal was processed meanwhile (that one set fresher ones).
+// The focus of a resumed session is restored, each thread re-checked with gateway.focus in
+// delivery mode (04 section 6.3 step 7).
 func (h *Hub) Register(ctx context.Context, c *Connection, s *Session) {
+	defer h.restoreFocus(ctx, c, s)
 	_, a := c.current()
 	m := &member{c: c, s: s, pending: true, phase: domain.PhaseCatchingUp}
 	h.mu.Lock()
@@ -249,6 +274,8 @@ func (h *Hub) Dispatch(ctx context.Context, ev sync.Event) {
 		h.accessChanged(ctx, ev)
 	case ev.Type == eventSessionRevoked && !ev.AudiencePrincipalID.IsZero():
 		h.sessionRevoked(ev)
+	case ev.Type == eventThreadMoved || ev.Type == eventChannelArchived || ev.Type == eventSpaceArchived:
+		h.structureChanged(ctx, ev)
 	}
 	enc := &encoded{ev: ev}
 	for _, m := range h.candidates(ev) {
@@ -566,6 +593,7 @@ func (h *Hub) unindexLocked(m *member) {
 // removeLocked removes m from every index; h.mu is held.
 func (h *Hub) removeLocked(m *member) {
 	h.unindexLocked(m)
+	h.setFocusLocked(m, nil)
 	delete(h.pending, m)
 	delete(h.notLive, m)
 	_, a := m.c.current()

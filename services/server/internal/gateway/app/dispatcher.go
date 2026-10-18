@@ -11,6 +11,7 @@ import (
 	"slices"
 	"sort"
 	gosync "sync"
+	"sync/atomic"
 
 	"github.com/OWNER/bothy/services/server/internal/gateway/domain"
 	"github.com/OWNER/bothy/services/server/internal/kernel/authorize"
@@ -125,7 +126,7 @@ func (d *Dispatcher) Dispatch(ctx context.Context, c *Connection, op string, raw
 		c.Close(domain.CloseDecodeError, "")
 		return
 	}
-	ctx = authorize.WithRequestScope(authorize.WithCheckLog(ctx))
+	ctx = context.WithValue(authorize.WithRequestScope(authorize.WithCheckLog(ctx)), noResourceKey{}, new(atomic.Bool))
 	err = e.handler(ctx, c, v)
 	var ce *CloseError
 	var oe *OpError
@@ -147,9 +148,25 @@ func (d *Dispatcher) Dispatch(ctx context.Context, c *Connection, op string, raw
 	}
 }
 
-// proven reports whether the check log of ctx holds an authorize check of action.
+// proven reports whether the check log of ctx holds an authorize check of action, or whether the
+// handler declared that its op named no resource (noResource).
 func proven(ctx context.Context, action authorize.Action) bool {
+	if b, ok := ctx.Value(noResourceKey{}).(*atomic.Bool); ok && b.Load() {
+		return true
+	}
 	return slices.ContainsFunc(authorize.Checks(ctx), func(ch authorize.Check) bool {
 		return ch.Action == string(action) && ch.Kind == authorize.CheckAuthorize
 	})
+}
+
+// noResourceKey is the context key of the marker of noResource.
+type noResourceKey struct{}
+
+// noResource declares that the op of ctx succeeded without naming any resource, so there was
+// nothing to authorize: a focus with an empty set, which grants nothing and only clears the
+// previous focus (docs/DECISIONS.md M1-66). Every other success still needs its check.
+func noResource(ctx context.Context) {
+	if b, ok := ctx.Value(noResourceKey{}).(*atomic.Bool); ok {
+		b.Store(true)
+	}
 }
