@@ -23,6 +23,8 @@ const Map<String, String> exceptions = {
   'vizChartRuns': 'German plural of the term Run',
   // {space} and {channel} are placeholders that carry the names, not the terms (INT-W27/4).
   'vizLaneLabel': 'placeholders {space} and {channel}, not the terms',
+  // "runs on the subscription" is the verb, not the term Run (components.md section 10).
+  'billingLabelPersonal': 'verb "runs", not the term Run',
 };
 
 void main() {

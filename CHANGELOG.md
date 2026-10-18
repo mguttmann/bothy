@@ -33,6 +33,14 @@ operated, and the order of the build.
   transaction, removal of targets and wipe, the cache cleanup by `client.cache_max_age` and
   `client.cache_max_bytes`, and a migration survival test for outbox, drafts and share inbox;
   `make codegen-check` compares the drift generation (M4-12).
+- Design system core components: message (every variant, collapse with "Show more", origin
+  badges, isolated foreign names), a safe Markdown renderer that runs and loads nothing, live box
+  with collapsed and mobile lines and a throttled announcer, tool chip, status line, trigger
+  state, thread, space and channel rows, components on messages with a header built only from
+  server fields, the composer with suggestions, the backend policy badge with cost texts and
+  banners; view models with `unknown` members, texts in German and English, a golden matrix in
+  light and dark, three densities, text scale 1 and 2, de and en, and guideline tests for contrast,
+  tap targets and labels (M4-07).
 - Design tokens: `tools/design-tokens` writes `design/build/ts/tokens.gen.ts` for the Grafana
   panel plugin (colour roles of both themes including the chart and state roles, font families,
   font sizes and radii as typed constants) and copies the vendored Atkinson Hyperlegible fonts

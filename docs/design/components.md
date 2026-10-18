@@ -268,6 +268,15 @@ Accessibility: group with a label from the card title; buttons in reading order;
 triggers an approval globally (accidental operation); Enter or Space only on the focused
 button.
 
+Header and texts (M4-07, SEC-OUT-4): above the agent text a framed header with
+`security.step-up`, built only from server fields: "Request from <Agent>", "Run <Run>",
+"Requires the permission '<Capability>'" and the approval note ("Only <Name> or an owner can
+approve this", "Only an owner can approve this", "Anyone with access to this channel can
+answer"). Below it a divider labeled "Text from <Agent>", then the agent text. While an answer is
+pending the button reads "Sending your choice" to screen readers. Form fields show "Required",
+"At most <n> characters" or "Enter a number"; a select without a choice shows "Choose"; a
+component type the app does not know shows "This element needs a newer app".
+
 ## 9. Input with slash suggestions
 
 Purpose: compose a message, commands (`commands`) with options and autocompletion,
@@ -297,6 +306,11 @@ your own last message.
 
 Accessibility: field with the label "Message to <channel or thread>"; suggestion list as a listbox
 with an active entry; the number of suggestions is announced.
+
+Texts (M4-07): two or more people typing read "Several people are typing"; offline shows
+"Offline: your message waits in the queue" with `state.offline`; incomplete options show
+"Missing option: <Option>" with `state.warning` above the field; the buttons read "Send",
+"Attach file" and "Record voice message".
 
 ## 10. Backend policy badge
 
