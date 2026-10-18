@@ -107,7 +107,7 @@ func TestGateway_SpaceDefaultOperatorGetsNewChannelLive(t *testing.T) {
 	t.Logf("live frames of the operator agent: %v", ops(live))
 	c.Close()
 	// Control: the agent may read the channel; catch-up from the head of ready admits the message.
-	c2 := w.dial()
+	c2 := w.dial(t)
 	p := params
 	p.Cursor, p.SyncEpoch = &r.HeadSeq, r.SyncEpoch.String()
 	ictx, icancel := context.WithTimeout(context.Background(), testkit.Patience)
@@ -187,6 +187,8 @@ func TestGateway_OperatorNewChannelWhileCatchingUp(t *testing.T) {
 	wcancel()
 	c2 := w.dial(wstest.WithoutHeartbeat())
 	ctx, cancel := context.WithTimeout(context.Background(), testkit.Patience)
+	c2 := w.dial(t, wstest.WithoutHeartbeat())
+	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
 	p := params
 	p.Cursor, p.SyncEpoch = &r.HeadSeq, r.SyncEpoch.String()
 	if _, err := c2.Identify(ctx, p); err != nil {
