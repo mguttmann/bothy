@@ -111,8 +111,8 @@ func TestGatewayOpsEnableList(t *testing.T) {
 	}
 }
 
-// TestGatewayOpRateClasses: the classes the gateway counts for focus and typing are the
-// x-rate-limit-class of their receive operations in docs/api/asyncapi.yaml.
+// TestGatewayOpRateClasses: the class of every enabled op is the x-rate-limit-class of its
+// receive operation in docs/api/asyncapi.yaml.
 func TestGatewayOpRateClasses(t *testing.T) {
 	t.Parallel()
 	b, err := os.ReadFile("../../../../docs/api/asyncapi.yaml")
@@ -132,7 +132,7 @@ func TestGatewayOpRateClasses(t *testing.T) {
 			t.Errorf("%s counts %s, the contract says %q", op, class, got)
 		}
 	}
-	if n := len(wire.GatewayOpClasses()); n != 3 {
-		t.Errorf("%d ops with a class, want focus, typing.start and typing.stop", n)
+	if n := len(wire.GatewayOpClasses()); n != len(routes.GatewayOps()) {
+		t.Errorf("%d ops with a class, want every enabled op", n)
 	}
 }
