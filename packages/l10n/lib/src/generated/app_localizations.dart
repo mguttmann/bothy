@@ -4884,6 +4884,510 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Reason'**
   String get threadMoveReason;
+
+  /// Entry of the grants in the administration navigation (01 section 5.2 A1).
+  ///
+  /// In en, this message translates to:
+  /// **'Access grants'**
+  String get adminNavGrants;
+
+  /// Title of the grants screen (01 section 5.2 A2, A3).
+  ///
+  /// In en, this message translates to:
+  /// **'Access grants'**
+  String get adminGrantsTitle;
+
+  /// Label of the target picker of the grants screen.
+  ///
+  /// In en, this message translates to:
+  /// **'Target'**
+  String get adminGrantsTarget;
+
+  /// Hint of the target picker before a target is chosen.
+  ///
+  /// In en, this message translates to:
+  /// **'Choose a target'**
+  String get adminGrantsPickTarget;
+
+  /// The instance as the target of an access grant (07 section 2.4).
+  ///
+  /// In en, this message translates to:
+  /// **'Instance'**
+  String get adminTargetInstance;
+
+  /// A space as the target of an access grant.
+  ///
+  /// In en, this message translates to:
+  /// **'Space {name}'**
+  String adminTargetSpace(String name);
+
+  /// A channel as the target of an access grant, with its space.
+  ///
+  /// In en, this message translates to:
+  /// **'Channel {path}'**
+  String adminTargetChannel(String path);
+
+  /// Button and title of the grant wizard (01 section 5.2 A2).
+  ///
+  /// In en, this message translates to:
+  /// **'Create access grant'**
+  String get adminGrantsCreate;
+
+  /// Button and title of the access view of a space or channel (01 section 5.2 A3).
+  ///
+  /// In en, this message translates to:
+  /// **'Who has access?'**
+  String get adminGrantsWhoHasAccess;
+
+  /// Empty grants list of a target.
+  ///
+  /// In en, this message translates to:
+  /// **'No access grant on this target.'**
+  String get adminGrantsEmpty;
+
+  /// End of an access grant or source in a list.
+  ///
+  /// In en, this message translates to:
+  /// **'until {day}'**
+  String adminGrantsUntil(String day);
+
+  /// Reason of an access grant in a list.
+  ///
+  /// In en, this message translates to:
+  /// **'Reason: {reason}'**
+  String adminGrantsReason(String reason);
+
+  /// Notice after an access grant was created.
+  ///
+  /// In en, this message translates to:
+  /// **'{name} received the access grant.'**
+  String adminGrantCreated(String name);
+
+  /// Notice after an access grant was revoked.
+  ///
+  /// In en, this message translates to:
+  /// **'The access grant for {name} was revoked.'**
+  String adminGrantRevoked(String name);
+
+  /// Level read of an access grant (07 section 2.2).
+  ///
+  /// In en, this message translates to:
+  /// **'Read'**
+  String get adminLevelRead;
+
+  /// Level write of an access grant (07 section 2.2).
+  ///
+  /// In en, this message translates to:
+  /// **'Write'**
+  String get adminLevelWrite;
+
+  /// Level trigger of an access grant (01 section 9 term table).
+  ///
+  /// In en, this message translates to:
+  /// **'Trigger agents'**
+  String get adminLevelTrigger;
+
+  /// Level none: no level before or after a change, or access only via an agent.
+  ///
+  /// In en, this message translates to:
+  /// **'No level'**
+  String get adminLevelNone;
+
+  /// Capability upload (07 section 2.3).
+  ///
+  /// In en, this message translates to:
+  /// **'Upload files'**
+  String get adminCapabilityUpload;
+
+  /// Capability export (07 section 2.3).
+  ///
+  /// In en, this message translates to:
+  /// **'Export'**
+  String get adminCapabilityExport;
+
+  /// Capability manage (07 section 2.3).
+  ///
+  /// In en, this message translates to:
+  /// **'Manage'**
+  String get adminCapabilityManage;
+
+  /// Capability terminal on a host (07 section 2.12).
+  ///
+  /// In en, this message translates to:
+  /// **'Terminal'**
+  String get adminCapabilityTerminal;
+
+  /// Progress of the grant wizard.
+  ///
+  /// In en, this message translates to:
+  /// **'Step {step} of {total}'**
+  String adminWizardStep(int step, int total);
+
+  /// Step 1 of the grant wizard.
+  ///
+  /// In en, this message translates to:
+  /// **'Who'**
+  String get adminWizardWho;
+
+  /// Step 2 of the grant wizard.
+  ///
+  /// In en, this message translates to:
+  /// **'Where'**
+  String get adminWizardWhere;
+
+  /// Step 3 of the grant wizard.
+  ///
+  /// In en, this message translates to:
+  /// **'Level and capabilities'**
+  String get adminWizardLevel;
+
+  /// Subject kind person in the grant wizard.
+  ///
+  /// In en, this message translates to:
+  /// **'Person'**
+  String get adminWizardKindPerson;
+
+  /// Subject kind group in the grant wizard.
+  ///
+  /// In en, this message translates to:
+  /// **'Group'**
+  String get adminWizardKindGroup;
+
+  /// Subject kind agent in the grant wizard.
+  ///
+  /// In en, this message translates to:
+  /// **'Agent'**
+  String get adminWizardKindAgent;
+
+  /// Search field of the subject step.
+  ///
+  /// In en, this message translates to:
+  /// **'Search by name'**
+  String get adminWizardSearch;
+
+  /// Empty result of a wizard list.
+  ///
+  /// In en, this message translates to:
+  /// **'Nothing matches.'**
+  String get adminWizardNoMatch;
+
+  /// Label of the capability boxes.
+  ///
+  /// In en, this message translates to:
+  /// **'Capabilities'**
+  String get adminWizardCapabilities;
+
+  /// Field of the expiry date of an access grant.
+  ///
+  /// In en, this message translates to:
+  /// **'Valid until (YYYY-MM-DD, optional)'**
+  String get adminWizardUntil;
+
+  /// Required reason of an access grant or a revocation (07 section 9.5).
+  ///
+  /// In en, this message translates to:
+  /// **'Reason (required, stored in the audit log)'**
+  String get adminReasonRequired;
+
+  /// Previous step of the grant wizard.
+  ///
+  /// In en, this message translates to:
+  /// **'Back'**
+  String get adminWizardBack;
+
+  /// Next step of the grant wizard.
+  ///
+  /// In en, this message translates to:
+  /// **'Next'**
+  String get adminWizardNext;
+
+  /// Confirms the access grant after the preview; the step-up follows (07 section 9.3).
+  ///
+  /// In en, this message translates to:
+  /// **'Confirm'**
+  String get adminWizardConfirm;
+
+  /// Title of the preview panel (07 section 9.3).
+  ///
+  /// In en, this message translates to:
+  /// **'Plain-language preview'**
+  String get adminPreviewTitle;
+
+  /// Shown while the preview loads.
+  ///
+  /// In en, this message translates to:
+  /// **'Checking the effect'**
+  String get adminPreviewLoading;
+
+  /// Title of the effects per principal in the preview.
+  ///
+  /// In en, this message translates to:
+  /// **'Who is affected'**
+  String get adminPreviewEffects;
+
+  /// Effect label: a principal gains a level.
+  ///
+  /// In en, this message translates to:
+  /// **'Gets {level}'**
+  String adminPreviewAdded(String level);
+
+  /// Effect label: a principal loses its level.
+  ///
+  /// In en, this message translates to:
+  /// **'Loses {level}'**
+  String adminPreviewRemoved(String level);
+
+  /// Effect label: the level of a principal changes.
+  ///
+  /// In en, this message translates to:
+  /// **'{before} becomes {after}'**
+  String adminPreviewChanged(String before, String after);
+
+  /// Effect label: capabilities that are added.
+  ///
+  /// In en, this message translates to:
+  /// **'Adds: {list}'**
+  String adminPreviewCapabilities(String list);
+
+  /// Title of an invariant violation in the preview (07 section 9.3).
+  ///
+  /// In en, this message translates to:
+  /// **'Would be rejected'**
+  String get adminPreviewRejected;
+
+  /// The agent an invariant violation names.
+  ///
+  /// In en, this message translates to:
+  /// **'Agent: {agent}'**
+  String adminPreviewAgent(String agent);
+
+  /// The principals an invariant violation names.
+  ///
+  /// In en, this message translates to:
+  /// **'Affected: {people}'**
+  String adminPreviewAffected(String people);
+
+  /// Guidance for an I1 violation in the preview (01 section 5.2 A2; 10 section 11).
+  ///
+  /// In en, this message translates to:
+  /// **'Switch the agent to organization first.'**
+  String get adminPreviewI1Hint;
+
+  /// A delegation limit refuses the access grant (07 section 4.1).
+  ///
+  /// In en, this message translates to:
+  /// **'The access grant would be refused: {reason}'**
+  String adminPreviewDenied(String reason);
+
+  /// Title of the hints in the preview.
+  ///
+  /// In en, this message translates to:
+  /// **'Hints'**
+  String get adminPreviewHints;
+
+  /// Hint read_horizon of the preview (07 section 6).
+  ///
+  /// In en, this message translates to:
+  /// **'Read horizon (H1): {person} can learn content of {channel} through agent {agent}'**
+  String adminHintReadHorizon(String person, String channel, String agent);
+
+  /// Hint trigger_blocked_tool_class of the preview (07 section 5).
+  ///
+  /// In en, this message translates to:
+  /// **'Triggering blocked: {agent} cannot be triggered by this principal (SR2, SR3)'**
+  String adminHintTriggerBlocked(String agent);
+
+  /// Hint group_reach of the preview.
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, =1{This access grant reaches 1 person} other{This access grant reaches {count} people}}'**
+  String adminHintGroupReach(int count);
+
+  /// Hint expiry_missing of the preview (07 section 9.5).
+  ///
+  /// In en, this message translates to:
+  /// **'No expiry date: the access grant for a person outside of groups has no end'**
+  String get adminHintExpiryMissing;
+
+  /// Hint terminal_not_effective of the preview (07 section 2.12).
+  ///
+  /// In en, this message translates to:
+  /// **'The access grant does not take effect on this host (SR10, SR12)'**
+  String get adminHintTerminalNotEffective;
+
+  /// A hint code this app does not know.
+  ///
+  /// In en, this message translates to:
+  /// **'Hint {code}'**
+  String adminHintUnknown(String code);
+
+  /// Title of the revoke confirmation.
+  ///
+  /// In en, this message translates to:
+  /// **'Revoke the access grant for {name}?'**
+  String adminRevokeGrantTitle(String name);
+
+  /// Body of the revoke confirmation (07 section 9.5).
+  ///
+  /// In en, this message translates to:
+  /// **'Revoking takes effect immediately: the access ends now.'**
+  String get adminRevokeGrantBody;
+
+  /// Title of the access view of a target.
+  ///
+  /// In en, this message translates to:
+  /// **'Who has access? {target}'**
+  String adminAccessTitle(String target);
+
+  /// Empty access view.
+  ///
+  /// In en, this message translates to:
+  /// **'Nobody has access.'**
+  String get adminAccessEmpty;
+
+  /// Source direct (07 section 9.1).
+  ///
+  /// In en, this message translates to:
+  /// **'Direct access grant'**
+  String get adminSourceDirect;
+
+  /// Source group (07 section 9.1).
+  ///
+  /// In en, this message translates to:
+  /// **'Via group {group}'**
+  String adminSourceGroup(String group);
+
+  /// Source inherited from a space (07 section 9.1).
+  ///
+  /// In en, this message translates to:
+  /// **'Inherited from space {space}'**
+  String adminSourceInheritedSpace(String space);
+
+  /// Source inherited from the instance (07 section 9.1).
+  ///
+  /// In en, this message translates to:
+  /// **'Inherited from the instance'**
+  String get adminSourceInheritedInstance;
+
+  /// Source dm_participant (07 section 9.1).
+  ///
+  /// In en, this message translates to:
+  /// **'Participant'**
+  String get adminSourceDm;
+
+  /// Source operator (07 section 9.1).
+  ///
+  /// In en, this message translates to:
+  /// **'Operator of this channel'**
+  String get adminSourceOperator;
+
+  /// Source via_agent with hint H1 (07 sections 6 and 9.1).
+  ///
+  /// In en, this message translates to:
+  /// **'Can learn content here through agent {agent} (H1)'**
+  String adminSourceViaAgent(String agent);
+
+  /// Source guard_blocked with its rule (07 section 9.1).
+  ///
+  /// In en, this message translates to:
+  /// **'Trigger agents, but triggering is blocked ({rule})'**
+  String adminSourceGuardBlocked(String rule);
+
+  /// The agent of a guard_blocked source.
+  ///
+  /// In en, this message translates to:
+  /// **'Agent {agent}'**
+  String adminSourceGuardAgent(String agent);
+
+  /// A source kind this app does not know.
+  ///
+  /// In en, this message translates to:
+  /// **'Other source'**
+  String get adminSourceUnknown;
+
+  /// End of the group membership of a source.
+  ///
+  /// In en, this message translates to:
+  /// **'member until {day}'**
+  String adminSourceMemberUntil(String day);
+
+  /// Picker of the view as a person (01 section 5.2 A4).
+  ///
+  /// In en, this message translates to:
+  /// **'View as person'**
+  String get adminAccessViewAs;
+
+  /// Frame of the view as a person (01 section 5.2 A4).
+  ///
+  /// In en, this message translates to:
+  /// **'Viewing as {name} (read-only). Nothing is sent. Logged.'**
+  String adminViewAsBanner(String name);
+
+  /// End of the view as a person (07 section 9.2).
+  ///
+  /// In en, this message translates to:
+  /// **'The view ends {when}'**
+  String adminViewAsUntil(String when);
+
+  /// Leaves the view as a person.
+  ///
+  /// In en, this message translates to:
+  /// **'Exit'**
+  String get adminViewAsExit;
+
+  /// Title of the spaces the person sees.
+  ///
+  /// In en, this message translates to:
+  /// **'Space list'**
+  String get adminViewAsSpaces;
+
+  /// Title of the channels the person sees.
+  ///
+  /// In en, this message translates to:
+  /// **'Channel list'**
+  String get adminViewAsChannels;
+
+  /// The person sees no space or channel.
+  ///
+  /// In en, this message translates to:
+  /// **'Nothing visible.'**
+  String get adminViewAsNothing;
+
+  /// Purpose of the step-up of createGrant.
+  ///
+  /// In en, this message translates to:
+  /// **'Create the access grant for {name} on {target}'**
+  String stepUpPurposeCreateGrant(String name, String target);
+
+  /// Purpose of the step-up of revokeGrant.
+  ///
+  /// In en, this message translates to:
+  /// **'Revoke the access grant for {name}'**
+  String stepUpPurposeRevokeGrant(String name);
+
+  /// Purpose of the step-up of viewAsUser.
+  ///
+  /// In en, this message translates to:
+  /// **'View as {name}'**
+  String stepUpPurposeViewAs(String name);
+
+  /// Text of forbidden with reason delegation_exceeds_own_level (07 section 4.1).
+  ///
+  /// In en, this message translates to:
+  /// **'You cannot give more than your own level'**
+  String get problemForbiddenDelegationLevel;
+
+  /// Text of forbidden with reason delegation_exceeds_own_capabilities (07 section 4.1).
+  ///
+  /// In en, this message translates to:
+  /// **'You cannot give capabilities you do not have'**
+  String get problemForbiddenDelegationCapabilities;
+
+  /// Text of forbidden with reason subject_kind_not_allowed (07 section 4.1).
+  ///
+  /// In en, this message translates to:
+  /// **'Not allowed for agents or apps'**
+  String get problemForbiddenSubjectKind;
 }
 
 class _AppLocalizationsDelegate

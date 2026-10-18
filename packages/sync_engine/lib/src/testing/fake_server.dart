@@ -11,6 +11,7 @@ import 'action_catalog.dart';
 import 'dpop_verifier.dart';
 import 'faults.dart';
 import 'gateway_fake.dart';
+import 'rest/access_handlers.dart';
 import 'rest/admin_handlers.dart';
 import 'rest/auth_handlers.dart';
 import 'rest/message_handlers.dart';
@@ -148,6 +149,7 @@ final class FakeServer {
     registerThreadViewHandlers(rest);
     final actions = ActionCatalog.load();
     registerAdminHandlers(rest, actions);
+    registerAccessHandlers(rest, actions);
     final server = FakeServer._(
       http,
       world,

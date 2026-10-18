@@ -2941,4 +2941,330 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get threadMoveReason => 'Reason';
+
+  @override
+  String get adminNavGrants => 'Access grants';
+
+  @override
+  String get adminGrantsTitle => 'Access grants';
+
+  @override
+  String get adminGrantsTarget => 'Target';
+
+  @override
+  String get adminGrantsPickTarget => 'Choose a target';
+
+  @override
+  String get adminTargetInstance => 'Instance';
+
+  @override
+  String adminTargetSpace(String name) {
+    return 'Space $name';
+  }
+
+  @override
+  String adminTargetChannel(String path) {
+    return 'Channel $path';
+  }
+
+  @override
+  String get adminGrantsCreate => 'Create access grant';
+
+  @override
+  String get adminGrantsWhoHasAccess => 'Who has access?';
+
+  @override
+  String get adminGrantsEmpty => 'No access grant on this target.';
+
+  @override
+  String adminGrantsUntil(String day) {
+    return 'until $day';
+  }
+
+  @override
+  String adminGrantsReason(String reason) {
+    return 'Reason: $reason';
+  }
+
+  @override
+  String adminGrantCreated(String name) {
+    return '$name received the access grant.';
+  }
+
+  @override
+  String adminGrantRevoked(String name) {
+    return 'The access grant for $name was revoked.';
+  }
+
+  @override
+  String get adminLevelRead => 'Read';
+
+  @override
+  String get adminLevelWrite => 'Write';
+
+  @override
+  String get adminLevelTrigger => 'Trigger agents';
+
+  @override
+  String get adminLevelNone => 'No level';
+
+  @override
+  String get adminCapabilityUpload => 'Upload files';
+
+  @override
+  String get adminCapabilityExport => 'Export';
+
+  @override
+  String get adminCapabilityManage => 'Manage';
+
+  @override
+  String get adminCapabilityTerminal => 'Terminal';
+
+  @override
+  String adminWizardStep(int step, int total) {
+    return 'Step $step of $total';
+  }
+
+  @override
+  String get adminWizardWho => 'Who';
+
+  @override
+  String get adminWizardWhere => 'Where';
+
+  @override
+  String get adminWizardLevel => 'Level and capabilities';
+
+  @override
+  String get adminWizardKindPerson => 'Person';
+
+  @override
+  String get adminWizardKindGroup => 'Group';
+
+  @override
+  String get adminWizardKindAgent => 'Agent';
+
+  @override
+  String get adminWizardSearch => 'Search by name';
+
+  @override
+  String get adminWizardNoMatch => 'Nothing matches.';
+
+  @override
+  String get adminWizardCapabilities => 'Capabilities';
+
+  @override
+  String get adminWizardUntil => 'Valid until (YYYY-MM-DD, optional)';
+
+  @override
+  String get adminReasonRequired =>
+      'Reason (required, stored in the audit log)';
+
+  @override
+  String get adminWizardBack => 'Back';
+
+  @override
+  String get adminWizardNext => 'Next';
+
+  @override
+  String get adminWizardConfirm => 'Confirm';
+
+  @override
+  String get adminPreviewTitle => 'Plain-language preview';
+
+  @override
+  String get adminPreviewLoading => 'Checking the effect';
+
+  @override
+  String get adminPreviewEffects => 'Who is affected';
+
+  @override
+  String adminPreviewAdded(String level) {
+    return 'Gets $level';
+  }
+
+  @override
+  String adminPreviewRemoved(String level) {
+    return 'Loses $level';
+  }
+
+  @override
+  String adminPreviewChanged(String before, String after) {
+    return '$before becomes $after';
+  }
+
+  @override
+  String adminPreviewCapabilities(String list) {
+    return 'Adds: $list';
+  }
+
+  @override
+  String get adminPreviewRejected => 'Would be rejected';
+
+  @override
+  String adminPreviewAgent(String agent) {
+    return 'Agent: $agent';
+  }
+
+  @override
+  String adminPreviewAffected(String people) {
+    return 'Affected: $people';
+  }
+
+  @override
+  String get adminPreviewI1Hint => 'Switch the agent to organization first.';
+
+  @override
+  String adminPreviewDenied(String reason) {
+    return 'The access grant would be refused: $reason';
+  }
+
+  @override
+  String get adminPreviewHints => 'Hints';
+
+  @override
+  String adminHintReadHorizon(String person, String channel, String agent) {
+    return 'Read horizon (H1): $person can learn content of $channel through agent $agent';
+  }
+
+  @override
+  String adminHintTriggerBlocked(String agent) {
+    return 'Triggering blocked: $agent cannot be triggered by this principal (SR2, SR3)';
+  }
+
+  @override
+  String adminHintGroupReach(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: 'This access grant reaches $count people',
+      one: 'This access grant reaches 1 person',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get adminHintExpiryMissing =>
+      'No expiry date: the access grant for a person outside of groups has no end';
+
+  @override
+  String get adminHintTerminalNotEffective =>
+      'The access grant does not take effect on this host (SR10, SR12)';
+
+  @override
+  String adminHintUnknown(String code) {
+    return 'Hint $code';
+  }
+
+  @override
+  String adminRevokeGrantTitle(String name) {
+    return 'Revoke the access grant for $name?';
+  }
+
+  @override
+  String get adminRevokeGrantBody =>
+      'Revoking takes effect immediately: the access ends now.';
+
+  @override
+  String adminAccessTitle(String target) {
+    return 'Who has access? $target';
+  }
+
+  @override
+  String get adminAccessEmpty => 'Nobody has access.';
+
+  @override
+  String get adminSourceDirect => 'Direct access grant';
+
+  @override
+  String adminSourceGroup(String group) {
+    return 'Via group $group';
+  }
+
+  @override
+  String adminSourceInheritedSpace(String space) {
+    return 'Inherited from space $space';
+  }
+
+  @override
+  String get adminSourceInheritedInstance => 'Inherited from the instance';
+
+  @override
+  String get adminSourceDm => 'Participant';
+
+  @override
+  String get adminSourceOperator => 'Operator of this channel';
+
+  @override
+  String adminSourceViaAgent(String agent) {
+    return 'Can learn content here through agent $agent (H1)';
+  }
+
+  @override
+  String adminSourceGuardBlocked(String rule) {
+    return 'Trigger agents, but triggering is blocked ($rule)';
+  }
+
+  @override
+  String adminSourceGuardAgent(String agent) {
+    return 'Agent $agent';
+  }
+
+  @override
+  String get adminSourceUnknown => 'Other source';
+
+  @override
+  String adminSourceMemberUntil(String day) {
+    return 'member until $day';
+  }
+
+  @override
+  String get adminAccessViewAs => 'View as person';
+
+  @override
+  String adminViewAsBanner(String name) {
+    return 'Viewing as $name (read-only). Nothing is sent. Logged.';
+  }
+
+  @override
+  String adminViewAsUntil(String when) {
+    return 'The view ends $when';
+  }
+
+  @override
+  String get adminViewAsExit => 'Exit';
+
+  @override
+  String get adminViewAsSpaces => 'Space list';
+
+  @override
+  String get adminViewAsChannels => 'Channel list';
+
+  @override
+  String get adminViewAsNothing => 'Nothing visible.';
+
+  @override
+  String stepUpPurposeCreateGrant(String name, String target) {
+    return 'Create the access grant for $name on $target';
+  }
+
+  @override
+  String stepUpPurposeRevokeGrant(String name) {
+    return 'Revoke the access grant for $name';
+  }
+
+  @override
+  String stepUpPurposeViewAs(String name) {
+    return 'View as $name';
+  }
+
+  @override
+  String get problemForbiddenDelegationLevel =>
+      'You cannot give more than your own level';
+
+  @override
+  String get problemForbiddenDelegationCapabilities =>
+      'You cannot give capabilities you do not have';
+
+  @override
+  String get problemForbiddenSubjectKind => 'Not allowed for agents or apps';
 }

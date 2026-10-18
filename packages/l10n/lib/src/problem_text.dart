@@ -23,6 +23,11 @@ String problemText(AppLocalizations l, String code, {String? reason}) {
     ('forbidden', 'level_insufficient') => l.problemForbiddenLevelInsufficient,
     ('forbidden', 'owner_only') => l.problemForbiddenOwnerOnly,
     ('forbidden', 'view_as_read_only') => l.problemForbiddenViewAsReadOnly,
+    ('forbidden', 'delegation_exceeds_own_level') =>
+      l.problemForbiddenDelegationLevel,
+    ('forbidden', 'delegation_exceeds_own_capabilities') =>
+      l.problemForbiddenDelegationCapabilities,
+    ('forbidden', 'subject_kind_not_allowed') => l.problemForbiddenSubjectKind,
     ('channel_read_only', 'channel_archived') =>
       l.problemChannelReadOnlyChannelArchived,
     ('agent_invocation_denied', 'project_not_ready') =>

@@ -5,7 +5,8 @@ the onboarding screens E1 to E7 and the empty column frames of the main view, wh
 M4-25 fill. Settings (M4-25): the sections of 01 5.1 D8 under `/settings/<section>`, with the
 device and session views of `admin_ui`. Administration (M4-26): the `AdminShell` of `admin_ui`
 at `/admin`, `/admin/<section>` and `/admin/<section>/<id>` (`lib/admin/admin_route.dart`),
-over the REST client of the signed-in session. iOS and Android follow in M5.
+over the REST client of the signed-in session; grants (M4-27) at `/admin/grants/<target key>`
+with the grant wizard, "Who has access?" and "View as person". iOS and Android follow in M5.
 
 Flutter app for macOS and Windows, later iOS and Android. One code base for interface and
 logic; native code only where the system requires it.
@@ -91,7 +92,11 @@ without one.
   `flutter test integration_test/forum_test.dart -d flutter-tester`.
   `integration_test/admin_step_up_test.dart` walks every changing action of the administration
   through its screens and checks the step-up dialog against `docs/spec/actions.yaml`;
-  `test/admin/admin_step_up_test.dart` runs the same enumeration headless.
+  `test/admin/admin_step_up_test.dart` runs the same enumeration headless (grants and "View as
+  person" included). `integration_test/grant_preview_test.dart` runs the example of 07 9.3 from
+  the wizard to "Who has access?"; `test/admin/grant_preview_test.dart` runs it headless over
+  REST. Both compare the preview with the example the fake reads from the specification at run
+  time.
 
 ## Sidebar and post list
 

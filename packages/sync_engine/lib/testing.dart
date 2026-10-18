@@ -20,6 +20,7 @@ export 'src/testing/dpop_verifier.dart';
 export 'src/testing/fake_server.dart';
 export 'src/testing/faults.dart';
 export 'src/testing/gateway_fake.dart';
+export 'src/testing/rest/access_handlers.dart' show grantPreviewExample;
 export 'src/testing/rest_fake.dart';
 export 'src/testing/scenarios.dart';
 export 'src/testing/schema_validator.dart';

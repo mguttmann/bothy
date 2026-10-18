@@ -958,12 +958,16 @@ warum eine Freigabe scheitern würde.
 
 Beispiel:
 
+<!-- language-check: off -->
+
 ```text
 Sam erhält bis 31.12.2026 die Stufe "Auslösen" im Kanal Marketing/Kampagnen.
 Sam kann damit: Nachrichten lesen und schreiben, Threads anlegen, Agent Texter auslösen.
 Dateien hochladen: nein. Freigabe-Karten bestätigen: nein.
 Hinweis: Texter liest auch Marketing/Intern. Sam darf Marketing/Intern nicht lesen, kann aber über Texter Inhalte daraus erfahren.
 ```
+
+<!-- language-check: on -->
 
 Eine Freigabe auf einen Rechner (M2-40) zeigt als Wirkung je erreichter Person den Rechner mit
 `before_level` und `after_level` `none` und `capabilities_added: [terminal]`; eine Verletzung von I6

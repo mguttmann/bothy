@@ -12,6 +12,7 @@ import 'package:api_client/api_client.dart';
 import 'package:auth/auth.dart';
 import 'package:dio/dio.dart';
 
+import 'access_repository.dart';
 import 'self_repository.dart';
 
 /// The state of a person (`UserStatus`).
@@ -280,11 +281,12 @@ final class WaitingDevice {
 
 /// The administration's calls; every changing one carries the [purpose] text that the step-up
 /// dialog shows when the server answers `401 step_up_required` (05 2.4, 08 6.2). The
-/// repository never asks for a step-up on its own (fixed requirement 10).
+/// repository never asks for a step-up on its own (fixed requirement 10). It also holds the
+/// grant calls of [AccessRepository] (M4-27), so a host passes one repository to the shell.
 ///
 /// Errors: [SelfActionFailed] with the server's problem (null without an answer),
 /// [StepUpCancelled] when the person cancels the step-up.
-abstract interface class AdminRepository {
+abstract interface class AdminRepository implements AccessRepository {
   /// One page of people; [query] and [status] are request parameters of `listUsers`.
   Future<AdminPage<AdminPerson>> people({
     String? query,
@@ -460,10 +462,47 @@ Future<List<AdminPerson>> allPeople(
 final class ApiAdminRepository implements AdminRepository {
   /// Creates the repository.
   ApiAdminRepository(this._api, {required String Function() newIdempotencyKey})
-    : _newKey = newIdempotencyKey;
+    : _newKey = newIdempotencyKey,
+      _access = ApiAccessRepository(_api, newIdempotencyKey: newIdempotencyKey);
 
   final ApiClient _api;
   final String Function() _newKey;
+  final ApiAccessRepository _access;
+
+  @override
+  Future<List<AdminTarget>> targets() => _access.targets();
+
+  @override
+  Future<List<AdminAgent>> agents() => _access.agents();
+
+  @override
+  Future<GrantPreviewResult> previewGrant(GrantRequest request) =>
+      _access.previewGrant(request);
+
+  @override
+  Future<AdminGrant> createGrant(
+    GrantRequest request, {
+    required String purpose,
+  }) => _access.createGrant(request, purpose: purpose);
+
+  @override
+  Future<List<AdminGrant>> grantsOn(AdminTarget target) =>
+      _access.grantsOn(target);
+
+  @override
+  Future<AdminGrant> revokeGrant(
+    String grantId, {
+    required String reason,
+    required String purpose,
+  }) => _access.revokeGrant(grantId, reason: reason, purpose: purpose);
+
+  @override
+  Future<AccessExplanationResult> explain(AdminTarget target) =>
+      _access.explain(target);
+
+  @override
+  Future<ViewAsResult> viewAs(String userId, {required String purpose}) =>
+      _access.viewAs(userId, purpose: purpose);
 
   UsersApi get _users => _api.getUsersApi();
   GroupsApi get _groups => _api.getGroupsApi();

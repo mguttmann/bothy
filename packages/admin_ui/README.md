@@ -3,7 +3,8 @@
 Administration screens for the desktop app, the console and the emergency actions on mobile.
 
 Status: own devices and sessions (M4-25), the administration of people, groups and waiting
-devices (M4-26); grants (M4-27), agents (M4-28), audit (M4-29) and the console (M6) follow. Kind: Flutter package, a member of the Dart
+devices (M4-26), grants with preview, "Who has access?" and "View as person" (M4-27); agents
+(M4-28), audit (M4-29) and the console (M6) follow. Kind: Flutter package, a member of the Dart
 workspace at the repository root (`resolution: workspace`, `publish_to: none`).
 
 ## What it offers
@@ -25,6 +26,10 @@ database, because the console has neither a gateway nor a local store (15 3.1).
 | `PeopleList`, `PersonDetail`, `CreatePersonDialog`, `EnrollmentCodeView`, `CredentialsSection`, `OwnersSection` | A1 People: list with search, state and group filter (the group filter works on the loaded page, with a note), "Add person" with the code shown once, a person's detail, owners with the server's `last_owner` text |
 | `GroupsList`, `GroupDetail`, `MemberEditor` | groups: create, rename, delete, members with an optional expiry (`YYYY-MM-DD`) |
 | `WaitingDevicesView`, `ApproveDeviceDialog` | the queue of waiting devices with person, platform, time and origin; approve with the code the device shows, reject (revoke) |
+| `AccessRepository`, `ApiAccessRepository` | grants and access over REST: `listSpaces` and `listSpaceChannels` (targets), `listAgents`, `previewGrant`, `createGrant`, `listGrants`, `revokeGrant`, `explainSpaceAccess`, `explainChannelAccess`, `viewAsUser`; `AdminRepository` includes these calls |
+| `GrantWizard`, `PreviewPanel` | A2: who (person, group, agent, search by name), where (instance, space, channel), level, capabilities, last day and required reason; every change previews the full request, the panel shows the server's `text` unchanged, the effects per principal, I1 and SR8 ("Switch the agent to organization first."), the hints and a delegation denial; "Confirm" only with a current, allowed preview and a reason, then the step-up |
+| `GrantsList`, `RevokeGrantDialog` | the grants of a target (`/grants/<target key>`) with "Revoke": takes effect immediately, required reason |
+| `WhoHasAccess`, `SourceChain`, `ViewAsPerson` | A3 and A4: level, capabilities and source chain per principal (owner, direct, group, inherited, participant, operator, via agent with H1, blocked by a guard rule; disabled principals struck through), and the read-only snapshot of a person in a clear frame with its end |
 | `ConfirmChange`, `ProblemBanner`, `adminFailure`, `CodeText` | the one confirmation before a change (danger style for destructive ones), the server's problem texts (`one_time_secret` and `i1_violation` explained), the code view of onboarding and enrollment codes |
 
 Step-up comes only from the server: a changing call carries its purpose text
@@ -61,6 +66,8 @@ Further rules checked by `make arch`:
 | `lib/src/self/` | the device and session views and their dialogs |
 | `lib/src/shell/`, `lib/src/people/`, `lib/src/groups/`, `lib/src/devices/`, `lib/src/common/` | the administration of M4-26 |
 | `lib/src/step_up/` | the step-up dialog |
+| `lib/src/grants/`, `lib/src/access/`, `lib/src/data/access_repository.dart` | the permission screens of M4-27 |
+| `test/grants/`, `test/access/` | the wizard, revoke, "Who has access?" and "View as person"; the fake reads the example of 07 9.3 at run time |
 | `test/self/`, `test/admin/` | widget tests over fake repositories that behave like the server behind the step-up interceptor |
 | `test/goldens/` | goldens (`ci/` with Ahem, `macos/` with the bundled fonts) |
 | `test/` | tests, run by `make test` with coverage (`quality.coverage.dart_min_percent`) |
