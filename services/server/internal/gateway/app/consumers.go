@@ -558,7 +558,7 @@ func (e *ConsumerEngine) step(ctx context.Context, cc *consumerConn) bool {
 // dispatch queues the dispatch frame of env for ev on cc; false when the connection ended. An
 // envelope that cannot be encoded is logged and skipped.
 func (e *ConsumerEngine) dispatch(ctx context.Context, cc *consumerConn, ev sync.Event, env sync.Envelope) bool {
-	b, err := json.Marshal(outFrame{Op: "dispatch", D: env})
+	b, err := json.Marshal(outFrame{Op: opDispatch, D: env})
 	if err != nil {
 		e.d.Log.LogAttrs(ctx, slog.LevelError, msgEncodeEvent, slog.String(logKeyErrorType, errorTypeEncodeEv))
 		return true

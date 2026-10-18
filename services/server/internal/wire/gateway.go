@@ -167,10 +167,7 @@ func NewGateway(cfg GatewayConfig, d GatewayDeps) (*Gateway, error) {
 	if err != nil {
 		return nil, err
 	}
-	var publisher eventlog.EphemeralPublisher = noPublisher{}
-	if hub != nil {
-		publisher = hub
-	}
+	publisher := ephemeralPublisher(hub)
 	engine, err := newConsumerEngine(cfg, d, hub)
 	if err != nil {
 		return nil, err
@@ -391,6 +388,15 @@ func (o opLimiter) AllowRead(principal ids.ID) (bool, error) {
 func (o opLimiter) AllowTyping(conn ids.ID) (bool, error) {
 	d, err := o.l.Allow(typingClass, ratelimit.KeyForConnection(conn.String()))
 	return d.Allowed, err
+}
+
+// ephemeralPublisher returns the hub as the publisher of ephemeral events, or noPublisher when the
+// tests of the connection bring their own delivery (no hub, M1-66/9).
+func ephemeralPublisher(hub *gatewayapp.Hub) eventlog.EphemeralPublisher {
+	if hub == nil {
+		return noPublisher{}
+	}
+	return hub
 }
 
 // noPublisher is the publisher of a gateway whose tests bring their own delivery: it relays

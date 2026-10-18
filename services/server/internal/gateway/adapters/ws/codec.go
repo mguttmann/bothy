@@ -123,11 +123,7 @@ func (d *Decoder) Decode(op string, raw json.RawMessage) (any, error) {
 		}
 		return app.Heartbeat{LastSeq: f.LastSeq, Agent: f.Agent != nil}, nil
 	case "ack":
-		var f rest.GatewayAck
-		if err := strictUnmarshal(raw, &f); err != nil {
-			return nil, err
-		}
-		return app.Ack{Seq: f.Seq}, nil
+		return decodeAck(raw)
 	case "reauth":
 		var f rest.GatewayReauth
 		if err := strictUnmarshal(raw, &f); err != nil {
@@ -144,6 +140,15 @@ func (d *Decoder) Decode(op string, raw json.RawMessage) (any, error) {
 		return app.Typing{ThreadID: ids.ID(f.ThreadId)}, nil
 	}
 	return nil, fmt.Errorf("gateway: no frame type for the op %q", op)
+}
+
+// decodeAck decodes the body of ack strictly into its frame.
+func decodeAck(raw json.RawMessage) (app.Ack, error) {
+	var f rest.GatewayAck
+	if err := strictUnmarshal(raw, &f); err != nil {
+		return app.Ack{}, err
+	}
+	return app.Ack{Seq: f.Seq}, nil
 }
 
 // decodeFocus decodes the body of focus strictly into its frame.

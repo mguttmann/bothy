@@ -57,7 +57,7 @@ func (h *Hub) PublishEphemeral(ctx context.Context, ev eventlog.EphemeralEvent) 
 	if ev.Actor != nil {
 		admit.ActorKind, admit.ActorPrincipalID = string(ev.Actor.Kind), ev.Actor.PrincipalID
 	}
-	frame, err := json.Marshal(outFrame{Op: "dispatch", D: ephemeralEnvelope(admit)})
+	frame, err := json.Marshal(outFrame{Op: opDispatch, D: ephemeralEnvelope(admit)})
 	if err != nil {
 		return fmt.Errorf("gateway: %s cannot be encoded: %w", ev.Type, err)
 	}

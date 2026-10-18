@@ -358,13 +358,16 @@ func (e *encoded) frame(kind actor.Kind) ([]byte, error) {
 	if *cached != nil {
 		return *cached, nil
 	}
-	b, err := json.Marshal(outFrame{Op: "dispatch", D: e.ev.Envelope(sync.DeliveryFields{IncludeTraceContext: isAgent})})
+	b, err := json.Marshal(outFrame{Op: opDispatch, D: e.ev.Envelope(sync.DeliveryFields{IncludeTraceContext: isAgent})})
 	if err != nil {
 		return nil, err
 	}
 	*cached = b
 	return b, nil
 }
+
+// opDispatch is the op of a dispatch frame, durable or ephemeral.
+const opDispatch = "dispatch"
 
 // outFrame is the outer object {op, d} of a server frame the hub encodes itself.
 type outFrame struct {
