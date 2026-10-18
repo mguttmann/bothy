@@ -23,6 +23,7 @@ import 'rest/run_handlers.dart';
 import 'rest/self_handlers.dart';
 import 'rest/structure_handlers.dart';
 import 'rest/sync_handlers.dart';
+import 'rest/thread_view_handlers.dart';
 import 'rest_fake.dart';
 import 'schema_validator.dart';
 import 'scripted_agent.dart';
@@ -160,6 +161,7 @@ final class FakeServer {
     final audit = FakeAuditLog();
     registerAuditHandlers(rest, actions, audit);
     registerHostHandlers(rest, actions, audit);
+    registerThreadViewHandlers(rest);
     final server = FakeServer._(
       http,
       world,
