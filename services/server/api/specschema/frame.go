@@ -7,6 +7,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"maps"
 	"math/big"
 	"slices"
 	"strconv"
@@ -14,6 +15,9 @@ import (
 
 	"github.com/santhosh-tekuri/jsonschema/v6"
 )
+
+// ptrType is the JSON pointer of the event type of a dispatch frame.
+const ptrType = "/d/type"
 
 // maxSafeInteger is 2^53 - 1, the largest integer every client decodes exactly (06 "Basic rules").
 const maxSafeInteger = 1<<53 - 1
@@ -44,14 +48,14 @@ func (c *Contract) ValidateServerFrame(raw []byte) error {
 		return err
 	}
 	d, _ := frame["d"].(map[string]any)
-	if op == "dispatch" {
+	if op == opDispatch {
 		if d == nil {
 			return &FrameError{Op: op, Pointer: "/d", Reason: "dispatch without an object d"}
 		}
 		t, _ := d["type"].(string)
 		ev, ok := c.events[t]
 		if !ok {
-			return &FrameError{Op: op, Pointer: "/d/type", Reason: fmt.Sprintf("event type %q has no message event.%s in asyncapi.yaml", t, t)}
+			return &FrameError{Op: op, Pointer: ptrType, Reason: fmt.Sprintf("event type %q has no message event.%s in asyncapi.yaml", t, t)}
 		}
 		if err := c.envelopeRule(t, ev.Kind, d); err != nil {
 			return err
@@ -107,12 +111,7 @@ func plainValues(v any, ptr string) *FrameError {
 	case nil:
 		return &FrameError{Pointer: ptr, Reason: "null (ADR 0053: absent instead of null)"}
 	case map[string]any:
-		keys := make([]string, 0, len(x))
-		for k := range x {
-			keys = append(keys, k)
-		}
-		slices.Sort(keys)
-		for _, k := range keys {
+		for _, k := range slices.Sorted(maps.Keys(x)) {
 			if err := plainValues(x[k], ptr+"/"+jsonPointerEscape(k)); err != nil {
 				return err
 			}
@@ -124,14 +123,21 @@ func plainValues(v any, ptr string) *FrameError {
 			}
 		}
 	case json.Number:
-		s := x.String()
-		if strings.ContainsAny(s, ".eE") {
-			return nil
-		}
-		n, ok := new(big.Int).SetString(s, 10)
-		if !ok || n.CmpAbs(big.NewInt(maxSafeInteger)) > 0 {
-			return &FrameError{Pointer: ptr, Reason: fmt.Sprintf("integer %s above 2^53 - 1", s)}
-		}
+		return safeInteger(x, ptr)
+	}
+	return nil
+}
+
+// safeInteger fails on an integer literal above 2^53 - 1 in magnitude; fractions and exponents
+// are no integer literals.
+func safeInteger(n json.Number, ptr string) *FrameError {
+	s := n.String()
+	if strings.ContainsAny(s, ".eE") {
+		return nil
+	}
+	i, ok := new(big.Int).SetString(s, 10)
+	if !ok || i.CmpAbs(big.NewInt(maxSafeInteger)) > 0 {
+		return &FrameError{Pointer: ptr, Reason: fmt.Sprintf("integer %s above 2^53 - 1", s)}
 	}
 	return nil
 }
@@ -144,29 +150,29 @@ func (c *Contract) envelopeRule(t, kind string, d map[string]any) error {
 	switch kind {
 	case "durable":
 		if !hasSeq {
-			return &FrameError{Op: "dispatch", Pointer: "/d/seq", Reason: "durable event " + t + " without seq"}
+			return &FrameError{Op: opDispatch, Pointer: "/d/seq", Reason: "durable event " + t + " without seq"}
 		}
 		if !hasPV {
-			return &FrameError{Op: "dispatch", Pointer: "/d/permission_version", Reason: "durable event " + t + " without permission_version"}
+			return &FrameError{Op: opDispatch, Pointer: "/d/permission_version", Reason: "durable event " + t + " without permission_version"}
 		}
 	case "ephemeral":
 		if hasSeq {
-			return &FrameError{Op: "dispatch", Pointer: "/d/seq", Reason: "ephemeral event " + t + " with seq"}
+			return &FrameError{Op: opDispatch, Pointer: "/d/seq", Reason: "ephemeral event " + t + " with seq"}
 		}
 		if hasPV {
-			return &FrameError{Op: "dispatch", Pointer: "/d/permission_version", Reason: "ephemeral event " + t + " with permission_version"}
+			return &FrameError{Op: opDispatch, Pointer: "/d/permission_version", Reason: "ephemeral event " + t + " with permission_version"}
 		}
 	default:
-		return &FrameError{Op: "dispatch", Pointer: "/d/type", Reason: fmt.Sprintf("event %s has x-event-kind %q", t, kind)}
+		return &FrameError{Op: opDispatch, Pointer: ptrType, Reason: fmt.Sprintf("event %s has x-event-kind %q", t, kind)}
 	}
 	spec, ok := c.catalogue.Events[t]
 	if !ok {
-		return &FrameError{Op: "dispatch", Pointer: "/d/type", Reason: "event type " + t + " is not in actions.yaml"}
+		return &FrameError{Op: opDispatch, Pointer: ptrType, Reason: "event type " + t + " is not in actions.yaml"}
 	}
 	res, _ := d["resource"].(map[string]any)
 	_, hasVersion := res["version"]
 	if hasVersion != spec.ResourceVersion {
-		return &FrameError{Op: "dispatch", Pointer: "/d/resource/version",
+		return &FrameError{Op: opDispatch, Pointer: "/d/resource/version",
 			Reason: fmt.Sprintf("resource.version present %t, the catalogue says %t for %s", hasVersion, spec.ResourceVersion, t)}
 	}
 	return nil

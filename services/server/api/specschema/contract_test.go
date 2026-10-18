@@ -71,10 +71,10 @@ func TestLoad_RealContracts(t *testing.T) {
 func TestLoad_UnknownRefFormFails(t *testing.T) {
 	t.Parallel()
 	root := t.TempDir()
-	if err := os.MkdirAll(filepath.Join(root, "docs", "api"), 0o755); err != nil {
+	if err := os.MkdirAll(filepath.Join(root, "docs", "api"), 0o750); err != nil {
 		t.Fatal(err)
 	}
-	if err := os.MkdirAll(filepath.Join(root, "docs", "spec"), 0o755); err != nil {
+	if err := os.MkdirAll(filepath.Join(root, "docs", "spec"), 0o750); err != nil {
 		t.Fatal(err)
 	}
 	real, err := specschema.RepoRoot()
@@ -82,7 +82,7 @@ func TestLoad_UnknownRefFormFails(t *testing.T) {
 		t.Fatal(err)
 	}
 	for _, f := range []string{"docs/api/openapi.yaml", "docs/api/asyncapi.yaml", "docs/spec/actions.yaml"} {
-		b, err := os.ReadFile(filepath.Join(real, f))
+		b, err := os.ReadFile(filepath.Join(real, f)) // #nosec G304 -- the contract files of this repository
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -90,7 +90,7 @@ func TestLoad_UnknownRefFormFails(t *testing.T) {
 			// References in a form the bundle does not know; everything else stays real.
 			b = bytes.ReplaceAll(b, []byte("$ref: '#/components/schemas/Uuid'"), []byte("$ref: 'other.yaml#/B'"))
 		}
-		if err := os.WriteFile(filepath.Join(root, f), b, 0o600); err != nil {
+		if err := os.WriteFile(filepath.Join(root, f), b, 0o600); err != nil { // #nosec G703 -- a fixed name below t.TempDir
 			t.Fatal(err)
 		}
 	}
