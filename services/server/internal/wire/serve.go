@@ -22,7 +22,9 @@ import (
 	"github.com/OWNER/bothy/services/server/api/routes"
 	"github.com/OWNER/bothy/services/server/internal/authz"
 	authzapp "github.com/OWNER/bothy/services/server/internal/authz/app"
+	identitypg "github.com/OWNER/bothy/services/server/internal/identity/adapters/postgres"
 	"github.com/OWNER/bothy/services/server/internal/identity/adapters/secretbox"
+	identityapp "github.com/OWNER/bothy/services/server/internal/identity/app"
 	"github.com/OWNER/bothy/services/server/internal/identity/domain/trustedheader"
 	"github.com/OWNER/bothy/services/server/internal/instance"
 	instancepg "github.com/OWNER/bothy/services/server/internal/instance/adapters/postgres"
@@ -31,6 +33,7 @@ import (
 	"github.com/OWNER/bothy/services/server/internal/kernel/authorize"
 	"github.com/OWNER/bothy/services/server/internal/kernel/clock"
 	"github.com/OWNER/bothy/services/server/internal/kernel/searchlang"
+	"github.com/OWNER/bothy/services/server/internal/kernel/txn"
 	"github.com/OWNER/bothy/services/server/internal/platform/buildinfo"
 	"github.com/OWNER/bothy/services/server/internal/platform/config"
 	"github.com/OWNER/bothy/services/server/internal/platform/egress"
@@ -168,6 +171,8 @@ type server struct {
 	messaging *Messaging
 	// personal is the personal data of sync (M1-61), built in the chat step over chat and messaging.
 	personal *Personal
+	// syncReads is catch-up and snapshot of sync (M1-63), built in the chat step after personal.
+	syncReads *SyncReads
 	// signingKeys are the server signing keys (M1-32) and keyCheck the interval of their job.
 	signingKeys *SigningKeys
 	keyCheck    time.Duration
@@ -785,8 +790,12 @@ func (s *server) startChat(context.Context) error {
 	if err != nil {
 		return err
 	}
+	r, err := s.buildSyncReads(pool, a.UoW(), az, c, m, p)
+	if err != nil {
+		return err
+	}
 	s.mu.Lock()
-	s.chat, s.messaging, s.personal = c, m, p
+	s.chat, s.messaging, s.personal, s.syncReads = c, m, p, r
 	s.mu.Unlock()
 	return nil
 }
@@ -861,6 +870,24 @@ func (s *server) startApps(ctx context.Context) error {
 	return nil
 }
 
+// buildSyncReads builds catch-up and snapshot of sync (M1-63) over the chat and messaging modules
+// and the personal data of the chat step, the agents step, the principal directory of identity
+// and the instance settings (feature flags).
+func (s *server) buildSyncReads(pool *pg.Pool, uow txn.UnitOfWork, az authorize.Authorizer, c *Chat, m *Messaging, p *Personal) (*SyncReads, error) {
+	cfg, err := CatchUpConfig(s.values)
+	if err != nil {
+		return nil, err
+	}
+	s.mu.Lock()
+	ag, st := s.agents, s.settings
+	s.mu.Unlock()
+	if ag == nil || st == nil {
+		return nil, errors.New("wire: catch-up and snapshot need the agents and settings steps")
+	}
+	return NewSyncReads(cfg, SyncReadDeps{Pool: pool, UoW: uow, Authorizer: az, Chat: c.Service, Messaging: m.Service, Personal: p.Service,
+		Agents: ag.Service, Directory: identityapp.NewDirectory(identitypg.NewRepository(pool)), Flags: st.Admin})
+}
+
 // startSessions is the second extension point of start step 7 (M1-34): the session part of
 // identity over the signing keys of the previous step and the instance id, the issuer of access
 // tokens. From here on the HTTP chain authenticates people with identity's Authenticator.
@@ -916,6 +943,7 @@ func (s *server) handlers() Handlers {
 	}
 	s.messaging.fillHandlers(&h)
 	s.personal.fillHandlers(&h)
+	s.syncReads.fillHandlers(&h)
 	if h.Hosts == nil && s.terminal != nil {
 		h.Hosts = s.terminal.Handlers
 	}

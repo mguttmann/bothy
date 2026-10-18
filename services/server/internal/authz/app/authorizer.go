@@ -386,6 +386,10 @@ func (a *Authorizer) authorize(ctx context.Context, p authorize.Principal, act a
 	if act == authorize.ActionWebhookOutDeliver {
 		return a.authorizeDelivery(ctx, p, r)
 	}
+	r, found, err := a.eventTarget(ctx, act, r)
+	if err != nil || !found {
+		return outcome(domain.Decision{Outcome: domain.OutcomeNotFound, Reason: domain.ReasonNoGrant}), err
+	}
 	spec, req, preview, err := a.actionFor(act, r)
 	if err != nil {
 		return authorize.Decision{}, err

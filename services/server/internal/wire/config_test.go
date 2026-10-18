@@ -199,6 +199,8 @@ func TestConfigSchemaBuilds(t *testing.T) {
 		"sync.idempotency_cleanup_interval":   {Kind: config.KindDuration, Default: "1h", Min: "1s", Chapter: "02-architecture.md"},
 		"sync.idempotency_cleanup_batch_size": {Kind: config.KindInt, Default: "1000", Min: "1", Max: "2147483647", Chapter: "02-architecture.md"},
 		"sync.event_log_partitions_ahead":     {Kind: config.KindInt, Default: "3", Min: "1", Max: "1000", Chapter: "02-architecture.md"},
+		"sync.catchup_page_size":              {Kind: config.KindInt, Default: "500", Min: "1", Max: "2147483647", Chapter: "04-sync-protocol.md"},
+		"sync.catchup_max_events":             {Kind: config.KindInt, Default: "50000", Min: "1", Max: "1000000000000", Chapter: "04-sync-protocol.md"},
 
 		"consumer.batch_size":          {Kind: config.KindInt, Default: "500", Min: "1", Max: "2147483647", Chapter: "02-architecture.md"},
 		"consumer.poll_interval":       {Kind: config.KindDuration, Default: "1s", Min: "1ms", Chapter: "02-architecture.md"},

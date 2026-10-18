@@ -167,6 +167,17 @@ scope of the action, for example `messages:read` for `message.read`) is the resu
 event carries no `DeliveryOf` (its receive action is `self`); without an audience an empty
 `DeliveryOf` or `webhook_out.deliver` itself is an internal error.
 The delivery job calls it in filter mode, so no denial is written (AZ-P13).
+### Stored events (M1-63)
+
+`authorize.ResourceFromEvent` describes a stored event for the check of its receive action at
+delivery (REST catch-up, gateway, webhooks): a thread, channel or space by its id, any other kind
+with its most specific scope, and `Resource.Event` with the full scope. When the receive action
+does not take the stored kind, `eventTarget` (`app/eventtarget.go`) decides on the first object
+it does take: the target of a grant (for an instance grant its subject principal), then the
+thread, channel and space of the scope. No fitting object, or a receive action whose requirement
+is still deferred, is `not_found` without an error line, so one event never stops a reader
+(`TestResourceFromEventCatalogue` decides every durable event type; docs/DECISIONS.md M1-63/9,
+M1-63/12).
 
 ### How a module builds a `Resource`
 

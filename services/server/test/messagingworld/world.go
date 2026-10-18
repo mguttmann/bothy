@@ -22,6 +22,7 @@ import (
 
 	"github.com/OWNER/bothy/services/server/api/rest"
 	"github.com/OWNER/bothy/services/server/api/routes"
+	agentsapp "github.com/OWNER/bothy/services/server/internal/agents/app"
 	"github.com/OWNER/bothy/services/server/internal/audit/adapters/logs"
 	auditpg "github.com/OWNER/bothy/services/server/internal/audit/adapters/postgres"
 	auditapp "github.com/OWNER/bothy/services/server/internal/audit/app"
@@ -164,15 +165,44 @@ type World struct {
 	rec   *Recorder
 	audit *auditapp.Recorder
 
-	// Personal is the personal data of sync (M1-61); nil unless built by NewPersonal.
+	// Personal is the personal data of sync (M1-61); nil unless built by NewPersonal or NewSync.
 	Personal *syncapp.Personal
+	// Sync is catch-up and snapshot of sync (M1-63); nil unless built by NewSync.
+	Sync *wire.SyncReads
+	// Maintenance is the partition maintenance of the world over its clock (M1-63 retention).
+	Maintenance *syncapp.PartitionMaintenance
 }
+
+// SyncOptions are the limits of a world of NewSync: the catch-up keys and the partition size of
+// event_log (sync.event_log_partition_size; the world keeps 40 partitions ready and the retention
+// of 30 days).
+type SyncOptions struct {
+	CatchUp       syncapp.CatchUpConfig
+	PartitionSize int64
+}
+
+// syncIdentity is the identity configuration of a NewSync world: the keys NewIdentity requires.
+var syncIdentity = identityapp.Config{
+	HandleMaxChars: 32, DisplayNameMaxChars: 64, DPoPNonceTTL: 5 * time.Minute, DPoPProofMaxAge: time.Minute,
+	ClockLeeway: 30 * time.Second, PublicURL: httpservertest.PublicURL, PageSizeDefault: 20, PageSizeMax: 50,
+	StepUpMaxAge: 5 * time.Minute, AccessTokenTTL: 10 * time.Minute, RefreshTokenTTL: 24 * time.Hour,
+	SessionMaxAge: 30 * 24 * time.Hour, RefreshReuseGrace: 30 * time.Second, LastActiveGranularity: 5 * time.Minute,
+	StepUpChallengeTTL: 2 * time.Minute, StepUpFailLimit: 3, LoginFailWindow: 15 * time.Minute, CleanupInterval: time.Hour,
+	APITokenMaxTTL: 365 * 24 * time.Hour, PersonalTokenMaxTTL: 90 * 24 * time.Hour,
+	EnrollmentCodeTTL: 72 * time.Hour, EnrollmentCodeMaxAttempts: 5, LoginFlowTTL: 10 * time.Minute,
+	DevicePendingTTL: 24 * time.Hour, DeviceVerificationCodeDigits: 6, PairingCodeTTL: 5 * time.Minute, PairingCodeChars: 8,
+	ServerCodeTTL: time.Minute, OIDCJWKSCacheTTL: time.Hour, OIDCClientAssertionTTL: 2 * time.Minute,
+	IDPRecheckInterval: 30 * 24 * time.Hour, DeviceInactiveRevokeAfter: 180 * 24 * time.Hour,
+}
+
+// syncPepper is the token pepper of a NewSync world (a fixed test value, never a secret).
+var syncPepper = []byte("0123456789abcdef0123456789abcdef")
 
 // New builds a world on a new database with the owner "owner"; subscribe registers the test
 // subscriber of MessagePosted of the calling package; opts change the messaging configuration.
 func New(t *testing.T, subscribe Subscribe, opts ...Option) *World {
 	t.Helper()
-	return build(t, subscribe, false, opts)
+	return build(t, subscribe, false, nil, opts)
 }
 
 // NewPersonal builds the world of New with the personal data of sync (M1-61): its REST handlers in
@@ -180,11 +210,20 @@ func New(t *testing.T, subscribe Subscribe, opts ...Option) *World {
 // registry, bound to the appender of the world, as internal/wire registers it (INT-W25/2).
 func NewPersonal(t *testing.T, subscribe Subscribe, opts ...Option) *World {
 	t.Helper()
-	return build(t, subscribe, true, opts)
+	return build(t, subscribe, true, nil, opts)
 }
 
-// build builds the world of New; personal adds the personal data of sync.
-func build(t *testing.T, subscribe Subscribe, personal bool, opts []Option) *World {
+// NewSync builds the world of NewPersonal with catch-up and snapshot of sync (M1-63) as
+// internal/wire builds them, under the limits so: their REST handlers in the harness, the identity
+// module for the principal directory and the agents module for the agent listing.
+func NewSync(t *testing.T, subscribe Subscribe, so SyncOptions, opts ...Option) *World {
+	t.Helper()
+	return build(t, subscribe, true, &so, opts)
+}
+
+// build builds the world of New; personal adds the personal data of sync, so (not nil) catch-up
+// and snapshot.
+func build(t *testing.T, subscribe Subscribe, personal bool, so *SyncOptions, opts []Option) *World {
 	t.Helper()
 	db := pgtest.New(t)
 	cfg := db.Config(pg.RoleApp)
@@ -221,14 +260,18 @@ func build(t *testing.T, subscribe Subscribe, personal bool, opts []Option) *Wor
 	if err := hook.Bind(authzapp.RightsBindings{Events: appender, Audit: rec}); err != nil {
 		t.Fatal(err)
 	}
-	maint, err := syncapp.NewPartitionMaintenance(syncapp.PartitionConfig{Size: 1000, Ahead: 2, Retention: 30 * 24 * time.Hour, LockTimeout: 2 * time.Second},
-		uow, syncpg.NewRepository(pool, log), w.Clock)
+	part := syncapp.PartitionConfig{Size: 1000, Ahead: 2, Retention: 30 * 24 * time.Hour, LockTimeout: 2 * time.Second}
+	if so != nil {
+		part.Size, part.Ahead = so.PartitionSize, 40
+	}
+	maint, err := syncapp.NewPartitionMaintenance(part, uow, syncpg.NewRepository(pool, log), w.Clock)
 	if err != nil {
 		t.Fatal(err)
 	}
 	if _, err := maint.Run(context.Background()); err != nil {
 		t.Fatal(err)
 	}
+	w.Maintenance = maint
 	az, err := authzapp.NewAuthorizer(authzapp.AuthorizerConfig{SnapshotCacheMaxEntries: 1000, StepUpMaxAge: 5 * time.Minute}, authzapp.AuthorizerDeps{
 		Catalog: authzapp.NewCatalog(log), Store: authzpg.NewRepository(pool), Principals: principals,
 		Credentials: w.creds, Structure: str, Policies: w.policies,
@@ -263,6 +306,9 @@ func build(t *testing.T, subscribe Subscribe, personal bool, opts []Option) *Wor
 	if subs != nil {
 		w.personal(subs, pool, uow, az, appender, c, m, &handlers)
 	}
+	if so != nil {
+		w.syncReads(so.CatchUp, pool, uow, az, hook, rec, appender, c, m, &handlers)
+	}
 	w.H = harness(t, pool, uow, w.actors, handlers, w.Clock)
 	w.OwnerID = w.Person("owner", true)
 	return w
@@ -293,6 +339,36 @@ func (w *World) personal(subs *syncapp.Subscribers, pool *pg.Pool, uow *pg.UnitO
 		w.t.Fatal(err)
 	}
 	w.Personal, handlers.Personal = p.Service, p.Handlers
+}
+
+// syncReads adds catch-up and snapshot of sync to the world and to handlers (NewSync) over the
+// instance settings, identity and agents modules it builds with w.
+func (w *World) syncReads(cfg syncapp.CatchUpConfig, pool *pg.Pool, uow *pg.UnitOfWork, az authorize.Authorizer, hook *authzapp.RightsHook,
+	rec *auditapp.Recorder, appender *syncapp.Appender, c *wire.Chat, m *wire.Messaging, handlers *wire.Handlers) {
+	w.t.Helper()
+	log := slog.New(w.Logs)
+	// The instance row with its sync_epoch, as bothy migrate up writes it (pgtest databases have
+	// none).
+	w.SQL(`INSERT INTO instance (instance_id, schema_version, sync_epoch) VALUES ($1, 1, $2)`, ids.New().String(), ids.New().String())
+	settings, err := wire.NewInstanceSettings(wire.DefaultInstanceConfig(), true, pool, uow, az, wire.SettingsWrites{Audit: rec, Events: appender}, w.Clock)
+	if err != nil {
+		w.t.Fatal(err)
+	}
+	writes := wire.IdentityWrites{Audit: rec, Events: appender, Settings: settings.Admin, Flags: settings.Admin}
+	id, err := wire.NewIdentity(syncIdentity, pool, uow, az, writes, syncPepper, w.Clock, log)
+	if err != nil {
+		w.t.Fatal(err)
+	}
+	ag, err := wire.NewAgents(agentsapp.Config{PageSizeDefault: 20, PageSizeMax: 50}, pool, uow, az, hook, writes, id, w.Clock, log)
+	if err != nil {
+		w.t.Fatal(err)
+	}
+	r, err := wire.NewSyncReads(cfg, wire.SyncReadDeps{Pool: pool, UoW: uow, Authorizer: az, Chat: c.Service, Messaging: m.Service,
+		Personal: w.Personal, Agents: ag.Service, Directory: identityapp.NewDirectory(identitypg.NewRepository(pool)), Flags: writes.Flags})
+	if err != nil {
+		w.t.Fatal(err)
+	}
+	w.Sync, handlers.Sync = r, r.Handlers
 }
 
 // registry returns the sealed txn registry with the rights hooks, the sync and audit hooks and
