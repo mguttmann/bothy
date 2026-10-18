@@ -85,6 +85,8 @@ type Client struct {
 	http      *http.Client
 	key       *deviceKey
 	stepKey   *deviceKey
+	// apiToken marks the client of an agent: access is an API token, there is no device.
+	apiToken bool
 
 	mu      sync.Mutex
 	access  string

@@ -81,8 +81,9 @@ type Store interface {
 	// PutSidebarState inserts or replaces the row of st.UserID and st.SpaceID with version + 1;
 	// keepKey keeps the stored personal key. It returns the stored row.
 	PutSidebarState(ctx context.Context, st domain.SidebarState, keepKey bool) (domain.SidebarState, error)
-	// SidebarStates returns the rows of user for spaces that are not archived, ascending by space.
-	SidebarStates(ctx context.Context, user ids.ID) ([]domain.SidebarState, error)
+	// SidebarStates returns the rows of user for spaces that are not archived, all of them (all)
+	// or those in visible, ascending by space (07 section 7.4 rule 1).
+	SidebarStates(ctx context.Context, user ids.ID, all bool, visible []ids.ID) ([]domain.SidebarState, error)
 
 	// Channel returns the channel id with its space facts; found is false for an unknown id.
 	Channel(ctx context.Context, id ids.ID) (c ChannelRow, found bool, err error)

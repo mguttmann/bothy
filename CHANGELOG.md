@@ -25,6 +25,10 @@ operated, and the order of the build.
 
 ### Added
 
+- Gate `sql-visibility` (M1-70, AZ-P12): `tools/lint/sql_visibility.py` rejects every reading
+  sqlc query on a content table without `channel_id = ANY(...)` or `space_id = ANY(...)` unless it
+  stands with a category and a reason on `tools/lint/sql_visibility.yaml`; stale, duplicate and
+  uncategorised exceptions and content tables unknown to chapter 03 fail too.
 - Contract tests (M1-71): the gate `contract-test` (G7, Schemathesis 4.30.1 from `tools/contract/`
   with ES256 DPoP proofs built with `cryptography`), G8 in `make test` through the build tag
   `contract_validate`, and the named values `quality.contract.max_examples` and

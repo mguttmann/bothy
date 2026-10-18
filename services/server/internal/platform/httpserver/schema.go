@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"slices"
 	"strings"
+	"sync"
 
 	"github.com/pb33f/libopenapi"
 	"github.com/pb33f/libopenapi-validator/config"
@@ -21,6 +22,9 @@ import (
 // gateway validates the body d of every client frame with it (M1-64), where no HTTP operation
 // exists. It knows only the schemas it was built for and is safe for concurrent use.
 type SchemaValidator struct {
+	// mu serializes validation: libopenapi renders a schema for validation by writing into the
+	// shared schema model, so two connections validating the same frame type would race.
+	mu      sync.Mutex
 	v       schema_validation.SchemaValidator
 	schemas map[string]*base.Schema
 }
@@ -82,7 +86,10 @@ func (v *SchemaValidator) Validate(name string, body []byte) error {
 	if !ok {
 		return errs.Wrap(errs.CodeInternalError, errors.New("httpserver: unknown schema "+name), "httpserver: schema validator")
 	}
-	if valid, found := v.v.ValidateSchemaBytes(s, body); !valid {
+	v.mu.Lock()
+	valid, found := v.v.ValidateSchemaBytes(s, body)
+	v.mu.Unlock()
+	if !valid {
 		if len(found) == 0 {
 			return errs.New(errs.CodeValidationFailed, "").WithFields(field("", fieldCodeInvalid))
 		}

@@ -88,6 +88,13 @@ documented in this file. The format is based on
   bootstrap-owner` and `serve`), `Options.DurableDB`, `CreateUser` and a gateway client; pgtest
   gains `Limits` and `DB.Restart`, which restarts the server of a durable container in place. `make lint`
   vets and lints the `perf` tag.
+- Leak tests behind threat T-AZ-02 (M1-70, `test/leak`): AZ-P4 runs every enabled GET route with
+  a uuid path parameter for a person and an agent and requires the same normalized status,
+  headers, body and length for a foreign and an unknown ID, 404 `not_found` without read on a
+  content resource, and medians within `authz.not_found_timing_tolerance`; AZ-P5 checks lists,
+  counters, the snapshot (REST and gateway `ready`), the personal lists and catch-up on random
+  worlds (seed printed, replay with `LEAK_SEED`), with noise in unreadable channels changing
+  nothing; AZ-M52. The shared harness gains `Client.Gateway` and `World.Owner`.
 - Gateway delivery (M1-65): the log tail of every api process feeds `Authorizer.Observe` and then
   the hub, which delivers each durable event to exactly the connections whose principal may
   receive it at delivery time (`sync.Admit` in delivery mode, no denial audit), in `seq` order and
@@ -1155,7 +1162,13 @@ documented in this file. The format is based on
   per page (`listEvents`, gateway catch-up) through a structure scope of the Authorizer
   (`authorize.WithStructureScope`) instead of once per connection and event; under the load of
   `make perf` live delivery fell behind by seconds.
-
+- `httpserver.SchemaValidator` serializes its validations: libopenapi writes into the shared schema
+  model while it renders a schema for validation, so two gateway connections validating client
+  frames at the same time raced (found by the M1-70 leak tests under `-race`, regression test
+  `TestSchemaValidatorConcurrent`).
+- The sidebar rows of `getMySidebar` and of the snapshot are read with the visible spaces of
+  `Authorizer.Scope` in the query (07 section 7.4 rule 1, AZ-P12); before, the query read every
+  row of the person and only `authorize` per row filtered them (M1-70).
 - The body schemas of every client frame of the gateway refuse unknown members
   (`additionalProperties: false`, W7, M1-64); the route generator checks them and generates
   `routes.GatewayOps` from the section `gateway_ops` of `api/operations.yaml`.
