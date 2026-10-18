@@ -727,20 +727,26 @@ final class TypingInFamily extends $Family
   String toString() => r'typingInProvider';
 }
 
-/// Whether the app window is in the foreground; the history marks read and focuses only then
-/// (brief M4-20 Design note 2: `idle` while the window has no focus).
+/// Whether the app window has the focus: in the foreground (`AppLifecycle`) and not
+/// `inactive` for Flutter, which is how macOS and Windows report a window behind another app.
+/// The history marks read and focuses only then (brief M4-20 Design note 2: `idle` while the
+/// window has no focus).
 
 @ProviderFor(windowFocused)
 final windowFocusedProvider = WindowFocusedProvider._();
 
-/// Whether the app window is in the foreground; the history marks read and focuses only then
-/// (brief M4-20 Design note 2: `idle` while the window has no focus).
+/// Whether the app window has the focus: in the foreground (`AppLifecycle`) and not
+/// `inactive` for Flutter, which is how macOS and Windows report a window behind another app.
+/// The history marks read and focuses only then (brief M4-20 Design note 2: `idle` while the
+/// window has no focus).
 
 final class WindowFocusedProvider
     extends $FunctionalProvider<AsyncValue<bool>, bool, Stream<bool>>
     with $FutureModifier<bool>, $StreamProvider<bool> {
-  /// Whether the app window is in the foreground; the history marks read and focuses only then
-  /// (brief M4-20 Design note 2: `idle` while the window has no focus).
+  /// Whether the app window has the focus: in the foreground (`AppLifecycle`) and not
+  /// `inactive` for Flutter, which is how macOS and Windows report a window behind another app.
+  /// The history marks read and focuses only then (brief M4-20 Design note 2: `idle` while the
+  /// window has no focus).
   WindowFocusedProvider._()
     : super(
         from: null,
@@ -766,7 +772,7 @@ final class WindowFocusedProvider
   }
 }
 
-String _$windowFocusedHash() => r'9a27c975bea15986a92e5e8ca0589082a38ebf4b';
+String _$windowFocusedHash() => r'a487dc6a1efa30864c26f54c2e657b53ef79f0d5';
 
 /// The engine's notices to the app (removed targets, an overwritten draft).
 
@@ -873,7 +879,7 @@ final class ThreadReadStateProvider
   }
 }
 
-String _$threadReadStateHash() => r'72464c5d70c7539a8360ef645c3cdde914197ab2';
+String _$threadReadStateHash() => r'd2e3054653852615feeb04fc6ffd49ed8cd19737';
 
 /// The stored read state of [threadId], or null.
 
@@ -1114,18 +1120,22 @@ final class DraftEditingProvider
 
 String _$draftEditingHash() => r'2b5ecf8e8bd0399c4574add5ad6bea7e392e0aad';
 
-/// Whether the session column shows (the header button "Column", 01 5.1 D1); it lasts while
-/// the app runs.
+/// Whether the session column shows (the header buttons "Column" and "Pin", 01 5.1 D1): next to
+/// a forum thread it shows unless the person hid it; next to a thread of a text channel it is
+/// collapsed until the person shows it (D2). It lasts while the app runs.
 
 @ProviderFor(SessionColumnShown)
 final sessionColumnShownProvider = SessionColumnShownProvider._();
 
-/// Whether the session column shows (the header button "Column", 01 5.1 D1); it lasts while
-/// the app runs.
+/// Whether the session column shows (the header buttons "Column" and "Pin", 01 5.1 D1): next to
+/// a forum thread it shows unless the person hid it; next to a thread of a text channel it is
+/// collapsed until the person shows it (D2). It lasts while the app runs.
 final class SessionColumnShownProvider
-    extends $NotifierProvider<SessionColumnShown, bool> {
-  /// Whether the session column shows (the header button "Column", 01 5.1 D1); it lasts while
-  /// the app runs.
+    extends
+        $NotifierProvider<SessionColumnShown, ({bool forum, bool textThread})> {
+  /// Whether the session column shows (the header buttons "Column" and "Pin", 01 5.1 D1): next to
+  /// a forum thread it shows unless the person hid it; next to a thread of a text channel it is
+  /// collapsed until the person shows it (D2). It lasts while the app runs.
   SessionColumnShownProvider._()
     : super(
         from: null,
@@ -1145,31 +1155,43 @@ final class SessionColumnShownProvider
   SessionColumnShown create() => SessionColumnShown();
 
   /// {@macro riverpod.override_with_value}
-  Override overrideWithValue(bool value) {
+  Override overrideWithValue(({bool forum, bool textThread}) value) {
     return $ProviderOverride(
       origin: this,
-      providerOverride: $SyncValueProvider<bool>(value),
+      providerOverride: $SyncValueProvider<({bool forum, bool textThread})>(
+        value,
+      ),
     );
   }
 }
 
 String _$sessionColumnShownHash() =>
-    r'a2922dc514801271d805ea52a2dcb7ff7cb5f3f8';
+    r'170a57de08078cf0c7a7975dbe3aba47c715dfc0';
 
-/// Whether the session column shows (the header button "Column", 01 5.1 D1); it lasts while
-/// the app runs.
+/// Whether the session column shows (the header buttons "Column" and "Pin", 01 5.1 D1): next to
+/// a forum thread it shows unless the person hid it; next to a thread of a text channel it is
+/// collapsed until the person shows it (D2). It lasts while the app runs.
 
-abstract class _$SessionColumnShown extends $Notifier<bool> {
-  bool build();
+abstract class _$SessionColumnShown
+    extends $Notifier<({bool forum, bool textThread})> {
+  ({bool forum, bool textThread}) build();
   @$mustCallSuper
   @override
   WhenComplete runBuild() {
-    final ref = this.ref as $Ref<bool, bool>;
+    final ref =
+        this.ref
+            as $Ref<
+              ({bool forum, bool textThread}),
+              ({bool forum, bool textThread})
+            >;
     final element =
         ref.element
             as $ClassProviderElement<
-              AnyNotifier<bool, bool>,
-              bool,
+              AnyNotifier<
+                ({bool forum, bool textThread}),
+                ({bool forum, bool textThread})
+              >,
+              ({bool forum, bool textThread}),
               Object?,
               Object?
             >;
@@ -1569,19 +1591,22 @@ final class StoredMessageFamily extends $Family
 
 /// The threads on screen and whether the window is idle, sent to the gateway as `focus`
 /// (04 11.3 item 2; brief M4-20 Design note 2): every history column adds its thread while it
-/// shows and removes it when it closes.
+/// shows and removes it when it closes. The state stays empty; the set lives in the notifier
+/// and goes to `EngineFocus.setVisible`.
 
 @ProviderFor(VisibleThreads)
 final visibleThreadsProvider = VisibleThreadsProvider._();
 
 /// The threads on screen and whether the window is idle, sent to the gateway as `focus`
 /// (04 11.3 item 2; brief M4-20 Design note 2): every history column adds its thread while it
-/// shows and removes it when it closes.
+/// shows and removes it when it closes. The state stays empty; the set lives in the notifier
+/// and goes to `EngineFocus.setVisible`.
 final class VisibleThreadsProvider
     extends $NotifierProvider<VisibleThreads, Set<ThreadId>> {
   /// The threads on screen and whether the window is idle, sent to the gateway as `focus`
   /// (04 11.3 item 2; brief M4-20 Design note 2): every history column adds its thread while it
-  /// shows and removes it when it closes.
+  /// shows and removes it when it closes. The state stays empty; the set lives in the notifier
+  /// and goes to `EngineFocus.setVisible`.
   VisibleThreadsProvider._()
     : super(
         from: null,
@@ -1609,11 +1634,12 @@ final class VisibleThreadsProvider
   }
 }
 
-String _$visibleThreadsHash() => r'fb8015b31022db51ba3d343c8d2b08558c66fec5';
+String _$visibleThreadsHash() => r'7239d391e5b93be084e3803114590ab4a1db0139';
 
 /// The threads on screen and whether the window is idle, sent to the gateway as `focus`
 /// (04 11.3 item 2; brief M4-20 Design note 2): every history column adds its thread while it
-/// shows and removes it when it closes.
+/// shows and removes it when it closes. The state stays empty; the set lives in the notifier
+/// and goes to `EngineFocus.setVisible`.
 
 abstract class _$VisibleThreads extends $Notifier<Set<ThreadId>> {
   Set<ThreadId> build();

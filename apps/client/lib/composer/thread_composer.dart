@@ -78,9 +78,10 @@ class ThreadComposerState extends ConsumerState<ThreadComposer> {
     )..addListener(_changed);
     final composer = _composer!;
     final thread = widget.threadId.value;
+    unawaited(composer.restoreUnsent());
     ref.listenManual(
       threadDraftProvider(widget.channelId.value, thread),
-      (_, next) => composer.applyStored(next.value),
+      (_, next) => unawaited(composer.applyStored(next.value)),
       fireImmediately: true,
     );
     ref.listenManual(syncNoticesProvider, (_, next) {

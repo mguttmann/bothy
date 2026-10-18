@@ -5,7 +5,10 @@
 /// 6). Widgets never query the database themselves (R-CL-03).
 library;
 
+import 'dart:async';
+
 import 'package:domain/domain.dart';
+import 'package:flutter/widgets.dart';
 import 'package:local_store/local_store.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 import 'package:sync_engine/sync_engine.dart';
@@ -115,13 +118,39 @@ Stream<Set<PrincipalId>> typingIn(Ref ref, String threadId) {
       : engine.ephemeral.watchTyping(ThreadId.parse(threadId));
 }
 
-/// Whether the app window is in the foreground; the history marks read and focuses only then
-/// (brief M4-20 Design note 2: `idle` while the window has no focus).
+/// Whether the app window has the focus: in the foreground (`AppLifecycle`) and not
+/// `inactive` for Flutter, which is how macOS and Windows report a window behind another app.
+/// The history marks read and focuses only then (brief M4-20 Design note 2: `idle` while the
+/// window has no focus).
 @riverpod
-Stream<bool> windowFocused(Ref ref) async* {
+Stream<bool> windowFocused(Ref ref) {
   final lifecycle = ref.watch(appPortsProvider).lifecycle;
-  yield lifecycle.current == AppActivity.foreground;
-  yield* lifecycle.changes.map((a) => a == AppActivity.foreground);
+  final controller = StreamController<bool>();
+  bool active(AppLifecycleState? s) =>
+      s == null || s == AppLifecycleState.resumed;
+  var window = active(WidgetsBinding.instance.lifecycleState);
+  var foreground = lifecycle.current == AppActivity.foreground;
+  void emit() {
+    if (!controller.isClosed) controller.add(foreground && window);
+  }
+
+  final listener = AppLifecycleListener(
+    onStateChange: (s) {
+      window = active(s);
+      emit();
+    },
+  );
+  final sub = lifecycle.changes.listen((a) {
+    foreground = a == AppActivity.foreground;
+    emit();
+  });
+  emit();
+  ref.onDispose(() {
+    listener.dispose();
+    unawaited(sub.cancel());
+    unawaited(controller.close());
+  });
+  return controller.stream;
 }
 
 /// The engine's notices to the app (removed targets, an overwritten draft).
@@ -165,18 +194,23 @@ Future<TemplateLists> templateLists(Ref ref, String channelId) =>
 DraftEditingRegistry draftEditing(Ref ref) =>
     ref.watch(signedInServicesProvider)?.draftEditing ?? DraftEditingRegistry();
 
-/// Whether the session column shows (the header button "Column", 01 5.1 D1); it lasts while
-/// the app runs.
+/// Whether the session column shows (the header buttons "Column" and "Pin", 01 5.1 D1): next to
+/// a forum thread it shows unless the person hid it; next to a thread of a text channel it is
+/// collapsed until the person shows it (D2). It lasts while the app runs.
 @Riverpod(keepAlive: true)
 class SessionColumnShown extends _$SessionColumnShown {
   @override
-  bool build() => true;
+  ({bool forum, bool textThread}) build() => (forum: true, textThread: false);
 
-  /// Shows or hides the column.
-  void toggle() => state = !state;
+  /// Shows or hides the column of the layout ([textThread]: a thread of a text channel).
+  void toggle({required bool textThread}) => state = textThread
+      ? (forum: state.forum, textThread: !state.textThread)
+      : (forum: !state.forum, textThread: state.textThread);
 
-  /// Shows the column.
-  void show() => state = true;
+  /// Shows the column of the layout.
+  void show({required bool textThread}) => state = textThread
+      ? (forum: state.forum, textThread: true)
+      : (forum: true, textThread: state.textThread);
 }
 
 /// What the server lets the person do in a channel, from its level, capabilities and the

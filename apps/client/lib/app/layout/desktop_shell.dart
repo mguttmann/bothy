@@ -61,9 +61,18 @@ class DesktopShell extends ConsumerWidget {
             ? ref.watch(lastRouteSelectionProvider)
             : const RouteSelection());
     final forum = selection.forum;
-    // D2: with a thread of a text channel open, the session column is collapsed.
-    final textThread =
+    // D2: with a thread of a text channel open the session column is collapsed until the
+    // person shows it.
+    final textChannel =
         selection.kind == ChannelKind.text && selection.thread != null;
+    final shown = ref.watch(sessionColumnShownProvider);
+    final channelOfRoute = selection.channel == null
+        ? null
+        : ref
+              .watch(storedChannelOfRouteProvider(selection.channel!.value))
+              .value;
+    // The session of the open thread, else of the main history a channel route shows.
+    final sessionThread = selection.thread ?? channelOfRoute?.mainThreadId;
     final banner = switch (phase) {
       ConnectionPhase.updateRequired => DsBanner(
         key: const ValueKey('shell.updateRequired'),
@@ -95,7 +104,7 @@ class DesktopShell extends ConsumerWidget {
                   .toDouble(),
               stackShowsHistory: parsed is ThreadLocation,
               showPostList: forum != null,
-              showSession: ref.watch(sessionColumnShownProvider) && !textThread,
+              showSession: textChannel ? shown.textThread : shown.forum,
               onWidthsChanged: (next) {
                 final settings = ref.read(settingsRepositoryProvider);
                 if (settings != null) ColumnWidthsWriter(settings).save(next);
@@ -109,7 +118,7 @@ class DesktopShell extends ConsumerWidget {
                       selectedThread: selection.thread,
                     ),
               history: HistoryArea(location: location),
-              session: SessionColumn(threadId: selection.thread),
+              session: SessionColumn(threadId: sessionThread),
             ),
           ),
         ],

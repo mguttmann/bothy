@@ -94,9 +94,11 @@ final class ComposerController extends ChangeNotifier {
   /// Whether the person changed the text since the stored draft was applied.
   bool get dirty => _dirty;
 
-  /// The field got or lost the focus.
+  /// The field got or lost the focus; without it the person is not typing (04 14), so a
+  /// draft of another device may be applied again.
   void setFocused(bool focused) {
     _focused = focused;
+    if (!focused) _dirty = false;
     _markEditing();
   }
 
@@ -135,19 +137,40 @@ final class ComposerController extends ChangeNotifier {
   }
 
   /// Applies the stored [draft] (another device's change, or the draft at opening) unless the
-  /// person is typing in it (04 14: the next local write wins then).
-  void applyStored(Draft? draft) {
-    if (draft != null) _draftVersion = draft.version;
-    if (_editing.isEditing(channelId: channel, threadId: thread) || _dirty) {
-      return;
-    }
+  /// person is typing in it or a draft write of this device has not been confirmed (04 14: the
+  /// next local write wins then, and a stale base version reports `overwrote_newer`). The
+  /// version is taken over only with the text, or when the text is already the field's.
+  Future<void> applyStored(Draft? draft) async {
+    final call = ++_applyCalls;
+    if (_typingNow) return;
+    // An own write that is not confirmed is newer than any stored draft; its answer, which can
+    // arrive after a send, must not bring the sent text back.
+    if (await _drafts.hasUnsent() || call != _applyCalls || _typingNow) return;
     final next = draft?.contentMd ?? '';
+    if (draft != null) _draftVersion = draft.version;
     if (next == text.text) return;
     text.value = TextEditingValue(
       text: next,
       selection: TextSelection.collapsed(offset: next.length),
     );
     replyTo = draft?.replyToMessageId;
+    notifyListeners();
+  }
+
+  int _applyCalls = 0;
+
+  bool get _typingNow =>
+      _dirty || _editing.isEditing(channelId: channel, threadId: thread);
+
+  /// Puts the text of a draft write that was not confirmed back into the field (the composer
+  /// opened again, or the app started again while offline, 04 13); the stored draft is older.
+  Future<void> restoreUnsent() async {
+    final unsent = await _drafts.restore();
+    if (unsent == null || _typingNow || unsent == text.text) return;
+    text.value = TextEditingValue(
+      text: unsent,
+      selection: TextSelection.collapsed(offset: unsent.length),
+    );
     notifyListeners();
   }
 

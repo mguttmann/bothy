@@ -50,12 +50,13 @@ Future<ColumnHost> open(
 Future<void> pumpThreadWith(
   WidgetTester tester,
   ColumnHost host,
-  Map<String, Object?> settings,
-) async {
+  Map<String, Object?> settings, {
+  bool show = true,
+}) async {
   final reads = FakeThreadReads(host.db);
   await host.pump(
     tester,
-    HistoryColumn(threadId: threadId(1)),
+    show ? HistoryColumn(threadId: threadId(1)) : const SizedBox(),
     location: '/t/${threadId(1).value}',
     overrides: [
       ...threadOverrides(reads),
@@ -286,6 +287,68 @@ void main() {
     );
     await host.settle(tester);
     expect(find.text(en.composerTyping(dsIsolate('Sam'))), findsOneWidget);
+    // The indicator ends on its own before the engine closes.
+    await tester.runAsync(
+      () => Future<void>.delayed(const Duration(milliseconds: 1200)),
+    );
+    await host.settle(tester);
+    expect(find.text(en.composerTyping(dsIsolate('Sam'))), findsNothing);
+    await host.dispose(tester);
+  });
+
+  testWidgets(
+    'the answer of a draft write after a send does not bring the text back',
+    (tester) async {
+      final host = await open(tester);
+      await type(tester, host, 'Hello Sam');
+      final draft = (await entries(
+        tester,
+        host,
+      )).singleWhere((e) => e.kind == PersonalOps.putThreadDraft);
+      await host.run(
+        tester,
+        () => host.db.outboxDao.markState(draft.id, OutboxState.sending),
+      );
+      await tester.sendKeyEvent(LogicalKeyboardKey.enter);
+      await host.settle(tester);
+      expect(tester.widget<TextField>(composerField).controller!.text, isEmpty);
+      // The in-flight write answers with the text as the draft.
+      await host.run(
+        tester,
+        () => host.db.personalDao.upsertDraftIfNewer(
+          Draft(
+            id: DraftId.parse(uuid(0xd3)),
+            threadId: threadId(1),
+            channelId: channelId(1),
+            contentMd: 'Hello Sam',
+            fileIds: const [],
+            version: const ResourceVersion(3),
+          ),
+        ),
+      );
+      await host.settle(tester);
+      expect(tester.widget<TextField>(composerField).controller!.text, isEmpty);
+      await host.dispose(tester);
+    },
+  );
+
+  testWidgets('text typed offline comes back when the thread opens again', (
+    tester,
+  ) async {
+    final host = await open(tester);
+    await type(tester, host, 'Typed while offline');
+    await pumpThreadWith(tester, host, const {}, show: false);
+    await pumpThreadWith(tester, host, const {});
+    expect(
+      tester.widget<TextField>(composerField).controller!.text,
+      'Typed while offline',
+    );
+    await type(tester, host, 'Typed while offline, more');
+    final drafts = (await entries(
+      tester,
+      host,
+    )).where((e) => e.kind == PersonalOps.putThreadDraft).toList();
+    expect(drafts, hasLength(1), reason: 'the waiting write is updated');
     await host.dispose(tester);
   });
 }

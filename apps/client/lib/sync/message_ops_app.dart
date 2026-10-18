@@ -20,13 +20,15 @@ final class AppOpsStore {
     required this.storeReadState,
     required this.applyPin,
     required this.storeDraftResult,
+    this.readVersion,
   });
 
   /// Stores an API `Thread` as JSON by the version rule (`storeConfirmedThread`).
   final Future<void> Function(Map<String, Object?> thread) storeThread;
 
-  /// Stores the read state of `markThreadUnread` as a reset (04 14).
-  final Future<void> Function(ReadState state) storeReadState;
+  /// Stores a read state the server returned; [reset] for `markThreadUnread` (04 14).
+  final Future<void> Function(ReadState state, {required bool reset})
+  storeReadState;
 
   /// Sets the pin state of a message (`pin.*` follows).
   final Future<void> Function(MessageId message, {required bool pinned})
@@ -36,14 +38,21 @@ final class AppOpsStore {
   /// (`CatchUpListener.applyDraftPutResult`).
   final Future<void> Function(Map<String, Object?> result) storeDraftResult;
 
+  /// The version of the stored read state of a thread, or null; `markThreadUnread` takes it
+  /// when it is sent, so an own `putReadState` ahead of it in the thread's lane does not make
+  /// its `If-Match` stale (04 14).
+  final Future<ResourceVersion?> Function(ThreadId thread)? readVersion;
+
   /// The store of [engine] on [db].
   factory AppOpsStore.of(SyncEngine Function() engine, LocalDatabase db) =>
       AppOpsStore(
         storeThread: (t) => engine().catchUp.storeConfirmedThread(t),
-        storeReadState: (r) => db.personalDao.applyReadState(r, reset: true),
+        storeReadState: (r, {required reset}) =>
+            db.personalDao.applyReadState(r, reset: reset),
         applyPin: (m, {required pinned}) =>
             db.messagesDao.applyPin(m, pinned: pinned),
         storeDraftResult: (r) => engine().catchUp.applyDraftPutResult(r),
+        readVersion: (t) async => (await db.personalDao.readState(t))?.version,
       );
 }
 
@@ -59,6 +68,7 @@ final class AppOpsStore {
 /// | `createPersonalTemplate` | `name`, `content_md` | no | `templates` |
 /// | `cancelRun` | `run_id`, optional `reason` | no | `run:<id>` |
 /// | `putThreadDraft` | `DraftPut` (replaces the executor of M4-15) | yes | thread |
+/// | `putReadState` | `ReadStatePut` (replaces the executor of M4-15) | yes | thread |
 ///
 /// Example: `AppMessageOps.register(executors, api, AppOpsStore.of(() => engine, db));`
 abstract final class AppMessageOps {
@@ -115,16 +125,20 @@ abstract final class AppMessageOps {
     registry
       ..register(markThreadUnread, (e, ctx) async {
         final body = decodePayload(e.payload);
+        final stored = await store.readVersion?.call(e.threadId!);
+        final version = stored ?? ResourceVersion(_version(e));
         final response = await prefs.markThreadUnread(
           threadId: _thread(e),
-          ifMatch: '"${_version(e)}"',
+          ifMatch: '"${version.value}"',
           readStatePut: ReadStatePut(
             (b) => b..lastReadSeq = _required<int>(body, 'last_read_seq'),
           ),
           extra: ctx.extra,
         );
         final data = response.data;
-        if (data != null) await store.storeReadState(_readState(data));
+        if (data != null) {
+          await store.storeReadState(_readState(data), reset: true);
+        }
         return OutboxResponse(status: response.statusCode, body: data);
       })
       ..register(pinMessage, (e, ctx) => _pin(messages, store, e, ctx, true))
@@ -188,6 +202,22 @@ abstract final class AppMessageOps {
         );
         return OutboxResponse(status: response.statusCode, body: response.data);
       }, lane: (e) => 'run:${decodePayload(e.payload)['run_id']}')
+      ..register(PersonalOps.putReadState, (e, ctx) async {
+        final response = await prefs.putReadState(
+          threadId: _thread(e),
+          readStatePut: api.serializers.deserializeWith(
+            ReadStatePut.serializer,
+            decodePayload(e.payload),
+          )!,
+          extra: ctx.extra,
+        );
+        final data = response.data;
+        // The answer carries the new version at once; the echo may come later (04 14).
+        if (data != null) {
+          await store.storeReadState(_readState(data), reset: false);
+        }
+        return OutboxResponse(status: response.statusCode, body: data);
+      })
       ..register(PersonalOps.putThreadDraft, (e, ctx) async {
         final response = await prefs.putThreadDraft(
           threadId: _thread(e),

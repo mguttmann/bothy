@@ -15,11 +15,15 @@ import '../sync/thread_ops.dart';
 ///
 /// Example: `await ThreadActions(engine).send(thread, 'Hello Sam');`
 final class ThreadActions {
-  /// Creates the actions on [engine].
-  const ThreadActions(this.engine);
+  /// Creates the actions on [engine]; [outboxDao] (the engine's database) lets an edit join
+  /// the edit of the same message that is not confirmed yet.
+  const ThreadActions(this.engine, {this.outboxDao});
 
   /// The engine whose outbox takes the writes.
   final SyncEngine engine;
+
+  /// The outbox table of the engine's database, or null.
+  final OutboxDao? outboxDao;
 
   Outbox get _outbox => engine.outbox;
 
@@ -41,19 +45,49 @@ final class ThreadActions {
     ),
   );
 
-  /// Edits the confirmed [message] to [text] with `If-Match` of its version (04 13.3).
-  Future<OutboxEntry> edit(Message message, String text) => _outbox.enqueue(
-    OutboxRequest(
-      kind: MessageOps.updateMessage,
-      threadId: message.threadId,
-      payload: {
-        'message_id': message.id.value,
-        'version': message.version.value,
-        'content_md': text,
-      },
-      expectedVersion: message.version,
-    ),
-  );
+  /// Edits the confirmed [message] to [text] with `If-Match` of its version (04 13.3). When an
+  /// own edit of the message is not confirmed yet, the new text joins it (`Outbox.edit`: in
+  /// place, or a follow-up that takes the version the first edit returns), so the person's
+  /// second edit never meets a `412` against the first.
+  Future<void> edit(Message message, String text) async {
+    final pending = await _pendingEdit(message);
+    if (pending != null) {
+      await _outbox.edit(pending, {'content_md': text});
+      return;
+    }
+    await _enqueueEdit(message, text);
+  }
+
+  Future<String?> _pendingEdit(Message message) async {
+    final dao = outboxDao;
+    if (dao == null) return null;
+    String? found;
+    for (final e in await dao.entriesFor(message.threadId)) {
+      if (e.kind != MessageOps.updateMessage ||
+          e.state.isFinal ||
+          e.state == OutboxState.failed) {
+        continue;
+      }
+      if (decodePayload(e.payload)['message_id'] == message.id.value) {
+        found = e.id;
+      }
+    }
+    return found;
+  }
+
+  Future<OutboxEntry> _enqueueEdit(Message message, String text) =>
+      _outbox.enqueue(
+        OutboxRequest(
+          kind: MessageOps.updateMessage,
+          threadId: message.threadId,
+          payload: {
+            'message_id': message.id.value,
+            'version': message.version.value,
+            'content_md': text,
+          },
+          expectedVersion: message.version,
+        ),
+      );
 
   /// Edits the waiting or failed outbox entry [id] to [text] (04 13.3).
   Future<String> editEntry(String id, String text) =>

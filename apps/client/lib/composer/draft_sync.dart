@@ -109,6 +109,29 @@ final class DraftWriter {
     if (waiting != null) await _outbox.discard(waiting.id);
   });
 
+  /// The draft writes of the thread that the server has not confirmed yet, oldest first.
+  Future<List<OutboxEntry>> _unsent() async => [
+    for (final e in await _dao.entriesFor(thread))
+      if (e.kind == PersonalOps.putThreadDraft && !e.state.isFinal) e,
+  ];
+
+  /// Whether a draft write of this device waits or is in flight; a stored draft is then older
+  /// than what the person typed here (the next local write wins, 04 14).
+  Future<bool> hasUnsent() async => (await _unsent()).isNotEmpty;
+
+  /// The text of the newest draft write that waits or is in flight, or null; a write that was
+  /// not attempted becomes the one that later changes update (a composer opened again, or the
+  /// app started again while offline).
+  Future<String?> restore() async {
+    final unsent = await _unsent();
+    if (unsent.isEmpty) return null;
+    final last = unsent.last;
+    if (last.attempts == 0 && last.state == OutboxState.pending) {
+      _waiting = last.id;
+    }
+    return decodePayload(last.payload)['content_md'] as String?;
+  }
+
   Future<OutboxEntry?> _waitingEntry() async {
     final id = _waiting;
     if (id == null) return null;

@@ -42,13 +42,22 @@ import 'versions_dialog.dart';
 /// (`/t/{thread_id}?m={message_id}`, 15 11).
 class HistoryColumn extends ConsumerStatefulWidget {
   /// Creates the column.
-  const HistoryColumn({super.key, required this.threadId, this.jumpTo});
+  const HistoryColumn({
+    super.key,
+    required this.threadId,
+    this.jumpTo,
+    this.besideMain = false,
+  });
 
   /// The thread.
   final ThreadId threadId;
 
   /// The message to jump to, or null.
   final MessageId? jumpTo;
+
+  /// Whether the column is part of D2 (a thread of a text channel beside the main history),
+  /// where the session column is collapsed until the person shows it.
+  final bool besideMain;
 
   @override
   ConsumerState<HistoryColumn> createState() => HistoryColumnState();
@@ -92,7 +101,10 @@ class HistoryColumnState extends ConsumerState<HistoryColumn> {
 
   ThreadActions? get _actions {
     final engine = ref.read(syncEngineProvider);
-    return engine == null ? null : ThreadActions(engine);
+    final db = ref.read(localDatabaseProvider);
+    return engine == null
+        ? null
+        : ThreadActions(engine, outboxDao: db?.outboxDao);
   }
 
   // ---- paging, jump and read state (Design notes 1 and 2) ------------------------------
@@ -100,6 +112,14 @@ class HistoryColumnState extends ConsumerState<HistoryColumn> {
   Future<void> _loadOlder(ContiguousWindow window, Thread? thread) async {
     if (_loadingOlder || !mounted) return;
     final first = window.messages.isEmpty ? null : window.messages.first;
+    final limit = ref.read(historyLimitProvider(_thread));
+    if (window.messages.length >= limit) {
+      // Stored and loaded but cut by the limit: show more without reading.
+      ref
+          .read(historyLimitProvider(_thread).notifier)
+          .atLeast(limit + historyPageSize);
+      return;
+    }
     final ThreadSeq before;
     if (first != null) {
       if (window.gapBefore == null) return;
@@ -156,7 +176,8 @@ class HistoryColumnState extends ConsumerState<HistoryColumn> {
     if (!force && (!_newestVisible || !focused)) return;
     final newest = window.messages.last.threadSeq;
     final read = ref.read(threadReadStateProvider(_thread))?.lastReadSeq;
-    final done = _markedSeq ?? read;
+    // Esc compares with the stored position only: after "Mark as unread" it marks read again.
+    final done = force ? read : _markedSeq ?? read;
     if (done != null && done >= newest) return;
     _markedSeq = newest;
     unawaited(_actions?.markRead(widget.threadId, newest));
@@ -329,6 +350,7 @@ class HistoryColumnState extends ConsumerState<HistoryColumn> {
     // The move targets are listed from the sidebar's channels; kept while Move is offered.
     if (permissions.canManage) ref.watch(visibleChannelsProvider);
     final main = thread.kind == ThreadKind.main;
+    final textLayout = widget.besideMain;
     final starters = main
         ? ref.watch(threadsOfChannelProvider(channelId)).value ?? const []
         : const <Thread>[];
@@ -461,9 +483,12 @@ class HistoryColumnState extends ConsumerState<HistoryColumn> {
               ),
             ),
             onMove: () => unawaited(_move(thread, channel)),
-            onPin: () => ref.read(sessionColumnShownProvider.notifier).show(),
-            onColumn: () =>
-                ref.read(sessionColumnShownProvider.notifier).toggle(),
+            onPin: () => ref
+                .read(sessionColumnShownProvider.notifier)
+                .show(textThread: textLayout),
+            onColumn: () => ref
+                .read(sessionColumnShownProvider.notifier)
+                .toggle(textThread: textLayout),
           ),
           Expanded(
             child: items.isEmpty
