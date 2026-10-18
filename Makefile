@@ -169,6 +169,9 @@ bootstrap-ci: ## Install pinned tools without git hooks (CI)
 	  npm ci --prefix sdk/typescript --ignore-scripts --no-audit --no-fund --loglevel=error || exit 1; fi
 	@if git ls-files --error-unmatch sdk/python/uv.lock >/dev/null 2>&1; then \
 	  $(UV) sync --project sdk/python --locked --quiet || exit 1; fi
+	@# The Grafana panel plugin (M7-25): its own lock, installed when tracked.
+	@if git ls-files --error-unmatch plugins/grafana-bothy-live/package-lock.json >/dev/null 2>&1; then \
+	  npm ci --prefix plugins/grafana-bothy-live --ignore-scripts --no-audit --no-fund --loglevel=error || exit 1; fi
 
 # ---- aggregate ------------------------------------------------------------------------
 check: gates denylist sonar ## Every gate, identical to CI (before every push)

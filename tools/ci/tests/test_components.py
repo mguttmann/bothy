@@ -44,6 +44,12 @@ import pytest
         (["docs/spec/actions.yaml"], ["server"]),
         (["docs/spec/actions.yaml", "docs/spec/05-actions.md"], ["server"]),
         (["docs/spec/05-actions.md"], []),
+        (["docs/spec/07-permissions.md", "infra/compose/compose.yaml", "README.md"], ["plugins"]),
+        (["docs/spec/07-permissions.md", "infra/compose/secrets.yaml", "README.md"], []),
+        # The panel plugin reads the TypeScript tokens, its dashboard and the Grafana pin (M7-25).
+        (["design/build/ts/tokens.gen.ts"], ["apps", "plugins"]),
+        (["infra/observability/grafana/dashboards/bothy-live.json"], ["plugins"]),
+        (["infra/observability/grafana/dashboards/push.json"], []),
         # Chapter 09 is the contract of the adapters; its 17.10 is bound to their evidence.
         (["docs/spec/09-agents.md"], ["plugins"]),
         # The SLI bounds generator and the Sloth files feed generated files of the server and

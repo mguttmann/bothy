@@ -11,7 +11,8 @@ query the metrics to it:
    has exactly one row in 4.7, and 4.7 names only histograms; no attribute column names a
    person or an ID attribute.
 2. Names: every metric name in the `expr` of the dashboards (Prometheus targets, recursively),
-   in the `expr` of the rule files and in `error_query`/`total_query` of the Sloth files is a
+   in the `expr` of the rule files, in `error_query`/`total_query` of the Sloth files and in the
+   `expr` of the panel queries plugins/grafana-bothy-live/queries.yaml (M7-25) is a
    Prometheus name of the catalogue (histograms also with `_bucket`, `_count`, `_sum`), a
    recording rule of the rule files, a series of section 3 (`target_info`), or `up`, `ALERTS`,
    `ALERTS_FOR_STATE`.
@@ -24,9 +25,10 @@ query the metrics to it:
    duration, strings are skipped except as label values, identifiers before `(` are functions,
    identifiers in `by`, `without`, `on`, `ignoring`, `group_left` and `group_right` lists are
    labels, keywords, numbers and durations are skipped; the rest are metric names.
-6. Syntax of the dashboards: every dashboard `expr` becomes a recording rule of a temporary
-   rule file, checked by the pinned `promtool check rules` (tools/bin/tools.lock.json); a parse
-   error names the dashboard and the panel.
+6. Syntax of the dashboards and the panel queries: every dashboard `expr` and every `expr` of
+   the panel queries becomes a recording rule of a temporary rule file, checked by the pinned
+   `promtool check rules` (tools/bin/tools.lock.json); a parse error names the file and the
+   panel or query.
 
 Usage:
   signalcheck.py [--root <repository root>]
@@ -70,6 +72,8 @@ RULES_DIR = Path("infra/observability/prometheus/rules")
 """Prometheus rule files: hand-written alerts and the rules Sloth generates."""
 SLO_DIR = Path("infra/observability/slo")
 """Sloth SLO files."""
+PANEL_QUERIES = Path("plugins/grafana-bothy-live/queries.yaml")
+"""Queries of the Grafana panel plugin bothy-live-panel (docs/spec/25-visualisierung.md 8.2)."""
 
 PROMTOOL_TIMEOUT_S: float = 120
 """Seconds one promtool run may take."""
@@ -584,6 +588,25 @@ def slo_expressions(root: Path) -> list[Expression]:
     return out
 
 
+def panel_query_expressions(root: Path) -> list[Expression]:
+    """The `expr` of every query of the panel plugin, in file order; none without the file.
+
+    The file's shape is checked by the plugin's own generator (scripts/gen-queries.mts); this
+    reads only what the name test needs: `views.<view>.queries[].expr` with its `ref_id`.
+    """
+    path = root / PANEL_QUERIES
+    if not path.is_file():
+        return []
+    doc = yaml.safe_load(path.read_text(encoding="utf-8")) or {}
+    out: list[Expression] = []
+    for view, entry in (doc.get("views") or {}).items():
+        for query in (entry or {}).get("queries") or []:
+            if isinstance(query, dict) and isinstance(query.get("expr"), str):
+                location = f"view {view!r} query {query.get('ref_id')!r}"
+                out.append(Expression(str(PANEL_QUERIES), location, query["expr"]))
+    return out
+
+
 # ---- rules 2 to 4 --------------------------------------------------------------------------
 
 
@@ -715,11 +738,12 @@ def run(root: Path, promtool: Path | None) -> tuple[list[Finding], str]:
     cat, findings = read_catalogue(cat_text, str(SIGNALS_DOC))
     rules, records = rule_expressions(root)
     dashboards = list(dashboard_expressions(root))
-    exprs = [*dashboards, *rules, *slo_expressions(root)]
+    panel = panel_query_expressions(root)
+    exprs = [*dashboards, *rules, *slo_expressions(root), *panel]
     for e in exprs:
         findings.extend(check_expression(e, cat, records))
     if promtool is not None:
-        findings.extend(check_syntax(dashboards, promtool))
+        findings.extend(check_syntax([*dashboards, *panel], promtool))
     summary = f"signal-check: ok ({len(cat.metrics)} catalogue metrics, {len(exprs)} expressions)"
     return findings, summary
 

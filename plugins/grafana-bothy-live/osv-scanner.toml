@@ -1,0 +1,205 @@
+# SPDX-License-Identifier: Apache-2.0
+#
+# OSV-Scanner configuration of the panel plugin (docs/quality/licenses.md, "Lizenz-Gate" item 3;
+# docs/DECISIONS.md D-M7-25-5). The plugin bundles only its own code: webpack marks React,
+# Emotion and @grafana/* external (.config/bundler/externals.ts) and Grafana provides them at
+# runtime, and the rest of package-lock.json are build and test tools. So no package below
+# ships in dist/; test/repo.test.ts fails when a package enters the bundle. Each entry names one
+# package version and its reason; never a blanket override.
+
+[[PackageOverrides]]
+name = "@isaacs/cliui"
+ecosystem = "npm"
+version = "9.0.0"
+license.ignore = true
+reason = "License BlueOak-1.0.0. Not shipped: a dev dependency of jest (glob), used only to build, lint or test the plugin."
+
+[[PackageOverrides]]
+name = "body"
+ecosystem = "npm"
+version = "5.1.0"
+license.override = ["MIT"]
+reason = "LICENCE of body 5.1.0 is the MIT text; deps.dev has no SPDX value. Build tool: reached only through webpack-livereload-plugin (tiny-lr), the live-reload of `npm run dev`; never in dist/."
+
+[[PackageOverrides]]
+name = "caniuse-lite"
+ecosystem = "npm"
+version = "1.0.30001816"
+license.ignore = true
+reason = "License CC-BY-4.0 (browser usage data; deps.dev reports no SPDX value). Not shipped: a dev dependency of webpack (browserslist), used only to build, lint or test the plugin."
+
+[[PackageOverrides]]
+name = "continuable-cache"
+ecosystem = "npm"
+version = "0.3.1"
+license.override = ["MIT"]
+reason = "LICENCE of continuable-cache 0.3.1 is the MIT text; deps.dev has no SPDX value. Build tool: reached only through webpack-livereload-plugin (tiny-lr), the live-reload of `npm run dev`; never in dist/."
+
+[[PackageOverrides]]
+name = "error"
+ecosystem = "npm"
+version = "7.2.1"
+license.override = ["MIT"]
+reason = "LICENCE of error 7.2.1 is the MIT text; deps.dev has no SPDX value. Build tool: reached only through webpack-livereload-plugin (tiny-lr, body), the live-reload of `npm run dev`; never in dist/."
+
+[[PackageOverrides]]
+name = "fast-shallow-equal"
+ecosystem = "npm"
+version = "1.0.0"
+license.ignore = true
+reason = "License the Unlicense text (deps.dev reports no SPDX value). Not shipped: reached through @grafana/data via react-use, which webpack marks external and Grafana provides at runtime; the plugin bundle contains no file of it."
+
+[[PackageOverrides]]
+name = "fs-monkey"
+ecosystem = "npm"
+version = "1.1.0"
+license.ignore = true
+reason = "License Unlicense. Not shipped: a dev dependency of fork-ts-checker-webpack-plugin (memfs), used only to build, lint or test the plugin."
+
+[[PackageOverrides]]
+name = "get-document"
+ecosystem = "npm"
+version = "1.0.0"
+license.ignore = true
+reason = "License no license field; the README names none. Not shipped: reached through @grafana/ui via slate-react, which webpack marks external and Grafana provides at runtime; the plugin bundle contains no file of it."
+
+[[PackageOverrides]]
+name = "glob"
+ecosystem = "npm"
+version = "11.1.0"
+license.ignore = true
+reason = "License BlueOak-1.0.0. Not shipped: a dev dependency of jest and the scaffold webpack configuration, used only to build, lint or test the plugin."
+
+[[PackageOverrides]]
+name = "glob"
+ecosystem = "npm"
+version = "13.0.6"
+license.ignore = true
+reason = "License BlueOak-1.0.0. Not shipped: a dev dependency of jest and the scaffold webpack configuration, used only to build, lint or test the plugin."
+
+[[PackageOverrides]]
+name = "jackspeak"
+ecosystem = "npm"
+version = "3.4.3"
+license.ignore = true
+reason = "License BlueOak-1.0.0. Not shipped: a dev dependency of jest (glob), used only to build, lint or test the plugin."
+
+[[PackageOverrides]]
+name = "jackspeak"
+ecosystem = "npm"
+version = "4.2.3"
+license.ignore = true
+reason = "License BlueOak-1.0.0. Not shipped: a dev dependency of jest (glob), used only to build, lint or test the plugin."
+
+[[PackageOverrides]]
+name = "lru-cache"
+ecosystem = "npm"
+version = "11.5.3"
+license.ignore = true
+reason = "License BlueOak-1.0.0. Not shipped: a dev dependency of jest (glob, path-scurry), used only to build, lint or test the plugin."
+
+[[PackageOverrides]]
+name = "memfs"
+ecosystem = "npm"
+version = "3.5.3"
+license.ignore = true
+reason = "License Unlicense. Not shipped: a dev dependency of fork-ts-checker-webpack-plugin, used only to build, lint or test the plugin."
+
+[[PackageOverrides]]
+name = "minimatch"
+ecosystem = "npm"
+version = "10.2.6"
+license.ignore = true
+reason = "License BlueOak-1.0.0. Not shipped: reached through the dev tools glob and typescript-eslint and the externals @grafana/*, which webpack marks external and Grafana provides at runtime; the plugin bundle contains no file of it."
+
+[[PackageOverrides]]
+name = "minipass"
+ecosystem = "npm"
+version = "7.1.3"
+license.ignore = true
+reason = "License BlueOak-1.0.0. Not shipped: a dev dependency of jest (glob), used only to build, lint or test the plugin."
+
+[[PackageOverrides]]
+name = "nano-css"
+ecosystem = "npm"
+version = "5.6.2"
+license.ignore = true
+reason = "License Unlicense. Not shipped: reached through @grafana/data via react-use, which webpack marks external and Grafana provides at runtime; the plugin bundle contains no file of it."
+
+[[PackageOverrides]]
+name = "package-json-from-dist"
+ecosystem = "npm"
+version = "1.0.1"
+license.ignore = true
+reason = "License BlueOak-1.0.0. Not shipped: a dev dependency of jest (glob), used only to build, lint or test the plugin."
+
+[[PackageOverrides]]
+name = "path-scurry"
+ecosystem = "npm"
+version = "1.11.1"
+license.ignore = true
+reason = "License BlueOak-1.0.0. Not shipped: a dev dependency of jest (glob), used only to build, lint or test the plugin."
+
+[[PackageOverrides]]
+name = "path-scurry"
+ecosystem = "npm"
+version = "2.0.2"
+license.ignore = true
+reason = "License BlueOak-1.0.0. Not shipped: a dev dependency of jest (glob), used only to build, lint or test the plugin."
+
+[[PackageOverrides]]
+name = "react-universal-interface"
+ecosystem = "npm"
+version = "0.6.2"
+license.ignore = true
+reason = "License the Unlicense text (deps.dev reports no SPDX value). Not shipped: reached through @grafana/data via react-use, which webpack marks external and Grafana provides at runtime; the plugin bundle contains no file of it."
+
+[[PackageOverrides]]
+name = "react-use"
+ecosystem = "npm"
+version = "17.6.1"
+license.ignore = true
+reason = "License Unlicense. Not shipped: reached through @grafana/data and @grafana/ui, which webpack marks external and Grafana provides at runtime; the plugin bundle contains no file of it."
+
+[[PackageOverrides]]
+name = "safe-json-parse"
+ecosystem = "npm"
+version = "1.0.1"
+license.override = ["MIT"]
+reason = "LICENCE of safe-json-parse 1.0.1 is the MIT text; deps.dev has no SPDX value. Build tool: reached only through webpack-livereload-plugin (tiny-lr, body), the live-reload of `npm run dev`; never in dist/."
+
+[[PackageOverrides]]
+name = "set-harmonic-interval"
+ecosystem = "npm"
+version = "1.0.1"
+license.ignore = true
+reason = "License Unlicense. Not shipped: reached through @grafana/data via react-use, which webpack marks external and Grafana provides at runtime; the plugin bundle contains no file of it."
+
+[[PackageOverrides]]
+name = "spdx-exceptions"
+ecosystem = "npm"
+version = "2.5.0"
+license.ignore = true
+reason = "License CC-BY-3.0. Not shipped: a dev dependency of eslint-plugin-jsdoc, used only to build, lint or test the plugin."
+
+[[PackageOverrides]]
+name = "ts-easing"
+ecosystem = "npm"
+version = "0.2.0"
+license.ignore = true
+reason = "License Unlicense. Not shipped: reached through @grafana/data via react-use, which webpack marks external and Grafana provides at runtime; the plugin bundle contains no file of it."
+
+[[IgnoredVulns]]
+id = "GHSA-337j-9hxr-rhxg"
+ignoreUntil = 2026-11-18
+reason = "react-router 6.30.6 via @grafana/ui 13.2.3. Not shipped: react-router and @grafana/ui are webpack externals that Grafana provides at runtime, and the plugin never imports react-router. Re-check with the next @grafana/ui release that moves to the fixed line."
+
+[[IgnoredVulns]]
+id = "GHSA-wrjc-x8rr-h8h6"
+ignoreUntil = 2026-11-18
+reason = "react-router 6.30.6 via @grafana/ui 13.2.3; same reason as GHSA-337j-9hxr-rhxg: an external provided by Grafana, never bundled or imported by the plugin."
+
+[[IgnoredVulns]]
+id = "GHSA-hp3w-g68c-fv3c"
+ignoreUntil = 2026-11-18
+reason = "sprintf-js 1.0.3, a dev dependency of jest (argparse); it runs only in the unit tests on fixed input and never ships. No fixed release exists yet; Renovate proposes it when one does."

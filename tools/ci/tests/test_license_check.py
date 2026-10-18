@@ -60,6 +60,7 @@ def test_other_license_identifier_is_reported(tmp_path: Path) -> None:
         "services/server/internal/identity/adapters/postgres/sqlcgen/db.go",
         "sdk/typescript/src/generated/schema.ts",
         "tools/node/node_modules/x/index.js",
+        "plugins/grafana-bothy-live/.config/webpack/webpack.config.ts",
     ],
 )
 def test_non_source_and_generated_files_are_skipped(tmp_path: Path, name: str) -> None:
@@ -67,6 +68,15 @@ def test_non_source_and_generated_files_are_skipped(tmp_path: Path, name: str) -
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text("no header\n")
     assert lc.header_findings(tmp_path, [name]) == []
+
+
+def test_plugin_sources_outside_the_scaffold_config_need_a_header(tmp_path: Path) -> None:
+    """Only the scaffold's .config/ is exempt; the plugin's own files are hand-written (M7-25)."""
+    name = "plugins/grafana-bothy-live/src/module.ts"
+    path = tmp_path / name
+    path.parent.mkdir(parents=True)
+    path.write_text("export const x = 1;\n")
+    assert lc.header_findings(tmp_path, [name]) != []
 
 
 def test_repository_sources_have_headers() -> None:

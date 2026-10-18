@@ -41,6 +41,9 @@ GENERATED = (
     "*/generated/*",
     # The output directory of sqlc (ADR 0007); sqlc writes no license header (M1-26).
     "*/sqlcgen/*",
+    # The configuration @grafana/create-plugin scaffolds and owns (`npx @grafana/create-plugin
+    # update` rewrites it); it carries no license header (M7-25, docs/DECISIONS.md D-M7-25-1).
+    "*/grafana-bothy-live/.config/*",
 )
 # Go files that only a generator writes (by name or below a directory named generated, which
 # GENERATED and sonar.exclusions skip); the Go convention marks them with GO_GENERATED_MARKER

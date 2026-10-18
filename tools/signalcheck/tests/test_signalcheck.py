@@ -202,3 +202,51 @@ def test_unknown_promtool_fails_main(
     monkeypatch.setattr(sc, "promtool_path", broken)
     assert sc.main(["--root", str(repo)]) == 1
     assert "promtool unavailable" in capsys.readouterr().err
+
+
+PANEL_QUERIES = "plugins/grafana-bothy-live/queries.yaml"
+
+
+def test_panel_queries_are_read(repo: Path) -> None:
+    """Every expr of the panel's queries.yaml is an expression of the check (M7-25)."""
+    exprs = sc.panel_query_expressions(repo)
+    assert [e.location for e in exprs] == [
+        "view 'delivery' query 'fanout_lag'",
+        "view 'delivery' query 'request_p95'",
+        "view 'executive' query 'error_ratio'",
+    ]
+    assert all(e.file == PANEL_QUERIES for e in exprs)
+
+
+def test_unknown_metric_in_panel_queries_fails(repo: Path) -> None:
+    mutate(
+        repo, PANEL_QUERIES, "max(bothy_event_fanout_lag_seconds{", "max(bothy_fanout_lag_seconds{"
+    )
+    findings, _ = sc.run(repo, None)
+    assert any(
+        f.rule == 2 and f.file == PANEL_QUERIES and "bothy_fanout_lag_seconds" in f.message
+        for f in findings
+    ), findings
+
+
+def test_id_label_in_panel_queries_fails(repo: Path) -> None:
+    """A label outside the metric's attributes (here an ID) is refused, as in dashboards."""
+    mutate(
+        repo,
+        PANEL_QUERIES,
+        'deployment_environment_name=~"$env"',
+        'deployment_environment_name=~"$env",bothy_run_id!=""',
+    )
+    findings, _ = sc.run(repo, None)
+    assert any(f.rule == 3 and "bothy_run_id" in f.message for f in findings), findings
+
+
+def test_panel_query_syntax_error_fails(repo: Path, promtool: Path) -> None:
+    mutate(repo, PANEL_QUERIES, "max(slo:sli_error:ratio_rate5m)", "max(slo:sli_error:ratio_rate5m")
+    findings, _ = sc.run(repo, promtool)
+    assert any(f.rule == 6 and f.file == PANEL_QUERIES for f in findings), findings
+
+
+def test_without_panel_queries_nothing_is_read(repo: Path) -> None:
+    (repo / PANEL_QUERIES).unlink()
+    assert sc.panel_query_expressions(repo) == []

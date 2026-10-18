@@ -1,0 +1,9 @@
+{
+  "extends": "./.config/tsconfig.json",
+  "compilerOptions": {
+    "rootDir": "../..",
+    "strict": true,
+    "noUncheckedIndexedAccess": true
+  },
+  "include": ["src", ".config/types", "test", "scripts", "../../design/build/ts/tokens.gen.ts"]
+}
