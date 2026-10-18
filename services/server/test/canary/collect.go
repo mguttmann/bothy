@@ -4,9 +4,11 @@ package canary
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"net/http"
 	"strconv"
+	"strings"
 
 	"github.com/jackc/pgx/v5/pgxpool"
 	"go.opentelemetry.io/otel/attribute"
@@ -171,7 +173,7 @@ func ErrorObserver(s *Sinks, who string, next func(harness.Request, harness.Resp
 			return
 		}
 		src := fmt.Sprintf("%s %s %s -> %d", who, r.Method, routeOf(r.Method, r.Path), resp.Status)
-		f := JSONFields("/body", resp.Body)
+		f := markEcho(JSONFields("/body", resp.Body), resp.Body)
 		for name, vs := range resp.Header {
 			for _, v := range vs {
 				f = append(f, Field{Location: "/header/" + name, Text: v})
@@ -179,4 +181,31 @@ func ErrorObserver(s *Sinks, who string, next func(harness.Request, harness.Resp
 		}
 		s.Add(Record{Sink: SinkError, Source: src, Fields: f})
 	}
+}
+
+// markEcho sets Field.Echo on the fields of an error body that the contract returns to the
+// caller: everything below /body/current of version_conflict and base_version_conflict, and the
+// pointer of every errors[] entry with code unknown_member.
+func markEcho(fields []Field, body []byte) []Field {
+	var p struct {
+		Code   string `json:"code"`
+		Errors []struct {
+			Code string `json:"code"`
+		} `json:"errors"`
+	}
+	_ = json.Unmarshal(body, &p)
+	echo := map[string]bool{}
+	for i, e := range p.Errors {
+		if e.Code == "unknown_member" {
+			echo["/body/errors/"+strconv.Itoa(i)+"/pointer"] = true
+		}
+	}
+	current := p.Code == "version_conflict" || p.Code == "base_version_conflict"
+	for i := range fields {
+		loc := fields[i].Location
+		if echo[loc] || current && (loc == "/body/current" || strings.HasPrefix(loc, "/body/current/") || strings.HasPrefix(loc, "/body/current#")) {
+			fields[i].Echo = true
+		}
+	}
+	return fields
 }

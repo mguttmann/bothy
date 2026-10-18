@@ -90,7 +90,7 @@ func scan(reg *Registry, sinks *Sinks, rules AllowRules, all bool) []Finding {
 	for _, r := range sinks.Records() {
 		for _, f := range r.Fields {
 			for _, c := range match(index, strings.ToLower(f.Text)) {
-				if !all && allowed(*c, r, f.Location, rules) {
+				if !all && allowed(*c, r, f, rules) {
 					continue
 				}
 				prefix := c.Value
@@ -124,21 +124,22 @@ func match(index map[string][]needle, text string) []*Canary {
 	return out
 }
 
-// allowed applies the allow matrix to canary c found in field location of record r.
-func allowed(c Canary, r Record, location string, rules AllowRules) bool {
+// allowed applies the allow matrix to canary c found in field f of record r.
+func allowed(c Canary, r Record, f Field, rules AllowRules) bool {
 	switch c.Class {
 	case ClassSecret, ClassNetwork:
 		return false
 	case ClassIdentity:
 		return r.Sink != SinkLog && r.Sink != SinkTrace && r.Sink != SinkMetric
 	case ClassAdminReason:
-		if r.Sink == SinkAudit && location == "/details/reason" {
+		if r.Sink == SinkAudit && f.Location == "/details/reason" {
 			return true
 		}
-		return contentAllowed(c, r, rules)
-	default:
-		return contentAllowed(c, r, rules)
 	}
+	if r.Sink == SinkError && f.Echo {
+		return true
+	}
+	return contentAllowed(c, r, rules)
 }
 
 // contentAllowed is the content row: only in records of the foreign sink, for an instance-wide
