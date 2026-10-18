@@ -10,12 +10,10 @@ import (
 	"sync"
 	"time"
 
-	otelapi "go.opentelemetry.io/otel"
-	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/metric"
 
 	"github.com/OWNER/bothy/services/server/internal/kernel/clock"
-	"github.com/OWNER/bothy/services/server/internal/platform/otel/attr"
+	"github.com/OWNER/bothy/services/server/internal/platform/otel/metrics"
 )
 
 // Fixed-point arithmetic: a bucket stores tokens in units of 1/unitsPerToken, chosen so that the
@@ -41,12 +39,6 @@ const (
 	// full shard cheap while still finding a full or a long-unused bucket in most floods.
 	evictSample = 8
 )
-
-// instrumentation is the meter name of bothy.ratelimit.rejected when New gets no meter.
-const instrumentation = "github.com/OWNER/bothy/services/server/internal/platform/ratelimit"
-
-// metricRejected is bothy.ratelimit.rejected of signals.md "REST and gateway".
-const metricRejected = "bothy.ratelimit.rejected"
 
 // Limits are the token-bucket values of one class: ratelimit.<class>.per_minute and .burst.
 type Limits struct{ PerMinute, Burst int }
@@ -99,13 +91,12 @@ type Limiter struct {
 	seed     maphash.Seed
 	perShard int
 	sweep    time.Duration
-	rejected metric.Int64Counter
-	attrs    map[Class]metric.AddOption
+	rejected *metrics.Counter
 }
 
 // New checks cfg and returns a Limiter on clk (nil means clock.System()) that counts rejections
-// in bothy.ratelimit.rejected of m (nil means a meter of the global provider of platform/otel, so
-// call New after otel.Setup). The error names every problem: a class
+// in bothy.ratelimit.rejected (metrics.RateLimitRejected) on mp (nil means the global provider of
+// platform/otel, so call New after otel.Setup). The error names every problem: a class
 // of Classes() without limits, a class 05 does not list, PerMinute or Burst outside 1 to
 // MaxLimit, MaxTrackedKeys below 1, SweepInterval not positive, or a counter m cannot create.
 //
@@ -115,34 +106,32 @@ type Limiter struct {
 //		Classes:        map[ratelimit.Class]ratelimit.Limits{"rl.read": {PerMinute: 600, Burst: 100}, ...},
 //		MaxTrackedKeys: 100000,
 //		SweepInterval:  time.Minute,
-//	}, clock.System(), meter)
-func New(cfg Config, clk clock.Clock, m metric.Meter) (*Limiter, error) {
+//	}, clock.System(), nil)
+func New(cfg Config, clk clock.Clock, mp metric.MeterProvider) (*Limiter, error) {
 	if err := cfg.validate(); err != nil {
 		return nil, err
 	}
 	if clk == nil {
 		clk = clock.System()
 	}
-	if m == nil {
-		m = otelapi.GetMeterProvider().Meter(instrumentation)
+	// The attribute values come from the closed class list of 05, so the metric's cardinality is
+	// bounded (signals.md "Cardinality").
+	classes := make([]string, 0, len(kinds))
+	for c := range kinds {
+		classes = append(classes, string(c))
 	}
-	counter, err := m.Int64Counter(metricRejected,
-		metric.WithUnit("{request}"),
-		metric.WithDescription("Requests refused because their rate-limit class was exhausted."))
+	counter, err := metrics.NewCounter(mp, metrics.RateLimitRejected, metrics.Values{metrics.SourceRateClasses: classes})
 	if err != nil {
-		return nil, fmt.Errorf("ratelimit: %s: %w", metricRejected, err)
+		return nil, fmt.Errorf("ratelimit: %w", err)
 	}
 	n := min(max(cfg.MaxTrackedKeys/minPerShard, 1), maxShards)
 	l := &Limiter{
 		limits: make(map[Class]Limits, len(cfg.Classes)), clk: clk,
 		shards: make([]shard, n), seed: maphash.MakeSeed(), perShard: cfg.MaxTrackedKeys / n, sweep: cfg.SweepInterval,
-		rejected: counter, attrs: make(map[Class]metric.AddOption, len(cfg.Classes)),
+		rejected: counter,
 	}
 	for c, lim := range cfg.Classes {
 		l.limits[c] = lim
-		// The attribute values come from the closed class list, so the metric's cardinality is
-		// bounded (signals.md "Cardinality").
-		l.attrs[c] = metric.WithAttributeSet(attribute.NewSet(attribute.String(attr.RatelimitClass, string(c))))
 	}
 	for i := range l.shards {
 		l.shards[i].m = make(map[string]bucket)
@@ -263,8 +252,8 @@ func (l *Limiter) Refund(class Class, key string) error {
 // Reject counts one refused request of class in bothy.ratelimit.rejected. Allow calls it for
 // every denial; a caller that refuses on a Peek calls it itself. An unknown class is ignored.
 func (l *Limiter) Reject(class Class) {
-	if opt, ok := l.attrs[class]; ok {
-		l.rejected.Add(context.Background(), 1, opt)
+	if _, ok := l.limits[class]; ok {
+		l.rejected.Add(context.Background(), 1, string(class))
 	}
 }
 

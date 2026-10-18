@@ -228,7 +228,7 @@ var (
 	// SecretsRefreshFailures is bothy.secrets.refresh.failures (4.6, M1-09).
 	SecretsRefreshFailures = Spec{
 		Name: "bothy.secrets.refresh.failures", Kind: KindCounter, Unit: "{refresh}",
-		Description: "Re-reads of a secret that failed; the previous value stays in use.",
+		Description: "Failed re-reads of a cached secret; the previous value stays in use.",
 	}
 )
 
