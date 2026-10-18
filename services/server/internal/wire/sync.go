@@ -23,6 +23,7 @@ import (
 	"github.com/OWNER/bothy/services/server/internal/platform/lifecycle"
 	"github.com/OWNER/bothy/services/server/internal/platform/pg"
 	"github.com/OWNER/bothy/services/server/internal/sync"
+	syncmetrics "github.com/OWNER/bothy/services/server/internal/sync/adapters/otelmetrics"
 	syncpg "github.com/OWNER/bothy/services/server/internal/sync/adapters/postgres"
 	"github.com/OWNER/bothy/services/server/internal/sync/adapters/telemetry"
 	syncapp "github.com/OWNER/bothy/services/server/internal/sync/app"
@@ -70,11 +71,17 @@ func SyncConfigFrom(v *config.Values) (SyncConfig, error) {
 }
 
 // newSyncHook returns the sync phase hook over pool: the counters of instance (only the phase
-// hooks receive them, TestCountersOnlyUsedByPhaseHooks) and the repository of sync. It opens no
-// connection, so the golden test builds it without a database (pool nil).
+// hooks receive them, TestCountersOnlyUsedByPhaseHooks), the repository of sync and the metrics
+// of sync/adapters/otelmetrics on the global meter provider (M1-68). It opens no connection, so
+// the golden test builds it without a database (pool nil). It panics when the instruments cannot
+// be created, a programming error of their declaration.
 func newSyncHook(pool *pg.Pool, log *slog.Logger) *syncapp.PhaseHook {
 	counters := instanceapp.NewCounters(instancepg.NewRepository(pool))
-	return syncapp.NewPhaseHook(counters, syncpg.NewRepository(pool, orDiscard(log)))
+	m, err := syncmetrics.New(nil)
+	if err != nil {
+		panic(err)
+	}
+	return syncapp.NewPhaseHook(counters, syncpg.NewRepository(pool, orDiscard(log))).WithMetrics(m, nil)
 }
 
 // Sync is the sync module of a process: the appender every module receives as eventlog.Appender,
