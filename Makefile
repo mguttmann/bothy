@@ -110,7 +110,7 @@ TS_ON := $(and $(TS_PROJECTS),$(or $(call want,sdk-typescript),$(call want,plugi
         trivy-image portability linkcheck-external diagrams tokens api-lint api-checks api-breaking api-tables api-clients \
         runners-check commitlint \
         review labels-check labels-sync tools-lock release-build release-prep release-trial scancode clean \
-        codegen-check arch register-check migrations-lint migrations-lock flag-check perf ops-check \
+        codegen-check arch register-check migrations-lint migrations-lock sql-visibility flag-check perf ops-check \
         image image-test postgres-image postgres-image-test apps-platform contract-test
 
 help: ## Show the targets
@@ -151,7 +151,7 @@ check: gates denylist sonar ## Every gate, identical to CI (before every push)
 gates: ## All gates except denylist and sonar (CI job "gates")
 # Generated code is checked before lint and type checks, so that stale generator output is
 # reported as drift and not as a confusing compile error. `perf` is not a gate (P-07).
-gates: fmt-check codegen-check lint typecheck arch register-check migrations-lint flag-check test coverage contract-test commitlint \
+gates: fmt-check codegen-check lint typecheck arch register-check migrations-lint sql-visibility flag-check test coverage contract-test commitlint \
        docs config-doc-check linkcheck diagrams catalog-check api-lint api-checks api-breaking ops-check \
        api-clients tokens runners-check labels-check gitleaks semgrep trivy osv licenses
 
@@ -180,7 +180,7 @@ lint: ## Linters: file hygiene hooks, ruff, bandit, Dockerfile pins, actionlint,
 	$(UVRUN) ruff check tools
 	@# Every FROM of a tracked Dockerfile is pinned by digest (SEC-SC-4, docs/spec/18-release.md "Server-Images").
 	$(UVRUN) python tools/ci/dockerfile_pins.py
-	$(UVRUN) bandit -q -c tools/pyproject.toml -r tools/api-checks tools/arch-check tools/bin tools/catalog tools/ci tools/configdoc tools/contract tools/denylist tools/design-tokens tools/doccheck tools/docs tools/hooks tools/observability tools/opscheck tools/sonarqube
+	$(UVRUN) bandit -q -c tools/pyproject.toml -r tools/api-checks tools/arch-check tools/bin tools/catalog tools/ci tools/configdoc tools/contract tools/denylist tools/design-tokens tools/doccheck tools/docs tools/hooks tools/lint tools/observability tools/opscheck tools/sonarqube
 	$(UVRUN) check-jsonschema --builtin-schema vendor.github-issue-forms $(filter-out %/config.yml,$(wildcard .github/ISSUE_TEMPLATE/*.yml))
 	$(UVRUN) check-jsonschema --builtin-schema vendor.github-issue-config .github/ISSUE_TEMPLATE/config.yml
 	$(UVRUN) check-jsonschema --builtin-schema vendor.renovate renovate.json
@@ -392,6 +392,12 @@ migrations-lint: ## Migration rules: sequential numbers, locked checksums, STORE
 	      printf '  SKIP  %-14s %s\n' migrations-lint "$$m has no migrations/ directory yet"; \
 	    else $(MIGRATIONS_LINT) check --dir $$m/migrations --sum $$m/migrations.sha256 || exit 1; fi; \
 	  done; fi
+
+# AZ-P12 (07 "Query pattern" rule 1): every reading sqlc query on a content table carries the
+# visibility predicate or stands on the reviewed exception list tools/lint/sql_visibility.yaml.
+sql-visibility: ## SQL visibility predicate on content tables (AZ-P12)
+	@if [ -z "$(GO_ON)" ]; then $(call skip,sql-visibility,no Go module selected under services/); \
+	else $(UVRUN) python tools/lint/sql_visibility.py || exit 1; fi
 
 # Repository-wide like register-check: the server module decides, not COMPONENTS (gates.md
 # "Überspringen"). ADR 0064: no registered release flag outlives its remove_by.

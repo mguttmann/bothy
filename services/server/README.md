@@ -96,7 +96,10 @@ the public listener against `docs/api/openapi.yaml`
 ([`contractcheck`](internal/platform/httpserver/contractcheck/README.md); a violation ends the test
 binary with exit code 3). `make contract-test` runs G7, Schemathesis against the server of this tree
 ([`test/contract`](test/contract/README.md)). Full-server tests build on the shared harness
-[`test/harness`](test/harness/README.md).
+[`test/harness`](test/harness/README.md). The leak tests behind threat T-AZ-02 (M1-70: AZ-P4 404
+equality and timing per route, AZ-P5 property tests of lists, counters, snapshot and catch-up on
+random worlds, AZ-M52) live in [`test/leak`](test/leak/README.md); a failing AZ-P5 seed is
+replayed with `LEAK_SEED=<seed>`.
 
 Load and chaos tests (M1-16, M1-72): `make perf` runs the packages under [`perf`](perf/README.md)
 and [`test/chaos`](test/chaos/README.md) with the build tag `perf`, one after another, and prints the
@@ -240,6 +243,10 @@ Technik ohne Fachlogik; nur `adapters/`, `wire` und `cmd` dürfen sie importiere
 - Register, Kern-Vertrag (03, `actions.yaml`), Modultabellen in 02, Komponenten-Diagramm und
   Modul-READMEs stimmen überein (`make register-check`, ADR 0050).
 - Erzeugter Code (`api/`, sqlc, `.go-arch-lint.yml`) entspricht seiner Quelle.
+- Every reading sqlc query on a content table carries `channel_id = ANY(...)` or
+  `space_id = ANY(...)` with the visible lists of `Authorizer.Scope`, or stands with a category
+  and a reason on the reviewed exception list `tools/lint/sql_visibility.yaml` (`make
+  sql-visibility`, AZ-P12, 07 7.4 rule 1).
 
 ## Namensgebundene Stellen
 

@@ -20,6 +20,10 @@ Planning stage (milestone M0). Nothing is installable yet.
 
 ### Added
 
+- Gate `sql-visibility` (M1-70, AZ-P12): `tools/lint/sql_visibility.py` rejects every reading
+  sqlc query on a content table without `channel_id = ANY(...)` or `space_id = ANY(...)` unless it
+  stands with a category and a reason on `tools/lint/sql_visibility.yaml`; stale, duplicate and
+  uncategorised exceptions and content tables unknown to chapter 03 fail too.
 - Desktop app shell (M4-18): `apps/client` builds for macOS and Windows with platform folders,
   the build branding of `branding.example.yaml` (URL scheme, app name, bundle identifier, default
   server) and deep links of that scheme on both platforms. One composition root per server

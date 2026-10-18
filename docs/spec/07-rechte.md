@@ -807,7 +807,9 @@ Regeln:
    Rechte-Version. Ein Lint im Repository-Layer lehnt lesende sqlc-Abfragen auf diesen Tabellen
    ohne dieses Prädikat ab, außer sie stehen auf einer geprüften Ausnahmeliste (Auflösung für
    `authorize`, Laden einer schon geprüften Ressource, Jobs mit Systemrecht wie die Aufbewahrung,
-   Log-Tail). Schreibende Abfragen treffen nur Zeilen einer Ressource, die `authorize` vorher
+   Log-Tail). The lint is `tools/lint/sql_visibility.py` (gate `sql-visibility`, AZ-P12); the
+   reviewed exception list with a category and a reason per query is
+   `tools/lint/sql_visibility.yaml`. Schreibende Abfragen treffen nur Zeilen einer Ressource, die `authorize` vorher
    geprüft hat (z. B. die Kopien von `channel_id` beim Verschieben); der Lint prüft sie nicht.
 2. Gesamtzahlen (`total`), Facetten und "weitere Treffer" zählen nur innerhalb dieses Prädikats.
 3. Nach dem SQL-Filter läuft für jedes Ergebnis zusätzlich `authorize` mit der Lese-Aktion (z. B.

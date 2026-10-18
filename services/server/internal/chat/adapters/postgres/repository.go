@@ -198,8 +198,12 @@ func (r *Repository) PutSidebarState(ctx context.Context, st domain.SidebarState
 }
 
 // SidebarStates implements app.Store.
-func (r *Repository) SidebarStates(ctx context.Context, user ids.ID) ([]domain.SidebarState, error) {
-	rows, err := r.read(ctx).ListSidebarStates(ctx, uuid(user))
+func (r *Repository) SidebarStates(ctx context.Context, user ids.ID, all bool, visible []ids.ID) ([]domain.SidebarState, error) {
+	keys := make([]pgtype.UUID, 0, len(visible))
+	for _, id := range visible {
+		keys = append(keys, uuid(id))
+	}
+	rows, err := r.read(ctx).ListSidebarStates(ctx, sqlcgen.ListSidebarStatesParams{UserID: uuid(user), AllSpaces: all, Visible: keys})
 	if err != nil {
 		return nil, mapError(err, "reading the sidebar states")
 	}

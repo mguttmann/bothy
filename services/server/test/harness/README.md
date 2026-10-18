@@ -44,20 +44,23 @@ process against a disposable PostgreSQL 18 from `internal/platform/pg/pgtest`.
   `RestartWith(ctx, config)` (same ports, new configuration: seeding with raised limits, then
   the measured server with the defaults). Cleanup stops it by PID (SIGTERM, then SIGKILL).
 - `Client.Gateway(ctx)` and `Client.GatewayFrom(ctx, after)`: a gateway connection through
-  `identify` (DPoP proof with the HTTPS `htu` of the public origin) to `ready`, optionally with a
-  cursor; `GatewayConn` sends heartbeats every `heartbeat_interval_ms` of `hello` (first after a
-  random share), answers `reauth_required` with a refreshed token and `reauth`, counts the
-  acknowledgements (`Heartbeats()`), and hands every other frame with its receive time to
-  `Next`. `Client.ClientIP` sends `X-Forwarded-For` through the trusted loopback proxy path, so
-  load tests can give each simulated client its own address.
+  `identify` (access token and device of a person or, M1-70, the API token of an agent; DPoP proof
+  with the HTTPS `htu` of the public origin) to `ready`, optionally with a cursor; `GatewayConn`
+  sends heartbeats every `heartbeat_interval_ms` of `hello` (first after a random share), answers
+  `reauth_required` of a person with a refreshed token and `reauth`, counts the acknowledgements
+  (`Heartbeats()`), and hands every other frame with its receive time to `Next`.
+  `Client.ClientIP` sends `X-Forwarded-For` through the trusted loopback proxy path, so load tests
+  can give each simulated client its own address.
 - `Server.CreateUser(ctx, UserSpec)`: `NewUser` without a `testing.TB`, for seeding from several
   goroutines.
 - `BuildMatrixWorld(tb, s) *World`: the M1 subset of 07 "Examples" and "Test matrix" (spaces,
   channels, Alex, Sam, Robin, Lotse, Texter, Runner, Assistent, group Leser, grants G-1 to G-5,
-  threads and a forum post); expiry times relative to the harness clock.
+  threads and a forum post); expiry times relative to the harness clock. `World.Owner` is the owner
+  that built it (M1-70).
 
 ## Deviations from the brief (rulings M1-71/5 to M1-71/7)
 
 - `public_url` must name the port before the listener exists, so `Start` reserves a free port of
   `127.0.0.1` first and retries a start whose port was taken in between.
-- `Client.Gateway` came with M1-72 (the gateway of M1-64 was not in the base of M1-71).
+- `Client.Gateway` came with M1-72 (the gateway of M1-64 was not in the base of M1-71); M1-70
+  adds the identify with the API token of an agent (INT-W40/1).

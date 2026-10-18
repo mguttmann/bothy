@@ -15,13 +15,21 @@ const listSidebarStates = `-- name: ListSidebarStates :many
 SELECT st.user_id, st.space_id, st.collapsed, st.sort_key, st.version, st.updated_by_device_id, st.updated_at FROM user_space_states st
 JOIN spaces sp ON sp.id = st.space_id
 WHERE st.user_id = $1 AND sp.archived_at IS NULL
+  AND ($2::boolean OR st.space_id = ANY ($3::uuid[]))
 ORDER BY st.space_id
 `
 
-// The rows of one person for the spaces that are not archived; visibility runs through
-// authorize afterwards.
-func (q *Queries) ListSidebarStates(ctx context.Context, userID pgtype.UUID) ([]UserSpaceState, error) {
-	rows, err := q.db.Query(ctx, listSidebarStates, userID)
+type ListSidebarStatesParams struct {
+	UserID    pgtype.UUID
+	AllSpaces bool
+	Visible   []pgtype.UUID
+}
+
+// The rows of one person for the spaces that are not archived, with the predicate of 07 section
+// 7.4 rule 1: every space for an instance-wide reader, else the visible spaces of Scope;
+// authorize then checks each row.
+func (q *Queries) ListSidebarStates(ctx context.Context, arg ListSidebarStatesParams) ([]UserSpaceState, error) {
+	rows, err := q.db.Query(ctx, listSidebarStates, arg.UserID, arg.AllSpaces, arg.Visible)
 	if err != nil {
 		return nil, err
 	}

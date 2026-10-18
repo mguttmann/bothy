@@ -1,0 +1,163 @@
+# SPDX-License-Identifier: Apache-2.0
+#
+# Configuration of the gate `sql-visibility` (tools/lint/sql_visibility.py, AZ-P12; 07 "Query
+# pattern" rule 1). Every reading sqlc query on a content table carries
+# `channel_id = ANY($visible)` or `space_id = ANY($visible_spaces)`, unless it stands under
+# `exceptions` with a category and a reason. A new exception needs review: it says why the
+# query cannot carry the predicate, never only that it does not.
+
+# The data model chapter whose table headings every content table must name.
+data_model: docs/spec/03-datenmodell.md
+
+# Content tables in their final state, also tables of later milestones, so a new query is
+# covered from its first commit.
+content_tables:
+  - spaces
+  - channels
+  - channel_skill_bindings
+  - project_bindings
+  - dm_participants
+  - forum_tags
+  - threads
+  - thread_tags
+  - agent_sessions
+  - messages
+  - message_revisions
+  - mentions
+  - reactions
+  - pins
+  - message_templates
+  - files
+  - file_thumbnails
+  - message_attachments
+  - file_text_extracts
+  - runs
+  - run_steps
+  - run_followups
+  - message_components
+  - interactions
+  - read_states
+  - drafts
+  - event_log
+
+# Categories: authorize_resolution (resolves a resource path for authorize), after_authorize
+# (loads a single resource after authorize allowed it), system_job (job without principal),
+# log_tail (the log tail reads every event; delivery checks authorize per receiver).
+exceptions:
+  - query: chat.GetChannel
+    category: authorize_resolution
+    reason: "resolves one channel (space, archive state, operator) for authorize; the use case returns it only after channel.read allowed it"
+  - query: chat.LockChannel
+    category: after_authorize
+    reason: "locks the one channel a change authorize allowed (03 section 6.3)"
+  - query: chat.ListAllChannels
+    category: authorize_resolution
+    reason: "the structure source of authz: every non-dm channel with its space and operator, from which Scope and authorize compute visibility (07 section 7.2)"
+  - query: chat.ActiveChannelKeys
+    category: after_authorize
+    reason: "ids and sort keys of the channels of the one space whose channel.create or channel.reorder authorize allowed; no content leaves the use case"
+  - query: chat.ShareChannel
+    category: after_authorize
+    reason: "holds the one channel whose preference write authorize allowed (M3-18)"
+  - query: chat.ChannelIDsOfSpace
+    category: after_authorize
+    reason: "ids of the channels of the one space whose archive authorize allowed, for the cleanup of notification preferences (M3-18)"
+  - query: chat.ListForumTags
+    category: after_authorize
+    reason: "the tags of the one forum channel authorize allowed (channel.read or forum_tag.manage)"
+  - query: chat.GetForumTag
+    category: after_authorize
+    reason: "one tag of the channel authorize allowed; a tag of another channel answers not_found"
+  - query: chat.LockInheritingChannels
+    category: after_authorize
+    reason: "locks the inheriting channels of the one space whose operator change authorize allowed (03 section 6.3)"
+  - query: chat.ServedChannels
+    category: authorize_resolution
+    reason: "the channels an agent serves, the facts of invariant I1 that authz.VerifyInvariants checks (07 section 4.4, 10 section 5.2)"
+  - query: chat.DefaultOperatedSpaces
+    category: authorize_resolution
+    reason: "the spaces whose default operator is an agent, facts of invariant I1 (07 section 4.4, 03 section 6.4)"
+  - query: chat.GetSpace
+    category: authorize_resolution
+    reason: "resolves one space for authorize; the use case returns it only after space.read allowed it"
+  - query: chat.LockSpace
+    category: after_authorize
+    reason: "locks the one space a change authorize allowed (03 section 6.3)"
+  - query: chat.LockActiveSpaces
+    category: after_authorize
+    reason: "locks the ids of the global space order after space.create or space.reorder (owner actions on the instance) allowed it; no content leaves the use case"
+  - query: chat.ActiveSpaceKeys
+    category: after_authorize
+    reason: "ids and sort keys of the global space order after space.create or space.reorder allowed it; no content leaves the use case"
+  - query: chat.SpaceIDs
+    category: authorize_resolution
+    reason: "the structure source of authz: every space id, from which Scope computes the visible spaces (07 section 7.2)"
+  - query: chat.ShareSpace
+    category: after_authorize
+    reason: "holds the one space whose preference write authorize allowed (M3-18)"
+  - query: chat.ListThreadTags
+    category: after_authorize
+    reason: "the tags of threads that getThread or listChannelThreads returned after authorize allowed them"
+  - query: chat.GetThread
+    category: authorize_resolution
+    reason: "resolves one thread (channel, operator) for authorize; the use case returns it only after thread.read allowed it"
+  - query: chat.LockThread
+    category: after_authorize
+    reason: "locks the one thread a change authorize allowed (03 section 6.3)"
+  - query: chat.ShareThread
+    category: after_authorize
+    reason: "holds the one thread against a move while sync copies its channel after authorize allowed the write (M1-61)"
+  - query: chat.ListThreadsByActivity
+    category: after_authorize
+    reason: "the threads of the one channel channel.read allowed (listChannelThreads); a thread is visible exactly when its channel is (07 section 7.2, limit)"
+  - query: chat.ListThreadsByCreated
+    category: after_authorize
+    reason: "the threads of the one channel channel.read allowed (listChannelThreads); a thread is visible exactly when its channel is (07 section 7.2, limit)"
+  - query: messaging.ListMentions
+    category: after_authorize
+    reason: "the mentioned principals of the one message authorize allowed (Message.mention_ids)"
+  - query: messaging.GetMessage
+    category: authorize_resolution
+    reason: "resolves one message (thread, channel) for authorize; the use case returns it only after message.read allowed it"
+  - query: messaging.GetMessageByClientID
+    category: after_authorize
+    reason: "the idempotency lookup of the author's own message after message.create allowed the write in the thread (04 section 5.1 point 4)"
+  - query: messaging.ListPersonalTemplates
+    category: after_authorize
+    reason: "the personal templates of the caller after self.read allowed it; a personal template has no channel (03 message_templates)"
+  - query: messaging.CountPersonalTemplates
+    category: after_authorize
+    reason: "the number of personal templates of the caller for template.max_per_scope after the create was allowed; only a count"
+  - query: messaging.CountChannelTemplates
+    category: after_authorize
+    reason: "the number of templates of the one channel template.manage allowed, for template.max_per_scope; only a count"
+  - query: sync.ListConsumerCursors
+    category: system_job
+    reason: "the lag gauges of the event consumers (head of the log only), no principal"
+  - query: sync.OldestEventAfter
+    category: system_job
+    reason: "occurred_at of the oldest pending event for bothy.event.consumer.pending_age, no principal"
+  - query: sync.HeadSeq
+    category: log_tail
+    reason: "the head of the log (max seq), no content"
+  - query: sync.MinRetainedSeq
+    category: log_tail
+    reason: "the smallest retained seq for resync_required (04), no content"
+  - query: sync.EventBySeq
+    category: log_tail
+    reason: "one event of the log for the webhook delivery; webhook_out.deliver checks authorize per receiver (07 section 8.1)"
+  - query: sync.EventsAfter
+    category: log_tail
+    reason: "the log tail reads every event; delivery checks authorize per receiver (07 section 8.1)"
+  - query: sync.LockResourceEvents
+    category: after_authorize
+    reason: "the stored events of the one resource whose deletion authorize allowed, locked for the redaction (03 section 6.5)"
+  - query: sync.GetReadState
+    category: after_authorize
+    reason: "the caller's own read state of the one thread authorize allowed"
+  - query: sync.LockReadState
+    category: after_authorize
+    reason: "the caller's own read state of the one thread authorize allowed, locked for markThreadUnread"
+  - query: sync.ListReadStatesOfChannel
+    category: after_authorize
+    reason: "the caller's own read states of the one channel, read only when the channel is in the visible set of Scope; each row then passes thread.read"

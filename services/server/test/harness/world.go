@@ -14,6 +14,8 @@ import (
 // built through the public API. Names are the keys: spaces by name, channels as "Space/Channel",
 // people and agents by display name, grants by their label G-1 to G-5.
 type World struct {
+	// Owner is the first owner of the server, the creator of the world.
+	Owner *Client
 	// Spaces maps a space name to its ID.
 	Spaces map[string]string
 	// Channels maps "Space/Channel" to the channel ID.
@@ -58,7 +60,7 @@ var worldChannels = []struct{ space, name, kind string }{
 func BuildMatrixWorld(tb testing.TB, s *Server) *World {
 	tb.Helper()
 	w := &World{
-		Spaces: map[string]string{}, Channels: map[string]string{}, People: map[string]*Client{}, Agents: map[string]*Client{},
+		Owner: s.Owner, Spaces: map[string]string{}, Channels: map[string]string{}, People: map[string]*Client{}, Agents: map[string]*Client{},
 		Groups: map[string]string{}, Grants: map[string]string{}, Threads: map[string]string{}, Messages: map[string][]string{},
 	}
 	o := s.Owner
