@@ -560,3 +560,46 @@ func (q *Queries) ShareThread(ctx context.Context, id pgtype.UUID) (ShareThreadR
 	)
 	return i, err
 }
+
+const threadCounters = `-- name: ThreadCounters :many
+SELECT id, channel_id, last_message_seq, unread_floor_seq
+FROM threads
+WHERE channel_id = ANY($1::uuid[]) AND last_message_seq > unread_floor_seq
+ORDER BY id
+`
+
+type ThreadCountersRow struct {
+	ID             pgtype.UUID
+	ChannelID      pgtype.UUID
+	LastMessageSeq int64
+	UnreadFloorSeq int64
+}
+
+// The counters of the snapshot of sync (M1-63, 07 section 7.4 "unread counter"): the threads of
+// the given channels (the visible set of the caller) with a message above unread_floor_seq, so
+// somebody may have something unread there. The read positions live in sync, which combines both
+// in Go (07 7.4 rule 6, no join across modules).
+func (q *Queries) ThreadCounters(ctx context.Context, channelIds []pgtype.UUID) ([]ThreadCountersRow, error) {
+	rows, err := q.db.Query(ctx, threadCounters, channelIds)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []ThreadCountersRow
+	for rows.Next() {
+		var i ThreadCountersRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.ChannelID,
+			&i.LastMessageSeq,
+			&i.UnreadFloorSeq,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}

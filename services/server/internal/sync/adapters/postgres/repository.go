@@ -168,6 +168,30 @@ func (r *Repository) EventBySeq(ctx context.Context, seq int64) (sync.Event, boo
 	return toEvent(rows[0]), true, nil
 }
 
+// Compile-time check: Repository is the log of catch-up.
+var _ app.CatchUpLog = (*Repository)(nil)
+
+// VisibleEvents runs the page query of catch-up (app.CatchUpLog, queries/catchup.sql). Outside a
+// unit of work it reads on the pool. Errors: kind internal for a limit outside int32.
+func (r *Repository) VisibleEvents(ctx context.Context, q app.VisibleQuery) ([]sync.Event, error) {
+	if q.Limit < 1 || q.Limit > math.MaxInt32 {
+		return nil, errs.New(errs.CodeInternalError, "sync: page size outside int")
+	}
+	rows, err := r.queries(ctx).CatchUpPage(ctx, sqlcgen.CatchUpPageParams{
+		AfterSeq: q.After, HeadSeq: q.Head, VisibleChannels: uuids(q.ChannelIDs), FullyVisibleSpaces: uuids(q.FullyVisibleSpaceIDs),
+		VisibleSpaces: uuids(q.SpaceIDs), InstanceWide: q.InstanceWide, Principal: uuid(q.Principal),
+		MaxRows: int32(q.Limit), // #nosec G115 -- checked above
+	})
+	if err != nil {
+		return nil, err
+	}
+	out := make([]sync.Event, len(rows))
+	for i, row := range rows {
+		out[i] = toEvent(row)
+	}
+	return out, nil
+}
+
 // toEvent maps a row to the port type; NULL becomes the zero value. The payload is compacted:
 // the text form of jsonb carries a space after every colon and comma, and the compact form of
 // the normalised value is never larger than the payload the appender checked.

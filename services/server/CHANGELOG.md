@@ -61,6 +61,18 @@ documented in this file. The format is based on
   `depguard` rule forbids the package `plugin` in the server module (ADR 0022). Manifests with
   the escape of NUL or of an unpaired surrogate are refused, and manifest values that are no audit
   code enter the audit hashed, so no checked manifest makes install or upgrade fail with 500.
+- Catch-up over REST and the snapshot (M1-63): `listEvents` (`GET /api/v1/events`) delivers every
+  durable event after a cursor that the caller may receive at delivery time (personal events only
+  to their audience, every other event through `authorize` with its receive action) with a cursor
+  that means "last checked", or `410 resync_required` with the reason `epoch_changed`,
+  `cursor_ahead`, `retention` or `too_far_behind`; the optional query parameter `epoch` and the
+  keys `sync.catchup_page_size` and `sync.catchup_max_events` are read. `getSnapshot`
+  (`GET /api/v1/sync/snapshot`) returns the visible spaces and channels with versions, the
+  sidebar, unread and mention counters, running runs (none before M2-05), agent presence
+  (`unknown` before M2-20), settings, draft versions and the evaluated feature flags, without
+  thread contents. Both are the sync ports `CatchUp` and `Snapshot`, which the gateway reuses;
+  `authorize.ResourceFromEvent` describes a stored event for its delivery check,
+  `instance.Versions.EventSeq` reads the head and `chat.Threads.Counters` the thread counters.
 - Release chain (M7-10): `make -C services/server release-build VERSION=<v> OUT=<dir>` builds the
   static binaries `bothy_<v>_linux_amd64` and `bothy_<v>_linux_arm64`. A tag `server/vX.Y.Z`
   publishes `bothy-server:X.Y.Z` and `bothy-postgres:pg18-X.Y.Z` (multi-arch, built without

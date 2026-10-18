@@ -26,3 +26,8 @@ func NewVersions(repo Repository) instance.Versions {
 func (v *versions) PermissionVersion(ctx context.Context) (int64, error) {
 	return v.repo.CounterValue(ctx, string(instance.CounterPermissionVersion))
 }
+
+// EventSeq reads the head of the event log (instance.Versions).
+func (v *versions) EventSeq(ctx context.Context) (int64, error) {
+	return v.repo.CounterValue(ctx, string(instance.CounterEventSeq))
+}

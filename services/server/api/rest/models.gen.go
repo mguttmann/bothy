@@ -15877,6 +15877,18 @@ type RevokeDeviceParams struct {
 	IdempotencyKey *IdempotencyKey `json:"Idempotency-Key,omitempty"`
 }
 
+// ListEventsParams defines parameters for ListEvents.
+type ListEventsParams struct {
+	// After Last processed `seq`.
+	After int64 `form:"after" json:"after"`
+
+	// Epoch Sync epoch stored with the cursor (04 section 7.5). A different epoch answers `410 resync_required` with `reason = epoch_changed`. Absent only before the first catch-up; then `cursor_ahead` is the second net (R-SY-04).
+	Epoch *Uuid `form:"epoch,omitempty" json:"epoch,omitempty"`
+
+	// Limit At most `sync.catchup_page_size`.
+	Limit *int `form:"limit,omitempty" json:"limit,omitempty"`
+}
+
 // PutFeatureFlagParams defines parameters for PutFeatureFlag.
 type PutFeatureFlagParams struct {
 	// IfMatch Optional ETag; when given, a mismatch gives 412 `version_conflict`.

@@ -362,6 +362,9 @@ func (v *Versions) PermissionVersion(_ context.Context) (int64, error) {
 	return v.v.Load(), nil
 }
 
+// EventSeq implements instance.Versions; authz never reads it, so the fake answers 0.
+func (v *Versions) EventSeq(_ context.Context) (int64, error) { return 0, nil }
+
 // ListLiveGroups implements app.Store.
 func (s *Store) ListLiveGroups(_ context.Context, after, memberID ids.ID, t time.Time, limit int) ([]domain.Group, error) {
 	if err := s.err(); err != nil {

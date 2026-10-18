@@ -33,3 +33,8 @@ RETURNING *;
 -- name: ListReadStatesOfChannel :many
 -- The rows of the person in one channel (index read_states_user_channel_idx).
 SELECT * FROM read_states WHERE user_id = sqlc.arg(user_id) AND channel_id = sqlc.arg(channel_id) ORDER BY thread_id;
+
+-- name: ListReadStatesInChannels :many
+-- The rows of the person in the given channels (the visible set), for the unread counters of the
+-- snapshot (M1-63).
+SELECT * FROM read_states WHERE user_id = sqlc.arg(user_id) AND channel_id = ANY(sqlc.arg(channel_ids)::uuid[]) ORDER BY thread_id;
