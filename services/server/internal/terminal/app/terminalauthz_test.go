@@ -200,7 +200,7 @@ func TestI6_UserEnableRevivesGrant(t *testing.T) {
 	w := newTWorld(t)
 	w.SQL(`UPDATE principals SET status = 'disabled' WHERE id = $1`, w.sam.String())
 	w.declare(w.r1, `{"llm_credentials":"personal","credential_holder_id":"`+w.alex.String()+`","reason":"Abo von Alex"}`)
-	p := w.Want(w.Do("owner", http.MethodPost, "/api/v1/users/"+w.sam.String()+"/enable", `{"reason":"Zurück"}`, terminalworld.Key()...),
+	p := w.Want(w.Do("owner", http.MethodPost, "/api/v1/users/"+w.sam.String()+"/enable", `{"reason":"Back again"}`, terminalworld.Key()...),
 		http.StatusConflict, "i6_violation")
 	if list, _ := p["conflicts"].([]any); len(list) != 1 {
 		t.Fatalf("conflicts %v", p["conflicts"])
@@ -262,7 +262,7 @@ func TestI6_HolderChangeEndsForeignSessions(t *testing.T) {
 	robinSes := w.session(r4, w.robin)
 	w.SQL(`INSERT INTO grants (id, subject_kind, subject_principal_id, target_kind, target_host_id, capabilities, reason, granted_by)
 		VALUES ($1, 'user', $2, 'host', $3, '{terminal}', 'fixture', $4)`, ids.New().String(), w.sam.String(), r4.String(), w.owner.String())
-	body := `{"llm_credentials":"personal","credential_holder_id":"` + w.owner.String() + `","reason":"Owner übernimmt"}`
+	body := `{"llm_credentials":"personal","credential_holder_id":"` + w.owner.String() + `","reason":"Owner takes over"}`
 	w.Want(w.Do("owner", http.MethodPut, terminalworld.HostPath(r4)+"/llm-credentials", body, terminalworld.IfMatch(w.HostVersion(r4))...),
 		http.StatusConflict, "i6_violation")
 	if st, _ := w.closeReason(robinSes); st != "active" {
@@ -290,7 +290,7 @@ func TestSR10_AssigneeChangeEndsSessions(t *testing.T) {
 	update := func(body string) {
 		w.Want(w.Do("owner", http.MethodPatch, terminalworld.HostPath(w.r1), body, w.Keyed(w.r1)...), http.StatusOK, "")
 	}
-	update(`{"assigned_user_id":"` + w.sam.String() + `","reason":"Sam übernimmt"}`)
+	update(`{"assigned_user_id":"` + w.sam.String() + `","reason":"Sam takes over"}`)
 	if st, r := w.closeReason(alexSes); st != "closed" || r != "access_revoked" {
 		t.Fatalf("Alex's session: %s %s", st, r)
 	}
@@ -362,7 +362,7 @@ func TestSetHostLlmCredentials_HTTP(t *testing.T) {
 	agent := w.AgentToken("lotse")
 	w.Want(w.Do("owner", http.MethodPut, terminalworld.HostPath(w.r3)+"/llm-credentials", `{"llm_credentials":"personal","credential_holder_id":"`+agent.String()+
 		`","reason":"x"}`, terminalworld.IfMatch(v)...), http.StatusBadRequest, "validation_failed")
-	body := `{"llm_credentials":"organization","reason":"Zurück"}`
+	body := `{"llm_credentials":"organization","reason":"Back again"}`
 	w.Want(put("owner", body), http.StatusPreconditionRequired, "precondition_required")
 	w.Want(put("owner", body, terminalworld.IfMatch(v+7)...), http.StatusPreconditionFailed, "version_conflict")
 	unknown := w.Do("owner", http.MethodPut, terminalworld.HostPath(ids.New())+"/llm-credentials", body, terminalworld.IfMatch(1)...)
@@ -467,9 +467,11 @@ func TestPreviewHostGrant(t *testing.T) {
 		}
 		return nil
 	}
+	// language-check: off
 	wantText := "Sam erhält das Zusatzrecht \"Terminal\" auf dem Rechner R1.\n" +
 		"Hinweis: Die Freigabe wirkt für Sam nicht. Auf R1 öffnen nur Owner und die Person, der der Rechner zugewiesen ist, ein Terminal.\n" +
 		"Hinweis: Die Freigabe für Sam hat kein Ablaufdatum."
+	// language-check: on
 	// With Sam's grant in place: the hint and the text, no effect.
 	m := preview("user", w.sam, w.r1)
 	if h := hint(m); h == nil || h["principal_id"] != w.sam.String() || m["allowed"] != true || m["text"] != wantText {
@@ -495,9 +497,11 @@ func TestPreviewHostGrant(t *testing.T) {
 	w.Want(w.Do("owner", http.MethodPatch, terminalworld.HostPath(w.r1), `{"revoke_session_users":["`+w.alex.String()+`"],"reason":"Ende"}`, w.Keyed(w.r1)...),
 		http.StatusOK, "")
 	m = preview("user", w.alex, w.r1)
+	// language-check: off
 	if hint(m) == nil || !strings.Contains(m["text"].(string), "erst, wenn Alex auf R1 einen eigenen Sitzungsbenutzer hat") {
 		t.Fatalf("preview without a session user: %v", m)
 	}
+	// language-check: on
 	if h := hint(preview("group", w.leser, w.r1)); h == nil || h["group_id"] != w.leser.String() || h["count"] != float64(1) {
 		t.Fatalf("group hint %v", h)
 	}
@@ -506,9 +510,11 @@ func TestPreviewHostGrant(t *testing.T) {
 	if m["allowed"] != false || len(vs) != 1 || vs[0].(map[string]any)["code"] != "i6_violation" || vs[0].(map[string]any)["host_id"] != w.r2.String() || hint(m) != nil {
 		t.Fatalf("preview on the personal host: %v", m)
 	}
+	// language-check: off
 	if !strings.Contains(m["text"].(string), "Abgelehnt: Auf R2 gilt die persönliche LLM-Anmeldung von Robin.") {
 		t.Fatalf("text %q", m["text"])
 	}
+	// language-check: on
 }
 
 // TestTerminalAuthzAudit_NoContent (SEC-LOG-2, SEC-AUD-5): the audit rows of the flows of M2-40
@@ -521,7 +527,7 @@ func TestTerminalAuthzAudit_NoContent(t *testing.T) {
 	w.open(t, "owner", w.r1)
 	w.open(t, "sam", w.r1)
 	w.grant(t, "user", w.sam, w.r2, http.StatusConflict, "i6_violation")
-	w.declare(w.r2, `{"llm_credentials":"personal","credential_holder_id":"`+w.owner.String()+`","reason":"Owner übernimmt"}`)
+	w.declare(w.r2, `{"llm_credentials":"personal","credential_holder_id":"`+w.owner.String()+`","reason":"Owner takes over"}`)
 	if _, err := w.Terminal.Service.RecordSessionUserReport(context.Background(), authorize.ActionHostConnect, w.r1,
 		[]domain.ReportedSessionUser{{OSUser: "bothy-s-sam"}}); err != nil {
 		t.Fatal(err)

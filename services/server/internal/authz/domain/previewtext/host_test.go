@@ -65,6 +65,7 @@ func TestPreviewTextHostVariants(t *testing.T) {
 		edit         func(*previewtext.Input)
 		want         []string
 	}{
+		// language-check: off
 		{"server host de", "de", func(in *previewtext.Input) {
 			in.NotEffective.Cause = previewtext.CauseServerHost
 			in.ExpiryMissing = false
@@ -129,6 +130,7 @@ func TestPreviewTextHostVariants(t *testing.T) {
 			"Abgelehnt: Auf R1 gilt die persönliche LLM-Anmeldung von Alex. Dort darf nur Alex eine Freigabe haben.",
 			"Hinweis: Die Freigabe wirkt für Sam nicht. Auf R1 öffnen nur Owner und die Person, der der Rechner zugewiesen ist, ein Terminal.",
 			"Hinweis: Die Freigabe für Sam hat kein Ablaufdatum."}},
+		// language-check: on
 	}
 	for _, c := range cases {
 		in := exampleHost(c.locale)
