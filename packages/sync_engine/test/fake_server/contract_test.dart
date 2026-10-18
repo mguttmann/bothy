@@ -300,7 +300,6 @@ void main() {
     await users.createEnrollmentCode(userId: robin.id);
     await users.disableUser(userId: robin.id, reasonBody: why);
     await users.enableUser(userId: robin.id, reasonBody: why);
-    final world = h.server.world;
     final passkey = world.addPasskey(w.sam.id, name: 'Sam laptop');
     final identity = world.addIdentity(w.sam.id, subject: 'sam');
     await users.getUserCredentials(userId: w.sam.id);
