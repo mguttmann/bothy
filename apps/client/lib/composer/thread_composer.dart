@@ -75,6 +75,7 @@ class ThreadComposerState extends ConsumerState<ThreadComposer> {
       ),
       editing: ref.read(draftEditingProvider),
       typing: engine.typing,
+      deviceId: ref.read(signedInServicesProvider)?.auth.session?.deviceId,
     )..addListener(_changed);
     final composer = _composer!;
     final thread = widget.threadId.value;

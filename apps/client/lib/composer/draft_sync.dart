@@ -122,10 +122,21 @@ final class DraftWriter {
   /// The text of the newest draft write that waits or is in flight, or null; a write that was
   /// not attempted becomes the one that later changes update (a composer opened again, or the
   /// app started again while offline).
+  ///
+  /// A message of the thread queued after that write was sent with `clear_draft`, so the
+  /// draft ended there and nothing is restored.
   Future<String?> restore() async {
-    final unsent = await _unsent();
+    final all = await _dao.entriesFor(thread);
+    final unsent = [
+      for (final e in all)
+        if (e.kind == PersonalOps.putThreadDraft && !e.state.isFinal) e,
+    ];
     if (unsent.isEmpty) return null;
     final last = unsent.last;
+    final sentAfter = all
+        .skipWhile((e) => e.id != last.id)
+        .any((e) => e.kind == MessageOps.createMessage && !e.state.isFinal);
+    if (sentAfter) return null;
     if (last.attempts == 0 && last.state == OutboxState.pending) {
       _waiting = last.id;
     }

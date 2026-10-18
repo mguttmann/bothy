@@ -53,7 +53,12 @@ final class ComposerController extends ChangeNotifier {
     required this._drafts,
     required this._editing,
     this._typing,
+    this.deviceId,
   });
+
+  /// This device, so the answer of an own draft write moves the base version even while the
+  /// person types (04 14: `overwrote_newer` only for another device's newer write).
+  final DeviceId? deviceId;
 
   /// The thread.
   final ThreadId thread;
@@ -142,6 +147,11 @@ final class ComposerController extends ChangeNotifier {
   /// version is taken over only with the text, or when the text is already the field's.
   Future<void> applyStored(Draft? draft) async {
     final call = ++_applyCalls;
+    if (draft != null && _isOwn(draft)) {
+      // The answer of this device's own write: the next write builds on it.
+      _draftVersion = draft.version;
+      return;
+    }
     if (_typingNow) return;
     // An own write that is not confirmed is newer than any stored draft; its answer, which can
     // arrive after a send, must not bring the sent text back.
@@ -158,6 +168,11 @@ final class ComposerController extends ChangeNotifier {
   }
 
   int _applyCalls = 0;
+
+  bool _isOwn(Draft draft) {
+    final own = deviceId;
+    return own != null && draft.updatedByDeviceId == own;
+  }
 
   bool get _typingNow =>
       _dirty || _editing.isEditing(channelId: channel, threadId: thread);

@@ -7,7 +7,10 @@
 // applied while typing, the `overwrote_newer` notice and the typing line.
 
 import 'package:client/app/providers/settings.dart';
+import 'package:client/composer/composer_controller.dart';
+import 'package:client/composer/draft_sync.dart';
 import 'package:client/thread/history_column.dart';
+import 'package:client/thread/thread_actions.dart';
 import 'package:design_system/design_system.dart';
 import 'package:domain/domain.dart';
 import 'package:flutter/material.dart';
@@ -349,6 +352,75 @@ void main() {
       host,
     )).where((e) => e.kind == PersonalOps.putThreadDraft).toList();
     expect(drafts, hasLength(1), reason: 'the waiting write is updated');
+    await host.dispose(tester);
+  });
+
+  testWidgets(
+    'the answer of an own draft write moves the base version while typing',
+    (tester) async {
+      final host = await open(tester);
+      final device = DeviceId.parse(uuid(0xde));
+      final composer = ComposerController(
+        thread: threadId(1),
+        channel: channelId(1),
+        actions: ThreadActions(host.engine),
+        drafts: DraftWriter(
+          outbox: host.engine.outbox,
+          dao: host.db.outboxDao,
+          thread: threadId(1),
+        ),
+        editing: DraftEditingRegistry(),
+        deviceId: device,
+      );
+      addTearDown(composer.dispose);
+      await host.run(tester, () async {
+        composer
+          ..setFocused(true)
+          ..onChanged('Hel');
+        await composer.applyStored(
+          Draft(
+            id: DraftId.parse(uuid(0xd4)),
+            threadId: threadId(1),
+            channelId: channelId(1),
+            contentMd: 'Hel',
+            fileIds: const [],
+            version: const ResourceVersion(4),
+            updatedByDeviceId: device,
+          ),
+        );
+        composer.onChanged('Hello');
+        await Future<void>.delayed(Duration.zero);
+      });
+      await host.settle(tester);
+      final draft = (await entries(
+        tester,
+        host,
+      )).lastWhere((e) => e.kind == PersonalOps.putThreadDraft);
+      expect(decodePayload(draft.payload)['base_version'], 4);
+      expect(decodePayload(draft.payload)['content_md'], 'Hello');
+      await host.dispose(tester);
+    },
+  );
+
+  testWidgets('no draft comes back when a message was sent after it', (
+    tester,
+  ) async {
+    final host = await open(tester);
+    await type(tester, host, 'Hello Sam');
+    final draft = (await entries(
+      tester,
+      host,
+    )).singleWhere((e) => e.kind == PersonalOps.putThreadDraft);
+    // In flight when the connection dropped: it stays, attempted.
+    await host.run(
+      tester,
+      () => host.db.outboxDao.markState(draft.id, OutboxState.waiting),
+    );
+    await tester.sendKeyEvent(LogicalKeyboardKey.enter);
+    await host.settle(tester);
+    await pumpThreadWith(tester, host, const {}, show: false);
+    await pumpThreadWith(tester, host, const {});
+    expect(tester.widget<TextField>(composerField).controller!.text, isEmpty);
     await host.dispose(tester);
   });
 }
