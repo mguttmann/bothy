@@ -17,6 +17,7 @@ import (
 	"github.com/riverqueue/river"
 	"github.com/riverqueue/river/riverdriver/riverpgxv5"
 	otelapi "go.opentelemetry.io/otel"
+	"go.opentelemetry.io/otel/metric"
 	"go.opentelemetry.io/otel/trace"
 
 	"github.com/OWNER/bothy/services/server/internal/platform/pg"
@@ -62,6 +63,12 @@ type Config struct {
 	// Logger receives River's log lines and the panic lines of the handler wrapper; nil means
 	// slog.Default(). The server logger keeps only catalogue attributes (signals.md "Logs").
 	Logger *slog.Logger
+	// StatementTimeout is database.statement_timeout: it bounds the count query of bothy.job.queue
+	// (0 means no bound of its own).
+	StatementTimeout time.Duration
+	// MeterProvider creates bothy.job.duration and bothy.job.queue; nil means the global provider
+	// of platform/otel.
+	MeterProvider metric.MeterProvider
 }
 
 // validate checks c.
@@ -129,6 +136,11 @@ type Runtime struct {
 	log    *slog.Logger
 	kinds  map[string]*entry
 	client *river.Client[pgx.Tx]
+	pool   *pg.Pool
+	// metrics are bothy.job.duration and bothy.job.queue; queueReg is the callback of the queue
+	// gauge while River runs.
+	metrics  *jobMetrics
+	queueReg metric.Registration
 	// works is false for RoleAPI and for a worker without registered kinds: River refuses to
 	// start a client without workers, and such a process has nothing to run.
 	works bool
@@ -173,9 +185,13 @@ func New(pool *pg.Pool, cfg Config, role Role, reg *Registry, tracer trace.Trace
 		log = slog.Default()
 	}
 	kinds, periodic := reg.seal()
-	rt := &Runtime{role: role, cfg: cfg, log: log, kinds: kinds, failed: make(chan error, 1)}
+	m, err := newJobMetrics(cfg.MeterProvider, sortedKinds(kinds))
+	if err != nil {
+		return nil, err
+	}
+	rt := &Runtime{role: role, cfg: cfg, log: log, kinds: kinds, pool: pool, metrics: m, failed: make(chan error, 1)}
 	rt.works = role.works() && len(kinds) > 0
-	rc, err := rt.riverConfig(periodic, workerDeps{tracer: tracer, log: log})
+	rc, err := rt.riverConfig(periodic, workerDeps{tracer: tracer, log: log, metrics: m})
 	if err != nil {
 		return nil, err
 	}
@@ -247,6 +263,12 @@ func (rt *Runtime) Start(ctx context.Context) error {
 	if err := rt.client.Start(context.WithoutCancel(ctx)); err != nil {
 		return fmt.Errorf("jobs: start River: %w", err)
 	}
+	// Only a process that works jobs observes the queue (role worker, signals.md 4.4).
+	reg, err := rt.metrics.registerQueue(rt.pool, rt.cfg.Schema, rt.cfg.StatementTimeout)
+	if err != nil {
+		return errors.Join(fmt.Errorf("jobs: register bothy.job.queue: %w", err), rt.client.StopAndCancel(ctx))
+	}
+	rt.queueReg = reg
 	rt.started = true
 	go rt.watch(rt.client.Stopped())
 	return nil
@@ -282,10 +304,15 @@ func (rt *Runtime) Failed() <-chan error { return rt.failed }
 func (rt *Runtime) Stop(ctx context.Context) error {
 	rt.mu.Lock()
 	rt.stopping = true
-	started := rt.started
+	started, reg := rt.started, rt.queueReg
+	rt.queueReg = nil
 	rt.mu.Unlock()
 	if !started {
 		return nil
+	}
+	if reg != nil {
+		// The queue is not observed after the stop; the error only says it was unregistered.
+		_ = reg.Unregister()
 	}
 	if err := rt.client.Stop(ctx); err == nil {
 		return nil
