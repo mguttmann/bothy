@@ -272,11 +272,28 @@ func (w *pgWorld) grantRow(t *testing.T, s domain.Subject, tg domain.Target, l d
 	return g.ID
 }
 
+// mirrorChannel writes the spaces and channels rows of a fake channel, the targets of the foreign
+// keys of grants (M1-52, M1-53); authorize still reads the fake.
+func (w *pgWorld) mirrorChannel(t *testing.T, c authz.ChannelFacts) {
+	t.Helper()
+	var space any
+	kind, inherit := string(c.Kind), true
+	if c.Kind == authz.ChannelDM {
+		inherit = false
+	} else {
+		space = c.SpaceID.String()
+		w.sql(t, `INSERT INTO spaces (id, name, sort_key, created_by) VALUES ($1::uuid, $1::text, 'a0', $2) ON CONFLICT (id) DO NOTHING`, c.SpaceID.String(), w.owner.String())
+	}
+	w.sql(t, `INSERT INTO channels (id, space_id, kind, name, sort_key, operator_inherit, history_backfill_limit, created_by)
+		VALUES ($1::uuid, $2, $3, $1::text, 'a0', $4, 20, $5) ON CONFLICT (id) DO NOTHING`, c.ID.String(), space, kind, inherit, w.owner.String())
+}
+
 // seed builds the world of 07 sections 10 and 11.1.
 func (w *pgWorld) seed(t *testing.T) {
 	t.Helper()
 	w.owner, w.alex, w.sam, w.robin = w.person(t, "owner"), w.person(t, "alex"), w.person(t, "sam"), w.person(t, "robin")
 	w.makeOwner(t, w.owner)
+	w.structure.OnPutChannel(func(c authz.ChannelFacts) { w.mirrorChannel(t, c) })
 	w.lotse, w.texter, w.runner, w.assistent = w.bot(t, "agent", "lotse"), w.bot(t, "agent", "texter"), w.bot(t, "agent", "runner"), w.bot(t, "agent", "assistent")
 	w.tracker = w.bot(t, "app", "tracker")
 	w.policies.Put(w.lotse, authz.AgentPolicy{BillingMode: domain.BillingOrganization, ToolClass: domain.ToolChat})

@@ -377,6 +377,50 @@ func (stubServer) PutMySidebarSpace(context.Context, rest.PutMySidebarSpaceReque
 	return nil, nil
 }
 
+func (stubServer) ListSpaceChannels(context.Context, rest.ListSpaceChannelsRequestObject) (rest.ListSpaceChannelsResponseObject, error) {
+	return nil, nil
+}
+
+func (stubServer) CreateChannel(context.Context, rest.CreateChannelRequestObject) (rest.CreateChannelResponseObject, error) {
+	return nil, nil
+}
+
+func (stubServer) GetChannel(context.Context, rest.GetChannelRequestObject) (rest.GetChannelResponseObject, error) {
+	return nil, nil
+}
+
+func (stubServer) UpdateChannel(context.Context, rest.UpdateChannelRequestObject) (rest.UpdateChannelResponseObject, error) {
+	return nil, nil
+}
+
+func (stubServer) MoveChannel(context.Context, rest.MoveChannelRequestObject) (rest.MoveChannelResponseObject, error) {
+	return nil, nil
+}
+
+func (stubServer) ArchiveChannel(context.Context, rest.ArchiveChannelRequestObject) (rest.ArchiveChannelResponseObject, error) {
+	return nil, nil
+}
+
+func (stubServer) ListForumTags(context.Context, rest.ListForumTagsRequestObject) (rest.ListForumTagsResponseObject, error) {
+	return nil, nil
+}
+
+func (stubServer) CreateForumTag(context.Context, rest.CreateForumTagRequestObject) (rest.CreateForumTagResponseObject, error) {
+	return nil, nil
+}
+
+func (stubServer) UpdateForumTag(context.Context, rest.UpdateForumTagRequestObject) (rest.UpdateForumTagResponseObject, error) {
+	return nil, nil
+}
+
+func (stubServer) MoveForumTag(context.Context, rest.MoveForumTagRequestObject) (rest.MoveForumTagResponseObject, error) {
+	return nil, nil
+}
+
+func (stubServer) DeleteForumTag(context.Context, rest.DeleteForumTagRequestObject) (rest.DeleteForumTagResponseObject, error) {
+	return nil, nil
+}
+
 func (stubServer) ListAgents(context.Context, rest.ListAgentsRequestObject) (rest.ListAgentsResponseObject, error) {
 	return nil, nil
 }
@@ -545,6 +589,18 @@ func TestRealTable_Enabled(t *testing.T) {
 		"moveSpace":         {"POST /api/v1/spaces/{space_id}/move", "space.reorder", "rl.admin"},
 		"archiveSpace":      {"POST /api/v1/spaces/{space_id}/archive", "space.archive", "rl.admin"},
 		"putMySidebarSpace": {"PUT /api/v1/me/sidebar/spaces/{space_id}", "sidebar.update", "rl.write"},
+		// M1-53
+		"listSpaceChannels": {"GET /api/v1/spaces/{space_id}/channels", "channel.read", "rl.read"},
+		"createChannel":     {"POST /api/v1/spaces/{space_id}/channels", "channel.create", "rl.admin"},
+		"getChannel":        {"GET /api/v1/channels/{channel_id}", "channel.read", "rl.read"},
+		"updateChannel":     {"PATCH /api/v1/channels/{channel_id}", "channel.update", "rl.admin"},
+		"moveChannel":       {"POST /api/v1/channels/{channel_id}/move", "channel.reorder", "rl.admin"},
+		"archiveChannel":    {"POST /api/v1/channels/{channel_id}/archive", "channel.archive", "rl.admin"},
+		"listForumTags":     {"GET /api/v1/channels/{channel_id}/tags", "channel.read", "rl.read"},
+		"createForumTag":    {"POST /api/v1/channels/{channel_id}/tags", "forum_tag.manage", "rl.admin"},
+		"updateForumTag":    {"PATCH /api/v1/channels/{channel_id}/tags/{tag_id}", "forum_tag.manage", "rl.admin"},
+		"moveForumTag":      {"POST /api/v1/channels/{channel_id}/tags/{tag_id}/move", "forum_tag.manage", "rl.admin"},
+		"deleteForumTag":    {"DELETE /api/v1/channels/{channel_id}/tags/{tag_id}", "forum_tag.manage", "rl.admin"},
 	}
 	ops := routes.Enabled()
 	if len(ops) != len(want) {

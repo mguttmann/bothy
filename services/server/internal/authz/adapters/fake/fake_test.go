@@ -275,3 +275,17 @@ func TestStructureDetails(t *testing.T) {
 		t.Fatal(err)
 	}
 }
+
+// TestStructureOnPutChannel: PutChannel hands every stored channel to the registered function
+// (M1-53: test worlds mirror fake channels into PostgreSQL).
+func TestStructureOnPutChannel(t *testing.T) {
+	t.Parallel()
+	s := fake.NewStructure()
+	var got []ids.ID
+	s.OnPutChannel(func(c authz.ChannelFacts) { got = append(got, c.ID) })
+	id := ids.New()
+	s.PutChannel(authz.ChannelFacts{ID: id, Kind: authz.ChannelText})
+	if len(got) != 1 || got[0] != id {
+		t.Fatalf("hook saw %v", got)
+	}
+}

@@ -25,6 +25,8 @@ func TestDecisionErrMapping(t *testing.T) {
 		{authorize.OutcomeForbidden, "device_pending", errs.KindForbidden, errs.CodeDevicePending, "device_pending"},
 		{authorize.OutcomeForbidden, "principal_pending", errs.KindForbidden, errs.CodeDevicePending, "principal_pending"},
 		{authorize.OutcomeForbidden, "channel_read_only", errs.KindForbidden, errs.CodeChannelReadOnly, "channel_read_only"},
+		// 07 section 4.5: an archived channel answers like a read-only one, with its own reason (M1-53).
+		{authorize.OutcomeForbidden, "channel_archived", errs.KindForbidden, errs.CodeChannelReadOnly, "channel_archived"},
 		{authorize.OutcomeForbidden, "level_insufficient", errs.KindForbidden, errs.CodeForbidden, "level_insufficient"},
 		{authorize.OutcomeForbidden, "owner_only", errs.KindForbidden, errs.CodeForbidden, "owner_only"},
 		{authorize.OutcomeStepUpRequired, "step_up_required", errs.KindStepUpRequired, errs.CodeStepUpRequired, ""},

@@ -15615,6 +15615,45 @@ type LoginWithTrustedHeaderParams struct {
 	DPoP DpopProof `json:"DPoP"`
 }
 
+// UpdateChannelParams defines parameters for UpdateChannel.
+type UpdateChannelParams struct {
+	// IdempotencyKey UUIDv7 chosen by the client per logical operation. A repeat with the same request returns the stored response; a different request gives 422 `idempotency_key_reuse`; a repeat while the first is running gives 409 `request_in_progress`. Kept for `sync.idempotency_key_ttl`.
+	IdempotencyKey *IdempotencyKey `json:"Idempotency-Key,omitempty"`
+
+	// IfMatch ETag of the version the change is based on, e.g. `"7"`. Mismatch gives 412 `version_conflict`.
+	IfMatch IfMatchRequired `json:"If-Match"`
+}
+
+// ArchiveChannelParams defines parameters for ArchiveChannel.
+type ArchiveChannelParams struct {
+	// IdempotencyKey UUIDv7 chosen by the client per logical operation. A repeat with the same request returns the stored response; a different request gives 422 `idempotency_key_reuse`; a repeat while the first is running gives 409 `request_in_progress`. Kept for `sync.idempotency_key_ttl`.
+	IdempotencyKey *IdempotencyKey `json:"Idempotency-Key,omitempty"`
+}
+
+// MoveChannelParams defines parameters for MoveChannel.
+type MoveChannelParams struct {
+	// IdempotencyKey UUIDv7 chosen by the client per logical operation. A repeat with the same request returns the stored response; a different request gives 422 `idempotency_key_reuse`; a repeat while the first is running gives 409 `request_in_progress`. Kept for `sync.idempotency_key_ttl`.
+	IdempotencyKey *IdempotencyKey `json:"Idempotency-Key,omitempty"`
+}
+
+// CreateForumTagParams defines parameters for CreateForumTag.
+type CreateForumTagParams struct {
+	// IdempotencyKey UUIDv7 chosen by the client per logical operation. A repeat with the same request returns the stored response; a different request gives 422 `idempotency_key_reuse`; a repeat while the first is running gives 409 `request_in_progress`. Kept for `sync.idempotency_key_ttl`.
+	IdempotencyKey *IdempotencyKey `json:"Idempotency-Key,omitempty"`
+}
+
+// UpdateForumTagParams defines parameters for UpdateForumTag.
+type UpdateForumTagParams struct {
+	// IdempotencyKey UUIDv7 chosen by the client per logical operation. A repeat with the same request returns the stored response; a different request gives 422 `idempotency_key_reuse`; a repeat while the first is running gives 409 `request_in_progress`. Kept for `sync.idempotency_key_ttl`.
+	IdempotencyKey *IdempotencyKey `json:"Idempotency-Key,omitempty"`
+}
+
+// MoveForumTagParams defines parameters for MoveForumTag.
+type MoveForumTagParams struct {
+	// IdempotencyKey UUIDv7 chosen by the client per logical operation. A repeat with the same request returns the stored response; a different request gives 422 `idempotency_key_reuse`; a repeat while the first is running gives 409 `request_in_progress`. Kept for `sync.idempotency_key_ttl`.
+	IdempotencyKey *IdempotencyKey `json:"Idempotency-Key,omitempty"`
+}
+
 // ApproveDeviceParams defines parameters for ApproveDevice.
 type ApproveDeviceParams struct {
 	// IdempotencyKey UUIDv7 chosen by the client per logical operation. A repeat with the same request returns the stored response; a different request gives 422 `idempotency_key_reuse`; a repeat while the first is running gives 409 `request_in_progress`. Kept for `sync.idempotency_key_ttl`.
@@ -15810,6 +15849,12 @@ type ArchiveSpaceParams struct {
 	IdempotencyKey *IdempotencyKey `json:"Idempotency-Key,omitempty"`
 }
 
+// CreateChannelParams defines parameters for CreateChannel.
+type CreateChannelParams struct {
+	// IdempotencyKey UUIDv7 chosen by the client per logical operation. A repeat with the same request returns the stored response; a different request gives 422 `idempotency_key_reuse`; a repeat while the first is running gives 409 `request_in_progress`. Kept for `sync.idempotency_key_ttl`.
+	IdempotencyKey *IdempotencyKey `json:"Idempotency-Key,omitempty"`
+}
+
 // MoveSpaceParams defines parameters for MoveSpace.
 type MoveSpaceParams struct {
 	// IdempotencyKey UUIDv7 chosen by the client per logical operation. A repeat with the same request returns the stored response; a different request gives 422 `idempotency_key_reuse`; a repeat while the first is running gives 409 `request_in_progress`. Kept for `sync.idempotency_key_ttl`.
@@ -15936,6 +15981,24 @@ type RefreshTokenJSONRequestBody = TokenRefreshRequest
 // LoginWithTrustedHeaderJSONRequestBody defines body for LoginWithTrustedHeader for application/json ContentType.
 type LoginWithTrustedHeaderJSONRequestBody = TrustedHeaderLoginRequest
 
+// UpdateChannelJSONRequestBody defines body for UpdateChannel for application/json ContentType.
+type UpdateChannelJSONRequestBody = ChannelUpdate
+
+// ArchiveChannelJSONRequestBody defines body for ArchiveChannel for application/json ContentType.
+type ArchiveChannelJSONRequestBody = ReasonBody
+
+// MoveChannelJSONRequestBody defines body for MoveChannel for application/json ContentType.
+type MoveChannelJSONRequestBody = MovePosition
+
+// CreateForumTagJSONRequestBody defines body for CreateForumTag for application/json ContentType.
+type CreateForumTagJSONRequestBody = ForumTagCreate
+
+// UpdateForumTagJSONRequestBody defines body for UpdateForumTag for application/json ContentType.
+type UpdateForumTagJSONRequestBody = ForumTagUpdate
+
+// MoveForumTagJSONRequestBody defines body for MoveForumTag for application/json ContentType.
+type MoveForumTagJSONRequestBody = MovePosition
+
 // ApproveDeviceJSONRequestBody defines body for ApproveDevice for application/json ContentType.
 type ApproveDeviceJSONRequestBody = DeviceApprove
 
@@ -16019,6 +16082,9 @@ type UpdateSpaceJSONRequestBody = SpaceUpdate
 
 // ArchiveSpaceJSONRequestBody defines body for ArchiveSpace for application/json ContentType.
 type ArchiveSpaceJSONRequestBody = ReasonBody
+
+// CreateChannelJSONRequestBody defines body for CreateChannel for application/json ContentType.
+type CreateChannelJSONRequestBody = ChannelCreate
 
 // MoveSpaceJSONRequestBody defines body for MoveSpace for application/json ContentType.
 type MoveSpaceJSONRequestBody = MovePosition

@@ -25,6 +25,36 @@ import (
 type Config struct {
 	// SpaceNameMaxChars is space.name_max_chars, the longest space name in Unicode characters.
 	SpaceNameMaxChars int `config:"space.name_max_chars"`
+	// ChannelNameMaxChars is channel.name_max_chars, the longest channel name.
+	ChannelNameMaxChars int `config:"channel.name_max_chars"`
+	// ChannelTopicMaxChars is channel.topic_max_chars, the longest channel topic.
+	ChannelTopicMaxChars int `config:"channel.topic_max_chars"`
+	// TagNameMaxChars is forum_tag.name_max_chars, the longest forum tag name.
+	TagNameMaxChars int `config:"forum_tag.name_max_chars"`
+	// HistoryBackfillLimitDefault is channel.history_backfill_limit_default, the
+	// history_backfill_limit of a new channel; at most HistoryBackfillLimitMax.
+	HistoryBackfillLimitDefault int `config:"channel.history_backfill_limit_default"`
+	// HistoryBackfillLimitMax is channel.history_backfill_limit_max (checked by M2-02 when the
+	// limit becomes writable).
+	HistoryBackfillLimitMax int `config:"channel.history_backfill_limit_max"`
+}
+
+// limits returns the text limits of channels and tags.
+func (c Config) limits() domain.Limits {
+	return domain.Limits{ChannelName: c.ChannelNameMaxChars, ChannelTopic: c.ChannelTopicMaxChars, TagName: c.TagNameMaxChars}
+}
+
+// check refuses limits below 1 and a backfill default outside 0 to the maximum.
+func (c Config) check() error {
+	switch {
+	case c.SpaceNameMaxChars < 1:
+		return errors.New("chat: space.name_max_chars must be at least 1")
+	case c.ChannelNameMaxChars < 1 || c.ChannelTopicMaxChars < 1 || c.TagNameMaxChars < 1:
+		return errors.New("chat: channel.name_max_chars, channel.topic_max_chars and forum_tag.name_max_chars must be at least 1")
+	case c.HistoryBackfillLimitDefault < 0 || c.HistoryBackfillLimitDefault > c.HistoryBackfillLimitMax:
+		return errors.New("chat: channel.history_backfill_limit_default must be between 0 and channel.history_backfill_limit_max")
+	}
+	return nil
 }
 
 // Deps are the collaborators of the chat use cases.
@@ -45,7 +75,7 @@ type Deps struct {
 	Clock clock.Clock
 }
 
-// Service implements chat.Structure (space and sidebar part). It is safe for concurrent use.
+// Service implements chat.Structure (space, sidebar, channel and forum tag part). It is safe for concurrent use.
 type Service struct {
 	cfg Config
 	d   Deps
@@ -54,13 +84,14 @@ type Service struct {
 // Compile-time check: the incoming port.
 var _ chat.Structure = (*Service)(nil)
 
-// New returns the use cases. Errors: a missing collaborator or a name limit below 1.
+// New returns the use cases. Errors: a missing collaborator, a text limit below 1 or a backfill
+// default outside its range.
 func New(cfg Config, d Deps) (*Service, error) {
 	if d.Store == nil || d.UoW == nil || d.Authorizer == nil || d.Rights == nil || d.Audit == nil || d.Events == nil {
 		return nil, errors.New("chat: New needs every collaborator")
 	}
-	if cfg.SpaceNameMaxChars < 1 {
-		return nil, errors.New("chat: space.name_max_chars must be at least 1")
+	if err := cfg.check(); err != nil {
+		return nil, err
 	}
 	if d.Clock == nil {
 		d.Clock = clock.System()

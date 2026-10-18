@@ -73,6 +73,7 @@ func newWorld(t *testing.T) *world {
 	log := slog.New(slog.DiscardHandler)
 	clk := clock.NewFake(start)
 	w := &world{t: t, owner: db.Pool(t, pg.RoleOwner), creds: fake.NewCredentials(), structure: fake.NewStructure()}
+	w.structure.OnPutChannel(w.mirrorChannel)
 	repo := identitypg.NewRepository(pool)
 	principals := identityapp.NewPrincipalSource(repo)
 	source := authzsource.New(agentspg.NewRepository(pool), identityapp.NewDirectory(repo))
@@ -196,4 +197,22 @@ func wantCode(t *testing.T, err error, code errs.Code) {
 	if !ok || e.PublicCode() != code {
 		t.Fatalf("error %v, want %s", err, code)
 	}
+}
+
+// mirrorChannel writes the spaces and channels rows of a fake channel, created by the app
+// principal structure-fixture, the targets of the foreign keys of grants (M1-52, M1-53);
+// authorize still reads the fake.
+func (w *world) mirrorChannel(c authz.ChannelFacts) {
+	w.t.Helper()
+	w.sql(`INSERT INTO principals (id, kind, handle, display_name) SELECT gen_random_uuid(), 'app', 'structure-fixture', 'Structure fixture'
+		WHERE NOT EXISTS (SELECT 1 FROM principals WHERE handle = 'structure-fixture')`)
+	const by = `(SELECT id FROM principals WHERE handle = 'structure-fixture')`
+	var space any
+	inherit := c.Kind != authz.ChannelDM
+	if inherit {
+		space = c.SpaceID.String()
+		w.sql(`INSERT INTO spaces (id, name, sort_key, created_by) VALUES ($1::uuid, $1::text, 'a0', `+by+`) ON CONFLICT (id) DO NOTHING`, c.SpaceID.String())
+	}
+	w.sql(`INSERT INTO channels (id, space_id, kind, name, sort_key, operator_inherit, history_backfill_limit, created_by)
+		VALUES ($1::uuid, $2, $3, $1::text, 'a0', $4, 20, `+by+`) ON CONFLICT (id) DO NOTHING`, c.ID.String(), space, string(c.Kind), inherit)
 }
