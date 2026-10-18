@@ -1,0 +1,273 @@
+// SPDX-License-Identifier: Apache-2.0
+
+package canary
+
+import (
+	"context"
+	"crypto/rand"
+	"encoding/json"
+	"fmt"
+	"io/fs"
+	"math/big"
+	"net/netip"
+	"os"
+	"path/filepath"
+	"strings"
+	"sync"
+	"testing"
+	"time"
+
+	"github.com/OWNER/bothy/services/server/internal/kernel/ids"
+	"github.com/OWNER/bothy/services/server/test/harness"
+)
+
+// Exempt lists enabled operations the scenario does not call, each with its reason. The brief
+// expects it to be empty; an entry needs a reason a reviewer can check.
+var Exempt = map[string]string{}
+
+// ScenarioConfig returns the Options.Config of the scenario server: every rate-limit class raised
+// (the run is deterministic), all spans sampled, logs at debug to stdout and OTLP, and the
+// trusted proxies of the harness (loopback), so X-Forwarded-For carries the network canaries.
+func ScenarioConfig() map[string]string {
+	cfg := harness.RaisedRateLimits()
+	cfg["telemetry.traces.sampler_ratio"] = "1.0"
+	cfg["telemetry.logs.exporter"] = "both"
+	cfg["telemetry.logs.level"] = "debug"
+	return cfg
+}
+
+// Run is one canary run: the registry, the sinks, the coverage and the server.
+type Run struct {
+	T      testing.TB
+	Reg    *Registry
+	Sinks  *Sinks
+	Cov    *Coverage
+	Server *harness.Server
+	Tel    *harness.TelemetrySinks
+	Logs   *LineWriter
+	// IPv4 and IPv6 are the network canaries of the run.
+	IPv4, IPv6 string
+
+	mu      sync.Mutex
+	clients []*harness.Client
+}
+
+// RunOptions change StartRun.
+type RunOptions struct {
+	// Config are extra Options.Config entries over ScenarioConfig.
+	Config map[string]string
+	// Defaults starts the server with the harness defaults (no ScenarioConfig), for the rate
+	// limit test.
+	Defaults bool
+	// Env are extra process environment entries of the server.
+	Env []string
+	// Harness changes the harness options after StartRun filled them.
+	Harness func(*harness.Options)
+}
+
+// StartRun starts a harness server whose every output is captured: the log stream through
+// Options.LogWriter, the telemetry through in-memory sinks, the DPoP proofs into the registry.
+// It also redirects the standard logger and slog's default logger into the log sink until the
+// test ends. The owner gets the observer of the run.
+func StartRun(t testing.TB, o RunOptions) *Run {
+	t.Helper()
+	r := &Run{T: t, Reg: NewRegistry(), Sinks: NewSinks(), Cov: NewCoverage(), Tel: harness.NewTelemetrySinks()}
+	r.Logs = NewLineWriter(r.Sinks, SinkLog, "stdout")
+	r.IPv4 = randomIPv4()
+	r.IPv6 = randomIPv6()
+	r.Reg.Register(r.IPv4, ClassNetwork, "", "client IPv4")
+	r.Reg.Register(r.IPv6, ClassNetwork, "", "client IPv6")
+	cfg := map[string]string{}
+	if !o.Defaults {
+		cfg = ScenarioConfig()
+	} else {
+		cfg["telemetry.traces.sampler_ratio"] = "1.0"
+		cfg["telemetry.logs.exporter"] = "both"
+		cfg["telemetry.logs.level"] = "debug"
+	}
+	for k, v := range o.Config {
+		cfg[k] = v
+	}
+	redirectStdLoggers(t, NewLineWriter(r.Sinks, SinkLog, "std logger"))
+	opts := harness.Options{
+		Config: cfg, LogWriter: r.Logs, Telemetry: r.Tel, Env: o.Env,
+		ProofObserver: func(p string) { r.Reg.Register(p, ClassSecret, "", "DPoP proof") },
+	}
+	if o.Harness != nil {
+		o.Harness(&opts)
+	}
+	r.Server = harness.Start(t, opts)
+	r.Watch(r.Server.Owner, "owner")
+	return r
+}
+
+// Watch gives c the observer of the run: coverage, the error sink and the harvest of issued
+// secrets. who names the client in error records.
+func (r *Run) Watch(c *harness.Client, who string) *harness.Client {
+	c.Observer = ErrorObserver(r.Sinks, who, func(req harness.Request, resp harness.Response) {
+		r.Cov.Observe(req.Method, req.Path, resp.Status)
+		if resp.Status >= 200 && resp.Status < 300 {
+			r.harvest(resp.Body)
+		}
+	})
+	r.mu.Lock()
+	r.clients = append(r.clients, c)
+	r.mu.Unlock()
+	return c
+}
+
+// secretMembers are the members of success bodies whose string values are secrets the server
+// issues (tokens, codes, challenges, enrollment URIs, signing material).
+var secretMembers = map[string]bool{
+	"access_token": true, "refresh_token": true, "secret": true, "code": true, "enrollment_code": true,
+	"pairing_code": true, "login_code": true, "challenge": true, "verification_code": true,
+	"totp_secret_uri": true, "hmac_secret": true, "recovery_code": true, "client_secret": true,
+	"token": true, "id_token": true, "authorization_url": true, "redirect_uri_with_code": true,
+}
+
+// harvest registers every secret member of a JSON success body as a secret.
+func (r *Run) harvest(body []byte) {
+	var v any
+	if json.Unmarshal(body, &v) != nil {
+		return
+	}
+	var walk func(any)
+	walk = func(v any) {
+		switch x := v.(type) {
+		case map[string]any:
+			for k, e := range x {
+				if s, ok := e.(string); ok && secretMembers[k] {
+					// A lowercase identifier (a problem code of getProblemType) is no secret.
+					if !identifierText(s) {
+						r.Reg.Register(s, ClassSecret, "", "issued "+k)
+					}
+					continue
+				}
+				walk(e)
+			}
+		case []any:
+			for _, e := range x {
+				walk(e)
+			}
+		}
+	}
+	walk(v)
+}
+
+// RegisterSecretFiles registers the content of every regular file below dir (the secrets
+// directory or the key store) as secrets: the raw text and, for keys, the forms README.md
+// "Matching" names (decoded hex and base64 text, PEM bodies and private key material, JWK d).
+func (r *Run) RegisterSecretFiles(dir string) (int, error) {
+	n := 0
+	err := filepath.WalkDir(dir, func(path string, d fs.DirEntry, err error) error {
+		if err != nil || d.IsDir() {
+			return err
+		}
+		if !d.Type().IsRegular() {
+			return nil
+		}
+		b, err := os.ReadFile(path) // #nosec G304 -- a file of the test's own secrets directory
+		if err != nil {
+			return err
+		}
+		rel, _ := filepath.Rel(dir, path)
+		for _, v := range SecretFileForms(b) {
+			r.Reg.Register(v, ClassSecret, "", "secret file "+rel)
+		}
+		n++
+		return nil
+	})
+	return n, err
+}
+
+// Collect gathers the sinks that are read at the end: telemetry (after a flush), the audit rows
+// and the rest of the log stream. It returns the number of audit rows.
+func (r *Run) Collect(ctx context.Context) int {
+	r.T.Helper()
+	if err := r.Server.FlushTelemetry(ctx); err != nil {
+		r.T.Fatalf("flush telemetry: %v", err)
+	}
+	r.Logs.Flush()
+	if err := CollectTelemetry(ctx, r.Sinks, r.Tel); err != nil {
+		r.T.Fatalf("collect telemetry: %v", err)
+	}
+	n, err := CollectAudit(ctx, r.Sinks, r.Server.AdminDB())
+	if err != nil {
+		r.T.Fatalf("collect audit: %v", err)
+	}
+	return n
+}
+
+// RegisterIdentities registers every principal and device ID of the database as identity
+// canaries (everything in it was created in this run).
+func (r *Run) RegisterIdentities(ctx context.Context) int {
+	r.T.Helper()
+	n := 0
+	for _, q := range []struct{ sql, label string }{
+		{`SELECT id::text, kind::text FROM principals`, "principal"},
+		{`SELECT id::text, 'device' FROM devices`, "device"},
+	} {
+		rows, err := r.Server.AdminDB().Query(ctx, q.sql)
+		if err != nil {
+			r.T.Fatalf("identities: %v", err)
+		}
+		for rows.Next() {
+			var id, kind string
+			if err := rows.Scan(&id, &kind); err != nil {
+				r.T.Fatal(err)
+			}
+			r.Reg.Register(id, ClassIdentity, "", kind+" id")
+			n++
+		}
+		rows.Close()
+	}
+	return n
+}
+
+// identifierText reports whether s consists of lowercase letters, dots and underscores only.
+func identifierText(s string) bool {
+	return strings.Trim(s, "abcdefghijklmnopqrstuvwxyz._") == ""
+}
+
+// redirectStdLoggers sends the standard logger and slog's default logger into w until the test
+// ends, so libraries that log through them are captured.
+func redirectStdLoggers(t testing.TB, w *LineWriter) {
+	t.Helper()
+	restore := swapStdLoggers(w)
+	t.Cleanup(func() {
+		restore()
+		w.Flush()
+	})
+}
+
+// randomIPv4 returns a documentation address of 198.51.100.0/24 (RFC 5737) with a random host.
+func randomIPv4() string {
+	return fmt.Sprintf("198.51.100.%d", 1+randInt(253))
+}
+
+// randomIPv6 returns a documentation address of 2001:db8::/32 (RFC 3849) with random low bits.
+func randomIPv6() string {
+	b := [16]byte{0x20, 0x01, 0x0d, 0xb8}
+	if _, err := rand.Read(b[4:]); err != nil {
+		panic(err)
+	}
+	return netip.AddrFrom16(b).String()
+}
+
+// randInt returns a uniform random integer in [0, n).
+func randInt(n int64) int64 {
+	v, err := rand.Int(rand.Reader, big.NewInt(n))
+	if err != nil {
+		panic(err)
+	}
+	return v.Int64()
+}
+
+// timestamp formats t as RFC 3339 in UTC with milliseconds (06 "Basic rules").
+func timestamp(t time.Time) string { return t.UTC().Format("2006-01-02T15:04:05.000Z") }
+
+// newID returns a fresh UUIDv7 text (client_msg_id and the like).
+func newID() string { return ids.New().String() }
+
+// trimSpace is strings.TrimSpace (secret file content without its newline).
+func trimSpace(s string) string { return strings.TrimSpace(s) }
