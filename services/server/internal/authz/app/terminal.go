@@ -52,7 +52,7 @@ func (a *Authorizer) resolveTerminalSession(ctx context.Context, r authorize.Res
 	return a.resolveHost(ctx, r.HostID)
 }
 
-// terminalFacts fills the facts of the step-up "frisch", of the quick reattach and of the guards
+// terminalFacts fills the facts of the fresh step-up, of the quick reattach and of the guards
 // SR10 to SR12 (Design notes 4 and 5 of M2-40). Errors: terminal.attach without Resource.Terminal
 // and a terminal action without its host are internal errors.
 func (a *Authorizer) terminalFacts(s *actingPrincipal, spec domain.ActionSpec, r authorize.Resource, in *domain.Input) error {

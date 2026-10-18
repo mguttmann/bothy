@@ -178,7 +178,7 @@ func (s *Service) precondition(ctx context.Context, p terminal.Precondition, h h
 	return errs.VersionConflict(hostBody(s.view(ctx, h)))
 }
 
-// rightsChange declares the rights change host.manage on hostID (05 rule 1.7, "Rechte" ja): the
+// rightsChange declares the rights change host.manage on hostID (05 rule 1.7, "Permissions" yes): the
 // rights hook raises permission_version, records the views of the active owners, the holder, the
 // subjects of grants on the host and principals, and writes access.changed for every difference.
 func rightsChange(hostID ids.ID, principals ...ids.ID) txn.Option {

@@ -38,7 +38,7 @@ type Decision struct {
 	Outcome Outcome
 	// Reason is the reason code; empty for allow.
 	Reason Reason
-	// QuickReattach is true exactly when the step-up rule of a "frisch" action (terminal.attach)
+	// QuickReattach is true exactly when the step-up rule of an action with fresh step-up (terminal.attach)
 	// was waived by the quick reattach of 08 section 6.3 point 5 (M2-40): the use case then
 	// consumes no step-up.
 	QuickReattach bool

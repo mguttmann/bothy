@@ -42,7 +42,7 @@ type FreshFacts struct {
 	StepUpMethod, ClientComponent string
 }
 
-// FreshStepUp reports a step-up "frisch" (05 section 2.4, 08 section 6.3 points 1, 2, 4): set and
+// FreshStepUp reports a fresh step-up (05 section 2.4, 08 section 6.3 points 1, 2, 4): set and
 // not older than maxAge (terminal.step_up_max_age; equal is fresh), confirmed with a passkey or a
 // device key, not consumed by another opening (step_up_consumed_at NULL or before step_up_at), and
 // not in the web console, which fails closed until M6-18 adds the passkey rule with user

@@ -30,7 +30,7 @@ type AuthorizerConfig struct {
 	// ViewAsMaxDuration is how long "view as" lasts (authz.view_as_max_duration, M1-49): from
 	// actor.ViewAs.StartedAt plus this duration on, every decision is step_up_required.
 	ViewAsMaxDuration time.Duration `config:"authz.view_as_max_duration"`
-	// TerminalStepUpMaxAge is how young the step-up "frisch" of terminal.open and terminal.attach
+	// TerminalStepUpMaxAge is how young the fresh step-up of terminal.open and terminal.attach
 	// must be (terminal.step_up_max_age, M2-40).
 	TerminalStepUpMaxAge time.Duration `config:"terminal.step_up_max_age"`
 	// QuickReattachWindow is how long after the detachment terminal.attach from the same device

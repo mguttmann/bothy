@@ -250,7 +250,7 @@ Principals, people, owners, login drivers, identities, local credentials, enroll
 
 ### Fresh step-up of the terminal (M2-40)
 
-- Port: `StepUp.ConsumeFresh(ctx, a)` consumes the step-up "frisch" of one terminal opening (08
+- Port: `StepUp.ConsumeFresh(ctx, a)` consumes the fresh step-up of one terminal opening (08
   section 6.3 point 4). It runs only inside the caller's unit of work (M2-44 calls it in the
   transactions of `openTerminalSession` and `attachTerminalSession`), locks the session row
   (`LockSessionForStepUpConsumption`, the first domain row lock of the action), answers `401

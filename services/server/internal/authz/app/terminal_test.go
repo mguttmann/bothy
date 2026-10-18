@@ -232,7 +232,7 @@ func TestTerminalDecisionOrder(t *testing.T) {
 	w.expect(t, stale(w.sam), actOpen, host(w.r1), authorize.OutcomeStepUpRequired, "terminal_step_up_not_fresh")
 	w.expect(t, w.person(w.sam), actOpen, host(w.r2), authorize.OutcomeNotFound, "no_grant")
 	w.expect(t, stale(w.owner), actOpen, host(w.r2), authorize.OutcomeStepUpRequired, "terminal_step_up_not_fresh")
-	// Step-up "frisch" ignores auth.step_up_max_age: a step-up older than terminal.step_up_max_age
+	// Fresh step-up ignores auth.step_up_max_age: a step-up older than terminal.step_up_max_age
 	// but younger than auth.step_up_max_age is stale.
 	old := w.person(w.alex)
 	old.StepUpAt = w.clk.Now().Add(-termFresh - time.Second)

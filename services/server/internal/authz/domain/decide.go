@@ -23,7 +23,7 @@ const (
 )
 
 // Decision is an outcome with its reason; the empty Reason belongs to allow. QuickReattach is true
-// exactly when the step-up rule of a "frisch" action was waived by the quick reattach (M2-40):
+// exactly when the step-up rule of an action with fresh step-up was waived by the quick reattach (M2-40):
 // the use case then consumes no step-up.
 type Decision struct {
 	Outcome       Outcome
@@ -226,7 +226,7 @@ type Input struct {
 	// Host are the facts of a host resource, and of the host of a terminal_session; nil for every
 	// other kind.
 	Host *HostFacts
-	// Fresh are the step-up facts of the session for a "frisch" action (05 section 2.4); FreshMaxAge
+	// Fresh are the step-up facts of the session for an action with fresh step-up (05 section 2.4); FreshMaxAge
 	// is terminal.step_up_max_age and ReattachWindow terminal.quick_reattach_window (M2-40).
 	Fresh          FreshFacts
 	FreshMaxAge    time.Duration
@@ -371,7 +371,7 @@ func decidePrincipalRules(in *Input) (Decision, bool) {
 	return Decision{}, false
 }
 
-// decideFresh is step 8 for an action with step-up "frisch" (05 section 2.4, 08 section 6.3; M2-40):
+// decideFresh is step 8 for an action with fresh step-up (05 section 2.4, 08 section 6.3; M2-40):
 // only this branch, never the one of auth.step_up_max_age. The quick reattach of terminal.attach
 // passes without step-up and is recorded for the decision; otherwise the step-up must be fresh and
 // unconsumed (FreshStepUp), else step_up_required with terminal_step_up_not_fresh.

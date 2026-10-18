@@ -129,7 +129,7 @@ type rightsState struct {
 // never assumes anything: an expired row is invalid from its expiry on (07 section 2.5).
 var reportedView = domain.AssumeValid{Unreported: true}
 
-// writesRightsState are the actions with "Rechte" nein in 05 whose writes 03 still counts as rights
+// writesRightsState are the actions with "Permissions" no in 05 whose writes 03 still counts as rights
 // state (03 grants paragraph on permission_version: hosts.reported_session_users, M2-40): the
 // report of the session users of a host by host.pair (M2-41) and host.connect (M2-43). They may
 // declare a rights change (docs/DECISIONS.md D-M2-40-9).
