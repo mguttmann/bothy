@@ -61,6 +61,18 @@ documented in this file. The format is based on
   `depguard` rule forbids the package `plugin` in the server module (ADR 0022). Manifests with
   the escape of NUL or of an unpaired surrogate are refused, and manifest values that are no audit
   code enter the audit hashed, so no checked manifest makes install or upgrade fail with 500.
+- Gateway frame conformance, gate G9 (M1-67): the test harness `wstest` validates every frame of
+  the gateway integration tests as it arrives against `docs/api/asyncapi.yaml` and the body
+  schemas of `openapi.yaml` (new test package `api/specschema`: one JSON Schema 2020-12 bundle,
+  strict about undeclared members, no `null`, integers below 2^53, at most
+  `sync.ws_max_frame_bytes`, `seq` and `permission_version` exactly on durable events,
+  `resource.version` as the catalogue says), each client frame on send, the order per connection
+  and every close code against `x-close-codes`; a violation fails the test. The register of ops and
+  event types and the enable list `gateway_ops` are compared with actions.yaml and asyncapi.yaml,
+  a corpus test observes every M1 event type and server op, and a parser test keeps the harness
+  the only WebSocket client of the tests. New direct dependency
+  `github.com/santhosh-tekuri/jsonschema/v6` (test code only).
+
 - Gateway focus and typing (M1-66): the ops `focus {thread_ids, idle}` (`gateway.focus` per
   thread, `rl.read` per principal, at most `sync.max_focused_threads` threads, unreadable and
   unknown threads dropped silently), `typing.start` and `typing.stop` (`typing.start`, people
@@ -1210,6 +1222,9 @@ documented in this file. The format is based on
   keys (a new or wrong volume) no longer retires every key of the instance; it ends with an error
   and changes no key. The new key `signing_key.accept_lost_keys` (default `false`) allows the
   repair for a restore without the key store.
+- `instance` registers the event type `instance.updated` it emits, so the start check and gate G9
+  see it (M1-67).
+
 - `pgtest` no longer leaves its PostgreSQL container running when a test binary ends without
   reaching the end of `pgtest.Main` (a panicking test, the `-test.timeout` alarm, a signal,
   `SIGKILL`). The test binary holds a lease connection, and a watchdog in the container stops

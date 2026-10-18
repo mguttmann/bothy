@@ -2,10 +2,10 @@
 
 Status: connection and session built (M1-64); delivery of durable events, catch-up over the
 WebSocket, revocation of open connections and the shutdown close built (M1-65); focus, typing and
-the ephemeral publisher built (M1-66). Frame conformance comes with M1-67.
+the ephemeral publisher built (M1-66); frame conformance, gate G9, built (M1-67).
 Normative are [docs/spec/04-sync-protocol.md](../../../../docs/spec/04-sync-protocol.md) section 6
 and [docs/spec/02-architecture.md](../../../../docs/spec/02-architecture.md); on any difference the
-chapters win. Rulings: [DECISIONS.md](../../../../docs/DECISIONS.md) M1-64, M1-65 and M1-66.
+chapters win. Rulings: [DECISIONS.md](../../../../docs/DECISIONS.md) M1-64, M1-65, M1-66 and M1-67.
 
 ## Purpose
 
@@ -39,8 +39,9 @@ connections.
   (the only package of the server that imports it), one reader, one writer and one deadline
   goroutine per connection, the frame codec on the generated `Gateway*` types of `api/rest`, the
   span `gateway.connect`.
-- `adapters/wstest/`: a Go client for tests of this and later tickets (`Dial`, `Hello`,
-  `Identify`, `Resume`, `Send`, `Next`, `ExpectClose`, a heartbeat loop with a random first delay).
+- `adapters/wstest/`: the gateway test harness, the only WebSocket client of the tests (`Dial`,
+  `Hello`, `Identify`, `Resume`, `Send`, `Next`, `ExpectClose`, `Pause`, a heartbeat loop with a
+  random first delay), which validates every frame (section "Frame conformance").
 
 ## Connection
 
@@ -85,6 +86,30 @@ there ends the process; the liveness check `event_tail` fails once that goroutin
   `domain.ControlReserve` entries of the queue free for control frames of the client's ops. A
   target that `access.changed` adds during the catch-up is no longer filtered. A failing page is retried with backoff up to
   `database.listen_reconnect_backoff_cap`. Without a cursor the connection is live from H at once.
+
+## Frame conformance (M1-67, gate G9)
+
+Every gateway test connects through `wstest.Dial(t, ctx, baseURL, opts...)`. Its reader goroutine
+records each server frame and validates it on receipt with `api/specschema` against
+`docs/api/asyncapi.yaml` and the body schemas of `openapi.yaml`: the message by `op` (by `d.type`
+for `dispatch`, a server-to-client op only), the strict schema (no undeclared member), no `null`,
+integers at most 2^53 - 1, at most `sync.ws_max_frame_bytes` (`WithMaxFrameBytes`), `seq` and
+`permission_version` exactly on durable events, `resource.version` as actions.yaml says. Client
+frames are validated on send unless a negative test passes `WithRawClientFrames()`. Per connection
+the first server frame is `hello`, durable `seq` strictly increases, `cursor` and
+`catchup.complete` never fall below the last delivered `seq`, and a close of the server carries a
+code of `x-close-codes`. `Pause()` stops reading for slow-consumer tests; the cleanup drains and
+validates the rest. Violations fail the test in `t.Cleanup` with test name, frame index, op and
+JSON pointer.
+
+- `TestRegister_MatchesActionsAndAsyncAPI` (`internal/wire`): registered ops and event types and
+  the enable list `gateway_ops` against actions.yaml and asyncapi.yaml (`specschema.Compare`).
+- `TestConformance_M1EventCorpus` (`internal/wire`): one scenario with all real modules in which
+  every M1 event type and every server op of M1 is observed and valid.
+- `TestHarness_OnlyEntryPoint` (`adapters/wstest`): no other test dials the gateway.
+
+Run: `cd services/server && go test -race ./api/... ./internal/gateway/... ./internal/wire/...`
+(also part of `make test`). Rulings: DECISIONS M1-67.
 
 ## Revocation and shutdown
 
