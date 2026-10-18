@@ -586,7 +586,7 @@ abstract interface class AccessRepository {
 /// final preview = await access.previewGrant(request);
 /// ```
 final class ApiAccessRepository implements AccessRepository {
-  /// Creates the repository over [api] (the client of the signed-in session, so DPoP, refresh
+  /// Creates the repository over `api` (the client of the signed-in session, so DPoP, refresh
   /// and the step-up interceptor apply); [newIdempotencyKey] returns a fresh UUIDv7.
   ApiAccessRepository(this._api, {required String Function() newIdempotencyKey})
     : _newKey = newIdempotencyKey;
