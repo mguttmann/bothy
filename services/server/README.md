@@ -96,6 +96,13 @@ binary with exit code 3). `make contract-test` runs G7, Schemathesis against the
 ([`test/contract`](test/contract/README.md)). Full-server tests build on the shared harness
 [`test/harness`](test/harness/README.md).
 
+Load and chaos tests (M1-16, M1-72): `make perf` runs the packages under [`perf`](perf/README.md)
+and [`test/chaos`](test/chaos/README.md) with the build tag `perf`, one after another, and prints the
+table of every performance target with value, threshold and the profile mode of ADR 0063; it is not
+part of `make check`, which only vets and lints the tagged code. The thresholds come from the table
+of chapter 02, never from a literal. The production validator compiles request schemas only; the
+test build with `contract_validate` keeps the responses for G8.
+
 ## Image
 
 The image `bothy-server` (ADR 0012, 18-release.md "Server images") is built from

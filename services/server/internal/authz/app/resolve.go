@@ -99,7 +99,7 @@ func wrapSource(err error) error {
 func (a *Authorizer) resolveChannel(ctx context.Context, threadID, channelID, spaceHint ids.ID) (resolved, bool, error) {
 	var th authz.ThreadFacts
 	if !threadID.IsZero() {
-		t, ok, err := a.structure.Thread(ctx, threadID)
+		t, ok, err := a.thread(ctx, threadID)
 		if err != nil {
 			return resolved{}, false, sourceError("structure source", err)
 		}
@@ -114,7 +114,7 @@ func (a *Authorizer) resolveChannel(ctx context.Context, threadID, channelID, sp
 	if channelID.IsZero() {
 		return resolved{}, false, internal("resource without a thread or channel")
 	}
-	ch, ok, err := a.structure.Channel(ctx, channelID)
+	ch, ok, err := a.channel(ctx, channelID)
 	if err != nil {
 		return resolved{}, false, sourceError("structure source", err)
 	}
@@ -422,4 +422,44 @@ func (a *Authorizer) invokeFacts(ctx context.Context, s *actingPrincipal, f *aut
 		return nil, sourceError("agent policy source", err)
 	}
 	return out, nil
+}
+
+// structureEntry is a thread or channel read kept in the structure memo of a scope.
+type structureEntry[T any] struct {
+	facts T
+	found bool
+}
+
+// memoKeys of the structure memo: the thread or channel by ID.
+type (
+	threadMemoKey  ids.ID
+	channelMemoKey ids.ID
+)
+
+// thread reads the thread facts of id, once per structure scope (authorize.WithStructureScope).
+func (a *Authorizer) thread(ctx context.Context, id ids.ID) (authz.ThreadFacts, bool, error) {
+	return memoized(ctx, threadMemoKey(id), func() (authz.ThreadFacts, bool, error) { return a.structure.Thread(ctx, id) })
+}
+
+// channel reads the channel facts of id, once per structure scope.
+func (a *Authorizer) channel(ctx context.Context, id ids.ID) (authz.ChannelFacts, bool, error) {
+	return memoized(ctx, channelMemoKey(id), func() (authz.ChannelFacts, bool, error) { return a.structure.Channel(ctx, id) })
+}
+
+// memoized returns the value of key from the structure memo of ctx, or reads it with read and
+// keeps a successful read there; without a scope it always reads. Errors are never kept.
+func memoized[T any](ctx context.Context, key any, read func() (T, bool, error)) (T, bool, error) {
+	m, ok := authorize.StructureMemoFrom(ctx)
+	if !ok {
+		return read()
+	}
+	if v, ok := m.Load(key); ok {
+		e := v.(structureEntry[T])
+		return e.facts, e.found, nil
+	}
+	facts, found, err := read()
+	if err == nil {
+		m.Store(key, structureEntry[T]{facts: facts, found: found})
+	}
+	return facts, found, err
 }

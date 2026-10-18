@@ -220,8 +220,8 @@ lint: ## Linters: file hygiene hooks, ruff, bandit, Dockerfile pins, actionlint,
 	@# Pins are looked up in the repository root: the lookup command uses paths relative to it.
 	@if [ -z "$(GO_ON)" ]; then $(call skip,go-lint,no Go module selected); \
 	else gl=$(call tool,golangci-lint) || exit 1; \
-	  for m in $(GO_MODS); do (cd $$m && go vet -tags contract_validate,contract_live ./... && \
-	    "$$gl" run --build-tags contract_validate,contract_live ./...) || exit 1; done; \
+	  for m in $(GO_MODS); do (cd $$m && go vet -tags contract_validate,contract_live,perf ./... && \
+	    "$$gl" run --build-tags contract_validate,contract_live,perf ./...) || exit 1; done; \
 	  for m in $(filter $(GO_CROSS_MODULES),$(GO_MODS)); do for os in $(GO_CROSS_OS); do \
 	    (cd $$m && GOOS=$$os go vet ./... && GOOS=$$os "$$gl" run ./...) || exit 1; done; done; fi
 	@# One analysis at the root covers every member of the workspace (docs/DECISIONS.md D-M4-01-5).
@@ -449,14 +449,17 @@ migrations-lock: ## Record the checksums of new migrations in <module>/migration
 	    $(MIGRATIONS_LINT) lock --dir $$m/migrations --sum $$m/migrations.sha256 || exit 1; fi; \
 	done; [ -n "$$found" ] || echo "  migrations-lock: no Go module with a migrations/ directory"
 
-perf: ## Load tests against the performance targets (end of a milestone and releases, not a gate; P-07)
+perf: ## Load and chaos tests against the performance targets (end of a milestone and releases, not a gate; P-07)
 	@if [ -z "$(GO_ON)" ]; then $(call skip,perf,no Go module selected under services/); \
 	elif [ -z "$(PERF_MODS)" ]; then $(call skip,perf,no Go module with performance targets selected); \
 	else $(GO_PREREQS) perf || exit 1; \
 	  for m in $(PERF_MODS); do \
 	    [ -d $$m/perf ] || { echo "perf: $$m/perf does not exist; load tests live there (docs/spec/02-architecture.md \"Performance targets\")" >&2; exit 1; }; \
-	    echo "  perf: targets hold only on perf.reference_profile"; \
-	    (cd $$m && go test -tags perf -count=1 -timeout $(PERF_TIMEOUT) ./perf/...) || exit 1; \
+	    echo "  perf: targets hold only on perf.reference_profile (mode match or emulated, ADR 0063)"; \
+	    rm -f .cache/perf/results.json; \
+	    rc=0; (cd $$m && go test -tags perf -count=1 -p 1 -timeout $(PERF_TIMEOUT) ./perf/... ./test/chaos/...) || rc=1; \
+	    (cd $$m && go run ./perf/internal/report/perfreport) || rc=1; \
+	    [ $$rc -eq 0 ] || exit 1; \
 	  done; fi
 	@# Dart members run their performance test in profile mode on macOS (`tool/perf_macos.sh`
 	@# of the member, for example the live topology of bothy_viz, brief M6-12 design note 6);

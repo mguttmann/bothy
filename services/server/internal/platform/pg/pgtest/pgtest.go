@@ -128,20 +128,32 @@ const (
 // count it cannot read (server starting, restarting or busy) is no verdict, but once the lease
 // is taken, leaseStartGrace without a readable count stops the server as well, so a hung server
 // cannot keep its container. stop waits at most leaseStopWait for PostgreSQL to end; then the
-// script exits, and with it the container's main process.
+// script exits, and with it the container's main process. SIGUSR1 (DB.Restart) stops PostgreSQL
+// the same way and starts it again in the same container, so the host port, the data and
+// AutoRemove stay.
 const watchdogScript = `set -u
-docker-entrypoint.sh "$@" &
+args=("$@")
+docker-entrypoint.sh "${args[@]}" &
 pg=$!
-stop() {
+halt() {
 	kill -INT "$pg" 2>/dev/null
 	waited=0
 	while kill -0 "$pg" 2>/dev/null && [ "$waited" -lt "$PGTEST_STOP_WAIT" ]; do
 		sleep 1
 		waited=$((waited + 1))
 	done
+}
+stop() {
+	halt
 	exit 0
 }
+restart() {
+	halt
+	docker-entrypoint.sh "${args[@]}" &
+	pg=$!
+}
 trap stop TERM INT
+trap restart USR1
 query="SELECT coalesce(shobj_description(d.oid, 'pg_database'), '') = '$PGTEST_LEASE_APP', (SELECT count(*) FROM pg_stat_activity WHERE application_name = '$PGTEST_LEASE_APP') FROM pg_database d WHERE d.datname = 'postgres'"
 taken=f
 misses=0
@@ -186,14 +198,22 @@ const legacyReapAge = 2 * time.Hour
 // noRuntimeMessage is what Main prints when no container runtime answers (plan P-09).
 const noRuntimeMessage = "pgtest: no Docker-compatible runtime reachable (%v); integration tests need one (plan P-09)\n"
 
+// clusterKey selects a container of the test binary: durability and the resource limits.
+type clusterKey struct {
+	durable     bool
+	cpus        float64 // container CPUs, 0 for no limit
+	memoryBytes int64   // container memory, 0 for no limit
+}
+
 // state holds the containers of the running test binary: one with the speed flags and, started
-// only by a New with Durable, one with the PostgreSQL defaults (key true).
+// only by a New with Durable (and Limits), one per combination of the PostgreSQL defaults and
+// resource limits.
 var state struct {
 	mu       sync.Mutex
 	active   bool // Main is running the tests
-	clusters map[bool]*cluster
-	errs     map[bool]error // a failed start, reported to every later New
-	steps    Steps          // the steps of bothy migrate up for every template, from Main
+	clusters map[clusterKey]*cluster
+	errs     map[clusterKey]error // a failed start, reported to every later New
+	steps    Steps                // the steps of bothy migrate up for every template, from Main
 }
 
 // Steps builds the steps bothy migrate up runs around the goose migrations, for a pool of
@@ -216,6 +236,7 @@ func WithSteps(steps Steps) MainOption { return func(o *mainOptions) { o.steps =
 
 // cluster is the started container with its roles and template databases.
 type cluster struct {
+	key        clusterKey
 	ctr        *testcontainers.DockerContainer
 	host       string
 	port       int
@@ -311,27 +332,27 @@ func setActive(active bool) {
 	state.active = active
 }
 
-// sharedCluster returns the container of this test binary with the speed flags, or with the
-// PostgreSQL defaults for durable, starting it on first use.
-func sharedCluster(durable bool) (*cluster, error) {
+// sharedCluster returns the container of this test binary for key (speed flags, or the
+// PostgreSQL defaults with optional limits), starting it on first use.
+func sharedCluster(key clusterKey) (*cluster, error) {
 	state.mu.Lock()
 	defer state.mu.Unlock()
 	if !state.active {
 		return nil, errors.New("pgtest: New needs pgtest.Main: add func TestMain(m *testing.M) { os.Exit(pgtest.Main(m)) } to the test package")
 	}
 	if state.clusters == nil {
-		state.clusters, state.errs = map[bool]*cluster{}, map[bool]error{}
+		state.clusters, state.errs = map[clusterKey]*cluster{}, map[clusterKey]error{}
 	}
-	if state.clusters[durable] == nil && state.errs[durable] == nil {
+	if state.clusters[key] == nil && state.errs[key] == nil {
 		ctx, cancel := context.WithTimeout(context.Background(), startTimeout)
-		c, err := startCluster(ctx, durable)
+		c, err := startCluster(ctx, key)
 		cancel()
 		if c != nil {
 			c.steps = state.steps
 		}
-		state.clusters[durable], state.errs[durable] = c, err
+		state.clusters[key], state.errs[key] = c, err
 	}
-	return state.clusters[durable], state.errs[durable]
+	return state.clusters[key], state.errs[key]
 }
 
 // stopCluster terminates the containers and removes their secrets directories.
@@ -367,8 +388,9 @@ func (c *cluster) stop() error {
 	return errors.Join(problems...)
 }
 
-// startCluster starts a container (durable: without the speed flags) and bootstraps the roles.
-func startCluster(ctx context.Context, durable bool) (c *cluster, err error) {
+// startCluster starts a container for key (durable: without the speed flags) and bootstraps the
+// roles.
+func startCluster(ctx context.Context, key clusterKey) (c *cluster, err error) {
 	dir, err := os.MkdirTemp("", "pgtest-secrets-")
 	if err != nil {
 		return nil, fmt.Errorf("pgtest: secrets directory: %w", err)
@@ -382,7 +404,7 @@ func startCluster(ctx context.Context, durable bool) (c *cluster, err error) {
 	if err != nil {
 		return nil, err
 	}
-	ctr, err := runContainer(ctx, superPassword, durable)
+	ctr, err := runContainer(ctx, superPassword, key)
 	if ctr != nil {
 		defer func() {
 			if err != nil {
@@ -402,7 +424,7 @@ func startCluster(ctx context.Context, durable bool) (c *cluster, err error) {
 		return nil, err
 	}
 	c = &cluster{
-		ctr: ctr, host: "127.0.0.1", port: int(mapped.Num()), secretsDir: dir, provider: provider,
+		key: key, ctr: ctr, host: "127.0.0.1", port: int(mapped.Num()), secretsDir: dir, provider: provider,
 		templates: map[string]string{},
 	}
 	conn, err := c.superConn(ctx, superDatabase)
@@ -528,11 +550,12 @@ const maxConnections = "400"
 
 // runContainer starts the pinned image on 127.0.0.1 with a random host port, under
 // watchdogScript and with AutoRemove, so the container and its anonymous data volume disappear
-// when the lease of this process ends; with the speed flags unless durable.
-func runContainer(ctx context.Context, superPassword string, durable bool) (*testcontainers.DockerContainer, error) {
+// when the lease of this process ends; with the speed flags unless key is durable, and with the
+// CPU and memory limits of key.
+func runContainer(ctx context.Context, superPassword string, key clusterKey) (*testcontainers.DockerContainer, error) {
 	port := network.MustParsePort(containerPort)
 	cmd := []string{"postgres", "-c", "max_connections=" + maxConnections}
-	if !durable {
+	if !key.durable {
 		cmd = append(cmd, speedFlags...)
 	}
 	return testcontainers.Run(ctx, Image,
@@ -549,6 +572,8 @@ func runContainer(ctx context.Context, superPassword string, durable bool) (*tes
 		testcontainers.WithHostConfigModifier(func(hc *container.HostConfig) {
 			hc.PortBindings = network.PortMap{port: {{HostIP: netip.MustParseAddr("127.0.0.1"), HostPort: "0"}}}
 			hc.AutoRemove = true
+			hc.NanoCPUs = int64(key.cpus * 1e9)
+			hc.Memory = key.memoryBytes
 		}),
 		// The image's entry point starts the server once to initialise the data directory and
 		// then for good; only the second line means ready.
@@ -622,6 +647,8 @@ type Option func(*options)
 type options struct {
 	fsys    fs.FS // nil: no migrations
 	durable bool  // the server with the PostgreSQL defaults
+	cpus    float64
+	memory  int64
 }
 
 // WithMigrations makes New clone a template migrated with fsys instead of the server's
@@ -637,6 +664,14 @@ func WithoutMigrations() Option { return func(o *options) { o.fsys = nil } }
 // flags of the normal server. Performance and chaos tests use it (ADR 0063 point 2: measured only
 // with the durability settings of production); the server starts with the first such New.
 func Durable() Option { return func(o *options) { o.durable = true } }
+
+// Limits makes New create the database on a container limited to cpus CPUs (docker --cpus) and
+// memoryBytes of memory (docker --memory); 0 leaves a resource unlimited. The emulated profile of
+// make perf uses it with Durable (ADR 0063 point 3); each combination of options is its own
+// container of the test binary.
+func Limits(cpus float64, memoryBytes int64) Option {
+	return func(o *options) { o.cpus, o.memory = cpus, memoryBytes }
+}
 
 // DB is one database of a test, dropped when the test ends.
 type DB struct {
@@ -656,7 +691,7 @@ func New(t testing.TB, opts ...Option) *DB {
 	for _, opt := range opts {
 		opt(&o)
 	}
-	c, err := sharedCluster(o.durable)
+	c, err := sharedCluster(clusterKey{durable: o.durable, cpus: o.cpus, memoryBytes: o.memory})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -902,4 +937,54 @@ func (d *DB) ContainerLogs(t testing.TB) string {
 		t.Fatal(err)
 	}
 	return string(b)
+}
+
+// restartWait bounds how long Restart waits for the server to go down after the restart signal:
+// the watchdog waits at most leaseStopWait for the fast shutdown, plus slack.
+const restartWait = leaseStopWait + 10*time.Second
+
+// Restart restarts the PostgreSQL server of this database inside its container, as a crash and
+// recovery of the database server looks to the clients: every connection breaks, and after the
+// restart the server accepts connections again on the same host port with the data it had. It
+// sends SIGUSR1 to the watchdog of the container (watchdogScript), which stops the server with a
+// fast shutdown and starts it again; the container keeps running, so its lease and AutoRemove
+// stay. It affects every database of the same container (the options of New select it), so a
+// test that restarts must use a container no parallel test uses. Only a Durable database can
+// restart; Restart returns once a superuser connection succeeds after the server went down. The
+// error reports a signal that cannot be sent or a server that does not go down or come back.
+func (d *DB) Restart(ctx context.Context) error {
+	if !d.c.key.durable {
+		return errors.New("pgtest: Restart needs a Durable database")
+	}
+	witness, err := d.c.superConn(ctx, superDatabase)
+	if err != nil {
+		return err
+	}
+	defer func() { _ = witness.Close(context.WithoutCancel(ctx)) }()
+	cli, err := testcontainers.NewDockerClientWithOpts(ctx)
+	if err != nil {
+		return fmt.Errorf("pgtest: restart: %w", err)
+	}
+	defer func() { _ = cli.Close() }()
+	if _, err := cli.ContainerKill(ctx, d.c.ctr.GetContainerID(), client.ContainerKillOptions{Signal: "USR1"}); err != nil {
+		return fmt.Errorf("pgtest: restart signal: %w", err)
+	}
+	// The signal is asynchronous: only a broken connection shows that the old server is gone, so
+	// the connection below cannot reach it.
+	deadline := time.Now().Add(restartWait)
+	for witness.Ping(ctx) == nil {
+		if time.Now().After(deadline) {
+			return fmt.Errorf("pgtest: restart: the server still answers after %s", restartWait)
+		}
+		select {
+		case <-ctx.Done():
+			return fmt.Errorf("pgtest: restart: %w", ctx.Err())
+		case <-time.After(100 * time.Millisecond):
+		}
+	}
+	conn, err := d.c.superConn(ctx, superDatabase)
+	if err != nil {
+		return err
+	}
+	return conn.Close(ctx)
 }
