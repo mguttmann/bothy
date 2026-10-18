@@ -78,7 +78,8 @@ class DsComposer extends StatefulWidget {
   /// The text controller, or null for an own one, which the composer clears after a send.
   final TextEditingController? controller;
 
-  /// Called on every change of the text.
+  /// Called on every change of the text, also the new line and the clearing after a send that
+  /// the composer makes itself.
   final ValueChanged<String>? onChanged;
 
   /// Arrow up in the empty field: edit the own last message.
@@ -167,7 +168,10 @@ class DsComposerState extends State<DsComposer> {
     widget.onSend(_text.text);
     // Only the own controller is cleared: a caller's controller stays with the caller, which
     // decides when its text goes (D-M4-07-11).
-    if (widget.controller == null) _own?.clear();
+    if (widget.controller == null && _own != null) {
+      _own!.clear();
+      widget.onChanged?.call('');
+    }
   }
 
   void _newline() {
@@ -180,6 +184,7 @@ class DsComposerState extends State<DsComposer> {
       text: text,
       selection: TextSelection.collapsed(offset: sel.start + 1),
     );
+    widget.onChanged?.call(text);
   }
 
   KeyEventResult _onKey(FocusNode node, KeyEvent event) {

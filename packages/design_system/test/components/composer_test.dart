@@ -100,6 +100,30 @@ void main() {
     expect(text.text, 'hello');
   });
 
+  testWidgets('onChanged also reports the changes the composer makes itself', (
+    tester,
+  ) async {
+    final changes = <String>[];
+    await pumpDs(
+      tester,
+      DsComposer(
+        targetName: 'general',
+        maxLines: 4,
+        enterSends: true,
+        onSend: (_) {},
+        onChanged: changes.add,
+      ),
+    );
+    await _focus(tester);
+    await tester.enterText(find.byType(TextField), 'hi');
+    await tester.sendKeyDownEvent(LogicalKeyboardKey.shift);
+    await tester.sendKeyEvent(LogicalKeyboardKey.enter);
+    await tester.sendKeyUpEvent(LogicalKeyboardKey.shift);
+    expect(changes.last, 'hi\n');
+    await tester.sendKeyEvent(LogicalKeyboardKey.enter);
+    expect(changes.last, isEmpty);
+  });
+
   testWidgets('with enterSends false the keys swap', (tester) async {
     final sent = <String>[];
     final text = TextEditingController();
