@@ -32,7 +32,9 @@ platform:                   # <name>: {depends_on: [<platform names>], vendors: 
   # test helpers import it (docs/DECISIONS.md PL/8).
   testkit: {depends_on: [], vendors: []}
   # pgtest (internal/platform/pg/pgtest) starts the test containers; only tests import it.
-  pg: {depends_on: [secrets, testkit], vendors: [pgx, goose, otelpgx, otel, testcontainers, mobyapi, mobyclient]}
+  # otel: the declarations of the metric registry for db.client.operation.duration and
+  # bothy.db.pool.connections (M1-68).
+  pg: {depends_on: [secrets, testkit, otel], vendors: [pgx, goose, otelpgx, otel, testcontainers, mobyapi, mobyclient]}
   # River only here (R-AR-09); jobstest (internal/platform/jobs/jobstest) prepares pgtest
   # databases for the job runtime; only tests import it.
   jobs: {depends_on: [pg, otel], vendors: [river, pgx, otel]}

@@ -113,6 +113,9 @@ type Deps struct {
 	// Log receives the errors of ops; nil means slog.Default(). It never receives tokens,
 	// proofs, nonces or snapshots.
 	Log *slog.Logger
+	// Metrics records the gateway metrics of connection setup and end (M1-68); nil records
+	// nothing.
+	Metrics Metrics
 }
 
 // Gateway holds the use cases of the WebSocket gateway (docs/spec/04-sync-protocol.md section
@@ -148,6 +151,7 @@ func New(cfg Config, d Deps) (*Gateway, error) {
 	if d.Log == nil {
 		d.Log = slog.Default()
 	}
+	d.Metrics = orNop(d.Metrics)
 	cfg.ProtocolVersions = slices.Clone(cfg.ProtocolVersions)
 	g := &Gateway{cfg: cfg, d: d, sessions: newSessions(cfg.ResumeWindow, d.Clock), ops: newDispatcher(d.Decoder, d.Alarm, d.Log),
 		open: map[*Connection]struct{}{}, gone: make(chan struct{})}
@@ -181,16 +185,23 @@ func (g *Gateway) SessionOf(c *Connection) *Session {
 
 // Open starts a connection on conn right after the upgrade and sends hello (04 section 6.3 step
 // 2): heartbeat interval and resume window, protocol versions, the current nonce, the server time
-// and the sync epoch. Errors: the epoch cannot be read; the caller closes with 4000.
+// and the sync epoch. Errors: the epoch cannot be read; the caller closes with 4000. Both refusals
+// (that one and a draining gateway, 4013) are recorded as a connect with outcome server_error and
+// as their close.
 func (g *Gateway) Open(ctx context.Context, conn Conn) (*Connection, error) {
 	epoch, err := g.d.Epoch.SyncEpoch(ctx)
 	if err != nil {
+		g.refused(ctx, domain.CloseUnknownError)
 		return nil, err
 	}
 	now := g.d.Clock.Now()
 	c := &Connection{id: ids.New(), conn: conn, opened: now, state: domain.StateAwaitingIdentify}
 	if !g.track(c) {
 		conn.Close(domain.CloseServerRestart, domain.CloseServerRestart.Name())
+		c.mu.Lock()
+		c.finished = true
+		c.mu.Unlock()
+		g.refused(ctx, domain.CloseServerRestart)
 		return c, errDraining
 	}
 	err = conn.Send(Hello{
@@ -293,11 +304,21 @@ var resumableEnds = map[domain.CloseCode]bool{
 // Closed ends c after its connection is gone: the connection leaves delivery, and its session stays
 // resumable for sync.resume_window after a resumable end; after 4004, 4012, 4016, 4017, 4018 and
 // the other final ends it is removed. A session that a newer connection took over is left alone.
+// The end is recorded once (finished): the connect before ready with its outcome, the -1 of a
+// connection counted as active, and the close code of the server or else of the client; a
+// connection that ended without a close frame in either direction counts no close.
 func (g *Gateway) Closed(c *Connection) {
+	now := g.d.Clock.Now()
 	c.mu.Lock()
 	s, code := c.session, c.code
 	c.state = domain.StateClosed
+	end := c.finished
+	c.finished = true
+	ready, active, peer, kind := !c.readyAt.IsZero(), c.activeKind, c.peerCode, string(c.actor.Kind)
 	c.mu.Unlock()
+	if !end {
+		g.recordEnd(now.Sub(c.opened), code, peer, ready, active, kind)
+	}
 	g.untrack(c)
 	if s == nil {
 		return
@@ -324,10 +345,61 @@ func (g *Gateway) attach(ctx context.Context, c *Connection, cursor *int64, epoc
 			return err
 		}
 		if res.Reason != "" {
-			_ = c.conn.Send(ResyncRequired{Reason: res.Reason, HeadSeq: head, SyncEpoch: res.SyncEpoch})
+			if c.conn.Send(ResyncRequired{Reason: res.Reason, HeadSeq: head, SyncEpoch: res.SyncEpoch}) == nil {
+				g.resynced(ctx, c, string(res.Reason))
+			}
 		} else {
 			from = *cursor
 		}
 	}
 	return g.d.Delivery.Attach(ctx, c, from, head)
+}
+
+// recordEnd records the end of a connection that lived for d (see Closed).
+func (g *Gateway) recordEnd(d time.Duration, code domain.CloseCode, peer int, ready bool, active, kind string) {
+	ctx := context.Background()
+	if !ready {
+		if kind == "" {
+			kind = KindAnonymous
+		}
+		g.d.Metrics.Connected(ctx, d, domain.Outcome(code, false), kind)
+	}
+	if active != "" {
+		g.d.Metrics.ConnectionClosed(ctx, active)
+	}
+	switch {
+	case code != 0:
+		g.d.Metrics.Closed(ctx, int(code))
+	case peer != 0:
+		g.d.Metrics.Closed(ctx, peer)
+	}
+}
+
+// refused records a connection Open refused with code: a connect with outcome server_error before
+// identification and its close.
+func (g *Gateway) refused(ctx context.Context, code domain.CloseCode) {
+	g.d.Metrics.Connected(ctx, 0, domain.OutcomeServerError, KindAnonymous)
+	g.d.Metrics.Closed(ctx, int(code))
+}
+
+// connected records that c reached ready or resumed as kind at the first call: the connect with
+// outcome ok, the start of its catch-up and +1 active connection.
+func (g *Gateway) connected(ctx context.Context, c *Connection, kind string) {
+	now := g.d.Clock.Now()
+	c.mu.Lock()
+	if !c.readyAt.IsZero() {
+		c.mu.Unlock()
+		return
+	}
+	c.readyAt, c.activeKind = now, kind
+	c.mu.Unlock()
+	g.d.Metrics.Connected(ctx, now.Sub(c.opened), domain.OutcomeOK, kind)
+	g.d.Metrics.ConnectionOpened(ctx, kind)
+}
+
+// resynced records a resync_required with reason sent on c: its reason, and the end of the
+// catch-up with outcome resync_required.
+func (g *Gateway) resynced(ctx context.Context, c *Connection, reason string) {
+	g.d.Metrics.Resync(ctx, reason)
+	g.d.Metrics.CatchupDone(ctx, g.d.Clock.Now().Sub(c.readyTime()), OutcomeResyncRequired)
 }

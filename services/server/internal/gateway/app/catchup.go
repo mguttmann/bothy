@@ -58,6 +58,7 @@ func (h *Hub) runCatchUp(ctx context.Context, m *member, from, head int64) {
 	if !h.offer(ctx, m, controlEntry("catchup.complete", completeFrame{HeadSeq: head}, 0)) {
 		return
 	}
+	h.d.Metrics.CatchupDone(ctx, h.d.Clock.Now().Sub(m.c.readyTime()), OutcomeComplete)
 	h.flush(ctx, m)
 }
 

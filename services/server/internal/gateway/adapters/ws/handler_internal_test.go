@@ -170,6 +170,12 @@ type testServer struct {
 // newTestServer starts the server; mod changes the handler before it serves.
 func newTestServer(t *testing.T, queueMax int, mod func(*Handler)) *testServer {
 	t.Helper()
+	return newTestServerWith(t, queueMax, mod, nil)
+}
+
+// newTestServerWith is newTestServer with the metrics gm of the gateway use cases.
+func newTestServerWith(t *testing.T, queueMax int, mod func(*Handler), gm app.Metrics) *testServer {
+	t.Helper()
 	o := &order{}
 	transports := make(chan reqmeta.Transport, 16)
 	agent := actor.Actor{ID: ids.New(), Kind: actor.KindAgent, TokenID: ids.New(), CredentialExpiresAt: time.Now().Add(time.Hour)}
@@ -190,7 +196,7 @@ func newTestServer(t *testing.T, queueMax int, mod func(*Handler)) *testServer {
 		MaxFocusedThreads: 20, TypingMinInterval: 5 * time.Second, TypingTTL: 8 * time.Second},
 		app.Deps{Authenticator: agentAuth{agent: agent, transports: transports}, Authorizer: allowAll{}, Nonces: nonce{}, Limiter: unlimited{}, Snapshot: snapshot{o},
 			CatchUp: catchUp{}, Epoch: epochSource{}, Delivery: delivery{o}, Decoder: NewDecoder(schemas, check), Alarm: noAlarm{},
-			Threads: noThreads{}, OpLimiter: noLimits{}, Publisher: noPublisher{}})
+			Threads: noThreads{}, OpLimiter: noLimits{}, Publisher: noPublisher{}, Metrics: gm})
 	if err != nil {
 		t.Fatal(err)
 	}

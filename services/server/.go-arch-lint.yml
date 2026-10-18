@@ -283,7 +283,7 @@ deps:
     mayDependOn: [platform-otel, kernel-ports, platform-secrets]
     canUse: [v-otel, v-otelhttp, v-otelslog]
   platform-pg:
-    mayDependOn: [platform-pg, kernel-ports, platform-secrets, platform-testkit, migrations]
+    mayDependOn: [platform-pg, kernel-ports, platform-secrets, platform-testkit, platform-otel, migrations]
     canUse: [v-pgx, v-goose, v-otelpgx, v-otel, v-testcontainers, v-mobyapi, v-mobyclient]
   platform-ratelimit:
     mayDependOn: [platform-ratelimit, kernel-ports, platform-httpserver, platform-otel]
