@@ -24,11 +24,15 @@ const (
 	sectionLater   = "later"
 )
 
-// listKeys and laterKeys are the only keys the list knows; anything else is a typo that would
-// otherwise be ignored.
+// sectionGatewayOps is the optional section of the gateway ops (M1-64, gatewayops.go).
+const sectionGatewayOps = "gateway_ops"
+
+// requiredListKeys are the keys every list has; listKeys and laterKeys are the only keys the list
+// knows, anything else is a typo that would otherwise be ignored.
 var (
-	listKeys  = []string{"version", sectionEnabled, sectionLater}
-	laterKeys = []string{"operation_id", "milestone", "ticket"}
+	requiredListKeys = []string{"version", sectionEnabled, sectionLater}
+	listKeys         = []string{"version", sectionEnabled, sectionLater, sectionGatewayOps}
+	laterKeys        = []string{"operation_id", "milestone", "ticket"}
 )
 
 // laterEntry is one operation that has no handler yet, with the milestone (and optionally the
@@ -44,6 +48,8 @@ type enableList struct {
 	Version int          `yaml:"version"`
 	Enabled []string     `yaml:"enabled"`
 	Later   []laterEntry `yaml:"later"`
+	// GatewayOps is the section gateway_ops; nil when the list has none (gatewayops.go).
+	GatewayOps *gatewayOpsList `yaml:"gateway_ops"`
 }
 
 // readList loads and checks the enable list at path on its own: version, keys, sort order,
@@ -57,7 +63,7 @@ func readList(path string, p *problemsError) *enableList {
 	}
 	root := doc.Content[0]
 	knownKeys(path, "", root, listKeys, p)
-	for _, k := range listKeys {
+	for _, k := range requiredListKeys {
 		if value(root, k) == nil {
 			p.add(path, "missing key %s", k)
 		}

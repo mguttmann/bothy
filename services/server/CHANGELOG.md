@@ -78,6 +78,23 @@ documented in this file. The format is based on
   transaction through the new in-transaction event `chat.ThreadMoved`, and the tags are removed.
   `thread.moved_out` (source, never naming the target) and `thread.moved` (target) are appended in
   this order. Main threads, the same channel, archived targets and DM channels are refused.
+- WebSocket gateway connection and session (M1-64): `GET /api/v1/gateway` checks the `Origin`
+  (`403 forbidden` for a foreign one, SEC-CORS-3), upgrades with `github.com/coder/websocket`,
+  sends `hello` with the current DPoP nonce and authenticates in-band with `identify` (access
+  token or API token, DPoP proof bound to the nonce) or `resume`, rate limited by
+  `rl.gateway_connect` per device or token and authorized with `gateway.connect`. `ready` carries
+  the snapshot of `sync`; `resume` within `sync.resume_window` answers `resumed`; heartbeats,
+  `reauth_required` and `reauth` keep the connection; the close codes `4001` to `4009`, `4011`,
+  `4012`, `4014` and `4016` to `4018` follow 04 section 6.4. One connection per device (`4017`).
+  Sessions live in process memory with a sweeper. The ops of the new section `gateway_ops` of
+  `api/operations.yaml` are registered; every other client op is unknown (`4001`). New
+  configuration keys `sync.ws_max_frame_bytes`, `sync.identify_timeout`,
+  `sync.heartbeat_interval`, `sync.heartbeat_miss_limit`, `sync.resume_window`,
+  `sync.reauth_lead_time`, `sync.outbound_queue_max` and `gateway.write_timeout`. The test client
+  `internal/gateway/adapters/wstest` serves later tickets. Delivery of events follows with M1-65.
+- `httpserver.NewSchemaValidator` checks a JSON value against a named schema of the contract;
+  `httpserver.Operation.AuthorizedInBand` marks the one route that authorizes on its connection.
+- `actor.Actor.CredentialExpiresAt`: the expiry of the access token or API token of a request.
 - Catch-up over REST and the snapshot (M1-63): `listEvents` (`GET /api/v1/events`) delivers every
   durable event after a cursor that the caller may receive at delivery time (personal events only
   to their audience, every other event through `authorize` with its receive action) with a cursor
@@ -1092,6 +1109,9 @@ documented in this file. The format is based on
 
 ### Changed
 
+- The body schemas of every client frame of the gateway refuse unknown members
+  (`additionalProperties: false`, W7, M1-64); the route generator checks them and generates
+  `routes.GatewayOps` from the section `gateway_ops` of `api/operations.yaml`.
 - `createToken` decides personal tokens by the feature flag `tokens.personal_enabled` evaluated
   for the caller (M1-47); the always-off stand-in of M1-44 is removed.
 - authz (M1-48): the delegation limits of `grant.create` and `grant.revoke` are part of the

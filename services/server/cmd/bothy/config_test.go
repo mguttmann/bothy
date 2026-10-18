@@ -269,6 +269,7 @@ func TestConfigPrintShowsSourcePerKey(t *testing.T) {
 		"file.s3.use_path_style = true  # default\n" +
 		"file.storage.driver = fs  # default\n" +
 		"forum_tag.name_max_chars = 50  # default\n" +
+		"gateway.write_timeout = 10s  # default\n" +
 		"group.description_max_chars = 500  # default\n" +
 		"group.name_max_chars = 100  # default\n" +
 		"host.name_max_chars = 100  # default\n" +
@@ -378,12 +379,19 @@ func TestConfigPrintShowsSourcePerKey(t *testing.T) {
 		"sync.event_log_partitions_ahead = 3  # default\n" +
 		"sync.event_payload_max_bytes = 65536  # default\n" +
 		"sync.event_retention = 30d  # default\n" +
+		"sync.heartbeat_interval = 30s  # default\n" +
+		"sync.heartbeat_miss_limit = 2  # default\n" +
 		"sync.idempotency_cleanup_batch_size = 1000  # default\n" +
 		"sync.idempotency_cleanup_interval = 1h  # default\n" +
 		"sync.idempotency_key_ttl = 1d  # default\n" +
+		"sync.identify_timeout = 10s  # default\n" +
 		"sync.log_poll_interval = 1s  # default\n" +
+		"sync.outbound_queue_max = 10000  # default\n" +
 		"sync.partition_maintenance_interval = 10m  # default\n" +
+		"sync.reauth_lead_time = 1m  # default\n" +
+		"sync.resume_window = 5m  # default\n" +
 		"sync.tail_batch_size = 1000  # default\n" +
+		"sync.ws_max_frame_bytes = 1048576  # default\n" +
 		"telemetry.enabled = true  # default\n" +
 		"telemetry.logs.exporter = both  # default\n" +
 		"telemetry.logs.level = info  # default\n" +
