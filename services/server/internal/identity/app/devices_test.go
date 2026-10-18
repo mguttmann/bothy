@@ -36,6 +36,9 @@ func (denyAll) Scope(context.Context, authorize.Principal, authorize.Action) (au
 	return authorize.Scope{}, nil
 }
 
+// Observe implements authorize.Authorizer; the fake keeps no cache.
+func (denyAll) Observe(context.Context, authorize.LogEvent) {}
+
 // nopCursors is a codec for use cases that list nothing in these tests.
 type nopCursors struct{}
 

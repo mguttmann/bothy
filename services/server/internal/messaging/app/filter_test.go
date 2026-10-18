@@ -44,6 +44,9 @@ func (*mismatchAuthz) Scope(context.Context, authorize.Principal, authorize.Acti
 	return authorize.Scope{}, nil
 }
 
+// Observe implements authorize.Authorizer; the fake keeps no cache.
+func (*mismatchAuthz) Observe(context.Context, authorize.LogEvent) {}
+
 // rowsStore returns fixed history rows.
 type rowsStore struct {
 	bareStore
@@ -147,6 +150,9 @@ func (d *decideAuthz) Authorize(_ context.Context, _ authorize.Principal, a auth
 func (*decideAuthz) Scope(context.Context, authorize.Principal, authorize.Action) (authorize.Scope, error) {
 	return authorize.Scope{ChannelIDs: []ids.ID{}}, nil
 }
+
+// Observe implements authorize.Authorizer; the fake keeps no cache.
+func (*decideAuthz) Observe(context.Context, authorize.LogEvent) {}
 
 // getStore holds the visible and the existing messages of Get.
 type getStore struct {

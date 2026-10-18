@@ -49,6 +49,20 @@ func (c *fakeConn) Close(code domain.CloseCode, reason string) {
 	}
 }
 
+// Offer records the frame of an entry of the hub; the fake queue never fills.
+func (c *fakeConn) Offer(e domain.Entry) bool {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	c.frames = append(c.frames, e)
+	return true
+}
+
+// WaitSpace returns at once.
+func (c *fakeConn) WaitSpace(context.Context) error { return nil }
+
+// Purge drops nothing.
+func (c *fakeConn) Purge(domain.Targets) {}
+
 func (c *fakeConn) closed() (domain.CloseCode, string) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
@@ -148,6 +162,9 @@ func (z *fakeAuthz) Scope(context.Context, authorize.Principal, authorize.Action
 	return authorize.Scope{}, nil
 }
 
+// Observe implements authorize.Authorizer; the fake keeps no cache.
+func (*fakeAuthz) Observe(context.Context, authorize.LogEvent) {}
+
 func (z *fakeAuthz) set(id ids.ID, d authorize.Decision) {
 	z.mu.Lock()
 	defer z.mu.Unlock()
@@ -199,6 +216,12 @@ func (fakeCatchUp) Page(context.Context, sync.PageInput) (sync.PageResult, error
 	return sync.PageResult{}, nil
 }
 
+func (fakeCatchUp) PageEvents(context.Context, sync.PageInput) (sync.EventPage, error) {
+	return sync.EventPage{}, nil
+}
+
+func (fakeCatchUp) Admit(context.Context, actor.Actor, sync.Event) (bool, error) { return true, nil }
+
 // epoch is the sync epoch of the fakes.
 var epoch = ids.MustParse("0192f4a0-7b1c-7577-8bf0-c4f4ee4f8000")
 
@@ -223,12 +246,14 @@ func (l *callLog) all() []string {
 // fakeDelivery records Register, Attach and Detach.
 type fakeDelivery struct{ log *callLog }
 
-func (d fakeDelivery) Register(s *app.Session) { d.log.add("register " + s.ID.String()) }
-func (d fakeDelivery) Attach(_ context.Context, s *app.Session, from int64) error {
+func (d fakeDelivery) Register(_ context.Context, _ *app.Connection, s *app.Session) {
+	d.log.add("register " + s.ID.String())
+}
+func (d fakeDelivery) Attach(_ context.Context, _ *app.Connection, from, _ int64) error {
 	d.log.add(fmt.Sprintf("attach %d", from))
 	return nil
 }
-func (d fakeDelivery) Detach(s *app.Session) { d.log.add("detach " + s.ID.String()) }
+func (d fakeDelivery) Detach(*app.Connection) { d.log.add("detach") }
 
 // fakeAlarm counts unproven ops.
 type fakeAlarm struct {

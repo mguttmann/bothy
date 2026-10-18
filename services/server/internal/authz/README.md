@@ -1,6 +1,8 @@
 # Module `authz`
 
 Status: skeleton (M1-05); M1-26 brings the principal source port, M1-25 the closed action catalogue and the start check (section "Action catalogue" below), M1-27 the grant model storage: tables, domain rules and the store port with its PostgreSQL adapter. M1-28 brings the permission snapshot, the cache and the one authorization function `Authorize` with `Scope` (section "Authorize" below). M1-29 brings the one transactional path of every rights change (rights hooks, `access.changed`, I1 and SR8) and the `Admin` use cases for groups, memberships and grants (section "Rights changes" below). M1-48 brings the twelve REST operations of groups and grants with their reads, events and the manage scope (section "Groups and grants over the API (M1-48)" below). M1-30 brings the expiry jobs `authz.expiry_sweep` and `authz.expiry_reminder` (section "Expiry (M1-30)" below). M1-42 brings the claim group sync of OIDC logins (section "Claim groups (M1-42)" below). M1-49 brings "who has access", the grant preview and "view as" (section "Who has access, preview and view as (M1-49)" below). M2-39 adds the target host and M2-40 the terminal rights (sections "Target host (M2-39)" and "Terminal rights (M2-40)" below).
+
+Status: skeleton (M1-05); M1-26 brings the principal source port, M1-25 the closed action catalogue and the start check (section "Action catalogue" below), M1-27 the grant model storage: tables, domain rules and the store port with its PostgreSQL adapter. M1-28 brings the permission snapshot, the cache and the one authorization function `Authorize` with `Scope` (section "Authorize" below). M1-29 brings the one transactional path of every rights change (rights hooks, `access.changed`, I1 and SR8) and the `Admin` use cases for groups, memberships and grants (section "Rights changes" below). M1-48 brings the twelve REST operations of groups and grants with their reads, events and the manage scope (section "Groups and grants over the API (M1-48)" below). M1-30 brings the expiry jobs `authz.expiry_sweep` and `authz.expiry_reminder` (section "Expiry (M1-30)" below). M1-42 brings the claim group sync of OIDC logins (section "Claim groups (M1-42)" below). M1-49 brings "who has access", the grant preview and "view as" (section "Who has access, preview and view as (M1-49)" below). M1-65 brings `Observe` and the delivery mode (section "Delivery mode and Observe (M1-65)" below).
 The normative source is [docs/spec/02-architecture.md](../../../../docs/spec/02-architecture.md); if this file differs, the chapter applies.
 
 ## Purpose
@@ -95,7 +97,32 @@ states, with named constraints (`grants_subject_shape_check`, `grants_bot_limits
 - The only place with permission logic (B7). Other modules call `authorize` through `kernel/authorize` and never join with `grants` themselves.
 - Data of other modules comes through the source ports `PrincipalSource`, `StructureSource`, `AgentPolicySource`; `authz` imports no domain modules.
 - The I1 check and `access.changed` run in phase 3.1 of the Unit of Work (02, 8.1).
-- The permission cache follows `access.changed` through `Observe` in log order (02, 11.3); `Observe` comes with M1-65, REST reads the permission version per request (M1-28).
+- The permission cache follows the log through `Observe` in log order (02, 11.3, M1-65); REST reads the permission version per request (M1-28).
+
+## Delivery mode and Observe (M1-65)
+
+`Observe(ctx, LogEvent)` is called by the log tail of every api process for each durable event in
+`seq` order, before the gateway hub sees it (`app/observe.go`):
+
+- Every event raises the highest permission version seen in the log. A delivery snapshot built at an
+  older version is rebuilt at its next delivery check. The key is this process-wide version, not a
+  floor per principal, because a permission change without a difference of visible targets writes no
+  `access.changed` (04 8.2), for example `token.revoke`; the next event of the log carries the new
+  version (DECISIONS M1-65).
+- `access.changed` also forgets the delivery snapshots of its audience.
+- `channel.created`, `channel.updated`, `channel.archived`, `space.archived` and `thread.moved`
+  advance a process-wide structure generation; snapshots of an older generation are rebuilt
+  (DECISIONS M1-65).
+
+`authorize.Delivery(ctx)` marks the checks of the hub and the gateway catch-up: the snapshot is
+validated against that state instead of reading `permission_version` per check; a rebuilt snapshot
+reads the current database state. Delivery implies `Filter(ctx)`, so a denial writes no audit entry
+(07 4.2, R-AZ-04); requests and ops keep auditing denials. A revoked credential answers
+`unauthenticated`, which the hub turns into `4012`.
+
+Tests: `TestAuthzObserve_AccessChangedRaisesFloor`,
+`TestAuthzObserve_NewRightsVersionInvalidatesWithoutAccessChanged`,
+`TestAuthzObserve_StructureEventInvalidates`, `TestAuthzDelivery_DenialWritesNoAudit`.
 
 ## Action catalogue (M1-25)
 

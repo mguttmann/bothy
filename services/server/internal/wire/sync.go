@@ -18,6 +18,7 @@ import (
 	"github.com/OWNER/bothy/services/server/internal/kernel/idempotency"
 	"github.com/OWNER/bothy/services/server/internal/kernel/txn"
 	"github.com/OWNER/bothy/services/server/internal/platform/config"
+	"github.com/OWNER/bothy/services/server/internal/platform/health"
 	"github.com/OWNER/bothy/services/server/internal/platform/httpserver"
 	"github.com/OWNER/bothy/services/server/internal/platform/lifecycle"
 	"github.com/OWNER/bothy/services/server/internal/platform/pg"
@@ -216,21 +217,18 @@ func (s *Sync) Appender() eventlog.Appender { return s.appender }
 // Maintenance returns the partition maintenance.
 func (s *Sync) Maintenance() *syncapp.PartitionMaintenance { return s.maintenance }
 
-// NewTail returns the log tail of the process with sinks in delivery order: M1-28 adds the
-// rights cache, then M1-65 the hub (02 "Log tail per api process"); today the list is empty.
+// NewTail returns the log tail of the process with sinks in delivery order (02 "Log tail per api
+// process"); serve passes DeliverySink, the rights cache and then the hub.
 func (s *Sync) NewTail(sinks ...sync.Sink) *syncpg.Tail {
 	return syncpg.NewTail(s.pool, s.repo, s.cfg.Tail, sinks, s.log)
 }
 
-// tailSinks are the sinks of the log tail of api and all, in this order: the rights cache
-// (M1-28), then the hub (M1-65). Empty until those tickets.
-func tailSinks() []sync.Sink { return nil }
-
 // startTail is start step 8 for api and all: it starts the log tail, waits until it has read the
-// head it starts at (local_head, 02 "Start and graceful shutdown"), and registers the stop step event_tail in
-// lifecycle.PhaseEventTail. A tail that ends with an error (a sink error, a gap) ends the process
-// with exit code 1 (02 "Panics"); a head that cannot be read ends the start.
-func startTail(ctx context.Context, r *lifecycle.Runner, tail *syncpg.Tail) error {
+// head it starts at (local_head, 02 "Start and graceful shutdown"), registers the stop step event_tail in
+// lifecycle.PhaseEventTail and the liveness check event_tail, which fails once the goroutine of the
+// tail and the hub has ended (02 "Health"). A tail that ends with an error (a sink error, a gap)
+// ends the process with exit code 1 (02 "Panics"); a head that cannot be read ends the start.
+func startTail(ctx context.Context, r *lifecycle.Runner, reg *health.Registry, tail *syncpg.Tail) error {
 	// The stop step event_tail calls cancel.
 	tctx, cancel := context.WithCancel(context.Background())
 	done := make(chan struct{})
@@ -253,6 +251,7 @@ func startTail(ctx context.Context, r *lifecycle.Runner, tail *syncpg.Tail) erro
 		}
 	}
 	r.OnStop(lifecycle.StopStep{Name: "event_tail", Phase: lifecycle.PhaseEventTail, Run: stop})
+	reg.AddLiveness(CheckEventTail, TailLiveness(done))
 	select {
 	case <-tail.Started():
 		return nil
@@ -260,6 +259,26 @@ func startTail(ctx context.Context, r *lifecycle.Runner, tail *syncpg.Tail) erro
 		return fmt.Errorf("log tail: %w", runErr)
 	case <-ctx.Done():
 		return ctx.Err()
+	}
+}
+
+// CheckEventTail is the liveness check of the log tail and the hub.
+const CheckEventTail = "event_tail"
+
+// errTailStopped is the failure of the liveness check event_tail.
+var errTailStopped = errors.New("the log tail and the hub have stopped")
+
+// TailLiveness returns the liveness check of the goroutine of the log tail and the hub, which
+// closes done when it ends: from then on /healthz fails (02 "Health"), since the process delivers
+// nothing any more.
+func TailLiveness(done <-chan struct{}) health.Check {
+	return func(context.Context) error {
+		select {
+		case <-done:
+			return errTailStopped
+		default:
+			return nil
+		}
 	}
 }
 

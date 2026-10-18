@@ -2591,6 +2591,18 @@
       "doc": "Events per catch-up page; the default and the largest limit of GET /api/v1/events."
     },
     {
+      "name": "sync.cursor_advance_every",
+      "env": "BOTHY_SYNC__CURSOR_ADVANCE_EVERY",
+      "kind": "int",
+      "default": "1000",
+      "required": false,
+      "enum": [],
+      "min": "1",
+      "max": "2147483647",
+      "chapter": "04-sync-protocol.md",
+      "doc": "Skipped events after which the gateway sends a cursor frame (catch-up and live)."
+    },
+    {
       "name": "sync.event_log_partition_size",
       "env": "BOTHY_SYNC__EVENT_LOG_PARTITION_SIZE",
       "kind": "int",

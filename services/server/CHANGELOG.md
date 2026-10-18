@@ -78,6 +78,17 @@ documented in this file. The format is based on
   transaction through the new in-transaction event `chat.ThreadMoved`, and the tags are removed.
   `thread.moved_out` (source, never naming the target) and `thread.moved` (target) are appended in
   this order. Main threads, the same channel, archived targets and DM channels are refused.
+- Gateway delivery (M1-65): the log tail of every api process feeds `Authorizer.Observe` and then
+  the hub, which delivers each durable event to exactly the connections whose principal may
+  receive it at delivery time (`sync.Admit` in delivery mode, no denial audit), in `seq` order and
+  without blocking on a slow reader (`4014` at `sync.outbound_queue_max` or a missed
+  `gateway.write_timeout`); live `cursor` frames every `sync.cursor_advance_every` events; catch-up
+  over the WebSocket in pages with `cursor` frames, `catchup.complete {head_seq}` and the buffered
+  live events after it; `resync_required` keeps the connection live; `access.changed`
+  revalidates, re-indexes and purges removed targets; `session.revoked` and revoked credentials
+  close with `4012`; shutdown closes every connection with `4013 server_restart`; the liveness
+  check `event_tail` fails once the tail and hub goroutine has ended. `sync.cursor_advance_every`
+  is an active key.
 - WebSocket gateway connection and session (M1-64): `GET /api/v1/gateway` checks the `Origin`
   (`403 forbidden` for a foreign one, SEC-CORS-3), upgrades with `github.com/coder/websocket`,
   sends `hello` with the current DPoP nonce and authenticates in-band with `identify` (access

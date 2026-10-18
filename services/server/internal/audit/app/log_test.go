@@ -62,6 +62,9 @@ func (decider) Scope(context.Context, authorize.Principal, authorize.Action) (au
 	return authorize.Scope{}, nil
 }
 
+// Observe implements authorize.Authorizer; the fake keeps no cache.
+func (decider) Observe(context.Context, authorize.LogEvent) {}
+
 // metricsRec records the instrument calls.
 type metricsRec struct {
 	mu        sync.Mutex
