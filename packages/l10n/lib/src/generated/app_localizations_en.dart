@@ -1988,4 +1988,568 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get newPostCancel => 'Cancel';
+
+  @override
+  String get adminTitle => 'Administration';
+
+  @override
+  String get adminBack => 'Back to the chat';
+
+  @override
+  String get adminNavPeople => 'People';
+
+  @override
+  String get adminNavGroups => 'Groups';
+
+  @override
+  String get adminNavDevices => 'Devices';
+
+  @override
+  String adminNavDevicesWaiting(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: 'Devices ($count waiting)',
+      one: 'Devices (1 waiting)',
+      zero: 'Devices',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get adminReason => 'Reason (stored in the audit log)';
+
+  @override
+  String get adminDefaultReason => 'Changed in the administration';
+
+  @override
+  String get adminLoadMore => 'Load more';
+
+  @override
+  String get adminOneTimeSecret =>
+      'The code was shown once and cannot be shown again. Issue a new code.';
+
+  @override
+  String get adminI1Explained =>
+      'Change the mode of the affected agent under Agents first, then enable the person again.';
+
+  @override
+  String get adminPickPerson => 'Choose a person';
+
+  @override
+  String get adminRevoke => 'Revoke';
+
+  @override
+  String get adminOwnerBadge => 'Owner';
+
+  @override
+  String get adminStatusActive => 'Active';
+
+  @override
+  String get adminStatusPending => 'Waiting for login';
+
+  @override
+  String get adminStatusDisabled => 'Disabled';
+
+  @override
+  String get adminStatusDeleted => 'Deleted';
+
+  @override
+  String get adminPeopleTitle => 'People';
+
+  @override
+  String get adminPeopleAdd => 'Add person';
+
+  @override
+  String get adminPeopleSearch => 'Search';
+
+  @override
+  String get adminPeopleStatusAll => 'All states';
+
+  @override
+  String get adminPeopleGroupAll => 'All groups';
+
+  @override
+  String get adminPeopleGroupNote =>
+      'The group filter applies only to the people loaded on this page.';
+
+  @override
+  String get adminPeopleEmpty => 'No person matches.';
+
+  @override
+  String adminPersonCreated(String name) {
+    return '$name was created.';
+  }
+
+  @override
+  String get adminCreatePersonTitle => 'Add person';
+
+  @override
+  String get adminCreatePersonBody =>
+      'The person gets an account. With a local account, the enrollment code is shown once in the next step.';
+
+  @override
+  String get adminCreatePersonName => 'Display name';
+
+  @override
+  String get adminCreatePersonHandle => 'Handle';
+
+  @override
+  String get adminCreatePersonHandleInvalid =>
+      'Use lower case letters, digits, dots, hyphens and underscores.';
+
+  @override
+  String get adminCreatePersonLocal => 'Local account with an enrollment code';
+
+  @override
+  String get adminCreatePersonSubmit => 'Create';
+
+  @override
+  String adminCodeTitle(String name) {
+    return 'Enrollment code for $name';
+  }
+
+  @override
+  String get adminCodeOnce =>
+      'This code is shown only once. Hand it over in person or by phone.';
+
+  @override
+  String get adminCodePurposeFirstLogin => 'For the first login';
+
+  @override
+  String get adminCodePurposeRecovery => 'For recovery';
+
+  @override
+  String get adminCodePurposeIdentityLink => 'For linking a login service';
+
+  @override
+  String adminCodeExpires(String when) {
+    return 'Valid until $when';
+  }
+
+  @override
+  String get adminCodeClose => 'Close';
+
+  @override
+  String get adminPersonBack => 'All people';
+
+  @override
+  String get adminPersonDisable => 'Disable';
+
+  @override
+  String get adminPersonEnable => 'Enable';
+
+  @override
+  String get adminPersonNewCode => 'New enrollment code';
+
+  @override
+  String adminDisableTitle(String name) {
+    return 'Disable $name?';
+  }
+
+  @override
+  String adminDisableBody(String name) {
+    return '$name is disabled. All sessions of $name end now and all devices are revoked.';
+  }
+
+  @override
+  String adminPersonDisabled(String name) {
+    return '$name is disabled. All sessions ended.';
+  }
+
+  @override
+  String adminEnableTitle(String name) {
+    return 'Enable $name?';
+  }
+
+  @override
+  String adminEnableBody(String name) {
+    return '$name can sign in again. Earlier devices stay revoked.';
+  }
+
+  @override
+  String adminPersonEnabled(String name) {
+    return '$name is enabled.';
+  }
+
+  @override
+  String adminNewCodeTitle(String name) {
+    return 'New enrollment code for $name?';
+  }
+
+  @override
+  String adminNewCodeBody(String name) {
+    return 'A new code is issued and shown once. Every older code of $name stops working.';
+  }
+
+  @override
+  String get adminCredentialsTitle => 'Credentials';
+
+  @override
+  String get adminCredentialsPasswordSet => 'Local password set';
+
+  @override
+  String get adminCredentialsPasswordNone => 'No local password';
+
+  @override
+  String get adminCredentialsTotpSet => 'One-time code app set up';
+
+  @override
+  String get adminCredentialsTotpNone => 'No one-time code app';
+
+  @override
+  String get adminCredentialsIdentities => 'Linked login services';
+
+  @override
+  String get adminCredentialsPasskeys => 'Passkeys';
+
+  @override
+  String get adminCredentialsNone => 'None';
+
+  @override
+  String adminPasskeyAdded(String when) {
+    return 'Added $when';
+  }
+
+  @override
+  String get adminUnlink => 'Unlink';
+
+  @override
+  String adminUnlinkTitle(String subject) {
+    return 'Unlink $subject?';
+  }
+
+  @override
+  String adminUnlinkBody(String name) {
+    return '$name can no longer sign in with this login service.';
+  }
+
+  @override
+  String adminUnlinked(String subject) {
+    return '$subject was unlinked.';
+  }
+
+  @override
+  String adminRevokePasskeyTitle(String passkey) {
+    return 'Revoke the passkey $passkey?';
+  }
+
+  @override
+  String adminRevokePasskeyBody(String name) {
+    return '$name can no longer sign in with this passkey.';
+  }
+
+  @override
+  String adminPasskeyRevoked(String passkey) {
+    return 'The passkey $passkey was revoked.';
+  }
+
+  @override
+  String get adminEndSessionBody =>
+      'The device of this session is signed out at once.';
+
+  @override
+  String get adminSessionEnded => 'The session was ended.';
+
+  @override
+  String get adminOwnersTitle => 'Owners';
+
+  @override
+  String get adminOwnersAdd => 'Add owner';
+
+  @override
+  String get adminOwnersAddTitle => 'Add an owner';
+
+  @override
+  String get adminOwnersAddBody =>
+      'The person gets every permission of the instance.';
+
+  @override
+  String adminOwnersAdded(String name) {
+    return '$name is now an owner.';
+  }
+
+  @override
+  String get adminOwnersRevoke => 'Revoke';
+
+  @override
+  String adminOwnersRevokeTitle(String name) {
+    return 'Revoke the owner $name?';
+  }
+
+  @override
+  String adminOwnersRevokeBody(String name) {
+    return '$name keeps the account but loses the owner permissions.';
+  }
+
+  @override
+  String adminOwnersRevoked(String name) {
+    return '$name is no longer an owner.';
+  }
+
+  @override
+  String adminOwnerSince(String when, String reason) {
+    return 'Since $when: $reason';
+  }
+
+  @override
+  String get adminGroupsTitle => 'Groups';
+
+  @override
+  String get adminGroupsCreate => 'Create group';
+
+  @override
+  String get adminGroupsEmpty => 'No groups yet.';
+
+  @override
+  String adminGroupMembers(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count members',
+      one: '1 member',
+      zero: 'No members',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String adminGroupCreated(String name) {
+    return 'The group $name was created.';
+  }
+
+  @override
+  String get adminGroupCreateTitle => 'Create group';
+
+  @override
+  String get adminGroupCreateBody => 'A new group without members is created.';
+
+  @override
+  String get adminGroupName => 'Name';
+
+  @override
+  String get adminGroupDescription => 'Description (optional)';
+
+  @override
+  String get adminGroupBack => 'All groups';
+
+  @override
+  String get adminGroupFromProvider =>
+      'The login service manages the members of this group.';
+
+  @override
+  String get adminGroupRename => 'Rename';
+
+  @override
+  String adminGroupRenameTitle(String name) {
+    return 'Rename $name';
+  }
+
+  @override
+  String get adminGroupRenameBody =>
+      'The group keeps its members and its permissions.';
+
+  @override
+  String adminGroupRenamed(String name) {
+    return 'The group is now called $name.';
+  }
+
+  @override
+  String get adminGroupDelete => 'Delete group';
+
+  @override
+  String adminGroupDeleteTitle(String name) {
+    return 'Delete $name?';
+  }
+
+  @override
+  String get adminGroupDeleteBody =>
+      'The group is removed and the permissions it gave end. The members keep their accounts.';
+
+  @override
+  String get adminMembersTitle => 'Members';
+
+  @override
+  String get adminMembersEmpty => 'No members yet.';
+
+  @override
+  String get adminMemberAdd => 'Add member';
+
+  @override
+  String adminMemberAddTitle(String group) {
+    return 'Add a member to $group';
+  }
+
+  @override
+  String get adminMemberAddBody =>
+      'The person gets the permissions of the group, until the given day when one is set.';
+
+  @override
+  String get adminMemberUntil => 'Until (optional, YYYY-MM-DD)';
+
+  @override
+  String get adminMemberUntilInvalid => 'Enter a date as YYYY-MM-DD.';
+
+  @override
+  String adminMemberAdded(String name, String group) {
+    return '$name was added to $group.';
+  }
+
+  @override
+  String adminMemberExpires(String when) {
+    return 'Until $when';
+  }
+
+  @override
+  String get adminMemberRemove => 'Remove';
+
+  @override
+  String adminMemberRemoveTitle(String name, String group) {
+    return 'Remove $name from $group?';
+  }
+
+  @override
+  String adminMemberRemoveBody(String name) {
+    return '$name loses the permissions of the group.';
+  }
+
+  @override
+  String adminMemberRemoved(String name, String group) {
+    return '$name was removed from $group.';
+  }
+
+  @override
+  String get adminWaitingTitle => 'Waiting devices';
+
+  @override
+  String get adminWaitingEmpty => 'No device is waiting.';
+
+  @override
+  String adminWaitingDevice(String person, String device) {
+    return '$person: $device';
+  }
+
+  @override
+  String adminWaitingLoggedIn(String when) {
+    return 'Logged in $when';
+  }
+
+  @override
+  String adminWaitingVia(String method) {
+    return 'via $method';
+  }
+
+  @override
+  String get adminWaitingNoOrigin => 'Origin unknown';
+
+  @override
+  String get adminApprove => 'Approve';
+
+  @override
+  String get adminReject => 'Reject';
+
+  @override
+  String adminApproveTitle(String device, String person) {
+    return 'Approve $device of $person';
+  }
+
+  @override
+  String adminApproveHint(String person) {
+    return 'Ask $person for the code that the waiting device shows and type it here.';
+  }
+
+  @override
+  String adminApproved(String device, String person) {
+    return '$device of $person is now active.';
+  }
+
+  @override
+  String adminRejectTitle(String device) {
+    return 'Reject $device?';
+  }
+
+  @override
+  String adminRejectBody(String person) {
+    return 'The waiting device of $person is revoked and cannot sign in.';
+  }
+
+  @override
+  String adminRejected(String device) {
+    return '$device was rejected.';
+  }
+
+  @override
+  String stepUpPurposeCreatePerson(String name) {
+    return 'Create the person $name';
+  }
+
+  @override
+  String stepUpPurposeDisablePerson(String name) {
+    return 'Disable $name';
+  }
+
+  @override
+  String stepUpPurposeEnablePerson(String name) {
+    return 'Enable $name';
+  }
+
+  @override
+  String stepUpPurposeNewCode(String name) {
+    return 'Issue an enrollment code for $name';
+  }
+
+  @override
+  String stepUpPurposeUnlinkIdentity(String name) {
+    return 'Unlink a login service of $name';
+  }
+
+  @override
+  String stepUpPurposeRevokePasskey(String name) {
+    return 'Revoke a passkey of $name';
+  }
+
+  @override
+  String stepUpPurposeAddOwner(String name) {
+    return 'Make $name an owner';
+  }
+
+  @override
+  String stepUpPurposeRevokeOwner(String name) {
+    return 'Revoke the owner $name';
+  }
+
+  @override
+  String stepUpPurposeCreateGroup(String name) {
+    return 'Create the group $name';
+  }
+
+  @override
+  String stepUpPurposeRenameGroup(String name) {
+    return 'Rename the group $name';
+  }
+
+  @override
+  String stepUpPurposeDeleteGroup(String name) {
+    return 'Delete the group $name';
+  }
+
+  @override
+  String stepUpPurposeAddMember(String name, String group) {
+    return 'Add $name to $group';
+  }
+
+  @override
+  String stepUpPurposeRemoveMember(String name, String group) {
+    return 'Remove $name from $group';
+  }
+
+  @override
+  String stepUpPurposeApproveDeviceOf(String device, String person) {
+    return 'Approve the device $device of $person';
+  }
+
+  @override
+  String stepUpPurposeRejectDevice(String device, String person) {
+    return 'Reject the device $device of $person';
+  }
 }

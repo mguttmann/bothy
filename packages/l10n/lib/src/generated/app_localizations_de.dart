@@ -2004,4 +2004,569 @@ class AppLocalizationsDe extends AppLocalizations {
 
   @override
   String get newPostCancel => 'Abbrechen';
+
+  @override
+  String get adminTitle => 'Verwaltung';
+
+  @override
+  String get adminBack => 'Zurück zum Chat';
+
+  @override
+  String get adminNavPeople => 'Personen';
+
+  @override
+  String get adminNavGroups => 'Gruppen';
+
+  @override
+  String get adminNavDevices => 'Geräte';
+
+  @override
+  String adminNavDevicesWaiting(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: 'Geräte ($count warten)',
+      one: 'Geräte (1 wartet)',
+      zero: 'Geräte',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get adminReason => 'Grund (steht im Audit-Log)';
+
+  @override
+  String get adminDefaultReason => 'In der Verwaltung geändert';
+
+  @override
+  String get adminLoadMore => 'Mehr laden';
+
+  @override
+  String get adminOneTimeSecret =>
+      'Der Code wurde einmal angezeigt und lässt sich nicht erneut anzeigen. Stelle einen neuen Code aus.';
+
+  @override
+  String get adminI1Explained =>
+      'Ändere zuerst unter Agenten den Modus des betroffenen Agenten und aktiviere die Person dann erneut.';
+
+  @override
+  String get adminPickPerson => 'Person wählen';
+
+  @override
+  String get adminRevoke => 'Widerrufen';
+
+  @override
+  String get adminOwnerBadge => 'Owner';
+
+  @override
+  String get adminStatusActive => 'Aktiv';
+
+  @override
+  String get adminStatusPending => 'Wartet auf Anmeldung';
+
+  @override
+  String get adminStatusDisabled => 'Gesperrt';
+
+  @override
+  String get adminStatusDeleted => 'Gelöscht';
+
+  @override
+  String get adminPeopleTitle => 'Personen';
+
+  @override
+  String get adminPeopleAdd => 'Person anlegen';
+
+  @override
+  String get adminPeopleSearch => 'Suchen';
+
+  @override
+  String get adminPeopleStatusAll => 'Alle Zustände';
+
+  @override
+  String get adminPeopleGroupAll => 'Alle Gruppen';
+
+  @override
+  String get adminPeopleGroupNote =>
+      'Der Gruppenfilter wirkt nur auf die auf dieser Seite geladenen Personen.';
+
+  @override
+  String get adminPeopleEmpty => 'Keine Person passt.';
+
+  @override
+  String adminPersonCreated(String name) {
+    return '$name wurde angelegt.';
+  }
+
+  @override
+  String get adminCreatePersonTitle => 'Person anlegen';
+
+  @override
+  String get adminCreatePersonBody =>
+      'Die Person bekommt ein Konto. Mit lokalem Konto erscheint der Einladungs-Code im nächsten Schritt genau einmal.';
+
+  @override
+  String get adminCreatePersonName => 'Anzeigename';
+
+  @override
+  String get adminCreatePersonHandle => 'Handle';
+
+  @override
+  String get adminCreatePersonHandleInvalid =>
+      'Verwende Kleinbuchstaben, Ziffern, Punkte, Bindestriche und Unterstriche.';
+
+  @override
+  String get adminCreatePersonLocal => 'Lokales Konto mit Einladungs-Code';
+
+  @override
+  String get adminCreatePersonSubmit => 'Anlegen';
+
+  @override
+  String adminCodeTitle(String name) {
+    return 'Einladungs-Code für $name';
+  }
+
+  @override
+  String get adminCodeOnce =>
+      'Dieser Code wird nur einmal angezeigt. Gib ihn persönlich oder telefonisch weiter.';
+
+  @override
+  String get adminCodePurposeFirstLogin => 'Für die erste Anmeldung';
+
+  @override
+  String get adminCodePurposeRecovery => 'Für die Wiederherstellung';
+
+  @override
+  String get adminCodePurposeIdentityLink =>
+      'Zum Verknüpfen eines Anmeldedienstes';
+
+  @override
+  String adminCodeExpires(String when) {
+    return 'Gültig bis $when';
+  }
+
+  @override
+  String get adminCodeClose => 'Schließen';
+
+  @override
+  String get adminPersonBack => 'Alle Personen';
+
+  @override
+  String get adminPersonDisable => 'Sperren';
+
+  @override
+  String get adminPersonEnable => 'Entsperren';
+
+  @override
+  String get adminPersonNewCode => 'Neuer Einladungs-Code';
+
+  @override
+  String adminDisableTitle(String name) {
+    return '$name sperren?';
+  }
+
+  @override
+  String adminDisableBody(String name) {
+    return '$name wird gesperrt. Alle Sitzungen von $name enden sofort und alle Geräte werden widerrufen.';
+  }
+
+  @override
+  String adminPersonDisabled(String name) {
+    return '$name ist gesperrt. Alle Sitzungen wurden beendet.';
+  }
+
+  @override
+  String adminEnableTitle(String name) {
+    return '$name entsperren?';
+  }
+
+  @override
+  String adminEnableBody(String name) {
+    return '$name kann sich wieder anmelden. Frühere Geräte bleiben widerrufen.';
+  }
+
+  @override
+  String adminPersonEnabled(String name) {
+    return '$name ist entsperrt.';
+  }
+
+  @override
+  String adminNewCodeTitle(String name) {
+    return 'Neuen Einladungs-Code für $name?';
+  }
+
+  @override
+  String adminNewCodeBody(String name) {
+    return 'Ein neuer Code wird ausgestellt und einmal angezeigt. Jeder ältere Code von $name wird ungültig.';
+  }
+
+  @override
+  String get adminCredentialsTitle => 'Anmeldedaten';
+
+  @override
+  String get adminCredentialsPasswordSet => 'Lokales Passwort gesetzt';
+
+  @override
+  String get adminCredentialsPasswordNone => 'Kein lokales Passwort';
+
+  @override
+  String get adminCredentialsTotpSet => 'Einmalcode-App eingerichtet';
+
+  @override
+  String get adminCredentialsTotpNone => 'Keine Einmalcode-App';
+
+  @override
+  String get adminCredentialsIdentities => 'Verknüpfte Anmeldedienste';
+
+  @override
+  String get adminCredentialsPasskeys => 'Passkeys';
+
+  @override
+  String get adminCredentialsNone => 'Keine';
+
+  @override
+  String adminPasskeyAdded(String when) {
+    return 'Hinzugefügt $when';
+  }
+
+  @override
+  String get adminUnlink => 'Trennen';
+
+  @override
+  String adminUnlinkTitle(String subject) {
+    return '$subject trennen?';
+  }
+
+  @override
+  String adminUnlinkBody(String name) {
+    return '$name kann sich mit diesem Anmeldedienst nicht mehr anmelden.';
+  }
+
+  @override
+  String adminUnlinked(String subject) {
+    return '$subject wurde getrennt.';
+  }
+
+  @override
+  String adminRevokePasskeyTitle(String passkey) {
+    return 'Passkey $passkey widerrufen?';
+  }
+
+  @override
+  String adminRevokePasskeyBody(String name) {
+    return '$name kann sich mit diesem Passkey nicht mehr anmelden.';
+  }
+
+  @override
+  String adminPasskeyRevoked(String passkey) {
+    return 'Der Passkey $passkey wurde widerrufen.';
+  }
+
+  @override
+  String get adminEndSessionBody =>
+      'Das Gerät dieser Sitzung wird sofort abgemeldet.';
+
+  @override
+  String get adminSessionEnded => 'Die Sitzung wurde beendet.';
+
+  @override
+  String get adminOwnersTitle => 'Owner';
+
+  @override
+  String get adminOwnersAdd => 'Owner hinzufügen';
+
+  @override
+  String get adminOwnersAddTitle => 'Owner hinzufügen';
+
+  @override
+  String get adminOwnersAddBody => 'Die Person erhält alle Rechte der Instanz.';
+
+  @override
+  String adminOwnersAdded(String name) {
+    return '$name ist jetzt Owner.';
+  }
+
+  @override
+  String get adminOwnersRevoke => 'Entziehen';
+
+  @override
+  String adminOwnersRevokeTitle(String name) {
+    return 'Owner-Rechte von $name entziehen?';
+  }
+
+  @override
+  String adminOwnersRevokeBody(String name) {
+    return '$name behält das Konto, verliert aber die Owner-Rechte.';
+  }
+
+  @override
+  String adminOwnersRevoked(String name) {
+    return '$name ist nicht mehr Owner.';
+  }
+
+  @override
+  String adminOwnerSince(String when, String reason) {
+    return 'Seit $when: $reason';
+  }
+
+  @override
+  String get adminGroupsTitle => 'Gruppen';
+
+  @override
+  String get adminGroupsCreate => 'Gruppe anlegen';
+
+  @override
+  String get adminGroupsEmpty => 'Noch keine Gruppen.';
+
+  @override
+  String adminGroupMembers(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count Mitglieder',
+      one: '1 Mitglied',
+      zero: 'Keine Mitglieder',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String adminGroupCreated(String name) {
+    return 'Die Gruppe $name wurde angelegt.';
+  }
+
+  @override
+  String get adminGroupCreateTitle => 'Gruppe anlegen';
+
+  @override
+  String get adminGroupCreateBody =>
+      'Eine neue Gruppe ohne Mitglieder wird angelegt.';
+
+  @override
+  String get adminGroupName => 'Name';
+
+  @override
+  String get adminGroupDescription => 'Beschreibung (optional)';
+
+  @override
+  String get adminGroupBack => 'Alle Gruppen';
+
+  @override
+  String get adminGroupFromProvider =>
+      'Der Anmeldedienst verwaltet die Mitglieder dieser Gruppe.';
+
+  @override
+  String get adminGroupRename => 'Umbenennen';
+
+  @override
+  String adminGroupRenameTitle(String name) {
+    return '$name umbenennen';
+  }
+
+  @override
+  String get adminGroupRenameBody =>
+      'Die Gruppe behält ihre Mitglieder und ihre Rechte.';
+
+  @override
+  String adminGroupRenamed(String name) {
+    return 'Die Gruppe heißt jetzt $name.';
+  }
+
+  @override
+  String get adminGroupDelete => 'Gruppe löschen';
+
+  @override
+  String adminGroupDeleteTitle(String name) {
+    return '$name löschen?';
+  }
+
+  @override
+  String get adminGroupDeleteBody =>
+      'Die Gruppe wird entfernt und die Rechte, die sie gab, enden. Die Mitglieder behalten ihre Konten.';
+
+  @override
+  String get adminMembersTitle => 'Mitglieder';
+
+  @override
+  String get adminMembersEmpty => 'Noch keine Mitglieder.';
+
+  @override
+  String get adminMemberAdd => 'Mitglied hinzufügen';
+
+  @override
+  String adminMemberAddTitle(String group) {
+    return 'Mitglied zu $group hinzufügen';
+  }
+
+  @override
+  String get adminMemberAddBody =>
+      'Die Person erhält die Rechte der Gruppe, bis zum angegebenen Tag, wenn einer gesetzt ist.';
+
+  @override
+  String get adminMemberUntil => 'Bis (optional, JJJJ-MM-TT)';
+
+  @override
+  String get adminMemberUntilInvalid => 'Gib ein Datum als JJJJ-MM-TT ein.';
+
+  @override
+  String adminMemberAdded(String name, String group) {
+    return '$name wurde zu $group hinzugefügt.';
+  }
+
+  @override
+  String adminMemberExpires(String when) {
+    return 'Bis $when';
+  }
+
+  @override
+  String get adminMemberRemove => 'Entfernen';
+
+  @override
+  String adminMemberRemoveTitle(String name, String group) {
+    return '$name aus $group entfernen?';
+  }
+
+  @override
+  String adminMemberRemoveBody(String name) {
+    return '$name verliert die Rechte der Gruppe.';
+  }
+
+  @override
+  String adminMemberRemoved(String name, String group) {
+    return '$name wurde aus $group entfernt.';
+  }
+
+  @override
+  String get adminWaitingTitle => 'Wartende Geräte';
+
+  @override
+  String get adminWaitingEmpty => 'Kein Gerät wartet.';
+
+  @override
+  String adminWaitingDevice(String person, String device) {
+    return '$person: $device';
+  }
+
+  @override
+  String adminWaitingLoggedIn(String when) {
+    return 'Angemeldet $when';
+  }
+
+  @override
+  String adminWaitingVia(String method) {
+    return 'über $method';
+  }
+
+  @override
+  String get adminWaitingNoOrigin => 'Herkunft unbekannt';
+
+  @override
+  String get adminApprove => 'Bestätigen';
+
+  @override
+  String get adminReject => 'Ablehnen';
+
+  @override
+  String adminApproveTitle(String device, String person) {
+    return '$device von $person bestätigen';
+  }
+
+  @override
+  String adminApproveHint(String person) {
+    return 'Frage $person nach dem Code, den das wartende Gerät zeigt, und gib ihn hier ein.';
+  }
+
+  @override
+  String adminApproved(String device, String person) {
+    return '$device von $person ist jetzt aktiv.';
+  }
+
+  @override
+  String adminRejectTitle(String device) {
+    return '$device ablehnen?';
+  }
+
+  @override
+  String adminRejectBody(String person) {
+    return 'Das wartende Gerät von $person wird widerrufen und kann sich nicht anmelden.';
+  }
+
+  @override
+  String adminRejected(String device) {
+    return '$device wurde abgelehnt.';
+  }
+
+  @override
+  String stepUpPurposeCreatePerson(String name) {
+    return 'Person $name anlegen';
+  }
+
+  @override
+  String stepUpPurposeDisablePerson(String name) {
+    return '$name sperren';
+  }
+
+  @override
+  String stepUpPurposeEnablePerson(String name) {
+    return '$name entsperren';
+  }
+
+  @override
+  String stepUpPurposeNewCode(String name) {
+    return 'Einladungs-Code für $name ausstellen';
+  }
+
+  @override
+  String stepUpPurposeUnlinkIdentity(String name) {
+    return 'Anmeldedienst von $name trennen';
+  }
+
+  @override
+  String stepUpPurposeRevokePasskey(String name) {
+    return 'Passkey von $name widerrufen';
+  }
+
+  @override
+  String stepUpPurposeAddOwner(String name) {
+    return '$name zum Owner machen';
+  }
+
+  @override
+  String stepUpPurposeRevokeOwner(String name) {
+    return 'Owner-Rechte von $name entziehen';
+  }
+
+  @override
+  String stepUpPurposeCreateGroup(String name) {
+    return 'Gruppe $name anlegen';
+  }
+
+  @override
+  String stepUpPurposeRenameGroup(String name) {
+    return 'Gruppe $name umbenennen';
+  }
+
+  @override
+  String stepUpPurposeDeleteGroup(String name) {
+    return 'Gruppe $name löschen';
+  }
+
+  @override
+  String stepUpPurposeAddMember(String name, String group) {
+    return '$name zu $group hinzufügen';
+  }
+
+  @override
+  String stepUpPurposeRemoveMember(String name, String group) {
+    return '$name aus $group entfernen';
+  }
+
+  @override
+  String stepUpPurposeApproveDeviceOf(String device, String person) {
+    return 'Gerät $device von $person bestätigen';
+  }
+
+  @override
+  String stepUpPurposeRejectDevice(String device, String person) {
+    return 'Gerät $device von $person ablehnen';
+  }
 }

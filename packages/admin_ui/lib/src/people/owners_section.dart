@@ -1,0 +1,251 @@
+// SPDX-License-Identifier: Apache-2.0
+
+/// The owners: list, add and revoke (docs/spec/07-permissions.md 2.7, SR8; 08 4; 05
+/// `owner.add`, `owner.remove` with step-up).
+library;
+
+import 'package:api_client/api_client.dart' show ApiProblem;
+import 'package:design_system/design_system.dart';
+import 'package:flutter/material.dart';
+import 'package:l10n/l10n.dart';
+
+import '../common/admin_action.dart';
+import '../common/confirm_change.dart';
+import '../common/problem_banner.dart';
+import '../data/admin_repository.dart';
+import '../self/device_tile.dart' show activityText;
+import '../self/self_feedback.dart';
+
+/// The owners of the instance with "Revoke" each and "Add owner" (a person of [people] who is
+/// not an owner yet).
+///
+/// The screen never decides which owner may go: revoking the last one is sent, and the
+/// server's `409 last_owner` is shown with its text (07 SR8). A `403` of the list shows the
+/// server's reason instead.
+class OwnersSection extends StatefulWidget {
+  /// Creates the section.
+  const OwnersSection({
+    super.key,
+    required this.repository,
+    required this.people,
+    this.timeZone = 'UTC',
+    this.clock = DateTime.now,
+    this.onChanged,
+  });
+
+  /// The administration's calls.
+  final AdminRepository repository;
+
+  /// The people the list has loaded, the candidates of "Add owner".
+  final List<AdminPerson> people;
+
+  /// The time zone of the signed-in person.
+  final String timeZone;
+
+  /// The current time.
+  final DateTime Function() clock;
+
+  /// Runs after a change.
+  final VoidCallback? onChanged;
+
+  @override
+  State<OwnersSection> createState() => _OwnersSectionState();
+}
+
+class _OwnersSectionState extends State<OwnersSection>
+    with AdminActionState<OwnersSection> {
+  List<AdminOwner>? _owners;
+  ApiProblem? _problem;
+
+  @override
+  void initState() {
+    super.initState();
+    _load();
+  }
+
+  Future<void> _load() async {
+    try {
+      final owners = await widget.repository.owners();
+      if (mounted) {
+        setState(() {
+          _owners = owners;
+          _problem = null;
+        });
+      }
+    } on Object catch (e) {
+      if (mounted) setState(() => _problem = loadProblem(e));
+    }
+  }
+
+  Future<void> _revoke(AdminOwner owner) async {
+    final l = AppLocalizations.of(context);
+    final reason = await ConfirmChange.show(
+      context,
+      title: l.adminOwnersRevokeTitle(owner.displayName),
+      body: l.adminOwnersRevokeBody(owner.displayName),
+      confirmLabel: l.adminOwnersRevoke,
+      destructive: true,
+      withReason: true,
+    );
+    if (reason == null || !mounted) return;
+    final ok = await runChange('${owner.userId}.revoke', () async {
+      await widget.repository.revokeOwner(
+        owner.userId,
+        reason: reason.isEmpty ? l.adminDefaultReason : reason,
+        purpose: l.stepUpPurposeRevokeOwner(owner.displayName),
+      );
+      return SelfNotice(l.adminOwnersRevoked(owner.displayName));
+    });
+    if (ok) widget.onChanged?.call();
+    if (mounted) await _load();
+  }
+
+  Future<void> _add() async {
+    final l = AppLocalizations.of(context);
+    final owners = {for (final o in _owners ?? const <AdminOwner>[]) o.userId};
+    final candidates = [
+      for (final p in widget.people)
+        if (!owners.contains(p.id) && p.status == AdminPersonStatus.active) p,
+    ];
+    final picked = await showDialog<(AdminPerson, String)>(
+      context: context,
+      builder: (_) => _AddOwnerDialog(candidates: candidates),
+    );
+    if (picked == null || !mounted) return;
+    final (person, reason) = picked;
+    final ok = await runChange('add', () async {
+      await widget.repository.addOwner(
+        person.id,
+        reason: reason.isEmpty ? l.adminDefaultReason : reason,
+        purpose: l.stepUpPurposeAddOwner(person.displayName),
+      );
+      return SelfNotice(l.adminOwnersAdded(person.displayName));
+    });
+    if (ok) widget.onChanged?.call();
+    if (mounted) await _load();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final l = AppLocalizations.of(context);
+    final colors = context.dsColors;
+    final owners = _owners;
+    final now = widget.clock();
+    return Column(
+      key: const ValueKey('owners'),
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Row(
+          children: [
+            Expanded(
+              child: Semantics(
+                header: true,
+                child: Text(
+                  l.adminOwnersTitle,
+                  style: dsTextStyle(DsType.heading)
+                      .copyWith(color: colors.textPrimary),
+                ),
+              ),
+            ),
+            if (owners != null && !denied.contains('add'))
+              OutlinedButton(
+                key: const ValueKey('owners.add'),
+                onPressed: busy ? null : _add,
+                child: Text(l.adminOwnersAdd),
+              ),
+          ],
+        ),
+        const SizedBox(height: DsSpace.s8),
+        noticeBanner(),
+        if (_problem case final problem?)
+          ProblemBanner(problem: problem, onRetry: _load)
+        else if (owners != null)
+          for (final owner in owners) ...[
+            Padding(
+              key: ValueKey('owner.${owner.userId}'),
+              padding: const EdgeInsets.symmetric(vertical: DsSpace.s8),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          owner.displayName,
+                          style: dsTextStyle(DsType.bodyStrong)
+                              .copyWith(color: colors.textPrimary),
+                        ),
+                        Text(
+                          l.adminOwnerSince(
+                            activityText(
+                              context,
+                              owner.grantedAt,
+                              now: now,
+                              timeZone: widget.timeZone,
+                            ),
+                            owner.reason,
+                          ),
+                          style: dsTextStyle(DsType.bodySm)
+                              .copyWith(color: colors.textSecondary),
+                        ),
+                      ],
+                    ),
+                  ),
+                  if (!denied.contains('${owner.userId}.revoke'))
+                    OutlinedButton(
+                      key: ValueKey('owner.${owner.userId}.revoke'),
+                      onPressed: busy ? null : () => _revoke(owner),
+                      child: Text(l.adminOwnersRevoke),
+                    ),
+                ],
+              ),
+            ),
+            Divider(height: 1, color: colors.borderSubtle),
+          ],
+      ],
+    );
+  }
+}
+
+/// Picks the new owner and the reason; pops `(person, reason)` or null.
+class _AddOwnerDialog extends StatefulWidget {
+  const _AddOwnerDialog({required this.candidates});
+
+  final List<AdminPerson> candidates;
+
+  @override
+  State<_AddOwnerDialog> createState() => _AddOwnerDialogState();
+}
+
+class _AddOwnerDialogState extends State<_AddOwnerDialog> {
+  AdminPerson? _picked;
+
+  @override
+  Widget build(BuildContext context) {
+    final l = AppLocalizations.of(context);
+    return ConfirmChange(
+      title: l.adminOwnersAddTitle,
+      body: l.adminOwnersAddBody,
+      confirmLabel: l.adminOwnersAdd,
+      withReason: true,
+      canConfirm: _picked != null,
+      onConfirm: (reason) => Navigator.of(context).pop((_picked!, reason)),
+      fields: DropdownButton<AdminPerson>(
+        key: const ValueKey('owners.pick'),
+        isExpanded: true,
+        value: _picked,
+        hint: Text(l.adminPickPerson),
+        items: [
+          for (final p in widget.candidates)
+            DropdownMenuItem(
+              key: ValueKey('owners.pick.${p.id}'),
+              value: p,
+              child: Text(p.displayName),
+            ),
+        ],
+        onChanged: (p) => setState(() => _picked = p),
+      ),
+    );
+  }
+}
