@@ -222,6 +222,7 @@ func (s *Service) send(ctx context.Context, a actor.Actor, p prepared, info chat
 	if err != nil {
 		return messaging.Created{}, err
 	}
+	s.countCreated(ctx, domain.Message{Origin: p.origin, Kind: domain.KindText})
 	if err := s.d.Store.InsertMentions(ctx, row.ID, info.ID, mentions, now); err != nil {
 		return messaging.Created{}, err
 	}
@@ -305,6 +306,7 @@ func (s *Service) systemLine(ctx context.Context, a actor.Actor, info chat.Threa
 	if err != nil {
 		return nil, err
 	}
+	s.countCreated(ctx, line)
 	m := view(row, author, nil)
 	posted := s.posted(a, info, m, false)
 	posted.AuthorDeviceID = nil

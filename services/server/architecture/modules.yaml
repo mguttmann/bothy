@@ -81,7 +81,7 @@ modules:
     ephemeral_events: []
     ws_ops: []
     depends_on: [instance]
-    adapter_vendors: [otel, pgx]   # adapters/telemetry counts bothy.authz.errors (M1-25); sqlc code and the repository (M1-27)
+    adapter_vendors: [otel, pgx]   # adapters/telemetry counts bothy.authz.errors (M1-25), adapters/otelmetrics bothy.authz.decisions (M1-68); sqlc code and the repository (M1-27)
   identity:
     tables: [principals, users, owners, identity_providers, user_identities, local_credentials,
              enrollment_codes, auth_login_flows, auth_challenges, device_pairings,
@@ -155,8 +155,9 @@ modules:
     ws_ops: []
     depends_on: [identity, chat, files]
     # sqlc code and the repository (M1-56); UAX #29 grapheme clusters and NFC of the reaction
-    # symbol rule, only in adapters/unicode (M1-59).
-    adapter_vendors: [pgx, xtext, uniseg]
+    # symbol rule, only in adapters/unicode (M1-59); adapters/otelmetrics counts
+    # bothy.message.created (M1-68).
+    adapter_vendors: [pgx, xtext, uniseg, otel]
   status:
     tables: [status_components, status_incidents, status_incident_updates,
              status_incident_components, backup_runs]

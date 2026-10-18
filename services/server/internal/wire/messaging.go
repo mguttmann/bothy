@@ -15,6 +15,7 @@ import (
 	"github.com/OWNER/bothy/services/server/internal/kernel/eventlog"
 	"github.com/OWNER/bothy/services/server/internal/kernel/txn"
 	messaginghttp "github.com/OWNER/bothy/services/server/internal/messaging/adapters/httpapi"
+	messagingmetrics "github.com/OWNER/bothy/services/server/internal/messaging/adapters/otelmetrics"
 	messagingpg "github.com/OWNER/bothy/services/server/internal/messaging/adapters/postgres"
 	messagingunicode "github.com/OWNER/bothy/services/server/internal/messaging/adapters/unicode"
 	messagingapp "github.com/OWNER/bothy/services/server/internal/messaging/app"
@@ -56,6 +57,9 @@ type MessagingWrites struct {
 	Events   eventlog.Appender
 	Redactor eventlog.Redactor
 	Audit    auditing.Recorder
+	// Metrics counts the created messages; nil means bothy.message.created of
+	// messaging/adapters/otelmetrics on the global meter provider of platform/otel (M1-68).
+	Metrics messagingapp.Metrics
 }
 
 // NewMessaging builds the messaging module over pool with the unit of work uow, the Authorizer
@@ -74,9 +78,17 @@ func NewMessaging(cfg messagingapp.Config, pool *pg.Pool, uow txn.UnitOfWork, az
 	if err != nil {
 		return nil, err
 	}
+	if w.Metrics == nil {
+		m, err := messagingmetrics.New(nil)
+		if err != nil {
+			return nil, err
+		}
+		w.Metrics = m
+	}
 	svc, err := messagingapp.New(cfg, messagingapp.Deps{
 		Store: messagingpg.NewRepository(pool), UoW: uow, Authorizer: az, Events: w.Events, Redactor: w.Redactor, Audit: w.Audit,
 		Threads: threads, Directory: dir, Cursors: messaginghttp.Cursors{}, Symbols: messagingunicode.Normalizer{}, Errors: counter, Clock: clk, Log: log,
+		Metrics: w.Metrics,
 	})
 	if err != nil {
 		return nil, err
