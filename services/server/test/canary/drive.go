@@ -11,6 +11,8 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/OWNER/bothy/services/server/internal/identity/adapters/oidc/oidctest"
+	"github.com/OWNER/bothy/services/server/internal/identity/adapters/webauthn/virtualauthn"
 	"github.com/OWNER/bothy/services/server/test/harness"
 )
 
@@ -31,6 +33,16 @@ type Scenario struct {
 	threads, messages []string
 	// newUser is the person the people step created.
 	newUser string
+	// enrollee is the device of the passkey enrollment, alexPhone the device of the password
+	// login, authn the virtual authenticator of the last passkey registration.
+	enrollee, alexPhone *harness.Client
+	authn               *virtualauthn.Authenticator
+	// owner is the local credential of the owner, consoleCookie the cookie of its console tab,
+	// ownerLogin the provider login linked to the owner, lastRaw the body of the last raw answer.
+	owner         *localAccount
+	consoleCookie *http.Cookie
+	ownerLogin    oidctest.Login
+	lastRaw       map[string]any
 }
 
 // harnessResponse is the response of a step.

@@ -89,13 +89,18 @@ type Options struct {
 	// DurableDB puts the database on the durable pgtest server (pgtest.Durable: fsync,
 	// synchronous_commit and full_page_writes on); every perf and chaos test sets it (ADR 0063).
 	DurableDB bool
-	// Env are extra "NAME=value" entries of the process environment of the server, for secret
-	// references of the env scheme (env:BOTHY_IDP_<name> of an OIDC client secret, M1-69).
-	Env []string
+	// SecretFiles are extra files of the secrets directory of the server by relative path, written
+	// with mode 0400 after bothy secrets init (the client secret of a fake OIDC provider as
+	// idp/<name>, referenced as file:<secrets.dir>/idp/<name>; M1-69).
+	SecretFiles map[string][]byte
 	// OIDCRootCAs are the trusted TLS roots of the OIDC provider requests of the server
 	// (wire.Deps.OIDCRootCAs): the pool of the fake provider of oidctest; nil means the system
 	// roots.
 	OIDCRootCAs *x509.CertPool
+	// PublicHost is the host of server.public_url; empty means 127.0.0.1. "localhost" gives the
+	// server a domain name as WebAuthn relying party (passkeys, M1-40); the listeners stay on
+	// 127.0.0.1 either way.
+	PublicHost string
 	// ProofObserver, when set, sees every DPoP proof a client of the server sends (requests and
 	// gateway identify or reauth), so the canary test registers them as secrets.
 	ProofObserver func(proof string)
@@ -119,10 +124,10 @@ type Server struct {
 	// proofs is Options.ProofObserver, handed to every client of the server.
 	proofs func(string)
 	db     *pgtest.DB
-	tb    testing.TB
-	clk   clock.Clock
-	http  *http.Client
-	users sync.Map // handle -> *Client
+	tb     testing.TB
+	clk    clock.Clock
+	http   *http.Client
+	users  sync.Map // handle -> *Client
 
 	adminOnce sync.Once
 	admin     *pgxpool.Pool
@@ -163,6 +168,7 @@ func Start(tb testing.TB, opts Options) *Server {
 	db := pgtest.New(tb, dbOpts...)
 	jobstest.Migrate(tb, db, "jobs")
 	secretsDir := initSecrets(tb, db)
+	writeSecretFiles(tb, secretsDir, opts.SecretFiles)
 	keys := filepath.Join(tb.TempDir(), "signing-keys")
 	if err := os.Mkdir(keys, 0o700); err != nil {
 		tb.Fatal(err)
@@ -193,7 +199,11 @@ func start(tb testing.TB, db *pgtest.DB, opts Options, clk clock.Clock, secretsD
 	if err != nil {
 		return nil, err
 	}
-	public := "http://127.0.0.1:" + strconv.Itoa(port)
+	host := opts.PublicHost
+	if host == "" {
+		host = "127.0.0.1"
+	}
+	public := "http://" + host + ":" + strconv.Itoa(port)
 	env := environment(db, opts, public, secretsDir, keys, port)
 	schema, err := wire.ConfigSchema()
 	if err != nil {
@@ -235,7 +245,7 @@ func start(tb testing.TB, db *pgtest.DB, opts Options, clk clock.Clock, secretsD
 		return nil, err
 	}
 	s := &Server{
-		PublicURL: public, APIBase: public + apiPrefix, GatewayURL: "ws://127.0.0.1:" + strconv.Itoa(port) + apiPrefix + "/gateway",
+		PublicURL: public, APIBase: public + apiPrefix, GatewayURL: "ws://" + host + ":" + strconv.Itoa(port) + apiPrefix + "/gateway",
 		InternalURL: internal, SecretsDir: secretsDir, SigningKeyDir: keys, proofs: opts.ProofObserver, db: db, tb: tb, clk: clk, values: values, env: env,
 		http: &http.Client{Timeout: 60 * time.Second},
 	}
@@ -283,11 +293,11 @@ func environment(db *pgtest.DB, opts Options, public, secretsDir, keys string, p
 	for k, v := range opts.Config {
 		set[k] = v
 	}
-	env := make([]string, 0, len(set)+len(opts.Env))
+	env := make([]string, 0, len(set))
 	for k, v := range set {
 		env = append(env, config.EnvName(k)+"="+v)
 	}
-	return append(env, opts.Env...)
+	return env
 }
 
 // initSecrets creates the secret volume as bothy secrets init does, with the database passwords
@@ -314,6 +324,34 @@ func initSecrets(tb testing.TB, db *pgtest.DB) string {
 	dir := filepath.Join(target, "server")
 	tb.Cleanup(func() { makeRemovable(target) })
 	return dir
+}
+
+// writeSecretFiles writes files below dir with mode 0400 in directories of mode 0700; dir itself
+// is made writable for the owner only while it writes.
+func writeSecretFiles(tb testing.TB, dir string, files map[string][]byte) {
+	tb.Helper()
+	if len(files) == 0 {
+		return
+	}
+	fi, err := os.Stat(dir)
+	if err != nil {
+		tb.Fatal(err)
+	}
+	if err := os.Chmod(dir, 0o700); err != nil {
+		tb.Fatal(err)
+	}
+	for rel, b := range files {
+		path := filepath.Join(dir, filepath.Clean(rel))
+		if err := os.MkdirAll(filepath.Dir(path), 0o700); err != nil {
+			tb.Fatal(err)
+		}
+		if err := os.WriteFile(path, b, 0o400); err != nil { //nolint:gosec // G703: a path below the test's own temp directory
+			tb.Fatal(err)
+		}
+	}
+	if err := os.Chmod(dir, fi.Mode().Perm()); err != nil { //nolint:gosec // G302: restores the mode bothy secrets init set
+		tb.Fatal(err)
+	}
 }
 
 // makeRemovable gives the owner write access to the secret volume again, so t.TempDir can remove

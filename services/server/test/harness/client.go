@@ -133,6 +133,17 @@ func (c *Client) Do(ctx context.Context, r Request) Response {
 	return resp
 }
 
+// DoAnonymous sends r like Do but without the access token: the DPoP proof of the client's key
+// alone, with one retry on use_dpop_nonce (refreshToken, a replayed refresh token, the login and
+// pairing requests of a device). The Observer sees it.
+func (c *Client) DoAnonymous(ctx context.Context, r Request) Response {
+	resp := c.send(ctx, r, false)
+	if c.Observer != nil {
+		c.Observer(r, resp)
+	}
+	return resp
+}
+
 // send sends r with the access token (when auth) and repeats it once on use_dpop_nonce.
 func (c *Client) send(ctx context.Context, r Request, auth bool) Response {
 	resp := c.attempt(ctx, r, auth)
