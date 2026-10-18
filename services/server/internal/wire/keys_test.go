@@ -80,6 +80,9 @@ func (allowAll) Scope(context.Context, authorize.Principal, authorize.Action) (a
 	return authorize.Scope{}, nil
 }
 
+// Observe implements authorize.Authorizer; the fake keeps no cache.
+func (allowAll) Observe(context.Context, authorize.LogEvent) {}
+
 // TestStartup_SigningKeys_Readiness: /readyz reports signing_keys while a purpose lacks an active
 // key and is ready after EnsureActive.
 func TestStartup_SigningKeys_Readiness(t *testing.T) {

@@ -117,8 +117,8 @@ adds), at the marked place, with its stop step:
 | M1-32 (built) | signing keys (`startSigningKeys`: `EnsureActive`, readiness `signing_keys`), key store check in `startSecrets`, job `instance.key_rotation` in `NewJobRegistry` | step `signing_keys` after `identity` | none |
 | M1-34 (built) | session part of identity (`startSessions`: `Identity.BindSessions` with the signing keys and the instance id; the Authenticator of the chain, the session handlers) | step `sessions` after `signing_keys`, before `routes` | none |
 | M1-17 | module handlers in `Deps.Handlers` | `routes` | none |
-| M1-28, M1-65 | sinks of the log tail (rights cache, then hub) in `tailSinks` | `sync.go` | none |
-| M1-65 | gateway connections | with the log tail | `connections` |
+| M1-28, M1-65 (built) | sink of the log tail `DeliverySink` (`Authorizer.Observe`, then `Hub.Dispatch`, one goroutine), liveness check `event_tail` | step `log_tail` (`startLogTail`, `gateway.go`, `sync.go`) | `event_tail` |
+| M1-65 (built) | gateway connections: `Gateway.StopConnections` closes every connection with 4013 | `mountGateway` | `connections` |
 | M1-43 | readiness `trusted_header_requires_loopback` | before `ready` | none |
 | M1-18 | middleware chain around the public mux | `public_listener` | none |
 

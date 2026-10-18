@@ -22,6 +22,7 @@ import (
 
 	"github.com/OWNER/bothy/services/server/internal/gateway/app"
 	"github.com/OWNER/bothy/services/server/internal/gateway/domain"
+	"github.com/OWNER/bothy/services/server/internal/kernel/authorize"
 	"github.com/OWNER/bothy/services/server/internal/kernel/clock"
 	"github.com/OWNER/bothy/services/server/internal/kernel/errs"
 	"github.com/OWNER/bothy/services/server/internal/kernel/reqmeta"
@@ -165,8 +166,11 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	// The TCP peer, the header fields of the upgrade request and the action reach identity as
 	// on every REST request (the authenticate stage does it there): the session binding of
 	// trusted header logins checks them on every identify, resume and reauth (M1-43).
+	// The connection outlives the upgrade request: it drops the request memo of the chain, so
+	// identify, heartbeats, ops, catch-up pages and live checks read the current rights version
+	// (AZ-P9), each op and page with its own memo.
 	peer, _ := netip.ParseAddrPort(r.RemoteAddr)
-	base := reqmeta.WithTransport(context.WithoutCancel(r.Context()),
+	base := reqmeta.WithTransport(authorize.WithoutRequestScope(context.WithoutCancel(r.Context())),
 		reqmeta.Transport{Peer: peer.Addr().Unmap(), Header: r.Header.Clone(), Action: actionConnect})
 	ctx, span := h.d.Tracer.Tracer(instrumentationName).Start(base, SpanName, trace.WithSpanKind(trace.SpanKindServer))
 	h.run(ctx, ws, span)

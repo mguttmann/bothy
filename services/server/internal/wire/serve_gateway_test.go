@@ -50,6 +50,8 @@ type gwWorld struct {
 	id     *wire.Identity
 	pepper []byte
 	cfg    wire.GatewayConfig
+	// env is the environment of the process, for a second process on the same database.
+	env []string
 	// secrets are every token, proof and nonce of the world; reasons every close reason seen.
 	mu      gosync.Mutex
 	secrets []string
@@ -128,7 +130,7 @@ func newGatewayWorld(t *testing.T, extra ...string) *gwWorld {
 	if err != nil {
 		t.Fatal(err)
 	}
-	return &gwWorld{t: t, db: db, owner: owner, p: p, base: "http://127.0.0.1:" + strconv.Itoa(public), id: id, pepper: pepper, cfg: gcfg}
+	return &gwWorld{t: t, db: db, owner: owner, p: p, base: "http://127.0.0.1:" + strconv.Itoa(public), id: id, pepper: pepper, cfg: gcfg, env: env}
 }
 
 // sql runs a statement as the schema owner.

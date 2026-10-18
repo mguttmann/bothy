@@ -14,7 +14,8 @@ import (
 type versionMemoKey struct{}
 
 // version returns the rights version for a check (07 section 7.3, R-RE-02), from these sources in
-// order: a version pinned with authorize.WithPermissionVersion; the memo of the request scope
+// order: a version pinned with authorize.WithPermissionVersion; in delivery mode the highest
+// version Observe has seen; the memo of the request scope
 // (filled by the first read in the request); a fresh read through instance.Versions. A failed
 // read is an error of kind unavailable, never an allow. Inside a unit of work declared as a
 // rights change the version is read fresh and never memoised: it is the unit's own uncommitted
@@ -22,6 +23,12 @@ type versionMemoKey struct{}
 func (a *Authorizer) version(ctx context.Context) (int64, error) {
 	if v, ok := authorize.PinnedPermissionVersion(ctx); ok {
 		return v, nil
+	}
+	// A delivery check validates its snapshot against the version Observe saw instead (loadDelivery);
+	// the version here only labels the result (Scope.PermissionVersion), so the log position
+	// serves, 0 before the first event.
+	if authorize.IsDelivery(ctx) && !txn.InRightsChange(ctx) {
+		return a.delivery.observed(), nil
 	}
 	memo, hasMemo := authorize.RequestMemoFrom(ctx)
 	if txn.InRightsChange(ctx) {

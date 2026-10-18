@@ -58,10 +58,18 @@ func WithRequestScope(ctx context.Context) context.Context {
 	return context.WithValue(ctx, memoKey{}, &RequestMemo{vals: map[any]any{}})
 }
 
+// WithoutRequestScope returns a copy of ctx without a request memo. A long-lived context derived
+// from a request (the WebSocket connection, 04 section 7.2) uses it at its boundary, so every
+// later check or WithRequestScope reads the current rights version instead of the one memoised by
+// the request that opened it.
+func WithoutRequestScope(ctx context.Context) context.Context {
+	return context.WithValue(ctx, memoKey{}, (*RequestMemo)(nil))
+}
+
 // RequestMemoFrom returns the memo installed by WithRequestScope.
 func RequestMemoFrom(ctx context.Context) (*RequestMemo, bool) {
 	m, ok := ctx.Value(memoKey{}).(*RequestMemo)
-	return m, ok
+	return m, ok && m != nil
 }
 
 // Filter returns a copy of ctx in filter mode (07 section 4.2, 05 section 2.4): checks for delivery

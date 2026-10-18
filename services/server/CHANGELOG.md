@@ -61,6 +61,18 @@ documented in this file. The format is based on
   `depguard` rule forbids the package `plugin` in the server module (ADR 0022). Manifests with
   the escape of NUL or of an unpaired surrogate are refused, and manifest values that are no audit
   code enter the audit hashed, so no checked manifest makes install or upgrade fail with 500.
+- Gateway delivery (M1-65): the log tail of every api process feeds `Authorizer.Observe` and then
+  the hub, which delivers each durable event to exactly the connections whose principal may
+  receive it at delivery time (`sync.Admit` in delivery mode, no denial audit), in `seq` order and
+  without blocking on a slow reader (`4014` at `sync.outbound_queue_max` or a missed
+  `gateway.write_timeout`); live `cursor` frames every `sync.cursor_advance_every` events; catch-up
+  over the WebSocket in pages with `cursor` frames, `catchup.complete {head_seq}` and the buffered
+  live events after it; `resync_required` keeps the connection live; `access.changed`
+  revalidates, re-indexes and purges removed targets; `session.revoked` and revoked credentials
+  close with `4012`; shutdown closes every connection with `4013 server_restart`; the liveness
+  check `event_tail` fails once the tail and hub goroutine has ended. `sync.cursor_advance_every`
+  is an active key.
+
 - Contract tests G7 and G8 (M1-71): `make contract-test` runs Schemathesis against the server of
   this tree with a throwaway PostgreSQL and the matrix world (every enabled operation as owner and as
   a plain user, the stateful phase, SEC-T06, the project checks problem format, `Correlation-Id`, no

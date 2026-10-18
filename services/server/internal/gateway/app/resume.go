@@ -16,6 +16,9 @@ import (
 // the same 4006. The old connection of the session is closed with 4017 first; resumed carries the
 // head and epoch of catch-up, and delivery continues as after ready (note 12).
 func (g *Gateway) resume(ctx context.Context, c *Connection, d any) error {
+	if g.isDraining() {
+		return closeWith(domain.CloseServerRestart)
+	}
 	in, ok := d.(Resume)
 	if !ok || (in.AccessToken == "") == (in.APIToken == "") || in.Cursor < 0 {
 		return closeWith(domain.CloseDecodeError)
@@ -37,7 +40,7 @@ func (g *Gateway) resume(ctx context.Context, c *Connection, d any) error {
 		g.sessions.release(s, c, true)
 		return nil
 	}
-	g.d.Delivery.Register(s)
+	g.d.Delivery.Register(ctx, c, s)
 	res, err := g.d.CatchUp.Check(ctx, sync.CheckInput{After: in.Cursor, Epoch: in.SyncEpoch})
 	if err != nil {
 		return setupClose(err)
@@ -51,7 +54,7 @@ func (g *Gateway) resume(ctx context.Context, c *Connection, d any) error {
 		_ = c.conn.Send(ResyncRequired{Reason: res.Reason, HeadSeq: res.HeadSeq, SyncEpoch: res.SyncEpoch})
 		from = res.HeadSeq
 	}
-	if err := g.d.Delivery.Attach(ctx, s, from); err != nil {
+	if err := g.d.Delivery.Attach(ctx, c, from, res.HeadSeq); err != nil {
 		return setupClose(err)
 	}
 	return nil

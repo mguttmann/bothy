@@ -45,6 +45,9 @@ func (f *catchAuthz) Scope(context.Context, authorize.Principal, authorize.Actio
 	return sc, nil
 }
 
+// Observe implements authorize.Authorizer; the fake keeps no cache.
+func (*catchAuthz) Observe(context.Context, authorize.LogEvent) {}
+
 // catchLog returns the stored events after the cursor up to the head; it applies no visibility
 // predicate, so the use case alone decides.
 type catchLog struct {
@@ -77,7 +80,7 @@ func (e catchEpoch) Load(context.Context) (instance.Record, error) {
 }
 
 // newCatchUp returns the use case over the fakes with page size pageSize.
-func newCatchUp(t *testing.T, log *catchLog, az *catchAuthz, head int64, pageSize int) *app.CatchUpService {
+func newCatchUp(t *testing.T, log *catchLog, az authorize.Authorizer, head int64, pageSize int) *app.CatchUpService {
 	t.Helper()
 	s, err := app.NewCatchUp(app.CatchUpConfig{PageSize: pageSize, MaxEvents: 1000},
 		app.CatchUpDeps{Log: log, Head: catchHead(head), Epoch: catchEpoch(ids.New()), Authorizer: az})
