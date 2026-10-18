@@ -4,6 +4,7 @@ package wire
 
 import (
 	"context"
+	"crypto/x509"
 	"errors"
 	"fmt"
 	"io"
@@ -114,6 +115,13 @@ type Deps struct {
 	// checkpoint sink) refuse every target before resolution (egress.Deps.DenyAll). Only
 	// test servers set it (the contract server of G7, M1-71); production leaves it false.
 	EgressDenyAll bool
+	// TelemetryExporters replace the OTLP exporters of the telemetry (otel.Deps.Exporters). They
+	// exist for in-process tests (the canary test of M1-69); the zero value means production.
+	TelemetryExporters otel.Exporters
+	// OIDCRootCAs are the trusted TLS roots of the OIDC provider requests (OIDCDeps.RootCAs).
+	// They exist for in-process tests against the fake provider of M1-41 (the canary test of
+	// M1-69); nil means the system roots, as in production.
+	OIDCRootCAs *x509.CertPool
 }
 
 // server is the state of one serve process that the components fill and the stop steps read.
@@ -468,6 +476,7 @@ func (s *server) startTelemetry(ctx context.Context) error {
 	}
 	tel, err := otel.Setup(ctx, cfg, otel.Deps{
 		Secrets: s.sp, Clock: s.deps.Clock, Stdout: s.deps.Stdout, ServiceVersion: s.deps.Version, Env: s.deps.Env,
+		Exporters: s.deps.TelemetryExporters,
 	})
 	if err != nil {
 		return err
@@ -950,7 +959,8 @@ func (s *server) startSessions(context.Context) error {
 	if err != nil {
 		return err
 	}
-	if err := id.BindOIDC(OIDCDeps{Egress: eg, Secrets: sec, ClaimGroups: admin.Admin, EgressDenyAll: s.deps.EgressDenyAll}); err != nil {
+	if err := id.BindOIDC(OIDCDeps{Egress: eg, Secrets: sec, ClaimGroups: admin.Admin, EgressDenyAll: s.deps.EgressDenyAll,
+		RootCAs: s.deps.OIDCRootCAs}); err != nil {
 		return err
 	}
 	return id.BindLocal(box, nil)
