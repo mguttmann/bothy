@@ -31,6 +31,8 @@ type Connection struct {
 	reauthSent bool
 	wasReady   bool
 	code       domain.CloseCode
+	// typing is the fan-out throttle of typing.start of this connection, created on first use.
+	typing *domain.TypingThrottle
 }
 
 // ID returns the id of the connection, for logs; it is not the gateway session id.
@@ -108,4 +110,15 @@ func (c *Connection) renewed(a actor.Actor) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	c.actor, c.expiresAt, c.reauthSent = a, a.CredentialExpiresAt, false
+}
+
+// typingThrottle returns the typing throttle of the connection, created with interval
+// (sync.typing_min_interval) on first use.
+func (c *Connection) typingThrottle(interval time.Duration) *domain.TypingThrottle {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	if c.typing == nil {
+		c.typing = domain.NewTypingThrottle(interval)
+	}
+	return c.typing
 }

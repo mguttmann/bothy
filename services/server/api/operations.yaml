@@ -547,18 +547,18 @@ later:               # every other operationId of docs/api/openapi.yaml; sorted 
 # moves it. The terminal channels are no gateway ops and are not listed.
 gateway_ops:
   enabled:           # sorted ascending
+    - focus
     - heartbeat
     - identify
     - reauth
     - resume
+    - typing.start
+    - typing.stop
   later:             # sorted by op
     - op: ack
       etappe: M2
     - op: command.autocomplete_result
       etappe: M2
-    - op: focus
-      etappe: M1
-      ticket: M1-66
     - op: run.update
       etappe: M2
     - op: stats.subscribe
@@ -567,9 +567,3 @@ gateway_ops:
     - op: stats.unsubscribe
       etappe: M6
       ticket: M6-15
-    - op: typing.start
-      etappe: M1
-      ticket: M1-66
-    - op: typing.stop
-      etappe: M1
-      ticket: M1-66

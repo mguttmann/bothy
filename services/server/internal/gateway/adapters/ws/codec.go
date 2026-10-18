@@ -128,8 +128,29 @@ func (d *Decoder) Decode(op string, raw json.RawMessage) (any, error) {
 			return nil, err
 		}
 		return app.Reauth{AccessToken: f.AccessToken, DPoP: f.Dpop}, nil
+	case "focus":
+		return decodeFocus(raw)
+	case "typing.start", "typing.stop":
+		var f rest.GatewayTyping
+		if err := strictUnmarshal(raw, &f); err != nil {
+			return nil, err
+		}
+		return app.Typing{ThreadID: ids.ID(f.ThreadId)}, nil
 	}
 	return nil, fmt.Errorf("gateway: no frame type for the op %q", op)
+}
+
+// decodeFocus decodes the body of focus strictly into its frame.
+func decodeFocus(raw json.RawMessage) (app.Focus, error) {
+	var f rest.GatewayFocus
+	if err := strictUnmarshal(raw, &f); err != nil {
+		return app.Focus{}, err
+	}
+	out := app.Focus{ThreadIDs: make([]ids.ID, 0, len(f.ThreadIds)), Idle: f.Idle != nil && *f.Idle}
+	for _, id := range f.ThreadIds {
+		out.ThreadIDs = append(out.ThreadIDs, ids.ID(id))
+	}
+	return out, nil
 }
 
 // identifyFrame converts the generated identify body.

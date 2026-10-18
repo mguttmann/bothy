@@ -1,11 +1,11 @@
 # Module `gateway`
 
 Status: connection and session built (M1-64); delivery of durable events, catch-up over the
-WebSocket, revocation of open connections and the shutdown close built (M1-65). Focus and typing
-come with M1-66, frame conformance with M1-67.
+WebSocket, revocation of open connections and the shutdown close built (M1-65); focus, typing and
+the ephemeral publisher built (M1-66). Frame conformance comes with M1-67.
 Normative are [docs/spec/04-sync-protokoll.md](../../../../docs/spec/04-sync-protokoll.md) section 6
 and [docs/spec/02-architektur.md](../../../../docs/spec/02-architektur.md); on any difference the
-chapters win. Rulings: [DECISIONS.md](../../../../docs/DECISIONS.md) M1-64 and M1-65.
+chapters win. Rulings: [DECISIONS.md](../../../../docs/DECISIONS.md) M1-64, M1-65 and M1-66.
 
 ## Purpose
 
@@ -20,15 +20,21 @@ connections.
   the span, the session states `awaiting_identify`, `ready`, `detached`, `closed` with their
   transitions, and the deadlines of heartbeat and reauth; the connection phases `catching_up`,
   `live` and `closing`; the bounded outbound queue with class (`dispatch` or `control`), seq, scope
-  ids and `Purge` of removed targets (control frames are never purged).
+  ids and `Purge` of removed targets (control frames are never purged); `FocusSet` (dedupe and
+  the limit of a focus), the stored `Focus`, `TypingThrottle` and the register of the ephemeral
+  types the gateway relays (`LookupEphemeral`: `typing.started` and `run.updated`, both bound to
+  the focus, 05 "Ephemeral events").
 - `app/`: `Gateway` with `Open` (hello), `Handle`, `Tick` (deadlines), `Closed`; the handlers of
   `identify`, `resume`, `heartbeat` and `reauth`; the op registry `Dispatcher`
   (`Register(op, action, handler)`), which closes with `4000` and raises the alarm when a successful
   handler did not call `authorize` with its action; the session store `Sessions` with its
   sweeper; the ports `Conn`, `FrameDecoder`, `NonceSource`, `ConnectLimiter`, `EpochSource`,
-  `ProofAlarm` and `Delivery`; `Hub` (the implementation of `Delivery`: indices, `Dispatch`,
-  `CloseAll`), the catch-up runner (`catchup.go`), revocation (`revocation.go`) and shutdown
-  (`shutdown.go`).
+  `ProofAlarm`, `Delivery`, `OpLimiter` and `Threads`; `Hub` (the implementation of `Delivery`:
+  indices, `Dispatch`, `CloseAll`), the catch-up runner (`catchup.go`), revocation
+  (`revocation.go`) and shutdown (`shutdown.go`); the handlers of `focus` (`focus.go`),
+  `typing.start` and `typing.stop` (`typing.go`), the thread index with focus pruning
+  (`hubfocus.go`) and `Hub.PublishEphemeral`, the process's `kernel/eventlog.EphemeralPublisher`
+  (`ephemeral.go`).
 - `adapters/ws/`: the HTTP handler of `GET /api/v1/gateway` with `github.com/coder/websocket`
   (the only package of the server that imports it), one reader, one writer and one deadline
   goroutine per connection, the frame codec on the generated `Gateway*` types of `api/rest`, the
@@ -98,11 +104,43 @@ there ends the process; the liveness check `event_tail` fails once that goroutin
   connection closes with `4013 server_restart`, new `identify` and `resume` get `4013`, the
   writers flush within the rest of `shutdown.total_timeout`.
 
+## Focus, typing and ephemeral events (M1-66)
+
+- `focus {thread_ids, idle}`: `rl.read` keyed by the principal (`error rate_limited`), repeated
+  ids count once, more than `sync.max_focused_threads` answers `error validation_failed` with
+  the detail `sync.max_focused_threads` and keeps the previous set; then `gateway.focus` per
+  thread in the request context (denials audited by authz). Unknown and unreadable threads both
+  get `not_found` from authorize and are dropped without an error frame. The readable threads
+  replace the focus of the connection in the thread index and of its gateway session, with
+  `idle`; an empty set clears it. Accepted while the connection catches up.
+- `typing.start {thread_id}` and `typing.stop {thread_id}`: `rl.typing` keyed by the connection,
+  then `typing.start` on the thread (people with `write` only; read-only channels deny everyone);
+  a denial answers `error` with the code of the decision (`not_found`, `forbidden`,
+  `channel_read_only`). `typing.start` fans out at most once per `sync.typing_min_interval` per
+  connection and thread and publishes `typing.started {thread_id, principal_id, expires_at}`
+  with `expires_at = occurred_at + sync.typing_ttl` (UTC, milliseconds). `typing.stop` sends
+  nothing; it clears the throttle so the next start fans out at once.
+- `PublishEphemeral` checks the type against the register, the schema version and the payload
+  (a JSON object without null, smaller than `sync.event_payload_max_bytes`), encodes the frame
+  once without `seq` and `permission_version`, and offers it to the candidates: the connections
+  that focus the thread of a focus-bound type, the audience's connections of a personal one,
+  otherwise the scope rule of delivery; `typing.started` skips every connection of its actor.
+  Each candidate must be live and pass `sync.Admit` with the type's receive action in delivery
+  mode. Ephemeral frames are never buffered or sent before `catchup.complete`, a full queue drops
+  them (never `4014`), and `access.changed` purges them like dispatches of the removed targets.
+  It never waits on a connection. With `cluster.mode = multi` M7-17 adds the forwarding as a
+  decorator of the publisher.
+- Focus pruning: `access.changed` re-checks every focused thread of the principal's connections
+  with `gateway.focus` in delivery mode; `thread.moved`, `channel.archived` and `space.archived`
+  re-check the connections that focus an affected thread (the moved thread takes its new
+  channel). `resume` restores the focus of the session after the same re-check.
+
 ## Ops
 
 Enabled (section `gateway_ops` of `api/operations.yaml`): `identify`, `resume`, `heartbeat`,
-`reauth`, each with the action `gateway.connect`. Every other client op of the channel is unknown
-(`4001`) until its ticket enables it.
+`reauth` with the action `gateway.connect`; `focus` with `gateway.focus`; `typing.start` and
+`typing.stop` with `typing.start`. Every other client op of the channel is unknown (`4001`) until
+its ticket enables it.
 
 ## Close codes owned
 
@@ -123,8 +161,10 @@ resumable for `sync.resume_window`; the sweeper runs every `sync.resume_window`.
 `sync.ws_max_frame_bytes`, `sync.outbound_queue_max`, `gateway.write_timeout`,
 `sync.catchup_page_size`, `sync.cursor_advance_every`, `sync.log_poll_interval`,
 `database.listen_reconnect_backoff_cap`, `shutdown.total_timeout`, `http.max_json_depth`, `ratelimit.rl.gateway_connect.per_minute`,
-`ratelimit.rl.gateway_connect.burst`; the DPoP windows `auth.dpop_nonce_ttl` and
-`auth.clock_leeway` apply through identity.
+`ratelimit.rl.gateway_connect.burst`, `sync.max_focused_threads`, `sync.typing_min_interval`,
+`sync.typing_ttl`, `sync.event_payload_max_bytes`, `ratelimit.rl.read.per_minute`,
+`ratelimit.rl.read.burst`, `ratelimit.rl.typing.per_minute`, `ratelimit.rl.typing.burst`; the
+DPoP windows `auth.dpop_nonce_ttl` and `auth.clock_leeway` apply through identity.
 
 ## Abhängigkeiten
 
@@ -133,12 +173,13 @@ check expects.
 
 Darf die Ports dieser Module nutzen: `chat`, `agents`, `runs`, `sync`, `stats`.
 
-This ticket uses `sync` (`Snapshot`, `CatchUp`); the others serve focus, typing, agent presence and
-live statistics of later tickets. Every module may use `internal/kernel`; `internal/platform`
+M1-64 and M1-65 use `sync` (`Snapshot`, `CatchUp`), M1-66 `chat` (`Threads.Info` for the place
+of a focused or typed-in thread); the others serve agent presence and live statistics of later
+tickets. Every module may use `internal/kernel`; `internal/platform`
 (`httpserver` for the JSON guard, the schema validator and the problem writer) and `api/` only in
 `adapters/`. Vendors of the adapters: `github.com/coder/websocket`, OpenTelemetry. `internal/wire`
 binds identity's Authenticator and DPoP nonce, the Authorizer, the limiter of the HTTP chain, the
-instance row and a delivery that delivers nothing until M1-65.
+instance row, the threads of chat and the hub, which is also the process's `EphemeralPublisher`.
 
 ## Tabellen
 
@@ -148,7 +189,7 @@ Keine. The module reads through the ports of other modules (03-datenmodell.md, p
 
 `gateway.connect`, `gateway.focus`, `typing.start`.
 
-`gateway.connect` is built by this ticket; `gateway.focus` and `typing.start` follow with M1-66.
+`gateway.connect` is built by M1-64, `gateway.focus` and `typing.start` by M1-66.
 
 ## Ereignisse und WebSocket-Ops
 
@@ -158,8 +199,8 @@ Keine. The module reads through the ports of other modules (03-datenmodell.md, p
 
 ## Enabled ops
 
-This ticket enables `identify`, `resume`, `heartbeat` and `reauth`; `focus`, `typing.start`,
-`typing.stop` and `typing.started` follow with M1-66.
+M1-64 enables `identify`, `resume`, `heartbeat` and `reauth`; M1-66 enables `focus`,
+`typing.start` and `typing.stop` and emits `typing.started`.
 
 ## Not proven here
 

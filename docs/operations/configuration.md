@@ -271,10 +271,10 @@ Quelle: [04-sync-protokoll.md](../spec/04-sync-protokoll.md), Abschnitt 18.
 | `sync.cursor_advance_every` | `BOTHY_SYNC__CURSOR_ADVANCE_EVERY` | Server | int | `1000` | nach so vielen übersprungenen Ereignissen ein `cursor`-Rahmen | aktiv |
 | `sync.outbound_queue_max` | `BOTHY_SYNC__OUTBOUND_QUEUE_MAX` | Server | int | `10000` | Rahmen im Ausgang einer Verbindung bis `4014` | aktiv |
 | `sync.idempotency_key_ttl` | `BOTHY_SYNC__IDEMPOTENCY_KEY_TTL` | Server | duration | `24h` | Aufbewahrung von `Idempotency-Key` | aktiv |
-| `sync.max_focused_threads` | `BOTHY_SYNC__MAX_FOCUSED_THREADS` | Server |  | `20` | Threads im `focus` je Verbindung | geplant (M1) |
+| `sync.max_focused_threads` | `BOTHY_SYNC__MAX_FOCUSED_THREADS` | Server | int | `20` | Threads im `focus` je Verbindung | aktiv |
 | `sync.run_patch_coalesce_interval` | `BOTHY_SYNC__RUN_PATCH_COALESCE_INTERVAL` | Server |  | `250ms` | Sammelfenster für `run.updated` | geplant (M2) |
-| `sync.typing_min_interval` | `BOTHY_SYNC__TYPING_MIN_INTERVAL` | Server |  | `5s` | höchstens so oft `typing.start` | geplant (M1) |
-| `sync.typing_ttl` | `BOTHY_SYNC__TYPING_TTL` | Server |  | `8s` | Tipp-Anzeige ohne Erneuerung | geplant (M1) |
+| `sync.typing_min_interval` | `BOTHY_SYNC__TYPING_MIN_INTERVAL` | Server | duration | `5s` | höchstens so oft `typing.start` | aktiv |
+| `sync.typing_ttl` | `BOTHY_SYNC__TYPING_TTL` | Server | duration | `8s` | Tipp-Anzeige ohne Erneuerung | aktiv |
 | `client.cache_max_age` | `BOTHY_CLIENT__CACHE_MAX_AGE` | Server |  | `30d` | ungenutzte Cache-Einträge | geplant (M3) |
 | `client.outbox_retry_base` | `BOTHY_CLIENT__OUTBOX_RETRY_BASE` | Server |  | `2s` | Basis des Backoffs im Ausgangsfach | geplant (M4) |
 | `client.outbox_retry_cap` | `BOTHY_CLIENT__OUTBOX_RETRY_CAP` | Server |  | `5m` | größter Abstand im Ausgangsfach | geplant (M4) |

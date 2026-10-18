@@ -11,6 +11,19 @@ documented in this file. The format is based on
 
 ### Added
 
+- Gateway focus and typing (M1-66): the ops `focus {thread_ids, idle}` (`gateway.focus` per
+  thread, `rl.read` per principal, at most `sync.max_focused_threads` threads, unreadable and
+  unknown threads dropped silently), `typing.start` and `typing.stop` (`typing.start`, people
+  with `write` only, `rl.typing` per connection) are enabled. `typing.started {thread_id,
+  principal_id, expires_at}` reaches the live connections that focus the thread and may read it,
+  never the typist's own connections, at most once per `sync.typing_min_interval` per connection
+  and thread, with `expires_at = occurred_at + sync.typing_ttl`; `typing.stop` only resets that
+  throttle. The hub is the process's `kernel/eventlog.EphemeralPublisher`: ephemeral frames carry
+  no `seq` and no `permission_version`, are never sent before `catchup.complete`, are dropped on
+  a full queue instead of closing with `4014`, and are purged with the targets `access.changed`
+  removes. `access.changed`, `thread.moved`, `channel.archived` and `space.archived` re-check the
+  focus, and `resume` restores it. The configuration keys `sync.max_focused_threads`,
+  `sync.typing_min_interval` and `sync.typing_ttl` are active.
 - Web console serving (M6-02): `console.assets_dir` names the built console, which the api
   process serves under `/console/` (exact files with their type, `index.html` for every other
   path below `/console/`, traversal refused, `index.html` never stored, hashed assets immutable,

@@ -144,7 +144,7 @@ func candidatesWorld(t *testing.T, r *rand.Rand) {
 			}
 		}
 	}
-	h := newHub(t, w, app.HubConfig{QueueMax: 10000, PageSize: 4, CursorEvery: 1 << 30, RetryBase: time.Millisecond, RetryCap: time.Millisecond})
+	h := newHub(t, w, app.HubConfig{QueueMax: 10000, PageSize: 4, CursorEvery: 1 << 30, RetryBase: time.Millisecond, RetryCap: time.Millisecond, PayloadMax: 65536})
 	type conn struct {
 		a  actor.Actor
 		qc *qconn

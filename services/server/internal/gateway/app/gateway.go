@@ -16,6 +16,7 @@ import (
 	"github.com/OWNER/bothy/services/server/internal/kernel/actor"
 	"github.com/OWNER/bothy/services/server/internal/kernel/authorize"
 	"github.com/OWNER/bothy/services/server/internal/kernel/clock"
+	"github.com/OWNER/bothy/services/server/internal/kernel/eventlog"
 	"github.com/OWNER/bothy/services/server/internal/kernel/ids"
 	"github.com/OWNER/bothy/services/server/internal/sync"
 )
@@ -44,6 +45,12 @@ type Config struct {
 	ReauthLeadTime time.Duration
 	// ProtocolVersions are the protocol versions this server speaks (info.x-protocol-versions).
 	ProtocolVersions []int
+	// MaxFocusedThreads is sync.max_focused_threads.
+	MaxFocusedThreads int
+	// TypingMinInterval is sync.typing_min_interval.
+	TypingMinInterval time.Duration
+	// TypingTTL is sync.typing_ttl.
+	TypingTTL time.Duration
 }
 
 // validate names every invalid value.
@@ -55,10 +62,14 @@ func (c Config) validate() error {
 	for name, d := range map[string]time.Duration{
 		"sync.identify_timeout": c.IdentifyTimeout, "sync.heartbeat_interval": c.HeartbeatInterval,
 		"sync.resume_window": c.ResumeWindow, "sync.reauth_lead_time": c.ReauthLeadTime,
+		"sync.typing_min_interval": c.TypingMinInterval, "sync.typing_ttl": c.TypingTTL,
 	} {
 		if d <= 0 {
 			problems = append(problems, fmt.Errorf("%s must be positive", name))
 		}
+	}
+	if c.MaxFocusedThreads < 1 {
+		problems = append(problems, errors.New("sync.max_focused_threads must be positive"))
 	}
 	if c.HeartbeatMissLimit < 0 {
 		problems = append(problems, errors.New("sync.heartbeat_miss_limit must not be negative"))
@@ -91,6 +102,12 @@ type Deps struct {
 	Decoder FrameDecoder
 	// Alarm counts handlers without an authorization check.
 	Alarm ProofAlarm
+	// Threads reads the space and channel of a thread (chat, M1-55) for focus and typing.
+	Threads Threads
+	// OpLimiter holds rl.read and rl.typing of focus and typing.
+	OpLimiter OpLimiter
+	// Publisher relays typing.started (the hub of this process, M1-66).
+	Publisher eventlog.EphemeralPublisher
 	// Clock is the time of deadlines and frames; nil means clock.System().
 	Clock clock.Clock
 	// Log receives the errors of ops; nil means slog.Default(). It never receives tokens,
@@ -122,7 +139,7 @@ func New(cfg Config, d Deps) (*Gateway, error) {
 		return nil, fmt.Errorf("gateway: %w", err)
 	}
 	if d.Authenticator == nil || d.Authorizer == nil || d.Nonces == nil || d.Limiter == nil || d.Snapshot == nil || d.CatchUp == nil ||
-		d.Epoch == nil || d.Delivery == nil || d.Decoder == nil || d.Alarm == nil {
+		d.Epoch == nil || d.Delivery == nil || d.Decoder == nil || d.Alarm == nil || d.Threads == nil || d.OpLimiter == nil || d.Publisher == nil {
 		return nil, errors.New("gateway: New needs every collaborator")
 	}
 	if d.Clock == nil {
@@ -134,7 +151,8 @@ func New(cfg Config, d Deps) (*Gateway, error) {
 	cfg.ProtocolVersions = slices.Clone(cfg.ProtocolVersions)
 	g := &Gateway{cfg: cfg, d: d, sessions: newSessions(cfg.ResumeWindow, d.Clock), ops: newDispatcher(d.Decoder, d.Alarm, d.Log),
 		open: map[*Connection]struct{}{}, gone: make(chan struct{})}
-	g.handlers = map[string]OpHandler{opIdentify: g.identify, opResume: g.resume, "heartbeat": g.heartbeat, "reauth": g.reauth}
+	g.handlers = map[string]OpHandler{opIdentify: g.identify, opResume: g.resume, "heartbeat": g.heartbeat, "reauth": g.reauth,
+		opFocus: g.focus, opTypingStart: g.typingStart, opTypingStop: g.typingStop}
 	return g, nil
 }
 

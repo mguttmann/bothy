@@ -83,8 +83,6 @@ rules:
     etappe: M6
   - match: "status."  # M7-09
     etappe: M7
-  - match: "sync."  # M1-16 to M1-66
-    etappe: M1
   - match: sync.reconnect_backoff_base  # M2-29
     etappe: M2
   - match: sync.reconnect_backoff_cap  # M2-29

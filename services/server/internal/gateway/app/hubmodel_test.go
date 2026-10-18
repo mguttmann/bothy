@@ -100,7 +100,7 @@ func runModel(t *testing.T, seed uint64) (failed bool) {
 	r := rand.New(rand.NewPCG(seed, seed^0x9e3779b97f4a7c15)) //nolint:gosec // G404: a seeded generator makes a failing run reproducible.
 	m := &model{t: t, r: r, w: newHubWorld(), bySession: map[ids.ID]*modelConn{}}
 	cfg := app.HubConfig{QueueMax: 100000, PageSize: 1 + r.IntN(4), CursorEvery: 1 + r.IntN(4),
-		RetryBase: time.Millisecond, RetryCap: time.Millisecond}
+		RetryBase: time.Millisecond, RetryCap: time.Millisecond, PayloadMax: 65536}
 	h, err := app.NewHub(cfg, app.HubDeps{Authenticator: m.w, Authorizer: m.w, CatchUp: m.w, Log: slog.New(slog.DiscardHandler)})
 	if err != nil {
 		t.Fatal(err)

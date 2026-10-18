@@ -4,15 +4,22 @@ package wire_test
 
 import (
 	"context"
+	"os"
 	"slices"
 	"testing"
 	"time"
 
+	"go.yaml.in/yaml/v3"
+
 	"github.com/OWNER/bothy/services/server/api/routes"
 	authzapp "github.com/OWNER/bothy/services/server/internal/authz/app"
+	"github.com/OWNER/bothy/services/server/internal/chat"
 	"github.com/OWNER/bothy/services/server/internal/instance"
 	"github.com/OWNER/bothy/services/server/internal/kernel/actor"
 	"github.com/OWNER/bothy/services/server/internal/kernel/authorize"
+	"github.com/OWNER/bothy/services/server/internal/kernel/errs"
+	"github.com/OWNER/bothy/services/server/internal/kernel/eventlog"
+	"github.com/OWNER/bothy/services/server/internal/kernel/ids"
 	"github.com/OWNER/bothy/services/server/internal/platform/ratelimit"
 	"github.com/OWNER/bothy/services/server/internal/wire"
 )
@@ -47,8 +54,16 @@ type staticNonces struct{}
 
 func (staticNonces) CurrentNonce() string { return "n" }
 
+// noThreads is a chat port that knows no thread.
+type noThreads struct{}
+
+func (noThreads) Info(context.Context, ids.ID) (chat.ThreadInfo, error) {
+	return chat.ThreadInfo{}, errs.New(errs.CodeNotFound, "")
+}
+
 // TestGatewayOpsEnableList: the gateway registers exactly the ops of gateway_ops.enabled with the
-// action of each (routes.GatewayOps).
+// action of each (routes.GatewayOps, M1-64 and M1-66), and its hub is the EphemeralPublisher of
+// the process.
 func TestGatewayOpsEnableList(t *testing.T) {
 	t.Parallel()
 	values := loadEnv(t, nil)
@@ -65,21 +80,59 @@ func TestGatewayOpsEnableList(t *testing.T) {
 		t.Fatal(err)
 	}
 	gw, err := wire.NewGateway(cfg, wire.GatewayDeps{Authenticator: actor.AnonymousOnly{}, Authorizer: allowAll{}, Nonces: staticNonces{},
-		Limiter: l, Reads: &wire.SyncReads{}, Instance: fixedInstance{}})
+		Limiter: l, Reads: &wire.SyncReads{}, Instance: fixedInstance{}, Threads: noThreads{}})
 	if err != nil {
 		t.Fatal(err)
+	}
+	actions := map[string]authorize.Action{
+		"focus": authorize.ActionGatewayFocus, "heartbeat": authorize.ActionGatewayConnect, "identify": authorize.ActionGatewayConnect,
+		"reauth": authorize.ActionGatewayConnect, "resume": authorize.ActionGatewayConnect, "typing.start": authorize.ActionTypingStart,
+		"typing.stop": authorize.ActionTypingStart,
 	}
 	var want []string
 	for _, op := range routes.GatewayOps() {
 		want = append(want, op.Op)
-		if op.Action != string(authorize.ActionGatewayConnect) {
-			t.Errorf("%s has action %s", op.Op, op.Action)
+		if op.Action != string(actions[op.Op]) {
+			t.Errorf("%s has action %s, want %s", op.Op, op.Action, actions[op.Op])
 		}
 	}
-	if got := gw.App.Dispatcher().Ops(); !slices.Equal(got, want) || !slices.Equal(want, []string{"heartbeat", "identify", "reauth", "resume"}) {
+	if got := gw.App.Dispatcher().Ops(); !slices.Equal(got, want) ||
+		!slices.Equal(want, []string{"focus", "heartbeat", "identify", "reauth", "resume", "typing.start", "typing.stop"}) {
 		t.Errorf("registered %v, enabled %v", got, want)
 	}
 	if cfg.HeartbeatInterval != 30*time.Second || cfg.ResumeWindow != 5*time.Minute {
 		t.Errorf("defaults %+v", cfg)
+	}
+	if cfg.MaxFocusedThreads != 20 || cfg.TypingMinInterval != 5*time.Second || cfg.TypingTTL != 8*time.Second || cfg.PayloadMax != 65536 {
+		t.Errorf("focus and typing defaults %+v", cfg)
+	}
+	if gw.Publisher == nil || gw.Publisher != eventlog.EphemeralPublisher(gw.Hub) {
+		t.Error("the hub is not the EphemeralPublisher of the gateway")
+	}
+}
+
+// TestGatewayOpRateClasses: the classes the gateway counts for focus and typing are the
+// x-rate-limit-class of their receive operations in docs/api/asyncapi.yaml.
+func TestGatewayOpRateClasses(t *testing.T) {
+	t.Parallel()
+	b, err := os.ReadFile("../../../../docs/api/asyncapi.yaml")
+	if err != nil {
+		t.Fatal(err)
+	}
+	var doc struct {
+		Operations map[string]struct {
+			Class string `yaml:"x-rate-limit-class"`
+		} `yaml:"operations"`
+	}
+	if err := yaml.Unmarshal(b, &doc); err != nil {
+		t.Fatal(err)
+	}
+	for op, class := range wire.GatewayOpClasses() {
+		if got := doc.Operations["receive."+op].Class; got != class {
+			t.Errorf("%s counts %s, the contract says %q", op, class, got)
+		}
+	}
+	if n := len(wire.GatewayOpClasses()); n != 3 {
+		t.Errorf("%d ops with a class, want focus, typing.start and typing.stop", n)
 	}
 }

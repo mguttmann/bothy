@@ -26,3 +26,31 @@ func (h *Hub) PhaseOf(c *Connection) domain.Phase {
 	defer m.mu.Unlock()
 	return m.phase
 }
+
+// FocusOf returns the focused thread ids of c in the hub index; nil when c is not registered.
+func (h *Hub) FocusOf(c *Connection) []ids.ID {
+	h.mu.Lock()
+	defer h.mu.Unlock()
+	m := h.members[c]
+	if m == nil {
+		return nil
+	}
+	out := make([]ids.ID, 0, len(m.focus))
+	for _, e := range m.focus {
+		out = append(out, e.ThreadID)
+	}
+	return out
+}
+
+// ForceFocus puts thread into the focus index of c without any check, so a test can prove that
+// admission still refuses a reader without permission.
+func (h *Hub) ForceFocus(c *Connection, thread ids.ID) {
+	h.mu.Lock()
+	defer h.mu.Unlock()
+	if m := h.members[c]; m != nil {
+		h.setFocusLocked(m, append(m.focus, domain.FocusEntry{ThreadID: thread}))
+	}
+}
+
+// FocusState returns the stored focus of the session.
+func (s *Session) FocusState() domain.Focus { return s.focusState() }
