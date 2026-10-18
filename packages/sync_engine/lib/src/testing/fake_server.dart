@@ -8,11 +8,13 @@ import 'dart:async';
 import 'dart:io';
 
 import 'action_catalog.dart';
+import 'audit_log.dart';
 import 'dpop_verifier.dart';
 import 'faults.dart';
 import 'gateway_fake.dart';
 import 'rest/access_handlers.dart';
 import 'rest/admin_handlers.dart';
+import 'rest/audit_handlers.dart';
 import 'rest/auth_handlers.dart';
 import 'rest/message_handlers.dart';
 import 'rest/personal_handlers.dart';
@@ -73,6 +75,7 @@ final class FakeServer {
     this.verifier,
     this._contract,
     this.actions,
+    this.audit,
   );
 
   final HttpServer _http;
@@ -96,6 +99,10 @@ final class FakeServer {
 
   /// The action catalogue of `docs/spec/actions.yaml` (brief M4-26 Design note 3).
   final ActionCatalog actions;
+
+  /// The audit log behind `listAuditEvents`, `exportAuditEvents` and `verifyAuditChain`
+  /// (brief M4-29); a test adds rows and breaks the chain with [FakeAuditLog.tamper].
+  final FakeAuditLog audit;
 
   /// The authorization action of [operationId] (`x-authz-action`), or null when it names none.
   String? actionOf(String operationId) =>
@@ -149,6 +156,8 @@ final class FakeServer {
     final actions = ActionCatalog.load();
     registerAdminHandlers(rest, actions);
     registerAccessHandlers(rest, actions);
+    final audit = FakeAuditLog();
+    registerAuditHandlers(rest, actions, audit);
     final server = FakeServer._(
       http,
       world,
@@ -158,6 +167,7 @@ final class FakeServer {
       verifier,
       contract,
       actions,
+      audit,
     );
     http.listen(server._onRequest);
     return server;
