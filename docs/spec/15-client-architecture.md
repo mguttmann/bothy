@@ -163,6 +163,10 @@ Rules (checked by an architecture test in the gate, ticket "Dependency rules"):
 9. Every `pubspec.yaml` under `apps/` and `packages/` is a member of the workspace (root
    `workspace:` list) and of `tools/arch-check/rules.yaml`, and every member listed there has
    its manifest.
+10. A library named `testing.dart` of any member (and its `lib/src/testing/` folder) is test
+    support, for example the fake server `package:sync_engine/testing.dart` and
+    `package:design_system/testing.dart`; only the `test/` and `integration_test/` folders
+    import or export it, also inside its own member (brief M4-17).
 
 Rule 4 in the check: native sources (`*.swift`, `*.m`, `*.mm`, `*.kt`, `*.java`, `*.cpp`,
 `*.cc`, `*.h`) lie only in `packages/device_key` and in `apps/client/{ios,macos,android,windows}`;
@@ -321,6 +325,11 @@ and has ports for clock, network status, transport (WebSocket, HTTP) and login.
 | `FocusManager` | report visible threads to the gateway (at most `sync.max_focused_threads`) |
 | `RunStore` | run documents in memory; patches according to RFC 6902 (`add`, `replace`, `remove`), rule from [04](04-sync-protocol.md) section 11.3 item 4 |
 | `EphemeralStore` | typing (`sync.typing_ttl`), agent presence |
+
+`SyncEngine` (`lib/src/engine.dart`) is the one composition root the apps use: it builds these
+parts and wires their hooks (echo to the outbox, outbox start after `catchup.complete` and pause
+on every disconnect, `run.updated` and the run end to the `RunStore`, focused runs into the
+focus), so no app wires them itself (M4-17).
 
 Large catch-up pages are decoded in a background isolate as soon as a page
 exceeds `client.sync.parse_offload_bytes`; the database runs in its own isolate
@@ -744,7 +753,7 @@ Default values are in section 22.
 | Widget | components, states, semantics, guidelines `textContrastGuideline`, `androidTapTargetGuideline`, `iOSTapTargetGuideline`, `labeledTapTargetGuideline` (https://api.flutter.dev/flutter/flutter_test/meetsGuideline.html, retrieved 2026-10-10 [verified]) | `flutter test` | every run |
 | Golden | every core component and every view of `bothy_viz` with its fixtures in light and dark, `comfortable`, `compact`, `touch`, text scaling 1 and 2, de and en | `alchemist` (MIT, betterment.dev): CI goldens with the Ahem font are the same on all machines; platform goldens only on macOS (https://pub.dev/packages/alchemist, retrieved 2026-10-10 [verified]) | every run (CI goldens), macOS runner (platform goldens) |
 | Migration | generated drift migration tests plus "outbox survives" | `drift_dev make-migrations` | every run |
-| Integration | the whole app against a fake server in Dart (gateway and REST, a subset with fault injection: disconnect, duplicate, delay, `resync_required`, `4012`, `409`, `410`) | `integration_test` | desktop runner per platform |
+| Integration | the whole app against a fake server in Dart (gateway and REST, a subset with fault injection: disconnect, duplicate, delay, `resync_required`, `4012`, `409`, `410`). The fake lives in `packages/sync_engine` as the separate library `package:sync_engine/testing.dart` (world, fault plan, DPoP and contract checks, the scenarios of 04 16 as drivers); the headless tests of `sync_engine` run the same scenarios against `SyncEngine` (M4-17) | `integration_test` | desktop runner per platform |
 | E2E on devices | login, push permission, tapping a notification, sharing, offline sending, opening, detaching and reattaching a terminal against a host service in a container, against the real server in the Compose stack | `patrol` (Apache-2.0, leancode.co; Android, iOS, macOS, Web; https://pub.dev/packages/patrol, retrieved 2026-10-10 [verified]) for mobile, macOS, console; `integration_test` for Windows, because `patrol` does not support Windows | nightly and before a release |
 | Performance | targets from section 19 with a profile build and timeline evaluation | `flutter drive --profile` | nightly |
 | Accessibility by hand | VoiceOver, TalkBack, Narrator per release with a checklist | checklist | before a release |

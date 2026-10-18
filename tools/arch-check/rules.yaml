@@ -22,6 +22,15 @@
 #               top-level folders of the member that may hold native sources (rule 4); without
 #               this field the member holds no native source at all
 
+# Rule 10 (brief M4-17): a library with this file name in any member (and its `lib/src/testing/`
+# folder) is test support, for example `package:sync_engine/testing.dart` (the fake server) and
+# `package:design_system/testing.dart`; only the listed top-level folders may import or export
+# it, so it never reaches a production build.
+test_libraries:
+  rule: 10
+  library: testing.dart
+  dirs: [test, integration_test]
+
 members:
   - name: client
     path: apps/client

@@ -197,6 +197,58 @@ def test_conditional_and_multiline_imports_are_read(tree: Tree) -> None:
     ]
 
 
+def test_test_library_outside_test_folders_fails(tree: Tree) -> None:
+    # Rule 10 (brief M4-17): package:<member>/testing.dart and its src/testing/ folder are test
+    # support; production code, also of the own member, never reaches them.
+    app = tree.source("client", "lib/main.dart", "import 'package:sync_engine/testing.dart';\n")
+    deep = tree.source(
+        "client", "bin/tool.dart", "import 'package:sync_engine/src/testing/world.dart';\n"
+    )
+    own = tree.source("sync_engine", "lib/sync_engine.dart", "export 'testing.dart';\n")
+    inner = tree.source("sync_engine", "lib/src/engine.dart", "import 'testing/world.dart';\n")
+    ds = tree.source("admin_ui", "lib/x.dart", "import 'package:design_system/testing.dart';\n")
+    code, lines = tree.run()
+    assert code == 1
+    reach = "outside integration_test/ and test/"
+    assert _only(lines) == [
+        f"{deep}:1: rule 10 (15 3.1): client reaches the test library"
+        f" package:sync_engine/testing.dart {reach}",
+        f"{app}:1: rule 10 (15 3.1): client reaches the test library"
+        f" package:sync_engine/testing.dart {reach}",
+        f"{ds}:1: rule 10 (15 3.1): admin_ui reaches the test library"
+        f" package:design_system/testing.dart {reach}",
+        f"{inner}:1: rule 10 (15 3.1): sync_engine reaches the test library"
+        f" package:sync_engine/testing.dart {reach}",
+        f"{own}:1: rule 10 (15 3.1): sync_engine reaches the test library"
+        f" package:sync_engine/testing.dart {reach}",
+    ]
+
+
+def test_test_library_inside_test_folders_passes(tree: Tree) -> None:
+    tree.source("client", "test/x_test.dart", "import 'package:sync_engine/testing.dart';\n")
+    tree.source(
+        "client", "integration_test/app_test.dart", "import 'package:sync_engine/testing.dart';\n"
+    )
+    tree.source("sync_engine", "lib/testing.dart", "export 'src/testing/world.dart';\n")
+    tree.source(
+        "sync_engine",
+        "lib/src/testing/world.dart",
+        "import '../engine.dart';\nimport 'faults.dart';\n",
+    )
+    tree.source("sync_engine", "test/x_test.dart", "import '../lib/src/testing/world.dart';\n")
+    code, lines = tree.run()
+    assert code == 0, lines
+
+
+def test_test_libraries_entry_is_checked(tmp_path: Path) -> None:
+    data = yaml.safe_load(RULES.read_text(encoding="utf-8"))
+    data["test_libraries"] = {"rule": 10, "library": "testing"}
+    bad = tmp_path / "rules.yaml"
+    bad.write_text(yaml.safe_dump(data), encoding="utf-8")
+    with pytest.raises(arch_check.RulesError, match="test_libraries"):
+        arch_check.load_rules(bad)
+
+
 @pytest.mark.parametrize("folder", ["test", "integration_test", "bin"])
 def test_every_source_folder_is_read(tree: Tree, folder: str) -> None:
     path = tree.source("domain", f"{folder}/x.dart", "import 'package:flutter/widgets.dart';\n")

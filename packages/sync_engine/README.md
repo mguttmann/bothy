@@ -3,7 +3,8 @@
 Gateway connection, catch-up, outbox, reconciliation, run documents and focus, without Flutter.
 
 Status: the gateway connection with focus and typing (M4-13), catch-up and reconciliation
-(M4-14), the outbox (M4-15) and the run documents of the live box (M4-16) are built. Kind: pure Dart package, a member of the Dart
+(M4-14), the outbox (M4-15), the run documents of the live box (M4-16), the composition root
+`SyncEngine` and the fake server of the integration tests (M4-17) are built. Kind: pure Dart package, a member of the Dart
 workspace at the repository root (`resolution: workspace`, `publish_to: none`).
 
 ## Dependencies
@@ -15,6 +16,8 @@ Further rules checked by `make arch`:
 
 - no import of `package:flutter/`, `dart:ui` (rule 1).
 - no native source (rule 4).
+- `package:sync_engine/testing.dart` and `lib/src/testing/` are reached only from `test/` and
+  `integration_test/` folders, also inside this package (rule 10).
 
 ## Gateway connection (M4-13)
 
@@ -306,6 +309,144 @@ Wiring by M4-17: the dispatcher of M4-14 passes the decoded payload of every `ru
 threads; `run.state_changed` to an end state calls `onRunEnded`, after which the collapsed row
 comes from the table `runs`. A `Notifier` per run listens to `watch`.
 
+## Composition root (M4-17)
+
+`SyncEngine.create(...)` is the one place that builds and wires the parts; the apps never wire
+them themselves (docs/DECISIONS.md D-M4-17-1).
+
+| Part | Built from |
+|---|---|
+| REST client | `AuthSession.api` (the client of the session with its DPoP, refresh and step-up interceptors) |
+| `GatewayConnection` | the transport, network, lifecycle and clock ports; gateway `wss://<host>/api/v1/gateway` from `baseUrl` |
+| `CatchUpListener` and `Dispatcher` | the local database, `ApiFetcher` over the REST client |
+| `Outbox` | `MessageOps` and `PersonalOps` on the REST client |
+| `RunStore` | a fetcher on `getRun` and the `FrameTicker` |
+
+Hooks: the echo `message.created` calls `Outbox.confirmByEcho` with `message_id` and
+`version`; the catch-up's live signal (`catchup.complete`, or `ready` without a cursor) calls
+`Outbox.start`, every disconnect `Outbox.pause` (04 13.4); `run.updated` goes to
+`RunStore.onRunUpdated`, a `run.state_changed` to `completed`, `failed` or `cancelled` to
+`RunStore.onRunEnded`; after a resync the focused runs that the new snapshot no longer lists
+as active end too. A confirmed `createMessage` or `updateMessage` stores the returned message
+at once (`CatchUpListener.storeConfirmedMessage`), so the entry is replaced before its echo
+(04 13.2 item 6). `EngineFocus` joins the visible threads and the threads of focused runs
+into the gateway focus, so `focusRun(run, thread)` both fetches the document and lets
+`run.updated` arrive. `baseUrl` must be `https`; only `allowPlainHttpForTests: true` (the
+headless tests and the app's test entry point) accepts `http` with a `ws` gateway
+(D-M4-17-6).
+
+## Fake server for integration tests (M4-17)
+
+`package:sync_engine/testing.dart` is a separate library: the headless tests of this package and
+the app tests from M4-18 on share one fake of the server (D-W-114). Start one per test:
+
+```dart
+final server = await FakeServer.start(
+  options: const FakeServerOptions(
+    timings: GatewayTimings(runPatchCoalesce: Duration(milliseconds: 40)),
+  ),
+);
+final world = WorldSeed.standard(server.world); // Alex, Sam and the agent Robin
+// point the client at server.baseUri (http://127.0.0.1:<port>, test builds only)
+server.faults.dropResponseAfterCommit('createMessage');
+// ... drive the client ...
+expect(server.violations, isEmpty);
+await server.stop();
+```
+
+It binds `127.0.0.1` with port 0, serves REST under `/api/v1/` and the gateway at
+`/api/v1/gateway`, and holds no global state.
+
+### World
+
+`FakeWorld` keeps the instance and its sync epoch, people and agents, devices, sessions and
+pairings, spaces, channels with the level of each principal, threads, messages with
+`thread_seq`, the event log with a global `seq`, read states, drafts, settings and run
+documents. Every write appends the events of 05 section 6 with a new `seq` and pushes them to
+the connections that may see them. Test controls: `addPerson`, `addSpace`, `addChannel`,
+`addThread`, `createMessage` (as any author), `setAccess` (writes `access.changed` as 04 8.2),
+`approveDevice`, `expirePendingDevice`, `rejectPendingDevice`, `expirePairing`,
+`revokeSession`, `revokeDevice`, `dropEventsUpTo` (retention), `changeEpoch`, `createRun`,
+`setRunState`, `patchRun`, and the values `catchupPageSize`, `cursorAdvanceEvery` and
+`catchupMaxEvents`. `WorldSeed.standard` builds the space "Team" with the channels `general`,
+`support` and `private` (only Sam) and one thread each.
+
+### Operations
+
+`getDiscovery`, `loginWithPassword` (password and TOTP), `beginPairing`, `completePairing`,
+`approvePairing`, `getDevice`, `approveDevice`, `refreshToken`, `logout`, `getMe`,
+`getInstance`, `getSnapshot`, `listEvents`, `listSpaces`, `getSpace`, `listSpaceChannels`,
+`getChannel`, `listChannelThreads`, `getThread`, `listThreadMessages`, `getMessage`,
+`createMessage` (04 5.1 replay and `422 idempotency_key_reuse`), `updateMessage` (`If-Match`,
+`412 version_conflict` with `current`, `410 message_deleted`), `deleteMessage` (idempotent
+`204`), `addReaction`, `removeReaction`, `putReadState`, `putThreadDraft`,
+`deleteThreadDraft`, `listMyReadStates`, `listMyDrafts`, `listMySettings`, `putMySetting`,
+`deleteMySetting`, `getRun`, `cancelRun`. Other writes with `Idempotency-Key` repeat their
+stored answer (04 5.2). Later tickets add operations with `server.handle(operationId,
+handler)` in their own `rest/` file (D-M4-17-2). Gateway: `hello`, `identify`, `resume`,
+`ready` with the snapshot, catch-up in pages with `cursor` frames, `catchup.complete`,
+`resync_required` for `epoch_changed`, `retention`, `too_far_behind` and `cursor_ahead`, live
+delivery by visibility at delivery time, `heartbeat_ack`, `reauth`, `focus` (with `error`
+`validation_failed` above `sync.max_focused_threads`), `typing.started` to other focusing
+connections, coalesced `run.updated` with the whole document on focus, one connection per
+device (`4017`) and the close codes of 04 6.4 for the session checks.
+
+### Faults
+
+`server.faults` is a `FaultPlan`, a queue of rules matched in order and fully deterministic
+(D-M4-17-3):
+
+| Fault | Effect |
+|---|---|
+| `onRequest(op, status:, code:, retryAfter:, times:)` | answers `409`, `410`, `412`, `429` (with `Retry-After`), `5xx` or any problem instead of the handler |
+| `dropResponseAfterCommit(op)` | stores the write and appends its events, then closes the connection before the response (04 16.2) |
+| `delay(duration, operationId:)` | holds the response after the handler ran |
+| `closeGateway(code, reason:, after:)` | closes every gateway connection with any code |
+| `duplicateNextDispatch()` | sends the next `dispatch` twice |
+| `resyncRequired(reason)` | answers the next catch-up with `resync_required` |
+| `revoke(deviceId:)` | closes the device's connections with `4012` and revokes its sessions |
+| `holdDispatches()`, `releaseDispatches()` | holds live delivery, as a slow gateway does |
+
+`server.disconnect(deviceId:)` ends connections without a close code (a lost network).
+
+### Checks
+
+DPoP (08 7.3): ES256 signature with the header `jwk`, `typ`, `htm`, `htu` (the fake's origin
+plus the path; the gateway's `http` form), `ath`, `iat`, `jti` reuse and the bound key; a
+missing or stale nonce answers `401 use_dpop_nonce` with `DPoP-Nonce`, any other failure
+`401 invalid_dpop_proof`; the gateway closes with `4004`. Contract (D-M4-17-4): every request
+body is validated against `docs/api/openapi.yaml` (a violation answers
+`400 validation_failed` with the pointer), every response and every frame the fake sends
+against `openapi.yaml` and `asyncapi.yaml`, every client frame too (a violation closes with
+`4002`); all of them land in `server.violations`. The validator (`ContractSchemas`) reads the
+documents once per isolate, walking up from the working directory.
+
+### Scenarios
+
+`scenarios.dart` holds the flows of 04 16 as functions over a `ScenarioClient`:
+`scenarioSendOnline` (16.1), `scenarioSendOffline` (16.2), `scenarioCatchUp` and
+`scenarioResync` (16.3), `scenarioAccessRemoval` (16.4), `scenarioAgentRun` (16.5, with a
+`ScriptedAgent` whose steps come from an `AgentScript`). `test/scenarios/` runs them over
+`SyncEngine`; M4-18 implements `ScenarioClient` over the app (D-M4-17-5).
+
+### What the fake simplifies
+
+- Permissions: only visibility and the level per channel; no grants, groups, `manage`, scopes
+  or step-up (`approveDevice` and `approvePairing` need none); no rate limits unless injected.
+- Identity: a fixed TOTP code per person; a password login gives an active device unless the
+  person has `newDevicesPending`; access tokens are unsigned JWS-shaped strings the fake
+  recognizes by value; nonces are counters (current and previous accepted) instead of HMAC
+  windows; only `ES256` proofs; no refresh token reuse detection beyond rejecting unknown
+  tokens with `401 session_revoked`.
+- Gateway: no heartbeat timeout (`4009`), no `reauth_required`, no `identify` timeout, no
+  outbound queue limit (`4014`); catch-up runs synchronously, so no live event interleaves.
+- Events: `agent.invocation` and the agent consumer side are not modelled; `device.pending` is
+  not written (it is not in the API documents of this base); `typing.stop` has no effect.
+- `cancelRun` ends the run at once with `cancelled`.
+- Snapshot: `unread_threads` and the read state's `mention_count` are computed (messages of
+  others after the read position, not deleted); `sidebar` and the agent presence (`agents`) are
+  always empty.
+
 ## Layout
 
 | Path | Content |
@@ -315,10 +456,14 @@ comes from the table `runs`. A `Notifier` per run listens to `watch`.
 | `lib/src/catch_up.dart`, `dispatcher.dart`, `appliers/`, `snapshot_applier.dart`, `fetcher.dart`, `gap_filler.dart`, `ephemeral_store.dart`, `sync_events.dart`, `isolate_decode.dart`, `wire.dart` | catch-up, dispatcher, appliers per resource group, REST reads, gaps, ephemeral store, notices and ports, decoding, the wire mappers (M4-14) |
 | `lib/src/runs/` | `RunStore`, `applyRunPatch`, `RunDocument` and the ports (M4-16) |
 | `lib/src/outbox/` | `Outbox`, the sender, `classify`, the backoff, the executor registry and the operations (M4-15) |
+| `lib/src/engine.dart` | `SyncEngine`, `EngineFocus` (M4-17) |
+| `lib/testing.dart`, `lib/src/testing/` | the fake server: world, gateway, REST with one handler file per group under `rest/`, DPoP check, faults, scripted agent, contract validator, seed, scenarios (M4-17) |
 | `test/connection/` | tests of the gateway connection, one per close code, with the fakes of `test/support/` |
 | `test/catch_up/` | tests of the catch-up on the connection fakes, an in-memory store and recorded REST responses |
 | `test/outbox/` | tests of the outbox on an in-memory database with scripted executors, a fake clock and a seeded jitter |
 | `test/runs/` | tests of the run documents, fixtures of a document at versions 1 to 4 under `fixtures/` |
+| `test/fake_server/` | the fake's own tests: contract, DPoP, idempotency, faults |
+| `test/scenarios/` | the scenarios of 04 16 and the wiring of `SyncEngine`, headless against the fake |
 | `test/` | tests, run by `make test` with coverage (`quality.coverage.dart_min_percent`) |
 
 Run from the repository root: `make lint test coverage arch COMPONENTS=apps`. The API pages
