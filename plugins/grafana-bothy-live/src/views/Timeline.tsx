@@ -133,7 +133,14 @@ export function TimelineView({ frames, theme, range, timeZone }: ViewProps) {
             aria-label="Speed"
             value={speed}
             onChange={(e) => setSpeed(Number(e.target.value))}
-            style={{ ...button, padding: '1px 4px' }}
+            style={{
+              ...button,
+              padding: '1px 4px',
+              appearance: 'auto',
+              height: 26,
+              minWidth: 72,
+              lineHeight: 'normal',
+            }}
           >
             {SPEEDS.map((s) => (
               <option key={s} value={s}>{`${s}x`}</option>
