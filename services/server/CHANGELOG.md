@@ -61,6 +61,19 @@ documented in this file. The format is based on
   `depguard` rule forbids the package `plugin` in the server module (ADR 0022). Manifests with
   the escape of NUL or of an unpaired surrogate are refused, and manifest values that are no audit
   code enter the audit hashed, so no checked manifest makes install or upgrade fail with 500.
+- Core metrics per catalogue (M1-68): one Go declaration per instrument
+  (`internal/platform/otel/metrics`) with checks for closed attribute sets, no person or ID
+  attribute and bucket bounds, and the SDK view that keeps only catalogue instruments and keys
+  with the bounds of signals.md 4.7, library instruments included. New instruments:
+  `bothy.authz.decisions`, the gateway set (`connections.active`, `connect.duration`,
+  `catchup.duration`, `resync`, `close`, `outbound.dropped`), `bothy.delivery.duration`,
+  `bothy.event.fanout.lag`, `bothy.message.created` and `bothy.event.appended` (both after the
+  commit), `bothy.db.event_seq.lock_wait`, `bothy.job.duration`, `bothy.job.queue`,
+  `db.client.operation.duration` from the pool's own query tracer with closed
+  `db.operation.name` and `db.collection.name` (the otelpgx metrics are dropped) and
+  `bothy.db.pool.connections`. A value outside a closed set records as `other`.
+  `txn.AfterCommit` runs registered functions after the commit of a unit of work. The gate
+  `make signal-check` holds dashboards, rules and SLOs to the catalogue.
 - Gateway frame conformance, gate G9 (M1-67): the test harness `wstest` validates every frame of
   the gateway integration tests as it arrives against `docs/api/asyncapi.yaml` and the body
   schemas of `openapi.yaml` (new test package `api/specschema`: one JSON Schema 2020-12 bundle,
