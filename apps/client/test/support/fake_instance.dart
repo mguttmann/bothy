@@ -6,6 +6,7 @@
 import 'dart:async';
 import 'dart:io';
 
+import 'package:auth/auth.dart' show StepUpPrompt;
 import 'package:client/app/bootstrap.dart';
 import 'package:client/app/discovery.dart';
 import 'package:client/app/providers/ports.dart';
@@ -46,6 +47,7 @@ class FakeInstance {
   static Future<FakeInstance> start({
     Map<String, String> config = fastConfig,
     DiscoveryClient Function(DiscoveryClient real)? discovery,
+    StepUpPrompt? stepUpPrompt,
   }) async {
     final server = await FakeServer.start(
       options: const FakeServerOptions(
@@ -53,6 +55,23 @@ class FakeInstance {
       ),
     );
     final seed = WorldSeed.standard(server.world);
+    return _on(server, seed, config, discovery, stepUpPrompt);
+  }
+
+  /// A second app of Alex on the same fake: its own data folder, keys and secrets (a second
+  /// simulated device, brief M4-25 Tests). The caller stops it with [stopSibling].
+  Future<FakeInstance> sibling({
+    Map<String, String> config = fastConfig,
+    StepUpPrompt? stepUpPrompt,
+  }) => _on(server, seed, config, null, stepUpPrompt);
+
+  static Future<FakeInstance> _on(
+    FakeServer server,
+    WorldSeed seed,
+    Map<String, String> config,
+    DiscoveryClient Function(DiscoveryClient real)? discovery,
+    StepUpPrompt? stepUpPrompt,
+  ) async {
     final root = await Directory.systemTemp.createTemp('client-flow');
     final keys = SoftwareKeyStore();
     final secure = MemorySecureBackend();
@@ -67,6 +86,7 @@ class FakeInstance {
       secureBackend: secure,
       deviceKeys: keys,
       discovery: discovery == null ? real : discovery(real),
+      stepUpPrompt: stepUpPrompt,
     );
     return FakeInstance._(server, seed, root, ports, keys, secure);
   }
@@ -98,6 +118,11 @@ class FakeInstance {
       !instanceFolder.existsSync() &&
       keys.scopes.isEmpty &&
       !secure.values.keys.any((k) => k.contains(server.world.instanceId));
+
+  /// Deletes the data folder of a [sibling]; the fake keeps running.
+  Future<void> stopSibling() async {
+    if (root.existsSync()) await root.delete(recursive: true);
+  }
 
   /// Stops the fake and deletes the data folder.
   Future<void> stop() async {

@@ -429,6 +429,14 @@ class OnboardingController extends _$OnboardingController {
   /// E4 "Cancel": logs out and deletes the keys of the device (01 5.6, 08 5.2).
   Future<void> cancelPending() => logout();
 
+  /// Ends the account on this device after the server already ended it from the settings
+  /// (this device revoked, the current session ended; 08 10, R-SY-14): no server logout,
+  /// the wiper deletes every local datum and E7 shows [cause].
+  Future<void> endLocally(SignOutCause cause) async {
+    _flow++;
+    await _endAccount(cause);
+  }
+
   /// Logs out (E6 "Log out", the shell): the server session ends, every local datum of the
   /// account is deleted and E7 shows.
   Future<void> logout() async {

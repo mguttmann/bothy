@@ -2494,5 +2494,465 @@
   "shellStepUpTitle": "Confirm it is you",
   "@shellStepUpTitle": {
     "description": "Title of the system dialog that confirms a step-up signature with biometrics or the device password (08 section 6.1)."
+  },
+  "stepUpGenericPurpose": "This action needs your confirmation.",
+  "@stepUpGenericPurpose": {
+    "description": "Purpose text of the step-up dialog when the action names none (08 section 6.2)."
+  },
+  "stepUpNext": "Next, your device asks for your fingerprint, face or device password.",
+  "@stepUpNext": {
+    "description": "Second line of the step-up dialog before the system prompt (08 section 6.1)."
+  },
+  "stepUpContinue": "Continue",
+  "@stepUpContinue": {
+    "description": "Button of the step-up dialog that continues to the system prompt."
+  },
+  "selfCancel": "Cancel",
+  "@selfCancel": {
+    "description": "Cancel button of the device, session and step-up dialogs."
+  },
+  "selfOffline": "No connection. Try again when you are online.",
+  "@selfOffline": {
+    "description": "Message when a device or session action got no answer from the server."
+  },
+  "selfLoadFailed": "The list could not be loaded.",
+  "@selfLoadFailed": {
+    "description": "Banner when the device or session list could not be loaded."
+  },
+  "selfRetry": "Try again",
+  "@selfRetry": {
+    "description": "Action of the banner when a list could not be loaded."
+  },
+  "stepUpPurposeApproveDevice": "Confirm the waiting device {name}",
+  "@stepUpPurposeApproveDevice": {
+    "description": "Purpose text of the step-up when a waiting device is confirmed (08 section 5.2).",
+    "placeholders": {
+      "name": {
+        "type": "String",
+        "example": "Alex laptop"
+      }
+    }
+  },
+  "stepUpPurposeAddDevice": "Add a new device to your account",
+  "@stepUpPurposeAddDevice": {
+    "description": "Purpose text of the step-up when a device is added by its pairing code (08 section 5.3)."
+  },
+  "stepUpPurposeRevokeDevice": "Revoke the device {name}",
+  "@stepUpPurposeRevokeDevice": {
+    "description": "Purpose text of the step-up when a device is revoked (08 section 10).",
+    "placeholders": {
+      "name": {
+        "type": "String",
+        "example": "Alex phone"
+      }
+    }
+  },
+  "devicesTitle": "Devices",
+  "@devicesTitle": {
+    "description": "Heading of the own device list (01 section 5.1 D8)."
+  },
+  "devicesAdd": "Add device",
+  "@devicesAdd": {
+    "description": "Button that opens the field for the pairing code of a new device (01 section 5.6 E5)."
+  },
+  "devicesThisDevice": "This device",
+  "@devicesThisDevice": {
+    "description": "Badge of the device the app runs on."
+  },
+  "devicesStatePending": "Waiting for confirmation",
+  "@devicesStatePending": {
+    "description": "Badge of a waiting device (08 section 5.2)."
+  },
+  "devicesStateRevoked": "Revoked",
+  "@devicesStateRevoked": {
+    "description": "Badge of a revoked device (08 section 10)."
+  },
+  "devicesAppVersion": "Version {version}",
+  "@devicesAppVersion": {
+    "description": "App version of a device in the device list.",
+    "placeholders": {
+      "version": {
+        "type": "String",
+        "example": "1.4.0"
+      }
+    }
+  },
+  "devicesLastActive": "Last active {when}",
+  "@devicesLastActive": {
+    "description": "Last activity of a device; when is a relative day and a clock time.",
+    "placeholders": {
+      "when": {
+        "type": "String",
+        "example": "Today 14:05"
+      }
+    }
+  },
+  "devicesPlatformIos": "iPhone or iPad",
+  "@devicesPlatformIos": {
+    "description": "Platform name of the device platform ios."
+  },
+  "devicesPlatformAndroid": "Android",
+  "@devicesPlatformAndroid": {
+    "description": "Platform name of the device platform android."
+  },
+  "devicesPlatformMacos": "Mac",
+  "@devicesPlatformMacos": {
+    "description": "Platform name of the device platform macos."
+  },
+  "devicesPlatformWindows": "Windows",
+  "@devicesPlatformWindows": {
+    "description": "Platform name of the device platform windows."
+  },
+  "devicesPlatformWeb": "Web console",
+  "@devicesPlatformWeb": {
+    "description": "Platform name of the device platform web."
+  },
+  "devicesPlatformCli": "Command line",
+  "@devicesPlatformCli": {
+    "description": "Platform name of the device platform cli."
+  },
+  "devicesPlatformOther": "Other platform",
+  "@devicesPlatformOther": {
+    "description": "Platform name of a platform this build does not know."
+  },
+  "devicesEnterCode": "Enter code",
+  "@devicesEnterCode": {
+    "description": "Button of a waiting device that opens the field for its confirmation code (01 section 5.6 E4)."
+  },
+  "devicesRevoke": "Revoke",
+  "@devicesRevoke": {
+    "description": "Button that revokes a device (08 section 10)."
+  },
+  "devicesRevokeTitle": "Revoke {name}?",
+  "@devicesRevokeTitle": {
+    "description": "Title of the confirmation before a device is revoked (01 section 6.7).",
+    "placeholders": {
+      "name": {
+        "type": "String",
+        "example": "Alex phone"
+      }
+    }
+  },
+  "devicesRevokeBody": "The device is signed out and deletes its local data at its next contact.",
+  "@devicesRevokeBody": {
+    "description": "Text of the confirmation before another device is revoked (08 section 10)."
+  },
+  "devicesRevokeThisBody": "You are signed out on this device and its local data is deleted.",
+  "@devicesRevokeThisBody": {
+    "description": "Text of the confirmation before this device is revoked (08 section 10)."
+  },
+  "devicesRevokeReason": "Reason (optional)",
+  "@devicesRevokeReason": {
+    "description": "Label of the optional reason field when a device is revoked."
+  },
+  "devicesRevokeDefaultReason": "Revoked in the settings",
+  "@devicesRevokeDefaultReason": {
+    "description": "Reason sent with a revocation when the person typed none."
+  },
+  "devicesRevoked": "{name} was revoked.",
+  "@devicesRevoked": {
+    "description": "Message after a device was revoked.",
+    "placeholders": {
+      "name": {
+        "type": "String",
+        "example": "Alex phone"
+      }
+    }
+  },
+  "devicesConfirmTitle": "Confirm {name}",
+  "@devicesConfirmTitle": {
+    "description": "Title of the dialog that takes the confirmation code of a waiting device (08 section 5.2).",
+    "placeholders": {
+      "name": {
+        "type": "String",
+        "example": "Alex laptop"
+      }
+    }
+  },
+  "devicesConfirmHint": "Type the code that the waiting device shows.",
+  "@devicesConfirmHint": {
+    "description": "Hint of the dialog that takes the confirmation code of a waiting device."
+  },
+  "devicesConfirmCode": "Confirmation code",
+  "@devicesConfirmCode": {
+    "description": "Label of the field for the confirmation code of a waiting device."
+  },
+  "devicesConfirmSubmit": "Confirm",
+  "@devicesConfirmSubmit": {
+    "description": "Button that sends the confirmation code of a waiting device."
+  },
+  "devicesConfirmed": "{name} is now active.",
+  "@devicesConfirmed": {
+    "description": "Message after a waiting device was confirmed.",
+    "placeholders": {
+      "name": {
+        "type": "String",
+        "example": "Alex laptop"
+      }
+    }
+  },
+  "devicesConfirmRejected": "The waiting device was rejected because the code did not match.",
+  "@devicesConfirmRejected": {
+    "description": "Message after a wrong confirmation code revoked the waiting device (08 section 5.2)."
+  },
+  "devicesAddTitle": "Add device",
+  "@devicesAddTitle": {
+    "description": "Title of the dialog that takes the pairing code of a new device (08 section 5.3)."
+  },
+  "devicesAddHint": "Type the pairing code that the new device shows.",
+  "@devicesAddHint": {
+    "description": "Hint of the dialog that takes the pairing code of a new device."
+  },
+  "devicesAddCode": "Pairing code",
+  "@devicesAddCode": {
+    "description": "Label of the field for the pairing code of a new device."
+  },
+  "devicesAddSubmit": "Add",
+  "@devicesAddSubmit": {
+    "description": "Button that sends the pairing code of a new device."
+  },
+  "devicesAdded": "{name} was added.",
+  "@devicesAdded": {
+    "description": "Message after a new device was added by its pairing code.",
+    "placeholders": {
+      "name": {
+        "type": "String",
+        "example": "Alex tablet"
+      }
+    }
+  },
+  "devicesPairingNotFound": "No open pairing with this code.",
+  "@devicesPairingNotFound": {
+    "description": "Message when the pairing code matches no open pairing (08 section 5.3, 404)."
+  },
+  "sessionsTitle": "Sessions",
+  "@sessionsTitle": {
+    "description": "Heading of the own session list."
+  },
+  "sessionsCurrent": "This session",
+  "@sessionsCurrent": {
+    "description": "Badge of the session of this app."
+  },
+  "sessionsUnknownDevice": "Unknown device",
+  "@sessionsUnknownDevice": {
+    "description": "Name of a session whose device is not in the device list."
+  },
+  "sessionsLastUsed": "Last used {when}",
+  "@sessionsLastUsed": {
+    "description": "Last use of a session; when is a relative day and a clock time.",
+    "placeholders": {
+      "when": {
+        "type": "String",
+        "example": "Today 14:05"
+      }
+    }
+  },
+  "sessionsMethodOidc": "Login service",
+  "@sessionsMethodOidc": {
+    "description": "Login method oidc of a session."
+  },
+  "sessionsMethodTrustedHeader": "Login through the network",
+  "@sessionsMethodTrustedHeader": {
+    "description": "Login method trusted_header of a session (08 section 2.4)."
+  },
+  "sessionsMethodPasskey": "Passkey",
+  "@sessionsMethodPasskey": {
+    "description": "Login method passkey of a session."
+  },
+  "sessionsMethodPasswordTotp": "Password and one-time code",
+  "@sessionsMethodPasswordTotp": {
+    "description": "Login method password_totp of a session."
+  },
+  "sessionsMethodEnrollmentCode": "Enrollment code",
+  "@sessionsMethodEnrollmentCode": {
+    "description": "Login method enrollment_code of a session."
+  },
+  "sessionsMethodDevicePairing": "Pairing",
+  "@sessionsMethodDevicePairing": {
+    "description": "Login method device_pairing of a session."
+  },
+  "sessionsMethodOther": "Other method",
+  "@sessionsMethodOther": {
+    "description": "Login method this build does not know."
+  },
+  "sessionsEnd": "End session",
+  "@sessionsEnd": {
+    "description": "Button that ends a session."
+  },
+  "sessionsEndTitle": "End this session?",
+  "@sessionsEndTitle": {
+    "description": "Title of the confirmation before a session ends (01 section 6.7)."
+  },
+  "sessionsEndBody": "The device of this session is signed out.",
+  "@sessionsEndBody": {
+    "description": "Text of the confirmation before another session ends."
+  },
+  "sessionsEndCurrentBody": "You are signed out on this device and its local data is deleted.",
+  "@sessionsEndCurrentBody": {
+    "description": "Text of the confirmation before the session of this app ends (R-SY-14)."
+  },
+  "sessionsEnded": "The session was ended.",
+  "@sessionsEnded": {
+    "description": "Message after a session was ended."
+  },
+  "settingsTitle": "Settings",
+  "@settingsTitle": {
+    "description": "Title of the settings and the button that opens them (01 section 5.1 D8)."
+  },
+  "settingsBack": "Back",
+  "@settingsBack": {
+    "description": "Button that leaves the settings."
+  },
+  "settingsSectionAppearance": "Appearance",
+  "@settingsSectionAppearance": {
+    "description": "Settings section Appearance (01 section 5.1 D8)."
+  },
+  "settingsSectionNotifications": "Notifications",
+  "@settingsSectionNotifications": {
+    "description": "Settings section Notifications (01 section 5.1 D8)."
+  },
+  "settingsSectionLanguage": "Language",
+  "@settingsSectionLanguage": {
+    "description": "Settings section Language (01 section 5.1 D8)."
+  },
+  "settingsSectionKeyboard": "Keyboard",
+  "@settingsSectionKeyboard": {
+    "description": "Settings section Keyboard (01 section 5.1 D8)."
+  },
+  "settingsSectionDevices": "Devices and sessions",
+  "@settingsSectionDevices": {
+    "description": "Settings section Devices and sessions (01 section 5.1 D8)."
+  },
+  "settingsSectionPrivacy": "Privacy",
+  "@settingsSectionPrivacy": {
+    "description": "Settings section Privacy (01 section 5.1 D8)."
+  },
+  "settingsSectionAbout": "About",
+  "@settingsSectionAbout": {
+    "description": "Settings section About (01 section 5.1 D8)."
+  },
+  "settingsTheme": "Theme",
+  "@settingsTheme": {
+    "description": "Label of the setting appearance.theme (01 section 11)."
+  },
+  "settingsThemeSystem": "System",
+  "@settingsThemeSystem": {
+    "description": "Value system of appearance.theme."
+  },
+  "settingsThemeLight": "Light",
+  "@settingsThemeLight": {
+    "description": "Value light of appearance.theme."
+  },
+  "settingsThemeDark": "Dark",
+  "@settingsThemeDark": {
+    "description": "Value dark of appearance.theme."
+  },
+  "settingsDensity": "Density",
+  "@settingsDensity": {
+    "description": "Label of the setting appearance.density (01 section 11)."
+  },
+  "settingsDensityComfortable": "Normal",
+  "@settingsDensityComfortable": {
+    "description": "Value comfortable of appearance.density."
+  },
+  "settingsDensityCompact": "Compact",
+  "@settingsDensityCompact": {
+    "description": "Value compact of appearance.density."
+  },
+  "settingsMotion": "Motion",
+  "@settingsMotion": {
+    "description": "Label of the setting appearance.reduce_motion (01 section 11)."
+  },
+  "settingsMotionSystem": "System",
+  "@settingsMotionSystem": {
+    "description": "Value system of appearance.reduce_motion."
+  },
+  "settingsMotionFull": "Full",
+  "@settingsMotionFull": {
+    "description": "Value off of appearance.reduce_motion (motion is not reduced)."
+  },
+  "settingsMotionReduced": "Reduced",
+  "@settingsMotionReduced": {
+    "description": "Value on of appearance.reduce_motion (motion is reduced)."
+  },
+  "settingsEnterSends": "Enter sends",
+  "@settingsEnterSends": {
+    "description": "Label of the setting composer.enter_sends (01 section 11)."
+  },
+  "settingsEnterSendsHint": "Shift+Enter: new line",
+  "@settingsEnterSendsHint": {
+    "description": "Hint of the setting composer.enter_sends."
+  },
+  "settingsColumnWidths": "Column widths",
+  "@settingsColumnWidths": {
+    "description": "Label of the reset of layout.column_widths (01 section 11)."
+  },
+  "settingsColumnWidthsReset": "Reset",
+  "@settingsColumnWidthsReset": {
+    "description": "Button that deletes layout.column_widths."
+  },
+  "settingsLanguage": "Language",
+  "@settingsLanguage": {
+    "description": "Label of the language of the profile (01 section 9)."
+  },
+  "settingsLanguageGerman": "German",
+  "@settingsLanguageGerman": {
+    "description": "Language choice German."
+  },
+  "settingsLanguageEnglish": "English",
+  "@settingsLanguageEnglish": {
+    "description": "Language choice English."
+  },
+  "settingsTimeZone": "Time zone",
+  "@settingsTimeZone": {
+    "description": "Label of the time zone of the profile."
+  },
+  "settingsProfileFailed": "The profile could not be saved: {reason}",
+  "@settingsProfileFailed": {
+    "description": "Message when updateMyProfile failed; reason is the translated problem.",
+    "placeholders": {
+      "reason": {
+        "type": "String",
+        "example": "No connection"
+      }
+    }
+  },
+  "settingsShortcuts": "All keyboard shortcuts: {shortcut}",
+  "@settingsShortcuts": {
+    "description": "Hint of the keyboard section that names the shortcut of the overlay (M4-24).",
+    "placeholders": {
+      "shortcut": {
+        "type": "String",
+        "example": "Cmd+/"
+      }
+    }
+  },
+  "settingsCrashReports": "Send crash reports",
+  "@settingsCrashReports": {
+    "description": "Label of the setting privacy.crash_reports (01 section 11)."
+  },
+  "settingsCrashReportsHint": "Without content: app version, platform and device type only.",
+  "@settingsCrashReportsHint": {
+    "description": "Hint of the setting privacy.crash_reports (15 section 16)."
+  },
+  "settingsClientMetrics": "Send performance data",
+  "@settingsClientMetrics": {
+    "description": "Label of the setting privacy.client_metrics (01 section 11)."
+  },
+  "settingsClientMetricsHint": "Without content, IDs or names.",
+  "@settingsClientMetricsHint": {
+    "description": "Hint of the setting privacy.client_metrics (15 section 17)."
+  },
+  "settingsAboutAppVersion": "App version",
+  "@settingsAboutAppVersion": {
+    "description": "Label of the version of this build."
+  },
+  "settingsAboutServerVersion": "Server specification",
+  "@settingsAboutServerVersion": {
+    "description": "Label of the spec_version of the instance."
+  },
+  "settingsAboutLicenses": "Licenses",
+  "@settingsAboutLicenses": {
+    "description": "Button that opens the licenses page."
   }
 }

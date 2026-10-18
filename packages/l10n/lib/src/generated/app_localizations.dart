@@ -2922,6 +2922,588 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Confirm it is you'**
   String get shellStepUpTitle;
+
+  /// Purpose text of the step-up dialog when the action names none (08 section 6.2).
+  ///
+  /// In en, this message translates to:
+  /// **'This action needs your confirmation.'**
+  String get stepUpGenericPurpose;
+
+  /// Second line of the step-up dialog before the system prompt (08 section 6.1).
+  ///
+  /// In en, this message translates to:
+  /// **'Next, your device asks for your fingerprint, face or device password.'**
+  String get stepUpNext;
+
+  /// Button of the step-up dialog that continues to the system prompt.
+  ///
+  /// In en, this message translates to:
+  /// **'Continue'**
+  String get stepUpContinue;
+
+  /// Cancel button of the device, session and step-up dialogs.
+  ///
+  /// In en, this message translates to:
+  /// **'Cancel'**
+  String get selfCancel;
+
+  /// Message when a device or session action got no answer from the server.
+  ///
+  /// In en, this message translates to:
+  /// **'No connection. Try again when you are online.'**
+  String get selfOffline;
+
+  /// Banner when the device or session list could not be loaded.
+  ///
+  /// In en, this message translates to:
+  /// **'The list could not be loaded.'**
+  String get selfLoadFailed;
+
+  /// Action of the banner when a list could not be loaded.
+  ///
+  /// In en, this message translates to:
+  /// **'Try again'**
+  String get selfRetry;
+
+  /// Purpose text of the step-up when a waiting device is confirmed (08 section 5.2).
+  ///
+  /// In en, this message translates to:
+  /// **'Confirm the waiting device {name}'**
+  String stepUpPurposeApproveDevice(String name);
+
+  /// Purpose text of the step-up when a device is added by its pairing code (08 section 5.3).
+  ///
+  /// In en, this message translates to:
+  /// **'Add a new device to your account'**
+  String get stepUpPurposeAddDevice;
+
+  /// Purpose text of the step-up when a device is revoked (08 section 10).
+  ///
+  /// In en, this message translates to:
+  /// **'Revoke the device {name}'**
+  String stepUpPurposeRevokeDevice(String name);
+
+  /// Heading of the own device list (01 section 5.1 D8).
+  ///
+  /// In en, this message translates to:
+  /// **'Devices'**
+  String get devicesTitle;
+
+  /// Button that opens the field for the pairing code of a new device (01 section 5.6 E5).
+  ///
+  /// In en, this message translates to:
+  /// **'Add device'**
+  String get devicesAdd;
+
+  /// Badge of the device the app runs on.
+  ///
+  /// In en, this message translates to:
+  /// **'This device'**
+  String get devicesThisDevice;
+
+  /// Badge of a waiting device (08 section 5.2).
+  ///
+  /// In en, this message translates to:
+  /// **'Waiting for confirmation'**
+  String get devicesStatePending;
+
+  /// Badge of a revoked device (08 section 10).
+  ///
+  /// In en, this message translates to:
+  /// **'Revoked'**
+  String get devicesStateRevoked;
+
+  /// App version of a device in the device list.
+  ///
+  /// In en, this message translates to:
+  /// **'Version {version}'**
+  String devicesAppVersion(String version);
+
+  /// Last activity of a device; when is a relative day and a clock time.
+  ///
+  /// In en, this message translates to:
+  /// **'Last active {when}'**
+  String devicesLastActive(String when);
+
+  /// Platform name of the device platform ios.
+  ///
+  /// In en, this message translates to:
+  /// **'iPhone or iPad'**
+  String get devicesPlatformIos;
+
+  /// Platform name of the device platform android.
+  ///
+  /// In en, this message translates to:
+  /// **'Android'**
+  String get devicesPlatformAndroid;
+
+  /// Platform name of the device platform macos.
+  ///
+  /// In en, this message translates to:
+  /// **'Mac'**
+  String get devicesPlatformMacos;
+
+  /// Platform name of the device platform windows.
+  ///
+  /// In en, this message translates to:
+  /// **'Windows'**
+  String get devicesPlatformWindows;
+
+  /// Platform name of the device platform web.
+  ///
+  /// In en, this message translates to:
+  /// **'Web console'**
+  String get devicesPlatformWeb;
+
+  /// Platform name of the device platform cli.
+  ///
+  /// In en, this message translates to:
+  /// **'Command line'**
+  String get devicesPlatformCli;
+
+  /// Platform name of a platform this build does not know.
+  ///
+  /// In en, this message translates to:
+  /// **'Other platform'**
+  String get devicesPlatformOther;
+
+  /// Button of a waiting device that opens the field for its confirmation code (01 section 5.6 E4).
+  ///
+  /// In en, this message translates to:
+  /// **'Enter code'**
+  String get devicesEnterCode;
+
+  /// Button that revokes a device (08 section 10).
+  ///
+  /// In en, this message translates to:
+  /// **'Revoke'**
+  String get devicesRevoke;
+
+  /// Title of the confirmation before a device is revoked (01 section 6.7).
+  ///
+  /// In en, this message translates to:
+  /// **'Revoke {name}?'**
+  String devicesRevokeTitle(String name);
+
+  /// Text of the confirmation before another device is revoked (08 section 10).
+  ///
+  /// In en, this message translates to:
+  /// **'The device is signed out and deletes its local data at its next contact.'**
+  String get devicesRevokeBody;
+
+  /// Text of the confirmation before this device is revoked (08 section 10).
+  ///
+  /// In en, this message translates to:
+  /// **'You are signed out on this device and its local data is deleted.'**
+  String get devicesRevokeThisBody;
+
+  /// Label of the optional reason field when a device is revoked.
+  ///
+  /// In en, this message translates to:
+  /// **'Reason (optional)'**
+  String get devicesRevokeReason;
+
+  /// Reason sent with a revocation when the person typed none.
+  ///
+  /// In en, this message translates to:
+  /// **'Revoked in the settings'**
+  String get devicesRevokeDefaultReason;
+
+  /// Message after a device was revoked.
+  ///
+  /// In en, this message translates to:
+  /// **'{name} was revoked.'**
+  String devicesRevoked(String name);
+
+  /// Title of the dialog that takes the confirmation code of a waiting device (08 section 5.2).
+  ///
+  /// In en, this message translates to:
+  /// **'Confirm {name}'**
+  String devicesConfirmTitle(String name);
+
+  /// Hint of the dialog that takes the confirmation code of a waiting device.
+  ///
+  /// In en, this message translates to:
+  /// **'Type the code that the waiting device shows.'**
+  String get devicesConfirmHint;
+
+  /// Label of the field for the confirmation code of a waiting device.
+  ///
+  /// In en, this message translates to:
+  /// **'Confirmation code'**
+  String get devicesConfirmCode;
+
+  /// Button that sends the confirmation code of a waiting device.
+  ///
+  /// In en, this message translates to:
+  /// **'Confirm'**
+  String get devicesConfirmSubmit;
+
+  /// Message after a waiting device was confirmed.
+  ///
+  /// In en, this message translates to:
+  /// **'{name} is now active.'**
+  String devicesConfirmed(String name);
+
+  /// Message after a wrong confirmation code revoked the waiting device (08 section 5.2).
+  ///
+  /// In en, this message translates to:
+  /// **'The waiting device was rejected because the code did not match.'**
+  String get devicesConfirmRejected;
+
+  /// Title of the dialog that takes the pairing code of a new device (08 section 5.3).
+  ///
+  /// In en, this message translates to:
+  /// **'Add device'**
+  String get devicesAddTitle;
+
+  /// Hint of the dialog that takes the pairing code of a new device.
+  ///
+  /// In en, this message translates to:
+  /// **'Type the pairing code that the new device shows.'**
+  String get devicesAddHint;
+
+  /// Label of the field for the pairing code of a new device.
+  ///
+  /// In en, this message translates to:
+  /// **'Pairing code'**
+  String get devicesAddCode;
+
+  /// Button that sends the pairing code of a new device.
+  ///
+  /// In en, this message translates to:
+  /// **'Add'**
+  String get devicesAddSubmit;
+
+  /// Message after a new device was added by its pairing code.
+  ///
+  /// In en, this message translates to:
+  /// **'{name} was added.'**
+  String devicesAdded(String name);
+
+  /// Message when the pairing code matches no open pairing (08 section 5.3, 404).
+  ///
+  /// In en, this message translates to:
+  /// **'No open pairing with this code.'**
+  String get devicesPairingNotFound;
+
+  /// Heading of the own session list.
+  ///
+  /// In en, this message translates to:
+  /// **'Sessions'**
+  String get sessionsTitle;
+
+  /// Badge of the session of this app.
+  ///
+  /// In en, this message translates to:
+  /// **'This session'**
+  String get sessionsCurrent;
+
+  /// Name of a session whose device is not in the device list.
+  ///
+  /// In en, this message translates to:
+  /// **'Unknown device'**
+  String get sessionsUnknownDevice;
+
+  /// Last use of a session; when is a relative day and a clock time.
+  ///
+  /// In en, this message translates to:
+  /// **'Last used {when}'**
+  String sessionsLastUsed(String when);
+
+  /// Login method oidc of a session.
+  ///
+  /// In en, this message translates to:
+  /// **'Login service'**
+  String get sessionsMethodOidc;
+
+  /// Login method trusted_header of a session (08 section 2.4).
+  ///
+  /// In en, this message translates to:
+  /// **'Login through the network'**
+  String get sessionsMethodTrustedHeader;
+
+  /// Login method passkey of a session.
+  ///
+  /// In en, this message translates to:
+  /// **'Passkey'**
+  String get sessionsMethodPasskey;
+
+  /// Login method password_totp of a session.
+  ///
+  /// In en, this message translates to:
+  /// **'Password and one-time code'**
+  String get sessionsMethodPasswordTotp;
+
+  /// Login method enrollment_code of a session.
+  ///
+  /// In en, this message translates to:
+  /// **'Enrollment code'**
+  String get sessionsMethodEnrollmentCode;
+
+  /// Login method device_pairing of a session.
+  ///
+  /// In en, this message translates to:
+  /// **'Pairing'**
+  String get sessionsMethodDevicePairing;
+
+  /// Login method this build does not know.
+  ///
+  /// In en, this message translates to:
+  /// **'Other method'**
+  String get sessionsMethodOther;
+
+  /// Button that ends a session.
+  ///
+  /// In en, this message translates to:
+  /// **'End session'**
+  String get sessionsEnd;
+
+  /// Title of the confirmation before a session ends (01 section 6.7).
+  ///
+  /// In en, this message translates to:
+  /// **'End this session?'**
+  String get sessionsEndTitle;
+
+  /// Text of the confirmation before another session ends.
+  ///
+  /// In en, this message translates to:
+  /// **'The device of this session is signed out.'**
+  String get sessionsEndBody;
+
+  /// Text of the confirmation before the session of this app ends (R-SY-14).
+  ///
+  /// In en, this message translates to:
+  /// **'You are signed out on this device and its local data is deleted.'**
+  String get sessionsEndCurrentBody;
+
+  /// Message after a session was ended.
+  ///
+  /// In en, this message translates to:
+  /// **'The session was ended.'**
+  String get sessionsEnded;
+
+  /// Title of the settings and the button that opens them (01 section 5.1 D8).
+  ///
+  /// In en, this message translates to:
+  /// **'Settings'**
+  String get settingsTitle;
+
+  /// Button that leaves the settings.
+  ///
+  /// In en, this message translates to:
+  /// **'Back'**
+  String get settingsBack;
+
+  /// Settings section Appearance (01 section 5.1 D8).
+  ///
+  /// In en, this message translates to:
+  /// **'Appearance'**
+  String get settingsSectionAppearance;
+
+  /// Settings section Notifications (01 section 5.1 D8).
+  ///
+  /// In en, this message translates to:
+  /// **'Notifications'**
+  String get settingsSectionNotifications;
+
+  /// Settings section Language (01 section 5.1 D8).
+  ///
+  /// In en, this message translates to:
+  /// **'Language'**
+  String get settingsSectionLanguage;
+
+  /// Settings section Keyboard (01 section 5.1 D8).
+  ///
+  /// In en, this message translates to:
+  /// **'Keyboard'**
+  String get settingsSectionKeyboard;
+
+  /// Settings section Devices and sessions (01 section 5.1 D8).
+  ///
+  /// In en, this message translates to:
+  /// **'Devices and sessions'**
+  String get settingsSectionDevices;
+
+  /// Settings section Privacy (01 section 5.1 D8).
+  ///
+  /// In en, this message translates to:
+  /// **'Privacy'**
+  String get settingsSectionPrivacy;
+
+  /// Settings section About (01 section 5.1 D8).
+  ///
+  /// In en, this message translates to:
+  /// **'About'**
+  String get settingsSectionAbout;
+
+  /// Label of the setting appearance.theme (01 section 11).
+  ///
+  /// In en, this message translates to:
+  /// **'Theme'**
+  String get settingsTheme;
+
+  /// Value system of appearance.theme.
+  ///
+  /// In en, this message translates to:
+  /// **'System'**
+  String get settingsThemeSystem;
+
+  /// Value light of appearance.theme.
+  ///
+  /// In en, this message translates to:
+  /// **'Light'**
+  String get settingsThemeLight;
+
+  /// Value dark of appearance.theme.
+  ///
+  /// In en, this message translates to:
+  /// **'Dark'**
+  String get settingsThemeDark;
+
+  /// Label of the setting appearance.density (01 section 11).
+  ///
+  /// In en, this message translates to:
+  /// **'Density'**
+  String get settingsDensity;
+
+  /// Value comfortable of appearance.density.
+  ///
+  /// In en, this message translates to:
+  /// **'Normal'**
+  String get settingsDensityComfortable;
+
+  /// Value compact of appearance.density.
+  ///
+  /// In en, this message translates to:
+  /// **'Compact'**
+  String get settingsDensityCompact;
+
+  /// Label of the setting appearance.reduce_motion (01 section 11).
+  ///
+  /// In en, this message translates to:
+  /// **'Motion'**
+  String get settingsMotion;
+
+  /// Value system of appearance.reduce_motion.
+  ///
+  /// In en, this message translates to:
+  /// **'System'**
+  String get settingsMotionSystem;
+
+  /// Value off of appearance.reduce_motion (motion is not reduced).
+  ///
+  /// In en, this message translates to:
+  /// **'Full'**
+  String get settingsMotionFull;
+
+  /// Value on of appearance.reduce_motion (motion is reduced).
+  ///
+  /// In en, this message translates to:
+  /// **'Reduced'**
+  String get settingsMotionReduced;
+
+  /// Label of the setting composer.enter_sends (01 section 11).
+  ///
+  /// In en, this message translates to:
+  /// **'Enter sends'**
+  String get settingsEnterSends;
+
+  /// Hint of the setting composer.enter_sends.
+  ///
+  /// In en, this message translates to:
+  /// **'Shift+Enter: new line'**
+  String get settingsEnterSendsHint;
+
+  /// Label of the reset of layout.column_widths (01 section 11).
+  ///
+  /// In en, this message translates to:
+  /// **'Column widths'**
+  String get settingsColumnWidths;
+
+  /// Button that deletes layout.column_widths.
+  ///
+  /// In en, this message translates to:
+  /// **'Reset'**
+  String get settingsColumnWidthsReset;
+
+  /// Label of the language of the profile (01 section 9).
+  ///
+  /// In en, this message translates to:
+  /// **'Language'**
+  String get settingsLanguage;
+
+  /// Language choice German.
+  ///
+  /// In en, this message translates to:
+  /// **'German'**
+  String get settingsLanguageGerman;
+
+  /// Language choice English.
+  ///
+  /// In en, this message translates to:
+  /// **'English'**
+  String get settingsLanguageEnglish;
+
+  /// Label of the time zone of the profile.
+  ///
+  /// In en, this message translates to:
+  /// **'Time zone'**
+  String get settingsTimeZone;
+
+  /// Message when updateMyProfile failed; reason is the translated problem.
+  ///
+  /// In en, this message translates to:
+  /// **'The profile could not be saved: {reason}'**
+  String settingsProfileFailed(String reason);
+
+  /// Hint of the keyboard section that names the shortcut of the overlay (M4-24).
+  ///
+  /// In en, this message translates to:
+  /// **'All keyboard shortcuts: {shortcut}'**
+  String settingsShortcuts(String shortcut);
+
+  /// Label of the setting privacy.crash_reports (01 section 11).
+  ///
+  /// In en, this message translates to:
+  /// **'Send crash reports'**
+  String get settingsCrashReports;
+
+  /// Hint of the setting privacy.crash_reports (15 section 16).
+  ///
+  /// In en, this message translates to:
+  /// **'Without content: app version, platform and device type only.'**
+  String get settingsCrashReportsHint;
+
+  /// Label of the setting privacy.client_metrics (01 section 11).
+  ///
+  /// In en, this message translates to:
+  /// **'Send performance data'**
+  String get settingsClientMetrics;
+
+  /// Hint of the setting privacy.client_metrics (15 section 17).
+  ///
+  /// In en, this message translates to:
+  /// **'Without content, IDs or names.'**
+  String get settingsClientMetricsHint;
+
+  /// Label of the version of this build.
+  ///
+  /// In en, this message translates to:
+  /// **'App version'**
+  String get settingsAboutAppVersion;
+
+  /// Label of the spec_version of the instance.
+  ///
+  /// In en, this message translates to:
+  /// **'Server specification'**
+  String get settingsAboutServerVersion;
+
+  /// Button that opens the licenses page.
+  ///
+  /// In en, this message translates to:
+  /// **'Licenses'**
+  String get settingsAboutLicenses;
 }
 
 class _AppLocalizationsDelegate

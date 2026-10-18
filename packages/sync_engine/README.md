@@ -381,7 +381,9 @@ the connections that may see them. Test controls: `addPerson`, `addSpace`, `addC
 `412 version_conflict` with `current`, `410 message_deleted`), `deleteMessage` (idempotent
 `204`), `addReaction`, `removeReaction`, `putReadState`, `putThreadDraft`,
 `deleteThreadDraft`, `listMyReadStates`, `listMyDrafts`, `listMySettings`, `putMySetting`,
-`deleteMySetting`, `getRun`, `cancelRun`. Other writes with `Idempotency-Key` repeat their
+`deleteMySetting`, `getRun`, `cancelRun`, and from M4-25 in `rest/self_handlers.dart`
+`listMyDevices`, `revokeDevice`, `listMySessions` (with `current`), `revokeSession`,
+`updateMyProfile`, `createStepUpChallenge` and `completeStepUpWithDeviceKey`. Other writes with `Idempotency-Key` repeat their
 stored answer (04 5.2). Later tickets add operations with `server.handle(operationId,
 handler)` in their own `rest/` file (D-M4-17-2). Gateway: `hello`, `identify`, `resume`,
 `ready` with the snapshot, catch-up in pages with `cursor` frames, `catchup.complete`,
@@ -431,8 +433,13 @@ documents once per isolate, walking up from the working directory.
 
 ### What the fake simplifies
 
-- Permissions: only visibility and the level per channel; no grants, groups, `manage`, scopes
-  or step-up (`approveDevice` and `approvePairing` need none); no rate limits unless injected.
+- Permissions: only visibility and the level per channel; no grants, groups, `manage` or
+  scopes; no rate limits unless injected. Step-up (M4-25): `approveDevice`, `approvePairing`
+  and `revokeDevice` answer `401 step_up_required` until the session confirmed with its
+  `step_up` key (`createStepUpChallenge`, `completeStepUpWithDeviceKey`, ES256 signature over
+  `challenge` and `sid`) within five minutes; a pairing code without an open pairing ends that
+  confirmation; no failure counting (`auth.step_up_fail_limit`). A `401` is never stored as the
+  answer of an `Idempotency-Key`, so the repeat after a step-up runs the operation.
 - Identity: a fixed TOTP code per person; a password login gives an active device unless the
   person has `newDevicesPending`; access tokens are unsigned JWS-shaped strings the fake
   recognizes by value; nonces are counters (current and previous accepted) instead of HMAC

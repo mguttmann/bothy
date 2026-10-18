@@ -11,6 +11,7 @@ environment:
   flutter: 3.47.7
 
 dependencies:
+  admin_ui: any
   api_client: any
   auth: any
   design_system: any
@@ -27,6 +28,7 @@ dependencies:
   path_provider: ^2.1.6
   riverpod_annotation: ^4.0.7
   sync_engine: any
+  timezone: ^0.11.2
   url_launcher: ^6.3.3
 
 dev_dependencies:

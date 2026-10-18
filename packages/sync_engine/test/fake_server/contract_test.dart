@@ -164,6 +164,20 @@ void main() {
       isA<LoginSignedIn>(),
     );
 
+    // Own devices, sessions and profile (M4-25): end the tablet's session, revoke the tablet.
+    final devicesApi = api.getDevicesApi();
+    final tabletSession = (await devicesApi.listMySessions()).data!.items
+        .firstWhere((s) => !(s.current ?? false));
+    await devicesApi.listMyDevices();
+    await devicesApi.revokeSession(sessionId: tabletSession.id);
+    await devicesApi.revokeDevice(
+      deviceId: tabletSession.deviceId,
+      reasonBody: ReasonBody((b) => b..reason = 'Not needed'),
+    );
+    await api.getMeApi().updateMyProfile(
+      profileUpdate: ProfileUpdate((b) => b..locale = 'en'),
+    );
+
     await alex.auth.refresh.refreshNow();
     await api.getMeApi().getMe();
     await alex.auth.login.logout();

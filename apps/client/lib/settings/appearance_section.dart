@@ -1,0 +1,145 @@
+// SPDX-License-Identifier: Apache-2.0
+
+/// Appearance: theme, density, motion, Enter sends and the column widths reset
+/// (docs/spec/01-product.md 5.1 D8 and 11).
+library;
+
+import 'dart:async';
+
+import 'package:design_system/design_system.dart';
+import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:l10n/l10n.dart';
+
+import 'settings_providers.dart';
+import 'settings_shell.dart';
+
+/// A choice of one value out of a few, as a row of chips (one selected).
+class SettingChoice extends StatelessWidget {
+  /// Creates the control.
+  const SettingChoice({
+    super.key,
+    required this.value,
+    required this.options,
+    required this.onChanged,
+  });
+
+  /// The current value.
+  final String value;
+
+  /// The values and their labels, in order.
+  final Map<String, String> options;
+
+  /// Called with the chosen value; null disables the control.
+  final ValueChanged<String>? onChanged;
+
+  @override
+  Widget build(BuildContext context) => Wrap(
+    spacing: DsSpace.s8,
+    runSpacing: DsSpace.s8,
+    children: [
+      for (final MapEntry(:key, value: label) in options.entries)
+        ChoiceChip(
+          key: ValueKey('choice.$key'),
+          label: Text(label),
+          showCheckmark: false,
+          selected: key == value,
+          onSelected: onChanged == null ? null : (_) => onChanged!(key),
+        ),
+    ],
+  );
+}
+
+/// The switch of `composer.enter_sends`, shared by Appearance and Keyboard.
+class EnterSendsRow extends ConsumerWidget {
+  /// Creates the row.
+  const EnterSendsRow({super.key});
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final l = AppLocalizations.of(context);
+    final settings = ref.watch(personalSettingsProvider);
+    final writer = ref.watch(settingsRepositoryProvider);
+    return SettingRow(
+      label: l.settingsEnterSends,
+      hint: l.settingsEnterSendsHint,
+      control: Switch(
+        key: const ValueKey('settings.enterSends'),
+        value: settings.enterSends,
+        onChanged: writer == null
+            ? null
+            : (on) => unawaited(writer.set(SettingKeys.enterSends, on)),
+      ),
+    );
+  }
+}
+
+/// The Appearance section.
+class AppearanceSection extends ConsumerWidget {
+  /// Creates the section.
+  const AppearanceSection({super.key});
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final l = AppLocalizations.of(context);
+    final settings = ref.watch(personalSettingsProvider);
+    final writer = ref.watch(settingsRepositoryProvider);
+    ValueChanged<String>? set(String key) =>
+        writer == null ? null : (value) => unawaited(writer.set(key, value));
+    return SectionFrame(
+      title: l.settingsSectionAppearance,
+      children: [
+        SettingRow(
+          label: l.settingsTheme,
+          control: SettingChoice(
+            key: const ValueKey('settings.theme'),
+            value: settings.theme,
+            options: {
+              'system': l.settingsThemeSystem,
+              'light': l.settingsThemeLight,
+              'dark': l.settingsThemeDark,
+            },
+            onChanged: set(SettingKeys.theme),
+          ),
+        ),
+        SettingRow(
+          label: l.settingsDensity,
+          control: SettingChoice(
+            key: const ValueKey('settings.density'),
+            value: settings.density,
+            options: {
+              'comfortable': l.settingsDensityComfortable,
+              'compact': l.settingsDensityCompact,
+            },
+            onChanged: set(SettingKeys.density),
+          ),
+        ),
+        SettingRow(
+          label: l.settingsMotion,
+          control: SettingChoice(
+            key: const ValueKey('settings.motion'),
+            value: settings.reduceMotion,
+            // `on` reduces motion, `off` keeps the full motion (01 11).
+            options: {
+              'system': l.settingsMotionSystem,
+              'off': l.settingsMotionFull,
+              'on': l.settingsMotionReduced,
+            },
+            onChanged: set(SettingKeys.reduceMotion),
+          ),
+        ),
+        const EnterSendsRow(),
+        SettingRow(
+          label: l.settingsColumnWidths,
+          control: OutlinedButton(
+            key: const ValueKey('settings.columnWidths.reset'),
+            onPressed: writer == null || !settings.hasColumnWidths
+                ? null
+                : () => unawaited(writer.reset(SettingKeys.columnWidths)),
+            child: Text(l.settingsColumnWidthsReset),
+          ),
+        ),
+      ],
+    );
+  }
+}

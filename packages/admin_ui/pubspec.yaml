@@ -11,10 +11,16 @@ environment:
   flutter: 3.47.7
 
 dependencies:
+  api_client: any
+  auth: any
+  design_system: any
+  dio: ^5.11.1
   flutter:
     sdk: flutter
+  l10n: any
 
 dev_dependencies:
+  alchemist: ^0.14.1
   flutter_lints: ^6.0.0
   flutter_test:
     sdk: flutter

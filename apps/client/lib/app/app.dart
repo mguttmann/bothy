@@ -14,6 +14,8 @@ import 'package:l10n/l10n.dart';
 
 import '../onboarding/onboarding_controller.dart';
 import '../onboarding/onboarding_screen.dart';
+import '../settings/settings_providers.dart';
+import '../settings/settings_shell.dart';
 import 'deep_links.dart';
 import 'layout/desktop_shell.dart';
 import 'providers/ports.dart';
@@ -49,6 +51,8 @@ class _ClientAppState extends ConsumerState<ClientApp> {
     super.initState();
     _step.value = ref.read(onboardingControllerProvider).step;
     _router = GoRouter(
+      // The navigator of the ports: the step-up dialog of the auth session opens over it.
+      navigatorKey: ref.read(appPortsProvider).navigatorKey,
       initialLocation: _step.value == OnboardingStep.signedIn
           ? '/'
           : _step.value.path,
@@ -76,6 +80,15 @@ class _ClientAppState extends ConsumerState<ClientApp> {
             );
           },
         ),
+        GoRoute(
+          path: '/settings',
+          redirect: (context, state) => SettingsSection.appearance.path,
+        ),
+        GoRoute(
+          path: '/settings/:section',
+          builder: (context, state) =>
+              SettingsShell(segment: state.pathParameters['section']),
+        ),
         for (final path in const [
           '/s/:id',
           '/c/:id',
@@ -86,7 +99,7 @@ class _ClientAppState extends ConsumerState<ClientApp> {
         ])
           GoRoute(path: path, builder: _shell),
       ],
-      // `/admin/...`, `/settings/...` and every unknown path: the shell parses them itself and
+      // `/admin/...` and every unknown path: the shell parses them itself and
       // shows "Not found or no access" for an unknown one (01 6.7).
       errorBuilder: _shell,
     );
@@ -135,7 +148,12 @@ class _ClientAppState extends ConsumerState<ClientApp> {
         media?.disableAnimations ?? false,
       ),
     );
+    // 01 9: the language follows `users.locale`; without one the system language applies.
+    final userLocale = ref.watch(profileControllerProvider).value?.locale;
     return MaterialApp.router(
+      locale: userLocale == null
+          ? null
+          : resolveAppLocale(userLocale: userLocale, systemLocales: const []),
       title: instance?.productName ?? branding.appName,
       debugShowCheckedModeBanner: false,
       localizationsDelegates: AppLocalizations.localizationsDelegates,

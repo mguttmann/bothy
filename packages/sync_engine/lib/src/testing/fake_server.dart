@@ -14,6 +14,7 @@ import 'rest/auth_handlers.dart';
 import 'rest/message_handlers.dart';
 import 'rest/personal_handlers.dart';
 import 'rest/run_handlers.dart';
+import 'rest/self_handlers.dart';
 import 'rest/structure_handlers.dart';
 import 'rest/sync_handlers.dart';
 import 'rest_fake.dart';
@@ -122,6 +123,7 @@ final class FakeServer {
     registerMessageHandlers(rest);
     registerPersonalHandlers(rest);
     registerRunHandlers(rest);
+    registerSelfHandlers(rest);
     final server = FakeServer._(http, world, rest, gateway, faults, verifier);
     http.listen(server._onRequest);
     return server;
