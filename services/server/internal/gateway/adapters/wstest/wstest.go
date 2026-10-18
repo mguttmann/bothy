@@ -27,6 +27,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"maps"
 	"math/rand/v2"
 	"net/http"
 	gosync "sync"
@@ -136,6 +137,7 @@ type Client struct {
 	serverFrames, clientFrames int
 	delivered                  int64 // seq of the last durable dispatch, 0 before the first
 	violations                 []string
+	seen                       map[string]int // ops and "dispatch <type>" received, for corpus tests
 }
 
 // Dial connects to the gateway at baseURL (http or https, for example the URL of a test server)
@@ -164,6 +166,7 @@ func Dial(t testing.TB, ctx context.Context, baseURL string, opts ...Option) (*C
 	c := &Client{t: t, ws: ws, opts: o, contract: contract.WithMaxFrameBytes(o.maxFrame), cancel: cancel, stop: make(chan struct{}),
 		readDone: make(chan struct{})}
 	c.cond = gosync.NewCond(&c.mu)
+	c.seen = map[string]int{}
 	t.Cleanup(c.finish)
 	go c.readLoop(rctx)
 	op, d, err := c.next(ctx, false)
@@ -266,6 +269,7 @@ func (c *Client) receive(b []byte) message {
 		}
 	}
 	c.order(idx, env.Op, env.D)
+	c.observe(env.Op, env.D)
 	return message{op: env.Op, d: env.D}
 }
 
@@ -303,6 +307,32 @@ func (c *Client) order(idx int, op string, d json.RawMessage) {
 			c.violate(idx, op, "/d/head_seq", fmt.Sprintf("head_seq %d below delivered seq %d", *v.HeadSeq, last))
 		}
 	}
+}
+
+// observe counts the op of a server frame and, for dispatch, its event type.
+func (c *Client) observe(op string, d json.RawMessage) {
+	key := op
+	if op == "dispatch" {
+		var v struct {
+			Type string `json:"type"`
+		}
+		_ = json.Unmarshal(d, &v)
+		key = "dispatch " + v.Type
+	}
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	c.seen[op]++
+	if key != op {
+		c.seen[key]++
+	}
+}
+
+// Observed returns how often each op and each event type ("dispatch <type>") arrived from the
+// server so far, in a new map.
+func (c *Client) Observed() map[string]int {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	return maps.Clone(c.seen)
 }
 
 // ended records the end of the read loop; a close of the server must carry a code of
