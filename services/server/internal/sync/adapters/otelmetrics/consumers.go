@@ -4,7 +4,8 @@
 // consumers, bothy.event.consumer.lag and bothy.event.consumer.pending_age
 // (docs/observability/signals.md "Events and delivery", alarm BothyEventConsumerLag).
 // Every role registers them, so a stopped or missing worker still shows a growing lag
-// (docs/DECISIONS.md D-M2-01-5). The metric registry of M1-68 takes them over when it lands.
+// (docs/DECISIONS.md D-M2-01-5). Both are declared in the metric registry
+// (metrics.EventConsumerLag, metrics.EventConsumerPendingAge).
 package otelmetrics
 
 import (
@@ -12,20 +13,11 @@ import (
 	"fmt"
 	"time"
 
-	"go.opentelemetry.io/otel"
-	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/metric"
 
 	"github.com/OWNER/bothy/services/server/internal/kernel/clock"
-	"github.com/OWNER/bothy/services/server/internal/platform/otel/attr"
+	"github.com/OWNER/bothy/services/server/internal/platform/otel/metrics"
 	"github.com/OWNER/bothy/services/server/internal/sync"
-)
-
-// Names of the instruments (signals.md 4.2).
-const (
-	instrumentation  = "github.com/OWNER/bothy/services/server/internal/sync"
-	metricLag        = "bothy.event.consumer.lag"
-	metricPendingAge = "bothy.event.consumer.pending_age"
 )
 
 // RegisterConsumerGauges registers both gauges on mp (nil means the global provider that
@@ -40,28 +32,22 @@ const (
 //
 // Errors: those of the meter provider.
 func RegisterConsumerGauges(mp metric.MeterProvider, consumers sync.Consumers, c clock.Clock) (metric.Registration, error) {
-	if mp == nil {
-		mp = otel.GetMeterProvider()
-	}
 	if c == nil {
 		c = clock.System()
 	}
-	meter := mp.Meter(instrumentation)
-	lag, err := meter.Int64ObservableGauge(metricLag, metric.WithUnit("{event}"),
-		metric.WithDescription("Events in the log after the cursor of a worker consumer."))
+	lag, err := metrics.NewObservableGauge(mp, metrics.EventConsumerLag, nil)
 	if err != nil {
-		return nil, fmt.Errorf("otelmetrics: %s: %w", metricLag, err)
+		return nil, fmt.Errorf("otelmetrics: %w", err)
 	}
-	age, err := meter.Float64ObservableGauge(metricPendingAge, metric.WithUnit("s"),
-		metric.WithDescription("Age of the oldest event a worker consumer has not processed."))
+	age, err := metrics.NewObservableGauge(mp, metrics.EventConsumerPendingAge, nil)
 	if err != nil {
-		return nil, fmt.Errorf("otelmetrics: %s: %w", metricPendingAge, err)
+		return nil, fmt.Errorf("otelmetrics: %w", err)
 	}
-	g := gauges{consumers: consumers, clock: c, lag: lag, age: age, sets: map[sync.ConsumerName]metric.ObserveOption{}}
+	g := gauges{consumers: consumers, clock: c, lag: lag, age: age, known: map[sync.ConsumerName]bool{}}
 	for _, n := range sync.ConsumerNames() {
-		g.sets[n] = metric.WithAttributeSet(attribute.NewSet(attribute.String(attr.ConsumerName, string(n))))
+		g.known[n] = true
 	}
-	reg, err := meter.RegisterCallback(g.observe, lag, age)
+	reg, err := lag.Meter().RegisterCallback(g.observe, lag.Observable(), age.Observable())
 	if err != nil {
 		return nil, fmt.Errorf("otelmetrics: register the consumer gauges: %w", err)
 	}
@@ -72,9 +58,8 @@ func RegisterConsumerGauges(mp metric.MeterProvider, consumers sync.Consumers, c
 type gauges struct {
 	consumers sync.Consumers
 	clock     clock.Clock
-	lag       metric.Int64ObservableGauge
-	age       metric.Float64ObservableGauge
-	sets      map[sync.ConsumerName]metric.ObserveOption
+	lag, age  *metrics.ObservableGauge
+	known     map[sync.ConsumerName]bool
 }
 
 // observe reads the states once and observes both gauges per known consumer. A failed read
@@ -87,12 +72,11 @@ func (g gauges) observe(ctx context.Context, o metric.Observer) error {
 	}
 	now := g.clock.Now()
 	for _, s := range states {
-		set, ok := g.sets[s.Name]
-		if !ok {
+		if !g.known[s.Name] {
 			continue
 		}
-		o.ObserveInt64(g.lag, max(s.HeadSeq-s.LastSeq, 0), set)
-		o.ObserveFloat64(g.age, pendingAge(now, s.OldestPendingAt), set)
+		g.lag.Observe(o, float64(max(s.HeadSeq-s.LastSeq, 0)), string(s.Name))
+		g.age.Observe(o, pendingAge(now, s.OldestPendingAt), string(s.Name))
 	}
 	return nil
 }

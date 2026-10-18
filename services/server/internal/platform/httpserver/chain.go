@@ -16,7 +16,6 @@ import (
 	"strings"
 	"sync"
 
-	otelapi "go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/metric"
 
 	"github.com/OWNER/bothy/services/server/internal/kernel/actor"
@@ -25,13 +24,8 @@ import (
 	"github.com/OWNER/bothy/services/server/internal/kernel/reqmeta"
 	"github.com/OWNER/bothy/services/server/internal/platform/otel"
 	"github.com/OWNER/bothy/services/server/internal/platform/otel/attr"
+	"github.com/OWNER/bothy/services/server/internal/platform/otel/metrics"
 )
-
-// instrumentation is the meter name of the chain's own metrics.
-const instrumentation = "github.com/OWNER/bothy/services/server/internal/platform/httpserver"
-
-// metricAuthzErrors is bothy.authz.errors of signals.md "REST and gateway".
-const metricAuthzErrors = "bothy.authz.errors"
 
 // Stage is one per-route step of the chain (docs/spec/02-architecture.md 9.1, steps 5 to 14). The
 // steps 1 to 4 (recover, trace and correlate, base headers and client IP, routing) are the outer
@@ -107,7 +101,7 @@ type Chain struct {
 	log         *slog.Logger
 	auth        actor.Authenticator
 	validator   *Validator
-	authzErrors metric.Int64Counter
+	authzErrors *metrics.Counter
 	publicURL   *url.URL
 	origins     map[string]bool
 	sec         SecurityHeaders
@@ -146,14 +140,9 @@ func NewChain(cfg ChainConfig, deps Deps) (*Chain, error) {
 	if deps.Logger == nil {
 		deps.Logger = slog.Default()
 	}
-	if deps.MeterProvider == nil {
-		deps.MeterProvider = otelapi.GetMeterProvider()
-	}
-	counter, err := deps.MeterProvider.Meter(instrumentation).Int64Counter(metricAuthzErrors,
-		metric.WithUnit("{check}"),
-		metric.WithDescription("Programming errors of the authorization check."))
+	counter, err := metrics.NewCounter(deps.MeterProvider, metrics.AuthzErrors, nil)
 	if err != nil {
-		return nil, fmt.Errorf("httpserver: %s: %w", metricAuthzErrors, err)
+		return nil, fmt.Errorf("httpserver: %w", err)
 	}
 	public, _ := url.Parse(cfg.PublicURL) // validated above
 	c := &Chain{
