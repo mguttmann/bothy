@@ -5,7 +5,8 @@
 library;
 
 import 'package:design_system/design_system.dart';
-import 'package:sync_engine/sync_engine.dart';
+
+import '../../settings/settings_providers.dart';
 
 /// The columns of D1 and D2 by the names of `layout.column_widths`.
 abstract final class AppColumn {
@@ -85,27 +86,19 @@ final class ColumnWidths {
   int get hashCode => Object.hashAll(AppColumn.sized.map(of));
 }
 
-/// Writes the column widths through the outbox (one lane per setting, M4-15); the stored value
-/// comes back through `user_settings` (04 14).
+/// Writes the column widths through the settings writer: the local `user_settings` row changes
+/// at once (so Settings offers "Reset" right after a drag) and the outbox carries the write
+/// (one lane per setting, M4-15; 04 14; brief M4-25 Design note 1).
 final class ColumnWidthsWriter {
-  /// Creates the writer over the outbox of [engine].
-  ColumnWidthsWriter(this._engine);
+  /// Creates the writer over [settings].
+  ColumnWidthsWriter(this._settings);
 
-  final SyncEngine _engine;
+  final SettingsRepository _settings;
 
   /// Stores [widths] as `layout.column_widths` (`putMySetting`).
-  Future<void> save(ColumnWidths widths) => _engine.outbox.enqueue(
-    OutboxRequest(
-      kind: PersonalOps.putMySetting,
-      payload: {'key': ColumnWidths.settingKey, 'value': widths.toSetting()},
-    ),
-  );
+  Future<void> save(ColumnWidths widths) =>
+      _settings.set(ColumnWidths.settingKey, widths.toSetting());
 
   /// Restores the defaults: deletes the setting (`deleteMySetting`).
-  Future<void> reset() => _engine.outbox.enqueue(
-    OutboxRequest(
-      kind: PersonalOps.deleteMySetting,
-      payload: const {'key': ColumnWidths.settingKey},
-    ),
-  );
+  Future<void> reset() => _settings.reset(ColumnWidths.settingKey);
 }

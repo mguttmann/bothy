@@ -2,7 +2,8 @@
 
 Status: desktop app shell (M4-18): macOS and Windows builds, the composition root, the router,
 the onboarding screens E1 to E7 and the empty column frames of the main view, which M4-19 to
-M4-25 fill. iOS and Android follow in M5.
+M4-25 fill. Settings (M4-25): the sections of 01 5.1 D8 under `/settings/<section>`, with the
+device and session views of `admin_ui`. iOS and Android follow in M5.
 
 Flutter app for macOS and Windows, later iOS and Android. One code base for interface and
 logic; native code only where the system requires it.
@@ -23,7 +24,7 @@ Allowed members (docs/spec/15-client-architecture.md, 3.1; `tools/arch-check/rul
 `admin_ui`, `sync_engine`, `design_system`, `device_key`, `terminal_ui` and every member they
 reach; `make arch` checks the manifest and every import. Outside the workspace: `flutter_riverpod`
 and `riverpod_annotation` (state, with `riverpod_generator`), `go_router`, `flutter_secure_storage`,
-`url_launcher`, `path_provider` and `dio`. The network status needs no plugin
+`url_launcher`, `path_provider`, `timezone` (IANA time zones of the profile) and `dio`. The network status needs no plugin
 (docs/DECISIONS.md D-M4-18-8).
 
 ## Layout
@@ -38,6 +39,7 @@ and `riverpod_annotation` (state, with `riverpod_generator`), `go_router`, `flut
 | `lib/app/providers/` | Riverpod providers (generated `*.g.dart`): ports, session, engine, settings, targets |
 | `lib/app/layout/` | the desktop shell, the four columns and their stored widths |
 | `lib/onboarding/` | E1 to E7, the controller of the flow, codes and remaining times |
+| `lib/settings/` | Settings (01 5.1 D8): the sections, the personal settings of 01 11 with their defaults, the profile and the devices section hosting `admin_ui` |
 | `lib/platform/` | secure storage, device key signers, loopback redirect, browser, lifecycle, network, frames |
 | `macos/`, `windows/` | the runners (`flutter create`), URL scheme registration and the deep link channel |
 | `tool/branding_defines.dart` | build branding to dart defines and native settings |

@@ -68,6 +68,17 @@ operated, and the order of the build.
   drivers. The headless scenarios 16.1 to 16.5 run against `SyncEngine` with its local
   database. `make arch` gains rule 10: a `testing.dart` library is imported only from `test/`
   and `integration_test/` folders.
+- Desktop settings, devices and sessions (M4-25): Settings has the sections of 01 5.1 D8
+  (Appearance, Language, Keyboard, Devices and sessions, Privacy, About and the Notifications
+  entry M4-33 fills) under `/settings/<section>`. The personal settings of 01 11 apply their
+  defaults on the client, a change goes through the outbox as `putMySetting` and a reset as
+  `deleteMySetting`, and changes from another device apply per key. Language and time zone are
+  profile fields, and the app language follows the profile. `packages/admin_ui` gains the own
+  devices and sessions views (confirm a waiting device by its verification code, add a device by
+  its pairing code, revoke a device, end a session) and the step-up dialog that explains an
+  action before the system asks for the step-up key; revoking this device or ending the current
+  session wipes the local data. The fake server gains the own device, session, profile, settings
+  and step-up operations and a second simulated device of Alex.
 - Desktop app shell (M4-18): `apps/client` builds for macOS and Windows with platform folders,
   the build branding of `branding.example.yaml` (URL scheme, app name, bundle identifier, default
   server) and deep links of that scheme on both platforms. One composition root per server

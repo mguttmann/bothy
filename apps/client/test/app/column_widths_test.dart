@@ -10,6 +10,7 @@ import 'package:client/app/layout/column_layout.dart';
 import 'package:client/app/layout/column_widths.dart';
 import 'package:client/app/providers/session.dart';
 import 'package:client/app/providers/settings.dart';
+import 'package:client/settings/settings_providers.dart';
 import 'package:design_system/design_system.dart';
 import 'package:domain/domain.dart';
 import 'package:flutter/material.dart';
@@ -115,11 +116,17 @@ void main() {
       () async {
         final db = openInMemoryForTests();
         final idle = idleEngine(db);
-        final writer = ColumnWidthsWriter(idle.engine);
+        final writer = ColumnWidthsWriter(SettingsRepository(db, idle.engine));
         await writer.save(
           ColumnWidths.defaults.withWidth(AppColumn.sidebar, 312),
         );
+        // The local row changes at once, so Settings offers "Reset" (M4-25 Design note 1).
+        expect(
+          (await db.personalDao.watchSettings().first).map((s) => s.key),
+          contains('layout.column_widths'),
+        );
         await writer.reset();
+        expect(await db.personalDao.watchSettings().first, isEmpty);
         final entries = await db.outboxDao.allEntries();
         expect(entries.map((e) => e.kind), [
           PersonalOps.putMySetting,

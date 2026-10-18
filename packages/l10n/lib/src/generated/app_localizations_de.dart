@@ -1577,4 +1577,329 @@ class AppLocalizationsDe extends AppLocalizations {
 
   @override
   String get shellStepUpTitle => 'Bestätige, dass du es bist';
+
+  @override
+  String get stepUpGenericPurpose => 'Diese Aktion braucht deine Bestätigung.';
+
+  @override
+  String get stepUpNext =>
+      'Als Nächstes fragt dein Gerät nach Fingerabdruck, Gesicht oder Gerätepasswort.';
+
+  @override
+  String get stepUpContinue => 'Weiter';
+
+  @override
+  String get selfCancel => 'Abbrechen';
+
+  @override
+  String get selfOffline =>
+      'Keine Verbindung. Versuche es erneut, wenn du online bist.';
+
+  @override
+  String get selfLoadFailed => 'Die Liste konnte nicht geladen werden.';
+
+  @override
+  String get selfRetry => 'Erneut versuchen';
+
+  @override
+  String stepUpPurposeApproveDevice(String name) {
+    return 'Das wartende Gerät $name bestätigen';
+  }
+
+  @override
+  String get stepUpPurposeAddDevice =>
+      'Ein neues Gerät zu deinem Konto hinzufügen';
+
+  @override
+  String stepUpPurposeRevokeDevice(String name) {
+    return 'Das Gerät $name sperren';
+  }
+
+  @override
+  String get devicesTitle => 'Geräte';
+
+  @override
+  String get devicesAdd => 'Gerät hinzufügen';
+
+  @override
+  String get devicesThisDevice => 'Dieses Gerät';
+
+  @override
+  String get devicesStatePending => 'Wartet auf Bestätigung';
+
+  @override
+  String get devicesStateRevoked => 'Gesperrt';
+
+  @override
+  String devicesAppVersion(String version) {
+    return 'Version $version';
+  }
+
+  @override
+  String devicesLastActive(String when) {
+    return 'Zuletzt aktiv $when';
+  }
+
+  @override
+  String get devicesPlatformIos => 'iPhone oder iPad';
+
+  @override
+  String get devicesPlatformAndroid => 'Android';
+
+  @override
+  String get devicesPlatformMacos => 'Mac';
+
+  @override
+  String get devicesPlatformWindows => 'Windows';
+
+  @override
+  String get devicesPlatformWeb => 'Web-Konsole';
+
+  @override
+  String get devicesPlatformCli => 'Kommandozeile';
+
+  @override
+  String get devicesPlatformOther => 'Andere Plattform';
+
+  @override
+  String get devicesEnterCode => 'Code eingeben';
+
+  @override
+  String get devicesRevoke => 'Sperren';
+
+  @override
+  String devicesRevokeTitle(String name) {
+    return '$name sperren?';
+  }
+
+  @override
+  String get devicesRevokeBody =>
+      'Das Gerät wird abgemeldet und löscht seine lokalen Daten beim nächsten Kontakt.';
+
+  @override
+  String get devicesRevokeThisBody =>
+      'Du wirst auf diesem Gerät abgemeldet, und seine lokalen Daten werden gelöscht.';
+
+  @override
+  String get devicesRevokeReason => 'Grund (optional)';
+
+  @override
+  String get devicesRevokeDefaultReason => 'In den Einstellungen gesperrt';
+
+  @override
+  String devicesRevoked(String name) {
+    return '$name wurde gesperrt.';
+  }
+
+  @override
+  String devicesConfirmTitle(String name) {
+    return '$name bestätigen';
+  }
+
+  @override
+  String get devicesConfirmHint =>
+      'Gib den Code ein, den das wartende Gerät anzeigt.';
+
+  @override
+  String get devicesConfirmCode => 'Bestätigungscode';
+
+  @override
+  String get devicesConfirmSubmit => 'Bestätigen';
+
+  @override
+  String devicesConfirmed(String name) {
+    return '$name ist jetzt aktiv.';
+  }
+
+  @override
+  String get devicesConfirmRejected =>
+      'Das wartende Gerät wurde abgelehnt, weil der Code nicht passte.';
+
+  @override
+  String get devicesAddTitle => 'Gerät hinzufügen';
+
+  @override
+  String get devicesAddHint =>
+      'Gib den Kopplungs-Code ein, den das neue Gerät anzeigt.';
+
+  @override
+  String get devicesAddCode => 'Kopplungs-Code';
+
+  @override
+  String get devicesAddSubmit => 'Hinzufügen';
+
+  @override
+  String devicesAdded(String name) {
+    return '$name wurde hinzugefügt.';
+  }
+
+  @override
+  String get devicesPairingNotFound => 'Keine offene Kopplung mit diesem Code.';
+
+  @override
+  String get sessionsTitle => 'Sitzungen';
+
+  @override
+  String get sessionsCurrent => 'Diese Sitzung';
+
+  @override
+  String get sessionsUnknownDevice => 'Unbekanntes Gerät';
+
+  @override
+  String sessionsLastUsed(String when) {
+    return 'Zuletzt genutzt $when';
+  }
+
+  @override
+  String get sessionsMethodOidc => 'Anmeldedienst';
+
+  @override
+  String get sessionsMethodTrustedHeader => 'Anmeldung über das Netzwerk';
+
+  @override
+  String get sessionsMethodPasskey => 'Passkey';
+
+  @override
+  String get sessionsMethodPasswordTotp => 'Passwort und Einmalcode';
+
+  @override
+  String get sessionsMethodEnrollmentCode => 'Einladungscode';
+
+  @override
+  String get sessionsMethodDevicePairing => 'Kopplung';
+
+  @override
+  String get sessionsMethodOther => 'Andere Methode';
+
+  @override
+  String get sessionsEnd => 'Sitzung beenden';
+
+  @override
+  String get sessionsEndTitle => 'Diese Sitzung beenden?';
+
+  @override
+  String get sessionsEndBody => 'Das Gerät dieser Sitzung wird abgemeldet.';
+
+  @override
+  String get sessionsEndCurrentBody =>
+      'Du wirst auf diesem Gerät abgemeldet, und seine lokalen Daten werden gelöscht.';
+
+  @override
+  String get sessionsEnded => 'Die Sitzung wurde beendet.';
+
+  @override
+  String get settingsTitle => 'Einstellungen';
+
+  @override
+  String get settingsBack => 'Zurück';
+
+  @override
+  String get settingsSectionAppearance => 'Darstellung';
+
+  @override
+  String get settingsSectionNotifications => 'Benachrichtigungen';
+
+  @override
+  String get settingsSectionLanguage => 'Sprache';
+
+  @override
+  String get settingsSectionKeyboard => 'Tastatur';
+
+  @override
+  String get settingsSectionDevices => 'Geräte und Sitzungen';
+
+  @override
+  String get settingsSectionPrivacy => 'Datenschutz';
+
+  @override
+  String get settingsSectionAbout => 'Über';
+
+  @override
+  String get settingsTheme => 'Design';
+
+  @override
+  String get settingsThemeSystem => 'System';
+
+  @override
+  String get settingsThemeLight => 'Hell';
+
+  @override
+  String get settingsThemeDark => 'Dunkel';
+
+  @override
+  String get settingsDensity => 'Dichte';
+
+  @override
+  String get settingsDensityComfortable => 'Normal';
+
+  @override
+  String get settingsDensityCompact => 'Kompakt';
+
+  @override
+  String get settingsMotion => 'Bewegung';
+
+  @override
+  String get settingsMotionSystem => 'System';
+
+  @override
+  String get settingsMotionFull => 'Voll';
+
+  @override
+  String get settingsMotionReduced => 'Reduziert';
+
+  @override
+  String get settingsEnterSends => 'Enter sendet';
+
+  @override
+  String get settingsEnterSendsHint => 'Umschalt+Enter: neue Zeile';
+
+  @override
+  String get settingsColumnWidths => 'Spaltenbreiten';
+
+  @override
+  String get settingsColumnWidthsReset => 'Zurücksetzen';
+
+  @override
+  String get settingsLanguage => 'Sprache';
+
+  @override
+  String get settingsLanguageGerman => 'Deutsch';
+
+  @override
+  String get settingsLanguageEnglish => 'Englisch';
+
+  @override
+  String get settingsTimeZone => 'Zeitzone';
+
+  @override
+  String settingsProfileFailed(String reason) {
+    return 'Das Profil konnte nicht gespeichert werden: $reason';
+  }
+
+  @override
+  String settingsShortcuts(String shortcut) {
+    return 'Alle Tastenkürzel: $shortcut';
+  }
+
+  @override
+  String get settingsCrashReports => 'Absturzberichte senden';
+
+  @override
+  String get settingsCrashReportsHint =>
+      'Ohne Inhalte: nur App-Version, Plattform und Gerätetyp.';
+
+  @override
+  String get settingsClientMetrics => 'Leistungsdaten senden';
+
+  @override
+  String get settingsClientMetricsHint => 'Ohne Inhalte, IDs oder Namen.';
+
+  @override
+  String get settingsAboutAppVersion => 'App-Version';
+
+  @override
+  String get settingsAboutServerVersion => 'Server-Spezifikation';
+
+  @override
+  String get settingsAboutLicenses => 'Lizenzen';
 }

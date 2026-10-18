@@ -9,13 +9,14 @@ import 'dart:convert';
 import '../dpop_verifier.dart';
 import '../rest_fake.dart';
 import '../world.dart';
+import 'self_handlers.dart' show requireStepUp;
 
 /// Registers the auth and instance handlers on [rest]; access tokens live [accessTokenTtl]
 /// (`auth.access_token_ttl`).
 ///
 /// Simplifications (README): a password login of a person without
-/// `newDevicesPending` gets an active device; the TOTP code is a fixed value of the person;
-/// step-up is not asked for `approveDevice` and `approvePairing`.
+/// `newDevicesPending` gets an active device; the TOTP code is a fixed value of the person.
+/// `approveDevice` and `approvePairing` need a fresh step-up of the session (08 5.2, 5.3).
 void registerAuthHandlers(RestFake rest, {required Duration accessTokenTtl}) {
   final world = rest.world;
   final tokens = _Tokens(world, accessTokenTtl);
@@ -87,11 +88,16 @@ void registerAuthHandlers(RestFake rest, {required Duration accessTokenTtl}) {
       });
     })
     ..handle('approvePairing', (r) {
+      requireStepUp(r);
       final code = r.json['pairing_code'];
       final pairing = world.pairings.values
           .where((p) => p.code == code && p.state == 'requested')
           .firstOrNull;
-      if (pairing == null) throw const FakeProblem(404, 'not_found');
+      if (pairing == null) {
+        // A code without an open pairing ends the step-up of the session (08 5.3).
+        r.session!.stepUpAt = null;
+        throw const FakeProblem(404, 'not_found');
+      }
       pairing
         ..state = 'approved'
         ..approvedBy = r.person.id;
@@ -170,6 +176,7 @@ void registerAuthHandlers(RestFake rest, {required Duration accessTokenTtl}) {
           (device.userId != r.person.id && !r.person.isOwner)) {
         throw const FakeProblem(404, 'not_found');
       }
+      requireStepUp(r);
       if (device.state != 'pending') throw const FakeProblem(409, 'conflict');
       if (r.json['verification_code'] == device.verificationCode) {
         world.approveDevice(device.id);
@@ -184,6 +191,8 @@ void registerAuthHandlers(RestFake rest, {required Duration accessTokenTtl}) {
       return FakeResponse(200, {
         'principal': person.ref,
         'is_owner': person.isOwner,
+        'locale': ?person.locale,
+        'time_zone': ?person.timeZone,
         'permission_version': world.permissionVersion,
         'session_id': r.session!.id,
         'device_id': r.session!.deviceId,
@@ -246,6 +255,11 @@ FakeDevice _register(
     createdAt: world.stamp(),
   );
   if (state == 'active') device.approvedAt = device.createdAt;
+  final stepUp = registration['step_up_key'];
+  if (stepUp is JsonMap && stepUp['public_jwk'] is JsonMap) {
+    device.stepUpJwk = (stepUp['public_jwk']! as JsonMap)
+        .cast<String, Object?>();
+  }
   world.devices[id] = device;
   return device;
 }

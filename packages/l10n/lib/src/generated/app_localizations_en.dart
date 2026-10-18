@@ -1564,4 +1564,327 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get shellStepUpTitle => 'Confirm it is you';
+
+  @override
+  String get stepUpGenericPurpose => 'This action needs your confirmation.';
+
+  @override
+  String get stepUpNext =>
+      'Next, your device asks for your fingerprint, face or device password.';
+
+  @override
+  String get stepUpContinue => 'Continue';
+
+  @override
+  String get selfCancel => 'Cancel';
+
+  @override
+  String get selfOffline => 'No connection. Try again when you are online.';
+
+  @override
+  String get selfLoadFailed => 'The list could not be loaded.';
+
+  @override
+  String get selfRetry => 'Try again';
+
+  @override
+  String stepUpPurposeApproveDevice(String name) {
+    return 'Confirm the waiting device $name';
+  }
+
+  @override
+  String get stepUpPurposeAddDevice => 'Add a new device to your account';
+
+  @override
+  String stepUpPurposeRevokeDevice(String name) {
+    return 'Revoke the device $name';
+  }
+
+  @override
+  String get devicesTitle => 'Devices';
+
+  @override
+  String get devicesAdd => 'Add device';
+
+  @override
+  String get devicesThisDevice => 'This device';
+
+  @override
+  String get devicesStatePending => 'Waiting for confirmation';
+
+  @override
+  String get devicesStateRevoked => 'Revoked';
+
+  @override
+  String devicesAppVersion(String version) {
+    return 'Version $version';
+  }
+
+  @override
+  String devicesLastActive(String when) {
+    return 'Last active $when';
+  }
+
+  @override
+  String get devicesPlatformIos => 'iPhone or iPad';
+
+  @override
+  String get devicesPlatformAndroid => 'Android';
+
+  @override
+  String get devicesPlatformMacos => 'Mac';
+
+  @override
+  String get devicesPlatformWindows => 'Windows';
+
+  @override
+  String get devicesPlatformWeb => 'Web console';
+
+  @override
+  String get devicesPlatformCli => 'Command line';
+
+  @override
+  String get devicesPlatformOther => 'Other platform';
+
+  @override
+  String get devicesEnterCode => 'Enter code';
+
+  @override
+  String get devicesRevoke => 'Revoke';
+
+  @override
+  String devicesRevokeTitle(String name) {
+    return 'Revoke $name?';
+  }
+
+  @override
+  String get devicesRevokeBody =>
+      'The device is signed out and deletes its local data at its next contact.';
+
+  @override
+  String get devicesRevokeThisBody =>
+      'You are signed out on this device and its local data is deleted.';
+
+  @override
+  String get devicesRevokeReason => 'Reason (optional)';
+
+  @override
+  String get devicesRevokeDefaultReason => 'Revoked in the settings';
+
+  @override
+  String devicesRevoked(String name) {
+    return '$name was revoked.';
+  }
+
+  @override
+  String devicesConfirmTitle(String name) {
+    return 'Confirm $name';
+  }
+
+  @override
+  String get devicesConfirmHint =>
+      'Type the code that the waiting device shows.';
+
+  @override
+  String get devicesConfirmCode => 'Confirmation code';
+
+  @override
+  String get devicesConfirmSubmit => 'Confirm';
+
+  @override
+  String devicesConfirmed(String name) {
+    return '$name is now active.';
+  }
+
+  @override
+  String get devicesConfirmRejected =>
+      'The waiting device was rejected because the code did not match.';
+
+  @override
+  String get devicesAddTitle => 'Add device';
+
+  @override
+  String get devicesAddHint =>
+      'Type the pairing code that the new device shows.';
+
+  @override
+  String get devicesAddCode => 'Pairing code';
+
+  @override
+  String get devicesAddSubmit => 'Add';
+
+  @override
+  String devicesAdded(String name) {
+    return '$name was added.';
+  }
+
+  @override
+  String get devicesPairingNotFound => 'No open pairing with this code.';
+
+  @override
+  String get sessionsTitle => 'Sessions';
+
+  @override
+  String get sessionsCurrent => 'This session';
+
+  @override
+  String get sessionsUnknownDevice => 'Unknown device';
+
+  @override
+  String sessionsLastUsed(String when) {
+    return 'Last used $when';
+  }
+
+  @override
+  String get sessionsMethodOidc => 'Login service';
+
+  @override
+  String get sessionsMethodTrustedHeader => 'Login through the network';
+
+  @override
+  String get sessionsMethodPasskey => 'Passkey';
+
+  @override
+  String get sessionsMethodPasswordTotp => 'Password and one-time code';
+
+  @override
+  String get sessionsMethodEnrollmentCode => 'Enrollment code';
+
+  @override
+  String get sessionsMethodDevicePairing => 'Pairing';
+
+  @override
+  String get sessionsMethodOther => 'Other method';
+
+  @override
+  String get sessionsEnd => 'End session';
+
+  @override
+  String get sessionsEndTitle => 'End this session?';
+
+  @override
+  String get sessionsEndBody => 'The device of this session is signed out.';
+
+  @override
+  String get sessionsEndCurrentBody =>
+      'You are signed out on this device and its local data is deleted.';
+
+  @override
+  String get sessionsEnded => 'The session was ended.';
+
+  @override
+  String get settingsTitle => 'Settings';
+
+  @override
+  String get settingsBack => 'Back';
+
+  @override
+  String get settingsSectionAppearance => 'Appearance';
+
+  @override
+  String get settingsSectionNotifications => 'Notifications';
+
+  @override
+  String get settingsSectionLanguage => 'Language';
+
+  @override
+  String get settingsSectionKeyboard => 'Keyboard';
+
+  @override
+  String get settingsSectionDevices => 'Devices and sessions';
+
+  @override
+  String get settingsSectionPrivacy => 'Privacy';
+
+  @override
+  String get settingsSectionAbout => 'About';
+
+  @override
+  String get settingsTheme => 'Theme';
+
+  @override
+  String get settingsThemeSystem => 'System';
+
+  @override
+  String get settingsThemeLight => 'Light';
+
+  @override
+  String get settingsThemeDark => 'Dark';
+
+  @override
+  String get settingsDensity => 'Density';
+
+  @override
+  String get settingsDensityComfortable => 'Normal';
+
+  @override
+  String get settingsDensityCompact => 'Compact';
+
+  @override
+  String get settingsMotion => 'Motion';
+
+  @override
+  String get settingsMotionSystem => 'System';
+
+  @override
+  String get settingsMotionFull => 'Full';
+
+  @override
+  String get settingsMotionReduced => 'Reduced';
+
+  @override
+  String get settingsEnterSends => 'Enter sends';
+
+  @override
+  String get settingsEnterSendsHint => 'Shift+Enter: new line';
+
+  @override
+  String get settingsColumnWidths => 'Column widths';
+
+  @override
+  String get settingsColumnWidthsReset => 'Reset';
+
+  @override
+  String get settingsLanguage => 'Language';
+
+  @override
+  String get settingsLanguageGerman => 'German';
+
+  @override
+  String get settingsLanguageEnglish => 'English';
+
+  @override
+  String get settingsTimeZone => 'Time zone';
+
+  @override
+  String settingsProfileFailed(String reason) {
+    return 'The profile could not be saved: $reason';
+  }
+
+  @override
+  String settingsShortcuts(String shortcut) {
+    return 'All keyboard shortcuts: $shortcut';
+  }
+
+  @override
+  String get settingsCrashReports => 'Send crash reports';
+
+  @override
+  String get settingsCrashReportsHint =>
+      'Without content: app version, platform and device type only.';
+
+  @override
+  String get settingsClientMetrics => 'Send performance data';
+
+  @override
+  String get settingsClientMetricsHint => 'Without content, IDs or names.';
+
+  @override
+  String get settingsAboutAppVersion => 'App version';
+
+  @override
+  String get settingsAboutServerVersion => 'Server specification';
+
+  @override
+  String get settingsAboutLicenses => 'Licenses';
 }

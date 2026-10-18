@@ -8,10 +8,13 @@ import 'package:design_system/design_system.dart';
 import 'package:domain/domain.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 import 'package:l10n/l10n.dart';
 import 'package:sync_engine/sync_engine.dart';
 
 import '../../onboarding/onboarding_controller.dart';
+import '../../settings/settings_providers.dart';
+import '../../settings/settings_shell.dart';
 import '../providers/ports.dart';
 import '../providers/session.dart';
 import '../providers/settings.dart';
@@ -73,22 +76,40 @@ class DesktopShell extends ConsumerWidget {
                   .toDouble(),
               stackShowsHistory: parsed is ThreadLocation,
               onWidthsChanged: (next) {
-                final engine = ref.read(syncEngineProvider);
-                if (engine != null) ColumnWidthsWriter(engine).save(next);
+                final settings = ref.read(settingsRepositoryProvider);
+                if (settings != null) ColumnWidthsWriter(settings).save(next);
               },
               sidebar: Align(
                 alignment: Alignment.bottomLeft,
                 child: Padding(
                   padding: const EdgeInsets.all(DsSpace.s8),
-                  child: TextButton(
-                    key: const ValueKey('shell.logout'),
-                    onPressed: () => ref
-                        .read(onboardingControllerProvider.notifier)
-                        .logout(),
-                    child: Text(
-                      l.onboardingLogOut,
-                      style: TextStyle(color: context.dsColors.textOnSidebar),
-                    ),
+                  child: Wrap(
+                    spacing: DsSpace.s8,
+                    children: [
+                      TextButton(
+                        key: const ValueKey('shell.settings'),
+                        onPressed: () =>
+                            context.go(SettingsSection.appearance.path),
+                        child: Text(
+                          l.settingsTitle,
+                          style: TextStyle(
+                            color: context.dsColors.textOnSidebar,
+                          ),
+                        ),
+                      ),
+                      TextButton(
+                        key: const ValueKey('shell.logout'),
+                        onPressed: () => ref
+                            .read(onboardingControllerProvider.notifier)
+                            .logout(),
+                        child: Text(
+                          l.onboardingLogOut,
+                          style: TextStyle(
+                            color: context.dsColors.textOnSidebar,
+                          ),
+                        ),
+                      ),
+                    ],
                   ),
                 ),
               ),

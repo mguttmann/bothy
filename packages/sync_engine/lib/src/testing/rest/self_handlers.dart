@@ -1,0 +1,149 @@
+// SPDX-License-Identifier: Apache-2.0
+
+/// Handlers of the own devices, sessions and profile and of the step-up with the device key
+/// (brief M4-25 Scope; 08 5.4, 6.2, 10; 05 `device.approve`, `device.revoke` with step-up,
+/// `session.revoke` without).
+library;
+
+import '../dpop_verifier.dart';
+import '../rest_fake.dart';
+import '../world.dart';
+
+/// How long one confirmation of a session counts (`auth.step_up_max_age`).
+const Duration stepUpMaxAge = Duration(minutes: 5);
+
+/// Throws `401 step_up_required` unless the session of [r] confirmed with its step-up key
+/// within [stepUpMaxAge], and `403 forbidden` with `step_up_not_possible` for a device
+/// without an active `step_up` key (08 6.2).
+void requireStepUp(FakeRequest r) {
+  final session = r.session!;
+  final device = r.world.devices[session.deviceId]!;
+  if (device.stepUpJwk == null) {
+    throw const FakeProblem(403, 'forbidden', reason: 'step_up_not_possible');
+  }
+  final at = session.stepUpAt;
+  if (at == null || r.world.now().difference(at) > stepUpMaxAge) {
+    throw const FakeProblem(401, 'step_up_required');
+  }
+}
+
+/// Registers the self-service and step-up handlers on [rest].
+void registerSelfHandlers(RestFake rest) {
+  final world = rest.world;
+  rest
+    ..handle('createStepUpChallenge', (r) {
+      final session = r.session!;
+      if (world.devices[session.deviceId]!.stepUpJwk == null) {
+        throw const FakeProblem(
+          403,
+          'forbidden',
+          reason: 'step_up_not_possible',
+        );
+      }
+      final id = world.nextId();
+      final challenge = 'c${id.replaceAll('-', '')}';
+      world.stepUpChallenges[id] = (
+        challenge: challenge,
+        sessionId: session.id,
+      );
+      return FakeResponse(200, {
+        'challenge_id': id,
+        'challenge': challenge,
+        'expires_at': world.stamp(world.now().add(const Duration(minutes: 2))),
+      });
+    })
+    ..handle('completeStepUpWithDeviceKey', (r) {
+      final session = r.session!;
+      final jwk = world.devices[session.deviceId]!.stepUpJwk;
+      if (jwk == null) {
+        throw const FakeProblem(
+          403,
+          'forbidden',
+          reason: 'step_up_not_possible',
+        );
+      }
+      final open = world.stepUpChallenges.remove(r.json['challenge_id']);
+      if (open == null || open.sessionId != session.id) {
+        throw const FakeProblem(401, 'step_up_required');
+      }
+      final payload = DpopVerifier.verifyCompactJws(
+        jwk,
+        r.json['signature']! as String,
+      );
+      if (payload == null ||
+          payload['challenge'] != open.challenge ||
+          payload['sid'] != session.id) {
+        throw const FakeProblem(401, 'step_up_required');
+      }
+      final now = world.now();
+      session.stepUpAt = now;
+      return FakeResponse(200, {
+        'step_up_at': world.stamp(now),
+        'valid_until': world.stamp(now.add(stepUpMaxAge)),
+      });
+    })
+    ..handle(
+      'listMyDevices',
+      (r) => FakeResponse(200, {
+        'items': [
+          for (final d in world.devices.values)
+            if (d.userId == r.person.id)
+              d.toJson(self: d.id == r.session!.deviceId),
+        ],
+      }),
+    )
+    ..handle('revokeDevice', (r) {
+      final device = world.devices[r.param('device_id')];
+      if (device == null ||
+          (device.userId != r.person.id && !r.person.isOwner)) {
+        throw const FakeProblem(404, 'not_found');
+      }
+      requireStepUp(r);
+      if (device.state != 'revoked') {
+        world.revokeDevice(
+          device.id,
+          reason: device.userId == r.person.id
+              ? 'revoked_by_self'
+              : 'revoked_by_owner',
+        );
+      }
+      return FakeResponse(200, device.toJson());
+    })
+    ..handle(
+      'listMySessions',
+      (r) => FakeResponse(200, {
+        'items': [
+          for (final s in world.sessions.values)
+            if (s.userId == r.person.id && !s.revoked)
+              s.toJson(current: s.id == r.session!.id),
+        ],
+      }),
+    )
+    ..handle('revokeSession', (r) {
+      final session = world.sessions[r.param('session_id')];
+      if (session == null || session.userId != r.person.id) {
+        throw const FakeProblem(404, 'not_found');
+      }
+      world.revokeSession(session.id, reason: 'logout');
+      return const FakeResponse.noContent();
+    })
+    ..handle('updateMyProfile', (r) {
+      final person = r.person;
+      final body = r.json;
+      person
+        ..locale = body['locale'] as String? ?? person.locale
+        ..timeZone = body['time_zone'] as String? ?? person.timeZone;
+      return FakeResponse(200, _user(world, person));
+    });
+}
+
+JsonMap _user(FakeWorld world, FakePerson person) => {
+  'id': person.id,
+  'handle': person.handle,
+  'display_name': person.displayName,
+  'status': 'active',
+  'is_owner': person.isOwner,
+  'locale': ?person.locale,
+  'time_zone': ?person.timeZone,
+  'created_at': world.stamp(DateTime.utc(2026, 10)),
+};

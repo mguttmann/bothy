@@ -172,9 +172,12 @@ AppPorts testPorts({
   PasskeyAuthenticator? passkeys,
   BrowserLauncher? browser,
   DatabaseOpener? openDatabase,
+  StepUpPrompt? stepUpPrompt,
+  BuildBranding branding = testBranding,
   Map<String, String> config = fastConfig,
 }) => AppPorts(
-  branding: testBranding,
+  branding: branding,
+  stepUpPrompt: stepUpPrompt,
   platform: 'macos',
   deviceName: 'Alex laptop',
   secureBackend: secureBackend ?? MemorySecureBackend(),

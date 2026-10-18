@@ -187,6 +187,25 @@ final class DpopVerifier {
   static String athOf(String accessToken) =>
       _encode(sha256.convert(ascii.encode(accessToken)).bytes);
 
+  /// The payload of the compact JWS [jws] when its header is only `{"alg":"ES256"}` and the
+  /// signature verifies with the EC [jwk]; null otherwise (a step-up confirmation, 08 6.2).
+  static JsonMap? verifyCompactJws(JsonMap jwk, String jws) {
+    final parts = jws.split('.');
+    if (parts.length != 3) return null;
+    try {
+      final header = _json(parts[0]);
+      if (header.length != 1 || header['alg'] != 'ES256') return null;
+      final valid = _verifyEs256(
+        jwk,
+        Uint8List.fromList(ascii.encode('${parts[0]}.${parts[1]}')),
+        _b64(parts[2]),
+      );
+      return valid ? _json(parts[1]) : null;
+    } on FormatException {
+      return null;
+    }
+  }
+
   /// The RFC 7638 thumbprint of an EC [jwk].
   static String thumbprint(Map<String, Object?> jwk) => _encode(
     sha256
