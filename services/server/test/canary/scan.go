@@ -62,6 +62,18 @@ type needle struct {
 // field of every record and returns the matches the allow matrix forbids. Matching is
 // case-insensitive. A value is reported once per record field.
 func Scan(reg *Registry, sinks *Sinks, rules AllowRules) []Finding {
+	return scan(reg, sinks, rules, false)
+}
+
+// Matches is Scan without the allow matrix: every match of every value, allowed or not. The
+// tests use it for positive checks (a reason reached audit_events.details, a content value
+// reached a permitted observer).
+func Matches(reg *Registry, sinks *Sinks) []Finding {
+	return scan(reg, sinks, AllowRules{}, true)
+}
+
+// scan matches the values; all keeps the matches the allow matrix permits.
+func scan(reg *Registry, sinks *Sinks, rules AllowRules, all bool) []Finding {
 	canaries := reg.Canaries()
 	index := map[string][]needle{}
 	for i := range canaries {
@@ -78,7 +90,7 @@ func Scan(reg *Registry, sinks *Sinks, rules AllowRules) []Finding {
 	for _, r := range sinks.Records() {
 		for _, f := range r.Fields {
 			for _, c := range match(index, strings.ToLower(f.Text)) {
-				if allowed(*c, r, f.Location, rules) {
+				if !all && allowed(*c, r, f.Location, rules) {
 					continue
 				}
 				prefix := c.Value

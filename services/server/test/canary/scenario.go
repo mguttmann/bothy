@@ -271,3 +271,76 @@ func newID() string { return ids.New().String() }
 
 // trimSpace is strings.TrimSpace (secret file content without its newline).
 func trimSpace(s string) string { return strings.TrimSpace(s) }
+
+// NewScenario builds the matrix world on the server of r, gives every client of the world the
+// observer of the run and a network canary as client address, and opens the gateway
+// connections of the observers Sam (reads Marketing and Support/Allgemein) and Robin (reads
+// Engineering/Projekt-A).
+func NewScenario(ctx context.Context, r *Run) *Scenario {
+	r.T.Helper()
+	w := harness.BuildMatrixWorld(r.T, r.Server)
+	sc := &Scenario{Run: r, W: w, Ctx: ctx, Observers: map[string]*harness.Client{}, gw: map[string]*harness.GatewayConn{}}
+	for name, c := range w.People {
+		r.Watch(c, name)
+	}
+	for name, c := range w.Agents {
+		r.Watch(c, name)
+	}
+	r.Server.Owner.ClientIP = r.IPv6
+	w.People["Alex"].ClientIP = r.IPv4
+	sc.Observers["Sam"], sc.Observers["Robin"] = w.People["Sam"], w.People["Robin"]
+	sc.Readable = map[string]map[string]bool{
+		"Sam":   {w.Spaces["Marketing"]: true, w.Channels["Marketing/Kampagnen"]: true, w.Spaces["Support"]: true, w.Channels["Support/Allgemein"]: true},
+		"Robin": {w.Spaces["Engineering"]: true, w.Channels["Engineering/Projekt-A"]: true},
+	}
+	for name, c := range sc.Observers {
+		g, err := c.Gateway(ctx)
+		if err != nil {
+			r.T.Fatalf("gateway of %s: %v", name, err)
+		}
+		sc.gw[name] = g
+	}
+	return sc
+}
+
+// observerWait is how long the end of the scenario waits for further observer frames.
+const observerWait = 2 * time.Second
+
+// FinishObservers drains the gateway frames of the observers, pages listEvents from cursor 0 and
+// loads getSnapshot for each, and adds all of it to the foreign sink.
+func (sc *Scenario) FinishObservers() {
+	sc.T.Helper()
+	for name, g := range sc.gw {
+		n := 0
+		for {
+			ctx, cancel := context.WithTimeout(sc.Ctx, observerWait)
+			f, err := g.Next(ctx)
+			cancel()
+			if err != nil {
+				break
+			}
+			n++
+			sc.Sinks.AddJSON(SinkForeign, fmt.Sprintf("%s gateway frame %d %s", name, n, f.Op), name, "/d", f.D)
+		}
+		g.Close()
+	}
+	for name, c := range sc.Observers {
+		after := "0"
+		for page := 1; ; page++ {
+			resp := sc.get(c, "/events?limit=200&after="+after, ok...)
+			sc.Sinks.AddJSON(SinkForeign, fmt.Sprintf("%s listEvents page %d", name, page), name, "", resp.Body)
+			var body struct {
+				Items      []json.RawMessage `json:"items"`
+				NextCursor *string           `json:"next_cursor"`
+				HeadSeq    json.Number       `json:"head_seq"`
+			}
+			_ = json.Unmarshal(resp.Body, &body)
+			if len(body.Items) == 0 || body.NextCursor == nil || *body.NextCursor == "" || *body.NextCursor == after || page > 200 {
+				break
+			}
+			after = *body.NextCursor
+		}
+		snap := sc.get(c, "/sync/snapshot", ok...)
+		sc.Sinks.AddJSON(SinkForeign, name+" getSnapshot", name, "", snap.Body)
+	}
+}
