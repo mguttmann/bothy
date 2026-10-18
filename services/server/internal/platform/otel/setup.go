@@ -186,7 +186,7 @@ func setup(ctx context.Context, cfg Config, deps Deps, opts setupOptions) (*Tele
 	otelapi.SetLoggerProvider(t.logs)
 	otelapi.SetTextMapPropagator(propagation.TraceContext{})
 	otelapi.SetErrorHandler(&errorHandler{logger: NewCommandLogger(deps.Stdout, slog.LevelWarn), clock: deps.Clock})
-	setHTTPState(cfg.TrustRemoteParent, t.logger)
+	setHTTPState(cfg.TrustRemoteParent, t.logger, t.pseudo)
 	return t, nil
 }
 
