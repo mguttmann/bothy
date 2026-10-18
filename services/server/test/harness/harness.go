@@ -25,6 +25,7 @@ import (
 	"bufio"
 	"bytes"
 	"context"
+	"crypto/x509"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -74,8 +75,10 @@ type Options struct {
 	Config map[string]string
 	// LogWriter receives the JSON log lines of the server besides the harness; nil discards them.
 	LogWriter io.Writer
-	// Telemetry are in-process telemetry sinks; M1-69 adds them, until then Start refuses a
-	// non-nil value.
+	// Telemetry are in-process telemetry sinks (NewTelemetrySinks): the server exports spans,
+	// OTLP log records and metrics into them instead of over OTLP, and telemetry.enabled is true
+	// unless Config sets it. otel.Setup installs global providers, so a test that sets it never
+	// runs in parallel with another harness start of its binary.
 	Telemetry *TelemetrySinks
 	// EgressDenyAll makes every outgoing client of the server refuse every target before name
 	// resolution (wire.Deps.EgressDenyAll).
@@ -86,10 +89,17 @@ type Options struct {
 	// DurableDB puts the database on the durable pgtest server (pgtest.Durable: fsync,
 	// synchronous_commit and full_page_writes on); every perf and chaos test sets it (ADR 0063).
 	DurableDB bool
+	// Env are extra "NAME=value" entries of the process environment of the server, for secret
+	// references of the env scheme (env:BOTHY_IDP_<name> of an OIDC client secret, M1-69).
+	Env []string
+	// OIDCRootCAs are the trusted TLS roots of the OIDC provider requests of the server
+	// (wire.Deps.OIDCRootCAs): the pool of the fake provider of oidctest; nil means the system
+	// roots.
+	OIDCRootCAs *x509.CertPool
+	// ProofObserver, when set, sees every DPoP proof a client of the server sends (requests and
+	// gateway identify or reauth), so the canary test registers them as secrets.
+	ProofObserver func(proof string)
 }
-
-// TelemetrySinks are the in-process exporters of the canary test; M1-69 fills them.
-type TelemetrySinks struct{}
 
 // Server is a running harness server.
 type Server struct {
@@ -100,10 +110,15 @@ type Server struct {
 	InternalURL string
 	// SecretsDir is secrets.dir of the server.
 	SecretsDir string
+	// SigningKeyDir is secrets.signing_key_dir of the server, the store of its private signing
+	// keys.
+	SigningKeyDir string
 	// Owner is the first owner, enrolled with fresh device keys.
 	Owner *Client
 
-	db    *pgtest.DB
+	// proofs is Options.ProofObserver, handed to every client of the server.
+	proofs func(string)
+	db     *pgtest.DB
 	tb    testing.TB
 	clk   clock.Clock
 	http  *http.Client
@@ -137,9 +152,6 @@ const (
 // Start runs a harness server for tb and stops it in tb.Cleanup.
 func Start(tb testing.TB, opts Options) *Server {
 	tb.Helper()
-	if opts.Telemetry != nil {
-		tb.Fatal("harness: Options.Telemetry is not supported before M1-69")
-	}
 	clk := opts.Clock
 	if clk == nil {
 		clk = clock.System()
@@ -202,9 +214,13 @@ func start(tb testing.TB, db *pgtest.DB, opts Options, clk clock.Clock, secretsD
 		out = io.MultiWriter(logs, opts.LogWriter)
 	}
 	sigs := make(chan os.Signal, 2)
-	runner, err := wire.Serve(context.Background(), values, wire.RoleAll, wire.Deps{
-		Env: env, Stdout: out, Signals: sigs, Clock: clk, EgressDenyAll: opts.EgressDenyAll,
-	})
+	deps := wire.Deps{
+		Env: env, Stdout: out, Signals: sigs, Clock: clk, EgressDenyAll: opts.EgressDenyAll, OIDCRootCAs: opts.OIDCRootCAs,
+	}
+	if opts.Telemetry != nil {
+		deps.TelemetryExporters = opts.Telemetry.exporters()
+	}
+	runner, err := wire.Serve(context.Background(), values, wire.RoleAll, deps)
 	if err != nil {
 		return nil, err
 	}
@@ -220,7 +236,7 @@ func start(tb testing.TB, db *pgtest.DB, opts Options, clk clock.Clock, secretsD
 	}
 	s := &Server{
 		PublicURL: public, APIBase: public + apiPrefix, GatewayURL: "ws://127.0.0.1:" + strconv.Itoa(port) + apiPrefix + "/gateway",
-		InternalURL: internal, SecretsDir: secretsDir, db: db, tb: tb, clk: clk, values: values, env: env,
+		InternalURL: internal, SecretsDir: secretsDir, SigningKeyDir: keys, proofs: opts.ProofObserver, db: db, tb: tb, clk: clk, values: values, env: env,
 		http: &http.Client{Timeout: 60 * time.Second},
 	}
 	owner, err := s.redeem(tb.Context(), *code, "Owner device")
@@ -261,14 +277,17 @@ func environment(db *pgtest.DB, opts Options, public, secretsDir, keys string, p
 		"telemetry.logs.exporter":     "stdout",
 		"shutdown.drain_delay":        "0s",
 	}
+	if opts.Telemetry != nil {
+		set["telemetry.enabled"] = "true"
+	}
 	for k, v := range opts.Config {
 		set[k] = v
 	}
-	env := make([]string, 0, len(set))
+	env := make([]string, 0, len(set)+len(opts.Env))
 	for k, v := range set {
 		env = append(env, config.EnvName(k)+"="+v)
 	}
-	return env
+	return append(env, opts.Env...)
 }
 
 // initSecrets creates the secret volume as bothy secrets init does, with the database passwords
@@ -370,7 +389,7 @@ func stop(tb testing.TB, sigs chan os.Signal, done chan int, logs *logBuffer) {
 
 // redeem enrolls a new device with code (redeemEnrollmentCode) and returns its client.
 func (s *Server) redeem(ctx context.Context, code, name string) (*Client, error) {
-	c := &Client{publicURL: s.PublicURL, http: s.http, tb: s.tb, key: newDeviceKey(), stepKey: newDeviceKey(), DeviceID: ids.New().String()}
+	c := s.NewDevice()
 	resp := c.send(ctx, Request{Method: http.MethodPost, Path: "/auth/enroll/redeem", Body: map[string]any{
 		"enrollment_code": code,
 		"device":          c.registration(name),
@@ -397,6 +416,13 @@ func (s *Server) redeem(ctx context.Context, code, name string) (*Client, error)
 		c.PrincipalID = body.Principal.ID
 	}
 	return c, nil
+}
+
+// NewDevice returns a client of the server with fresh DPoP and step-up device keys and no
+// tokens yet: the device of a login, pairing or enrollment flow the test drives itself. Adopt
+// gives it the token pair of the flow.
+func (s *Server) NewDevice() *Client {
+	return &Client{publicURL: s.PublicURL, http: s.http, tb: s.tb, key: newDeviceKey(), stepKey: newDeviceKey(), DeviceID: ids.New().String(), proofs: s.proofs}
 }
 
 // registration is the DeviceRegistration of c with its DPoP and step-up keys.

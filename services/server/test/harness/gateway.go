@@ -102,7 +102,11 @@ func (c *Client) gatewayProof(nonce, access string) string {
 	if err != nil {
 		htu = c.publicURL + wstest.Path
 	}
-	return c.key.proof(http.MethodGet, htu, nonce, access, time.Now())
+	proof := c.key.proof(http.MethodGet, htu, nonce, access, time.Now())
+	if c.proofs != nil {
+		c.proofs(proof)
+	}
+	return proof
 }
 
 // read hands frames to Next until the connection ends; it counts heartbeat_ack and answers

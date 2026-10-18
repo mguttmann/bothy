@@ -88,6 +88,8 @@ type Client struct {
 	stepKey   *deviceKey
 	// apiToken marks the client of an agent: access is an API token, there is no device.
 	apiToken bool
+	// proofs is Options.ProofObserver of the server; nil sees nothing.
+	proofs func(string)
 	// tb is the test of the server: gateway connections report their frame violations to it (G9).
 	tb testing.TB
 
@@ -177,7 +179,11 @@ func (c *Client) attempt(ctx context.Context, r Request, auth bool) Response {
 	if access != "" {
 		req.Header.Set("Authorization", "DPoP "+access)
 	}
-	req.Header.Set("DPoP", c.key.proof(r.Method, target, nonce, access, time.Now()))
+	proof := c.key.proof(r.Method, target, nonce, access, time.Now())
+	if c.proofs != nil {
+		c.proofs(proof)
+	}
+	req.Header.Set("DPoP", proof)
 	start := time.Now()
 	resp, err := c.http.Do(req)
 	if err != nil {
@@ -223,6 +229,28 @@ type tokenPair struct {
 		PrincipalID string `json:"principal_id"`
 	} `json:"device"`
 }
+
+// Adopt takes over the token pair of a TokenResponse body (a login, pairing or enrollment the
+// test drove itself with a client of Server.NewDevice) and sets PrincipalID and SessionID from
+// it. The error reports a body without access token.
+func (c *Client) Adopt(body []byte) error {
+	var pair tokenPair
+	if err := json.Unmarshal(body, &pair); err != nil {
+		return err
+	}
+	if pair.AccessToken == "" {
+		return fmt.Errorf("harness: no access_token in %d bytes", len(body))
+	}
+	c.adopt(pair)
+	if pair.Device.PrincipalID != "" {
+		c.PrincipalID = pair.Device.PrincipalID
+	}
+	return nil
+}
+
+// Registration returns the DeviceRegistration of the client (its DPoP and step-up keys) with
+// name, for the device member of login, pairing and enrollment requests.
+func (c *Client) Registration(name string) map[string]any { return c.registration(name) }
 
 // adopt takes over a token pair.
 func (c *Client) adopt(p tokenPair) {
