@@ -10,6 +10,15 @@ environment:
   sdk: ^3.13.5
   flutter: 3.47.7
 
+# drift on SQLite3MultipleCiphers (15 6): the cipher comes from the build hook of `sqlite3`,
+# selected by the user define in the root pubspec.yaml (docs/DECISIONS.md D-M4-12-2).
+dependencies:
+  domain: any
+  drift: ^2.35.2
+  sqlite3: ^3.7.1
+
 dev_dependencies:
+  build_runner: ^2.16.1
+  drift_dev: ^2.35.1
   lints: ^6.1.0
   test: ^1.31.1

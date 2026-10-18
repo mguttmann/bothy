@@ -3,9 +3,12 @@
 
 Generated code is excluded from coverage (docs/DECISIONS.md D-M4-01-4), with the same patterns
 as the doc and style lint in the root analysis_options.yaml: `*.g.dart`, `*.freezed.dart`,
-`*.drift.dart`, everything below `lib/src/generated/` and the build output `build/`. The report
-of `flutter test --coverage` names files relative to the member (`SF:lib/x.dart`); absolute
-paths are matched by their file name and the `lib/src/generated/` segment.
+`*.drift.dart`, everything below `lib/src/generated/` and the build output `build/`. The drift
+table definitions below `lib/src/tables/` leave too: drift's generator reads them and the
+generated `*.g.dart` holds the code that runs, so their getters never execute (D-M4-12-11).
+The report of `flutter test --coverage` names files relative to the member (`SF:lib/x.dart`);
+absolute paths are matched by their file name and the `lib/src/generated/` and `lib/src/tables/`
+segments.
 
 Usage:
   lcov_filter.py <lcov.info>            print the report without generated records
@@ -20,6 +23,7 @@ from pathlib import Path, PurePosixPath
 
 GENERATED_SUFFIXES = (".g.dart", ".freezed.dart", ".drift.dart")
 GENERATED_DIR = ("lib", "src", "generated")
+GENERATOR_INPUT_DIR = ("lib", "src", "tables")
 
 
 def is_generated(path: str) -> bool:
@@ -29,8 +33,11 @@ def is_generated(path: str) -> bool:
         return True
     if not path.startswith("/") and parts[:1] == ("build",):
         return True
-    n = len(GENERATED_DIR)
-    return any(parts[i : i + n] == GENERATED_DIR for i in range(len(parts) - n))
+    for segment in (GENERATED_DIR, GENERATOR_INPUT_DIR):
+        n = len(segment)
+        if any(parts[i : i + n] == segment for i in range(len(parts) - n)):
+            return True
+    return False
 
 
 def _records(text: str) -> list[list[str]]:

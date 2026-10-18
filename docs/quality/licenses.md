@@ -83,6 +83,18 @@ font file has no license text, a manifest entry names another license, or a file
 its recorded SHA-256. `NOTICE` names both fonts with their copyright (docs/DECISIONS.md
 D-M4-04-4).
 
+## Bundled native code
+
+The apps load SQLite3MultipleCiphers as their encrypted SQLite (docs/spec/15-client-architecture.md
+6, `packages/local_store`). The build hook of the Dart package `sqlite3` (3.7.1, MIT, a lock file
+package that `make licenses` checks) downloads the prebuilt library of its release and verifies it
+against the sha256 hashes in its sources; the root `pubspec.yaml` selects it with
+`hooks: user_defines: sqlite3: source: sqlite3mc`. SQLite3MultipleCiphers 2.6.1 is under the MIT
+license (`LICENSE` of its repository, Ulrich Telle); the SQLite 3.54.0 it contains is in the
+public domain (https://sqlite.org/copyright.html). Both are bundled native code, not packages of
+the lock file: OSV-Scanner does not see them and `quality/licenses/allowed.txt` stays unchanged;
+MIT is on that list (docs/DECISIONS.md D-M4-12-9).
+
 ## SBOM and checking releases
 
 * Every release contains `sbom.spdx.json` (SPDX, generated with Syft via

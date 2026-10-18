@@ -225,12 +225,24 @@ are marked as end-of-life (pub.dev API, version `0.6.0+eol` and `0.7.0+eol` resp
 2026-10-10 [verified]) and are not used.
 
 ```yaml
-# pubspec.yaml of the app (excerpt)
+# root pubspec.yaml of the workspace (excerpt)
 hooks:
   user_defines:
     sqlite3:
       source: sqlite3mc
 ```
+
+As built (M4-12): the user define lives in the root `pubspec.yaml`, because build hooks read
+user defines only from the workspace root; with the pinned SDK the hook then loads SQLite 3.54.0
+as SQLite3MultipleCiphers 2.6.1 (package `sqlite3` 3.7.1, a prebuilt library checked against
+the hashes of the package). The cipher is the SQLite3MultipleCiphers default `chacha20`
+(ChaCha20-Poly1305); the key is set as the first statement in the raw form
+`PRAGMA key = "x'<64 hex>'"`, which that library takes without a key derivation, and the opener
+checks the key, the cipher and FTS5 before drift uses the connection
+(`packages/local_store/README.md`, docs/DECISIONS.md D-M4-12-1, D-M4-12-2). The offline search
+table `search_index` is FTS5 with the tokenizer `unicode61 remove_diacritics 2` and no stemmer
+([14](14-search.md) 6, D-M4-12-5). Schema version 1 has every table of 6.1 except
+`host_key_pins`, which M4-36 adds with its own schema version (D-M4-12-8).
 
 ### 6.1 Schema mirror
 
@@ -284,6 +296,9 @@ work; `host_key_pins` likewise, because they are trust anchors. A test checks th
   that Android backups can restore an old database).
 - Cleanup: entries without access since `client.cache_max_age` and everything above `client.cache_max_bytes`
   (oldest first) are removed; never the outbox and drafts.
+  As built (M4-12): `CacheCleaner` removes threads (with everything below them) and file cache
+  rows by `last_accessed_at`; it never touches `outbox`, `drafts` and `share_inbox`, and never
+  the structure rows (spaces, channels, principals, commands, instance) the sidebar needs.
 - Access removal ([04](04-sync-protocol.md) section 8.3): on `access.changed` with `removed` the
   dispatcher deletes, in one transaction, all rows of the targets, their files in the cache and their entries in the
   search index. On `4012` the app deletes the database, file cache, keys and tokens.

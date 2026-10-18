@@ -1,0 +1,24 @@
+-- SPDX-License-Identifier: Apache-2.0
+-- Offline search (docs/spec/14-search.md 6; brief M4-12 Design note 5): FTS5 over the cached
+-- messages, thread titles and transcripts. Only `body` is indexed; the other columns locate the
+-- hit and drive the removal of 04 8.3. `unicode61 remove_diacritics 2` folds umlauts and accents
+-- without a stemmer, so German and English match without their diacritics (14 6 accepts other
+-- word stems than the server; docs/DECISIONS.md D-M4-12-5).
+CREATE VIRTUAL TABLE search_index USING fts5(
+  kind UNINDEXED,
+  target_id UNINDEXED,
+  thread_id UNINDEXED,
+  channel_id UNINDEXED,
+  space_id UNINDEXED,
+  body,
+  tokenize = 'unicode61 remove_diacritics 2'
+);
+
+-- Hits by relevance (bm25, lower is better) with a snippet of `body` (column 5).
+searchIndexQuery: SELECT kind, target_id, thread_id, channel_id, space_id,
+    snippet(search_index, 5, :open, :close, :ellipsis, 16) AS snippet,
+    bm25(search_index) AS rank
+  FROM search_index
+  WHERE search_index MATCH :query
+  ORDER BY rank
+  LIMIT :limit;

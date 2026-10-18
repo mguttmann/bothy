@@ -707,3 +707,94 @@ version = "2.1.2"
 ecosystem = "Pub"
 license.override = ["BSD-3-Clause"]
 reason = "deps.dev knows no license for this pub package; its LICENSE file on pub.dev is BSD-3-Clause. Dev package of api_client (build_runner or built_value_generator) or one of its transitive packages."
+
+[[PackageOverrides]]
+name = "charcode"
+version = "1.4.0"
+ecosystem = "Pub"
+license.override = ["BSD-3-Clause"]
+reason = "deps.dev knows no license for this pub package; its LICENSE file on pub.dev is BSD-3-Clause. Comes with the local database of the apps, a dependency of the drift generator (docs/DECISIONS.md D-M4-12-9)."
+
+[[PackageOverrides]]
+name = "code_assets"
+version = "2.1.0"
+ecosystem = "Pub"
+license.override = ["BSD-3-Clause"]
+reason = "deps.dev knows no license for this pub package; its LICENSE file on pub.dev is BSD-3-Clause. Comes with the local database of the apps, used by the build hook of sqlite3 (docs/DECISIONS.md D-M4-12-9)."
+
+[[PackageOverrides]]
+name = "drift"
+version = "2.35.2"
+ecosystem = "Pub"
+license.override = ["MIT"]
+reason = "deps.dev knows no license for this pub package; its LICENSE file on pub.dev is MIT. Comes with the local database of the apps, the database library of local_store (docs/DECISIONS.md D-M4-12-9)."
+
+[[PackageOverrides]]
+name = "drift_dev"
+version = "2.35.1"
+ecosystem = "Pub"
+license.override = ["MIT"]
+reason = "deps.dev knows no license for this pub package; its LICENSE file on pub.dev is MIT. Comes with the local database of the apps, the drift code generator, a dev dependency of local_store (docs/DECISIONS.md D-M4-12-9)."
+
+[[PackageOverrides]]
+name = "hooks"
+version = "2.2.0"
+ecosystem = "Pub"
+license.override = ["BSD-3-Clause"]
+reason = "deps.dev knows no license for this pub package; its LICENSE file on pub.dev is BSD-3-Clause. Comes with the local database of the apps, used by the build hook of sqlite3 (docs/DECISIONS.md D-M4-12-9)."
+
+[[PackageOverrides]]
+name = "native_toolchain_c"
+version = "0.19.5"
+ecosystem = "Pub"
+license.override = ["BSD-3-Clause"]
+reason = "deps.dev knows no license for this pub package; its LICENSE file on pub.dev is BSD-3-Clause. Comes with the local database of the apps, used by the build hook of sqlite3 (docs/DECISIONS.md D-M4-12-9)."
+
+[[PackageOverrides]]
+name = "platform"
+version = "3.2.0"
+ecosystem = "Pub"
+license.override = ["BSD-3-Clause"]
+reason = "deps.dev knows no license for this pub package; its LICENSE file on pub.dev is BSD-3-Clause. Comes with the local database of the apps, a dependency of the build hook tooling (docs/DECISIONS.md D-M4-12-9)."
+
+[[PackageOverrides]]
+name = "process"
+version = "5.0.6"
+ecosystem = "Pub"
+license.override = ["BSD-3-Clause"]
+reason = "deps.dev knows no license for this pub package; its LICENSE file on pub.dev is BSD-3-Clause. Comes with the local database of the apps, a dependency of the build hook tooling (docs/DECISIONS.md D-M4-12-9)."
+
+[[PackageOverrides]]
+name = "recase"
+version = "4.1.0"
+ecosystem = "Pub"
+license.override = ["BSD-2-Clause"]
+reason = "deps.dev knows no license for this pub package; its LICENSE file on pub.dev is BSD-2-Clause. Comes with the local database of the apps, a dependency of the drift generator (docs/DECISIONS.md D-M4-12-9)."
+
+[[PackageOverrides]]
+name = "record_use"
+version = "1.1.1"
+ecosystem = "Pub"
+license.override = ["BSD-3-Clause"]
+reason = "deps.dev knows no license for this pub package; its LICENSE file on pub.dev is BSD-3-Clause. Comes with the local database of the apps, used by the build hook of sqlite3 (docs/DECISIONS.md D-M4-12-9)."
+
+[[PackageOverrides]]
+name = "sqlite3"
+version = "3.7.1"
+ecosystem = "Pub"
+license.override = ["MIT"]
+reason = "deps.dev knows no license for this pub package; its LICENSE file on pub.dev is MIT. Comes with the local database of the apps, the SQLite binding whose hook bundles SQLite3MultipleCiphers (docs/DECISIONS.md D-M4-12-9)."
+
+[[PackageOverrides]]
+name = "sqlparser"
+version = "0.45.0"
+ecosystem = "Pub"
+license.override = ["MIT"]
+reason = "deps.dev knows no license for this pub package; its LICENSE file on pub.dev is MIT. Comes with the local database of the apps, the SQL parser of the drift generator (docs/DECISIONS.md D-M4-12-9)."
+
+[[PackageOverrides]]
+name = "yaml_edit"
+version = "2.2.4"
+ecosystem = "Pub"
+license.override = ["BSD-3-Clause"]
+reason = "deps.dev knows no license for this pub package; its LICENSE file on pub.dev is BSD-3-Clause. Comes with the local database of the apps, a dependency of the drift generator (docs/DECISIONS.md D-M4-12-9)."
