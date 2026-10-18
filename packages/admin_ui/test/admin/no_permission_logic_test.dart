@@ -2,7 +2,8 @@
 
 // No permission logic in the administration (brief M4-26 fixed requirement 9; 15 1 principle
 // 1): a 403 of a list hides the section and shows the server's reason; a refused change hides
-// its control; no source of the package reads grants.
+// its control; no source of the package reads grants, except the grant screens of M4-27 and
+// their data source, which show grants and never derive a control from them.
 
 import 'dart:io' as io;
 
@@ -95,13 +96,21 @@ void main() {
     expect(find.byKey(const ValueKey('person.newCode')), findsOneWidget);
   });
 
-  test('no source of admin_ui reads grants', () {
+  test('no source of admin_ui reads grants outside the grant screens', () {
     final grants = RegExp(r'GrantsApi|listGrants|\bGrant\b|grant\.read');
+    // The screens that show grants (M4-27, 07 9): they list and explain what the server
+    // answers and decide nothing with it.
+    bool showsGrants(String path) =>
+        path.startsWith('lib/src/grants/') ||
+        path.startsWith('lib/src/access/') ||
+        path == 'lib/src/data/access_repository.dart';
     final offenders = [
       for (final f in io.Directory(
         'lib',
       ).listSync(recursive: true).whereType<io.File>())
-        if (f.path.endsWith('.dart') && grants.hasMatch(f.readAsStringSync()))
+        if (f.path.endsWith('.dart') &&
+            !showsGrants(f.path) &&
+            grants.hasMatch(f.readAsStringSync()))
           f.path,
     ];
     expect(offenders, isEmpty);

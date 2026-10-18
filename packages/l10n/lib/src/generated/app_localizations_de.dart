@@ -2569,4 +2569,331 @@ class AppLocalizationsDe extends AppLocalizations {
   String stepUpPurposeRejectDevice(String device, String person) {
     return 'Gerät $device von $person ablehnen';
   }
+
+  @override
+  String get adminNavGrants => 'Freigaben';
+
+  @override
+  String get adminGrantsTitle => 'Freigaben';
+
+  @override
+  String get adminGrantsTarget => 'Ziel';
+
+  @override
+  String get adminGrantsPickTarget => 'Ziel wählen';
+
+  @override
+  String get adminTargetInstance => 'Instanz';
+
+  @override
+  String adminTargetSpace(String name) {
+    return 'Bereich $name';
+  }
+
+  @override
+  String adminTargetChannel(String path) {
+    return 'Kanal $path';
+  }
+
+  @override
+  String get adminGrantsCreate => 'Freigabe anlegen';
+
+  @override
+  String get adminGrantsWhoHasAccess => 'Wer hat Zugriff?';
+
+  @override
+  String get adminGrantsEmpty => 'Keine Freigabe auf diesem Ziel.';
+
+  @override
+  String adminGrantsUntil(String day) {
+    return 'bis $day';
+  }
+
+  @override
+  String adminGrantsReason(String reason) {
+    return 'Grund: $reason';
+  }
+
+  @override
+  String adminGrantCreated(String name) {
+    return '$name hat die Freigabe erhalten.';
+  }
+
+  @override
+  String adminGrantRevoked(String name) {
+    return 'Die Freigabe für $name wurde widerrufen.';
+  }
+
+  @override
+  String get adminLevelRead => 'Lesen';
+
+  @override
+  String get adminLevelWrite => 'Schreiben';
+
+  @override
+  String get adminLevelTrigger => 'Agenten auslösen';
+
+  @override
+  String get adminLevelNone => 'Keine Stufe';
+
+  @override
+  String get adminCapabilityUpload => 'Dateien hochladen';
+
+  @override
+  String get adminCapabilityExport => 'Exportieren';
+
+  @override
+  String get adminCapabilityManage => 'Verwalten';
+
+  @override
+  String get adminCapabilityTerminal => 'Terminal';
+
+  @override
+  String adminWizardStep(int step, int total) {
+    return 'Schritt $step von $total';
+  }
+
+  @override
+  String get adminWizardWho => 'Wer';
+
+  @override
+  String get adminWizardWhere => 'Wo';
+
+  @override
+  String get adminWizardLevel => 'Stufe und Zusatzrechte';
+
+  @override
+  String get adminWizardKindPerson => 'Person';
+
+  @override
+  String get adminWizardKindGroup => 'Gruppe';
+
+  @override
+  String get adminWizardKindAgent => 'Agent';
+
+  @override
+  String get adminWizardSearch => 'Nach Namen suchen';
+
+  @override
+  String get adminWizardNoMatch => 'Nichts gefunden.';
+
+  @override
+  String get adminWizardCapabilities => 'Zusatzrechte';
+
+  @override
+  String get adminWizardUntil => 'Gültig bis (JJJJ-MM-TT, optional)';
+
+  @override
+  String get adminReasonRequired => 'Grund (Pflicht, steht im Audit-Log)';
+
+  @override
+  String get adminWizardBack => 'Zurück';
+
+  @override
+  String get adminWizardNext => 'Weiter';
+
+  @override
+  String get adminWizardConfirm => 'Bestätigen';
+
+  @override
+  String get adminPreviewTitle => 'Vorschau in Klartext';
+
+  @override
+  String get adminPreviewLoading => 'Wirkung wird geprüft';
+
+  @override
+  String get adminPreviewEffects => 'Wer betroffen ist';
+
+  @override
+  String adminPreviewAdded(String level) {
+    return 'Erhält $level';
+  }
+
+  @override
+  String adminPreviewRemoved(String level) {
+    return 'Verliert $level';
+  }
+
+  @override
+  String adminPreviewChanged(String before, String after) {
+    return '$before wird zu $after';
+  }
+
+  @override
+  String adminPreviewCapabilities(String list) {
+    return 'Zusätzlich: $list';
+  }
+
+  @override
+  String get adminPreviewRejected => 'Würde abgelehnt';
+
+  @override
+  String adminPreviewAgent(String agent) {
+    return 'Agent: $agent';
+  }
+
+  @override
+  String adminPreviewAffected(String people) {
+    return 'Betroffen: $people';
+  }
+
+  @override
+  String get adminPreviewI1Hint =>
+      'Stelle den Agenten zuerst auf Organisation um.';
+
+  @override
+  String adminPreviewDenied(String reason) {
+    return 'Die Freigabe würde abgelehnt: $reason';
+  }
+
+  @override
+  String get adminPreviewHints => 'Hinweise';
+
+  @override
+  String adminHintReadHorizon(String person, String channel, String agent) {
+    return 'Lesehorizont (H1): $person kann Inhalte aus $channel über Agent $agent erfahren';
+  }
+
+  @override
+  String adminHintTriggerBlocked(String agent) {
+    return 'Auslösen gesperrt: $agent kann von diesem Prinzipal nicht ausgelöst werden (SR2, SR3)';
+  }
+
+  @override
+  String adminHintGroupReach(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: 'Diese Freigabe erreicht $count Personen',
+      one: 'Diese Freigabe erreicht 1 Person',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get adminHintExpiryMissing =>
+      'Kein Ablaufdatum: Die Freigabe für eine Person außerhalb von Gruppen endet nicht';
+
+  @override
+  String get adminHintTerminalNotEffective =>
+      'Die Freigabe wirkt auf diesem Rechner nicht (SR10, SR12)';
+
+  @override
+  String adminHintUnknown(String code) {
+    return 'Hinweis $code';
+  }
+
+  @override
+  String adminRevokeGrantTitle(String name) {
+    return 'Freigabe für $name widerrufen?';
+  }
+
+  @override
+  String get adminRevokeGrantBody =>
+      'Der Widerruf wirkt sofort: Der Zugriff endet jetzt.';
+
+  @override
+  String adminAccessTitle(String target) {
+    return 'Wer hat Zugriff? $target';
+  }
+
+  @override
+  String get adminAccessEmpty => 'Niemand hat Zugriff.';
+
+  @override
+  String get adminSourceDirect => 'Direkte Freigabe';
+
+  @override
+  String adminSourceGroup(String group) {
+    return 'Über Gruppe $group';
+  }
+
+  @override
+  String adminSourceInheritedSpace(String space) {
+    return 'Geerbt vom Bereich $space';
+  }
+
+  @override
+  String get adminSourceInheritedInstance => 'Geerbt von der Instanz';
+
+  @override
+  String get adminSourceDm => 'Teilnehmer';
+
+  @override
+  String get adminSourceOperator => 'Bediener dieses Kanals';
+
+  @override
+  String adminSourceViaAgent(String agent) {
+    return 'Kann Inhalte hier über Agent $agent erfahren (H1)';
+  }
+
+  @override
+  String adminSourceGuardBlocked(String rule) {
+    return 'Agenten auslösen, aber das Auslösen ist gesperrt ($rule)';
+  }
+
+  @override
+  String adminSourceGuardAgent(String agent) {
+    return 'Agent $agent';
+  }
+
+  @override
+  String get adminSourceUnknown => 'Andere Herkunft';
+
+  @override
+  String adminSourceMemberUntil(String day) {
+    return 'Mitglied bis $day';
+  }
+
+  @override
+  String get adminAccessViewAs => 'Als Person ansehen';
+
+  @override
+  String adminViewAsBanner(String name) {
+    return 'Ansicht als $name (nur lesen). Nichts wird gesendet. Protokolliert.';
+  }
+
+  @override
+  String adminViewAsUntil(String when) {
+    return 'Die Ansicht endet $when';
+  }
+
+  @override
+  String get adminViewAsExit => 'Beenden';
+
+  @override
+  String get adminViewAsSpaces => 'Bereichsliste';
+
+  @override
+  String get adminViewAsChannels => 'Kanalliste';
+
+  @override
+  String get adminViewAsNothing => 'Nichts sichtbar.';
+
+  @override
+  String stepUpPurposeCreateGrant(String name, String target) {
+    return 'Freigabe für $name auf $target anlegen';
+  }
+
+  @override
+  String stepUpPurposeRevokeGrant(String name) {
+    return 'Freigabe für $name widerrufen';
+  }
+
+  @override
+  String stepUpPurposeViewAs(String name) {
+    return 'Als $name ansehen';
+  }
+
+  @override
+  String get problemForbiddenDelegationLevel =>
+      'Du kannst nicht mehr als deine eigene Stufe vergeben';
+
+  @override
+  String get problemForbiddenDelegationCapabilities =>
+      'Du kannst keine Zusatzrechte vergeben, die du nicht hast';
+
+  @override
+  String get problemForbiddenSubjectKind =>
+      'Für Agenten oder Apps nicht erlaubt';
 }

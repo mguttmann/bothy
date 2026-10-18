@@ -10,7 +10,10 @@ import 'package:admin_ui/admin_ui.dart';
 import 'package:api_client/api_client.dart';
 import 'package:auth/auth.dart';
 
+import 'access_fake.dart';
+
 export '../self/support.dart' show pumpInApp, testClock, testNow;
+export 'access_fake.dart';
 
 /// The changing calls of this fake and whether 05 gives their action step-up.
 const Map<String, bool> stepUpOf = {
@@ -30,6 +33,7 @@ const Map<String, bool> stepUpOf = {
   'addMember': true,
   'removeMember': true,
   'endSession': false,
+  ...accessStepUpOf,
 };
 
 AdminPerson _p(
@@ -48,8 +52,8 @@ AdminPerson _p(
 
 /// The fake repository with Alex (owner), Sam and Robin; Sam has a waiting tablet that logged
 /// in with OIDC, an active laptop, a passkey and a linked identity; group "Support" holds
-/// Robin until the end of the year.
-class FakeAdminRepository implements AdminRepository {
+/// Robin until the end of the year. The grant calls come from [FakeAccess].
+class FakeAdminRepository with FakeAccess implements AdminRepository {
   /// Creates the fake; [prompt] is asked as the step-up interceptor would.
   FakeAdminRepository({required this.prompt});
 
@@ -183,6 +187,16 @@ class FakeAdminRepository implements AdminRepository {
     final problem = refuse[op];
     if (problem != null) throw SelfActionFailed(problem);
   }
+
+  @override
+  void refused(String op) => _refused(op);
+
+  @override
+  Future<void> change(String op, String args, String purpose) =>
+      _change(op, args, purpose);
+
+  @override
+  String nameOf(String userId) => peopleById[userId]?.displayName ?? userId;
 
   Future<void> _change(String op, String args, String purpose) async {
     calls.add('$op $args'.trim());

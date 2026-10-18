@@ -3820,5 +3820,547 @@
         "example": "Sam"
       }
     }
+  },
+  "adminNavGrants": "Access grants",
+  "@adminNavGrants": {
+    "description": "Entry of the grants in the administration navigation (01 section 5.2 A1)."
+  },
+  "adminGrantsTitle": "Access grants",
+  "@adminGrantsTitle": {
+    "description": "Title of the grants screen (01 section 5.2 A2, A3)."
+  },
+  "adminGrantsTarget": "Target",
+  "@adminGrantsTarget": {
+    "description": "Label of the target picker of the grants screen."
+  },
+  "adminGrantsPickTarget": "Choose a target",
+  "@adminGrantsPickTarget": {
+    "description": "Hint of the target picker before a target is chosen."
+  },
+  "adminTargetInstance": "Instance",
+  "@adminTargetInstance": {
+    "description": "The instance as the target of an access grant (07 section 2.4)."
+  },
+  "adminTargetSpace": "Space {name}",
+  "@adminTargetSpace": {
+    "description": "A space as the target of an access grant.",
+    "placeholders": {
+      "name": {
+        "type": "String",
+        "example": "Marketing"
+      }
+    }
+  },
+  "adminTargetChannel": "Channel {path}",
+  "@adminTargetChannel": {
+    "description": "A channel as the target of an access grant, with its space.",
+    "placeholders": {
+      "path": {
+        "type": "String",
+        "example": "Marketing/Campaigns"
+      }
+    }
+  },
+  "adminGrantsCreate": "Create access grant",
+  "@adminGrantsCreate": {
+    "description": "Button and title of the grant wizard (01 section 5.2 A2)."
+  },
+  "adminGrantsWhoHasAccess": "Who has access?",
+  "@adminGrantsWhoHasAccess": {
+    "description": "Button and title of the access view of a space or channel (01 section 5.2 A3)."
+  },
+  "adminGrantsEmpty": "No access grant on this target.",
+  "@adminGrantsEmpty": {
+    "description": "Empty grants list of a target."
+  },
+  "adminGrantsUntil": "until {day}",
+  "@adminGrantsUntil": {
+    "description": "End of an access grant or source in a list.",
+    "placeholders": {
+      "day": {
+        "type": "String",
+        "example": "Dec 31, 2026"
+      }
+    }
+  },
+  "adminGrantsReason": "Reason: {reason}",
+  "@adminGrantsReason": {
+    "description": "Reason of an access grant in a list.",
+    "placeholders": {
+      "reason": {
+        "type": "String",
+        "example": "Campaign work"
+      }
+    }
+  },
+  "adminGrantCreated": "{name} received the access grant.",
+  "@adminGrantCreated": {
+    "description": "Notice after an access grant was created.",
+    "placeholders": {
+      "name": {
+        "type": "String",
+        "example": "Sam"
+      }
+    }
+  },
+  "adminGrantRevoked": "The access grant for {name} was revoked.",
+  "@adminGrantRevoked": {
+    "description": "Notice after an access grant was revoked.",
+    "placeholders": {
+      "name": {
+        "type": "String",
+        "example": "Sam"
+      }
+    }
+  },
+  "adminLevelRead": "Read",
+  "@adminLevelRead": {
+    "description": "Level read of an access grant (07 section 2.2)."
+  },
+  "adminLevelWrite": "Write",
+  "@adminLevelWrite": {
+    "description": "Level write of an access grant (07 section 2.2)."
+  },
+  "adminLevelTrigger": "Trigger agents",
+  "@adminLevelTrigger": {
+    "description": "Level trigger of an access grant (01 section 9 term table)."
+  },
+  "adminLevelNone": "No level",
+  "@adminLevelNone": {
+    "description": "Level none: no level before or after a change, or access only via an agent."
+  },
+  "adminCapabilityUpload": "Upload files",
+  "@adminCapabilityUpload": {
+    "description": "Capability upload (07 section 2.3)."
+  },
+  "adminCapabilityExport": "Export",
+  "@adminCapabilityExport": {
+    "description": "Capability export (07 section 2.3)."
+  },
+  "adminCapabilityManage": "Manage",
+  "@adminCapabilityManage": {
+    "description": "Capability manage (07 section 2.3)."
+  },
+  "adminCapabilityTerminal": "Terminal",
+  "@adminCapabilityTerminal": {
+    "description": "Capability terminal on a host (07 section 2.12)."
+  },
+  "adminWizardStep": "Step {step} of {total}",
+  "@adminWizardStep": {
+    "description": "Progress of the grant wizard.",
+    "placeholders": {
+      "step": {
+        "type": "int",
+        "example": "3"
+      },
+      "total": {
+        "type": "int",
+        "example": "3"
+      }
+    }
+  },
+  "adminWizardWho": "Who",
+  "@adminWizardWho": {
+    "description": "Step 1 of the grant wizard."
+  },
+  "adminWizardWhere": "Where",
+  "@adminWizardWhere": {
+    "description": "Step 2 of the grant wizard."
+  },
+  "adminWizardLevel": "Level and capabilities",
+  "@adminWizardLevel": {
+    "description": "Step 3 of the grant wizard."
+  },
+  "adminWizardKindPerson": "Person",
+  "@adminWizardKindPerson": {
+    "description": "Subject kind person in the grant wizard."
+  },
+  "adminWizardKindGroup": "Group",
+  "@adminWizardKindGroup": {
+    "description": "Subject kind group in the grant wizard."
+  },
+  "adminWizardKindAgent": "Agent",
+  "@adminWizardKindAgent": {
+    "description": "Subject kind agent in the grant wizard."
+  },
+  "adminWizardSearch": "Search by name",
+  "@adminWizardSearch": {
+    "description": "Search field of the subject step."
+  },
+  "adminWizardNoMatch": "Nothing matches.",
+  "@adminWizardNoMatch": {
+    "description": "Empty result of a wizard list."
+  },
+  "adminWizardCapabilities": "Capabilities",
+  "@adminWizardCapabilities": {
+    "description": "Label of the capability boxes."
+  },
+  "adminWizardUntil": "Valid until (YYYY-MM-DD, optional)",
+  "@adminWizardUntil": {
+    "description": "Field of the expiry date of an access grant."
+  },
+  "adminReasonRequired": "Reason (required, stored in the audit log)",
+  "@adminReasonRequired": {
+    "description": "Required reason of an access grant or a revocation (07 section 9.5)."
+  },
+  "adminWizardBack": "Back",
+  "@adminWizardBack": {
+    "description": "Previous step of the grant wizard."
+  },
+  "adminWizardNext": "Next",
+  "@adminWizardNext": {
+    "description": "Next step of the grant wizard."
+  },
+  "adminWizardConfirm": "Confirm",
+  "@adminWizardConfirm": {
+    "description": "Confirms the access grant after the preview; the step-up follows (07 section 9.3)."
+  },
+  "adminPreviewTitle": "Plain-language preview",
+  "@adminPreviewTitle": {
+    "description": "Title of the preview panel (07 section 9.3)."
+  },
+  "adminPreviewLoading": "Checking the effect",
+  "@adminPreviewLoading": {
+    "description": "Shown while the preview loads."
+  },
+  "adminPreviewEffects": "Who is affected",
+  "@adminPreviewEffects": {
+    "description": "Title of the effects per principal in the preview."
+  },
+  "adminPreviewAdded": "Gets {level}",
+  "@adminPreviewAdded": {
+    "description": "Effect label: a principal gains a level.",
+    "placeholders": {
+      "level": {
+        "type": "String",
+        "example": "Write"
+      }
+    }
+  },
+  "adminPreviewRemoved": "Loses {level}",
+  "@adminPreviewRemoved": {
+    "description": "Effect label: a principal loses its level.",
+    "placeholders": {
+      "level": {
+        "type": "String",
+        "example": "Write"
+      }
+    }
+  },
+  "adminPreviewChanged": "{before} becomes {after}",
+  "@adminPreviewChanged": {
+    "description": "Effect label: the level of a principal changes.",
+    "placeholders": {
+      "before": {
+        "type": "String",
+        "example": "Read"
+      },
+      "after": {
+        "type": "String",
+        "example": "Write"
+      }
+    }
+  },
+  "adminPreviewCapabilities": "Adds: {list}",
+  "@adminPreviewCapabilities": {
+    "description": "Effect label: capabilities that are added.",
+    "placeholders": {
+      "list": {
+        "type": "String",
+        "example": "Upload files"
+      }
+    }
+  },
+  "adminPreviewRejected": "Would be rejected",
+  "@adminPreviewRejected": {
+    "description": "Title of an invariant violation in the preview (07 section 9.3)."
+  },
+  "adminPreviewAgent": "Agent: {agent}",
+  "@adminPreviewAgent": {
+    "description": "The agent an invariant violation names.",
+    "placeholders": {
+      "agent": {
+        "type": "String",
+        "example": "Writer"
+      }
+    }
+  },
+  "adminPreviewAffected": "Affected: {people}",
+  "@adminPreviewAffected": {
+    "description": "The principals an invariant violation names.",
+    "placeholders": {
+      "people": {
+        "type": "String",
+        "example": "Sam"
+      }
+    }
+  },
+  "adminPreviewI1Hint": "Switch the agent to organization first.",
+  "@adminPreviewI1Hint": {
+    "description": "Guidance for an I1 violation in the preview (01 section 5.2 A2; 10 section 11)."
+  },
+  "adminPreviewDenied": "The access grant would be refused: {reason}",
+  "@adminPreviewDenied": {
+    "description": "A delegation limit refuses the access grant (07 section 4.1).",
+    "placeholders": {
+      "reason": {
+        "type": "String",
+        "example": "You cannot give more than your own level"
+      }
+    }
+  },
+  "adminPreviewHints": "Hints",
+  "@adminPreviewHints": {
+    "description": "Title of the hints in the preview."
+  },
+  "adminHintReadHorizon": "Read horizon (H1): {person} can learn content of {channel} through agent {agent}",
+  "@adminHintReadHorizon": {
+    "description": "Hint read_horizon of the preview (07 section 6).",
+    "placeholders": {
+      "person": {
+        "type": "String",
+        "example": "Sam"
+      },
+      "channel": {
+        "type": "String",
+        "example": "Marketing/Internal"
+      },
+      "agent": {
+        "type": "String",
+        "example": "Writer"
+      }
+    }
+  },
+  "adminHintTriggerBlocked": "Triggering blocked: {agent} cannot be triggered by this principal (SR2, SR3)",
+  "@adminHintTriggerBlocked": {
+    "description": "Hint trigger_blocked_tool_class of the preview (07 section 5).",
+    "placeholders": {
+      "agent": {
+        "type": "String",
+        "example": "Writer"
+      }
+    }
+  },
+  "adminHintGroupReach": "{count, plural, =1{This access grant reaches 1 person} other{This access grant reaches {count} people}}",
+  "@adminHintGroupReach": {
+    "description": "Hint group_reach of the preview.",
+    "placeholders": {
+      "count": {
+        "type": "int",
+        "example": "4"
+      }
+    }
+  },
+  "adminHintExpiryMissing": "No expiry date: the access grant for a person outside of groups has no end",
+  "@adminHintExpiryMissing": {
+    "description": "Hint expiry_missing of the preview (07 section 9.5)."
+  },
+  "adminHintTerminalNotEffective": "The access grant does not take effect on this host (SR10, SR12)",
+  "@adminHintTerminalNotEffective": {
+    "description": "Hint terminal_not_effective of the preview (07 section 2.12)."
+  },
+  "adminHintUnknown": "Hint {code}",
+  "@adminHintUnknown": {
+    "description": "A hint code this app does not know.",
+    "placeholders": {
+      "code": {
+        "type": "String",
+        "example": "new_hint"
+      }
+    }
+  },
+  "adminRevokeGrantTitle": "Revoke the access grant for {name}?",
+  "@adminRevokeGrantTitle": {
+    "description": "Title of the revoke confirmation.",
+    "placeholders": {
+      "name": {
+        "type": "String",
+        "example": "Sam"
+      }
+    }
+  },
+  "adminRevokeGrantBody": "Revoking takes effect immediately: the access ends now.",
+  "@adminRevokeGrantBody": {
+    "description": "Body of the revoke confirmation (07 section 9.5)."
+  },
+  "adminAccessTitle": "Who has access? {target}",
+  "@adminAccessTitle": {
+    "description": "Title of the access view of a target.",
+    "placeholders": {
+      "target": {
+        "type": "String",
+        "example": "Channel Marketing/Campaigns"
+      }
+    }
+  },
+  "adminAccessEmpty": "Nobody has access.",
+  "@adminAccessEmpty": {
+    "description": "Empty access view."
+  },
+  "adminSourceDirect": "Direct access grant",
+  "@adminSourceDirect": {
+    "description": "Source direct (07 section 9.1)."
+  },
+  "adminSourceGroup": "Via group {group}",
+  "@adminSourceGroup": {
+    "description": "Source group (07 section 9.1).",
+    "placeholders": {
+      "group": {
+        "type": "String",
+        "example": "Support"
+      }
+    }
+  },
+  "adminSourceInheritedSpace": "Inherited from space {space}",
+  "@adminSourceInheritedSpace": {
+    "description": "Source inherited from a space (07 section 9.1).",
+    "placeholders": {
+      "space": {
+        "type": "String",
+        "example": "Support"
+      }
+    }
+  },
+  "adminSourceInheritedInstance": "Inherited from the instance",
+  "@adminSourceInheritedInstance": {
+    "description": "Source inherited from the instance (07 section 9.1)."
+  },
+  "adminSourceDm": "Participant",
+  "@adminSourceDm": {
+    "description": "Source dm_participant (07 section 9.1)."
+  },
+  "adminSourceOperator": "Operator of this channel",
+  "@adminSourceOperator": {
+    "description": "Source operator (07 section 9.1)."
+  },
+  "adminSourceViaAgent": "Can learn content here through agent {agent} (H1)",
+  "@adminSourceViaAgent": {
+    "description": "Source via_agent with hint H1 (07 sections 6 and 9.1).",
+    "placeholders": {
+      "agent": {
+        "type": "String",
+        "example": "Writer"
+      }
+    }
+  },
+  "adminSourceGuardBlocked": "Trigger agents, but triggering is blocked ({rule})",
+  "@adminSourceGuardBlocked": {
+    "description": "Source guard_blocked with its rule (07 section 9.1).",
+    "placeholders": {
+      "rule": {
+        "type": "String",
+        "example": "SR3"
+      }
+    }
+  },
+  "adminSourceGuardAgent": "Agent {agent}",
+  "@adminSourceGuardAgent": {
+    "description": "The agent of a guard_blocked source.",
+    "placeholders": {
+      "agent": {
+        "type": "String",
+        "example": "Writer"
+      }
+    }
+  },
+  "adminSourceUnknown": "Other source",
+  "@adminSourceUnknown": {
+    "description": "A source kind this app does not know."
+  },
+  "adminSourceMemberUntil": "member until {day}",
+  "@adminSourceMemberUntil": {
+    "description": "End of the group membership of a source.",
+    "placeholders": {
+      "day": {
+        "type": "String",
+        "example": "Nov 30, 2026"
+      }
+    }
+  },
+  "adminAccessViewAs": "View as person",
+  "@adminAccessViewAs": {
+    "description": "Picker of the view as a person (01 section 5.2 A4)."
+  },
+  "adminViewAsBanner": "Viewing as {name} (read-only). Nothing is sent. Logged.",
+  "@adminViewAsBanner": {
+    "description": "Frame of the view as a person (01 section 5.2 A4).",
+    "placeholders": {
+      "name": {
+        "type": "String",
+        "example": "Sam"
+      }
+    }
+  },
+  "adminViewAsUntil": "The view ends {when}",
+  "@adminViewAsUntil": {
+    "description": "End of the view as a person (07 section 9.2).",
+    "placeholders": {
+      "when": {
+        "type": "String",
+        "example": "today 10:15"
+      }
+    }
+  },
+  "adminViewAsExit": "Exit",
+  "@adminViewAsExit": {
+    "description": "Leaves the view as a person."
+  },
+  "adminViewAsSpaces": "Space list",
+  "@adminViewAsSpaces": {
+    "description": "Title of the spaces the person sees."
+  },
+  "adminViewAsChannels": "Channel list",
+  "@adminViewAsChannels": {
+    "description": "Title of the channels the person sees."
+  },
+  "adminViewAsNothing": "Nothing visible.",
+  "@adminViewAsNothing": {
+    "description": "The person sees no space or channel."
+  },
+  "stepUpPurposeCreateGrant": "Create the access grant for {name} on {target}",
+  "@stepUpPurposeCreateGrant": {
+    "description": "Purpose of the step-up of createGrant.",
+    "placeholders": {
+      "name": {
+        "type": "String",
+        "example": "Sam"
+      },
+      "target": {
+        "type": "String",
+        "example": "Channel Marketing/Campaigns"
+      }
+    }
+  },
+  "stepUpPurposeRevokeGrant": "Revoke the access grant for {name}",
+  "@stepUpPurposeRevokeGrant": {
+    "description": "Purpose of the step-up of revokeGrant.",
+    "placeholders": {
+      "name": {
+        "type": "String",
+        "example": "Sam"
+      }
+    }
+  },
+  "stepUpPurposeViewAs": "View as {name}",
+  "@stepUpPurposeViewAs": {
+    "description": "Purpose of the step-up of viewAsUser.",
+    "placeholders": {
+      "name": {
+        "type": "String",
+        "example": "Sam"
+      }
+    }
+  },
+  "problemForbiddenDelegationLevel": "You cannot give more than your own level",
+  "@problemForbiddenDelegationLevel": {
+    "description": "Text of forbidden with reason delegation_exceeds_own_level (07 section 4.1)."
+  },
+  "problemForbiddenDelegationCapabilities": "You cannot give capabilities you do not have",
+  "@problemForbiddenDelegationCapabilities": {
+    "description": "Text of forbidden with reason delegation_exceeds_own_capabilities (07 section 4.1)."
+  },
+  "problemForbiddenSubjectKind": "Not allowed for agents or apps",
+  "@problemForbiddenSubjectKind": {
+    "description": "Text of forbidden with reason subject_kind_not_allowed (07 section 4.1)."
   }
 }
