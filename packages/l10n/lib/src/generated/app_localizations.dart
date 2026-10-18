@@ -3678,6 +3678,846 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Cancel'**
   String get newPostCancel;
+
+  /// Heading of the administration navigation (01 section 5.2 A1).
+  ///
+  /// In en, this message translates to:
+  /// **'Administration'**
+  String get adminTitle;
+
+  /// Button above the administration navigation that leaves the administration.
+  ///
+  /// In en, this message translates to:
+  /// **'Back to the chat'**
+  String get adminBack;
+
+  /// Entry of the administration navigation: people (01 section 5.2 A1).
+  ///
+  /// In en, this message translates to:
+  /// **'People'**
+  String get adminNavPeople;
+
+  /// Entry of the administration navigation: groups (07 section 2.1).
+  ///
+  /// In en, this message translates to:
+  /// **'Groups'**
+  String get adminNavGroups;
+
+  /// Entry of the administration navigation: the queue of waiting devices.
+  ///
+  /// In en, this message translates to:
+  /// **'Devices'**
+  String get adminNavDevices;
+
+  /// Entry of the administration navigation with the number of waiting devices (01 section 5.2 A1).
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, =0{Devices} =1{Devices (1 waiting)} other{Devices ({count} waiting)}}'**
+  String adminNavDevicesWaiting(int count);
+
+  /// Label of the optional reason field of a confirmation in the administration.
+  ///
+  /// In en, this message translates to:
+  /// **'Reason (stored in the audit log)'**
+  String get adminReason;
+
+  /// Reason sent to the server when the person typed none.
+  ///
+  /// In en, this message translates to:
+  /// **'Changed in the administration'**
+  String get adminDefaultReason;
+
+  /// Button below a list of the administration that loads its next page.
+  ///
+  /// In en, this message translates to:
+  /// **'Load more'**
+  String get adminLoadMore;
+
+  /// Note when the server refuses to repeat an enrollment code (06 section 7, one_time_secret).
+  ///
+  /// In en, this message translates to:
+  /// **'The code was shown once and cannot be shown again. Issue a new code.'**
+  String get adminOneTimeSecret;
+
+  /// Explanation after enabling a person failed with i1_violation (10 section 5.4).
+  ///
+  /// In en, this message translates to:
+  /// **'Change the mode of the affected agent under Agents first, then enable the person again.'**
+  String get adminI1Explained;
+
+  /// Hint of the person selection in the dialogs of the administration.
+  ///
+  /// In en, this message translates to:
+  /// **'Choose a person'**
+  String get adminPickPerson;
+
+  /// Button that revokes a passkey.
+  ///
+  /// In en, this message translates to:
+  /// **'Revoke'**
+  String get adminRevoke;
+
+  /// Badge of a person who is an owner (07 section 2.7).
+  ///
+  /// In en, this message translates to:
+  /// **'Owner'**
+  String get adminOwnerBadge;
+
+  /// State of a person: active.
+  ///
+  /// In en, this message translates to:
+  /// **'Active'**
+  String get adminStatusActive;
+
+  /// State of a person who has not signed in yet.
+  ///
+  /// In en, this message translates to:
+  /// **'Waiting for login'**
+  String get adminStatusPending;
+
+  /// State of a disabled person (08 section 11).
+  ///
+  /// In en, this message translates to:
+  /// **'Disabled'**
+  String get adminStatusDisabled;
+
+  /// State of a deleted person.
+  ///
+  /// In en, this message translates to:
+  /// **'Deleted'**
+  String get adminStatusDeleted;
+
+  /// Heading of the people list (01 section 5.2 A1).
+  ///
+  /// In en, this message translates to:
+  /// **'People'**
+  String get adminPeopleTitle;
+
+  /// Button that creates a person (no self-registration, no invitation links).
+  ///
+  /// In en, this message translates to:
+  /// **'Add person'**
+  String get adminPeopleAdd;
+
+  /// Label of the search field of the people list.
+  ///
+  /// In en, this message translates to:
+  /// **'Search'**
+  String get adminPeopleSearch;
+
+  /// Choice of the state filter that shows everybody.
+  ///
+  /// In en, this message translates to:
+  /// **'All states'**
+  String get adminPeopleStatusAll;
+
+  /// Choice of the group filter that shows everybody.
+  ///
+  /// In en, this message translates to:
+  /// **'All groups'**
+  String get adminPeopleGroupAll;
+
+  /// Note below the filters while a group filter is active; the server has no group filter for people.
+  ///
+  /// In en, this message translates to:
+  /// **'The group filter applies only to the people loaded on this page.'**
+  String get adminPeopleGroupNote;
+
+  /// Text of the people list when nobody matches.
+  ///
+  /// In en, this message translates to:
+  /// **'No person matches.'**
+  String get adminPeopleEmpty;
+
+  /// Notice after a person was created.
+  ///
+  /// In en, this message translates to:
+  /// **'{name} was created.'**
+  String adminPersonCreated(String name);
+
+  /// Title of the dialog that creates a person.
+  ///
+  /// In en, this message translates to:
+  /// **'Add person'**
+  String get adminCreatePersonTitle;
+
+  /// What creating a person does (08 section 3.2).
+  ///
+  /// In en, this message translates to:
+  /// **'The person gets an account. With a local account, the enrollment code is shown once in the next step.'**
+  String get adminCreatePersonBody;
+
+  /// Label of the display name field.
+  ///
+  /// In en, this message translates to:
+  /// **'Display name'**
+  String get adminCreatePersonName;
+
+  /// Label of the handle field.
+  ///
+  /// In en, this message translates to:
+  /// **'Handle'**
+  String get adminCreatePersonHandle;
+
+  /// Error below the handle field when it does not match the pattern.
+  ///
+  /// In en, this message translates to:
+  /// **'Use lower case letters, digits, dots, hyphens and underscores.'**
+  String get adminCreatePersonHandleInvalid;
+
+  /// Checkbox: the person gets a local identity and a first login code.
+  ///
+  /// In en, this message translates to:
+  /// **'Local account with an enrollment code'**
+  String get adminCreatePersonLocal;
+
+  /// Button that confirms creating a person.
+  ///
+  /// In en, this message translates to:
+  /// **'Create'**
+  String get adminCreatePersonSubmit;
+
+  /// Title of the view that shows an enrollment code once.
+  ///
+  /// In en, this message translates to:
+  /// **'Enrollment code for {name}'**
+  String adminCodeTitle(String name);
+
+  /// Warning of the enrollment code view (08 section 3.2).
+  ///
+  /// In en, this message translates to:
+  /// **'This code is shown only once. Hand it over in person or by phone.'**
+  String get adminCodeOnce;
+
+  /// Purpose of an enrollment code: first_login.
+  ///
+  /// In en, this message translates to:
+  /// **'For the first login'**
+  String get adminCodePurposeFirstLogin;
+
+  /// Purpose of an enrollment code: recovery.
+  ///
+  /// In en, this message translates to:
+  /// **'For recovery'**
+  String get adminCodePurposeRecovery;
+
+  /// Purpose of an enrollment code: identity_link.
+  ///
+  /// In en, this message translates to:
+  /// **'For linking a login service'**
+  String get adminCodePurposeIdentityLink;
+
+  /// Expiry of an enrollment code; when is a relative day and a time.
+  ///
+  /// In en, this message translates to:
+  /// **'Valid until {when}'**
+  String adminCodeExpires(String when);
+
+  /// Button that closes the enrollment code view and discards the code.
+  ///
+  /// In en, this message translates to:
+  /// **'Close'**
+  String get adminCodeClose;
+
+  /// Button above a person that returns to the list.
+  ///
+  /// In en, this message translates to:
+  /// **'All people'**
+  String get adminPersonBack;
+
+  /// Button that disables a person (08 section 11).
+  ///
+  /// In en, this message translates to:
+  /// **'Disable'**
+  String get adminPersonDisable;
+
+  /// Button that enables a disabled person.
+  ///
+  /// In en, this message translates to:
+  /// **'Enable'**
+  String get adminPersonEnable;
+
+  /// Button that issues a new enrollment code (08 section 3.2).
+  ///
+  /// In en, this message translates to:
+  /// **'New enrollment code'**
+  String get adminPersonNewCode;
+
+  /// Title of the confirmation before a person is disabled.
+  ///
+  /// In en, this message translates to:
+  /// **'Disable {name}?'**
+  String adminDisableTitle(String name);
+
+  /// What disabling does (08 section 11).
+  ///
+  /// In en, this message translates to:
+  /// **'{name} is disabled. All sessions of {name} end now and all devices are revoked.'**
+  String adminDisableBody(String name);
+
+  /// Notice after a person was disabled.
+  ///
+  /// In en, this message translates to:
+  /// **'{name} is disabled. All sessions ended.'**
+  String adminPersonDisabled(String name);
+
+  /// Title of the confirmation before a person is enabled.
+  ///
+  /// In en, this message translates to:
+  /// **'Enable {name}?'**
+  String adminEnableTitle(String name);
+
+  /// What enabling does (08 section 11).
+  ///
+  /// In en, this message translates to:
+  /// **'{name} can sign in again. Earlier devices stay revoked.'**
+  String adminEnableBody(String name);
+
+  /// Notice after a person was enabled.
+  ///
+  /// In en, this message translates to:
+  /// **'{name} is enabled.'**
+  String adminPersonEnabled(String name);
+
+  /// Title of the confirmation before a new enrollment code is issued.
+  ///
+  /// In en, this message translates to:
+  /// **'New enrollment code for {name}?'**
+  String adminNewCodeTitle(String name);
+
+  /// What issuing a code does (08 section 3.2).
+  ///
+  /// In en, this message translates to:
+  /// **'A new code is issued and shown once. Every older code of {name} stops working.'**
+  String adminNewCodeBody(String name);
+
+  /// Heading of the credentials of a person.
+  ///
+  /// In en, this message translates to:
+  /// **'Credentials'**
+  String get adminCredentialsTitle;
+
+  /// The person has a local password.
+  ///
+  /// In en, this message translates to:
+  /// **'Local password set'**
+  String get adminCredentialsPasswordSet;
+
+  /// The person has no local password.
+  ///
+  /// In en, this message translates to:
+  /// **'No local password'**
+  String get adminCredentialsPasswordNone;
+
+  /// The person has a one-time code app.
+  ///
+  /// In en, this message translates to:
+  /// **'One-time code app set up'**
+  String get adminCredentialsTotpSet;
+
+  /// The person has no one-time code app.
+  ///
+  /// In en, this message translates to:
+  /// **'No one-time code app'**
+  String get adminCredentialsTotpNone;
+
+  /// Heading of the linked identities.
+  ///
+  /// In en, this message translates to:
+  /// **'Linked login services'**
+  String get adminCredentialsIdentities;
+
+  /// Heading of the passkeys.
+  ///
+  /// In en, this message translates to:
+  /// **'Passkeys'**
+  String get adminCredentialsPasskeys;
+
+  /// Text of an empty credential list.
+  ///
+  /// In en, this message translates to:
+  /// **'None'**
+  String get adminCredentialsNone;
+
+  /// When a passkey was registered.
+  ///
+  /// In en, this message translates to:
+  /// **'Added {when}'**
+  String adminPasskeyAdded(String when);
+
+  /// Button that unlinks an identity (08 section 3.3).
+  ///
+  /// In en, this message translates to:
+  /// **'Unlink'**
+  String get adminUnlink;
+
+  /// Title of the confirmation before an identity is unlinked.
+  ///
+  /// In en, this message translates to:
+  /// **'Unlink {subject}?'**
+  String adminUnlinkTitle(String subject);
+
+  /// What unlinking does.
+  ///
+  /// In en, this message translates to:
+  /// **'{name} can no longer sign in with this login service.'**
+  String adminUnlinkBody(String name);
+
+  /// Notice after an identity was unlinked.
+  ///
+  /// In en, this message translates to:
+  /// **'{subject} was unlinked.'**
+  String adminUnlinked(String subject);
+
+  /// Title of the confirmation before a passkey is revoked.
+  ///
+  /// In en, this message translates to:
+  /// **'Revoke the passkey {passkey}?'**
+  String adminRevokePasskeyTitle(String passkey);
+
+  /// What revoking a passkey does.
+  ///
+  /// In en, this message translates to:
+  /// **'{name} can no longer sign in with this passkey.'**
+  String adminRevokePasskeyBody(String name);
+
+  /// Notice after a passkey was revoked.
+  ///
+  /// In en, this message translates to:
+  /// **'The passkey {passkey} was revoked.'**
+  String adminPasskeyRevoked(String passkey);
+
+  /// What ending the session of another person does.
+  ///
+  /// In en, this message translates to:
+  /// **'The device of this session is signed out at once.'**
+  String get adminEndSessionBody;
+
+  /// Notice after a session of another person was ended.
+  ///
+  /// In en, this message translates to:
+  /// **'The session was ended.'**
+  String get adminSessionEnded;
+
+  /// Heading of the owners (07 section 2.7).
+  ///
+  /// In en, this message translates to:
+  /// **'Owners'**
+  String get adminOwnersTitle;
+
+  /// Button that makes a person an owner.
+  ///
+  /// In en, this message translates to:
+  /// **'Add owner'**
+  String get adminOwnersAdd;
+
+  /// Title of the dialog that adds an owner.
+  ///
+  /// In en, this message translates to:
+  /// **'Add an owner'**
+  String get adminOwnersAddTitle;
+
+  /// What adding an owner does (07 section 2.7).
+  ///
+  /// In en, this message translates to:
+  /// **'The person gets every permission of the instance.'**
+  String get adminOwnersAddBody;
+
+  /// Notice after an owner was added.
+  ///
+  /// In en, this message translates to:
+  /// **'{name} is now an owner.'**
+  String adminOwnersAdded(String name);
+
+  /// Button that revokes an owner.
+  ///
+  /// In en, this message translates to:
+  /// **'Revoke'**
+  String get adminOwnersRevoke;
+
+  /// Title of the confirmation before an owner is revoked.
+  ///
+  /// In en, this message translates to:
+  /// **'Revoke the owner {name}?'**
+  String adminOwnersRevokeTitle(String name);
+
+  /// What revoking an owner does.
+  ///
+  /// In en, this message translates to:
+  /// **'{name} keeps the account but loses the owner permissions.'**
+  String adminOwnersRevokeBody(String name);
+
+  /// Notice after an owner was revoked.
+  ///
+  /// In en, this message translates to:
+  /// **'{name} is no longer an owner.'**
+  String adminOwnersRevoked(String name);
+
+  /// Since when and why a person is an owner.
+  ///
+  /// In en, this message translates to:
+  /// **'Since {when}: {reason}'**
+  String adminOwnerSince(String when, String reason);
+
+  /// Heading of the group list (07 section 2.1).
+  ///
+  /// In en, this message translates to:
+  /// **'Groups'**
+  String get adminGroupsTitle;
+
+  /// Button that creates a group.
+  ///
+  /// In en, this message translates to:
+  /// **'Create group'**
+  String get adminGroupsCreate;
+
+  /// Text of an empty group list.
+  ///
+  /// In en, this message translates to:
+  /// **'No groups yet.'**
+  String get adminGroupsEmpty;
+
+  /// Member count of a group.
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, =0{No members} =1{1 member} other{{count} members}}'**
+  String adminGroupMembers(int count);
+
+  /// Notice after a group was created.
+  ///
+  /// In en, this message translates to:
+  /// **'The group {name} was created.'**
+  String adminGroupCreated(String name);
+
+  /// Title of the dialog that creates a group.
+  ///
+  /// In en, this message translates to:
+  /// **'Create group'**
+  String get adminGroupCreateTitle;
+
+  /// What creating a group does.
+  ///
+  /// In en, this message translates to:
+  /// **'A new group without members is created.'**
+  String get adminGroupCreateBody;
+
+  /// Label of the group name field.
+  ///
+  /// In en, this message translates to:
+  /// **'Name'**
+  String get adminGroupName;
+
+  /// Label of the group description field.
+  ///
+  /// In en, this message translates to:
+  /// **'Description (optional)'**
+  String get adminGroupDescription;
+
+  /// Button above a group that returns to the list.
+  ///
+  /// In en, this message translates to:
+  /// **'All groups'**
+  String get adminGroupBack;
+
+  /// Note of a group whose members come from the identity provider (08 section 3.4).
+  ///
+  /// In en, this message translates to:
+  /// **'The login service manages the members of this group.'**
+  String get adminGroupFromProvider;
+
+  /// Button that renames a group.
+  ///
+  /// In en, this message translates to:
+  /// **'Rename'**
+  String get adminGroupRename;
+
+  /// Title of the dialog that renames a group.
+  ///
+  /// In en, this message translates to:
+  /// **'Rename {name}'**
+  String adminGroupRenameTitle(String name);
+
+  /// What renaming a group does.
+  ///
+  /// In en, this message translates to:
+  /// **'The group keeps its members and its permissions.'**
+  String get adminGroupRenameBody;
+
+  /// Notice after a group was renamed.
+  ///
+  /// In en, this message translates to:
+  /// **'The group is now called {name}.'**
+  String adminGroupRenamed(String name);
+
+  /// Button that deletes a group.
+  ///
+  /// In en, this message translates to:
+  /// **'Delete group'**
+  String get adminGroupDelete;
+
+  /// Title of the confirmation before a group is deleted.
+  ///
+  /// In en, this message translates to:
+  /// **'Delete {name}?'**
+  String adminGroupDeleteTitle(String name);
+
+  /// What deleting a group does.
+  ///
+  /// In en, this message translates to:
+  /// **'The group is removed and the permissions it gave end. The members keep their accounts.'**
+  String get adminGroupDeleteBody;
+
+  /// Heading of the members of a group.
+  ///
+  /// In en, this message translates to:
+  /// **'Members'**
+  String get adminMembersTitle;
+
+  /// Text of a group without members.
+  ///
+  /// In en, this message translates to:
+  /// **'No members yet.'**
+  String get adminMembersEmpty;
+
+  /// Button that adds a member to a group.
+  ///
+  /// In en, this message translates to:
+  /// **'Add member'**
+  String get adminMemberAdd;
+
+  /// Title of the dialog that adds a member.
+  ///
+  /// In en, this message translates to:
+  /// **'Add a member to {group}'**
+  String adminMemberAddTitle(String group);
+
+  /// What adding a member does (07 section 2.1).
+  ///
+  /// In en, this message translates to:
+  /// **'The person gets the permissions of the group, until the given day when one is set.'**
+  String get adminMemberAddBody;
+
+  /// Label of the expiry field of a membership.
+  ///
+  /// In en, this message translates to:
+  /// **'Until (optional, YYYY-MM-DD)'**
+  String get adminMemberUntil;
+
+  /// Error below the expiry field.
+  ///
+  /// In en, this message translates to:
+  /// **'Enter a date as YYYY-MM-DD.'**
+  String get adminMemberUntilInvalid;
+
+  /// Notice after a member was added.
+  ///
+  /// In en, this message translates to:
+  /// **'{name} was added to {group}.'**
+  String adminMemberAdded(String name, String group);
+
+  /// When a membership ends.
+  ///
+  /// In en, this message translates to:
+  /// **'Until {when}'**
+  String adminMemberExpires(String when);
+
+  /// Button that removes a member from a group.
+  ///
+  /// In en, this message translates to:
+  /// **'Remove'**
+  String get adminMemberRemove;
+
+  /// Title of the confirmation before a member is removed.
+  ///
+  /// In en, this message translates to:
+  /// **'Remove {name} from {group}?'**
+  String adminMemberRemoveTitle(String name, String group);
+
+  /// What removing a member does.
+  ///
+  /// In en, this message translates to:
+  /// **'{name} loses the permissions of the group.'**
+  String adminMemberRemoveBody(String name);
+
+  /// Notice after a member was removed.
+  ///
+  /// In en, this message translates to:
+  /// **'{name} was removed from {group}.'**
+  String adminMemberRemoved(String name, String group);
+
+  /// Heading of the queue of waiting devices (01 section 5.2 A1).
+  ///
+  /// In en, this message translates to:
+  /// **'Waiting devices'**
+  String get adminWaitingTitle;
+
+  /// Text of an empty queue.
+  ///
+  /// In en, this message translates to:
+  /// **'No device is waiting.'**
+  String get adminWaitingEmpty;
+
+  /// A waiting device with its person.
+  ///
+  /// In en, this message translates to:
+  /// **'{person}: {device}'**
+  String adminWaitingDevice(String person, String device);
+
+  /// When the waiting device logged in.
+  ///
+  /// In en, this message translates to:
+  /// **'Logged in {when}'**
+  String adminWaitingLoggedIn(String when);
+
+  /// The origin of the login of a waiting device.
+  ///
+  /// In en, this message translates to:
+  /// **'via {method}'**
+  String adminWaitingVia(String method);
+
+  /// A waiting device without a session that names its login.
+  ///
+  /// In en, this message translates to:
+  /// **'Origin unknown'**
+  String get adminWaitingNoOrigin;
+
+  /// Button that approves a waiting device (08 section 5.2).
+  ///
+  /// In en, this message translates to:
+  /// **'Approve'**
+  String get adminApprove;
+
+  /// Button that rejects a waiting device.
+  ///
+  /// In en, this message translates to:
+  /// **'Reject'**
+  String get adminReject;
+
+  /// Title of the dialog that approves a waiting device.
+  ///
+  /// In en, this message translates to:
+  /// **'Approve {device} of {person}'**
+  String adminApproveTitle(String device, String person);
+
+  /// Hint of the approval dialog; the code never appears for owners (08 section 5.2).
+  ///
+  /// In en, this message translates to:
+  /// **'Ask {person} for the code that the waiting device shows and type it here.'**
+  String adminApproveHint(String person);
+
+  /// Notice after a waiting device was approved.
+  ///
+  /// In en, this message translates to:
+  /// **'{device} of {person} is now active.'**
+  String adminApproved(String device, String person);
+
+  /// Title of the confirmation before a waiting device is rejected.
+  ///
+  /// In en, this message translates to:
+  /// **'Reject {device}?'**
+  String adminRejectTitle(String device);
+
+  /// What rejecting a waiting device does.
+  ///
+  /// In en, this message translates to:
+  /// **'The waiting device of {person} is revoked and cannot sign in.'**
+  String adminRejectBody(String person);
+
+  /// Notice after a waiting device was rejected.
+  ///
+  /// In en, this message translates to:
+  /// **'{device} was rejected.'**
+  String adminRejected(String device);
+
+  /// Purpose of the step-up of createUser.
+  ///
+  /// In en, this message translates to:
+  /// **'Create the person {name}'**
+  String stepUpPurposeCreatePerson(String name);
+
+  /// Purpose of the step-up of disableUser.
+  ///
+  /// In en, this message translates to:
+  /// **'Disable {name}'**
+  String stepUpPurposeDisablePerson(String name);
+
+  /// Purpose of the step-up of enableUser.
+  ///
+  /// In en, this message translates to:
+  /// **'Enable {name}'**
+  String stepUpPurposeEnablePerson(String name);
+
+  /// Purpose of the step-up of createEnrollmentCode.
+  ///
+  /// In en, this message translates to:
+  /// **'Issue an enrollment code for {name}'**
+  String stepUpPurposeNewCode(String name);
+
+  /// Purpose of the step-up of unlinkIdentity.
+  ///
+  /// In en, this message translates to:
+  /// **'Unlink a login service of {name}'**
+  String stepUpPurposeUnlinkIdentity(String name);
+
+  /// Purpose of the step-up of revokePasskey.
+  ///
+  /// In en, this message translates to:
+  /// **'Revoke a passkey of {name}'**
+  String stepUpPurposeRevokePasskey(String name);
+
+  /// Purpose of the step-up of addOwner.
+  ///
+  /// In en, this message translates to:
+  /// **'Make {name} an owner'**
+  String stepUpPurposeAddOwner(String name);
+
+  /// Purpose of the step-up of revokeOwner.
+  ///
+  /// In en, this message translates to:
+  /// **'Revoke the owner {name}'**
+  String stepUpPurposeRevokeOwner(String name);
+
+  /// Purpose of the step-up of createGroup.
+  ///
+  /// In en, this message translates to:
+  /// **'Create the group {name}'**
+  String stepUpPurposeCreateGroup(String name);
+
+  /// Purpose of the step-up of updateGroup.
+  ///
+  /// In en, this message translates to:
+  /// **'Rename the group {name}'**
+  String stepUpPurposeRenameGroup(String name);
+
+  /// Purpose of the step-up of deleteGroup.
+  ///
+  /// In en, this message translates to:
+  /// **'Delete the group {name}'**
+  String stepUpPurposeDeleteGroup(String name);
+
+  /// Purpose of the step-up of addGroupMember.
+  ///
+  /// In en, this message translates to:
+  /// **'Add {name} to {group}'**
+  String stepUpPurposeAddMember(String name, String group);
+
+  /// Purpose of the step-up of removeGroupMember.
+  ///
+  /// In en, this message translates to:
+  /// **'Remove {name} from {group}'**
+  String stepUpPurposeRemoveMember(String name, String group);
+
+  /// Purpose of the step-up of approveDevice for the device of another person.
+  ///
+  /// In en, this message translates to:
+  /// **'Approve the device {device} of {person}'**
+  String stepUpPurposeApproveDeviceOf(String device, String person);
+
+  /// Purpose of the step-up of revokeDevice that rejects a waiting device.
+  ///
+  /// In en, this message translates to:
+  /// **'Reject the device {device} of {person}'**
+  String stepUpPurposeRejectDevice(String device, String person);
 }
 
 class _AppLocalizationsDelegate

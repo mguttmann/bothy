@@ -24,6 +24,15 @@ Planning stage (milestone M0). Nothing is installable yet.
   sqlc query on a content table without `channel_id = ANY(...)` or `space_id = ANY(...)` unless it
   stands with a category and a reason on `tools/lint/sql_visibility.yaml`; stale, duplicate and
   uncategorised exceptions and content tables unknown to chapter 03 fail too.
+- Administration of people, groups and devices (M4-26): `packages/admin_ui` has the shell of
+  01 5.2 A1 (People, Groups, Devices with the count of waiting devices) and its screens: the
+  people list with search and filters, "Add person" with an enrollment code shown once, a
+  person's detail (owner flag, credentials, devices, sessions; disable, enable, new code),
+  owners (add and revoke; the last owner stays), groups (create, rename, delete, members with
+  an expiry) and the queue of waiting devices with the origin of the login (approve with the
+  code, reject). Every change asks once and then for the step-up where the server demands it;
+  the desktop app hosts the shell at `/admin`. The fake server answers these operations and
+  takes the step-up of each from `docs/spec/actions.yaml`.
 - Desktop settings, devices and sessions (M4-25): Settings has the sections of 01 5.1 D8
   (Appearance, Language, Keyboard, Devices and sessions, Privacy, About and the Notifications
   entry M4-33 fills) under `/settings/<section>`. The personal settings of 01 11 apply their

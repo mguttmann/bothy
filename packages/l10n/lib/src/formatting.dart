@@ -104,6 +104,26 @@ class L10nFormat {
     return tz.TZDateTime.from(instant, location);
   }
 
+  /// The instant (UTC) at which the calendar day [year]-[month]-[day] starts in [timeZone]
+  /// (IANA name), for a date the person typed in their own time zone.
+  ///
+  /// Example: `dayStart(2027, 1, 1, timeZone: 'America/New_York')` is 2027-01-01 05:00 UTC.
+  /// Throws an [ArgumentError] when [timeZone] is not in the time zone database.
+  DateTime dayStart(int year, int month, int day, {required String timeZone}) {
+    _ensureData();
+    final tz.Location location;
+    try {
+      location = tz.getLocation(timeZone);
+    } on tz.LocationNotFoundException {
+      throw ArgumentError.value(timeZone, 'timeZone', 'not an IANA time zone');
+    }
+    final start = tz.TZDateTime(location, year, month, day);
+    return DateTime.fromMicrosecondsSinceEpoch(
+      start.microsecondsSinceEpoch,
+      isUtc: true,
+    );
+  }
+
   /// The clock time of [instant] in [timeZone] (IANA name): `14:05` in German, `2:05 PM` in
   /// English.
   ///

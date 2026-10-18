@@ -86,8 +86,30 @@ final class FakePerson {
   /// The TOTP code the fake accepts (fixed: the fake has no clock-based TOTP).
   final String? totpCode;
 
-  /// Whether the person is an owner.
-  final bool isOwner;
+  /// Whether the person is an owner (`addOwner` and `revokeOwner` change it).
+  bool isOwner;
+
+  /// `pending`, `active`, `disabled` or `deleted` (`UserStatus`); `disableUser` and
+  /// `enableUser` change it.
+  String status = 'active';
+
+  /// The e-mail address of the profile, or null.
+  String? email;
+
+  /// When the person was created.
+  String createdAt = '2026-10-01T00:00:00.000Z';
+
+  /// When and why the person became an owner (`Owner.granted_at`, `Owner.reason`).
+  String ownerGrantedAt = '2026-10-01T00:00:00.000Z';
+
+  /// The reason of the owner row.
+  String ownerReason = 'bootstrap';
+
+  /// The linked external identities (`Identity`), by ID.
+  final Map<String, JsonMap> identities = {};
+
+  /// The passkeys (`Passkey`), by ID.
+  final Map<String, JsonMap> passkeys = {};
 
   /// Whether a device that logs in with a password starts `pending` (08 5.2); false lets
   /// tests skip the approval, a simplification the README names.
@@ -98,6 +120,18 @@ final class FakePerson {
 
   /// The IANA time zone of the profile (`users.time_zone`), or null.
   String? timeZone;
+
+  /// The API `User`.
+  JsonMap get user => {
+    'id': id,
+    'handle': handle,
+    'display_name': displayName,
+    'status': status,
+    'is_owner': isOwner,
+    'locale': ?locale,
+    'time_zone': ?timeZone,
+    'created_at': createdAt,
+  };
 
   /// The API `PrincipalRef`.
   JsonMap get ref => {
@@ -417,6 +451,18 @@ final class FakeWorld {
 
   /// People and agents by ID.
   final Map<String, FakePerson> people = {};
+
+  /// Groups (`Group` without `member_count`) by ID.
+  final Map<String, JsonMap> groups = {};
+
+  /// The members (`GroupMember`) of each group, by group and person ID.
+  final Map<String, Map<String, JsonMap>> groupMembers = {};
+
+  /// People whose `enableUser` answers `409 i1_violation` (10 5.4), a switch of the tests.
+  final Set<String> i1OnEnable = {};
+
+  /// The last enrollment code issued per person (only the newest is valid, 08 3.2).
+  final Map<String, String> enrollmentCodes = {};
 
   /// Devices by ID.
   final Map<String, FakeDevice> devices = {};
@@ -1701,6 +1747,44 @@ final class FakeWorld {
   /// Rejects the pending device [deviceId] as a wrong verification code does.
   void rejectPendingDevice(String deviceId) =>
       revokeDevice(deviceId, reason: 'verification_failed');
+
+  /// Disables the person [userId] as 08 11 does: status `disabled`, every session revoked
+  /// (`user_disabled`), every device revoked (`user_disabled`).
+  void disablePerson(String userId) {
+    people[userId]!.status = 'disabled';
+    for (final d in devices.values.where((d) => d.userId == userId).toList()) {
+      if (d.state != 'revoked') revokeDevice(d.id, reason: 'user_disabled');
+    }
+    for (final s in sessions.values.where((s) => s.userId == userId).toList()) {
+      revokeSession(s.id, reason: 'user_disabled');
+    }
+  }
+
+  /// Adds a passkey named [name] to [userId] and returns its ID.
+  String addPasskey(String userId, {required String name}) {
+    final id = nextId();
+    people[userId]!.passkeys[id] = {
+      'id': id,
+      'name': name,
+      'backup_eligible': true,
+      'created_at': stamp(),
+    };
+    return id;
+  }
+
+  /// Links an OIDC identity with [subject] to [userId] and returns its ID.
+  String addIdentity(String userId, {required String subject}) {
+    final id = nextId();
+    people[userId]!.identities[id] = {
+      'id': id,
+      'provider_id': localProviderId,
+      'provider_kind': 'oidc',
+      'subject': subject,
+      'issuer': 'https://login.example.com',
+      'linked_at': stamp(),
+    };
+    return id;
+  }
 
   /// Lets the pairing [pairingId] expire (`auth.pairing_code_ttl`, 08 5.3).
   void expirePairing(String pairingId) {

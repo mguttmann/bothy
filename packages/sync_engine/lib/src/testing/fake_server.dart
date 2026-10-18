@@ -7,9 +7,11 @@ library;
 import 'dart:async';
 import 'dart:io';
 
+import 'action_catalog.dart';
 import 'dpop_verifier.dart';
 import 'faults.dart';
 import 'gateway_fake.dart';
+import 'rest/admin_handlers.dart';
 import 'rest/auth_handlers.dart';
 import 'rest/message_handlers.dart';
 import 'rest/personal_handlers.dart';
@@ -68,6 +70,8 @@ final class FakeServer {
     this.gateway,
     this.faults,
     this.verifier,
+    this._contract,
+    this.actions,
   );
 
   final HttpServer _http;
@@ -86,6 +90,22 @@ final class FakeServer {
 
   /// The DPoP check; [DpopVerifier.rotateNonce] makes the current nonce the previous one.
   final DpopVerifier verifier;
+
+  final ContractSchemas _contract;
+
+  /// The action catalogue of `docs/spec/actions.yaml` (brief M4-26 Design note 3).
+  final ActionCatalog actions;
+
+  /// The authorization action of [operationId] (`x-authz-action`), or null when it names none.
+  String? actionOf(String operationId) =>
+      _contract.operation(operationId).authzAction;
+
+  /// The `step_up` value (`true`, `false`, `fresh`, `conditional`) of the action of
+  /// [operationId] in `docs/spec/actions.yaml`; `false` for an operation without an action.
+  String stepUpOf(String operationId) {
+    final action = actionOf(operationId);
+    return action == null ? 'false' : actions.stepUp(action);
+  }
 
   final List<ScriptedAgent> _agents = [];
   final Set<Future<void>> _serving = {};
@@ -124,7 +144,18 @@ final class FakeServer {
     registerPersonalHandlers(rest);
     registerRunHandlers(rest);
     registerSelfHandlers(rest);
-    final server = FakeServer._(http, world, rest, gateway, faults, verifier);
+    final actions = ActionCatalog.load();
+    registerAdminHandlers(rest, actions);
+    final server = FakeServer._(
+      http,
+      world,
+      rest,
+      gateway,
+      faults,
+      verifier,
+      contract,
+      actions,
+    );
     http.listen(server._onRequest);
     return server;
   }

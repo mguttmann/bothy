@@ -3112,5 +3112,963 @@
   "newPostCancel": "Cancel",
   "@newPostCancel": {
     "description": "Button of the dialog that closes it without creating a post."
+  },
+  "adminTitle": "Administration",
+  "@adminTitle": {
+    "description": "Heading of the administration navigation (01 section 5.2 A1)."
+  },
+  "adminBack": "Back to the chat",
+  "@adminBack": {
+    "description": "Button above the administration navigation that leaves the administration."
+  },
+  "adminNavPeople": "People",
+  "@adminNavPeople": {
+    "description": "Entry of the administration navigation: people (01 section 5.2 A1)."
+  },
+  "adminNavGroups": "Groups",
+  "@adminNavGroups": {
+    "description": "Entry of the administration navigation: groups (07 section 2.1)."
+  },
+  "adminNavDevices": "Devices",
+  "@adminNavDevices": {
+    "description": "Entry of the administration navigation: the queue of waiting devices."
+  },
+  "adminNavDevicesWaiting": "{count, plural, =0{Devices} =1{Devices (1 waiting)} other{Devices ({count} waiting)}}",
+  "@adminNavDevicesWaiting": {
+    "description": "Entry of the administration navigation with the number of waiting devices (01 section 5.2 A1).",
+    "placeholders": {
+      "count": {
+        "type": "int",
+        "example": "1"
+      }
+    }
+  },
+  "adminReason": "Reason (stored in the audit log)",
+  "@adminReason": {
+    "description": "Label of the optional reason field of a confirmation in the administration."
+  },
+  "adminDefaultReason": "Changed in the administration",
+  "@adminDefaultReason": {
+    "description": "Reason sent to the server when the person typed none."
+  },
+  "adminLoadMore": "Load more",
+  "@adminLoadMore": {
+    "description": "Button below a list of the administration that loads its next page."
+  },
+  "adminOneTimeSecret": "The code was shown once and cannot be shown again. Issue a new code.",
+  "@adminOneTimeSecret": {
+    "description": "Note when the server refuses to repeat an enrollment code (06 section 7, one_time_secret)."
+  },
+  "adminI1Explained": "Change the mode of the affected agent under Agents first, then enable the person again.",
+  "@adminI1Explained": {
+    "description": "Explanation after enabling a person failed with i1_violation (10 section 5.4)."
+  },
+  "adminPickPerson": "Choose a person",
+  "@adminPickPerson": {
+    "description": "Hint of the person selection in the dialogs of the administration."
+  },
+  "adminRevoke": "Revoke",
+  "@adminRevoke": {
+    "description": "Button that revokes a passkey."
+  },
+  "adminOwnerBadge": "Owner",
+  "@adminOwnerBadge": {
+    "description": "Badge of a person who is an owner (07 section 2.7)."
+  },
+  "adminStatusActive": "Active",
+  "@adminStatusActive": {
+    "description": "State of a person: active."
+  },
+  "adminStatusPending": "Waiting for login",
+  "@adminStatusPending": {
+    "description": "State of a person who has not signed in yet."
+  },
+  "adminStatusDisabled": "Disabled",
+  "@adminStatusDisabled": {
+    "description": "State of a disabled person (08 section 11)."
+  },
+  "adminStatusDeleted": "Deleted",
+  "@adminStatusDeleted": {
+    "description": "State of a deleted person."
+  },
+  "adminPeopleTitle": "People",
+  "@adminPeopleTitle": {
+    "description": "Heading of the people list (01 section 5.2 A1)."
+  },
+  "adminPeopleAdd": "Add person",
+  "@adminPeopleAdd": {
+    "description": "Button that creates a person (no self-registration, no invitation links)."
+  },
+  "adminPeopleSearch": "Search",
+  "@adminPeopleSearch": {
+    "description": "Label of the search field of the people list."
+  },
+  "adminPeopleStatusAll": "All states",
+  "@adminPeopleStatusAll": {
+    "description": "Choice of the state filter that shows everybody."
+  },
+  "adminPeopleGroupAll": "All groups",
+  "@adminPeopleGroupAll": {
+    "description": "Choice of the group filter that shows everybody."
+  },
+  "adminPeopleGroupNote": "The group filter applies only to the people loaded on this page.",
+  "@adminPeopleGroupNote": {
+    "description": "Note below the filters while a group filter is active; the server has no group filter for people."
+  },
+  "adminPeopleEmpty": "No person matches.",
+  "@adminPeopleEmpty": {
+    "description": "Text of the people list when nobody matches."
+  },
+  "adminPersonCreated": "{name} was created.",
+  "@adminPersonCreated": {
+    "description": "Notice after a person was created.",
+    "placeholders": {
+      "name": {
+        "type": "String",
+        "example": "Robin"
+      }
+    }
+  },
+  "adminCreatePersonTitle": "Add person",
+  "@adminCreatePersonTitle": {
+    "description": "Title of the dialog that creates a person."
+  },
+  "adminCreatePersonBody": "The person gets an account. With a local account, the enrollment code is shown once in the next step.",
+  "@adminCreatePersonBody": {
+    "description": "What creating a person does (08 section 3.2)."
+  },
+  "adminCreatePersonName": "Display name",
+  "@adminCreatePersonName": {
+    "description": "Label of the display name field."
+  },
+  "adminCreatePersonHandle": "Handle",
+  "@adminCreatePersonHandle": {
+    "description": "Label of the handle field."
+  },
+  "adminCreatePersonHandleInvalid": "Use lower case letters, digits, dots, hyphens and underscores.",
+  "@adminCreatePersonHandleInvalid": {
+    "description": "Error below the handle field when it does not match the pattern."
+  },
+  "adminCreatePersonLocal": "Local account with an enrollment code",
+  "@adminCreatePersonLocal": {
+    "description": "Checkbox: the person gets a local identity and a first login code."
+  },
+  "adminCreatePersonSubmit": "Create",
+  "@adminCreatePersonSubmit": {
+    "description": "Button that confirms creating a person."
+  },
+  "adminCodeTitle": "Enrollment code for {name}",
+  "@adminCodeTitle": {
+    "description": "Title of the view that shows an enrollment code once.",
+    "placeholders": {
+      "name": {
+        "type": "String",
+        "example": "Robin"
+      }
+    }
+  },
+  "adminCodeOnce": "This code is shown only once. Hand it over in person or by phone.",
+  "@adminCodeOnce": {
+    "description": "Warning of the enrollment code view (08 section 3.2)."
+  },
+  "adminCodePurposeFirstLogin": "For the first login",
+  "@adminCodePurposeFirstLogin": {
+    "description": "Purpose of an enrollment code: first_login."
+  },
+  "adminCodePurposeRecovery": "For recovery",
+  "@adminCodePurposeRecovery": {
+    "description": "Purpose of an enrollment code: recovery."
+  },
+  "adminCodePurposeIdentityLink": "For linking a login service",
+  "@adminCodePurposeIdentityLink": {
+    "description": "Purpose of an enrollment code: identity_link."
+  },
+  "adminCodeExpires": "Valid until {when}",
+  "@adminCodeExpires": {
+    "description": "Expiry of an enrollment code; when is a relative day and a time.",
+    "placeholders": {
+      "when": {
+        "type": "String",
+        "example": "Today 14:05"
+      }
+    }
+  },
+  "adminCodeClose": "Close",
+  "@adminCodeClose": {
+    "description": "Button that closes the enrollment code view and discards the code."
+  },
+  "adminPersonBack": "All people",
+  "@adminPersonBack": {
+    "description": "Button above a person that returns to the list."
+  },
+  "adminPersonDisable": "Disable",
+  "@adminPersonDisable": {
+    "description": "Button that disables a person (08 section 11)."
+  },
+  "adminPersonEnable": "Enable",
+  "@adminPersonEnable": {
+    "description": "Button that enables a disabled person."
+  },
+  "adminPersonNewCode": "New enrollment code",
+  "@adminPersonNewCode": {
+    "description": "Button that issues a new enrollment code (08 section 3.2)."
+  },
+  "adminDisableTitle": "Disable {name}?",
+  "@adminDisableTitle": {
+    "description": "Title of the confirmation before a person is disabled.",
+    "placeholders": {
+      "name": {
+        "type": "String",
+        "example": "Sam"
+      }
+    }
+  },
+  "adminDisableBody": "{name} is disabled. All sessions of {name} end now and all devices are revoked.",
+  "@adminDisableBody": {
+    "description": "What disabling does (08 section 11).",
+    "placeholders": {
+      "name": {
+        "type": "String",
+        "example": "Sam"
+      }
+    }
+  },
+  "adminPersonDisabled": "{name} is disabled. All sessions ended.",
+  "@adminPersonDisabled": {
+    "description": "Notice after a person was disabled.",
+    "placeholders": {
+      "name": {
+        "type": "String",
+        "example": "Sam"
+      }
+    }
+  },
+  "adminEnableTitle": "Enable {name}?",
+  "@adminEnableTitle": {
+    "description": "Title of the confirmation before a person is enabled.",
+    "placeholders": {
+      "name": {
+        "type": "String",
+        "example": "Sam"
+      }
+    }
+  },
+  "adminEnableBody": "{name} can sign in again. Earlier devices stay revoked.",
+  "@adminEnableBody": {
+    "description": "What enabling does (08 section 11).",
+    "placeholders": {
+      "name": {
+        "type": "String",
+        "example": "Sam"
+      }
+    }
+  },
+  "adminPersonEnabled": "{name} is enabled.",
+  "@adminPersonEnabled": {
+    "description": "Notice after a person was enabled.",
+    "placeholders": {
+      "name": {
+        "type": "String",
+        "example": "Sam"
+      }
+    }
+  },
+  "adminNewCodeTitle": "New enrollment code for {name}?",
+  "@adminNewCodeTitle": {
+    "description": "Title of the confirmation before a new enrollment code is issued.",
+    "placeholders": {
+      "name": {
+        "type": "String",
+        "example": "Sam"
+      }
+    }
+  },
+  "adminNewCodeBody": "A new code is issued and shown once. Every older code of {name} stops working.",
+  "@adminNewCodeBody": {
+    "description": "What issuing a code does (08 section 3.2).",
+    "placeholders": {
+      "name": {
+        "type": "String",
+        "example": "Sam"
+      }
+    }
+  },
+  "adminCredentialsTitle": "Credentials",
+  "@adminCredentialsTitle": {
+    "description": "Heading of the credentials of a person."
+  },
+  "adminCredentialsPasswordSet": "Local password set",
+  "@adminCredentialsPasswordSet": {
+    "description": "The person has a local password."
+  },
+  "adminCredentialsPasswordNone": "No local password",
+  "@adminCredentialsPasswordNone": {
+    "description": "The person has no local password."
+  },
+  "adminCredentialsTotpSet": "One-time code app set up",
+  "@adminCredentialsTotpSet": {
+    "description": "The person has a one-time code app."
+  },
+  "adminCredentialsTotpNone": "No one-time code app",
+  "@adminCredentialsTotpNone": {
+    "description": "The person has no one-time code app."
+  },
+  "adminCredentialsIdentities": "Linked login services",
+  "@adminCredentialsIdentities": {
+    "description": "Heading of the linked identities."
+  },
+  "adminCredentialsPasskeys": "Passkeys",
+  "@adminCredentialsPasskeys": {
+    "description": "Heading of the passkeys."
+  },
+  "adminCredentialsNone": "None",
+  "@adminCredentialsNone": {
+    "description": "Text of an empty credential list."
+  },
+  "adminPasskeyAdded": "Added {when}",
+  "@adminPasskeyAdded": {
+    "description": "When a passkey was registered.",
+    "placeholders": {
+      "when": {
+        "type": "String",
+        "example": "Today 14:05"
+      }
+    }
+  },
+  "adminUnlink": "Unlink",
+  "@adminUnlink": {
+    "description": "Button that unlinks an identity (08 section 3.3)."
+  },
+  "adminUnlinkTitle": "Unlink {subject}?",
+  "@adminUnlinkTitle": {
+    "description": "Title of the confirmation before an identity is unlinked.",
+    "placeholders": {
+      "subject": {
+        "type": "String",
+        "example": "sam"
+      }
+    }
+  },
+  "adminUnlinkBody": "{name} can no longer sign in with this login service.",
+  "@adminUnlinkBody": {
+    "description": "What unlinking does.",
+    "placeholders": {
+      "name": {
+        "type": "String",
+        "example": "Sam"
+      }
+    }
+  },
+  "adminUnlinked": "{subject} was unlinked.",
+  "@adminUnlinked": {
+    "description": "Notice after an identity was unlinked.",
+    "placeholders": {
+      "subject": {
+        "type": "String",
+        "example": "sam"
+      }
+    }
+  },
+  "adminRevokePasskeyTitle": "Revoke the passkey {passkey}?",
+  "@adminRevokePasskeyTitle": {
+    "description": "Title of the confirmation before a passkey is revoked.",
+    "placeholders": {
+      "passkey": {
+        "type": "String",
+        "example": "Laptop"
+      }
+    }
+  },
+  "adminRevokePasskeyBody": "{name} can no longer sign in with this passkey.",
+  "@adminRevokePasskeyBody": {
+    "description": "What revoking a passkey does.",
+    "placeholders": {
+      "name": {
+        "type": "String",
+        "example": "Sam"
+      }
+    }
+  },
+  "adminPasskeyRevoked": "The passkey {passkey} was revoked.",
+  "@adminPasskeyRevoked": {
+    "description": "Notice after a passkey was revoked.",
+    "placeholders": {
+      "passkey": {
+        "type": "String",
+        "example": "Laptop"
+      }
+    }
+  },
+  "adminEndSessionBody": "The device of this session is signed out at once.",
+  "@adminEndSessionBody": {
+    "description": "What ending the session of another person does."
+  },
+  "adminSessionEnded": "The session was ended.",
+  "@adminSessionEnded": {
+    "description": "Notice after a session of another person was ended."
+  },
+  "adminOwnersTitle": "Owners",
+  "@adminOwnersTitle": {
+    "description": "Heading of the owners (07 section 2.7)."
+  },
+  "adminOwnersAdd": "Add owner",
+  "@adminOwnersAdd": {
+    "description": "Button that makes a person an owner."
+  },
+  "adminOwnersAddTitle": "Add an owner",
+  "@adminOwnersAddTitle": {
+    "description": "Title of the dialog that adds an owner."
+  },
+  "adminOwnersAddBody": "The person gets every permission of the instance.",
+  "@adminOwnersAddBody": {
+    "description": "What adding an owner does (07 section 2.7)."
+  },
+  "adminOwnersAdded": "{name} is now an owner.",
+  "@adminOwnersAdded": {
+    "description": "Notice after an owner was added.",
+    "placeholders": {
+      "name": {
+        "type": "String",
+        "example": "Sam"
+      }
+    }
+  },
+  "adminOwnersRevoke": "Revoke",
+  "@adminOwnersRevoke": {
+    "description": "Button that revokes an owner."
+  },
+  "adminOwnersRevokeTitle": "Revoke the owner {name}?",
+  "@adminOwnersRevokeTitle": {
+    "description": "Title of the confirmation before an owner is revoked.",
+    "placeholders": {
+      "name": {
+        "type": "String",
+        "example": "Sam"
+      }
+    }
+  },
+  "adminOwnersRevokeBody": "{name} keeps the account but loses the owner permissions.",
+  "@adminOwnersRevokeBody": {
+    "description": "What revoking an owner does.",
+    "placeholders": {
+      "name": {
+        "type": "String",
+        "example": "Sam"
+      }
+    }
+  },
+  "adminOwnersRevoked": "{name} is no longer an owner.",
+  "@adminOwnersRevoked": {
+    "description": "Notice after an owner was revoked.",
+    "placeholders": {
+      "name": {
+        "type": "String",
+        "example": "Sam"
+      }
+    }
+  },
+  "adminOwnerSince": "Since {when}: {reason}",
+  "@adminOwnerSince": {
+    "description": "Since when and why a person is an owner.",
+    "placeholders": {
+      "when": {
+        "type": "String",
+        "example": "Today 14:05"
+      },
+      "reason": {
+        "type": "String",
+        "example": "Deputy"
+      }
+    }
+  },
+  "adminGroupsTitle": "Groups",
+  "@adminGroupsTitle": {
+    "description": "Heading of the group list (07 section 2.1)."
+  },
+  "adminGroupsCreate": "Create group",
+  "@adminGroupsCreate": {
+    "description": "Button that creates a group."
+  },
+  "adminGroupsEmpty": "No groups yet.",
+  "@adminGroupsEmpty": {
+    "description": "Text of an empty group list."
+  },
+  "adminGroupMembers": "{count, plural, =0{No members} =1{1 member} other{{count} members}}",
+  "@adminGroupMembers": {
+    "description": "Member count of a group.",
+    "placeholders": {
+      "count": {
+        "type": "int",
+        "example": "4"
+      }
+    }
+  },
+  "adminGroupCreated": "The group {name} was created.",
+  "@adminGroupCreated": {
+    "description": "Notice after a group was created.",
+    "placeholders": {
+      "name": {
+        "type": "String",
+        "example": "Support"
+      }
+    }
+  },
+  "adminGroupCreateTitle": "Create group",
+  "@adminGroupCreateTitle": {
+    "description": "Title of the dialog that creates a group."
+  },
+  "adminGroupCreateBody": "A new group without members is created.",
+  "@adminGroupCreateBody": {
+    "description": "What creating a group does."
+  },
+  "adminGroupName": "Name",
+  "@adminGroupName": {
+    "description": "Label of the group name field."
+  },
+  "adminGroupDescription": "Description (optional)",
+  "@adminGroupDescription": {
+    "description": "Label of the group description field."
+  },
+  "adminGroupBack": "All groups",
+  "@adminGroupBack": {
+    "description": "Button above a group that returns to the list."
+  },
+  "adminGroupFromProvider": "The login service manages the members of this group.",
+  "@adminGroupFromProvider": {
+    "description": "Note of a group whose members come from the identity provider (08 section 3.4)."
+  },
+  "adminGroupRename": "Rename",
+  "@adminGroupRename": {
+    "description": "Button that renames a group."
+  },
+  "adminGroupRenameTitle": "Rename {name}",
+  "@adminGroupRenameTitle": {
+    "description": "Title of the dialog that renames a group.",
+    "placeholders": {
+      "name": {
+        "type": "String",
+        "example": "Support"
+      }
+    }
+  },
+  "adminGroupRenameBody": "The group keeps its members and its permissions.",
+  "@adminGroupRenameBody": {
+    "description": "What renaming a group does."
+  },
+  "adminGroupRenamed": "The group is now called {name}.",
+  "@adminGroupRenamed": {
+    "description": "Notice after a group was renamed.",
+    "placeholders": {
+      "name": {
+        "type": "String",
+        "example": "Help desk"
+      }
+    }
+  },
+  "adminGroupDelete": "Delete group",
+  "@adminGroupDelete": {
+    "description": "Button that deletes a group."
+  },
+  "adminGroupDeleteTitle": "Delete {name}?",
+  "@adminGroupDeleteTitle": {
+    "description": "Title of the confirmation before a group is deleted.",
+    "placeholders": {
+      "name": {
+        "type": "String",
+        "example": "Support"
+      }
+    }
+  },
+  "adminGroupDeleteBody": "The group is removed and the permissions it gave end. The members keep their accounts.",
+  "@adminGroupDeleteBody": {
+    "description": "What deleting a group does."
+  },
+  "adminMembersTitle": "Members",
+  "@adminMembersTitle": {
+    "description": "Heading of the members of a group."
+  },
+  "adminMembersEmpty": "No members yet.",
+  "@adminMembersEmpty": {
+    "description": "Text of a group without members."
+  },
+  "adminMemberAdd": "Add member",
+  "@adminMemberAdd": {
+    "description": "Button that adds a member to a group."
+  },
+  "adminMemberAddTitle": "Add a member to {group}",
+  "@adminMemberAddTitle": {
+    "description": "Title of the dialog that adds a member.",
+    "placeholders": {
+      "group": {
+        "type": "String",
+        "example": "Support"
+      }
+    }
+  },
+  "adminMemberAddBody": "The person gets the permissions of the group, until the given day when one is set.",
+  "@adminMemberAddBody": {
+    "description": "What adding a member does (07 section 2.1)."
+  },
+  "adminMemberUntil": "Until (optional, YYYY-MM-DD)",
+  "@adminMemberUntil": {
+    "description": "Label of the expiry field of a membership."
+  },
+  "adminMemberUntilInvalid": "Enter a date as YYYY-MM-DD.",
+  "@adminMemberUntilInvalid": {
+    "description": "Error below the expiry field."
+  },
+  "adminMemberAdded": "{name} was added to {group}.",
+  "@adminMemberAdded": {
+    "description": "Notice after a member was added.",
+    "placeholders": {
+      "name": {
+        "type": "String",
+        "example": "Sam"
+      },
+      "group": {
+        "type": "String",
+        "example": "Support"
+      }
+    }
+  },
+  "adminMemberExpires": "Until {when}",
+  "@adminMemberExpires": {
+    "description": "When a membership ends.",
+    "placeholders": {
+      "when": {
+        "type": "String",
+        "example": "31 Dec 2026"
+      }
+    }
+  },
+  "adminMemberRemove": "Remove",
+  "@adminMemberRemove": {
+    "description": "Button that removes a member from a group."
+  },
+  "adminMemberRemoveTitle": "Remove {name} from {group}?",
+  "@adminMemberRemoveTitle": {
+    "description": "Title of the confirmation before a member is removed.",
+    "placeholders": {
+      "name": {
+        "type": "String",
+        "example": "Sam"
+      },
+      "group": {
+        "type": "String",
+        "example": "Support"
+      }
+    }
+  },
+  "adminMemberRemoveBody": "{name} loses the permissions of the group.",
+  "@adminMemberRemoveBody": {
+    "description": "What removing a member does.",
+    "placeholders": {
+      "name": {
+        "type": "String",
+        "example": "Sam"
+      }
+    }
+  },
+  "adminMemberRemoved": "{name} was removed from {group}.",
+  "@adminMemberRemoved": {
+    "description": "Notice after a member was removed.",
+    "placeholders": {
+      "name": {
+        "type": "String",
+        "example": "Sam"
+      },
+      "group": {
+        "type": "String",
+        "example": "Support"
+      }
+    }
+  },
+  "adminWaitingTitle": "Waiting devices",
+  "@adminWaitingTitle": {
+    "description": "Heading of the queue of waiting devices (01 section 5.2 A1)."
+  },
+  "adminWaitingEmpty": "No device is waiting.",
+  "@adminWaitingEmpty": {
+    "description": "Text of an empty queue."
+  },
+  "adminWaitingDevice": "{person}: {device}",
+  "@adminWaitingDevice": {
+    "description": "A waiting device with its person.",
+    "placeholders": {
+      "person": {
+        "type": "String",
+        "example": "Sam"
+      },
+      "device": {
+        "type": "String",
+        "example": "Pixel"
+      }
+    }
+  },
+  "adminWaitingLoggedIn": "Logged in {when}",
+  "@adminWaitingLoggedIn": {
+    "description": "When the waiting device logged in.",
+    "placeholders": {
+      "when": {
+        "type": "String",
+        "example": "Today 08:12"
+      }
+    }
+  },
+  "adminWaitingVia": "via {method}",
+  "@adminWaitingVia": {
+    "description": "The origin of the login of a waiting device.",
+    "placeholders": {
+      "method": {
+        "type": "String",
+        "example": "OIDC"
+      }
+    }
+  },
+  "adminWaitingNoOrigin": "Origin unknown",
+  "@adminWaitingNoOrigin": {
+    "description": "A waiting device without a session that names its login."
+  },
+  "adminApprove": "Approve",
+  "@adminApprove": {
+    "description": "Button that approves a waiting device (08 section 5.2)."
+  },
+  "adminReject": "Reject",
+  "@adminReject": {
+    "description": "Button that rejects a waiting device."
+  },
+  "adminApproveTitle": "Approve {device} of {person}",
+  "@adminApproveTitle": {
+    "description": "Title of the dialog that approves a waiting device.",
+    "placeholders": {
+      "device": {
+        "type": "String",
+        "example": "Pixel"
+      },
+      "person": {
+        "type": "String",
+        "example": "Sam"
+      }
+    }
+  },
+  "adminApproveHint": "Ask {person} for the code that the waiting device shows and type it here.",
+  "@adminApproveHint": {
+    "description": "Hint of the approval dialog; the code never appears for owners (08 section 5.2).",
+    "placeholders": {
+      "person": {
+        "type": "String",
+        "example": "Sam"
+      }
+    }
+  },
+  "adminApproved": "{device} of {person} is now active.",
+  "@adminApproved": {
+    "description": "Notice after a waiting device was approved.",
+    "placeholders": {
+      "device": {
+        "type": "String",
+        "example": "Pixel"
+      },
+      "person": {
+        "type": "String",
+        "example": "Sam"
+      }
+    }
+  },
+  "adminRejectTitle": "Reject {device}?",
+  "@adminRejectTitle": {
+    "description": "Title of the confirmation before a waiting device is rejected.",
+    "placeholders": {
+      "device": {
+        "type": "String",
+        "example": "Pixel"
+      }
+    }
+  },
+  "adminRejectBody": "The waiting device of {person} is revoked and cannot sign in.",
+  "@adminRejectBody": {
+    "description": "What rejecting a waiting device does.",
+    "placeholders": {
+      "person": {
+        "type": "String",
+        "example": "Sam"
+      }
+    }
+  },
+  "adminRejected": "{device} was rejected.",
+  "@adminRejected": {
+    "description": "Notice after a waiting device was rejected.",
+    "placeholders": {
+      "device": {
+        "type": "String",
+        "example": "Pixel"
+      }
+    }
+  },
+  "stepUpPurposeCreatePerson": "Create the person {name}",
+  "@stepUpPurposeCreatePerson": {
+    "description": "Purpose of the step-up of createUser.",
+    "placeholders": {
+      "name": {
+        "type": "String",
+        "example": "Robin"
+      }
+    }
+  },
+  "stepUpPurposeDisablePerson": "Disable {name}",
+  "@stepUpPurposeDisablePerson": {
+    "description": "Purpose of the step-up of disableUser.",
+    "placeholders": {
+      "name": {
+        "type": "String",
+        "example": "Sam"
+      }
+    }
+  },
+  "stepUpPurposeEnablePerson": "Enable {name}",
+  "@stepUpPurposeEnablePerson": {
+    "description": "Purpose of the step-up of enableUser.",
+    "placeholders": {
+      "name": {
+        "type": "String",
+        "example": "Sam"
+      }
+    }
+  },
+  "stepUpPurposeNewCode": "Issue an enrollment code for {name}",
+  "@stepUpPurposeNewCode": {
+    "description": "Purpose of the step-up of createEnrollmentCode.",
+    "placeholders": {
+      "name": {
+        "type": "String",
+        "example": "Sam"
+      }
+    }
+  },
+  "stepUpPurposeUnlinkIdentity": "Unlink a login service of {name}",
+  "@stepUpPurposeUnlinkIdentity": {
+    "description": "Purpose of the step-up of unlinkIdentity.",
+    "placeholders": {
+      "name": {
+        "type": "String",
+        "example": "Sam"
+      }
+    }
+  },
+  "stepUpPurposeRevokePasskey": "Revoke a passkey of {name}",
+  "@stepUpPurposeRevokePasskey": {
+    "description": "Purpose of the step-up of revokePasskey.",
+    "placeholders": {
+      "name": {
+        "type": "String",
+        "example": "Sam"
+      }
+    }
+  },
+  "stepUpPurposeAddOwner": "Make {name} an owner",
+  "@stepUpPurposeAddOwner": {
+    "description": "Purpose of the step-up of addOwner.",
+    "placeholders": {
+      "name": {
+        "type": "String",
+        "example": "Sam"
+      }
+    }
+  },
+  "stepUpPurposeRevokeOwner": "Revoke the owner {name}",
+  "@stepUpPurposeRevokeOwner": {
+    "description": "Purpose of the step-up of revokeOwner.",
+    "placeholders": {
+      "name": {
+        "type": "String",
+        "example": "Sam"
+      }
+    }
+  },
+  "stepUpPurposeCreateGroup": "Create the group {name}",
+  "@stepUpPurposeCreateGroup": {
+    "description": "Purpose of the step-up of createGroup.",
+    "placeholders": {
+      "name": {
+        "type": "String",
+        "example": "Support"
+      }
+    }
+  },
+  "stepUpPurposeRenameGroup": "Rename the group {name}",
+  "@stepUpPurposeRenameGroup": {
+    "description": "Purpose of the step-up of updateGroup.",
+    "placeholders": {
+      "name": {
+        "type": "String",
+        "example": "Support"
+      }
+    }
+  },
+  "stepUpPurposeDeleteGroup": "Delete the group {name}",
+  "@stepUpPurposeDeleteGroup": {
+    "description": "Purpose of the step-up of deleteGroup.",
+    "placeholders": {
+      "name": {
+        "type": "String",
+        "example": "Support"
+      }
+    }
+  },
+  "stepUpPurposeAddMember": "Add {name} to {group}",
+  "@stepUpPurposeAddMember": {
+    "description": "Purpose of the step-up of addGroupMember.",
+    "placeholders": {
+      "name": {
+        "type": "String",
+        "example": "Sam"
+      },
+      "group": {
+        "type": "String",
+        "example": "Support"
+      }
+    }
+  },
+  "stepUpPurposeRemoveMember": "Remove {name} from {group}",
+  "@stepUpPurposeRemoveMember": {
+    "description": "Purpose of the step-up of removeGroupMember.",
+    "placeholders": {
+      "name": {
+        "type": "String",
+        "example": "Sam"
+      },
+      "group": {
+        "type": "String",
+        "example": "Support"
+      }
+    }
+  },
+  "stepUpPurposeApproveDeviceOf": "Approve the device {device} of {person}",
+  "@stepUpPurposeApproveDeviceOf": {
+    "description": "Purpose of the step-up of approveDevice for the device of another person.",
+    "placeholders": {
+      "device": {
+        "type": "String",
+        "example": "Pixel"
+      },
+      "person": {
+        "type": "String",
+        "example": "Sam"
+      }
+    }
+  },
+  "stepUpPurposeRejectDevice": "Reject the device {device} of {person}",
+  "@stepUpPurposeRejectDevice": {
+    "description": "Purpose of the step-up of revokeDevice that rejects a waiting device.",
+    "placeholders": {
+      "device": {
+        "type": "String",
+        "example": "Pixel"
+      },
+      "person": {
+        "type": "String",
+        "example": "Sam"
+      }
+    }
   }
 }

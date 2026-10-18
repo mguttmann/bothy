@@ -63,7 +63,9 @@ void registerAuthHandlers(RestFake rest, {required Duration accessTokenTtl}) {
             (p) => p.loginName != null && p.loginName == body['login_name'],
           )
           .firstOrNull;
+      // A disabled person cannot sign in (07 SR7).
       if (person == null ||
+          person.status != 'active' ||
           person.password != body['password'] ||
           person.totpCode != body['totp_code']) {
         throw const FakeProblem(401, 'unauthenticated');
