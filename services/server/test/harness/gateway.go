@@ -66,6 +66,38 @@ func (c *Client) GatewayFrom(ctx context.Context, after int64) (*GatewayConn, er
 	return c.gateway(ctx, &after)
 }
 
+// GatewayResume opens a new connection that resumes the gateway session sessionID of an earlier
+// connection of c from cursor (04 section 6.3, op resume) instead of identify. The error reports
+// a failed upgrade, a close of the server or another frame than resumed.
+func (c *Client) GatewayResume(ctx context.Context, sessionID string, cursor int64) (*GatewayConn, error) {
+	opts := []wstest.Option{wstest.WithoutHeartbeat()}
+	if c.ClientIP != "" {
+		opts = append(opts, wstest.WithHeader("X-Forwarded-For", c.ClientIP))
+	}
+	ws, err := wstest.Dial(c.tb, ctx, c.publicURL, opts...)
+	if err != nil {
+		return nil, err
+	}
+	access, _ := c.Tokens()
+	p := wstest.ResumeParams{SessionID: sessionID, Cursor: cursor, Proof: func(nonce string) string { return c.gatewayProof(nonce, access) }}
+	if c.apiToken {
+		p.APIToken = access
+	} else {
+		p.AccessToken = access
+	}
+	resumed, err := ws.Resume(ctx, p)
+	if err != nil {
+		ws.Abort()
+		return nil, err
+	}
+	g := &GatewayConn{Hello: ws.Hello(), c: c, ws: ws, frames: make(chan Frame, frameBuffer), done: make(chan struct{}), stop: make(chan struct{})}
+	g.Ready.GatewaySessionId = resumed.GatewaySessionId
+	g.lastSeq.Store(resumed.HeadSeq)
+	go g.read() //nolint:gosec // G118: the reader lives as long as the connection, not as ctx
+	go g.heartbeat(time.Duration(ws.Hello().HeartbeatIntervalMs) * time.Millisecond)
+	return g, nil
+}
+
 // gateway opens the connection with an optional cursor.
 func (c *Client) gateway(ctx context.Context, cursor *int64) (*GatewayConn, error) {
 	opts := []wstest.Option{wstest.WithoutHeartbeat()}
@@ -214,6 +246,13 @@ func (g *GatewayConn) Err() error {
 		}
 	}
 	return g.err
+}
+
+// Reauth sends reauth with the current access token of the client and a proof for the newest
+// dpop_nonce the server announced (hello), without waiting for reauth_required.
+func (g *GatewayConn) Reauth() error {
+	access, _ := g.c.Tokens()
+	return g.ws.Send("reauth", map[string]any{"access_token": access, "dpop": g.c.gatewayProof(g.Hello.DpopNonce, access)})
 }
 
 // Heartbeats returns how many heartbeats were sent and how many heartbeat_ack frames came back.

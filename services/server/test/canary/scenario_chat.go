@@ -146,20 +146,22 @@ func (sc *Scenario) content() {
 	sc.messages = append(sc.messages, parent)
 }
 
-// markUnread sends markThreadUnread with the ETag of the read state of thread in rs.
+// markUnread sends markThreadUnread one message before the read position of thread in rs, with
+// the version of that read state as If-Match.
 func (sc *Scenario) markUnread(thread string, rs harnessResponse) {
 	sc.T.Helper()
-	ver := ""
+	ver, pos := "", int64(0)
 	for _, it := range items(rs) {
 		if it["thread_id"] == thread {
-			ver = jsonText(it["version"])
+			ver, pos = jsonText(it["version"]), atoi(jsonText(it["last_read_seq"]))
 		}
 	}
-	if ver == "" {
-		ver = "1"
+	if ver == "" || pos < 1 {
+		sc.T.Errorf("no read state of the thread in %s", clip(rs.Body))
+		return
 	}
-	sc.call(sc.W.Owner, req{method: http.MethodPost, path: "/threads/" + thread + "/read-state/mark-unread",
-		body: map[string]any{"last_read_seq": 1}, header: ifMatch(ver)}, ok...)
+	sc.versioned(sc.W.Owner, req{method: http.MethodPost, path: "/threads/" + thread + "/read-state/mark-unread",
+		body: map[string]any{"last_read_seq": pos - 1}, header: ifMatch(ver)}, ok...)
 }
 
 // matchedTemplate updates the template with canary text and its version as If-Match.
@@ -180,7 +182,7 @@ func (sc *Scenario) matchedTemplate(tpl, scope string) {
 func lastSeq(r harnessResponse) int64 {
 	var max int64
 	for _, it := range items(r) {
-		if n, err := strconv.ParseInt(jsonText(it["seq"]), 10, 64); err == nil && n > max {
+		if n, err := strconv.ParseInt(jsonText(it["thread_seq"]), 10, 64); err == nil && n > max {
 			max = n
 		}
 	}

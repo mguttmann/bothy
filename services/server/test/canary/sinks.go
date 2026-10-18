@@ -38,6 +38,11 @@ const (
 type Field struct {
 	Location string
 	Text     string
+	// Echo marks a field of an error response that returns to the caller what it sent or may
+	// read, as the contract defines it: current of version_conflict and base_version_conflict
+	// (06 "Errors" item 3) and the pointer of an unknown_member error, which names the member the
+	// caller sent (W7, M1-18/3). Content there counts as a success response (ruling M1-69/2).
+	Echo bool
 }
 
 // Record is one captured output: a log line, a span, a metric point, an audit row, an error

@@ -177,3 +177,25 @@ func TestSEC_T10_FindingNeverPrintsValue(t *testing.T) {
 		}
 	}
 }
+
+// TestSEC_T10_ScanEchoFields: content in an echo field of an error response (current of a
+// version conflict, the pointer of unknown_member) counts as a success response; a secret there
+// is still a finding, and markEcho marks only those fields.
+func TestSEC_T10_ScanEchoFields(t *testing.T) {
+	reg := NewRegistry()
+	content := reg.New(ClassContent, "chan", "message text")
+	secret := reg.New(ClassSecret, "", "token")
+	body := []byte(`{"code":"version_conflict","detail":"x","current":{"content_md":"` + content + `","note":"` + secret + `"},` +
+		`"errors":[{"pointer":"/` + content + `","code":"unknown_member"},{"pointer":"/name","code":"too_long","detail":"` + content + `"}]}`)
+	s := NewSinks()
+	s.Add(Record{Sink: SinkError, Source: "probe", Fields: markEcho(JSONFields("/body", body), body)})
+	got := Scan(reg, s, AllowRules{})
+	if len(got) != 2 {
+		t.Fatalf("findings:\n%s\nwant the secret in current and the content in errors/1/detail", Report(got))
+	}
+	for _, f := range got {
+		if f.Location != "probe /body/current/note" && f.Location != "probe /body/errors/1/detail" {
+			t.Errorf("unexpected finding %s", f)
+		}
+	}
+}
