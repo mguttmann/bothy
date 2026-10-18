@@ -61,6 +61,9 @@ type AuthorizerDeps struct {
 	Clock clock.Clock
 	// Log receives programming errors and recorder failures; nil means slog.Default().
 	Log *slog.Logger
+	// Metrics counts the decisions of requests and ops (bothy.authz.decisions); nil counts
+	// nothing.
+	Metrics Metrics
 }
 
 // Authorizer implements kernel/authorize.Authorizer: Authorize decides as docs/spec/07-permissions.md
@@ -80,6 +83,7 @@ type Authorizer struct {
 	recorder  auditing.Recorder
 	clock     clock.Clock
 	log       *slog.Logger
+	metrics   Metrics
 	cache     *snapshotCache
 	delivery  *deliveryState
 }
@@ -118,10 +122,14 @@ func NewAuthorizer(cfg AuthorizerConfig, d AuthorizerDeps) (*Authorizer, error) 
 	if log == nil {
 		log = slog.Default()
 	}
+	var m Metrics = noMetrics{}
+	if d.Metrics != nil {
+		m = d.Metrics
+	}
 	return &Authorizer{
 		cfg: cfg, catalog: d.Catalog, store: d.Store, principal: d.Principals, creds: d.Credentials,
 		structure: d.Structure, policies: d.Policies, hosts: hostsOrNone(d.Hosts), versions: d.Versions, recorder: d.Recorder,
-		clock: d.Clock, log: log, cache: newSnapshotCache(cfg.SnapshotCacheMaxEntries),
+		clock: d.Clock, log: log, metrics: m, cache: newSnapshotCache(cfg.SnapshotCacheMaxEntries),
 		delivery: newDeliveryState(cfg.SnapshotCacheMaxEntries),
 	}, nil
 }
@@ -132,7 +140,9 @@ const msgAuditFailed = "audit of an authorization decision failed"
 // Authorize implements authorize.Authorizer (07 section 4.2). After deciding it records the check
 // in the request check log (02 section 9.3) and, outside filter mode, hands every non-allow
 // decision to the recorder as a denial outside the business transaction, aggregated per
-// audit.deny_aggregate_window, and every error as decision error (R-AZ-04, AZ-P13).
+// audit.deny_aggregate_window, and every error as decision error (R-AZ-04, AZ-P13). Outside filter
+// mode (delivery mode implies it) every decision without an error is counted in
+// bothy.authz.decisions.
 func (a *Authorizer) Authorize(ctx context.Context, p authorize.Principal, act authorize.Action, r authorize.Resource) (authorize.Decision, error) {
 	d, err := a.authorize(ctx, p, act, r)
 	if err != nil {
@@ -140,6 +150,9 @@ func (a *Authorizer) Authorize(ctx context.Context, p authorize.Principal, act a
 	}
 	authorize.RecordCheck(ctx, authorize.Check{Action: string(act), Kind: authorize.CheckAuthorize, Allowed: err == nil && d.Allowed()})
 	a.audit(ctx, act, string(r.Kind), r.ID, d, err)
+	if err == nil && !authorize.IsFilter(ctx) {
+		a.metrics.Decision(ctx, act, d.Outcome)
+	}
 	return d, err
 }
 
