@@ -104,6 +104,19 @@ final class PersonalDao {
     );
   }
 
+  /// Deletes setting [key] when [version] is greater than the stored version
+  /// (`settings.updated` with `deleted: true`, 04 14); returns whether a row went.
+  Future<bool> deleteSettingIfNewer(String key, ResourceVersion version) async {
+    final deleted =
+        await (_db.delete(_db.userSettings)..where(
+              (t) =>
+                  t.key.equals(key) &
+                  t.version.isSmallerThanValue(version.value),
+            ))
+            .go();
+    return deleted > 0;
+  }
+
   /// All settings by key.
   Stream<List<UserSetting>> watchSettings() =>
       (_db.select(_db.userSettings)
@@ -123,6 +136,25 @@ final class PersonalDao {
       update: row,
       version: (t) => t.version,
     );
+  }
+
+  /// Deletes the preference of [targetKind] and [targetId] when [version] is greater than the
+  /// stored version (`notification_pref.updated` with `deleted: true`, 04 14); returns whether
+  /// a row went.
+  Future<bool> deleteNotificationPreferenceIfNewer(
+    NotificationTargetKind targetKind,
+    String targetId,
+    ResourceVersion version,
+  ) async {
+    final deleted =
+        await (_db.delete(_db.notificationPreferences)..where(
+              (t) =>
+                  t.targetKind.equals(targetKind.code) &
+                  t.targetId.equals(targetId) &
+                  t.version.isSmallerThanValue(version.value),
+            ))
+            .go();
+    return deleted > 0;
   }
 
   /// All notification preferences.

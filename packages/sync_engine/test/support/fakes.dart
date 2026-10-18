@@ -273,13 +273,16 @@ class FakeLifecycle implements AppLifecycle {
 /// One REST request as the fake API saw it.
 class SeenRequest {
   /// Records a request.
-  SeenRequest(this.method, this.path);
+  SeenRequest(this.method, this.path, [this.query = const {}]);
 
   /// HTTP method in upper case.
   final String method;
 
   /// Path below `/api/v1`.
   final String path;
+
+  /// The query parameters.
+  final Map<String, String> query;
 }
 
 /// A canned answer of the fake API.
@@ -310,6 +313,9 @@ class FakeApi implements HttpClientAdapter {
   /// Routes by `METHOD /path`.
   final Map<String, FakeReply Function(SeenRequest r)> routes = {};
 
+  /// Futures by `METHOD /path` that a request waits for before it is answered.
+  final Map<String, Future<void>> gates = {};
+
   /// The requests to [path].
   int count(String path) => requests.where((r) => r.path == path).length;
 
@@ -321,8 +327,14 @@ class FakeApi implements HttpClientAdapter {
   ) async {
     if (requestStream != null) await requestStream.drain<void>();
     final path = options.uri.path.replaceFirst('/api/v1', '');
-    final seen = SeenRequest(options.method.toUpperCase(), path);
+    final seen = SeenRequest(
+      options.method.toUpperCase(),
+      path,
+      options.uri.queryParameters,
+    );
     requests.add(seen);
+    final gate = gates['${seen.method} $path'];
+    if (gate != null) await gate;
     final route = routes['${seen.method} $path'];
     final r = route == null ? FakeReply.problem(404, 'not_found') : route(seen);
     final problem = r.body is Map && (r.body! as Map)['code'] is String;
@@ -554,7 +566,8 @@ class Harness {
     int seed = 1,
     this.keepConnectedInBackground = false,
     AppActivity activity = AppActivity.foreground,
-    this.listener,
+    this._listener,
+    this.listenerFor,
   }) : clock = FakeClock(DateTime.utc(2026, 10, 15, 10)),
        random = SeededRandom(seed),
        lifecycle = FakeLifecycle(activity),
@@ -633,8 +646,13 @@ class Harness {
   /// Desktop behaviour.
   final bool keepConnectedInBackground;
 
+  final SessionListener? _listener;
+
+  /// Builds the listener from the harness (its database, clock and configuration), when given.
+  final SessionListener Function(Harness h)? listenerFor;
+
   /// The listener, if any.
-  final SessionListener? listener;
+  late final SessionListener? listener = listenerFor?.call(this) ?? _listener;
 
   /// The transport.
   late final FakeTransport transport;
