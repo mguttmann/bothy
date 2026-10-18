@@ -12,6 +12,7 @@ import (
 	"github.com/OWNER/bothy/services/server/internal/authz"
 	authzhttp "github.com/OWNER/bothy/services/server/internal/authz/adapters/httpapi"
 	authzpg "github.com/OWNER/bothy/services/server/internal/authz/adapters/postgres"
+	authzmetrics "github.com/OWNER/bothy/services/server/internal/authz/adapters/otelmetrics"
 	"github.com/OWNER/bothy/services/server/internal/authz/adapters/telemetry"
 	authzapp "github.com/OWNER/bothy/services/server/internal/authz/app"
 	"github.com/OWNER/bothy/services/server/internal/chat"
@@ -159,14 +160,19 @@ func AuthzConfig(v *config.Values) (authzapp.AuthorizerConfig, error) {
 // the rights version of instance (instance.Versions), the recorder of audit (M1-24), the clock and
 // log, the CredentialSource of identity (devices since M1-33, sessions since M1-34, API tokens
 // since M1-44), the agent policy source of agents (M1-51) and the structure source with the
-// spaces of chat (M1-52) and no channels until M1-53 (NewStructureSource).
+// spaces of chat (M1-52) and no channels until M1-53 (NewStructureSource), and the counter
+// bothy.authz.decisions of authz/adapters/otelmetrics on the global meter provider (M1-68).
 // It opens no connection.
 //
-// Errors: those of authzapp.NewAuthorizer (a cache bound below 1).
+// Errors: those of authzapp.NewAuthorizer (a cache bound below 1) and of the meter provider.
 func NewAuthorizer(pool *pg.Pool, cfg authzapp.AuthorizerConfig, cat *authzapp.Catalog, rec auditing.Recorder,
 	clk clock.Clock, log *slog.Logger) (*authzapp.Authorizer, error) {
 	if clk == nil {
 		clk = clock.System()
+	}
+	decisions, err := authzmetrics.New(nil)
+	if err != nil {
+		return nil, err
 	}
 	return authzapp.NewAuthorizer(cfg, authzapp.AuthorizerDeps{
 		Catalog:     cat,
@@ -180,6 +186,7 @@ func NewAuthorizer(pool *pg.Pool, cfg authzapp.AuthorizerConfig, cat *authzapp.C
 		Recorder:    rec,
 		Clock:       clk,
 		Log:         orDiscard(log),
+		Metrics:     decisions,
 	})
 }
 
