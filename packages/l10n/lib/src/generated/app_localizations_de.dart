@@ -3568,4 +3568,212 @@ class AppLocalizationsDe extends AppLocalizations {
 
   @override
   String get adminTargetsHosts => 'Rechner';
+
+  @override
+  String get threadNoOperator => 'Kein Agent antwortet hier';
+
+  @override
+  String threadOperator(String name) {
+    return 'Bediener: $name';
+  }
+
+  @override
+  String get threadTitleAutomatic => 'automatisch';
+
+  @override
+  String get threadDone => 'Erledigt';
+
+  @override
+  String get threadReopen => 'Wieder öffnen';
+
+  @override
+  String get threadMove => 'Verschieben';
+
+  @override
+  String get threadPin => 'Anheften';
+
+  @override
+  String get threadColumn => 'Spalte';
+
+  @override
+  String get threadEditTitle => 'Titel bearbeiten';
+
+  @override
+  String get threadTitleLabel => 'Titel';
+
+  @override
+  String get threadSave => 'Speichern';
+
+  @override
+  String get threadCancel => 'Abbrechen';
+
+  @override
+  String threadStarter(String title, int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count Antworten',
+      one: '1 Antwort',
+    );
+    return 'Thread: $title, $_temp0';
+  }
+
+  @override
+  String get threadLoadingOlder => 'Frühere Nachrichten werden geladen';
+
+  @override
+  String get threadLoadingNewer => 'Fehlende Nachrichten werden geladen';
+
+  @override
+  String get threadEmpty => 'Noch keine Nachrichten';
+
+  @override
+  String get threadNoAccess => 'Kein Zugriff mehr';
+
+  @override
+  String get threadNoAccessWaiting =>
+      'Nicht gesendete Nachrichten zum Kopieren:';
+
+  @override
+  String get messageActionStartThread => 'Thread starten';
+
+  @override
+  String get messageActionUnpin => 'Lösen';
+
+  @override
+  String get messageActionVersions => 'Fassungen ansehen';
+
+  @override
+  String get messageActionDelete => 'Löschen';
+
+  @override
+  String get messageActionMarkUnread => 'Als ungelesen markieren';
+
+  @override
+  String get messageActionCopyText => 'Text kopieren';
+
+  @override
+  String get messageActionCopyLink => 'Link kopieren';
+
+  @override
+  String get messageMenuLabel => 'Aktionen der Nachricht';
+
+  @override
+  String get messageDeleteTitle => 'Nachricht löschen?';
+
+  @override
+  String get messageDeleteBody =>
+      'Die Nachricht wird für alle durch \"Nachricht gelöscht\" ersetzt.';
+
+  @override
+  String get messageVersionsTitle => 'Fassungen';
+
+  @override
+  String get messageVersionsCurrent => 'Aktuelle Fassung';
+
+  @override
+  String messageVersionsRevision(int number) {
+    return 'Fassung $number';
+  }
+
+  @override
+  String get messageVersionsEmpty => 'Keine früheren Fassungen';
+
+  @override
+  String messageVersionsFailed(String reason) {
+    return 'Die Fassungen konnten nicht geladen werden: $reason';
+  }
+
+  @override
+  String get messageConflictTitle => 'Die Nachricht wurde anderswo geändert';
+
+  @override
+  String get messageConflictMine => 'Deine Fassung';
+
+  @override
+  String get messageConflictTheirs => 'Aktuelle Fassung';
+
+  @override
+  String get messageConflictKeepMine => 'Meine behalten';
+
+  @override
+  String get messageConflictTakeTheirs => 'Aktuelle übernehmen';
+
+  @override
+  String get messageEditLabel => 'Nachricht bearbeiten';
+
+  @override
+  String get messageReactionTitle => 'Reagieren';
+
+  @override
+  String get messageReactionInput => 'Beliebiges Zeichen';
+
+  @override
+  String get messageReactionAdd => 'Hinzufügen';
+
+  @override
+  String get messageCopied => 'Kopiert';
+
+  @override
+  String outboxFailedAction(String reason) {
+    return 'Nicht gespeichert: $reason';
+  }
+
+  @override
+  String get outboxCompare => 'Vergleichen';
+
+  @override
+  String get outboxCopy => 'Kopieren';
+
+  @override
+  String composerTooLong(int limit) {
+    return 'Die Nachricht ist zu lang: höchstens $limit Byte';
+  }
+
+  @override
+  String get composerDraftOverwritten =>
+      'Dieser Entwurf hat eine neuere Fassung eines anderen Geräts ersetzt';
+
+  @override
+  String composerReplyTo(String name) {
+    return 'Antwort an $name';
+  }
+
+  @override
+  String get composerCancelReply => 'Antwort abbrechen';
+
+  @override
+  String get composerTemplates => 'Vorlagen';
+
+  @override
+  String get composerTemplatesPersonal => 'Deine Vorlagen';
+
+  @override
+  String get composerTemplatesChannel => 'Vorlagen dieses Kanals';
+
+  @override
+  String get composerTemplatesEmpty => 'Keine Vorlagen';
+
+  @override
+  String get composerTemplatesSave => 'Als Vorlage speichern';
+
+  @override
+  String get composerTemplatesName => 'Name';
+
+  @override
+  String sessionPinned(int count) {
+    return 'Angeheftet ($count)';
+  }
+
+  @override
+  String get sessionPinnedEmpty => 'Keine angehefteten Nachrichten';
+
+  @override
+  String get sessionNoThread => 'Öffne einen Thread, um seine Sitzung zu sehen';
+
+  @override
+  String get threadMoveNoTarget => 'Kein Kanal mit demselben Bediener';
+
+  @override
+  String get threadMoveReason => 'Grund';
 }

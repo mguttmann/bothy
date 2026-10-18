@@ -1,0 +1,645 @@
+// SPDX-License-Identifier: Apache-2.0
+
+/// The history column (brief M4-20 Design notes 1 to 6; 01 5.1 D1 and D2, 6, 7): the header,
+/// the messages of the local database with the outbox after them, paging and the jump to a
+/// message, focus and read state, the message actions, the composer, and "No access anymore"
+/// when the thread or its channel is removed.
+library;
+
+import 'dart:async';
+
+import 'package:design_system/design_system.dart';
+import 'package:domain/domain.dart';
+import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
+import 'package:l10n/l10n.dart';
+import 'package:local_store/local_store.dart';
+import 'package:sync_engine/sync_engine.dart';
+
+import '../app/providers/ports.dart';
+import '../app/providers/session.dart';
+import '../composer/thread_composer.dart';
+import '../forum/forum_model.dart' show timeLabel;
+import '../sidebar/providers.dart';
+import 'delete_confirm.dart';
+import 'history_model.dart';
+import 'message_list.dart';
+import 'message_menu.dart';
+import 'message_tile.dart';
+import 'move_thread_dialog.dart';
+import 'outbox_rows.dart';
+import 'providers.dart';
+import 'reaction_picker.dart';
+import 'revisions_dialog.dart';
+import 'thread_actions.dart';
+import 'thread_header.dart';
+import 'title_editor.dart';
+import 'versions_dialog.dart';
+
+/// The history of [threadId]; [jumpTo] brings a message into view and highlights it
+/// (`/t/{thread_id}?m={message_id}`, 15 11).
+class HistoryColumn extends ConsumerStatefulWidget {
+  /// Creates the column.
+  const HistoryColumn({super.key, required this.threadId, this.jumpTo});
+
+  /// The thread.
+  final ThreadId threadId;
+
+  /// The message to jump to, or null.
+  final MessageId? jumpTo;
+
+  @override
+  ConsumerState<HistoryColumn> createState() => HistoryColumnState();
+}
+
+/// State of [HistoryColumn]: paging, the jump, the read position written last, the message
+/// being edited and the removal.
+class HistoryColumnState extends ConsumerState<HistoryColumn> {
+  final GlobalKey<ThreadComposerState> _composer = GlobalKey();
+  late final VisibleThreads _visible;
+  bool _loadingOlder = false;
+  bool _jumpLoaded = false;
+  bool _newestVisible = true;
+  ThreadSeq? _markedSeq;
+  MessageId? _editing;
+  String? _editingEntry;
+
+  /// The texts of the waiting messages when access was removed (01 6.6), or null while the
+  /// thread is visible.
+  List<(String, String)>? _removed;
+
+  String get _thread => widget.threadId.value;
+
+  @override
+  void initState() {
+    super.initState();
+    _visible = ref.read(visibleThreadsProvider.notifier)..add(widget.threadId);
+  }
+
+  @override
+  void dispose() {
+    _visible.remove(widget.threadId);
+    super.dispose();
+  }
+
+  ThreadActions? get _actions {
+    final engine = ref.read(syncEngineProvider);
+    return engine == null ? null : ThreadActions(engine);
+  }
+
+  // ---- paging, jump and read state (Design notes 1 and 2) ------------------------------
+
+  Future<void> _loadOlder(ContiguousWindow window, Thread? thread) async {
+    if (_loadingOlder || !mounted) return;
+    final first = window.messages.isEmpty ? null : window.messages.first;
+    final ThreadSeq before;
+    if (first != null) {
+      if (window.gapBefore == null) return;
+      before = first.threadSeq;
+    } else {
+      final last = thread?.lastMessageSeq;
+      if (last == null || last.value == 0) return;
+      before = last.next;
+    }
+    _loadingOlder = true;
+    try {
+      await ref.read(threadReadsProvider).loadOlder(widget.threadId, before);
+      if (!mounted) return;
+      ref
+          .read(historyLimitProvider(_thread).notifier)
+          .atLeast(window.messages.length + historyPageSize);
+    } on Object {
+      // Offline or refused: the gap row stays and the next scroll tries again.
+    } finally {
+      _loadingOlder = false;
+    }
+  }
+
+  Future<void> _jump(ContiguousWindow window) async {
+    final target = widget.jumpTo;
+    if (target == null || _jumpLoaded) return;
+    if (window.messages.any((m) => m.id == target)) {
+      _jumpLoaded = true;
+      return;
+    }
+    if (window.messages.isEmpty) return;
+    _jumpLoaded = true;
+    final reads = ref.read(threadReadsProvider);
+    try {
+      final seq = await reads.positionOf(target);
+      final first = window.messages.first.threadSeq;
+      if (seq == null || !mounted || seq >= first) return;
+      await reads.loadRange(widget.threadId, seq, ThreadSeq(first.value - 1));
+      if (!mounted) return;
+      ref
+          .read(historyLimitProvider(_thread).notifier)
+          .atLeast(window.messages.last.threadSeq.value - seq.value + 1);
+    } on Object {
+      // The message stays out of view; the history shows the newest messages.
+    }
+  }
+
+  /// Marks the thread read up to its newest message while that is on screen and the window
+  /// is focused, at most once per newest message; the server keeps the maximum (Design
+  /// note 2, 04 14).
+  void _markRead(ContiguousWindow window, {bool force = false}) {
+    if (window.messages.isEmpty || window.gapAfter != null) return;
+    final focused = ref.read(windowFocusedProvider).value ?? false;
+    if (!force && (!_newestVisible || !focused)) return;
+    final newest = window.messages.last.threadSeq;
+    final read = ref.read(threadReadStateProvider(_thread))?.lastReadSeq;
+    final done = _markedSeq ?? read;
+    if (done != null && done >= newest) return;
+    _markedSeq = newest;
+    unawaited(_actions?.markRead(widget.threadId, newest));
+  }
+
+  // ---- removal (Design note 6) ---------------------------------------------------------
+
+  void _onNotice(SyncNotice? notice, Thread? thread) {
+    if (notice is! TargetsRemoved || _removed != null) return;
+    final channel = thread?.channelId.value;
+    final hit = notice.targets.any(
+      (t) =>
+          t.id == _thread ||
+          (channel != null && t.id == channel) ||
+          (thread != null && _spaceOf(thread) == t.id),
+    );
+    if (!hit) return;
+    final waiting = ref.read(threadOutboxProvider(_thread)).value ?? const [];
+    setState(
+      () => _removed = [
+        for (final v in waiting)
+          if (v.entry.kind == MessageOps.createMessage)
+            (v.id, v.payload['content_md'] as String? ?? ''),
+      ],
+    );
+  }
+
+  String? _spaceOf(Thread thread) => ref
+      .read(storedChannelOfRouteProvider(thread.channelId.value))
+      .value
+      ?.spaceId
+      ?.value;
+
+  // ---- actions (Design note 4) ---------------------------------------------------------
+
+  Future<void> _onAction(
+    MessageAction action,
+    Message message,
+    Thread thread,
+    Map<PrincipalId, Principal> principals,
+  ) async {
+    final actions = _actions;
+    if (actions == null) return;
+    final l = AppLocalizations.of(context);
+    switch (action) {
+      case MessageAction.reply:
+        _composer.currentState?.startReply(
+          message,
+          principals[message.authorId]?.displayName ?? '',
+        );
+      case MessageAction.startThread:
+        await actions.startThread(thread.channelId, message);
+      case MessageAction.react:
+        final existing = await ref.read(
+          messageReactionsProvider(message.id.value).future,
+        );
+        if (!mounted) return;
+        final choice = await pickReaction(context, existing);
+        if (choice != null) {
+          await actions.react(message, choice.emoji, remove: choice.remove);
+        }
+      case MessageAction.pin || MessageAction.unpin:
+        await actions.pin(message, pinned: action == MessageAction.pin);
+      case MessageAction.edit:
+        setState(() => _editing = message.id);
+      case MessageAction.versions:
+        await showVersions(context, ref.read(threadReadsProvider), message);
+      case MessageAction.delete:
+        if (await confirmDelete(context)) await actions.delete(message);
+      case MessageAction.markUnread:
+        _markedSeq = message.threadSeq.value <= 1
+            ? const ThreadSeq(0)
+            : ThreadSeq(message.threadSeq.value - 1);
+        await actions.markUnread(
+          message,
+          ref.read(threadReadStateProvider(_thread)),
+        );
+      case MessageAction.copyText:
+        await Clipboard.setData(ClipboardData(text: message.contentMd));
+        _copied(l);
+      case MessageAction.copyLink:
+        final scheme = ref.read(appPortsProvider).branding.urlScheme;
+        await Clipboard.setData(
+          ClipboardData(
+            text: '$scheme://t/${thread.id.value}?m=${message.id.value}',
+          ),
+        );
+        _copied(l);
+    }
+  }
+
+  void _copied(AppLocalizations l) {
+    if (!mounted) return;
+    ScaffoldMessenger.maybeOf(context)
+        ?.showSnackBar(SnackBar(content: Text(l.messageCopied)));
+  }
+
+  void _editLast(ContiguousWindow window) {
+    final last = lastOwnMessage(window, ref.read(myPrincipalIdProvider));
+    if (last != null) setState(() => _editing = last.id);
+  }
+
+  void _openLink(Uri uri) {
+    // Internal paths of 15 11 open in the app; everything else in the system browser. The
+    // renderer hands over only links it classified as active (SEC-OUT-1).
+    if (uri.scheme.isEmpty) {
+      context.go(uri.toString());
+    } else {
+      unawaited(ref.read(appPortsProvider).browser.open(uri));
+    }
+  }
+
+  Future<void> _move(Thread thread, Channel? channel) async {
+    final operator =
+        thread.operatorAgentId ?? channel?.operator.effectiveAgentId;
+    final targets = moveTargets(
+      ref.read(visibleChannelsProvider),
+      from: thread.channelId,
+      operator: operator,
+    );
+    final choice = await showMoveThread(context, targets);
+    if (choice != null) {
+      await _actions?.move(thread, choice.target, choice.reason);
+    }
+  }
+
+  Future<void> _title(Thread thread) async {
+    final limits = ref.read(instanceLimitsProvider).value;
+    final title = await editTitle(
+      context,
+      thread.title,
+      maxChars: limits?.threadTitleMaxChars,
+    );
+    if (title != null) await _actions?.setTitle(thread, title);
+  }
+
+  Future<void> _compare(String id, String mine, String theirs) async {
+    final choice = await showConflict(context, mine: mine, theirs: theirs);
+    final actions = _actions;
+    if (choice == null || actions == null) return;
+    switch (choice) {
+      case ConflictChoice.keepMine:
+        await actions.keepMine(id, mine);
+      case ConflictChoice.takeTheirs:
+        await actions.discard(id);
+    }
+  }
+
+  // ---- build -------------------------------------------------------------------------
+
+  @override
+  Widget build(BuildContext context) {
+    final l = AppLocalizations.of(context);
+    final thread = ref.watch(storedThreadProvider(_thread)).value;
+    ref.listen(syncNoticesProvider, (_, next) => _onNotice(next.value, thread));
+    final removed = _removed;
+    if (removed != null) return _NoAccess(waiting: removed);
+    if (thread == null) return const SizedBox.expand();
+    final channelId = thread.channelId.value;
+    final channel = ref.watch(storedChannelOfRouteProvider(channelId)).value;
+    final config = ref.watch(appConfigProvider);
+    final windowValue = ref.watch(threadWindowProvider(_thread));
+    final window =
+        windowValue.value ?? const ContiguousWindow(messages: []);
+    final outbox = ref.watch(threadOutboxProvider(_thread)).value ?? const [];
+    final principals = ref.watch(principalsByIdProvider).value ?? const {};
+    final me = ref.watch(myPrincipalIdProvider);
+    final permissions = ref.watch(threadPermissionsProvider(channelId));
+    // Kept alive while the column shows: the read state decides "Mark as unread" and the
+    // read position written next (Design note 2).
+    ref.watch(threadReadStateProvider(_thread));
+    // The move targets are listed from the sidebar's channels; kept while Move is offered.
+    if (permissions.canManage) ref.watch(visibleChannelsProvider);
+    final main = thread.kind == ThreadKind.main;
+    final starters = main
+        ? ref.watch(threadsOfChannelProvider(channelId)).value ?? const []
+        : const <Thread>[];
+    ref.listen(windowFocusedProvider, (_, _) => _markRead(window));
+    final items = buildHistory(
+      window: window,
+      outbox: outbox,
+      groupWindow: config.messageGroupWindow,
+      threads: starters,
+    );
+    final now = ref.watch(appPortsProvider).clock.now();
+    final format = L10nFormat(Localizations.localeOf(context));
+    String time(DateTime at) => timeLabel(at, now: now, format: format);
+    final operatorId =
+        thread.operatorAgentId ?? channel?.operator.effectiveAgentId;
+    final header = ThreadHeaderData(
+      title: main ? channel?.name ?? '' : thread.title,
+      automaticTitle: thread.titleSource == TitleSource.auto,
+      operatorName: operatorId == null
+          ? null
+          : principals[operatorId]?.displayName ?? operatorId.value,
+      mainHistory: main,
+      done: thread.state == ThreadState.closed,
+      canEditTitle:
+          permissions.canWrite &&
+          (thread.createdBy == me || permissions.canManage),
+      canSetDone: permissions.canWrite,
+      canMove: permissions.canManage,
+    );
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      unawaited(_jump(window));
+      _markRead(window);
+      // A thread never opened on this device has no loaded range yet: its newest page.
+      if (windowValue.hasValue &&
+          window.messages.isEmpty &&
+          thread.lastMessageSeq.value > 0) {
+        unawaited(_loadOlder(window, thread));
+      }
+    });
+    final jumpKey = widget.jumpTo == null
+        ? null
+        : 'message.${widget.jumpTo!.value}';
+
+    Widget row(BuildContext context, HistoryItem item) => switch (item) {
+      GapItem(:final before) => _GapRow(before: before),
+      MessageItem(:final message, :final continuation, :final started) =>
+        _MessageRow(
+          key: ValueKey(item.key),
+          message: message,
+          continuation: continuation,
+          started: started,
+          principals: principals,
+          me: me,
+          time: time(message.createdAt),
+          collapseLines: config.messageCollapseLines,
+          highlighted: item.key == jumpKey,
+          actions: messageActions(
+            message,
+            me: me,
+            permissions: permissions,
+            mainHistory: main && channel?.kind == ChannelKind.text,
+            startedThread: started.isNotEmpty,
+          ),
+          editing: _editing == message.id
+              ? InlineEditor(
+                  initial: message.contentMd,
+                  onSave: (text) {
+                    setState(() => _editing = null);
+                    unawaited(_actions?.edit(message, text));
+                  },
+                  onCancel: () => setState(() => _editing = null),
+                )
+              : null,
+          onAction: (a) => _onAction(a, message, thread, principals),
+          onOpenLink: _openLink,
+          onOpenThread: (t) => context.go('/t/${t.id.value}'),
+        ),
+      PendingItem(:final view) => KeyedSubtree(
+        key: ValueKey(item.key),
+        child: _editingEntry == view.id
+            ? InlineEditor(
+                initial: view.payload['content_md'] as String? ?? '',
+                onSave: (text) {
+                  setState(() => _editingEntry = null);
+                  unawaited(_actions?.editEntry(view.id, text));
+                },
+                onCancel: () => setState(() => _editingEntry = null),
+              )
+            : PendingRow(
+                view: view,
+                authorName: me == null ? '' : principals[me]?.displayName ?? '',
+                timeLabel: time(view.entry.createdAt),
+                collapseLines: config.messageCollapseLines,
+                onResend: () => unawaited(_actions?.retry(view.id)),
+                onEdit: () => setState(() => _editingEntry = view.id),
+                onDiscard: () => unawaited(_actions?.discard(view.id)),
+                onOpenLink: _openLink,
+              ),
+      ),
+      FailedWriteItem(:final view) => KeyedSubtree(
+        key: ValueKey(item.key),
+        child: FailedWriteRow(
+          view: view,
+          onCompare: (mine, theirs) =>
+              unawaited(_compare(view.id, mine, theirs)),
+          onResend: () => unawaited(_actions?.retry(view.id)),
+          onDiscard: () => unawaited(_actions?.discard(view.id)),
+        ),
+      ),
+    };
+
+    return CallbackShortcuts(
+      bindings: {
+        // 01 7: Esc in the history marks the thread read (M4-24 binds the shortcut list).
+        const SingleActivator(LogicalKeyboardKey.escape): () =>
+            _markRead(window, force: true),
+      },
+      child: Column(
+        key: ValueKey('history.$_thread'),
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          ThreadHeader(
+            data: header,
+            onEditTitle: () => unawaited(_title(thread)),
+            onDone: () => unawaited(
+              _actions?.setDone(
+                thread,
+                reopen: thread.state == ThreadState.closed,
+              ),
+            ),
+            onMove: () => unawaited(_move(thread, channel)),
+            onPin: () => ref.read(sessionColumnShownProvider.notifier).show(),
+            onColumn: () =>
+                ref.read(sessionColumnShownProvider.notifier).toggle(),
+          ),
+          Expanded(
+            child: items.isEmpty
+                ? Center(
+                    key: const ValueKey('history.empty'),
+                    child: Text(
+                      l.threadEmpty,
+                      style: dsTextStyle(DsType.body)
+                          .copyWith(color: context.dsColors.textSecondary),
+                    ),
+                  )
+                : MessageList(
+                    items: items,
+                    itemBuilder: row,
+                    jumpTo: jumpKey,
+                    onNearTop: () => unawaited(_loadOlder(window, thread)),
+                    onNewestVisible: (visible) {
+                      _newestVisible = visible;
+                      if (visible) _markRead(window);
+                    },
+                  ),
+          ),
+          ThreadComposer(
+            key: _composer,
+            threadId: widget.threadId,
+            channelId: thread.channelId,
+            targetName: main ? channel?.name ?? '' : thread.title,
+            onEditLast: () => _editLast(window),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// A message row with its reactions and the quote of a reply, read per message.
+class _MessageRow extends ConsumerWidget {
+  const _MessageRow({
+    super.key,
+    required this.message,
+    required this.continuation,
+    required this.started,
+    required this.principals,
+    required this.me,
+    required this.time,
+    required this.collapseLines,
+    required this.highlighted,
+    required this.actions,
+    required this.editing,
+    required this.onAction,
+    required this.onOpenLink,
+    required this.onOpenThread,
+  });
+
+  final Message message;
+  final bool continuation;
+  final List<Thread> started;
+  final Map<PrincipalId, Principal> principals;
+  final PrincipalId? me;
+  final String time;
+  final int collapseLines;
+  final bool highlighted;
+  final List<MessageAction> actions;
+  final Widget? editing;
+  final ValueChanged<MessageAction> onAction;
+  final void Function(Uri) onOpenLink;
+  final ValueChanged<Thread> onOpenThread;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final reactions =
+        ref.watch(messageReactionsProvider(message.id.value)).value ?? const [];
+    final replyId = message.replyToMessageId;
+    final replied = replyId == null
+        ? null
+        : ref.watch(storedMessageProvider(replyId.value)).value;
+    return MessageTile(
+      data: messageData(
+        message,
+        principals: principals,
+        me: me,
+        timeLabel: time,
+        reactions: reactions,
+        replied: replied,
+      ),
+      continuation: continuation,
+      collapseLines: collapseLines,
+      actions: actions,
+      onAction: onAction,
+      onOpenLink: onOpenLink,
+      highlighted: highlighted,
+      editing: editing,
+      started: [
+        for (final t in started)
+          ThreadStarterLine(thread: t, onOpen: () => onOpenThread(t)),
+      ],
+    );
+  }
+}
+
+/// The loading row of a gap (04 4: never messages out of order).
+class _GapRow extends StatelessWidget {
+  const _GapRow({required this.before});
+
+  final bool before;
+
+  @override
+  Widget build(BuildContext context) {
+    final l = AppLocalizations.of(context);
+    final colors = context.dsColors;
+    return Padding(
+      key: ValueKey(before ? 'history.gapBefore' : 'history.gapAfter'),
+      padding: const EdgeInsets.all(DsSpace.s12),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          SizedBox.square(
+            dimension: DsIconSize.sizeSm,
+            child: CircularProgressIndicator(
+              strokeWidth: DsBorderWidth.focus,
+              color: colors.textSecondary,
+              value: MediaQuery.of(context).disableAnimations ? 0 : null,
+            ),
+          ),
+          const SizedBox(width: DsSpace.s8),
+          Text(
+            before ? l.threadLoadingOlder : l.threadLoadingNewer,
+            style: dsTextStyle(DsType.caption)
+                .copyWith(color: colors.textSecondary),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// "No access anymore" with the waiting messages as copyable text (01 6.6; 04 8.3 item 4).
+class _NoAccess extends StatelessWidget {
+  const _NoAccess({required this.waiting});
+
+  final List<(String, String)> waiting;
+
+  @override
+  Widget build(BuildContext context) {
+    final l = AppLocalizations.of(context);
+    final colors = context.dsColors;
+    return Padding(
+      key: const ValueKey('thread.noAccess'),
+      padding: const EdgeInsets.all(DsSpace.s24),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          DsBanner(
+            tone: DsTone.warning,
+            text: l.threadNoAccess,
+            liveRegion: true,
+          ),
+          if (waiting.isNotEmpty) ...[
+            const SizedBox(height: DsSpace.s16),
+            Text(l.threadNoAccessWaiting, style: dsTextStyle(DsType.label)),
+            const SizedBox(height: DsSpace.s8),
+            Expanded(
+              child: ListView(
+                children: [
+                  for (final (id, text) in waiting)
+                    Padding(
+                      padding: const EdgeInsets.only(bottom: DsSpace.s8),
+                      child: SelectableText(
+                        text,
+                        key: ValueKey('thread.noAccess.text.$id'),
+                        style: dsTextStyle(DsType.body)
+                            .copyWith(color: colors.textPrimary),
+                      ),
+                    ),
+                ],
+              ),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+}
