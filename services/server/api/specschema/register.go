@@ -4,7 +4,6 @@ package specschema
 
 import (
 	"fmt"
-	"maps"
 	"slices"
 	"strings"
 )
@@ -130,10 +129,7 @@ func SchemaName(eventType string) string {
 //   - every enabled op is registered, no later op is registered, and together they are exactly the
 //     client-to-server ops of asyncapi.yaml, each later op with a milestone.
 func Compare(reg Register, actions Catalogue, async AsyncAPI) []Problem {
-	var out []Problem
-	add := func(subject, format string, args ...any) {
-		out = append(out, Problem{Subject: subject, Text: fmt.Sprintf(format, args...)})
-	}
+	var p problems
 	clientOps := map[string]Operation{}
 	for _, o := range async.Operations {
 		if !o.Send {
@@ -142,85 +138,119 @@ func Compare(reg Register, actions Catalogue, async AsyncAPI) []Problem {
 	}
 	registered := map[string]bool{}
 	for _, r := range reg.Ops {
-		subject := "op " + r.Op
 		registered[r.Op] = true
-		a, inAsync := clientOps[r.Op]
-		c, inCat := actions.Ops[r.Op]
-		inCat = inCat && c.Inbound()
-		if !inAsync {
-			add(subject, "registered, but asyncapi.yaml has no receive.%s", r.Op)
-		}
-		if !inCat {
-			add(subject, "registered, but actions.yaml has no client-to-server ws_op %s", r.Op)
-		}
-		if (inAsync && a.AuthzAction != r.Action) || (inCat && c.Action != r.Action) {
-			add(subject, "registered with action %s; asyncapi.yaml says %q, actions.yaml says %q", r.Action, a.AuthzAction, c.Action)
-		}
-		if inAsync && a.RateLimitClass != r.RateLimitClass {
-			add(subject, "counts rate-limit class %q; asyncapi.yaml says %q", r.RateLimitClass, a.RateLimitClass)
-		}
+		p.compareOp(r, actions, clientOps)
 	}
 	for _, e := range reg.Events {
-		subject := "event " + e.Type
-		c, inCat := actions.Events[e.Type]
-		m, inAsync := async.Events[e.Type]
-		if !inCat {
-			add(subject, "registered, but actions.yaml has no such event type")
-		} else if c.Kind != e.Kind || c.ReceiveAction != e.ReceiveAction {
-			add(subject, "registered as %s with receive action %s; actions.yaml says %s with %s", e.Kind, e.ReceiveAction, c.Kind, c.ReceiveAction)
-		}
-		if !inAsync {
-			add(subject, "registered, but asyncapi.yaml has no message event.%s in send.dispatch", e.Type)
-			continue
-		}
-		if m.Kind != e.Kind || m.ReceiveAction != e.ReceiveAction {
-			add(subject, "registered as %s with receive action %s; asyncapi.yaml says x-event-kind %q, x-receive-action %q",
-				e.Kind, e.ReceiveAction, m.Kind, m.ReceiveAction)
-		}
-		if want := SchemaName(e.Type); m.Schema != want || !async.Schemas[want] {
-			add(subject, "message body is %q, want the openapi.yaml schema %s", m.Schema, want)
-		}
+		p.compareEvent(e, actions, async)
 	}
+	p.compareEnableList(reg, registered, clientOps)
+	out := p.list
+	slices.SortFunc(out, func(a, b Problem) int { return strings.Compare(a.String(), b.String()) })
+	return out
+}
+
+// problems collects the differences of one Compare.
+type problems struct{ list []Problem }
+
+// add appends one problem.
+func (p *problems) add(subject, format string, args ...any) {
+	p.list = append(p.list, Problem{Subject: subject, Text: fmt.Sprintf(format, args...)})
+}
+
+// compareOp holds one registered op against asyncapi.yaml and actions.yaml.
+func (p *problems) compareOp(r RegisteredOp, actions Catalogue, clientOps map[string]Operation) {
+	subject := "op " + r.Op
+	a, inAsync := clientOps[r.Op]
+	c, inCat := actions.Ops[r.Op]
+	inCat = inCat && c.Inbound()
+	if !inAsync {
+		p.add(subject, "registered, but asyncapi.yaml has no receive.%s", r.Op)
+	}
+	if !inCat {
+		p.add(subject, "registered, but actions.yaml has no client-to-server ws_op %s", r.Op)
+	}
+	if (inAsync && a.AuthzAction != r.Action) || (inCat && c.Action != r.Action) {
+		p.add(subject, "registered with action %s; asyncapi.yaml says %q, actions.yaml says %q", r.Action, a.AuthzAction, c.Action)
+	}
+	if inAsync && a.RateLimitClass != r.RateLimitClass {
+		p.add(subject, "counts rate-limit class %q; asyncapi.yaml says %q", r.RateLimitClass, a.RateLimitClass)
+	}
+}
+
+// compareEvent holds one registered event type against actions.yaml, asyncapi.yaml and the
+// schema names of openapi.yaml.
+func (p *problems) compareEvent(e RegisteredEvent, actions Catalogue, async AsyncAPI) {
+	subject := "event " + e.Type
+	c, inCat := actions.Events[e.Type]
+	m, inAsync := async.Events[e.Type]
+	switch {
+	case !inCat:
+		p.add(subject, "registered, but actions.yaml has no such event type")
+	case c.Kind != e.Kind || c.ReceiveAction != e.ReceiveAction:
+		p.add(subject, "registered as %s with receive action %s; actions.yaml says %s with %s", e.Kind, e.ReceiveAction, c.Kind, c.ReceiveAction)
+	}
+	if !inAsync {
+		p.add(subject, "registered, but asyncapi.yaml has no message event.%s in send.dispatch", e.Type)
+		return
+	}
+	if m.Kind != e.Kind || m.ReceiveAction != e.ReceiveAction {
+		p.add(subject, "registered as %s with receive action %s; asyncapi.yaml says x-event-kind %q, x-receive-action %q",
+			e.Kind, e.ReceiveAction, m.Kind, m.ReceiveAction)
+	}
+	if want := SchemaName(e.Type); m.Schema != want || !async.Schemas[want] {
+		p.add(subject, "message body is %q, want the openapi.yaml schema %s", m.Schema, want)
+	}
+}
+
+// compareEnableList holds gateway_ops against the registered ops and the client ops of
+// asyncapi.yaml.
+func (p *problems) compareEnableList(reg Register, registered map[string]bool, clientOps map[string]Operation) {
 	enabled := map[string]bool{}
 	for _, op := range reg.Enabled {
 		enabled[op] = true
 		if !registered[op] {
-			add("op "+op, "in gateway_ops.enabled, but not registered")
+			p.add("op "+op, "in gateway_ops.enabled, but not registered")
 		}
 	}
-	later := map[string]bool{}
-	for _, l := range reg.Later {
-		later[l.Op] = true
-		if registered[l.Op] {
-			add("op "+l.Op, "in gateway_ops.later, but registered")
-		}
-		if enabled[l.Op] {
-			add("op "+l.Op, "in gateway_ops.enabled and gateway_ops.later")
-		}
-		if l.Milestone == "" {
-			add("op "+l.Op, "in gateway_ops.later without a milestone")
-		}
-	}
+	later := p.compareLater(reg.Later, registered, enabled)
 	for op := range registered {
 		if !enabled[op] {
-			add("op "+op, "registered, but not in gateway_ops.enabled")
+			p.add("op "+op, "registered, but not in gateway_ops.enabled")
 		}
 	}
 	for op := range clientOps {
 		if !enabled[op] && !later[op] {
-			add("op "+op, "a client op of asyncapi.yaml in neither gateway_ops.enabled nor gateway_ops.later")
+			p.add("op "+op, "a client op of asyncapi.yaml in neither gateway_ops.enabled nor gateway_ops.later")
 		}
 	}
-	for op := range maps.Keys(enabled) {
+	p.notClientOps("enabled", enabled, clientOps)
+	p.notClientOps("later", later, clientOps)
+}
+
+// compareLater checks gateway_ops.later and returns its ops.
+func (p *problems) compareLater(list []LaterOp, registered, enabled map[string]bool) map[string]bool {
+	later := map[string]bool{}
+	for _, l := range list {
+		later[l.Op] = true
+		if registered[l.Op] {
+			p.add("op "+l.Op, "in gateway_ops.later, but registered")
+		}
+		if enabled[l.Op] {
+			p.add("op "+l.Op, "in gateway_ops.enabled and gateway_ops.later")
+		}
+		if l.Milestone == "" {
+			p.add("op "+l.Op, "in gateway_ops.later without a milestone")
+		}
+	}
+	return later
+}
+
+// notClientOps reports every op of the list section that is no client op of asyncapi.yaml.
+func (p *problems) notClientOps(section string, ops map[string]bool, clientOps map[string]Operation) {
+	for op := range ops {
 		if _, ok := clientOps[op]; !ok {
-			add("op "+op, "in gateway_ops.enabled, but no client op of asyncapi.yaml")
+			p.add("op "+op, "in gateway_ops.%s, but no client op of asyncapi.yaml", section)
 		}
 	}
-	for op := range maps.Keys(later) {
-		if _, ok := clientOps[op]; !ok {
-			add("op "+op, "in gateway_ops.later, but no client op of asyncapi.yaml")
-		}
-	}
-	slices.SortFunc(out, func(a, b Problem) int { return strings.Compare(a.String(), b.String()) })
-	return out
 }

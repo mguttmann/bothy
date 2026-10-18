@@ -7,6 +7,9 @@ import (
 	"strings"
 )
 
+// kwAllOf is the composition keyword the strictness rule treats specially.
+const kwAllOf = "allOf"
+
 // Keywords whose value is one subschema, a map of subschemas or a list of subschemas
 // (JSON Schema 2020-12 core and applicator vocabularies). Every other keyword holds data or an
 // annotation and is copied as it is.
@@ -16,7 +19,7 @@ var (
 		"not": true, "if": true, "then": true, "else": true, "contains": true, "propertyNames": true,
 	}
 	schemaMapKeywords  = map[string]bool{"properties": true, "patternProperties": true, "$defs": true, "dependentSchemas": true}
-	schemaListKeywords = map[string]bool{"allOf": true, "anyOf": true, "oneOf": true, "prefixItems": true}
+	schemaListKeywords = map[string]bool{kwAllOf: true, "anyOf": true, "oneOf": true, "prefixItems": true}
 )
 
 // dropped reports whether k is a keyword outside JSON Schema 2020-12 that the bundle removes
@@ -25,9 +28,11 @@ func dropped(k string) bool {
 	return k == "discriminator" || k == "xml" || k == "externalDocs" || strings.HasPrefix(k, "x-")
 }
 
-// walk calls f for every schema object below and including s, keyword-aware: f gets the schema
-// and whether it is a direct member of an allOf array.
-func walk(s any, inAllOf bool, f func(m map[string]any, inAllOf bool) error) error {
+// visitor is called for every schema object; inAllOf says whether it is a direct allOf member.
+type visitor func(m map[string]any, inAllOf bool) error
+
+// walk calls f for every schema object below and including s, keyword-aware.
+func walk(s any, inAllOf bool, f visitor) error {
 	m, ok := s.(map[string]any)
 	if !ok {
 		return nil
@@ -36,24 +41,30 @@ func walk(s any, inAllOf bool, f func(m map[string]any, inAllOf bool) error) err
 		return err
 	}
 	for k, v := range m {
-		switch {
-		case schemaKeywords[k]:
-			if err := walk(v, false, f); err != nil {
+		if err := walkKeyword(k, v, f); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+// walkKeyword walks the subschemas the keyword k holds in v.
+func walkKeyword(k string, v any, f visitor) error {
+	switch {
+	case schemaKeywords[k]:
+		return walk(v, false, f)
+	case schemaMapKeywords[k]:
+		sub, _ := v.(map[string]any)
+		for _, e := range sub {
+			if err := walk(e, false, f); err != nil {
 				return err
 			}
-		case schemaMapKeywords[k]:
-			sub, _ := v.(map[string]any)
-			for _, e := range sub {
-				if err := walk(e, false, f); err != nil {
-					return err
-				}
-			}
-		case schemaListKeywords[k]:
-			list, _ := v.([]any)
-			for _, e := range list {
-				if err := walk(e, k == "allOf", f); err != nil {
-					return err
-				}
+		}
+	case schemaListKeywords[k]:
+		list, _ := v.([]any)
+		for _, e := range list {
+			if err := walk(e, k == kwAllOf, f); err != nil {
+				return err
 			}
 		}
 	}
@@ -64,31 +75,34 @@ func walk(s any, inAllOf bool, f func(m map[string]any, inAllOf bool) error) err
 // other form or on a reference to a schema that does not exist.
 func rewriteRefs(defs map[string]any) error {
 	for name, s := range defs {
-		err := walk(s, false, func(m map[string]any, _ bool) error {
-			ref, ok := m["$ref"].(string)
-			if !ok {
-				if _, present := m["$ref"]; present {
-					return fmt.Errorf("specschema: %s: $ref is not a string", name)
-				}
-				return nil
-			}
-			target, ok := strings.CutPrefix(ref, openAPIRefPrefix)
-			if !ok {
-				target, ok = strings.CutPrefix(ref, asyncAPIRefPrefix)
-			}
-			if !ok || target == "" || strings.Contains(target, "/") {
-				return fmt.Errorf("specschema: %s: unknown $ref form %q", name, ref)
-			}
-			if _, exists := defs[target]; !exists {
-				return fmt.Errorf("specschema: %s: $ref %q names no schema", name, ref)
-			}
-			m["$ref"] = defsRefPrefix + target
-			return nil
-		})
-		if err != nil {
+		if err := walk(s, false, func(m map[string]any, _ bool) error { return rewriteRef(name, defs, m) }); err != nil {
 			return err
 		}
 	}
+	return nil
+}
+
+// rewriteRef rewrites the $ref of the schema object m inside the definition name.
+func rewriteRef(name string, defs, m map[string]any) error {
+	raw, present := m["$ref"]
+	if !present {
+		return nil
+	}
+	ref, ok := raw.(string)
+	if !ok {
+		return fmt.Errorf("specschema: %s: $ref is not a string", name)
+	}
+	target, ok := strings.CutPrefix(ref, openAPIRefPrefix)
+	if !ok {
+		target, ok = strings.CutPrefix(ref, asyncAPIRefPrefix)
+	}
+	if !ok || target == "" || strings.Contains(target, "/") {
+		return fmt.Errorf("specschema: %s: unknown $ref form %q", name, ref)
+	}
+	if _, exists := defs[target]; !exists {
+		return fmt.Errorf("specschema: %s: $ref %q names no schema", name, ref)
+	}
+	m["$ref"] = defsRefPrefix + target
 	return nil
 }
 
@@ -120,42 +134,51 @@ func normalize(s any, strict, inAllOf bool) any {
 	}
 	out := make(map[string]any, len(m)+1)
 	for k, v := range m {
-		switch {
-		case dropped(k):
-		case schemaKeywords[k]:
-			out[k] = normalize(v, true, false)
-		case schemaMapKeywords[k]:
-			sub, ok := v.(map[string]any)
-			if !ok {
-				out[k] = v
-				continue
-			}
-			cp := make(map[string]any, len(sub))
-			for name, e := range sub {
-				cp[name] = normalize(e, true, false)
-			}
-			out[k] = cp
-		case schemaListKeywords[k]:
-			list, ok := v.([]any)
-			if !ok {
-				out[k] = v
-				continue
-			}
-			cp := make([]any, len(list))
-			for i, e := range list {
-				cp[i] = normalize(e, true, k == "allOf")
-			}
-			out[k] = cp
-		default:
-			out[k] = v
+		if !dropped(k) {
+			out[k] = normalizeKeyword(k, v)
 		}
 	}
-	_, hasProps := m["properties"]
-	_, hasAllOf := m["allOf"]
-	_, hasAP := m["additionalProperties"]
-	_, hasUP := m["unevaluatedProperties"]
-	if strict && !inAllOf && (hasProps || hasAllOf) && !hasAP && !hasUP {
+	if strict && !inAllOf && needsStrictness(m) {
 		out["unevaluatedProperties"] = false
 	}
 	return out
+}
+
+// normalizeKeyword normalizes the subschemas the keyword k holds in v and copies other values.
+func normalizeKeyword(k string, v any) any {
+	switch {
+	case schemaKeywords[k]:
+		return normalize(v, true, false)
+	case schemaMapKeywords[k]:
+		sub, ok := v.(map[string]any)
+		if !ok {
+			return v
+		}
+		cp := make(map[string]any, len(sub))
+		for name, e := range sub {
+			cp[name] = normalize(e, true, false)
+		}
+		return cp
+	case schemaListKeywords[k]:
+		list, ok := v.([]any)
+		if !ok {
+			return v
+		}
+		cp := make([]any, len(list))
+		for i, e := range list {
+			cp[i] = normalize(e, true, k == kwAllOf)
+		}
+		return cp
+	default:
+		return v
+	}
+}
+
+// needsStrictness reports whether m declares properties or allOf and leaves unknown members open.
+func needsStrictness(m map[string]any) bool {
+	_, hasProps := m["properties"]
+	_, hasAllOf := m[kwAllOf]
+	_, hasAP := m["additionalProperties"]
+	_, hasUP := m["unevaluatedProperties"]
+	return (hasProps || hasAllOf) && !hasAP && !hasUP
 }

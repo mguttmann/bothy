@@ -57,6 +57,9 @@ const (
 // gatewayChannel is the $ref of the channel gateway in asyncapi.yaml.
 const gatewayChannel = "#/channels/gateway"
 
+// opDispatch is the op of every event frame.
+const opDispatch = "dispatch"
+
 // Operation is one operation of the channel gateway in asyncapi.yaml.
 type Operation struct {
 	// ID is the operation key, for example receive.identify or send.hello.
@@ -227,7 +230,37 @@ func (c *Contract) readGateway(asyncapi, messages map[string]any) error {
 	if channel == nil {
 		return errors.New("specschema: asyncapi.yaml has no channel gateway")
 	}
-	chMsgs := mapAt(channel, "messages")
+	if err := c.readCloseCodes(channel); err != nil {
+		return err
+	}
+	g := gatewayDoc{chMsgs: mapAt(channel, "messages"), messages: messages}
+	ops := mapAt(asyncapi, "operations")
+	for _, id := range slices.Sorted(maps.Keys(ops)) {
+		op, _ := ops[id].(map[string]any)
+		if ref, _ := mapAt(op, "channel")["$ref"].(string); ref != gatewayChannel {
+			continue
+		}
+		list, _ := op["messages"].([]any)
+		for _, e := range list {
+			ref, _ := e.(map[string]any)["$ref"].(string)
+			if err := c.readMessage(g, id, op, ref); err != nil {
+				return err
+			}
+		}
+		if id == "send."+opDispatch {
+			c.ops = append(c.ops, Operation{ID: id, Send: true, Op: opDispatch})
+		}
+	}
+	return nil
+}
+
+// gatewayDoc holds the message maps of the channel gateway and of components.messages.
+type gatewayDoc struct {
+	chMsgs, messages map[string]any
+}
+
+// readCloseCodes reads x-close-codes of the channel.
+func (c *Contract) readCloseCodes(channel map[string]any) error {
 	c.closeCodes = map[int]string{}
 	codes, _ := channel["x-close-codes"].([]any)
 	for _, e := range codes {
@@ -239,50 +272,42 @@ func (c *Contract) readGateway(asyncapi, messages map[string]any) error {
 		}
 		c.closeCodes[code] = name
 	}
-	ops := mapAt(asyncapi, "operations")
-	for _, id := range slices.Sorted(maps.Keys(ops)) {
-		op, _ := ops[id].(map[string]any)
-		if ref, _ := mapAt(op, "channel")["$ref"].(string); ref != gatewayChannel {
-			continue
-		}
-		send := op["action"] == "send"
-		list, _ := op["messages"].([]any)
-		for _, e := range list {
-			ref, _ := e.(map[string]any)["$ref"].(string)
-			chKey, ok := strings.CutPrefix(ref, gatewayChannel+"/messages/")
-			if !ok {
-				return fmt.Errorf("specschema: operation %s: message reference %q", id, ref)
-			}
-			target, _ := mapAt(chMsgs, chKey)["$ref"].(string)
-			key, ok := strings.CutPrefix(target, "#/components/messages/")
-			if !ok || messages[key] == nil {
-				return fmt.Errorf("specschema: channel message %s: reference %q", chKey, target)
-			}
-			msg, _ := messages[key].(map[string]any)
-			if t, isEvent := strings.CutPrefix(key, "event."); isEvent && send {
-				kind, _ := msg["x-event-kind"].(string)
-				recv, _ := msg["x-receive-action"].(string)
-				ref, _ := mapAt(msg, "payload", "properties", "d")["$ref"].(string)
-				c.events[t] = EventMessage{Type: t, Kind: kind, ReceiveAction: recv, Schema: strings.TrimPrefix(ref, asyncAPIRefPrefix)}
-				continue
-			}
-			name, ok := strings.CutPrefix(key, "op.")
-			if !ok {
-				return fmt.Errorf("specschema: operation %s: message %s is neither op.* nor event.*", id, key)
-			}
-			if send {
-				c.serverOps[name] = key
-			} else {
-				c.clientOps[name] = key
-			}
-			aa, _ := op["x-authz-action"].(string)
-			rl, _ := op["x-rate-limit-class"].(string)
-			c.ops = append(c.ops, Operation{ID: id, Send: send, Op: name, AuthzAction: aa, RateLimitClass: rl})
-		}
-		if id == "send.dispatch" {
-			c.ops = append(c.ops, Operation{ID: id, Send: true, Op: "dispatch"})
-		}
+	return nil
+}
+
+// readMessage records the message ref of the operation id: an event of send.dispatch or the op
+// of a send or receive operation.
+func (c *Contract) readMessage(g gatewayDoc, id string, op map[string]any, ref string) error {
+	chKey, ok := strings.CutPrefix(ref, gatewayChannel+"/messages/")
+	if !ok {
+		return fmt.Errorf("specschema: operation %s: message reference %q", id, ref)
 	}
+	target, _ := mapAt(g.chMsgs, chKey)["$ref"].(string)
+	key, ok := strings.CutPrefix(target, "#/components/messages/")
+	if !ok || g.messages[key] == nil {
+		return fmt.Errorf("specschema: channel message %s: reference %q", chKey, target)
+	}
+	send := op["action"] == "send"
+	if t, isEvent := strings.CutPrefix(key, "event."); isEvent && send {
+		msg, _ := g.messages[key].(map[string]any)
+		kind, _ := msg["x-event-kind"].(string)
+		recv, _ := msg["x-receive-action"].(string)
+		body, _ := mapAt(msg, "payload", "properties", "d")["$ref"].(string)
+		c.events[t] = EventMessage{Type: t, Kind: kind, ReceiveAction: recv, Schema: strings.TrimPrefix(body, asyncAPIRefPrefix)}
+		return nil
+	}
+	name, ok := strings.CutPrefix(key, "op.")
+	if !ok {
+		return fmt.Errorf("specschema: operation %s: message %s is neither op.* nor event.*", id, key)
+	}
+	if send {
+		c.serverOps[name] = key
+	} else {
+		c.clientOps[name] = key
+	}
+	aa, _ := op["x-authz-action"].(string)
+	rl, _ := op["x-rate-limit-class"].(string)
+	c.ops = append(c.ops, Operation{ID: id, Send: send, Op: name, AuthzAction: aa, RateLimitClass: rl})
 	return nil
 }
 
@@ -330,7 +355,7 @@ func (c *Contract) Catalogue() Catalogue {
 
 // readYAML parses a YAML file into JSON-compatible values.
 func readYAML(path string) (map[string]any, error) {
-	b, err := os.ReadFile(path)
+	b, err := os.ReadFile(path) // #nosec G304 -- a contract file below the repository root
 	if err != nil {
 		return nil, err
 	}
