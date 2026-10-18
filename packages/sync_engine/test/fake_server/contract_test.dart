@@ -20,6 +20,16 @@ void main() {
   setUp(() async => h = await FakeWorldHarness.start());
   tearDown(() => h.stop());
 
+  test('discovery lists the local driver like the server does', () async {
+    final discovery =
+        (await h.device().api.getDiscoveryApi().getDiscovery()).data!;
+    expect(
+      discovery.authProviders.map((p) => p.kind),
+      contains(IdentityProviderKind.local),
+    );
+    expect(discovery.localPasswordEnabled, isTrue);
+  });
+
   test('every handler answers within the contract', () async {
     final alex = h.device();
     final w = h.seed;

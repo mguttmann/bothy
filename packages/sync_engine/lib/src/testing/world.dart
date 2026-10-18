@@ -356,6 +356,7 @@ final class FakeWorld {
   FakeWorld({DateTime Function()? now})
     : now = now ?? (() => DateTime.now().toUtc()) {
     instanceId = nextId();
+    localProviderId = nextId();
     syncEpoch = nextId();
   }
 
@@ -366,6 +367,9 @@ final class FakeWorld {
 
   /// The instance ID.
   late final String instanceId;
+
+  /// The ID of the local login driver, which discovery lists like the server does (08 2).
+  late final String localProviderId;
 
   /// The current sync epoch (04 7.5).
   late String syncEpoch;

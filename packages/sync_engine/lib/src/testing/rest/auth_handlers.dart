@@ -37,7 +37,9 @@ void registerAuthHandlers(RestFake rest, {required Duration accessTokenTtl}) {
           'protocol_versions': [1],
         },
         'branding': {'product_name': world.productName},
-        'auth_providers': <Object?>[],
+        'auth_providers': [
+          {'id': world.localProviderId, 'kind': 'local', 'name': 'Local'},
+        ],
         'local_password_enabled': true,
         'jwks_uri': '/api/v1/auth/jwks',
         'webhook_keys_uri': '/api/v1/webhooks/keys',
