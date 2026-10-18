@@ -156,10 +156,11 @@ const (
 // GatewayOpClasses returns the rate-limit class of each enabled client op, for the contract tests
 // (TestGatewayOpRateClasses, the register test of G9): identify and resume consume
 // rl.gateway_connect in the handshake; heartbeat and reauth belong to that class but consume
-// nothing from it (05 section 3); focus and typing are counted by the gateway itself.
+// nothing from it (05 section 3); focus and typing are counted by the gateway itself, ack by the
+// agent limiter (M2-07, INT-W42/4).
 func GatewayOpClasses() map[string]string {
 	return map[string]string{"identify": gatewayClass, "resume": gatewayClass, "heartbeat": gatewayClass, "reauth": gatewayClass,
-		"focus": focusClass, "typing.start": typingClass, "typing.stop": typingClass}
+		"focus": focusClass, "typing.start": typingClass, "typing.stop": typingClass, "ack": agentRuntimeClass}
 }
 
 // NewGateway builds the gateway over d with cfg and registers exactly the ops of

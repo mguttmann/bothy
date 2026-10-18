@@ -288,19 +288,9 @@ func (c *Client) order(idx int, op string, d json.RawMessage) {
 	c.mu.Unlock()
 	switch op {
 	case "dispatch":
-		if v.Seq == nil {
-			return // ephemeral
+		if v.Seq != nil { // nil: ephemeral
+			c.dispatched(idx, *v.Seq, last, v.Redelivered)
 		}
-		if v.Redelivered && *v.Seq <= last {
-			return // an agent consumer redelivers from acked_seq + 1 (04 section 15.2, INT-W42/1)
-		}
-		if *v.Seq <= last {
-			c.violate(idx, op, "/d/seq", fmt.Sprintf("seq %d after delivered seq %d", *v.Seq, last))
-			return
-		}
-		c.mu.Lock()
-		c.delivered = *v.Seq
-		c.mu.Unlock()
 	case "cursor":
 		if v.Seq != nil && *v.Seq < last {
 			c.violate(idx, op, "/d/seq", fmt.Sprintf("cursor %d below delivered seq %d", *v.Seq, last))
@@ -310,6 +300,21 @@ func (c *Client) order(idx int, op string, d json.RawMessage) {
 			c.violate(idx, op, "/d/head_seq", fmt.Sprintf("head_seq %d below delivered seq %d", *v.HeadSeq, last))
 		}
 	}
+}
+
+// dispatched checks the seq of a durable dispatch against the last delivered one: it must be
+// higher, except for a redelivery, since an agent consumer redelivers from acked_seq + 1 (04
+// section 15.2, INT-W42/1).
+func (c *Client) dispatched(idx int, seq, last int64, redelivered bool) {
+	if seq <= last {
+		if !redelivered {
+			c.violate(idx, "dispatch", "/d/seq", fmt.Sprintf("seq %d after delivered seq %d", seq, last))
+		}
+		return
+	}
+	c.mu.Lock()
+	c.delivered = seq
+	c.mu.Unlock()
 }
 
 // observe counts the op of a server frame and, for dispatch, its event type.
