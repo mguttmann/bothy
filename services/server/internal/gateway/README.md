@@ -39,6 +39,8 @@ connections.
   (the only package of the server that imports it), one reader, one writer and one deadline
   goroutine per connection, the frame codec on the generated `Gateway*` types of `api/rest`, the
   span `gateway.connect`.
+- `app/metrics.go`, `adapters/otelmetrics/` (M1-68): the outbound port `Metrics` and its
+  implementation with the declarations of the metric registry, see "Metrics".
 - `adapters/wstest/`: a Go client for tests of this and later tickets (`Dial`, `Hello`,
   `Identify`, `Resume`, `Send`, `Next`, `ExpectClose`, a heartbeat loop with a random first delay).
 
@@ -133,6 +135,23 @@ there ends the process; the liveness check `event_tail` fails once that goroutin
   with `gateway.focus` in delivery mode; `thread.moved`, `channel.archived` and `space.archived`
   re-check the connections that focus an affected thread (the moved thread takes its new
   channel). `resume` restores the focus of the session after the same re-check.
+
+## Metrics (M1-68)
+
+The use cases record through the port `app.Metrics` (nil: `NopMetrics`); `internal/wire` passes
+`adapters/otelmetrics` on the global meter provider to the gateway, the hub and the WebSocket
+adapter.
+
+| Instrument | When |
+|---|---|
+| `bothy.gateway.connect.duration` | at `ready` or `resumed` (`ok`, the actor's kind), or at the end of a connection that never got there (`domain.Outcome`: `client_error` for 4001 to 4008, 4011, 4012, 4016 to 4018 and a client that leaves, `server_error` otherwise; kind `anonymous` before identification); a refusal of `Open` (no epoch, draining) is `server_error` |
+| `bothy.gateway.connections.active` | +1 at the first `ready` or `resumed`, -1 when that connection ends |
+| `bothy.gateway.catchup.duration` | from `ready`/`resumed` to `catchup.complete` (`complete`, catch-up runner) or to `resync_required` (`resync_required`) |
+| `bothy.gateway.resync` | each `resync_required` with its reason |
+| `bothy.gateway.close` | once per connection: the code of the server's close, else the code of the client's close frame (`Connection.PeerClosed`); a connection that ends without a close frame counts no close; a code outside 04 counts as `other` |
+| `bothy.gateway.outbound.dropped` | `slow_consumer`: at a 4014 close the live buffer of the hub, the outbound queue of the adapter and the frame that did not fit or missed `gateway.write_timeout` |
+| `bothy.delivery.duration` | after the successful write of a live dispatch (hub phase `live`, durable and ephemeral), from `occurred_at`; catch-up and its flush are not measured |
+| `bothy.event.fanout.lag` | `Hub.FanoutLag`: the sink of the log tail announces each batch (`Hub.Known`) before `Dispatch`; the lag is now minus the time the oldest batch not fully distributed became known, 0 when everything is distributed |
 
 ## Ops
 
