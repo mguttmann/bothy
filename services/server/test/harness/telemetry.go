@@ -8,7 +8,6 @@ import (
 	"sync"
 
 	otelapi "go.opentelemetry.io/otel"
-	"go.opentelemetry.io/otel/log/global"
 	sdklog "go.opentelemetry.io/otel/sdk/log"
 	sdkmetric "go.opentelemetry.io/otel/sdk/metric"
 	sdktrace "go.opentelemetry.io/otel/sdk/trace"
@@ -84,7 +83,7 @@ func (s *Server) FlushTelemetry(ctx context.Context) error {
 	if tp, ok := otelapi.GetTracerProvider().(*sdktrace.TracerProvider); ok {
 		errs = append(errs, tp.ForceFlush(ctx))
 	}
-	if lp, ok := global.GetLoggerProvider().(*sdklog.LoggerProvider); ok {
+	if lp, ok := otelapi.GetLoggerProvider().(*sdklog.LoggerProvider); ok {
 		errs = append(errs, lp.ForceFlush(ctx))
 	}
 	return errors.Join(errs...)

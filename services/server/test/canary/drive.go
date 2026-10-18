@@ -104,18 +104,18 @@ func (sc *Scenario) put(c *harness.Client, path string, body any, want ...int) h
 	return sc.call(c, req{method: http.MethodPut, path: path, body: body}, want...)
 }
 
-func (sc *Scenario) patch(c *harness.Client, path string, body any, want ...int) harness.Response {
+func (sc *Scenario) patch(c *harness.Client, path string, body any, want ...int) {
 	sc.T.Helper()
-	return sc.call(c, req{method: http.MethodPatch, path: path, body: body}, want...)
+	sc.call(c, req{method: http.MethodPatch, path: path, body: body}, want...)
 }
 
-func (sc *Scenario) del(c *harness.Client, path string, want ...int) harness.Response {
+func (sc *Scenario) del(c *harness.Client, path string, want ...int) {
 	sc.T.Helper()
-	return sc.call(c, req{method: http.MethodDelete, path: path}, want...)
+	sc.call(c, req{method: http.MethodDelete, path: path}, want...)
 }
 
 // matched sends r with If-Match set to the ETag of a GET of etagPath.
-func (sc *Scenario) matched(c *harness.Client, etagPath string, r req, want ...int) harness.Response {
+func (sc *Scenario) matched(c *harness.Client, etagPath string, r req, want ...int) {
 	sc.T.Helper()
 	cur := sc.get(c, etagPath, http.StatusOK)
 	h := r.header.Clone()
@@ -124,20 +124,21 @@ func (sc *Scenario) matched(c *harness.Client, etagPath string, r req, want ...i
 	}
 	h.Set("If-Match", cur.Header.Get("ETag"))
 	r.header = h
-	return sc.versioned(c, r, want...)
+	sc.versioned(c, r, want...)
 }
 
 // versioned sends r and, on a 412 whose problem names the current version, repeats it once
 // with that version as If-Match (the version of a sub-resource can differ from the ETag of the
 // resource the step read).
-func (sc *Scenario) versioned(c *harness.Client, r req, want ...int) harness.Response {
+func (sc *Scenario) versioned(c *harness.Client, r req, want ...int) {
 	sc.T.Helper()
 	resp, err := harness.DoWithStepUp(sc.Ctx, c, harness.Request{Method: r.method, Path: r.path, Body: r.body, Header: r.header})
 	if err == nil && resp.Status == http.StatusPreconditionFailed {
 		if cur, isObj := obj(resp)["current"].(map[string]any); isObj && jsonText(cur["version"]) != "" {
 			r.header = r.header.Clone()
 			r.header.Set("If-Match", `"`+jsonText(cur["version"])+`"`)
-			return sc.call(c, r, want...)
+			sc.call(c, r, want...)
+			return
 		}
 	}
 	if err != nil {
@@ -145,7 +146,6 @@ func (sc *Scenario) versioned(c *harness.Client, r req, want ...int) harness.Res
 	} else if len(want) > 0 && !contains(want, resp.Status) {
 		sc.T.Errorf("%s %s (%s) = %d %s, want %v", r.method, routeOf(r.method, r.path), r.path, resp.Status, clip(resp.Body), want)
 	}
-	return resp
 }
 
 // obj decodes a JSON object body; a body that is no object gives an empty map.
@@ -202,15 +202,6 @@ func header(kv ...string) http.Header {
 // ifMatch is the If-Match header of version.
 func ifMatch(version any) http.Header {
 	return header("If-Match", fmt.Sprintf(`"%v"`, version))
-}
-
-// version returns the member version of a body as an integer text, or "".
-func version(r harness.Response) string {
-	var v struct {
-		Version json.Number `json:"version"`
-	}
-	_ = json.Unmarshal(r.Body, &v)
-	return v.Version.String()
 }
 
 // firstID returns the first non-empty string at one of the dotted paths of the body of r.

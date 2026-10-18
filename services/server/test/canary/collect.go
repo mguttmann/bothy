@@ -24,7 +24,7 @@ func attrFields(prefix string, kvs []attribute.KeyValue) []Field {
 	out := make([]Field, 0, 2*len(kvs))
 	for _, kv := range kvs {
 		loc := prefix + "/" + string(kv.Key)
-		out = append(out, Field{Location: loc + "#key", Text: string(kv.Key)}, Field{Location: loc, Text: kv.Value.Emit()})
+		out = append(out, Field{Location: loc + "#key", Text: string(kv.Key)}, Field{Location: loc, Text: kv.Value.String()})
 	}
 	return out
 }
@@ -58,7 +58,7 @@ func CollectTelemetry(ctx context.Context, s *Sinks, ts *harness.TelemetrySinks)
 		s.Add(Record{Sink: SinkTrace, Source: fmt.Sprintf("span %d %q", i, sp.Name), Fields: f})
 	}
 	for i, r := range ts.Logs.Records() {
-		f := []Field{{Location: "/body", Text: r.Body().Emit()}, {Location: "/severity_text", Text: r.SeverityText()}, {Location: "/event_name", Text: r.EventName()}}
+		f := []Field{{Location: "/body", Text: r.Body().String()}, {Location: "/severity_text", Text: r.SeverityText()}, {Location: "/event_name", Text: r.EventName()}}
 		var kvs []attribute.KeyValue
 		r.WalkAttributes(func(kv attribute.KeyValue) bool { kvs = append(kvs, kv); return true })
 		f = append(f, attrFields("/attributes", kvs)...)

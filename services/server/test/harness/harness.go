@@ -332,8 +332,9 @@ func initSecrets(tb testing.TB, db *pgtest.DB) string {
 	return dir
 }
 
-// writeSecretFiles writes files below dir with mode 0400 in directories of mode 0700; dir itself
-// is made writable for the owner only while it writes.
+// writeSecretFiles writes files below dir with mode 0400 in directories of mode 0700, through an
+// os.Root, so a relative path cannot leave dir; dir itself is made writable for the owner only
+// while it writes.
 func writeSecretFiles(tb testing.TB, dir string, files map[string][]byte) {
 	tb.Helper()
 	if len(files) == 0 {
@@ -343,19 +344,23 @@ func writeSecretFiles(tb testing.TB, dir string, files map[string][]byte) {
 	if err != nil {
 		tb.Fatal(err)
 	}
-	if err := os.Chmod(dir, 0o700); err != nil {
+	if err := os.Chmod(dir, 0o700); err != nil { //nolint:gosec // G302: a directory needs the search bit; owner only
 		tb.Fatal(err)
 	}
+	root, err := os.OpenRoot(dir)
+	if err != nil {
+		tb.Fatal(err)
+	}
+	defer func() { _ = root.Close() }()
 	for rel, b := range files {
-		path := filepath.Join(dir, filepath.Clean(rel))
-		if err := os.MkdirAll(filepath.Dir(path), 0o700); err != nil {
+		if err := root.MkdirAll(filepath.Dir(rel), 0o700); err != nil {
 			tb.Fatal(err)
 		}
-		if err := os.WriteFile(path, b, 0o400); err != nil { //nolint:gosec // G703: a path below the test's own temp directory
+		if err := root.WriteFile(rel, b, 0o400); err != nil {
 			tb.Fatal(err)
 		}
 	}
-	if err := os.Chmod(dir, fi.Mode().Perm()); err != nil { //nolint:gosec // G302: restores the mode bothy secrets init set
+	if err := os.Chmod(dir, fi.Mode().Perm()); err != nil {
 		tb.Fatal(err)
 	}
 }

@@ -17,7 +17,6 @@ import (
 	"go.opentelemetry.io/contrib/bridges/otelslog"
 	otelapi "go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/attribute"
-	"go.opentelemetry.io/otel/log/global"
 
 	"github.com/OWNER/bothy/services/server/internal/wire"
 	"github.com/OWNER/bothy/services/server/test/harness"
@@ -32,7 +31,7 @@ const collectWait = 2 * time.Minute
 // logger provider otel.Setup installed): its records pass the catalogue filter and the bounded
 // queue of the server like every record of the server's own logger.
 func serverLog() *slog.Logger {
-	return slog.New(otelslog.NewHandler("canary-meta", otelslog.WithLoggerProvider(global.GetLoggerProvider())))
+	return slog.New(otelslog.NewHandler("canary-meta", otelslog.WithLoggerProvider(otelapi.GetLoggerProvider())))
 }
 
 // findingsIn returns the findings of sink.

@@ -89,8 +89,8 @@ func (sc *Scenario) hosts() {
 		"profiles":      []any{map[string]any{"name": "shell", "display_name": sc.Reg.New(ClassContent, "", "host profile name"), "kind": "shell"}},
 		"session_users": []any{map[string]any{"os_user": "bothy-s-alex", "workdirs": []any{sc.Reg.New(ClassContent, "", "host workdir")}}},
 	})
-	if r := sc.raw(http.MethodPost, "/hosts/pair", nil, body, "host service"); statusOf(r) != http.StatusCreated {
-		sc.T.Errorf("pairHost: %d", statusOf(r))
+	if r := sc.raw(http.MethodPost, "/hosts/pair", nil, body, "host service"); r.Status != http.StatusCreated {
+		sc.T.Errorf("pairHost: %d", r.Status)
 	}
 	fp, err := domain.ComputeFingerprint(x.PublicKey().Bytes(), pub)
 	if err != nil {
