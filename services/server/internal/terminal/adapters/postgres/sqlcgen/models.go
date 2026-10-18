@@ -546,6 +546,13 @@ type Thread struct {
 	Version         int64
 }
 
+type ThreadTag struct {
+	ThreadID pgtype.UUID
+	TagID    pgtype.UUID
+	AddedBy  pgtype.UUID
+	AddedAt  pgtype.Timestamptz
+}
+
 type User struct {
 	PrincipalID  pgtype.UUID
 	Email        pgtype.Text
