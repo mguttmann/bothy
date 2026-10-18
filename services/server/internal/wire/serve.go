@@ -598,7 +598,9 @@ func (s *server) startDatabase(ctx context.Context) error {
 		return err
 	}
 	s.reg.AddReadiness("database", pool.Ping)
-	return nil
+	// bothy.db.pool.connections of the process pool (M1-68); the callback ends with the process.
+	_, err = pool.RegisterMetrics(nil)
+	return err
 }
 
 // startAudit is start step 6a: it checks the key-encryption key, builds the audit module over the

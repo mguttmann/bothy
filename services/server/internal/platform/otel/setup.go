@@ -30,6 +30,7 @@ import (
 
 	"github.com/OWNER/bothy/services/server/internal/kernel/clock"
 	"github.com/OWNER/bothy/services/server/internal/platform/otel/attr"
+	"github.com/OWNER/bothy/services/server/internal/platform/otel/metrics"
 	"github.com/OWNER/bothy/services/server/internal/platform/secrets"
 )
 
@@ -228,12 +229,13 @@ func newSpanExporter(ctx context.Context, protocol string) (sdktrace.SpanExporte
 	return otlptracegrpc.New(ctx)
 }
 
-// newMeterProvider reads cumulative metrics periodically into the OTLP exporter. Exemplars are
-// off: they would carry the attributes the views remove.
+// newMeterProvider reads cumulative metrics periodically into the OTLP exporter, through the view
+// of the metric registry (metrics.View: catalogue keys and bucket bounds only, everything else
+// dropped). Exemplars are off: they would carry the attributes the views remove.
 func newMeterProvider(ctx context.Context, cfg Config, env otelEnv, res *resource.Resource, opts setupOptions, dropped func(int64)) (*sdkmetric.MeterProvider, error) {
 	mopts := []sdkmetric.Option{
 		sdkmetric.WithResource(res),
-		sdkmetric.WithView(httpView),
+		sdkmetric.WithView(metrics.View),
 		sdkmetric.WithExemplarFilter(exemplar.AlwaysOffFilter),
 	}
 	if opts.metricReader != nil {

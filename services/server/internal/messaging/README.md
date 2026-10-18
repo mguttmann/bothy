@@ -69,6 +69,15 @@ Nachrichten, Revisionen, Erwähnungen, Reaktionen, Anheften, Vorlagen, Kanal-Exp
   `00041_messaging_reactions_pins.sql` (`reactions` and `pins` as 03 states them, M1-59).
 - The test world of both handlers is `services/server/test/messagingworld`.
 
+## Metrics (M1-68)
+
+`bothy.message.created` counts every inserted message, the reopen line included, with
+`bothy.message.origin` and `bothy.message.kind` once its unit of work committed
+(`txn.AfterCommit`), so a rolled-back message counts nothing. The use cases record through the
+port `app.Metrics` (`app/metrics.go`); `adapters/otelmetrics` implements it with the declaration
+`metrics.MessageCreated` of the metric registry, and `wire.MessagingWrites.Metrics` nil means that
+adapter on the global meter provider.
+
 ## Port (Wurzelpaket `internal/messaging`)
 
 - Eingehend: `Messages` (Anlegen, Thread mit erster Nachricht anlegen, Bearbeiten, Löschen, Verlauf, `SetTriggerState`, Anker), `Reactions`, `Pins`, `Templates`, `Mentions` (Liste, ungelesene je Thread), `Export`; deklariert `ComponentReader`.

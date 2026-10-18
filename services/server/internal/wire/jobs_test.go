@@ -38,7 +38,7 @@ func TestJobsConfigBindsDefaults(t *testing.T) {
 		t.Fatal(err)
 	}
 	want := map[string]int{"default": 8, "files": 5, "delivery": 16, "maintenance": 2, "privacy": 1}
-	if cfg.Schema != "jobs" || cfg.SoftStopTimeout != 20*time.Second || len(cfg.MaxWorkers) != len(want) {
+	if cfg.Schema != "jobs" || cfg.SoftStopTimeout != 20*time.Second || cfg.StatementTimeout <= 0 || len(cfg.MaxWorkers) != len(want) {
 		t.Fatalf("JobsConfig = %+v", cfg)
 	}
 	for q, n := range want {

@@ -22,7 +22,7 @@ Audit-Log mit Hash-Kette, signierte Prüfpunkte, Schlüssel der IP-Pseudonyme, A
 | `app/sinktest/` | `Run`, the conformance suite of `CheckpointSink` that `filesink` and `s3sink` pass (only tests import it, `TestFilestestNotInBinary`) |
 | `adapters/jobs/` | the periodic job `audit.chain_verify` on the queue `maintenance` |
 | `adapters/httpapi/` | the handlers of `listAuditEvents`, `exportAuditEvents`, `verifyAuditChain` and the cursor codec `Cursors` |
-| `adapters/otelmetrics/` | `bothy.audit.verify.failures` and `bothy.audit.verify.last_success.timestamp` |
+| `adapters/otelmetrics/` | `bothy.audit.verify.failures` and `bothy.audit.verify.last_success.timestamp`, declared in the metric registry of `platform/otel/metrics` (M1-68) |
 
 `internal/wire` (`audit.go`) builds the module (`wire.NewAudit`), registers `(*Chain).Hook` as the
 hook of phase 3.3 in `wire.NewTxnRegistry` (golden file `testdata/txn_registrations.golden`),

@@ -13,7 +13,7 @@
 //
 // Example:
 //
-//	l, err := ratelimit.New(cfg, clock.System(), meter)
+//	l, err := ratelimit.New(cfg, clock.System(), nil) // nil: the global meter provider
 //	if err != nil {
 //		return err // a class without limits, a value below 1
 //	}

@@ -10,7 +10,9 @@ Status: built (M1-19). Normative are [05-aktionen.md](../../../../../docs/spec/0
 
 ## Interface
 
-- `New(Config, clock.Clock, metric.Meter)`: the limiter. `Config` holds the limits of every class
+- `New(Config, clock.Clock, metric.MeterProvider)` (nil provider: the global one; the counter
+  `bothy.ratelimit.rejected` comes from the declaration `metrics.RateLimitRejected` of the metric
+  registry, M1-68): the limiter. `Config` holds the limits of every class
   (`ratelimit.<class>.per_minute`, `.burst`), `ratelimit.max_tracked_keys` and
   `ratelimit.sweep_interval`; `internal/wire` binds it (`RateLimitConfig`). Every class of 05 must
   have limits between 1 and `MaxLimit`.

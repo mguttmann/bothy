@@ -17,8 +17,8 @@ import (
 	"github.com/OWNER/bothy/services/server/internal/platform/otel/attr"
 )
 
-// The values of bothy.outcome on the span "job <bothy.job.kind>"
-// (docs/observability/signals.md "Spans"). The catalogue also lists snoozed; it stays unused
+// The values of bothy.outcome on the span "job <bothy.job.kind>" and on bothy.job.duration
+// (docs/observability/signals.md "Spans", 4.4). The catalogue also lists snoozed; it stays unused
 // until the River-free interface offers a snooze (README.md "Spans").
 const (
 	outcomeCompleted = "completed"
@@ -34,8 +34,9 @@ const errTypePanic = "panic"
 
 // workerDeps are what every wrapped handler needs from the runtime.
 type workerDeps struct {
-	tracer trace.Tracer
-	log    *slog.Logger
+	tracer  trace.Tracer
+	log     *slog.Logger
+	metrics *jobMetrics
 }
 
 // worker adapts a Handler to River's Worker. River never reaches the handler directly: the
@@ -55,15 +56,20 @@ func newWorker[A Args](h Handler[A], o HandlerOptions, kind string, d workerDeps
 }
 
 // Work runs one attempt inside the CONSUMER span "job <kind>" with bothy.job.kind and
-// bothy.outcome. A nil result while ctx has ended becomes ctx.Err(): a handler that swallowed
+// bothy.outcome, and records its duration with the same two attributes in bothy.job.duration. A
+// nil result while ctx has ended becomes ctx.Err(): a handler that swallowed
 // the cancellation would otherwise mark an unfinished job as done, and a rerun is safe because
 // jobs are idempotent (docs/DECISIONS.md M1-14).
 func (w *worker[A]) Work(ctx context.Context, j *river.Job[A]) (err error) {
+	start := time.Now()
 	ctx, span := w.d.tracer.Start(ctx, "job "+w.kind,
 		trace.WithSpanKind(trace.SpanKindConsumer),
 		trace.WithAttributes(attribute.String(attr.JobKind, w.kind)))
 	defer func() {
 		outcome := outcomeOf(ctx, err)
+		if w.d.metrics != nil {
+			w.d.metrics.observed(ctx, w.kind, outcome, time.Since(start))
+		}
 		span.SetAttributes(attribute.String(attr.Outcome, outcome))
 		if outcome == outcomeFailed {
 			span.SetStatus(codes.Error, "")

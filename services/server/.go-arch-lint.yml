@@ -279,7 +279,7 @@ deps:
     mayDependOn: [platform-otel, kernel-ports, platform-secrets]
     canUse: [v-otel, v-otelhttp, v-otelslog]
   platform-pg:
-    mayDependOn: [platform-pg, kernel-ports, platform-secrets, migrations]
+    mayDependOn: [platform-pg, kernel-ports, platform-secrets, platform-otel, migrations]
     canUse: [v-pgx, v-goose, v-otelpgx, v-otel, v-testcontainers, v-mobyapi]
   platform-ratelimit:
     mayDependOn: [platform-ratelimit, kernel-ports, platform-httpserver, platform-otel]
@@ -375,7 +375,7 @@ deps:
     mayDependOn: [messaging-app, messaging, messaging-domain, kernel-ports, identity, chat, files]
   messaging-adapters:
     mayDependOn: [messaging-adapters, messaging, messaging-app, messaging-domain, kernel-ports, platform-buildinfo, platform-config, platform-egress, platform-health, platform-httpserver, platform-jobs, platform-jsoncanon, platform-lifecycle, platform-otel, platform-pg, platform-ratelimit, platform-secrets, api, identity, chat, files]
-    canUse: [v-pgx, v-xtext, v-uniseg]
+    canUse: [v-pgx, v-xtext, v-uniseg, v-otel]
   status:
     mayDependOn: [status, kernel-ports]
   status-domain:

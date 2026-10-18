@@ -48,6 +48,7 @@ func (g *Gateway) resume(ctx context.Context, c *Connection, d any) error {
 	if err := c.conn.Send(Resumed{SessionID: s.ID, HeadSeq: res.HeadSeq, SyncEpoch: res.SyncEpoch}); err != nil {
 		return nil
 	}
+	g.connected(ctx, c, string(a.Kind))
 	c.beat(g.d.Clock.Now())
 	from := in.Cursor
 	switch {
@@ -55,7 +56,9 @@ func (g *Gateway) resume(ctx context.Context, c *Connection, d any) error {
 		// The durable cursor of the consumer decides, not the client cursor (brief M2-07 note 4).
 		from = res.HeadSeq
 	case res.Reason != "":
-		_ = c.conn.Send(ResyncRequired{Reason: res.Reason, HeadSeq: res.HeadSeq, SyncEpoch: res.SyncEpoch})
+		if c.conn.Send(ResyncRequired{Reason: res.Reason, HeadSeq: res.HeadSeq, SyncEpoch: res.SyncEpoch}) == nil {
+			g.resynced(ctx, c, string(res.Reason))
+		}
 		from = res.HeadSeq
 	}
 	if err := g.d.Delivery.Attach(ctx, c, from, res.HeadSeq); err != nil {

@@ -61,7 +61,8 @@ func (h *Hub) PublishEphemeral(ctx context.Context, ev eventlog.EphemeralEvent) 
 	if err != nil {
 		return fmt.Errorf("gateway: %s cannot be encoded: %w", ev.Type, err)
 	}
-	entry := domain.Entry{Frame: frame, Class: domain.ClassDispatch, SpaceID: ev.Scope.SpaceID, ChannelID: ev.Scope.ChannelID, OccurredAt: occurred}
+	entry := domain.Entry{Frame: frame, Class: domain.ClassDispatch, SpaceID: ev.Scope.SpaceID, ChannelID: ev.Scope.ChannelID, OccurredAt: occurred,
+		Live: true, Ephemeral: true}
 	for _, m := range h.ephemeralCandidates(admit, et) {
 		h.offerEphemeral(ctx, m, admit, entry)
 	}

@@ -27,7 +27,8 @@ collector is counted.
 | `spans.go` | span processor, attribute filter and counting span exporter |
 | `txnspan.go` | `SubscriberSpan`, the span `txn.subscribe <module>` of an in-transaction subscriber (kernel/txn tracer, M1-13) |
 | `logexport.go` | log processor and counting log exporter |
-| `metrics.go` | `bothy.telemetry.dropped`, the view of `http.server.request.duration`, counting metric exporter |
+| `metrics.go` | `bothy.telemetry.dropped` (declared in `metrics/`), counting metric exporter |
+| [`metrics/`](metrics/doc.go) | the metric registry (M1-68): one `Spec` per instrument of the catalogue, `Check`, the SDK view of every instrument, the recording wrappers with the strict switch; `metricstest/` holds the test helpers |
 | `logs.go` | slog handler chain, `NewCommandLogger`, `ParseLevel`, `CorrelationID`, `ServerErrorLog` |
 | `http.go` | `Middleware`, `RecordRoute`, access log |
 | `pseudonym.go` | `Pseudonymizer`, `NewPseudonymizer` |
@@ -188,9 +189,15 @@ by handle. Metrics never carry a pseudonym.
 
 - Spans: `otelapi.Tracer(<package path>).Start(ctx, name)` with a constant name and attributes
   from `attr` or `genai` only; unknown keys are removed on export.
-- Metrics: `otelapi.Meter(<package path>)`; names and units from signals.md "Namen und
-  Einheiten", attributes only from closed sets (signals.md "Kardinalität"), never an object id or
-  a pseudonym.
+- Metrics: declare the instrument in `metrics/catalogue.go` (a row of signals.md, attributes with
+  literal values or a closed `Source`) and record through `metrics.NewCounter`, `NewHistogram`,
+  `NewUpDownCounter`, `NewGauge` or `NewObservableGauge`; an app layer records through an
+  outbound port of its own (`internal/<module>/app/metrics.go`) implemented in
+  `adapters/otelmetrics` (02 "Layers within a module" rule 5). The view drops every instrument the
+  registry does not declare, keeps only the declared attribute keys and sets the bucket bounds of
+  4.7; a value outside a closed set records as `other`, and fails a test that called
+  `metricstest.Strict`. `TestCatalogue_RegistryMatchesSignalsDoc` holds the registry equal to
+  signals.md.
 - Logs: the logger from `Telemetry.Logger()` (or `NewCommandLogger`), a constant English message,
   `slog.Attr` values with `attr` constants and the context variant (`InfoContext`, `LogAttrs`);
   `sloglint` enforces this in `make lint`.

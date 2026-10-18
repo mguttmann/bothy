@@ -22,7 +22,19 @@ documented in this file. The format is based on
   a corpus test observes every M1 event type and server op, and a parser test keeps the harness
   the only WebSocket client of the tests. New direct dependency
   `github.com/santhosh-tekuri/jsonschema/v6` (test code only).
-
+- Core metrics per catalogue (M1-68): one Go declaration per instrument
+  (`internal/platform/otel/metrics`) with checks for closed attribute sets, no person or ID
+  attribute and bucket bounds, and the SDK view that keeps only catalogue instruments and keys
+  with the bounds of signals.md 4.7, library instruments included. New instruments:
+  `bothy.authz.decisions`, the gateway set (`connections.active`, `connect.duration`,
+  `catchup.duration`, `resync`, `close`, `outbound.dropped`), `bothy.delivery.duration`,
+  `bothy.event.fanout.lag`, `bothy.message.created` and `bothy.event.appended` (both after the
+  commit), `bothy.db.event_seq.lock_wait`, `bothy.job.duration`, `bothy.job.queue`,
+  `db.client.operation.duration` from the pool's own query tracer with closed
+  `db.operation.name` and `db.collection.name` (the otelpgx metrics are dropped) and
+  `bothy.db.pool.connections`. A value outside a closed set records as `other`.
+  `txn.AfterCommit` runs registered functions after the commit of a unit of work. The gate
+  `make signal-check` holds dashboards, rules and SLOs to the catalogue.
 - Gateway focus and typing (M1-66): the ops `focus {thread_ids, idle}` (`gateway.focus` per
   thread, `rl.read` per principal, at most `sync.max_focused_threads` threads, unreadable and
   unknown threads dropped silently), `typing.start` and `typing.stop` (`typing.start`, people

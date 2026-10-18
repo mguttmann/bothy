@@ -101,6 +101,8 @@ type world struct {
 	devices  map[ids.ID]ids.ID // principal -> device
 	tokens   map[ids.ID]ids.ID // principal -> token
 	install  ids.ID
+	// metrics receives the counted decisions; nil means the no-op default.
+	metrics app.Metrics
 }
 
 func newWorld(t testing.TB) *world {
@@ -187,7 +189,7 @@ func (w *world) build(t testing.TB) {
 	az, err := app.NewAuthorizer(w.cfg, app.AuthorizerDeps{
 		Catalog: app.NewCatalog(slog.New(slog.NewTextHandler(w.logs, nil))), Store: w.store, Principals: w.principals,
 		Credentials: w.creds, Structure: w.structure, Policies: w.policies, Versions: w.versions, Recorder: w.rec,
-		Clock: w.clk, Log: slog.New(slog.NewTextHandler(w.logs, nil)),
+		Clock: w.clk, Log: slog.New(slog.NewTextHandler(w.logs, nil)), Metrics: w.metrics,
 	})
 	if err != nil {
 		t.Fatal(err)

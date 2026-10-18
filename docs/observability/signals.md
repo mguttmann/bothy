@@ -44,6 +44,10 @@ Allowlist des Collectors, Dashboards, Regeln und SLOs nutzen nur Namen von hier.
 | `deployment.environment.name` | `dev`, `staging`, `prod` | `instance.environment` bzw. `OTEL_RESOURCE_ATTRIBUTES` |
 | `bothy.server.role` | `api`, `worker`, `all` | `server.role` |
 
+Prometheus exposes these attributes of a process as the labels of the series `target_info`
+(translated like the names in section 1, item 4); dashboards and alerts may use it to count
+processes or to detect a missing one (M1-68).
+
 ## 4. Metriken
 
 ### 4.1 REST und Gateway
@@ -142,7 +146,7 @@ Betriebswerte der eigenen Messung ([25-visualisierung.md](../spec/25-visualisier
 
 | Name | Typ | Einheit | Attribute | Quelle | Prometheus |
 |---|---|---|---|---|---|
-| `db.client.operation.duration` | Histogramm | `s` | `db.operation.name`, `db.collection.name` | otelpgx (Namen der installierten Version im Ticket prüfen) | `db_client_operation_duration_seconds` |
+| `db.client.operation.duration` | Histogramm | `s` | `db.operation.name`, `db.collection.name` | api, worker: the query tracer of `platform/pg`. otelpgx v0.13.0 (verified 2026-10-18) records a metric of this name with the raw first word of a statement and `pgx.operation.type`, and without `db.collection.name`; the view of the metric registry drops every otelpgx instrument (M1-68) | `db_client_operation_duration_seconds` |
 | `bothy.db.pool.connections` | Gauge | `{connection}` | `bothy.pool.state` (`idle`, `acquired`, `max`) | api, worker | `bothy_db_pool_connections` |
 | `postgresql.backends`, `postgresql.connection.max`, `postgresql.commits`, `postgresql.rollbacks`, `postgresql.db_size`, `postgresql.table.size`, `postgresql.deadlocks` | wie vom Empfänger | wie vom Empfänger | Resource `postgresql.database.name`, `postgresql.table.name` (als Labels übernommen) | Collector, Empfänger `postgresql` (https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/v0.162.0/receiver/postgresqlreceiver/documentation.md, abgerufen 2026-10-10) [belegt] | `postgresql_backends`, `postgresql_connection_max`, `postgresql_commits_total`, `postgresql_rollbacks_total`, `postgresql_db_size_bytes`, `postgresql_table_size_bytes`, `postgresql_deadlocks_total` |
 
@@ -199,7 +203,7 @@ Grenzen "Dauern bis Sekunden" aus 4.7; andere Grenzen verwirft der Server.
 
 | Histogramme | Grenzen |
 |---|---|
-| Dauern bis Sekunden (`http.server.request.duration`, `bothy.delivery.duration`, `bothy.gateway.connect.duration`, `bothy.run.start.latency`, `bothy.push.send.duration`, `bothy.db.event_seq.lock_wait`, `bothy.search.duration`, `bothy.stats.flush.duration`, `db.client.operation.duration`) | 0.005, 0.01, 0.025, 0.05, 0.075, 0.1, 0.25, 0.5, 0.75, 1, 2.5, 5, 7.5, 10 |
+| Dauern bis Sekunden (`http.server.request.duration`, `bothy.delivery.duration`, `bothy.gateway.connect.duration`, `bothy.run.start.latency`, `bothy.push.send.duration`, `bothy.db.event_seq.lock_wait`, `bothy.search.duration`, `bothy.stats.flush.duration`, `db.client.operation.duration`, and the app histograms of 4.6a: `bothy.client.cold_start.duration`, `bothy.client.thread_open.duration`, `bothy.client.send_local.duration`, `bothy.client.catchup.duration`, `bothy.client.push_display.duration`) | 0.005, 0.01, 0.025, 0.05, 0.075, 0.1, 0.25, 0.5, 0.75, 1, 2.5, 5, 7.5, 10 |
 | lange Dauern (`bothy.run.duration`, `bothy.gateway.catchup.duration`, `bothy.job.duration`, `bothy.file.scan.duration`) | 1, 2.5, 5, 10, 30, 60, 120, 300, 600, 1800, 3600, 7200 |
 | Größen (`bothy.file.upload.size`) | 1024, 16384, 131072, 1048576, 8388608, 67108864, 536870912 |
 

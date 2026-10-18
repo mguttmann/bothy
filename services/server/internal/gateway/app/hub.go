@@ -73,8 +73,12 @@ type HubDeps struct {
 	// Log receives failures of revalidation, of the index and of catch-up; nil means
 	// slog.Default(). It never receives event contents.
 	Log *slog.Logger
-	// Clock stamps ephemeral events without a time; nil means clock.System().
+	// Clock stamps ephemeral events without a time and times the catch-up and the fan-out lag;
+	// nil means clock.System().
 	Clock clock.Clock
+	// Metrics records the catch-up, the frames discarded at a 4014 close (M1-68); nil records
+	// nothing.
+	Metrics Metrics
 }
 
 // member is the hub's state of one registered connection. The hub's mutex guards the index
@@ -142,6 +146,12 @@ type Hub struct {
 	consumers *ConsumerEngine
 	// position is the hub position: the highest seq Dispatch has finished (Position).
 	position atomic.Int64
+
+	// lagMu guards the state of bothy.event.fanout.lag: the batches the tail announced (Known)
+	// that are not fully distributed, and the highest seq Dispatch distributed.
+	lagMu       gosync.Mutex
+	known       []knownBatch
+	distributed int64
 }
 
 // Compile-time check: the hub is the delivery of the gateway.
@@ -161,6 +171,7 @@ func NewHub(cfg HubConfig, d HubDeps) (*Hub, error) {
 	if d.Clock == nil {
 		d.Clock = clock.System()
 	}
+	d.Metrics = orNop(d.Metrics)
 	return &Hub{
 		cfg: cfg, d: d, members: map[*Connection]*member{}, byPrincipal: map[ids.ID]map[*member]struct{}{},
 		bySpace: map[ids.ID]map[*member]struct{}{}, byChannel: map[ids.ID]map[*member]struct{}{},
@@ -332,6 +343,7 @@ func (h *Hub) Dispatch(ctx context.Context, ev sync.Event) {
 		h.deliver(scoped, m, ev, enc)
 	}
 	h.advance(ctx, ev.Seq)
+	h.distributedUpTo(ev.Seq)
 	h.raise(ev.Seq)
 	h.mu.Lock()
 	e := h.consumers
@@ -469,6 +481,7 @@ func (h *Hub) deliver(ctx context.Context, m *member, ev sync.Event, enc *encode
 	if !ok {
 		return
 	}
+	e.Live = true
 	m.mu.Lock()
 	switch {
 	case m.phase == domain.PhaseClosing:
@@ -480,6 +493,7 @@ func (h *Hub) deliver(ctx context.Context, m *member, ev sync.Event, enc *encode
 		return
 	}
 	m.mu.Unlock()
+	h.d.Metrics.Dropped(ctx, ReasonSlowConsumer, 1)
 	h.closeMember(m, domain.CloseSlowConsumer)
 }
 
@@ -574,6 +588,7 @@ func (h *Hub) advance(_ context.Context, seq int64) {
 		}
 		m.mu.Unlock()
 		if !ok {
+			h.d.Metrics.Dropped(context.Background(), ReasonSlowConsumer, 1)
 			h.closeMember(m, domain.CloseSlowConsumer)
 		}
 	}
@@ -622,11 +637,20 @@ func (h *Hub) flushBatch(ctx context.Context, m *member, batch []sync.Event, hea
 	return true
 }
 
-// closeMember marks m closing and closes its connection with code.
+// closeMember marks m closing and closes its connection with code. At a 4014 close the events of
+// the live buffer it discards count in bothy.gateway.outbound.dropped; the frames of the outbound
+// queue are counted by the adapter that clears it.
 func (h *Hub) closeMember(m *member, code domain.CloseCode) {
 	m.mu.Lock()
+	dropped := len(m.buffer)
+	if m.phase == domain.PhaseClosing {
+		dropped = 0
+	}
 	m.phase, m.buffer = domain.PhaseClosing, nil
 	m.mu.Unlock()
+	if code == domain.CloseSlowConsumer && dropped > 0 {
+		h.d.Metrics.Dropped(context.Background(), ReasonSlowConsumer, dropped)
+	}
 	m.c.Close(code, "")
 }
 

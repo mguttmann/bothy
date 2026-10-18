@@ -7,6 +7,7 @@ import (
 	"net"
 	"net/http"
 	"net/http/httptest"
+	"slices"
 	"strings"
 	"testing"
 	"time"
@@ -16,6 +17,7 @@ import (
 	"go.opentelemetry.io/otel/trace"
 
 	"github.com/OWNER/bothy/services/server/internal/platform/otel/attr"
+	"github.com/OWNER/bothy/services/server/internal/platform/otel/metrics"
 )
 
 // hookPattern is a route with a secret in its path (a webhook token).
@@ -245,21 +247,21 @@ func TestUnknownMethodNormalized(t *testing.T) {
 
 func histogramPoints(t *testing.T, tt *testTelemetry) []metricdata.HistogramDataPoint[float64] {
 	t.Helper()
-	m := findMetric(t, tt.reader, metricHTTPRequestDuration)
+	m := findMetric(t, tt.reader, metrics.HTTPServerRequestDuration.Name)
 	if m == nil {
-		t.Fatalf("%s missing", metricHTTPRequestDuration)
+		t.Fatalf("%s missing", metrics.HTTPServerRequestDuration.Name)
 	}
 	h, ok := m.Data.(metricdata.Histogram[float64])
 	if !ok {
-		t.Fatalf("%s is %T", metricHTTPRequestDuration, m.Data)
+		t.Fatalf("%s is %T", metrics.HTTPServerRequestDuration.Name, m.Data)
 	}
 	return h.DataPoints
 }
 
-// TestHTTPMetricAttributesFromCatalog: http.server.request.duration carries only the four
-// catalog attributes (no server.address from the Host header), the boundaries of signals.md 4.7
-// and no exemplars; the body size histograms of otelhttp are dropped.
-func TestHTTPMetricAttributesFromCatalog(t *testing.T) {
+// TestHTTPMetric_OnlyAllowedAttributes: http.server.request.duration carries only the four
+// catalog attributes (a request with an unusual Host header leaves no server.address), the
+// boundaries of signals.md 4.7 and no exemplars; the body size histograms of otelhttp are dropped.
+func TestHTTPMetric_OnlyAllowedAttributes(t *testing.T) {
 	tt := setupTest(t, testConfig(), nil, nil, nil)
 	h := Middleware(testMux(nil, http.StatusBadGateway))
 	r := hookRequest(t, trace.SpanContext{})
@@ -286,8 +288,8 @@ func TestHTTPMetricAttributesFromCatalog(t *testing.T) {
 	if len(dp.Exemplars) != 0 {
 		t.Errorf("exemplars = %v, want none", dp.Exemplars)
 	}
-	if len(dp.Bounds) != len(durationBuckets) || dp.Bounds[0] != 0.005 || dp.Bounds[len(dp.Bounds)-1] != 10 {
-		t.Errorf("bounds = %v, want %v", dp.Bounds, durationBuckets)
+	if !slices.Equal(dp.Bounds, metrics.BucketsSeconds) {
+		t.Errorf("bounds = %v, want %v", dp.Bounds, metrics.BucketsSeconds)
 	}
 	for _, name := range []string{"http.server.request.body.size", "http.server.response.body.size"} {
 		if findMetric(t, tt.reader, name) != nil {
@@ -358,5 +360,23 @@ func TestCollectorUnreachableDoesNotDelayRequests(t *testing.T) {
 	got := tt.dropped(t)
 	if got[signalTraces] == 0 || got[signalLogs] == 0 {
 		t.Errorf("dropped = %v, want traces and logs above zero", got)
+	}
+}
+
+// TestHTTPMetric_RouteTemplateAndUnmatched: http.route of the metric is the route template for a
+// routed request, never the raw path, and "unmatched" for a request no route matched.
+func TestHTTPMetric_RouteTemplateAndUnmatched(t *testing.T) {
+	tt := setupTest(t, testConfig(), nil, nil, nil)
+	h := Middleware(testMux(nil, http.StatusOK))
+	serve(h, hookRequest(t, trace.SpanContext{}))
+	serve(h, httptest.NewRequestWithContext(t.Context(), http.MethodGet, "/api/v1/no/such/route/secret-token", nil))
+
+	routes := map[string]bool{}
+	for _, dp := range histogramPoints(t, tt) {
+		v, _ := dp.Attributes.Value(attribute.Key(attr.HTTPRoute))
+		routes[v.AsString()] = true
+	}
+	if len(routes) != 2 || !routes[hookPattern] || !routes["unmatched"] {
+		t.Errorf("http.route values = %v, want exactly %q and unmatched", routes, hookPattern)
 	}
 }

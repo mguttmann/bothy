@@ -33,6 +33,15 @@ type Connection struct {
 	code       domain.CloseCode
 	// typing is the fan-out throttle of typing.start of this connection, created on first use.
 	typing *domain.TypingThrottle
+
+	// The state of the metrics: readyAt is the time of the first ready or resumed (zero before),
+	// activeKind the kind counted in bothy.gateway.connections.active ("" when not counted),
+	// peerCode the close code the client sent (0 for none), finished whether Closed recorded the
+	// end.
+	readyAt    time.Time
+	activeKind string
+	peerCode   int
+	finished   bool
 }
 
 // ID returns the id of the connection, for logs; it is not the gateway session id.
@@ -53,6 +62,24 @@ func (c *Connection) Close(code domain.CloseCode, reason string) {
 		reason = code.Name()
 	}
 	c.conn.Close(code, reason)
+}
+
+// PeerClosed records the close code the client sent in its close frame; the adapter calls it when
+// the read loop ends on a close frame. Only the first code counts; Gateway.Closed counts it in
+// bothy.gateway.close when the server did not close first.
+func (c *Connection) PeerClosed(code int) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	if c.peerCode == 0 {
+		c.peerCode = code
+	}
+}
+
+// readyTime returns the time of the first ready or resumed, zero before.
+func (c *Connection) readyTime() time.Time {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	return c.readyAt
 }
 
 // Closing reports whether the connection has been closed.

@@ -20,6 +20,8 @@ import (
 	"testing"
 	"time"
 
+	sdkmetric "go.opentelemetry.io/otel/sdk/metric"
+
 	"github.com/OWNER/bothy/services/server/api/rest"
 	"github.com/OWNER/bothy/services/server/api/routes"
 	agentsapp "github.com/OWNER/bothy/services/server/internal/agents/app"
@@ -44,11 +46,13 @@ import (
 	"github.com/OWNER/bothy/services/server/internal/kernel/searchlang"
 	"github.com/OWNER/bothy/services/server/internal/kernel/txn"
 	"github.com/OWNER/bothy/services/server/internal/messaging"
+	messagingmetrics "github.com/OWNER/bothy/services/server/internal/messaging/adapters/otelmetrics"
 	messagingapp "github.com/OWNER/bothy/services/server/internal/messaging/app"
 	notifypg "github.com/OWNER/bothy/services/server/internal/notify/adapters/postgres"
 	notifyapp "github.com/OWNER/bothy/services/server/internal/notify/app"
 	"github.com/OWNER/bothy/services/server/internal/platform/httpserver"
 	"github.com/OWNER/bothy/services/server/internal/platform/httpserver/httpservertest"
+	"github.com/OWNER/bothy/services/server/internal/platform/otel/metrics/metricstest"
 	"github.com/OWNER/bothy/services/server/internal/platform/pg"
 	"github.com/OWNER/bothy/services/server/internal/platform/pg/pgtest"
 	syncpg "github.com/OWNER/bothy/services/server/internal/sync/adapters/postgres"
@@ -164,6 +168,8 @@ type World struct {
 	Authorizer authorize.Authorizer
 	// Logs holds every record the modules logged (the chain logs into H.Logs).
 	Logs *httpservertest.LogCapture
+	// Metrics reads the metrics of the messaging module (bothy.message.created, M1-68).
+	Metrics *sdkmetric.ManualReader
 
 	rec      *Recorder
 	installs *installations
@@ -336,8 +342,14 @@ func build(t *testing.T, subscribe Subscribe, personal bool, notifyCfg *notifyap
 	for _, o := range opts {
 		o(&mcfg)
 	}
-	m, err := wire.NewMessaging(mcfg, pool, uow, az, wire.MessagingWrites{Events: appender, Redactor: syncpg.NewRedactor(pool), Audit: rec},
-		c.Service, dir, w.Clock, log)
+	mp, reader := metricstest.Provider(t)
+	mmetrics, err := messagingmetrics.New(mp)
+	if err != nil {
+		t.Fatal(err)
+	}
+	w.Metrics = reader
+	m, err := wire.NewMessaging(mcfg, pool, uow, az, wire.MessagingWrites{Events: appender, Redactor: syncpg.NewRedactor(pool), Audit: rec,
+		Metrics: mmetrics}, c.Service, dir, w.Clock, log)
 	if err != nil {
 		t.Fatal(err)
 	}

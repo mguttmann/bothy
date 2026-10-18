@@ -200,6 +200,8 @@ type Unit struct {
 	opts   Options
 	mu     sync.Mutex
 	values map[any]any
+	// after are the functions AfterCommit registered, in order.
+	after []func()
 }
 
 // NewUnit returns a unit in PhaseNone with an empty state, and the function that moves it to
@@ -232,6 +234,36 @@ func (c UnitControl) Declare(o Options) {
 	c.u.mu.Lock()
 	defer c.u.mu.Unlock()
 	c.u.opts = o
+}
+
+// Committed runs the functions AfterCommit registered on the unit, in registration order, once;
+// platform/pg calls it right after a successful COMMIT of the attempt and never for an attempt
+// that rolled back.
+func (c UnitControl) Committed() {
+	c.u.mu.Lock()
+	after := c.u.after
+	c.u.after = nil
+	c.u.mu.Unlock()
+	for _, fn := range after {
+		fn()
+	}
+}
+
+// AfterCommit registers fn to run after the outermost unit of ctx commits, for facts that may
+// only be told once they are durable (bothy.message.created and bothy.event.appended count after
+// the commit, signals.md 4.2). A nested unit registers on the outermost one. A rolled-back attempt
+// drops its registrations, and a retried attempt starts without them. fn runs in the goroutine of
+// Do, after COMMIT and before Do returns; it must be quick and must not fail (counting a metric).
+// AfterCommit reports false, and fn is not kept, outside a unit of work.
+func AfterCommit(ctx context.Context, fn func()) bool {
+	u, ok := UnitFrom(ctx)
+	if !ok || fn == nil {
+		return false
+	}
+	u.mu.Lock()
+	defer u.mu.Unlock()
+	u.after = append(u.after, fn)
+	return true
 }
 
 // Phase returns the current phase.

@@ -22,6 +22,7 @@ migrator behind `bothy migrate`. Migrations never run at `bothy serve` (R-AR-16)
 | `querier.go` | `DBTX`, `Pool.Exec`, `Pool.Query`, `Pool.QueryRow` |
 | `timeouts.go` | `Timeouts`, `SetLocalTimeouts` |
 | `tracer.go` | otelpgx tracer without query parameters, statement errors redacted |
+| `metrics.go` | `db.client.operation.duration` of the query tracer with closed attributes, `Pool.RegisterMetrics` (`bothy.db.pool.connections`) (M1-68) |
 | `schema.go` | `CheckSchema`, `SchemaTooOldError`, `RequiredSchemaVersion`, `SchemaVersion` |
 | `roles.go`, `scram.go` | `Role`, `Bootstrap`, `BootstrapRoles`, `BootstrapDatabase`, SCRAM-SHA-256 verifiers |
 | `migrator.go` | `Migrator`, `Step`, `MigratorOptions`, `Result`, `MigrationStatus`, `ErrNotSchemaOwner` |
@@ -185,6 +186,17 @@ only, because PostgreSQL messages can quote parameter values. The pinned otelpgx
 carries `server.address`, `server.port` and `error.type` (a SQLSTATE or error class), never an
 error text.
 
+Metrics (M1-68): otelpgx v0.13.0 records `db.client.operation.duration` with the raw first word of
+a statement as `db.operation.name`, `pgx.operation.type` and `db.system.name`, and without
+`db.collection.name`; the view of the metric registry drops every otelpgx instrument. The query
+tracer of this package records the metric itself for every query: `db.operation.name` is the
+first keyword (for `WITH` the keyword of the main statement) from the closed list of
+`metrics.DBClientOperationDuration`, `db.collection.name` the table the statement reads or writes
+from the tables the embedded migrations create (the module register), anything else `other`, and
+no attribute without a table. Batches and `COPY FROM` are not measured. `Pool.RegisterMetrics`
+observes `bothy.db.pool.connections` with `bothy.pool.state` `idle`, `acquired` and `max` from the
+pool statistics; `internal/wire` registers the process pool after `Open`.
+
 ## Dedicated connections
 
 `Pool.DialDedicated(ctx, applicationName)` opens one connection with the configuration, session
@@ -202,4 +214,4 @@ handlers of a platform package.
 ## Not covered here
 
 The phase hooks of authz, sync and audit (M1-29, M1-16, M1-24), idempotency keys in the unit
-of work (M1-20), River migrations (M1-14), the backup requirement of `migrate` (M7-02), pool metrics (M1-68).
+of work (M1-20), River migrations (M1-14), the backup requirement of `migrate` (M7-02).

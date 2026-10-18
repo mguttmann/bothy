@@ -89,6 +89,16 @@ River's job timeout) or `failed` (any other error or a panic). `snoozed` of the 
 unused until this interface offers a snooze. The tracer is the global provider's unless `New`
 gets one.
 
+## Metrics (M1-68)
+
+Every attempt records `bothy.job.duration` with `bothy.job.kind` (the kinds registered at start)
+and `bothy.outcome` (`completed`, `failed`, `cancelled`; `snoozed` stays unused like on the span).
+A runtime that works jobs (roles `worker` and `all`) observes `bothy.job.queue` from `Start` to
+`Stop`: one grouped count over River's job table in the states `available`, `scheduled` and
+`retryable` per collection, bounded by `database.statement_timeout` (`Config.StatementTimeout`),
+0 for a registered kind without waiting jobs. `Config.MeterProvider` nil means the global
+provider.
+
 ## Shutdown
 
 `Stop` stops River with `SoftStopTimeout = shutdown.jobs_soft_timeout`: producers stop fetching,

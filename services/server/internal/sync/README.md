@@ -17,7 +17,7 @@ Ereignis-Log (Anhängen, Tail, Nachholen, Schwärzen, Partitionen), Momentaufnah
 | `adapters/postgres/` | `Repository` (writer, partitions, head, minimum, reads, the cursor store and log reader of the worker consumers) and `IdempotencyRepository` (`KeyRows`) over sqlc queries in `queries/`, generated code in `sqlcgen/` (entry in `services/server/sqlc.yaml`); `Tail` and `Waker`, each with its own `LISTEN` connection over one shared listening loop (`listener`); `PersonalRepository` (`PersonalStore`) over `queries/read_states.sql`, `drafts.sql` and `user_settings.sql` (M1-61), also `SnapshotStore` (M1-63); the page query of catch-up `queries/catchup.sql` (`Repository.VisibleEvents`, M1-63) |
 | `adapters/httpapi/` | `Personal`, the handlers of `listMyReadStates`, `putReadState`, `markThreadUnread`, `putThreadDraft`, `deleteThreadDraft`, `putChannelDraft`, `deleteChannelDraft`, `listMyDrafts`, `listMySettings`, `putMySetting`, `deleteMySetting` and `getMySidebar` (M1-61); `Sync`, the handlers of `listEvents` and `getSnapshot`, and `SnapshotREST` (M1-63) |
 | `adapters/noruns/` | `Source`, the M1 binding of `app.RunSummarySource`: no running run, because the table `runs` exists only from M2-05, which binds the runs port instead (M1-63) |
-| `adapters/otelmetrics/` | the lag gauges of the worker consumers (`RegisterConsumerGauges`) |
+| `adapters/otelmetrics/` | the lag gauges of the worker consumers (`RegisterConsumerGauges`); `New`, the implementation of `app.Metrics` (`bothy.event.appended`, `bothy.db.event_seq.lock_wait`, M1-68) |
 | `adapters/telemetry/` | `Correlator`: `correlation_id` and `trace_context` from the trace context of the append |
 | `adapters/jobs/` | jobs `sync.partition_maintenance` and `sync.idempotency_cleanup`: arguments, handlers, periodic registrations |
 
@@ -49,6 +49,13 @@ advances `event_seq` by n through `instance.Counters` (the lock holds until the 
 `occurred_at` is the column default `now()`, the transaction time. An insert that no partition
 takes (SQLSTATE 23514) is kind `unavailable`; the error line names the first seq, never a
 payload.
+
+### Metrics of the phase hook (M1-68)
+
+The phase hook measures the statement that locks and advances the `event_seq` row
+(`bothy.db.event_seq.lock_wait`) and, once the unit of work committed (`txn.AfterCommit`), counts
+its events per durable type (`bothy.event.appended`); a rolled-back unit counts nothing. It records
+through the port `app.Metrics` (`PhaseHook.WithMetrics`), implemented by `adapters/otelmetrics.New`.
 
 ### Log tail
 
@@ -111,8 +118,8 @@ webhook deliveries carry.
   budget; an unexpected end of the runner ends the process with exit code 1.
 - **Gauges.** Every role registers `bothy.event.consumer.lag` (`head_seq - last_seq`) and
   `bothy.event.consumer.pending_age` (now minus `occurred_at` of the oldest pending event) with
-  the attribute `bothy.consumer.name` (`adapters/otelmetrics`, until the registry of M1-68 takes
-  them over); the alarm `BothyEventConsumerLag` fires at `consumer.pending_alert_after`.
+  the attribute `bothy.consumer.name` (`adapters/otelmetrics`, declared in the metric registry of
+  `platform/otel/metrics` since M1-68); the alarm `BothyEventConsumerLag` fires at `consumer.pending_alert_after`.
 - **Reads without the visibility predicate.** `EventsAfter` (shared with the tail),
   `OldestEventAfter`, `ListConsumerCursors` (head) and `MinRetainedSeq` read every event without
   the visible-channel predicate, like the log tail: each consumer job checks `push.deliver` or

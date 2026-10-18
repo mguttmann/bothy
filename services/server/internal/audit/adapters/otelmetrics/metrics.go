@@ -15,23 +15,17 @@ import (
 	"fmt"
 	"time"
 
-	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/metric"
 
 	"github.com/OWNER/bothy/services/server/internal/audit/app"
+	"github.com/OWNER/bothy/services/server/internal/platform/otel/metrics"
 )
 
-// Names of the instruments (signals.md 4.6).
-const (
-	instrumentation   = "github.com/OWNER/bothy/services/server/internal/audit"
-	metricFailures    = "bothy.audit.verify.failures"
-	metricLastSuccess = "bothy.audit.verify.last_success.timestamp"
-)
-
-// Metrics are the two instruments of the chain verification.
+// Metrics are the two instruments of the chain verification, declared in the metric registry
+// (metrics.AuditVerifyFailures, metrics.AuditVerifyLastSuccess).
 type Metrics struct {
-	failures    metric.Int64Counter
-	lastSuccess metric.Float64Gauge
+	failures    *metrics.Counter
+	lastSuccess *metrics.Gauge
 }
 
 // Compile-time check: Metrics is the outgoing port of app.
@@ -40,19 +34,13 @@ var _ app.Metrics = (*Metrics)(nil)
 // New creates the instruments on mp; nil means the global provider that platform/otel installs
 // in otel.Setup. The error comes from the meter provider.
 func New(mp metric.MeterProvider) (*Metrics, error) {
-	if mp == nil {
-		mp = otel.GetMeterProvider()
-	}
-	meter := mp.Meter(instrumentation)
-	failures, err := meter.Int64Counter(metricFailures, metric.WithUnit("{run}"),
-		metric.WithDescription("Runs of the periodic audit chain verification that found a broken chain."))
+	failures, err := metrics.NewCounter(mp, metrics.AuditVerifyFailures, nil)
 	if err != nil {
-		return nil, fmt.Errorf("otelmetrics: %s: %w", metricFailures, err)
+		return nil, fmt.Errorf("otelmetrics: %w", err)
 	}
-	last, err := meter.Float64Gauge(metricLastSuccess, metric.WithUnit("s"),
-		metric.WithDescription("Unix time of the last successful audit chain verification."))
+	last, err := metrics.NewGauge(mp, metrics.AuditVerifyLastSuccess, nil)
 	if err != nil {
-		return nil, fmt.Errorf("otelmetrics: %s: %w", metricLastSuccess, err)
+		return nil, fmt.Errorf("otelmetrics: %w", err)
 	}
 	return &Metrics{failures: failures, lastSuccess: last}, nil
 }

@@ -56,6 +56,7 @@ func (g *Gateway) identify(ctx context.Context, c *Connection, d any) error {
 	if err := c.conn.Send(Ready{SessionID: s.ID, DeviceID: a.DeviceID, View: view}); err != nil {
 		return nil
 	}
+	g.connected(ctx, c, string(a.Kind))
 	// The heartbeat deadline runs from ready (note 14), not from the start of identify.
 	c.beat(g.d.Clock.Now())
 	if err := g.attach(ctx, c, in.Cursor, in.SyncEpoch, view.HeadSeq); err != nil {

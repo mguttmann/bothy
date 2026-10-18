@@ -5,19 +5,11 @@ package otel
 import (
 	"context"
 
-	"go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp"
-	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/metric"
 	sdkmetric "go.opentelemetry.io/otel/sdk/metric"
 	"go.opentelemetry.io/otel/sdk/metric/metricdata"
 
-	"github.com/OWNER/bothy/services/server/internal/platform/otel/attr"
-)
-
-// Names of signals.md 4.1 and 4.6.
-const (
-	metricDropped             = "bothy.telemetry.dropped"
-	metricHTTPRequestDuration = "http.server.request.duration"
+	"github.com/OWNER/bothy/services/server/internal/platform/otel/metrics"
 )
 
 // Values of bothy.signal.
@@ -27,61 +19,29 @@ const (
 	signalLogs    = "logs"
 )
 
-// durationBuckets are the boundaries "Dauern bis Sekunden" of signals.md 4.7.
-var durationBuckets = []float64{0.005, 0.01, 0.025, 0.05, 0.075, 0.1, 0.25, 0.5, 0.75, 1, 2.5, 5, 7.5, 10}
-
-// httpMetricKeys are the attributes of http.server.request.duration in signals.md 4.1.
-var httpMetricKeys = []attribute.Key{
-	attribute.Key(attr.HTTPRequestMethod), attribute.Key(attr.HTTPRoute),
-	attribute.Key(attr.HTTPResponseStatusCode), attribute.Key(attr.ErrorType),
-}
-
-// httpView keeps of the otelhttp instruments only http.server.request.duration, with exactly
-// the attributes of the catalog and the boundaries of 4.7 (signals.md "Kardinalität" item 5:
-// otelhttp also sets server.address from the Host header of the client, an open set). The body
-// size histograms are not in the catalog and are dropped.
-func httpView(i sdkmetric.Instrument) (sdkmetric.Stream, bool) {
-	if i.Scope.Name != otelhttp.ScopeName {
-		return sdkmetric.Stream{}, false
-	}
-	if i.Name != metricHTTPRequestDuration {
-		return sdkmetric.Stream{Aggregation: sdkmetric.AggregationDrop{}}, true
-	}
-	return sdkmetric.Stream{
-		Name:            i.Name,
-		Description:     i.Description,
-		Unit:            i.Unit,
-		Aggregation:     sdkmetric.AggregationExplicitBucketHistogram{Boundaries: durationBuckets},
-		AttributeFilter: attribute.NewAllowKeysFilter(httpMetricKeys...),
-	}, true
-}
+// metricDropped is the name of bothy.telemetry.dropped; its declaration is
+// metrics.TelemetryDropped.
+var metricDropped = metrics.TelemetryDropped.Name
 
 // dropCounter is bothy.telemetry.dropped (signals.md 4.6): items of a signal that never
 // reached the collector, from a full front queue or a failed export. It is cumulative, so the
 // count is visible as soon as the collector is reachable again.
 type dropCounter struct {
-	counter metric.Int64Counter
-	sets    map[string]metric.AddOption
+	counter *metrics.Counter
 }
 
 func newDropCounter(mp metric.MeterProvider) (*dropCounter, error) {
-	c, err := mp.Meter(instrumentationName).Int64Counter(metricDropped,
-		metric.WithUnit("{item}"),
-		metric.WithDescription("Telemetry items that never reached the collector"))
+	c, err := metrics.NewCounter(mp, metrics.TelemetryDropped, nil)
 	if err != nil {
 		return nil, err
 	}
-	d := &dropCounter{counter: c, sets: make(map[string]metric.AddOption)}
-	for _, s := range []string{signalTraces, signalMetrics, signalLogs} {
-		d.sets[s] = metric.WithAttributeSet(attribute.NewSet(attribute.String(attr.Signal, s)))
-	}
-	return d, nil
+	return &dropCounter{counter: c}, nil
 }
 
 // add counts n dropped items of signal.
 func (d *dropCounter) add(signal string, n int64) {
 	if n > 0 {
-		d.counter.Add(context.Background(), n, d.sets[signal])
+		d.counter.Add(context.Background(), n, signal)
 	}
 }
 
