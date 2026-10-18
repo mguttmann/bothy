@@ -3,10 +3,11 @@
 package canary
 
 import (
-	"github.com/OWNER/bothy/services/server/internal/kernel/designkeys"
 	"net/http"
 	"net/url"
 	"strconv"
+
+	"github.com/OWNER/bothy/services/server/internal/kernel/designkeys"
 )
 
 // The status sets of the steps.
@@ -55,6 +56,15 @@ func (sc *Scenario) content() {
 	sc.Reg.Rescope(forumName, forum)
 	sc.post(o, "/channels/"+forum+"/move", map[string]any{"before_id": notizen}, ok...)
 	sc.get(o, "/channels/"+eskalation+"/access", ok...)
+	// Operators: Eskalation without one and back to the space's, the new space without one.
+	for _, mode := range []string{"none", "inherit"} {
+		sc.matched(o, "/channels/"+eskalation, req{method: http.MethodPut, path: "/channels/" + eskalation + "/operator", body: map[string]any{
+			"mode": mode, "reason": sc.Reg.New(ClassAdminReason, eskalation, "channel operator reason ("+mode+")"),
+		}}, ok...)
+	}
+	sc.matched(o, "/spaces/"+space, req{method: http.MethodPut, path: "/spaces/" + space + "/operator", body: map[string]any{
+		"mode": "none", "reason": sc.Reg.New(ClassAdminReason, space, "space operator reason"),
+	}}, ok...)
 
 	// Forum tags.
 	tagA := id(sc.post(o, "/channels/"+forum+"/tags", map[string]any{"name": sc.Reg.New(ClassContent, forum, "forum tag name"), "color": designkeys.CategoryColors()[1]}, created...))

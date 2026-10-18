@@ -135,6 +135,7 @@ func allowed(c Canary, r Record, f Field, rules AllowRules) bool {
 		if r.Sink == SinkAudit && f.Location == "/details/reason" {
 			return true
 		}
+	case ClassContent:
 	}
 	if r.Sink == SinkError && f.Echo {
 		return true
@@ -158,6 +159,7 @@ func forms(c Canary) []string {
 		return ipForms(c.Value)
 	case ClassIdentity:
 		return []string{c.Value, strings.ReplaceAll(c.Value, "-", "")}
+	case ClassContent, ClassAdminReason, ClassSecret:
 	}
 	if payload, sig, ok := jwsSegments(c.Value); ok {
 		return []string{payload, sig}

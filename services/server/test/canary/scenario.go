@@ -11,7 +11,6 @@ import (
 	"math/big"
 	"net/netip"
 	"os"
-	"path/filepath"
 	"strings"
 	"sync"
 	"testing"
@@ -163,21 +162,22 @@ func (r *Run) harvest(body []byte) {
 // directory or the key store) as secrets: the raw text and, for keys, the forms README.md
 // "Matching" names (decoded hex and base64 text, PEM bodies and private key material, JWK d).
 func (r *Run) RegisterSecretFiles(dir string) (int, error) {
+	root, err := os.OpenRoot(dir)
+	if err != nil {
+		return 0, err
+	}
+	defer func() { _ = root.Close() }()
 	n := 0
-	err := filepath.WalkDir(dir, func(path string, d fs.DirEntry, err error) error {
-		if err != nil || d.IsDir() {
+	err = fs.WalkDir(root.FS(), ".", func(path string, d fs.DirEntry, err error) error {
+		if err != nil || d.IsDir() || !d.Type().IsRegular() {
 			return err
 		}
-		if !d.Type().IsRegular() {
-			return nil
-		}
-		b, err := os.ReadFile(path) // #nosec G304 -- a file of the test's own secrets directory
+		b, err := fs.ReadFile(root.FS(), path)
 		if err != nil {
 			return err
 		}
-		rel, _ := filepath.Rel(dir, path)
 		for _, v := range SecretFileForms(b) {
-			r.Reg.Register(v, ClassSecret, "", "secret file "+rel)
+			r.Reg.Register(v, ClassSecret, "", "secret file "+path)
 		}
 		n++
 		return nil
@@ -274,9 +274,6 @@ func timestamp(t time.Time) string { return t.UTC().Format("2006-01-02T15:04:05.
 // newID returns a fresh UUIDv7 text (client_msg_id and the like).
 func newID() string { return ids.New().String() }
 
-// trimSpace is strings.TrimSpace (secret file content without its newline).
-func trimSpace(s string) string { return strings.TrimSpace(s) }
-
 // NewScenario builds the matrix world on the server of r, gives every client of the world the
 // observer of the run and a network canary as client address, and opens the gateway
 // connections of the observers Sam (reads Marketing and Support/Allgemein) and Robin (reads
@@ -284,6 +281,8 @@ func trimSpace(s string) string { return strings.TrimSpace(s) }
 func NewScenario(ctx context.Context, r *Run) *Scenario {
 	r.T.Helper()
 	w := harness.BuildMatrixWorld(r.T, r.Server)
+	// Only the scenario counts for the coverage: the world calls operations without canaries.
+	r.Cov = NewCoverage()
 	sc := &Scenario{Run: r, W: w, Ctx: ctx, Observers: map[string]*harness.Client{}, gw: map[string]*harness.GatewayConn{},
 		GatewaySent: map[string]int{}}
 	for name, c := range w.People {

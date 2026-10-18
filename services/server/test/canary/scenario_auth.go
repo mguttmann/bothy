@@ -23,7 +23,7 @@ import (
 // The fake identity provider of the scenario (oidctest, M1-41).
 const (
 	idpClientID   = "chat"
-	idpSecretFile = "idp/canary_client_secret"
+	idpSecretFile = "idp/canary_client_secret" //nolint:gosec // G101: a file name, no credential
 	appRedirect   = "com.example.chat:/oidc"
 	groupsClaim   = "groups"
 )
@@ -262,22 +262,22 @@ func (sc *Scenario) password() {
 	// The console of the owner: a cookie session from the console form of loginWithPassword.
 	body, _ := json.Marshal(map[string]any{"client": "console", "login_name": "owner", "password": own.password, "totp_code": sc.code(own)})
 	resp := sc.console(http.MethodPost, "/auth/password/login", body)
-	if resp == nil || resp.StatusCode != http.StatusOK {
+	if resp.Status != http.StatusOK {
 		sc.T.Errorf("console password login: %d", statusOf(resp))
 	}
 }
 
 // console sends a request of the owner's console tab: the CSRF header, the Origin and the
 // session cookie; it keeps a new cookie of the answer.
-func (sc *Scenario) console(method, path string, body []byte) *http.Response {
+func (sc *Scenario) console(method, path string, body []byte) harness.Response {
 	sc.T.Helper()
 	h := header("X-Console-Request", "1", "Origin", sc.Server.PublicURL)
 	if sc.consoleCookie != nil {
 		h.Set("Cookie", sc.consoleCookie.Name+"="+sc.consoleCookie.Value)
 	}
 	resp := sc.raw(method, path, h, body, "owner console")
-	if resp != nil {
-		for _, k := range resp.Cookies() {
+	if resp.Status != 0 {
+		for _, k := range (&http.Response{Header: resp.Header}).Cookies() {
 			if k.Value != "" {
 				sc.Reg.Register(k.Value, ClassSecret, "", "console cookie")
 				sc.consoleCookie = k
@@ -296,7 +296,7 @@ func (sc *Scenario) consoleSteps(p *IDP, prov string) {
 		sc.T.Errorf("no console session")
 		return
 	}
-	want := func(r *http.Response, code int, what string) {
+	want := func(r harness.Response, code int, what string) {
 		if statusOf(r) != code {
 			sc.T.Errorf("console %s: %d, want %d", what, statusOf(r), code)
 		}
@@ -417,7 +417,9 @@ func (sc *Scenario) oidc(p *IDP) string {
 		sc.post(o, "/me/identities/complete", map[string]any{"login_code": c4, "client_verifier": v4}, created...)
 	}
 	// A callback with a state the server never issued.
-	sc.callbackRaw("/auth/oidc/callback?state=" + sc.Reg.New(ClassSecret, "", "OIDC state") + "&code=" + sc.Reg.New(ClassSecret, "", "OIDC code"))
+	if r := sc.callbackRaw("/auth/oidc/callback?state=" + sc.Reg.New(ClassSecret, "", "OIDC state") + "&code=" + sc.Reg.New(ClassSecret, "", "OIDC code")); r.Status < http.StatusBadRequest {
+		sc.T.Errorf("handleOidcCallback with a forged state: %d", r.Status)
+	}
 	return prov
 }
 
@@ -435,7 +437,7 @@ func (sc *Scenario) callback(loc *url.URL) string {
 		sc.Reg.Register(s, ClassSecret, "", "OIDC state")
 	}
 	r := sc.callbackRaw(strings.TrimPrefix(loc.Path, "/api/v1") + "?" + loc.RawQuery)
-	if r == nil || r.StatusCode != http.StatusFound {
+	if r.Status != http.StatusFound {
 		sc.T.Errorf("handleOidcCallback: %v", statusOf(r))
 		return ""
 	}
@@ -448,26 +450,20 @@ func (sc *Scenario) callback(loc *url.URL) string {
 	return code
 }
 
-// statusOf returns the status of r or 0.
-func statusOf(r *http.Response) int {
-	if r == nil {
-		return 0
-	}
-	return r.StatusCode
-}
+// statusOf returns the status of r (0 for a transport error).
+func statusOf(r harness.Response) int { return r.Status }
 
 // callbackRaw sends GET path (relative to /api/v1) like a browser, without following the
 // redirect, and records it like a client request.
-func (sc *Scenario) callbackRaw(path string) *http.Response {
+func (sc *Scenario) callbackRaw(path string) harness.Response {
 	sc.T.Helper()
-	resp := sc.raw(http.MethodGet, path, nil, nil, "browser")
-	return resp
+	return sc.raw(http.MethodGet, path, nil, nil, "browser")
 }
 
 // raw sends a request without the harness client (a browser, a host service, a forged
-// Authorization header), records coverage and an error response, and returns the response with
-// its body consumed into the error sink.
-func (sc *Scenario) raw(method, path string, hdr http.Header, body []byte, who string) *http.Response {
+// Authorization header), records coverage and an error response, and returns the answer with its
+// whole body (status 0 for a transport error).
+func (sc *Scenario) raw(method, path string, hdr http.Header, body []byte, who string) harness.Response {
 	sc.T.Helper()
 	var rd *bytes.Reader
 	if body != nil {
@@ -478,7 +474,7 @@ func (sc *Scenario) raw(method, path string, hdr http.Header, body []byte, who s
 	rq, err := http.NewRequestWithContext(sc.Ctx, method, sc.Server.APIBase+path, rd)
 	if err != nil {
 		sc.T.Errorf("raw request: %v", err)
-		return nil
+		return harness.Response{}
 	}
 	for k, vs := range hdr {
 		rq.Header[k] = vs
@@ -490,7 +486,7 @@ func (sc *Scenario) raw(method, path string, hdr http.Header, body []byte, who s
 	resp, err := cl.Do(rq)
 	if err != nil {
 		sc.T.Errorf("raw %s %s: %v", method, routeOf(method, path), err)
-		return nil
+		return harness.Response{}
 	}
 	defer func() { _ = resp.Body.Close() }()
 	var buf bytes.Buffer
@@ -502,7 +498,7 @@ func (sc *Scenario) raw(method, path string, hdr http.Header, body []byte, who s
 	}
 	ErrorObserver(sc.Sinks, who, func(r harness.Request, x harness.Response) { sc.Cov.Observe(r.Method, r.Path, x.Status) })(
 		harness.Request{Method: method, Path: path}, hr)
-	return resp
+	return hr
 }
 
 // trustedHeader: a trusted-header driver with provisioning and a login whose header values are
@@ -627,8 +623,14 @@ func (sc *Scenario) sessions() {
 // badCredentials sends invalid Authorization headers that carry canaries.
 func (sc *Scenario) badCredentials() {
 	sc.T.Helper()
-	sc.raw(http.MethodGet, "/me", header("Authorization", "Bearer bothy_"+sc.Reg.New(ClassSecret, "", "forged API token")), nil, "forged bearer")
-	sc.raw(http.MethodGet, "/me", header("Authorization", "DPoP "+sc.Reg.New(ClassSecret, "", "forged DPoP token"), "DPoP", sc.Reg.New(ClassSecret, "", "forged DPoP proof")), nil, "forged dpop")
+	for _, r := range []harness.Response{
+		sc.raw(http.MethodGet, "/me", header("Authorization", "Bearer bothy_"+sc.Reg.New(ClassSecret, "", "forged API token")), nil, "forged bearer"),
+		sc.raw(http.MethodGet, "/me", header("Authorization", "DPoP "+sc.Reg.New(ClassSecret, "", "forged DPoP token"), "DPoP", sc.Reg.New(ClassSecret, "", "forged DPoP proof")), nil, "forged dpop"),
+	} {
+		if r.Status != http.StatusUnauthorized {
+			sc.T.Errorf("forged Authorization: %d, want 401", r.Status)
+		}
+	}
 }
 
 // contains reports whether v is in list.

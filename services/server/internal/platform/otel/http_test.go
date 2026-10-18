@@ -401,7 +401,7 @@ func TestAnnotatePrincipal(t *testing.T) {
 		spans := tt.spans.GetSpans()
 		got := map[string]string{}
 		for _, kv := range spans[len(spans)-1].Attributes {
-			got[string(kv.Key)] = kv.Value.Emit()
+			got[string(kv.Key)] = kv.Value.String()
 		}
 		if got[attr.PrincipalKind] != c.kind {
 			t.Errorf("%s: kind %q", c.kind, got[attr.PrincipalKind])
