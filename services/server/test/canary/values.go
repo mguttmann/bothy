@@ -100,6 +100,18 @@ func (r *Registry) Register(value string, class Class, scope, label string) {
 	r.items = append(r.items, Canary{Value: value, Class: class, Scope: scope, Label: label})
 }
 
+// Rescope sets the scope of a registered value; the scenario learns the ID of a new space or
+// channel only from the answer that creates it with the canary name.
+func (r *Registry) Rescope(value, scope string) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	for i := range r.items {
+		if r.items[i].Value == value {
+			r.items[i].Scope = scope
+		}
+	}
+}
+
 // Canaries returns a copy of the registered values in registration order.
 func (r *Registry) Canaries() []Canary {
 	r.mu.Lock()

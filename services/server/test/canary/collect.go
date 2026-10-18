@@ -10,8 +10,8 @@ import (
 
 	"github.com/jackc/pgx/v5/pgxpool"
 	"go.opentelemetry.io/otel/attribute"
-	sdkresource "go.opentelemetry.io/otel/sdk/resource"
 	"go.opentelemetry.io/otel/sdk/metric/metricdata"
+	sdkresource "go.opentelemetry.io/otel/sdk/resource"
 
 	"github.com/OWNER/bothy/services/server/test/harness"
 )

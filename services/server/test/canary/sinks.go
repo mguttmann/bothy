@@ -172,7 +172,7 @@ func (w *LineWriter) Write(p []byte) (int, error) {
 		if i < 0 {
 			return len(p), nil
 		}
-		line := append([]byte(nil), w.buf.Next(i+1)[:i]...)
+		line := append([]byte(nil), w.buf.Next(i + 1)[:i]...)
 		w.add(line)
 	}
 }

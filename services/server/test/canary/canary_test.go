@@ -93,3 +93,50 @@ func TestSEC_T10_DetectorFindsClearPrincipalIDInLog(t *testing.T) {
 		t.Fatalf("identity findings at bothy.thread.id:\n%s\nwant exactly one", Report(hits))
 	}
 }
+
+// TestSEC_T10_CanaryAcrossAllOutputs: the full scenario, then Scan; zero findings.
+func TestSEC_T10_CanaryAcrossAllOutputs(t *testing.T) {
+	res := runScenario(t)
+	if f := Scan(res.run.Reg, res.run.Sinks, AllowRules{Readable: res.sc.Readable}); len(f) > 0 {
+		t.Errorf("%d findings:\n%s", len(f), Report(f))
+	}
+}
+
+// scenarioResult is a finished scenario run.
+type scenarioResult struct {
+	run *Run
+	sc  *Scenario
+}
+
+// runScenario runs the whole scenario once per test binary run and collects every sink.
+func runScenario(t *testing.T) scenarioResult {
+	t.Helper()
+	r := StartRun(t, RunOptions{})
+	ctx := t.Context()
+	sc := NewScenario(ctx, r)
+	sc.content()
+	sc.people()
+	sc.agents()
+	sc.settings()
+	sc.instance()
+	sc.FinishObservers()
+	cctx, cancel := context.WithTimeout(ctx, collectWait)
+	defer cancel()
+	audits := r.Collect(cctx)
+	if _, err := r.RegisterSecretFiles(r.Server.SecretsDir); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := r.RegisterSecretFiles(r.Server.SigningKeyDir); err != nil {
+		t.Fatal(err)
+	}
+	r.RegisterIdentities(cctx)
+	t.Logf("canaries: content %d, admin_reason %d, secret %d, network %d, identity %d; records: log %d, trace %d, metric %d, audit %d, error %d, foreign %d",
+		r.Reg.Count(ClassContent), r.Reg.Count(ClassAdminReason), r.Reg.Count(ClassSecret), r.Reg.Count(ClassNetwork), r.Reg.Count(ClassIdentity),
+		r.Sinks.Count(SinkLog), r.Sinks.Count(SinkTrace), r.Sinks.Count(SinkMetric), audits, r.Sinks.Count(SinkError), r.Sinks.Count(SinkForeign))
+	counts := map[string]int{}
+	for _, m := range Matches(r.Reg, r.Sinks) {
+		counts[m.Sink+"/"+m.Class]++
+	}
+	t.Logf("matches before the allow matrix: %v", counts)
+	return scenarioResult{run: r, sc: sc}
+}
