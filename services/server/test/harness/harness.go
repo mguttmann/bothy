@@ -104,6 +104,10 @@ type Options struct {
 	// ProofObserver, when set, sees every DPoP proof a client of the server sends (requests and
 	// gateway identify or reauth), so the canary test registers them as secrets.
 	ProofObserver func(proof string)
+	// TokenObserver, when set, sees every token pair a client of the server takes over (the
+	// enrollment of the owner and of NewUser, refreshes, Adopt) and the API token of NewAgent
+	// (refresh empty), so the canary test registers them as secrets.
+	TokenObserver func(access, refresh string)
 }
 
 // Server is a running harness server.
@@ -121,8 +125,10 @@ type Server struct {
 	// Owner is the first owner, enrolled with fresh device keys.
 	Owner *Client
 
-	// proofs is Options.ProofObserver, handed to every client of the server.
+	// proofs and tokens are Options.ProofObserver and Options.TokenObserver, handed to every
+	// client of the server.
 	proofs func(string)
+	tokens func(access, refresh string)
 	db     *pgtest.DB
 	tb     testing.TB
 	clk    clock.Clock
@@ -246,7 +252,7 @@ func start(tb testing.TB, db *pgtest.DB, opts Options, clk clock.Clock, secretsD
 	}
 	s := &Server{
 		PublicURL: public, APIBase: public + apiPrefix, GatewayURL: "ws://" + host + ":" + strconv.Itoa(port) + apiPrefix + "/gateway",
-		InternalURL: internal, SecretsDir: secretsDir, SigningKeyDir: keys, proofs: opts.ProofObserver, db: db, tb: tb, clk: clk, values: values, env: env,
+		InternalURL: internal, SecretsDir: secretsDir, SigningKeyDir: keys, proofs: opts.ProofObserver, tokens: opts.TokenObserver, db: db, tb: tb, clk: clk, values: values, env: env,
 		http: &http.Client{Timeout: 60 * time.Second},
 	}
 	owner, err := s.redeem(tb.Context(), *code, "Owner device")
@@ -460,7 +466,7 @@ func (s *Server) redeem(ctx context.Context, code, name string) (*Client, error)
 // tokens yet: the device of a login, pairing or enrollment flow the test drives itself. Adopt
 // gives it the token pair of the flow.
 func (s *Server) NewDevice() *Client {
-	return &Client{publicURL: s.PublicURL, http: s.http, tb: s.tb, key: newDeviceKey(), stepKey: newDeviceKey(), DeviceID: ids.New().String(), proofs: s.proofs}
+	return &Client{publicURL: s.PublicURL, http: s.http, tb: s.tb, key: newDeviceKey(), stepKey: newDeviceKey(), DeviceID: ids.New().String(), proofs: s.proofs, tokens: s.tokens}
 }
 
 // registration is the DeviceRegistration of c with its DPoP and step-up keys.

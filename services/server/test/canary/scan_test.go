@@ -199,3 +199,18 @@ func TestSEC_T10_ScanEchoFields(t *testing.T) {
 		}
 	}
 }
+
+// TestSEC_T10_JSONFieldsKeepsTrailingText: a line that starts with a JSON value but goes on (a
+// standard logger line with its date prefix) is scanned as the whole text, never cut to its first
+// value.
+func TestSEC_T10_JSONFieldsKeepsTrailingText(t *testing.T) {
+	reg := NewRegistry()
+	v := reg.New(ClassSecret, "", "token")
+	for _, line := range []string{"2026/10/18 12:00:00 leaked " + v, "true " + v, `{"a":1} ` + v} {
+		s := NewSinks()
+		s.AddJSON(SinkLog, "probe", "", "", []byte(line))
+		if got := Scan(reg, s, AllowRules{}); len(got) != 1 {
+			t.Errorf("%q: %d findings, want 1", line[:10], len(got))
+		}
+	}
+}

@@ -27,7 +27,8 @@ process against a disposable PostgreSQL 18 from `internal/platform/pg/pgtest`.
   that sets it never runs in parallel with another harness start. `SecretFiles` writes extra files
   into the secrets directory (mode 0400; the client secret of a fake OIDC provider), `OIDCRootCAs`
   is the TLS root of the OIDC provider requests, `PublicHost` (`localhost`) gives the server a
-  domain name as WebAuthn relying party, and `ProofObserver` sees every DPoP proof a client sends.
+  domain name as WebAuthn relying party, `ProofObserver` sees every DPoP proof a client sends and `TokenObserver` every token pair a client
+  takes over and the API token of `NewAgent`.
 - `Server{PublicURL, APIBase, GatewayURL, InternalURL, SecretsDir, SigningKeyDir, Owner}`,
   `AdminDB()` (superuser pool, assertions only), `ConfigValue(key)`, `Clock()`,
   `FlushTelemetry(ctx)` (flushes the global tracer and logger providers into the sinks),

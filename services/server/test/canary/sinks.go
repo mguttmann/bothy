@@ -103,12 +103,14 @@ func (s *Sinks) AddJSON(sink Sink, source, viewer, prefix string, b []byte) {
 
 // JSONFields returns the leaves of the JSON document b as fields with their JSON pointer below
 // prefix: object keys are leaves too, so a canary used as a member name is found. Text that is
-// not JSON is one field at prefix.
+// not exactly one JSON value is one field at prefix.
 func JSONFields(prefix string, b []byte) []Field {
 	var v any
 	dec := json.NewDecoder(bytes.NewReader(b))
 	dec.UseNumber()
-	if err := dec.Decode(&v); err != nil {
+	if err := dec.Decode(&v); err != nil || len(bytes.TrimSpace(b[dec.InputOffset():])) > 0 {
+		// No JSON, or text after the first value (a standard logger line with its date prefix):
+		// the whole text is one field, so nothing after a leading value goes unscanned.
 		return []Field{{Location: prefix, Text: string(b)}}
 	}
 	var out []Field

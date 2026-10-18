@@ -89,6 +89,7 @@ func privateMaterial(der []byte) []string {
 func swapStdLoggers(w io.Writer) func() {
 	prevOut, prevFlags, prevDefault := log.Writer(), log.Flags(), slog.Default()
 	log.SetOutput(w)
+	log.SetFlags(0)
 	slog.SetDefault(slog.New(slog.NewJSONHandler(w, &slog.HandlerOptions{Level: slog.LevelDebug})))
 	return func() {
 		slog.SetDefault(prevDefault)

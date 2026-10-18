@@ -4,6 +4,7 @@ package canary
 
 import (
 	"context"
+	"log"
 	"log/slog"
 	"net/http"
 	"os"
@@ -117,6 +118,15 @@ func TestSEC_T10_CanaryAcrossAllOutputs(t *testing.T) {
 	}
 	if res.alexIPRows == 0 {
 		t.Error("no audit row of Alex (IPv4 canary) with ip_hmac and ip_key_id")
+	}
+	refresh := 0
+	for _, c := range res.run.Reg.Canaries() {
+		if c.Label == "refresh token" {
+			refresh++
+		}
+	}
+	if refresh < 2 {
+		t.Errorf("%d refresh tokens registered, want those of the harness clients and their rotations", refresh)
 	}
 	if !res.redacted {
 		t.Error("the message delete left no redacted event")
@@ -297,3 +307,18 @@ func TestSEC_T10_RateLimitedResponse(t *testing.T) {
 // rateLimitAttempts bounds the logins of the rate limit test; the default burst of
 // rl.public_auth is far below it.
 const rateLimitAttempts = 100
+
+// TestSEC_T10_DetectorFindsStdLoggerLine: a canary a library writes through the standard logger
+// during a run is a finding in the log sink.
+func TestSEC_T10_DetectorFindsStdLoggerLine(t *testing.T) {
+	r := StartRun(t, RunOptions{})
+	v := r.Reg.New(ClassSecret, "", "standard logger line")
+	log.Printf("library message %s", v)
+	ctx, cancel := context.WithTimeout(t.Context(), collectWait)
+	defer cancel()
+	r.Collect(ctx)
+	got := findingsIn(Scan(r.Reg, r.Sinks, AllowRules{}), SinkLog)
+	if len(got) != 1 || !strings.HasPrefix(got[0].Location, "std logger line") {
+		t.Fatalf("log findings:\n%s\nwant exactly one in the standard logger lines", Report(got))
+	}
+}

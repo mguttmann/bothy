@@ -20,6 +20,7 @@ forbids it. A new operation that the scenario does not call fails
 | `ops_test.go` | the coverage record names an enabled operation without a call |
 | `TestSEC_T10_DetectorFindsInjectedLog` | a canary logged through the OTLP log pipeline of the server as an attribute is exactly one finding at that key |
 | `TestSEC_T10_DetectorFindsInjectedSpanAttribute` | a canary span attribute through the server's tracer provider is a trace finding |
+| `TestSEC_T10_DetectorFindsStdLoggerLine` | a canary written through the standard logger during a run is a log finding |
 | `TestSEC_T10_DetectorFindsClearPrincipalIDInLog` | a clear principal ID in a log attribute is an identity finding |
 | `TestSEC_T10_CanaryAcrossAllOutputs` | the full scenario, zero findings; every class has values, every file of the secrets directory and the key store is registered, the IP canaries reached the audit IP path, the message delete left a redacted event, the permitted sinks saw their values |
 | `TestSEC_T10_ScenarioCoversEveryEnabledOperation` | every enabled operation called, every op of `wire.GatewayOpClasses` sent |

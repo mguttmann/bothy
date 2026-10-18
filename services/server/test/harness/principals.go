@@ -143,7 +143,10 @@ func (s *Server) NewAgent(tb testing.TB, spec AgentSpec) *Client {
 		Secret string `json:"secret"`
 	}
 	tok.JSON(tb, &token)
-	return &Client{PrincipalID: agent.ID, publicURL: s.PublicURL, http: s.http, tb: s.tb, key: key, access: token.Secret, apiToken: true, proofs: s.proofs}
+	if s.tokens != nil {
+		s.tokens(token.Secret, "")
+	}
+	return &Client{PrincipalID: agent.ID, publicURL: s.PublicURL, http: s.http, tb: s.tb, key: key, access: token.Secret, apiToken: true, proofs: s.proofs, tokens: s.tokens}
 }
 
 // ifMatch returns an If-Match header for version.
