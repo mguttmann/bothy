@@ -70,6 +70,9 @@ var idCfg = identityapp.Config{
 	IDPRecheckInterval: 30 * 24 * time.Hour, DeviceInactiveRevokeAfter: 180 * 24 * time.Hour,
 }
 
+// viewAsMax is authz.view_as_max_duration of the world.
+const viewAsMax = 15 * time.Minute
+
 // pepper is the token pepper of the world (fixed test bytes, never a secret).
 var pepper = []byte("0123456789abcdef0123456789abcdef")
 
@@ -86,6 +89,7 @@ func (testKEK) KEK(context.Context, string) ([]byte, error) {
 // (Lotse, Texter organization; Assistent personal for Research/Notizen with the owner as holder).
 type world struct {
 	t         *testing.T
+	db        *pgtest.DB
 	pool      *pg.Pool
 	owner     *pg.Pool
 	uow       *pg.UnitOfWork
@@ -120,7 +124,7 @@ func newWorld(t *testing.T) *world {
 	cfg.MaxConns = 12
 	pool := db.OpenPool(t, cfg)
 	log := slog.New(slog.DiscardHandler)
-	w := &world{t: t, pool: pool, owner: db.Pool(t, pg.RoleOwner), clk: clock.NewFake(start), structure: fake.NewStructure(), policies: fake.NewPolicies()}
+	w := &world{t: t, db: db, pool: pool, owner: db.Pool(t, pg.RoleOwner), clk: clock.NewFake(start), structure: fake.NewStructure(), policies: fake.NewPolicies()}
 	principals := identityapp.NewPrincipalSource(identitypg.NewRepository(pool))
 	hook, err := wire.NewRightsHook(pool, wire.RightsSources{Principals: principals, Structure: w.structure, Policies: w.policies}, w.clk, log)
 	must(t, err)
@@ -148,7 +152,7 @@ func newWorld(t *testing.T) *world {
 	_, err = maint.Run(context.Background())
 	must(t, err)
 	repo := identitypg.NewRepository(pool)
-	w.az, err = authzapp.NewAuthorizer(authzapp.AuthorizerConfig{SnapshotCacheMaxEntries: 1000, StepUpMaxAge: idCfg.StepUpMaxAge}, authzapp.AuthorizerDeps{
+	w.az, err = authzapp.NewAuthorizer(authzapp.AuthorizerConfig{SnapshotCacheMaxEntries: 1000, StepUpMaxAge: idCfg.StepUpMaxAge, ViewAsMaxDuration: viewAsMax}, authzapp.AuthorizerDeps{
 		Catalog: authzapp.NewCatalog(log), Store: authzpg.NewRepository(pool), Principals: principals,
 		Credentials: identityapp.NewCredentialSource(repo, repo, repo), Structure: w.structure, Policies: w.policies,
 		Versions: instanceapp.NewVersions(instancepg.NewRepository(pool)), Recorder: w.rec, Clock: w.clk, Log: log,
@@ -214,8 +218,9 @@ func (w *world) seed() {
 	w.alex, w.sam, w.robin = w.person("alex", false), w.person("sam", false), w.person("robin", false)
 	w.lotse, w.texter, w.assistent = w.principal("lotse", "agent"), w.principal("texter", "agent"), w.principal("assistent", "agent")
 	w.support, w.marketing, w.research, w.engineering = ids.New(), ids.New(), ids.New(), ids.New()
-	for _, s := range []ids.ID{w.support, w.marketing, w.research, w.engineering} {
-		w.structure.PutSpace(s)
+	for i, s := range []ids.ID{w.support, w.marketing, w.research, w.engineering} {
+		w.structure.PutSpaceDetail(authz.SpaceDetail{ID: s, Name: []string{"Support", "Marketing", "Research", "Engineering"}[i],
+			SortKey: "a" + strconv.Itoa(i), Version: 1, CreatedAt: start})
 	}
 	w.allgemein = w.channel(w.support, w.lotse)
 	w.eskalation = w.channel(w.support, ids.ID{})

@@ -172,6 +172,123 @@ type GrantPage struct {
 	NextCursor string
 }
 
+// AccessTargetRef names the target of access.explain: a space or a channel (OpenAPI
+// AccessTargetKind without host).
+type AccessTargetRef struct {
+	// Kind is space or channel.
+	Kind string
+	ID   ids.ID
+}
+
+// LevelNone is the level text of an entry without access (OpenAPI LevelOrNone).
+const LevelNone = "none"
+
+// AccessSource is one source of access (OpenAPI AccessSource, 07 section 9.1); zero fields are
+// absent.
+type AccessSource struct {
+	// Kind is owner, direct, group, inherited, dm_participant, operator, via_agent or
+	// guard_blocked.
+	Kind             string
+	GrantID, GroupID ids.ID
+	// FromTargetKind and FromTargetID name the ancestor of inherited (no id for the instance).
+	FromTargetKind string
+	FromTargetID   ids.ID
+	// AgentID is the agent of operator, via_agent and guard_blocked; Rule (sr2) that of
+	// guard_blocked.
+	AgentID ids.ID
+	Rule    string
+	// ExpiresAt is the expiry of the grant, MembershipExpiresAt that of the membership.
+	ExpiresAt, MembershipExpiresAt time.Time
+	// Reason is the reason of the grant.
+	Reason string
+}
+
+// AccessEntry is one principal of an explanation (OpenAPI AccessEntry).
+type AccessEntry struct {
+	Principal PrincipalRef
+	// Level is none, read, write or trigger; none only for an entry through an agent alone.
+	Level string
+	// Inactive marks a principal whose status is not active; Level is what its grants would give.
+	Inactive     bool
+	Capabilities []string
+	Sources      []AccessSource
+}
+
+// AccessExplanation is the answer of access.explain (OpenAPI AccessExplanation).
+type AccessExplanation struct {
+	TargetKind string
+	TargetID   ids.ID
+	Entries    []AccessEntry
+}
+
+// AccessEffect is one effect of a previewed grant (OpenAPI AccessEffect).
+type AccessEffect struct {
+	Principal PrincipalRef
+	// TargetKind is space or channel.
+	TargetKind              string
+	TargetID                ids.ID
+	BeforeLevel, AfterLevel string
+	CapabilitiesAdded       []string
+}
+
+// InvariantViolation is one invariant a previewed grant would break (OpenAPI InvariantViolation):
+// i1_violation with the agent, or last_owner.
+type InvariantViolation struct {
+	Code               string
+	AgentID            ids.ID
+	CredentialHolderID ids.ID
+	// PrincipalIDs would gain trigger next to the credential holder; never nil.
+	PrincipalIDs []ids.ID
+	// OrganizationReady reports organization among the agent's billing_modes_supported.
+	OrganizationReady bool
+	Hint              string
+}
+
+// PreviewHint is one hint of a preview (OpenAPI PreviewHint): read_horizon,
+// trigger_blocked_tool_class, group_reach or expiry_missing. HasCount marks a present Count.
+type PreviewHint struct {
+	Code                                              string
+	AgentID, PrincipalID, GroupID, SpaceID, ChannelID ids.ID
+	Count                                             int64
+	HasCount                                          bool
+}
+
+// GrantPreview is the answer of access.preview for a grant (OpenAPI GrantPreview, 07 section 9.3).
+type GrantPreview struct {
+	// Allowed is false when DenialReason is set or an invariant would reject the grant.
+	Allowed      bool
+	DenialReason string
+	Effects      []AccessEffect
+	// InvariantViolations and Hints are never nil.
+	InvariantViolations []InvariantViolation
+	Hints               []PreviewHint
+	// Text is the plain text in TextLocale (de or en).
+	Text, TextLocale string
+}
+
+// SpaceView is one space of "view as" with the intersected level and capabilities.
+type SpaceView struct {
+	Space        SpaceDetail
+	Level        string
+	Capabilities []string
+}
+
+// ChannelView is one channel of "view as" with the intersected level and capabilities.
+type ChannelView struct {
+	Channel      ChannelDetail
+	Level        string
+	Capabilities []string
+}
+
+// ViewAsSnapshot is the answer of access.view_as (OpenAPI ViewAsSnapshot, 07 section 9.2).
+type ViewAsSnapshot struct {
+	User PrincipalRef
+	// ExpiresAt is the start of the view plus authz.view_as_max_duration.
+	ExpiresAt time.Time
+	Spaces    []SpaceView
+	Channels  []ChannelView
+}
+
 // Admin is the incoming port of authz for groups, memberships and grants (05 section 4.4). Every
 // method takes the caller as actor.Actor, loads the resource, calls authorize with the action
 // before any write, runs in one unit of work (rights changes with permission_version, I1, SR8 and
@@ -230,6 +347,20 @@ type Admin interface {
 	// section 2.6 point 3; an already revoked grant succeeds without change and is returned as
 	// stored.
 	RevokeGrant(ctx context.Context, caller actor.Actor, grantID ids.ID, reason string) (Grant, error)
+	// ExplainAccess answers "who has access" for a space or channel (access.explain, 07 section
+	// 9.1, M1-49): every principal with its effective level, capabilities and sources, computed
+	// with the snapshot code of authorize. No read on the target is 404, read without owner or
+	// manage 403. No step-up, no audit.
+	ExplainAccess(ctx context.Context, caller actor.Actor, target AccessTargetRef) (AccessExplanation, error)
+	// PreviewGrant shows what CreateGrant of cmd would change (access.preview, 07 section 9.3,
+	// M1-49): a dry run in the real transaction that is rolled back. It needs what grant.create
+	// needs on the target (404 without read, 403 without owner or manage) but no step-up and
+	// writes no audit entry; a delegation limit gives Allowed false with DenialReason.
+	PreviewGrant(ctx context.Context, caller actor.Actor, cmd CreateGrantCmd) (GrantPreview, error)
+	// ViewAs returns what the person userID sees, as the owner caller sees it with "view as"
+	// (access.view_as, 07 section 9.2, M1-49): owner, step-up, audit of allow and deny. An unknown
+	// id or a principal that is not a person is 404.
+	ViewAs(ctx context.Context, caller actor.Actor, userID ids.ID) (ViewAsSnapshot, error)
 	// ClaimSync reconciles the claim groups at an OIDC login (M1-42).
 	ClaimSync
 }

@@ -74,6 +74,11 @@ type AdminDeps struct {
 	Cursors Cursors
 	// Config holds the group limits and the page sizes.
 	Config AdminConfig
+	// Engine and Hook are the Authorizer and the rights hook of authz that access.explain,
+	// access.preview and access.view_as compute with (M1-49); nil takes Authorizer and Rights
+	// when they are these types. Without them those three use cases fail with kind internal.
+	Engine *Authorizer
+	Hook   *RightsHook
 }
 
 // AdminService implements authz.Admin (brief M1-29 scope 5). It is safe for concurrent use.
@@ -650,9 +655,11 @@ func (s *AdminService) removeMember(ctx context.Context, caller actor.Actor, gro
 	return true, s.record(ctx, authorize.ActionGroupMemberRemove, authorize.ResourceGroup, g.ID, attrs)
 }
 
-// CreateGrant implements authz.Admin (brief M1-48 "createGrant"): the shape first, then
-// authorize with the proposed grant, then the subject, then the insert in one rights change with
-// grant.changed (change created) and the audit entry.
+// CreateGrant implements authz.Admin (brief M1-48 "createGrant"): the shape first, then the
+// authorization step (authorizeGrant) with the proposed grant, then the apply step (createGrant:
+// target, subject, insert, grant.changed with change created and the audit entry) in one rights
+// change. access.preview runs the same apply step in the same rights change and rolls it back
+// (M1-49).
 func (s *AdminService) CreateGrant(ctx context.Context, caller actor.Actor, cmd authz.CreateGrantCmd) (authz.Grant, error) {
 	ctx, err := withCaller(ctx, caller)
 	if err != nil {
@@ -667,10 +674,6 @@ func (s *AdminService) CreateGrant(ctx context.Context, caller actor.Actor, cmd 
 	if err := domain.CheckGrantShape(subject, target, level, caps, cmd.ExpiresAt, reason, now); err != nil {
 		return authz.Grant{}, err
 	}
-	var principals []ids.ID
-	if subject.Kind != domain.SubjectGroup {
-		principals = append(principals, subject.PrincipalID)
-	}
 	proposed := domain.Grant{Subject: subject, Target: target, Level: level, Caps: caps}
 	var g domain.Grant
 	err = s.d.UoW.Do(ctx, func(ctx context.Context) error {
@@ -682,9 +685,7 @@ func (s *AdminService) CreateGrant(ctx context.Context, caller actor.Actor, cmd 
 			return err
 		}
 		return s.createGrant(ctx, g)
-	}, txn.DeclareRightsChange(txn.RightsChangeSpec{
-		Action: string(authorize.ActionGrantCreate), Resource: txn.Ref{Kind: string(target.Kind), ID: cmd.TargetID}, Principals: principals,
-	}))
+	}, grantRightsChange(subject, target, cmd.TargetID))
 	if err != nil {
 		return authz.Grant{}, err
 	}

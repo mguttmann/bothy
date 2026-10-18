@@ -103,6 +103,9 @@ type ServerInterface interface {
 	// LoginWithTrustedHeader Log in with the identity header of a trusted reverse proxy
 	// (POST /auth/trusted-header/login)
 	LoginWithTrustedHeader(w http.ResponseWriter, r *http.Request, params LoginWithTrustedHeaderParams)
+	// ExplainChannelAccess Who has access to a channel
+	// (GET /channels/{channel_id}/access)
+	ExplainChannelAccess(w http.ResponseWriter, r *http.Request, channelId ChannelIdPath)
 	// GetDevice Read a device
 	// (GET /devices/{device_id})
 	GetDevice(w http.ResponseWriter, r *http.Request, deviceId DeviceIdPath)
@@ -124,6 +127,9 @@ type ServerInterface interface {
 	// CreateGrant Create a grant
 	// (POST /grants)
 	CreateGrant(w http.ResponseWriter, r *http.Request, params CreateGrantParams)
+	// PreviewGrant Show what a grant would change
+	// (POST /grants/preview)
+	PreviewGrant(w http.ResponseWriter, r *http.Request)
 	// GetGrant Read a grant
 	// (GET /grants/{grant_id})
 	GetGrant(w http.ResponseWriter, r *http.Request, grantId GrantIdPath)
@@ -247,6 +253,9 @@ type ServerInterface interface {
 	// RotateSigningKey Rotate a server signing key
 	// (POST /signing-keys/rotate)
 	RotateSigningKey(w http.ResponseWriter, r *http.Request, params RotateSigningKeyParams)
+	// ExplainSpaceAccess Who has access to a space
+	// (GET /spaces/{space_id}/access)
+	ExplainSpaceAccess(w http.ResponseWriter, r *http.Request, spaceId SpaceIdPath)
 	// RevokeToken Revoke an API token
 	// (DELETE /tokens/{token_id})
 	RevokeToken(w http.ResponseWriter, r *http.Request, tokenId TokenIdPath)
@@ -286,6 +295,9 @@ type ServerInterface interface {
 	// ListUserSessions List sessions of a person
 	// (GET /users/{user_id}/sessions)
 	ListUserSessions(w http.ResponseWriter, r *http.Request, userId UserIdPath, params ListUserSessionsParams)
+	// ViewAsUser See the instance as a person sees it
+	// (GET /users/{user_id}/view-as)
+	ViewAsUser(w http.ResponseWriter, r *http.Request, userId UserIdPath)
 }
 
 // ServerInterfaceWrapper converts contexts to parameters.
@@ -1472,6 +1484,32 @@ func (siw *ServerInterfaceWrapper) LoginWithTrustedHeader(w http.ResponseWriter,
 	handler.ServeHTTP(w, r)
 }
 
+// ExplainChannelAccess operation middleware
+func (siw *ServerInterfaceWrapper) ExplainChannelAccess(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "channel_id" -------------
+	var channelId ChannelIdPath
+
+	err = runtime.BindStyledParameterWithOptions("simple", "channel_id", r.PathValue("channel_id"), &channelId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "uuid", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "channel_id", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.ExplainChannelAccess(w, r, channelId)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
 // GetDevice operation middleware
 func (siw *ServerInterfaceWrapper) GetDevice(w http.ResponseWriter, r *http.Request) {
 
@@ -1805,6 +1843,20 @@ func (siw *ServerInterfaceWrapper) CreateGrant(w http.ResponseWriter, r *http.Re
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		siw.Handler.CreateGrant(w, r, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// PreviewGrant operation middleware
+func (siw *ServerInterfaceWrapper) PreviewGrant(w http.ResponseWriter, r *http.Request) {
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.PreviewGrant(w, r)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -3153,6 +3205,32 @@ func (siw *ServerInterfaceWrapper) RotateSigningKey(w http.ResponseWriter, r *ht
 	handler.ServeHTTP(w, r)
 }
 
+// ExplainSpaceAccess operation middleware
+func (siw *ServerInterfaceWrapper) ExplainSpaceAccess(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "space_id" -------------
+	var spaceId SpaceIdPath
+
+	err = runtime.BindStyledParameterWithOptions("simple", "space_id", r.PathValue("space_id"), &spaceId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "uuid", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "space_id", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.ExplainSpaceAccess(w, r, spaceId)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
 // RevokeToken operation middleware
 func (siw *ServerInterfaceWrapper) RevokeToken(w http.ResponseWriter, r *http.Request) {
 
@@ -3724,6 +3802,32 @@ func (siw *ServerInterfaceWrapper) ListUserSessions(w http.ResponseWriter, r *ht
 	handler.ServeHTTP(w, r)
 }
 
+// ViewAsUser operation middleware
+func (siw *ServerInterfaceWrapper) ViewAsUser(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "user_id" -------------
+	var userId UserIdPath
+
+	err = runtime.BindStyledParameterWithOptions("simple", "user_id", r.PathValue("user_id"), &userId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "uuid", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "user_id", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.ViewAsUser(w, r, userId)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
 type UnescapedCookieParamError struct {
 	ParamName string
 	Err       error
@@ -3882,6 +3986,7 @@ func HandlerWithOptions(si ServerInterface, options StdHTTPServerOptions) http.H
 	m.HandleFunc(http.MethodDelete+" "+options.BaseURL+"/users/{user_id}/passkeys/{passkey_id}", wrapper.RevokePasskey)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/users/{user_id}/devices", wrapper.ListUserDevices)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/users/{user_id}/sessions", wrapper.ListUserSessions)
+	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/users/{user_id}/view-as", wrapper.ViewAsUser)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/owners", wrapper.ListOwners)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/owners", wrapper.AddOwner)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/owners/{user_id}/revoke", wrapper.RevokeOwner)
@@ -3906,8 +4011,11 @@ func HandlerWithOptions(si ServerInterface, options StdHTTPServerOptions) http.H
 	m.HandleFunc(http.MethodDelete+" "+options.BaseURL+"/groups/{group_id}/members/{user_id}", wrapper.RemoveGroupMember)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/grants", wrapper.ListGrants)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/grants", wrapper.CreateGrant)
+	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/grants/preview", wrapper.PreviewGrant)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/grants/{grant_id}", wrapper.GetGrant)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/grants/{grant_id}/revoke", wrapper.RevokeGrant)
+	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/spaces/{space_id}/access", wrapper.ExplainSpaceAccess)
+	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/channels/{channel_id}/access", wrapper.ExplainChannelAccess)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/instance", wrapper.GetInstance)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/instance/settings", wrapper.ListInstanceSettings)
 	m.HandleFunc(http.MethodPut+" "+options.BaseURL+"/instance/settings/{key}", wrapper.PutInstanceSetting)
@@ -8705,6 +8813,177 @@ func (response LoginWithTrustedHeaderdefaultApplicationProblemPlusJSONResponse) 
 	return err
 }
 
+type ExplainChannelAccessRequestObject struct {
+	ChannelId ChannelIdPath `json:"channel_id"`
+}
+
+type ExplainChannelAccessResponseObject interface {
+	VisitExplainChannelAccessResponse(w http.ResponseWriter) error
+}
+
+type ExplainChannelAccess200ResponseHeaders struct {
+	CorrelationId   *CorrelationId
+	RateLimit       *string
+	RateLimitPolicy *string
+}
+
+type ExplainChannelAccess200JSONResponse struct {
+	Body    AccessExplanation
+	Headers ExplainChannelAccess200ResponseHeaders
+}
+
+func (response ExplainChannelAccess200JSONResponse) VisitExplainChannelAccessResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	if response.Headers.CorrelationId != nil {
+		w.Header().Set("Correlation-Id", fmt.Sprint(*response.Headers.CorrelationId))
+	}
+	if response.Headers.RateLimit != nil {
+		w.Header().Set("RateLimit", fmt.Sprint(*response.Headers.RateLimit))
+	}
+	if response.Headers.RateLimitPolicy != nil {
+		w.Header().Set("RateLimit-Policy", fmt.Sprint(*response.Headers.RateLimitPolicy))
+	}
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ExplainChannelAccess400ApplicationProblemPlusJSONResponse struct {
+	BadRequestApplicationProblemPlusJSONResponse
+}
+
+func (response ExplainChannelAccess400ApplicationProblemPlusJSONResponse) VisitExplainChannelAccessResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	if response.Headers.CorrelationId != nil {
+		w.Header().Set("Correlation-Id", fmt.Sprint(*response.Headers.CorrelationId))
+	}
+	w.WriteHeader(400)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ExplainChannelAccess401ApplicationProblemPlusJSONResponse struct {
+	UnauthorizedApplicationProblemPlusJSONResponse
+}
+
+func (response ExplainChannelAccess401ApplicationProblemPlusJSONResponse) VisitExplainChannelAccessResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	if response.Headers.CorrelationId != nil {
+		w.Header().Set("Correlation-Id", fmt.Sprint(*response.Headers.CorrelationId))
+	}
+	if response.Headers.DPoPNonce != nil {
+		w.Header().Set("DPoP-Nonce", fmt.Sprint(*response.Headers.DPoPNonce))
+	}
+	if response.Headers.WWWAuthenticate != nil {
+		w.Header().Set("WWW-Authenticate", fmt.Sprint(*response.Headers.WWWAuthenticate))
+	}
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ExplainChannelAccess403ApplicationProblemPlusJSONResponse struct {
+	ForbiddenApplicationProblemPlusJSONResponse
+}
+
+func (response ExplainChannelAccess403ApplicationProblemPlusJSONResponse) VisitExplainChannelAccessResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	if response.Headers.CorrelationId != nil {
+		w.Header().Set("Correlation-Id", fmt.Sprint(*response.Headers.CorrelationId))
+	}
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ExplainChannelAccess404ApplicationProblemPlusJSONResponse struct {
+	NotFoundApplicationProblemPlusJSONResponse
+}
+
+func (response ExplainChannelAccess404ApplicationProblemPlusJSONResponse) VisitExplainChannelAccessResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	if response.Headers.CorrelationId != nil {
+		w.Header().Set("Correlation-Id", fmt.Sprint(*response.Headers.CorrelationId))
+	}
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ExplainChannelAccess429ApplicationProblemPlusJSONResponse struct {
+	TooManyRequestsApplicationProblemPlusJSONResponse
+}
+
+func (response ExplainChannelAccess429ApplicationProblemPlusJSONResponse) VisitExplainChannelAccessResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	if response.Headers.CorrelationId != nil {
+		w.Header().Set("Correlation-Id", fmt.Sprint(*response.Headers.CorrelationId))
+	}
+	if response.Headers.RateLimit != nil {
+		w.Header().Set("RateLimit", fmt.Sprint(*response.Headers.RateLimit))
+	}
+	if response.Headers.RateLimitPolicy != nil {
+		w.Header().Set("RateLimit-Policy", fmt.Sprint(*response.Headers.RateLimitPolicy))
+	}
+	if response.Headers.RetryAfter != nil {
+		w.Header().Set("Retry-After", fmt.Sprint(*response.Headers.RetryAfter))
+	}
+	w.WriteHeader(429)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ExplainChannelAccessdefaultApplicationProblemPlusJSONResponse struct {
+	Body       Problem
+	Headers    ErrorResponseHeaders
+	StatusCode int
+}
+
+func (response ExplainChannelAccessdefaultApplicationProblemPlusJSONResponse) VisitExplainChannelAccessResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	if response.Headers.CorrelationId != nil {
+		w.Header().Set("Correlation-Id", fmt.Sprint(*response.Headers.CorrelationId))
+	}
+	w.WriteHeader(response.StatusCode)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
 type GetDeviceRequestObject struct {
 	DeviceId DeviceIdPath `json:"device_id"`
 }
@@ -9936,6 +10215,158 @@ type CreateGrantdefaultApplicationProblemPlusJSONResponse struct {
 }
 
 func (response CreateGrantdefaultApplicationProblemPlusJSONResponse) VisitCreateGrantResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	if response.Headers.CorrelationId != nil {
+		w.Header().Set("Correlation-Id", fmt.Sprint(*response.Headers.CorrelationId))
+	}
+	w.WriteHeader(response.StatusCode)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type PreviewGrantRequestObject struct {
+	Body *PreviewGrantJSONRequestBody
+}
+
+type PreviewGrantResponseObject interface {
+	VisitPreviewGrantResponse(w http.ResponseWriter) error
+}
+
+type PreviewGrant200ResponseHeaders struct {
+	CorrelationId   *CorrelationId
+	RateLimit       *string
+	RateLimitPolicy *string
+}
+
+type PreviewGrant200JSONResponse struct {
+	Body    GrantPreview
+	Headers PreviewGrant200ResponseHeaders
+}
+
+func (response PreviewGrant200JSONResponse) VisitPreviewGrantResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	if response.Headers.CorrelationId != nil {
+		w.Header().Set("Correlation-Id", fmt.Sprint(*response.Headers.CorrelationId))
+	}
+	if response.Headers.RateLimit != nil {
+		w.Header().Set("RateLimit", fmt.Sprint(*response.Headers.RateLimit))
+	}
+	if response.Headers.RateLimitPolicy != nil {
+		w.Header().Set("RateLimit-Policy", fmt.Sprint(*response.Headers.RateLimitPolicy))
+	}
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type PreviewGrant400ApplicationProblemPlusJSONResponse struct {
+	BadRequestApplicationProblemPlusJSONResponse
+}
+
+func (response PreviewGrant400ApplicationProblemPlusJSONResponse) VisitPreviewGrantResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	if response.Headers.CorrelationId != nil {
+		w.Header().Set("Correlation-Id", fmt.Sprint(*response.Headers.CorrelationId))
+	}
+	w.WriteHeader(400)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type PreviewGrant401ApplicationProblemPlusJSONResponse struct {
+	UnauthorizedApplicationProblemPlusJSONResponse
+}
+
+func (response PreviewGrant401ApplicationProblemPlusJSONResponse) VisitPreviewGrantResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	if response.Headers.CorrelationId != nil {
+		w.Header().Set("Correlation-Id", fmt.Sprint(*response.Headers.CorrelationId))
+	}
+	if response.Headers.DPoPNonce != nil {
+		w.Header().Set("DPoP-Nonce", fmt.Sprint(*response.Headers.DPoPNonce))
+	}
+	if response.Headers.WWWAuthenticate != nil {
+		w.Header().Set("WWW-Authenticate", fmt.Sprint(*response.Headers.WWWAuthenticate))
+	}
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type PreviewGrant403ApplicationProblemPlusJSONResponse struct {
+	ForbiddenApplicationProblemPlusJSONResponse
+}
+
+func (response PreviewGrant403ApplicationProblemPlusJSONResponse) VisitPreviewGrantResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	if response.Headers.CorrelationId != nil {
+		w.Header().Set("Correlation-Id", fmt.Sprint(*response.Headers.CorrelationId))
+	}
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type PreviewGrant429ApplicationProblemPlusJSONResponse struct {
+	TooManyRequestsApplicationProblemPlusJSONResponse
+}
+
+func (response PreviewGrant429ApplicationProblemPlusJSONResponse) VisitPreviewGrantResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	if response.Headers.CorrelationId != nil {
+		w.Header().Set("Correlation-Id", fmt.Sprint(*response.Headers.CorrelationId))
+	}
+	if response.Headers.RateLimit != nil {
+		w.Header().Set("RateLimit", fmt.Sprint(*response.Headers.RateLimit))
+	}
+	if response.Headers.RateLimitPolicy != nil {
+		w.Header().Set("RateLimit-Policy", fmt.Sprint(*response.Headers.RateLimitPolicy))
+	}
+	if response.Headers.RetryAfter != nil {
+		w.Header().Set("Retry-After", fmt.Sprint(*response.Headers.RetryAfter))
+	}
+	w.WriteHeader(429)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type PreviewGrantdefaultApplicationProblemPlusJSONResponse struct {
+	Body       Problem
+	Headers    ErrorResponseHeaders
+	StatusCode int
+}
+
+func (response PreviewGrantdefaultApplicationProblemPlusJSONResponse) VisitPreviewGrantResponse(w http.ResponseWriter) error {
 
 	var buf bytes.Buffer
 	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
@@ -16779,6 +17210,177 @@ func (response RotateSigningKeydefaultApplicationProblemPlusJSONResponse) VisitR
 	return err
 }
 
+type ExplainSpaceAccessRequestObject struct {
+	SpaceId SpaceIdPath `json:"space_id"`
+}
+
+type ExplainSpaceAccessResponseObject interface {
+	VisitExplainSpaceAccessResponse(w http.ResponseWriter) error
+}
+
+type ExplainSpaceAccess200ResponseHeaders struct {
+	CorrelationId   *CorrelationId
+	RateLimit       *string
+	RateLimitPolicy *string
+}
+
+type ExplainSpaceAccess200JSONResponse struct {
+	Body    AccessExplanation
+	Headers ExplainSpaceAccess200ResponseHeaders
+}
+
+func (response ExplainSpaceAccess200JSONResponse) VisitExplainSpaceAccessResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	if response.Headers.CorrelationId != nil {
+		w.Header().Set("Correlation-Id", fmt.Sprint(*response.Headers.CorrelationId))
+	}
+	if response.Headers.RateLimit != nil {
+		w.Header().Set("RateLimit", fmt.Sprint(*response.Headers.RateLimit))
+	}
+	if response.Headers.RateLimitPolicy != nil {
+		w.Header().Set("RateLimit-Policy", fmt.Sprint(*response.Headers.RateLimitPolicy))
+	}
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ExplainSpaceAccess400ApplicationProblemPlusJSONResponse struct {
+	BadRequestApplicationProblemPlusJSONResponse
+}
+
+func (response ExplainSpaceAccess400ApplicationProblemPlusJSONResponse) VisitExplainSpaceAccessResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	if response.Headers.CorrelationId != nil {
+		w.Header().Set("Correlation-Id", fmt.Sprint(*response.Headers.CorrelationId))
+	}
+	w.WriteHeader(400)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ExplainSpaceAccess401ApplicationProblemPlusJSONResponse struct {
+	UnauthorizedApplicationProblemPlusJSONResponse
+}
+
+func (response ExplainSpaceAccess401ApplicationProblemPlusJSONResponse) VisitExplainSpaceAccessResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	if response.Headers.CorrelationId != nil {
+		w.Header().Set("Correlation-Id", fmt.Sprint(*response.Headers.CorrelationId))
+	}
+	if response.Headers.DPoPNonce != nil {
+		w.Header().Set("DPoP-Nonce", fmt.Sprint(*response.Headers.DPoPNonce))
+	}
+	if response.Headers.WWWAuthenticate != nil {
+		w.Header().Set("WWW-Authenticate", fmt.Sprint(*response.Headers.WWWAuthenticate))
+	}
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ExplainSpaceAccess403ApplicationProblemPlusJSONResponse struct {
+	ForbiddenApplicationProblemPlusJSONResponse
+}
+
+func (response ExplainSpaceAccess403ApplicationProblemPlusJSONResponse) VisitExplainSpaceAccessResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	if response.Headers.CorrelationId != nil {
+		w.Header().Set("Correlation-Id", fmt.Sprint(*response.Headers.CorrelationId))
+	}
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ExplainSpaceAccess404ApplicationProblemPlusJSONResponse struct {
+	NotFoundApplicationProblemPlusJSONResponse
+}
+
+func (response ExplainSpaceAccess404ApplicationProblemPlusJSONResponse) VisitExplainSpaceAccessResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	if response.Headers.CorrelationId != nil {
+		w.Header().Set("Correlation-Id", fmt.Sprint(*response.Headers.CorrelationId))
+	}
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ExplainSpaceAccess429ApplicationProblemPlusJSONResponse struct {
+	TooManyRequestsApplicationProblemPlusJSONResponse
+}
+
+func (response ExplainSpaceAccess429ApplicationProblemPlusJSONResponse) VisitExplainSpaceAccessResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	if response.Headers.CorrelationId != nil {
+		w.Header().Set("Correlation-Id", fmt.Sprint(*response.Headers.CorrelationId))
+	}
+	if response.Headers.RateLimit != nil {
+		w.Header().Set("RateLimit", fmt.Sprint(*response.Headers.RateLimit))
+	}
+	if response.Headers.RateLimitPolicy != nil {
+		w.Header().Set("RateLimit-Policy", fmt.Sprint(*response.Headers.RateLimitPolicy))
+	}
+	if response.Headers.RetryAfter != nil {
+		w.Header().Set("Retry-After", fmt.Sprint(*response.Headers.RetryAfter))
+	}
+	w.WriteHeader(429)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ExplainSpaceAccessdefaultApplicationProblemPlusJSONResponse struct {
+	Body       Problem
+	Headers    ErrorResponseHeaders
+	StatusCode int
+}
+
+func (response ExplainSpaceAccessdefaultApplicationProblemPlusJSONResponse) VisitExplainSpaceAccessResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	if response.Headers.CorrelationId != nil {
+		w.Header().Set("Correlation-Id", fmt.Sprint(*response.Headers.CorrelationId))
+	}
+	w.WriteHeader(response.StatusCode)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
 type RevokeTokenRequestObject struct {
 	TokenId TokenIdPath `json:"token_id"`
 }
@@ -19161,6 +19763,177 @@ func (response ListUserSessionsdefaultApplicationProblemPlusJSONResponse) VisitL
 	return err
 }
 
+type ViewAsUserRequestObject struct {
+	UserId UserIdPath `json:"user_id"`
+}
+
+type ViewAsUserResponseObject interface {
+	VisitViewAsUserResponse(w http.ResponseWriter) error
+}
+
+type ViewAsUser200ResponseHeaders struct {
+	CorrelationId   *CorrelationId
+	RateLimit       *string
+	RateLimitPolicy *string
+}
+
+type ViewAsUser200JSONResponse struct {
+	Body    ViewAsSnapshot
+	Headers ViewAsUser200ResponseHeaders
+}
+
+func (response ViewAsUser200JSONResponse) VisitViewAsUserResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	if response.Headers.CorrelationId != nil {
+		w.Header().Set("Correlation-Id", fmt.Sprint(*response.Headers.CorrelationId))
+	}
+	if response.Headers.RateLimit != nil {
+		w.Header().Set("RateLimit", fmt.Sprint(*response.Headers.RateLimit))
+	}
+	if response.Headers.RateLimitPolicy != nil {
+		w.Header().Set("RateLimit-Policy", fmt.Sprint(*response.Headers.RateLimitPolicy))
+	}
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ViewAsUser400ApplicationProblemPlusJSONResponse struct {
+	BadRequestApplicationProblemPlusJSONResponse
+}
+
+func (response ViewAsUser400ApplicationProblemPlusJSONResponse) VisitViewAsUserResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	if response.Headers.CorrelationId != nil {
+		w.Header().Set("Correlation-Id", fmt.Sprint(*response.Headers.CorrelationId))
+	}
+	w.WriteHeader(400)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ViewAsUser401ApplicationProblemPlusJSONResponse struct {
+	UnauthorizedApplicationProblemPlusJSONResponse
+}
+
+func (response ViewAsUser401ApplicationProblemPlusJSONResponse) VisitViewAsUserResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	if response.Headers.CorrelationId != nil {
+		w.Header().Set("Correlation-Id", fmt.Sprint(*response.Headers.CorrelationId))
+	}
+	if response.Headers.DPoPNonce != nil {
+		w.Header().Set("DPoP-Nonce", fmt.Sprint(*response.Headers.DPoPNonce))
+	}
+	if response.Headers.WWWAuthenticate != nil {
+		w.Header().Set("WWW-Authenticate", fmt.Sprint(*response.Headers.WWWAuthenticate))
+	}
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ViewAsUser403ApplicationProblemPlusJSONResponse struct {
+	ForbiddenApplicationProblemPlusJSONResponse
+}
+
+func (response ViewAsUser403ApplicationProblemPlusJSONResponse) VisitViewAsUserResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	if response.Headers.CorrelationId != nil {
+		w.Header().Set("Correlation-Id", fmt.Sprint(*response.Headers.CorrelationId))
+	}
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ViewAsUser404ApplicationProblemPlusJSONResponse struct {
+	NotFoundApplicationProblemPlusJSONResponse
+}
+
+func (response ViewAsUser404ApplicationProblemPlusJSONResponse) VisitViewAsUserResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	if response.Headers.CorrelationId != nil {
+		w.Header().Set("Correlation-Id", fmt.Sprint(*response.Headers.CorrelationId))
+	}
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ViewAsUser429ApplicationProblemPlusJSONResponse struct {
+	TooManyRequestsApplicationProblemPlusJSONResponse
+}
+
+func (response ViewAsUser429ApplicationProblemPlusJSONResponse) VisitViewAsUserResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	if response.Headers.CorrelationId != nil {
+		w.Header().Set("Correlation-Id", fmt.Sprint(*response.Headers.CorrelationId))
+	}
+	if response.Headers.RateLimit != nil {
+		w.Header().Set("RateLimit", fmt.Sprint(*response.Headers.RateLimit))
+	}
+	if response.Headers.RateLimitPolicy != nil {
+		w.Header().Set("RateLimit-Policy", fmt.Sprint(*response.Headers.RateLimitPolicy))
+	}
+	if response.Headers.RetryAfter != nil {
+		w.Header().Set("Retry-After", fmt.Sprint(*response.Headers.RetryAfter))
+	}
+	w.WriteHeader(429)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ViewAsUserdefaultApplicationProblemPlusJSONResponse struct {
+	Body       Problem
+	Headers    ErrorResponseHeaders
+	StatusCode int
+}
+
+func (response ViewAsUserdefaultApplicationProblemPlusJSONResponse) VisitViewAsUserResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	if response.Headers.CorrelationId != nil {
+		w.Header().Set("Correlation-Id", fmt.Sprint(*response.Headers.CorrelationId))
+	}
+	w.WriteHeader(response.StatusCode)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
 // StrictServerInterface represents all server handlers.
 type StrictServerInterface interface {
 	// ListAgents List visible agents
@@ -19247,6 +20020,9 @@ type StrictServerInterface interface {
 	// LoginWithTrustedHeader Log in with the identity header of a trusted reverse proxy
 	// (POST /auth/trusted-header/login)
 	LoginWithTrustedHeader(ctx context.Context, request LoginWithTrustedHeaderRequestObject) (LoginWithTrustedHeaderResponseObject, error)
+	// ExplainChannelAccess Who has access to a channel
+	// (GET /channels/{channel_id}/access)
+	ExplainChannelAccess(ctx context.Context, request ExplainChannelAccessRequestObject) (ExplainChannelAccessResponseObject, error)
 	// GetDevice Read a device
 	// (GET /devices/{device_id})
 	GetDevice(ctx context.Context, request GetDeviceRequestObject) (GetDeviceResponseObject, error)
@@ -19268,6 +20044,9 @@ type StrictServerInterface interface {
 	// CreateGrant Create a grant
 	// (POST /grants)
 	CreateGrant(ctx context.Context, request CreateGrantRequestObject) (CreateGrantResponseObject, error)
+	// PreviewGrant Show what a grant would change
+	// (POST /grants/preview)
+	PreviewGrant(ctx context.Context, request PreviewGrantRequestObject) (PreviewGrantResponseObject, error)
 	// GetGrant Read a grant
 	// (GET /grants/{grant_id})
 	GetGrant(ctx context.Context, request GetGrantRequestObject) (GetGrantResponseObject, error)
@@ -19391,6 +20170,9 @@ type StrictServerInterface interface {
 	// RotateSigningKey Rotate a server signing key
 	// (POST /signing-keys/rotate)
 	RotateSigningKey(ctx context.Context, request RotateSigningKeyRequestObject) (RotateSigningKeyResponseObject, error)
+	// ExplainSpaceAccess Who has access to a space
+	// (GET /spaces/{space_id}/access)
+	ExplainSpaceAccess(ctx context.Context, request ExplainSpaceAccessRequestObject) (ExplainSpaceAccessResponseObject, error)
 	// RevokeToken Revoke an API token
 	// (DELETE /tokens/{token_id})
 	RevokeToken(ctx context.Context, request RevokeTokenRequestObject) (RevokeTokenResponseObject, error)
@@ -19430,6 +20212,9 @@ type StrictServerInterface interface {
 	// ListUserSessions List sessions of a person
 	// (GET /users/{user_id}/sessions)
 	ListUserSessions(ctx context.Context, request ListUserSessionsRequestObject) (ListUserSessionsResponseObject, error)
+	// ViewAsUser See the instance as a person sees it
+	// (GET /users/{user_id}/view-as)
+	ViewAsUser(ctx context.Context, request ViewAsUserRequestObject) (ViewAsUserResponseObject, error)
 }
 
 type StrictHandlerFunc func(ctx context.Context, w http.ResponseWriter, r *http.Request, request any) (any, error)
@@ -20336,6 +21121,32 @@ func (sh *strictHandler) LoginWithTrustedHeader(w http.ResponseWriter, r *http.R
 	}
 }
 
+// ExplainChannelAccess operation middleware
+func (sh *strictHandler) ExplainChannelAccess(w http.ResponseWriter, r *http.Request, channelId ChannelIdPath) {
+	var request ExplainChannelAccessRequestObject
+
+	request.ChannelId = channelId
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.ExplainChannelAccess(ctx, request.(ExplainChannelAccessRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "ExplainChannelAccess")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(ExplainChannelAccessResponseObject); ok {
+		if err := validResponse.VisitExplainChannelAccessResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
 // GetDevice operation middleware
 func (sh *strictHandler) GetDevice(w http.ResponseWriter, r *http.Request, deviceId DeviceIdPath) {
 	var request GetDeviceRequestObject
@@ -20540,6 +21351,37 @@ func (sh *strictHandler) CreateGrant(w http.ResponseWriter, r *http.Request, par
 		sh.options.ResponseErrorHandlerFunc(w, r, err)
 	} else if validResponse, ok := response.(CreateGrantResponseObject); ok {
 		if err := validResponse.VisitCreateGrantResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// PreviewGrant operation middleware
+func (sh *strictHandler) PreviewGrant(w http.ResponseWriter, r *http.Request) {
+	var request PreviewGrantRequestObject
+
+	var body PreviewGrantJSONRequestBody
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
+		return
+	}
+	request.Body = &body
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.PreviewGrant(ctx, request.(PreviewGrantRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "PreviewGrant")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(PreviewGrantResponseObject); ok {
+		if err := validResponse.VisitPreviewGrantResponse(w); err != nil {
 			sh.options.ResponseErrorHandlerFunc(w, r, err)
 		}
 	} else if response != nil {
@@ -21729,6 +22571,32 @@ func (sh *strictHandler) RotateSigningKey(w http.ResponseWriter, r *http.Request
 	}
 }
 
+// ExplainSpaceAccess operation middleware
+func (sh *strictHandler) ExplainSpaceAccess(w http.ResponseWriter, r *http.Request, spaceId SpaceIdPath) {
+	var request ExplainSpaceAccessRequestObject
+
+	request.SpaceId = spaceId
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.ExplainSpaceAccess(ctx, request.(ExplainSpaceAccessRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "ExplainSpaceAccess")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(ExplainSpaceAccessResponseObject); ok {
+		if err := validResponse.VisitExplainSpaceAccessResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
 // RevokeToken operation middleware
 func (sh *strictHandler) RevokeToken(w http.ResponseWriter, r *http.Request, tokenId TokenIdPath) {
 	var request RevokeTokenRequestObject
@@ -22096,6 +22964,32 @@ func (sh *strictHandler) ListUserSessions(w http.ResponseWriter, r *http.Request
 		sh.options.ResponseErrorHandlerFunc(w, r, err)
 	} else if validResponse, ok := response.(ListUserSessionsResponseObject); ok {
 		if err := validResponse.VisitListUserSessionsResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// ViewAsUser operation middleware
+func (sh *strictHandler) ViewAsUser(w http.ResponseWriter, r *http.Request, userId UserIdPath) {
+	var request ViewAsUserRequestObject
+
+	request.UserId = userId
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.ViewAsUser(ctx, request.(ViewAsUserRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "ViewAsUser")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(ViewAsUserResponseObject); ok {
+		if err := validResponse.VisitViewAsUserResponse(w); err != nil {
 			sh.options.ResponseErrorHandlerFunc(w, r, err)
 		}
 	} else if response != nil {

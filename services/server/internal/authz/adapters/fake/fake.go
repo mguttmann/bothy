@@ -61,6 +61,8 @@ type Principals struct {
 	rows map[ids.ID]authz.PrincipalFacts
 	// passkeys are the people with an active passkey (M1-40).
 	passkeys map[ids.ID]bool
+	// profiles are the names, locales and time zones set with PutProfile (M1-49).
+	profiles map[ids.ID]authz.PrincipalProfile
 }
 
 // Compile-time check.
@@ -123,8 +125,8 @@ func (s *Principals) ActiveOwnerIDs(_ context.Context) ([]ids.ID, error) {
 	return sortIDs(out), nil
 }
 
-// Refs implements authz.PrincipalSource: the handle and display name of a fake principal are
-// its id, because the facts carry no names.
+// Refs implements authz.PrincipalSource: the names set with PutProfile, else the id as handle
+// and display name, because the facts carry no names.
 func (s *Principals) Refs(_ context.Context, principals []ids.ID) (map[ids.ID]authz.PrincipalRef, error) {
 	if err := s.err(); err != nil {
 		return nil, err
@@ -133,11 +135,69 @@ func (s *Principals) Refs(_ context.Context, principals []ids.ID) (map[ids.ID]au
 	defer s.mu.Unlock()
 	out := map[ids.ID]authz.PrincipalRef{}
 	for _, id := range principals {
-		if f, ok := s.rows[id]; ok {
-			out[id] = authz.PrincipalRef{ID: id, Kind: f.Kind, Handle: id.String(), DisplayName: id.String()}
+		if p, ok := s.profile(id); ok {
+			out[id] = p.PrincipalRef
 		}
 	}
 	return out, nil
+}
+
+// PutProfile sets the names, locale and time zone of p.ID that Profiles and Refs report; kind and
+// status always come from the facts set with Put.
+func (s *Principals) PutProfile(p authz.PrincipalProfile) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if s.profiles == nil {
+		s.profiles = map[ids.ID]authz.PrincipalProfile{}
+	}
+	s.profiles[p.ID] = p
+}
+
+// profile returns the profile of a known principal; without PutProfile its handle and display
+// name are its id. The caller holds s.mu.
+func (s *Principals) profile(id ids.ID) (authz.PrincipalProfile, bool) {
+	f, ok := s.rows[id]
+	if !ok {
+		return authz.PrincipalProfile{}, false
+	}
+	p, named := s.profiles[id]
+	if !named {
+		p = authz.PrincipalProfile{PrincipalRef: authz.PrincipalRef{Handle: id.String(), DisplayName: id.String()}}
+	}
+	p.ID, p.Kind, p.Status = id, f.Kind, f.Status
+	return p, true
+}
+
+// Profiles implements authz.PrincipalSource.
+func (s *Principals) Profiles(_ context.Context, principals []ids.ID) (map[ids.ID]authz.PrincipalProfile, error) {
+	if err := s.err(); err != nil {
+		return nil, err
+	}
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	out := map[ids.ID]authz.PrincipalProfile{}
+	for _, id := range principals {
+		if p, ok := s.profile(id); ok {
+			out[id] = p
+		}
+	}
+	return out, nil
+}
+
+// OwnerIDs implements authz.PrincipalSource: every principal whose facts carry IsOwner.
+func (s *Principals) OwnerIDs(_ context.Context) ([]ids.ID, error) {
+	if err := s.err(); err != nil {
+		return nil, err
+	}
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	var out []ids.ID
+	for _, f := range s.rows {
+		if f.IsOwner {
+			out = append(out, f.ID)
+		}
+	}
+	return sortIDs(out), nil
 }
 
 // Structure is an in-memory authz.StructureSource. ServedTargets follows the rules of its doc
@@ -150,6 +210,9 @@ type Structure struct {
 	threads         map[ids.ID]authz.ThreadFacts
 	defaultOperator map[ids.ID]ids.ID
 	archivedSpaces  map[ids.ID]bool
+	// spaceDetails and channelDetails are set with PutSpaceDetail and PutChannelDetail (M1-49).
+	spaceDetails   map[ids.ID]authz.SpaceDetail
+	channelDetails map[ids.ID]authz.ChannelDetail
 }
 
 // Compile-time check.
@@ -158,7 +221,95 @@ var _ authz.StructureSource = (*Structure)(nil)
 // NewStructure returns an empty structure.
 func NewStructure() *Structure {
 	return &Structure{spaces: map[ids.ID]bool{}, channels: map[ids.ID]authz.ChannelFacts{}, threads: map[ids.ID]authz.ThreadFacts{},
-		defaultOperator: map[ids.ID]ids.ID{}, archivedSpaces: map[ids.ID]bool{}}
+		defaultOperator: map[ids.ID]ids.ID{}, archivedSpaces: map[ids.ID]bool{},
+		spaceDetails: map[ids.ID]authz.SpaceDetail{}, channelDetails: map[ids.ID]authz.ChannelDetail{}}
+}
+
+// PutSpaceDetail adds the space d.ID with its details; its default operator feeds ServedTargets
+// like SetDefaultOperator and a non-zero ArchivedAt marks it archived like SetSpaceArchived.
+func (s *Structure) PutSpaceDetail(d authz.SpaceDetail) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.spaces[d.ID], s.spaceDetails[d.ID] = true, d
+	s.archivedSpaces[d.ID] = !d.ArchivedAt.IsZero()
+	if d.DefaultOperatorID.IsZero() {
+		delete(s.defaultOperator, d.ID)
+	} else {
+		s.defaultOperator[d.ID] = d.DefaultOperatorID
+	}
+}
+
+// PutChannelDetail sets the names and presentation of a channel that ChannelDetails reports; the
+// facts of PutChannel (space, kind, operator, read-only, archived, participants) win over the
+// same fields of d.
+func (s *Structure) PutChannelDetail(d authz.ChannelDetail) {
+	s.mu.Lock()
+	s.channelDetails[d.ID] = d
+	s.mu.Unlock()
+}
+
+// SpaceDetails implements authz.StructureSource: the details of PutSpaceDetail, else the id as
+// name, with the default operator of SetDefaultOperator.
+func (s *Structure) SpaceDetails(_ context.Context, spaceIDs []ids.ID) (map[ids.ID]authz.SpaceDetail, error) {
+	if err := s.err(); err != nil {
+		return nil, err
+	}
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	out := map[ids.ID]authz.SpaceDetail{}
+	for _, id := range spaceIDs {
+		if !s.spaces[id] {
+			continue
+		}
+		d, ok := s.spaceDetails[id]
+		if !ok {
+			d = authz.SpaceDetail{ID: id, Name: id.String(), SortKey: "a0", Version: 1}
+		}
+		d.DefaultOperatorID = s.defaultOperator[id]
+		out[id] = d
+	}
+	return out, nil
+}
+
+// ChannelDetails implements authz.StructureSource: the facts of PutChannel with the names of
+// PutChannelDetail, else the id as name.
+func (s *Structure) ChannelDetails(_ context.Context, channelIDs []ids.ID) (map[ids.ID]authz.ChannelDetail, error) {
+	if err := s.err(); err != nil {
+		return nil, err
+	}
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	out := map[ids.ID]authz.ChannelDetail{}
+	for _, id := range channelIDs {
+		c, ok := s.channels[id]
+		if !ok {
+			continue
+		}
+		out[id] = channelDetail(c, s.channelDetails[id])
+	}
+	return out, nil
+}
+
+// channelDetail merges the facts c into the details d of PutChannelDetail (zero: the id as name).
+func channelDetail(c authz.ChannelFacts, d authz.ChannelDetail) authz.ChannelDetail {
+	if d.ID.IsZero() {
+		d = authz.ChannelDetail{Name: c.ID.String(), SortKey: "a0", Version: 1, SettingsVersion: 1}
+	}
+	d.ID, d.SpaceID, d.Kind, d.ReadOnly, d.EffectiveOperatorID = c.ID, c.SpaceID, c.Kind, c.ReadOnly, c.EffectiveOperatorID
+	d.DMParticipantIDs = slices.Clone(c.DMParticipants)
+	if d.OperatorMode == "" {
+		d.OperatorMode, d.OperatorAgentID = authz.OperatorNone, ids.ID{}
+		if !c.EffectiveOperatorID.IsZero() {
+			d.OperatorMode, d.OperatorAgentID = authz.OperatorAgent, c.EffectiveOperatorID
+		}
+	}
+	switch {
+	case !c.Archived:
+		d.ArchivedAt = time.Time{}
+	case d.ArchivedAt.IsZero():
+		d.ArchivedAt = time.Unix(0, 0).UTC()
+	}
+	return d
 }
 
 // SetSpaceArchived marks space archived for SpaceArchived; channels report their own Archived.

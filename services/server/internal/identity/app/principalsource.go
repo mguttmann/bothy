@@ -4,8 +4,10 @@ package app
 
 import (
 	"context"
+	"slices"
 
 	"github.com/OWNER/bothy/services/server/internal/authz"
+	"github.com/OWNER/bothy/services/server/internal/identity/domain"
 	"github.com/OWNER/bothy/services/server/internal/kernel/actor"
 	"github.com/OWNER/bothy/services/server/internal/kernel/ids"
 )
@@ -71,4 +73,52 @@ func (s *PrincipalSource) Refs(ctx context.Context, principals []ids.ID) (map[id
 		}
 	}
 	return out, nil
+}
+
+// Profiles implements authz.PrincipalSource (M1-49): the public views and statuses of the known
+// principals among principals, whatever their status, with users.locale and users.time_zone for
+// people; unknown ids are absent. Errors: those of the Store.
+func (s *PrincipalSource) Profiles(ctx context.Context, principals []ids.ID) (map[ids.ID]authz.PrincipalProfile, error) {
+	out := map[ids.ID]authz.PrincipalProfile{}
+	if len(principals) == 0 {
+		return out, nil
+	}
+	rows, err := s.store.Principals(ctx, principals)
+	if err != nil {
+		return nil, err
+	}
+	for _, p := range rows {
+		prof := authz.PrincipalProfile{
+			PrincipalRef: authz.PrincipalRef{
+				ID: p.ID, Kind: actor.Kind(p.Kind), Handle: p.Handle.String(), DisplayName: p.DisplayName.String(), AvatarFileID: p.AvatarFileID,
+			},
+			Status: authz.PrincipalStatus(p.Status),
+		}
+		if p.Kind == domain.KindUser {
+			u, found, err := s.store.User(ctx, p.ID)
+			if err != nil {
+				return nil, err
+			}
+			if found {
+				prof.Locale, prof.TimeZone = u.User.Locale, u.User.TimeZone
+			}
+		}
+		out[p.ID] = prof
+	}
+	return out, nil
+}
+
+// OwnerIDs implements authz.PrincipalSource (M1-49): the persons with an owners row that is not
+// revoked, whatever their principal status, ascending by id. Errors: those of the Store.
+func (s *PrincipalSource) OwnerIDs(ctx context.Context) ([]ids.ID, error) {
+	rows, err := s.store.ActiveOwners(ctx)
+	if err != nil {
+		return nil, err
+	}
+	out := make([]ids.ID, 0, len(rows))
+	for _, r := range rows {
+		out = append(out, r.Owner.UserID)
+	}
+	slices.SortFunc(out, func(a, b ids.ID) int { return slices.Compare(a[:], b[:]) })
+	return slices.Compact(out), nil
 }

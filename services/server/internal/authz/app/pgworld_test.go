@@ -130,7 +130,7 @@ func newPGWorld(t *testing.T) *pgWorld {
 		db: db, pool: pool, clk: clock.NewFake(pgStart), structure: fake.NewStructure(), policies: fake.NewPolicies(),
 		creds: fake.NewCredentials(), store: authzpg.NewRepository(pool),
 		principals: identityapp.NewPrincipalSource(identitypg.NewRepository(pool)),
-		cfg:        app.AuthorizerConfig{SnapshotCacheMaxEntries: 1000, StepUpMaxAge: 5 * time.Minute},
+		cfg:        app.AuthorizerConfig{SnapshotCacheMaxEntries: 1000, StepUpMaxAge: 5 * time.Minute, ViewAsMaxDuration: viewAsMax},
 		sessions:   map[ids.ID]ids.ID{}, devices: map[ids.ID]ids.ID{}, tokens: map[ids.ID]ids.ID{},
 	}
 	hook, err := wire.NewRightsHook(pool, wire.RightsSources{Principals: w.principals, Structure: w.structure, Policies: w.policies}, w.clk, log)
