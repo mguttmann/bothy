@@ -59,7 +59,8 @@ func NewUnitOfWork(pool *Pool, cfg UnitConfig, reg *txn.Registry) *UnitOfWork {
 // Outermost unit, per attempt: BEGIN with READ COMMITTED explicitly (never the database
 // default, ADR 0009), SET LOCAL of the three deadlines, then the phases rights_begin (only with
 // txn.RightsChange), work (fn), rights_check (only with RightsChange), sync, audit and the
-// commit; a phase without a hook is skipped. Every attempt has a fresh per-unit state. Any error
+// commit; a phase without a hook is skipped. After a successful commit the functions of
+// txn.AfterCommit run. Every attempt has a fresh per-unit state. Any error
 // and any panic roll back; a panic is raised again after the rollback. An attempt that fails
 // with SQLSTATE 40P01 or 55P03 while ctx is still live is retried, at most
 // database.tx_retry_max times.
@@ -194,6 +195,10 @@ func (w *UnitOfWork) attempt(ctx context.Context, fn func(context.Context) error
 	err = tx.Commit(ctx)
 	// After a failed COMMIT the transaction is over as well; a rollback has nothing to do.
 	done = true
+	if err == nil {
+		// Only now are the facts of the unit durable (txn.AfterCommit).
+		ctrl.Committed()
+	}
 	return err
 }
 
