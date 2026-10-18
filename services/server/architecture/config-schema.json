@@ -2719,6 +2719,18 @@
       "doc": "How often the log tail reads event_log without a notification."
     },
     {
+      "name": "sync.max_focused_threads",
+      "env": "BOTHY_SYNC__MAX_FOCUSED_THREADS",
+      "kind": "int",
+      "default": "20",
+      "required": false,
+      "enum": [],
+      "min": "1",
+      "max": "1000",
+      "chapter": "04-sync-protocol.md",
+      "doc": "Threads a gateway connection may focus; a focus with more answers validation_failed."
+    },
+    {
       "name": "sync.outbound_queue_max",
       "env": "BOTHY_SYNC__OUTBOUND_QUEUE_MAX",
       "kind": "int",
@@ -2777,6 +2789,30 @@
       "max": "2147483647",
       "chapter": "02-architecture.md",
       "doc": "Events per read of the log tail."
+    },
+    {
+      "name": "sync.typing_min_interval",
+      "env": "BOTHY_SYNC__TYPING_MIN_INTERVAL",
+      "kind": "duration",
+      "default": "5s",
+      "required": false,
+      "enum": [],
+      "min": "1ms",
+      "max": "",
+      "chapter": "04-sync-protocol.md",
+      "doc": "Shortest interval between two typing.started fan-outs of one connection and thread."
+    },
+    {
+      "name": "sync.typing_ttl",
+      "env": "BOTHY_SYNC__TYPING_TTL",
+      "kind": "duration",
+      "default": "8s",
+      "required": false,
+      "enum": [],
+      "min": "1ms",
+      "max": "",
+      "chapter": "04-sync-protocol.md",
+      "doc": "How long a typing indicator lasts without renewal (expires_at of typing.started)."
     },
     {
       "name": "sync.ws_max_frame_bytes",

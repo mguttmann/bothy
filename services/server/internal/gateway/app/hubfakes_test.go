@@ -394,7 +394,8 @@ func (w *hubWorld) store(evs ...sync.Event) {
 }
 
 // hubCfg is the configuration of the hub tests.
-var hubCfg = app.HubConfig{QueueMax: 100, PageSize: 4, CursorEvery: 3, RetryBase: time.Millisecond, RetryCap: 4 * time.Millisecond}
+var hubCfg = app.HubConfig{QueueMax: 100, PageSize: 4, CursorEvery: 3, RetryBase: time.Millisecond, RetryCap: 4 * time.Millisecond,
+	PayloadMax: 65536}
 
 // newHub returns a hub over w with cfg.
 func newHub(t testing.TB, w *hubWorld, cfg app.HubConfig) *app.Hub {
