@@ -91,7 +91,8 @@ final class MessagesDao {
     required int limit,
   }) => _db
       .customSelect(
-        'SELECT 1',
+        // Its own statement text: drift shares streams of equal SQL (see `watchThread`).
+        'SELECT 1 AS contiguous_watch',
         readsFrom: {_db.messages, _db.loadedRangesTable, _db.threads},
       )
       .watch()
