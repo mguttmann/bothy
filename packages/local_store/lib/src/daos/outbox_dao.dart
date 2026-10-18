@@ -114,6 +114,14 @@ final class OutboxDao {
     );
   }
 
+  /// Sets the `depends_on` value of entry [id] to [dependsOn]; the outbox re-points the entries
+  /// that waited for an entry it replaced with a new ID (docs/DECISIONS.md D-M4-15-6).
+  Future<void> updateDependsOn(String id, String? dependsOn) async {
+    await (_db.update(_db.outbox)..where((t) => t.id.equals(id))).write(
+      OutboxCompanion(dependsOn: Value(dependsOn)),
+    );
+  }
+
   /// Deletes entry [id] (discarded by the person).
   Future<void> delete(String id) async {
     await (_db.delete(_db.outbox)..where((t) => t.id.equals(id))).go();
@@ -161,6 +169,11 @@ final class OutboxDao {
   /// All entries of [threadId] in FIFO order, for the display of pending and failed sends.
   Future<List<OutboxEntry>> entriesFor(ThreadId? threadId) =>
       _entries(threadId).get();
+
+  /// Every entry of the table, final ones included, in FIFO order (`created_at`, then `id`);
+  /// the outbox resolves dependencies across threads with it (docs/DECISIONS.md D-M4-15-10).
+  Future<List<OutboxEntry>> allEntries() =>
+      (_db.select(_db.outbox)..orderBy(_fifo)).map(_fromRow).get();
 
   /// [entriesFor] on every change.
   Stream<List<OutboxEntry>> watchEntriesFor(ThreadId? threadId) =>
