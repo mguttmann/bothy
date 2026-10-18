@@ -215,9 +215,10 @@ Normative together with [24-terminal.md](24-terminal.md), section 8.
     - a valid grant (2.5) with target `H` and `terminal` to `P` or one of their valid
       groups.
 
-   The exception of the first item (an owner on a host with `personal`) is decided by the
-   guard rule SR11 with the reason `i6_holder_only` (section 4.2, step 9; M2-40); the atom
-   `+terminal` of the requirement does not repeat it (docs/DECISIONS.md D-M2-39-3).
+    The exception of the first item (an owner on a host with `personal`) is decided by the
+    guard rule SR11 with the reason `i6_holder_only` (section 4.2, step 9; M2-40); the atom
+    `+terminal` of the requirement does not repeat it (docs/DECISIONS.md D-M2-39-3).
+
 4. Effective `terminal` is not enough: SR10, SR11 and SR12 (section 5) block afterwards. The preview
    of a grant that does not take effect because of SR10 or for lack of a session user (SR12) says
    so (hint `terminal_not_effective`).
