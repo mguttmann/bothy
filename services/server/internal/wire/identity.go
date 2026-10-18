@@ -396,6 +396,8 @@ type OIDCDeps struct {
 	// ClaimGroups is the claim group sync of authz (the Admin use cases of start step 6c), called
 	// at the completion of an OIDC login (M1-42).
 	ClaimGroups authz.ClaimSync
+	// EgressDenyAll refuses every provider request (Deps.EgressDenyAll); only test servers set it.
+	EgressDenyAll bool
 }
 
 // BindOIDC builds the OIDC login (M1-41) over the login service of BindSessions: the provider
@@ -408,7 +410,7 @@ func (i *Identity) BindOIDC(d OIDCDeps) error {
 		return errors.New("wire: BindOIDC needs BindSessions first")
 	}
 	client, err := oidc.New(oidc.Config{CacheTTL: i.cfg.OIDCJWKSCacheTTL, AssertionTTL: i.cfg.OIDCClientAssertionTTL, Egress: d.Egress},
-		oidc.Deps{Providers: i.repo, Secrets: d.Secrets, RootCAs: d.RootCAs, Logger: i.log, Clock: i.clk})
+		oidc.Deps{Providers: i.repo, Secrets: d.Secrets, RootCAs: d.RootCAs, Logger: i.log, Clock: i.clk, DenyAll: d.EgressDenyAll})
 	if err != nil {
 		return err
 	}

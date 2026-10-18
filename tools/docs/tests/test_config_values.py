@@ -152,6 +152,8 @@ SOURCES = {
     "quality.coverage.dart_min_percent": lambda: _makefile_var("COVERAGE_DART_MIN"),
     "quality.coverage.python_min_percent": _python_min_percent,
     "quality.coverage.typescript_min_percent": _sdk_typescript_min,
+    "quality.contract.max_examples": lambda: _makefile_var("CONTRACT_MAX_EXAMPLES"),
+    "quality.contract.timeout": lambda: _makefile_var("CONTRACT_TIMEOUT"),
     "quality.perf.timeout": lambda: _makefile_var("PERF_TIMEOUT"),
     "quality.test.go_timeout": lambda: _makefile_var("GO_TEST_TIMEOUT"),
     "quality.test.patience": _testkit_patience,

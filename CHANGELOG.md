@@ -25,6 +25,10 @@ operated, and the order of the build.
 
 ### Added
 
+- Contract tests (M1-71): the gate `contract-test` (G7, Schemathesis 4.30.1 from `tools/contract/`
+  with ES256 DPoP proofs built with `cryptography`), G8 in `make test` through the build tag
+  `contract_validate`, and the named values `quality.contract.max_examples` and
+  `quality.contract.timeout`.
 - Local database of the apps: `packages/local_store` is a drift database on
   SQLite3MultipleCiphers (cipher `chacha20`, 256-bit key from a key source port), schema
   version 1 with the mirror tables of the client architecture chapter and the local tables

@@ -88,18 +88,20 @@ func (r *recordingTB) Errorf(format string, args ...any) {
 }
 
 // TestHarness_ValidateResponses: with the option, a response outside the contract is reported.
+// The route is one of the test contract: a deliberately wrong answer on a route of
+// docs/api/openapi.yaml would end the test binary in the build with G8 (M1-71).
 func TestHarness_ValidateResponses(t *testing.T) {
 	t.Parallel()
-	op := httpserver.Operation{ID: "getMe", Method: http.MethodGet, Path: "/api/v1/me", Pattern: "GET /api/v1/me", Action: "self.read"}
+	op := httpserver.Operation{ID: "getWidget", Method: http.MethodGet, Path: "/api/v1/widgets/{widget_id}", Pattern: "GET /api/v1/widgets/{widget_id}", Action: "thing.read"}
 	rec := &recordingTB{TB: t}
-	h := httpservertest.New(rec, httpservertest.Options{Contract: rest.Spec, ValidateResponses: true, Routes: []httpservertest.Route{{
-		Op: op, Handler: httpservertest.Authorized("self.read", func(w http.ResponseWriter, _ *http.Request) {
-			httpservertest.JSON(w, http.StatusOK, map[string]any{"is_owner": false})
+	h := httpservertest.New(rec, httpservertest.Options{ValidateResponses: true, Routes: []httpservertest.Route{{
+		Op: op, Handler: httpservertest.Authorized("thing.read", func(w http.ResponseWriter, _ *http.Request) {
+			httpservertest.JSON(w, http.StatusOK, map[string]any{"size": 1})
 		}),
 	}}})
-	r := h.Do(h.NewRequest(http.MethodGet, "/api/v1/me", "", "Authorization", httpservertest.GoodToken))
+	r := h.Do(h.NewRequest(http.MethodGet, "/api/v1/widgets/w1", "", "Authorization", httpservertest.GoodToken))
 	if r.StatusCode != http.StatusOK || len(rec.errors) != 1 {
-		t.Fatalf("status %d, findings %v; want one finding for the missing members", r.StatusCode, rec.errors)
+		t.Fatalf("status %d, findings %v; want one finding for the missing member", r.StatusCode, rec.errors)
 	}
 }
 

@@ -124,6 +124,26 @@ paths:
             application/x-ndjson:
               schema:
                 type: object
+  /widgets/{widget_id}:
+    get:
+      operationId: getWidget
+      parameters:
+      - name: widget_id
+        in: path
+        required: true
+        schema:
+          type: string
+      responses:
+        '200':
+          description: a widget with its required name
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [name]
+                properties:
+                  name:
+                    type: string
   /hooks/{hook_id}/{token}:
     post:
       operationId: postHook
