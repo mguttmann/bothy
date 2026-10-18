@@ -1895,6 +1895,256 @@
       }
     }
   },
+  "consoleNavLive": "Live",
+  "@consoleNavLive": {
+    "description": "Web console screen 01 section 5.5: navigation entry."
+  },
+  "consoleNavStats": "Statistics",
+  "@consoleNavStats": {
+    "description": "Web console screen 01 section 5.5: navigation entry."
+  },
+  "consoleNavHosts": "Hosts and terminal",
+  "@consoleNavHosts": {
+    "description": "Web console screen 01 section 5.5: navigation entry."
+  },
+  "consoleNavPeople": "People",
+  "@consoleNavPeople": {
+    "description": "Web console screen 01 section 5.5: navigation entry."
+  },
+  "consoleNavGroups": "Groups and access grants",
+  "@consoleNavGroups": {
+    "description": "Web console screen 01 section 5.5: navigation entry."
+  },
+  "consoleNavDevices": "Devices",
+  "@consoleNavDevices": {
+    "description": "Web console screen 01 section 5.5: navigation entry."
+  },
+  "consoleNavAgents": "Agents and costs",
+  "@consoleNavAgents": {
+    "description": "Web console screen 01 section 5.5: navigation entry."
+  },
+  "consoleNavApps": "Apps and webhooks",
+  "@consoleNavApps": {
+    "description": "Web console screen 01 section 5.5: navigation entry."
+  },
+  "consoleNavAudit": "Audit",
+  "@consoleNavAudit": {
+    "description": "Web console screen 01 section 5.5: navigation entry."
+  },
+  "consoleNavImport": "Import",
+  "@consoleNavImport": {
+    "description": "Web console screen 01 section 5.5: navigation entry."
+  },
+  "consoleNavInstance": "Instance and branding",
+  "@consoleNavInstance": {
+    "description": "Web console screen 01 section 5.5: navigation entry."
+  },
+  "consoleNavStatus": "Status",
+  "@consoleNavStatus": {
+    "description": "Web console screen 01 section 5.5: navigation entry."
+  },
+  "consoleNavigationLabel": "Console navigation",
+  "@consoleNavigationLabel": {
+    "description": "Web console screen 01 section 5.5: screen reader label of the navigation rail."
+  },
+  "consoleTitle": "{product} console",
+  "@consoleTitle": {
+    "description": "Web console screen 01 section 5.5: title of the console with the product name of the branding.",
+    "placeholders": {
+      "product": {
+        "type": "String",
+        "example": "Team Chat"
+      }
+    }
+  },
+  "consolePlaceholderPage": "This page comes with a later version of the console.",
+  "@consolePlaceholderPage": {
+    "description": "Web console screen 01 section 5.5: body of a navigation entry whose screen is not built yet."
+  },
+  "consoleSignedInAs": "Signed in: {name}",
+  "@consoleSignedInAs": {
+    "description": "Web console screen 01 section 5.5: header line with the signed-in person.",
+    "placeholders": {
+      "name": {
+        "type": "String",
+        "example": "Alex"
+      }
+    }
+  },
+  "consoleLogout": "Log out",
+  "@consoleLogout": {
+    "description": "Web console screen 01 section 5.5: button that ends the console session."
+  },
+  "consoleThreadInApp": "Thread {id}: there is no chat in the browser. Open it in the app.",
+  "@consoleThreadInApp": {
+    "description": "Web console screen 01 section 5.5: a thread when the instance announces no deep link scheme.",
+    "placeholders": {
+      "id": {
+        "type": "String",
+        "example": "0192f4a0-7b1c-78f9-8074-fa94e84bab7d"
+      }
+    }
+  },
+  "consoleCopyThreadId": "Copy thread ID",
+  "@consoleCopyThreadId": {
+    "description": "Web console screen 01 section 5.5: action that copies the ID of a thread."
+  },
+  "consoleCopied": "Copied",
+  "@consoleCopied": {
+    "description": "Web console screen 01 section 5.5: confirmation after a copy action."
+  },
+  "consoleWorking": "One moment",
+  "@consoleWorking": {
+    "description": "Web console screen 01 section 5.5: progress while the console loads or sends."
+  },
+  "consoleLoginTitle": "Log in to {product}",
+  "@consoleLoginTitle": {
+    "description": "Web console login E2 (01 section 5.6, brief M6-02): title with the product name of the branding.",
+    "placeholders": {
+      "product": {
+        "type": "String",
+        "example": "Team Chat"
+      }
+    }
+  },
+  "consoleLoginWithProvider": "Log in with {provider}",
+  "@consoleLoginWithProvider": {
+    "description": "Web console login E2 (01 section 5.6, brief M6-02): button of a login provider.",
+    "placeholders": {
+      "provider": {
+        "type": "String",
+        "example": "Company SSO"
+      }
+    }
+  },
+  "consoleLoginOr": "or",
+  "@consoleLoginOr": {
+    "description": "Web console login E2 (01 section 5.6, brief M6-02): divider between the provider buttons and the local login."
+  },
+  "consoleLoginName": "Login name",
+  "@consoleLoginName": {
+    "description": "Web console login E2 (01 section 5.6, brief M6-02): field of the login name."
+  },
+  "consoleLoginWithPasskey": "Log in with passkey",
+  "@consoleLoginWithPasskey": {
+    "description": "Web console login E2 (01 section 5.6, brief M6-02): button of the passkey login."
+  },
+  "consoleLoginPasswordAndCode": "Password and one-time code",
+  "@consoleLoginPasswordAndCode": {
+    "description": "Web console login E2 (01 section 5.6, brief M6-02): button that opens the password login."
+  },
+  "consoleLoginPassword": "Password",
+  "@consoleLoginPassword": {
+    "description": "Web console login E2 (01 section 5.6, brief M6-02): password field."
+  },
+  "consoleLoginOneTimeCode": "One-time code",
+  "@consoleLoginOneTimeCode": {
+    "description": "Web console login E2 (01 section 5.6, brief M6-02): field of the TOTP code."
+  },
+  "consoleLoginSubmit": "Log in",
+  "@consoleLoginSubmit": {
+    "description": "Web console login E2 (01 section 5.6, brief M6-02): button that sends the password login."
+  },
+  "consoleLoginNoMethod": "No login is set up for this instance. Ask the owner to set one up.",
+  "@consoleLoginNoMethod": {
+    "description": "Web console login E2 (01 section 5.6, brief M6-02): when discovery offers no method."
+  },
+  "consoleLoginFailed": "The login failed. Check the login name, password and one-time code and try again.",
+  "@consoleLoginFailed": {
+    "description": "Web console login E2 (01 section 5.6, brief M6-02): a refused password login."
+  },
+  "consoleLoginPasskeyFailed": "The passkey was not accepted. Try again or choose another way.",
+  "@consoleLoginPasskeyFailed": {
+    "description": "Web console login E2 (01 section 5.6, brief M6-02): a refused or cancelled passkey login."
+  },
+  "consoleLoginOidcFailed": "The login service did not confirm the login. Start the login again.",
+  "@consoleLoginOidcFailed": {
+    "description": "Web console login E2 (01 section 5.6, brief M6-02): an OIDC callback that failed."
+  },
+  "consoleLoginOidcCancelled": "The login was cancelled at the login service. Start it again or choose another way.",
+  "@consoleLoginOidcCancelled": {
+    "description": "Web console login E2 (01 section 5.6, brief M6-02): an OIDC callback with access_denied."
+  },
+  "consoleLoginOidcExpired": "The login took too long. Start it again.",
+  "@consoleLoginOidcExpired": {
+    "description": "Web console login E2 (01 section 5.6, brief M6-02): an OIDC callback with flow_expired or without its stored flow."
+  },
+  "consoleLoginUnavailable": "The server cannot be reached. Check the connection and try again.",
+  "@consoleLoginUnavailable": {
+    "description": "Web console login E2 (01 section 5.6, brief M6-02): a network error or a server error during login."
+  },
+  "consoleCallbackWorking": "Completing the login",
+  "@consoleCallbackWorking": {
+    "description": "Web console login E2 (01 section 5.6, brief M6-02): progress on the callback page."
+  },
+  "consoleStepUpTitle": "Confirm that it is you",
+  "@consoleStepUpTitle": {
+    "description": "Web console step-up after login (08 section 7.5, brief M6-02): title."
+  },
+  "consoleStepUpExplanation": "The console asks for a fresh confirmation before any administration.",
+  "@consoleStepUpExplanation": {
+    "description": "Web console step-up after login (08 section 7.5, brief M6-02): explanation below the title."
+  },
+  "consoleStepUpPasskey": "Confirm with passkey",
+  "@consoleStepUpPasskey": {
+    "description": "Web console step-up after login (08 section 7.5, brief M6-02): button of the passkey step-up."
+  },
+  "consoleStepUpOidc": "Log in again with {provider}",
+  "@consoleStepUpOidc": {
+    "description": "Web console step-up after login (08 section 7.5, brief M6-02): button of the OIDC re-login.",
+    "placeholders": {
+      "provider": {
+        "type": "String",
+        "example": "Company SSO"
+      }
+    }
+  },
+  "consoleStepUpPassword": "Confirm with password and one-time code",
+  "@consoleStepUpPassword": {
+    "description": "Web console step-up after login (08 section 7.5, brief M6-02): button that opens the password step-up."
+  },
+  "consoleStepUpConfirm": "Confirm",
+  "@consoleStepUpConfirm": {
+    "description": "Web console step-up after login (08 section 7.5, brief M6-02): button that sends the password step-up."
+  },
+  "consoleStepUpFailed": "The confirmation failed. Try again or choose another way.",
+  "@consoleStepUpFailed": {
+    "description": "Web console step-up after login (08 section 7.5, brief M6-02): a refused confirmation."
+  },
+  "consoleStepUpNoMethod": "No way to confirm is set up for you. Ask the owner to set up a passkey for you.",
+  "@consoleStepUpNoMethod": {
+    "description": "Web console step-up after login (08 section 7.5, brief M6-02): a session without step-up methods."
+  },
+  "consoleLoggedOutTitle": "You are logged out.",
+  "@consoleLoggedOutTitle": {
+    "description": "Web console E7 logged out (01 section 5.6, brief M6-02): title."
+  },
+  "consoleLoggedOutReason": "Reason: {reason}",
+  "@consoleLoggedOutReason": {
+    "description": "Web console E7 logged out (01 section 5.6, brief M6-02): the reason, a problem text.",
+    "placeholders": {
+      "reason": {
+        "type": "String",
+        "example": "This session was ended"
+      }
+    }
+  },
+  "consoleLoggedOutByYou": "You logged out of the console.",
+  "@consoleLoggedOutByYou": {
+    "description": "Web console E7 logged out (01 section 5.6, brief M6-02): reason after the own logout."
+  },
+  "consoleLogInAgain": "Log in again",
+  "@consoleLogInAgain": {
+    "description": "Web console E7 logged out (01 section 5.6, brief M6-02): button to E2."
+  },
+  "consoleUpdatedReload": "The console was updated. Reload the page to continue.",
+  "@consoleUpdatedReload": {
+    "description": "Web console version check (brief M6-02 Design note 5): the console version differs from the API version of the server."
+  },
+  "consoleReload": "Reload",
+  "@consoleReload": {
+    "description": "Web console version check (brief M6-02 Design note 5): button that reloads the page."
+  },
   "onboardingConnectTitle": "Connect to your instance",
   "@onboardingConnectTitle": {
     "description": "Title of screen E1, the server address (01 section 5.6)."
@@ -3820,6 +4070,298 @@
         "example": "Sam"
       }
     }
+  },
+  "adminNavAudit": "Audit",
+  "@adminNavAudit": {
+    "description": "Entry of the administration navigation for the audit log (01 section 5.2 A6)."
+  },
+  "auditTitle": "Audit log",
+  "@auditTitle": {
+    "description": "Title of the audit log screen of the administration (01 5.2 A6)."
+  },
+  "auditFilterAction": "Action",
+  "@auditFilterAction": {
+    "description": "Label of the action filter of the audit log; a list of the loaded action IDs or a typed action ID."
+  },
+  "auditFilterActorAll": "All people",
+  "@auditFilterActorAll": {
+    "description": "First choice of the person filter of the audit log: no filter."
+  },
+  "auditResultAll": "All results",
+  "@auditResultAll": {
+    "description": "First choice of the result filter of the audit log: no filter."
+  },
+  "auditResultAllow": "allowed",
+  "@auditResultAllow": {
+    "description": "Result of an audit entry whose decision was allow."
+  },
+  "auditResultDeny": "denied",
+  "@auditResultDeny": {
+    "description": "Result of an audit entry whose decision was deny."
+  },
+  "auditResultError": "error",
+  "@auditResultError": {
+    "description": "Result of an audit entry whose decision was error."
+  },
+  "auditFilterResourceKind": "Resource kind",
+  "@auditFilterResourceKind": {
+    "description": "Label of the resource kind filter of the audit log, for example space or grant."
+  },
+  "auditFilterResourceId": "Resource ID",
+  "@auditFilterResourceId": {
+    "description": "Label of the resource ID filter of the audit log."
+  },
+  "auditFilterFrom": "From (YYYY-MM-DD)",
+  "@auditFilterFrom": {
+    "description": "Label of the first day of the time range filter of the audit log, read in the person's time zone."
+  },
+  "auditFilterTo": "To (YYYY-MM-DD)",
+  "@auditFilterTo": {
+    "description": "Label of the last day (inclusive) of the time range filter of the audit log."
+  },
+  "auditFilterApply": "Apply filters",
+  "@auditFilterApply": {
+    "description": "Button that loads the audit log with the typed filters."
+  },
+  "auditFilterInvalidDate": "Enter a date as YYYY-MM-DD.",
+  "@auditFilterInvalidDate": {
+    "description": "Error under a day field of the audit log filter that holds no valid date."
+  },
+  "auditColTime": "Time",
+  "@auditColTime": {
+    "description": "Column header of the audit log: when it happened."
+  },
+  "auditColWho": "Who",
+  "@auditColWho": {
+    "description": "Column header of the audit log: the acting person or agent."
+  },
+  "auditColResult": "Result",
+  "@auditColResult": {
+    "description": "Column header of the audit log: allowed, denied or error."
+  },
+  "auditColResource": "Resource",
+  "@auditColResource": {
+    "description": "Column header of the audit log: the resource of the action."
+  },
+  "auditColReason": "Reason",
+  "@auditColReason": {
+    "description": "Column header of the audit log: the deny reason or the stated reason."
+  },
+  "auditEmpty": "No entries match these filters.",
+  "@auditEmpty": {
+    "description": "Shown when the audit log has no entry for the filters."
+  },
+  "auditStepUpNeeded": "Reading the audit log needs your confirmation.",
+  "@auditStepUpNeeded": {
+    "description": "Shown when the person cancelled the step-up that reading the audit log needs."
+  },
+  "auditCheckChain": "Check chain",
+  "@auditCheckChain": {
+    "description": "Button that checks the hash chain of the audit log (verifyAuditChain)."
+  },
+  "auditChainOk": "Chain checked up to no. {seq}: unchanged.",
+  "@auditChainOk": {
+    "description": "Result of an intact hash chain check (01 5.2 A6, ADR 0021).",
+    "placeholders": {
+      "seq": {
+        "type": "int",
+        "example": "18402"
+      }
+    }
+  },
+  "auditChainBroken": "Chain broken at no. {seq}: {reason}",
+  "@auditChainBroken": {
+    "description": "Result of a hash chain check that found the first broken entry; reason is one of the auditChainReason texts.",
+    "placeholders": {
+      "seq": {
+        "type": "int",
+        "example": "5301"
+      },
+      "reason": {
+        "type": "String",
+        "example": "the entry does not match its hash."
+      }
+    }
+  },
+  "auditChainRange": "Checked no. {from} to {to}; checkpoints compared: {count}.",
+  "@auditChainRange": {
+    "description": "Range and checkpoints of a hash chain check.",
+    "placeholders": {
+      "from": {
+        "type": "int",
+        "example": "1"
+      },
+      "to": {
+        "type": "int",
+        "example": "18402"
+      },
+      "count": {
+        "type": "int",
+        "example": "12"
+      }
+    }
+  },
+  "auditChainReasonHash": "the entry does not match its hash.",
+  "@auditChainReasonHash": {
+    "description": "Failure reason hash_mismatch of a chain check."
+  },
+  "auditChainReasonLink": "the entry does not link the entry before.",
+  "@auditChainReasonLink": {
+    "description": "Failure reason link_mismatch of a chain check."
+  },
+  "auditChainReasonGap": "an entry is missing.",
+  "@auditChainReasonGap": {
+    "description": "Failure reason seq_gap of a chain check."
+  },
+  "auditChainReasonCheckpoint": "a checkpoint does not match.",
+  "@auditChainReasonCheckpoint": {
+    "description": "Failure reason checkpoint_mismatch of a chain check."
+  },
+  "auditChainReasonCheckpointInvalid": "a checkpoint is invalid.",
+  "@auditChainReasonCheckpointInvalid": {
+    "description": "Failure reason checkpoint_invalid of a chain check."
+  },
+  "auditChainReasonOther": "reason {code}.",
+  "@auditChainReasonOther": {
+    "description": "Failure reason of a chain check that this app does not know.",
+    "placeholders": {
+      "code": {
+        "type": "String",
+        "example": "hash_mismatch"
+      }
+    }
+  },
+  "auditChainWarningNoSink": "Warning: no checkpoint target is configured, so checkpoints exist only in the database.",
+  "@auditChainWarningNoSink": {
+    "description": "Warning checkpoint_sink_not_configured of a chain check."
+  },
+  "auditChainWarning": "Warning: {code}",
+  "@auditChainWarning": {
+    "description": "A warning of a chain check that this app does not know, by its code.",
+    "placeholders": {
+      "code": {
+        "type": "String",
+        "example": "checkpoint_sink_not_configured"
+      }
+    }
+  },
+  "auditExport": "Export",
+  "@auditExport": {
+    "description": "Button that saves the audit log of the time range as NDJSON with hashes."
+  },
+  "auditExportCsv": "Export as CSV",
+  "@auditExportCsv": {
+    "description": "Button that saves the audit log of the time range as a CSV converted on the device."
+  },
+  "auditExportNeedsRange": "Choose a time range (from and to) to export.",
+  "@auditExportNeedsRange": {
+    "description": "Shown when the person exports without a time range in the filter."
+  },
+  "auditExportDone": "Export saved.",
+  "@auditExportDone": {
+    "description": "Notice after the audit export was written to the chosen file."
+  },
+  "auditExportFailed": "The export broke off; the file is incomplete.",
+  "@auditExportFailed": {
+    "description": "Notice when the audit export stream ended with an error after the file was opened."
+  },
+  "stepUpPurposeAuditRead": "Read the audit log",
+  "@stepUpPurposeAuditRead": {
+    "description": "Purpose of the step-up dialog when reading the audit log (05 audit.read)."
+  },
+  "stepUpPurposeAuditVerify": "Check the hash chain of the audit log",
+  "@stepUpPurposeAuditVerify": {
+    "description": "Purpose of the step-up dialog when checking the audit chain (05 audit.verify)."
+  },
+  "stepUpPurposeAuditExport": "Export the audit log",
+  "@stepUpPurposeAuditExport": {
+    "description": "Purpose of the step-up dialog when exporting the audit log (05 audit.read)."
+  },
+  "auditDetailTitle": "Entry no. {seq}",
+  "@auditDetailTitle": {
+    "description": "Title of the details of one audit entry.",
+    "placeholders": {
+      "seq": {
+        "type": "int",
+        "example": "5301"
+      }
+    }
+  },
+  "auditDetailCorrelation": "Correlation ID",
+  "@auditDetailCorrelation": {
+    "description": "Label of the correlation ID in the details of an audit entry."
+  },
+  "auditDetailDenyReason": "Deny reason",
+  "@auditDetailDenyReason": {
+    "description": "Label of the deny reason in the details of an audit entry."
+  },
+  "auditDetailDetails": "Details",
+  "@auditDetailDetails": {
+    "description": "Label of the details object the server returns for an audit entry."
+  },
+  "auditDetailHash": "Hash",
+  "@auditDetailHash": {
+    "description": "Label of the hash of an audit entry."
+  },
+  "auditDetailPrevHash": "Previous hash",
+  "@auditDetailPrevHash": {
+    "description": "Label of the hash of the entry before, in the details of an audit entry."
+  },
+  "auditDetailClose": "Close",
+  "@auditDetailClose": {
+    "description": "Button that closes the details of an audit entry."
+  },
+  "auditActionAuditRead": "Read the audit log",
+  "@auditActionAuditRead": {
+    "description": "Label of the action audit.read in the audit log."
+  },
+  "auditActionAuditVerify": "Check the audit chain",
+  "@auditActionAuditVerify": {
+    "description": "Label of the action audit.verify in the audit log."
+  },
+  "auditActionGrantCreate": "Create a grant",
+  "@auditActionGrantCreate": {
+    "description": "Label of the action grant.create in the audit log."
+  },
+  "auditActionGrantRevoke": "Revoke a grant",
+  "@auditActionGrantRevoke": {
+    "description": "Label of the action grant.revoke in the audit log."
+  },
+  "auditActionOwnerAdd": "Add an owner",
+  "@auditActionOwnerAdd": {
+    "description": "Label of the action owner.add in the audit log."
+  },
+  "auditActionOwnerRemove": "Remove an owner",
+  "@auditActionOwnerRemove": {
+    "description": "Label of the action owner.remove in the audit log."
+  },
+  "auditActionUserCreate": "Create a person",
+  "@auditActionUserCreate": {
+    "description": "Label of the action user.create in the audit log."
+  },
+  "auditActionUserDisable": "Disable a person",
+  "@auditActionUserDisable": {
+    "description": "Label of the action user.disable in the audit log."
+  },
+  "auditActionUserEnable": "Enable a person",
+  "@auditActionUserEnable": {
+    "description": "Label of the action user.enable in the audit log."
+  },
+  "auditActionDeviceApprove": "Approve a device",
+  "@auditActionDeviceApprove": {
+    "description": "Label of the action device.approve in the audit log."
+  },
+  "auditActionDeviceRevoke": "Revoke a device",
+  "@auditActionDeviceRevoke": {
+    "description": "Label of the action device.revoke in the audit log."
+  },
+  "auditActionGroupCreate": "Create a group",
+  "@auditActionGroupCreate": {
+    "description": "Label of the action group.create in the audit log."
+  },
+  "auditActionStepUp": "Confirm with step-up",
+  "@auditActionStepUp": {
+    "description": "Label of the action auth.step_up in the audit log."
   },
   "adminNavGrants": "Access grants",
   "@adminNavGrants": {

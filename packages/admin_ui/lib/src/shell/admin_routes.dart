@@ -26,8 +26,8 @@ enum AdminSection {
   /// Apps (M6-08).
   apps('apps'),
 
-  /// Audit (M4-29).
-  audit('audit'),
+  /// The audit log (M4-29).
+  audit('audit', hasScreen: true),
 
   /// Statistics (M6-06).
   statistics('statistics'),
@@ -84,7 +84,9 @@ final class AdminLocation {
         .firstOrNull;
     if (section == null || parts.length > 2) return null;
     if (parts.length == 2) {
-      if (section == AdminSection.devices) return null;
+      if (section == AdminSection.devices || section == AdminSection.audit) {
+        return null;
+      }
       return AdminLocation(section, id: parts[1]);
     }
     return AdminLocation(section);

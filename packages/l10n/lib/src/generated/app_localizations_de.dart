@@ -1311,6 +1311,189 @@ class AppLocalizationsDe extends AppLocalizations {
   }
 
   @override
+  String get consoleNavLive => 'Live';
+
+  @override
+  String get consoleNavStats => 'Statistik';
+
+  @override
+  String get consoleNavHosts => 'Rechner und Terminal';
+
+  @override
+  String get consoleNavPeople => 'Personen';
+
+  @override
+  String get consoleNavGroups => 'Gruppen und Freigaben';
+
+  @override
+  String get consoleNavDevices => 'Geräte';
+
+  @override
+  String get consoleNavAgents => 'Agenten und Kosten';
+
+  @override
+  String get consoleNavApps => 'Apps und Webhooks';
+
+  @override
+  String get consoleNavAudit => 'Audit';
+
+  @override
+  String get consoleNavImport => 'Import';
+
+  @override
+  String get consoleNavInstance => 'Instanz und Branding';
+
+  @override
+  String get consoleNavStatus => 'Status';
+
+  @override
+  String get consoleNavigationLabel => 'Navigation der Konsole';
+
+  @override
+  String consoleTitle(String product) {
+    return '$product Konsole';
+  }
+
+  @override
+  String get consolePlaceholderPage =>
+      'Diese Seite kommt mit einer späteren Version der Konsole.';
+
+  @override
+  String consoleSignedInAs(String name) {
+    return 'Angemeldet: $name';
+  }
+
+  @override
+  String get consoleLogout => 'Abmelden';
+
+  @override
+  String consoleThreadInApp(String id) {
+    return 'Thread $id: Im Browser gibt es keinen Chat. Öffne ihn in der App.';
+  }
+
+  @override
+  String get consoleCopyThreadId => 'Thread-ID kopieren';
+
+  @override
+  String get consoleCopied => 'Kopiert';
+
+  @override
+  String get consoleWorking => 'Einen Moment';
+
+  @override
+  String consoleLoginTitle(String product) {
+    return 'Bei $product anmelden';
+  }
+
+  @override
+  String consoleLoginWithProvider(String provider) {
+    return 'Mit $provider anmelden';
+  }
+
+  @override
+  String get consoleLoginOr => 'oder';
+
+  @override
+  String get consoleLoginName => 'Anmeldename';
+
+  @override
+  String get consoleLoginWithPasskey => 'Mit Passkey anmelden';
+
+  @override
+  String get consoleLoginPasswordAndCode => 'Passwort und Einmal-Code';
+
+  @override
+  String get consoleLoginPassword => 'Passwort';
+
+  @override
+  String get consoleLoginOneTimeCode => 'Einmal-Code';
+
+  @override
+  String get consoleLoginSubmit => 'Anmelden';
+
+  @override
+  String get consoleLoginNoMethod =>
+      'Für diese Instanz ist keine Anmeldung eingerichtet. Bitte den Eigentümer, eine einzurichten.';
+
+  @override
+  String get consoleLoginFailed =>
+      'Die Anmeldung ist fehlgeschlagen. Prüfe Anmeldename, Passwort und Einmal-Code und versuche es erneut.';
+
+  @override
+  String get consoleLoginPasskeyFailed =>
+      'Der Passkey wurde nicht angenommen. Versuche es erneut oder wähle einen anderen Weg.';
+
+  @override
+  String get consoleLoginOidcFailed =>
+      'Der Anmeldedienst hat die Anmeldung nicht bestätigt. Starte die Anmeldung erneut.';
+
+  @override
+  String get consoleLoginOidcCancelled =>
+      'Die Anmeldung wurde beim Anmeldedienst abgebrochen. Starte sie erneut oder wähle einen anderen Weg.';
+
+  @override
+  String get consoleLoginOidcExpired =>
+      'Die Anmeldung hat zu lange gedauert. Starte sie erneut.';
+
+  @override
+  String get consoleLoginUnavailable =>
+      'Der Server ist nicht erreichbar. Prüfe die Verbindung und versuche es erneut.';
+
+  @override
+  String get consoleCallbackWorking => 'Die Anmeldung wird abgeschlossen';
+
+  @override
+  String get consoleStepUpTitle => 'Bestätige, dass du es bist';
+
+  @override
+  String get consoleStepUpExplanation =>
+      'Vor jeder Verwaltung verlangt die Konsole eine frische Bestätigung.';
+
+  @override
+  String get consoleStepUpPasskey => 'Mit Passkey bestätigen';
+
+  @override
+  String consoleStepUpOidc(String provider) {
+    return 'Erneut mit $provider anmelden';
+  }
+
+  @override
+  String get consoleStepUpPassword => 'Mit Passwort und Einmal-Code bestätigen';
+
+  @override
+  String get consoleStepUpConfirm => 'Bestätigen';
+
+  @override
+  String get consoleStepUpFailed =>
+      'Die Bestätigung ist fehlgeschlagen. Versuche es erneut oder wähle einen anderen Weg.';
+
+  @override
+  String get consoleStepUpNoMethod =>
+      'Für dich ist kein Weg zur Bestätigung eingerichtet. Bitte den Eigentümer, dir einen Passkey einzurichten.';
+
+  @override
+  String get consoleLoggedOutTitle => 'Du bist abgemeldet.';
+
+  @override
+  String consoleLoggedOutReason(String reason) {
+    return 'Grund: $reason';
+  }
+
+  @override
+  String get consoleLoggedOutByYou =>
+      'Du hast dich von der Konsole abgemeldet.';
+
+  @override
+  String get consoleLogInAgain => 'Erneut anmelden';
+
+  @override
+  String get consoleUpdatedReload =>
+      'Die Konsole wurde aktualisiert. Lade die Seite neu, um weiterzumachen.';
+
+  @override
+  String get consoleReload => 'Neu laden';
+
+  @override
   String get onboardingConnectTitle => 'Mit deiner Instanz verbinden';
 
   @override
@@ -2569,6 +2752,206 @@ class AppLocalizationsDe extends AppLocalizations {
   String stepUpPurposeRejectDevice(String device, String person) {
     return 'Gerät $device von $person ablehnen';
   }
+
+  @override
+  String get adminNavAudit => 'Audit';
+
+  @override
+  String get auditTitle => 'Audit-Log';
+
+  @override
+  String get auditFilterAction => 'Aktion';
+
+  @override
+  String get auditFilterActorAll => 'Alle Personen';
+
+  @override
+  String get auditResultAll => 'Alle Ergebnisse';
+
+  @override
+  String get auditResultAllow => 'erlaubt';
+
+  @override
+  String get auditResultDeny => 'abgelehnt';
+
+  @override
+  String get auditResultError => 'Fehler';
+
+  @override
+  String get auditFilterResourceKind => 'Ressourcenart';
+
+  @override
+  String get auditFilterResourceId => 'Ressourcen-ID';
+
+  @override
+  String get auditFilterFrom => 'Von (JJJJ-MM-TT)';
+
+  @override
+  String get auditFilterTo => 'Bis (JJJJ-MM-TT)';
+
+  @override
+  String get auditFilterApply => 'Filter anwenden';
+
+  @override
+  String get auditFilterInvalidDate => 'Datum als JJJJ-MM-TT eingeben.';
+
+  @override
+  String get auditColTime => 'Zeit';
+
+  @override
+  String get auditColWho => 'Wer';
+
+  @override
+  String get auditColResult => 'Ergebnis';
+
+  @override
+  String get auditColResource => 'Ressource';
+
+  @override
+  String get auditColReason => 'Grund';
+
+  @override
+  String get auditEmpty => 'Keine Einträge zu diesen Filtern.';
+
+  @override
+  String get auditStepUpNeeded =>
+      'Das Audit-Log zu lesen braucht deine Bestätigung.';
+
+  @override
+  String get auditCheckChain => 'Kette prüfen';
+
+  @override
+  String auditChainOk(int seq) {
+    return 'Kette geprüft bis Nr. $seq: unverändert.';
+  }
+
+  @override
+  String auditChainBroken(int seq, String reason) {
+    return 'Kette gebrochen bei Nr. $seq: $reason';
+  }
+
+  @override
+  String auditChainRange(int from, int to, int count) {
+    return 'Geprüft Nr. $from bis $to; verglichene Prüfpunkte: $count.';
+  }
+
+  @override
+  String get auditChainReasonHash => 'der Eintrag passt nicht zu seinem Hash.';
+
+  @override
+  String get auditChainReasonLink =>
+      'der Eintrag verweist nicht auf den Eintrag davor.';
+
+  @override
+  String get auditChainReasonGap => 'ein Eintrag fehlt.';
+
+  @override
+  String get auditChainReasonCheckpoint => 'ein Prüfpunkt passt nicht.';
+
+  @override
+  String get auditChainReasonCheckpointInvalid => 'ein Prüfpunkt ist ungültig.';
+
+  @override
+  String auditChainReasonOther(String code) {
+    return 'Grund $code.';
+  }
+
+  @override
+  String get auditChainWarningNoSink =>
+      'Warnung: Es ist kein Ziel für Prüfpunkte eingerichtet, Prüfpunkte gibt es nur in der Datenbank.';
+
+  @override
+  String auditChainWarning(String code) {
+    return 'Warnung: $code';
+  }
+
+  @override
+  String get auditExport => 'Exportieren';
+
+  @override
+  String get auditExportCsv => 'Als CSV exportieren';
+
+  @override
+  String get auditExportNeedsRange =>
+      'Für den Export einen Zeitraum (von und bis) wählen.';
+
+  @override
+  String get auditExportDone => 'Export gespeichert.';
+
+  @override
+  String get auditExportFailed =>
+      'Der Export brach ab; die Datei ist unvollständig.';
+
+  @override
+  String get stepUpPurposeAuditRead => 'Audit-Log lesen';
+
+  @override
+  String get stepUpPurposeAuditVerify => 'Hash-Kette des Audit-Logs prüfen';
+
+  @override
+  String get stepUpPurposeAuditExport => 'Audit-Log exportieren';
+
+  @override
+  String auditDetailTitle(int seq) {
+    return 'Eintrag Nr. $seq';
+  }
+
+  @override
+  String get auditDetailCorrelation => 'Korrelations-ID';
+
+  @override
+  String get auditDetailDenyReason => 'Ablehnungsgrund';
+
+  @override
+  String get auditDetailDetails => 'Details';
+
+  @override
+  String get auditDetailHash => 'Hash';
+
+  @override
+  String get auditDetailPrevHash => 'Vorheriger Hash';
+
+  @override
+  String get auditDetailClose => 'Schließen';
+
+  @override
+  String get auditActionAuditRead => 'Audit-Log lesen';
+
+  @override
+  String get auditActionAuditVerify => 'Audit-Kette prüfen';
+
+  @override
+  String get auditActionGrantCreate => 'Freigabe anlegen';
+
+  @override
+  String get auditActionGrantRevoke => 'Freigabe widerrufen';
+
+  @override
+  String get auditActionOwnerAdd => 'Owner hinzufügen';
+
+  @override
+  String get auditActionOwnerRemove => 'Owner entfernen';
+
+  @override
+  String get auditActionUserCreate => 'Person anlegen';
+
+  @override
+  String get auditActionUserDisable => 'Person deaktivieren';
+
+  @override
+  String get auditActionUserEnable => 'Person aktivieren';
+
+  @override
+  String get auditActionDeviceApprove => 'Gerät bestätigen';
+
+  @override
+  String get auditActionDeviceRevoke => 'Gerät widerrufen';
+
+  @override
+  String get auditActionGroupCreate => 'Gruppe anlegen';
+
+  @override
+  String get auditActionStepUp => 'Mit Step-up bestätigen';
 
   @override
   String get adminNavGrants => 'Freigaben';
