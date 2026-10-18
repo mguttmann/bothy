@@ -1,0 +1,10 @@
+# SPDX-License-Identifier: Apache-2.0
+groups:
+  - name: fixture
+    rules:
+      - record: slo:sli_error:ratio_rate5m
+        expr: sum(rate(http_server_request_duration_seconds_count{http_response_status_code=~"5.."}[5m])) / sum(rate(http_server_request_duration_seconds_count[5m]))
+      - alert: FixtureFanoutLag
+        expr: max without (instance) (bothy_event_fanout_lag_seconds) > 5 unless count(ALERTS{alertname="Watchdog"}) == 0
+        labels:
+          severity: page

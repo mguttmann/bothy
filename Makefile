@@ -133,7 +133,7 @@ TOOLS_SOURCE_TESTS := ci/tests/test_product_name_places.py docs/tests/test_confi
         trivy-image portability linkcheck-external diagrams tokens api-lint api-checks api-breaking api-tables api-clients \
         runners-check release-pins commitlint \
         review labels-check labels-sync tools-lock release-build release-prep release-trial scancode clean \
-        codegen-check arch register-check migrations-lint migrations-lock sql-visibility flag-check perf ops-check \
+        codegen-check arch register-check migrations-lint migrations-lock sql-visibility flag-check perf ops-check signal-check \
         image image-test postgres-image postgres-image-test apps-platform contract-test
 
 help: ## Show the targets
@@ -175,7 +175,7 @@ gates: ## All gates except denylist and sonar (CI job "gates")
 # Generated code is checked before lint and type checks, so that stale generator output is
 # reported as drift and not as a confusing compile error. `perf` is not a gate (P-07).
 gates: fmt-check codegen-check lint typecheck arch register-check migrations-lint sql-visibility flag-check test coverage contract-test commitlint \
-       docs config-doc-check linkcheck diagrams catalog-check api-lint api-checks api-breaking ops-check \
+       docs config-doc-check linkcheck diagrams catalog-check api-lint api-checks api-breaking ops-check signal-check \
        api-clients tokens runners-check labels-check release-pins gitleaks semgrep trivy osv licenses
 
 # ---- code quality ---------------------------------------------------------------------
@@ -203,7 +203,7 @@ lint: ## Linters: file hygiene hooks, ruff, bandit, Dockerfile pins, actionlint,
 	@if [ -z "$(TOOLS_ON)" ]; then $(call tools_skip,tools-lint); else $(UVRUN) ruff check tools; fi
 	@# Every FROM of a tracked Dockerfile is pinned by digest (SEC-SC-4, docs/spec/18-release.md "Server images").
 	$(UVRUN) python tools/ci/dockerfile_pins.py
-	@if [ -z "$(TOOLS_ON)" ]; then $(call tools_skip,tools-bandit); else $(UVRUN) bandit -q -c tools/pyproject.toml -r tools/api-checks tools/arch-check tools/bin tools/catalog tools/ci tools/configdoc tools/contract tools/denylist tools/design-tokens tools/doccheck tools/docs tools/hooks tools/lint tools/observability tools/opscheck tools/sonarqube; fi
+	@if [ -z "$(TOOLS_ON)" ]; then $(call tools_skip,tools-bandit); else $(UVRUN) bandit -q -c tools/pyproject.toml -r tools/api-checks tools/arch-check tools/bin tools/catalog tools/ci tools/configdoc tools/contract tools/denylist tools/design-tokens tools/doccheck tools/docs tools/hooks tools/lint tools/observability tools/opscheck tools/signalcheck tools/sonarqube; fi
 	$(UVRUN) check-jsonschema --builtin-schema vendor.github-issue-forms $(filter-out %/config.yml,$(wildcard .github/ISSUE_TEMPLATE/*.yml))
 	$(UVRUN) check-jsonschema --builtin-schema vendor.github-issue-config .github/ISSUE_TEMPLATE/config.yml
 	$(UVRUN) check-jsonschema --builtin-schema vendor.renovate renovate.json
@@ -551,6 +551,9 @@ api-breaking: ## G6: no breaking change of the API against the last server relea
 	@if [ -z "$(call want,server)" ]; then $(call skip,api-breaking,component server not selected); \
 	elif [ ! -f docs/api/openapi.yaml ]; then $(call skip,api-breaking,docs/api/openapi.yaml does not exist yet); \
 	else $(UVRUN) python tools/api-checks/breaking.py check; fi
+
+signal-check: ## Dashboards, rules and SLOs use only catalogue metrics and labels; SLO thresholds are bucket bounds (M1-68)
+	$(UVRUN) python tools/signalcheck/signalcheck.py
 
 ops-check: ## Operations configuration valid with the pinned upstream tools; derived values equal their sources
 	@# Collector, Prometheus, Alertmanager, Loki, Tempo, Sloth and OpenTofu files exist, so there
