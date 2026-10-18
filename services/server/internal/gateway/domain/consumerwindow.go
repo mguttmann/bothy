@@ -212,8 +212,8 @@ func (w *ConsumerWindow) Restart(seq int64) {
 }
 
 // Frames returns the control frames due after a page, in order: in the backlog phase a cursor
-// {read} when read is above the last seq a frame carried, then catchup.complete {readyHead} once
-// read reaches readyHead, which starts the live phase; in the live phase a cursor {read} once
+// {read} when read is above the last seq a frame carried, then catchup.complete {max(readyHead,
+// read)} once read reaches readyHead, which starts the live phase; in the live phase a cursor {read} once
 // sync.cursor_advance_every numbers were passed without a frame (04 sections 7.1 and 7.2, R-SY-03).
 func (w *ConsumerWindow) Frames() []WindowFrame {
 	var out []WindowFrame
@@ -226,7 +226,9 @@ func (w *ConsumerWindow) Frames() []WindowFrame {
 		w.lastFrame = w.read
 	}
 	if !w.live && w.read >= w.readyHead {
-		out = append(out, WindowFrame{Kind: FrameComplete, Seq: w.readyHead})
+		// A page may read past readyHead, so the frame never names a seq below a delivered one
+		// (INT-W42/3).
+		out = append(out, WindowFrame{Kind: FrameComplete, Seq: max(w.readyHead, w.read)})
 		w.live = true
 	}
 	return out

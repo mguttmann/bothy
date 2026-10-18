@@ -248,18 +248,6 @@ func sendAck(t *testing.T, c *wstest.Client, seq int64) {
 	}
 }
 
-// withEnv returns env with the entry kv ("NAME=value") replacing an entry of the same name.
-func withEnv(env []string, kv string) []string {
-	name := kv[:bytes.IndexByte([]byte(kv), '=')+1]
-	out := make([]string, 0, len(env)+1)
-	for _, e := range env {
-		if len(e) < len(name) || e[:len(name)] != name {
-			out = append(out, e)
-		}
-	}
-	return append(out, kv)
-}
-
 // redeliveredFrame reads the flag of a dispatch frame.
 type redeliveredFrame struct {
 	Seq         int64 `json:"seq"`
@@ -452,7 +440,7 @@ func TestAgentConsumers(t *testing.T) {
 		later := w.post(ch.thread, "to the second")
 		readUntil(t, c2, message(later))
 		readUntil(t, other, message(later))
-		c3 := w.dial()
+		c3 := w.dial(t)
 		ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
 		defer cancel()
 		_, err := c3.Resume(ctx, wstest.ResumeParams{SessionID: r1.GatewaySessionId.String(), APIToken: a.tok,
@@ -512,7 +500,8 @@ func TestAgentConsumers(t *testing.T) {
 
 	t.Run("TestConsumerNameRules", func(t *testing.T) {
 		a := w.agent()
-		w.identifyErr(t, w.agentParams(a, "Not Valid"), 4002)
+		// An invalid consumer name breaks the identify schema on purpose (INT-W42/2).
+		w.identifyErr(t, w.agentParams(a, "Not Valid"), 4002, wstest.WithRawClientFrames())
 		code, b := w.call(w.base, a, http.MethodGet, "/api/v1/agents/me/consumers/Not_Valid", nil)
 		if code != http.StatusBadRequest || !bytes.Contains(b, []byte("validation_failed")) {
 			t.Fatalf("invalid path = %d %s", code, b)
@@ -677,7 +666,7 @@ func TestAgentConsumers(t *testing.T) {
 		t.Helper()
 		ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
 		defer cancel()
-		c, err := wstest.Dial(ctx, bBase, wstest.WithOrigin(gwPublicURL))
+		c, err := wstest.Dial(t, ctx, bBase, wstest.WithOrigin(gwPublicURL), wstest.WithMaxFrameBytes(w.cfg.MaxFrameBytes))
 		if err != nil {
 			t.Fatal(err)
 		}

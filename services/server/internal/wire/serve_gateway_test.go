@@ -265,10 +265,10 @@ func (w *gwWorld) expectClose(t *testing.T, c *wstest.Client, code int) string {
 	return reason
 }
 
-// identifyErr identifies on a fresh connection and requires the close code.
-func (w *gwWorld) identifyErr(t *testing.T, p wstest.IdentifyParams, code int) {
+// identifyErr identifies on a fresh connection dialed with opts and requires the close code.
+func (w *gwWorld) identifyErr(t *testing.T, p wstest.IdentifyParams, code int, opts ...wstest.Option) {
 	t.Helper()
-	c := w.dial(t)
+	c := w.dial(t, opts...)
 	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
 	defer cancel()
 	_, err := c.Identify(ctx, p)

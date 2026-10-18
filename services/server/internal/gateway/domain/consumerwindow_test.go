@@ -153,6 +153,20 @@ func TestConsumerWindow_CursorAndCatchupFrames(t *testing.T) {
 	}
 }
 
+// TestConsumerWindow_CatchupCompleteNotBelowDelivered (INT-W42/3): a backlog page may read past the
+// ready head (the runner pages up to the hub position), and catchup.complete then names the
+// position read, never a head_seq below a delivered seq (04 section 6, gate G9).
+func TestConsumerWindow_CatchupCompleteNotBelowDelivered(t *testing.T) {
+	t.Parallel()
+	cfg := windowCfg()
+	cfg.MaxInflight = 100
+	w := domain.NewConsumerWindow(cfg, 10, 30)
+	page(w, []int64{28, 34}, 34, t0)
+	if got := w.Frames(); !slices.Equal(got, []domain.WindowFrame{{Kind: domain.FrameComplete, Seq: 34}}) {
+		t.Fatalf("frames %v, want catchup.complete at the delivered seq 34", got)
+	}
+}
+
 // TestConsumerWindow_ResyncReasons: retention and cursor_ahead restart the window at the head
 // without catchup.complete; too_far_behind and epoch_changed do not apply to consumers.
 func TestConsumerWindow_ResyncReasons(t *testing.T) {

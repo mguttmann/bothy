@@ -278,8 +278,9 @@ func (c *Client) order(idx int, op string, d json.RawMessage) {
 		c.violate(idx, op, "/op", "first server frame is not hello")
 	}
 	var v struct {
-		Seq     *int64 `json:"seq"`
-		HeadSeq *int64 `json:"head_seq"`
+		Seq         *int64 `json:"seq"`
+		HeadSeq     *int64 `json:"head_seq"`
+		Redelivered bool   `json:"redelivered"`
 	}
 	_ = json.Unmarshal(d, &v)
 	c.mu.Lock()
@@ -289,6 +290,9 @@ func (c *Client) order(idx int, op string, d json.RawMessage) {
 	case "dispatch":
 		if v.Seq == nil {
 			return // ephemeral
+		}
+		if v.Redelivered && *v.Seq <= last {
+			return // an agent consumer redelivers from acked_seq + 1 (04 section 15.2, INT-W42/1)
 		}
 		if *v.Seq <= last {
 			c.violate(idx, op, "/d/seq", fmt.Sprintf("seq %d after delivered seq %d", *v.Seq, last))

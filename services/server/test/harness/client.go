@@ -18,6 +18,7 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+	"testing"
 	"time"
 
 	"go.yaml.in/yaml/v3"
@@ -87,6 +88,8 @@ type Client struct {
 	stepKey   *deviceKey
 	// apiToken marks the client of an agent: access is an API token, there is no device.
 	apiToken bool
+	// tb is the test of the server: gateway connections report their frame violations to it (G9).
+	tb testing.TB
 
 	mu      sync.Mutex
 	access  string

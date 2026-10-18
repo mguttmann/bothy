@@ -131,6 +131,19 @@ func TestHarness_ValidConnectionReportsNothing(t *testing.T) {
 	}
 }
 
+// TestHarness_RedeliveryKeepsOrder (INT-W42/1): an agent consumer redelivers from acked_seq + 1
+// with redelivered (04 section 15.2 item 3, M2-07), so a redelivered dispatch may repeat a
+// delivered seq; a first delivery that repeats one is still reported.
+func TestHarness_RedeliveryKeepsOrder(t *testing.T) {
+	t.Parallel()
+	again := strings.Replace(revoked(5), `"d":{`, `"d":{"redelivered":true,`, 1)
+	if got := runFake(t, fakeServer(t, websocket.StatusNormalClosure, hello, revoked(5), revoked(6), again, revoked(7))); len(got) != 0 {
+		t.Fatalf("reports %q for a redelivery", got)
+	}
+	got := runFake(t, fakeServer(t, websocket.StatusNormalClosure, hello, revoked(5), again, revoked(5)))
+	requireOne(t, got, "frame 3", "seq 5 after delivered seq 5")
+}
+
 func TestHarness_OrderViolationReported(t *testing.T) {
 	t.Parallel()
 	got := runFake(t, fakeServer(t, websocket.StatusNormalClosure, hello, revoked(5), revoked(5)))
