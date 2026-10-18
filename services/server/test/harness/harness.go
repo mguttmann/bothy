@@ -63,6 +63,7 @@ func Main(m *testing.M) int {
 		_, _ = fmt.Fprintf(os.Stderr, "harness: %v\n", err)
 		return 1
 	}
+	defer cleanupBuild()
 	return pgtest.Main(m, pgtest.WithSteps(wire.MigrationSteps))
 }
 
@@ -82,6 +83,9 @@ type Options struct {
 	// Clock is the clock of the harness: expiry times of BuildMatrixWorld and the shutdown budget
 	// of the server; nil means clock.System().
 	Clock clock.Clock
+	// DurableDB puts the database on the durable pgtest server (pgtest.Durable: fsync,
+	// synchronous_commit and full_page_writes on); every perf and chaos test sets it (ADR 0063).
+	DurableDB bool
 }
 
 // TelemetrySinks are the in-process exporters of the canary test; M1-69 fills them.
@@ -140,7 +144,11 @@ func Start(tb testing.TB, opts Options) *Server {
 	if clk == nil {
 		clk = clock.System()
 	}
-	db := pgtest.New(tb)
+	var dbOpts []pgtest.Option
+	if opts.DurableDB {
+		dbOpts = append(dbOpts, pgtest.Durable())
+	}
+	db := pgtest.New(tb, dbOpts...)
 	jobstest.Migrate(tb, db, "jobs")
 	secretsDir := initSecrets(tb, db)
 	keys := filepath.Join(tb.TempDir(), "signing-keys")

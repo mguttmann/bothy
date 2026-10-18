@@ -649,6 +649,12 @@ Menschen sehen. Ihr Zustand steht in der Admin-Konsole (`backup_runs`) und in de
 
 ## 13. Kapazität und Ressourcen
 
+The measurement is `make perf` (M1-72, ADR 0063): it records the pool occupancy under
+`perf.sustained_messages_per_s` and the growth of the database and its indexes per thousand
+messages in `.cache/perf/results.json`; `services/server/perf/README.md` describes how to read
+them. `database.max_conns` keeps its start value until a run on `perf.reference_profile` (mode
+`match` or `emulated`) confirms or changes it; a run in mode `below` is no evidence for it.
+
 Feste Größen gibt es erst nach dem Lasttest: M1-72 bestätigt oder ändert `database.max_conns` mit
 Messwerten, M7-18 füllt die Kapazitätstabelle. Bis dahin gelten Startwerte aus der Konfiguration
 und dieses Modell:

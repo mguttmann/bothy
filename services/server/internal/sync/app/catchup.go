@@ -166,7 +166,9 @@ func (s *CatchUpService) PageEvents(ctx context.Context, in sync.PageInput) (syn
 		return sync.EventPage{}, err
 	}
 	out := sync.EventPage{Events: make([]sync.Event, 0, len(rows))}
-	fctx := authorize.Filter(ctx)
+	// One structure scope per page: the checks read the thread and channel of the page's events
+	// once each instead of once per event (M1-72, perf.catchup_page_p99).
+	fctx := authorize.Filter(authorize.WithStructureScope(ctx))
 	var last int64
 	for _, ev := range rows {
 		last = ev.Seq

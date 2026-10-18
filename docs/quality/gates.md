@@ -128,11 +128,31 @@ liegen unter `<modul>/perf/` und zählen nicht zur Abdeckung. Ohne Go-Modul meld
 `PERF_MODULES` ohne `perf/` ist ein Fehler. Wie die Server-Gates braucht
 `make perf` go, eine Docker-kompatible Laufzeit und die Pins.
 
+Since M1-72 `make perf` runs the load tests and the chaos tests (`<module>/test/chaos`, same tag)
+one package after another (`go test -p 1`), then `perf/internal/report/perfreport`: it prints the
+profile mode (`match`, `emulated` or `below`, ADR 0063) and one line per target with value,
+threshold, comparison and pass, writes nothing but `.cache/perf/results.json`, and exits non-zero
+when a target is missed or missing, the mode is `below`, or a measured database ran without
+`fsync` or `synchronous_commit`. A failed chaos test fails `make perf` as well.
+`services/server/perf/README.md` describes every test. `make lint` vets and lints the tagged code
+(`go vet` and golangci-lint with the tag `perf` next to `contract_validate,contract_live`), so it
+cannot rot between milestones.
+
 Dart members (M6-12): a member with `tool/perf_macos.sh` runs its performance test in profile
 mode on macOS, today the live topology of `packages/bothy_viz/harness` against
 `viz.perf.frame_build_p95`. On another host `make perf` prints `SKIP perf-dart needs macOS`;
 the CI job `apps-macos` runs the same script through `platform-tests.json` (`make
 apps-platform`). The variable `PERF_HOST` (default `uname -s`) names the host system.
+
+## Not in `make check`
+
+Two targets check the whole system and run only at their occasion, never in `make check`, `gates`
+or the pre-push hook:
+
+| Target | What it checks | When |
+|---|---|---|
+| `perf` | load tests of the performance targets of 02 and the chaos tests of the event path, on `perf.reference_profile` (section above, ADR 0063) | end of a milestone, release, tickets that touch a performance target (PLAN P-07) |
+| `portability` | the whole stack from images on a fresh machine plus the smoke test (`infra/compose/smoke.sh`) | release workflow |
 
 ## Migrationen
 

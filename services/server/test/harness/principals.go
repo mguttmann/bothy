@@ -66,14 +66,30 @@ func DoWithStepUp(ctx context.Context, c *Client, r Request) (Response, error) {
 
 // NewUser creates a person with a local account through the public API as the owner (createUser
 // with local_account), redeems the enrollment code with fresh device keys (redeemEnrollmentCode)
-// and returns the signed-in client.
+// and returns the signed-in client. Errors fail tb.
 func (s *Server) NewUser(tb testing.TB, spec UserSpec) *Client {
 	tb.Helper()
+	c, err := s.CreateUser(tb.Context(), spec)
+	if err != nil {
+		tb.Fatalf("harness: %v", err)
+	}
+	return c
+}
+
+// CreateUser is NewUser without a testing.TB, for seeding from several goroutines: it returns
+// the error of a failed createUser, step-up or redeemEnrollmentCode instead of failing a test.
+func (s *Server) CreateUser(ctx context.Context, spec UserSpec) (*Client, error) {
 	body := map[string]any{"handle": spec.Handle, "display_name": spec.DisplayName, "local_account": true}
 	if spec.Email != "" {
 		body["email"] = spec.Email
 	}
-	resp := MustDo(tb, s.Owner, Request{Method: http.MethodPost, Path: "/users", Body: body}, http.StatusCreated)
+	resp, err := DoWithStepUp(ctx, s.Owner, Request{Method: http.MethodPost, Path: "/users", Body: body})
+	if err != nil {
+		return nil, err
+	}
+	if resp.Status != http.StatusCreated {
+		return nil, fmt.Errorf("createUser %s: %d %s", spec.Handle, resp.Status, resp.Body)
+	}
 	var created struct {
 		User struct {
 			ID string `json:"id"`
@@ -82,14 +98,16 @@ func (s *Server) NewUser(tb testing.TB, spec UserSpec) *Client {
 			Code string `json:"code"`
 		} `json:"enrollment"`
 	}
-	resp.JSON(tb, &created)
-	c, err := s.redeem(tb.Context(), created.Enrollment.Code, spec.DisplayName+" device")
+	if err := json.Unmarshal(resp.Body, &created); err != nil {
+		return nil, fmt.Errorf("createUser %s: %w", spec.Handle, err)
+	}
+	c, err := s.redeem(ctx, created.Enrollment.Code, spec.DisplayName+" device")
 	if err != nil {
-		tb.Fatalf("harness: %v", err)
+		return nil, err
 	}
 	c.PrincipalID = created.User.ID
 	s.users.Store(spec.Handle, c)
-	return c
+	return c, nil
 }
 
 // NewAgent creates an agent through the public API as the owner (createAgent, then

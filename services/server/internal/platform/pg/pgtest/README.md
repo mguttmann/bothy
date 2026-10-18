@@ -44,6 +44,16 @@ instead of the speed flags below; it starts with the first such `New`. Load and 
 because ADR 0063 point 2 measures only with the durability settings of production (M1-16,
 `perf/event_commit`; M1-72). Normal tests keep the fast container.
 
+M1-72 adds two things for the load and chaos tests of `make perf`:
+
+- `Limits(cpus, memoryBytes)` puts the database on a container started with `docker --cpus` and
+  `--memory` (the emulated profile of ADR 0063); each combination of `Durable` and `Limits` is its
+  own container of the test binary.
+- A durable container publishes a free loopback port picked first, as
+  `127.0.0.1:<port>:5432` (retried on a bind conflict), and is not removed automatically, so
+  `DB.Restart(ctx)` can stop and start it on the same port with its data; `Restart` affects every
+  database of that container and returns once a superuser connection works.
+
 Roles are cluster-wide: a test that changes a role password must not call `t.Parallel` and must
 restore the password (see `roles_test.go` in package `pg`).
 
@@ -59,8 +69,8 @@ and the test binary exits with 1; tests never skip. The image is the pinned `Ima
 
 ## Cleanup
 
-`Main` terminates the container after the tests and removes the secrets directory; the container
-also has `AutoRemove`. A test binary that was killed leaves its container running. Find and remove
+`Main` terminates the containers after the tests and removes the secrets directories; a container
+with the speed flags also has `AutoRemove`. A test binary that was killed leaves its container running. Find and remove
 such containers by their label:
 
 ```sh

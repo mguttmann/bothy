@@ -8,9 +8,10 @@ import (
 )
 
 type (
-	pinKey    struct{}
-	memoKey   struct{}
-	filterKey struct{}
+	pinKey       struct{}
+	memoKey      struct{}
+	filterKey    struct{}
+	structureKey struct{}
 )
 
 // WithPermissionVersion returns a copy of ctx that pins the rights version v: the Authorizer uses
@@ -69,6 +70,21 @@ func WithoutRequestScope(ctx context.Context) context.Context {
 // RequestMemoFrom returns the memo installed by WithRequestScope.
 func RequestMemoFrom(ctx context.Context) (*RequestMemo, bool) {
 	m, ok := ctx.Value(memoKey{}).(*RequestMemo)
+	return m, ok && m != nil
+}
+
+// WithStructureScope returns a copy of ctx with a new, empty structure memo: within it the
+// Authorizer reads the thread and channel facts of a resource once and reuses them for every
+// further check. The gateway hub opens one per live event, so the checks of all its connections
+// for that event share one read of the structure instead of one per connection (M1-72,
+// perf.fanout_local_p99). It does not touch the request memo or the rights version.
+func WithStructureScope(ctx context.Context) context.Context {
+	return context.WithValue(ctx, structureKey{}, &RequestMemo{vals: map[any]any{}})
+}
+
+// StructureMemoFrom returns the memo installed by WithStructureScope.
+func StructureMemoFrom(ctx context.Context) (*RequestMemo, bool) {
+	m, ok := ctx.Value(structureKey{}).(*RequestMemo)
 	return m, ok && m != nil
 }
 

@@ -24,6 +24,20 @@ documented in this file. The format is based on
   removes. `access.changed`, `thread.moved`, `channel.archived` and `space.archived` re-check the
   focus, and `resume` restores it. The configuration keys `sync.max_focused_threads`,
   `sync.typing_min_interval` and `sync.typing_ttl` are active.
+- Performance gate of the server core (M1-72, ADR 0063): `make perf` measures every M1 target
+  (`perf.message_create_p99` under `perf.sustained_messages_per_s`, `perf.fanout_local_p99`,
+  `perf.catchup_page_p99` with a fractional and a large visible set, `perf.authorize_cached_p99`,
+  `perf.ws_connections_per_node`, `perf.ws_idle_conn_mem_max`, `perf.idle_rss_max`,
+  `perf.startup_ready_max`, `perf.event_commit_min_per_s`) with thresholds read from chapter 02,
+  writes `.cache/perf/results.json`, prints the table with the profile mode (`match`, `emulated`,
+  `below`) and fails on a miss, a run below the profile or a database without `fsync` or
+  `synchronous_commit`. Chaos tests of the event path: loss of the `LISTEN` connection, a database
+  restart during the tail and `SIGKILL` during commits, each followed by the invariants of the
+  event log, threads, idempotency keys, audit chain and receivers. The shared harness gains
+  `StartProcess` (the real binary through `secrets init`, `migrate up --bootstrap`, `setup
+  bootstrap-owner` and `serve`), `Options.DurableDB`, `CreateUser` and a gateway client; pgtest
+  gains `Limits` and a durable container on a fixed loopback port with `DB.Restart`. `make lint`
+  vets and lints the `perf` tag.
 - Web console serving (M6-02): `console.assets_dir` names the built console, which the api
   process serves under `/console/` (exact files with their type, `index.html` for every other
   path below `/console/`, traversal refused, `index.html` never stored, hashed assets immutable,
@@ -1177,6 +1191,15 @@ documented in this file. The format is based on
   `identity.auth_cleanup` (`device.expire`, reason `inactive`).
 
 ### Changed
+
+- Start and memory of the server process (M1-72): the production request validator no longer
+  compiles the response schemas of every operation (only the test build with `contract_validate`
+  keeps them for G8); `make perf` had measured `perf.startup_ready_max` and `perf.idle_rss_max`
+  above their thresholds.
+- Live delivery and catch-up read the thread and channel of an event once per event (hub) and once
+  per page (`listEvents`, gateway catch-up) through a structure scope of the Authorizer
+  (`authorize.WithStructureScope`) instead of once per connection and event; under the load of
+  `make perf` live delivery fell behind by seconds.
 
 - The body schemas of every client frame of the gateway refuse unknown members
   (`additionalProperties: false`, W7, M1-64); the route generator checks them and generates

@@ -23,6 +23,7 @@ import (
 	syncpg "github.com/OWNER/bothy/services/server/internal/sync/adapters/postgres"
 	syncapp "github.com/OWNER/bothy/services/server/internal/sync/app"
 	"github.com/OWNER/bothy/services/server/internal/wire"
+	"github.com/OWNER/bothy/services/server/perf/internal/perfkit"
 	"github.com/OWNER/bothy/services/server/perf/internal/report"
 )
 
@@ -46,33 +47,23 @@ const target = "perf.event_commit_min_per_s"
 // second subtest repeats the measurement with an idle River worker on the same database and only
 // prints its number (02 "Offen", PollOnly).
 func TestEventCommitThroughput(t *testing.T) {
-	targets, err := report.Load(report.ArchitectureChapter())
-	if err != nil {
-		t.Fatal(err)
-	}
-	threshold, err := targets.Minimum(target)
-	if err != nil {
-		t.Fatal(err)
-	}
-	profile, err := targets.Text("perf.reference_profile")
-	if err != nil {
-		t.Fatal(err)
+	env := perfkit.Setup(t)
+	th := env.Threshold(t, target)
+	if env.GOMAXPROCS > 0 {
+		// The measured server runs in this process: emulated mode limits it like a server process.
+		defer runtime.GOMAXPROCS(runtime.GOMAXPROCS(env.GOMAXPROCS))
 	}
 	n := *writers
 	if n <= 0 {
 		n = 4 * runtime.GOMAXPROCS(0)
 	}
-	db := pgtest.New(t, pgtest.Durable())
-	super := db.SuperConn(t)
-	for _, setting := range []string{"fsync", "synchronous_commit"} {
-		var v string
-		if err := super.QueryRow(context.Background(), "SHOW "+setting).Scan(&v); err != nil {
-			t.Fatal(err)
-		}
-		if v != "on" {
-			t.Fatalf("%s = %s; ADR 0063 point 2 measures only with fsync and synchronous_commit on", setting, v)
-		}
+	dbOpts := []pgtest.Option{pgtest.Durable()}
+	if env.DBCPUs > 0 || env.DBMemoryBytes > 0 {
+		dbOpts = append(dbOpts, pgtest.Limits(env.DBCPUs, env.DBMemoryBytes))
 	}
+	db := pgtest.New(t, dbOpts...)
+	super := db.SuperConn(t)
+	env.ReadDurability(t, super)
 	owner := db.Pool(t, pg.RoleOwner)
 	for _, stmt := range []string{
 		"CREATE TABLE perf_scratch (id int PRIMARY KEY, n bigint NOT NULL DEFAULT 0)",
@@ -105,14 +96,11 @@ func TestEventCommitThroughput(t *testing.T) {
 	if _, err := sy.Maintenance().Run(context.Background()); err != nil {
 		t.Fatal(err)
 	}
-	t.Logf("profile %s: %s; this machine: %d logical CPUs", "perf.reference_profile", profile, runtime.NumCPU())
 
 	t.Run("counter_pattern", func(t *testing.T) {
 		rate := measure(t, uow, pool, sy.Appender(), n)
-		fmt.Printf("%s measured=%.0f threshold=%.0f cpus=%d writers=%d\n", target, rate, threshold, runtime.NumCPU(), n)
-		if err := report.CheckMinimum(target, rate, threshold); err != nil {
-			t.Fatal(err)
-		}
+		env.Record(t, []report.Result{th.Result("TestEventCommitThroughput", rate, int(rate*duration.Seconds()))},
+			map[string]any{"event_commit.params": map[string]any{"writers": n, "duration_s": duration.Seconds()}})
 	})
 	t.Run("with_idle_river_worker", func(t *testing.T) {
 		jobstest.Migrate(t, db, "jobs")
@@ -133,7 +121,7 @@ func TestEventCommitThroughput(t *testing.T) {
 			_ = rt.Stop(ctx)
 		}()
 		rate := measure(t, uow, pool, sy.Appender(), n)
-		fmt.Printf("%s with_idle_river_worker measured=%.0f threshold=%.0f cpus=%d writers=%d\n", target, rate, threshold, runtime.NumCPU(), n)
+		env.Record(t, nil, map[string]any{"event_commit.with_idle_river_worker_per_s": rate})
 	})
 }
 

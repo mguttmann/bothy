@@ -80,6 +80,12 @@ var fieldDetails = map[string]string{
 // allowed" and "missing property 'x'".
 var quotedName = regexp.MustCompile(`'([^']*)'`)
 
+// keepResponses keeps the responses of the operations in the validator. Only the test build with
+// the tag contract_validate sets it (contractcheck_install.go), because only its response check
+// (G8) validates responses; compiling the response schemas of every operation took most of the
+// start of a production server and memory it never used (docs/DECISIONS.md M1-72).
+var keepResponses bool
+
 // opEntry is one operation of the pruned contract.
 type opEntry struct {
 	item *v3.PathItem
@@ -183,6 +189,11 @@ func (v *Validator) prune(path string, item *v3.PathItem, keep map[string]bool) 
 		if !keep[op.OperationId] {
 			*slot = nil
 			continue
+		}
+		if !keepResponses {
+			// The production build validates requests only; without the responses the library
+			// compiles no response schema at the start (perf.startup_ready_max, M1-72).
+			op.Responses = nil
 		}
 		v.ops[op.OperationId] = opEntry{item: item, path: path}
 		left = true
