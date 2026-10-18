@@ -6,7 +6,7 @@
  * section 10; brief M7-25 requirement 14). The rule reports a string or template literal that
  * holds a hex colour, a CSS colour function (rgb, rgba, hsl, hsla, hwb, lab, lch, oklab, oklch,
  * color), a named CSS colour as the whole value, or a named colour after a colour property in
- * CSS text (`color: navy`). The generated token file lies outside src/ and is not linted by it.
+ * CSS text (`color: navy`) or among the words of a style key's value (`border: '1px solid red'`). The generated token file lies outside src/ and is not linted by it.
  *
  * Example: `{ color: 'red' }` and `'1px solid #136f69'` are reported; `{ color: theme.colors.text.primary }`
  * is not.
@@ -41,6 +41,22 @@ const FUNCTION = /\b(?:rgba?|hsla?|hwb|lab|lch|oklab|oklch|color)\(/i;
 const DECLARATION =
   /(?:^|[;{\s])(?:color|background(?:-color)?|border(?:-[a-z]+)*|outline(?:-color)?|fill|stroke|text-decoration-color|caret-color|accent-color)\s*:\s*([^;]*)/gi;
 
+/** Style keys whose value can hold a colour (camelCase or CSS spelling). */
+const COLOR_KEY = /colou?r|background|border|outline|shadow|fill|stroke|decoration/i;
+
+/**
+ * Whether a style value contains a named colour among its words (`1px solid red`).
+ *
+ * @param {string} text - the value
+ * @returns {boolean} true when one word is a named colour
+ */
+function hasNamedWord(text) {
+  return text
+    .toLowerCase()
+    .split(/[\s,()]+/)
+    .some((w) => NAMED.has(w));
+}
+
 /**
  * Whether a piece of literal text holds a colour.
  *
@@ -55,8 +71,7 @@ function hasColor(text) {
     return true;
   }
   for (const match of text.matchAll(DECLARATION)) {
-    const words = (match[1] || '').toLowerCase().split(/[\s,()]+/);
-    if (words.some((w) => NAMED.has(w))) {
+    if (hasNamedWord(match[1] || '')) {
       return true;
     }
   }
@@ -77,8 +92,20 @@ module.exports = {
     const report = (node, text) => context.report({ node, messageId: 'literal', data: { text: text.slice(0, 40) } });
     return {
       Literal(node) {
-        if (typeof node.value === 'string' && hasColor(node.value)) {
+        if (typeof node.value !== 'string') {
+          return;
+        }
+        if (hasColor(node.value)) {
           report(node, node.value);
+          return;
+        }
+        // The value of a style key such as `border` or `boxShadow`: a named colour among its words.
+        const parent = node.parent;
+        if (parent && parent.type === 'Property' && parent.value === node) {
+          const key = parent.key.type === 'Identifier' ? parent.key.name : String(parent.key.value);
+          if (COLOR_KEY.test(key) && hasNamedWord(node.value)) {
+            report(node, node.value);
+          }
         }
       },
       TemplateLiteral(node) {

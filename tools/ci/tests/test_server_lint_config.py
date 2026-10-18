@@ -50,6 +50,9 @@ OTHER = {
     "**/*.g.kt",
     "**/*.g.cpp",
     "**/*.g.h",
+    # The scaffold configuration and the generated queries of the Grafana panel plugin (M7-25).
+    "plugins/grafana-bothy-live/.config/**",
+    "plugins/grafana-bothy-live/src/queries.gen.ts",
 }
 # Files whose path looks like generated code. Each one that a lint rule exempts must be one that
 # sonar.exclusions leaves out too: dropping an entry there must narrow the rule.

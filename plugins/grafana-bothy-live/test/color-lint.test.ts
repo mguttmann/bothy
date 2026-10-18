@@ -44,6 +44,9 @@ describe('bothy/no-color-literal', () => {
     ['a named colour in a CSS declaration', "const c = 'color: navy';"],
     ['a colour in a template literal', 'const c = `1px solid ${w} #00ff00`;'],
     ['a named colour in a template literal declaration', 'const c = `background: ${x}; color: teal`;'],
+    ['a named colour inside a border value', "const s = { border: '1px solid red' };"],
+    ['a named colour inside a shadow value', "const s = { boxShadow: '0 0 2px black' };"],
+    ['a named colour inside a quoted style key', "const s = { 'outline-color': 'thin dotted Blue' };"],
   ])('rejects %s', (_name, code) => {
     expect(lint(code)).toEqual([expect.stringContaining('design tokens')]);
   });
@@ -54,6 +57,7 @@ describe('bothy/no-color-literal', () => {
     ['an id-like hash that is no colour', "const t = '#backend';"],
     ['a word that contains a colour name', "const t = 'reduced';"],
     ['none and currentColor', "const a = 'none'; const b = 'currentColor';"],
+    ['a colour word in a property that holds no colour', "const s = { label: 'red team' };"],
   ])('accepts %s', (_name, code) => {
     expect(lint(code)).toEqual([]);
   });
