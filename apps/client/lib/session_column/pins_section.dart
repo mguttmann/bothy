@@ -4,6 +4,8 @@
 /// the pinned messages of the open thread; a row opens the message in the history.
 library;
 
+import 'dart:async';
+
 import 'package:design_system/design_system.dart';
 import 'package:domain/domain.dart';
 import 'package:flutter/material.dart';
@@ -14,8 +16,9 @@ import 'package:l10n/l10n.dart';
 import '../thread/message_tile.dart' show excerpt;
 import '../thread/providers.dart';
 
-/// The pinned messages of [threadId].
-class PinsSection extends ConsumerWidget {
+/// The pinned messages of [threadId]; opening the section reads `listPins` once, so pins
+/// outside the loaded history show too.
+class PinsSection extends ConsumerStatefulWidget {
   /// Creates the section.
   const PinsSection({super.key, required this.threadId});
 
@@ -23,7 +26,38 @@ class PinsSection extends ConsumerWidget {
   final ThreadId threadId;
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<PinsSection> createState() => _PinsSectionState();
+}
+
+class _PinsSectionState extends ConsumerState<PinsSection> {
+  @override
+  void initState() {
+    super.initState();
+    // Offline or refused: the section shows the stored pins.
+    unawaited(
+      ref
+          .read(threadReadsProvider)
+          .loadPins(widget.threadId)
+          .catchError((Object _) {}),
+    );
+  }
+
+  @override
+  void didUpdateWidget(PinsSection old) {
+    super.didUpdateWidget(old);
+    if (old.threadId != widget.threadId) {
+      unawaited(
+        ref
+            .read(threadReadsProvider)
+            .loadPins(widget.threadId)
+            .catchError((Object _) {}),
+      );
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final threadId = widget.threadId;
     final l = AppLocalizations.of(context);
     final colors = context.dsColors;
     final pinned =

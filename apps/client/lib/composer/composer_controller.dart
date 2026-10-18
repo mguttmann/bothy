@@ -147,15 +147,16 @@ final class ComposerController extends ChangeNotifier {
   /// version is taken over only with the text, or when the text is already the field's.
   Future<void> applyStored(Draft? draft) async {
     final call = ++_applyCalls;
-    if (draft != null && _isOwn(draft)) {
-      // The answer of this device's own write: the next write builds on it.
-      _draftVersion = draft.version;
-      return;
-    }
+    // The answer of this device's own write: the next write builds on its version even while
+    // the person types; the text is the person's own and stays as it is.
+    final own = draft != null && _isOwn(draft);
+    if (own) _draftVersion = draft.version;
     if (_typingNow) return;
     // An own write that is not confirmed is newer than any stored draft; its answer, which can
     // arrive after a send, must not bring the sent text back.
     if (await _drafts.hasUnsent() || call != _applyCalls || _typingNow) return;
+    // Nothing unconfirmed and nobody typing: the stored draft, own or not, is the text (a
+    // composer opened again shows the draft this device saved).
     final next = draft?.contentMd ?? '';
     if (draft != null) _draftVersion = draft.version;
     if (next == text.text) return;

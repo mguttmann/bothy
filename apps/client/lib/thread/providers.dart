@@ -356,4 +356,7 @@ final class _NoReads implements ThreadReads {
   @override
   Future<TemplateLists> templates(ChannelId channelId) async =>
       const TemplateLists(personal: [], channel: []);
+
+  @override
+  Future<void> loadPins(ThreadId thread) async {}
 }

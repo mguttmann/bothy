@@ -423,4 +423,41 @@ void main() {
     expect(tester.widget<TextField>(composerField).controller!.text, isEmpty);
     await host.dispose(tester);
   });
+
+  testWidgets(
+    'a draft this device saved comes back when the composer opens again',
+    (tester) async {
+      final host = await open(tester);
+      final device = DeviceId.parse(uuid(0xde));
+      final composer = ComposerController(
+        thread: threadId(1),
+        channel: channelId(1),
+        actions: ThreadActions(host.engine),
+        drafts: DraftWriter(
+          outbox: host.engine.outbox,
+          dao: host.db.outboxDao,
+          thread: threadId(1),
+        ),
+        editing: DraftEditingRegistry(),
+        deviceId: device,
+      );
+      addTearDown(composer.dispose);
+      await host.run(
+        tester,
+        () => composer.applyStored(
+          Draft(
+            id: DraftId.parse(uuid(0xd5)),
+            threadId: threadId(1),
+            channelId: channelId(1),
+            contentMd: 'Long reply in progress',
+            fileIds: const [],
+            version: const ResourceVersion(2),
+            updatedByDeviceId: device,
+          ),
+        ),
+      );
+      expect(composer.text.text, 'Long reply in progress');
+      await host.dispose(tester);
+    },
+  );
 }

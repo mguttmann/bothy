@@ -7,8 +7,10 @@
 library;
 
 import 'package:api_client/api_client.dart'
-    show ApiClient, MessageRevision, Template;
-import 'package:api_client/api_client.dart' as wire show TemplateScopeEnum;
+    show ApiClient, MessageRevision, Pin, Template;
+import 'package:api_client/api_client.dart'
+    as wire
+    show Message, TemplateScopeEnum;
 import 'package:domain/domain.dart';
 import 'package:sync_engine/sync_engine.dart';
 
@@ -87,6 +89,11 @@ abstract interface class ThreadReads {
 
   /// `listMyTemplates` and `listTemplates` of [channelId].
   Future<TemplateLists> templates(ChannelId channelId);
+
+  /// `listPins` of [thread]: stores the pinned messages that are not stored yet (`getMessage`),
+  /// so the section "Pinned" also shows pins outside the loaded history (they stay out of the
+  /// history until their range is loaded).
+  Future<void> loadPins(ThreadId thread);
 }
 
 /// [ThreadReads] over the engine's catch-up and the session's REST client.
@@ -128,6 +135,28 @@ final class EngineThreadReads implements ThreadReads {
           createdAt: r.createdAt,
         ),
     ];
+  }
+
+  @override
+  Future<void> loadPins(ThreadId thread) async {
+    final pins = (await _api.getMessagesApi().listPins(threadId: thread.value))
+        .data;
+    for (final pin in pins?.items ?? const <Pin>[]) {
+      final message = (await _api.getMessagesApi().getMessage(
+        messageId: pin.messageId,
+      )).data;
+      if (message == null) continue;
+      final json = _api.serializers.serializeWith(
+        wire.Message.serializer,
+        message,
+      );
+      if (json is Map) {
+        await _engine.catchUp.storeConfirmedMessage(
+          json.cast<String, Object?>(),
+          created: false,
+        );
+      }
+    }
   }
 
   @override

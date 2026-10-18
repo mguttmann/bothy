@@ -86,6 +86,17 @@ class FakeThreadReads implements ThreadReads {
   @override
   Future<TemplateLists> templates(ChannelId channelId) async =>
       TemplateLists(personal: personal, channel: channel);
+
+  /// Pinned messages the "server" lists beyond the stored ones.
+  final List<Message> pins = [];
+
+  @override
+  Future<void> loadPins(ThreadId thread) async {
+    calls.add('pins');
+    for (final m in pins) {
+      if (m.threadId == thread) await db.messagesDao.upsertIfNewer(m);
+    }
+  }
 }
 
 /// The overrides of the thread tests: Alex signed in, the [reads].
