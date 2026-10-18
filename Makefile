@@ -39,6 +39,11 @@ PERF_TIMEOUT ?= 60m
 GO_TEST_TIMEOUT ?= 20m
 # Host system of the Dart performance tests: they run in profile mode on macOS only.
 PERF_HOST ?= $(shell uname -s)
+
+# Examples per operation of G7 and its time limit (named values quality.contract.max_examples,
+# quality.contract.timeout).
+CONTRACT_MAX_EXAMPLES ?= 100
+CONTRACT_TIMEOUT ?= 180m
 SONAR_HOST_URL ?= http://127.0.0.1:9000
 SONAR_ORGANIZATION ?=
 SONAR_PROJECT_KEY ?= bothy
@@ -129,7 +134,7 @@ TOOLS_SOURCE_TESTS := ci/tests/test_product_name_places.py docs/tests/test_confi
         runners-check release-pins commitlint \
         review labels-check labels-sync tools-lock release-build release-prep release-trial scancode clean \
         codegen-check arch register-check migrations-lint migrations-lock flag-check perf ops-check \
-        image image-test postgres-image postgres-image-test apps-platform
+        image image-test postgres-image postgres-image-test apps-platform contract-test
 
 help: ## Show the targets
 	@awk 'BEGIN {FS = ":.*## "} /^[a-zA-Z0-9_-]+:.*## / {printf "  %-20s %s\n", $$1, $$2}' $(MAKEFILE_LIST)
@@ -169,7 +174,7 @@ check: gates denylist sonar ## Every gate, identical to CI (before every push)
 gates: ## All gates except denylist and sonar (CI job "gates")
 # Generated code is checked before lint and type checks, so that stale generator output is
 # reported as drift and not as a confusing compile error. `perf` is not a gate (P-07).
-gates: fmt-check codegen-check lint typecheck arch register-check migrations-lint flag-check test coverage commitlint \
+gates: fmt-check codegen-check lint typecheck arch register-check migrations-lint flag-check test coverage contract-test commitlint \
        docs config-doc-check linkcheck diagrams catalog-check api-lint api-checks api-breaking ops-check \
        api-clients tokens runners-check labels-check release-pins gitleaks semgrep trivy osv licenses
 
@@ -198,7 +203,7 @@ lint: ## Linters: file hygiene hooks, ruff, bandit, Dockerfile pins, actionlint,
 	@if [ -z "$(TOOLS_ON)" ]; then $(call tools_skip,tools-lint); else $(UVRUN) ruff check tools; fi
 	@# Every FROM of a tracked Dockerfile is pinned by digest (SEC-SC-4, docs/spec/18-release.md "Server images").
 	$(UVRUN) python tools/ci/dockerfile_pins.py
-	@if [ -z "$(TOOLS_ON)" ]; then $(call tools_skip,tools-bandit); else $(UVRUN) bandit -q -c tools/pyproject.toml -r tools/api-checks tools/arch-check tools/bin tools/catalog tools/ci tools/configdoc tools/denylist tools/design-tokens tools/doccheck tools/docs tools/hooks tools/observability tools/opscheck tools/sonarqube; fi
+	@if [ -z "$(TOOLS_ON)" ]; then $(call tools_skip,tools-bandit); else $(UVRUN) bandit -q -c tools/pyproject.toml -r tools/api-checks tools/arch-check tools/bin tools/catalog tools/ci tools/configdoc tools/contract tools/denylist tools/design-tokens tools/doccheck tools/docs tools/hooks tools/observability tools/opscheck tools/sonarqube; fi
 	$(UVRUN) check-jsonschema --builtin-schema vendor.github-issue-forms $(filter-out %/config.yml,$(wildcard .github/ISSUE_TEMPLATE/*.yml))
 	$(UVRUN) check-jsonschema --builtin-schema vendor.github-issue-config .github/ISSUE_TEMPLATE/config.yml
 	$(UVRUN) check-jsonschema --builtin-schema vendor.renovate renovate.json
@@ -209,7 +214,8 @@ lint: ## Linters: file hygiene hooks, ruff, bandit, Dockerfile pins, actionlint,
 	@# Pins are looked up in the repository root: the lookup command uses paths relative to it.
 	@if [ -z "$(GO_ON)" ]; then $(call skip,go-lint,no Go module selected); \
 	else gl=$(call tool,golangci-lint) || exit 1; \
-	  for m in $(GO_MODS); do (cd $$m && go vet ./... && "$$gl" run ./...) || exit 1; done; \
+	  for m in $(GO_MODS); do (cd $$m && go vet -tags contract_validate,contract_live ./... && \
+	    "$$gl" run --build-tags contract_validate,contract_live ./...) || exit 1; done; \
 	  for m in $(filter $(GO_CROSS_MODULES),$(GO_MODS)); do for os in $(GO_CROSS_OS); do \
 	    (cd $$m && GOOS=$$os go vet ./... && GOOS=$$os "$$gl" run ./...) || exit 1; done; done; fi
 	@# One analysis at the root covers every member of the workspace (docs/DECISIONS.md D-M4-01-5).
@@ -250,7 +256,7 @@ test: ## All tests with coverage data
 	@# instrumentation of the whole module slows the larger packages down (PL/2).
 	@if [ -z "$(GO_ON)" ]; then $(call skip,go-test,no Go module selected); \
 	else $(GO_PREREQS) test || exit 1; gal=$(call tool,go-arch-lint) || exit 1; \
-	  for m in $(GO_MODS); do (cd $$m && GO_ARCH_LINT="$$gal" go test -race -covermode=atomic -coverpkg=./... -coverprofile=coverage.out -timeout=$(GO_TEST_TIMEOUT) ./...) || exit 1; done; fi
+	  for m in $(GO_MODS); do (cd $$m && GO_ARCH_LINT="$$gal" go test -race -tags contract_validate -covermode=atomic -coverpkg=./... -coverprofile=coverage.out -timeout=$(GO_TEST_TIMEOUT) ./...) || exit 1; done; fi
 	@# --enforce-lockfile: a pubspec.lock that no longer matches pubspec.yaml fails instead of being
 	@# rewritten silently, so osv and licenses always read the lock file the tests ran with.
 	@# The workspace resolves once at the root (one pubspec.lock); then every member runs its tests.
@@ -269,6 +275,15 @@ test: ## All tests with coverage data
 	else for p in $(PY_PROJECTS); do (cd $$p && $(UV) run --locked pytest --cov --cov-report=xml:coverage.xml); done; fi
 	@if [ -z "$(TS_ON)" ]; then $(call skip,ts-test,no TypeScript project selected); \
 	else for p in $(TS_PROJECTS); do npm --prefix $$p test; done; fi
+
+# G7 (06 "Contract tests and gate"): the Go test starts the server of this tree with a throwaway
+# PostgreSQL and runs tools/contract/live_contract.py (Schemathesis) against it; G8 validates its
+# responses on the server side (tag contract_validate).
+contract-test: ## Contract tests G7: Schemathesis against the server of this tree (Docker runtime)
+	@if [ -z "$(GO_ON)" ]; then $(call skip,contract-test,no Go module selected); \
+	else $(GO_PREREQS) test || exit 1; \
+	  cd services/server && CONTRACT_MAX_EXAMPLES=$(CONTRACT_MAX_EXAMPLES) go test -count=1 -tags contract_validate,contract_live \
+	    -run '^TestG7_' -timeout $(CONTRACT_TIMEOUT) ./test/contract/... || exit 1; fi
 
 coverage: test ## Coverage thresholds (named values quality.coverage.*)
 	@if [ -z "$(TOOLS_ON)" ]; then $(call tools_skip,tools-coverage); \

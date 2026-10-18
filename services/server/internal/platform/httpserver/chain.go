@@ -311,8 +311,17 @@ func (c *Chain) Public(mux *http.ServeMux) http.Handler {
 	dispatch := c.enter("mux", routed)
 	headers := c.enter("headers", c.headersStage(dispatch))
 	traced := c.enter("trace", otel.Middleware(c.correlate(headers)))
-	return c.enter("recover", c.recoverStage(traced))
+	h := c.enter("recover", c.recoverStage(traced))
+	if responseCheck != nil {
+		h = responseCheck(c, h)
+	}
+	return h
 }
+
+// responseCheck wraps the public handler of c when set; only the test build with the tag
+// contract_validate sets it (G8, contractcheck_install.go), so the production build serves
+// without it.
+var responseCheck func(c *Chain, h http.Handler) http.Handler
 
 // outerState is what the outer steps share per request: the recover step reads the correlation ID
 // that step 2 found, to answer a panic with the same value.

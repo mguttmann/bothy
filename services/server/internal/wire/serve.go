@@ -109,6 +109,10 @@ type Deps struct {
 	// otelmetrics.RegisterConsumerGauges on the global meter provider of otel.Setup. Tests read
 	// the gauges of a role through their own meter provider here.
 	ConsumerGauges func(consumers sync.Consumers) error
+	// EgressDenyAll makes every outgoing client of the process (OIDC providers and the audit
+	// checkpoint sink) refuse every target before resolution (egress.Deps.DenyAll). Only
+	// test servers set it (the contract server of G7, M1-71); production leaves it false.
+	EgressDenyAll bool
 }
 
 // server is the state of one serve process that the components fill and the stop steps read.
@@ -369,6 +373,11 @@ func (s *server) api() bool { return s.role == RoleAPI || s.role == RoleAll }
 
 // worker reports whether the role runs jobs.
 func (s *server) worker() bool { return s.role == RoleWorker || s.role == RoleAll }
+
+// egressDeps are the dependencies of the outgoing clients of the process.
+func (s *server) egressDeps() egress.Deps {
+	return egress.Deps{Logger: s.logger(), DenyAll: s.deps.EgressDenyAll}
+}
 
 // logger returns the current process logger.
 func (s *server) logger() *slog.Logger { return slog.New(s.log) }
@@ -910,7 +919,7 @@ func (s *server) startSessions(context.Context) error {
 	if err != nil {
 		return err
 	}
-	if err := id.BindOIDC(OIDCDeps{Egress: eg, Secrets: sec, ClaimGroups: admin.Admin}); err != nil {
+	if err := id.BindOIDC(OIDCDeps{Egress: eg, Secrets: sec, ClaimGroups: admin.Admin, EgressDenyAll: s.deps.EgressDenyAll}); err != nil {
 		return err
 	}
 	return id.BindLocal(box, nil)
@@ -1002,7 +1011,7 @@ func (s *server) startAuditLog(ctx context.Context) error {
 	if a == nil || keys == nil || az == nil {
 		return errors.New("wire: the audit log needs the audit step, the signing keys and the Authorizer")
 	}
-	sink, err := CheckpointSink(ctx, s.values, rec.InstanceID, CheckpointSinkDeps{Secrets: s.sp, Egress: egress.Deps{Logger: s.logger()}})
+	sink, err := CheckpointSink(ctx, s.values, rec.InstanceID, CheckpointSinkDeps{Secrets: s.sp, Egress: s.egressDeps()})
 	if err != nil {
 		return err
 	}
@@ -1164,6 +1173,15 @@ var enabledValidator = stdsync.OnceValues(func() (*httpserver.Validator, error) 
 	}
 	return httpserver.NewValidator(rest.Spec, ids)
 })
+
+// WarmRequestValidator builds the request validator of the enabled operations of this process
+// ahead of the first start (the result is cached): test binaries that start whole servers call it
+// before their tests, so no readiness wait pays the build (tens of seconds under -race). Errors:
+// those of httpserver.NewValidator.
+func WarmRequestValidator() error {
+	_, err := enabledValidator()
+	return err
+}
 
 // jobsStopSteps returns the stop steps of phase jobs in registration order; none for api. Steps
 // of one phase run in reverse registration order: the soft stop within

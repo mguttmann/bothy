@@ -113,6 +113,9 @@ type Deps struct {
 	Logger *slog.Logger
 	// Metrics counts refused attempts; nil counts nothing.
 	Metrics Metrics
+	// DenyAll refuses every request before any resolution or connection (host_not_allowed). Only
+	// test servers set it, so that generated hosts and issuers cause no outbound traffic (M1-71).
+	DenyAll bool
 }
 
 // Log attributes of a refused attempt; the keys are in docs/observability/signals.md 5.3.
@@ -149,6 +152,7 @@ type Client struct {
 	resolver  Resolver
 	logger    *slog.Logger
 	metrics   Metrics
+	denyAll   bool
 	// dial opens a connection to a checked address ("ip:port"); tests wrap it to count dials.
 	dial func(ctx context.Context, network, address string) (net.Conn, error)
 	http *http.Client
@@ -183,6 +187,7 @@ func New(cfg Config, opts Options, deps Deps) (*Client, error) {
 		resolver:  deps.Resolver,
 		logger:    deps.Logger,
 		metrics:   deps.Metrics,
+		denyAll:   deps.DenyAll,
 	}
 	if opts.Timeout != 0 {
 		c.timeout = opts.Timeout
@@ -356,6 +361,9 @@ func (c *Client) check(req *http.Request) (decision, *BlockedError) {
 	t, refused := parseTarget(req.URL)
 	if refused != nil {
 		return decision{}, refused
+	}
+	if c.denyAll {
+		return decision{}, &BlockedError{Reason: ReasonHostNotAllowed, Host: t.host}
 	}
 	if t.scheme != schemeHTTPS && t.scheme != schemeHTTP {
 		return decision{}, &BlockedError{Reason: ReasonSchemeNotAllowed, Host: t.host}

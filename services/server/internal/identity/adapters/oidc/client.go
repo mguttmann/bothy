@@ -90,6 +90,8 @@ type Deps struct {
 	RootCAs *x509.CertPool
 	// Resolver resolves host names; nil means net.DefaultResolver.
 	Resolver egress.Resolver
+	// DenyAll refuses every provider request (egress.Deps.DenyAll); only test servers set it.
+	DenyAll bool
 	// Logger receives the refusals of the egress client; nil discards them.
 	Logger *slog.Logger
 	// Metrics counts refused egress attempts; nil counts nothing.
@@ -176,7 +178,7 @@ func (c *Client) providerOf(ctx context.Context, id ids.ID) (*providerState, err
 	}
 	st.allow(issuer)
 	st.http, err = egress.New(c.cfg.Egress, egress.Options{Purpose: "oidc", Hosts: st.policy, Redirects: egress.RedirectChecked},
-		egress.Deps{Resolver: c.d.Resolver, RootCAs: c.d.RootCAs, Logger: c.d.Logger, Metrics: c.d.Metrics})
+		egress.Deps{Resolver: c.d.Resolver, RootCAs: c.d.RootCAs, Logger: c.d.Logger, Metrics: c.d.Metrics, DenyAll: c.d.DenyAll})
 	if err != nil {
 		return nil, fail("building the egress client", err)
 	}

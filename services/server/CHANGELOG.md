@@ -61,6 +61,14 @@ documented in this file. The format is based on
   `depguard` rule forbids the package `plugin` in the server module (ADR 0022). Manifests with
   the escape of NUL or of an unpaired surrogate are refused, and manifest values that are no audit
   code enter the audit hashed, so no checked manifest makes install or upgrade fail with 500.
+- Contract tests G7 and G8 (M1-71): `make contract-test` runs Schemathesis against the server of
+  this tree with a throwaway PostgreSQL and the matrix world (every enabled operation as owner and as
+  a plain user, the stateful phase, SEC-T06, the project checks problem format, `Correlation-Id`, no
+  JSON `null` and 404 equality); `go test -tags contract_validate` validates every response of
+  every integration test against `docs/api/openapi.yaml` (`internal/platform/httpserver/contractcheck`,
+  exit code 3 on a violation, absent from the production build). The shared test harness
+  `test/harness` runs the real server in the test process, and `egress.Deps.DenyAll` with
+  `wire.Deps.EgressDenyAll` keeps a test server off the network.
 - WebSocket gateway connection and session (M1-64): `GET /api/v1/gateway` checks the `Origin`
   (`403 forbidden` for a foreign one, SEC-CORS-3), upgrades with `github.com/coder/websocket`,
   sends `hello` with the current DPoP nonce and authenticates in-band with `identify` (access
