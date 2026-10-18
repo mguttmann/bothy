@@ -2,8 +2,8 @@
 
 Gateway connection, catch-up, outbox, reconciliation, run documents and focus, without Flutter.
 
-Status: the run documents of the live box (M4-16) and the outbox (M4-15) are built; connection,
-catch-up and focus follow with M4-13, M4-14 and M4-17. Kind: pure Dart package, a member of the Dart
+Status: the gateway connection with focus and typing (M4-13), the outbox (M4-15) and the run
+documents of the live box (M4-16) are built; catch-up follows with M4-14 and M4-17. Kind: pure Dart package, a member of the Dart
 workspace at the repository root (`resolution: workspace`, `publish_to: none`).
 
 ## Dependencies
@@ -15,6 +15,78 @@ Further rules checked by `make arch`:
 
 - no import of `package:flutter/`, `dart:ui` (rule 1).
 - no native source (rule 4).
+
+## Gateway connection (M4-13)
+
+`GatewayConnection` holds the one WebSocket of the device (04 6.1): it never opens a second
+socket while one is open or opening. It answers `hello` through `GatewaySession` with `resume`
+(stored gateway session and cursor, last disconnect within `resume_window_ms`) or `identify`
+(cursor and epoch only when stored), both with a gateway DPoP proof of `auth`
+(`DpopProofFactory.forGateway`: `htm` `GET`, `htu` the HTTPS form of the gateway URL, the
+`hello` nonce, `ath`). `ready` stores `gateway_session_id`, `permission_version` and `head_seq`
+through `SyncStateDao`; the `sync_epoch` stays in memory, because M4-14 stores it with the
+cursor. `reauth_required` renews the token (`RefreshCoordinator.refreshNow`) and sends `reauth`
+with a proof over the nonce of `reauth_required`. Heartbeats go every `heartbeat_interval_ms`,
+the first after a random fraction; a missing `heartbeat_ack` within one interval closes with
+`1000` and reconnects. Waits are full jitter in `[0, min(cap, base * 2^n)]`
+(`sync.reconnect_backoff_base`, `sync.reconnect_backoff_cap`), reset after `ready` or
+`resumed`; a network change or the foreground starts an attempt at once without raising `n`.
+A server frame that does not decode is counted (`decodeErrors`) and skipped; unknown ops and
+fields are ignored.
+
+### States
+
+`connection.states` publishes `ConnectionState(phase, reason)`. Phases (15 7.2): `offline`,
+`connecting`, `identifying`, `catchingUp`, `live`, `resyncing`, `backoff`, `suspended`,
+`signedOut`, `updateRequired`. Reasons: `none`, `networkUnavailable`, `devicePending`,
+`deviceReplaced`, `forbidden`, `rateLimited`, `revoked`, `protocolUnsupported`,
+`closedByServer(code)`. On mobile the connection closes with `1000` in the background
+(`suspended`) and resumes in the foreground; with `keepConnectedInBackground` (desktop) it
+stays connected; no reconnect path (backoff timer, token renewal, approved device) opens a
+socket in the background on mobile.
+
+### Close codes
+
+One table, `closeCodeTable`, resolved by `reactTo(code, reason, foreground:)` (docs/DECISIONS.md
+D-M4-13-2). "Next frame" is the answer to the next `hello`.
+
+| Code | Phase, reason | Next frame | Wait |
+|---|---|---|---|
+| `1000` | foreground: `backoff`; background: `offline`, `closedByServer(1000)` | `resume` | backoff; in the background until the foreground |
+| `1001`, `4000` to `4003`, `4005`, `4009`, `4014` | `backoff`, `closedByServer(code)` | `resume` | backoff |
+| `4004` | `backoff` after one `refreshNow`; failed refresh: `signedOut` | `resume` | none (a second renewal before `ready` or `resumed`: backoff) |
+| `4006` | `backoff` | `identify` | backoff |
+| `4007` | `updateRequired`, `protocolUnsupported` | none | never |
+| `4008` | `backoff`, `rateLimited` | `resume` | `retry_after=<seconds>` of the reason, else backoff |
+| `4011` | `backoff` after one `refreshNow`; failed refresh: `signedOut` | `resume` | none (a second renewal before `ready` or `resumed`: backoff) |
+| `4012` | `signedOut`, `revoked`; `AuthSession.sessionRevoked` (`SignedOut.deleteLocalData`) | none | never |
+| `4013` | `backoff`, `closedByServer(4013)` | `resume` | uniform in `[0, base]`, counter unchanged |
+| `4015` | `offline`, `closedByServer(4015)`, logged as unexpected | none | `connectNow` |
+| `4016` | `offline`, `devicePending` | `resume` | until `pollPendingDevice` reports `active` |
+| `4017` | `offline`, `deviceReplaced` | `resume` | foreground or `connectNow` |
+| `4018` | `offline`, `forbidden`; no token renewal | `resume` | `connectNow` |
+| other `4000` to `4099`, other codes, a drop | `backoff` (a drop without network: `offline`, `networkUnavailable`) | `resume` | backoff |
+
+### Ports
+
+| Port | Production implementation | Tests |
+|---|---|---|
+| `GatewayTransport`, `GatewayChannel` | `IoGatewayTransport` on `web_socket_channel` (this package) | a fake transport that records frames and closes with any code |
+| `NetworkStatus` | connectivity of the platform (M4-18) | a switchable fake |
+| `AppLifecycle` | lifecycle of the Flutter app (M4-18) | a switchable fake |
+| `RandomSource` | `SystemRandomSource` (`Random.secure`) | a seeded source |
+| `Clock` (of `auth`) | `SystemClock` | a clock with `elapse` |
+
+### What M4-14 and M4-15 plug in
+
+`SessionListener` (`onReady`, `onResumed`, `onFrame`, `onDisconnected`) receives the frames in
+order (the control frames `heartbeat_ack` and `reauth_required` act outside that queue, so a long
+listener step cannot delay them); M4-14 applies the snapshot, catch-up pages, `cursor`, `catchup.complete` and
+`resync_required`, and sets `catchingUp`, `resyncing` or `live` through `SessionControl`,
+which also sends frames and sets `lastProcessedSeq` for the heartbeat. M4-15 (outbox) reads
+`connection.states` to know when the gateway is live. `connection.focus` (`FocusManager`, at
+most `sync.max_focused_threads`, the complete set per frame with `idle`) and
+`connection.typing` (`TypingThrottle`, `sync.typing_min_interval`) are called by the interface.
 
 ## Outbox (M4-15)
 
@@ -144,8 +216,10 @@ comes from the table `runs`. A `Notifier` per run listens to `watch`.
 | Path | Content |
 |---|---|
 | `lib/sync_engine.dart` | the public library; every public symbol has a doc comment (`make lint`, `public_member_api_docs`) |
+| `lib/src/*.dart` | the gateway connection: ports, `dart:io` transport, frames, states, close table, backoff, heartbeat, session, connection, focus, typing, listener (M4-13) |
 | `lib/src/outbox/` | `Outbox`, the sender, `classify`, the backoff, the executor registry and the operations (M4-15) |
 | `lib/src/runs/` | `RunStore`, `applyRunPatch`, `RunDocument` and the ports (M4-16) |
+| `test/connection/` | tests of the gateway connection, one per close code, with the fakes of `test/support/` |
 | `test/outbox/` | tests of the outbox on an in-memory database with scripted executors, a fake clock and a seeded jitter |
 | `test/runs/` | tests of the run documents, fixtures of a document at versions 1 to 4 under `fixtures/` |
 | `test/` | tests, run by `make test` with coverage (`quality.coverage.dart_min_percent`) |

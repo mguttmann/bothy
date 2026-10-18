@@ -10,15 +10,31 @@ environment:
   sdk: ^3.13.5
   flutter: 3.47.7
 
+# The four arrows of 15 3.1: api_client (gateway models), auth (proofs, refresh, the Clock
+# port), domain (AppConfig, IDs) and local_store (SyncStateDao). web_socket_channel carries the
+# dart:io transport of the gateway; built_collection and built_value are the types and the
+# serializers of the generated gateway models.
 dependencies:
-  # Members of the workspace; pub resolves them to packages/<name> (resolution: workspace).
-  api_client: any
-  domain: any
-  local_store: any
+  api_client:
+    path: ../api_client
+  auth:
+    path: ../auth
+  built_collection: ^5.1.2
+  built_value: ^8.13.0
   # The outbox classifies the transport errors of the generated client (brief M4-15 Design
-  # note 2); the same constraint as in packages/api_client.
+  # note 2); the same constraint as in packages/api_client. Also the fake API of the auth
+  # session in the tests (test/support/), as in packages/auth.
   dio: ^5.11.1
+  # A member of the workspace; pub resolves it to packages/domain (resolution: workspace).
+  domain: any
+  local_store:
+    path: ../local_store
+  web_socket_channel: ^3.0.3
 
 dev_dependencies:
+  # SHA-256 of the software P-256 signer of the tests (test/support/).
+  crypto: ^3.0.7
   lints: ^6.1.0
+  # Only the software P-256 signer of the tests (test/support/), never in the library.
+  pointycastle: ^4.0.0
   test: ^1.31.1

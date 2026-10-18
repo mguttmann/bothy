@@ -33,6 +33,16 @@ operated, and the order of the build.
   transaction, removal of targets and wipe, the cache cleanup by `client.cache_max_age` and
   `client.cache_max_bytes`, and a migration survival test for outbox, drafts and share inbox;
   `make codegen-check` compares the drift generation (M4-12).
+- Sync engine gateway connection: `GatewayConnection` holds the one WebSocket of a device
+  (transport port with a `dart:io` implementation), answers `hello` with `identify` or `resume`
+  and a gateway DPoP proof over the `hello` nonce, stores the session fields of `ready`, renews
+  the token on `reauth_required`, sends heartbeats with a random first delay and reconnects when
+  an acknowledgement is missing, waits by full-jitter backoff that a network change or the
+  foreground cuts short, and reacts to every close code of 04 6.4 through one table
+  (`4012` signs out with deletion of local data, `4016` waits for the pending device, `4017` for
+  the foreground, `4018` for user action, `4008` for `retry_after`); `ConnectionState` exposes
+  the phases of 15 7.2 with a reason, `FocusManager` and `TypingThrottle` send `focus` and
+  typing within their limits, and `SessionListener` is where catch-up plugs in (M4-13).
 - Design system core components: message (every variant, collapse with "Show more", origin
   badges, isolated foreign names), a safe Markdown renderer that runs and loads nothing, live box
   with collapsed and mobile lines and a throttled announcer, tool chip, status line, trigger
