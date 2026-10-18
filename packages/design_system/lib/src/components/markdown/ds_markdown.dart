@@ -50,6 +50,7 @@ class DsMarkdown extends StatelessWidget {
     required this.onOpenLink,
     this.attachments,
     this.style,
+    this.mentionHandles = const {},
   });
 
   /// The Markdown text, unchanged content of the message.
@@ -63,6 +64,19 @@ class DsMarkdown extends StatelessWidget {
 
   /// The body text style, or null for `type.body`.
   final TextStyle? style;
+
+  /// The handles (lower case, without `@`) that the server resolved for this message
+  /// (`mention_ids`); a token `@handle` outside code renders as a mention only when its handle
+  /// is here (03 content format items 1, 2 and 4). Empty: no token is a mention.
+  final Set<String> mentionHandles;
+
+  /// A mention token of 03 content format item 1: `@` after the start or a character that is
+  /// no letter, digit or one of `_ . - @ /`, then a handle; trailing `.`, `-` and `_` end it.
+  static final RegExp mentionToken = RegExp(
+    r'(?<![\p{L}\p{N}_.\-@/])@([a-z0-9](?:[a-z0-9._-]*[a-z0-9])?)',
+    caseSensitive: false,
+    unicode: true,
+  );
 
   /// The deepest nesting of block quotes and lists that renders as structure; a deeper
   /// element renders as its plain text. The server accepts messages without a nesting limit,
@@ -102,7 +116,13 @@ class DsMarkdown extends StatelessWidget {
     final base =
         style ??
         dsTextStyle(DsType.body).copyWith(color: context.dsColors.textPrimary);
-    final builder = _Builder(context, base, onOpenLink, attachments);
+    final builder = _Builder(
+      context,
+      base,
+      onOpenLink,
+      attachments,
+      mentionHandles,
+    );
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       mainAxisSize: MainAxisSize.min,
@@ -113,12 +133,47 @@ class DsMarkdown extends StatelessWidget {
 
 /// Builds the widgets of the AST.
 class _Builder {
-  _Builder(this.context, this.base, this.onOpenLink, this.attachments);
+  _Builder(
+    this.context,
+    this.base,
+    this.onOpenLink,
+    this.attachments,
+    this.mentionHandles,
+  );
 
   final BuildContext context;
   final TextStyle base;
   final void Function(Uri) onOpenLink;
   final DsAttachmentResolver? attachments;
+  final Set<String> mentionHandles;
+
+  /// [text] as spans in [style], with the tokens of [mentionHandles] in the mention style.
+  void _text(String text, TextStyle style, List<InlineSpan> out) {
+    if (mentionHandles.isEmpty) {
+      out.add(TextSpan(text: text, style: style));
+      return;
+    }
+    var at = 0;
+    for (final m in DsMarkdown.mentionToken.allMatches(text)) {
+      if (!mentionHandles.contains(m[1]!.toLowerCase())) continue;
+      if (m.start > at) {
+        out.add(TextSpan(text: text.substring(at, m.start), style: style));
+      }
+      out.add(
+        TextSpan(
+          text: m[0],
+          style: style.copyWith(
+            fontWeight: FontWeight.w600,
+            color: context.dsAccent.textLink,
+          ),
+        ),
+      );
+      at = m.end;
+    }
+    if (at < text.length) {
+      out.add(TextSpan(text: text.substring(at), style: style));
+    }
+  }
 
   static const _blockTags = {
     'p',
@@ -392,7 +447,7 @@ class _Builder {
 
   void _inline(md.Node node, TextStyle style, List<InlineSpan> out) {
     if (node is md.Text) {
-      out.add(TextSpan(text: node.text, style: style));
+      _text(node.text, style, out);
       return;
     }
     if (node is! md.Element) {
