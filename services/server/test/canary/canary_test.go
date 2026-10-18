@@ -261,17 +261,19 @@ func runScenario(t *testing.T) *scenarioResult {
 }
 
 // TestSEC_T10_RateLimitedResponse: a server with the default rate limits answers canary-bearing
-// password logins from one client address with 429 on rl.public_auth; no canary appears in any
-// output, the 429 answers included.
+// logins (redeemEnrollmentCode with a canary code and device name) from one client address with
+// 429 on rl.public_auth; no canary appears in any output, the 429 answers included. The login
+// with an enrollment code is the cheap one of the class: a password login hashes with Argon2id,
+// which takes minutes per burst under the race detector.
 func TestSEC_T10_RateLimitedResponse(t *testing.T) {
 	r := StartRun(t, RunOptions{Defaults: true})
 	dev := r.Watch(r.Server.NewDevice(), "login burst")
 	dev.ClientIP = r.IPv4
 	limited := 0
 	for i := 0; i < rateLimitAttempts && limited == 0; i++ {
-		resp := dev.DoAnonymous(t.Context(), harness.Request{Method: http.MethodPost, Path: "/auth/password/login", Body: map[string]any{
-			"login_name": r.Reg.New(ClassContent, "", "login name (rate limit)"), "password": r.Reg.New(ClassSecret, "", "password (rate limit)"),
-			"totp_code": "123456", "device": dev.Registration(r.Reg.New(ClassContent, "", "device name (rate limit)")),
+		resp := dev.DoAnonymous(t.Context(), harness.Request{Method: http.MethodPost, Path: "/auth/enroll/redeem", Body: map[string]any{
+			"enrollment_code": r.Reg.New(ClassSecret, "", "enrollment code (rate limit)"),
+			"device":          dev.Registration(r.Reg.New(ClassContent, "", "device name (rate limit)")),
 		}})
 		if resp.Status == http.StatusTooManyRequests {
 			limited++
