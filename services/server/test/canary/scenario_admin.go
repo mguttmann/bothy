@@ -139,13 +139,9 @@ func (sc *Scenario) settings() {
 	esk := sc.W.Channels["Support/Eskalation"]
 	research := sc.W.Spaces["Research"]
 
-	for _, it := range items(sc.get(alex, "/me/settings", ok...)) {
-		if k := jsonText(it["key"]); k != "" {
-			sc.put(alex, "/me/settings/"+k, map[string]any{"value": it["value"]}, ok...)
-			sc.del(alex, "/me/settings/"+k, none...)
-			break
-		}
-	}
+	sc.put(alex, "/me/settings/notify.default_level", map[string]any{"value": "mentions"}, ok...)
+	sc.get(alex, "/me/settings", ok...)
+	sc.del(alex, "/me/settings/notify.default_level", none...)
 	for _, it := range items(sc.get(o, "/instance/settings", ok...)) {
 		if k := jsonText(it["key"]); k != "" && !strings.HasPrefix(k, "branding.") {
 			sc.put(o, "/instance/settings/"+k, map[string]any{"value": it["value"]}, ok...)

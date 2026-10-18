@@ -75,6 +75,7 @@ func (sc *Scenario) gatewayOps() {
 		sc.T.Errorf("gateway of Alex: %v", err)
 		return
 	}
+	sc.GatewaySent["identify"]++
 	for _, f := range []struct {
 		op string
 		d  any
@@ -86,10 +87,14 @@ func (sc *Scenario) gatewayOps() {
 	} {
 		if err := g.Send(f.op, f.d); err != nil {
 			sc.T.Errorf("send %s: %v", f.op, err)
+		} else {
+			sc.GatewaySent[f.op]++
 		}
 	}
 	if err := g.Reauth(); err != nil {
 		sc.T.Errorf("reauth: %v", err)
+	} else {
+		sc.GatewaySent["reauth"]++
 	}
 	sc.drain(g, "Alex")
 	session := g.Ready.GatewaySessionId.String()
@@ -99,6 +104,7 @@ func (sc *Scenario) gatewayOps() {
 	if err != nil {
 		sc.T.Errorf("resume: %v", err)
 	} else {
+		sc.GatewaySent["resume"]++
 		sc.drain(r, "Alex resumed")
 		r.Close()
 	}
@@ -110,6 +116,8 @@ func (sc *Scenario) gatewayOps() {
 	}
 	if err := a.Send("ack", map[string]any{"seq": a.Ready.HeadSeq}); err != nil {
 		sc.T.Errorf("ack: %v", err)
+	} else {
+		sc.GatewaySent["ack"]++
 	}
 	sc.drain(a, "Lotse")
 	a.Close()

@@ -277,7 +277,8 @@ func trimSpace(s string) string { return strings.TrimSpace(s) }
 func NewScenario(ctx context.Context, r *Run) *Scenario {
 	r.T.Helper()
 	w := harness.BuildMatrixWorld(r.T, r.Server)
-	sc := &Scenario{Run: r, W: w, Ctx: ctx, Observers: map[string]*harness.Client{}, gw: map[string]*harness.GatewayConn{}}
+	sc := &Scenario{Run: r, W: w, Ctx: ctx, Observers: map[string]*harness.Client{}, gw: map[string]*harness.GatewayConn{},
+		GatewaySent: map[string]int{}}
 	for name, c := range w.People {
 		r.Watch(c, name)
 	}
@@ -286,6 +287,7 @@ func NewScenario(ctx context.Context, r *Run) *Scenario {
 	}
 	r.Server.Owner.ClientIP = r.IPv6
 	w.People["Alex"].ClientIP = r.IPv4
+	sc.start = time.Now()
 	sc.Observers["Sam"], sc.Observers["Robin"] = w.People["Sam"], w.People["Robin"]
 	sc.Readable = map[string]map[string]bool{
 		"Sam":   {w.Spaces["Marketing"]: true, w.Channels["Marketing/Kampagnen"]: true, w.Spaces["Support"]: true, w.Channels["Support/Allgemein"]: true},
@@ -297,8 +299,69 @@ func NewScenario(ctx context.Context, r *Run) *Scenario {
 			r.T.Fatalf("gateway of %s: %v", name, err)
 		}
 		sc.gw[name] = g
+		sc.GatewaySent["identify"]++
 	}
 	return sc
+}
+
+// RedactedEvent reports whether the owner's event log holds an event with redacted true (the
+// message delete of the content step, 04 "Envelope").
+func (sc *Scenario) RedactedEvent() bool {
+	sc.T.Helper()
+	found := false
+	sc.EventPages(sc.W.Owner, func(_ int, _ []byte, events []map[string]any) {
+		for _, e := range events {
+			if e["redacted"] == true {
+				found = true
+			}
+		}
+	})
+	return found
+}
+
+// eventPageLimit is the limit of one listEvents page; maxEventPages bounds the paging.
+const (
+	eventPageLimit = 200
+	maxEventPages  = 500
+)
+
+// EventPages pages listEvents of c from cursor 0 to the head and hands every page to fn.
+func (sc *Scenario) EventPages(c *harness.Client, fn func(page int, body []byte, events []map[string]any)) {
+	sc.T.Helper()
+	after := int64(0)
+	for page := 1; page <= maxEventPages; page++ {
+		resp := sc.get(c, fmt.Sprintf("/events?limit=%d&after=%d", eventPageLimit, after), ok...)
+		var body struct {
+			Events     []map[string]any `json:"events"`
+			NextCursor int64            `json:"next_cursor"`
+			HeadSeq    int64            `json:"head_seq"`
+		}
+		if json.Unmarshal(resp.Body, &body) != nil {
+			return
+		}
+		fn(page, resp.Body, body.Events)
+		if len(body.Events) == 0 || body.NextCursor <= after || body.NextCursor >= body.HeadSeq {
+			return
+		}
+		after = body.NextCursor
+	}
+}
+
+// AuditIPRows returns the number of distinct ip_hmac values of the owner's audit rows (the
+// loopback address of the world building and the IPv6 canary afterwards) and the number of
+// Alex's audit rows since the scenario start with ip_hmac and ip_key_id (the IPv4 canary).
+func (sc *Scenario) AuditIPRows(ctx context.Context) (owner, alex int) {
+	sc.T.Helper()
+	db := sc.Server.AdminDB()
+	if err := db.QueryRow(ctx, `SELECT count(DISTINCT details->>'ip_hmac') FROM audit_events WHERE actor_principal_id = $1 AND details ? 'ip_hmac'`,
+		sc.W.Owner.PrincipalID).Scan(&owner); err != nil {
+		sc.T.Errorf("audit ip rows: %v", err)
+	}
+	if err := db.QueryRow(ctx, `SELECT count(*) FROM audit_events WHERE actor_principal_id = $1 AND occurred_at >= $2 AND details ? 'ip_hmac' AND details ? 'ip_key_id'`,
+		sc.W.People["Alex"].PrincipalID, sc.start).Scan(&alex); err != nil {
+		sc.T.Errorf("audit ip rows: %v", err)
+	}
+	return owner, alex
 }
 
 // observerWait is how long the end of the scenario waits for further observer frames.
@@ -323,21 +386,9 @@ func (sc *Scenario) FinishObservers() {
 		g.Close()
 	}
 	for name, c := range sc.Observers {
-		after := "0"
-		for page := 1; ; page++ {
-			resp := sc.get(c, "/events?limit=200&after="+after, ok...)
-			sc.Sinks.AddJSON(SinkForeign, fmt.Sprintf("%s listEvents page %d", name, page), name, "", resp.Body)
-			var body struct {
-				Items      []json.RawMessage `json:"items"`
-				NextCursor *string           `json:"next_cursor"`
-				HeadSeq    json.Number       `json:"head_seq"`
-			}
-			_ = json.Unmarshal(resp.Body, &body)
-			if len(body.Items) == 0 || body.NextCursor == nil || *body.NextCursor == "" || *body.NextCursor == after || page > 200 {
-				break
-			}
-			after = *body.NextCursor
-		}
+		sc.EventPages(c, func(page int, body []byte, _ []map[string]any) {
+			sc.Sinks.AddJSON(SinkForeign, fmt.Sprintf("%s listEvents page %d", name, page), name, "", body)
+		})
 		snap := sc.get(c, "/sync/snapshot", ok...)
 		sc.Sinks.AddJSON(SinkForeign, name+" getSnapshot", name, "", snap.Body)
 	}

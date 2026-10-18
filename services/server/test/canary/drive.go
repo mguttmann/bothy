@@ -10,6 +10,7 @@ import (
 	"slices"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/OWNER/bothy/services/server/internal/identity/adapters/oidc/oidctest"
 	"github.com/OWNER/bothy/services/server/internal/identity/adapters/webauthn/virtualauthn"
@@ -27,6 +28,10 @@ type Scenario struct {
 	Observers map[string]*harness.Client
 	// Readable are the scopes each observer may read (AllowRules.Readable).
 	Readable map[string]map[string]bool
+	// GatewaySent counts the client gateway ops the scenario sent.
+	GatewaySent map[string]int
+	// start is when the scenario's clients got their network canaries.
+	start time.Time
 	// gw are the observer gateway connections, open for the whole scenario.
 	gw map[string]*harness.GatewayConn
 	// threads and messages are IDs the later steps reuse.
