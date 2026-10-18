@@ -98,7 +98,10 @@ binary with exit code 3). `make contract-test` runs G7, Schemathesis against the
 [`test/harness`](test/harness/README.md). The leak tests behind threat T-AZ-02 (M1-70: AZ-P4 404
 equality and timing per route, AZ-P5 property tests of lists, counters, snapshot and catch-up on
 random worlds, AZ-M52) live in [`test/leak`](test/leak/README.md); a failing AZ-P5 seed is
-replayed with `LEAK_SEED=<seed>`.
+replayed with `LEAK_SEED=<seed>`. The canary test behind threat T-LG-01
+(M1-69: SEC-T10 and DP-T09, canary values through every enabled operation and gateway op, scanned
+in logs, traces, metrics, audit rows, error responses and the events of observers) lives in
+[`test/canary`](test/canary/README.md).
 
 Load and chaos tests (M1-16, M1-72): `make perf` runs the packages under [`perf`](perf/README.md)
 and [`test/chaos`](test/chaos/README.md) with the build tag `perf`, one after another, and prints the
