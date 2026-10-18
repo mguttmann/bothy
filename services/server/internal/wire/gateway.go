@@ -137,9 +137,13 @@ const (
 	typingClass = "rl.typing"
 )
 
-// GatewayOpClasses returns the rate-limit class of each client op of M1-66, for the contract test.
+// GatewayOpClasses returns the rate-limit class of each enabled client op, for the contract tests
+// (TestGatewayOpRateClasses, the register test of G9): identify and resume consume
+// rl.gateway_connect in the handshake; heartbeat and reauth belong to that class but consume
+// nothing from it (05 section 3); focus and typing are counted by the gateway itself.
 func GatewayOpClasses() map[string]string {
-	return map[string]string{"focus": focusClass, "typing.start": typingClass, "typing.stop": typingClass}
+	return map[string]string{"identify": gatewayClass, "resume": gatewayClass, "heartbeat": gatewayClass, "reauth": gatewayClass,
+		"focus": focusClass, "typing.start": typingClass, "typing.stop": typingClass}
 }
 
 // NewGateway builds the gateway over d with cfg and registers exactly the ops of
