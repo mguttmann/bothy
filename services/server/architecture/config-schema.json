@@ -1307,6 +1307,18 @@
       "doc": "Longest forum tag name in Unicode characters."
     },
     {
+      "name": "gateway.write_timeout",
+      "env": "BOTHY_GATEWAY__WRITE_TIMEOUT",
+      "kind": "duration",
+      "default": "10s",
+      "required": false,
+      "enum": [],
+      "min": "1ms",
+      "max": "",
+      "chapter": "02-architecture.md",
+      "doc": "Deadline of one WebSocket write; a missed deadline closes the connection with 4014."
+    },
+    {
       "name": "group.description_max_chars",
       "env": "BOTHY_GROUP__DESCRIPTION_MAX_CHARS",
       "kind": "int",
@@ -2611,6 +2623,30 @@
       "doc": "How long durable events stay available for catch-up before their partition is detached."
     },
     {
+      "name": "sync.heartbeat_interval",
+      "env": "BOTHY_SYNC__HEARTBEAT_INTERVAL",
+      "kind": "duration",
+      "default": "30s",
+      "required": false,
+      "enum": [],
+      "min": "1ms",
+      "max": "",
+      "chapter": "04-sync-protocol.md",
+      "doc": "Interval of the client's heartbeats, announced in hello."
+    },
+    {
+      "name": "sync.heartbeat_miss_limit",
+      "env": "BOTHY_SYNC__HEARTBEAT_MISS_LIMIT",
+      "kind": "int",
+      "default": "2",
+      "required": false,
+      "enum": [],
+      "min": "0",
+      "max": "100",
+      "chapter": "04-sync-protocol.md",
+      "doc": "Missed heartbeats after which the gateway closes with 4009."
+    },
+    {
       "name": "sync.idempotency_cleanup_batch_size",
       "env": "BOTHY_SYNC__IDEMPOTENCY_CLEANUP_BATCH_SIZE",
       "kind": "int",
@@ -2647,6 +2683,18 @@
       "doc": "How long an Idempotency-Key and its stored response stay valid per principal."
     },
     {
+      "name": "sync.identify_timeout",
+      "env": "BOTHY_SYNC__IDENTIFY_TIMEOUT",
+      "kind": "duration",
+      "default": "10s",
+      "required": false,
+      "enum": [],
+      "min": "1ms",
+      "max": "",
+      "chapter": "04-sync-protocol.md",
+      "doc": "Time between hello and identify or resume; without either the gateway closes with 4003."
+    },
+    {
       "name": "sync.log_poll_interval",
       "env": "BOTHY_SYNC__LOG_POLL_INTERVAL",
       "kind": "duration",
@@ -2657,6 +2705,18 @@
       "max": "",
       "chapter": "02-architecture.md",
       "doc": "How often the log tail reads event_log without a notification."
+    },
+    {
+      "name": "sync.outbound_queue_max",
+      "env": "BOTHY_SYNC__OUTBOUND_QUEUE_MAX",
+      "kind": "int",
+      "default": "10000",
+      "required": false,
+      "enum": [],
+      "min": "1",
+      "max": "1000000",
+      "chapter": "04-sync-protocol.md",
+      "doc": "Frames in the outbound queue of a gateway connection before it closes with 4014."
     },
     {
       "name": "sync.partition_maintenance_interval",
@@ -2671,6 +2731,30 @@
       "doc": "Interval of the job sync.partition_maintenance."
     },
     {
+      "name": "sync.reauth_lead_time",
+      "env": "BOTHY_SYNC__REAUTH_LEAD_TIME",
+      "kind": "duration",
+      "default": "60s",
+      "required": false,
+      "enum": [],
+      "min": "1ms",
+      "max": "",
+      "chapter": "04-sync-protocol.md",
+      "doc": "Lead time of reauth_required before a person's access token expires."
+    },
+    {
+      "name": "sync.resume_window",
+      "env": "BOTHY_SYNC__RESUME_WINDOW",
+      "kind": "duration",
+      "default": "5m",
+      "required": false,
+      "enum": [],
+      "min": "1ms",
+      "max": "",
+      "chapter": "04-sync-protocol.md",
+      "doc": "How long a gateway session stays resumable after its connection ended."
+    },
+    {
       "name": "sync.tail_batch_size",
       "env": "BOTHY_SYNC__TAIL_BATCH_SIZE",
       "kind": "int",
@@ -2681,6 +2765,18 @@
       "max": "2147483647",
       "chapter": "02-architecture.md",
       "doc": "Events per read of the log tail."
+    },
+    {
+      "name": "sync.ws_max_frame_bytes",
+      "env": "BOTHY_SYNC__WS_MAX_FRAME_BYTES",
+      "kind": "int",
+      "default": "1048576",
+      "required": false,
+      "enum": [],
+      "min": "1024",
+      "max": "16777216",
+      "chapter": "04-sync-protocol.md",
+      "doc": "Largest WebSocket frame of the gateway; a larger one closes the connection with 4002."
     },
     {
       "name": "telemetry.enabled",

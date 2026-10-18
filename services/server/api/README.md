@@ -70,6 +70,28 @@ of the form `<milestone>-<two digits>` or of another milestone. Operations under
 not in the list: the server sends them, it does not serve them. How `later` was filled:
 DECISIONS.md, M1-17/4.
 
+### Gateway ops (`gateway_ops`, M1-64)
+
+The section `gateway_ops` lists every op a client, agent or app sends on the channel `gateway` of
+`docs/api/asyncapi.yaml`:
+
+```yaml
+gateway_ops:
+  enabled:           # ops the gateway dispatcher registers; sorted ascending
+    - identify
+  later:             # every other client op of the channel; sorted by op
+    - op: focus
+      milestone: M1
+      ticket: M1-66  # optional
+```
+
+When the generator runs with `-asyncapi`, the section is required and checked like the REST
+sections: every entry is a client-to-server op of the channel, no op is missing or in both parts,
+both parts are sorted, `milestone` and `ticket` follow the same forms. The body schema of every
+client op must refuse unknown members (`additionalProperties: false`, W7). The enabled ops become
+`routes.GatewayOps()` with the action of their `x-authz-action` and the name of their body schema;
+the gateway registers exactly these. The terminal channels are not gateway ops and are not listed.
+
 For every operation under `paths`, enabled or not, the generator also checks: `x-authz-action`
 and `x-rate-limit-class` present, the action in the catalogue, the class equal to the class of the
 action and not `none`, no action with the permission `system` (05, rule 10), exactly one server

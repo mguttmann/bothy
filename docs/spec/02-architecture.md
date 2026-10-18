@@ -837,6 +837,13 @@ Responses from `400` upward pass through unchanged. Reason for the place: the st
 a typed response object, not the status. Reason: B7 requires that every route
 checks. The lint rule in the spec holds only the declaration; this proof holds the execution.
 
+The gateway upgrade `GET /api/v1/gateway` is the one route marked as authorized in-band
+(`AuthorizedInBand`, M1-64): it passes only steps 1 to 4, because `identify` and `resume`
+authenticate and authorize on the connection (R-SY-01). The same proof applies per op there: the
+gateway dispatcher runs every op with its own check log and, after a successful handler, requires a
+check of the op's action (05 "WebSocket ops and action"); a missing check closes the connection with
+`4000` and raises `bothy.authz.errors` with `bothy.reason = authz_not_checked`.
+
 ## 10. Gateway
 
 The gateway is part of the role `api`. Per connection, one read and one write goroutine run. The

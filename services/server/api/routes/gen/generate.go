@@ -25,7 +25,7 @@ type codegenFunc func(ctx context.Context, configPath, specPath, dir string) err
 // config is one generator run.
 type config struct {
 	spec, catalog, list string // inputs: openapi.yaml, actions.yaml, operations.yaml
-	asyncapi            string // asyncapi.yaml for the gateway protocol versions; "" for none
+	asyncapi            string // asyncapi.yaml for the gateway protocol versions and ops; "" for none
 	codegenConfig       string // api/rest/oapi-codegen.yaml
 	restDir             string // output directory of models.gen.go and rest.gen.go
 	routesDir           string // output directory of routes.gen.go, catalog.gen.go, build.gen.go
@@ -47,6 +47,9 @@ func generate(ctx context.Context, c config) (err error) {
 	}
 	if c.asyncapi != "" {
 		if in.gatewayVersions, err = readGatewayVersions(c.asyncapi); err != nil {
+			return err
+		}
+		if in.gatewayOps, err = loadGatewayOps(in, c.spec, c.list, c.asyncapi); err != nil {
 			return err
 		}
 	}

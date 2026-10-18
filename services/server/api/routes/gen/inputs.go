@@ -15,6 +15,9 @@ type inputs struct {
 	// gatewayVersions are info.x-protocol-versions of the AsyncAPI document, nil without
 	// -asyncapi (routes.GatewayProtocolVersions, M1-46).
 	gatewayVersions []int
+	// gatewayOps are the enabled ops of gateway_ops with action and body schema, nil without
+	// -asyncapi (routes.GatewayOps, M1-64).
+	gatewayOps []gatewayOp
 }
 
 // loadInputs reads and validates the spec, the action catalogue and the enable list. The checks

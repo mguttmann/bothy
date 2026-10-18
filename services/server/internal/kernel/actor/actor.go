@@ -73,6 +73,11 @@ type Actor struct {
 	// principal: Idempotency-Key never replays a stored answer to it, the rate limiter keys it by
 	// the client IP and the failed-credentials precheck counts it as a failure.
 	CredentialInactive bool
+	// CredentialExpiresAt is the end of the credential this actor was authenticated with: the exp
+	// of a person's access token, the expires_at of an API token; zero when unknown (anonymous,
+	// tests). The gateway schedules reauth_required before it and closes with 4011 at it (04
+	// section 6.3 step 6, M1-64); REST requests ignore it.
+	CredentialExpiresAt time.Time
 	// Scopes are the scopes of the API token (api_tokens.scopes, 07 section 3 token_scopes). For
 	// an app, authz requires the scope of each action here as well as in GrantedScopes (M2-24,
 	// docs/DECISIONS.md D-M2-24-10, which replaces M1-28 D6); agents and people carry none.

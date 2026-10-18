@@ -556,3 +556,35 @@ later:               # every other operationId of docs/api/openapi.yaml; sorted 
   - operation_id: uploadPart
     milestone: M3
     ticket: M3-03
+# WebSocket ops a client, agent or app sends on the channel gateway of docs/api/asyncapi.yaml
+# (M1-64). The gateway dispatcher registers exactly the ops under `enabled`; every other client op
+# of the channel stands under `later` and is treated as unknown (close code 4001) until its ticket
+# moves it. The terminal channels are no gateway ops and are not listed.
+gateway_ops:
+  enabled:           # sorted ascending
+    - heartbeat
+    - identify
+    - reauth
+    - resume
+  later:             # sorted by op
+    - op: ack
+      milestone: M2
+    - op: command.autocomplete_result
+      milestone: M2
+    - op: focus
+      milestone: M1
+      ticket: M1-66
+    - op: run.update
+      milestone: M2
+    - op: stats.subscribe
+      milestone: M6
+      ticket: M6-15
+    - op: stats.unsubscribe
+      milestone: M6
+      ticket: M6-15
+    - op: typing.start
+      milestone: M1
+      ticket: M1-66
+    - op: typing.stop
+      milestone: M1
+      ticket: M1-66

@@ -258,7 +258,9 @@ modules:
     ephemeral_events: [typing.started]
     ws_ops: [identify, resume, heartbeat, reauth, focus, typing.start, typing.stop]
     depends_on: [chat, agents, runs, sync, stats]
-    adapter_vendors: []
+    # The only module with github.com/coder/websocket (02 "Layers within a module" rule 4, M1-64);
+    # otel for the span gateway.connect.
+    adapter_vendors: [websocket, otel]
 vendors:                    # <group>: [<import path>, <import path>/**]
   age: [filippo.io/age, filippo.io/age/**]
   oapi: [github.com/oapi-codegen/runtime, github.com/oapi-codegen/runtime/**]
@@ -278,6 +280,8 @@ vendors:                    # <group>: [<import path>, <import path>/**]
   xcrypto: [golang.org/x/crypto/argon2]
   libopenapi: [github.com/pb33f/libopenapi, github.com/pb33f/libopenapi/**, github.com/pb33f/libopenapi-validator,
                github.com/pb33f/libopenapi-validator/**]
+  # WebSocket server and test client of the gateway (gateway adapters only, M1-64).
+  websocket: [github.com/coder/websocket, github.com/coder/websocket/**]
   pgx: [github.com/jackc/pgx/v5, github.com/jackc/pgx/v5/**]
   goose: [github.com/pressly/goose/v3, github.com/pressly/goose/v3/**]
   otelpgx: [github.com/exaring/otelpgx]

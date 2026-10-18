@@ -30,6 +30,7 @@ var configKeyGroups = []func() []config.Key{
 	rateLimitConfigKeys,
 	filesConfigKeys,
 	syncConfigKeys,
+	gatewayConfigKeys,
 	consumerConfigKeys,
 	instanceConfigKeys,
 	terminalConfigKeys,

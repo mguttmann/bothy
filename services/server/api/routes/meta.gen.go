@@ -13,6 +13,19 @@ func GatewayProtocolVersions() []int {
 	return []int{1}
 }
 
+// GatewayOps returns the enabled ops of the section gateway_ops of the enable list, each with the
+// action of its x-authz-action and the schema of its body in the AsyncAPI document, sorted by op
+// (04 section 6.2, 05 "WebSocket ops and action"); a fresh slice per call, nil when the generator
+// read no AsyncAPI document. The gateway dispatcher registers exactly these ops (M1-64).
+func GatewayOps() []GatewayOp {
+	return []GatewayOp{
+		{Op: "heartbeat", Action: "gateway.connect", Schema: "GatewayHeartbeat"},
+		{Op: "identify", Action: "gateway.connect", Schema: "GatewayIdentify"},
+		{Op: "reauth", Action: "gateway.connect", Schema: "GatewayReauth"},
+		{Op: "resume", Action: "gateway.connect", Schema: "GatewayResume"},
+	}
+}
+
 // ProblemTypes returns x-problem-codes of the schema Problem, the one catalogue of problem codes
 // (06 section 5, R-API-23), sorted by code; a fresh slice per call.
 func ProblemTypes() []ProblemType {
