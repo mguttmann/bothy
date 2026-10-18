@@ -45,7 +45,7 @@ Only this module writes and reads these tables via SQL (03-data-model.md, princi
 
 - Durable: `host.updated` (M2-39), `terminal_session.changed` (M2-44).
 - Ephemeral: `host.presence_changed` (M2-43).
-- WebSocket ops (client to server): none on the gateway; separate connections with their own ops (05, section 7).
+- WebSocket ops (client to server): none on the shared WebSocket; separate connections with their own ops (05, section 7).
 
 ## Background jobs
 
