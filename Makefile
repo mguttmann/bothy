@@ -102,7 +102,7 @@ TS_ON := $(and $(TS_PROJECTS),$(or $(call want,sdk-typescript),$(call want,plugi
 
 .PHONY: help bootstrap bootstrap-ci check gates fmt fmt-check lint typecheck test coverage \
         sonar sonar-up sonar-down sonar-config sonar-config-check semgrep trivy osv gitleaks \
-        gitleaks-staged denylist denylist-history licenses docs adr-index config-reference config-doc-check app-config event-catalog catalog catalog-check linkcheck \
+        gitleaks-staged denylist denylist-history licenses docs adr-index config-reference config-doc-check app-config event-catalog contract-documents catalog catalog-check linkcheck \
         trivy-image portability linkcheck-external diagrams tokens api-lint api-checks api-breaking api-tables api-clients \
         runners-check release-pins commitlint \
         review labels-check labels-sync tools-lock release-build release-prep release-trial scancode clean \
@@ -288,7 +288,7 @@ commitlint: ## Conventional Commits and DCO sign-off for commits not yet on the 
 # of go-arch-lint and sqlc; tools/ci/go_prereqs.py). Every step ends with `|| exit 1`, so a
 # recipe stops on its own even in a shell without errexit (docs/DECISIONS.md M1-01/8); the
 # flags in SHELL (top of this file, also for GNU make 3.81) are the second line of defence.
-codegen-check: ## Generated code equals a fresh generation (sqlc, go generate, flutter gen-l10n, Pigeon, drift, Riverpod, the domain tables)
+codegen-check: ## Generated code equals a fresh generation (sqlc, go generate, flutter gen-l10n, Pigeon, drift, Riverpod, the domain tables, the contract copy of the fake)
 	@if [ -z "$(GO_ON)" ]; then $(call skip,codegen-check,no Go module selected under services/); \
 	else $(GO_PREREQS) codegen-check || exit 1; \
 	  gal=$(call tool,go-arch-lint) || exit 1; sqlc=$(call tool,sqlc) || exit 1; \
@@ -339,6 +339,10 @@ codegen-check: ## Generated code equals a fresh generation (sqlc, go generate, f
 	@if [ ! -f packages/domain/pubspec.yaml ]; then $(call skip,codegen-domain,packages/domain is not tracked); \
 	else $(UVRUN) python tools/configdoc/app_config.py --check || exit 1; \
 	  $(UVRUN) python tools/catalog/event_catalog_dart.py --check || exit 1; fi
+	@# The copy of docs/api/ in the fake server of sync_engine, which the app's integration tests
+	@# read inside the macOS app sandbox (docs/DECISIONS.md D-M4-18-17); Python only, like above.
+	@if [ ! -f packages/sync_engine/pubspec.yaml ]; then $(call skip,codegen-contract,packages/sync_engine is not tracked); \
+	else $(UVRUN) python tools/catalog/contract_documents_dart.py --check || exit 1; fi
 
 arch: ## Module boundaries: Go modules (go-arch-lint, from the module register) and the Dart workspace (tools/arch-check)
 	@# go-arch-lint does not follow a linked directory but attributes it by the path of the link,
@@ -454,6 +458,9 @@ app-config: ## Regenerate the AppConfig key table of packages/domain from the co
 
 event-catalog: ## Regenerate the event catalogue of packages/domain from docs/spec/actions.yaml
 	$(UVRUN) python tools/catalog/event_catalog_dart.py
+
+contract-documents: ## Regenerate the copy of docs/api/ in the fake server of packages/sync_engine
+	$(UVRUN) python tools/catalog/contract_documents_dart.py
 
 linkcheck: ## Local links and anchors of every tracked Markdown file (offline); no link to the placeholder repository
 	@# docs/reference/dart-api.md links the generated Dart API pages; `make docs` builds them, and

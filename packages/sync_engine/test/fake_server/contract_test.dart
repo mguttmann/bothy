@@ -367,6 +367,19 @@ void main() {
     expect(h.server.violations.single, contains('/d/last_seq'));
   });
 
+  test('the embedded copy equals docs/api (D-M4-18-17)', () {
+    final files = ContractSchemas.load();
+    final copy = ContractSchemas.embedded();
+    List<String> facts(ContractSchemas c) => [
+      for (final o in c.operations)
+        '${o.operationId} ${o.method} ${o.path} ${o.requestSchema} '
+            '${o.responseSchemas}',
+    ];
+    expect(facts(copy), facts(files));
+    expect(copy.validate({'last_read_seq': -1}, 'ReadStatePut'), hasLength(1));
+    expect(identical(ContractSchemas.embedded(), copy), isTrue);
+  });
+
   test('the validator reports each rule with its pointer', () {
     final contract = ContractSchemas.load();
     String codes(Object? value, String schema) => [

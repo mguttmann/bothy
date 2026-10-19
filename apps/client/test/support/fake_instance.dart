@@ -100,9 +100,24 @@ class FakeInstance {
       !secure.values.keys.any((k) => k.contains(server.world.instanceId));
 
   /// Stops the fake and deletes the data folder.
-  Future<void> stop() async {
+  ///
+  /// When a test removes the app, the app closes its database without waiting, as it does
+  /// when it quits (`OnboardingController` on dispose). Windows refuses to delete an open
+  /// file, so the delete is retried until the close is done, at most [closeTimeout]
+  /// (docs/DECISIONS.md D-M4-18-18).
+  Future<void> stop({
+    Duration closeTimeout = const Duration(seconds: 10),
+  }) async {
     await server.stop();
-    if (root.existsSync()) await root.delete(recursive: true);
+    final end = DateTime.now().add(closeTimeout);
+    while (root.existsSync()) {
+      try {
+        await root.delete(recursive: true);
+      } on FileSystemException {
+        if (DateTime.now().isAfter(end)) rethrow;
+        await Future<void>.delayed(const Duration(milliseconds: 50));
+      }
+    }
   }
 }
 

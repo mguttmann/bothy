@@ -71,8 +71,9 @@ without one.
   everywhere) and on macOS `test/goldens/*/macos/`.
 - Providers: after changing a file with `@riverpod`, run `dart run build_runner build` and
   `dart format lib`; `make codegen-check` fails on a stale `*.g.dart`.
-- Integration tests: `make apps-platform` runs `platform-tests.json` on macOS and Windows
-  (`flutter test integration_test -d macos` or `-d windows`); elsewhere it prints its SKIP line.
+- Integration tests: `make apps-platform` runs `platform-tests.json` on macOS and Windows, one
+  `flutter test integration_test/<file> -d macos` (or `-d windows`) per file, so a new file
+  needs its line there (D-M4-18-19); elsewhere it prints its SKIP line.
   They start the app from `integration_test/support/test_app.dart`, the only entry that allows
   plain HTTP, with secrets in memory and software device keys, against `FakeServer` on
   `127.0.0.1`.

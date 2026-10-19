@@ -92,8 +92,9 @@ final class FakeServer {
 
   /// Starts a fake on `127.0.0.1` with a free port.
   ///
-  /// Throws a [StateError] when `docs/api/openapi.yaml` is not found above the working
-  /// directory (the contract checks need it), and the error of `HttpServer.bind`.
+  /// The contract checks use `docs/api/` above the working directory, or the embedded copy
+  /// where the repository cannot be read ([ContractSchemas.load]). Throws the error of
+  /// `HttpServer.bind`.
   static Future<FakeServer> start({
     FakeServerOptions options = const FakeServerOptions(),
   }) async {
