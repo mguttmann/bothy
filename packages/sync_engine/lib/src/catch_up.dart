@@ -140,7 +140,10 @@ final class CatchUpListener implements SessionListener {
   bool _live = false;
   bool _halted = false;
   bool _resyncing = false;
-  bool _draining = false;
+
+  /// The session whose held frames are being drained, or null; a drain of an ended session
+  /// does not hold the frames of the next one.
+  int? _drainingSession;
   int _session = 0;
   String _resyncReason = '';
   final List<GatewayFrame> _held = [];
@@ -232,7 +235,7 @@ final class CatchUpListener implements SessionListener {
   @override
   Future<void> onFrame(GatewayFrame frame, SessionControl control) async {
     if (_wiped || _halted) return;
-    if (_resyncing || _draining) {
+    if (_resyncing || _drainingSession == _session) {
       _held.add(frame);
       return;
     }
@@ -366,7 +369,9 @@ final class CatchUpListener implements SessionListener {
   /// Loads the snapshot and replaces the mirror. A failed load is retried after the reconnect
   /// backoff on the same connection while frames wait in memory; mirror and cursor stay until
   /// a snapshot arrives, and a disconnect ends the retries (the next session gets
-  /// `resync_required` again from its stored cursor) (D-M4-14-9).
+  /// `resync_required` again from its stored cursor) (D-M4-14-9). The retry runs outside the
+  /// frame queue of the connection, so it checks its session after every await: a new session
+  /// that started meanwhile is never set live or reported as resynced by it.
   Future<void> _attemptResync(SessionControl control, int session) async {
     final SnapshotData snapshot;
     try {
@@ -396,13 +401,16 @@ final class CatchUpListener implements SessionListener {
       cursor: snapshot.headSeq,
       syncEpoch: snapshot.syncEpoch,
     );
+    if (_wiped || session != _session) return;
     gaps.clear();
     await _db.syncStateDao.markSnapshot(_clock.now());
+    if (_wiped || session != _session) return;
     control.lastProcessedSeq = snapshot.headSeq;
     for (final threadId in _openThreads()) {
       after.reads.add(() => _loadNewestPage(threadId));
     }
     await _afterCommit(after);
+    if (_wiped || session != _session) return;
     _resyncing = false;
     _goLive(control);
     _notify(Resynced(_resyncReason));
@@ -412,8 +420,8 @@ final class CatchUpListener implements SessionListener {
   /// Applies the frames that arrived during a resync, in order, with the duplicate rule (04
   /// 7.3); new frames keep waiting behind them.
   Future<void> _drainHeld(SessionControl control, int session) async {
-    if (_draining) return;
-    _draining = true;
+    if (_drainingSession == session) return;
+    _drainingSession = session;
     try {
       while (_held.isNotEmpty &&
           !_resyncing &&
@@ -423,7 +431,7 @@ final class CatchUpListener implements SessionListener {
         await _handle(_held.removeAt(0), control);
       }
     } finally {
-      _draining = false;
+      if (_drainingSession == session) _drainingSession = null;
     }
   }
 
