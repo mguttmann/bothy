@@ -10,6 +10,8 @@ Anleitung: [docs/operations/install-compose.md](../../docs/operations/install-co
 | `compose.yaml` | alle Dienste, Profile, Netze, Volumes |
 | `.env.example` | Vorlage für `.env`; nur Platzhalter und Standardwerte, keine Geheimnisse |
 | `secrets/` | nicht im Repository: vom Owner gelieferte Geheimnisse als Dateien (Katalog in [configuration.md](../../docs/operations/configuration.md) 5) |
+| `smoke.sh` | the Compose smoke test (`make portability`, M1-73); test only |
+| `test/` | the test overlay, its variables and the collector overlay `file` of the smoke test; test only, not in the release bundle ([test/README.md](test/README.md)) |
 
 Der Stack bindet außerdem `../otel` (Collector) und `../observability` (Prometheus, Alertmanager,
 Loki, Tempo, Grafana) nur lesend ein.
@@ -54,3 +56,11 @@ Genau eines von `direct` und `tailscale`.
 2026-10-10: gültig. Ein Start war nicht möglich, weil die Bothy-Images noch nicht existieren und
 auf dem Prüfrechner kein Docker-Daemon lief. `secrets-init`, `bothy-backupd`, `bothy healthcheck`,
 `migrate --bootstrap` und die TLS-Verbindung von pgBackRest sind Verträge für Bau-Tickets.
+
+Since M1-73 the smoke test `smoke.sh` (`make portability`, [test/README.md](test/README.md))
+proves the server part of the stack with the real `bothy-server` image: this file unchanged plus
+the test overlay, `secrets-init`, `migrate up --bootstrap`, `api`, `worker` and the collector,
+first setup, enrollment, live delivery over WebSocket, catch-up, revocation and the canary scan of
+the collector export and the container logs. It runs on the official PostgreSQL 18 image without
+`backup`; `bothy-postgres`, `bothy-backupd`, the profiles `scan`, `s3`, `tailscale` and
+`observability` and the full portability test stay for M7 (M7-14).

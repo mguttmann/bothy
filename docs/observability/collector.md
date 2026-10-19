@@ -57,6 +57,11 @@ Belege und Grenzen je Backend: [backends.md](backends.md).
 
 Compose wählt bis zu zwei Overlays mit `BOTHY_OTEL_EXPORTER` und `BOTHY_OTEL_EXPORTER_2`.
 
+The test overlay `file` (`infra/compose/test/otel/file.yaml`) exists only for the Compose smoke
+test (M1-73): it writes the three signals as OTLP JSON lines into a volume of the test overlay,
+shortens `tail_sampling.decision_wait` and `batch.timeout` to one second, and is never part of an
+installation or of the release bundle. `tools/opscheck` validates it with the base alone.
+
 ## 4. Geheimnisse
 
 Alle Schlüssel liest der Collector mit `${file:/run/bothy/secrets/<name>}` aus seinem
