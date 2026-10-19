@@ -30,6 +30,8 @@ class _$Problem extends Problem {
   @override
   final BuiltMap<String, JsonObject?>? current;
   @override
+  final int? attemptsRemaining;
+  @override
   final BuiltList<InvariantViolation>? conflicts;
 
   factory _$Problem([void Function(ProblemBuilder)? updates]) =>
@@ -47,6 +49,7 @@ class _$Problem extends Problem {
     this.hint,
     this.errors,
     this.current,
+    this.attemptsRemaining,
     this.conflicts,
   }) : super._();
   @override
@@ -71,6 +74,7 @@ class _$Problem extends Problem {
         hint == other.hint &&
         errors == other.errors &&
         current == other.current &&
+        attemptsRemaining == other.attemptsRemaining &&
         conflicts == other.conflicts;
   }
 
@@ -88,6 +92,7 @@ class _$Problem extends Problem {
     _$hash = $jc(_$hash, hint.hashCode);
     _$hash = $jc(_$hash, errors.hashCode);
     _$hash = $jc(_$hash, current.hashCode);
+    _$hash = $jc(_$hash, attemptsRemaining.hashCode);
     _$hash = $jc(_$hash, conflicts.hashCode);
     _$hash = $jf(_$hash);
     return _$hash;
@@ -107,6 +112,7 @@ class _$Problem extends Problem {
           ..add('hint', hint)
           ..add('errors', errors)
           ..add('current', current)
+          ..add('attemptsRemaining', attemptsRemaining)
           ..add('conflicts', conflicts))
         .toString();
   }
@@ -163,6 +169,11 @@ class ProblemBuilder implements Builder<Problem, ProblemBuilder> {
   set current(MapBuilder<String, JsonObject?>? current) =>
       _$this._current = current;
 
+  int? _attemptsRemaining;
+  int? get attemptsRemaining => _$this._attemptsRemaining;
+  set attemptsRemaining(int? attemptsRemaining) =>
+      _$this._attemptsRemaining = attemptsRemaining;
+
   ListBuilder<InvariantViolation>? _conflicts;
   ListBuilder<InvariantViolation> get conflicts =>
       _$this._conflicts ??= ListBuilder<InvariantViolation>();
@@ -187,6 +198,7 @@ class ProblemBuilder implements Builder<Problem, ProblemBuilder> {
       _hint = $v.hint;
       _errors = $v.errors?.toBuilder();
       _current = $v.current?.toBuilder();
+      _attemptsRemaining = $v.attemptsRemaining;
       _conflicts = $v.conflicts?.toBuilder();
       _$v = null;
     }
@@ -243,6 +255,7 @@ class ProblemBuilder implements Builder<Problem, ProblemBuilder> {
             hint: hint,
             errors: _errors?.build(),
             current: _current?.build(),
+            attemptsRemaining: attemptsRemaining,
             conflicts: _conflicts?.build(),
           );
     } catch (_) {
@@ -252,6 +265,7 @@ class ProblemBuilder implements Builder<Problem, ProblemBuilder> {
         _errors?.build();
         _$failedField = 'current';
         _current?.build();
+
         _$failedField = 'conflicts';
         _conflicts?.build();
       } catch (e) {
