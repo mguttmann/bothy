@@ -435,6 +435,19 @@ type InstanceSetting struct {
 	UpdatedAt pgtype.Timestamptz
 }
 
+type LocalCredential struct {
+	IdentityID           pgtype.UUID
+	PasswordHash         string
+	PasswordChangedAt    pgtype.Timestamptz
+	TotpSecretCiphertext []byte
+	TotpKeyRef           pgtype.Text
+	TotpLastStep         pgtype.Int8
+	TotpEnabledAt        pgtype.Timestamptz
+	FailedCount          int32
+	FailWindowStartedAt  pgtype.Timestamptz
+	LockedUntil          pgtype.Timestamptz
+}
+
 type Owner struct {
 	ID        pgtype.UUID
 	UserID    pgtype.UUID
