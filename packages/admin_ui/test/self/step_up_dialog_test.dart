@@ -48,12 +48,14 @@ void main() {
     unawaited(prompt.ask(''));
     await tester.pumpAndSettle();
 
+    // language-check: off
     expect(find.text('Bestätige, dass du es bist'), findsOneWidget);
     expect(
       find.text('Diese Aktion braucht deine Bestätigung.'),
       findsOneWidget,
     );
     expect(find.text('Weiter'), findsOneWidget);
+    // language-check: on
   });
 
   testWidgets('cancel answers no and the action ends with StepUpCancelled', (
