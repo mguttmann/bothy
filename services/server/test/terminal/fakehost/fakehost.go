@@ -592,7 +592,9 @@ func (dc *DataConn) read() {
 }
 
 // Recv returns the next binary message; after the end the close error.
-func (dc *DataConn) Recv(ctx context.Context) ([]byte, error) { return recv(ctx, &dc.mu, dc.cond, &dc.queue, &dc.cerr) }
+func (dc *DataConn) Recv(ctx context.Context) ([]byte, error) {
+	return recv(ctx, &dc.mu, dc.cond, &dc.queue, &dc.cerr)
+}
 
 // Send sends m as one binary message.
 func (dc *DataConn) Send(ctx context.Context, m []byte) error {
@@ -609,6 +611,10 @@ func (dc *DataConn) SendText(ctx context.Context, s string) error {
 func (dc *DataConn) CloseCode(ctx context.Context) (int, string) {
 	return closeOf(ctx, dc.done, &dc.mu, &dc.cerr)
 }
+
+// Sync pings the server and waits for the pong: the data connection is in the relay (or ended)
+// when it returns.
+func (dc *DataConn) Sync(ctx context.Context) error { return dc.ws.Ping(ctx) }
 
 // Close closes the connection with code and reason (the host service ending its side).
 func (dc *DataConn) Close(code int, reason string) error {
@@ -821,6 +827,10 @@ func (dv *Device) Recv(ctx context.Context) ([]byte, error) {
 func (dv *Device) CloseCode(ctx context.Context) (int, string) {
 	return closeOf(ctx, dv.done, &dv.mu, &dv.cerr)
 }
+
+// Sync pings the server and waits for the pong: the server answers only once it reads the stream
+// after identify, so the device side is in the relay (or the stream ended) when it returns.
+func (dv *Device) Sync(ctx context.Context) error { return dv.ws.Ping(ctx) }
 
 // Close closes the stream with 1000 (the device leaves).
 func (dv *Device) Close() error { return dv.ws.Close(websocket.StatusNormalClosure, "") }

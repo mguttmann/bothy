@@ -14,6 +14,7 @@ import (
 	"net/url"
 	"slices"
 	"strings"
+	"sync/atomic"
 	"time"
 
 	"github.com/coder/websocket"
@@ -26,6 +27,7 @@ import (
 	"github.com/OWNER/bothy/services/server/internal/kernel/ids"
 	"github.com/OWNER/bothy/services/server/internal/kernel/reqmeta"
 	"github.com/OWNER/bothy/services/server/internal/platform/httpserver"
+	"github.com/OWNER/bothy/services/server/internal/terminal/app"
 	"github.com/OWNER/bothy/services/server/internal/terminal/domain"
 )
 
@@ -61,6 +63,8 @@ type StreamDeps struct {
 	Relay         *Relay
 	// Schemas checks the body of identify (TerminalStreamIdentify).
 	Schemas SchemaChecker
+	// Timers drive the deadline of identify (terminal.open_timeout); nil means app.RealTimers.
+	Timers app.Timers
 	// Clock gives hello.server_time; nil means clock.System().
 	Clock clock.Clock
 	// Log receives panics without content; nil means slog.Default().
@@ -90,6 +94,9 @@ func NewStreamHandler(cfg StreamConfig, d StreamDeps) (*StreamHandler, error) {
 	}
 	if d.UseCases == nil || d.Authenticator == nil || d.Nonces == nil || d.Relay == nil || d.Schemas == nil {
 		return nil, errors.New("wsrelay: NewStreamHandler needs the use cases, the authenticator, the nonces, the relay and the schemas")
+	}
+	if d.Timers == nil {
+		d.Timers = app.RealTimers{}
 	}
 	if d.Clock == nil {
 		d.Clock = clock.System()
@@ -166,11 +173,8 @@ const (
 	opTerminalIdentify = "identify"
 )
 
-// streamIdentify is the frame identify of the device stream, decoded strictly.
-type streamIdentify struct {
-	Op string                      `json:"op"`
-	D  *rest.TerminalStreamIdentify `json:"d"`
-}
+// closedAlready marks an identify whose connection already ended or was closed by its deadline.
+const closedAlready = -1
 
 // serve runs one device stream: hello, identify, the decision, then the relay.
 func (h *StreamHandler) serve(ctx context.Context, ws *websocket.Conn, id ids.ID) {
@@ -188,6 +192,9 @@ func (h *StreamHandler) serve(ctx context.Context, ws *websocket.Conn, id ids.ID
 		return
 	}
 	a, code, reason := h.identify(ctx, ws, id)
+	if code == closedAlready {
+		return
+	}
 	if code != 0 {
 		_ = ws.Close(websocket.StatusCode(code), reason)
 		return
@@ -203,17 +210,23 @@ func (h *StreamHandler) serve(ctx context.Context, ws *websocket.Conn, id ids.ID
 // identify reads identify within terminal.open_timeout and decides it (the table of Design note
 // 8). It returns the principal, or the close code with its reason.
 func (h *StreamHandler) identify(ctx context.Context, ws *websocket.Conn, id ids.ID) (actor.Actor, int, string) {
-	rctx, cancel := context.WithTimeout(ctx, h.cfg.OpenTimeout)
-	typ, rd, err := ws.Reader(rctx)
-	if err != nil {
-		cancel()
-		if rctx.Err() != nil {
-			return h.authFailed(ctx, id)
-		}
-		return actor.Actor{}, int(domain.StreamNormal), ""
+	// The deadline closes the connection itself; cancelling the read would tear it down without
+	// a close frame.
+	var timedOut atomic.Bool
+	stop := h.d.Timers.AfterFunc(h.cfg.OpenTimeout, func() {
+		timedOut.Store(true)
+		_, code, reason := h.authFailed(ctx, id)
+		go func() { _ = ws.Close(websocket.StatusCode(code), reason) }()
+	})
+	typ, rd, err := ws.Reader(ctx)
+	if err != nil || timedOut.Load() {
+		stop()
+		return actor.Actor{}, closedAlready, ""
 	}
 	b, err := io.ReadAll(io.LimitReader(rd, int64(h.cfg.MaxFrameBytes)+1))
-	cancel()
+	if !stop() {
+		return actor.Actor{}, closedAlready, ""
+	}
 	if err != nil || typ != websocket.MessageText || len(b) > h.cfg.MaxFrameBytes {
 		return actor.Actor{}, int(domain.StreamDecodeError), domain.StreamDecodeError.Name()
 	}

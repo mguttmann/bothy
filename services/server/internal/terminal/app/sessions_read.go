@@ -53,11 +53,7 @@ func (s *Service) listSessions(ctx context.Context, p actor.Actor, q terminal.Li
 	if err != nil {
 		return terminal.SessionPage{}, err
 	}
-	r := instanceResource
-	if !q.HostID.IsZero() {
-		r = hostResource(q.HostID)
-	}
-	if err := s.check(ctx, p, authorize.ActionTerminalReadOwn, r); err != nil {
+	if err := s.checkList(ctx, p, q.HostID); err != nil {
 		return terminal.SessionPage{}, err
 	}
 	if q.State != "" && !slices.Contains(sessionStates, q.State) {
@@ -88,6 +84,29 @@ func (s *Service) listSessions(ctx context.Context, p actor.Actor, q terminal.Li
 	}
 	limit = min(limit, s.cfg.PageSizeMax)
 	return s.page(ctx, p, user, q, before, limit, binding)
+}
+
+// checkList is the collection check of listTerminalSessions (ruling D-M2-44-10): with host_id
+// terminal.read_own on that host (a host the caller cannot see is 404); without it the catalogue
+// has no instance resource for the action (M2-40: terminal_session and host), so the check runs on
+// a descriptor of an own session no host holds, in filter mode: the gate HumanSession and the
+// liveness of the principal answer as for any id (agents, apps and personal tokens 403
+// subject_kind_not_allowed, a revoked session 401), and the not_found of the unknown host only
+// says that the rows decide, each through its own check.
+func (s *Service) checkList(ctx context.Context, p actor.Actor, hostID ids.ID) error {
+	if !hostID.IsZero() {
+		return s.check(ctx, p, authorize.ActionTerminalReadOwn, hostResource(hostID))
+	}
+	probe := authorize.Resource{Kind: authorize.ResourceTerminalSession, ID: ids.New(), HostID: ids.New(), OwnerID: p.ID,
+		Terminal: &authorize.TerminalFacts{}}
+	d, err := s.d.Authorizer.Authorize(authorize.Filter(ctx), p, authorize.ActionTerminalReadOwn, probe)
+	if err != nil {
+		return err
+	}
+	if d.Allowed() || d.Outcome == authorize.OutcomeNotFound {
+		return nil
+	}
+	return d.Err()
 }
 
 // page reads rows until limit visible ones and one more are found or the rows end.

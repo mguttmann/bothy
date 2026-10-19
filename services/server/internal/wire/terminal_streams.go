@@ -142,7 +142,7 @@ func NewTerminalStreams(cfg TerminalStreamsConfig, t *Terminal, hc *HostControl,
 	stream, err := wsrelay.NewStreamHandler(wsrelay.StreamConfig{PublicURL: cfg.PublicURL, OpenTimeout: cfg.OpenTimeout,
 		MaxFrameBytes: cfg.MaxFrameBytes, MaxJSONDepth: cfg.MaxJSONDepth},
 		wsrelay.StreamDeps{UseCases: t.Service, Authenticator: d.Authenticator, Nonces: d.Nonces, Relay: relay, Schemas: schemas,
-			Clock: d.Clock, Log: d.Log})
+			Timers: d.Timers, Clock: d.Clock, Log: d.Log})
 	if err != nil {
 		return nil, err
 	}

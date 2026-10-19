@@ -11,6 +11,7 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
+	"io"
 	"net/http"
 	"os"
 	"strings"
@@ -53,12 +54,20 @@ type world struct {
 // newWorld builds the world with the configuration overrides cfg.
 func newWorld(t *testing.T, cfg map[string]string) *world {
 	t.Helper()
+	return newWorldLogs(t, cfg, nil)
+}
+
+// newWorldLogs is newWorld with the log lines of the server also written to logs.
+func newWorldLogs(t *testing.T, cfg map[string]string, logs io.Writer) *world {
+	t.Helper()
 	conf := harness.RaisedRateLimits()
+	// Denials are aggregated per window; a short one writes them while the test waits.
+	conf["audit.deny_aggregate_window"] = "50ms"
 	for k, v := range cfg {
 		conf[k] = v
 	}
 	w := &world{t: t, timers: &fakehost.Timers{}}
-	w.s = harness.Start(t, harness.Options{Config: conf, TerminalTimers: w.timers, EgressDenyAll: true})
+	w.s = harness.Start(t, harness.Options{Config: conf, TerminalTimers: w.timers, EgressDenyAll: true, LogWriter: logs})
 	w.robin = w.s.Owner
 	w.alex = w.s.NewUser(t, harness.UserSpec{Handle: "alex", DisplayName: "Alex"})
 	w.sam = w.s.NewUser(t, harness.UserSpec{Handle: "sam", DisplayName: "Sam"})
@@ -376,6 +385,14 @@ func (w *world) denials(action string) []string {
 		out = append(out, r)
 	}
 	return out
+}
+
+// waitDenial waits until a deny entry of action with reason exists.
+func (w *world) waitDenial(action, reason string) {
+	w.t.Helper()
+	w.eventually("deny entry "+action+" "+reason, func() bool {
+		return w.count(`SELECT count(*) FROM audit_events WHERE action = $1 AND decision = 'deny' AND deny_reason = $2`, action, reason) > 0
+	})
 }
 
 // tokenClaims decodes the payload and header of a compact JWS without checking it.
