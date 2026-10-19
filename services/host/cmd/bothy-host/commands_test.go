@@ -264,7 +264,7 @@ func TestInstallRefusesSessionUsersThatAddRefuses(t *testing.T) {
 	for _, c := range []struct {
 		name string
 		code int
-	}{{"-o", 2}, {"Bothy-S-Alex", 2}, {"bothy-s-old", 1}} {
+	}{{"-o", 2}, {"BOTHY-S-ALEX", 2}, {"bothy-s-old", 1}} {
 		f.applied = nil
 		code, _, stderr := runCmd("install", "--config", f.cfg, "--session-user", c.name)
 		if code != c.code || len(f.applied) != 0 {
