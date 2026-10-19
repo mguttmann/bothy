@@ -13,6 +13,31 @@ import (
 	"github.com/oapi-codegen/runtime"
 )
 
+// GetApplicationproblemJSON403 returns the response for an HTTP 403 `application/problem+json` response
+func (r PinMessageResponse) GetApplicationproblemJSON403() *Forbidden {
+	return r.ApplicationproblemJSON403
+}
+
+// GetApplicationproblemJSON404 returns the response for an HTTP 404 `application/problem+json` response
+func (r PinMessageResponse) GetApplicationproblemJSON404() *NotFound {
+	return r.ApplicationproblemJSON404
+}
+
+// GetApplicationproblemJSON410 returns the response for an HTTP 410 `application/problem+json` response
+func (r PinMessageResponse) GetApplicationproblemJSON410() *Gone {
+	return r.ApplicationproblemJSON410
+}
+
+// GetApplicationproblemJSON429 returns the response for an HTTP 429 `application/problem+json` response
+func (r PinMessageResponse) GetApplicationproblemJSON429() *TooManyRequests {
+	return r.ApplicationproblemJSON429
+}
+
+// GetApplicationproblemJSONDefault returns the response for an HTTP default `application/problem+json` response
+func (r PinMessageResponse) GetApplicationproblemJSONDefault() *Error {
+	return r.ApplicationproblemJSONDefault
+}
+
 // GetBody returns the raw response body bytes
 func (r PinMessageResponse) GetBody() []byte {
 	return r.Body

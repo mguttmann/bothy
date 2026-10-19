@@ -76,6 +76,7 @@ var chatConfig = chatapp.Config{
 	ThreadTitleMaxChars: 200, ThreadMaxTags: 5,
 	PlaceholderTitles: []string{"Neuer Chat", "New chat", "Chat", "Ohne Titel", "Untitled", "Test"},
 	PageSizeDefault:   20, PageSizeMax: 50,
+	ProjectBindingTextMaxChars: 64, ReasonMaxChars: 200,
 }
 
 // pepper is the token pepper of the world (a fixed test value, never a secret).

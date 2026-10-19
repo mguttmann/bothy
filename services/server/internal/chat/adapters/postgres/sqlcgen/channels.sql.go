@@ -70,10 +70,12 @@ func (q *Queries) ChannelIDsOfSpace(ctx context.Context, spaceID pgtype.UUID) ([
 const getChannel = `-- name: GetChannel :one
 
 SELECT c.id, c.space_id, c.kind, c.name, c.topic, c.sort_key, c.operator_inherit, c.operator_agent_id, c.require_mention, c.thread_require_mention, c.free_response, c.auto_thread, c.allow_mentioned_agents, c.history_backfill_limit, c.prompt, c.forum_default_sort, c.default_notification_level, c.read_only, c.created_by, c.created_at, c.archived_at, c.version, c.settings_version, s.default_operator_agent_id AS space_operator_id,
-       (s.archived_at IS NOT NULL)::boolean AS space_archived, t.id AS main_thread_id
+       (s.archived_at IS NOT NULL)::boolean AS space_archived, t.id AS main_thread_id,
+       (pb.channel_id IS NOT NULL)::boolean AS project_bound, coalesce(pb.ready, false)::boolean AS project_ready
 FROM channels c
 LEFT JOIN spaces s ON s.id = c.space_id
 LEFT JOIN threads t ON t.channel_id = c.id AND t.kind = 'main'
+LEFT JOIN project_bindings pb ON pb.channel_id = c.id
 WHERE c.id = $1
 `
 
@@ -82,6 +84,8 @@ type GetChannelRow struct {
 	SpaceOperatorID pgtype.UUID
 	SpaceArchived   bool
 	MainThreadID    pgtype.UUID
+	ProjectBound    bool
+	ProjectReady    bool
 }
 
 // SPDX-License-Identifier: Apache-2.0
@@ -120,6 +124,8 @@ func (q *Queries) GetChannel(ctx context.Context, id pgtype.UUID) (GetChannelRow
 		&i.SpaceOperatorID,
 		&i.SpaceArchived,
 		&i.MainThreadID,
+		&i.ProjectBound,
+		&i.ProjectReady,
 	)
 	return i, err
 }
@@ -180,10 +186,12 @@ func (q *Queries) InsertChannel(ctx context.Context, arg InsertChannelParams) er
 
 const listAllChannels = `-- name: ListAllChannels :many
 SELECT c.id, c.space_id, c.kind, c.name, c.topic, c.sort_key, c.operator_inherit, c.operator_agent_id, c.require_mention, c.thread_require_mention, c.free_response, c.auto_thread, c.allow_mentioned_agents, c.history_backfill_limit, c.prompt, c.forum_default_sort, c.default_notification_level, c.read_only, c.created_by, c.created_at, c.archived_at, c.version, c.settings_version, s.default_operator_agent_id AS space_operator_id,
-       (s.archived_at IS NOT NULL)::boolean AS space_archived, t.id AS main_thread_id
+       (s.archived_at IS NOT NULL)::boolean AS space_archived, t.id AS main_thread_id,
+       (pb.channel_id IS NOT NULL)::boolean AS project_bound, coalesce(pb.ready, false)::boolean AS project_ready
 FROM channels c
 LEFT JOIN spaces s ON s.id = c.space_id
 LEFT JOIN threads t ON t.channel_id = c.id AND t.kind = 'main'
+LEFT JOIN project_bindings pb ON pb.channel_id = c.id
 WHERE c.kind <> 'dm'
 ORDER BY c.id
 `
@@ -193,6 +201,8 @@ type ListAllChannelsRow struct {
 	SpaceOperatorID pgtype.UUID
 	SpaceArchived   bool
 	MainThreadID    pgtype.UUID
+	ProjectBound    bool
+	ProjectReady    bool
 }
 
 // Every channel that is not a dm channel, archived ones included, ascending by id, for the
@@ -233,6 +243,8 @@ func (q *Queries) ListAllChannels(ctx context.Context) ([]ListAllChannelsRow, er
 			&i.SpaceOperatorID,
 			&i.SpaceArchived,
 			&i.MainThreadID,
+			&i.ProjectBound,
+			&i.ProjectReady,
 		); err != nil {
 			return nil, err
 		}
@@ -246,10 +258,12 @@ func (q *Queries) ListAllChannels(ctx context.Context) ([]ListAllChannelsRow, er
 
 const listVisibleChannels = `-- name: ListVisibleChannels :many
 SELECT c.id, c.space_id, c.kind, c.name, c.topic, c.sort_key, c.operator_inherit, c.operator_agent_id, c.require_mention, c.thread_require_mention, c.free_response, c.auto_thread, c.allow_mentioned_agents, c.history_backfill_limit, c.prompt, c.forum_default_sort, c.default_notification_level, c.read_only, c.created_by, c.created_at, c.archived_at, c.version, c.settings_version, s.default_operator_agent_id AS space_operator_id,
-       (s.archived_at IS NOT NULL)::boolean AS space_archived, t.id AS main_thread_id
+       (s.archived_at IS NOT NULL)::boolean AS space_archived, t.id AS main_thread_id,
+       (pb.channel_id IS NOT NULL)::boolean AS project_bound, coalesce(pb.ready, false)::boolean AS project_ready
 FROM channels c
 LEFT JOIN spaces s ON s.id = c.space_id
 LEFT JOIN threads t ON t.channel_id = c.id AND t.kind = 'main'
+LEFT JOIN project_bindings pb ON pb.channel_id = c.id
 WHERE c.space_id = $1 AND c.archived_at IS NULL
   AND (c.id = ANY ($2::uuid[]) OR c.space_id = ANY ($3::uuid[]) OR $4::boolean)
 ORDER BY c.sort_key, c.id
@@ -267,6 +281,8 @@ type ListVisibleChannelsRow struct {
 	SpaceOperatorID pgtype.UUID
 	SpaceArchived   bool
 	MainThreadID    pgtype.UUID
+	ProjectBound    bool
+	ProjectReady    bool
 }
 
 // listSpaceChannels with the predicate of 07 section 7.4 and 04 section 7.2: the channels of the
@@ -313,6 +329,8 @@ func (q *Queries) ListVisibleChannels(ctx context.Context, arg ListVisibleChanne
 			&i.SpaceOperatorID,
 			&i.SpaceArchived,
 			&i.MainThreadID,
+			&i.ProjectBound,
+			&i.ProjectReady,
 		); err != nil {
 			return nil, err
 		}
@@ -326,10 +344,12 @@ func (q *Queries) ListVisibleChannels(ctx context.Context, arg ListVisibleChanne
 
 const lockChannel = `-- name: LockChannel :one
 SELECT c.id, c.space_id, c.kind, c.name, c.topic, c.sort_key, c.operator_inherit, c.operator_agent_id, c.require_mention, c.thread_require_mention, c.free_response, c.auto_thread, c.allow_mentioned_agents, c.history_backfill_limit, c.prompt, c.forum_default_sort, c.default_notification_level, c.read_only, c.created_by, c.created_at, c.archived_at, c.version, c.settings_version, s.default_operator_agent_id AS space_operator_id,
-       (s.archived_at IS NOT NULL)::boolean AS space_archived, t.id AS main_thread_id
+       (s.archived_at IS NOT NULL)::boolean AS space_archived, t.id AS main_thread_id,
+       (pb.channel_id IS NOT NULL)::boolean AS project_bound, coalesce(pb.ready, false)::boolean AS project_ready
 FROM channels c
 LEFT JOIN spaces s ON s.id = c.space_id
 LEFT JOIN threads t ON t.channel_id = c.id AND t.kind = 'main'
+LEFT JOIN project_bindings pb ON pb.channel_id = c.id
 WHERE c.id = $1
 FOR UPDATE OF c
 `
@@ -339,6 +359,8 @@ type LockChannelRow struct {
 	SpaceOperatorID pgtype.UUID
 	SpaceArchived   bool
 	MainThreadID    pgtype.UUID
+	ProjectBound    bool
+	ProjectReady    bool
 }
 
 // The channel locked for a change (03 section 6.3: domain rows after permission_version).
@@ -372,6 +394,8 @@ func (q *Queries) LockChannel(ctx context.Context, id pgtype.UUID) (LockChannelR
 		&i.SpaceOperatorID,
 		&i.SpaceArchived,
 		&i.MainThreadID,
+		&i.ProjectBound,
+		&i.ProjectReady,
 	)
 	return i, err
 }
@@ -413,10 +437,12 @@ func (q *Queries) SaveChannel(ctx context.Context, arg SaveChannelParams) error 
 
 const shareChannel = `-- name: ShareChannel :one
 SELECT c.id, c.space_id, c.kind, c.name, c.topic, c.sort_key, c.operator_inherit, c.operator_agent_id, c.require_mention, c.thread_require_mention, c.free_response, c.auto_thread, c.allow_mentioned_agents, c.history_backfill_limit, c.prompt, c.forum_default_sort, c.default_notification_level, c.read_only, c.created_by, c.created_at, c.archived_at, c.version, c.settings_version, s.default_operator_agent_id AS space_operator_id,
-       (s.archived_at IS NOT NULL)::boolean AS space_archived, t.id AS main_thread_id
+       (s.archived_at IS NOT NULL)::boolean AS space_archived, t.id AS main_thread_id,
+       (pb.channel_id IS NOT NULL)::boolean AS project_bound, coalesce(pb.ready, false)::boolean AS project_ready
 FROM channels c
 LEFT JOIN spaces s ON s.id = c.space_id
 LEFT JOIN threads t ON t.channel_id = c.id AND t.kind = 'main'
+LEFT JOIN project_bindings pb ON pb.channel_id = c.id
 WHERE c.id = $1
 FOR SHARE OF c
 `
@@ -426,6 +452,8 @@ type ShareChannelRow struct {
 	SpaceOperatorID pgtype.UUID
 	SpaceArchived   bool
 	MainThreadID    pgtype.UUID
+	ProjectBound    bool
+	ProjectReady    bool
 }
 
 // The channel held FOR SHARE while notify writes a preference on it or below it (M3-18); the
@@ -460,6 +488,8 @@ func (q *Queries) ShareChannel(ctx context.Context, id pgtype.UUID) (ShareChanne
 		&i.SpaceOperatorID,
 		&i.SpaceArchived,
 		&i.MainThreadID,
+		&i.ProjectBound,
+		&i.ProjectReady,
 	)
 	return i, err
 }

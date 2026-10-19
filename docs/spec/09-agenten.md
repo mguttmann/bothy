@@ -1329,6 +1329,20 @@ Gemessen in M2-32 gegen Hermes Agent `v2026.9.24`, Commit `f97608f178d1`, aufgez
 - Bereitschaft: Der Runner meldet je `workspace_ref` im Heartbeat `ready` (Ordner vorhanden,
   Git-Arbeitsbaum, Rechte passen). Der Server setzt `project_bindings.ready`; ohne `ready` lehnt
   `agent.invoke` mit `project_not_ready` ab.
+- Schema `project_runner_config.v1` (`project_bindings.runner_config`, OpenAPI
+  `ProjectRunnerConfig`, M2-03): a closed JSON object (unknown members are rejected) with the
+  optional members `model` (string, not empty, not starting with `-`; the runner passes it as
+  `--model`) and `allowed_tools` (array of distinct strings, each not empty and not starting with
+  `-`). It holds no secrets. The server checks only this shape and the length limit
+  `project.binding_text_max_chars`; it never interprets a tool name. The runner never widens its
+  configured tool class with this list: it derives its flags from `agents.tool_class` (18.2) and
+  only narrows them by `allowed_tools`, so the rule "within `agents.tool_class`" of 03 is enforced
+  by the runner.
+- Binding changes (`putProjectBinding`, `deleteProjectBinding`, M2-03): every effective change of
+  the binding and every change of the effective operator of the forum sets `ready` to `false`; an
+  identical PUT changes nothing. Only reports of the effective operator for a bound forum that is
+  not archived are applied; a readiness change writes no event, no audit entry and no new
+  `settings_version`.
 - Ein Thread ist eine Claude-Code-Sitzung. Der Runner vergibt die Sitzungs-ID vorab als UUID; der
   erste Turn startet mit `--session-id <uuid>`, jeder weitere mit `--resume <uuid>` (Wahl über
   `agent_sessions.started`, 9.1).
@@ -1587,6 +1601,7 @@ Konfiguration des jeweiligen Programms außerhalb des Servers.
 | `component.max_per_message` | Server | `25` | Komponenten je Nachricht |
 | `component.custom_id_max_chars` | Server | `100` | Länge von `custom_id` |
 | `component.form_max_fields` | Server | `10` | Felder je Formular |
+| `project.binding_text_max_chars` | Server | `512` | longest `workspace_ref`, `repository_url`, `default_branch`, `runner_config.model` and tool name of a project binding in Unicode characters; 512 characters of at most 4 bytes in UTF-8, also after `lower()`, stay below the PostgreSQL B-tree entry limit of the unique index on `lower(workspace_ref)`, so an over-long reference is a field error, never an internal error (maximum `600`) |
 | `thread.placeholder_titles` | Server | `["Neuer Chat", "New chat", "Chat", "Ohne Titel", "Untitled", "Test"]` | Platzhalter für die Titel-Erkennung; der leere Titel gilt immer als Platzhalter (12 Punkt 2), ein Listeneintrag ist nie leer |
 | `adapter.invocation_token_leeway` | Adapter | `10s` | Uhren-Toleranz bei `exp` und `iat`; höchstens `auth.clock_leeway` des Servers (4.5) |
 | `adapter.jwks_refresh_min_interval` | Adapter | `60s` | höchstens so oft JWKS neu laden |

@@ -11771,8 +11771,8 @@ type ProjectBinding struct {
 	RepositoryUrl *string `json:"repository_url,omitempty"`
 
 	// RunnerConfig Schema `project_runner_config.v1`. No secrets.
-	RunnerConfig JsonObject `json:"runner_config"`
-	Version      int64      `json:"version"`
+	RunnerConfig ProjectRunnerConfig `json:"runner_config"`
+	Version      int64               `json:"version"`
 
 	// WorkspaceRef Opaque reference the runner resolves; never a server path.
 	//
@@ -11791,8 +11791,8 @@ type ProjectBindingPut struct {
 	// RepositoryUrl Examples: https://git.example.com/team/website
 	RepositoryUrl *string `json:"repository_url,omitempty"`
 
-	// RunnerConfig Free-form JSON object whose schema is named in the field description.
-	RunnerConfig *JsonObject `json:"runner_config,omitempty"`
+	// RunnerConfig Schema `project_runner_config.v1`. No secrets.
+	RunnerConfig *ProjectRunnerConfig `json:"runner_config,omitempty"`
 
 	// WorkspaceRef Examples: website
 	WorkspaceRef string `json:"workspace_ref"`
@@ -11803,6 +11803,12 @@ type ProjectReadiness struct {
 	// ChannelId UUIDv7 (RFC 9562), lowercase canonical form.
 	ChannelId Uuid `json:"channel_id"`
 	Ready     bool `json:"ready"`
+}
+
+// ProjectRunnerConfig Schema `project_runner_config.v1`. No secrets.
+type ProjectRunnerConfig struct {
+	AllowedTools *[]string `json:"allowed_tools,omitempty"`
+	Model        *string   `json:"model,omitempty"`
 }
 
 // PublicBranding defines model for PublicBranding.
@@ -26095,21 +26101,6 @@ func (c *Client) PutFeatureFlag(ctx context.Context, key KeyPath, params *PutFea
 // Corresponds with DELETE /files/{file_id} (the `DeleteFile` operationId).
 func (c *Client) DeleteFile(ctx context.Context, fileId FileIdPath, reqEditors ...RequestEditorFn) (*http.Response, error) {
 	req, err := NewDeleteFileRequest(c.Server, fileId)
-	if err != nil {
-		return nil, err
-	}
-	req = req.WithContext(ctx)
-	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
-		return nil, err
-	}
-	return c.Client.Do(req)
-}
-
-// GetFile Read file metadata
-//
-// Corresponds with GET /files/{file_id} (the `GetFile` operationId).
-func (c *Client) GetFile(ctx context.Context, fileId FileIdPath, reqEditors ...RequestEditorFn) (*http.Response, error) {
-	req, err := NewGetFileRequest(c.Server, fileId)
 	if err != nil {
 		return nil, err
 	}

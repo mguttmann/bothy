@@ -255,6 +255,26 @@ func TestAgentInvoke_ProjectNotReady(t *testing.T) {
 	w.expect(t, w.user(w.owner), authorize.ActionAgentInvoke, w.invoke(w.projektA, w.runner, true), forbidden, "project_not_ready")
 }
 
+// TestAgentInvoke_ProjectReadinessFreshInStructureScope: inside one structure scope (the hub
+// checks every receiver of an event in one, M1-72) agent.invoke still reads the project facts
+// fresh, because a readiness change writes no event that would end the scope (M2-03 design note
+// 8); the channel facts of the path come from the memo.
+func TestAgentInvoke_ProjectReadinessFreshInStructureScope(t *testing.T) {
+	w := newWorld(t)
+	ctx := authorize.WithStructureScope(context.Background())
+	if d := w.decide(t, ctx, w.user(w.owner), authorize.ActionAgentInvoke, w.invoke(w.projektA, w.runner, true)); !d.Allowed() {
+		t.Fatalf("ready binding: %s/%s", d.Outcome, d.Reason)
+	}
+	w.setChannel(t, w.projektA, func(c *authz.ChannelFacts) { c.ProjectReady = false })
+	if d := w.decide(t, ctx, w.user(w.owner), authorize.ActionAgentInvoke, w.invoke(w.projektA, w.runner, true)); d.Reason != "project_not_ready" {
+		t.Fatalf("readiness reset inside the scope: %s/%s", d.Outcome, d.Reason)
+	}
+	w.setChannel(t, w.projektA, func(c *authz.ChannelFacts) { c.ProjectBound, c.ProjectReady = false, false })
+	if d := w.decide(t, ctx, w.user(w.owner), authorize.ActionAgentInvoke, w.invoke(w.projektA, w.runner, true)); !d.Allowed() {
+		t.Fatalf("binding removed inside the scope: %s/%s", d.Outcome, d.Reason)
+	}
+}
+
 func TestAgentInvoke_DevEnvironmentNotReady(t *testing.T) {
 	w := newWorld(t)
 	w.policies.Put(w.runner, authz.AgentPolicy{BillingMode: domain.BillingOrganization, ToolClass: domain.ToolScoped})
