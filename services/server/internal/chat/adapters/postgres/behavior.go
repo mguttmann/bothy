@@ -8,6 +8,7 @@ import (
 	"math"
 
 	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgconn"
 
 	"github.com/OWNER/bothy/services/server/internal/chat/adapters/postgres/sqlcgen"
 	"github.com/OWNER/bothy/services/server/internal/chat/app"
@@ -73,8 +74,19 @@ func (r *Repository) ReplaceSkills(ctx context.Context, id ids.ID, skills []stri
 	if len(skills) == 0 {
 		return nil
 	}
-	return mapError(q.InsertChannelSkills(ctx, sqlcgen.InsertChannelSkillsParams{ChannelID: uuid(id), SkillRefs: skills}), "inserting the skills of a channel")
+	err = q.InsertChannelSkills(ctx, sqlcgen.InsertChannelSkillsParams{ChannelID: uuid(id), SkillRefs: skills})
+	if pgErr := (*pgconn.PgError)(nil); errors.As(err, &pgErr) && pgErr.Code == sqlstateProgramLimitExceeded {
+		// A reference too large for the unique index (channel_id, skill_ref) is a field error of
+		// the request, not a server fault; the message names no value.
+		return errs.Wrap(errs.CodeValidationFailed, err, "the skills are not valid").
+			WithFields(errs.FieldError{Pointer: "/skills", Code: domain.FieldTooLong, Detail: "a skill reference is too long to be stored"})
+	}
+	return mapError(err, "inserting the skills of a channel")
 }
+
+// sqlstateProgramLimitExceeded is program_limit_exceeded, raised among others for an index entry
+// above the btree limit.
+const sqlstateProgramLimitExceeded = "54000"
 
 // RaiseSettingsVersion implements app.BehaviorStore.
 func (r *Repository) RaiseSettingsVersion(ctx context.Context, id ids.ID) (int64, error) {

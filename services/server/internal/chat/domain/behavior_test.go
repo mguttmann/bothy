@@ -45,6 +45,8 @@ func TestValidateBehavior(t *testing.T) {
 		{"prompt multi-byte above", func(b *domain.Behavior) { b.Prompt = strings.Repeat("ä", l.PromptMaxBytes/2) + "a" }, []string{"/prompt:too_long"}},
 		{"prompt with newlines and tabs", func(b *domain.Behavior) { b.Prompt = "one\n\ttwo" }, nil},
 		{"empty prompt", func(b *domain.Behavior) { b.Prompt = "" }, nil},
+		{"prompt with NUL", func(b *domain.Behavior) { b.Prompt = "one\x00two" }, []string{"/prompt:invalid_characters"}},
+		{"prompt over limit with NUL", func(b *domain.Behavior) { b.Prompt = strings.Repeat("a", l.PromptMaxBytes) + "\x00" }, []string{"/prompt:too_long"}},
 		{"no skills", func(b *domain.Behavior) { b.Skills = []string{} }, nil},
 		{"empty skill", func(b *domain.Behavior) { b.Skills = []string{"a", ""} }, []string{"/skills/1:required"}},
 		{"control character", func(b *domain.Behavior) { b.Skills = []string{"a\x01b"} }, []string{"/skills/0:invalid_characters"}},
