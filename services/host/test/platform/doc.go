@@ -3,7 +3,7 @@
 // Package platform is the platform suite of the host service (brief M2-42 design note 19,
 // docs/DECISIONS.md D-M2-42-19). It creates and deletes operating system users, services and ACLs
 // with administrator rights and runs only on a disposable machine: a GitHub-hosted runner
-// (ubuntu-latest with systemd, macos-latest, windows-latest) through the manual or scheduled
+// (ubuntu-24.04 with systemd, macos-15, windows-2025) through the manual or scheduled
 // workflow host-platform.yml, never on a workstation or a machine with real users. Every file
 // carries the build tag platform, so make check never compiles or runs it.
 //
