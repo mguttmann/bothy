@@ -16,11 +16,18 @@ import (
 // asked through PrincipalSource. A function that returns false waives the step-up, because the
 // person sets up the first sign-in data of that kind; "human with a session" stays required. A
 // conditional action without an entry counts as "ja" (07 section 4.2). The rights logic stays here
-// in authz (B7); M1-39 adds local_credential.set with the same shape.
+// in authz (B7).
 var stepUpOnlyWithExistingCredential = map[authorize.Action]func(ctx context.Context, src authz.PrincipalSource, userID ids.ID) (bool, error){
 	// passkey.register: step-up once the person has an active passkey (M1-40).
 	authorize.ActionPasskeyRegister: func(ctx context.Context, src authz.PrincipalSource, userID ids.ID) (bool, error) {
 		return src.HasActivePasskey(ctx, userID)
+	},
+	// local_credential.set: step-up once the password path is established, TOTP confirmed (M1-39).
+	// The first set-up and its confirmation work without step-up; a stolen session that adds a
+	// password only gains a login whose new devices stay pending (brief M1-39 "Conditional
+	// step-up").
+	authorize.ActionLocalCredentialSet: func(ctx context.Context, src authz.PrincipalSource, userID ids.ID) (bool, error) {
+		return src.HasEstablishedLocalCredential(ctx, userID)
 	},
 }
 

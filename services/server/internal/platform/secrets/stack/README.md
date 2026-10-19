@@ -61,7 +61,7 @@ Every row of the table in configuration.md section 5 is an entry with name, orig
   self-signed CA limited to leaf certificates (`ca.crt`; its key is never written) and per host
   `postgres` and `backup` an ECDSA P-256 key in PKCS#8 (`<host>.key`) with a certificate for the
   host name with server and client use (`<host>.crt`), all valid for `PGBackRestTLSValidity`.
-- `pending`: the generator comes with a later ticket (`Entry.PendingOn`): `totp_key` (M1-39),
+- `pending`: the generator comes with a later ticket (`Entry.PendingOn`):
   `s3_access_key` and `s3_secret_key` (M3, supplied until then). If
   they are missing, `init` reports them as `pending` and ends with exit code 0; when supplied,
   they are taken over like every other entry.
@@ -88,7 +88,7 @@ Per entry between `_store` and `--source`:
 
 | `_store` | Source | Generated entry | Supplied entry |
 |---|---|---|---|
-| missing | missing | generate (`generated`); with a pending generator (`Entry.PendingOn`: `totp_key`) `pending` | `missing`; with a pending generator (`Entry.PendingOn`: `s3_*`) `pending` |
+| missing | missing | generate (`generated`) | `missing`; with a pending generator (`Entry.PendingOn`: `s3_*`) `pending` |
 | missing | present | take over (`adopted`) | take over (`adopted`) |
 | present | missing | keep (`kept`) | keep (`kept`) |
 | present | equal | keep (`kept`) | keep (`kept`) |
@@ -196,7 +196,7 @@ its files belong to the volume of `secrets.signing_key_dir` (disaster-recovery.m
 
 ## What is missing
 
-- Generators for `totp_key` (M1-39) and the generated form of
+- Generators for the generated form of
   `s3_access_key` and `s3_secret_key` (M3).
 
 ## Dependencies

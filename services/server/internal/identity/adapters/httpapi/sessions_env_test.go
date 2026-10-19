@@ -5,6 +5,7 @@ package httpapi_test
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"log/slog"
 	"net/http"
 	"os"
@@ -26,7 +27,9 @@ import (
 	authzapp "github.com/OWNER/bothy/services/server/internal/authz/app"
 	"github.com/OWNER/bothy/services/server/internal/identity"
 	"github.com/OWNER/bothy/services/server/internal/identity/adapters/identitytest"
+	"github.com/OWNER/bothy/services/server/internal/identity/adapters/passwordhash"
 	"github.com/OWNER/bothy/services/server/internal/identity/adapters/postgres"
+	"github.com/OWNER/bothy/services/server/internal/identity/adapters/secretbox"
 	"github.com/OWNER/bothy/services/server/internal/identity/app"
 	"github.com/OWNER/bothy/services/server/internal/identity/domain/dpop"
 	instancepg "github.com/OWNER/bothy/services/server/internal/instance/adapters/postgres"
@@ -63,6 +66,45 @@ var sessCfg = app.Config{
 	ServerCodeTTL: time.Minute, OIDCJWKSCacheTTL: time.Hour, OIDCClientAssertionTTL: 2 * time.Minute,
 	IDPRecheckInterval: 7 * 24 * time.Hour, GroupClaimMaxAge: 30 * 24 * time.Hour,
 	DeviceInactiveRevokeAfter: 180 * 24 * time.Hour,
+	// Local accounts (M1-39): the Argon2id floor parameters keep the tests fast.
+	LocalPasswordEnabled: true, PasswordMinLength: 12, Argon2idMemoryKiB: 19456, Argon2idIterations: 2, Argon2idParallelism: 1,
+	LoginFailLimit: 3, LoginLockDuration: 10 * time.Minute, TOTPKeyRef: testTOTPKeyRef,
+}
+
+// testTOTPKeyRef is the reference of the TOTP key of the session world.
+const testTOTPKeyRef = "file:<secrets.dir>/totp_key"
+
+// testTOTPKeys resolves testTOTPKeyRef to a key generated per test run (secretbox.Resolver).
+type testTOTPKeys struct{}
+
+// testTOTPKey is the key behind testTOTPKeyRef, 32 bytes as hex.
+var testTOTPKey = []byte(strings.Repeat("5d", 32))
+
+// Resolve implements secretbox.Resolver.
+func (testTOTPKeys) Resolve(_ context.Context, ref string) ([]byte, error) {
+	if ref != testTOTPKeyRef {
+		return nil, errors.New("unknown reference")
+	}
+	return testTOTPKey, nil
+}
+
+// sharedHasher is one Argon2id hasher with the floor parameters for every world of the package:
+// its dummy hash is computed once, not per world, which the race detector makes expensive.
+var sharedHasher = sync.OnceValue(func() app.PasswordHasher {
+	h, err := passwordhash.New(passwordhash.Params{MemoryKiB: 19456, Iterations: 2, Parallelism: 1})
+	if err != nil {
+		panic(err)
+	}
+	return h
+})
+
+// worldOptions change the session world: the identity configuration and the password hasher
+// (nil builds the Argon2id hasher of the configuration).
+type worldOptions struct {
+	cfg    func(*app.Config)
+	hasher app.PasswordHasher
+	// binds run after BindSessions and BindLocal and before the routes are built.
+	binds []func(*sworld)
 }
 
 // testPepper is the token pepper of the session world (generated per test run, never a secret).
@@ -141,14 +183,19 @@ func keyDir(t *testing.T) string {
 // provider client there).
 func newSessionWorldOn(t *testing.T, db *pgtest.DB, clk *clock.Fake, instID ids.ID, dir string, binds ...func(*sworld)) *sworld {
 	t.Helper()
-	return newSessionWorldWith(t, db, clk, instID, dir, sessCfg, binds...)
+	return newSessionWorldWith(t, db, clk, instID, dir, worldOptions{binds: binds})
 }
 
-// newSessionWorldWith is newSessionWorldOn with the identity configuration cfg (M1-43). The public
-// listener of the world is the loopback test server, so the flag of the trusted header driver is
-// set; a test of the off state clears it. The binds run as in newSessionWorldOn.
-func newSessionWorldWith(t *testing.T, db *pgtest.DB, clk *clock.Fake, instID ids.ID, dir string, cfg app.Config, binds ...func(*sworld)) *sworld {
+// newSessionWorldWith is newSessionWorldOn with the options o: o.cfg changes the identity
+// configuration (M1-43, M1-39), o.hasher replaces the Argon2id hasher (M1-39). The public listener
+// of the world is the loopback test server, so the flag of the trusted header driver is set; a
+// test of the off state clears it. The binds of o run as in newSessionWorldOn.
+func newSessionWorldWith(t *testing.T, db *pgtest.DB, clk *clock.Fake, instID ids.ID, dir string, o worldOptions) *sworld {
 	t.Helper()
+	cfg := sessCfg
+	if o.cfg != nil {
+		o.cfg(&cfg)
+	}
 	pcfg := db.Config(pg.RoleApp)
 	pcfg.MaxConns = 12
 	pool := db.OpenPool(t, pcfg)
@@ -253,7 +300,17 @@ func newSessionWorldWith(t *testing.T, db *pgtest.DB, clk *clock.Fake, instID id
 	if err := w.id.BindSessions(keys.Keys, instID); err != nil {
 		t.Fatal(err)
 	}
-	for _, bind := range binds {
+	box, err := secretbox.New(context.Background(), testTOTPKeys{}, testTOTPKeyRef)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if o.hasher == nil {
+		o.hasher = sharedHasher()
+	}
+	if err := w.id.BindLocal(box, o.hasher); err != nil {
+		t.Fatal(err)
+	}
+	for _, bind := range o.binds {
 		bind(w)
 	}
 	w.id.SetPublicListenerLoopback(true)
@@ -261,7 +318,7 @@ func newSessionWorldWith(t *testing.T, db *pgtest.DB, clk *clock.Fake, instID id
 		Providers: w.id.ProviderHandlers, Credentials: w.id.CredentialHandlers,
 		Tokens: w.id.TokenHandlers, Enrollment: w.id.EnrollmentHandlers, Approval: w.id.ApprovalHandlers, Admin: w.settings.Handlers,
 		Passkeys: w.id.PasskeyHandlers, OIDC: w.id.OIDCHandlers,
-		TrustedHeader: w.id.TrustedHeaderHandlers, Lifecycle: w.id.LifecycleHandlers},
+		TrustedHeader: w.id.TrustedHeaderHandlers, Lifecycle: w.id.LifecycleHandlers, Local: w.id.LocalHandlers},
 		wire.RouteOptions(), routes.SpecCatalog())
 	if err != nil {
 		t.Fatal(err)

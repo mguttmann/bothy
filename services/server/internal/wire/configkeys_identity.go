@@ -22,7 +22,8 @@ const (
 // DPoP requirement of 08 section 18 (M1-44), the enrollment code lifetime and attempt limit of
 // 08 section 18 (M1-37), the OIDC flow, code, cache, assertion and recheck durations of 08
 // section 18 (M1-41), the binding switch of the trusted_header driver of 08 section 18 (M1-43),
-// and the inactivity window of devices (M1-45). The page sizes of
+// the inactivity window of devices (M1-45), and the password, Argon2id, lockout and TOTP key
+// values of 08 section 18 (M1-39). The page sizes of
 // 06-api.md live in apiConfigKeys, because every list reads them.
 func identityConfigKeys() []config.Key {
 	return []config.Key{
@@ -84,7 +85,7 @@ func identityConfigKeys() []config.Key {
 		},
 		{
 			// Discovery reports it with an enabled provider of kind local (M1-46); the password
-			// login of M1-38 reads it too.
+			// login and setMyLocalCredential read it (M1-39).
 			Name: "auth.local_password_enabled", Kind: config.KindBool, Default: defaultTrue,
 			Doc:     "Whether a local account may sign in with password and TOTP as fallback.",
 			Chapter: chapter08,
@@ -92,6 +93,43 @@ func identityConfigKeys() []config.Key {
 		{
 			Name: "auth.login_fail_window", Kind: config.KindDuration, Default: defaultQuarterHour, Min: "1s",
 			Doc:     "Window in which failed attempts count.",
+			Chapter: chapter08,
+		},
+		{
+			// The OWASP floors of 08 section 2.5 are the minimums: a lower value stops the start and
+			// bothy config check, naming the key (ID-T24, M1-39).
+			Name: "auth.argon2id_memory_kib", Kind: config.KindInt, Default: "65536", Min: "19456", Max: "4194304",
+			Doc:     "Argon2id memory in KiB of new password hashes.",
+			Chapter: chapter08,
+		},
+		{
+			Name: "auth.argon2id_iterations", Kind: config.KindInt, Default: "3", Min: "2", Max: "1000",
+			Doc:     "Argon2id passes of new password hashes.",
+			Chapter: chapter08,
+		},
+		{
+			Name: "auth.argon2id_parallelism", Kind: config.KindInt, Default: "1", Min: "1", Max: "255",
+			Doc:     "Argon2id parallelism of new password hashes.",
+			Chapter: chapter08,
+		},
+		{
+			Name: "auth.password_min_length", Kind: config.KindInt, Default: "12", Min: "1", Max: "1024",
+			Doc:     "Shortest local password in Unicode code points after NFC.",
+			Chapter: chapter08,
+		},
+		{
+			Name: "auth.login_fail_limit", Kind: config.KindInt, Default: "10", Min: "1",
+			Doc:     "Failed password logins of a login name per window before the password path is locked.",
+			Chapter: chapter08,
+		},
+		{
+			Name: "auth.login_lock_duration", Kind: config.KindDuration, Default: defaultQuarterHour, Min: "1s",
+			Doc:     "How long the password path of a login name stays locked.",
+			Chapter: chapter08,
+		},
+		{
+			Name: "auth.totp_key_ref", Kind: config.KindSecretRef, Default: "file:<secrets.dir>/totp_key",
+			Doc:     "Secret reference of the AES-256 key that encrypts the TOTP secrets; 32 bytes as hex.",
 			Chapter: chapter08,
 		},
 		{

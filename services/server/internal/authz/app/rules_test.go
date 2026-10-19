@@ -487,3 +487,33 @@ func TestAdminScope(t *testing.T) {
 		t.Fatal("AdminScope served message.read")
 	}
 }
+
+// TestLocalCredentialStepUpOnlyWhenEstablished: step-up "conditional" of local_credential.set (05
+// 2.4, 07 section 4.2 step 8, M1-39): without an established password path a session needs no
+// step-up; with one it does; a personal token is never enough; the source is asked for the
+// resource's person; a source error never allows.
+func TestLocalCredentialStepUpOnlyWhenEstablished(t *testing.T) {
+	w := newWorld(t)
+	self := authorize.Resource{Kind: authorize.ResourceUser, ID: w.alex, OwnerID: w.alex}
+	stale := w.user(w.alex)
+	stale.StepUpAt = time.Time{}
+	w.allow(t, stale, authorize.ActionLocalCredentialSet, self)
+	w.addToken(w.alex)
+	personal := actor.Actor{ID: w.alex, Kind: actor.KindUser, TokenID: w.tokens[w.alex]}
+	w.expect(t, personal, authorize.ActionLocalCredentialSet, self, forbidden, "step_up_not_possible")
+	// Another person's established path does not count for Alex.
+	w.principals.SetLocalCredential(w.sam, true)
+	w.allow(t, stale, authorize.ActionLocalCredentialSet, self)
+	w.principals.SetLocalCredential(w.alex, true)
+	w.expect(t, stale, authorize.ActionLocalCredentialSet, self, stepUpNeeded, "step_up_required")
+	w.allow(t, w.user(w.alex), authorize.ActionLocalCredentialSet, self)
+	w.expect(t, personal, authorize.ActionLocalCredentialSet, self, forbidden, "step_up_not_possible")
+	// passkey.register keeps its own condition (M1-40, INT-W18/2): a password path is no passkey.
+	w.allow(t, stale, authorize.ActionPasskeyRegister, self)
+	w.principals.SetLocalCredential(w.alex, false)
+	// A failing source is an error, never an allow.
+	w.principals.Fail(true)
+	if _, err := w.az.Authorize(context.Background(), stale, authorize.ActionLocalCredentialSet, self); err == nil {
+		t.Fatal("a source error allowed")
+	}
+}

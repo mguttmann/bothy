@@ -15,8 +15,6 @@ rules:
     milestone: M6
   - match: "app."  # M2-24, M2-25
     milestone: M2
-  - match: "auth."  # M1-28 to M1-45
-    milestone: M1
   - match: auth.console_session_idle_timeout  # M6-01
     milestone: M6
   - match: auth.console_session_max_age  # M6-01

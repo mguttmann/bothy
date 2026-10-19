@@ -206,6 +206,42 @@
       "doc": "Longest lifetime of an agent or app token."
     },
     {
+      "name": "auth.argon2id_iterations",
+      "env": "BOTHY_AUTH__ARGON2ID_ITERATIONS",
+      "kind": "int",
+      "default": "3",
+      "required": false,
+      "enum": [],
+      "min": "2",
+      "max": "1000",
+      "chapter": "08-identity.md",
+      "doc": "Argon2id passes of new password hashes."
+    },
+    {
+      "name": "auth.argon2id_memory_kib",
+      "env": "BOTHY_AUTH__ARGON2ID_MEMORY_KIB",
+      "kind": "int",
+      "default": "65536",
+      "required": false,
+      "enum": [],
+      "min": "19456",
+      "max": "4194304",
+      "chapter": "08-identity.md",
+      "doc": "Argon2id memory in KiB of new password hashes."
+    },
+    {
+      "name": "auth.argon2id_parallelism",
+      "env": "BOTHY_AUTH__ARGON2ID_PARALLELISM",
+      "kind": "int",
+      "default": "1",
+      "required": false,
+      "enum": [],
+      "min": "1",
+      "max": "255",
+      "chapter": "08-identity.md",
+      "doc": "Argon2id parallelism of new password hashes."
+    },
+    {
       "name": "auth.cleanup_interval",
       "env": "BOTHY_AUTH__CLEANUP_INTERVAL",
       "kind": "duration",
@@ -362,6 +398,18 @@
       "doc": "Whether a local account may sign in with password and TOTP as fallback."
     },
     {
+      "name": "auth.login_fail_limit",
+      "env": "BOTHY_AUTH__LOGIN_FAIL_LIMIT",
+      "kind": "int",
+      "default": "10",
+      "required": false,
+      "enum": [],
+      "min": "1",
+      "max": "",
+      "chapter": "08-identity.md",
+      "doc": "Failed password logins of a login name per window before the password path is locked."
+    },
+    {
       "name": "auth.login_fail_window",
       "env": "BOTHY_AUTH__LOGIN_FAIL_WINDOW",
       "kind": "duration",
@@ -384,6 +432,18 @@
       "max": "",
       "chapter": "08-identity.md",
       "doc": "Validity of an OIDC login flow and of a passkey ceremony (login, enrollment, registration)."
+    },
+    {
+      "name": "auth.login_lock_duration",
+      "env": "BOTHY_AUTH__LOGIN_LOCK_DURATION",
+      "kind": "duration",
+      "default": "15m",
+      "required": false,
+      "enum": [],
+      "min": "1s",
+      "max": "",
+      "chapter": "08-identity.md",
+      "doc": "How long the password path of a login name stays locked."
     },
     {
       "name": "auth.oidc_client_assertion_ttl",
@@ -432,6 +492,18 @@
       "max": "",
       "chapter": "08-identity.md",
       "doc": "Validity of a pairing code, and the window to collect an approved pairing."
+    },
+    {
+      "name": "auth.password_min_length",
+      "env": "BOTHY_AUTH__PASSWORD_MIN_LENGTH",
+      "kind": "int",
+      "default": "12",
+      "required": false,
+      "enum": [],
+      "min": "1",
+      "max": "1024",
+      "chapter": "08-identity.md",
+      "doc": "Shortest local password in Unicode code points after NFC."
     },
     {
       "name": "auth.personal_token_max_ttl",
@@ -540,6 +612,18 @@
       "max": "",
       "chapter": "08-identity.md",
       "doc": "Secret reference of the server pepper for the HMAC hashes of tokens and codes and the DPoP nonce key; 32 bytes as hex."
+    },
+    {
+      "name": "auth.totp_key_ref",
+      "env": "BOTHY_AUTH__TOTP_KEY_REF",
+      "kind": "secret_ref",
+      "default": "file:<secrets.dir>/totp_key",
+      "required": false,
+      "enum": [],
+      "min": "",
+      "max": "",
+      "chapter": "08-identity.md",
+      "doc": "Secret reference of the AES-256 key that encrypts the TOTP secrets; 32 bytes as hex."
     },
     {
       "name": "auth.trusted_header_bind_requests",

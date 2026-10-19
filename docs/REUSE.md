@@ -426,3 +426,9 @@ repo.
 | Handoff channel for new chats | `thread.create` (L24). |
 | Own Discord REST layer for replies | Bothy never writes to Discord; replies go through its own API. |
 | Copy of the conversion from a mirror tool | The import converts Discord formatting itself (22, section 6.3). |
+
+## 7. Third-party data
+
+| Data | Where | Source and licence |
+|---|---|---|
+| Truncated SHA-256 values of common passwords (`common_passwords.txt`, M1-39) | `services/server/internal/identity/adapters/passwordpolicy` | SecLists `Passwords/Common-Credentials/10k-most-common.txt` at commit `3a5f62f0e18a1b8a36b25399aff0077f3706e5af`, MIT licence, Copyright (c) 2018 Daniel Miessler (https://github.com/danielmiessler/SecLists). The repository holds only the first 16 hex characters of the SHA-256 of each normalised entry, no word list; source, checksum and generation command are in the adapter README. |

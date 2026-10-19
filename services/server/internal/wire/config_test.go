@@ -218,6 +218,13 @@ func TestConfigSchemaBuilds(t *testing.T) {
 		"auth.trusted_header_bind_requests":  {Kind: config.KindBool, Default: "true", Chapter: "08-identity.md"},
 		"auth.idp_recheck_interval":          {Kind: config.KindDuration, Default: "30d", Min: "1m", Chapter: "08-identity.md"},
 		"auth.group_claim_max_age":           {Kind: config.KindDuration, Default: "30d", Min: "1m", Chapter: "08-identity.md"},
+		"auth.argon2id_memory_kib":           {Kind: config.KindInt, Default: "65536", Min: "19456", Max: "4194304", Chapter: "08-identity.md"},
+		"auth.argon2id_iterations":           {Kind: config.KindInt, Default: "3", Min: "2", Max: "1000", Chapter: "08-identity.md"},
+		"auth.argon2id_parallelism":          {Kind: config.KindInt, Default: "1", Min: "1", Max: "255", Chapter: "08-identity.md"},
+		"auth.password_min_length":           {Kind: config.KindInt, Default: "12", Min: "1", Max: "1024", Chapter: "08-identity.md"},
+		"auth.login_fail_limit":              {Kind: config.KindInt, Default: "10", Min: "1", Chapter: "08-identity.md"},
+		"auth.login_lock_duration":           {Kind: config.KindDuration, Default: "15m", Min: "1s", Chapter: "08-identity.md"},
+		"auth.totp_key_ref":                  {Kind: config.KindSecretRef, Default: "file:<secrets.dir>/totp_key", Chapter: "08-identity.md"},
 		"client.min_version.ios":             {Kind: config.KindString, Default: "", Chapter: "18-release.md"},
 		"client.min_version.android":         {Kind: config.KindString, Default: "", Chapter: "18-release.md"},
 		"client.min_version.macos":           {Kind: config.KindString, Default: "", Chapter: "18-release.md"},
@@ -832,5 +839,26 @@ func TestConfig_FingerprintKeysChecked(t *testing.T) {
 		if len(got) == 0 || !strings.Contains(got[0].Key+" "+got[0].Message, key) {
 			t.Errorf("%s: problems %v, want one naming %s", env, got, key)
 		}
+	}
+}
+
+// TestIDT24_Argon2BelowFloorStopsStart: each Argon2id key below its OWASP floor (19456 KiB, 2
+// passes, parallelism 1; 08 section 2.5) stops the start and bothy config check with one problem
+// that names the key; the floor values load (ID-T24, M1-39).
+func TestIDT24_Argon2BelowFloorStopsStart(t *testing.T) {
+	t.Parallel()
+	for key, env := range map[string]string{
+		"auth.argon2id_memory_kib":  "BOTHY_AUTH__ARGON2ID_MEMORY_KIB=19455",
+		"auth.argon2id_iterations":  "BOTHY_AUTH__ARGON2ID_ITERATIONS=1",
+		"auth.argon2id_parallelism": "BOTHY_AUTH__ARGON2ID_PARALLELISM=0",
+	} {
+		problems := load(t, env)
+		if len(problems) != 1 || !strings.Contains(problems[0].Message+problems[0].Key, key) {
+			t.Errorf("%s: problems %v, want one naming %s", env, problems, key)
+		}
+	}
+	if problems := load(t, "BOTHY_AUTH__ARGON2ID_MEMORY_KIB=19456", "BOTHY_AUTH__ARGON2ID_ITERATIONS=2",
+		"BOTHY_AUTH__ARGON2ID_PARALLELISM=1"); problems != nil {
+		t.Fatalf("floor values: %v", problems)
 	}
 }

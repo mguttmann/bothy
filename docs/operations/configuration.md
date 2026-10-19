@@ -393,16 +393,16 @@ Source: [08-identity.md](../spec/08-identity.md), section 18.
 | `auth.console_session_max_age` | `BOTHY_AUTH__CONSOLE_SESSION_MAX_AGE` | Server |  | `12h` | absolute duration of a console session | planned (M6) |
 | `auth.console_session_idle_timeout` | `BOTHY_AUTH__CONSOLE_SESSION_IDLE_TIMEOUT` | Server |  | `30m` | idle time until the console session ends | planned (M6) |
 | `auth.local_password_enabled` | `BOTHY_AUTH__LOCAL_PASSWORD_ENABLED` | Server | bool | `true` | password with TOTP as a fallback for local accounts | active |
-| `auth.totp_key_ref` | `BOTHY_AUTH__TOTP_KEY_REF` | Server |  | `file:<secrets.dir>/totp_key` | Reference to the key (32 bytes) with which TOTP secrets are encrypted | planned (M1) |
+| `auth.totp_key_ref` | `BOTHY_AUTH__TOTP_KEY_REF` | Server | secret_ref | `file:<secrets.dir>/totp_key` | Reference to the key (32 bytes) with which TOTP secrets are encrypted | active |
 | `auth.webauthn_rp_id` | `BOTHY_AUTH__WEBAUTHN_RP_ID` | Server | string | empty | RP ID of the passkeys; empty means the host of `server.public_url` | active |
 | `auth.webauthn_origins` | `BOTHY_AUTH__WEBAUTHN_ORIGINS` | Server | list(string) | empty | allowed origins of the passkeys; empty means the origin of `server.public_url`; entries may also be app origins such as `android:apk-key-hash:...` | active |
-| `auth.password_min_length` | `BOTHY_AUTH__PASSWORD_MIN_LENGTH` | Server |  | `12` | Minimum length of a password | planned (M1) |
-| `auth.argon2id_memory_kib` | `BOTHY_AUTH__ARGON2ID_MEMORY_KIB` | Server |  | `65536` | Argon2id memory (lower bound 19456) | planned (M1) |
-| `auth.argon2id_iterations` | `BOTHY_AUTH__ARGON2ID_ITERATIONS` | Server |  | `3` | Argon2id iterations (lower bound 2) | planned (M1) |
-| `auth.argon2id_parallelism` | `BOTHY_AUTH__ARGON2ID_PARALLELISM` | Server |  | `1` | Argon2id parallelism | planned (M1) |
-| `auth.login_fail_limit` | `BOTHY_AUTH__LOGIN_FAIL_LIMIT` | Server |  | `10` | Failed attempts per account and window | planned (M1) |
+| `auth.password_min_length` | `BOTHY_AUTH__PASSWORD_MIN_LENGTH` | Server | int | `12` | Minimum length of a password | active |
+| `auth.argon2id_memory_kib` | `BOTHY_AUTH__ARGON2ID_MEMORY_KIB` | Server | int | `65536` | Argon2id memory (lower bound 19456) | active |
+| `auth.argon2id_iterations` | `BOTHY_AUTH__ARGON2ID_ITERATIONS` | Server | int | `3` | Argon2id iterations (lower bound 2) | active |
+| `auth.argon2id_parallelism` | `BOTHY_AUTH__ARGON2ID_PARALLELISM` | Server | int | `1` | Argon2id parallelism | active |
+| `auth.login_fail_limit` | `BOTHY_AUTH__LOGIN_FAIL_LIMIT` | Server | int | `10` | Failed attempts per account and window | active |
 | `auth.login_fail_window` | `BOTHY_AUTH__LOGIN_FAIL_WINDOW` | Server | duration | `15m` | Window for failed attempts | active |
-| `auth.login_lock_duration` | `BOTHY_AUTH__LOGIN_LOCK_DURATION` | Server |  | `15m` | Lockout of the password path | planned (M1) |
+| `auth.login_lock_duration` | `BOTHY_AUTH__LOGIN_LOCK_DURATION` | Server | duration | `15m` | Lockout of the password path | active |
 | `auth.dpop_required_for` | `BOTHY_AUTH__DPOP_REQUIRED_FOR` | Server | list(string) | `["agent"]` | Token kinds that must be DPoP-bound | active |
 | `auth.api_token_max_ttl` | `BOTHY_AUTH__API_TOKEN_MAX_TTL` | Server | duration | `365d` | Maximum duration of an agent or app token | active |
 | `auth.personal_token_max_ttl` | `BOTHY_AUTH__PERSONAL_TOKEN_MAX_TTL` | Server | duration | `90d` | Maximum duration of a personal token | active |
@@ -910,13 +910,13 @@ in the volume `signing-keys` (`secrets.signing_key_dir`, ADR 0066); `server_sign
 points there. `bothy secrets export` backs up both places; it takes in the key store with M1-32,
 which generates the signing keys.
 
-Generators of later milestones: `totp_key` (M1-39) and the generated
+Generators of later milestones: the generated
 form of `s3_access_key` and `s3_secret_key` (profile s3, M3). Until then, `bothy secrets init`
 reports these entries as `pending` as long as neither the store nor the source holds them; meanwhile
 `s3_*` count as supplied. Passwords are generated as 32 random bytes in base64url without
-padding (43 characters) and keys (`token_pepper`, `telemetry_pseudonym_key`, `audit_ip_kek`,
-`file_ticket_key`) as 32 random bytes in lower-case hex (64 characters); users that need the raw
-key bytes decode the hex text.
+padding (43 characters) and keys (`token_pepper`, `totp_key`, `telemetry_pseudonym_key`,
+`audit_ip_kek`, `file_ticket_key`) as 32 random bytes in lower-case hex (64 characters); users
+that need the raw key bytes decode the hex text.
 
 `pgbackrest_tls/` (M7-01) is generated as a directory: a self-signed CA that may sign only leaf
 certificates, and one certificate per pgBackRest host (`postgres`, `backup`) with the host name as
