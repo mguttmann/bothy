@@ -13,6 +13,214 @@ import (
 	"github.com/oapi-codegen/runtime"
 )
 
+type UnpinMessageResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// ApplicationproblemJSON400 the response for an HTTP 400 `application/problem+json` response
+	ApplicationproblemJSON400 *BadRequest
+	// ApplicationproblemJSON401 the response for an HTTP 401 `application/problem+json` response
+	ApplicationproblemJSON401 *Unauthorized
+	// ApplicationproblemJSON403 the response for an HTTP 403 `application/problem+json` response
+	ApplicationproblemJSON403 *Forbidden
+	// ApplicationproblemJSON404 the response for an HTTP 404 `application/problem+json` response
+	ApplicationproblemJSON404 *NotFound
+	// ApplicationproblemJSON429 the response for an HTTP 429 `application/problem+json` response
+	ApplicationproblemJSON429 *TooManyRequests
+	// ApplicationproblemJSONDefault the response for an HTTP default `application/problem+json` response
+	ApplicationproblemJSONDefault *Error
+	// Headers204 the parsed response headers for an HTTP 204 response
+	Headers204 *UnpinMessageResponse204Headers
+	// Headers400 the parsed response headers for an HTTP 400 response
+	Headers400 *UnpinMessageResponse400Headers
+	// Headers401 the parsed response headers for an HTTP 401 response
+	Headers401 *UnpinMessageResponse401Headers
+	// Headers403 the parsed response headers for an HTTP 403 response
+	Headers403 *UnpinMessageResponse403Headers
+	// Headers404 the parsed response headers for an HTTP 404 response
+	Headers404 *UnpinMessageResponse404Headers
+	// Headers429 the parsed response headers for an HTTP 429 response
+	Headers429 *UnpinMessageResponse429Headers
+	// HeadersDefault the parsed response headers for an HTTP default response
+	HeadersDefault *UnpinMessageResponseDefaultHeaders
+}
+
+// GetApplicationproblemJSON400 returns the response for an HTTP 400 `application/problem+json` response
+func (r UnpinMessageResponse) GetApplicationproblemJSON400() *BadRequest {
+	return r.ApplicationproblemJSON400
+}
+
+// GetApplicationproblemJSON401 returns the response for an HTTP 401 `application/problem+json` response
+func (r UnpinMessageResponse) GetApplicationproblemJSON401() *Unauthorized {
+	return r.ApplicationproblemJSON401
+}
+
+// GetApplicationproblemJSON403 returns the response for an HTTP 403 `application/problem+json` response
+func (r UnpinMessageResponse) GetApplicationproblemJSON403() *Forbidden {
+	return r.ApplicationproblemJSON403
+}
+
+// GetApplicationproblemJSON404 returns the response for an HTTP 404 `application/problem+json` response
+func (r UnpinMessageResponse) GetApplicationproblemJSON404() *NotFound {
+	return r.ApplicationproblemJSON404
+}
+
+// GetApplicationproblemJSON429 returns the response for an HTTP 429 `application/problem+json` response
+func (r UnpinMessageResponse) GetApplicationproblemJSON429() *TooManyRequests {
+	return r.ApplicationproblemJSON429
+}
+
+// GetApplicationproblemJSONDefault returns the response for an HTTP default `application/problem+json` response
+func (r UnpinMessageResponse) GetApplicationproblemJSONDefault() *Error {
+	return r.ApplicationproblemJSONDefault
+}
+
+// GetBody returns the raw response body bytes
+func (r UnpinMessageResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r UnpinMessageResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r UnpinMessageResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r UnpinMessageResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
+// PinMessageResponse204Headers the declared response headers of an HTTP 204 response for PinMessage
+type PinMessageResponse204Headers struct {
+	CorrelationId   *CorrelationId
+	RateLimit       *string
+	RateLimitPolicy *string
+}
+
+// PinMessageResponse400Headers the declared response headers of an HTTP 400 response for PinMessage
+type PinMessageResponse400Headers struct {
+	CorrelationId *CorrelationId
+}
+
+// PinMessageResponse401Headers the declared response headers of an HTTP 401 response for PinMessage
+type PinMessageResponse401Headers struct {
+	CorrelationId   *CorrelationId
+	DPoPNonce       *string
+	SetCookie       *string
+	WWWAuthenticate *string
+}
+
+// PinMessageResponse403Headers the declared response headers of an HTTP 403 response for PinMessage
+type PinMessageResponse403Headers struct {
+	CorrelationId *CorrelationId
+}
+
+// PinMessageResponse404Headers the declared response headers of an HTTP 404 response for PinMessage
+type PinMessageResponse404Headers struct {
+	CorrelationId *CorrelationId
+}
+
+// PinMessageResponse410Headers the declared response headers of an HTTP 410 response for PinMessage
+type PinMessageResponse410Headers struct {
+	CorrelationId *CorrelationId
+}
+
+// PinMessageResponse429Headers the declared response headers of an HTTP 429 response for PinMessage
+type PinMessageResponse429Headers struct {
+	CorrelationId   *CorrelationId
+	RateLimit       *string
+	RateLimitPolicy *string
+	RetryAfter      *int
+}
+
+// PinMessageResponseDefaultHeaders the declared response headers of an HTTP default response for PinMessage
+type PinMessageResponseDefaultHeaders struct {
+	CorrelationId *CorrelationId
+}
+
+type PinMessageResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// ApplicationproblemJSON400 the response for an HTTP 400 `application/problem+json` response
+	ApplicationproblemJSON400 *BadRequest
+	// ApplicationproblemJSON401 the response for an HTTP 401 `application/problem+json` response
+	ApplicationproblemJSON401 *Unauthorized
+	// ApplicationproblemJSON403 the response for an HTTP 403 `application/problem+json` response
+	ApplicationproblemJSON403 *Forbidden
+	// ApplicationproblemJSON404 the response for an HTTP 404 `application/problem+json` response
+	ApplicationproblemJSON404 *NotFound
+	// ApplicationproblemJSON410 the response for an HTTP 410 `application/problem+json` response
+	ApplicationproblemJSON410 *Gone
+	// ApplicationproblemJSON429 the response for an HTTP 429 `application/problem+json` response
+	ApplicationproblemJSON429 *TooManyRequests
+	// ApplicationproblemJSONDefault the response for an HTTP default `application/problem+json` response
+	ApplicationproblemJSONDefault *Error
+	// Headers204 the parsed response headers for an HTTP 204 response
+	Headers204 *PinMessageResponse204Headers
+	// Headers400 the parsed response headers for an HTTP 400 response
+	Headers400 *PinMessageResponse400Headers
+	// Headers401 the parsed response headers for an HTTP 401 response
+	Headers401 *PinMessageResponse401Headers
+	// Headers403 the parsed response headers for an HTTP 403 response
+	Headers403 *PinMessageResponse403Headers
+	// Headers404 the parsed response headers for an HTTP 404 response
+	Headers404 *PinMessageResponse404Headers
+	// Headers410 the parsed response headers for an HTTP 410 response
+	Headers410 *PinMessageResponse410Headers
+	// Headers429 the parsed response headers for an HTTP 429 response
+	Headers429 *PinMessageResponse429Headers
+	// HeadersDefault the parsed response headers for an HTTP default response
+	HeadersDefault *PinMessageResponseDefaultHeaders
+}
+
+// GetApplicationproblemJSON400 returns the response for an HTTP 400 `application/problem+json` response
+func (r PinMessageResponse) GetApplicationproblemJSON400() *BadRequest {
+	return r.ApplicationproblemJSON400
+}
+
+// GetApplicationproblemJSON401 returns the response for an HTTP 401 `application/problem+json` response
+func (r PinMessageResponse) GetApplicationproblemJSON401() *Unauthorized {
+	return r.ApplicationproblemJSON401
+}
+
+// GetApplicationproblemJSON403 returns the response for an HTTP 403 `application/problem+json` response
+func (r PinMessageResponse) GetApplicationproblemJSON403() *Forbidden {
+	return r.ApplicationproblemJSON403
+}
+
+// GetApplicationproblemJSON404 returns the response for an HTTP 404 `application/problem+json` response
+func (r PinMessageResponse) GetApplicationproblemJSON404() *NotFound {
+	return r.ApplicationproblemJSON404
+}
+
+// GetApplicationproblemJSON410 returns the response for an HTTP 410 `application/problem+json` response
+func (r PinMessageResponse) GetApplicationproblemJSON410() *Gone {
+	return r.ApplicationproblemJSON410
+}
+
+// GetApplicationproblemJSON429 returns the response for an HTTP 429 `application/problem+json` response
+func (r PinMessageResponse) GetApplicationproblemJSON429() *TooManyRequests {
+	return r.ApplicationproblemJSON429
+}
+
+// GetApplicationproblemJSONDefault returns the response for an HTTP default `application/problem+json` response
+func (r PinMessageResponse) GetApplicationproblemJSONDefault() *Error {
+	return r.ApplicationproblemJSONDefault
+}
+
 // GetBody returns the raw response body bytes
 func (r PinMessageResponse) GetBody() []byte {
 	return r.Body
@@ -11901,6 +12109,11 @@ type AbortUploadResponse404Headers struct {
 	CorrelationId *CorrelationId
 }
 
+// AbortUploadResponse409Headers the declared response headers of an HTTP 409 response for AbortUpload
+type AbortUploadResponse409Headers struct {
+	CorrelationId *CorrelationId
+}
+
 // AbortUploadResponse429Headers the declared response headers of an HTTP 429 response for AbortUpload
 type AbortUploadResponse429Headers struct {
 	CorrelationId   *CorrelationId
@@ -11925,6 +12138,8 @@ type AbortUploadResponse struct {
 	ApplicationproblemJSON403 *Forbidden
 	// ApplicationproblemJSON404 the response for an HTTP 404 `application/problem+json` response
 	ApplicationproblemJSON404 *NotFound
+	// ApplicationproblemJSON409 the response for an HTTP 409 `application/problem+json` response
+	ApplicationproblemJSON409 *Conflict
 	// ApplicationproblemJSON429 the response for an HTTP 429 `application/problem+json` response
 	ApplicationproblemJSON429 *TooManyRequests
 	// ApplicationproblemJSONDefault the response for an HTTP default `application/problem+json` response
@@ -11939,6 +12154,8 @@ type AbortUploadResponse struct {
 	Headers403 *AbortUploadResponse403Headers
 	// Headers404 the parsed response headers for an HTTP 404 response
 	Headers404 *AbortUploadResponse404Headers
+	// Headers409 the parsed response headers for an HTTP 409 response
+	Headers409 *AbortUploadResponse409Headers
 	// Headers429 the parsed response headers for an HTTP 429 response
 	Headers429 *AbortUploadResponse429Headers
 	// HeadersDefault the parsed response headers for an HTTP default response
@@ -11963,6 +12180,11 @@ func (r AbortUploadResponse) GetApplicationproblemJSON403() *Forbidden {
 // GetApplicationproblemJSON404 returns the response for an HTTP 404 `application/problem+json` response
 func (r AbortUploadResponse) GetApplicationproblemJSON404() *NotFound {
 	return r.ApplicationproblemJSON404
+}
+
+// GetApplicationproblemJSON409 returns the response for an HTTP 409 `application/problem+json` response
+func (r AbortUploadResponse) GetApplicationproblemJSON409() *Conflict {
+	return r.ApplicationproblemJSON409
 }
 
 // GetApplicationproblemJSON429 returns the response for an HTTP 429 `application/problem+json` response
@@ -12179,6 +12401,11 @@ type CompleteUploadResponse409Headers struct {
 	CorrelationId *CorrelationId
 }
 
+// CompleteUploadResponse410Headers the declared response headers of an HTTP 410 response for CompleteUpload
+type CompleteUploadResponse410Headers struct {
+	CorrelationId *CorrelationId
+}
+
 // CompleteUploadResponse422Headers the declared response headers of an HTTP 422 response for CompleteUpload
 type CompleteUploadResponse422Headers struct {
 	CorrelationId *CorrelationId
@@ -12212,6 +12439,8 @@ type CompleteUploadResponse struct {
 	ApplicationproblemJSON404 *NotFound
 	// ApplicationproblemJSON409 the response for an HTTP 409 `application/problem+json` response
 	ApplicationproblemJSON409 *Conflict
+	// ApplicationproblemJSON410 the response for an HTTP 410 `application/problem+json` response
+	ApplicationproblemJSON410 *Gone
 	// ApplicationproblemJSON422 the response for an HTTP 422 `application/problem+json` response
 	ApplicationproblemJSON422 *UnprocessableEntity
 	// ApplicationproblemJSON429 the response for an HTTP 429 `application/problem+json` response
@@ -12230,6 +12459,8 @@ type CompleteUploadResponse struct {
 	Headers404 *CompleteUploadResponse404Headers
 	// Headers409 the parsed response headers for an HTTP 409 response
 	Headers409 *CompleteUploadResponse409Headers
+	// Headers410 the parsed response headers for an HTTP 410 response
+	Headers410 *CompleteUploadResponse410Headers
 	// Headers422 the parsed response headers for an HTTP 422 response
 	Headers422 *CompleteUploadResponse422Headers
 	// Headers429 the parsed response headers for an HTTP 429 response
@@ -12266,6 +12497,11 @@ func (r CompleteUploadResponse) GetApplicationproblemJSON404() *NotFound {
 // GetApplicationproblemJSON409 returns the response for an HTTP 409 `application/problem+json` response
 func (r CompleteUploadResponse) GetApplicationproblemJSON409() *Conflict {
 	return r.ApplicationproblemJSON409
+}
+
+// GetApplicationproblemJSON410 returns the response for an HTTP 410 `application/problem+json` response
+func (r CompleteUploadResponse) GetApplicationproblemJSON410() *Gone {
+	return r.ApplicationproblemJSON410
 }
 
 // GetApplicationproblemJSON422 returns the response for an HTTP 422 `application/problem+json` response
@@ -12347,6 +12583,11 @@ type UploadPartResponse409Headers struct {
 	CorrelationId *CorrelationId
 }
 
+// UploadPartResponse410Headers the declared response headers of an HTTP 410 response for UploadPart
+type UploadPartResponse410Headers struct {
+	CorrelationId *CorrelationId
+}
+
 // UploadPartResponse413Headers the declared response headers of an HTTP 413 response for UploadPart
 type UploadPartResponse413Headers struct {
 	CorrelationId *CorrelationId
@@ -12380,6 +12621,8 @@ type UploadPartResponse struct {
 	ApplicationproblemJSON404 *NotFound
 	// ApplicationproblemJSON409 the response for an HTTP 409 `application/problem+json` response
 	ApplicationproblemJSON409 *Conflict
+	// ApplicationproblemJSON410 the response for an HTTP 410 `application/problem+json` response
+	ApplicationproblemJSON410 *Gone
 	// ApplicationproblemJSON413 the response for an HTTP 413 `application/problem+json` response
 	ApplicationproblemJSON413 *PayloadTooLarge
 	// ApplicationproblemJSON429 the response for an HTTP 429 `application/problem+json` response
@@ -12398,6 +12641,8 @@ type UploadPartResponse struct {
 	Headers404 *UploadPartResponse404Headers
 	// Headers409 the parsed response headers for an HTTP 409 response
 	Headers409 *UploadPartResponse409Headers
+	// Headers410 the parsed response headers for an HTTP 410 response
+	Headers410 *UploadPartResponse410Headers
 	// Headers413 the parsed response headers for an HTTP 413 response
 	Headers413 *UploadPartResponse413Headers
 	// Headers429 the parsed response headers for an HTTP 429 response
@@ -12434,6 +12679,11 @@ func (r UploadPartResponse) GetApplicationproblemJSON404() *NotFound {
 // GetApplicationproblemJSON409 returns the response for an HTTP 409 `application/problem+json` response
 func (r UploadPartResponse) GetApplicationproblemJSON409() *Conflict {
 	return r.ApplicationproblemJSON409
+}
+
+// GetApplicationproblemJSON410 returns the response for an HTTP 410 `application/problem+json` response
+func (r UploadPartResponse) GetApplicationproblemJSON410() *Gone {
+	return r.ApplicationproblemJSON410
 }
 
 // GetApplicationproblemJSON413 returns the response for an HTTP 413 `application/problem+json` response
@@ -16853,6 +17103,8 @@ func (c *ClientWithResponses) CreateThreadWithResponse(ctx context.Context, chan
 
 // CreateUploadWithBodyWithResponse Start an upload
 //
+// Checks in this order (12, 3.1): size against `file.max_upload_bytes` (413 `payload_too_large`), quota `file.quota_bytes_per_principal` (409 `conflict` with `reason` `quota_exceeded`), open sessions (429), free space of the file system driver (503 `unavailable` with `reason` `storage_full`). A denied type answers 415 `unsupported_media_type` with `reason` `file_type_denied`.
+//
 // Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
 //
 // Corresponds with POST /channels/{channel_id}/uploads (the `CreateUpload` operationId).
@@ -16865,6 +17117,8 @@ func (c *ClientWithResponses) CreateUploadWithBodyWithResponse(ctx context.Conte
 }
 
 // CreateUploadWithResponse Start an upload
+//
+// Checks in this order (12, 3.1): size against `file.max_upload_bytes` (413 `payload_too_large`), quota `file.quota_bytes_per_principal` (409 `conflict` with `reason` `quota_exceeded`), open sessions (429), free space of the file system driver (503 `unavailable` with `reason` `storage_full`). A denied type answers 415 `unsupported_media_type` with `reason` `file_type_denied`.
 //
 // Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
 //
@@ -21014,6 +21268,8 @@ func (c *ClientWithResponses) RevokeTokenWithResponse(ctx context.Context, token
 
 // AbortUploadWithResponse Abort an upload
 //
+// Ends an open own session: its parts are deleted, the file becomes `upload_state` `failed` and `file.updated` goes to the uploader. An aborted or expired session answers 204 again; a completed one 409 `invalid_state_transition`.
+//
 // Returns a wrapper object for the known response body format(s).
 //
 // Corresponds with DELETE /uploads/{file_id} (the `AbortUpload` operationId).
@@ -21027,7 +21283,7 @@ func (c *ClientWithResponses) AbortUploadWithResponse(ctx context.Context, fileI
 
 // GetUploadWithResponse Read the state of an own upload
 //
-// Confirmed parts of an unfinished upload, so a client can resume after a network loss (12, 4).
+// Confirmed parts of an own upload, so a client can resume after a network loss (12, 3.2). `upload_state` is `pending` for an open session without a confirmed part, `uploading` with at least one, `complete` once completed. An aborted or expired session answers 410 `gone`.
 //
 // Returns a wrapper object for the known response body format(s).
 //
@@ -21042,8 +21298,8 @@ func (c *ClientWithResponses) GetUploadWithResponse(ctx context.Context, fileId 
 
 // CompleteUploadWithBodyWithResponse Finish an upload
 //
-// Checks size and optional SHA-256, detects the MIME type and queues the malware scan. The file is
-// downloadable after `scan_status` is `clean` or `skipped`.
+// Closes the session; the verify pass then checks size and SHA-256, detects the MIME type and runs the malware scan. The file is
+// downloadable after `scan_status` is `clean` or `skipped`. `parts` is checked against the confirmed parts: a duplicate or out-of-range number gives 400, another `etag` 409 `conflict` with `reason` `part_conflict`. A completed session answers 200 with the file again. Missing parts answer 409 `conflict` with `reason` `upload_incomplete`; an expired session answers 410 `gone` (12, 3.4 and 3.6).
 //
 // Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
 //
@@ -21058,8 +21314,8 @@ func (c *ClientWithResponses) CompleteUploadWithBodyWithResponse(ctx context.Con
 
 // CompleteUploadWithResponse Finish an upload
 //
-// Checks size and optional SHA-256, detects the MIME type and queues the malware scan. The file is
-// downloadable after `scan_status` is `clean` or `skipped`.
+// Closes the session; the verify pass then checks size and SHA-256, detects the MIME type and runs the malware scan. The file is
+// downloadable after `scan_status` is `clean` or `skipped`. `parts` is checked against the confirmed parts: a duplicate or out-of-range number gives 400, another `etag` 409 `conflict` with `reason` `part_conflict`. A completed session answers 200 with the file again. Missing parts answer 409 `conflict` with `reason` `upload_incomplete`; an expired session answers 410 `gone` (12, 3.4 and 3.6).
 //
 // Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
 //
@@ -21074,13 +21330,13 @@ func (c *ClientWithResponses) CompleteUploadWithResponse(ctx context.Context, fi
 
 // UploadPartWithBodyWithResponse Upload one part in direct mode
 //
-// Repeating a part replaces it. Parts can be sent in parallel.
+// Parts can be sent in parallel and in any order (12, 3.2). The same part number with the same `Content-Digest` answers 200 without new work; with another digest 409 `conflict` with `reason` `part_conflict`. Wrong length or digest: 400 `validation_failed` with `errors[].code` `part_digest_mismatch`, nothing is stored. An expired session answers 410 `gone`.
 //
 // Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
 //
 // Corresponds with PUT /uploads/{file_id}/parts/{part_number} (the `UploadPart` operationId).
-func (c *ClientWithResponses) UploadPartWithBodyWithResponse(ctx context.Context, fileId FileIdPath, partNumber PartNumberPath, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*UploadPartResponse, error) {
-	rsp, err := c.UploadPartWithBody(ctx, fileId, partNumber, contentType, body, reqEditors...)
+func (c *ClientWithResponses) UploadPartWithBodyWithResponse(ctx context.Context, fileId FileIdPath, partNumber PartNumberPath, params *UploadPartParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*UploadPartResponse, error) {
+	rsp, err := c.UploadPartWithBody(ctx, fileId, partNumber, params, contentType, body, reqEditors...)
 	if err != nil {
 		return nil, err
 	}
@@ -23543,261 +23799,6 @@ func ParseUpdateAgentResponse(rsp *http.Response) (*UpdateAgentResponse, error) 
 		response.Headers429 = &headers
 	case true:
 		var headers UpdateAgentResponseDefaultHeaders
-		if values := rsp.Header.Values("Correlation-Id"); len(values) > 0 {
-			var value CorrelationId
-			if err := runtime.BindStyledParameterWithOptions("simple", "Correlation-Id", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: "uuid"}); err != nil {
-				return nil, err
-			}
-			headers.CorrelationId = &value
-		}
-		response.HeadersDefault = &headers
-	}
-
-	return response, nil
-}
-
-// ParseSetAgentBillingModeResponse parses an HTTP response from a SetAgentBillingModeWithResponse call
-func ParseSetAgentBillingModeResponse(rsp *http.Response) (*SetAgentBillingModeResponse, error) {
-	bodyBytes, err := io.ReadAll(rsp.Body)
-	defer func() { _ = rsp.Body.Close() }()
-	if err != nil {
-		return nil, err
-	}
-
-	response := &SetAgentBillingModeResponse{
-		Body:         bodyBytes,
-		HTTPResponse: rsp,
-	}
-
-	switch {
-	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
-		var dest Agent
-		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
-			return nil, err
-		}
-		response.JSON200 = &dest
-
-	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
-		var dest BadRequest
-		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
-			return nil, err
-		}
-		response.ApplicationproblemJSON400 = &dest
-
-	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
-		var dest Unauthorized
-		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
-			return nil, err
-		}
-		response.ApplicationproblemJSON401 = &dest
-
-	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 403:
-		var dest Forbidden
-		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
-			return nil, err
-		}
-		response.ApplicationproblemJSON403 = &dest
-
-	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
-		var dest NotFound
-		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
-			return nil, err
-		}
-		response.ApplicationproblemJSON404 = &dest
-
-	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 409:
-		var dest Conflict
-		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
-			return nil, err
-		}
-		response.ApplicationproblemJSON409 = &dest
-
-	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 412:
-		var dest PreconditionFailed
-		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
-			return nil, err
-		}
-		response.ApplicationproblemJSON412 = &dest
-
-	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 428:
-		var dest PreconditionRequired
-		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
-			return nil, err
-		}
-		response.ApplicationproblemJSON428 = &dest
-
-	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 429:
-		var dest TooManyRequests
-		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
-			return nil, err
-		}
-		response.ApplicationproblemJSON429 = &dest
-
-	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && true:
-		var dest Error
-		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
-			return nil, err
-		}
-		response.ApplicationproblemJSONDefault = &dest
-
-	}
-
-	switch {
-	case rsp.StatusCode == 200:
-		var headers SetAgentBillingModeResponse200Headers
-		if values := rsp.Header.Values("Correlation-Id"); len(values) > 0 {
-			var value CorrelationId
-			if err := runtime.BindStyledParameterWithOptions("simple", "Correlation-Id", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: "uuid"}); err != nil {
-				return nil, err
-			}
-			headers.CorrelationId = &value
-		}
-		if values := rsp.Header.Values("ETag"); len(values) > 0 {
-			var value string
-			if err := runtime.BindStyledParameterWithOptions("simple", "ETag", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
-				return nil, err
-			}
-			headers.ETag = &value
-		}
-		if values := rsp.Header.Values("RateLimit"); len(values) > 0 {
-			var value string
-			if err := runtime.BindStyledParameterWithOptions("simple", "RateLimit", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
-				return nil, err
-			}
-			headers.RateLimit = &value
-		}
-		if values := rsp.Header.Values("RateLimit-Policy"); len(values) > 0 {
-			var value string
-			if err := runtime.BindStyledParameterWithOptions("simple", "RateLimit-Policy", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
-				return nil, err
-			}
-			headers.RateLimitPolicy = &value
-		}
-		response.Headers200 = &headers
-	case rsp.StatusCode == 400:
-		var headers SetAgentBillingModeResponse400Headers
-		if values := rsp.Header.Values("Correlation-Id"); len(values) > 0 {
-			var value CorrelationId
-			if err := runtime.BindStyledParameterWithOptions("simple", "Correlation-Id", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: "uuid"}); err != nil {
-				return nil, err
-			}
-			headers.CorrelationId = &value
-		}
-		response.Headers400 = &headers
-	case rsp.StatusCode == 401:
-		var headers SetAgentBillingModeResponse401Headers
-		if values := rsp.Header.Values("Correlation-Id"); len(values) > 0 {
-			var value CorrelationId
-			if err := runtime.BindStyledParameterWithOptions("simple", "Correlation-Id", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: "uuid"}); err != nil {
-				return nil, err
-			}
-			headers.CorrelationId = &value
-		}
-		if values := rsp.Header.Values("DPoP-Nonce"); len(values) > 0 {
-			var value string
-			if err := runtime.BindStyledParameterWithOptions("simple", "DPoP-Nonce", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
-				return nil, err
-			}
-			headers.DPoPNonce = &value
-		}
-		if values := rsp.Header.Values("Set-Cookie"); len(values) > 0 {
-			var value string
-			if err := runtime.BindStyledParameterWithOptions("simple", "Set-Cookie", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
-				return nil, err
-			}
-			headers.SetCookie = &value
-		}
-		if values := rsp.Header.Values("WWW-Authenticate"); len(values) > 0 {
-			var value string
-			if err := runtime.BindStyledParameterWithOptions("simple", "WWW-Authenticate", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
-				return nil, err
-			}
-			headers.WWWAuthenticate = &value
-		}
-		response.Headers401 = &headers
-	case rsp.StatusCode == 403:
-		var headers SetAgentBillingModeResponse403Headers
-		if values := rsp.Header.Values("Correlation-Id"); len(values) > 0 {
-			var value CorrelationId
-			if err := runtime.BindStyledParameterWithOptions("simple", "Correlation-Id", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: "uuid"}); err != nil {
-				return nil, err
-			}
-			headers.CorrelationId = &value
-		}
-		response.Headers403 = &headers
-	case rsp.StatusCode == 404:
-		var headers SetAgentBillingModeResponse404Headers
-		if values := rsp.Header.Values("Correlation-Id"); len(values) > 0 {
-			var value CorrelationId
-			if err := runtime.BindStyledParameterWithOptions("simple", "Correlation-Id", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: "uuid"}); err != nil {
-				return nil, err
-			}
-			headers.CorrelationId = &value
-		}
-		response.Headers404 = &headers
-	case rsp.StatusCode == 409:
-		var headers SetAgentBillingModeResponse409Headers
-		if values := rsp.Header.Values("Correlation-Id"); len(values) > 0 {
-			var value CorrelationId
-			if err := runtime.BindStyledParameterWithOptions("simple", "Correlation-Id", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: "uuid"}); err != nil {
-				return nil, err
-			}
-			headers.CorrelationId = &value
-		}
-		response.Headers409 = &headers
-	case rsp.StatusCode == 412:
-		var headers SetAgentBillingModeResponse412Headers
-		if values := rsp.Header.Values("Correlation-Id"); len(values) > 0 {
-			var value CorrelationId
-			if err := runtime.BindStyledParameterWithOptions("simple", "Correlation-Id", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: "uuid"}); err != nil {
-				return nil, err
-			}
-			headers.CorrelationId = &value
-		}
-		response.Headers412 = &headers
-	case rsp.StatusCode == 428:
-		var headers SetAgentBillingModeResponse428Headers
-		if values := rsp.Header.Values("Correlation-Id"); len(values) > 0 {
-			var value CorrelationId
-			if err := runtime.BindStyledParameterWithOptions("simple", "Correlation-Id", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: "uuid"}); err != nil {
-				return nil, err
-			}
-			headers.CorrelationId = &value
-		}
-		response.Headers428 = &headers
-	case rsp.StatusCode == 429:
-		var headers SetAgentBillingModeResponse429Headers
-		if values := rsp.Header.Values("Correlation-Id"); len(values) > 0 {
-			var value CorrelationId
-			if err := runtime.BindStyledParameterWithOptions("simple", "Correlation-Id", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: "uuid"}); err != nil {
-				return nil, err
-			}
-			headers.CorrelationId = &value
-		}
-		if values := rsp.Header.Values("RateLimit"); len(values) > 0 {
-			var value string
-			if err := runtime.BindStyledParameterWithOptions("simple", "RateLimit", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
-				return nil, err
-			}
-			headers.RateLimit = &value
-		}
-		if values := rsp.Header.Values("RateLimit-Policy"); len(values) > 0 {
-			var value string
-			if err := runtime.BindStyledParameterWithOptions("simple", "RateLimit-Policy", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
-				return nil, err
-			}
-			headers.RateLimitPolicy = &value
-		}
-		if values := rsp.Header.Values("Retry-After"); len(values) > 0 {
-			var value int
-			if err := runtime.BindStyledParameterWithOptions("simple", "Retry-After", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "integer", Format: ""}); err != nil {
-				return nil, err
-			}
-			headers.RetryAfter = &value
-		}
-		response.Headers429 = &headers
-	case true:
-		var headers SetAgentBillingModeResponseDefaultHeaders
 		if values := rsp.Header.Values("Correlation-Id"); len(values) > 0 {
 			var value CorrelationId
 			if err := runtime.BindStyledParameterWithOptions("simple", "Correlation-Id", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: "uuid"}); err != nil {

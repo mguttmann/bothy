@@ -15103,8 +15103,8 @@ type UploadCreate struct {
 	// Name Examples: screenshot.png
 	Name string `json:"name"`
 
-	// Sha256 Hex SHA-256; the server verifies it on completion when given.
-	Sha256 *string `json:"sha256,omitempty"`
+	// Sha256 Lowercase hex SHA-256 of the whole file; the verify pass checks it.
+	Sha256 string `json:"sha256"`
 
 	// SizeBytes Examples: 48213
 	SizeBytes int64 `json:"size_bytes"`
@@ -16953,6 +16953,12 @@ type SetThreadTitleParams struct {
 type CompleteUploadParams struct {
 	// IdempotencyKey UUIDv7 chosen by the client per logical operation. A repeat with the same request returns the stored response; a different request gives 422 `idempotency_key_reuse`; a repeat while the first is running gives 409 `request_in_progress`. Kept for `sync.idempotency_key_ttl`.
 	IdempotencyKey *IdempotencyKey `json:"Idempotency-Key,omitempty"`
+}
+
+// UploadPartParams defines parameters for UploadPart.
+type UploadPartParams struct {
+	// ContentDigest RFC 9530 digest of the part with the member `sha-256`, e.g. `sha-256=:<base64>:`; other members are ignored.
+	ContentDigest string `json:"Content-Digest"`
 }
 
 // ListUsersParams defines parameters for ListUsers.
@@ -20896,12 +20902,16 @@ type ClientInterface interface {
 
 	// CreateUploadWithBody Start an upload
 	//
+	// Checks in this order (12, 3.1): size against `file.max_upload_bytes` (413 `payload_too_large`), quota `file.quota_bytes_per_principal` (409 `conflict` with `reason` `quota_exceeded`), open sessions (429), free space of the file system driver (503 `unavailable` with `reason` `storage_full`). A denied type answers 415 `unsupported_media_type` with `reason` `file_type_denied`.
+	//
 	// Takes any type of body and a specified content type.
 	//
 	// Corresponds with POST /channels/{channel_id}/uploads (the `CreateUpload` operationId).
 	CreateUploadWithBody(ctx context.Context, channelId ChannelIdPath, params *CreateUploadParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// CreateUpload Start an upload
+	//
+	// Checks in this order (12, 3.1): size against `file.max_upload_bytes` (413 `payload_too_large`), quota `file.quota_bytes_per_principal` (409 `conflict` with `reason` `quota_exceeded`), open sessions (429), free space of the file system driver (503 `unavailable` with `reason` `storage_full`). A denied type answers 415 `unsupported_media_type` with `reason` `file_type_denied`.
 	//
 	// Takes a body of the `application/json` content type.
 	//
@@ -23037,20 +23047,22 @@ type ClientInterface interface {
 
 	// AbortUpload Abort an upload
 	//
+	// Ends an open own session: its parts are deleted, the file becomes `upload_state` `failed` and `file.updated` goes to the uploader. An aborted or expired session answers 204 again; a completed one 409 `invalid_state_transition`.
+	//
 	// Corresponds with DELETE /uploads/{file_id} (the `AbortUpload` operationId).
 	AbortUpload(ctx context.Context, fileId FileIdPath, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// GetUpload Read the state of an own upload
 	//
-	// Confirmed parts of an unfinished upload, so a client can resume after a network loss (12, 4).
+	// Confirmed parts of an own upload, so a client can resume after a network loss (12, 3.2). `upload_state` is `pending` for an open session without a confirmed part, `uploading` with at least one, `complete` once completed. An aborted or expired session answers 410 `gone`.
 	//
 	// Corresponds with GET /uploads/{file_id} (the `GetUpload` operationId).
 	GetUpload(ctx context.Context, fileId FileIdPath, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// CompleteUploadWithBody Finish an upload
 	//
-	// Checks size and optional SHA-256, detects the MIME type and queues the malware scan. The file is
-	// downloadable after `scan_status` is `clean` or `skipped`.
+	// Closes the session; the verify pass then checks size and SHA-256, detects the MIME type and runs the malware scan. The file is
+	// downloadable after `scan_status` is `clean` or `skipped`. `parts` is checked against the confirmed parts: a duplicate or out-of-range number gives 400, another `etag` 409 `conflict` with `reason` `part_conflict`. A completed session answers 200 with the file again. Missing parts answer 409 `conflict` with `reason` `upload_incomplete`; an expired session answers 410 `gone` (12, 3.4 and 3.6).
 	//
 	// Takes any type of body and a specified content type.
 	//
@@ -23059,8 +23071,8 @@ type ClientInterface interface {
 
 	// CompleteUpload Finish an upload
 	//
-	// Checks size and optional SHA-256, detects the MIME type and queues the malware scan. The file is
-	// downloadable after `scan_status` is `clean` or `skipped`.
+	// Closes the session; the verify pass then checks size and SHA-256, detects the MIME type and runs the malware scan. The file is
+	// downloadable after `scan_status` is `clean` or `skipped`. `parts` is checked against the confirmed parts: a duplicate or out-of-range number gives 400, another `etag` 409 `conflict` with `reason` `part_conflict`. A completed session answers 200 with the file again. Missing parts answer 409 `conflict` with `reason` `upload_incomplete`; an expired session answers 410 `gone` (12, 3.4 and 3.6).
 	//
 	// Takes a body of the `application/json` content type.
 	//
@@ -23069,12 +23081,12 @@ type ClientInterface interface {
 
 	// UploadPartWithBody Upload one part in direct mode
 	//
-	// Repeating a part replaces it. Parts can be sent in parallel.
+	// Parts can be sent in parallel and in any order (12, 3.2). The same part number with the same `Content-Digest` answers 200 without new work; with another digest 409 `conflict` with `reason` `part_conflict`. Wrong length or digest: 400 `validation_failed` with `errors[].code` `part_digest_mismatch`, nothing is stored. An expired session answers 410 `gone`.
 	//
 	// Takes any type of body and a specified content type.
 	//
 	// Corresponds with PUT /uploads/{file_id}/parts/{part_number} (the `UploadPart` operationId).
-	UploadPartWithBody(ctx context.Context, fileId FileIdPath, partNumber PartNumberPath, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
+	UploadPartWithBody(ctx context.Context, fileId FileIdPath, partNumber PartNumberPath, params *UploadPartParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// ListUsers List people
 	//
@@ -25513,6 +25525,8 @@ func (c *Client) CreateThread(ctx context.Context, channelId ChannelIdPath, para
 
 // CreateUploadWithBody Start an upload
 //
+// Checks in this order (12, 3.1): size against `file.max_upload_bytes` (413 `payload_too_large`), quota `file.quota_bytes_per_principal` (409 `conflict` with `reason` `quota_exceeded`), open sessions (429), free space of the file system driver (503 `unavailable` with `reason` `storage_full`). A denied type answers 415 `unsupported_media_type` with `reason` `file_type_denied`.
+//
 // Takes any type of body and a specified content type.
 //
 // Corresponds with POST /channels/{channel_id}/uploads (the `CreateUpload` operationId).
@@ -25529,6 +25543,8 @@ func (c *Client) CreateUploadWithBody(ctx context.Context, channelId ChannelIdPa
 }
 
 // CreateUpload Start an upload
+//
+// Checks in this order (12, 3.1): size against `file.max_upload_bytes` (413 `payload_too_large`), quota `file.quota_bytes_per_principal` (409 `conflict` with `reason` `quota_exceeded`), open sessions (429), free space of the file system driver (503 `unavailable` with `reason` `storage_full`). A denied type answers 415 `unsupported_media_type` with `reason` `file_type_denied`.
 //
 // Takes a body of the `application/json` content type.
 //
@@ -26014,102 +26030,6 @@ func (c *Client) CreateDmWithBody(ctx context.Context, params *CreateDmParams, c
 // Corresponds with POST /dms (the `CreateDm` operationId).
 func (c *Client) CreateDm(ctx context.Context, params *CreateDmParams, body CreateDmJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
 	req, err := NewCreateDmRequest(c.Server, params, body)
-	if err != nil {
-		return nil, err
-	}
-	req = req.WithContext(ctx)
-	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
-		return nil, err
-	}
-	return c.Client.Do(req)
-}
-
-// ListEvents Catch up on events after a sequence
-//
-// Same filtering as the gateway. 410 `resync_required` with `reason` when catch-up is impossible.
-//
-// Corresponds with GET /events (the `ListEvents` operationId).
-func (c *Client) ListEvents(ctx context.Context, params *ListEventsParams, reqEditors ...RequestEditorFn) (*http.Response, error) {
-	req, err := NewListEventsRequest(c.Server, params)
-	if err != nil {
-		return nil, err
-	}
-	req = req.WithContext(ctx)
-	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
-		return nil, err
-	}
-	return c.Client.Do(req)
-}
-
-// ListFeatureFlags List feature flags
-//
-// Corresponds with GET /feature-flags (the `ListFeatureFlags` operationId).
-func (c *Client) ListFeatureFlags(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error) {
-	req, err := NewListFeatureFlagsRequest(c.Server)
-	if err != nil {
-		return nil, err
-	}
-	req = req.WithContext(ctx)
-	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
-		return nil, err
-	}
-	return c.Client.Do(req)
-}
-
-// PutFeatureFlagWithBody Set a feature flag
-//
-// Takes any type of body and a specified content type.
-//
-// Corresponds with PUT /feature-flags/{key} (the `PutFeatureFlag` operationId).
-func (c *Client) PutFeatureFlagWithBody(ctx context.Context, key KeyPath, params *PutFeatureFlagParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
-	req, err := NewPutFeatureFlagRequestWithBody(c.Server, key, params, contentType, body)
-	if err != nil {
-		return nil, err
-	}
-	req = req.WithContext(ctx)
-	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
-		return nil, err
-	}
-	return c.Client.Do(req)
-}
-
-// PutFeatureFlag Set a feature flag
-//
-// Takes a body of the `application/json` content type.
-//
-// Corresponds with PUT /feature-flags/{key} (the `PutFeatureFlag` operationId).
-func (c *Client) PutFeatureFlag(ctx context.Context, key KeyPath, params *PutFeatureFlagParams, body PutFeatureFlagJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
-	req, err := NewPutFeatureFlagRequest(c.Server, key, params, body)
-	if err != nil {
-		return nil, err
-	}
-	req = req.WithContext(ctx)
-	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
-		return nil, err
-	}
-	return c.Client.Do(req)
-}
-
-// DeleteFile Delete an unattached file
-//
-// Corresponds with DELETE /files/{file_id} (the `DeleteFile` operationId).
-func (c *Client) DeleteFile(ctx context.Context, fileId FileIdPath, reqEditors ...RequestEditorFn) (*http.Response, error) {
-	req, err := NewDeleteFileRequest(c.Server, fileId)
-	if err != nil {
-		return nil, err
-	}
-	req = req.WithContext(ctx)
-	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
-		return nil, err
-	}
-	return c.Client.Do(req)
-}
-
-// GetFile Read file metadata
-//
-// Corresponds with GET /files/{file_id} (the `GetFile` operationId).
-func (c *Client) GetFile(ctx context.Context, fileId FileIdPath, reqEditors ...RequestEditorFn) (*http.Response, error) {
-	req, err := NewGetFileRequest(c.Server, fileId)
 	if err != nil {
 		return nil, err
 	}

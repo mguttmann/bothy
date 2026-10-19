@@ -146,6 +146,16 @@ func keyStoreDir(t *testing.T) string {
 	return dir
 }
 
+// filesRoot returns a fresh root of the file system driver (file.fs.root) with mode 0700.
+func filesRoot(t *testing.T) string {
+	t.Helper()
+	dir := filepath.Join(t.TempDir(), "files")
+	if err := os.Mkdir(dir, 0o700); err != nil {
+		t.Fatal(err)
+	}
+	return dir
+}
+
 // setMode sets the permission bits of path; tests build key stores with a wrong mode with it.
 func setMode(t *testing.T, path string, mode os.FileMode) {
 	t.Helper()
@@ -161,6 +171,7 @@ func serveEnv(t *testing.T, db *pgtest.DB, extra ...string) []string {
 	env := []string{
 		"BOTHY_SECRETS__DIR=" + secretsDir(t, db),
 		"BOTHY_SECRETS__SIGNING_KEY_DIR=" + sharedKeyStore(t, db),
+		"BOTHY_FILE__FS__ROOT=" + filesRoot(t),
 		"BOTHY_DATABASE__HOST=" + cfg.Host,
 		"BOTHY_DATABASE__PORT=" + strconv.Itoa(cfg.Port),
 		"BOTHY_DATABASE__NAME=" + db.Name(),

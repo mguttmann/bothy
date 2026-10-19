@@ -82,6 +82,16 @@ func DisplayText(s string) error {
 	return nil
 }
 
+// IsBidiControl reports whether r is one of the bidi controls of SEC-IN-4 that DisplayText
+// rejects (U+061C, U+200E, U+200F, U+202A to U+202E, U+2066 to U+2069). Callers that clean a
+// text instead of rejecting it, such as the file names of docs/spec/12-dateien.md "6.2", use it so
+// that the set stays in one place.
+//
+// Example:
+//
+//	textcheck.IsBidiControl('\u202E') // true
+func IsBidiControl(r rune) bool { return isBidiControl(r) }
+
 // isBidiControl reports the bidi controls of SEC-IN-4: the Arabic letter mark, the left-to-right
 // and right-to-left marks, the embeddings and overrides with their pop, and the isolates. They
 // can reorder how a name is shown and so make one person look like another.

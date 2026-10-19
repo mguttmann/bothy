@@ -70,6 +70,11 @@ def _parse_response(
 
         return response_409
 
+    if response.status_code == 410:
+        response_410 = Problem.from_dict(response.json())
+
+        return response_410
+
     if response.status_code == 422:
         response_422 = Problem.from_dict(response.json())
 
@@ -105,8 +110,13 @@ def sync_detailed(
 ) -> Response[File | Problem]:
     """Finish an upload
 
-     Checks size and optional SHA-256, detects the MIME type and queues the malware scan. The file is
-    downloadable after `scan_status` is `clean` or `skipped`.
+     Closes the session; the verify pass then checks size and SHA-256, detects the MIME type and runs the
+    malware scan. The file is
+    downloadable after `scan_status` is `clean` or `skipped`. `parts` is checked against the confirmed
+    parts: a duplicate or out-of-range number gives 400, another `etag` 409 `conflict` with `reason`
+    `part_conflict`. A completed session answers 200 with the file again. Missing parts answer 409
+    `conflict` with `reason` `upload_incomplete`; an expired session answers 410 `gone` (12, 3.4 and
+    3.6).
 
     Args:
         file_id (UUID): UUIDv7 (RFC 9562), lowercase canonical form.
@@ -143,8 +153,13 @@ def sync(
 ) -> File | Problem | None:
     """Finish an upload
 
-     Checks size and optional SHA-256, detects the MIME type and queues the malware scan. The file is
-    downloadable after `scan_status` is `clean` or `skipped`.
+     Closes the session; the verify pass then checks size and SHA-256, detects the MIME type and runs the
+    malware scan. The file is
+    downloadable after `scan_status` is `clean` or `skipped`. `parts` is checked against the confirmed
+    parts: a duplicate or out-of-range number gives 400, another `etag` 409 `conflict` with `reason`
+    `part_conflict`. A completed session answers 200 with the file again. Missing parts answer 409
+    `conflict` with `reason` `upload_incomplete`; an expired session answers 410 `gone` (12, 3.4 and
+    3.6).
 
     Args:
         file_id (UUID): UUIDv7 (RFC 9562), lowercase canonical form.
@@ -176,8 +191,13 @@ async def asyncio_detailed(
 ) -> Response[File | Problem]:
     """Finish an upload
 
-     Checks size and optional SHA-256, detects the MIME type and queues the malware scan. The file is
-    downloadable after `scan_status` is `clean` or `skipped`.
+     Closes the session; the verify pass then checks size and SHA-256, detects the MIME type and runs the
+    malware scan. The file is
+    downloadable after `scan_status` is `clean` or `skipped`. `parts` is checked against the confirmed
+    parts: a duplicate or out-of-range number gives 400, another `etag` 409 `conflict` with `reason`
+    `part_conflict`. A completed session answers 200 with the file again. Missing parts answer 409
+    `conflict` with `reason` `upload_incomplete`; an expired session answers 410 `gone` (12, 3.4 and
+    3.6).
 
     Args:
         file_id (UUID): UUIDv7 (RFC 9562), lowercase canonical form.
@@ -212,8 +232,13 @@ async def asyncio(
 ) -> File | Problem | None:
     """Finish an upload
 
-     Checks size and optional SHA-256, detects the MIME type and queues the malware scan. The file is
-    downloadable after `scan_status` is `clean` or `skipped`.
+     Closes the session; the verify pass then checks size and SHA-256, detects the MIME type and runs the
+    malware scan. The file is
+    downloadable after `scan_status` is `clean` or `skipped`. `parts` is checked against the confirmed
+    parts: a duplicate or out-of-range number gives 400, another `etag` 409 `conflict` with `reason`
+    `part_conflict`. A completed session answers 200 with the file again. Missing parts answer 409
+    `conflict` with `reason` `upload_incomplete`; an expired session answers 410 `gone` (12, 3.4 and
+    3.6).
 
     Args:
         file_id (UUID): UUIDv7 (RFC 9562), lowercase canonical form.

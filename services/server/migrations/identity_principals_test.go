@@ -78,8 +78,8 @@ func indexes(t *testing.T, conn *pgx.Conn, table string) []string {
 
 // TestIdentityPrincipalsSchema holds acceptance criterion 1 of M1-26: principals, users and
 // owners match docs/spec/03-datenmodell.md section 4.2 column by column, with every check,
-// unique index, index and foreign key; the only deviation is the missing foreign key of
-// avatar_file_id (M3-03 adds it with files).
+// unique index, index and foreign key, including the foreign key of avatar_file_id that M3-03
+// adds with files.
 func TestIdentityPrincipalsSchema(t *testing.T) {
 	t.Parallel()
 	conn := pgtest.New(t).SuperConn(t)
@@ -107,6 +107,7 @@ func TestIdentityPrincipalsSchema(t *testing.T) {
 				"CHECK ((handle ~ '^[a-z0-9][a-z0-9._-]*$'::text))",
 				"CHECK ((kind = ANY (ARRAY['user'::text, 'agent'::text, 'app'::text])))",
 				"CHECK ((status = ANY (ARRAY['pending'::text, 'active'::text, 'disabled'::text, 'deleted'::text])))",
+				"FOREIGN KEY (avatar_file_id) REFERENCES files(id) ON DELETE SET NULL",
 				"PRIMARY KEY (id)",
 			},
 			indexes: []string{

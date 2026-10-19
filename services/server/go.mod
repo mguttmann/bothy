@@ -11,6 +11,7 @@ require (
 	github.com/aws/smithy-go v1.28.5
 	github.com/coder/websocket v1.8.15
 	github.com/exaring/otelpgx v0.13.0
+	github.com/gabriel-vasile/mimetype v1.4.16
 	github.com/getkin/kin-openapi v0.142.0
 	github.com/go-webauthn/webauthn v0.18.2
 	github.com/gowebpki/jcs v1.0.2

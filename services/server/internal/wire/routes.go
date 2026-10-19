@@ -15,6 +15,7 @@ import (
 	audithttp "github.com/OWNER/bothy/services/server/internal/audit/adapters/httpapi"
 	authzhttp "github.com/OWNER/bothy/services/server/internal/authz/adapters/httpapi"
 	chathttp "github.com/OWNER/bothy/services/server/internal/chat/adapters/httpapi"
+	fileshttp "github.com/OWNER/bothy/services/server/internal/files/adapters/httpapi"
 	identityhttp "github.com/OWNER/bothy/services/server/internal/identity/adapters/httpapi"
 	instancehttp "github.com/OWNER/bothy/services/server/internal/instance/adapters/httpapi"
 	messaginghttp "github.com/OWNER/bothy/services/server/internal/messaging/adapters/httpapi"
@@ -139,6 +140,9 @@ type Handlers struct {
 	*notifyhttp.Preferences
 	// Sync implements listEvents and getSnapshot (sync, M1-63).
 	*synchttp.Sync
+	// Files implements createUpload, uploadPart, getUpload, completeUpload, abortUpload and
+	// getFile (files, M3-03).
+	*fileshttp.Files
 }
 
 // routeBuilder builds and verifies the routes of one REST surface against a catalogue with the

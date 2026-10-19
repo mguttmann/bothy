@@ -16,8 +16,10 @@ def _get_kwargs(
     part_number: int,
     *,
     body: File,
+    content_digest: str,
 ) -> dict[str, Any]:
     headers: dict[str, Any] = {}
+    headers["Content-Digest"] = content_digest
 
     _kwargs: dict[str, Any] = {
         "method": "put",
@@ -67,6 +69,11 @@ def _parse_response(
 
         return response_409
 
+    if response.status_code == 410:
+        response_410 = Problem.from_dict(response.json())
+
+        return response_410
+
     if response.status_code == 413:
         response_413 = Problem.from_dict(response.json())
 
@@ -99,14 +106,19 @@ def sync_detailed(
     *,
     client: AuthenticatedClient | Client,
     body: File,
+    content_digest: str,
 ) -> Response[Problem | UploadPartResult]:
     """Upload one part in direct mode
 
-     Repeating a part replaces it. Parts can be sent in parallel.
+     Parts can be sent in parallel and in any order (12, 3.2). The same part number with the same
+    `Content-Digest` answers 200 without new work; with another digest 409 `conflict` with `reason`
+    `part_conflict`. Wrong length or digest: 400 `validation_failed` with `errors[].code`
+    `part_digest_mismatch`, nothing is stored. An expired session answers 410 `gone`.
 
     Args:
         file_id (UUID): UUIDv7 (RFC 9562), lowercase canonical form.
         part_number (int):
+        content_digest (str):
         body (File):
 
     Raises:
@@ -121,6 +133,7 @@ def sync_detailed(
         file_id=file_id,
         part_number=part_number,
         body=body,
+        content_digest=content_digest,
     )
 
     response = client.get_httpx_client().request(
@@ -136,14 +149,19 @@ def sync(
     *,
     client: AuthenticatedClient | Client,
     body: File,
+    content_digest: str,
 ) -> Problem | UploadPartResult | None:
     """Upload one part in direct mode
 
-     Repeating a part replaces it. Parts can be sent in parallel.
+     Parts can be sent in parallel and in any order (12, 3.2). The same part number with the same
+    `Content-Digest` answers 200 without new work; with another digest 409 `conflict` with `reason`
+    `part_conflict`. Wrong length or digest: 400 `validation_failed` with `errors[].code`
+    `part_digest_mismatch`, nothing is stored. An expired session answers 410 `gone`.
 
     Args:
         file_id (UUID): UUIDv7 (RFC 9562), lowercase canonical form.
         part_number (int):
+        content_digest (str):
         body (File):
 
     Raises:
@@ -159,6 +177,7 @@ def sync(
         part_number=part_number,
         client=client,
         body=body,
+        content_digest=content_digest,
     ).parsed
 
 
@@ -168,14 +187,19 @@ async def asyncio_detailed(
     *,
     client: AuthenticatedClient | Client,
     body: File,
+    content_digest: str,
 ) -> Response[Problem | UploadPartResult]:
     """Upload one part in direct mode
 
-     Repeating a part replaces it. Parts can be sent in parallel.
+     Parts can be sent in parallel and in any order (12, 3.2). The same part number with the same
+    `Content-Digest` answers 200 without new work; with another digest 409 `conflict` with `reason`
+    `part_conflict`. Wrong length or digest: 400 `validation_failed` with `errors[].code`
+    `part_digest_mismatch`, nothing is stored. An expired session answers 410 `gone`.
 
     Args:
         file_id (UUID): UUIDv7 (RFC 9562), lowercase canonical form.
         part_number (int):
+        content_digest (str):
         body (File):
 
     Raises:
@@ -190,6 +214,7 @@ async def asyncio_detailed(
         file_id=file_id,
         part_number=part_number,
         body=body,
+        content_digest=content_digest,
     )
 
     response = await client.get_async_httpx_client().request(**kwargs)
@@ -203,14 +228,19 @@ async def asyncio(
     *,
     client: AuthenticatedClient | Client,
     body: File,
+    content_digest: str,
 ) -> Problem | UploadPartResult | None:
     """Upload one part in direct mode
 
-     Repeating a part replaces it. Parts can be sent in parallel.
+     Parts can be sent in parallel and in any order (12, 3.2). The same part number with the same
+    `Content-Digest` answers 200 without new work; with another digest 409 `conflict` with `reason`
+    `part_conflict`. Wrong length or digest: 400 `validation_failed` with `errors[].code`
+    `part_digest_mismatch`, nothing is stored. An expired session answers 410 `gone`.
 
     Args:
         file_id (UUID): UUIDv7 (RFC 9562), lowercase canonical form.
         part_number (int):
+        content_digest (str):
         body (File):
 
     Raises:
@@ -227,5 +257,6 @@ async def asyncio(
             part_number=part_number,
             client=client,
             body=body,
+            content_digest=content_digest,
         )
     ).parsed

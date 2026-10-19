@@ -96,10 +96,16 @@ func serveTestEnv(t *testing.T, db *pgtest.DB, extra ...string) []string {
 	if err := os.Mkdir(keys, 0o700); err != nil {
 		t.Fatal(err)
 	}
+	// The root of the file system driver (M3-03): a directory of the test with mode 0700.
+	files := filepath.Join(t.TempDir(), "files")
+	if err := os.Mkdir(files, 0o700); err != nil {
+		t.Fatal(err)
+	}
 	cfg := db.Config(pg.RoleApp)
 	env := []string{
 		"BOTHY_SECRETS__DIR=" + dir,
 		"BOTHY_SECRETS__SIGNING_KEY_DIR=" + keys,
+		"BOTHY_FILE__FS__ROOT=" + files,
 		"BOTHY_DATABASE__HOST=" + cfg.Host,
 		"BOTHY_DATABASE__PORT=" + strconv.Itoa(cfg.Port),
 		"BOTHY_DATABASE__NAME=" + db.Name(),
