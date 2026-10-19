@@ -240,6 +240,7 @@ E = Elevation of Privilege. "Register" verweist auf Abschnitt 6.
 | S | Erster Besucher wird Owner | erster Owner nur per Server-Befehl (08, 4) | T-ID-04 |
 | I | Sicherung gestohlen | Verschlüsselung, Schlüssel getrennt (SEC-BAK-*) | T-BK-01 |
 | T | Wiederherstellung bringt Gelöschtes zurück | Lösch-Journal (SEC-BAK-3) | T-BK-02 |
+| T | The smoke test overlay or its settings end up in an installation (test images, `staging`, disabled backup, file export of telemetry) | overlay only under `infra/compose/test`, excluded from `make release-build`; own project name `bothy-smoke-<run ID>`; no published port; environment `staging` | T-OP-01 |
 
 ### 5.15 Lieferkette
 
@@ -337,6 +338,7 @@ Kopplung, Relais, Host-Dienst und Terminal-Ansicht ([24-terminal.md](../spec/24-
 | T-PU-01 | **Push-Metadaten.** Push-Anbieter sehen Zeitpunkt, Gerät, App, Häufigkeit. | hoch | niedrig | nur IDs und neutraler Platzhalter (ADR 0031); IDs zufällig | Tests in [13-push-benachrichtigungen.md](../spec/13-push-benachrichtigungen.md) | niedrig: Metadaten bleiben sichtbar; Auftragsverarbeitung nach 20 |
 | T-BK-01 | **Diebstahl einer Sicherung.** | mittel | hoch | Verschlüsselung, Schlüssel getrennt, keine Geheimnisse im Klartext (SEC-BAK-1, 2) | Wiederherstellungsprobe | niedrig, solange der Schlüssel getrennt bleibt |
 | T-BK-02 | **Wiederherstellung bringt Gelöschtes zurück.** | mittel | mittel | Lösch-Journal (20, 4.6; SEC-BAK-3) | SEC-T15 | niedrig |
+| T-OP-01 | **Test settings in an installation.** The overlay of the Compose smoke test (test images, a disabled `backup`, telemetry written to a file, environment `staging`) is copied into or combined with an installation. | niedrig | mittel | overlay only under `infra/compose/test` with a "test only" header, excluded from the release bundle (`release-build`), own project name per run, no published port, explicit `--env-file` so a real `.env` is never read | `test_release_bundle_excludes_smoke_overlay`, `test_overlay_publishes_no_ports` (M1-73) | niedrig: an operator can still copy the file by hand |
 | T-DB-01 | **Änderung des Audit-Logs mit Datenbankzugriff.** | niedrig | hoch | Rechte der Anwendungsrolle, Hash-Kette, signierte und exportierte Prüfpunkte (ADR 0021) | SEC-T16; the application-role part is proven since M1-24 (`TestSECT16_AppRoleCannotUpdateOrDelete`, `TestAudit_TriggerBlocksOwnerUpdate` in `services/server/migrations`), the detection of a changed row and of a rewritten chain through the checkpoints of the sink is proven since M1-50 (`TestSECT16_ChangedRowIsDetected`, `TestSECT16_RewrittenChainIsDetectedByCheckpoint`, `TestVerifyIgnoresDatabaseCheckpoints` in `services/server/internal/audit/adapters/httpapi`) | mittel: Wer Datenbank und Exportziel kontrolliert, kann beides ändern |
 | T-LG-01 | **Geheimnisse oder Inhalte in Logs und Telemetrie.** | hoch | mittel | Erlaubnislisten, Typ für Geheimnisse, Routen-Muster (SEC-LOG-*) | SEC-T10 | niedrig |
 | T-IN-01 | **Eingabe-Angriffe** (Injection, Parser-Unterschiede, Bidi-Täuschung). | mittel | mittel | SEC-IN-1 bis SEC-IN-8 | SEC-T06, SEC-T07 | niedrig |
