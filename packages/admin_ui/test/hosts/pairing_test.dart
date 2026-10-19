@@ -170,4 +170,73 @@ void main() {
       expect(done.single.state, HostLifecycle.active);
     },
   );
+
+  testWidgets('only the rows shown on step 3 are sent, also after Back', (
+    tester,
+  ) async {
+    final host = confirming();
+    await pumpInApp(
+      tester,
+      PairingWizard(
+        repository: repository,
+        host: host,
+        code: HostPairingCodeInfo(
+          hostId: 'build',
+          code: 'bothy_hpc_EXAMPLE000000000000000000000000000000000000_EXAMPL',
+          expiresAt: DateTime.utc(2026, 10, 17, 9, 14, 12),
+        ),
+        clock: testClock,
+        onDone: done.add,
+      ),
+      navigatorKey: navigator,
+    );
+    await tapKey(tester, 'pairing.next');
+    expect(textOf(tester, 'pairing.step'), 'Step 3 of 3');
+    await tapKey(tester, 'sessionRows.add');
+    await pick(tester, 'sessionRow.0.person', 'Sam');
+    await pick(tester, 'sessionRow.0.name', 'term-sam');
+    // Back to the code and forward again: the row is still shown and still sent.
+    await tapKey(tester, 'pairing.back');
+    expect(textOf(tester, 'pairing.step'), 'Step 2 of 3');
+    await tapKey(tester, 'pairing.next');
+    expect(textOf(tester, 'pairing.step'), 'Step 3 of 3');
+    expect(find.byKey(const ValueKey('sessionRow.0')), findsOneWidget);
+    await tapKey(tester, 'sessionRow.0.remove');
+    expect(find.byKey(const ValueKey('sessionRow.0')), findsNothing);
+    await answer(tester, '7KQ2-9XTA');
+    await tapKey(tester, 'pairing.confirm');
+    await confirmStepUp(tester);
+    // No row on the screen: no session user is sent.
+    expect(
+      repository.calls.last,
+      endsWith('organization false  Build machine'),
+    );
+    expect(repository.hostsById['build']!.sessionUsers, isEmpty);
+  });
+
+  testWidgets('after the fallback to pairing no earlier row is sent', (
+    tester,
+  ) async {
+    await wizard(tester, host: confirming());
+    await tapKey(tester, 'sessionRows.add');
+    await pick(tester, 'sessionRow.0.person', 'Sam');
+    await pick(tester, 'sessionRow.0.name', 'term-sam');
+    await answer(tester, 'ZZZZ-ZZZZ');
+    for (var i = 0; i < 3; i++) {
+      await tapKey(tester, 'pairing.confirm');
+      if (i == 0) await confirmStepUp(tester);
+    }
+    expect(textOf(tester, 'pairing.step'), 'Step 2 of 3');
+    await tapKey(tester, 'pairing.newCode');
+    repository.simulatePair('build', ['term-robin']);
+    await tapKey(tester, 'pairing.next');
+    expect(find.byKey(const ValueKey('sessionRow.0')), findsNothing);
+    await answer(tester, '7KQ2-9XTA');
+    await tapKey(tester, 'pairing.confirm');
+    expect(
+      repository.calls.last,
+      endsWith('organization false  Build machine'),
+    );
+    expect(repository.hostsById['build']!.state, HostLifecycle.active);
+  });
 }

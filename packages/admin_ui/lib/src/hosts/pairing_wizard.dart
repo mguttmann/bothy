@@ -150,7 +150,10 @@ class _PairingWizardState extends State<PairingWizard>
   HostLlmLogin? _login;
   String? _holder;
   bool? _serverHost;
-  List<HostAssignment> _assignments = const [];
+
+  /// The session user rows of step 3; they stay when the owner goes back and are dropped
+  /// when the host falls back to pairing (its next report may name other users).
+  final List<SessionUserRow> _rows = [];
 
   @override
   void initState() {
@@ -317,7 +320,11 @@ class _PairingWizardState extends State<PairingWizard>
             llmLogin: login,
             credentialHolderId: login == HostLlmLogin.personal ? _holder : null,
             declaredServerHost: serverHost,
-            sessionUsers: _assignments,
+            // Exactly the complete rows step 3 shows (brief Design note 1).
+            sessionUsers: [
+              for (final r in _rows)
+                if (offeredNames(h).contains(r.osUser)) ?r.assignment,
+            ],
             reason: _reason.text.trim(),
           ),
           purpose: l.stepUpPurposeConfirmHost(h.name),
@@ -366,6 +373,7 @@ class _PairingWizardState extends State<PairingWizard>
       _code = null;
       _remaining = null;
       _prefix.clear();
+      _rows.clear();
       _step = 1;
     });
   }
@@ -497,7 +505,8 @@ class _PairingWizardState extends State<PairingWizard>
         SessionUserRows(
           host: h,
           people: _people,
-          onChanged: (rows) => setState(() => _assignments = rows),
+          rows: _rows,
+          onChanged: () => setState(() {}),
         ),
         if (_sessionProblem case final text?)
           DsBanner(

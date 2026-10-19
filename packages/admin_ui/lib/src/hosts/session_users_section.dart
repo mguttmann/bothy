@@ -46,15 +46,35 @@ String? sessionUserProblemText(AppLocalizations l, ApiProblem? problem) {
   return null;
 }
 
+/// One row of [SessionUserRows]: a person and a reported name, either still unset. The
+/// wizard owns the rows, so they survive leaving step 3 and are exactly what it sends.
+final class SessionUserRow {
+  /// The person, or null.
+  String? userId;
+
+  /// The reported name, or null.
+  String? osUser;
+
+  /// The assignment of a complete row, or null.
+  HostAssignment? get assignment => switch ((userId, osUser)) {
+    (final u?, final n?) => HostAssignment(userId: u, osUser: n),
+    _ => null,
+  };
+}
+
 /// The session user rows of the confirmation (second wireframe of A8): per row a person, then
 /// a name of the host's report that no other row holds; "Add a session user" adds a row.
-/// [onChanged] receives the complete rows as assignments.
-class SessionUserRows extends StatefulWidget {
+///
+/// [rows] belong to the caller, which sends exactly the complete rows shown here (brief Design
+/// note 1); [onChanged] runs after every change of them. A name the host no longer reports is
+/// shown as unset.
+class SessionUserRows extends StatelessWidget {
   /// Creates the rows.
   const SessionUserRows({
     super.key,
     required this.host,
     required this.people,
+    required this.rows,
     required this.onChanged,
   });
 
@@ -64,26 +84,11 @@ class SessionUserRows extends StatefulWidget {
   /// The people to choose from.
   final List<AdminPerson> people;
 
-  /// Receives the complete rows.
-  final ValueChanged<List<HostAssignment>> onChanged;
+  /// The rows, owned and kept by the caller.
+  final List<SessionUserRow> rows;
 
-  @override
-  State<SessionUserRows> createState() => _SessionUserRowsState();
-}
-
-class _SessionUserRowsState extends State<SessionUserRows> {
-  final List<(String?, String?)> _rows = [];
-
-  void _set(int i, {String? person, String? name}) {
-    final (p, n) = _rows[i];
-    setState(() => _rows[i] = (person ?? p, name ?? n));
-    _report();
-  }
-
-  void _report() => widget.onChanged([
-    for (final (p, n) in _rows)
-      if (p != null && n != null) HostAssignment(userId: p, osUser: n),
-  ]);
+  /// Runs after a change of [rows].
+  final VoidCallback onChanged;
 
   @override
   Widget build(BuildContext context) {
@@ -98,59 +103,18 @@ class _SessionUserRowsState extends State<SessionUserRows> {
           style: dsTextStyle(DsType.bodyStrong)
               .copyWith(color: colors.textPrimary),
         ),
-        for (var i = 0; i < _rows.length; i++)
-          Row(
-            key: ValueKey('sessionRow.$i'),
-            children: [
-              Expanded(
-                child: DropdownButtonFormField<String>(
-                  key: ValueKey('sessionRow.$i.person'),
-                  initialValue: _rows[i].$1,
-                  decoration: InputDecoration(
-                    labelText: l.hostSessionUserPerson,
-                  ),
-                  items: [
-                    for (final p in widget.people)
-                      DropdownMenuItem(value: p.id, child: Text(p.displayName)),
-                  ],
-                  onChanged: (v) => _set(i, person: v),
-                ),
-              ),
-              const SizedBox(width: DsSpace.s8),
-              Expanded(
-                child: DropdownButtonFormField<String>(
-                  key: ValueKey('sessionRow.$i.name'),
-                  initialValue: _rows[i].$2,
-                  decoration: InputDecoration(labelText: l.hostSessionUserName),
-                  items: [
-                    for (final n in offeredNames(
-                      widget.host,
-                      chosen: {
-                        for (var j = 0; j < _rows.length; j++)
-                          if (j != i) ?_rows[j].$2,
-                      },
-                    ))
-                      DropdownMenuItem(value: n, child: Text(n)),
-                  ],
-                  onChanged: (v) => _set(i, name: v),
-                ),
-              ),
-              IconButton(
-                key: ValueKey('sessionRow.$i.remove'),
-                tooltip: l.hostSessionRowRemove,
-                icon: const Icon(Icons.close),
-                onPressed: () {
-                  setState(() => _rows.removeAt(i));
-                  _report();
-                },
-              ),
-            ],
-          ),
+        for (var i = 0; i < rows.length; i++)
+          // The row object keys the subtree, so the pickers follow their row when another
+          // row is removed.
+          KeyedSubtree(key: ObjectKey(rows[i]), child: _row(l, i)),
         Align(
           alignment: Alignment.centerLeft,
           child: TextButton(
             key: const ValueKey('sessionRows.add'),
-            onPressed: () => setState(() => _rows.add((null, null))),
+            onPressed: () {
+              rows.add(SessionUserRow());
+              onChanged();
+            },
             child: Text(l.hostSessionRowsAdd),
           ),
         ),
@@ -158,6 +122,61 @@ class _SessionUserRowsState extends State<SessionUserRows> {
           l.hostSessionUsersOnlyReported,
           style: dsTextStyle(DsType.bodySm)
               .copyWith(color: colors.textSecondary),
+        ),
+      ],
+    );
+  }
+
+  Widget _row(AppLocalizations l, int i) {
+    final row = rows[i];
+    final names = offeredNames(
+      host,
+      chosen: {
+        for (var j = 0; j < rows.length; j++)
+          if (j != i) ?rows[j].osUser,
+      },
+    );
+    return Row(
+      key: ValueKey('sessionRow.$i'),
+      children: [
+        Expanded(
+          child: DropdownButtonFormField<String>(
+            key: ValueKey('sessionRow.$i.person'),
+            initialValue: row.userId,
+            decoration: InputDecoration(labelText: l.hostSessionUserPerson),
+            items: [
+              for (final p in people)
+                DropdownMenuItem(value: p.id, child: Text(p.displayName)),
+            ],
+            onChanged: (v) {
+              row.userId = v;
+              onChanged();
+            },
+          ),
+        ),
+        const SizedBox(width: DsSpace.s8),
+        Expanded(
+          child: DropdownButtonFormField<String>(
+            key: ValueKey('sessionRow.$i.name'),
+            initialValue: names.contains(row.osUser) ? row.osUser : null,
+            decoration: InputDecoration(labelText: l.hostSessionUserName),
+            items: [
+              for (final n in names) DropdownMenuItem(value: n, child: Text(n)),
+            ],
+            onChanged: (v) {
+              row.osUser = v;
+              onChanged();
+            },
+          ),
+        ),
+        IconButton(
+          key: ValueKey('sessionRow.$i.remove'),
+          tooltip: l.hostSessionRowRemove,
+          icon: const Icon(Icons.close),
+          onPressed: () {
+            rows.removeAt(i);
+            onChanged();
+          },
         ),
       ],
     );
