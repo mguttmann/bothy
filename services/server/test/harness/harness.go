@@ -52,6 +52,7 @@ import (
 	"github.com/OWNER/bothy/services/server/internal/platform/pg/pgtest"
 	"github.com/OWNER/bothy/services/server/internal/platform/ratelimit"
 	"github.com/OWNER/bothy/services/server/internal/platform/secrets/stack"
+	terminalapp "github.com/OWNER/bothy/services/server/internal/terminal/app"
 	"github.com/OWNER/bothy/services/server/internal/wire"
 )
 
@@ -86,6 +87,9 @@ type Options struct {
 	// DurableDB puts the database on the durable pgtest server (pgtest.Durable: fsync,
 	// synchronous_commit and full_page_writes on); every perf and chaos test sets it (ADR 0063).
 	DurableDB bool
+	// TerminalTimers drive the deadlines of the terminal relay (wire.Deps.TerminalTimers, M2-44);
+	// nil means the real timers.
+	TerminalTimers terminalapp.Timers
 }
 
 // TelemetrySinks are the in-process exporters of the canary test; M1-69 fills them.
@@ -203,7 +207,7 @@ func start(tb testing.TB, db *pgtest.DB, opts Options, clk clock.Clock, secretsD
 	}
 	sigs := make(chan os.Signal, 2)
 	runner, err := wire.Serve(context.Background(), values, wire.RoleAll, wire.Deps{
-		Env: env, Stdout: out, Signals: sigs, Clock: clk, EgressDenyAll: opts.EgressDenyAll,
+		Env: env, Stdout: out, Signals: sigs, Clock: clk, EgressDenyAll: opts.EgressDenyAll, TerminalTimers: opts.TerminalTimers,
 	})
 	if err != nil {
 		return nil, err

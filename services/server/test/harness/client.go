@@ -100,6 +100,14 @@ type Client struct {
 // Key returns the private DPoP key of the client as a JWK (credential broker of G7).
 func (c *Client) Key() json.RawMessage { return c.key.privateJWK() }
 
+// Proof returns a DPoP proof of the device key of the client for htm and htu with nonce, bound to
+// its current access token (RFC 9449): the identify of the device stream of the terminal (M2-44)
+// sends it with the access token.
+func (c *Client) Proof(htm, htu, nonce string) string {
+	access, _ := c.Tokens()
+	return c.key.proof(htm, htu, nonce, access, time.Now())
+}
+
 // Tokens returns the current access and refresh token.
 func (c *Client) Tokens() (access, refresh string) {
 	c.mu.Lock()

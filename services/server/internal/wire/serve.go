@@ -47,6 +47,7 @@ import (
 	"github.com/OWNER/bothy/services/server/internal/platform/secrets"
 	"github.com/OWNER/bothy/services/server/internal/sync"
 	"github.com/OWNER/bothy/services/server/internal/sync/adapters/otelmetrics"
+	terminalapp "github.com/OWNER/bothy/services/server/internal/terminal/app"
 	"github.com/OWNER/bothy/services/server/migrations"
 )
 
@@ -112,6 +113,9 @@ type Deps struct {
 	// audit checkpoint sink) refuse every target before resolution (egress.Deps.DenyAll). Only
 	// test servers set it (the contract server of G7, M1-71); production leaves it false.
 	EgressDenyAll bool
+	// TerminalTimers drive the deadlines of the terminal relay (M2-44); nil means the real timers.
+	// Tests pass a fake that they fire, so no test sleeps for terminal.open_timeout.
+	TerminalTimers terminalapp.Timers
 }
 
 // server is the state of one serve process that the components fill and the stop steps read.
@@ -1207,7 +1211,7 @@ func (s *server) mountTerminalStreams(mux Mux, chain *httpserver.Chain, tm *Term
 		return errors.New("wire: the terminal streams need identity's authenticator and nonces and the signing keys")
 	}
 	ts, err := NewTerminalStreams(cfg, tm, hc, TerminalStreamsDeps{Authenticator: id.Authenticator, Nonces: id.DPoP, Signer: keys.Keys,
-		Clock: s.deps.Clock, Log: log})
+		Timers: s.deps.TerminalTimers, Clock: s.deps.Clock, Log: log})
 	if err != nil {
 		return err
 	}

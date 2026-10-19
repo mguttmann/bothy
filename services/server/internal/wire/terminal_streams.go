@@ -173,7 +173,9 @@ func (s *TerminalStreams) StopConnections() lifecycle.StopStep {
 // Observe and Dispatch goes to the relay, which closes the connections of a closed session and
 // tells the host service.
 func (s *TerminalStreams) Observer() LogObserver {
-	return func(ctx context.Context, ev sync.Event) { s.Relay.ObserveLogEvent(ctx, ev.Type, ev.ResourceID, ev.Payload) }
+	return func(ctx context.Context, ev sync.Event) {
+		s.Relay.ObserveLogEvent(ctx, ev.Type, ev.ResourceID, ev.Payload)
+	}
 }
 
 // LogObserver is a consumer of the log tail of an api process after Authorizer.Observe and the
