@@ -175,7 +175,8 @@ func TestAggregated_AttributesAndSpecs(t *testing.T) {
 
 // TestAggregated_Default: the process set exists once; otel.Setup attaches it to the OTLP reader.
 func TestAggregated_Default(t *testing.T) {
-	if metrics.DefaultAggregated() == nil || metrics.DefaultAggregated() != metrics.DefaultAggregated() {
+	first, second := metrics.DefaultAggregated(), metrics.DefaultAggregated()
+	if first == nil || first != second {
 		t.Fatal("DefaultAggregated is not one set per process")
 	}
 }

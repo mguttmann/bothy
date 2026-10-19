@@ -29,7 +29,7 @@ func TestFilter_DiscardsEachBadEntryAlone(t *testing.T) {
 	good := []domain.Entry{
 		{Name: "client.thread_open.duration", Kind: "histogram", Buckets: []domain.Bucket{{LE: 0.1, Count: 12}, {LE: 0.25, Count: 3}}},
 		{Name: "client.frames", Kind: "counter", Value: ptr(1200.0)},
-		{Name: "client.outbox.depth", Kind: "gauge", Value: ptr(-0.0)},
+		{Name: "client.outbox.depth", Kind: "gauge", Value: ptr(math.Copysign(0, -1))},
 		{Name: "client.push.placeholder", Kind: "counter", Value: ptr(0.0)},
 	}
 	bad := []struct {
@@ -113,7 +113,7 @@ func TestFilter_CloseCode(t *testing.T) {
 func TestAppMajor(t *testing.T) {
 	for in, want := range map[string]string{
 		"1.4.0": "1", "12.0.3": "12", "07.1": "7", "0.0.0": "0", "99": "99", "100.0.0": "other",
-		"": "other", "v1.2": "other", "1a.0": "other", "cnryabc.1": "other", "-1.0": "other", " 1.0": "other",
+		"": "other", "v1.2": "other", "1a.0": "other", "cnryabc.1": "other", "-1.0": "other", "\x201.0": "other",
 	} {
 		if got := domain.AppMajor(in); got != want {
 			t.Errorf("AppMajor(%q) = %q, want %q", in, got, want)

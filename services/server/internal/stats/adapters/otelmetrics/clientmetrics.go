@@ -59,6 +59,9 @@ func New(mp metric.MeterProvider, set *metrics.AggregatedSet, closeCodes []int) 
 			c.gauges[name], err = metrics.NewGauge(mp, s, v)
 		case metrics.KindHistogram:
 			c.hists[name], err = set.Histogram(s, v)
+		case metrics.KindUpDownCounter:
+			// No app metric of signals.md 4.6a is an up-down counter; one would be a catalogue error.
+			err = fmt.Errorf("%s is a %s", s.Name, s.Kind)
 		default:
 			err = fmt.Errorf("%s is a %s", s.Name, s.Kind)
 		}

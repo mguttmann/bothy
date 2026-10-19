@@ -48,7 +48,7 @@ func clientSpec(name string, kind Kind, unit, description string, extra ...Attr)
 	switch kind {
 	case KindHistogram:
 		s.Buckets = BucketsSeconds
-	default:
+	case KindCounter, KindUpDownCounter, KindGauge:
 		// The apps send counter increments and gauge values as JSON numbers (ClientMetric.value).
 		s.Float = true
 	}

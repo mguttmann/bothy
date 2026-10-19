@@ -1,5 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
+// Package domain holds the pure rules of the stats module; this file filters and normalizes the
+// app metrics of submitClientMetrics (signals.md 4.6a, ADR 0057, brief M4-31).
 package domain
 
 import (
