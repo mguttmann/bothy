@@ -27,7 +27,7 @@ import (
 	"github.com/OWNER/bothy/services/server/internal/platform/otel/metrics"
 )
 
-// Stage is one per-route step of the chain (docs/spec/02-architektur.md 9.1, steps 5 to 14). The
+// Stage is one per-route step of the chain (docs/spec/02-architecture.md 9.1, steps 5 to 14). The
 // steps 1 to 4 (recover, trace and correlate, base headers and client IP, routing) are the outer
 // part and always present; step 15 is the generated wrapper with the handler.
 type Stage int
