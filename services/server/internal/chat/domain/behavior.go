@@ -5,6 +5,7 @@ package domain
 import (
 	"slices"
 	"strconv"
+	"strings"
 
 	"github.com/OWNER/bothy/services/server/internal/kernel/errs"
 	"github.com/OWNER/bothy/services/server/internal/kernel/textcheck"
@@ -18,7 +19,7 @@ const (
 	// FieldTooLarge marks a number above its configured maximum.
 	FieldTooLarge = "too_large"
 	// FieldInvalidCharacters marks a skill reference with invalid UTF-8, a C0 or C1 control or a
-	// bidi control (kernel/textcheck).
+	// bidi control (kernel/textcheck), and a prompt with U+0000.
 	FieldInvalidCharacters = "invalid_characters"
 )
 
@@ -58,7 +59,7 @@ type BehaviorLimits struct {
 // ValidateBehavior checks b against l (design note 5 of M2-02) and returns every failing field in
 // the order history_backfill_limit, prompt, skills; nil when b is valid. history_backfill_limit
 // lies between 0 and l.BackfillMax; the prompt has at most l.PromptMaxBytes bytes of UTF-8 and is
-// otherwise free; each skill reference is non-empty, passes kernel/textcheck and appears once. A
+// otherwise free except for U+0000, which PostgreSQL text cannot store; each skill reference is non-empty, passes kernel/textcheck and appears once. A
 // detail never repeats the input, because prompt and skills are readable only with manage.
 //
 // Example:
@@ -77,8 +78,12 @@ func ValidateBehavior(b Behavior, l BehaviorLimits) []errs.FieldError {
 	case b.HistoryBackfillLimit > l.BackfillMax:
 		add("/history_backfill_limit", FieldTooLarge, "history_backfill_limit is above channel.history_backfill_limit_max")
 	}
-	if len(b.Prompt) > l.PromptMaxBytes {
+	switch {
+	case len(b.Prompt) > l.PromptMaxBytes:
 		add("/prompt", FieldTooLong, "the prompt is longer than channel.prompt_max_bytes")
+	case strings.IndexByte(b.Prompt, 0) >= 0:
+		// The only character a text column cannot store; everything else stays allowed.
+		add("/prompt", FieldInvalidCharacters, "the prompt contains a NUL character")
 	}
 	seen := make(map[string]bool, len(b.Skills))
 	for i, s := range b.Skills {
