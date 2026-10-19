@@ -6,7 +6,8 @@
 # context. Embedded files live in migrations/ (migrations/embed.go), which is allowed. The console
 # stage (brief M6-02, docs/spec/18-release.md 7 rule 7) also reads the root files of the pub
 # workspace, every member pubspec.yaml, the console and the lib/ of the packages it uses, the
-# assets and fonts of design_system, the OpenAPI document for version.json; no tests.
+# assets and fonts of design_system, the OpenAPI document for version.json; no tests. The only
+# test sources are those of the smoke probe, built only by the target smoke.
 *
 !services/server/go.mod
 !services/server/go.sum
@@ -15,6 +16,8 @@
 !services/server/cmd/
 !services/server/internal/
 !services/server/migrations/
+# The probe of the Compose smoke test (target smoke, brief M1-73); its tests stay out below.
+!services/server/test/smoke/
 !pubspec.yaml
 !pubspec.lock
 !analysis_options.yaml

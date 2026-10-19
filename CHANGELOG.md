@@ -20,6 +20,14 @@ Planning stage (milestone M0). Nothing is installable yet.
 
 ### Added
 
+- Compose smoke test (M1-73): `make portability` runs `infra/compose/smoke.sh`, which starts the
+  server core from the real `bothy-server` image with the installation Compose file and a test
+  overlay (`infra/compose/test/`), proves secrets init, migrations, the setup lock, the first
+  owner, enrollment with device keys and DPoP, space, channel, thread and messages, ordered live
+  delivery, REST and gateway catch-up, step-up and revocation with `4012` through the black-box
+  probe `services/server/test/smoke`, and scans the collector export and the container logs for
+  the run's canary, tokens, enrollment code and principal ID. Missing Docker, an old Engine or
+  Compose or a missing image exit with code 2. The release bundle leaves the test overlay out.
 - Desktop thread view (M4-20): the history column shows a thread or the main history of a text
   channel from the local database with grouping, origin badges, safe Markdown, "Show more",
   tombstones and system lines, loads older pages and fills gaps, focuses the visible threads and

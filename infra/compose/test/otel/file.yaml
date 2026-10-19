@@ -1,0 +1,41 @@
+# SPDX-License-Identifier: Apache-2.0
+#
+# Collector overlay "file": TEST ONLY, used by the Compose smoke test (brief M1-73,
+# infra/compose/test/compose.smoke.yaml) and never by an installation. It writes the three signals
+# as OTLP JSON lines into the volume of the overlay, where the canary scan reads them
+# (docs/observability/privacy.md section 6). The waits of tail_sampling and batch are shortened, so
+# the settle time after the flush stays short; the policies of the base stay (map keys merge).
+# SMOKE_TELEMETRY_SETTLE_S of smoke.sh must cover decision_wait + batch.timeout + flush_interval
+# (a test holds it).
+
+processors:
+  tail_sampling:
+    decision_wait: 1s
+  batch:
+    timeout: 1s
+
+exporters:
+  file/traces:
+    path: /var/lib/otelcol-smoke/traces.jsonl
+    format: json
+    flush_interval: 1s
+  file/metrics:
+    path: /var/lib/otelcol-smoke/metrics.jsonl
+    format: json
+    flush_interval: 1s
+  file/logs:
+    path: /var/lib/otelcol-smoke/logs.jsonl
+    format: json
+    flush_interval: 1s
+
+service:
+  pipelines:
+    traces/smoke:
+      receivers: [forward/traces]
+      exporters: [file/traces]
+    metrics/smoke:
+      receivers: [forward/metrics]
+      exporters: [file/metrics]
+    logs/smoke:
+      receivers: [forward/logs]
+      exporters: [file/logs]

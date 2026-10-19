@@ -90,6 +90,12 @@
       "groupName": "Compose-Images"
     },
     {
+      "description": "PostgreSQL test image: the pgtest containers and the overlay of the Compose smoke test pin the same postgres:18 digest and move in one pull request; test_overlay_postgres_pin_equals_pgtest fails when they differ",
+      "matchFileNames": ["services/server/internal/platform/pg/pgtest/image.go", "infra/compose/test/compose.smoke.yaml"],
+      "matchDepNames": ["postgres"],
+      "groupName": "PostgreSQL test image"
+    },
+    {
       "description": "Local SonarQube and its database",
       "matchFileNames": ["tools/sonarqube/compose.yaml"],
       "groupName": "local SonarQube"
