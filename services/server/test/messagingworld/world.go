@@ -327,7 +327,7 @@ func build(t *testing.T, subscribe Subscribe, personal bool, so *SyncOptions, no
 	}
 	w.Metrics = reader
 	m, err := wire.NewMessaging(mcfg, pool, uow, az, wire.MessagingWrites{Events: appender, Redactor: syncpg.NewRedactor(pool), Audit: rec,
-		Metrics: mmetrics}, c.Service, dir, w.Clock, log)
+		Metrics: mmetrics}, c.Service, w.Clock, log)
 	if err != nil {
 		t.Fatal(err)
 	}
