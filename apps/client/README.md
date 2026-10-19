@@ -159,7 +159,8 @@ bound counts in the top bucket (`le` 10), because a bucket carries only its uppe
 server accepts only these bounds. The sender sends at most once per
 `client.metrics.flush_interval` and when the app quits, only while `privacy.client_metrics` is on,
 and stops after `403 feature_disabled` until the setting changes (docs/DECISIONS.md D-M4-31-2).
-Crash reports go through `sentry_flutter` only with a `CRASH_DSN` and `privacy.crash_reports` on;
+Crash reports go through `sentry_flutter` only with a `CRASH_DSN` and, after the login, the
+person's stored `privacy.crash_reports` on (D-M4-31-5);
 `beforeSend` and `beforeBreadcrumb` remove every content, header, token and URL parameter
 (D-M4-31-3). `test/telemetry/canary_test.dart` drives the collector, the sender and the Sentry
 pipeline with a recording transport while a thread with canary content shows and asserts that no

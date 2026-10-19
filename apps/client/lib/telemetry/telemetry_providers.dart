@@ -17,6 +17,7 @@ import 'package:riverpod_annotation/riverpod_annotation.dart';
 
 import '../app/providers/ports.dart';
 import '../app/providers/session.dart';
+import '../app/providers/settings.dart';
 import '../settings/settings_providers.dart';
 import 'client_metrics.dart';
 import 'crash_reports.dart';
@@ -33,6 +34,29 @@ AppMeasurements appMeasurements(Ref ref) =>
 /// The crash path of the build ([CrashReports] over the define `CRASH_DSN`).
 @Riverpod(keepAlive: true)
 CrashReports crashReports(Ref ref) => ref.watch(appPortsProvider).crashReports;
+
+/// Whether the personal settings of the signed-in person are read from the local database.
+/// Before that `personalSettingsProvider` holds the defaults, which would start crash reports
+/// and send metrics of a person who turned them off (D-M4-31-5).
+@Riverpod(keepAlive: true)
+bool personalSettingsLoaded(Ref ref) {
+  if (ref.watch(localDatabaseProvider) == null) return false;
+  final stored = ref.watch(userSettingsProvider);
+  return stored.hasValue && !stored.isLoading;
+}
+
+/// `privacy.client_metrics` of the signed-in person, false while it is not loaded.
+@Riverpod(keepAlive: true)
+bool clientMetricsOn(Ref ref) =>
+    ref.watch(personalSettingsLoadedProvider) &&
+    ref.watch(personalSettingsProvider.select((s) => s.clientMetrics));
+
+/// `privacy.crash_reports` of the signed-in person, false while it is not loaded: crash
+/// reports start only after the login, with the person's own choice (D-M4-31-5).
+@Riverpod(keepAlive: true)
+bool crashReportsOn(Ref ref) =>
+    ref.watch(personalSettingsLoadedProvider) &&
+    ref.watch(personalSettingsProvider.select((s) => s.crashReports));
 
 /// The server port of the sender: the REST client of the signed-in session, or null before
 /// the login.
@@ -52,16 +76,23 @@ MetricsSender? metricsSender(Ref ref) {
   // Kept current by a listener, because the last flush runs while this provider is disposed,
   // where a read is not allowed.
   late PersonalSettings settings;
-  ref.listen(
-    personalSettingsProvider,
-    (_, next) => settings = next,
-    fireImmediately: true,
-  );
+  late bool on;
+  ref
+    ..listen(
+      personalSettingsProvider,
+      (_, next) => settings = next,
+      fireImmediately: true,
+    )
+    ..listen(
+      clientMetricsOnProvider,
+      (_, next) => on = next,
+      fireImmediately: true,
+    );
   final sender = MetricsSender(
     metrics: ref.watch(appMeasurementsProvider).metrics,
     api: api,
     interval: ports.config.metricsFlushInterval,
-    enabled: () => settings.clientMetrics,
+    enabled: () => on,
     attributes: () {
       return MetricsAttributes(
         platform: ports.platform,
@@ -90,11 +121,11 @@ void appTelemetry(Ref ref) {
   final crashes = ref.watch(crashReportsProvider);
   ref
     ..listen(
-      personalSettingsProvider.select((s) => s.clientMetrics),
+      clientMetricsOnProvider,
       (_, _) => ref.read(metricsSenderProvider)?.settingChanged(),
     )
     ..listen(
-      personalSettingsProvider.select((s) => s.crashReports),
+      crashReportsOnProvider,
       (_, on) => unawaited(crashes.apply(enabled: on)),
       fireImmediately: true,
     )

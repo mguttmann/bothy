@@ -101,6 +101,153 @@ final class CrashReportsProvider
 
 String _$crashReportsHash() => r'd72119bc6fd2f4684417e851ffb437db4428690f';
 
+/// Whether the personal settings of the signed-in person are read from the local database.
+/// Before that `personalSettingsProvider` holds the defaults, which would start crash reports
+/// and send metrics of a person who turned them off (D-M4-31-5).
+
+@ProviderFor(personalSettingsLoaded)
+final personalSettingsLoadedProvider = PersonalSettingsLoadedProvider._();
+
+/// Whether the personal settings of the signed-in person are read from the local database.
+/// Before that `personalSettingsProvider` holds the defaults, which would start crash reports
+/// and send metrics of a person who turned them off (D-M4-31-5).
+
+final class PersonalSettingsLoadedProvider
+    extends $FunctionalProvider<bool, bool, bool>
+    with $Provider<bool> {
+  /// Whether the personal settings of the signed-in person are read from the local database.
+  /// Before that `personalSettingsProvider` holds the defaults, which would start crash reports
+  /// and send metrics of a person who turned them off (D-M4-31-5).
+  PersonalSettingsLoadedProvider._()
+    : super(
+        from: null,
+        argument: null,
+        retry: null,
+        name: r'personalSettingsLoadedProvider',
+        isAutoDispose: false,
+        dependencies: null,
+        $allTransitiveDependencies: null,
+      );
+
+  @override
+  String debugGetCreateSourceHash() => _$personalSettingsLoadedHash();
+
+  @$internal
+  @override
+  $ProviderElement<bool> $createElement($ProviderPointer pointer) =>
+      $ProviderElement(pointer);
+
+  @override
+  bool create(Ref ref) {
+    return personalSettingsLoaded(ref);
+  }
+
+  /// {@macro riverpod.override_with_value}
+  Override overrideWithValue(bool value) {
+    return $ProviderOverride(
+      origin: this,
+      providerOverride: $SyncValueProvider<bool>(value),
+    );
+  }
+}
+
+String _$personalSettingsLoadedHash() =>
+    r'edd77cc8b2bf833f336e727a1ad174b162321e14';
+
+/// `privacy.client_metrics` of the signed-in person, false while it is not loaded.
+
+@ProviderFor(clientMetricsOn)
+final clientMetricsOnProvider = ClientMetricsOnProvider._();
+
+/// `privacy.client_metrics` of the signed-in person, false while it is not loaded.
+
+final class ClientMetricsOnProvider
+    extends $FunctionalProvider<bool, bool, bool>
+    with $Provider<bool> {
+  /// `privacy.client_metrics` of the signed-in person, false while it is not loaded.
+  ClientMetricsOnProvider._()
+    : super(
+        from: null,
+        argument: null,
+        retry: null,
+        name: r'clientMetricsOnProvider',
+        isAutoDispose: false,
+        dependencies: null,
+        $allTransitiveDependencies: null,
+      );
+
+  @override
+  String debugGetCreateSourceHash() => _$clientMetricsOnHash();
+
+  @$internal
+  @override
+  $ProviderElement<bool> $createElement($ProviderPointer pointer) =>
+      $ProviderElement(pointer);
+
+  @override
+  bool create(Ref ref) {
+    return clientMetricsOn(ref);
+  }
+
+  /// {@macro riverpod.override_with_value}
+  Override overrideWithValue(bool value) {
+    return $ProviderOverride(
+      origin: this,
+      providerOverride: $SyncValueProvider<bool>(value),
+    );
+  }
+}
+
+String _$clientMetricsOnHash() => r'a556e5d3afc38cc7b27f8fbb37b370d843e0a150';
+
+/// `privacy.crash_reports` of the signed-in person, false while it is not loaded: crash
+/// reports start only after the login, with the person's own choice (D-M4-31-5).
+
+@ProviderFor(crashReportsOn)
+final crashReportsOnProvider = CrashReportsOnProvider._();
+
+/// `privacy.crash_reports` of the signed-in person, false while it is not loaded: crash
+/// reports start only after the login, with the person's own choice (D-M4-31-5).
+
+final class CrashReportsOnProvider extends $FunctionalProvider<bool, bool, bool>
+    with $Provider<bool> {
+  /// `privacy.crash_reports` of the signed-in person, false while it is not loaded: crash
+  /// reports start only after the login, with the person's own choice (D-M4-31-5).
+  CrashReportsOnProvider._()
+    : super(
+        from: null,
+        argument: null,
+        retry: null,
+        name: r'crashReportsOnProvider',
+        isAutoDispose: false,
+        dependencies: null,
+        $allTransitiveDependencies: null,
+      );
+
+  @override
+  String debugGetCreateSourceHash() => _$crashReportsOnHash();
+
+  @$internal
+  @override
+  $ProviderElement<bool> $createElement($ProviderPointer pointer) =>
+      $ProviderElement(pointer);
+
+  @override
+  bool create(Ref ref) {
+    return crashReportsOn(ref);
+  }
+
+  /// {@macro riverpod.override_with_value}
+  Override overrideWithValue(bool value) {
+    return $ProviderOverride(
+      origin: this,
+      providerOverride: $SyncValueProvider<bool>(value),
+    );
+  }
+}
+
+String _$crashReportsOnHash() => r'26ddac8a12d4d340c8d8ed23829362f845166ede';
+
 /// The server port of the sender: the REST client of the signed-in session, or null before
 /// the login.
 
@@ -203,7 +350,7 @@ final class MetricsSenderProvider
   }
 }
 
-String _$metricsSenderHash() => r'09b55bec8fe64ab8e0cafbff2b69a7bfee44048e';
+String _$metricsSenderHash() => r'8a16bff4d6fdaecbd966c0f553aa06a1f3fd64ba';
 
 /// Keeps the telemetry in step with the settings: the sender runs while signed in and resumes
 /// after a change of `privacy.client_metrics`, the crash path starts or stops with
@@ -254,4 +401,4 @@ final class AppTelemetryProvider extends $FunctionalProvider<void, void, void>
   }
 }
 
-String _$appTelemetryHash() => r'ee28ad74fcd09fa73f1637d7b42ae2f0a36f1e62';
+String _$appTelemetryHash() => r'ee0d3f44f7cfdf2babf114b7a085e8cb73b1f42b';
