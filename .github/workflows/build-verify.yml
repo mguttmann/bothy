@@ -26,6 +26,10 @@ concurrency:
   cancel-in-progress: true
 
 env:
+  GIT_AUTHOR_NAME: Alex
+  GIT_AUTHOR_EMAIL: alex@example.com
+  GIT_COMMITTER_NAME: Alex
+  GIT_COMMITTER_EMAIL: alex@example.com
   # Chromium's sandbox can be blocked where user namespaces are restricted; the renderer only
   # processes this repository's own diagrams (as in ci.yml).
   MMDC_PUPPETEER_CONFIG: tools/node/puppeteer-ci.json
