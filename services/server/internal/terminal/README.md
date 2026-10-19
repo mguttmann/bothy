@@ -84,7 +84,7 @@ Only this module writes and reads these tables via SQL (03-data-model.md, princi
 - `HostSource.PersonalHosts` and `SessionUsersOf` (exact comparison with `domain.Reports`) and
   `HostFacts.Name` for the text of the preview.
 - Tests: `domain` (`TestValidateDeclaration`, `TestEndsForeignSessions`, `TestSameReport`,
-  `TestVanishedNames`) and `adapters/httpapi/terminalauthz_test.go` over PostgreSQL 18 and the
+  `TestVanishedNames`) and `app/terminalauthz_test.go` over PostgreSQL 18 and the
   HTTP chain: `TestTMT09_I6`, `TestI6_UserEnableRevivesGrant`, `TestI6_SwitchEndsForeignSessions`,
   `TestI6_HolderChangeEndsForeignSessions`, `TestSR10_AssigneeChangeEndsSessions`,
   `TestSetHostLlmCredentials_HTTP`, `TestSR12_ReportDropsName`, `TestPreviewHostGrant`,
