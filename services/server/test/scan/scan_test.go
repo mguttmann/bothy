@@ -66,11 +66,20 @@ func nestedZip(t *testing.T, payload []byte, depth int) []byte {
 	return b
 }
 
-// gone reports that path does not exist.
+// gone reports that path does not exist, waiting up to waitScan: the pass deletes objects and
+// parts after the commit of the result (design note 6f), so the row can be final a moment earlier.
 func gone(t *testing.T, path string) bool {
 	t.Helper()
-	_, err := os.Stat(path)
-	return errors.Is(err, os.ErrNotExist)
+	deadline := time.Now().Add(waitScan)
+	for {
+		if _, err := os.Stat(path); errors.Is(err, os.ErrNotExist) {
+			return true
+		}
+		if time.Now().After(deadline) {
+			return false
+		}
+		time.Sleep(50 * time.Millisecond)
+	}
 }
 
 // TestScan runs the cases of the shared server with the shared clamd.
