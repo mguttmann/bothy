@@ -16,6 +16,70 @@ import (
 	"github.com/oapi-codegen/runtime"
 )
 
+// PutFeatureFlagWithBody Set a feature flag
+//
+// Takes any type of body and a specified content type.
+//
+// Corresponds with PUT /feature-flags/{key} (the `PutFeatureFlag` operationId).
+func (c *Client) PutFeatureFlagWithBody(ctx context.Context, key KeyPath, params *PutFeatureFlagParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewPutFeatureFlagRequestWithBody(c.Server, key, params, contentType, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// PutFeatureFlag Set a feature flag
+//
+// Takes a body of the `application/json` content type.
+//
+// Corresponds with PUT /feature-flags/{key} (the `PutFeatureFlag` operationId).
+func (c *Client) PutFeatureFlag(ctx context.Context, key KeyPath, params *PutFeatureFlagParams, body PutFeatureFlagJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewPutFeatureFlagRequest(c.Server, key, params, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// DeleteFile Delete an unattached file
+//
+// Corresponds with DELETE /files/{file_id} (the `DeleteFile` operationId).
+func (c *Client) DeleteFile(ctx context.Context, fileId FileIdPath, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewDeleteFileRequest(c.Server, fileId)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// GetFile Read file metadata
+//
+// Corresponds with GET /files/{file_id} (the `GetFile` operationId).
+func (c *Client) GetFile(ctx context.Context, fileId FileIdPath, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewGetFileRequest(c.Server, fileId)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
 // DownloadFile Download a file
 //
 // Answers 200 with the bytes (supports `Range`); there are no presigned GET URLs (ADR 0048).
@@ -4573,7 +4637,7 @@ func (c *Client) GetUpload(ctx context.Context, fileId FileIdPath, reqEditors ..
 // CompleteUploadWithBody Finish an upload
 //
 // Checks size and optional SHA-256, detects the MIME type and queues the malware scan. The file is
-// downloadable after `scan_status` is `clean` or `skipped`.
+// downloadable after `scan_status` is `clean` or `skipped`. Missing parts answer 409 `conflict` with `reason` `upload_incomplete`; an expired session answers 410 `gone` (12, 3.4 and 3.6).
 //
 // Takes any type of body and a specified content type.
 //
@@ -4593,7 +4657,7 @@ func (c *Client) CompleteUploadWithBody(ctx context.Context, fileId FileIdPath, 
 // CompleteUpload Finish an upload
 //
 // Checks size and optional SHA-256, detects the MIME type and queues the malware scan. The file is
-// downloadable after `scan_status` is `clean` or `skipped`.
+// downloadable after `scan_status` is `clean` or `skipped`. Missing parts answer 409 `conflict` with `reason` `upload_incomplete`; an expired session answers 410 `gone` (12, 3.4 and 3.6).
 //
 // Takes a body of the `application/json` content type.
 //
@@ -4612,7 +4676,7 @@ func (c *Client) CompleteUpload(ctx context.Context, fileId FileIdPath, params *
 
 // UploadPartWithBody Upload one part in direct mode
 //
-// Repeating a part replaces it. Parts can be sent in parallel.
+// Parts can be sent in parallel and in any order (12, 3.2). The same part number with the same `Content-Digest` answers 200 without new work; with another digest 409 `conflict` with `reason` `part_conflict`. Wrong length or digest: 400 `validation_failed` with `errors[].code` `part_digest_mismatch`, nothing is stored. An expired session answers 410 `gone`.
 //
 // Takes any type of body and a specified content type.
 //
@@ -21903,12 +21967,16 @@ type ClientWithResponsesInterface interface {
 
 	// CreateUploadWithBodyWithResponse Start an upload
 	//
+	// Checks in this order (12, 3.1): size against `file.max_upload_bytes` (413 `payload_too_large`), quota `file.quota_bytes_per_principal` (409 `conflict` with `reason` `quota_exceeded`), open sessions (429), free space of the file system driver (503 `unavailable` with `reason` `storage_full`). A denied type answers 415 `unsupported_media_type` with `reason` `file_type_denied`.
+	//
 	// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
 	//
 	// Corresponds with POST /channels/{channel_id}/uploads (the `CreateUpload` operationId).
 	CreateUploadWithBodyWithResponse(ctx context.Context, channelId ChannelIdPath, params *CreateUploadParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*CreateUploadResponse, error)
 
 	// CreateUploadWithResponse Start an upload
+	//
+	// Checks in this order (12, 3.1): size against `file.max_upload_bytes` (413 `payload_too_large`), quota `file.quota_bytes_per_principal` (409 `conflict` with `reason` `quota_exceeded`), open sessions (429), free space of the file system driver (503 `unavailable` with `reason` `storage_full`). A denied type answers 415 `unsupported_media_type` with `reason` `file_type_denied`.
 	//
 	// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
 	//
@@ -24287,7 +24355,7 @@ type ClientWithResponsesInterface interface {
 	// CompleteUploadWithBodyWithResponse Finish an upload
 	//
 	// Checks size and optional SHA-256, detects the MIME type and queues the malware scan. The file is
-	// downloadable after `scan_status` is `clean` or `skipped`.
+	// downloadable after `scan_status` is `clean` or `skipped`. Missing parts answer 409 `conflict` with `reason` `upload_incomplete`; an expired session answers 410 `gone` (12, 3.4 and 3.6).
 	//
 	// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
 	//
@@ -24297,7 +24365,7 @@ type ClientWithResponsesInterface interface {
 	// CompleteUploadWithResponse Finish an upload
 	//
 	// Checks size and optional SHA-256, detects the MIME type and queues the malware scan. The file is
-	// downloadable after `scan_status` is `clean` or `skipped`.
+	// downloadable after `scan_status` is `clean` or `skipped`. Missing parts answer 409 `conflict` with `reason` `upload_incomplete`; an expired session answers 410 `gone` (12, 3.4 and 3.6).
 	//
 	// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
 	//
@@ -24306,7 +24374,7 @@ type ClientWithResponsesInterface interface {
 
 	// UploadPartWithBodyWithResponse Upload one part in direct mode
 	//
-	// Repeating a part replaces it. Parts can be sent in parallel.
+	// Parts can be sent in parallel and in any order (12, 3.2). The same part number with the same `Content-Digest` answers 200 without new work; with another digest 409 `conflict` with `reason` `part_conflict`. Wrong length or digest: 400 `validation_failed` with `errors[].code` `part_digest_mismatch`, nothing is stored. An expired session answers 410 `gone`.
 	//
 	// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
 	//
@@ -27422,97 +27490,4 @@ type InstallAppResponse201Headers struct {
 // InstallAppResponse400Headers the declared response headers of an HTTP 400 response for InstallApp
 type InstallAppResponse400Headers struct {
 	CorrelationId *CorrelationId
-}
-
-// InstallAppResponse401Headers the declared response headers of an HTTP 401 response for InstallApp
-type InstallAppResponse401Headers struct {
-	CorrelationId   *CorrelationId
-	DPoPNonce       *string
-	SetCookie       *string
-	WWWAuthenticate *string
-}
-
-// InstallAppResponse403Headers the declared response headers of an HTTP 403 response for InstallApp
-type InstallAppResponse403Headers struct {
-	CorrelationId *CorrelationId
-}
-
-// InstallAppResponse409Headers the declared response headers of an HTTP 409 response for InstallApp
-type InstallAppResponse409Headers struct {
-	CorrelationId *CorrelationId
-}
-
-// InstallAppResponse422Headers the declared response headers of an HTTP 422 response for InstallApp
-type InstallAppResponse422Headers struct {
-	CorrelationId *CorrelationId
-}
-
-// InstallAppResponse429Headers the declared response headers of an HTTP 429 response for InstallApp
-type InstallAppResponse429Headers struct {
-	CorrelationId   *CorrelationId
-	RateLimit       *string
-	RateLimitPolicy *string
-	RetryAfter      *int
-}
-
-// InstallAppResponseDefaultHeaders the declared response headers of an HTTP default response for InstallApp
-type InstallAppResponseDefaultHeaders struct {
-	CorrelationId *CorrelationId
-}
-
-type InstallAppResponse struct {
-	Body         []byte
-	HTTPResponse *http.Response
-	// JSON201 the response for an HTTP 201 `application/json` response
-	JSON201 *App
-	// ApplicationproblemJSON400 the response for an HTTP 400 `application/problem+json` response
-	ApplicationproblemJSON400 *BadRequest
-	// ApplicationproblemJSON401 the response for an HTTP 401 `application/problem+json` response
-	ApplicationproblemJSON401 *Unauthorized
-	// ApplicationproblemJSON403 the response for an HTTP 403 `application/problem+json` response
-	ApplicationproblemJSON403 *Forbidden
-	// ApplicationproblemJSON409 the response for an HTTP 409 `application/problem+json` response
-	ApplicationproblemJSON409 *Conflict
-	// ApplicationproblemJSON422 the response for an HTTP 422 `application/problem+json` response
-	ApplicationproblemJSON422 *UnprocessableEntity
-	// ApplicationproblemJSON429 the response for an HTTP 429 `application/problem+json` response
-	ApplicationproblemJSON429 *TooManyRequests
-	// ApplicationproblemJSONDefault the response for an HTTP default `application/problem+json` response
-	ApplicationproblemJSONDefault *Error
-	// Headers201 the parsed response headers for an HTTP 201 response
-	Headers201 *InstallAppResponse201Headers
-	// Headers400 the parsed response headers for an HTTP 400 response
-	Headers400 *InstallAppResponse400Headers
-	// Headers401 the parsed response headers for an HTTP 401 response
-	Headers401 *InstallAppResponse401Headers
-	// Headers403 the parsed response headers for an HTTP 403 response
-	Headers403 *InstallAppResponse403Headers
-	// Headers409 the parsed response headers for an HTTP 409 response
-	Headers409 *InstallAppResponse409Headers
-	// Headers422 the parsed response headers for an HTTP 422 response
-	Headers422 *InstallAppResponse422Headers
-	// Headers429 the parsed response headers for an HTTP 429 response
-	Headers429 *InstallAppResponse429Headers
-	// HeadersDefault the parsed response headers for an HTTP default response
-	HeadersDefault *InstallAppResponseDefaultHeaders
-}
-
-// GetJSON201 returns the response for an HTTP 201 `application/json` response
-func (r InstallAppResponse) GetJSON201() *App {
-	return r.JSON201
-}
-
-// GetApplicationproblemJSON400 returns the response for an HTTP 400 `application/problem+json` response
-func (r InstallAppResponse) GetApplicationproblemJSON400() *BadRequest {
-	return r.ApplicationproblemJSON400
-}
-
-// GetApplicationproblemJSON401 returns the response for an HTTP 401 `application/problem+json` response
-func (r InstallAppResponse) GetApplicationproblemJSON401() *Unauthorized {
-	return r.ApplicationproblemJSON401
-}
-
-// GetApplicationproblemJSON403 returns the response for an HTTP 403 `application/problem+json` response
-func (r InstallAppResponse) GetApplicationproblemJSON403() *Forbidden {
-	return r.ApplicationproblemJSON403
 }

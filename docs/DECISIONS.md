@@ -2201,6 +2201,14 @@ section 13 of chapter 24 exists only on `main`, so it is named as a path.
 | INT-W46/2 | 2026-10-19 | The fake server keeps one `listAuditEvents`: the handler of M4-29 over `FakeAuditLog`. The host handlers of M4-37 write their `host.manage` rows into that log (`registerHostHandlers` takes it) instead of `FakeWorld.auditEvents`, which is gone. | Both tickets registered `listAuditEvents`; the later registration replaced the other, so either the audit filters, paging and chain of M4-29 or the host audit of M4-37 broke. One log keeps both, with hash-linked rows; the contract test reads the host rows through the M4-29 handler. |
 | INT-W46/3 | 2026-10-19 | In the admin_ui test fakes the per-host audit map of `FakeHosts` is named `hostAudit`; the admin shell goldens are regenerated with both entries "Audit" and "Hosts". | `FakeAdminRepository.audit` (M4-29, the audit entries) and `FakeHosts.audit` (M4-37) collided; the shell now lists both sections. Test code only, no change of behaviour. |
 
+## D-W-20 Closed problem codes (brought in from main for M3-03)
+
+The planning ruling D-W-20 is on `main` (`docs/DECISIONS-PLANNING.md`) but not on this integration base. M3-03 relies on it for the problem codes of the upload operations, so its delta for those operations (openapi `createUpload`, `uploadPart`, `completeUpload`, chapter 12 sections 3.1 to 3.6) is brought in first, as its own commit. The row is copied with the links adjusted to the chapter names of this base.
+
+| ID | Ruling | Reason | Place |
+|---|---|---|---|
+| D-W-20 | Problem codes are a closed list: chapters, briefs and plan name only codes from `x-problem-codes`; finer reasons stand in `reason` (for `authorize`, the reason code from 07 4.1) or in `errors[].code` of `400 validation_failed`. The codes so far named only in chapters are mapped, for example `413 payload_too_large` instead of `file_too_large`, `409 conflict` with `reason` `quota_exceeded`, `503 unavailable` with `reason` `storage_full` or `search_timeout`, respectively, `400 validation_failed` with `errors[].code` `patch_path_forbidden`, `403 forbidden` with `reason` `owner_only`. The check `tools/docs/problem_code_refs.py` runs in `make docs`. | Finding L-10: about a dozen codes and statuses (507, 422 outside idempotency) were attached to no operation; the same class of error without a gate. | [06 5 item 7](spec/06-api.md), R-API-28, [openapi.yaml](api/openapi.yaml) `createUpload`, `uploadPart`, `completeUpload`, `bindAgentSession`, [12 3](spec/12-dateien.md), [09](spec/09-agenten.md), [14 7](spec/14-suche.md) |
+
 ## M3-03 Upload sessions, parts and completion
 
 | No | Date | Ruling | Reason |

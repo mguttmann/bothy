@@ -2553,7 +2553,10 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Start an upload */
+        /**
+         * Start an upload
+         * @description Checks in this order (12, 3.1): size against `file.max_upload_bytes` (413 `payload_too_large`), quota `file.quota_bytes_per_principal` (409 `conflict` with `reason` `quota_exceeded`), open sessions (429), free space of the file system driver (503 `unavailable` with `reason` `storage_full`). A denied type answers 415 `unsupported_media_type` with `reason` `file_type_denied`.
+         */
         post: operations["createUpload"];
         delete?: never;
         options?: never;
@@ -2571,7 +2574,7 @@ export interface paths {
         get?: never;
         /**
          * Upload one part in direct mode
-         * @description Repeating a part replaces it. Parts can be sent in parallel.
+         * @description Parts can be sent in parallel and in any order (12, 3.2). The same part number with the same `Content-Digest` answers 200 without new work; with another digest 409 `conflict` with `reason` `part_conflict`. Wrong length or digest: 400 `validation_failed` with `errors[].code` `part_digest_mismatch`, nothing is stored. An expired session answers 410 `gone`.
          */
         put: operations["uploadPart"];
         post?: never;
@@ -2593,7 +2596,7 @@ export interface paths {
         /**
          * Finish an upload
          * @description Checks size and optional SHA-256, detects the MIME type and queues the malware scan. The file is
-         *     downloadable after `scan_status` is `clean` or `skipped`.
+         *     downloadable after `scan_status` is `clean` or `skipped`. Missing parts answer 409 `conflict` with `reason` `upload_incomplete`; an expired session answers 410 `gone` (12, 3.4 and 3.6).
          */
         post: operations["completeUpload"];
         delete?: never;
@@ -16646,6 +16649,7 @@ export interface operations {
             401: components["responses"]["Unauthorized"];
             403: components["responses"]["Forbidden"];
             404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
             413: components["responses"]["PayloadTooLarge"];
             415: components["responses"]["UnsupportedMediaType"];
             422: components["responses"]["UnprocessableEntity"];
@@ -16686,6 +16690,7 @@ export interface operations {
             403: components["responses"]["Forbidden"];
             404: components["responses"]["NotFound"];
             409: components["responses"]["Conflict"];
+            410: components["responses"]["Gone"];
             413: components["responses"]["PayloadTooLarge"];
             429: components["responses"]["TooManyRequests"];
             default: components["responses"]["Error"];
@@ -16726,6 +16731,7 @@ export interface operations {
             403: components["responses"]["Forbidden"];
             404: components["responses"]["NotFound"];
             409: components["responses"]["Conflict"];
+            410: components["responses"]["Gone"];
             422: components["responses"]["UnprocessableEntity"];
             429: components["responses"]["TooManyRequests"];
             default: components["responses"]["Error"];

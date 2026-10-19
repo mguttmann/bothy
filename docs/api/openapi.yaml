@@ -9486,6 +9486,8 @@ paths:
       operationId: createUpload
       summary: Start an upload
       tags: [Files]
+      description: |-
+        Checks in this order (12, 3.1): size against `file.max_upload_bytes` (413 `payload_too_large`), quota `file.quota_bytes_per_principal` (409 `conflict` with `reason` `quota_exceeded`), open sessions (429), free space of the file system driver (503 `unavailable` with `reason` `storage_full`). A denied type answers 415 `unsupported_media_type` with `reason` `file_type_denied`.
       x-authz-action: file.upload
       x-rate-limit-class: rl.upload
       parameters:
@@ -9538,6 +9540,8 @@ paths:
           $ref: '#/components/responses/Forbidden'
         '404':
           $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
         '413':
           $ref: '#/components/responses/PayloadTooLarge'
         '415':
@@ -9554,7 +9558,8 @@ paths:
       operationId: uploadPart
       summary: Upload one part in direct mode
       tags: [Files]
-      description: Repeating a part replaces it. Parts can be sent in parallel.
+      description: |-
+        Parts can be sent in parallel and in any order (12, 3.2). The same part number with the same `Content-Digest` answers 200 without new work; with another digest 409 `conflict` with `reason` `part_conflict`. Wrong length or digest: 400 `validation_failed` with `errors[].code` `part_digest_mismatch`, nothing is stored. An expired session answers 410 `gone`.
       x-authz-action: file.upload
       x-rate-limit-class: rl.upload
       parameters:
@@ -9596,6 +9601,8 @@ paths:
           $ref: '#/components/responses/NotFound'
         '409':
           $ref: '#/components/responses/Conflict'
+        '410':
+          $ref: '#/components/responses/Gone'
         '413':
           $ref: '#/components/responses/PayloadTooLarge'
         '429':
@@ -9610,7 +9617,7 @@ paths:
       tags: [Files]
       description: |-
         Checks size and optional SHA-256, detects the MIME type and queues the malware scan. The file is
-        downloadable after `scan_status` is `clean` or `skipped`.
+        downloadable after `scan_status` is `clean` or `skipped`. Missing parts answer 409 `conflict` with `reason` `upload_incomplete`; an expired session answers 410 `gone` (12, 3.4 and 3.6).
       x-authz-action: file.upload
       x-rate-limit-class: rl.upload
       parameters:
@@ -9671,6 +9678,8 @@ paths:
           $ref: '#/components/responses/NotFound'
         '409':
           $ref: '#/components/responses/Conflict'
+        '410':
+          $ref: '#/components/responses/Gone'
         '422':
           $ref: '#/components/responses/UnprocessableEntity'
         '429':

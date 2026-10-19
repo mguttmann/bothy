@@ -65,6 +65,11 @@ def _parse_response(
 
         return response_404
 
+    if response.status_code == 409:
+        response_409 = Problem.from_dict(response.json())
+
+        return response_409
+
     if response.status_code == 413:
         response_413 = Problem.from_dict(response.json())
 
@@ -110,6 +115,12 @@ def sync_detailed(
 ) -> Response[Problem | UploadSession]:
     """Start an upload
 
+     Checks in this order (12, 3.1): size against `file.max_upload_bytes` (413 `payload_too_large`),
+    quota `file.quota_bytes_per_principal` (409 `conflict` with `reason` `quota_exceeded`), open
+    sessions (429), free space of the file system driver (503 `unavailable` with `reason`
+    `storage_full`). A denied type answers 415 `unsupported_media_type` with `reason`
+    `file_type_denied`.
+
     Args:
         channel_id (UUID): UUIDv7 (RFC 9562), lowercase canonical form.
         idempotency_key (UUID | Unset): UUIDv7 (RFC 9562), lowercase canonical form.
@@ -145,6 +156,12 @@ def sync(
 ) -> Problem | UploadSession | None:
     """Start an upload
 
+     Checks in this order (12, 3.1): size against `file.max_upload_bytes` (413 `payload_too_large`),
+    quota `file.quota_bytes_per_principal` (409 `conflict` with `reason` `quota_exceeded`), open
+    sessions (429), free space of the file system driver (503 `unavailable` with `reason`
+    `storage_full`). A denied type answers 415 `unsupported_media_type` with `reason`
+    `file_type_denied`.
+
     Args:
         channel_id (UUID): UUIDv7 (RFC 9562), lowercase canonical form.
         idempotency_key (UUID | Unset): UUIDv7 (RFC 9562), lowercase canonical form.
@@ -174,6 +191,12 @@ async def asyncio_detailed(
     idempotency_key: UUID | Unset = UNSET,
 ) -> Response[Problem | UploadSession]:
     """Start an upload
+
+     Checks in this order (12, 3.1): size against `file.max_upload_bytes` (413 `payload_too_large`),
+    quota `file.quota_bytes_per_principal` (409 `conflict` with `reason` `quota_exceeded`), open
+    sessions (429), free space of the file system driver (503 `unavailable` with `reason`
+    `storage_full`). A denied type answers 415 `unsupported_media_type` with `reason`
+    `file_type_denied`.
 
     Args:
         channel_id (UUID): UUIDv7 (RFC 9562), lowercase canonical form.
@@ -207,6 +230,12 @@ async def asyncio(
     idempotency_key: UUID | Unset = UNSET,
 ) -> Problem | UploadSession | None:
     """Start an upload
+
+     Checks in this order (12, 3.1): size against `file.max_upload_bytes` (413 `payload_too_large`),
+    quota `file.quota_bytes_per_principal` (409 `conflict` with `reason` `quota_exceeded`), open
+    sessions (429), free space of the file system driver (503 `unavailable` with `reason`
+    `storage_full`). A denied type answers 415 `unsupported_media_type` with `reason`
+    `file_type_denied`.
 
     Args:
         channel_id (UUID): UUIDv7 (RFC 9562), lowercase canonical form.

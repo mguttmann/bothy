@@ -20896,12 +20896,16 @@ type ClientInterface interface {
 
 	// CreateUploadWithBody Start an upload
 	//
+	// Checks in this order (12, 3.1): size against `file.max_upload_bytes` (413 `payload_too_large`), quota `file.quota_bytes_per_principal` (409 `conflict` with `reason` `quota_exceeded`), open sessions (429), free space of the file system driver (503 `unavailable` with `reason` `storage_full`). A denied type answers 415 `unsupported_media_type` with `reason` `file_type_denied`.
+	//
 	// Takes any type of body and a specified content type.
 	//
 	// Corresponds with POST /channels/{channel_id}/uploads (the `CreateUpload` operationId).
 	CreateUploadWithBody(ctx context.Context, channelId ChannelIdPath, params *CreateUploadParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// CreateUpload Start an upload
+	//
+	// Checks in this order (12, 3.1): size against `file.max_upload_bytes` (413 `payload_too_large`), quota `file.quota_bytes_per_principal` (409 `conflict` with `reason` `quota_exceeded`), open sessions (429), free space of the file system driver (503 `unavailable` with `reason` `storage_full`). A denied type answers 415 `unsupported_media_type` with `reason` `file_type_denied`.
 	//
 	// Takes a body of the `application/json` content type.
 	//
@@ -23050,7 +23054,7 @@ type ClientInterface interface {
 	// CompleteUploadWithBody Finish an upload
 	//
 	// Checks size and optional SHA-256, detects the MIME type and queues the malware scan. The file is
-	// downloadable after `scan_status` is `clean` or `skipped`.
+	// downloadable after `scan_status` is `clean` or `skipped`. Missing parts answer 409 `conflict` with `reason` `upload_incomplete`; an expired session answers 410 `gone` (12, 3.4 and 3.6).
 	//
 	// Takes any type of body and a specified content type.
 	//
@@ -23060,7 +23064,7 @@ type ClientInterface interface {
 	// CompleteUpload Finish an upload
 	//
 	// Checks size and optional SHA-256, detects the MIME type and queues the malware scan. The file is
-	// downloadable after `scan_status` is `clean` or `skipped`.
+	// downloadable after `scan_status` is `clean` or `skipped`. Missing parts answer 409 `conflict` with `reason` `upload_incomplete`; an expired session answers 410 `gone` (12, 3.4 and 3.6).
 	//
 	// Takes a body of the `application/json` content type.
 	//
@@ -23069,7 +23073,7 @@ type ClientInterface interface {
 
 	// UploadPartWithBody Upload one part in direct mode
 	//
-	// Repeating a part replaces it. Parts can be sent in parallel.
+	// Parts can be sent in parallel and in any order (12, 3.2). The same part number with the same `Content-Digest` answers 200 without new work; with another digest 409 `conflict` with `reason` `part_conflict`. Wrong length or digest: 400 `validation_failed` with `errors[].code` `part_digest_mismatch`, nothing is stored. An expired session answers 410 `gone`.
 	//
 	// Takes any type of body and a specified content type.
 	//
@@ -25513,6 +25517,8 @@ func (c *Client) CreateThread(ctx context.Context, channelId ChannelIdPath, para
 
 // CreateUploadWithBody Start an upload
 //
+// Checks in this order (12, 3.1): size against `file.max_upload_bytes` (413 `payload_too_large`), quota `file.quota_bytes_per_principal` (409 `conflict` with `reason` `quota_exceeded`), open sessions (429), free space of the file system driver (503 `unavailable` with `reason` `storage_full`). A denied type answers 415 `unsupported_media_type` with `reason` `file_type_denied`.
+//
 // Takes any type of body and a specified content type.
 //
 // Corresponds with POST /channels/{channel_id}/uploads (the `CreateUpload` operationId).
@@ -25529,6 +25535,8 @@ func (c *Client) CreateUploadWithBody(ctx context.Context, channelId ChannelIdPa
 }
 
 // CreateUpload Start an upload
+//
+// Checks in this order (12, 3.1): size against `file.max_upload_bytes` (413 `payload_too_large`), quota `file.quota_bytes_per_principal` (409 `conflict` with `reason` `quota_exceeded`), open sessions (429), free space of the file system driver (503 `unavailable` with `reason` `storage_full`). A denied type answers 415 `unsupported_media_type` with `reason` `file_type_denied`.
 //
 // Takes a body of the `application/json` content type.
 //
@@ -26046,70 +26054,6 @@ func (c *Client) ListEvents(ctx context.Context, params *ListEventsParams, reqEd
 // Corresponds with GET /feature-flags (the `ListFeatureFlags` operationId).
 func (c *Client) ListFeatureFlags(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error) {
 	req, err := NewListFeatureFlagsRequest(c.Server)
-	if err != nil {
-		return nil, err
-	}
-	req = req.WithContext(ctx)
-	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
-		return nil, err
-	}
-	return c.Client.Do(req)
-}
-
-// PutFeatureFlagWithBody Set a feature flag
-//
-// Takes any type of body and a specified content type.
-//
-// Corresponds with PUT /feature-flags/{key} (the `PutFeatureFlag` operationId).
-func (c *Client) PutFeatureFlagWithBody(ctx context.Context, key KeyPath, params *PutFeatureFlagParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
-	req, err := NewPutFeatureFlagRequestWithBody(c.Server, key, params, contentType, body)
-	if err != nil {
-		return nil, err
-	}
-	req = req.WithContext(ctx)
-	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
-		return nil, err
-	}
-	return c.Client.Do(req)
-}
-
-// PutFeatureFlag Set a feature flag
-//
-// Takes a body of the `application/json` content type.
-//
-// Corresponds with PUT /feature-flags/{key} (the `PutFeatureFlag` operationId).
-func (c *Client) PutFeatureFlag(ctx context.Context, key KeyPath, params *PutFeatureFlagParams, body PutFeatureFlagJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
-	req, err := NewPutFeatureFlagRequest(c.Server, key, params, body)
-	if err != nil {
-		return nil, err
-	}
-	req = req.WithContext(ctx)
-	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
-		return nil, err
-	}
-	return c.Client.Do(req)
-}
-
-// DeleteFile Delete an unattached file
-//
-// Corresponds with DELETE /files/{file_id} (the `DeleteFile` operationId).
-func (c *Client) DeleteFile(ctx context.Context, fileId FileIdPath, reqEditors ...RequestEditorFn) (*http.Response, error) {
-	req, err := NewDeleteFileRequest(c.Server, fileId)
-	if err != nil {
-		return nil, err
-	}
-	req = req.WithContext(ctx)
-	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
-		return nil, err
-	}
-	return c.Client.Do(req)
-}
-
-// GetFile Read file metadata
-//
-// Corresponds with GET /files/{file_id} (the `GetFile` operationId).
-func (c *Client) GetFile(ctx context.Context, fileId FileIdPath, reqEditors ...RequestEditorFn) (*http.Response, error) {
-	req, err := NewGetFileRequest(c.Server, fileId)
 	if err != nil {
 		return nil, err
 	}

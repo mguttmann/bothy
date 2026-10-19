@@ -93,7 +93,7 @@ class FilesApi {
   }
 
   /// Finish an upload
-  /// Checks size and optional SHA-256, detects the MIME type and queues the malware scan. The file is downloadable after &#x60;scan_status&#x60; is &#x60;clean&#x60; or &#x60;skipped&#x60;.
+  /// Checks size and optional SHA-256, detects the MIME type and queues the malware scan. The file is downloadable after &#x60;scan_status&#x60; is &#x60;clean&#x60; or &#x60;skipped&#x60;. Missing parts answer 409 &#x60;conflict&#x60; with &#x60;reason&#x60; &#x60;upload_incomplete&#x60;; an expired session answers 410 &#x60;gone&#x60; (12, 3.4 and 3.6).
   ///
   /// Parameters:
   /// * [fileId]
@@ -321,7 +321,7 @@ class FilesApi {
   }
 
   /// Start an upload
-  ///
+  /// Checks in this order (12, 3.1): size against &#x60;file.max_upload_bytes&#x60; (413 &#x60;payload_too_large&#x60;), quota &#x60;file.quota_bytes_per_principal&#x60; (409 &#x60;conflict&#x60; with &#x60;reason&#x60; &#x60;quota_exceeded&#x60;), open sessions (429), free space of the file system driver (503 &#x60;unavailable&#x60; with &#x60;reason&#x60; &#x60;storage_full&#x60;). A denied type answers 415 &#x60;unsupported_media_type&#x60; with &#x60;reason&#x60; &#x60;file_type_denied&#x60;.
   ///
   /// Parameters:
   /// * [channelId]
@@ -1061,7 +1061,7 @@ class FilesApi {
   }
 
   /// Upload one part in direct mode
-  /// Repeating a part replaces it. Parts can be sent in parallel.
+  /// Parts can be sent in parallel and in any order (12, 3.2). The same part number with the same &#x60;Content-Digest&#x60; answers 200 without new work; with another digest 409 &#x60;conflict&#x60; with &#x60;reason&#x60; &#x60;part_conflict&#x60;. Wrong length or digest: 400 &#x60;validation_failed&#x60; with &#x60;errors[].code&#x60; &#x60;part_digest_mismatch&#x60;, nothing is stored. An expired session answers 410 &#x60;gone&#x60;.
   ///
   /// Parameters:
   /// * [fileId]

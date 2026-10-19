@@ -74,162 +74,167 @@ Abschnitt 6). Inhalte stehen nie im Ereignis.
 
 ## 3. Upload-Ablauf
 
-### 3.1 Upload-Session anlegen
+### 3.1 Creating an upload session
 
-Der Client meldet die Datei vorab an. Der Server prüft alles, was ohne Bytes prüfbar ist, und
-lehnt früh ab, bevor Bandbreite verbraucht wird.
+The client declares the file upfront. The server checks everything that can be checked without
+bytes and rejects early, before bandwidth is used.
 
-Anfrage (`file.upload` auf dem Kanal, `Idempotency-Key` Pflicht):
+Request (`file.upload` on the channel, `Idempotency-Key` required):
 
-| Feld | Pflicht | Regel |
+| Field | Required | Rule |
 |---|---|---|
-| `name` | ja | wird bereinigt (Abschnitt 6.2) und als `original_name` gespeichert |
-| `size_bytes` | ja | `1 ..= file.max_upload_bytes`; sonst `413 file_too_large` |
-| `sha256` | ja | SHA-256 der gesamten Datei, Base64; wird am Ende geprüft |
-| `declared_mime_type` | ja | nur Hinweis; gespeichert in `declared_mime_type`; der Server erkennt den Typ selbst |
-| `purpose` | nein | Standard `attachment`; weitere Werte in 3.7 |
-| `poster` | nein | nur Video: kleines JPEG oder PNG als Vorschaubild, höchstens `file.poster_max_bytes` |
+| `name` | yes | is sanitized (section 6.2) and stored as `original_name` |
+| `size_bytes` | yes | `1 ..= file.max_upload_bytes`; otherwise `413 payload_too_large` |
+| `sha256` | yes | SHA-256 of the whole file, Base64; checked at the end |
+| `declared_mime_type` | yes | hint only; stored in `declared_mime_type`; the server detects the type itself |
+| `purpose` | no | default `attachment`; further values in 3.7 |
+| `poster` | no | video only: small JPEG or PNG as thumbnail, at most `file.poster_max_bytes` |
 
-Der Server prüft in dieser Reihenfolge:
+The server checks in this order:
 
-1. `authorize(principal, file.upload, channel)`. Kein Leserecht: `404`. Leserecht, aber `write`
-   oder `upload` fehlt: `403`.
-2. Größe gegen `file.max_upload_bytes`.
-3. Kontingent: Summe `size_bytes` der nicht gelöschten Dateien des Prinzipals plus neue Größe
-   höchstens `file.quota_bytes_per_principal` (0 = aus). Sonst `409 quota_exceeded`.
-4. Offene Sessions des Prinzipals unter `file.upload_max_open_sessions`. Sonst `429`.
-5. Nur Dateisystem-Treiber: freier Platz nach dem Upload mindestens `file.fs.min_free_bytes`.
-   Sonst `507 storage_full` und eine Warnung an die Statusseite.
+1. `authorize(principal, file.upload, channel)`. No read permission: `404`. Read permission, but
+   `write` or `upload` missing: `403`.
+2. Size against `file.max_upload_bytes`.
+3. Quota: the sum of `size_bytes` of the principal's non-deleted files plus the new size is
+   at most `file.quota_bytes_per_principal` (0 = off). Otherwise `409 conflict` with `reason`
+   `quota_exceeded`.
+4. Open sessions of the principal below `file.upload_max_open_sessions`. Otherwise `429`.
+5. File system driver only: free space after the upload at least `file.fs.min_free_bytes`.
+   Otherwise `503 unavailable` with `reason` `storage_full` and a warning to the status page.
 
-Danach legt er in einer Transaktion an: eine Zeile in `files` (`upload_state = 'pending'`,
-`scan_status = 'pending'`, `mime_type = 'application/octet-stream'` bis zur Erkennung,
-`scope_channel_id` = Kanal, `sha256` und `size_bytes` = angemeldete Werte) und eine Zeile
-`file_upload_sessions` (03). Die Antwort nennt
-`file_id`, `mode`, `part_size_bytes`, `part_count`, `expires_at` und bei `mode = presigned` die
-Ziel-URLs je Teil.
+Then it creates in one transaction: a row in `files` (`upload_state = 'pending'`,
+`scan_status = 'pending'`, `mime_type = 'application/octet-stream'` until detection,
+`scope_channel_id` = channel, `sha256` and `size_bytes` = declared values) and a row in
+`file_upload_sessions` (03). The response names
+`file_id`, `mode`, `part_size_bytes`, `part_count`, `expires_at` and, for `mode = presigned`,
+the target URLs per part.
 
-`part_size_bytes` ist `file.upload_part_bytes`; `part_count` = aufgerundet `size_bytes /
-part_size_bytes`. Der letzte Teil darf kleiner sein. Der Standard liegt über der kleinsten
-S3-Teilgröße, damit derselbe Teilplan für beide Treiber gilt (S3: Teile mindestens 5 MiB außer
-dem letzten, höchstens 10 000 Teile [Q1, belegt]). Der Server prüft beim Start, dass
-`file.max_upload_bytes / file.upload_part_bytes` unter dieser Teilgrenze liegt.
+`part_size_bytes` is `file.upload_part_bytes`; `part_count` = the rounded-up `size_bytes /
+part_size_bytes`. The last part may be smaller. The default lies above the smallest
+S3 part size so that the same part plan applies to both drivers (S3: parts at least 5 MiB
+except the last, at most 10,000 parts [Q1, verified]). At startup the server checks that
+`file.max_upload_bytes / file.upload_part_bytes` lies below this part limit.
 
-### 3.2 Teile übertragen (Modus `direct`, Standard)
+### 3.2 Transferring parts (mode `direct`, default)
 
-`PUT /api/v1/uploads/{file_id}/parts/{n}` mit den Rohbytes des Teils und der Kopfzeile
-`Content-Digest: sha-256=:<base64>:` nach RFC 9530 [Q2, belegt].
+`PUT /api/v1/uploads/{file_id}/parts/{n}` with the raw bytes of the part and the header
+`Content-Digest: sha-256=:<base64>:` per RFC 9530 [Q2, verified].
 
-1. Nur der Prinzipal der Session darf Teile senden; sonst `404`.
-2. Der Server prüft Länge (`part_size_bytes`, beim letzten Teil der Rest) und Digest beim Lesen.
-   Abweichung: `422 part_digest_mismatch`, nichts wird gespeichert.
-3. Ein Teil ist idempotent: gleiche Nummer mit gleichem Digest ergibt `204` ohne neue Arbeit;
-   gleiche Nummer mit anderem Digest ergibt `409 part_conflict`.
-4. Teile dürfen parallel und in beliebiger Reihenfolge kommen. Der Client wählt die Parallelität.
-5. `GET /api/v1/uploads/{file_id}` liefert die schon bestätigten Teile. Ein Client setzt nach
-   Abbruch dort fort.
+1. Only the principal of the session may send parts; otherwise `404`.
+2. The server checks length (`part_size_bytes`, for the last part the remainder) and digest
+   while reading. Mismatch: `400 validation_failed` with `errors[].code` `part_digest_mismatch`,
+   nothing is stored.
+3. A part is idempotent: the same number with the same digest yields `200` without new work;
+   the same number with a different digest yields `409 conflict` with `reason` `part_conflict`.
+4. Parts may arrive in parallel and in any order. The client chooses the parallelism.
+5. `GET /api/v1/uploads/{file_id}` returns the parts already confirmed. After an interruption
+   a client resumes from there.
 
-Der S3-Treiber reicht jeden Teil als Multipart-Teil durch (kein Zwischenspeicher im Server).
-Der Dateisystem-Treiber schreibt Teile nach `uploads/<file_id>/<n>` unter `file.fs.root`.
+The S3 driver passes each part through as a multipart part (no buffering in the server).
+The file system driver writes parts to `uploads/<file_id>/<n>` under `file.fs.root`.
 
-### 3.3 Presigned PUT (Modus `presigned`, optional)
+### 3.3 Presigned PUT (mode `presigned`, optional)
 
-Nur mit S3-Treiber und `file.s3.presigned_upload = true`. Die Session-Antwort enthält je Teil
-eine presigned URL für den Multipart-Teil, gültig `file.s3.presign_ttl`. Der Client lädt direkt
-in den Objektspeicher und meldet beim Abschluss die ETags der Teile. Der Server prüft beim
-Abschluss Teilzahl und Gesamtgröße (HEAD) und im Prüfdurchlauf (3.4) die SHA-256.
+Only with the S3 driver and `file.s3.presigned_upload = true`. The session response contains,
+per part, a presigned URL for the multipart part, valid for `file.s3.presign_ttl`. The client
+uploads directly to the object storage and reports the ETags of the parts on completion. On
+completion the server checks part count and total size (HEAD), and in the verification pass
+(3.4) the SHA-256.
 
-Der Modus bleibt aus, bis zwei Dinge belegt sind:
+The mode stays off until two things are proven:
 
-- Die presigned URL bindet die Teil-Länge, sodass ein Client nicht mehr Bytes ablegen kann als
-  angemeldet. Integrationstest gegen jeden unterstützten S3-Dienst. Result of M3-02
+- The presigned URL binds the part length, so that a client cannot store more bytes than
+  declared. Integration test against every supported S3 service. Result of M3-02
   (`TestPresignedPartBindsLength`, docs/DECISIONS.md M3-02/9): proven for SeaweedFS at the version
   the Compose stack pins (`BOTHY_SEAWEEDFS_VERSION`). The S3 driver signs `content-length` into
   every part URL; SeaweedFS accepts a plain `PUT` of exactly the signed length and refuses one
   byte more, one byte less, chunked transfer encoding and a request after the validity, each
   without storing a part. Other S3 services are not proven.
-- Die Clients erreichen den S3-Endpunkt. Bei Instanzen in privaten Netzen ist das oft nicht so
-  (offen, nicht geprüft).
+- The clients reach the S3 endpoint. For instances in private networks this is often not so
+  (open, not checked).
 
-Grund für "optional": Der direkte Weg reicht für die Grenze `file.max_upload_bytes` und braucht
-keine öffentliche Erreichbarkeit des Speichers.
+Reason for "optional": the direct path is enough for the limit `file.max_upload_bytes` and
+needs no public reachability of the storage.
 
-### 3.4 Abschluss und Prüfdurchlauf
+### 3.4 Completion and verification pass
 
 `POST /api/v1/uploads/{file_id}/complete`:
 
-1. Alle Teile vorhanden (sonst `409 upload_incomplete` mit fehlenden Nummern).
-2. S3: `CompleteMultipartUpload`. Bei genau einem Teil darf der Treiber stattdessen ein
-   einfaches PUT genutzt haben.
-3. Session `state = 'completed'`, Job `file_verify` in die Warteschlange (River), Antwort `202`
-   mit dem Datei-Objekt. Ab jetzt darf der Client die Datei an eine Nachricht hängen.
+1. All parts present (otherwise `409 conflict` with `reason` `upload_incomplete` and the
+   missing numbers in `detail`).
+2. S3: `CompleteMultipartUpload`. With exactly one part the driver may have used a simple PUT
+   instead.
+3. Session `state = 'completed'`, job `file_verify` into the queue (River), response `200`
+   with the file object. From now on the client may attach the file to a message.
 
-Der Job `file_verify` liest die Bytes **genau einmal** und verteilt den Strom auf:
+The job `file_verify` reads the bytes **exactly once** and splits the stream into:
 
-- SHA-256 und Byte-Zähler. Weichen sie von der Anmeldung ab: `upload_state = 'failed'`, Grund
-  `checksum_mismatch` bzw. `size_mismatch` in der Session, Objekt löschen, `file.updated`.
-- Typ-Erkennung über die ersten `file.sniff_bytes` (Abschnitt 6.1).
-- clamd `INSTREAM` (Abschnitt 5).
-- Nur Dateisystem: Zusammenfügen der Teile in das Zielobjekt (Schreiben in eine temporäre Datei,
-  `fsync`, `rename`). Danach werden die Teile gelöscht.
+- SHA-256 and byte counter. If they differ from the declaration: `upload_state = 'failed'`,
+  reason `checksum_mismatch` or `size_mismatch` respectively in the session, delete the
+  object, `file.updated`.
+- Type detection over the first `file.sniff_bytes` (section 6.1).
+- clamd `INSTREAM` (section 5).
+- File system only: joining the parts into the target object (write to a temporary file,
+  `fsync`, `rename`). After that the parts are deleted.
 
-Ein einziger Lesedurchlauf hält die Kosten bei großen Dateien klein und gilt für beide Modi
-gleich. Die Prüfsumme pro Teil (3.2) fängt Übertragungsfehler früh; die Gesamtprüfsumme hier
-fängt Fehler beim Zusammenfügen und im presigned-Modus.
+A single read pass keeps the cost low for large files and works the same way for both modes.
+The checksum per part (3.2) catches transfer errors early; the total checksum here catches
+errors during joining and in presigned mode.
 
-Ist alles gut: `upload_state = 'complete'`, `mime_type` = erkannter Typ, `scan_status` nach
-Abschnitt 5.2, `scanned_at`, `scan_engine`, Ereignis `file.updated`. Ist die Datei auslieferbar,
-folgt der Job `file_process` (Abschnitte 7 und 8) und, wenn unterstützt, die Text-Extraktion
+If all is well: `upload_state = 'complete'`, `mime_type` = detected type, `scan_status` per
+section 5.2, `scanned_at`, `scan_engine`, event `file.updated`. If the file is servable,
+the job `file_process` follows (sections 7 and 8) and, if supported, the text extraction
 ([14-suche.md](14-suche.md)).
 
-### 3.5 Sequenz (direkter Upload mit Scan)
+### 3.5 Sequence (direct upload with scan)
 
 ```mermaid
 sequenceDiagram
     autonumber
     participant C as Client (Alex)
-    participant API as API-Prozess
-    participant OS as Objektspeicher
+    participant API as API process
+    participant OS as Object storage
     participant DB as PostgreSQL
     participant W as Worker
     participant AV as clamd
-    C->>API: POST /api/v1/channels/{id}/uploads (Name, Größe, SHA-256, Typ)
-    API->>API: authorize(Alex, file.upload, channel), Grenzen
+    C->>API: POST /api/v1/channels/{id}/uploads (name, size, SHA-256, type)
+    API->>API: authorize(Alex, file.upload, channel), limits
     API->>DB: files pending, file_upload_sessions open
     API-->>C: 201 file_id, part_size_bytes, part_count
-    loop je Teil, parallel möglich
+    loop per part, parallel possible
         C->>API: PUT /api/v1/uploads/{file_id}/parts/{n} (Content-Digest)
-        API->>API: Länge und Digest prüfen
-        API->>OS: Teil schreiben
+        API->>API: check length and digest
+        API->>OS: write part
         API-->>C: 204
     end
     C->>API: POST /api/v1/uploads/{file_id}/complete
-    API->>DB: Session completed, Job file_verify
-    API-->>C: 202 (wird geprüft)
-    W->>OS: Bytes lesen, ein Durchlauf
-    W->>W: SHA-256, Größe, Typ-Erkennung
-    W->>AV: INSTREAM in Stücken
+    API->>DB: session completed, job file_verify
+    API-->>C: 202 (being checked)
+    W->>OS: read bytes, one pass
+    W->>W: SHA-256, size, type detection
+    W->>AV: INSTREAM in chunks
     AV-->>W: stream: OK
     W->>DB: upload_state complete, scan_status clean, file.updated
-    W->>W: Metadaten entfernen, Vorschaubilder
+    W->>W: remove metadata, thumbnails
     W->>DB: file_thumbnails, file.updated
 ```
 
-### 3.6 Fehlerfälle
+### 3.6 Error cases
 
-| Fall | Antwort oder Folge |
+| Case | Response or consequence |
 |---|---|
-| Kein Leserecht auf den Kanal | `404` |
-| `write` oder `upload` fehlt | `403` |
-| Größe über `file.max_upload_bytes` | `413 file_too_large` |
-| Kontingent erschöpft | `409 quota_exceeded` |
-| Zu viele offene Sessions | `429` mit `Retry-After` |
-| Speicher fast voll (Dateisystem) | `507 storage_full` |
-| Teil mit falscher Länge oder Digest | `422 part_digest_mismatch` |
-| Teil-Nummer schon mit anderem Inhalt | `409 part_conflict` |
-| `complete` mit fehlenden Teilen | `409 upload_incomplete` |
-| Session abgelaufen (`file.upload_session_ttl`) | `410 upload_expired`; Aufräumen löscht Teile und bricht den Multipart-Upload ab |
-| Rechte während des Uploads entzogen | nächste Anfrage `404`; die Session wird abgebrochen |
-| Gesamt-Prüfsumme oder Größe falsch | `upload_state = 'failed'`, `file.updated` |
+| No read permission on the channel | `404` |
+| `write` or `upload` missing | `403` |
+| Size above `file.max_upload_bytes` | `413 payload_too_large` |
+| Quota exhausted | `409 conflict` with `reason` `quota_exceeded` |
+| Too many open sessions | `429` with `Retry-After` |
+| Storage almost full (file system) | `503 unavailable` with `reason` `storage_full` |
+| Part with wrong length or digest | `400 validation_failed` with `errors[].code` `part_digest_mismatch` |
+| Part number already used with different content | `409 conflict` with `reason` `part_conflict` |
+| `complete` with missing parts | `409 conflict` with `reason` `upload_incomplete` |
+| Session expired (`file.upload_session_ttl`) | `410 gone`; cleanup deletes the parts and aborts the multipart upload |
+| Permissions revoked during the upload | next request `404`; the session is aborted |
+| Total checksum or size wrong | `upload_state = 'failed'`, `file.updated` |
 
 ### 3.7 Zweck einer Datei
 
@@ -875,7 +880,7 @@ Werte aus anderen Kapiteln (nur Verweis): `file.max_upload_bytes`, `message.max_
 |---|---|---|
 | `file.storage.driver` | `fs` | `fs` oder `s3` |
 | `file.fs.root` | `/var/lib/bothy/files` | Wurzel des Dateisystem-Treibers (Pfad im Container) |
-| `file.fs.min_free_bytes` | `2147483648` | freier Platz, unter dem Uploads mit `507` abgelehnt werden |
+| `file.fs.min_free_bytes` | `2147483648` | freier Platz, unter dem Uploads mit `503 unavailable` (`reason` `storage_full`) abgelehnt werden |
 | `file.s3.endpoint` | leer | S3-Endpunkt |
 | `file.s3.region` | `us-east-1` | Region für die Signatur |
 | `file.s3.bucket` | leer | Bucket |

@@ -70,6 +70,11 @@ def _parse_response(
 
         return response_409
 
+    if response.status_code == 410:
+        response_410 = Problem.from_dict(response.json())
+
+        return response_410
+
     if response.status_code == 422:
         response_422 = Problem.from_dict(response.json())
 
@@ -106,7 +111,8 @@ def sync_detailed(
     """Finish an upload
 
      Checks size and optional SHA-256, detects the MIME type and queues the malware scan. The file is
-    downloadable after `scan_status` is `clean` or `skipped`.
+    downloadable after `scan_status` is `clean` or `skipped`. Missing parts answer 409 `conflict` with
+    `reason` `upload_incomplete`; an expired session answers 410 `gone` (12, 3.4 and 3.6).
 
     Args:
         file_id (UUID): UUIDv7 (RFC 9562), lowercase canonical form.
@@ -144,7 +150,8 @@ def sync(
     """Finish an upload
 
      Checks size and optional SHA-256, detects the MIME type and queues the malware scan. The file is
-    downloadable after `scan_status` is `clean` or `skipped`.
+    downloadable after `scan_status` is `clean` or `skipped`. Missing parts answer 409 `conflict` with
+    `reason` `upload_incomplete`; an expired session answers 410 `gone` (12, 3.4 and 3.6).
 
     Args:
         file_id (UUID): UUIDv7 (RFC 9562), lowercase canonical form.
@@ -177,7 +184,8 @@ async def asyncio_detailed(
     """Finish an upload
 
      Checks size and optional SHA-256, detects the MIME type and queues the malware scan. The file is
-    downloadable after `scan_status` is `clean` or `skipped`.
+    downloadable after `scan_status` is `clean` or `skipped`. Missing parts answer 409 `conflict` with
+    `reason` `upload_incomplete`; an expired session answers 410 `gone` (12, 3.4 and 3.6).
 
     Args:
         file_id (UUID): UUIDv7 (RFC 9562), lowercase canonical form.
@@ -213,7 +221,8 @@ async def asyncio(
     """Finish an upload
 
      Checks size and optional SHA-256, detects the MIME type and queues the malware scan. The file is
-    downloadable after `scan_status` is `clean` or `skipped`.
+    downloadable after `scan_status` is `clean` or `skipped`. Missing parts answer 409 `conflict` with
+    `reason` `upload_incomplete`; an expired session answers 410 `gone` (12, 3.4 and 3.6).
 
     Args:
         file_id (UUID): UUIDv7 (RFC 9562), lowercase canonical form.

@@ -67,6 +67,11 @@ def _parse_response(
 
         return response_409
 
+    if response.status_code == 410:
+        response_410 = Problem.from_dict(response.json())
+
+        return response_410
+
     if response.status_code == 413:
         response_413 = Problem.from_dict(response.json())
 
@@ -102,7 +107,10 @@ def sync_detailed(
 ) -> Response[Problem | UploadPartResult]:
     """Upload one part in direct mode
 
-     Repeating a part replaces it. Parts can be sent in parallel.
+     Parts can be sent in parallel and in any order (12, 3.2). The same part number with the same
+    `Content-Digest` answers 200 without new work; with another digest 409 `conflict` with `reason`
+    `part_conflict`. Wrong length or digest: 400 `validation_failed` with `errors[].code`
+    `part_digest_mismatch`, nothing is stored. An expired session answers 410 `gone`.
 
     Args:
         file_id (UUID): UUIDv7 (RFC 9562), lowercase canonical form.
@@ -139,7 +147,10 @@ def sync(
 ) -> Problem | UploadPartResult | None:
     """Upload one part in direct mode
 
-     Repeating a part replaces it. Parts can be sent in parallel.
+     Parts can be sent in parallel and in any order (12, 3.2). The same part number with the same
+    `Content-Digest` answers 200 without new work; with another digest 409 `conflict` with `reason`
+    `part_conflict`. Wrong length or digest: 400 `validation_failed` with `errors[].code`
+    `part_digest_mismatch`, nothing is stored. An expired session answers 410 `gone`.
 
     Args:
         file_id (UUID): UUIDv7 (RFC 9562), lowercase canonical form.
@@ -171,7 +182,10 @@ async def asyncio_detailed(
 ) -> Response[Problem | UploadPartResult]:
     """Upload one part in direct mode
 
-     Repeating a part replaces it. Parts can be sent in parallel.
+     Parts can be sent in parallel and in any order (12, 3.2). The same part number with the same
+    `Content-Digest` answers 200 without new work; with another digest 409 `conflict` with `reason`
+    `part_conflict`. Wrong length or digest: 400 `validation_failed` with `errors[].code`
+    `part_digest_mismatch`, nothing is stored. An expired session answers 410 `gone`.
 
     Args:
         file_id (UUID): UUIDv7 (RFC 9562), lowercase canonical form.
@@ -206,7 +220,10 @@ async def asyncio(
 ) -> Problem | UploadPartResult | None:
     """Upload one part in direct mode
 
-     Repeating a part replaces it. Parts can be sent in parallel.
+     Parts can be sent in parallel and in any order (12, 3.2). The same part number with the same
+    `Content-Digest` answers 200 without new work; with another digest 409 `conflict` with `reason`
+    `part_conflict`. Wrong length or digest: 400 `validation_failed` with `errors[].code`
+    `part_digest_mismatch`, nothing is stored. An expired session answers 410 `gone`.
 
     Args:
         file_id (UUID): UUIDv7 (RFC 9562), lowercase canonical form.
