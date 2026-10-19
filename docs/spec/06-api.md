@@ -498,8 +498,8 @@ sequenceDiagram
    Teilgröße `file.upload_part_bytes`, Gültigkeit der Sitzung `file.upload_session_ttl`,
    presigned PUT-URLs für Teile (nur Modus `presigned`, S3) `file.s3.presign_ttl`
    ([12-dateien.md](12-dateien.md), Abschnitt 3).
-2. `complete` closes the session and leads to the check of size and SHA-256 in the verify pass,
-   which also detects the MIME type and runs the virus scan (M3-03, M3-04). Herunterladen geht erst bei `scan_status` `clean` oder `skipped`; vorher
+2. `complete` closes the session and queues the job `files.scan`, which checks size and SHA-256,
+   detects the MIME type and runs the virus scan in one read pass (M3-03, M3-04). Herunterladen geht erst bei `scan_status` `clean` oder `skipped`; vorher
    `409 file_not_ready`, bei `infected`, `error` oder gescheitertem Upload `409 file_blocked`
    ([12-dateien.md](12-dateien.md), Abschnitt 9.3); ohne Leserecht immer `404`.
 3. `GET /files/{id}/content` liefert die Bytes immer selbst, mit `Range`-Unterstützung; es gibt

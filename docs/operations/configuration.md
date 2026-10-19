@@ -499,18 +499,18 @@ Quelle: [12-dateien.md](../spec/12-dateien.md), Abschnitt 18.
 | `file.upload_max_open_sessions` | `BOTHY_FILE__UPLOAD_MAX_OPEN_SESSIONS` | Server | int | `20` | offene Sessions je Prinzipal | aktiv |
 | `file.quota_bytes_per_principal` | `BOTHY_FILE__QUOTA_BYTES_PER_PRINCIPAL` | Server | int | `0` | Kontingent je Prinzipal, 0 = aus | aktiv |
 | `file.poster_max_bytes` | `BOTHY_FILE__POSTER_MAX_BYTES` | Server |  | `524288` | Größe des Video-Vorschaubilds vom Client | geplant (M3) |
-| `file.sniff_bytes` | `BOTHY_FILE__SNIFF_BYTES` | Server |  | `1048576` | Bytes für die Typ-Erkennung | geplant (M3) |
+| `file.sniff_bytes` | `BOTHY_FILE__SNIFF_BYTES` | Server | int | `1048576` | Bytes für die Typ-Erkennung | aktiv |
 | `file.denied_mime_types` | `BOTHY_FILE__DENIED_MIME_TYPES` | Server | list(string) | leer | gesperrte Typen | aktiv |
 | `file.name_max_bytes` | `BOTHY_FILE__NAME_MAX_BYTES` | Server | int | `255` | Länge eines Dateinamens in UTF-8-Bytes | aktiv |
-| `file.scan.mode` | `BOTHY_FILE__SCAN__MODE` | Server |  | `required` | `required` oder `off` | geplant (M3) |
-| `file.scan.clamd_address` | `BOTHY_FILE__SCAN__CLAMD_ADDRESS` | Server |  | `tcp://clamav:3310` | clamd im internen Netz; alternativ `unix:///...` | geplant (M3) |
-| `file.scan.chunk_bytes` | `BOTHY_FILE__SCAN__CHUNK_BYTES` | Server |  | `65536` | Stückgröße für `INSTREAM` | geplant (M3) |
-| `file.scan.timeout` | `BOTHY_FILE__SCAN__TIMEOUT` | Server |  | `120s` | Zeitlimit je Scan | geplant (M3) |
-| `file.scan.max_concurrent` | `BOTHY_FILE__SCAN__MAX_CONCURRENT` | Server |  | `4` | Scans je Worker-Prozess | geplant (M3) |
-| `file.scan.retry_backoff_cap` | `BOTHY_FILE__SCAN__RETRY_BACKOFF_CAP` | Server |  | `5m` | größter Abstand zwischen Scan-Versuchen | geplant (M3) |
-| `file.scan.health_interval` | `BOTHY_FILE__SCAN__HEALTH_INTERVAL` | Server |  | `30s` | `PING`-Abstand | geplant (M3) |
+| `file.scan.mode` | `BOTHY_FILE__SCAN__MODE` | Server | enum(required, off) | `required` | `required` oder `off` | aktiv |
+| `file.scan.clamd_address` | `BOTHY_FILE__SCAN__CLAMD_ADDRESS` | Server | string | `unix:///run/clamav/clamd.sock` | Unix socket of clamd, `unix://` plus an absolute path; no other transport (19 SEC-TLS-5) | aktiv |
+| `file.scan.chunk_bytes` | `BOTHY_FILE__SCAN__CHUNK_BYTES` | Server | int | `65536` | Stückgröße für `INSTREAM` | aktiv |
+| `file.scan.timeout` | `BOTHY_FILE__SCAN__TIMEOUT` | Server | duration | `120s` | Zeitlimit je Scan | aktiv |
+| `file.scan.max_concurrent` | `BOTHY_FILE__SCAN__MAX_CONCURRENT` | Server | int | `4` | Scans je Worker-Prozess | aktiv |
+| `file.scan.retry_backoff_cap` | `BOTHY_FILE__SCAN__RETRY_BACKOFF_CAP` | Server | duration | `5m` | größter Abstand zwischen Scan-Versuchen | aktiv |
+| `file.scan.health_interval` | `BOTHY_FILE__SCAN__HEALTH_INTERVAL` | Server | duration | `30s` | `PING`-Abstand | aktiv |
 | `file.scan.pending_alert_after` | `BOTHY_FILE__SCAN__PENDING_ALERT_AFTER` | Server |  | `10m` | Alter der ältesten `pending`-Datei bis zum Alarm | geplant (M3) |
-| `file.scan.clamd_stream_max_bytes` | `BOTHY_FILE__SCAN__CLAMD_STREAM_MAX_BYTES` | Server |  | `104857600` | Spiegel von clamd `StreamMaxLength` | geplant (M3) |
+| `file.scan.clamd_stream_max_bytes` | `BOTHY_FILE__SCAN__CLAMD_STREAM_MAX_BYTES` | Server | int | `104857600` | Spiegel von clamd `StreamMaxLength` | aktiv |
 | `file.invocation_hold_max` | `BOTHY_FILE__INVOCATION_HOLD_MAX` | Server |  | `120s` | längstes Warten des Agenten-Aufrufs auf Anhänge | geplant (M3) |
 | `file.image.libvips_enabled` | `BOTHY_FILE__IMAGE__LIBVIPS_ENABLED` | Server |  | `false` | libvips-Build nutzen | geplant (M3) |
 | `file.image.max_pixels` | `BOTHY_FILE__IMAGE__MAX_PIXELS` | Server |  | `50000000` | größte dekodierte Pixelzahl | geplant (M3) |
@@ -991,7 +991,7 @@ Diese Variablen sind keine Server-Konfiguration; Compose setzt daraus Werte der 
 | `BOTHY_STORAGE_DRIVER` | `fs` | setzt `file.storage.driver`: fs oder s3 (Kapitel 12) |
 | `BOTHY_S3_ENDPOINT` | `http://seaweedfs:8333` | setzt `file.s3.endpoint` bei Treiber s3 |
 | `BOTHY_S3_BUCKET` | `bothy-files` | setzt `file.s3.bucket` bei Treiber s3 |
-| `BOTHY_CLAMD_ADDRESS` | `tcp://clamav:3310` | setzt `file.scan.clamd_address` (Kapitel 12) |
+| `BOTHY_CLAMD_ADDRESS` | `unix:///run/clamav/clamd.sock` | setzt `file.scan.clamd_address` (Kapitel 12); the socket lies in the volume `clamav-socket` |
 | `BOTHY_PG_SHM_SIZE` | `256m` | Shared Memory des Datenbank-Containers |
 | `BOTHY_PG_ARCHIVE_TIMEOUT` | `60s` | setzt `archive_timeout` in PostgreSQL; gleich `backup.pg.archive_timeout` |
 | `BOTHY_BACKUP_OFFSITE_TARGET` | leer | setzt `backup.offsite.target` |

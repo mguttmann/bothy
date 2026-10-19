@@ -1110,7 +1110,11 @@ Server lädt.
    identifiers and never `simple` (check `search_languages`); every key of `search.locale_map` is
    a first language subtag in lower-case ASCII letters and every value is listed in
    `search.languages` or is `simple` (check `search_locale_map`, the start error of
-   [14-suche.md](14-suche.md) 3.1; M3-13). Dazu prüft der Lader eine Regel für einen einzelnen Schlüssel, die kein
+   [14-suche.md](14-suche.md) 3.1; M3-13). With `file.scan.mode = required`,
+   `file.max_upload_bytes` is at most `file.scan.clamd_stream_max_bytes`, the mirror of the clamd
+   option `StreamMaxLength` (cross-check `scan_stream_limit`, [12-dateien.md](12-dateien.md) 5.4,
+   M3-04), and `file.scan.clamd_address` is `unix://` followed by an absolute path (cross-check
+   `clamd_address_unix`, [19-sicherheit.md](19-sicherheit.md) SEC-TLS-5, M3-04). Dazu prüft der Lader eine Regel für einen einzelnen Schlüssel, die kein
    Typ ausdrückt: `secrets.dir` ist ein absoluter Pfad in sauberer Form (kein `.` oder `..`, kein
    doppelter oder abschließender `/`), nicht `/`, ohne NUL-Zeichen und ohne `<`, wie ihn der
    Secret-Provider verlangt; ein falscher Wert ist ein Problem von `secrets.dir` allein, nicht der

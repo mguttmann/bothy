@@ -4,6 +4,7 @@ package app
 
 import (
 	"context"
+	"time"
 
 	"github.com/OWNER/bothy/services/server/internal/files"
 	"github.com/OWNER/bothy/services/server/internal/files/domain"
@@ -15,9 +16,9 @@ import (
 
 // Complete implements files.Uploads (brief M3-03 design note 12, docs/DECISIONS.md D-M3-03-11 and
 // -12): in one unit of work (the ambient one of a keyed request) the session FOR UPDATE, then
-// authorize, the state, the list of the client against the confirmed parts and the state change.
-// No object storage call, no event and no job (M3-04 adds files.scan here). The size metric is
-// recorded after the commit.
+// authorize, the state, the list of the client against the confirmed parts, the state change and
+// the job files.scan with round 0 (M3-04), so the job exists exactly when the session is
+// completed. No object storage call and no event. The size metric is recorded after the commit.
 func (s *Service) Complete(ctx context.Context, cmd files.CompleteUpload) (files.File, error) {
 	a := caller(ctx)
 	var out files.File
@@ -72,6 +73,9 @@ func (s *Service) complete(ctx context.Context, a actor.Actor, cmd files.Complet
 		return files.File{}, 0, false, err
 	}
 	if err := s.d.Repo.CompleteSession(ctx, cmd.FileID, now); err != nil {
+		return files.File{}, 0, false, err
+	}
+	if err := s.d.ScanQueue.EnqueueScan(ctx, cmd.FileID, 0, time.Time{}); err != nil {
 		return files.File{}, 0, false, err
 	}
 	return FileView(rec.File), rec.DeclaredSizeBytes, true, nil

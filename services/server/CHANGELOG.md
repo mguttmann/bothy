@@ -11,6 +11,27 @@ documented in this file. The format is based on
 
 ### Added
 
+- Scan pass with clamd (M3-04): every completed upload runs through the job `files.scan` (queue
+  `files`, inserted in the transaction of `completeUpload`), which reads the stored bytes once,
+  checks size and SHA-256 against the declaration, detects the type from the first
+  `file.sniff_bytes`, joins file system parts into the object and scans with clamd over
+  `INSTREAM`. Files end `complete` with `clean`, `skipped` (`file.scan.mode = off`), `infected` or
+  `error` (objects deleted, malware audited as `file.upload` deny `malware_detected`), or `failed`
+  with `size_mismatch`, `checksum_mismatch` or `file_type_denied`; every change writes
+  `file.updated` and a final state publishes `files.FileFinalized`. While clamd is unreachable the
+  file stays `pending` and the job retries with backoff up to `file.scan.retry_backoff_cap`
+  without an attempt limit. clamd is reached only over a Unix socket (`file.scan.clamd_address`,
+  start check `clamd_address_unix`); the server refuses to start when `file.max_upload_bytes`
+  exceeds `file.scan.clamd_stream_max_bytes` with the scan required (`scan_stream_limit`). New
+  keys `file.scan.mode`, `file.scan.clamd_address`, `file.scan.chunk_bytes`, `file.scan.timeout`,
+  `file.scan.max_concurrent`, `file.scan.retry_backoff_cap`, `file.scan.health_interval`,
+  `file.scan.clamd_stream_max_bytes` and `file.sniff_bytes`; the worker pings clamd every
+  `file.scan.health_interval` and records `bothy.file.scan.queue`; the metrics
+  `bothy.file.scan` and `bothy.file.scan.duration` and the span `file.scan`. The Compose stack
+  shares clamd's socket with the worker through the volume `clamav-socket` and sets the mandatory
+  clamd options in `infra/compose/clamav/clamd.conf`. `platform/jobs.HandlerOptions.Timeout` sets
+  River's job timeout per kind.
+
 - Upload sessions, parts and completion (M3-03): `createUpload`, `uploadPart`, `getUpload`,
   `completeUpload`, `abortUpload` and `getFile` in mode `direct`. The tables `files`,
   `file_upload_sessions` and `file_upload_parts` (with `files.search_vector`) and the validated

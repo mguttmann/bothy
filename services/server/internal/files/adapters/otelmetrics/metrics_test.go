@@ -4,12 +4,16 @@ package otelmetrics_test
 
 import (
 	"context"
+	"slices"
 	"testing"
+	"time"
 
+	"go.opentelemetry.io/otel/attribute"
 	sdkmetric "go.opentelemetry.io/otel/sdk/metric"
 	"go.opentelemetry.io/otel/sdk/metric/metricdata"
 
 	"github.com/OWNER/bothy/services/server/internal/files/adapters/otelmetrics"
+	"github.com/OWNER/bothy/services/server/internal/platform/otel/metrics"
 )
 
 // TestUploadSizeMetric holds bothy.file.upload.size: one histogram point per completion, the
@@ -42,4 +46,63 @@ func TestUploadSizeMetric(t *testing.T) {
 		}
 	}
 	t.Fatal("bothy.file.upload.size not recorded")
+}
+
+// TestScanMetrics holds the scan instruments: bothy.file.scan per outcome, bothy.file.scan.duration
+// with the long-duration buckets of the registry and no attribute but bothy.outcome, and
+// bothy.file.scan.queue without attributes.
+func TestScanMetrics(t *testing.T) {
+	reader := sdkmetric.NewManualReader()
+	mp := sdkmetric.NewMeterProvider(sdkmetric.WithReader(reader), sdkmetric.WithView(metrics.View))
+	m, err := otelmetrics.New(mp)
+	if err != nil {
+		t.Fatal(err)
+	}
+	ctx := context.Background()
+	m.ScanCompleted(ctx, "clean", 3*time.Second)
+	m.ScanCompleted(ctx, "infected", time.Second)
+	m.ScanCompleted(ctx, "clean", time.Second)
+	m.ScanQueue(ctx, 7)
+	var rm metricdata.ResourceMetrics
+	if err := reader.Collect(ctx, &rm); err != nil {
+		t.Fatal(err)
+	}
+	seen := map[string]bool{}
+	for _, sm := range rm.ScopeMetrics {
+		for _, met := range sm.Metrics {
+			seen[met.Name] = true
+			switch met.Name {
+			case "bothy.file.scan":
+				sum := met.Data.(metricdata.Sum[int64])
+				counts := map[string]int64{}
+				for _, dp := range sum.DataPoints {
+					if dp.Attributes.Len() != 1 {
+						t.Errorf("attributes %v", dp.Attributes)
+					}
+					v, _ := dp.Attributes.Value(attribute.Key("bothy.outcome"))
+					counts[v.AsString()] = dp.Value
+				}
+				if counts["clean"] != 2 || counts["infected"] != 1 {
+					t.Errorf("counts %v", counts)
+				}
+			case "bothy.file.scan.duration":
+				h := met.Data.(metricdata.Histogram[float64])
+				for _, dp := range h.DataPoints {
+					if dp.Attributes.Len() != 1 || !slices.Equal(dp.Bounds, metrics.BucketsLong) {
+						t.Errorf("point %v bounds %v", dp.Attributes, dp.Bounds)
+					}
+				}
+			case "bothy.file.scan.queue":
+				g := met.Data.(metricdata.Gauge[float64])
+				if len(g.DataPoints) != 1 || g.DataPoints[0].Value != 7 || g.DataPoints[0].Attributes.Len() != 0 {
+					t.Errorf("queue %+v", g.DataPoints)
+				}
+			}
+		}
+	}
+	for _, n := range []string{"bothy.file.scan", "bothy.file.scan.duration", "bothy.file.scan.queue"} {
+		if !seen[n] {
+			t.Errorf("%s not recorded", n)
+		}
+	}
 }

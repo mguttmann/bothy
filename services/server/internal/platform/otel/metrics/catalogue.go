@@ -43,7 +43,9 @@ var (
 	principalKinds = []string{"user", "agent", "app"}
 	// httpMethods are http.request.method: the methods of the HTTP semantic conventions and
 	// _OTHER for every other method (platform/otel Middleware).
-	httpMethods = []string{"GET", "HEAD", "POST", "PUT", "DELETE", "CONNECT", "OPTIONS", "TRACE", "PATCH", "_OTHER"}
+	// scanOutcomes are bothy.outcome of bothy.file.scan and bothy.file.scan.duration.
+	scanOutcomes = []string{"clean", "infected", "error", "skipped"}
+	httpMethods  = []string{"GET", "HEAD", "POST", "PUT", "DELETE", "CONNECT", "OPTIONS", "TRACE", "PATCH", "_OTHER"}
 )
 
 // The instruments of signals.md that this build registers. Every instrument the server creates
@@ -184,6 +186,27 @@ var (
 		Description: "Declared size of completed uploads.",
 		Buckets:     BucketsSizes,
 	}
+	// FileScan is bothy.file.scan (4.4): one per final scan outcome, recorded after the commit of
+	// the scan pass; failed files and retries are not counted (M3-04).
+	FileScan = Spec{
+		Name: "bothy.file.scan", Kind: KindCounter, Unit: "{file}",
+		Description: "Final outcomes of the virus scan of uploaded files.",
+		Attrs:       []Attr{{Key: keyOutcome, Values: scanOutcomes}},
+	}
+	// FileScanDuration is bothy.file.scan.duration (4.4): the whole read pass with the scan, per
+	// outcome (docs/DECISIONS.md D-M3-04-12).
+	FileScanDuration = Spec{
+		Name: "bothy.file.scan.duration", Kind: KindHistogram, Unit: "s",
+		Description: "Duration of the read pass with the virus scan of one file.",
+		Attrs:       []Attr{{Key: keyOutcome, Values: scanOutcomes}},
+		Buckets:     BucketsLong,
+	}
+	// FileScanQueue is bothy.file.scan.queue (4.4): files awaiting the scan pass, recorded by the
+	// health monitor of the worker every file.scan.health_interval.
+	FileScanQueue = Spec{
+		Name: "bothy.file.scan.queue", Kind: KindGauge, Unit: "{file}",
+		Description: "Files awaiting the read pass with the virus scan.",
+	}
 	// JobDuration is bothy.job.duration (4.4).
 	JobDuration = Spec{
 		Name: "bothy.job.duration", Kind: KindHistogram, Unit: "s",
@@ -258,7 +281,7 @@ func All() []Spec {
 		GatewayClose, GatewayOutboundDropped,
 		MessageCreated, EventAppended, EventSeqLockWait, EventFanoutLag, EventConsumerLag,
 		EventConsumerPendingAge, DeliveryDuration,
-		JobDuration, JobQueue, EgressBlocked, FileUploadSize,
+		JobDuration, JobQueue, EgressBlocked, FileUploadSize, FileScan, FileScanDuration, FileScanQueue,
 		DBClientOperationDuration, DBPoolConnections,
 		AuditVerifyFailures, AuditVerifyLastSuccess, TelemetryDropped, SecretsRefreshFailures,
 		ClientMetricsDiscarded,

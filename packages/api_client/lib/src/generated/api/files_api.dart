@@ -93,7 +93,7 @@ class FilesApi {
   }
 
   /// Finish an upload
-  /// Closes the session; the verify pass then checks size and SHA-256, detects the MIME type and runs the malware scan. The file is downloadable after &#x60;scan_status&#x60; is &#x60;clean&#x60; or &#x60;skipped&#x60;. &#x60;parts&#x60; is checked against the confirmed parts: a duplicate or out-of-range number gives 400, another &#x60;etag&#x60; 409 &#x60;conflict&#x60; with &#x60;reason&#x60; &#x60;part_conflict&#x60;. A completed session answers 200 with the file again. Missing parts answer 409 &#x60;conflict&#x60; with &#x60;reason&#x60; &#x60;upload_incomplete&#x60;; an expired session answers 410 &#x60;gone&#x60; (12, 3.4 and 3.6).
+  /// Closes the session and queues the job &#x60;files.scan&#x60;, which checks size and SHA-256, detects the MIME type and runs the malware scan. The file is downloadable after &#x60;scan_status&#x60; is &#x60;clean&#x60; or &#x60;skipped&#x60;. &#x60;parts&#x60; is checked against the confirmed parts: a duplicate or out-of-range number gives 400, another &#x60;etag&#x60; 409 &#x60;conflict&#x60; with &#x60;reason&#x60; &#x60;part_conflict&#x60;. A completed session answers 200 with the file again. Missing parts answer 409 &#x60;conflict&#x60; with &#x60;reason&#x60; &#x60;upload_incomplete&#x60;; an expired session answers 410 &#x60;gone&#x60; (12, 3.4 and 3.6).
   ///
   /// Parameters:
   /// * [fileId]

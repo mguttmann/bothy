@@ -4670,7 +4670,7 @@ func (c *Client) GetUpload(ctx context.Context, fileId FileIdPath, reqEditors ..
 
 // CompleteUploadWithBody Finish an upload
 //
-// Closes the session; the verify pass then checks size and SHA-256, detects the MIME type and runs the malware scan. The file is
+// Closes the session and queues the job `files.scan`, which checks size and SHA-256, detects the MIME type and runs the malware scan. The file is
 // downloadable after `scan_status` is `clean` or `skipped`. `parts` is checked against the confirmed parts: a duplicate or out-of-range number gives 400, another `etag` 409 `conflict` with `reason` `part_conflict`. A completed session answers 200 with the file again. Missing parts answer 409 `conflict` with `reason` `upload_incomplete`; an expired session answers 410 `gone` (12, 3.4 and 3.6).
 //
 // Takes any type of body and a specified content type.
@@ -4690,7 +4690,7 @@ func (c *Client) CompleteUploadWithBody(ctx context.Context, fileId FileIdPath, 
 
 // CompleteUpload Finish an upload
 //
-// Closes the session; the verify pass then checks size and SHA-256, detects the MIME type and runs the malware scan. The file is
+// Closes the session and queues the job `files.scan`, which checks size and SHA-256, detects the MIME type and runs the malware scan. The file is
 // downloadable after `scan_status` is `clean` or `skipped`. `parts` is checked against the confirmed parts: a duplicate or out-of-range number gives 400, another `etag` 409 `conflict` with `reason` `part_conflict`. A completed session answers 200 with the file again. Missing parts answer 409 `conflict` with `reason` `upload_incomplete`; an expired session answers 410 `gone` (12, 3.4 and 3.6).
 //
 // Takes a body of the `application/json` content type.
@@ -24403,7 +24403,7 @@ type ClientWithResponsesInterface interface {
 
 	// CompleteUploadWithBodyWithResponse Finish an upload
 	//
-	// Closes the session; the verify pass then checks size and SHA-256, detects the MIME type and runs the malware scan. The file is
+	// Closes the session and queues the job `files.scan`, which checks size and SHA-256, detects the MIME type and runs the malware scan. The file is
 	// downloadable after `scan_status` is `clean` or `skipped`. `parts` is checked against the confirmed parts: a duplicate or out-of-range number gives 400, another `etag` 409 `conflict` with `reason` `part_conflict`. A completed session answers 200 with the file again. Missing parts answer 409 `conflict` with `reason` `upload_incomplete`; an expired session answers 410 `gone` (12, 3.4 and 3.6).
 	//
 	// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
@@ -24413,7 +24413,7 @@ type ClientWithResponsesInterface interface {
 
 	// CompleteUploadWithResponse Finish an upload
 	//
-	// Closes the session; the verify pass then checks size and SHA-256, detects the MIME type and runs the malware scan. The file is
+	// Closes the session and queues the job `files.scan`, which checks size and SHA-256, detects the MIME type and runs the malware scan. The file is
 	// downloadable after `scan_status` is `clean` or `skipped`. `parts` is checked against the confirmed parts: a duplicate or out-of-range number gives 400, another `etag` 409 `conflict` with `reason` `part_conflict`. A completed session answers 200 with the file again. Missing parts answer 409 `conflict` with `reason` `upload_incomplete`; an expired session answers 410 `gone` (12, 3.4 and 3.6).
 	//
 	// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).

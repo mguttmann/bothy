@@ -244,7 +244,8 @@ type server struct {
 //     the recorder and the appender, then messaging over the threads of chat (M1-56; startChat),
 //     6f'. files (M3-03): open the object store of file.storage.driver and build the upload
 //     sessions over the unit of work, the Authorizer, the appender and the structure of chat
-//     (startFiles); a root the file system driver refuses ends the start,
+//     (startFiles); a root the file system driver refuses ends the start; worker and all also
+//     build the scan pass with the clamd client and its health monitor (M3-04),
 //     6g. terminal (M2-39): build the host records over the unit of work, the Authorizer, the
 //     recorder, the appender and the identity module (startTerminal),
 //     6h. apps (M2-24): build the app use cases and their handlers over identity, the rights hook
@@ -261,14 +262,16 @@ type server struct {
 //     that stops on its own later ends the process with exit code 1 (02 "Health"). Then
 //     worker and all start the worker consumers of the event log (M2-01): their cursor rows at
 //     the head for every registered consumer, then the runner with its own LISTEN connection;
-//     a runner that ends unexpectedly ends the process with exit code 1. Every role registers
-//     the lag gauges of the consumers in step 6b,
+//     a runner that ends unexpectedly ends the process with exit code 1. Then worker and all
+//     start the health monitor of the virus scanner (M3-04, scan_health; it never changes
+//     readiness). Every role registers the lag gauges of the consumers in step 6b,
 //  8. public listener (api and all) through httpserver.ListenPublic: own TLS, or plaintext only
 //     from loopback and server.trusted_proxies (SEC-TLS-1, SEC-TLS-2),
 //  9. ready: readiness passes startup and the line "server ready" is written.
 //
 // Stop steps, by phase: not ready (always), drain and HTTP (api, all), event tail (api, all),
-// consumers (worker, all: the running rounds finish, no new one starts), jobs (worker, all: River's
+// consumers (worker, all: the running rounds finish, no new one starts), jobs (worker, all: the
+// health monitor of the virus scanner ends, River's
 // soft stop within shutdown.jobs_soft_timeout, then what the fixed budgets leave of the total
 // for the cancelled jobs to end), telemetry, database (the flush of the audit denials, then the
 // pool), internal listener. Their budgets come from shutdown.*.
@@ -432,7 +435,7 @@ func (s *server) components() []lifecycle.Component {
 	cs = append(cs, step("jobs", s.startJobs))
 	if s.worker() {
 		// 02 "Start" step 8: the worker consumers start after River (M2-01).
-		cs = append(cs, step("event_consumers", s.startEventConsumers))
+		cs = append(cs, step("event_consumers", s.startEventConsumers), step("scan_health", s.startScanHealth))
 	}
 	if s.api() {
 		cs = append(cs, step("public_listener", s.startPublic))
@@ -1376,7 +1379,7 @@ func (s *server) startLogTail(ctx context.Context) error {
 // on its own ends the process.
 func (s *server) startJobs(ctx context.Context) error {
 	s.mu.Lock()
-	pool, sy, a, keys, keyCheck, id, ap := s.pool, s.sync, s.audit, s.signingKeys, s.keyCheck, s.identity, s.apps
+	pool, sy, a, keys, keyCheck, id, ap, files := s.pool, s.sync, s.audit, s.signingKeys, s.keyCheck, s.identity, s.apps, s.files
 	s.mu.Unlock()
 	if err := jobs.ValidateMigrations(ctx, pool, s.jobsCfg.Schema); err != nil {
 		return err
@@ -1409,6 +1412,7 @@ func (s *server) startJobs(ctx context.Context) error {
 		AuthCleanup: id.AuthCleanup, AuthCleanupInterval: id.cfg.CleanupInterval,
 		ChainVerify: a.Log(), ChainVerifyInterval: a.cfg.CheckpointInterval,
 		Deliveries: ap.Webhooks,
+		FilesScan:  files.ScanRunner(),
 	})
 	if err != nil {
 		return err
@@ -1418,6 +1422,7 @@ func (s *server) startJobs(ctx context.Context) error {
 		return err
 	}
 	ap.BindJobs(rt.Inserter())
+	files.BindJobs(rt.Inserter())
 	s.mu.Lock()
 	s.jobsRT = rt
 	s.mu.Unlock()
@@ -1541,8 +1546,46 @@ func (s *server) startFiles(ctx context.Context) error {
 		}
 		return err
 	}
+	if s.worker() {
+		scanCfg, clamdCfg, err := ScanConfigs(s.values)
+		if err == nil {
+			err = f.EnableScan(scanCfg, clamdCfg, a.Recorder(), s.deps.Clock, s.logger())
+		}
+		if err != nil {
+			_ = f.Close()
+			return err
+		}
+	}
 	s.mu.Lock()
 	s.files = f
 	s.mu.Unlock()
+	return nil
+}
+
+// startScanHealth starts the health monitor of the virus scanner in the roles worker and all
+// (M3-04, 12 5.3): a loop that pings clamd every file.scan.health_interval until the stop step
+// scan_health ends it. It never changes readiness.
+func (s *server) startScanHealth(context.Context) error {
+	s.mu.Lock()
+	f := s.files
+	s.mu.Unlock()
+	if f == nil || f.Health == nil {
+		return errors.New("wire: the scan health step needs the scan pass of the files step")
+	}
+	ctx, cancel := context.WithCancel(context.Background())
+	done := make(chan struct{})
+	go func() {
+		defer close(done)
+		f.Health.Run(ctx)
+	}()
+	s.runner.OnStop(lifecycle.StopStep{Name: "scan_health", Phase: lifecycle.PhaseJobs, Run: func(stop context.Context) error {
+		cancel()
+		select {
+		case <-done:
+			return nil
+		case <-stop.Done():
+			return stop.Err()
+		}
+	}})
 	return nil
 }

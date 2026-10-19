@@ -279,6 +279,15 @@ func TestConfigPrintShowsSourcePerKey(t *testing.T) {
 		"file.s3.region = us-east-1  # default\n" +
 		"file.s3.secret_key_ref = file:/run/bothy/secrets/s3_secret_key  # default\n" +
 		"file.s3.use_path_style = true  # default\n" +
+		"file.scan.chunk_bytes = 65536  # default\n" +
+		"file.scan.clamd_address = unix:///run/clamav/clamd.sock  # default\n" +
+		"file.scan.clamd_stream_max_bytes = 104857600  # default\n" +
+		"file.scan.health_interval = 30s  # default\n" +
+		"file.scan.max_concurrent = 4  # default\n" +
+		"file.scan.mode = required  # default\n" +
+		"file.scan.retry_backoff_cap = 5m  # default\n" +
+		"file.scan.timeout = 2m  # default\n" +
+		"file.sniff_bytes = 1048576  # default\n" +
 		"file.storage.driver = fs  # default\n" +
 		"file.upload_max_open_sessions = 20  # default\n" +
 		"file.upload_part_bytes = 8388608  # default\n" +

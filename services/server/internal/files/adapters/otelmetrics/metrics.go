@@ -1,9 +1,10 @@
 // SPDX-License-Identifier: Apache-2.0
 
-// Package otelmetrics is the metrics adapter of the files module: bothy.file.upload.size
-// (docs/observability/signals.md 4.4) through the declaration metrics.FileUploadSize of the
-// metric registry, without attributes (a file id never goes on a metric). It implements
-// app.Metrics.
+// Package otelmetrics is the metrics adapter of the files module (docs/observability/signals.md
+// 4.4) through the declarations of the metric registry: bothy.file.upload.size without
+// attributes (M3-03), and bothy.file.scan, bothy.file.scan.duration with bothy.outcome only and
+// bothy.file.scan.queue without attributes (M3-04). A file id, name or signature never goes on a
+// metric. It implements app.Metrics and app.ScanMetrics.
 //
 // Example:
 //
@@ -13,6 +14,7 @@ package otelmetrics
 import (
 	"context"
 	"fmt"
+	"time"
 
 	"go.opentelemetry.io/otel/metric"
 
@@ -20,22 +22,51 @@ import (
 	"github.com/OWNER/bothy/services/server/internal/platform/otel/metrics"
 )
 
-// Metrics is the histogram of the completed upload sizes.
+// Metrics holds the instruments of the files module.
 type Metrics struct {
-	size *metrics.Histogram
+	size     *metrics.Histogram
+	scans    *metrics.Counter
+	duration *metrics.Histogram
+	queue    *metrics.Gauge
 }
 
-// Compile-time check: Metrics is the outgoing port of app.
-var _ app.Metrics = (*Metrics)(nil)
+// Compile-time checks: Metrics is the outgoing port of app.
+var (
+	_ app.Metrics     = (*Metrics)(nil)
+	_ app.ScanMetrics = (*Metrics)(nil)
+)
 
-// New creates the histogram on mp; nil means the global provider that platform/otel installs in
-// otel.Setup. The error comes from the meter provider.
+// New creates the instruments on mp; nil means the global provider that platform/otel installs
+// in otel.Setup. The error comes from the meter provider.
 func New(mp metric.MeterProvider) (*Metrics, error) {
 	h, err := metrics.NewHistogram(mp, metrics.FileUploadSize, nil)
 	if err != nil {
 		return nil, fmt.Errorf("otelmetrics: %w", err)
 	}
-	return &Metrics{size: h}, nil
+	c, err := metrics.NewCounter(mp, metrics.FileScan, nil)
+	if err != nil {
+		return nil, fmt.Errorf("otelmetrics: %w", err)
+	}
+	d, err := metrics.NewHistogram(mp, metrics.FileScanDuration, nil)
+	if err != nil {
+		return nil, fmt.Errorf("otelmetrics: %w", err)
+	}
+	q, err := metrics.NewGauge(mp, metrics.FileScanQueue, nil)
+	if err != nil {
+		return nil, fmt.Errorf("otelmetrics: %w", err)
+	}
+	return &Metrics{size: h, scans: c, duration: d, queue: q}, nil
+}
+
+// ScanCompleted implements app.ScanMetrics: one count and the duration with bothy.outcome.
+func (m *Metrics) ScanCompleted(ctx context.Context, outcome string, d time.Duration) {
+	m.scans.Add(ctx, 1, outcome)
+	m.duration.RecordDuration(ctx, d, outcome)
+}
+
+// ScanQueue implements app.ScanMetrics.
+func (m *Metrics) ScanQueue(ctx context.Context, n int64) {
+	m.queue.Record(ctx, float64(n))
 }
 
 // UploadCompleted implements app.Metrics.

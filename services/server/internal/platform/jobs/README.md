@@ -77,7 +77,9 @@ delivers an error and `internal/wire` ends the process with exit code 1 (02 "Hea
    panic value or the arguments) and retried, the process keeps running. The log line
    `job panicked` carries `bothy.job.kind` and `error.type=panic`.
 6. Chapters with their own retry rule set `HandlerOptions.NextRetry` (pause after an attempt) and
-   `MaxAttempts`.
+   `MaxAttempts`. `HandlerOptions.Timeout` sets River's job timeout of a kind: zero keeps the
+   default below, a negative value means no River timeout, for a handler that bounds its own work
+   (`files.scan`, M3-04).
 7. Periodic jobs (`Registry.AddPeriodic`) need a registered kind and a positive interval; only the
    leader among the workers inserts them.
 

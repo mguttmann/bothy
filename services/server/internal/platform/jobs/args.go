@@ -59,6 +59,10 @@ type HandlerOptions struct {
 	// River's default backoff. Chapters with their own retry rule set it (02 "Regeln für Jobs"
 	// item 4).
 	NextRetry func(attempt int) time.Duration
+	// Timeout is River's job timeout for the kind: zero means River's default (README "River
+	// defaults"), a negative value no River timeout at all, for a handler that bounds its own work
+	// (files.scan, docs/DECISIONS.md D-M3-04-2).
+	Timeout time.Duration
 }
 
 // The queues of docs/spec/02-architektur.md "Warteschlangen".

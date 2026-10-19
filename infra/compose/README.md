@@ -32,7 +32,7 @@ docker compose up -d
 | (immer) | `secrets-init`, `postgres`, `migrate`, `worker`, `backup`, `otel-collector` | |
 | `direct` | `api` auf `127.0.0.1:${BOTHY_HTTP_PUBLISH_PORT}` | TLS und Anmeldung über Reverse-Proxy oder OIDC |
 | `tailscale` | `tailscale`, `api-tailscale` | Header-Identität; siehe [tailscale.md](../../docs/operations/tailscale.md) |
-| `scan` | `clamav` | braucht viel Speicher (Hersteller: mindestens 3 GiB) |
+| `scan` | `clamav` | braucht viel Speicher (Hersteller: mindestens 3 GiB); clamd's socket lies in the volume `clamav-socket`, mounted read-only in `worker` |
 | `s3` | `seaweedfs` | S3-Treiber auf einem Host; `BOTHY_STORAGE_DRIVER=s3` setzen |
 | `observability` | `prometheus`, `alertmanager`, `loki`, `tempo`, `grafana` | dazu `BOTHY_OTEL_EXPORTER=local` |
 
@@ -49,6 +49,11 @@ Genau eines von `direct` und `tailscale`.
    (Kernel-Netz, siehe [tailscale.md](../../docs/operations/tailscale.md) 2).
 4. Images der Hilfsdienste sind auf Versionen gepinnt; Bothy-Images auf `BOTHY_VERSION`.
 5. Container-Logs werden vom Log-Treiber rotiert.
+6. clamd is reached only over its Unix socket (19 SEC-TLS-5, M3-04): the volume `clamav-socket`
+   is mounted at `/run/clamav` in `clamav` and read-only in `worker`, in no other service;
+   `clamav` publishes no port, exposes none and has no `TCPSocket` in
+   [clamav/clamd.conf](clamav/clamd.conf), which also sets the mandatory options of
+   [12-dateien.md](../../docs/spec/12-dateien.md) 5.4. Its health check pings over the socket.
 
 ## Geprüft
 

@@ -2595,7 +2595,7 @@ export interface paths {
         put?: never;
         /**
          * Finish an upload
-         * @description Closes the session; the verify pass then checks size and SHA-256, detects the MIME type and runs the malware scan. The file is
+         * @description Closes the session and queues the job `files.scan`, which checks size and SHA-256, detects the MIME type and runs the malware scan. The file is
          *     downloadable after `scan_status` is `clean` or `skipped`. `parts` is checked against the confirmed parts: a duplicate or out-of-range number gives 400, another `etag` 409 `conflict` with `reason` `part_conflict`. A completed session answers 200 with the file again. Missing parts answer 409 `conflict` with `reason` `upload_incomplete`; an expired session answers 410 `gone` (12, 3.4 and 3.6).
          */
         post: operations["completeUpload"];

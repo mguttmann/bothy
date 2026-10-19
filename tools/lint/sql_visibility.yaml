@@ -134,6 +134,15 @@ exceptions:
   - query: files.LockSessionForShare
     category: after_authorize
     reason: "holds the caller's own upload session by file id and uploader while a part is confirmed (M3-03)"
+  - query: files.GetScanTarget
+    category: system_job
+    reason: "the job files.scan reads the one file and session it was inserted for by id, without a principal; it serves nothing to a reader (M3-04)"
+  - query: files.LockScanTarget
+    category: system_job
+    reason: "the job files.scan locks the one file and session it scans by id, without a principal (03 section 6.3, M3-04)"
+  - query: files.CountAwaitingScan
+    category: system_job
+    reason: "the health monitor of the worker counts the files awaiting the scan for bothy.file.scan.queue; only a number, no content (M3-04)"
   - query: messaging.ListMentions
     category: after_authorize
     reason: "the mentioned principals of the one message authorize allowed (Message.mention_ids)"
