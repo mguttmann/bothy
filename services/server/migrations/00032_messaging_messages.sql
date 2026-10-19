@@ -61,7 +61,7 @@ CREATE TABLE messages (
     FOREIGN KEY (reply_to_message_id) REFERENCES messages (id) ON DELETE SET NULL,
     CONSTRAINT messages_origin_check CHECK (origin IN ('human', 'agent', 'app', 'import', 'system')),
     CONSTRAINT messages_kind_check CHECK (kind IN ('text', 'voice', 'run', 'card', 'system')),
-    CONSTRAINT messages_system_code_check CHECK (system_code IN ('thread.reopened')),
+    CONSTRAINT messages_system_code_check CHECK (system_code IN ('thread.reopened', 'agent_session.resume_failed')),
     CONSTRAINT messages_trigger_state_check CHECK (trigger_state IN
         ('received', 'queued', 'working', 'done', 'failed', 'cancelled', 'followup_delivered')),
     -- The anchor of a live box names its run, and only it does.

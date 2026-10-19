@@ -130,7 +130,8 @@ No module subscribes in M1-56 (sync in M1-61, runs in M2, notify in M3).
 
 System codes (`messages.system_code`, CHECK of 03): `thread.reopened`, written when a message
 reopens a closed thread, with origin `system`, empty content, `silent`, the author of the
-reopening message and the sequence right before it. M2-12 adds `agent_session.resume_failed`.
+reopening message and the sequence right before it. The CHECK also allows `agent_session.resume_failed`,
+which M2-12 writes (R-DM-42).
 
 ## Notes for the build
 
