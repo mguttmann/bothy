@@ -5,6 +5,8 @@ package httpserver
 import (
 	"context"
 	"net/http"
+	"slices"
+	"strings"
 )
 
 // BodyKind is the media type of an operation's request body (06 "Grundregeln", row
@@ -17,7 +19,14 @@ const (
 	BodyJSON                        // application/json
 	BodyMultipart                   // multipart/form-data
 	BodyOctetStream                 // application/octet-stream
+	BodyReport                      // application/reports+json or application/csp-report
 )
+
+// reportMediaTypes are the media types of BodyReport: the Reporting API format and the legacy
+// report-uri format of a Content Security Policy violation report (submitCspReport,
+// docs/spec/19-sicherheit.md 5 rule 6). Both carry JSON, so the JSON guard and the JSON limit
+// apply.
+var reportMediaTypes = []string{"application/reports+json", "application/csp-report"}
 
 // mediaType returns the media type of the kind, "" for BodyNone.
 func (k BodyKind) mediaType() string {
@@ -30,8 +39,23 @@ func (k BodyKind) mediaType() string {
 		return "multipart/form-data"
 	case BodyOctetStream:
 		return "application/octet-stream"
+	case BodyReport:
+		return strings.Join(reportMediaTypes, " or ")
 	}
 	return ""
+}
+
+// accepts reports whether media (without parameters) is a media type of the kind.
+func (k BodyKind) accepts(media string) bool {
+	if k == BodyReport {
+		return slices.Contains(reportMediaTypes, media)
+	}
+	return k != BodyNone && media == k.mediaType()
+}
+
+// json reports whether the kind carries JSON that StageBody reads whole and guards (SEC-IN-2).
+func (k BodyKind) json() bool {
+	return k == BodyJSON || k == BodyReport
 }
 
 // transfer reports whether the kind streams a file, so http.transfer_timeout and

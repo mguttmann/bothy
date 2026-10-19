@@ -1533,6 +1533,66 @@ paths:
         default:
           $ref: '#/components/responses/Error'
 
+  /csp-reports:
+    post:
+      operationId: submitCspReport
+      summary: Accept a CSP violation report of the web console
+      tags: [Discovery]
+      description: 'Endpoint of `report-to csp` and of `Reporting-Endpoints: csp="/api/v1/csp-reports"` on every console response (19-security 5 rule 6, R-AZ-33). Public, because browsers send reports without cookies in many cases; a console cookie is not checked by the CSRF guard here, the action changes nothing. Accepts the Reporting API format (`application/reports+json`, an array of reports) and the legacy `report-uri` format (`application/csp-report`), both limited by `http.max_json_body_bytes`. The server stores no report; it logs only the effective directive, the disposition and the origin of the blocked URL and counts `bothy.console.csp_violations`. Members it does not read are ignored.'
+      security: []
+      x-authz-action: console.csp_report
+      x-rate-limit-class: rl.public_auth
+      requestBody:
+        required: true
+        content:
+          application/reports+json:
+            schema:
+              $ref: '#/components/schemas/CspReportList'
+            examples:
+              default:
+                summary: Reporting API
+                value:
+                - type: csp-violation
+                  age: 10
+                  url: https://chat.example.com/console/
+                  body:
+                    documentURL: https://chat.example.com/console/
+                    blockedURL: https://cdn.example.com/x.js
+                    effectiveDirective: script-src-elem
+                    disposition: enforce
+          application/csp-report:
+            schema:
+              $ref: '#/components/schemas/CspReportLegacy'
+            examples:
+              default:
+                summary: Legacy report-uri
+                value:
+                  csp-report:
+                    document-uri: https://chat.example.com/console/
+                    blocked-uri: inline
+                    effective-directive: script-src-elem
+                    disposition: enforce
+      responses:
+        '204':
+          description: Report accepted (also when it names nothing the server logs).
+          headers:
+            Correlation-Id:
+              $ref: '#/components/headers/Correlation-Id'
+            RateLimit:
+              $ref: '#/components/headers/RateLimit'
+            RateLimit-Policy:
+              $ref: '#/components/headers/RateLimit-Policy'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '413':
+          $ref: '#/components/responses/PayloadTooLarge'
+        '415':
+          $ref: '#/components/responses/UnsupportedMediaType'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        default:
+          $ref: '#/components/responses/Error'
+
   /me:
     get:
       operationId: getMe
@@ -20514,6 +20574,19 @@ components:
         is_estimate:
           type: boolean
           description: True until the amount was reconciled with the provider invoice.
+    CspReportList:
+      type: array
+      description: Reports of the Reporting API (https://www.w3.org/TR/reporting-1/); each item is a report object whose `body` is a CSP violation report (https://www.w3.org/TR/CSP3/#reporting). The server reads only `type`, `body.effectiveDirective`, `body.blockedURL` and `body.disposition`.
+      items:
+        $ref: '#/components/schemas/JsonObject'
+    CspReportLegacy:
+      type: object
+      description: Legacy report of the `report-uri` directive (CSP Level 2). The server reads only `effective-directive` (else `violated-directive`), `blocked-uri` and `disposition` of `csp-report`.
+      additionalProperties: false
+      required: [csp-report]
+      properties:
+        csp-report:
+          $ref: '#/components/schemas/JsonObject'
     JsonObject:
       type: object
       description: Free-form JSON object whose schema is named in the field description.

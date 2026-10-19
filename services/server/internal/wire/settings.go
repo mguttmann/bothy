@@ -3,7 +3,10 @@
 package wire
 
 import (
+	"log/slog"
 	"time"
+
+	"go.opentelemetry.io/otel/metric"
 
 	"github.com/OWNER/bothy/services/server/api/routes"
 	authzflags "github.com/OWNER/bothy/services/server/internal/authz/adapters/flagsource"
@@ -13,6 +16,7 @@ import (
 	identitypg "github.com/OWNER/bothy/services/server/internal/identity/adapters/postgres"
 	"github.com/OWNER/bothy/services/server/internal/instance"
 	instancehttp "github.com/OWNER/bothy/services/server/internal/instance/adapters/httpapi"
+	instancemetrics "github.com/OWNER/bothy/services/server/internal/instance/adapters/otelmetrics"
 	instancepg "github.com/OWNER/bothy/services/server/internal/instance/adapters/postgres"
 	instanceapp "github.com/OWNER/bothy/services/server/internal/instance/app"
 	"github.com/OWNER/bothy/services/server/internal/kernel/auditing"
@@ -39,6 +43,23 @@ type InstanceSettings struct {
 	Admin *instanceapp.Admin
 	// Handlers are the REST handlers of the six settings operations and the two flag operations.
 	Handlers *instancehttp.Admin
+	// CSPReports is the handler of submitCspReport (M6-03); NewCSPReports builds it.
+	CSPReports *instancehttp.CSPReports
+}
+
+// NewCSPReports returns the handler of submitCspReport over the Authorizer az, the logger log and
+// the counter bothy.console.csp_violations on mp (nil means the global meter provider).
+// Errors: the meter provider refuses the counter, or az is nil.
+func NewCSPReports(az authorize.Authorizer, log *slog.Logger, mp metric.MeterProvider) (*instancehttp.CSPReports, error) {
+	counter, err := instancemetrics.NewCSPViolations(mp)
+	if err != nil {
+		return nil, err
+	}
+	reports, err := instanceapp.NewCSPReports(az, log, counter)
+	if err != nil {
+		return nil, err
+	}
+	return instancehttp.NewCSPReports(reports), nil
 }
 
 // SettingsWrites are the collaborators of the writing settings use cases: the recorder of audit

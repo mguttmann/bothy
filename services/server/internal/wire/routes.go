@@ -85,6 +85,8 @@ type Handlers struct {
 	// updateBranding and getProblemType (instance, M1-46), listFeatureFlags and putFeatureFlag
 	// (M1-47).
 	*instancehttp.Admin
+	// CSPReports implements submitCspReport (instance, M6-03).
+	*instancehttp.CSPReports
 	// Sessions implements refreshToken, logout, listMySessions, listUserSessions and
 	// createExtensionSession (identity, M1-34).
 	*identityhttp.Sessions

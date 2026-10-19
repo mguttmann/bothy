@@ -183,6 +183,7 @@ enabled:             # operationIds that have a handler; sorted ascending
   - setThreadTags
   - setThreadTitle
   - stepUpWithPassword
+  - submitCspReport
   - suspendApp
   - uninstallApp
   - unlinkIdentity

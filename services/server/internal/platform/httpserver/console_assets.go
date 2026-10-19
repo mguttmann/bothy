@@ -3,6 +3,7 @@
 package httpserver
 
 import (
+	"bytes"
 	"crypto/sha256"
 	"encoding/hex"
 	"errors"
@@ -39,9 +40,7 @@ const (
 	cacheConsoleOther  = "no-cache"
 )
 
-// The headers of SEC-HDR-3 that M6-02 sets (docs/spec/19-sicherheit.md 3). The CSP and
-// Cross-Origin-Embedder-Policy come with M6-03; until then SEC-HDR-3 is incomplete
-// (docs/DECISIONS.md D-M6-02-5).
+// Headers of SEC-HDR-3 (docs/spec/19-sicherheit.md 3); csp.go sets them with the CSP and COEP.
 const (
 	headerCOOP              = "Cross-Origin-Opener-Policy"
 	headerFrameOptions      = "X-Frame-Options"
@@ -88,6 +87,9 @@ var consoleTypes = map[string]string{
 //	assets.Mount(publicMux)
 type ConsoleAssets struct {
 	root *os.Root
+	// index is index.html of the build, read once at the start, with NoncePlaceholder; each
+	// response gets a copy with its own nonce (docs/DECISIONS.md D-M6-03-2).
+	index []byte
 	// etags caches the content tag per file version (etagKey); the build is immutable in the
 	// image, so each file is hashed once.
 	etags sync.Map
@@ -100,10 +102,11 @@ type etagKey struct {
 	mod  time.Time
 }
 
-// OpenConsoleAssets opens dir as the root of the console build. An empty dir returns a nil
-// *ConsoleAssets and no error (console disabled). The error names the directory when it cannot
-// be opened or holds no regular index.html, so a broken image ends the start instead of serving
-// 404 for every console path.
+// OpenConsoleAssets opens dir as the root of the console build and reads its index.html once. An
+// empty dir returns a nil *ConsoleAssets and no error (console disabled). The error names the
+// directory when it cannot be opened, holds no regular index.html or an index.html without
+// NoncePlaceholder, so a broken image ends the start instead of serving 404 for every console
+// path or a console whose loader has no nonce.
 func OpenConsoleAssets(dir string) (*ConsoleAssets, error) {
 	if dir == "" {
 		return nil, nil
@@ -117,7 +120,12 @@ func OpenConsoleAssets(dir string) (*ConsoleAssets, error) {
 		_ = root.Close()
 		return nil, fmt.Errorf("httpserver: console.assets_dir %s holds no regular %s", dir, consoleIndex)
 	}
-	return &ConsoleAssets{root: root}, nil
+	index, err := root.ReadFile(consoleIndex)
+	if err != nil || !bytes.Contains(index, []byte(NoncePlaceholder)) {
+		_ = root.Close()
+		return nil, fmt.Errorf("httpserver: %s of console.assets_dir %s is unreadable or has no %s", consoleIndex, dir, NoncePlaceholder)
+	}
+	return &ConsoleAssets{root: root, index: index}, nil
 }
 
 // Close releases the directory; a nil *ConsoleAssets has nothing to close.
@@ -140,27 +148,38 @@ func (a *ConsoleAssets) Mount(mux interface {
 		return
 	}
 	mux.Handle(http.MethodGet+" "+strings.TrimSuffix(ConsolePrefix, "/"), http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		consoleHeaders(w.Header())
+		consoleHeaders(w.Header(), NewNonce())
 		http.Redirect(w, r, ConsolePrefix, http.StatusMovedPermanently)
 	}))
 	mux.Handle(http.MethodGet+" "+ConsolePrefix, http.HandlerFunc(a.serve))
 }
 
 // serve answers one request below ConsolePrefix: the exact file of the build, index.html for a
-// path the build does not hold, and 404 for a path that tries to leave the build directory.
+// path the build does not hold, and 404 for a path that tries to leave the build directory. Every
+// answer carries the headers of SEC-HDR-3 with a fresh nonce.
 func (a *ConsoleAssets) serve(w http.ResponseWriter, r *http.Request) {
-	consoleHeaders(w.Header())
+	nonce := NewNonce()
+	consoleHeaders(w.Header(), nonce)
 	rel, ok := consoleRelPath(r)
 	if !ok {
 		writeProblem(w, r, errs.New(errs.CodeNotFound, ""))
 		return
 	}
-	if rel != "" && a.serveFile(w, r, rel) {
+	if rel != "" && rel != consoleIndex && a.serveFile(w, r, rel) {
 		return
 	}
-	if !a.serveFile(w, r, consoleIndex) {
-		writeProblem(w, r, errs.New(errs.CodeNotFound, ""))
-	}
+	a.serveIndex(w, r, nonce)
+}
+
+// serveIndex writes index.html with nonce in place of NoncePlaceholder, the same nonce the CSP
+// of the response names (19 5 rule 2). It has no ETag: the body differs on every response, and
+// Cache-Control: no-store keeps a nonce from ever being reused (D-M6-02-4, D-M6-03-2).
+func (a *ConsoleAssets) serveIndex(w http.ResponseWriter, r *http.Request, nonce string) {
+	h := w.Header()
+	h.Set(headerContentType, consoleType(consoleIndex))
+	h.Set(headerCacheControl, cacheConsoleIndex)
+	body := bytes.ReplaceAll(a.index, []byte(NoncePlaceholder), []byte(nonce))
+	http.ServeContent(w, r, consoleIndex, time.Time{}, bytes.NewReader(body))
 }
 
 // consoleRelPath returns the path of r relative to the build directory, "" for ConsolePrefix
@@ -207,8 +226,6 @@ func (a *ConsoleAssets) serveFile(w http.ResponseWriter, r *http.Request, rel st
 	h := w.Header()
 	h.Set(headerContentType, consoleType(name))
 	switch {
-	case rel == consoleIndex:
-		h.Set(headerCacheControl, cacheConsoleIndex)
 	case hashedName.MatchString(name):
 		h.Set(headerCacheControl, cacheConsoleHashed)
 	default:
@@ -251,12 +268,4 @@ func consoleType(name string) string {
 		return t
 	}
 	return "application/octet-stream"
-}
-
-// consoleHeaders sets the headers of SEC-HDR-3 that this ticket owns on every console response.
-// SEC-HDR-1 comes from the recover step of the chain.
-func consoleHeaders(h http.Header) {
-	h.Set(headerCOOP, valueSameOrigin)
-	h.Set(headerFrameOptions, valueFrameDeny)
-	h.Set(headerPermissionsPolicy, valuePermissionsPolicy)
 }

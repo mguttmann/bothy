@@ -37,7 +37,7 @@ var funcs = template.FuncMap{
 		return map[ifMatch]string{ifMatchNone: "IfMatchNone", ifMatchOptional: "IfMatchOptional", ifMatchRequired: "IfMatchRequired"}[m]
 	},
 	"body": func(k bodyKind) string {
-		return map[bodyKind]string{bodyNone: "BodyNone", bodyJSON: "BodyJSON", bodyMultipart: "BodyMultipart", bodyOctetStream: "BodyOctetStream"}[k]
+		return map[bodyKind]string{bodyNone: "BodyNone", bodyJSON: "BodyJSON", bodyMultipart: "BodyMultipart", bodyOctetStream: "BodyOctetStream", bodyReport: "BodyReport"}[k]
 	},
 	"ints": func(xs []int) string {
 		if len(xs) == 0 {

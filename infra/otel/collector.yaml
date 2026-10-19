@@ -154,6 +154,9 @@ processors:
       - bothy.close.code
       - bothy.consumer.name
       - bothy.correlation_id
+      - bothy.csp.blocked_origin
+      - bothy.csp.directive
+      - bothy.csp.disposition
       - bothy.decision
       - bothy.egress.purpose
       - bothy.event.durability

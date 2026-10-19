@@ -7731,6 +7731,15 @@ type CredentialOverview struct {
 	TotpEnrolled     bool       `json:"totp_enrolled"`
 }
 
+// CspReportLegacy Legacy report of the `report-uri` directive (CSP Level 2). The server reads only `effective-directive` (else `violated-directive`), `blocked-uri` and `disposition` of `csp-report`.
+type CspReportLegacy struct {
+	// CspReport Free-form JSON object whose schema is named in the field description.
+	CspReport JsonObject `json:"csp-report"`
+}
+
+// CspReportList Reports of the Reporting API (https://www.w3.org/TR/reporting-1/); each item is a report object whose `body` is a CSP violation report (https://www.w3.org/TR/CSP3/#reporting). The server reads only `type`, `body.effectiveDirective`, `body.blockedURL` and `body.disposition`.
+type CspReportList = []JsonObject
+
 // Cursor Opaque pagination cursor. Clients must not parse or build cursors.
 //
 // Examples: eyJrIjoiMDE5MmY0YTAtN2IxYy03MDAwLThhMDAtMDAwMDAwMDAwMDAxIn0
@@ -16581,6 +16590,9 @@ type CreateChannelTemplateJSONRequestBody = TemplateCreate
 
 // CreateThreadJSONRequestBody defines body for CreateThread for application/json ContentType.
 type CreateThreadJSONRequestBody = ThreadCreate
+
+// SubmitCspReportApplicationReportsPlusJSONRequestBody defines body for SubmitCspReport for application/reports+json ContentType.
+type SubmitCspReportApplicationReportsPlusJSONRequestBody = CspReportList
 
 // ApproveDeviceJSONRequestBody defines body for ApproveDevice for application/json ContentType.
 type ApproveDeviceJSONRequestBody = DeviceApprove

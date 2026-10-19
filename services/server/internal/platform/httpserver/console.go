@@ -26,6 +26,9 @@ const (
 	// LogConsoleRequestRefused is the message of a refused console request; it carries only the
 	// reason, never the cookie, the person or the session.
 	LogConsoleRequestRefused = "console request refused"
+	// ActionCSPReport is the action of submitCspReport, the endpoint of the console's report-to
+	// (R-AZ-33); the console guard does not check it.
+	ActionCSPReport = "console.csp_report"
 )
 
 // ConsoleCookieHeader returns the value of a Cookie request header that carries only the console
@@ -54,9 +57,14 @@ func safeMethod(m string) bool {
 // X-Console-Request: 1 and an Origin equal to the origin of server.public_url (scheme, host and
 // port after normalization); otherwise the answer is 403 forbidden with reason
 // csrf_check_failed and nothing below runs. A request with an Authorization header never reaches
-// it. It adds no CORS header (SEC-CORS-1).
+// it. The public action console.csp_report passes as well: a browser sends a violation report
+// with the cookie of the same origin but never with X-Console-Request, and the report changes
+// nothing (R-AZ-33, docs/DECISIONS.md D-M6-03-5). It adds no CORS header (SEC-CORS-1).
 func (c *Chain) consoleGuard(r *http.Request, creds actor.Credentials, a actor.Actor) error {
 	if creds.Authorization != "" || creds.ConsoleCookie.IsZero() || a.IsAnonymous() || safeMethod(r.Method) {
+		return nil
+	}
+	if op, _ := OperationFrom(r.Context()); op.Action == ActionCSPReport {
 		return nil
 	}
 	values := r.Header.Values(HeaderConsoleRequest)
