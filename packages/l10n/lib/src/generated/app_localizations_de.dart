@@ -3187,8 +3187,8 @@ class AppLocalizationsDe extends AppLocalizations {
   String get hostNotReported => 'Noch nicht gemeldet';
 
   @override
-  String hostFingerprintValue(String fingerprint, int generation) {
-    return '$fingerprint   Schlüsselgeneration $generation';
+  String hostFingerprintValue(String value, int generation) {
+    return '$value   Schlüsselgeneration $generation';
   }
 
   @override
@@ -3230,7 +3230,8 @@ class AppLocalizationsDe extends AppLocalizations {
   }
 
   @override
-  String get hostServerHostQuestion => 'Läuft der Server auf diesem Rechner?';
+  String get hostServerHostQuestion =>
+      'Ist dieser Rechner der Server der Instanz?';
 
   @override
   String get hostYes => 'Ja';

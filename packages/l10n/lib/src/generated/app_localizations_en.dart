@@ -3170,8 +3170,8 @@ class AppLocalizationsEn extends AppLocalizations {
   String get hostNotReported => 'Not reported yet';
 
   @override
-  String hostFingerprintValue(String fingerprint, int generation) {
-    return '$fingerprint   Key generation $generation';
+  String hostFingerprintValue(String value, int generation) {
+    return '$value   Key generation $generation';
   }
 
   @override
@@ -3213,7 +3213,8 @@ class AppLocalizationsEn extends AppLocalizations {
   }
 
   @override
-  String get hostServerHostQuestion => 'Does the server run on this host?';
+  String get hostServerHostQuestion =>
+      'Is this host the server of the instance?';
 
   @override
   String get hostYes => 'Yes';

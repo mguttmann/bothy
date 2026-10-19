@@ -5248,8 +5248,8 @@ abstract class AppLocalizations {
   /// Fingerprint in groups and the key generation (24 section 4.3).
   ///
   /// In en, this message translates to:
-  /// **'{fingerprint}   Key generation {generation}'**
-  String hostFingerprintValue(String fingerprint, int generation);
+  /// **'{value}   Key generation {generation}'**
+  String hostFingerprintValue(String value, int generation);
 
   /// The host has no keys (before pairing, after re-pairing).
   ///
@@ -5314,7 +5314,7 @@ abstract class AppLocalizations {
   /// Mandatory question of the confirmation (24 section 2.3).
   ///
   /// In en, this message translates to:
-  /// **'Does the server run on this host?'**
+  /// **'Is this host the server of the instance?'**
   String get hostServerHostQuestion;
 
   /// Answer yes.

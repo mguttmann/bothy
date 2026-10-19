@@ -4783,13 +4783,13 @@
   "@hostNotReported": {
     "description": "A value the host did not report yet."
   },
-  "hostFingerprintValue": "{fingerprint}   Key generation {generation}",
+  "hostFingerprintValue": "{value}   Key generation {generation}",
   "@hostFingerprintValue": {
     "description": "Fingerprint in groups and the key generation (24 section 4.3).",
     "placeholders": {
-      "fingerprint": {
+      "value": {
         "type": "String",
-        "example": "Sam"
+        "example": "7KQ2 9XTA"
       },
       "generation": {
         "type": "int",
@@ -4855,7 +4855,7 @@
       }
     }
   },
-  "hostServerHostQuestion": "Does the server run on this host?",
+  "hostServerHostQuestion": "Is this host the server of the instance?",
   "@hostServerHostQuestion": {
     "description": "Mandatory question of the confirmation (24 section 2.3)."
   },
