@@ -101,6 +101,9 @@ func (t *Timers) Pending() int {
 	return n
 }
 
+// errNotText is a first frame that is no text frame.
+var errNotText = errors.New("fakehost: hello is no text frame")
+
 // ScriptKind names the behaviour of the host service for one session.
 type ScriptKind int
 
@@ -417,6 +420,7 @@ func (h *Host) run(session ids.ID, s Script) {
 		}
 		_ = h.Send("session.ended", d)
 		return
+	case Accept, Refuse, Stall, Pair:
 	}
 	dc, err := h.DialData(h.ctx, session)
 	if err != nil {
@@ -432,6 +436,7 @@ func (h *Host) run(session ids.ID, s Script) {
 		_ = dc.ws.Close(websocket.StatusCode(s.Code), s.Detail)
 	case Accept, Pair:
 		h.accept(dc, s.Kind == Accept)
+	case End, Ignore:
 	}
 }
 
@@ -539,9 +544,13 @@ func (h *Host) DialData(ctx context.Context, session ids.ID) (*DataConn, error) 
 	}
 	ws.SetReadLimit(-1)
 	typ, b, err := ws.Read(ctx)
-	if err != nil || typ != websocket.MessageText {
+	if err != nil {
 		_ = ws.CloseNow()
-		return nil, fmt.Errorf("fakehost: hello: %v", err)
+		return nil, fmt.Errorf("fakehost: hello: %w", err)
+	}
+	if typ != websocket.MessageText {
+		_ = ws.CloseNow()
+		return nil, errNotText
 	}
 	if err := h.contract.ValidateChannelFrame(channelData, true, b); err != nil {
 		h.t.Errorf("fakehost: server frame violates the contract (G9): %v", err)
@@ -563,7 +572,7 @@ func (h *Host) DialData(ctx context.Context, session ids.ID) (*DataConn, error) 
 	}
 	dc := &DataConn{Session: session, ws: ws, h: h, done: make(chan struct{})}
 	dc.cond = gosync.NewCond(&dc.mu)
-	go dc.read()
+	go dc.read() //nolint:gosec // G118: the reader lives as long as the connection, not as ctx
 	h.mu.Lock()
 	h.data[session] = dc
 	h.cond.Broadcast()
@@ -740,8 +749,11 @@ func DialDevice(t testing.TB, ctx context.Context, baseURL, publicURL string, se
 	}
 	ws.SetReadLimit(-1)
 	typ, b, err := ws.Read(ctx)
-	if err != nil || typ != websocket.MessageText {
-		return nil, status, fmt.Errorf("fakehost: hello: %v", err)
+	if err != nil {
+		return nil, status, fmt.Errorf("fakehost: hello: %w", err)
+	}
+	if typ != websocket.MessageText {
+		return nil, status, errNotText
 	}
 	if err := contract.ValidateChannelFrame(channelStream, true, b); err != nil {
 		t.Errorf("fakehost: server frame violates the contract (G9): %v", err)
@@ -755,7 +767,7 @@ func DialDevice(t testing.TB, ctx context.Context, baseURL, publicURL string, se
 		return nil, status, err
 	}
 	dev.Hello = env.D
-	go dev.read()
+	go dev.read() //nolint:gosec // G118: the reader lives as long as the connection, not as ctx
 	t.Cleanup(func() { _ = ws.CloseNow() })
 	switch {
 	case dp.Silent:

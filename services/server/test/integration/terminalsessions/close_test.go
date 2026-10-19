@@ -42,13 +42,13 @@ func TestClose_EndsConnectionsAndTellsHost(t *testing.T) {
 	if got := w.text(`SELECT closed_by::text FROM terminal_sessions WHERE id = $1`, g.Session.ID); got != w.alex.PrincipalID {
 		t.Fatalf("closed_by %s", got)
 	}
-	entries := w.audits("terminal.close", "allow")
+	entries := w.audits("terminal.close")
 	if len(entries) != 1 || entries[0]["reason"] != "done for today" || entries[0]["session_id"] != g.Session.ID {
 		t.Fatalf("terminal.close entries %v", entries)
 	}
 	// Robin, an owner, opens on R1 (assigned to Alex) and closes a session of Alex.
 	w.opened(w.robin, w.r1, openBody("shell"))
-	opens := w.audits("terminal.open", "allow")
+	opens := w.audits("terminal.open")
 	foreign := map[bool]int{}
 	for _, e := range opens {
 		foreign[e["foreign_assignee"] == true]++
@@ -116,7 +116,7 @@ func TestClose_RightsAndRepeats(t *testing.T) {
 		t.Fatal("a close without effect raised the version")
 	}
 	noChange := 0
-	for _, e := range w.audits("terminal.close", "allow") {
+	for _, e := range w.audits("terminal.close") {
 		if e["no_change"] == true {
 			noChange++
 		}

@@ -254,52 +254,61 @@ func (r *Relay) OpeningWorkdir(sessionID ids.ID) (*int, bool) {
 // another reason than the end of the session, its counts are written.
 func (r *Relay) apply(s *slot, acts []domain.RelayAction) effects {
 	var fx effects
-	id := s.id
 	wasPaired, dropped := s.paired, false
 	for _, a := range acts {
-		switch a.Kind {
-		case domain.ActCloseDevice:
-			r.closeSide(s, s.dev, a.Code, a.Reason)
-		case domain.ActCloseHost:
-			r.closeSide(s, s.hst, a.Code, a.Reason)
-		case domain.ActActivate:
-			fx = append(fx, func(ctx context.Context) { r.call(ctx, r.uc.RelayActivate(ctx, id)) })
-		case domain.ActDetach:
-			fx = append(fx, func(ctx context.Context) { r.call(ctx, r.uc.RelayDetach(ctx, id)) })
-		case domain.ActEndOpenFailed:
-			detail := a.Detail
-			fx = append(fx, func(ctx context.Context) { r.call(ctx, r.uc.RelayOpenFailed(ctx, id, detail)) })
-		case domain.ActMeetDeadline:
-			// A new generation: a deadline already waiting for the lock does nothing.
-			s.gen++
-			if s.stop != nil {
-				s.stop()
-			}
-		case domain.ActRearmDeadline:
-			s.gen++
-			if s.stop != nil {
-				s.stop()
-			}
-			r.arm(s, r.cfg.OpenTimeout)
-		case domain.ActCountUnpaired:
-			side := a.Side
-			fx = append(fx, func(ctx context.Context) { r.uc.RelayUnpaired(ctx, side) })
-		case domain.ActDrop:
-			if s.stop != nil {
-				s.stop()
-			}
-			delete(r.slots, id)
-			dropped = true
+		if f := r.applyOne(s, a); f != nil {
+			fx = append(fx, f)
 		}
+		dropped = dropped || a.Kind == domain.ActDrop
 	}
 	if s.dev == nil || s.hst == nil {
 		s.paired = false
 	}
 	if wasPaired && !s.paired && !dropped {
-		c := s.take()
+		id, c := s.id, s.take()
 		fx = append([]func(context.Context){func(ctx context.Context) { r.call(ctx, r.uc.RelayCounters(ctx, id, c)) }}, fx...)
 	}
 	return fx
+}
+
+// applyOne executes one action on s; r.mu is held. It returns the call into the use cases, or nil.
+func (r *Relay) applyOne(s *slot, a domain.RelayAction) func(context.Context) {
+	id := s.id
+	switch a.Kind {
+	case domain.ActCloseDevice:
+		r.closeSide(s, s.dev, a.Code, a.Reason)
+	case domain.ActCloseHost:
+		r.closeSide(s, s.hst, a.Code, a.Reason)
+	case domain.ActActivate:
+		return func(ctx context.Context) { r.call(ctx, r.uc.RelayActivate(ctx, id)) }
+	case domain.ActDetach:
+		return func(ctx context.Context) { r.call(ctx, r.uc.RelayDetach(ctx, id)) }
+	case domain.ActEndOpenFailed:
+		detail := a.Detail
+		return func(ctx context.Context) { r.call(ctx, r.uc.RelayOpenFailed(ctx, id, detail)) }
+	case domain.ActMeetDeadline:
+		// A new generation: a deadline already waiting for the lock does nothing.
+		s.gen++
+		s.stopDeadline()
+	case domain.ActRearmDeadline:
+		s.gen++
+		s.stopDeadline()
+		r.arm(s, r.cfg.OpenTimeout)
+	case domain.ActCountUnpaired:
+		side := a.Side
+		return func(ctx context.Context) { r.uc.RelayUnpaired(ctx, side) }
+	case domain.ActDrop:
+		s.stopDeadline()
+		delete(r.slots, id)
+	}
+	return nil
+}
+
+// stopDeadline stops the running deadline of s, if any.
+func (s *slot) stopDeadline() {
+	if s.stop != nil {
+		s.stop()
+	}
 }
 
 // closeSide removes sd from s and closes it; nil does nothing.

@@ -112,34 +112,50 @@ func (s *Service) checkList(ctx context.Context, p actor.Actor, hostID ids.ID) e
 // page reads rows until limit visible ones and one more are found or the rows end.
 func (s *Service) page(ctx context.Context, p actor.Actor, user ids.ID, q terminal.ListSessions, before ids.ID, limit int, binding []byte) (terminal.SessionPage, error) {
 	out := terminal.SessionPage{Items: []terminal.SessionView{}}
-	var last ids.ID
 	for {
 		rows, err := s.d.Store.ListSessions(ctx, user, q.HostID, q.State, before, limit+1)
 		if err != nil {
 			return terminal.SessionPage{}, err
 		}
-		for _, ses := range rows {
-			before = ses.ID
-			d, err := s.d.Authorizer.Authorize(authorize.Filter(ctx), p, authorize.ActionTerminalReadOwn, sessionResource(ses.ID, ses, true, false))
-			if err != nil {
-				return terminal.SessionPage{}, err
-			}
-			if !d.Allowed() {
-				continue
-			}
+		visible, err := s.visibleSessions(ctx, p, rows)
+		if err != nil {
+			return terminal.SessionPage{}, err
+		}
+		for _, ses := range visible {
 			if len(out.Items) == limit {
-				c, err := s.d.Cursors.Encode(sessionsList, binding, sessionsCursor{ID: last.String()})
-				if err != nil {
-					return terminal.SessionPage{}, errs.Wrap(errs.CodeInternalError, err, "terminal: list cursor")
-				}
-				out.NextCursor = c
-				return out, nil
+				return s.withCursor(out, binding)
 			}
 			out.Items = append(out.Items, sessionView(ses))
-			last = ses.ID
 		}
 		if len(rows) < limit+1 {
 			return out, nil
 		}
+		before = rows[len(rows)-1].ID
 	}
+}
+
+// withCursor sets next_cursor of a full page out to its last id.
+func (s *Service) withCursor(out terminal.SessionPage, binding []byte) (terminal.SessionPage, error) {
+	last := out.Items[len(out.Items)-1].ID
+	c, err := s.d.Cursors.Encode(sessionsList, binding, sessionsCursor{ID: last.String()})
+	if err != nil {
+		return terminal.SessionPage{}, errs.Wrap(errs.CodeInternalError, err, "terminal: list cursor")
+	}
+	out.NextCursor = c
+	return out, nil
+}
+
+// visibleSessions returns the rows that pass terminal.read_own in filter mode.
+func (s *Service) visibleSessions(ctx context.Context, p actor.Actor, rows []domain.Session) ([]domain.Session, error) {
+	out := make([]domain.Session, 0, len(rows))
+	for _, ses := range rows {
+		d, err := s.d.Authorizer.Authorize(authorize.Filter(ctx), p, authorize.ActionTerminalReadOwn, sessionResource(ses.ID, ses, true, false))
+		if err != nil {
+			return nil, err
+		}
+		if d.Allowed() {
+			out = append(out, ses)
+		}
+	}
+	return out, nil
 }

@@ -98,36 +98,14 @@ func (s *Service) attachUnit(ctx context.Context, p actor.Actor, h domain.Host, 
 			return terminal.Grant{}, false, nil, err
 		}
 	}
-	ses, found, err := s.d.Store.LockSession(ctx, cmd.SessionID)
+	ses, att, u, err := s.lockAttach(ctx, p, cmd.SessionID, quick)
 	if err != nil {
 		return terminal.Grant{}, false, nil, err
-	}
-	if !found {
-		return terminal.Grant{}, false, nil, invisible()
-	}
-	att, err := domain.AttachKind(ses.State)
-	if err != nil {
-		return terminal.Grant{}, false, nil, err
-	}
-	if quick && !domain.QuickReattachHolds(ses, p.DeviceID, p.SessionID) {
-		return terminal.Grant{}, false, nil, errStepUpConsumed
-	}
-	u, err := s.ownAssignment(ctx, p.ID, ses.HostID)
-	if err != nil {
-		return terminal.Grant{}, false, nil, err
-	}
-	if u == nil || u.ID != ses.HostSessionUserID {
-		return terminal.Grant{}, false, nil, errNoSessionUser()
 	}
 	kind := domain.ProfileKind(h.Profiles, ses.Profile)
-	var wdi *int
-	if att == domain.AttOpen && kind == domain.ProfileKindClaude {
-		var ok bool
-		if wdi, ok = s.relayControl().OpeningWorkdir(ses.ID); !ok {
-			// The working directory of the opening lived in the relay slot of a node that no longer
-			// holds it; the opening cannot be resumed (ruling D-M2-44-4).
-			return terminal.Grant{}, false, nil, errs.New(errs.CodeInvalidStateTransition, "")
-		}
+	wdi, err := s.openingWorkdir(ses.ID, att, kind)
+	if err != nil {
+		return terminal.Grant{}, false, nil, err
 	}
 	ses.DeviceID, ses.AuthSessionID, ses.TokenJTI = p.DeviceID, p.SessionID, ids.New()
 	if err := s.d.Store.AttachSession(ctx, ses.ID, ses.DeviceID, ses.AuthSessionID, ses.TokenJTI); err != nil {
@@ -147,4 +125,48 @@ func (s *Service) attachUnit(ctx context.Context, p actor.Actor, h domain.Host, 
 		return terminal.Grant{}, false, nil, err
 	}
 	return g, att == domain.AttAttach, wdi, nil
+}
+
+// lockAttach locks the session of an attach and checks it (Design note 6 b and c): not closed
+// (409 invalid_state_transition), for a quick reattach still detached with the device and login
+// session of the request (else the step-up is required), and its session user still the person's
+// valid assignment (else 403 terminal_denied no_session_user). It returns the session, the claim
+// att and the assignment.
+func (s *Service) lockAttach(ctx context.Context, p actor.Actor, id ids.ID, quick bool) (domain.Session, string, *domain.OwnSessionUser, error) {
+	ses, found, err := s.d.Store.LockSession(ctx, id)
+	if err != nil {
+		return domain.Session{}, "", nil, err
+	}
+	if !found {
+		return domain.Session{}, "", nil, invisible()
+	}
+	att, err := domain.AttachKind(ses.State)
+	if err != nil {
+		return domain.Session{}, "", nil, err
+	}
+	if quick && !domain.QuickReattachHolds(ses, p.DeviceID, p.SessionID) {
+		return domain.Session{}, "", nil, errStepUpConsumed
+	}
+	u, err := s.ownAssignment(ctx, p.ID, ses.HostID)
+	if err != nil {
+		return domain.Session{}, "", nil, err
+	}
+	if u == nil || u.ID != ses.HostSessionUserID {
+		return domain.Session{}, "", nil, errNoSessionUser()
+	}
+	return ses, att, u, nil
+}
+
+// openingWorkdir returns the working directory index of an attach that opens a claude session
+// (att open): the index the relay slot of this node keeps. Without it the opening cannot be
+// resumed here (409 invalid_state_transition, ruling D-M2-44-4); any other attach has none.
+func (s *Service) openingWorkdir(id ids.ID, att, kind string) (*int, error) {
+	if att != domain.AttOpen || kind != domain.ProfileKindClaude {
+		return nil, nil
+	}
+	wdi, ok := s.relayControl().OpeningWorkdir(id)
+	if !ok {
+		return nil, errs.New(errs.CodeInvalidStateTransition, "")
+	}
+	return wdi, nil
 }

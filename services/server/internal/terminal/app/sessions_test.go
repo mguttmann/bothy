@@ -221,9 +221,8 @@ func (s edSigner) Sign(_ context.Context, in []byte) ([]byte, error) {
 // recLinks records session.open and session.close.
 type recLinks struct {
 	app.NoLinks
-	mu     gosync.Mutex
-	opens  []app.SessionOpen
-	closes []ids.ID
+	mu    gosync.Mutex
+	opens []app.SessionOpen
 }
 
 func (l *recLinks) OpenSession(_ context.Context, _ ids.ID, cmd app.SessionOpen) error {
@@ -387,7 +386,9 @@ func TestAttach_QuickReattachRaceNeedsStepUp(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	w.store.update(g.Session.ID, func(x *domain.Session) { x.State = domain.SessionActive })
+	if err := w.store.update(g.Session.ID, func(x *domain.Session) { x.State = domain.SessionActive }); err != nil {
+		t.Fatal(err)
+	}
 	w.authz.quick = true
 	_, err = w.svc.Sessions().Attach(context.Background(), w.alex, terminal.AttachSession{SessionID: g.Session.ID, CEK: "cek"})
 	if e, ok := errs.As(err); !ok || e.Code != errs.CodeStepUpRequired {

@@ -66,10 +66,10 @@ func StreamCodeForEnd(_ CloseReason, detail CloseDetail) StreamCode {
 // It returns the detail and true, or false for any other close.
 func HostRefusal(code int, reason string) (CloseDetail, bool) {
 	d := CloseDetail(reason)
-	switch StreamCode(code) {
-	case StreamTokenInvalid:
+	if StreamCode(code) == StreamTokenInvalid {
 		return d, tokenDetails[d]
-	case StreamHandshakeFailed:
+	}
+	if StreamCode(code) == StreamHandshakeFailed {
 		return d, handshakeDetails[d]
 	}
 	return "", false

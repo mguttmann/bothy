@@ -48,7 +48,6 @@ type world struct {
 	r1, r2           ids.ID
 	h1Key            hosttest.Key
 	h1               *fakehost.Host
-	confirm          bool
 }
 
 // newWorld builds the world with the configuration overrides cfg.
@@ -169,7 +168,7 @@ func (w *world) pairedHost(name, holder string, users map[string]string) (hostte
 }
 
 // grant creates a grant of subject on the target with level (empty for a host) and caps.
-func (w *world) grant(subject, targetKind, targetID, level string, caps ...string) string {
+func (w *world) grant(subject, targetKind, targetID, level string, caps ...string) {
 	w.t.Helper()
 	body := map[string]any{"subject_kind": "user", "subject_id": subject, "target_kind": targetKind, "capabilities": caps, "reason": "terminal test"}
 	if targetID != "" {
@@ -178,11 +177,7 @@ func (w *world) grant(subject, targetKind, targetID, level string, caps ...strin
 	if level != "" {
 		body["level"] = level
 	}
-	var g struct {
-		ID string `json:"id"`
-	}
-	w.must(w.robin, http.MethodPost, "/grants", body, http.StatusCreated).JSON(w.t, &g)
-	return g.ID
+	w.must(w.robin, http.MethodPost, "/grants", body, http.StatusCreated)
 }
 
 // ctx is a context bounded by waitLong.
@@ -347,11 +342,11 @@ func (w *world) handshake(d *fakehost.Device, token string) {
 	}
 }
 
-// audits returns the details of the audit rows of action and decision, oldest first.
-func (w *world) audits(action, decision string) []map[string]any {
+// audits returns the details of the allow rows of action, oldest first.
+func (w *world) audits(action string) []map[string]any {
 	w.t.Helper()
-	rows, err := w.s.AdminDB().Query(context.Background(), `SELECT details::text FROM audit_events WHERE action = $1 AND decision = $2 ORDER BY seq`,
-		action, decision)
+	rows, err := w.s.AdminDB().Query(context.Background(), `SELECT details::text FROM audit_events WHERE action = $1 AND decision = 'allow' ORDER BY seq`,
+		action)
 	if err != nil {
 		w.t.Fatal(err)
 	}
@@ -365,24 +360,6 @@ func (w *world) audits(action, decision string) []map[string]any {
 		var m map[string]any
 		_ = json.Unmarshal([]byte(raw), &m)
 		out = append(out, m)
-	}
-	return out
-}
-
-// denials returns the deny reasons of action (aggregated denials are written after their window
-// or at once; the count of rows is enough here).
-func (w *world) denials(action string) []string {
-	w.t.Helper()
-	rows, err := w.s.AdminDB().Query(context.Background(), `SELECT coalesce(deny_reason, '') FROM audit_events WHERE action = $1 AND decision = 'deny' ORDER BY seq`, action)
-	if err != nil {
-		w.t.Fatal(err)
-	}
-	defer rows.Close()
-	var out []string
-	for rows.Next() {
-		var r string
-		_ = rows.Scan(&r)
-		out = append(out, r)
 	}
 	return out
 }

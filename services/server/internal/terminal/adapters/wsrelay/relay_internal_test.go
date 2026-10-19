@@ -77,13 +77,16 @@ func relayServer(t *testing.T, r *Relay, session, host, device ids.ID) *httptest
 // dial opens a client of path and returns it with a channel of its close code.
 func dial(t *testing.T, ctx context.Context, srv *httptest.Server, path string) (*websocket.Conn, chan int) {
 	t.Helper()
-	ws, _, err := websocket.Dial(ctx, "ws"+strings.TrimPrefix(srv.URL, "http")+path, nil) // nosemgrep: bothy-go-egress-only -- test client of the httptest server of the test
+	ws, resp, err := websocket.Dial(ctx, "ws"+strings.TrimPrefix(srv.URL, "http")+path, nil) // nosemgrep: bothy-go-egress-only -- test client of the httptest server of the test
+	if resp != nil && resp.Body != nil {
+		_ = resp.Body.Close()
+	}
 	if err != nil {
 		t.Fatal(err)
 	}
 	ws.SetReadLimit(-1)
 	codes := make(chan int, 1)
-	go func() {
+	go func() { //nolint:gosec // G118: the reader lives as long as the connection, not as ctx
 		for {
 			if _, _, err := ws.Read(context.Background()); err != nil {
 				var ce websocket.CloseError

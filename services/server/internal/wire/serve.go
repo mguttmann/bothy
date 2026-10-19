@@ -991,12 +991,7 @@ func (s *server) handlers() Handlers {
 	s.personal.fillHandlers(&h)
 	s.notify.fillHandlers(&h)
 	s.syncReads.fillHandlers(&h)
-	if h.Hosts == nil && s.terminal != nil {
-		h.Hosts = s.terminal.Handlers
-	}
-	if h.TerminalSessions == nil && s.terminal != nil {
-		h.TerminalSessions = s.terminal.Sessions
-	}
+	s.terminal.fillHandlers(&h)
 	if h.Keys == nil && s.signingKeys != nil {
 		h.Keys = s.signingKeys.Handlers
 	}

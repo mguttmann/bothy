@@ -210,6 +210,43 @@ func (h *StreamHandler) serve(ctx context.Context, ws *websocket.Conn, id ids.ID
 // identify reads identify within terminal.open_timeout and decides it (the table of Design note
 // 8). It returns the principal, or the close code with its reason.
 func (h *StreamHandler) identify(ctx context.Context, ws *websocket.Conn, id ids.ID) (actor.Actor, int, string) {
+	in, code, reason := h.readIdentify(ctx, ws, id)
+	if code != 0 {
+		return actor.Actor{}, code, reason
+	}
+	if in.AccessToken == nil || *in.AccessToken == "" || in.Dpop == nil {
+		// The console path (cookie session) is M6-18's; any other identify without a token fails.
+		return h.authFailed(ctx, id)
+	}
+	ip, _ := reqmeta.ClientIP(ctx)
+	a, err := h.d.Authenticator.Authenticate(ctx, actor.Credentials{Method: http.MethodGet, HTU: h.htu(id),
+		Authorization: "DPoP " + *in.AccessToken, DPoP: *in.Dpop, DPoPProofs: []string{*in.Dpop}, ClientIP: ip})
+	switch {
+	case err != nil && isSessionRevoked(err):
+		_ = h.d.UseCases.StreamAuthFailed(ctx, id)
+		return actor.Actor{}, int(domain.StreamRevoked), domain.StreamRevoked.Name()
+	case err != nil:
+		return h.authFailed(ctx, id)
+	case a.Kind == actor.KindUser && a.DeviceID != ids.ID(in.DeviceId):
+		return h.authFailed(ctx, id)
+	}
+	// Agents, apps and personal tokens reach authorize too, whose gate answers them (TM-T17).
+	sc, reason, err := h.d.UseCases.StreamAccess(actor.WithActor(ctx, a), a, id)
+	switch {
+	case err != nil:
+		return actor.Actor{}, int(domain.CodeUnknownError), ""
+	case sc != 0:
+		return actor.Actor{}, int(sc), nameOr(sc, reason)
+	case a.Kind != actor.KindUser:
+		return actor.Actor{}, int(domain.StreamAuthFailed), domain.StreamAuthFailed.Name()
+	}
+	return a, 0, ""
+}
+
+// readIdentify reads identify within terminal.open_timeout (Timers) and decodes it. It returns
+// the frame, or the close code: closedAlready when the connection ended or the deadline closed it
+// with 4004, 4002 for a frame that is no valid identify of protocol version 1.
+func (h *StreamHandler) readIdentify(ctx context.Context, ws *websocket.Conn, id ids.ID) (rest.TerminalStreamIdentify, int, string) {
 	// The deadline closes the connection itself; cancelling the read would tear it down without
 	// a close frame.
 	var timedOut atomic.Bool
@@ -221,55 +258,26 @@ func (h *StreamHandler) identify(ctx context.Context, ws *websocket.Conn, id ids
 	typ, rd, err := ws.Reader(ctx)
 	if err != nil || timedOut.Load() {
 		stop()
-		return actor.Actor{}, closedAlready, ""
+		return rest.TerminalStreamIdentify{}, closedAlready, ""
 	}
 	b, err := io.ReadAll(io.LimitReader(rd, int64(h.cfg.MaxFrameBytes)+1))
 	if !stop() {
-		return actor.Actor{}, closedAlready, ""
+		return rest.TerminalStreamIdentify{}, closedAlready, ""
 	}
 	if err != nil || typ != websocket.MessageText || len(b) > h.cfg.MaxFrameBytes {
-		return actor.Actor{}, int(domain.StreamDecodeError), domain.StreamDecodeError.Name()
+		return rest.TerminalStreamIdentify{}, int(domain.StreamDecodeError), domain.StreamDecodeError.Name()
 	}
 	in, ok := h.decodeIdentify(b)
-	if !ok || in.ProtocolVersion != 1 || !slices.Contains(domain.SupportedProtocolVersions(), in.ProtocolVersion) {
-		return actor.Actor{}, int(domain.StreamDecodeError), domain.StreamDecodeError.Name()
+	if !ok || !slices.Contains(domain.SupportedProtocolVersions(), in.ProtocolVersion) {
+		return rest.TerminalStreamIdentify{}, int(domain.StreamDecodeError), domain.StreamDecodeError.Name()
 	}
-	if in.AccessToken == nil || *in.AccessToken == "" || in.Dpop == nil {
-		// The console path (cookie session) is M6-18's; any other identify without a token fails.
-		return h.authFailed(ctx, id)
-	}
-	ip, _ := reqmeta.ClientIP(ctx)
-	a, err := h.d.Authenticator.Authenticate(ctx, actor.Credentials{Method: http.MethodGet, HTU: h.htu(id),
-		Authorization: "DPoP " + *in.AccessToken, DPoP: *in.Dpop, DPoPProofs: []string{*in.Dpop}, ClientIP: ip})
-	if err != nil {
-		if e, ok := errs.As(err); ok && e.Code == errs.CodeSessionRevoked {
-			_ = h.d.UseCases.StreamAuthFailed(ctx, id)
-			return actor.Actor{}, int(domain.StreamRevoked), domain.StreamRevoked.Name()
-		}
-		return h.authFailed(ctx, id)
-	}
-	if a.Kind != actor.KindUser || a.DeviceID != ids.ID(in.DeviceId) {
-		if a.Kind != actor.KindUser {
-			// An agent, app or personal token reaches authorize, whose gate answers it (TM-T17).
-			code, reason, err := h.d.UseCases.StreamAccess(actor.WithActor(ctx, a), a, id)
-			if err != nil {
-				return actor.Actor{}, int(domain.CodeUnknownError), ""
-			}
-			if code == 0 {
-				code = domain.StreamAuthFailed
-			}
-			return actor.Actor{}, int(code), nameOr(code, reason)
-		}
-		return h.authFailed(ctx, id)
-	}
-	code, reason, err := h.d.UseCases.StreamAccess(actor.WithActor(ctx, a), a, id)
-	switch {
-	case err != nil:
-		return actor.Actor{}, int(domain.CodeUnknownError), ""
-	case code != 0:
-		return actor.Actor{}, int(code), nameOr(code, reason)
-	}
-	return a, 0, ""
+	return in, 0, ""
+}
+
+// isSessionRevoked reports the answer of the authenticator for a revoked session (4012).
+func isSessionRevoked(err error) bool {
+	e, ok := errs.As(err)
+	return ok && e.Code == errs.CodeSessionRevoked
 }
 
 // nameOr returns reason, or the name of code without one.

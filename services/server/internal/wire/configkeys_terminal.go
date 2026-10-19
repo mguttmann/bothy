@@ -85,7 +85,7 @@ func terminalConfigKeys() []config.Key {
 		},
 		// The terminal sessions and the relay (M2-44, 24 sections 6.1 and 6.3).
 		{
-			Name: "terminal.open_timeout", Kind: config.KindDuration, Default: "20s", Min: "1s",
+			Name: "terminal.open_timeout", Kind: config.KindDuration, Default: twentySeconds, Min: "1s",
 			Doc:     "Deadline until both sides are connected in the relay and the opening has started.",
 			Chapter: chapter24,
 		},

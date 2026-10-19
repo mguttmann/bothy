@@ -181,25 +181,9 @@ func (d *decision) decide(ev RelayEvent) {
 	case EvDeadline:
 		d.deadline()
 	case EvQueueFull:
-		if ev.Side == SideClient {
-			dev(int(StreamSlowConsumer), "")
-			host(codeNormal, "")
-		} else {
-			dev(codeHostUnavail, "")
-			host(int(StreamSlowConsumer), "")
-		}
-		detach()
-		rearm()
+		d.offender(ev.Side, int(StreamSlowConsumer))
 	case EvProtocolError:
-		if ev.Side == SideClient {
-			dev(int(StreamDecodeError), "")
-			host(codeNormal, "")
-		} else {
-			dev(codeHostUnavail, "")
-			host(int(StreamDecodeError), "")
-		}
-		detach()
-		rearm()
+		d.offender(ev.Side, int(StreamDecodeError))
 	case EvNewGrant:
 		dev(int(StreamReplaced), "")
 		host(codeNormal, "")
@@ -225,6 +209,21 @@ func (d *decision) decide(ev RelayEvent) {
 		dev(codeServerRestrt, "")
 		host(codeServerRestrt, "")
 	}
+}
+
+// offender is the row of a full queue (side the receiver, code 4014) and of a protocol error
+// (side the offender, code 4002): that side gets code, the other the device 4102 or the host 1000;
+// a started session detaches.
+func (d *decision) offender(side Side, code int) {
+	if side == SideClient {
+		d.dev(code, "")
+		d.host(codeNormal, "")
+	} else {
+		d.dev(codeHostUnavail, "")
+		d.host(code, "")
+	}
+	d.detach()
+	d.rearm()
 }
 
 // hostClosed is the row of a host side that ends by itself: a refusal of the handshake (4101 or

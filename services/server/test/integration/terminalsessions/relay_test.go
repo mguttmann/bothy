@@ -46,7 +46,7 @@ func TestRelay_ForwardsBytesUnchanged(t *testing.T) {
 	w := newWorldLogs(t, nil, &logs)
 	g, d := w.started(w.alex)
 	ctx := w.ctx()
-	var sum int64 = int64(len("start"))
+	sum := int64(len("start"))
 	canary := []byte("CANARY-terminal-content-7f3a")
 	for _, n := range []int{1, 2, 1000, 65534, 65535} {
 		m := make([]byte, n)
@@ -162,7 +162,7 @@ func TestRelay_OpenTimeout(t *testing.T) {
 	w.timers.Fire()
 	w.closeCode("host missing", func() (int, string) { return d.CloseCode(ctx) }, 4102, "")
 	w.waitState(g.Session.ID, "closed:open_failed:open_timeout")
-	if len(w.audits("terminal.terminate", "allow")) == 0 {
+	if len(w.audits("terminal.terminate")) == 0 {
 		t.Fatal("no terminal.terminate entry")
 	}
 

@@ -38,7 +38,7 @@ func TestOpen_HappyPathShell(t *testing.T) {
 	if w.count(`SELECT count(*) FROM auth_sessions WHERE id = $1 AND step_up_consumed_at IS NOT NULL`, w.alex.SessionID) != 1 {
 		t.Fatal("the step-up is not consumed")
 	}
-	if n := len(w.audits("terminal.open", "allow")); n != 1 {
+	if n := len(w.audits("terminal.open")); n != 1 {
 		t.Fatalf("%d allow entries terminal.open", n)
 	}
 	if n := w.count(`SELECT count(*) FROM event_log WHERE type = 'terminal_session.changed' AND resource_id = $1 AND audience_principal_id = $2`,

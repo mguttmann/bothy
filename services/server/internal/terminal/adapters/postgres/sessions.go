@@ -5,6 +5,7 @@ package postgres
 import (
 	"context"
 	"errors"
+	"math"
 	"time"
 
 	"github.com/jackc/pgx/v5"
@@ -25,7 +26,7 @@ func (r *Repository) InsertSession(ctx context.Context, s domain.Session) error 
 	return mapError(q.InsertTerminalSession(ctx, sqlcgen.InsertTerminalSessionParams{
 		ID: uuid(s.ID), HostID: uuid(s.HostID), UserID: uuid(s.UserID), HostSessionUserID: uuid(s.HostSessionUserID),
 		DeviceID: uuid(s.DeviceID), AuthSessionID: uuid(s.AuthSessionID), Profile: s.Profile, TokenJti: uuid(s.TokenJTI),
-		KeyGeneration: int32(min(s.KeyGeneration, int64(^uint32(0)>>1))), OpenedAt: optionalTime(s.OpenedAt),
+		KeyGeneration: int32(min(max(s.KeyGeneration, math.MinInt32), math.MaxInt32)), OpenedAt: optionalTime(s.OpenedAt),
 	}), "inserting a terminal session")
 }
 
@@ -90,7 +91,7 @@ func (r *Repository) CloseSessionByPerson(ctx context.Context, id ids.ID, reason
 // ListSessions implements app.Store.
 func (r *Repository) ListSessions(ctx context.Context, userID, hostID ids.ID, state string, beforeID ids.ID, limit int) ([]domain.Session, error) {
 	rows, err := r.read(ctx).ListTerminalSessions(ctx, sqlcgen.ListTerminalSessionsParams{
-		UserID: uuid(userID), HostID: uuid(hostID), State: state, BeforeID: uuid(beforeID), PageLimit: int32(min(limit, 1<<20)),
+		UserID: uuid(userID), HostID: uuid(hostID), State: state, BeforeID: uuid(beforeID), PageLimit: int32(min(max(limit, 0), math.MaxInt32)),
 	})
 	if err != nil {
 		return nil, mapError(err, "listing terminal sessions")

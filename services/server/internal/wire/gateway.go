@@ -388,15 +388,21 @@ func DeliverySink(az authorize.Authorizer, hub *gatewayapp.Hub, versions instanc
 			}
 		}
 		for _, ev := range batch {
-			az.Observe(ctx, authorize.LogEvent{Seq: ev.Seq, Type: ev.Type, PermissionVersion: ev.PermissionVersion, Audience: ev.AudiencePrincipalID})
-			if hub != nil {
-				hub.Dispatch(ctx, ev)
-			}
-			for _, o := range observers {
-				o(ctx, ev)
-			}
+			deliver(ctx, az, hub, observers, ev)
 		}
 		return nil
+	}
+}
+
+// deliver hands one event of the tail to Authorizer.Observe, the hub (nil: none) and the
+// observers, in this order.
+func deliver(ctx context.Context, az authorize.Authorizer, hub *gatewayapp.Hub, observers []LogObserver, ev sync.Event) {
+	az.Observe(ctx, authorize.LogEvent{Seq: ev.Seq, Type: ev.Type, PermissionVersion: ev.PermissionVersion, Audience: ev.AudiencePrincipalID})
+	if hub != nil {
+		hub.Dispatch(ctx, ev)
+	}
+	for _, o := range observers {
+		o(ctx, ev)
 	}
 }
 

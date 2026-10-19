@@ -43,6 +43,11 @@ func QuickReattachHolds(s Session, deviceID, authSessionID ids.ID) bool {
 	return s.State == SessionDetached && s.DeviceID == deviceID && s.AuthSessionID == authSessionID
 }
 
+// hostStateEnds are the close reasons of a host that left active (24 section 10.3).
+var hostStateEnds = map[State]CloseReason{
+	StateDisabled: CloseHostDisabled, StateRetired: CloseHostRetired, StatePairing: CloseHostRekeyed, StateConfirming: CloseHostRekeyed,
+}
+
 // RecheckEnd maps the reason of a recheck that no longer allows an opening or attach (Design note
 // 12 of M2-44) to the close reason of the new session: i6_holder_only gives i6_violation,
 // host_not_active the reason of the host state (disabled host_disabled, retired host_retired,
@@ -52,13 +57,8 @@ func RecheckEnd(reason string, hostState State) CloseReason {
 	case "i6_holder_only":
 		return CloseI6Violation
 	case "host_not_active":
-		switch hostState {
-		case StateDisabled:
-			return CloseHostDisabled
-		case StateRetired:
-			return CloseHostRetired
-		case StatePairing, StateConfirming:
-			return CloseHostRekeyed
+		if r, ok := hostStateEnds[hostState]; ok {
+			return r
 		}
 	}
 	return CloseAccessRevoked

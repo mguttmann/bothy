@@ -124,43 +124,57 @@ func (s *Service) openSession(ctx context.Context, p actor.Actor, cmd terminal.O
 		ProfileKind: domain.ProfileKind(h.Profiles, cmd.Profile), CEK: cmd.CEK, Owner: owner, OSUser: f.assignment.OSUser, WorkdirIndex: cmd.WorkdirIndex}
 	var g terminal.Grant
 	err = s.d.UoW.Do(ctx, func(ctx context.Context) error {
-		if err := s.consume(ctx, p); err != nil {
-			return err
-		}
-		if err := s.d.Store.InsertSession(ctx, ses); err != nil {
-			return err
-		}
 		var err error
-		if g, err = s.grant(ctx, h, ses, tg, now); err != nil {
-			return err
-		}
-		if err := s.recordGrant(ctx, authorize.ActionTerminalOpen, h, ses, cmd.PinChanged, owner); err != nil {
-			return err
-		}
-		if err := s.emitSessionChangedBy(ctx, ses, p.ID); err != nil {
-			return err
-		}
-		if s.d.BeforeOpenCommit != nil {
-			s.d.BeforeOpenCommit()
-		}
-		return nil
+		g, err = s.openUnit(ctx, p, h, ses, tg, cmd.PinChanged, owner)
+		return err
 	})
 	if err != nil {
 		return terminal.Grant{}, s.stepUpDenied(ctx, err, authorize.ActionTerminalOpen, authorize.ResourceHost, h.ID)
 	}
-	if err := s.recheck(ctx, p, authorize.ActionTerminalOpen, ses.ID, func(h domain.Host) (authorize.Resource, error) {
-		known := false
-		if u, err := s.ownAssignment(ctx, p.ID, h.ID); err != nil {
-			return authorize.Resource{}, err
-		} else if u != nil {
-			known = domain.ProfileKnown(h.Profiles, domain.OwnWorkdirs(h.ReportedUsers, u.OSUser), cmd.Profile, cmd.WorkdirIndex)
-		}
-		return openResource(h.ID, true, known), nil
-	}, h.ID); err != nil {
+	if err := s.recheck(ctx, p, authorize.ActionTerminalOpen, ses.ID, s.openRecheck(ctx, p, cmd), h.ID); err != nil {
 		return terminal.Grant{}, err
 	}
 	s.announce(ctx, h, ses, now, false, cmd.WorkdirIndex)
 	return g, nil
+}
+
+// openUnit is the unit of work of an opening (Design note 4 c to f): the step-up as the first row
+// lock, the row, the signed token, the allow entry and the event.
+func (s *Service) openUnit(ctx context.Context, p actor.Actor, h domain.Host, ses domain.Session, tg domain.TokenGrant,
+	pinChanged, owner bool) (terminal.Grant, error) {
+	if err := s.consume(ctx, p); err != nil {
+		return terminal.Grant{}, err
+	}
+	if err := s.d.Store.InsertSession(ctx, ses); err != nil {
+		return terminal.Grant{}, err
+	}
+	g, err := s.grant(ctx, h, ses, tg, ses.OpenedAt)
+	if err != nil {
+		return terminal.Grant{}, err
+	}
+	if err := s.recordGrant(ctx, authorize.ActionTerminalOpen, h, ses, pinChanged, owner); err != nil {
+		return terminal.Grant{}, err
+	}
+	if err := s.emitSessionChangedBy(ctx, ses, p.ID); err != nil {
+		return terminal.Grant{}, err
+	}
+	if s.d.BeforeOpenCommit != nil {
+		s.d.BeforeOpenCommit()
+	}
+	return g, nil
+}
+
+// openRecheck returns the descriptor builder of the recheck of an opening: fresh profile facts of
+// the host read again, the connection as the first decision saw it (Design note 12).
+func (s *Service) openRecheck(ctx context.Context, p actor.Actor, cmd terminal.OpenSession) func(domain.Host) (authorize.Resource, error) {
+	return func(h domain.Host) (authorize.Resource, error) {
+		u, err := s.ownAssignment(ctx, p.ID, h.ID)
+		if err != nil {
+			return authorize.Resource{}, err
+		}
+		known := u != nil && domain.ProfileKnown(h.Profiles, domain.OwnWorkdirs(h.ReportedUsers, u.OSUser), cmd.Profile, cmd.WorkdirIndex)
+		return openResource(h.ID, true, known), nil
+	}
 }
 
 // consume consumes the fresh step-up of p inside the unit of work; a stale or consumed step-up

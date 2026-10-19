@@ -143,6 +143,20 @@ func NewTerminal(cfg terminalapp.Config, pool *pg.Pool, uow txn.UnitOfWork, az a
 	return &Terminal{Service: svc, Handlers: terminalhttp.New(svc), Sessions: terminalhttp.NewSessions(svc.Sessions())}, nil
 }
 
+// fillHandlers sets the REST handlers of the module in h where none are set (tests inject their
+// own); a nil module sets nothing.
+func (t *Terminal) fillHandlers(h *Handlers) {
+	if t == nil {
+		return
+	}
+	if h.Hosts == nil {
+		h.Hosts = t.Handlers
+	}
+	if h.TerminalSessions == nil {
+		h.TerminalSessions = t.Sessions
+	}
+}
+
 // lateStepUps binds terminal/app.StepUps to identity's StepUps, which the sessions step of
 // identity sets after the terminal module is built (BindSessions); before it the consumption fails
 // closed.
