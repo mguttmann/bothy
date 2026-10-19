@@ -100,8 +100,9 @@ Normative: [11-extensions.md](../../../../docs/spec/11-extensions.md) sections 3
   disables the principal; the messages of the app keep their author.
 - **Without effect**: an identical upgrade, unchanged scopes and a transition to the current state
   are decided before the rights change and audited with `no_change: true`; no rights version.
-- **Reads**: `listApps` and `validateManifest` check `app.read` on the collection of apps (403
-  `owner_only` for a non-owner); `getApp` on the app (404 for a non-owner, like an unknown id).
+- **Reads**: `listApps` and `validateManifest` check `app.read` on the collection of apps
+  (`403 forbidden` with the reason `owner_only` for a non-owner); `getApp` on the app (404 for a
+  non-owner, like an unknown id).
 
 Later tickets extend these use cases with their parts of 11 section 4.3: M2-25 commands and
 components (hide on suspend, remove on uninstall), M2-26 deliveries and subscriptions (pause on
