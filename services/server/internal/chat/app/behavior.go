@@ -170,16 +170,23 @@ func (s *Service) putChannelBehavior(ctx context.Context, st BehaviorStore, a ac
 	if archived(c) {
 		return BehaviorRow{}, channelArchivedConflict()
 	}
+	return s.writeBehavior(ctx, st, c, cur, want)
+}
+
+// writeBehavior writes want over cur of the locked channel c: a call without effect when nothing
+// differs, otherwise the columns, the skill rows when they changed, settingsChanged with the
+// effective operator after the locks, and the audit entry.
+func (s *Service) writeBehavior(ctx context.Context, st BehaviorStore, c ChannelRow, cur BehaviorRow, want domain.Behavior) (BehaviorRow, error) {
 	changed := domain.ChangedFields(cur.Behavior, want)
 	if len(changed) == 0 {
 		return cur, s.recordChannel(ctx, authorize.ActionChannelBehaviorUpdate, cur.ChannelID,
 			withNoChange(behaviorAttrs(cur, cur.SettingsVersion, nil)))
 	}
-	if err := st.SaveBehavior(ctx, cmd.ChannelID, want); err != nil {
+	if err := st.SaveBehavior(ctx, cur.ChannelID, want); err != nil {
 		return BehaviorRow{}, err
 	}
 	if slices.Contains(changed, domain.ChangedSkills) {
-		if err := st.ReplaceSkills(ctx, cmd.ChannelID, want.Skills); err != nil {
+		if err := st.ReplaceSkills(ctx, cur.ChannelID, want.Skills); err != nil {
 			return BehaviorRow{}, err
 		}
 	}

@@ -39,7 +39,7 @@ func newBW(t *testing.T, cfg map[string]string) *bw {
 	return &bw{t: t, s: s, w: harness.BuildMatrixWorld(t, s), ctx: t.Context()}
 }
 
-func (b *bw) ch(name string) string            { return b.w.Channels[name] }
+func (b *bw) ch(name string) string              { return b.w.Channels[name] }
 func (b *bw) person(name string) *harness.Client { return b.w.People[name] }
 func (b *bw) agent(name string) *harness.Client  { return b.w.Agents[name] }
 
@@ -236,11 +236,11 @@ func envelopeTypes(evs []map[string]any, channel string) []string {
 	return out
 }
 
-// audits returns details, decision and deny reason of the audit rows of action on resource.
-func (b *bw) audits(action, resource string) []auditRow {
+// audits returns decision, deny reason and details of the channel.behavior.update rows of resource.
+func (b *bw) audits(resource string) []auditRow {
 	b.t.Helper()
 	rows, err := b.s.AdminDB().Query(b.ctx, `SELECT decision, coalesce(deny_reason, ''), details::text FROM audit_events
-		WHERE action = $1 AND resource_id = $2 ORDER BY seq`, action, resource)
+		WHERE action = 'channel.behavior.update' AND resource_id = $1 ORDER BY seq`, resource)
 	if err != nil {
 		b.t.Fatal(err)
 	}
@@ -380,7 +380,7 @@ func TestBehaviorRightsAndRequests(t *testing.T) {
 			{"prompt too long", func(m map[string]any) { m["prompt"] = secret + strings.Repeat("a", maxPrompt) }, "/prompt", "too_long"},
 			{"empty skill", func(m map[string]any) { m["skills"] = []string{"triage", ""} }, "/skills/1", "required"},
 			{"control character", func(m map[string]any) { m["skills"] = []string{"tri\u0007age"} }, "/skills/0", "invalid_characters"},
-			{"bidi control", func(m map[string]any) { m["skills"] = []string{"tri‮age"} }, "/skills/0", "invalid_characters"},
+			{"bidi control", func(m map[string]any) { m["skills"] = []string{"tri\u202eage"} }, "/skills/0", "invalid_characters"},
 			{"duplicate", func(m map[string]any) { m["skills"] = []string{"triage", "faq", "triage"} }, "/skills/2", "duplicate"},
 			{"unknown member", func(m map[string]any) { m["temperature"] = 1 }, "", ""},
 		} {
@@ -417,9 +417,9 @@ func TestBehaviorRightsAndRequests(t *testing.T) {
 	})
 
 	t.Run("TestPutChannelBehavior_Audit", func(t *testing.T) {
-		before := len(b.audits("channel.behavior.update", allgemein))
+		before := len(b.audits(allgemein))
 		d := b.set(allgemein, func(d *behaviorDoc) { d.FreeResponse = !d.FreeResponse; d.Skills = []string{"audit-skill"} })
-		rows := b.audits("channel.behavior.update", allgemein)
+		rows := b.audits(allgemein)
 		var allows []auditRow
 		for _, r := range rows[before:] {
 			if r.Decision == "allow" {
@@ -446,7 +446,7 @@ func TestBehaviorRightsAndRequests(t *testing.T) {
 		deadline := time.Now().Add(30 * time.Second)
 		for {
 			var reasons []string
-			for _, r := range b.audits("channel.behavior.update", allgemein) {
+			for _, r := range b.audits(allgemein) {
 				if r.Decision == "deny" {
 					reasons = append(reasons, r.Reason)
 				}
@@ -571,7 +571,7 @@ func TestBehaviorChangesAndEvents(t *testing.T) {
 			t.Fatalf("settings_version %d after three changes from %d", d.SettingsVersion, start)
 		}
 		head := b.head()
-		audits := len(b.audits("channel.behavior.update", allgemein))
+		audits := len(b.audits(allgemein))
 		r := b.must(b.w.Owner, http.MethodPut, "/channels/"+allgemein+"/behavior", d.put(), ifMatch(d.SettingsVersion), http.StatusOK)
 		var same behaviorDoc
 		r.JSON(t, &same)
@@ -581,7 +581,7 @@ func TestBehaviorChangesAndEvents(t *testing.T) {
 		if evs := b.eventsAfter(head); len(types(evs, allgemein)) != 0 {
 			t.Fatalf("no-op wrote %v", types(evs, allgemein))
 		}
-		rows := b.audits("channel.behavior.update", allgemein)
+		rows := b.audits(allgemein)
 		if len(rows) != audits+1 || !strings.Contains(rows[len(rows)-1].Details, `"no_change": true`) {
 			t.Fatalf("no-op audit %+v", rows[audits:])
 		}
