@@ -116,6 +116,11 @@ type Deps struct {
 	// TerminalTimers drive the deadlines of the terminal relay (M2-44); nil means the real timers.
 	// Tests pass a fake that they fire, so no test sleeps for terminal.open_timeout.
 	TerminalTimers terminalapp.Timers
+	// TerminalBeforeOpenCommit is a test seam of the terminal openings (M2-44,
+	// terminalapp.Deps.BeforeOpenCommit): it runs inside the unit of work of an opening before
+	// the commit, so a test commits a revocation between the decision and the commit. nil in
+	// production.
+	TerminalBeforeOpenCommit func()
 }
 
 // server is the state of one serve process that the components fill and the stop steps read.
@@ -878,7 +883,8 @@ func (s *server) startTerminal(context.Context) error {
 	if a == nil || az == nil || sy == nil || id == nil {
 		return errors.New("wire: the terminal step needs audit, sync, the Authorizer and identity")
 	}
-	tm, err := NewTerminal(cfg, pool, a.UoW(), az, IdentityWrites{Audit: a.Recorder(), Events: sy.Appender()}, id, s.deps.Clock, s.logger())
+	tm, err := NewTerminal(cfg, pool, a.UoW(), az, IdentityWrites{Audit: a.Recorder(), Events: sy.Appender()}, id, s.deps.Clock,
+		s.deps.TerminalBeforeOpenCommit, s.logger())
 	if err != nil {
 		return err
 	}

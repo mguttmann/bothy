@@ -122,11 +122,12 @@ type Terminal struct {
 
 // NewTerminal builds the terminal module over pool with the unit of work uow, the Authorizer az,
 // the recorder and appender of w, the identity module id (the pairing codes of identity.Tokens and
-// the directory of people) and the clock (nil means clock.System()). Presence is NoConnections
-// until M2-43 builds the control connections. It opens no connection. Errors: a missing
-// collaborator or a configuration value the use cases refuse.
+// the directory of people), the clock (nil means clock.System()) and the test seam
+// beforeOpenCommit (terminalapp.Deps.BeforeOpenCommit; nil in production). Presence is
+// NoConnections until M2-43 builds the control connections. It opens no connection. Errors: a
+// missing collaborator or a configuration value the use cases refuse.
 func NewTerminal(cfg terminalapp.Config, pool *pg.Pool, uow txn.UnitOfWork, az authorize.Authorizer, w IdentityWrites, id *Identity,
-	clk clock.Clock, _ *slog.Logger) (*Terminal, error) {
+	clk clock.Clock, beforeOpenCommit func(), _ *slog.Logger) (*Terminal, error) {
 	if id == nil || id.Tokens == nil {
 		return nil, errors.New("wire: the terminal module needs the identity module")
 	}
@@ -135,7 +136,7 @@ func NewTerminal(cfg terminalapp.Config, pool *pg.Pool, uow txn.UnitOfWork, az a
 		Instance: instanceIdentity{state: instanceapp.NewState(instancepg.NewRepository(pool), uow)},
 		People:   people{dir: identityapp.NewDirectory(identitypg.NewRepository(pool))}, Presence: terminalapp.NoConnections{},
 		UoW: uow, Authorizer: az, Audit: w.Audit, Events: w.Events, Cursors: terminalhttp.Cursors{}, Clock: clk,
-		StepUps: lateStepUps{id: id},
+		StepUps: lateStepUps{id: id}, BeforeOpenCommit: beforeOpenCommit,
 	})
 	if err != nil {
 		return nil, err

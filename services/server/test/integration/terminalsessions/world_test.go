@@ -15,6 +15,7 @@ import (
 	"net/http"
 	"os"
 	"strings"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -48,6 +49,11 @@ type world struct {
 	r1, r2           ids.ID
 	h1Key            hosttest.Key
 	h1               *fakehost.Host
+	// alexGrant is the id of Alex's grant terminal on R1.
+	alexGrant string
+	// beforeOpenCommit, when set, runs inside the unit of work of the next opening before its
+	// commit (TestOpen_RevocationRaceRecheck); it is cleared when it runs.
+	beforeOpenCommit atomic.Pointer[func()]
 }
 
 // newWorld builds the world with the configuration overrides cfg.
@@ -56,9 +62,16 @@ func newWorld(t *testing.T, cfg map[string]string) *world {
 	return newWorldLogs(t, cfg, nil)
 }
 
+// worldSlots bounds the servers that run at once: each has its own database and connection pool
+// on the shared pgtest server, whose connection slots a test per core would exhaust.
+var worldSlots = make(chan struct{}, 3)
+
 // newWorldLogs is newWorld with the log lines of the server also written to logs.
 func newWorldLogs(t *testing.T, cfg map[string]string, logs io.Writer) *world {
 	t.Helper()
+	worldSlots <- struct{}{}
+	// Registered first, so it runs after the cleanups of the server.
+	t.Cleanup(func() { <-worldSlots })
 	conf := harness.RaisedRateLimits()
 	// Denials are aggregated per window; a short one writes them while the test waits.
 	conf["audit.deny_aggregate_window"] = "50ms"
@@ -66,7 +79,12 @@ func newWorldLogs(t *testing.T, cfg map[string]string, logs io.Writer) *world {
 		conf[k] = v
 	}
 	w := &world{t: t, timers: &fakehost.Timers{}}
-	w.s = harness.Start(t, harness.Options{Config: conf, TerminalTimers: w.timers, EgressDenyAll: true, LogWriter: logs})
+	w.s = harness.Start(t, harness.Options{Config: conf, TerminalTimers: w.timers, EgressDenyAll: true, LogWriter: logs,
+		TerminalBeforeOpenCommit: func() {
+			if f := w.beforeOpenCommit.Swap(nil); f != nil {
+				(*f)()
+			}
+		}})
 	w.robin = w.s.Owner
 	w.alex = w.s.NewUser(t, harness.UserSpec{Handle: "alex", DisplayName: "Alex"})
 	w.sam = w.s.NewUser(t, harness.UserSpec{Handle: "sam", DisplayName: "Sam"})
@@ -78,7 +96,7 @@ func newWorldLogs(t *testing.T, cfg map[string]string, logs io.Writer) *world {
 	w.h1Key, w.r1 = w.pairedHost("Build server", w.alex.PrincipalID, map[string]string{
 		w.alex.PrincipalID: "bothy-s-alex", w.robin.PrincipalID: "bothy-s-robin", w.sam.PrincipalID: "bothy-s-sam"})
 	_, w.r2 = w.pairedHost("Lab machine", "", map[string]string{w.sam.PrincipalID: "bothy-s-sam"})
-	w.grant(w.alex.PrincipalID, "host", w.r1.String(), "", "terminal")
+	w.alexGrant = w.grant(w.alex.PrincipalID, "host", w.r1.String(), "", "terminal")
 	w.grant(w.sam.PrincipalID, "host", w.r1.String(), "", "terminal")
 	w.grant(w.sam.PrincipalID, "instance", "", "trigger", "approve_actions", "upload", "export", "manage")
 	w.h1 = w.connect(w.r1, w.h1Key, false)
@@ -167,8 +185,9 @@ func (w *world) pairedHost(name, holder string, users map[string]string) (hostte
 	return key, ids.MustParse(created.HostID)
 }
 
-// grant creates a grant of subject on the target with level (empty for a host) and caps.
-func (w *world) grant(subject, targetKind, targetID, level string, caps ...string) {
+// grant creates a grant of subject on the target with level (empty for a host) and caps and
+// returns its id.
+func (w *world) grant(subject, targetKind, targetID, level string, caps ...string) string {
 	w.t.Helper()
 	body := map[string]any{"subject_kind": "user", "subject_id": subject, "target_kind": targetKind, "capabilities": caps, "reason": "terminal test"}
 	if targetID != "" {
@@ -177,7 +196,11 @@ func (w *world) grant(subject, targetKind, targetID, level string, caps ...strin
 	if level != "" {
 		body["level"] = level
 	}
-	w.must(w.robin, http.MethodPost, "/grants", body, http.StatusCreated)
+	var g struct {
+		ID string `json:"id"`
+	}
+	w.must(w.robin, http.MethodPost, "/grants", body, http.StatusCreated).JSON(w.t, &g)
+	return g.ID
 }
 
 // ctx is a context bounded by waitLong.

@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/OWNER/bothy/services/server/internal/kernel/ids"
+	"github.com/OWNER/bothy/services/server/test/harness"
 	"github.com/OWNER/bothy/services/server/test/terminal/fakehost"
 )
 
@@ -89,4 +90,42 @@ func TestOpen_HappyPathShell(t *testing.T) {
 		t.Fatalf("Robin's claims %v", rc)
 	}
 	_ = http.StatusOK
+}
+
+// TestOpen_RevocationRaceRecheck (Design note 12): Robin revokes Alex's grant terminal on R1
+// between the decision and the commit of her opening; the recheck after the commit ends the new
+// session with access_revoked, writes terminal.terminate, sends no session.open and answers 403
+// forbidden.
+func TestOpen_RevocationRaceRecheck(t *testing.T) {
+	t.Parallel()
+	w := newWorld(t, nil)
+	revoke := func() {
+		harness.MustDo(t, w.robin, harness.Request{Method: http.MethodPost, Path: "/grants/" + w.alexGrant + "/revoke",
+			Body: map[string]any{"reason": "terminal test"}}, http.StatusOK)
+	}
+	w.beforeOpenCommit.Store(&revoke)
+	r := w.open(w.alex, w.r1, openBody("shell"))
+	// Only status and problem code: a 201 body would carry the session token.
+	if code, _ := problem(r); r.Status != http.StatusForbidden || code != "forbidden" {
+		t.Fatalf("opening during a revocation: %d %q, want 403 forbidden", r.Status, code)
+	}
+	if w.beforeOpenCommit.Load() != nil {
+		t.Fatal("the seam did not run")
+	}
+	sid := w.text(`SELECT id::text FROM terminal_sessions WHERE user_id = $1`, w.alex.PrincipalID)
+	if got := w.state(sid); got != "closed:access_revoked" {
+		t.Fatalf("state %s", got)
+	}
+	found := false
+	for _, e := range w.audits("terminal.terminate") {
+		if e["session_id"] == sid && e["close_reason"] == "access_revoked" {
+			found = true
+		}
+	}
+	if !found {
+		t.Fatalf("no terminal.terminate entry for %s", sid)
+	}
+	if n := w.h1.OpensOf(ids.MustParse(sid)); n != 0 {
+		t.Fatalf("%d session.open", n)
+	}
 }

@@ -90,6 +90,9 @@ type Options struct {
 	// TerminalTimers drive the deadlines of the terminal relay (wire.Deps.TerminalTimers, M2-44);
 	// nil means the real timers.
 	TerminalTimers terminalapp.Timers
+	// TerminalBeforeOpenCommit runs inside the unit of work of every terminal opening before its
+	// commit (wire.Deps.TerminalBeforeOpenCommit, M2-44); nil runs nothing.
+	TerminalBeforeOpenCommit func()
 }
 
 // TelemetrySinks are the in-process exporters of the canary test; M1-69 fills them.
@@ -208,6 +211,7 @@ func start(tb testing.TB, db *pgtest.DB, opts Options, clk clock.Clock, secretsD
 	sigs := make(chan os.Signal, 2)
 	runner, err := wire.Serve(context.Background(), values, wire.RoleAll, wire.Deps{
 		Env: env, Stdout: out, Signals: sigs, Clock: clk, EgressDenyAll: opts.EgressDenyAll, TerminalTimers: opts.TerminalTimers,
+		TerminalBeforeOpenCommit: opts.TerminalBeforeOpenCommit,
 	})
 	if err != nil {
 		return nil, err
