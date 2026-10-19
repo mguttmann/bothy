@@ -223,3 +223,16 @@ func TestDoctorOutputFormatAndExitCode(t *testing.T) {
 		t.Errorf("one failure (exit %d):\n%s", r.ExitCode(), got)
 	}
 }
+
+// A declaration that arrives while entry scans run must not race with the scans' read of the
+// environment (INT-W44/1); go test -race reports the unsynchronised access.
+func TestSetDeclarationDuringEntryScans(t *testing.T) {
+	x := newTW(t)
+	runner := NewRunner(x.env, nil)
+	runner.RunFull(context.Background())
+	runner.SetDeclaration("api_key")
+	runner.WaitScans()
+	if runner.Last() == nil {
+		t.Fatal("no result after the scans")
+	}
+}

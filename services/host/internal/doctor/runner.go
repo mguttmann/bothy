@@ -61,9 +61,10 @@ func (r *Runner) RunFull(ctx context.Context) *Result {
 }
 
 func (r *Runner) scan(ctx context.Context, user string, req Request) {
-	sctx, cancel := context.WithTimeout(ctx, r.env.scanBound())
+	env := r.snapshotEnv() // SetDeclaration may write r.env while the scan runs
+	sctx, cancel := context.WithTimeout(ctx, env.scanBound())
 	defer cancel()
-	code, err := r.env.Helpers.Scan(sctx, user, req)
+	code, err := env.Helpers.Scan(sctx, user, req)
 	if err != nil {
 		code = CodeEntryScanTimeout // a scan that did not finish has not seen every entry
 	}
