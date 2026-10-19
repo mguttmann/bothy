@@ -108,7 +108,7 @@ func parallelCreates(t *testing.T, c *harness.Client, ch string, n int, b []byte
 // TestCreateUpload_StorageFull: with a reserve file.fs.min_free_bytes above the free space of the
 // root, createUpload answers 503 unavailable storage_full with Retry-After.
 func TestCreateUpload_StorageFull(t *testing.T) {
-	s := harness.Start(t, harness.Options{Config: baseConfig(map[string]string{"file.fs.min_free_bytes": "9000000000000000000"})})
+	s := harness.Start(t, harness.Options{Config: baseConfig(map[string]string{"file.fs.min_free_bytes": "50000000000000"})})
 	w := harness.BuildMatrixWorld(t, s)
 	r := create(t, w.People["Alex"], w.Channels["Support/Allgemein"], "a.txt", content, nil)
 	wantProblem(t, r, http.StatusServiceUnavailable, "unavailable", "storage_full")
