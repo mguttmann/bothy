@@ -167,6 +167,7 @@ Betriebswerte der eigenen Messung ([25-visualisierung.md](../spec/25-visualisier
 | `bothy.audit.verify.last_success.timestamp` | Gauge | `s` | keine | worker | `bothy_audit_verify_last_success_timestamp_seconds` |
 | `bothy.telemetry.dropped` | Zähler | `{item}` | `bothy.signal` (`traces`, `metrics`, `logs`) | alle Prozesse | `bothy_telemetry_dropped_total` |
 | `bothy.secrets.refresh.failures` | Zähler | `{refresh}` | keine | alle Prozesse: erneutes Lesen eines Geheimnisses scheitert, der alte Wert bleibt ([02-architektur.md](../spec/02-architektur.md) 14.4) | `bothy_secrets_refresh_failures_total` |
+| `bothy.client_metrics.discarded` | Counter | `{entry}` | `bothy.reason` (`unknown_name`, `kind_mismatch`, `invalid_bounds`, `invalid_value`) | api: entries of a `submitClientMetrics` batch the server discarded one by one (4.6a, [ADR 0057](../adr/0057-client-telemetrie-ueber-einen-server-endpunkt.md), M4-31) | `bothy_client_metrics_discarded_total` |
 
 `bothy-backupd` sieht die Volumes `pgdata` und `files` nur lesend und misst dort nur den freien
 Platz.

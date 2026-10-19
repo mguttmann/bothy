@@ -111,6 +111,14 @@ zu öffnen, und weil der Server jede Annahme prüfen kann. Normativ in
 - Quelle (abgerufen 2026-10-10): Q1 OpenTelemetry Blog, "Dart and Flutter",
   https://opentelemetry.io/blog/2026/dart-flutter-opentelemetry/ [belegt, wie in 15 und 17
   zitiert].
-- Offen für Bau-Ticket M4-31: Weg der vorab aggregierten Histogramme in den Collector (eigene
-  Datenpunkte über OTLP oder Messung je Bucket) mit einem Test, der Summen und Grenzen vergleicht.
+- Decided by build ticket M4-31 (docs/DECISIONS.md D-M4-31-1): the pre-aggregated histograms
+  reach the Collector as own OTLP data points. An `AggregatedSet` in `platform/otel/metrics` is an
+  `sdkmetric.Producer` attached to the OTLP metric reader; it keeps one cumulative histogram per
+  name and attribute set with the bounds of signals.md 4.7 and adds the client's bucket counts
+  unchanged. One measurement per bucket count was rejected: it would put every value at one point
+  of its bucket through the SDK's own aggregation and could not keep the counts exact. Exact are the
+  count and the count of every bucket; the sum is an upper bound (every value at its bucket's upper
+  bound, the clients send no sum); minimum and maximum are absent. `TestAggregated_HistogramPath`
+  sends known buckets (13 values up to 0.1 s, 3 up to 0.25 s, 2 up to 10 s) and reads count 18,
+  the counts per bound and the sum 22.05 from an in-memory reader.
 - Verwandt: ADR 0021 (Audit getrennt von Telemetrie), ADR 0027 (Flutter), ADR 0034 (Collector).

@@ -722,8 +722,10 @@ Identitäten kommen aus der Build-Konfiguration (ADR 0044); Signieren und Veröf
 Manager statt CocoaPods; https://pub.dev/packages/sentry_flutter und
 https://docs.sentry.io/platforms/dart/guides/flutter/, abgerufen 2026-10-10 [belegt]).
 
-- Aus, solange die Instanz keine DSN in der Build-Konfiguration bzw. den Instanz-Einstellungen
-  setzt; die Person kann es abschalten (`privacy.crash_reports`).
+- Off while the build configuration names no DSN (the build define `CRASH_DSN`); there is no
+  instance setting for the target, because no configuration key exists for it
+  ([DECISIONS](../DECISIONS.md) D-M4-31-3). The person can turn it off
+  (`privacy.crash_reports`, shown only when a target exists).
 - Keine Inhalte: `sendDefaultPii` aus; `beforeSend` und `beforeBreadcrumb` entfernen Texte,
   Dateinamen, URLs mit IDs, Titel; keine Screenshots, kein Session Replay, keine Ansichts-Hierarchie.
 - Nur technische Merkmale: App-Version, Plattform, Gerätetyp, gehashte Instanz-ID.
@@ -752,6 +754,10 @@ Dichte, Theme. Die Liste ist geschlossen; der Server verwirft Einträge mit ande
 unpassendem `kind` einzeln und nimmt den Rest des Stapels an (`202`). Senden höchstens alle `client.metrics.flush_interval`, abschaltbar
 (`privacy.client_metrics`). Endpunkt `POST /api/v1/client-metrics` mit der Aktion
 `client_metrics.submit` (05; [ADR 0057](../adr/0057-client-telemetrie-ueber-einen-server-endpunkt.md)).
+Histograms arrive pre-aggregated with the bounds of [signals.md](../observability/signals.md) 4.7;
+the server hands their bucket counts to the Collector unchanged as cumulative OTLP histogram data
+points (count and bucket counts exact, the sum an upper bound from the bucket bounds, no minimum or
+maximum; [DECISIONS](../DECISIONS.md) D-M4-31-1).
 
 ## 18. Schalter (Feature-Flags)
 

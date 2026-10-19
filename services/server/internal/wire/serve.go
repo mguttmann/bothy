@@ -179,6 +179,8 @@ type server struct {
 	messaging *Messaging
 	// personal is the personal data of sync (M1-61), built in the chat step over chat and messaging.
 	personal *Personal
+	// stats is the client metrics part of the stats module (M4-31), built in the chat step.
+	stats *Stats
 	// notify is the notify module (M3-18), built in the chat step over chat, sync and identity.
 	notify *Notify
 	// syncReads is catch-up and snapshot of sync (M1-63), built in the chat step after personal.
@@ -830,8 +832,12 @@ func (s *server) startChat(context.Context) error {
 	if err != nil {
 		return err
 	}
+	st, err := NewStats(az, p.Service.Settings())
+	if err != nil {
+		return err
+	}
 	s.mu.Lock()
-	s.chat, s.messaging, s.personal, s.notify, s.syncReads = c, m, p, n, r
+	s.chat, s.messaging, s.personal, s.notify, s.syncReads, s.stats = c, m, p, n, r, st
 	s.mu.Unlock()
 	return nil
 }
@@ -1002,6 +1008,7 @@ func (s *server) handlers() Handlers {
 	s.notify.fillHandlers(&h)
 	s.syncReads.fillHandlers(&h)
 	s.files.fillHandlers(&h)
+	s.stats.fillHandlers(&h)
 	if h.Hosts == nil && s.terminal != nil {
 		h.Hosts = s.terminal.Handlers
 	}

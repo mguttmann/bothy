@@ -28,7 +28,8 @@ Allowed members (docs/spec/15-client-architektur.md, 3.1; `tools/arch-check/rule
 `admin_ui`, `sync_engine`, `design_system`, `device_key`, `terminal_ui` and every member they
 reach; `make arch` checks the manifest and every import. Outside the workspace: `flutter_riverpod`
 and `riverpod_annotation` (state, with `riverpod_generator`), `go_router`, `flutter_secure_storage`,
-`url_launcher`, `path_provider`, `timezone` (IANA time zones of the profile) and `dio`. The network status needs no plugin
+`url_launcher`, `path_provider`, `timezone` (IANA time zones of the profile), `dio`,
+`sentry_flutter` (crash reports, M4-31) and `crypto` (the hashed instance tag of a crash report). The network status needs no plugin
 (docs/DECISIONS.md D-M4-18-8).
 
 ## Layout
@@ -51,6 +52,7 @@ and `riverpod_annotation` (state, with `riverpod_generator`), `go_router`, `flut
 | `lib/onboarding/` | E1 to E7, the controller of the flow, codes and remaining times |
 | `lib/admin/` | the route of the administration: `AdminRoute`, `adminRepositoryProvider`, the mapping of `AdminLocation` to `/admin/...` |
 | `lib/settings/` | Settings (01 5.1 D8): the sections, the personal settings of 01 11 with their defaults, the profile and the devices section hosting `admin_ui` |
+| `lib/telemetry/` | app metrics and crash reports (M4-31): the collector, the measurement points, the sender, the scrubbed crash path and their providers |
 | `lib/platform/` | secure storage, device key signers, loopback redirect, browser, lifecycle, network, frames |
 | `macos/`, `windows/` | the runners (`flutter create`), URL scheme registration and the deep link channel |
 | `tool/branding_defines.dart` | build branding to dart defines and native settings |
@@ -75,6 +77,10 @@ The app shows `branding.product_name` of the instance after E1, never a name of 
 A release build on macOS needs a team signature: the release entitlements carry the keychain
 access group of `flutter_secure_storage` (docs/spec/15-client-architektur.md 9). Debug builds run
 without one.
+
+Crash reports need a target in the build configuration (docs/spec/15-client-architektur.md 16):
+`--dart-define=CRASH_DSN=<dsn>` and optionally `--dart-define=CRASH_ENVIRONMENT=<name>`. Without
+`CRASH_DSN` the crash path never starts and Settings hides `privacy.crash_reports`.
 
 ## Test
 
@@ -129,3 +135,34 @@ by the level and capabilities the server reported for the channel, never by gran
 goes through the outbox (docs/DECISIONS.md D-M4-20-1 to D-M4-20-8). Rendering loads and runs
 nothing from a message (SEC-T13). The session column (`lib/session_column/`) has its frame with
 the pinned messages; the agent session and the files follow (M4-21, M4-22).
+
+## Client metrics and crash reports
+
+`lib/telemetry/` measures the closed list of docs/observability/signals.md 4.6a (`ClientMetric`,
+held equal to the table by a test) and nothing else: no text, no name and no ID of a thread,
+channel or person leaves the device (15 17, ADR 0057). The measurement points:
+
+| Metric | Starts | Stops |
+|---|---|---|
+| `client.cold_start.duration` | the first line of `main` | the frame after the sidebar first shows spaces from the local database |
+| `client.thread_open.duration` | the history column of a thread is created | the frame after it first shows messages |
+| `client.send_local.duration` | Enter in the composer | the frame after the outbox write |
+| `client.frames`, `client.frames.over_budget` | the frame timings of the engine | per frame; over budget above one refresh interval |
+| `client.catchup.duration`, `client.catchup.events` | the connection enters catch-up | it is live; events are the `dispatch` frames in between |
+| `client.resync` | a `Resynced` notice of the engine | |
+| `client.reconnects` | a new gateway connection, with the close code of the previous one | |
+| `client.outbox.depth` | every change of the outbox depth | |
+
+Histograms use the bounds "Durations up to seconds" of signals.md 4.7; a value above the top
+bound counts in the top bucket (`le` 10), because a bucket carries only its upper bound and the
+server accepts only these bounds. The sender sends at most once per
+`client.metrics.flush_interval` and when the app quits, only while `privacy.client_metrics` is on,
+and stops after `403 feature_disabled` until the setting changes (docs/DECISIONS.md D-M4-31-2).
+Crash reports go through `sentry_flutter` only with a `CRASH_DSN` and, after the login, the
+person's stored `privacy.crash_reports` on (D-M4-31-5), and report Dart errors only: the
+native crash handlers and the session pings are off, because they bypass the scrubber
+(D-M4-31-6);
+`beforeSend` and `beforeBreadcrumb` remove every content, header, token and URL parameter
+(D-M4-31-3). `test/telemetry/canary_test.dart` drives the collector, the sender and the Sentry
+pipeline with a recording transport while a thread with canary content shows and asserts that no
+canary value leaves the device; no test talks to a real Sentry service.

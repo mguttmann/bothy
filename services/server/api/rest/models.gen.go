@@ -16612,6 +16612,9 @@ type CreateThreadJSONRequestBody = ThreadCreate
 // CreateUploadJSONRequestBody defines body for CreateUpload for application/json ContentType.
 type CreateUploadJSONRequestBody = UploadCreate
 
+// SubmitClientMetricsJSONRequestBody defines body for SubmitClientMetrics for application/json ContentType.
+type SubmitClientMetricsJSONRequestBody = ClientMetricsBatch
+
 // ApproveDeviceJSONRequestBody defines body for ApproveDevice for application/json ContentType.
 type ApproveDeviceJSONRequestBody = DeviceApprove
 

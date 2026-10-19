@@ -91,6 +91,10 @@ func readCatalogue(t *testing.T) docCatalogue {
 		switch {
 		case section == "7" && len(cells) == 2:
 			addBuckets(t, cat.buckets, cells)
+		case section == "6a" && len(cells) == 5:
+			if r, ok := parseAppRow(cells); ok {
+				cat.rows[r.name] = r
+			}
 		case section >= "1" && section <= "6" && section != "6a" && len(cells) == 6:
 			if r, ok := parseRow(cells); ok {
 				cat.rows[r.name] = r
@@ -162,6 +166,29 @@ func parseRow(cells []string) (docRow, bool) {
 	return r, true
 }
 
+// appCommonKeys are the attributes of every app metric, which the prose of 4.6a names instead of
+// the table.
+var appCommonKeys = []string{"bothy.client.platform", "bothy.client.density", "bothy.client.theme", "bothy.client.app_major"}
+
+// parseAppRow reads a row of 4.6a: name in the app, type, unit, further attributes, server name
+// and Prometheus name. The row is keyed by the server name and carries the common attributes of
+// the section plus its further ones.
+func parseAppRow(cells []string) (docRow, bool) {
+	server := backticked.FindAllStringSubmatch(cells[4], -1)
+	if len(server) == 0 {
+		return docRow{}, false
+	}
+	r, ok := parseRow([]string{"`" + server[0][1] + "`", cells[1], cells[2], cells[3], "", ""})
+	if !ok {
+		return docRow{}, false
+	}
+	for _, k := range appCommonKeys {
+		r.keys = append(r.keys, k)
+		r.attrs[k] = nil
+	}
+	return r, true
+}
+
 // addBuckets reads a 4.7 row: the histogram names in the first cell, the bounds in the second.
 func addBuckets(t *testing.T, out map[string][]float64, cells []string) {
 	t.Helper()
@@ -217,8 +244,8 @@ func TestCatalogue_RegistryMatchesSignalsDoc(t *testing.T) {
 }
 
 // TestCatalogue_M1InstrumentSet: the registry holds exactly the instruments this build records
-// (brief M1-68 "Instruments", plus the gauges of M2-01 already on the base and
-// bothy.file.upload.size of M3-03).
+// (brief M1-68 "Instruments", plus the gauges of M2-01 already on the base,
+// bothy.file.upload.size of M3-03 and the app metrics of M4-31).
 func TestCatalogue_M1InstrumentSet(t *testing.T) {
 	want := []string{
 		"bothy.audit.verify.failures", "bothy.audit.verify.last_success.timestamp", "bothy.authz.decisions",
@@ -228,7 +255,14 @@ func TestCatalogue_M1InstrumentSet(t *testing.T) {
 		"bothy.gateway.connections.active", "bothy.gateway.outbound.dropped", "bothy.gateway.resync", "bothy.job.duration",
 		"bothy.job.queue", "bothy.message.created", "bothy.ratelimit.rejected", "bothy.secrets.refresh.failures",
 		"bothy.telemetry.dropped", "db.client.operation.duration", "http.server.request.duration",
+		// M4-31: the app metrics of 4.6a and the discard counter of their endpoint.
+		"bothy.client.catchup.duration", "bothy.client.catchup.events", "bothy.client.cold_start.duration",
+		"bothy.client.frames", "bothy.client.frames.over_budget", "bothy.client.outbox.depth",
+		"bothy.client.push.placeholder", "bothy.client.push_display.duration", "bothy.client.reconnects",
+		"bothy.client.resync", "bothy.client.send_local.duration", "bothy.client.thread_open.duration",
+		"bothy.client_metrics.discarded",
 	}
+	slices.Sort(want)
 	var got []string
 	for _, s := range All() {
 		got = append(got, s.Name)

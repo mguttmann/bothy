@@ -841,6 +841,10 @@ func (stubServer) GetFile(context.Context, rest.GetFileRequestObject) (rest.GetF
 	return nil, nil
 }
 
+func (stubServer) SubmitClientMetrics(context.Context, rest.SubmitClientMetricsRequestObject) (rest.SubmitClientMetricsResponseObject, error) {
+	return nil, nil
+}
+
 // TestRealTable_Enabled pins the enabled operations (P-04) with action and rate-limit class
 // (AZ-P1): the three device reads of M1-33, the ten people, owner and self operations of M1-31
 // and the JWKS and the rotation of the signing keys (M1-32), the sessions (M1-34), the step-up
@@ -849,7 +853,7 @@ func (stubServer) GetFile(context.Context, rest.GetFileRequestObject) (rest.GetF
 // the OIDC login (M1-41), the trusted header login (M1-43), the revocations (M1-45), the host
 // records (M2-39), the local accounts (M1-39), the nine app operations (M2-24), the threads
 // (M1-55), sending (M1-56), editing and deleting (M1-58), the preferences (M3-18) and the upload
-// sessions with getFile (M3-03). A handler
+// sessions with getFile (M3-03) and the client metrics (M4-31). A handler
 // ticket that enables an operation changes this test together with
 // api/operations.yaml.
 func TestRealTable_Enabled(t *testing.T) {
@@ -1097,6 +1101,8 @@ func TestRealTable_Enabled(t *testing.T) {
 		"putChannelBehavior":     {"PUT /api/v1/channels/{channel_id}/behavior", "channel.behavior.update", "rl.admin"},
 		"listServedChannels":     {"GET /api/v1/agents/me/channels", "agent.config.read", "rl.read"},
 		"getServedChannelConfig": {"GET /api/v1/agents/me/channels/{channel_id}/config", "agent.config.read", "rl.read"},
+		// M4-31
+		"submitClientMetrics": {"POST /api/v1/client-metrics", "client_metrics.submit", "rl.write"},
 	}
 	ops := routes.Enabled()
 	if len(ops) != len(want) {

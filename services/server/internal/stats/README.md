@@ -52,3 +52,26 @@ Nur dieses Modul schreibt und liest diese Tabellen per SQL (03-datenmodell.md, G
 ## Kapitel
 
 [02-architektur.md](../../../../docs/spec/02-architektur.md), [01-produkt.md](../../../../docs/spec/01-produkt.md), [17-observability.md](../../../../docs/spec/17-observability.md)
+
+## Client metrics (M4-31)
+
+`submitClientMetrics` (`POST /api/v1/client-metrics`, action `client_metrics.submit`, `rl.write`)
+takes the app metrics of docs/observability/signals.md 4.6a (ADR 0057):
+
+- `clientmetrics.go` (port): `ClientMetrics` with `Submit` and the batch types.
+- `domain/`: the closed list of names and kinds, the per-entry filter (unknown name, mismatched
+  `kind`, bucket bounds outside 4.7, negative counts, a negative counter or a non-finite value
+  discard only that entry) and the attribute normalization (`platform`, `density`, `theme`,
+  `app_major` from `app_version` or `other`; `close_code` only for `client.reconnects`, `other`
+  outside the codes of 04 6.4).
+- `app/`: `SubmitClientMetrics` reads `privacy.client_metrics` of the person (`403
+  feature_disabled` when off), filters, records and answers `202`; it attaches no principal or
+  device and writes no table.
+- `adapters/httpapi`: the handler of the generated interface; `adapters/otelmetrics`: the sink over
+  the instruments `bothy.client.*` and `bothy.client_metrics.discarded`.
+
+Histogram path (docs/DECISIONS.md D-M4-31-1): the buckets go to `metrics.AggregatedSet` in
+`internal/platform/otel/metrics`, an `sdkmetric.Producer` on the OTLP metric reader, which exports
+them as cumulative OTLP histogram data points with the bounds of 4.7. Count and bucket counts are
+exact; the sum is an upper bound (each value at its bucket's upper bound), minimum and maximum are
+absent. The app clamps a value above the top bound into the top bucket.

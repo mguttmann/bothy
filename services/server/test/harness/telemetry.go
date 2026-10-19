@@ -14,6 +14,7 @@ import (
 	"go.opentelemetry.io/otel/sdk/trace/tracetest"
 
 	"github.com/OWNER/bothy/services/server/internal/platform/otel"
+	"github.com/OWNER/bothy/services/server/internal/platform/otel/metrics"
 )
 
 // TelemetrySinks are the in-process exporters of a harness server (M1-69): spans, OTLP log
@@ -27,13 +28,15 @@ type TelemetrySinks struct {
 	Spans *tracetest.InMemoryExporter
 	// Logs holds every exported OTLP log record.
 	Logs *MemoryLogExporter
-	// Metrics is collected on demand (Collect of sdkmetric.ManualReader).
+	// Metrics is collected on demand (Collect of sdkmetric.ManualReader); it also reads the
+	// pre-aggregated app histograms of the process (metrics.DefaultAggregated, M4-31).
 	Metrics *sdkmetric.ManualReader
 }
 
 // NewTelemetrySinks returns empty sinks.
 func NewTelemetrySinks() *TelemetrySinks {
-	return &TelemetrySinks{Spans: tracetest.NewInMemoryExporter(), Logs: &MemoryLogExporter{}, Metrics: sdkmetric.NewManualReader()}
+	return &TelemetrySinks{Spans: tracetest.NewInMemoryExporter(), Logs: &MemoryLogExporter{},
+		Metrics: sdkmetric.NewManualReader(sdkmetric.WithProducer(metrics.DefaultAggregated()))}
 }
 
 // exporters returns the sinks as otel.Exporters.

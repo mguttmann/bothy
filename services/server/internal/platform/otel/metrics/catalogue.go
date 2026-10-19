@@ -252,7 +252,7 @@ var (
 // All returns every instrument of the catalogue this build registers, in catalogue order; a
 // fresh slice per call.
 func All() []Spec {
-	return []Spec{
+	return append([]Spec{
 		HTTPServerRequestDuration, AuthzDecisions, AuthzErrors, RateLimitRejected,
 		GatewayConnectionsActive, GatewayConnectDuration, GatewayCatchupDuration, GatewayResync,
 		GatewayClose, GatewayOutboundDropped,
@@ -261,5 +261,6 @@ func All() []Spec {
 		JobDuration, JobQueue, EgressBlocked, FileUploadSize,
 		DBClientOperationDuration, DBPoolConnections,
 		AuditVerifyFailures, AuditVerifyLastSuccess, TelemetryDropped, SecretsRefreshFailures,
-	}
+		ClientMetricsDiscarded,
+	}, Client()...)
 }

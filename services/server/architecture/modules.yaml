@@ -234,7 +234,8 @@ modules:
     ephemeral_events: [stats.live]
     ws_ops: [stats.subscribe, stats.unsubscribe]
     depends_on: [chat, agents, messaging, runs, billing]
-    adapter_vendors: []
+    # otel: the meter provider of the instruments of the app metrics (adapters/otelmetrics, M4-31).
+    adapter_vendors: [otel]
   notify:
     tables: [notification_preferences, quiet_hours, push_registrations]
     actions: [notification_pref.update, quiet_hours.update, push.register, push.unregister,

@@ -5,6 +5,7 @@
 library;
 
 import 'dart:async';
+import 'dart:ui' show AppExitResponse;
 
 import 'package:design_system/design_system.dart';
 import 'package:flutter/material.dart';
@@ -17,6 +18,7 @@ import '../onboarding/onboarding_controller.dart';
 import '../onboarding/onboarding_screen.dart';
 import '../settings/settings_providers.dart';
 import '../settings/settings_shell.dart';
+import '../telemetry/telemetry_providers.dart';
 import 'deep_links.dart';
 import 'layout/desktop_shell.dart';
 import 'providers/ports.dart';
@@ -46,6 +48,14 @@ class _ClientAppState extends ConsumerState<ClientApp> {
   late final GoRouter _router;
   StreamSubscription<Uri>? _links;
   String? _kept;
+
+  /// Sends the collected app metrics before the app quits (brief M4-31 Design note 2).
+  late final AppLifecycleListener _exit = AppLifecycleListener(
+    onExitRequested: () async {
+      await ref.read(metricsSenderProvider)?.flush();
+      return AppExitResponse.exit;
+    },
+  );
 
   @override
   void initState() {
@@ -115,6 +125,7 @@ class _ClientAppState extends ConsumerState<ClientApp> {
       // (01 6.7).
       errorBuilder: _shell,
     );
+    _exit;
     final deepLinks = ref.read(appPortsProvider).deepLinks;
     _links = deepLinks.links.listen(_open);
     unawaited(
@@ -140,6 +151,7 @@ class _ClientAppState extends ConsumerState<ClientApp> {
   @override
   void dispose() {
     unawaited(_links?.cancel());
+    _exit.dispose();
     _router.dispose();
     _step.dispose();
     super.dispose();
@@ -151,6 +163,8 @@ class _ClientAppState extends ConsumerState<ClientApp> {
       onboardingControllerProvider.select((s) => s.step),
       (_, step) => _step.value = step,
     );
+    // The sender while signed in and the crash path by the privacy switches (M4-31).
+    ref.watch(appTelemetryProvider);
     final instance = ref.watch(currentInstanceProvider);
     final branding = ref.watch(appPortsProvider).branding;
     final media = MediaQuery.maybeOf(context);

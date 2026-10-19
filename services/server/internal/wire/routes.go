@@ -21,6 +21,7 @@ import (
 	messaginghttp "github.com/OWNER/bothy/services/server/internal/messaging/adapters/httpapi"
 	notifyhttp "github.com/OWNER/bothy/services/server/internal/notify/adapters/httpapi"
 	"github.com/OWNER/bothy/services/server/internal/platform/httpserver"
+	statshttp "github.com/OWNER/bothy/services/server/internal/stats/adapters/httpapi"
 	synchttp "github.com/OWNER/bothy/services/server/internal/sync/adapters/httpapi"
 	terminalhttp "github.com/OWNER/bothy/services/server/internal/terminal/adapters/httpapi"
 )
@@ -146,6 +147,8 @@ type Handlers struct {
 	// Files implements createUpload, uploadPart, getUpload, completeUpload, abortUpload and
 	// getFile (files, M3-03).
 	*fileshttp.Files
+	// ClientMetrics implements submitClientMetrics (stats, M4-31).
+	*statshttp.ClientMetrics
 }
 
 // routeBuilder builds and verifies the routes of one REST surface against a catalogue with the

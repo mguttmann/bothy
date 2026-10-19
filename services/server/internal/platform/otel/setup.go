@@ -88,7 +88,8 @@ type Exporters struct {
 	// Log receives the OTLP log records through the bounded queue and the attribute filter.
 	Log sdklog.Exporter
 	// MetricReader is a reader of the meter provider (for example sdkmetric.NewManualReader),
-	// behind the views of the metric registry.
+	// behind the views of the metric registry. To read the pre-aggregated app histograms too,
+	// build it with sdkmetric.WithProducer(metrics.DefaultAggregated()), as the OTLP reader does.
 	MetricReader sdkmetric.Reader
 }
 
@@ -273,7 +274,10 @@ func newMeterProvider(ctx context.Context, cfg Config, env otelEnv, res *resourc
 		if err != nil {
 			return nil, err
 		}
-		mopts = append(mopts, sdkmetric.WithReader(sdkmetric.NewPeriodicReader(countingMetricExporter{next: exp, dropped: dropped})))
+		// The producer adds the pre-aggregated app histograms of the stats module (M4-31,
+		// docs/DECISIONS.md D-M4-31-1); an injected reader attaches it itself.
+		mopts = append(mopts, sdkmetric.WithReader(sdkmetric.NewPeriodicReader(countingMetricExporter{next: exp, dropped: dropped},
+			sdkmetric.WithProducer(metrics.DefaultAggregated()))))
 	}
 	return sdkmetric.NewMeterProvider(mopts...), nil
 }

@@ -192,6 +192,7 @@ enabled:             # operationIds that have a handler; sorted ascending
   - setThreadTags
   - setThreadTitle
   - stepUpWithPassword
+  - submitClientMetrics
   - suspendApp
   - uninstallApp
   - unlinkIdentity
@@ -491,9 +492,6 @@ later:               # every other operationId of docs/api/openapi.yaml; sorted 
   - operation_id: startRun
     etappe: M2
     ticket: M2-09
-  - operation_id: submitClientMetrics
-    etappe: M4
-    ticket: M4-31
   - operation_id: submitCostReconciliation
     etappe: M2
     ticket: M2-28
