@@ -47,6 +47,7 @@ String targetLabel(AppLocalizations l, AdminTarget target) =>
       AdminTargetKind.instance => l.adminTargetInstance,
       AdminTargetKind.space => l.adminTargetSpace(target.name),
       AdminTargetKind.channel => l.adminTargetChannel(target.path),
+      AdminTargetKind.host => l.adminTargetHost(target.name),
     };
 
 /// The last day of a validity that ends at [end] (exclusive), seen in [timeZone] relative to
@@ -67,8 +68,8 @@ String lastDayLabel(
 }
 
 /// The names of what the grant answers name by ID, loaded from the directory lists the caller
-/// may read (`listUsers`, `listGroups`, `listAgents`, `listSpaces`, `listSpaceChannels`). A
-/// list the server refuses stays empty, and its IDs show as they are.
+/// may read (`listUsers`, `listGroups`, `listAgents`, `listSpaces`, `listSpaceChannels`,
+/// `listHosts`). A list the server refuses stays empty, and its IDs show as they are.
 final class AccessNames {
   /// Creates the names from loaded lists.
   AccessNames({
@@ -76,6 +77,7 @@ final class AccessNames {
     this.groups = const [],
     this.agents = const [],
     this.targets = const [],
+    this.hosts = const [],
   });
 
   /// Loads every list of [repository]; a refused list stays empty.
@@ -104,6 +106,11 @@ final class AccessNames {
       groups: await orEmpty(allGroups),
       agents: await orEmpty(repository.agents),
       targets: await orEmpty(repository.targets),
+      // Hosts are targets of the capability `terminal` only (07 2.12; M4-37); they stay out of
+      // [targets], whose entries "Who has access?" explains.
+      hosts: await orEmpty(
+        () async => [for (final h in await repository.hosts()) h.target],
+      ),
     );
   }
 
@@ -119,6 +126,9 @@ final class AccessNames {
   /// The spaces and channels.
   final List<AdminTarget> targets;
 
+  /// The hosts, as targets of kind [AdminTargetKind.host].
+  final List<AdminTarget> hosts;
+
   /// The name of the person or agent [id], or [id].
   String principal(String id) =>
       people.where((p) => p.id == id).firstOrNull?.displayName ??
@@ -129,7 +139,8 @@ final class AccessNames {
   String group(String id) =>
       groups.where((g) => g.id == id).firstOrNull?.name ?? id;
 
-  /// The path of the space or channel [id] (`Marketing/Kampagnen`), or [id].
+  /// The path of the space or channel [id] (`Marketing/Kampagnen`) or the name of the host
+  /// [id], or [id].
   String target(String id) =>
-      targets.where((t) => t.id == id).firstOrNull?.path ?? id;
+      [...targets, ...hosts].where((t) => t.id == id).firstOrNull?.path ?? id;
 }

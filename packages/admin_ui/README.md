@@ -3,8 +3,9 @@
 Administration screens for the desktop app, the console and the emergency actions on mobile.
 
 Status: own devices and sessions (M4-25), the administration of people, groups and waiting
-devices (M4-26), grants with preview, "Who has access?" and "View as person" (M4-27) and the
-audit log (M4-29); agents (M4-28) and the console (M6) follow. Kind: Flutter package, a member of the Dart
+devices (M4-26), grants with preview, "Who has access?" and "View as person" (M4-27), the
+audit log (M4-29) and hosts of the terminal with pairing and session users (M4-37); agents
+(M4-28) and the console (M6) follow. Kind: Flutter package, a member of the Dart
 workspace at the repository root (`resolution: workspace`, `publish_to: none`).
 
 ## What it offers
@@ -34,12 +35,16 @@ database, because the console has neither a gateway nor a local store (15 3.1).
 | `AuditLogView`, `AuditFilters`, `AuditEntryDetail` | A6 Audit: the virtualized list (time in the person's time zone, who, action with its label where `l10n` has one, result, resource, reason), the filters (action from the loaded IDs or typed, person, result, resource kind and ID, days `YYYY-MM-DD`), "Load more" with the cursor, the details of an entry (correlation ID, deny reason, details, hashes); nothing changes or deletes an entry |
 | `AuditChainCheckButton`, `AuditChainPanel` | "Check chain": without a filter from the last checkpoint, with a filter over the `seq` span of the listed entries; "Chain checked up to no. n: unchanged" or the first broken entry with its reason in the danger style, the range, the checkpoints compared and the warnings |
 | `AuditExportBar`, `AuditSaveTarget`, `auditNdjsonToCsv`, `auditCsvCell` | "Export" writes the NDJSON stream unchanged, "Export as CSV" converts it on the device (columns `occurred_at` to `prev_hash`, RFC 4180, an apostrophe before a cell starting with `=`, `+`, `-` or `@`); the host passes the save dialog (`AuditSaveTarget`), without one there are no export buttons |
+| `HostsRepository`, `ApiHostsRepository` | A8 over REST: `getMe` (`is_owner` lists "Hosts"), `listHosts`, `getHost`, `createHost`, `issueHostPairingCode`, `confirmHost` (`FingerprintMismatch` carries `attempts_remaining`), `updateHost`, `setHostLlmCredentials`, `setHostState`, `listAuditEvents` (the person of an ended assignment, step-up) and `listTerminalSessions`; `AdminRepository` includes these calls |
+| `HostsList`, `HostDetail` | A8 for owners: the hosts and one host with every field of the first wireframe; the check results ask the audit of the host only for a named session user without a valid assignment |
+| `PairingWizard`, `CreateHostDialog`, `FingerprintConfirm`, `LlmLoginChoice`, `ServerHostChoice`, `SessionUserRows` | the three steps of pairing: create, the code in the command `bothy-host pair --server <origin> --code <code>` with its remaining time and "New code", then the fingerprint prefix, the LLM login (I6 explained), the server host and the session users from the reported names only |
+| `LlmLoginSection`, `ServerHostSection`, `DoctorResults`, `HostGrantsSection`, `SessionUsersSection`, `HostStateActions` | the parts of the host page: change of the declaration with `i6_violation` explained, declaration and report of the server host, every check entry with names and people, the grants with the server's preview and a "Not effective" badge, assign and end session users (`session_user_taken` and `session_user_not_on_host` explained), disable, enable, re-pair, retire |
 | `ConfirmChange`, `ProblemBanner`, `adminFailure`, `CodeText` | the one confirmation before a change (danger style for destructive ones), the server's problem texts (`one_time_secret` and `i1_violation` explained), the code view of onboarding and enrollment codes |
 
 Step-up comes only from the server: a changing call carries its purpose text
 (`stepUpPurposeExtra`), and the step-up interceptor of `auth` asks when the server answers
-`401 step_up_required` (05: `device.approve` and `device.revoke` have step-up,
-`session.revoke` has none). A `403` hides the refused action for that item and shows the
+`401 step_up_required` (05: `device.approve`, `device.revoke`, `host.manage` and `audit.read`
+have step-up, `session.revoke` has none). A `403` hides the refused action for that item and shows the
 translated reason; the screens hold no permission logic (15 1 principle 1).
 
 ## Embedding the administration
@@ -75,6 +80,8 @@ Further rules checked by `make arch`:
 | `lib/src/audit/` | the audit log of M4-29 |
 | `lib/src/step_up/` | the step-up dialog |
 | `lib/src/grants/`, `lib/src/access/`, `lib/src/data/access_repository.dart` | the permission screens of M4-27 |
+| `lib/src/hosts/`, `lib/src/data/hosts_repository.dart` | screen A8 of M4-37 |
+| `test/hosts/` | pairing, I6, session users, check results, grants on a host and the host page over the host fake (`test/admin/hosts_fake.dart`) |
 | `test/grants/`, `test/access/` | the wizard, revoke, "Who has access?" and "View as person"; the fake reads the example of 07 9.3 at run time |
 | `test/self/`, `test/admin/`, `test/audit/` | widget tests over fake repositories that behave like the server behind the step-up interceptor |
 | `test/goldens/` | goldens (`ci/` with Ahem, `macos/` with the bundled fonts) |

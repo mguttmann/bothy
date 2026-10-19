@@ -192,7 +192,77 @@ void main() {
         await tap('confirm.submit');
       });
 
-      expect(checked, hasLength(16));
+      // Hosts (M4-37): create, confirm, end an assignment, the audit of a former session
+      // user, the declaration, disable and re-pair.
+      Future<void> type(String key, String text) async {
+        await app.waitFor(find.byKey(ValueKey(key)));
+        await tester.enterText(find.byKey(ValueKey(key)).first, text);
+        await tester.pumpAndSettle();
+      }
+
+      Future<void> pick(String key, String label) async {
+        await tap(key);
+        await tester.tap(find.text(label).last);
+        await tester.pumpAndSettle();
+      }
+
+      await go('/admin/hosts');
+      await check('createHost', () async {
+        await tap('hosts.add');
+        await type('createHost.name', 'Build host');
+        await type('createHost.reason', 'Builds');
+        await tap('pairing.create');
+      });
+      final hostId = world.hosts.keys.single;
+      world.pairHost(hostId, ['term-sam']);
+      await tap('pairing.next');
+      await check('confirmHost', () async {
+        await type('fingerprint.prefix', '7KQ29XTA');
+        await tap('llmChoice.organization');
+        await tap('serverHost.no');
+        await tap('sessionRows.add');
+        await pick('sessionRow.0.person', 'Sam');
+        await pick('sessionRow.0.name', 'term-sam');
+        await type('pairing.reason', 'Builds');
+        await tap('pairing.confirm');
+      });
+      await check('updateHost', () async {
+        await tap('sessionUser.$sam.end');
+        await type('confirm.reason', 'Rotate');
+        await tap('confirm.submit');
+      });
+      world.hosts[hostId]!.doctor = [
+        {
+          'check': 'hd9_foreign_homes',
+          'ok': false,
+          'code': 'foreign_home_listable',
+          'session_user': 'term-sam',
+        },
+      ];
+      await check('listAuditEvents', () async {
+        await go('/admin/hosts');
+        await go('/admin/hosts/$hostId');
+      });
+      await app.waitFor(find.textContaining('formerly assigned to Sam'));
+      await check('setHostLlmCredentials', () async {
+        await tap('llm.change');
+        await tap('llmChoice.none');
+        await type('llm.reason', 'No login');
+        await tap('confirm.submit');
+      });
+      await check('setHostState', () async {
+        await tap('host.disable');
+        await type('confirm.reason', 'Maintenance');
+        await tap('confirm.submit');
+      });
+      await check('issueHostPairingCode', () async {
+        await tap('host.repair');
+        await type('confirm.reason', 'New disk');
+        await tap('confirm.submit');
+      });
+      await tap('pairing.close');
+
+      expect(checked, hasLength(23));
       expect(server.violations, isEmpty);
     } finally {
       await app.stop();

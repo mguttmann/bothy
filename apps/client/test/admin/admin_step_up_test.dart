@@ -66,6 +66,10 @@ void main() {
         adminLocationOf(['admin', 'grants', 'channel.x']),
         const AdminLocation(AdminSection.grants, id: 'channel.x'),
       );
+      expect(
+        adminLocationOf(['admin', 'hosts', 'h']),
+        const AdminLocation(AdminSection.hosts, id: 'h'),
+      );
       expect(adminLocationOf(['admin', 'agents']), isNull);
       expect(adminLocationOf(['admin', 'devices', 'x']), isNull);
       expect(
@@ -117,6 +121,7 @@ void main() {
 
     late AdminGroup group;
     late AdminGrant grant;
+    late AdminHost host;
     final general = AdminTarget(
       AdminTargetKind.channel,
       id: fake.seed.general,
@@ -177,6 +182,52 @@ void main() {
       'revokeGrant': () =>
           admin.revokeGrant(grant.id, reason: 'Done', purpose: 'revokeGrant'),
       'viewAsUser': () => admin.viewAs(sam, purpose: 'viewAsUser'),
+      // Hosts (M4-37): host.manage and audit.read have step-up.
+      'createHost': () async {
+        final code = await admin.createHost(
+          name: 'Build host',
+          reason: 'Builds',
+          purpose: 'createHost',
+        );
+        world.pairHost(code.hostId, ['term-sam']);
+        host = await admin.host(code.hostId);
+      },
+      'confirmHost': () async => host = await admin.confirmHost(
+        host,
+        HostConfirmRequest(
+          fingerprintPrefix: '7KQ29XTA',
+          llmLogin: HostLlmLogin.organization,
+          declaredServerHost: false,
+          sessionUsers: [HostAssignment(userId: sam, osUser: 'term-sam')],
+          reason: 'Builds',
+        ),
+        purpose: 'confirmHost',
+      ),
+      'updateHost': () async => host = await admin.updateHost(
+        host,
+        revoke: [sam],
+        reason: 'Rotate',
+        purpose: 'updateHost',
+      ),
+      'setHostLlmCredentials': () async => host = await admin.setLlmLogin(
+        host,
+        HostLlmLogin.none,
+        reason: 'No login',
+        purpose: 'setHostLlmCredentials',
+      ),
+      'listAuditEvents': () =>
+          admin.assignmentHistory(host.id, purpose: 'listAuditEvents'),
+      'setHostState': () async => host = await admin.setHostState(
+        host,
+        HostStateRequest.disabled,
+        reason: 'Maintenance',
+        purpose: 'setHostState',
+      ),
+      'issueHostPairingCode': () => admin.newPairingCode(
+        host.id,
+        reason: 'New disk',
+        purpose: 'issueHostPairingCode',
+      ),
       'disableUser': () =>
           admin.disablePerson(sam, reason: 'Left', purpose: 'disableUser'),
       'enableUser': () =>

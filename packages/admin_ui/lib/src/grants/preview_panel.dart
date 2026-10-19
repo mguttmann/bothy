@@ -120,11 +120,29 @@ class PreviewPanel extends StatelessWidget {
               for (final h in p.hints)
                 Padding(
                   padding: const EdgeInsets.only(top: DsSpace.s4),
-                  child: DsBanner(
-                    key: ValueKey('preview.hint.${h.code}'),
-                    tone: DsTone.warning,
-                    text: _hintLabel(l, h),
-                  ),
+                  child: h.code == 'terminal_not_effective'
+                      // A grant on a host that SR10 or SR12 keeps from taking effect: the
+                      // badge marks it, the cause is the server's text above (07 9.3).
+                      ? Row(
+                          children: [
+                            const NotEffectiveBadge(
+                              key: ValueKey('preview.notEffective'),
+                            ),
+                            const SizedBox(width: DsSpace.s8),
+                            Expanded(
+                              child: DsBanner(
+                                key: ValueKey('preview.hint.${h.code}'),
+                                tone: DsTone.warning,
+                                text: _hintLabel(l, h),
+                              ),
+                            ),
+                          ],
+                        )
+                      : DsBanner(
+                          key: ValueKey('preview.hint.${h.code}'),
+                          tone: DsTone.warning,
+                          text: _hintLabel(l, h),
+                        ),
                 ),
             ],
           ],
@@ -172,6 +190,23 @@ class PreviewPanel extends StatelessWidget {
   };
 }
 
+/// The badge "Not effective" of a grant whose preview has the hint `terminal_not_effective`
+/// (07 2.12, 9.3). It names no cause: the cause is the server's preview text.
+class NotEffectiveBadge extends StatelessWidget {
+  /// Creates the badge.
+  const NotEffectiveBadge({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    final t = dsToneColors(context, DsTone.warning);
+    return DsBadge(
+      text: AppLocalizations.of(context).hostNotEffective,
+      background: t.subtle,
+      foreground: t.fg,
+    );
+  }
+}
+
 /// One invariant violation: the server's problem text, the agent and the affected principals,
 /// and for I1 the guidance "switch to organization first" (the guided switch is M4-28).
 class _Violation extends StatelessWidget {
@@ -214,6 +249,12 @@ class _Violation extends StatelessWidget {
             Text(
               l.adminPreviewI1Hint,
               key: const ValueKey('preview.i1Hint'),
+              style: style,
+            ),
+          if (finding.code == 'i6_violation')
+            Text(
+              l.hostLlmI6Explained,
+              key: const ValueKey('preview.i6Hint'),
               style: style,
             ),
         ],

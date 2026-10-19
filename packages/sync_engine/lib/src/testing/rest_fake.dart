@@ -351,6 +351,7 @@ final class RestFake {
         reason: p.reason,
         retryAfter: p.retryAfter,
         errors: p.errors,
+        extra: p.extra,
       );
     } on _Unauthorized catch (u) {
       response = u.response;
@@ -466,7 +467,13 @@ final class RestFake {
         world.idempotency[slot] = StoredResponse(
           hash,
           p.status,
-          _problemBody(p.status, p.code, current: p.current, reason: p.reason),
+          _problemBody(
+            p.status,
+            p.code,
+            current: p.current,
+            reason: p.reason,
+            extra: p.extra,
+          ),
         );
       }
       rethrow;
@@ -498,6 +505,7 @@ final class RestFake {
     String? detail,
     Duration? retryAfter,
     List<JsonMap>? errors,
+    JsonMap extra = const {},
     Map<String, String> headers = const {},
   }) => FakeResponse(
     status,
@@ -508,6 +516,7 @@ final class RestFake {
       reason: reason,
       detail: detail,
       errors: errors,
+      extra: extra,
     ),
     {
       ...headers,
@@ -523,6 +532,7 @@ final class RestFake {
     String? reason,
     String? detail,
     List<JsonMap>? errors,
+    JsonMap extra = const {},
   }) => {
     'type': '/api/v1/problems/$code',
     'title': code,
@@ -533,6 +543,7 @@ final class RestFake {
     'reason': ?reason,
     'errors': ?errors,
     'current': ?current,
+    ...extra,
   };
 
   Future<void> _send(

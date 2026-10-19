@@ -171,6 +171,7 @@ nav:
       - Self-hosted Runner: quality/self-hosted-runner.md
       - Öffentlich schalten: quality/public-switch.md
       - Lizenzen: quality/licenses.md
+      - Barrierefreiheit: quality/accessibility-checklist.md
   - Sicherheit:
       - Bedrohungsmodell: security/threat-model.md
   - Compliance:

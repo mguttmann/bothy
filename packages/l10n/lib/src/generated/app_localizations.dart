@@ -5754,6 +5754,726 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Confirm with step-up'**
   String get auditActionStepUp;
+
+  /// Navigation entry of screen A8 (01 section 5.2).
+  ///
+  /// In en, this message translates to:
+  /// **'Hosts'**
+  String get adminNavHosts;
+
+  /// Button of the hosts list that opens the pairing wizard.
+  ///
+  /// In en, this message translates to:
+  /// **'Add host'**
+  String get hostsAdd;
+
+  /// Hosts list without entries.
+  ///
+  /// In en, this message translates to:
+  /// **'No hosts yet.'**
+  String get hostsEmpty;
+
+  /// Host without an assignee: only owners get a terminal (SR10).
+  ///
+  /// In en, this message translates to:
+  /// **'Owners only'**
+  String get hostOwnersOnly;
+
+  /// Host state pairing (24 section 3.1).
+  ///
+  /// In en, this message translates to:
+  /// **'Pairing'**
+  String get hostStatePairing;
+
+  /// Host state confirming (24 section 3.1).
+  ///
+  /// In en, this message translates to:
+  /// **'Waiting for confirmation'**
+  String get hostStateConfirming;
+
+  /// Host state active (24 section 3.1).
+  ///
+  /// In en, this message translates to:
+  /// **'active'**
+  String get hostStateActive;
+
+  /// Host state disabled by an owner (24 section 3.1).
+  ///
+  /// In en, this message translates to:
+  /// **'disabled'**
+  String get hostStateDisabled;
+
+  /// Host disabled with duplicate_connection (24 section 3.4).
+  ///
+  /// In en, this message translates to:
+  /// **'disabled: a second connection used the same keys, only a new pairing helps'**
+  String get hostStateDuplicate;
+
+  /// Host state retired (24 section 3.1).
+  ///
+  /// In en, this message translates to:
+  /// **'retired'**
+  String get hostStateRetired;
+
+  /// A host state this build does not know.
+  ///
+  /// In en, this message translates to:
+  /// **'unknown'**
+  String get hostStateUnknown;
+
+  /// The control connection of the host is open.
+  ///
+  /// In en, this message translates to:
+  /// **'connected'**
+  String get hostConnected;
+
+  /// The control connection of the host is closed.
+  ///
+  /// In en, this message translates to:
+  /// **'disconnected'**
+  String get hostDisconnected;
+
+  /// When the host service was last seen.
+  ///
+  /// In en, this message translates to:
+  /// **'last seen {when}'**
+  String hostLastSeen(String when);
+
+  /// Back button of the host page.
+  ///
+  /// In en, this message translates to:
+  /// **'Back to the hosts'**
+  String get hostBack;
+
+  /// Field label of the host page (01 A8).
+  ///
+  /// In en, this message translates to:
+  /// **'Assignee'**
+  String get hostFieldAssignee;
+
+  /// Field label of the host page (01 A8).
+  ///
+  /// In en, this message translates to:
+  /// **'Platform'**
+  String get hostFieldPlatform;
+
+  /// Field label of the host page (01 A8).
+  ///
+  /// In en, this message translates to:
+  /// **'Connection'**
+  String get hostFieldConnection;
+
+  /// Field label of the host page (01 A8).
+  ///
+  /// In en, this message translates to:
+  /// **'Fingerprint'**
+  String get hostFieldFingerprint;
+
+  /// Field label of the host page (01 A8).
+  ///
+  /// In en, this message translates to:
+  /// **'LLM login'**
+  String get hostFieldLlmLogin;
+
+  /// Field label of the host page (01 A8; 24 section 2.3).
+  ///
+  /// In en, this message translates to:
+  /// **'Server host'**
+  String get hostFieldServerHost;
+
+  /// Field label of the check results (01 A8; 24 section 2.2).
+  ///
+  /// In en, this message translates to:
+  /// **'Checks'**
+  String get hostFieldChecks;
+
+  /// Field label of the host page (01 A8).
+  ///
+  /// In en, this message translates to:
+  /// **'Profiles'**
+  String get hostFieldProfiles;
+
+  /// Field label of the grants on the host (01 A8).
+  ///
+  /// In en, this message translates to:
+  /// **'Access grants'**
+  String get hostFieldGrants;
+
+  /// Field label of the session users (01 A8; 24 section 2.2).
+  ///
+  /// In en, this message translates to:
+  /// **'Session users'**
+  String get hostFieldSessionUsers;
+
+  /// Field label of the count of open sessions.
+  ///
+  /// In en, this message translates to:
+  /// **'Terminal sessions'**
+  String get hostFieldSessions;
+
+  /// Platform and version of the host service.
+  ///
+  /// In en, this message translates to:
+  /// **'{platform}, version {version}'**
+  String hostPlatformValue(String platform, String version);
+
+  /// A value the host did not report yet.
+  ///
+  /// In en, this message translates to:
+  /// **'Not reported yet'**
+  String get hostNotReported;
+
+  /// Fingerprint in groups and the key generation (24 section 4.3).
+  ///
+  /// In en, this message translates to:
+  /// **'{value}   Key generation {generation}'**
+  String hostFingerprintValue(String value, int generation);
+
+  /// The host has no keys (before pairing, after re-pairing).
+  ///
+  /// In en, this message translates to:
+  /// **'No keys'**
+  String get hostNoKeys;
+
+  /// LLM login none (24 section 7.2).
+  ///
+  /// In en, this message translates to:
+  /// **'None'**
+  String get hostLlmNone;
+
+  /// LLM login personal (24 section 7.2).
+  ///
+  /// In en, this message translates to:
+  /// **'Personal'**
+  String get hostLlmPersonal;
+
+  /// LLM login personal with its holder.
+  ///
+  /// In en, this message translates to:
+  /// **'Personal of {name}'**
+  String hostLlmPersonalOf(String name);
+
+  /// LLM login organization (24 section 7.2).
+  ///
+  /// In en, this message translates to:
+  /// **'Organization'**
+  String get hostLlmOrganization;
+
+  /// Explanation of I6 under the choice personal (24 section 7.3).
+  ///
+  /// In en, this message translates to:
+  /// **'Personal: only this person may open a terminal here, not even other owners.'**
+  String get hostLlmI6Explained;
+
+  /// Picker of the holder of a personal LLM login.
+  ///
+  /// In en, this message translates to:
+  /// **'Holder of the login'**
+  String get hostLlmHolder;
+
+  /// Title of the dialog that changes the LLM login.
+  ///
+  /// In en, this message translates to:
+  /// **'LLM login on {name}'**
+  String hostLlmTitle(String name);
+
+  /// Body of the dialog that changes the LLM login (24 section 7.3 point 3).
+  ///
+  /// In en, this message translates to:
+  /// **'A change to Personal or a new holder ends the terminal sessions of other people on this host.'**
+  String get hostLlmBody;
+
+  /// Notice after the LLM login changed.
+  ///
+  /// In en, this message translates to:
+  /// **'The LLM login of {name} is changed.'**
+  String hostLlmChanged(String name);
+
+  /// Mandatory question of the confirmation (24 section 2.3).
+  ///
+  /// In en, this message translates to:
+  /// **'Is this host the server of the instance?'**
+  String get hostServerHostQuestion;
+
+  /// Answer yes.
+  ///
+  /// In en, this message translates to:
+  /// **'Yes'**
+  String get hostYes;
+
+  /// Answer no.
+  ///
+  /// In en, this message translates to:
+  /// **'No'**
+  String get hostNo;
+
+  /// The owner answer to the server host question.
+  ///
+  /// In en, this message translates to:
+  /// **'Declared: {answer}'**
+  String hostServerHostDeclared(String answer);
+
+  /// What the host service reported (24 section 2.3).
+  ///
+  /// In en, this message translates to:
+  /// **'Report of the host service: {answer}'**
+  String hostServerHostReported(String answer);
+
+  /// A passed check, for example HD1 ok.
+  ///
+  /// In en, this message translates to:
+  /// **'{check} ok'**
+  String hostDoctorOk(String check);
+
+  /// A failed check with its code.
+  ///
+  /// In en, this message translates to:
+  /// **'{check} failed: {code}'**
+  String hostDoctorFailed(String check, String code);
+
+  /// A named session user with the person of its valid assignment (24 section 2.2).
+  ///
+  /// In en, this message translates to:
+  /// **'{osUser} (assigned to {name})'**
+  String hostDoctorAssigned(String osUser, String name);
+
+  /// A named former session user with the person of its ended assignment from the audit.
+  ///
+  /// In en, this message translates to:
+  /// **'{osUser} (formerly assigned to {name})'**
+  String hostDoctorFormer(String osUser, String name);
+
+  /// A named session user without a known assignment.
+  ///
+  /// In en, this message translates to:
+  /// **'{osUser} (no assignment known)'**
+  String hostDoctorUnknown(String osUser);
+
+  /// The host reported no check results yet.
+  ///
+  /// In en, this message translates to:
+  /// **'No check results yet.'**
+  String get hostDoctorNone;
+
+  /// The audit of the host was not readable.
+  ///
+  /// In en, this message translates to:
+  /// **'The audit of this host could not be read, so former session users show without their person.'**
+  String get hostDoctorAuditFailed;
+
+  /// Work folders of a session user (ruling T13).
+  ///
+  /// In en, this message translates to:
+  /// **'Work folders: {folders}'**
+  String hostWorkdirs(String folders);
+
+  /// A session user without work folders.
+  ///
+  /// In en, this message translates to:
+  /// **'Work folders: none'**
+  String get hostWorkdirsNone;
+
+  /// A reported name without a valid assignment.
+  ///
+  /// In en, this message translates to:
+  /// **'Reported, not assigned: {osUser}'**
+  String hostSessionUsersUnassigned(String osUser);
+
+  /// Note under the session users (07 SR12).
+  ///
+  /// In en, this message translates to:
+  /// **'Without a session user no terminal (SR12).'**
+  String get hostSessionUsersSr12;
+
+  /// Note of the session user pickers (24 section 3.2).
+  ///
+  /// In en, this message translates to:
+  /// **'Only names that the host reported during pairing or in its last report.'**
+  String get hostSessionUsersOnlyReported;
+
+  /// Button that assigns a session user.
+  ///
+  /// In en, this message translates to:
+  /// **'Assign'**
+  String get hostSessionUserAssign;
+
+  /// Title of the dialog that assigns a session user.
+  ///
+  /// In en, this message translates to:
+  /// **'Assign a session user'**
+  String get hostSessionUserAssignTitle;
+
+  /// Body of the dialog that assigns a session user (ruling T12).
+  ///
+  /// In en, this message translates to:
+  /// **'A name once given to a person stays bound to that person on this host.'**
+  String get hostSessionUserAssignBody;
+
+  /// Person picker of a session user row.
+  ///
+  /// In en, this message translates to:
+  /// **'Person'**
+  String get hostSessionUserPerson;
+
+  /// Name picker of a session user row.
+  ///
+  /// In en, this message translates to:
+  /// **'Reported name'**
+  String get hostSessionUserName;
+
+  /// Notice after an assignment.
+  ///
+  /// In en, this message translates to:
+  /// **'{name} now has the session user {osUser}.'**
+  String hostSessionUserAssigned(String name, String osUser);
+
+  /// Button that ends an assignment.
+  ///
+  /// In en, this message translates to:
+  /// **'End'**
+  String get hostSessionUserEnd;
+
+  /// Title of the dialog that ends an assignment.
+  ///
+  /// In en, this message translates to:
+  /// **'End the assignment of {name}?'**
+  String hostSessionUserEndTitle(String name);
+
+  /// Body of the dialog that ends an assignment (ruling T12).
+  ///
+  /// In en, this message translates to:
+  /// **'{name} can no longer open a terminal on this host. The name {osUser} stays taken on this host and is never given to another person.'**
+  String hostSessionUserEndBody(String name, String osUser);
+
+  /// Notice after an assignment ended.
+  ///
+  /// In en, this message translates to:
+  /// **'The assignment of {name} ended; {osUser} stays taken.'**
+  String hostSessionUserEnded(String name, String osUser);
+
+  /// Explanation of conflict with session_user_taken (ruling T12).
+  ///
+  /// In en, this message translates to:
+  /// **'This name is taken: a name once given to a person stays bound to that person on this host, also after the assignment ends, and each person has one session user per host.'**
+  String get hostSessionUserTaken;
+
+  /// Explanation of validation_failed with session_user_not_on_host (24 section 3.2).
+  ///
+  /// In en, this message translates to:
+  /// **'The host has not reported this name. The host must report the name before it can be assigned.'**
+  String get hostSessionUserNotOnHost;
+
+  /// Heading of the session user rows of the confirmation.
+  ///
+  /// In en, this message translates to:
+  /// **'Session user per person'**
+  String get hostSessionRowsTitle;
+
+  /// Adds a row of the confirmation.
+  ///
+  /// In en, this message translates to:
+  /// **'Add a session user'**
+  String get hostSessionRowsAdd;
+
+  /// Removes a row of the confirmation.
+  ///
+  /// In en, this message translates to:
+  /// **'Remove'**
+  String get hostSessionRowRemove;
+
+  /// Button that changes a field of the host page.
+  ///
+  /// In en, this message translates to:
+  /// **'Change'**
+  String get hostChange;
+
+  /// Title of the dialog that changes the assignee.
+  ///
+  /// In en, this message translates to:
+  /// **'Assignee of {name}'**
+  String hostAssigneeTitle(String name);
+
+  /// Body of the dialog that changes the assignee (07 SR10).
+  ///
+  /// In en, this message translates to:
+  /// **'A person who is not an owner gets a terminal only on the host assigned to them (SR10).'**
+  String get hostAssigneeBody;
+
+  /// Notice after the assignee changed.
+  ///
+  /// In en, this message translates to:
+  /// **'The assignee of {name} is changed.'**
+  String hostAssigneeChanged(String name);
+
+  /// Opens the grant wizard on this host.
+  ///
+  /// In en, this message translates to:
+  /// **'Grant terminal'**
+  String get hostGrantsAdd;
+
+  /// A host without grants.
+  ///
+  /// In en, this message translates to:
+  /// **'No access grants on this host.'**
+  String get hostGrantsNone;
+
+  /// Badge of a grant whose preview has the hint terminal_not_effective (07 section 9.3).
+  ///
+  /// In en, this message translates to:
+  /// **'Not effective'**
+  String get hostNotEffective;
+
+  /// Count of open terminal sessions on the host.
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, =0{No open terminal sessions} =1{1 open terminal session} other{{count} open terminal sessions}}'**
+  String hostSessionsCount(int count);
+
+  /// Button that re-pairs the host (24 section 3.3).
+  ///
+  /// In en, this message translates to:
+  /// **'Re-pair'**
+  String get hostRepair;
+
+  /// Title of the dialog that re-pairs.
+  ///
+  /// In en, this message translates to:
+  /// **'Re-pair {name}?'**
+  String hostRepairTitle(String name);
+
+  /// Body of the dialog that re-pairs (24 section 3.3).
+  ///
+  /// In en, this message translates to:
+  /// **'The keys of the host are dropped now, its connections close and its terminal sessions end. A new pairing code follows; the key generation rises with the next pairing.'**
+  String get hostRepairBody;
+
+  /// Opens the pairing wizard of a host in pairing or confirming.
+  ///
+  /// In en, this message translates to:
+  /// **'Continue pairing'**
+  String get hostPair;
+
+  /// Button that disables the host.
+  ///
+  /// In en, this message translates to:
+  /// **'Disable'**
+  String get hostDisable;
+
+  /// Title of the dialog that disables.
+  ///
+  /// In en, this message translates to:
+  /// **'Disable {name}?'**
+  String hostDisableTitle(String name);
+
+  /// Body of the dialog that disables (24 section 3.1).
+  ///
+  /// In en, this message translates to:
+  /// **'All terminal sessions on this host end now. No one can open a terminal here until it is enabled again.'**
+  String get hostDisableBody;
+
+  /// Button that enables the host again.
+  ///
+  /// In en, this message translates to:
+  /// **'Enable'**
+  String get hostEnable;
+
+  /// Title of the dialog that enables.
+  ///
+  /// In en, this message translates to:
+  /// **'Enable {name}?'**
+  String hostEnableTitle(String name);
+
+  /// Body of the dialog that enables.
+  ///
+  /// In en, this message translates to:
+  /// **'Terminal sessions are possible again for the people who may open them.'**
+  String get hostEnableBody;
+
+  /// Button that retires the host.
+  ///
+  /// In en, this message translates to:
+  /// **'Retire'**
+  String get hostRetire;
+
+  /// Title of the dialog that retires.
+  ///
+  /// In en, this message translates to:
+  /// **'Retire {name}?'**
+  String hostRetireTitle(String name);
+
+  /// Body of the dialog that retires (24 section 3.1).
+  ///
+  /// In en, this message translates to:
+  /// **'All terminal sessions end now and the host is retired for good. It cannot be paired or enabled again.'**
+  String get hostRetireBody;
+
+  /// Notice after a state change.
+  ///
+  /// In en, this message translates to:
+  /// **'{name} is now {state}.'**
+  String hostStateChanged(String name, String state);
+
+  /// Title of the pairing wizard (01 A8).
+  ///
+  /// In en, this message translates to:
+  /// **'Pair host'**
+  String get hostPairingTitle;
+
+  /// Name field of a new host.
+  ///
+  /// In en, this message translates to:
+  /// **'Name'**
+  String get hostCreateName;
+
+  /// Assignee picker of a new host.
+  ///
+  /// In en, this message translates to:
+  /// **'Assignee (optional)'**
+  String get hostCreateAssignee;
+
+  /// Button of step 1 of the pairing wizard.
+  ///
+  /// In en, this message translates to:
+  /// **'Create and get a code'**
+  String get hostCreateSubmit;
+
+  /// Text above the pairing command (01 A8).
+  ///
+  /// In en, this message translates to:
+  /// **'Enter this command on the host as the user of the host service (a one-time code that expires soon):'**
+  String get hostPairingCommandIntro;
+
+  /// Remaining time of the pairing code.
+  ///
+  /// In en, this message translates to:
+  /// **'Expires in {time}'**
+  String hostPairingExpiresIn(String time);
+
+  /// The pairing code expired.
+  ///
+  /// In en, this message translates to:
+  /// **'The pairing code has expired. Issue a new code.'**
+  String get hostPairingExpired;
+
+  /// Issues another pairing code.
+  ///
+  /// In en, this message translates to:
+  /// **'New code'**
+  String get hostPairingNewCode;
+
+  /// Next pressed before the host reported its keys.
+  ///
+  /// In en, this message translates to:
+  /// **'The host has not reported yet. Enter the command on the host, then try again.'**
+  String get hostPairingNotYet;
+
+  /// Step 2 without a code.
+  ///
+  /// In en, this message translates to:
+  /// **'This host waits for a pairing code. Issue a new code to continue.'**
+  String get hostPairingNeedsCode;
+
+  /// Closes the pairing wizard.
+  ///
+  /// In en, this message translates to:
+  /// **'Close'**
+  String get hostPairingClose;
+
+  /// Fingerprint field of step 3 (24 section 3.2).
+  ///
+  /// In en, this message translates to:
+  /// **'Type the fingerprint from the host (first {count} characters)'**
+  String hostFingerprintLabel(int count);
+
+  /// Advice after fingerprint_mismatch.
+  ///
+  /// In en, this message translates to:
+  /// **'Compare with the output on the host and type it again.'**
+  String get hostFingerprintCompare;
+
+  /// Attempts left after fingerprint_mismatch.
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, =1{1 attempt left} other{{count} attempts left}}'**
+  String hostAttemptsLeft(int count);
+
+  /// Last failed attempt (24 section 3.2, TM-T19).
+  ///
+  /// In en, this message translates to:
+  /// **'No attempts left: the host is back in pairing and its keys are dropped. Issue a new pairing code.'**
+  String get hostFingerprintFallback;
+
+  /// Mandatory question of the confirmation (24 section 7.2).
+  ///
+  /// In en, this message translates to:
+  /// **'LLM login on this host'**
+  String get hostLlmQuestion;
+
+  /// Button of step 3 (01 A8).
+  ///
+  /// In en, this message translates to:
+  /// **'Confirm with passkey / device'**
+  String get hostConfirmSubmit;
+
+  /// Notice after the confirmation.
+  ///
+  /// In en, this message translates to:
+  /// **'{name} is active.'**
+  String hostConfirmed(String name);
+
+  /// Step-up purpose of createHost.
+  ///
+  /// In en, this message translates to:
+  /// **'Create the host {name}'**
+  String stepUpPurposeCreateHost(String name);
+
+  /// Step-up purpose of issueHostPairingCode.
+  ///
+  /// In en, this message translates to:
+  /// **'Issue a pairing code for {name}'**
+  String stepUpPurposePairingCode(String name);
+
+  /// Step-up purpose of confirmHost.
+  ///
+  /// In en, this message translates to:
+  /// **'Confirm the host {name}'**
+  String stepUpPurposeConfirmHost(String name);
+
+  /// Step-up purpose of updateHost.
+  ///
+  /// In en, this message translates to:
+  /// **'Change the host {name}'**
+  String stepUpPurposeUpdateHost(String name);
+
+  /// Step-up purpose of setHostLlmCredentials.
+  ///
+  /// In en, this message translates to:
+  /// **'Change the LLM login of {name}'**
+  String stepUpPurposeHostLlmLogin(String name);
+
+  /// Step-up purpose of setHostState.
+  ///
+  /// In en, this message translates to:
+  /// **'Change the state of {name}'**
+  String stepUpPurposeHostState(String name);
+
+  /// Step-up purpose of listAuditEvents for the former session users.
+  ///
+  /// In en, this message translates to:
+  /// **'Read the audit of {name}'**
+  String stepUpPurposeHostAudit(String name);
+
+  /// Label of a host target of a grant.
+  ///
+  /// In en, this message translates to:
+  /// **'Host {name}'**
+  String adminTargetHost(String name);
+
+  /// Heading of the host targets in the grant wizard.
+  ///
+  /// In en, this message translates to:
+  /// **'Hosts'**
+  String get adminTargetsHosts;
 }
 
 class _AppLocalizationsDelegate

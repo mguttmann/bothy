@@ -35,8 +35,8 @@ enum AdminSection {
   /// Instance settings (M6-09).
   instance('instance'),
 
-  /// Hosts (M4-37).
-  hosts('hosts');
+  /// Hosts of the terminal, for owners (M4-37).
+  hosts('hosts', hasScreen: true);
 
   const AdminSection(this.segment, {this.hasScreen = false});
 
@@ -69,8 +69,8 @@ final class AdminLocation {
   /// The section.
   final AdminSection section;
 
-  /// The person (in [AdminSection.people]), group (in [AdminSection.groups]) or target key
-  /// (in [AdminSection.grants]), or null for the list.
+  /// The person (in [AdminSection.people]), group (in [AdminSection.groups]), target key
+  /// (in [AdminSection.grants]) or host (in [AdminSection.hosts]), or null for the list.
   final String? id;
 
   /// Parses the path [segments] below the administration's root; null for a path that names no

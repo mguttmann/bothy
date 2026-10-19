@@ -13,6 +13,7 @@ library;
 import 'dart:io';
 
 import '../action_catalog.dart';
+import '../fake_host.dart';
 import '../rest_fake.dart';
 import '../world.dart';
 import 'admin_handlers.dart' show requireCatalogStepUp;
@@ -208,6 +209,75 @@ void registerAccessHandlers(RestFake rest, ActionCatalog catalog) {
     return entries;
   }
 
+  /// The host of a grant request; `404` for a host the world does not have.
+  FakeHost hostOf(JsonMap body) =>
+      world.hosts[body['target_id']] ??
+      (throw const FakeProblem(404, 'not_found'));
+
+  /// The preview of a grant `terminal` on a host (07 2.12, 9.3): SR10 (a non-owner who is not
+  /// the assignee) and SR12 (no valid session user whose name the host reports) give the hint
+  /// `terminal_not_effective` and a sentence with the cause, as the server's templates do.
+  FakeResponse hostPreview(JsonMap body) {
+    final h = hostOf(body);
+    final subject = body['subject_id']! as String;
+    final person = world.people[subject];
+    final name = person?.displayName ?? subject;
+    final notAssignee =
+        person != null && !person.isOwner && h.assignedUserId != subject;
+    final own = h.sessionUsers[subject];
+    final noSessionUser =
+        own == null || !(h.reported ?? const []).contains(own.$1);
+    final cause = notAssignee
+        ? 'Not effective: $name is not the assignee of this host (SR10).'
+        : noSessionUser
+        ? 'Not effective: no session user (SR12).'
+        : null;
+    return FakeResponse(200, {
+      'allowed': true,
+      'effects': <Object?>[],
+      'invariant_violations': <Object?>[],
+      'hints': [
+        if (cause != null)
+          {'code': 'terminal_not_effective', 'principal_id': subject},
+      ],
+      'text': [
+        '$name gets the capability "terminal" on the host ${h.name}.',
+        ?cause,
+      ].join('\n'),
+      'text_locale': 'en',
+    });
+  }
+
+  /// Creates a grant `terminal` on a host: no level, I6 checked (24 7.3).
+  FakeResponse hostGrant(FakeRequest r, JsonMap body) {
+    final h = hostOf(body);
+    final subject = body['subject_id']! as String;
+    if (h.llmCredentials == 'personal' &&
+        (body['subject_kind'] != 'user' || subject != h.credentialHolderId)) {
+      throw const FakeProblem(
+        409,
+        'i6_violation',
+        extra: {'hint': 'Only the holder of the personal login may get it.'},
+      );
+    }
+    final id = world.nextId();
+    final grant = <String, Object?>{
+      'id': id,
+      'subject_kind': body['subject_kind'],
+      'subject_id': subject,
+      'target_kind': 'host',
+      'target_id': h.id,
+      'capabilities': body['capabilities'] ?? <Object?>[],
+      'expires_at': ?body['expires_at'],
+      'reason': body['reason'],
+      'granted_by': r.person.id,
+      'granted_at': world.stamp(),
+    };
+    world.grants[id] = grant;
+    world.permissionVersion++;
+    return FakeResponse(201, grant);
+  }
+
   rest
     ..handle('listAgents', (r) {
       return FakeResponse(200, {
@@ -220,6 +290,7 @@ void registerAccessHandlers(RestFake rest, ActionCatalog catalog) {
     ..handle('previewGrant', (r) {
       owner(r);
       final body = r.json;
+      if (body['target_kind'] == 'host') return hostPreview(body);
       final kind = body['target_kind']! as String;
       final target = body['target_id'] as String?;
       final channels = covered(kind, target);
@@ -266,6 +337,7 @@ void registerAccessHandlers(RestFake rest, ActionCatalog catalog) {
       owner(r);
       stepUp(r);
       final body = r.json;
+      if (body['target_kind'] == 'host') return hostGrant(r, body);
       final kind = body['target_kind']! as String;
       final target = body['target_id'] as String?;
       final channels = covered(kind, target);
@@ -322,6 +394,10 @@ void registerAccessHandlers(RestFake rest, ActionCatalog catalog) {
         ..['revoked_by'] = r.person.id
         ..['revoke_reason'] = r.json['reason'];
       final subject = g['subject_id']! as String;
+      if (g['target_kind'] == 'host') {
+        world.permissionVersion++;
+        return FakeResponse(200, g);
+      }
       for (final c in covered(
         g['target_kind']! as String,
         g['target_id'] as String?,

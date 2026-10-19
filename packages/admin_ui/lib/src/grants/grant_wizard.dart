@@ -153,12 +153,30 @@ class _GrantWizardState extends State<GrantWizard>
   GrantPreviewResult? _preview;
   SelfFailure? _previewFailure;
 
+  /// Sets [target] and, when its kind changes between a host and any other target, the parts
+  /// that depend on it: a host has no level and exactly `terminal` (07 2.12), the others have a
+  /// level and no `terminal`.
+  void _setTarget(AdminTarget? target) {
+    final wasHost = _target?.kind == AdminTargetKind.host;
+    final isHost = target?.kind == AdminTargetKind.host;
+    _target = target;
+    if (isHost) {
+      _level = AccessLevel.none;
+      _capabilities
+        ..clear()
+        ..add(AccessCapability.terminal);
+    } else if (wasHost) {
+      _level = null;
+      _capabilities.clear();
+    }
+  }
+
   @override
   void initState() {
     super.initState();
-    _target = widget.target;
     _step = widget.step.clamp(0, 2);
     _level = widget.level;
+    _setTarget(widget.target);
     if (widget.subject case final subject?) {
       _kind = subject.kind;
       _subjectId = subject.id;
@@ -342,13 +360,15 @@ class _GrantWizardState extends State<GrantWizard>
     ),
     1 => TargetStep(
       targets: names.targets,
+      hosts: names.hosts,
       selected: _target,
       onSelect: (t) {
-        _target = t;
+        _setTarget(t);
         _changed();
       },
     ),
     _ => LevelStep(
+      host: _target?.kind == AdminTargetKind.host,
       level: _level,
       capabilities: _capabilities,
       until: _until,
