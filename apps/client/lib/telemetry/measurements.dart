@@ -19,7 +19,6 @@
 library;
 
 import 'dart:async';
-import 'dart:ui' show FrameTiming;
 
 import 'package:flutter/scheduler.dart';
 import 'package:sync_engine/sync_engine.dart';

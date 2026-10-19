@@ -250,7 +250,7 @@ void main() {
         bundleId: 'com.example.chat',
         defaultServer: 'https://chat.example.com',
         appVersion: '1.0.0',
-        hasCrashTarget: true,
+        crashDsn: 'https://public@crash.example.com/1',
       );
       await tester.pumpWidget(
         section(const PrivacySection(), branding: withTarget),

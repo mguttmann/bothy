@@ -22,7 +22,8 @@ final class BuildBranding {
     required this.bundleId,
     required this.defaultServer,
     required this.appVersion,
-    this.hasCrashTarget = false,
+    this.crashDsn = '',
+    this.crashEnvironment = 'production',
   });
 
   /// The branding the build was compiled with.
@@ -47,7 +48,11 @@ final class BuildBranding {
       'BRANDING_APP_VERSION',
       defaultValue: '0.0.0',
     ),
-    hasCrashTarget: bool.fromEnvironment('BRANDING_CRASH_REPORTS'),
+    crashDsn: String.fromEnvironment('CRASH_DSN'),
+    crashEnvironment: String.fromEnvironment(
+      'CRASH_ENVIRONMENT',
+      defaultValue: 'production',
+    ),
   );
 
   /// The name of the app in the system (window title before discovery).
@@ -65,8 +70,15 @@ final class BuildBranding {
   /// The version of this build, compared with `min_client_versions` on E1.
   final String appVersion;
 
+  /// The crash report target of the build (the define `CRASH_DSN`), or "" for none. 15 16
+  /// allows the build configuration only; there is no instance setting (docs/DECISIONS.md
+  /// D-M4-31-3).
+  final String crashDsn;
+
+  /// The `environment` of every crash report (the define `CRASH_ENVIRONMENT`).
+  final String crashEnvironment;
+
   /// Whether the build names a crash report target (15 16): only then Settings offers
-  /// `privacy.crash_reports` (brief M4-25 Design note 4). M4-31 brings the target itself;
-  /// until then the define `BRANDING_CRASH_REPORTS=true` stands for it and absent means hidden.
-  final bool hasCrashTarget;
+  /// `privacy.crash_reports` and the crash path can start (briefs M4-25 Design note 4, M4-31).
+  bool get hasCrashTarget => crashDsn.isNotEmpty;
 }

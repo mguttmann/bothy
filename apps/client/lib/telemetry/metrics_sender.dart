@@ -103,20 +103,14 @@ final class MetricsSender {
   /// the platform, version, density and theme at the moment of sending. [log] receives one
   /// line per failed send, never a value.
   MetricsSender({
-    required ClientMetrics metrics,
-    required ClientMetricsApi api,
-    required Duration interval,
-    required bool Function() enabled,
-    required MetricsAttributes Function() attributes,
+    required this._metrics,
+    required this._api,
+    required this._interval,
+    required this._enabled,
+    required this._attributes,
     MetricsTimerFactory? timer,
-    void Function(String line)? log,
-  }) : _metrics = metrics,
-       _api = api,
-       _interval = interval,
-       _enabled = enabled,
-       _attributes = attributes,
-       _timerFactory = timer ?? Timer.periodic,
-       _log = log;
+    this._log,
+  }) : _timerFactory = timer ?? Timer.periodic;
 
   final ClientMetrics _metrics;
   final ClientMetricsApi _api;

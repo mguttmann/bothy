@@ -139,6 +139,9 @@ final class CrashReports {
       ..request = null
       ..serverName = null
       ..modules = null
+      // Deprecated in the SDK, but a plugin may still fill it with content; cleared all the
+      // same.
+      // ignore: deprecated_member_use
       ..extra = null
       ..transaction = event.transaction == null
           ? null
@@ -152,17 +155,31 @@ final class CrashReports {
       t.name = null;
       _scrubFrames(t.stacktrace);
     }
-    event.contexts
-      ..remove('culture')
-      ..remove('response')
-      ..remove('browser');
+    // An allow-list: a context set by a plugin or the app (any name) could carry content.
+    event.contexts.removeWhere((key, _) => !technicalContexts.contains(key));
     event.contexts.device?.name = null;
+    // The screen names of the app context are routes, which may carry IDs.
+    event.contexts.app?.viewNames = null;
     final crumbs = event.breadcrumbs;
     if (crumbs != null) {
       event.breadcrumbs = [for (final b in crumbs) ?scrubBreadcrumb(b, Hint())];
     }
     return event;
   }
+
+  /// The contexts a report keeps, each technical only: app, device (without its name),
+  /// operating system, runtimes, GPU, trace and the Dart and Flutter build modes.
+  static const Set<String> technicalContexts = {
+    'app',
+    'device',
+    'os',
+    'runtime',
+    'runtimes',
+    'gpu',
+    'trace',
+    'dart_context',
+    'flutter_context',
+  };
 
   /// The members of a breadcrumb's data that stay, each without content: HTTP method and
   /// status, the URL and the navigation targets (scrubbed by [scrubUrl]), the lifecycle state.

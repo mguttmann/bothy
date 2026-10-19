@@ -35,6 +35,9 @@ import '../platform/secure_store.dart';
 import '../sync/message_ops_app.dart';
 import '../sync/sidebar_ops.dart';
 import '../sync/thread_ops.dart';
+import '../telemetry/client_metrics.dart';
+import '../telemetry/crash_reports.dart';
+import '../telemetry/measurements.dart';
 import 'account_wiper.dart';
 import 'branding.dart';
 import 'deep_links.dart';
@@ -72,8 +75,18 @@ final class AppPorts {
     this.allowPlainHttpForTests = false,
     GlobalKey<NavigatorState>? navigatorKey,
     this._stepUpPrompt,
+    AppMeasurements? measurements,
+    CrashReports? crashReports,
   }) : config = config ?? AppConfig.defaults(),
-       navigatorKey = navigatorKey ?? GlobalKey<NavigatorState>();
+       navigatorKey = navigatorKey ?? GlobalKey<NavigatorState>(),
+       measurements = measurements ?? AppMeasurements(ClientMetrics()),
+       crashReports =
+           crashReports ??
+           CrashReports(
+             dsn: branding.crashDsn,
+             release: 'client@${branding.appVersion}',
+             environment: branding.crashEnvironment,
+           );
 
   /// The build branding.
   final BuildBranding branding;
@@ -138,6 +151,13 @@ final class AppPorts {
   final GlobalKey<NavigatorState> navigatorKey;
 
   final StepUpPrompt? _stepUpPrompt;
+
+  /// The measurement points of the app metrics (brief M4-31); the gateway transport of every
+  /// instance runs through [AppMeasurements.wrapTransport].
+  final AppMeasurements measurements;
+
+  /// The crash path; starts only when [BuildBranding.crashDsn] names a target (15 16).
+  final CrashReports crashReports;
 
   /// Explains a step-up before the system asks for the confirmation: by default the
   /// `StepUpDialog` of `admin_ui` over [navigatorKey] (brief M4-25 Design note 3).
@@ -205,7 +225,10 @@ final class InstanceServices {
     required this.secrets,
     required this.ids,
     required this.draftEditing,
+    required this._stopWatching,
   });
+
+  final Future<void> Function() _stopWatching;
 
   /// Builds the services of [instance] (Design note 1): the device keys with the instance ID as
   /// scope, the secrets prefixed with the instance ID, the database key (32 random bytes at the
@@ -267,7 +290,9 @@ final class InstanceServices {
       baseUrl: instance.address,
       auth: auth,
       store: database,
-      transport: ports.transport,
+      // Catch-up events and reconnects by close code (brief M4-31, `client.catchup.*`,
+      // `client.reconnects`).
+      transport: ports.measurements.wrapTransport(ports.transport),
       network: ports.network,
       lifecycle: ports.lifecycle,
       ticker: ports.ticker,
@@ -300,6 +325,11 @@ final class InstanceServices {
         );
       },
     );
+    final stopWatching = ports.measurements.watchEngine(
+      states: engine.states,
+      notices: engine.notices,
+      outboxDepth: engine.outbox.depth,
+    );
     var stopped = false;
     final wiper = AccountWiper(
       instanceId: instance.instanceId,
@@ -307,6 +337,7 @@ final class InstanceServices {
       stop: () async {
         if (stopped) return;
         stopped = true;
+        await stopWatching();
         await engine.dispose();
       },
       wipeDatabase: database.wipe,
@@ -322,6 +353,7 @@ final class InstanceServices {
       secrets: secrets,
       ids: ids,
       draftEditing: draftEditing,
+      stopWatching: stopWatching,
     );
   }
 
@@ -369,6 +401,7 @@ final class InstanceServices {
   Future<void> close() => _closing ??= _close();
 
   Future<void> _close() async {
+    await _stopWatching();
     await engine.dispose();
     await database.close();
     await auth.dispose();
