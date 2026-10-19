@@ -10,6 +10,7 @@ import (
 	"github.com/OWNER/bothy/services/server/internal/platform/jobs"
 	"github.com/OWNER/bothy/services/server/internal/platform/jobs/internal/fakemodule"
 	"github.com/OWNER/bothy/services/server/internal/platform/otel/metrics/metricstest"
+	"github.com/OWNER/bothy/services/server/internal/platform/testkit"
 )
 
 // TestJobsMetrics_DurationAndQueue: every attempt records bothy.job.duration with its kind and
@@ -27,7 +28,7 @@ func TestJobsMetrics_DurationAndQueue(t *testing.T) {
 	e.insert(t, rt.Inserter(), fakemodule.Echo{Target: ids.New(), Seq: 2}, nil)
 	receive(t, ran)
 
-	deadline := time.Now().Add(waitLong)
+	deadline := time.Now().Add(testkit.Patience)
 	for {
 		got := metricstest.Collect(t, reader)
 		done := metricstest.Sum(got["bothy.job.duration"], map[string]string{"bothy.job.kind": "fakemodule.echo", "bothy.outcome": "completed"})
