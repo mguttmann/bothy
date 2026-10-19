@@ -68,6 +68,19 @@ operated, and the order of the build.
   drivers. The headless scenarios 16.1 to 16.5 run against `SyncEngine` with its local
   database. `make arch` gains rule 10: a `testing.dart` library is imported only from `test/`
   and `integration_test/` folders.
+- Desktop app shell (M4-18): `apps/client` builds for macOS and Windows with platform folders,
+  the build branding of `branding.example.yaml` (URL scheme, app name, bundle identifier, default
+  server) and deep links of that scheme on both platforms. One composition root per server
+  address wires the device keys, the secrets in secure storage, the encrypted local database,
+  the auth session and the sync engine; Riverpod providers over the database and the engine feed
+  the widgets. The onboarding screens E1 to E7 run the login flows (OIDC in the system browser
+  with a loopback redirect, proxy, password with one-time code, enrollment code, waiting device
+  with its verification code, pairing), and every end of an account (logout, cancel, rejection,
+  expiry, revocation, `4012`) deletes the local database, the file cache, the keys and the
+  tokens. The router has one path per target with "Not found or no access", and the main view
+  has four resizable column frames whose widths are stored as `layout.column_widths`. Widget,
+  golden and flow tests run against the fake server of M4-17; the integration tests run on the
+  desktop runners of CI.
 - Design system core components: message (every variant, collapse with "Show more", origin
   badges, isolated foreign names), a safe Markdown renderer that runs and loads nothing, live box
   with collapsed and mobile lines and a throttled announcer, tool chip, status line, trigger

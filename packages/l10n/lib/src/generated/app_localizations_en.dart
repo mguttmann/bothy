@@ -1298,4 +1298,270 @@ class AppLocalizationsEn extends AppLocalizations {
   String vizTvPosition(String title, int index, int count) {
     return '$title ($index of $count)';
   }
+
+  @override
+  String get onboardingConnectTitle => 'Connect to your instance';
+
+  @override
+  String get onboardingServerAddress => 'Server address';
+
+  @override
+  String get onboardingConnect => 'Connect';
+
+  @override
+  String get onboardingConnecting => 'Connecting';
+
+  @override
+  String get onboardingAddressInvalid =>
+      'Enter the full address of the instance, for example https://chat.example.com.';
+
+  @override
+  String get onboardingNoInstance =>
+      'No instance at this address. Check the address and try again.';
+
+  @override
+  String get onboardingCertificateInvalid =>
+      'Certificate invalid. The connection is not secure, so the app does not connect. Ask the owner of the instance to renew the certificate.';
+
+  @override
+  String get onboardingNotSetUp =>
+      'Instance not set up yet. The owner sets it up on the host with the setup wizard (install.sh).';
+
+  @override
+  String onboardingAppTooOld(String version) {
+    return 'App too old. This instance needs version $version or newer. Install the update, then connect again.';
+  }
+
+  @override
+  String onboardingLoginTitle(String productName) {
+    return 'Log in to $productName';
+  }
+
+  @override
+  String onboardingLoginWithProvider(String name) {
+    return 'Log in with $name';
+  }
+
+  @override
+  String get onboardingOr => 'or';
+
+  @override
+  String get onboardingLoginName => 'Login name';
+
+  @override
+  String get onboardingLoginWithPasskey => 'Log in with passkey';
+
+  @override
+  String get onboardingPasswordAndCode => 'Password and one-time code';
+
+  @override
+  String get onboardingPassword => 'Password';
+
+  @override
+  String get onboardingOneTimeCode => 'One-time code';
+
+  @override
+  String get onboardingLogIn => 'Log in';
+
+  @override
+  String get onboardingEnrollmentCodeLink => 'I have an enrollment code';
+
+  @override
+  String get onboardingPairLink => 'Pair with another device';
+
+  @override
+  String get onboardingNoMethod =>
+      'No login is set up for this instance. Ask the owner of the instance.';
+
+  @override
+  String onboardingServerHost(String address) {
+    return 'Server: $address';
+  }
+
+  @override
+  String get onboardingChangeServer => 'Change';
+
+  @override
+  String get onboardingBack => 'Back';
+
+  @override
+  String get onboardingLoginFailed =>
+      'Login failed. Check your details and try again.';
+
+  @override
+  String get onboardingUnreachable =>
+      'The instance is not reachable. Check the network and try again.';
+
+  @override
+  String get onboardingBrowserCancelled =>
+      'The login in the browser was cancelled. Start it again.';
+
+  @override
+  String get onboardingBrowserExpired =>
+      'The login in the browser took too long. Start it again.';
+
+  @override
+  String get onboardingEnrollTitle => 'Enrollment code';
+
+  @override
+  String get onboardingEnrollCode => 'Code from the owner';
+
+  @override
+  String get onboardingEnrollHow => 'How do you want to log in?';
+
+  @override
+  String get onboardingEnrollThisDevice => 'Use this device';
+
+  @override
+  String get onboardingEnrollCreatePasskey => 'Create passkey';
+
+  @override
+  String onboardingEnrollLink(String name) {
+    return 'Link with $name';
+  }
+
+  @override
+  String get onboardingContinue => 'Continue';
+
+  @override
+  String get onboardingEnrollOnce => 'The code is valid once.';
+
+  @override
+  String get onboardingPendingTitle => 'Device waiting for confirmation';
+
+  @override
+  String get onboardingPendingExplain =>
+      'Type this code on one of your active devices: Settings, Devices and sessions, Confirm. No active device: ask the owner.';
+
+  @override
+  String get onboardingCancel => 'Cancel';
+
+  @override
+  String onboardingValidFor(int minutes) {
+    String _temp0 = intl.Intl.pluralLogic(
+      minutes,
+      locale: localeName,
+      other: 'Valid for $minutes more minutes',
+      one: 'Valid for 1 more minute',
+      zero: 'Valid for less than a minute',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get onboardingPairTitle => 'Pair device';
+
+  @override
+  String get onboardingPairExplain =>
+      'On an active device: Settings, Devices, Add device, then enter:';
+
+  @override
+  String get onboardingPairNewCode => 'New code';
+
+  @override
+  String get onboardingPairExpired => 'The code has expired. Get a new code.';
+
+  @override
+  String onboardingLockedTitle(String productName) {
+    return '$productName is locked';
+  }
+
+  @override
+  String get onboardingUnlock => 'Unlock';
+
+  @override
+  String get onboardingUnlockFailed => 'Unlocking failed.';
+
+  @override
+  String get onboardingTryAgain => 'Try again';
+
+  @override
+  String get onboardingLogOut => 'Log out';
+
+  @override
+  String get onboardingSignedOutTitle => 'You are logged out.';
+
+  @override
+  String onboardingSignedOutReason(String reason) {
+    return 'Reason: $reason';
+  }
+
+  @override
+  String get onboardingReasonLoggedOut => 'You logged out.';
+
+  @override
+  String get onboardingReasonRevokedBySelf =>
+      'This device was revoked by another device.';
+
+  @override
+  String get onboardingReasonRevokedByOwner => 'The owner revoked this device.';
+
+  @override
+  String get onboardingReasonUserDisabled => 'Your account has been disabled.';
+
+  @override
+  String get onboardingReasonInactive =>
+      'This device was not used for a long time.';
+
+  @override
+  String get onboardingReasonRejected =>
+      'The confirmation of this device was rejected.';
+
+  @override
+  String get onboardingReasonPendingExpired =>
+      'This device was not confirmed in time.';
+
+  @override
+  String get onboardingReasonSessionRevoked =>
+      'Your session was ended on the server.';
+
+  @override
+  String get onboardingReasonSessionExpired => 'Your session has expired.';
+
+  @override
+  String get onboardingDataDeleted =>
+      'The data of this device has been deleted.';
+
+  @override
+  String get onboardingLogInAgain => 'Log in again';
+
+  @override
+  String get onboardingContactOwner => 'Contact the owner of the instance.';
+
+  @override
+  String get onboardingCopy => 'Copy';
+
+  @override
+  String get onboardingCopied => 'Copied';
+
+  @override
+  String onboardingCodeLabel(String characters) {
+    return 'Code: $characters';
+  }
+
+  @override
+  String get onboardingLoopbackDone =>
+      'The login is complete. You can close this window.';
+
+  @override
+  String get shellColumnSidebar => 'Spaces and channels';
+
+  @override
+  String get shellColumnPostList => 'Post list';
+
+  @override
+  String get shellColumnHistory => 'History';
+
+  @override
+  String get shellColumnSession => 'Session';
+
+  @override
+  String get shellResizeColumn => 'Resize column';
+
+  @override
+  String get shellUpdateRequired =>
+      'Update required. Install the new version to connect again.';
+
+  @override
+  String get shellStepUpTitle => 'Confirm it is you';
 }

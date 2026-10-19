@@ -5,9 +5,12 @@
 /// schemas of `docs/api/openapi.yaml` and `docs/api/asyncapi.yaml`.
 library;
 
+import 'dart:convert';
 import 'dart:io';
 
 import 'package:yaml/yaml.dart';
+
+part 'contract_documents.g.dart';
 
 /// One place where a JSON value breaks its schema.
 ///
@@ -111,31 +114,45 @@ final class ContractSchemas {
 
   /// Loads `docs/api/openapi.yaml` and `docs/api/asyncapi.yaml` of the repository that holds
   /// [from] (default: the working directory), walking up to the folder that has `docs/api`.
+  /// Without such a folder (an app under test in the macOS app sandbox, whose working
+  /// directory is `/` and which cannot read the repository) it uses [embedded].
   ///
-  /// The documents are read once per isolate and cached. Throws a [StateError] when no
-  /// repository root is found above [from].
-  static ContractSchemas load({Directory? from}) {
-    final cached = _loaded;
-    if (cached != null) return cached;
-    var dir = (from ?? Directory.current).absolute;
+  /// The documents are read once per isolate and cached.
+  static ContractSchemas load({Directory? from}) =>
+      _loaded ??= _fromFiles(from ?? Directory.current) ?? embedded();
+
+  /// The copy of both documents compiled into this library (`contract_documents.g.dart`,
+  /// written by `make contract-documents`; `make codegen-check` keeps it equal to `docs/api`,
+  /// docs/DECISIONS.md D-M4-18-17). Decoded once per isolate.
+  static ContractSchemas embedded() => _embedded ??= ContractSchemas._(
+    _decode(_openapiGzip),
+    _decode(_asyncapiGzip),
+  );
+
+  static ContractSchemas? _embedded;
+
+  static ContractSchemas? _fromFiles(Directory from) {
+    var dir = from.absolute;
     while (true) {
       final openapi = File('${dir.path}/docs/api/openapi.yaml');
       final asyncapi = File('${dir.path}/docs/api/asyncapi.yaml');
       if (openapi.existsSync() && asyncapi.existsSync()) {
-        return _loaded = ContractSchemas._(
-          _plain(loadYaml(openapi.readAsStringSync())) as Map<String, Object?>,
-          _plain(loadYaml(asyncapi.readAsStringSync())) as Map<String, Object?>,
+        return ContractSchemas._(
+          _parse(openapi.readAsStringSync()),
+          _parse(asyncapi.readAsStringSync()),
         );
       }
       final parent = dir.parent;
-      if (parent.path == dir.path) {
-        throw StateError(
-          'no docs/api/openapi.yaml above the working directory',
-        );
-      }
+      if (parent.path == dir.path) return null;
       dir = parent;
     }
   }
+
+  static Map<String, Object?> _decode(List<String> chunks) =>
+      _parse(utf8.decode(gzip.decode(base64.decode(chunks.join()))));
+
+  static Map<String, Object?> _parse(String yaml) =>
+      _plain(loadYaml(yaml)) as Map<String, Object?>;
 
   /// The operation [operationId]; throws an [ArgumentError] for an unknown ID.
   ContractOperation operation(String operationId) =>

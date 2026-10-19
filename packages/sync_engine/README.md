@@ -419,7 +419,10 @@ body is validated against `docs/api/openapi.yaml` (a violation answers
 `400 validation_failed` with the pointer), every response and every frame the fake sends
 against `openapi.yaml` and `asyncapi.yaml`, every client frame too (a violation closes with
 `4002`); all of them land in `server.violations`. The validator (`ContractSchemas`) reads the
-documents once per isolate, walking up from the working directory.
+documents once per isolate, walking up from the working directory. Where no `docs/api/` is
+above it (the app under test in the macOS app sandbox, M4-18), it uses the copy compiled into
+`lib/src/testing/contract_documents.g.dart`; `make contract-documents` writes it and
+`make codegen-check` fails when it differs from `docs/api/` (D-M4-18-17).
 
 ### Scenarios
 

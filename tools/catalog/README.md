@@ -203,3 +203,12 @@ a write error of `generate`), `generated_blocks`,
 `resource_version`, the resource kind and `audience: self`. `make event-catalog` regenerates
 it, `make codegen-check` fails when it is stale (docs/DECISIONS.md D-M4-08-3). Tests:
 `tests/test_event_catalog_dart.py`.
+
+## Contract copy of the fake server
+
+`contract_documents_dart.py` (M4-18) writes `docs/api/openapi.yaml` and `docs/api/asyncapi.yaml`
+gzip and base64 encoded into `packages/sync_engine/lib/src/testing/contract_documents.g.dart`.
+The fake server reads that copy where it cannot read the repository: the app's integration
+tests run inside the macOS app sandbox. `make contract-documents` regenerates it after a change
+to `docs/api/`; `make codegen-check` decodes the copy and fails when its text differs
+(docs/DECISIONS.md D-M4-18-17). Tests: `tests/test_contract_documents_dart.py`.
