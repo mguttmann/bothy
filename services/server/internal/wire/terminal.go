@@ -18,6 +18,7 @@ import (
 	"github.com/OWNER/bothy/services/server/internal/instance"
 	instancepg "github.com/OWNER/bothy/services/server/internal/instance/adapters/postgres"
 	instanceapp "github.com/OWNER/bothy/services/server/internal/instance/app"
+	"github.com/OWNER/bothy/services/server/internal/kernel/actor"
 	"github.com/OWNER/bothy/services/server/internal/kernel/authorize"
 	"github.com/OWNER/bothy/services/server/internal/kernel/clock"
 	"github.com/OWNER/bothy/services/server/internal/kernel/errs"
@@ -115,6 +116,8 @@ type Terminal struct {
 	Service *terminalapp.Service
 	// Handlers are the REST handlers.
 	Handlers *terminalhttp.Hosts
+	// Sessions are the REST handlers of the terminal sessions (M2-44).
+	Sessions *terminalhttp.TerminalSessions
 }
 
 // NewTerminal builds the terminal module over pool with the unit of work uow, the Authorizer az,
@@ -132,11 +135,25 @@ func NewTerminal(cfg terminalapp.Config, pool *pg.Pool, uow txn.UnitOfWork, az a
 		Instance: instanceIdentity{state: instanceapp.NewState(instancepg.NewRepository(pool), uow)},
 		People:   people{dir: identityapp.NewDirectory(identitypg.NewRepository(pool))}, Presence: terminalapp.NoConnections{},
 		UoW: uow, Authorizer: az, Audit: w.Audit, Events: w.Events, Cursors: terminalhttp.Cursors{}, Clock: clk,
+		StepUps: lateStepUps{id: id},
 	})
 	if err != nil {
 		return nil, err
 	}
-	return &Terminal{Service: svc, Handlers: terminalhttp.New(svc)}, nil
+	return &Terminal{Service: svc, Handlers: terminalhttp.New(svc), Sessions: terminalhttp.NewSessions(svc.Sessions())}, nil
+}
+
+// lateStepUps binds terminal/app.StepUps to identity's StepUps, which the sessions step of
+// identity sets after the terminal module is built (BindSessions); before it the consumption fails
+// closed.
+type lateStepUps struct{ id *Identity }
+
+// ConsumeFresh implements terminalapp.StepUps.
+func (l lateStepUps) ConsumeFresh(ctx context.Context, a actor.Actor) error {
+	if l.id == nil || l.id.StepUps == nil {
+		return errs.New(errs.CodeInternalError, "wire: the step-ups of identity are not bound")
+	}
+	return l.id.StepUps.ConsumeFresh(ctx, a)
 }
 
 // The route of the control connection of the host services (M2-43, asyncapi channel hostControl):

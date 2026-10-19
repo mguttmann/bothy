@@ -296,6 +296,9 @@ type ServerInterface interface {
 	// SetHostState Disable, enable or retire a host
 	// (POST /hosts/{host_id}/state)
 	SetHostState(w http.ResponseWriter, r *http.Request, hostId HostIdPath, params SetHostStateParams)
+	// OpenTerminalSession Open a terminal session
+	// (POST /hosts/{host_id}/terminal/sessions)
+	OpenTerminalSession(w http.ResponseWriter, r *http.Request, hostId HostIdPath)
 	// ListIdentityProviders List identity providers
 	// (GET /identity-providers)
 	ListIdentityProviders(w http.ResponseWriter, r *http.Request)
@@ -512,6 +515,18 @@ type ServerInterface interface {
 	// UpdateTemplate Change a template
 	// (PATCH /templates/{template_id})
 	UpdateTemplate(w http.ResponseWriter, r *http.Request, templateId TemplateIdPath, params UpdateTemplateParams)
+	// ListTerminalSessions List terminal sessions
+	// (GET /terminal/sessions)
+	ListTerminalSessions(w http.ResponseWriter, r *http.Request, params ListTerminalSessionsParams)
+	// GetTerminalSession Read a terminal session
+	// (GET /terminal/sessions/{session_id})
+	GetTerminalSession(w http.ResponseWriter, r *http.Request, sessionId TerminalSessionIdPath)
+	// AttachTerminalSession Attach to an own session again
+	// (POST /terminal/sessions/{session_id}/attach)
+	AttachTerminalSession(w http.ResponseWriter, r *http.Request, sessionId TerminalSessionIdPath)
+	// CloseTerminalSession End a terminal session
+	// (POST /terminal/sessions/{session_id}/close)
+	CloseTerminalSession(w http.ResponseWriter, r *http.Request, sessionId TerminalSessionIdPath, params CloseTerminalSessionParams)
 	// GetThread Read a thread
 	// (GET /threads/{thread_id})
 	GetThread(w http.ResponseWriter, r *http.Request, threadId ThreadIdPath)
@@ -4641,6 +4656,32 @@ func (siw *ServerInterfaceWrapper) SetHostState(w http.ResponseWriter, r *http.R
 	handler.ServeHTTP(w, r)
 }
 
+// OpenTerminalSession operation middleware
+func (siw *ServerInterfaceWrapper) OpenTerminalSession(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "host_id" -------------
+	var hostId HostIdPath
+
+	err = runtime.BindStyledParameterWithOptions("simple", "host_id", r.PathValue("host_id"), &hostId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "uuid", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "host_id", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.OpenTerminalSession(w, r, hostId)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
 // ListIdentityProviders operation middleware
 func (siw *ServerInterfaceWrapper) ListIdentityProviders(w http.ResponseWriter, r *http.Request) {
 
@@ -6899,6 +6940,180 @@ func (siw *ServerInterfaceWrapper) UpdateTemplate(w http.ResponseWriter, r *http
 	handler.ServeHTTP(w, r)
 }
 
+// ListTerminalSessions operation middleware
+func (siw *ServerInterfaceWrapper) ListTerminalSessions(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params ListTerminalSessionsParams
+
+	// ------------- Optional query parameter "cursor" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "cursor", r.URL.Query(), &params.Cursor, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "cursor"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "cursor", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "limit" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "limit", r.URL.Query(), &params.Limit, runtime.BindQueryParameterOptions{Type: "integer", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "limit"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "limit", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "host_id" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "host_id", r.URL.Query(), &params.HostId, runtime.BindQueryParameterOptions{Type: "string", Format: "uuid"})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "host_id"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "host_id", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "state" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "state", r.URL.Query(), &params.State, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "state"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "state", Err: err})
+		}
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.ListTerminalSessions(w, r, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// GetTerminalSession operation middleware
+func (siw *ServerInterfaceWrapper) GetTerminalSession(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "session_id" -------------
+	var sessionId TerminalSessionIdPath
+
+	err = runtime.BindStyledParameterWithOptions("simple", "session_id", r.PathValue("session_id"), &sessionId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "uuid", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "session_id", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.GetTerminalSession(w, r, sessionId)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// AttachTerminalSession operation middleware
+func (siw *ServerInterfaceWrapper) AttachTerminalSession(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "session_id" -------------
+	var sessionId TerminalSessionIdPath
+
+	err = runtime.BindStyledParameterWithOptions("simple", "session_id", r.PathValue("session_id"), &sessionId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "uuid", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "session_id", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.AttachTerminalSession(w, r, sessionId)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// CloseTerminalSession operation middleware
+func (siw *ServerInterfaceWrapper) CloseTerminalSession(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "session_id" -------------
+	var sessionId TerminalSessionIdPath
+
+	err = runtime.BindStyledParameterWithOptions("simple", "session_id", r.PathValue("session_id"), &sessionId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "uuid", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "session_id", Err: err})
+		return
+	}
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params CloseTerminalSessionParams
+
+	headers := r.Header
+
+	// ------------- Optional header parameter "Idempotency-Key" -------------
+	if valueList, found := headers[http.CanonicalHeaderKey("Idempotency-Key")]; found {
+		var IdempotencyKey IdempotencyKey
+		n := len(valueList)
+		if n != 1 {
+			siw.ErrorHandlerFunc(w, r, &TooManyValuesForParamError{ParamName: "Idempotency-Key", Count: n})
+			return
+		}
+
+		err = runtime.BindStyledParameterWithOptions("simple", "Idempotency-Key", valueList[0], &IdempotencyKey, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: "uuid"})
+		if err != nil {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "Idempotency-Key", Err: err})
+			return
+		}
+
+		params.IdempotencyKey = &IdempotencyKey
+
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.CloseTerminalSession(w, r, sessionId, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
 // GetThread operation middleware
 func (siw *ServerInterfaceWrapper) GetThread(w http.ResponseWriter, r *http.Request) {
 
@@ -8570,6 +8785,11 @@ func HandlerWithOptions(si ServerInterface, options StdHTTPServerOptions) http.H
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/hosts/{host_id}/confirm", wrapper.ConfirmHost)
 	m.HandleFunc(http.MethodPut+" "+options.BaseURL+"/hosts/{host_id}/llm-credentials", wrapper.SetHostLlmCredentials)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/hosts/{host_id}/state", wrapper.SetHostState)
+	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/hosts/{host_id}/terminal/sessions", wrapper.OpenTerminalSession)
+	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/terminal/sessions", wrapper.ListTerminalSessions)
+	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/terminal/sessions/{session_id}", wrapper.GetTerminalSession)
+	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/terminal/sessions/{session_id}/attach", wrapper.AttachTerminalSession)
+	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/terminal/sessions/{session_id}/close", wrapper.CloseTerminalSession)
 
 	return m
 }
@@ -9017,6 +9237,9 @@ type StrictServerInterface interface {
 	// SetHostState Disable, enable or retire a host
 	// (POST /hosts/{host_id}/state)
 	SetHostState(ctx context.Context, request SetHostStateRequestObject) (SetHostStateResponseObject, error)
+	// OpenTerminalSession Open a terminal session
+	// (POST /hosts/{host_id}/terminal/sessions)
+	OpenTerminalSession(ctx context.Context, request OpenTerminalSessionRequestObject) (OpenTerminalSessionResponseObject, error)
 	// ListIdentityProviders List identity providers
 	// (GET /identity-providers)
 	ListIdentityProviders(ctx context.Context, request ListIdentityProvidersRequestObject) (ListIdentityProvidersResponseObject, error)
@@ -9233,6 +9456,18 @@ type StrictServerInterface interface {
 	// UpdateTemplate Change a template
 	// (PATCH /templates/{template_id})
 	UpdateTemplate(ctx context.Context, request UpdateTemplateRequestObject) (UpdateTemplateResponseObject, error)
+	// ListTerminalSessions List terminal sessions
+	// (GET /terminal/sessions)
+	ListTerminalSessions(ctx context.Context, request ListTerminalSessionsRequestObject) (ListTerminalSessionsResponseObject, error)
+	// GetTerminalSession Read a terminal session
+	// (GET /terminal/sessions/{session_id})
+	GetTerminalSession(ctx context.Context, request GetTerminalSessionRequestObject) (GetTerminalSessionResponseObject, error)
+	// AttachTerminalSession Attach to an own session again
+	// (POST /terminal/sessions/{session_id}/attach)
+	AttachTerminalSession(ctx context.Context, request AttachTerminalSessionRequestObject) (AttachTerminalSessionResponseObject, error)
+	// CloseTerminalSession End a terminal session
+	// (POST /terminal/sessions/{session_id}/close)
+	CloseTerminalSession(ctx context.Context, request CloseTerminalSessionRequestObject) (CloseTerminalSessionResponseObject, error)
 	// GetThread Read a thread
 	// (GET /threads/{thread_id})
 	GetThread(ctx context.Context, request GetThreadRequestObject) (GetThreadResponseObject, error)
@@ -12208,6 +12443,39 @@ func (sh *strictHandler) SetHostState(w http.ResponseWriter, r *http.Request, ho
 	}
 }
 
+// OpenTerminalSession operation middleware
+func (sh *strictHandler) OpenTerminalSession(w http.ResponseWriter, r *http.Request, hostId HostIdPath) {
+	var request OpenTerminalSessionRequestObject
+
+	request.HostId = hostId
+
+	var body OpenTerminalSessionJSONRequestBody
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
+		return
+	}
+	request.Body = &body
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.OpenTerminalSession(ctx, request.(OpenTerminalSessionRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "OpenTerminalSession")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(OpenTerminalSessionResponseObject); ok {
+		if err := validResponse.VisitOpenTerminalSessionResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
 // ListIdentityProviders operation middleware
 func (sh *strictHandler) ListIdentityProviders(w http.ResponseWriter, r *http.Request) {
 	var request ListIdentityProvidersRequestObject
@@ -14253,6 +14521,125 @@ func (sh *strictHandler) UpdateTemplate(w http.ResponseWriter, r *http.Request, 
 		sh.options.ResponseErrorHandlerFunc(w, r, err)
 	} else if validResponse, ok := response.(UpdateTemplateResponseObject); ok {
 		if err := validResponse.VisitUpdateTemplateResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// ListTerminalSessions operation middleware
+func (sh *strictHandler) ListTerminalSessions(w http.ResponseWriter, r *http.Request, params ListTerminalSessionsParams) {
+	var request ListTerminalSessionsRequestObject
+
+	request.Params = params
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.ListTerminalSessions(ctx, request.(ListTerminalSessionsRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "ListTerminalSessions")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(ListTerminalSessionsResponseObject); ok {
+		if err := validResponse.VisitListTerminalSessionsResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// GetTerminalSession operation middleware
+func (sh *strictHandler) GetTerminalSession(w http.ResponseWriter, r *http.Request, sessionId TerminalSessionIdPath) {
+	var request GetTerminalSessionRequestObject
+
+	request.SessionId = sessionId
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.GetTerminalSession(ctx, request.(GetTerminalSessionRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "GetTerminalSession")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(GetTerminalSessionResponseObject); ok {
+		if err := validResponse.VisitGetTerminalSessionResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// AttachTerminalSession operation middleware
+func (sh *strictHandler) AttachTerminalSession(w http.ResponseWriter, r *http.Request, sessionId TerminalSessionIdPath) {
+	var request AttachTerminalSessionRequestObject
+
+	request.SessionId = sessionId
+
+	var body AttachTerminalSessionJSONRequestBody
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
+		return
+	}
+	request.Body = &body
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.AttachTerminalSession(ctx, request.(AttachTerminalSessionRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "AttachTerminalSession")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(AttachTerminalSessionResponseObject); ok {
+		if err := validResponse.VisitAttachTerminalSessionResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// CloseTerminalSession operation middleware
+func (sh *strictHandler) CloseTerminalSession(w http.ResponseWriter, r *http.Request, sessionId TerminalSessionIdPath, params CloseTerminalSessionParams) {
+	var request CloseTerminalSessionRequestObject
+
+	request.SessionId = sessionId
+	request.Params = params
+
+	var body CloseTerminalSessionJSONRequestBody
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
+		return
+	}
+	request.Body = &body
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.CloseTerminalSession(ctx, request.(CloseTerminalSessionRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "CloseTerminalSession")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(CloseTerminalSessionResponseObject); ok {
+		if err := validResponse.VisitCloseTerminalSessionResponse(w); err != nil {
 			sh.options.ResponseErrorHandlerFunc(w, r, err)
 		}
 	} else if response != nil {

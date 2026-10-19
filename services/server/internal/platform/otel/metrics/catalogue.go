@@ -233,6 +233,13 @@ var (
 		Description: "Telemetry items that never reached the collector.",
 		Attrs:       []Attr{{Key: "bothy.signal", Values: []string{"traces", "metrics", "logs"}}},
 	}
+	// TerminalRelayUnpaired is bothy.terminal.relay.unpaired (4.3a, M2-44): a side of the relay
+	// that found no counterpart before terminal.open_timeout, once per connection.
+	TerminalRelayUnpaired = Spec{
+		Name: "bothy.terminal.relay.unpaired", Kind: KindCounter, Unit: unitConnection,
+		Description: "Relay connections whose counterpart did not arrive before terminal.open_timeout.",
+		Attrs:       []Attr{{Key: "bothy.terminal.side", Values: []string{"client", "host"}}},
+	}
 	// SecretsRefreshFailures is bothy.secrets.refresh.failures (4.6, M1-09).
 	SecretsRefreshFailures = Spec{
 		Name: "bothy.secrets.refresh.failures", Kind: KindCounter, Unit: "{refresh}",
@@ -252,5 +259,6 @@ func All() []Spec {
 		JobDuration, JobQueue, EgressBlocked,
 		DBClientOperationDuration, DBPoolConnections,
 		AuditVerifyFailures, AuditVerifyLastSuccess, TelemetryDropped, SecretsRefreshFailures,
+		TerminalRelayUnpaired,
 	}
 }

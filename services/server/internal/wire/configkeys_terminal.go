@@ -83,6 +83,17 @@ func terminalConfigKeys() []config.Key {
 			Doc:     "Time between hello and identify on the control and data connections of a host service.",
 			Chapter: chapter24,
 		},
+		// The terminal sessions and the relay (M2-44, 24 sections 6.1 and 6.3).
+		{
+			Name: "terminal.open_timeout", Kind: config.KindDuration, Default: "20s", Min: "1s",
+			Doc:     "Deadline until both sides are connected in the relay and the opening has started.",
+			Chapter: chapter24,
+		},
+		{
+			Name: "terminal.relay_buffer_max_bytes", Kind: config.KindInt, Default: "262144", Min: "1",
+			Doc:     "Buffer of the relay per direction and session, in bytes of queued messages.",
+			Chapter: chapter24,
+		},
 		{
 			Name: "terminal.host_duplicate_probe_timeout", Kind: config.KindDuration, Default: "5s", Min: minDeadline,
 			Doc:     "Time the server waits for the answer of the older control connection of a host (24 section 3.4).",

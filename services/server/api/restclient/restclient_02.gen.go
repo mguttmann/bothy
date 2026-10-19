@@ -935,7 +935,7 @@ func (c *Client) SetHostState(ctx context.Context, hostId HostIdPath, params *Se
 
 // OpenTerminalSessionWithBody Open a terminal session
 //
-// Needs a fresh, unused step-up (passkey or step-up device key; in the console only a passkey with `userVerification = required`), the `terminal` right, SR10, SR11 (I6) and SR12 (an own session user on the host whose name the host reports, otherwise 403 `terminal_denied` with `reason: no_session_user`). With a `claude` profile `workdir_index` must point into the caller's own working directories (ruling T13). Consumes the step-up and returns a one-time session token for the Noise handshake (24, 5 and 6.1). The device then connects to `stream_path`.
+// Needs a fresh, unused step-up (passkey or step-up device key; in the console only a passkey with `userVerification = required`), the `terminal` right, SR10, SR11 (I6) and SR12 (an own session user on the host whose name the host reports, otherwise 403 `terminal_denied` with `reason: no_session_user`). Consumes the step-up and returns a one-time session token for the Noise handshake (24, 5 and 6.1). The device then connects to `stream_path`.
 //
 // Takes any type of body and a specified content type.
 //
@@ -954,7 +954,7 @@ func (c *Client) OpenTerminalSessionWithBody(ctx context.Context, hostId HostIdP
 
 // OpenTerminalSession Open a terminal session
 //
-// Needs a fresh, unused step-up (passkey or step-up device key; in the console only a passkey with `userVerification = required`), the `terminal` right, SR10, SR11 (I6) and SR12 (an own session user on the host whose name the host reports, otherwise 403 `terminal_denied` with `reason: no_session_user`). With a `claude` profile `workdir_index` must point into the caller's own working directories (ruling T13). Consumes the step-up and returns a one-time session token for the Noise handshake (24, 5 and 6.1). The device then connects to `stream_path`.
+// Needs a fresh, unused step-up (passkey or step-up device key; in the console only a passkey with `userVerification = required`), the `terminal` right, SR10, SR11 (I6) and SR12 (an own session user on the host whose name the host reports, otherwise 403 `terminal_denied` with `reason: no_session_user`). Consumes the step-up and returns a one-time session token for the Noise handshake (24, 5 and 6.1). The device then connects to `stream_path`.
 //
 // Takes a body of the `application/json` content type.
 //
@@ -3972,7 +3972,7 @@ func (c *Client) GetTerminalSession(ctx context.Context, sessionId TerminalSessi
 
 // AttachTerminalSessionWithBody Attach to an own session again
 //
-// For a session in state `opening`, `active` or `detached`. Needs a fresh step-up, except from the same device in the same login session within `terminal.quick_reattach_window` after the disconnect. Returns a new session token; older tokens become worthless. A connection of another device is closed with `4103` (24, 6.2).
+// For a session in state `opening`, `active` or `detached`. Needs a fresh step-up, except from the same device in the same login session within `terminal.quick_reattach_window` after the disconnect. Returns a new session token; older tokens become worthless. A connection of another device is closed with `4103` (24, 6.2). An attach to an `opening` session restarts the opening (`att = open`, new deadline).
 //
 // Takes any type of body and a specified content type.
 //
@@ -3991,7 +3991,7 @@ func (c *Client) AttachTerminalSessionWithBody(ctx context.Context, sessionId Te
 
 // AttachTerminalSession Attach to an own session again
 //
-// For a session in state `opening`, `active` or `detached`. Needs a fresh step-up, except from the same device in the same login session within `terminal.quick_reattach_window` after the disconnect. Returns a new session token; older tokens become worthless. A connection of another device is closed with `4103` (24, 6.2).
+// For a session in state `opening`, `active` or `detached`. Needs a fresh step-up, except from the same device in the same login session within `terminal.quick_reattach_window` after the disconnect. Returns a new session token; older tokens become worthless. A connection of another device is closed with `4103` (24, 6.2). An attach to an `opening` session restarts the opening (`att = open`, new deadline).
 //
 // Takes a body of the `application/json` content type.
 //
@@ -22609,7 +22609,7 @@ type ClientWithResponsesInterface interface {
 
 	// OpenTerminalSessionWithBodyWithResponse Open a terminal session
 	//
-	// Needs a fresh, unused step-up (passkey or step-up device key; in the console only a passkey with `userVerification = required`), the `terminal` right, SR10, SR11 (I6) and SR12 (an own session user on the host whose name the host reports, otherwise 403 `terminal_denied` with `reason: no_session_user`). With a `claude` profile `workdir_index` must point into the caller's own working directories (ruling T13). Consumes the step-up and returns a one-time session token for the Noise handshake (24, 5 and 6.1). The device then connects to `stream_path`.
+	// Needs a fresh, unused step-up (passkey or step-up device key; in the console only a passkey with `userVerification = required`), the `terminal` right, SR10, SR11 (I6) and SR12 (an own session user on the host whose name the host reports, otherwise 403 `terminal_denied` with `reason: no_session_user`). Consumes the step-up and returns a one-time session token for the Noise handshake (24, 5 and 6.1). The device then connects to `stream_path`.
 	//
 	// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
 	//
@@ -22618,7 +22618,7 @@ type ClientWithResponsesInterface interface {
 
 	// OpenTerminalSessionWithResponse Open a terminal session
 	//
-	// Needs a fresh, unused step-up (passkey or step-up device key; in the console only a passkey with `userVerification = required`), the `terminal` right, SR10, SR11 (I6) and SR12 (an own session user on the host whose name the host reports, otherwise 403 `terminal_denied` with `reason: no_session_user`). With a `claude` profile `workdir_index` must point into the caller's own working directories (ruling T13). Consumes the step-up and returns a one-time session token for the Noise handshake (24, 5 and 6.1). The device then connects to `stream_path`.
+	// Needs a fresh, unused step-up (passkey or step-up device key; in the console only a passkey with `userVerification = required`), the `terminal` right, SR10, SR11 (I6) and SR12 (an own session user on the host whose name the host reports, otherwise 403 `terminal_denied` with `reason: no_session_user`). Consumes the step-up and returns a one-time session token for the Noise handshake (24, 5 and 6.1). The device then connects to `stream_path`.
 	//
 	// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
 	//
@@ -24010,7 +24010,7 @@ type ClientWithResponsesInterface interface {
 
 	// AttachTerminalSessionWithBodyWithResponse Attach to an own session again
 	//
-	// For a session in state `opening`, `active` or `detached`. Needs a fresh step-up, except from the same device in the same login session within `terminal.quick_reattach_window` after the disconnect. Returns a new session token; older tokens become worthless. A connection of another device is closed with `4103` (24, 6.2).
+	// For a session in state `opening`, `active` or `detached`. Needs a fresh step-up, except from the same device in the same login session within `terminal.quick_reattach_window` after the disconnect. Returns a new session token; older tokens become worthless. A connection of another device is closed with `4103` (24, 6.2). An attach to an `opening` session restarts the opening (`att = open`, new deadline).
 	//
 	// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
 	//
@@ -24019,7 +24019,7 @@ type ClientWithResponsesInterface interface {
 
 	// AttachTerminalSessionWithResponse Attach to an own session again
 	//
-	// For a session in state `opening`, `active` or `detached`. Needs a fresh step-up, except from the same device in the same login session within `terminal.quick_reattach_window` after the disconnect. Returns a new session token; older tokens become worthless. A connection of another device is closed with `4103` (24, 6.2).
+	// For a session in state `opening`, `active` or `detached`. Needs a fresh step-up, except from the same device in the same login session within `terminal.quick_reattach_window` after the disconnect. Returns a new session token; older tokens become worthless. A connection of another device is closed with `4103` (24, 6.2). An attach to an `opening` session restarts the opening (`att = open`, new deadline).
 	//
 	// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
 	//
