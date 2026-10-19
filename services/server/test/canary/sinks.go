@@ -55,6 +55,8 @@ type Record struct {
 	Source string
 	// Viewer is the observer of a foreign record (Sam, Robin); empty for other sinks.
 	Viewer string
+	// Operation is the operationId of an error record; empty for other sinks.
+	Operation string
 	// Fields are the texts of the record.
 	Fields []Field
 }

@@ -214,3 +214,35 @@ func TestSEC_T10_JSONFieldsKeepsTrailingText(t *testing.T) {
 		}
 	}
 }
+
+// TestSEC_T10_ScanAllowMatrixManageOnly: the rows of the class manage_only (M2-02): a channel
+// prompt or skill reference is a finding in every sink, the events of a reader of its channel
+// and of its operator included, and allowed only in current of a 412 of putChannelBehavior.
+func TestSEC_T10_ScanAllowMatrixManageOnly(t *testing.T) {
+	reg := NewRegistry()
+	prompt := reg.New(ClassManageOnly, "chan-support", "channel prompt")
+	rules := AllowRules{Readable: map[string]map[string]bool{"Alex": {"chan-support": true}, "Lotse": {"chan-support": true}}}
+	cases := []struct {
+		name               string
+		sink, viewer, loc  string
+		operation          string
+		echo, wantFindings bool
+	}{
+		{"log", SinkLog, "", "/msg", "", false, true},
+		{"trace", SinkTrace, "", "/attr", "", false, true},
+		{"metric", SinkMetric, "", "/attr", "", false, true},
+		{"audit details", SinkAudit, "", "/details/reason", "", false, true},
+		{"event frame of a reader", SinkForeign, "Alex", "/d/payload", "", false, true},
+		{"catch-up page of the operator", SinkForeign, "Lotse", "/events/0/payload", "", false, true},
+		{"error detail", SinkError, "", "/body/detail", opPutChannelBehavior, false, true},
+		{"current of another operation", SinkError, "", "/body/current/name", "updateChannel", true, true},
+		{"current of putChannelBehavior", SinkError, "", "/body/current/prompt", opPutChannelBehavior, true, false},
+	}
+	for _, c := range cases {
+		s := NewSinks()
+		s.Add(Record{Sink: c.sink, Viewer: c.viewer, Operation: c.operation, Fields: []Field{{Location: c.loc, Text: "x " + prompt + " y", Echo: c.echo}}})
+		if got := Scan(reg, s, rules); (len(got) > 0) != c.wantFindings {
+			t.Errorf("%s: findings %v, want findings=%v", c.name, got, c.wantFindings)
+		}
+	}
+}
