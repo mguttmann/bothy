@@ -483,7 +483,7 @@ Quelle: [12-dateien.md](../spec/12-dateien.md), Abschnitt 18.
 |---|---|---|---|---|---|---|
 | `file.storage.driver` | `BOTHY_FILE__STORAGE__DRIVER` | Server | enum(fs, s3) | `fs` | `fs` oder `s3` | aktiv |
 | `file.fs.root` | `BOTHY_FILE__FS__ROOT` | Server | string | `/var/lib/bothy/files` | Wurzel des Dateisystem-Treibers (Pfad im Container) | aktiv |
-| `file.fs.min_free_bytes` | `BOTHY_FILE__FS__MIN_FREE_BYTES` | Server |  | `2147483648` | freier Platz, unter dem Uploads mit `503 unavailable` (`reason` `storage_full`) abgelehnt werden | geplant (M3) |
+| `file.fs.min_free_bytes` | `BOTHY_FILE__FS__MIN_FREE_BYTES` | Server | int | `2147483648` | freier Platz, unter dem Uploads mit `503 unavailable` (`reason` `storage_full`) abgelehnt werden | aktiv |
 | `file.s3.endpoint` | `BOTHY_FILE__S3__ENDPOINT` | Server | string | leer | S3-Endpunkt | aktiv |
 | `file.s3.region` | `BOTHY_FILE__S3__REGION` | Server | string | `us-east-1` | Region für die Signatur | aktiv |
 | `file.s3.bucket` | `BOTHY_FILE__S3__BUCKET` | Server | string | leer | Bucket | aktiv |
@@ -492,16 +492,16 @@ Quelle: [12-dateien.md](../spec/12-dateien.md), Abschnitt 18.
 | `file.s3.checksum_mode` | `BOTHY_FILE__S3__CHECKSUM_MODE` | Server | enum(when_required, when_supported) | `when_required` | SDK-Prüfsummen für Anfrage und Antwort: `when_required` oder `when_supported` (nur mit `https`-Endpunkt) | aktiv |
 | `file.s3.access_key_ref` | `BOTHY_FILE__S3__ACCESS_KEY_REF` | Server | secret_ref | `file:<secrets.dir>/s3_access_key` | Verweise auf den Secret-Provider; nur mit `file.storage.driver = s3` gelesen | aktiv |
 | `file.s3.secret_key_ref` | `BOTHY_FILE__S3__SECRET_KEY_REF` | Server | secret_ref | `file:<secrets.dir>/s3_secret_key` | Verweise auf den Secret-Provider; nur mit `file.storage.driver = s3` gelesen | aktiv |
-| `file.s3.presigned_upload` | `BOTHY_FILE__S3__PRESIGNED_UPLOAD` | Server |  | `false` | Modus `presigned` erlauben | geplant (M3) |
+| `file.s3.presigned_upload` | `BOTHY_FILE__S3__PRESIGNED_UPLOAD` | Server | bool | `false` | Modus `presigned` erlauben | aktiv |
 | `file.s3.presign_ttl` | `BOTHY_FILE__S3__PRESIGN_TTL` | Server |  | `15m` | Gültigkeit einer presigned URL | geplant (M3) |
-| `file.upload_part_bytes` | `BOTHY_FILE__UPLOAD_PART_BYTES` | Server |  | `8388608` | Teilgröße | geplant (M3) |
-| `file.upload_session_ttl` | `BOTHY_FILE__UPLOAD_SESSION_TTL` | Server |  | `24h` | Lebensdauer einer offenen Session | geplant (M3) |
-| `file.upload_max_open_sessions` | `BOTHY_FILE__UPLOAD_MAX_OPEN_SESSIONS` | Server |  | `20` | offene Sessions je Prinzipal | geplant (M3) |
-| `file.quota_bytes_per_principal` | `BOTHY_FILE__QUOTA_BYTES_PER_PRINCIPAL` | Server |  | `0` | Kontingent je Prinzipal, 0 = aus | geplant (M3) |
+| `file.upload_part_bytes` | `BOTHY_FILE__UPLOAD_PART_BYTES` | Server | int | `8388608` | Teilgröße | aktiv |
+| `file.upload_session_ttl` | `BOTHY_FILE__UPLOAD_SESSION_TTL` | Server | duration | `24h` | Lebensdauer einer offenen Session | aktiv |
+| `file.upload_max_open_sessions` | `BOTHY_FILE__UPLOAD_MAX_OPEN_SESSIONS` | Server | int | `20` | offene Sessions je Prinzipal | aktiv |
+| `file.quota_bytes_per_principal` | `BOTHY_FILE__QUOTA_BYTES_PER_PRINCIPAL` | Server | int | `0` | Kontingent je Prinzipal, 0 = aus | aktiv |
 | `file.poster_max_bytes` | `BOTHY_FILE__POSTER_MAX_BYTES` | Server |  | `524288` | Größe des Video-Vorschaubilds vom Client | geplant (M3) |
 | `file.sniff_bytes` | `BOTHY_FILE__SNIFF_BYTES` | Server |  | `1048576` | Bytes für die Typ-Erkennung | geplant (M3) |
-| `file.denied_mime_types` | `BOTHY_FILE__DENIED_MIME_TYPES` | Server |  | leer | gesperrte Typen | geplant (M3) |
-| `file.name_max_bytes` | `BOTHY_FILE__NAME_MAX_BYTES` | Server |  | `255` | Länge eines Dateinamens in UTF-8-Bytes | geplant (M3) |
+| `file.denied_mime_types` | `BOTHY_FILE__DENIED_MIME_TYPES` | Server | list(string) | leer | gesperrte Typen | aktiv |
+| `file.name_max_bytes` | `BOTHY_FILE__NAME_MAX_BYTES` | Server | int | `255` | Länge eines Dateinamens in UTF-8-Bytes | aktiv |
 | `file.scan.mode` | `BOTHY_FILE__SCAN__MODE` | Server |  | `required` | `required` oder `off` | geplant (M3) |
 | `file.scan.clamd_address` | `BOTHY_FILE__SCAN__CLAMD_ADDRESS` | Server |  | `tcp://clamav:3310` | clamd im internen Netz; alternativ `unix:///...` | geplant (M3) |
 | `file.scan.chunk_bytes` | `BOTHY_FILE__SCAN__CHUNK_BYTES` | Server |  | `65536` | Stückgröße für `INSTREAM` | geplant (M3) |
