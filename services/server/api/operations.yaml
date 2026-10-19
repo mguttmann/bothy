@@ -75,6 +75,7 @@ enabled:             # operationIds that have a handler; sorted ascending
   - getAgent
   - getApp
   - getChannel
+  - getChannelBehavior
   - getConsoleSession
   - getConsumerState
   - getDevice
@@ -90,6 +91,7 @@ enabled:             # operationIds that have a handler; sorted ascending
   - getMyCredentials
   - getMySidebar
   - getProblemType
+  - getServedChannelConfig
   - getSnapshot
   - getSpace
   - getThread
@@ -125,6 +127,7 @@ enabled:             # operationIds that have a handler; sorted ascending
   - listOwners
   - listPins
   - listReactions
+  - listServedChannels
   - listSpaceChannels
   - listSpaces
   - listTemplates
@@ -147,6 +150,7 @@ enabled:             # operationIds that have a handler; sorted ascending
   - pinMessage
   - pollAgentEvents
   - previewGrant
+  - putChannelBehavior
   - putChannelDraft
   - putFeatureFlag
   - putInstanceSetting
@@ -317,9 +321,6 @@ later:               # every other operationId of docs/api/openapi.yaml; sorted 
   - operation_id: getBrandingLogo
     etappe: M3
     ticket: M3-10
-  - operation_id: getChannelBehavior
-    etappe: M2
-    ticket: M2-02
   - operation_id: getCommand
     etappe: M2
     ticket: M2-16
@@ -351,9 +352,6 @@ later:               # every other operationId of docs/api/openapi.yaml; sorted 
   - operation_id: getRunStats
     etappe: M6
     ticket: M6-05
-  - operation_id: getServedChannelConfig
-    etappe: M2
-    ticket: M2-02
   - operation_id: getStatsBackends
     etappe: M6
     ticket: M6-14
@@ -424,9 +422,6 @@ later:               # every other operationId of docs/api/openapi.yaml; sorted 
   - operation_id: listRunSteps
     etappe: M2
     ticket: M2-05
-  - operation_id: listServedChannels
-    etappe: M2
-    ticket: M2-02
   - operation_id: listTerminalSessions
     etappe: M2
     ticket: M2-44
@@ -445,9 +440,6 @@ later:               # every other operationId of docs/api/openapi.yaml; sorted 
   - operation_id: postIncomingWebhook
     etappe: M2
     ticket: M2-27
-  - operation_id: putChannelBehavior
-    etappe: M2
-    ticket: M2-02
   - operation_id: putProjectBinding
     etappe: M2
     ticket: M2-03

@@ -55,7 +55,8 @@ go test -race -count=1 ./test/canary/... ./test/harness/...
 4. Audit: every column of every `audit_events` row; `details` by member.
 5. Error responses: body fields and every header of each answer with status 400 or higher.
 6. Foreign events: the gateway frames, every `listEvents` page from cursor 0 and the snapshot of
-   the observers Sam (reads Marketing and Support/Allgemein) and Robin (reads Engineering/Projekt-A).
+   the observers Sam (reads Marketing and Support/Allgemein), Robin (reads Engineering/Projekt-A)
+   and Alex (reads Support), and the `listEvents` pages of the operator Lotse.
 
 ## Allow matrix
 
@@ -66,6 +67,15 @@ go test -race -count=1 ./test/canary/... ./test/harness/...
 | `secret` | nowhere |
 | `network` | nowhere (the audit log holds only `ip_hmac` with `ip_key_id`) |
 | `identity` | everywhere except logs, traces and metrics |
+| `manage_only` | success bodies of `getChannelBehavior`, `putChannelBehavior`, `listServedChannels` and `getServedChannelConfig` (no sink captures them) and `current` of a `412` of `putChannelBehavior`; nowhere else |
+
+`manage_only` (M2-02) holds the channel prompt and the skill references. It is stricter than
+`content`: a reader of the channel is no permitted observer, because prompt and skills are readable
+only with `manage` or as the effective operator (R-AZ-09), and even the operator agent receives
+only the settings version in its events. Error records name their operation, so only the `412` of
+`putChannelBehavior`, whose caller passed `manage` before the version check, may echo the value.
+Alex (reads Support without `manage`) is an observer with gateway, `listEvents` and `getSnapshot`;
+the pages of the operator Lotse are foreign records too.
 
 Echo fields (ruling M1-69/2) are the fields of an error response the contract returns to the
 caller: `current` of `version_conflict` and `base_version_conflict` (06 "Errors" item 3, the
@@ -96,7 +106,8 @@ cannot call goes into `Exempt` with its reason; the expected list is empty.
   of the server, the standard logger or slog.
 - Texts shorter than eight characters: six-digit TOTP codes are registered, but would match
   unrelated digits.
-- File names, transcripts, search terms, channel prompts, push tokens, component form values and
-  tool arguments: their tickets in M2 and M3 extend the scenario.
+- File names, transcripts, search terms, push tokens, component form values and tool arguments:
+  their tickets in M2 and M3 extend the scenario (channel prompts and skill references since
+  M2-02).
 - The `current` member of a 412 and the `pointer` of `unknown_member` are judged as echoes to the
   caller, not as leaks (ruling M1-69/2).

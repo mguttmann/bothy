@@ -14,9 +14,12 @@ import (
 )
 
 // structureEvents are the event types that change the path or the read-only state of a resource
-// without a new rights version for every affected principal (04 section 8.1).
+// without a new rights version for every affected principal (04 section 8.1), and
+// channel.settings_changed, which changes the mention switches of the channel facts that
+// agent.invoke evaluates at delivery time (M2-02, docs/DECISIONS.md D-M2-02-8).
 var structureEvents = map[string]bool{
 	"channel.created": true, "channel.updated": true, "channel.archived": true, "space.archived": true, "thread.moved": true,
+	"channel.settings_changed": true,
 }
 
 // credRef keys the delivery state of one credential: the principal with session, device and

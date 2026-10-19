@@ -5,6 +5,7 @@ package app_test
 import (
 	"context"
 	"encoding/json"
+	"slices"
 	"testing"
 
 	"github.com/OWNER/bothy/services/server/internal/kernel/actor"
@@ -83,5 +84,60 @@ func TestPageEvents_AdmittedEventsAndCursor(t *testing.T) {
 	}
 	if len(page.Events) != 2 || page.Events[0].Seq != 1 || page.Events[1].Seq != 3 || page.NextCursor != 4 {
 		t.Fatalf("page %+v", page)
+	}
+}
+
+// operatorAuthz allows agent.config.read on a channel only for its operator in operators, and
+// every other action (gateway.connect of the credential check) for everyone.
+type operatorAuthz struct {
+	catchAuthz
+	operators map[ids.ID]ids.ID // channel -> operator
+	asked     []authorize.Action
+}
+
+func (f *operatorAuthz) Authorize(_ context.Context, p authorize.Principal, a authorize.Action, r authorize.Resource) (authorize.Decision, error) {
+	f.asked = append(f.asked, a)
+	if a != authorize.ActionAgentConfigRead {
+		return authorize.Decision{Outcome: authorize.OutcomeAllow}, nil
+	}
+	if r.Kind == authorize.ResourceChannel && f.operators[r.ID] == p.PrincipalID() {
+		return authorize.Decision{Outcome: authorize.OutcomeAllow}, nil
+	}
+	return authorize.Decision{Outcome: authorize.OutcomeForbidden, Reason: "subject_kind_not_allowed"}, nil
+}
+
+// TestAdmit_PersonalEventWithReceiveAction: a personal event whose receive action is not self
+// (agent.config_changed, M2-02 design note 11a) needs both the audience and the receive action at
+// delivery time: admitted for Lotse while it operates the channel, not after the operator
+// changed, never for another principal; a personal event with self is admitted for its audience
+// without a receive action check.
+func TestAdmit_PersonalEventWithReceiveAction(t *testing.T) {
+	t.Parallel()
+	lotse, runner, channel, space := ids.New(), ids.New(), ids.New(), ids.New()
+	cfg := sync.Event{Seq: 1, ID: ids.New(), Type: "agent.config_changed", SchemaVersion: 1, SpaceID: space, ChannelID: channel,
+		ResourceKind: "channel", ResourceID: channel, ReceiveAction: "agent.config.read", AudiencePrincipalID: lotse,
+		Payload: json.RawMessage(`{}`)}
+	az := &operatorAuthz{operators: map[ids.ID]ids.ID{channel: lotse}}
+	s := newCatchUp(t, &catchLog{}, az, 5, 10)
+	ctx := context.Background()
+	asLotse := actor.Actor{ID: lotse, Kind: actor.KindAgent}
+	if ok, err := s.Admit(ctx, asLotse, cfg); err != nil || !ok {
+		t.Fatalf("Lotse as operator: %v %v, want admitted", ok, err)
+	}
+	if ok, err := s.Admit(ctx, actor.Actor{ID: runner, Kind: actor.KindAgent}, cfg); err != nil || ok {
+		t.Fatalf("another principal: %v %v, want not admitted", ok, err)
+	}
+	az.operators[channel] = runner
+	if ok, err := s.Admit(ctx, asLotse, cfg); err != nil || ok {
+		t.Fatalf("Lotse after the operator changed: %v %v, want not admitted", ok, err)
+	}
+	az.asked = nil
+	self := sync.Event{Seq: 2, ID: ids.New(), Type: "access.changed", SchemaVersion: 1, ResourceKind: "principal", ResourceID: lotse,
+		ReceiveAction: "self", AudiencePrincipalID: lotse, Payload: json.RawMessage(`{}`)}
+	if ok, err := s.Admit(ctx, asLotse, self); err != nil || !ok {
+		t.Fatalf("own personal event with self: %v %v, want admitted", ok, err)
+	}
+	if slices.Contains(az.asked, authorize.ActionAgentConfigRead) {
+		t.Fatalf("a self event asked for a receive action: %v", az.asked)
 	}
 }

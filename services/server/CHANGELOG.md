@@ -11,6 +11,18 @@ documented in this file. The format is based on
 
 ### Added
 
+- Channel behaviour and agent configuration (M2-02): `getChannelBehavior` and `putChannelBehavior`
+  (`manage`; the write with fresh step-up, `If-Match` on `settings_version`, audit of allow and
+  deny) for the mention switches, `auto_thread`, `history_backfill_limit`, the channel prompt and
+  the ordered skill references; every effective change raises `settings_version` by one and
+  writes `channel.settings_changed`, a change of prompt or skills also the personal
+  `agent.config_changed` to the effective operator, both with only `channel_id` and
+  `settings_version`. `listServedChannels` and `getServedChannelConfig` (`agent.config.read`) serve
+  the effective operator agent. Configuration key `channel.prompt_max_bytes`; `Scope` of `authz`
+  serves `agent.config.read`; `channel.settings_changed` advances the delivery cache generation; a
+  personal event with a receive action other than `self` needs that action at delivery. The
+  canary test carries a prompt and a skill reference (class `manage_only`).
+
 - Control connection of the host services (M2-43): `GET /api/v1/hosts/connect` on the public
   listener of the roles `api` and `all` (asyncapi `hostControl`). Login with an EdDSA proof over
   the challenge of `hello` with the key registered at pairing; close codes `4110` to `4114`, `4002`,

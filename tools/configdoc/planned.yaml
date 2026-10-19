@@ -23,8 +23,6 @@ rules:
     etappe: M7
   - match: "billing."  # M2-20, M2-22
     etappe: M2
-  - match: channel.prompt_max_bytes  # M2-02
-    etappe: M2
   - match: client.app_lock_after  # M5-08
     etappe: M5
   - match: client.cache_max_age  # M3-05
