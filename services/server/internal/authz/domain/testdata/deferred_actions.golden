@@ -5,7 +5,6 @@ agent_session.bind
 agent_session.reset
 command.autocomplete
 command.invoke
-file.read
 file.transcript.submit
 import.apply
 interaction.create

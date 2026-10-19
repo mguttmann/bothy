@@ -41,6 +41,9 @@ func pick(id, hint ids.ID, what string) (ids.ID, error) {
 func (a *Authorizer) resolve(ctx context.Context, act authorize.Action, r authorize.Resource) (resolved, bool, error) {
 	kind := string(r.Kind)
 	switch {
+	case r.Kind == authorize.ResourceFile && r.File != nil && r.File.Purpose != purposeAttachment:
+		// A file of another purpose has no channel path; its visibility rule refuses it (M3-03).
+		return resolved{path: domain.Path{Kind: domain.PathNone}}, true, nil
 	case domain.IsChannelPathKind(kind):
 		threadID, channelID := r.ThreadID, r.ChannelID
 		var err error
@@ -189,7 +192,7 @@ func (a *Authorizer) gather(ctx context.Context, s *actingPrincipal, spec domain
 			ViewAs:   s.viewAs != nil, ActingFor: s.actingFor != nil,
 		},
 		Resource: domain.ResourceFacts{Kind: string(r.Kind), ID: r.ID, OwnerID: r.OwnerID,
-			HasAttachments: r.HasAttachments, RestrictedTags: r.RestrictedTags},
+			HasAttachments: r.HasAttachments, RestrictedTags: r.RestrictedTags, File: fileFacts(r.File)},
 		Path: res.path, Eff: eff, BaseEff: base, GrantTarget: res.grantTarget,
 	}
 	in.Principal.Pending = pendingReason(s.liveness())
@@ -462,4 +465,25 @@ func memoized[T any](ctx context.Context, key any, read func() (T, bool, error))
 		m.Store(key, structureEntry[T]{facts: facts, found: found})
 	}
 	return facts, found, err
+}
+
+// purposeAttachment is files.purpose of a file uploaded into a channel (M3-03).
+const purposeAttachment = "attachment"
+
+// fileFacts converts the file facts of a resource; nil stays nil.
+func fileFacts(f *authorize.FileFacts) *domain.FileFacts {
+	if f == nil {
+		return nil
+	}
+	return &domain.FileFacts{Purpose: f.Purpose, Attached: f.Attached}
+}
+
+// checkFileFacts refuses a file resource without its facts in request mode (M3-03, docs/DECISIONS.md
+// D-M3-03-17): only filter and delivery mode, which decide stored events by their scope, may leave
+// them out, so no request widens access by omitting them.
+func checkFileFacts(ctx context.Context, r authorize.Resource) error {
+	if r.Kind == authorize.ResourceFile && r.File == nil && !authorize.IsFilter(ctx) {
+		return internal("file resource without its facts in request mode")
+	}
+	return nil
 }

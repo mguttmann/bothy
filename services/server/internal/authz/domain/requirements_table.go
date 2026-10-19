@@ -106,7 +106,8 @@ var requirementGroups = []struct {
 	}},
 	{"read und +export", All(AtLeast(LevelRead), HasCap(CapExport)), []string{"export.channel"}},
 	{"self oder manage", Any(Self, HasCap(CapManage)), []string{"file.delete", "template.manage"}},
-	{"read", Deferred("M3"), []string{"file.read"}},
+	// file.read (M3-03): read on the path; the visibility of kind file adds the uploader rule.
+	{"read", AtLeast(LevelRead), []string{"file.read"}},
 	{"write", AtLeast(LevelWrite), []string{
 		"file.transcribe", "reaction.add", "thread.close", "thread.create", "thread.reopen",
 	}},

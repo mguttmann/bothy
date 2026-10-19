@@ -148,6 +148,16 @@ type ResourceFacts struct {
 	ID, OwnerID ids.ID
 	// HasAttachments and RestrictedTags feed HasCapIf.
 	HasAttachments, RestrictedTags bool
+	// File are the facts of a file resource (M3-03); nil for every other kind and for a file
+	// event decided in filter or delivery mode.
+	File *FileFacts
+}
+
+// FileFacts are the facts of a file resource: files.purpose and whether the file is attached to
+// a message (docs/DECISIONS.md D-M3-03-17).
+type FileFacts struct {
+	Purpose  string
+	Attached bool
 }
 
 // PreviewFacts are the action that access.preview previews.

@@ -413,6 +413,9 @@ func (a *Authorizer) authorize(ctx context.Context, p authorize.Principal, act a
 	if err != nil {
 		return authorize.Decision{}, err
 	}
+	if err := checkFileFacts(ctx, r); err != nil {
+		return authorize.Decision{}, err
+	}
 	t := a.clock.Now()
 	if p != nil && !p.ViewAsPerson().IsZero() &&
 		domain.ViewAsExempt(string(act), domain.ExemptTarget{Kind: string(r.Kind), ID: r.ID, OwnerID: r.OwnerID}, p.PrincipalID(), p.SessionRef()) {
