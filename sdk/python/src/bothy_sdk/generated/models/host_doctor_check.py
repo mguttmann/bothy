@@ -25,12 +25,8 @@ class HostDoctorCheck:
             check (HostDoctorCheckCheck):
             ok (bool):
             code (str | Unset):
-            session_user (str | Unset): Only when not passed: with `hd6_llm_login` and `hd11_shared_locations` the session
-                user whose account the finding is in; with `hd10_helper_integrity` and a wrong peer the session user of that
-                channel; with `hd9_foreign_homes` a former session user of this host (bound to a person in the state directory,
-                no longer in `host_service.session_users`) whose home can be listed. The instance operator knows where to look,
-                and the console shows the person of the assignment (24, 2.2 and 7.4). One entry per such account; names of other
-                users are never sent. A name, never a path.
+            session_user (str | Unset): Only when not passed: the account the rule for names gives (see the schema; 24, 2.2
+                and 7.4). A name, never a path.
     """
 
     check: HostDoctorCheckCheck

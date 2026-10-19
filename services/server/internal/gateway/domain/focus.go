@@ -114,14 +114,16 @@ type EphemeralType struct {
 }
 
 // ephemeralTypes is the register of the ephemeral types the gateway relays. typing.started and
-// run.updated carry the additional condition "thread in focus" of 05 "Ephemeral events"; the
-// other ephemeral types of 05 (agent and host presence, notification.created,
-// command.autocomplete_requested, stats.live) are added by the tickets that build them, with
-// their own candidate rule. TestEphemeralTypes holds the receive actions against
+// run.updated carry the additional condition "thread in focus" of 05 "Ephemeral events";
+// host.presence_changed (M2-43) has no scope, so every live connection is a candidate and its
+// receive action host.read admits it. The other ephemeral types of 05 (agent presence,
+// notification.created, command.autocomplete_requested, stats.live) are added by the tickets that
+// build them, with their own candidate rule. TestEphemeralTypes holds the receive actions against
 // docs/spec/actions.yaml.
 var ephemeralTypes = map[string]EphemeralType{
-	"typing.started": {ReceiveAction: "thread.read", FocusBound: true, ExcludeActor: true},
-	"run.updated":    {ReceiveAction: "run.read", FocusBound: true},
+	"typing.started":        {ReceiveAction: "thread.read", FocusBound: true, ExcludeActor: true},
+	"run.updated":           {ReceiveAction: "run.read", FocusBound: true},
+	"host.presence_changed": {ReceiveAction: "host.read"},
 }
 
 // LookupEphemeral returns the delivery rule of the ephemeral type typ; false when the gateway

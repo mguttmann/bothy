@@ -441,11 +441,14 @@ func TestDoctorOnce(t *testing.T) {
 }
 
 // TestNoNetworkListener: no package of the host module opens a TCP or UDP listener; the admin
-// endpoint and every channel are Unix sockets or named pipes.
+// endpoint and every channel are Unix sockets or named pipes. The test helper packages (a
+// directory named *test, only tests import them) are exempt: controltest is the TLS fake server
+// of the control connection (M2-43).
 func TestNoNetworkListener(t *testing.T) {
 	root := filepath.Join("..", "..")
 	err := filepath.WalkDir(root, func(p string, d os.DirEntry, err error) error {
-		if err != nil || d.IsDir() || !strings.HasSuffix(p, ".go") || strings.HasSuffix(p, "_test.go") || strings.Contains(p, "testdata") {
+		if err != nil || d.IsDir() || !strings.HasSuffix(p, ".go") || strings.HasSuffix(p, "_test.go") || strings.Contains(p, "testdata") ||
+			strings.HasSuffix(filepath.Base(filepath.Dir(p)), "test") {
 			return err
 		}
 		b, err := os.ReadFile(p) //nolint:gosec // the file of this test
@@ -573,5 +576,30 @@ func TestPairThroughAdmin(t *testing.T) {
 	}
 	if err := c.Call(context.Background(), localchan.OpPairRun, "not an object", localchan.OpPairRes, nil); !errors.As(err, &re) {
 		t.Errorf("malformed %v", err)
+	}
+}
+
+// TestLateReadyLogsInAndReports (M2-43): a host that started while the server was unreachable
+// counts as logged in at its first later ready, applies the declaration and reports.
+func TestLateReadyLogsInAndReports(t *testing.T) {
+	x := newWorld(t)
+	x.ctl.err = ErrUnreachable
+	x.pair()
+	s, code := Start(context.Background(), x.deps())
+	if s == nil || code != 0 {
+		t.Fatalf("start: %d", code)
+	}
+	// The entry scans of the full run finish in the background; without a login they report
+	// nothing, and they must be done before the late ready, or they would report after it.
+	s.runner.WaitScans()
+	if _, reports, _ := x.ctl.count(); reports != 0 {
+		t.Fatalf("%d reports before a login", reports)
+	}
+	s.OnReady(context.Background(), Ready{LLMCredentials: state.DeclPersonal})
+	if _, reports, _ := x.ctl.count(); reports != 1 {
+		t.Fatalf("%d reports after the late ready, want 1", reports)
+	}
+	if d, _ := x.st.ReadDeclaration(); d != state.DeclPersonal {
+		t.Errorf("declaration %q", d)
 	}
 }

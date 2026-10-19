@@ -414,6 +414,9 @@ func (a *Authorizer) authorize(ctx context.Context, p authorize.Principal, act a
 		return authorize.Decision{}, err
 	}
 	t := a.clock.Now()
+	if req.IsHostSelf() || (p != nil && p.PrincipalKind() == domain.KindHost) {
+		return a.authorizeHost(ctx, p, spec, req, r, t)
+	}
 	if d, anonymous := anonymousDecision(p, req); anonymous {
 		return d, nil
 	}

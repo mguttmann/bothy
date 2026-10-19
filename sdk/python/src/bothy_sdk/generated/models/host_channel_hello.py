@@ -23,6 +23,7 @@ class HostChannelHello:
         challenge (str): Random value; the host signs it with its Ed25519 key in `identify`.
         server_time (datetime.datetime): RFC 3339 timestamp in UTC with millisecond precision and suffix `Z`.
         heartbeat_interval_ms (int):
+        heartbeat_miss_limit (int):
         jwks (Jwks): JSON Web Key Set (RFC 7517) with the public keys for access tokens, invocation tokens and terminal
             session tokens.
     """
@@ -31,6 +32,7 @@ class HostChannelHello:
     challenge: str
     server_time: datetime.datetime
     heartbeat_interval_ms: int
+    heartbeat_miss_limit: int
     jwks: Jwks
     additional_properties: dict[str, Any] = _attrs_field(init=False, factory=dict)
 
@@ -43,6 +45,8 @@ class HostChannelHello:
 
         heartbeat_interval_ms = self.heartbeat_interval_ms
 
+        heartbeat_miss_limit = self.heartbeat_miss_limit
+
         jwks = self.jwks.to_dict()
 
         field_dict: dict[str, Any] = {}
@@ -53,6 +57,7 @@ class HostChannelHello:
                 "challenge": challenge,
                 "server_time": server_time,
                 "heartbeat_interval_ms": heartbeat_interval_ms,
+                "heartbeat_miss_limit": heartbeat_miss_limit,
                 "jwks": jwks,
             }
         )
@@ -72,6 +77,8 @@ class HostChannelHello:
 
         heartbeat_interval_ms = d.pop("heartbeat_interval_ms")
 
+        heartbeat_miss_limit = d.pop("heartbeat_miss_limit")
+
         jwks = Jwks.from_dict(d.pop("jwks"))
 
         host_channel_hello = cls(
@@ -79,6 +86,7 @@ class HostChannelHello:
             challenge=challenge,
             server_time=server_time,
             heartbeat_interval_ms=heartbeat_interval_ms,
+            heartbeat_miss_limit=heartbeat_miss_limit,
             jwks=jwks,
         )
 

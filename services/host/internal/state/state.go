@@ -33,7 +33,10 @@ const (
 	PairingFile     = "pairing.json"
 	BindingsFile    = "bindings.json"
 	DeclarationFile = "declaration.json"
-	AdminSocket     = "admin.sock"
+	// ServerCAFile is the CA of `pair --ca-file`, trusted by the control connection besides the
+	// system roots (M2-43); absent without --ca-file.
+	ServerCAFile = "server_ca.pem"
+	AdminSocket  = "admin.sock"
 	// ClaudeAPIKeyFile is reserved for the API key of the declaration organization (M2-45).
 	ClaudeAPIKeyFile = "claude_api_key"
 )
@@ -245,6 +248,30 @@ func (d *Dir) ReadPairing() (Pairing, error) {
 
 // WritePairing stores p.
 func (d *Dir) WritePairing(p Pairing) error { return d.writeJSON(PairingFile, p) }
+
+// WriteServerCA stores the CA certificates of `pair --ca-file` (PEM, public data); nil or empty
+// removes a stored one, so a pairing without --ca-file trusts the system roots only.
+func (d *Dir) WriteServerCA(pem []byte) error {
+	if len(pem) == 0 {
+		if err := os.Remove(d.File(ServerCAFile)); err != nil && !errors.Is(err, fs.ErrNotExist) {
+			return fmt.Errorf("state %s: %w", ServerCAFile, err)
+		}
+		return nil
+	}
+	return d.WriteFile(ServerCAFile, pem)
+}
+
+// ReadServerCA returns the stored CA of the pairing, nil when there is none.
+func (d *Dir) ReadServerCA() ([]byte, error) {
+	b, err := os.ReadFile(d.File(ServerCAFile))
+	if errors.Is(err, fs.ErrNotExist) {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, fmt.Errorf("state %s: %w", ServerCAFile, err)
+	}
+	return b, nil
+}
 
 // ReadBindings returns the bindings of session user names to person IDs (24 2.2 point 3); an
 // empty map when the file is missing.

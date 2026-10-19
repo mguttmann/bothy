@@ -36,8 +36,8 @@ release-build: ## Unsigned bothy-host binaries for every platform: make release-
 	    -ldflags "-X github.com/OWNER/bothy/services/host/internal/buildinfo.Version=$$VERSION" -o "$$out" ./cmd/bothy-host || exit 1; \
 	done
 
-recordings: ## Rewrite testdata/noise/recordings/go.json and testdata/noise/fingerprint.json
-	UPDATE_RECORDINGS=1 GOTOOLCHAIN=local go test -count=1 -run 'TestRecordingsCurrent|TestFingerprintFileCurrent' ./internal/noise ./internal/fingerprint
+recordings: ## Rewrite testdata/noise/recordings/go.json, testdata/noise/fingerprint.json and testdata/control/host_frames.json
+	UPDATE_RECORDINGS=1 GOTOOLCHAIN=local go test -count=1 -run 'TestRecordingsCurrent|TestFingerprintFileCurrent|TestHostFramesRecordingCurrent' ./internal/noise ./internal/fingerprint ./internal/control
 
 # The platform suite (brief M2-42 design note 19): only on a disposable machine with administrator
 # rights (a GitHub-hosted runner of the workflow host-platform.yml), never on a workstation. The

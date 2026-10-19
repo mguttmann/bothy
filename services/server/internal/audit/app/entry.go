@@ -109,6 +109,8 @@ func detailsOf(attrs auditing.Attrs) (map[string]any, error) {
 			return nil, invalid("a session user name belongs under os_user and nowhere else")
 		case k == domain.DetailOSUser && !domain.ValidOSUser(v.Data().(string)):
 			return nil, invalid("os_user is not the name of a session user")
+		case domain.IsOSUserListKey(k) != (v.Kind() == auditing.KindOSUserNames):
+			return nil, invalid("a list of session user names belongs under its members of host.connect and nowhere else")
 		case !domain.ValidKey(k):
 			return nil, invalid("attribute key does not match ^[a-z][a-z0-9_]*$")
 		}
@@ -131,6 +133,8 @@ func valueData(v auditing.Value, top bool) (any, error) {
 		return domain.FormatTime(t), nil
 	case auditing.KindList:
 		return listData(v, top)
+	case auditing.KindOSUserNames:
+		return osUserNamesData(v)
 	case auditing.KindViolations:
 		vs, _ := v.Data().([]auditing.Violation)
 		return violationsData(vs)
@@ -139,6 +143,20 @@ func valueData(v auditing.Value, top bool) (any, error) {
 	default:
 		return nil, invalid("attribute value has an unknown kind")
 	}
+}
+
+// osUserNamesData converts a list of session user names; each must have the form of os_user.
+func osUserNamesData(v auditing.Value) (any, error) {
+	elems, _ := v.Data().([]auditing.Value)
+	out := make([]any, 0, len(elems))
+	for _, e := range elems {
+		s, _ := e.Data().(string)
+		if e.Kind() != auditing.KindOSUserName || !domain.ValidOSUser(s) {
+			return nil, invalid("a list of session user names holds only names of session users")
+		}
+		out = append(out, s)
+	}
+	return out, nil
 }
 
 // listData converts a list value.

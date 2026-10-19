@@ -476,6 +476,10 @@ func (s *Service) SetState(ctx context.Context, a actor.Actor, cmd terminal.SetH
 		out, err = s.stateWrite(ctx, cmd, causes[cmd.State], reason)
 		return err
 	}, rightsChange(cmd.HostID, holder))
+	if err == nil && (out.State == string(domain.StateDisabled) || out.State == string(domain.StateRetired)) {
+		// The control connection ends with the state change, after the commit (24 section 3.1).
+		s.control().CloseHost(cmd.HostID, domain.CodeHostDisabled)
+	}
 	return out, err
 }
 

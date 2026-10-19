@@ -826,11 +826,11 @@ Source: [24-terminal.md](../spec/24-terminal.md), section 17.
 | `terminal.max_sessions_per_person` | `BOTHY_TERMINAL__MAX_SESSIONS_PER_PERSON` | Server |  | `5` | open sessions per person | planned (M2) |
 | `terminal.max_sessions_per_host` | `BOTHY_TERMINAL__MAX_SESSIONS_PER_HOST` | Server |  | `10` | open sessions per host | planned (M2) |
 | `terminal.relay_buffer_max_bytes` | `BOTHY_TERMINAL__RELAY_BUFFER_MAX_BYTES` | Server |  | `262144` | Buffer of the relay per direction and session | planned (M2) |
-| `terminal.host_heartbeat_interval` | `BOTHY_TERMINAL__HOST_HEARTBEAT_INTERVAL` | Server |  | `20s` | Interval of the heartbeats of the control connection (reported in `hello`) | planned (M2) |
-| `terminal.host_heartbeat_miss_limit` | `BOTHY_TERMINAL__HOST_HEARTBEAT_MISS_LIMIT` | Server |  | `3` | missing heartbeats until the control connection is closed | planned (M2) |
-| `terminal.host_auth_timeout` | `BOTHY_TERMINAL__HOST_AUTH_TIMEOUT` | Server |  | `10s` | Deadline between `hello` and `identify` of the control and data connection | planned (M2) |
+| `terminal.host_heartbeat_interval` | `BOTHY_TERMINAL__HOST_HEARTBEAT_INTERVAL` | Server | duration | `20s` | Interval of the heartbeats of the control connection (reported in `hello`) | active |
+| `terminal.host_heartbeat_miss_limit` | `BOTHY_TERMINAL__HOST_HEARTBEAT_MISS_LIMIT` | Server | int | `3` | missing heartbeats until the control connection is closed | active |
+| `terminal.host_auth_timeout` | `BOTHY_TERMINAL__HOST_AUTH_TIMEOUT` | Server | duration | `10s` | Deadline between `hello` and `identify` of the control and data connection | active |
 | `terminal.sweep_interval` | `BOTHY_TERMINAL__SWEEP_INTERVAL` | Server |  | `30s` | Interval of the job `terminal.sweep` ([02-architecture.md](../spec/02-architecture.md), section 12.3) | planned (M2) |
-| `terminal.host_duplicate_probe_timeout` | `BOTHY_TERMINAL__HOST_DUPLICATE_PROBE_TIMEOUT` | Server |  | `5s` | this long the server waits for the answer of the older control connection (3.4) | planned (M2) |
+| `terminal.host_duplicate_probe_timeout` | `BOTHY_TERMINAL__HOST_DUPLICATE_PROBE_TIMEOUT` | Server | duration | `5s` | this long the server waits for the answer of the older control connection (3.4) | active |
 | `host_service.state_dir` |  | Host service |  | `/var/lib/bothy-host` (Windows: `%ProgramData%\bothy-host`) | State directory with the keys of the host, the bindings of the session users to people and, with `organization`, the API key of the profile `claude`; also the pairing record and the last declaration from `ready`, both without secrets (D-M2-42-4); never a subscription login (7.4) |  |
 | `host_service.auth_status_timeout` |  | Host service |  | `30s` | bound of one call of `claude auth status` and of the login shell probe of HD6; a timeout gives `auth_status_unknown` (7.4, D-M2-42-3) |  |
 | `host_service.session_users` |  | Host service |  | empty | Session users of this host, one per person; one PTY helper per entry; never the service user; empty means: HD1 not passed; read only at start, changed with `bothy-host session-user add` and `remove`, which restart the host service for this (2.2) |  |
@@ -843,6 +843,8 @@ Source: [24-terminal.md](../spec/24-terminal.md), section 17.
 | `host_service.scrollback_bytes` |  | Host service |  | `1048576` | Scrollback buffer per session, only in memory |  |
 | `host_service.require_local_confirm` |  | Host service |  | `false` | every PTY only after consent on the host (6.4) |  |
 | `host_service.local_confirm_timeout` |  | Host service |  | `60s` | Deadline for the consent on the host |  |
+| `host_service.reconnect_backoff_base` |  | Host service |  | `1s` | first delay of the exponential backoff with full jitter before a new control connection (3.5) |  |
+| `host_service.reconnect_backoff_cap` |  | Host service |  | `5m` | largest delay of that backoff; also the total time the login of a refused start keeps trying (3.5) |  |
 
 ### 25 Visualization
 

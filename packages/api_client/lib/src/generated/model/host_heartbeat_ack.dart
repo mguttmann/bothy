@@ -3,6 +3,7 @@
 //
 
 // ignore_for_file: unused_element
+import 'package:api_client/src/generated/model/jwks.dart';
 import 'package:built_value/built_value.dart';
 import 'package:built_value/serializer.dart';
 
@@ -12,12 +13,16 @@ part 'host_heartbeat_ack.g.dart';
 ///
 /// Properties:
 /// * [serverTime] - RFC 3339 timestamp in UTC with millisecond precision and suffix `Z`.
+/// * [jwks]
 @BuiltValue()
 abstract class HostHeartbeatAck
     implements Built<HostHeartbeatAck, HostHeartbeatAckBuilder> {
   /// RFC 3339 timestamp in UTC with millisecond precision and suffix `Z`.
   @BuiltValueField(wireName: r'server_time')
   DateTime? get serverTime;
+
+  @BuiltValueField(wireName: r'jwks')
+  Jwks? get jwks;
 
   HostHeartbeatAck._();
 
@@ -50,6 +55,13 @@ class _$HostHeartbeatAckSerializer
       yield serializers.serialize(
         object.serverTime,
         specifiedType: const FullType(DateTime),
+      );
+    }
+    if (object.jwks != null) {
+      yield r'jwks';
+      yield serializers.serialize(
+        object.jwks,
+        specifiedType: const FullType(Jwks),
       );
     }
   }
@@ -86,6 +98,14 @@ class _$HostHeartbeatAckSerializer
           ) as DateTime?;
           if (valueDes == null) continue;
           result.serverTime = valueDes;
+          break;
+        case r'jwks':
+          final valueDes = serializers.deserialize(
+            value,
+            specifiedType: const FullType.nullable(Jwks),
+          ) as Jwks?;
+          if (valueDes == null) continue;
+          result.jwks.replace(valueDes);
           break;
         default:
           unhandled.add(key);

@@ -325,6 +325,11 @@ func TestServeRolesStartReadyAndStop(t *testing.T) {
 						t.Fatalf("public %s = %d %q, want a 404 problem", path, code, body)
 					}
 				}
+				// The control connection of the host services is mounted in api and all (M2-43): a
+				// request without the upgrade reaches the WebSocket handler, which asks for it.
+				if code, _ := get(t, public, "/api/v1/hosts/connect"); code != http.StatusUpgradeRequired {
+					t.Fatalf("public /api/v1/hosts/connect = %d, want 426", code)
+				}
 			}
 			if code, _ := get(t, internal, "/healthz"); code != http.StatusOK {
 				t.Fatalf("/healthz = %d", code)

@@ -231,14 +231,7 @@ func (r *Repository) LockOpenSessions(ctx context.Context, hostID, userID ids.ID
 	if err != nil {
 		return nil, mapError(err, "locking the open sessions of a host")
 	}
-	out := make([]domain.Session, 0, len(rows))
-	for _, row := range rows {
-		out = append(out, domain.Session{
-			ID: idOf(row.ID), HostID: idOf(row.HostID), UserID: idOf(row.UserID), State: row.State, OpenedAt: timeOf(row.OpenedAt),
-			BytesIn: row.BytesIn, BytesOut: row.BytesOut,
-		})
-	}
-	return out, nil
+	return sessions(rows), nil
 }
 
 // CloseSession implements app.Store.
@@ -277,7 +270,8 @@ func toHost(row sqlcgen.Host) domain.Host {
 		KeyGeneration: int64(row.KeyGeneration), FingerprintFailures: int(row.FingerprintFailures),
 		PairedAt: timeOf(row.PairedAt), Profiles: domain.DecodeProfiles(row.ReportedProfiles),
 		ReportedUsers: domain.DecodeReportedSessionUsers(row.ReportedSessionUsers), Doctor: domain.DecodeDoctor(row.ReportedDoctor),
-		OSVersion: row.ReportedOsVersion.String, HostVersion: row.ReportedHostVersion.String, LastSeenAt: timeOf(row.LastSeenAt),
+		AuthPublicJWK: row.AuthPublicJwk,
+		OSVersion:     row.ReportedOsVersion.String, HostVersion: row.ReportedHostVersion.String, LastSeenAt: timeOf(row.LastSeenAt),
 		CreatedBy: idOf(row.CreatedBy), CreatedAt: timeOf(row.CreatedAt), Version: row.Version,
 	}
 	if row.ReportedIsServerHost.Valid {

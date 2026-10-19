@@ -4,9 +4,11 @@ package app
 
 import (
 	"context"
+	"errors"
 	"time"
 
 	"github.com/OWNER/bothy/services/server/internal/identity"
+	"github.com/OWNER/bothy/services/server/internal/instance"
 	"github.com/OWNER/bothy/services/server/internal/kernel/actor"
 	"github.com/OWNER/bothy/services/server/internal/kernel/ids"
 	"github.com/OWNER/bothy/services/server/internal/terminal/domain"
@@ -84,6 +86,28 @@ type Store interface {
 	// ConfirmPairing writes the confirmation of the host id (M2-41): declared_server_host,
 	// confirmed_by, confirmed_at, fingerprint_failures 0, state active and version.
 	ConfirmPairing(ctx context.Context, id ids.ID, declaredServerHost bool, by ids.ID, at time.Time, version int64) error
+	// UpdateHostLogin writes the login of the host id (M2-43): reported_host_version,
+	// last_seen_at and version (the caller passes the current version when the host version is
+	// unchanged).
+	UpdateHostLogin(ctx context.Context, id ids.ID, hostVersion string, seen time.Time, version int64) error
+	// TouchLastSeen writes last_seen_at = at of the host id when it is older than olderThan or
+	// NULL; the version stays (M2-43).
+	TouchLastSeen(ctx context.Context, id ids.ID, at, olderThan time.Time) error
+	// UpdateHostReport writes the reported columns of r besides the session users and version
+	// (M2-43): reported_profiles, reported_doctor, reported_is_server_host,
+	// reported_require_local_confirm and reported_os_version (NULL for "").
+	UpdateHostReport(ctx context.Context, id ids.ID, r domain.Report, version int64) error
+	// LockSession returns the session id and locks its row; found is false for an unknown id.
+	LockSession(ctx context.Context, id ids.ID) (s domain.Session, found bool, err error)
+	// SessionsByIDs returns the sessions of the ids that exist, ascending, without a lock.
+	SessionsByIDs(ctx context.Context, list []ids.ID) ([]domain.Session, error)
+	// StartSession turns the opening session id active with started_at = at.
+	StartSession(ctx context.Context, id ids.ID, at time.Time) error
+	// DetachSession turns the active session id detached with detached_at = at.
+	DetachSession(ctx context.Context, id ids.ID, at time.Time) error
+	// CloseSessionReported closes the session id as the host service ended it: reason, detail
+	// and exit code of end, closed_at = at, detached_at cleared, version raised.
+	CloseSessionReported(ctx context.Context, id ids.ID, end domain.HostSessionEnd, at time.Time) error
 }
 
 // PairingWrite is what host.pair stores (M2-41, Design note 3h): the checked keys, the
@@ -129,19 +153,84 @@ type People interface {
 	IsActiveOwner(ctx context.Context, userID ids.ID) (bool, error)
 }
 
-// Presence reports whether the control connection of a host is open (24 section 3.4). Until
-// M2-43 builds the control connections, internal/wire binds NoConnections.
+// Presence reports whether the control connection of a host is open and usable for sessions (24
+// section 3.5). A process without the route /hosts/connect keeps NoConnections; the api roles
+// bind the registry of adapters/wsrelay through BindControl (M2-43).
 type Presence interface {
-	// Connected reports an open control connection of hostID.
+	// Connected reports an open control connection of hostID after its first report.
 	Connected(ctx context.Context, hostID ids.ID) bool
 }
 
 // NoConnections is the Presence of a server without the route /hosts/connect: no host is
-// connected, which is the truth there. M2-43 replaces the binding with its registry.
+// connected, which is the truth there.
 type NoConnections struct{}
 
 // Connected implements Presence: always false.
 func (NoConnections) Connected(context.Context, ids.ID) bool { return false }
+
+// SessionOpen is the message session.open of the server (schema HostSessionOpen): the session, the
+// path of its data connection, the profile and the instant after which the host service drops the
+// request (terminal.open_timeout). M2-44 produces it.
+type SessionOpen struct {
+	SessionID ids.ID
+	DataPath  string
+	Profile   string
+	ExpiresAt time.Time
+}
+
+// The answers of ControlLinks.OpenSession that M2-44 maps to 409 host_unavailable.
+var (
+	// ErrHostNotConnected is a host without a control connection in this process.
+	ErrHostNotConnected = errors.New("terminal: the host service is not connected")
+	// ErrHostNotReady is a control connection whose first report after ready has not been applied.
+	ErrHostNotReady = errors.New("terminal: the host service has not reported yet")
+)
+
+// ControlLinks is the outgoing port to the control connections of this process (M2-43 Design note
+// 7), implemented by the registry of adapters/wsrelay. M2-47 adds the path across nodes behind it
+// without changing callers. Every method is safe for concurrent use and never waits on the
+// network.
+type ControlLinks interface {
+	// OpenSession enqueues session.open on the link of hostID. Errors: ErrHostNotConnected without
+	// a link, ErrHostNotReady before the first applied report after ready.
+	OpenSession(ctx context.Context, hostID ids.ID, cmd SessionOpen) error
+	// CloseSession enqueues session.close with reason on the link of hostID; without a link
+	// nothing happens (the next login catches it, 24 section 6.2).
+	CloseSession(ctx context.Context, hostID, sessionID ids.ID, reason domain.CloseReason) error
+	// CloseHost closes the link of hostID with code; callers call it after their commit.
+	CloseHost(hostID ids.ID, code domain.CloseCode)
+	// Connected reports a link of hostID whose first report after ready was applied.
+	Connected(hostID ids.ID) bool
+	// SendReady sends ready again on the link of hostID with the declaration read now; without a
+	// link nothing happens.
+	SendReady(hostID ids.ID)
+}
+
+// NoLinks is the ControlLinks of a process without the route /hosts/connect: no host is
+// connected; closing and sending do nothing.
+type NoLinks struct{}
+
+// OpenSession implements ControlLinks: ErrHostNotConnected.
+func (NoLinks) OpenSession(context.Context, ids.ID, SessionOpen) error { return ErrHostNotConnected }
+
+// CloseSession implements ControlLinks: nothing to close.
+func (NoLinks) CloseSession(context.Context, ids.ID, ids.ID, domain.CloseReason) error { return nil }
+
+// CloseHost implements ControlLinks: nothing to close.
+func (NoLinks) CloseHost(ids.ID, domain.CloseCode) {}
+
+// Connected implements ControlLinks: false.
+func (NoLinks) Connected(ids.ID) bool { return false }
+
+// SendReady implements ControlLinks: nothing to send.
+func (NoLinks) SendReady(ids.ID) {}
+
+// TerminalKeys reads the published signing keys of purpose terminal (instance.Keys); the control
+// connection hands them to the host service in hello and heartbeat_ack (24 section 5.3).
+type TerminalKeys interface {
+	// PublicKeys returns the next, active and retiring keys of p, read fresh.
+	PublicKeys(ctx context.Context, p instance.Purpose) ([]instance.PublicKey, error)
+}
 
 // Cursors encodes and checks the opaque cursors of listHosts (implemented by adapters/httpapi
 // with platform/httpserver).

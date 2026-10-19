@@ -168,6 +168,10 @@ func Start(ctx context.Context, d Deps) (*Service, int) {
 	s.mu.Lock()
 	s.started = true
 	s.mu.Unlock()
+	if ev, ok := d.Control.(Events); ok {
+		// Every later ready is the current declaration (M2-42 Design note 15, M2-43).
+		ev.SetReadyHandler(func(ctx context.Context, r Ready) { s.OnReady(ctx, r) })
+	}
 	s.report(ctx, s.runner.Last())
 	return s, 0
 }
@@ -187,6 +191,11 @@ func (s *Service) applyDeclaration(ctx context.Context, decl string) *doctor.Res
 // OnReady applies the declaration of a later ready (the server sends ready again on every change
 // of the declaration, M2-43): store it, evaluate HD6 again and send a new report.
 func (s *Service) OnReady(ctx context.Context, r Ready) *doctor.Result {
+	// A ready is a login: a host that started while the server was unreachable reports from its
+	// first later ready on (M2-43).
+	s.mu.Lock()
+	s.loggedIn = true
+	s.mu.Unlock()
 	res := s.applyDeclaration(ctx, r.LLMCredentials)
 	s.report(ctx, res)
 	return res
@@ -222,6 +231,10 @@ func (s *Service) Serve(ctx context.Context) int {
 	if s.d.Admin != nil {
 		go func() { _ = localchan.ServeAdmin(ctx, s.d.Admin, s.d.AdminUID, s.adminHandler()) }()
 	}
+	var stopped <-chan struct{}
+	if ev, ok := s.d.Control.(Events); ok {
+		stopped = ev.Stopped()
+	}
 	select {
 	case <-ctx.Done():
 		_ = s.d.Control.Close()
@@ -229,6 +242,12 @@ func (s *Service) Serve(ctx context.Context) int {
 	case code := <-s.end:
 		_ = s.d.Control.Close()
 		return code
+	case <-stopped:
+		// The server refused the keys, found a second host service or does not speak our
+		// version: no service manager restarts after this code (D-M2-42-14, M2-43).
+		s.d.Log.ErrorContext(ctx, "control connection stopped")
+		_ = s.d.Control.Close()
+		return ExitStartRefused
 	}
 }
 

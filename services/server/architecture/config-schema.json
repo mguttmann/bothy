@@ -3008,6 +3008,54 @@
       "doc": "Failed confirmations of a host before it falls back to pairing."
     },
     {
+      "name": "terminal.host_auth_timeout",
+      "env": "BOTHY_TERMINAL__HOST_AUTH_TIMEOUT",
+      "kind": "duration",
+      "default": "10s",
+      "required": false,
+      "enum": [],
+      "min": "1ms",
+      "max": "",
+      "chapter": "24-terminal.md",
+      "doc": "Time between hello and identify on the control and data connections of a host service."
+    },
+    {
+      "name": "terminal.host_duplicate_probe_timeout",
+      "env": "BOTHY_TERMINAL__HOST_DUPLICATE_PROBE_TIMEOUT",
+      "kind": "duration",
+      "default": "5s",
+      "required": false,
+      "enum": [],
+      "min": "1ms",
+      "max": "",
+      "chapter": "24-terminal.md",
+      "doc": "Time the server waits for the answer of the older control connection of a host (24 section 3.4)."
+    },
+    {
+      "name": "terminal.host_heartbeat_interval",
+      "env": "BOTHY_TERMINAL__HOST_HEARTBEAT_INTERVAL",
+      "kind": "duration",
+      "default": "20s",
+      "required": false,
+      "enum": [],
+      "min": "1ms",
+      "max": "",
+      "chapter": "24-terminal.md",
+      "doc": "Interval of the heartbeats of the control connection of a host service, announced in hello."
+    },
+    {
+      "name": "terminal.host_heartbeat_miss_limit",
+      "env": "BOTHY_TERMINAL__HOST_HEARTBEAT_MISS_LIMIT",
+      "kind": "int",
+      "default": "3",
+      "required": false,
+      "enum": [],
+      "min": "1",
+      "max": "",
+      "chapter": "24-terminal.md",
+      "doc": "Missed heartbeats after which the server closes the control connection with 4009."
+    },
+    {
       "name": "terminal.pairing_code_ttl",
       "env": "BOTHY_TERMINAL__PAIRING_CODE_TTL",
       "kind": "duration",

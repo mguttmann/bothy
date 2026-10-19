@@ -11,6 +11,21 @@ documented in this file. The format is based on
 
 ### Added
 
+- Control connection of the host services (M2-43): `GET /api/v1/hosts/connect` on the public
+  listener of the roles `api` and `all` (asyncapi `hostControl`). Login with an EdDSA proof over
+  the challenge of `hello` with the key registered at pairing; close codes `4110` to `4114`, `4002`,
+  `4009`, `4013`, `4014` and `4000`; `host.connect` is a real requirement with the right
+  `host-self` (no longer deferred); `live_sessions` ends every other open session with
+  `host_restarted`; `report` writes the reported columns (session users as rights state, SR12; the
+  server-host flag ends the sessions of non-owners, SR10) and is audited on a change of the flag,
+  the checks or the session users; a second live connection with the same keys disables the host
+  (TM-T23); heartbeats with `heartbeat_ack` carrying a changed key set of purpose `terminal`; the
+  presence `Host.connected` and the ephemeral `host.presence_changed`; the end of every session
+  writes `terminal_session.changed`. Configuration keys `terminal.host_heartbeat_interval`,
+  `terminal.host_heartbeat_miss_limit`, `terminal.host_auth_timeout` and
+  `terminal.host_duplicate_probe_timeout`; deny reason `host_duplicate_connection`; the test client
+  `internal/terminal/adapters/hosttest` and `specschema.ValidateChannelFrame` for the terminal
+  channels.
 - `bothy import login` and `bothy import logout` (M8-10): the import tool logs in as a `cli`
   device through device pairing (Ed25519 DPoP key, no step-up key), prints the pairing code alone
   on stdout and polls `completePairing` every `import.login_poll_interval` (new tool key) until the

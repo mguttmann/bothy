@@ -494,8 +494,16 @@ A host is a target outside the tree instance, space, channel (07 section 2.12):
   gate: `authorize` and `Scope` refuse agents, apps and personal tokens with
   `subject_kind_not_allowed` right after the liveness checks, before any resource is resolved.
   `host.pair` is `Public` since M2-41 (the use case proves the pairing code before `authorize`, as
-  for the refresh token); `host.connect` stays deferred for M2-43; the terminal actions are real
-  since M2-40 (section below).
+  for the refresh token); `host.connect` is `HostSelf` since M2-43 (below); the terminal actions
+  are real since M2-40 (section below).
+- **Host principal (M2-43).** `host.connect` passes only for the principal of kind `host` on its
+  own host row (`HostSelf`). `authorize` decides it on its own path (`authorizeHost`): a host
+  principal is never looked up in `principals` and has an empty snapshot; `Resource.HostAuth`
+  carries the verdict of the proof (missing: internal error); an unknown key or an invalid proof is
+  `unauthenticated` with `host_auth_failed`, a host outside `confirming` and `active` is
+  `unauthenticated` with `principal_inactive`, another host is `not_found`; people, agents and apps
+  get `forbidden` with `subject_kind_not_allowed`; a host principal is not authenticated for any
+  other action. Tests: `TestHostConnectRequirement`, `TestHostPrincipalSkipsPrincipalSource`.
 - **Visibility.** A host resource resolves through the source; it is visible to an effective
   owner, its holder and a person with `TerminalOn`, with "view as" to both views, and to any
   principal for an action whose requirement is exactly `Public` (only `host.pair`, M2-41).

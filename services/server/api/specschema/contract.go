@@ -96,6 +96,9 @@ type Contract struct {
 	catalogue  Catalogue
 	defs       map[string]bool // openapi schema names
 	maxFrame   int
+	// channels are the message keys of the terminal channels hostControl and hostData by
+	// channel, direction (true: server to host) and op (M2-43).
+	channels map[string]map[bool]map[string]string
 }
 
 // RepoRoot walks up from the working directory to the directory that contains
@@ -151,6 +154,9 @@ func Load(repoRoot string) (*Contract, error) {
 		events: map[string]EventMessage{}, defs: map[string]bool{}, maxFrame: DefaultMaxFrameBytes}
 	// The gateway register first: rewriteRefs below changes the message payloads in place.
 	if err := c.readGateway(asyncapi, messages); err != nil {
+		return nil, err
+	}
+	if err := c.readTerminalChannels(asyncapi, messages); err != nil {
 		return nil, err
 	}
 	defs := map[string]any{}
@@ -221,7 +227,68 @@ func (c *Contract) allMessages() map[string]bool {
 	for t := range c.events {
 		out["event."+t] = true
 	}
+	for _, dirs := range c.channels {
+		for _, ops := range dirs {
+			for _, k := range ops {
+				out[k] = true
+			}
+		}
+	}
 	return out
+}
+
+// terminalChannels are the channels of the host service whose frames ValidateChannelFrame checks.
+var terminalChannels = []string{"hostControl", "hostData"}
+
+// readTerminalChannels reads, per terminal channel, the op of every message of its send and
+// receive operations: the message name is the op (asyncapi.yaml components.messages host.*).
+// Binary messages (noise.frame) have no op and are left out.
+func (c *Contract) readTerminalChannels(asyncapi, messages map[string]any) error {
+	c.channels = map[string]map[bool]map[string]string{}
+	ops := mapAt(asyncapi, "operations")
+	for _, ch := range terminalChannels {
+		channel := mapAt(asyncapi, "channels", ch)
+		if channel == nil {
+			return errors.New("specschema: asyncapi.yaml has no channel " + ch)
+		}
+		g := gatewayDoc{chMsgs: mapAt(channel, "messages"), messages: messages}
+		c.channels[ch] = map[bool]map[string]string{true: {}, false: {}}
+		for _, id := range slices.Sorted(maps.Keys(ops)) {
+			op, _ := ops[id].(map[string]any)
+			if ref, _ := mapAt(op, "channel")["$ref"].(string); ref != "#/channels/"+ch {
+				continue
+			}
+			if err := c.readChannelOp(g, ch, id, op); err != nil {
+				return err
+			}
+		}
+	}
+	return nil
+}
+
+// readChannelOp records the message keys of the operation id of the terminal channel ch by op.
+func (c *Contract) readChannelOp(g gatewayDoc, ch, id string, op map[string]any) error {
+	send := op["action"] == "send"
+	list, _ := op["messages"].([]any)
+	for _, e := range list {
+		ref, _ := e.(map[string]any)["$ref"].(string)
+		chKey, ok := strings.CutPrefix(ref, "#/channels/"+ch+"/messages/")
+		if !ok {
+			return fmt.Errorf("specschema: operation %s: message reference %q", id, ref)
+		}
+		target, _ := mapAt(g.chMsgs, chKey)["$ref"].(string)
+		key, ok := strings.CutPrefix(target, "#/components/messages/")
+		msg, _ := g.messages[key].(map[string]any)
+		if !ok || msg == nil {
+			return fmt.Errorf("specschema: channel %s message %s: reference %q", ch, chKey, target)
+		}
+		if msg["contentType"] == "application/octet-stream" {
+			continue
+		}
+		name, _ := msg["name"].(string)
+		c.channels[ch][send][name] = key
+	}
+	return nil
 }
 
 // readGateway reads the operations, the message keys and x-close-codes of the channel gateway.

@@ -190,6 +190,10 @@ func Pair(ctx context.Context, o Options) (Result, error) {
 	if err := o.State.WritePairing(state.Pairing{ServerURL: u.String(), HostID: res.HostID, InstanceID: res.InstanceID, Fingerprint: fp}); err != nil {
 		return Result{}, err
 	}
+	// The control connection of run must trust the same server (M2-43).
+	if err := o.State.WriteServerCA(o.CAPEM); err != nil {
+		return Result{}, err
+	}
 	return Result{HostID: res.HostID, InstanceID: res.InstanceID, Fingerprint: fp}, nil
 }
 

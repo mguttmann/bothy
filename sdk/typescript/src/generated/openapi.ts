@@ -10063,7 +10063,7 @@ export interface components {
             /** @example subscription_login_detected */
             code?: string;
             /**
-             * @description Only when not passed: with `hd6_llm_login` and `hd11_shared_locations` the session user whose account the finding is in; with `hd10_helper_integrity` and a wrong peer the session user of that channel; with `hd9_foreign_homes` a former session user of this host (bound to a person in the state directory, no longer in `host_service.session_users`) whose home can be listed. The instance operator knows where to look, and the console shows the person of the assignment (24, 2.2 and 7.4). One entry per such account; names of other users are never sent. A name, never a path.
+             * @description Only when not passed: the account the rule for names gives (see the schema; 24, 2.2 and 7.4). A name, never a path.
              * @example bothy-s-robin
              */
             session_user?: string;
@@ -10135,7 +10135,7 @@ export interface components {
             reported_session_users?: components["schemas"]["HostReportedSessionUser"][];
             /** @description Report whether `host_service.require_local_confirm` is on. */
             require_local_confirm?: boolean;
-            /** @description The control connection of the host service is open (memory of the server). */
+            /** @description Usable for sessions, from the first `report` after `ready` to the end of the control connection (24, 3.5). */
             connected: boolean;
             /** @example 1.0.0 */
             host_version?: string;
@@ -10361,10 +10361,11 @@ export interface components {
              * @example 20000
              */
             heartbeat_interval_ms: number;
+            heartbeat_miss_limit: number;
             /** @description Public keys with purpose `terminal` for checking session tokens. */
             jwks: components["schemas"]["Jwks"];
         };
-        /** @description Login of a host service. `proof` is a compact JWS (`alg = EdDSA`, `typ = host-auth+jwt`) over `{challenge, host_id, iat}` with the registered Ed25519 key. */
+        /** @description Login of a host service. `proof` is a compact JWS (`alg = EdDSA`, `typ = host-auth+jwt`, `kid`) over exactly `{challenge, host_id, iat}` with the registered Ed25519 key (24, 3.5). */
         HostIdentify: {
             /** @example 1 */
             protocol_version: number;
@@ -10387,6 +10388,7 @@ export interface components {
         };
         HostHeartbeatAck: {
             server_time?: components["schemas"]["Timestamp"];
+            jwks?: components["schemas"]["Jwks"];
         };
         /** @description Report of profiles, session users and self-checks; never content, paths or values. Sent after every `ready` before the host service accepts `session.open`, and on every change. When `doctor` refuses the start, the host service still logs in, sends one `report` and closes the connection without accepting `session.open` (24 section 2.2). */
         HostReport: {

@@ -1321,7 +1321,10 @@ Role `api`:
 2. `http.Server.Shutdown` with `shutdown.http_grace`: close listeners, finish running requests.
    `Shutdown` does not close hijacked connections such as WebSockets [Q9, verified]; therefore:
 3. Gateway: store `acked_seq` of all agent consumers immediately; close all connections with `4013
-   server_restart` (04, 6.4; clients reconnect with a random delay).
+   server_restart` (04, 6.4; clients reconnect with a random delay). Control
+   connections of host services (24 3.5, M2-43): the sessions of each host turn `detached`, then
+   the connection closes with `4013`; the host service reconnects after a random delay below
+   `host_service.reconnect_backoff_base` and keeps its PTYs until `terminal.detach_grace`.
 4. Stop the log tail and `LISTEN`.
 5. Flush telemetry, at most `shutdown.telemetry_flush_timeout`.
 6. Close the pool.
