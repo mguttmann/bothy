@@ -6,6 +6,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"log/slog"
 	"time"
 
 	"github.com/OWNER/bothy/services/server/internal/authz"
@@ -35,9 +36,12 @@ type Config struct {
 	// HistoryBackfillLimitDefault is channel.history_backfill_limit_default, the
 	// history_backfill_limit of a new channel; at most HistoryBackfillLimitMax.
 	HistoryBackfillLimitDefault int `config:"channel.history_backfill_limit_default"`
-	// HistoryBackfillLimitMax is channel.history_backfill_limit_max (checked by M2-02 when the
-	// limit becomes writable).
+	// HistoryBackfillLimitMax is channel.history_backfill_limit_max, the upper bound of
+	// history_backfill_limit that putChannelBehavior checks at request time (M2-02).
 	HistoryBackfillLimitMax int `config:"channel.history_backfill_limit_max"`
+	// PromptMaxBytes is channel.prompt_max_bytes, the longest channel prompt in bytes of UTF-8
+	// (M2-02); the key itself has the minimum 1.
+	PromptMaxBytes int `config:"channel.prompt_max_bytes"`
 	// ThreadTitleMaxChars is thread.title_max_chars, the longest thread title (M1-55).
 	ThreadTitleMaxChars int `config:"thread.title_max_chars"`
 	// ThreadMaxTags is thread.max_tags, the most forum tags of one thread.
@@ -100,6 +104,14 @@ type Deps struct {
 	// Directory and Policies answer whether an agent_id names an active agent with an agents row
 	// (identity and the agent policy source of agents behind the port of authz, D1 of M1-54).
 	Directory identity.Directory
+	// Behaviors reads and writes the behaviour of channels (M2-02); nil means Store when it
+	// implements BehaviorStore. Without one the chat.AgentConfig methods answer internal.
+	Behaviors BehaviorStore
+	// Errors counts a filter mismatch of listServedChannels in bothy.authz.errors; nil counts
+	// nothing (M2-02).
+	Errors ErrorCounter
+	// Log receives the record of such a filter mismatch; nil means slog.Default().
+	Log *slog.Logger
 }
 
 // Cursors is the outgoing port that encodes and checks the opaque list cursors (06 section 6
@@ -111,8 +123,8 @@ type Cursors interface {
 	Decode(list string, binding []byte, s string, key any) error
 }
 
-// Service implements chat.Structure (space, sidebar, channel, forum tag and operator part) and
-// chat.Threads (M1-55). It is safe for concurrent use.
+// Service implements chat.Structure (space, sidebar, channel, forum tag and operator part),
+// chat.Threads (M1-55) and chat.AgentConfig (M2-02). It is safe for concurrent use.
 type Service struct {
 	cfg Config
 	d   Deps
@@ -133,6 +145,12 @@ func New(cfg Config, d Deps) (*Service, error) {
 	}
 	if d.Clock == nil {
 		d.Clock = clock.System()
+	}
+	if d.Behaviors == nil {
+		d.Behaviors, _ = d.Store.(BehaviorStore)
+	}
+	if d.Log == nil {
+		d.Log = slog.Default()
 	}
 	return &Service{cfg: cfg, d: d}, nil
 }
