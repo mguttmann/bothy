@@ -226,6 +226,7 @@ func TestConfigPrintShowsSourcePerKey(t *testing.T) {
 		"channel.history_backfill_limit_default = 20  # default\n" +
 		"channel.history_backfill_limit_max = 200  # default\n" +
 		"channel.name_max_chars = 100  # default\n" +
+		"channel.prompt_max_bytes = 32768  # default\n" +
 		"channel.topic_max_chars = 1024  # default\n" +
 		"client.min_version.android =   # default\n" +
 		"client.min_version.ios =   # default\n" +
