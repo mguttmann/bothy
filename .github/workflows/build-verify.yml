@@ -215,10 +215,10 @@ jobs:
             ~/.cache/pre-commit
           key: gates-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('tools/bin/tools.lock.json', '.pre-commit-config.yaml') }}
       - run: make bootstrap-ci
-      - name: make test coverage
+      - name: make test coverage contract-test
         env:
           COMPONENTS: server
-        run: make test coverage COMPONENTS="$COMPONENTS"
+        run: make test coverage contract-test COMPONENTS="$COMPONENTS"
 
   # Dart tests of the workspace, the JVM tests of the Android code and their coverage threshold.
   test-apps:
