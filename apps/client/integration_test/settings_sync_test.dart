@@ -37,7 +37,13 @@ void main() {
         return s.theme == 'dark' && !s.enterSends;
       });
 
-      await tester.tap(find.byKey(const ValueKey('choice.system')));
+      // Theme and motion both offer `system`; the reset is the one of the theme.
+      await tester.tap(
+        find.descendant(
+          of: find.byKey(const ValueKey('settings.theme')),
+          matching: find.byKey(const ValueKey('choice.system')),
+        ),
+      );
       await tester.pumpAndSettle();
       await eventually(
         'the reset reaches the second device',

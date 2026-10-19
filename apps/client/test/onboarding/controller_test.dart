@@ -243,6 +243,22 @@ void main() {
     },
   );
 
+  test(
+    'an end of the account that outlives its container sets no state',
+    () async {
+      final control = await connected(c, f);
+      await loginAsAlex(control);
+      await eventually(
+        'live',
+        () => state().services?.engine.state.phase == ConnectionPhase.live,
+      );
+      final ending = control.endLocally(SignOutCause.sessionRevoked);
+      c.dispose();
+      c = appContainer(f);
+      await expectLater(ending, completes);
+    },
+  );
+
   test('4012 from the fake does the same', () async {
     final control = await connected(c, f);
     await loginAsAlex(control);

@@ -692,6 +692,8 @@ class OnboardingController extends _$OnboardingController {
         // every step regardless of failures, so what is left is reported by its error.
       }
       await services.auth.dispose();
+      // The app quit or a test ended while the wipe ran: the data is gone, no state is left.
+      if (!ref.mounted) return;
       state = state.next(
         step: OnboardingStep.signedOut,
         clearServices: true,

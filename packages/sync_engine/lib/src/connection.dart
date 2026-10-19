@@ -228,7 +228,9 @@ final class GatewayConnection {
     await _networkSub?.cancel();
     await _lifecycleSub?.cancel();
     await _frameSub?.cancel();
-    await _states.close();
+    // A paused listener (a provider nobody watches) would hold the done event, and with it
+    // this future, until it resumes; the close is delivered whenever it does.
+    unawaited(_states.close());
   }
 
   // -------------------------------------------------------------------------------------------
