@@ -55,6 +55,16 @@ operated, and the order of the build.
   probe `services/server/test/smoke`, and scans the collector export and the container logs for
   the run's canary, tokens, enrollment code and principal ID. Missing Docker, an old Engine or
   Compose or a missing image exit with code 2. The release bundle leaves the test overlay out.
+- Client metrics and crash reports (M4-31, ADR 0057): the server accepts `submitClientMetrics`
+  in the module `stats`, answers `403 feature_disabled` when `privacy.client_metrics` is off,
+  discards entries with an unknown name, a mismatched `kind`, foreign bucket bounds or invalid
+  values one by one (`bothy.client_metrics.discarded`), normalizes the attributes and passes the
+  values to the Collector as `bothy.client.*`, with pre-aggregated histograms as own OTLP data
+  points. The desktop app measures cold start, thread open, send until local display, frames,
+  catch-up, resyncs, reconnects by close code and outbox depth, sends them at most once per
+  `client.metrics.flush_interval`, and starts scrubbed crash reports through `sentry_flutter` only
+  when the build names a target (`CRASH_DSN`) and `privacy.crash_reports` is on. A gate fails when
+  a Dart package depends on an OpenTelemetry or analytics SDK.
 - Gate `sql-visibility` (M1-70, AZ-P12): `tools/lint/sql_visibility.py` rejects every reading
   sqlc query on a content table without `channel_id = ANY(...)` or `space_id = ANY(...)` unless it
   stands with a category and a reason on `tools/lint/sql_visibility.yaml`; stale, duplicate and
