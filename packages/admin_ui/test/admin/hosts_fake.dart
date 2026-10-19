@@ -423,8 +423,9 @@ mixin FakeHosts {
         if (!revoke.contains(s.userId)) s,
     ];
     for (final s in h.sessionUsers) {
-      if (revoke.contains(s.userId))
+      if (revoke.contains(s.userId)) {
         (hostAudit[h.id] ??= {})[s.osUser] = s.userId;
+      }
     }
     final base = changedHost(h, sessionUsers: kept);
     return hostsById[h.id] = changedHost(
