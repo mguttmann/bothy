@@ -409,11 +409,8 @@ func (a *Authorizer) authorize(ctx context.Context, p authorize.Principal, act a
 	if err != nil || !found {
 		return outcome(domain.Decision{Outcome: domain.OutcomeNotFound, Reason: domain.ReasonNoGrant}), err
 	}
-	spec, req, preview, err := a.actionFor(act, r)
+	spec, req, preview, err := a.checkedAction(ctx, act, r)
 	if err != nil {
-		return authorize.Decision{}, err
-	}
-	if err := checkFileFacts(ctx, r); err != nil {
 		return authorize.Decision{}, err
 	}
 	t := a.clock.Now()

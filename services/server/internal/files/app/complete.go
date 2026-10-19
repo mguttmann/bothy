@@ -7,6 +7,7 @@ import (
 
 	"github.com/OWNER/bothy/services/server/internal/files"
 	"github.com/OWNER/bothy/services/server/internal/files/domain"
+	"github.com/OWNER/bothy/services/server/internal/kernel/actor"
 	"github.com/OWNER/bothy/services/server/internal/kernel/authorize"
 	"github.com/OWNER/bothy/services/server/internal/kernel/errs"
 	"github.com/OWNER/bothy/services/server/internal/kernel/txn"
@@ -20,42 +21,13 @@ import (
 func (s *Service) Complete(ctx context.Context, cmd files.CompleteUpload) (files.File, error) {
 	a := caller(ctx)
 	var out files.File
-	var size int64
 	err := s.d.UoW.Do(ctx, func(ctx context.Context) error {
-		rec, found, err := s.d.Repo.LockSession(ctx, cmd.FileID, a.ID, true)
-		if err != nil {
+		f, size, done, err := s.complete(ctx, a, cmd)
+		if err != nil || !done {
+			out = f
 			return err
 		}
-		if !found {
-			return notFound()
-		}
-		d, err := s.decide(ctx, a, authorize.ActionFileUpload, authorize.Resource{Kind: authorize.ResourceChannel, ID: rec.File.ScopeChannelID})
-		if err != nil {
-			return err
-		}
-		if d.Outcome == authorize.OutcomeNotFound {
-			// The idempotency stage rolls back a final error, so the session is not aborted here
-			// (design note 14); the next request without key or the expiry ends it.
-			return notFound()
-		}
-		if err := d.Err(); err != nil {
-			return err
-		}
-		now := s.now()
-		if rec.State == domain.SessionCompleted {
-			out = FileView(rec.File)
-			return nil
-		}
-		if s.expired(rec, now) {
-			return gone()
-		}
-		if err := s.checkParts(ctx, rec, cmd.Parts); err != nil {
-			return err
-		}
-		if err := s.d.Repo.CompleteSession(ctx, cmd.FileID, now); err != nil {
-			return err
-		}
-		out, size = FileView(rec.File), rec.DeclaredSizeBytes
+		out = f
 		if !txn.AfterCommit(ctx, func() { s.d.Metrics.UploadCompleted(ctx, size) }) {
 			return errs.New(errs.CodeInternalError, "files: Complete outside a unit of work")
 		}
@@ -65,6 +37,44 @@ func (s *Service) Complete(ctx context.Context, cmd files.CompleteUpload) (files
 		return files.File{}, err
 	}
 	return out, nil
+}
+
+// complete is the work of Complete inside its unit of work: it returns the file, the declared size
+// and whether this call completed the session (false for a session completed before).
+func (s *Service) complete(ctx context.Context, a actor.Actor, cmd files.CompleteUpload) (files.File, int64, bool, error) {
+	rec, found, err := s.d.Repo.LockSession(ctx, cmd.FileID, a.ID, true)
+	if err != nil {
+		return files.File{}, 0, false, err
+	}
+	if !found {
+		return files.File{}, 0, false, notFound()
+	}
+	d, err := s.decide(ctx, a, authorize.ActionFileUpload, authorize.Resource{Kind: authorize.ResourceChannel, ID: rec.File.ScopeChannelID})
+	if err != nil {
+		return files.File{}, 0, false, err
+	}
+	if d.Outcome == authorize.OutcomeNotFound {
+		// The idempotency stage rolls back a final error, so the session is not aborted here
+		// (design note 14); the next request without key or the expiry ends it.
+		return files.File{}, 0, false, notFound()
+	}
+	if err := d.Err(); err != nil {
+		return files.File{}, 0, false, err
+	}
+	now := s.now()
+	switch {
+	case rec.State == domain.SessionCompleted:
+		return FileView(rec.File), 0, false, nil
+	case s.expired(rec, now):
+		return files.File{}, 0, false, gone()
+	}
+	if err := s.checkParts(ctx, rec, cmd.Parts); err != nil {
+		return files.File{}, 0, false, err
+	}
+	if err := s.d.Repo.CompleteSession(ctx, cmd.FileID, now); err != nil {
+		return files.File{}, 0, false, err
+	}
+	return FileView(rec.File), rec.DeclaredSizeBytes, true, nil
 }
 
 // checkParts checks the list of the client against the confirmed parts of rec: a duplicate or

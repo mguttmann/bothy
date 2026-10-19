@@ -95,33 +95,47 @@ func (p *sfParser) dictionary() (map[string]sfValue, error) {
 		return nil, p.fail("empty header")
 	}
 	for {
-		key, err := p.key()
+		key, v, err := p.member()
 		if err != nil {
 			return nil, err
 		}
-		var v sfValue
-		if p.peek() == '=' {
-			p.i++
-			if v, err = p.itemOrInnerList(); err != nil {
-				return nil, err
-			}
-		} else if err := p.parameters(); err != nil {
-			return nil, err
-		}
 		out[key] = v
-		p.skipOWS()
-		if p.i == len(p.s) {
-			return out, nil
-		}
-		if p.peek() != ',' {
-			return nil, p.fail("expected a comma")
-		}
-		p.i++
-		p.skipOWS()
-		if p.i == len(p.s) {
-			return nil, p.fail("trailing comma")
+		done, err := p.next()
+		if err != nil || done {
+			return out, err
 		}
 	}
+}
+
+// member parses one member: a key with an optional "=" value, or parameters of a bare key.
+func (p *sfParser) member() (string, sfValue, error) {
+	key, err := p.key()
+	if err != nil {
+		return "", sfValue{}, err
+	}
+	if p.peek() != '=' {
+		return key, sfValue{}, p.parameters()
+	}
+	p.i++
+	v, err := p.itemOrInnerList()
+	return key, v, err
+}
+
+// next moves past the separator after a member; done is true at the end of the input.
+func (p *sfParser) next() (bool, error) {
+	p.skipOWS()
+	if p.i == len(p.s) {
+		return true, nil
+	}
+	if p.peek() != ',' {
+		return false, p.fail("expected a comma")
+	}
+	p.i++
+	p.skipOWS()
+	if p.i == len(p.s) {
+		return false, p.fail("trailing comma")
+	}
+	return false, nil
 }
 
 // key parses a key: lcalpha or "*", then lcalpha, digits, "_", "-", "." and "*".
@@ -146,29 +160,34 @@ func (p *sfParser) key() (string, error) {
 // itemOrInnerList parses a member value with its parameters.
 func (p *sfParser) itemOrInnerList() (sfValue, error) {
 	if p.peek() == '(' {
-		p.i++
-		for {
-			p.skipSP()
-			if p.peek() == ')' {
-				p.i++
-				return sfValue{}, p.parameters()
-			}
-			if _, err := p.bareItem(); err != nil {
-				return sfValue{}, err
-			}
-			if err := p.parameters(); err != nil {
-				return sfValue{}, err
-			}
-			if c := p.peek(); c != ' ' && c != ')' {
-				return sfValue{}, p.fail("malformed inner list")
-			}
-		}
+		return sfValue{}, p.innerList()
 	}
 	v, err := p.bareItem()
 	if err != nil {
 		return sfValue{}, err
 	}
 	return v, p.parameters()
+}
+
+// innerList parses "(" items separated by spaces ")" with parameters.
+func (p *sfParser) innerList() error {
+	p.i++
+	for {
+		p.skipSP()
+		if p.peek() == ')' {
+			p.i++
+			return p.parameters()
+		}
+		if _, err := p.bareItem(); err != nil {
+			return err
+		}
+		if err := p.parameters(); err != nil {
+			return err
+		}
+		if c := p.peek(); c != ' ' && c != ')' {
+			return p.fail("malformed inner list")
+		}
+	}
 }
 
 // parameters parses ";key[=bare item]" repetitions.

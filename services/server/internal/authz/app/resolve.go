@@ -487,3 +487,13 @@ func checkFileFacts(ctx context.Context, r authorize.Resource) error {
 	}
 	return nil
 }
+
+// checkedAction is actionFor followed by checkFileFacts: the catalogue entry of act for r, and the
+// refusal of a file resource without its facts in request mode.
+func (a *Authorizer) checkedAction(ctx context.Context, act authorize.Action, r authorize.Resource) (domain.ActionSpec, domain.Expr, *domain.PreviewFacts, error) {
+	spec, req, preview, err := a.actionFor(act, r)
+	if err != nil {
+		return spec, req, preview, err
+	}
+	return spec, req, preview, checkFileFacts(ctx, r)
+}

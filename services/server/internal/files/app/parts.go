@@ -76,29 +76,8 @@ func (s *Service) confirmPart(ctx context.Context, a actor.Actor, rec SessionRec
 	var out files.PartRef
 	var ended bool
 	err := s.d.UoW.Do(ctx, func(ctx context.Context) error {
-		cur, found, err := s.d.Repo.LockSession(ctx, p.FileID, a.ID, false)
-		if err != nil {
-			return err
-		}
-		if !found || cur.State == domain.SessionAborted || cur.State == domain.SessionExpired {
-			ended = true
-			return gone()
-		}
-		if cur.State == domain.SessionOpen {
-			inserted, err := s.d.Repo.InsertPart(ctx, p)
-			if err != nil || inserted {
-				out = files.PartRef{PartNumber: p.PartNumber, ETag: partETag(p)}
-				return err
-			}
-		}
-		have, found, err := s.d.Repo.Part(ctx, p.FileID, p.PartNumber)
-		if err != nil {
-			return err
-		}
-		if !found {
-			return errs.New(errs.CodeInternalError, "files: a confirmed part is missing")
-		}
-		out, err = samePart(have, p.SHA256)
+		var err error
+		out, ended, err = s.confirmIn(ctx, a, p)
 		return err
 	})
 	if ended {
@@ -107,6 +86,33 @@ func (s *Service) confirmPart(ctx context.Context, a actor.Actor, rec SessionRec
 		}
 	}
 	return out, err
+}
+
+// confirmIn is the work of confirmPart inside its unit of work; ended reports a session that ended
+// while the part streamed, whose object goes after the rollback.
+func (s *Service) confirmIn(ctx context.Context, a actor.Actor, p PartRecord) (files.PartRef, bool, error) {
+	cur, found, err := s.d.Repo.LockSession(ctx, p.FileID, a.ID, false)
+	if err != nil {
+		return files.PartRef{}, false, err
+	}
+	if !found || cur.State == domain.SessionAborted || cur.State == domain.SessionExpired {
+		return files.PartRef{}, true, gone()
+	}
+	if cur.State == domain.SessionOpen {
+		inserted, err := s.d.Repo.InsertPart(ctx, p)
+		if err != nil || inserted {
+			return files.PartRef{PartNumber: p.PartNumber, ETag: partETag(p)}, false, err
+		}
+	}
+	have, found, err := s.d.Repo.Part(ctx, p.FileID, p.PartNumber)
+	if err != nil {
+		return files.PartRef{}, false, err
+	}
+	if !found {
+		return files.PartRef{}, false, errs.New(errs.CodeInternalError, "files: a confirmed part is missing")
+	}
+	out, err := samePart(have, p.SHA256)
+	return out, false, err
 }
 
 // samePart answers a part whose number is confirmed: the same digest is the confirmed part (200
@@ -145,9 +151,9 @@ func lengthMismatch() error {
 // (a storage failure answers 503, a cancelled request ends).
 func partError(body *verifyingReader, err error) error {
 	switch {
-	case errors.Is(err, errDigest) || body.failed == errDigest:
+	case errors.Is(err, errDigest) || errors.Is(body.failed, errDigest):
 		return fieldError(pointerContentDigest, codePartDigestMismatch, "the part does not match its Content-Digest")
-	case errors.Is(err, errLength) || errors.Is(err, ErrSizeMismatch) || body.failed == errLength:
+	case errors.Is(err, errLength) || errors.Is(err, ErrSizeMismatch) || errors.Is(body.failed, errLength):
 		return lengthMismatch()
 	}
 	if _, ok := errs.As(err); ok {
@@ -174,16 +180,7 @@ func (v *verifyingReader) Read(p []byte) (int, error) {
 		return 0, v.failed
 	}
 	if v.n == v.want {
-		// The part is complete; one more byte means a longer body.
-		var one [1]byte
-		n, err := io.ReadFull(v.r, one[:])
-		if n > 0 {
-			return 0, v.fail(errLength)
-		}
-		if errors.Is(err, io.EOF) || errors.Is(err, io.ErrUnexpectedEOF) {
-			return 0, io.EOF
-		}
-		return 0, err
+		return 0, v.atEnd()
 	}
 	if rest := v.want - v.n; int64(len(p)) > rest {
 		p = p[:rest]
@@ -192,25 +189,43 @@ func (v *verifyingReader) Read(p []byte) (int, error) {
 	v.n += int64(n)
 	v.h.Write(p[:n])
 	if v.n == v.want {
-		var sum [32]byte
-		v.h.Sum(sum[:0])
-		if sum != v.digest {
-			// A longer body is a length error, not a digest error (D-M3-03-10).
-			if err == nil && v.more() {
-				return n, v.fail(errLength)
-			}
-			return n, v.fail(errDigest)
-		}
-		if err == io.EOF {
-			err = nil
-		}
-		return n, err
+		return n, v.complete(err)
 	}
 	if errors.Is(err, io.EOF) || errors.Is(err, io.ErrUnexpectedEOF) {
 		// A body that ends early, also against its own Content-Length, is a length error.
 		return n, v.fail(errLength)
 	}
 	return n, err
+}
+
+// atEnd answers a read after the whole part: io.EOF at the end of the body, errLength when it has
+// another byte, else the error of the body.
+func (v *verifyingReader) atEnd() error {
+	var one [1]byte
+	n, err := io.ReadFull(v.r, one[:])
+	switch {
+	case n > 0:
+		return v.fail(errLength)
+	case errors.Is(err, io.EOF) || errors.Is(err, io.ErrUnexpectedEOF):
+		return io.EOF
+	}
+	return err
+}
+
+// complete checks the digest once the part length is read; err is the error of the last read. A
+// longer body is a length error, not a digest error (D-M3-03-10).
+func (v *verifyingReader) complete(err error) error {
+	var sum [32]byte
+	v.h.Sum(sum[:0])
+	switch {
+	case sum == v.digest && errors.Is(err, io.EOF):
+		return nil
+	case sum == v.digest:
+		return err
+	case err == nil && v.more():
+		return v.fail(errLength)
+	}
+	return v.fail(errDigest)
 }
 
 // more reports whether the body has another byte after the part.
