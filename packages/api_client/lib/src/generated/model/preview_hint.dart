@@ -9,7 +9,7 @@ import 'package:built_value/serializer.dart';
 
 part 'preview_hint.g.dart';
 
-/// PreviewHint
+/// `terminal_not_effective` (grant on a host, 07, 2.12 point 4) says that SR10 or SR12 keep the grant from taking effect: with `principal_id` for a user subject, with `group_id` and `count` (members in effect it does not reach, absent when 0) for a group subject.
 ///
 /// Properties:
 /// * [code]
