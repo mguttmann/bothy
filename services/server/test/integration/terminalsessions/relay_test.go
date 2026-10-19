@@ -8,12 +8,33 @@ import (
 	"net/http"
 	"strconv"
 	"strings"
+	gosync "sync"
 	"testing"
 
 	"github.com/OWNER/bothy/services/server/internal/kernel/ids"
 	"github.com/OWNER/bothy/services/server/test/harness"
 	"github.com/OWNER/bothy/services/server/test/terminal/fakehost"
 )
+
+// syncBuffer is a bytes.Buffer safe for the concurrent writes of the server's log.
+type syncBuffer struct {
+	mu gosync.Mutex
+	b  bytes.Buffer
+}
+
+// Write implements io.Writer.
+func (s *syncBuffer) Write(p []byte) (int, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return s.b.Write(p)
+}
+
+// String returns the text written so far.
+func (s *syncBuffer) String() string {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return s.b.String()
+}
 
 // started opens a shell of c on R1 with H1 on Accept, connects the device and runs the handshake;
 // the session is active.
@@ -42,8 +63,8 @@ func (w *world) closeCode(what string, got func() (int, string), code int, reaso
 // the session is detached and the row carries the transport bytes without the handshake; a canary
 // and the token appear in no audit entry, no event and no log line.
 func TestRelay_ForwardsBytesUnchanged(t *testing.T) {
-	var logs bytes.Buffer
-	w := newWorldLogs(t, nil, &logs)
+	logs := &syncBuffer{}
+	w := newWorldLogs(t, nil, logs)
 	g, d := w.started(w.alex)
 	ctx := w.ctx()
 	sum := int64(len("start"))
