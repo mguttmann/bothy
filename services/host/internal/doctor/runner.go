@@ -39,7 +39,8 @@ func NewRunner(env Env, onChange func(*Result)) *Runner {
 // helper. Until its first scan finishes, a session user fails HD11 with entry_scan_running; after
 // that the previous finding holds until the new scan finishes.
 func (r *Runner) RunFull(ctx context.Context) *Result {
-	res := RunService(ctx, r.snapshotEnv())
+	env := r.snapshotEnv()
+	res := RunService(ctx, env)
 	r.mu.Lock()
 	r.base = res
 	for _, u := range res.reached {
@@ -53,17 +54,19 @@ func (r *Runner) RunFull(ctx context.Context) *Result {
 		}
 		st.running = true
 		req := res.requests[u]
-		r.wg.Go(func() { r.scan(ctx, u, req) })
+		r.wg.Go(func() { r.scan(ctx, env, u, req) })
 	}
 	out := r.merged()
 	r.mu.Unlock()
 	return out
 }
 
-func (r *Runner) scan(ctx context.Context, user string, req Request) {
-	sctx, cancel := context.WithTimeout(ctx, r.env.scanBound())
+// scan runs the entry scan of user over env, the snapshot RunFull took under the lock, so a
+// SetDeclaration during the scan does not race with it.
+func (r *Runner) scan(ctx context.Context, env Env, user string, req Request) {
+	sctx, cancel := context.WithTimeout(ctx, env.scanBound())
 	defer cancel()
-	code, err := r.env.Helpers.Scan(sctx, user, req)
+	code, err := env.Helpers.Scan(sctx, user, req)
 	if err != nil {
 		code = CodeEntryScanTimeout // a scan that did not finish has not seen every entry
 	}
