@@ -145,8 +145,15 @@ class FakeChannel implements GatewayChannel {
     sent.add(text);
   }
 
+  /// When set, a close by the client completes only after this future (a slow close
+  /// handshake).
+  Future<void>? closeGate;
+
   @override
   Future<void> close(int code, [String? reason]) async {
+    if (_closed) return;
+    final gate = closeGate;
+    if (gate != null) await gate;
     if (_closed) return;
     _closed = true;
     clientCloseCode = code;
@@ -206,6 +213,9 @@ class FakeTransport implements GatewayTransport {
   /// Connection attempts, failed ones included.
   int attempts = 0;
 
+  /// How many of the next connects never complete (a stalled TCP connect or upgrade).
+  int stallNext = 0;
+
   /// The newest channel.
   FakeChannel get last => channels.last;
 
@@ -216,6 +226,10 @@ class FakeTransport implements GatewayTransport {
     if (failNext > 0) {
       failNext--;
       throw const SocketLikeError();
+    }
+    if (stallNext > 0) {
+      stallNext--;
+      return Completer<GatewayChannel>().future;
     }
     final ch = FakeChannel(clock.now());
     channels.add(ch);

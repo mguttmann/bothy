@@ -34,6 +34,9 @@ the first after a random fraction; a missing `heartbeat_ack` within one interval
 `1000` and reconnects. Waits are full jitter in `[0, min(cap, base * 2^n)]`
 (`sync.reconnect_backoff_base`, `sync.reconnect_backoff_cap`), reset after `ready` or
 `resumed`; a network change or the foreground starts an attempt at once without raising `n`.
+An attempt that has not reached `ready` or `resumed` within `client.sync.connect_timeout` (a
+stalled connect, no `hello`, no answer to `identify` or `resume`) is dropped and waits the
+backoff like a failed connect.
 A server frame that does not decode is counted (`decodeErrors`) and skipped; unknown ops and
 fields are ignored.
 

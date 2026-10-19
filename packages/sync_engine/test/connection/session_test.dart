@@ -142,7 +142,10 @@ void main() {
     await h.clock.elapse(const Duration(seconds: 5));
     expect((await h.answerHello())['op'], 'resume');
     h.transport.last.serverClose(4006);
-    await h.clock.elapse(const Duration(minutes: 1));
+    // Step until the reconnect opens; a longer wait would pass client.sync.connect_timeout.
+    for (var i = 0; i < 600 && h.transport.channels.length < 3; i++) {
+      await h.clock.elapse(const Duration(milliseconds: 100));
+    }
     expect(h.transport.channels, hasLength(3));
     expect((await h.answerHello())['op'], 'identify');
   });
