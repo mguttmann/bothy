@@ -25,6 +25,9 @@ type ChannelRow struct {
 	SpaceDefaultOperatorID ids.ID
 	// SpaceArchived reports an archived space.
 	SpaceArchived bool
+	// ProjectBound reports a project_bindings row of the channel; ProjectReady its ready flag
+	// (M2-03, the facts of agent.invoke).
+	ProjectBound, ProjectReady bool
 }
 
 // ServedTarget is one target an agent serves for I1 (10 section 5.2): a channel with its space,

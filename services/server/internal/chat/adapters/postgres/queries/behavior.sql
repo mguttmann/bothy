@@ -1,7 +1,8 @@
 -- SPDX-License-Identifier: Apache-2.0
 -- Queries on the behaviour of channels (chat module, M2-02; docs/spec/03-data-model.md section
 -- 4.5 channels and channel_skill_bindings). A behaviour is read in one statement: the switches,
--- the context window, the prompt, settings_version and the skill references in their order, so a
+-- the context window, the prompt, settings_version, the skill references in their order and the
+-- project binding of a forum (M2-03), so a
 -- concurrent change never mixes two states. The locks of a change (the space row FOR SHARE, then
 -- the channel row FOR UPDATE) are ShareSpace and LockChannel.
 
@@ -10,8 +11,11 @@
 -- channel.behavior.update or agent.config.read on it.
 SELECT c.id, c.space_id, c.require_mention, c.thread_require_mention, c.free_response, c.auto_thread,
        c.allow_mentioned_agents, c.history_backfill_limit, c.prompt, c.settings_version,
-       ARRAY(SELECT b.skill_ref FROM channel_skill_bindings b WHERE b.channel_id = c.id ORDER BY b.position)::text[] AS skills
+       ARRAY(SELECT b.skill_ref FROM channel_skill_bindings b WHERE b.channel_id = c.id ORDER BY b.position)::text[] AS skills,
+       (pb.channel_id IS NOT NULL)::boolean AS project_bound, pb.workspace_ref, pb.repository_url, pb.default_branch,
+       pb.runner_config, pb.ready, pb.version AS binding_version
 FROM channels c
+LEFT JOIN project_bindings pb ON pb.channel_id = c.id
 WHERE c.id = @id;
 
 -- name: ListServedBehaviors :many
@@ -20,8 +24,11 @@ WHERE c.id = @id;
 -- checks each row.
 SELECT c.id, c.space_id, c.require_mention, c.thread_require_mention, c.free_response, c.auto_thread,
        c.allow_mentioned_agents, c.history_backfill_limit, c.prompt, c.settings_version,
-       ARRAY(SELECT b.skill_ref FROM channel_skill_bindings b WHERE b.channel_id = c.id ORDER BY b.position)::text[] AS skills
+       ARRAY(SELECT b.skill_ref FROM channel_skill_bindings b WHERE b.channel_id = c.id ORDER BY b.position)::text[] AS skills,
+       (pb.channel_id IS NOT NULL)::boolean AS project_bound, pb.workspace_ref, pb.repository_url, pb.default_branch,
+       pb.runner_config, pb.ready, pb.version AS binding_version
 FROM channels c
+LEFT JOIN project_bindings pb ON pb.channel_id = c.id
 WHERE c.id = ANY (@channel_ids::uuid[]) AND c.space_id = ANY (@space_ids::uuid[]) AND c.archived_at IS NULL
 ORDER BY c.id;
 

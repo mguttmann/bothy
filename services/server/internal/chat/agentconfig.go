@@ -22,12 +22,15 @@ type BehaviorSettings struct {
 	Skills []string
 }
 
-// ChannelBehavior is the behaviour of a channel with its settings version (schema
-// ChannelBehavior; the member project_binding joins with M2-03).
+// ChannelBehavior is the behaviour of a channel with its settings version and, for a bound forum,
+// its project binding (schema ChannelBehavior).
 type ChannelBehavior struct {
 	BehaviorSettings
 	// SettingsVersion is channels.settings_version, the ETag of the behaviour.
 	SettingsVersion int64
+	// ProjectBinding is the binding of a bound forum (M2-03); nil otherwise, then the member is
+	// absent.
+	ProjectBinding *ProjectBinding
 }
 
 // PutChannelBehaviorCmd is the request of putChannelBehavior: the channel, the If-Match of the

@@ -106,7 +106,7 @@ func NewChat(cfg chatapp.Config, pool *pg.Pool, uow txn.UnitOfWork, az authorize
 		return nil, err
 	}
 	return &Chat{Service: svc, Handlers: chathttp.New(svc), ChannelHandlers: chathttp.NewChannels(svc), ThreadHandlers: chathttp.NewThreads(svc),
-		BehaviorHandlers: chathttp.NewBehavior(svc)}, nil
+		BehaviorHandlers: chathttp.NewBehavior(svc, svc)}, nil
 }
 
 // fillHandlers sets the nil chat handlers of h to the ones c built: spaces and the sidebar

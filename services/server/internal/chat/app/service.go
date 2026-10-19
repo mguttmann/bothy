@@ -52,6 +52,12 @@ type Config struct {
 	PageSizeDefault int `config:"api.page_size_default"`
 	// PageSizeMax is api.page_size_max; larger limits are capped.
 	PageSizeMax int `config:"api.page_size_max"`
+	// ProjectBindingTextMaxChars is project.binding_text_max_chars, the longest workspace_ref,
+	// repository_url, default_branch, model and tool name of a project binding (M2-03); the key
+	// itself has the minimum 1.
+	ProjectBindingTextMaxChars int `config:"project.binding_text_max_chars"`
+	// ReasonMaxChars is audit.reason_max_chars, the longest reason of putProjectBinding (SEC-AUD-5).
+	ReasonMaxChars int `config:"audit.reason_max_chars"`
 }
 
 // limits returns the text limits of channels and tags.
@@ -107,6 +113,9 @@ type Deps struct {
 	// Behaviors reads and writes the behaviour of channels (M2-02); nil means Store when it
 	// implements BehaviorStore. Without one the chat.AgentConfig methods answer internal.
 	Behaviors BehaviorStore
+	// Bindings reads and writes project_bindings (M2-03); nil means Store when it implements
+	// BindingStore. Without one the chat.ProjectBindings methods answer internal.
+	Bindings BindingStore
 	// Errors counts a filter mismatch of listServedChannels in bothy.authz.errors; nil counts
 	// nothing (M2-02).
 	Errors ErrorCounter
@@ -124,7 +133,8 @@ type Cursors interface {
 }
 
 // Service implements chat.Structure (space, sidebar, channel, forum tag and operator part),
-// chat.Threads (M1-55) and chat.AgentConfig (M2-02). It is safe for concurrent use.
+// chat.Threads (M1-55), chat.AgentConfig (M2-02) and chat.ProjectBindings (M2-03). It is safe for
+// concurrent use.
 type Service struct {
 	cfg Config
 	d   Deps
@@ -148,6 +158,9 @@ func New(cfg Config, d Deps) (*Service, error) {
 	}
 	if d.Behaviors == nil {
 		d.Behaviors, _ = d.Store.(BehaviorStore)
+	}
+	if d.Bindings == nil {
+		d.Bindings, _ = d.Store.(BindingStore)
 	}
 	if d.Log == nil {
 		d.Log = slog.Default()

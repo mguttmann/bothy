@@ -22,10 +22,12 @@ UPDATE channels SET version = @version WHERE id = @id;
 -- The channels of a space that inherit the default operator and are not archived, locked in
 -- ascending id after the space row (03 section 6.3).
 SELECT sqlc.embed(c), s.default_operator_agent_id AS space_operator_id,
-       (s.archived_at IS NOT NULL)::boolean AS space_archived, t.id AS main_thread_id
+       (s.archived_at IS NOT NULL)::boolean AS space_archived, t.id AS main_thread_id,
+       (pb.channel_id IS NOT NULL)::boolean AS project_bound, coalesce(pb.ready, false)::boolean AS project_ready
 FROM channels c
 JOIN spaces s ON s.id = c.space_id
 LEFT JOIN threads t ON t.channel_id = c.id AND t.kind = 'main'
+LEFT JOIN project_bindings pb ON pb.channel_id = c.id
 WHERE c.space_id = @space_id AND c.operator_inherit AND c.archived_at IS NULL
 ORDER BY c.id
 FOR UPDATE OF c;

@@ -61,6 +61,7 @@ enabled:             # operationIds that have a handler; sorted ascending
   - deleteMessage
   - deleteMySetting
   - deleteNotificationPreference
+  - deleteProjectBinding
   - deleteQuietHoursRule
   - deleteTemplate
   - deleteThreadDraft
@@ -158,6 +159,7 @@ enabled:             # operationIds that have a handler; sorted ascending
   - putMySetting
   - putMySidebarSpace
   - putNotificationPreference
+  - putProjectBinding
   - putQuietHoursRule
   - putReadState
   - putThreadDraft
@@ -289,9 +291,6 @@ later:               # every other operationId of docs/api/openapi.yaml; sorted 
   - operation_id: deleteMyAvatar
     milestone: M3
     ticket: M3-10
-  - operation_id: deleteProjectBinding
-    milestone: M2
-    ticket: M2-03
   - operation_id: deleteStatusComponent
     milestone: M7
     ticket: M7-09
@@ -430,9 +429,6 @@ later:               # every other operationId of docs/api/openapi.yaml; sorted 
   - operation_id: postIncomingWebhook
     milestone: M2
     ticket: M2-27
-  - operation_id: putProjectBinding
-    milestone: M2
-    ticket: M2-03
   - operation_id: reconcileCosts
     milestone: M2
     ticket: M2-28

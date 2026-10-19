@@ -29,7 +29,8 @@ func (r *Repository) ChannelBehavior(ctx context.Context, id ids.ID) (app.Behavi
 	if err != nil {
 		return app.BehaviorRow{}, false, mapError(err, "reading the behaviour of a channel")
 	}
-	return toBehavior(row), true, nil
+	b, err := toBehavior(row)
+	return b, err == nil, err
 }
 
 // ServedBehaviors implements app.BehaviorStore.
@@ -40,7 +41,11 @@ func (r *Repository) ServedBehaviors(ctx context.Context, channels, spaces []ids
 	}
 	out := make([]app.BehaviorRow, 0, len(rows))
 	for _, row := range rows {
-		out = append(out, toBehavior(sqlcgen.GetChannelBehaviorRow(row)))
+		b, err := toBehavior(sqlcgen.GetChannelBehaviorRow(row))
+		if err != nil {
+			return nil, err
+		}
+		out = append(out, b)
 	}
 	return out, nil
 }
@@ -101,13 +106,14 @@ func (r *Repository) RaiseSettingsVersion(ctx context.Context, id ids.ID) (int64
 	return v, nil
 }
 
-// toBehavior converts a behaviour row; skills are never nil.
-func toBehavior(row sqlcgen.GetChannelBehaviorRow) app.BehaviorRow {
+// toBehavior converts a behaviour row with the project binding of a bound forum; skills are never
+// nil. Errors: internal for a stored runner_config that is not the schema.
+func toBehavior(row sqlcgen.GetChannelBehaviorRow) (app.BehaviorRow, error) {
 	skills := row.Skills
 	if skills == nil {
 		skills = []string{}
 	}
-	return app.BehaviorRow{
+	out := app.BehaviorRow{
 		ChannelID: idOf(row.ID), SpaceID: idOf(row.SpaceID), SettingsVersion: row.SettingsVersion,
 		Behavior: domain.Behavior{
 			RequireMention: row.RequireMention, ThreadRequireMention: row.ThreadRequireMention, FreeResponse: row.FreeResponse,
@@ -115,4 +121,16 @@ func toBehavior(row sqlcgen.GetChannelBehaviorRow) app.BehaviorRow {
 			Prompt: row.Prompt, Skills: skills,
 		},
 	}
+	if row.ProjectBound {
+		b := domain.ProjectBinding{
+			ChannelID: idOf(row.ID), WorkspaceRef: row.WorkspaceRef.String, RepositoryURL: row.RepositoryUrl.String,
+			DefaultBranch: row.DefaultBranch.String, Ready: row.Ready.Bool, Version: row.BindingVersion.Int64,
+		}
+		var err error
+		if b.RunnerConfig, err = decodeRunnerConfig(row.RunnerConfig); err != nil {
+			return app.BehaviorRow{}, err
+		}
+		out.Binding = &b
+	}
+	return out, nil
 }

@@ -190,7 +190,7 @@ func oneChannel(row sqlcgen.GetChannelRow, err error, what string) (app.ChannelR
 	return toChannel(row), true, nil
 }
 
-// toChannel converts a channel row with its space facts and main thread.
+// toChannel converts a channel row with its space facts, main thread and project facts.
 func toChannel(row sqlcgen.GetChannelRow) app.ChannelRow {
 	c := row.Channel
 	return app.ChannelRow{
@@ -205,6 +205,8 @@ func toChannel(row sqlcgen.GetChannelRow) app.ChannelRow {
 		},
 		SpaceDefaultOperatorID: idOf(row.SpaceOperatorID),
 		SpaceArchived:          row.SpaceArchived,
+		ProjectBound:           row.ProjectBound,
+		ProjectReady:           row.ProjectReady,
 	}
 }
 

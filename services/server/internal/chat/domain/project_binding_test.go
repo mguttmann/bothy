@@ -188,7 +188,9 @@ func TestSEC_T07_ProjectBindingRejectsControlAndBidi(t *testing.T) {
 		set     func(*domain.ProjectBindingInput, string)
 	}{
 		{"/workspace_ref", func(in *domain.ProjectBindingInput, c string) { in.WorkspaceRef = "web" + c + "site" }},
-		{"/repository_url", func(in *domain.ProjectBindingInput, c string) { in.RepositoryURL = str("https://git.example.com/a" + c + "b") }},
+		{"/repository_url", func(in *domain.ProjectBindingInput, c string) {
+			in.RepositoryURL = str("https://git.example.com/a" + c + "b")
+		}},
 		{"/default_branch", func(in *domain.ProjectBindingInput, c string) { in.DefaultBranch = str("ma" + c + "in") }},
 		{"/runner_config/model", func(in *domain.ProjectBindingInput, c string) { in.RunnerConfig.Model = str("son" + c + "net") }},
 		{"/runner_config/allowed_tools/1", func(in *domain.ProjectBindingInput, c string) {

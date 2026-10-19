@@ -19,11 +19,15 @@ import (
 )
 
 // BehaviorRow is the behaviour of one channel as the store reads it in one statement: the
-// switches, the context window, the prompt, the skills in their order and settings_version.
+// switches, the context window, the prompt, the skills in their order, settings_version and the
+// project binding.
 type BehaviorRow struct {
 	ChannelID, SpaceID ids.ID
 	Behavior           domain.Behavior
 	SettingsVersion    int64
+	// Binding is the project binding of a bound forum, read in the same statement (M2-03); nil
+	// otherwise.
+	Binding *domain.ProjectBinding
 }
 
 // BehaviorStore is the outgoing port of the behaviour use cases over channels and
@@ -195,7 +199,7 @@ func (s *Service) writeBehavior(ctx context.Context, st BehaviorStore, c Channel
 	if err != nil {
 		return BehaviorRow{}, err
 	}
-	out := BehaviorRow{ChannelID: cur.ChannelID, SpaceID: cur.SpaceID, Behavior: want, SettingsVersion: version}
+	out := BehaviorRow{ChannelID: cur.ChannelID, SpaceID: cur.SpaceID, Behavior: want, SettingsVersion: version, Binding: cur.Binding}
 	return out, s.recordChannel(ctx, authorize.ActionChannelBehaviorUpdate, cur.ChannelID, behaviorAttrs(out, cur.SettingsVersion, changed))
 }
 
@@ -294,17 +298,18 @@ func behaviorPrecondition(p chat.Precondition, cur BehaviorRow) error {
 }
 
 // behaviorJSON is the schema ChannelBehavior, the member current of 412 version_conflict. skills
-// is never null (ADR 0053); project_binding joins with M2-03.
+// is never null (ADR 0053); project_binding is absent without a binding (M2-03).
 type behaviorJSON struct {
-	RequireMention       bool     `json:"require_mention"`
-	ThreadRequireMention bool     `json:"thread_require_mention"`
-	FreeResponse         bool     `json:"free_response"`
-	AutoThread           bool     `json:"auto_thread"`
-	AllowMentionedAgents bool     `json:"allow_mentioned_agents"`
-	HistoryBackfillLimit int      `json:"history_backfill_limit"`
-	Prompt               string   `json:"prompt"`
-	Skills               []string `json:"skills"`
-	SettingsVersion      int64    `json:"settings_version"`
+	RequireMention       bool         `json:"require_mention"`
+	ThreadRequireMention bool         `json:"thread_require_mention"`
+	FreeResponse         bool         `json:"free_response"`
+	AutoThread           bool         `json:"auto_thread"`
+	AllowMentionedAgents bool         `json:"allow_mentioned_agents"`
+	HistoryBackfillLimit int          `json:"history_backfill_limit"`
+	Prompt               string       `json:"prompt"`
+	Skills               []string     `json:"skills"`
+	ProjectBinding       *bindingJSON `json:"project_binding,omitempty"`
+	SettingsVersion      int64        `json:"settings_version"`
 }
 
 // behaviorBody converts a behaviour row into the JSON form of the schema ChannelBehavior.
@@ -313,11 +318,16 @@ func behaviorBody(b BehaviorRow) behaviorJSON {
 	if skills == nil {
 		skills = []string{}
 	}
-	return behaviorJSON{
+	out := behaviorJSON{
 		RequireMention: b.Behavior.RequireMention, ThreadRequireMention: b.Behavior.ThreadRequireMention, FreeResponse: b.Behavior.FreeResponse,
 		AutoThread: b.Behavior.AutoThread, AllowMentionedAgents: b.Behavior.AllowMentionedAgents, HistoryBackfillLimit: b.Behavior.HistoryBackfillLimit,
 		Prompt: b.Behavior.Prompt, Skills: skills, SettingsVersion: b.SettingsVersion,
 	}
+	if b.Binding != nil {
+		pb := bindingBody(*b.Binding)
+		out.ProjectBinding = &pb
+	}
+	return out
 }
 
 // settingsOf converts the port settings into the domain value.
@@ -335,7 +345,7 @@ func behaviorDTO(b BehaviorRow) chat.ChannelBehavior {
 	if skills == nil {
 		skills = []string{}
 	}
-	return chat.ChannelBehavior{
+	out := chat.ChannelBehavior{
 		BehaviorSettings: chat.BehaviorSettings{
 			RequireMention: b.Behavior.RequireMention, ThreadRequireMention: b.Behavior.ThreadRequireMention, FreeResponse: b.Behavior.FreeResponse,
 			AutoThread: b.Behavior.AutoThread, AllowMentionedAgents: b.Behavior.AllowMentionedAgents,
@@ -343,6 +353,11 @@ func behaviorDTO(b BehaviorRow) chat.ChannelBehavior {
 		},
 		SettingsVersion: b.SettingsVersion,
 	}
+	if b.Binding != nil {
+		pb := bindingDTO(*b.Binding)
+		out.ProjectBinding = &pb
+	}
+	return out
 }
 
 // servedDTO converts a behaviour row into the configuration of a served channel.

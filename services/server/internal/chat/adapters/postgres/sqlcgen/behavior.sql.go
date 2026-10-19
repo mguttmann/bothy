@@ -24,8 +24,11 @@ const getChannelBehavior = `-- name: GetChannelBehavior :one
 
 SELECT c.id, c.space_id, c.require_mention, c.thread_require_mention, c.free_response, c.auto_thread,
        c.allow_mentioned_agents, c.history_backfill_limit, c.prompt, c.settings_version,
-       ARRAY(SELECT b.skill_ref FROM channel_skill_bindings b WHERE b.channel_id = c.id ORDER BY b.position)::text[] AS skills
+       ARRAY(SELECT b.skill_ref FROM channel_skill_bindings b WHERE b.channel_id = c.id ORDER BY b.position)::text[] AS skills,
+       (pb.channel_id IS NOT NULL)::boolean AS project_bound, pb.workspace_ref, pb.repository_url, pb.default_branch,
+       pb.runner_config, pb.ready, pb.version AS binding_version
 FROM channels c
+LEFT JOIN project_bindings pb ON pb.channel_id = c.id
 WHERE c.id = $1
 `
 
@@ -41,12 +44,20 @@ type GetChannelBehaviorRow struct {
 	Prompt               string
 	SettingsVersion      int64
 	Skills               []string
+	ProjectBound         bool
+	WorkspaceRef         pgtype.Text
+	RepositoryUrl        pgtype.Text
+	DefaultBranch        pgtype.Text
+	RunnerConfig         []byte
+	Ready                pgtype.Bool
+	BindingVersion       pgtype.Int8
 }
 
 // SPDX-License-Identifier: Apache-2.0
 // Queries on the behaviour of channels (chat module, M2-02; docs/spec/03-data-model.md section
 // 4.5 channels and channel_skill_bindings). A behaviour is read in one statement: the switches,
-// the context window, the prompt, settings_version and the skill references in their order, so a
+// the context window, the prompt, settings_version, the skill references in their order and the
+// project binding of a forum (M2-03), so a
 // concurrent change never mixes two states. The locks of a change (the space row FOR SHARE, then
 // the channel row FOR UPDATE) are ShareSpace and LockChannel.
 // The behaviour of one channel, read after authorize allowed channel.behavior.read,
@@ -66,6 +77,13 @@ func (q *Queries) GetChannelBehavior(ctx context.Context, id pgtype.UUID) (GetCh
 		&i.Prompt,
 		&i.SettingsVersion,
 		&i.Skills,
+		&i.ProjectBound,
+		&i.WorkspaceRef,
+		&i.RepositoryUrl,
+		&i.DefaultBranch,
+		&i.RunnerConfig,
+		&i.Ready,
+		&i.BindingVersion,
 	)
 	return i, err
 }
@@ -90,8 +108,11 @@ func (q *Queries) InsertChannelSkills(ctx context.Context, arg InsertChannelSkil
 const listServedBehaviors = `-- name: ListServedBehaviors :many
 SELECT c.id, c.space_id, c.require_mention, c.thread_require_mention, c.free_response, c.auto_thread,
        c.allow_mentioned_agents, c.history_backfill_limit, c.prompt, c.settings_version,
-       ARRAY(SELECT b.skill_ref FROM channel_skill_bindings b WHERE b.channel_id = c.id ORDER BY b.position)::text[] AS skills
+       ARRAY(SELECT b.skill_ref FROM channel_skill_bindings b WHERE b.channel_id = c.id ORDER BY b.position)::text[] AS skills,
+       (pb.channel_id IS NOT NULL)::boolean AS project_bound, pb.workspace_ref, pb.repository_url, pb.default_branch,
+       pb.runner_config, pb.ready, pb.version AS binding_version
 FROM channels c
+LEFT JOIN project_bindings pb ON pb.channel_id = c.id
 WHERE c.id = ANY ($1::uuid[]) AND c.space_id = ANY ($2::uuid[]) AND c.archived_at IS NULL
 ORDER BY c.id
 `
@@ -113,6 +134,13 @@ type ListServedBehaviorsRow struct {
 	Prompt               string
 	SettingsVersion      int64
 	Skills               []string
+	ProjectBound         bool
+	WorkspaceRef         pgtype.Text
+	RepositoryUrl        pgtype.Text
+	DefaultBranch        pgtype.Text
+	RunnerConfig         []byte
+	Ready                pgtype.Bool
+	BindingVersion       pgtype.Int8
 }
 
 // listServedChannels with the predicate of 07 section 7.4 rule 1: the channels and spaces of
@@ -139,6 +167,13 @@ func (q *Queries) ListServedBehaviors(ctx context.Context, arg ListServedBehavio
 			&i.Prompt,
 			&i.SettingsVersion,
 			&i.Skills,
+			&i.ProjectBound,
+			&i.WorkspaceRef,
+			&i.RepositoryUrl,
+			&i.DefaultBranch,
+			&i.RunnerConfig,
+			&i.Ready,
+			&i.BindingVersion,
 		); err != nil {
 			return nil, err
 		}

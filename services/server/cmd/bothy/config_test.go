@@ -322,6 +322,7 @@ func TestConfigPrintShowsSourcePerKey(t *testing.T) {
 		"privacy.audit_ip_key_period = 30d  # default\n" +
 		"privacy.audit_ip_key_retention = 90d  # default\n" +
 		"privacy.telemetry_pseudonym_rotation = 30d  # default\n" +
+		"project.binding_text_max_chars = 512  # default\n" +
 		"ratelimit.max_tracked_keys = 100000  # default\n" +
 		"ratelimit.rl.admin.burst = 20  # default\n" +
 		"ratelimit.rl.admin.per_minute = 60  # default\n" +

@@ -7,19 +7,23 @@
 
 -- name: GetChannel :one
 SELECT sqlc.embed(c), s.default_operator_agent_id AS space_operator_id,
-       (s.archived_at IS NOT NULL)::boolean AS space_archived, t.id AS main_thread_id
+       (s.archived_at IS NOT NULL)::boolean AS space_archived, t.id AS main_thread_id,
+       (pb.channel_id IS NOT NULL)::boolean AS project_bound, coalesce(pb.ready, false)::boolean AS project_ready
 FROM channels c
 LEFT JOIN spaces s ON s.id = c.space_id
 LEFT JOIN threads t ON t.channel_id = c.id AND t.kind = 'main'
+LEFT JOIN project_bindings pb ON pb.channel_id = c.id
 WHERE c.id = @id;
 
 -- name: LockChannel :one
 -- The channel locked for a change (03 section 6.3: domain rows after permission_version).
 SELECT sqlc.embed(c), s.default_operator_agent_id AS space_operator_id,
-       (s.archived_at IS NOT NULL)::boolean AS space_archived, t.id AS main_thread_id
+       (s.archived_at IS NOT NULL)::boolean AS space_archived, t.id AS main_thread_id,
+       (pb.channel_id IS NOT NULL)::boolean AS project_bound, coalesce(pb.ready, false)::boolean AS project_ready
 FROM channels c
 LEFT JOIN spaces s ON s.id = c.space_id
 LEFT JOIN threads t ON t.channel_id = c.id AND t.kind = 'main'
+LEFT JOIN project_bindings pb ON pb.channel_id = c.id
 WHERE c.id = @id
 FOR UPDATE OF c;
 
@@ -28,10 +32,12 @@ FOR UPDATE OF c;
 -- space that are not archived, every one for an instance-wide reader or a fully visible space,
 -- else the visible ones of Scope; authorize then checks each row.
 SELECT sqlc.embed(c), s.default_operator_agent_id AS space_operator_id,
-       (s.archived_at IS NOT NULL)::boolean AS space_archived, t.id AS main_thread_id
+       (s.archived_at IS NOT NULL)::boolean AS space_archived, t.id AS main_thread_id,
+       (pb.channel_id IS NOT NULL)::boolean AS project_bound, coalesce(pb.ready, false)::boolean AS project_ready
 FROM channels c
 LEFT JOIN spaces s ON s.id = c.space_id
 LEFT JOIN threads t ON t.channel_id = c.id AND t.kind = 'main'
+LEFT JOIN project_bindings pb ON pb.channel_id = c.id
 WHERE c.space_id = @space_id AND c.archived_at IS NULL
   AND (c.id = ANY (@visible::uuid[]) OR c.space_id = ANY (@fully_visible::uuid[]) OR @instance_wide::boolean)
 ORDER BY c.sort_key, c.id;
@@ -40,10 +46,12 @@ ORDER BY c.sort_key, c.id;
 -- Every channel that is not a dm channel, archived ones included, ascending by id, for the
 -- structure source of authz.
 SELECT sqlc.embed(c), s.default_operator_agent_id AS space_operator_id,
-       (s.archived_at IS NOT NULL)::boolean AS space_archived, t.id AS main_thread_id
+       (s.archived_at IS NOT NULL)::boolean AS space_archived, t.id AS main_thread_id,
+       (pb.channel_id IS NOT NULL)::boolean AS project_bound, coalesce(pb.ready, false)::boolean AS project_ready
 FROM channels c
 LEFT JOIN spaces s ON s.id = c.space_id
 LEFT JOIN threads t ON t.channel_id = c.id AND t.kind = 'main'
+LEFT JOIN project_bindings pb ON pb.channel_id = c.id
 WHERE c.kind <> 'dm'
 ORDER BY c.id;
 
@@ -72,10 +80,12 @@ WHERE id = @id;
 -- The channel held FOR SHARE while notify writes a preference on it or below it (M3-18); the
 -- columns of GetChannel. The space row is not locked here: the caller shares it next.
 SELECT sqlc.embed(c), s.default_operator_agent_id AS space_operator_id,
-       (s.archived_at IS NOT NULL)::boolean AS space_archived, t.id AS main_thread_id
+       (s.archived_at IS NOT NULL)::boolean AS space_archived, t.id AS main_thread_id,
+       (pb.channel_id IS NOT NULL)::boolean AS project_bound, coalesce(pb.ready, false)::boolean AS project_ready
 FROM channels c
 LEFT JOIN spaces s ON s.id = c.space_id
 LEFT JOIN threads t ON t.channel_id = c.id AND t.kind = 'main'
+LEFT JOIN project_bindings pb ON pb.channel_id = c.id
 WHERE c.id = @id
 FOR SHARE OF c;
 
