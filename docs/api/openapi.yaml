@@ -123,7 +123,6 @@ paths:
                 $ref: '#/components/schemas/Discovery'
               examples:
                 default:
-                  summary: Response
                   value:
                     instance_id: 0192f4a0-7b1c-7db7-89b9-2fe4c48dcb3e
                     setup_required: false
@@ -171,7 +170,6 @@ paths:
                 $ref: '#/components/schemas/Jwks'
               examples:
                 default:
-                  summary: Response
                   value:
                     keys:
                     - {}
@@ -204,7 +202,6 @@ paths:
                 $ref: '#/components/schemas/WebhookKeys'
               examples:
                 default:
-                  summary: Response
                   value:
                     keys:
                     - kid: whk-2026-10
@@ -273,7 +270,6 @@ paths:
                 $ref: '#/components/schemas/Branding'
               examples:
                 default:
-                  summary: Response
                   value:
                     product_name: Team Chat
                     accent_color: loch
@@ -342,7 +338,6 @@ paths:
                 $ref: '#/components/schemas/ProblemType'
               examples:
                 default:
-                  summary: Response
                   value:
                     code: version_conflict
                     status: 412
@@ -374,7 +369,6 @@ paths:
               $ref: '#/components/schemas/OidcBeginRequest'
             examples:
               default:
-                summary: Request
                 value:
                   provider_id: 0192f4a0-7b1c-7b3c-87cd-dea30414c03e
                   app_redirect_uri: com.example.teamchat:/login
@@ -395,7 +389,6 @@ paths:
                 $ref: '#/components/schemas/OidcBeginResponse'
               examples:
                 default:
-                  summary: Response
                   value:
                     login_attempt_id: 0192f4a0-7b1c-74de-8f28-b1bfbb9fa235
                     authorization_url: https://login.example.com/authorize?client_id=chat&state=s1
@@ -483,7 +476,6 @@ paths:
               $ref: '#/components/schemas/OidcCompleteRequest'
             examples:
               default:
-                summary: Request
                 value:
                   login_code: lc_8f2d1c
                   client_verifier: dBjftJeZ4CVP-mB92K27uhbUJU1p1r_wW1gFWFOEjXk
@@ -512,7 +504,6 @@ paths:
                 $ref: '#/components/schemas/TokenResponse'
               examples:
                 default:
-                  summary: Response
                   value:
                     access_token: eyJhbGciOiJFZERTQSJ9.e30.sig
                     token_type: DPoP
@@ -568,7 +559,6 @@ paths:
               $ref: '#/components/schemas/TrustedHeaderLoginRequest'
             examples:
               default:
-                summary: Request
                 value:
                   device:
                     device_id: 0192f4a0-7b1c-7848-8501-1716705c7dbe
@@ -595,7 +585,6 @@ paths:
                 $ref: '#/components/schemas/TokenResponse'
               examples:
                 default:
-                  summary: Response
                   value:
                     access_token: eyJhbGciOiJFZERTQSJ9.e30.sig
                     token_type: DPoP
@@ -647,7 +636,6 @@ paths:
               $ref: '#/components/schemas/PasskeyLoginBeginRequest'
             examples:
               default:
-                summary: Request
                 value:
                   login_name: alex
       responses:
@@ -666,7 +654,6 @@ paths:
                 $ref: '#/components/schemas/WebAuthnChallenge'
               examples:
                 default:
-                  summary: Response
                   value:
                     challenge_id: 0192f4a0-7b1c-747c-835d-13eca158d3c0
                     public_key: {}
@@ -700,7 +687,6 @@ paths:
               $ref: '#/components/schemas/PasskeyLoginCompleteRequest'
             examples:
               default:
-                summary: Request
                 value:
                   challenge_id: 0192f4a0-7b1c-747c-835d-13eca158d3c0
                   credential: {}
@@ -729,7 +715,6 @@ paths:
                 $ref: '#/components/schemas/TokenResponse'
               examples:
                 default:
-                  summary: Response
                   value:
                     access_token: eyJhbGciOiJFZERTQSJ9.e30.sig
                     token_type: DPoP
@@ -779,7 +764,6 @@ paths:
               $ref: '#/components/schemas/EnrollBeginRequest'
             examples:
               default:
-                summary: Request
                 value:
                   enrollment_code: en_4KX9-2MQA
       responses:
@@ -798,7 +782,6 @@ paths:
                 $ref: '#/components/schemas/WebAuthnChallenge'
               examples:
                 default:
-                  summary: Response
                   value:
                     challenge_id: 0192f4a0-7b1c-747c-835d-13eca158d3c0
                     public_key: {}
@@ -832,7 +815,6 @@ paths:
               $ref: '#/components/schemas/EnrollCompleteRequest'
             examples:
               default:
-                summary: Request
                 value:
                   challenge_id: 0192f4a0-7b1c-747c-835d-13eca158d3c0
                   credential: {}
@@ -860,7 +842,6 @@ paths:
                 $ref: '#/components/schemas/TokenResponse'
               examples:
                 default:
-                  summary: Response
                   value:
                     access_token: eyJhbGciOiJFZERTQSJ9.e30.sig
                     token_type: DPoP
@@ -913,7 +894,6 @@ paths:
               $ref: '#/components/schemas/EnrollRedeemRequest'
             examples:
               default:
-                summary: Request
                 value:
                   enrollment_code: en_EXAMPLE
                   device:
@@ -939,7 +919,6 @@ paths:
                 $ref: '#/components/schemas/TokenResponse'
               examples:
                 default:
-                  summary: Response
                   value:
                     access_token: eyJhbGciOiJFZERTQSJ9.e30.sig
                     token_type: DPoP
@@ -995,7 +974,6 @@ paths:
               $ref: '#/components/schemas/PairingBeginRequest'
             examples:
               default:
-                summary: Request
                 value:
                   device:
                     device_id: 0192f4a0-7b1c-7848-8501-1716705c7dbe
@@ -1023,7 +1001,6 @@ paths:
                 $ref: '#/components/schemas/PairingStarted'
               examples:
                 default:
-                  summary: Response
                   value:
                     pairing_id: 0192f4a0-7b1c-7e21-8f3a-5b6c7d8e9f10
                     pairing_code: 7KQ2-M9XD
@@ -1058,7 +1035,6 @@ paths:
               $ref: '#/components/schemas/PairingCompleteRequest'
             examples:
               default:
-                summary: Request
                 value:
                   pairing_id: 0192f4a0-7b1c-7e21-8f3a-5b6c7d8e9f10
       responses:
@@ -1077,7 +1053,6 @@ paths:
                 $ref: '#/components/schemas/TokenResponse'
               examples:
                 default:
-                  summary: Response
                   value:
                     access_token: eyJhbGciOiJFZERTQSJ9.e30.sig
                     token_type: DPoP
@@ -1143,7 +1118,6 @@ paths:
               $ref: '#/components/schemas/PasswordLoginRequest'
             examples:
               default:
-                summary: Request
                 value:
                   login_name: alex
                   password: example-password
@@ -1173,7 +1147,6 @@ paths:
                 $ref: '#/components/schemas/TokenResponse'
               examples:
                 default:
-                  summary: Response
                   value:
                     access_token: eyJhbGciOiJFZERTQSJ9.e30.sig
                     token_type: DPoP
@@ -1231,7 +1204,6 @@ paths:
               $ref: '#/components/schemas/TokenRefreshRequest'
             examples:
               default:
-                summary: Request
                 value:
                   refresh_token: rt_q2Z0
       responses:
@@ -1250,7 +1222,6 @@ paths:
                 $ref: '#/components/schemas/TokenResponse'
               examples:
                 default:
-                  summary: Response
                   value:
                     access_token: eyJhbGciOiJFZERTQSJ9.e30.sig
                     token_type: DPoP
@@ -1340,7 +1311,6 @@ paths:
                 $ref: '#/components/schemas/StepUpChallenge'
               examples:
                 default:
-                  summary: Response
                   value:
                     challenge_id: 0192f4a0-7b1c-747c-835d-13eca158d3c0
                     challenge: Zm9vYmFyYmF6
@@ -1373,7 +1343,6 @@ paths:
               $ref: '#/components/schemas/StepUpPasskeyRequest'
             examples:
               default:
-                summary: Request
                 value:
                   challenge_id: 0192f4a0-7b1c-747c-835d-13eca158d3c0
                   credential: {}
@@ -1407,7 +1376,6 @@ paths:
               $ref: '#/components/schemas/StepUpDeviceKeyRequest'
             examples:
               default:
-                summary: Request
                 value:
                   challenge_id: 0192f4a0-7b1c-747c-835d-13eca158d3c0
                   signature: eyJhbGciOiJFUzI1NiJ9.eyJjIjoiWm05dlltRnlZbUY2In0.sig
@@ -1427,7 +1395,6 @@ paths:
                 $ref: '#/components/schemas/StepUpResult'
               examples:
                 default:
-                  summary: Response
                   value:
                     step_up_at: '2026-10-10T09:30:00.000Z'
                     valid_until: '2026-10-10T09:30:00.000Z'
@@ -1589,7 +1556,6 @@ paths:
                 $ref: '#/components/schemas/Me'
               examples:
                 default:
-                  summary: Response
                   value:
                     principal:
                       id: 0192f4a0-7b1c-7f89-8d6b-6960453241bc
@@ -1627,7 +1593,6 @@ paths:
               $ref: '#/components/schemas/ProfileUpdate'
             examples:
               default:
-                summary: Request
                 value:
                   display_name: Alex
                   locale: de
@@ -1648,7 +1613,6 @@ paths:
                 $ref: '#/components/schemas/User'
               examples:
                 default:
-                  summary: Response
                   value:
                     id: 0192f4a0-7b1c-7f89-8d6b-6960453241bc
                     handle: sam
@@ -1700,7 +1664,6 @@ paths:
                 $ref: '#/components/schemas/User'
               examples:
                 default:
-                  summary: Response
                   value:
                     id: 0192f4a0-7b1c-7f89-8d6b-6960453241bc
                     handle: sam
@@ -1772,7 +1735,6 @@ paths:
                 $ref: '#/components/schemas/CredentialOverview'
               examples:
                 default:
-                  summary: Response
                   value:
                     identities:
                     - id: 0192f4a0-7b1c-7dd2-83b9-528d363b749b
@@ -1813,7 +1775,6 @@ paths:
               $ref: '#/components/schemas/IdentityLinkBegin'
             examples:
               default:
-                summary: Request
                 value:
                   provider_id: 0192f4a0-7b1c-7b3c-87cd-dea30414c03e
                   app_redirect_uri: com.example.teamchat:/link
@@ -1834,7 +1795,6 @@ paths:
                 $ref: '#/components/schemas/OidcBeginResponse'
               examples:
                 default:
-                  summary: Response
                   value:
                     login_attempt_id: 0192f4a0-7b1c-74de-8f28-b1bfbb9fa235
                     authorization_url: https://login.example.com/authorize?client_id=chat&state=s1
@@ -1866,7 +1826,6 @@ paths:
               $ref: '#/components/schemas/IdentityLinkComplete'
             examples:
               default:
-                summary: Request
                 value:
                   login_code: lc_8f2d1c
                   client_verifier: dBjftJeZ4CVP-mB92K27uhbUJU1p1r_wW1gFWFOEjXk
@@ -1886,7 +1845,6 @@ paths:
                 $ref: '#/components/schemas/Identity'
               examples:
                 default:
-                  summary: Response
                   value:
                     id: 0192f4a0-7b1c-7dd2-83b9-528d363b749b
                     provider_id: 0192f4a0-7b1c-7b3c-87cd-dea30414c03e
@@ -1931,7 +1889,6 @@ paths:
                 $ref: '#/components/schemas/WebAuthnChallenge'
               examples:
                 default:
-                  summary: Response
                   value:
                     challenge_id: 0192f4a0-7b1c-747c-835d-13eca158d3c0
                     public_key: {}
@@ -1961,7 +1918,6 @@ paths:
               $ref: '#/components/schemas/PasskeyRegisterComplete'
             examples:
               default:
-                summary: Request
                 value:
                   challenge_id: 0192f4a0-7b1c-747c-835d-13eca158d3c0
                   credential: {}
@@ -1982,7 +1938,6 @@ paths:
                 $ref: '#/components/schemas/Passkey'
               examples:
                 default:
-                  summary: Response
                   value:
                     id: 0192f4a0-7b1c-7ad4-8a99-f31c00005918
                     name: Laptop
@@ -2015,7 +1970,6 @@ paths:
               $ref: '#/components/schemas/LocalCredentialSet'
             examples:
               default:
-                summary: Request
                 value:
                   password: example-password
       responses:
@@ -2034,7 +1988,6 @@ paths:
                 $ref: '#/components/schemas/LocalCredentialResult'
               examples:
                 default:
-                  summary: Response
                   value:
                     password_set: true
                     totp_enabled: false
@@ -2080,7 +2033,6 @@ paths:
                 $ref: '#/components/schemas/MentionItemPage'
               examples:
                 default:
-                  summary: Response
                   value:
                     items:
                     - message:
@@ -2170,7 +2122,6 @@ paths:
                 $ref: '#/components/schemas/TemplateList'
               examples:
                 default:
-                  summary: Response
                   value:
                     items:
                     - id: 0192f4a0-7b1c-777d-8541-d21a5b1c8fe4
@@ -2202,7 +2153,6 @@ paths:
               $ref: '#/components/schemas/TemplateCreate'
             examples:
               default:
-                summary: Request
                 value:
                   name: Escalation
                   content_md: Please escalate this ticket to second level.
@@ -2222,7 +2172,6 @@ paths:
                 $ref: '#/components/schemas/Template'
               examples:
                 default:
-                  summary: Response
                   value:
                     id: 0192f4a0-7b1c-777d-8541-d21a5b1c8fe4
                     scope: personal
@@ -2278,7 +2227,6 @@ paths:
                 $ref: '#/components/schemas/UserPage'
               examples:
                 default:
-                  summary: Response
                   value:
                     items:
                     - id: 0192f4a0-7b1c-7f89-8d6b-6960453241bc
@@ -2317,7 +2265,6 @@ paths:
               $ref: '#/components/schemas/UserCreate'
             examples:
               default:
-                summary: Request
                 value:
                   handle: robin
                   display_name: Robin
@@ -2340,7 +2287,6 @@ paths:
                 $ref: '#/components/schemas/UserCreated'
               examples:
                 default:
-                  summary: Response
                   value:
                     user:
                       id: 0192f4a0-7b1c-7f89-8d6b-6960453241bc
@@ -2391,7 +2337,6 @@ paths:
                 $ref: '#/components/schemas/User'
               examples:
                 default:
-                  summary: Response
                   value:
                     id: 0192f4a0-7b1c-7f89-8d6b-6960453241bc
                     handle: sam
@@ -2430,7 +2375,6 @@ paths:
               $ref: '#/components/schemas/UserUpdate'
             examples:
               default:
-                summary: Request
                 value: {}
       responses:
         '200':
@@ -2448,7 +2392,6 @@ paths:
                 $ref: '#/components/schemas/User'
               examples:
                 default:
-                  summary: Response
                   value:
                     id: 0192f4a0-7b1c-7f89-8d6b-6960453241bc
                     handle: sam
@@ -2491,7 +2434,6 @@ paths:
               $ref: '#/components/schemas/ReasonBody'
             examples:
               default:
-                summary: Request
                 value:
                   reason: Left the team
       responses:
@@ -2510,7 +2452,6 @@ paths:
                 $ref: '#/components/schemas/User'
               examples:
                 default:
-                  summary: Response
                   value:
                     id: 0192f4a0-7b1c-7f89-8d6b-6960453241bc
                     handle: sam
@@ -2555,7 +2496,6 @@ paths:
               $ref: '#/components/schemas/ReasonBody'
             examples:
               default:
-                summary: Request
                 value:
                   reason: Left the team
       responses:
@@ -2574,7 +2514,6 @@ paths:
                 $ref: '#/components/schemas/User'
               examples:
                 default:
-                  summary: Response
                   value:
                     id: 0192f4a0-7b1c-7f89-8d6b-6960453241bc
                     handle: sam
@@ -2629,7 +2568,6 @@ paths:
                 $ref: '#/components/schemas/EnrollmentCode'
               examples:
                 default:
-                  summary: Response
                   value:
                     code: en_4KX9-2MQA
                     purpose: first_login
@@ -2676,7 +2614,6 @@ paths:
                 $ref: '#/components/schemas/CredentialOverview'
               examples:
                 default:
-                  summary: Response
                   value:
                     identities:
                     - id: 0192f4a0-7b1c-7dd2-83b9-528d363b749b
@@ -2802,7 +2739,6 @@ paths:
                 $ref: '#/components/schemas/DevicePage'
               examples:
                 default:
-                  summary: Response
                   value:
                     items:
                     - id: 0192f4a0-7b1c-7848-8501-1716705c7dbe
@@ -2853,7 +2789,6 @@ paths:
                 $ref: '#/components/schemas/SessionPage'
               examples:
                 default:
-                  summary: Response
                   value:
                     items:
                     - id: 0192f4a0-7b1c-75c3-8a09-bf22e12411b6
@@ -2901,7 +2836,6 @@ paths:
                 $ref: '#/components/schemas/ViewAsSnapshot'
               examples:
                 default:
-                  summary: Response
                   value:
                     user:
                       id: 0192f4a0-7b1c-7f89-8d6b-6960453241bc
@@ -2969,7 +2903,6 @@ paths:
                 $ref: '#/components/schemas/OwnerList'
               examples:
                 default:
-                  summary: Response
                   value:
                     items:
                     - user:
@@ -3003,7 +2936,6 @@ paths:
               $ref: '#/components/schemas/OwnerAdd'
             examples:
               default:
-                summary: Request
                 value:
                   user_id: 0192f4a0-7b1c-7f89-8d6b-6960453241bc
                   reason: Second owner as deputy
@@ -3023,7 +2955,6 @@ paths:
                 $ref: '#/components/schemas/Owner'
               examples:
                 default:
-                  summary: Response
                   value:
                     user:
                       id: 0192f4a0-7b1c-7f89-8d6b-6960453241bc
@@ -3068,7 +2999,6 @@ paths:
               $ref: '#/components/schemas/ReasonBody'
             examples:
               default:
-                summary: Request
                 value:
                   reason: Left the team
       responses:
@@ -3124,7 +3054,6 @@ paths:
                 $ref: '#/components/schemas/DevicePage'
               examples:
                 default:
-                  summary: Response
                   value:
                     items:
                     - id: 0192f4a0-7b1c-7848-8501-1716705c7dbe
@@ -3165,7 +3094,6 @@ paths:
               $ref: '#/components/schemas/PairingApprove'
             examples:
               default:
-                summary: Request
                 value:
                   pairing_code: 7KQ2-M9XD
       responses:
@@ -3184,7 +3112,6 @@ paths:
                 $ref: '#/components/schemas/Device'
               examples:
                 default:
-                  summary: Response
                   value:
                     id: 0192f4a0-7b1c-7848-8501-1716705c7dbe
                     user_id: 0192f4a0-7b1c-7f89-8d6b-6960453241bc
@@ -3231,7 +3158,6 @@ paths:
                 $ref: '#/components/schemas/Device'
               examples:
                 default:
-                  summary: Response
                   value:
                     id: 0192f4a0-7b1c-7848-8501-1716705c7dbe
                     user_id: 0192f4a0-7b1c-7f89-8d6b-6960453241bc
@@ -3274,7 +3200,6 @@ paths:
               $ref: '#/components/schemas/DeviceApprove'
             examples:
               default:
-                summary: Request
                 value:
                   verification_code: '042517'
       responses:
@@ -3293,7 +3218,6 @@ paths:
                 $ref: '#/components/schemas/Device'
               examples:
                 default:
-                  summary: Response
                   value:
                     id: 0192f4a0-7b1c-7848-8501-1716705c7dbe
                     user_id: 0192f4a0-7b1c-7f89-8d6b-6960453241bc
@@ -3339,7 +3263,6 @@ paths:
               $ref: '#/components/schemas/ReasonBody'
             examples:
               default:
-                summary: Request
                 value:
                   reason: Left the team
       responses:
@@ -3358,7 +3281,6 @@ paths:
                 $ref: '#/components/schemas/Device'
               examples:
                 default:
-                  summary: Response
                   value:
                     id: 0192f4a0-7b1c-7848-8501-1716705c7dbe
                     user_id: 0192f4a0-7b1c-7f89-8d6b-6960453241bc
@@ -3400,7 +3322,6 @@ paths:
               $ref: '#/components/schemas/PushRegistrationCreate'
             examples:
               default:
-                summary: Request
                 value:
                   provider: apns
                   token: example-device-token-a1b2
@@ -3421,7 +3342,6 @@ paths:
                 $ref: '#/components/schemas/PushRegistration'
               examples:
                 default:
-                  summary: Response
                   value:
                     id: 0192f4a0-7b1c-72f6-893c-a890548910a3
                     device_id: 0192f4a0-7b1c-7848-8501-1716705c7dbe
@@ -3514,7 +3434,6 @@ paths:
                 $ref: '#/components/schemas/PushPreview'
               examples:
                 default:
-                  summary: Response
                   value:
                     kind: mention
                     thread_id: 0192f4a0-7b1c-78f9-8074-fa94e84bab7d
@@ -3562,7 +3481,6 @@ paths:
                 $ref: '#/components/schemas/SessionPage'
               examples:
                 default:
-                  summary: Response
                   value:
                     items:
                     - id: 0192f4a0-7b1c-75c3-8a09-bf22e12411b6
@@ -3600,7 +3518,6 @@ paths:
               $ref: '#/components/schemas/ExtensionSessionCreate'
             examples:
               default:
-                summary: Request
                 value:
                   client_component: share_ext
       responses:
@@ -3619,7 +3536,6 @@ paths:
                 $ref: '#/components/schemas/TokenResponse'
               examples:
                 default:
-                  summary: Response
                   value:
                     access_token: eyJhbGciOiJFZERTQSJ9.e30.sig
                     token_type: DPoP
@@ -3718,7 +3634,6 @@ paths:
                 $ref: '#/components/schemas/ApiTokenPage'
               examples:
                 default:
-                  summary: Response
                   value:
                     items:
                     - id: 0192f4a0-7b1c-703d-85ae-fdc884c55554
@@ -3760,7 +3675,6 @@ paths:
               $ref: '#/components/schemas/ApiTokenCreate'
             examples:
               default:
-                summary: Request
                 value:
                   name: Adapter production
                   dpop_jkt: 0ZcOCORZNYy-DWpqq30jZyJGHTN0d2HglBV3uiguA4I
@@ -3781,7 +3695,6 @@ paths:
                 $ref: '#/components/schemas/ApiTokenCreated'
               examples:
                 default:
-                  summary: Response
                   value:
                     token:
                       id: 0192f4a0-7b1c-703d-85ae-fdc884c55554
@@ -3873,7 +3786,6 @@ paths:
                 $ref: '#/components/schemas/GroupPage'
               examples:
                 default:
-                  summary: Response
                   value:
                     items:
                     - id: 0192f4a0-7b1c-7abf-88a6-0fbb818f7405
@@ -3908,7 +3820,6 @@ paths:
               $ref: '#/components/schemas/GroupCreate'
             examples:
               default:
-                summary: Request
                 value:
                   name: Support
       responses:
@@ -3927,7 +3838,6 @@ paths:
                 $ref: '#/components/schemas/Group'
               examples:
                 default:
-                  summary: Response
                   value:
                     id: 0192f4a0-7b1c-7abf-88a6-0fbb818f7405
                     name: Support
@@ -3975,7 +3885,6 @@ paths:
                 $ref: '#/components/schemas/Group'
               examples:
                 default:
-                  summary: Response
                   value:
                     id: 0192f4a0-7b1c-7abf-88a6-0fbb818f7405
                     name: Support
@@ -4012,7 +3921,6 @@ paths:
               $ref: '#/components/schemas/GroupUpdate'
             examples:
               default:
-                summary: Request
                 value:
                   name: Support
       responses:
@@ -4031,7 +3939,6 @@ paths:
                 $ref: '#/components/schemas/Group'
               examples:
                 default:
-                  summary: Response
                   value:
                     id: 0192f4a0-7b1c-7abf-88a6-0fbb818f7405
                     name: Support
@@ -4115,7 +4022,6 @@ paths:
                 $ref: '#/components/schemas/GroupMemberPage'
               examples:
                 default:
-                  summary: Response
                   value:
                     items:
                     - user:
@@ -4153,7 +4059,6 @@ paths:
               $ref: '#/components/schemas/GroupMemberAdd'
             examples:
               default:
-                summary: Request
                 value:
                   user_id: 0192f4a0-7b1c-7f89-8d6b-6960453241bc
       responses:
@@ -4172,7 +4077,6 @@ paths:
                 $ref: '#/components/schemas/GroupMember'
               examples:
                 default:
-                  summary: Response
                   value:
                     user:
                       id: 0192f4a0-7b1c-7f89-8d6b-6960453241bc
@@ -4283,7 +4187,6 @@ paths:
                 $ref: '#/components/schemas/GrantPage'
               examples:
                 default:
-                  summary: Response
                   value:
                     items:
                     - id: 0192f4a0-7b1c-727f-86bd-90fe7bdb3024
@@ -4321,7 +4224,6 @@ paths:
               $ref: '#/components/schemas/GrantCreate'
             examples:
               default:
-                summary: Request
                 value:
                   subject_kind: user
                   subject_id: 0192f4a0-7b1c-7f89-8d6b-6960453241bc
@@ -4344,7 +4246,6 @@ paths:
                 $ref: '#/components/schemas/Grant'
               examples:
                 default:
-                  summary: Response
                   value:
                     id: 0192f4a0-7b1c-727f-86bd-90fe7bdb3024
                     subject_kind: user
@@ -4393,7 +4294,6 @@ paths:
               $ref: '#/components/schemas/GrantCreate'
             examples:
               default:
-                summary: Request
                 value:
                   subject_kind: user
                   subject_id: 0192f4a0-7b1c-7f89-8d6b-6960453241bc
@@ -4416,7 +4316,6 @@ paths:
                 $ref: '#/components/schemas/GrantPreview'
               examples:
                 default:
-                  summary: Response
                   value:
                     allowed: true
                     effects:
@@ -4474,7 +4373,6 @@ paths:
                 $ref: '#/components/schemas/Grant'
               examples:
                 default:
-                  summary: Response
                   value:
                     id: 0192f4a0-7b1c-727f-86bd-90fe7bdb3024
                     subject_kind: user
@@ -4516,7 +4414,6 @@ paths:
               $ref: '#/components/schemas/ReasonBody'
             examples:
               default:
-                summary: Request
                 value:
                   reason: Left the team
       responses:
@@ -4535,7 +4432,6 @@ paths:
                 $ref: '#/components/schemas/Grant'
               examples:
                 default:
-                  summary: Response
                   value:
                     id: 0192f4a0-7b1c-727f-86bd-90fe7bdb3024
                     subject_kind: user
@@ -4589,7 +4485,6 @@ paths:
                 $ref: '#/components/schemas/AccessExplanation'
               examples:
                 default:
-                  summary: Response
                   value:
                     target_kind: space
                     target_id: 0192f4a0-7b1c-7fd5-831e-d4370e087874
@@ -4642,7 +4537,6 @@ paths:
                 $ref: '#/components/schemas/AccessExplanation'
               examples:
                 default:
-                  summary: Response
                   value:
                     target_kind: space
                     target_id: 0192f4a0-7b1c-7fd5-831e-d4370e087874
@@ -4694,7 +4588,6 @@ paths:
                 $ref: '#/components/schemas/InstanceInfo'
               examples:
                 default:
-                  summary: Response
                   value:
                     instance_id: 0192f4a0-7b1c-7db7-89b9-2fe4c48dcb3e
                     branding:
@@ -4744,7 +4637,6 @@ paths:
                 $ref: '#/components/schemas/InstanceSettingList'
               examples:
                 default:
-                  summary: Response
                   value:
                     items:
                     - key: locale.default
@@ -4778,7 +4670,6 @@ paths:
               $ref: '#/components/schemas/InstanceSettingPut'
             examples:
               default:
-                summary: Request
                 value:
                   value: true
       responses:
@@ -4799,7 +4690,6 @@ paths:
                 $ref: '#/components/schemas/InstanceSetting'
               examples:
                 default:
-                  summary: Response
                   value:
                     key: locale.default
                     value: true
@@ -4837,7 +4727,6 @@ paths:
               $ref: '#/components/schemas/BrandingUpdate'
             examples:
               default:
-                summary: Request
                 value:
                   product_name: Team Chat
                   accent_color: loch
@@ -4859,7 +4748,6 @@ paths:
                 $ref: '#/components/schemas/Branding'
               examples:
                 default:
-                  summary: Response
                   value:
                     product_name: Team Chat
                     accent_color: loch
@@ -4894,7 +4782,6 @@ paths:
               $ref: '#/components/schemas/BillingModeSetAll'
             examples:
               default:
-                summary: Request
                 value:
                   billing_mode: organization
                   reason: Switch all agents to the company key
@@ -4914,7 +4801,6 @@ paths:
                 $ref: '#/components/schemas/BillingModeSetAllResult'
               examples:
                 default:
-                  summary: Response
                   value:
                     changed_agent_ids: [0192f4a0-7b1c-7d65-8e06-d83d1842d15e]
         '400':
@@ -4953,7 +4839,6 @@ paths:
                 $ref: '#/components/schemas/FeatureFlagList'
               examples:
                 default:
-                  summary: Response
                   value:
                     items:
                     - key: voice.enabled
@@ -4992,7 +4877,6 @@ paths:
               $ref: '#/components/schemas/FeatureFlagPut'
             examples:
               default:
-                summary: Request
                 value:
                   enabled: true
                   reason: Pilot with the support team
@@ -5014,7 +4898,6 @@ paths:
                 $ref: '#/components/schemas/FeatureFlag'
               examples:
                 default:
-                  summary: Response
                   value:
                     key: voice.enabled
                     kind: option
@@ -5057,7 +4940,6 @@ paths:
               $ref: '#/components/schemas/SigningKeyRotate'
             examples:
               default:
-                summary: Request
                 value:
                   purpose: access_token
                   mode: scheduled
@@ -5078,7 +4960,6 @@ paths:
                 $ref: '#/components/schemas/SigningKeyRotation'
               examples:
                 default:
-                  summary: Response
                   value:
                     purpose: access_token
                     new_kid: inv-2026-11
@@ -5120,7 +5001,6 @@ paths:
                 $ref: '#/components/schemas/IdentityProviderList'
               examples:
                 default:
-                  summary: Response
                   value:
                     items:
                     - id: 0192f4a0-7b1c-7e26-89e1-d4e246452fb8
@@ -5154,7 +5034,6 @@ paths:
               $ref: '#/components/schemas/IdentityProviderCreate'
             examples:
               default:
-                summary: Request
                 value:
                   kind: oidc
                   name: Company SSO
@@ -5175,7 +5054,6 @@ paths:
                 $ref: '#/components/schemas/IdentityProvider'
               examples:
                 default:
-                  summary: Response
                   value:
                     id: 0192f4a0-7b1c-7e26-89e1-d4e246452fb8
                     kind: oidc
@@ -5223,7 +5101,6 @@ paths:
                 $ref: '#/components/schemas/IdentityProvider'
               examples:
                 default:
-                  summary: Response
                   value:
                     id: 0192f4a0-7b1c-7e26-89e1-d4e246452fb8
                     kind: oidc
@@ -5261,7 +5138,6 @@ paths:
               $ref: '#/components/schemas/IdentityProviderUpdate'
             examples:
               default:
-                summary: Request
                 value: {}
       responses:
         '200':
@@ -5279,7 +5155,6 @@ paths:
                 $ref: '#/components/schemas/IdentityProvider'
               examples:
                 default:
-                  summary: Response
                   value:
                     id: 0192f4a0-7b1c-7e26-89e1-d4e246452fb8
                     kind: oidc
@@ -5360,7 +5235,6 @@ paths:
                 $ref: '#/components/schemas/SpaceViewList'
               examples:
                 default:
-                  summary: Response
                   value:
                     items:
                     - space:
@@ -5395,7 +5269,6 @@ paths:
               $ref: '#/components/schemas/SpaceCreate'
             examples:
               default:
-                summary: Request
                 value:
                   name: Research
                   icon: flask
@@ -5416,7 +5289,6 @@ paths:
                 $ref: '#/components/schemas/Space'
               examples:
                 default:
-                  summary: Response
                   value:
                     id: 0192f4a0-7b1c-7881-8522-0a58634abc14
                     name: Support
@@ -5467,7 +5339,6 @@ paths:
                 $ref: '#/components/schemas/SpaceView'
               examples:
                 default:
-                  summary: Response
                   value:
                     space:
                       id: 0192f4a0-7b1c-7881-8522-0a58634abc14
@@ -5509,7 +5380,6 @@ paths:
               $ref: '#/components/schemas/SpaceUpdate'
             examples:
               default:
-                summary: Request
                 value:
                   name: Research
       responses:
@@ -5530,7 +5400,6 @@ paths:
                 $ref: '#/components/schemas/Space'
               examples:
                 default:
-                  summary: Response
                   value:
                     id: 0192f4a0-7b1c-7881-8522-0a58634abc14
                     name: Support
@@ -5578,7 +5447,6 @@ paths:
               $ref: '#/components/schemas/MovePosition'
             examples:
               default:
-                summary: Request
                 value: {}
       responses:
         '200':
@@ -5596,7 +5464,6 @@ paths:
                 $ref: '#/components/schemas/Space'
               examples:
                 default:
-                  summary: Response
                   value:
                     id: 0192f4a0-7b1c-7881-8522-0a58634abc14
                     name: Support
@@ -5641,7 +5508,6 @@ paths:
               $ref: '#/components/schemas/ReasonBody'
             examples:
               default:
-                summary: Request
                 value:
                   reason: Left the team
       responses:
@@ -5660,7 +5526,6 @@ paths:
                 $ref: '#/components/schemas/Space'
               examples:
                 default:
-                  summary: Response
                   value:
                     id: 0192f4a0-7b1c-7881-8522-0a58634abc14
                     name: Support
@@ -5702,7 +5567,6 @@ paths:
               $ref: '#/components/schemas/OperatorSet'
             examples:
               default:
-                summary: Request
                 value:
                   mode: inherit
                   reason: Support agent takes over
@@ -5724,7 +5588,6 @@ paths:
                 $ref: '#/components/schemas/Space'
               examples:
                 default:
-                  summary: Response
                   value:
                     id: 0192f4a0-7b1c-7881-8522-0a58634abc14
                     name: Support
@@ -5775,7 +5638,6 @@ paths:
                 $ref: '#/components/schemas/SidebarStateList'
               examples:
                 default:
-                  summary: Response
                   value:
                     items:
                     - space_id: 0192f4a0-7b1c-7881-8522-0a58634abc14
@@ -5808,7 +5670,6 @@ paths:
               $ref: '#/components/schemas/SidebarStatePut'
             examples:
               default:
-                summary: Request
                 value:
                   collapsed: false
       responses:
@@ -5827,7 +5688,6 @@ paths:
                 $ref: '#/components/schemas/SidebarState'
               examples:
                 default:
-                  summary: Response
                   value:
                     space_id: 0192f4a0-7b1c-7881-8522-0a58634abc14
                     collapsed: false
@@ -5871,7 +5731,6 @@ paths:
                 $ref: '#/components/schemas/ChannelViewList'
               examples:
                 default:
-                  summary: Response
                   value:
                     items:
                     - channel:
@@ -5917,7 +5776,6 @@ paths:
               $ref: '#/components/schemas/ChannelCreate'
             examples:
               default:
-                summary: Request
                 value:
                   kind: text
                   name: tickets
@@ -5937,7 +5795,6 @@ paths:
                 $ref: '#/components/schemas/Channel'
               examples:
                 default:
-                  summary: Response
                   value:
                     id: 0192f4a0-7b1c-72d4-8bae-7661d2b2f203
                     kind: text
@@ -5994,7 +5851,6 @@ paths:
                 $ref: '#/components/schemas/ChannelView'
               examples:
                 default:
-                  summary: Response
                   value:
                     channel:
                       id: 0192f4a0-7b1c-72d4-8bae-7661d2b2f203
@@ -6040,7 +5896,6 @@ paths:
               $ref: '#/components/schemas/ChannelUpdate'
             examples:
               default:
-                summary: Request
                 value:
                   name: tickets
       responses:
@@ -6061,7 +5916,6 @@ paths:
                 $ref: '#/components/schemas/Channel'
               examples:
                 default:
-                  summary: Response
                   value:
                     id: 0192f4a0-7b1c-72d4-8bae-7661d2b2f203
                     kind: text
@@ -6113,7 +5967,6 @@ paths:
               $ref: '#/components/schemas/MovePosition'
             examples:
               default:
-                summary: Request
                 value: {}
       responses:
         '200':
@@ -6131,7 +5984,6 @@ paths:
                 $ref: '#/components/schemas/Channel'
               examples:
                 default:
-                  summary: Response
                   value:
                     id: 0192f4a0-7b1c-72d4-8bae-7661d2b2f203
                     kind: text
@@ -6178,7 +6030,6 @@ paths:
               $ref: '#/components/schemas/ReasonBody'
             examples:
               default:
-                summary: Request
                 value:
                   reason: Left the team
       responses:
@@ -6197,7 +6048,6 @@ paths:
                 $ref: '#/components/schemas/Channel'
               examples:
                 default:
-                  summary: Response
                   value:
                     id: 0192f4a0-7b1c-72d4-8bae-7661d2b2f203
                     kind: text
@@ -6253,7 +6103,6 @@ paths:
                 $ref: '#/components/schemas/ChannelBehavior'
               examples:
                 default:
-                  summary: Response
                   value:
                     require_mention: false
                     thread_require_mention: false
@@ -6293,7 +6142,6 @@ paths:
               $ref: '#/components/schemas/ChannelBehaviorPut'
             examples:
               default:
-                summary: Request
                 value:
                   require_mention: false
                   thread_require_mention: false
@@ -6321,7 +6169,6 @@ paths:
                 $ref: '#/components/schemas/ChannelBehavior'
               examples:
                 default:
-                  summary: Response
                   value:
                     require_mention: false
                     thread_require_mention: false
@@ -6367,7 +6214,6 @@ paths:
               $ref: '#/components/schemas/OperatorSet'
             examples:
               default:
-                summary: Request
                 value:
                   mode: inherit
                   reason: Support agent takes over
@@ -6389,7 +6235,6 @@ paths:
                 $ref: '#/components/schemas/Channel'
               examples:
                 default:
-                  summary: Response
                   value:
                     id: 0192f4a0-7b1c-72d4-8bae-7661d2b2f203
                     kind: text
@@ -6441,7 +6286,6 @@ paths:
               $ref: '#/components/schemas/ChannelReadOnlySet'
             examples:
               default:
-                summary: Request
                 value:
                   read_only: true
                   reason: Channel is mirrored from the old system
@@ -6463,7 +6307,6 @@ paths:
                 $ref: '#/components/schemas/Channel'
               examples:
                 default:
-                  summary: Response
                   value:
                     id: 0192f4a0-7b1c-72d4-8bae-7661d2b2f203
                     kind: text
@@ -6511,7 +6354,6 @@ paths:
               $ref: '#/components/schemas/ProjectBindingPut'
             examples:
               default:
-                summary: Request
                 value:
                   workspace_ref: website
                   repository_url: https://git.example.com/team/website
@@ -6535,7 +6377,6 @@ paths:
                 $ref: '#/components/schemas/ProjectBinding'
               examples:
                 default:
-                  summary: Response
                   value:
                     workspace_ref: website
                     repository_url: https://git.example.com/team/website
@@ -6615,7 +6456,6 @@ paths:
                 $ref: '#/components/schemas/ForumTagList'
               examples:
                 default:
-                  summary: Response
                   value:
                     items:
                     - id: 0192f4a0-7b1c-7f24-8f76-a5de0ed16c6f
@@ -6653,7 +6493,6 @@ paths:
               $ref: '#/components/schemas/ForumTagCreate'
             examples:
               default:
-                summary: Request
                 value:
                   name: bug
                   color: rowan
@@ -6673,7 +6512,6 @@ paths:
                 $ref: '#/components/schemas/ForumTag'
               examples:
                 default:
-                  summary: Response
                   value:
                     id: 0192f4a0-7b1c-7f24-8f76-a5de0ed16c6f
                     channel_id: 0192f4a0-7b1c-72d4-8bae-7661d2b2f203
@@ -6717,7 +6555,6 @@ paths:
               $ref: '#/components/schemas/ForumTagUpdate'
             examples:
               default:
-                summary: Request
                 value:
                   name: bug
       responses:
@@ -6736,7 +6573,6 @@ paths:
                 $ref: '#/components/schemas/ForumTag'
               examples:
                 default:
-                  summary: Response
                   value:
                     id: 0192f4a0-7b1c-7f24-8f76-a5de0ed16c6f
                     channel_id: 0192f4a0-7b1c-72d4-8bae-7661d2b2f203
@@ -6812,7 +6648,6 @@ paths:
               $ref: '#/components/schemas/MovePosition'
             examples:
               default:
-                summary: Request
                 value: {}
       responses:
         '200':
@@ -6830,7 +6665,6 @@ paths:
                 $ref: '#/components/schemas/ForumTag'
               examples:
                 default:
-                  summary: Response
                   value:
                     id: 0192f4a0-7b1c-7f24-8f76-a5de0ed16c6f
                     channel_id: 0192f4a0-7b1c-72d4-8bae-7661d2b2f203
@@ -6880,7 +6714,6 @@ paths:
                 $ref: '#/components/schemas/TemplateList'
               examples:
                 default:
-                  summary: Response
                   value:
                     items:
                     - id: 0192f4a0-7b1c-777d-8541-d21a5b1c8fe4
@@ -6917,7 +6750,6 @@ paths:
               $ref: '#/components/schemas/TemplateCreate'
             examples:
               default:
-                summary: Request
                 value:
                   name: Escalation
                   content_md: Please escalate this ticket to second level.
@@ -6937,7 +6769,6 @@ paths:
                 $ref: '#/components/schemas/Template'
               examples:
                 default:
-                  summary: Response
                   value:
                     id: 0192f4a0-7b1c-777d-8541-d21a5b1c8fe4
                     scope: personal
@@ -6978,7 +6809,6 @@ paths:
               $ref: '#/components/schemas/TemplateUpdate'
             examples:
               default:
-                summary: Request
                 value: {}
       responses:
         '200':
@@ -6998,7 +6828,6 @@ paths:
                 $ref: '#/components/schemas/Template'
               examples:
                 default:
-                  summary: Response
                   value:
                     id: 0192f4a0-7b1c-777d-8541-d21a5b1c8fe4
                     scope: personal
@@ -7126,7 +6955,6 @@ paths:
                 $ref: '#/components/schemas/ChannelViewList'
               examples:
                 default:
-                  summary: Response
                   value:
                     items:
                     - channel:
@@ -7172,7 +7000,6 @@ paths:
               $ref: '#/components/schemas/DmCreate'
             examples:
               default:
-                summary: Request
                 value:
                   participant_ids: [0192f4a0-7b1c-7324-80b6-deddeed437e3]
       responses:
@@ -7191,7 +7018,6 @@ paths:
                 $ref: '#/components/schemas/Channel'
               examples:
                 default:
-                  summary: Response
                   value:
                     id: 0192f4a0-7b1c-72d4-8bae-7661d2b2f203
                     kind: text
@@ -7277,7 +7103,6 @@ paths:
                 $ref: '#/components/schemas/IncomingWebhookList'
               examples:
                 default:
-                  summary: Response
                   value:
                     items:
                     - id: 0192f4a0-7b1c-784b-80fa-070d5a412eea
@@ -7314,7 +7139,6 @@ paths:
               $ref: '#/components/schemas/IncomingWebhookCreate'
             examples:
               default:
-                summary: Request
                 value:
                   app_id: 0192f4a0-7b1c-7895-82f8-463a64ff0fbe
                   name: Monitoring alerts
@@ -7334,7 +7158,6 @@ paths:
                 $ref: '#/components/schemas/IncomingWebhookCreated'
               examples:
                 default:
-                  summary: Response
                   value:
                     webhook:
                       id: 0192f4a0-7b1c-784b-80fa-070d5a412eea
@@ -7412,7 +7235,6 @@ paths:
               $ref: '#/components/schemas/IncomingWebhookPost'
             examples:
               default:
-                summary: Request
                 value:
                   content_md: Disk usage above threshold on build host.
                   title: Disk alert
@@ -7432,7 +7254,6 @@ paths:
                 $ref: '#/components/schemas/IncomingWebhookResult'
               examples:
                 default:
-                  summary: Response
                   value:
                     message_id: 0192f4a0-7b1c-7353-8d8c-dea659467151
                     thread_id: 0192f4a0-7b1c-78f9-8074-fa94e84bab7d
@@ -7490,7 +7311,6 @@ paths:
                 $ref: '#/components/schemas/ThreadPage'
               examples:
                 default:
-                  summary: Response
                   value:
                     items:
                     - id: 0192f4a0-7b1c-78f9-8074-fa94e84bab7d
@@ -7536,7 +7356,6 @@ paths:
               $ref: '#/components/schemas/ThreadCreate'
             examples:
               default:
-                summary: Request
                 value:
                   title: Invoice export fails
       responses:
@@ -7555,7 +7374,6 @@ paths:
                 $ref: '#/components/schemas/ThreadCreated'
               examples:
                 default:
-                  summary: Response
                   value:
                     thread:
                       id: 0192f4a0-7b1c-78f9-8074-fa94e84bab7d
@@ -7588,7 +7406,6 @@ paths:
                 $ref: '#/components/schemas/ThreadCreated'
               examples:
                 default:
-                  summary: Response
                   value:
                     thread:
                       id: 0192f4a0-7b1c-78f9-8074-fa94e84bab7d
@@ -7648,7 +7465,6 @@ paths:
                 $ref: '#/components/schemas/Thread'
               examples:
                 default:
-                  summary: Response
                   value:
                     id: 0192f4a0-7b1c-78f9-8074-fa94e84bab7d
                     channel_id: 0192f4a0-7b1c-72d4-8bae-7661d2b2f203
@@ -7695,7 +7511,6 @@ paths:
               $ref: '#/components/schemas/ThreadTitlePut'
             examples:
               default:
-                summary: Request
                 value:
                   title: Invoice export fails for March
       responses:
@@ -7716,7 +7531,6 @@ paths:
                 $ref: '#/components/schemas/Thread'
               examples:
                 default:
-                  summary: Response
                   value:
                     id: 0192f4a0-7b1c-78f9-8074-fa94e84bab7d
                     channel_id: 0192f4a0-7b1c-72d4-8bae-7661d2b2f203
@@ -7776,7 +7590,6 @@ paths:
                 $ref: '#/components/schemas/Thread'
               examples:
                 default:
-                  summary: Response
                   value:
                     id: 0192f4a0-7b1c-78f9-8074-fa94e84bab7d
                     channel_id: 0192f4a0-7b1c-72d4-8bae-7661d2b2f203
@@ -7834,7 +7647,6 @@ paths:
                 $ref: '#/components/schemas/Thread'
               examples:
                 default:
-                  summary: Response
                   value:
                     id: 0192f4a0-7b1c-78f9-8074-fa94e84bab7d
                     channel_id: 0192f4a0-7b1c-72d4-8bae-7661d2b2f203
@@ -7883,7 +7695,6 @@ paths:
               $ref: '#/components/schemas/ThreadMove'
             examples:
               default:
-                summary: Request
                 value:
                   target_channel_id: 0192f4a0-7b1c-77d1-8cf4-a695a7985d2f
                   reason: Belongs to billing
@@ -7903,7 +7714,6 @@ paths:
                 $ref: '#/components/schemas/Thread'
               examples:
                 default:
-                  summary: Response
                   value:
                     id: 0192f4a0-7b1c-78f9-8074-fa94e84bab7d
                     channel_id: 0192f4a0-7b1c-77d1-8cf4-a695a7985d2f
@@ -7954,7 +7764,6 @@ paths:
               $ref: '#/components/schemas/ThreadTagsPut'
             examples:
               default:
-                summary: Request
                 value:
                   tag_ids: [0192f4a0-7b1c-712d-8017-1dad64203598]
       responses:
@@ -7975,7 +7784,6 @@ paths:
                 $ref: '#/components/schemas/Thread'
               examples:
                 default:
-                  summary: Response
                   value:
                     id: 0192f4a0-7b1c-78f9-8074-fa94e84bab7d
                     channel_id: 0192f4a0-7b1c-72d4-8bae-7661d2b2f203
@@ -8030,7 +7838,6 @@ paths:
                 $ref: '#/components/schemas/AgentSessionList'
               examples:
                 default:
-                  summary: Response
                   value:
                     items:
                     - id: 0192f4a0-7b1c-741b-8617-885056753dc0
@@ -8085,7 +7892,6 @@ paths:
                 $ref: '#/components/schemas/AgentSession'
               examples:
                 default:
-                  summary: Response
                   value:
                     id: 0192f4a0-7b1c-741b-8617-885056753dc0
                     thread_id: 0192f4a0-7b1c-78f9-8074-fa94e84bab7d
@@ -8135,7 +7941,6 @@ paths:
               $ref: '#/components/schemas/AgentSessionBind'
             examples:
               default:
-                summary: Request
                 value:
                   external_session_ref: sess-7f3a
       responses:
@@ -8154,7 +7959,6 @@ paths:
                 $ref: '#/components/schemas/AgentSession'
               examples:
                 default:
-                  summary: Response
                   value:
                     id: 0192f4a0-7b1c-741b-8617-885056753dc0
                     thread_id: 0192f4a0-7b1c-78f9-8074-fa94e84bab7d
@@ -8204,7 +8008,6 @@ paths:
               $ref: '#/components/schemas/AgentSessionReport'
             examples:
               default:
-                summary: Request
                 value:
                   external_session_ref: sess-7f3a
                   model: model-large
@@ -8224,7 +8027,6 @@ paths:
                 $ref: '#/components/schemas/AgentSession'
               examples:
                 default:
-                  summary: Response
                   value:
                     id: 0192f4a0-7b1c-741b-8617-885056753dc0
                     thread_id: 0192f4a0-7b1c-78f9-8074-fa94e84bab7d
@@ -8281,7 +8083,6 @@ paths:
                 $ref: '#/components/schemas/RunSummaryPage'
               examples:
                 default:
-                  summary: Response
                   value:
                     items:
                     - id: 0192f4a0-7b1c-767f-8292-c1b14d7d40df
@@ -8339,7 +8140,6 @@ paths:
                 $ref: '#/components/schemas/CostBreakdown'
               examples:
                 default:
-                  summary: Response
                   value:
                     thread_id: 0192f4a0-7b1c-78f9-8074-fa94e84bab7d
                     total:
@@ -8391,7 +8191,6 @@ paths:
                 $ref: '#/components/schemas/PinList'
               examples:
                 default:
-                  summary: Response
                   value:
                     items:
                     - message_id: 0192f4a0-7b1c-7353-8d8c-dea659467151
@@ -8428,7 +8227,6 @@ paths:
               $ref: '#/components/schemas/ReadStatePut'
             examples:
               default:
-                summary: Request
                 value:
                   last_read_seq: 42
       responses:
@@ -8447,7 +8245,6 @@ paths:
                 $ref: '#/components/schemas/ReadState'
               examples:
                 default:
-                  summary: Response
                   value:
                     thread_id: 0192f4a0-7b1c-78f9-8074-fa94e84bab7d
                     channel_id: 0192f4a0-7b1c-72d4-8bae-7661d2b2f203
@@ -8486,7 +8283,6 @@ paths:
               $ref: '#/components/schemas/ReadStatePut'
             examples:
               default:
-                summary: Request
                 value:
                   last_read_seq: 42
       responses:
@@ -8507,7 +8303,6 @@ paths:
                 $ref: '#/components/schemas/ReadState'
               examples:
                 default:
-                  summary: Response
                   value:
                     thread_id: 0192f4a0-7b1c-78f9-8074-fa94e84bab7d
                     channel_id: 0192f4a0-7b1c-72d4-8bae-7661d2b2f203
@@ -8550,7 +8345,6 @@ paths:
               $ref: '#/components/schemas/DraftPut'
             examples:
               default:
-                summary: Request
                 value:
                   content_md: Draft of a reply
       responses:
@@ -8569,7 +8363,6 @@ paths:
                 $ref: '#/components/schemas/DraftPutResult'
               examples:
                 default:
-                  summary: Response
                   value:
                     draft:
                       id: 0192f4a0-7b1c-7ad4-8297-1c4f06dd683c
@@ -8638,7 +8431,6 @@ paths:
               $ref: '#/components/schemas/DraftPut'
             examples:
               default:
-                summary: Request
                 value:
                   content_md: Draft of a reply
       responses:
@@ -8657,7 +8449,6 @@ paths:
                 $ref: '#/components/schemas/DraftPutResult'
               examples:
                 default:
-                  summary: Response
                   value:
                     draft:
                       id: 0192f4a0-7b1c-7ad4-8297-1c4f06dd683c
@@ -8760,7 +8551,6 @@ paths:
                 $ref: '#/components/schemas/MessagePage'
               examples:
                 default:
-                  summary: Response
                   value:
                     items:
                     - id: 0192f4a0-7b1c-7353-8d8c-dea659467151
@@ -8849,7 +8639,6 @@ paths:
               $ref: '#/components/schemas/MessageCreate'
             examples:
               default:
-                summary: Request
                 value:
                   client_msg_id: 0192f4a0-7b1c-7f4e-8959-c3574b6ad93b
                   content_md: '@support-agent the invoice export fails since this morning.'
@@ -8869,7 +8658,6 @@ paths:
                 $ref: '#/components/schemas/Message'
               examples:
                 default:
-                  summary: Response
                   value:
                     id: 0192f4a0-7b1c-7353-8d8c-dea659467151
                     thread_id: 0192f4a0-7b1c-78f9-8074-fa94e84bab7d
@@ -8938,7 +8726,6 @@ paths:
                 $ref: '#/components/schemas/Message'
               examples:
                 default:
-                  summary: Response
                   value:
                     id: 0192f4a0-7b1c-7353-8d8c-dea659467151
                     thread_id: 0192f4a0-7b1c-78f9-8074-fa94e84bab7d
@@ -9036,7 +8823,6 @@ paths:
                 $ref: '#/components/schemas/Message'
               examples:
                 default:
-                  summary: Response
                   value:
                     id: 0192f4a0-7b1c-7353-8d8c-dea659467151
                     thread_id: 0192f4a0-7b1c-78f9-8074-fa94e84bab7d
@@ -9119,7 +8905,6 @@ paths:
               $ref: '#/components/schemas/MessageUpdate'
             examples:
               default:
-                summary: Request
                 value:
                   content_md: '@support-agent the invoice export fails since 08:00.'
       responses:
@@ -9140,7 +8925,6 @@ paths:
                 $ref: '#/components/schemas/Message'
               examples:
                 default:
-                  summary: Response
                   value:
                     id: 0192f4a0-7b1c-7353-8d8c-dea659467151
                     thread_id: 0192f4a0-7b1c-78f9-8074-fa94e84bab7d
@@ -9273,7 +9057,6 @@ paths:
                 $ref: '#/components/schemas/MessageRevisionList'
               examples:
                 default:
-                  summary: Response
                   value:
                     items:
                     - revision: 1
@@ -9325,7 +9108,6 @@ paths:
                 $ref: '#/components/schemas/ReactionPage'
               examples:
                 default:
-                  summary: Response
                   value:
                     items:
                     - emoji: 👍
@@ -9499,7 +9281,6 @@ paths:
               $ref: '#/components/schemas/InteractionCreate'
             examples:
               default:
-                summary: Request
                 value:
                   client_interaction_id: 0192f4a0-7b1c-704d-8f46-22a420803f92
       responses:
@@ -9518,7 +9299,6 @@ paths:
                 $ref: '#/components/schemas/Interaction'
               examples:
                 default:
-                  summary: Response
                   value:
                     id: 0192f4a0-7b1c-77f5-8fe4-151103a7b8b5
                     component_id: 0192f4a0-7b1c-7080-8a1e-eb7183f5a9a2
@@ -9546,7 +9326,6 @@ paths:
                 $ref: '#/components/schemas/Interaction'
               examples:
                 default:
-                  summary: Response
                   value:
                     id: 0192f4a0-7b1c-77f5-8fe4-151103a7b8b5
                     component_id: 0192f4a0-7b1c-7080-8a1e-eb7183f5a9a2
@@ -9593,7 +9372,6 @@ paths:
               $ref: '#/components/schemas/ComponentUpdate'
             examples:
               default:
-                summary: Request
                 value: {}
       responses:
         '200':
@@ -9613,7 +9391,6 @@ paths:
                 $ref: '#/components/schemas/Component'
               examples:
                 default:
-                  summary: Response
                   value:
                     id: 0192f4a0-7b1c-7080-8a1e-eb7183f5a9a2
                     custom_id: approve-refund
@@ -9661,7 +9438,6 @@ paths:
               $ref: '#/components/schemas/InteractionRespond'
             examples:
               default:
-                summary: Request
                 value:
                   state: acknowledged
       responses:
@@ -9680,7 +9456,6 @@ paths:
                 $ref: '#/components/schemas/Interaction'
               examples:
                 default:
-                  summary: Response
                   value:
                     id: 0192f4a0-7b1c-77f5-8fe4-151103a7b8b5
                     component_id: 0192f4a0-7b1c-7080-8a1e-eb7183f5a9a2
@@ -9724,7 +9499,6 @@ paths:
               $ref: '#/components/schemas/UploadCreate'
             examples:
               default:
-                summary: Request
                 value:
                   name: screenshot.png
                   size_bytes: 48213
@@ -9745,7 +9519,6 @@ paths:
                 $ref: '#/components/schemas/UploadSession'
               examples:
                 default:
-                  summary: Response
                   value:
                     file_id: 0192f4a0-7b1c-75c7-88f6-199cc394b56a
                     mode: direct
@@ -9810,7 +9583,6 @@ paths:
                 $ref: '#/components/schemas/UploadPartResult'
               examples:
                 default:
-                  summary: Response
                   value:
                     part_number: 1
                     etag: '"3858f62230ac3c915f300c664312c11f"'
@@ -9852,7 +9624,6 @@ paths:
               $ref: '#/components/schemas/UploadComplete'
             examples:
               default:
-                summary: Request
                 value:
                   parts:
                   - part_number: 1
@@ -9873,7 +9644,6 @@ paths:
                 $ref: '#/components/schemas/File'
               examples:
                 default:
-                  summary: Response
                   value:
                     id: 0192f4a0-7b1c-75c7-88f6-199cc394b56a
                     sha256: 9f86d081884c7d659a2feaa0c55ad015a3bf4f1b2b0b822cd15d6c15b0f00a08
@@ -9935,7 +9705,6 @@ paths:
                 $ref: '#/components/schemas/UploadState'
               examples:
                 default:
-                  summary: Response
                   value:
                     file_id: 0192f4a0-7b1c-75c7-88f6-199cc394b56a
                     upload_state: uploading
@@ -10012,7 +9781,6 @@ paths:
                 $ref: '#/components/schemas/File'
               examples:
                 default:
-                  summary: Response
                   value:
                     id: 0192f4a0-7b1c-75c7-88f6-199cc394b56a
                     sha256: 9f86d081884c7d659a2feaa0c55ad015a3bf4f1b2b0b822cd15d6c15b0f00a08
@@ -10190,7 +9958,6 @@ paths:
               $ref: '#/components/schemas/FileTicketCreate'
             examples:
               default:
-                summary: Request
                 value:
                   variant: original
       responses:
@@ -10209,7 +9976,6 @@ paths:
                 $ref: '#/components/schemas/FileTicket'
               examples:
                 default:
-                  summary: Response
                   value:
                     url: '/api/v1/files/0192f4a0-7b1c-75c7-88f6-199cc394b56a/content?ticket=c2lnbmVk'
                     expires_at: '2026-10-10T09:30:00.000Z'
@@ -10254,7 +10020,6 @@ paths:
                 $ref: '#/components/schemas/Transcript'
               examples:
                 default:
-                  summary: Response
                   value:
                     file_id: 0192f4a0-7b1c-75c7-88f6-199cc394b56a
                     status: none
@@ -10290,7 +10055,6 @@ paths:
               $ref: '#/components/schemas/TranscriptSubmit'
             examples:
               default:
-                summary: Request
                 value:
                   text: Please call the customer back tomorrow morning.
                   language: en
@@ -10310,7 +10074,6 @@ paths:
                 $ref: '#/components/schemas/Transcript'
               examples:
                 default:
-                  summary: Response
                   value:
                     file_id: 0192f4a0-7b1c-75c7-88f6-199cc394b56a
                     status: none
@@ -10356,7 +10119,6 @@ paths:
                 $ref: '#/components/schemas/Transcript'
               examples:
                 default:
-                  summary: Response
                   value:
                     file_id: 0192f4a0-7b1c-75c7-88f6-199cc394b56a
                     status: none
@@ -10491,7 +10253,6 @@ paths:
                 $ref: '#/components/schemas/SearchHitPage'
               examples:
                 default:
-                  summary: Response
                   value:
                     items:
                     - kind: message
@@ -10552,7 +10313,6 @@ paths:
                 $ref: '#/components/schemas/ThreadTitleHitList'
               examples:
                 default:
-                  summary: Response
                   value:
                     items:
                     - thread_id: 0192f4a0-7b1c-78f9-8074-fa94e84bab7d
@@ -10593,7 +10353,6 @@ paths:
                 $ref: '#/components/schemas/Snapshot'
               examples:
                 default:
-                  summary: Response
                   value:
                     head_seq: 5300
                     sync_epoch: 0192f4a0-7b1c-7a3e-8c41-5d2e9b7f1a60
@@ -10725,7 +10484,6 @@ paths:
                 $ref: '#/components/schemas/EventPage'
               examples:
                 default:
-                  summary: Response
                   value:
                     events:
                     - id: 0192f4a0-7b1c-7ff0-88b6-7d3b051173dd
@@ -10829,7 +10587,6 @@ paths:
                 $ref: '#/components/schemas/ReadStateList'
               examples:
                 default:
-                  summary: Response
                   value:
                     items:
                     - thread_id: 0192f4a0-7b1c-78f9-8074-fa94e84bab7d
@@ -10871,7 +10628,6 @@ paths:
                 $ref: '#/components/schemas/DraftList'
               examples:
                 default:
-                  summary: Response
                   value:
                     items:
                     - id: 0192f4a0-7b1c-7ad4-8297-1c4f06dd683c
@@ -10911,7 +10667,6 @@ paths:
                 $ref: '#/components/schemas/UserSettingList'
               examples:
                 default:
-                  summary: Response
                   value:
                     items:
                     - key: composer.enter_sends
@@ -10943,7 +10698,6 @@ paths:
               $ref: '#/components/schemas/UserSettingPut'
             examples:
               default:
-                summary: Request
                 value:
                   value: true
       responses:
@@ -10962,7 +10716,6 @@ paths:
                 $ref: '#/components/schemas/UserSetting'
               examples:
                 default:
-                  summary: Response
                   value:
                     key: composer.enter_sends
                     value: true
@@ -11036,7 +10789,6 @@ paths:
                 $ref: '#/components/schemas/NotificationPreferenceList'
               examples:
                 default:
-                  summary: Response
                   value:
                     items:
                     - target_kind: space
@@ -11077,7 +10829,6 @@ paths:
               $ref: '#/components/schemas/NotificationPreferencePut'
             examples:
               default:
-                summary: Request
                 value:
                   level: all
       responses:
@@ -11096,7 +10847,6 @@ paths:
                 $ref: '#/components/schemas/NotificationPreference'
               examples:
                 default:
-                  summary: Response
                   value:
                     target_kind: space
                     target_id: 0192f4a0-7b1c-7fd5-831e-d4370e087874
@@ -11175,7 +10925,6 @@ paths:
                 $ref: '#/components/schemas/QuietHoursList'
               examples:
                 default:
-                  summary: Response
                   value:
                     items:
                     - id: 0192f4a0-7b1c-7c3e-88ef-5d4efd8f4f24
@@ -11214,7 +10963,6 @@ paths:
               $ref: '#/components/schemas/QuietHoursRuleInput'
             examples:
               default:
-                summary: Request
                 value:
                   weekdays: 31
                   start_local: '22:00'
@@ -11237,7 +10985,6 @@ paths:
                 $ref: '#/components/schemas/QuietHoursRule'
               examples:
                 default:
-                  summary: Response
                   value:
                     id: 0192f4a0-7b1c-7c3e-88ef-5d4efd8f4f24
                     weekdays: 31
@@ -11280,7 +11027,6 @@ paths:
               $ref: '#/components/schemas/QuietHoursRuleInput'
             examples:
               default:
-                summary: Request
                 value:
                   weekdays: 31
                   start_local: '22:00'
@@ -11303,7 +11049,6 @@ paths:
                 $ref: '#/components/schemas/QuietHoursRule'
               examples:
                 default:
-                  summary: Response
                   value:
                     id: 0192f4a0-7b1c-7c3e-88ef-5d4efd8f4f24
                     weekdays: 31
@@ -11373,7 +11118,6 @@ paths:
               $ref: '#/components/schemas/ClientMetricsBatch'
             examples:
               default:
-                summary: Request
                 value:
                   platform: ios
                   app_version: 1.4.0
@@ -11439,7 +11183,6 @@ paths:
                 $ref: '#/components/schemas/AgentPage'
               examples:
                 default:
-                  summary: Response
                   value:
                     items:
                     - id: 0192f4a0-7b1c-7d07-84b0-358556a08a99
@@ -11480,7 +11223,6 @@ paths:
               $ref: '#/components/schemas/AgentCreate'
             examples:
               default:
-                summary: Request
                 value:
                   handle: support-agent
                   display_name: Support Agent
@@ -11502,7 +11244,6 @@ paths:
                 $ref: '#/components/schemas/Agent'
               examples:
                 default:
-                  summary: Response
                   value:
                     id: 0192f4a0-7b1c-7d07-84b0-358556a08a99
                     handle: support-agent
@@ -11559,7 +11300,6 @@ paths:
                 $ref: '#/components/schemas/Agent'
               examples:
                 default:
-                  summary: Response
                   value:
                     id: 0192f4a0-7b1c-7d07-84b0-358556a08a99
                     handle: support-agent
@@ -11604,7 +11344,6 @@ paths:
               $ref: '#/components/schemas/AgentUpdate'
             examples:
               default:
-                summary: Request
                 value:
                   display_name: Support Agent
       responses:
@@ -11625,7 +11364,6 @@ paths:
                 $ref: '#/components/schemas/Agent'
               examples:
                 default:
-                  summary: Response
                   value:
                     id: 0192f4a0-7b1c-7d07-84b0-358556a08a99
                     handle: support-agent
@@ -11677,7 +11415,6 @@ paths:
               $ref: '#/components/schemas/ReasonBody'
             examples:
               default:
-                summary: Request
                 value:
                   reason: Left the team
       responses:
@@ -11696,7 +11433,6 @@ paths:
                 $ref: '#/components/schemas/Agent'
               examples:
                 default:
-                  summary: Response
                   value:
                     id: 0192f4a0-7b1c-7d07-84b0-358556a08a99
                     handle: support-agent
@@ -11744,7 +11480,6 @@ paths:
               $ref: '#/components/schemas/ReasonBody'
             examples:
               default:
-                summary: Request
                 value:
                   reason: Left the team
       responses:
@@ -11763,7 +11498,6 @@ paths:
                 $ref: '#/components/schemas/Agent'
               examples:
                 default:
-                  summary: Response
                   value:
                     id: 0192f4a0-7b1c-7d07-84b0-358556a08a99
                     handle: support-agent
@@ -11816,7 +11550,6 @@ paths:
               $ref: '#/components/schemas/BillingModeSet'
             examples:
               default:
-                summary: Request
                 value:
                   billing_mode: personal
                   reason: Team uses the agent now
@@ -11838,7 +11571,6 @@ paths:
                 $ref: '#/components/schemas/Agent'
               examples:
                 default:
-                  summary: Response
                   value:
                     id: 0192f4a0-7b1c-7d07-84b0-358556a08a99
                     handle: support-agent
@@ -11890,7 +11622,6 @@ paths:
               $ref: '#/components/schemas/CredentialHolderSet'
             examples:
               default:
-                summary: Request
                 value:
                   credential_holder_id: 0192f4a0-7b1c-7ae9-8d74-7494cd730bc3
                   reason: Handover to deputy
@@ -11912,7 +11643,6 @@ paths:
                 $ref: '#/components/schemas/Agent'
               examples:
                 default:
-                  summary: Response
                   value:
                     id: 0192f4a0-7b1c-7d07-84b0-358556a08a99
                     handle: support-agent
@@ -11966,7 +11696,6 @@ paths:
               $ref: '#/components/schemas/ToolClassSet'
             examples:
               default:
-                summary: Request
                 value:
                   tool_class: scoped
                   reason: Agent now works in a project checkout
@@ -11988,7 +11717,6 @@ paths:
                 $ref: '#/components/schemas/Agent'
               examples:
                 default:
-                  summary: Response
                   value:
                     id: 0192f4a0-7b1c-7d07-84b0-358556a08a99
                     handle: support-agent
@@ -12048,7 +11776,6 @@ paths:
                 $ref: '#/components/schemas/WebhookSubscriptionList'
               examples:
                 default:
-                  summary: Response
                   value:
                     items:
                     - id: 0192f4a0-7b1c-7b8e-8d3f-2a9c4e6f0b15
@@ -12089,7 +11816,6 @@ paths:
               $ref: '#/components/schemas/WebhookSubscriptionCreate'
             examples:
               default:
-                summary: Request
                 value:
                   url: https://hooks.example.com/agent
                   event_types: [agent.invocation, agent.followup, run.cancel_requested]
@@ -12138,7 +11864,6 @@ paths:
               $ref: '#/components/schemas/Heartbeat'
             examples:
               default:
-                summary: Request
                 value:
                   state: online
                   runtime_version: 2.3.1
@@ -12159,7 +11884,6 @@ paths:
                 $ref: '#/components/schemas/HeartbeatAck'
               examples:
                 default:
-                  summary: Response
                   value:
                     presence:
                       state: unknown
@@ -12201,7 +11925,6 @@ paths:
                 $ref: '#/components/schemas/ConsumerState'
               examples:
                 default:
-                  summary: Response
                   value:
                     consumer: default
                     acked_seq: 5301
@@ -12253,7 +11976,6 @@ paths:
                 $ref: '#/components/schemas/EventPage'
               examples:
                 default:
-                  summary: Response
                   value:
                     events:
                     - id: 0192f4a0-7b1c-7ff0-88b6-7d3b051173dd
@@ -12347,7 +12069,6 @@ paths:
               $ref: '#/components/schemas/ConsumerAck'
             examples:
               default:
-                summary: Request
                 value:
                   seq: 5301
       responses:
@@ -12366,7 +12087,6 @@ paths:
                 $ref: '#/components/schemas/ConsumerState'
               examples:
                 default:
-                  summary: Response
                   value:
                     consumer: default
                     acked_seq: 5301
@@ -12407,7 +12127,6 @@ paths:
                 $ref: '#/components/schemas/AgentChannelConfigList'
               examples:
                 default:
-                  summary: Response
                   value:
                     items:
                     - channel_id: 0192f4a0-7b1c-72d4-8bae-7661d2b2f203
@@ -12457,7 +12176,6 @@ paths:
                 $ref: '#/components/schemas/AgentChannelConfig'
               examples:
                 default:
-                  summary: Response
                   value:
                     channel_id: 0192f4a0-7b1c-72d4-8bae-7661d2b2f203
                     behavior:
@@ -12508,7 +12226,6 @@ paths:
                 $ref: '#/components/schemas/AgentTriggerers'
               examples:
                 default:
-                  summary: Response
                   value:
                     principal_ids: [0192f4a0-7b1c-7f89-8d6b-6960453241bc]
                     permission_version: 418
@@ -12553,7 +12270,6 @@ paths:
                 $ref: '#/components/schemas/RunSummaryPage'
               examples:
                 default:
-                  summary: Response
                   value:
                     items:
                     - id: 0192f4a0-7b1c-767f-8292-c1b14d7d40df
@@ -12611,7 +12327,6 @@ paths:
                 $ref: '#/components/schemas/Run'
               examples:
                 default:
-                  summary: Response
                   value:
                     id: 0192f4a0-7b1c-70cd-8013-27d7ac09a77f
                     thread_id: 0192f4a0-7b1c-78f9-8074-fa94e84bab7d
@@ -12675,7 +12390,6 @@ paths:
               $ref: '#/components/schemas/RunPatch'
             examples:
               default:
-                summary: Request
                 value:
                   base_version: 7
                   ops:
@@ -12697,7 +12411,6 @@ paths:
                 $ref: '#/components/schemas/RunPatchResult'
               examples:
                 default:
-                  summary: Response
                   value:
                     version: 8
         '400':
@@ -12750,7 +12463,6 @@ paths:
                 $ref: '#/components/schemas/RunStepPage'
               examples:
                 default:
-                  summary: Response
                   value:
                     items:
                     - id: 0192f4a0-7b1c-70f2-84b9-bdac58ce716b
@@ -12800,7 +12512,6 @@ paths:
                 $ref: '#/components/schemas/RunContext'
               examples:
                 default:
-                  summary: Response
                   value:
                     run_id: 0192f4a0-7b1c-7c4b-8f0e-4d2a6b1c9e30
                     context_floor_seq: 0
@@ -12854,7 +12565,6 @@ paths:
               $ref: '#/components/schemas/RunStart'
             examples:
               default:
-                summary: Request
                 value:
                   invocation_token: eyJhbGciOiJFZERTQSIsImtpZCI6Imludi0yMDI2LTEwIn0.e30.sig
                   billing_mode_used: personal
@@ -12876,7 +12586,6 @@ paths:
                 $ref: '#/components/schemas/Run'
               examples:
                 default:
-                  summary: Response
                   value:
                     id: 0192f4a0-7b1c-70cd-8013-27d7ac09a77f
                     thread_id: 0192f4a0-7b1c-78f9-8074-fa94e84bab7d
@@ -12942,7 +12651,6 @@ paths:
               $ref: '#/components/schemas/RunStart'
             examples:
               default:
-                summary: Request
                 value:
                   invocation_token: eyJhbGciOiJFZERTQSIsImtpZCI6Imludi0yMDI2LTEwIn0.e30.sig
                   billing_mode_used: personal
@@ -12964,7 +12672,6 @@ paths:
                 $ref: '#/components/schemas/Run'
               examples:
                 default:
-                  summary: Response
                   value:
                     id: 0192f4a0-7b1c-70cd-8013-27d7ac09a77f
                     thread_id: 0192f4a0-7b1c-78f9-8074-fa94e84bab7d
@@ -13029,7 +12736,6 @@ paths:
               $ref: '#/components/schemas/RunAwaitInput'
             examples:
               default:
-                summary: Request
                 value:
                   status_line: Waiting for approval
       responses:
@@ -13048,7 +12754,6 @@ paths:
                 $ref: '#/components/schemas/Run'
               examples:
                 default:
-                  summary: Response
                   value:
                     id: 0192f4a0-7b1c-70cd-8013-27d7ac09a77f
                     thread_id: 0192f4a0-7b1c-78f9-8074-fa94e84bab7d
@@ -13114,7 +12819,6 @@ paths:
               $ref: '#/components/schemas/RunFinish'
             examples:
               default:
-                summary: Request
                 value:
                   state: completed
                   reason: adapter_error
@@ -13135,7 +12839,6 @@ paths:
                 $ref: '#/components/schemas/Run'
               examples:
                 default:
-                  summary: Response
                   value:
                     id: 0192f4a0-7b1c-70cd-8013-27d7ac09a77f
                     thread_id: 0192f4a0-7b1c-78f9-8074-fa94e84bab7d
@@ -13203,7 +12906,6 @@ paths:
               $ref: '#/components/schemas/RunCancel'
             examples:
               default:
-                summary: Request
                 value:
                   reason: Wrong ticket
       responses:
@@ -13222,7 +12924,6 @@ paths:
                 $ref: '#/components/schemas/RunSummary'
               examples:
                 default:
-                  summary: Response
                   value:
                     id: 0192f4a0-7b1c-767f-8292-c1b14d7d40df
                     thread_id: 0192f4a0-7b1c-78f9-8074-fa94e84bab7d
@@ -13281,7 +12982,6 @@ paths:
                 $ref: '#/components/schemas/CommandList'
               examples:
                 default:
-                  summary: Response
                   value:
                     items:
                     - id: 0192f4a0-7b1c-7beb-80fc-f336f4fe79aa
@@ -13327,7 +13027,6 @@ paths:
               $ref: '#/components/schemas/CommandRegister'
             examples:
               default:
-                summary: Request
                 value:
                   name: escalate
                   description: Escalate the ticket to second level
@@ -13347,7 +13046,6 @@ paths:
                 $ref: '#/components/schemas/Command'
               examples:
                 default:
-                  summary: Response
                   value:
                     id: 0192f4a0-7b1c-7beb-80fc-f336f4fe79aa
                     owner_principal_id: 0192f4a0-7b1c-7176-8de0-ddf186d11091
@@ -13404,7 +13102,6 @@ paths:
                 $ref: '#/components/schemas/Command'
               examples:
                 default:
-                  summary: Response
                   value:
                     id: 0192f4a0-7b1c-7beb-80fc-f336f4fe79aa
                     owner_principal_id: 0192f4a0-7b1c-7176-8de0-ddf186d11091
@@ -13448,7 +13145,6 @@ paths:
               $ref: '#/components/schemas/CommandRegister'
             examples:
               default:
-                summary: Request
                 value:
                   name: escalate
                   description: Escalate the ticket to second level
@@ -13470,7 +13166,6 @@ paths:
                 $ref: '#/components/schemas/Command'
               examples:
                 default:
-                  summary: Response
                   value:
                     id: 0192f4a0-7b1c-7beb-80fc-f336f4fe79aa
                     owner_principal_id: 0192f4a0-7b1c-7176-8de0-ddf186d11091
@@ -13554,7 +13249,6 @@ paths:
               $ref: '#/components/schemas/AutocompleteQuery'
             examples:
               default:
-                summary: Request
                 value:
                   option: ticket
                   value: '47'
@@ -13574,7 +13268,6 @@ paths:
                 $ref: '#/components/schemas/AutocompleteResult'
               examples:
                 default:
-                  summary: Response
                   value:
                     choices:
                     - name: High priority
@@ -13611,7 +13304,6 @@ paths:
               $ref: '#/components/schemas/CommandInvoke'
             examples:
               default:
-                summary: Request
                 value: {}
       responses:
         '202':
@@ -13629,7 +13321,6 @@ paths:
                 $ref: '#/components/schemas/CommandInvocation'
               examples:
                 default:
-                  summary: Response
                   value:
                     invocation_id: 0192f4a0-7b1c-712e-8ccb-17c85f8d11c9
                     command_id: 0192f4a0-7b1c-7beb-80fc-f336f4fe79aa
@@ -13670,7 +13361,6 @@ paths:
               $ref: '#/components/schemas/AutocompleteAnswer'
             examples:
               default:
-                summary: Request
                 value:
                   choices:
                   - name: High priority
@@ -13726,7 +13416,6 @@ paths:
                 $ref: '#/components/schemas/AppPage'
               examples:
                 default:
-                  summary: Response
                   value:
                     items:
                     - id: 0192f4a0-7b1c-7895-82f8-463a64ff0fbe
@@ -13784,7 +13473,6 @@ paths:
               $ref: '#/components/schemas/AppInstall'
             examples:
               default:
-                summary: Request
                 value:
                   manifest:
                     schema_version: 1
@@ -13822,7 +13510,6 @@ paths:
                 $ref: '#/components/schemas/App'
               examples:
                 default:
-                  summary: Response
                   value:
                     id: 0192f4a0-7b1c-7895-82f8-463a64ff0fbe
                     slug: ticket-sync
@@ -13884,7 +13571,6 @@ paths:
               $ref: '#/components/schemas/AppManifest'
             examples:
               default:
-                summary: Request
                 value:
                   schema_version: 1
                   slug: ticket-sync
@@ -13918,7 +13604,6 @@ paths:
                 $ref: '#/components/schemas/ManifestValidation'
               examples:
                 default:
-                  summary: Response
                   value:
                     valid: false
                     errors:
@@ -13961,7 +13646,6 @@ paths:
                 $ref: '#/components/schemas/App'
               examples:
                 default:
-                  summary: Response
                   value:
                     id: 0192f4a0-7b1c-7895-82f8-463a64ff0fbe
                     slug: ticket-sync
@@ -14022,7 +13706,6 @@ paths:
               $ref: '#/components/schemas/AppInstall'
             examples:
               default:
-                summary: Request
                 value:
                   manifest:
                     schema_version: 1
@@ -14060,7 +13743,6 @@ paths:
                 $ref: '#/components/schemas/App'
               examples:
                 default:
-                  summary: Response
                   value:
                     id: 0192f4a0-7b1c-7895-82f8-463a64ff0fbe
                     slug: ticket-sync
@@ -14123,7 +13805,6 @@ paths:
               $ref: '#/components/schemas/AppScopesPut'
             examples:
               default:
-                summary: Request
                 value:
                   granted_scopes: ['events:subscribe', 'messages:read', 'messages:write']
                   event_subscriptions: [message.created]
@@ -14144,7 +13825,6 @@ paths:
                 $ref: '#/components/schemas/App'
               examples:
                 default:
-                  summary: Response
                   value:
                     id: 0192f4a0-7b1c-7895-82f8-463a64ff0fbe
                     slug: ticket-sync
@@ -14274,7 +13954,6 @@ paths:
               $ref: '#/components/schemas/ReasonBody'
             examples:
               default:
-                summary: Request
                 value:
                   reason: Left the team
       responses:
@@ -14327,7 +14006,6 @@ paths:
                 $ref: '#/components/schemas/WebhookSubscriptionList'
               examples:
                 default:
-                  summary: Response
                   value:
                     items:
                     - id: 0192f4a0-7b1c-7e12-8162-c8db90be34b1
@@ -14369,7 +14047,6 @@ paths:
               $ref: '#/components/schemas/WebhookSubscriptionCreate'
             examples:
               default:
-                summary: Request
                 value:
                   url: https://hooks.example.com/chat
                   event_types: [message.created]
@@ -14389,7 +14066,6 @@ paths:
                 $ref: '#/components/schemas/WebhookSubscriptionCreated'
               examples:
                 default:
-                  summary: Response
                   value:
                     subscription:
                       id: 0192f4a0-7b1c-7e12-8162-c8db90be34b1
@@ -14438,7 +14114,6 @@ paths:
               $ref: '#/components/schemas/WebhookSubscriptionUpdate'
             examples:
               default:
-                summary: Request
                 value: {}
       responses:
         '200':
@@ -14456,7 +14131,6 @@ paths:
                 $ref: '#/components/schemas/WebhookSubscriptionCreated'
               examples:
                 default:
-                  summary: Response
                   value:
                     subscription:
                       id: 0192f4a0-7b1c-7e12-8162-c8db90be34b1
@@ -14548,7 +14222,6 @@ paths:
                 $ref: '#/components/schemas/WebhookDeliveryPage'
               examples:
                 default:
-                  summary: Response
                   value:
                     items:
                     - id: 0192f4a0-7b1c-73de-870f-6ce6fa448f1e
@@ -14599,7 +14272,6 @@ paths:
                 $ref: '#/components/schemas/WebhookDelivery'
               examples:
                 default:
-                  summary: Response
                   value:
                     id: 0192f4a0-7b1c-73de-870f-6ce6fa448f1e
                     subscription_id: 0192f4a0-7b1c-756c-88a8-bf72a9fa67f3
@@ -14688,7 +14360,6 @@ paths:
                 $ref: '#/components/schemas/AuditEventPage'
               examples:
                 default:
-                  summary: Response
                   value:
                     items:
                     - seq: 5301
@@ -14773,7 +14444,6 @@ paths:
               $ref: '#/components/schemas/AuditVerifyRequest'
             examples:
               default:
-                summary: Request
                 value: {}
       responses:
         '200':
@@ -14791,7 +14461,6 @@ paths:
                 $ref: '#/components/schemas/AuditVerifyResult'
               examples:
                 default:
-                  summary: Response
                   value:
                     ok: true
                     checked_from_seq: 1
@@ -14857,7 +14526,6 @@ paths:
                 $ref: '#/components/schemas/StatsSeries'
               examples:
                 default:
-                  summary: Response
                   value:
                     granularity: hour
                     buckets:
@@ -14929,7 +14597,6 @@ paths:
                 $ref: '#/components/schemas/StatsSeries'
               examples:
                 default:
-                  summary: Response
                   value:
                     granularity: hour
                     buckets:
@@ -14999,7 +14666,6 @@ paths:
                 $ref: '#/components/schemas/StatsSeries'
               examples:
                 default:
-                  summary: Response
                   value:
                     granularity: hour
                     buckets:
@@ -15066,7 +14732,6 @@ paths:
                 $ref: '#/components/schemas/StatsSeries'
               examples:
                 default:
-                  summary: Response
                   value:
                     granularity: hour
                     buckets:
@@ -15141,7 +14806,6 @@ paths:
                 $ref: '#/components/schemas/CostSeries'
               examples:
                 default:
-                  summary: Response
                   value:
                     granularity: hour
                     currency: USD
@@ -15192,7 +14856,6 @@ paths:
                 $ref: '#/components/schemas/StatsLiveFrame'
               examples:
                 default:
-                  summary: Response
                   value:
                     at: '2026-10-10T09:30:00.000Z'
                     interval_ms: 1000
@@ -15297,7 +14960,6 @@ paths:
                 $ref: '#/components/schemas/StatsTimeline'
               examples:
                 default:
-                  summary: Response
                   value:
                     from: '2026-10-10T00:00:00.000Z'
                     to: '2026-10-11T00:00:00.000Z'
@@ -15357,7 +15019,6 @@ paths:
                 $ref: '#/components/schemas/StatsSloReport'
               examples:
                 default:
-                  summary: Response
                   value:
                     at: '2026-10-10T09:30:00.000Z'
                     measured_by: own
@@ -15424,7 +15085,6 @@ paths:
                 $ref: '#/components/schemas/StatsBackendReport'
               examples:
                 default:
-                  summary: Response
                   value:
                     items:
                     - agent_id: 0192f4a0-7b1c-7000-8a00-000000000401
@@ -15479,7 +15139,6 @@ paths:
                 $ref: '#/components/schemas/PriceList'
               examples:
                 default:
-                  summary: Response
                   value:
                     items:
                     - id: 0192f4a0-7b1c-7096-8437-e1ee469c906c
@@ -15515,7 +15174,6 @@ paths:
               $ref: '#/components/schemas/PriceCreate'
             examples:
               default:
-                summary: Request
                 value:
                   provider: anthropic
                   model: model-large
@@ -15541,7 +15199,6 @@ paths:
                 $ref: '#/components/schemas/Price'
               examples:
                 default:
-                  summary: Response
                   value:
                     id: 0192f4a0-7b1c-7096-8437-e1ee469c906c
                     provider: anthropic
@@ -15585,7 +15242,6 @@ paths:
               $ref: '#/components/schemas/PriceClose'
             examples:
               default:
-                summary: Request
                 value:
                   valid_to: '2026-10-10T09:30:00.000Z'
       responses:
@@ -15604,7 +15260,6 @@ paths:
                 $ref: '#/components/schemas/Price'
               examples:
                 default:
-                  summary: Response
                   value:
                     id: 0192f4a0-7b1c-7096-8437-e1ee469c906c
                     provider: anthropic
@@ -15649,7 +15304,6 @@ paths:
               $ref: '#/components/schemas/CostReconcile'
             examples:
               default:
-                summary: Request
                 value:
                   provider: anthropic
                   period_start: '2026-10-10T09:30:00.000Z'
@@ -15674,7 +15328,6 @@ paths:
                 $ref: '#/components/schemas/CostReconcileResult'
               examples:
                 default:
-                  summary: Response
                   value:
                     reconciled: 1
                     unmatched_run_ids: [0192f4a0-7b1c-7250-807f-c268a7b21797]
@@ -15758,7 +15411,6 @@ paths:
                 $ref: '#/components/schemas/StatusPage'
               examples:
                 default:
-                  summary: Response
                   value:
                     overall_state: operational
                     components:
@@ -15815,7 +15467,6 @@ paths:
                 $ref: '#/components/schemas/StatusPage'
               examples:
                 default:
-                  summary: Response
                   value:
                     overall_state: operational
                     components:
@@ -15864,7 +15515,6 @@ paths:
               $ref: '#/components/schemas/StatusComponentInput'
             examples:
               default:
-                summary: Request
                 value:
                   name: Messages
       responses:
@@ -15883,7 +15533,6 @@ paths:
                 $ref: '#/components/schemas/StatusComponent'
               examples:
                 default:
-                  summary: Response
                   value:
                     id: 0192f4a0-7b1c-7cbd-8bdb-de45278e4e7b
                     name: Messages
@@ -15923,7 +15572,6 @@ paths:
               $ref: '#/components/schemas/StatusComponentInput'
             examples:
               default:
-                summary: Request
                 value:
                   name: Messages
       responses:
@@ -15942,7 +15590,6 @@ paths:
                 $ref: '#/components/schemas/StatusComponent'
               examples:
                 default:
-                  summary: Response
                   value:
                     id: 0192f4a0-7b1c-7cbd-8bdb-de45278e4e7b
                     name: Messages
@@ -16013,7 +15660,6 @@ paths:
               $ref: '#/components/schemas/StatusIncidentCreate'
             examples:
               default:
-                summary: Request
                 value:
                   title: Push notifications delayed
                   kind: incident
@@ -16037,7 +15683,6 @@ paths:
                 $ref: '#/components/schemas/StatusIncident'
               examples:
                 default:
-                  summary: Response
                   value:
                     id: 0192f4a0-7b1c-7b46-88f5-a7d58fbd8809
                     title: Push notifications delayed
@@ -16082,7 +15727,6 @@ paths:
               $ref: '#/components/schemas/StatusIncidentUpdateCreate'
             examples:
               default:
-                summary: Request
                 value:
                   state: scheduled
                   body_md: Delays are resolved.
@@ -16102,7 +15746,6 @@ paths:
                 $ref: '#/components/schemas/StatusIncident'
               examples:
                 default:
-                  summary: Response
                   value:
                     id: 0192f4a0-7b1c-7b46-88f5-a7d58fbd8809
                     title: Push notifications delayed
@@ -16157,7 +15800,6 @@ paths:
                 $ref: '#/components/schemas/ImportSourcePage'
               examples:
                 default:
-                  summary: Response
                   value:
                     items:
                     - id: 0192f4a0-7b1c-78d2-8a6a-ec465435b8a0
@@ -16193,7 +15835,6 @@ paths:
               $ref: '#/components/schemas/ImportSourceCreate'
             examples:
               default:
-                summary: Request
                 value:
                   kind: discord
                   name: Old community server
@@ -16214,7 +15855,6 @@ paths:
                 $ref: '#/components/schemas/ImportSource'
               examples:
                 default:
-                  summary: Response
                   value:
                     id: 0192f4a0-7b1c-78d2-8a6a-ec465435b8a0
                     kind: discord
@@ -16261,7 +15901,6 @@ paths:
                 $ref: '#/components/schemas/ImportSource'
               examples:
                 default:
-                  summary: Response
                   value:
                     id: 0192f4a0-7b1c-78d2-8a6a-ec465435b8a0
                     kind: discord
@@ -16315,7 +15954,6 @@ paths:
                 $ref: '#/components/schemas/ImportItemPage'
               examples:
                 default:
-                  summary: Response
                   value:
                     items:
                     - id: 0192f4a0-7b1c-7e43-8919-6113546a4c70
@@ -16362,7 +16000,6 @@ paths:
                 $ref: '#/components/schemas/ImportSource'
               examples:
                 default:
-                  summary: Response
                   value:
                     id: 0192f4a0-7b1c-78d2-8a6a-ec465435b8a0
                     kind: discord
@@ -16414,7 +16051,6 @@ paths:
                 $ref: '#/components/schemas/ImportSource'
               examples:
                 default:
-                  summary: Response
                   value:
                     id: 0192f4a0-7b1c-78d2-8a6a-ec465435b8a0
                     kind: discord
@@ -16466,7 +16102,6 @@ paths:
                 $ref: '#/components/schemas/ImportSource'
               examples:
                 default:
-                  summary: Response
                   value:
                     id: 0192f4a0-7b1c-78d2-8a6a-ec465435b8a0
                     kind: discord
@@ -16520,7 +16155,6 @@ paths:
                 $ref: '#/components/schemas/ImportSource'
               examples:
                 default:
-                  summary: Response
                   value:
                     id: 0192f4a0-7b1c-78d2-8a6a-ec465435b8a0
                     kind: discord
@@ -16563,7 +16197,6 @@ paths:
               $ref: '#/components/schemas/ImportLeadSet'
             examples:
               default:
-                summary: Request
                 value:
                   source_channel: '1029384000'
                   lead: bothy
@@ -16583,7 +16216,6 @@ paths:
                 $ref: '#/components/schemas/ImportSource'
               examples:
                 default:
-                  summary: Response
                   value:
                     id: 0192f4a0-7b1c-78d2-8a6a-ec465435b8a0
                     kind: discord
@@ -16627,7 +16259,6 @@ paths:
               $ref: '#/components/schemas/ImportBatch'
             examples:
               default:
-                summary: Request
                 value:
                   thread_origin_key: 'thread:1029384700'
                   items:
@@ -16653,7 +16284,6 @@ paths:
                 $ref: '#/components/schemas/ImportBatchResult'
               examples:
                 default:
-                  summary: Response
                   value:
                     items:
                     - id: 0192f4a0-7b1c-7e43-8919-6113546a4c70
@@ -16701,7 +16331,6 @@ paths:
               $ref: '#/components/schemas/ImportFileCreate'
             examples:
               default:
-                summary: Request
                 value:
                   origin_key: 'file:1029384799'
                   channel_id: 0192f4a0-7b1c-72d4-8bae-7661d2b2f203
@@ -16758,7 +16387,6 @@ paths:
               $ref: '#/components/schemas/ImportCursorSet'
             examples:
               default:
-                summary: Request
                 value:
                   cursor: {}
       responses:
@@ -16777,7 +16405,6 @@ paths:
                 $ref: '#/components/schemas/ImportSource'
               examples:
                 default:
-                  summary: Response
                   value:
                     id: 0192f4a0-7b1c-78d2-8a6a-ec465435b8a0
                     kind: discord
@@ -16837,7 +16464,6 @@ paths:
                 $ref: '#/components/schemas/GdprRequestPage'
               examples:
                 default:
-                  summary: Response
                   value:
                     items:
                     - id: 0192f4a0-7b1c-7ac0-85c3-2e83fd50d9e7
@@ -16874,7 +16500,6 @@ paths:
               $ref: '#/components/schemas/GdprRequestCreate'
             examples:
               default:
-                summary: Request
                 value:
                   kind: export
                   reason: Request by the person
@@ -16894,7 +16519,6 @@ paths:
                 $ref: '#/components/schemas/GdprRequest'
               examples:
                 default:
-                  summary: Response
                   value:
                     id: 0192f4a0-7b1c-7ac0-85c3-2e83fd50d9e7
                     subject_user_id: 0192f4a0-7b1c-7277-8379-95fe87046d8a
@@ -16944,7 +16568,6 @@ paths:
                 $ref: '#/components/schemas/GdprRequest'
               examples:
                 default:
-                  summary: Response
                   value:
                     id: 0192f4a0-7b1c-7ac0-85c3-2e83fd50d9e7
                     subject_user_id: 0192f4a0-7b1c-7277-8379-95fe87046d8a
@@ -16985,7 +16608,6 @@ paths:
               $ref: '#/components/schemas/GdprDecision'
             examples:
               default:
-                summary: Request
                 value:
                   decision: approve
                   reason: Identity verified
@@ -17005,7 +16627,6 @@ paths:
                 $ref: '#/components/schemas/GdprRequest'
               examples:
                 default:
-                  summary: Response
                   value:
                     id: 0192f4a0-7b1c-7ac0-85c3-2e83fd50d9e7
                     subject_user_id: 0192f4a0-7b1c-7277-8379-95fe87046d8a
@@ -17101,7 +16722,6 @@ paths:
                 $ref: '#/components/schemas/HostPage'
               examples:
                 default:
-                  summary: Response
                   value:
                     items:
                     - id: 0192f4a0-7b1c-7a11-8c3e-4f5a6b7c8d9e
@@ -17163,7 +16783,6 @@ paths:
               $ref: '#/components/schemas/HostCreate'
             examples:
               default:
-                summary: Request
                 value:
                   name: Build server
                   assigned_user_id: 0192f4a0-7b1c-7f89-8d6b-6960453241bc
@@ -17184,7 +16803,6 @@ paths:
                 $ref: '#/components/schemas/HostPairingCode'
               examples:
                 default:
-                  summary: Response
                   value:
                     host_id: 0192f4a0-7b1c-7a11-8c3e-4f5a6b7c8d9e
                     pairing_code: bothy_hpc_EXAMPLE000000000000000000000000000000000000_EXAMPL
@@ -17223,7 +16841,6 @@ paths:
               $ref: '#/components/schemas/HostPairRequest'
             examples:
               default:
-                summary: Request
                 value:
                   pairing_code: bothy_hpc_EXAMPLE000000000000000000000000000000000000_EXAMPL
                   noise_public_key: Zm9vYmFyZm9vYmFyZm9vYmFyZm9vYmFyZm9vYmFyMTI
@@ -17260,7 +16877,6 @@ paths:
                 $ref: '#/components/schemas/HostPairResult'
               examples:
                 default:
-                  summary: Response
                   value:
                     host_id: 0192f4a0-7b1c-7a11-8c3e-4f5a6b7c8d9e
                     key_fingerprint: 7K2Q-M9XD-0000-0000-0000-0000-0000-0000-0000-0000-0000-0000-0000
@@ -17303,7 +16919,6 @@ paths:
                 $ref: '#/components/schemas/Host'
               examples:
                 default:
-                  summary: Response
                   value:
                     id: 0192f4a0-7b1c-7a11-8c3e-4f5a6b7c8d9e
                     name: Build server
@@ -17367,7 +16982,6 @@ paths:
               $ref: '#/components/schemas/HostUpdate'
             examples:
               default:
-                summary: Request
                 value:
                   assigned_user_id: 0192f4a0-7b1c-7f89-8d6b-6960453241bc
                   reason: Robin hands the machine to Alex
@@ -17389,7 +17003,6 @@ paths:
                 $ref: '#/components/schemas/Host'
               examples:
                 default:
-                  summary: Response
                   value:
                     id: 0192f4a0-7b1c-7a11-8c3e-4f5a6b7c8d9e
                     name: Build server
@@ -17460,7 +17073,6 @@ paths:
               $ref: '#/components/schemas/ReasonBody'
             examples:
               default:
-                summary: Request
                 value:
                   reason: Host reinstalled
       responses:
@@ -17479,7 +17091,6 @@ paths:
                 $ref: '#/components/schemas/HostPairingCode'
               examples:
                 default:
-                  summary: Response
                   value:
                     host_id: 0192f4a0-7b1c-7a11-8c3e-4f5a6b7c8d9e
                     pairing_code: bothy_hpc_EXAMPLE000000000000000000000000000000000000_EXAMPL
@@ -17522,7 +17133,6 @@ paths:
               $ref: '#/components/schemas/HostConfirm'
             examples:
               default:
-                summary: Request
                 value:
                   fingerprint_prefix: 7K2QM9XD
                   llm_credentials: organization
@@ -17549,7 +17159,6 @@ paths:
                 $ref: '#/components/schemas/Host'
               examples:
                 default:
-                  summary: Response
                   value:
                     id: 0192f4a0-7b1c-7a11-8c3e-4f5a6b7c8d9e
                     name: Build server
@@ -17620,7 +17229,6 @@ paths:
               $ref: '#/components/schemas/HostLlmCredentialsSet'
             examples:
               default:
-                summary: Request
                 value:
                   llm_credentials: personal
                   credential_holder_id: 0192f4a0-7b1c-7f89-8d6b-6960453241bc
@@ -17643,7 +17251,6 @@ paths:
                 $ref: '#/components/schemas/Host'
               examples:
                 default:
-                  summary: Response
                   value:
                     id: 0192f4a0-7b1c-7a11-8c3e-4f5a6b7c8d9e
                     name: Build server
@@ -17715,7 +17322,6 @@ paths:
               $ref: '#/components/schemas/HostStateSet'
             examples:
               default:
-                summary: Request
                 value:
                   state: disabled
                   reason: Machine sent for repair
@@ -17737,7 +17343,6 @@ paths:
                 $ref: '#/components/schemas/Host'
               examples:
                 default:
-                  summary: Response
                   value:
                     id: 0192f4a0-7b1c-7a11-8c3e-4f5a6b7c8d9e
                     name: Build server
@@ -17808,7 +17413,6 @@ paths:
               $ref: '#/components/schemas/TerminalSessionOpen'
             examples:
               default:
-                summary: Request
                 value:
                   profile: shell
                   cols: 120
@@ -17830,7 +17434,6 @@ paths:
                 $ref: '#/components/schemas/TerminalSessionGrant'
               examples:
                 default:
-                  summary: Response
                   value:
                     session:
                       id: 0192f4a0-7b1c-7b22-9d4f-5a6b7c8d9e0f
@@ -17897,7 +17500,6 @@ paths:
                 $ref: '#/components/schemas/TerminalSessionPage'
               examples:
                 default:
-                  summary: Response
                   value:
                     items:
                     - id: 0192f4a0-7b1c-7b22-9d4f-5a6b7c8d9e0f
@@ -17947,7 +17549,6 @@ paths:
                 $ref: '#/components/schemas/TerminalSession'
               examples:
                 default:
-                  summary: Response
                   value:
                     id: 0192f4a0-7b1c-7b22-9d4f-5a6b7c8d9e0f
                     host_id: 0192f4a0-7b1c-7a11-8c3e-4f5a6b7c8d9e
@@ -17993,7 +17594,6 @@ paths:
               $ref: '#/components/schemas/TerminalSessionAttach'
             examples:
               default:
-                summary: Request
                 value:
                   cols: 120
                   rows: 40
@@ -18014,7 +17614,6 @@ paths:
                 $ref: '#/components/schemas/TerminalSessionGrant'
               examples:
                 default:
-                  summary: Response
                   value:
                     session:
                       id: 0192f4a0-7b1c-7b22-9d4f-5a6b7c8d9e0f
@@ -18071,7 +17670,6 @@ paths:
               $ref: '#/components/schemas/ReasonBody'
             examples:
               default:
-                summary: Request
                 value:
                   reason: Done
       responses:
@@ -18090,7 +17688,6 @@ paths:
                 $ref: '#/components/schemas/TerminalSession'
               examples:
                 default:
-                  summary: Response
                   value:
                     id: 0192f4a0-7b1c-7b22-9d4f-5a6b7c8d9e0f
                     host_id: 0192f4a0-7b1c-7a11-8c3e-4f5a6b7c8d9e
