@@ -61,8 +61,9 @@ final class GatewayConnection {
   /// Creates the connection; nothing happens before [start].
   ///
   /// [config] supplies `sync.reconnect_backoff_base`, `sync.reconnect_backoff_cap`,
-  /// `sync.typing_min_interval` and `sync.max_focused_threads` (D-W-115); every other interval
-  /// comes from the server. [logHook] receives one line per notable step, never a token,
+  /// `sync.typing_min_interval` and `sync.max_focused_threads` (D-W-115) and the attempt
+  /// deadline `client.sync.connect_timeout` (15 7.2); every other interval comes from the
+  /// server. [logHook] receives one line per notable step, never a token,
   /// proof or frame content.
   GatewayConnection({
     required this._transport,
@@ -78,7 +79,8 @@ final class GatewayConnection {
     this._keepConnectedInBackground = false,
     this._listener,
     this._logHook,
-  }) : _backoff = ReconnectBackoff(
+  }) : _connectTimeout = config.syncConnectTimeout,
+       _backoff = ReconnectBackoff(
          base: config.reconnectBackoffBase,
          cap: config.reconnectBackoffCap,
          random: _random,
@@ -114,6 +116,9 @@ final class GatewayConnection {
   final void Function(String line)? _logHook;
   final ReconnectBackoff _backoff;
   final GatewaySession _session;
+
+  /// `client.sync.connect_timeout`: the deadline of one attempt until `ready` or `resumed`.
+  final Duration _connectTimeout;
   late final _Control _control;
 
   /// The focus of this connection.
@@ -254,6 +259,29 @@ final class GatewayConnection {
     final gen = ++_channelGen;
     _set(ConnectionPhase.connecting);
     unawaited(_open(gen));
+    unawaited(_clock.delay(_connectTimeout).then((_) => _onDeadline(gen)));
+  }
+
+  /// Ends the attempt [gen] when it has not reached `ready` or `resumed` within
+  /// `client.sync.connect_timeout` (15 7.2): a stalled connect, a socket without `hello` or an
+  /// unanswered `identify` or `resume`. The generation is invalidated, so a late socket or frame
+  /// of the attempt does nothing, and the attempt takes the backoff of a failed connect.
+  void _onDeadline(int gen) {
+    if (gen != _channelGen || !_attempting || _identified || _stopped) return;
+    // A close the client started itself (sign-out, update required, background) runs already.
+    if (_ownReaction != null) return;
+    _log('connect attempt timed out');
+    final ch = _channel;
+    final sub = _frameSub;
+    _channelGen++;
+    _channel = null;
+    _frameSub = null;
+    _attempting = false;
+    if (ch != null) {
+      unawaited(sub?.cancel());
+      unawaited(ch.close(1000));
+    }
+    _enqueue(() => _apply(reactTo(null, null, foreground: _foreground)));
   }
 
   Future<void> _open(int gen) async {

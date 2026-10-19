@@ -368,6 +368,7 @@ stateDiagram-v2
 `4017`: a newer connection of the same device is active; the app reconnects only on the return to the foreground or on user action.
 `4008`: the app waits the seconds of `retry_after=<seconds>` in the close reason instead of the jitter; without a readable value the normal backoff applies.
 `4006`: the app connects with `identify` instead of `resume`.
+Every attempt has the deadline `client.sync.connect_timeout` from its start in `Connecting` until `ready` or `resumed`: a socket that does not open, a missing `hello` or a missing answer to `identify` or `resume` ends the attempt, and the app goes to `Backoff` like after a failed connect.
 
 Every state carries a reason beside its phase (`ConnectionState(phase, reason)` of `sync_engine`): `none`, `networkUnavailable`, `devicePending`, `deviceReplaced`, `forbidden`, `rateLimited`, `revoked`, `protocolUnsupported` or `closedByServer(code)`; the interface explains `Offline` and `Backoff` with it. `Offline` with `networkUnavailable` connects when the network returns. The close reactions are one table in code (`closeCodeTable`, docs/DECISIONS.md D-M4-13-2).
 
@@ -818,6 +819,7 @@ real server.
 |---|---|---|
 | `client.cache_max_bytes` | `1GiB` | upper limit for the local database plus file cache; above it the oldest entries are removed |
 | `client.sync.parse_offload_bytes` | `262144` | from this page size on, decoding happens in the background isolate |
+| `client.sync.connect_timeout` | `30s` | deadline of one connection attempt from opening the socket to `ready` or `resumed`; when it passes, the attempt ends and the backoff applies (7.2) |
 | `client.outbox_stuck_after` | `2m` | from then on a waiting entry shows "Sending delayed" |
 | `client.push.fetch_timeout` | `20s` | time that the NSE or the Android service uses to fetch the text |
 | `client.voice.bitrate` | `64kbps` | bitrate of the AAC recording |

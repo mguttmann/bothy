@@ -68,7 +68,10 @@ void main() {
       await settle();
       expect(h.phase, ConnectionPhase.backoff);
       expect(h.connection.backoffAttempt, 1);
-      await h.clock.elapse(const Duration(minutes: 2));
+      // Step until the fourth attempt opens; a longer wait would pass client.sync.connect_timeout.
+      while (h.transport.attempts < 4) {
+        await h.clock.elapse(const Duration(milliseconds: 100));
+      }
       expect(h.transport.attempts, 4);
       expect(h.connection.backoffAttempt, 3);
       h.transport.last.push('hello', helloData());
@@ -136,6 +139,64 @@ void main() {
       await settle();
       expect(h.transport.attempts, 2);
       expect(h.connection.backoffAttempt, 1);
+    });
+
+    group('client.sync.connect_timeout', () {
+      const deadline = Duration(seconds: 5);
+      setUp(() async {
+        await h.dispose();
+        h = Harness(overrides: {'client.sync.connect_timeout': '5s'});
+      });
+
+      test('a connect that never completes ends in backoff', () async {
+        await h.signIn();
+        h.transport.stallNext = 1;
+        h.connection.start();
+        await settle();
+        expect(h.phase, ConnectionPhase.connecting);
+        await h.clock.elapse(deadline);
+        expect(h.phase, ConnectionPhase.backoff);
+        expect(h.connection.backoffAttempt, 1);
+        await h.clock.elapse(const Duration(seconds: 2));
+        expect(h.transport.attempts, 2, reason: 'the backoff reconnects');
+      });
+
+      test('a socket without hello is closed and ends in backoff', () async {
+        await h.signIn();
+        h.connection.start();
+        await settle();
+        final first = h.transport.last;
+        await h.clock.elapse(deadline);
+        expect(first.isClosed, isTrue);
+        expect(h.phase, ConnectionPhase.backoff);
+        await h.clock.elapse(const Duration(seconds: 2));
+        expect(h.transport.attempts, 2);
+      });
+
+      test('a hello without ready ends in backoff', () async {
+        await h.signIn();
+        h.connection.start();
+        await settle();
+        final first = h.transport.last..push('hello', helloData());
+        await settle();
+        expect(h.phase, ConnectionPhase.identifying);
+        await h.clock.elapse(deadline);
+        expect(first.isClosed, isTrue);
+        expect(h.phase, ConnectionPhase.backoff);
+      });
+
+      test('a session that started is not cut by the deadline', () async {
+        await h.signIn();
+        h.connection.start();
+        await settle();
+        final first = h.transport.last..push('hello', helloData());
+        await settle();
+        first.push('ready', readyData());
+        await settle();
+        await h.clock.elapse(deadline * 2);
+        expect(first.isClosed, isFalse);
+        expect(h.transport.attempts, 1);
+      });
     });
 
     test('without network the connection waits offline', () async {

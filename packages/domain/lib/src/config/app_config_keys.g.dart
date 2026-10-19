@@ -26,6 +26,7 @@ const List<AppConfigKey> appConfigKeys = <AppConfigKey>[
   AppConfigKey('client.perf.thread_open_p95', 'App', AppConfigKind.duration, '300ms'),
   AppConfigKey('client.push.fetch_timeout', 'App', AppConfigKind.duration, '20s'),
   AppConfigKey('client.share.recent_targets', 'App', AppConfigKind.integer, '8'),
+  AppConfigKey('client.sync.connect_timeout', 'App', AppConfigKind.duration, '30s'),
   AppConfigKey('client.sync.parse_offload_bytes', 'App', AppConfigKind.integer, '262144'),
   AppConfigKey('client.terminal.font_size_default', 'App', AppConfigKind.integer, '14'),
   AppConfigKey('client.terminal.scrollback_lines', 'App', AppConfigKind.integer, '10000'),
@@ -107,6 +108,8 @@ extension AppConfigValues on AppConfig {
   Duration get pushFetchTimeout => value<Duration>('client.push.fetch_timeout');
   /// `client.share.recent_targets` (integer, default `8`).
   int get shareRecentTargets => value<int>('client.share.recent_targets');
+  /// `client.sync.connect_timeout` (duration, default `30s`).
+  Duration get syncConnectTimeout => value<Duration>('client.sync.connect_timeout');
   /// `client.sync.parse_offload_bytes` (integer, default `262144`).
   int get syncParseOffloadBytes => value<int>('client.sync.parse_offload_bytes');
   /// `client.terminal.font_size_default` (integer, default `14`).
