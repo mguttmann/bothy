@@ -402,6 +402,36 @@ def test_push_on_main_outside_post_merge_workflow_is_rejected() -> None:
     assert check(text, "ci.yml") == ["push-on-branch"]
 
 
+BUILD_PUSH = "on:\n  push:\n    branches: ['build/**']\n"
+
+
+def test_build_verify_workflow_may_trigger_on_build_branches() -> None:
+    # Full verification of build branches on hosted runners (docs/quality/push-discipline.md).
+    text = ok_job().replace("on:\n  pull_request:\n    branches: [main]\n", BUILD_PUSH)
+    assert check(text, "build-verify.yml") == []
+
+
+@pytest.mark.parametrize(
+    "trigger",
+    [
+        "on:\n  push:\n    branches: [main]\n",
+        "on:\n  push:\n    branches: ['**']\n",
+        "on:\n  push:\n    branches: ['build/**', main]\n",
+        "on:\n  push:\n    branches: ['build/**']\n    paths: ['docs/**']\n",
+        "on:\n  push:\n    branches: ['build/**']\n  pull_request:\n",
+        "on:\n  push:\n    branches: ['build/**']\n  workflow_dispatch:\n",
+    ],
+)
+def test_build_verify_workflow_is_limited_to_build_branches(trigger: str) -> None:
+    text = ok_job().replace("on:\n  pull_request:\n    branches: [main]\n", trigger)
+    assert check(text, "build-verify.yml") != []
+
+
+def test_push_on_build_branches_outside_build_verify_is_rejected() -> None:
+    text = ok_job().replace("on:\n  pull_request:\n    branches: [main]\n", BUILD_PUSH)
+    assert check(text, "ci.yml") == ["push-on-branch"]
+
+
 # --- matrix (K2-11) ------------------------------------------------------------------------
 
 

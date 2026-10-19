@@ -74,9 +74,11 @@ Supplementary rules:
    a new VM ("each GitHub-hosted runner is a new virtual machine (VM) hosted by GitHub",
    same source as above, retrieved 2026-10-11) [verified]; a job therefore takes over no state of
    another job except through caches, artifacts and outputs.
-5. **Scan after the merge.** The only exception to "no `push` on branches" is
+5. **Scan after the merge.** The only exceptions to "no `push` on branches" are
    `denylist-main.yml`: a `push` to exactly `main`, which checks the pushed commits against the
-   private deny list (D-W-34).
+   private deny list (D-W-34), and `build-verify.yml`: a `push` to exactly `build/**`, which runs
+   every gate of `make gates` without secrets for a build team and is no required check
+   ([push-discipline.md](../quality/push-discipline.md#build-branches)).
 
 ### Consequences
 

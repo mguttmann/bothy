@@ -24,7 +24,8 @@ commit per feature, signed and linear.
    with `BOTHY_CODERABBIT=1`, see below). At the end of a milestone, the overall review
    over the whole milestone is added.
 5. **Push.** The pre-push hook first checks the report (`tools/hooks/review_gate.py`:
-   file present, last line `Urteil: JA`), then it runs `make check`. Red means:
+   file present, last line `Urteil: JA`), then it runs `make check` (a push to a build
+   branch `build/**` runs only the fast gates, section "Build branches"). Red means:
    fix, do not bypass. `git push --no-verify` is a process failure. Contributors from
    forks set `REVIEW_SKIP=1`; then a maintainer checks before the merge.
 6. **Pull request.** One pull request per finished feature. The title is a
@@ -40,6 +41,41 @@ commit per feature, signed and linear.
    pending from the first second of a run.
 8. **Merge.** "Squash and merge". GitHub signs the resulting commit; its message is the
    pull request body (repository setting below). `main` stays linear.
+
+## Build branches
+
+A build team does not run the full `make check` on its own machine while it works. It pushes
+the ticket branch to a build branch and lets GitHub-hosted runners verify it, which are free
+for this public repository (ADR 0039):
+
+1. **Push.** `git push origin <ticket-branch>:build/<ticket>`, for example
+   `git push origin feat/M2-44-terminal-relay:build/M2-44`, as often as needed (a force push
+   of the build branch is fine, it is no shared branch). The pre-push hook sees the build
+   branch (`tools/hooks/build_push.py`) and runs only the fast gates: `denylist` with the
+   private list, `gitleaks`, `commitlint`, `codegen-check` when a generator input changed and
+   `lint`, both for the components the diff against `origin/main` touches. It needs no review
+   report (`tools/hooks/review_gate.py`).
+2. **Wait.** The push starts `.github/workflows/build-verify.yml`: every target of
+   `make gates` and the platform jobs of `ci.yml` (postgres image on both architectures,
+   apps on macOS, Windows and the Android emulators), split into parallel jobs, with the
+   Go, pub, npm and uv caches. The job `build-verify-ok` sums them up; wait for it, for
+   example with `gh run watch <run-id> --exit-status` (the id from
+   `gh run list --workflow build-verify.yml --branch build/<ticket> --limit 1`). A newer push
+   to the same build branch cancels the older run.
+3. **Read failures.** `gh run view <run-id> --log-failed` prints the log of the failed steps.
+   Fix them, reproduce locally only with the targeted test (one Go package, one Dart test
+   file, one pytest module), commit and push the build branch again.
+4. **Pull request.** When `build-verify-ok` is green, the ticket branch goes the usual way
+   from step 4 of the flow above: independent review, push of the ticket branch (the
+   pre-push hook runs the full `make check` there), pull request, `ci-ok`. Delete the build
+   branch afterwards (`git push origin --delete build/<ticket>`).
+
+What the build verification does not do: it uses no secret, so it scans with the generic
+deny rules only and runs no SonarQube analysis; both stay in `ci.yml` of the pull request.
+It is no required check, and its result never stands in for `ci-ok`. Caches are scoped to
+the branch that wrote them, so the first run of a new build branch starts cold. pre-commit
+reports one ref per push (the first one that is not a deletion), so push a build branch on
+its own, never together with another branch in one `git push`.
 
 ## Protection of `main` (ruleset)
 

@@ -10,7 +10,9 @@ local; the pull request names the reviewed commit and the verdict in fresh words
 
 The pushed commit comes from pre-commit (`PRE_COMMIT_TO_REF`, else
 `PRE_COMMIT_LOCAL_BRANCH`), else HEAD. Tag pushes need no report: a tag points to a
-commit that was reviewed before its merge. `REVIEW_SKIP=1` is the explicit switch for
+commit that was reviewed before its merge. A push to a build branch (`build/**`) needs no
+report either: it only starts the verification of build-verify.yml, and the pull request
+branch is pushed with a report. `REVIEW_SKIP=1` is the explicit switch for
 contributors from forks; it prints a warning, and a maintainer reviews before the merge
 (R-QA-02).
 Exit codes: 0 passed or skipped, 1 report missing or verdict not JA.
@@ -23,6 +25,8 @@ import os
 import subprocess
 import sys
 from pathlib import Path
+
+import build_push
 
 REVIEW_DIR = ".review"
 VERDICT_YES = "Urteil: JA"
@@ -54,7 +58,11 @@ def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description="Require review evidence before a push.")
     parser.add_argument("--repo", type=Path, default=Path.cwd())
     args = parser.parse_args(argv)
-    if os.environ.get("PRE_COMMIT_REMOTE_BRANCH", "").startswith("refs/tags/"):
+    remote = os.environ.get("PRE_COMMIT_REMOTE_BRANCH", "")
+    if remote.startswith("refs/tags/"):
+        return 0
+    if build_push.is_build_ref(remote):
+        print(f"review: {remote} is a build branch (verification only); no report needed")
         return 0
     if os.environ.get("REVIEW_SKIP") == "1":
         print(

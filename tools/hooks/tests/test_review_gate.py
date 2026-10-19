@@ -84,6 +84,23 @@ def test_tag_push_needs_no_report(repo: Path, monkeypatch: pytest.MonkeyPatch) -
     assert review_gate.main(["--repo", str(repo)]) == 0
 
 
+def test_build_branch_push_needs_no_report(
+    repo: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    # A build branch is verification only (build-verify.yml); the pull request push needs one.
+    monkeypatch.setenv("PRE_COMMIT_REMOTE_BRANCH", "refs/heads/build/M2-44")
+    assert review_gate.main(["--repo", str(repo)]) == 0
+    assert "build branch" in capsys.readouterr().out
+
+
+@pytest.mark.parametrize("ref", ["refs/heads/feat/build-x", "refs/heads/rebuild/M2-44"])
+def test_other_branches_still_need_a_report(
+    repo: Path, monkeypatch: pytest.MonkeyPatch, ref: str
+) -> None:
+    monkeypatch.setenv("PRE_COMMIT_REMOTE_BRANCH", ref)
+    assert review_gate.main(["--repo", str(repo)]) == 1
+
+
 def test_fork_switch_is_explicit_and_visible(
     repo: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
 ) -> None:

@@ -19,10 +19,12 @@ Every finding names a rule:
                                 of its release (D-W-111)
   pull-request-target           the pull_request_target trigger
   push-on-branch                a push trigger that is not limited to tags (only the
-                                post-merge workflows may name exactly `main`)
-  release-trigger               a release workflow with other triggers than its own
-                                (release.yml: tag push; portability.yml: the call from
-                                release.yml and workflow_dispatch)
+                                post-merge workflows may name exactly `main`, only
+                                build-verify.yml exactly `build/**`)
+  release-trigger               a release, post-merge or build verification workflow with
+                                other triggers than its own (release.yml: tag push;
+                                portability.yml: the call from release.yml and
+                                workflow_dispatch; build-verify.yml: push)
   schedule-without-public-guard a scheduled workflow with a job lacking PUBLIC_GUARD
   unpinned-action               `uses:` not pinned to a full commit SHA (or image digest)
   missing-timeout               a job without timeout-minutes (reusable calls excepted)
@@ -77,6 +79,10 @@ _CALLED_WORKFLOW = re.compile(r"(?:^|/)\.github/workflows/([^/@\s]+)(?:@|$)")
 POST_MERGE_WORKFLOWS: dict[str, frozenset[str]] = {
     "denylist-main.yml": frozenset({"push", "workflow_dispatch"}),
 }
+# Build verification: the full gate set on hosted runners for a push to a `build/**` branch,
+# nothing else (docs/quality/push-discipline.md, "Build branches"). It is no required check.
+BUILD_VERIFY_WORKFLOWS: dict[str, frozenset[str]] = {"build-verify.yml": frozenset({"push"})}
+BUILD_VERIFY_PUSH = {"branches": ["build/**"]}
 RELEASE_ENVIRONMENT_PREFIX = "release"
 PUBLIC_GUARD = (
     "github.event.repository.visibility == 'public' || "
@@ -196,9 +202,14 @@ def _check_triggers(file: str, triggers: dict[str, Any], out: list[Finding]) -> 
             and "branches-ignore" not in push
         )
         main_only = file in POST_MERGE_WORKFLOWS and push == {"branches": ["main"]}
-        if not tag_only and not main_only:
+        build_only = file in BUILD_VERIFY_WORKFLOWS and push == BUILD_VERIFY_PUSH
+        if not tag_only and not main_only and not build_only:
             out.append(Finding(file, "on.push", "push-on-branch", "push must be limited to tags"))
-    allowed = RELEASE_WORKFLOWS.get(file) or POST_MERGE_WORKFLOWS.get(file)
+    allowed = (
+        RELEASE_WORKFLOWS.get(file)
+        or POST_MERGE_WORKFLOWS.get(file)
+        or BUILD_VERIFY_WORKFLOWS.get(file)
+    )
     if allowed is not None:
         extra = sorted(set(triggers) - allowed)
         if extra:
