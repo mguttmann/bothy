@@ -11,6 +11,7 @@ from __future__ import annotations
 
 import os
 import re
+import shutil
 import subprocess
 import tarfile
 from dataclasses import dataclass
@@ -92,6 +93,9 @@ def dropped_keys() -> list[str]:
 
 FAKE_DOCKER = """#!/bin/sh
 printf '%s\\n' "$*" >> "$FAKE_LOG"
+case "$1" in
+  compose) printf 'env SMOKE_SERVER_IMAGE=%s\\n' "${SMOKE_SERVER_IMAGE:-}" >> "$FAKE_LOG" ;;
+esac
 case "$1 $2" in
   "info "*) exit 0 ;;
   "version --format") printf '%s\\n' "$FAKE_ENGINE"; exit 0 ;;
@@ -127,8 +131,17 @@ def run_smoke(
         fake = bin_dir / "docker"
         fake.write_text(FAKE_DOCKER, encoding="utf-8")
         fake.chmod(0o755)
+        path = f"{bin_dir}:/usr/bin:/bin"
+    else:
+        # Only the tools the script needs before its docker check, so a docker of the host
+        # (CI runners have /usr/bin/docker) cannot be found.
+        for tool in ("bash", "dirname", "sed", "tr", "cat"):
+            found = shutil.which(tool)
+            assert found is not None, tool
+            (bin_dir / tool).symlink_to(found)
+        path = str(bin_dir)
     env = {
-        "PATH": f"{bin_dir}:/usr/bin:/bin",
+        "PATH": path,
         "HOME": str(tmp_path),
         "TMPDIR": str(tmp_path),
         "FAKE_LOG": str(log),
@@ -158,8 +171,6 @@ def test_missing_image_fails_with_hint(tmp_path: Path) -> None:
 
 
 def test_missing_docker_fails(tmp_path: Path) -> None:
-    assert not Path("/usr/bin/docker").exists()
-    assert not Path("/bin/docker").exists()
     result, _ = run_smoke(tmp_path, docker=False)
     assert result.returncode == 2
     assert "docker is not on PATH" in result.stderr
@@ -183,6 +194,8 @@ def test_new_versions_with_suffix_pass_the_preflight(tmp_path: Path) -> None:
     result, calls = run_smoke(tmp_path, engine="26.0.0", compose="v2.26.0-desktop.1")
     assert "too old" not in result.stderr
     assert "compose" in calls.split("image inspect", 1)[1]
+    # The default image reaches the overlay's ${SMOKE_SERVER_IMAGE:?} through the environment.
+    assert f"env SMOKE_SERVER_IMAGE={_default_image()}" in calls
     # The fake answers every compose call with nothing; the run stops after the start step.
     assert result.returncode == 1
 

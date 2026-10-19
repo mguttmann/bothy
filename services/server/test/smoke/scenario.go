@@ -465,7 +465,8 @@ func (r *runner) restCatchup(ctx context.Context) error {
 				got = append(got, want{typ: d.typ, resource: d.resource, clientMsgID: d.clientMsgID})
 			}
 		}
-		if len(p.Events) == 0 || p.NextCursor >= p.HeadSeq {
+		// A page may hold no visible event and still advance (04 7.1); only head_seq ends it.
+		if p.NextCursor >= p.HeadSeq {
 			break
 		}
 		if p.NextCursor <= after {

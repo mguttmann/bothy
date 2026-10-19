@@ -9,6 +9,7 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
+	"slices"
 	"strings"
 	"sync"
 	"testing"
@@ -24,6 +25,7 @@ type fakeEvent struct {
 	resource string
 	thread   string
 	cmid     string
+	hidden   bool
 }
 
 // world is a fake server behind the REST and Gateway fakes: an event log, its gateway
@@ -48,7 +50,10 @@ type world struct {
 	revokeClose         int
 	dispatchAfterRevoke bool
 	oldTokenWorks       bool
-	cursor              int64 // the cursor of the last identify
+	// hiddenBeforeAway writes two events the caller may not see before the first message while
+	// no connection is live, so listEvents answers a page without events that still advances.
+	hiddenBeforeAway bool
+	cursor           int64 // the cursor of the last identify
 }
 
 func newWorld() *world { return &world{revokeClose: 4012} }
@@ -168,6 +173,11 @@ func (f *fakeREST) CreateThread(_ context.Context, _ rest.Uuid, body rest.Thread
 func (f *fakeREST) CreateMessage(_ context.Context, thread rest.Uuid, body rest.MessageCreate) (rest.Message, error) {
 	f.w.mu.Lock()
 	defer f.w.mu.Unlock()
+	if f.w.hiddenBeforeAway && f.w.thread != "" && !slices.ContainsFunc(f.w.conns, func(c *fakeGateway) bool { return c.live }) {
+		f.w.hiddenBeforeAway = false
+		f.w.emit(fakeEvent{typ: "space.updated", resource: f.w.id(), hidden: true})
+		f.w.emit(fakeEvent{typ: "space.updated", resource: f.w.id(), hidden: true})
+	}
 	id := f.w.id()
 	f.w.emit(fakeEvent{typ: "message.created", resource: id, thread: thread.String(), cmid: body.ClientMsgId.String()})
 	return rest.Message{Id: f.uuid(id), ThreadId: thread, ClientMsgId: body.ClientMsgId}, nil
@@ -178,12 +188,17 @@ func (f *fakeREST) ListEvents(_ context.Context, p rest.ListEventsParams) (rest.
 	f.w.mu.Lock()
 	defer f.w.mu.Unlock()
 	page := rest.EventPage{HeadSeq: f.w.seq, NextCursor: p.After, Events: []rest.Event{}}
+	scanned := 0
 	for _, e := range f.w.log {
-		if e.seq > p.After && len(page.Events) < 2 {
+		if e.seq <= p.After || scanned == 2 {
+			continue
+		}
+		scanned++
+		page.NextCursor = e.seq
+		if !e.hidden {
 			var ev rest.Event
 			_ = ev.UnmarshalJSON(eventJSON(e))
 			page.Events = append(page.Events, ev)
-			page.NextCursor = e.seq
 		}
 	}
 	return page, nil
@@ -498,4 +513,15 @@ func TestRunFailsWhenSetupStillRequired(t *testing.T) {
 	w := newWorld()
 	w.setupRequired = true
 	expectRunError(t, w, "setup_required")
+}
+
+// TestRunFollowsEmptyEventPages: a listEvents page without visible events but with an advanced
+// next_cursor below head_seq does not end the REST catch-up.
+func TestRunFollowsEmptyEventPages(t *testing.T) {
+	t.Parallel()
+	w := newWorld()
+	w.hiddenBeforeAway = true
+	if _, err, log := runWorld(t, w); err != nil {
+		t.Fatalf("Run: %v\n%s", err, log)
+	}
 }

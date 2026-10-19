@@ -122,7 +122,7 @@ mkdir -m 0700 "$tmp/secrets-input" "$tmp/out" "$tmp/otel" "$tmp/logs"
 run_id="$(hex 4)"
 project="bothy-smoke-$run_id"
 canary="smk$(hex 12)"
-export SMOKE_RUN_ID="$run_id" SMOKE_SECRETS_INPUT="$tmp/secrets-input" SMOKE_OUT="$tmp/out" SMOKE_TMP="$tmp" SMOKE_CANARY="$canary"
+export SMOKE_SERVER_IMAGE="$image" SMOKE_RUN_ID="$run_id" SMOKE_SECRETS_INPUT="$tmp/secrets-input" SMOKE_OUT="$tmp/out" SMOKE_TMP="$tmp" SMOKE_CANARY="$canary"
 uid_gid="$(id -u):$(id -g)"
 
 compose() {
