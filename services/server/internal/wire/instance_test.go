@@ -36,7 +36,7 @@ func TestStart_MinServerVersionAboveOwn_NotReady(t *testing.T) {
 			t.Parallel()
 			p := start(t, role, serveEnv(t, db), wire.Deps{Version: "1.0.0"})
 			internal := p.waitInternal(t)
-			deadline := time.Now().Add(30 * time.Second)
+			deadline := time.Now().Add(startupWait)
 			for !strings.Contains(p.logs.String(), `"msg":"server started, not ready"`) && time.Now().Before(deadline) {
 				time.Sleep(20 * time.Millisecond)
 			}

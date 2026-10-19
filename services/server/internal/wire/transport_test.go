@@ -93,7 +93,7 @@ func envValue(env []string, name string) string {
 func (p *process) waitPublic(t *testing.T) int {
 	t.Helper()
 	const msg = "public listener started"
-	deadline := time.Now().Add(30 * time.Second)
+	deadline := time.Now().Add(startupWait)
 	for time.Now().Before(deadline) {
 		if port := p.logs.port(msg); port != 0 {
 			return port

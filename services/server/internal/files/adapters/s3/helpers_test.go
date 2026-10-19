@@ -42,6 +42,12 @@ const testRegion = "us-east-1"
 // testCacheTTL is secrets.cache_ttl of the test providers.
 const testCacheTTL = time.Minute
 
+// testTransferTimeout is http.transfer_timeout and the egress timeout of the test stores. The
+// SeaweedFS suite sends objects of several megabytes to a container; on a loaded CI runner one
+// such request took longer than 30 seconds and failed with "transport: deadline exceeded"
+// (ruling PL/7). The production default of http.transfer_timeout is longer still.
+const testTransferTimeout = 5 * time.Minute
+
 // randomHex returns n random bytes as hex.
 func randomHex(t testing.TB, n int) string {
 	t.Helper()
@@ -122,9 +128,9 @@ func loopbackRule(t testing.TB, endpoint string) egress.Rule {
 // deps returns the dependencies of a store with the given egress entries.
 func (s *testSecrets) deps(rules ...egress.Rule) s3.Deps {
 	return s3.Deps{
-		Egress:          egress.Config{AllowedHosts: rules, Timeout: 30 * time.Second, MaxResponseBytes: 1 << 20},
+		Egress:          egress.Config{AllowedHosts: rules, Timeout: testTransferTimeout, MaxResponseBytes: 1 << 20},
 		Secrets:         s.provider,
-		TransferTimeout: 30 * time.Second,
+		TransferTimeout: testTransferTimeout,
 		MaxObjectBytes:  64 << 20,
 	}
 }
