@@ -110,8 +110,8 @@ def sync_detailed(
 ) -> Response[File | Problem]:
     """Finish an upload
 
-     Closes the session; the verify pass then checks size and SHA-256, detects the MIME type and runs the
-    malware scan. The file is
+     Closes the session and queues the job `files.scan`, which checks size and SHA-256, detects the MIME
+    type and runs the malware scan. The file is
     downloadable after `scan_status` is `clean` or `skipped`. `parts` is checked against the confirmed
     parts: a duplicate or out-of-range number gives 400, another `etag` 409 `conflict` with `reason`
     `part_conflict`. A completed session answers 200 with the file again. Missing parts answer 409
@@ -153,8 +153,8 @@ def sync(
 ) -> File | Problem | None:
     """Finish an upload
 
-     Closes the session; the verify pass then checks size and SHA-256, detects the MIME type and runs the
-    malware scan. The file is
+     Closes the session and queues the job `files.scan`, which checks size and SHA-256, detects the MIME
+    type and runs the malware scan. The file is
     downloadable after `scan_status` is `clean` or `skipped`. `parts` is checked against the confirmed
     parts: a duplicate or out-of-range number gives 400, another `etag` 409 `conflict` with `reason`
     `part_conflict`. A completed session answers 200 with the file again. Missing parts answer 409
@@ -191,8 +191,8 @@ async def asyncio_detailed(
 ) -> Response[File | Problem]:
     """Finish an upload
 
-     Closes the session; the verify pass then checks size and SHA-256, detects the MIME type and runs the
-    malware scan. The file is
+     Closes the session and queues the job `files.scan`, which checks size and SHA-256, detects the MIME
+    type and runs the malware scan. The file is
     downloadable after `scan_status` is `clean` or `skipped`. `parts` is checked against the confirmed
     parts: a duplicate or out-of-range number gives 400, another `etag` 409 `conflict` with `reason`
     `part_conflict`. A completed session answers 200 with the file again. Missing parts answer 409
@@ -232,8 +232,8 @@ async def asyncio(
 ) -> File | Problem | None:
     """Finish an upload
 
-     Closes the session; the verify pass then checks size and SHA-256, detects the MIME type and runs the
-    malware scan. The file is
+     Closes the session and queues the job `files.scan`, which checks size and SHA-256, detects the MIME
+    type and runs the malware scan. The file is
     downloadable after `scan_status` is `clean` or `skipped`. `parts` is checked against the confirmed
     parts: a duplicate or out-of-range number gives 400, another `etag` 409 `conflict` with `reason`
     `part_conflict`. A completed session answers 200 with the file again. Missing parts answer 409
