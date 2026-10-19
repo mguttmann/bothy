@@ -55,6 +55,12 @@ Planungsgrundlage nennt River (MPL-2.0) für Hintergrundjobs.
    Lizenztext nicht als SPDX-Ausdruck), wird die Lizenz in der LICENSE-Datei des Pakets
    geprüft und in einer `osv-scanner.toml` der Komponente als `PackageOverrides` mit Grund
    festgehalten; nie pauschal für alle Pakete.
+   The Grafana panel plugin (M7-25) ships only its own code: React, Emotion and `@grafana/*` are
+   webpack externals that Grafana provides, and the rest of its lock are build and test tools.
+   Its `osv-scanner.toml` therefore also lists, per package version and with a reason,
+   packages under a license outside the list that are such tools or reached only through those
+   externals (`license.ignore`); a unit test of the plugin fails when another production
+   dependency enters (docs/DECISIONS.md D-M7-25-5).
 4. Vor jedem Release und vor dem Öffentlich-Schalten: ScanCode über den ganzen Baum
    (Lizenztexte und Copyright-Angaben in Dateien), Ergebnis im Release-Protokoll. ScanCode
    ist kein Pull-Request-Gate, weil ein Lauf über den ganzen Baum lange dauert. As built

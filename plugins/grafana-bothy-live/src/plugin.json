@@ -1,0 +1,25 @@
+{
+  "$schema": "https://raw.githubusercontent.com/grafana/grafana/main/docs/sources/developers/plugins/plugin.schema.json",
+  "type": "panel",
+  "name": "Live views",
+  "id": "bothy-live-panel",
+  "info": {
+    "keywords": ["panel", "agents", "live", "slo"],
+    "description": "Live views of agents, delivery and SLOs from metrics only.",
+    "author": {
+      "name": "Project contributors"
+    },
+    "logos": {
+      "small": "img/logo.svg",
+      "large": "img/logo.svg"
+    },
+    "links": [],
+    "screenshots": [],
+    "version": "%VERSION%",
+    "updated": "%TODAY%"
+  },
+  "dependencies": {
+    "grafanaDependency": ">=13.2.3",
+    "plugins": []
+  }
+}

@@ -29,6 +29,9 @@ repos:
         args: [--unsafe]
       - id: check-toml
       - id: check-json
+        # TypeScript reads tsconfig as JSON with comments; the scaffold of @grafana/create-plugin
+        # writes its header comment there (M7-25).
+        exclude: '^plugins/grafana-bothy-live/\.config/tsconfig\.json$'
       - id: check-merge-conflict
       - id: check-case-conflict
       - id: check-added-large-files

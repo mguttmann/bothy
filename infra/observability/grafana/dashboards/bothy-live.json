@@ -1,0 +1,383 @@
+{
+  "uid": "bothy-live",
+  "title": "Bothy / Live",
+  "description": "Live views of the panel plugin bothy-live-panel from metrics only (docs/spec/25-visualisierung.md section 8). Grafana shows them once the plugin build is installed (provisioning: M7-26).",
+  "tags": [
+    "bothy"
+  ],
+  "timezone": "browser",
+  "editable": false,
+  "graphTooltip": 1,
+  "schemaVersion": 39,
+  "version": 1,
+  "time": {
+    "from": "now-6h",
+    "to": "now"
+  },
+  "refresh": "1m",
+  "templating": {
+    "list": [
+      {
+        "name": "env",
+        "label": "Environment",
+        "type": "query",
+        "datasource": {
+          "type": "prometheus",
+          "uid": "prometheus"
+        },
+        "query": {
+          "query": "label_values(target_info{job=\"bothy/bothy-server\"}, deployment_environment_name)",
+          "refId": "env"
+        },
+        "definition": "label_values(target_info{job=\"bothy/bothy-server\"}, deployment_environment_name)",
+        "refresh": 2,
+        "includeAll": true,
+        "allValue": ".*",
+        "multi": false,
+        "current": {},
+        "sort": 1
+      }
+    ]
+  },
+  "annotations": {
+    "list": [
+      {
+        "builtIn": 1,
+        "datasource": {
+          "type": "grafana",
+          "uid": "-- Grafana --"
+        },
+        "enable": true,
+        "hide": true,
+        "iconColor": "rgba(0, 211, 255, 1)",
+        "name": "Annotations & Alerts",
+        "type": "dashboard"
+      }
+    ]
+  },
+  "links": [
+    {
+      "title": "Bothy",
+      "type": "dashboards",
+      "tags": [
+        "bothy"
+      ],
+      "asDropdown": true
+    }
+  ],
+  "panels": [
+    {
+      "id": 1,
+      "type": "bothy-live-panel",
+      "title": "Live topology",
+      "description": "Lanes per agent: active runs by state, tool steps per minute, costs over the period.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "gridPos": {
+        "h": 9,
+        "w": 24,
+        "x": 0,
+        "y": 0
+      },
+      "targets": [
+        {
+          "refId": "active",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "expr": "sum by (bothy_agent_handle, bothy_run_state) (bothy_run_active{job=\"bothy/bothy-server\",deployment_environment_name=~\"$env\"})",
+          "legendFormat": "{{bothy_agent_handle}} {{bothy_run_state}}",
+          "instant": true,
+          "range": false
+        },
+        {
+          "refId": "tool_steps",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "expr": "sum by (bothy_agent_handle) (rate(bothy_run_steps_total{job=\"bothy/bothy-server\",deployment_environment_name=~\"$env\",bothy_step_kind=\"tool_call\"}[$__rate_interval])) * 60",
+          "legendFormat": "{{bothy_agent_handle}}",
+          "instant": true,
+          "range": false
+        },
+        {
+          "refId": "cost",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "expr": "sum by (bothy_agent_handle, bothy_currency, bothy_cost_estimate) (increase(bothy_run_cost_total{job=\"bothy/bothy-server\",deployment_environment_name=~\"$env\"}[$__range]))",
+          "legendFormat": "{{bothy_agent_handle}} {{bothy_currency}}",
+          "instant": true,
+          "range": false
+        }
+      ],
+      "options": {
+        "view": "topology",
+        "warnBudgetRatio": 0.25,
+        "showCosts": true
+      }
+    },
+    {
+      "id": 2,
+      "type": "bothy-live-panel",
+      "title": "Backend view",
+      "description": "Per agent: runs per billing mode, mode mismatches (I3), denials (I2), costs per mode.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 24,
+        "x": 0,
+        "y": 9
+      },
+      "targets": [
+        {
+          "refId": "mode_runs",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "expr": "sum by (bothy_agent_handle, bothy_billing_mode) (increase(bothy_run_start_latency_seconds_count{job=\"bothy/bothy-server\",deployment_environment_name=~\"$env\"}[$__range]))",
+          "legendFormat": "{{bothy_agent_handle}} {{bothy_billing_mode}}",
+          "instant": true,
+          "range": false
+        },
+        {
+          "refId": "mismatches",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "expr": "sum by (bothy_agent_handle) (increase(bothy_agent_billing_mode_mismatch_total{job=\"bothy/bothy-server\",deployment_environment_name=~\"$env\"}[$__range]))",
+          "legendFormat": "{{bothy_agent_handle}}",
+          "instant": true,
+          "range": false
+        },
+        {
+          "refId": "denials",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "expr": "sum by (bothy_agent_handle, bothy_reason) (increase(bothy_agent_invocation_denied_total{job=\"bothy/bothy-server\",deployment_environment_name=~\"$env\"}[$__range]))",
+          "legendFormat": "{{bothy_agent_handle}} {{bothy_reason}}",
+          "instant": true,
+          "range": false
+        },
+        {
+          "refId": "cost_by_mode",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "expr": "sum by (bothy_agent_handle, bothy_billing_mode, bothy_currency, bothy_cost_estimate) (increase(bothy_run_cost_total{job=\"bothy/bothy-server\",deployment_environment_name=~\"$env\"}[$__range]))",
+          "legendFormat": "{{bothy_agent_handle}} {{bothy_billing_mode}} {{bothy_currency}}",
+          "instant": true,
+          "range": false
+        }
+      ],
+      "options": {
+        "view": "backend",
+        "warnBudgetRatio": 0.25,
+        "showCosts": true
+      }
+    },
+    {
+      "id": 3,
+      "type": "bothy-live-panel",
+      "title": "Delivery and sync",
+      "description": "Delivery latency, connecting, catch-up (p95) and fan-out lag with their course over the period.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "gridPos": {
+        "h": 6,
+        "w": 24,
+        "x": 0,
+        "y": 17
+      },
+      "targets": [
+        {
+          "refId": "delivery_p95",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "expr": "histogram_quantile(0.95, sum by (le) (rate(bothy_delivery_duration_seconds_bucket{job=\"bothy/bothy-server\",deployment_environment_name=~\"$env\"}[$__rate_interval])))",
+          "legendFormat": "delivery p95",
+          "instant": false,
+          "range": true
+        },
+        {
+          "refId": "connect_p95",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "expr": "histogram_quantile(0.95, sum by (le) (rate(bothy_gateway_connect_duration_seconds_bucket{job=\"bothy/bothy-server\",deployment_environment_name=~\"$env\"}[$__rate_interval])))",
+          "legendFormat": "connect p95",
+          "instant": false,
+          "range": true
+        },
+        {
+          "refId": "catchup_p95",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "expr": "histogram_quantile(0.95, sum by (le) (rate(bothy_gateway_catchup_duration_seconds_bucket{job=\"bothy/bothy-server\",deployment_environment_name=~\"$env\"}[$__rate_interval])))",
+          "legendFormat": "catch-up p95",
+          "instant": false,
+          "range": true
+        },
+        {
+          "refId": "fanout_lag",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "expr": "max(bothy_event_fanout_lag_seconds{job=\"bothy/bothy-server\",deployment_environment_name=~\"$env\"})",
+          "legendFormat": "fan-out lag",
+          "instant": false,
+          "range": true
+        }
+      ],
+      "options": {
+        "view": "delivery",
+        "warnBudgetRatio": 0.25,
+        "showCosts": true
+      }
+    },
+    {
+      "id": 4,
+      "type": "bothy-live-panel",
+      "title": "Executive page",
+      "description": "SLO traffic light from the Sloth recording rules: good share over 30 days, objective, remaining error budget.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "gridPos": {
+        "h": 10,
+        "w": 12,
+        "x": 0,
+        "y": 23
+      },
+      "targets": [
+        {
+          "refId": "objective",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "expr": "max by (sloth_service, sloth_slo) (slo:objective:ratio)",
+          "legendFormat": "{{sloth_slo}}",
+          "instant": true,
+          "range": false
+        },
+        {
+          "refId": "error_ratio",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "expr": "max by (sloth_service, sloth_slo) (slo:sli_error:ratio_rate30d)",
+          "legendFormat": "{{sloth_slo}}",
+          "instant": true,
+          "range": false
+        },
+        {
+          "refId": "budget_remaining",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "expr": "max by (sloth_service, sloth_slo) (slo:period_error_budget_remaining:ratio)",
+          "legendFormat": "{{sloth_slo}}",
+          "instant": true,
+          "range": false
+        }
+      ],
+      "options": {
+        "view": "executive",
+        "warnBudgetRatio": 0.25,
+        "showCosts": true
+      }
+    },
+    {
+      "id": 5,
+      "type": "bothy-live-panel",
+      "title": "Timeline",
+      "description": "Playback over the dashboard period: active runs, tool steps, delivery latency and the lowest remaining error budget at the playhead.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "gridPos": {
+        "h": 10,
+        "w": 12,
+        "x": 12,
+        "y": 23
+      },
+      "targets": [
+        {
+          "refId": "active",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "expr": "sum by (bothy_run_state) (bothy_run_active{job=\"bothy/bothy-server\",deployment_environment_name=~\"$env\"})",
+          "legendFormat": "{{bothy_run_state}}",
+          "instant": false,
+          "range": true
+        },
+        {
+          "refId": "tool_steps",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "expr": "sum(rate(bothy_run_steps_total{job=\"bothy/bothy-server\",deployment_environment_name=~\"$env\",bothy_step_kind=\"tool_call\"}[$__rate_interval])) * 60",
+          "legendFormat": "tool steps per minute",
+          "instant": false,
+          "range": true
+        },
+        {
+          "refId": "delivery_p95",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "expr": "histogram_quantile(0.95, sum by (le) (rate(bothy_delivery_duration_seconds_bucket{job=\"bothy/bothy-server\",deployment_environment_name=~\"$env\"}[$__rate_interval])))",
+          "legendFormat": "delivery p95",
+          "instant": false,
+          "range": true
+        },
+        {
+          "refId": "budget_remaining",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "expr": "min(slo:period_error_budget_remaining:ratio)",
+          "legendFormat": "lowest remaining error budget",
+          "instant": false,
+          "range": true
+        }
+      ],
+      "options": {
+        "view": "timeline",
+        "warnBudgetRatio": 0.25,
+        "showCosts": true
+      }
+    }
+  ]
+}

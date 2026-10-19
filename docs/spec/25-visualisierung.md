@@ -430,6 +430,15 @@ Dazu Widget-Tests für Semantik und Tabellenansicht und ein Leistungstest für d
 - Das Panel nutzt die Datenquellen von Grafana (Prometheus, Tempo aus
   [datasources.yaml](../../infra/observability/grafana/provisioning/datasources/datasources.yaml)); es
   spricht nie mit dem Bothy-Server. Grund: Ebene b gehört dem Betrieb und den Rechten von Grafana.
+- As built (M7-25): scaffolded once with the pinned `@grafana/create-plugin` 7.13.0 (not
+  `@latest`), panel type, TypeScript and React; `grafanaDependency` is `>=13.2.3`, the Grafana pin
+  `BOTHY_GRAFANA_VERSION` of the Compose stack, and `@grafana/data` and `@grafana/ui` are pinned to
+  the same version. The configuration in `.config/` stays as generated; root files extend it.
+  React, Emotion and `@grafana/*` are webpack externals that Grafana provides, so the bundle holds
+  only the plugin's code, the token constants and the fonts of section 10. The display name in
+  Grafana's panel picker is "Live views"; the working name stays in the places of
+  [02-architektur.md](02-architektur.md) section 6 (folder, release component, plugin ID,
+  dashboard).
 
 ### 8.2 Ansichten aus Metriken
 
@@ -443,12 +452,50 @@ Kanäle und keine Läufe einzeln; Einzelheiten führen über Exemplare zu Tempo.
 | Zustellung und Sync | Latenz, Verbinden, Nachholen, Fan-out-Verzug | `bothy.delivery.duration`, `bothy.gateway.connect.duration`, `bothy.gateway.catchup.duration`, `bothy.event.fanout.lag` |
 | Executive-Seite | SLO-Ampel aus den Recording-Regeln | `slo:sli_error:ratio_rate30d`, `slo:period_error_budget_remaining:ratio`, `slo:objective:ratio` |
 | Timeline | Abspielen über den Zeitraum des Dashboards | dieselben |
-| TV-Modus | Kiosk-Modus von Grafana [vermutet: URL-Parameter `kiosk`; das Bau-Ticket prüft es gegen die Doku der eingesetzten Version] | |
+| TV-Modus | Kiosk-Modus von Grafana: URL-Parameter `kiosk` (`/d/bothy-live?kiosk`, also `kiosk=1` or `kiosk=true`), the user menu item "Enable kiosk mode" or the shortcut `d k`; `Esc` leaves it [verified for 13.2, see below] | |
 
 Die Abfragen stehen in `plugins/grafana-bothy-live/queries.yaml`; daraus erzeugt ein Skript
 `src/queries.gen.ts`. Der Namens-Test aus 17, Abschnitt 10 prüft jede Metrik darin gegen den
 Katalog. Die sechs Datei-Dashboards bleiben ([dashboards.md](../observability/dashboards.md)); ein
 siebtes Dashboard `bothy-live.json` nutzt das Panel.
+
+As built (M7-25):
+
+1. Each view is a React component from data frames to a rendering; it reads only the frames of
+   the refIds its entry in `queries.yaml` names. Lanes, rows and tiles group by the attribute
+   values the catalogue allows (`bothy.agent.handle`, `bothy.run.state`, `bothy.billing_mode`,
+   `bothy.reason`, `bothy.currency`, `bothy.cost.estimate`, `sloth_service`, `sloth_slo`). Every
+   view shows its values as a table or as labelled text, so colour never carries meaning alone.
+2. Live topology and backend view use instant queries at the end of the dashboard period (active
+   runs, tool steps per minute, increases over `$__range`); delivery and sync shows the latest
+   p95 values and fan-out lag with a sparkline over the period.
+3. Executive page: traffic light per SLO from the three recording rules with the colours and
+   texts of 6.4: green "on target" (remaining budget at least the panel option
+   `warnBudgetRatio`, default 0.25 like `stats.slo_warn_budget_ratio`), yellow "budget tight",
+   red "target missed" (0 or less), gray "not enough data" when a recording rule has no value for
+   the SLO (Prometheus has no event count per SLO here, so `stats.slo_min_events` has no
+   equivalent). The note names the source: the Prometheus recording rules, not the own
+   measurement.
+4. Timeline: playback over the dashboard period with play, pause, jump to start or end and the
+   speeds of `viz.timeline_speeds` (60, 300, 900); the area shows active runs, the table the
+   values of every query at the playhead. A dashboard refresh keeps the playhead inside the new
+   period.
+5. TV mode: the plugin adds no full-screen mode. Grafana 13.2 documents kiosk mode as "the main
+   menu and top navigation bar of a dashboard are hidden", turned on with "Enable kiosk mode"
+   in the user menu or `d k` and off with `Esc`
+   (https://grafana.com/docs/grafana/v13.2/visualizations/dashboards/use-dashboards/, retrieved
+   2026-10-18 [verified]); playlists start in a kiosk view mode and their link can be copied
+   (https://grafana.com/docs/grafana/v13.2/visualizations/dashboards/create-manage-playlists/,
+   retrieved 2026-10-18 [verified]). The 13.2 documentation names no URL form; the URL parameter
+   `kiosk` is the one the source of v13.2.3 reads (`AppChromeService.setKioskModeFromUrl` accepts
+   `kiosk` without a value or `kiosk=1`, and writes `kiosk=true` when the menu turns kiosk mode on;
+   https://github.com/grafana/grafana/blob/v13.2.3/public/app/core/components/AppChrome/AppChromeService.tsx,
+   retrieved 2026-10-18 [verified]). The value `kiosk=tv` of older versions no longer exists there.
+6. The name test of 17 section 10 item 4 runs in `make signal-check` (`tools/signalcheck`): every
+   `expr` of `queries.yaml` passes the same rules as a dashboard query (catalogue names, labels
+   only from the metric's attributes, `le` bounds, `promtool` syntax). A unit test of the plugin
+   holds the targets of `bothy-live.json` equal to `queries.yaml`; `make -C
+   plugins/grafana-bothy-live generate-check` fails when `src/queries.gen.ts` is stale.
 
 ### 8.3 Verteilung
 
@@ -547,6 +594,10 @@ setzt (Standard leer, dann gibt es keine Einbettung und keine Lockerung der CSP)
    compiles the file with `tsc --strict`.
 4. Das Plugin passt sich dem hellen oder dunklen Theme von Grafana an und nimmt dann das passende
    Theme der Tokens; die Schrift ist Atkinson Hyperlegible aus den mitgelieferten Dateien (OFL).
+   As built (M7-25): `src/theme.ts` maps `useTheme2().isDark` to `dark` or `light` of
+   `tokens.gen.ts`; the build copies the font files and their OFL texts to `dist/fonts/`. The lint
+   rule `bothy/no-color-literal` rejects a hex colour, a CSS colour function or a named colour in
+   `src/`.
 5. Komponenten-Hinweise: [components.md](../design/components.md), Abschnitt 11.
 
 ## 11. Fehler

@@ -10,8 +10,8 @@ Independently versioned components keep their own `VERSION` and `CHANGELOG.md` i
 directory and are tagged `<component>/v<version>` (docs/spec/18-release.md):
 server (`services/server/`), host service (`services/host/`), client app (`apps/client/`),
 admin console (`apps/console/`), Python SDK (`sdk/python/`), TypeScript SDK (`sdk/typescript/`), Hermes
-Agent adapter (`plugins/hermes-adapter/`) and Claude Code runner
-(`plugins/claude-code-runner/`). Each of these files is created with the component's
+Agent adapter (`plugins/hermes-adapter/`), Claude Code runner
+(`plugins/claude-code-runner/`) and the Grafana panel plugin (`plugins/grafana-bothy-live/`). Each of these files is created with the component's
 first code.
 
 ## [Unreleased]
@@ -40,6 +40,15 @@ Planning stage (milestone M0). Nothing is installable yet.
   with hashes or as a CSV converted on the device with a guard against formula injection. The
   fake server of `sync_engine` serves the three audit operations over a hash chain that a test
   can break at a given entry.
+- Grafana panel plugin `bothy-live-panel` (M7-25, `plugins/grafana-bothy-live`, its own
+  `VERSION` and `CHANGELOG.md`): the five live views of docs/spec/25-visualisierung.md 8.2 from
+  metrics only, in the colours and fonts of `design/build/ts/tokens.gen.ts` with a lint rule
+  against colour literals; `queries.yaml` with the generated `src/queries.gen.ts` and
+  `make -C plugins/grafana-bothy-live generate-check`; the seventh dashboard `bothy-live.json`.
+  `make signal-check` now also checks every metric and label of `queries.yaml` against the
+  signal catalogue; `make bootstrap-ci` installs the plugin's lock, and a change of
+  `design/build/ts/`, of `bothy-live.json` or of the Grafana pin selects the gate component
+  `plugins`. TV mode is Grafana's kiosk mode (`?kiosk`, verified for Grafana 13.2).
 - Gate `sql-visibility` (M1-70, AZ-P12): `tools/lint/sql_visibility.py` rejects every reading
   sqlc query on a content table without `channel_id = ANY(...)` or `space_id = ANY(...)` unless it
   stands with a category and a reason on `tools/lint/sql_visibility.yaml`; stale, duplicate and

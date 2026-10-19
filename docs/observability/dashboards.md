@@ -1,6 +1,6 @@
 # Dashboards
 
-Status: Entwurf M0. Sechs Grafana-Dashboards als Dateien unter
+Status: Entwurf M0. Sechs Grafana-Dashboards (seven since M7-25, the seventh uses the panel plugin of section 5) als Dateien unter
 [infra/observability/grafana/dashboards/](../../infra/observability/grafana/dashboards/), geladen per
 Datei-Provisioning (https://grafana.com/docs/grafana/latest/administration/provisioning/,
 abgerufen 2026-10-10) [belegt].
@@ -15,6 +15,7 @@ abgerufen 2026-10-10) [belegt].
 | `push.json` | `bothy-push` | Bothy / Push | Annahme beim Anbieter, Abruf-Quote, Sendungen nach Ergebnis, Sendedauer, Auslassungen |
 | `database.json` | `bothy-database` | Bothy / Database and backup | Verbindungen, Größe, Deadlocks, Commits und Rollbacks, Abfragedauer, Pool, größte Tabellen, Alter der Sicherungen, WAL-Archiv, Wiederherstellungstest, freier Platz |
 | `slo-overview.json` | `bothy-slo-overview` | Bothy / SLO overview | Ziele, Erfüllung über 30 Tage, verbleibendes Fehlerbudget, Burn-Rate, aktive Alarme |
+| `bothy-live.json` | `bothy-live` | Bothy / Live | five panels of the plugin `bothy-live-panel` (section 5): live topology per agent, backend view, delivery and sync, SLO traffic light, timeline; variable `env` only |
 
 Alle Dashboards haben die Variable `env` (aus `target_info`, Label
 `deployment_environment_name`); `agent-runs` zusätzlich `agent`. Datenquellen mit festen UIDs
@@ -70,3 +71,12 @@ Mit M7 kommt das eigene Panel-Plugin `bothy-live-panel` aus `plugins/grafana-bot
    Entscheid des Owners.
 5. Einbettung von Dashboards in die Web-Konsole ist optional und standardmäßig aus; in Apps gibt es
    sie nie ([25-visualisierung.md](../spec/25-visualisierung.md), Abschnitt 9).
+
+As built (M7-25): `bothy-live.json` has one panel per view (option `view`), each with the
+targets of its view in `plugins/grafana-bothy-live/queries.yaml`; a unit test of the plugin
+holds them equal, and `make signal-check` checks `queries.yaml` and the dashboard against the
+catalogue. The provider of `infra/observability/grafana/provisioning/dashboards/` loads it with
+the other six, but Grafana renders its panels only once the plugin build is installed and
+allowed unsigned; that provisioning in the Compose stack is M7-26. TV mode is Grafana's kiosk
+mode: `/d/bothy-live?kiosk` (verified for Grafana 13.2,
+[25-visualisierung.md](../spec/25-visualisierung.md) section 8.2).

@@ -1,0 +1,25 @@
+# SPDX-License-Identifier: Apache-2.0
+# Fixture of the panel queries (plugins/grafana-bothy-live/queries.yaml): a catalogue metric with
+# a Grafana variable and a resource label, a histogram over _bucket and a recording rule.
+views:
+  delivery:
+    title: Delivery and sync
+    queries:
+      - ref_id: fanout_lag
+        expr: max(bothy_event_fanout_lag_seconds{deployment_environment_name=~"$env"})
+        instant: false
+        legend: fan-out lag
+        unit: seconds
+      - ref_id: request_p95
+        expr: histogram_quantile(0.95, sum by (le) (rate(http_server_request_duration_seconds_bucket[$__rate_interval])))
+        instant: false
+        legend: p95
+        unit: seconds
+  executive:
+    title: Executive page
+    queries:
+      - ref_id: error_ratio
+        expr: max(slo:sli_error:ratio_rate5m)
+        instant: true
+        legend: errors
+        unit: ratio

@@ -1,0 +1,122 @@
+# SPDX-License-Identifier: Apache-2.0
+#
+# Queries of the panel bothy-live-panel, one list per view (docs/spec/25-visualisierung.md
+# section 8.2). This file is the only source: `make generate` writes src/queries.gen.ts from it,
+# `make generate-check` fails when that file is stale, and `make signal-check` holds every metric
+# and label here to the signal catalogue docs/observability/signals.md (17 section 10 item 4).
+# The dashboard infra/observability/grafana/dashboards/bothy-live.json carries the same targets;
+# a unit test of the plugin compares them.
+#
+# Fields per query:
+#   ref_id   refId of the Grafana target; the view reads its frames by it
+#   expr     PromQL; metrics carry no ID label (17 rule 9), so views show agents and states
+#   instant  true: one value at the end of the dashboard range; false: a series over the range
+#   legend   legendFormat of the target
+#   unit     how the view formats the value (count, per_minute, seconds, ratio, currency)
+
+views:
+  topology:
+    title: Live topology
+    queries:
+      - ref_id: active
+        expr: sum by (bothy_agent_handle, bothy_run_state) (bothy_run_active{job="bothy/bothy-server",deployment_environment_name=~"$env"})
+        instant: true
+        legend: '{{bothy_agent_handle}} {{bothy_run_state}}'
+        unit: count
+      - ref_id: tool_steps
+        expr: sum by (bothy_agent_handle) (rate(bothy_run_steps_total{job="bothy/bothy-server",deployment_environment_name=~"$env",bothy_step_kind="tool_call"}[$__rate_interval])) * 60
+        instant: true
+        legend: '{{bothy_agent_handle}}'
+        unit: per_minute
+      - ref_id: cost
+        expr: sum by (bothy_agent_handle, bothy_currency, bothy_cost_estimate) (increase(bothy_run_cost_total{job="bothy/bothy-server",deployment_environment_name=~"$env"}[$__range]))
+        instant: true
+        legend: '{{bothy_agent_handle}} {{bothy_currency}}'
+        unit: currency
+  backend:
+    title: Backend view
+    queries:
+      - ref_id: mode_runs
+        expr: sum by (bothy_agent_handle, bothy_billing_mode) (increase(bothy_run_start_latency_seconds_count{job="bothy/bothy-server",deployment_environment_name=~"$env"}[$__range]))
+        instant: true
+        legend: '{{bothy_agent_handle}} {{bothy_billing_mode}}'
+        unit: count
+      - ref_id: mismatches
+        expr: sum by (bothy_agent_handle) (increase(bothy_agent_billing_mode_mismatch_total{job="bothy/bothy-server",deployment_environment_name=~"$env"}[$__range]))
+        instant: true
+        legend: '{{bothy_agent_handle}}'
+        unit: count
+      - ref_id: denials
+        expr: sum by (bothy_agent_handle, bothy_reason) (increase(bothy_agent_invocation_denied_total{job="bothy/bothy-server",deployment_environment_name=~"$env"}[$__range]))
+        instant: true
+        legend: '{{bothy_agent_handle}} {{bothy_reason}}'
+        unit: count
+      - ref_id: cost_by_mode
+        expr: sum by (bothy_agent_handle, bothy_billing_mode, bothy_currency, bothy_cost_estimate) (increase(bothy_run_cost_total{job="bothy/bothy-server",deployment_environment_name=~"$env"}[$__range]))
+        instant: true
+        legend: '{{bothy_agent_handle}} {{bothy_billing_mode}} {{bothy_currency}}'
+        unit: currency
+  delivery:
+    title: Delivery and sync
+    queries:
+      - ref_id: delivery_p95
+        expr: histogram_quantile(0.95, sum by (le) (rate(bothy_delivery_duration_seconds_bucket{job="bothy/bothy-server",deployment_environment_name=~"$env"}[$__rate_interval])))
+        instant: false
+        legend: delivery p95
+        unit: seconds
+      - ref_id: connect_p95
+        expr: histogram_quantile(0.95, sum by (le) (rate(bothy_gateway_connect_duration_seconds_bucket{job="bothy/bothy-server",deployment_environment_name=~"$env"}[$__rate_interval])))
+        instant: false
+        legend: connect p95
+        unit: seconds
+      - ref_id: catchup_p95
+        expr: histogram_quantile(0.95, sum by (le) (rate(bothy_gateway_catchup_duration_seconds_bucket{job="bothy/bothy-server",deployment_environment_name=~"$env"}[$__rate_interval])))
+        instant: false
+        legend: catch-up p95
+        unit: seconds
+      - ref_id: fanout_lag
+        expr: max(bothy_event_fanout_lag_seconds{job="bothy/bothy-server",deployment_environment_name=~"$env"})
+        instant: false
+        legend: fan-out lag
+        unit: seconds
+  executive:
+    title: Executive page
+    queries:
+      - ref_id: objective
+        expr: max by (sloth_service, sloth_slo) (slo:objective:ratio)
+        instant: true
+        legend: '{{sloth_slo}}'
+        unit: ratio
+      - ref_id: error_ratio
+        expr: max by (sloth_service, sloth_slo) (slo:sli_error:ratio_rate30d)
+        instant: true
+        legend: '{{sloth_slo}}'
+        unit: ratio
+      - ref_id: budget_remaining
+        expr: max by (sloth_service, sloth_slo) (slo:period_error_budget_remaining:ratio)
+        instant: true
+        legend: '{{sloth_slo}}'
+        unit: ratio
+  timeline:
+    title: Timeline
+    queries:
+      - ref_id: active
+        expr: sum by (bothy_run_state) (bothy_run_active{job="bothy/bothy-server",deployment_environment_name=~"$env"})
+        instant: false
+        legend: '{{bothy_run_state}}'
+        unit: count
+      - ref_id: tool_steps
+        expr: sum(rate(bothy_run_steps_total{job="bothy/bothy-server",deployment_environment_name=~"$env",bothy_step_kind="tool_call"}[$__rate_interval])) * 60
+        instant: false
+        legend: tool steps per minute
+        unit: per_minute
+      - ref_id: delivery_p95
+        expr: histogram_quantile(0.95, sum by (le) (rate(bothy_delivery_duration_seconds_bucket{job="bothy/bothy-server",deployment_environment_name=~"$env"}[$__rate_interval])))
+        instant: false
+        legend: delivery p95
+        unit: seconds
+      - ref_id: budget_remaining
+        expr: min(slo:period_error_budget_remaining:ratio)
+        instant: false
+        legend: lowest remaining error budget
+        unit: ratio

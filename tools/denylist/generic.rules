@@ -13,6 +13,9 @@
 @exclude-path: *package-lock.json
 @exclude-path: *pubspec.lock
 @exclude-path: *go.sum
+# The scaffold of @grafana/create-plugin types webpack-livereload-plugin with its upstream doc
+# comment, which names the VirtualBox host address as an example hostname (M7-25).
+@exclude-path: plugins/grafana-bothy-live/.config/types/webpack-plugins.d.ts
 
 # macOS home directories. The character class keeps this file from matching itself in
 # other scanners; placeholders with angle brackets stay allowed. `/Users` is matched with its

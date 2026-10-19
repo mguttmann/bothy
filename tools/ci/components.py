@@ -48,7 +48,14 @@ GATE_COMPONENT_INPUTS: dict[str, tuple[str, ...]] = {
     "server": ("docs/spec/actions.yaml",),
     # Chapter 09 is the contract of the adapters under plugins/; its section 17.10 is bound to the
     # recording evidence of plugins/hermes-adapter by the offline fixture tests.
-    "plugins": ("docs/spec/09-agenten.md",),
+    # The unit tests of plugins/grafana-bothy-live hold its dashboard to queries.yaml and its
+    # Grafana pin to the Compose stack (M7-25).
+    "plugins": (
+        "docs/spec/09-agenten.md",
+        "infra/observability/grafana/dashboards/bothy-live.json",
+        "infra/compose/compose.yaml",
+        "infra/compose/.env.example",
+    ),
     # The root files of the Dart workspace: manifest with the Flutter pin, the one lock file and
     # the shared analysis rules (docs/DECISIONS.md D-M4-01-8).
     "apps": ("pubspec.yaml", "pubspec.lock", "analysis_options.yaml"),
@@ -60,6 +67,8 @@ GATE_COMPONENT_INPUTS: dict[str, tuple[str, ...]] = {
 GATE_COMPONENT_INPUT_PREFIXES: dict[str, tuple[str, ...]] = {
     "server": ("tools/observability/", "infra/observability/slo/"),
     "apps": ("tools/observability/", "infra/observability/slo/"),
+    # The panel plugin imports the TypeScript tokens and bundles their fonts (M7-24, M7-25).
+    "plugins": ("design/build/ts/",),
 }
 # Areas without component gates; their repository-wide gates always run.
 NO_COMPONENT_PREFIXES = ("docs/", "infra/")
