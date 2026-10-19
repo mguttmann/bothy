@@ -23,6 +23,7 @@ func closePath(session string) string { return "/terminal/sessions/" + session +
 // audit terminal.close with the reason; Robin closes another session of Alex: closed_by_owner and
 // foreign_assignee true in his opening; every event goes only to Alex and holds no token or name.
 func TestClose_EndsConnectionsAndTellsHost(t *testing.T) {
+	t.Parallel()
 	w := newWorld(t, nil)
 	ctx := w.ctx()
 	g, d := w.started(w.alex)
@@ -91,6 +92,7 @@ func TestClose_EndsConnectionsAndTellsHost(t *testing.T) {
 // Lotse 403 forbidden; an already closed session 200 without a new version and with no_change; a
 // reason above audit.reason_max_chars 400 too_long.
 func TestClose_RightsAndRepeats(t *testing.T) {
+	t.Parallel()
 	w := newWorld(t, nil)
 	w.h1.Default(fakehost.Script{Kind: fakehost.Ignore})
 	g := w.opened(w.alex, w.r1, openBody("shell"))
@@ -129,6 +131,7 @@ func TestClose_RightsAndRepeats(t *testing.T) {
 // TestListAndGet (Design note 17): Alex lists only her sessions, Robin all; the filters host_id
 // and state; pages without gap or duplicate; Sam's get of Alex's session equals an unknown id.
 func TestListAndGet(t *testing.T) {
+	t.Parallel()
 	w := newWorld(t, nil)
 	w.h1.Default(fakehost.Script{Kind: fakehost.Ignore})
 	var alex []string

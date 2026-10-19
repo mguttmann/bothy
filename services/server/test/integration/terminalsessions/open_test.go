@@ -19,6 +19,7 @@ import (
 // key set H1 got and carries the claims of 24 section 5.3; with H1 on Accept the session becomes
 // active after the start frame.
 func TestOpen_HappyPathShell(t *testing.T) {
+	t.Parallel()
 	w := newWorld(t, nil)
 	before := time.Now()
 	g := w.opened(w.alex, w.r1, openBody("shell"))

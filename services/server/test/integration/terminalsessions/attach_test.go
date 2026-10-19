@@ -17,6 +17,7 @@ import (
 // attaches. Every grant has a new jti, the last one is token_jti; opened_at,
 // host_session_user_id and key_generation never change.
 func TestAttach_TMT12(t *testing.T) {
+	t.Parallel()
 	w := newWorld(t, nil)
 	ctx := w.ctx()
 	g, d := w.started(w.alex)
@@ -74,6 +75,7 @@ func TestAttach_TMT12(t *testing.T) {
 // stream gets 4103, H1's old data connection 1000, H1 gets a new session.open, D2 pairs and the
 // session is active with device_id D2; a later identify from D1 gets 4103.
 func TestAttach_SecondDeviceCloses4103(t *testing.T) {
+	t.Parallel()
 	w := newWorld(t, nil)
 	ctx := w.ctx()
 	g, d1 := w.started(w.alex)
@@ -109,6 +111,7 @@ func TestAttach_SecondDeviceCloses4103(t *testing.T) {
 // TestAttach_OpeningSession (Design note 6 d): D1 drops before message 1 of a claude opening with
 // index 1; the attach with a fresh step-up gives att open and wdi 1.
 func TestAttach_OpeningSession(t *testing.T) {
+	t.Parallel()
 	w := newWorld(t, nil)
 	ctx := w.ctx()
 	w.h1.Default(fakehost.Script{Kind: fakehost.Ignore})

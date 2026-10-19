@@ -63,6 +63,7 @@ func (w *world) closeCode(what string, got func() (int, string), code int, reaso
 // the session is detached and the row carries the transport bytes without the handshake; a canary
 // and the token appear in no audit entry, no event and no log line.
 func TestRelay_ForwardsBytesUnchanged(t *testing.T) {
+	t.Parallel()
 	logs := &syncBuffer{}
 	w := newWorldLogs(t, nil, logs)
 	g, d := w.started(w.alex)
@@ -114,6 +115,7 @@ func TestRelay_ForwardsBytesUnchanged(t *testing.T) {
 // binary message of 65536 bytes from the device gives it 4002 and the host side 1000; from the
 // host the host side 4002 and the device 4102.
 func TestRelay_TextFrameAfterIdentify4002(t *testing.T) {
+	t.Parallel()
 	w := newWorld(t, nil)
 	ctx := w.ctx()
 	g, d := w.started(w.alex)
@@ -146,6 +148,7 @@ func TestRelay_TextFrameAfterIdentify4002(t *testing.T) {
 // as the slow end (4014, when its socket still takes the close frame), the host side gets 1000 and
 // the session is detached.
 func TestRelay_SlowDevice4014(t *testing.T) {
+	t.Parallel()
 	w := newWorld(t, map[string]string{"terminal.relay_buffer_max_bytes": "4096"})
 	ctx := w.ctx()
 	g, d := w.started(w.alex)
@@ -172,6 +175,7 @@ func TestRelay_SlowDevice4014(t *testing.T) {
 // 4102 and ends open_failed open_timeout; without a device the host side gets 4100; with both
 // paired and no start both get 4100.
 func TestRelay_OpenTimeout(t *testing.T) {
+	t.Parallel()
 	w := newWorld(t, nil)
 	ctx := w.ctx()
 	w.h1.Default(fakehost.Script{Kind: fakehost.Ignore})
@@ -218,6 +222,7 @@ func TestRelay_OpenTimeout(t *testing.T) {
 // TestRelay_LocalConfirmHostDeadline: on a host that reports require_local_confirm the pairing
 // meets the deadline: a session.started after it makes the session active.
 func TestRelay_LocalConfirmHostDeadline(t *testing.T) {
+	t.Parallel()
 	w := newWorld(t, nil)
 	ctx := w.ctx()
 	if err := w.h1.Send("report", report(reportedUsers(), true)); err != nil {
@@ -250,6 +255,7 @@ func TestRelay_LocalConfirmHostDeadline(t *testing.T) {
 // profile_unknown the device gets 4104; with End(open_failed, token_replayed) the device gets 4101
 // as well.
 func TestRelay_HostRefusalCodes(t *testing.T) {
+	t.Parallel()
 	w := newWorld(t, nil)
 	ctx := w.ctx()
 	for _, c := range []struct {
@@ -286,6 +292,7 @@ func TestRelay_HostRefusalCodes(t *testing.T) {
 // ends the stream with 4100 process_exited; a disable of R1 ends another with host_disabled; H1
 // gets session.close where it holds the link.
 func TestRelay_EndsFromOtherPaths(t *testing.T) {
+	t.Parallel()
 	w := newWorld(t, nil)
 	ctx := w.ctx()
 	g, d := w.started(w.alex)
@@ -310,6 +317,7 @@ func TestRelay_EndsFromOtherPaths(t *testing.T) {
 // TestControlLoss_ClosesStreams: H1's control link drops while a session is active: the device
 // gets 4102 and the session is detached.
 func TestControlLoss_ClosesStreams(t *testing.T) {
+	t.Parallel()
 	w := newWorld(t, nil)
 	ctx := w.ctx()
 	g, d := w.started(w.alex)

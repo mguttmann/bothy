@@ -14,6 +14,7 @@ import (
 // TestStream_IdentifyDecisions (Design note 8) with TestTerminalOps_NonHumanTokens on the stream:
 // every row of the close code table; the denials have deny entries.
 func TestStream_IdentifyDecisions(t *testing.T) {
+	t.Parallel()
 	w := newWorld(t, nil)
 	ctx := w.ctx()
 	w.h1.Default(fakehost.Script{Kind: fakehost.Ignore})
@@ -78,6 +79,7 @@ func TestStream_IdentifyDecisions(t *testing.T) {
 // TestStream_ForeignOriginRejected (SEC-CORS-3, part of SEC-T04): a foreign Origin gets 403 before
 // the upgrade on both paths; the instance origin and no Origin are accepted.
 func TestStream_ForeignOriginRejected(t *testing.T) {
+	t.Parallel()
 	w := newWorld(t, nil)
 	ctx := w.ctx()
 	sid := ids.New()

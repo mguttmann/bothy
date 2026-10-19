@@ -40,6 +40,7 @@ func expect(t *testing.T, what string, r harness.Response, status int, code, rea
 // an index and an unreported profile each give 403 terminal_denied profile_unknown with a deny
 // entry and nothing opened; valid indexes stand as wdi.
 func TestOpen_TMT29g_WorkdirIndexOutsideOwnList(t *testing.T) {
+	t.Parallel()
 	w := newWorld(t, nil)
 	for name, body := range map[string]map[string]any{
 		"index 2":        openBody("claude", 2),
@@ -71,6 +72,7 @@ func TestOpen_TMT29g_WorkdirIndexOutsideOwnList(t *testing.T) {
 
 // TestOpen_ClaudeWdi: Alex opens claude with index 0 and 1; the tokens carry wdi 0 and 1.
 func TestOpen_ClaudeWdi(t *testing.T) {
+	t.Parallel()
 	w := newWorld(t, nil)
 	for _, i := range []int{0, 1} {
 		g := w.opened(w.alex, w.r1, openBody("claude", i))
@@ -84,6 +86,7 @@ func TestOpen_ClaudeWdi(t *testing.T) {
 // TestOpen_NoSessionUserIsDeniedNot4104 (TM-T28 (e) server part): a report without bothy-s-alex
 // makes the opening 403 terminal_denied no_session_user; no row, no token, no session.open.
 func TestOpen_NoSessionUserIsDeniedNot4104(t *testing.T) {
+	t.Parallel()
 	w := newWorld(t, nil)
 	users := []any{
 		map[string]any{"os_user": "bothy-s-robin", "workdirs": []string{"Project C"}},
@@ -104,6 +107,7 @@ func TestOpen_NoSessionUserIsDeniedNot4104(t *testing.T) {
 // terminal.step_up_max_age and a step-up consumed by a successful opening each give 401
 // step_up_required with a deny entry; of two parallel openings with one step-up exactly one wins.
 func TestOpen_TMT07_StepUp(t *testing.T) {
+	t.Parallel()
 	w := newWorld(t, nil)
 	expect(t, "no step-up", w.openRaw(w.alex, w.r1, openBody("shell")), http.StatusUnauthorized, "step_up_required", "")
 	if err := w.alex.StepUp(t.Context()); err != nil {
@@ -142,6 +146,7 @@ func TestOpen_TMT07_StepUp(t *testing.T) {
 // assignee; an agent token gets the gate; Sam on R2 with only the instance grant gets the same 404
 // as an unknown host; H1 disconnected gives 409 host_unavailable; nothing is opened.
 func TestOpen_DeniedOpensNothing(t *testing.T) {
+	t.Parallel()
 	w := newWorld(t, nil)
 	expect(t, "Sam on R1", w.open(w.sam, w.r1, openBody("shell")), http.StatusForbidden, "terminal_denied", "not_host_assignee")
 	w.nothingOpened(w.sam)
@@ -165,6 +170,7 @@ func TestOpen_DeniedOpensNothing(t *testing.T) {
 
 // TestToken_OsuFromAssignment: a body with an extra member osu is 400 validation_failed.
 func TestToken_OsuFromAssignment(t *testing.T) {
+	t.Parallel()
 	w := newWorld(t, nil)
 	b := openBody("shell")
 	b["osu"] = "bothy-s-robin"
