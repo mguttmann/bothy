@@ -71,7 +71,7 @@ void main() {
       ],
     );
     // Robin's assignment to term-robin ended; only the audit of the host knows it.
-    repository.audit['build'] = {'term-robin': 'robin'};
+    repository.hostAudit['build'] = {'term-robin': 'robin'};
   });
 
   Future<void> page(WidgetTester tester) => pumpInApp(

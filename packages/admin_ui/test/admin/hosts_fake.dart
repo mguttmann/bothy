@@ -148,7 +148,7 @@ mixin FakeHosts {
   final Map<String, Map<String, String>> taken = {};
 
   /// The audit of the assignments per host: name to the person of its last assignment or end.
-  final Map<String, Map<String, String>> audit = {};
+  final Map<String, Map<String, String>> hostAudit = {};
 
   /// Open terminal sessions per host.
   final Map<String, int> sessionCounts = {};
@@ -253,7 +253,7 @@ mixin FakeHosts {
   List<HostSessionUserInfo> _assigned(AdminHost h, List<HostAssignment> add) {
     for (final a in add) {
       (taken[h.id] ??= {})[a.osUser] = a.userId;
-      (audit[h.id] ??= {})[a.osUser] = a.userId;
+      (hostAudit[h.id] ??= {})[a.osUser] = a.userId;
     }
     return [
       ...h.sessionUsers,
@@ -423,7 +423,8 @@ mixin FakeHosts {
         if (!revoke.contains(s.userId)) s,
     ];
     for (final s in h.sessionUsers) {
-      if (revoke.contains(s.userId)) (audit[h.id] ??= {})[s.osUser] = s.userId;
+      if (revoke.contains(s.userId))
+        (hostAudit[h.id] ??= {})[s.osUser] = s.userId;
     }
     final base = changedHost(h, sessionUsers: kept);
     return hostsById[h.id] = changedHost(
@@ -483,7 +484,7 @@ mixin FakeHosts {
     required String purpose,
   }) async {
     await change('assignmentHistory', hostId, purpose);
-    return Map.of(audit[hostId] ?? const {});
+    return Map.of(hostAudit[hostId] ?? const {});
   }
 
   /// Open sessions.
