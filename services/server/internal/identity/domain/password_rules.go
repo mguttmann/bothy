@@ -7,9 +7,9 @@ import "unicode/utf8"
 // Field error codes of a rejected password (setMyLocalCredential, pointer /password).
 const (
 	// PasswordTooShort is a password below auth.password_min_length code points.
-	PasswordTooShort = "too_short"
+	PasswordTooShort = "too_short" // NOSONAR: an API error code, not a credential (M1-39/14)
 	// PasswordCommon is a password on the local list of common passwords.
-	PasswordCommon = "common_password"
+	PasswordCommon = "common_password" // NOSONAR: an API error code, not a credential (M1-39/14)
 )
 
 // CheckPassword applies the password rules of docs/spec/08-identity.md section 2.5 to nfc, the

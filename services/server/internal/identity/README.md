@@ -845,7 +845,7 @@ Principals, people, owners, login drivers, identities, local credentials, enroll
   `"totp/v1" || 0x00 || identity_id`, stored layout `0x01 || nonce || ciphertext and tag`; the row
   keeps the reference that sealed it.
 - `adapters/passwordpolicy`: the embedded list `common_passwords.txt` (truncated SHA-256 values,
-  source and licence in its [README](adapters/passwordpolicy/README.md)) and the NFC normalisation
+  source and license in its [README](adapters/passwordpolicy/README.md)) and the NFC normalization
   (`golang.org/x/text/unicode/norm`).
 - `adapters/postgres`: `queries/local_credentials.sql`, `local.go`. Migration
   `migrations/00029_identity_local_credentials.sql`: `local_credentials` as 03 section 4.2 with
