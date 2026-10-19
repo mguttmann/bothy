@@ -109,13 +109,13 @@ jobs:
             ~/.cache/pre-commit
           key: gates-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('tools/bin/tools.lock.json', '.pre-commit-config.yaml') }}
       - run: make bootstrap-ci
-      - name: make fmt-check codegen-check lint typecheck arch register-check migrations-lint flag-check commitlint runners-check labels-check release-pins
+      - name: make fmt-check codegen-check lint typecheck arch register-check migrations-lint sql-visibility flag-check commitlint runners-check labels-check release-pins
         env:
           COMPONENTS: ${{ needs.plan.outputs.components }}
           COMMIT_RANGE: ${{ needs.plan.outputs.base && format('{0}..{1}', needs.plan.outputs.base, github.sha) || '' }}
           # zizmor's online audits in make lint read public data with the run's token.
           GH_TOKEN: ${{ github.token }}
-        run: make fmt-check codegen-check lint typecheck arch register-check migrations-lint flag-check commitlint runners-check labels-check release-pins COMPONENTS="$COMPONENTS"
+        run: make fmt-check codegen-check lint typecheck arch register-check migrations-lint sql-visibility flag-check commitlint runners-check labels-check release-pins COMPONENTS="$COMPONENTS"
 
   # The Python tools: `make test coverage` with no component selected runs only their tests.
   test-tools:
