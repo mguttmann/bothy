@@ -639,7 +639,7 @@ release-build: ## Product release bundle (tag v<version>): Compose installation,
 	@[ "$$(cat VERSION)" = "$$VERSION" ] || { echo "release-build: VERSION file says $$(cat VERSION), not $$VERSION"; exit 1; }
 	mkdir -p "$$OUT"
 	git archive --format=tar.gz --prefix="bothy-$$VERSION/" -o "$$OUT/bothy-compose-$$VERSION.tar.gz" HEAD \
-	  infra/compose LICENSE NOTICE CHANGELOG.md VERSION
+	  infra/compose ':(exclude)infra/compose/test' LICENSE NOTICE CHANGELOG.md VERSION
 
 release-prep: ## Prepare a component release (ADR 0060): make release-prep COMPONENT=<name> [CHANNEL=beta]
 	@[ -n "$${COMPONENT:-}" ] || { echo "usage: make release-prep COMPONENT=<name> [CHANNEL=beta]"; exit 2; }
@@ -748,7 +748,7 @@ postgres-image-test: ## Two-container test of bothy-postgres: archive-push, full
 	BOTHY_TEST_IMAGE='$(or $(POSTGRES_IMAGE),$(POSTGRES_IMAGE_NAME):$(POSTGRES_IMAGE_TAG))' BOTHY_TEST_IMAGE_OCI='$(abspath $(POSTGRES_IMAGE_OCI))' \
 	  go test -tags imagetest -count=1 -v -timeout 20m ./test/postgresimage/... || exit 1
 
-portability: ## Full stack from images on this machine plus smoke test (contract: infra/compose/smoke.sh)
+portability: ## Compose smoke test with the server image (SMOKE_SERVER_IMAGE, default the tag of make image; infra/compose/test/README.md)
 	@[ -x infra/compose/smoke.sh ] || { echo "portability: infra/compose/smoke.sh is missing (docs/quality/gates.md)"; exit 1; }
 	infra/compose/smoke.sh
 

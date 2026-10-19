@@ -94,6 +94,15 @@ sind kurz.
 
 The in-process part of this gate is `services/server/test/canary` (M1-69); the collector part with the `file` exporter and container stdout is M1-73.
 
+Implementation of the collector part (M1-73): `infra/compose/smoke.sh` (`make portability`) runs
+the real server image with the collector overlay `file` alone (no `local`), puts one canary of
+`smk` plus 24 hex characters into every content field the probe writes (space, channel, thread,
+message, device name, display name, revocation reason), and scans the collector export and the
+logs of every container for the canary, both tokens, the enrollment code and the principal ID. A
+positive control proves the scanner, and the export must hold telemetry of the server, so an empty
+export cannot pass. The probe's own output (the setup output with the enrollment code and the
+canary list) is not scanned. Details: [infra/compose/test/README.md](../../infra/compose/test/README.md).
+
 ## 7. Apps
 
 Apps senden keine Telemetrie an den Collector. Absturzberichte gehen nur an ein Ziel, das der
