@@ -819,7 +819,7 @@ real server.
 |---|---|---|
 | `client.cache_max_bytes` | `1GiB` | upper limit for the local database plus file cache; above it the oldest entries are removed |
 | `client.sync.parse_offload_bytes` | `262144` | from this page size on, decoding happens in the background isolate |
-| `client.sync.connect_timeout` | `30s` | deadline of one connection attempt from opening the socket to `ready` or `resumed`; when it passes, the attempt ends and the backoff applies (7.2) |
+| `client.sync.connect_timeout` | `30s` | deadline of one connection attempt from its start in `Connecting`, before the socket opens, to `ready` or `resumed`; it also covers a connect that never completes; when it passes, the attempt ends and the backoff applies (7.2) |
 | `client.outbox_stuck_after` | `2m` | from then on a waiting entry shows "Sending delayed" |
 | `client.push.fetch_timeout` | `20s` | time that the NSE or the Android service uses to fetch the text |
 | `client.voice.bitrate` | `64kbps` | bitrate of the AAC recording |

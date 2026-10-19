@@ -265,22 +265,40 @@ final class GatewayConnection {
   /// Ends the attempt [gen] when it has not reached `ready` or `resumed` within
   /// `client.sync.connect_timeout` (15 7.2): a stalled connect, a socket without `hello` or an
   /// unanswered `identify` or `resume`. The generation is invalidated, so a late socket or frame
-  /// of the attempt does nothing, and the attempt takes the backoff of a failed connect.
+  /// of the attempt does nothing, and the attempt takes the backoff of a failed connect once its
+  /// socket is closed: the attempt stays open until then, so no second socket opens (04 6.1).
   void _onDeadline(int gen) {
     if (gen != _channelGen || !_attempting || _identified || _stopped) return;
     // A close the client started itself (sign-out, update required, background) runs already.
     if (_ownReaction != null) return;
-    _log('connect attempt timed out');
     final ch = _channel;
+    // The server closed first: its code waits in the queue and decides the reaction.
+    if (ch?.closeCode != null) return;
+    _log('connect attempt timed out');
     final sub = _frameSub;
-    _channelGen++;
+    final mine = ++_channelGen;
     _channel = null;
     _frameSub = null;
-    _attempting = false;
+    unawaited(_endTimedOut(mine, ch, sub));
+  }
+
+  /// Closes the socket of a timed-out attempt, bounded by `client.sync.connect_timeout` again,
+  /// then ends the attempt with the backoff of a failed connect unless something newer took
+  /// over (a stop or the background).
+  Future<void> _endTimedOut(
+    int mine,
+    GatewayChannel? ch,
+    StreamSubscription<String>? sub,
+  ) async {
     if (ch != null) {
       unawaited(sub?.cancel());
-      unawaited(ch.close(1000));
+      await Future.any<void>([
+        ch.close(1000).catchError((Object _) {}),
+        _clock.delay(_connectTimeout),
+      ]);
     }
+    if (mine != _channelGen || _stopped) return;
+    _attempting = false;
     _enqueue(() => _apply(reactTo(null, null, foreground: _foreground)));
   }
 

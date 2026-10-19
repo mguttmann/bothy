@@ -145,8 +145,15 @@ class FakeChannel implements GatewayChannel {
     sent.add(text);
   }
 
+  /// When set, a close by the client completes only after this future (a slow close
+  /// handshake).
+  Future<void>? closeGate;
+
   @override
   Future<void> close(int code, [String? reason]) async {
+    if (_closed) return;
+    final gate = closeGate;
+    if (gate != null) await gate;
     if (_closed) return;
     _closed = true;
     clientCloseCode = code;

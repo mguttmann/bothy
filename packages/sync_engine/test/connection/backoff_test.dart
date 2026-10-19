@@ -4,6 +4,8 @@
 // an immediate attempt on a network change or the foreground that does not raise n (brief
 // M4-13, Tests).
 
+import 'dart:async';
+
 import 'package:sync_engine/sync_engine.dart';
 import 'package:test/test.dart';
 
@@ -184,6 +186,45 @@ void main() {
         expect(first.isClosed, isTrue);
         expect(h.phase, ConnectionPhase.backoff);
       });
+
+      test('a server close before the deadline keeps its reaction', () async {
+        await h.signIn();
+        // An expired token makes the answer to hello wait for a refresh, so the close of
+        // the server waits in the frame queue behind it when the deadline passes.
+        await h.clock.elapse(const Duration(hours: 2));
+        final release = Completer<void>();
+        h.api.gates['POST /auth/token/refresh'] = release.future;
+        h.connection.start();
+        await settle();
+        final first = h.transport.last..push('hello', helloData());
+        await settle();
+        first.serverClose(4012);
+        await settle();
+        await h.clock.elapse(deadline);
+        release.complete();
+        await settle();
+        expect(h.phase, ConnectionPhase.signedOut);
+      });
+
+      test(
+        'the next attempt waits until the timed-out socket closed',
+        () async {
+          await h.signIn();
+          h.connection.start();
+          await settle();
+          final slow = Completer<void>();
+          final first = h.transport.last..closeGate = slow.future;
+          await h.clock.elapse(deadline);
+          // The close may take up to the deadline again before the attempt gives up on it.
+          await h.clock.elapse(const Duration(seconds: 4));
+          expect(h.transport.attempts, 1, reason: 'one socket at a time');
+          expect(first.isClosed, isFalse);
+          slow.complete();
+          await settle();
+          await h.clock.elapse(const Duration(seconds: 2));
+          expect(h.transport.attempts, 2);
+        },
+      );
 
       test('a session that started is not cut by the deadline', () async {
         await h.signIn();
