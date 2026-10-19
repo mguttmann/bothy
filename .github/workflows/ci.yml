@@ -477,9 +477,10 @@ jobs:
     # No `needs` on purpose: a job with `needs` gets its check run only when the others are
     # done, so an older green ci-ok would stay the latest result of the head commit while the
     # run after an edit of the pull request text is still going. tools/ci/ci_ok.py waits for
-    # the other jobs of this run through the API and combines their results.
+    # the other jobs of this run through the API and combines their results. Its timeout
+    # covers plan, gates and sonar in a row, with margin for queueing.
     runs-on: ubuntu-24.04
-    timeout-minutes: 120
+    timeout-minutes: 150
     permissions:
       actions: read # list the jobs of this run
       contents: read

@@ -248,7 +248,7 @@ coverage: test ## Coverage thresholds (named values quality.coverage.*)
 	@# (docs/spec/02-architecture.md "Code layout"), and generated files (*.gen.go, docs/DECISIONS.md
 	@# M1-05/7 and M1-17) are not hand-written code. The total comes from a filtered copy;
 	@# coverage.out stays as go test wrote it, so SonarQube reads the same file in
-	@# `make check` and in the CI job that runs `make sonar` alone.
+	@# `make check` and in the CI job sonar, which scans the reports of the job gates.
 	@if [ -z "$(GO_ON)" ]; then $(call skip,go-coverage,no Go module selected); \
 	else for m in $(GO_MODS); do \
 	  mod=$$(awk '$$1 == "module" { gsub(/"/, "", $$2); print $$2; exit }' $$m/go.mod); \

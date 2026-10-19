@@ -610,7 +610,7 @@ def test_go_coverage_counts_production_code_only(fakes: Fakes, shell: list[str])
     assert result.returncode == 0, result.stdout + result.stderr
     [cover] = fakes.calls("go")
     assert cover["cwd"] == str(fakes.module.resolve())
-    # SonarQube reads coverage.out in `make check` and in the CI job `make sonar` alike.
+    # SonarQube reads coverage.out in `make check` and in `make sonar-scan` of CI alike.
     assert (fakes.module / "coverage.out").read_text() == profile
 
 

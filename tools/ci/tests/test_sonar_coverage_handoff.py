@@ -106,3 +106,11 @@ def _rule(target: str) -> str:
 def test_make_sonar_tests_first_and_sonar_scan_does_not() -> None:
     assert _rule("sonar").split(":", 1)[1].split() == ["test"]
     assert _rule("sonar-scan").split(":", 1)[1].split() == []
+
+
+def test_ci_ok_outlasts_the_longest_chain() -> None:
+    # ci-ok has no `needs` and waits for the others; sonar now runs after gates, so its
+    # timeout must cover plan, gates and sonar in a row.
+    jobs = _workflow()["jobs"]
+    chain = sum(int(jobs[j]["timeout-minutes"]) for j in ("plan", "gates", "sonar"))
+    assert int(jobs["ci-ok"]["timeout-minutes"]) > chain
