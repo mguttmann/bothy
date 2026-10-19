@@ -58,6 +58,8 @@ func TestG7_SchemathesisAllEnabledOperations(t *testing.T) {
 		"BOTHY_CONTRACT_BROKER_URL="+b.URL(),
 		"BOTHY_CONTRACT_OPERATIONS="+filepath.Join(root, "services", "server", "api", "operations.yaml"),
 		"BOTHY_CONTRACT_SPEC="+filepath.Join(root, "docs", "api", "openapi.yaml"),
+		// The channel where Alex uploads, so the upload operations reach a real session (M3-03).
+		"BOTHY_CONTRACT_UPLOAD_CHANNEL="+w.Channels["Support/Allgemein"],
 		"CONTRACT_MAX_EXAMPLES="+examples,
 		"CONTRACT_SEED="+seed,
 		"BOTHY_CONTRACT_STEP_UP_MAX_AGE_S="+seconds(t, s.ConfigValue("auth.step_up_max_age")),

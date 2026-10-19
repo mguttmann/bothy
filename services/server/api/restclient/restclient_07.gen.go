@@ -9899,6 +9899,13 @@ func ParseAbortUploadResponse(rsp *http.Response) (*AbortUploadResponse, error) 
 		}
 		response.ApplicationproblemJSON404 = &dest
 
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 409:
+		var dest Conflict
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON409 = &dest
+
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 429:
 		var dest TooManyRequests
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
@@ -10001,6 +10008,16 @@ func ParseAbortUploadResponse(rsp *http.Response) (*AbortUploadResponse, error) 
 			headers.CorrelationId = &value
 		}
 		response.Headers404 = &headers
+	case rsp.StatusCode == 409:
+		var headers AbortUploadResponse409Headers
+		if values := rsp.Header.Values("Correlation-Id"); len(values) > 0 {
+			var value CorrelationId
+			if err := runtime.BindStyledParameterWithOptions("simple", "Correlation-Id", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: "uuid"}); err != nil {
+				return nil, err
+			}
+			headers.CorrelationId = &value
+		}
+		response.Headers409 = &headers
 	case rsp.StatusCode == 429:
 		var headers AbortUploadResponse429Headers
 		if values := rsp.Header.Values("Correlation-Id"); len(values) > 0 {

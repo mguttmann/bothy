@@ -30,7 +30,7 @@ class FilesApi {
   const FilesApi(this._dio, this._serializers);
 
   /// Abort an upload
-  ///
+  /// Ends an open own session: its parts are deleted, the file becomes &#x60;upload_state&#x60; &#x60;failed&#x60; and &#x60;file.updated&#x60; goes to the uploader. An aborted or expired session answers 204 again; a completed one 409 &#x60;invalid_state_transition&#x60;.
   ///
   /// Parameters:
   /// * [fileId]
@@ -93,7 +93,7 @@ class FilesApi {
   }
 
   /// Finish an upload
-  /// Checks size and optional SHA-256, detects the MIME type and queues the malware scan. The file is downloadable after &#x60;scan_status&#x60; is &#x60;clean&#x60; or &#x60;skipped&#x60;. Missing parts answer 409 &#x60;conflict&#x60; with &#x60;reason&#x60; &#x60;upload_incomplete&#x60;; an expired session answers 410 &#x60;gone&#x60; (12, 3.4 and 3.6).
+  /// Closes the session; the verify pass then checks size and SHA-256, detects the MIME type and runs the malware scan. The file is downloadable after &#x60;scan_status&#x60; is &#x60;clean&#x60; or &#x60;skipped&#x60;. &#x60;parts&#x60; is checked against the confirmed parts: a duplicate or out-of-range number gives 400, another &#x60;etag&#x60; 409 &#x60;conflict&#x60; with &#x60;reason&#x60; &#x60;part_conflict&#x60;. A completed session answers 200 with the file again. Missing parts answer 409 &#x60;conflict&#x60; with &#x60;reason&#x60; &#x60;upload_incomplete&#x60;; an expired session answers 410 &#x60;gone&#x60; (12, 3.4 and 3.6).
   ///
   /// Parameters:
   /// * [fileId]
@@ -872,7 +872,7 @@ class FilesApi {
   }
 
   /// Read the state of an own upload
-  /// Confirmed parts of an unfinished upload, so a client can resume after a network loss (12, 4).
+  /// Confirmed parts of an own upload, so a client can resume after a network loss (12, 3.2). &#x60;upload_state&#x60; is &#x60;pending&#x60; for an open session without a confirmed part, &#x60;uploading&#x60; with at least one, &#x60;complete&#x60; once completed. An aborted or expired session answers 410 &#x60;gone&#x60;.
   ///
   /// Parameters:
   /// * [fileId]
@@ -1066,6 +1066,7 @@ class FilesApi {
   /// Parameters:
   /// * [fileId]
   /// * [partNumber]
+  /// * [contentDigest] - RFC 9530 digest of the part with the member `sha-256`, e.g. `sha-256=:<base64>:`; other members are ignored.
   /// * [body]
   /// * [cancelToken] - A [CancelToken] that can be used to cancel the operation
   /// * [headers] - Can be used to add additional headers to the request
@@ -1079,6 +1080,7 @@ class FilesApi {
   Future<Response<UploadPartResult>> uploadPart({
     required String fileId,
     required int partNumber,
+    required String contentDigest,
     required MultipartFile body,
     CancelToken? cancelToken,
     Map<String, dynamic>? headers,
@@ -1110,7 +1112,7 @@ class FilesApi {
         );
     final _options = Options(
       method: r'PUT',
-      headers: <String, dynamic>{...?headers},
+      headers: <String, dynamic>{r'Content-Digest': contentDigest, ...?headers},
       extra: <String, dynamic>{
         'secure': <Map<String, String>>[
           {

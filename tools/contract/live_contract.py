@@ -26,6 +26,8 @@ a pass. Every failure prints a ``curl`` reproduction without credentials and the
 
 from __future__ import annotations
 
+import base64
+import hashlib
 import json
 import os
 import re
@@ -76,6 +78,10 @@ MAX_EXAMPLES = int(os.environ.get("CONTRACT_MAX_EXAMPLES", "100"))
 SEED = int(os.environ["CONTRACT_SEED"])
 CODES = problem_codes(SPEC)
 KEY_DIR = Path(tempfile.mkdtemp(prefix="bothy-contract-keys-"))
+# A channel the plain user may upload to (Support/Allgemein of the matrix world, M3-03); the
+# upload operations of a positive case run against a fresh session there.
+UPLOAD_CHANNEL = os.environ.get("BOTHY_CONTRACT_UPLOAD_CHANNEL", "")
+UPLOAD_OPS = frozenset({"uploadPart", "getUpload", "completeUpload", "abortUpload"})
 
 _UUID_PARAM = re.compile(r"\{([a-z_]+)\}")
 
@@ -263,8 +269,46 @@ def _project_checks(case: Any, response: Any, state: PassAuth) -> None:
     _check_not_found(case, response, state)
 
 
+def _prepare_upload(case: Any, state: PassAuth) -> None:
+    """Point a positive case of an upload operation at a fresh session of the pass (M3-03).
+
+    A random ``file_id`` only ever reaches the 404 of an unknown upload. For a case whose path is
+    positive the pass announces an upload of the generated part (or a fixed byte string) and the
+    case uses its file ID; uploadPart gets part number 1 and, unless the header is negative, the
+    matching ``Content-Digest``. A pass that may not upload there keeps the generated case.
+    """
+    op = _operation_id(case)
+    if op not in UPLOAD_OPS or not UPLOAD_CHANNEL or _negative(case, ParameterLocation.PATH):
+        return
+    body = b"contract"
+    if op == "uploadPart" and isinstance(case.body, (bytes, bytearray)) and len(case.body) > 0:
+        body = bytes(case.body)
+    digest = hashlib.sha256(body).digest()
+    resp = state.send(
+        "POST",
+        f"{BASE_URL}/channels/{UPLOAD_CHANNEL}/uploads",
+        {"Content-Type": "application/json", "Idempotency-Key": uuid7()},
+        json.dumps(
+            {"name": "contract.bin", "size_bytes": len(body), "sha256": digest.hex()}
+        ).encode(),
+        authenticated=True,
+    )
+    if resp.status != 201:
+        return
+    params = dict(case.path_parameters or {})
+    params["file_id"] = json.loads(resp.body)["file_id"]
+    if op == "uploadPart":
+        params["part_number"] = 1
+        case.body = body
+        if not _negative(case, ParameterLocation.HEADER):
+            value = "sha-256=:" + base64.b64encode(digest).decode() + ":"
+            case.headers = {**(case.headers or {}), "Content-Digest": value}
+    case.path_parameters = params
+
+
 def _call(case: Any, state: PassAuth) -> Any:
     """Call ``case`` with fresh auth headers; repeat after a nonce, renewal or step-up answer."""
+    _prepare_upload(case, state)
     response = None
     for _ in range(3):
         if not schemathesis_negated_auth(case):

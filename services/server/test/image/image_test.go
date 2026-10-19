@@ -40,6 +40,8 @@ const (
 	binaryPath = "usr/local/bin/bothy"
 	// keyDir is the default of secrets.signing_key_dir (docs/operations/configuration.md).
 	keyDir = "var/lib/bothy/signing-keys"
+	// filesDir is the default file.fs.root of the file system driver (M3-03).
+	filesDir = "var/lib/bothy/files"
 	// nonroot is uid and gid of the distroless user nonroot (18 "Server-Images" rule 3).
 	nonroot = 65532
 	// dockerTimeout bounds one Docker CLI call; an export of the small image takes seconds.
@@ -383,16 +385,20 @@ func TestImageHasNoShell(t *testing.T) {
 	}
 }
 
-// TestSigningKeyDir checks the empty key store of secrets.signing_key_dir: a named volume
-// mounted there takes owner and mode from the image (18 "Server-Images" rule 3, ADR 0066).
+// TestSigningKeyDir checks the empty key store of secrets.signing_key_dir and the empty root of
+// the file system driver (file.fs.root, M3-03): a named volume mounted there takes owner and mode
+// from the image (18 "Server-Images" rule 3, ADR 0066).
 func TestSigningKeyDir(t *testing.T) {
-	e, ok := exportFS(t, env(t, "BOTHY_TEST_IMAGE"))[keyDir]
-	if !ok {
-		t.Fatalf("%s is missing", keyDir)
-	}
-	h := e.header
-	if h.Typeflag != tar.TypeDir || h.Uid != nonroot || h.Gid != nonroot || h.Mode&0o7777 != 0o700 {
-		t.Errorf("%s: type %c owner %d:%d mode %o, want a directory 65532:65532 mode 700", keyDir, h.Typeflag, h.Uid, h.Gid, h.Mode&0o7777)
+	fs := exportFS(t, env(t, "BOTHY_TEST_IMAGE"))
+	for _, dir := range []string{keyDir, filesDir} {
+		e, ok := fs[dir]
+		if !ok {
+			t.Fatalf("%s is missing", dir)
+		}
+		h := e.header
+		if h.Typeflag != tar.TypeDir || h.Uid != nonroot || h.Gid != nonroot || h.Mode&0o7777 != 0o700 {
+			t.Errorf("%s: type %c owner %d:%d mode %o, want a directory 65532:65532 mode 700", dir, h.Typeflag, h.Uid, h.Gid, h.Mode&0o7777)
+		}
 	}
 }
 

@@ -239,6 +239,7 @@ func runScenario(t *testing.T) *scenarioResult {
 	ctx := t.Context()
 	sc := NewScenario(ctx, r)
 	sc.content()
+	sc.files()
 	sc.people()
 	sc.agents()
 	sc.settings()

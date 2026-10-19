@@ -13,6 +13,108 @@ import (
 	"github.com/oapi-codegen/runtime"
 )
 
+type UnpinMessageResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// ApplicationproblemJSON400 the response for an HTTP 400 `application/problem+json` response
+	ApplicationproblemJSON400 *BadRequest
+	// ApplicationproblemJSON401 the response for an HTTP 401 `application/problem+json` response
+	ApplicationproblemJSON401 *Unauthorized
+	// ApplicationproblemJSON403 the response for an HTTP 403 `application/problem+json` response
+	ApplicationproblemJSON403 *Forbidden
+	// ApplicationproblemJSON404 the response for an HTTP 404 `application/problem+json` response
+	ApplicationproblemJSON404 *NotFound
+	// ApplicationproblemJSON429 the response for an HTTP 429 `application/problem+json` response
+	ApplicationproblemJSON429 *TooManyRequests
+	// ApplicationproblemJSONDefault the response for an HTTP default `application/problem+json` response
+	ApplicationproblemJSONDefault *Error
+	// Headers204 the parsed response headers for an HTTP 204 response
+	Headers204 *UnpinMessageResponse204Headers
+	// Headers400 the parsed response headers for an HTTP 400 response
+	Headers400 *UnpinMessageResponse400Headers
+	// Headers401 the parsed response headers for an HTTP 401 response
+	Headers401 *UnpinMessageResponse401Headers
+	// Headers403 the parsed response headers for an HTTP 403 response
+	Headers403 *UnpinMessageResponse403Headers
+	// Headers404 the parsed response headers for an HTTP 404 response
+	Headers404 *UnpinMessageResponse404Headers
+	// Headers429 the parsed response headers for an HTTP 429 response
+	Headers429 *UnpinMessageResponse429Headers
+	// HeadersDefault the parsed response headers for an HTTP default response
+	HeadersDefault *UnpinMessageResponseDefaultHeaders
+}
+
+// GetApplicationproblemJSON400 returns the response for an HTTP 400 `application/problem+json` response
+func (r UnpinMessageResponse) GetApplicationproblemJSON400() *BadRequest {
+	return r.ApplicationproblemJSON400
+}
+
+// GetApplicationproblemJSON401 returns the response for an HTTP 401 `application/problem+json` response
+func (r UnpinMessageResponse) GetApplicationproblemJSON401() *Unauthorized {
+	return r.ApplicationproblemJSON401
+}
+
+// GetApplicationproblemJSON403 returns the response for an HTTP 403 `application/problem+json` response
+func (r UnpinMessageResponse) GetApplicationproblemJSON403() *Forbidden {
+	return r.ApplicationproblemJSON403
+}
+
+// GetApplicationproblemJSON404 returns the response for an HTTP 404 `application/problem+json` response
+func (r UnpinMessageResponse) GetApplicationproblemJSON404() *NotFound {
+	return r.ApplicationproblemJSON404
+}
+
+// GetApplicationproblemJSON429 returns the response for an HTTP 429 `application/problem+json` response
+func (r UnpinMessageResponse) GetApplicationproblemJSON429() *TooManyRequests {
+	return r.ApplicationproblemJSON429
+}
+
+// GetApplicationproblemJSONDefault returns the response for an HTTP default `application/problem+json` response
+func (r UnpinMessageResponse) GetApplicationproblemJSONDefault() *Error {
+	return r.ApplicationproblemJSONDefault
+}
+
+// GetBody returns the raw response body bytes
+func (r UnpinMessageResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r UnpinMessageResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r UnpinMessageResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r UnpinMessageResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
+// PinMessageResponse204Headers the declared response headers of an HTTP 204 response for PinMessage
+type PinMessageResponse204Headers struct {
+	CorrelationId   *CorrelationId
+	RateLimit       *string
+	RateLimitPolicy *string
+}
+
+// PinMessageResponse400Headers the declared response headers of an HTTP 400 response for PinMessage
+type PinMessageResponse400Headers struct {
+	CorrelationId *CorrelationId
+}
+
 // PinMessageResponse401Headers the declared response headers of an HTTP 401 response for PinMessage
 type PinMessageResponse401Headers struct {
 	CorrelationId   *CorrelationId
@@ -12007,6 +12109,11 @@ type AbortUploadResponse404Headers struct {
 	CorrelationId *CorrelationId
 }
 
+// AbortUploadResponse409Headers the declared response headers of an HTTP 409 response for AbortUpload
+type AbortUploadResponse409Headers struct {
+	CorrelationId *CorrelationId
+}
+
 // AbortUploadResponse429Headers the declared response headers of an HTTP 429 response for AbortUpload
 type AbortUploadResponse429Headers struct {
 	CorrelationId   *CorrelationId
@@ -12031,6 +12138,8 @@ type AbortUploadResponse struct {
 	ApplicationproblemJSON403 *Forbidden
 	// ApplicationproblemJSON404 the response for an HTTP 404 `application/problem+json` response
 	ApplicationproblemJSON404 *NotFound
+	// ApplicationproblemJSON409 the response for an HTTP 409 `application/problem+json` response
+	ApplicationproblemJSON409 *Conflict
 	// ApplicationproblemJSON429 the response for an HTTP 429 `application/problem+json` response
 	ApplicationproblemJSON429 *TooManyRequests
 	// ApplicationproblemJSONDefault the response for an HTTP default `application/problem+json` response
@@ -12045,6 +12154,8 @@ type AbortUploadResponse struct {
 	Headers403 *AbortUploadResponse403Headers
 	// Headers404 the parsed response headers for an HTTP 404 response
 	Headers404 *AbortUploadResponse404Headers
+	// Headers409 the parsed response headers for an HTTP 409 response
+	Headers409 *AbortUploadResponse409Headers
 	// Headers429 the parsed response headers for an HTTP 429 response
 	Headers429 *AbortUploadResponse429Headers
 	// HeadersDefault the parsed response headers for an HTTP default response
@@ -12069,6 +12180,11 @@ func (r AbortUploadResponse) GetApplicationproblemJSON403() *Forbidden {
 // GetApplicationproblemJSON404 returns the response for an HTTP 404 `application/problem+json` response
 func (r AbortUploadResponse) GetApplicationproblemJSON404() *NotFound {
 	return r.ApplicationproblemJSON404
+}
+
+// GetApplicationproblemJSON409 returns the response for an HTTP 409 `application/problem+json` response
+func (r AbortUploadResponse) GetApplicationproblemJSON409() *Conflict {
+	return r.ApplicationproblemJSON409
 }
 
 // GetApplicationproblemJSON429 returns the response for an HTTP 429 `application/problem+json` response
@@ -21152,6 +21268,8 @@ func (c *ClientWithResponses) RevokeTokenWithResponse(ctx context.Context, token
 
 // AbortUploadWithResponse Abort an upload
 //
+// Ends an open own session: its parts are deleted, the file becomes `upload_state` `failed` and `file.updated` goes to the uploader. An aborted or expired session answers 204 again; a completed one 409 `invalid_state_transition`.
+//
 // Returns a wrapper object for the known response body format(s).
 //
 // Corresponds with DELETE /uploads/{file_id} (the `AbortUpload` operationId).
@@ -21165,7 +21283,7 @@ func (c *ClientWithResponses) AbortUploadWithResponse(ctx context.Context, fileI
 
 // GetUploadWithResponse Read the state of an own upload
 //
-// Confirmed parts of an unfinished upload, so a client can resume after a network loss (12, 4).
+// Confirmed parts of an own upload, so a client can resume after a network loss (12, 3.2). `upload_state` is `pending` for an open session without a confirmed part, `uploading` with at least one, `complete` once completed. An aborted or expired session answers 410 `gone`.
 //
 // Returns a wrapper object for the known response body format(s).
 //
@@ -21180,8 +21298,8 @@ func (c *ClientWithResponses) GetUploadWithResponse(ctx context.Context, fileId 
 
 // CompleteUploadWithBodyWithResponse Finish an upload
 //
-// Checks size and optional SHA-256, detects the MIME type and queues the malware scan. The file is
-// downloadable after `scan_status` is `clean` or `skipped`. Missing parts answer 409 `conflict` with `reason` `upload_incomplete`; an expired session answers 410 `gone` (12, 3.4 and 3.6).
+// Closes the session; the verify pass then checks size and SHA-256, detects the MIME type and runs the malware scan. The file is
+// downloadable after `scan_status` is `clean` or `skipped`. `parts` is checked against the confirmed parts: a duplicate or out-of-range number gives 400, another `etag` 409 `conflict` with `reason` `part_conflict`. A completed session answers 200 with the file again. Missing parts answer 409 `conflict` with `reason` `upload_incomplete`; an expired session answers 410 `gone` (12, 3.4 and 3.6).
 //
 // Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
 //
@@ -21196,8 +21314,8 @@ func (c *ClientWithResponses) CompleteUploadWithBodyWithResponse(ctx context.Con
 
 // CompleteUploadWithResponse Finish an upload
 //
-// Checks size and optional SHA-256, detects the MIME type and queues the malware scan. The file is
-// downloadable after `scan_status` is `clean` or `skipped`. Missing parts answer 409 `conflict` with `reason` `upload_incomplete`; an expired session answers 410 `gone` (12, 3.4 and 3.6).
+// Closes the session; the verify pass then checks size and SHA-256, detects the MIME type and runs the malware scan. The file is
+// downloadable after `scan_status` is `clean` or `skipped`. `parts` is checked against the confirmed parts: a duplicate or out-of-range number gives 400, another `etag` 409 `conflict` with `reason` `part_conflict`. A completed session answers 200 with the file again. Missing parts answer 409 `conflict` with `reason` `upload_incomplete`; an expired session answers 410 `gone` (12, 3.4 and 3.6).
 //
 // Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
 //
@@ -21217,8 +21335,8 @@ func (c *ClientWithResponses) CompleteUploadWithResponse(ctx context.Context, fi
 // Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
 //
 // Corresponds with PUT /uploads/{file_id}/parts/{part_number} (the `UploadPart` operationId).
-func (c *ClientWithResponses) UploadPartWithBodyWithResponse(ctx context.Context, fileId FileIdPath, partNumber PartNumberPath, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*UploadPartResponse, error) {
-	rsp, err := c.UploadPartWithBody(ctx, fileId, partNumber, contentType, body, reqEditors...)
+func (c *ClientWithResponses) UploadPartWithBodyWithResponse(ctx context.Context, fileId FileIdPath, partNumber PartNumberPath, params *UploadPartParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*UploadPartResponse, error) {
+	rsp, err := c.UploadPartWithBody(ctx, fileId, partNumber, params, contentType, body, reqEditors...)
 	if err != nil {
 		return nil, err
 	}

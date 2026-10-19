@@ -16,6 +16,38 @@ import (
 	"github.com/oapi-codegen/runtime"
 )
 
+// ListEvents Catch up on events after a sequence
+//
+// Same filtering as the gateway. 410 `resync_required` with `reason` when catch-up is impossible.
+//
+// Corresponds with GET /events (the `ListEvents` operationId).
+func (c *Client) ListEvents(ctx context.Context, params *ListEventsParams, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewListEventsRequest(c.Server, params)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// ListFeatureFlags List feature flags
+//
+// Corresponds with GET /feature-flags (the `ListFeatureFlags` operationId).
+func (c *Client) ListFeatureFlags(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewListFeatureFlagsRequest(c.Server)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
 // PutFeatureFlagWithBody Set a feature flag
 //
 // Takes any type of body and a specified content type.
@@ -4604,6 +4636,8 @@ func (c *Client) RevokeToken(ctx context.Context, tokenId TokenIdPath, reqEditor
 
 // AbortUpload Abort an upload
 //
+// Ends an open own session: its parts are deleted, the file becomes `upload_state` `failed` and `file.updated` goes to the uploader. An aborted or expired session answers 204 again; a completed one 409 `invalid_state_transition`.
+//
 // Corresponds with DELETE /uploads/{file_id} (the `AbortUpload` operationId).
 func (c *Client) AbortUpload(ctx context.Context, fileId FileIdPath, reqEditors ...RequestEditorFn) (*http.Response, error) {
 	req, err := NewAbortUploadRequest(c.Server, fileId)
@@ -4619,7 +4653,7 @@ func (c *Client) AbortUpload(ctx context.Context, fileId FileIdPath, reqEditors 
 
 // GetUpload Read the state of an own upload
 //
-// Confirmed parts of an unfinished upload, so a client can resume after a network loss (12, 4).
+// Confirmed parts of an own upload, so a client can resume after a network loss (12, 3.2). `upload_state` is `pending` for an open session without a confirmed part, `uploading` with at least one, `complete` once completed. An aborted or expired session answers 410 `gone`.
 //
 // Corresponds with GET /uploads/{file_id} (the `GetUpload` operationId).
 func (c *Client) GetUpload(ctx context.Context, fileId FileIdPath, reqEditors ...RequestEditorFn) (*http.Response, error) {
@@ -4636,8 +4670,8 @@ func (c *Client) GetUpload(ctx context.Context, fileId FileIdPath, reqEditors ..
 
 // CompleteUploadWithBody Finish an upload
 //
-// Checks size and optional SHA-256, detects the MIME type and queues the malware scan. The file is
-// downloadable after `scan_status` is `clean` or `skipped`. Missing parts answer 409 `conflict` with `reason` `upload_incomplete`; an expired session answers 410 `gone` (12, 3.4 and 3.6).
+// Closes the session; the verify pass then checks size and SHA-256, detects the MIME type and runs the malware scan. The file is
+// downloadable after `scan_status` is `clean` or `skipped`. `parts` is checked against the confirmed parts: a duplicate or out-of-range number gives 400, another `etag` 409 `conflict` with `reason` `part_conflict`. A completed session answers 200 with the file again. Missing parts answer 409 `conflict` with `reason` `upload_incomplete`; an expired session answers 410 `gone` (12, 3.4 and 3.6).
 //
 // Takes any type of body and a specified content type.
 //
@@ -4656,8 +4690,8 @@ func (c *Client) CompleteUploadWithBody(ctx context.Context, fileId FileIdPath, 
 
 // CompleteUpload Finish an upload
 //
-// Checks size and optional SHA-256, detects the MIME type and queues the malware scan. The file is
-// downloadable after `scan_status` is `clean` or `skipped`. Missing parts answer 409 `conflict` with `reason` `upload_incomplete`; an expired session answers 410 `gone` (12, 3.4 and 3.6).
+// Closes the session; the verify pass then checks size and SHA-256, detects the MIME type and runs the malware scan. The file is
+// downloadable after `scan_status` is `clean` or `skipped`. `parts` is checked against the confirmed parts: a duplicate or out-of-range number gives 400, another `etag` 409 `conflict` with `reason` `part_conflict`. A completed session answers 200 with the file again. Missing parts answer 409 `conflict` with `reason` `upload_incomplete`; an expired session answers 410 `gone` (12, 3.4 and 3.6).
 //
 // Takes a body of the `application/json` content type.
 //
@@ -4681,8 +4715,8 @@ func (c *Client) CompleteUpload(ctx context.Context, fileId FileIdPath, params *
 // Takes any type of body and a specified content type.
 //
 // Corresponds with PUT /uploads/{file_id}/parts/{part_number} (the `UploadPart` operationId).
-func (c *Client) UploadPartWithBody(ctx context.Context, fileId FileIdPath, partNumber PartNumberPath, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
-	req, err := NewUploadPartRequestWithBody(c.Server, fileId, partNumber, contentType, body)
+func (c *Client) UploadPartWithBody(ctx context.Context, fileId FileIdPath, partNumber PartNumberPath, params *UploadPartParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewUploadPartRequestWithBody(c.Server, fileId, partNumber, params, contentType, body)
 	if err != nil {
 		return nil, err
 	}
@@ -19895,7 +19929,7 @@ func NewCompleteUploadRequestWithBody(server string, fileId FileIdPath, params *
 }
 
 // NewUploadPartRequestWithBody constructs an http.Request for the UploadPart method, with any body, and a specified content type
-func NewUploadPartRequestWithBody(server string, fileId FileIdPath, partNumber PartNumberPath, contentType string, body io.Reader) (*http.Request, error) {
+func NewUploadPartRequestWithBody(server string, fileId FileIdPath, partNumber PartNumberPath, params *UploadPartParams, contentType string, body io.Reader) (*http.Request, error) {
 	var err error
 
 	var pathParam0 string
@@ -19933,6 +19967,19 @@ func NewUploadPartRequestWithBody(server string, fileId FileIdPath, partNumber P
 	}
 
 	req.Header.Add("Content-Type", contentType)
+
+	if params != nil {
+
+		var headerParam0 string
+
+		headerParam0, err = runtime.StyleParamWithOptions("simple", false, "Content-Digest", params.ContentDigest, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationHeader, Type: "string", Format: ""})
+		if err != nil {
+			return nil, err
+		}
+
+		req.Header.Set("Content-Digest", headerParam0)
+
+	}
 
 	return req, nil
 }
@@ -24338,6 +24385,8 @@ type ClientWithResponsesInterface interface {
 
 	// AbortUploadWithResponse Abort an upload
 	//
+	// Ends an open own session: its parts are deleted, the file becomes `upload_state` `failed` and `file.updated` goes to the uploader. An aborted or expired session answers 204 again; a completed one 409 `invalid_state_transition`.
+	//
 	// Returns a wrapper object for the known response body format(s).
 	//
 	// Corresponds with DELETE /uploads/{file_id} (the `AbortUpload` operationId).
@@ -24345,7 +24394,7 @@ type ClientWithResponsesInterface interface {
 
 	// GetUploadWithResponse Read the state of an own upload
 	//
-	// Confirmed parts of an unfinished upload, so a client can resume after a network loss (12, 4).
+	// Confirmed parts of an own upload, so a client can resume after a network loss (12, 3.2). `upload_state` is `pending` for an open session without a confirmed part, `uploading` with at least one, `complete` once completed. An aborted or expired session answers 410 `gone`.
 	//
 	// Returns a wrapper object for the known response body format(s).
 	//
@@ -24354,8 +24403,8 @@ type ClientWithResponsesInterface interface {
 
 	// CompleteUploadWithBodyWithResponse Finish an upload
 	//
-	// Checks size and optional SHA-256, detects the MIME type and queues the malware scan. The file is
-	// downloadable after `scan_status` is `clean` or `skipped`. Missing parts answer 409 `conflict` with `reason` `upload_incomplete`; an expired session answers 410 `gone` (12, 3.4 and 3.6).
+	// Closes the session; the verify pass then checks size and SHA-256, detects the MIME type and runs the malware scan. The file is
+	// downloadable after `scan_status` is `clean` or `skipped`. `parts` is checked against the confirmed parts: a duplicate or out-of-range number gives 400, another `etag` 409 `conflict` with `reason` `part_conflict`. A completed session answers 200 with the file again. Missing parts answer 409 `conflict` with `reason` `upload_incomplete`; an expired session answers 410 `gone` (12, 3.4 and 3.6).
 	//
 	// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
 	//
@@ -24364,8 +24413,8 @@ type ClientWithResponsesInterface interface {
 
 	// CompleteUploadWithResponse Finish an upload
 	//
-	// Checks size and optional SHA-256, detects the MIME type and queues the malware scan. The file is
-	// downloadable after `scan_status` is `clean` or `skipped`. Missing parts answer 409 `conflict` with `reason` `upload_incomplete`; an expired session answers 410 `gone` (12, 3.4 and 3.6).
+	// Closes the session; the verify pass then checks size and SHA-256, detects the MIME type and runs the malware scan. The file is
+	// downloadable after `scan_status` is `clean` or `skipped`. `parts` is checked against the confirmed parts: a duplicate or out-of-range number gives 400, another `etag` 409 `conflict` with `reason` `part_conflict`. A completed session answers 200 with the file again. Missing parts answer 409 `conflict` with `reason` `upload_incomplete`; an expired session answers 410 `gone` (12, 3.4 and 3.6).
 	//
 	// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
 	//
@@ -24379,7 +24428,7 @@ type ClientWithResponsesInterface interface {
 	// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
 	//
 	// Corresponds with PUT /uploads/{file_id}/parts/{part_number} (the `UploadPart` operationId).
-	UploadPartWithBodyWithResponse(ctx context.Context, fileId FileIdPath, partNumber PartNumberPath, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*UploadPartResponse, error)
+	UploadPartWithBodyWithResponse(ctx context.Context, fileId FileIdPath, partNumber PartNumberPath, params *UploadPartParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*UploadPartResponse, error)
 
 	// ListUsersWithResponse List people
 	//
@@ -27389,105 +27438,5 @@ type ListAppsResponse429Headers struct {
 
 // ListAppsResponseDefaultHeaders the declared response headers of an HTTP default response for ListApps
 type ListAppsResponseDefaultHeaders struct {
-	CorrelationId *CorrelationId
-}
-
-type ListAppsResponse struct {
-	Body         []byte
-	HTTPResponse *http.Response
-	// JSON200 the response for an HTTP 200 `application/json` response
-	JSON200 *AppPage
-	// ApplicationproblemJSON400 the response for an HTTP 400 `application/problem+json` response
-	ApplicationproblemJSON400 *BadRequest
-	// ApplicationproblemJSON401 the response for an HTTP 401 `application/problem+json` response
-	ApplicationproblemJSON401 *Unauthorized
-	// ApplicationproblemJSON403 the response for an HTTP 403 `application/problem+json` response
-	ApplicationproblemJSON403 *Forbidden
-	// ApplicationproblemJSON429 the response for an HTTP 429 `application/problem+json` response
-	ApplicationproblemJSON429 *TooManyRequests
-	// ApplicationproblemJSONDefault the response for an HTTP default `application/problem+json` response
-	ApplicationproblemJSONDefault *Error
-	// Headers200 the parsed response headers for an HTTP 200 response
-	Headers200 *ListAppsResponse200Headers
-	// Headers400 the parsed response headers for an HTTP 400 response
-	Headers400 *ListAppsResponse400Headers
-	// Headers401 the parsed response headers for an HTTP 401 response
-	Headers401 *ListAppsResponse401Headers
-	// Headers403 the parsed response headers for an HTTP 403 response
-	Headers403 *ListAppsResponse403Headers
-	// Headers429 the parsed response headers for an HTTP 429 response
-	Headers429 *ListAppsResponse429Headers
-	// HeadersDefault the parsed response headers for an HTTP default response
-	HeadersDefault *ListAppsResponseDefaultHeaders
-}
-
-// GetJSON200 returns the response for an HTTP 200 `application/json` response
-func (r ListAppsResponse) GetJSON200() *AppPage {
-	return r.JSON200
-}
-
-// GetApplicationproblemJSON400 returns the response for an HTTP 400 `application/problem+json` response
-func (r ListAppsResponse) GetApplicationproblemJSON400() *BadRequest {
-	return r.ApplicationproblemJSON400
-}
-
-// GetApplicationproblemJSON401 returns the response for an HTTP 401 `application/problem+json` response
-func (r ListAppsResponse) GetApplicationproblemJSON401() *Unauthorized {
-	return r.ApplicationproblemJSON401
-}
-
-// GetApplicationproblemJSON403 returns the response for an HTTP 403 `application/problem+json` response
-func (r ListAppsResponse) GetApplicationproblemJSON403() *Forbidden {
-	return r.ApplicationproblemJSON403
-}
-
-// GetApplicationproblemJSON429 returns the response for an HTTP 429 `application/problem+json` response
-func (r ListAppsResponse) GetApplicationproblemJSON429() *TooManyRequests {
-	return r.ApplicationproblemJSON429
-}
-
-// GetApplicationproblemJSONDefault returns the response for an HTTP default `application/problem+json` response
-func (r ListAppsResponse) GetApplicationproblemJSONDefault() *Error {
-	return r.ApplicationproblemJSONDefault
-}
-
-// GetBody returns the raw response body bytes
-func (r ListAppsResponse) GetBody() []byte {
-	return r.Body
-}
-
-// Status returns HTTPResponse.Status
-func (r ListAppsResponse) Status() string {
-	if r.HTTPResponse != nil {
-		return r.HTTPResponse.Status
-	}
-	return http.StatusText(0)
-}
-
-// StatusCode returns HTTPResponse.StatusCode
-func (r ListAppsResponse) StatusCode() int {
-	if r.HTTPResponse != nil {
-		return r.HTTPResponse.StatusCode
-	}
-	return 0
-}
-
-// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
-func (r ListAppsResponse) ContentType() string {
-	if r.HTTPResponse != nil {
-		return r.HTTPResponse.Header.Get("Content-Type")
-	}
-	return ""
-}
-
-// InstallAppResponse201Headers the declared response headers of an HTTP 201 response for InstallApp
-type InstallAppResponse201Headers struct {
-	CorrelationId   *CorrelationId
-	RateLimit       *string
-	RateLimitPolicy *string
-}
-
-// InstallAppResponse400Headers the declared response headers of an HTTP 400 response for InstallApp
-type InstallAppResponse400Headers struct {
 	CorrelationId *CorrelationId
 }

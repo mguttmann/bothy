@@ -483,7 +483,7 @@ Quelle: [12-dateien.md](../spec/12-dateien.md), Abschnitt 18.
 |---|---|---|---|---|---|---|
 | `file.storage.driver` | `BOTHY_FILE__STORAGE__DRIVER` | Server | enum(fs, s3) | `fs` | `fs` oder `s3` | aktiv |
 | `file.fs.root` | `BOTHY_FILE__FS__ROOT` | Server | string | `/var/lib/bothy/files` | Wurzel des Dateisystem-Treibers (Pfad im Container) | aktiv |
-| `file.fs.min_free_bytes` | `BOTHY_FILE__FS__MIN_FREE_BYTES` | Server |  | `2147483648` | freier Platz, unter dem Uploads mit `507` abgelehnt werden | geplant (M3) |
+| `file.fs.min_free_bytes` | `BOTHY_FILE__FS__MIN_FREE_BYTES` | Server |  | `2147483648` | freier Platz, unter dem Uploads mit `503 unavailable` (`reason` `storage_full`) abgelehnt werden | geplant (M3) |
 | `file.s3.endpoint` | `BOTHY_FILE__S3__ENDPOINT` | Server | string | leer | S3-Endpunkt | aktiv |
 | `file.s3.region` | `BOTHY_FILE__S3__REGION` | Server | string | `us-east-1` | Region für die Signatur | aktiv |
 | `file.s3.bucket` | `BOTHY_FILE__S3__BUCKET` | Server | string | leer | Bucket | aktiv |

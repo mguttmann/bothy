@@ -34,9 +34,10 @@ RUN --mount=type=cache,target=/go/pkg/mod \
     --mount=type=cache,target=/root/.cache/go-build \
     CGO_ENABLED=0 GOOS=$TARGETOS GOARCH=$TARGETARCH GOTOOLCHAIN=local GOFLAGS=-mod=readonly \
     go build -trimpath -buildvcs=false -ldflags "-s -w" -o /out/bothy ./cmd/bothy
-# Empty key store of secrets.signing_key_dir (18 "Server-Images" rule 3, ADR 0066): a named volume
-# mounted there takes owner 65532 and mode 0700 from the image on first use.
-RUN mkdir -p /out/signing-keys
+# Empty key store of secrets.signing_key_dir (18 "Server-Images" rule 3, ADR 0066) and empty root
+# file.fs.root of the file system driver (M3-03): a named volume mounted there takes owner 65532
+# and mode 0700 from the image on first use, which the start check of the driver requires.
+RUN mkdir -p /out/signing-keys /out/files
 
 # The web console (brief M6-02, docs/spec/18-release.md 7 rule 7): built with the pinned Flutter
 # of the workspace (pubspec.yaml) on the build platform, because its output is platform
@@ -100,6 +101,7 @@ LABEL org.opencontainers.image.title="bothy-server" \
 # Owned by root and not writable, so the running user cannot replace the binary.
 COPY --from=build --chown=0:0 --chmod=0555 /out/bothy /usr/local/bin/bothy
 COPY --from=build --chown=65532:65532 --chmod=0700 /out/signing-keys /var/lib/bothy/signing-keys
+COPY --from=build --chown=65532:65532 --chmod=0700 /out/files /var/lib/bothy/files
 # The console build, owned by root and read-only for the running user (console.assets_dir).
 COPY --from=console --chown=0:0 --chmod=0555 /src/apps/console/build/web /usr/share/bothy/console
 ENV BOTHY_CONSOLE__ASSETS_DIR=/usr/share/bothy/console
