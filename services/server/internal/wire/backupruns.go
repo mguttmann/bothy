@@ -4,11 +4,14 @@ package wire
 
 import (
 	"context"
-	"errors"
+	"crypto/rand"
 	"time"
 
+	"github.com/OWNER/bothy/services/server/internal/kernel/clock"
+	"github.com/OWNER/bothy/services/server/internal/kernel/ids"
 	"github.com/OWNER/bothy/services/server/internal/platform/pg"
 	"github.com/OWNER/bothy/services/server/internal/status"
+	statuspg "github.com/OWNER/bothy/services/server/internal/status/adapters/postgres"
 )
 
 // ErrNoBackupTable is status.ErrNoBackupTable for the commands, which import wire only: the
@@ -21,7 +24,7 @@ var ErrNoBackupTable = status.ErrNoBackupTable
 // bothy migrate uses bothy_owner. It returns ErrNoBackupTable when the schema has no table
 // backup_runs.
 func LastBackupSuccess(ctx context.Context, pool *pg.Pool) (time.Time, bool, error) {
-	_ = ctx
-	_ = pool
-	return time.Time{}, false, errors.New("wire: LastBackupSuccess is not built yet")
+	// The clock and the id generator serve Start and Finish only; this read uses neither.
+	runs := statuspg.NewRuns(pool, clock.System(), ids.NewGenerator(clock.System(), rand.Reader))
+	return runs.LastSuccess(ctx, status.BackupPGFull, status.BackupPGDiff, status.BackupLogical)
 }

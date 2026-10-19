@@ -169,7 +169,10 @@ modules:
     ephemeral_events: []
     ws_ops: []
     depends_on: [agents]
-    adapter_vendors: []
+    # M7-02: sqlc code, Runs and ManifestSource (pgx); adapters/otelmetrics records
+    # bothy.backup.* and bothy.storage.volume.* (otel); adapters/s3mirror copies the objects of the
+    # driver s3 into the off-site bucket (awssdk).
+    adapter_vendors: [pgx, otel, awssdk]
   terminal:
     tables: [hosts, host_session_users, terminal_sessions]
     actions: [host.read, host.manage, host.pair, host.connect, terminal.open, terminal.attach,

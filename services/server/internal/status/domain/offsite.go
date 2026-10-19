@@ -53,31 +53,51 @@ func ParseOffsiteTarget(s string) (OffsiteTarget, error) {
 	if err != nil || u.Scheme != "https" || u.User != nil || u.RawQuery != "" || u.Fragment != "" || u.Opaque != "" {
 		return OffsiteTarget{}, ErrInvalidOffsiteTarget
 	}
+	host, port, ok := hostPort(u)
+	if !ok {
+		return OffsiteTarget{}, ErrInvalidOffsiteTarget
+	}
+	bucket, prefix, ok := bucketPrefix(u.Path)
+	if !ok {
+		return OffsiteTarget{}, ErrInvalidOffsiteTarget
+	}
+	return OffsiteTarget{Host: host, Port: port, Bucket: bucket, Prefix: prefix}, nil
+}
+
+// hostPort returns the host and the port of u (443 when it names none) and whether both are
+// valid: an IP address or a DNS name, a port from 1 to 65535.
+func hostPort(u *url.URL) (string, int, bool) {
 	host := u.Hostname()
-	if host == "" || strings.ContainsAny(host, " /") {
-		return OffsiteTarget{}, ErrInvalidOffsiteTarget
+	if host == "" || (net.ParseIP(host) == nil && !hostPattern.MatchString(host)) {
+		return "", 0, false
 	}
-	port := 443
-	if p := u.Port(); p != "" {
-		n, err := strconv.Atoi(p)
-		if err != nil || n < 1 || n > 65535 {
-			return OffsiteTarget{}, ErrInvalidOffsiteTarget
-		}
-		port = n
+	p := u.Port()
+	if p == "" {
+		return host, 443, true
 	}
-	if ip := net.ParseIP(host); ip == nil && !hostPattern.MatchString(host) {
-		return OffsiteTarget{}, ErrInvalidOffsiteTarget
+	n, err := strconv.Atoi(p)
+	if err != nil || n < 1 || n > 65535 {
+		return "", 0, false
 	}
-	segments := strings.Split(strings.Trim(u.Path, "/"), "/")
-	if len(segments) == 0 || !bucketPattern.MatchString(segments[0]) || strings.HasSuffix(u.Path, "//") {
-		return OffsiteTarget{}, ErrInvalidOffsiteTarget
+	return host, n, true
+}
+
+// bucketPrefix splits the path /<bucket>[/<prefix>] and reports whether the bucket follows the
+// S3 naming rule and every prefix segment is plain (no empty, "." or ".." segment).
+func bucketPrefix(path string) (string, string, bool) {
+	if strings.HasSuffix(path, "//") {
+		return "", "", false
+	}
+	segments := strings.Split(strings.Trim(path, "/"), "/")
+	if !bucketPattern.MatchString(segments[0]) {
+		return "", "", false
 	}
 	for _, seg := range segments[1:] {
 		if !prefixSegment.MatchString(seg) || seg == "." || seg == ".." {
-			return OffsiteTarget{}, ErrInvalidOffsiteTarget
+			return "", "", false
 		}
 	}
-	return OffsiteTarget{Host: host, Port: port, Bucket: segments[0], Prefix: strings.Join(segments[1:], "/")}, nil
+	return segments[0], strings.Join(segments[1:], "/"), true
 }
 
 // hostPattern is a DNS host name.
