@@ -253,9 +253,16 @@ func archived(t *testing.T, backup, seg string) bool {
 // secrets runs bothy secrets init into a temporary directory and returns the volume root.
 func secrets(t *testing.T) string {
 	t.Helper()
+	return secretsWith(t, "")
+}
+
+// secretsWith runs bothy secrets init with the supplied files of source ("" for none) into a
+// temporary directory and returns the volume root.
+func secretsWith(t *testing.T, source string) string {
+	t.Helper()
 	target := filepath.Join(t.TempDir(), "vol")
 	me := stack.Owner{UID: os.Geteuid(), GID: os.Getegid()}
-	if _, err := stack.Init(t.Context(), stack.InitOptions{Target: target, Owners: map[string]stack.Owner{"server": me, "migrate": me}}); err != nil {
+	if _, err := stack.Init(t.Context(), stack.InitOptions{Target: target, Source: source, Owners: map[string]stack.Owner{"server": me, "migrate": me}}); err != nil {
 		t.Fatalf("bothy secrets init: %v", err)
 	}
 	t.Cleanup(func() {
@@ -288,11 +295,13 @@ func TestArchiveBackupRestoreVerify(t *testing.T) {
 	secBackup := w.secretVolume("sec-backup", filepath.Join(vol, "backup"))
 	pgdata := w.volume("pgdata")
 
-	backup := w.start("backup",
+	// bothy-backupd reads the server configuration (M7-02); without migrations its runs would
+	// fail, which this test never starts.
+	backup := w.start("backup", append(serverEnv("bothy_backup", "db_backup_password"),
 		"-e", "BOTHY_PGBACKREST_PG_HOST=postgres",
 		"-v", secBackup+":/run/bothy/secrets:ro", "-v", w.volume("repo")+":/var/lib/pgbackrest",
 		"-v", w.volume("backup-pg")+":/var/lib/postgresql",
-		w.image, "bothy-backupd", "--retry", "1s")
+		w.image, "bothy-backupd", "--retry", "1s")...)
 	db := w.start("postgres", append(databaseArgs(secPostgres, pgdata), w.image)...)
 
 	waitDatabase(t, db, true)

@@ -20,6 +20,9 @@
 #   BOTHY_PGBACKREST_REPO_HOST  database role: host name of the repository host (required)
 #   BOTHY_PG_ARCHIVE_TIMEOUT    database role, command postgres: archive_timeout (required)
 #   BOTHY_PGBACKREST_PG_HOST    repository role: host name of the database host (required)
+#   BOTHY_PGBACKREST_REPO2      database role: "on" when an off-site target is set; archive-push
+#                               then also reaches repo2 through the repository host (brief M7-02).
+#                               The repository host gets repo2 from bothy-backupd, never from here.
 set -euo pipefail
 
 readonly secrets=/run/bothy/secrets
@@ -100,6 +103,10 @@ EOF
 database_role() {
 	require BOTHY_PGBACKREST_REPO_HOST
 	host_name "$BOTHY_PGBACKREST_REPO_HOST" BOTHY_PGBACKREST_REPO_HOST
+	case "${BOTHY_PGBACKREST_REPO2:-}" in
+	"" | on) ;;
+	*) die "BOTHY_PGBACKREST_REPO2 must be empty or on" ;;
+	esac
 	local f
 	for f in "$tls_dir/ca.crt" "$tls_dir/postgres.crt" "$tls_dir/postgres.key"; do
 		need_file "$f"
@@ -122,11 +129,30 @@ tls-server-ca-file=$tls_dir/ca.crt
 tls-server-cert-file=$tls_dir/postgres.crt
 tls-server-key-file=$tls_dir/postgres.key
 tls-server-auth=backup=$stanza
+$(repo2_host_lines)
 
 [$stanza]
 pg1-path=$pgdata
 pg1-socket-path=/var/run/postgresql
 EOF
+}
+
+# repo2_host_lines prints the repo2 options of the database host: the same repository host and
+# certificates as repo1. The repository host knows where repo2 is; the database host only needs
+# to know that it exists, so that archive-push writes every segment to both repositories.
+repo2_host_lines() {
+	case "${BOTHY_PGBACKREST_REPO2:-}" in
+	on)
+		cat <<EOF
+repo2-host=$BOTHY_PGBACKREST_REPO_HOST
+repo2-host-type=tls
+repo2-host-port=$tls_port
+repo2-host-ca-file=$tls_dir/ca.crt
+repo2-host-cert-file=$tls_dir/postgres.crt
+repo2-host-key-file=$tls_dir/postgres.key
+EOF
+		;;
+	esac
 }
 
 [ "$(id -u)" != 0 ] || die "runs as the user postgres of the image, not as root"

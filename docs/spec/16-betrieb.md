@@ -421,6 +421,7 @@ Entscheidung: [ADR 0064](../adr/0064-feature-flag-registrierung-mit-aufraeum-gat
 | `bothy_app` | DML; auf `audit_events` nur `INSERT` und `SELECT` | `api`, `worker`, Server-Befehle `bothy setup ...` (sie schreiben nur Zeilen) |
 | `bothy_maint` | Kürzen des Audit-Logs am Fristende mit Anker-Eintrag | Aufbewahrungsjob ([03-datenmodell.md](03-datenmodell.md) 4.12) |
 | `bothy_monitor` | `pg_monitor` | `otel-collector` |
+| `bothy_backup` | `SELECT, INSERT, UPDATE` on `backup_runs` only (03 4.12) | `bothy-backupd`, records its runs (M7-02) |
 
 `migrate --bootstrap` legt fehlende Rollen idempotent an und setzt ihre Passwörter aus den
 Geheimnissen (`migrate.*_password_ref`). Dafür verbindet es sich als `migrate.bootstrap_user` mit
@@ -432,7 +433,8 @@ mit `database.password_ref`, wie ohne `--bootstrap`. Regeln:
    nie im Klartext.
 2. `bothy_owner` besitzt die Datenbank und das Schema `public`; `PUBLIC` verliert alle Rechte an
    beiden; `bothy_app`, `bothy_maint` und `bothy_monitor` bekommen `CONNECT`, die ersten beiden
-   `USAGE` auf `public`; `bothy_monitor` bekommt `pg_monitor`.
+   `USAGE` auf `public`; `bothy_monitor` bekommt `pg_monitor`. `bothy_backup` gets `CONNECT` and
+   `USAGE` on `public`; its only table right is the one the migration of `backup_runs` grants.
 3. Keine Standardrechte im Schema `public`: Jede Migration, die eine Tabelle anlegt, erteilt
    `bothy_app` genau die Rechte, die 03 und dieses Kapitel vorsehen (meist `SELECT, INSERT,
    UPDATE, DELETE`, weniger etwa bei `audit_events`); ein Test prüft je Tabelle die Rechte gegen
@@ -511,6 +513,38 @@ Begründungen:
 4. Jeder Lauf schreibt eine Zeile in `backup_runs` (03, Modul `status`) und meldet
    Kennzahlen (Kapitel 17). Die Admin-Konsole und die Statusseite lesen die Tabelle.
 
+As built (M7-02, [bothy-backupd README](../../services/server/cmd/bothy-backupd/README.md),
+docs/DECISIONS.md D-M7-02-1 to D-M7-02-9):
+
+1. `bothy-backupd` evaluates the five-field cron expressions of `backup.pg.full_schedule`,
+   `backup.pg.diff_schedule`, `backup.logical.schedule` and `backup.objects.schedule` in UTC once
+   a minute. Missed times while the process was down are not caught up; the next due time runs.
+   At most one run per slot runs at a time: `pg_full` and `pg_diff` share one slot (one
+   pgBackRest lock per stanza), and a full and a differential due together run only the full.
+   `bothy-backupd backup <kind>` runs one kind at once and exits with `0` or `1`.
+2. `pg_full` and `pg_diff`: `pgbackrest backup` into repo1 and, with an off-site target, into
+   repo2; then `pgbackrest expire` on repo1 only, keeping `backup.pg.local_retention_full` full
+   backups. Automatic expiry after a backup is off (`expire-auto=n`), so the service never deletes
+   in repo2. `logical`: `pg_dump -Fc` as `migrate.bootstrap_user` into the volume
+   `backup-scratch`, stored as a restic snapshot and removed. `objects`: driver `fs` restic over
+   the read-only volume `files`; driver `s3` a mirror into the off-site bucket that copies new
+   objects and never deletes or overwrites.
+3. The off-site target `backup.offsite.target` is an S3-compatible bucket with versioning and
+   Object Lock, written `s3:https://<host>[:<port>]/<bucket>[/<prefix>]`; repo2 lies below
+   `<prefix>/pgbackrest`, the restic repository below `<prefix>/restic`, the object mirror below
+   `<prefix>/objects/`. The keys in `offsite/` can write and read but the bucket's Object Lock
+   refuses every deletion of a stored version (R-OP-09); expiry needs the owner's separate account
+   (`bothy-backupd expire --offsite`, [backup-restore.md](../operations/backup-restore.md) 9).
+   With an empty target, logical and object backups go to a local restic repository in the
+   volume `pgbackrest-repo`, and `bothy config check` and the start log of `bothy-backupd` warn
+   "local backup only".
+4. The manifest of every successful run is stored in `backup_runs.manifest` and as a restic
+   snapshot of its own (tags `manifest`, the kind and the run id), so it is encrypted next to the
+   backup. A failed run has `error` set to a code such as `pgbackrest_exit_82` and no manifest.
+5. The row is written with the role `bothy_backup`; the manifest queries run as
+   `migrate.bootstrap_user` in one `READ ONLY` transaction with `REPEATABLE READ`, with exact
+   `count(*)` per table of the schema `public`.
+
 ![Sicherung](../operations/diagrams/backup-flow.svg)
 
 ### 8.3 Automatischer Wiederherstellungstest
@@ -566,8 +600,9 @@ Ziele: `dr.rpo_target` (Datenverlust) und `dr.rto_target` (Dauer bis zum Betrieb
    `worker`. Gibt es offene Migrationen auf einem bestehenden Schema und keine erfolgreiche
    Sicherung jünger als `migrate.recent_backup_max_age`, bricht `migrate` ab, solange
    `migrate.require_recent_backup` gilt. Eine leere Datenbank (Erstinstallation) ist ausgenommen.
-   Diese Prüfung gilt ab M7-02, weil sie `backup_runs` liest; bis dahin prüft `migrate` keine
-   Sicherung, und die Konfigurationsreferenz führt beide Schlüssel als geplant.
+   As built (M7-02): the check reads the newest successful run of kind `pg_full`, `pg_diff` or
+   `logical` in `backup_runs`; a schema without that table (migrated before M7-02) is exempt once,
+   because no run can have been recorded there.
 2. Migrationen folgen Expand/Contract: Version N darf nur entfernen, was Version N-1 nicht mehr
    nutzt. Damit läuft der Code von N-1 gegen das Schema von N, und der Rückweg ist ein
    Image-Wechsel ohne Datenbank-Rückbau.
@@ -714,6 +749,7 @@ Die Kennzahl `bothy.storage.volume.free` warnt rechtzeitig (Alarm `BothyVolumeFu
 | `migrate.app_password_ref` | `file:<secrets.dir>/db_app_password` | Passwort für `bothy_app` |
 | `migrate.maint_password_ref` | `file:<secrets.dir>/db_maint_password` | Passwort für `bothy_maint` |
 | `migrate.monitor_password_ref` | `file:<secrets.dir>/db_monitor_password` | Passwort für `bothy_monitor` |
+| `migrate.backup_password_ref` | `file:<secrets.dir>/db_backup_password` | password for `bothy_backup` (M7-02) |
 | `backup.pg.full_schedule` | `0 2 * * 0` | Plan der Vollsicherung (cron) |
 | `backup.pg.diff_schedule` | `0 2 * * 1-6` | Plan der Differenzsicherung (cron) |
 | `backup.pg.archive_timeout` | `60s` | spätestens dann wird ein WAL-Segment archiviert |
@@ -724,6 +760,8 @@ Die Kennzahl `bothy.storage.volume.free` warnt rechtzeitig (Alarm `BothyVolumeFu
 | `backup.objects.schedule` | `30 3 * * *` | Plan der Objektsicherung (cron) |
 | `backup.objects.retention` | `90d` | Aufbewahrung der Objekt-Snapshots |
 | `backup.offsite.target` | leer | Off-site-Ziel; leer heißt nur lokal (Warnung in Konsole und Status) |
+| `backup.offsite.region` | `us-east-1` | region of the off-site bucket (signing of S3 requests) |
+| `backup.offsite.use_path_style` | `true` | path-style addressing of the off-site bucket (`https://<host>/<bucket>`); `false` uses virtual hosts |
 | `backup.max_age` | `26h` | ohne erfolgreiche Sicherung länger als das: Alarm |
 | `backup.restore_test.schedule` | `0 5 * * 6` | Plan des Wiederherstellungstests (cron) |
 | `backup.restore_test.sample_files` | `200` | geprüfte Dateien je Test |
