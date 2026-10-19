@@ -374,6 +374,7 @@ Format of the checkpoints (03, `audit_checkpoints`):
 | `signing_key.cache_ttl` | `30s` | longest time a process still accepts a retired key or does not know a new one |
 | `signing_key.rotation_check_interval` | `1m` | interval of the job `instance.key_rotation` |
 | `signing_key.access_token_rotation_interval` | `30d` | scheduled rotation of the key for access tokens |
+| `signing_key.accept_lost_keys` | `false` | consent that a start whose key store `secrets.signing_key_dir` holds the private file of none of the unretired keys retires them and creates fresh ones; without it that start ends with an error and changes no key (restore without the key store, [disaster-recovery.md](../operations/disaster-recovery.md) case B) |
 
 Values of other chapters that this chapter refers to: `server.trusted_proxies`
 ([16-operations.md](16-operations.md)), `http.max_json_body_bytes`, `http.max_header_bytes`,

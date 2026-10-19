@@ -117,7 +117,7 @@ passed: `auth.access_token_ttl` + `auth.clock_leeway` (`access_token`),
 | retire | `retiring` with `not_after + window <= t` | `retired`, file deleted after the commit |
 | `Rotate` with `mode = scheduled` | owner request | returns the pending `next` or announces one; the job promotes it |
 | `Rotate` with `mode = emergency` | owner request | every `next`, `active` and `retiring` key `retired` at once, a fresh key `active` |
-| `EnsureActive` | start of every role, later `bothy setup bootstrap-owner` (M1-37) | an `active` key for every purpose without one; keys whose private file is missing are retired first (`LostTransitions`) |
+| `EnsureActive` | start of every role, later `bothy setup bootstrap-owner` (M1-37) | an `active` key for every purpose without one; keys whose private file is missing are retired first (`LostTransitions`); a key store with none of the unretired keys is refused unless `signing_key.accept_lost_keys` is set |
 
 Every change of the keys of a purpose runs in a unit of work of its own that first takes
 `pg_advisory_xact_lock(hashtext('bothy.server_signing_keys'), hashtext(<purpose>))`, also when no
@@ -173,11 +173,14 @@ not belong to the row).
   changes in the database.
 - Private file of the active key unreadable: `Signer` answers `unavailable` and logs
   `signing key not loadable` with purpose and `kid`; `/readyz` fails with `signing_keys`.
-- Private file missing (a restore without the key store, or a role without the key store
-  volume): the next start retires the keys without a file, creates a fresh active key and logs
-  `signing key file missing, key retired` at level error; tokens signed with the old keys stop
-  verifying (16 section 5.4). Every role must mount the same key store; one without it retires the
-  keys of the others at its start.
+- Private file missing for some keys: the next start retires the keys without a file, creates a
+  fresh active key and logs `signing key file missing, key retired` at level error; tokens signed
+  with the old keys stop verifying (16 section 5.4).
+- Key store holds none of the unretired keys (a role on a new or wrong volume, a restore without
+  the key store): the start ends with an error naming `secrets.signing_key_dir` and
+  `signing_key.accept_lost_keys` and changes no key, because the other roles may still sign with
+  them. With `signing_key.accept_lost_keys = true` the start repairs as above (disaster recovery
+  case B with a bundle without `signing-keys/`).
 - Crash between the file and the row: an unreferenced file `<purpose>-<kid>.pem` stays in the key
   store. It is never used (no row names it); `bothy secrets export` includes it, and it can be
   deleted by hand. The same holds for the file of a retired key whose removal after the commit

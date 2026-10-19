@@ -47,9 +47,12 @@ automatic restore test measures the duration on every run.
    keys mean: tokens and devices stay valid. `secrets-init` skips the directory `signing-keys/` of
    the bundle: before the first start of `api` and `worker`, copy its files into the volume
    `signing-keys` (owner `65532:65532`, directory `0700`, files `0600`, names unchanged). Without
-   them the first start retires every key whose private file is missing and creates fresh ones
-   (log line `signing key file missing, key retired`): access tokens and invocation tokens of
-   the old keys stop verifying, people sign in again, webhook receivers need the new public key.
+   them the first start ends with an error naming `secrets.signing_key_dir` and changes no key. Only
+   when the bundle has no `signing-keys/`, set `BOTHY_SIGNING_KEY__ACCEPT_LOST_KEYS=true` for one
+   start of `api` and `worker`: it retires every key whose private file is missing and creates
+   fresh ones (log line `signing key file missing, key retired`); access tokens and invocation
+   tokens of the old keys stop verifying, people sign in again, webhook receivers need the new
+   public key. Remove the variable again after that start.
 3. `docker compose up -d secrets-init postgres backup`, then restore from repo2 according to
    [backup-restore.md](backup-restore.md) 5.2 from step 4 (target: latest state).
 4. Restore the objects from restic.

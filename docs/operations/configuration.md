@@ -734,6 +734,7 @@ Source: [19-security.md](../spec/19-security.md), section 16.
 | `signing_key.cache_ttl` | `BOTHY_SIGNING_KEY__CACHE_TTL` | Server | duration | `30s` | longest time a process still accepts a retired key or does not know a new one | active |
 | `signing_key.rotation_check_interval` | `BOTHY_SIGNING_KEY__ROTATION_CHECK_INTERVAL` | Server | duration | `1m` | interval of the job `instance.key_rotation` | active |
 | `signing_key.access_token_rotation_interval` | `BOTHY_SIGNING_KEY__ACCESS_TOKEN_ROTATION_INTERVAL` | Server | duration | `30d` | scheduled rotation of the key for access tokens | active |
+| `signing_key.accept_lost_keys` | `BOTHY_SIGNING_KEY__ACCEPT_LOST_KEYS` | Server | bool | `false` | consent that a start whose key store `secrets.signing_key_dir` holds the private file of none of the unretired keys retires them and creates fresh ones; without it that start ends with an error and changes no key (restore without the key store, [disaster-recovery.md](../operations/disaster-recovery.md) case B) | active |
 
 ### 20 Privacy
 
