@@ -62,6 +62,8 @@ Diensten; `TestCatalogMatchesConfigurationDoc` vergleicht beide Richtungen und d
   self-signed CA limited to leaf certificates (`ca.crt`; its key is never written) and per host
   `postgres` and `backup` an ECDSA P-256 key in PKCS#8 (`<host>.key`) with a certificate for the
   host name with server and client use (`<host>.crt`), all valid for `PGBackRestTLSValidity`.
+- `db_backup_password` (M7-02) is the password of the role `bothy_backup`: `migrate` sets it with
+  `--bootstrap`, `backup` (bothy-backupd) logs in with it to record `backup_runs`.
 - `pending`: Der Erzeuger kommt mit einem späteren Ticket (`Entry.PendingOn`):
   `s3_access_key` und `s3_secret_key` (M3, bis dahin geliefert).
   Fehlen sie, meldet `init` sie als `pending` und endet mit Exitcode 0; geliefert werden sie

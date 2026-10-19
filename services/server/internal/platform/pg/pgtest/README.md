@@ -5,7 +5,7 @@ Status: built (M1-12). Test helper only; no production package imports it (plan 
 ## Purpose
 
 Gives every integration test a fresh PostgreSQL 18 database with the schema production gets: one
-disposable container per test binary, the four roles bootstrapped with `pg.Bootstrap`, a template
+disposable container per test binary, the five roles bootstrapped with `pg.Bootstrap`, a template
 migrated once per migration set with `pg.Migrator` as `bothy_owner`, and a clone of that template
 per test.
 
@@ -28,7 +28,7 @@ func TestSomething(t *testing.T) {
 - `Config(role)` is the connection configuration of a role (127.0.0.1, the mapped port, `sslmode
   disable`, generous test deadlines); change fields and open it with `OpenPool(t, cfg)`.
 - `SecretsDir()` holds `db_owner_password`, `db_app_password`, `db_maint_password`,
-  `db_monitor_password` and `db_superuser_password` (mode 0600, generated `EXAMPLE` values).
+  `db_monitor_password`, `db_backup_password` and `db_superuser_password` (mode 0600, generated `EXAMPLE` values).
 - `SuperConn(t)` and `SuperConfig()` are the superuser of the container, `ContainerLogs(t)` its
   server log.
 

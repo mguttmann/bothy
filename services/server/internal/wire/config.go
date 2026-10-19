@@ -23,6 +23,7 @@ var configKeyGroups = []func() []config.Key{
 	signingKeyConfigKeys,
 	databaseConfigKeys,
 	migrateConfigKeys,
+	backupConfigKeys,
 	telemetryConfigKeys,
 	shutdownConfigKeys,
 	auditConfigKeys,

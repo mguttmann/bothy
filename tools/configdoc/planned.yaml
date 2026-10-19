@@ -49,10 +49,6 @@ rules:
     etappe: M3
   - match: "interaction."  # M2-15
     etappe: M2
-  - match: migrate.recent_backup_max_age  # M7-02
-    etappe: M7
-  - match: migrate.require_recent_backup  # M7-02
-    etappe: M7
   - match: "notify."  # M3-17, M3-22, M3-23; etappe of the chapter for badge_sync_min_interval (no ticket names it)
     etappe: M3
   - match: "privacy."  # M7-06, M7-07; etappe of the chapter for ai_notice_enabled, notice_url (no ticket names it)

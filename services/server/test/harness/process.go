@@ -170,7 +170,7 @@ func (p *Process) prepare(dir string) error {
 	if err := os.Mkdir(src, 0o700); err != nil {
 		return err
 	}
-	for _, name := range []string{"db_superuser_password", "db_owner_password", "db_app_password", "db_maint_password", "db_monitor_password"} {
+	for _, name := range []string{"db_superuser_password", "db_owner_password", "db_app_password", "db_maint_password", "db_monitor_password", "db_backup_password"} {
 		b, err := os.ReadFile(filepath.Join(p.DB.SecretsDir(), name)) // #nosec G304 -- a fixed name in the pgtest directory
 		if err != nil {
 			return err

@@ -76,19 +76,29 @@ func TestMigrateSettingsBinds(t *testing.T) {
 	want := wire.MigrateConfig{ // #nosec G101 -- secret references, not credentials
 		LockTimeout: 750 * time.Millisecond, DependencyWait: time.Minute, BootstrapUser: "postgres",
 		BootstrapPasswordRef: "file:/srv/secrets/db_superuser_password",
+		RequireRecentBackup:  true, RecentBackupMaxAge: 24 * time.Hour,
 	}
 	refs := map[pg.Role]string{
 		pg.RoleOwner: "file:/srv/secrets/db_owner_password", pg.RoleApp: "file:/srv/secrets/db_app_password",
 		pg.RoleMaint: "file:/srv/secrets/db_maint_password", pg.RoleMonitor: "file:/srv/secrets/db_monitor_password",
+		pg.RoleBackup: "file:/srv/secrets/db_backup_password",
 	}
 	if s.LockTimeout != want.LockTimeout || s.DependencyWait != want.DependencyWait || s.BootstrapUser != want.BootstrapUser ||
-		s.BootstrapPasswordRef != want.BootstrapPasswordRef || len(s.PasswordRefs()) != 4 {
+		s.BootstrapPasswordRef != want.BootstrapPasswordRef || s.RequireRecentBackup != want.RequireRecentBackup ||
+		s.RecentBackupMaxAge != want.RecentBackupMaxAge || len(s.PasswordRefs()) != len(pg.Roles()) {
 		t.Fatalf("MigrateSettings = %+v\nwant %+v", s, want)
 	}
 	for r, ref := range refs {
 		if got := s.PasswordRefs()[r]; got != ref {
 			t.Errorf("password of %s: %s, want %s", r, got, ref)
 		}
+	}
+	s, err = wire.MigrateSettings(loadValues(t, schema(t), "BOTHY_MIGRATE__REQUIRE_RECENT_BACKUP=false", "BOTHY_MIGRATE__RECENT_BACKUP_MAX_AGE=36h"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if s.RequireRecentBackup || s.RecentBackupMaxAge != 36*time.Hour {
+		t.Errorf("RequireRecentBackup %v, RecentBackupMaxAge %s; want false, 36h", s.RequireRecentBackup, s.RecentBackupMaxAge)
 	}
 }
 

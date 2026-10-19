@@ -2,7 +2,7 @@
 
 // Package pgtest gives integration tests a fresh PostgreSQL 18 database each (ADR 0006, plan
 // P-09 and P-10). One disposable container per test binary runs the pinned Image on 127.0.0.1
-// with a random host port; its four roles are bootstrapped with pg.Bootstrap and generated
+// with a random host port; its five roles are bootstrapped with pg.Bootstrap and generated
 // EXAMPLE passwords, and a template database per migration set is migrated once with
 // pg.Migrator as bothy_owner, so tests run against the schema production gets. Every New clones
 // that template.

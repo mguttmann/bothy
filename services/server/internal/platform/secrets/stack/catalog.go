@@ -81,6 +81,8 @@ var catalog = []Entry{
 	{Name: "db_app_password", Origin: OriginGenerated, Generator: GeneratorToken, Services: []string{serviceServer, serviceMigrate}},
 	{Name: "db_maint_password", Origin: OriginGenerated, Generator: GeneratorToken, Services: []string{serviceServer, serviceMigrate}},
 	{Name: "db_monitor_password", Origin: OriginGenerated, Generator: GeneratorToken, Services: []string{serviceCollector, serviceMigrate}},
+	// The password of bothy_backup, the role bothy-backupd records backup_runs with (M7-02).
+	{Name: "db_backup_password", Origin: OriginGenerated, Generator: GeneratorToken, Services: []string{serviceMigrate, serviceBackup}},
 	{Name: "token_pepper", Origin: OriginGenerated, Generator: GeneratorKey, Services: []string{serviceServer}},
 	// The AES-256-GCM key of the TOTP secrets in local_credentials (M1-39): 32 bytes as hex.
 	{Name: "totp_key", Origin: OriginGenerated, Generator: GeneratorKey, Services: []string{serviceServer}},

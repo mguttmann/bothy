@@ -42,17 +42,44 @@ func secretSchema() (*config.Schema, error) {
 	})
 }
 
+// offsiteWarning is what config check prints on stderr while backup.offsite.target is empty
+// (docs/spec/16-betrieb.md 8.1): the backups stay on the host.
+const offsiteWarning = "warning: backup.offsite.target is empty: local backup only (16-betrieb.md 8.1)\n"
+
 func TestConfigCheckOK(t *testing.T) {
 	t.Parallel()
 	code, stdout, stderr := runConfig(t, wire.ConfigSchema, []string{"PATH=/usr/bin"}, "check")
-	if code != 0 || stdout != "configuration ok\n" || stderr != "" {
-		t.Fatalf("exit %d, stdout %q, stderr %q; want 0, %q, empty", code, stdout, stderr, "configuration ok\n")
+	if code != 0 || stdout != "configuration ok\n" || stderr != offsiteWarning {
+		t.Fatalf("exit %d, stdout %q, stderr %q; want 0, %q, %q", code, stdout, stderr, "configuration ok\n", offsiteWarning)
 	}
 
 	// Registered in the command table: the same through run.
 	var out, errOut bytes.Buffer
 	if code := run(context.Background(), []string{"config", "check", "--role", "worker"}, withPublicURL(nil), &out, &errOut); code != 0 || out.String() != "configuration ok\n" {
 		t.Fatalf("run config check: exit %d, stdout %q, stderr %q", code, out.String(), errOut.String())
+	}
+}
+
+// TestConfigCheckWarnsOnEmptyOffsiteTarget: config check warns while backup.offsite.target is
+// empty and stays quiet once a target is set; the warning does not fail the check, and a schema
+// without the key gets none.
+func TestConfigCheckWarnsOnEmptyOffsiteTarget(t *testing.T) {
+	t.Parallel()
+	code, stdout, stderr := runConfig(t, wire.ConfigSchema, []string{"BOTHY_BACKUP__OFFSITE__TARGET="}, "check")
+	if code != 0 || stdout != "configuration ok\n" || stderr != offsiteWarning {
+		t.Errorf("empty target: exit %d, stdout %q, stderr %q", code, stdout, stderr)
+	}
+	code, stdout, stderr = runConfig(t, wire.ConfigSchema, []string{"BOTHY_BACKUP__OFFSITE__TARGET=s3:https://s3.example.com/bothy-backup"}, "check")
+	if code != 0 || stdout != "configuration ok\n" || stderr != "" {
+		t.Errorf("target set: exit %d, stdout %q, stderr %q", code, stdout, stderr)
+	}
+	if code, _, stderr := runConfig(t, secretSchema, []string{"BOTHY_SECRET_TEST=unused-EXAMPLE"}, "check"); code != 0 || strings.Contains(stderr, "backup.offsite.target") {
+		t.Errorf("schema without the key: exit %d, stderr %q", code, stderr)
+	}
+	// print shows the value and never warns.
+	if code, stdout, stderr := runConfig(t, wire.ConfigSchema, nil, "print"); code != 0 || stderr != "" ||
+		!strings.Contains(stdout, "backup.offsite.target =   # default\n") {
+		t.Errorf("print: exit %d, stderr %q", code, stderr)
 	}
 }
 
@@ -227,6 +254,17 @@ func TestConfigPrintShowsSourcePerKey(t *testing.T) {
 		"authz.expiry_sweep_interval = 1m  # default\n" +
 		"authz.snapshot_cache_max_entries = 10000  # default\n" +
 		"authz.view_as_max_duration = 15m  # default\n" +
+		"backup.logical.retention = 30d  # default\n" +
+		"backup.logical.schedule = 0 3 * * *  # default\n" +
+		"backup.objects.retention = 90d  # default\n" +
+		"backup.objects.schedule = 30 3 * * *  # default\n" +
+		"backup.offsite.region = us-east-1  # default\n" +
+		"backup.offsite.target =   # default\n" +
+		"backup.offsite.use_path_style = true  # default\n" +
+		"backup.pg.diff_schedule = 0 2 * * 1-6  # default\n" +
+		"backup.pg.full_schedule = 0 2 * * 0  # default\n" +
+		"backup.pg.local_retention_full = 1  # default\n" +
+		"backup.pg.retention_full = 4  # default\n" +
 		"branding.product_name_max_chars = 64  # default\n" +
 		"channel.history_backfill_limit_default = 20  # default\n" +
 		"channel.history_backfill_limit_max = 200  # default\n" +
@@ -310,12 +348,15 @@ func TestConfigPrintShowsSourcePerKey(t *testing.T) {
 		"message.max_content_bytes = 2048  # env BOTHY_MESSAGE__MAX_CONTENT_BYTES\n" +
 		"message.max_mentions = 50  # default\n" +
 		"migrate.app_password_ref = file:/run/bothy/secrets/db_app_password  # default\n" +
+		"migrate.backup_password_ref = file:/run/bothy/secrets/db_backup_password  # default\n" +
 		"migrate.bootstrap_password_ref = file:/run/bothy/secrets/db_superuser_password  # default\n" +
 		"migrate.bootstrap_user = postgres  # default\n" +
 		"migrate.lock_timeout = 5s  # default\n" +
 		"migrate.maint_password_ref = file:/run/bothy/secrets/db_maint_password  # default\n" +
 		"migrate.monitor_password_ref = file:/run/bothy/secrets/db_monitor_password  # default\n" +
 		"migrate.owner_password_ref = file:/run/bothy/secrets/db_owner_password  # default\n" +
+		"migrate.recent_backup_max_age = 1d  # default\n" +
+		"migrate.require_recent_backup = true  # default\n" +
 		"notify.user_default_level = mentions  # default\n" +
 		"pin.max_per_thread = 50  # default\n" +
 		"principal.display_name_max_chars = 64  # default\n" +
