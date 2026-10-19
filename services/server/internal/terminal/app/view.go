@@ -47,7 +47,7 @@ func (s *Service) view(ctx context.Context, h hostState) terminal.HostView {
 		ID: r.ID, Name: r.Name, State: string(r.State), Platform: r.Platform, AssignedUserID: r.AssignedUserID,
 		LLMCredentials: r.LLMCredentials, DeclaredServerHost: r.DeclaredServerHost, ReportedIsServerHost: r.ReportedIsServerHost,
 		NoisePublicKey: r.NoisePublicKey, KeyFingerprint: r.KeyFingerprint, KeyGeneration: r.KeyGeneration,
-		RequireLocalConfirm: r.RequireLocalConfirm, Connected: s.d.Presence.Connected(ctx, r.ID), HostVersion: r.HostVersion,
+		RequireLocalConfirm: r.RequireLocalConfirm, Connected: s.connected(ctx, r.ID), HostVersion: r.HostVersion,
 		OSVersion: r.OSVersion, LastSeenAt: r.LastSeenAt, CreatedAt: r.CreatedAt, Version: r.Version,
 		Profiles: []terminal.Profile{}, Doctor: []terminal.DoctorCheck{},
 	}

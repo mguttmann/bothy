@@ -14,11 +14,20 @@ import (
 	"github.com/OWNER/bothy/services/server/internal/kernel/ids"
 )
 
-// Register declares what the terminal module emits (M1-25, docs/spec/05-aktionen.md section 6):
-// the durable event host.updated (M2-39). internal/wire lists it in moduleRegistrations;
-// terminal_session.changed comes with M2-44.
+// Register declares what the terminal module emits and accepts (M1-25, docs/spec/05-aktionen.md
+// sections 6 and 7): the durable events host.updated (M2-39) and terminal_session.changed (the
+// one end path of a session, M2-43), the ephemeral event host.presence_changed and the ops the
+// host service sends on host_control (M2-43). internal/wire lists it in moduleRegistrations.
 func Register(r *authorize.Registry) {
 	r.Event("terminal", authorize.EventHostUpdated)
+	r.Event("terminal", authorize.EventTerminalSessionChanged)
+	r.Event("terminal", authorize.EventHostPresenceChanged)
+	for _, op := range []authorize.ChannelOp{
+		authorize.ChannelOpHostControlIdentify, authorize.ChannelOpHostControlHeartbeat, authorize.ChannelOpHostControlReport,
+		authorize.ChannelOpHostControlSessionStarted, authorize.ChannelOpHostControlSessionEnded,
+	} {
+		r.ChannelOp("terminal", op)
+	}
 }
 
 // Page asks for one page of a list: Cursor is next_cursor of the previous page, Limit the page

@@ -1304,7 +1304,10 @@ Rolle `api`:
 2. `http.Server.Shutdown` mit `shutdown.http_grace`: Listener schließen, laufende Anfragen beenden.
    `Shutdown` schließt übernommene Verbindungen wie WebSockets nicht [Q9, belegt]; darum:
 3. Gateway: `acked_seq` aller Agenten-Verbraucher sofort speichern; alle Verbindungen mit `4013
-   server_restart` schließen (04, 6.4; Clients verbinden mit Zufallsverzögerung neu).
+   server_restart` schließen (04, 6.4; Clients verbinden mit Zufallsverzögerung neu). Control
+   connections of host services (24 3.5, M2-43): the sessions of each host turn `detached`, then
+   the connection closes with `4013`; the host service reconnects after a random delay below
+   `host_service.reconnect_backoff_base` and keeps its PTYs until `terminal.detach_grace`.
 4. Log-Tail und `LISTEN` beenden.
 5. Telemetrie leeren, höchstens `shutdown.telemetry_flush_timeout`.
 6. Pool schließen.

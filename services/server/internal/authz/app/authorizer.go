@@ -420,6 +420,9 @@ func (a *Authorizer) authorize(ctx context.Context, p authorize.Principal, act a
 		// stored view (R-AZ-32, M6-01).
 		p = withoutViewAs{p}
 	}
+	if req.IsHostSelf() || (p != nil && p.PrincipalKind() == domain.KindHost) {
+		return a.authorizeHost(ctx, p, spec, req, r, t)
+	}
 	if p == nil || p.PrincipalKind() == domain.KindAnonymous {
 		if isPublic(req) {
 			return authorize.Decision{Outcome: authorize.OutcomeAllow}, nil

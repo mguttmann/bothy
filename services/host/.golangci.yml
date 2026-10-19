@@ -89,8 +89,8 @@ linters:
         linters: [forbidigo]
       # The tests of the recordings and fingerprint vectors read UPDATE_RECORDINGS, the switch of
       # make -C services/host recordings that writes the test data instead of comparing it
-      # (docs/DECISIONS.md D-M2-38-18).
-      - path: ^internal/(noise/recordings|fingerprint/fingerprint)_test\.go$
+      # (docs/DECISIONS.md D-M2-38-18; the control recordings since M2-43).
+      - path: ^internal/(noise/recordings|fingerprint/fingerprint|control/recording_internal)_test\.go$
         linters: [forbidigo]
       # Like the analysis (sonar.test.inclusions), gocognit and goconst check product code only;
       # table rows of tests repeat literals on purpose.

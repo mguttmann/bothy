@@ -72,6 +72,9 @@ const (
 	// KindOSUserName is the name of a session user of a terminal host, only under "os_user"
 	// (M2-39).
 	KindOSUserName
+	// KindOSUserNames is a list of names of session users of a terminal host, only under the
+	// members of host.connect that name them (M2-43).
+	KindOSUserNames
 )
 
 // Value is one attribute value of details. Build it with ID, Code, Int, Bool, Time, List,
@@ -118,6 +121,23 @@ func ReasonText(s string) Value { return Value{kind: KindReasonText, str: s} }
 // reuses it for host.connect.
 func OSUserName(s string) Value { return Value{kind: KindOSUserName, str: s} }
 
+// OSUserNames returns a list of names of session users of a terminal host (M2-43 Design note 8b):
+// the value of the members hd6_users, hd9_users, hd10_users, hd11_users, session_users_added and
+// session_users_removed of host.connect. The audit module accepts it only under those keys and each
+// name only in the form of OSUserName; the length bound (host.os_user_max_chars) belongs to the
+// validation of the report.
+//
+// Example:
+//
+//	attrs := auditing.Attrs{"hd6_users": auditing.OSUserNames("bothy-s-alex", "bothy-s-sam")}
+func OSUserNames(names ...string) Value {
+	list := make([]Value, 0, len(names))
+	for _, n := range names {
+		list = append(list, OSUserName(n))
+	}
+	return Value{kind: KindOSUserNames, list: list}
+}
+
 // Violation is one entry of the reserved member violations of i1_violation (19 SEC-AUD-5); M1-29
 // fills it.
 type Violation struct {
@@ -150,7 +170,8 @@ func (v Value) Kind() Kind { return v.kind }
 
 // Data returns the content of v for the audit module: a string for KindID (canonical UUID text),
 // KindCode, KindReasonText and KindOSUserName, int64, bool, time.Time, a copy of the elements ([]Value) for
-// KindList, a copy of the violations ([]Violation) for KindViolations, and nil for KindInvalid.
+// KindList and KindOSUserNames, a copy of the violations ([]Violation) for KindViolations, and nil
+// for KindInvalid.
 func (v Value) Data() any {
 	switch v.kind {
 	case KindID, KindCode, KindReasonText, KindOSUserName:
@@ -161,7 +182,7 @@ func (v Value) Data() any {
 		return v.b
 	case KindTime:
 		return v.t
-	case KindList:
+	case KindList, KindOSUserNames:
 		return slices.Clone(v.list)
 	case KindViolations:
 		return Violations(v.viols...).viols

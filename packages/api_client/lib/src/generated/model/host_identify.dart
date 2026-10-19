@@ -9,7 +9,7 @@ import 'package:built_value/serializer.dart';
 
 part 'host_identify.g.dart';
 
-/// Login of a host service. `proof` is a compact JWS (`alg = EdDSA`, `typ = host-auth+jwt`) over `{challenge, host_id, iat}` with the registered Ed25519 key.
+/// Login of a host service. `proof` is a compact JWS (`alg = EdDSA`, `typ = host-auth+jwt`, `kid`) over exactly `{challenge, host_id, iat}` with the registered Ed25519 key (24, 3.5).
 ///
 /// Properties:
 /// * [protocolVersion]

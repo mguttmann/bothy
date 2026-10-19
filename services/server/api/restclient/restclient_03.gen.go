@@ -7,16 +7,6 @@ import (
 	"net/http"
 )
 
-// GetApplicationproblemJSON401 returns the response for an HTTP 401 `application/problem+json` response
-func (r InstallAppResponse) GetApplicationproblemJSON401() *Unauthorized {
-	return r.ApplicationproblemJSON401
-}
-
-// GetApplicationproblemJSON403 returns the response for an HTTP 403 `application/problem+json` response
-func (r InstallAppResponse) GetApplicationproblemJSON403() *Forbidden {
-	return r.ApplicationproblemJSON403
-}
-
 // GetApplicationproblemJSON409 returns the response for an HTTP 409 `application/problem+json` response
 func (r InstallAppResponse) GetApplicationproblemJSON409() *Conflict {
 	return r.ApplicationproblemJSON409
@@ -25978,4 +25968,14 @@ func (r PinMessageResponse) GetApplicationproblemJSON404() *NotFound {
 // GetApplicationproblemJSON410 returns the response for an HTTP 410 `application/problem+json` response
 func (r PinMessageResponse) GetApplicationproblemJSON410() *Gone {
 	return r.ApplicationproblemJSON410
+}
+
+// GetApplicationproblemJSON429 returns the response for an HTTP 429 `application/problem+json` response
+func (r PinMessageResponse) GetApplicationproblemJSON429() *TooManyRequests {
+	return r.ApplicationproblemJSON429
+}
+
+// GetApplicationproblemJSONDefault returns the response for an HTTP default `application/problem+json` response
+func (r PinMessageResponse) GetApplicationproblemJSONDefault() *Error {
+	return r.ApplicationproblemJSONDefault
 }

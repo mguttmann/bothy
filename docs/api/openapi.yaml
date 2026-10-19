@@ -29209,7 +29209,7 @@ components:
           examples: [subscription_login_detected]
         session_user:
           type: string
-          description: 'Only when not passed: with `hd6_llm_login` and `hd11_shared_locations` the session user whose account the finding is in; with `hd10_helper_integrity` and a wrong peer the session user of that channel; with `hd9_foreign_homes` a former session user of this host (bound to a person in the state directory, no longer in `host_service.session_users`) whose home can be listed. The operator knows where to look, and the console shows the person of the assignment (24, 2.2 and 7.4). One entry per such account; names of other users are never sent. A name, never a path.'
+          description: 'Only when not passed: the account the rule for names gives (see the schema; 24, 2.2 and 7.4). A name, never a path.'
           pattern: ^[A-Za-z0-9_][A-Za-z0-9_.-]*$
           examples: [bothy-s-robin]
     HostSessionUserAssign:
@@ -29320,7 +29320,7 @@ components:
           description: Report whether `host_service.require_local_confirm` is on.
         connected:
           type: boolean
-          description: The control connection of the host service is open (memory of the server).
+          description: Usable for sessions, from the first `report` after `ready` to the end of the control connection (24, 3.5).
         host_version:
           type: string
           examples: [1.0.0]
@@ -29699,7 +29699,7 @@ components:
     HostChannelHello:
       type: object
       description: First text frame on the control and data connections of a host service.
-      required: [protocol_versions, challenge, server_time, heartbeat_interval_ms, jwks]
+      required: [protocol_versions, challenge, server_time, heartbeat_interval_ms, heartbeat_miss_limit, jwks]
       properties:
         protocol_versions:
           type: array
@@ -29715,12 +29715,15 @@ components:
           type: integer
           format: int64
           examples: [20000]
+        heartbeat_miss_limit:
+          type: integer
+          minimum: 1
         jwks:
           $ref: '#/components/schemas/Jwks'
           description: Public keys with purpose `terminal` for checking session tokens.
     HostIdentify:
       type: object
-      description: Login of a host service. `proof` is a compact JWS (`alg = EdDSA`, `typ = host-auth+jwt`) over `{challenge, host_id, iat}` with the registered Ed25519 key.
+      description: Login of a host service. `proof` is a compact JWS (`alg = EdDSA`, `typ = host-auth+jwt`, `kid`) over exactly `{challenge, host_id, iat}` with the registered Ed25519 key (24, 3.5).
       required: [protocol_version, host_id, proof, host_version]
       properties:
         protocol_version:
@@ -29732,6 +29735,7 @@ components:
           type: string
         host_version:
           type: string
+          pattern: ^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)(?:-((?:0|[1-9]\d*|\d*[a-zA-Z-][0-9a-zA-Z-]*)(?:\.(?:0|[1-9]\d*|\d*[a-zA-Z-][0-9a-zA-Z-]*))*))?(?:\+([0-9a-zA-Z-]+(?:\.[0-9a-zA-Z-]+)*))?$
         session_id:
           $ref: '#/components/schemas/Uuid'
           description: Only on a data connection; the session the connection belongs to.
@@ -29757,11 +29761,14 @@ components:
       properties:
         active_sessions:
           type: integer
+          minimum: 0
     HostHeartbeatAck:
       type: object
       properties:
         server_time:
           $ref: '#/components/schemas/Timestamp'
+        jwks:
+          $ref: '#/components/schemas/Jwks'
     HostReport:
       type: object
       description: Report of profiles, session users and self-checks; never content, paths or values. Sent after every `ready` before the host service accepts `session.open`, and on every change. When `doctor` refuses the start, the host service still logs in, sends one `report` and closes the connection without accepting `session.open` (24 section 2.2).

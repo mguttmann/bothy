@@ -16,8 +16,11 @@ import (
 	"github.com/santhosh-tekuri/jsonschema/v6"
 )
 
-// ptrType is the JSON pointer of the event type of a dispatch frame.
-const ptrType = "/d/type"
+// ptrType is the JSON pointer of the event type of a dispatch frame; ptrOp that of the op.
+const (
+	ptrType = "/d/type"
+	ptrOp   = "/op"
+)
 
 // maxSafeInteger is 2^53 - 1, the largest integer every client decodes exactly (06 "Basic rules").
 const maxSafeInteger = 1<<53 - 1
@@ -64,7 +67,7 @@ func (c *Contract) ValidateServerFrame(raw []byte) error {
 	}
 	key, ok := c.serverOps[op]
 	if !ok {
-		return &FrameError{Op: op, Pointer: "/op", Reason: fmt.Sprintf("op %q is no server-to-client message of the channel gateway", op)}
+		return &FrameError{Op: op, Pointer: ptrOp, Reason: fmt.Sprintf("op %q is no server-to-client message of the channel gateway", op)}
 	}
 	return c.validate(op, key, frame)
 }
@@ -78,7 +81,32 @@ func (c *Contract) ValidateClientFrame(raw []byte) error {
 	}
 	key, ok := c.clientOps[op]
 	if !ok {
-		return &FrameError{Op: op, Pointer: "/op", Reason: fmt.Sprintf("op %q is no client-to-server message of the channel gateway", op)}
+		return &FrameError{Op: op, Pointer: ptrOp, Reason: fmt.Sprintf("op %q is no client-to-server message of the channel gateway", op)}
+	}
+	return c.validate(op, key, frame)
+}
+
+// ValidateChannelFrame checks one text frame of a terminal channel (M2-43): channel is hostControl
+// or hostData, fromServer the direction (true: sent by the server). The rules of every frame
+// apply (size up to sync.ws_max_frame_bytes, one JSON object {op, d}, no null, integers at most
+// 2^53 - 1), then the op must be a message of the channel in that direction and the frame must
+// pass its strict schema. Errors: a *FrameError, or a schema error wrapped with the op.
+func (c *Contract) ValidateChannelFrame(channel string, fromServer bool, raw []byte) error {
+	dirs, ok := c.channels[channel]
+	if !ok {
+		return &FrameError{Reason: fmt.Sprintf("channel %q is no terminal channel of asyncapi.yaml", channel)}
+	}
+	op, frame, err := c.decode(raw)
+	if err != nil {
+		return err
+	}
+	key, ok := dirs[fromServer][op]
+	if !ok {
+		dir := "host-to-server"
+		if fromServer {
+			dir = "server-to-host"
+		}
+		return &FrameError{Op: op, Pointer: ptrOp, Reason: fmt.Sprintf("op %q is no %s message of the channel %s", op, dir, channel)}
 	}
 	return c.validate(op, key, frame)
 }

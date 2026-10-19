@@ -92,7 +92,8 @@ Die Ausnahme schränkt Owner ein und erweitert nichts; L22 bleibt für I1 unver�
   `packages/bothy_noise`; TM-T02 halten `TestRecordingsTMT02Dart` und
   `TestRecordingsTMT02Negative` in Go und `test/recordings_test.dart` in Dart, über die
   Aufzeichnungen beider Sprachen in beiden Rollen.
-* Trennung der Benutzer und Sperre bei zweiter Steuerverbindung (TM-T22, TM-T23).
+* Trennung der Benutzer und Sperre bei zweiter Steuerverbindung (TM-T22, TM-T23). Since M2-43
+  TM-T23 holds `TestDuplicate_TMT23` in `services/server/internal/terminal/adapters/wsrelay`.
 * Since M2-42 the host side of TM-T13, TM-T22, TM-T24, TM-T26, TM-T27 and the TM-T29 parts (a),
   (b), (c), (d), (e), (f), (h), (i), (j) holds the platform suite of `services/host/test/platform`
   (`TestPlatform_TMT13`, `TestPlatform_TMT22`, `TestPlatform_TMT24`, `TestPlatform_TMT26`,

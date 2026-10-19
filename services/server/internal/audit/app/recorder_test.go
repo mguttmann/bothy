@@ -402,3 +402,39 @@ func TestDetails_OSUserName(t *testing.T) {
 		t.Fatalf("%d entries written, want the one valid entry", n)
 	}
 }
+
+// TestDetails_OSUserNames (M2-43 Design note 8b, 19 SEC-AUD-5): lists of session user names are
+// accepted only under the members of host.connect that name them (hd6_users, hd9_users,
+// hd10_users, hd11_users, session_users_added, session_users_removed), each element in the form
+// of host_session_users.os_user; another kind under those keys and the list under another key
+// are refused at Record, and the stored row validates as audit_details.v1.
+func TestDetails_OSUserNames(t *testing.T) {
+	t.Parallel()
+	w := newWorld(t, time.Minute, 10)
+	ok := auditing.Entry{Action: "host.connect", Decision: auditing.DecisionAllow,
+		Attrs: auditing.Attrs{"hd6_users": auditing.OSUserNames("bothy-s-alex", "BOTHY-S-SHARED"), "session_users_removed": auditing.OSUserNames()}}
+	if err := w.uow.Do(as(alex), func(ctx context.Context) error { return w.rec.Record(ctx, ok) }); err != nil {
+		t.Fatalf("Record with hd6_users: %v", err)
+	}
+	got := w.store.committed()[0].Details
+	if l, _ := got["hd6_users"].([]any); len(l) != 2 || l[1] != "BOTHY-S-SHARED" {
+		t.Fatalf("hd6_users = %v", got["hd6_users"])
+	}
+	if err := domain.DetailsV1(got).Validate(); err != nil {
+		t.Fatalf("stored details: %v", err)
+	}
+	bad := map[string]auditing.Attrs{
+		"path":            {"hd9_users": auditing.OSUserNames("bothy-s-sam", "../x")},
+		"under other key": {"names": auditing.OSUserNames("bothy-s-sam")},
+		"codes":           {"hd10_users": auditing.List(auditing.Code("bothy-s-sam"))},
+	}
+	for name, attrs := range bad {
+		e := auditing.Entry{Action: "host.connect", Decision: auditing.DecisionAllow, Attrs: attrs}
+		if err := w.uow.Do(as(alex), func(ctx context.Context) error { return w.rec.Record(ctx, e) }); errs.KindOf(err) != errs.KindInternal {
+			t.Errorf("%s: Record = %v, want kind internal", name, err)
+		}
+	}
+	if err := (domain.DetailsV1{"hd11_users": []any{"a/b"}}).Validate(); err == nil {
+		t.Error("a path in hd11_users validated")
+	}
+}

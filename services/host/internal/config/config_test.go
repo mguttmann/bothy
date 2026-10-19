@@ -245,3 +245,26 @@ host_service:
 		t.Error("missing file accepted")
 	}
 }
+
+// TestReconnectBackoffKeys (M2-43, 24 section 17): the defaults 1s and 5m, both keys read, zero
+// and a cap below the base refused with the key named.
+func TestReconnectBackoffKeys(t *testing.T) {
+	c, err := Parse([]byte("host_service: {}\n"), linux)
+	if err != nil || c.ReconnectBackoffBase != time.Second || c.ReconnectBackoffCap != 5*time.Minute {
+		t.Fatalf("defaults %v %v %v", c, err, err)
+	}
+	c, err = Parse([]byte("host_service:\n  reconnect_backoff_base: 200ms\n  reconnect_backoff_cap: 30s\n"), linux)
+	if err != nil || c.ReconnectBackoffBase != 200*time.Millisecond || c.ReconnectBackoffCap != 30*time.Second {
+		t.Fatalf("set %v %v", c, err)
+	}
+	for doc, key := range map[string]string{
+		"host_service:\n  reconnect_backoff_base: 0s\n":                              "host_service.reconnect_backoff_base",
+		"host_service:\n  reconnect_backoff_base: 2m\n  reconnect_backoff_cap: 1m\n": "host_service.reconnect_backoff_cap",
+	} {
+		_, err := Parse([]byte(doc), linux)
+		var ke *KeyError
+		if !errors.As(err, &ke) || ke.Key != key {
+			t.Errorf("%q: %v, want a KeyError of %s", doc, err, key)
+		}
+	}
+}

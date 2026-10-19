@@ -32,6 +32,14 @@ const (
 	DetailOSUser = "os_user"
 )
 
+// osUserListKeys are the members of host.connect that hold lists of session user names (M2-43
+// Design note 8b, 19 SEC-AUD-5): the accounts a failed HD6, HD9, HD10 or HD11 names and the names a
+// report added or removed. Only they take such a list, and they take nothing else.
+var osUserListKeys = []string{"hd6_users", "hd9_users", "hd10_users", "hd11_users", "session_users_added", "session_users_removed"}
+
+// IsOSUserListKey reports whether key holds a list of session user names.
+func IsOSUserListKey(key string) bool { return slices.Contains(osUserListKeys, key) }
+
 // MaxCodeLen is the longest code (and attribute key) in bytes. Codes are short machine words
 // such as reason codes and action ids; the bound keeps a code from carrying text.
 const MaxCodeLen = 64
@@ -128,6 +136,10 @@ func validateMember(k string, v any) error {
 		s, isStr := v.(string)
 		ok = isStr && ValidOSUser(s)
 	default:
+		if IsOSUserListKey(k) {
+			ok = validOSUserList(v)
+			break
+		}
 		if !ValidKey(k) {
 			return fmt.Errorf("%w: attribute key does not match ^[a-z][a-z0-9_]*$", ErrDetails)
 		}
@@ -137,6 +149,20 @@ func validateMember(k string, v any) error {
 		return fmt.Errorf("%w: member %s has a value outside its form", ErrDetails, k)
 	}
 	return nil
+}
+
+// validOSUserList reports a list of session user names in the form of os_user.
+func validOSUserList(v any) bool {
+	list, isList := v.([]any)
+	if !isList {
+		return false
+	}
+	for _, e := range list {
+		if s, isStr := e.(string); !isStr || !ValidOSUser(s) {
+			return false
+		}
+	}
+	return true
 }
 
 // validAttribute reports a scalar attribute value or a flat list of them.

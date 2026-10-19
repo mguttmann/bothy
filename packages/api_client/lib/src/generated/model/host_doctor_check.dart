@@ -15,7 +15,7 @@ part 'host_doctor_check.g.dart';
 /// * [check]
 /// * [ok]
 /// * [code]
-/// * [sessionUser] - Only when not passed: with `hd6_llm_login` and `hd11_shared_locations` the session user whose account the finding is in; with `hd10_helper_integrity` and a wrong peer the session user of that channel; with `hd9_foreign_homes` a former session user of this host (bound to a person in the state directory, no longer in `host_service.session_users`) whose home can be listed. The operator knows where to look, and the console shows the person of the assignment (24, 2.2 and 7.4). One entry per such account; names of other users are never sent. A name, never a path.
+/// * [sessionUser] - Only when not passed: the account the rule for names gives (see the schema; 24, 2.2 and 7.4). A name, never a path.
 @BuiltValue()
 abstract class HostDoctorCheck
     implements Built<HostDoctorCheck, HostDoctorCheckBuilder> {
@@ -29,7 +29,7 @@ abstract class HostDoctorCheck
   @BuiltValueField(wireName: r'code')
   String? get code;
 
-  /// Only when not passed: with `hd6_llm_login` and `hd11_shared_locations` the session user whose account the finding is in; with `hd10_helper_integrity` and a wrong peer the session user of that channel; with `hd9_foreign_homes` a former session user of this host (bound to a person in the state directory, no longer in `host_service.session_users`) whose home can be listed. The operator knows where to look, and the console shows the person of the assignment (24, 2.2 and 7.4). One entry per such account; names of other users are never sent. A name, never a path.
+  /// Only when not passed: the account the rule for names gives (see the schema; 24, 2.2 and 7.4). A name, never a path.
   @BuiltValueField(wireName: r'session_user')
   String? get sessionUser;
 

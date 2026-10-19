@@ -126,11 +126,11 @@ func TestDecide_Rules(t *testing.T) {
 			t.Errorf("%s: %+v, %v; want %+v", c.name, got, err, c.want)
 		}
 	}
-	// A deferred requirement never decides.
+	// HostSelf (M2-43): an owner who sees the host is no host principal.
 	in := input(t, "host.connect", "host", person, domain.Rights{Owner: true})
 	in.Host = &domain.HostFacts{Visible: true}
-	if _, err := domain.Decide(in); err == nil {
-		t.Fatal("a deferred requirement decided")
+	if got, err := domain.Decide(in); err != nil || got.Reason != domain.ReasonSubjectKindNotAllowed {
+		t.Fatalf("host.connect for a person: %+v, %v", got, err)
 	}
 }
 

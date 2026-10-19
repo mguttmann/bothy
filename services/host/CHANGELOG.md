@@ -10,6 +10,14 @@ is the [`VERSION`](VERSION) file next to this one; release tags are `host/v<vers
 
 ### Added
 
+- `internal/control` (M2-43): the control connection to `wss://<server>/api/v1/hosts/connect`
+  with the EdDSA proof of `identify`, `report` first after every `ready`, heartbeats, the key set of
+  purpose `terminal`, the reconnect policy per close code with the new keys
+  `host_service.reconnect_backoff_base` and `host_service.reconnect_backoff_cap`, and the refused
+  start over one connection (one `report`, close `1000`, exit `78`). `run` uses it instead of
+  `NoControl` once the host is paired; `startup.Events` passes every later `ready` to the start
+  sequence and stops `run` after `4110`, `4112` and `4114`. Recordings
+  `testdata/control/host_frames.json` and `server_frames.json`; the fake server `controltest`.
 - Go module `github.com/OWNER/bothy/services/host` with `VERSION`, the golangci-lint v2
   configuration and the hand-maintained go-arch-lint rules of the module.
 - Binary `bothy-host` with a command table, usage text and the exit codes 0, 1 and 2.

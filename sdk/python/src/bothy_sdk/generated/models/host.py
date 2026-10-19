@@ -39,7 +39,8 @@ class Host:
         profiles (list[HostProfile]):
         doctor (list[HostDoctorCheck]): One entry per check HD1 to HD11; a failed HD6, HD9, HD10 or HD11 has one entry
             per account named by the rule for names (24, 2.2).
-        connected (bool): The control connection of the host service is open (memory of the server).
+        connected (bool): Usable for sessions, from the first `report` after `ready` to the end of the control
+            connection (24, 3.5).
         created_at (datetime.datetime): RFC 3339 timestamp in UTC with millisecond precision and suffix `Z`.
         version (int):
         disabled_reason (HostDisabledReason | Unset): Present exactly with `state = disabled`. `duplicate_connection`

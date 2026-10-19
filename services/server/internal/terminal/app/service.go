@@ -5,6 +5,7 @@ package app
 import (
 	"context"
 	"errors"
+	"sync/atomic"
 	"time"
 
 	"github.com/OWNER/bothy/services/server/internal/kernel/actor"
@@ -43,6 +44,11 @@ type Config struct {
 	// PageSizeDefault is api.page_size_default; PageSizeMax is api.page_size_max.
 	PageSizeDefault int `config:"api.page_size_default"`
 	PageSizeMax     int `config:"api.page_size_max"`
+	// ClockLeeway is auth.clock_leeway, the tolerance of iat in the proof of identify (M2-43).
+	ClockLeeway time.Duration `config:"auth.clock_leeway"`
+	// LastActiveGranularity is identity.last_active_granularity: a heartbeat writes last_seen_at
+	// only when the stored value is older (M2-43).
+	LastActiveGranularity time.Duration `config:"identity.last_active_granularity"`
 }
 
 // Deps are the collaborators of the host use cases.
@@ -70,12 +76,67 @@ type Deps struct {
 	Cursors Cursors
 	// Clock gives the time of every write; nil means clock.System().
 	Clock clock.Clock
+	// Keys reads the keys of purpose terminal for hello and heartbeat_ack (M2-43); nil means an
+	// empty key set.
+	Keys TerminalKeys
 }
 
 // Service implements terminal.Hosts. It is safe for concurrent use.
 type Service struct {
 	cfg Config
 	d   Deps
+	// links are the control connections of this process (BindControl); NoLinks until bound.
+	links atomic.Pointer[linksHolder]
+	// keys are the keys of purpose terminal bound after the start of the signing keys.
+	keys atomic.Pointer[keysHolder]
+}
+
+// linksHolder carries the bound ControlLinks through the atomic pointer.
+type linksHolder struct{ l ControlLinks }
+
+// BindControl binds the control connections of this process (M2-43): the registry of
+// adapters/wsrelay, built after the module because it needs the use cases. From then on the
+// presence of host reads is the registry, and the use cases that change a host close or update
+// its connection after their commit. internal/wire calls it once, before the public listener
+// opens.
+func (s *Service) BindControl(l ControlLinks) {
+	if l == nil {
+		l = NoLinks{}
+	}
+	s.links.Store(&linksHolder{l: l})
+}
+
+// BindKeys binds the keys of purpose terminal for hello and heartbeat_ack (M2-43); the signing
+// keys start after the module, so internal/wire binds them with the control connection.
+func (s *Service) BindKeys(k TerminalKeys) {
+	s.keys.Store(&keysHolder{k: k})
+}
+
+// keysHolder carries the bound TerminalKeys through the atomic pointer.
+type keysHolder struct{ k TerminalKeys }
+
+// terminalKeys returns the bound keys, else Deps.Keys (nil: no keys).
+func (s *Service) terminalKeys() TerminalKeys {
+	if h := s.keys.Load(); h != nil && h.k != nil {
+		return h.k
+	}
+	return s.d.Keys
+}
+
+// control returns the bound ControlLinks, NoLinks before BindControl.
+func (s *Service) control() ControlLinks {
+	if h := s.links.Load(); h != nil {
+		return h.l
+	}
+	return NoLinks{}
+}
+
+// connected reports the presence of hostID: the registry once bound, else Deps.Presence.
+func (s *Service) connected(ctx context.Context, hostID ids.ID) bool {
+	if h := s.links.Load(); h != nil {
+		return h.l.Connected(hostID)
+	}
+	return s.d.Presence.Connected(ctx, hostID)
 }
 
 // Compile-time check: the incoming port.
@@ -91,8 +152,9 @@ func New(cfg Config, d Deps) (*Service, error) {
 	if cfg.NameMaxChars < 1 || cfg.OSUserMaxChars < 1 || cfg.ReasonMaxChars < 1 || cfg.PairingCodeTTL <= 0 ||
 		cfg.PageSizeDefault < 1 || cfg.PageSizeMax < cfg.PageSizeDefault || cfg.FingerprintMaxAttempts < 1 ||
 		cfg.FingerprintConfirmChars < 1 || cfg.FingerprintConfirmChars > domain.FingerprintChars ||
-		cfg.ReportLabelMaxChars < 1 || cfg.ReportMaxEntries < 1 {
-		return nil, errors.New("terminal: the text limits, terminal.pairing_code_ttl, the fingerprint and report keys and the page sizes must be in range")
+		cfg.ReportLabelMaxChars < 1 || cfg.ReportMaxEntries < 1 || cfg.ClockLeeway < 0 || cfg.LastActiveGranularity < 0 {
+		return nil, errors.New("terminal: the text limits, terminal.pairing_code_ttl, the fingerprint and report keys, the page sizes, " +
+			"auth.clock_leeway and identity.last_active_granularity must be in range")
 	}
 	if d.Presence == nil {
 		d.Presence = NoConnections{}
@@ -105,10 +167,12 @@ func New(cfg Config, d Deps) (*Service, error) {
 
 // Values of the audit entries and of host.updated (05 sections 4.14 and 6, 24 section 10).
 const (
-	resourceHost     = "host"
-	resourceSession  = "terminal_session"
-	eventHostUpdated = "host.updated"
-	receiveHostRead  = "host.read"
+	resourceHost        = "host"
+	resourceSession     = "terminal_session"
+	eventHostUpdated    = "host.updated"
+	eventSessionChanged = "terminal_session.changed"
+	receiveHostRead     = "host.read"
+	receiveSelf         = "self"
 
 	attrOperation       = "operation"
 	attrReason          = "reason"
@@ -124,6 +188,7 @@ const (
 	attrOSUser          = "os_user"
 	attrSessionID       = "session_id"
 	attrCloseReason     = "close_reason"
+	attrCloseDetail     = "close_detail"
 	attrBytesIn         = "bytes_in"
 	attrBytesOut        = "bytes_out"
 	attrDurationMS      = "duration_ms"
@@ -198,6 +263,12 @@ func (s *Service) precondition(ctx context.Context, p terminal.Precondition, h h
 // rights hook raises permission_version, records the views of the active owners, the holder, the
 // subjects of grants on the host and principals, and writes access.changed for every difference.
 func rightsChange(hostID ids.ID, principals ...ids.ID) txn.Option {
+	return rightsChangeOf(authorize.ActionHostManage, hostID, principals...)
+}
+
+// rightsChangeOf declares the rights change of action on hostID with principals (M2-43: the
+// transition of a duplicate control connection is the rights change host.connect).
+func rightsChangeOf(action authorize.Action, hostID ids.ID, principals ...ids.ID) txn.Option {
 	ref := txn.Ref{Kind: resourceHost, ID: hostID}
 	var list []ids.ID
 	for _, p := range principals {
@@ -206,6 +277,6 @@ func rightsChange(hostID ids.ID, principals ...ids.ID) txn.Option {
 		}
 	}
 	return txn.DeclareRightsChange(txn.RightsChangeSpec{
-		Action: string(authorize.ActionHostManage), Resource: ref, Principals: list, Targets: []txn.Ref{ref},
+		Action: string(action), Resource: ref, Principals: list, Targets: []txn.Ref{ref},
 	})
 }

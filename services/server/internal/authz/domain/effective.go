@@ -14,6 +14,9 @@ const (
 	KindAgent     = "agent"
 	KindApp       = "app"
 	KindAnonymous = "anonymous"
+	// KindHost is the host service of a terminal host, authenticated with its Ed25519 key (07
+	// section 3, D-T25); it has no row in principals and an empty snapshot (M2-43).
+	KindHost = "host"
 )
 
 // PathKind says how deep a resolved path reaches.

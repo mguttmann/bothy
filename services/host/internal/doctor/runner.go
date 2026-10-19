@@ -53,15 +53,17 @@ func (r *Runner) RunFull(ctx context.Context) *Result {
 		}
 		st.running = true
 		req := res.requests[u]
-		r.wg.Go(func() { r.scan(ctx, u, req) })
+		// The scan reads its own copy of the environment: a later ready changes r.env
+		// (SetDeclaration) while the scan runs (M2-43).
+		env := r.env
+		r.wg.Go(func() { r.scan(ctx, env, u, req) })
 	}
 	out := r.merged()
 	r.mu.Unlock()
 	return out
 }
 
-func (r *Runner) scan(ctx context.Context, user string, req Request) {
-	env := r.snapshotEnv() // SetDeclaration may write r.env while the scan runs
+func (r *Runner) scan(ctx context.Context, env Env, user string, req Request) {
 	sctx, cancel := context.WithTimeout(ctx, env.scanBound())
 	defer cancel()
 	code, err := env.Helpers.Scan(sctx, user, req)

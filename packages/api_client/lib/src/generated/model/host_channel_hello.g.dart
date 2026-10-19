@@ -16,6 +16,8 @@ class _$HostChannelHello extends HostChannelHello {
   @override
   final int heartbeatIntervalMs;
   @override
+  final int heartbeatMissLimit;
+  @override
   final Jwks jwks;
 
   factory _$HostChannelHello([
@@ -27,6 +29,7 @@ class _$HostChannelHello extends HostChannelHello {
     required this.challenge,
     required this.serverTime,
     required this.heartbeatIntervalMs,
+    required this.heartbeatMissLimit,
     required this.jwks,
   }) : super._();
   @override
@@ -45,6 +48,7 @@ class _$HostChannelHello extends HostChannelHello {
         challenge == other.challenge &&
         serverTime == other.serverTime &&
         heartbeatIntervalMs == other.heartbeatIntervalMs &&
+        heartbeatMissLimit == other.heartbeatMissLimit &&
         jwks == other.jwks;
   }
 
@@ -55,6 +59,7 @@ class _$HostChannelHello extends HostChannelHello {
     _$hash = $jc(_$hash, challenge.hashCode);
     _$hash = $jc(_$hash, serverTime.hashCode);
     _$hash = $jc(_$hash, heartbeatIntervalMs.hashCode);
+    _$hash = $jc(_$hash, heartbeatMissLimit.hashCode);
     _$hash = $jc(_$hash, jwks.hashCode);
     _$hash = $jf(_$hash);
     return _$hash;
@@ -67,6 +72,7 @@ class _$HostChannelHello extends HostChannelHello {
           ..add('challenge', challenge)
           ..add('serverTime', serverTime)
           ..add('heartbeatIntervalMs', heartbeatIntervalMs)
+          ..add('heartbeatMissLimit', heartbeatMissLimit)
           ..add('jwks', jwks))
         .toString();
   }
@@ -95,6 +101,11 @@ class HostChannelHelloBuilder
   set heartbeatIntervalMs(int? heartbeatIntervalMs) =>
       _$this._heartbeatIntervalMs = heartbeatIntervalMs;
 
+  int? _heartbeatMissLimit;
+  int? get heartbeatMissLimit => _$this._heartbeatMissLimit;
+  set heartbeatMissLimit(int? heartbeatMissLimit) =>
+      _$this._heartbeatMissLimit = heartbeatMissLimit;
+
   JwksBuilder? _jwks;
   JwksBuilder get jwks => _$this._jwks ??= JwksBuilder();
   set jwks(JwksBuilder? jwks) => _$this._jwks = jwks;
@@ -110,6 +121,7 @@ class HostChannelHelloBuilder
       _challenge = $v.challenge;
       _serverTime = $v.serverTime;
       _heartbeatIntervalMs = $v.heartbeatIntervalMs;
+      _heartbeatMissLimit = $v.heartbeatMissLimit;
       _jwks = $v.jwks.toBuilder();
       _$v = null;
     }
@@ -150,6 +162,11 @@ class HostChannelHelloBuilder
               heartbeatIntervalMs,
               r'HostChannelHello',
               'heartbeatIntervalMs',
+            ),
+            heartbeatMissLimit: BuiltValueNullFieldError.checkNotNull(
+              heartbeatMissLimit,
+              r'HostChannelHello',
+              'heartbeatMissLimit',
             ),
             jwks: jwks.build(),
           );

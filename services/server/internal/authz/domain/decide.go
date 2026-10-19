@@ -467,6 +467,10 @@ var atoms = map[op]atom{
 	opTerminal: func(v evaluator, _ Expr) (bool, Reason) {
 		return v.in.Host != nil && v.in.Host.Terminal, ReasonCapabilityMissing
 	},
+	opHostSelf: func(v evaluator, _ Expr) (bool, Reason) {
+		return v.in.Principal.Kind == KindHost && v.in.Resource.Kind == kindHost && v.in.Resource.ID == v.in.Principal.ID,
+			ReasonSubjectKindNotAllowed
+	},
 }
 
 // self reports that the resource belongs to the principal (isSelf).

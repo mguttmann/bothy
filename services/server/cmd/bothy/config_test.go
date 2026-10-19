@@ -411,6 +411,10 @@ func TestConfigPrintShowsSourcePerKey(t *testing.T) {
 		"template.name_max_chars = 100  # default\n" +
 		"terminal.fingerprint_confirm_chars = 8  # default\n" +
 		"terminal.fingerprint_max_attempts = 3  # default\n" +
+		"terminal.host_auth_timeout = 10s  # default\n" +
+		"terminal.host_duplicate_probe_timeout = 5s  # default\n" +
+		"terminal.host_heartbeat_interval = 20s  # default\n" +
+		"terminal.host_heartbeat_miss_limit = 3  # default\n" +
 		"terminal.pairing_code_ttl = 15m  # default\n" +
 		"terminal.quick_reattach_window = 1m  # default\n" +
 		"terminal.report_label_max_chars = 100  # default\n" +

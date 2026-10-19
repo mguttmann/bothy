@@ -131,9 +131,9 @@ func TestHostRequirementEntries(t *testing.T) {
 			t.Errorf("%s is not gated by HumanSession", id)
 		}
 	}
-	// host.pair is Public since M2-41 (TestHostPairRequirement); host.connect waits for M2-43.
-	if req, _ := domain.RequirementOf("host.connect"); !func() bool { _, d := req.Expr.DeferredTo(); return d }() {
-		t.Error("host.connect must stay deferred until M2-43")
+	// host.pair is Public since M2-41 (TestHostPairRequirement); host.connect is HostSelf since M2-43.
+	if req, _ := domain.RequirementOf("host.connect"); !req.Expr.IsHostSelf() || req.Source != "host-self" {
+		t.Errorf("host.connect = %v from %q, want HostSelf from host-self", req.Expr, req.Source)
 	}
 	if req, _ := domain.RequirementOf("terminal.terminate"); !req.Expr.IsSystem() {
 		t.Error("terminal.terminate must stay a system action")

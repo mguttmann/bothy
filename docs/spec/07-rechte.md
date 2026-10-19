@@ -313,6 +313,7 @@ verrät (bei `404` nie).
 | `terminal_step_up_not_fresh` | `step_up_required` | Step-up älter als `terminal.step_up_max_age`, schon verbraucht oder (Konsole) nicht per Passkey; in der Konsole gilt das schnelle Wiederanhängen ohne Step-up nie |
 | `host_not_active` | `forbidden` | Rechner nicht `active` oder Host-Dienst nicht verbunden; Problem-Code `host_unavailable` (`409`) |
 | `host_auth_failed` | `unauthenticated` | Anmeldung eines Rechners mit unbekanntem Schlüssel oder falscher Signatur |
+| `host_duplicate_connection` | `forbidden` | a second live control connection with the same keys of a host whose credentials are valid (24 3.4, M2-43); the host is disabled or falls back to `pairing`, both connections close with `4112` |
 | `unknown_action` | Fehler `500` | Programmfehler, Alarm |
 | `trusted_header_requires_loopback` | no `authorize` result | Reason of the audit entry of `identity_provider.manage` when enabling the driver `trusted_header` is refused because the public listener is not bound to loopback; problem code `conflict` (`409`) with `reason: trusted_header_requires_loopback` ([08-identitaet.md](08-identitaet.md), section 2.4, PLAN W4) |
 

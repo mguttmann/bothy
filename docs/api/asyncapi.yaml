@@ -321,7 +321,7 @@ channels:
   hostControl:
     address: /hosts/connect
     title: Control connection of a host service
-    description: 'Outgoing connection of `bothy-host`, one per host. A second connection with the same keys makes the server probe the older one: if the older does not answer it is closed with `4009`; if it answers, both are closed with `4112` and the host is disabled (24, 3.4). Login with the Ed25519 key registered at pairing. The server sends `ready` after the login and again on every change of the declaration `llm_credentials`; the host service treats each `ready` as the current declaration and evaluates check HD6 with it (24, 2.2 and 7.4). The server sends `session.open` per session; the host service answers with a data connection.'
+    description: 'Outgoing connection of `bothy-host`, one per host. A second connection with the same keys makes the server probe the older one: if the older does not answer it is closed with `4009`; if it answers, both are closed with `4112` and the host is disabled (24, 3.4). Login with the Ed25519 key registered at pairing (24, 3.5); `identify` lists the sessions the host service still knows (`live_sessions`), and the server ends every other session of the host in `active` or `detached` with `host_restarted` (24, 6.2). The server sends `ready` after the login and again on every change of the declaration `llm_credentials`; the host service treats each `ready` as the current declaration and evaluates check HD6 with it (24, 2.2 and 7.4). After `ready` the host service sends `report` (profiles, session users, self-checks) before it accepts any `session.open`, and the server sends `session.open` only after that `report` (24, 2.2). An invalid `report` is answered with `error` (`validation_failed`), stores nothing and keeps the connection. When `doctor` refused the start, the host service sends that `report` and closes the connection without accepting `session.open`. `heartbeat_ack` carries `jwks` whenever the set of purpose `terminal` changed since the last set sent on the connection (24, 5.3). The server sends `session.open` per session; the host service answers with a data connection.'
     x-protocol-versions: [1]
     messages:
       host.hello:
@@ -356,6 +356,9 @@ channels:
       client_action: reconnect with backoff
     - code: 1001
       name: going_away
+      client_action: reconnect with backoff
+    - code: 4000
+      name: unknown_error
       client_action: reconnect with backoff
     - code: 4002
       name: decode_error
@@ -417,6 +420,9 @@ channels:
       client_action: reconnect with backoff
     - code: 1001
       name: going_away
+      client_action: reconnect with backoff
+    - code: 4000
+      name: unknown_error
       client_action: reconnect with backoff
     - code: 4002
       name: decode_error
@@ -828,7 +834,7 @@ operations:
     action: receive
     channel:
       $ref: '#/channels/hostControl'
-    summary: Profiles and self-checks; a change of the server-host flag or a check result is audited.
+    summary: Profiles, session users and self-checks; a change of the server-host flag, a check result or the session users is audited.
     messages:
     - $ref: '#/channels/hostControl/messages/host.report'
     x-authz-action: host.connect

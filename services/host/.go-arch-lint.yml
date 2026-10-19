@@ -11,6 +11,7 @@ vendors:
   v-noise: { in: [github.com/flynn/noise] }
   v-sys:   { in: [golang.org/x/sys/**] }
   v-yaml:  { in: [go.yaml.in/yaml/v3] }
+  v-websocket: { in: [github.com/coder/websocket, github.com/coder/websocket/**] }
 components:
   cmd:         { in: cmd/** }
   noise:       { in: internal/noise }
@@ -29,9 +30,11 @@ components:
   install:     { in: internal/install }
   startup:     { in: internal/startup }
   pairing:     { in: internal/pairing }
+  control:     { in: internal/control }
+  controltest: { in: internal/control/controltest }
   platformtest: { in: test/** }
   testdata:    { in: testdata/** }
-# M2-42: cmd may use every internal package; doctor, install, helper, startup and pairing use
+# M2-42 and M2-43: cmd may use every internal package; doctor, install, helper, startup and pairing use
 # hostos only through its interfaces (they receive implementations from cmd).
 deps:
   noise:      { canUse: [v-noise] }
@@ -47,3 +50,7 @@ deps:
   install:    { mayDependOn: [config, hostos, localchan], canUse: [v-sys] }
   startup:    { mayDependOn: [config, doctor, hostos, localchan, pairing, state] }
   pairing:    { mayDependOn: [doctor, fingerprint, noise, state] }
+  # M2-43: the control connection uses startup's port types and doctor's report types; it never
+  # touches the local channel of the PTY helpers.
+  control:    { mayDependOn: [clock, doctor, startup], canUse: [v-websocket] }
+  controltest: { canUse: [v-websocket] }

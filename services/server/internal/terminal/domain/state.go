@@ -82,6 +82,9 @@ var steps = []step{
 	{StateConfirming, "", CauseConfirm, StateActive, ""},
 	{StateConfirming, "", CauseNewPairingCode, StatePairing, ""},
 	{StateConfirming, "", CauseFingerprintAttemptsExhausted, StatePairing, ""},
+	// A live duplicate of an unconfirmed host (M2-43, 24 section 3.4): 03 allows disabled only
+	// after the confirmation, so the host falls back to pairing without keys.
+	{StateConfirming, "", CauseDuplicateConnection, StatePairing, ""},
 	{StateActive, "", CauseNewPairingCode, StatePairing, ""},
 	{StateActive, "", CauseDisable, StateDisabled, DisabledOwner},
 	{StateActive, "", CauseDuplicateConnection, StateDisabled, DisabledDuplicateConnection},

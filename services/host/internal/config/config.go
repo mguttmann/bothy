@@ -70,6 +70,11 @@ type Config struct {
 	ClaudeWorkdirs          []WorkdirList
 	ScrollbackBytes         int
 	RequireLocalConfirm     bool
+	// ReconnectBackoffBase and ReconnectBackoffCap bound the backoff of the control connection
+	// (M2-43, 24 section 3.5): host_service.reconnect_backoff_base and
+	// host_service.reconnect_backoff_cap.
+	ReconnectBackoffBase time.Duration
+	ReconnectBackoffCap  time.Duration
 }
 
 // Workdirs returns the configured list of sessionUser, or nil.
@@ -115,6 +120,8 @@ func Defaults(p Platform) Config {
 		LocalConfirmTimeout:     60 * time.Second,
 		Profiles:                []Profile{builtin(KindShell)},
 		ScrollbackBytes:         1048576,
+		ReconnectBackoffBase:    time.Second,
+		ReconnectBackoffCap:     5 * time.Minute,
 	}
 }
 
@@ -175,7 +182,19 @@ func Parse(b []byte, p Platform) (*Config, error) {
 	if err != nil {
 		return nil, err
 	}
+	if c.ReconnectBackoffCap < c.ReconnectBackoffBase {
+		return nil, invalid("host_service.reconnect_backoff_cap", "must not be below host_service.reconnect_backoff_base")
+	}
 	return &c, nil
+}
+
+// positiveDuration is a duration above zero.
+func positiveDuration(key string, v *yaml.Node) (time.Duration, error) {
+	d, err := duration(key, v)
+	if err == nil && d <= 0 {
+		return 0, invalid(key, "must be above zero")
+	}
+	return d, err
 }
 
 // eachKey calls fn for every key of the mapping m in order, with prefix prepended; a duplicate
@@ -226,6 +245,10 @@ func (c *Config) set(key string, v *yaml.Node) error {
 		c.ScrollbackBytes, err = integer(key, v)
 	case "host_service.require_local_confirm":
 		c.RequireLocalConfirm, err = boolean(key, v)
+	case "host_service.reconnect_backoff_base":
+		c.ReconnectBackoffBase, err = positiveDuration(key, v)
+	case "host_service.reconnect_backoff_cap":
+		c.ReconnectBackoffCap, err = positiveDuration(key, v)
 	default:
 		err = invalid(key, "unknown key")
 	}

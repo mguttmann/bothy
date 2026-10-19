@@ -9340,7 +9340,7 @@ type Host struct {
 	// AssignedUserId Person the host is assigned to (SR10); absent means owners only.
 	AssignedUserId *Uuid `json:"assigned_user_id,omitempty"`
 
-	// Connected The control connection of the host service is open (memory of the server).
+	// Connected Usable for sessions, from the first `report` after `ready` to the end of the control connection (24, 3.5).
 	Connected bool `json:"connected"`
 
 	// CreatedAt RFC 3339 timestamp in UTC with millisecond precision and suffix `Z`.
@@ -9416,6 +9416,7 @@ type HostChannelHello struct {
 
 	// HeartbeatIntervalMs Examples: 20000
 	HeartbeatIntervalMs int64 `json:"heartbeat_interval_ms"`
+	HeartbeatMissLimit  int   `json:"heartbeat_miss_limit"`
 
 	// Jwks Public keys with purpose `terminal` for checking session tokens.
 	Jwks             Jwks  `json:"jwks"`
@@ -9464,7 +9465,7 @@ type HostDoctorCheck struct {
 	Code *string `json:"code,omitempty"`
 	Ok   bool    `json:"ok"`
 
-	// SessionUser Only when not passed: with `hd6_llm_login` and `hd11_shared_locations` the session user whose account the finding is in; with `hd10_helper_integrity` and a wrong peer the session user of that channel; with `hd9_foreign_homes` a former session user of this host (bound to a person in the state directory, no longer in `host_service.session_users`) whose home can be listed. The operator knows where to look, and the console shows the person of the assignment (24, 2.2 and 7.4). One entry per such account; names of other users are never sent. A name, never a path.
+	// SessionUser Only when not passed: the account the rule for names gives (see the schema; 24, 2.2 and 7.4). A name, never a path.
 	//
 	// Examples: bothy-s-robin
 	SessionUser *string `json:"session_user,omitempty"`
@@ -9480,11 +9481,14 @@ type HostHeartbeat struct {
 
 // HostHeartbeatAck defines model for HostHeartbeatAck.
 type HostHeartbeatAck struct {
+	// Jwks JSON Web Key Set (RFC 7517) with the public keys for access tokens, invocation tokens and terminal session tokens.
+	Jwks *Jwks `json:"jwks,omitempty"`
+
 	// ServerTime RFC 3339 timestamp in UTC with millisecond precision and suffix `Z`.
 	ServerTime *Timestamp `json:"server_time,omitempty"`
 }
 
-// HostIdentify Login of a host service. `proof` is a compact JWS (`alg = EdDSA`, `typ = host-auth+jwt`) over `{challenge, host_id, iat}` with the registered Ed25519 key.
+// HostIdentify Login of a host service. `proof` is a compact JWS (`alg = EdDSA`, `typ = host-auth+jwt`, `kid`) over exactly `{challenge, host_id, iat}` with the registered Ed25519 key (24, 3.5).
 type HostIdentify struct {
 	// HostId UUIDv7 (RFC 9562), lowercase canonical form.
 	HostId      Uuid   `json:"host_id"`
@@ -26091,6 +26095,21 @@ func (c *Client) PutFeatureFlag(ctx context.Context, key KeyPath, params *PutFea
 // Corresponds with DELETE /files/{file_id} (the `DeleteFile` operationId).
 func (c *Client) DeleteFile(ctx context.Context, fileId FileIdPath, reqEditors ...RequestEditorFn) (*http.Response, error) {
 	req, err := NewDeleteFileRequest(c.Server, fileId)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// GetFile Read file metadata
+//
+// Corresponds with GET /files/{file_id} (the `GetFile` operationId).
+func (c *Client) GetFile(ctx context.Context, fileId FileIdPath, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewGetFileRequest(c.Server, fileId)
 	if err != nil {
 		return nil, err
 	}

@@ -9,12 +9,14 @@ part of 'host_heartbeat_ack.dart';
 class _$HostHeartbeatAck extends HostHeartbeatAck {
   @override
   final DateTime? serverTime;
+  @override
+  final Jwks? jwks;
 
   factory _$HostHeartbeatAck([
     void Function(HostHeartbeatAckBuilder)? updates,
   ]) => (HostHeartbeatAckBuilder()..update(updates))._build();
 
-  _$HostHeartbeatAck._({this.serverTime}) : super._();
+  _$HostHeartbeatAck._({this.serverTime, this.jwks}) : super._();
   @override
   HostHeartbeatAck rebuild(void Function(HostHeartbeatAckBuilder) updates) =>
       (toBuilder()..update(updates)).build();
@@ -26,22 +28,26 @@ class _$HostHeartbeatAck extends HostHeartbeatAck {
   @override
   bool operator ==(Object other) {
     if (identical(other, this)) return true;
-    return other is HostHeartbeatAck && serverTime == other.serverTime;
+    return other is HostHeartbeatAck &&
+        serverTime == other.serverTime &&
+        jwks == other.jwks;
   }
 
   @override
   int get hashCode {
     var _$hash = 0;
     _$hash = $jc(_$hash, serverTime.hashCode);
+    _$hash = $jc(_$hash, jwks.hashCode);
     _$hash = $jf(_$hash);
     return _$hash;
   }
 
   @override
   String toString() {
-    return (newBuiltValueToStringHelper(
-      r'HostHeartbeatAck',
-    )..add('serverTime', serverTime)).toString();
+    return (newBuiltValueToStringHelper(r'HostHeartbeatAck')
+          ..add('serverTime', serverTime)
+          ..add('jwks', jwks))
+        .toString();
   }
 }
 
@@ -53,6 +59,10 @@ class HostHeartbeatAckBuilder
   DateTime? get serverTime => _$this._serverTime;
   set serverTime(DateTime? serverTime) => _$this._serverTime = serverTime;
 
+  JwksBuilder? _jwks;
+  JwksBuilder get jwks => _$this._jwks ??= JwksBuilder();
+  set jwks(JwksBuilder? jwks) => _$this._jwks = jwks;
+
   HostHeartbeatAckBuilder() {
     HostHeartbeatAck._defaults(this);
   }
@@ -61,6 +71,7 @@ class HostHeartbeatAckBuilder
     final $v = _$v;
     if ($v != null) {
       _serverTime = $v.serverTime;
+      _jwks = $v.jwks?.toBuilder();
       _$v = null;
     }
     return this;
@@ -80,7 +91,25 @@ class HostHeartbeatAckBuilder
   HostHeartbeatAck build() => _build();
 
   _$HostHeartbeatAck _build() {
-    final _$result = _$v ?? _$HostHeartbeatAck._(serverTime: serverTime);
+    _$HostHeartbeatAck _$result;
+    try {
+      _$result =
+          _$v ??
+          _$HostHeartbeatAck._(serverTime: serverTime, jwks: _jwks?.build());
+    } catch (_) {
+      late String _$failedField;
+      try {
+        _$failedField = 'jwks';
+        _jwks?.build();
+      } catch (e) {
+        throw BuiltValueNestedFieldError(
+          r'HostHeartbeatAck',
+          _$failedField,
+          e.toString(),
+        );
+      }
+      rethrow;
+    }
     replace(_$result);
     return _$result;
   }

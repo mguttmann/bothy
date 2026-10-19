@@ -816,11 +816,11 @@ Quelle: [24-terminal.md](../spec/24-terminal.md), Abschnitt 17.
 | `terminal.max_sessions_per_person` | `BOTHY_TERMINAL__MAX_SESSIONS_PER_PERSON` | Server |  | `5` | offene Sitzungen je Mensch | geplant (M2) |
 | `terminal.max_sessions_per_host` | `BOTHY_TERMINAL__MAX_SESSIONS_PER_HOST` | Server |  | `10` | offene Sitzungen je Rechner | geplant (M2) |
 | `terminal.relay_buffer_max_bytes` | `BOTHY_TERMINAL__RELAY_BUFFER_MAX_BYTES` | Server |  | `262144` | Puffer des Relais je Richtung und Sitzung | geplant (M2) |
-| `terminal.host_heartbeat_interval` | `BOTHY_TERMINAL__HOST_HEARTBEAT_INTERVAL` | Server |  | `20s` | Abstand der Heartbeats der Steuerverbindung (in `hello` gemeldet) | geplant (M2) |
-| `terminal.host_heartbeat_miss_limit` | `BOTHY_TERMINAL__HOST_HEARTBEAT_MISS_LIMIT` | Server |  | `3` | fehlende Heartbeats bis zum Schließen der Steuerverbindung | geplant (M2) |
-| `terminal.host_auth_timeout` | `BOTHY_TERMINAL__HOST_AUTH_TIMEOUT` | Server |  | `10s` | Frist zwischen `hello` und `identify` der Steuer- und Datenverbindung | geplant (M2) |
+| `terminal.host_heartbeat_interval` | `BOTHY_TERMINAL__HOST_HEARTBEAT_INTERVAL` | Server | duration | `20s` | Abstand der Heartbeats der Steuerverbindung (in `hello` gemeldet) | aktiv |
+| `terminal.host_heartbeat_miss_limit` | `BOTHY_TERMINAL__HOST_HEARTBEAT_MISS_LIMIT` | Server | int | `3` | fehlende Heartbeats bis zum Schließen der Steuerverbindung | aktiv |
+| `terminal.host_auth_timeout` | `BOTHY_TERMINAL__HOST_AUTH_TIMEOUT` | Server | duration | `10s` | Frist zwischen `hello` und `identify` der Steuer- und Datenverbindung | aktiv |
 | `terminal.sweep_interval` | `BOTHY_TERMINAL__SWEEP_INTERVAL` | Server |  | `30s` | Abstand des Jobs `terminal.sweep` ([02-architektur.md](../spec/02-architektur.md), Abschnitt 12.3) | geplant (M2) |
-| `terminal.host_duplicate_probe_timeout` | `BOTHY_TERMINAL__HOST_DUPLICATE_PROBE_TIMEOUT` | Server |  | `5s` | so lange wartet der Server auf die Antwort der älteren Steuerverbindung (3.4) | geplant (M2) |
+| `terminal.host_duplicate_probe_timeout` | `BOTHY_TERMINAL__HOST_DUPLICATE_PROBE_TIMEOUT` | Server | duration | `5s` | so lange wartet der Server auf die Antwort der älteren Steuerverbindung (3.4) | aktiv |
 | `host_service.state_dir` |  | Host-Dienst |  | `/var/lib/bothy-host` (Windows: `%ProgramData%\bothy-host`) | Zustandsordner mit den Schlüsseln des Rechners, den Bindungen der Sitzungsbenutzer an Personen und bei `organization` dem API-Schlüssel des Profils `claude`; also the pairing record and the last declaration from `ready`, both without secrets (D-M2-42-4); nie eine Abo-Anmeldung (7.4) |  |
 | `host_service.session_users` |  | Host-Dienst |  | leer | Sitzungsbenutzer dieses Rechners, je Person einer; je Eintrag ein PTY-Helfer; nie der Dienstbenutzer; leer heißt: HD1 nicht bestanden; gelesen nur beim Start, geändert mit `bothy-host session-user add` und `remove`, die den Host-Dienst dafür neu starten (2.2) |  |
 | `host_service.extra_forbidden_groups` |  | Host-Dienst |  | leer | weitere Gruppen, die HD2 zusätzlich zur festen Liste sperrt |  |
@@ -833,6 +833,8 @@ Quelle: [24-terminal.md](../spec/24-terminal.md), Abschnitt 17.
 | `host_service.scrollback_bytes` |  | Host-Dienst |  | `1048576` | Rückblick-Puffer je Sitzung, nur im Speicher |  |
 | `host_service.require_local_confirm` |  | Host-Dienst |  | `false` | jede PTY erst nach Zustimmung am Rechner (6.4) |  |
 | `host_service.local_confirm_timeout` |  | Host-Dienst |  | `60s` | Frist für die Zustimmung am Rechner |  |
+| `host_service.reconnect_backoff_base` |  | Host-Dienst |  | `1s` | first delay of the exponential backoff with full jitter before a new control connection (3.5) |  |
+| `host_service.reconnect_backoff_cap` |  | Host-Dienst |  | `5m` | largest delay of that backoff; also the total time the login of a refused start keeps trying (3.5) |  |
 
 ### 25 Visualisierung
 
