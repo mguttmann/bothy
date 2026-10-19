@@ -71,7 +71,7 @@ void main() {
     final banner = tester.getSemantics(
       find.byKey(const ValueKey('fingerprint.mismatch')),
     );
-    expect(banner, containsSemantics(isLiveRegion: true));
+    expect(banner, isSemantics(isLiveRegion: true));
     semantics.dispose();
   });
 }

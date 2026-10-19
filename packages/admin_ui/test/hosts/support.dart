@@ -38,9 +38,12 @@ Future<void> pick(WidgetTester tester, String key, String label) async {
 String textOf(WidgetTester tester, String key) {
   final finder = find.byKey(ValueKey(key));
   final widget = tester.widget(finder.first);
-  if (widget is Text)
+  if (widget is Text) {
     return widget.data ?? widget.textSpan?.toPlainText() ?? '';
-  if (widget is SelectableText) return widget.data ?? '';
+  }
+  if (widget is SelectableText) {
+    return widget.data ?? '';
+  }
   return [
     for (final t in tester.widgetList<Text>(
       find.descendant(of: finder.first, matching: find.byType(Text)),
