@@ -61,6 +61,10 @@ void main() {
     expect(o.replay.onErrorSampleRate ?? 0, 0);
     expect(o.enableUserInteractionBreadcrumbs, isFalse);
     expect(o.tracesSampleRate, isNull);
+    // The native crash handlers (breakpad minidumps, the native beforeSend) and the session
+    // pings bypass the Dart scrubber, so they stay off.
+    expect(o.enableNativeCrashHandling, isFalse);
+    expect(o.enableAutoSessionTracking, isFalse);
     expect(o.beforeSend, isNotNull);
     expect(o.beforeBreadcrumb, isNotNull);
   });

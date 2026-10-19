@@ -92,6 +92,11 @@ final class CrashReports {
       ..enableUserInteractionBreadcrumbs = false
       ..enableUserInteractionTracing = false
       ..enableAutoNativeBreadcrumbs = false
+      // The native handlers (breakpad minidumps with stack memory on Windows, the native
+      // beforeSend on macOS) and the session pings never pass [scrubEvent]; only Dart errors
+      // are reported (15 16, D-M4-31-6).
+      ..enableNativeCrashHandling = false
+      ..enableAutoSessionTracking = false
       ..reportPackages = false;
     o.replay
       ..sessionSampleRate = 0
