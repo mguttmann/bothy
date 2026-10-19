@@ -49,7 +49,7 @@ func TestValidateBehavior(t *testing.T) {
 		{"empty skill", func(b *domain.Behavior) { b.Skills = []string{"a", ""} }, []string{"/skills/1:required"}},
 		{"control character", func(b *domain.Behavior) { b.Skills = []string{"a\x01b"} }, []string{"/skills/0:invalid_characters"}},
 		{"C1 control", func(b *domain.Behavior) { b.Skills = []string{"a\u0085b"} }, []string{"/skills/0:invalid_characters"}},
-		{"bidi control", func(b *domain.Behavior) { b.Skills = []string{"a‮b"} }, []string{"/skills/0:invalid_characters"}},
+		{"bidi control", func(b *domain.Behavior) { b.Skills = []string{"a\u202eb"} }, []string{"/skills/0:invalid_characters"}},
 		{"invalid UTF-8", func(b *domain.Behavior) { b.Skills = []string{"a\xffb"} }, []string{"/skills/0:invalid_characters"}},
 		{"duplicate", func(b *domain.Behavior) { b.Skills = []string{"x", "y", "x"} }, []string{"/skills/2:duplicate"}},
 		{"several failures together", func(b *domain.Behavior) {
@@ -148,7 +148,7 @@ func TestConfigChanged(t *testing.T) {
 // input keeps the limits and the skill rules.
 func FuzzValidateBehavior(f *testing.F) {
 	f.Add("prompt", "a\x00b", "a", 3)
-	f.Add(strings.Repeat("x", 40), "", "‮", -1)
+	f.Add(strings.Repeat("x", 40), "", "\u202e", -1)
 	f.Add("\xff\xfe", "dup", "dup", 1000)
 	f.Fuzz(func(t *testing.T, prompt, s1, s2 string, backfill int) {
 		b := domain.Behavior{HistoryBackfillLimit: backfill, Prompt: prompt, Skills: []string{s1, s2}}
