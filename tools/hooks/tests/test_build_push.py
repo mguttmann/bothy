@@ -170,7 +170,7 @@ def test_a_command_is_required() -> None:
         build_push.main([])
 
 
-def test_the_pre_push_hook_runs_make_check_through_the_selection() -> None:
+def test_the_pre_push_hook_runs_the_push_plan_through_the_selection() -> None:
     import yaml
 
     repo = Path(__file__).resolve().parents[3]
@@ -183,4 +183,5 @@ def test_the_pre_push_hook_runs_make_check_through_the_selection() -> None:
     entry = entries["make-check"]
     split = entry.index("--")
     assert entry[split - 1] == "tools/hooks/build_push.py"
-    assert entry[split + 1 :][-2:] == ["make", "check"]
+    # Every other push runs the affected-only plan of make check (tools/hooks/push_plan.py).
+    assert entry[split + 1 :][-3:] == ["python", "tools/hooks/push_plan.py", "run"]

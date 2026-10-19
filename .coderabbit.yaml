@@ -46,7 +46,7 @@ reviews:
         SVGs are excluded from review on purpose (path_filters); the default theme is
         dark (docs/design/tokens.md, modifier `theme`); GIT_DIR, GIT_WORK_TREE,
         GIT_INDEX_FILE and the other git variables are cleared centrally by the pre-push
-        hook before `make check` (.pre-commit-config.yaml) and by tools/conftest.py, so a
+        hook before `make check` (tools/hooks/push_plan.py) and by tools/conftest.py, so a
         test or script need not unset them itself. In tests, descriptive test names and
         loopback addresses (127.0.0.1, ::1, localhost) or documentation addresses
         (192.0.2.0/24, 198.51.100.0/24, 203.0.113.0/24, 2001:db8::/32, example.com,

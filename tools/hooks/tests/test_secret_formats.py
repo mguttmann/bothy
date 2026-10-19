@@ -135,6 +135,10 @@ def test_hook_runs_on_every_commit_and_in_lint() -> None:
     assert hook.get("stages", config["default_stages"]) == ["pre-commit"]
     assert hook.get("pass_filenames", True)
     makefile = (REPO / "Makefile").read_text(encoding="utf-8")
-    lint = re.search(r"^\tSKIP=(\S+) .*pre-commit run --all-files", makefile, re.MULTILINE)
-    assert lint, "make lint no longer runs the pre-commit hooks over all files"
+    lint = re.search(r"^\tSKIP=(\S+) .*pre-commit run \$\(LINT_SCOPE\)", makefile, re.MULTILINE)
+    assert lint, "make lint no longer runs the pre-commit hooks"
+    # Over all files, unless the pre-push gate names the changed range (push_plan.py).
+    scope = re.search(r"^LINT_SCOPE = (.*)$", makefile, re.MULTILINE)
+    assert scope
+    assert scope.group(1).endswith(",--all-files)")
     assert "secret-formats" not in lint.group(1).split(",")

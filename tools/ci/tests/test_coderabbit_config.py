@@ -90,7 +90,10 @@ def test_git_variables_are_cleared_by_the_pre_push_hook() -> None:
     entries = [
         h["entry"] for r in hooks["repos"] for h in r["hooks"] if "pre-push" in h.get("stages", [])
     ]
-    assert any("env -u GIT_DIR " in e and e.endswith(" make check") for e in entries)
+    # The hook runs make through tools/hooks/push_plan.py, which starts make without them.
+    assert any(e.endswith(" tools/hooks/push_plan.py run") for e in entries)
+    plan = (REPO / "tools" / "hooks" / "push_plan.py").read_text(encoding="utf-8")
+    assert '"GIT_DIR", "GIT_WORK_TREE", "GIT_INDEX_FILE", "GIT_COMMON_DIR", "GIT_PREFIX"' in plan
 
 
 def test_test_names_and_reserved_addresses_are_fine_in_tests() -> None:

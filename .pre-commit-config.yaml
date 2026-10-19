@@ -1,7 +1,8 @@
 # SPDX-License-Identifier: Apache-2.0
 #
 # Git hooks (install once with `make bootstrap`). Fast checks on every commit, the
-# commit message on commit-msg, and the full gate (`make check`) before every push.
+# commit message on commit-msg, and before every push `make check` for the parts the push
+# touches (tools/hooks/push_plan.py; the full `make check` when a shared input changes).
 # The local hooks run the same pinned tools as the Makefile (tools/uv.lock,
 # tools/bin/tools.lock.json); only the generic file hygiene hooks come from a remote
 # repository, pinned to a full commit SHA. `make lint` runs the commit stage over all files.
@@ -87,11 +88,13 @@ repos:
         always_run: true
         stages: [pre-push]
       - id: make-check
-        name: make check (every gate, as in CI; fast gates only for a push to build/**)
-        # Without the variables git exports to hooks, so every gate sees the repository as in CI
-        # (docs/DECISIONS.md D-M4-05-6). A push to build/** runs only the fast gates, because
-        # build-verify.yml runs every gate (tools/hooks/build_push.py).
-        entry: uv run --project tools --locked --quiet python tools/hooks/build_push.py -- env -u GIT_DIR -u GIT_WORK_TREE -u GIT_INDEX_FILE -u GIT_COMMON_DIR -u GIT_PREFIX make check
+        name: make check of the parts the push touches (full on shared inputs; fast gates for build/**)
+        # tools/hooks/push_plan.py maps the pushed diff to COMPONENTS and AREAS and runs make
+        # without the variables git exports to hooks, so every gate sees the repository as in CI
+        # (docs/DECISIONS.md D-M4-05-6); PUSH_FULL=1 runs the full make check. A push to build/**
+        # runs only the fast gates, because build-verify.yml runs every gate
+        # (tools/hooks/build_push.py).
+        entry: uv run --project tools --locked --quiet python tools/hooks/build_push.py -- uv run --project tools --locked --quiet python tools/hooks/push_plan.py run
         language: system
         pass_filenames: false
         always_run: true

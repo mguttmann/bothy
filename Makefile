@@ -23,6 +23,14 @@ MAKEFLAGS += --no-builtin-rules --no-print-directory
 
 # ---- configuration (named values: docs/spec/23-quality.md) -------------------------
 COMPONENTS ?= all
+# Repository-wide areas whose gates run (`all`, or `tools`, or `none`); only the pre-push gate
+# narrows them (tools/hooks/push_plan.py, docs/quality/push-discipline.md). CI never sets it.
+AREAS ?= all
+# The file hygiene hooks of `make lint` run on the files changed between these two refs instead
+# of every file, when both are set (the pre-push gate sets them); CI never sets them.
+LINT_FROM_REF ?=
+LINT_TO_REF ?=
+LINT_SCOPE = $(if $(and $(LINT_FROM_REF),$(LINT_TO_REF)),--from-ref $(LINT_FROM_REF) --to-ref $(LINT_TO_REF),--all-files)
 COVERAGE_GO_MIN ?= 80
 COVERAGE_DART_MIN ?= 80
 # Time limit of `make perf` per Go module (named value quality.perf.timeout).
@@ -66,6 +74,7 @@ tool = "$$($(FETCH) path $(1))"
 need_node = [ -x $(NODE_BIN)/$(1) ] || { echo "$(1): $(NODE_BIN)/$(1) not found; run \`make bootstrap\`" >&2; exit 2; }
 skip = printf '  SKIP  %-14s %s\n' '$(1)' '$(2)'
 want = $(if $(filter all $(1),$(COMPONENTS)),yes,)
+area = $(if $(filter all $(1),$(AREAS)),yes,)
 # Sets `allowed` to the allowlist joined by commas. An empty list would become `--licenses=`
 # and `--allowed_licenses=`, which no longer limit the licenses, so it fails.
 allowed_licenses = allowed=$$(awk '!/^\#/ && NF' $(LICENSE_ALLOWLIST) | paste -sd, -) || exit 1; \
@@ -99,6 +108,14 @@ GO_ON := $(and $(GO_MODS),$(call want,server))
 DART_ON := $(and $(DART_PKGS),$(call want,apps))
 PY_ON := $(and $(PY_PROJECTS),$(or $(call want,sdk-python),$(call want,plugins)))
 TS_ON := $(and $(TS_PROJECTS),$(or $(call want,sdk-typescript),$(call want,plugins)))
+# The Python tools under tools/ (format, lint, types, tests, coverage).
+TOOLS_ON := $(call area,tools)
+tools_skip = $(call skip,$(1),AREAS=$(AREAS) leaves the Python tools out (pre-push gate))
+# The tools tests that read source files of the components (the working name in every Go and
+# Dart file, the patience of the Go test helper, the Dart sources of bothy_noise): they run
+# also when AREAS leaves the Python tools out, because a component change alone can fail them.
+TOOLS_SOURCE_TESTS := ci/tests/test_product_name_places.py docs/tests/test_config_values.py \
+  ci/tests/test_bothy_noise_package.py
 
 .PHONY: help bootstrap bootstrap-ci check gates fmt fmt-check lint typecheck test coverage \
         sonar sonar-scan sonar-up sonar-down sonar-config sonar-config-check semgrep trivy osv gitleaks \
@@ -161,7 +178,7 @@ fmt: ## Format all code in place
 	@if [ -n "$(TS_ON)" ]; then for p in $(TS_PROJECTS); do npm --prefix $$p run format; done; fi
 
 fmt-check: ## Formatting is clean (no changes)
-	$(UVRUN) ruff format --check tools
+	@if [ -z "$(TOOLS_ON)" ]; then $(call tools_skip,tools-format); else $(UVRUN) ruff format --check tools; fi
 	@if [ -z "$(GO_ON)" ]; then $(call skip,go-fmt,no Go module selected under services/); \
 	else for m in $(GO_MODS); do out=$$(cd $$m && gofmt -l .) || exit 1; [ -z "$$out" ] || { echo "$$out"; exit 1; }; done; fi
 	@if [ -z "$(DART_ON)" ]; then $(call skip,dart-format,no Dart package selected under apps/ or packages/); \
@@ -172,11 +189,11 @@ fmt-check: ## Formatting is clean (no changes)
 	else for p in $(TS_PROJECTS); do npm --prefix $$p run format:check; done; fi
 
 lint: ## Linters: file hygiene hooks, ruff, bandit, Dockerfile pins, actionlint, zizmor, component linters
-	SKIP=ruff-format,ruff-check,gitleaks-staged $(UVRUN) pre-commit run --all-files --hook-stage pre-commit
-	$(UVRUN) ruff check tools
+	SKIP=ruff-format,ruff-check,gitleaks-staged $(UVRUN) pre-commit run $(LINT_SCOPE) --hook-stage pre-commit
+	@if [ -z "$(TOOLS_ON)" ]; then $(call tools_skip,tools-lint); else $(UVRUN) ruff check tools; fi
 	@# Every FROM of a tracked Dockerfile is pinned by digest (SEC-SC-4, docs/spec/18-release.md "Server images").
 	$(UVRUN) python tools/ci/dockerfile_pins.py
-	$(UVRUN) bandit -q -c tools/pyproject.toml -r tools/api-checks tools/arch-check tools/bin tools/catalog tools/ci tools/configdoc tools/denylist tools/design-tokens tools/doccheck tools/docs tools/hooks tools/observability tools/opscheck tools/sonarqube
+	@if [ -z "$(TOOLS_ON)" ]; then $(call tools_skip,tools-bandit); else $(UVRUN) bandit -q -c tools/pyproject.toml -r tools/api-checks tools/arch-check tools/bin tools/catalog tools/ci tools/configdoc tools/denylist tools/design-tokens tools/doccheck tools/docs tools/hooks tools/observability tools/opscheck tools/sonarqube; fi
 	$(UVRUN) check-jsonschema --builtin-schema vendor.github-issue-forms $(filter-out %/config.yml,$(wildcard .github/ISSUE_TEMPLATE/*.yml))
 	$(UVRUN) check-jsonschema --builtin-schema vendor.github-issue-config .github/ISSUE_TEMPLATE/config.yml
 	$(UVRUN) check-jsonschema --builtin-schema vendor.renovate renovate.json
@@ -200,7 +217,7 @@ lint: ## Linters: file hygiene hooks, ruff, bandit, Dockerfile pins, actionlint,
 	else for p in $(TS_PROJECTS); do npm --prefix $$p run lint; done; fi
 
 typecheck: ## Type checks: mypy (strict), go build, flutter analyze, tsc
-	cd tools && uv run --locked --quiet mypy
+	@if [ -z "$(TOOLS_ON)" ]; then $(call tools_skip,tools-types); else cd tools && uv run --locked --quiet mypy; fi
 	@if [ -z "$(GO_ON)" ]; then $(call skip,go-build,no Go module selected); \
 	else for m in $(GO_MODS); do (cd $$m && go build ./...) || exit 1; done; fi
 	@if [ -z "$(DART_ON)" ]; then $(call skip,dart-types,no Dart package selected); \
@@ -213,7 +230,9 @@ typecheck: ## Type checks: mypy (strict), go build, flutter analyze, tsc
 
 test: ## All tests with coverage data
 	@mkdir -p .cache/coverage
-	cd tools && uv run --locked --quiet pytest --cov --cov-report=xml:../.cache/coverage/tools.xml --cov-report=term
+	@if [ -z "$(TOOLS_ON)" ]; then $(call skip,tools-test,AREAS=$(AREAS): only the tools tests that read component sources); \
+	  cd tools && uv run --locked --quiet pytest -q $(TOOLS_SOURCE_TESTS); \
+	else cd tools && uv run --locked --quiet pytest --cov --cov-report=xml:../.cache/coverage/tools.xml --cov-report=term; fi
 	@# Prerequisites first: without a Docker runtime the integration tests fail clearly (P-09).
 	@# The architecture tests of tools/archgen run the pinned go-arch-lint named by GO_ARCH_LINT.
 	@# -coverpkg=./...: a statement counts as covered when any test of its module runs it, also a
@@ -243,7 +262,8 @@ test: ## All tests with coverage data
 	else for p in $(TS_PROJECTS); do npm --prefix $$p test; done; fi
 
 coverage: test ## Coverage thresholds (named values quality.coverage.*)
-	cd tools && uv run --locked --quiet coverage report >/dev/null && echo "  tools coverage: ok (fail_under in tools/pyproject.toml)"
+	@if [ -z "$(TOOLS_ON)" ]; then $(call tools_skip,tools-coverage); \
+	else cd tools && uv run --locked --quiet coverage report >/dev/null && echo "  tools coverage: ok (fail_under in tools/pyproject.toml)"; fi
 	@# Production code only: packages under <module>/test/ and <module>/perf/ are test code
 	@# (docs/spec/02-architecture.md "Code layout"), and generated files (*.gen.go, docs/DECISIONS.md
 	@# M1-05/7 and M1-17) are not hand-written code. The total comes from a filtered copy;
