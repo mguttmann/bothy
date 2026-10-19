@@ -16,6 +16,7 @@ import 'rest/access_handlers.dart';
 import 'rest/admin_handlers.dart';
 import 'rest/audit_handlers.dart';
 import 'rest/auth_handlers.dart';
+import 'rest/host_handlers.dart';
 import 'rest/message_handlers.dart';
 import 'rest/personal_handlers.dart';
 import 'rest/run_handlers.dart';
@@ -158,6 +159,7 @@ final class FakeServer {
     registerAccessHandlers(rest, actions);
     final audit = FakeAuditLog();
     registerAuditHandlers(rest, actions, audit);
+    registerHostHandlers(rest, actions);
     final server = FakeServer._(
       http,
       world,
