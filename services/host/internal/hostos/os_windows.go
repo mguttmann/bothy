@@ -158,10 +158,16 @@ var (
 
 type groupInfo0 struct{ Name *uint16 }
 
-// Groups implements Users: local and global groups of name plus the well-known groups of every
-// token of an interactive or service logon (Everyone, Authenticated Users, Users).
+// Groups implements Users: local and global groups of name plus the well-known groups that a token
+// of an interactive or service logon of a local account can hold (Everyone, Authenticated Users,
+// Users, INTERACTIVE, SERVICE, LOCAL, CONSOLE LOGON, This Organization, Local account). The list
+// over-approximates on purpose: a right granted to any of them counts, so the checks fail closed.
 func (WindowsUsers) Groups(name string) ([]Group, error) {
-	out := []Group{{Name: "Everyone", ID: SIDEveryone}, {Name: "Authenticated Users", ID: SIDAuthenticated}, {Name: "Users", ID: SIDUsers}}
+	out := []Group{
+		{Name: "Everyone", ID: SIDEveryone}, {Name: "Authenticated Users", ID: SIDAuthenticated}, {Name: "Users", ID: SIDUsers},
+		{Name: "INTERACTIVE", ID: SIDInteractive}, {Name: "SERVICE", ID: SIDService}, {Name: "LOCAL", ID: SIDLocal},
+		{Name: "CONSOLE LOGON", ID: SIDConsoleLogon}, {Name: "This Organization", ID: SIDThisOrg}, {Name: "Local account", ID: SIDLocalAccount},
+	}
 	u, err := windows.UTF16PtrFromString(name)
 	if err != nil {
 		return nil, ErrUnknownUser

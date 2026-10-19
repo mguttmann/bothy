@@ -29,18 +29,28 @@ var (
 
 var namePattern = regexp.MustCompile(`^[A-Za-z0-9_][A-Za-z0-9_.-]*$`)
 
+// CheckNewSessionUser refuses a new session user name that session-user add and install
+// --session-user must not create: a name outside the pattern, a name bound to a person in
+// bindings.json (a *BoundError) and a name that differs from a configured one only in letter case.
+func CheckNewSessionUser(name string, configured []string, bindings map[string]string) error {
+	if !namePattern.MatchString(name) {
+		return ErrInvalidName
+	}
+	if _, bound := bindings[name]; bound {
+		return &BoundError{Name: name}
+	}
+	if slices.ContainsFunc(configured, func(c string) bool { return strings.EqualFold(c, name) }) {
+		return fmt.Errorf("bothy-host session-user add: %s: %w", name, ErrConfigured)
+	}
+	return nil
+}
+
 // SessionUserAdd returns the plan of "session-user add <name>": refuse a name bound in
 // bindings.json or already configured; create user, home only for it and the helper service, add
 // the name to host_service.session_users and restart the host service.
 func SessionUserAdd(t Target, name string, configured []string, bindings map[string]string) ([]Step, error) {
-	if !namePattern.MatchString(name) {
-		return nil, ErrInvalidName
-	}
-	if _, bound := bindings[name]; bound {
-		return nil, &BoundError{Name: name}
-	}
-	if slices.ContainsFunc(configured, func(c string) bool { return strings.EqualFold(c, name) }) {
-		return nil, fmt.Errorf("bothy-host session-user add: %s: %w", name, ErrConfigured)
+	if err := CheckNewSessionUser(name, configured, bindings); err != nil {
+		return nil, err
 	}
 	var steps []Step
 	switch t.GOOS {

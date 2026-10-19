@@ -245,3 +245,13 @@ host_service:
 		t.Error("missing file accepted")
 	}
 }
+
+// Every spelling YAML tags as !!bool reads as its value (True and TRUE too, not only true).
+func TestBooleanSpellings(t *testing.T) {
+	for body, want := range map[string]bool{"true": true, "True": true, "TRUE": true, "false": false, "False": false, "FALSE": false} {
+		c, err := Load(write(t, "host_service: {require_local_confirm: "+body+"}\n"), linux)
+		if err != nil || c.RequireLocalConfirm != want {
+			t.Errorf("%s: %v %v", body, c, err)
+		}
+	}
+}

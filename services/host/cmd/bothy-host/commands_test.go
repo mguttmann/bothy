@@ -253,6 +253,29 @@ func TestInstallCommand(t *testing.T) {
 	}
 }
 
+// install --session-user refuses the names session-user add refuses: an invalid name, a name
+// that differs from a configured one only in letter case, and a name bound to a person.
+func TestInstallRefusesSessionUsersThatAddRefuses(t *testing.T) {
+	f := newFake(t)
+	sys.isAdmin = func() bool { return true }
+	if err := state.Open(f.state, state.Plain{}).WriteBindings(map[string]string{"bothy-s-old": "p"}); err != nil {
+		t.Fatal(err)
+	}
+	for _, c := range []struct {
+		name string
+		code int
+	}{{"-o", 2}, {"Bothy-S-Alex", 2}, {"bothy-s-old", 1}} {
+		f.applied = nil
+		code, _, stderr := runCmd("install", "--config", f.cfg, "--session-user", c.name)
+		if code != c.code || len(f.applied) != 0 {
+			t.Errorf("%s: %d %q %v", c.name, code, stderr, f.applied)
+		}
+		if b, _ := os.ReadFile(f.cfg); strings.Contains(string(b), c.name) {
+			t.Errorf("%s: added to the configuration", c.name)
+		}
+	}
+}
+
 func TestSessionUserCommand(t *testing.T) {
 	f := newFake(t)
 	sys.isAdmin = func() bool { return true }

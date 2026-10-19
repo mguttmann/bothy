@@ -299,11 +299,15 @@ func integer(key string, v *yaml.Node) (int, error) {
 }
 
 func boolean(key string, v *yaml.Node) (bool, error) {
-	s, err := scalar(key, v, "!!bool", "true or false")
-	if err != nil {
+	if _, err := scalar(key, v, "!!bool", "true or false"); err != nil {
 		return false, err
 	}
-	return s == "true", nil
+	// The node carries the !!bool tag, so Decode accepts every YAML spelling (True, TRUE).
+	var b bool
+	if err := v.Decode(&b); err != nil {
+		return false, invalid(key, "must be true or false")
+	}
+	return b, nil
 }
 
 // profileName is the pattern of HostProfile.name.

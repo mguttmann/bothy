@@ -71,8 +71,16 @@ func (o *OSOps) Write(path string, content []byte, _ fs.FileMode, _ string) erro
 	return os.WriteFile(path, content, 0o600)
 }
 
-// Copy implements Ops.
+// Copy implements Ops. A repeated install replaces the image that the host and helper services
+// run: Windows refuses to replace a running image but lets it be renamed, so the old file moves
+// aside first and is removed when no process runs it any more. Installing from the installed
+// binary itself copies nothing.
 func (o *OSOps) Copy(src, dst string, _ fs.FileMode, _ string) error {
+	if a, err := os.Stat(src); err == nil {
+		if b, err := os.Stat(dst); err == nil && os.SameFile(a, b) {
+			return nil
+		}
+	}
 	in, err := os.Open(src) //nolint:gosec // the running binary
 	if err != nil {
 		return err
@@ -90,8 +98,42 @@ func (o *OSOps) Copy(src, dst string, _ fs.FileMode, _ string) error {
 	if err := out.Close(); err != nil {
 		return err
 	}
-	return os.Rename(tmp, dst)
+	aside, err := moveAside(dst)
+	if err != nil {
+		return err
+	}
+	if err := os.Rename(tmp, dst); err != nil {
+		if aside != "" {
+			_ = os.Rename(aside, dst)
+		}
+		return err
+	}
+	if aside != "" {
+		_ = os.Remove(aside) // fails while a service still runs the old image; the next install retries
+	}
+	return nil
 }
+
+// moveAside renames an existing dst to a free name next to it and returns that name ("" when dst
+// does not exist). A name whose earlier image a process still runs cannot be reused, so the next
+// one is tried.
+func moveAside(dst string) (string, error) {
+	if _, err := os.Stat(dst); errors.Is(err, fs.ErrNotExist) {
+		return "", nil
+	}
+	var err error
+	for i := range maxAsideImages {
+		aside := fmt.Sprintf("%s.old%d", dst, i)
+		_ = os.Remove(aside) // an earlier image that no process runs any more
+		if err = os.Rename(dst, aside); err == nil {
+			return aside, nil
+		}
+	}
+	return "", err
+}
+
+// maxAsideImages bounds the names moveAside tries; each taken one is an earlier image that runs.
+const maxAsideImages = 8
 
 // Chmod implements Ops; Windows closes a home with a win.acl step instead.
 func (o *OSOps) Chmod(string, fs.FileMode, string) error { return nil }

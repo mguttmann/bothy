@@ -17,11 +17,18 @@ import (
 func serviceExit() (int, bool) {
 	switch runtime.GOOS {
 	case "linux":
-		out, _ := try("/usr/bin/systemctl", "show", "--property=ActiveState,ExecMainStatus", "--value", "bothy-host.service")
-		f := strings.Fields(out)
-		if len(f) == 2 && (f[0] == "failed" || f[0] == "inactive") {
-			n, _ := strconv.Atoi(f[1])
-			return n, true
+		// Without --value each line is key=value, so the order of the properties does not matter.
+		out, _ := try("/usr/bin/systemctl", "show", "--property=ActiveState,ExecMainStatus", "bothy-host.service")
+		props := map[string]string{}
+		for _, l := range strings.Split(out, "\n") {
+			if k, v, ok := strings.Cut(strings.TrimSpace(l), "="); ok {
+				props[k] = v
+			}
+		}
+		if st := props["ActiveState"]; st == "failed" || st == "inactive" {
+			if n, err := strconv.Atoi(props["ExecMainStatus"]); err == nil {
+				return n, true
+			}
 		}
 	case "darwin":
 		out, _ := try("/bin/launchctl", "print", "system/bothy-host")

@@ -152,6 +152,11 @@ const (
 	SIDUsers          = "S-1-5-32-545"
 	SIDOwnerRights    = "S-1-3-4"
 	SIDInteractive    = "S-1-5-4"
+	SIDService        = "S-1-5-6"
+	SIDLocal          = "S-1-2-0"
+	SIDConsoleLogon   = "S-1-2-1"
+	SIDThisOrg        = "S-1-5-15"
+	SIDLocalAccount   = "S-1-5-113"
 )
 
 // TrustedOwner reports whether the owner of f is a trusted owner of the platform goos: root on

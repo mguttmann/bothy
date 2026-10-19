@@ -25,12 +25,13 @@ const (
 // FILE_FLAG_FIRST_PIPE_INSTANCE, so a pipe created first by another process makes the listener
 // fail instead of sharing the name.
 type pipeListener struct {
-	path  string
-	sa    *windows.SecurityAttributes
-	mu    sync.Mutex
-	next  windows.Handle
-	close chan struct{}
-	once  sync.Once
+	path    string
+	sa      *windows.SecurityAttributes
+	mu      sync.Mutex
+	next    windows.Handle
+	waiting bool // an Accept blocks in ConnectNamedPipe
+	close   chan struct{}
+	once    sync.Once
 }
 
 // ListenPipe creates the named pipe path with the security descriptor sddl.
@@ -76,7 +77,27 @@ func (l *pipeListener) Accept() (net.Conn, error) {
 			return nil, err
 		}
 	}
+	l.mu.Lock()
+	select {
+	case <-l.close:
+		l.mu.Unlock()
+		_ = windows.CloseHandle(h)
+		return nil, net.ErrClosed
+	default:
+	}
+	l.waiting = true // under mu, so a Close after this point sees it and wakes the wait
+	l.mu.Unlock()
 	err := windows.ConnectNamedPipe(h, nil)
+	l.mu.Lock()
+	l.waiting = false
+	l.mu.Unlock()
+	select {
+	case <-l.close:
+		// Close connected to the pipe to end the wait, or a client came after Close.
+		_ = windows.CloseHandle(h)
+		return nil, net.ErrClosed
+	default:
+	}
 	if err != nil && !errors.Is(err, windows.ERROR_PIPE_CONNECTED) {
 		_ = windows.CloseHandle(h)
 		select {
@@ -89,6 +110,9 @@ func (l *pipeListener) Accept() (net.Conn, error) {
 	return &pipeConn{f: os.NewFile(uintptr(h), l.path), h: h, server: true}, nil
 }
 
+// Close stops the listener. A ConnectNamedPipe on a synchronous handle cannot be cancelled from
+// another thread, so Close ends a waiting Accept by connecting to the pipe once itself; Accept
+// then sees the closed listener and returns net.ErrClosed.
 func (l *pipeListener) Close() error {
 	l.once.Do(func() {
 		close(l.close)
@@ -97,9 +121,26 @@ func (l *pipeListener) Close() error {
 			_ = windows.CloseHandle(l.next)
 			l.next = 0
 		}
+		waiting := l.waiting
 		l.mu.Unlock()
+		if waiting {
+			l.wake()
+		}
 	})
 	return nil
+}
+
+// wake opens and closes one client end of the pipe, which completes a pending ConnectNamedPipe.
+func (l *pipeListener) wake() {
+	name, err := windows.UTF16PtrFromString(l.path)
+	if err != nil {
+		return
+	}
+	h, err := windows.CreateFile(name, windows.GENERIC_READ|windows.GENERIC_WRITE, 0, nil, windows.OPEN_EXISTING,
+		windows.SECURITY_SQOS_PRESENT|windows.SECURITY_IDENTIFICATION, 0)
+	if err == nil {
+		_ = windows.CloseHandle(h)
+	}
 }
 
 func (l *pipeListener) Addr() net.Addr { return pipeAddr(l.path) }
