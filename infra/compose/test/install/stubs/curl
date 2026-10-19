@@ -1,0 +1,63 @@
+#!/bin/sh
+# SPDX-License-Identifier: Apache-2.0
+#
+# Stub of curl for the tests of install.sh (README.md next to this folder). Nothing goes to the
+# network: a download URL is served from the folder STUB_DL_DIR by its last path segment, the
+# discovery URL of the server answers with the status STUB_DISCOVERY_STATUS.
+#
+# Inputs: STUB_LOG (log file, required), STUB_DL_DIR (folder of the files to serve),
+# STUB_DISCOVERY_STATUS (HTTP status of /api/v1/instance/discovery, default 200).
+# Every call appends "curl <arguments>" to STUB_LOG, a download also "url <url>".
+#
+# Exit codes: 0 served, 22 file missing (like curl -f with HTTP 404), 64 unexpected call.
+
+log=${STUB_LOG:?STUB_LOG is not set}
+printf 'curl %s\n' "$*" >>"$log"
+
+out=
+format=
+url=
+while [ $# -gt 0 ]; do
+	case $1 in
+	-o)
+		out=$2
+		shift 2
+		;;
+	-w)
+		format=$2
+		shift 2
+		;;
+	-*) shift ;;
+	*)
+		url=$1
+		shift
+		;;
+	esac
+done
+
+case $url in
+http://127.0.0.1:*/api/v1/instance/discovery)
+	[ "$format" = '%{http_code}' ] || {
+		echo "curl stub: the discovery call must use -w '%{http_code}'" >&2
+		exit 64
+	}
+	printf '%s' "${STUB_DISCOVERY_STATUS:-200}"
+	;;
+https://*)
+	printf 'url %s\n' "$url" >>"$log"
+	[ -n "$out" ] || {
+		echo "curl stub: a download needs -o <file>" >&2
+		exit 64
+	}
+	file=${STUB_DL_DIR:?STUB_DL_DIR is not set}/${url##*/}
+	if [ ! -f "$file" ]; then
+		echo "curl: (22) The requested URL returned error: 404" >&2
+		exit 22
+	fi
+	cp "$file" "$out"
+	;;
+*)
+	printf 'curl stub: unexpected URL %s\n' "$url" >&2
+	exit 64
+	;;
+esac
