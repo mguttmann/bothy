@@ -410,6 +410,11 @@ with every fixture in light and dark, `comfortable`, `compact` and `touch`, text
 de and en (same matrix as 15, section 20).
 In addition, widget tests for semantics and the table view and a performance test for the live
 topology with `stats.live_max_runs` runs (target `viz.perf.frame_build_p95`).
+The target holds on the reference hardware: `make perf` runs the test with
+`BOTHY_PERF_BUDGET=reference` and fails above `viz.perf.frame_build_p95`. On a shared hosted CI
+runner (`CI` set, job `apps-macos` through `make apps-platform`) the same test runs, records the
+p95 and fails only above the CI budget `viz.perf.frame_build_p95_ci`; `BOTHY_PERF_BUDGET`
+(`reference` or `ci`) overrides the choice.
 
 ### 7.4 Accessibility
 
@@ -638,6 +643,7 @@ Column "Place": Server = configuration reference of the server; App = constant o
 | `viz.tv_rotation_interval` | App | `30s` | switching of the views in TV mode |
 | `viz.tv_show_costs` | App | `false` | show costs in TV mode |
 | `viz.perf.frame_build_p95` | App | `8ms` | target: build of one frame of the live topology with `stats.live_max_runs` runs |
+| `viz.perf.frame_build_p95_ci` | App | `50ms` | budget of the same test on a shared hosted CI runner (measured p95 about 23 ms on the macOS runner, about twice that as headroom); the reference target above holds on reference hardware through `make perf` |
 
 Values of other chapters that this chapter refers to: `retention.stats_minutes`,
 `privacy.stats_min_group_size`, `privacy.per_person_stats_enabled`

@@ -396,13 +396,14 @@ perf: ## Load tests against the performance targets (end of a milestone and rele
 	  done; fi
 	@# Dart members run their performance test in profile mode on macOS (`tool/perf_macos.sh`
 	@# of the member, for example the live topology of bothy_viz, brief M6-12 design note 6);
-	@# other hosts print a SKIP line, the CI job apps-macos is the evidence there.
+	@# other hosts print a SKIP line, the CI job apps-macos is the evidence there. `make perf` is
+	@# the run on reference hardware, so it holds the reference budget (D-M6-12-10).
 	@if [ -z "$(DART_ON)" ]; then $(call skip,perf-dart,no Dart package selected); \
 	else found=""; for p in $(DART_PKGS); do \
 	    if [ -f $$p/tool/perf_macos.sh ]; then found="$$found $$p"; fi; done; \
 	  if [ -z "$$found" ]; then $(call skip,perf-dart,no Dart member with tool/perf_macos.sh); \
 	  elif [ "$(PERF_HOST)" != Darwin ]; then $(call skip,perf-dart,needs macOS (CI job apps-macos)); \
-	  else for p in $$found; do sh $$p/tool/perf_macos.sh || exit 1; done; fi; fi
+	  else for p in $$found; do BOTHY_PERF_BUDGET=reference sh $$p/tool/perf_macos.sh || exit 1; done; fi; fi
 
 # ---- documentation --------------------------------------------------------------------
 docs: ## Documentation site builds strictly with the API references and the Dart API pages; ADR index is current; problem codes registered; brief dependencies consistent; register IDs unique; risk ranking and the list behind its last rank follow the register ratings; no German text in tracked files (D-W-94); no external assets

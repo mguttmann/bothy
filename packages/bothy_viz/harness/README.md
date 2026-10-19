@@ -35,7 +35,9 @@ every view; run it with `make test COMPONENTS=apps` or `flutter test` in this fo
 
 `integration_test/topology_perf_test.dart` renders the live topology with the `load` frame and
 replays frames on the fixture clock; it fails when the p95 of `FrameTiming.buildDuration` is
-above `viz.perf.frame_build_p95`. It needs macOS and runs in profile mode through
+above its budget: `viz.perf.frame_build_p95` on reference hardware (`make perf` sets
+`BOTHY_PERF_BUDGET=reference`) and `viz.perf.frame_build_p95_ci` on a shared hosted CI runner
+(`CI` set), docs/DECISIONS.md D-M6-12-10. It needs macOS and runs in profile mode through
 `tool/perf_macos.sh` (listed in `platform-tests.json`), so `make apps-platform` and `make perf`
 run it on a Mac and print a SKIP line elsewhere. The script makes the `macos/` folder with
 `flutter create` for the run and removes everything the run added afterwards, also after a

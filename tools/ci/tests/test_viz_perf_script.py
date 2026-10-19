@@ -109,3 +109,56 @@ def test_never_removes_a_file_that_was_there_before(harness: Path) -> None:
     result = _run(harness)
     assert result.returncode == 0, result.stdout + result.stderr
     assert (harness / ".gitignore").read_text(encoding="utf-8") == "x"
+
+
+def _budget(root: Path) -> str:
+    args = (root / "drive.args").read_text(encoding="utf-8").split()
+    defines = [a for a in args if a.startswith("--dart-define=BOTHY_PERF_BUDGET=")]
+    assert len(defines) == 1, args
+    return defines[0].split("=", 2)[2]
+
+
+def _without_ci() -> dict[str, str]:
+    return {k: v for k, v in os.environ.items() if k not in {"CI", "BOTHY_PERF_BUDGET"}}
+
+
+def _run_clean(root: Path, **env: str) -> subprocess.CompletedProcess[str]:
+    environ = _without_ci()
+    environ["PATH"] = f"{root.parent / 'bin'}{os.pathsep}{environ['PATH']}"
+    environ.update(env)
+    return subprocess.run(
+        ["sh", str(root / "tool" / "perf_macos.sh")],
+        env=environ,
+        capture_output=True,
+        text=True,
+        check=False,
+        timeout=60,
+    )
+
+
+def test_selects_the_reference_budget_outside_ci(harness: Path) -> None:
+    # docs/DECISIONS.md D-M6-12-10: viz.perf.frame_build_p95 holds on reference hardware.
+    result = _run_clean(harness)
+    assert result.returncode == 0, result.stdout + result.stderr
+    assert _budget(harness) == "reference"
+
+
+def test_selects_the_ci_budget_on_a_hosted_runner(harness: Path) -> None:
+    # A hosted runner sets CI; the test then holds viz.perf.frame_build_p95_ci.
+    result = _run_clean(harness, CI="true")
+    assert result.returncode == 0, result.stdout + result.stderr
+    assert _budget(harness) == "ci"
+
+
+def test_an_explicit_budget_wins_over_ci(harness: Path) -> None:
+    result = _run_clean(harness, CI="true", BOTHY_PERF_BUDGET="reference")
+    assert result.returncode == 0, result.stdout + result.stderr
+    assert _budget(harness) == "reference"
+
+
+def test_rejects_an_unknown_budget_before_the_drive(harness: Path) -> None:
+    before = _tree(harness)
+    result = _run_clean(harness, BOTHY_PERF_BUDGET="fast")
+    assert result.returncode == 2
+    assert "BOTHY_PERF_BUDGET" in result.stderr
+    assert _tree(harness) == before

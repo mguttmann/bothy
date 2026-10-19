@@ -140,7 +140,9 @@ Dart members (M6-12): a member with `tool/perf_macos.sh` runs its performance te
 mode on macOS, today the live topology of `packages/bothy_viz/harness` against
 `viz.perf.frame_build_p95`. On another host `make perf` prints `SKIP perf-dart needs macOS`;
 the CI job `apps-macos` runs the same script through `platform-tests.json` (`make
-apps-platform`). The variable `PERF_HOST` (default `uname -s`) names the host system.
+apps-platform`), there against the CI budget `viz.perf.frame_build_p95_ci`, because the
+reference budget holds on reference hardware only (`make perf` sets
+`BOTHY_PERF_BUDGET=reference`; docs/DECISIONS.md D-M6-12-10). The variable `PERF_HOST` (default `uname -s`) names the host system.
 
 ## Migrations
 

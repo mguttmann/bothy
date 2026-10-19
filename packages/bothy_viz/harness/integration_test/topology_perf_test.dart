@@ -3,7 +3,9 @@
 /// The performance test of the live topology (docs/spec/25-visualization.md 7.3; brief
 /// M6-12, design note 6): the `load` frame with exactly the default of `stats.live_max_runs`
 /// runs, replayed every `stats.live_interval` of the fixture clock, builds a frame within
-/// `viz.perf.frame_build_p95` at p95.
+/// `viz.perf.frame_build_p95` at p95. On a shared hosted CI runner `tool/perf_macos.sh` selects
+/// the CI budget `viz.perf.frame_build_p95_ci` instead (docs/DECISIONS.md D-M6-12-10); the p95 is
+/// reported either way.
 ///
 /// Runs in profile mode on macOS through `platform-tests.json` (`make apps-platform`) and
 /// `make perf`: `flutter drive --profile -d macos --driver=test_driver/integration_test.dart
@@ -13,6 +15,7 @@ library;
 import 'package:api_client/api_client.dart' as api;
 import 'package:bothy_viz/bothy_viz.dart';
 import 'package:bothy_viz_harness/main.dart' show harnessNames;
+import 'package:bothy_viz_harness/perf_budget.dart';
 import 'package:design_system/design_system.dart';
 import 'package:domain/domain.dart';
 import 'package:flutter/material.dart';
@@ -21,6 +24,9 @@ import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:integration_test/integration_test.dart';
 import 'package:l10n/l10n.dart';
+
+/// The budget `tool/perf_macos.sh` selected: `reference` or `ci`.
+const String perfBudget = String.fromEnvironment('BOTHY_PERF_BUDGET');
 
 /// Frames of the replay: at least 200 (brief M6-12, design note 6).
 const int replayFrames = 200;
@@ -54,6 +60,7 @@ void main() {
   testWidgets('the live topology of the load frame builds within '
       'viz.perf.frame_build_p95', (tester) async {
     final config = AppConfig.defaults();
+    final budget = frameBuildBudget(config, perfBudget);
     final fixtures = VizFixtures(
       (name) => rootBundle.loadString('packages/bothy_viz/fixtures/$name'),
     );
@@ -126,9 +133,15 @@ void main() {
     binding.reportData = {
       'frames': builds.length,
       'frame_build_p95_us': measured.inMicroseconds,
-      'target_us': config.perfFrameBuildP95.inMicroseconds,
+      'budget': budget.key,
+      'target_us': budget.limit.inMicroseconds,
     };
+    // Printed before the checks, so the log carries the measured value also when they fail.
+    debugPrint(
+      'perf: viz frame build p95 ${measured.inMicroseconds} us over ${builds.length} frames; '
+      '${budget.key} ${budget.limit.inMicroseconds} us',
+    );
     expect(builds.length, greaterThanOrEqualTo(replayFrames));
-    expect(measured, lessThanOrEqualTo(config.perfFrameBuildP95));
+    expect(measured, lessThanOrEqualTo(budget.limit), reason: budget.key);
   });
 }

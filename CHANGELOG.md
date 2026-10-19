@@ -165,7 +165,8 @@ operated, and the order of the build.
   sortable tables, follows reduced motion and is pinned by goldens in the full matrix; the
   registry `vizViewRegistry` lists the views for the hosts, and the harness shows them all.
   A performance test of the live topology with the `load` frame runs in profile mode on macOS
-  through `make apps-platform` and `make perf` (`viz.perf.frame_build_p95`).
+  through `make apps-platform` and `make perf` (`viz.perf.frame_build_p95` on reference
+  hardware, `viz.perf.frame_build_p95_ci` on a shared hosted CI runner).
 - Architecture test `tools/arch-check` in `make arch`: the dependency rules of 15 3.1 for every
   member, with the reach of the diagram as an allow list (M4-01).
 - Sync engine outbox: `Outbox` stores every write with its own UUIDv7 before sending, sends

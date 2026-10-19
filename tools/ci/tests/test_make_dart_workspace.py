@@ -424,6 +424,7 @@ PERF_SCRIPT = (
     "#!/bin/sh\n"
     "# SPDX-License-Identifier: Apache-2.0\n"
     'echo "perf script of $(basename $(dirname $(dirname $0)))" >> "$FAKE_LOG.perf"\n'
+    'echo "budget ${BOTHY_PERF_BUDGET:-unset}" >> "$FAKE_LOG.budget"\n'
 )
 
 
@@ -439,6 +440,15 @@ def test_perf_runs_the_dart_performance_tests_on_macos(repo: Repo) -> None:
     result = repo.make("perf", "COMPONENTS=apps", "PERF_HOST=Darwin")
     assert result.returncode == 0, result.stdout + result.stderr
     assert Path(f"{repo.log}.perf").read_text(encoding="utf-8") == "perf script of beta\n"
+
+
+def test_perf_holds_the_reference_budget_also_on_ci(repo: Repo) -> None:
+    # docs/DECISIONS.md D-M6-12-10: `make perf` is the run on reference hardware, so it selects
+    # the reference budget even where CI is set.
+    _perf_member(repo)
+    result = repo.make("perf", "COMPONENTS=apps", "PERF_HOST=Darwin", CI="true")
+    assert result.returncode == 0, result.stdout + result.stderr
+    assert Path(f"{repo.log}.budget").read_text(encoding="utf-8") == "budget reference\n"
 
 
 def test_perf_prints_a_skip_line_for_dart_elsewhere(repo: Repo) -> None:
