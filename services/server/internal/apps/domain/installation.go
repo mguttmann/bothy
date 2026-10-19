@@ -34,7 +34,7 @@ const (
 // Next returns the state after t from s and whether the state changes (M2-24 design note 9):
 // suspend moves active to suspended, resume suspended to active, uninstall active or suspended to
 // uninstalled. A transition to the state an installation already has is a call without effect
-// (change false, nil error; 06 section 2 "Ohne Wirkung"). Suspend and resume of an uninstalled
+// (change false, nil error; 06 section 2 "No effect"). Suspend and resume of an uninstalled
 // installation fail with 409 invalid_state_transition. An unknown state or transition is an
 // internal error.
 func Next(s State, t Transition) (State, bool, error) {

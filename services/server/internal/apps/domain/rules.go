@@ -28,7 +28,7 @@ const (
 )
 
 // ScopeEventsSubscribe is the scope every subscribing app needs (05 section 2.6 row
-// "Ereignis-Abos").
+// "Event subscriptions").
 const ScopeEventsSubscribe = "events:subscribe"
 
 // ReservedCommands are the built-in command names of 09 section 10.1; no manifest may register
