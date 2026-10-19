@@ -23,7 +23,8 @@ Unit tests: `TestNormalize*`, `TestSelectRoutes*`, `TestToleranceFromReference`,
 - `routes.go`: `SelectRoutes` reads `api/operations.yaml` (documented format) and the contract
   (`rest.Spec`, byte-equal to `docs/api/openapi.yaml`).
 - `fixtures.go`: `ParamFixture` per path parameter name, `PrepareExtras` (a login driver, an app
-  with a webhook subscription and a host, created by the owner; needs `ExtrasConfig`).
+  with a webhook subscription and a host, created by the owner; needs `ExtrasConfig`; and an
+  upload of Sam in Marketing/Kampagnen for `file_id` of `getFile` and `getUpload`, M3-03).
 - `normalize.go`: drops `Correlation-Id`, `Date`, `DPoP-Nonce`, keeps the policy name of
   `RateLimit`, drops `correlation_id` and replaces the requested IDs in `instance` of a problem
   body; `Diff` lists every remaining difference.
