@@ -206,7 +206,8 @@ func (v *verifyingReader) Read(p []byte) (int, error) {
 		}
 		return n, err
 	}
-	if errors.Is(err, io.EOF) {
+	if errors.Is(err, io.EOF) || errors.Is(err, io.ErrUnexpectedEOF) {
+		// A body that ends early, also against its own Content-Length, is a length error.
 		return n, v.fail(errLength)
 	}
 	return n, err

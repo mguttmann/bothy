@@ -2513,8 +2513,8 @@ export interface paths {
         put?: never;
         /**
          * Finish an upload
-         * @description Checks size and optional SHA-256, detects the MIME type and queues the malware scan. The file is
-         *     downloadable after `scan_status` is `clean` or `skipped`. Missing parts answer 409 `conflict` with `reason` `upload_incomplete`; an expired session answers 410 `gone` (12, 3.4 and 3.6).
+         * @description Closes the session; the verify pass then checks size and SHA-256, detects the MIME type and runs the malware scan. The file is
+         *     downloadable after `scan_status` is `clean` or `skipped`. `parts` is checked against the confirmed parts: a duplicate or out-of-range number gives 400, another `etag` 409 `conflict` with `reason` `part_conflict`. A completed session answers 200 with the file again. Missing parts answer 409 `conflict` with `reason` `upload_incomplete`; an expired session answers 410 `gone` (12, 3.4 and 3.6).
          */
         post: operations["completeUpload"];
         delete?: never;
@@ -2532,12 +2532,15 @@ export interface paths {
         };
         /**
          * Read the state of an own upload
-         * @description Confirmed parts of an unfinished upload, so a client can resume after a network loss (12, 4).
+         * @description Confirmed parts of an own upload, so a client can resume after a network loss (12, 3.2). `upload_state` is `pending` for an open session without a confirmed part, `uploading` with at least one, `complete` once completed. An aborted or expired session answers 410 `gone`.
          */
         get: operations["getUpload"];
         put?: never;
         post?: never;
-        /** Abort an upload */
+        /**
+         * Abort an upload
+         * @description Ends an open own session: its parts are deleted, the file becomes `upload_state` `failed` and `file.updated` goes to the uploader. An aborted or expired session answers 204 again; a completed one 409 `invalid_state_transition`.
+         */
         delete: operations["abortUpload"];
         options?: never;
         head?: never;
@@ -6950,8 +6953,8 @@ export interface components {
             size_bytes: number;
             /** @example image/png */
             declared_mime_type?: string;
-            /** @description Hex SHA-256; the server verifies it on completion when given. */
-            sha256?: string;
+            /** @description Lowercase hex SHA-256 of the whole file; the verify pass checks it. */
+            sha256: string;
         };
         /**
          * @description Upload plan. In mode `direct` the part URLs point to this server; in mode `presigned` they
@@ -16530,7 +16533,10 @@ export interface operations {
     uploadPart: {
         parameters: {
             query?: never;
-            header?: never;
+            header: {
+                /** @description RFC 9530 digest of the part with the member `sha-256`, e.g. `sha-256=:<base64>:`; other members are ignored. */
+                "Content-Digest": string;
+            };
             path: {
                 file_id: components["parameters"]["FileIdPath"];
                 part_number: components["parameters"]["PartNumberPath"];
@@ -16663,6 +16669,7 @@ export interface operations {
             401: components["responses"]["Unauthorized"];
             403: components["responses"]["Forbidden"];
             404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
             429: components["responses"]["TooManyRequests"];
             default: components["responses"]["Error"];
         };

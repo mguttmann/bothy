@@ -8,6 +8,7 @@
 # checks this file; it never rewrites it.
 version: 1
 enabled:             # operationIds that have a handler; sorted ascending
+  - abortUpload
   - addGroupMember
   - addOwner
   - addReaction
@@ -30,6 +31,7 @@ enabled:             # operationIds that have a handler; sorted ascending
   - completePasskeyRegistration
   - completeStepUpWithDeviceKey
   - completeStepUpWithPasskey
+  - completeUpload
   - confirmHost
   - createAgent
   - createChannel
@@ -48,6 +50,7 @@ enabled:             # operationIds that have a handler; sorted ascending
   - createStepUpChallenge
   - createThread
   - createToken
+  - createUpload
   - createUser
   - createWebhookSubscription
   - deleteChannelDraft
@@ -73,6 +76,7 @@ enabled:             # operationIds that have a handler; sorted ascending
   - getChannel
   - getDevice
   - getDiscovery
+  - getFile
   - getGrant
   - getGroup
   - getHost
@@ -87,6 +91,7 @@ enabled:             # operationIds that have a handler; sorted ascending
   - getSnapshot
   - getSpace
   - getThread
+  - getUpload
   - getUser
   - getUserCredentials
   - getWebhookKeys
@@ -193,13 +198,11 @@ enabled:             # operationIds that have a handler; sorted ascending
   - updateUser
   - updateWebhookSubscription
   - upgradeAppManifest
+  - uploadPart
   - validateManifest
   - verifyAuditChain
   - viewAsUser
 later:               # every other operationId of docs/api/openapi.yaml; sorted by operation_id
-  - operation_id: abortUpload
-    milestone: M3
-    ticket: M3-03
   - operation_id: ackAgentEvents
     milestone: M2
     ticket: M2-07
@@ -239,9 +242,6 @@ later:               # every other operationId of docs/api/openapi.yaml; sorted 
   - operation_id: completeImport
     milestone: M8
     ticket: M8-03
-  - operation_id: completeUpload
-    milestone: M3
-    ticket: M3-03
   - operation_id: createAgentWebhookSubscription
     milestone: M2
   - operation_id: createDm
@@ -273,9 +273,6 @@ later:               # every other operationId of docs/api/openapi.yaml; sorted 
   - operation_id: createStatusIncident
     milestone: M7
     ticket: M7-09
-  - operation_id: createUpload
-    milestone: M3
-    ticket: M3-03
   - operation_id: decideGdprRequest
     milestone: M7
   - operation_id: deleteBrandingLogo
@@ -327,9 +324,6 @@ later:               # every other operationId of docs/api/openapi.yaml; sorted 
   - operation_id: getErrorStats
     milestone: M6
     ticket: M6-05
-  - operation_id: getFile
-    milestone: M3
-    ticket: M3-03
   - operation_id: getGdprRequest
     milestone: M7
   - operation_id: getImport
@@ -379,9 +373,6 @@ later:               # every other operationId of docs/api/openapi.yaml; sorted 
   - operation_id: getTranscript
     milestone: M3
     ticket: M3-05
-  - operation_id: getUpload
-    milestone: M3
-    ticket: M3-03
   - operation_id: getUsageStats
     milestone: M6
     ticket: M6-05
@@ -539,9 +530,6 @@ later:               # every other operationId of docs/api/openapi.yaml; sorted 
   - operation_id: uploadBrandingLogo
     milestone: M3
     ticket: M3-10
-  - operation_id: uploadPart
-    milestone: M3
-    ticket: M3-03
 # WebSocket ops a client, agent or app sends on the channel gateway of docs/api/asyncapi.yaml
 # (M1-64). The gateway dispatcher registers exactly the ops under `enabled`; every other client op
 # of the channel stands under `later` and is treated as unknown (close code 4001) until its ticket

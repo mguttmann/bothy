@@ -29,15 +29,6 @@ type Agent struct {
 	Version                int64
 }
 
-type AgentConsumerCursor struct {
-	AgentID         pgtype.UUID
-	ConsumerName    string
-	AckedSeq        int64
-	HolderSessionID pgtype.UUID
-	CreatedAt       pgtype.Timestamptz
-	UpdatedAt       pgtype.Timestamptz
-}
-
 type ApiToken struct {
 	ID          pgtype.UUID
 	PrincipalID pgtype.UUID
@@ -167,8 +158,6 @@ type AuthSession struct {
 	LastIp           *netip.Addr
 	RevokedAt        pgtype.Timestamptz
 	RevokeReason     pgtype.Text
-	ViewAsUserID     pgtype.UUID
-	ViewAsStartedAt  pgtype.Timestamptz
 }
 
 type Channel struct {

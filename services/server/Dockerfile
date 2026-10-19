@@ -34,9 +34,10 @@ RUN --mount=type=cache,target=/go/pkg/mod \
     --mount=type=cache,target=/root/.cache/go-build \
     CGO_ENABLED=0 GOOS=$TARGETOS GOARCH=$TARGETARCH GOTOOLCHAIN=local GOFLAGS=-mod=readonly \
     go build -trimpath -buildvcs=false -ldflags "-s -w" -o /out/bothy ./cmd/bothy
-# Empty key store of secrets.signing_key_dir (18 "Server images" rule 3, ADR 0066): a named volume
-# mounted there takes owner 65532 and mode 0700 from the image on first use.
-RUN mkdir -p /out/signing-keys
+# Empty key store of secrets.signing_key_dir (18 "Server images" rule 3, ADR 0066) and empty root
+# file.fs.root of the file system driver (M3-03): a named volume mounted there takes owner 65532
+# and mode 0700 from the image on first use, which the start check of the driver requires.
+RUN mkdir -p /out/signing-keys /out/files
 
 FROM gcr.io/distroless/static-debian13:nonroot@sha256:e2e927ec666bae08560abb3c55d0659eceabb657f56b6782ab500a9fc7f555e3
 ARG VERSION REVISION
@@ -49,6 +50,7 @@ LABEL org.opencontainers.image.title="bothy-server" \
 # Owned by root and not writable, so the running user cannot replace the binary.
 COPY --from=build --chown=0:0 --chmod=0555 /out/bothy /usr/local/bin/bothy
 COPY --from=build --chown=65532:65532 --chmod=0700 /out/signing-keys /var/lib/bothy/signing-keys
+COPY --from=build --chown=65532:65532 --chmod=0700 /out/files /var/lib/bothy/files
 # Numeric, so runtimes that enforce "run as non-root" can verify it without /etc/passwd.
 USER 65532:65532
 ENTRYPOINT ["/usr/local/bin/bothy"]

@@ -16,8 +16,10 @@ def _get_kwargs(
     part_number: int,
     *,
     body: File,
+    content_digest: str,
 ) -> dict[str, Any]:
     headers: dict[str, Any] = {}
+    headers["Content-Digest"] = content_digest
 
     _kwargs: dict[str, Any] = {
         "method": "put",
@@ -104,6 +106,7 @@ def sync_detailed(
     *,
     client: AuthenticatedClient | Client,
     body: File,
+    content_digest: str,
 ) -> Response[Problem | UploadPartResult]:
     """Upload one part in direct mode
 
@@ -115,6 +118,7 @@ def sync_detailed(
     Args:
         file_id (UUID): UUIDv7 (RFC 9562), lowercase canonical form.
         part_number (int):
+        content_digest (str):
         body (File):
 
     Raises:
@@ -129,6 +133,7 @@ def sync_detailed(
         file_id=file_id,
         part_number=part_number,
         body=body,
+        content_digest=content_digest,
     )
 
     response = client.get_httpx_client().request(
@@ -144,6 +149,7 @@ def sync(
     *,
     client: AuthenticatedClient | Client,
     body: File,
+    content_digest: str,
 ) -> Problem | UploadPartResult | None:
     """Upload one part in direct mode
 
@@ -155,6 +161,7 @@ def sync(
     Args:
         file_id (UUID): UUIDv7 (RFC 9562), lowercase canonical form.
         part_number (int):
+        content_digest (str):
         body (File):
 
     Raises:
@@ -170,6 +177,7 @@ def sync(
         part_number=part_number,
         client=client,
         body=body,
+        content_digest=content_digest,
     ).parsed
 
 
@@ -179,6 +187,7 @@ async def asyncio_detailed(
     *,
     client: AuthenticatedClient | Client,
     body: File,
+    content_digest: str,
 ) -> Response[Problem | UploadPartResult]:
     """Upload one part in direct mode
 
@@ -190,6 +199,7 @@ async def asyncio_detailed(
     Args:
         file_id (UUID): UUIDv7 (RFC 9562), lowercase canonical form.
         part_number (int):
+        content_digest (str):
         body (File):
 
     Raises:
@@ -204,6 +214,7 @@ async def asyncio_detailed(
         file_id=file_id,
         part_number=part_number,
         body=body,
+        content_digest=content_digest,
     )
 
     response = await client.get_async_httpx_client().request(**kwargs)
@@ -217,6 +228,7 @@ async def asyncio(
     *,
     client: AuthenticatedClient | Client,
     body: File,
+    content_digest: str,
 ) -> Problem | UploadPartResult | None:
     """Upload one part in direct mode
 
@@ -228,6 +240,7 @@ async def asyncio(
     Args:
         file_id (UUID): UUIDv7 (RFC 9562), lowercase canonical form.
         part_number (int):
+        content_digest (str):
         body (File):
 
     Raises:
@@ -244,5 +257,6 @@ async def asyncio(
             part_number=part_number,
             client=client,
             body=body,
+            content_digest=content_digest,
         )
     ).parsed
