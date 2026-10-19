@@ -17,6 +17,18 @@ void main() {
   TimelinePlayback playback(FakeVizClock clock) =>
       TimelinePlayback(from: from, to: to, clock: clock, speeds: speeds);
 
+  test('the start is the minute of from, the origin of the jump slider', () {
+    final clock = FakeVizClock(to);
+    final p = TimelinePlayback(
+      from: from.add(const Duration(seconds: 30, milliseconds: 5)),
+      to: to,
+      clock: clock,
+      speeds: speeds,
+    );
+    expect(p.start, from);
+    expect(p.position.difference(p.start).inMinutes, p.minutes);
+  });
+
   test('the speeds come from viz.timeline_speeds', () {
     expect(speeds, isNotEmpty);
     expect(speeds, everyElement(greaterThanOrEqualTo(1)));

@@ -84,6 +84,9 @@ class _VizTableState extends State<VizTable> {
   }
 
   static int _compare(Comparable<Object> a, Comparable<Object> b) {
+    // Numbers by value: an int and a double (or two ints of different VM classes) have
+    // different runtime types.
+    if (a is num && b is num) return a.compareTo(b);
     if (a.runtimeType == b.runtimeType) return a.compareTo(b);
     // Mixed keys (a number and "not shown"): numbers first, so the text stays at the end.
     return a is num ? -1 : 1;

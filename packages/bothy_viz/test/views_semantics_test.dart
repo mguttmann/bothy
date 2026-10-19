@@ -196,6 +196,33 @@ void main() {
     expect(reversed.first.$1, 'support-agent', reason: '2 switches first');
   });
 
+  testWidgets('a column of int and double keys sorts by value', (tester) async {
+    // The SLI rows sort by a ratio (double) or -1 (int), counts are ints: one column mixes
+    // both, and the order follows the value, not the runtime type.
+    final data = VizTableData(
+      caption: 'Mixed',
+      columns: const ['Name', 'Value'],
+      rows: [
+        [const VizCell('b'), const VizCell('0.5', sortBy: 0.5)],
+        [const VizCell('c'), const VizCell('3', sortBy: 3)],
+        [const VizCell('a'), const VizCell('-1', sortBy: -1)],
+        [const VizCell('d'), const VizCell('0.25', sortBy: 0.25)],
+        [const VizCell('e'), const VizCell('not shown')],
+      ],
+    );
+    await pumpWorld(tester, ViewWorld(), VizTable(data: data));
+    List<String> order() => ([
+      for (final name in ['a', 'b', 'c', 'd', 'e'])
+        (name, tester.getTopLeft(find.text(name).last).dy),
+    ]..sort((x, y) => x.$2.compareTo(y.$2))).map((e) => e.$1).toList();
+    await tester.tap(find.text('Value'));
+    await tester.pump();
+    expect(order(), ['a', 'd', 'b', 'c', 'e']);
+    await tester.tap(find.text('Value'));
+    await tester.pump();
+    expect(order(), ['e', 'c', 'b', 'd', 'a']);
+  });
+
   testWidgets(
     'a traffic light change in the executive tiles is announced once',
     (tester) async {

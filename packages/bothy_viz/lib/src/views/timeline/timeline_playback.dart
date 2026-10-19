@@ -73,6 +73,9 @@ class TimelinePlayback extends ChangeNotifier {
   /// Whether the playback runs.
   bool get playing => _tick != null;
 
+  /// The first stop of the playhead, [from] floored to its minute.
+  DateTime get start => _floor(from);
+
   /// Every whole minute from [from] to [to], the stops of the playhead.
   int get minutes => _floor(to).difference(_floor(from)).inMinutes;
 

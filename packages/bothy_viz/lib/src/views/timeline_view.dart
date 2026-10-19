@@ -215,7 +215,7 @@ class _Controls extends StatelessWidget {
   Widget build(BuildContext context) {
     final l10n = VizTexts.of(context).l10n;
     final minutes = playback.minutes;
-    final index = playback.position.difference(playback.from).inMinutes;
+    final index = playback.position.difference(playback.start).inMinutes;
     return Wrap(
       spacing: DsSpace.s8,
       runSpacing: DsSpace.s8,
@@ -245,7 +245,7 @@ class _Controls extends StatelessWidget {
               max: minutes.toDouble(),
               divisions: minutes,
               onChanged: (v) => playback.jumpTo(
-                playback.from.add(Duration(minutes: v.round())),
+                playback.start.add(Duration(minutes: v.round())),
               ),
             ),
           ),
