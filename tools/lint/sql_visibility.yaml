@@ -50,6 +50,9 @@ exceptions:
   - query: chat.LockChannel
     category: after_authorize
     reason: "locks the one channel a change authorize allowed (03 section 6.3)"
+  - query: chat.GetChannelBehavior
+    category: after_authorize
+    reason: "the behaviour of the one channel whose channel.behavior.read, channel.behavior.update or agent.config.read authorize allowed (M2-02)"
   - query: chat.ListAllChannels
     category: authorize_resolution
     reason: "the structure source of authz: every non-dm channel with its space and operator, from which Scope and authorize compute visibility (07 section 7.2)"
