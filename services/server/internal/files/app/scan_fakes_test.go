@@ -213,11 +213,10 @@ func (m *scanMetrics) ScanQueue(_ context.Context, n int64) {
 // countingStore counts the bytes read from every key of the fake store.
 type countingStore struct {
 	*store
-	mu    sync.Mutex
-	read  map[string]int64
-	gets  map[string]int
-	puts  map[string][]byte
-	after func(op, key string)
+	mu   sync.Mutex
+	read map[string]int64
+	gets map[string]int
+	puts map[string][]byte
 }
 
 func newCountingStore(s *store) *countingStore {
@@ -264,6 +263,6 @@ func (c *countingStore) Put(ctx context.Context, key string, body io.Reader, siz
 func (c *countingStore) has(key string) bool {
 	c.store.mu.Lock()
 	defer c.store.mu.Unlock()
-	_, ok := c.store.objects[key]
+	_, ok := c.objects[key]
 	return ok
 }

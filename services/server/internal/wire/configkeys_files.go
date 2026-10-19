@@ -160,7 +160,7 @@ func filesConfigKeys() []config.Key {
 			Chapter: chapter12,
 		},
 		{
-			Name: "file.scan.health_interval", Kind: config.KindDuration, Default: "30s", Min: "1s",
+			Name: "file.scan.health_interval", Kind: config.KindDuration, Default: thirtySeconds, Min: "1s",
 			Doc:     "Interval of the PING to clamd, the first pause of a retried scan and the deadline of a PING.",
 			Chapter: chapter12,
 		},

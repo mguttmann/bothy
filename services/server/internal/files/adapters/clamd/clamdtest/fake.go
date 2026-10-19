@@ -4,6 +4,7 @@ package clamdtest
 
 import (
 	"bytes"
+	"context"
 	"encoding/binary"
 	"errors"
 	"io"
@@ -63,7 +64,7 @@ func NewFake() (*Fake, error) {
 	if err != nil {
 		return nil, err
 	}
-	ln, err := net.Listen("unix", filepath.Join(dir, "clamd.sock"))
+	ln, err := (&net.ListenConfig{}).Listen(context.Background(), "unix", filepath.Join(dir, "clamd.sock"))
 	if err != nil {
 		_ = os.RemoveAll(dir)
 		return nil, err

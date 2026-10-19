@@ -353,41 +353,12 @@ func (a *assembly) wait() error {
 
 // finish is the result unit of work (design note 6) and the deletions and metrics after it.
 func (p *ScanPass) finish(ctx context.Context, t SessionRecord, st passState, out domain.PassOutcome, start time.Time) (PassResult, error) {
-	fileID := t.FileID
 	var current SessionRecord
 	var transitioned bool
 	err := p.d.UoW.Do(ctx, func(ctx context.Context) error {
-		cur, found, err := p.d.Scans.LockScanTarget(ctx, fileID)
-		if err != nil {
-			return err
-		}
-		current = cur
-		if !found || !awaiting(cur) {
-			return nil
-		}
-		res := p.result(cur, st, out)
-		if err := p.d.Scans.FinishScan(ctx, fileID, res); err != nil {
-			return err
-		}
-		f := cur.File
-		f.UploadState, f.ScanStatus, f.MIMEType, f.SHA256, f.SizeBytes = res.UploadState, res.ScanStatus, res.MIMEType, res.SHA256, res.SizeBytes
-		if err := p.appendUpdated(ctx, f); err != nil {
-			return err
-		}
-		if out.AuditMalware {
-			if err := p.auditMalware(ctx, fileID, st); err != nil {
-				return err
-			}
-		}
-		if domain.Final(f.UploadState, f.ScanStatus, false) {
-			if err := txn.Publish(ctx, files.FileFinalized{FileID: fileID}); err != nil {
-				return err
-			}
-		}
-		// M3-06 inserts files.thumbnail and M3-15 files.extract_text here for a deliverable file,
-		// in this unit of work (12 3.4 last paragraph).
-		transitioned = true
-		return nil
+		var err error
+		current, transitioned, err = p.write(ctx, t.FileID, st, out)
+		return err
 	})
 	if err != nil {
 		return PassResult{}, err
@@ -396,7 +367,7 @@ func (p *ScanPass) finish(ctx context.Context, t SessionRecord, st passState, ou
 		// Another run decided the file, or it was deleted: keep the state, remove only what this
 		// run wrote and nobody may serve.
 		if st.written && !domain.Deliverable(current.File.UploadState, current.File.ScanStatus, current.File.Deleted) {
-			p.deleteKeys(ctx, fileID, t.File.ObjectKey)
+			p.deleteKeys(ctx, t.FileID, t.File.ObjectKey)
 		}
 		return PassResult{Outcome: OutcomeNone}, nil
 	}
@@ -409,6 +380,37 @@ func (p *ScanPass) finish(ctx context.Context, t SessionRecord, st passState, ou
 		outcome = OutcomeFailed
 	}
 	return PassResult{Outcome: outcome, Transitioned: true}, nil
+}
+
+// write is the work of the result unit: lock and check again, the rows, file.updated, the
+// malware entry and FileFinalized. It returns the locked state and whether this run wrote.
+func (p *ScanPass) write(ctx context.Context, fileID ids.ID, st passState, out domain.PassOutcome) (SessionRecord, bool, error) {
+	cur, found, err := p.d.Scans.LockScanTarget(ctx, fileID)
+	if err != nil || !found || !awaiting(cur) {
+		return cur, false, err
+	}
+	res := p.result(cur, st, out)
+	if err := p.d.Scans.FinishScan(ctx, fileID, res); err != nil {
+		return cur, false, err
+	}
+	f := cur.File
+	f.UploadState, f.ScanStatus, f.MIMEType, f.SHA256, f.SizeBytes = res.UploadState, res.ScanStatus, res.MIMEType, res.SHA256, res.SizeBytes
+	if err := p.appendUpdated(ctx, f); err != nil {
+		return cur, false, err
+	}
+	if out.AuditMalware {
+		if err := p.auditMalware(ctx, fileID, st); err != nil {
+			return cur, false, err
+		}
+	}
+	if domain.Final(f.UploadState, f.ScanStatus, false) {
+		if err := txn.Publish(ctx, files.FileFinalized{FileID: fileID}); err != nil {
+			return cur, false, err
+		}
+	}
+	// M3-06 inserts files.thumbnail and M3-15 files.extract_text here for a deliverable file, in
+	// this unit of work (12 3.4 last paragraph).
+	return cur, true, nil
 }
 
 // result builds the row change of out.
@@ -592,13 +594,7 @@ func (r *partsReader) Read(b []byte) (int, error) {
 			if r.n >= r.count {
 				return 0, io.EOF
 			}
-			r.n++
-			key, err := domain.UploadPartKey(r.fileID, r.n)
-			if err != nil {
-				return 0, err
-			}
-			if r.cur, err = r.store.Get(r.ctx, key, nil); err != nil {
-				r.cur = nil
+			if err := r.next(); err != nil {
 				return 0, err
 			}
 		}
@@ -613,6 +609,21 @@ func (r *partsReader) Read(b []byte) (int, error) {
 		}
 		return n, err
 	}
+}
+
+// next opens the following part.
+func (r *partsReader) next() error {
+	r.n++
+	key, err := domain.UploadPartKey(r.fileID, r.n)
+	if err != nil {
+		return err
+	}
+	cur, err := r.store.Get(r.ctx, key, nil)
+	if err != nil {
+		return err
+	}
+	r.cur = cur
+	return nil
 }
 
 // Close closes the open part.

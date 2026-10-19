@@ -245,7 +245,7 @@ func ping(ctx context.Context, path string) error {
 	if err != nil {
 		return err
 	}
-	defer conn.Close()
+	defer func() { _ = conn.Close() }()
 	_ = conn.SetDeadline(time.Now().Add(5 * time.Second))
 	if _, err := conn.Write([]byte("zPING\x00")); err != nil {
 		return err
@@ -275,7 +275,7 @@ func newRelay(resolve func(ctx context.Context) (string, error)) (*relay, error)
 		return nil, err
 	}
 	p := filepath.Join(dir, "clamd.sock")
-	ln, err := net.Listen("unix", p)
+	ln, err := (&net.ListenConfig{}).Listen(context.Background(), "unix", p)
 	if err != nil {
 		_ = os.RemoveAll(dir)
 		return nil, err
@@ -304,7 +304,7 @@ func (r *relay) serve() {
 // pipe connects one client to the container; a failed dial closes the client at once, which the
 // client sees as an unreachable scanner.
 func (r *relay) pipe(c net.Conn) {
-	defer c.Close()
+	defer func() { _ = c.Close() }()
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	addr, err := r.resolve(ctx)
 	var up net.Conn
@@ -316,35 +316,34 @@ func (r *relay) pipe(c net.Conn) {
 	if err != nil {
 		return
 	}
-	defer up.Close()
+	defer func() { _ = up.Close() }()
 	r.track(c, up)
 	defer r.untrack(c, up)
 	done := make(chan struct{})
 	go func() {
-		_, _ = copyClose(up, c)
+		_ = copyClose(up, c)
 		if tc, ok := up.(*net.TCPConn); ok {
 			_ = tc.CloseWrite()
 		}
 		close(done)
 	}()
-	_, _ = copyClose(c, up)
+	_ = copyClose(c, up)
 	_ = c.Close()
 	<-done
 }
 
-func copyClose(dst, src net.Conn) (int64, error) {
+// copyClose copies src to dst until one side fails or src ends.
+func copyClose(dst, src net.Conn) error {
 	buf := make([]byte, 32<<10)
-	var n int64
 	for {
 		k, err := src.Read(buf)
 		if k > 0 {
 			if _, werr := dst.Write(buf[:k]); werr != nil {
-				return n, werr
+				return werr
 			}
-			n += int64(k)
 		}
 		if err != nil {
-			return n, err
+			return err
 		}
 	}
 }
