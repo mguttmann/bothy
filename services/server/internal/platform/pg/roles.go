@@ -192,8 +192,9 @@ func checkPasswords(passwords map[Role]secrets.Value) error {
 // each migration grants what bothy_app needs on its tables (rule 3).
 //
 // super must be connected to database (the schema statements act on the current database);
-// otherwise BootstrapDatabase fails naming both databases. pgtest runs it again for every cloned
-// database, because a template does not pass on database-level grants.
+// otherwise BootstrapDatabase fails naming both databases. A template does not pass on the
+// database-level grants: pgtest sets them again on every clone (pgtest.clone), and a pgtest test
+// holds the result equal to this function's.
 func BootstrapDatabase(ctx context.Context, super *pgx.Conn, database string) error {
 	var current string
 	if err := super.QueryRow(ctx, "SELECT current_database()").Scan(&current); err != nil {
