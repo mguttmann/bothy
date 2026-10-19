@@ -307,8 +307,11 @@ func TestUploads(t *testing.T) {
 		if err := db.QueryRow(ctx, `SELECT count(*) FROM event_log WHERE resource_id = $1`, sess.FileID).Scan(&events); err != nil || events != 0 {
 			t.Errorf("%d events (%v), want none", events, err)
 		}
-		if err := db.QueryRow(ctx, `SELECT count(*) FROM jobs.river_job WHERE kind LIKE 'files.%'`).Scan(&jobs); err != nil || jobs != 0 {
-			t.Errorf("%d file jobs (%v), want none", jobs, err)
+		// Since M3-04 the completion inserts files.scan with round 0, once; the repeated
+		// completion inserts none. Later rounds are retries of the pass (no clamd here).
+		if err := db.QueryRow(ctx, `SELECT count(*) FROM jobs.river_job WHERE kind = 'files.scan' AND args->>'file_id' = $1
+			AND (args->>'round')::bigint = 0`, sess.FileID).Scan(&jobs); err != nil || jobs != 1 {
+			t.Errorf("%d files.scan jobs of round 0 (%v), want 1", jobs, err)
 		}
 	})
 
