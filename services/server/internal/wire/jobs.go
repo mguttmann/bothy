@@ -12,6 +12,7 @@ import (
 	appsjobs "github.com/OWNER/bothy/services/server/internal/apps/adapters/jobs"
 	auditjobs "github.com/OWNER/bothy/services/server/internal/audit/adapters/jobs"
 	authzjobs "github.com/OWNER/bothy/services/server/internal/authz/adapters/jobs"
+	filesjobs "github.com/OWNER/bothy/services/server/internal/files/adapters/jobs"
 	identityjobs "github.com/OWNER/bothy/services/server/internal/identity/adapters/jobs"
 	instancejobs "github.com/OWNER/bothy/services/server/internal/instance/adapters/jobs"
 	"github.com/OWNER/bothy/services/server/internal/platform/config"
@@ -102,14 +103,17 @@ type JobModules struct {
 	ChainVerifyInterval time.Duration
 	// Deliveries is the use case of apps.webhook_deliver (M2-26).
 	Deliveries appsjobs.Deliverer
+	// FilesScan is the scan pass of files.scan (M3-04); nil in the role api.
+	FilesScan filesjobs.Runner
 }
 
 // NewJobRegistry returns the job registry of a process: every role (api, worker, all) builds
 // the same one here, so an api process accepts exactly the kinds a worker runs. It registers
 // sync.partition_maintenance (M1-16), sync.idempotency_cleanup (M1-20), authz.expiry_sweep and
 // authz.expiry_reminder (M1-30), instance.key_rotation (M1-32), identity.auth_cleanup (M1-35) and
-// audit.chain_verify (M1-50) and apps.webhook_deliver on the queue delivery (M2-26); the error is
-// the first rejected registration.
+// audit.chain_verify (M1-50), apps.webhook_deliver on the queue delivery (M2-26) and files.scan
+// on the queue files without a River job timeout (M3-04); the error is the first rejected
+// registration.
 func NewJobRegistry(m *JobModules) (*jobs.Registry, error) {
 	if m == nil {
 		return nil, errors.New("wire: NewJobRegistry needs the job modules")
@@ -134,6 +138,9 @@ func NewJobRegistry(m *JobModules) (*jobs.Registry, error) {
 		return nil, err
 	}
 	if err := appsjobs.Register(reg, m.Deliveries); err != nil {
+		return nil, err
+	}
+	if err := filesjobs.Register(reg, m.FilesScan); err != nil {
 		return nil, err
 	}
 	return reg, nil

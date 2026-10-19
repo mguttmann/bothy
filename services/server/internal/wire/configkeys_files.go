@@ -8,6 +8,13 @@ import "github.com/OWNER/bothy/services/server/internal/platform/config"
 // file_s3 and upload_part_size_s3 and FilesObjectStore read it.
 const keyStorageDriver = "file.storage.driver"
 
+// The keys of the scan checks of M3-04 (docs/DECISIONS.md D-M3-04-15).
+const (
+	keyScanMode           = "file.scan.mode"
+	keyClamdAddress       = "file.scan.clamd_address"
+	keyClamdStreamMaxByte = "file.scan.clamd_stream_max_bytes"
+)
+
 // The keys of the upload checks of M3-03 (docs/DECISIONS.md D-M3-03-19).
 const (
 	keyMaxUploadBytes  = "file.max_upload_bytes"
@@ -24,6 +31,12 @@ const (
 // denied types, and file.s3.presigned_upload, which the check presigned_mode_unavailable holds
 // false because the mode is not built (12 3.3). file.s3.presign_ttl enters with the presigned
 // mode, its consumer (02 "13" item 5).
+//
+// The keys of the scan pass (M3-04) follow: file.scan.* without file.scan.pending_alert_after,
+// which enters with the status component of M7-09, and file.sniff_bytes. The cross-check
+// scan_stream_limit holds file.max_upload_bytes within the mirror file.scan.clamd_stream_max_bytes
+// while the scan is required, the cross-check clamd_address_unix the address to a Unix socket
+// (19 SEC-TLS-5).
 //
 // voice.max_duration is here because getInstance reports it as a client limit (M1-46) before the
 // voice messages of M3 read it.
@@ -114,6 +127,51 @@ func filesConfigKeys() []config.Key {
 		{
 			Name: keyPresignedUpload, Kind: config.KindBool, Default: defaultFalse,
 			Doc:     "Allow the upload mode presigned; it is not built, so the check presigned_mode_unavailable refuses true.",
+			Chapter: chapter12,
+		},
+		{
+			Name: keyScanMode, Kind: config.KindEnum, Default: "required", Enum: []string{"required", "off"},
+			Doc:     "Virus scan of uploads: required keeps every file undeliverable until clamd checked it (fail closed), off marks files skipped.",
+			Chapter: chapter12,
+		},
+		{
+			Name: keyClamdAddress, Kind: config.KindString, Default: "unix:///run/clamav/clamd.sock",
+			Doc:     "Unix socket of clamd as unix:// followed by an absolute path; no other transport is accepted.",
+			Chapter: chapter12,
+		},
+		{
+			Name: "file.scan.chunk_bytes", Kind: config.KindInt, Default: "65536", Min: "1", Max: "2147483647",
+			Doc:     "Largest chunk of an INSTREAM to clamd, and the bound of its reply.",
+			Chapter: chapter12,
+		},
+		{
+			Name: "file.scan.timeout", Kind: config.KindDuration, Default: "120s", Min: "1s",
+			Doc:     "Deadline of the read pass with the scan of one file.",
+			Chapter: chapter12,
+		},
+		{
+			Name: "file.scan.max_concurrent", Kind: config.KindInt, Default: "4", Min: "1",
+			Doc:     "Scans that one worker process runs at the same time.",
+			Chapter: chapter12,
+		},
+		{
+			Name: "file.scan.retry_backoff_cap", Kind: config.KindDuration, Default: "5m", Min: "1s",
+			Doc:     "Longest pause between two attempts to scan a file while clamd is not reachable.",
+			Chapter: chapter12,
+		},
+		{
+			Name: "file.scan.health_interval", Kind: config.KindDuration, Default: "30s", Min: "1s",
+			Doc:     "Interval of the PING to clamd, the first pause of a retried scan and the deadline of a PING.",
+			Chapter: chapter12,
+		},
+		{
+			Name: keyClamdStreamMaxByte, Kind: config.KindInt, Default: "104857600", Min: "1",
+			Doc:     "Mirror of the clamd option StreamMaxLength; the server does not start when file.max_upload_bytes is larger while the scan is required.",
+			Chapter: chapter12,
+		},
+		{
+			Name: "file.sniff_bytes", Kind: config.KindInt, Default: "1048576", Min: "1",
+			Doc:     "Bytes at the start of a file the type detection reads.",
 			Chapter: chapter12,
 		},
 		{

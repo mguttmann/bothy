@@ -12,21 +12,26 @@ import (
 	"time"
 
 	"github.com/OWNER/bothy/services/server/internal/chat"
+	"github.com/OWNER/bothy/services/server/internal/files"
 	fileschannels "github.com/OWNER/bothy/services/server/internal/files/adapters/channels"
+	filesclamd "github.com/OWNER/bothy/services/server/internal/files/adapters/clamd"
 	filesfs "github.com/OWNER/bothy/services/server/internal/files/adapters/fs"
 	fileshttp "github.com/OWNER/bothy/services/server/internal/files/adapters/httpapi"
+	filesjobs "github.com/OWNER/bothy/services/server/internal/files/adapters/jobs"
 	filesmimetype "github.com/OWNER/bothy/services/server/internal/files/adapters/mimetype"
 	filesmetrics "github.com/OWNER/bothy/services/server/internal/files/adapters/otelmetrics"
 	filespg "github.com/OWNER/bothy/services/server/internal/files/adapters/postgres"
 	filess3 "github.com/OWNER/bothy/services/server/internal/files/adapters/s3"
 	filesunicode "github.com/OWNER/bothy/services/server/internal/files/adapters/unicode"
 	filesapp "github.com/OWNER/bothy/services/server/internal/files/app"
+	"github.com/OWNER/bothy/services/server/internal/kernel/auditing"
 	"github.com/OWNER/bothy/services/server/internal/kernel/authorize"
 	"github.com/OWNER/bothy/services/server/internal/kernel/clock"
 	"github.com/OWNER/bothy/services/server/internal/kernel/eventlog"
 	"github.com/OWNER/bothy/services/server/internal/kernel/txn"
 	"github.com/OWNER/bothy/services/server/internal/platform/config"
 	"github.com/OWNER/bothy/services/server/internal/platform/egress"
+	"github.com/OWNER/bothy/services/server/internal/platform/jobs"
 	"github.com/OWNER/bothy/services/server/internal/platform/pg"
 )
 
@@ -191,19 +196,32 @@ func FilesConfig(v *config.Values) (filesapp.Config, error) {
 }
 
 // Files is the files module of the process (M3-03): the upload use cases over the object store of
-// the driver and their REST handlers.
+// the driver and their REST handlers; in the roles worker and all also the scan pass and its
+// health monitor (M3-04, EnableScan).
 type Files struct {
 	// Service implements files.Uploads and files.Files.
 	Service *filesapp.Service
 	// Handlers are the REST handlers.
 	Handlers *fileshttp.Files
+	// Queue inserts files.scan; BindJobs gives it the inserter of the job runtime.
+	Queue *filesjobs.Queue
+	// Pass is the scan pass and Health its monitor; nil until EnableScan (role api).
+	Pass   *filesapp.ScanPass
+	Health *filesapp.ScanHealth
 	// store is the object store; Close releases it.
 	store filesapp.ObjectStore
+	// The collaborators the scan pass shares with the upload use cases.
+	repo        *filespg.Repository
+	uow         txn.UnitOfWork
+	events      eventlog.Appender
+	channels    filesapp.ChannelLocator
+	scanMetrics filesapp.ScanMetrics
 }
 
 // FilesWrites are the write ports of other modules the files module receives: the appender of
-// sync for file.updated, and the metrics (nil means bothy.file.upload.size of
-// files/adapters/otelmetrics on the global meter provider of platform/otel).
+// sync for file.updated, and the metrics (nil means the instruments of files/adapters/otelmetrics
+// on the global meter provider of platform/otel; a Metrics that also implements
+// filesapp.ScanMetrics records the scan signals, any other records none).
 type FilesWrites struct {
 	Events  eventlog.Appender
 	Metrics filesapp.Metrics
@@ -227,7 +245,10 @@ func NewFiles(cfg filesapp.Config, driver string, store filesapp.ObjectStore, po
 		}
 		w.Metrics = m
 	}
+	scanMetrics, _ := w.Metrics.(filesapp.ScanMetrics)
 	repo := filespg.NewRepository(pool)
+	queue := &filesjobs.Queue{}
+	channels := fileschannels.Locator{Structure: structure}
 	var parts filesapp.PartStore
 	var free filesapp.FreeSpace
 	switch driver {
@@ -242,13 +263,103 @@ func NewFiles(cfg filesapp.Config, driver string, store filesapp.ObjectStore, po
 		return nil, errors.New("config: file.storage.driver: unknown driver")
 	}
 	svc, err := filesapp.New(cfg, filesapp.Deps{
-		Repo: repo, Parts: parts, UoW: uow, Authorizer: az, Events: w.Events, Channels: fileschannels.Locator{Structure: structure},
-		Names: filesunicode.Normalizer{}, Types: filesmimetype.Extensions{}, FreeSpace: free, Metrics: w.Metrics, Clock: clk, Log: log,
+		Repo: repo, Parts: parts, UoW: uow, Authorizer: az, Events: w.Events, Channels: channels,
+		Names: filesunicode.Normalizer{}, Types: filesmimetype.Extensions{}, FreeSpace: free, ScanQueue: queue, Metrics: w.Metrics,
+		Clock: clk, Log: log,
 	})
 	if err != nil {
 		return nil, err
 	}
-	return &Files{Service: svc, Handlers: fileshttp.New(svc, svc), store: store}, nil
+	return &Files{Service: svc, Handlers: fileshttp.New(svc, svc), Queue: queue, store: store, repo: repo, uow: uow, events: w.Events,
+		channels: channels, scanMetrics: scanMetrics}, nil
+}
+
+// ScanConfigs binds the keys of the scan pass (file.scan.mode, file.scan.timeout,
+// file.scan.health_interval, file.scan.retry_backoff_cap, file.sniff_bytes,
+// file.denied_mime_types) and of the clamd client (file.scan.clamd_address,
+// file.scan.chunk_bytes, file.scan.timeout, file.scan.max_concurrent). The error names the key
+// whose binding failed, never a value.
+func ScanConfigs(v *config.Values) (filesapp.ScanConfig, filesclamd.Config, error) {
+	var c filesapp.ScanConfig
+	if err := config.Bind(v, &c); err != nil {
+		return filesapp.ScanConfig{}, filesclamd.Config{}, err
+	}
+	var cc filesclamd.Config
+	if err := config.Bind(v, &cc); err != nil {
+		return filesapp.ScanConfig{}, filesclamd.Config{}, err
+	}
+	return c, cc, nil
+}
+
+// EnableScan builds the scan pass and its health monitor (roles worker and all, M3-04): the clamd
+// client of cc with file.scan.mode = required (none with off), the type detection of
+// adapters/mimetype, the audit recorder for the malware entry, the clock (nil means
+// clock.System()) and log (nil means slog.Default()). It opens no connection. Errors: the
+// client refuses cc, or the pass refuses cfg.
+func (f *Files) EnableScan(cfg filesapp.ScanConfig, cc filesclamd.Config, audit auditing.Recorder, clk clock.Clock, log *slog.Logger) error {
+	var scanner filesapp.Scanner
+	if cfg.Mode == filesapp.ScanModeRequired {
+		c, err := filesclamd.New(cc)
+		if err != nil {
+			return fmt.Errorf("config: %w", err)
+		}
+		scanner = c
+	}
+	pass, err := filesapp.NewScanPass(cfg, filesapp.ScanDeps{
+		Repo: f.repo, Scans: f.repo, Store: f.store, UoW: f.uow, Events: f.events, Audit: audit, Channels: f.channels,
+		Scanner: scanner, Types: filesmimetype.Detector{}, Queue: f.Queue, Metrics: f.scanMetrics, Clock: clk, Log: log,
+	})
+	if err != nil {
+		return err
+	}
+	health, err := filesapp.NewScanHealth(cfg, scanner, f.repo, f.scanMetrics, clk, log)
+	if err != nil {
+		return err
+	}
+	f.Pass, f.Health = pass, health
+	return nil
+}
+
+// ScanRunner returns the use case of files.scan for the job registry: the pass in a role that
+// runs jobs, nil otherwise (the api role only inserts the job).
+func (f *Files) ScanRunner() filesjobs.Runner {
+	if f == nil || f.Pass == nil {
+		return nil
+	}
+	return f.Pass
+}
+
+// ScannerHealth returns the health of the virus scanner as this worker sees it (12 5.3); nil in
+// the role api. M7-09 reads it for the status component.
+func (f *Files) ScannerHealth() files.ScannerHealth {
+	if f == nil || f.Health == nil {
+		return nil
+	}
+	return f.Health
+}
+
+// BindJobs gives the scan queue the inserter of the job runtime of the role; nil-safe.
+func (f *Files) BindJobs(ins jobs.Inserter) {
+	if f != nil {
+		f.Queue.Bind(ins)
+	}
+}
+
+// scanStreamLimit is the cross-check scan_stream_limit (12 5.4, ADR 0033 Confirmation): with
+// file.scan.mode = required, file.max_upload_bytes must not exceed file.scan.clamd_stream_max_bytes,
+// the mirror of the clamd option StreamMaxLength, else clamd would cut every large upload off.
+func scanStreamLimit(v *config.Values) error {
+	if v.String(keyScanMode) != filesapp.ScanModeRequired || v.Int(keyMaxUploadBytes) <= v.Int(keyClamdStreamMaxByte) {
+		return nil
+	}
+	return errors.New("file.max_upload_bytes must not exceed file.scan.clamd_stream_max_bytes when file.scan.mode is required")
+}
+
+// clamdAddressUnix is the cross-check clamd_address_unix (19 SEC-TLS-5): file.scan.clamd_address
+// is unix:// followed by an absolute path, the rule of the clamd client (clamd.SocketPath).
+func clamdAddressUnix(v *config.Values) error {
+	_, err := filesclamd.SocketPath(v.String(keyClamdAddress))
+	return err
 }
 
 // Close releases the object store (the directory handle of the driver fs); nil-safe.

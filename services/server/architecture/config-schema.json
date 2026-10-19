@@ -1592,6 +1592,117 @@
       "doc": "Path-style requests on the endpoint instead of virtual-hosted requests on <bucket>.<endpoint host>."
     },
     {
+      "name": "file.scan.chunk_bytes",
+      "env": "BOTHY_FILE__SCAN__CHUNK_BYTES",
+      "kind": "int",
+      "default": "65536",
+      "required": false,
+      "enum": [],
+      "min": "1",
+      "max": "2147483647",
+      "chapter": "12-dateien.md",
+      "doc": "Largest chunk of an INSTREAM to clamd, and the bound of its reply."
+    },
+    {
+      "name": "file.scan.clamd_address",
+      "env": "BOTHY_FILE__SCAN__CLAMD_ADDRESS",
+      "kind": "string",
+      "default": "unix:///run/clamav/clamd.sock",
+      "required": false,
+      "enum": [],
+      "min": "",
+      "max": "",
+      "chapter": "12-dateien.md",
+      "doc": "Unix socket of clamd as unix:// followed by an absolute path; no other transport is accepted."
+    },
+    {
+      "name": "file.scan.clamd_stream_max_bytes",
+      "env": "BOTHY_FILE__SCAN__CLAMD_STREAM_MAX_BYTES",
+      "kind": "int",
+      "default": "104857600",
+      "required": false,
+      "enum": [],
+      "min": "1",
+      "max": "",
+      "chapter": "12-dateien.md",
+      "doc": "Mirror of the clamd option StreamMaxLength; the server does not start when file.max_upload_bytes is larger while the scan is required."
+    },
+    {
+      "name": "file.scan.health_interval",
+      "env": "BOTHY_FILE__SCAN__HEALTH_INTERVAL",
+      "kind": "duration",
+      "default": "30s",
+      "required": false,
+      "enum": [],
+      "min": "1s",
+      "max": "",
+      "chapter": "12-dateien.md",
+      "doc": "Interval of the PING to clamd, the first pause of a retried scan and the deadline of a PING."
+    },
+    {
+      "name": "file.scan.max_concurrent",
+      "env": "BOTHY_FILE__SCAN__MAX_CONCURRENT",
+      "kind": "int",
+      "default": "4",
+      "required": false,
+      "enum": [],
+      "min": "1",
+      "max": "",
+      "chapter": "12-dateien.md",
+      "doc": "Scans that one worker process runs at the same time."
+    },
+    {
+      "name": "file.scan.mode",
+      "env": "BOTHY_FILE__SCAN__MODE",
+      "kind": "enum",
+      "default": "required",
+      "required": false,
+      "enum": [
+        "required",
+        "off"
+      ],
+      "min": "",
+      "max": "",
+      "chapter": "12-dateien.md",
+      "doc": "Virus scan of uploads: required keeps every file undeliverable until clamd checked it (fail closed), off marks files skipped."
+    },
+    {
+      "name": "file.scan.retry_backoff_cap",
+      "env": "BOTHY_FILE__SCAN__RETRY_BACKOFF_CAP",
+      "kind": "duration",
+      "default": "5m",
+      "required": false,
+      "enum": [],
+      "min": "1s",
+      "max": "",
+      "chapter": "12-dateien.md",
+      "doc": "Longest pause between two attempts to scan a file while clamd is not reachable."
+    },
+    {
+      "name": "file.scan.timeout",
+      "env": "BOTHY_FILE__SCAN__TIMEOUT",
+      "kind": "duration",
+      "default": "120s",
+      "required": false,
+      "enum": [],
+      "min": "1s",
+      "max": "",
+      "chapter": "12-dateien.md",
+      "doc": "Deadline of the read pass with the scan of one file."
+    },
+    {
+      "name": "file.sniff_bytes",
+      "env": "BOTHY_FILE__SNIFF_BYTES",
+      "kind": "int",
+      "default": "1048576",
+      "required": false,
+      "enum": [],
+      "min": "1",
+      "max": "",
+      "chapter": "12-dateien.md",
+      "doc": "Bytes at the start of a file the type detection reads."
+    },
+    {
       "name": "file.storage.driver",
       "env": "BOTHY_FILE__STORAGE__DRIVER",
       "kind": "enum",
