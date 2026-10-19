@@ -124,6 +124,7 @@ func TestConfigSchemaBuilds(t *testing.T) {
 			Chapter: "09-agents.md"},
 		"channel.history_backfill_limit_default": {Kind: config.KindInt, Default: "20", Min: "0", Chapter: "03-data-model.md"},
 		"channel.history_backfill_limit_max":     {Kind: config.KindInt, Default: "200", Min: "0", Chapter: "03-data-model.md"},
+		"channel.prompt_max_bytes":               {Kind: config.KindInt, Default: "32768", Min: "1", Chapter: "03-data-model.md"},
 		"egress.allowed_hosts":                   {Kind: config.KindStringList, Default: "", Chapter: "19-security.md"},
 		"egress.timeout":                         {Kind: config.KindDuration, Default: "15s", Min: "1ms", Chapter: "19-security.md"},
 		"egress.max_response_bytes":              {Kind: config.KindInt, Default: "1048576", Min: "1", Chapter: "19-security.md"},

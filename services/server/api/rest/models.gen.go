@@ -15853,6 +15853,12 @@ type ArchiveChannelParams struct {
 	IdempotencyKey *IdempotencyKey `json:"Idempotency-Key,omitempty"`
 }
 
+// PutChannelBehaviorParams defines parameters for PutChannelBehavior.
+type PutChannelBehaviorParams struct {
+	// IfMatch ETag of the version the change is based on, e.g. `"7"`. Mismatch gives 412 `version_conflict`.
+	IfMatch IfMatchRequired `json:"If-Match"`
+}
+
 // MoveChannelParams defines parameters for MoveChannel.
 type MoveChannelParams struct {
 	// IdempotencyKey UUIDv7 chosen by the client per logical operation. A repeat with the same request returns the stored response; a different request gives 422 `idempotency_key_reuse`; a repeat while the first is running gives 409 `request_in_progress`. Kept for `sync.idempotency_key_ttl`.
@@ -16469,6 +16475,9 @@ type UpdateChannelJSONRequestBody = ChannelUpdate
 
 // ArchiveChannelJSONRequestBody defines body for ArchiveChannel for application/json ContentType.
 type ArchiveChannelJSONRequestBody = ReasonBody
+
+// PutChannelBehaviorJSONRequestBody defines body for PutChannelBehavior for application/json ContentType.
+type PutChannelBehaviorJSONRequestBody = ChannelBehaviorPut
 
 // PutChannelDraftJSONRequestBody defines body for PutChannelDraft for application/json ContentType.
 type PutChannelDraftJSONRequestBody = DraftPut

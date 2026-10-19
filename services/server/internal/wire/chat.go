@@ -6,6 +6,7 @@ import (
 	"errors"
 
 	"github.com/OWNER/bothy/services/server/internal/authz"
+	authztelemetry "github.com/OWNER/bothy/services/server/internal/authz/adapters/telemetry"
 	"github.com/OWNER/bothy/services/server/internal/chat/adapters/authzsource"
 	chathttp "github.com/OWNER/bothy/services/server/internal/chat/adapters/httpapi"
 	chatpg "github.com/OWNER/bothy/services/server/internal/chat/adapters/postgres"
@@ -60,8 +61,8 @@ type ChatWrites struct {
 }
 
 // Chat is the chat module of the process (M1-52 to M1-55): the space, sidebar, channel, forum tag
-// and operator use cases of chat.Structure, the thread use cases of chat.Threads and the REST
-// handlers of their twenty-six operations.
+// and operator use cases of chat.Structure, the thread use cases of chat.Threads, the behaviour
+// use cases of chat.AgentConfig (M2-02) and the REST handlers of their operations.
 type Chat struct {
 	// Service implements chat.Structure and chat.Threads.
 	Service *chatapp.Service
@@ -71,14 +72,18 @@ type Chat struct {
 	ChannelHandlers *chathttp.Channels
 	// ThreadHandlers are the REST handlers of threads (M1-55).
 	ThreadHandlers *chathttp.Threads
+	// BehaviorHandlers are the REST handlers of channel behaviour and agent configuration
+	// (M2-02).
+	BehaviorHandlers *chathttp.Behavior
 }
 
 // NewChat builds the chat module over pool with the unit of work uow, the Authorizer az (also the
 // rights query of SpaceView), the recorder, appender, rights hook and principal directory of w,
 // the agent policy source policies (the agents rows of M1-54 and
 // the billing mode of a thread operator; nil means the source of agents, NewAgentPolicySource)
-// and the clock (nil means clock.System()). It opens no connection. Errors: a missing
-// collaborator or a limit the use cases refuse.
+// and the clock (nil means clock.System()); a filter mismatch of listServedChannels is counted in
+// bothy.authz.errors on the global meter provider of platform/otel (M2-02). It opens no
+// connection. Errors: a missing collaborator, a limit the use cases refuse or the counter.
 func NewChat(cfg chatapp.Config, pool *pg.Pool, uow txn.UnitOfWork, az authorize.Authorizer, rights authz.RightsQuery,
 	w ChatWrites, policies authz.AgentPolicySource, clk clock.Clock) (*Chat, error) {
 	if az == nil || rights == nil || w.Directory == nil {
@@ -87,19 +92,26 @@ func NewChat(cfg chatapp.Config, pool *pg.Pool, uow txn.UnitOfWork, az authorize
 	if policies == nil {
 		policies = NewAgentPolicySource(pool)
 	}
+	counter, err := authztelemetry.NewErrorCounter(nil)
+	if err != nil {
+		return nil, err
+	}
+	repo := chatpg.NewRepository(pool)
 	svc, err := chatapp.New(cfg, chatapp.Deps{
-		Store: chatpg.NewRepository(pool), UoW: uow, Authorizer: az, Rights: rights, Audit: w.Audit, Events: w.Events,
+		Store: repo, UoW: uow, Authorizer: az, Rights: rights, Audit: w.Audit, Events: w.Events,
 		RightsChanges: w.Rights, Directory: w.Directory,
-		Policies: policies, Cursors: chathttp.Cursors{}, Clock: clk,
+		Policies: policies, Cursors: chathttp.Cursors{}, Clock: clk, Behaviors: repo, Errors: counter,
 	})
 	if err != nil {
 		return nil, err
 	}
-	return &Chat{Service: svc, Handlers: chathttp.New(svc), ChannelHandlers: chathttp.NewChannels(svc), ThreadHandlers: chathttp.NewThreads(svc)}, nil
+	return &Chat{Service: svc, Handlers: chathttp.New(svc), ChannelHandlers: chathttp.NewChannels(svc), ThreadHandlers: chathttp.NewThreads(svc),
+		BehaviorHandlers: chathttp.NewBehavior(svc)}, nil
 }
 
 // fillHandlers sets the nil chat handlers of h to the ones c built: spaces and the sidebar
-// (M1-52), channels and forum tags (M1-53), threads (M1-55).
+// (M1-52), channels and forum tags (M1-53), threads (M1-55), behaviour and agent configuration
+// (M2-02).
 func (c *Chat) fillHandlers(h *Handlers) {
 	if h.Spaces == nil {
 		h.Spaces = c.Handlers
@@ -109,5 +121,8 @@ func (c *Chat) fillHandlers(h *Handlers) {
 	}
 	if h.Threads == nil {
 		h.Threads = c.ThreadHandlers
+	}
+	if h.Behavior == nil {
+		h.Behavior = c.BehaviorHandlers
 	}
 }

@@ -230,7 +230,7 @@ Source: [03-data-model.md](../spec/03-data-model.md), section 9.
 | `agent.heartbeat_persist_interval` | `BOTHY_AGENT__HEARTBEAT_PERSIST_INTERVAL` | Server |  | `60s` | heartbeat fields are stored at most this often | planned (M2) |
 | `channel.history_backfill_limit_default` | `BOTHY_CHANNEL__HISTORY_BACKFILL_LIMIT_DEFAULT` | Server | int | `20` | default for `history_backfill_limit` | active |
 | `channel.history_backfill_limit_max` | `BOTHY_CHANNEL__HISTORY_BACKFILL_LIMIT_MAX` | Server | int | `200` | upper limit for `history_backfill_limit` | active |
-| `channel.prompt_max_bytes` | `BOTHY_CHANNEL__PROMPT_MAX_BYTES` | Server |  | `32768` | size of a channel prompt | planned (M2) |
+| `channel.prompt_max_bytes` | `BOTHY_CHANNEL__PROMPT_MAX_BYTES` | Server | int | `32768` | size of a channel prompt | active |
 | `thread.title_max_chars` | `BOTHY_THREAD__TITLE_MAX_CHARS` | Server | int | `200` | length of a thread title | active |
 | `thread.max_tags` | `BOTHY_THREAD__MAX_TAGS` | Server | int | `5` | forum tags per thread | active |
 | `message.max_content_bytes` | `BOTHY_MESSAGE__MAX_CONTENT_BYTES` | Server | int | `262144` | size of a message (long answers without splitting) | active |
