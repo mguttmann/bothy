@@ -11,6 +11,17 @@ documented in this file. The format is based on
 
 ### Added
 
+- Trigger decision as pure functions (M2-04): the package `internal/runs/domain` holds `Decide`
+  (steps 1 to 6 of 09 3.4 and the voice rule of 09 13: no trigger, a rejection at acceptance with
+  a code of 09 3.5, an invocation of the operator or a guest in the thread or a new auto thread, or
+  a follow-up to the candidate's active run), `DecideCommand` (09 10.4: control commands at once,
+  `run_active` for a model command during a run) and `Settle` (step 7: the verdict of
+  `agent.invoke` or `run.followup.create` to `trigger_state` and `trigger_state_reason`, with the
+  mapping of `agent_not_reachable`, `level_insufficient` and `no_grant`). No I/O, no clock, no
+  `authorize`; invalid input is an `internal_error` that never invokes. Table tests for AG-01 to
+  AG-06 and the guest rule, a switch matrix, a test that reads the rejection table of 09 3.5 and a
+  fuzz test. Nothing applies the decision yet (M2-05).
+
 - Channel behaviour and agent configuration (M2-02): `getChannelBehavior` and `putChannelBehavior`
   (`manage`; the write with fresh step-up, `If-Match` on `settings_version`, audit of allow and
   deny) for the mention switches, `auto_thread`, `history_backfill_limit`, the channel prompt and
