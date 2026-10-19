@@ -16,6 +16,8 @@ import '../devices/waiting_devices.dart';
 import '../grants/grants_list.dart';
 import '../groups/group_detail.dart';
 import '../groups/groups_list.dart';
+import '../hosts/host_page.dart';
+import '../hosts/hosts_list.dart';
 import '../people/people_list.dart';
 import '../people/person_detail.dart';
 import 'admin_routes.dart';
@@ -28,12 +30,15 @@ String adminSectionLabel(AppLocalizations l, AdminSection section) =>
       AdminSection.grants => l.adminNavGrants,
       AdminSection.devices => l.adminNavDevices,
       AdminSection.audit => l.adminNavAudit,
+      AdminSection.hosts => l.adminNavHosts,
       // Entries without a screen are not listed (AdminSection.listed).
       _ => section.segment,
     };
 
 /// The administration at [location]: the entries of [AdminSection.listed] (an entry without a
 /// screen is not listed) with the count of waiting devices, and the screen of the location.
+/// "Hosts" is listed when `getMe.is_owner` is true (brief M4-37 fixed requirement 11: A8 is
+/// for owners; `listHosts` itself answers non-owners with their own hosts, so it is no gate).
 ///
 /// The host maps locations to its paths: [onNavigate] receives the location to open (the app
 /// goes to `/admin` plus [AdminLocation.path]); [onExit] leaves the administration. The count
@@ -90,11 +95,22 @@ class AdminShell extends StatefulWidget {
 
 class _AdminShellState extends State<AdminShell> {
   int? _waiting;
+  bool _owner = false;
 
   @override
   void initState() {
     super.initState();
     _count();
+    _ownerFlag();
+  }
+
+  Future<void> _ownerFlag() async {
+    try {
+      final owner = await widget.repository.callerIsOwner();
+      if (mounted) setState(() => _owner = owner);
+    } on Object {
+      // Without an answer the owner entries stay hidden.
+    }
   }
 
   Future<void> _count() async {
@@ -154,6 +170,23 @@ class _AdminShellState extends State<AdminShell> {
         clock: widget.clock,
         saveTarget: widget.saveTarget,
       ),
+      AdminSection.hosts when id != null => HostDetail(
+        key: ValueKey('admin.host.$id'),
+        repository: r,
+        hostId: id,
+        timeZone: widget.timeZone,
+        clock: widget.clock,
+        onBack: () =>
+            widget.onNavigate(const AdminLocation(AdminSection.hosts)),
+        onChanged: changed,
+      ),
+      AdminSection.hosts => HostsList(
+        repository: r,
+        clock: widget.clock,
+        onOpen: (h) =>
+            widget.onNavigate(AdminLocation(AdminSection.hosts, id: h)),
+        onChanged: changed,
+      ),
       AdminSection.devices => WaitingDevicesView(
         repository: r,
         timeZone: widget.timeZone,
@@ -209,19 +242,20 @@ class _AdminShellState extends State<AdminShell> {
                     ),
                   ),
                   for (final s in AdminSection.listed)
-                    ListTile(
-                      key: ValueKey('admin.nav.${s.segment}'),
-                      selected: s == widget.location.section,
-                      selectedColor: colors.textPrimary,
-                      selectedTileColor: colors.accentSubtle,
-                      textColor: colors.textSecondary,
-                      title: Text(
-                        s == AdminSection.devices && waiting != null
-                            ? l.adminNavDevicesWaiting(waiting)
-                            : adminSectionLabel(l, s),
+                    if (s != AdminSection.hosts || _owner)
+                      ListTile(
+                        key: ValueKey('admin.nav.${s.segment}'),
+                        selected: s == widget.location.section,
+                        selectedColor: colors.textPrimary,
+                        selectedTileColor: colors.accentSubtle,
+                        textColor: colors.textSecondary,
+                        title: Text(
+                          s == AdminSection.devices && waiting != null
+                              ? l.adminNavDevicesWaiting(waiting)
+                              : adminSectionLabel(l, s),
+                        ),
+                        onTap: () => widget.onNavigate(AdminLocation(s)),
                       ),
-                      onTap: () => widget.onNavigate(AdminLocation(s)),
-                    ),
                 ],
               ),
             ),

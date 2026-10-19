@@ -14,6 +14,7 @@ import 'package:dio/dio.dart';
 
 import '../audit/audit_repository.dart';
 import 'access_repository.dart';
+import 'hosts_repository.dart';
 import 'self_repository.dart';
 
 /// The state of a person (`UserStatus`).
@@ -283,7 +284,8 @@ final class WaitingDevice {
 /// The administration's calls; every changing one carries the [purpose] text that the step-up
 /// dialog shows when the server answers `401 step_up_required` (05 2.4, 08 6.2). The
 /// repository never asks for a step-up on its own (fixed requirement 10). It also holds the
-/// grant calls of [AccessRepository] (M4-27), so a host passes one repository to the shell.
+/// grant calls of [AccessRepository] (M4-27) and the host calls of [HostsRepository] (M4-37),
+/// so an app passes one repository to the shell.
 ///
 /// The audit log of A6 is part of it ([AuditRepository], brief M4-29), so the shell hands one
 /// repository to every screen.
@@ -291,7 +293,7 @@ final class WaitingDevice {
 /// Errors: [SelfActionFailed] with the server's problem (null without an answer),
 /// [StepUpCancelled] when the person cancels the step-up.
 abstract interface class AdminRepository
-    implements AccessRepository, AuditRepository {
+    implements AccessRepository, AuditRepository, HostsRepository {
   /// One page of people; [query] and [status] are request parameters of `listUsers`.
   Future<AdminPage<AdminPerson>> people({
     String? query,
@@ -468,11 +470,103 @@ final class ApiAdminRepository implements AdminRepository {
   /// Creates the repository.
   ApiAdminRepository(this._api, {required String Function() newIdempotencyKey})
     : _newKey = newIdempotencyKey,
-      _access = ApiAccessRepository(_api, newIdempotencyKey: newIdempotencyKey);
+      _access = ApiAccessRepository(_api, newIdempotencyKey: newIdempotencyKey),
+      _hosts = ApiHostsRepository(_api, newIdempotencyKey: newIdempotencyKey);
 
   final ApiClient _api;
   final String Function() _newKey;
   final ApiAccessRepository _access;
+  final ApiHostsRepository _hosts;
+
+  @override
+  String get serverOrigin => _hosts.serverOrigin;
+
+  @override
+  Future<bool> callerIsOwner() => _hosts.callerIsOwner();
+
+  @override
+  Future<List<AdminHost>> hosts() => _hosts.hosts();
+
+  @override
+  Future<AdminHost> host(String hostId) => _hosts.host(hostId);
+
+  @override
+  Future<HostPairingCodeInfo> createHost({
+    required String name,
+    String? assigneeId,
+    required String reason,
+    required String purpose,
+  }) => _hosts.createHost(
+    name: name,
+    assigneeId: assigneeId,
+    reason: reason,
+    purpose: purpose,
+  );
+
+  @override
+  Future<HostPairingCodeInfo> newPairingCode(
+    String hostId, {
+    required String reason,
+    required String purpose,
+  }) => _hosts.newPairingCode(hostId, reason: reason, purpose: purpose);
+
+  @override
+  Future<AdminHost> confirmHost(
+    AdminHost host,
+    HostConfirmRequest request, {
+    required String purpose,
+  }) => _hosts.confirmHost(host, request, purpose: purpose);
+
+  @override
+  Future<AdminHost> updateHost(
+    AdminHost host, {
+    String? assigneeId,
+    bool clearAssignee = false,
+    List<HostAssignment> add = const [],
+    List<String> revoke = const [],
+    required String reason,
+    required String purpose,
+  }) => _hosts.updateHost(
+    host,
+    assigneeId: assigneeId,
+    clearAssignee: clearAssignee,
+    add: add,
+    revoke: revoke,
+    reason: reason,
+    purpose: purpose,
+  );
+
+  @override
+  Future<AdminHost> setLlmLogin(
+    AdminHost host,
+    HostLlmLogin login, {
+    String? holderId,
+    required String reason,
+    required String purpose,
+  }) => _hosts.setLlmLogin(
+    host,
+    login,
+    holderId: holderId,
+    reason: reason,
+    purpose: purpose,
+  );
+
+  @override
+  Future<AdminHost> setHostState(
+    AdminHost host,
+    HostStateRequest state, {
+    required String reason,
+    required String purpose,
+  }) => _hosts.setHostState(host, state, reason: reason, purpose: purpose);
+
+  @override
+  Future<Map<String, String>> assignmentHistory(
+    String hostId, {
+    required String purpose,
+  }) => _hosts.assignmentHistory(hostId, purpose: purpose);
+
+  @override
+  Future<int> openSessions(String hostId) => _hosts.openSessions(hostId);
 
   @override
   Future<List<AdminTarget>> targets() => _access.targets();
@@ -508,7 +602,6 @@ final class ApiAdminRepository implements AdminRepository {
   @override
   Future<ViewAsResult> viewAs(String userId, {required String purpose}) =>
       _access.viewAs(userId, purpose: purpose);
-
   late final ApiAuditRepository _auditLog = ApiAuditRepository(_api);
 
   UsersApi get _users => _api.getUsersApi();

@@ -34,8 +34,8 @@ enum AccessLevel {
   final String wire;
 }
 
-/// A capability next to the level (07 2.3). `terminal` belongs to hosts (M4-37) and is not
-/// offered by the wizard of this package.
+/// A capability next to the level (07 2.3). `terminal` belongs to hosts and is the only
+/// capability of a host target (07 2.12; M4-37).
 enum AccessCapability {
   /// Approve actions of agents.
   approveActions('approve_actions'),
@@ -73,7 +73,7 @@ enum AdminSubjectKind {
   app,
 }
 
-/// Where a grant applies (`TargetKind` without `host`, which M4-37 adds).
+/// Where a grant applies (`TargetKind`).
 enum AdminTargetKind {
   /// The whole instance.
   instance,
@@ -83,9 +83,12 @@ enum AdminTargetKind {
 
   /// One channel.
   channel,
+
+  /// A host of the terminal: no level, only the capability `terminal` (07 2.12; M4-37).
+  host,
 }
 
-/// A target of a grant as the server lists it: the instance, a space or a channel.
+/// A target of a grant as the server lists it: the instance, a space, a channel or a host.
 final class AdminTarget {
   /// Creates the target; [id] is null exactly for the instance.
   const AdminTarget(this.kind, {this.id, this.name = '', this.spaceName});
@@ -96,10 +99,10 @@ final class AdminTarget {
   /// The kind.
   final AdminTargetKind kind;
 
-  /// The space or channel ID, null for the instance.
+  /// The space, channel or host ID, null for the instance.
   final String? id;
 
-  /// The name of the space or channel (empty for the instance).
+  /// The name of the space, channel or host (empty for the instance).
   final String name;
 
   /// The name of the channel's space, or null.
@@ -183,7 +186,8 @@ final class GrantRequest {
   /// Where.
   final AdminTarget target;
 
-  /// The level (never [AccessLevel.none]).
+  /// The level; [AccessLevel.none] exactly for a host target, whose request carries no level
+  /// (07 2.12).
   final AccessLevel level;
 
   /// The capabilities.
@@ -348,7 +352,7 @@ final class AdminGrant {
   /// The principal or group ID.
   final String subjectId;
 
-  /// The target kind, or null for a kind this package does not show (a host).
+  /// The target kind, or null for a kind this build does not know.
   final AdminTargetKind? targetKind;
 
   /// The target ID, null for the instance.
@@ -801,11 +805,14 @@ final class ApiAccessRepository implements AccessRepository {
       ..subjectId = r.subjectId
       ..targetKind = _wireTarget(r.target.kind)
       ..targetId = r.target.id
-      ..level = switch (r.level) {
-        AccessLevel.read || AccessLevel.none => Level.read,
-        AccessLevel.write => Level.write,
-        AccessLevel.trigger => Level.trigger,
-      }
+      // A host has no level: the member must be absent (07 2.12, `GrantCreate`).
+      ..level = r.target.kind == AdminTargetKind.host
+          ? null
+          : switch (r.level) {
+              AccessLevel.read || AccessLevel.none => Level.read,
+              AccessLevel.write => Level.write,
+              AccessLevel.trigger => Level.trigger,
+            }
       ..capabilities.replace([
         for (final c in AccessCapability.values)
           if (r.capabilities.contains(c)) _wireCapability(c),
@@ -818,12 +825,14 @@ final class ApiAccessRepository implements AccessRepository {
     AdminTargetKind.instance => TargetKind.instance,
     AdminTargetKind.space => TargetKind.space,
     AdminTargetKind.channel => TargetKind.channel,
+    AdminTargetKind.host => TargetKind.host,
   };
 
   static AdminTargetKind? _targetKind(TargetKind? kind) => switch (kind) {
     TargetKind.instance => AdminTargetKind.instance,
     TargetKind.space => AdminTargetKind.space,
     TargetKind.channel => AdminTargetKind.channel,
+    TargetKind.host => AdminTargetKind.host,
     _ => null,
   };
 

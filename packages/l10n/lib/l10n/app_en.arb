@@ -4654,5 +4654,755 @@
   "problemForbiddenSubjectKind": "Not allowed for agents or apps",
   "@problemForbiddenSubjectKind": {
     "description": "Text of forbidden with reason subject_kind_not_allowed (07 section 4.1)."
+  },
+  "adminNavHosts": "Hosts",
+  "@adminNavHosts": {
+    "description": "Navigation entry of screen A8 (01 section 5.2)."
+  },
+  "hostsAdd": "Add host",
+  "@hostsAdd": {
+    "description": "Button of the hosts list that opens the pairing wizard."
+  },
+  "hostsEmpty": "No hosts yet.",
+  "@hostsEmpty": {
+    "description": "Hosts list without entries."
+  },
+  "hostOwnersOnly": "Owners only",
+  "@hostOwnersOnly": {
+    "description": "Host without an assignee: only owners get a terminal (SR10)."
+  },
+  "hostStatePairing": "Pairing",
+  "@hostStatePairing": {
+    "description": "Host state pairing (24 section 3.1)."
+  },
+  "hostStateConfirming": "Waiting for confirmation",
+  "@hostStateConfirming": {
+    "description": "Host state confirming (24 section 3.1)."
+  },
+  "hostStateActive": "active",
+  "@hostStateActive": {
+    "description": "Host state active (24 section 3.1)."
+  },
+  "hostStateDisabled": "disabled",
+  "@hostStateDisabled": {
+    "description": "Host state disabled by an owner (24 section 3.1)."
+  },
+  "hostStateDuplicate": "disabled: a second connection used the same keys, only a new pairing helps",
+  "@hostStateDuplicate": {
+    "description": "Host disabled with duplicate_connection (24 section 3.4)."
+  },
+  "hostStateRetired": "retired",
+  "@hostStateRetired": {
+    "description": "Host state retired (24 section 3.1)."
+  },
+  "hostStateUnknown": "unknown",
+  "@hostStateUnknown": {
+    "description": "A host state this build does not know."
+  },
+  "hostConnected": "connected",
+  "@hostConnected": {
+    "description": "The control connection of the host is open."
+  },
+  "hostDisconnected": "disconnected",
+  "@hostDisconnected": {
+    "description": "The control connection of the host is closed."
+  },
+  "hostLastSeen": "last seen {when}",
+  "@hostLastSeen": {
+    "description": "When the host service was last seen.",
+    "placeholders": {
+      "when": {
+        "type": "String",
+        "example": "Sam"
+      }
+    }
+  },
+  "hostBack": "Back to the hosts",
+  "@hostBack": {
+    "description": "Back button of the host page."
+  },
+  "hostFieldAssignee": "Assignee",
+  "@hostFieldAssignee": {
+    "description": "Field label of the host page (01 A8)."
+  },
+  "hostFieldPlatform": "Platform",
+  "@hostFieldPlatform": {
+    "description": "Field label of the host page (01 A8)."
+  },
+  "hostFieldConnection": "Connection",
+  "@hostFieldConnection": {
+    "description": "Field label of the host page (01 A8)."
+  },
+  "hostFieldFingerprint": "Fingerprint",
+  "@hostFieldFingerprint": {
+    "description": "Field label of the host page (01 A8)."
+  },
+  "hostFieldLlmLogin": "LLM login",
+  "@hostFieldLlmLogin": {
+    "description": "Field label of the host page (01 A8)."
+  },
+  "hostFieldServerHost": "Server host",
+  "@hostFieldServerHost": {
+    "description": "Field label of the host page (01 A8; 24 section 2.3)."
+  },
+  "hostFieldChecks": "Checks",
+  "@hostFieldChecks": {
+    "description": "Field label of the check results (01 A8; 24 section 2.2)."
+  },
+  "hostFieldProfiles": "Profiles",
+  "@hostFieldProfiles": {
+    "description": "Field label of the host page (01 A8)."
+  },
+  "hostFieldGrants": "Access grants",
+  "@hostFieldGrants": {
+    "description": "Field label of the grants on the host (01 A8)."
+  },
+  "hostFieldSessionUsers": "Session users",
+  "@hostFieldSessionUsers": {
+    "description": "Field label of the session users (01 A8; 24 section 2.2)."
+  },
+  "hostFieldSessions": "Terminal sessions",
+  "@hostFieldSessions": {
+    "description": "Field label of the count of open sessions."
+  },
+  "hostPlatformValue": "{platform}, version {version}",
+  "@hostPlatformValue": {
+    "description": "Platform and version of the host service.",
+    "placeholders": {
+      "platform": {
+        "type": "String",
+        "example": "Sam"
+      },
+      "version": {
+        "type": "String",
+        "example": "Sam"
+      }
+    }
+  },
+  "hostNotReported": "Not reported yet",
+  "@hostNotReported": {
+    "description": "A value the host did not report yet."
+  },
+  "hostFingerprintValue": "{fingerprint}   Key generation {generation}",
+  "@hostFingerprintValue": {
+    "description": "Fingerprint in groups and the key generation (24 section 4.3).",
+    "placeholders": {
+      "fingerprint": {
+        "type": "String",
+        "example": "Sam"
+      },
+      "generation": {
+        "type": "int",
+        "example": "3"
+      }
+    }
+  },
+  "hostNoKeys": "No keys",
+  "@hostNoKeys": {
+    "description": "The host has no keys (before pairing, after re-pairing)."
+  },
+  "hostLlmNone": "None",
+  "@hostLlmNone": {
+    "description": "LLM login none (24 section 7.2)."
+  },
+  "hostLlmPersonal": "Personal",
+  "@hostLlmPersonal": {
+    "description": "LLM login personal (24 section 7.2)."
+  },
+  "hostLlmPersonalOf": "Personal of {name}",
+  "@hostLlmPersonalOf": {
+    "description": "LLM login personal with its holder.",
+    "placeholders": {
+      "name": {
+        "type": "String",
+        "example": "Sam"
+      }
+    }
+  },
+  "hostLlmOrganization": "Organization",
+  "@hostLlmOrganization": {
+    "description": "LLM login organization (24 section 7.2)."
+  },
+  "hostLlmI6Explained": "Personal: only this person may open a terminal here, not even other owners.",
+  "@hostLlmI6Explained": {
+    "description": "Explanation of I6 under the choice personal (24 section 7.3)."
+  },
+  "hostLlmHolder": "Holder of the login",
+  "@hostLlmHolder": {
+    "description": "Picker of the holder of a personal LLM login."
+  },
+  "hostLlmTitle": "LLM login on {name}",
+  "@hostLlmTitle": {
+    "description": "Title of the dialog that changes the LLM login.",
+    "placeholders": {
+      "name": {
+        "type": "String",
+        "example": "Sam"
+      }
+    }
+  },
+  "hostLlmBody": "A change to Personal or a new holder ends the terminal sessions of other people on this host.",
+  "@hostLlmBody": {
+    "description": "Body of the dialog that changes the LLM login (24 section 7.3 point 3)."
+  },
+  "hostLlmChanged": "The LLM login of {name} is changed.",
+  "@hostLlmChanged": {
+    "description": "Notice after the LLM login changed.",
+    "placeholders": {
+      "name": {
+        "type": "String",
+        "example": "Sam"
+      }
+    }
+  },
+  "hostServerHostQuestion": "Does the server run on this host?",
+  "@hostServerHostQuestion": {
+    "description": "Mandatory question of the confirmation (24 section 2.3)."
+  },
+  "hostYes": "Yes",
+  "@hostYes": {
+    "description": "Answer yes."
+  },
+  "hostNo": "No",
+  "@hostNo": {
+    "description": "Answer no."
+  },
+  "hostServerHostDeclared": "Declared: {answer}",
+  "@hostServerHostDeclared": {
+    "description": "The owner answer to the server host question.",
+    "placeholders": {
+      "answer": {
+        "type": "String",
+        "example": "Sam"
+      }
+    }
+  },
+  "hostServerHostReported": "Report of the host service: {answer}",
+  "@hostServerHostReported": {
+    "description": "What the host service reported (24 section 2.3).",
+    "placeholders": {
+      "answer": {
+        "type": "String",
+        "example": "Sam"
+      }
+    }
+  },
+  "hostDoctorOk": "{check} ok",
+  "@hostDoctorOk": {
+    "description": "A passed check, for example HD1 ok.",
+    "placeholders": {
+      "check": {
+        "type": "String",
+        "example": "Sam"
+      }
+    }
+  },
+  "hostDoctorFailed": "{check} failed: {code}",
+  "@hostDoctorFailed": {
+    "description": "A failed check with its code.",
+    "placeholders": {
+      "check": {
+        "type": "String",
+        "example": "Sam"
+      },
+      "code": {
+        "type": "String",
+        "example": "Sam"
+      }
+    }
+  },
+  "hostDoctorAssigned": "{osUser} (assigned to {name})",
+  "@hostDoctorAssigned": {
+    "description": "A named session user with the person of its valid assignment (24 section 2.2).",
+    "placeholders": {
+      "osUser": {
+        "type": "String",
+        "example": "Sam"
+      },
+      "name": {
+        "type": "String",
+        "example": "Sam"
+      }
+    }
+  },
+  "hostDoctorFormer": "{osUser} (formerly assigned to {name})",
+  "@hostDoctorFormer": {
+    "description": "A named former session user with the person of its ended assignment from the audit.",
+    "placeholders": {
+      "osUser": {
+        "type": "String",
+        "example": "Sam"
+      },
+      "name": {
+        "type": "String",
+        "example": "Sam"
+      }
+    }
+  },
+  "hostDoctorUnknown": "{osUser} (no assignment known)",
+  "@hostDoctorUnknown": {
+    "description": "A named session user without a known assignment.",
+    "placeholders": {
+      "osUser": {
+        "type": "String",
+        "example": "Sam"
+      }
+    }
+  },
+  "hostDoctorNone": "No check results yet.",
+  "@hostDoctorNone": {
+    "description": "The host reported no check results yet."
+  },
+  "hostDoctorAuditFailed": "The audit of this host could not be read, so former session users show without their person.",
+  "@hostDoctorAuditFailed": {
+    "description": "The audit of the host was not readable."
+  },
+  "hostWorkdirs": "Work folders: {folders}",
+  "@hostWorkdirs": {
+    "description": "Work folders of a session user (ruling T13).",
+    "placeholders": {
+      "folders": {
+        "type": "String",
+        "example": "Sam"
+      }
+    }
+  },
+  "hostWorkdirsNone": "Work folders: none",
+  "@hostWorkdirsNone": {
+    "description": "A session user without work folders."
+  },
+  "hostSessionUsersUnassigned": "Reported, not assigned: {osUser}",
+  "@hostSessionUsersUnassigned": {
+    "description": "A reported name without a valid assignment.",
+    "placeholders": {
+      "osUser": {
+        "type": "String",
+        "example": "Sam"
+      }
+    }
+  },
+  "hostSessionUsersSr12": "Without a session user no terminal (SR12).",
+  "@hostSessionUsersSr12": {
+    "description": "Note under the session users (07 SR12)."
+  },
+  "hostSessionUsersOnlyReported": "Only names that the host reported during pairing or in its last report.",
+  "@hostSessionUsersOnlyReported": {
+    "description": "Note of the session user pickers (24 section 3.2)."
+  },
+  "hostSessionUserAssign": "Assign",
+  "@hostSessionUserAssign": {
+    "description": "Button that assigns a session user."
+  },
+  "hostSessionUserAssignTitle": "Assign a session user",
+  "@hostSessionUserAssignTitle": {
+    "description": "Title of the dialog that assigns a session user."
+  },
+  "hostSessionUserAssignBody": "A name once given to a person stays bound to that person on this host.",
+  "@hostSessionUserAssignBody": {
+    "description": "Body of the dialog that assigns a session user (ruling T12)."
+  },
+  "hostSessionUserPerson": "Person",
+  "@hostSessionUserPerson": {
+    "description": "Person picker of a session user row."
+  },
+  "hostSessionUserName": "Reported name",
+  "@hostSessionUserName": {
+    "description": "Name picker of a session user row."
+  },
+  "hostSessionUserAssigned": "{name} now has the session user {osUser}.",
+  "@hostSessionUserAssigned": {
+    "description": "Notice after an assignment.",
+    "placeholders": {
+      "name": {
+        "type": "String",
+        "example": "Sam"
+      },
+      "osUser": {
+        "type": "String",
+        "example": "Sam"
+      }
+    }
+  },
+  "hostSessionUserEnd": "End",
+  "@hostSessionUserEnd": {
+    "description": "Button that ends an assignment."
+  },
+  "hostSessionUserEndTitle": "End the assignment of {name}?",
+  "@hostSessionUserEndTitle": {
+    "description": "Title of the dialog that ends an assignment.",
+    "placeholders": {
+      "name": {
+        "type": "String",
+        "example": "Sam"
+      }
+    }
+  },
+  "hostSessionUserEndBody": "{name} can no longer open a terminal on this host. The name {osUser} stays taken on this host and is never given to another person.",
+  "@hostSessionUserEndBody": {
+    "description": "Body of the dialog that ends an assignment (ruling T12).",
+    "placeholders": {
+      "name": {
+        "type": "String",
+        "example": "Sam"
+      },
+      "osUser": {
+        "type": "String",
+        "example": "Sam"
+      }
+    }
+  },
+  "hostSessionUserEnded": "The assignment of {name} ended; {osUser} stays taken.",
+  "@hostSessionUserEnded": {
+    "description": "Notice after an assignment ended.",
+    "placeholders": {
+      "name": {
+        "type": "String",
+        "example": "Sam"
+      },
+      "osUser": {
+        "type": "String",
+        "example": "Sam"
+      }
+    }
+  },
+  "hostSessionUserTaken": "This name is taken: a name once given to a person stays bound to that person on this host, also after the assignment ends, and each person has one session user per host.",
+  "@hostSessionUserTaken": {
+    "description": "Explanation of conflict with session_user_taken (ruling T12)."
+  },
+  "hostSessionUserNotOnHost": "The host has not reported this name. The host must report the name before it can be assigned.",
+  "@hostSessionUserNotOnHost": {
+    "description": "Explanation of validation_failed with session_user_not_on_host (24 section 3.2)."
+  },
+  "hostSessionRowsTitle": "Session user per person",
+  "@hostSessionRowsTitle": {
+    "description": "Heading of the session user rows of the confirmation."
+  },
+  "hostSessionRowsAdd": "Add a session user",
+  "@hostSessionRowsAdd": {
+    "description": "Adds a row of the confirmation."
+  },
+  "hostSessionRowRemove": "Remove",
+  "@hostSessionRowRemove": {
+    "description": "Removes a row of the confirmation."
+  },
+  "hostChange": "Change",
+  "@hostChange": {
+    "description": "Button that changes a field of the host page."
+  },
+  "hostAssigneeTitle": "Assignee of {name}",
+  "@hostAssigneeTitle": {
+    "description": "Title of the dialog that changes the assignee.",
+    "placeholders": {
+      "name": {
+        "type": "String",
+        "example": "Sam"
+      }
+    }
+  },
+  "hostAssigneeBody": "A person who is not an owner gets a terminal only on the host assigned to them (SR10).",
+  "@hostAssigneeBody": {
+    "description": "Body of the dialog that changes the assignee (07 SR10)."
+  },
+  "hostAssigneeChanged": "The assignee of {name} is changed.",
+  "@hostAssigneeChanged": {
+    "description": "Notice after the assignee changed.",
+    "placeholders": {
+      "name": {
+        "type": "String",
+        "example": "Sam"
+      }
+    }
+  },
+  "hostGrantsAdd": "Grant terminal",
+  "@hostGrantsAdd": {
+    "description": "Opens the grant wizard on this host."
+  },
+  "hostGrantsNone": "No access grants on this host.",
+  "@hostGrantsNone": {
+    "description": "A host without grants."
+  },
+  "hostNotEffective": "Not effective",
+  "@hostNotEffective": {
+    "description": "Badge of a grant whose preview has the hint terminal_not_effective (07 section 9.3)."
+  },
+  "hostSessionsCount": "{count, plural, =0{No open terminal sessions} =1{1 open terminal session} other{{count} open terminal sessions}}",
+  "@hostSessionsCount": {
+    "description": "Count of open terminal sessions on the host.",
+    "placeholders": {
+      "count": {
+        "type": "int",
+        "example": "3"
+      }
+    }
+  },
+  "hostRepair": "Re-pair",
+  "@hostRepair": {
+    "description": "Button that re-pairs the host (24 section 3.3)."
+  },
+  "hostRepairTitle": "Re-pair {name}?",
+  "@hostRepairTitle": {
+    "description": "Title of the dialog that re-pairs.",
+    "placeholders": {
+      "name": {
+        "type": "String",
+        "example": "Sam"
+      }
+    }
+  },
+  "hostRepairBody": "The keys of the host are dropped now, its connections close and its terminal sessions end. A new pairing code follows; the key generation rises with the next pairing.",
+  "@hostRepairBody": {
+    "description": "Body of the dialog that re-pairs (24 section 3.3)."
+  },
+  "hostPair": "Continue pairing",
+  "@hostPair": {
+    "description": "Opens the pairing wizard of a host in pairing or confirming."
+  },
+  "hostDisable": "Disable",
+  "@hostDisable": {
+    "description": "Button that disables the host."
+  },
+  "hostDisableTitle": "Disable {name}?",
+  "@hostDisableTitle": {
+    "description": "Title of the dialog that disables.",
+    "placeholders": {
+      "name": {
+        "type": "String",
+        "example": "Sam"
+      }
+    }
+  },
+  "hostDisableBody": "All terminal sessions on this host end now. No one can open a terminal here until it is enabled again.",
+  "@hostDisableBody": {
+    "description": "Body of the dialog that disables (24 section 3.1)."
+  },
+  "hostEnable": "Enable",
+  "@hostEnable": {
+    "description": "Button that enables the host again."
+  },
+  "hostEnableTitle": "Enable {name}?",
+  "@hostEnableTitle": {
+    "description": "Title of the dialog that enables.",
+    "placeholders": {
+      "name": {
+        "type": "String",
+        "example": "Sam"
+      }
+    }
+  },
+  "hostEnableBody": "Terminal sessions are possible again for the people who may open them.",
+  "@hostEnableBody": {
+    "description": "Body of the dialog that enables."
+  },
+  "hostRetire": "Retire",
+  "@hostRetire": {
+    "description": "Button that retires the host."
+  },
+  "hostRetireTitle": "Retire {name}?",
+  "@hostRetireTitle": {
+    "description": "Title of the dialog that retires.",
+    "placeholders": {
+      "name": {
+        "type": "String",
+        "example": "Sam"
+      }
+    }
+  },
+  "hostRetireBody": "All terminal sessions end now and the host is retired for good. It cannot be paired or enabled again.",
+  "@hostRetireBody": {
+    "description": "Body of the dialog that retires (24 section 3.1)."
+  },
+  "hostStateChanged": "{name} is now {state}.",
+  "@hostStateChanged": {
+    "description": "Notice after a state change.",
+    "placeholders": {
+      "name": {
+        "type": "String",
+        "example": "Sam"
+      },
+      "state": {
+        "type": "String",
+        "example": "Sam"
+      }
+    }
+  },
+  "hostPairingTitle": "Pair host",
+  "@hostPairingTitle": {
+    "description": "Title of the pairing wizard (01 A8)."
+  },
+  "hostCreateName": "Name",
+  "@hostCreateName": {
+    "description": "Name field of a new host."
+  },
+  "hostCreateAssignee": "Assignee (optional)",
+  "@hostCreateAssignee": {
+    "description": "Assignee picker of a new host."
+  },
+  "hostCreateSubmit": "Create and get a code",
+  "@hostCreateSubmit": {
+    "description": "Button of step 1 of the pairing wizard."
+  },
+  "hostPairingCommandIntro": "Enter this command on the host as the user of the host service (a one-time code that expires soon):",
+  "@hostPairingCommandIntro": {
+    "description": "Text above the pairing command (01 A8)."
+  },
+  "hostPairingExpiresIn": "Expires in {time}",
+  "@hostPairingExpiresIn": {
+    "description": "Remaining time of the pairing code.",
+    "placeholders": {
+      "time": {
+        "type": "String",
+        "example": "Sam"
+      }
+    }
+  },
+  "hostPairingExpired": "The pairing code has expired. Issue a new code.",
+  "@hostPairingExpired": {
+    "description": "The pairing code expired."
+  },
+  "hostPairingNewCode": "New code",
+  "@hostPairingNewCode": {
+    "description": "Issues another pairing code."
+  },
+  "hostPairingNotYet": "The host has not reported yet. Enter the command on the host, then try again.",
+  "@hostPairingNotYet": {
+    "description": "Next pressed before the host reported its keys."
+  },
+  "hostPairingNeedsCode": "This host waits for a pairing code. Issue a new code to continue.",
+  "@hostPairingNeedsCode": {
+    "description": "Step 2 without a code."
+  },
+  "hostPairingClose": "Close",
+  "@hostPairingClose": {
+    "description": "Closes the pairing wizard."
+  },
+  "hostFingerprintLabel": "Type the fingerprint from the host (first {count} characters)",
+  "@hostFingerprintLabel": {
+    "description": "Fingerprint field of step 3 (24 section 3.2).",
+    "placeholders": {
+      "count": {
+        "type": "int",
+        "example": "3"
+      }
+    }
+  },
+  "hostFingerprintCompare": "Compare with the output on the host and type it again.",
+  "@hostFingerprintCompare": {
+    "description": "Advice after fingerprint_mismatch."
+  },
+  "hostAttemptsLeft": "{count, plural, =1{1 attempt left} other{{count} attempts left}}",
+  "@hostAttemptsLeft": {
+    "description": "Attempts left after fingerprint_mismatch.",
+    "placeholders": {
+      "count": {
+        "type": "int",
+        "example": "3"
+      }
+    }
+  },
+  "hostFingerprintFallback": "No attempts left: the host is back in pairing and its keys are dropped. Issue a new pairing code.",
+  "@hostFingerprintFallback": {
+    "description": "Last failed attempt (24 section 3.2, TM-T19)."
+  },
+  "hostLlmQuestion": "LLM login on this host",
+  "@hostLlmQuestion": {
+    "description": "Mandatory question of the confirmation (24 section 7.2)."
+  },
+  "hostConfirmSubmit": "Confirm with passkey / device",
+  "@hostConfirmSubmit": {
+    "description": "Button of step 3 (01 A8)."
+  },
+  "hostConfirmed": "{name} is active.",
+  "@hostConfirmed": {
+    "description": "Notice after the confirmation.",
+    "placeholders": {
+      "name": {
+        "type": "String",
+        "example": "Sam"
+      }
+    }
+  },
+  "stepUpPurposeCreateHost": "Create the host {name}",
+  "@stepUpPurposeCreateHost": {
+    "description": "Step-up purpose of createHost.",
+    "placeholders": {
+      "name": {
+        "type": "String",
+        "example": "Sam"
+      }
+    }
+  },
+  "stepUpPurposePairingCode": "Issue a pairing code for {name}",
+  "@stepUpPurposePairingCode": {
+    "description": "Step-up purpose of issueHostPairingCode.",
+    "placeholders": {
+      "name": {
+        "type": "String",
+        "example": "Sam"
+      }
+    }
+  },
+  "stepUpPurposeConfirmHost": "Confirm the host {name}",
+  "@stepUpPurposeConfirmHost": {
+    "description": "Step-up purpose of confirmHost.",
+    "placeholders": {
+      "name": {
+        "type": "String",
+        "example": "Sam"
+      }
+    }
+  },
+  "stepUpPurposeUpdateHost": "Change the host {name}",
+  "@stepUpPurposeUpdateHost": {
+    "description": "Step-up purpose of updateHost.",
+    "placeholders": {
+      "name": {
+        "type": "String",
+        "example": "Sam"
+      }
+    }
+  },
+  "stepUpPurposeHostLlmLogin": "Change the LLM login of {name}",
+  "@stepUpPurposeHostLlmLogin": {
+    "description": "Step-up purpose of setHostLlmCredentials.",
+    "placeholders": {
+      "name": {
+        "type": "String",
+        "example": "Sam"
+      }
+    }
+  },
+  "stepUpPurposeHostState": "Change the state of {name}",
+  "@stepUpPurposeHostState": {
+    "description": "Step-up purpose of setHostState.",
+    "placeholders": {
+      "name": {
+        "type": "String",
+        "example": "Sam"
+      }
+    }
+  },
+  "stepUpPurposeHostAudit": "Read the audit of {name}",
+  "@stepUpPurposeHostAudit": {
+    "description": "Step-up purpose of listAuditEvents for the former session users.",
+    "placeholders": {
+      "name": {
+        "type": "String",
+        "example": "Sam"
+      }
+    }
+  },
+  "adminTargetHost": "Host {name}",
+  "@adminTargetHost": {
+    "description": "Label of a host target of a grant.",
+    "placeholders": {
+      "name": {
+        "type": "String",
+        "example": "Sam"
+      }
+    }
+  },
+  "adminTargetsHosts": "Hosts",
+  "@adminTargetsHosts": {
+    "description": "Heading of the host targets in the grant wizard."
   }
 }
