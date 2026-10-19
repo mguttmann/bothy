@@ -42,18 +42,23 @@ func jwsParts(t *testing.T, jws string) (header, payload map[string]any, input s
 // publicKeyOf rebuilds the P-256 public key of a JWK member map.
 func publicKeyOf(t *testing.T, jwk map[string]any) *ecdsa.PublicKey {
 	t.Helper()
-	coord := func(name string) *big.Int {
+	coord := func(name string) []byte {
 		s, _ := jwk[name].(string)
 		raw, err := base64.RawURLEncoding.DecodeString(s)
 		if err != nil || len(raw) != 32 {
 			t.Fatalf("jwk %s: %d bytes, %v", name, len(raw), err)
 		}
-		return new(big.Int).SetBytes(raw)
+		return raw
 	}
 	if jwk["kty"] != "EC" || jwk["crv"] != "P-256" {
 		t.Fatalf("jwk kty %v crv %v", jwk["kty"], jwk["crv"])
 	}
-	return &ecdsa.PublicKey{Curve: elliptic.P256(), X: coord("x"), Y: coord("y")}
+	raw := append([]byte{4}, coord("x")...)
+	pub, err := ecdsa.ParseUncompressedPublicKey(elliptic.P256(), append(raw, coord("y")...))
+	if err != nil {
+		t.Fatalf("jwk is no P-256 point: %v", err)
+	}
+	return pub
 }
 
 func newTestKey(t *testing.T) Key {

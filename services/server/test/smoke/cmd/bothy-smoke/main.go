@@ -99,7 +99,7 @@ func precheck(baseURL, publicURL string) error {
 }
 
 func scenario(baseURL, publicURL, out string, stderr io.Writer) error {
-	setupOut, err := os.ReadFile(filepath.Join(out, "setup.out")) // #nosec G304 -- the output directory of the run
+	setupOut, err := os.ReadFile(filepath.Join(out, "setup.out")) // #nosec G304 G703 -- the output directory of the run, a flag of the harness
 	if err != nil {
 		return errors.New("cannot read setup.out")
 	}
@@ -112,14 +112,14 @@ func scenario(baseURL, publicURL, out string, stderr io.Writer) error {
 	cfg := smoke.Config{PublicURL: publicURL, Canary: getenv("SMOKE_CANARY"), SetupStdout: setupOut, Log: stderr}
 	canaries, runErr := smoke.Run(ctx, cfg, api, func() smoke.Gateway { return smoke.NewWSGateway(baseURL) })
 	// The canaries are written also after a failure, so a kept stack can still be scanned.
-	if err := os.WriteFile(filepath.Join(out, "canaries.txt"), canaries.Marshal(), 0o600); err != nil {
+	if err := os.WriteFile(filepath.Join(out, "canaries.txt"), canaries.Marshal(), 0o600); err != nil { // #nosec G703 -- the output directory of the run
 		return errors.Join(runErr, fmt.Errorf("write canaries.txt: %w", err))
 	}
 	return runErr
 }
 
 func scan(in string, stderr io.Writer) error {
-	raw, err := os.ReadFile(filepath.Join(in, "out", "canaries.txt")) // #nosec G304 -- the input directory of the scan
+	raw, err := os.ReadFile(filepath.Join(in, "out", "canaries.txt")) // #nosec G304 G703 -- the input directory of the scan, a flag of the harness
 	if err != nil {
 		return errors.New("cannot read out/canaries.txt")
 	}

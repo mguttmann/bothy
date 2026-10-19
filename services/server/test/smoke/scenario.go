@@ -74,7 +74,7 @@ func Precheck(ctx context.Context, api REST) error {
 	var se *StatusError
 	if !errors.As(err, &se) || se.Status != http.StatusServiceUnavailable || se.Code != "setup_required" ||
 		!strings.HasSuffix(se.Type, "/setup_required") {
-		return fmt.Errorf("smoke: getMe before setup = %v, want 503 setup_required", err)
+		return fmt.Errorf("smoke: getMe before setup = %w, want 503 setup_required", err)
 	}
 	return nil
 }
@@ -571,7 +571,7 @@ func (r *runner) oldToken(ctx context.Context) error {
 	_, err := r.api.GetMe(ctx)
 	var se *StatusError
 	if !errors.As(err, &se) || se.Status != http.StatusUnauthorized {
-		return fmt.Errorf("getMe with the old access token = %v, want 401", err)
+		return fmt.Errorf("getMe with the old access token = %w, want 401", err)
 	}
 	return nil
 }

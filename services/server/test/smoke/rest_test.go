@@ -41,7 +41,9 @@ func (s *nonceServer) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	s.script[i](w)
 }
 
-func problem(status int, code, nonce string) func(w http.ResponseWriter) {
+// useNonce answers 401 use_dpop_nonce with nonce as the new DPoP-Nonce.
+func useNonce(nonce string) func(w http.ResponseWriter) {
+	const status, code = http.StatusUnauthorized, "use_dpop_nonce"
 	return func(w http.ResponseWriter) {
 		if nonce != "" {
 			w.Header().Set("DPoP-Nonce", nonce)
@@ -80,7 +82,7 @@ func newTestClient(t *testing.T, s *nonceServer) *HTTPClient {
 // of its answer; the proof names the public URL, not the dialled address, and carries ath.
 func TestHTTPClientRetriesOnceOnUseDPoPNonce(t *testing.T) {
 	t.Parallel()
-	s := &nonceServer{script: []func(http.ResponseWriter){problem(http.StatusUnauthorized, "use_dpop_nonce", "n-1"), okMe("")}}
+	s := &nonceServer{script: []func(http.ResponseWriter){useNonce("n-1"), okMe("")}}
 	c := newTestClient(t, s)
 	me, err := c.GetMe(t.Context())
 	if err != nil || me.Principal.Handle != "alex" {
@@ -108,8 +110,8 @@ func TestHTTPClientRetriesOnceOnUseDPoPNonce(t *testing.T) {
 func TestHTTPClientStopsAfterSecondNonceError(t *testing.T) {
 	t.Parallel()
 	s := &nonceServer{script: []func(http.ResponseWriter){
-		problem(http.StatusUnauthorized, "use_dpop_nonce", "n-1"),
-		problem(http.StatusUnauthorized, "use_dpop_nonce", "n-2"),
+		useNonce("n-1"),
+		useNonce("n-2"),
 		okMe(""),
 	}}
 	c := newTestClient(t, s)
@@ -148,7 +150,7 @@ func TestHTTPClientIdempotencyKey(t *testing.T) {
 		w.WriteHeader(http.StatusCreated)
 		_, _ = w.Write([]byte(`{"created_at":"2026-10-19T00:00:00.000Z","id":"0192f000-0000-7000-8000-000000000002","name":"x","sort_key":"a","version":1}`))
 	}
-	s := &nonceServer{script: []func(http.ResponseWriter){problem(http.StatusUnauthorized, "use_dpop_nonce", "n-1"), space}}
+	s := &nonceServer{script: []func(http.ResponseWriter){useNonce("n-1"), space}}
 	c := newTestClient(t, s)
 	if _, err := c.CreateSpace(t.Context(), rest.SpaceCreate{Name: "x"}); err != nil {
 		t.Fatal(err)

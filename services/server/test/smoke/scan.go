@@ -69,7 +69,7 @@ func (h Hit) String() string { return fmt.Sprintf("%s:%d: %s", h.File, h.Line, h
 
 // match reports whether value occurs in line. It is a variable so that a test can break it and
 // prove that the positive control of Scan catches a broken matcher.
-var match = func(line, value []byte) bool { return bytes.Contains(line, value) }
+var match = bytes.Contains
 
 // controlText is the built-in text of the positive control: the value inside a JSON string as a
 // collector export or a log line carries it.

@@ -367,14 +367,14 @@ func (g *fakeGateway) CloseCode() int {
 }
 
 // runWorld runs the scenario against w and returns the canaries, the error and the step log.
-func runWorld(t *testing.T, w *world) (Canaries, error, string) {
+func runWorld(t *testing.T, w *world) (Canaries, string, error) {
 	t.Helper()
 	var log bytes.Buffer
 	cfg := Config{PublicURL: "https://chat.example.com", Canary: testCanary, SetupStdout: []byte(testCode + "\n"), Log: &log}
 	ctx, cancel := context.WithTimeout(t.Context(), 30*time.Second)
 	defer cancel()
 	c, err := Run(ctx, cfg, &fakeREST{w: w}, w.dial)
-	return c, err, log.String()
+	return c, log.String(), err
 }
 
 // TestPrecheck: setup_required true and /me 503 setup_required pass; false fails; /me with
@@ -401,7 +401,7 @@ func TestPrecheck(t *testing.T) {
 // steps only and never a value.
 func TestRunHappyPath(t *testing.T) {
 	t.Parallel()
-	c, err, log := runWorld(t, newWorld())
+	c, log, err := runWorld(t, newWorld())
 	if err != nil {
 		t.Fatalf("Run: %v\n%s", err, log)
 	}
@@ -441,7 +441,7 @@ func tamperMessages(conn int, phase string, n int, f func(w *world, e *fakeEvent
 
 func expectRunError(t *testing.T, w *world, want string) {
 	t.Helper()
-	_, err, log := runWorld(t, w)
+	_, log, err := runWorld(t, w)
 	if err == nil || !strings.Contains(err.Error(), want) {
 		t.Fatalf("Run error %v, want one with %q\n%s", err, want, log)
 	}
@@ -521,7 +521,7 @@ func TestRunFollowsEmptyEventPages(t *testing.T) {
 	t.Parallel()
 	w := newWorld()
 	w.hiddenBeforeAway = true
-	if _, err, log := runWorld(t, w); err != nil {
+	if _, log, err := runWorld(t, w); err != nil {
 		t.Fatalf("Run: %v\n%s", err, log)
 	}
 }

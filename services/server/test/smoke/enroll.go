@@ -23,7 +23,7 @@ func ReadEnrollmentCode(stdout []byte) (string, error) {
 	}
 	code := strings.TrimSuffix(lines[0], "\r")
 	if !enrollmentCode.MatchString(code) {
-		return "", errors.New("smoke: the setup output is not one enrollment code in the display form en_XXXX-...")
+		return "", errors.New("smoke: the setup output is not one enrollment code in the display form en_XXXX")
 	}
 	return code, nil
 }

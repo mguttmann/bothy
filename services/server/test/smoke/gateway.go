@@ -103,7 +103,7 @@ func (g *WSGateway) Dial(ctx context.Context) (rest.GatewayHello, error) {
 	}
 	conn.SetReadLimit(maxFrameBytes)
 	g.conn, g.frames, g.done = conn, make(chan Frame, frameBuffer), make(chan struct{})
-	go g.read()
+	go g.read() //nolint:gosec // G118: the reader lives as long as the connection, not as ctx
 	f, err := g.Next(ctx)
 	if err != nil {
 		return rest.GatewayHello{}, err
