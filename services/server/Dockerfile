@@ -89,6 +89,23 @@ WORKDIR /src/apps/console
 RUN flutter build web --release --base-href /console/ --no-web-resources-cdn --no-pub --no-wasm-dry-run \
     && sh tool/version_json.sh ../../docs/api/openapi.yaml ../../services/server/VERSION build/web/version.json
 
+# The probe of the Compose smoke test (brief M1-73, infra/compose/test/compose.smoke.yaml target
+# smoke). It is built from the builder stage above and runs on the same runtime base as the
+# server, so no second pin can drift; the production stage stays last, so a build without
+# --target and every release are unchanged.
+FROM build AS smoke-build
+ARG TARGETOS TARGETARCH
+COPY services/server/test/smoke ./test/smoke
+RUN --mount=type=cache,target=/go/pkg/mod \
+    --mount=type=cache,target=/root/.cache/go-build \
+    CGO_ENABLED=0 GOOS=$TARGETOS GOARCH=$TARGETARCH GOTOOLCHAIN=local GOFLAGS=-mod=readonly \
+    go build -trimpath -buildvcs=false -ldflags "-s -w" -o /out/bothy-smoke ./test/smoke/cmd/bothy-smoke
+
+FROM gcr.io/distroless/static-debian13:nonroot@sha256:e2e927ec666bae08560abb3c55d0659eceabb657f56b6782ab500a9fc7f555e3 AS smoke
+COPY --from=smoke-build --chown=0:0 --chmod=0555 /out/bothy-smoke /usr/local/bin/bothy-smoke
+USER 65532:65532
+ENTRYPOINT ["/usr/local/bin/bothy-smoke"]
+
 FROM gcr.io/distroless/static-debian13:nonroot@sha256:e2e927ec666bae08560abb3c55d0659eceabb657f56b6782ab500a9fc7f555e3
 ARG VERSION REVISION
 ARG SOURCE_URL=https://github.com/OWNER/bothy
