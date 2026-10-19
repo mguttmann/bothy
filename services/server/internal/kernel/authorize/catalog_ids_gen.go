@@ -119,6 +119,8 @@ const (
 	ActionCommandRemove Action = "command.remove"
 	// ActionComponentUpdate is the action component.update.
 	ActionComponentUpdate Action = "component.update"
+	// ActionConsoleCspReport is the action console.csp_report.
+	ActionConsoleCspReport Action = "console.csp_report"
 	// ActionCostReadAggregate is the action cost.read.aggregate.
 	ActionCostReadAggregate Action = "cost.read.aggregate"
 	// ActionCostReadThread is the action cost.read.thread.
@@ -478,6 +480,7 @@ var actionByID = map[string]Action{
 	"command.register":             ActionCommandRegister,
 	"command.remove":               ActionCommandRemove,
 	"component.update":             ActionComponentUpdate,
+	"console.csp_report":           ActionConsoleCspReport,
 	"cost.read.aggregate":          ActionCostReadAggregate,
 	"cost.read.thread":             ActionCostReadThread,
 	"cost.reconcile":               ActionCostReconcile,
@@ -686,6 +689,7 @@ var actionList = []Action{
 	ActionCommandRegister,
 	ActionCommandRemove,
 	ActionComponentUpdate,
+	ActionConsoleCspReport,
 	ActionCostReadAggregate,
 	ActionCostReadThread,
 	ActionCostReconcile,

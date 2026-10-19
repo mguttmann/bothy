@@ -88,6 +88,18 @@ actions:
   rights_change: false
   rl_class: rl.public_auth
   effect: read
+- id: console.csp_report
+  section: public
+  description: accept a Content Security Policy violation report of the web console, without content in the
+    log ([19-sicherheit.md](19-sicherheit.md), section 5, rule 6; R-AZ-33)
+  resource: instance
+  right: public
+  owner: false
+  step_up: false
+  audit: never
+  rights_change: false
+  rl_class: rl.public_auth
+  effect: read
 - id: auth.login.begin
   section: public
   description: Anmeldung starten (OIDC, Passkey-Challenge, Header-Login, Geräte-Kopplung)
