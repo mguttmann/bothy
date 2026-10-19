@@ -41,10 +41,13 @@ func runtimeRegister(t *testing.T) specschema.Register {
 				ev.Kind = "durable"
 			}
 			ev.ReceiveAction = strings.Trim(spec.ReceiveAction, "`")
-			if spec.AudienceSelf {
-				ev.ReceiveAction = "self"
-			} else if len(spec.MentionedActions) == 1 {
+			// A personal event names its receive action when it has one (agent.config_changed:
+			// self and agent.config.read, M2-02); otherwise it is self.
+			switch {
+			case len(spec.MentionedActions) == 1:
 				ev.ReceiveAction = spec.MentionedActions[0]
+			case spec.AudienceSelf:
+				ev.ReceiveAction = "self"
 			}
 		}
 		out.Events = append(out.Events, ev)
