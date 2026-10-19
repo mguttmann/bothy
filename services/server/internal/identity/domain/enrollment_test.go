@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"github.com/OWNER/bothy/services/server/internal/identity/domain"
+	"github.com/OWNER/bothy/services/server/internal/platform/testkit"
 )
 
 // crockford is the alphabet of the enrollment codes.
@@ -117,7 +118,7 @@ func TestIDT27_EnrollmentCodeEntropyAndSource(t *testing.T) {
 	// go list -deps of these packages always contains math/rand through the standard library
 	// (math/big, crypto/ecdsa, database/sql) and the drivers, so the rule is held on the imports of
 	// every package under internal/identity, tests included (docs/DECISIONS.md M1-37).
-	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
+	ctx, cancel := context.WithTimeout(context.Background(), testkit.Patience)
 	defer cancel()
 	out, err := exec.CommandContext(ctx, "go", "list", "-test", "-f", "{{.ImportPath}}: {{join .Imports \" \"}}",
 		"github.com/OWNER/bothy/services/server/internal/identity/...").CombinedOutput()

@@ -14,13 +14,33 @@ import (
 	"path/filepath"
 	"strconv"
 	"strings"
+	"sync"
 	"syscall"
 	"testing"
 	"time"
 
 	"github.com/OWNER/bothy/services/server/internal/platform/buildinfo"
 	"github.com/OWNER/bothy/services/server/internal/platform/secrets/stack"
+	"github.com/OWNER/bothy/services/server/internal/platform/testkit"
 )
+
+// lockedBuffer is a bytes.Buffer that serve may write while the test reads it.
+type lockedBuffer struct {
+	mu  sync.Mutex
+	buf bytes.Buffer
+}
+
+func (b *lockedBuffer) Write(p []byte) (int, error) {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	return b.buf.Write(p)
+}
+
+func (b *lockedBuffer) String() string {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	return b.buf.String()
+}
 
 // fakePgbackrest writes an executable shell script that stands in for pgbackrest: "server"
 // runs until SIGTERM and records it in dir/term, "stanza-create" fails until it has been
@@ -68,51 +88,43 @@ func writeExecutable(t *testing.T, path, script string) {
 	}
 }
 
-// waitFile waits until path exists, failing the test after a few seconds.
+// waitFile waits until path has content and returns it, failing the test after
+// testkit.Patience.
 func waitFile(t *testing.T, path string) string {
 	t.Helper()
-	deadline := time.Now().Add(10 * time.Second)
-	for time.Now().Before(deadline) {
-		if b, err := os.ReadFile(path); err == nil && len(b) > 0 { //nolint:gosec // G304: path from t.TempDir.
-			return strings.TrimSpace(string(b))
-		}
-		time.Sleep(20 * time.Millisecond)
-	}
-	t.Fatalf("%s did not appear", path)
-	return ""
+	var content string
+	testkit.Until(t, path+" with content", func() bool {
+		b, err := os.ReadFile(path) //nolint:gosec // G304: path from t.TempDir.
+		content = strings.TrimSpace(string(b))
+		return err == nil && content != ""
+	})
+	return content
 }
 
 func TestServeStopsChildOnSIGTERM(t *testing.T) {
 	t.Parallel()
 	bin, dir := fakePgbackrest(t, 2, "")
 	signals := make(chan os.Signal, 1)
-	var stderr bytes.Buffer
+	stderr := &lockedBuffer{}
 	done := make(chan int, 1)
 	go func() {
-		done <- serve(context.Background(), serveOptions{pgbackrest: bin, stanza: "bothy", retry: 10 * time.Millisecond}, signals, &stderr)
+		done <- serve(context.Background(), serveOptions{pgbackrest: bin, stanza: "bothy", retry: 10 * time.Millisecond}, signals, stderr)
 	}()
-	// The stanza is created after two failed attempts while the server keeps running.
-	deadline := time.Now().Add(10 * time.Second)
-	for waitFile(t, filepath.Join(dir, "stanza")) != "3" {
-		if time.Now().After(deadline) {
-			t.Fatal("stanza-create was not retried until it succeeded")
-		}
-		time.Sleep(20 * time.Millisecond)
+	// The stanza is created after two failed attempts while the server keeps running. The fake
+	// counts an attempt before it succeeds, so the test waits for the line serve writes after the
+	// third attempt returned; a SIGTERM before it would cancel that attempt.
+	testkit.Until(t, "the line of the ready stanza", func() bool {
+		return strings.Contains(stderr.String(), "stanza "+defaultStanza+" is ready")
+	})
+	if got := waitFile(t, filepath.Join(dir, "stanza")); got != "3" {
+		t.Errorf("stanza-create ran %s times, want 3 (two failures, one success)", got)
 	}
 	signals <- syscall.SIGTERM
-	select {
-	case code := <-done:
-		if code != exitOK {
-			t.Errorf("serve returned %d after SIGTERM, want 0; stderr:\n%s", code, stderr.String())
-		}
-	case <-time.After(10 * time.Second):
-		t.Fatal("serve did not return after SIGTERM")
+	if code := testkit.Receive(t, "the return of serve after SIGTERM", done); code != exitOK {
+		t.Errorf("serve returned %d after SIGTERM, want 0; stderr:\n%s", code, stderr.String())
 	}
 	if got := waitFile(t, filepath.Join(dir, "term")); got != "term" {
 		t.Errorf("child did not receive SIGTERM: %q", got)
-	}
-	if !strings.Contains(stderr.String(), "stanza "+defaultStanza+" is ready") {
-		t.Errorf("stderr does not report the stanza:\n%s", stderr.String())
 	}
 }
 
@@ -234,7 +246,7 @@ func tlsServer(t *testing.T, dir, caDir, host string) string {
 func healthArgs(dir, addr string, extra ...string) []string {
 	return append([]string{"healthcheck", "--addr", addr,
 		"--ca", filepath.Join(dir, "ca.crt"), "--cert", filepath.Join(dir, "backup.crt"), "--key", filepath.Join(dir, "backup.key"),
-		"--timeout", "2s"}, extra...)
+		"--timeout", testkit.Patience.String()}, extra...)
 }
 
 func TestHealthcheck(t *testing.T) {
@@ -280,7 +292,10 @@ func TestHealthcheckSilentServer(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	t.Cleanup(func() { _ = l.Close() })
+	// The connections stay open until the test ends, so a check that ignored --timeout would
+	// wait past testkit.Patience.
+	silent := make(chan struct{})
+	t.Cleanup(func() { close(silent); _ = l.Close() })
 	go func() {
 		for {
 			c, err := l.Accept()
@@ -288,21 +303,20 @@ func TestHealthcheckSilentServer(t *testing.T) {
 				return
 			}
 			go func() {
-				// Hold the connection open past the timeout of the check, then let it go.
-				time.Sleep(3 * time.Second)
+				<-silent
 				_ = c.Close()
 			}()
 		}
 	}()
-	start := time.Now()
 	var stdout, stderr bytes.Buffer
 	args := healthArgs(dir, l.Addr().String())
 	args[len(args)-1] = "200ms"
-	if code := run(context.Background(), args, &stdout, &stderr); code != exitFailure {
+	// In a goroutine, so a check that ignored --timeout fails the test after testkit.Patience;
+	// the cleanup then releases the silent connections.
+	done := make(chan int, 1)
+	go func() { done <- run(context.Background(), args, &stdout, &stderr) }()
+	if code := testkit.Receive(t, "the end of the healthcheck within --timeout", done); code != exitFailure {
 		t.Errorf("silent server: code %d, want 1", code)
-	}
-	if time.Since(start) > 5*time.Second {
-		t.Errorf("healthcheck took %v with --timeout 200ms", time.Since(start))
 	}
 }
 
@@ -334,13 +348,8 @@ func TestServeAcceptsAServerEndedBySIGTERM(t *testing.T) {
 	}()
 	waitFile(t, filepath.Join(dir, "stanza"))
 	signals <- syscall.SIGTERM
-	select {
-	case code := <-done:
-		if code != exitOK {
-			t.Errorf("serve returned %d after SIGTERM, want 0; stderr:\n%s", code, stderr.String())
-		}
-	case <-time.After(10 * time.Second):
-		t.Fatal("serve did not return after SIGTERM")
+	if code := testkit.Receive(t, "the return of serve after SIGTERM", done); code != exitOK {
+		t.Errorf("serve returned %d after SIGTERM, want 0; stderr:\n%s", code, stderr.String())
 	}
 	if strings.Contains(stderr.String(), "stopped with") {
 		t.Errorf("a server ended by SIGTERM was reported as an error:\n%s", stderr.String())

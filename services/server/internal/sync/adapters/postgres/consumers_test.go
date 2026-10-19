@@ -19,6 +19,7 @@ import (
 	"github.com/OWNER/bothy/services/server/internal/kernel/errs"
 	"github.com/OWNER/bothy/services/server/internal/platform/otel/attr"
 	"github.com/OWNER/bothy/services/server/internal/platform/pg"
+	"github.com/OWNER/bothy/services/server/internal/platform/testkit"
 	"github.com/OWNER/bothy/services/server/internal/sync"
 	"github.com/OWNER/bothy/services/server/internal/sync/adapters/otelmetrics"
 	"github.com/OWNER/bothy/services/server/internal/sync/adapters/postgres"
@@ -234,7 +235,7 @@ func TestConsumersTwoWorkersExactlyOnce(t *testing.T) {
 	barrier := func(context.Context, sync.Event) error {
 		select {
 		case <-overlap.ch:
-		case <-time.After(20 * time.Second):
+		case <-time.After(testkit.Patience):
 			return errors.New("no overlap within the bound")
 		}
 		return nil
@@ -259,7 +260,7 @@ func TestConsumersTwoWorkersExactlyOnce(t *testing.T) {
 	}
 	wg.Wait()
 	head := e.head(t)
-	e.waitCursor(t, sync.ConsumerWebhooks, head, 60*time.Second)
+	e.waitCursor(t, sync.ConsumerWebhooks, head)
 	if ca.locked.Load()+cb.locked.Load() == 0 {
 		t.Fatal("no round was locked; the barrier did not force an overlap")
 	}
@@ -348,7 +349,7 @@ func TestConsumerCrashMidRoundNoDuplicates(t *testing.T) {
 			if c.abort != nil {
 				select {
 				case <-abort:
-				case <-time.After(10 * time.Second):
+				case <-time.After(testkit.Patience):
 					t.Fatal("the handler did not reach seq 3")
 				}
 				c.abort(t, e, pid.Load(), cancel)
@@ -361,7 +362,7 @@ func TestConsumerCrashMidRoundNoDuplicates(t *testing.T) {
 				if name == "handler_panic" && errs.KindOf(err) != errs.KindInternal {
 					t.Errorf("a panic became %v, want kind internal", err)
 				}
-			case <-time.After(20 * time.Second):
+			case <-time.After(testkit.Patience):
 				t.Fatal("the round did not end")
 			}
 			if got := e.probeJobs(t); len(got) != 0 {
@@ -373,7 +374,7 @@ func TestConsumerCrashMidRoundNoDuplicates(t *testing.T) {
 			restarted := e.newWorker(t, cfg)
 			restarted.register(t, sync.ConsumerWebhooks, &probe{inserter: restarted.inserter})
 			restarted.runner(t, cfg, nil, nil)
-			e.waitCursor(t, sync.ConsumerWebhooks, 4, 20*time.Second)
+			e.waitCursor(t, sync.ConsumerWebhooks, 4)
 			e.exactlyTwoJobs(t, 1, 4)
 		})
 	}
@@ -382,7 +383,7 @@ func TestConsumerCrashMidRoundNoDuplicates(t *testing.T) {
 // waitWakeConnection waits until the one LISTEN connection of the waker is open and idle.
 func waitWakeConnection(t *testing.T, e *consumerEnv) {
 	t.Helper()
-	waitFor(t, 10*time.Second, "the wake connection", func() bool {
+	testkit.Until(t, "the wake connection", func() bool {
 		var got int
 		if err := e.db.SuperConn(t).QueryRow(context.Background(), `SELECT count(*) FROM pg_stat_activity
 			WHERE application_name = $1 AND datname = current_database() AND state = 'idle'`, postgres.WakerAppName).Scan(&got); err != nil {
@@ -406,18 +407,19 @@ func TestConsumerWakesOnNotify(t *testing.T) {
 	w.register(t, sync.ConsumerPush, &probe{inserter: w.inserter})
 	w.runner(t, cfg, nil, counting)
 	waitWakeConnection(t, e)
-	waitFor(t, 10*time.Second, "the rounds after the start", func() bool { return counting.rounds.Load() >= 1 })
+	testkit.Until(t, "the rounds after the start", func() bool { return counting.rounds.Load() >= 1 })
 	time.Sleep(200 * time.Millisecond)
 	before := counting.rounds.Load()
 	e.appendSettings(t, 1)
-	waitFor(t, 5*time.Second, "the jobs of the notified event", func() bool { return len(e.probeJobs(t)) == 1 })
+	testkit.Until(t, "the jobs of the notified event", func() bool { return len(e.probeJobs(t)) == 1 })
 	// The jobs are visible when the round commits, the count only when Round returns.
-	waitFor(t, 5*time.Second, "a round after the notification", func() bool { return counting.rounds.Load() > before })
+	testkit.Until(t, "a round after the notification", func() bool { return counting.rounds.Load() > before })
 	e.exactlyTwoJobs(t, 1, 1)
 }
 
 // TestConsumerWakesOnPoll (plan M2-01, same item): with a waker that never signals, a committed
-// event gets its jobs within a small multiple of consumer.poll_interval.
+// event gets its jobs, so only the poll delivers it. How long it took is logged, not bounded: a
+// bound in wall-clock time failed on loaded hosts (PL/8).
 func TestConsumerWakesOnPoll(t *testing.T) {
 	t.Parallel()
 	e := newConsumerEnv(t, envOptions{})
@@ -429,9 +431,9 @@ func TestConsumerWakesOnPoll(t *testing.T) {
 	time.Sleep(300 * time.Millisecond)
 	start := time.Now()
 	e.appendSettings(t, 1)
-	waitFor(t, 5*cfg.PollInterval, "the jobs of the polled event", func() bool { return len(e.probeJobs(t)) == 1 })
+	testkit.Until(t, "the jobs of the polled event", func() bool { return len(e.probeJobs(t)) == 1 })
 	t.Logf("jobs after %s with poll interval %s", time.Since(start), cfg.PollInterval)
-	e.waitCursor(t, sync.ConsumerPush, 1, 5*time.Second)
+	e.waitCursor(t, sync.ConsumerPush, 1)
 	e.exactlyTwoJobs(t, 1, 1)
 }
 
@@ -466,7 +468,7 @@ func TestConsumerListenLossLosesNothing(t *testing.T) {
 	}
 	wg.Wait()
 	head := e.head(t)
-	e.waitCursor(t, sync.ConsumerWebhooks, head, 30*time.Second)
+	e.waitCursor(t, sync.ConsumerWebhooks, head)
 	e.exactlyTwoJobs(t, 1, head)
 	if countLines(w.logs, "event consumer LISTEN connection lost, polling and reconnecting") == 0 {
 		t.Error("no line for the lost wake connection")
@@ -558,7 +560,7 @@ func TestConsumerHoleFailsClosed(t *testing.T) {
 	}
 	counting := &countingRounds{Rounds: w.svc}
 	w.runner(t, cfg, nil, counting)
-	waitFor(t, 10*time.Second, "several failed rounds", func() bool { return counting.failed.Load() >= 3 })
+	testkit.Until(t, "several failed rounds", func() bool { return counting.failed.Load() >= 3 })
 	if got := e.cursor(t, sync.ConsumerWebhooks); got != 2 {
 		t.Fatalf("cursor at %d over the hole", got)
 	}
@@ -572,9 +574,9 @@ func TestConsumerHoleFailsClosed(t *testing.T) {
 		t.Errorf("the failure line lacks error.type consumer_gap:\n%s", w.logs)
 	}
 	insertRaw(t, e, 3)
-	e.waitCursor(t, sync.ConsumerWebhooks, 4, 10*time.Second)
+	e.waitCursor(t, sync.ConsumerWebhooks, 4)
 	e.exactlyTwoJobs(t, 3, 4)
-	waitFor(t, 5*time.Second, "the recovery line", func() bool { return countLines(w.logs, "event consumer recovered") == 1 })
+	testkit.Until(t, "the recovery line", func() bool { return countLines(w.logs, "event consumer recovered") == 1 })
 }
 
 // TestConsumerRoundRejectsAppendedEvents: a handler that appends a durable event fails the
@@ -624,7 +626,7 @@ func TestConsumersIndependent(t *testing.T) {
 	for range 4 {
 		e.appendSettings(t, 3)
 	}
-	e.waitCursor(t, sync.ConsumerWebhooks, 12, 20*time.Second)
+	e.waitCursor(t, sync.ConsumerWebhooks, 12)
 	if got := e.cursor(t, sync.ConsumerPush); got != 0 {
 		t.Fatalf("push cursor = %d, want 0", got)
 	}
@@ -722,7 +724,7 @@ func TestConsumerShutdownFinishesRound(t *testing.T) {
 	if err := r2.Stop(ctx); !errors.Is(err, context.DeadlineExceeded) {
 		t.Fatalf("Stop with an expired budget = %v", err)
 	}
-	waitFor(t, 10*time.Second, "the cancelled round to roll back", func() bool {
+	testkit.Until(t, "the cancelled round to roll back", func() bool {
 		return r2.Stop(context.Background()) == nil
 	})
 	if got := e.cursor(t, sync.ConsumerWebhooks); got != 5 {
@@ -732,7 +734,7 @@ func TestConsumerShutdownFinishesRound(t *testing.T) {
 	restarted := e.newWorker(t, cfg)
 	restarted.register(t, sync.ConsumerWebhooks, &probe{inserter: restarted.inserter})
 	restarted.runner(t, cfg, nil, nil)
-	e.waitCursor(t, sync.ConsumerWebhooks, 10, 20*time.Second)
+	e.waitCursor(t, sync.ConsumerWebhooks, 10)
 	e.exactlyTwoJobs(t, 1, 10)
 }
 

@@ -19,6 +19,7 @@ import (
 	"github.com/OWNER/bothy/services/server/internal/kernel/ids"
 	"github.com/OWNER/bothy/services/server/internal/platform/egress"
 	"github.com/OWNER/bothy/services/server/internal/platform/secrets"
+	"github.com/OWNER/bothy/services/server/internal/platform/testkit"
 )
 
 // s3Sink returns a constructor of the object store sink on a fresh locked bucket of the shared
@@ -53,7 +54,7 @@ func s3Sink(t *testing.T) func(string, ids.ID) auditapp.CheckpointSink {
 			t.Fatal(err)
 		}
 		// The S3 gateway may learn of a bucket of weed shell a moment later.
-		deadline := time.Now().Add(30 * time.Second)
+		deadline := testkit.Deadline()
 		for _, err = sink.List(context.Background()); err != nil && time.Now().Before(deadline); _, err = sink.List(context.Background()) {
 			time.Sleep(500 * time.Millisecond)
 		}

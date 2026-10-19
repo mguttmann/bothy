@@ -17,6 +17,7 @@ import (
 	"github.com/OWNER/bothy/services/server/internal/platform/jobs"
 	"github.com/OWNER/bothy/services/server/internal/platform/jobs/jobstest"
 	"github.com/OWNER/bothy/services/server/internal/platform/pg"
+	"github.com/OWNER/bothy/services/server/internal/platform/testkit"
 	"github.com/OWNER/bothy/services/server/internal/sync"
 	"github.com/OWNER/bothy/services/server/internal/sync/adapters/postgres"
 	"github.com/OWNER/bothy/services/server/internal/sync/app"
@@ -194,7 +195,7 @@ func (w *worker) runner(t *testing.T, cfg app.ConsumerConfig, waker app.Waker, r
 		t.Fatal(err)
 	}
 	t.Cleanup(func() {
-		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+		ctx, cancel := context.WithTimeout(context.Background(), testkit.Patience)
 		defer cancel()
 		if err := r.Stop(ctx); err != nil {
 			t.Errorf("Stop: %v", err)
@@ -302,9 +303,9 @@ func (e *consumerEnv) exactlyTwoJobs(t *testing.T, from, to int64) {
 }
 
 // waitCursor waits until the cursor of name equals want.
-func (e *consumerEnv) waitCursor(t *testing.T, name sync.ConsumerName, want int64, d time.Duration) {
+func (e *consumerEnv) waitCursor(t *testing.T, name sync.ConsumerName, want int64) {
 	t.Helper()
-	waitFor(t, d, "the cursor of "+string(name)+" at the head", func() bool { return e.cursor(t, name) == want })
+	testkit.Until(t, "the cursor of "+string(name)+" at the head", func() bool { return e.cursor(t, name) == want })
 }
 
 // countLines counts the log lines of buf with msg.

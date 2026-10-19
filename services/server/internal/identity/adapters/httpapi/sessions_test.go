@@ -24,6 +24,7 @@ import (
 	"github.com/OWNER/bothy/services/server/internal/kernel/ids"
 	"github.com/OWNER/bothy/services/server/internal/kernel/jose"
 	"github.com/OWNER/bothy/services/server/internal/platform/httpserver/httpservertest"
+	"github.com/OWNER/bothy/services/server/internal/platform/testkit"
 )
 
 const mySessions = "/api/v1/me/sessions"
@@ -734,7 +735,7 @@ func TestRevokeParent_ChildCreatedConcurrently(t *testing.T) {
 		revoked <- w.id.Sessions.RevokeSession(context.Background(), c.session, identity.RevokeLogout, nil)
 	}()
 	// The proof needs the logout to wait on the parent lock before the child commits.
-	deadline := time.Now().Add(5 * time.Second)
+	deadline := testkit.Deadline()
 	for w.count(`SELECT count(*) FROM pg_locks WHERE NOT granted
 		AND pid IN (SELECT pid FROM pg_stat_activity WHERE datname = current_database())`) == 0 {
 		if time.Now().After(deadline) {

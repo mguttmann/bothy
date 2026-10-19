@@ -39,14 +39,13 @@ import (
 	"time"
 
 	"github.com/OWNER/bothy/services/server/internal/platform/secrets/stack"
+	"github.com/OWNER/bothy/services/server/internal/platform/testkit"
 )
 
 const (
 	// dockerTimeout bounds one Docker CLI call; a full backup of the small test cluster takes
 	// seconds, the slowest call is the start of a container.
 	dockerTimeout = 3 * time.Minute
-	// waitTimeout bounds every wait for a state (server ready, segment archived).
-	waitTimeout = 3 * time.Minute
 	// versionFile holds the server version, relative to this package directory.
 	versionFile = "../../VERSION"
 	// noEgressAddr is in the documentation range 192.0.2.0/24 (RFC 5737), which is never routed.
@@ -185,11 +184,11 @@ func (w *world) once(args ...string) (string, int) {
 	return out + errOut, code
 }
 
-// eventually polls check every half second until it returns true, failing after waitTimeout with
+// eventually polls check every half second until it returns true, failing after testkit.Patience with
 // what describe says.
 func eventually(t *testing.T, what string, check func() bool, describe func() string) {
 	t.Helper()
-	deadline := time.Now().Add(waitTimeout)
+	deadline := testkit.Deadline()
 	for !check() {
 		if time.Now().After(deadline) {
 			t.Fatalf("timed out waiting for %s:\n%s", what, describe())

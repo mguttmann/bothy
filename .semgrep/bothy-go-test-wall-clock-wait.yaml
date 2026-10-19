@@ -1,0 +1,44 @@
+# SPDX-License-Identifier: Apache-2.0
+rules:
+  - id: bothy-go-test-wall-clock-wait
+    languages: [go]
+    severity: ERROR
+    paths:
+      include: ["*_test.go"]
+      # The one place that defines how long a test waits.
+      exclude: ["services/*/internal/platform/testkit/*"]
+    message: >-
+      A test bounds a wait for something that must happen with its own number of seconds. On a
+      loaded host and under -race that fails correct changes. Wait with testkit.Until,
+      testkit.Receive or testkit.Context, or bound the wait by testkit.Patience or
+      testkit.Deadline() (services/server/internal/platform/testkit, docs/DECISIONS.md PL/8). A
+      check that something stays fast makes the slow alternative take longer than
+      testkit.Patience and compares with testkit.Patience. A bounded give-up or a latency bound
+      under test carries `// nosemgrep: bothy-go-test-wall-clock-wait -- <reason>`.
+    pattern-either:
+      # A polling deadline: a variable named like a deadline from time.Now().Add.
+      - patterns:
+          - pattern-either:
+              - pattern: $DL := time.Now().Add($D)
+              - pattern: $DL = time.Now().Add($D)
+          - metavariable-regex:
+              metavariable: $DL
+              regex: (?i).*deadline
+      # A connection deadline.
+      - patterns:
+          - pattern-either:
+              - pattern: $C.SetDeadline(time.Now().Add($D))
+              - pattern: $C.SetReadDeadline(time.Now().Add($D))
+              - pattern: $C.SetWriteDeadline(time.Now().Add($D))
+      # A literal number of seconds or minutes as the bound of a wait.
+      - patterns:
+          - pattern-either:
+              - pattern: time.After($D)
+              - pattern: time.NewTimer($D)
+              - pattern: context.WithTimeout($CTX, $D)
+              - pattern: 'http.Client{..., Timeout: $D, ...}'
+              - pattern: time.Since($S) > $D
+              - pattern: $V.Sub($S) > $D
+          - metavariable-regex:
+              metavariable: $D
+              regex: ^(\d+\s*\*\s*)?time\.(Second|Minute)$

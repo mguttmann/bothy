@@ -26,6 +26,7 @@ import (
 	"github.com/OWNER/bothy/services/server/internal/kernel/clock"
 	"github.com/OWNER/bothy/services/server/internal/platform/httpserver"
 	"github.com/OWNER/bothy/services/server/internal/platform/secrets"
+	"github.com/OWNER/bothy/services/server/internal/platform/testkit"
 )
 
 // mustURL parses s or stops the test.
@@ -170,7 +171,7 @@ func (f *tlsFixture) listen(t *testing.T, log *slog.Logger) net.Listener {
 func handshake(t *testing.T, addr string, cfg *tls.Config) (tls.ConnectionState, error) {
 	t.Helper()
 	d := &tls.Dialer{NetDialer: &net.Dialer{Timeout: 5 * time.Second}, Config: cfg}
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), testkit.Patience)
 	defer cancel()
 	c, err := d.DialContext(ctx, "tcp", addr)
 	if err != nil {

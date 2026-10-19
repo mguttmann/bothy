@@ -19,6 +19,7 @@ import (
 	"github.com/OWNER/bothy/services/server/internal/platform/httpserver"
 	"github.com/OWNER/bothy/services/server/internal/platform/httpserver/httpservertest"
 	"github.com/OWNER/bothy/services/server/internal/platform/ratelimit"
+	"github.com/OWNER/bothy/services/server/internal/platform/testkit"
 )
 
 const (
@@ -504,7 +505,7 @@ func TestFailedCredentials_ConcurrentVerificationsBounded(t *testing.T) {
 			statuses <- resp.StatusCode
 		}()
 	}
-	deadline := time.Now().Add(10 * time.Second)
+	deadline := testkit.Deadline()
 	for verified.Load()+limited.Load() < n && time.Now().Before(deadline) {
 		time.Sleep(5 * time.Millisecond)
 	}

@@ -9,7 +9,6 @@ import (
 	"strings"
 	"sync"
 	"testing"
-	"time"
 
 	"github.com/OWNER/bothy/services/server/internal/identity/domain"
 	"github.com/OWNER/bothy/services/server/internal/platform/pg"
@@ -55,7 +54,7 @@ func TestBootstrapPrintsCodeOnce(t *testing.T) {
 	db := newServeDB(t)
 	env := serveTestEnv(t, db)
 	c := startChild(t, env, "setup", "bootstrap-owner", "--handle", "alex", "--display-name", "Alex")
-	if code := c.wait(t, 60*time.Second); code != 0 {
+	if code := c.wait(t); code != 0 {
 		t.Fatalf("exit %d; stderr %s", code, c.stderr)
 	}
 	out, errText := c.stdout.String(), c.stderr.String()
@@ -70,7 +69,7 @@ func TestBootstrapPrintsCodeOnce(t *testing.T) {
 		t.Fatalf("stderr %s: want the info line without the handle", errText)
 	}
 	r := startChild(t, env, "setup", "issue-enrollment-code", "--user", "alex")
-	if code := r.wait(t, 60*time.Second); code != 0 {
+	if code := r.wait(t); code != 0 {
 		t.Fatalf("recovery exit %d; stderr %s", code, r.stderr)
 	}
 	rout := r.stdout.String()

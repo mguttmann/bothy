@@ -19,6 +19,7 @@ import (
 
 	"github.com/OWNER/bothy/services/server/internal/platform/health"
 	"github.com/OWNER/bothy/services/server/internal/platform/httpserver"
+	"github.com/OWNER/bothy/services/server/internal/platform/testkit"
 )
 
 // fakeListener hands out the server ends of net.Pipe connections whose RemoteAddr the test
@@ -63,7 +64,7 @@ func (l *fakeListener) dial(t *testing.T, peer string) net.Conn {
 	}
 	select {
 	case l.conns <- &peerConn{Conn: server, remote: remote}:
-	case <-time.After(5 * time.Second):
+	case <-time.After(testkit.Patience):
 		t.Fatal("the server did not accept")
 	}
 	t.Cleanup(func() { _ = client.Close() })
@@ -106,7 +107,7 @@ const rawRequest = "GET / HTTP/1.1\r\nHost: chat.example.com\r\nConnection: clos
 // roundTrip writes rawRequest on c and returns the status of the response, or the read error.
 func roundTrip(t *testing.T, c net.Conn) (int, error) {
 	t.Helper()
-	_ = c.SetDeadline(time.Now().Add(5 * time.Second))
+	_ = c.SetDeadline(testkit.Deadline())
 	go func() { _, _ = io.WriteString(c, rawRequest) }()
 	resp, err := http.ReadResponse(bufio.NewReader(c), nil)
 	if err != nil {
@@ -119,7 +120,7 @@ func roundTrip(t *testing.T, c net.Conn) (int, error) {
 // refused writes a request on c and checks that the connection ends without a single byte.
 func refused(t *testing.T, c net.Conn) {
 	t.Helper()
-	_ = c.SetDeadline(time.Now().Add(5 * time.Second))
+	_ = c.SetDeadline(testkit.Deadline())
 	go func() { _, _ = io.WriteString(c, rawRequest) }()
 	b, err := io.ReadAll(c)
 	if len(b) != 0 {
@@ -259,7 +260,7 @@ func TestSECT01_InternalListenerNotFiltered(t *testing.T) {
 	// The internal listener is opened with Listen and served without PeerFilter (R-SE-09).
 	serveOn(t, fl, httpserver.InternalHandler(httpserver.Internal(reg), httpserver.SecurityHeadersFor(mustURL(t, "https://chat.example.com"), time.Hour)))
 	c := fl.dial(t, "192.0.2.10:40000")
-	_ = c.SetDeadline(time.Now().Add(5 * time.Second))
+	_ = c.SetDeadline(testkit.Deadline())
 	go func() { _, _ = io.WriteString(c, "GET /healthz HTTP/1.1\r\nHost: x\r\nConnection: close\r\n\r\n") }()
 	resp, err := http.ReadResponse(bufio.NewReader(c), nil)
 	if err != nil || resp.StatusCode != http.StatusOK {

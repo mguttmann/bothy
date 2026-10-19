@@ -20,6 +20,7 @@ import (
 	"github.com/OWNER/bothy/services/server/internal/kernel/jose"
 	"github.com/OWNER/bothy/services/server/internal/platform/pg"
 	"github.com/OWNER/bothy/services/server/internal/platform/secrets"
+	"github.com/OWNER/bothy/services/server/internal/platform/testkit"
 	"github.com/OWNER/bothy/services/server/internal/wire"
 )
 
@@ -126,7 +127,7 @@ func TestServe_AuthenticatesPeople(t *testing.T) {
 			req.Header.Set("DPoP", identitytest.SignDPoPProof(key, identitytest.ProofClaims{HTM: http.MethodGet, HTU: cfg.PublicURL + path,
 				IAT: time.Now(), Nonce: id.DPoP.CurrentNonce(), ATH: dpop.ATH(access)}))
 		}
-		resp, err := (&http.Client{Timeout: 10 * time.Second}).Do(req)
+		resp, err := (&http.Client{Timeout: testkit.Patience}).Do(req)
 		if err != nil {
 			t.Fatal(err)
 		}

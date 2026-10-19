@@ -18,6 +18,7 @@ import (
 	"github.com/OWNER/bothy/services/server/internal/kernel/txn"
 	"github.com/OWNER/bothy/services/server/internal/platform/pg"
 	"github.com/OWNER/bothy/services/server/internal/platform/pg/pgtest"
+	"github.com/OWNER/bothy/services/server/internal/platform/testkit"
 	"github.com/OWNER/bothy/services/server/internal/sync"
 	"github.com/OWNER/bothy/services/server/internal/sync/adapters/postgres"
 	"github.com/OWNER/bothy/services/server/internal/sync/app"
@@ -181,18 +182,6 @@ func (c *collector) snapshot() []sync.Event {
 	return slices.Clone(c.events)
 }
 
-// waitFor polls cond every 20ms until it holds or d has passed.
-func waitFor(t *testing.T, d time.Duration, what string, cond func() bool) {
-	t.Helper()
-	deadline := time.Now().Add(d)
-	for !cond() {
-		if time.Now().After(deadline) {
-			t.Fatalf("timeout after %s waiting for %s", d, what)
-		}
-		time.Sleep(20 * time.Millisecond)
-	}
-}
-
 // tailConfig is a fast tail configuration for tests.
 func tailConfig() postgres.TailConfig {
 	return postgres.TailConfig{PollInterval: 100 * time.Millisecond, BatchSize: 7, ReconnectBackoffCap: 400 * time.Millisecond}
@@ -212,7 +201,7 @@ func runTail(t *testing.T, tail *postgres.Tail) (<-chan error, context.CancelFun
 		cancel()
 		select {
 		case <-finished:
-		case <-time.After(10 * time.Second):
+		case <-time.After(testkit.Patience):
 			t.Error("the tail did not stop")
 		}
 	})
@@ -237,7 +226,7 @@ func started(t *testing.T, tail *postgres.Tail) {
 	t.Helper()
 	select {
 	case <-tail.Started():
-	case <-time.After(10 * time.Second):
+	case <-time.After(testkit.Patience):
 		t.Fatal("the tail did not start")
 	}
 }

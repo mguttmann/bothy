@@ -13,6 +13,7 @@ import (
 	"github.com/OWNER/bothy/services/server/internal/identity/adapters/replay"
 	"github.com/OWNER/bothy/services/server/internal/identity/app"
 	"github.com/OWNER/bothy/services/server/internal/kernel/clock"
+	"github.com/OWNER/bothy/services/server/internal/platform/testkit"
 )
 
 // Compile-time check: the store is the outgoing port of the verifier.
@@ -79,7 +80,7 @@ func TestReplayStore_Run(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	done := make(chan struct{})
 	go func() { s.Run(ctx, time.Millisecond); close(done) }()
-	deadline := time.Now().Add(5 * time.Second)
+	deadline := testkit.Deadline()
 	for s.Len() != 0 && time.Now().Before(deadline) {
 		time.Sleep(time.Millisecond)
 	}

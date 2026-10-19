@@ -19,6 +19,8 @@ import (
 	"github.com/moby/moby/api/types/mount"
 	"github.com/moby/moby/client"
 	"github.com/testcontainers/testcontainers-go"
+
+	"github.com/OWNER/bothy/services/server/internal/platform/testkit"
 )
 
 // childMode makes TestPgtestChild act: the test binary runs itself as a child with the flag set.
@@ -78,6 +80,7 @@ func TestPgtestChild(t *testing.T) {
 // -test.timeout alarm and by SIGKILL (which no code in the process can intercept, so it stands
 // for every signal). After each, the container and its anonymous data volume must be gone.
 func TestNoContainerSurvivesTheRun(t *testing.T) {
+	testkit.Integration(t)
 	if *childMode != "" {
 		return // a child runs only TestPgtestChild
 	}
@@ -178,7 +181,7 @@ func TestNoContainerSurvivesTheRun(t *testing.T) {
 			}
 			// Docker removes the volumes right after the container, so poll for them as well.
 			for _, v := range volumes {
-				if !volumeGone(ctx, t, cli.Client, v, 30*time.Second) {
+				if !volumeGone(ctx, t, cli.Client, v, testkit.Patience) {
 					t.Errorf("volume %s of container %s still exists (%s)", v, id, tc.name)
 				}
 			}
@@ -205,7 +208,7 @@ func anonymousVolumes(ctx context.Context, t *testing.T, cli *client.Client, id 
 // volumeGone polls until volume name no longer exists, at most for limit.
 func volumeGone(ctx context.Context, t *testing.T, cli *client.Client, name string, limit time.Duration) bool {
 	t.Helper()
-	deadline := time.Now().Add(limit)
+	deadline := time.Now().Add(limit) // nosemgrep: bothy-go-test-wall-clock-wait -- the bound under test (survivalDeadline), testkit.Patience or a single probe (0)
 	for {
 		res, err := cli.VolumeList(ctx, client.VolumeListOptions{Filters: client.Filters{}.Add("name", name)})
 		if err != nil {
@@ -228,7 +231,7 @@ func volumeGone(ctx context.Context, t *testing.T, cli *client.Client, name stri
 // gone polls until container id no longer exists, at most for limit.
 func gone(ctx context.Context, t *testing.T, cli *client.Client, id string, limit time.Duration) bool {
 	t.Helper()
-	deadline := time.Now().Add(limit)
+	deadline := time.Now().Add(limit) // nosemgrep: bothy-go-test-wall-clock-wait -- the bound under test (survivalDeadline), testkit.Patience or a single probe (0)
 	for {
 		res, err := cli.ContainerList(ctx, client.ContainerListOptions{All: true, Filters: client.Filters{}.Add("id", id)})
 		if err != nil {
@@ -250,6 +253,7 @@ func gone(ctx context.Context, t *testing.T, cli *client.Client, id string, limi
 // checks that reapLegacy removes the unwatched ones whatever their value, and only once they are
 // older than legacyReapAge.
 func TestReapLegacyRemovesOnlyOldUnwatchedContainers(t *testing.T) {
+	testkit.Integration(t)
 	if *childMode != "" {
 		return
 	}

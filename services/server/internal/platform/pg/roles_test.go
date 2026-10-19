@@ -13,6 +13,7 @@ import (
 	"github.com/OWNER/bothy/services/server/internal/platform/pg"
 	"github.com/OWNER/bothy/services/server/internal/platform/pg/pgtest"
 	"github.com/OWNER/bothy/services/server/internal/platform/secrets"
+	"github.com/OWNER/bothy/services/server/internal/platform/testkit"
 )
 
 // The password files pgtest writes, by role.
@@ -163,7 +164,7 @@ func TestBootstrapNeverSendsPlaintext(t *testing.T) {
 		t.Fatalf("the canary password does not work: %v", err)
 	}
 	logs := ""
-	for deadline := time.Now().Add(10 * time.Second); time.Now().Before(deadline); time.Sleep(100 * time.Millisecond) {
+	for deadline := testkit.Deadline(); time.Now().Before(deadline); time.Sleep(100 * time.Millisecond) {
 		if logs = db.ContainerLogs(t); strings.Contains(logs, `ROLE "bothy_monitor" WITH`) {
 			break
 		}

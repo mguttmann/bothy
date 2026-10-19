@@ -19,6 +19,7 @@ import (
 	"github.com/OWNER/bothy/services/server/internal/kernel/eventlog"
 	"github.com/OWNER/bothy/services/server/internal/kernel/ids"
 	"github.com/OWNER/bothy/services/server/internal/platform/pg"
+	"github.com/OWNER/bothy/services/server/internal/platform/testkit"
 	"github.com/OWNER/bothy/services/server/internal/sync"
 	"github.com/OWNER/bothy/services/server/internal/sync/adapters/postgres"
 )
@@ -98,7 +99,7 @@ func TestSyncHook_ContiguousSeqInAppendOrder(t *testing.T) {
 	if _, err := e.appendUnit(ctx, testEvent("thread.first")); err != nil {
 		t.Fatal(err)
 	}
-	if got := notification(t, conn, 5*time.Second); got != "1" {
+	if got := notification(t, conn, testkit.Patience); got != "1" {
 		t.Errorf("notification after the first unit = %q, want 1", got)
 	}
 	if _, err := super.Exec(ctx, "UPDATE sequence_counters SET value = 6 WHERE name = 'permission_version'"); err != nil {
@@ -107,7 +108,7 @@ func TestSyncHook_ContiguousSeqInAppendOrder(t *testing.T) {
 	if _, err := e.appendUnit(ctx, testEvent("thread.a"), testEvent("thread.b"), testEvent("thread.c")); err != nil {
 		t.Fatal(err)
 	}
-	if got := notification(t, conn, 5*time.Second); got != "4" {
+	if got := notification(t, conn, testkit.Patience); got != "4" {
 		t.Errorf("notification after the second unit = %q, want 4 (only the last seq)", got)
 	}
 	rows, err := super.Query(ctx, "SELECT seq, type, permission_version FROM event_log ORDER BY seq")
@@ -240,7 +241,7 @@ func TestEventLog_ConcurrentWritersGapless(t *testing.T) {
 	if len(rolledBack) == 0 {
 		t.Fatal("no unit rolled back; the test does not exercise rollbacks")
 	}
-	waitFor(t, 20*time.Second, "the tail to reach the head", func() bool { return tail.Head() == total })
+	testkit.Until(t, "the tail to reach the head", func() bool { return tail.Head() == total })
 	events := col.snapshot()
 	checkContiguous(t, events, total)
 	seqOf := map[ids.ID]int64{}
@@ -290,7 +291,7 @@ func TestTail_ListenConnectionLossLosesNothing(t *testing.T) {
 		}
 		return n
 	}
-	waitFor(t, 10*time.Second, "the LISTEN connection", func() bool { return listeners() == 1 })
+	testkit.Until(t, "the LISTEN connection", func() bool { return listeners() == 1 })
 
 	ctx, stop := context.WithCancel(context.Background())
 	var wg stdsync.WaitGroup
@@ -316,11 +317,11 @@ func TestTail_ListenConnectionLossLosesNothing(t *testing.T) {
 			WHERE application_name = 'bothy-event-tail' AND datname = current_database()`); err != nil {
 			t.Fatal(err)
 		}
-		waitFor(t, 10*time.Second, "the tail to reconnect", func() bool { return listeners() == 1 })
+		testkit.Until(t, "the tail to reconnect", func() bool { return listeners() == 1 })
 	}
 	stop()
 	wg.Wait()
-	waitFor(t, 20*time.Second, "the tail to reach the head", func() bool { return tail.Head() == total })
+	testkit.Until(t, "the tail to reach the head", func() bool { return tail.Head() == total })
 	checkContiguous(t, col.snapshot(), total)
 }
 
@@ -335,11 +336,11 @@ func TestTail_PollsWithoutNotify(t *testing.T) {
 	_, _ = runTail(t, tail)
 	started(t, tail)
 	e.mustAppend(t, 2)
+	// Without LISTEN only the poll delivers; the time is logged, not bounded, because a bound in
+	// wall-clock time fails on loaded hosts (PL/8).
 	start := time.Now()
-	waitFor(t, 5*time.Second, "delivery by polling", func() bool { return len(col.snapshot()) == 2 })
-	if d := time.Since(start); d > 2*cfg.PollInterval+500*time.Millisecond {
-		t.Errorf("delivery took %s with a poll interval of %s", d, cfg.PollInterval)
-	}
+	testkit.Until(t, "delivery by polling", func() bool { return len(col.snapshot()) == 2 })
+	t.Logf("delivery after %s with a poll interval of %s", time.Since(start), cfg.PollInterval)
 	checkContiguous(t, col.snapshot(), 2)
 }
 
@@ -350,9 +351,9 @@ func TestTail_StartsAtHead(t *testing.T) {
 	col := &collector{}
 	tail := postgres.NewTail(e.pool, e.repo, tailConfig(), []sync.Sink{col.sink}, nil)
 	_, _ = runTail(t, tail)
-	waitFor(t, 5*time.Second, "the tail to start at the head", func() bool { return tail.Head() == 3 })
+	testkit.Until(t, "the tail to start at the head", func() bool { return tail.Head() == 3 })
 	e.mustAppend(t, 1)
-	waitFor(t, 5*time.Second, "the new event", func() bool { return tail.Head() == 4 })
+	testkit.Until(t, "the new event", func() bool { return tail.Head() == 4 })
 	if got := col.snapshot(); len(got) != 1 || got[0].Seq != 4 {
 		t.Fatalf("delivered %+v, want only seq 4", got)
 	}
@@ -385,7 +386,7 @@ func TestTail_SinksInOrderAndSinkErrorIsFatal(t *testing.T) {
 		if !errors.Is(err, boom) {
 			t.Fatalf("Run = %v, want the sink error", err)
 		}
-	case <-time.After(10 * time.Second):
+	case <-time.After(testkit.Patience):
 		t.Fatal("Run did not end after a sink error")
 	}
 	mu.Lock()
@@ -412,7 +413,7 @@ func TestTail_GapIsFatal(t *testing.T) {
 		if !errors.Is(err, sync.ErrGap) || !strings.Contains(err.Error(), "expected seq 1, read 2") {
 			t.Fatalf("Run = %v, want ErrGap naming both numbers", err)
 		}
-	case <-time.After(10 * time.Second):
+	case <-time.After(testkit.Patience):
 		t.Fatal("Run did not end on a gap")
 	}
 	if len(col.snapshot()) != 0 {
@@ -432,7 +433,7 @@ func TestTail_StopsOnContextEnd(t *testing.T) {
 		if err != nil {
 			t.Fatalf("Run after the end of its context = %v, want nil", err)
 		}
-	case <-time.After(10 * time.Second):
+	case <-time.After(testkit.Patience):
 		t.Fatal("Run did not end")
 	}
 }

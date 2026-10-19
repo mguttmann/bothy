@@ -20,6 +20,7 @@ import (
 	"github.com/OWNER/bothy/services/server/internal/platform/jobs"
 	"github.com/OWNER/bothy/services/server/internal/platform/pg"
 	"github.com/OWNER/bothy/services/server/internal/platform/pg/pgtest"
+	"github.com/OWNER/bothy/services/server/internal/platform/testkit"
 	"github.com/OWNER/bothy/services/server/migrations"
 )
 
@@ -35,7 +36,7 @@ func migrateEnvFor(db *pgtest.DB, role pg.Role, extra ...string) []string {
 		"BOTHY_DATABASE__USER=" + string(role),
 		"BOTHY_DATABASE__PASSWORD_REF=" + cfg.PasswordRef,
 		"BOTHY_DATABASE__SSLMODE=disable",
-		"BOTHY_STARTUP__DEPENDENCY_WAIT=10s",
+		"BOTHY_STARTUP__DEPENDENCY_WAIT=" + testkit.PatienceSetting,
 		testPublicURL,
 	}
 	// An extra entry replaces the default of the same variable; the loader refuses duplicates.
@@ -360,7 +361,10 @@ func TestMigrateUpHonoursLockTimeout(t *testing.T) {
 func TestMigrateMissingDatabaseIsNamed(t *testing.T) {
 	t.Parallel()
 	db := pgtest.New(t, pgtest.WithoutMigrations())
-	env := migrateEnvFor(db, pg.RoleOwner, "BOTHY_DATABASE__NAME=no_such_database", "BOTHY_STARTUP__DEPENDENCY_WAIT=1s")
+	// The command retries a missing database for the whole wait and names the cause of the last
+	// whole attempt, so the wait must hold one connection attempt on a loaded host (1s did not);
+	// the test takes twice the wait.
+	env := migrateEnvFor(db, pg.RoleOwner, "BOTHY_DATABASE__NAME=no_such_database", "BOTHY_STARTUP__DEPENDENCY_WAIT=10s")
 	for _, args := range [][]string{{"migrate", "up", "--bootstrap"}, {"migrate", "up"}} {
 		code, stdout, stderr := runBothy(t, env, args...)
 		if code != 1 || stdout != "" || !strings.Contains(stderr, `database "no_such_database" does not exist`) {

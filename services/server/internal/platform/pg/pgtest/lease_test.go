@@ -10,6 +10,8 @@ import (
 	"time"
 
 	"github.com/jackc/pgx/v5"
+
+	"github.com/OWNER/bothy/services/server/internal/platform/testkit"
 )
 
 // leaseConnections counts the lease connections of the cluster that conn belongs to.
@@ -26,7 +28,7 @@ func leaseConnections(t *testing.T, conn *pgx.Conn) int {
 // waitLeaseConnections polls until the cluster that conn belongs to has want lease connections.
 func waitLeaseConnections(t *testing.T, conn *pgx.Conn, want int) {
 	t.Helper()
-	deadline := time.Now().Add(30 * time.Second)
+	deadline := testkit.Deadline()
 	for {
 		n := leaseConnections(t, conn)
 		if n == want {

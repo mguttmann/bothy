@@ -11,6 +11,8 @@ import (
 	"syscall"
 	"testing"
 	"time"
+
+	"github.com/OWNER/bothy/services/server/internal/platform/testkit"
 )
 
 // Stubs for watchdogScript outside the container. The entry point stands for PostgreSQL: it
@@ -84,7 +86,7 @@ func startWatchdog(t *testing.T, bin, first string) *watchdogRun {
 			_ = w.cmd.Process.Signal(syscall.SIGTERM)
 			select {
 			case <-w.done:
-			case <-time.After(10 * time.Second):
+			case <-time.After(testkit.Patience):
 				_ = w.cmd.Process.Kill()
 				<-w.done
 			}

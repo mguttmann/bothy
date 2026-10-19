@@ -25,6 +25,7 @@ import (
 	"time"
 
 	"github.com/OWNER/bothy/services/server/internal/platform/egress"
+	"github.com/OWNER/bothy/services/server/internal/platform/testkit"
 )
 
 func hostIs(name string) egress.HostPolicy {
@@ -603,13 +604,11 @@ func TestResponseLimit(t *testing.T) {
 	}
 }
 
-// slowServer answers only when the client gives up.
+// slowServer answers only when the client gives up (or the server closes at the end of the
+// test), so a client without its time limit waits past testkit.Patience.
 func slowServer(t *testing.T) *server {
 	return newServer(t, func(_ http.ResponseWriter, r *http.Request) {
-		select {
-		case <-r.Context().Done():
-		case <-time.After(10 * time.Second):
-		}
+		<-r.Context().Done()
 	})
 }
 
@@ -618,14 +617,18 @@ func TestTimeout(t *testing.T) {
 	srv := slowServer(t)
 	rules := []egress.Rule{{Host: "127.0.0.1", Port: srv.port(t), AllowPrivate: true}}
 	for name, s := range map[string]setup{
-		"egress.timeout":    {rules: rules, timeout: 200 * time.Millisecond},
-		"consumer override": {rules: rules, timeout: time.Minute, opts: egress.Options{Timeout: 200 * time.Millisecond}},
+		"egress.timeout": {rules: rules, timeout: 200 * time.Millisecond},
+		// egress.timeout far beyond testkit.Patience: only the override ends the request in time.
+		"consumer override": {rules: rules, timeout: 2 * testkit.Patience, opts: egress.Options{Timeout: 200 * time.Millisecond}},
 	} {
 		t.Run(name, func(t *testing.T) {
 			t.Parallel()
 			h := newHarness(t, s)
-			start := time.Now()
-			err := h.err(t, srv.URL)
+			// In a goroutine, so a request that ignored its time limit fails the test after
+			// testkit.Patience; the end of the test cancels it.
+			done := make(chan error, 1)
+			go func() { done <- h.err(t, srv.URL) }()
+			err := testkit.Receive(t, "the end of the request by its time limit", done)
 			var ne net.Error
 			if !errors.As(err, &ne) || !ne.Timeout() {
 				t.Fatalf("want a timeout, got %v", err)
@@ -635,9 +638,6 @@ func TestTimeout(t *testing.T) {
 			}
 			if !os.IsTimeout(err) {
 				t.Errorf("os.IsTimeout(%v) = false", err)
-			}
-			if d := time.Since(start); d > 5*time.Second {
-				t.Fatalf("took %v", d)
 			}
 		})
 	}
@@ -654,7 +654,7 @@ func TestTimeoutBoundsResolver(t *testing.T) {
 	}
 	select {
 	case <-h.res.ended:
-	case <-time.After(5 * time.Second):
+	case <-time.After(testkit.Patience):
 		t.Fatal("the lookup still runs after the timeout")
 	}
 }
@@ -884,7 +884,8 @@ func TestProtocolSwitchRefused(t *testing.T) {
 	t.Parallel()
 	port := switchingServer(t)
 	target := "http://127.0.0.1:" + strconv.Itoa(int(port)) + "/"
-	h := newHarness(t, setup{rules: []egress.Rule{{Host: "127.0.0.1", Port: port, AllowPrivate: true}}, timeout: 5 * time.Second})
+	// A returned or waited-on switch would only end with egress.timeout, far beyond testkit.Patience.
+	h := newHarness(t, setup{rules: []egress.Rule{{Host: "127.0.0.1", Port: port, AllowPrivate: true}}, timeout: 2 * testkit.Patience})
 	loop := egress.NewLoopbackResolver(5*time.Second, newResolver(nil))
 	for name, get := range map[string]func() error{
 		"Do": func() error { return h.err(t, target) },
@@ -909,7 +910,7 @@ func TestProtocolSwitchRefused(t *testing.T) {
 		if err == nil || !strings.Contains(err.Error(), "switched protocols") {
 			t.Errorf("%s: want the protocol switch refused, got %v", name, err)
 		}
-		if d := time.Since(start); d > 3*time.Second {
+		if d := time.Since(start); d > testkit.Patience {
 			t.Errorf("%s: took %v", name, d)
 		}
 	}
@@ -1006,17 +1007,22 @@ func TestTransportDeadlineWithoutClientTimeout(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	start := time.Now()
-	resp, err := own.Do(req)
+	// In a goroutine, so a request without the time limit fails the test after testkit.Patience;
+	// the end of the test cancels it.
+	done := make(chan error, 1)
+	go func() {
+		resp, err := own.Do(req)
+		if err == nil {
+			_ = resp.Body.Close()
+		}
+		done <- err
+	}()
+	err = testkit.Receive(t, "the end of the request by the transport deadline", done)
 	if err == nil {
-		_ = resp.Body.Close()
 		t.Fatal("no error")
 	}
 	if !errors.Is(err, context.DeadlineExceeded) {
 		t.Errorf("error %v is not a deadline", err)
-	}
-	if d := time.Since(start); d > 3*time.Second {
-		t.Errorf("took %v", d)
 	}
 }
 
