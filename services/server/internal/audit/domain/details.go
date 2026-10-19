@@ -27,6 +27,9 @@ const (
 	DetailViolations = "violations"
 	// DetailReason is the reason a management action requires, the only free text.
 	DetailReason = "reason"
+	// DetailOSUser is the name of a session user of a terminal host (M2-39), in the form of
+	// host_session_users.os_user; never a path.
+	DetailOSUser = "os_user"
 )
 
 // MaxCodeLen is the longest code (and attribute key) in bytes. Codes are short machine words
@@ -40,6 +43,8 @@ var (
 	codePattern = regexp.MustCompile(`^[a-z0-9][a-z0-9_.:-]*$`)
 	keyPattern  = regexp.MustCompile(`^[a-z][a-z0-9_]*$`)
 	hmacPattern = regexp.MustCompile(`^[0-9a-f]{64}$`)
+	// osUserPattern is the check host_session_users_os_user_check of 03 section 4.14.
+	osUserPattern = regexp.MustCompile(`^[A-Za-z0-9_][A-Za-z0-9_.-]*$`)
 )
 
 // ValidCode reports whether s is a code of SEC-AUD-5: ^[a-z0-9][a-z0-9_.:-]*$ and at most
@@ -52,7 +57,7 @@ func ValidKey(s string) bool { return len(s) <= MaxCodeLen && keyPattern.MatchSt
 // IsReserved reports whether key is one of the reserved members of audit_details.v1.
 func IsReserved(key string) bool {
 	switch key {
-	case DetailIPHMAC, DetailIPKeyID, DetailAggregate, DetailViolations, DetailReason:
+	case DetailIPHMAC, DetailIPKeyID, DetailAggregate, DetailViolations, DetailReason, DetailOSUser:
 		return true
 	}
 	return false
@@ -71,6 +76,10 @@ func ValidReasonText(s string) error {
 	}
 	return nil
 }
+
+// ValidOSUser reports whether s is the name of a session user in the form of
+// host_session_users.os_user: ^[A-Za-z0-9_][A-Za-z0-9_.-]*$, never a path.
+func ValidOSUser(s string) bool { return osUserPattern.MatchString(s) }
 
 // DetailsV1 is a details object of schema audit_details.v1 (19 SEC-AUD-5), decoded: strings,
 // booleans, integers (int, int64, json.Number), []any and, inside the reserved members,
@@ -115,6 +124,9 @@ func validateMember(k string, v any) error {
 			return fmt.Errorf("%w: member reason is not a string", ErrDetails)
 		}
 		return ValidReasonText(s)
+	case DetailOSUser:
+		s, isStr := v.(string)
+		ok = isStr && ValidOSUser(s)
 	default:
 		if !ValidKey(k) {
 			return fmt.Errorf("%w: attribute key does not match ^[a-z][a-z0-9_]*$", ErrDetails)

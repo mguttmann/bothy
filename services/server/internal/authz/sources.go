@@ -15,9 +15,9 @@ import (
 // tables. M1-28 adds CredentialSource, StructureSource and AgentPolicySource; M1-29 adds
 // StructureSource.ServedTargets, ChannelFacts.Archived and AgentPolicySource.PersonalAgents; M1-49
 // adds PrincipalSource.Profiles and OwnerIDs, StructureSource.SpaceDetails and ChannelDetails and
-// AgentPolicy.BillingModesSupported for "who has access", the preview and "view as". Until their
-// owning modules have tables, internal/wire passes empty sources (ruling D2 of
-// docs/briefs/M1-28-authz-core.md).
+// AgentPolicy.BillingModesSupported for "who has access", the preview and "view as"; M2-39 adds
+// HostSource. Until their owning modules have tables, internal/wire passes empty sources (ruling D2
+// of docs/briefs/M1-28-authz-core.md).
 
 // PrincipalStatus is the lifecycle state of a principal as authz sees it.
 type PrincipalStatus string
@@ -277,6 +277,42 @@ type AgentPolicySource interface {
 	// DevEnvironmentReady reports a ready own dev environment of userID for channelID (SR3);
 	// false until V2.
 	DevEnvironmentReady(ctx context.Context, userID, channelID ids.ID) (bool, error)
+}
+
+// HostFacts are the facts of one terminal host that authz needs (02 section 4.3: state, holder,
+// LLM declaration, server host of the host). The terminal module implements the source (M2-39).
+type HostFacts struct {
+	// ID is the host.
+	ID ids.ID
+	// State is pairing, confirming, active, disabled or retired (24 section 3.1).
+	State string
+	// AssignedUserID is the holder (hosts.assigned_user_id, SR10); zero means owners only.
+	AssignedUserID ids.ID
+	// LLMCredentials is none, personal or organization; consumed by the I6 guard of M2-40.
+	LLMCredentials string
+	// CredentialHolderID is set exactly with personal; consumed by M2-40.
+	CredentialHolderID ids.ID
+	// DeclaredServerHost is the owner's declaration that the server runs on the host (SR11).
+	DeclaredServerHost bool
+	// ReportedIsServerHost is the report of the host service; false while not reported.
+	ReportedIsServerHost bool
+}
+
+// HostRetired is the state of a retired host (24 section 3.1): final, no grant can work on it.
+const HostRetired = "retired"
+
+// HostSource gives authz the facts of terminal hosts, the target outside the tree instance,
+// space, channel (07 section 2.12). The terminal module implements it (terminal/app,
+// M2-39); internal/wire binds it. Every method reads fresh, inside the ambient transaction of ctx
+// when there is one: host facts are few and change rarely, and a stale cache would decide on an
+// old holder. Lists are ascending by id.
+type HostSource interface {
+	// Host returns the facts of one host; ok is false for an unknown id.
+	Host(ctx context.Context, id ids.ID) (HostFacts, bool, error)
+	// HostIDs returns every host, retired ones included.
+	HostIDs(ctx context.Context) ([]ids.ID, error)
+	// AssignedTo returns the hosts whose holder is userID.
+	AssignedTo(ctx context.Context, userID ids.ID) ([]ids.ID, error)
 }
 
 // CredentialRef names the credentials of a request principal.

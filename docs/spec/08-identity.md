@@ -810,10 +810,13 @@ the person knew, rotate secrets in their dev environment.
 
 - **Form.** `<prefix>_<kind>_<random>_<checksum>` following [ADR 0061](../adr/0061-token-format-with-a-fixed-prefix-and-checksum.md): prefix `bothy` (one of the
   listed places with the working name, [02-architecture.md](02-architecture.md) section 6),
-  kind `agt` (agent), `app` (app), `pat` (personal), `whi` (incoming webhook), 256 bits of randomness in
+  kind `agt` (agent), `app` (app), `pat` (personal), `whi` (incoming webhook), `hpc` (pairing
+  code of a host), 256 bits of randomness in
   Base62 (alphabet `0-9A-Za-z`) as exactly 43 characters, checksum CRC-32 (IEEE) over the characters of the
   random part as exactly 6 Base62 characters. The kind follows the principal: `agt` only for agents,
-  `app` only for apps, `pat` only for people; `whi` is issued only by an incoming webhook. Reason:
+  `app` only for apps, `pat` only for people; `whi` is issued only by an incoming webhook; `hpc`
+  is issued only by `host.manage`, only `host.pair` redeems it, and authentication never accepts it
+  (like `whi`, rejected without database access; [24-terminal.md](24-terminal.md), section 3.2). Reason:
   the prefix allows a rule in the secret scanner ([23-quality.md](23-quality.md)); the
   checksum rejects typos and chance finds without database access.
 - **Storage.** Only HMAC-SHA-256 with the server pepper and the first 6 characters of the random part as

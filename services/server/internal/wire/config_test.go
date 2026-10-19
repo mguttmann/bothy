@@ -31,6 +31,11 @@ func TestConfigSchemaBuilds(t *testing.T) {
 		got[k.Name] = k
 	}
 	want := map[string]config.Key{
+		"audit.reason_max_chars":               {Kind: config.KindInt, Default: "500", Min: "1", Chapter: "19-security.md"},
+		"host.name_max_chars":                  {Kind: config.KindInt, Default: "100", Min: "1", Chapter: "03-data-model.md"},
+		"host.os_user_max_chars":               {Kind: config.KindInt, Default: "64", Min: "1", Chapter: "03-data-model.md"},
+		"terminal.pairing_code_ttl":            {Kind: config.KindDuration, Default: "15m", Min: "1s", Chapter: "24-terminal.md"},
+		"terminal.session_token_ttl":           {Kind: config.KindDuration, Default: "30s", Min: "1s", Chapter: "24-terminal.md"},
 		"server.role":                          {Kind: config.KindEnum, Default: "all", Enum: []string{"api", "worker", "all"}, Chapter: "16-operations.md"},
 		"server.listen_addr":                   {Kind: config.KindListenAddr, Default: "127.0.0.1:8080", Chapter: "16-operations.md"},
 		"server.internal_listen_addr":          {Kind: config.KindListenAddr, Default: "127.0.0.1:8081", Chapter: "16-operations.md"},

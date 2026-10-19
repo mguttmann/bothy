@@ -54,6 +54,14 @@ WHERE g.revoked_at IS NULL
        OR g.target_channel_id = ANY (@channel_ids::uuid[]))
 ORDER BY g.id;
 
+-- name: ListActiveGrantsOnHosts :many
+-- Grants on the given hosts: the subjects a rights change on a host affects (M2-39).
+SELECT sqlc.embed(g)
+FROM grants g
+WHERE g.revoked_at IS NULL
+  AND g.target_host_id = ANY (@host_ids::uuid[])
+ORDER BY g.id;
+
 -- name: ListGrantsPage :many
 -- One keyset page of grants ascending by id (listGrants, M1-48). Without include_revoked only the
 -- grants in effect at @at (not revoked, not expired); the filters are optional; without

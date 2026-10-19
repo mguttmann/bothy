@@ -152,6 +152,14 @@ type PreviewFacts struct {
 	Req    Expr
 }
 
+// HostFacts are the facts of a host resource (M2-39, 07 section 2.12), computed by the
+// application layer from the snapshots of the principal and of "view as": Visible is the
+// visibility of the host (owner, holder or terminal), Assignee and Terminal the atoms of the
+// requirement after the "view as" intersection.
+type HostFacts struct {
+	Visible, Assignee, Terminal bool
+}
+
 // TargetFacts are the facts of the second target (thread.move).
 type TargetFacts struct {
 	Visible bool
@@ -204,7 +212,23 @@ type Input struct {
 	Grant                                                      *GrantFacts
 	Invoke                                                     *InvokeFacts
 	Token                                                      *TokenFacts
+	// Host are the facts of a host resource; nil for every other kind.
+	Host *HostFacts
 }
+
+// GateHumanSession is the gate of 07 section 4.2 for a requirement gated by HumanSession
+// (HumanGated): every principal that is not a person acting in a session is refused with
+// forbidden subject_kind_not_allowed. The answer depends on the principal alone, never on the
+// resource, so an agent learns nothing about a host (AZ-P4). Any other requirement passes.
+func GateHumanSession(req Expr, p Principal) Decision {
+	if HumanGated(req) && !humanSession(p) {
+		return deny(OutcomeForbidden, ReasonSubjectKindNotAllowed)
+	}
+	return Allow
+}
+
+// humanSession reports a person acting in a session (not with an API token).
+func humanSession(p Principal) bool { return p.Kind == KindUser && p.HasSession }
 
 // Decide decides one call from the facts of in, steps 5 to 9 of 07 section 4.2 in the order of the
 // brief M1-28: visibility (not_found), requirement (forbidden with the atom's reason), app scope,
@@ -367,6 +391,13 @@ var atoms = map[op]atom{
 	},
 	opReadOnOperatedChannel: func(v evaluator, _ Expr) (bool, Reason) { return v.in.ReadOnOperatedChannel, ReasonNoGrant },
 	opGroupMember:           func(v evaluator, _ Expr) (bool, Reason) { return v.in.GroupMember, ReasonNotSelf },
+	opHumanSession: func(v evaluator, _ Expr) (bool, Reason) {
+		return humanSession(v.in.Principal), ReasonSubjectKindNotAllowed
+	},
+	opAssignee: func(v evaluator, _ Expr) (bool, Reason) { return v.in.Host != nil && v.in.Host.Assignee, ReasonNotSelf },
+	opTerminal: func(v evaluator, _ Expr) (bool, Reason) {
+		return v.in.Host != nil && v.in.Host.Terminal, ReasonCapabilityMissing
+	},
 }
 
 // self reports that the resource belongs to the principal (isSelf).

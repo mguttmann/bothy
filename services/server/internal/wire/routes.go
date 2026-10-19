@@ -17,6 +17,7 @@ import (
 	identityhttp "github.com/OWNER/bothy/services/server/internal/identity/adapters/httpapi"
 	instancehttp "github.com/OWNER/bothy/services/server/internal/instance/adapters/httpapi"
 	"github.com/OWNER/bothy/services/server/internal/platform/httpserver"
+	terminalhttp "github.com/OWNER/bothy/services/server/internal/terminal/adapters/httpapi"
 )
 
 // logKeyError is the attribute key of the joined error in the "route check failed" record
@@ -106,6 +107,9 @@ type Handlers struct {
 	*identityhttp.TrustedHeader
 	// Lifecycle implements disableUser, revokeDevice and revokeSession (identity, M1-45).
 	*identityhttp.Lifecycle
+	// Hosts implements listHosts, createHost, getHost, updateHost and setHostState (terminal,
+	// M2-39).
+	*terminalhttp.Hosts
 }
 
 // routeBuilder builds and verifies the routes of one REST surface against a catalogue with the

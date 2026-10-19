@@ -154,6 +154,8 @@ type server struct {
 	agents *Agents
 	// chat is the chat module (M1-52): spaces, the sidebar and their REST handlers.
 	chat *Chat
+	// terminal is the terminal module (M2-39): the host records and their REST handlers.
+	terminal *Terminal
 	// signingKeys are the server signing keys (M1-32) and keyCheck the interval of their job.
 	signingKeys *SigningKeys
 	keyCheck    time.Duration
@@ -194,6 +196,8 @@ type server struct {
 //     hook and the identity module (startAgents),
 //     6f. chat (M1-52): build the spaces and the sidebar over the unit of work, the Authorizer,
 //     the recorder and the appender (startChat),
+//     6g. terminal (M2-39): build the host records over the unit of work, the Authorizer, the
+//     recorder, the appender and the identity module (startTerminal),
 //  7. extension points, in this order: signing keys (M1-32), routes (the catalogue check of
 //     route bindings and registrations for every role, M1-25, then InstallRateLimits with its
 //     sweeper, M1-19, InstallIdempotency, M1-20, and MountRoutes, api and all), log
@@ -355,6 +359,7 @@ func (s *server) components() []lifecycle.Component {
 		step("identity", s.startIdentity),
 		step("agents", s.startAgents),
 		step("chat", s.startChat),
+		step("terminal", s.startTerminal),
 		step("signing_keys", s.startSigningKeys),
 		step("audit_log", s.startAuditLog),
 		step("sessions", s.startSessions),
@@ -728,6 +733,30 @@ func (s *server) startChat(context.Context) error {
 	return nil
 }
 
+// startTerminal is start step 6g (M2-39): the terminal module over the pool, the unit of work and
+// the recorder of the audit step, the appender of the sync step, the Authorizer and the identity
+// module.
+func (s *server) startTerminal(context.Context) error {
+	cfg, err := TerminalConfig(s.values)
+	if err != nil {
+		return err
+	}
+	s.mu.Lock()
+	pool, a, az, sy, id := s.pool, s.audit, s.authorizer, s.sync, s.identity
+	s.mu.Unlock()
+	if a == nil || az == nil || sy == nil || id == nil {
+		return errors.New("wire: the terminal step needs audit, sync, the Authorizer and identity")
+	}
+	tm, err := NewTerminal(cfg, pool, a.UoW(), az, IdentityWrites{Audit: a.Recorder(), Events: sy.Appender()}, id, s.deps.Clock, s.logger())
+	if err != nil {
+		return err
+	}
+	s.mu.Lock()
+	s.terminal = tm
+	s.mu.Unlock()
+	return nil
+}
+
 // startSessions is the second extension point of start step 7 (M1-34): the session part of
 // identity over the signing keys of the previous step and the instance id, the issuer of access
 // tokens. From here on the HTTP chain authenticates people with identity's Authenticator.
@@ -777,6 +806,9 @@ func (s *server) handlers() Handlers {
 	}
 	if s.chat != nil {
 		s.chat.fillHandlers(&h)
+	}
+	if h.Hosts == nil && s.terminal != nil {
+		h.Hosts = s.terminal.Handlers
 	}
 	if h.Keys == nil && s.signingKeys != nil {
 		h.Keys = s.signingKeys.Handlers

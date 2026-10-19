@@ -80,6 +80,17 @@ type IssuedToken struct {
 	Secret Token
 }
 
+// PairingCode is a new pairing code of a terminal host (bothy_hpc_..., 24-terminal.md section 3.2,
+// ADR 0061): the secret, shown exactly once by createHost, and its HMAC-SHA-256 with the token
+// pepper of auth.token_pepper_ref, the only form the terminal module stores
+// (hosts.pairing_code_hash). The secret prints "[redacted]" through fmt, slog and JSON.
+type PairingCode struct {
+	// Secret is the code; only the createHost handler reveals it, once.
+	Secret Token
+	// Hash is HMAC-SHA-256(pepper, code).
+	Hash []byte
+}
+
 // Tokens is the API token port of identity (02 section 4.3, brief M1-44). Its methods authorize
 // nothing: the calling use case did. Each joins the ambient unit of work of ctx, or runs its own.
 // Every error is a kernel/errs error without the secret, the hash or SQL.
@@ -100,6 +111,11 @@ type Tokens interface {
 	// (M1-45 on user.disable, M1-51 on agent.disable). The caller owns the rights change and the
 	// audit; outside a unit of work that is a rights change it fails with internal_error.
 	RevokeAllForPrincipal(ctx context.Context, principalID, by ids.ID) (int, error)
+	// NewHostPairingCode returns a new pairing code of kind hpc from crypto/rand with its HMAC
+	// (M2-39). It reads and writes no database and authorizes nothing: host.manage did. The
+	// authenticator never accepts the code; host.pair redeems it (M2-41). Errors: internal_error
+	// when the random source fails.
+	NewHostPairingCode(ctx context.Context) (PairingCode, error)
 }
 
 // CreateTokenCmd is the body of createToken (schema ApiTokenCreate).

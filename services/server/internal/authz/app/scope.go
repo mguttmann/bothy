@@ -19,6 +19,8 @@ type scopeMemoKey struct {
 	key               cacheKey
 	viewAs, actingFor ids.ID
 	scope             string
+	// hosts tells the host list of host.read from the channel lists (M2-39).
+	hosts bool
 }
 
 // Scope implements authorize.Authorizer (07 sections 7.2 and 7.4). The lists are built per request
@@ -55,11 +57,10 @@ func (a *Authorizer) scope(ctx context.Context, p authorize.Principal, act autho
 	if err != nil || d.Outcome != domain.OutcomeAllow {
 		return authorize.Scope{}, d, err
 	}
-	appScope := ""
-	if s.kind == domain.KindApp {
-		appScope, _ = domain.AppScopeOf(spec.ID)
+	if d := gate(spec, s); d.Outcome != domain.OutcomeAllow {
+		return authorize.Scope{}, d, nil
 	}
-	mk := scopeMemoKey{key: s.entry.key, viewAs: p.ViewAsPerson(), actingFor: p.ActingForPerson(), scope: appScope}
+	mk := memoKey(spec, s, p)
 	memo, hasMemo := authorize.RequestMemoFrom(ctx)
 	if txn.InRightsChange(ctx) {
 		// The unit sees uncommitted rights; nothing of it may outlive the unit (version.go).
@@ -68,16 +69,44 @@ func (a *Authorizer) scope(ctx context.Context, p authorize.Principal, act autho
 	if sc, ok := memoScope(memo, mk); ok {
 		return sc, domain.Allow, nil
 	}
-	sc := authorize.Scope{PermissionVersion: v}
-	if s.kind != domain.KindApp || domain.CheckAppScope(spec.ID, p.AppGrantedScopes()) == "" {
-		if sc, err = a.buildScope(ctx, s, v); err != nil {
-			return authorize.Scope{}, domain.Decision{}, err
-		}
+	sc, err := a.lists(ctx, spec, s, p, v)
+	if err != nil {
+		return authorize.Scope{}, domain.Decision{}, err
 	}
 	if hasMemo {
 		memo.Store(mk, cloneScope(sc))
 	}
 	return sc, domain.Allow, nil
+}
+
+// gate applies the gate of HumanSession of spec's requirement to s (M2-39).
+func gate(spec domain.ActionSpec, s *actingPrincipal) domain.Decision {
+	req, ok := domain.RequirementOf(spec.ID)
+	if !ok {
+		return domain.Allow
+	}
+	return domain.GateHumanSession(req.Expr, s.domainPrincipal())
+}
+
+// memoKey returns the key of the lists of spec for s and p in the request memo.
+func memoKey(spec domain.ActionSpec, s *actingPrincipal, p authorize.Principal) scopeMemoKey {
+	appScope := ""
+	if s.kind == domain.KindApp {
+		appScope, _ = domain.AppScopeOf(spec.ID)
+	}
+	return scopeMemoKey{key: s.entry.key, viewAs: p.ViewAsPerson(), actingFor: p.ActingForPerson(), scope: appScope, hosts: isHostList(spec)}
+}
+
+// lists builds the lists of spec: the hosts of host.read, or the channels and spaces, which an
+// app without the scope of the action does not get.
+func (a *Authorizer) lists(ctx context.Context, spec domain.ActionSpec, s *actingPrincipal, p authorize.Principal, v int64) (authorize.Scope, error) {
+	switch {
+	case isHostList(spec):
+		return a.buildHostScope(ctx, s, v)
+	case s.kind != domain.KindApp || domain.CheckAppScope(spec.ID, p.AppGrantedScopes()) == "":
+		return a.buildScope(ctx, s, v)
+	}
+	return authorize.Scope{PermissionVersion: v}, nil
 }
 
 // memoScope returns a copy of the scope stored under k in memo, which may be nil.
@@ -94,11 +123,15 @@ func memoScope(memo *authorize.RequestMemo, k scopeMemoKey) (authorize.Scope, bo
 }
 
 // listAction returns the spec of act when Scope may serve it: a requirement of exactly read on
-// channel-path kinds or spaces (07 section 7.4); any other action is an internal error.
+// channel-path kinds or spaces (07 section 7.4), or host.read (M2-39); any other action is an
+// internal error.
 func (a *Authorizer) listAction(act authorize.Action) (domain.ActionSpec, error) {
 	spec, req, err := a.requirement(act)
 	if err != nil {
 		return domain.ActionSpec{}, err
+	}
+	if isHostList(spec) {
+		return spec, nil
 	}
 	ok := req.IsReadLevel() && len(spec.Resources) > 0
 	for _, k := range spec.Resources {
@@ -189,5 +222,6 @@ func cloneScope(sc authorize.Scope) authorize.Scope {
 	sc.ChannelIDs = slices.Clone(sc.ChannelIDs)
 	sc.SpaceIDs = slices.Clone(sc.SpaceIDs)
 	sc.FullyVisibleSpaceIDs = slices.Clone(sc.FullyVisibleSpaceIDs)
+	sc.HostIDs = slices.Clone(sc.HostIDs)
 	return sc
 }

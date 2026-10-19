@@ -73,6 +73,9 @@ type KeysConfig struct {
 	WebhookDeliveryTimeout time.Duration `config:"webhook.delivery_timeout"`
 	// ClockLeeway is auth.clock_leeway, the margin of every window.
 	ClockLeeway time.Duration `config:"auth.clock_leeway"`
+	// TerminalSessionTokenTTL is terminal.session_token_ttl, the validity of a session token of
+	// the terminal (24 section 5.3).
+	TerminalSessionTokenTTL time.Duration `config:"terminal.session_token_ttl"`
 }
 
 // Policy returns the rotation policy of p: the scheduled interval (invocation and access_token
@@ -86,6 +89,9 @@ func (c KeysConfig) Policy(p instance.Purpose) domain.RotationPolicy {
 		pol.Interval, pol.Window = c.InvocationRotation, domain.Window(c.InvocationTokenTTL, c.ClockLeeway)
 	case instance.PurposeWebhookOut:
 		pol.Window = domain.Window(c.WebhookDeliveryTimeout, c.ClockLeeway)
+	case instance.PurposeTerminal:
+		// No interval: like webhook_out it rotates on owner request (19 section 10 names none).
+		pol.Window = domain.Window(c.TerminalSessionTokenTTL, c.ClockLeeway)
 	case instance.PurposeAuditCheckpoint:
 		// Zero: old checkpoints are verified through PublicKey in any state.
 	}
@@ -97,7 +103,7 @@ func (c KeysConfig) check() error {
 	if c.CacheTTL <= 0 || c.JWKSMaxAge <= 0 || c.InvocationRotation <= 0 || c.AccessTokenRotation <= 0 {
 		return errors.New("instance: signing_key.cache_ttl, agent.jwks_max_age and both rotation intervals must be positive")
 	}
-	if c.AccessTokenTTL < 0 || c.InvocationTokenTTL < 0 || c.WebhookDeliveryTimeout < 0 || c.ClockLeeway < 0 {
+	if c.AccessTokenTTL < 0 || c.InvocationTokenTTL < 0 || c.WebhookDeliveryTimeout < 0 || c.ClockLeeway < 0 || c.TerminalSessionTokenTTL < 0 {
 		return errors.New("instance: token lifetimes and auth.clock_leeway must not be negative")
 	}
 	return nil

@@ -371,7 +371,6 @@ func TestRotateSigningKey_HTTP(t *testing.T) {
 		// refuses it before the step-up rule of step 8 (docs/DECISIONS.md M1-32).
 		{"personal token", "pat", body("invocation", "emergency", "x"), http.StatusForbidden, "forbidden", "owner_only"},
 		{"anonymous", "", body("invocation", "emergency", "x"), http.StatusUnauthorized, "unauthenticated", ""},
-		{"terminal", "owner", body("terminal", "scheduled", "x"), http.StatusBadRequest, "validation_failed", ""},
 		{"unknown purpose", "owner", body("session", "scheduled", "x"), http.StatusBadRequest, "validation_failed", ""},
 		{"missing mode", "owner", body("invocation", "", "x"), http.StatusBadRequest, "validation_failed", ""},
 		{"empty reason", "owner", body("invocation", "scheduled", ""), http.StatusBadRequest, "validation_failed", ""},

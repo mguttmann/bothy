@@ -55,6 +55,9 @@ type Snapshot struct {
 	Spaces map[ids.ID]Rights
 	// Channels are the rights of grants on channels.
 	Channels map[ids.ID]Rights
+	// Hosts are the capabilities of grants on hosts (07 section 2.12, M2-39); a host is outside
+	// the tree, so these grants never enter Instance, Spaces or Channels.
+	Hosts map[ids.ID]Caps
 	// Groups are the groups with a membership in effect, ascending.
 	Groups []ids.ID
 }
@@ -87,12 +90,13 @@ type SnapshotInput struct {
 
 // BuildSnapshot builds the snapshot of in: grants in effect at in.At (07 section 2.5), for people
 // also those of the groups with a membership in effect, the maximum level and the union of
-// capabilities per target. Grants on a host never enter the tree (07 section 2.12). ValidUntil is
+// capabilities per target. Grants on a host enter only Hosts, never the tree (07 section 2.12).
+// ValidUntil is
 // the earliest expiry after in.At of every grant and membership read and of in.Expiries.
 func BuildSnapshot(in SnapshotInput) Snapshot {
 	s := Snapshot{
 		PrincipalID: in.PrincipalID, PermissionVersion: in.Version, ComputedAt: in.At,
-		Spaces: map[ids.ID]Rights{}, Channels: map[ids.ID]Rights{},
+		Spaces: map[ids.ID]Rights{}, Channels: map[ids.ID]Rights{}, Hosts: map[ids.ID]Caps{},
 	}
 	expiries := slices.Clone(in.Expiries)
 	if !in.Active {
@@ -115,7 +119,7 @@ func BuildSnapshot(in SnapshotInput) Snapshot {
 		case TargetChannel:
 			s.Channels[g.Target.ChannelID] = s.Channels[g.Target.ChannelID].union(r)
 		case TargetHost:
-			// Outside the tree; M2-39 adds a map for hosts.
+			s.Hosts[g.Target.HostID] = s.Hosts[g.Target.HostID].Union(g.Caps)
 		}
 	}
 	for _, g := range in.Grants {

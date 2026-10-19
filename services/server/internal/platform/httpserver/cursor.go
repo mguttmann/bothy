@@ -12,6 +12,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"strings"
 
 	"github.com/OWNER/bothy/services/server/internal/kernel/errs"
 )
@@ -87,6 +88,9 @@ func DecodeCursor(list string, binding []byte, s string, key any) error {
 	if !ok {
 		return invalid
 	}
+	if bytes.Contains(k, []byte(`\u0000`)) && hasNUL(k) {
+		return invalid
+	}
 	dec := json.NewDecoder(bytes.NewReader(k))
 	dec.DisallowUnknownFields()
 	dec.UseNumber()
@@ -94,6 +98,26 @@ func DecodeCursor(list string, binding []byte, s string, key any) error {
 		return invalid
 	}
 	return nil
+}
+
+// hasNUL reports a NUL character in a string or member name of the JSON key k (or a key that does
+// not parse). PostgreSQL text holds no NUL (SQLSTATE 22021), so such a key, which only a forged
+// cursor carries, would turn a keyset query into a 500; DecodeCursor rejects it for every list.
+func hasNUL(k []byte) bool {
+	dec := json.NewDecoder(bytes.NewReader(k))
+	dec.UseNumber()
+	for {
+		tok, err := dec.Token()
+		if errors.Is(err, io.EOF) {
+			return false
+		}
+		if err != nil {
+			return true
+		}
+		if s, ok := tok.(string); ok && strings.ContainsRune(s, 0) {
+			return true
+		}
+	}
 }
 
 // cursorKey parses a decoded cursor and returns its key bytes when version, list name, length,

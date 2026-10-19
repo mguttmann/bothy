@@ -38,7 +38,7 @@ import (
 var keyCfg = app.KeysConfig{
 	CacheTTL: 30 * time.Second, InvocationRotation: 2 * time.Hour, AccessTokenRotation: 30 * 24 * time.Hour,
 	JWKSMaxAge: 20 * time.Minute, AccessTokenTTL: 10 * time.Minute, InvocationTokenTTL: time.Minute,
-	WebhookDeliveryTimeout: 15 * time.Second, ClockLeeway: 30 * time.Second,
+	WebhookDeliveryTimeout: 15 * time.Second, ClockLeeway: 30 * time.Second, TerminalSessionTokenTTL: 30 * time.Second,
 }
 
 // checkInterval is signing_key.rotation_check_interval of these tests.
@@ -250,16 +250,16 @@ func TestEnsureActive_EmptyDatabase(t *testing.T) {
 			t.Errorf("purpose %s has %d active keys, want 1", p, len(active[string(p)]))
 		}
 	}
-	if len(rs) != 4 || len(e.files(t)) != 4 {
-		t.Fatalf("%d rows and %d files, want 4 each", len(rs), len(e.files(t)))
+	if len(rs) != 5 || len(e.files(t)) != 5 {
+		t.Fatalf("%d rows and %d files, want 5 each", len(rs), len(e.files(t)))
 	}
 	for _, r := range rs {
 		if r.ref != "file:"+filepath.Join(e.dir, r.purpose+"-"+r.kid+".pem") {
 			t.Errorf("private_key_ref %q of %s", r.ref, r.kid)
 		}
 	}
-	if got := e.transitionAudits(t); len(got) != 4 || got[0]["from_state"] != "none" || got[0]["to_state"] != "active" {
-		t.Errorf("transition audit entries %v, want four from none to active", got)
+	if got := e.transitionAudits(t); len(got) != 5 || got[0]["from_state"] != "none" || got[0]["to_state"] != "active" {
+		t.Errorf("transition audit entries %v, want five from none to active", got)
 	}
 	if err := k.EnsureActive(context.Background()); err != nil {
 		t.Fatal(err)
@@ -293,8 +293,8 @@ func TestEnsureActive_ConcurrentInstances(t *testing.T) {
 		}
 	}
 	files := e.files(t)
-	if len(rs) != 4 || len(files) != 4 {
-		t.Errorf("%d rows and files %v, want exactly 4 each (the losing files removed)", len(rs), files)
+	if len(rs) != 5 || len(files) != 5 {
+		t.Errorf("%d rows and files %v, want exactly 5 each (the losing files removed)", len(rs), files)
 	}
 }
 
@@ -315,7 +315,7 @@ func TestScheduledRotation_EverySignatureStaysVerifiable(t *testing.T) {
 	if err := k.EnsureActive(ctx); err != nil {
 		t.Fatal(err)
 	}
-	transitions := 4 // the creations of EnsureActive
+	transitions := len(instance.Purposes()) // the creations of EnsureActive
 	validity := map[instance.Purpose]time.Duration{
 		instance.PurposeInvocation:  keyCfg.InvocationTokenTTL + keyCfg.ClockLeeway,
 		instance.PurposeAccessToken: keyCfg.AccessTokenTTL + keyCfg.ClockLeeway,
@@ -536,7 +536,7 @@ func TestRotate_ValidatesBeforeAnything(t *testing.T) {
 	k := e.keys(t)
 	owner := actor.Actor{ID: ids.New(), Kind: actor.KindUser}
 	for name, cmd := range map[string]instance.RotateCommand{
-		"terminal":     {Purpose: "terminal", Mode: instance.ModeScheduled, Reason: "x"},
+		"unknown":      {Purpose: "session", Mode: instance.ModeScheduled, Reason: "x"},
 		"unknown mode": {Purpose: instance.PurposeInvocation, Mode: "later", Reason: "x"},
 		"no reason":    {Purpose: instance.PurposeInvocation, Mode: instance.ModeScheduled, Reason: " "},
 		"bidi reason":  {Purpose: instance.PurposeInvocation, Mode: instance.ModeScheduled, Reason: "a\u202eb"},
@@ -616,7 +616,8 @@ func TestEnsureActive_ReplacesKeysWithoutFile(t *testing.T) {
 	for _, r := range e.rows(t) {
 		states[r.kid] = r.state
 	}
-	if states[lost.kid] != "retired" || len(states) != 5 {
+	purposes := len(instance.Purposes())
+	if states[lost.kid] != "retired" || len(states) != purposes+1 {
 		t.Fatalf("states after the repair %v, want the lost key retired and one new key", states)
 	}
 	s, err := k.Signer(ctx, instance.PurposeInvocation)
@@ -625,7 +626,7 @@ func TestEnsureActive_ReplacesKeysWithoutFile(t *testing.T) {
 	}
 	audits := e.transitionAudits(t)
 	var retired, created int
-	for _, d := range audits[4:] {
+	for _, d := range audits[purposes:] {
 		switch {
 		case d["from_state"] == "active" && d["to_state"] == "retired" && d["purpose"] == "invocation":
 			retired++
@@ -633,10 +634,10 @@ func TestEnsureActive_ReplacesKeysWithoutFile(t *testing.T) {
 			created++
 		}
 	}
-	if retired != 1 || created != 1 || len(audits) != 6 {
+	if retired != 1 || created != 1 || len(audits) != purposes+2 {
 		t.Errorf("audit entries %v, want one retirement and one creation of invocation after the first four", audits)
 	}
-	if err := k.EnsureActive(ctx); err != nil || len(e.rows(t)) != 5 {
+	if err := k.EnsureActive(ctx); err != nil || len(e.rows(t)) != purposes+1 {
 		t.Errorf("a further EnsureActive changed the keys: %v", err)
 	}
 }
@@ -705,7 +706,7 @@ func TestKeyRotationJob_AuditsTransitions(t *testing.T) {
 	if err := k.EnsureActive(ctx); err != nil {
 		t.Fatal(err)
 	}
-	total := 4
+	total := len(instance.Purposes())
 	for range int((keyCfg.InvocationRotation + keyCfg.JWKSMaxAge + time.Hour) / checkInterval) {
 		n, err := k.RunRotation(ctx)
 		if err != nil {
@@ -715,7 +716,7 @@ func TestKeyRotationJob_AuditsTransitions(t *testing.T) {
 		e.clk.Advance(checkInterval)
 	}
 	audits := e.transitionAudits(t)
-	if len(audits) != total || total < 4+4 {
+	if len(audits) != total || total < len(instance.Purposes())+4 {
 		t.Fatalf("%d audit rows for %d transitions (EnsureActive and the job)", len(audits), total)
 	}
 	byKID := map[string][]string{}
@@ -801,5 +802,78 @@ func TestEnsureActive_LostNextPromotedConcurrently(t *testing.T) {
 	}
 	if s.KeyID() == next.NewKID || s.KeyID() == next.PreviousKID {
 		t.Errorf("Signer uses %s, want a fresh key", s.KeyID())
+	}
+}
+
+// TestEnsureActive_TerminalPurpose (M2-39): an empty database gets an active key for each of the
+// five purposes, terminal included; getJwks publishes no terminal key (the host service gets its
+// keys over the control connection, M2-43); a terminal key in retiring turns retired only after
+// terminal.session_token_ttl plus auth.clock_leeway; the purpose rotates only on request.
+func TestEnsureActive_TerminalPurpose(t *testing.T) {
+	t.Parallel()
+	e := newKeysEnv(t)
+	k := e.keys(t)
+	ctx := context.Background()
+	if err := k.EnsureActive(ctx); err != nil {
+		t.Fatal(err)
+	}
+	if got := instance.Purposes(); len(got) != 5 || !slices.Contains(got, instance.PurposeTerminal) || !instance.PurposeTerminal.Valid() {
+		t.Fatalf("Purposes() = %v, want five with terminal", got)
+	}
+	active := activeByPurpose(e.rows(t))
+	if len(active["terminal"]) != 1 {
+		t.Fatalf("terminal has %d active keys, want 1", len(active["terminal"]))
+	}
+	set, err := k.JWKS(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, key := range set.Keys {
+		if key.Kid == active["terminal"][0] {
+			t.Fatalf("getJwks publishes the terminal key %s", key.Kid)
+		}
+	}
+	// No rotation interval: the job leaves the key alone however long it waits.
+	e.clk.Advance(365 * 24 * time.Hour)
+	if _, err := k.RunRotation(ctx); err != nil {
+		t.Fatal(err)
+	}
+	if now := activeByPurpose(e.rows(t)); len(now["terminal"]) != 1 || now["terminal"][0] != active["terminal"][0] {
+		t.Fatalf("the job rotated terminal without a request: %v", now["terminal"])
+	}
+	owner := actor.Actor{ID: ids.New(), Kind: actor.KindUser}
+	first, err := k.Rotate(ctx, owner, instance.RotateCommand{Purpose: instance.PurposeTerminal, Mode: instance.ModeScheduled, Reason: "Test"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	e.clk.Advance(keyCfg.JWKSMaxAge)
+	if _, err := k.RunRotation(ctx); err != nil {
+		t.Fatal(err)
+	}
+	state := func(kid string) string {
+		for _, r := range e.rows(t) {
+			if r.kid == kid {
+				return r.state
+			}
+		}
+		return ""
+	}
+	if state(first.PreviousKID) != "retiring" || state(first.NewKID) != "active" {
+		t.Fatalf("after the promotion: previous %s, new %s", state(first.PreviousKID), state(first.NewKID))
+	}
+	window := keyCfg.TerminalSessionTokenTTL + keyCfg.ClockLeeway
+	e.clk.Advance(window - time.Second)
+	if _, err := k.RunRotation(ctx); err != nil {
+		t.Fatal(err)
+	}
+	if state(first.PreviousKID) != "retiring" {
+		t.Fatalf("the retiring terminal key is %s before its window", state(first.PreviousKID))
+	}
+	e.clk.Advance(time.Second)
+	if _, err := k.RunRotation(ctx); err != nil {
+		t.Fatal(err)
+	}
+	if state(first.PreviousKID) != "retired" {
+		t.Fatalf("the retiring terminal key is %s after its window", state(first.PreviousKID))
 	}
 }

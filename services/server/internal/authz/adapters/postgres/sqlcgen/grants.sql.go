@@ -201,6 +201,59 @@ func (q *Queries) ListActiveGrantsOfPrincipal(ctx context.Context, principalID p
 	return items, nil
 }
 
+const listActiveGrantsOnHosts = `-- name: ListActiveGrantsOnHosts :many
+SELECT g.id, g.subject_kind, g.subject_principal_id, g.subject_group_id, g.target_kind, g.target_space_id, g.target_channel_id, g.target_host_id, g.level, g.capabilities, g.expires_at, g.expiry_reminded_at, g.expiry_reported_at, g.reason, g.granted_by, g.granted_at, g.revoked_at, g.revoked_by, g.revoke_reason
+FROM grants g
+WHERE g.revoked_at IS NULL
+  AND g.target_host_id = ANY ($1::uuid[])
+ORDER BY g.id
+`
+
+type ListActiveGrantsOnHostsRow struct {
+	Grant Grant
+}
+
+// Grants on the given hosts: the subjects a rights change on a host affects (M2-39).
+func (q *Queries) ListActiveGrantsOnHosts(ctx context.Context, hostIds []pgtype.UUID) ([]ListActiveGrantsOnHostsRow, error) {
+	rows, err := q.db.Query(ctx, listActiveGrantsOnHosts, hostIds)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []ListActiveGrantsOnHostsRow
+	for rows.Next() {
+		var i ListActiveGrantsOnHostsRow
+		if err := rows.Scan(
+			&i.Grant.ID,
+			&i.Grant.SubjectKind,
+			&i.Grant.SubjectPrincipalID,
+			&i.Grant.SubjectGroupID,
+			&i.Grant.TargetKind,
+			&i.Grant.TargetSpaceID,
+			&i.Grant.TargetChannelID,
+			&i.Grant.TargetHostID,
+			&i.Grant.Level,
+			&i.Grant.Capabilities,
+			&i.Grant.ExpiresAt,
+			&i.Grant.ExpiryRemindedAt,
+			&i.Grant.ExpiryReportedAt,
+			&i.Grant.Reason,
+			&i.Grant.GrantedBy,
+			&i.Grant.GrantedAt,
+			&i.Grant.RevokedAt,
+			&i.Grant.RevokedBy,
+			&i.Grant.RevokeReason,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const listActiveGrantsOnTargets = `-- name: ListActiveGrantsOnTargets :many
 SELECT g.id, g.subject_kind, g.subject_principal_id, g.subject_group_id, g.target_kind, g.target_space_id, g.target_channel_id, g.target_host_id, g.level, g.capabilities, g.expires_at, g.expiry_reminded_at, g.expiry_reported_at, g.reason, g.granted_by, g.granted_at, g.revoked_at, g.revoked_by, g.revoke_reason
 FROM grants g

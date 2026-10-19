@@ -20,6 +20,8 @@ type resolved struct {
 	// grant is the stored grant of a grant resource; grantTarget its target kind.
 	grant       *domain.Grant
 	grantTarget domain.TargetKind
+	// host are the facts of a host resource (M2-39); nil for every other kind.
+	host *authz.HostFacts
 }
 
 // pick returns the one id of a resource and its hint: both set and different is a contradiction.
@@ -62,7 +64,7 @@ func (a *Authorizer) resolve(ctx context.Context, act authorize.Action, r author
 	case r.Kind == authorize.ResourceGrant:
 		return a.resolveGrant(ctx, r.ID, act == authorize.ActionGrantRevoke)
 	case r.Kind == authorize.ResourceHost:
-		return resolved{path: domain.Path{Kind: domain.PathNone}}, true, nil
+		return a.resolveHost(ctx, r.ID)
 	}
 	return resolved{path: domain.Path{Kind: domain.PathInstance}}, true, nil
 }
@@ -188,6 +190,9 @@ func (a *Authorizer) gather(ctx context.Context, s *actingPrincipal, spec domain
 		Path: res.path, Eff: eff, BaseEff: base, GrantTarget: res.grantTarget,
 	}
 	in.Principal.Pending = pendingReason(s.liveness())
+	if res.host != nil {
+		in.Host = hostFacts(s, *res.host)
+	}
 	baseIn := in
 	baseIn.Eff = base
 	if err := a.kindFacts(ctx, s, req, r, res, &in, &baseIn); err != nil {

@@ -453,6 +453,26 @@ func (stubServer) SetThreadTags(context.Context, rest.SetThreadTagsRequestObject
 	return nil, nil
 }
 
+func (stubServer) ListHosts(context.Context, rest.ListHostsRequestObject) (rest.ListHostsResponseObject, error) {
+	return nil, nil
+}
+
+func (stubServer) CreateHost(context.Context, rest.CreateHostRequestObject) (rest.CreateHostResponseObject, error) {
+	return nil, nil
+}
+
+func (stubServer) GetHost(context.Context, rest.GetHostRequestObject) (rest.GetHostResponseObject, error) {
+	return nil, nil
+}
+
+func (stubServer) UpdateHost(context.Context, rest.UpdateHostRequestObject) (rest.UpdateHostResponseObject, error) {
+	return nil, nil
+}
+
+func (stubServer) SetHostState(context.Context, rest.SetHostStateRequestObject) (rest.SetHostStateResponseObject, error) {
+	return nil, nil
+}
+
 func (stubServer) ListAgents(context.Context, rest.ListAgentsRequestObject) (rest.ListAgentsResponseObject, error) {
 	return nil, nil
 }
@@ -498,7 +518,8 @@ func (stubServer) SetAgentToolClass(context.Context, rest.SetAgentToolClassReque
 // and the JWKS and the rotation of the signing keys (M1-32), the sessions (M1-34), the step-up
 // (M1-35), the providers and credentials (M1-36), the API tokens (M1-44), the audit log (M1-50),
 // the enrollment codes (M1-37), the device approval and pairing (M1-38), the passkeys (M1-40),
-// the OIDC login (M1-41), the trusted header login (M1-43) and the revocations (M1-45). A handler
+// the OIDC login (M1-41), the trusted header login (M1-43), the revocations (M1-45) and the host
+// records (M2-39). A handler
 // ticket that enables an operation changes this test together with
 // api/operations.yaml.
 func TestRealTable_Enabled(t *testing.T) {
@@ -643,6 +664,13 @@ func TestRealTable_Enabled(t *testing.T) {
 		"closeThread":        {"POST /api/v1/threads/{thread_id}/close", "thread.close", "rl.write"},
 		"reopenThread":       {"POST /api/v1/threads/{thread_id}/reopen", "thread.reopen", "rl.write"},
 		"setThreadTags":      {"PUT /api/v1/threads/{thread_id}/tags", "thread.tags.set", "rl.write"},
+
+		// M2-39
+		"listHosts":    {"GET /api/v1/hosts", "host.read", "rl.read"},
+		"createHost":   {"POST /api/v1/hosts", "host.manage", "rl.admin"},
+		"getHost":      {"GET /api/v1/hosts/{host_id}", "host.read", "rl.read"},
+		"updateHost":   {"PATCH /api/v1/hosts/{host_id}", "host.manage", "rl.admin"},
+		"setHostState": {"POST /api/v1/hosts/{host_id}/state", "host.manage", "rl.admin"},
 	}
 	ops := routes.Enabled()
 	if len(ops) != len(want) {

@@ -30,7 +30,7 @@ type refGrant struct {
 	id                 ids.ID
 	subject            ids.ID // principal or group
 	group              bool
-	targetKind         string // instance, space, channel
+	targetKind         string // instance, space, channel, host
 	target             ids.ID
 	level              int // 1 read, 2 write, 3 trigger
 	upload, manage, ex bool
@@ -65,8 +65,14 @@ type refChannel struct {
 	thread    ids.ID
 }
 
+// refHost is a terminal host with its holder (zero for none, M2-39).
+type refHost struct {
+	id, holder ids.ID
+}
+
 type refWorld struct {
 	rnd        *rand.Rand
+	hosts      []*refHost
 	now        time.Time
 	principals []*refPrincipal
 	spaces     []ids.ID
@@ -82,6 +88,7 @@ type refWorld struct {
 	fCreds     *fake.Credentials
 	fStore     *fake.Store
 	fVersions  *fake.Versions
+	fHosts     *fake.Hosts
 	az         *app.Authorizer
 }
 
@@ -128,6 +135,69 @@ func (m *refWorld) rights(p *refPrincipal, space ids.ID, c *refChannel) (level i
 		level, manage, export = min(level, 2), false, false
 	}
 	return level, upload, manage, export
+}
+
+// groupsOf returns the groups of p with a membership in effect.
+func (m *refWorld) groupsOf(p *refPrincipal) map[ids.ID]bool {
+	groups := map[ids.ID]bool{}
+	for _, mb := range m.members {
+		if mb.user == p.id && !mb.removed && !m.groups[mb.group] && m.inEffect(mb.expires) {
+			groups[mb.group] = true
+		}
+	}
+	return groups
+}
+
+// terminalOn is the reference of 07 section 2.12 point 3 for a person p on host h: an active owner,
+// or a grant terminal in effect on h to p or a group in effect of p.
+func (m *refWorld) terminalOn(p *refPrincipal, h *refHost) bool {
+	if p.owner {
+		return true
+	}
+	groups := m.groupsOf(p)
+	for _, g := range m.grants {
+		if g.targetKind != "host" || g.target != h.id || g.revoked || !m.inEffect(g.expires) {
+			continue
+		}
+		if g.group && groups[g.subject] || !g.group && g.subject == p.id {
+			return true
+		}
+	}
+	return false
+}
+
+// decideHost is the reference of host.read on h (07 section 2.12 point 5, 05 section 4.14): the
+// gate refuses agents and apps, then owners, the holder and a terminal grant see the host.
+func (m *refWorld) decideHost(p *refPrincipal, h *refHost) (authorize.Outcome, string) {
+	if p.disabled {
+		return authorize.OutcomeUnauthenticated, "principal_inactive"
+	}
+	if p.kind != domain.KindUser {
+		return authorize.OutcomeForbidden, "subject_kind_not_allowed"
+	}
+	if h.holder == p.id || m.terminalOn(p, h) {
+		return authorize.OutcomeAllow, ""
+	}
+	return authorize.OutcomeNotFound, "no_grant"
+}
+
+// hostScope is the reference of Scope(host.read) for a person: every host for an owner, else the
+// hosts it holds or has terminal on.
+func (m *refWorld) hostScope(p *refPrincipal) (all bool, list []ids.ID) {
+	if p.owner {
+		return true, nil
+	}
+	for _, h := range m.hosts {
+		if h.holder == p.id || m.terminalOn(p, h) {
+			list = append(list, h.id)
+		}
+	}
+	return false, domain.SortIDs(list)
+}
+
+// syncHost mirrors a host into the fake source.
+func (m *refWorld) syncHost(h *refHost) {
+	m.fHosts.Put(authz.HostFacts{ID: h.id, State: "active", AssignedUserID: h.holder, LLMCredentials: "none"})
 }
 
 // refAppScope is the scope table of 05 section 2.6 for the actions of the test.
@@ -287,6 +357,10 @@ func (m *refWorld) addGrant() {
 	} else {
 		g.subject = m.pick().id
 	}
+	if m.rnd.IntN(5) == 0 && (g.group || m.kindOf(g.subject) == domain.KindUser) {
+		m.addHostGrant(g)
+		return
+	}
 	switch m.rnd.IntN(4) {
 	case 0:
 		g.targetKind = "instance"
@@ -327,12 +401,50 @@ func (m *refWorld) addGrant() {
 		Caps: domain.CapsOf(caps...), ExpiresAt: g.expires, GrantedAt: m.now})
 }
 
+// kindOf returns the kind of principal id; "" for a group.
+func (m *refWorld) kindOf(id ids.ID) string {
+	for _, p := range m.principals {
+		if p.id == id {
+			return p.kind
+		}
+	}
+	return ""
+}
+
+// addHostGrant turns g into a grant terminal on a random host (people and groups only, 07 section
+// 2.12) and stores it.
+func (m *refWorld) addHostGrant(g *refGrant) {
+	h := m.hosts[m.rnd.IntN(len(m.hosts))]
+	g.targetKind, g.target, g.level, g.upload, g.manage, g.ex = "host", h.id, 0, false, false, false
+	m.grants = append(m.grants, g)
+	sub := domain.Subject{Kind: domain.SubjectUser, PrincipalID: g.subject}
+	if g.group {
+		sub = domain.Subject{Kind: domain.SubjectGroup, GroupID: g.subject}
+	}
+	_ = m.fStore.InsertGrant(context.Background(), domain.Grant{ID: g.id, Subject: sub, Target: domain.Target{Kind: domain.TargetHost, HostID: h.id},
+		Caps: domain.CapsOf(domain.CapTerminal), ExpiresAt: g.expires, GrantedAt: m.now})
+}
+
+// randomHolder returns a person of the world or zero (no holder).
+func (m *refWorld) randomHolder() ids.ID {
+	var people []ids.ID
+	for _, p := range m.principals {
+		if p.kind == domain.KindUser {
+			people = append(people, p.id)
+		}
+	}
+	if m.rnd.IntN(3) == 0 {
+		return ids.ID{}
+	}
+	return people[m.rnd.IntN(len(people))]
+}
+
 func newRefWorld(t *testing.T, seed uint64) *refWorld {
 	t.Helper()
 	rnd := rand.New(rand.NewPCG(seed, seed^0x9e3779b97f4a7c15)) //nolint:gosec // G404: a reproducible test world needs a seeded generator
 	m := &refWorld{rnd: rnd, now: worldStart, groups: map[ids.ID]bool{},
 		clk: clock.NewFake(worldStart), fPrincipal: fake.NewPrincipals(), fStructure: fake.NewStructure(),
-		fCreds: fake.NewCredentials(), fStore: fake.NewStore(), fVersions: &fake.Versions{}}
+		fCreds: fake.NewCredentials(), fStore: fake.NewStore(), fVersions: &fake.Versions{}, fHosts: fake.NewHosts()}
 	m.fVersions.Set(1)
 	kinds := []string{domain.KindUser, domain.KindUser, domain.KindUser, domain.KindUser, domain.KindAgent, domain.KindAgent, domain.KindApp}
 	for i, k := range kinds {
@@ -366,6 +478,11 @@ func newRefWorld(t *testing.T, seed uint64) *refWorld {
 		}
 	}
 	m.addDM()
+	for range 3 {
+		h := &refHost{id: ids.New(), holder: m.randomHolder()}
+		m.hosts = append(m.hosts, h)
+		m.syncHost(h)
+	}
 	for range 2 {
 		g := ids.New()
 		m.groups[g] = false
@@ -383,7 +500,7 @@ func newRefWorld(t *testing.T, seed uint64) *refWorld {
 	}
 	az, err := app.NewAuthorizer(app.AuthorizerConfig{SnapshotCacheMaxEntries: 4, StepUpMaxAge: 5 * time.Minute}, app.AuthorizerDeps{
 		Catalog: app.NewCatalog(slog.New(slog.DiscardHandler)), Store: m.fStore, Principals: m.fPrincipal, Credentials: m.fCreds,
-		Structure: m.fStructure, Policies: fake.NewPolicies(), Versions: m.fVersions, Recorder: &recorder{}, Clock: m.clk,
+		Structure: m.fStructure, Policies: fake.NewPolicies(), Hosts: m.fHosts, Versions: m.fVersions, Recorder: &recorder{}, Clock: m.clk,
 		Log: slog.New(slog.DiscardHandler),
 	})
 	if err != nil {
@@ -396,7 +513,7 @@ func newRefWorld(t *testing.T, seed uint64) *refWorld {
 // mutate applies one random change; rights changes raise the version, structure changes do not.
 func (m *refWorld) mutate() string {
 	ctx := context.Background()
-	switch m.rnd.IntN(11) {
+	switch m.rnd.IntN(12) {
 	case 0:
 		m.addGrant()
 		m.fVersions.Bump()
@@ -456,6 +573,12 @@ func (m *refWorld) mutate() string {
 		m.now = m.now.Add(time.Duration(m.rnd.IntN(40)) * time.Minute)
 		m.clk.Set(m.now)
 		return "clock advance"
+	case 11:
+		// A holder change is no rights change (07 section 2.12 point 3): the source is read fresh.
+		h := m.hosts[m.rnd.IntN(len(m.hosts))]
+		h.holder = m.randomHolder()
+		m.syncHost(h)
+		return "change holder"
 	case 9:
 		c := m.channels[m.rnd.IntN(len(m.channels))]
 		if !c.dm {
@@ -519,8 +642,23 @@ func TestAZP8_CacheMatchesReference(t *testing.T) {
 							seed, ws, w, step, p.kind, act, d.Outcome, d.Reason, err, wantO, wantR, trail)
 					}
 				}
+				h := m.hosts[m.rnd.IntN(len(m.hosts))]
+				wantO, wantR := m.decideHost(p, h)
+				outcomes["host.read "+string(wantO)+"/"+wantR]++
+				d, err := m.az.Authorize(context.Background(), a, authorize.ActionHostRead, authorize.Resource{Kind: authorize.ResourceHost, ID: h.id})
+				if err != nil || d.Outcome != wantO || string(d.Reason) != wantR {
+					t.Fatalf("seed %d, world %d, step %d, %s host.read: got %s/%s %v, want %s/%s\ntrail %v",
+						ws, w, step, p.kind, d.Outcome, d.Reason, err, wantO, wantR, trail)
+				}
 				if p.disabled {
 					continue
+				}
+				if p.kind == domain.KindUser {
+					all, list := m.hostScope(p)
+					hs, err := m.az.Scope(context.Background(), a, authorize.ActionHostRead)
+					if err != nil || hs.AllHosts != all || !slices.Equal(hs.HostIDs, list) {
+						t.Fatalf("seed %d, world %d, step %d, host scope: got %v %v %v, want %v %v\ntrail %v", ws, w, step, hs.AllHosts, hs.HostIDs, err, all, list, trail)
+					}
 				}
 				sc, err := m.az.Scope(context.Background(), a, authorize.ActionMessageRead)
 				if want := m.visibleChannels(p); err != nil || !slices.Equal(sc.ChannelIDs, want) {

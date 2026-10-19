@@ -84,3 +84,12 @@ sql:
         package: sqlcgen
         out: internal/chat/adapters/postgres/sqlcgen
         sql_package: pgx/v5
+  # terminal (M2-39)
+  - engine: postgresql
+    schema: migrations
+    queries: internal/terminal/adapters/postgres/queries
+    gen:
+      go:
+        package: sqlcgen
+        out: internal/terminal/adapters/postgres/sqlcgen
+        sql_package: pgx/v5

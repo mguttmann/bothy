@@ -11,7 +11,7 @@ import (
 )
 
 func view(spaces []ids.ID, chans map[ids.ID]domain.Rights) domain.AccessView {
-	v := domain.AccessView{Spaces: map[ids.ID]bool{}, SpaceLevels: map[ids.ID]domain.Level{}, Channels: map[ids.ID]domain.Rights{}}
+	v := domain.AccessView{Spaces: map[ids.ID]bool{}, SpaceLevels: map[ids.ID]domain.Level{}, Channels: map[ids.ID]domain.Rights{}, Hosts: map[ids.ID]bool{}}
 	for _, s := range spaces {
 		v.Spaces[s] = true
 	}
@@ -93,7 +93,7 @@ func TestAccessViewOf(t *testing.T) {
 		{Kind: domain.PathChannel, SpaceID: sp1, ChannelID: c1},
 		{Kind: domain.PathChannel, SpaceID: sp2, ChannelID: c2},
 	}
-	v := domain.AccessViewOf(snap, domain.KindUser, alexID, paths, []domain.Path{{Kind: domain.PathSpace, SpaceID: sp1}, {Kind: domain.PathSpace, SpaceID: sp2}})
+	v := domain.AccessViewOf(snap, domain.KindUser, alexID, paths, []domain.Path{{Kind: domain.PathSpace, SpaceID: sp1}, {Kind: domain.PathSpace, SpaceID: sp2}}, nil)
 	if !reflect.DeepEqual(v, view([]ids.ID{sp1}, map[ids.ID]domain.Rights{c1: {Level: domain.LevelWrite, Caps: domain.CapsOf(domain.CapUpload)}})) {
 		t.Fatalf("view %+v", v)
 	}
@@ -111,12 +111,12 @@ func TestAccessViewOf_SpaceLevels(t *testing.T) {
 	}})
 	paths := []domain.Path{{Kind: domain.PathChannel, SpaceID: sp1, ChannelID: c1}}
 	spaces := []domain.Path{{Kind: domain.PathSpace, SpaceID: sp1}, {Kind: domain.PathSpace, SpaceID: sp2}}
-	v := domain.AccessViewOf(snap, domain.KindUser, alexID, paths, spaces)
+	v := domain.AccessViewOf(snap, domain.KindUser, alexID, paths, spaces, nil)
 	if !reflect.DeepEqual(v.SpaceLevels, map[ids.ID]domain.Level{sp2: domain.LevelTrigger}) || !v.Spaces[sp1] || !v.Spaces[sp2] {
 		t.Fatalf("view %+v", v)
 	}
 	spaces[1].Archived = true
-	v = domain.AccessViewOf(snap, domain.KindUser, alexID, paths, spaces)
+	v = domain.AccessViewOf(snap, domain.KindUser, alexID, paths, spaces, nil)
 	if !reflect.DeepEqual(v.SpaceLevels, map[ids.ID]domain.Level{sp2: domain.LevelRead}) {
 		t.Fatalf("archived view %+v", v)
 	}

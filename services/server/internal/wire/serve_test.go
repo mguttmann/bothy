@@ -309,8 +309,8 @@ func TestServeRolesStartReadyAndStop(t *testing.T) {
 				`SELECT count(DISTINCT purpose), count(*) FROM server_signing_keys WHERE state = 'active'`).Scan(&purposes, &actives); err != nil {
 				t.Fatal(err)
 			}
-			if purposes != 4 || actives != 4 {
-				t.Fatalf("%d active keys over %d purposes after the start, want 4 and 4", actives, purposes)
+			if purposes != 5 || actives != 5 {
+				t.Fatalf("%d active keys over %d purposes after the start, want 5 and 5 (terminal since M2-39)", actives, purposes)
 			}
 			public := p.logs.port("public listener started")
 			if role == wire.RoleWorker {

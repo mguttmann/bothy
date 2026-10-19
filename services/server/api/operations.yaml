@@ -36,6 +36,7 @@ enabled:             # operationIds that have a handler; sorted ascending
   - createForumTag
   - createGrant
   - createGroup
+  - createHost
   - createIdentityProvider
   - createSpace
   - createStepUpChallenge
@@ -57,6 +58,7 @@ enabled:             # operationIds that have a handler; sorted ascending
   - getDiscovery
   - getGrant
   - getGroup
+  - getHost
   - getIdentityProvider
   - getInstance
   - getJwks
@@ -76,6 +78,7 @@ enabled:             # operationIds that have a handler; sorted ascending
   - listGrants
   - listGroupMembers
   - listGroups
+  - listHosts
   - listIdentityProviders
   - listInstanceSettings
   - listMyDevices
@@ -112,6 +115,7 @@ enabled:             # operationIds that have a handler; sorted ascending
   - setAllAgentsBillingMode
   - setChannelOperator
   - setCredentialHolder
+  - setHostState
   - setSpaceOperator
   - setThreadTags
   - setThreadTitle
@@ -121,6 +125,7 @@ enabled:             # operationIds that have a handler; sorted ascending
   - updateChannel
   - updateForumTag
   - updateGroup
+  - updateHost
   - updateIdentityProvider
   - updateMyProfile
   - updateSpace
@@ -193,9 +198,6 @@ later:               # every other operationId of docs/api/openapi.yaml; sorted 
     ticket: M3-05
   - operation_id: createGdprRequest
     milestone: M7
-  - operation_id: createHost
-    milestone: M2
-    ticket: M2-39
   - operation_id: createImport
     milestone: M8
     ticket: M8-03
@@ -318,9 +320,6 @@ later:               # every other operationId of docs/api/openapi.yaml; sorted 
     ticket: M3-03
   - operation_id: getGdprRequest
     milestone: M7
-  - operation_id: getHost
-    milestone: M2
-    ticket: M2-39
   - operation_id: getImport
     milestone: M8
     ticket: M8-03
@@ -421,9 +420,6 @@ later:               # every other operationId of docs/api/openapi.yaml; sorted 
     ticket: M1-63
   - operation_id: listGdprRequests
     milestone: M7
-  - operation_id: listHosts
-    milestone: M2
-    ticket: M2-39
   - operation_id: listImportItems
     milestone: M8
     ticket: M8-03
@@ -606,9 +602,6 @@ later:               # every other operationId of docs/api/openapi.yaml; sorted 
   - operation_id: setHostLlmCredentials
     milestone: M2
     ticket: M2-40
-  - operation_id: setHostState
-    milestone: M2
-    ticket: M2-39
   - operation_id: setImportCursor
     milestone: M8
     ticket: M8-03
@@ -653,9 +646,6 @@ later:               # every other operationId of docs/api/openapi.yaml; sorted 
   - operation_id: updateComponent
     milestone: M2
     ticket: M2-15
-  - operation_id: updateHost
-    milestone: M2
-    ticket: M2-39
   - operation_id: updateMessage
     milestone: M1
     ticket: M1-58

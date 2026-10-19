@@ -144,6 +144,9 @@ flowchart LR
        `errors[].code = session_user_not_on_host`), and an assignment takes effect for SR12 only as long as the
        host reports its name. Reason: A typo or a user not yet created should be noticed
        at the assignment, not only at opening as the tampering warning `4104` (R-TM-16).
+       A name must equal a reported name exactly, also in upper and lower case, because the host
+       service compares `osu` exactly with `host_service.session_users`; uniqueness per host, in
+       contrast, ignores case (03, `host_session_users`; docs/DECISIONS.md D-M2-39-9).
     6. **No shared locations** (Ruling T13): On the host there is no location that one
        session user can write and another can read or execute, if it carries code,
        settings or logins. For the locations that the host service knows, this means:
@@ -1279,13 +1282,13 @@ for byte streams. With one node, everything is trivial.
 
 | Action | When | Details (`audit_details.v1`) |
 |---|---|---|
-| `host.manage` | every change | `host_id`, operation (`create`, `update`, `pairing_code`, `confirm`, `llm_credentials`, `state`, `session_user`), old and new values as codes, with `session_user` the person and the name of the session user per assignment or end, fingerprints on re-pairing, `reason` |
+| `host.manage` | every change | `host_id` (resource), `operation` (`create`, `update`, `pairing_code`, `confirm`, `llm_credentials`, `state`, `session_user`), old and new values as codes (`from_assigned_user_id`, `to_assigned_user_id`, `name_changed`, `from_state`, `to_state`, `disabled_reason`), with `session_user` one entry per assignment or end with `change` (`assigned`, `revoked`), `user_id` and the name of the session user in the reserved field `os_user`, fingerprints on re-pairing, `reason`; without effect `no_change`; never the name of the host |
 | `host.pair` | allow and deny | `host_id`, fingerprint |
 | `host.connect` | denials; allow only on a change of `reported_is_server_host`, `reported_doctor` or `reported_session_users`; second control connection (3.4) | `host_id`, check codes, with the name of every account that the message names (rule for names, 2.2: for HD6, HD10 and HD11 session users, for HD9 former ones), added and removed names of the session users, code `duplicate_connection` |
 | `terminal.open`, `terminal.attach` | allow and deny | `host_id`, `session_id`, `profile`, `device_id`, `pin_changed`, `foreign_assignee` |
 | `terminal.close` | allow and deny | `session_id`, who closed |
 | `terminal.stream` | denials (for example `identify` from a device that does not belong to the current token) | `session_id`, `device_id`, reason code |
-| `terminal.terminate` | every end by the server or the host | `session_id`, `close_reason`, `close_detail`, `bytes_in`, `bytes_out`, duration |
+| `terminal.terminate` | every end by the server or the host | actor `system`; `session_id`, `close_reason`, `close_detail` (when set), `bytes_in`, `bytes_out`, `duration_ms` |
 
 Never in the audit: terminal content, commands, environment variables, paths, profile command lines.
 
@@ -1400,7 +1403,7 @@ available from Windows 10 version 1809 and Windows Server 2019
 | `fingerprint_mismatch` | `409` | confirmation with a wrong fingerprint |
 | `i6_violation` | `409` | change would violate I6 (`hint`) |
 | `conflict` | `409` | assignment of a session user that on the host already belongs or belonged to a person, or a second valid assignment of the same person (`reason: session_user_taken`, 2.2) |
-| `validation_failed` | `400` | assignment of a name that the host does not report (`errors[].code = session_user_not_on_host`, 2.2 item 5) |
+| `validation_failed` | `400` | assignment of a name that the host does not report (`errors[].code = session_user_not_on_host`, 2.2 item 5); assignee or person of an assignment unknown, not a person or deleted (`errors[].code = unknown_user`); `assigned_user_id` together with `clear_assigned_user = true` (`errors[].code = mutually_exclusive`) |
 | `not_found` | `404` | no read permission on the host or the session |
 
 Close codes of the terminal channels (source of the names and client reactions in English:

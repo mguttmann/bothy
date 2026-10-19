@@ -60,6 +60,8 @@ type AdminDeps struct {
 	// Principals and Structure check subjects and targets.
 	Principals authz.PrincipalSource
 	Structure  authz.StructureSource
+	// Hosts checks host targets (M2-39); nil means a world without hosts.
+	Hosts authz.HostSource
 	// Rights names the members of a group as affected (RightsHook).
 	Rights authz.RightsChanges
 	// Audit writes the allow entries inside the transaction.
@@ -790,8 +792,8 @@ func fieldCode(pointer, code, detail string) error {
 	return errs.New(errs.CodeValidationFailed, "").WithFields(errs.FieldError{Pointer: pointer, Code: code, Detail: detail})
 }
 
-// targetExists reports a missing target as not found. Hosts come with M2-39: before it no host
-// exists (docs/DECISIONS.md M1-29).
+// targetExists reports a missing target as not found; a host is read from the host source of
+// the terminal module (M2-39).
 func (s *AdminService) targetExists(ctx context.Context, tg domain.Target) error {
 	switch tg.Kind {
 	case domain.TargetInstance:
@@ -815,13 +817,21 @@ func (s *AdminService) targetExists(ctx context.Context, tg domain.Target) error
 		}
 		return nil
 	case domain.TargetHost:
-		return errNotFound()
+		_, ok, err := hostsOrNone(s.d.Hosts).Host(ctx, tg.HostID)
+		if err != nil {
+			return sourceError("host source", err)
+		}
+		if !ok {
+			return errNotFound()
+		}
+		return nil
 	}
 	return errNotFound()
 }
 
-// targetLive refuses an archived space or channel with 409 conflict (after authorize, so an
-// invisible target stays not found).
+// targetLive refuses an archived space or channel and a retired host with 409 conflict (after
+// authorize, so an invisible target stays not found). A retired host is final (24 section 3.1),
+// so a grant on it could never work (M2-39).
 func (s *AdminService) targetLive(ctx context.Context, tg domain.Target) error {
 	archived := false
 	switch tg.Kind {
@@ -837,7 +847,15 @@ func (s *AdminService) targetLive(ctx context.Context, tg domain.Target) error {
 			return sourceError("structure source", err)
 		}
 		archived = c.Archived
-	case domain.TargetInstance, domain.TargetHost:
+	case domain.TargetHost:
+		h, _, err := hostsOrNone(s.d.Hosts).Host(ctx, tg.HostID)
+		if err != nil {
+			return sourceError("host source", err)
+		}
+		if h.State == authz.HostRetired {
+			return errs.New(errs.CodeConflict, "The host is retired.")
+		}
+	case domain.TargetInstance:
 	}
 	if archived {
 		return errs.New(errs.CodeConflict, "The target is archived.").WithReason(string(auditing.ReasonChannelArchived))

@@ -42,6 +42,9 @@ const (
 	opByKind
 	opDeferred
 	opSystem
+	opHumanSession
+	opAssignee
+	opTerminal
 )
 
 // Fact names a fact of the resource descriptor that a conditional capability depends on.
@@ -98,6 +101,15 @@ var (
 	Preview = Expr{op: opPreview}
 	// System marks an action only the server runs (05 rule 10); not evaluable.
 	System = Expr{op: opSystem}
+	// HumanSession is true for a person acting in a session, not with an API token (M2-39, 05
+	// section 4.14: agents, apps and personal tokens reach no host action). As the first part of
+	// All it is the gate of 07 section 4.2 (HumanGated).
+	HumanSession = Expr{op: opHumanSession}
+	// Assignee is true when the resource is a host whose holder is the principal (M2-39).
+	Assignee = Expr{op: opAssignee}
+	// Terminal is true when the principal holds the effective right terminal on the resource host
+	// (TerminalOn, M2-39).
+	Terminal = Expr{op: opTerminal}
 )
 
 // AtLeast is true when the effective level on the path is at least l.
@@ -131,6 +143,13 @@ func (e Expr) IsSystem() bool { return e.op == opSystem }
 // DeferredTo returns the milestone of a deferred entry.
 func (e Expr) DeferredTo() (string, bool) { return e.milestone, e.op == opDeferred }
 
+// HumanGated reports whether e is All with HumanSession as its first part: authorize then refuses
+// every principal that is not a person in a session right after the liveness checks, before any
+// resource is resolved, with subject_kind_not_allowed (07 section 4.2, M2-39).
+func HumanGated(e Expr) bool {
+	return e.op == opAll && len(e.args) > 0 && e.args[0].op == opHumanSession
+}
+
 // IsReadLevel reports whether e is exactly AtLeast(LevelRead), the requirement Scope accepts.
 func (e Expr) IsReadLevel() bool { return e.op == opLevel && e.level == LevelRead }
 
@@ -158,7 +177,7 @@ var exprNames = map[op]string{
 	opAgentSelf: "AgentSelf", opAppSelf: "AppSelf", opOwner: "Owner", opParticipant: "Participant",
 	opThreadOperator: "ThreadOperator", opChannelOperator: "ChannelOperator",
 	opReadOnOperatedChannel: "ReadOnOperatedChannel", opGroupMember: "GroupMember", opPreview: "Preview",
-	opSystem: "System",
+	opSystem: "System", opHumanSession: "HumanSession", opAssignee: "Assignee", opTerminal: "Terminal",
 }
 
 // capOpNames are the names of the nodes with a capability.
