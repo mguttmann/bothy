@@ -37,6 +37,12 @@ const (
 	// ClassIdentity is a principal or device ID created in the run; never in logs, traces or
 	// metrics, where people appear only as bothy.principal.pseudo_id.
 	ClassIdentity Class = "identity"
+	// ClassManageOnly is a channel prompt or skill reference (M2-02, R-AZ-09): readable only with
+	// manage or as the effective operator. Allowed only in success bodies of getChannelBehavior,
+	// putChannelBehavior, listServedChannels and getServedChannelConfig (no sink captures them)
+	// and in the echo field current of a 412 of putChannelBehavior; never in an event, catch-up
+	// page or snapshot of any observer, readers of the channel and its operator included.
+	ClassManageOnly Class = "manage_only"
 )
 
 // canaryPrefix starts every generated canary word; canaryHexLen is the number of random

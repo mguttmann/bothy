@@ -104,7 +104,7 @@ func TestSEC_T10_DetectorFindsClearPrincipalIDInLog(t *testing.T) {
 // message delete left a redacted event, and the permitted places did see their values.
 func TestSEC_T10_CanaryAcrossAllOutputs(t *testing.T) {
 	res := scenario(t)
-	for _, c := range []Class{ClassContent, ClassAdminReason, ClassSecret, ClassNetwork, ClassIdentity} {
+	for _, c := range []Class{ClassContent, ClassAdminReason, ClassSecret, ClassNetwork, ClassIdentity, ClassManageOnly} {
 		if res.run.Reg.Count(c) == 0 {
 			t.Errorf("no canary of class %s", c)
 		}
@@ -134,7 +134,8 @@ func TestSEC_T10_CanaryAcrossAllOutputs(t *testing.T) {
 	for _, m := range Matches(res.run.Reg, res.run.Sinks) {
 		seen[m.Sink+"/"+m.Class] = true
 	}
-	for _, want := range []string{SinkAudit + "/" + string(ClassAdminReason), SinkForeign + "/" + string(ClassContent)} {
+	// The 412 of putChannelBehavior echoes the stored canary prompt in current (M2-02).
+	for _, want := range []string{SinkAudit + "/" + string(ClassAdminReason), SinkForeign + "/" + string(ClassContent), SinkError + "/" + string(ClassManageOnly)} {
 		if !seen[want] {
 			t.Errorf("no permitted match in %s: the sink was not exercised", want)
 		}
@@ -239,6 +240,7 @@ func runScenario(t *testing.T) *scenarioResult {
 	ctx := t.Context()
 	sc := NewScenario(ctx, r)
 	sc.content()
+	sc.behavior()
 	sc.people()
 	sc.agents()
 	sc.settings()
@@ -263,9 +265,9 @@ func runScenario(t *testing.T) *scenarioResult {
 		t.Fatal(err)
 	}
 	r.RegisterIdentities(cctx)
-	t.Logf("canaries: content %d, admin_reason %d, secret %d, network %d, identity %d; records: log %d, trace %d, metric %d, audit %d, error %d, foreign %d",
+	t.Logf("canaries: content %d, admin_reason %d, secret %d, network %d, identity %d, manage_only %d; records: log %d, trace %d, metric %d, audit %d, error %d, foreign %d",
 		r.Reg.Count(ClassContent), r.Reg.Count(ClassAdminReason), r.Reg.Count(ClassSecret), r.Reg.Count(ClassNetwork), r.Reg.Count(ClassIdentity),
-		r.Sinks.Count(SinkLog), r.Sinks.Count(SinkTrace), r.Sinks.Count(SinkMetric), audits, r.Sinks.Count(SinkError), r.Sinks.Count(SinkForeign))
+		r.Reg.Count(ClassManageOnly), r.Sinks.Count(SinkLog), r.Sinks.Count(SinkTrace), r.Sinks.Count(SinkMetric), audits, r.Sinks.Count(SinkError), r.Sinks.Count(SinkForeign))
 	return res
 }
 
