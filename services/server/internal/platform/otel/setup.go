@@ -150,7 +150,7 @@ func setup(ctx context.Context, cfg Config, deps Deps, opts setupOptions) (*Tele
 	if err != nil {
 		return nil, err
 	}
-	res, err := newResource(ctx, cfg, deps.ServiceVersion, deps.Clock.Now())
+	res, err := newResource(ctx, cfg, serviceName, deps.ServiceVersion, deps.Clock.Now())
 	if err != nil {
 		return nil, err
 	}
