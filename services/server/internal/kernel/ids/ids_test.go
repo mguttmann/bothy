@@ -146,7 +146,7 @@ func TestNewEmbedsClockMilliseconds(t *testing.T) {
 		t.Fatalf("timestamp digits of %s = %s, want %s", s, s[:8]+s[9:13], wantPrefix)
 	}
 
-	if got := ids.New().Time(); time.Since(got) < -time.Millisecond || time.Since(got) > time.Minute {
+	if got := ids.New().Time(); time.Since(got) < -time.Millisecond || time.Since(got) > time.Minute { // nosemgrep: bothy-go-test-wall-clock-wait -- the clock of an ID, not a wait
 		t.Fatalf("package New().Time() = %v, want close to now", got)
 	}
 }

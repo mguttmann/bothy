@@ -13,6 +13,7 @@ import (
 
 	"github.com/OWNER/bothy/services/server/internal/kernel/clock"
 	"github.com/OWNER/bothy/services/server/internal/platform/secrets"
+	"github.com/OWNER/bothy/services/server/internal/platform/testkit"
 )
 
 const ttl = 5 * time.Minute
@@ -107,7 +108,7 @@ func TestProviderConcurrentMissReadsOnce(t *testing.T) {
 	ready.Wait()
 	select {
 	case <-entered:
-	case <-time.After(10 * time.Second):
+	case <-time.After(testkit.Patience):
 		t.Fatal("no caller reached the driver")
 	}
 	// Give the other callers time to arrive at the reference while the first read is blocked.

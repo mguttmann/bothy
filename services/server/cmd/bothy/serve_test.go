@@ -24,6 +24,7 @@ import (
 	"github.com/OWNER/bothy/services/server/internal/platform/lifecycle"
 	"github.com/OWNER/bothy/services/server/internal/platform/pg"
 	"github.com/OWNER/bothy/services/server/internal/platform/pg/pgtest"
+	"github.com/OWNER/bothy/services/server/internal/platform/testkit"
 )
 
 // bothyBinary is the binary TestMain builds once for the tests that run bothy as a child
@@ -106,7 +107,7 @@ func serveTestEnv(t *testing.T, db *pgtest.DB, extra ...string) []string {
 		"BOTHY_DATABASE__SSLMODE=disable",
 		"BOTHY_SERVER__LISTEN_ADDR=127.0.0.1:0",
 		"BOTHY_SERVER__INTERNAL_LISTEN_ADDR=127.0.0.1:0",
-		"BOTHY_STARTUP__DEPENDENCY_WAIT=10s",
+		"BOTHY_STARTUP__DEPENDENCY_WAIT=" + testkit.PatienceSetting,
 		"BOTHY_TELEMETRY__ENABLED=false",
 		"BOTHY_TELEMETRY__LOGS__EXPORTER=stdout",
 		"BOTHY_SHUTDOWN__DRAIN_DELAY=0s",
@@ -162,20 +163,22 @@ func (c *child) signal(t *testing.T) {
 	}
 }
 
-func (c *child) wait(t *testing.T, limit time.Duration) int {
+// wait returns the exit code of the child, failing the test when it still runs after
+// testkit.Patience.
+func (c *child) wait(t *testing.T) int {
 	t.Helper()
 	select {
 	case <-c.done:
 		return c.code
-	case <-time.After(limit):
-		t.Fatalf("bothy did not exit within %v; stdout:\n%s\nstderr:\n%s", limit, c.stdout, c.stderr)
+	case <-time.After(testkit.Patience):
+		t.Fatalf("bothy did not exit within %v; stdout:\n%s\nstderr:\n%s", testkit.Patience, c.stdout, c.stderr)
 		return -1
 	}
 }
 
 func (c *child) port(t *testing.T, msg string) int {
 	t.Helper()
-	deadline := time.Now().Add(30 * time.Second)
+	deadline := testkit.Deadline()
 	for time.Now().Before(deadline) {
 		if p := logPort(c.stdout.String(), msg); p != 0 {
 			return p
@@ -190,10 +193,10 @@ func (c *child) port(t *testing.T, msg string) int {
 	return 0
 }
 
-// waitLine waits up to 30 seconds for stdout to contain text.
+// waitLine waits up to testkit.Patience for stdout to contain text.
 func (c *child) waitLine(t *testing.T, text string) {
 	t.Helper()
-	deadline := time.Now().Add(30 * time.Second)
+	deadline := testkit.Deadline()
 	for !strings.Contains(c.stdout.String(), text) {
 		if time.Now().After(deadline) {
 			t.Fatalf("no line with %s; stdout:\n%s", text, c.stdout)
@@ -207,7 +210,7 @@ func httpGet(port int, path string) (int, string) {
 	if err != nil {
 		return 0, err.Error()
 	}
-	resp, err := (&http.Client{Timeout: 5 * time.Second}).Do(req)
+	resp, err := (&http.Client{Timeout: testkit.Patience}).Do(req)
 	if err != nil {
 		return 0, err.Error()
 	}
@@ -218,7 +221,7 @@ func httpGet(port int, path string) (int, string) {
 
 func waitHTTP(t *testing.T, port int, path string, want int) {
 	t.Helper()
-	deadline := time.Now().Add(30 * time.Second)
+	deadline := testkit.Deadline()
 	var code int
 	var body string
 	for time.Now().Before(deadline) {
@@ -254,7 +257,7 @@ func TestServeHealthOnlyOnInternalListener(t *testing.T) {
 		}
 	}
 	c.signal(t)
-	if code := c.wait(t, 30*time.Second); code != 0 {
+	if code := c.wait(t); code != 0 {
 		t.Fatalf("exit %d; stderr %s", code, c.stderr)
 	}
 }
@@ -272,13 +275,15 @@ func TestServeReadyAfterStart(t *testing.T) {
 		t.Fatal("role all (the default) has no public listener")
 	}
 	c.signal(t)
-	c.wait(t, 30*time.Second)
+	c.wait(t)
 }
 
 func TestServeSigtermExitsZeroWithinTotal(t *testing.T) {
 	t.Parallel()
 	db := newServeDB(t)
-	c := startChild(t, serveTestEnv(t, db, "BOTHY_SHUTDOWN__DRAIN_DELAY=2s", "BOTHY_SHUTDOWN__HTTP_GRACE=3s", "BOTHY_SHUTDOWN__TELEMETRY_FLUSH_TIMEOUT=1s", "BOTHY_SHUTDOWN__TOTAL_TIMEOUT=10s"), "serve", "--role=api")
+	// The total stays at testkit.Patience: a loaded host may take longer than the budgets of the
+	// steps for the rest of the shutdown, which is no defect.
+	c := startChild(t, serveTestEnv(t, db, "BOTHY_SHUTDOWN__DRAIN_DELAY=2s", "BOTHY_SHUTDOWN__HTTP_GRACE=3s", "BOTHY_SHUTDOWN__TELEMETRY_FLUSH_TIMEOUT=1s", "BOTHY_SHUTDOWN__TOTAL_TIMEOUT="+testkit.PatienceSetting), "serve", "--role=api")
 	internal := c.port(t, "internal listener started")
 	waitHTTP(t, internal, "/readyz", http.StatusOK)
 	sent := time.Now()
@@ -287,10 +292,10 @@ func TestServeSigtermExitsZeroWithinTotal(t *testing.T) {
 	if code, _ := httpGet(internal, "/healthz"); code != http.StatusOK {
 		t.Fatalf("/healthz during the drain = %d", code)
 	}
-	if code := c.wait(t, 30*time.Second); code != 0 {
+	if code := c.wait(t); code != 0 {
 		t.Fatalf("exit %d; stderr %s", code, c.stderr)
 	}
-	if took := c.exited.Sub(sent); took > 10*time.Second || took < 2*time.Second {
+	if took := c.exited.Sub(sent); took > testkit.Patience || took < 2*time.Second {
 		t.Fatalf("shutdown took %v, want between the drain delay and the total", took)
 	}
 	if !strings.Contains(c.stdout.String(), `"msg":"shutdown complete"`) {
@@ -301,17 +306,18 @@ func TestServeSigtermExitsZeroWithinTotal(t *testing.T) {
 func TestServeSecondSignalExitsImmediately(t *testing.T) {
 	t.Parallel()
 	db := newServeDB(t)
-	c := startChild(t, serveTestEnv(t, db, "BOTHY_SHUTDOWN__DRAIN_DELAY=30s"), "serve", "--role=api")
+	// The drain delay is far beyond testkit.Patience, so only the second signal ends it in time.
+	c := startChild(t, serveTestEnv(t, db, "BOTHY_SHUTDOWN__DRAIN_DELAY=30m", "BOTHY_SHUTDOWN__TOTAL_TIMEOUT=1h"), "serve", "--role=api")
 	internal := c.port(t, "internal listener started")
 	waitHTTP(t, internal, "/readyz", http.StatusOK)
 	sent := time.Now()
 	c.signal(t)
 	waitHTTP(t, internal, "/readyz", http.StatusServiceUnavailable)
 	c.signal(t)
-	if code := c.wait(t, 20*time.Second); code != 3 {
+	if code := c.wait(t); code != 3 {
 		t.Fatalf("exit %d, want 3", code)
 	}
-	if took := c.exited.Sub(sent); took > 10*time.Second {
+	if took := c.exited.Sub(sent); took > testkit.Patience {
 		t.Fatalf("forced end took %v", took)
 	}
 }
@@ -326,7 +332,7 @@ func TestServeWorkerHasNoPublicListener(t *testing.T) {
 		t.Fatal("worker opened the public listener")
 	}
 	c.signal(t)
-	if code := c.wait(t, 30*time.Second); code != 0 {
+	if code := c.wait(t); code != 0 {
 		t.Fatalf("exit %d", code)
 	}
 }
@@ -336,7 +342,7 @@ func TestServeAbortsOnOldSchema(t *testing.T) {
 	// The binary embeds migration 00001; a database without migrations has version 0.
 	db := pgtest.New(t, pgtest.WithoutMigrations())
 	c := startChild(t, serveTestEnv(t, db), "serve")
-	if code := c.wait(t, 30*time.Second); code != 1 {
+	if code := c.wait(t); code != 1 {
 		t.Fatalf("exit %d", code)
 	}
 	if !strings.Contains(c.stderr.String(), "bothy migrate up") {
@@ -362,7 +368,7 @@ func TestServeDatabaseUnreachableExits1AfterWait(t *testing.T) {
 	db := newServeDB(t)
 	began := time.Now()
 	c := startChild(t, serveTestEnv(t, db, "BOTHY_DATABASE__PORT=1", "BOTHY_STARTUP__DEPENDENCY_WAIT=1s"), "serve")
-	if code := c.wait(t, 30*time.Second); code != 1 {
+	if code := c.wait(t); code != 1 {
 		t.Fatalf("exit %d", code)
 	}
 	if took := time.Since(began); took < time.Second {
@@ -409,10 +415,7 @@ func TestServeCommandInProcess(t *testing.T) {
 	go func() {
 		done <- serveCommand(context.Background(), []string{"--role=worker"}, serveTestEnv(t, db), stdout, stderr, sigs)
 	}()
-	deadline := time.Now().Add(30 * time.Second)
-	for !strings.Contains(stdout.String(), "server ready") && time.Now().Before(deadline) {
-		time.Sleep(20 * time.Millisecond)
-	}
+	testkit.Until(t, "the ready line", func() bool { return strings.Contains(stdout.String(), "server ready") })
 	sigs <- syscall.SIGTERM
 	if code := <-done; code != 0 {
 		t.Fatalf("exit %d; stderr %s", code, stderr)

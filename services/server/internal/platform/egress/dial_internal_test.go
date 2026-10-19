@@ -10,6 +10,8 @@ import (
 	"sync"
 	"testing"
 	"time"
+
+	"github.com/OWNER/bothy/services/server/internal/platform/testkit"
 )
 
 // TestSocketAddressRecheck exercises the second line of defence: the control function of the
@@ -124,11 +126,11 @@ func TestLoopbackConnectRechecksSocketAddress(t *testing.T) {
 	}
 }
 
-// boundedContext returns a context that ends after five seconds, so that a regression that
+// boundedContext returns a context that ends after testkit.Patience, so that a regression that
 // dials for real fails instead of waiting for the connect timeout of the system.
 func boundedContext(t *testing.T) context.Context {
 	t.Helper()
-	ctx, cancel := context.WithTimeout(t.Context(), 5*time.Second)
+	ctx, cancel := context.WithTimeout(t.Context(), testkit.Patience)
 	t.Cleanup(cancel)
 	return ctx
 }

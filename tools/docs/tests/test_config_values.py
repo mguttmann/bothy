@@ -97,6 +97,16 @@ def _sdk_typescript_min() -> str:
     return next(iter(values.values()))
 
 
+def _testkit_patience() -> str:
+    """Patience of the Go test helper, as its configuration text PatienceSetting."""
+    text = (REPO / "services/server/internal/platform/testkit/testkit.go").read_text(
+        encoding="utf-8"
+    )
+    match = re.search(r'^const PatienceSetting = "([^"]+)"$', text, re.MULTILINE)
+    assert match, "testkit.go has no PatienceSetting"
+    return match.group(1)
+
+
 SOURCES = {
     "quality.coverage.tools_min_percent": lambda: str(
         tomllib.loads((REPO / "tools" / "pyproject.toml").read_text())["tool"]["coverage"][
@@ -109,6 +119,7 @@ SOURCES = {
     "quality.coverage.typescript_min_percent": _sdk_typescript_min,
     "quality.perf.timeout": lambda: _makefile_var("PERF_TIMEOUT"),
     "quality.test.go_timeout": lambda: _makefile_var("GO_TEST_TIMEOUT"),
+    "quality.test.patience": _testkit_patience,
     "quality.sonar.new_issues_max": lambda: _gate_value("quality.sonar.new_issues_max"),
     "quality.sonar.new_hotspots_reviewed_min_percent": lambda: _gate_value(
         "quality.sonar.new_hotspots_reviewed_min_percent"

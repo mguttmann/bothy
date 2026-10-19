@@ -11,6 +11,7 @@ import (
 
 	"github.com/OWNER/bothy/services/server/internal/platform/lifecycle"
 	"github.com/OWNER/bothy/services/server/internal/platform/pg/pgtest"
+	"github.com/OWNER/bothy/services/server/internal/platform/testkit"
 	"github.com/OWNER/bothy/services/server/internal/wire"
 )
 
@@ -46,7 +47,7 @@ func TestServeLogTailInAPIRoles(t *testing.T) {
 			}
 			// LISTEN is set up by the tail's own goroutine right after the head is read, so the
 			// connection may appear just after readiness.
-			deadline := time.Now().Add(10 * time.Second)
+			deadline := testkit.Deadline()
 			for countRows(t, db, tailBackends) != want {
 				if time.Now().After(deadline) {
 					t.Fatalf("%d tail connections after readiness, want %d", countRows(t, db, tailBackends), want)
@@ -54,7 +55,7 @@ func TestServeLogTailInAPIRoles(t *testing.T) {
 				time.Sleep(50 * time.Millisecond)
 			}
 			if role != wire.RoleAPI {
-				deadline := time.Now().Add(60 * time.Second)
+				deadline := testkit.Deadline()
 				for countRows(t, db, "SELECT count(*) FROM pg_inherits WHERE inhparent = 'public.event_log'::regclass") == 0 {
 					if time.Now().After(deadline) {
 						t.Fatalf("the worker did not create partitions; logs:\n%s", p.logs)
@@ -66,7 +67,7 @@ func TestServeLogTailInAPIRoles(t *testing.T) {
 			if code := p.exit(t); code != lifecycle.ExitOK {
 				t.Fatalf("exit = %d; logs:\n%s", code, p.logs)
 			}
-			deadline = time.Now().Add(10 * time.Second)
+			deadline = testkit.Deadline()
 			for countRows(t, db, tailBackends) != 0 {
 				if time.Now().After(deadline) {
 					t.Fatal("the LISTEN connection is still open after the shutdown")

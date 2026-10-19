@@ -12,6 +12,7 @@ import (
 	"testing/fstest"
 
 	"github.com/OWNER/bothy/services/server/internal/platform/pg"
+	"github.com/OWNER/bothy/services/server/internal/platform/testkit"
 )
 
 func TestMain(m *testing.M) { os.Exit(Main(m)) }
@@ -141,6 +142,7 @@ func TestDatabaseIsDroppedAtCleanup(t *testing.T) {
 // TestFailedTemplateIsDropped: a migration set that fails leaves no template behind, so a second
 // attempt reports the migration error again instead of "database already exists".
 func TestFailedTemplateIsDropped(t *testing.T) {
+	testkit.Integration(t)
 	t.Parallel()
 	broken := fstest.MapFS{"00001_broken.sql": {Data: []byte("-- +goose Up\nSELECT * FROM no_such_table;\n")}}
 	c, err := sharedCluster(false)

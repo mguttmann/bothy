@@ -12,6 +12,7 @@ import (
 	"github.com/OWNER/bothy/services/server/internal/kernel/auditing"
 	"github.com/OWNER/bothy/services/server/internal/kernel/clock"
 	"github.com/OWNER/bothy/services/server/internal/kernel/ids"
+	"github.com/OWNER/bothy/services/server/internal/platform/testkit"
 )
 
 // denyN records n identical denials of ctx, one second apart.
@@ -216,7 +217,7 @@ func TestDenyAggregation_RunWritesAtWindowEnd(t *testing.T) {
 	if err := w.rec.RecordDenial(as(alex), deny("grant.create", auditing.ReasonNoGrant)); err != nil {
 		t.Fatal(err)
 	}
-	deadline := time.Now().Add(5 * time.Second)
+	deadline := testkit.Deadline()
 	for len(w.store.committed()) == 0 {
 		if time.Now().After(deadline) {
 			t.Fatal("Run did not write the bucket at the end of its window")

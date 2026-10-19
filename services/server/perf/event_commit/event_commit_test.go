@@ -20,6 +20,7 @@ import (
 	"github.com/OWNER/bothy/services/server/internal/platform/jobs/jobstest"
 	"github.com/OWNER/bothy/services/server/internal/platform/pg"
 	"github.com/OWNER/bothy/services/server/internal/platform/pg/pgtest"
+	"github.com/OWNER/bothy/services/server/internal/platform/testkit"
 	syncpg "github.com/OWNER/bothy/services/server/internal/sync/adapters/postgres"
 	syncapp "github.com/OWNER/bothy/services/server/internal/sync/app"
 	"github.com/OWNER/bothy/services/server/internal/wire"
@@ -128,7 +129,7 @@ func TestEventCommitThroughput(t *testing.T) {
 			t.Fatal(err)
 		}
 		defer func() {
-			ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+			ctx, cancel := context.WithTimeout(context.Background(), testkit.Patience)
 			defer cancel()
 			_ = rt.Stop(ctx)
 		}()
@@ -143,7 +144,7 @@ func measure(t *testing.T, uow *pg.UnitOfWork, pool *pg.Pool, appender eventlog.
 	t.Helper()
 	var count atomic.Int64
 	var failures atomic.Int64
-	deadline := time.Now().Add(*duration)
+	deadline := time.Now().Add(*duration) // nosemgrep: bothy-go-test-wall-clock-wait -- the length of the load run, not a wait
 	start := time.Now()
 	var wg stdsync.WaitGroup
 	for w := range n {

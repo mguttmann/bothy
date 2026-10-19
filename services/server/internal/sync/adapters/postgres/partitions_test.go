@@ -12,6 +12,7 @@ import (
 	"github.com/jackc/pgx/v5"
 
 	"github.com/OWNER/bothy/services/server/internal/platform/pg"
+	"github.com/OWNER/bothy/services/server/internal/platform/testkit"
 	"github.com/OWNER/bothy/services/server/internal/sync/app"
 	"github.com/OWNER/bothy/services/server/internal/sync/domain"
 )
@@ -218,7 +219,7 @@ func TestPartitions_EnsureDoesNotBlockInserts(t *testing.T) {
 	if err := tx.QueryRow(ctx, "SELECT sync_event_log_ensure_partitions(10, 5, 0)").Scan(&created); err != nil || created != 2 {
 		t.Fatalf("ensure in the open transaction = %d, %v", created, err)
 	}
-	actx, cancel := context.WithTimeout(ctx, 5*time.Second)
+	actx, cancel := context.WithTimeout(ctx, testkit.Patience)
 	defer cancel()
 	if _, err := e.appendUnit(actx, testEvent("thread.during_attach")); err != nil {
 		t.Fatalf("an append waited for the open attach: %v", err)

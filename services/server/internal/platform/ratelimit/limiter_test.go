@@ -21,6 +21,7 @@ import (
 	"github.com/OWNER/bothy/services/server/internal/kernel/clock"
 	"github.com/OWNER/bothy/services/server/internal/kernel/ids"
 	"github.com/OWNER/bothy/services/server/internal/platform/ratelimit"
+	"github.com/OWNER/bothy/services/server/internal/platform/testkit"
 )
 
 const keyA = "p:0192f4a0-7b1c-7577-8bf0-c4f4ee4f887e"
@@ -368,7 +369,7 @@ func TestRun_StopsOnCancel(t *testing.T) {
 		l.Run(ctx)
 		close(done)
 	}()
-	deadline := time.Now().Add(5 * time.Second)
+	deadline := testkit.Deadline()
 	for l.Len() != 0 {
 		if time.Now().After(deadline) {
 			t.Fatal("Run never swept the full bucket")
@@ -379,7 +380,7 @@ func TestRun_StopsOnCancel(t *testing.T) {
 	cancel()
 	select {
 	case <-done:
-	case <-time.After(5 * time.Second):
+	case <-time.After(testkit.Patience):
 		t.Fatal("Run did not return after the context ended")
 	}
 }

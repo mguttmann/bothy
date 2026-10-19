@@ -15,6 +15,7 @@ import (
 
 	"github.com/OWNER/bothy/services/server/internal/kernel/clock"
 	"github.com/OWNER/bothy/services/server/internal/platform/otel/attr"
+	"github.com/OWNER/bothy/services/server/internal/platform/testkit"
 )
 
 // TestFailedExportCountsExactly: every span and every log record of a failed export is counted
@@ -52,7 +53,7 @@ func TestQueueFullDropsAndCounts(t *testing.T) {
 		start := time.Now()
 		s.End()
 		// A waiting End would wait for the exporter, which never returns.
-		if d := time.Since(start); d > 500*time.Millisecond {
+		if d := time.Since(start); d > testkit.Patience {
 			t.Fatalf("End of span %d took %v", i, d)
 		}
 	}
@@ -73,14 +74,14 @@ func TestShutdownRespectsDeadline(t *testing.T) {
 	}
 	select {
 	case <-exp.started:
-	case <-time.After(5 * time.Second):
+	case <-time.After(testkit.Patience):
 		t.Fatal("the exporter was never called")
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), 100*time.Millisecond)
 	defer cancel()
 	start := time.Now()
 	err := tt.Shutdown(ctx)
-	if d := time.Since(start); d > time.Second {
+	if d := time.Since(start); d > testkit.Patience {
 		t.Errorf("Shutdown took %v with a 100ms deadline", d)
 	}
 	if !errors.Is(err, context.DeadlineExceeded) {

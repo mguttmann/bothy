@@ -5,6 +5,7 @@ package s3_test
 import (
 	"context"
 	"errors"
+	"flag"
 	"fmt"
 	"net/netip"
 	"os"
@@ -22,6 +23,8 @@ import (
 	"github.com/testcontainers/testcontainers-go"
 	tclog "github.com/testcontainers/testcontainers-go/log"
 	"github.com/testcontainers/testcontainers-go/wait"
+
+	"github.com/OWNER/bothy/services/server/internal/platform/testkit"
 )
 
 // seaweedImage is the SeaweedFS image of the test container: the repository and version of the
@@ -49,11 +52,6 @@ const (
 // seaweedS3Port is the port of the S3 gateway inside the container.
 const seaweedS3Port = "8333/tcp"
 
-const (
-	seaweedStartTimeout = 3 * time.Minute
-	seaweedRuntimeWait  = 30 * time.Second
-)
-
 // TestMain checks for a container runtime and stops the SeaweedFS container after the tests.
 // Without a Docker-compatible runtime the binary fails with the reason; the integration tests
 // never skip (plan P-09).
@@ -65,7 +63,12 @@ func seaweedMain(m *testing.M) int {
 		_, _ = fmt.Fprintf(os.Stderr, "s3 tests: %v\n", err)
 		return 1
 	}
-	ctx, cancel := context.WithTimeout(context.Background(), seaweedRuntimeWait)
+	flag.Parse()
+	if testing.Short() {
+		// go test -short skips the SeaweedFS tests (testkit.Integration in sharedSeaweed).
+		return m.Run()
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), testkit.Patience)
 	err := runtimeReachable(ctx)
 	cancel()
 	if err != nil {
@@ -114,10 +117,11 @@ var seaweed struct {
 // sharedSeaweed returns the SeaweedFS of this test binary, starting it on first use.
 func sharedSeaweed(t *testing.T) *seaweedServer {
 	t.Helper()
+	testkit.Integration(t)
 	seaweed.mu.Lock()
 	defer seaweed.mu.Unlock()
 	if seaweed.srv == nil && seaweed.err == nil {
-		ctx, cancel := context.WithTimeout(context.Background(), seaweedStartTimeout)
+		ctx, cancel := context.WithTimeout(context.Background(), testkit.Patience)
 		seaweed.srv, seaweed.err = startSeaweed(ctx, t)
 		cancel()
 	}
@@ -153,7 +157,7 @@ func startSeaweed(ctx context.Context, t *testing.T) (*seaweedServer, error) {
 		// An unsigned request gets 403 once the gateway checks signatures.
 		testcontainers.WithWaitStrategy(wait.ForHTTP("/").WithPort(seaweedS3Port).
 			WithStatusCodeMatcher(func(status int) bool { return status == 403 }).
-			WithStartupTimeout(seaweedStartTimeout)),
+			WithStartupTimeout(testkit.Patience)),
 	)
 	if err != nil {
 		if ctr != nil {

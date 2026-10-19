@@ -28,6 +28,7 @@ import (
 	"encoding/base64"
 	"encoding/hex"
 	"errors"
+	"flag"
 	"fmt"
 	"io"
 	"io/fs"
@@ -51,6 +52,7 @@ import (
 
 	"github.com/OWNER/bothy/services/server/internal/platform/pg"
 	"github.com/OWNER/bothy/services/server/internal/platform/secrets"
+	"github.com/OWNER/bothy/services/server/internal/platform/testkit"
 	"github.com/OWNER/bothy/services/server/migrations"
 )
 
@@ -85,15 +87,16 @@ var secretFiles = map[pg.Role]string{
 const superSecretFile = "db_superuser_password" // #nosec G101 -- a file name of the secret catalog, not a credential
 
 // The deadlines and pool size of Config: generous, because tests share one container and run
-// with the race detector; a test of the deadlines sets its own.
+// with the race detector on loaded hosts, where waits of 10 and 30 seconds ran out for correct
+// tests (PL/8); a test of the deadlines sets its own.
 const (
 	testMaxConns         = 4
-	testAcquireTimeout   = 10 * time.Second
-	testStatementTimeout = 30 * time.Second
-	testLockTimeout      = 10 * time.Second
+	testAcquireTimeout   = testkit.Patience
+	testStatementTimeout = testkit.Patience
+	testLockTimeout      = testkit.Patience
 	testIdleInTxTimeout  = 60 * time.Second
-	connectWait          = 30 * time.Second
-	startTimeout         = 3 * time.Minute
+	connectWait          = testkit.Patience
+	startTimeout         = testkit.Patience
 	cleanupTimeout       = 30 * time.Second
 	// adminMaxConns bounds the superuser pool that creates and drops the databases of the
 	// tests, so parallel tests clone at the same time instead of one after the other.
@@ -247,6 +250,14 @@ func Main(m *testing.M, opts ...MainOption) int {
 	state.mu.Lock()
 	state.steps = o.steps
 	state.mu.Unlock()
+	if !flag.Parsed() {
+		flag.Parse()
+	}
+	if testing.Short() {
+		// go test -short skips every test that asks New for a database (testkit.Integration), so
+		// the binary needs no container runtime and starts no container.
+		return m.Run()
+	}
 	// testcontainers reads its configuration once, at the first call; only the exact value
 	// "true" disables Ryuk.
 	if err := os.Setenv("TESTCONTAINERS_RYUK_DISABLED", "true"); err != nil {
@@ -509,12 +520,18 @@ func reapLegacy(ctx context.Context, key string, now time.Time) error {
 // (M1-12 D7); Durable leaves them out.
 var speedFlags = []string{"-c", "fsync=off", "-c", "synchronous_commit=off", "-c", "full_page_writes=off"}
 
+// maxConnections is max_connections of both containers. Every test of a binary shares one
+// server, and on a loaded host the tests run longer and overlap more: the default of 100 ran out
+// ("too many clients already", SQLSTATE 53300) when the serve tests of internal/wire ran their
+// servers in parallel (PL/8).
+const maxConnections = "400"
+
 // runContainer starts the pinned image on 127.0.0.1 with a random host port, under
 // watchdogScript and with AutoRemove, so the container and its anonymous data volume disappear
 // when the lease of this process ends; with the speed flags unless durable.
 func runContainer(ctx context.Context, superPassword string, durable bool) (*testcontainers.DockerContainer, error) {
 	port := network.MustParsePort(containerPort)
-	cmd := []string{"postgres"}
+	cmd := []string{"postgres", "-c", "max_connections=" + maxConnections}
 	if !durable {
 		cmd = append(cmd, speedFlags...)
 	}
@@ -634,6 +651,7 @@ type DB struct {
 // already. New fails t when Main is not in use or the container cannot start.
 func New(t testing.TB, opts ...Option) *DB {
 	t.Helper()
+	testkit.Integration(t)
 	o := options{fsys: migrations.FS}
 	for _, opt := range opts {
 		opt(&o)

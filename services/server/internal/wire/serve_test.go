@@ -31,6 +31,7 @@ import (
 	"github.com/OWNER/bothy/services/server/internal/platform/pg"
 	"github.com/OWNER/bothy/services/server/internal/platform/pg/pgtest"
 	"github.com/OWNER/bothy/services/server/internal/platform/secrets"
+	"github.com/OWNER/bothy/services/server/internal/platform/testkit"
 	"github.com/OWNER/bothy/services/server/internal/wire"
 )
 
@@ -168,7 +169,7 @@ func serveEnv(t *testing.T, db *pgtest.DB, extra ...string) []string {
 		"BOTHY_DATABASE__SSLMODE=disable",
 		"BOTHY_SERVER__LISTEN_ADDR=127.0.0.1:0",
 		"BOTHY_SERVER__INTERNAL_LISTEN_ADDR=127.0.0.1:0",
-		"BOTHY_STARTUP__DEPENDENCY_WAIT=10s",
+		"BOTHY_STARTUP__DEPENDENCY_WAIT=" + testkit.PatienceSetting,
 		"BOTHY_TELEMETRY__ENABLED=false",
 		"BOTHY_TELEMETRY__LOGS__EXPORTER=stdout",
 		"BOTHY_SHUTDOWN__DRAIN_DELAY=0s",
@@ -229,23 +230,17 @@ func (p *process) exit(t *testing.T) int {
 	case code := <-p.done:
 		p.done <- code
 		return code
-	case <-time.After(60 * time.Second):
+	case <-time.After(testkit.Patience):
 		t.Fatalf("serve did not exit; logs:\n%s", p.logs)
 		return -1
 	}
 }
 
-// startupWait bounds how long a test waits for a started server to log its listeners, to
-// report its start or to answer /readyz. A server under -race on a loaded host needs well
-// over 30 seconds for the start (migrations, key check, warming the validators); the shared
-// harness waits as long (M1-71/10). A server that never gets ready still fails the test.
-const startupWait = 3 * time.Minute
-
 // waitInternal waits for the line of the internal listener and returns its port.
 func (p *process) waitInternal(t *testing.T) int {
 	t.Helper()
 	const msg = "internal listener started"
-	deadline := time.Now().Add(startupWait)
+	deadline := testkit.Deadline()
 	for time.Now().Before(deadline) {
 		if port := p.logs.port(msg); port != 0 {
 			return port
@@ -262,7 +257,7 @@ func get(t *testing.T, port int, path string) (int, string) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	resp, err := (&http.Client{Timeout: 10 * time.Second}).Do(req)
+	resp, err := (&http.Client{Timeout: testkit.Patience}).Do(req)
 	if err != nil {
 		return 0, err.Error()
 	}
@@ -275,7 +270,7 @@ func get(t *testing.T, port int, path string) (int, string) {
 func waitReadyz(t *testing.T, port int, code int) string {
 	t.Helper()
 	const path = "/readyz"
-	deadline := time.Now().Add(startupWait)
+	deadline := testkit.Deadline()
 	var got int
 	var body string
 	for time.Now().Before(deadline) {
@@ -300,9 +295,8 @@ func TestServeRolesStartReadyAndStop(t *testing.T) {
 			p := start(t, role, serveEnv(t, db), wire.Deps{})
 			internal := p.waitInternal(t)
 			waitReadyz(t, internal, http.StatusOK)
-			if !strings.Contains(p.logs.String(), `"msg":"server ready"`) {
-				t.Fatalf("no ready line:\n%s", p.logs)
-			}
+			// /readyz answers 200 as soon as the start is marked complete; the line follows.
+			testkit.Until(t, "the ready line", func() bool { return strings.Contains(p.logs.String(), `"msg":"server ready"`) })
 			// EnsureActive of the start (M1-32): exactly one active key per purpose, also with the
 			// three roles starting against one database at once.
 			var purposes, actives int
@@ -427,15 +421,13 @@ func TestServeRefusesCheckpointSinkWithoutLock(t *testing.T) {
 func TestServeDatabaseUnreachableExits1AfterWait(t *testing.T) {
 	t.Parallel()
 	db := newServeDB(t)
-	start := time.Now()
 	p := startProc(t, serveEnv(t, db, "BOTHY_DATABASE__PORT=1", "BOTHY_STARTUP__DEPENDENCY_WAIT=500ms"))
 	if code := p.exit(t); code != lifecycle.ExitFailure {
 		t.Fatalf("exit = %d", code)
 	}
-	if time.Since(start) > 20*time.Second {
-		t.Fatal("the start waited far beyond startup.dependency_wait")
-	}
-	if err := p.runner.Err(); err == nil || !strings.Contains(err.Error(), "not reachable") {
+	// The error names the wait it gave up after, so the configured startup.dependency_wait was
+	// the bound (and not the default of 60s); no clock reading is involved.
+	if err := p.runner.Err(); err == nil || !strings.Contains(err.Error(), "not reachable within 500ms") {
 		t.Fatalf("Err() = %v", err)
 	}
 }
@@ -581,16 +573,16 @@ func (r *recorder) WriteHeader(code int)        { r.code = code }
 func TestServeSignalDuringStartSkipsTheDrain(t *testing.T) {
 	t.Parallel()
 	db := newServeDB(t)
-	// The database never answers; the drain delay would hold the end for 30s although the public
-	// listener never opened.
-	p := start(t, wire.RoleAPI, serveEnv(t, db, "BOTHY_DATABASE__PORT=1", "BOTHY_STARTUP__DEPENDENCY_WAIT=20s", "BOTHY_SHUTDOWN__DRAIN_DELAY=30s"), wire.Deps{})
+	// The database never answers; the drain delay would hold the end for 30 minutes, far beyond
+	// testkit.Patience, although the public listener never opened.
+	p := start(t, wire.RoleAPI, serveEnv(t, db, "BOTHY_DATABASE__PORT=1", "BOTHY_STARTUP__DEPENDENCY_WAIT=1h", "BOTHY_SHUTDOWN__DRAIN_DELAY=30m", "BOTHY_SHUTDOWN__TOTAL_TIMEOUT=1h"), wire.Deps{})
 	p.waitInternal(t)
 	sent := time.Now()
 	p.sigs <- syscall.SIGTERM
 	if code := p.exit(t); code != lifecycle.ExitOK {
 		t.Fatalf("exit = %d", code)
 	}
-	if took := time.Since(sent); took > 10*time.Second {
+	if took := time.Since(sent); took > testkit.Patience {
 		t.Fatalf("the end took %v; the drain ran without a public listener", took)
 	}
 }

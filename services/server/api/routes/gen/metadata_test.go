@@ -7,6 +7,8 @@ import (
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/OWNER/bothy/services/server/internal/platform/testkit"
 )
 
 func TestOperationMetadata_FromFixtureSpec(t *testing.T) {
@@ -357,8 +359,8 @@ func TestLoadInputs_SelfReferencingAnchorFailsPromptly(t *testing.T) {
 		if err == nil {
 			t.Fatal("a self-referencing anchor was accepted")
 		}
-	case <-time.After(30 * time.Second):
-		t.Fatal("loadInputs did not return within 30s on a self-referencing anchor")
+	case <-time.After(testkit.Patience):
+		t.Fatalf("loadInputs did not return within %s on a self-referencing anchor", testkit.Patience)
 	}
 }
 

@@ -14,6 +14,7 @@ import (
 	"time"
 
 	"github.com/OWNER/bothy/services/server/internal/kernel/errs"
+	"github.com/OWNER/bothy/services/server/internal/platform/testkit"
 	"github.com/OWNER/bothy/services/server/internal/sync"
 	"github.com/OWNER/bothy/services/server/internal/sync/app"
 	"github.com/OWNER/bothy/services/server/internal/sync/domain"
@@ -472,7 +473,7 @@ func waitAsked(t *testing.T, a *fakeAfter) {
 	t.Helper()
 	select {
 	case <-a.asked:
-	case <-time.After(5 * time.Second):
+	case <-time.After(testkit.Patience):
 		t.Fatal("the runner did not start to wait")
 	}
 }
@@ -555,7 +556,7 @@ func TestRunnerWakeSignalsCoalesce(t *testing.T) {
 	// wake would start a third round (the send of a wake returns before dispatch forwards it).
 	select {
 	case <-rounds.started:
-	case <-time.After(5 * time.Second):
+	case <-time.After(testkit.Patience):
 		t.Fatal("the first round did not start")
 	}
 	for range 5 {
@@ -608,7 +609,7 @@ func TestRunnerStopStartsNoNewRound(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-		case <-time.After(5 * time.Second):
+		case <-time.After(testkit.Patience):
 			t.Fatal("Stop did not return after the round ended")
 		}
 		settle()
@@ -688,7 +689,7 @@ func TestRunnerFailsWhenTheWakerEnds(t *testing.T) {
 		if err == nil {
 			t.Fatal("Failed delivered nil")
 		}
-	case <-time.After(5 * time.Second):
+	case <-time.After(testkit.Patience):
 		t.Fatal("the end of the waker did not reach Failed")
 	}
 }

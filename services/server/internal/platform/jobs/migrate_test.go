@@ -12,6 +12,7 @@ import (
 	"github.com/OWNER/bothy/services/server/internal/platform/jobs"
 	"github.com/OWNER/bothy/services/server/internal/platform/pg"
 	"github.com/OWNER/bothy/services/server/internal/platform/pg/pgtest"
+	"github.com/OWNER/bothy/services/server/internal/platform/testkit"
 )
 
 // TestMigrationFunctionsRefuseAnInvalidSchema: every entry point checks the schema name before
@@ -37,7 +38,7 @@ func TestMigrationStatusBeforeAndAfterMigrate(t *testing.T) {
 	t.Parallel()
 	db := pgtest.New(t)
 	pool := db.OpenPool(t, db.Config(pg.RoleOwner).ForMigrate(time.Second))
-	ctx, cancel := context.WithTimeout(t.Context(), waitLong)
+	ctx, cancel := context.WithTimeout(t.Context(), testkit.Patience)
 	defer cancel()
 	const schema = "jobs_fresh"
 	st, err := jobs.MigrationStatus(ctx, pool, schema)
@@ -83,7 +84,7 @@ func TestMigrateStopsWaitingForTheLockWhenTheContextEnds(t *testing.T) {
 	t.Parallel()
 	db := pgtest.New(t)
 	pool := db.OpenPool(t, db.Config(pg.RoleOwner).ForMigrate(time.Second))
-	hctx, hcancel := context.WithTimeout(t.Context(), waitLong)
+	hctx, hcancel := context.WithTimeout(t.Context(), testkit.Patience)
 	defer hcancel()
 	holder, err := pool.PGX().Acquire(hctx)
 	if err != nil {

@@ -14,6 +14,7 @@ import (
 
 	"github.com/OWNER/bothy/services/server/internal/platform/lifecycle"
 	"github.com/OWNER/bothy/services/server/internal/platform/pg/pgtest"
+	"github.com/OWNER/bothy/services/server/internal/platform/testkit"
 	"github.com/OWNER/bothy/services/server/internal/sync"
 	"github.com/OWNER/bothy/services/server/internal/sync/adapters/otelmetrics"
 	"github.com/OWNER/bothy/services/server/internal/wire"
@@ -75,7 +76,7 @@ func TestServeWorkerRolesRunConsumers(t *testing.T) {
 				if n := countRows(t, db, "SELECT count(*) FROM event_consumer_cursors WHERE name = 'webhooks' AND last_seq = 0"); n != 1 {
 					t.Fatalf("cursor rows at the head = %d, want 1", n)
 				}
-				deadline := time.Now().Add(10 * time.Second)
+				deadline := testkit.Deadline()
 				for countRows(t, db, wakeBackends) != 1 {
 					if time.Now().After(deadline) {
 						t.Fatalf("%d wake connections, want 1", countRows(t, db, wakeBackends))
@@ -88,7 +89,7 @@ func TestServeWorkerRolesRunConsumers(t *testing.T) {
 					if seq != 1 {
 						t.Fatalf("handled seq %d, want 1", seq)
 					}
-				case <-time.After(10 * time.Second):
+				case <-time.After(testkit.Patience):
 					t.Fatalf("the consumer did not handle the event; logs:\n%s", p.logs)
 				}
 			}
@@ -96,7 +97,7 @@ func TestServeWorkerRolesRunConsumers(t *testing.T) {
 			if code := p.exit(t); code != lifecycle.ExitOK {
 				t.Fatalf("exit = %d; logs:\n%s", code, p.logs)
 			}
-			deadline := time.Now().Add(10 * time.Second)
+			deadline := testkit.Deadline()
 			for countRows(t, db, wakeBackends) != 0 {
 				if time.Now().After(deadline) {
 					t.Fatal("the wake connection is still open after the shutdown")

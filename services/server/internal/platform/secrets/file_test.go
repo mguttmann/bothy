@@ -17,6 +17,7 @@ import (
 	"time"
 
 	"github.com/OWNER/bothy/services/server/internal/platform/secrets"
+	"github.com/OWNER/bothy/services/server/internal/platform/testkit"
 )
 
 // modeBits are the bits the file driver checks: permissions plus setuid, setgid and sticky.
@@ -144,7 +145,7 @@ func TestFileDriverRejectsInsecureModes(t *testing.T) {
 		select {
 		case r := <-done:
 			checkInsecure(t, ref, r.v, r.ver, r.err, "not a regular file", canary)
-		case <-time.After(10 * time.Second):
+		case <-time.After(testkit.Patience):
 			t.Fatal("Get blocked on a FIFO")
 		}
 	})

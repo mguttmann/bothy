@@ -23,17 +23,13 @@ import (
 	"github.com/OWNER/bothy/services/server/internal/platform/jobs/jobstest"
 	"github.com/OWNER/bothy/services/server/internal/platform/pg"
 	"github.com/OWNER/bothy/services/server/internal/platform/pg/pgtest"
+	"github.com/OWNER/bothy/services/server/internal/platform/testkit"
 )
 
 func TestMain(m *testing.M) { os.Exit(pgtest.Main(m)) }
 
 // The schema of River's tables in these tests: not the default, so nothing depends on it.
 const testSchema = "jobs_test"
-
-// waitLong bounds every wait for River in these tests; River picks a job up within a fetch
-// interval (1s) after LISTEN/NOTIFY or the poll, scheduled jobs within the scheduler interval
-// (5s) after their time.
-const waitLong = 30 * time.Second
 
 // env is the database of one test: River's tables in testSchema, a pool of bothy_app with
 // room for River's connections, and a unit of work over it.
@@ -88,7 +84,7 @@ func (e *env) runtime(t *testing.T, cfg jobs.Config, role jobs.Role, reg *jobs.R
 		t.Fatalf("Start: %v", err)
 	}
 	t.Cleanup(func() {
-		ctx, cancel := context.WithTimeout(context.Background(), waitLong)
+		ctx, cancel := context.WithTimeout(context.Background(), testkit.Patience)
 		defer cancel()
 		if err := rt.Stop(ctx); err != nil {
 			t.Errorf("Stop: %v", err)
@@ -161,8 +157,8 @@ func receive[A jobs.Args](t *testing.T, ch <-chan jobs.Job[A]) jobs.Job[A] {
 	select {
 	case j := <-ch:
 		return j
-	case <-time.After(waitLong):
-		t.Fatalf("no job ran within %s", waitLong)
+	case <-time.After(testkit.Patience):
+		t.Fatalf("no job ran within %s", testkit.Patience)
 		return jobs.Job[A]{}
 	}
 }
@@ -308,13 +304,22 @@ func TestInsertTx_ScheduledAt(t *testing.T) {
 	e := newEnv(t)
 	ran := make(chan jobs.Job[fakemodule.Echo], 1)
 	rt := e.runtime(t, testConfig(t, time.Second), jobs.RoleWorker, registry(t, recorder(ran), jobs.HandlerOptions{}))
+	// River compares scheduled_at with the clock of the database, which in a container VM can run
+	// ahead of or behind the clock of this process; both checks read that clock.
 	const offset = 3 * time.Second
-	at := time.Now().Add(offset)
+	// skew is read with the time before the query, so it errs towards the database being ahead and
+	// the quiet window below ends early rather than late.
+	var dbNow time.Time
+	before := time.Now()
+	e.query(t, "SELECT clock_timestamp()", &dbNow)
+	skew := dbNow.Sub(before)
+	at := dbNow.Add(offset)
 	e.insert(t, rt.Inserter(), fakemodule.Echo{Target: ids.New(), Seq: 1}, &jobs.InsertOptions{ScheduledAt: at})
-	none(t, ran, time.Until(at)-200*time.Millisecond)
+	none(t, ran, time.Until(at.Add(-skew))-200*time.Millisecond)
 	receive(t, ran)
-	if now := time.Now(); now.Before(at) {
-		t.Fatalf("the job ran at %s, before its time %s", now, at)
+	e.query(t, "SELECT clock_timestamp()", &dbNow)
+	if dbNow.Before(at) {
+		t.Fatalf("the job ran at %s by the database clock, before its time %s", dbNow, at)
 	}
 }
 
@@ -376,14 +381,14 @@ func TestRoleWorker_RunsJobAsAppRole(t *testing.T) {
 func waitCompleted(t *testing.T, e *env) jobRow {
 	t.Helper()
 	const state = "completed"
-	deadline := time.Now().Add(waitLong)
+	deadline := testkit.Deadline()
 	for {
 		r := e.onlyJob(t)
 		if r.state == state {
 			return r
 		}
 		if time.Now().After(deadline) {
-			t.Fatalf("job = %+v, want state %s within %s", r, state, waitLong)
+			t.Fatalf("job = %+v, want state %s within %s", r, state, testkit.Patience)
 		}
 		time.Sleep(50 * time.Millisecond)
 	}
@@ -433,7 +438,7 @@ func stopAfterSoftTimeout(t *testing.T, e *env, returnNil bool) {
 		t.Fatalf("first run on attempt %d", j.Attempt)
 	}
 	begin := time.Now()
-	ctx, cancel := context.WithTimeout(context.Background(), waitLong)
+	ctx, cancel := context.WithTimeout(context.Background(), testkit.Patience)
 	defer cancel()
 	if err := rt.Stop(ctx); err != nil {
 		t.Fatalf("Stop: %v", err)
@@ -451,7 +456,7 @@ func stopAfterSoftTimeout(t *testing.T, e *env, returnNil bool) {
 		if ok {
 			t.Fatalf("Failed delivered %v after Stop", err)
 		}
-	case <-time.After(waitLong):
+	case <-time.After(testkit.Patience):
 		t.Fatal("Failed was not closed after Stop")
 	}
 
@@ -527,7 +532,7 @@ func TestFailed_UnexpectedStopEndsProcess(t *testing.T) {
 		if err == nil {
 			t.Fatal("Failed was closed without an error")
 		}
-	case <-time.After(waitLong):
+	case <-time.After(testkit.Patience):
 		t.Fatal("Failed delivered nothing after the client stopped")
 	}
 }
@@ -615,7 +620,7 @@ func TestMigrateNeedsTwoConnections(t *testing.T) {
 	cfg := db.Config(pg.RoleOwner).ForMigrate(time.Second)
 	cfg.MaxConns = 1
 	pool := db.OpenPool(t, cfg)
-	ctx, cancel := context.WithTimeout(t.Context(), waitLong)
+	ctx, cancel := context.WithTimeout(t.Context(), testkit.Patience)
 	defer cancel()
 	_, err := jobs.Migrate(ctx, pool, testSchema)
 	if err == nil || !strings.Contains(err.Error(), "database.max_conns") {
@@ -636,7 +641,7 @@ func TestMigrateWaitsForAConcurrentRun(t *testing.T) {
 	t.Parallel()
 	db := pgtest.New(t)
 	pool := db.OpenPool(t, db.Config(pg.RoleOwner).ForMigrate(100*time.Millisecond))
-	ctx, cancel := context.WithTimeout(t.Context(), waitLong)
+	ctx, cancel := context.WithTimeout(t.Context(), testkit.Patience)
 	defer cancel()
 	holder, err := pool.PGX().Acquire(ctx)
 	if err != nil {
@@ -654,7 +659,7 @@ func TestMigrateWaitsForAConcurrentRun(t *testing.T) {
 	select {
 	case err := <-done:
 		t.Fatalf("Migrate returned %v while another run held the lock", err)
-	case <-time.After(time.Second):
+	case <-time.After(time.Second): // nosemgrep: bothy-go-test-wall-clock-wait -- a wait for something that must not happen
 	}
 	if _, err := holder.Exec(ctx, "SELECT pg_advisory_unlock($1)", jobs.MigrateLockIDForTest); err != nil {
 		t.Fatal(err)

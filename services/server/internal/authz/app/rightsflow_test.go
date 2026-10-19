@@ -21,6 +21,7 @@ import (
 	"github.com/OWNER/bothy/services/server/internal/kernel/errs"
 	"github.com/OWNER/bothy/services/server/internal/kernel/ids"
 	"github.com/OWNER/bothy/services/server/internal/kernel/txn"
+	"github.com/OWNER/bothy/services/server/internal/platform/testkit"
 	"github.com/OWNER/bothy/services/server/internal/wire"
 )
 
@@ -41,7 +42,7 @@ func (w *pgWorld) race(t *testing.T, first, second func(ctx context.Context) err
 	<-locked
 	go func() { errSecond <- declare(second) }()
 	conn := w.db.SuperConn(t)
-	deadline := time.Now().Add(20 * time.Second)
+	deadline := testkit.Deadline()
 	for {
 		var waiting int
 		if err := conn.QueryRow(context.Background(), `SELECT count(*) FROM pg_stat_activity WHERE datname = $1 AND wait_event_type = 'Lock'`,

@@ -16,6 +16,7 @@ import (
 	"github.com/OWNER/bothy/services/server/internal/platform/config"
 	"github.com/OWNER/bothy/services/server/internal/platform/lifecycle"
 	"github.com/OWNER/bothy/services/server/internal/platform/ratelimit"
+	"github.com/OWNER/bothy/services/server/internal/platform/testkit"
 )
 
 // loadValues loads the server schema with the test environment plus env.
@@ -138,7 +139,7 @@ func TestSweeper_StopsWithItsStopStep(t *testing.T) {
 	if stop.Phase != lifecycle.PhaseHTTP || stop.Name != "ratelimit_sweeper" {
 		t.Fatalf("stop step %+v", stop)
 	}
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), testkit.Patience)
 	defer cancel()
 	if err := stop.Run(ctx); err != nil {
 		t.Fatalf("stop: %v", err)

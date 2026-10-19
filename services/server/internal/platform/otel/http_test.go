@@ -7,6 +7,7 @@ import (
 	"net"
 	"net/http"
 	"net/http/httptest"
+	"strconv"
 	"strings"
 	"testing"
 	"time"
@@ -16,6 +17,7 @@ import (
 	"go.opentelemetry.io/otel/trace"
 
 	"github.com/OWNER/bothy/services/server/internal/platform/otel/attr"
+	"github.com/OWNER/bothy/services/server/internal/platform/testkit"
 )
 
 // hookPattern is a route with a secret in its path (a webhook token).
@@ -322,9 +324,10 @@ func TestCollectorUnreachableDoesNotDelayRequests(t *testing.T) {
 	t.Cleanup(func() { _ = ln.Close() })
 	t.Setenv("OTEL_EXPORTER_OTLP_ENDPOINT", "http://"+ln.Addr().String())
 	t.Setenv("OTEL_EXPORTER_OTLP_INSECURE", "true")
-	// A request that waited for the exporter would take about this long; the bound below stays
-	// well under it and well above the time a request needs on a loaded single CPU.
-	t.Setenv("OTEL_EXPORTER_OTLP_TIMEOUT", "3000")
+	// A request that waited for the exporter would take this long (milliseconds, twice
+	// testkit.Patience); the bound below is testkit.Patience, far above the time a request needs
+	// on a loaded host.
+	t.Setenv("OTEL_EXPORTER_OTLP_TIMEOUT", strconv.FormatInt((2*testkit.Patience).Milliseconds(), 10))
 
 	tt := &testTelemetry{stdout: &syncBuffer{}}
 	reader := newManualReader()
@@ -338,12 +341,12 @@ func TestCollectorUnreachableDoesNotDelayRequests(t *testing.T) {
 	}
 	tt.Telemetry, tt.reader = tel, reader
 	t.Cleanup(func() {
-		ctx, cancel := context.WithTimeout(context.Background(), time.Second)
+		ctx, cancel := context.WithTimeout(context.Background(), time.Second) // nosemgrep: bothy-go-test-wall-clock-wait -- a bounded give-up; the exporter never answers
 		defer cancel()
 		_ = tel.Shutdown(ctx)
 	})
 
-	const requests, bound = 200, time.Second
+	const requests, bound = 200, testkit.Patience
 	h := Middleware(testMux(nil, http.StatusOK))
 	for i := range requests {
 		start := time.Now()
@@ -352,7 +355,7 @@ func TestCollectorUnreachableDoesNotDelayRequests(t *testing.T) {
 			t.Fatalf("request %d took %v, bound %v", i, d, bound)
 		}
 	}
-	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second) // nosemgrep: bothy-go-test-wall-clock-wait -- a bounded give-up; the exporter never answers
 	defer cancel()
 	_ = tel.ForceFlush(ctx)
 	got := tt.dropped(t)

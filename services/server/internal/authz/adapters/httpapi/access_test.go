@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/OWNER/bothy/services/server/internal/kernel/ids"
+	"github.com/OWNER/bothy/services/server/internal/platform/testkit"
 )
 
 // access paths of the four operations of M1-49.
@@ -56,7 +57,7 @@ func TestPreviewRollsBackEverything(t *testing.T) {
 		t.Fatalf("notification after a preview: %+v", n)
 	}
 	w.want(w.boss.call(http.MethodPost, "/api/v1/grants", grantBody("user", w.robin, "space", w.support, "write", "upload")), http.StatusCreated, "")
-	wait2, cancel2 := context.WithTimeout(ctx, 10*time.Second)
+	wait2, cancel2 := context.WithTimeout(ctx, testkit.Patience)
 	defer cancel2()
 	if _, err := conn.WaitForNotification(wait2); err != nil {
 		t.Fatalf("no notification after createGrant: %v", err)

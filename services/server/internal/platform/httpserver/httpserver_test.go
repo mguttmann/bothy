@@ -18,6 +18,7 @@ import (
 	"github.com/OWNER/bothy/services/server/internal/platform/health"
 	"github.com/OWNER/bothy/services/server/internal/platform/httpserver"
 	"github.com/OWNER/bothy/services/server/internal/platform/httpserver/httpservertest"
+	"github.com/OWNER/bothy/services/server/internal/platform/testkit"
 )
 
 type syncBuffer struct {
@@ -57,7 +58,7 @@ func get(t *testing.T, url string) (int, string) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	resp, err := (&http.Client{Timeout: 5 * time.Second}).Do(req)
+	resp, err := (&http.Client{Timeout: testkit.Patience}).Do(req)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -79,11 +80,11 @@ func TestServerErrorLogHasNoClientAddress(t *testing.T) {
 	base := serve(t, srv)
 	req, _ := http.NewRequestWithContext(context.Background(), http.MethodGet, base+"/", nil)
 	// The client sees the connection drop; its own local address is what net/http would log.
-	resp, err := (&http.Client{Timeout: 5 * time.Second}).Do(req)
+	resp, err := (&http.Client{Timeout: testkit.Patience}).Do(req)
 	if err == nil {
 		_ = resp.Body.Close()
 	}
-	deadline := time.Now().Add(5 * time.Second)
+	deadline := testkit.Deadline()
 	for !strings.Contains(logs.String(), "http server error") && time.Now().Before(deadline) {
 		time.Sleep(10 * time.Millisecond)
 	}

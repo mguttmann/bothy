@@ -10,9 +10,9 @@ import (
 	"strconv"
 	"strings"
 	"testing"
-	"time"
 
 	identityapp "github.com/OWNER/bothy/services/server/internal/identity/app"
+	"github.com/OWNER/bothy/services/server/internal/platform/testkit"
 	"github.com/OWNER/bothy/services/server/internal/wire"
 )
 
@@ -33,7 +33,7 @@ func call(t *testing.T, port int, method, path, body string, headers ...string) 
 	for i := 0; i+1 < len(headers); i += 2 {
 		req.Header.Set(headers[i], headers[i+1])
 	}
-	resp, err := (&http.Client{Timeout: 10 * time.Second}).Do(req)
+	resp, err := (&http.Client{Timeout: testkit.Patience}).Do(req)
 	if err != nil {
 		t.Fatal(err)
 	}

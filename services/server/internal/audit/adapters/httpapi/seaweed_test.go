@@ -25,6 +25,8 @@ import (
 	"github.com/testcontainers/testcontainers-go"
 	tclog "github.com/testcontainers/testcontainers-go/log"
 	"github.com/testcontainers/testcontainers-go/wait"
+
+	"github.com/OWNER/bothy/services/server/internal/platform/testkit"
 )
 
 // The SeaweedFS of the object store tests of this package (M7-22): the image the S3 driver of
@@ -32,8 +34,7 @@ import (
 // one pin moves both. Buckets are created with weed shell inside the container, so this package
 // needs no S3 client of its own (only internal/audit/adapters/s3sink imports the AWS SDK).
 const (
-	seaweedS3Port       = "8333/tcp"
-	seaweedStartTimeout = 3 * time.Minute
+	seaweedS3Port = "8333/tcp"
 )
 
 // seaweedServer is the started container with its S3 endpoint and keys.
@@ -52,10 +53,11 @@ var seaweed struct {
 // sharedSeaweed returns the SeaweedFS of this test binary, starting it on first use.
 func sharedSeaweed(t *testing.T) *seaweedServer {
 	t.Helper()
+	testkit.Integration(t)
 	seaweed.mu.Lock()
 	defer seaweed.mu.Unlock()
 	if seaweed.srv == nil && seaweed.err == nil {
-		ctx, cancel := context.WithTimeout(context.Background(), seaweedStartTimeout)
+		ctx, cancel := context.WithTimeout(context.Background(), testkit.Patience)
 		seaweed.srv, seaweed.err = startSeaweed(ctx)
 		cancel()
 	}
@@ -115,7 +117,7 @@ func startSeaweed(ctx context.Context) (*seaweedServer, error) {
 		}),
 		testcontainers.WithWaitStrategy(wait.ForHTTP("/").WithPort(seaweedS3Port).
 			WithStatusCodeMatcher(func(status int) bool { return status == 403 }).
-			WithStartupTimeout(seaweedStartTimeout)),
+			WithStartupTimeout(testkit.Patience)),
 	)
 	if err != nil {
 		if ctr != nil {

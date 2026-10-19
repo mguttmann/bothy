@@ -28,8 +28,11 @@ platform:                   # <name>: {depends_on: [<platform names>], vendors: 
   # Token buckets of the rate-limit classes (M1-19): the StageRateLimit middleware of httpserver
   # and the class attribute of bothy.ratelimit.rejected from otel/attr.
   ratelimit: {depends_on: [httpserver, otel], vendors: [otel]}
+  # testkit: how tests wait (Patience) and the mark of integration tests; only tests and the
+  # test helpers import it (docs/DECISIONS.md PL/8).
+  testkit: {depends_on: [], vendors: []}
   # pgtest (internal/platform/pg/pgtest) starts the test containers; only tests import it.
-  pg: {depends_on: [secrets], vendors: [pgx, goose, otelpgx, otel, testcontainers, mobyapi, mobyclient]}
+  pg: {depends_on: [secrets, testkit], vendors: [pgx, goose, otelpgx, otel, testcontainers, mobyapi, mobyclient]}
   # River only here (R-AR-09); jobstest (internal/platform/jobs/jobstest) prepares pgtest
   # databases for the job runtime; only tests import it.
   jobs: {depends_on: [pg, otel], vendors: [river, pgx, otel]}

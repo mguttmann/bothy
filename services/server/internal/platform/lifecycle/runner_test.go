@@ -17,6 +17,7 @@ import (
 
 	"github.com/OWNER/bothy/services/server/internal/kernel/clock"
 	"github.com/OWNER/bothy/services/server/internal/platform/lifecycle"
+	"github.com/OWNER/bothy/services/server/internal/platform/testkit"
 )
 
 // recorder collects the names of started components and run stop steps in order.
@@ -130,7 +131,7 @@ func wait(t *testing.T, done <-chan int) int {
 	select {
 	case code := <-done:
 		return code
-	case <-time.After(10 * time.Second):
+	case <-time.After(testkit.Patience):
 		t.Fatal("Run did not return")
 		return -1
 	}
@@ -650,7 +651,7 @@ func waitCh(t *testing.T, ch <-chan struct{}) {
 	t.Helper()
 	select {
 	case <-ch:
-	case <-time.After(10 * time.Second):
+	case <-time.After(testkit.Patience):
 		t.Fatal("timed out waiting for the start to reach the component")
 	}
 }

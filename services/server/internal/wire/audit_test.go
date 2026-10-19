@@ -29,6 +29,7 @@ import (
 	"github.com/OWNER/bothy/services/server/internal/platform/lifecycle"
 	"github.com/OWNER/bothy/services/server/internal/platform/pg"
 	"github.com/OWNER/bothy/services/server/internal/platform/pg/pgtest"
+	"github.com/OWNER/bothy/services/server/internal/platform/testkit"
 	"github.com/OWNER/bothy/services/server/internal/wire"
 )
 
@@ -232,6 +233,11 @@ func TestAudit_NoEntriesNoCounterLock(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer func() { _ = holder.Rollback(ctx) }()
+	// The holder stays idle in its transaction; without this the idle timeout of the test
+	// database would end it and release the lock before testkit.Patience.
+	if _, err := holder.Exec(ctx, "SET LOCAL idle_in_transaction_session_timeout = 0"); err != nil {
+		t.Fatal(err)
+	}
 	if _, err := holder.Exec(ctx, "SELECT value FROM sequence_counters WHERE name = 'audit_seq' FOR UPDATE"); err != nil {
 		t.Fatal(err)
 	}
@@ -239,7 +245,9 @@ func TestAudit_NoEntriesNoCounterLock(t *testing.T) {
 	if err := e.audit.UoW().Do(person(), func(context.Context) error { return nil }); err != nil {
 		t.Fatalf("a unit without entries failed while audit_seq was locked: %v", err)
 	}
-	if d := time.Since(began); d > 2*time.Second {
+	// The holder keeps the lock until the test ends: a unit that waited for it would fail with
+	// the lock timeout of the unit or wait past testkit.Patience.
+	if d := time.Since(began); d > testkit.Patience {
 		t.Fatalf("a unit without entries waited %v", d)
 	}
 	if e.auditSeq(t) != 0 {

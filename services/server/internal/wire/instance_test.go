@@ -13,6 +13,7 @@ import (
 	"github.com/OWNER/bothy/services/server/internal/kernel/errs"
 	"github.com/OWNER/bothy/services/server/internal/platform/lifecycle"
 	"github.com/OWNER/bothy/services/server/internal/platform/pg/pgtest"
+	"github.com/OWNER/bothy/services/server/internal/platform/testkit"
 	"github.com/OWNER/bothy/services/server/internal/wire"
 )
 
@@ -36,7 +37,7 @@ func TestStart_MinServerVersionAboveOwn_NotReady(t *testing.T) {
 			t.Parallel()
 			p := start(t, role, serveEnv(t, db), wire.Deps{Version: "1.0.0"})
 			internal := p.waitInternal(t)
-			deadline := time.Now().Add(startupWait)
+			deadline := testkit.Deadline()
 			for !strings.Contains(p.logs.String(), `"msg":"server started, not ready"`) && time.Now().Before(deadline) {
 				time.Sleep(20 * time.Millisecond)
 			}

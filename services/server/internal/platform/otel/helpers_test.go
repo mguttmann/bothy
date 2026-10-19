@@ -111,7 +111,7 @@ func setupTest(t *testing.T, cfg Config, env []string, spanExp sdktrace.SpanExpo
 	}
 	tt.Telemetry = tel
 	t.Cleanup(func() {
-		ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+		ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second) // nosemgrep: bothy-go-test-wall-clock-wait -- a bounded give-up; some tests install exporters that never return
 		defer cancel()
 		_ = tel.Shutdown(ctx)
 	})
@@ -121,7 +121,7 @@ func setupTest(t *testing.T, cfg Config, env []string, spanExp sdktrace.SpanExpo
 // flush calls ForceFlush with a deadline and ignores the errors of failing exporters.
 func (tt *testTelemetry) flush(t *testing.T) {
 	t.Helper()
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second) // nosemgrep: bothy-go-test-wall-clock-wait -- a bounded give-up; failing exporters do not matter here
 	defer cancel()
 	_ = tt.ForceFlush(ctx)
 }

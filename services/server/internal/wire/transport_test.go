@@ -25,6 +25,7 @@ import (
 
 	"github.com/OWNER/bothy/services/server/internal/platform/lifecycle"
 	"github.com/OWNER/bothy/services/server/internal/platform/pg/pgtest"
+	"github.com/OWNER/bothy/services/server/internal/platform/testkit"
 	"github.com/OWNER/bothy/services/server/internal/wire"
 )
 
@@ -93,7 +94,7 @@ func envValue(env []string, name string) string {
 func (p *process) waitPublic(t *testing.T) int {
 	t.Helper()
 	const msg = "public listener started"
-	deadline := time.Now().Add(startupWait)
+	deadline := testkit.Deadline()
 	for time.Now().Before(deadline) {
 		if port := p.logs.port(msg); port != 0 {
 			return port
@@ -119,7 +120,7 @@ func TestServeTLSPublicListener(t *testing.T) {
 	waitReadyz(t, internal, http.StatusOK)
 	public := p.waitPublic(t)
 
-	client := &http.Client{Timeout: 10 * time.Second, Transport: &http.Transport{TLSClientConfig: &tls.Config{RootCAs: pool, MinVersion: tls.VersionTLS12}}}
+	client := &http.Client{Timeout: testkit.Patience, Transport: &http.Transport{TLSClientConfig: &tls.Config{RootCAs: pool, MinVersion: tls.VersionTLS12}}}
 	req, _ := http.NewRequestWithContext(context.Background(), http.MethodGet, "https://127.0.0.1:"+strconv.Itoa(public)+"/nope", nil)
 	resp, err := client.Do(req)
 	if err != nil {
@@ -161,7 +162,7 @@ func TestServeTLSPublicListener(t *testing.T) {
 func TestServeTLSBadMaterialFailsBeforeTheWait(t *testing.T) {
 	t.Parallel()
 	db := pgtest.New(t)
-	env := serveEnv(t, db, "BOTHY_SERVER__PUBLIC_URL=https://127.0.0.1:8443", "BOTHY_STARTUP__DEPENDENCY_WAIT=60s",
+	env := serveEnv(t, db, "BOTHY_SERVER__PUBLIC_URL=https://127.0.0.1:8443", "BOTHY_STARTUP__DEPENDENCY_WAIT=1h",
 		"BOTHY_DATABASE__PORT=1",
 		"BOTHY_SERVER__TLS_CERT_REF=file:<secrets.dir>/tls_cert", "BOTHY_SERVER__TLS_KEY_REF=file:<secrets.dir>/tls_key")
 	dir := envValue(env, "BOTHY_SECRETS__DIR")
@@ -175,7 +176,8 @@ func TestServeTLSBadMaterialFailsBeforeTheWait(t *testing.T) {
 	if code := p.exit(t); code != lifecycle.ExitFailure {
 		t.Fatalf("exit = %d", code)
 	}
-	if time.Since(began) > 20*time.Second {
+	// A start that waited for the database would wait startup.dependency_wait (1h).
+	if time.Since(began) > testkit.Patience {
 		t.Fatal("the start waited for the database before it checked the TLS material")
 	}
 	err := p.runner.Err()
