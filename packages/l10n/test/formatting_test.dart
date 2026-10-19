@@ -85,6 +85,15 @@ void main() {
       expect(de.time(afterNewYork, timeZone: 'America/New_York'), '11:00');
     });
 
+    test('AM and PM follow a no-break space of the product font', () {
+      // intl writes U+202F, which Atkinson Hyperlegible Next lacks; each host then draws it
+      // with another fallback font, and the line breaks differ.
+      expect(
+        en.time(beforeNewYork, timeZone: 'America/New_York'),
+        '12:00\u00A0PM',
+      );
+    });
+
     test('an unknown time zone fails', () {
       expect(
         () => de.time(beforeBerlin, timeZone: 'Mars/Olympus'),

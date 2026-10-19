@@ -105,12 +105,13 @@ class L10nFormat {
   }
 
   /// The clock time of [instant] in [timeZone] (IANA name): `14:05` in German, `2:05 PM` in
-  /// English.
+  /// English. The space before AM or PM is the no-break space of the product font: `intl`
+  /// writes U+202F, which the font lacks, so each platform drew it with another fallback font.
   ///
   /// Throws an [ArgumentError] when [timeZone] is not in the time zone database.
   String time(DateTime instant, {required String timeZone}) {
     final local = _inZone(instant, timeZone);
-    return DateFormat.jm(_tag).format(local);
+    return DateFormat.jm(_tag).format(local).replaceAll('\u202F', _nbsp);
   }
 
   /// The day of [instant] relative to [now], both seen in [timeZone]: `Today`, `Yesterday`,
