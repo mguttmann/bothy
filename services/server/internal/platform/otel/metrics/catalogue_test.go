@@ -29,9 +29,9 @@ type docCatalogue struct {
 	buckets map[string][]float64
 }
 
-// kindWords maps the kind column (English or German edition of the catalogue) to Kind.
+// kindWords maps the kind column of the catalogue to Kind.
 var kindWords = map[string]Kind{
-	"Histogram": KindHistogram, "Histogramm": KindHistogram, "Counter": KindCounter, "Zähler": KindCounter,
+	"Histogram": KindHistogram, "Counter": KindCounter,
 	"UpDownCounter": KindUpDownCounter, "Gauge": KindGauge,
 }
 

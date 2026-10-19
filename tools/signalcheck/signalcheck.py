@@ -81,13 +81,11 @@ TARGET_LABELS = frozenset({"job", "instance"})
 
 KINDS = {
     "Histogram": "Histogram",
-    "Histogramm": "Histogram",
     "Counter": "Counter",
-    "Zähler": "Counter",
     "UpDownCounter": "UpDownCounter",
     "Gauge": "Gauge",
 }
-"""Kind column of the catalogue (English or German edition) to the kind."""
+"""Kind column of the catalogue to the kind."""
 
 NO_ATTRIBUTES = frozenset({"none", "keine"})
 """Words of the attribute column for "no attribute"."""
