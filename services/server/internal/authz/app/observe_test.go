@@ -6,6 +6,7 @@ import (
 	"context"
 	"testing"
 
+	"github.com/OWNER/bothy/services/server/internal/authz"
 	"github.com/OWNER/bothy/services/server/internal/kernel/authorize"
 )
 
@@ -105,5 +106,27 @@ func TestAuthzDelivery_DenialWritesNoAudit(t *testing.T) {
 	w.decide(t, context.Background(), robin, authorize.ActionMessageRead, msg)
 	if n, _ := w.rec.counts(); n != 1 {
 		t.Fatalf("%d denials audited for the request, want 1", n)
+	}
+}
+
+// TestAuthzObserve_SettingsChangedAdvancesGeneration: channel.settings_changed is a structure
+// event for the delivery cache (M2-02 design note 11b): the delivery snapshot of a principal is
+// rebuilt at its next check, so agent.invoke at delivery time evaluates the mention switches of
+// the change and not the ones of the snapshot.
+func TestAuthzObserve_SettingsChangedAdvancesGeneration(t *testing.T) {
+	w := newWorld(t)
+	alex := w.user(w.alex)
+	ctx := authorize.Delivery(context.Background())
+	if d := w.decide(t, ctx, alex, authorize.ActionAgentInvoke, w.invoke(w.allgemein, w.lotse, false)); !d.Allowed() {
+		t.Fatalf("before: %+v", d)
+	}
+	reads := w.store.Reads()
+	w.setChannel(t, w.allgemein, func(c *authz.ChannelFacts) { c.RequireMention = true })
+	w.az.Observe(context.Background(), authorize.LogEvent{Seq: 5, Type: "channel.settings_changed", PermissionVersion: 1})
+	if d := w.decide(t, ctx, alex, authorize.ActionAgentInvoke, w.invoke(w.allgemein, w.lotse, false)); d.Allowed() {
+		t.Fatalf("after channel.settings_changed with require_mention: %+v", d)
+	}
+	if w.store.Reads() == reads {
+		t.Fatal("channel.settings_changed did not make the delivery snapshot rebuild")
 	}
 }

@@ -125,7 +125,7 @@ func TestSplitRest_RejectsInvalidGo(t *testing.T) {
 }
 
 // TestRealRest_BelowMaxFileKB: each half of the real REST package stays below repo.max_file_kb
-// (1024 KiB, docs/spec/23-qualitaet.md), the limit the hook check-added-large-files holds.
+// (1024 KiB, docs/spec/23-quality.md), the limit the hook check-added-large-files holds.
 func TestRealRest_BelowMaxFileKB(t *testing.T) {
 	for _, name := range []string{"models.gen.go", "rest.gen.go", "objects.gen.go", "objects2.gen.go"} {
 		info, err := os.Stat(filepath.Join("..", "..", "rest", name))

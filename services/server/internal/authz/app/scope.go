@@ -21,6 +21,8 @@ type scopeMemoKey struct {
 	scope             string
 	// hosts tells the host list of host.read from the channel lists (M2-39).
 	hosts bool
+	// operated tells the operated channels of agent.config.read from the channel lists (M2-02).
+	operated bool
 }
 
 // Scope implements authorize.Authorizer (07 sections 7.2 and 7.4). The lists are built per request
@@ -60,6 +62,10 @@ func (a *Authorizer) scope(ctx context.Context, p authorize.Principal, act autho
 	if d := gate(spec, s); d.Outcome != domain.OutcomeAllow {
 		return authorize.Scope{}, d, nil
 	}
+	if isOperatedList(spec) && s.kind != domain.KindAgent {
+		// Only an agent can be the effective operator (requirement ChannelOperator, M2-02).
+		return authorize.Scope{}, domain.Decision{Outcome: domain.OutcomeForbidden, Reason: domain.ReasonSubjectKindNotAllowed}, nil
+	}
 	mk := memoKey(spec, s, p)
 	memo, hasMemo := authorize.RequestMemoFrom(ctx)
 	if txn.InRightsChange(ctx) {
@@ -94,7 +100,8 @@ func memoKey(spec domain.ActionSpec, s *actingPrincipal, p authorize.Principal) 
 	if s.kind == domain.KindApp {
 		appScope, _ = domain.AppScopeOf(spec.ID)
 	}
-	return scopeMemoKey{key: s.entry.key, viewAs: p.ViewAsPerson(), actingFor: p.ActingForPerson(), scope: appScope, hosts: isHostList(spec)}
+	return scopeMemoKey{key: s.entry.key, viewAs: p.ViewAsPerson(), actingFor: p.ActingForPerson(), scope: appScope, hosts: isHostList(spec),
+		operated: isOperatedList(spec)}
 }
 
 // lists builds the lists of spec: the hosts of host.read, or the channels and spaces, which an
@@ -103,6 +110,8 @@ func (a *Authorizer) lists(ctx context.Context, spec domain.ActionSpec, s *actin
 	switch {
 	case isHostList(spec):
 		return a.buildHostScope(ctx, s, v)
+	case isOperatedList(spec):
+		return a.buildOperatedScope(ctx, s, v)
 	case s.kind != domain.KindApp || domain.CheckAppScope(spec.ID, p.AppGrantedScopes(), p.AppTokenScopes(), !s.ref.TokenID.IsZero()) == "":
 		return a.buildScope(ctx, s, v)
 	}
@@ -123,14 +132,14 @@ func memoScope(memo *authorize.RequestMemo, k scopeMemoKey) (authorize.Scope, bo
 }
 
 // listAction returns the spec of act when Scope may serve it: a requirement of exactly read on
-// channel-path kinds or spaces (07 section 7.4), or host.read (M2-39); any other action is an
-// internal error.
+// channel-path kinds or spaces (07 section 7.4), host.read (M2-39) or agent.config.read (M2-02);
+// any other action is an internal error.
 func (a *Authorizer) listAction(act authorize.Action) (domain.ActionSpec, error) {
 	spec, req, err := a.requirement(act)
 	if err != nil {
 		return domain.ActionSpec{}, err
 	}
-	if isHostList(spec) {
+	if isHostList(spec) || isOperatedList(spec) {
 		return spec, nil
 	}
 	ok := req.IsReadLevel() && len(spec.Resources) > 0
@@ -224,4 +233,46 @@ func cloneScope(sc authorize.Scope) authorize.Scope {
 	sc.FullyVisibleSpaceIDs = slices.Clone(sc.FullyVisibleSpaceIDs)
 	sc.HostIDs = slices.Clone(sc.HostIDs)
 	return sc
+}
+
+// isOperatedList reports agent.config.read, whose Scope lists the channels the agent operates
+// (listServedChannels, M2-02, docs/DECISIONS.md D-M2-02-5).
+func isOperatedList(spec domain.ActionSpec) bool {
+	return spec.ID == string(authorize.ActionAgentConfigRead)
+}
+
+// buildOperatedScope is the scope of agent.config.read for the agent s (M2-02): ChannelIDs are
+// the channels that are not archived (nor in an archived space) whose effective operator is s and
+// that s reads after the acting-for intersection every Scope applies; SpaceIDs are their spaces.
+// FullyVisibleSpaceIDs stays empty and InstanceWide false, so a list query sees exactly these
+// channels (07 section 7.4 rule 1).
+func (a *Authorizer) buildOperatedScope(ctx context.Context, s *actingPrincipal, v int64) (authorize.Scope, error) {
+	sc := authorize.Scope{PermissionVersion: v}
+	list, err := a.structure.ChannelsOperatedBy(ctx, s.id)
+	if err != nil {
+		return authorize.Scope{}, sourceError("structure source", err)
+	}
+	spaces := map[ids.ID]bool{}
+	for _, id := range list {
+		c, ok, err := a.structure.Channel(ctx, id)
+		if err != nil {
+			return authorize.Scope{}, sourceError("structure source", err)
+		}
+		if !ok || c.Archived || c.EffectiveOperatorID != s.id {
+			continue
+		}
+		if f, _ := s.rights(channelPath(c)); f.Level < domain.LevelRead {
+			continue
+		}
+		sc.ChannelIDs = append(sc.ChannelIDs, c.ID)
+		if !c.SpaceID.IsZero() {
+			spaces[c.SpaceID] = true
+		}
+	}
+	for id := range spaces {
+		sc.SpaceIDs = append(sc.SpaceIDs, id)
+	}
+	sc.ChannelIDs = slices.Compact(domain.SortIDs(sc.ChannelIDs))
+	sc.SpaceIDs = domain.SortIDs(sc.SpaceIDs)
+	return sc, nil
 }

@@ -818,6 +818,18 @@
       "doc": "Longest channel name in Unicode characters."
     },
     {
+      "name": "channel.prompt_max_bytes",
+      "env": "BOTHY_CHANNEL__PROMPT_MAX_BYTES",
+      "kind": "int",
+      "default": "32768",
+      "required": false,
+      "enum": [],
+      "min": "1",
+      "max": "",
+      "chapter": "03-data-model.md",
+      "doc": "Longest channel prompt in bytes of UTF-8 (putChannelBehavior, M2-02)."
+    },
+    {
       "name": "channel.topic_max_chars",
       "env": "BOTHY_CHANNEL__TOPIC_MAX_CHARS",
       "kind": "int",

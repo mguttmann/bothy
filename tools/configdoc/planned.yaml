@@ -27,8 +27,6 @@ rules:
     milestone: M7
   - match: "billing."  # M2-20, M2-22
     milestone: M2
-  - match: channel.prompt_max_bytes  # M2-02
-    milestone: M2
   - match: client.app_lock_after  # M5-08
     milestone: M5
   - match: client.cache_max_age  # M3-05
