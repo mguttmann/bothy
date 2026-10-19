@@ -8,11 +8,14 @@ import (
 	"errors"
 	"io"
 	"slices"
+	"strings"
 	"testing"
+	"time"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	awss3 "github.com/aws/aws-sdk-go-v2/service/s3"
 
+	"github.com/OWNER/bothy/services/server/internal/platform/egress"
 	"github.com/OWNER/bothy/services/server/internal/status/adapters/s3mirror"
 	"github.com/OWNER/bothy/services/server/internal/status/app"
 	"github.com/OWNER/bothy/services/server/internal/status/domain"
@@ -23,9 +26,26 @@ func keys(access, secret string) s3mirror.Credentials {
 	return func(context.Context) (string, string, error) { return access, secret, nil }
 }
 
+// egressFor is the egress configuration of the tests: the SeaweedFS endpoint is a private
+// address over http, so it needs an allowed_hosts entry with allow_private, as in the stack; ""
+// allows no private host.
+func egressFor(endpoint string) egress.Config {
+	cfg := egress.Config{Timeout: 30 * time.Second, MaxResponseBytes: 1 << 20}
+	if endpoint == "" {
+		return cfg
+	}
+	r, err := egress.ParseRule(strings.TrimPrefix(endpoint, "http://") + ";allow_private")
+	if err != nil {
+		panic(err)
+	}
+	cfg.AllowedHosts = []egress.Rule{r}
+	return cfg
+}
+
 // mirrorConfig is a mirror from srcBucket below "files" into dstBucket below "instance-1".
 func mirrorConfig(s *seaweedServer, srcBucket, dstBucket string) s3mirror.Config {
 	return s3mirror.Config{
+		Egress: egressFor(s.endpoint),
 		Source: s3mirror.Source{
 			Endpoint: s.endpoint, Region: testRegion, Bucket: srcBucket, Prefix: "files", UsePathStyle: true,
 			Credentials: keys(s.access, s.secret),
@@ -149,6 +169,7 @@ func TestMirror_ErrorIsCode(t *testing.T) {
 // source endpoint, and an unparsable CA bundle.
 func TestNew_Validation(t *testing.T) {
 	good := s3mirror.Config{
+		Egress: egressFor(""),
 		Source: s3mirror.Source{Endpoint: "https://s3.example.com", Region: "us-east-1", Bucket: "bothy-files", Credentials: keys("EXAMPLE", "EXAMPLE")},
 		Destination: s3mirror.Destination{
 			Target: domain.OffsiteTarget{Host: "backup.example.com", Port: 443, Bucket: "bothy-backup"},
@@ -167,6 +188,7 @@ func TestNew_Validation(t *testing.T) {
 		"destination CA":     func(c *s3mirror.Config) { c.Destination.CAPEM = []byte("EXAMPLE not a PEM") },
 		"destination region": func(c *s3mirror.Config) { c.Destination.Region = "" },
 		"source region":      func(c *s3mirror.Config) { c.Source.Region = "" },
+		"egress timeout":     func(c *s3mirror.Config) { c.Egress.Timeout = 0 },
 	} {
 		cfg := good
 		mutate(&cfg)

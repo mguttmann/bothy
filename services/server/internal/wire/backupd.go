@@ -17,6 +17,7 @@ import (
 	"github.com/OWNER/bothy/services/server/internal/kernel/clock"
 	"github.com/OWNER/bothy/services/server/internal/kernel/ids"
 	"github.com/OWNER/bothy/services/server/internal/platform/config"
+	"github.com/OWNER/bothy/services/server/internal/platform/egress"
 	"github.com/OWNER/bothy/services/server/internal/platform/otel"
 	"github.com/OWNER/bothy/services/server/internal/platform/pg"
 	"github.com/OWNER/bothy/services/server/internal/platform/secrets"
@@ -152,7 +153,7 @@ func NewBackupDaemon(ctx context.Context, v *config.Values, o BackupDaemonOption
 	if err != nil {
 		return nil, &BackupConfigError{err: err}
 	}
-	mirror, err := backupMirror(v, s.backup, s.target, provider, s.secrets.Dir, o.DumpDir)
+	mirror, err := backupMirror(v, s.backup, s.target, provider, s.secrets.Dir, o.DumpDir, log)
 	if err != nil {
 		return nil, err
 	}
@@ -274,12 +275,20 @@ type backupS3Source struct {
 // backupMirror returns the object mirror of the driver s3 into the off-site bucket, or nil with
 // the driver fs or without an off-site target (then the object backup of the driver s3 fails
 // with s3_mirror_not_configured: a mirror needs a second bucket).
-func backupMirror(v *config.Values, s BackupConfig, target *statusdomain.OffsiteTarget, provider *secrets.Provider, secretsDir, scratch string) (executor.Mirror, error) {
+func backupMirror(v *config.Values, s BackupConfig, target *statusdomain.OffsiteTarget, provider *secrets.Provider, secretsDir, scratch string, log *slog.Logger) (executor.Mirror, error) {
 	if s.FilesDriver != driverS3 || target == nil {
 		return nil, nil
 	}
 	var src backupS3Source
 	if err := config.Bind(v, &src); err != nil {
+		return nil, &BackupConfigError{err: err}
+	}
+	var limits filesStorageValues
+	if err := config.Bind(v, &limits); err != nil {
+		return nil, &BackupConfigError{err: err}
+	}
+	eg, err := EgressConfig(v)
+	if err != nil {
 		return nil, &BackupConfigError{err: err}
 	}
 	keyDir := filepath.Join(secretsDir, offsiteDir)
@@ -299,6 +308,8 @@ func backupMirror(v *config.Values, s BackupConfig, target *statusdomain.Offsite
 			Credentials: fileCredentials(keyDir),
 		},
 		ScratchDir: scratch,
+		Egress:     eg, EgressDeps: egress.Deps{Logger: log},
+		MaxObjectBytes: limits.MaxUploadBytes, TransferTimeout: limits.TransferTimeout,
 	})
 	if err != nil {
 		return nil, &BackupConfigError{err: err}

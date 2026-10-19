@@ -14,7 +14,6 @@ package s3mirror
 import (
 	"context"
 	"crypto/sha256"
-	"crypto/tls"
 	"crypto/x509"
 	"encoding/base64"
 	"errors"
@@ -22,7 +21,9 @@ import (
 	"net/http"
 	"net/url"
 	"os"
+	"strconv"
 	"strings"
+	"time"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	awshttp "github.com/aws/aws-sdk-go-v2/aws/transport/http"
@@ -30,9 +31,13 @@ import (
 	"github.com/aws/smithy-go/logging"
 
 	"github.com/OWNER/bothy/services/server/internal/kernel/clock"
+	"github.com/OWNER/bothy/services/server/internal/platform/egress"
 	"github.com/OWNER/bothy/services/server/internal/status/app"
 	"github.com/OWNER/bothy/services/server/internal/status/domain"
 )
+
+// egressPurpose labels the egress clients of the mirror in logs (bothy.egress.purpose).
+const egressPurpose = "backup_mirror"
 
 // Error codes of the mirror.
 const (
@@ -79,6 +84,19 @@ type Config struct {
 	ScratchDir string
 	// Clock stamps the expiry of the credentials; nil means clock.System().
 	Clock clock.Clock
+	// Egress is egress.* (wire.EgressConfig): every request of the mirror goes through an
+	// egress client (19 SEC-NET-1) that allows the host of its own side only; an http or private
+	// endpoint (the SeaweedFS of the Compose profile s3) needs an egress.allowed_hosts entry with
+	// allow_private, as for the files driver.
+	Egress egress.Config
+	// EgressDeps are the resolver, logger and metrics of the egress clients; Destination.CAPEM
+	// replaces RootCAs on the destination side when set.
+	EgressDeps egress.Deps
+	// MaxObjectBytes bounds the body of one object read (file.max_upload_bytes); 0 keeps
+	// egress.max_response_bytes.
+	MaxObjectBytes int64
+	// TransferTimeout bounds one request (http.transfer_timeout); 0 keeps egress.timeout.
+	TransferTimeout time.Duration
 }
 
 // objectAPI is the part of the SDK client the mirror holds: no delete, no copy, no bucket call.
@@ -132,11 +150,14 @@ func newMirror(cfg Config, dstEndpoint string) (*Mirror, error) {
 	if dstEndpoint == "" {
 		dstEndpoint = d.Target.Endpoint()
 	}
-	dstHTTP, err := httpClient(d.CAPEM)
+	dstHTTP, err := sideClient(cfg, dstEndpoint, d.UsePathStyle, d.Target.Bucket, d.CAPEM)
 	if err != nil {
 		return nil, err
 	}
-	srcHTTP, _ := httpClient(nil)
+	srcHTTP, err := sideClient(cfg, cfg.Source.Endpoint, cfg.Source.UsePathStyle, cfg.Source.Bucket, nil)
+	if err != nil {
+		return nil, err
+	}
 	clk := cfg.Clock
 	if clk == nil {
 		clk = clock.System()
@@ -170,22 +191,57 @@ func checkSource(s Source) error {
 	return nil
 }
 
-// httpClient is the HTTP client of one side: no proxy from the environment, TLS 1.2 or later,
-// the roots of caPEM when set.
-func httpClient(caPEM []byte) (*http.Client, error) {
-	tlsCfg := &tls.Config{MinVersion: tls.VersionTLS12}
+// sideClient is the HTTP client of one side: an egress client that allows exactly the request
+// host of endpoint (the endpoint host with path style, <bucket>.<host> with virtual hosts) and
+// its port, follows no redirect and trusts caPEM instead of the system roots when it is set.
+func sideClient(cfg Config, endpoint string, pathStyle bool, bucket string, caPEM []byte) (*http.Client, error) {
+	deps := cfg.EgressDeps
 	if caPEM != nil {
 		pool := x509.NewCertPool()
 		if !pool.AppendCertsFromPEM(caPEM) {
 			return nil, errors.New("s3mirror: Destination.CAPEM holds no PEM certificate")
 		}
-		tlsCfg.RootCAs = pool
+		deps.RootCAs = pool
 	}
-	tr := awshttp.NewBuildableClient().WithTransportOptions(func(t *http.Transport) {
-		t.Proxy = nil
-		t.TLSClientConfig = tlsCfg
-	}).GetTransport()
-	return &http.Client{Transport: tr}, nil
+	policy, err := hostPolicy(endpoint, pathStyle, bucket)
+	if err != nil {
+		return nil, err
+	}
+	c, err := egress.New(cfg.Egress, egress.Options{
+		Purpose: egressPurpose, Hosts: policy, Redirects: egress.RedirectNever,
+		Timeout: cfg.TransferTimeout, MaxResponseBytes: cfg.MaxObjectBytes,
+	}, deps)
+	if err != nil {
+		return nil, errors.New("s3mirror: egress client: " + err.Error())
+	}
+	return c.HTTPClient(), nil
+}
+
+// hostPolicy allows the scheme, request host and port of one side.
+func hostPolicy(endpoint string, pathStyle bool, bucket string) (egress.HostPolicy, error) {
+	u, err := url.Parse(endpoint)
+	if err != nil || u.Hostname() == "" {
+		return nil, errors.New("s3mirror: an endpoint has no host")
+	}
+	host := strings.ToLower(u.Hostname())
+	if !pathStyle {
+		host = bucket + "." + host
+	}
+	port := uint16(443)
+	if u.Scheme == "http" {
+		port = 80
+	}
+	if p := u.Port(); p != "" {
+		n, err := strconv.ParseUint(p, 10, 16)
+		if err != nil || n == 0 {
+			return nil, errors.New("s3mirror: an endpoint has an invalid port")
+		}
+		port = uint16(n)
+	}
+	scheme := u.Scheme
+	return func(_ context.Context, sch, h string, pt uint16) bool {
+		return sch == scheme && h == host && pt == port
+	}, nil
 }
 
 // newClient builds an SDK client by hand, like the files driver: no default configuration of

@@ -87,7 +87,7 @@ service:
 // signals.md.
 func TestBackupKinds(t *testing.T) {
 	w := newWorld(t)
-	bin := buildBothy(t)
+	bin := buildServerBinary(t)
 	ca, serverCert, serverKey := seaweedTLS(t)
 
 	source := t.TempDir()
@@ -323,10 +323,10 @@ func serverEnv(user, passwordFile string) []string {
 	}
 }
 
-// buildBothy cross compiles the server binary for the platform of the Docker daemon into a
+// buildServerBinary cross compiles the server binary for the platform of the Docker daemon into a
 // temporary directory and returns the directory; the test runs bothy migrate from it inside a
 // container of the image.
-func buildBothy(t *testing.T) string {
+func buildServerBinary(t *testing.T) string {
 	t.Helper()
 	arch := strings.TrimSpace(mustDocker(t, "info", "--format", "{{.Architecture}}"))
 	goarch := map[string]string{"x86_64": "amd64", "amd64": "amd64", "aarch64": "arm64", "arm64": "arm64"}[arch]

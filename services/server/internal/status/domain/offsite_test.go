@@ -56,7 +56,7 @@ func TestParseOffsiteTarget(t *testing.T) {
 		"s3:ftp://s3.example.com/bothy-backup",
 		"s3:https://s3.example.com",
 		"s3:https://s3.example.com/",
-		"s3:https://s3.example.com/Bothy_Backup",
+		"s3:https://s3.example.com/Upper_Case",
 		"s3:https://s3.example.com/ab",
 		"s3:https://s3.example.com/-bucket",
 		"s3:https://s3.example.com/" + strings.Repeat("b", 64),
