@@ -129,7 +129,7 @@ func TestServeFailsWithoutBinary(t *testing.T) {
 func TestVersion(t *testing.T) {
 	t.Parallel()
 	var stdout, stderr bytes.Buffer
-	if code := run(context.Background(), []string{"version"}, &stdout, &stderr); code != exitOK {
+	if code := run(context.Background(), []string{"version"}, nil, &stdout, &stderr); code != exitOK {
 		t.Fatalf("version returned %d: %s", code, stderr.String())
 	}
 	if got := strings.TrimSpace(stdout.String()); got != buildinfo.Version() {
@@ -155,7 +155,7 @@ func TestUsage(t *testing.T) {
 		{[]string{"version", "extra"}, exitUsage},
 	} {
 		var stdout, stderr bytes.Buffer
-		if got := run(context.Background(), tc.args, &stdout, &stderr); got != tc.code {
+		if got := run(context.Background(), tc.args, nil, &stdout, &stderr); got != tc.code {
 			t.Errorf("run(%q) = %d, want %d; stderr %s", tc.args, got, tc.code, stderr.String())
 		}
 	}
@@ -249,7 +249,7 @@ func TestHealthcheck(t *testing.T) {
 		{"missing key", healthArgs(dir, addr, "--key", filepath.Join(dir, "missing.key")), exitFailure, "client certificate"},
 	} {
 		var stdout, stderr bytes.Buffer
-		code := run(context.Background(), tc.args, &stdout, &stderr)
+		code := run(context.Background(), tc.args, nil, &stdout, &stderr)
 		if code != tc.code || !strings.Contains(stderr.String(), tc.stderr) {
 			t.Errorf("%s: code %d stderr %q, want %d and %q", tc.name, code, stderr.String(), tc.code, tc.stderr)
 		}
@@ -282,7 +282,7 @@ func TestHealthcheckSilentServer(t *testing.T) {
 	var stdout, stderr bytes.Buffer
 	args := healthArgs(dir, l.Addr().String())
 	args[len(args)-1] = "200ms"
-	if code := run(context.Background(), args, &stdout, &stderr); code != exitFailure {
+	if code := run(context.Background(), args, nil, &stdout, &stderr); code != exitFailure {
 		t.Errorf("silent server: code %d, want 1", code)
 	}
 	if time.Since(start) > 5*time.Second {
