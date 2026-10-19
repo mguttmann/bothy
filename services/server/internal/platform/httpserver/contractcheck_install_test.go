@@ -8,7 +8,9 @@ import (
 	"bytes"
 	"context"
 	"errors"
+	"log/slog"
 	"net/http"
+	"net/http/httptest"
 	"os"
 	"os/exec"
 	"strings"
@@ -48,5 +50,53 @@ func TestG8_ChainInstallsTheCheck(t *testing.T) {
 	}
 	if !strings.Contains(stderr.String(), "operationId=getMe") || !strings.Contains(stderr.String(), "pointer=/principal") {
 		t.Fatalf("report:\n%s", stderr.String())
+	}
+}
+
+// inBandChildEnv switches the test binary into the child of TestG8_SkipsInBandRoutes.
+const inBandChildEnv = "BOTHY_G8_INBAND_CHILD"
+
+// TestG8_SkipsInBandRoutes: a route that authorizes in band (the control connection of the host
+// services, GET /api/v1/hosts/connect) is no operation of the contract, so G8 must not check its
+// answer against the contract operation whose pattern also matches the path (getHost, GET
+// /api/v1/hosts/{host_id}); before INT-W45/3 its 426 ended the process.
+func TestG8_SkipsInBandRoutes(t *testing.T) {
+	if os.Getenv(inBandChildEnv) == "1" { //nolint:forbidigo // switch of the own child test process
+		v, err := httpserver.NewValidator(rest.Spec, []string{"getHost"})
+		if err != nil {
+			t.Fatal(err)
+		}
+		chain, err := httpserver.NewChain(httpserver.DefaultChainConfig(httpservertest.PublicURL), httpserver.Deps{
+			Logger: slog.New(slog.DiscardHandler), Authenticator: httpservertest.FakeAuthenticator{}, Validator: v,
+		})
+		if err != nil {
+			t.Fatal(err)
+		}
+		op := httpserver.Operation{ID: "hostConnect", Method: http.MethodGet, Path: "/api/v1/hosts/connect",
+			Pattern: "GET /api/v1/hosts/connect", Action: "host.connect", AuthorizedInBand: true}
+		mux := http.NewServeMux()
+		mux.Handle(op.Pattern, chain.Wrap(op, http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+			http.Error(w, "upgrade required", http.StatusUpgradeRequired)
+		})))
+		srv := httptest.NewServer(chain.Public(mux))
+		defer srv.Close()
+		req, _ := http.NewRequestWithContext(context.Background(), http.MethodGet, srv.URL+"/api/v1/hosts/connect", http.NoBody)
+		resp, err := srv.Client().Do(req)
+		if err != nil {
+			t.Fatal(err)
+		}
+		_ = resp.Body.Close()
+		if resp.StatusCode != http.StatusUpgradeRequired {
+			t.Fatalf("status %d, want 426", resp.StatusCode)
+		}
+		return
+	}
+	t.Parallel()
+	cmd := exec.CommandContext(context.Background(), os.Args[0], "-test.run=^TestG8_SkipsInBandRoutes$", "-test.count=1") //nolint:gosec // G204: the own test binary
+	cmd.Env = append(os.Environ(), inBandChildEnv+"=1")                                                                   //nolint:forbidigo // the child test binary needs the environment of go test
+	var stderr bytes.Buffer
+	cmd.Stderr = &stderr
+	if err := cmd.Run(); err != nil {
+		t.Fatalf("child: %v; stderr:\n%s", err, stderr.String())
 	}
 }
