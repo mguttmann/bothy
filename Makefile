@@ -101,7 +101,7 @@ PY_ON := $(and $(PY_PROJECTS),$(or $(call want,sdk-python),$(call want,plugins))
 TS_ON := $(and $(TS_PROJECTS),$(or $(call want,sdk-typescript),$(call want,plugins)))
 
 .PHONY: help bootstrap bootstrap-ci check gates fmt fmt-check lint typecheck test coverage \
-        sonar sonar-up sonar-down sonar-config sonar-config-check semgrep trivy osv gitleaks \
+        sonar sonar-scan sonar-up sonar-down sonar-config sonar-config-check semgrep trivy osv gitleaks \
         gitleaks-staged denylist denylist-history licenses docs adr-index config-reference config-doc-check app-config event-catalog contract-documents catalog catalog-check linkcheck \
         trivy-image portability linkcheck-external diagrams tokens api-lint api-checks api-breaking api-tables api-clients \
         runners-check release-pins commitlint \
@@ -598,6 +598,11 @@ licenses: ## License gate: LICENSE text, SPDX headers, dependency licenses of sh
 
 # ---- SonarQube ------------------------------------------------------------------------
 sonar: test ## SonarQube analysis with the shared gate (local Community Build or SonarQube Cloud)
+	@$(MAKE) --no-print-directory sonar-scan
+
+# The scan alone, over the coverage reports that `make test` already wrote: the CI job sonar
+# unpacks them from the gates job instead of running every test a second time.
+sonar-scan: ## SonarQube analysis of the coverage reports already on disk (CI job sonar)
 	@if [ -z "$(PRODUCT_SOURCES)" ]; then $(call skip,sonar,no product source code yet (tools are covered by ruff/mypy/bandit)); \
 	elif [ "$${SONAR_SKIP:-0}" = 1 ]; then $(call skip,sonar,SONAR_SKIP=1 for fork contributors; maintainers and CI run it); \
 	elif [ -z "$${SONAR_TOKEN:-}" ]; then echo "sonar: SONAR_TOKEN is not set (docs/quality/sonarqube-local.md)"; exit 1; \

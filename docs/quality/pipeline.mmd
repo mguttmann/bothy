@@ -5,10 +5,10 @@ flowchart TB
     review["independent review of the diff<br/>.review/&lt;sha&gt;.md with Urteil: JA"] --> push["git push"]
     push --> check["pre-push: review evidence, then make check<br/>= gates + denylist + sonar"]
   end
-  subgraph ci["CI: ci.yml per pull request on main"]
+  subgraph ci["CI: ci.yml per pull request on main and per push to main"]
     plan["plan: components from changed paths,<br/>secret checks unless fork or bot run"] --> gates["gates: make gates"]
     plan --> deny["denylist: make denylist<br/>fork or bot run: generic rules only"]
-    plan --> sonar["sonar: make sonar<br/>skipped for a fork or bot run"]
+    gates --> sonar["sonar: make sonar-scan over the coverage of gates<br/>skipped for a fork or bot run"]
     gates --> ok["ci-ok: the only required check"]
     deny --> ok
     sonar --> ok

@@ -2,8 +2,15 @@
 
 `make check` runs all gates in a fixed order and stops at the first failure.
 CI runs the same targets: job `gates` calls `make gates`, job `denylist` calls
-`make denylist`, job `sonar` calls `make sonar`; `check` is exactly `gates denylist sonar`
-(chapter 23, R-QA-01). Thresholds appear as names; their default values appear only in
+`make denylist`, job `sonar` calls `make sonar-scan`; `check` is exactly `gates denylist sonar`
+(chapter 23, R-QA-01). `make sonar` is `make test` followed by `make sonar-scan`. In CI the tests
+run once per run: job `gates` packs the coverage reports of its `make test` (every report path of
+`sonar-project.properties`) into the artifact `sonar-coverage`, and job `sonar` waits for `gates`,
+unpacks them and only scans, with the same quality gate and `sonar.qualitygate.wait=true`. When
+`gates` fails, `sonar` is skipped and `ci-ok` fails through `gates`. ci.yml also runs on every
+push to `main`, so SonarQube keeps an analysis of `main` (its overall state and the reference for
+new code); a push event only comes from this repository's own branch, so fork code never runs
+with the secrets (fork pull requests keep the rules of push-discipline.md). Thresholds appear as names; their default values appear only in
 chapter 23, section 11.
 
 ![Flow from commit to release](pipeline.svg)
@@ -190,7 +197,8 @@ downloads no browser; otherwise it downloads the one that matches Puppeteer. CI 
 Chromium of Puppeteer from using user namespaces through AppArmor, [Puppeteer troubleshooting,
 "Issues with AppArmor on Ubuntu"](https://pptr.dev/troubleshooting), retrieved 2026-10-12; only
 the project's own diagrams are rendered) in every step that reaches
-`make diagrams` or `make test`, that is for `make gates` and `make sonar`; a test in
+`make diagrams` or `make test`, that is for `make gates` (job `sonar` runs `make sonar-scan`,
+which starts no tests); a test in
 `tools/doccheck` holds this.
 
 Further switches: `COMMIT_RANGE` and `DENYLIST_RANGE` (commit range instead of

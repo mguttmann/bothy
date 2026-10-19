@@ -84,7 +84,7 @@ def test_pull_request_target_forbidden() -> None:
 )
 def test_push_on_branches_forbidden(trigger: str) -> None:
     text = ok_job().replace("on:\n  pull_request:\n    branches: [main]\n", trigger)
-    assert "push-on-branch" in check(text)
+    assert "push-on-branch" in check(text, "other.yml")
 
 
 def test_push_on_tags_allowed() -> None:
@@ -399,7 +399,18 @@ def test_post_merge_workflow_is_limited_to_main(trigger: str) -> None:
 
 def test_push_on_main_outside_post_merge_workflow_is_rejected() -> None:
     text = ok_job().replace("on:\n  pull_request:\n    branches: [main]\n", POST_MERGE)
-    assert check(text, "ci.yml") == ["push-on-branch"]
+    assert check(text, "codeql.yml") == ["push-on-branch"]
+
+
+def test_ci_may_run_on_pull_requests_and_pushes_to_main() -> None:
+    # ci.yml analyses main with SonarQube after every merge (docs/quality/gates.md).
+    trigger = "on:\n  pull_request:\n    branches: [main]\n  push:\n    branches: [main]\n"
+    text = ok_job().replace("on:\n  pull_request:\n    branches: [main]\n", trigger)
+    assert check(text, "ci.yml") == []
+    wider = trigger.replace("  push:\n    branches: [main]\n", "  push:\n    branches: ['**']\n")
+    assert check(
+        ok_job().replace("on:\n  pull_request:\n    branches: [main]\n", wider), "ci.yml"
+    ) == ["push-on-branch"]
 
 
 BUILD_PUSH = "on:\n  push:\n    branches: ['build/**']\n"
