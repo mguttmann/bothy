@@ -205,6 +205,7 @@ func (d *decision) decide(ev RelayEvent) {
 		}
 		dev(codeHostUnavail, "")
 		host(codeNormal, "")
+		rearm()
 	case EvShutdown:
 		dev(codeServerRestrt, "")
 		host(codeServerRestrt, "")

@@ -84,6 +84,8 @@ func TestRelayDecide(t *testing.T) {
 			[]domain.RelayAction{a(domain.ActCloseDevice, 4104, "open_failed"), a(domain.ActCloseHost, 4100, "open_failed"), a(domain.ActDrop, 0, "")}},
 		{"control link lost", started, domain.RelayEvent{Kind: domain.EvControlLost, Code: 1006},
 			[]domain.RelayAction{a(domain.ActCloseDevice, 4102, ""), a(domain.ActCloseHost, 1000, "")}},
+		{"control link lost, opening with local confirmation", confirm, domain.RelayEvent{Kind: domain.EvControlLost, Code: 1006},
+			[]domain.RelayAction{a(domain.ActCloseDevice, 4102, ""), a(domain.ActCloseHost, 1000, ""), a(domain.ActRearmDeadline, 0, "")}},
 		{"control link ends with 4111", started, domain.RelayEvent{Kind: domain.EvControlLost, Code: 4111}, nil},
 		{"shutdown", started, domain.RelayEvent{Kind: domain.EvShutdown},
 			[]domain.RelayAction{a(domain.ActCloseDevice, 4013, ""), a(domain.ActCloseHost, 4013, "")}},
