@@ -461,6 +461,7 @@ func (a *Authorizer) decideFor(ctx context.Context, s *actingPrincipal, act auth
 		return authorize.Decision{}, err
 	}
 	in.Preview = preview
+	in.Recheck = authorize.IsRecheck(ctx)
 	if in.StepUpWaived, err = a.stepUpWaived(ctx, spec, act, in.Principal); err != nil {
 		return authorize.Decision{}, err
 	}

@@ -27,7 +27,34 @@ const (
 const (
 	ActionTerminalOpen   = "terminal.open"
 	ActionTerminalAttach = "terminal.attach"
+	ActionTerminalStream = "terminal.stream"
 )
+
+// hostStateActive is the only host state that allows sessions (24 section 3.1).
+const hostStateActive = "active"
+
+// TerminalLiveFacts are the facts of the live guards of M2-44 (24 section 6.1 step 2, 05 section
+// 4.14): whether the control connection of the host has reported, the verdict of the requested
+// profile of terminal.open, and the device of the current session token for terminal.stream.
+type TerminalLiveFacts struct {
+	HostConnected, ProfileKnown bool
+	SessionDeviceID             ids.ID
+}
+
+// TerminalLiveGuard applies the guards after SR12 (the extension point of TerminalGuard, 24
+// section 6.1 step 2) in this order: host_not_active when the host is not active or its control
+// connection has not reported (nil facts count as not connected: fail closed), then, for
+// terminal.open only, terminal_profile_unknown when the profile verdict is false. M2-46 inserts
+// terminal_session_limit before host_not_active. It returns the reason and false, or "" and true.
+func TerminalLiveGuard(action string, h HostFacts, f *TerminalLiveFacts) (Reason, bool) {
+	if h.State != hostStateActive || f == nil || !f.HostConnected {
+		return ReasonHostNotActive, false
+	}
+	if action == ActionTerminalOpen && !f.ProfileKnown {
+		return ReasonTerminalProfileUnknown, false
+	}
+	return "", true
+}
 
 // LLMPersonal is the declaration of a personal LLM login on a host (hosts.llm_credentials).
 const LLMPersonal = "personal"

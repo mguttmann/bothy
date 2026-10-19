@@ -76,6 +76,17 @@ func guards(in *Input) (Decision, error) {
 		if r, ok := TerminalGuard(*in.Terminal); !ok {
 			return deny(OutcomeForbidden, r), nil
 		}
+		if r, ok := TerminalLiveGuard(in.Action, in.Terminal.Host, in.Live); !ok {
+			return deny(OutcomeForbidden, r), nil
+		}
+		return Allow, nil
+	case ActionTerminalStream:
+		if in.Live == nil {
+			return Decision{}, internalError(in.Action + " without its terminal facts")
+		}
+		if in.Live.SessionDeviceID.IsZero() || in.Live.SessionDeviceID != in.Principal.DeviceID {
+			return deny(OutcomeForbidden, ReasonNotSelf), nil
+		}
 		return Allow, nil
 	case actionTokenCreate:
 		if in.Token == nil {

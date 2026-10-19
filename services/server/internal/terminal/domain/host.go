@@ -92,6 +92,12 @@ type Session struct {
 	ExitCode    *int
 	// Version is terminal_sessions.version.
 	Version int64
+	// HostSessionUserID, OpenedByDeviceID, AuthSessionID, TokenJTI and KeyGeneration are the
+	// columns of the grant (M2-44); ClosedBy the person who closed (zero: the server);
+	// LastInputAt the time of the last device frame (zero when NULL).
+	HostSessionUserID, OpenedByDeviceID, AuthSessionID, TokenJTI, ClosedBy ids.ID
+	KeyGeneration                                                          int64
+	LastInputAt                                                            time.Time
 }
 
 // Apply returns h after the transition r at t: the state, the disabled reason and disabled_at

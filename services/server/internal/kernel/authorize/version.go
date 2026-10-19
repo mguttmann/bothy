@@ -11,6 +11,7 @@ type (
 	pinKey       struct{}
 	memoKey      struct{}
 	filterKey    struct{}
+	recheckKey   struct{}
 	structureKey struct{}
 )
 
@@ -105,5 +106,25 @@ func Filter(ctx context.Context) context.Context {
 // IsFilter reports whether ctx is in filter mode.
 func IsFilter(ctx context.Context) bool {
 	v, _ := ctx.Value(filterKey{}).(bool)
+	return v
+}
+
+// Recheck returns a copy of ctx that marks the check after the commit of a terminal opening or
+// attach (docs/spec/24-terminal.md section 6.1, ruling D-M2-44-8): it implies Filter (no second
+// audit entry, not counted), and the fresh step-up of step 8 passes, because the decision being
+// rechecked consumed it in its own transaction. Every other step decides as before, so the result
+// can only end what that decision allowed, never grant anything. Only the terminal use cases call
+// it, after their commit.
+//
+// Example:
+//
+//	d, err := az.Authorize(authorize.Recheck(ctx), p, authorize.ActionTerminalOpen, r)
+func Recheck(ctx context.Context) context.Context {
+	return context.WithValue(Filter(ctx), recheckKey{}, true)
+}
+
+// IsRecheck reports whether ctx is marked with Recheck.
+func IsRecheck(ctx context.Context) bool {
+	v, _ := ctx.Value(recheckKey{}).(bool)
 	return v
 }

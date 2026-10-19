@@ -97,7 +97,8 @@ func (w *tworld) declare(host ids.ID, body string) map[string]any {
 // open authorizes terminal.open on host for the token name.
 func (w *tworld) open(t *testing.T, name string, host ids.ID) authorize.Decision {
 	t.Helper()
-	d, err := w.Az.Authorize(context.Background(), w.Actor(name), authorize.ActionTerminalOpen, authorize.Resource{Kind: authorize.ResourceHost, ID: host})
+	d, err := w.Az.Authorize(context.Background(), w.Actor(name), authorize.ActionTerminalOpen, authorize.Resource{Kind: authorize.ResourceHost, ID: host,
+		Terminal: &authorize.TerminalFacts{HostConnected: true, ProfileKnown: true}})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -563,8 +564,8 @@ func assertNoContent(t *testing.T, w *tworld) {
 }
 
 // TestAZP1_TerminalAuthzRoutes (AZ-P1, network point of D-W-101): setHostLlmCredentials is enabled
-// with host.manage and rl.admin, and no route with a terminal action or host.connect is enabled
-// (host.pair is pairHost since M2-41, TestAZP1_HostRoutes).
+// with host.manage and rl.admin, and no operation of openapi.yaml carries host.connect (its routes
+// are the upgrades of M2-43 and M2-44; host.pair is pairHost since M2-41, TestAZP1_HostRoutes).
 func TestAZP1_TerminalAuthzRoutes(t *testing.T) {
 	t.Parallel()
 	found := false
@@ -572,9 +573,7 @@ func TestAZP1_TerminalAuthzRoutes(t *testing.T) {
 		if op.ID == "setHostLlmCredentials" {
 			found = op.Action == "host.manage" && op.RateLimitClass == "rl.admin" && op.Pattern == "PUT /api/v1/hosts/{host_id}/llm-credentials"
 		}
-		if slices.Contains([]authorize.Action{authorize.ActionTerminalOpen, authorize.ActionTerminalAttach, authorize.ActionTerminalStream,
-			authorize.ActionTerminalReadOwn, authorize.ActionTerminalClose, authorize.ActionHostConnect},
-			authorize.Action(op.Action)) {
+		if authorize.Action(op.Action) == authorize.ActionHostConnect {
 			t.Errorf("route %s with %s is enabled", op.ID, op.Action)
 		}
 	}

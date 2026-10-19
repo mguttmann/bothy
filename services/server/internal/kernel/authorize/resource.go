@@ -47,8 +47,10 @@ type Resource struct {
 	// HostID is the path hint of a terminal_session: its host (terminal_sessions.host_id, M2-40).
 	// authz resolves the host through it; a terminal_session without it is an internal error.
 	HostID ids.ID
-	// Terminal describes the session of terminal.attach for the quick reattach (M2-40); required
-	// for terminal.attach, ignored otherwise.
+	// Terminal describes the session of terminal.attach for the quick reattach (M2-40) and, from
+	// M2-44, the live facts of terminal.open, terminal.attach and terminal.stream (the connection
+	// of the host, the profile verdict, the device of the current session token); required for
+	// terminal.open, terminal.attach and terminal.stream, ignored otherwise.
 	Terminal *TerminalFacts
 	// DeliveryOf is the receive action of the event a webhook_out.deliver check delivers
 	// (event_log.receive_action); empty for a personal event, whose receive action is "self" and
@@ -89,6 +91,14 @@ type TerminalFacts struct {
 	SessionDeviceID, SessionAuthSessionID ids.ID
 	// DetachedAt is terminal_sessions.detached_at; zero for none.
 	DetachedAt time.Time
+	// HostConnected reports a control connection of the host after its first report
+	// (app.ControlLinks.Connected, M2-44); false gives host_not_active for terminal.open and
+	// terminal.attach.
+	HostConnected bool
+	// ProfileKnown is the verdict of the requested profile and working directory of
+	// terminal.open (terminal/domain.ProfileKnown, M2-44); false gives terminal_profile_unknown.
+	// Ignored by every other action.
+	ProfileKnown bool
 }
 
 // HostAuthVerdict is the result of the proof check of a host service (24 section 3.5): the
