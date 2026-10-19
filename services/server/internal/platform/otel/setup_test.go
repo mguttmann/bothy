@@ -16,6 +16,7 @@ import (
 	"go.opentelemetry.io/otel/attribute"
 	sdkmetric "go.opentelemetry.io/otel/sdk/metric"
 	"go.opentelemetry.io/otel/sdk/metric/metricdata"
+	"go.opentelemetry.io/otel/sdk/trace/tracetest"
 
 	"github.com/OWNER/bothy/services/server/internal/kernel/clock"
 	"github.com/OWNER/bothy/services/server/internal/platform/otel/attr"
@@ -273,5 +274,46 @@ func TestTelemetry_ExportFailureDoesNotAffectRequest(t *testing.T) {
 	defer cancel()
 	if err := tel.ForceFlush(ctx); err == nil {
 		t.Error("ForceFlush succeeded; the exporters were meant to fail")
+	}
+}
+
+// TestSetupInjectedExporters holds the seam of the canary test (M1-69): Deps.Exporters replace
+// the OTLP side of every signal, so an in-process test reads spans, log records and metrics
+// without a collector and without any OTLP exporter being built.
+func TestSetupInjectedExporters(t *testing.T) {
+	spans := tracetest.NewInMemoryExporter()
+	logs := &memLogExporter{}
+	reader := sdkmetric.NewManualReader()
+	stdout := &syncBuffer{}
+	tel, err := Setup(context.Background(), testConfig(), Deps{
+		Secrets: testSecrets(t, testKey), Stdout: stdout,
+		// No OTEL_*_EXPORTER=none: the injected exporters alone must keep the OTLP ones away.
+		Env:       []string{"OTEL_EXPORTER_OTLP_ENDPOINT=http://192.0.2.1:4317"},
+		Exporters: Exporters{Span: spans, Log: logs, MetricReader: reader},
+	})
+	if err != nil {
+		t.Fatalf("Setup: %v", err)
+	}
+	t.Cleanup(func() { _ = tel.Shutdown(context.Background()) })
+	_, span := otelapi.Tracer("probe").Start(context.Background(), "probe span")
+	span.End()
+	tel.Logger().InfoContext(context.Background(), "probe")
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	if err := tel.ForceFlush(ctx); err != nil {
+		t.Fatalf("ForceFlush: %v", err)
+	}
+	if got := spans.GetSpans(); len(got) != 1 || got[0].Name != "probe span" {
+		t.Errorf("spans = %v, want the probe span", got)
+	}
+	if got := logs.get(); len(got) != 1 {
+		t.Errorf("log records = %d, want 1", len(got))
+	}
+	if !strings.Contains(stdout.String(), `"msg":"probe"`) {
+		t.Errorf("stdout lacks the probe line: %s", stdout.String())
+	}
+	var rm metricdata.ResourceMetrics
+	if err := reader.Collect(ctx, &rm); err != nil || rm.Resource == nil {
+		t.Errorf("metric reader: %v, want a registered reader with the resource", err)
 	}
 }

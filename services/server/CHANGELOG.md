@@ -26,6 +26,17 @@ documented in this file. The format is based on
   `terminal.host_duplicate_probe_timeout`; deny reason `host_duplicate_connection`; the test client
   `internal/terminal/adapters/hosttest` and `specschema.ValidateChannelFrame` for the terminal
   channels.
+
+- Canary test across all outputs, SEC-T10 and DP-T09 (M1-69): the package `test/canary` drives
+  every enabled operation and every M1 client gateway op with run-unique canary values (content,
+  reasons, secrets, client addresses, IDs) and scans the logs (stdout at debug and OTLP), traces,
+  metrics, audit rows, error responses and the events of observers without read permission; a new
+  operation without a call fails the coverage test. The request span now carries
+  `bothy.principal.kind` and, for a person, `bothy.principal.pseudo_id` (`otel.AnnotatePrincipal`).
+  Test seams: `otel.Deps.Exporters`, `wire.Deps.TelemetryExporters` and `wire.Deps.OIDCRootCAs`;
+  the harness gained telemetry sinks, secret files, a public host name, a proof observer, device
+  clients, anonymous requests and the gateway resume.
+
 - Gateway frame conformance, gate G9 (M1-67): the test harness `wstest` validates every frame of
   the gateway integration tests as it arrives against `docs/api/asyncapi.yaml` and the body
   schemas of `openapi.yaml` (new test package `api/specschema`: one JSON Schema 2020-12 bundle,

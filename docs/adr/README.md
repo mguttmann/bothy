@@ -82,4 +82,5 @@ fehl, wenn sie veraltet ist. Nicht von Hand bearbeiten.
 | [0068](0068-terminal-ueber-host-dienst-mit-noise-strom-und-invariante-i6.md) | Terminal über einen Host-Dienst mit Noise-Ende-zu-Ende-Strom und Invariante I6 | accepted | 2026-10-10 |
 | [0069](0069-visualisierung-auf-zwei-ebenen-ohne-iframes-in-apps.md) | Visualisierung auf zwei Ebenen ohne iframes in Apps | accepted | 2026-10-10 |
 | [0070](0070-terminal-in-der-web-konsole.md) | Terminal in der Web-Konsole | accepted | 2026-10-10 |
+| [0071](0071-in-process-test-seams-of-serve.md) | In-process test seams of serve | accepted | 2026-10-18 |
 <!-- adr-index:end -->

@@ -20,7 +20,7 @@ collector is counted.
 | File | Content |
 |---|---|
 | `config.go` | `Config`, bound from the configuration in `internal/wire` |
-| `setup.go` | `Deps`, `Setup`, `Telemetry`, providers, sampler, OpenTelemetry error handler |
+| `setup.go` | `Deps`, `Exporters` (in-process replacements of the OTLP exporters for tests, M1-69), `Setup`, `Telemetry`, providers, sampler, OpenTelemetry error handler |
 | `env.go` | the `OTEL_*` variables the package interprets itself |
 | `resource.go` | resource of the process |
 | `queue.go` | in-flight budget and front queue of one signal |
@@ -30,7 +30,7 @@ collector is counted.
 | `metrics.go` | `bothy.telemetry.dropped` (declared in `metrics/`), counting metric exporter |
 | [`metrics/`](metrics/doc.go) | the metric registry (M1-68): one `Spec` per instrument of the catalogue, `Check`, the SDK view of every instrument, the recording wrappers with the strict switch; `metricstest/` holds the test helpers |
 | `logs.go` | slog handler chain, `NewCommandLogger`, `ParseLevel`, `CorrelationID`, `ServerErrorLog` |
-| `http.go` | `Middleware`, `RecordRoute`, access log |
+| `http.go` | `Middleware`, `RecordRoute`, `AnnotatePrincipal` (principal kind and pseudonym on the request span, M1-69), access log |
 | `pseudonym.go` | `Pseudonymizer`, `NewPseudonymizer` |
 | `attr/` | attribute keys and `attr.Allowed` |
 | [`genai/`](genai/README.md) | the `gen_ai.*` keys |

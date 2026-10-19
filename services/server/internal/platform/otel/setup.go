@@ -72,6 +72,24 @@ type Deps struct {
 	// OTEL_RESOURCE_ATTRIBUTES still read the process environment, which is the same in the
 	// server.
 	Env []string
+	// Exporters replace the OTLP exporters of the signals they set. They exist for in-process
+	// tests (the canary test of M1-69, SEC-T10); the zero value means production behaviour.
+	Exporters Exporters
+}
+
+// Exporters are in-process replacements of the OTLP side, one per signal, for tests that read
+// what the server exports. A set field replaces the OTLP exporter of its signal: no OTLP
+// exporter of that signal is built, whatever the OTEL_* variables say, so the test opens no
+// connection. With telemetry.enabled false spans and log records are not exported, as in
+// production; an injected MetricReader still reads the meter provider.
+type Exporters struct {
+	// Span receives the spans through the bounded queue and the attribute filter of D3.
+	Span sdktrace.SpanExporter
+	// Log receives the OTLP log records through the bounded queue and the attribute filter.
+	Log sdklog.Exporter
+	// MetricReader is a reader of the meter provider (for example sdkmetric.NewManualReader),
+	// behind the views of the metric registry.
+	MetricReader sdkmetric.Reader
 }
 
 // Telemetry is the telemetry of a running process, built by Setup. Its methods are safe for
@@ -87,7 +105,7 @@ type Telemetry struct {
 }
 
 // setupOptions replace the OTLP side in tests: spanExporter and logExporter instead of the OTLP
-// exporters, metricReader as an additional reader of the meter provider.
+// exporters, metricReader instead of the OTLP metric reader.
 type setupOptions struct {
 	spanExporter sdktrace.SpanExporter
 	logExporter  sdklog.Exporter
@@ -108,7 +126,9 @@ type setupOptions struct {
 // cannot use; the errors of NewPseudonymizer (a missing or short pseudonym key); errors of the
 // OTLP exporter constructors.
 func Setup(ctx context.Context, cfg Config, deps Deps) (*Telemetry, error) {
-	return setup(ctx, cfg, deps, setupOptions{})
+	return setup(ctx, cfg, deps, setupOptions{
+		spanExporter: deps.Exporters.Span, logExporter: deps.Exporters.Log, metricReader: deps.Exporters.MetricReader,
+	})
 }
 
 func setup(ctx context.Context, cfg Config, deps Deps, opts setupOptions) (*Telemetry, error) {
@@ -167,7 +187,7 @@ func setup(ctx context.Context, cfg Config, deps Deps, opts setupOptions) (*Tele
 	otelapi.SetLoggerProvider(t.logs)
 	otelapi.SetTextMapPropagator(propagation.TraceContext{})
 	otelapi.SetErrorHandler(&errorHandler{logger: NewCommandLogger(deps.Stdout, slog.LevelWarn), clock: deps.Clock})
-	setHTTPState(cfg.TrustRemoteParent, t.logger)
+	setHTTPState(cfg.TrustRemoteParent, t.logger, t.pseudo)
 	return t, nil
 }
 
@@ -239,7 +259,8 @@ func newMeterProvider(ctx context.Context, cfg Config, env otelEnv, res *resourc
 		sdkmetric.WithExemplarFilter(exemplar.AlwaysOffFilter),
 	}
 	if opts.metricReader != nil {
-		mopts = append(mopts, sdkmetric.WithReader(opts.metricReader))
+		// An injected reader replaces the OTLP exporter (Exporters.MetricReader).
+		return sdkmetric.NewMeterProvider(append(mopts, sdkmetric.WithReader(opts.metricReader))...), nil
 	}
 	if cfg.Enabled && !env.metrics.off {
 		var exp sdkmetric.Exporter

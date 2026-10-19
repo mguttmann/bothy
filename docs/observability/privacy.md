@@ -92,6 +92,8 @@ sind kurz.
 4. Das Geheimwort darf in keiner Ausgabe stehen. Ein Treffer bricht das Gate und nennt die Stelle.
 5. Zusätzlich: Jede Prinzipal-ID der Testdaten darf im Klartext nicht vorkommen.
 
+The in-process part of this gate is `services/server/test/canary` (M1-69); the collector part with the `file` exporter and container stdout is M1-73.
+
 ## 7. Apps
 
 Apps senden keine Telemetrie an den Collector. Absturzberichte gehen nur an ein Ziel, das der

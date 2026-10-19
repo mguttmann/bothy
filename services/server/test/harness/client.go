@@ -88,6 +88,10 @@ type Client struct {
 	stepKey   *deviceKey
 	// apiToken marks the client of an agent: access is an API token, there is no device.
 	apiToken bool
+	// proofs and tokens are Options.ProofObserver and Options.TokenObserver of the server; nil
+	// sees nothing.
+	proofs func(string)
+	tokens func(access, refresh string)
 	// tb is the test of the server: gateway connections report their frame violations to it (G9).
 	tb testing.TB
 
@@ -125,6 +129,17 @@ func (c *Client) Do(ctx context.Context, r Request) Response {
 			resp = c.send(ctx, r, true)
 		}
 	}
+	if c.Observer != nil {
+		c.Observer(r, resp)
+	}
+	return resp
+}
+
+// DoAnonymous sends r like Do but without the access token: the DPoP proof of the client's key
+// alone, with one retry on use_dpop_nonce (refreshToken, a replayed refresh token, the login and
+// pairing requests of a device). The Observer sees it.
+func (c *Client) DoAnonymous(ctx context.Context, r Request) Response {
+	resp := c.send(ctx, r, false)
 	if c.Observer != nil {
 		c.Observer(r, resp)
 	}
@@ -177,7 +192,11 @@ func (c *Client) attempt(ctx context.Context, r Request, auth bool) Response {
 	if access != "" {
 		req.Header.Set("Authorization", "DPoP "+access)
 	}
-	req.Header.Set("DPoP", c.key.proof(r.Method, target, nonce, access, time.Now()))
+	proof := c.key.proof(r.Method, target, nonce, access, time.Now())
+	if c.proofs != nil {
+		c.proofs(proof)
+	}
+	req.Header.Set("DPoP", proof)
 	start := time.Now()
 	resp, err := c.http.Do(req)
 	if err != nil {
@@ -224,8 +243,33 @@ type tokenPair struct {
 	} `json:"device"`
 }
 
+// Adopt takes over the token pair of a TokenResponse body (a login, pairing or enrollment the
+// test drove itself with a client of Server.NewDevice) and sets PrincipalID and SessionID from
+// it. The error reports a body without access token.
+func (c *Client) Adopt(body []byte) error {
+	var pair tokenPair
+	if err := json.Unmarshal(body, &pair); err != nil {
+		return err
+	}
+	if pair.AccessToken == "" {
+		return fmt.Errorf("harness: no access_token in %d bytes", len(body))
+	}
+	c.adopt(pair)
+	if pair.Device.PrincipalID != "" {
+		c.PrincipalID = pair.Device.PrincipalID
+	}
+	return nil
+}
+
+// Registration returns the DeviceRegistration of the client (its DPoP and step-up keys) with
+// name, for the device member of login, pairing and enrollment requests.
+func (c *Client) Registration(name string) map[string]any { return c.registration(name) }
+
 // adopt takes over a token pair.
 func (c *Client) adopt(p tokenPair) {
+	if c.tokens != nil {
+		c.tokens(p.AccessToken, p.RefreshToken)
+	}
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	c.access, c.refresh = p.AccessToken, p.RefreshToken
