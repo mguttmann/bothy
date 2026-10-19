@@ -1231,9 +1231,11 @@ orchestrator restarts, clients resume according to 04.
    but never becomes ready: `/readyz` fails with `schema_requires_newer_server`.
 6. Ensure signing keys: every purpose without an `active` key gets one
    ([19-security.md](19-security.md), section 10; [ADR 0066](../adr/0066-signing-keys-in-the-writable-key-store.md)).
-   Keys whose private file is missing from the key store (a restore without it) are retired
-   first, so the purpose gets a fresh active key; this runs after audit, sync, authz and identity
-   (steps 6a to 6d of `internal/wire`), whose unit of work records `signing_key.transition`.
+   Keys whose private file is missing from the key store are retired first, so the purpose gets
+   a fresh active key; when the key store holds the file of none of the unretired keys (a new or
+   wrong volume, a restore without the key store), the start ends with an error instead, unless
+   `signing_key.accept_lost_keys` is set ([19-security.md](19-security.md), section 16). This
+   runs after audit, sync, authz and identity (steps 6a to 6d of `internal/wire`), whose unit of work records `signing_key.transition`.
 7. Register routes and check the route metadata: every operation has a known action, otherwise
    abort (05, rule 3).
 8. Role `api`: start the log tail, set `local_head` to the current head, open the public listener.
