@@ -111,7 +111,8 @@ states, with named constraints (`grants_subject_shape_check`, `grants_bot_limits
 - `access.changed` also forgets the delivery snapshots of its audience.
 - `channel.created`, `channel.updated`, `channel.archived`, `space.archived` and `thread.moved`
   advance a process-wide structure generation; snapshots of an older generation are rebuilt
-  (DECISIONS M1-65).
+  (DECISIONS M1-65). `channel.settings_changed` does the same, because the channel facts carry
+  the mention switches `agent.invoke` evaluates at delivery time (DECISIONS D-M2-02-8).
 
 `authorize.Delivery(ctx)` marks the checks of the hub and the gateway catch-up: the snapshot is
 validated against that state instead of reading `permission_version` per check; a rebuilt snapshot
@@ -121,7 +122,18 @@ reads the current database state. Delivery implies `Filter(ctx)`, so a denial wr
 
 Tests: `TestAuthzObserve_AccessChangedRaisesFloor`,
 `TestAuthzObserve_NewRightsVersionInvalidatesWithoutAccessChanged`,
-`TestAuthzObserve_StructureEventInvalidates`, `TestAuthzDelivery_DenialWritesNoAudit`.
+`TestAuthzObserve_StructureEventInvalidates`, `TestAuthzObserve_SettingsChangedAdvancesGeneration`,
+`TestAuthzDelivery_DenialWritesNoAudit`.
+
+## Scope of agent.config.read (M2-02)
+
+`Scope` serves `agent.config.read` besides the read-level list actions and `host.read`: for an
+agent the channels that are not archived (nor in an archived space) whose effective operator it
+is (`StructureSource.ChannelsOperatedBy`) and that it reads after the acting-for intersection, and
+their spaces; `FullyVisibleSpaceIDs` stays empty and `InstanceWide` false. Every other kind gets
+`forbidden` with `subject_kind_not_allowed`, the reason of the requirement `ChannelOperator`. The
+check log records `(agent.config.read, outcome)` (DECISIONS D-M2-02-6). Tests:
+`TestScope_AgentConfigRead`, `TestAZ_P8_ScopeAgentConfigRead`.
 
 ## Action catalogue (M1-25)
 

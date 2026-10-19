@@ -70,6 +70,9 @@ type Handlers struct {
 	// Threads implements listChannelThreads, getThread, setThreadTitle, closeThread, reopenThread
 	// and setThreadTags (chat, M1-55) and moveThread (M1-62).
 	*chathttp.Threads
+	// Behavior implements getChannelBehavior, putChannelBehavior, listServedChannels and
+	// getServedChannelConfig (chat, M2-02).
+	*chathttp.Behavior
 	// Messages implements createMessage and createThread (messaging, M1-56), listThreadMessages
 	// and getMessage (M1-57), listMyMentions and the template operations (M1-60).
 	*messaginghttp.Messages
