@@ -46,6 +46,7 @@ import yaml
 RELEASE_WORKFLOWS: dict[str, frozenset[str]] = {
     "release.yml": frozenset({"push"}),
     "portability.yml": frozenset({"push", "workflow_dispatch"}),
+    "build-verify.yml": frozenset({"push"}),
 }
 PUBLIC_GUARD = (
     "github.event.repository.visibility == 'public' || "
@@ -154,7 +155,8 @@ def _check_triggers(file: str, triggers: dict[str, Any], out: list[Finding]) -> 
             and "branches" not in push
             and "branches-ignore" not in push
         )
-        if not tag_only:
+        build_only = file == "build-verify.yml" and push == {"branches": ["build/**"]}
+        if not tag_only and not build_only:
             out.append(Finding(file, "on.push", "push-on-branch", "push must be limited to tags"))
     allowed = RELEASE_WORKFLOWS.get(file)
     if allowed is not None:
