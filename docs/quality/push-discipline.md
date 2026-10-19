@@ -232,5 +232,7 @@ The pull request review reports real problems only (CRT-1 in `docs/DECISIONS.md`
 profile is `chill`, a general instruction asks for bugs, security issues, broken contracts
 and problems that break CI and no style, wording or formatting nits, and a source URL with
 retrieval date is asked for only in `docs/spec/**`, `docs/security/**` and `docs/adr/**`.
+CodeRabbit stores the learnings of review replies for this repository (CRT-1/3), so an answer
+that explains a settled rule is not needed again on the next pull request.
 A comment that names a Blocker or a reproduced Major is fixed before the merge; any other
 comment gets a short answer and its thread is resolved.
