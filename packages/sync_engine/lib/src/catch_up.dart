@@ -370,8 +370,9 @@ final class CatchUpListener implements SessionListener {
   /// backoff on the same connection while frames wait in memory; mirror and cursor stay until
   /// a snapshot arrives, and a disconnect ends the retries (the next session gets
   /// `resync_required` again from its stored cursor) (D-M4-14-9). The retry runs outside the
-  /// frame queue of the connection, so it checks its session after every await: a new session
-  /// that started meanwhile is never set live or reported as resynced by it.
+  /// frame queue of the connection, so it checks its session after its awaits: a new session
+  /// that started meanwhile is never set live or reported as resynced by it, while the
+  /// follow-up steps of a committed snapshot still run.
   Future<void> _attemptResync(SessionControl control, int session) async {
     final SnapshotData snapshot;
     try {
@@ -401,16 +402,17 @@ final class CatchUpListener implements SessionListener {
       cursor: snapshot.headSeq,
       syncEpoch: snapshot.syncEpoch,
     );
-    if (_wiped || session != _session) return;
+    // The steps that belong to the committed snapshot run even when the session ended meanwhile
+    // (the instance row and the read states come only from its reads); what the session sees
+    // runs only for the session of the retry.
     gaps.clear();
     await _db.syncStateDao.markSnapshot(_clock.now());
-    if (_wiped || session != _session) return;
-    control.lastProcessedSeq = snapshot.headSeq;
     for (final threadId in _openThreads()) {
       after.reads.add(() => _loadNewestPage(threadId));
     }
     await _afterCommit(after);
     if (_wiped || session != _session) return;
+    control.lastProcessedSeq = snapshot.headSeq;
     _resyncing = false;
     _goLive(control);
     _notify(Resynced(_resyncReason));

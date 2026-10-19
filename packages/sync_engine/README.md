@@ -113,8 +113,9 @@ most `sync.max_focused_threads`, the complete set per frame with `idle`) and
   the threads in focus load their newest page; phase `live`, notice `Resynced`. Frames that
   arrive meanwhile wait and pass the duplicate rule afterwards. When the snapshot cannot be
   loaded, mirror and cursor stay and the snapshot is retried after the reconnect backoff on the
-  same connection. The retry runs outside the frame queue and checks its session after every
-  await, so a session that started meanwhile is never set live by it; a drain of held frames of
+  same connection. The retry runs outside the frame queue and checks its session after its
+  awaits, so a session that started meanwhile is never set live by it (the follow-up reads of a
+  committed snapshot still run); a drain of held frames of
   an ended session does not hold the frames of the next one.
 - REST reads after a commit store nothing for a target removed meanwhile (the channel row must
   exist and no removal of the channel, its space or the thread may have happened).
