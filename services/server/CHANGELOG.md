@@ -11,6 +11,32 @@ documented in this file. The format is based on
 
 ### Added
 
+- Control connection of the host services (M2-43): `GET /api/v1/hosts/connect` on the public
+  listener of the roles `api` and `all` (asyncapi `hostControl`). Login with an EdDSA proof over
+  the challenge of `hello` with the key registered at pairing; close codes `4110` to `4114`, `4002`,
+  `4009`, `4013`, `4014` and `4000`; `host.connect` is a real requirement with the right
+  `host-self` (no longer deferred); `live_sessions` ends every other open session with
+  `host_restarted`; `report` writes the reported columns (session users as rights state, SR12; the
+  server-host flag ends the sessions of non-owners, SR10) and is audited on a change of the flag,
+  the checks or the session users; a second live connection with the same keys disables the host
+  (TM-T23); heartbeats with `heartbeat_ack` carrying a changed key set of purpose `terminal`; the
+  presence `Host.connected` and the ephemeral `host.presence_changed`; the end of every session
+  writes `terminal_session.changed`. Configuration keys `terminal.host_heartbeat_interval`,
+  `terminal.host_heartbeat_miss_limit`, `terminal.host_auth_timeout` and
+  `terminal.host_duplicate_probe_timeout`; deny reason `host_duplicate_connection`; the test client
+  `internal/terminal/adapters/hosttest` and `specschema.ValidateChannelFrame` for the terminal
+  channels.
+- Gateway frame conformance, gate G9 (M1-67): the test harness `wstest` validates every frame of
+  the gateway integration tests as it arrives against `docs/api/asyncapi.yaml` and the body
+  schemas of `openapi.yaml` (new test package `api/specschema`: one JSON Schema 2020-12 bundle,
+  strict about undeclared members, no `null`, integers below 2^53, at most
+  `sync.ws_max_frame_bytes`, `seq` and `permission_version` exactly on durable events,
+  `resource.version` as the catalogue says), each client frame on send, the order per connection
+  and every close code against `x-close-codes`; a violation fails the test. The register of ops and
+  event types and the enable list `gateway_ops` are compared with actions.yaml and asyncapi.yaml,
+  a corpus test observes every M1 event type and server op, and a parser test keeps the harness
+  the only WebSocket client of the tests. New direct dependency
+  `github.com/santhosh-tekuri/jsonschema/v6` (test code only).
 - Notification levels and quiet hours (M3-18): the module `notify` owns `notification_preferences`
   and `quiet_hours` and serves `listMyNotificationPreferences`, `putNotificationPreference`,
   `deleteNotificationPreference`, `listMyQuietHours`, `createQuietHoursRule`, `putQuietHoursRule`

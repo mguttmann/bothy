@@ -273,3 +273,22 @@ func TestPairNeverPrintsCodeOrKeys(t *testing.T) {
 		t.Error("missing CA file")
 	}
 }
+
+// TestPairStoresServerCA (M2-43 red team): the CA of --ca-file is stored with the pairing, so the
+// control connection of run trusts the same server; a pairing without one removes an old CA.
+func TestPairStoresServerCA(t *testing.T) {
+	_, o := setup(t, accept)
+	if _, err := Pair(context.Background(), o); err != nil {
+		t.Fatal(err)
+	}
+	got, err := o.State.ReadServerCA()
+	if err != nil || string(got) != string(o.CAPEM) {
+		t.Fatalf("stored CA %q %v", got, err)
+	}
+	if err := o.State.WriteServerCA(nil); err != nil {
+		t.Fatal(err)
+	}
+	if got, err := o.State.ReadServerCA(); err != nil || got != nil {
+		t.Fatalf("removed CA %q %v", got, err)
+	}
+}

@@ -16,10 +16,12 @@ import (
 )
 
 // ReportOutcome is the result of RecordSessionUserReport: Changed reports a new report that was
-// written; EndedSessions the sessions it ended.
+// written; EndedSessions the number of sessions it ended and Ended their ids (M2-43 sends
+// session.close for each after the commit).
 type ReportOutcome struct {
 	Changed       bool
 	EndedSessions int
+	Ended         []ids.ID
 }
 
 // RecordSessionUserReport records the session users a host reports as rights state (03 grants
@@ -99,22 +101,22 @@ func (s *Service) ApplySessionUserReport(ctx context.Context, hostID ids.ID, rep
 	if err != nil {
 		return ReportOutcome{}, err
 	}
-	ended := 0
+	var ended []ids.ID
 	for _, r := range rows {
 		if r.Revoked || !slices.Contains(vanished, r.OSUser) {
 			continue
 		}
-		n, err := s.EndSessions(ctx, SessionSelector{HostID: h.ID, UserID: r.UserID}, domain.CloseAccessRevoked)
+		list, err := s.endSessions(ctx, SessionSelector{HostID: h.ID, UserID: r.UserID}, domain.CloseAccessRevoked)
 		if err != nil {
 			return ReportOutcome{}, err
 		}
-		ended += n
+		ended = append(ended, list...)
 	}
 	st, _, err := s.withUsers(ctx, h)
 	if err != nil {
 		return ReportOutcome{}, err
 	}
-	return ReportOutcome{Changed: true, EndedSessions: ended}, s.emitUpdated(ctx, s.view(ctx, st))
+	return ReportOutcome{Changed: true, EndedSessions: len(ended), Ended: ended}, s.emitUpdated(ctx, s.view(ctx, st))
 }
 
 // checkReport validates a report (schema host_reported_session_users.v1): each name a session user

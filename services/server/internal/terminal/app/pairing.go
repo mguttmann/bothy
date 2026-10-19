@@ -116,6 +116,8 @@ func (s *Service) IssuePairingCode(ctx context.Context, a actor.Actor, cmd termi
 	if err != nil {
 		return terminal.PairingCodeIssued{}, err
 	}
+	// The re-pairing dropped the keys: the old connection ends after the commit (24 section 3.3).
+	s.control().CloseHost(cmd.HostID, domain.CodeHostUnpaired)
 	return out, nil
 }
 
@@ -414,10 +416,22 @@ func (s *Service) Confirm(ctx context.Context, a actor.Actor, cmd terminal.Confi
 	if err != nil {
 		return terminal.HostView{}, err
 	}
-	if out.mismatch {
-		return terminal.HostView{}, errs.FingerprintMismatch(out.remaining)
+	return s.afterConfirm(cmd.HostID, out)
+}
+
+// afterConfirm tells the control connection of the host what the committed confirmation did
+// (M2-43): the fallback to pairing dropped the keys, so the connection ends with 4110; a
+// confirmation makes the host active, so its connection gets ready again with the state and the
+// declaration (M2-42 Design note 15). A mismatch answers 409 fingerprint_mismatch.
+func (s *Service) afterConfirm(hostID ids.ID, out confirmOutcome) (terminal.HostView, error) {
+	if !out.mismatch {
+		s.control().SendReady(hostID)
+		return out.view, nil
 	}
-	return out.view, nil
+	if out.remaining == 0 {
+		s.control().CloseHost(hostID, domain.CodeHostUnpaired)
+	}
+	return terminal.HostView{}, errs.FingerprintMismatch(out.remaining)
 }
 
 // confirmWrite is the second unit of Confirm, declared as the rights change.

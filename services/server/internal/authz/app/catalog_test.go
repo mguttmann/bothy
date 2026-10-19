@@ -377,8 +377,8 @@ func TestVerifyRegistrations_DeferredActions(t *testing.T) {
 		re.Violations[0].Action != "command.invoke" {
 		t.Fatalf("route: %v", err)
 	}
+	// Since M2-43 no channel op names a deferred action (host.connect is HostSelf).
 	for name, register := range map[string]func(*authorize.Registry){
-		"channel op": func(r *authorize.Registry) { r.ChannelOp("terminal", authorize.ChannelOpHostControlSessionOpen) },
 		"event type": func(r *authorize.Registry) { r.Event("files", authorize.EventFileUpdated) },
 	} {
 		r := authorize.NewRegistry()

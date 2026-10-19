@@ -174,7 +174,7 @@ func TestAZP3_UnknownActionFailsClosedThroughAuthorize(t *testing.T) {
 		t.Fatalf("recorder %+v", w.rec.detached)
 	}
 	// A deferred action fails the same way (D3).
-	for _, a := range []authorize.Action{authorize.ActionCommandInvoke, authorize.ActionFileRead, authorize.ActionImportApply, authorize.ActionHostConnect} {
+	for _, a := range []authorize.Action{authorize.ActionCommandInvoke, authorize.ActionFileRead, authorize.ActionImportApply} {
 		d, err := w.az.Authorize(context.Background(), w.user(w.owner), a, authorize.Resource{Kind: authorize.ResourceInstance})
 		if e, ok := errs.As(err); !ok || d.Allowed() || e.Cause != errs.CauseUnknownAction {
 			t.Errorf("%s: %+v %v", a, d, err)
@@ -293,7 +293,7 @@ func TestAnonymous(t *testing.T) {
 	if _, err := w.az.Scope(context.Background(), anon, authorize.ActionMessageRead); errs.KindOf(err) != errs.KindUnauthenticated {
 		t.Fatalf("scope: %v", err)
 	}
-	// A host principal has no action in M1.
+	// A host principal has no action but host.connect (M2-43).
 	w.expect(t, actor.Actor{ID: ids.New(), Kind: actor.KindHost}, authorize.ActionSelfRead, authorize.Resource{Kind: authorize.ResourcePrincipal}, unauthentic, "unauthenticated")
 }
 

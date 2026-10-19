@@ -123,7 +123,8 @@ var requirementGroups = []struct {
 		"grant.read",
 	}},
 	{"owner or self", Any(Owner, GroupMember), []string{"group.read"}},
-	{"host-self", Deferred("M2"), []string{"host.connect"}},
+	// host.connect (M2-43): only the host itself, authenticated with its key (07 section 3).
+	{"host-self", HostSelf, []string{"host.connect"}},
 	// host.manage and host.read are gated by HumanSession (M2-39, 05 section 4.14).
 	{"owner", All(HumanSession, Owner), []string{"host.manage"}},
 	// host.pair (M2-41): the use case proves the pairing code before authorize runs, as for the

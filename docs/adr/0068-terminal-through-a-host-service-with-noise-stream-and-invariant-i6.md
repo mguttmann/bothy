@@ -190,7 +190,8 @@ threat model T-TM-13).
   `packages/bothy_noise`; TM-T02 is held by `TestRecordingsTMT02Dart` and
   `TestRecordingsTMT02Negative` in Go and `test/recordings_test.dart` in Dart, over the
   recordings of both languages in both roles.
-* Separation of users and disabling on a second control connection (TM-T22, TM-T23).
+* Separation of users and disabling on a second control connection (TM-T22, TM-T23). Since M2-43
+  TM-T23 holds `TestDuplicate_TMT23` in `services/server/internal/terminal/adapters/wsrelay`.
 * Since M2-42 the host side of TM-T13, TM-T22, TM-T24, TM-T26, TM-T27 and the TM-T29 parts (a),
   (b), (c), (d), (e), (f), (h), (i), (j) holds the platform suite of `services/host/test/platform`
   (`TestPlatform_TMT13`, `TestPlatform_TMT22`, `TestPlatform_TMT24`, `TestPlatform_TMT26`,

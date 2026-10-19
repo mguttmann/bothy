@@ -7,7 +7,6 @@ command.autocomplete
 command.invoke
 file.read
 file.transcript.submit
-host.connect
 import.apply
 interaction.create
 run.followup.create

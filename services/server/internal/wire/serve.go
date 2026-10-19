@@ -1117,7 +1117,8 @@ func (s *server) mountRoutes(context.Context) error {
 	if s.api() {
 		mount = func() error { return s.mountAPI(cat, log) }
 	}
-	return startRoutes(append(RouteBindings(routes.Enabled()), GatewayRouteBinding()), BuildRegistry(s.deps.Registrations), cat, log, mount)
+	return startRoutes(append(RouteBindings(routes.Enabled()), GatewayRouteBinding(), HostConnectRouteBinding()), BuildRegistry(s.deps.Registrations),
+		cat, log, mount)
 }
 
 // mountAPI is the mount part of mountRoutes for api and all: the chain, the rate limiter with its
@@ -1149,7 +1150,33 @@ func (s *server) mountAPI(cat *authzapp.Catalog, log *slog.Logger) error {
 	if err := MountRoutes(s.role, mux, s.handlers(), cat, chain, log); err != nil {
 		return err
 	}
-	return s.mountGateway(mux, chain, limiter, log)
+	if err := s.mountGateway(mux, chain, limiter, log); err != nil {
+		return err
+	}
+	return s.mountHostControl(mux, chain, log)
+}
+
+// mountHostControl builds the control connection of the host services (M2-43) over the terminal
+// module, the ephemeral publisher of the gateway and the signing keys, mounts GET
+// /api/v1/hosts/connect on mux and registers its stop step.
+func (s *server) mountHostControl(mux Mux, chain *httpserver.Chain, log *slog.Logger) error {
+	cfg, err := HostControlConfigFrom(s.values)
+	if err != nil {
+		return err
+	}
+	s.mu.Lock()
+	tm, gw, keys := s.terminal, s.gateway, s.signingKeys
+	s.mu.Unlock()
+	if tm == nil || gw == nil || keys == nil {
+		return errors.New("wire: the control connection needs the terminal module, the gateway and the signing keys")
+	}
+	hc, err := NewHostControl(cfg, tm, gw.Publisher, keys.Keys, s.deps.Clock, log)
+	if err != nil {
+		return err
+	}
+	hc.Mount(mux, chain)
+	s.runner.OnStop(hc.StopConnections())
+	return nil
 }
 
 // mountGateway builds the WebSocket gateway (M1-64) over identity's Authenticator and DPoP

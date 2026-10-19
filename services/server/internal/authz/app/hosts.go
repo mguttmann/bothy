@@ -5,6 +5,7 @@ package app
 import (
 	"context"
 	"slices"
+	"time"
 
 	"github.com/OWNER/bothy/services/server/internal/authz"
 	"github.com/OWNER/bothy/services/server/internal/authz/domain"
@@ -148,3 +149,63 @@ func intersectHosts(x, y hostSet) hostSet {
 func isHostList(spec domain.ActionSpec) bool {
 	return spec.ID == string(authorize.ActionHostRead) && slices.Equal(spec.Resources, []string{string(authorize.ResourceHost)})
 }
+
+// authorizeHost decides host.connect and every call of a host principal (M2-43 Design note 4, 07
+// section 3): a host principal is never looked up in principals and has an empty snapshot. In this
+// order: a principal of another kind (or none) on host.connect is refused like at the human gate
+// (unauthenticated without a principal, otherwise the liveness of the principal, then forbidden
+// subject_kind_not_allowed); a host principal is not authenticated for any action but
+// host.connect (unauthenticated); it needs Resource.HostAuth (missing or zero is an internal
+// error); a proof that failed is unauthenticated host_auth_failed; its own host must exist (else
+// host_auth_failed) and be confirming or active (else unauthenticated principal_inactive); the
+// resource must be its own row (else not_found, the visibility of a host principal).
+func (a *Authorizer) authorizeHost(ctx context.Context, p authorize.Principal, spec domain.ActionSpec, req domain.Expr,
+	r authorize.Resource, t time.Time) (authorize.Decision, error) {
+	if p == nil || p.PrincipalKind() == domain.KindAnonymous {
+		return outcome(domain.Decision{Outcome: domain.OutcomeUnauthenticated, Reason: domain.ReasonUnauthenticated}), nil
+	}
+	if p.PrincipalKind() != domain.KindHost {
+		if _, d, err := a.acting(ctx, p, spec.ID, t); err != nil || d.Outcome != domain.OutcomeAllow {
+			return outcome(d), err
+		}
+		return outcome(domain.Decision{Outcome: domain.OutcomeForbidden, Reason: domain.ReasonSubjectKindNotAllowed}), nil
+	}
+	if !req.IsHostSelf() {
+		// A host principal is authenticated for host.connect only (fail closed, 07 section 3).
+		return outcome(domain.Decision{Outcome: domain.OutcomeUnauthenticated, Reason: domain.ReasonUnauthenticated}), nil
+	}
+	return a.hostSelf(ctx, p.PrincipalID(), r)
+}
+
+// hostSelf is the decision of host.connect for the host principal id on r: the verdict of the
+// proof, the state of its own host and the visibility of only its own row.
+func (a *Authorizer) hostSelf(ctx context.Context, id ids.ID, r authorize.Resource) (authorize.Decision, error) {
+	if r.HostAuth == nil || r.HostAuth.Verdict == authorize.HostAuthInvalidZero {
+		return authorize.Decision{}, internal("a host principal needs the verdict of its proof")
+	}
+	failed := domain.Decision{Outcome: domain.OutcomeUnauthenticated, Reason: domain.ReasonHostAuthFailed}
+	if r.HostAuth.Verdict != authorize.HostAuthValid {
+		return outcome(failed), nil
+	}
+	own, found, err := a.hosts.Host(ctx, id)
+	if err != nil {
+		return authorize.Decision{}, sourceError("host source", err)
+	}
+	if !found {
+		return outcome(failed), nil
+	}
+	if own.State != hostConfirming && own.State != hostActive {
+		return outcome(domain.Decision{Outcome: domain.OutcomeUnauthenticated, Reason: domain.ReasonPrincipalInactive}), nil
+	}
+	if r.Kind != authorize.ResourceHost || r.ID != id {
+		return outcome(domain.Decision{Outcome: domain.OutcomeNotFound, Reason: domain.ReasonNoGrant}), nil
+	}
+	return authorize.Decision{Outcome: authorize.OutcomeAllow}, nil
+}
+
+// The host states in which its host service may log in (24 section 3.1): keys stored and not
+// disabled or retired.
+const (
+	hostConfirming = "confirming"
+	hostActive     = "active"
+)

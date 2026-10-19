@@ -1,0 +1,79 @@
+{
+  "public_jwk": {
+    "crv": "Ed25519",
+    "kty": "OKP",
+    "x": "SHksqa0HaJk4jZWIGaeUlK837JNBcvpAaehXS9agIwA"
+  },
+  "host_id": "0192f4a0-7b1c-7b22-9d4f-5a6b7c8d9e0f",
+  "challenge": "SGVsbG8gZnJvbSB0aGUgcmVjb3JkaW5nIG9mIE0yLTQzIQ",
+  "server_time": "2026-10-14T09:00:00Z",
+  "frames": [
+    {
+      "op": "identify",
+      "d": {
+        "protocol_version": 1,
+        "host_id": "0192f4a0-7b1c-7b22-9d4f-5a6b7c8d9e0f",
+        "proof": "eyJhbGciOiJFZERTQSIsInR5cCI6Imhvc3QtYXV0aCtqd3QiLCJraWQiOiI5U0F1dGZuUHcyems3NGxzb0dLSHJob1VXd1JZdzZtQzV0V0p3eTRoeV9VIn0.eyJjaGFsbGVuZ2UiOiJTR1ZzYkc4Z1puSnZiU0IwYUdVZ2NtVmpiM0prYVc1bklHOW1JRTB5TFRReklRIiwiaG9zdF9pZCI6IjAxOTJmNGEwLTdiMWMtN2IyMi05ZDRmLTVhNmI3YzhkOWUwZiIsImlhdCI6MTc5MTk2ODQwMH0.gmAb_wmdONXXWInW_U5PKCwJpJ1k0kCips1iIGibjGHXK0PgQh_k8XfyF_852LRVMJJX_EQLOdjjS5gR4syeCg",
+        "host_version": "1.0.0",
+        "live_sessions": [
+          "0192f4a0-7b1c-7b22-9d4f-5a6b7c8d9e10"
+        ]
+      }
+    },
+    {
+      "op": "heartbeat",
+      "d": {
+        "active_sessions": 1
+      }
+    },
+    {
+      "op": "report",
+      "d": {
+        "profiles": [
+          {
+            "name": "shell",
+            "display_name": "Shell",
+            "kind": "shell"
+          }
+        ],
+        "session_users": [
+          {
+            "os_user": "bothy-s-alex",
+            "workdirs": [
+              "Project A"
+            ]
+          }
+        ],
+        "doctor": [
+          {
+            "check": "hd1_user",
+            "ok": true
+          },
+          {
+            "check": "hd6_llm_login",
+            "ok": false,
+            "code": "subscription_login_detected",
+            "session_user": "bothy-s-alex"
+          }
+        ],
+        "is_server_host": false,
+        "require_local_confirm": false,
+        "os_version": "Debian 13"
+      }
+    },
+    {
+      "op": "session.started",
+      "d": {
+        "session_id": "0192f4a0-7b1c-7b22-9d4f-5a6b7c8d9e10"
+      }
+    },
+    {
+      "op": "session.ended",
+      "d": {
+        "session_id": "0192f4a0-7b1c-7b22-9d4f-5a6b7c8d9e10",
+        "close_reason": "process_exited",
+        "exit_code": 0
+      }
+    }
+  ]
+}

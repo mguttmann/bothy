@@ -6,7 +6,11 @@ import (
 	"context"
 	"errors"
 	"log/slog"
+	"net/http"
+	stdsync "sync"
+	"time"
 
+	"github.com/OWNER/bothy/services/server/api/rest"
 	"github.com/OWNER/bothy/services/server/internal/authz"
 	"github.com/OWNER/bothy/services/server/internal/identity"
 	identitypg "github.com/OWNER/bothy/services/server/internal/identity/adapters/postgres"
@@ -17,12 +21,16 @@ import (
 	"github.com/OWNER/bothy/services/server/internal/kernel/authorize"
 	"github.com/OWNER/bothy/services/server/internal/kernel/clock"
 	"github.com/OWNER/bothy/services/server/internal/kernel/errs"
+	"github.com/OWNER/bothy/services/server/internal/kernel/eventlog"
 	"github.com/OWNER/bothy/services/server/internal/kernel/ids"
 	"github.com/OWNER/bothy/services/server/internal/kernel/txn"
 	"github.com/OWNER/bothy/services/server/internal/platform/config"
+	"github.com/OWNER/bothy/services/server/internal/platform/httpserver"
+	"github.com/OWNER/bothy/services/server/internal/platform/lifecycle"
 	"github.com/OWNER/bothy/services/server/internal/platform/pg"
 	terminalhttp "github.com/OWNER/bothy/services/server/internal/terminal/adapters/httpapi"
 	terminalpg "github.com/OWNER/bothy/services/server/internal/terminal/adapters/postgres"
+	"github.com/OWNER/bothy/services/server/internal/terminal/adapters/wsrelay"
 	terminalapp "github.com/OWNER/bothy/services/server/internal/terminal/app"
 )
 
@@ -129,4 +137,101 @@ func NewTerminal(cfg terminalapp.Config, pool *pg.Pool, uow txn.UnitOfWork, az a
 		return nil, err
 	}
 	return &Terminal{Service: svc, Handlers: terminalhttp.New(svc)}, nil
+}
+
+// The route of the control connection of the host services (M2-43, asyncapi channel hostControl):
+// one endpoint on the public listener of the roles api and all. Like the gateway it is no
+// operation of openapi.yaml, so its binding is written here; it authorizes host.connect on the
+// connection (identify and every later op), so it is marked AuthorizedInBand.
+const (
+	hostConnectOperationID = "hostConnect"
+	hostConnectPath        = "/api/v1/hosts/connect"
+	hostConnectPattern     = http.MethodGet + " " + hostConnectPath
+	hostConnectClass       = "rl.host"
+)
+
+// HostConnectOperation returns the route of GET /api/v1/hosts/connect for the HTTP chain: action
+// host.connect, class rl.host, marked AuthorizedInBand (the proof and authorize run on the
+// connection, 24 section 3.5).
+func HostConnectOperation() httpserver.Operation {
+	return httpserver.Operation{ID: hostConnectOperationID, Method: http.MethodGet, Path: hostConnectPath, Pattern: hostConnectPattern,
+		Action: string(authorize.ActionHostConnect), RateLimitClass: hostConnectClass, AuthorizedInBand: true}
+}
+
+// HostConnectRouteBinding is the binding of the route for the catalogue check of the start (AZ-P1).
+func HostConnectRouteBinding() authorize.RouteBinding {
+	op := HostConnectOperation()
+	return authorize.RouteBinding{OperationID: op.ID, Method: op.Method, Pattern: op.Pattern, Action: op.Action, RateLimitClass: op.RateLimitClass}
+}
+
+// HostControlConfig binds the keys of the control connection (M2-43).
+type HostControlConfig struct {
+	HeartbeatInterval     time.Duration `config:"terminal.host_heartbeat_interval"`
+	HeartbeatMissLimit    int           `config:"terminal.host_heartbeat_miss_limit"`
+	AuthTimeout           time.Duration `config:"terminal.host_auth_timeout"`
+	DuplicateProbeTimeout time.Duration `config:"terminal.host_duplicate_probe_timeout"`
+	MaxFrameBytes         int           `config:"sync.ws_max_frame_bytes"`
+	MaxJSONDepth          int           `config:"http.max_json_depth"`
+	OutboundQueueMax      int           `config:"sync.outbound_queue_max"`
+	WriteTimeout          time.Duration `config:"gateway.write_timeout"`
+}
+
+// HostControlConfigFrom binds HostControlConfig from v; the error names the key, never a value.
+func HostControlConfigFrom(v *config.Values) (HostControlConfig, error) {
+	var c HostControlConfig
+	if err := config.Bind(v, &c); err != nil {
+		return HostControlConfig{}, err
+	}
+	return c, nil
+}
+
+// HostControl is the control connection of the host services in an api process: the registry of
+// links and the WebSocket handler.
+type HostControl struct {
+	Links   *wsrelay.Links
+	Handler *wsrelay.Handler
+}
+
+// hostSchemas compiles the schemas of the host ops once per process.
+var hostSchemas = stdsync.OnceValues(func() (*httpserver.SchemaValidator, error) {
+	return httpserver.NewSchemaValidator(rest.Spec, wsrelay.SchemaNames())
+})
+
+// NewHostControl builds the control connection over the terminal module t: the registry publishes
+// the presence through publisher (the gateway hub, M1-66), the use cases read the keys of purpose
+// terminal from keys, and the module closes and updates the links after its commits
+// (Service.BindControl). Errors: an invalid configuration value.
+func NewHostControl(cfg HostControlConfig, t *Terminal, publisher eventlog.EphemeralPublisher, keys terminalapp.TerminalKeys,
+	clk clock.Clock, log *slog.Logger) (*HostControl, error) {
+	if t == nil || t.Service == nil {
+		return nil, errors.New("wire: the control connection needs the terminal module")
+	}
+	schemas, err := hostSchemas()
+	if err != nil {
+		return nil, err
+	}
+	links := wsrelay.NewLinks(publisher, log)
+	h, err := wsrelay.NewHandler(wsrelay.Config{
+		HeartbeatInterval: cfg.HeartbeatInterval, HeartbeatMissLimit: cfg.HeartbeatMissLimit, AuthTimeout: cfg.AuthTimeout,
+		DuplicateProbeTimeout: cfg.DuplicateProbeTimeout, MaxFrameBytes: cfg.MaxFrameBytes, MaxJSONDepth: cfg.MaxJSONDepth,
+		OutboundQueueMax: cfg.OutboundQueueMax, WriteTimeout: cfg.WriteTimeout,
+	}, wsrelay.Deps{UseCases: t.Service, Links: links, Schemas: schemas, Clock: clk, Log: log})
+	if err != nil {
+		return nil, err
+	}
+	t.Service.BindKeys(keys)
+	links.Bind(t.Service, t.Service)
+	t.Service.BindControl(links)
+	return &HostControl{Links: links, Handler: h}, nil
+}
+
+// Mount mounts GET /api/v1/hosts/connect on mux through chain (only the outer steps run for it).
+func (c *HostControl) Mount(mux Mux, chain *httpserver.Chain) {
+	mux.Handle(hostConnectPattern, chain.Wrap(HostConnectOperation(), c.Handler))
+}
+
+// StopConnections is the stop step of PhaseConnections (02 section 15.3 step 3): every control
+// connection detaches its sessions and closes with 4013 within the rest of shutdown.total_timeout.
+func (c *HostControl) StopConnections() lifecycle.StopStep {
+	return lifecycle.StopStep{Name: "host_control_connections", Phase: lifecycle.PhaseConnections, Run: c.Links.Shutdown}
 }
