@@ -62,6 +62,18 @@ und Tag-Muster auswertet und den Tag dem Menschen lässt.
 5. git-cliff kommt als gepinnte Binärdatei mit Prüfsumme über `tools/bin/tools.lock.json`, wie die
    übrigen Release-Binärdateien der Werkzeugkette ([toolchain.md](../quality/toolchain.md)).
 
+6. For the component `bothy`, `SERVER_VERSION=<version>` additionally writes the server version
+   that the product bundle installs into the line `BOTHY_VERSION=` of
+   `infra/compose/.env.example`, only if the tag `server/v<version>` exists
+   ([18-release.md](../spec/18-release.md), section 2.1; D-W-76). Without `CHANNEL=beta`
+   (stable product) it rejects a `<version>` with a pre-release identifier and names the value;
+   without `SERVER_VERSION` it rejects while the line carries the placeholder. So the error shows
+   up before commit and tag; `make release-build` keeps the check as a second safeguard, and the
+   gate `release-pins` checks the committed state in the pre-push of the branch and in the
+   required check `ci-ok` of the pull request, that is before the tag. The push of the tag alone
+   starts no check, because its commit is already on `origin`
+   ([18-release.md](../spec/18-release.md), section 2.1, rule 1; D-W-98).
+
 ### Consequences
 
 - Gut, weil die Vorbereitung lokal und ohne Netz läuft und denselben Stand wie CI nutzt.
@@ -83,6 +95,10 @@ und Tag-Muster auswertet und den Tag dem Menschen lässt.
 - Bestehende Checks: `tools/ci/components.py release` lehnt einen Tag ab, dessen Version nicht in
   `VERSION` steht; `release.yml` bricht ab, wenn `CHANGELOG.md` keinen Abschnitt für die Version
   hat.
+- Tests for `SERVER_VERSION` against the fixture repository: without a tag `server/v<version>`
+  abort, without `CHANNEL=beta` with a `<version>` with a pre-release identifier abort naming the
+  value, without `SERVER_VERSION` with the placeholder abort, each without a written file (PLAN
+  M7-29).
 - `make runners-check`: Kein Workflow läuft auf Pushes in Zweige; ein Release-Bot-Workflow würde
   daran scheitern.
 - Pin-Prüfung `test_toolchain_doc.py`: Die Version von git-cliff in `toolchain.md` gleicht dem Pin.

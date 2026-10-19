@@ -108,7 +108,7 @@ TS_ON := $(and $(TS_PROJECTS),$(or $(call want,sdk-typescript),$(call want,plugi
         sonar sonar-up sonar-down sonar-config sonar-config-check semgrep trivy osv gitleaks \
         gitleaks-staged denylist denylist-history licenses docs adr-index config-reference config-doc-check app-config event-catalog catalog catalog-check linkcheck \
         trivy-image portability linkcheck-external diagrams tokens api-lint api-checks api-breaking api-tables api-clients \
-        runners-check commitlint \
+        runners-check release-pins commitlint \
         review labels-check labels-sync tools-lock release-build release-prep release-trial scancode clean \
         codegen-check arch register-check migrations-lint migrations-lock sql-visibility flag-check perf ops-check signal-check \
         image image-test postgres-image postgres-image-test apps-platform contract-test
@@ -156,7 +156,7 @@ gates: ## All gates except denylist and sonar (CI job "gates")
 # reported as drift and not as a confusing compile error. `perf` is not a gate (P-07).
 gates: fmt-check codegen-check lint typecheck arch register-check migrations-lint sql-visibility flag-check test coverage contract-test commitlint \
        docs config-doc-check linkcheck diagrams catalog-check api-lint api-checks api-breaking ops-check signal-check \
-       api-clients tokens runners-check labels-check gitleaks semgrep trivy osv licenses
+       api-clients tokens runners-check labels-check release-pins gitleaks semgrep trivy osv licenses
 
 # ---- code quality ---------------------------------------------------------------------
 fmt: ## Format all code in place
@@ -539,6 +539,9 @@ api-clients: ## G4: generated API clients equal a fresh generation and compile (
 # ---- CI policy and supply chain -------------------------------------------------------
 runners-check: ## Workflow policy: runner switch, triggers, SHA pinning, timeouts, permissions
 	$(UVRUN) python tools/ci/check_runners.py .github/workflows
+
+release-pins: ## Server version pinned by the product bundle: SemVer, no server pre-release in a stable product (docs/spec/18-release.md 2.1)
+	$(UVRUN) python tools/ci/components.py pins
 
 gitleaks: ## Secret scan of every commit reachable from HEAD (all refs: GITLEAKS_LOG_OPTS=--all)
 	$(call tool,gitleaks) git --config .gitleaks.toml --redact --no-banner --log-opts="$(GITLEAKS_LOG_OPTS)" $(GITLEAKS_FLAGS) .
