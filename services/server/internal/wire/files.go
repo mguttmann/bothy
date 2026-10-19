@@ -307,7 +307,7 @@ func (f *Files) EnableScan(cfg filesapp.ScanConfig, cc filesclamd.Config, audit 
 	}
 	pass, err := filesapp.NewScanPass(cfg, filesapp.ScanDeps{
 		Repo: f.repo, Scans: f.repo, Store: f.store, UoW: f.uow, Events: f.events, Audit: audit, Channels: f.channels,
-		Scanner: scanner, Types: filesmimetype.Detector{}, Queue: f.Queue, Metrics: f.scanMetrics, Clock: clk, Log: log,
+		Scanner: scanner, Types: filesmimetype.NewDetector(cfg.SniffBytes), Queue: f.Queue, Metrics: f.scanMetrics, Clock: clk, Log: log,
 	})
 	if err != nil {
 		return err
