@@ -362,6 +362,27 @@ void main() {
     await access.viewAsUser(userId: w.sam.id);
     await access.revokeGrant(grantId: grant.id, reasonBody: why);
 
+    // Audit log (M4-29): list, NDJSON export and chain check.
+    h.server.audit.add(world, action: 'grant.create', actor: w.alex.id);
+    final audit = api.getAuditApi();
+    await audit.listAuditEvents(decision: AuditDecision.allow);
+    await api.dio.get<List<int>>(
+      '/audit/export',
+      queryParameters: {
+        'from': '2000-01-01T00:00:00.000Z',
+        'to': '2100-01-01T00:00:00.000Z',
+      },
+      options: Options(
+        responseType: ResponseType.bytes,
+        extra: {
+          'secure': [
+            {'type': 'http', 'scheme': 'DPoP', 'name': 'dpopAuth'},
+          ],
+        },
+      ),
+    );
+    await audit.verifyAuditChain(auditVerifyRequest: AuditVerifyRequest());
+
     await alex.auth.refresh.refreshNow();
     await api.getMeApi().getMe();
     await alex.auth.login.logout();

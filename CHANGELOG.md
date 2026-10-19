@@ -33,6 +33,13 @@ Planning stage (milestone M0). Nothing is installable yet.
   local store have their own trigger statements, so a history next to a post list shows new
   messages.
 
+- Audit log of the administration (M4-29): `packages/admin_ui` lists the audit log of 01 5.2 A6
+  (virtualized, newest first, cursor paging) with filters for action, person, result, resource
+  and time range, shows an entry's details, checks the hash chain (`verifyAuditChain`, intact
+  or the first broken entry with the warnings) and exports a time range as the server's NDJSON
+  with hashes or as a CSV converted on the device with a guard against formula injection. The
+  fake server of `sync_engine` serves the three audit operations over a hash chain that a test
+  can break at a given entry.
 - Gate `sql-visibility` (M1-70, AZ-P12): `tools/lint/sql_visibility.py` rejects every reading
   sqlc query on a content table without `channel_id = ANY(...)` or `space_id = ANY(...)` unless it
   stands with a category and a reason on `tools/lint/sql_visibility.yaml`; stale, duplicate and

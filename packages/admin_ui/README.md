@@ -3,8 +3,8 @@
 Administration screens for the desktop app, the console and the emergency actions on mobile.
 
 Status: own devices and sessions (M4-25), the administration of people, groups and waiting
-devices (M4-26), grants with preview, "Who has access?" and "View as person" (M4-27); agents
-(M4-28), audit (M4-29) and the console (M6) follow. Kind: Flutter package, a member of the Dart
+devices (M4-26), grants with preview, "Who has access?" and "View as person" (M4-27) and the
+audit log (M4-29); agents (M4-28) and the console (M6) follow. Kind: Flutter package, a member of the Dart
 workspace at the repository root (`resolution: workspace`, `publish_to: none`).
 
 ## What it offers
@@ -30,6 +30,10 @@ database, because the console has neither a gateway nor a local store (15 3.1).
 | `GrantWizard`, `PreviewPanel` | A2: who (person, group, agent, search by name), where (instance, space, channel), level, capabilities, last day and required reason; every change previews the full request, the panel shows the server's `text` unchanged, the effects per principal, I1 and SR8 ("Switch the agent to organization first."), the hints and a delegation denial; "Confirm" only with a current, allowed preview and a reason, then the step-up |
 | `GrantsList`, `RevokeGrantDialog` | the grants of a target (`/grants/<target key>`) with "Revoke": takes effect immediately, required reason |
 | `WhoHasAccess`, `SourceChain`, `ViewAsPerson` | A3 and A4: level, capabilities and source chain per principal (owner, direct, group, inherited, participant, operator, via agent with H1, blocked by a guard rule; disabled principals struck through), and the read-only snapshot of a person in a clear frame with its end |
+| `AuditRepository`, `ApiAuditRepository` | the audit log of A6 (part of `AdminRepository`): `listAuditEvents` with its filters (`action`, `actor_id`, `decision`, `resource_kind`, `resource_id`, `from`, `to`) and cursor, `verifyAuditChain` with or without a `seq` range, `exportAuditEvents` as the server's byte stream; a streamed export asks one entry of the range first, so the step-up and a `403` arrive on a JSON answer |
+| `AuditLogView`, `AuditFilters`, `AuditEntryDetail` | A6 Audit: the virtualized list (time in the person's time zone, who, action with its label where `l10n` has one, result, resource, reason), the filters (action from the loaded IDs or typed, person, result, resource kind and ID, days `YYYY-MM-DD`), "Load more" with the cursor, the details of an entry (correlation ID, deny reason, details, hashes); nothing changes or deletes an entry |
+| `AuditChainCheckButton`, `AuditChainPanel` | "Check chain": without a filter from the last checkpoint, with a filter over the `seq` span of the listed entries; "Chain checked up to no. n: unchanged" or the first broken entry with its reason in the danger style, the range, the checkpoints compared and the warnings |
+| `AuditExportBar`, `AuditSaveTarget`, `auditNdjsonToCsv`, `auditCsvCell` | "Export" writes the NDJSON stream unchanged, "Export as CSV" converts it on the device (columns `occurred_at` to `prev_hash`, RFC 4180, an apostrophe before a cell starting with `=`, `+`, `-` or `@`); the host passes the save dialog (`AuditSaveTarget`), without one there are no export buttons |
 | `ConfirmChange`, `ProblemBanner`, `adminFailure`, `CodeText` | the one confirmation before a change (danger style for destructive ones), the server's problem texts (`one_time_secret` and `i1_violation` explained), the code view of onboarding and enrollment codes |
 
 Step-up comes only from the server: a changing call carries its purpose text
@@ -46,7 +50,10 @@ it builds `ApiAdminRepository` over the client of the signed-in session and maps
 maps the same locations to its routes. Every screen also works on its own with a repository
 in its constructor. Every changing action asks once (`ConfirmChange`) and then sends the call;
 the step-up dialog appears when the server answers `401 step_up_required` (05 2.4: every
-administration action here has step-up except `session.revoke`).
+administration action here has step-up except `session.revoke`). Reading, checking and
+exporting the audit log have step-up too (`audit.read`, `audit.verify`). The desktop app passes
+no `saveTarget` yet, so it shows the audit log without the export buttons until a host wires a
+save dialog (docs/DECISIONS.md D-M4-29-3).
 
 ## Dependencies
 
@@ -65,10 +72,11 @@ Further rules checked by `make arch`:
 | `lib/src/data/` | `self_repository.dart`, `admin_repository.dart` |
 | `lib/src/self/` | the device and session views and their dialogs |
 | `lib/src/shell/`, `lib/src/people/`, `lib/src/groups/`, `lib/src/devices/`, `lib/src/common/` | the administration of M4-26 |
+| `lib/src/audit/` | the audit log of M4-29 |
 | `lib/src/step_up/` | the step-up dialog |
 | `lib/src/grants/`, `lib/src/access/`, `lib/src/data/access_repository.dart` | the permission screens of M4-27 |
 | `test/grants/`, `test/access/` | the wizard, revoke, "Who has access?" and "View as person"; the fake reads the example of 07 9.3 at run time |
-| `test/self/`, `test/admin/` | widget tests over fake repositories that behave like the server behind the step-up interceptor |
+| `test/self/`, `test/admin/`, `test/audit/` | widget tests over fake repositories that behave like the server behind the step-up interceptor |
 | `test/goldens/` | goldens (`ci/` with Ahem, `macos/` with the bundled fonts) |
 | `test/` | tests, run by `make test` with coverage (`quality.coverage.dart_min_percent`) |
 

@@ -5388,6 +5388,372 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Not allowed for agents or apps'**
   String get problemForbiddenSubjectKind;
+
+  /// Entry of the administration navigation for the audit log (01 section 5.2 A6).
+  ///
+  /// In en, this message translates to:
+  /// **'Audit'**
+  String get adminNavAudit;
+
+  /// Title of the audit log screen of the administration (01 5.2 A6).
+  ///
+  /// In en, this message translates to:
+  /// **'Audit log'**
+  String get auditTitle;
+
+  /// Label of the action filter of the audit log; a list of the loaded action IDs or a typed action ID.
+  ///
+  /// In en, this message translates to:
+  /// **'Action'**
+  String get auditFilterAction;
+
+  /// First choice of the person filter of the audit log: no filter.
+  ///
+  /// In en, this message translates to:
+  /// **'All people'**
+  String get auditFilterActorAll;
+
+  /// First choice of the result filter of the audit log: no filter.
+  ///
+  /// In en, this message translates to:
+  /// **'All results'**
+  String get auditResultAll;
+
+  /// Result of an audit entry whose decision was allow.
+  ///
+  /// In en, this message translates to:
+  /// **'allowed'**
+  String get auditResultAllow;
+
+  /// Result of an audit entry whose decision was deny.
+  ///
+  /// In en, this message translates to:
+  /// **'denied'**
+  String get auditResultDeny;
+
+  /// Result of an audit entry whose decision was error.
+  ///
+  /// In en, this message translates to:
+  /// **'error'**
+  String get auditResultError;
+
+  /// Label of the resource kind filter of the audit log, for example space or grant.
+  ///
+  /// In en, this message translates to:
+  /// **'Resource kind'**
+  String get auditFilterResourceKind;
+
+  /// Label of the resource ID filter of the audit log.
+  ///
+  /// In en, this message translates to:
+  /// **'Resource ID'**
+  String get auditFilterResourceId;
+
+  /// Label of the first day of the time range filter of the audit log, read in the person's time zone.
+  ///
+  /// In en, this message translates to:
+  /// **'From (YYYY-MM-DD)'**
+  String get auditFilterFrom;
+
+  /// Label of the last day (inclusive) of the time range filter of the audit log.
+  ///
+  /// In en, this message translates to:
+  /// **'To (YYYY-MM-DD)'**
+  String get auditFilterTo;
+
+  /// Button that loads the audit log with the typed filters.
+  ///
+  /// In en, this message translates to:
+  /// **'Apply filters'**
+  String get auditFilterApply;
+
+  /// Error under a day field of the audit log filter that holds no valid date.
+  ///
+  /// In en, this message translates to:
+  /// **'Enter a date as YYYY-MM-DD.'**
+  String get auditFilterInvalidDate;
+
+  /// Column header of the audit log: when it happened.
+  ///
+  /// In en, this message translates to:
+  /// **'Time'**
+  String get auditColTime;
+
+  /// Column header of the audit log: the acting person or agent.
+  ///
+  /// In en, this message translates to:
+  /// **'Who'**
+  String get auditColWho;
+
+  /// Column header of the audit log: allowed, denied or error.
+  ///
+  /// In en, this message translates to:
+  /// **'Result'**
+  String get auditColResult;
+
+  /// Column header of the audit log: the resource of the action.
+  ///
+  /// In en, this message translates to:
+  /// **'Resource'**
+  String get auditColResource;
+
+  /// Column header of the audit log: the deny reason or the stated reason.
+  ///
+  /// In en, this message translates to:
+  /// **'Reason'**
+  String get auditColReason;
+
+  /// Shown when the audit log has no entry for the filters.
+  ///
+  /// In en, this message translates to:
+  /// **'No entries match these filters.'**
+  String get auditEmpty;
+
+  /// Shown when the person cancelled the step-up that reading the audit log needs.
+  ///
+  /// In en, this message translates to:
+  /// **'Reading the audit log needs your confirmation.'**
+  String get auditStepUpNeeded;
+
+  /// Button that checks the hash chain of the audit log (verifyAuditChain).
+  ///
+  /// In en, this message translates to:
+  /// **'Check chain'**
+  String get auditCheckChain;
+
+  /// Result of an intact hash chain check (01 5.2 A6, ADR 0021).
+  ///
+  /// In en, this message translates to:
+  /// **'Chain checked up to no. {seq}: unchanged.'**
+  String auditChainOk(int seq);
+
+  /// Result of a hash chain check that found the first broken entry; reason is one of the auditChainReason texts.
+  ///
+  /// In en, this message translates to:
+  /// **'Chain broken at no. {seq}: {reason}'**
+  String auditChainBroken(int seq, String reason);
+
+  /// Range and checkpoints of a hash chain check.
+  ///
+  /// In en, this message translates to:
+  /// **'Checked no. {from} to {to}; checkpoints compared: {count}.'**
+  String auditChainRange(int from, int to, int count);
+
+  /// Failure reason hash_mismatch of a chain check.
+  ///
+  /// In en, this message translates to:
+  /// **'the entry does not match its hash.'**
+  String get auditChainReasonHash;
+
+  /// Failure reason link_mismatch of a chain check.
+  ///
+  /// In en, this message translates to:
+  /// **'the entry does not link the entry before.'**
+  String get auditChainReasonLink;
+
+  /// Failure reason seq_gap of a chain check.
+  ///
+  /// In en, this message translates to:
+  /// **'an entry is missing.'**
+  String get auditChainReasonGap;
+
+  /// Failure reason checkpoint_mismatch of a chain check.
+  ///
+  /// In en, this message translates to:
+  /// **'a checkpoint does not match.'**
+  String get auditChainReasonCheckpoint;
+
+  /// Failure reason checkpoint_invalid of a chain check.
+  ///
+  /// In en, this message translates to:
+  /// **'a checkpoint is invalid.'**
+  String get auditChainReasonCheckpointInvalid;
+
+  /// Failure reason of a chain check that this app does not know.
+  ///
+  /// In en, this message translates to:
+  /// **'reason {code}.'**
+  String auditChainReasonOther(String code);
+
+  /// Warning checkpoint_sink_not_configured of a chain check.
+  ///
+  /// In en, this message translates to:
+  /// **'Warning: no checkpoint target is configured, so checkpoints exist only in the database.'**
+  String get auditChainWarningNoSink;
+
+  /// A warning of a chain check that this app does not know, by its code.
+  ///
+  /// In en, this message translates to:
+  /// **'Warning: {code}'**
+  String auditChainWarning(String code);
+
+  /// Button that saves the audit log of the time range as NDJSON with hashes.
+  ///
+  /// In en, this message translates to:
+  /// **'Export'**
+  String get auditExport;
+
+  /// Button that saves the audit log of the time range as a CSV converted on the device.
+  ///
+  /// In en, this message translates to:
+  /// **'Export as CSV'**
+  String get auditExportCsv;
+
+  /// Shown when the person exports without a time range in the filter.
+  ///
+  /// In en, this message translates to:
+  /// **'Choose a time range (from and to) to export.'**
+  String get auditExportNeedsRange;
+
+  /// Notice after the audit export was written to the chosen file.
+  ///
+  /// In en, this message translates to:
+  /// **'Export saved.'**
+  String get auditExportDone;
+
+  /// Notice when the audit export stream ended with an error after the file was opened.
+  ///
+  /// In en, this message translates to:
+  /// **'The export broke off; the file is incomplete.'**
+  String get auditExportFailed;
+
+  /// Purpose of the step-up dialog when reading the audit log (05 audit.read).
+  ///
+  /// In en, this message translates to:
+  /// **'Read the audit log'**
+  String get stepUpPurposeAuditRead;
+
+  /// Purpose of the step-up dialog when checking the audit chain (05 audit.verify).
+  ///
+  /// In en, this message translates to:
+  /// **'Check the hash chain of the audit log'**
+  String get stepUpPurposeAuditVerify;
+
+  /// Purpose of the step-up dialog when exporting the audit log (05 audit.read).
+  ///
+  /// In en, this message translates to:
+  /// **'Export the audit log'**
+  String get stepUpPurposeAuditExport;
+
+  /// Title of the details of one audit entry.
+  ///
+  /// In en, this message translates to:
+  /// **'Entry no. {seq}'**
+  String auditDetailTitle(int seq);
+
+  /// Label of the correlation ID in the details of an audit entry.
+  ///
+  /// In en, this message translates to:
+  /// **'Correlation ID'**
+  String get auditDetailCorrelation;
+
+  /// Label of the deny reason in the details of an audit entry.
+  ///
+  /// In en, this message translates to:
+  /// **'Deny reason'**
+  String get auditDetailDenyReason;
+
+  /// Label of the details object the server returns for an audit entry.
+  ///
+  /// In en, this message translates to:
+  /// **'Details'**
+  String get auditDetailDetails;
+
+  /// Label of the hash of an audit entry.
+  ///
+  /// In en, this message translates to:
+  /// **'Hash'**
+  String get auditDetailHash;
+
+  /// Label of the hash of the entry before, in the details of an audit entry.
+  ///
+  /// In en, this message translates to:
+  /// **'Previous hash'**
+  String get auditDetailPrevHash;
+
+  /// Button that closes the details of an audit entry.
+  ///
+  /// In en, this message translates to:
+  /// **'Close'**
+  String get auditDetailClose;
+
+  /// Label of the action audit.read in the audit log.
+  ///
+  /// In en, this message translates to:
+  /// **'Read the audit log'**
+  String get auditActionAuditRead;
+
+  /// Label of the action audit.verify in the audit log.
+  ///
+  /// In en, this message translates to:
+  /// **'Check the audit chain'**
+  String get auditActionAuditVerify;
+
+  /// Label of the action grant.create in the audit log.
+  ///
+  /// In en, this message translates to:
+  /// **'Create a grant'**
+  String get auditActionGrantCreate;
+
+  /// Label of the action grant.revoke in the audit log.
+  ///
+  /// In en, this message translates to:
+  /// **'Revoke a grant'**
+  String get auditActionGrantRevoke;
+
+  /// Label of the action owner.add in the audit log.
+  ///
+  /// In en, this message translates to:
+  /// **'Add an owner'**
+  String get auditActionOwnerAdd;
+
+  /// Label of the action owner.remove in the audit log.
+  ///
+  /// In en, this message translates to:
+  /// **'Remove an owner'**
+  String get auditActionOwnerRemove;
+
+  /// Label of the action user.create in the audit log.
+  ///
+  /// In en, this message translates to:
+  /// **'Create a person'**
+  String get auditActionUserCreate;
+
+  /// Label of the action user.disable in the audit log.
+  ///
+  /// In en, this message translates to:
+  /// **'Disable a person'**
+  String get auditActionUserDisable;
+
+  /// Label of the action user.enable in the audit log.
+  ///
+  /// In en, this message translates to:
+  /// **'Enable a person'**
+  String get auditActionUserEnable;
+
+  /// Label of the action device.approve in the audit log.
+  ///
+  /// In en, this message translates to:
+  /// **'Approve a device'**
+  String get auditActionDeviceApprove;
+
+  /// Label of the action device.revoke in the audit log.
+  ///
+  /// In en, this message translates to:
+  /// **'Revoke a device'**
+  String get auditActionDeviceRevoke;
+
+  /// Label of the action group.create in the audit log.
+  ///
+  /// In en, this message translates to:
+  /// **'Create a group'**
+  String get auditActionGroupCreate;
+
+  /// Label of the action auth.step_up in the audit log.
+  ///
+  /// In en, this message translates to:
+  /// **'Confirm with step-up'**
+  String get auditActionStepUp;
 }
 
 class _AppLocalizationsDelegate

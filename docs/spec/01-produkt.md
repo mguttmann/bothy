@@ -637,7 +637,9 @@ Umschalten mit Grund und Step-up; Erklärung, warum Persönlich gerade nicht geh
 +--------------------------------+----------------------------------------------------------------+
 ```
 
-**A6 Audit.** Filterbar nach Aktion, Person, Ergebnis, Zeitraum; Prüfung der Hash-Kette.
+**A6 Audit.** Filterbar nach Aktion, Person, Ergebnis, Ressource, Zeitraum; Prüfung der Hash-Kette.
+Export eines Zeitraums als NDJSON des Servers mit Hashes (offline prüfbar) und als CSV, die das
+Gerät aus demselben Strom umwandelt.
 
 ```text
 +----------------------------------------------------------------------------------------------------+
@@ -650,7 +652,7 @@ Umschalten mit Grund und Step-up; Erklärung, warum Persönlich gerade nicht geh
 | 09:57   Alex      auth.step_up              erlaubt   Sitzung Laptop                               |
 | 08:12   Sam       agent.invoke              abgelehnt Lauf 0193..       Persönlich: nicht Inhaber  |
 +----------------------------------------------------------------------------------------------------+
-| Kette geprüft bis Nr. 18 402: unverändert.          [Export CSV]  (nur Owner, Step-up)             |
+| Kette geprüft bis Nr. 18 402: unverändert.  [Exportieren] [Als CSV exportieren]  (Owner, Step-up)  |
 +----------------------------------------------------------------------------------------------------+
 ```
 

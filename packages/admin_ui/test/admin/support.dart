@@ -5,6 +5,11 @@
 // confirmation is fresh, `revokeSession` never asks; enrollment codes are one-time secrets,
 // the last owner stays (SR8), disabling ends sessions and devices (08 11), enabling may meet
 // I1. The step-up enumeration against the real table of actions.yaml runs in apps/client.
+// The audit log (brief M4-29) holds entries newest first per page, a chain that can be broken
+// at a given entry and the NDJSON bytes of the export, which can break off after a line.
+
+import 'dart:async';
+import 'dart:convert';
 
 import 'package:admin_ui/admin_ui.dart';
 import 'package:api_client/api_client.dart';
@@ -34,6 +39,75 @@ const Map<String, bool> stepUpOf = {
   'removeMember': true,
   'endSession': false,
   ...accessStepUpOf,
+  // 05: audit.read (list and export) and audit.verify have step-up.
+  'auditEvents': true,
+  'exportAudit': true,
+  'verifyAuditChain': true,
+};
+
+/// The audit entries of the fake: Alex created a grant, Sam was denied an agent run, Alex
+/// changed an owner with a reason that starts like a formula; seq 1 to 3, oldest first.
+List<AuditEntry> auditFixture() => [
+  AuditEntry(
+    seq: 1,
+    id: 'e1',
+    occurredAt: DateTime.utc(2026, 10, 16, 7, 58),
+    actorId: 'alex',
+    action: 'grant.create',
+    result: AuditResult.allow,
+    resourceKind: 'space',
+    resourceId: '0192f4a0-7b1c-7000-8000-000000000101',
+    details: const {'reason': 'Deputy, Q4'},
+    correlationId: '4bf92f35-77b3-4da6-a3ce-000000000001',
+    prevHash: '0' * 64,
+    hash: 'a1' * 32,
+  ),
+  AuditEntry(
+    seq: 2,
+    id: 'e2',
+    occurredAt: DateTime.utc(2026, 10, 17, 6, 12),
+    actorId: 'sam',
+    action: 'agent.invoke',
+    result: AuditResult.deny,
+    denyReason: 'missing_grant',
+    resourceKind: 'run',
+    resourceId: '0192f4a0-7b1c-7000-8000-000000000202',
+    details: const {'note': 'said "no"'},
+    correlationId: '4bf92f35-77b3-4da6-a3ce-000000000002',
+    prevHash: 'a1' * 32,
+    hash: 'b2' * 32,
+  ),
+  AuditEntry(
+    seq: 3,
+    id: 'e3',
+    occurredAt: DateTime.utc(2026, 10, 17, 8),
+    actorId: 'alex',
+    action: 'owner.add',
+    result: AuditResult.allow,
+    resourceKind: 'user',
+    resourceId: '0192f4a0-7b1c-7000-8000-000000000303',
+    details: const {'reason': '=HYPERLINK("x")'},
+    correlationId: '4bf92f35-77b3-4da6-a3ce-000000000003',
+    prevHash: 'b2' * 32,
+    hash: 'c3' * 32,
+  ),
+];
+
+/// [entry] as one line of the server's NDJSON export (`AuditEvent`).
+Map<String, Object?> auditJson(AuditEntry entry) => {
+  'seq': entry.seq,
+  'id': entry.id,
+  'occurred_at': entry.occurredAt.toIso8601String(),
+  'actor_principal_id': ?entry.actorId,
+  'action': entry.action,
+  'decision': entry.result.name,
+  'deny_reason': ?entry.denyReason,
+  'resource_kind': ?entry.resourceKind,
+  'resource_id': ?entry.resourceId,
+  'details': entry.details,
+  'correlation_id': ?entry.correlationId,
+  'prev_hash': entry.prevHash,
+  'hash': entry.hash,
 };
 
 AdminPerson _p(
@@ -169,6 +243,33 @@ class FakeAdminRepository with FakeAccess implements AdminRepository {
   /// Calls the server refuses, by name, with their problem (lists included).
   final Map<String, ApiProblem> refuse = {};
 
+  /// The audit entries, oldest first.
+  List<AuditEntry> audit = auditFixture();
+
+  /// Audit entries per page.
+  int auditPageSize = 50;
+
+  /// The `listAuditEvents` requests: the filter and the cursor, as text.
+  final List<String> auditRequests = [];
+
+  /// The `verifyAuditChain` requests: `from..to` (empty for no range).
+  final List<String> verifyRequests = [];
+
+  /// The `exportAudit` requests: `from..to`.
+  final List<String> exportRequests = [];
+
+  /// The entry at which the chain is broken, or null for an intact chain.
+  int? brokenAt;
+
+  /// The warnings of every chain check.
+  List<String> chainWarnings = ['checkpoint_sink_not_configured'];
+
+  /// When set, the export stream breaks off after this many lines.
+  int? exportBreaksAfter;
+
+  /// The bytes of the last export, as the server sent them.
+  List<int> exportedBytes = const [];
+
   /// Whether a step-up of the session is fresh.
   bool stepUpFresh = false;
 
@@ -205,6 +306,105 @@ class FakeAdminRepository with FakeAccess implements AdminRepository {
       stepUps.add(purpose);
       if (!await prompt.ask(purpose)) throw const StepUpCancelled();
       stepUpFresh = true;
+    }
+  }
+
+  Future<void> _read(String op, String purpose) async {
+    _refused(op);
+    if (stepUpOf[op]! && !stepUpFresh) {
+      stepUps.add(purpose);
+      if (!await prompt.ask(purpose)) throw const StepUpCancelled();
+      stepUpFresh = true;
+    }
+  }
+
+  static String _day(DateTime? t) => t?.toUtc().toIso8601String() ?? '';
+
+  @override
+  Future<AuditPage> auditEvents(
+    AuditFilter filter, {
+    String? cursor,
+    required String purpose,
+  }) async {
+    auditRequests.add(
+      [
+        'action=${filter.action ?? ''}',
+        'actor=${filter.actorId ?? ''}',
+        'decision=${filter.result?.name ?? ''}',
+        'kind=${filter.resourceKind ?? ''}',
+        'id=${filter.resourceId ?? ''}',
+        'from=${_day(filter.from)}',
+        'to=${_day(filter.to)}',
+        'cursor=${cursor ?? ''}',
+      ].join(' '),
+    );
+    await _read('auditEvents', purpose);
+    final matching = [
+      for (final e in audit.reversed)
+        if ((filter.action == null || e.action == filter.action) &&
+            (filter.actorId == null || e.actorId == filter.actorId) &&
+            (filter.result == null || e.result == filter.result) &&
+            (filter.resourceKind == null ||
+                e.resourceKind == filter.resourceKind) &&
+            (filter.resourceId == null || e.resourceId == filter.resourceId) &&
+            (filter.from == null || !e.occurredAt.isBefore(filter.from!)) &&
+            (filter.to == null || e.occurredAt.isBefore(filter.to!)))
+          e,
+    ];
+    final start = int.tryParse(cursor ?? '') ?? 0;
+    final end = (start + auditPageSize).clamp(0, matching.length);
+    return AuditPage(
+      matching.sublist(start, end),
+      nextCursor: end < matching.length ? '$end' : null,
+    );
+  }
+
+  @override
+  Future<AuditChainCheck> verifyAuditChain({
+    int? fromSeq,
+    int? toSeq,
+    required String purpose,
+  }) async {
+    verifyRequests.add(
+      fromSeq == null && toSeq == null ? '' : '$fromSeq..$toSeq',
+    );
+    await _read('verifyAuditChain', purpose);
+    final from = fromSeq ?? 1;
+    final to = toSeq ?? audit.length;
+    final broken = brokenAt;
+    return AuditChainCheck(
+      ok: broken == null,
+      checkedFromSeq: from,
+      checkedToSeq: broken ?? to,
+      firstBrokenSeq: broken,
+      failureReason: broken == null ? null : 'hash_mismatch',
+      checkpointsCompared: 2,
+      lastCheckpointSeq: 1,
+      warnings: List.of(chainWarnings),
+    );
+  }
+
+  @override
+  Stream<List<int>> exportAudit({
+    required DateTime from,
+    required DateTime to,
+    required String purpose,
+  }) async* {
+    exportRequests.add('${_day(from)}..${_day(to)}');
+    await _read('exportAudit', purpose);
+    final lines = [
+      for (final e in audit)
+        if (!e.occurredAt.isBefore(from) && e.occurredAt.isBefore(to))
+          utf8.encode('${jsonEncode(auditJson(e))}\n'),
+    ];
+    exportedBytes = [for (final l in lines) ...l];
+    for (final (i, line) in lines.indexed) {
+      if (exportBreaksAfter case final n? when i >= n) {
+        throw const SelfActionFailed(null);
+      }
+      // Two chunks per line, so a consumer must join lines across chunks.
+      yield line.sublist(0, line.length ~/ 2);
+      yield line.sublist(line.length ~/ 2);
     }
   }
 
