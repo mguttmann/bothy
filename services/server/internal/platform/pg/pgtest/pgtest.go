@@ -74,6 +74,7 @@ var secretFiles = map[pg.Role]string{
 	pg.RoleApp:     "db_app_password",
 	pg.RoleMaint:   "db_maint_password",
 	pg.RoleMonitor: "db_monitor_password",
+	pg.RoleBackup:  "db_backup_password",
 }
 
 // superSecretFile is the password file of the superuser (migrate.bootstrap_password_ref).
