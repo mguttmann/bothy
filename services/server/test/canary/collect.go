@@ -179,7 +179,7 @@ func ErrorObserver(s *Sinks, who string, next func(harness.Request, harness.Resp
 				f = append(f, Field{Location: "/header/" + name, Text: v})
 			}
 		}
-		s.Add(Record{Sink: SinkError, Source: src, Fields: f})
+		s.Add(Record{Sink: SinkError, Source: src, Operation: OperationOf(r.Method, r.Path), Fields: f})
 	}
 }
 

@@ -276,8 +276,8 @@ func newID() string { return ids.New().String() }
 
 // NewScenario builds the matrix world on the server of r, gives every client of the world the
 // observer of the run and a network canary as client address, and opens the gateway
-// connections of the observers Sam (reads Marketing and Support/Allgemein) and Robin (reads
-// Engineering/Projekt-A).
+// connections of the observers Sam (reads Marketing and Support/Allgemein), Robin (reads
+// Engineering/Projekt-A) and Alex (reads Support without manage, M2-02).
 func NewScenario(ctx context.Context, r *Run) *Scenario {
 	r.T.Helper()
 	w := harness.BuildMatrixWorld(r.T, r.Server)
@@ -295,9 +295,14 @@ func NewScenario(ctx context.Context, r *Run) *Scenario {
 	w.People["Alex"].ClientIP = r.IPv4
 	sc.start = time.Now()
 	sc.Observers["Sam"], sc.Observers["Robin"] = w.People["Sam"], w.People["Robin"]
+	// Alex reads Support without manage: an observer of the manage_only values (M2-02).
+	sc.Observers["Alex"] = w.People["Alex"]
+	support := map[string]bool{w.Spaces["Support"]: true, w.Channels["Support/Allgemein"]: true, w.Channels["Support/Eskalation"]: true}
 	sc.Readable = map[string]map[string]bool{
 		"Sam":   {w.Spaces["Marketing"]: true, w.Channels["Marketing/Kampagnen"]: true, w.Spaces["Support"]: true, w.Channels["Support/Allgemein"]: true},
 		"Robin": {w.Spaces["Engineering"]: true, w.Channels["Engineering/Projekt-A"]: true},
+		// Lotse operates Support; its listEvents pages are foreign records of the behaviour step.
+		"Alex": support, "Lotse": support,
 	}
 	for name, c := range sc.Observers {
 		g, err := c.Gateway(ctx)

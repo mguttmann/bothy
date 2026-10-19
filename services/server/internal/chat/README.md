@@ -1,6 +1,6 @@
 # Modul `chat`
 
-Status: spaces and the sidebar (M1-52), channels and forum tags (M1-53), operators with I1 (M1-54), threads (M1-55) and moving threads (M1-62) built; `createThread` is built in `messaging` (M1-56); `Threads.InfoForShare` for the read states and drafts of sync (M1-61); `Threads.Counters` for the unread counters of the snapshot of sync (M1-63).
+Status: spaces and the sidebar (M1-52), channels and forum tags (M1-53), operators with I1 (M1-54), threads (M1-55), moving threads (M1-62) and channel behaviour with agent configuration (M2-02) built; `createThread` is built in `messaging` (M1-56); `Threads.InfoForShare` for the read states and drafts of sync (M1-61); `Threads.Counters` for the unread counters of the snapshot of sync (M1-63).
 Normativ ist [docs/spec/02-architektur.md](../../../../docs/spec/02-architektur.md); bei Abweichung gilt das Kapitel.
 
 ## Zweck
@@ -307,6 +307,44 @@ an agent or app), in the unit of work of the insert ([14-suche.md](../../../../d
 
 - Port: `Structure` adds `NotificationPath` and `LockNotificationPath` (the path of a notification preference target as `chat.NotificationPath`: kind, space, channel, thread, channel kind, `default_notification_level`, archived; the lock form takes `FOR SHARE` on thread, then channel, then space), `ChannelIDsOfSpace` (archived channels included) and `ThreadIDsOfChannels`, all ascending. None of them authorizes: `notify` authorizes the target with the returned path, and the two id lists run inside an archive that `space.archive` or `channel.archive` allowed. An id of another kind than the requested one is `not_found`.
 - Code: `chat/notification.go`, `app/notification.go`, `adapters/postgres/notification.go`; queries `ShareSpace`, `ShareChannel`, `ChannelIDsOfSpace`, `ThreadIDsOfChannels`.
+
+## Channel behaviour and agent configuration (M2-02)
+
+- Port `chat.AgentConfig` (`agentconfig.go`): `GetChannelBehavior`, `PutChannelBehavior`,
+  `ListServedChannels`, `GetServedChannelConfig` with `BehaviorSettings`, `ChannelBehavior`,
+  `PutChannelBehaviorCmd` and `ServedChannelConfig`. `Register` adds `channel.settings_changed` and
+  `agent.config_changed`. No in-transaction event.
+- Domain (`domain/behavior.go`): `Behavior`, `BehaviorLimits` (`channel.prompt_max_bytes`,
+  `channel.history_backfill_limit_max` at request time), `ValidateBehavior` (all failures at once:
+  `too_small`, `too_large`, `too_long`, `required`, `invalid_characters`, `duplicate`; no detail
+  repeats the input), `ChangedFields` and `ConfigChanged`.
+- Use cases (`app/behavior.go`) over the outgoing port `app.BehaviorStore`; `settingsChanged` is
+  the one function that raises `settings_version` and appends the events (M2-03 calls it for the
+  project binding).
+- Store: `queries/behavior.sql` (one statement reads switches, prompt, `settings_version` and the
+  ordered skills; the list query carries `id = ANY` and `space_id = ANY` from `Scope`); the locks
+  are `ShareSpace` and `LockChannel`. `GetChannelBehavior` is an `after_authorize` exception of
+  `tools/lint/sql_visibility.yaml`.
+- Handlers: `Behavior` in `adapters/httpapi`; `ETag` from `settings_version`.
+
+| Operation | Action | Event |
+|---|---|---|
+| `getChannelBehavior` | `channel.behavior.read` (`manage`) | |
+| `putChannelBehavior` | `channel.behavior.update` (`manage`, step-up, If-Match on `settings_version`) | `channel.settings_changed`, for prompt or skills `agent.config_changed` (self, the effective operator) |
+| `listServedChannels` | `agent.config.read` (Scope, then per item in filter mode) | |
+| `getServedChannelConfig` | `agent.config.read` (the effective operator) | |
+
+- Order of `putChannelBehavior` in one unit of work: authorize, space `FOR SHARE`, channel `FOR
+  UPDATE`, If-Match (`412` with `current`), field rules, `409` for an archived channel, no-op
+  (`200`, unchanged ETag, audit `no_change`), write, events, audit. `channels.version` stays, no
+  `channel.updated`, no permission change, no `Idempotency-Key`.
+- Prompt and skill references never appear in events, logs, traces, metrics, audit details or
+  error bodies; the audit entry carries the changed codes, the switches, the backfill and
+  `skills_count`.
+
+Rulings: docs/DECISIONS.md D-M2-02-1 to D-M2-02-13. Tests: `domain/behavior_test.go` (with
+`FuzzValidateBehavior`), `app/behavior_internal_test.go`, `test/integration/behavior` and the
+canary class `manage_only` of `test/canary`.
 
 ## Port (Wurzelpaket `internal/chat`)
 

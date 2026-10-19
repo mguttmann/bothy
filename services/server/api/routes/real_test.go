@@ -473,6 +473,22 @@ func (stubServer) GetChannel(context.Context, rest.GetChannelRequestObject) (res
 	return nil, nil
 }
 
+func (stubServer) GetChannelBehavior(context.Context, rest.GetChannelBehaviorRequestObject) (rest.GetChannelBehaviorResponseObject, error) {
+	return nil, nil
+}
+
+func (stubServer) PutChannelBehavior(context.Context, rest.PutChannelBehaviorRequestObject) (rest.PutChannelBehaviorResponseObject, error) {
+	return nil, nil
+}
+
+func (stubServer) ListServedChannels(context.Context, rest.ListServedChannelsRequestObject) (rest.ListServedChannelsResponseObject, error) {
+	return nil, nil
+}
+
+func (stubServer) GetServedChannelConfig(context.Context, rest.GetServedChannelConfigRequestObject) (rest.GetServedChannelConfigResponseObject, error) {
+	return nil, nil
+}
+
 func (stubServer) UpdateChannel(context.Context, rest.UpdateChannelRequestObject) (rest.UpdateChannelResponseObject, error) {
 	return nil, nil
 }
@@ -1045,6 +1061,11 @@ func TestRealTable_Enabled(t *testing.T) {
 		"stepUpWithPassword":       {"POST /api/v1/auth/step-up/password", "auth.step_up", "rl.public_auth"},
 		"beginStepUpOidcReauth":    {"POST /api/v1/auth/step-up/oidc", "auth.step_up", "rl.public_auth"},
 		"completeStepUpOidcReauth": {"POST /api/v1/auth/step-up/oidc/complete", "auth.step_up", "rl.public_auth"},
+		// M2-02
+		"getChannelBehavior":     {"GET /api/v1/channels/{channel_id}/behavior", "channel.behavior.read", "rl.read"},
+		"putChannelBehavior":     {"PUT /api/v1/channels/{channel_id}/behavior", "channel.behavior.update", "rl.admin"},
+		"listServedChannels":     {"GET /api/v1/agents/me/channels", "agent.config.read", "rl.read"},
+		"getServedChannelConfig": {"GET /api/v1/agents/me/channels/{channel_id}/config", "agent.config.read", "rl.read"},
 	}
 	ops := routes.Enabled()
 	if len(ops) != len(want) {
