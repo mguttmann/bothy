@@ -185,27 +185,10 @@ func threadREST(th chat.Thread) rest.Thread {
 	return out
 }
 
-// idsREST converts ids; never nil.
-func idsREST(list []ids.ID) []rest.Uuid {
-	out := make([]rest.Uuid, 0, len(list))
-	for _, id := range list {
-		out = append(out, rest.Uuid(id))
-	}
-	return out
-}
-
-func optionalID(id ids.ID) *rest.Uuid {
-	if id.IsZero() {
-		return nil
-	}
-	u := rest.Uuid(id)
-	return &u
-}
-
-func optionalTime(t time.Time) *time.Time {
-	if t.IsZero() {
-		return nil
-	}
-	v := t.UTC().Truncate(time.Millisecond)
-	return &v
-}
+// The response conversions are the shared ones of api/rest: idsREST never returns nil,
+// optionalID and optionalTime leave the zero value absent.
+var (
+	idsREST      = rest.IDs
+	optionalID   = rest.OptionalID
+	optionalTime = rest.OptionalTime
+)

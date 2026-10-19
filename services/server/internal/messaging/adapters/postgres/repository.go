@@ -162,24 +162,12 @@ func mapError(err error, what string) error {
 	return errs.Wrap(errs.CodeInternalError, err, "messaging: "+what+" failed")
 }
 
-// uuid converts an id for a parameter.
-func uuid(id ids.ID) pgtype.UUID { return pgtype.UUID{Bytes: id, Valid: true} }
-
-// optionalUUID converts an optional id: the zero ID becomes NULL.
-func optionalUUID(id ids.ID) pgtype.UUID { return pgtype.UUID{Bytes: id, Valid: !id.IsZero()} }
-
-// idOf converts a column; NULL becomes the zero ID.
-func idOf(u pgtype.UUID) ids.ID {
-	if !u.Valid {
-		return ids.ID{}
-	}
-	return ids.ID(u.Bytes)
-}
-
-// timeOf converts a column; NULL becomes the zero time.
-func timeOf(t pgtype.Timestamptz) time.Time {
-	if !t.Valid {
-		return time.Time{}
-	}
-	return t.Time.UTC()
-}
+// The column conversions are the shared ones of platform/pg: uuid and optionalUUID convert an id
+// for a parameter (the zero ID of optionalUUID becomes NULL), idOf and timeOf a column (NULL
+// becomes the zero value).
+var (
+	uuid         = pg.UUID
+	optionalUUID = pg.NullableUUID
+	idOf         = pg.IDOf
+	timeOf       = pg.TimeOf
+)

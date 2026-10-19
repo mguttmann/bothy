@@ -6,11 +6,11 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
-	"time"
 
 	"github.com/OWNER/bothy/services/server/internal/chat"
 	"github.com/OWNER/bothy/services/server/internal/kernel/actor"
 	"github.com/OWNER/bothy/services/server/internal/kernel/authorize"
+	"github.com/OWNER/bothy/services/server/internal/kernel/clock"
 	"github.com/OWNER/bothy/services/server/internal/kernel/errs"
 	"github.com/OWNER/bothy/services/server/internal/kernel/eventlog"
 	"github.com/OWNER/bothy/services/server/internal/kernel/ids"
@@ -62,23 +62,17 @@ func view(m domain.Message, author messaging.PrincipalRef, mentions []ids.ID) me
 	}
 }
 
-// timestampLayout is the form of every API time (06 section 2): UTC, milliseconds, suffix Z.
-const timestampLayout = "2006-01-02T15:04:05.000Z"
+// The payload helpers are the shared ones of the kernel: stamp formats an API time (the zero time
+// is absent) and optionalID an id (the zero ID is absent).
+var (
+	stamp      = clock.FormatAPI
+	optionalID = ids.ID.StringOrEmpty
+)
 
-// stamp formats t; the zero time is absent.
-func stamp(t time.Time) string {
-	if t.IsZero() {
-		return ""
-	}
-	return t.UTC().Truncate(time.Millisecond).Format(timestampLayout)
-}
-
-// optionalID formats id; the zero ID is absent.
-func optionalID(id ids.ID) string {
-	if id.IsZero() {
-		return ""
-	}
-	return id.String()
+// eventActor returns the event actor of the request in ctx; none outside a request.
+func eventActor(ctx context.Context) (eventlog.ActorKind, ids.ID) {
+	a, _ := actor.FromContext(ctx)
+	return eventlog.ActorFor(string(a.Kind), a.ID)
 }
 
 // principalJSON is the schema PrincipalRef.
@@ -196,22 +190,4 @@ func (s *Service) emitCreated(ctx context.Context, info chat.ThreadInfo, m messa
 		ev.ClientMsgID = m.ClientMsgID
 	}
 	return s.d.Events.Append(ctx, ev)
-}
-
-// eventActor returns the actor of the request in ctx; none outside a request.
-func eventActor(ctx context.Context) (eventlog.ActorKind, ids.ID) {
-	a, ok := actor.FromContext(ctx)
-	if !ok || a.ID.IsZero() {
-		return "", ids.ID{}
-	}
-	switch a.Kind {
-	case actor.KindUser:
-		return eventlog.ActorUser, a.ID
-	case actor.KindAgent:
-		return eventlog.ActorAgent, a.ID
-	case actor.KindApp:
-		return eventlog.ActorApp, a.ID
-	case actor.KindHost, actor.KindAnonymous:
-	}
-	return "", ids.ID{}
 }

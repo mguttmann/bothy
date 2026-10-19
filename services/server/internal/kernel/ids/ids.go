@@ -288,6 +288,15 @@ func (id ID) appendText(dst []byte) []byte {
 // IsZero reports whether id is the nil UUID, the zero value of [ID] that no generator returns.
 func (id ID) IsZero() bool { return id == ID{} }
 
+// StringOrEmpty returns the text form of id, or the empty string for the zero ID (an absent
+// optional member).
+func (id ID) StringOrEmpty() string {
+	if id.IsZero() {
+		return ""
+	}
+	return id.String()
+}
+
 // Time returns the creation instant stored in the first 48 bits, in UTC with millisecond
 // precision. For the zero ID it returns the Unix epoch.
 func (id ID) Time() time.Time {
