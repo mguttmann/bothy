@@ -177,7 +177,7 @@ next to `migrations/`, so that neither the embedding pattern `*.sql` nor sqlc re
 |---|---|---|
 | pre-commit | on every commit, on the changed files | text rules (no en or em dashes), Stripe webhook secret format `whsec_` (`tools/hooks/secret_formats.py`), file hygiene, ruff for `tools/`, gitleaks on the staged changes |
 | commit-msg | on every commit | Conventional Commits and DCO sign-off |
-| pre-push | before every push | `tools/hooks/review_gate.py` (report `.review/<sha>.md` of the pushed commit ends with `Urteil: JA`, [red-team-gate.md](red-team-gate.md)), then `make check` |
+| pre-push | before every push | `tools/hooks/review_gate.py` (report `.review/<sha>.md` of the pushed commit ends with `Urteil: JA`, [red-team-gate.md](red-team-gate.md)), then `make check`; a push to `build/**` runs only the fast gates and needs no report, because `build-verify.yml` runs every gate ([push-discipline.md](push-discipline.md#build-branches)) |
 
 ## Individual gates
 

@@ -33,7 +33,7 @@ def test_make_check_runs_without_the_git_variables_of_a_hook() -> None:
     assert entry[-2:] == ["make", "check"]
     env = dict(os.environ, **dict.fromkeys(HOOK_VARIABLES, "/nonexistent"))
     printed = subprocess.run(  # nosec B603 - the hook's own prefix with a fixed command
-        [*entry[:-2], "env"], env=env, capture_output=True, text=True, check=True
+        [*entry[:-2], "env"], cwd=REPO, env=env, capture_output=True, text=True, check=True
     ).stdout
     names = {line.split("=", 1)[0] for line in printed.splitlines()}
     assert not names & set(HOOK_VARIABLES)
