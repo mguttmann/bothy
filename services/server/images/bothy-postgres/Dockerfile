@@ -90,7 +90,12 @@ RUN set -eu; \
 # restic (BSD-2-Clause) for the logical and the object backup (docs/spec/16-betrieb.md 8.1,
 # brief M7-02): the release binary of the target architecture, checked against the SHA-256 of
 # that architecture pinned here (from the release's SHA256SUMS), so a changed download fails the
-# build. A version update changes RESTIC_VERSION and both checksums together.
+# build. A version update changes RESTIC_VERSION and both checksums together. The binary gets the
+# file capability cap_dac_read_search (restic's documented way to back up as a user that does not
+# own the files): the volume files belongs to the server's user 65532 with mode 0700, and the
+# service backup runs as 999 with cap_add DAC_READ_SEARCH (infra/compose/compose.yaml); without
+# that capability in the container the kernel refuses to start restic (docs/DECISIONS.md
+# D-M7-02-10).
 FROM --platform=$BUILDPLATFORM postgres:18.6-trixie@sha256:74935e72241653ca55e0414067e6d8763aceb8a810eb51b452253ec3dcfc4336 AS restic
 ARG TARGETARCH
 ARG RESTIC_VERSION=0.19.1
@@ -106,12 +111,14 @@ RUN set -eu; \
       *) echo "no restic checksum for $TARGETARCH" >&2; exit 1 ;; \
     esac; \
     apt-get update -qq; \
-    apt-get install -y -qq --no-install-recommends curl ca-certificates bzip2 >/dev/null; \
+    apt-get install -y -qq --no-install-recommends curl ca-certificates bzip2 libcap2-bin >/dev/null; \
     curl -fsSL --proto '=https' -o /tmp/restic.bz2 \
       "https://github.com/restic/restic/releases/download/v${RESTIC_VERSION}/restic_${RESTIC_VERSION}_linux_${TARGETARCH}.bz2"; \
     echo "$want  /tmp/restic.bz2" | sha256sum -c -; \
     bunzip2 /tmp/restic.bz2; \
-    install -D -m 0555 /tmp/restic /out/restic
+    install -D -m 0555 /tmp/restic /out/restic; \
+    setcap cap_dac_read_search=+ep /out/restic; \
+    getcap /out/restic | grep -q cap_dac_read_search
 
 FROM postgres:18.6-trixie@sha256:74935e72241653ca55e0414067e6d8763aceb8a810eb51b452253ec3dcfc4336
 ARG VERSION REVISION

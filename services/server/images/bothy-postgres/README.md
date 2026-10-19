@@ -81,6 +81,10 @@ accepts a key only when no other user can read it, so `secrets-init` runs with
 | `BOTHY_PGBACKREST_PG_HOST` | repository | host name of the database host (Compose: `postgres`), required |
 | `BOTHY_PGBACKREST_REPO2` | database | `on` when an off-site target is set: the configuration of the database host names repo2 on the same repository host, so `archive-push` writes every segment into repo1 and repo2; empty otherwise |
 
+restic carries the file capability `cap_dac_read_search` so that the user `999` can read the
+volume `files` of the server (owner `65532`, mode `0700`); the container of `backup` needs
+`--cap-add DAC_READ_SEARCH` (Compose: `cap_add`), else restic does not start (D-M7-02-10).
+
 The repository host gets repo2 (the off-site bucket) not from the entry point but from
 `bothy-backupd`, as `PGBACKREST_REPO2_*` variables of its pgBackRest children. The server
 configuration of `bothy-backupd` comes from the `BOTHY_*` variables of the server

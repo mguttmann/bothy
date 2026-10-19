@@ -25,6 +25,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"strings"
+	"sync"
 
 	"github.com/OWNER/bothy/services/server/internal/status/app"
 	"github.com/OWNER/bothy/services/server/internal/status/domain"
@@ -126,6 +127,11 @@ type Config struct {
 // its configuration.
 type Executor struct {
 	cfg Config
+	// resticMu orders the restic calls of this process on the repository: backups share it,
+	// forget and prune and the first initialisation hold it alone. restic itself refuses a prune
+	// while another process holds a lock, so without this order a local prune after a logical
+	// run fails a backup of another kind running at the same time, or the other way round.
+	resticMu sync.RWMutex
 }
 
 // Compile-time check: Executor is the outgoing port of app.

@@ -141,9 +141,12 @@ func TestBackupKinds(t *testing.T) {
 		t.Fatalf("bothy migrate up --bootstrap: exit %d:\n%s", code, out)
 	}
 
-	// The volume files with one object of the file system driver.
+	// The volume files with one object as the file system driver of the server leaves it: owner
+	// 65532 (the user of bothy-server), directories 0700, files 0600, so only restic's file
+	// capability lets the user 999 of backup read it.
 	if out, code := w.once("--user", "0:0", "--entrypoint", "sh", "-v", files+":/files", w.image, "-c",
-		"mkdir -p /files/f/ab/cd && echo object-EXAMPLE > /files/f/ab/cd/orig-1 && chown -R 999:999 /files"); code != 0 {
+		"mkdir -p /files/f/ab/cd && echo object-EXAMPLE > /files/f/ab/cd/orig-1 && chown -R 65532:65532 /files && "+
+			"find /files -type d -exec chmod 0700 {} + && find /files -type f -exec chmod 0600 {} +"); code != 0 {
 		t.Fatalf("seed the volume files: exit %d:\n%s", code, out)
 	}
 
@@ -156,7 +159,7 @@ func TestBackupKinds(t *testing.T) {
 		"-e", "OTEL_METRIC_EXPORT_INTERVAL=1000",
 		"-v", secBackup+":/run/bothy/secrets:ro", "-v", w.volume("repo")+":/var/lib/pgbackrest",
 		"-v", w.volume("scratch")+":/var/lib/bothy-backup", "-v", files+":/var/lib/bothy/files:ro",
-		"-v", pgdata+":/var/lib/postgresql:ro",
+		"-v", pgdata+":/var/lib/postgresql:ro", "--cap-add", "DAC_READ_SEARCH",
 		w.image, "bothy-backupd", "--retry", "1s")
 	backup := w.start("backup", backupArgs...)
 	eventually(t, "the stanza", func() bool {

@@ -85,9 +85,14 @@ func (e *Executor) ResticBackup(ctx context.Context, req app.ResticBackup) (app.
 	if err != nil {
 		return app.ResticResult{}, err
 	}
-	if err := e.ensureRepo(ctx, repo, env); err != nil {
+	e.resticMu.Lock()
+	err = e.ensureRepo(ctx, repo, env)
+	e.resticMu.Unlock()
+	if err != nil {
 		return app.ResticResult{}, err
 	}
+	e.resticMu.RLock()
+	defer e.resticMu.RUnlock()
 	// --quiet leaves only the summary on stdout.
 	args := []string{"backup", "--json", "--quiet"}
 	for _, tag := range req.Tags {
@@ -150,6 +155,8 @@ func (e *Executor) ResticForget(ctx context.Context, req app.ResticForget) error
 	if err != nil {
 		return err
 	}
+	e.resticMu.Lock()
+	defer e.resticMu.Unlock()
 	_, err = e.restic(ctx, repo, env, nil, "forget", "--tag", req.Tag, "--group-by=",
 		"--keep-within", strconv.FormatInt(hours, 10)+"h", "--prune")
 	return err

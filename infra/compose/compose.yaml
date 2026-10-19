@@ -254,6 +254,9 @@ services:
     image: ${BOTHY_REGISTRY}/bothy-postgres:pg18-${BOTHY_VERSION}
     command: ["bothy-backupd"]
     restart: unless-stopped
+    # restic reads the volume files (user 65532 of the server, mode 0700) through its file
+    # capability; the container must offer it, else the kernel refuses to start restic.
+    cap_add: [DAC_READ_SEARCH]
     logging: *logging
     # bothy-backupd reads the server configuration (backup.*, database.*, file.*): it records its
     # runs as bothy_backup, which may write only backup_runs; pgBackRest and pg_dump connect as
