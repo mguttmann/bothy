@@ -965,6 +965,10 @@ documented in this file. The format is based on
 
 ### Fixed
 
+- Signing keys: a start whose key store `secrets.signing_key_dir` holds none of the unretired
+  keys (a new or wrong volume) no longer retires every key of the instance; it ends with an error
+  and changes no key. The new key `signing_key.accept_lost_keys` (default `false`) allows the
+  repair for a restore without the key store.
 - `pgtest` no longer leaves its PostgreSQL container running when a test binary ends without
   reaching the end of `pgtest.Main` (a panicking test, the `-test.timeout` alarm, a signal,
   `SIGKILL`). The test binary holds a lease connection, and a watchdog in the container stops

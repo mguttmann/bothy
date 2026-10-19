@@ -132,6 +132,7 @@ func TestConfigSchemaBuilds(t *testing.T) {
 		"secrets.signing_key_dir":                {Kind: config.KindString, Default: "/var/lib/bothy/signing-keys", Chapter: "16-operations.md"},
 
 		"signing_key.cache_ttl":                      {Kind: config.KindDuration, Default: "30s", Min: "1s", Chapter: "19-security.md"},
+		"signing_key.accept_lost_keys":               {Kind: config.KindBool, Default: "false", Chapter: "19-security.md"},
 		"signing_key.rotation_check_interval":        {Kind: config.KindDuration, Default: "1m", Min: "1s", Chapter: "19-security.md"},
 		"signing_key.access_token_rotation_interval": {Kind: config.KindDuration, Default: "30d", Min: "1s", Chapter: "19-security.md"},
 		"signing_key.invocation_rotation_interval":   {Kind: config.KindDuration, Default: "30d", Min: "1s", Chapter: "09-agents.md"},

@@ -76,6 +76,9 @@ type KeysConfig struct {
 	// TerminalSessionTokenTTL is terminal.session_token_ttl, the validity of a session token of
 	// the terminal (24 section 5.3).
 	TerminalSessionTokenTTL time.Duration `config:"terminal.session_token_ttl"`
+	// AcceptLostKeys is signing_key.accept_lost_keys: the consent of the operator that a start
+	// whose key store holds none of the unretired keys retires them and creates fresh ones.
+	AcceptLostKeys bool `config:"signing_key.accept_lost_keys"`
 }
 
 // Policy returns the rotation policy of p: the scheduled interval (invocation and access_token
@@ -278,13 +281,51 @@ func (k *Keys) insert(ctx context.Context, g *generated) (change, error) {
 // when no active key is left, creates a fresh one. Each purpose runs in its own unit of work under
 // the advisory lock: the key is generated and stored before, inserted only when the purpose still
 // needs it, and its file removed otherwise. Every change writes signing_key.transition.
+//
+// A key store that holds none of the unretired keys of any purpose is refused before any change
+// unless KeysConfig.AcceptLostKeys is set: that is a role on a new or wrong volume, whose repair
+// would retire the keys the other roles still sign with (checkKeyStore).
 func (k *Keys) EnsureActive(ctx context.Context) error {
+	if err := k.checkKeyStore(ctx); err != nil {
+		return err
+	}
 	for _, p := range instance.Purposes() {
 		if err := k.ensureActive(ctx, p); err != nil {
 			return err
 		}
 	}
 	return nil
+}
+
+// checkKeyStore returns an error naming secrets.signing_key_dir when the database has unretired
+// keys and the key store holds the private file of none of them, unless the operator set
+// signing_key.accept_lost_keys. A key whose file exists but cannot be read counts as present.
+func (k *Keys) checkKeyStore(ctx context.Context) error {
+	if k.cfg.AcceptLostKeys {
+		return nil
+	}
+	unretired := 0
+	for _, p := range instance.Purposes() {
+		rows, err := k.d.Repo.ListKeys(ctx, p)
+		if err != nil {
+			return err
+		}
+		for _, r := range rows {
+			if r.State == instance.KeyRetired {
+				continue
+			}
+			unretired++
+			if _, err := k.d.Store.Load(ctx, r.Ref); !errors.Is(err, ErrKeyMissing) {
+				return ctx.Err()
+			}
+		}
+	}
+	if unretired == 0 {
+		return nil
+	}
+	return fmt.Errorf("instance: the key store secrets.signing_key_dir holds none of the %d unretired signing keys; "+
+		"mount the key store of the other roles or copy its files back (disaster recovery case B), "+
+		"or set signing_key.accept_lost_keys to retire them and create fresh keys", unretired)
 }
 
 // Unready returns the managed purposes that cannot sign, for the readiness check signing_keys:

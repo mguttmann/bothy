@@ -30,6 +30,11 @@ func signingKeyConfigKeys() []config.Key {
 			Chapter: chapter19,
 		},
 		{
+			Name: "signing_key.accept_lost_keys", Kind: config.KindBool, Default: "false",
+			Doc:     "Lets a start whose key store holds none of the unretired signing keys retire them and create fresh ones.",
+			Chapter: chapter19,
+		},
+		{
 			Name: "signing_key.access_token_rotation_interval", Kind: config.KindDuration, Default: defaultEventRetention, Min: "1s",
 			Doc:     "Scheduled rotation of the signing key of access tokens.",
 			Chapter: chapter19,

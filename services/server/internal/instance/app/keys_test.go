@@ -107,6 +107,12 @@ func (e *keysEnv) keys(t *testing.T) *app.Keys {
 // keysWith is keys with the repository wrapped by wrap (nil keeps it).
 func (e *keysEnv) keysWith(t *testing.T, wrap func(app.KeyRepository) app.KeyRepository) *app.Keys {
 	t.Helper()
+	return e.keysCfg(t, keyCfg, wrap)
+}
+
+// keysCfg is keysWith with the configuration cfg.
+func (e *keysEnv) keysCfg(t *testing.T, cfg app.KeysConfig, wrap func(app.KeyRepository) app.KeyRepository) *app.Keys {
+	t.Helper()
 	p, err := secrets.NewProvider(secrets.Options{Dir: filepath.Dir(e.dir), SigningKeyDir: e.dir, CacheTTL: time.Minute, Clock: e.clk})
 	if err != nil {
 		t.Fatal(err)
@@ -119,7 +125,7 @@ func (e *keysEnv) keysWith(t *testing.T, wrap func(app.KeyRepository) app.KeyRep
 	if wrap != nil {
 		repo = wrap(repo)
 	}
-	k, err := app.NewKeys(keyCfg, app.KeysDeps{
+	k, err := app.NewKeys(cfg, app.KeysDeps{
 		Repo: repo, Store: ks, UoW: e.audit.UoW(), Authorizer: allow{},
 		Audit: e.audit.Recorder(), Clock: e.clk, Log: slog.New(e.logs),
 	})
@@ -639,6 +645,55 @@ func TestEnsureActive_ReplacesKeysWithoutFile(t *testing.T) {
 	}
 	if err := k.EnsureActive(ctx); err != nil || len(e.rows(t)) != purposes+1 {
 		t.Errorf("a further EnsureActive changed the keys: %v", err)
+	}
+}
+
+// TestEnsureActive_EmptyKeyStoreKeepsKeys: a role that starts on an empty key store (a new or
+// mistyped volume) while the database has unretired keys must not retire them, because the other
+// roles still sign with them; the start ends with an error naming secrets.signing_key_dir. Only
+// signing_key.accept_lost_keys lets the start replace them (restore without the key store,
+// disaster recovery case B).
+func TestEnsureActive_EmptyKeyStoreKeepsKeys(t *testing.T) {
+	t.Parallel()
+	e := newKeysEnv(t)
+	ctx := context.Background()
+	if err := e.keys(t).EnsureActive(ctx); err != nil {
+		t.Fatal(err)
+	}
+	states := func() string {
+		var b strings.Builder
+		for _, r := range e.rows(t) {
+			b.WriteString(r.kid + "=" + r.state + " ")
+		}
+		return b.String()
+	}
+	before := states()
+	for _, name := range e.files(t) {
+		if err := os.Remove(filepath.Join(e.dir, name)); err != nil {
+			t.Fatal(err)
+		}
+	}
+	err := e.keys(t).EnsureActive(ctx)
+	if err == nil || !strings.Contains(err.Error(), "secrets.signing_key_dir") || !strings.Contains(err.Error(), "signing_key.accept_lost_keys") {
+		t.Fatalf("EnsureActive on an empty key store = %v, want an error naming secrets.signing_key_dir and signing_key.accept_lost_keys", err)
+	}
+	if after := states(); after != before {
+		t.Fatalf("keys changed on an empty key store:\nbefore %v\nafter  %v", before, after)
+	}
+	if n := len(e.transitionAudits(t)); n != len(instance.Purposes()) {
+		t.Errorf("%d transition audits, want only the %d creations", n, len(instance.Purposes()))
+	}
+	consent := keyCfg
+	consent.AcceptLostKeys = true
+	k := e.keysCfg(t, consent, nil)
+	if err := k.EnsureActive(ctx); err != nil {
+		t.Fatalf("EnsureActive with signing_key.accept_lost_keys: %v", err)
+	}
+	if missing, err := k.Unready(ctx); err != nil || len(missing) != 0 {
+		t.Fatalf("purposes without a usable key after the accepted repair: %v, %v", missing, err)
+	}
+	if len(e.rows(t)) != 2*len(instance.Purposes()) {
+		t.Errorf("rows after the accepted repair %v, want every old key retired and one new key each", e.rows(t))
 	}
 }
 

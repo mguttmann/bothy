@@ -2335,6 +2335,18 @@
       "doc": "Whole budget of the shutdown; at least the sum of the step budgets, and the orchestrator waits longer."
     },
     {
+      "name": "signing_key.accept_lost_keys",
+      "env": "BOTHY_SIGNING_KEY__ACCEPT_LOST_KEYS",
+      "kind": "bool",
+      "default": "false",
+      "required": false,
+      "enum": [],
+      "min": "",
+      "max": "",
+      "chapter": "19-security.md",
+      "doc": "Lets a start whose key store holds none of the unretired signing keys retire them and create fresh ones."
+    },
+    {
       "name": "signing_key.access_token_rotation_interval",
       "env": "BOTHY_SIGNING_KEY__ACCESS_TOKEN_ROTATION_INTERVAL",
       "kind": "duration",
