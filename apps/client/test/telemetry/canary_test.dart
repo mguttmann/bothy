@@ -7,7 +7,6 @@
 // crash path (the Sentry pipeline with a recording transport) run; no canary value may appear in
 // any sent batch, crash event, breadcrumb or log line, and no reported URL keeps a parameter.
 
-import 'dart:async';
 import 'dart:convert';
 
 import 'package:client/telemetry/client_metrics.dart';
