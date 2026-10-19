@@ -95,6 +95,9 @@ const (
 	connectWait          = 30 * time.Second
 	startTimeout         = 3 * time.Minute
 	cleanupTimeout       = 30 * time.Second
+	// adminMaxConns bounds the superuser pool that creates and drops the databases of the
+	// tests, so parallel tests clone at the same time instead of one after the other.
+	adminMaxConns = 8
 )
 
 // The lease: the test binary holds one superuser connection with application_name leaseApp for
@@ -215,8 +218,9 @@ type cluster struct {
 	port       int
 	secretsDir string
 	provider   *secrets.Provider
+	admin      *pg.Pool // superuser pool on superDatabase for CREATE and DROP DATABASE
 
-	mu        sync.Mutex        // serialises template creation and cloning
+	mu        sync.Mutex        // serialises template creation; clones run in parallel
 	templates map[string]string // migration set hash -> template database
 	steps     Steps             // the steps of Main's WithSteps, nil for none
 
@@ -338,6 +342,9 @@ func stopCluster() error {
 // stop ends the lease, terminates the container and removes the secrets directory.
 func (c *cluster) stop() error {
 	var problems []error
+	if c.admin != nil {
+		c.admin.Close()
+	}
 	c.stopLease()
 	// TerminateContainer ignores the errors of a container that AutoRemove already removes.
 	if err := testcontainers.TerminateContainer(c.ctr); err != nil {
@@ -397,6 +404,12 @@ func startCluster(ctx context.Context, durable bool) (c *cluster, err error) {
 	}
 	if c.stopLease, err = c.holdLease(ctx); err != nil {
 		return nil, err
+	}
+	adminCfg := c.superConfig(superDatabase)
+	adminCfg.MaxConns = adminMaxConns
+	if c.admin, err = pg.Open(ctx, adminCfg, c.provider, nil); err != nil {
+		c.stopLease()
+		return nil, fmt.Errorf("pgtest: superuser pool: %w", err)
 	}
 	return c, nil
 }
@@ -645,52 +658,74 @@ func New(t testing.TB, opts ...Option) *DB {
 	return &DB{name: name, c: c}
 }
 
-// createDatabase creates name from the template of fsys (none for nil) and bootstraps it.
+// createDatabase creates name as a clone of the template of fsys, or for nil as a database
+// bootstrapped with pg.BootstrapDatabase and no migrations. Only the creation of a template is serialised; clones of a ready template run in parallel.
 func (c *cluster) createDatabase(ctx context.Context, name string, fsys fs.FS) error {
-	c.mu.Lock()
-	defer c.mu.Unlock()
-	template := ""
-	if fsys != nil {
-		var err error
-		if template, err = c.template(ctx, fsys); err != nil {
-			return err
-		}
+	if fsys == nil {
+		return c.create(ctx, name, nil)
 	}
-	return c.create(ctx, name, template, nil)
+	template, err := c.template(ctx, fsys)
+	if err != nil {
+		return err
+	}
+	return c.clone(ctx, name, template)
 }
 
-// template returns the template database migrated with fsys, creating it on first use. The
-// caller holds c.mu.
+// template returns the template database migrated with fsys, creating it on first use.
 func (c *cluster) template(ctx context.Context, fsys fs.FS) (string, error) {
 	key, err := hashFS(fsys)
 	if err != nil {
 		return "", err
 	}
+	c.mu.Lock()
+	defer c.mu.Unlock()
 	if name, ok := c.templates[key]; ok {
 		return name, nil
 	}
 	name := "tpl_" + key[:16]
-	if err := c.create(ctx, name, "", fsys); err != nil {
+	if err := c.create(ctx, name, fsys); err != nil {
 		return "", err
 	}
 	c.templates[key] = name
 	return name, nil
 }
 
-// create runs CREATE DATABASE name (from template when set) OWNER bothy_owner and
-// pg.BootstrapDatabase in it; with fsys it then migrates the database as bothy_owner and closes
-// it for connections, so it can serve as a template. When a step after CREATE DATABASE fails, it
-// drops the database again, so a retry with the same name reports the real error.
-func (c *cluster) create(ctx context.Context, name, template string, fsys fs.FS) (err error) {
-	super, err := c.superConn(ctx, superDatabase)
-	if err != nil {
-		return err
+// clone creates name as a copy of template, a database create bootstrapped and migrated. The
+// copy carries everything inside the database, so also the schema grants of
+// pg.BootstrapDatabase; what lives on the database object itself (owner and ACL) is not copied,
+// so clone sets it the way pg.BootstrapDatabase does, over the superuser pool and without
+// connecting to the new database (TestCloneHasTheGrantsOfBootstrapDatabase holds the two
+// equal). When a grant fails, it drops the database again.
+func (c *cluster) clone(ctx context.Context, name, template string) (err error) {
+	db := pgx.Identifier{name}.Sanitize()
+	stmt := "CREATE DATABASE " + db + " OWNER " + pgx.Identifier{string(pg.RoleOwner)}.Sanitize() +
+		" TEMPLATE " + pgx.Identifier{template}.Sanitize()
+	if _, err := c.admin.PGX().Exec(ctx, stmt); err != nil {
+		return fmt.Errorf("pgtest: create database %s: %w", name, err)
 	}
-	defer func() { _ = super.Close(context.Background()) }()
+	defer func() {
+		if err != nil {
+			dctx, cancel := context.WithTimeout(context.Background(), cleanupTimeout)
+			defer cancel()
+			_ = c.dropDatabase(dctx, name)
+		}
+	}()
+	grants := "REVOKE ALL ON DATABASE " + db + " FROM PUBLIC; GRANT CONNECT ON DATABASE " + db + " TO " +
+		pgx.Identifier{string(pg.RoleApp)}.Sanitize() + ", " + pgx.Identifier{string(pg.RoleMaint)}.Sanitize() + ", " +
+		pgx.Identifier{string(pg.RoleMonitor)}.Sanitize()
+	if _, err := c.admin.PGX().Exec(ctx, grants, pgx.QueryExecModeSimpleProtocol); err != nil {
+		return fmt.Errorf("pgtest: grants of %s: %w", name, err)
+	}
+	return nil
+}
+
+// create runs CREATE DATABASE name OWNER bothy_owner and pg.BootstrapDatabase in it; with fsys
+// it then migrates the database as bothy_owner and closes it for connections, so it can serve
+// as a template. When a step after CREATE DATABASE fails, it drops the database again, so a
+// retry with the same name reports the real error.
+func (c *cluster) create(ctx context.Context, name string, fsys fs.FS) (err error) {
+	super := c.admin.PGX()
 	stmt := "CREATE DATABASE " + pgx.Identifier{name}.Sanitize() + " OWNER " + pgx.Identifier{string(pg.RoleOwner)}.Sanitize()
-	if template != "" {
-		stmt += " TEMPLATE " + pgx.Identifier{template}.Sanitize()
-	}
 	if _, err := super.Exec(ctx, stmt); err != nil {
 		return fmt.Errorf("pgtest: create database %s: %w", name, err)
 	}
@@ -754,13 +789,8 @@ func (c *cluster) migrate(ctx context.Context, database string, fsys fs.FS) erro
 
 // dropDatabase drops name, ending its sessions; a database the test dropped already is fine.
 func (c *cluster) dropDatabase(ctx context.Context, name string) error {
-	super, err := c.superConn(ctx, superDatabase)
-	if err != nil {
-		return err
-	}
-	defer func() { _ = super.Close(context.Background()) }()
 	drop := "DROP DATABASE IF EXISTS " + pgx.Identifier{name}.Sanitize() + " WITH (FORCE)"
-	_, err = super.Exec(ctx, drop)
+	_, err := c.admin.PGX().Exec(ctx, drop)
 	return err
 }
 

@@ -25,6 +25,12 @@ func TestSomething(t *testing.T) {
 - `New(t, opts...)` returns a database owned by `bothy_owner` with the grants of
   `pg.BootstrapDatabase`; `t.Cleanup` drops it (`DROP DATABASE IF EXISTS ... WITH (FORCE)`).
   `New` fails the test when `Main` is not in use.
+- A clone is `CREATE DATABASE ... TEMPLATE` plus the database grants of `pg.BootstrapDatabase`
+  (owner and ACL of the database object, which a template copy does not carry), sent over one
+  superuser pool of the container without connecting to the clone; the schema grants come with
+  the template. Only the first `New` of a migration set waits for the template; clones of a ready
+  template run in parallel. `TestCloneHasTheGrantsOfBootstrapDatabase` holds a clone and a
+  database bootstrapped directly equal.
 - `Config(role)` is the connection configuration of a role (127.0.0.1, the mapped port, `sslmode
   disable`, generous test deadlines); change fields and open it with `OpenPool(t, cfg)`.
 - `SecretsDir()` holds `db_owner_password`, `db_app_password`, `db_maint_password`,
