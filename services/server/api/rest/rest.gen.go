@@ -23,6 +23,12 @@ type ServerInterface interface {
 	// CreateAgent Create an agent
 	// (POST /agents)
 	CreateAgent(w http.ResponseWriter, r *http.Request, params CreateAgentParams)
+	// ListServedChannels List channels the agent serves
+	// (GET /agents/me/channels)
+	ListServedChannels(w http.ResponseWriter, r *http.Request)
+	// GetServedChannelConfig Read prompt, skills and project binding of a served channel
+	// (GET /agents/me/channels/{channel_id}/config)
+	GetServedChannelConfig(w http.ResponseWriter, r *http.Request, channelId ChannelIdPath)
 	// GetConsumerState Read the cursor of a consumer
 	// (GET /agents/me/consumers/{consumer})
 	GetConsumerState(w http.ResponseWriter, r *http.Request, consumer ConsumerPath)
@@ -167,6 +173,12 @@ type ServerInterface interface {
 	// ArchiveChannel Archive a channel
 	// (POST /channels/{channel_id}/archive)
 	ArchiveChannel(w http.ResponseWriter, r *http.Request, channelId ChannelIdPath, params ArchiveChannelParams)
+	// GetChannelBehavior Read prompt, skills and mention rules
+	// (GET /channels/{channel_id}/behavior)
+	GetChannelBehavior(w http.ResponseWriter, r *http.Request, channelId ChannelIdPath)
+	// PutChannelBehavior Change prompt, skills and mention rules
+	// (PUT /channels/{channel_id}/behavior)
+	PutChannelBehavior(w http.ResponseWriter, r *http.Request, channelId ChannelIdPath, params PutChannelBehaviorParams)
 	// DeleteChannelDraft Delete the draft of a new forum post
 	// (DELETE /channels/{channel_id}/draft)
 	DeleteChannelDraft(w http.ResponseWriter, r *http.Request, channelId ChannelIdPath)
@@ -694,6 +706,46 @@ func (siw *ServerInterfaceWrapper) CreateAgent(w http.ResponseWriter, r *http.Re
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		siw.Handler.CreateAgent(w, r, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// ListServedChannels operation middleware
+func (siw *ServerInterfaceWrapper) ListServedChannels(w http.ResponseWriter, r *http.Request) {
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.ListServedChannels(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// GetServedChannelConfig operation middleware
+func (siw *ServerInterfaceWrapper) GetServedChannelConfig(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "channel_id" -------------
+	var channelId ChannelIdPath
+
+	err = runtime.BindStyledParameterWithOptions("simple", "channel_id", r.PathValue("channel_id"), &channelId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "uuid", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "channel_id", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.GetServedChannelConfig(w, r, channelId)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -2689,6 +2741,86 @@ func (siw *ServerInterfaceWrapper) ArchiveChannel(w http.ResponseWriter, r *http
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		siw.Handler.ArchiveChannel(w, r, channelId, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// GetChannelBehavior operation middleware
+func (siw *ServerInterfaceWrapper) GetChannelBehavior(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "channel_id" -------------
+	var channelId ChannelIdPath
+
+	err = runtime.BindStyledParameterWithOptions("simple", "channel_id", r.PathValue("channel_id"), &channelId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "uuid", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "channel_id", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.GetChannelBehavior(w, r, channelId)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// PutChannelBehavior operation middleware
+func (siw *ServerInterfaceWrapper) PutChannelBehavior(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "channel_id" -------------
+	var channelId ChannelIdPath
+
+	err = runtime.BindStyledParameterWithOptions("simple", "channel_id", r.PathValue("channel_id"), &channelId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "uuid", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "channel_id", Err: err})
+		return
+	}
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params PutChannelBehaviorParams
+
+	headers := r.Header
+
+	// ------------- Required header parameter "If-Match" -------------
+	if valueList, found := headers[http.CanonicalHeaderKey("If-Match")]; found {
+		var IfMatch IfMatchRequired
+		n := len(valueList)
+		if n != 1 {
+			siw.ErrorHandlerFunc(w, r, &TooManyValuesForParamError{ParamName: "If-Match", Count: n})
+			return
+		}
+
+		err = runtime.BindStyledParameterWithOptions("simple", "If-Match", valueList[0], &IfMatch, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: true, Type: "string", Format: ""})
+		if err != nil {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "If-Match", Err: err})
+			return
+		}
+
+		params.IfMatch = IfMatch
+
+	} else {
+		err := fmt.Errorf("Header parameter If-Match is required, but not found")
+		siw.ErrorHandlerFunc(w, r, &RequiredHeaderError{ParamName: "If-Match", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.PutChannelBehavior(w, r, channelId, params)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -8481,6 +8613,8 @@ func HandlerWithOptions(si ServerInterface, options StdHTTPServerOptions) http.H
 	m.HandleFunc(http.MethodPatch+" "+options.BaseURL+"/channels/{channel_id}", wrapper.UpdateChannel)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/channels/{channel_id}/move", wrapper.MoveChannel)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/channels/{channel_id}/archive", wrapper.ArchiveChannel)
+	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/channels/{channel_id}/behavior", wrapper.GetChannelBehavior)
+	m.HandleFunc(http.MethodPut+" "+options.BaseURL+"/channels/{channel_id}/behavior", wrapper.PutChannelBehavior)
 	m.HandleFunc(http.MethodPut+" "+options.BaseURL+"/channels/{channel_id}/operator", wrapper.SetChannelOperator)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/channels/{channel_id}/tags", wrapper.ListForumTags)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/channels/{channel_id}/tags", wrapper.CreateForumTag)
@@ -8543,6 +8677,8 @@ func HandlerWithOptions(si ServerInterface, options StdHTTPServerOptions) http.H
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/agents/me/consumers/{consumer}", wrapper.GetConsumerState)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/agents/me/consumers/{consumer}/events", wrapper.PollAgentEvents)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/agents/me/consumers/{consumer}/ack", wrapper.AckAgentEvents)
+	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/agents/me/channels", wrapper.ListServedChannels)
+	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/agents/me/channels/{channel_id}/config", wrapper.GetServedChannelConfig)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/apps", wrapper.ListApps)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/apps", wrapper.InstallApp)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/app-manifests/validate", wrapper.ValidateManifest)
@@ -8744,6 +8880,12 @@ type StrictServerInterface interface {
 	// CreateAgent Create an agent
 	// (POST /agents)
 	CreateAgent(ctx context.Context, request CreateAgentRequestObject) (CreateAgentResponseObject, error)
+	// ListServedChannels List channels the agent serves
+	// (GET /agents/me/channels)
+	ListServedChannels(ctx context.Context, request ListServedChannelsRequestObject) (ListServedChannelsResponseObject, error)
+	// GetServedChannelConfig Read prompt, skills and project binding of a served channel
+	// (GET /agents/me/channels/{channel_id}/config)
+	GetServedChannelConfig(ctx context.Context, request GetServedChannelConfigRequestObject) (GetServedChannelConfigResponseObject, error)
 	// GetConsumerState Read the cursor of a consumer
 	// (GET /agents/me/consumers/{consumer})
 	GetConsumerState(ctx context.Context, request GetConsumerStateRequestObject) (GetConsumerStateResponseObject, error)
@@ -8888,6 +9030,12 @@ type StrictServerInterface interface {
 	// ArchiveChannel Archive a channel
 	// (POST /channels/{channel_id}/archive)
 	ArchiveChannel(ctx context.Context, request ArchiveChannelRequestObject) (ArchiveChannelResponseObject, error)
+	// GetChannelBehavior Read prompt, skills and mention rules
+	// (GET /channels/{channel_id}/behavior)
+	GetChannelBehavior(ctx context.Context, request GetChannelBehaviorRequestObject) (GetChannelBehaviorResponseObject, error)
+	// PutChannelBehavior Change prompt, skills and mention rules
+	// (PUT /channels/{channel_id}/behavior)
+	PutChannelBehavior(ctx context.Context, request PutChannelBehaviorRequestObject) (PutChannelBehaviorResponseObject, error)
 	// DeleteChannelDraft Delete the draft of a new forum post
 	// (DELETE /channels/{channel_id}/draft)
 	DeleteChannelDraft(ctx context.Context, request DeleteChannelDraftRequestObject) (DeleteChannelDraftResponseObject, error)
@@ -9419,6 +9567,56 @@ func (sh *strictHandler) CreateAgent(w http.ResponseWriter, r *http.Request, par
 		sh.options.ResponseErrorHandlerFunc(w, r, err)
 	} else if validResponse, ok := response.(CreateAgentResponseObject); ok {
 		if err := validResponse.VisitCreateAgentResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// ListServedChannels operation middleware
+func (sh *strictHandler) ListServedChannels(w http.ResponseWriter, r *http.Request) {
+	var request ListServedChannelsRequestObject
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.ListServedChannels(ctx, request.(ListServedChannelsRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "ListServedChannels")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(ListServedChannelsResponseObject); ok {
+		if err := validResponse.VisitListServedChannelsResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// GetServedChannelConfig operation middleware
+func (sh *strictHandler) GetServedChannelConfig(w http.ResponseWriter, r *http.Request, channelId ChannelIdPath) {
+	var request GetServedChannelConfigRequestObject
+
+	request.ChannelId = channelId
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.GetServedChannelConfig(ctx, request.(GetServedChannelConfigRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "GetServedChannelConfig")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(GetServedChannelConfigResponseObject); ok {
+		if err := validResponse.VisitGetServedChannelConfigResponse(w); err != nil {
 			sh.options.ResponseErrorHandlerFunc(w, r, err)
 		}
 	} else if response != nil {
@@ -10899,6 +11097,66 @@ func (sh *strictHandler) ArchiveChannel(w http.ResponseWriter, r *http.Request, 
 		sh.options.ResponseErrorHandlerFunc(w, r, err)
 	} else if validResponse, ok := response.(ArchiveChannelResponseObject); ok {
 		if err := validResponse.VisitArchiveChannelResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// GetChannelBehavior operation middleware
+func (sh *strictHandler) GetChannelBehavior(w http.ResponseWriter, r *http.Request, channelId ChannelIdPath) {
+	var request GetChannelBehaviorRequestObject
+
+	request.ChannelId = channelId
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.GetChannelBehavior(ctx, request.(GetChannelBehaviorRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "GetChannelBehavior")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(GetChannelBehaviorResponseObject); ok {
+		if err := validResponse.VisitGetChannelBehaviorResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// PutChannelBehavior operation middleware
+func (sh *strictHandler) PutChannelBehavior(w http.ResponseWriter, r *http.Request, channelId ChannelIdPath, params PutChannelBehaviorParams) {
+	var request PutChannelBehaviorRequestObject
+
+	request.ChannelId = channelId
+	request.Params = params
+
+	var body PutChannelBehaviorJSONRequestBody
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
+		return
+	}
+	request.Body = &body
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.PutChannelBehavior(ctx, request.(PutChannelBehaviorRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "PutChannelBehavior")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(PutChannelBehaviorResponseObject); ok {
+		if err := validResponse.VisitPutChannelBehaviorResponse(w); err != nil {
 			sh.options.ResponseErrorHandlerFunc(w, r, err)
 		}
 	} else if response != nil {

@@ -206,13 +206,22 @@ func (s *CatchUpService) Admit(ctx context.Context, a actor.Actor, ev sync.Event
 	return ok, nil
 }
 
-// admit is the delivery rule of one stored event for a (07 section 8.1): a personal event only to
-// its audience, any other only when authorize allows its receive action on the event's resource at
-// delivery time, with the decision of authorize (zero for a personal event). ctx is in filter
+// admit is the delivery rule of one stored event for a (07 section 8.1, 05 section 6): a personal
+// event only to its audience, and, when its receive action is not self, only when authorize also
+// allows that action (docs/DECISIONS.md D-M2-02-7); any other event only when authorize allows its
+// receive action on the event's resource at delivery time, with the decision of authorize (zero
+// for a personal event with self). ctx is in filter
 // mode, so a refusal writes no audit entry.
 func admit(ctx context.Context, az authorize.Authorizer, a actor.Actor, ev sync.Event) (bool, authorize.Decision, error) {
 	if !ev.AudiencePrincipalID.IsZero() {
-		return ev.AudiencePrincipalID == a.ID, authorize.Decision{}, nil
+		if ev.AudiencePrincipalID != a.ID {
+			return false, authorize.Decision{}, nil
+		}
+		if ev.ReceiveAction == receiveSelf {
+			return true, authorize.Decision{}, nil
+		}
+		// A personal event with a receive action (agent.config_changed, M2-02) also needs that
+		// action at delivery time: an agent that stopped operating the channel gets nothing.
 	}
 	act, ok := authorize.ParseAction(ev.ReceiveAction)
 	if !ok {
