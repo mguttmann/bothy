@@ -54,6 +54,10 @@ func (s *Service) view(ctx context.Context, h hostState) terminal.HostView {
 	if r.State == domain.StateDisabled {
 		v.DisabledReason = r.DisabledReason
 	}
+	if !r.HasKeys() {
+		// The retained fingerprint describes dropped keys; a client must never pin it (M2-41).
+		v.KeyFingerprint, v.NoisePublicKey = "", nil
+	}
 	if r.LLMCredentials == "personal" {
 		v.CredentialHolderID = r.CredentialHolderID
 	}

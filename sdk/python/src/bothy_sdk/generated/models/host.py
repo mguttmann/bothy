@@ -48,9 +48,10 @@ class Host:
         assigned_user_id (UUID | Unset): UUIDv7 (RFC 9562), lowercase canonical form.
         credential_holder_id (UUID | Unset): UUIDv7 (RFC 9562), lowercase canonical form.
         reported_is_server_host (bool | Unset): Report of the host service (24, 2.3); absent before the first report.
-        noise_public_key (str | Unset): Static X25519 key of the host, 32 bytes base64url without padding; absent before
-            pairing.
-        key_fingerprint (str | Unset):
+        noise_public_key (str | Unset): Static X25519 key of the host, 32 bytes base64url without padding; absent while
+            the host has no keys (before pairing and after a re-pairing or the fallback of `confirmHost`).
+        key_fingerprint (str | Unset): Fingerprint of the stored keys (24, 4.3), 13 groups of four Crockford base32
+            characters; absent while the host has no keys.
         session_users (list[HostSessionUser] | Unset): Valid session user assignments (ruling T12), visible like every
             other member to everyone with `host.read`. Absent when there is none.
         reported_session_users (list[HostReportedSessionUser] | Unset): Session users the host service reported at

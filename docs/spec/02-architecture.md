@@ -232,7 +232,7 @@ else is forbidden and fails in the gate (section 7).
 | `notify` | `identity`, `chat`, `messaging`, `sync` | devices and time zone; target path for settings; mentions; read state |
 | `apps` | `instance`, `identity`, `chat`, `agents`, `messaging`, `sync` | webhook signing key; app principal and tokens; target of the incoming webhooks; commands of apps; messages from webhooks; consumer for outgoing webhooks |
 | `gateway` | `chat`, `agents`, `runs`, `sync`, `stats` | thread to channel for focus and typing; consumer cursor and presence; run patches and delivery preparation; tail, catch-up, snapshot; live frame for `stats.subscribe` |
-| `terminal` | `instance`, `identity`, `authz`, `agents` | signer for terminal session tokens (purpose `terminal`); people, devices, owners, consumption of the step-up; grants on hosts and I6; readiness of the dev environment (milestone) |
+| `terminal` | `instance`, `identity`, `authz`, `agents` | signer for terminal session tokens (purpose `terminal`) and `instance_id` of the `pairHost` response; people, devices, owners, consumption of the step-up, pairing codes (format and HMAC through `identity`, M2-41); grants on hosts and I6; readiness of the dev environment (milestone) |
 
 Tiers (from the bottom): `instance`, `billing` · `audit`, `authz` · `identity` · `chat` · `agents`,
 `files` · `messaging`, `status`, `terminal` · `runs`, `search`, `importer`, `privacy` · `sync`,
@@ -738,6 +738,11 @@ the wait time.
   concurrent retry waits on the primary key until the first transaction ends, and then reads
   the stored response. If the wait ends with `database.lock_timeout`, the server answers
   `409 request_in_progress` (04, 5.2) and stores nothing.
+- Exception (M2-41): a final error response that the handler marks with
+  `idempotency.KeepEffectOnFinal` keeps its effect; the stage stores it with `Store.Complete` in
+  the same transaction and commits both together. Only `409 fingerprint_mismatch` of
+  `confirmHost` is marked, because every failed attempt must count even with a key (TM-T19); a
+  marked `401` or `5xx` still rolls back (docs/DECISIONS.md D-M2-41-7).
 - Rights changes behind the stage (M1-31): the stage opens its unit with
   `txn.AllowLateRightsChange()`. The use case declares its rights change in its nested unit as
   everywhere else; that nested unit then runs the rights begin hook (phase 1), its work and the

@@ -4,6 +4,7 @@ package identity
 
 import (
 	"context"
+	"errors"
 	"time"
 
 	"github.com/OWNER/bothy/services/server/internal/kernel/actor"
@@ -116,7 +117,18 @@ type Tokens interface {
 	// authenticator never accepts the code; host.pair redeems it (M2-41). Errors: internal_error
 	// when the random source fails.
 	NewHostPairingCode(ctx context.Context) (PairingCode, error)
+	// HashHostPairingCode returns the HMAC of raw exactly as NewHostPairingCode computes it, the
+	// value host.pair looks up in hosts.pairing_code_hash (M2-41). A value that is not a
+	// well-formed token of kind hpc (form, kind, checksum) is ErrTokenMalformed before any HMAC is
+	// computed; it reads and writes no database and authorizes nothing.
+	HashHostPairingCode(ctx context.Context, raw string) ([]byte, error)
 }
+
+// ErrTokenMalformed reports a value that is not a well-formed token of the expected kind (ADR
+// 0061: form, kind and checksum), found without any database access. It never names the value;
+// callers answer 401 unauthenticated with the body of every other failed redemption (M2-41,
+// TM-T20).
+var ErrTokenMalformed = errors.New("identity: malformed token")
 
 // CreateTokenCmd is the body of createToken (schema ApiTokenCreate).
 type CreateTokenCmd struct {

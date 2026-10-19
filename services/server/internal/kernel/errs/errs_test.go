@@ -691,3 +691,20 @@ func TestLogValueContainsCause(t *testing.T) {
 		}
 	}
 }
+
+// TestFingerprintMismatch_AttemptsRemaining (M2-41): the error is fingerprint_mismatch and
+// carries the member attempts_remaining, the value 0 included; it never names a fingerprint.
+func TestFingerprintMismatch_AttemptsRemaining(t *testing.T) {
+	t.Parallel()
+	for _, n := range []int{0, 1, 2} {
+		err := FingerprintMismatch(n)
+		e, ok := As(err)
+		if !ok || e.Code != CodeFingerprintMismatch || KindOf(err) != KindConflict {
+			t.Fatalf("%d: %v", n, err)
+		}
+		var ext ProblemExtender
+		if !errors.As(err, &ext) || ext.ProblemExtensions()["attempts_remaining"] != n {
+			t.Fatalf("%d: extensions %v", n, ext)
+		}
+	}
+}

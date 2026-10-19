@@ -16,11 +16,18 @@ import (
 // emitUpdated appends host.updated for v (05 section 6, 24 section 10.2): durable, resource host
 // with its new version, empty scope (the hub treats it as instance level), no audience, receive
 // action host.read, the actor of the request, payload HostUpdatedPayload with the host without
-// noise_public_key; key_changed stays absent (only re-pairing of M2-41 sets it).
+// noise_public_key; key_changed stays absent.
 func (s *Service) emitUpdated(ctx context.Context, v terminal.HostView) error {
+	return s.emitHostUpdated(ctx, v, false)
+}
+
+// emitHostUpdated appends host.updated for v like emitUpdated; keyChanged sets key_changed = true,
+// exactly when the stored keys were dropped (M2-41: re-pairing and the fallback of TM-T19).
+func (s *Service) emitHostUpdated(ctx context.Context, v terminal.HostView, keyChanged bool) error {
 	payload, err := json.Marshal(struct {
-		Host hostJSON `json:"host"`
-	}{eventHostBody(v)})
+		Host       hostJSON `json:"host"`
+		KeyChanged bool     `json:"key_changed,omitempty"`
+	}{eventHostBody(v), keyChanged})
 	if err != nil {
 		return errs.Wrap(errs.CodeInternalError, err, "terminal: host.updated payload")
 	}

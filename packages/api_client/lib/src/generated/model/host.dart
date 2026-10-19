@@ -29,8 +29,8 @@ part 'host.g.dart';
 /// * [credentialHolderId] - Present exactly with `llm_credentials = personal`.
 /// * [declaredServerHost]
 /// * [reportedIsServerHost] - Report of the host service (24, 2.3); absent before the first report.
-/// * [noisePublicKey] - Static X25519 key of the host, 32 bytes base64url without padding; absent before pairing.
-/// * [keyFingerprint]
+/// * [noisePublicKey] - Static X25519 key of the host, 32 bytes base64url without padding; absent while the host has no keys (before pairing and after a re-pairing or the fallback of `confirmHost`).
+/// * [keyFingerprint] - Fingerprint of the stored keys (24, 4.3), 13 groups of four Crockford base32 characters; absent while the host has no keys.
 /// * [keyGeneration]
 /// * [profiles]
 /// * [doctor] - One entry per check HD1 to HD11; a failed HD6, HD9, HD10 or HD11 has one entry per account named by the rule for names (24, 2.2).
@@ -84,10 +84,11 @@ abstract class Host implements Built<Host, HostBuilder> {
   @BuiltValueField(wireName: r'reported_is_server_host')
   bool? get reportedIsServerHost;
 
-  /// Static X25519 key of the host, 32 bytes base64url without padding; absent before pairing.
+  /// Static X25519 key of the host, 32 bytes base64url without padding; absent while the host has no keys (before pairing and after a re-pairing or the fallback of `confirmHost`).
   @BuiltValueField(wireName: r'noise_public_key')
   String? get noisePublicKey;
 
+  /// Fingerprint of the stored keys (24, 4.3), 13 groups of four Crockford base32 characters; absent while the host has no keys.
   @BuiltValueField(wireName: r'key_fingerprint')
   String? get keyFingerprint;
 

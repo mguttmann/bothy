@@ -119,7 +119,9 @@ var requirementGroups = []struct {
 	{"host-self", Deferred("M2"), []string{"host.connect"}},
 	// host.manage and host.read are gated by HumanSession (M2-39, 05 section 4.14).
 	{"owner", All(HumanSession, Owner), []string{"host.manage"}},
-	{"public (valid pairing code)", Deferred("M2"), []string{"host.pair"}},
+	// host.pair (M2-41): the use case proves the pairing code before authorize runs, as for the
+	// refresh token; the host is visible to any principal for exactly this requirement.
+	{"public (valid pairing code)", Public, []string{"host.pair"}},
 	{"owner or assignee or +terminal", All(HumanSession, Any(Owner, Assignee, Terminal)), []string{"host.read"}},
 	{"owner", Deferred("M8"), []string{"import.apply"}},
 	{"trigger", Deferred("M2"), []string{"interaction.create"}},

@@ -406,3 +406,36 @@ type ProblemExtender interface {
 	// must marshal to JSON.
 	ProblemExtensions() map[string]any
 }
+
+// memberAttemptsRemaining is the problem member of fingerprint_mismatch (M2-41).
+const memberAttemptsRemaining = "attempts_remaining"
+
+// attemptsError is fingerprint_mismatch with the remaining confirmation attempts of a host; the
+// problem writer adds them as attempts_remaining through ProblemExtender.
+type attemptsError struct {
+	e         *Error
+	remaining int
+}
+
+// FingerprintMismatch returns 409 fingerprint_mismatch with the problem member attempts_remaining
+// = remaining (docs/api/openapi.yaml Problem, 24 section 3.2): the confirmations a host has left
+// before it falls back to pairing; 0 means it fell back and needs a new pairing code. Screen A8
+// shows the number; no other field carries it. errs.As finds the *Error in it.
+//
+// Example:
+//
+//	return errs.FingerprintMismatch(outcome.Remaining)
+func FingerprintMismatch(remaining int) error {
+	return &attemptsError{e: New(CodeFingerprintMismatch, "The fingerprint prefix does not match."), remaining: max(remaining, 0)}
+}
+
+// Error returns the text of the wrapped error.
+func (a *attemptsError) Error() string { return a.e.Error() }
+
+// Unwrap returns the *Error.
+func (a *attemptsError) Unwrap() error { return a.e }
+
+// ProblemExtensions implements ProblemExtender: attempts_remaining.
+func (a *attemptsError) ProblemExtensions() map[string]any {
+	return map[string]any{memberAttemptsRemaining: a.remaining}
+}

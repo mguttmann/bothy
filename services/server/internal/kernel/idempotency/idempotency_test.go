@@ -31,3 +31,18 @@ func TestOneTimeSecret_MarkedOnlyInsideAScope(t *testing.T) {
 		t.Error("a new scope inherits the mark of the outer one")
 	}
 }
+
+// TestKeepEffectOnFinal_MarkedOnlyInsideAScope (M2-41): the mark works like MarkOneTimeSecret and
+// is independent of it.
+func TestKeepEffectOnFinal_MarkedOnlyInsideAScope(t *testing.T) {
+	ctx := context.Background()
+	idempotency.KeepEffectOnFinal(ctx)
+	if idempotency.EffectKept(ctx) {
+		t.Fatal("kept without a scope")
+	}
+	scoped := idempotency.WithSecretScope(ctx)
+	idempotency.KeepEffectOnFinal(context.WithValue(scoped, childKey{}, 1))
+	if !idempotency.EffectKept(scoped) || idempotency.OneTimeSecretMarked(scoped) {
+		t.Fatal("the mark is not seen by its scope, or it marked a secret")
+	}
+}

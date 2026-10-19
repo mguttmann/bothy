@@ -16,6 +16,13 @@ import (
 // belonged to another person on the host, or a second valid assignment of one person (24 2.2).
 const ReasonSessionUserTaken = "session_user_taken"
 
+// The reasons of 409 conflict at host.pair (M2-41, 24 section 3.3): the login key belongs to
+// another host, or the key pair equals the dropped keys of this host (its retained fingerprint).
+const (
+	ReasonHostKeyInUse  = "host_key_in_use"
+	ReasonHostKeyReused = "host_key_reused"
+)
+
 // SessionUserRow is one row of host_session_users of a host, valid or ended.
 type SessionUserRow struct {
 	ID        ids.ID
@@ -58,9 +65,15 @@ func errTaken() error {
 // of every entry comes before any 409 check. The function is pure; the rows come locked from the
 // caller.
 func PlanAssignments(reported []string, rows []SessionUserRow, revoke []ids.ID, add []SessionUserAssign) (Plan, error) {
+	return PlanAssignmentsAt("/add_session_users/", reported, rows, revoke, add)
+}
+
+// PlanAssignmentsAt is PlanAssignments with the pointer prefix of the list of additions:
+// "/add_session_users/" for updateHost, "/session_users/" for confirmHost (M2-41).
+func PlanAssignmentsAt(prefix string, reported []string, rows []SessionUserRow, revoke []ids.ID, add []SessionUserAssign) (Plan, error) {
 	for i, a := range add {
 		if !slices.Contains(reported, a.OSUser) {
-			return Plan{}, FieldError("/add_session_users/"+strconv.Itoa(i)+"/os_user", FieldSessionUserNotOnHost,
+			return Plan{}, FieldError(prefix+strconv.Itoa(i)+"/os_user", FieldSessionUserNotOnHost,
 				"the host does not report this session user")
 		}
 	}

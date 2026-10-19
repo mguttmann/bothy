@@ -806,8 +806,10 @@ Source: [24-terminal.md](../spec/24-terminal.md), section 17.
 | Key | Environment | Place | Type | Default | Meaning | Status |
 |---|---|---|---|---|---|---|
 | `terminal.pairing_code_ttl` | `BOTHY_TERMINAL__PAIRING_CODE_TTL` | Server | duration | `15m` | Validity of a pairing code for a host | active |
-| `terminal.fingerprint_confirm_chars` | `BOTHY_TERMINAL__FINGERPRINT_CONFIRM_CHARS` | Server |  | `8` | this many characters of the fingerprint the owner types for the confirmation | planned (M2) |
-| `terminal.fingerprint_max_attempts` | `BOTHY_TERMINAL__FINGERPRINT_MAX_ATTEMPTS` | Server |  | `3` | failed attempts at the confirmation, then fallback to `pairing` | planned (M2) |
+| `terminal.fingerprint_confirm_chars` | `BOTHY_TERMINAL__FINGERPRINT_CONFIRM_CHARS` | Server | int | `8` | this many characters of the fingerprint the owner types for the confirmation | active |
+| `terminal.fingerprint_max_attempts` | `BOTHY_TERMINAL__FINGERPRINT_MAX_ATTEMPTS` | Server | int | `3` | failed attempts at the confirmation, then fallback to `pairing` | active |
+| `terminal.report_label_max_chars` | `BOTHY_TERMINAL__REPORT_LABEL_MAX_CHARS` | Server | int | `100` | longest profile name, display name, name of a working directory and operating system version that a host reports (3.2) | active |
+| `terminal.report_max_entries` | `BOTHY_TERMINAL__REPORT_MAX_ENTRIES` | Server | int | `64` | at most this many entries per reported list: profiles, session users, working directories of a session user (3.2) | active |
 | `terminal.step_up_max_age` | `BOTHY_TERMINAL__STEP_UP_MAX_AGE` | Server | duration | `60s` | the step-up for `terminal.open` and `terminal.attach` must be at most this old | active |
 | `terminal.session_token_ttl` | `BOTHY_TERMINAL__SESSION_TOKEN_TTL` | Server | duration | `30s` | Validity of a terminal session token | active |
 | `terminal.open_timeout` | `BOTHY_TERMINAL__OPEN_TIMEOUT` | Server |  | `20s` | Deadline until both sides are connected in the relay and the handshake is complete | planned (M2) |

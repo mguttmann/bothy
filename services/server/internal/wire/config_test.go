@@ -38,6 +38,10 @@ func TestConfigSchemaBuilds(t *testing.T) {
 		"host.os_user_max_chars":               {Kind: config.KindInt, Default: "64", Min: "1", Chapter: "03-data-model.md"},
 		"terminal.pairing_code_ttl":            {Kind: config.KindDuration, Default: "15m", Min: "1s", Chapter: "24-terminal.md"},
 		"terminal.session_token_ttl":           {Kind: config.KindDuration, Default: "30s", Min: "1s", Chapter: "24-terminal.md"},
+		"terminal.fingerprint_confirm_chars":   {Kind: config.KindInt, Default: "8", Min: "1", Chapter: "24-terminal.md"},
+		"terminal.fingerprint_max_attempts":    {Kind: config.KindInt, Default: "3", Min: "1", Chapter: "24-terminal.md"},
+		"terminal.report_label_max_chars":      {Kind: config.KindInt, Default: "100", Min: "1", Chapter: "24-terminal.md"},
+		"terminal.report_max_entries":          {Kind: config.KindInt, Default: "64", Min: "1", Chapter: "24-terminal.md"},
 		"server.role":                          {Kind: config.KindEnum, Default: "all", Enum: []string{"api", "worker", "all"}, Chapter: "16-operations.md"},
 		"server.listen_addr":                   {Kind: config.KindListenAddr, Default: "127.0.0.1:8080", Chapter: "16-operations.md"},
 		"server.internal_listen_addr":          {Kind: config.KindListenAddr, Default: "127.0.0.1:8081", Chapter: "16-operations.md"},
@@ -808,5 +812,25 @@ func TestInstanceConfig_Defaults(t *testing.T) {
 	c.MinVersionIOS = ""
 	if c != wire.DefaultInstanceConfig() {
 		t.Errorf("DefaultInstanceConfig %+v, schema defaults %+v", wire.DefaultInstanceConfig(), c)
+	}
+}
+
+// TestConfig_FingerprintKeysChecked (M2-41, Design note 12): terminal.fingerprint_confirm_chars
+// of 0 or above the length of the fingerprint and terminal.fingerprint_max_attempts of 0 are
+// start errors that name the key.
+func TestConfig_FingerprintKeysChecked(t *testing.T) {
+	t.Parallel()
+	if got := load(t, "BOTHY_TERMINAL__FINGERPRINT_CONFIRM_CHARS=52", "BOTHY_TERMINAL__FINGERPRINT_MAX_ATTEMPTS=1"); got != nil {
+		t.Fatalf("the bounds are refused: %v", got)
+	}
+	for env, key := range map[string]string{
+		"BOTHY_TERMINAL__FINGERPRINT_CONFIRM_CHARS=0":  "terminal.fingerprint_confirm_chars",
+		"BOTHY_TERMINAL__FINGERPRINT_CONFIRM_CHARS=53": "terminal.fingerprint_confirm_chars",
+		"BOTHY_TERMINAL__FINGERPRINT_MAX_ATTEMPTS=0":   "terminal.fingerprint_max_attempts",
+	} {
+		got := load(t, env)
+		if len(got) == 0 || !strings.Contains(got[0].Key+" "+got[0].Message, key) {
+			t.Errorf("%s: problems %v, want one naming %s", env, got, key)
+		}
 	}
 }

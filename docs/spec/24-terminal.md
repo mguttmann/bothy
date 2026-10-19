@@ -643,13 +643,64 @@ A wrong fingerprint results in `409 fingerprint_mismatch`, and the host stays `c
 after `terminal.fingerprint_max_attempts` failed attempts it falls back to `pairing`, and the
 keys expire.
 
+Details of the pairing (M2-41, docs/DECISIONS.md D-M2-41-1 to D-M2-41-16):
+
+- **Code.** The server stores `HMAC-SHA-256` with the pepper of `auth.token_pepper_ref` over the
+  whole string of the code, the same derivation as `api_tokens.token_hash`. Every code that does
+  not work gives `401 unauthenticated` with the same body: wrong form or checksum (refused without
+  database access), unknown, used, replaced or expired. Refusals go into the audit in aggregated
+  form (`host.pair`, `unauthenticated`). A retry after a lost response also gets `401`; the
+  operator asks for a new code.
+- **Keys.** `noise_public_key` is strict base64url without padding with exactly 32 bytes and not a
+  point of small order (`errors[].code = invalid_key`); `auth_public_jwk` has exactly `kty`
+  (`OKP`), `crv` (`Ed25519`) and `x` (32 bytes, otherwise `invalid_key`); every other member,
+  above all the private `d`, is `unknown_member` under `/auth_public_jwk/<name>`. The server stores
+  the JWK as it builds it and its RFC 7638 thumbprint as `auth_jkt`.
+- **Report.** At least one session user (`empty`, otherwise the host can never offer a terminal,
+  HD1); names follow the pattern of 03, at most `host.os_user_max_chars` characters (`too_long`),
+  distinct without regard to case (`duplicate`); working directories, profile names, display names
+  and `os_version` are display texts (SEC-IN-4) with at most `terminal.report_label_max_chars`
+  characters; profile names distinct (`duplicate`); every list at most
+  `terminal.report_max_entries` entries (`limit_reached`); `host_version` SemVer without `v`
+  (`invalid_format`). Every finding is `400 validation_failed` with a pointer into the body; the
+  code stays valid. `reported_session_users` is stored exactly as reported, in the reported order;
+  `pairing_code_hash` and `pairing_expires_at` become `NULL`.
+- **Prefix.** `fingerprint_prefix` is compared in upper case; it has exactly
+  `terminal.fingerprint_confirm_chars` characters of the Crockford alphabet, otherwise
+  `400 validation_failed` with `errors[].code = invalid_format` under `/fingerprint_prefix`, and
+  the attempt does not count. `I`, `L`, `O` and `U` are not reinterpreted. The comparison with the
+  start of the fingerprint without hyphens runs in constant time, before any assignment and any
+  declaration.
+- **Failed attempts.** A wrong prefix raises `hosts.fingerprint_failures` without a new version
+  (the counter is not part of `Host`, the same `If-Match` stays valid) and answers with
+  `attempts_remaining`. The attempt also counts with an `Idempotency-Key`; a retry with the same
+  key gets the stored response and does not count again (02 section 8.4).
+- **Fallback.** At the failed attempt that reaches `terminal.fingerprint_max_attempts` the host
+  becomes `pairing`: the three key columns `NULL`, `key_fingerprint` stays (3.3),
+  `pairing_code_hash` is the HMAC of a fresh code that is never shown, with `pairing_expires_at`
+  equal to now, `fingerprint_failures = 0`, a new version, `host.updated` with
+  `key_changed = true`, `attempts_remaining = 0`. Only `issueHostPairingCode` continues from there.
+
 ### 3.3 Re-pairing
 
 A new pairing code for an existing host (`host.manage`) sets it to `pairing`,
 discards the stored keys immediately, closes its connections and ends its
-sessions (`host_rekeyed`). `hosts.key_generation` increases. The audit entry names the old and the
-new fingerprint; every active owner receives the event `host.updated` with `key_changed = true`.
+sessions (`host_rekeyed`). `hosts.key_generation` increases at the next `host.pair`, because it
+counts the stored keys that devices pin together with `noise_public_key`. The audit entry
+`pairing_code` names the old fingerprint, the next `host.pair` the old and the new one; every
+active owner receives the event `host.updated` with `key_changed = true`.
 Clients see a different key the next time they open a session and show a hard warning (section 5.5).
+
+Details (M2-41): from `pairing` the new code only replaces the old one; from `confirming`,
+`active` and `disabled` it also discards the keys, from `disabled` (also
+`duplicate_connection`, 3.4) it clears `disabled_reason` and `disabled_at`; `retired` gives
+`409 invalid_state_transition`. `key_changed` is set exactly when stored keys were discarded.
+Without keys `key_fingerprint` and `noise_public_key` are absent from `Host`; `key_fingerprint`
+stays stored, though, and a `host.pair` with exactly these keys gives `409 conflict` with
+`reason: host_key_reused` (the code stays valid). A login key of another host gives
+`409 conflict` with `reason: host_key_in_use`. Limit: the server keeps no discarded key, so a host
+service that keeps only one of the two keys goes unnoticed; `bothy-host pair` creates both anew at
+every pairing (M2-42).
 
 ### 3.4 Second control connection
 
@@ -1294,8 +1345,8 @@ for byte streams. With one node, everything is trivial.
 
 | Action | When | Details (`audit_details.v1`) |
 |---|---|---|
-| `host.manage` | every change | `host_id` (resource), `operation` (`create`, `update`, `pairing_code`, `confirm`, `llm_credentials`, `state`, `session_user`), old and new values as codes (`from_assigned_user_id`, `to_assigned_user_id`, `name_changed`, `from_state`, `to_state`, `disabled_reason`), with `session_user` one entry per assignment or end with `change` (`assigned`, `revoked`), `user_id` and the name of the session user in the reserved field `os_user`, fingerprints on re-pairing, `reason`; without effect `no_change`; never the name of the host |
-| `host.pair` | allow and deny | `host_id`, fingerprint |
+| `host.manage` | every change | `host_id` (resource), `operation` (`create`, `update`, `pairing_code`, `confirm`, `llm_credentials`, `state`, `session_user`), old and new values as codes (`from_assigned_user_id`, `to_assigned_user_id`, `name_changed`, `from_state`, `to_state`, `disabled_reason`), with `session_user` one entry per assignment or end with `change` (`assigned`, `revoked`), `user_id` and the name of the session user in the reserved field `os_user`; with `pairing_code` `from_state`, `to_state`, `old_fingerprint` (when keys were discarded), `key_generation`, `sessions_ended`; with `confirm` `result` (`confirmed`, `fingerprint_mismatch`, `fingerprint_max_attempts`), `fingerprint`, `key_generation`, `attempts_remaining` (on failed attempts), `llm_credentials`, `credential_holder_id`, `declared_server_host`; `reason`; without effect `no_change`; never the name of the host, the code, its HMAC or a key; fingerprints in lower case without hyphens |
+| `host.pair` | allow and deny | `host_id`, `fingerprint`, `old_fingerprint` (when one was stored), `key_generation`, `platform`; refusals aggregated with `unauthenticated` |
 | `host.connect` | denials; allow only on a change of `reported_is_server_host`, `reported_doctor` or `reported_session_users`; second control connection (3.4) | `host_id`, check codes, with the name of every account that the message names (rule for names, 2.2: for HD6, HD10 and HD11 session users, for HD9 former ones), added and removed names of the session users, code `duplicate_connection` |
 | `terminal.open`, `terminal.attach` | allow and deny | `host_id`, `session_id`, `profile`, `device_id`, `pin_changed`, `foreign_assignee` |
 | `terminal.close` | allow and deny | `session_id`, who closed |
@@ -1412,9 +1463,9 @@ available from Windows 10 version 1809 and Windows Server 2019
 | `terminal_denied` | `403` | permission present, but a guard rule or a limit blocks; `reason`: `not_host_assignee`, `server_host_owner_only`, `i6_holder_only`, `no_session_user`, `session_limit`, `profile_unknown` |
 | `step_up_required` | `401` | step-up missing, older than `terminal.step_up_max_age`, already consumed or, in the console, not by passkey (`reason: passkey_required`) |
 | `host_unavailable` | `409` | host not `active` or host service not connected |
-| `fingerprint_mismatch` | `409` | confirmation with a wrong fingerprint |
+| `fingerprint_mismatch` | `409` | confirmation with a wrong fingerprint; `attempts_remaining` names the attempts left, `0` means the fallback to `pairing` (3.2) |
 | `i6_violation` | `409` | change would violate I6 (`hint`) |
-| `conflict` | `409` | assignment of a session user that on the host already belongs or belonged to a person, or a second valid assignment of the same person (`reason: session_user_taken`, 2.2) |
+| `conflict` | `409` | assignment of a session user that on the host already belongs or belonged to a person, or a second valid assignment of the same person (`reason: session_user_taken`, 2.2); `host.pair` with the login key of another host (`reason: host_key_in_use`) or with the discarded keys of this host (`reason: host_key_reused`, 3.3) |
 | `validation_failed` | `400` | assignment of a name that the host does not report (`errors[].code = session_user_not_on_host`, 2.2 item 5); assignee, person of an assignment or holder of the LLM login unknown, not a person or deleted (`errors[].code = unknown_user`); `assigned_user_id` together with `clear_assigned_user = true` (`errors[].code = mutually_exclusive`); `credential_holder_id` with `none` or `organization` (`errors[].code = not_allowed`, 7.2) |
 | `not_found` | `404` | no read permission on the host or the session |
 
@@ -1529,6 +1580,8 @@ Column "Place": Server = configuration reference of the server; Host service = c
 | `terminal.pairing_code_ttl` | Server | `15m` | Validity of a pairing code for a host |
 | `terminal.fingerprint_confirm_chars` | Server | `8` | this many characters of the fingerprint the owner types for the confirmation |
 | `terminal.fingerprint_max_attempts` | Server | `3` | failed attempts at the confirmation, then fallback to `pairing` |
+| `terminal.report_label_max_chars` | Server | `100` | longest profile name, display name, name of a working directory and operating system version that a host reports (3.2) |
+| `terminal.report_max_entries` | Server | `64` | at most this many entries per reported list: profiles, session users, working directories of a session user (3.2) |
 | `terminal.step_up_max_age` | Server | `60s` | the step-up for `terminal.open` and `terminal.attach` must be at most this old |
 | `terminal.session_token_ttl` | Server | `30s` | Validity of a terminal session token |
 | `terminal.open_timeout` | Server | `20s` | Deadline until both sides are connected in the relay and the handshake is complete |

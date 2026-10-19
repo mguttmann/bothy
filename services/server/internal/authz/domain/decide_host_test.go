@@ -133,3 +133,32 @@ func TestDecide_Rules(t *testing.T) {
 		t.Fatal("a deferred requirement decided")
 	}
 }
+
+// TestHostPairRequirement (M2-41, Design note 10): host.pair is Public with the source text of 05;
+// an anonymous principal and an authenticated person on a host they cannot see are allowed for
+// host.pair, while the same host stays invisible to them for host.read.
+func TestHostPairRequirement(t *testing.T) {
+	t.Parallel()
+	req, ok := domain.RequirementOf("host.pair")
+	if !ok || req.Expr.String() != domain.Public.String() || req.Source != "public (valid pairing code)" {
+		t.Fatalf("host.pair: %v %q", req.Expr, req.Source)
+	}
+	for _, p := range []domain.Principal{
+		{Kind: domain.KindAnonymous},
+		{ID: alexID, Kind: domain.KindUser, HasSession: true, StepUpAt: t0},
+	} {
+		in := input(t, "host.pair", "host", p, domain.Rights{})
+		in.Host = &domain.HostFacts{}
+		if got, err := domain.Decide(in); err != nil || got != domain.Allow {
+			t.Errorf("%s: host.pair %+v, %v", p.Kind, got, err)
+		}
+		if p.Kind == domain.KindAnonymous {
+			continue
+		}
+		read := input(t, "host.read", "host", p, domain.Rights{})
+		read.Host = &domain.HostFacts{}
+		if got, _ := domain.Decide(read); got.Outcome != domain.OutcomeNotFound {
+			t.Errorf("%s: host.read %+v, want not_found", p.Kind, got)
+		}
+	}
+}

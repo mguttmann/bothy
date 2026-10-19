@@ -161,7 +161,44 @@ type SetLlmCredentials struct {
 	Reason             string
 }
 
-// PairingCodeIssued is the answer of createHost (schema HostPairingCode): the pairing code is
+// IssuePairingCode is the body of issueHostPairingCode (schema ReasonBody) with the host (M2-41).
+type IssuePairingCode struct {
+	HostID ids.ID
+	Reason string
+}
+
+// PairHost is the body of pairHost (schema HostPairRequest, M2-41). Code is the pairing code as
+// a Secret, so the request never prints it; AuthPublicJWK is the JSON object as sent.
+type PairHost struct {
+	Code                             Secret
+	NoisePublicKey                   string
+	AuthPublicJWK                    map[string]any
+	Platform, OSVersion, HostVersion string
+	Profiles                         []Profile
+	SessionUsers                     []ReportedSessionUser
+}
+
+// PairResult is the answer of pairHost (schema HostPairResult): only public data.
+type PairResult struct {
+	HostID         ids.ID
+	KeyFingerprint string
+	InstanceID     ids.ID
+}
+
+// ConfirmHost is the body of confirmHost (schema HostConfirm) with the host and its
+// precondition (M2-41): CredentialHolderID is set exactly with personal (zero: absent).
+type ConfirmHost struct {
+	HostID             ids.ID
+	IfMatch            Precondition
+	FingerprintPrefix  string
+	LLMCredentials     string
+	CredentialHolderID ids.ID
+	DeclaredServerHost bool
+	SessionUsers       []SessionUserAssign
+	Reason             string
+}
+
+// PairingCodeIssued is the answer of createHost and issueHostPairingCode (schema HostPairingCode): the pairing code is
 // shown exactly once; Code prints "[redacted]" through fmt, slog and JSON, only the handler
 // reveals it.
 type PairingCodeIssued struct {
@@ -245,4 +282,26 @@ type Hosts interface {
 	// unknown_user), precondition_required, version_conflict, conflict for a retired host,
 	// i6_violation with the conflicts.
 	SetLlmCredentials(ctx context.Context, p actor.Actor, cmd SetLlmCredentials) (HostView, error)
+	// IssuePairingCode issues a new pairing code for the host (re-pairing, host.manage, 24 section
+	// 3.3, M2-41): from pairing it replaces the code; from confirming, active and disabled it also
+	// drops the stored keys at once (host.updated with key_changed); from active it ends the
+	// sessions with host_rekeyed; from disabled it clears the disabled reason. The code is shown
+	// once. Errors: validation_failed on /reason, invalid_state_transition for retired.
+	IssuePairingCode(ctx context.Context, p actor.Actor, cmd IssuePairingCode) (PairingCodeIssued, error)
+	// Pair redeems a pairing code (host.pair, public: the code is the credential, M2-41): it
+	// stores both public keys, the fingerprint, the next key generation and the report, and the
+	// host becomes confirming. Errors: unauthenticated with one body for every code that does not
+	// work (malformed without any database access, unknown, used, replaced, expired);
+	// validation_failed for the keys and the report (the code stays valid); conflict with reason
+	// host_key_in_use or host_key_reused.
+	Pair(ctx context.Context, cmd PairHost) (PairResult, error)
+	// Confirm confirms the fingerprint of a host in confirming (host.manage, M2-41), declares its
+	// LLM login (I6 in the same transaction), its server host and the session users of people,
+	// and the host becomes active. Errors: fingerprint_mismatch with attempts_remaining (the
+	// failure counts and commits; at terminal.fingerprint_max_attempts the host falls back to
+	// pairing without keys), validation_failed (/fingerprint_prefix invalid_format, /reason,
+	// /credential_holder_id, /session_users/<i>/... with unknown_user or session_user_not_on_host),
+	// conflict session_user_taken, i6_violation, precondition_required, version_conflict,
+	// invalid_state_transition.
+	Confirm(ctx context.Context, p actor.Actor, cmd ConfirmHost) (HostView, error)
 }

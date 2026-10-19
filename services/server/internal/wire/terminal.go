@@ -11,6 +11,9 @@ import (
 	"github.com/OWNER/bothy/services/server/internal/identity"
 	identitypg "github.com/OWNER/bothy/services/server/internal/identity/adapters/postgres"
 	identityapp "github.com/OWNER/bothy/services/server/internal/identity/app"
+	"github.com/OWNER/bothy/services/server/internal/instance"
+	instancepg "github.com/OWNER/bothy/services/server/internal/instance/adapters/postgres"
+	instanceapp "github.com/OWNER/bothy/services/server/internal/instance/app"
 	"github.com/OWNER/bothy/services/server/internal/kernel/authorize"
 	"github.com/OWNER/bothy/services/server/internal/kernel/clock"
 	"github.com/OWNER/bothy/services/server/internal/kernel/errs"
@@ -25,7 +28,9 @@ import (
 
 // TerminalConfig binds the keys of the host use cases (host.name_max_chars,
 // host.os_user_max_chars, audit.reason_max_chars, terminal.pairing_code_ttl,
-// api.page_size_default, api.page_size_max). The error names the key whose binding failed, never
+// terminal.fingerprint_confirm_chars, terminal.fingerprint_max_attempts,
+// terminal.report_label_max_chars, terminal.report_max_entries, api.page_size_default,
+// api.page_size_max). The error names the key whose binding failed, never
 // a value.
 func TerminalConfig(v *config.Values) (terminalapp.Config, error) {
 	var c terminalapp.Config
@@ -48,6 +53,23 @@ type pairingCodes struct{ tokens identity.Tokens }
 // Issue implements terminalapp.PairingCodes.
 func (p pairingCodes) Issue(ctx context.Context) (identity.PairingCode, error) {
 	return p.tokens.NewHostPairingCode(ctx)
+}
+
+// Hash implements terminalapp.PairingCodes (M2-41).
+func (p pairingCodes) Hash(ctx context.Context, raw string) ([]byte, error) {
+	return p.tokens.HashHostPairingCode(ctx, raw)
+}
+
+// instanceIdentity binds the outgoing port terminal/app.Instance to instance.State (M2-41).
+type instanceIdentity struct{ state instance.State }
+
+// InstanceID implements terminalapp.Instance.
+func (i instanceIdentity) InstanceID(ctx context.Context) (ids.ID, error) {
+	r, err := i.state.Load(ctx)
+	if err != nil {
+		return ids.ID{}, err
+	}
+	return r.InstanceID, nil
 }
 
 // people binds the outgoing port terminal/app.People to identity.Directory.
@@ -99,7 +121,8 @@ func NewTerminal(cfg terminalapp.Config, pool *pg.Pool, uow txn.UnitOfWork, az a
 	}
 	svc, err := terminalapp.New(cfg, terminalapp.Deps{
 		Store: terminalpg.NewRepository(pool), PairingCodes: pairingCodes{tokens: id.Tokens},
-		People: people{dir: identityapp.NewDirectory(identitypg.NewRepository(pool))}, Presence: terminalapp.NoConnections{},
+		Instance: instanceIdentity{state: instanceapp.NewState(instancepg.NewRepository(pool), uow)},
+		People:   people{dir: identityapp.NewDirectory(identitypg.NewRepository(pool))}, Presence: terminalapp.NoConnections{},
 		UoW: uow, Authorizer: az, Audit: w.Audit, Events: w.Events, Cursors: terminalhttp.Cursors{}, Clock: clk,
 	})
 	if err != nil {

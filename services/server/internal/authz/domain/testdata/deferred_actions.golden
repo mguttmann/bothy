@@ -8,7 +8,6 @@ command.invoke
 file.read
 file.transcript.submit
 host.connect
-host.pair
 import.apply
 interaction.create
 run.followup.create

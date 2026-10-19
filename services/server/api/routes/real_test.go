@@ -453,6 +453,18 @@ func (stubServer) SetThreadTags(context.Context, rest.SetThreadTagsRequestObject
 	return nil, nil
 }
 
+func (stubServer) IssueHostPairingCode(context.Context, rest.IssueHostPairingCodeRequestObject) (rest.IssueHostPairingCodeResponseObject, error) {
+	return nil, nil
+}
+
+func (stubServer) PairHost(context.Context, rest.PairHostRequestObject) (rest.PairHostResponseObject, error) {
+	return nil, nil
+}
+
+func (stubServer) ConfirmHost(context.Context, rest.ConfirmHostRequestObject) (rest.ConfirmHostResponseObject, error) {
+	return nil, nil
+}
+
 func (stubServer) ListHosts(context.Context, rest.ListHostsRequestObject) (rest.ListHostsResponseObject, error) {
 	return nil, nil
 }
@@ -676,6 +688,10 @@ func TestRealTable_Enabled(t *testing.T) {
 		"updateHost":            {"PATCH /api/v1/hosts/{host_id}", "host.manage", "rl.admin"},
 		"setHostState":          {"POST /api/v1/hosts/{host_id}/state", "host.manage", "rl.admin"},
 		"setHostLlmCredentials": {"PUT /api/v1/hosts/{host_id}/llm-credentials", "host.manage", "rl.admin"},
+		// M2-41
+		"issueHostPairingCode": {"POST /api/v1/hosts/{host_id}/pairing-code", "host.manage", "rl.admin"},
+		"pairHost":             {"POST /api/v1/hosts/pair", "host.pair", "rl.public_auth"},
+		"confirmHost":          {"POST /api/v1/hosts/{host_id}/confirm", "host.manage", "rl.admin"},
 	}
 	ops := routes.Enabled()
 	if len(ops) != len(want) {

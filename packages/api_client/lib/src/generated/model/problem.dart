@@ -26,6 +26,7 @@ part 'problem.g.dart';
 /// * [hint] - Short instruction for the person making the change, e.g. switch the agent to `organization` first.
 /// * [errors] - Field errors for `validation_failed`.
 /// * [current] - Current representation of the resource for `version_conflict` and `base_version_conflict`.
+/// * [attemptsRemaining] - Present with `fingerprint_mismatch`; `0` means the host fell back to `pairing` and needs a new pairing code (24, 3.2).
 /// * [conflicts] - Present with `i1_violation` (one entry per agent, 10-backend-policy, 5.4) and `i6_violation` (one entry per host, 24, 7.3).
 @BuiltValue()
 abstract class Problem implements Built<Problem, ProblemBuilder> {
@@ -69,6 +70,10 @@ abstract class Problem implements Built<Problem, ProblemBuilder> {
   /// Current representation of the resource for `version_conflict` and `base_version_conflict`.
   @BuiltValueField(wireName: r'current')
   BuiltMap<String, JsonObject?>? get current;
+
+  /// Present with `fingerprint_mismatch`; `0` means the host fell back to `pairing` and needs a new pairing code (24, 3.2).
+  @BuiltValueField(wireName: r'attempts_remaining')
+  int? get attemptsRemaining;
 
   /// Present with `i1_violation` (one entry per agent, 10-backend-policy, 5.4) and `i6_violation` (one entry per host, 24, 7.3).
   @BuiltValueField(wireName: r'conflicts')
@@ -165,6 +170,13 @@ class _$ProblemSerializer implements PrimitiveSerializer<Problem> {
           FullType(String),
           FullType.nullable(JsonObject),
         ]),
+      );
+    }
+    if (object.attemptsRemaining != null) {
+      yield r'attempts_remaining';
+      yield serializers.serialize(
+        object.attemptsRemaining,
+        specifiedType: const FullType(int),
       );
     }
     if (object.conflicts != null) {
@@ -290,6 +302,14 @@ class _$ProblemSerializer implements PrimitiveSerializer<Problem> {
           ) as BuiltMap<String, JsonObject?>?;
           if (valueDes == null) continue;
           result.current.replace(valueDes);
+          break;
+        case r'attempts_remaining':
+          final valueDes = serializers.deserialize(
+            value,
+            specifiedType: const FullType.nullable(int),
+          ) as int?;
+          if (valueDes == null) continue;
+          result.attemptsRemaining = valueDes;
           break;
         case r'conflicts':
           final valueDes = serializers.deserialize(
