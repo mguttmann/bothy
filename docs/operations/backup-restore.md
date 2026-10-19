@@ -56,7 +56,9 @@ reports the metrics `bothy.backup.*` and `bothy.storage.volume.*`. One kind by h
    `s3:BypassGovernanceRetention` or bucket settings. The owner's second key, with the right to
    delete old versions, never goes into `secrets/` (section 9). The Compose file sets
    `BOTHY_PGBACKREST_REPO2=on` for `postgres` when the target is set, so `archive-push` writes
-   every WAL segment into repo2 as well.
+   every WAL segment into repo2 as well. While the off-site target cannot be reached,
+   `archive-push` fails and PostgreSQL keeps the segments in `pg_wal` and retries
+   (`BothyWalArchiveStale`); the volume `pgdata` grows until the target answers again.
 3. `docker compose up -d backup`; `bothy-backupd` legt beim ersten Start die pgBackRest-Stanza und
    das restic-Repository an. It retries `stanza-create` until the database and its pgBackRest
    server answer; its log line `stanza bothy is ready` and the health check of `backup` (a TLS
