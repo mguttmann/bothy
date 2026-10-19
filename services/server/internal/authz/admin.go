@@ -224,7 +224,7 @@ type AccessExplanation struct {
 // AccessEffect is one effect of a previewed grant (OpenAPI AccessEffect).
 type AccessEffect struct {
 	Principal PrincipalRef
-	// TargetKind is space or channel.
+	// TargetKind is space, channel or host (M2-40).
 	TargetKind              string
 	TargetID                ids.ID
 	BeforeLevel, AfterLevel string
@@ -232,10 +232,11 @@ type AccessEffect struct {
 }
 
 // InvariantViolation is one invariant a previewed grant would break (OpenAPI InvariantViolation):
-// i1_violation with the agent, or last_owner.
+// i1_violation with the agent, i6_violation with the host (M2-40), or last_owner.
 type InvariantViolation struct {
 	Code               string
 	AgentID            ids.ID
+	HostID             ids.ID
 	CredentialHolderID ids.ID
 	// PrincipalIDs would gain trigger next to the credential holder; never nil.
 	PrincipalIDs []ids.ID
@@ -245,7 +246,8 @@ type InvariantViolation struct {
 }
 
 // PreviewHint is one hint of a preview (OpenAPI PreviewHint): read_horizon,
-// trigger_blocked_tool_class, group_reach or expiry_missing. HasCount marks a present Count.
+// trigger_blocked_tool_class, group_reach, expiry_missing or terminal_not_effective (M2-40).
+// HasCount marks a present Count.
 type PreviewHint struct {
 	Code                                              string
 	AgentID, PrincipalID, GroupID, SpaceID, ChannelID ids.ID

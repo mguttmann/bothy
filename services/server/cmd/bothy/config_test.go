@@ -370,7 +370,9 @@ func TestConfigPrintShowsSourcePerKey(t *testing.T) {
 		"telemetry.traces.sampler_ratio = 1  # default\n" +
 		"telemetry.traces.trust_remote_parent = false  # default\n" +
 		"terminal.pairing_code_ttl = 15m  # default\n" +
+		"terminal.quick_reattach_window = 1m  # default\n" +
 		"terminal.session_token_ttl = 30s  # default\n" +
+		"terminal.step_up_max_age = 1m  # default\n" +
 		"thread.max_tags = 5  # default\n" +
 		"thread.placeholder_titles = Neuer Chat, New chat, Chat, Ohne Titel, Untitled, Test  # default\n" +
 		"thread.title_max_chars = 200  # default\n" +

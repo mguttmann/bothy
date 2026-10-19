@@ -38,6 +38,10 @@ type Decision struct {
 	Outcome Outcome
 	// Reason is the reason code; empty for allow.
 	Reason Reason
+	// QuickReattach is true exactly when the step-up rule of an action with fresh step-up (terminal.attach)
+	// was waived by the quick reattach of 08 section 6.3 point 5 (M2-40): the use case then
+	// consumes no step-up.
+	QuickReattach bool
 }
 
 // Allowed reports whether d allows the action. The zero Decision is no allow.
@@ -57,7 +61,20 @@ const (
 	reasonLastOwner       Reason = "last_owner"
 	reasonBillingMismatch Reason = "billing_mode_mismatch"
 	reasonToolMismatch    Reason = "tool_class_mismatch"
+	reasonI6Violation     Reason = "i6_violation"
+	reasonHostNotActive   Reason = "host_not_active"
 )
+
+// terminalReasons are the reasons of forbidden that answer 403 terminal_denied, with the reason of
+// the problem body (07 section 4.1, 24 section 13; M2-40).
+var terminalReasons = map[Reason]string{
+	"terminal_not_host_assignee":      "not_host_assignee",
+	"terminal_server_host_owner_only": "server_host_owner_only",
+	"i6_holder_only":                  "i6_holder_only",
+	"terminal_no_session_user":        "no_session_user",
+	"terminal_profile_unknown":        "profile_unknown",
+	"terminal_session_limit":          "session_limit",
+}
 
 // Err returns nil for allow and otherwise a kernel/errs error that the problem writer renders
 // (06 section 5; mapping table of the brief M1-28):
@@ -69,7 +86,10 @@ const (
 //   - step_up_required: 401 step_up_required;
 //   - unauthenticated: 401 session_revoked for principal_inactive, session_revoked and
 //     device_inactive, 401 unauthenticated otherwise; no reason;
-//   - invariant_violation: 409 with the reason as code (i1_violation, last_owner,
+//   - forbidden with a terminal guard reason (M2-40): 403 terminal_denied with the reason of 24
+//     section 13 (not_host_assignee, server_host_owner_only, i6_holder_only, no_session_user,
+//     profile_unknown, session_limit); host_not_active gives 409 host_unavailable without one;
+//   - invariant_violation: 409 with the reason as code (i1_violation, i6_violation, last_owner,
 //     billing_mode_mismatch, tool_class_mismatch) and the reason extension.
 //
 // An outcome outside the list, and the zero Decision, give 500 internal_error: fail closed.
@@ -80,6 +100,12 @@ func (d Decision) Err() error {
 	case OutcomeNotFound:
 		return errs.New(errs.CodeNotFound, "")
 	case OutcomeForbidden:
+		if r, ok := terminalReasons[d.Reason]; ok {
+			return errs.New(errs.CodeTerminalDenied, "").WithReason(r)
+		}
+		if d.Reason == reasonHostNotActive {
+			return errs.New(errs.CodeHostUnavailable, "")
+		}
 		code, ok := forbiddenCodes[d.Reason]
 		if !ok {
 			code = errs.CodeForbidden
@@ -117,6 +143,7 @@ var revokedReasons = map[Reason]bool{reasonPrincipalInact: true, reasonSessionRe
 // invariantCodes are the reasons of invariant_violation and their codes.
 var invariantCodes = map[Reason]errs.Code{
 	reasonI1Violation:     errs.CodeI1Violation,
+	reasonI6Violation:     errs.CodeI6Violation,
 	reasonLastOwner:       errs.CodeLastOwner,
 	reasonBillingMismatch: errs.CodeBillingModeMismatch,
 	reasonToolMismatch:    errs.CodeToolClassMismatch,

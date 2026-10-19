@@ -56,6 +56,10 @@ type Actor struct {
 	StepUpAt time.Time
 	// StepUpMethod is auth_sessions.step_up_method of StepUpAt; "" for none.
 	StepUpMethod string
+	// StepUpConsumedAt is auth_sessions.step_up_consumed_at, the time an opening of a terminal
+	// session consumed the step-up (08 section 6.3 point 4, M2-40); zero when never consumed. A
+	// step-up counts as consumed while StepUpConsumedAt is not before StepUpAt.
+	StepUpConsumedAt time.Time
 	// AuthMethod is auth_sessions.auth_method, the login path of the session.
 	AuthMethod string
 	// ClientComponent is auth_sessions.client_component (app, share_ext, console).
@@ -140,6 +144,15 @@ func (a Actor) InstallationRef() ids.ID { return a.InstallationID }
 
 // StepUpTime returns a.StepUpAt (kernel/authorize.Principal).
 func (a Actor) StepUpTime() time.Time { return a.StepUpAt }
+
+// StepUpMethodName returns a.StepUpMethod (kernel/authorize.Principal).
+func (a Actor) StepUpMethodName() string { return a.StepUpMethod }
+
+// StepUpConsumedTime returns a.StepUpConsumedAt (kernel/authorize.Principal).
+func (a Actor) StepUpConsumedTime() time.Time { return a.StepUpConsumedAt }
+
+// ClientComponentName returns a.ClientComponent (kernel/authorize.Principal).
+func (a Actor) ClientComponentName() string { return a.ClientComponent }
 
 // CredentialState returns the state of session, device and device key the authenticator read for
 // this request and true; false when it read none (DeviceState empty), for example for an API

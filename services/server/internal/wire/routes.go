@@ -108,7 +108,7 @@ type Handlers struct {
 	// Lifecycle implements disableUser, revokeDevice and revokeSession (identity, M1-45).
 	*identityhttp.Lifecycle
 	// Hosts implements listHosts, createHost, getHost, updateHost and setHostState (terminal,
-	// M2-39).
+	// M2-39) and setHostLlmCredentials (M2-40).
 	*terminalhttp.Hosts
 }
 

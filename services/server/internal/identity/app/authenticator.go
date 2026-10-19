@@ -285,7 +285,7 @@ func (a *Authenticator) describe(out *actor.Actor, st AuthState) {
 		}
 	}
 	out.DeviceKeyActive = own && st.DeviceKeyJKT != "" && st.DeviceKeyJKT == out.KeyThumbprint && !a.inactive(st)
-	out.StepUpAt, out.StepUpMethod = s.StepUpAt, s.StepUpMethod
+	out.StepUpAt, out.StepUpMethod, out.StepUpConsumedAt = s.StepUpAt, s.StepUpMethod, s.StepUpConsumedAt
 	out.AuthMethod, out.ClientComponent = string(s.AuthMethod), string(s.Component)
 }
 

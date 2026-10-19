@@ -17,6 +17,9 @@ const (
 	kindGroup     = "group"
 	kindGrant     = "grant"
 	kindDevice    = "device"
+	// kindTerminalSession is a terminal session (M2-40): visible to its person and to effective
+	// owners, whatever the requirement.
+	kindTerminalSession = "terminal_session"
 )
 
 // channelPathKinds are the kinds that live in a channel: a dm channel is visible to participants
@@ -47,9 +50,8 @@ var ownerOnlyKinds = map[string]bool{KindApp: true, "webhook_delivery": true, "i
 func IsChannelPathKind(kind string) bool { return channelPathKinds[kind] }
 
 // Visible applies the visibility table to the facts of in with its effective rights. reason is
-// the reason of an invisible resource (no_grant, or not_self for principal-owned kinds). The error
-// reports a kind outside the table (terminal_session included: none of its actions is reachable in
-// M1).
+// the reason of an invisible resource (no_grant, or not_self for principal-owned kinds and terminal
+// sessions). The error reports a kind outside the table.
 func Visible(in Input) (visible bool, reason Reason, err error) {
 	if in.Target != nil && !in.Target.Visible {
 		return false, ReasonNoGrant, nil
@@ -110,6 +112,9 @@ var kindRules = map[string]func(in Input) (bool, Reason, error){
 		return in.Eff.Owner || in.GroupMember, ReasonNoGrant, nil
 	},
 	kindHost: hostVisible,
+	kindTerminalSession: func(in Input) (bool, Reason, error) {
+		return isSelf(in) || in.Eff.Owner, ReasonNotSelf, nil
+	},
 }
 
 // hostVisible: an effective owner sees every host, its holder the own host, a person with the

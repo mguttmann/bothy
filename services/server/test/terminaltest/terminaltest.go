@@ -44,6 +44,14 @@ type Host struct {
 	ReportedSessionUsers []string
 	// CreatedAt is the creation time; zero means now() of the database.
 	CreatedAt time.Time
+	// LLMCredentials is none, personal or organization; empty means none (M2-40).
+	// CredentialHolderID is the holder with personal.
+	LLMCredentials     string
+	CredentialHolderID ids.ID
+	// DeclaredServerHost is the owner's declaration; ReportedIsServerHost the report of the host
+	// service, nil for none (M2-40).
+	DeclaredServerHost   bool
+	ReportedIsServerHost *bool
 }
 
 // The states the fixtures write besides the ones they only pass through.
@@ -117,22 +125,33 @@ func InsertHost(ctx context.Context, db *pg.Pool, h Host) (ids.ID, error) {
 	if h.State == "retired" {
 		ret = time.Now()
 	}
-	var holder any
-	if !h.AssignedUserID.IsZero() {
-		holder = h.AssignedUserID.String()
-	}
+	holder := idOrNil(h.AssignedUserID)
 	created := any(nil)
 	if !h.CreatedAt.IsZero() {
 		created = h.CreatedAt
 	}
+	if h.LLMCredentials == "" {
+		h.LLMCredentials = "none"
+	}
+	credHolder := idOrNil(h.CredentialHolderID)
 	_, err = db.Exec(ctx, `INSERT INTO hosts (id, name, state, platform, assigned_user_id, pairing_code_hash, pairing_expires_at,
 		noise_public_key, auth_public_jwk, auth_jkt, key_fingerprint, key_generation, paired_at, confirmed_by, confirmed_at,
-		reported_profiles, reported_session_users, reported_doctor, created_by, created_at, disabled_at, disabled_reason, retired_at)
+		reported_profiles, reported_session_users, reported_doctor, created_by, created_at, disabled_at, disabled_reason, retired_at,
+		llm_credentials, credential_holder_id, declared_server_host, reported_is_server_host)
 		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, CASE WHEN $8::bytea IS NULL THEN 0 ELSE 1 END, $12, $13, $14,
-		$15, $16, $17, $18, coalesce($19, now()), $20, $21, $22)`,
+		$15, $16, $17, $18, coalesce($19, now()), $20, $21, $22, $23, $24, $25, $26)`,
 		h.ID.String(), h.Name, h.State, pf, holder, hash, expires, noise, jwk, jkt, fingerprint, pairedAt, confirmedBy, confirmedAt,
-		profiles, string(users), doctor, h.CreatedBy.String(), created, disabledAt, reason, ret)
+		profiles, string(users), doctor, h.CreatedBy.String(), created, disabledAt, reason, ret,
+		h.LLMCredentials, credHolder, h.DeclaredServerHost, h.ReportedIsServerHost)
 	return h.ID, err
+}
+
+// idOrNil returns id as text, or nil (SQL NULL) for the zero id.
+func idOrNil(id ids.ID) any {
+	if id.IsZero() {
+		return nil
+	}
+	return id.String()
 }
 
 // SessionUser describes a host_session_users row.

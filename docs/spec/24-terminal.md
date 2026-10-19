@@ -1018,6 +1018,15 @@ audit, permissions `yes`):
 | `personal` | The login is the personal subscription of exactly one person (`hosts.credential_holder_id`). This person logs in themselves in the account of their session user; the host service does not touch the login (7.4). |
 | `organization` | The login is an organization API key from the state directory of the host service. |
 
+The owner declares it with `setHostLlmCredentials` (`PUT /api/v1/hosts/{host_id}/llm-credentials`,
+M2-40): `credential_holder_id` exactly with `personal`, a person who is not deleted (missing with
+`personal`: `errors[].code = required`; sent with `none` or `organization`: `not_allowed`;
+unknown, not a person or deleted: `unknown_user`), with a mandatory reason and `If-Match`. The same
+declaration the host already has answers `200` without a new version, without an event and without
+a new rights version (audit with `no_change`). A `retired` host answers `409 conflict`, because
+`retired` is final (3.1); every other state takes the declaration, and `confirmHost` (M2-41) sets it
+again at the confirmation (docs/DECISIONS.md D-M2-40-7).
+
 ### 7.3 Invariant I6
 
 **I6:** If `llm_credentials = personal`, only `credential_holder_id` may open or attach a terminal
@@ -1031,7 +1040,10 @@ Enforcement points:
    change of the declaration, change of the holder of the login): if afterwards a principal other
    than `credential_holder_id` would have a valid grant `terminal` on the host, the
    transaction rolls back: `409 i6_violation` (decision `invariant_violation`), audit `deny` (03,
-   section 6.8).
+   section 6.8). `authz` checks I6 on every rights change like I1 (M2-40), for every host with
+   `personal`: so the check also catches `user.enable` of a person whose dormant grant on a host
+   that has become `personal` in the meantime would become valid again (docs/DECISIONS.md
+   D-M2-40-5).
 2. **On every `terminal.open` and `terminal.attach`**: SR11 in 07, fail closed.
 3. **On a change** to `personal` or of the holder, the same transaction ends all sessions of
    other people on the host (`i6_violation`).
@@ -1403,7 +1415,7 @@ available from Windows 10 version 1809 and Windows Server 2019
 | `fingerprint_mismatch` | `409` | confirmation with a wrong fingerprint |
 | `i6_violation` | `409` | change would violate I6 (`hint`) |
 | `conflict` | `409` | assignment of a session user that on the host already belongs or belonged to a person, or a second valid assignment of the same person (`reason: session_user_taken`, 2.2) |
-| `validation_failed` | `400` | assignment of a name that the host does not report (`errors[].code = session_user_not_on_host`, 2.2 item 5); assignee or person of an assignment unknown, not a person or deleted (`errors[].code = unknown_user`); `assigned_user_id` together with `clear_assigned_user = true` (`errors[].code = mutually_exclusive`) |
+| `validation_failed` | `400` | assignment of a name that the host does not report (`errors[].code = session_user_not_on_host`, 2.2 item 5); assignee, person of an assignment or holder of the LLM login unknown, not a person or deleted (`errors[].code = unknown_user`); `assigned_user_id` together with `clear_assigned_user = true` (`errors[].code = mutually_exclusive`); `credential_holder_id` with `none` or `organization` (`errors[].code = not_allowed`, 7.2) |
 | `not_found` | `404` | no read permission on the host or the session |
 
 Close codes of the terminal channels (source of the names and client reactions in English:

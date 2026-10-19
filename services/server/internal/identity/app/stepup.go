@@ -8,6 +8,7 @@ import (
 	"errors"
 	"time"
 
+	"github.com/OWNER/bothy/services/server/internal/authz"
 	"github.com/OWNER/bothy/services/server/internal/identity"
 	"github.com/OWNER/bothy/services/server/internal/identity/domain"
 	"github.com/OWNER/bothy/services/server/internal/identity/domain/stepup"
@@ -47,6 +48,9 @@ type StepUpDeps struct {
 	People       Store
 	Verifier     PasskeyVerifier
 	RelyingParty domain.RelyingParty
+	// Fresh judges the fresh step-up of a terminal opening with the rule of authorize
+	// (terminal.step_up_max_age, M2-40); nil fails ConsumeFresh closed.
+	Fresh authz.FreshStepUpCheck
 }
 
 // StepUps implements identity.StepUp with the device key (08 section 6.2, brief M1-35 "Design

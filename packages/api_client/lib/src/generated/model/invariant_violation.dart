@@ -15,8 +15,8 @@ part 'invariant_violation.g.dart';
 /// * [code]
 /// * [agentId] - UUIDv7 (RFC 9562), lowercase canonical form.
 /// * [hostId] - UUIDv7 (RFC 9562), lowercase canonical form.
-/// * [credentialHolderId] - Credential holder of the agent; absent if the agent has none.
-/// * [principalIds] - Principals that would gain `trigger` next to the credential holder.
+/// * [credentialHolderId] - Credential holder of the agent (`i1_violation`) or of the personal LLM login of the host (`i6_violation`); absent if the agent has none.
+/// * [principalIds] - With `i1_violation` the principals that would gain `trigger` next to the credential holder; with `i6_violation` the people other than the holder that a valid grant on the host names, directly or as members in effect of a group grant (empty for a group without members).
 /// * [organizationReady] - True when the agent reports `organization` among its `billing_modes_supported`.
 /// * [hint]
 @BuiltValue()
@@ -33,11 +33,11 @@ abstract class InvariantViolation
   @BuiltValueField(wireName: r'host_id')
   String? get hostId;
 
-  /// Credential holder of the agent; absent if the agent has none.
+  /// Credential holder of the agent (`i1_violation`) or of the personal LLM login of the host (`i6_violation`); absent if the agent has none.
   @BuiltValueField(wireName: r'credential_holder_id')
   String? get credentialHolderId;
 
-  /// Principals that would gain `trigger` next to the credential holder.
+  /// With `i1_violation` the principals that would gain `trigger` next to the credential holder; with `i6_violation` the people other than the holder that a valid grant on the host names, directly or as members in effect of a group grant (empty for a group without members).
   @BuiltValueField(wireName: r'principal_ids')
   BuiltList<String> get principalIds;
 

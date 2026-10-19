@@ -617,7 +617,7 @@ class HostsApi {
   }
 
   /// Declare the LLM login of a host
-  /// &#x60;personal&#x60; needs &#x60;credential_holder_id&#x60;. Fails with &#x60;409 i6_violation&#x60; if any grant on the host names another subject than the holder; switching to &#x60;personal&#x60; or changing the holder ends sessions of other people (&#x60;i6_violation&#x60;, 24, 7.3). Needs step-up.
+  /// &#x60;personal&#x60; needs &#x60;credential_holder_id&#x60;, a person that is not deleted; &#x60;none&#x60; and &#x60;organization&#x60; take none. Fails with &#x60;409 i6_violation&#x60; (member &#x60;conflicts&#x60;, one entry per host) if any valid grant on the host names another subject than the holder or a group; switching to &#x60;personal&#x60; or changing the holder ends the sessions of other people in the same transaction (&#x60;close_reason&#x60; &#x60;i6_violation&#x60;, 24, 7.3). A &#x60;retired&#x60; host answers &#x60;409 conflict&#x60;. The declaration the host already has answers &#x60;200&#x60; with the current host, without a new version, an event or a new rights version (audited with &#x60;no_change&#x60;). Needs step-up and the mandatory &#x60;reason&#x60;.
   ///
   /// Parameters:
   /// * [hostId]

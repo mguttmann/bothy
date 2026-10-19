@@ -28,7 +28,7 @@ type AccessView struct {
 	SpaceLevels map[ids.ID]Level
 	// Channels are the channels with at least read, with level and capabilities (Owner unused).
 	Channels map[ids.ID]Rights
-	// Hosts are the hosts with the effective right terminal (TerminalOn, M2-39).
+	// Hosts are the hosts with the effective right terminal (TerminalEffective, M2-39 and M2-40).
 	Hosts map[ids.ID]bool
 }
 
@@ -66,8 +66,10 @@ func AccessViewOf(s Snapshot, kind string, principal ids.ID, channels []Path, sp
 	return v
 }
 
-// hostsOf returns the hosts of a person with TerminalOn: every host of hosts for an effective
-// owner, the hosts of the grants otherwise; agents and apps hold none (M2-39).
+// hostsOf returns the hosts of a person with the effective right terminal (TerminalEffective, the
+// I6 clause of 07 section 2.12 point 3 included, M2-40): every host of hosts for an effective
+// owner except the personal hosts of another holder, the hosts of the grants otherwise; agents and
+// apps hold none (M2-39).
 func hostsOf(s Snapshot, kind string, hosts []ids.ID) map[ids.ID]bool {
 	out := map[ids.ID]bool{}
 	if kind != KindUser {
@@ -75,11 +77,13 @@ func hostsOf(s Snapshot, kind string, hosts []ids.ID) map[ids.ID]bool {
 	}
 	if s.Owner {
 		for _, h := range hosts {
-			out[h] = true
+			if TerminalEffective(s, h) {
+				out[h] = true
+			}
 		}
 	}
 	for h := range s.Hosts {
-		if TerminalOn(s, h) {
+		if TerminalEffective(s, h) {
 			out[h] = true
 		}
 	}

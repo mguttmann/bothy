@@ -26,7 +26,7 @@ part 'problem.g.dart';
 /// * [hint] - Short instruction for the person making the change, e.g. switch the agent to `organization` first.
 /// * [errors] - Field errors for `validation_failed`.
 /// * [current] - Current representation of the resource for `version_conflict` and `base_version_conflict`.
-/// * [conflicts] - One entry per affected agent; present with `i1_violation` (10-backend-policy, 5.4).
+/// * [conflicts] - Present with `i1_violation` (one entry per agent, 10-backend-policy, 5.4) and `i6_violation` (one entry per host, 24, 7.3).
 @BuiltValue()
 abstract class Problem implements Built<Problem, ProblemBuilder> {
   @BuiltValueField(wireName: r'type')
@@ -70,7 +70,7 @@ abstract class Problem implements Built<Problem, ProblemBuilder> {
   @BuiltValueField(wireName: r'current')
   BuiltMap<String, JsonObject?>? get current;
 
-  /// One entry per affected agent; present with `i1_violation` (10-backend-policy, 5.4).
+  /// Present with `i1_violation` (one entry per agent, 10-backend-policy, 5.4) and `i6_violation` (one entry per host, 24, 7.3).
   @BuiltValueField(wireName: r'conflicts')
   BuiltList<InvariantViolation>? get conflicts;
 

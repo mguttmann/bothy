@@ -34,6 +34,13 @@ type Principal interface {
 	InstallationRef() ids.ID
 	// StepUpTime is the last fresh confirmation of the session; zero when there was none.
 	StepUpTime() time.Time
+	// StepUpMethodName is auth_sessions.step_up_method of StepUpTime; "" for none (M2-40).
+	StepUpMethodName() string
+	// StepUpConsumedTime is auth_sessions.step_up_consumed_at; zero when never consumed (M2-40).
+	StepUpConsumedTime() time.Time
+	// ClientComponentName is auth_sessions.client_component (app, share_ext, console); "" without
+	// a session (M2-40).
+	ClientComponentName() string
 	// AppGrantedScopes are app_installations.granted_scopes (apps only). The result may be shared;
 	// callers do not change it.
 	AppGrantedScopes() []string

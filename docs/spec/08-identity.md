@@ -573,7 +573,11 @@ session in which it was provided, that is, to one device.
 4. The step-up is unconsumed: `step_up_consumed_at IS NULL OR step_up_consumed_at < step_up_at`.
    The action sets `step_up_consumed_at = now()` in its transaction (lock on the session row).
    One confirmation thus opens exactly one session; of two simultaneous openings with the same
-   confirmation, all but one fail.
+   confirmation, all but one fail. The consumption (`StepUp.ConsumeFresh`, M2-40) is the first row
+   lock of the transaction of the action and checks the freshness at the locked row once more with
+   the same rule as `authorize` and the time of the call, not at the principal of the request: two
+   requests with one confirmation both pass `authorize`, only the lock orders them, and the second
+   sees the consumption (docs/DECISIONS.md D-M2-40-2).
 5. Exception: reattaching from the same device in the same login session within
    `terminal.quick_reattach_window` after the detach needs no new step-up
    ([24-terminal.md](24-terminal.md), section 6.2). Not in the web console

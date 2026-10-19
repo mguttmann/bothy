@@ -37,4 +37,12 @@ var catalogEN = catalog{
 	"hint.group_reach.one":                       "Note: the group {group} reaches one person.",
 	"hint.expiry_missing":                        "Note: the grant for {subject} has no expiry date.",
 	"date":                                       "2006-01-02",
+	// The grant on a host (M2-40, 07 section 9.3).
+	"summary.host": `{subject} gets the additional right "Terminal" on host {host}{until}.`,
+	"hint.i6":      "Rejected: {host} uses the personal LLM login of {holder}. Only {holder} may hold a grant there.",
+	"hint.terminal_not_effective.server_host":     "Note: the grant does not take effect for {subject}. {host} runs the server; only owners open a terminal there.",
+	"hint.terminal_not_effective.not_assignee":    "Note: the grant does not take effect for {subject}. On {host} only owners and the person the host is assigned to open a terminal.",
+	"hint.terminal_not_effective.no_session_user": "Note: the grant takes effect for {subject} only once {subject} has an own session user on {host}.",
+	"hint.terminal_not_effective.group":           "Note: the grant does not take effect on {host} for {count} members of {group}.",
+	"hint.terminal_not_effective.group_one":       "Note: the grant does not take effect on {host} for 1 member of {group}.",
 }

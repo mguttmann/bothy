@@ -177,6 +177,9 @@ type IdentityWrites struct {
 	// Settings reads locale.default, the language createUser stores when the request names none
 	// (M1-46).
 	Settings instance.Settings
+	// Fresh is the fresh step-up check of authz (terminal.step_up_max_age, M2-40) for
+	// StepUp.ConsumeFresh; nil fails it closed.
+	Fresh authz.FreshStepUpCheck
 }
 
 // NewIdentity builds the identity module over pool with the unit of work uow, the Authorizer az,
@@ -275,7 +278,7 @@ func (i *Identity) BindSessions(keys instance.Keys, instanceID ids.ID) error {
 	}
 	stepUps, err := app.NewStepUps(i.cfg, i.pepper, app.StepUpDeps{
 		Challenges: i.repo, Sessions: i.repo, Devices: i.repo, Auth: sessions, UoW: i.uow, Authorizer: i.az, Audit: i.writes.Audit,
-		Clock: i.clk, Passkeys: i.repo, People: i.repo, Verifier: verifier, RelyingParty: rp,
+		Clock: i.clk, Passkeys: i.repo, People: i.repo, Verifier: verifier, RelyingParty: rp, Fresh: i.writes.Fresh,
 	})
 	if err != nil {
 		return err

@@ -13,7 +13,7 @@ part 'host_llm_credentials_set.g.dart';
 ///
 /// Properties:
 /// * [llmCredentials]
-/// * [credentialHolderId] - Required exactly with `personal`.
+/// * [credentialHolderId] - Required exactly with `personal`. `errors[].code` `required` when missing with `personal`, `not_allowed` when sent with `none` or `organization`, `unknown_user` when it names no person or a deleted one.
 /// * [reason]
 @BuiltValue()
 abstract class HostLlmCredentialsSet
@@ -22,7 +22,7 @@ abstract class HostLlmCredentialsSet
   LlmCredentials get llmCredentials;
   // enum llmCredentialsEnum {  none,  personal,  organization,  };
 
-  /// Required exactly with `personal`.
+  /// Required exactly with `personal`. `errors[].code` `required` when missing with `personal`, `not_allowed` when sent with `none` or `organization`, `unknown_user` when it names no person or a deleted one.
   @BuiltValueField(wireName: r'credential_holder_id')
   String? get credentialHolderId;
 

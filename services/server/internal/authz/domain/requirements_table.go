@@ -143,10 +143,15 @@ var requirementGroups = []struct {
 	{"read or self", ByKind(map[string]Expr{kindChannel: AtLeast(LevelRead), kindUserRes: Self}), []string{
 		"template.read",
 	}},
-	{"self and +terminal", Deferred("M2"), []string{"terminal.attach"}},
-	{"self or owner", Deferred("M2"), []string{"terminal.close", "terminal.read_own"}},
-	{"human and +terminal", Deferred("M2"), []string{"terminal.open"}},
-	{"self", Deferred("M2"), []string{"terminal.stream"}},
+	// The terminal actions (M2-40, 05 section 4.14): overrides by action id put each behind the gate
+	// of HumanSession; Terminal of terminal.attach is evaluated on the session's host.
+	{"self and +terminal", All(HumanSession, Self, Terminal), []string{"terminal.attach"}},
+	{"self or owner", All(HumanSession, Any(Self, Owner)), []string{"terminal.close"}},
+	{"self or owner", All(HumanSession, ByKind(map[string]Expr{kindTerminalSession: Any(Self, Owner), kindHost: Auth})), []string{
+		"terminal.read_own",
+	}},
+	{"human and +terminal", All(HumanSession, Terminal), []string{"terminal.open"}},
+	{"self", All(HumanSession, Self), []string{"terminal.stream"}},
 	{"manage on source and target", All(HasCap(CapManage), TargetHasCap(CapManage)), []string{"thread.move"}},
 	{"write", All(AtLeast(LevelWrite), HasCapIf(CapManage, FactRestrictedTags)), []string{"thread.tags.set"}},
 	{"write and (creator or manage or operator agent)", All(AtLeast(LevelWrite), Any(Self, HasCap(CapManage), ThreadOperator)), []string{

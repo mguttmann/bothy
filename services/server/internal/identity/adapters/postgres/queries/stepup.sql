@@ -37,3 +37,13 @@ UPDATE auth_sessions SET step_up_at = @step_up_at, step_up_method = @step_up_met
 DELETE FROM auth_challenges
 WHERE expires_at <= @now
   AND NOT (purpose = 'step_up' AND status = 'failed' AND finished_at > @keep_failed_since);
+
+-- name: LockSessionForStepUpConsumption :one
+-- The login session of a terminal opening, locked as the first row lock of its transaction, so a
+-- second opening with the same confirmation waits and sees the consumption (08 section 6.3 point
+-- 4, 03 section 6.3; M2-40).
+SELECT * FROM auth_sessions WHERE id = @id AND user_id = @user_id FOR UPDATE;
+
+-- name: ConsumeStepUp :execrows
+-- Consumes the step-up of a session: one confirmation opens exactly one terminal session.
+UPDATE auth_sessions SET step_up_consumed_at = @consumed_at WHERE id = @id AND step_up_at IS NOT NULL;

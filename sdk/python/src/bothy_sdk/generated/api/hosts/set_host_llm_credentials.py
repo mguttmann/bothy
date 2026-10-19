@@ -109,9 +109,13 @@ def sync_detailed(
 ) -> Response[Host | Problem]:
     """Declare the LLM login of a host
 
-     `personal` needs `credential_holder_id`. Fails with `409 i6_violation` if any grant on the host
-    names another subject than the holder; switching to `personal` or changing the holder ends sessions
-    of other people (`i6_violation`, 24, 7.3). Needs step-up.
+     `personal` needs `credential_holder_id`, a person that is not deleted; `none` and `organization`
+    take none. Fails with `409 i6_violation` (member `conflicts`, one entry per host) if any valid grant
+    on the host names another subject than the holder or a group; switching to `personal` or changing
+    the holder ends the sessions of other people in the same transaction (`close_reason` `i6_violation`,
+    24, 7.3). A `retired` host answers `409 conflict`. The declaration the host already has answers
+    `200` with the current host, without a new version, an event or a new rights version (audited with
+    `no_change`). Needs step-up and the mandatory `reason`.
 
     Args:
         host_id (UUID): UUIDv7 (RFC 9562), lowercase canonical form.
@@ -148,9 +152,13 @@ def sync(
 ) -> Host | Problem | None:
     """Declare the LLM login of a host
 
-     `personal` needs `credential_holder_id`. Fails with `409 i6_violation` if any grant on the host
-    names another subject than the holder; switching to `personal` or changing the holder ends sessions
-    of other people (`i6_violation`, 24, 7.3). Needs step-up.
+     `personal` needs `credential_holder_id`, a person that is not deleted; `none` and `organization`
+    take none. Fails with `409 i6_violation` (member `conflicts`, one entry per host) if any valid grant
+    on the host names another subject than the holder or a group; switching to `personal` or changing
+    the holder ends the sessions of other people in the same transaction (`close_reason` `i6_violation`,
+    24, 7.3). A `retired` host answers `409 conflict`. The declaration the host already has answers
+    `200` with the current host, without a new version, an event or a new rights version (audited with
+    `no_change`). Needs step-up and the mandatory `reason`.
 
     Args:
         host_id (UUID): UUIDv7 (RFC 9562), lowercase canonical form.
@@ -182,9 +190,13 @@ async def asyncio_detailed(
 ) -> Response[Host | Problem]:
     """Declare the LLM login of a host
 
-     `personal` needs `credential_holder_id`. Fails with `409 i6_violation` if any grant on the host
-    names another subject than the holder; switching to `personal` or changing the holder ends sessions
-    of other people (`i6_violation`, 24, 7.3). Needs step-up.
+     `personal` needs `credential_holder_id`, a person that is not deleted; `none` and `organization`
+    take none. Fails with `409 i6_violation` (member `conflicts`, one entry per host) if any valid grant
+    on the host names another subject than the holder or a group; switching to `personal` or changing
+    the holder ends the sessions of other people in the same transaction (`close_reason` `i6_violation`,
+    24, 7.3). A `retired` host answers `409 conflict`. The declaration the host already has answers
+    `200` with the current host, without a new version, an event or a new rights version (audited with
+    `no_change`). Needs step-up and the mandatory `reason`.
 
     Args:
         host_id (UUID): UUIDv7 (RFC 9562), lowercase canonical form.
@@ -219,9 +231,13 @@ async def asyncio(
 ) -> Host | Problem | None:
     """Declare the LLM login of a host
 
-     `personal` needs `credential_holder_id`. Fails with `409 i6_violation` if any grant on the host
-    names another subject than the holder; switching to `personal` or changing the holder ends sessions
-    of other people (`i6_violation`, 24, 7.3). Needs step-up.
+     `personal` needs `credential_holder_id`, a person that is not deleted; `none` and `organization`
+    take none. Fails with `409 i6_violation` (member `conflicts`, one entry per host) if any valid grant
+    on the host names another subject than the holder or a group; switching to `personal` or changing
+    the holder ends the sessions of other people in the same transaction (`close_reason` `i6_violation`,
+    24, 7.3). A `retired` host answers `409 conflict`. The declaration the host already has answers
+    `200` with the current host, without a new version, an event or a new rights version (audited with
+    `no_change`). Needs step-up and the mandatory `reason`.
 
     Args:
         host_id (UUID): UUIDv7 (RFC 9562), lowercase canonical form.

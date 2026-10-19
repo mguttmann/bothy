@@ -473,6 +473,10 @@ func (stubServer) SetHostState(context.Context, rest.SetHostStateRequestObject) 
 	return nil, nil
 }
 
+func (stubServer) SetHostLlmCredentials(context.Context, rest.SetHostLlmCredentialsRequestObject) (rest.SetHostLlmCredentialsResponseObject, error) {
+	return nil, nil
+}
+
 func (stubServer) ListAgents(context.Context, rest.ListAgentsRequestObject) (rest.ListAgentsResponseObject, error) {
 	return nil, nil
 }
@@ -666,11 +670,12 @@ func TestRealTable_Enabled(t *testing.T) {
 		"setThreadTags":      {"PUT /api/v1/threads/{thread_id}/tags", "thread.tags.set", "rl.write"},
 
 		// M2-39
-		"listHosts":    {"GET /api/v1/hosts", "host.read", "rl.read"},
-		"createHost":   {"POST /api/v1/hosts", "host.manage", "rl.admin"},
-		"getHost":      {"GET /api/v1/hosts/{host_id}", "host.read", "rl.read"},
-		"updateHost":   {"PATCH /api/v1/hosts/{host_id}", "host.manage", "rl.admin"},
-		"setHostState": {"POST /api/v1/hosts/{host_id}/state", "host.manage", "rl.admin"},
+		"listHosts":             {"GET /api/v1/hosts", "host.read", "rl.read"},
+		"createHost":            {"POST /api/v1/hosts", "host.manage", "rl.admin"},
+		"getHost":               {"GET /api/v1/hosts/{host_id}", "host.read", "rl.read"},
+		"updateHost":            {"PATCH /api/v1/hosts/{host_id}", "host.manage", "rl.admin"},
+		"setHostState":          {"POST /api/v1/hosts/{host_id}/state", "host.manage", "rl.admin"},
+		"setHostLlmCredentials": {"PUT /api/v1/hosts/{host_id}/llm-credentials", "host.manage", "rl.admin"},
 	}
 	ops := routes.Enabled()
 	if len(ops) != len(want) {

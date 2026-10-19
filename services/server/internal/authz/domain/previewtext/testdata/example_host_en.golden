@@ -1,0 +1,3 @@
+Sam gets the additional right "Terminal" on host R1.
+Note: the grant does not take effect for Sam. On R1 only owners and the person the host is assigned to open a terminal.
+Note: the grant for Sam has no expiry date.

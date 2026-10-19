@@ -1,6 +1,6 @@
 # Module `authz`
 
-Status: skeleton (M1-05); M1-26 brings the principal source port, M1-25 the closed action catalogue and the start check (section "Action catalogue" below), M1-27 the grant model storage: tables, domain rules and the store port with its PostgreSQL adapter. M1-28 brings the permission snapshot, the cache and the one authorization function `Authorize` with `Scope` (section "Authorize" below). M1-29 brings the one transactional path of every rights change (rights hooks, `access.changed`, I1 and SR8) and the `Admin` use cases for groups, memberships and grants (section "Rights changes" below). M1-48 brings the twelve REST operations of groups and grants with their reads, events and the manage scope (section "Groups and grants over the API (M1-48)" below). M1-30 brings the expiry jobs `authz.expiry_sweep` and `authz.expiry_reminder` (section "Expiry (M1-30)" below). M1-42 brings the claim group sync of OIDC logins (section "Claim groups (M1-42)" below). M1-49 brings "who has access", the grant preview and "view as" (section "Who has access, preview and view as (M1-49)" below).
+Status: skeleton (M1-05); M1-26 brings the principal source port, M1-25 the closed action catalogue and the start check (section "Action catalogue" below), M1-27 the grant model storage: tables, domain rules and the store port with its PostgreSQL adapter. M1-28 brings the permission snapshot, the cache and the one authorization function `Authorize` with `Scope` (section "Authorize" below). M1-29 brings the one transactional path of every rights change (rights hooks, `access.changed`, I1 and SR8) and the `Admin` use cases for groups, memberships and grants (section "Rights changes" below). M1-48 brings the twelve REST operations of groups and grants with their reads, events and the manage scope (section "Groups and grants over the API (M1-48)" below). M1-30 brings the expiry jobs `authz.expiry_sweep` and `authz.expiry_reminder` (section "Expiry (M1-30)" below). M1-42 brings the claim group sync of OIDC logins (section "Claim groups (M1-42)" below). M1-49 brings "who has access", the grant preview and "view as" (section "Who has access, preview and view as (M1-49)" below). M2-39 adds the target host and M2-40 the terminal rights (sections "Target host (M2-39)" and "Terminal rights (M2-40)" below).
 The normative source is [docs/spec/02-architecture.md](../../../../docs/spec/02-architecture.md); if this file differs, the chapter applies.
 
 ## Purpose
@@ -440,7 +440,8 @@ A host is a target outside the tree instance, space, channel (07 section 2.12):
   `host.manage` `All(HumanSession, Owner)`. A requirement whose first part is `HumanSession` is a
   gate: `authorize` and `Scope` refuse agents, apps and personal tokens with
   `subject_kind_not_allowed` right after the liveness checks, before any resource is resolved.
-  `host.pair`, `host.connect` and `terminal.*` (except the system action) stay deferred.
+  `host.pair` and `host.connect` stay deferred for M2-41 and M2-43; the terminal actions are real
+  since M2-40 (section below).
 - **Visibility.** A host resource resolves through the source; it is visible to an effective
   owner, its holder and a person with `TerminalOn`, with "view as" to both views.
 - **Scope.** `Scope(host.read)` gives `AllHosts` to an effective owner, otherwise the ascending
@@ -453,3 +454,41 @@ A host is a target outside the tree instance, space, channel (07 section 2.12):
   conflict`; subject and capability rules stay with `CheckGrantShape`.
 - **Tests.** `TestHostRequirement`, `TestAZM60_InstanceGrantGivesNoHost`, `TestScope_Hosts`,
   `TestSnapshot_HostGrants`, `TestDiffVisible_Hosts` and the hosts of the AZ-P8 differential test.
+
+## Terminal rights (M2-40)
+
+- **Entries.** `terminal.open` `All(HumanSession, Terminal)` on `host`, `terminal.attach`
+  `All(HumanSession, Self, Terminal)` on `terminal_session` (Terminal on the session's host),
+  `terminal.stream` `All(HumanSession, Self)`, `terminal.close` `All(HumanSession, Any(Self,
+  Owner))`, `terminal.read_own` `All(HumanSession, ByKind{terminal_session: Any(Self, Owner), host:
+  Auth})`. A `terminal_session` resource names its host in `Resource.HostID` and its person in
+  `OwnerID`; it is visible to that person and to effective owners (else `not_found` `not_self`).
+- **Step-up `fresh`.** `domain/terminal.go`: `FreshStepUp` (`terminal.step_up_max_age`, passkey or
+  device key, unconsumed, never the console) and `QuickReattach` (`terminal.quick_reattach_window`,
+  same device and login session, `detached` only; `Decision.QuickReattach`). Step 8 of a `fresh`
+  action evaluates only this branch. `app.FreshCheck` implements `authz.FreshStepUpCheck` for
+  `identity.StepUp.ConsumeFresh`, so the consumption judges with the same rule.
+- **Guards.** `TerminalGuard` after step 8: SR10 server host, SR10 assignee, SR11 (I6, also other
+  owners), SR12 (an own reported session user, also owners). Extension point after SR12: M2-44
+  adds `host_not_active` and `terminal_profile_unknown`, M2-46 `terminal_session_limit`. The
+  reasons map to `403 terminal_denied` with the `reason` of 24 13 (`kernel/authorize.Decision.Err`).
+- **Rights state.** `HostSource.SessionUsersOf` fills `Snapshot.SessionUsers` for people and
+  `HostSource.PersonalHosts` fills `Snapshot.PersonalHosts` for effective owners; both are cached
+  per rights version (a change of an assignment, a report or a declaration raises it).
+- **Difference.** `TerminalEffective` (07 2.12 point 3 with the I6 clause) decides
+  `AccessView.Hosts`, so a switch to `personal` removes the host from every other owner's view.
+- **I6.** `VerifyInvariants` checks every personal host on every rights change (`domain.CheckI6`
+  over the valid grants and the members in effect of group grants); `InvariantError` with code
+  `i6_violation`, `HintI6` and one conflict per host; the deny entry carries `violations` with
+  `host_id`. `host.pair` and `host.connect` may declare a rights change (their reports are rights
+  state, D-M2-40-9).
+- **Preview.** A grant on a host gets host effects (`capabilities_added: [terminal]`), I6 in
+  `invariant_violations` and the hint `terminal_not_effective` (SR10 or SR12 would deny), with the
+  templates `summary.host`, `hint.i6` and `hint.terminal_not_effective.*` (golden files
+  `example_host_de.golden` and `example_host_en.golden`).
+- **Tests.** `TestFreshStepUp`, `TestQuickReattach`, `TestTerminalGuard`, `TestTerminalEffective`,
+  `TestCheckI6`, `TestRequirementSources_Terminal`, `TestAZ_M54_*` to `TestAZ_M61_*`,
+  `TestTMT08_SR10`, `TestTMT28a_NoSessionUser`, `TestTerminalDecisionOrder`,
+  `TestTerminalAttachStreamReadClose`, `TestSubjectGate_TerminalActions`,
+  `TestTerminalSnapshotVersion`, the terminal decisions of `TestAZP8_CacheMatchesReference` and the
+  preview text tests.

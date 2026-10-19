@@ -59,4 +59,18 @@ type StepUp interface {
 	// CompleteWithDeviceKey, except that a device without a step_up key may use it; a passkey of
 	// another person is a wrong confirmation and counts.
 	CompleteWithPasskey(ctx context.Context, a actor.Actor, challengeID ids.ID, credential json.RawMessage) (StepUpResult, error)
+	// ConsumeFresh consumes the fresh step-up of the session of a for one terminal opening (08
+	// section 6.3 point 4, M2-40). It runs only inside the caller's unit of work (none is kind
+	// internal) and is the first domain row lock of that transaction: it locks the session row,
+	// answers 401 session_revoked for a revoked or ended session, checks the freshness again on the
+	// locked row with the rule of authorize (terminal.step_up_max_age, passkey or device key,
+	// unconsumed, not the console) and then sets step_up_consumed_at, so one confirmation opens
+	// exactly one session. A stale step-up is 401 step_up_required without a reason in the problem
+	// body; the audit reason of the caller is ReasonStepUpNotFresh. It writes no event and no
+	// audit entry: the use case of the action records the opening and the denial.
+	ConsumeFresh(ctx context.Context, a actor.Actor) error
 }
+
+// ReasonStepUpNotFresh is the audit reason of a terminal opening whose step-up is not fresh or
+// already consumed (07 section 4.1 terminal_step_up_not_fresh), for the callers of ConsumeFresh.
+const ReasonStepUpNotFresh = "terminal_step_up_not_fresh"

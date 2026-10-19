@@ -12,6 +12,7 @@ import (
 
 	"github.com/OWNER/bothy/services/server/internal/identity/adapters/postgres/sqlcgen"
 	"github.com/OWNER/bothy/services/server/internal/identity/app"
+	"github.com/OWNER/bothy/services/server/internal/kernel/errs"
 	"github.com/OWNER/bothy/services/server/internal/kernel/ids"
 )
 
@@ -74,6 +75,35 @@ func (r *Repository) FailedStepUpTimes(ctx context.Context, sessionID ids.ID, si
 		out = append(out, timeOf(t))
 	}
 	return out, nil
+}
+
+// LockSessionForStepUpConsumption implements app.ChallengeStore.
+func (r *Repository) LockSessionForStepUpConsumption(ctx context.Context, id, userID ids.ID) (app.SessionRecord, bool, error) {
+	q, err := r.write(ctx)
+	if err != nil {
+		return app.SessionRecord{}, false, err
+	}
+	row, err := q.LockSessionForStepUpConsumption(ctx, sqlcgen.LockSessionForStepUpConsumptionParams{ID: uuid(id), UserID: uuid(userID)})
+	if errors.Is(err, pgx.ErrNoRows) {
+		return app.SessionRecord{}, false, nil
+	}
+	if err != nil {
+		return app.SessionRecord{}, false, mapError(err, "locking a session for the step-up")
+	}
+	return toSession(row), true, nil
+}
+
+// ConsumeStepUp implements app.ChallengeStore.
+func (r *Repository) ConsumeStepUp(ctx context.Context, id ids.ID, at time.Time) error {
+	q, err := r.write(ctx)
+	if err != nil {
+		return err
+	}
+	n, err := q.ConsumeStepUp(ctx, sqlcgen.ConsumeStepUpParams{ID: uuid(id), ConsumedAt: ts(at)})
+	if err == nil && n != 1 {
+		return errs.New(errs.CodeInternalError, "identity: consuming the step-up changed no row")
+	}
+	return mapError(err, "consuming the step-up of a session")
 }
 
 // SetSessionStepUp implements app.ChallengeStore.

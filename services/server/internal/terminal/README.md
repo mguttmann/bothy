@@ -1,6 +1,6 @@
 # Module `terminal`
 
-Status: host records (M2-39). The normative source is [docs/spec/24-terminal.md](../../../../docs/spec/24-terminal.md); where they differ, the chapter applies.
+Status: host records (M2-39), terminal rights (M2-40). The normative source is [docs/spec/24-terminal.md](../../../../docs/spec/24-terminal.md); where they differ, the chapter applies.
 
 ## Purpose
 
@@ -12,12 +12,12 @@ Hosts and pairing, declaration of the LLM login (I6), session users per person (
 - `domain/`: `Transition` is the one place that knows the life cycle of 24, section 3.1 (M2-41 and M2-43 call it for their transitions); `CloseReasons` and `CloseDetails` are the closed lists of 24, section 10.3; `NewHostName`, `NewOSUser` and `CheckReason` check the texts (SEC-IN-4); `PlanAssignments` plans assignment and end of session users after T12 (exactly a reported name, uniqueness per host without case over all rows, at most one valid assignment per person, every `400` before any `409`); `reported.go` reads the reported columns.
 - `app/`: the five use cases (`Service`), `EndSessions` (the one way of every end by the server), `HostSource` (implementation of `authz.HostSource`), the view `view.go`, the outgoing ports `Store`, `PairingCodes`, `People`, `Presence` and `Cursors`; `NoConnections` is the presence without control connections.
 - `adapters/postgres/`: the sqlc queries in `queries/`, the generated code in `sqlcgen/` and `Repository`.
-- `adapters/httpapi/`: the handlers of `listHosts`, `createHost`, `getHost`, `updateHost` and `setHostState`.
+- `adapters/httpapi/`: the handlers of `listHosts`, `createHost`, `getHost`, `updateHost`, `setHostState` and `setHostLlmCredentials` (M2-40).
 - Test code under `services/server/test/`: `terminaltest` creates hosts in every state with reported profiles, session users and check results as well as assignments and sessions directly in SQL (in production M2-41, M2-43 and M2-44 write these); `terminalworld` is the HTTP test world of M2-39.
 
 ## Port (root package `internal/terminal`)
 
-- Inbound: `Hosts` (M2-39). `Sessions` and `Relay` come with M2-44.
+- Inbound: `Hosts` (M2-39; `SetLlmCredentials` since M2-40). `Sessions` and `Relay` come with M2-44.
 - Emits in-tx events: none.
 - Subscribes to in-tx events: from M2-46 kernel `authorize.AccessChanged`, `identity.DeviceRevoked`, `identity.SessionEnded` (end sessions).
 - Implements source ports and cross-cutting ports: `authz.HostSource` (state, assignee, LLM declaration, server host of the host), bound in `internal/wire` for the authorizer, the rights hook and grants.
@@ -63,11 +63,38 @@ Only this module writes and reads these tables via SQL (03-data-model.md, princi
 - `EndSessions` writes the end of every session as a system action into the audit. The remaining
   actions stay deferred until M2-40 to M2-44.
 
+## Built in M2-40
+
+- `SetLlmCredentials` (`setHostLlmCredentials`, `host.manage`): declaration `none`, `personal` or
+  `organization` with `credential_holder_id` exactly with `personal` (`domain.ValidateDeclaration`:
+  `required`, `not_allowed`; an unknown or deleted person `unknown_user`), mandatory reason,
+  `If-Match`, `409 conflict` on a `retired` host, without effect for the same declaration
+  (`no_change`). The rights change locks the host after `permission_version`, writes the
+  declaration through `ApplyLlmDeclaration` (also for `confirmHost` of M2-41) and, on a switch to
+  `personal` or of the holder of the login, ends the sessions of everyone else with `i6_violation`
+  (`domain.EndsForeignSessions`, `SessionSelector.ExceptUserID`); `authz` checks I6 in phase 3.1, a
+  violation rolls everything back (`409 i6_violation`).
+- `RecordSessionUserReport` and `ApplySessionUserReport` (for `pairHost` of M2-41 and `report` of
+  M2-43): the reported session users are rights state. An equal report (`domain.SameReport`)
+  changes nothing; a different one is written with a new version of the host, ends the sessions of
+  the people whose assigned name is missing (`domain.VanishedNames`, `access_revoked`) and writes
+  `host.updated`.
+- `Update` ends the sessions of the previous assignee with `access_revoked` when the assignee
+  changes or is cleared, unless they are an active owner (`People.IsActiveOwner`, SR10).
+- `HostSource.PersonalHosts` and `SessionUsersOf` (exact comparison with `domain.Reports`) and
+  `HostFacts.Name` for the text of the preview.
+- Tests: `domain` (`TestValidateDeclaration`, `TestEndsForeignSessions`, `TestSameReport`,
+  `TestVanishedNames`) and `adapters/httpapi/terminalauthz_test.go` over PostgreSQL 18 and the
+  HTTP chain: `TestTMT09_I6`, `TestI6_UserEnableRevivesGrant`, `TestI6_SwitchEndsForeignSessions`,
+  `TestI6_HolderChangeEndsForeignSessions`, `TestSR10_AssigneeChangeEndsSessions`,
+  `TestSetHostLlmCredentials_HTTP`, `TestSR12_ReportDropsName`, `TestPreviewHostGrant`,
+  `TestTerminalAuthzAudit_NoContent`, `TestAZP1_TerminalAuthzRoutes`.
+
 ## Extension points
 
-- M2-40: guard rules SR10, SR11 with I6 and SR12, the I6 check at `grant.create` on a host and at `host.manage`, end of the sessions when the assignee changes.
 - M2-41: pairing (`issueHostPairingCode`, `pairHost`, `confirmHost`) through `domain.Transition` and `app.PairingCodes`.
 - M2-43: control connection; replaces the binding `NoConnections` of `app.Presence` with its register and writes the columns `reported_*` and `last_seen_at`.
+- M2-44: calls `identity.StepUp.ConsumeFresh` in the transactions of `openTerminalSession` and `attachTerminalSession`, sets `Resource.HostID` and `Resource.Terminal` and adds `host_not_active` and `terminal_profile_unknown` after SR12.
 - M2-44: sessions and relay; adds `terminal_session.changed`, the close code `4100` and `session.close` to the host service to `EndSessions`.
 - M2-46: revocation, limits and metrics (`bothy.terminal.sessions.closed`), job `terminal.sweep`.
 

@@ -21,9 +21,12 @@ type SessionRecord struct {
 	CreatedAt, ExpiresAt time.Time
 	StepUpAt             time.Time
 	StepUpMethod         string
-	LastSeenAt           time.Time
-	RevokedAt            time.Time
-	RevokeReason         identity.SessionRevokeReason
+	// StepUpConsumedAt is step_up_consumed_at: the time a terminal opening consumed the step-up
+	// (08 section 6.3 point 4, M2-40); zero for never.
+	StepUpConsumedAt time.Time
+	LastSeenAt       time.Time
+	RevokedAt        time.Time
+	RevokeReason     identity.SessionRevokeReason
 	// LastIP is last_ip as InsertSession writes it; the zero Addr stands for NULL. Reads leave it
 	// zero (the session store reads no address).
 	LastIP netip.Addr

@@ -2,7 +2,11 @@
 
 package authorize
 
-import "github.com/OWNER/bothy/services/server/internal/kernel/ids"
+import (
+	"time"
+
+	"github.com/OWNER/bothy/services/server/internal/kernel/ids"
+)
 
 // Resource describes the resource of one Authorize call. The calling use case loads the resource
 // first (02 section 9.2) and fills what it knows; authz resolves the path through the structure
@@ -40,6 +44,30 @@ type Resource struct {
 	Invoke *InvokeFacts
 	// PreviewOf is the action that access.preview previews.
 	PreviewOf Action
+	// HostID is the path hint of a terminal_session: its host (terminal_sessions.host_id, M2-40).
+	// authz resolves the host through it; a terminal_session without it is an internal error.
+	HostID ids.ID
+	// Terminal describes the session of terminal.attach for the quick reattach (M2-40); required
+	// for terminal.attach, ignored otherwise.
+	Terminal *TerminalFacts
+}
+
+// TerminalFacts describes a terminal session for the step-up rule of terminal.attach (08 section
+// 6.3 point 5): its state, the device and login session that opened it and the time it was
+// detached (zero when it is not detached).
+//
+// Example:
+//
+//	r := authorize.Resource{Kind: authorize.ResourceTerminalSession, ID: s.ID, HostID: s.HostID, OwnerID: s.UserID,
+//		Terminal: &authorize.TerminalFacts{SessionState: "detached", SessionDeviceID: s.DeviceID,
+//			SessionAuthSessionID: s.AuthSessionID, DetachedAt: s.DetachedAt}}
+type TerminalFacts struct {
+	// SessionState is terminal_sessions.state.
+	SessionState string
+	// SessionDeviceID and SessionAuthSessionID are the device and the login session of the session.
+	SessionDeviceID, SessionAuthSessionID ids.ID
+	// DetachedAt is terminal_sessions.detached_at; zero for none.
+	DetachedAt time.Time
 }
 
 // GrantFacts is the shape of a grant for the delegation rules (07 section 2.6). The strings are
