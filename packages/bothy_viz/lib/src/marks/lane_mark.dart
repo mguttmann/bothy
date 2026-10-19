@@ -15,14 +15,24 @@ import 'viz_texts.dart';
 /// The lane is a semantics container labelled "Engineering, #backend, 2 active runs"; each
 /// card inside keeps its own label and tap.
 class LaneMark extends StatelessWidget {
-  /// Creates the lane of [model].
-  const LaneMark({super.key, required this.model, this.onTapRun});
+  /// Creates the lane of [model]; [cardBuilder] replaces the default [RunCardMark] per card.
+  const LaneMark({
+    super.key,
+    required this.model,
+    this.onTapRun,
+    this.cardBuilder,
+  });
 
   /// The lane.
   final LaneModel model;
 
   /// Passed to every [RunCardMark].
   final RunTapCallback? onTapRun;
+
+  /// Builds the widget of one card; the live topology passes the widget it kept from the
+  /// previous frame for an unchanged card, so only changed cards rebuild (25 7.3). `null`
+  /// builds a [RunCardMark] with [onTapRun].
+  final Widget Function(RunCardModel card)? cardBuilder;
 
   @override
   Widget build(BuildContext context) {
@@ -58,7 +68,8 @@ class LaneMark extends StatelessWidget {
                 runSpacing: DsSpace.s8,
                 children: [
                   for (final card in model.cards)
-                    RunCardMark(model: card, onTap: onTapRun),
+                    cardBuilder?.call(card) ??
+                        RunCardMark(model: card, onTap: onTapRun),
                 ],
               ),
             ],

@@ -1752,6 +1752,420 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Waiting for an answer'**
   String get threadRowStateWaiting;
+
+  /// Title and tab of the live topology view (25 section 6.1, screen D12).
+  ///
+  /// In en, this message translates to:
+  /// **'Live topology'**
+  String get vizViewLiveTopology;
+
+  /// Title and tab of the backend view (25 section 6.2).
+  ///
+  /// In en, this message translates to:
+  /// **'Backend view'**
+  String get vizViewBackend;
+
+  /// Title and tab of the delivery and sync view (25 section 6.3).
+  ///
+  /// In en, this message translates to:
+  /// **'Delivery and sync live'**
+  String get vizViewDelivery;
+
+  /// Title and tab of the executive page (25 section 6.4).
+  ///
+  /// In en, this message translates to:
+  /// **'Executive page'**
+  String get vizViewExecutive;
+
+  /// Title and tab of the replayable daily timeline (25 section 6.5).
+  ///
+  /// In en, this message translates to:
+  /// **'Daily timeline'**
+  String get vizViewTimeline;
+
+  /// Name of TV mode in the view registry (25 section 6.6, screen D13).
+  ///
+  /// In en, this message translates to:
+  /// **'TV mode'**
+  String get vizViewTv;
+
+  /// Label of the switch in every view header that shows the same values as a table (25 section 7.4).
+  ///
+  /// In en, this message translates to:
+  /// **'As table'**
+  String get vizAsTable;
+
+  /// Link of a view that opens the dashboard in the system browser; only when the instance sets a dashboard URL (25 section 9.1).
+  ///
+  /// In en, this message translates to:
+  /// **'Open in Grafana'**
+  String get vizOpenGrafana;
+
+  /// Screen reader label of a view while its data loads.
+  ///
+  /// In en, this message translates to:
+  /// **'Loading'**
+  String get vizLoading;
+
+  /// Note of a view or tile that only the owner of the instance sees, shown instead of its data in a space scope (25 sections 6.3 and 6.4).
+  ///
+  /// In en, this message translates to:
+  /// **'Only for the owner'**
+  String get vizOnlyForOwner;
+
+  /// Screen reader label of a column header of a table view; a tap sorts by the column.
+  ///
+  /// In en, this message translates to:
+  /// **'Sort by {column}'**
+  String vizSortBy(String column);
+
+  /// Time of the shown live frame under the view title.
+  ///
+  /// In en, this message translates to:
+  /// **'As of {time}'**
+  String vizFrameTime(String time);
+
+  /// Live topology without an active run.
+  ///
+  /// In en, this message translates to:
+  /// **'No active runs'**
+  String get vizNoActiveRuns;
+
+  /// Heading of the rates of the last full minute in the live topology (screen D12).
+  ///
+  /// In en, this message translates to:
+  /// **'Last minute'**
+  String get vizRatesLastMinute;
+
+  /// Table cell of a value that does not exist for this row, for example no current step.
+  ///
+  /// In en, this message translates to:
+  /// **'none'**
+  String get vizNone;
+
+  /// Column header: the space of a run.
+  ///
+  /// In en, this message translates to:
+  /// **'Space'**
+  String get vizColSpace;
+
+  /// Column header: the channel of a run.
+  ///
+  /// In en, this message translates to:
+  /// **'Channel'**
+  String get vizColChannel;
+
+  /// Column header: the agent.
+  ///
+  /// In en, this message translates to:
+  /// **'Agent'**
+  String get vizColAgent;
+
+  /// Column header: the state of a run or a traffic light.
+  ///
+  /// In en, this message translates to:
+  /// **'State'**
+  String get vizColState;
+
+  /// Column header: the current step of a run (tool chip).
+  ///
+  /// In en, this message translates to:
+  /// **'Current step'**
+  String get vizColStep;
+
+  /// Column header: the billing mode badge of a run.
+  ///
+  /// In en, this message translates to:
+  /// **'Billing mode'**
+  String get vizColMode;
+
+  /// Column header: whether an approval card of the run waits.
+  ///
+  /// In en, this message translates to:
+  /// **'Approval'**
+  String get vizColApproval;
+
+  /// Column header: the cost of a run so far.
+  ///
+  /// In en, this message translates to:
+  /// **'Cost so far'**
+  String get vizColCost;
+
+  /// Column header: the metric of a row.
+  ///
+  /// In en, this message translates to:
+  /// **'Metric'**
+  String get vizColMetric;
+
+  /// Column header: the value of the last full minute.
+  ///
+  /// In en, this message translates to:
+  /// **'Last minute'**
+  String get vizColLastMinute;
+
+  /// Column header: the value of a row.
+  ///
+  /// In en, this message translates to:
+  /// **'Value'**
+  String get vizColValue;
+
+  /// Column header: comparison or cost label of a tile, or the label own measurement.
+  ///
+  /// In en, this message translates to:
+  /// **'Note'**
+  String get vizColNote;
+
+  /// Column header: presence of an agent from its heartbeats.
+  ///
+  /// In en, this message translates to:
+  /// **'Presence'**
+  String get vizColPresence;
+
+  /// Column header and label: billing mode set for the agent (25 section 6.2).
+  ///
+  /// In en, this message translates to:
+  /// **'Configured mode'**
+  String get vizColConfiguredMode;
+
+  /// Column header and label: billing mode the adapter reports (25 section 6.2).
+  ///
+  /// In en, this message translates to:
+  /// **'Reported mode'**
+  String get vizColReportedMode;
+
+  /// Column header and label: billing modes the agent supports.
+  ///
+  /// In en, this message translates to:
+  /// **'Supported modes'**
+  String get vizColSupportedModes;
+
+  /// Column header and label: billing mode switches in the period.
+  ///
+  /// In en, this message translates to:
+  /// **'Mode switches'**
+  String get vizColSwitches;
+
+  /// Column header and label: invocations denied before delivery by invariant I2.
+  ///
+  /// In en, this message translates to:
+  /// **'Denied before delivery (I2)'**
+  String get vizColI2Denied;
+
+  /// Column header and label: runs failed with billing_mode_mismatch by invariant I3.
+  ///
+  /// In en, this message translates to:
+  /// **'Failed on mode mismatch (I3)'**
+  String get vizColI3Denied;
+
+  /// Column header and label: costs of an agent per billing mode.
+  ///
+  /// In en, this message translates to:
+  /// **'Costs per mode'**
+  String get vizColCosts;
+
+  /// Column header and label: rate-limit state the adapter reports.
+  ///
+  /// In en, this message translates to:
+  /// **'Rate limit'**
+  String get vizColRateLimit;
+
+  /// Presence of an agent: online.
+  ///
+  /// In en, this message translates to:
+  /// **'Online'**
+  String get vizPresenceOnline;
+
+  /// Presence of an agent: degraded.
+  ///
+  /// In en, this message translates to:
+  /// **'Degraded'**
+  String get vizPresenceDegraded;
+
+  /// Presence of an agent: offline.
+  ///
+  /// In en, this message translates to:
+  /// **'Offline'**
+  String get vizPresenceOffline;
+
+  /// Presence of an agent without a live frame or with an unknown state.
+  ///
+  /// In en, this message translates to:
+  /// **'Unknown'**
+  String get vizPresenceUnknown;
+
+  /// Reported mode of an adapter that follows the configured mode per run and reports none.
+  ///
+  /// In en, this message translates to:
+  /// **'per run'**
+  String get vizFollowsRun;
+
+  /// Warning badge when the reported billing mode differs from the configured one (components.md section 10).
+  ///
+  /// In en, this message translates to:
+  /// **'Reported: {mode}'**
+  String vizReportedMismatch(String mode);
+
+  /// Rate-limit state ok.
+  ///
+  /// In en, this message translates to:
+  /// **'within the limit'**
+  String get vizRateLimitOk;
+
+  /// Rate-limit state near_limit.
+  ///
+  /// In en, this message translates to:
+  /// **'near the limit'**
+  String get vizRateLimitNearLimit;
+
+  /// Rate-limit state limited.
+  ///
+  /// In en, this message translates to:
+  /// **'limited'**
+  String get vizRateLimitLimited;
+
+  /// Rate-limit state unknown or not reported.
+  ///
+  /// In en, this message translates to:
+  /// **'unknown'**
+  String get vizRateLimitUnknown;
+
+  /// Time at which the rate limit resets.
+  ///
+  /// In en, this message translates to:
+  /// **'resets at {time}'**
+  String vizRateLimitResets(String time);
+
+  /// Value of an SLI without events in the window.
+  ///
+  /// In en, this message translates to:
+  /// **'no events'**
+  String get vizSliNoEvents;
+
+  /// Value of an SLI of the live frame: number of events and the good share.
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, =1{1 event} other{{count} events}}, {share} within the threshold'**
+  String vizSliValue(int count, String share);
+
+  /// Catch-ups of the last minute with their summed duration in milliseconds.
+  ///
+  /// In en, this message translates to:
+  /// **'{count}, together {millis} ms'**
+  String vizCatchupValue(String count, String millis);
+
+  /// Open gateway connections of kind user on this node.
+  ///
+  /// In en, this message translates to:
+  /// **'Connections of people'**
+  String get vizConnectionsUser;
+
+  /// Open gateway connections of kind agent on this node.
+  ///
+  /// In en, this message translates to:
+  /// **'Connections of agents'**
+  String get vizConnectionsAgent;
+
+  /// Open gateway connections of kind app on this node.
+  ///
+  /// In en, this message translates to:
+  /// **'Connections of apps'**
+  String get vizConnectionsApp;
+
+  /// Heading of the history chart of the delivery view.
+  ///
+  /// In en, this message translates to:
+  /// **'History'**
+  String get vizChartHistory;
+
+  /// Tile group of the executive page: messages, new threads, active people.
+  ///
+  /// In en, this message translates to:
+  /// **'Usage'**
+  String get vizTileUsage;
+
+  /// Tile group of the executive page: runs and error rates.
+  ///
+  /// In en, this message translates to:
+  /// **'Runs and error rate'**
+  String get vizTileRuns;
+
+  /// Tile group of the executive page: costs per billing mode.
+  ///
+  /// In en, this message translates to:
+  /// **'Costs per mode'**
+  String get vizTileCosts;
+
+  /// Tile group of the executive page: the SLO traffic lights.
+  ///
+  /// In en, this message translates to:
+  /// **'SLO traffic light'**
+  String get vizTileSlo;
+
+  /// Column header: the SLO of a traffic light.
+  ///
+  /// In en, this message translates to:
+  /// **'SLO'**
+  String get vizColSlo;
+
+  /// Note under the SLO traffic lights (25 section 6.4).
+  ///
+  /// In en, this message translates to:
+  /// **'Values can differ from Prometheus: the own measurement counts in the process and can lose one flush interval in a crash.'**
+  String get vizOwnMeasurementNote;
+
+  /// Column header: row of a run bar of the timeline.
+  ///
+  /// In en, this message translates to:
+  /// **'Agent and channel'**
+  String get vizColRun;
+
+  /// Column header: start of a run.
+  ///
+  /// In en, this message translates to:
+  /// **'Start'**
+  String get vizColStart;
+
+  /// Column header: end of a run, or the playhead while it runs.
+  ///
+  /// In en, this message translates to:
+  /// **'End'**
+  String get vizColEnd;
+
+  /// Position of the timeline playback under the view title.
+  ///
+  /// In en, this message translates to:
+  /// **'Playhead {time}'**
+  String vizPlayhead(String time);
+
+  /// Button of the timeline that starts the playback.
+  ///
+  /// In en, this message translates to:
+  /// **'Play'**
+  String get vizPlay;
+
+  /// Button of the timeline that stops the playback.
+  ///
+  /// In en, this message translates to:
+  /// **'Pause'**
+  String get vizPause;
+
+  /// Speed of the timeline playback in seconds of time of day per second (viz.timeline_speeds).
+  ///
+  /// In en, this message translates to:
+  /// **'{speed}x'**
+  String vizSpeed(int speed);
+
+  /// Label of the slider that moves the playhead of the timeline.
+  ///
+  /// In en, this message translates to:
+  /// **'Jump to a minute'**
+  String get vizJump;
+
+  /// Header of TV mode: the shown view and its place in the rotation (screen D13).
+  ///
+  /// In en, this message translates to:
+  /// **'{title} ({index} of {count})'**
+  String vizTvPosition(String title, int index, int count);
 }
 
 class _AppLocalizationsDelegate

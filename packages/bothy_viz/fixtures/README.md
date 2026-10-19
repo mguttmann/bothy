@@ -31,15 +31,18 @@ file, a file missing from the table below and a listed schema without a file. Th
 | `StatsLiveFrame.truncated.json` | `StatsLiveFrame` | truncated | live topology ("more runs than shown") |
 | `StatsLiveFrame.no_cost_permission.json` | `StatsLiveFrame` | no_cost_permission | live topology, run card mark |
 | `StatsLiveFrame.offline.json` | `StatsLiveFrame` | offline | live topology, backend (presence offline, space scope) |
-| `StatsTimeline.normal.json` | `StatsTimeline` | normal | timeline, area and bar marks |
+| `StatsTimeline.normal.json` | `StatsTimeline` | normal (with the delivery metrics) | timeline, delivery history, area and bar marks |
 | `StatsTimeline.empty.json` | `StatsTimeline` | empty | timeline |
 | `StatsTimeline.load.json` | `StatsTimeline` | load | timeline (a full day) |
 | `StatsTimeline.truncated.json` | `StatsTimeline` | truncated | timeline |
+| `StatsTimeline.day_boundary.json` | `StatsTimeline` | day_boundary (a period over midnight) | timeline |
+| `StatsTimeline.with_costs.json` | `StatsTimeline` | with_costs (`cost` buckets, as with `cost.read.aggregate`) | timeline (no cost series) |
 | `StatsSloReport.normal.json` | `StatsSloReport` | normal (all four states) | executive page, traffic light mark |
 | `StatsSloReport.empty.json` | `StatsSloReport` | empty | executive page |
 | `StatsBackendReport.normal.json` | `StatsBackendReport` | normal | backend view |
 | `StatsBackendReport.no_cost_permission.json` | `StatsBackendReport` | no_cost_permission | backend view |
 | `StatsBackendReport.empty.json` | `StatsBackendReport` | empty | backend view |
+| `StatsBackendReport.rate_limits.json` | `StatsBackendReport` | rate_limits (every `rate_limit` state, I2 and I3 denials, a mismatch) | backend view |
 | `StatsSeries.usage.normal.json` | `StatsSeries` | normal (`getUsageStats`) | executive page, metric tile mark |
 | `StatsSeries.runs.normal.json` | `StatsSeries` | normal (`getRunStats`) | executive page |
 | `StatsSeries.errors.normal.json` | `StatsSeries` | normal (`getErrorStats`) | executive page |

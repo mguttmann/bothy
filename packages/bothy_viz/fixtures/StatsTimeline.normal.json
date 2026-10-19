@@ -1441,6 +1441,390 @@
       "count": 1,
       "sum": 0,
       "good": 0
+    },
+    {
+      "start": "2026-10-15T10:00:00.000Z",
+      "metric": "sli.delivery_latency",
+      "dimension": "",
+      "count": 900,
+      "sum": 40000,
+      "good": 898
+    },
+    {
+      "start": "2026-10-15T10:00:00.000Z",
+      "metric": "sli.reconnect",
+      "dimension": "",
+      "count": 10,
+      "sum": 3000,
+      "good": 10
+    },
+    {
+      "start": "2026-10-15T10:00:00.000Z",
+      "metric": "catchups",
+      "dimension": "",
+      "count": 2,
+      "sum": 800,
+      "good": 0
+    },
+    {
+      "start": "2026-10-15T10:00:00.000Z",
+      "metric": "resyncs",
+      "dimension": "too_far_behind",
+      "count": 0,
+      "sum": 0,
+      "good": 0
+    },
+    {
+      "start": "2026-10-15T10:05:00.000Z",
+      "metric": "sli.delivery_latency",
+      "dimension": "",
+      "count": 965,
+      "sum": 40000,
+      "good": 963
+    },
+    {
+      "start": "2026-10-15T10:05:00.000Z",
+      "metric": "sli.reconnect",
+      "dimension": "",
+      "count": 15,
+      "sum": 3000,
+      "good": 15
+    },
+    {
+      "start": "2026-10-15T10:05:00.000Z",
+      "metric": "catchups",
+      "dimension": "",
+      "count": 4,
+      "sum": 800,
+      "good": 0
+    },
+    {
+      "start": "2026-10-15T10:05:00.000Z",
+      "metric": "resyncs",
+      "dimension": "too_far_behind",
+      "count": 1,
+      "sum": 0,
+      "good": 0
+    },
+    {
+      "start": "2026-10-15T10:10:00.000Z",
+      "metric": "sli.delivery_latency",
+      "dimension": "",
+      "count": 910,
+      "sum": 40000,
+      "good": 908
+    },
+    {
+      "start": "2026-10-15T10:10:00.000Z",
+      "metric": "sli.reconnect",
+      "dimension": "",
+      "count": 13,
+      "sum": 3000,
+      "good": 13
+    },
+    {
+      "start": "2026-10-15T10:10:00.000Z",
+      "metric": "catchups",
+      "dimension": "",
+      "count": 3,
+      "sum": 800,
+      "good": 0
+    },
+    {
+      "start": "2026-10-15T10:10:00.000Z",
+      "metric": "resyncs",
+      "dimension": "too_far_behind",
+      "count": 0,
+      "sum": 0,
+      "good": 0
+    },
+    {
+      "start": "2026-10-15T10:15:00.000Z",
+      "metric": "sli.delivery_latency",
+      "dimension": "",
+      "count": 975,
+      "sum": 40000,
+      "good": 973
+    },
+    {
+      "start": "2026-10-15T10:15:00.000Z",
+      "metric": "sli.reconnect",
+      "dimension": "",
+      "count": 11,
+      "sum": 3000,
+      "good": 11
+    },
+    {
+      "start": "2026-10-15T10:15:00.000Z",
+      "metric": "catchups",
+      "dimension": "",
+      "count": 2,
+      "sum": 800,
+      "good": 0
+    },
+    {
+      "start": "2026-10-15T10:15:00.000Z",
+      "metric": "resyncs",
+      "dimension": "too_far_behind",
+      "count": 1,
+      "sum": 0,
+      "good": 0
+    },
+    {
+      "start": "2026-10-15T10:20:00.000Z",
+      "metric": "sli.delivery_latency",
+      "dimension": "",
+      "count": 920,
+      "sum": 40000,
+      "good": 918
+    },
+    {
+      "start": "2026-10-15T10:20:00.000Z",
+      "metric": "sli.reconnect",
+      "dimension": "",
+      "count": 16,
+      "sum": 3000,
+      "good": 16
+    },
+    {
+      "start": "2026-10-15T10:20:00.000Z",
+      "metric": "catchups",
+      "dimension": "",
+      "count": 4,
+      "sum": 800,
+      "good": 0
+    },
+    {
+      "start": "2026-10-15T10:20:00.000Z",
+      "metric": "resyncs",
+      "dimension": "too_far_behind",
+      "count": 0,
+      "sum": 0,
+      "good": 0
+    },
+    {
+      "start": "2026-10-15T10:25:00.000Z",
+      "metric": "sli.delivery_latency",
+      "dimension": "",
+      "count": 985,
+      "sum": 40000,
+      "good": 983
+    },
+    {
+      "start": "2026-10-15T10:25:00.000Z",
+      "metric": "sli.reconnect",
+      "dimension": "",
+      "count": 14,
+      "sum": 3000,
+      "good": 14
+    },
+    {
+      "start": "2026-10-15T10:25:00.000Z",
+      "metric": "catchups",
+      "dimension": "",
+      "count": 3,
+      "sum": 800,
+      "good": 0
+    },
+    {
+      "start": "2026-10-15T10:25:00.000Z",
+      "metric": "resyncs",
+      "dimension": "too_far_behind",
+      "count": 1,
+      "sum": 0,
+      "good": 0
+    },
+    {
+      "start": "2026-10-15T10:30:00.000Z",
+      "metric": "sli.delivery_latency",
+      "dimension": "",
+      "count": 930,
+      "sum": 40000,
+      "good": 928
+    },
+    {
+      "start": "2026-10-15T10:30:00.000Z",
+      "metric": "sli.reconnect",
+      "dimension": "",
+      "count": 12,
+      "sum": 3000,
+      "good": 12
+    },
+    {
+      "start": "2026-10-15T10:30:00.000Z",
+      "metric": "catchups",
+      "dimension": "",
+      "count": 2,
+      "sum": 800,
+      "good": 0
+    },
+    {
+      "start": "2026-10-15T10:30:00.000Z",
+      "metric": "resyncs",
+      "dimension": "too_far_behind",
+      "count": 0,
+      "sum": 0,
+      "good": 0
+    },
+    {
+      "start": "2026-10-15T10:35:00.000Z",
+      "metric": "sli.delivery_latency",
+      "dimension": "",
+      "count": 995,
+      "sum": 40000,
+      "good": 993
+    },
+    {
+      "start": "2026-10-15T10:35:00.000Z",
+      "metric": "sli.reconnect",
+      "dimension": "",
+      "count": 10,
+      "sum": 3000,
+      "good": 10
+    },
+    {
+      "start": "2026-10-15T10:35:00.000Z",
+      "metric": "catchups",
+      "dimension": "",
+      "count": 4,
+      "sum": 800,
+      "good": 0
+    },
+    {
+      "start": "2026-10-15T10:35:00.000Z",
+      "metric": "resyncs",
+      "dimension": "too_far_behind",
+      "count": 1,
+      "sum": 0,
+      "good": 0
+    },
+    {
+      "start": "2026-10-15T10:40:00.000Z",
+      "metric": "sli.delivery_latency",
+      "dimension": "",
+      "count": 940,
+      "sum": 40000,
+      "good": 938
+    },
+    {
+      "start": "2026-10-15T10:40:00.000Z",
+      "metric": "sli.reconnect",
+      "dimension": "",
+      "count": 15,
+      "sum": 3000,
+      "good": 15
+    },
+    {
+      "start": "2026-10-15T10:40:00.000Z",
+      "metric": "catchups",
+      "dimension": "",
+      "count": 3,
+      "sum": 800,
+      "good": 0
+    },
+    {
+      "start": "2026-10-15T10:40:00.000Z",
+      "metric": "resyncs",
+      "dimension": "too_far_behind",
+      "count": 0,
+      "sum": 0,
+      "good": 0
+    },
+    {
+      "start": "2026-10-15T10:45:00.000Z",
+      "metric": "sli.delivery_latency",
+      "dimension": "",
+      "count": 1005,
+      "sum": 40000,
+      "good": 1003
+    },
+    {
+      "start": "2026-10-15T10:45:00.000Z",
+      "metric": "sli.reconnect",
+      "dimension": "",
+      "count": 13,
+      "sum": 3000,
+      "good": 13
+    },
+    {
+      "start": "2026-10-15T10:45:00.000Z",
+      "metric": "catchups",
+      "dimension": "",
+      "count": 2,
+      "sum": 800,
+      "good": 0
+    },
+    {
+      "start": "2026-10-15T10:45:00.000Z",
+      "metric": "resyncs",
+      "dimension": "too_far_behind",
+      "count": 1,
+      "sum": 0,
+      "good": 0
+    },
+    {
+      "start": "2026-10-15T10:50:00.000Z",
+      "metric": "sli.delivery_latency",
+      "dimension": "",
+      "count": 950,
+      "sum": 40000,
+      "good": 948
+    },
+    {
+      "start": "2026-10-15T10:50:00.000Z",
+      "metric": "sli.reconnect",
+      "dimension": "",
+      "count": 11,
+      "sum": 3000,
+      "good": 11
+    },
+    {
+      "start": "2026-10-15T10:50:00.000Z",
+      "metric": "catchups",
+      "dimension": "",
+      "count": 4,
+      "sum": 800,
+      "good": 0
+    },
+    {
+      "start": "2026-10-15T10:50:00.000Z",
+      "metric": "resyncs",
+      "dimension": "too_far_behind",
+      "count": 0,
+      "sum": 0,
+      "good": 0
+    },
+    {
+      "start": "2026-10-15T10:55:00.000Z",
+      "metric": "sli.delivery_latency",
+      "dimension": "",
+      "count": 1015,
+      "sum": 40000,
+      "good": 1013
+    },
+    {
+      "start": "2026-10-15T10:55:00.000Z",
+      "metric": "sli.reconnect",
+      "dimension": "",
+      "count": 16,
+      "sum": 3000,
+      "good": 16
+    },
+    {
+      "start": "2026-10-15T10:55:00.000Z",
+      "metric": "catchups",
+      "dimension": "",
+      "count": 3,
+      "sum": 800,
+      "good": 0
+    },
+    {
+      "start": "2026-10-15T10:55:00.000Z",
+      "metric": "resyncs",
+      "dimension": "too_far_behind",
+      "count": 1,
+      "sum": 0,
+      "good": 0
     }
   ],
   "runs": [

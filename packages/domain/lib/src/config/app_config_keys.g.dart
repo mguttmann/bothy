@@ -45,6 +45,7 @@ const List<AppConfigKey> appConfigKeys = <AppConfigKey>[
   AppConfigKey('ui.quick_switch_max_results', 'App', AppConfigKind.integer, '20'),
   AppConfigKey('viz.live_poll_interval', 'App', AppConfigKind.duration, '2s'),
   AppConfigKey('viz.perf.frame_build_p95', 'App', AppConfigKind.duration, '8ms'),
+  AppConfigKey('viz.perf.frame_build_p95_ci', 'App', AppConfigKind.duration, '50ms'),
   AppConfigKey('viz.stale_after', 'App', AppConfigKind.duration, '5s'),
   AppConfigKey('viz.timeline_speeds', 'App', AppConfigKind.list, '60, 300, 900'),
   AppConfigKey('viz.tv_rotation_interval', 'App', AppConfigKind.duration, '30s'),
@@ -144,6 +145,8 @@ extension AppConfigValues on AppConfig {
   Duration get livePollInterval => value<Duration>('viz.live_poll_interval');
   /// `viz.perf.frame_build_p95` (duration, default `8ms`).
   Duration get perfFrameBuildP95 => value<Duration>('viz.perf.frame_build_p95');
+  /// `viz.perf.frame_build_p95_ci` (duration, default `50ms`).
+  Duration get perfFrameBuildP95Ci => value<Duration>('viz.perf.frame_build_p95_ci');
   /// `viz.stale_after` (duration, default `5s`).
   Duration get staleAfter => value<Duration>('viz.stale_after');
   /// `viz.timeline_speeds` (list, default `60, 300, 900`).

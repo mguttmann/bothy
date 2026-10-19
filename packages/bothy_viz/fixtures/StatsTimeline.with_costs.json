@@ -1,0 +1,453 @@
+{
+  "from": "2026-10-15T23:50:00.000Z",
+  "to": "2026-10-16T00:10:00.000Z",
+  "buckets": [
+    {
+      "start": "2026-10-15T23:50:00.000Z",
+      "metric": "messages_created",
+      "dimension": "",
+      "count": 0,
+      "sum": 0,
+      "good": 0
+    },
+    {
+      "start": "2026-10-15T23:50:00.000Z",
+      "metric": "runs_started",
+      "dimension": "",
+      "count": 0,
+      "sum": 0,
+      "good": 0
+    },
+    {
+      "start": "2026-10-15T23:51:00.000Z",
+      "metric": "messages_created",
+      "dimension": "",
+      "count": 7,
+      "sum": 0,
+      "good": 0
+    },
+    {
+      "start": "2026-10-15T23:51:00.000Z",
+      "metric": "runs_started",
+      "dimension": "",
+      "count": 3,
+      "sum": 0,
+      "good": 0
+    },
+    {
+      "start": "2026-10-15T23:52:00.000Z",
+      "metric": "messages_created",
+      "dimension": "",
+      "count": 3,
+      "sum": 0,
+      "good": 0
+    },
+    {
+      "start": "2026-10-15T23:52:00.000Z",
+      "metric": "runs_started",
+      "dimension": "",
+      "count": 1,
+      "sum": 0,
+      "good": 0
+    },
+    {
+      "start": "2026-10-15T23:53:00.000Z",
+      "metric": "messages_created",
+      "dimension": "",
+      "count": 10,
+      "sum": 0,
+      "good": 0
+    },
+    {
+      "start": "2026-10-15T23:53:00.000Z",
+      "metric": "runs_started",
+      "dimension": "",
+      "count": 4,
+      "sum": 0,
+      "good": 0
+    },
+    {
+      "start": "2026-10-15T23:54:00.000Z",
+      "metric": "messages_created",
+      "dimension": "",
+      "count": 6,
+      "sum": 0,
+      "good": 0
+    },
+    {
+      "start": "2026-10-15T23:54:00.000Z",
+      "metric": "runs_started",
+      "dimension": "",
+      "count": 2,
+      "sum": 0,
+      "good": 0
+    },
+    {
+      "start": "2026-10-15T23:55:00.000Z",
+      "metric": "messages_created",
+      "dimension": "",
+      "count": 2,
+      "sum": 0,
+      "good": 0
+    },
+    {
+      "start": "2026-10-15T23:55:00.000Z",
+      "metric": "runs_started",
+      "dimension": "",
+      "count": 0,
+      "sum": 0,
+      "good": 0
+    },
+    {
+      "start": "2026-10-15T23:56:00.000Z",
+      "metric": "messages_created",
+      "dimension": "",
+      "count": 9,
+      "sum": 0,
+      "good": 0
+    },
+    {
+      "start": "2026-10-15T23:56:00.000Z",
+      "metric": "runs_started",
+      "dimension": "",
+      "count": 3,
+      "sum": 0,
+      "good": 0
+    },
+    {
+      "start": "2026-10-15T23:57:00.000Z",
+      "metric": "messages_created",
+      "dimension": "",
+      "count": 5,
+      "sum": 0,
+      "good": 0
+    },
+    {
+      "start": "2026-10-15T23:57:00.000Z",
+      "metric": "runs_started",
+      "dimension": "",
+      "count": 1,
+      "sum": 0,
+      "good": 0
+    },
+    {
+      "start": "2026-10-15T23:58:00.000Z",
+      "metric": "messages_created",
+      "dimension": "",
+      "count": 1,
+      "sum": 0,
+      "good": 0
+    },
+    {
+      "start": "2026-10-15T23:58:00.000Z",
+      "metric": "runs_started",
+      "dimension": "",
+      "count": 4,
+      "sum": 0,
+      "good": 0
+    },
+    {
+      "start": "2026-10-15T23:59:00.000Z",
+      "metric": "messages_created",
+      "dimension": "",
+      "count": 8,
+      "sum": 0,
+      "good": 0
+    },
+    {
+      "start": "2026-10-15T23:59:00.000Z",
+      "metric": "runs_started",
+      "dimension": "",
+      "count": 2,
+      "sum": 0,
+      "good": 0
+    },
+    {
+      "start": "2026-10-16T00:00:00.000Z",
+      "metric": "messages_created",
+      "dimension": "",
+      "count": 4,
+      "sum": 0,
+      "good": 0
+    },
+    {
+      "start": "2026-10-16T00:00:00.000Z",
+      "metric": "runs_started",
+      "dimension": "",
+      "count": 0,
+      "sum": 0,
+      "good": 0
+    },
+    {
+      "start": "2026-10-16T00:01:00.000Z",
+      "metric": "messages_created",
+      "dimension": "",
+      "count": 0,
+      "sum": 0,
+      "good": 0
+    },
+    {
+      "start": "2026-10-16T00:01:00.000Z",
+      "metric": "runs_started",
+      "dimension": "",
+      "count": 3,
+      "sum": 0,
+      "good": 0
+    },
+    {
+      "start": "2026-10-16T00:02:00.000Z",
+      "metric": "messages_created",
+      "dimension": "",
+      "count": 7,
+      "sum": 0,
+      "good": 0
+    },
+    {
+      "start": "2026-10-16T00:02:00.000Z",
+      "metric": "runs_started",
+      "dimension": "",
+      "count": 1,
+      "sum": 0,
+      "good": 0
+    },
+    {
+      "start": "2026-10-16T00:03:00.000Z",
+      "metric": "messages_created",
+      "dimension": "",
+      "count": 3,
+      "sum": 0,
+      "good": 0
+    },
+    {
+      "start": "2026-10-16T00:03:00.000Z",
+      "metric": "runs_started",
+      "dimension": "",
+      "count": 4,
+      "sum": 0,
+      "good": 0
+    },
+    {
+      "start": "2026-10-16T00:04:00.000Z",
+      "metric": "messages_created",
+      "dimension": "",
+      "count": 10,
+      "sum": 0,
+      "good": 0
+    },
+    {
+      "start": "2026-10-16T00:04:00.000Z",
+      "metric": "runs_started",
+      "dimension": "",
+      "count": 2,
+      "sum": 0,
+      "good": 0
+    },
+    {
+      "start": "2026-10-16T00:05:00.000Z",
+      "metric": "messages_created",
+      "dimension": "",
+      "count": 6,
+      "sum": 0,
+      "good": 0
+    },
+    {
+      "start": "2026-10-16T00:05:00.000Z",
+      "metric": "runs_started",
+      "dimension": "",
+      "count": 0,
+      "sum": 0,
+      "good": 0
+    },
+    {
+      "start": "2026-10-16T00:06:00.000Z",
+      "metric": "messages_created",
+      "dimension": "",
+      "count": 2,
+      "sum": 0,
+      "good": 0
+    },
+    {
+      "start": "2026-10-16T00:06:00.000Z",
+      "metric": "runs_started",
+      "dimension": "",
+      "count": 3,
+      "sum": 0,
+      "good": 0
+    },
+    {
+      "start": "2026-10-16T00:07:00.000Z",
+      "metric": "messages_created",
+      "dimension": "",
+      "count": 9,
+      "sum": 0,
+      "good": 0
+    },
+    {
+      "start": "2026-10-16T00:07:00.000Z",
+      "metric": "runs_started",
+      "dimension": "",
+      "count": 1,
+      "sum": 0,
+      "good": 0
+    },
+    {
+      "start": "2026-10-16T00:08:00.000Z",
+      "metric": "messages_created",
+      "dimension": "",
+      "count": 5,
+      "sum": 0,
+      "good": 0
+    },
+    {
+      "start": "2026-10-16T00:08:00.000Z",
+      "metric": "runs_started",
+      "dimension": "",
+      "count": 4,
+      "sum": 0,
+      "good": 0
+    },
+    {
+      "start": "2026-10-16T00:09:00.000Z",
+      "metric": "messages_created",
+      "dimension": "",
+      "count": 1,
+      "sum": 0,
+      "good": 0
+    },
+    {
+      "start": "2026-10-16T00:09:00.000Z",
+      "metric": "runs_started",
+      "dimension": "",
+      "count": 2,
+      "sum": 0,
+      "good": 0
+    },
+    {
+      "start": "2026-10-15T23:50:00.000Z",
+      "metric": "cost",
+      "dimension": "personal",
+      "currency": "USD",
+      "count": 3,
+      "sum": 420000,
+      "good": 0
+    },
+    {
+      "start": "2026-10-15T23:50:00.000Z",
+      "metric": "cost",
+      "dimension": "organization",
+      "currency": "USD",
+      "count": 2,
+      "sum": 630000,
+      "good": 0
+    },
+    {
+      "start": "2026-10-15T23:51:00.000Z",
+      "metric": "cost",
+      "dimension": "personal",
+      "currency": "USD",
+      "count": 3,
+      "sum": 420000,
+      "good": 0
+    },
+    {
+      "start": "2026-10-15T23:51:00.000Z",
+      "metric": "cost",
+      "dimension": "organization",
+      "currency": "USD",
+      "count": 2,
+      "sum": 630000,
+      "good": 0
+    },
+    {
+      "start": "2026-10-15T23:52:00.000Z",
+      "metric": "cost",
+      "dimension": "personal",
+      "currency": "USD",
+      "count": 3,
+      "sum": 420000,
+      "good": 0
+    },
+    {
+      "start": "2026-10-15T23:52:00.000Z",
+      "metric": "cost",
+      "dimension": "organization",
+      "currency": "USD",
+      "count": 2,
+      "sum": 630000,
+      "good": 0
+    },
+    {
+      "start": "2026-10-15T23:53:00.000Z",
+      "metric": "cost",
+      "dimension": "personal",
+      "currency": "USD",
+      "count": 3,
+      "sum": 420000,
+      "good": 0
+    },
+    {
+      "start": "2026-10-15T23:53:00.000Z",
+      "metric": "cost",
+      "dimension": "organization",
+      "currency": "USD",
+      "count": 2,
+      "sum": 630000,
+      "good": 0
+    },
+    {
+      "start": "2026-10-15T23:54:00.000Z",
+      "metric": "cost",
+      "dimension": "personal",
+      "currency": "USD",
+      "count": 3,
+      "sum": 420000,
+      "good": 0
+    },
+    {
+      "start": "2026-10-15T23:54:00.000Z",
+      "metric": "cost",
+      "dimension": "organization",
+      "currency": "USD",
+      "count": 2,
+      "sum": 630000,
+      "good": 0
+    }
+  ],
+  "runs": [
+    {
+      "run_id": "0192f4a0-7b1c-7000-8a00-000000006000",
+      "channel_id": "0192f4a0-7b1c-7000-8a00-000000000101",
+      "agent_id": "0192f4a0-7b1c-7000-8a00-000000000201",
+      "queued_at": "2026-10-15T23:50:00.000Z",
+      "started_at": "2026-10-15T23:50:04.000Z",
+      "finished_at": "2026-10-15T23:56:00.000Z",
+      "state": "completed"
+    },
+    {
+      "run_id": "0192f4a0-7b1c-7000-8a00-000000006001",
+      "channel_id": "0192f4a0-7b1c-7000-8a00-000000000102",
+      "agent_id": "0192f4a0-7b1c-7000-8a00-000000000202",
+      "queued_at": "2026-10-15T23:58:00.000Z",
+      "started_at": "2026-10-15T23:58:02.000Z",
+      "finished_at": "2026-10-16T00:03:00.000Z",
+      "state": "failed"
+    },
+    {
+      "run_id": "0192f4a0-7b1c-7000-8a00-000000006002",
+      "channel_id": "0192f4a0-7b1c-7000-8a00-000000000102",
+      "agent_id": "0192f4a0-7b1c-7000-8a00-000000000202",
+      "queued_at": "2026-10-16T00:04:00.000Z",
+      "started_at": "2026-10-16T00:04:03.000Z",
+      "state": "running"
+    },
+    {
+      "run_id": "0192f4a0-7b1c-7000-8a00-000000006003",
+      "channel_id": "0192f4a0-7b1c-7000-8a00-000000000101",
+      "agent_id": "0192f4a0-7b1c-7000-8a00-000000000201",
+      "queued_at": "2026-10-15T23:59:00.000Z",
+      "finished_at": "2026-10-16T00:00:00.000Z",
+      "state": "cancelled"
+    }
+  ],
+  "runs_truncated": false
+}

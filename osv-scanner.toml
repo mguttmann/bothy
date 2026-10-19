@@ -36,6 +36,27 @@ license.override = ["BSD-3-Clause"]
 reason = "Flutter SDK package (bin/cache/pkg/sky_engine): the dart:ui interface of the Flutter engine, BSD-3-Clause like the SDK. Its LICENSE file also collects the notices of the third-party code compiled into the engine that every Flutter app ships (ADR 0027), among them Apache-2.0, MIT, BSD, Zlib, Unicode, IJG and FreeType texts; the review of these notices is the ScanCode step before a release (docs/quality/licenses.md item 4)."
 
 [[PackageOverrides]]
+name = "flutter_driver"
+version = "0.0.0"
+ecosystem = "Pub"
+license.override = ["BSD-3-Clause"]
+reason = "Flutter SDK package (packages/flutter_driver of the SDK) without a LICENSE file of its own; the LICENSE of the Flutter repository it belongs to is BSD-3-Clause (checked against Flutter 3.47.7 on 2026-10-16 for M6-12). Dev dependency of the bothy_viz harness for its performance test."
+
+[[PackageOverrides]]
+name = "integration_test"
+version = "0.0.0"
+ecosystem = "Pub"
+license.override = ["BSD-3-Clause"]
+reason = "Flutter SDK package (packages/integration_test of the SDK); the LICENSE of the Flutter repository it belongs to is BSD-3-Clause (checked against Flutter 3.47.7 on 2026-10-16 for M6-12). Dev dependency of the bothy_viz harness for its performance test."
+
+[[PackageOverrides]]
+name = "fuchsia_remote_debug_protocol"
+version = "0.0.0"
+ecosystem = "Pub"
+license.override = ["BSD-3-Clause"]
+reason = "Flutter SDK package (packages/fuchsia_remote_debug_protocol of the SDK) without a LICENSE file of its own; the LICENSE of the Flutter repository it belongs to is BSD-3-Clause (checked against Flutter 3.47.7 on 2026-10-16 for M6-12). Transitive dev dependency of flutter_driver."
+
+[[PackageOverrides]]
 name = "flutter_localizations"
 version = "0.0.0"
 ecosystem = "Pub"
@@ -370,6 +391,20 @@ version = "29.0.10"
 ecosystem = "Pub"
 license.override = ["BSD-3-Clause"]
 reason = "deps.dev knows no license for this pub package; its LICENSE file on pub.dev is BSD-3-Clause. Dev package of device_key (code generator)."
+
+[[PackageOverrides]]
+name = "sync_http"
+version = "0.3.1"
+ecosystem = "Pub"
+license.override = ["BSD-3-Clause"]
+reason = "deps.dev knows no license for this pub package; its LICENSE file is BSD-3-Clause of the Dart project authors (checked against the 0.3.1 archive on 2026-10-16 for M6-12). Transitive dev dependency of flutter_driver for the performance test of the bothy_viz harness."
+
+[[PackageOverrides]]
+name = "webdriver"
+version = "3.2.0"
+ecosystem = "Pub"
+license.override = ["Apache-2.0"]
+reason = "deps.dev knows no license for this pub package; its LICENSE file is the Apache-2.0 text (checked against the 3.2.0 archive on 2026-10-16 for M6-12). Transitive dev dependency of flutter_driver for the performance test of the bothy_viz harness."
 
 [[PackageOverrides]]
 name = "pointycastle"

@@ -1,0 +1,3 @@
+{
+  "macos": [["sh", "tool/perf_macos.sh"]]
+}

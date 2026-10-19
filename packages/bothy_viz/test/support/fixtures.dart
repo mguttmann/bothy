@@ -25,6 +25,8 @@ const names = VizNames(
   agents: {
     '0192f4a0-7b1c-7000-8a00-000000000201': 'support-agent',
     '0192f4a0-7b1c-7000-8a00-000000000202': 'dev-runner',
+    '0192f4a0-7b1c-7000-8a00-000000000203': 'Texter',
+    '0192f4a0-7b1c-7000-8a00-000000000204': 'Assistent',
   },
   spaces: {
     '0192f4a0-7b1c-7000-8a00-000000000001': 'Support',

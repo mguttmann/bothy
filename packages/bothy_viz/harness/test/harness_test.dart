@@ -112,6 +112,40 @@ void main() {
     },
   );
 
+  testWidgets('every view of the registry shows from the fixtures', (
+    tester,
+  ) async {
+    tester.view.physicalSize = const Size(1600, 1200);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.reset);
+    await tester.pumpWidget(
+      const HarnessApp(reader: _read, motion: DsMotionMode.reduced),
+    );
+    await settle(tester);
+    final views = {
+      VizViewKind.liveTopology: LiveTopologyView,
+      VizViewKind.backend: BackendView,
+      VizViewKind.delivery: DeliveryView,
+      VizViewKind.executive: ExecutiveView,
+      VizViewKind.timeline: TimelineView,
+      VizViewKind.tvMode: TvMode,
+    };
+    expect(harnessViews, hasLength(vizViewRegistry.length));
+    for (var i = 0; i < harnessViews.length; i++) {
+      final index = harnessMarks.length + i;
+      await tester.ensureVisible(find.byKey(ValueKey('mark-$index')));
+      await tester.tap(find.byKey(ValueKey('mark-$index')));
+      await settle(tester);
+      expect(state(tester).selected, index);
+      expect(find.byType(views[vizViewRegistry[i].kind]!), findsOneWidget);
+      expect(find.text('Loading'), findsNothing);
+    }
+    // TV mode is last: a click ends it and returns to the first entry.
+    await tester.tapAt(tester.getCenter(find.byType(TvMode)));
+    await tester.pump();
+    expect(state(tester).selected, 0);
+  });
+
   testWidgets('a tap on a run card shows its thread', (tester) async {
     tester.view.physicalSize = const Size(1600, 1200);
     tester.view.devicePixelRatio = 1;

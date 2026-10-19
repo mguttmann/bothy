@@ -860,6 +860,7 @@ Source: [25-visualization.md](../spec/25-visualization.md), section 15.
 | `viz.tv_rotation_interval` |  | App |  | `30s` | switching of the views in TV mode |  |
 | `viz.tv_show_costs` |  | App |  | `false` | show costs in TV mode |  |
 | `viz.perf.frame_build_p95` |  | App |  | `8ms` | target: build of one frame of the live topology with `stats.live_max_runs` runs |  |
+| `viz.perf.frame_build_p95_ci` |  | App |  | `50ms` | budget of the same test on a shared hosted CI runner (measured p95 about 23 ms on the macOS runner, about twice that as headroom); the reference target above holds on reference hardware through `make perf` |  |
 <!-- config-reference:end -->
 
 ## 5. Secrets

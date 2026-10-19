@@ -47,6 +47,17 @@ final class VizCost {
 
   /// The amount in currency units.
   double get amount => micros / 1000000;
+
+  @override
+  bool operator ==(Object other) =>
+      other is VizCost &&
+      other.micros == micros &&
+      other.currency == currency &&
+      other.mode == mode &&
+      other.label == label;
+
+  @override
+  int get hashCode => Object.hash(micros, currency, mode, label);
 }
 
 /// The billing mode of `domain` for a generated [api.BillingMode]; an unknown value maps to

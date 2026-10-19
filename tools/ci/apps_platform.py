@@ -105,7 +105,13 @@ def _run(name: str, folder: Path, system: str, commands: list[list[str]]) -> boo
 
 
 def _members(root: Path) -> list[Path]:
-    files = [*root.glob("apps/*/platform-tests.json"), *root.glob("packages/*/platform-tests.json")]
+    # One level under apps/ and packages/, plus the nested harness members (packages/*/harness,
+    # docs/DECISIONS.md D-M6-11-6), as the workspace lists them.
+    files = [
+        *root.glob("apps/*/platform-tests.json"),
+        *root.glob("packages/*/platform-tests.json"),
+        *root.glob("packages/*/harness/platform-tests.json"),
+    ]
     return sorted(f for f in files if (f.parent / "pubspec.yaml").is_file())
 
 
