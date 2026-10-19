@@ -370,7 +370,7 @@ func stop(tb testing.TB, sigs chan os.Signal, done chan int, logs *logBuffer) {
 
 // redeem enrolls a new device with code (redeemEnrollmentCode) and returns its client.
 func (s *Server) redeem(ctx context.Context, code, name string) (*Client, error) {
-	c := &Client{publicURL: s.PublicURL, http: s.http, key: newDeviceKey(), stepKey: newDeviceKey(), DeviceID: ids.New().String()}
+	c := &Client{publicURL: s.PublicURL, http: s.http, tb: s.tb, key: newDeviceKey(), stepKey: newDeviceKey(), DeviceID: ids.New().String()}
 	resp := c.send(ctx, Request{Method: http.MethodPost, Path: "/auth/enroll/redeem", Body: map[string]any{
 		"enrollment_code": code,
 		"device":          c.registration(name),
