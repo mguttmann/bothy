@@ -413,6 +413,9 @@ func (a *Authorizer) authorize(ctx context.Context, p authorize.Principal, act a
 	if err != nil {
 		return authorize.Decision{}, err
 	}
+	if err := checkFileFacts(ctx, r); err != nil {
+		return authorize.Decision{}, err
+	}
 	t := a.clock.Now()
 	if d, anonymous := anonymousDecision(p, req); anonymous {
 		return d, nil

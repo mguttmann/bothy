@@ -377,15 +377,17 @@ func TestVerifyRegistrations_DeferredActions(t *testing.T) {
 		re.Violations[0].Action != "command.invoke" {
 		t.Fatalf("route: %v", err)
 	}
-	for name, register := range map[string]func(*authorize.Registry){
-		"channel op": func(r *authorize.Registry) { r.ChannelOp("terminal", authorize.ChannelOpHostControlSessionOpen) },
-		"event type": func(r *authorize.Registry) { r.Event("files", authorize.EventFileUpdated) },
-	} {
-		r := authorize.NewRegistry()
-		register(r)
-		err := cat.VerifyRegistrations(nil, r)
-		if !errors.As(err, &re) || len(re.Violations) != 1 || re.Violations[0].Kind != app.ViolationDeferredAction {
-			t.Errorf("%s: %v", name, err)
-		}
+	// A channel op of a deferred action is refused (host.control.session.open until M2-43).
+	r := authorize.NewRegistry()
+	r.ChannelOp("terminal", authorize.ChannelOpHostControlSessionOpen)
+	if err := cat.VerifyRegistrations(nil, r); !errors.As(err, &re) || len(re.Violations) != 1 || re.Violations[0].Kind != app.ViolationDeferredAction {
+		t.Errorf("channel op: %v", err)
+	}
+	// Since M3-03 no event type names a deferred action (file.updated receives with file.read):
+	// the registry of file.updated verifies.
+	r = authorize.NewRegistry()
+	r.Event("files", authorize.EventFileUpdated)
+	if err := cat.VerifyRegistrations(nil, r); err != nil {
+		t.Errorf("file.updated: %v", err)
 	}
 }
