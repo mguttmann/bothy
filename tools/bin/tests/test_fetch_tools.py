@@ -168,6 +168,22 @@ def test_ensure_extracts_member_and_caches(tmp_path: Path, downloads: FakeNet) -
     assert downloads.calls == [url]  # second call served from the cache
 
 
+def test_ensure_extracts_member_of_xz_tar(tmp_path: Path, downloads: FakeNet) -> None:
+    """ShellCheck publishes its release binaries only as xz-compressed tar archives."""
+    buf = io.BytesIO()
+    with tarfile.open(fileobj=buf, mode="w:xz") as tf:
+        info = tarfile.TarInfo("demo-v1.2.3/demo")
+        info.size = 5
+        info.mode = 0o755
+        tf.addfile(info, io.BytesIO(b"demo\n"))
+    payload = buf.getvalue()
+    lock = _lock("demo-v{version}.linux.x86_64.tar.xz", "demo-v{version}/demo", payload)
+    url = "https://github.com/example/demo/releases/download/v1.2.3/demo-v1.2.3.linux.x86_64.tar.xz"
+    downloads[url] = payload
+    path = fetch_tools.ensure(lock, "demo", "linux-amd64", tmp_path)
+    assert path.read_bytes() == b"demo\n"
+
+
 def test_ensure_raw_binary(tmp_path: Path, downloads: FakeNet) -> None:
     payload = b"\x7fELFbinary"
     lock = _lock("demo_linux_amd64", "", payload)

@@ -1,0 +1,145 @@
+#!/bin/sh
+# SPDX-License-Identifier: Apache-2.0
+#
+# Stub of the docker CLI for the tests of install.sh (README.md next to this folder). It starts
+# nothing: it appends its arguments and working folder to STUB_LOG and answers the calls
+# install.sh makes from environment variables.
+#
+# Inputs (defaults in brackets):
+#   STUB_LOG              log file (required); the state of the first owner lives in STUB_LOG.owner
+#   STUB_ENGINE_VERSION   docker version --format '{{.Server.Version}}' [27.3.1]
+#   STUB_ENGINE_DOWN=1    docker version fails as with a stopped engine
+#   STUB_COMPOSE_VERSION  docker compose version --short [2.29.7]
+#   STUB_ARCH             docker info --format '{{.Architecture}}' [x86_64]
+#   STUB_MEMTOTAL         docker info --format '{{.MemTotal}}' in bytes [8589934592]
+#   STUB_NETWORK          networks.default.name of docker compose config --format json [bothy_default]
+#   STUB_GW4, STUB_GW6    gateways of that network; empty means none [192.0.2.1, none]
+#   STUB_CONFIG_EXIT      exit code of docker compose config --quiet [0]
+#   STUB_READY_FAIL=1     bothy healthcheck never succeeds
+#   STUB_OWNER_EXISTS=1   bothy setup bootstrap-owner exits 3 (also after a first successful call)
+#   STUB_ENROLL_CODE      the code bootstrap-owner prints [K7QX-4M2P-9D3R]
+#   STUB_PORT             docker compose port api 8080 [127.0.0.1:8090]
+#   STUB_TS_STATUS_EXIT   exit code of tailscale status in the sidecar [0]
+#
+# Exit codes: those of the answered call; 64 for a call install.sh is not expected to make.
+
+log=${STUB_LOG:?STUB_LOG is not set}
+printf 'docker %s\n' "$*" >>"$log"
+printf 'cwd %s\n' "$PWD" >>"$log"
+
+# unexpected reports a call the stub does not know, so a test sees it in the output.
+# Arguments: none (uses the arguments of the stub). Exit code: 64.
+unexpected() {
+	printf 'docker stub: unexpected call: docker %s\n' "$ARGS" >&2
+	exit 64
+}
+
+ARGS=$*
+
+# compose_config_json prints a project model shaped like the one of Compose: the networks.default
+# object is not the first "networks" key and not the first "name", so a parser that only looks
+# for a key name fails.
+compose_config_json() {
+	cat <<EOF
+{
+  "name": "bothy",
+  "services": {
+    "api": {
+      "image": "ghcr.io/example/bothy-server:9.8.7",
+      "networks": {
+        "default": null,
+        "internal": null
+      }
+    }
+  },
+  "networks":{"internal":{"name":"bothy_internal","internal":true},
+    "default" :   {
+      "name"   :
+        "${STUB_NETWORK:-bothy_default}",
+      "ipam": {}
+    }
+  },
+  "volumes": { "files": { "name": "bothy_files" } }
+}
+EOF
+}
+
+# compose_exec answers docker compose exec -T <service> <command>.
+# Arguments: the words after "exec". Exit code: that of the simulated command.
+compose_exec() {
+	[ "$1" = -T ] || unexpected
+	service=$2
+	shift 2
+	case $service in
+	api | api-tailscale | tailscale) ;;
+	*)
+		printf 'service "%s" is not running\n' "$service" >&2
+		exit 1
+		;;
+	esac
+	case "$*" in
+	"bothy healthcheck --url http://127.0.0.1:8081/readyz")
+		[ "${STUB_READY_FAIL:-0}" = 1 ] && exit 1
+		exit 0
+		;;
+	"bothy setup bootstrap-owner --handle "*)
+		if [ "${STUB_OWNER_EXISTS:-0}" = 1 ] || [ -e "$log.owner" ]; then
+			echo "bothy setup: setup is already complete; nothing changed" >&2
+			exit 3
+		fi
+		: >"$log.owner"
+		printf '%s\n' "${STUB_ENROLL_CODE:-K7QX-4M2P-9D3R}"
+		echo "bothy setup: the code is valid until 2026-10-27T00:00:00Z; hand it over in person" >&2
+		exit 0
+		;;
+	"tailscale status")
+		exit "${STUB_TS_STATUS_EXIT:-0}"
+		;;
+	esac
+	unexpected
+}
+
+case $1 in
+version)
+	[ "${STUB_ENGINE_DOWN:-0}" = 1 ] && {
+		echo "Cannot connect to the Docker daemon" >&2
+		exit 1
+	}
+	printf '%s\n' "${STUB_ENGINE_VERSION:-27.3.1}"
+	;;
+info)
+	case "$*" in
+	*Architecture*) printf '%s\n' "${STUB_ARCH:-x86_64}" ;;
+	*MemTotal*) printf '%s\n' "${STUB_MEMTOTAL:-8589934592}" ;;
+	*) unexpected ;;
+	esac
+	;;
+network)
+	[ "$2" = inspect ] || unexpected
+	for net in "$@"; do :; done
+	if [ "$net" != "${STUB_NETWORK:-bothy_default}" ]; then
+		printf 'Error response from daemon: network %s not found\n' "$net" >&2
+		exit 1
+	fi
+	out=
+	[ -n "${STUB_GW4-192.0.2.1}" ] && out="${STUB_GW4-192.0.2.1} "
+	[ -n "${STUB_GW6:-}" ] && out="$out$STUB_GW6 "
+	printf '%s\n' "$out"
+	;;
+compose)
+	shift
+	case "$*" in
+	"version --short") printf '%s\n' "${STUB_COMPOSE_VERSION:-2.29.7}" ;;
+	"config --quiet") exit "${STUB_CONFIG_EXIT:-0}" ;;
+	"config --format json") compose_config_json ;;
+	"up --no-start" | "up -d" | ps | "ps "*) exit 0 ;;
+	"port api 8080") printf '%s\n' "${STUB_PORT:-127.0.0.1:8090}" ;;
+	exec\ *)
+		shift
+		compose_exec "$@"
+		;;
+	*) unexpected ;;
+	esac
+	;;
+*) unexpected ;;
+esac
