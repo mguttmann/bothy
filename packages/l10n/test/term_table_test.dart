@@ -25,6 +25,8 @@ const Map<String, String> exceptions = {
   'vizTileRuns': 'German plural of the term Run',
   // The German plural of the term Channel changes its vowel (M4-18).
   'shellColumnSidebar': 'German plural of the term Channel',
+  // The German plural of the term Post changes its vowel (M4-19, INT-W40/5).
+  'postListLoadFailed': 'German plural of the term Post',
   // {space} and {channel} are placeholders that carry the names, not the terms (INT-W27/4).
   'vizLaneLabel': 'placeholders {space} and {channel}, not the terms',
   // "runs on the subscription" is the verb, not the term Run (components.md section 10).

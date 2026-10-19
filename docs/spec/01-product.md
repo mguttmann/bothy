@@ -1197,6 +1197,8 @@ sentence "The data of this device has been deleted" (04, section 8.5, R-SY-14) a
 - "Done" (`thread.close`) in the thread header, in the context menu of the post list and via shortcut.
 - Done posts are at the bottom in the section "Done (n)", collapsed by default; the
   collapse state is personal per forum.
+  The collapse state is kept per forum on each device in the local database and is not
+  synchronized, because 11 has no setting key for it (docs/DECISIONS.md D-M4-19-4).
 - A new message in a done thread reopens it (`thread.reopen` implicitly). The
   history shows a system line "Reopened by message from Sam". A system line itself does not
   reopen a done thread ([03-data-model.md](03-data-model.md), R-DM-42).

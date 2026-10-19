@@ -37,7 +37,10 @@ void registerAuthHandlers(RestFake rest, {required Duration accessTokenTtl}) {
           'url': gateway.toString(),
           'protocol_versions': [1],
         },
-        'branding': {'product_name': world.productName},
+        'branding': {
+          'product_name': world.productName,
+          if (world.logo != null) 'logo_url': '/api/v1/instance/branding/logo',
+        },
         'auth_providers': [
           {'id': world.localProviderId, 'kind': 'local', 'name': 'Local'},
         ],
@@ -45,6 +48,11 @@ void registerAuthHandlers(RestFake rest, {required Duration accessTokenTtl}) {
         'jwks_uri': '/api/v1/auth/jwks',
         'webhook_keys_uri': '/api/v1/webhooks/keys',
       });
+    })
+    ..handle('getBrandingLogo', (r) {
+      final logo = world.logo;
+      if (logo == null) throw const FakeProblem(404, 'not_found');
+      return FakeResponse.bytes(logo, contentType: 'image/png');
     })
     ..handle('loginWithPassword', (r) {
       final body = r.json;

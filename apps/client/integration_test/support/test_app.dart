@@ -127,7 +127,7 @@ class TestApp {
 
   /// Opens the settings section [segment] from the shell.
   Future<void> openSettings(String segment) async {
-    await tester.tap(find.byKey(const ValueKey('shell.settings')));
+    await tester.tap(find.byKey(const ValueKey('sidebar.settings')));
     await waitFor(find.byKey(const ValueKey('screen.settings')));
     await tester.tap(find.byKey(ValueKey('settings.nav.$segment')));
     await tester.pumpAndSettle();

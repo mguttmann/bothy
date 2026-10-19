@@ -21,7 +21,8 @@ import argparse
 import sys
 from pathlib import Path, PurePosixPath
 
-GENERATED_SUFFIXES = (".g.dart", ".freezed.dart", ".drift.dart")
+# `.steps.dart`: the migration steps `drift_dev make-migrations` writes (brief M4-19).
+GENERATED_SUFFIXES = (".g.dart", ".freezed.dart", ".drift.dart", ".steps.dart")
 GENERATED_DIR = ("lib", "src", "generated")
 GENERATOR_INPUT_DIR = ("lib", "src", "tables")
 

@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
-/// Local-only tables (15 6.1): `outbox`, `sync_state`, `loaded_ranges`, `file_cache` and
-/// `share_inbox`. Times are milliseconds since the epoch in UTC, so ordering and the cleanup
+/// Local-only tables (15 6.1): `outbox`, `sync_state`, `loaded_ranges`, `file_cache`,
+/// `share_inbox` and `forum_view_states`. Times are milliseconds since the epoch in UTC, so ordering and the cleanup
 /// compare plain integers.
 library;
 
@@ -164,4 +164,22 @@ class ShareInbox extends Table {
 
   @override
   Set<Column<Object>> get primaryKey => {id};
+}
+
+/// How a forum looks on this device (brief M4-19 Design note 4): whether its Done section is
+/// collapsed. Kept per device because 01 11 has no personal setting for it (01 6.1); a forum
+/// without a row shows the section collapsed.
+@DataClassName('ForumViewStateRow')
+class ForumViewStates extends Table {
+  @override
+  String get tableName => 'forum_view_states';
+
+  /// The forum channel.
+  TextColumn get channelId => text()();
+
+  /// Whether the section "Done (n)" is collapsed.
+  BoolColumn get doneCollapsed => boolean()();
+
+  @override
+  Set<Column<Object>> get primaryKey => {channelId};
 }

@@ -79,6 +79,14 @@ operated, and the order of the build.
   action before the system asks for the step-up key; revoking this device or ending the current
   session wipes the local data. The fake server gains the own device, session, profile, settings
   and step-up operations and a second simulated device of Alex.
+- Sidebar and post list (M4-19): the desktop sidebar shows the instance's product name and
+  logo, the "Jump to" field and "Running now" as placeholders, the spaces in the person's own
+  order (collapse and drag synchronized across devices through `putMySidebarSpace` and
+  `sidebar.updated`, keys from the shared fractional index in `domain`) and their channels with
+  read, unread, mention, run, muted and selected states and counters kept by the sync engine.
+  A forum opens its post list with "New post" (`createThread` through the outbox), the filters
+  Open, Waiting for me, Tags and Sort, paging through `listChannelThreads` and the "Done (n)"
+  section, whose collapse state is kept per device in the new local table `forum_view_states`.
 - Desktop app shell (M4-18): `apps/client` builds for macOS and Windows with platform folders,
   the build branding of `branding.example.yaml` (URL scheme, app name, bundle identifier, default
   server) and deep links of that scheme on both platforms. One composition root per server

@@ -24,6 +24,28 @@ Widget hostScreen(Widget child, {Locale locale = const Locale('en')}) {
   );
 }
 
+/// [router] with the delegates of `package:l10n` in [locale] and the light design theme.
+Widget hostRouter(
+  RouterConfig<Object> router, {
+  Locale locale = const Locale('en'),
+}) {
+  const ds = DsContext(
+    theme: DsThemeMode.light,
+    density: DsDensityMode.comfortable,
+    motion: DsMotionMode.reduced,
+    accent: dsDefaultAccent,
+  );
+  return MaterialApp.router(
+    locale: locale,
+    theme: buildDsTheme(ds),
+    localizationsDelegates: AppLocalizations.localizationsDelegates,
+    supportedLocales: AppLocalizations.supportedLocales,
+    routerConfig: router,
+    builder: (context, child) =>
+        DsThemeScope(dsContext: ds, child: child ?? const SizedBox()),
+  );
+}
+
 /// A desktop-sized window for the test.
 void desktopWindow(WidgetTester tester) {
   tester.view

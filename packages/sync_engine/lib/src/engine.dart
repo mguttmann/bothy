@@ -103,6 +103,10 @@ final class SyncEngine {
   /// `identify`. [clock] defaults to the system clock, [random] to a secure source, [ids] to
   /// UUIDv7 on [clock] and [random]. [keepConnectedInBackground] is the desktop behaviour of
   /// 15 7.2. [logHook] receives one line per notable step, never content.
+  /// [registerExecutors] registers the app's own writes on the executor registry next to
+  /// [MessageOps] and [PersonalOps], with the session's REST client (brief M4-19: the sidebar
+  /// and forum writes of `apps/client/lib/sync/`); a kind it registers replaces a built-in
+  /// one.
   ///
   /// Throws an [ArgumentError] for a [baseUrl] that is not an absolute `https` origin (or
   /// `http` with [allowPlainHttpForTests]).
@@ -124,6 +128,7 @@ final class SyncEngine {
     bool keepConnectedInBackground = false,
     bool allowPlainHttpForTests = false,
     void Function(String line)? logHook,
+    void Function(OutboxExecutors executors, ApiClient api)? registerExecutors,
   }) {
     final gatewayUrl = gatewayUrlOf(
       baseUrl,
@@ -135,6 +140,7 @@ final class SyncEngine {
     final executors = OutboxExecutors();
     MessageOps.register(executors, api);
     PersonalOps.register(executors, api);
+    registerExecutors?.call(executors, api);
     late final CatchUpListener catchUp;
     final outbox = Outbox(
       db: store,

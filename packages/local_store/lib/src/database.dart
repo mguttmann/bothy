@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
 
-/// The drift database of the apps, schema version 1 (docs/spec/15-client-architecture.md 6, ADR
+/// The drift database of the apps, schema version 2 (docs/spec/15-client-architecture.md 6, ADR
 /// 0029): the mirror tables of 15 6.1 except `host_key_pins` (M4-36) and the local-only tables.
 library;
 
@@ -10,6 +10,7 @@ import 'package:drift/drift.dart';
 
 import 'daos/commands_dao.dart';
 import 'daos/file_cache_dao.dart';
+import 'daos/forum_view_dao.dart';
 import 'daos/instance_dao.dart';
 import 'daos/messages_dao.dart';
 import 'daos/outbox_dao.dart';
@@ -21,6 +22,7 @@ import 'daos/share_inbox_dao.dart';
 import 'daos/structure_dao.dart';
 import 'daos/sync_state_dao.dart';
 import 'daos/threads_dao.dart';
+import 'database.steps.dart';
 import 'tables/files.dart';
 import 'tables/instance.dart';
 import 'tables/local_only.dart';
@@ -62,6 +64,7 @@ part 'database.g.dart';
     LoadedRangesTable,
     FileCache,
     ShareInbox,
+    ForumViewStates,
   ],
   include: {'search.drift'},
 )
@@ -78,17 +81,17 @@ class LocalDatabase extends _$LocalDatabase {
   final DateTime Function() clock;
 
   @override
-  int get schemaVersion => 1;
+  int get schemaVersion => 2;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
     onCreate: (m) => m.createAll(),
-    // Version 1 has no step yet. From version 2 on, `dart run drift_dev make-migrations`
-    // writes `database.steps.dart` and this becomes `stepByStep(...)` with the steps built
-    // from MigrationRules (docs/DECISIONS.md D-M4-12-6). Until then any other stored version
-    // (a database of a newer app) cannot be opened; the app wipes it and resyncs.
-    onUpgrade: (m, from, to) async => throw UnsupportedError(
-      'no migration of the local database from version $from to $to',
+    // `dart run drift_dev make-migrations` writes `database.steps.dart`; each step is built
+    // from MigrationRules (docs/DECISIONS.md D-M4-12-6). A stored version above this one (a
+    // database of a newer app) cannot be opened; the app wipes it and resyncs.
+    onUpgrade: stepByStep(
+      // Version 2 (M4-19): the local-only table `forum_view_states`; no row moves.
+      from1To2: (m, schema) => m.createTable(schema.forumViewStates),
     ),
   );
 
@@ -164,4 +167,7 @@ class LocalDatabase extends _$LocalDatabase {
 
   /// Share inbox.
   late final ShareInboxDao shareInboxDao = ShareInboxDao(this);
+
+  /// How forums look on this device (the Done section).
+  late final ForumViewDao forumViewDao = ForumViewDao(this);
 }
