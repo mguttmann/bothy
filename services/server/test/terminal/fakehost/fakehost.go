@@ -879,6 +879,25 @@ func (dv *Device) Ended() bool {
 	}
 }
 
+// Dial opens a plain WebSocket client of url for the tests of the relay (compression off, no read
+// limit); the tests of services/server dial only through the test clients (TestHarness_OnlyEntryPoint).
+// It returns the connection and the HTTP status of a refused upgrade.
+func Dial(ctx context.Context, url string) (*websocket.Conn, int, error) {
+	ws, resp, err := websocket.Dial(ctx, url, &websocket.DialOptions{CompressionMode: websocket.CompressionDisabled}) // nosemgrep: bothy-go-egress-only -- test client of the relay tests; it dials only the server of the test
+	status := 0
+	if resp != nil {
+		status = resp.StatusCode
+		if resp.Body != nil {
+			_ = resp.Body.Close()
+		}
+	}
+	if err != nil {
+		return nil, status, err
+	}
+	ws.SetReadLimit(-1)
+	return ws, status, nil
+}
+
 // B64 encodes base64url without padding.
 func B64(b []byte) string { return base64.RawURLEncoding.EncodeToString(b) }
 
