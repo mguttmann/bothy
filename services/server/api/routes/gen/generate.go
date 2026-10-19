@@ -200,7 +200,7 @@ func runOapiCodegen(ctx context.Context, diag io.Writer, configPath, specPath, d
 	if err := writeGoModStub(ctx, dir); err != nil {
 		return err
 	}
-	resolve := exec.CommandContext(ctx, "go", "tool", "-n", "oapi-codegen") // NOSONAR: the go of go generate; see M1-17/33.
+	resolve := exec.CommandContext(ctx, "go", "tool", "-n", "oapi-codegen")
 	resolve.Stderr = &output
 	bin, err := resolve.Output()
 	if err != nil {
@@ -221,7 +221,7 @@ func runOapiCodegen(ctx context.Context, diag io.Writer, configPath, specPath, d
 
 // writeGoModStub writes dir/go.mod with the go directive of the current module (go env GOMOD).
 func writeGoModStub(ctx context.Context, dir string) error {
-	path, err := exec.CommandContext(ctx, "go", "env", "GOMOD").Output() // NOSONAR: the go of go generate; see M1-17/33.
+	path, err := exec.CommandContext(ctx, "go", "env", "GOMOD").Output()
 	if err != nil {
 		return fmt.Errorf("go env GOMOD: %w", err)
 	}

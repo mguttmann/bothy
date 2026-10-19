@@ -189,6 +189,8 @@ type server struct {
 	syncReads *SyncReads
 	// notify is the notify module (M3-18), built in the chat step over chat, sync and identity.
 	notify *Notify
+	// stats is the client metrics part of the stats module (M4-31), built in the chat step.
+	stats *Stats
 	// gateway is the WebSocket gateway of api and all (M1-64) with the hub the log tail feeds
 	// (M1-65).
 	gateway *Gateway
@@ -825,8 +827,12 @@ func (s *server) startChat(context.Context) error {
 	if err != nil {
 		return err
 	}
+	st, err := NewStats(az, p.Service.Settings())
+	if err != nil {
+		return err
+	}
 	s.mu.Lock()
-	s.chat, s.messaging, s.personal, s.syncReads, s.notify = c, m, p, r, n
+	s.chat, s.messaging, s.personal, s.syncReads, s.notify, s.stats = c, m, p, r, n, st
 	s.mu.Unlock()
 	return nil
 }
@@ -996,6 +1002,7 @@ func (s *server) handlers() Handlers {
 	s.personal.fillHandlers(&h)
 	s.syncReads.fillHandlers(&h)
 	s.notify.fillHandlers(&h)
+	s.stats.fillHandlers(&h)
 	if h.Hosts == nil && s.terminal != nil {
 		h.Hosts = s.terminal.Handlers
 	}

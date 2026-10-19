@@ -167,6 +167,7 @@ Operating values of the own measurement ([25-visualization.md](../spec/25-visual
 | `bothy.audit.verify.last_success.timestamp` | Gauge | `s` | none | worker | `bothy_audit_verify_last_success_timestamp_seconds` |
 | `bothy.telemetry.dropped` | Counter | `{item}` | `bothy.signal` (`traces`, `metrics`, `logs`) | all processes | `bothy_telemetry_dropped_total` |
 | `bothy.secrets.refresh.failures` | Counter | `{refresh}` | none | all processes: re-reading a secret fails, the old value stays ([02-architecture.md](../spec/02-architecture.md) 14.4) | `bothy_secrets_refresh_failures_total` |
+| `bothy.client_metrics.discarded` | Counter | `{entry}` | `bothy.reason` (`unknown_name`, `kind_mismatch`, `invalid_bounds`, `invalid_value`) | api: entries of a `submitClientMetrics` batch the server discarded one by one (4.6a, [ADR 0057](../adr/0057-client-telemetry-through-a-server-endpoint.md), M4-31) | `bothy_client_metrics_discarded_total` |
 
 `bothy-backupd` sees the volumes `pgdata` and `files` read-only and measures only the free
 space there.

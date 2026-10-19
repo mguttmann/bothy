@@ -6,6 +6,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"math"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -166,6 +167,20 @@ func (c *Counter) Add(ctx context.Context, n int64, values ...string) {
 		return
 	}
 	c.i64.Add(ctx, n, opt)
+}
+
+// AddFloat adds v with the attribute values in the order of the spec: the increments the apps send
+// as JSON numbers (signals.md 4.6a). A negative, NaN or infinite v is ignored; on an int64 counter
+// v is truncated toward zero.
+func (c *Counter) AddFloat(ctx context.Context, v float64, values ...string) {
+	if v < 0 || math.IsNaN(v) || math.IsInf(v, 0) {
+		return
+	}
+	if c.f64 == nil {
+		c.Add(ctx, int64(v), values...)
+		return
+	}
+	c.f64.Add(ctx, v, metric.WithAttributeSet(c.b.attrs(values)))
 }
 
 // UpDownCounter is a counter of the catalogue that also decreases.
