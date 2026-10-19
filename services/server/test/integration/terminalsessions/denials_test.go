@@ -62,7 +62,8 @@ func TestOpen_TMT29g_WorkdirIndexOutsideOwnList(t *testing.T) {
 		t.Fatal(err)
 	}
 	w.eventually("the report", func() bool {
-		return w.count(`SELECT count(*) FROM hosts WHERE id = $1 AND reported_session_users::text LIKE '%"bothy-s-alex", "workdirs": []%'`, w.r1.String()) == 1
+		return w.count(`SELECT count(*) FROM hosts h, jsonb_array_elements(h.reported_session_users) e
+			WHERE h.id = $1 AND e->>'os_user' = $2 AND e->'workdirs' = '[]'::jsonb`, w.r1.String(), "bothy-s-alex") == 1
 	})
 	expect(t, "index of Robin's list", w.open(w.alex, w.r1, openBody("claude", 0)), http.StatusForbidden, "terminal_denied", "profile_unknown")
 	w.nothingOpened(w.alex)
@@ -92,7 +93,8 @@ func TestOpen_NoSessionUserIsDeniedNot4104(t *testing.T) {
 		t.Fatal(err)
 	}
 	w.eventually("the report", func() bool {
-		return w.count(`SELECT count(*) FROM hosts WHERE id = $1 AND reported_session_users::text NOT LIKE '%bothy-s-alex%'`, w.r1.String()) == 1
+		return w.count(`SELECT count(*) FROM hosts WHERE id = $1 AND NOT reported_session_users @> jsonb_build_array(jsonb_build_object('os_user', $2::text))`,
+			w.r1.String(), "bothy-s-alex") == 1
 	})
 	expect(t, "no session user", w.open(w.alex, w.r1, openBody("shell")), http.StatusForbidden, "terminal_denied", "no_session_user")
 	w.nothingOpened(w.alex)
