@@ -20,6 +20,8 @@ vendors:
     in: [github.com/santhosh-tekuri/jsonschema/v6, github.com/santhosh-tekuri/jsonschema/v6/**]
   v-libopenapi:
     in: [github.com/pb33f/libopenapi, github.com/pb33f/libopenapi/**, github.com/pb33f/libopenapi-validator, github.com/pb33f/libopenapi-validator/**]
+  v-mimetype:
+    in: [github.com/gabriel-vasile/mimetype]
   v-mobyapi:
     in: [github.com/moby/moby/api/types/container, github.com/moby/moby/api/types/network]
   v-oapi:
@@ -366,7 +368,7 @@ deps:
     mayDependOn: [files-app, files, files-domain, kernel-ports, identity, chat]
   files-adapters:
     mayDependOn: [files-adapters, files, files-app, files-domain, kernel-ports, platform-buildinfo, platform-config, platform-egress, platform-health, platform-httpserver, platform-jobs, platform-jsoncanon, platform-lifecycle, platform-otel, platform-pg, platform-ratelimit, platform-secrets, api, identity, chat]
-    canUse: [v-awssdk]
+    canUse: [v-awssdk, v-pgx, v-xtext, v-mimetype, v-otel]
   messaging:
     mayDependOn: [messaging, kernel-ports]
   messaging-domain:

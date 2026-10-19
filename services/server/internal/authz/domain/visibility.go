@@ -20,6 +20,10 @@ const (
 	// kindTerminalSession is a terminal session (M2-40): visible to its person and to effective
 	// owners, whatever the requirement.
 	kindTerminalSession = "terminal_session"
+	// kindFile is a file (M3-03): its visibility depends on its purpose and attachment.
+	kindFile = "file"
+	// purposeAttachment is files.purpose of a file uploaded into a channel.
+	purposeAttachment = "attachment"
 )
 
 // channelPathKinds are the kinds that live in a channel: a dm channel is visible to participants
@@ -28,7 +32,7 @@ const (
 //nolint:goconst // resource kinds of the generated catalogue, listed once per rule
 var channelPathKinds = map[string]bool{
 	kindChannel: true, "thread": true, "message": true, "reaction": true, "pin": true, "run": true,
-	"run_step": true, "component": true, "interaction": true, "agent_session": true, "file": true,
+	"run_step": true, "component": true, "interaction": true, "agent_session": true, kindFile: true,
 	"incoming_webhook": true, "command": true,
 }
 
@@ -61,6 +65,8 @@ func Visible(in Input) (visible bool, reason Reason, err error) {
 	}
 	kind := in.Resource.Kind
 	switch {
+	case kind == kindFile:
+		return fileVisible(in), ReasonNoGrant, nil
 	case channelPathKinds[kind]:
 		if in.Path.DM {
 			// The rights after "view as" decide too: no view opens a dm the viewed person is not in.
@@ -151,4 +157,31 @@ func grantVisible(in Input) (bool, Reason, error) {
 		return in.Eff.Owner || in.Eff.Caps.Has(CapManage), ReasonNoGrant, nil
 	}
 	return false, "", internalError("grant resource without a target kind")
+}
+
+// channelReadable is the visibility of a resource in a channel: a participant of a dm channel,
+// or at least read on the path of any other channel.
+func channelReadable(in Input) bool {
+	if in.Path.DM {
+		return in.Path.Participant(in.Principal.ID) && in.Eff.Level >= LevelRead
+	}
+	return in.Eff.Level >= LevelRead
+}
+
+// fileVisible is the visibility of kind file (05 section 2.2, docs/DECISIONS.md D-M3-03-17): an
+// attachment not attached yet only to its uploader with read on its scope channel, an attached one
+// to every reader of the path of its message; avatar, branding and gdpr_export to nobody until
+// M3-10 and M7-06 define their read rules (fail closed). Without facts (an event decided in filter
+// or delivery mode, where the application layer allows it) the path of the event decides.
+func fileVisible(in Input) bool {
+	f := in.Resource.File
+	switch {
+	case f == nil:
+		return channelReadable(in)
+	case f.Purpose != purposeAttachment:
+		return false
+	case f.Attached:
+		return channelReadable(in)
+	}
+	return isSelf(in) && channelReadable(in)
 }

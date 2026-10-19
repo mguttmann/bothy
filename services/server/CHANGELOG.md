@@ -11,6 +11,26 @@ documented in this file. The format is based on
 
 ### Added
 
+- Upload sessions, parts and completion (M3-03): `createUpload`, `uploadPart`, `getUpload`,
+  `completeUpload`, `abortUpload` and `getFile` in mode `direct`. The tables `files`,
+  `file_upload_sessions` and `file_upload_parts` (with `files.search_vector`) and the validated
+  foreign key `principals.avatar_file_id`. `createUpload` checks rights, `file.max_upload_bytes`,
+  the denied types of `file.denied_mime_types` (declared type and extension), the quota
+  `file.quota_bytes_per_principal`, the open sessions `file.upload_max_open_sessions` (`429` with
+  `Retry-After`) and, for the file system driver, the reserve `file.fs.min_free_bytes` (`503`
+  `storage_full`); file names are cleaned (`file.name_max_bytes`) and object keys carry no name.
+  Parts are checked by length and `Content-Digest` while streaming and stored outside any
+  transaction (file system objects or S3 multipart parts), a confirmed part is never written
+  again, completion needs every part and leaves the file `pending` for the verify pass, abort
+  removes the parts and writes `file.updated` for the uploader only, and a lost read right aborts
+  the session. `file.read` is enforced (uploader only before attachment). New configuration keys
+  `file.upload_part_bytes`, `file.upload_session_ttl`, `file.upload_max_open_sessions`,
+  `file.quota_bytes_per_principal`, `file.name_max_bytes`, `file.denied_mime_types`,
+  `file.fs.min_free_bytes` and `file.s3.presigned_upload` with the start checks
+  `upload_part_plan`, `upload_part_size_s3` and `presigned_mode_unavailable`; the metric
+  `bothy.file.upload.size`; every role opens the object store at start, and the server image
+  holds the empty root `/var/lib/bothy/files`.
+
 - Control connection of the host services (M2-43): `GET /api/v1/hosts/connect` on the public
   listener of the roles `api` and `all` (asyncapi `hostControl`). Login with an EdDSA proof over
   the challenge of `hello` with the key registered at pairing; close codes `4110` to `4114`, `4002`,

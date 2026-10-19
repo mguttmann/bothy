@@ -7,6 +7,199 @@ import (
 	"net/http"
 )
 
+type ListAppsResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// JSON200 the response for an HTTP 200 `application/json` response
+	JSON200 *AppPage
+	// ApplicationproblemJSON400 the response for an HTTP 400 `application/problem+json` response
+	ApplicationproblemJSON400 *BadRequest
+	// ApplicationproblemJSON401 the response for an HTTP 401 `application/problem+json` response
+	ApplicationproblemJSON401 *Unauthorized
+	// ApplicationproblemJSON403 the response for an HTTP 403 `application/problem+json` response
+	ApplicationproblemJSON403 *Forbidden
+	// ApplicationproblemJSON429 the response for an HTTP 429 `application/problem+json` response
+	ApplicationproblemJSON429 *TooManyRequests
+	// ApplicationproblemJSONDefault the response for an HTTP default `application/problem+json` response
+	ApplicationproblemJSONDefault *Error
+	// Headers200 the parsed response headers for an HTTP 200 response
+	Headers200 *ListAppsResponse200Headers
+	// Headers400 the parsed response headers for an HTTP 400 response
+	Headers400 *ListAppsResponse400Headers
+	// Headers401 the parsed response headers for an HTTP 401 response
+	Headers401 *ListAppsResponse401Headers
+	// Headers403 the parsed response headers for an HTTP 403 response
+	Headers403 *ListAppsResponse403Headers
+	// Headers429 the parsed response headers for an HTTP 429 response
+	Headers429 *ListAppsResponse429Headers
+	// HeadersDefault the parsed response headers for an HTTP default response
+	HeadersDefault *ListAppsResponseDefaultHeaders
+}
+
+// GetJSON200 returns the response for an HTTP 200 `application/json` response
+func (r ListAppsResponse) GetJSON200() *AppPage {
+	return r.JSON200
+}
+
+// GetApplicationproblemJSON400 returns the response for an HTTP 400 `application/problem+json` response
+func (r ListAppsResponse) GetApplicationproblemJSON400() *BadRequest {
+	return r.ApplicationproblemJSON400
+}
+
+// GetApplicationproblemJSON401 returns the response for an HTTP 401 `application/problem+json` response
+func (r ListAppsResponse) GetApplicationproblemJSON401() *Unauthorized {
+	return r.ApplicationproblemJSON401
+}
+
+// GetApplicationproblemJSON403 returns the response for an HTTP 403 `application/problem+json` response
+func (r ListAppsResponse) GetApplicationproblemJSON403() *Forbidden {
+	return r.ApplicationproblemJSON403
+}
+
+// GetApplicationproblemJSON429 returns the response for an HTTP 429 `application/problem+json` response
+func (r ListAppsResponse) GetApplicationproblemJSON429() *TooManyRequests {
+	return r.ApplicationproblemJSON429
+}
+
+// GetApplicationproblemJSONDefault returns the response for an HTTP default `application/problem+json` response
+func (r ListAppsResponse) GetApplicationproblemJSONDefault() *Error {
+	return r.ApplicationproblemJSONDefault
+}
+
+// GetBody returns the raw response body bytes
+func (r ListAppsResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r ListAppsResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r ListAppsResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r ListAppsResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
+// InstallAppResponse201Headers the declared response headers of an HTTP 201 response for InstallApp
+type InstallAppResponse201Headers struct {
+	CorrelationId   *CorrelationId
+	RateLimit       *string
+	RateLimitPolicy *string
+}
+
+// InstallAppResponse400Headers the declared response headers of an HTTP 400 response for InstallApp
+type InstallAppResponse400Headers struct {
+	CorrelationId *CorrelationId
+}
+
+// InstallAppResponse401Headers the declared response headers of an HTTP 401 response for InstallApp
+type InstallAppResponse401Headers struct {
+	CorrelationId   *CorrelationId
+	DPoPNonce       *string
+	SetCookie       *string
+	WWWAuthenticate *string
+}
+
+// InstallAppResponse403Headers the declared response headers of an HTTP 403 response for InstallApp
+type InstallAppResponse403Headers struct {
+	CorrelationId *CorrelationId
+}
+
+// InstallAppResponse409Headers the declared response headers of an HTTP 409 response for InstallApp
+type InstallAppResponse409Headers struct {
+	CorrelationId *CorrelationId
+}
+
+// InstallAppResponse422Headers the declared response headers of an HTTP 422 response for InstallApp
+type InstallAppResponse422Headers struct {
+	CorrelationId *CorrelationId
+}
+
+// InstallAppResponse429Headers the declared response headers of an HTTP 429 response for InstallApp
+type InstallAppResponse429Headers struct {
+	CorrelationId   *CorrelationId
+	RateLimit       *string
+	RateLimitPolicy *string
+	RetryAfter      *int
+}
+
+// InstallAppResponseDefaultHeaders the declared response headers of an HTTP default response for InstallApp
+type InstallAppResponseDefaultHeaders struct {
+	CorrelationId *CorrelationId
+}
+
+type InstallAppResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// JSON201 the response for an HTTP 201 `application/json` response
+	JSON201 *App
+	// ApplicationproblemJSON400 the response for an HTTP 400 `application/problem+json` response
+	ApplicationproblemJSON400 *BadRequest
+	// ApplicationproblemJSON401 the response for an HTTP 401 `application/problem+json` response
+	ApplicationproblemJSON401 *Unauthorized
+	// ApplicationproblemJSON403 the response for an HTTP 403 `application/problem+json` response
+	ApplicationproblemJSON403 *Forbidden
+	// ApplicationproblemJSON409 the response for an HTTP 409 `application/problem+json` response
+	ApplicationproblemJSON409 *Conflict
+	// ApplicationproblemJSON422 the response for an HTTP 422 `application/problem+json` response
+	ApplicationproblemJSON422 *UnprocessableEntity
+	// ApplicationproblemJSON429 the response for an HTTP 429 `application/problem+json` response
+	ApplicationproblemJSON429 *TooManyRequests
+	// ApplicationproblemJSONDefault the response for an HTTP default `application/problem+json` response
+	ApplicationproblemJSONDefault *Error
+	// Headers201 the parsed response headers for an HTTP 201 response
+	Headers201 *InstallAppResponse201Headers
+	// Headers400 the parsed response headers for an HTTP 400 response
+	Headers400 *InstallAppResponse400Headers
+	// Headers401 the parsed response headers for an HTTP 401 response
+	Headers401 *InstallAppResponse401Headers
+	// Headers403 the parsed response headers for an HTTP 403 response
+	Headers403 *InstallAppResponse403Headers
+	// Headers409 the parsed response headers for an HTTP 409 response
+	Headers409 *InstallAppResponse409Headers
+	// Headers422 the parsed response headers for an HTTP 422 response
+	Headers422 *InstallAppResponse422Headers
+	// Headers429 the parsed response headers for an HTTP 429 response
+	Headers429 *InstallAppResponse429Headers
+	// HeadersDefault the parsed response headers for an HTTP default response
+	HeadersDefault *InstallAppResponseDefaultHeaders
+}
+
+// GetJSON201 returns the response for an HTTP 201 `application/json` response
+func (r InstallAppResponse) GetJSON201() *App {
+	return r.JSON201
+}
+
+// GetApplicationproblemJSON400 returns the response for an HTTP 400 `application/problem+json` response
+func (r InstallAppResponse) GetApplicationproblemJSON400() *BadRequest {
+	return r.ApplicationproblemJSON400
+}
+
+// GetApplicationproblemJSON401 returns the response for an HTTP 401 `application/problem+json` response
+func (r InstallAppResponse) GetApplicationproblemJSON401() *Unauthorized {
+	return r.ApplicationproblemJSON401
+}
+
+// GetApplicationproblemJSON403 returns the response for an HTTP 403 `application/problem+json` response
+func (r InstallAppResponse) GetApplicationproblemJSON403() *Forbidden {
+	return r.ApplicationproblemJSON403
+}
+
 // GetApplicationproblemJSON409 returns the response for an HTTP 409 `application/problem+json` response
 func (r InstallAppResponse) GetApplicationproblemJSON409() *Conflict {
 	return r.ApplicationproblemJSON409
@@ -8427,6 +8620,11 @@ type CreateUploadResponse404Headers struct {
 	CorrelationId *CorrelationId
 }
 
+// CreateUploadResponse409Headers the declared response headers of an HTTP 409 response for CreateUpload
+type CreateUploadResponse409Headers struct {
+	CorrelationId *CorrelationId
+}
+
 // CreateUploadResponse413Headers the declared response headers of an HTTP 413 response for CreateUpload
 type CreateUploadResponse413Headers struct {
 	CorrelationId *CorrelationId
@@ -8468,6 +8666,8 @@ type CreateUploadResponse struct {
 	ApplicationproblemJSON403 *Forbidden
 	// ApplicationproblemJSON404 the response for an HTTP 404 `application/problem+json` response
 	ApplicationproblemJSON404 *NotFound
+	// ApplicationproblemJSON409 the response for an HTTP 409 `application/problem+json` response
+	ApplicationproblemJSON409 *Conflict
 	// ApplicationproblemJSON413 the response for an HTTP 413 `application/problem+json` response
 	ApplicationproblemJSON413 *PayloadTooLarge
 	// ApplicationproblemJSON415 the response for an HTTP 415 `application/problem+json` response
@@ -8488,6 +8688,8 @@ type CreateUploadResponse struct {
 	Headers403 *CreateUploadResponse403Headers
 	// Headers404 the parsed response headers for an HTTP 404 response
 	Headers404 *CreateUploadResponse404Headers
+	// Headers409 the parsed response headers for an HTTP 409 response
+	Headers409 *CreateUploadResponse409Headers
 	// Headers413 the parsed response headers for an HTTP 413 response
 	Headers413 *CreateUploadResponse413Headers
 	// Headers415 the parsed response headers for an HTTP 415 response
@@ -8523,6 +8725,11 @@ func (r CreateUploadResponse) GetApplicationproblemJSON403() *Forbidden {
 // GetApplicationproblemJSON404 returns the response for an HTTP 404 `application/problem+json` response
 func (r CreateUploadResponse) GetApplicationproblemJSON404() *NotFound {
 	return r.ApplicationproblemJSON404
+}
+
+// GetApplicationproblemJSON409 returns the response for an HTTP 409 `application/problem+json` response
+func (r CreateUploadResponse) GetApplicationproblemJSON409() *Conflict {
+	return r.ApplicationproblemJSON409
 }
 
 // GetApplicationproblemJSON413 returns the response for an HTTP 413 `application/problem+json` response
@@ -25770,212 +25977,4 @@ type UnpinMessageResponse429Headers struct {
 // UnpinMessageResponseDefaultHeaders the declared response headers of an HTTP default response for UnpinMessage
 type UnpinMessageResponseDefaultHeaders struct {
 	CorrelationId *CorrelationId
-}
-
-type UnpinMessageResponse struct {
-	Body         []byte
-	HTTPResponse *http.Response
-	// ApplicationproblemJSON400 the response for an HTTP 400 `application/problem+json` response
-	ApplicationproblemJSON400 *BadRequest
-	// ApplicationproblemJSON401 the response for an HTTP 401 `application/problem+json` response
-	ApplicationproblemJSON401 *Unauthorized
-	// ApplicationproblemJSON403 the response for an HTTP 403 `application/problem+json` response
-	ApplicationproblemJSON403 *Forbidden
-	// ApplicationproblemJSON404 the response for an HTTP 404 `application/problem+json` response
-	ApplicationproblemJSON404 *NotFound
-	// ApplicationproblemJSON429 the response for an HTTP 429 `application/problem+json` response
-	ApplicationproblemJSON429 *TooManyRequests
-	// ApplicationproblemJSONDefault the response for an HTTP default `application/problem+json` response
-	ApplicationproblemJSONDefault *Error
-	// Headers204 the parsed response headers for an HTTP 204 response
-	Headers204 *UnpinMessageResponse204Headers
-	// Headers400 the parsed response headers for an HTTP 400 response
-	Headers400 *UnpinMessageResponse400Headers
-	// Headers401 the parsed response headers for an HTTP 401 response
-	Headers401 *UnpinMessageResponse401Headers
-	// Headers403 the parsed response headers for an HTTP 403 response
-	Headers403 *UnpinMessageResponse403Headers
-	// Headers404 the parsed response headers for an HTTP 404 response
-	Headers404 *UnpinMessageResponse404Headers
-	// Headers429 the parsed response headers for an HTTP 429 response
-	Headers429 *UnpinMessageResponse429Headers
-	// HeadersDefault the parsed response headers for an HTTP default response
-	HeadersDefault *UnpinMessageResponseDefaultHeaders
-}
-
-// GetApplicationproblemJSON400 returns the response for an HTTP 400 `application/problem+json` response
-func (r UnpinMessageResponse) GetApplicationproblemJSON400() *BadRequest {
-	return r.ApplicationproblemJSON400
-}
-
-// GetApplicationproblemJSON401 returns the response for an HTTP 401 `application/problem+json` response
-func (r UnpinMessageResponse) GetApplicationproblemJSON401() *Unauthorized {
-	return r.ApplicationproblemJSON401
-}
-
-// GetApplicationproblemJSON403 returns the response for an HTTP 403 `application/problem+json` response
-func (r UnpinMessageResponse) GetApplicationproblemJSON403() *Forbidden {
-	return r.ApplicationproblemJSON403
-}
-
-// GetApplicationproblemJSON404 returns the response for an HTTP 404 `application/problem+json` response
-func (r UnpinMessageResponse) GetApplicationproblemJSON404() *NotFound {
-	return r.ApplicationproblemJSON404
-}
-
-// GetApplicationproblemJSON429 returns the response for an HTTP 429 `application/problem+json` response
-func (r UnpinMessageResponse) GetApplicationproblemJSON429() *TooManyRequests {
-	return r.ApplicationproblemJSON429
-}
-
-// GetApplicationproblemJSONDefault returns the response for an HTTP default `application/problem+json` response
-func (r UnpinMessageResponse) GetApplicationproblemJSONDefault() *Error {
-	return r.ApplicationproblemJSONDefault
-}
-
-// GetBody returns the raw response body bytes
-func (r UnpinMessageResponse) GetBody() []byte {
-	return r.Body
-}
-
-// Status returns HTTPResponse.Status
-func (r UnpinMessageResponse) Status() string {
-	if r.HTTPResponse != nil {
-		return r.HTTPResponse.Status
-	}
-	return http.StatusText(0)
-}
-
-// StatusCode returns HTTPResponse.StatusCode
-func (r UnpinMessageResponse) StatusCode() int {
-	if r.HTTPResponse != nil {
-		return r.HTTPResponse.StatusCode
-	}
-	return 0
-}
-
-// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
-func (r UnpinMessageResponse) ContentType() string {
-	if r.HTTPResponse != nil {
-		return r.HTTPResponse.Header.Get("Content-Type")
-	}
-	return ""
-}
-
-// PinMessageResponse204Headers the declared response headers of an HTTP 204 response for PinMessage
-type PinMessageResponse204Headers struct {
-	CorrelationId   *CorrelationId
-	RateLimit       *string
-	RateLimitPolicy *string
-}
-
-// PinMessageResponse400Headers the declared response headers of an HTTP 400 response for PinMessage
-type PinMessageResponse400Headers struct {
-	CorrelationId *CorrelationId
-}
-
-// PinMessageResponse401Headers the declared response headers of an HTTP 401 response for PinMessage
-type PinMessageResponse401Headers struct {
-	CorrelationId   *CorrelationId
-	DPoPNonce       *string
-	SetCookie       *string
-	WWWAuthenticate *string
-}
-
-// PinMessageResponse403Headers the declared response headers of an HTTP 403 response for PinMessage
-type PinMessageResponse403Headers struct {
-	CorrelationId *CorrelationId
-}
-
-// PinMessageResponse404Headers the declared response headers of an HTTP 404 response for PinMessage
-type PinMessageResponse404Headers struct {
-	CorrelationId *CorrelationId
-}
-
-// PinMessageResponse410Headers the declared response headers of an HTTP 410 response for PinMessage
-type PinMessageResponse410Headers struct {
-	CorrelationId *CorrelationId
-}
-
-// PinMessageResponse429Headers the declared response headers of an HTTP 429 response for PinMessage
-type PinMessageResponse429Headers struct {
-	CorrelationId   *CorrelationId
-	RateLimit       *string
-	RateLimitPolicy *string
-	RetryAfter      *int
-}
-
-// PinMessageResponseDefaultHeaders the declared response headers of an HTTP default response for PinMessage
-type PinMessageResponseDefaultHeaders struct {
-	CorrelationId *CorrelationId
-}
-
-type PinMessageResponse struct {
-	Body         []byte
-	HTTPResponse *http.Response
-	// ApplicationproblemJSON400 the response for an HTTP 400 `application/problem+json` response
-	ApplicationproblemJSON400 *BadRequest
-	// ApplicationproblemJSON401 the response for an HTTP 401 `application/problem+json` response
-	ApplicationproblemJSON401 *Unauthorized
-	// ApplicationproblemJSON403 the response for an HTTP 403 `application/problem+json` response
-	ApplicationproblemJSON403 *Forbidden
-	// ApplicationproblemJSON404 the response for an HTTP 404 `application/problem+json` response
-	ApplicationproblemJSON404 *NotFound
-	// ApplicationproblemJSON410 the response for an HTTP 410 `application/problem+json` response
-	ApplicationproblemJSON410 *Gone
-	// ApplicationproblemJSON429 the response for an HTTP 429 `application/problem+json` response
-	ApplicationproblemJSON429 *TooManyRequests
-	// ApplicationproblemJSONDefault the response for an HTTP default `application/problem+json` response
-	ApplicationproblemJSONDefault *Error
-	// Headers204 the parsed response headers for an HTTP 204 response
-	Headers204 *PinMessageResponse204Headers
-	// Headers400 the parsed response headers for an HTTP 400 response
-	Headers400 *PinMessageResponse400Headers
-	// Headers401 the parsed response headers for an HTTP 401 response
-	Headers401 *PinMessageResponse401Headers
-	// Headers403 the parsed response headers for an HTTP 403 response
-	Headers403 *PinMessageResponse403Headers
-	// Headers404 the parsed response headers for an HTTP 404 response
-	Headers404 *PinMessageResponse404Headers
-	// Headers410 the parsed response headers for an HTTP 410 response
-	Headers410 *PinMessageResponse410Headers
-	// Headers429 the parsed response headers for an HTTP 429 response
-	Headers429 *PinMessageResponse429Headers
-	// HeadersDefault the parsed response headers for an HTTP default response
-	HeadersDefault *PinMessageResponseDefaultHeaders
-}
-
-// GetApplicationproblemJSON400 returns the response for an HTTP 400 `application/problem+json` response
-func (r PinMessageResponse) GetApplicationproblemJSON400() *BadRequest {
-	return r.ApplicationproblemJSON400
-}
-
-// GetApplicationproblemJSON401 returns the response for an HTTP 401 `application/problem+json` response
-func (r PinMessageResponse) GetApplicationproblemJSON401() *Unauthorized {
-	return r.ApplicationproblemJSON401
-}
-
-// GetApplicationproblemJSON403 returns the response for an HTTP 403 `application/problem+json` response
-func (r PinMessageResponse) GetApplicationproblemJSON403() *Forbidden {
-	return r.ApplicationproblemJSON403
-}
-
-// GetApplicationproblemJSON404 returns the response for an HTTP 404 `application/problem+json` response
-func (r PinMessageResponse) GetApplicationproblemJSON404() *NotFound {
-	return r.ApplicationproblemJSON404
-}
-
-// GetApplicationproblemJSON410 returns the response for an HTTP 410 `application/problem+json` response
-func (r PinMessageResponse) GetApplicationproblemJSON410() *Gone {
-	return r.ApplicationproblemJSON410
-}
-
-// GetApplicationproblemJSON429 returns the response for an HTTP 429 `application/problem+json` response
-func (r PinMessageResponse) GetApplicationproblemJSON429() *TooManyRequests {
-	return r.ApplicationproblemJSON429
-}
-
-// GetApplicationproblemJSONDefault returns the response for an HTTP default `application/problem+json` response
-func (r PinMessageResponse) GetApplicationproblemJSONDefault() *Error {
-	return r.ApplicationproblemJSONDefault
 }

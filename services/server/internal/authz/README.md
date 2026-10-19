@@ -208,7 +208,26 @@ The delivery job calls it in filter mode, so no denial is written (AZ-P13).
 
 ### How a module builds a `Resource`
 
-Load the resource first (02 section 9.2), then describe it: `Kind`, `ID`, the path hint (`ThreadID` for things in a thread, `ChannelID` for a channel or an unattached file, `SpaceID` for a space), `OwnerID` (author, creator, holder or the principal itself) and the facts of the action (`HasAttachments` for `message.create`, `RestrictedTags`, `TargetChannelID` for `thread.move`, `Grant` for `grant.create`, `Invoke` for `agent.invoke`, `PreviewOf` for `access.preview`, `DeliveryOf` and `Audience` for `webhook_out.deliver`). Pass the `actor.Actor` of the request as the principal; it implements `authorize.Principal`. Treat an error like a denial and return it. Per-element checks of lists, searches and deliveries run with `authorize.Filter(ctx)`.
+Load the resource first (02 section 9.2), then describe it: `Kind`, `ID`, the path hint (`ThreadID` for things in a thread, `ChannelID` for a channel or an unattached file, `SpaceID` for a space), `OwnerID` (author, creator, holder or the principal itself) and the facts of the action (`File` for a file, `HasAttachments` for `message.create`, `RestrictedTags`, `TargetChannelID` for `thread.move`, `Grant` for `grant.create`, `Invoke` for `agent.invoke`, `PreviewOf` for `access.preview`, `DeliveryOf` and `Audience` for `webhook_out.deliver`). Pass the `actor.Actor` of the request as the principal; it implements `authorize.Principal`. Treat an error like a denial and return it. Per-element checks of lists, searches and deliveries run with `authorize.Filter(ctx)`.
+
+### Files (M3-03)
+
+`file.read` is no longer deferred: its requirement is read on the path. Kind `file` has its own
+visibility rule (`domain/visibility.go`, `fileVisible`; docs/DECISIONS.md D-M3-03-17), fed by
+`authorize.Resource.File` (`FileFacts{Purpose, Attached}`):
+
+- purpose `attachment`, not attached: visible only when the principal is the uploader
+  (`OwnerID`) and reads the path of the scope channel (`ChannelID`; in a dm channel: participant);
+  the channel's other readers, the owner and everybody else get `not_found`;
+- attached (M3-07 sets the fact): visible with read on the path of the message (`ThreadID` or
+  `ChannelID`);
+- purposes `avatar`, `branding`, `gdpr_export`: not visible (`no_grant`) until M3-10 and M7-06
+  give them read rules; their resource needs no path (`resolve` gives them none).
+
+`File == nil` is allowed only in filter and delivery mode (a stored `file.updated` decided by
+`ResourceFromEvent`, where the event scope is the path); in request mode it is an internal error,
+so no caller widens access by leaving the facts out. `file.delete` keeps self or manage with the
+same visibility; `file.upload` stays on the channel.
 
 ### Tests
 

@@ -61,11 +61,34 @@ type Resource struct {
 	// HostAuth carries the verdict of the Ed25519 proof of a host principal (host.connect, M2-43);
 	// required for a host principal, whose liveness it decides, ignored otherwise.
 	HostAuth *HostAuthFacts
+	// File describes a file resource (kind file) for the visibility of file.read and file.delete
+	// (M3-03): required in request mode, where a missing value is an internal error, so no caller
+	// widens access by leaving it out; nil only in filter and delivery mode, where the event scope
+	// is the path (ResourceFromEvent).
+	File *FileFacts
 	// Event marks the descriptor of a stored event (ResourceFromEvent) and carries its full
 	// scope. When the stored resource kind is not a resource of the receive action (pin.added
 	// names a message, thread.read takes a thread), authz decides on the object of the scope the
 	// action takes instead, and on the target of a grant for grant.read (M1-63).
 	Event *EventScope
+}
+
+// FileFacts describes a file for the visibility rule of kind file (docs/spec/05-aktionen.md
+// section 2.2, docs/DECISIONS.md D-M3-03-17): an attachment that is not attached yet is visible
+// only to its uploader (Resource.OwnerID) with read on its scope channel (Resource.ChannelID); an
+// attached one to every reader of the path of its message (Resource.ThreadID or ChannelID); the
+// purposes avatar, branding and gdpr_export are not visible until their tickets (M3-10, M7-06)
+// define their read rules.
+//
+// Example:
+//
+//	r := authorize.Resource{Kind: authorize.ResourceFile, ID: f.ID, ChannelID: f.ScopeChannelID, OwnerID: f.UploadedBy,
+//		File: &authorize.FileFacts{Purpose: "attachment", Attached: false}}
+type FileFacts struct {
+	// Purpose is files.purpose: attachment, avatar, branding or gdpr_export.
+	Purpose string
+	// Attached reports that the file hangs on a message (set by M3-07).
+	Attached bool
 }
 
 // EventScope is the scope of a stored event (event_log.space_id, channel_id, thread_id).

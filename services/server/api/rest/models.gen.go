@@ -15017,8 +15017,8 @@ type UploadCreate struct {
 	// Name Examples: screenshot.png
 	Name string `json:"name"`
 
-	// Sha256 Hex SHA-256; the server verifies it on completion when given.
-	Sha256 *string `json:"sha256,omitempty"`
+	// Sha256 Lowercase hex SHA-256 of the whole file; the verify pass checks it.
+	Sha256 string `json:"sha256"`
 
 	// SizeBytes Examples: 48213
 	SizeBytes int64 `json:"size_bytes"`
@@ -15978,6 +15978,12 @@ type CreateThreadParams struct {
 	IdempotencyKey *IdempotencyKey `json:"Idempotency-Key,omitempty"`
 }
 
+// CreateUploadParams defines parameters for CreateUpload.
+type CreateUploadParams struct {
+	// IdempotencyKey UUIDv7 chosen by the client per logical operation. A repeat with the same request returns the stored response; a different request gives 422 `idempotency_key_reuse`; a repeat while the first is running gives 409 `request_in_progress`. Kept for `sync.idempotency_key_ttl`.
+	IdempotencyKey *IdempotencyKey `json:"Idempotency-Key,omitempty"`
+}
+
 // EndViewAsParams defines parameters for EndViewAs.
 type EndViewAsParams struct {
 	// XConsoleRequest CSRF header of the console (SEC-CORS-4).
@@ -16377,6 +16383,18 @@ type SetThreadTitleParams struct {
 	IfMatch IfMatchRequired `json:"If-Match"`
 }
 
+// CompleteUploadParams defines parameters for CompleteUpload.
+type CompleteUploadParams struct {
+	// IdempotencyKey UUIDv7 chosen by the client per logical operation. A repeat with the same request returns the stored response; a different request gives 422 `idempotency_key_reuse`; a repeat while the first is running gives 409 `request_in_progress`. Kept for `sync.idempotency_key_ttl`.
+	IdempotencyKey *IdempotencyKey `json:"Idempotency-Key,omitempty"`
+}
+
+// UploadPartParams defines parameters for UploadPart.
+type UploadPartParams struct {
+	// ContentDigest RFC 9530 digest of the part with the member `sha-256`, e.g. `sha-256=:<base64>:`; other members are ignored.
+	ContentDigest string `json:"Content-Digest"`
+}
+
 // ListUsersParams defines parameters for ListUsers.
 type ListUsersParams struct {
 	// Cursor Cursor from `next_cursor` of the previous page.
@@ -16582,6 +16600,9 @@ type CreateChannelTemplateJSONRequestBody = TemplateCreate
 // CreateThreadJSONRequestBody defines body for CreateThread for application/json ContentType.
 type CreateThreadJSONRequestBody = ThreadCreate
 
+// CreateUploadJSONRequestBody defines body for CreateUpload for application/json ContentType.
+type CreateUploadJSONRequestBody = UploadCreate
+
 // ApproveDeviceJSONRequestBody defines body for ApproveDevice for application/json ContentType.
 type ApproveDeviceJSONRequestBody = DeviceApprove
 
@@ -16740,6 +16761,9 @@ type SetThreadTagsJSONRequestBody = ThreadTagsPut
 
 // SetThreadTitleJSONRequestBody defines body for SetThreadTitle for application/json ContentType.
 type SetThreadTitleJSONRequestBody = ThreadTitlePut
+
+// CompleteUploadJSONRequestBody defines body for CompleteUpload for application/json ContentType.
+type CompleteUploadJSONRequestBody = UploadComplete
 
 // CreateUserJSONRequestBody defines body for CreateUser for application/json ContentType.
 type CreateUserJSONRequestBody = UserCreate

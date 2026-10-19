@@ -136,6 +136,10 @@ var appPrivileges = map[string][]string{
 	// M3-18: the notification levels and quiet hours of a person.
 	"notification_preferences": {"SELECT", "INSERT", "UPDATE", "DELETE"},
 	"quiet_hours":              {"SELECT", "INSERT", "UPDATE", "DELETE"},
+	// 03 section 4.7 (M3-03): the cleanup of M3-08 deletes sessions, parts and files.
+	"files":                {"SELECT", "INSERT", "UPDATE", "DELETE"},
+	"file_upload_sessions": {"SELECT", "INSERT", "UPDATE", "DELETE"},
+	"file_upload_parts":    {"SELECT", "INSERT", "UPDATE", "DELETE"},
 	// 03 section 4.14 (M2-39): hosts and terminal sessions are security history; a session user
 	// row is never deleted while its host is not retired (ruling T12, R-DM-39). The retention
 	// job of class security grants its own DELETE (M7).

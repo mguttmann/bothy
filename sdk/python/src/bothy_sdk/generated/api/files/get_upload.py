@@ -81,7 +81,9 @@ def sync_detailed(
 ) -> Response[Problem | UploadState]:
     """Read the state of an own upload
 
-     Confirmed parts of an unfinished upload, so a client can resume after a network loss (12, 4).
+     Confirmed parts of an own upload, so a client can resume after a network loss (12, 3.2).
+    `upload_state` is `pending` for an open session without a confirmed part, `uploading` with at least
+    one, `complete` once completed. An aborted or expired session answers 410 `gone`.
 
     Args:
         file_id (UUID): UUIDv7 (RFC 9562), lowercase canonical form.
@@ -112,7 +114,9 @@ def sync(
 ) -> Problem | UploadState | None:
     """Read the state of an own upload
 
-     Confirmed parts of an unfinished upload, so a client can resume after a network loss (12, 4).
+     Confirmed parts of an own upload, so a client can resume after a network loss (12, 3.2).
+    `upload_state` is `pending` for an open session without a confirmed part, `uploading` with at least
+    one, `complete` once completed. An aborted or expired session answers 410 `gone`.
 
     Args:
         file_id (UUID): UUIDv7 (RFC 9562), lowercase canonical form.
@@ -138,7 +142,9 @@ async def asyncio_detailed(
 ) -> Response[Problem | UploadState]:
     """Read the state of an own upload
 
-     Confirmed parts of an unfinished upload, so a client can resume after a network loss (12, 4).
+     Confirmed parts of an own upload, so a client can resume after a network loss (12, 3.2).
+    `upload_state` is `pending` for an open session without a confirmed part, `uploading` with at least
+    one, `complete` once completed. An aborted or expired session answers 410 `gone`.
 
     Args:
         file_id (UUID): UUIDv7 (RFC 9562), lowercase canonical form.
@@ -167,7 +173,9 @@ async def asyncio(
 ) -> Problem | UploadState | None:
     """Read the state of an own upload
 
-     Confirmed parts of an unfinished upload, so a client can resume after a network loss (12, 4).
+     Confirmed parts of an own upload, so a client can resume after a network loss (12, 3.2).
+    `upload_state` is `pending` for an open session without a confirmed part, `uploading` with at least
+    one, `complete` once completed. An aborted or expired session answers 410 `gone`.
 
     Args:
         file_id (UUID): UUIDv7 (RFC 9562), lowercase canonical form.

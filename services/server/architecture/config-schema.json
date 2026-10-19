@@ -1229,6 +1229,30 @@
       "doc": "Time limit of one outgoing request, from name resolution to the end of the body."
     },
     {
+      "name": "file.denied_mime_types",
+      "env": "BOTHY_FILE__DENIED_MIME_TYPES",
+      "kind": "list(string)",
+      "default": "",
+      "required": false,
+      "enum": [],
+      "min": "",
+      "max": "",
+      "chapter": "12-dateien.md",
+      "doc": "Media types refused at upload, by declared type and by file extension; empty refuses none."
+    },
+    {
+      "name": "file.fs.min_free_bytes",
+      "env": "BOTHY_FILE__FS__MIN_FREE_BYTES",
+      "kind": "int",
+      "default": "2147483648",
+      "required": false,
+      "enum": [],
+      "min": "0",
+      "max": "",
+      "chapter": "12-dateien.md",
+      "doc": "Free space the file system driver keeps; an upload that would leave less is refused with 503 storage_full."
+    },
+    {
       "name": "file.fs.root",
       "env": "BOTHY_FILE__FS__ROOT",
       "kind": "string",
@@ -1251,6 +1275,30 @@
       "max": "",
       "chapter": "03-datenmodell.md",
       "doc": "Largest file, and the stream limit of multipart and octet-stream request bodies."
+    },
+    {
+      "name": "file.name_max_bytes",
+      "env": "BOTHY_FILE__NAME_MAX_BYTES",
+      "kind": "int",
+      "default": "255",
+      "required": false,
+      "enum": [],
+      "min": "4",
+      "max": "",
+      "chapter": "12-dateien.md",
+      "doc": "Longest file name in UTF-8 bytes; longer names are shortened before their extension."
+    },
+    {
+      "name": "file.quota_bytes_per_principal",
+      "env": "BOTHY_FILE__QUOTA_BYTES_PER_PRINCIPAL",
+      "kind": "int",
+      "default": "0",
+      "required": false,
+      "enum": [],
+      "min": "0",
+      "max": "",
+      "chapter": "12-dateien.md",
+      "doc": "Bytes of files one principal may keep; 0 switches the quota off."
     },
     {
       "name": "file.s3.access_key_ref",
@@ -1316,6 +1364,18 @@
       "doc": "Optional prefix in the key grammar before every object name, so one bucket can hold several environments."
     },
     {
+      "name": "file.s3.presigned_upload",
+      "env": "BOTHY_FILE__S3__PRESIGNED_UPLOAD",
+      "kind": "bool",
+      "default": "false",
+      "required": false,
+      "enum": [],
+      "min": "",
+      "max": "",
+      "chapter": "12-dateien.md",
+      "doc": "Allow the upload mode presigned; it is not built, so the check presigned_mode_unavailable refuses true."
+    },
+    {
       "name": "file.s3.region",
       "env": "BOTHY_FILE__S3__REGION",
       "kind": "string",
@@ -1365,6 +1425,42 @@
       "max": "",
       "chapter": "12-dateien.md",
       "doc": "Driver of the object storage of files: fs for a directory of the server, s3 for an S3-compatible service."
+    },
+    {
+      "name": "file.upload_max_open_sessions",
+      "env": "BOTHY_FILE__UPLOAD_MAX_OPEN_SESSIONS",
+      "kind": "int",
+      "default": "20",
+      "required": false,
+      "enum": [],
+      "min": "1",
+      "max": "",
+      "chapter": "12-dateien.md",
+      "doc": "Open upload sessions of one principal."
+    },
+    {
+      "name": "file.upload_part_bytes",
+      "env": "BOTHY_FILE__UPLOAD_PART_BYTES",
+      "kind": "int",
+      "default": "8388608",
+      "required": false,
+      "enum": [],
+      "min": "1",
+      "max": "",
+      "chapter": "12-dateien.md",
+      "doc": "Size of every part of an upload but the last."
+    },
+    {
+      "name": "file.upload_session_ttl",
+      "env": "BOTHY_FILE__UPLOAD_SESSION_TTL",
+      "kind": "duration",
+      "default": "24h",
+      "required": false,
+      "enum": [],
+      "min": "1s",
+      "max": "",
+      "chapter": "12-dateien.md",
+      "doc": "Lifetime of an open upload session."
     },
     {
       "name": "forum_tag.name_max_chars",
