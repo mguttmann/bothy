@@ -88,7 +88,7 @@ func Encode(m Message) ([]byte, error) {
 	if len(body)+1 > MaxLen {
 		return nil, ErrTooLarge
 	}
-	out := make([]byte, lenSize+1, lenSize+1+len(body))
+	out := make([]byte, lenSize+1)
 	binary.BigEndian.PutUint32(out, uint32(len(body)+1)) //nolint:gosec // bounded by MaxLen above
 	out[lenSize] = KindControl
 	return append(out, body...), nil
