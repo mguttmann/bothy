@@ -96,6 +96,17 @@ documented in this file. The format is based on
   transaction through the new in-transaction event `chat.ThreadMoved`, and the tags are removed.
   `thread.moved_out` (source, never naming the target) and `thread.moved` (target) are appended in
   this order. Main threads, the same channel, archived targets and DM channels are refused.
+- Channel behaviour and agent configuration (M2-02): `getChannelBehavior` and `putChannelBehavior`
+  (`manage`; the write with fresh step-up, `If-Match` on `settings_version`, audit of allow and
+  deny) for the mention switches, `auto_thread`, `history_backfill_limit`, the channel prompt and
+  the ordered skill references; every effective change raises `settings_version` by one and
+  writes `channel.settings_changed`, a change of prompt or skills also the personal
+  `agent.config_changed` to the effective operator, both with only `channel_id` and
+  `settings_version`. `listServedChannels` and `getServedChannelConfig` (`agent.config.read`) serve
+  the effective operator agent. Configuration key `channel.prompt_max_bytes`; `Scope` of `authz`
+  serves `agent.config.read`; `channel.settings_changed` advances the delivery cache generation; a
+  personal event with a receive action other than `self` needs that action at delivery. The
+  canary test carries a prompt and a skill reference (class `manage_only`).
 - Canary test across all outputs, SEC-T10 and DP-T09 (M1-69): the package `test/canary` drives
   every enabled operation and every M1 client gateway op with run-unique canary values (content,
   reasons, secrets, client addresses, IDs) and scans the logs (stdout at debug and OTLP), traces,
