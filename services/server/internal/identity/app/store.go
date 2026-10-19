@@ -4,6 +4,7 @@ package app
 
 import (
 	"context"
+	"time"
 
 	"github.com/OWNER/bothy/services/server/internal/identity/domain"
 	"github.com/OWNER/bothy/services/server/internal/kernel/ids"
@@ -69,6 +70,13 @@ type Store interface {
 	// InsertPrincipal inserts p and sets p.CreatedAt from the database. The caller runs it inside
 	// a unit of work.
 	InsertPrincipal(ctx context.Context, p *domain.Principal) error
+	// SetBotPrincipalStatus sets the status of an agent or app principal and its disabled_at
+	// (zero clears it); found is false for an unknown id or a person. The caller runs it inside a
+	// unit of work declared as a rights change.
+	SetBotPrincipalStatus(ctx context.Context, id ids.ID, status domain.Status, disabledAt time.Time) (found bool, err error)
+	// UpdateBotDisplayName sets the display name of an agent or app principal; found is false for
+	// an unknown id or a person. The caller runs it inside a unit of work.
+	UpdateBotDisplayName(ctx context.Context, id ids.ID, name domain.DisplayName) (found bool, err error)
 	// InsertUser inserts the users row of u; its principal must exist (InsertPrincipal in the
 	// same unit of work).
 	InsertUser(ctx context.Context, u domain.User) error

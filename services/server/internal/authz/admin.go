@@ -349,6 +349,14 @@ type Admin interface {
 	// section 2.6 point 3; an already revoked grant succeeds without change and is returned as
 	// stored.
 	RevokeGrant(ctx context.Context, caller actor.Actor, grantID ids.ID, reason string) (Grant, error)
+	// RevokeSubjectGrants revokes every grant that is not revoked whose subject is the principal
+	// subjectID, in ascending id, with revoked_by the caller and revoke_reason reason, and
+	// returns their number (app.uninstall, 11 section 4.3). It authorizes nothing: it is a
+	// consequence of the authorized action of the caller, and it joins the ambient unit of work
+	// of ctx, which must be declared as a rights change naming subjectID (M2-24 design note 9 d).
+	// Errors: internal outside such a unit; validation_failed for a reason with a forbidden
+	// character; store errors.
+	RevokeSubjectGrants(ctx context.Context, caller actor.Actor, subjectID ids.ID, reason string) (int, error)
 	// ExplainAccess answers "who has access" for a space or channel (access.explain, 07 section
 	// 9.1, M1-49): every principal with its effective level, capabilities and sources, computed
 	// with the snapshot code of authorize. No read on the target is 404, read without owner or

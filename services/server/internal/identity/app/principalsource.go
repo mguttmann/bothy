@@ -7,6 +7,7 @@ import (
 	"slices"
 
 	"github.com/OWNER/bothy/services/server/internal/authz"
+	"github.com/OWNER/bothy/services/server/internal/identity"
 	"github.com/OWNER/bothy/services/server/internal/identity/domain"
 	"github.com/OWNER/bothy/services/server/internal/kernel/actor"
 	"github.com/OWNER/bothy/services/server/internal/kernel/ids"
@@ -17,30 +18,53 @@ import (
 // hands it to authz (M1-28).
 type PrincipalSource struct {
 	store Store
+	apps  identity.AppInstallations
 }
 
 // Compile-time check: PrincipalSource is the source port of authz.
 var _ authz.PrincipalSource = (*PrincipalSource)(nil)
 
-// NewPrincipalSource returns the source over store.
+// NewPrincipalSource returns the source over store. It knows no installation of an app
+// (identity.NoAppInstallations), so every app has an empty snapshot until WithApps binds the
+// installations of the module apps (M2-24).
 func NewPrincipalSource(store Store) *PrincipalSource {
-	return &PrincipalSource{store: store}
+	return &PrincipalSource{store: store, apps: identity.NoAppInstallations{}}
+}
+
+// WithApps returns a copy of s that reads the installation of app principals from apps
+// (internal/wire binds apps/adapters/identitysource); nil keeps none.
+func (s *PrincipalSource) WithApps(apps identity.AppInstallations) *PrincipalSource {
+	c := *s
+	if apps != nil {
+		c.apps = apps
+	}
+	return &c
 }
 
 // Principal implements authz.PrincipalSource: ok is false for an unknown id. IsOwner reports an
-// active owners row whatever the status of the principal. Errors: those of the Store.
+// active owners row whatever the status of the principal; AppInstallationActive an active
+// installation of an app, read on every call in the ambient transaction (M2-24 design note 11 b).
+// Errors: those of the Store and of the installations.
 func (s *PrincipalSource) Principal(ctx context.Context, id ids.ID) (authz.PrincipalFacts, bool, error) {
 	rec, found, err := s.store.Principal(ctx, id)
 	if err != nil || !found {
 		return authz.PrincipalFacts{}, false, err
 	}
 	p := rec.Principal
-	return authz.PrincipalFacts{
+	f := authz.PrincipalFacts{
 		ID:      p.ID,
 		Kind:    actor.Kind(p.Kind),
 		Status:  authz.PrincipalStatus(p.Status),
 		IsOwner: rec.IsOwner,
-	}, true, nil
+	}
+	if f.Kind == actor.KindApp {
+		_, active, err := s.apps.ActiveInstallation(ctx, id)
+		if err != nil {
+			return authz.PrincipalFacts{}, false, err
+		}
+		f.AppInstallationActive = active
+	}
+	return f, true, nil
 }
 
 // ActiveOwnerIDs implements authz.PrincipalSource: persons with an active owners row and

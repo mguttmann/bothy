@@ -3622,7 +3622,7 @@ paths:
       summary: Create an API token
       tags: [Tokens]
       description: |-
-        Kind follows the principal (`agt` agent, `app` app, `pat` person, 08 section 12). A personal token only for oneself and only with the flag `tokens.personal_enabled`. Until app installations exist (M2) a token for an app answers `409 conflict` with `reason` `app_not_installed`. The secret is shown once; a replay with the same `Idempotency-Key` answers `409 conflict` with `reason` `one_time_secret` (06, 7).
+        Kind follows the principal (`agt` agent, `app` app, `pat` person, 08 section 12). A personal token only for oneself and only with the flag `tokens.personal_enabled`. A token for an app needs an active installation (else `409 conflict` with `reason` `app_not_installed`, also while the app is suspended); its scopes are the requested subset of the granted scopes of the installation, or all of them when `scopes` is absent or empty, and a scope the installation does not grant gives `400 validation_failed` at `/scopes/<i>`. An app request needs the scope of its action in the token and in the installation. The secret is shown once; a replay with the same `Idempotency-Key` answers `409 conflict` with `reason` `one_time_secret` (06, 7).
       x-authz-action: token.create
       x-rate-limit-class: rl.admin
       parameters:
@@ -13669,12 +13669,23 @@ paths:
                         schema_version: 1
                         slug: ticket-sync
                         name: Ticket Sync
+                        description: Mirrors tickets of a help desk into a forum.
+                        publisher: Example Ltd
                         version: 1.2.0
-                        scopes: ['messages:read']
+                        homepage_url: https://apps.example.com/ticket-sync
+                        min_api_version: '0.2'
+                        scopes:
+                          required: ['messages:write']
+                          optional: ['messages:read', 'events:subscribe']
+                        events: [message.created]
+                        delivery:
+                          mode: webhook
+                          events_url: https://apps.example.com/ticket-sync/events
+                        data_egress: Messages of the granted channels go to apps.example.com.
                       manifest_version: 1.2.0
                       installation:
                         id: 0192f4a0-7b1c-78dc-8da2-d6c386222e8a
-                        granted_scopes: ['messages:read']
+                        granted_scopes: ['events:subscribe', 'messages:read', 'messages:write']
                         event_subscriptions: [message.created]
                         state: active
                         installed_at: '2026-10-10T09:30:00.000Z'
@@ -13692,6 +13703,8 @@ paths:
       operationId: installApp
       summary: Install an app from its manifest
       tags: [Apps]
+      description: |-
+        Owner only with a fresh step-up. The manifest is checked against the schema (unknown members give `400 validation_failed` with `unknown_member`) and the check rules of 11, 3.2 (`400 validation_failed` with the pointers under `/manifest`; `400 webhook_host_not_allowed` when every failure is a delivery host outside `webhook.allowed_hosts`). `granted_scopes` holds every required and any optional scope of the manifest; `event_subscriptions` absent means none, each needs `events:subscribe` and the scope of the event. One transaction creates the app principal (handle = `slug`, display name = `name`), the app and its installation and raises the rights version; nothing is stored on a refusal. No token and no grant is created: grants come per target from `createGrant`, tokens from `createToken`. The same `slug` again is `409 conflict` (use `upgradeAppManifest`); a slug whose apps are all uninstalled reinstalls with the same principal.
       x-authz-action: app.install
       x-rate-limit-class: rl.admin
       parameters:
@@ -13710,11 +13723,21 @@ paths:
                     schema_version: 1
                     slug: ticket-sync
                     name: Ticket Sync
-                    version: 1.2.0
+                    description: Mirrors tickets of a help desk into a forum.
                     publisher: Example Ltd
+                    version: 1.2.0
                     homepage_url: https://apps.example.com/ticket-sync
-                    scopes: ['messages:read']
-                  granted_scopes: ['messages:read']
+                    min_api_version: '0.2'
+                    scopes:
+                      required: ['messages:write']
+                      optional: ['messages:read', 'events:subscribe']
+                    events: [message.created]
+                    delivery:
+                      mode: webhook
+                      events_url: https://apps.example.com/ticket-sync/events
+                    data_egress: Messages of the granted channels go to apps.example.com.
+                  granted_scopes: ['events:subscribe', 'messages:read', 'messages:write']
+                  event_subscriptions: [message.created]
                   reason: Sync tickets with the help desk
       responses:
         '201':
@@ -13741,14 +13764,23 @@ paths:
                       schema_version: 1
                       slug: ticket-sync
                       name: Ticket Sync
-                      version: 1.2.0
+                      description: Mirrors tickets of a help desk into a forum.
                       publisher: Example Ltd
+                      version: 1.2.0
                       homepage_url: https://apps.example.com/ticket-sync
-                      scopes: ['messages:read']
+                      min_api_version: '0.2'
+                      scopes:
+                        required: ['messages:write']
+                        optional: ['messages:read', 'events:subscribe']
+                      events: [message.created]
+                      delivery:
+                        mode: webhook
+                        events_url: https://apps.example.com/ticket-sync/events
+                      data_egress: Messages of the granted channels go to apps.example.com.
                     manifest_version: 1.2.0
                     installation:
                       id: 0192f4a0-7b1c-78dc-8da2-d6c386222e8a
-                      granted_scopes: ['messages:read']
+                      granted_scopes: ['events:subscribe', 'messages:read', 'messages:write']
                       event_subscriptions: [message.created]
                       state: active
                       installed_at: '2026-10-10T09:30:00.000Z'
@@ -13772,6 +13804,8 @@ paths:
       operationId: validateManifest
       summary: Validate a manifest without installing
       tags: [Apps]
+      description: |-
+        Owner only. Schema violations give `400 validation_failed`; the check rules of 11, 3.2 give `200` with `valid` false and every rule error, pointers relative to the manifest root. Nothing is stored and no audit entry is written.
       x-authz-action: app.read
       x-rate-limit-class: rl.read
       x-idempotency-exempt: read_only
@@ -13788,10 +13822,19 @@ paths:
                   schema_version: 1
                   slug: ticket-sync
                   name: Ticket Sync
-                  version: 1.2.0
+                  description: Mirrors tickets of a help desk into a forum.
                   publisher: Example Ltd
+                  version: 1.2.0
                   homepage_url: https://apps.example.com/ticket-sync
-                  scopes: ['messages:read']
+                  min_api_version: '0.2'
+                  scopes:
+                    required: ['messages:write']
+                    optional: ['messages:read', 'events:subscribe']
+                  events: [message.created]
+                  delivery:
+                    mode: webhook
+                    events_url: https://apps.example.com/ticket-sync/events
+                  data_egress: Messages of the granted channels go to apps.example.com.
       responses:
         '200':
           description: OK.
@@ -13810,10 +13853,11 @@ paths:
                 default:
                   summary: Response
                   value:
-                    valid: true
+                    valid: false
                     errors:
-                    - pointer: /content_md
-                      code: too_long
+                    - pointer: /delivery/events_url
+                      code: webhook_host_not_allowed
+                      detail: The host is not in webhook.allowed_hosts (R-DM-17, 11 section 3.2 rule 3).
         '400':
           $ref: '#/components/responses/BadRequest'
         '401':
@@ -13859,14 +13903,23 @@ paths:
                       schema_version: 1
                       slug: ticket-sync
                       name: Ticket Sync
-                      version: 1.2.0
+                      description: Mirrors tickets of a help desk into a forum.
                       publisher: Example Ltd
+                      version: 1.2.0
                       homepage_url: https://apps.example.com/ticket-sync
-                      scopes: ['messages:read']
+                      min_api_version: '0.2'
+                      scopes:
+                        required: ['messages:write']
+                        optional: ['messages:read', 'events:subscribe']
+                      events: [message.created]
+                      delivery:
+                        mode: webhook
+                        events_url: https://apps.example.com/ticket-sync/events
+                      data_egress: Messages of the granted channels go to apps.example.com.
                     manifest_version: 1.2.0
                     installation:
                       id: 0192f4a0-7b1c-78dc-8da2-d6c386222e8a
-                      granted_scopes: ['messages:read']
+                      granted_scopes: ['events:subscribe', 'messages:read', 'messages:write']
                       event_subscriptions: [message.created]
                       state: active
                       installed_at: '2026-10-10T09:30:00.000Z'
@@ -13888,6 +13941,8 @@ paths:
       operationId: upgradeAppManifest
       summary: Install a new manifest version
       tags: [Apps]
+      description: |-
+        Owner only with a fresh step-up (`app.install`). The new manifest has the same `slug` and passes the rules of `installApp`; changed content needs another `version` (`400` at `/manifest/version`). The upgrade never adds a scope, an event or a grant: `granted_scopes` and `event_subscriptions` are subsets of the current ones (a new scope gives `400` at `/granted_scopes/<i>`; consent with `setAppScopes`), and `event_subscriptions` absent keeps the current ones the new manifest and scopes still allow. What the new manifest drops acts at once. New delivery hosts are confirmed by the upgrade itself and must be in `webhook.allowed_hosts`. An identical manifest with identical lists answers `200` without effect; an uninstalled app is `409 conflict`.
       x-authz-action: app.install
       x-rate-limit-class: rl.admin
       parameters:
@@ -13906,11 +13961,21 @@ paths:
                     schema_version: 1
                     slug: ticket-sync
                     name: Ticket Sync
-                    version: 1.2.0
+                    description: Mirrors tickets of a help desk into a forum.
                     publisher: Example Ltd
+                    version: 1.2.0
                     homepage_url: https://apps.example.com/ticket-sync
-                    scopes: ['messages:read']
-                  granted_scopes: ['messages:read']
+                    min_api_version: '0.2'
+                    scopes:
+                      required: ['messages:write']
+                      optional: ['messages:read', 'events:subscribe']
+                    events: [message.created]
+                    delivery:
+                      mode: webhook
+                      events_url: https://apps.example.com/ticket-sync/events
+                    data_egress: Messages of the granted channels go to apps.example.com.
+                  granted_scopes: ['events:subscribe', 'messages:read', 'messages:write']
+                  event_subscriptions: [message.created]
                   reason: Sync tickets with the help desk
       responses:
         '200':
@@ -13937,14 +14002,23 @@ paths:
                       schema_version: 1
                       slug: ticket-sync
                       name: Ticket Sync
-                      version: 1.2.0
+                      description: Mirrors tickets of a help desk into a forum.
                       publisher: Example Ltd
+                      version: 1.2.0
                       homepage_url: https://apps.example.com/ticket-sync
-                      scopes: ['messages:read']
+                      min_api_version: '0.2'
+                      scopes:
+                        required: ['messages:write']
+                        optional: ['messages:read', 'events:subscribe']
+                      events: [message.created]
+                      delivery:
+                        mode: webhook
+                        events_url: https://apps.example.com/ticket-sync/events
+                      data_egress: Messages of the granted channels go to apps.example.com.
                     manifest_version: 1.2.0
                     installation:
                       id: 0192f4a0-7b1c-78dc-8da2-d6c386222e8a
-                      granted_scopes: ['messages:read']
+                      granted_scopes: ['events:subscribe', 'messages:read', 'messages:write']
                       event_subscriptions: [message.created]
                       state: active
                       installed_at: '2026-10-10T09:30:00.000Z'
@@ -13968,6 +14042,8 @@ paths:
       operationId: setAppScopes
       summary: Change granted scopes and subscriptions
       tags: [Apps]
+      description: |-
+        Owner only with a fresh step-up; the consent for new scopes and events. `granted_scopes` is a subset of the scopes of the manifest; `event_subscriptions` absent keeps the current ones the new scopes still allow, present it replaces them (each needs `events:subscribe` and the scope of the event). A removed scope acts on the next request of every token; a newly granted scope needs a new token, because a token keeps the scopes it was created with. Equal lists answer `200` without effect; an uninstalled app is `409 conflict`.
       x-authz-action: app.scopes.update
       x-rate-limit-class: rl.admin
       parameters:
@@ -13982,8 +14058,9 @@ paths:
               default:
                 summary: Request
                 value:
-                  granted_scopes: ['messages:read']
-                  reason: App no longer needs files
+                  granted_scopes: ['events:subscribe', 'messages:read', 'messages:write']
+                  event_subscriptions: [message.created]
+                  reason: Mirror replies into the help desk
       responses:
         '200':
           description: OK.
@@ -14009,14 +14086,23 @@ paths:
                       schema_version: 1
                       slug: ticket-sync
                       name: Ticket Sync
-                      version: 1.2.0
+                      description: Mirrors tickets of a help desk into a forum.
                       publisher: Example Ltd
+                      version: 1.2.0
                       homepage_url: https://apps.example.com/ticket-sync
-                      scopes: ['messages:read']
+                      min_api_version: '0.2'
+                      scopes:
+                        required: ['messages:write']
+                        optional: ['messages:read', 'events:subscribe']
+                      events: [message.created]
+                      delivery:
+                        mode: webhook
+                        events_url: https://apps.example.com/ticket-sync/events
+                      data_egress: Messages of the granted channels go to apps.example.com.
                     manifest_version: 1.2.0
                     installation:
                       id: 0192f4a0-7b1c-78dc-8da2-d6c386222e8a
-                      granted_scopes: ['messages:read']
+                      granted_scopes: ['events:subscribe', 'messages:read', 'messages:write']
                       event_subscriptions: [message.created]
                       state: active
                       installed_at: '2026-10-10T09:30:00.000Z'
@@ -14028,6 +14114,8 @@ paths:
           $ref: '#/components/responses/Forbidden'
         '404':
           $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
         '429':
           $ref: '#/components/responses/TooManyRequests'
         default:
@@ -22328,7 +22416,7 @@ components:
           examples: [Adapter production]
         scopes:
           type: array
-          description: Only for app tokens, a subset of the granted scopes of the installation. Agent tokens (all agent scopes implicitly) and personal tokens (the grants of the person) carry none.
+          description: Only for app tokens, a subset of the granted scopes of the installation; absent or empty takes all granted scopes at this moment. A scope granted later needs a new token. Agent tokens (all agent scopes implicitly) and personal tokens (the grants of the person) carry none.
           items:
             $ref: '#/components/schemas/AppScope'
         dpop_jkt:
@@ -25394,48 +25482,130 @@ components:
     AppManifest:
       type: object
       additionalProperties: false
-      description: Schema `app_manifest.v1`.
-      required: [schema_version, slug, name, version, scopes]
+      description: 'Schema `app_manifest.v1` (11, 3.1). Unknown members are an error. Beyond the schema the server applies the check rules of 11, 3.2: scopes from the catalogue, only subscribable events with the scope of their receive action and `events:subscribe`, `https` delivery addresses whose host is in `webhook.allowed_hosts`, `requested_grants` at most `write` and at most the capability `upload` and never on a host, commands without reserved names and at most `command.max_per_principal`, and at most `app.manifest_max_bytes`.'
+      required: [schema_version, slug, name, description, publisher, version, min_api_version, scopes]
       properties:
         schema_version:
           type: integer
+          enum: [1]
           examples: [1]
         slug:
           type: string
           pattern: ^[a-z0-9][a-z0-9-]*$
+          description: Unique in the instance; becomes the handle of the app principal.
           examples: [ticket-sync]
         name:
           type: string
+          minLength: 1
+          description: Becomes the display name of the app principal.
           examples: [Ticket Sync]
-        version:
-          type: string
-          description: SemVer of the manifest.
-          examples: [1.2.0]
         description:
           type: string
+          minLength: 1
+          examples: [Mirrors tickets of a help desk into a forum.]
         publisher:
           type: string
+          minLength: 1
           examples: [Example Ltd]
+        version:
+          type: string
+          description: SemVer 2.0.0 of the manifest (`apps.manifest_version`).
+          examples: [1.2.0]
         homepage_url:
           type: string
+          description: Absolute `https` address for display only; the server never loads it.
           examples: ['https://apps.example.com/ticket-sync']
+        min_api_version:
+          type: string
+          pattern: ^[0-9]+\.[0-9]+$
+          description: Lowest API version (major.minor) the app needs; not above the version of this server.
+          examples: ['1.0']
         scopes:
+          type: object
+          additionalProperties: false
+          required: [required, optional]
+          properties:
+            required:
+              type: array
+              items:
+                $ref: '#/components/schemas/AppScope'
+            optional:
+              type: array
+              items:
+                $ref: '#/components/schemas/AppScope'
+        events:
           type: array
-          items:
-            $ref: '#/components/schemas/AppScope'
-        event_subscriptions:
-          type: array
+          description: Durable event types (05, 6) the app may subscribe to; each needs the scope of its receive action and `events:subscribe`.
           items:
             type: string
             examples: [message.created]
+        delivery:
+          type: object
+          additionalProperties: false
+          description: Required with `events`, `commands` or `components`.
+          required: [mode]
+          properties:
+            mode:
+              type: string
+              enum: [gateway, webhook]
+            events_url:
+              type: string
+              description: Required for `webhook`, not allowed for `gateway`; `https`, host in `webhook.allowed_hosts`.
+              examples: ['https://apps.example.com/ticket-sync/events']
+            interactions_url:
+              type: string
+              description: Required for commands or components without the gateway; `https`, host in `webhook.allowed_hosts`.
+              examples: ['https://apps.example.com/ticket-sync/interactions']
         commands:
           type: array
+          description: Commands after 09, 10, without reserved names and without a target.
           items:
             $ref: '#/components/schemas/CommandRegister'
-        webhooks:
+        components:
+          type: array
+          description: Component types the app uses; only shown for the consent.
+          items:
+            type: string
+            enum: [button, select, form]
+        requested_grants:
+          type: array
+          description: Grants the app asks for; the owner creates them per target with `createGrant`. Only `read` or `write`, at most the capability `upload`, never on a host.
+          items:
+            type: object
+            additionalProperties: false
+            required: [target_kind, level, purpose]
+            properties:
+              target_kind:
+                $ref: '#/components/schemas/TargetKind'
+              level:
+                $ref: '#/components/schemas/Level'
+              capabilities:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Capability'
+              purpose:
+                type: string
+                minLength: 1
+                examples: [Posts per ticket]
+        incoming_webhooks:
           type: array
           items:
-            $ref: '#/components/schemas/WebhookSubscriptionCreate'
+            type: object
+            additionalProperties: false
+            required: [name, purpose]
+            properties:
+              name:
+                type: string
+                minLength: 1
+                examples: [alerts]
+              purpose:
+                type: string
+                minLength: 1
+                examples: [Alerts of the help desk]
+        data_egress:
+          type: string
+          description: Plain text on which data leave the instance and where to; required with `events` or `interactions_url`.
+          examples: [Messages of the granted channels go to apps.example.com.]
     App:
       type: object
       required:

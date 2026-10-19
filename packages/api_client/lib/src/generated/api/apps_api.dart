@@ -112,7 +112,7 @@ class AppsApi {
   }
 
   /// Install an app from its manifest
-  ///
+  /// Owner only with a fresh step-up. The manifest is checked against the schema (unknown members give &#x60;400 validation_failed&#x60; with &#x60;unknown_member&#x60;) and the check rules of 11, 3.2 (&#x60;400 validation_failed&#x60; with the pointers under &#x60;/manifest&#x60;; &#x60;400 webhook_host_not_allowed&#x60; when every failure is a delivery host outside &#x60;webhook.allowed_hosts&#x60;). &#x60;granted_scopes&#x60; holds every required and any optional scope of the manifest; &#x60;event_subscriptions&#x60; absent means none, each needs &#x60;events:subscribe&#x60; and the scope of the event. One transaction creates the app principal (handle &#x3D; &#x60;slug&#x60;, display name &#x3D; &#x60;name&#x60;), the app and its installation and raises the rights version; nothing is stored on a refusal. No token and no grant is created: grants come per target from &#x60;createGrant&#x60;, tokens from &#x60;createToken&#x60;. The same &#x60;slug&#x60; again is &#x60;409 conflict&#x60; (use &#x60;upgradeAppManifest&#x60;); a slug whose apps are all uninstalled reinstalls with the same principal.
   ///
   /// Parameters:
   /// * [appInstall]
@@ -367,7 +367,7 @@ class AppsApi {
   }
 
   /// Change granted scopes and subscriptions
-  ///
+  /// Owner only with a fresh step-up; the consent for new scopes and events. &#x60;granted_scopes&#x60; is a subset of the scopes of the manifest; &#x60;event_subscriptions&#x60; absent keeps the current ones the new scopes still allow, present it replaces them (each needs &#x60;events:subscribe&#x60; and the scope of the event). A removed scope acts on the next request of every token; a newly granted scope needs a new token, because a token keeps the scopes it was created with. Equal lists answer &#x60;200&#x60; without effect; an uninstalled app is &#x60;409 conflict&#x60;.
   ///
   /// Parameters:
   /// * [appId]
@@ -613,7 +613,7 @@ class AppsApi {
   }
 
   /// Install a new manifest version
-  ///
+  /// Owner only with a fresh step-up (&#x60;app.install&#x60;). The new manifest has the same &#x60;slug&#x60; and passes the rules of &#x60;installApp&#x60;; changed content needs another &#x60;version&#x60; (&#x60;400&#x60; at &#x60;/manifest/version&#x60;). The upgrade never adds a scope, an event or a grant: &#x60;granted_scopes&#x60; and &#x60;event_subscriptions&#x60; are subsets of the current ones (a new scope gives &#x60;400&#x60; at &#x60;/granted_scopes/&lt;i&gt;&#x60;; consent with &#x60;setAppScopes&#x60;), and &#x60;event_subscriptions&#x60; absent keeps the current ones the new manifest and scopes still allow. What the new manifest drops acts at once. New delivery hosts are confirmed by the upgrade itself and must be in &#x60;webhook.allowed_hosts&#x60;. An identical manifest with identical lists answers &#x60;200&#x60; without effect; an uninstalled app is &#x60;409 conflict&#x60;.
   ///
   /// Parameters:
   /// * [appId]
@@ -717,7 +717,7 @@ class AppsApi {
   }
 
   /// Validate a manifest without installing
-  ///
+  /// Owner only. Schema violations give &#x60;400 validation_failed&#x60;; the check rules of 11, 3.2 give &#x60;200&#x60; with &#x60;valid&#x60; false and every rule error, pointers relative to the manifest root. Nothing is stored and no audit entry is written.
   ///
   /// Parameters:
   /// * [appManifest]

@@ -106,10 +106,13 @@ def sync_detailed(
     """Create an API token
 
      Kind follows the principal (`agt` agent, `app` app, `pat` person, 08 section 12). A personal token
-    only for oneself and only with the flag `tokens.personal_enabled`. Until app installations exist
-    (M2) a token for an app answers `409 conflict` with `reason` `app_not_installed`. The secret is
-    shown once; a replay with the same `Idempotency-Key` answers `409 conflict` with `reason`
-    `one_time_secret` (06, 7).
+    only for oneself and only with the flag `tokens.personal_enabled`. A token for an app needs an
+    active installation (else `409 conflict` with `reason` `app_not_installed`, also while the app is
+    suspended); its scopes are the requested subset of the granted scopes of the installation, or all of
+    them when `scopes` is absent or empty, and a scope the installation does not grant gives `400
+    validation_failed` at `/scopes/<i>`. An app request needs the scope of its action in the token and
+    in the installation. The secret is shown once; a replay with the same `Idempotency-Key` answers `409
+    conflict` with `reason` `one_time_secret` (06, 7).
 
     Args:
         principal_id (UUID): UUIDv7 (RFC 9562), lowercase canonical form.
@@ -147,10 +150,13 @@ def sync(
     """Create an API token
 
      Kind follows the principal (`agt` agent, `app` app, `pat` person, 08 section 12). A personal token
-    only for oneself and only with the flag `tokens.personal_enabled`. Until app installations exist
-    (M2) a token for an app answers `409 conflict` with `reason` `app_not_installed`. The secret is
-    shown once; a replay with the same `Idempotency-Key` answers `409 conflict` with `reason`
-    `one_time_secret` (06, 7).
+    only for oneself and only with the flag `tokens.personal_enabled`. A token for an app needs an
+    active installation (else `409 conflict` with `reason` `app_not_installed`, also while the app is
+    suspended); its scopes are the requested subset of the granted scopes of the installation, or all of
+    them when `scopes` is absent or empty, and a scope the installation does not grant gives `400
+    validation_failed` at `/scopes/<i>`. An app request needs the scope of its action in the token and
+    in the installation. The secret is shown once; a replay with the same `Idempotency-Key` answers `409
+    conflict` with `reason` `one_time_secret` (06, 7).
 
     Args:
         principal_id (UUID): UUIDv7 (RFC 9562), lowercase canonical form.
@@ -183,10 +189,13 @@ async def asyncio_detailed(
     """Create an API token
 
      Kind follows the principal (`agt` agent, `app` app, `pat` person, 08 section 12). A personal token
-    only for oneself and only with the flag `tokens.personal_enabled`. Until app installations exist
-    (M2) a token for an app answers `409 conflict` with `reason` `app_not_installed`. The secret is
-    shown once; a replay with the same `Idempotency-Key` answers `409 conflict` with `reason`
-    `one_time_secret` (06, 7).
+    only for oneself and only with the flag `tokens.personal_enabled`. A token for an app needs an
+    active installation (else `409 conflict` with `reason` `app_not_installed`, also while the app is
+    suspended); its scopes are the requested subset of the granted scopes of the installation, or all of
+    them when `scopes` is absent or empty, and a scope the installation does not grant gives `400
+    validation_failed` at `/scopes/<i>`. An app request needs the scope of its action in the token and
+    in the installation. The secret is shown once; a replay with the same `Idempotency-Key` answers `409
+    conflict` with `reason` `one_time_secret` (06, 7).
 
     Args:
         principal_id (UUID): UUIDv7 (RFC 9562), lowercase canonical form.
@@ -222,10 +231,13 @@ async def asyncio(
     """Create an API token
 
      Kind follows the principal (`agt` agent, `app` app, `pat` person, 08 section 12). A personal token
-    only for oneself and only with the flag `tokens.personal_enabled`. Until app installations exist
-    (M2) a token for an app answers `409 conflict` with `reason` `app_not_installed`. The secret is
-    shown once; a replay with the same `Idempotency-Key` answers `409 conflict` with `reason`
-    `one_time_secret` (06, 7).
+    only for oneself and only with the flag `tokens.personal_enabled`. A token for an app needs an
+    active installation (else `409 conflict` with `reason` `app_not_installed`, also while the app is
+    suspended); its scopes are the requested subset of the granted scopes of the installation, or all of
+    them when `scopes` is absent or empty, and a scope the installation does not grant gives `400
+    validation_failed` at `/scopes/<i>`. An app request needs the scope of its action in the token and
+    in the installation. The secret is shown once; a replay with the same `Idempotency-Key` answers `409
+    conflict` with `reason` `one_time_secret` (06, 7).
 
     Args:
         principal_id (UUID): UUIDv7 (RFC 9562), lowercase canonical form.

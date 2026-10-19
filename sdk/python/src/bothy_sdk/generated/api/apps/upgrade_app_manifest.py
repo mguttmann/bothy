@@ -96,6 +96,15 @@ def sync_detailed(
 ) -> Response[App | Problem]:
     """Install a new manifest version
 
+     Owner only with a fresh step-up (`app.install`). The new manifest has the same `slug` and passes the
+    rules of `installApp`; changed content needs another `version` (`400` at `/manifest/version`). The
+    upgrade never adds a scope, an event or a grant: `granted_scopes` and `event_subscriptions` are
+    subsets of the current ones (a new scope gives `400` at `/granted_scopes/<i>`; consent with
+    `setAppScopes`), and `event_subscriptions` absent keeps the current ones the new manifest and scopes
+    still allow. What the new manifest drops acts at once. New delivery hosts are confirmed by the
+    upgrade itself and must be in `webhook.allowed_hosts`. An identical manifest with identical lists
+    answers `200` without effect; an uninstalled app is `409 conflict`.
+
     Args:
         app_id (UUID): UUIDv7 (RFC 9562), lowercase canonical form.
         body (AppInstall):
@@ -128,6 +137,15 @@ def sync(
 ) -> App | Problem | None:
     """Install a new manifest version
 
+     Owner only with a fresh step-up (`app.install`). The new manifest has the same `slug` and passes the
+    rules of `installApp`; changed content needs another `version` (`400` at `/manifest/version`). The
+    upgrade never adds a scope, an event or a grant: `granted_scopes` and `event_subscriptions` are
+    subsets of the current ones (a new scope gives `400` at `/granted_scopes/<i>`; consent with
+    `setAppScopes`), and `event_subscriptions` absent keeps the current ones the new manifest and scopes
+    still allow. What the new manifest drops acts at once. New delivery hosts are confirmed by the
+    upgrade itself and must be in `webhook.allowed_hosts`. An identical manifest with identical lists
+    answers `200` without effect; an uninstalled app is `409 conflict`.
+
     Args:
         app_id (UUID): UUIDv7 (RFC 9562), lowercase canonical form.
         body (AppInstall):
@@ -154,6 +172,15 @@ async def asyncio_detailed(
     body: AppInstall,
 ) -> Response[App | Problem]:
     """Install a new manifest version
+
+     Owner only with a fresh step-up (`app.install`). The new manifest has the same `slug` and passes the
+    rules of `installApp`; changed content needs another `version` (`400` at `/manifest/version`). The
+    upgrade never adds a scope, an event or a grant: `granted_scopes` and `event_subscriptions` are
+    subsets of the current ones (a new scope gives `400` at `/granted_scopes/<i>`; consent with
+    `setAppScopes`), and `event_subscriptions` absent keeps the current ones the new manifest and scopes
+    still allow. What the new manifest drops acts at once. New delivery hosts are confirmed by the
+    upgrade itself and must be in `webhook.allowed_hosts`. An identical manifest with identical lists
+    answers `200` without effect; an uninstalled app is `409 conflict`.
 
     Args:
         app_id (UUID): UUIDv7 (RFC 9562), lowercase canonical form.
@@ -184,6 +211,15 @@ async def asyncio(
     body: AppInstall,
 ) -> App | Problem | None:
     """Install a new manifest version
+
+     Owner only with a fresh step-up (`app.install`). The new manifest has the same `slug` and passes the
+    rules of `installApp`; changed content needs another `version` (`400` at `/manifest/version`). The
+    upgrade never adds a scope, an event or a grant: `granted_scopes` and `event_subscriptions` are
+    subsets of the current ones (a new scope gives `400` at `/granted_scopes/<i>`; consent with
+    `setAppScopes`), and `event_subscriptions` absent keeps the current ones the new manifest and scopes
+    still allow. What the new manifest drops acts at once. New delivery hosts are confirmed by the
+    upgrade itself and must be in `webhook.allowed_hosts`. An identical manifest with identical lists
+    answers `200` without effect; an uninstalled app is `409 conflict`.
 
     Args:
         app_id (UUID): UUIDv7 (RFC 9562), lowercase canonical form.

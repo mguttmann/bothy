@@ -173,7 +173,13 @@ in DM channels.
 An app needs both for every action:
 
 1. an effective level from grants (at most `write`) and
-2. the scope of the action in `app_installations.granted_scopes` (05, section 2.6).
+2. the scope of the action in `app_installations.granted_scopes` (05, section 2.6) and, when the
+   request carries an API token, also in its `api_tokens.scopes` ([08-identity.md](08-identity.md),
+   section 12).
+
+An app without an active installation (suspended or uninstalled) has an empty permission state,
+like a principal that is not active: `app.suspend` and `app.uninstall` take every visible target
+from it, `app.resume` gives them back, and the permission change writes `access.changed` for it.
 
 Visibility follows the level: if an app has a grant on a channel, the channel is visible to it.
 If it lacks only the scope, the response is `403` with reason `scope_missing`, not `404`;

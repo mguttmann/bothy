@@ -69,6 +69,11 @@ func Visible(in Input) (visible bool, reason Reason, err error) {
 		return in.Eff.Level >= LevelRead, ReasonNoGrant, nil
 	case ownedKinds[kind]:
 		return isSelf(in) || (in.Eff.Owner && in.Req.Contains(Owner)), ReasonNotSelf, nil
+	case kind == KindApp && in.Resource.ID.IsZero():
+		// The collection of apps (listApps, validateManifest) names no app, so it hides nothing:
+		// its visibility is that of the instance, and the requirement owner answers a non-owner
+		// with owner_only (06 section 4 point 2, M2-24 design note 13).
+		return in.Principal.Kind != KindAnonymous, ReasonNoGrant, nil
 	case ownerOnlyKinds[kind]:
 		return in.Eff.Owner, ReasonNoGrant, nil
 	}

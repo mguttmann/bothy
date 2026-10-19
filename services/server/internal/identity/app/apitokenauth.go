@@ -5,6 +5,7 @@ package app
 import (
 	"context"
 	"log/slog"
+	"slices"
 
 	"github.com/OWNER/bothy/services/server/internal/identity"
 	"github.com/OWNER/bothy/services/server/internal/identity/domain/apitoken"
@@ -56,8 +57,26 @@ func (a *Authenticator) AuthenticateAPIToken(ctx context.Context, token string, 
 	if err := a.binding(ctx, rec.DPoPJKT, token, dpopScheme, creds); err != nil {
 		return actor.Actor{}, err
 	}
+	if kind == actor.KindApp {
+		if err := a.installation(ctx, &out); err != nil {
+			return actor.Actor{}, err
+		}
+	}
 	a.touchToken(ctx, rec.APITokenRecord)
 	return out, nil
+}
+
+// installation reads the installation of the app of out (M2-24 design note 10 b): active gives
+// the installation id and its granted scopes; otherwise the installation id stays zero and
+// authorize answers unauthenticated app_not_installed and audits the denial (M1-28 liveness rule).
+// It reads on every request; nothing is cached.
+func (a *Authenticator) installation(ctx context.Context, out *actor.Actor) error {
+	inst, found, err := a.apps.ActiveInstallation(ctx, out.ID)
+	if err != nil || !found {
+		return err
+	}
+	out.InstallationID, out.GrantedScopes = inst.ID, slices.Clone(inst.GrantedScopes)
+	return nil
 }
 
 // binding checks the DPoP binding of an active token: a bound token needs the scheme DPoP and a
@@ -108,6 +127,23 @@ func (a *Authenticator) revalidateToken(ctx context.Context, p actor.Actor) erro
 	}
 	if !found || r.PrincipalID != p.ID || !r.Active(a.clk.Now()) {
 		return unauthenticated()
+	}
+	if p.Kind == actor.KindApp {
+		return a.revalidateInstallation(ctx, p)
+	}
+	return nil
+}
+
+// revalidateInstallation is the installation part of Revalidate for an app (M2-24 design note
+// 11 a): the installation must still be active, be the one of the actor, and grant every scope
+// the actor carries; otherwise the connection ends with unauthenticated app_not_installed.
+func (a *Authenticator) revalidateInstallation(ctx context.Context, p actor.Actor) error {
+	inst, found, err := a.apps.ActiveInstallation(ctx, p.ID)
+	if err != nil {
+		return err
+	}
+	if !found || inst.ID != p.InstallationID || slices.ContainsFunc(p.GrantedScopes, func(s string) bool { return !slices.Contains(inst.GrantedScopes, s) }) {
+		return errs.New(errs.CodeUnauthenticated, "").WithHeader("WWW-Authenticate", schemeChallenge).WithReason(reasonAppNotInstalled)
 	}
 	return nil
 }

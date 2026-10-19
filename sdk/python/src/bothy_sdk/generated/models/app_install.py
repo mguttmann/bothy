@@ -19,7 +19,12 @@ T = TypeVar("T", bound="AppInstall")
 class AppInstall:
     """
     Attributes:
-        manifest (AppManifest): Schema `app_manifest.v1`.
+        manifest (AppManifest): Schema `app_manifest.v1` (11, 3.1). Unknown members are an error. Beyond the schema the
+            server applies the check rules of 11, 3.2: scopes from the catalogue, only subscribable events with the scope of
+            their receive action and `events:subscribe`, `https` delivery addresses whose host is in
+            `webhook.allowed_hosts`, `requested_grants` at most `write` and at most the capability `upload` and never on a
+            host, commands without reserved names and at most `command.max_per_principal`, and at most
+            `app.manifest_max_bytes`.
         granted_scopes (list[AppScope]):
         reason (str):
         event_subscriptions (list[str] | Unset):

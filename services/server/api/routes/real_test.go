@@ -81,6 +81,42 @@ func (stubServer) ViewAsUser(context.Context, rest.ViewAsUserRequestObject) (res
 	return nil, nil
 }
 
+func (stubServer) ListApps(context.Context, rest.ListAppsRequestObject) (rest.ListAppsResponseObject, error) {
+	return nil, nil
+}
+
+func (stubServer) InstallApp(context.Context, rest.InstallAppRequestObject) (rest.InstallAppResponseObject, error) {
+	return nil, nil
+}
+
+func (stubServer) ValidateManifest(context.Context, rest.ValidateManifestRequestObject) (rest.ValidateManifestResponseObject, error) {
+	return nil, nil
+}
+
+func (stubServer) GetApp(context.Context, rest.GetAppRequestObject) (rest.GetAppResponseObject, error) {
+	return nil, nil
+}
+
+func (stubServer) UpgradeAppManifest(context.Context, rest.UpgradeAppManifestRequestObject) (rest.UpgradeAppManifestResponseObject, error) {
+	return nil, nil
+}
+
+func (stubServer) SetAppScopes(context.Context, rest.SetAppScopesRequestObject) (rest.SetAppScopesResponseObject, error) {
+	return nil, nil
+}
+
+func (stubServer) SuspendApp(context.Context, rest.SuspendAppRequestObject) (rest.SuspendAppResponseObject, error) {
+	return nil, nil
+}
+
+func (stubServer) ResumeApp(context.Context, rest.ResumeAppRequestObject) (rest.ResumeAppResponseObject, error) {
+	return nil, nil
+}
+
+func (stubServer) UninstallApp(context.Context, rest.UninstallAppRequestObject) (rest.UninstallAppResponseObject, error) {
+	return nil, nil
+}
+
 func (stubServer) ListAuditEvents(context.Context, rest.ListAuditEventsRequestObject) (rest.ListAuditEventsResponseObject, error) {
 	return nil, nil
 }
@@ -543,7 +579,7 @@ func (stubServer) SetMyLocalCredential(context.Context, rest.SetMyLocalCredentia
 // (M1-35), the providers and credentials (M1-36), the API tokens (M1-44), the audit log (M1-50),
 // the enrollment codes (M1-37), the device approval and pairing (M1-38), the passkeys (M1-40),
 // the OIDC login (M1-41), the trusted header login (M1-43), the revocations (M1-45), the host
-// records (M2-39) and the local accounts (M1-39). A handler
+// records (M2-39), the local accounts (M1-39) and the nine app operations (M2-24). A handler
 // ticket that enables an operation changes this test together with
 // api/operations.yaml.
 func TestRealTable_Enabled(t *testing.T) {
@@ -703,6 +739,16 @@ func TestRealTable_Enabled(t *testing.T) {
 		"issueHostPairingCode": {"POST /api/v1/hosts/{host_id}/pairing-code", "host.manage", "rl.admin"},
 		"pairHost":             {"POST /api/v1/hosts/pair", "host.pair", "rl.public_auth"},
 		"confirmHost":          {"POST /api/v1/hosts/{host_id}/confirm", "host.manage", "rl.admin"},
+		// M2-24
+		"listApps":           {"GET /api/v1/apps", "app.read", "rl.read"},
+		"installApp":         {"POST /api/v1/apps", "app.install", "rl.admin"},
+		"validateManifest":   {"POST /api/v1/app-manifests/validate", "app.read", "rl.read"},
+		"getApp":             {"GET /api/v1/apps/{app_id}", "app.read", "rl.read"},
+		"upgradeAppManifest": {"PUT /api/v1/apps/{app_id}/manifest", "app.install", "rl.admin"},
+		"setAppScopes":       {"PUT /api/v1/apps/{app_id}/scopes", "app.scopes.update", "rl.admin"},
+		"suspendApp":         {"POST /api/v1/apps/{app_id}/suspend", "app.suspend", "rl.admin"},
+		"resumeApp":          {"POST /api/v1/apps/{app_id}/resume", "app.resume", "rl.admin"},
+		"uninstallApp":       {"POST /api/v1/apps/{app_id}/uninstall", "app.uninstall", "rl.admin"},
 	}
 	ops := routes.Enabled()
 	if len(ops) != len(want) {

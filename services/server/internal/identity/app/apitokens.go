@@ -60,6 +60,9 @@ type TokensDeps struct {
 	Clock clock.Clock
 	// Random is the source of the random part; nil means crypto/rand (ID-T27). Only tests set it.
 	Random io.Reader
+	// Apps reads the installation of an app principal (M2-24); nil means
+	// identity.NoAppInstallations, so app tokens are refused with app_not_installed.
+	Apps identity.AppInstallations
 }
 
 // Tokens implements identity.Tokens and identity.TokenAdmin (08 section 12, brief M1-44). It is
@@ -92,6 +95,9 @@ func NewTokens(cfg Config, pepper []byte, d TokensDeps) (*Tokens, error) {
 	}
 	if d.Clock == nil {
 		d.Clock = clock.System()
+	}
+	if d.Apps == nil {
+		d.Apps = identity.NoAppInstallations{}
 	}
 	return &Tokens{cfg: cfg, pepper: append([]byte(nil), pepper...), d: d}, nil
 }
@@ -366,9 +372,11 @@ const (
 	attrPrincipalID  = "principal_id"
 	attrDPoPBound    = "dpop_bound"
 	attrExpiresAt    = "expires_at"
+	attrScopes       = "scopes"
 )
 
-// reasonAppNotInstalled is the reason of createToken for an app until M2-24 (08 section 12).
+// reasonAppNotInstalled is the reason of createToken for an app without an active installation
+// and of Revalidate for such an app (08 section 12, 07 section 4.1).
 const reasonAppNotInstalled = "app_not_installed"
 
 // principalResource describes the principal id: kind principal, owned by itself.
@@ -385,11 +393,14 @@ func (s *Tokens) authorizeOn(ctx context.Context, a actor.Actor, act authorize.A
 	return d.Err()
 }
 
-// CreateToken implements identity.TokenAdmin (brief M1-44 "createToken"): authorize token.create
-// on the principal (with step-up and the not_self guard), then 404 for an unknown principal,
-// 409 app_not_installed for an app until M2-24, 403 feature_disabled for a personal token while
-// the switch is off, the body rules, the insert and the allow entry in one unit of work. The idempotency
-// stage stores no part of the answer (the handler marks the one-time secret).
+// CreateToken implements identity.TokenAdmin (brief M1-44 "createToken", M2-24 design note 10 a):
+// authorize token.create on the principal (with step-up and the not_self guard), then 404 for an
+// unknown principal; for an app the active installation is locked FOR SHARE (none, suspended or
+// uninstalled: 409 conflict app_not_installed) and the token scopes are the requested subset of
+// its granted scopes, or all of them when the body names none; 403 feature_disabled for a personal
+// token while the switch is off; the body rules, the insert and the allow entry in one unit of
+// work. The idempotency stage stores no part of the answer (the handler marks the one-time
+// secret).
 func (s *Tokens) CreateToken(ctx context.Context, a actor.Actor, principalID ids.ID, cmd identity.CreateTokenCmd) (identity.IssuedToken, error) {
 	ctx, err := withCaller(ctx, a)
 	if err != nil {
@@ -411,22 +422,19 @@ func (s *Tokens) CreateToken(ctx context.Context, a actor.Actor, principalID ids
 		if !ok {
 			return errs.New(errs.CodeInternalError, "identity: principal of an unknown kind")
 		}
-		if err := s.admitKind(ctx, a, k); err != nil {
+		scopes, err := s.admitKind(ctx, a, k, principalID, cmd.Scopes)
+		if err != nil {
 			return err
 		}
 		out, err = s.issue(ctx, k, identity.IssueTokenCmd{
-			PrincipalID: principalID, Name: cmd.Name, Scopes: cmd.Scopes, DPoPJKT: cmd.DPoPJKT, ExpiresAt: cmd.ExpiresAt, CreatedBy: a.ID,
+			PrincipalID: principalID, Name: cmd.Name, Scopes: scopes, DPoPJKT: cmd.DPoPJKT, ExpiresAt: cmd.ExpiresAt, CreatedBy: a.ID,
 		})
 		if err != nil {
 			return err
 		}
-		t := out.Token
 		return s.d.Audit.Record(ctx, auditing.Entry{
 			Action: string(authorize.ActionTokenCreate), Decision: auditing.DecisionAllow, ResourceKind: string(authorize.ResourcePrincipal),
-			ResourceID: principalID, Attrs: auditing.Attrs{
-				attrTokenID: auditing.ID(t.ID), attrKind: auditing.Code(string(t.Kind)), attrPrincipalID: auditing.ID(principalID),
-				attrDPoPBound: auditing.Bool(t.DPoPJKT != ""), attrExpiresAt: auditing.Time(t.ExpiresAt),
-			},
+			ResourceID: principalID, Attrs: createAttrs(out.Token, k.scopes),
 		})
 	})
 	if err != nil {
@@ -435,23 +443,49 @@ func (s *Tokens) CreateToken(ctx context.Context, a actor.Actor, principalID ids
 	return out, nil
 }
 
-// admitKind applies the rules of the token kind before the body: apps need an installation
-// (M2-24), personal tokens the switch tokens.personal_enabled of the caller.
-func (s *Tokens) admitKind(ctx context.Context, a actor.Actor, k tokenKind) error {
+// createAttrs are the audit attributes of token.create: ids, codes, the binding and the expiry,
+// and the stored scopes of a kind that carries scopes; never the secret or the hash.
+func createAttrs(t identity.APIToken, withScopes bool) auditing.Attrs {
+	attrs := auditing.Attrs{
+		attrTokenID: auditing.ID(t.ID), attrKind: auditing.Code(string(t.Kind)), attrPrincipalID: auditing.ID(t.PrincipalID),
+		attrDPoPBound: auditing.Bool(t.DPoPJKT != ""), attrExpiresAt: auditing.Time(t.ExpiresAt),
+	}
+	if withScopes {
+		codes := make([]auditing.Value, 0, len(t.Scopes))
+		for _, sc := range t.Scopes {
+			codes = append(codes, auditing.Code(sc))
+		}
+		attrs[attrScopes] = auditing.List(codes...)
+	}
+	return attrs
+}
+
+// admitKind applies the rules of the token kind before the body and returns the scopes of the new
+// token: apps need an active installation and get a subset of its granted scopes (M2-24 design
+// note 10 a), personal tokens the switch tokens.personal_enabled of the caller; other kinds keep
+// the requested scopes, which the body rules refuse when not empty.
+func (s *Tokens) admitKind(ctx context.Context, a actor.Actor, k tokenKind, principalID ids.ID, requested []string) ([]string, error) {
 	switch k.kind {
 	case identity.TokenKindApp:
-		return errs.New(errs.CodeConflict, "App tokens are issued with an installation.").WithReason(reasonAppNotInstalled)
+		inst, found, err := s.d.Apps.LockActiveInstallation(ctx, principalID)
+		if err != nil {
+			return nil, err
+		}
+		if !found {
+			return nil, errs.New(errs.CodeConflict, "The app has no active installation.").WithReason(reasonAppNotInstalled)
+		}
+		return domain.AppTokenScopes(requested, inst.GrantedScopes)
 	case identity.TokenKindPersonal:
 		on, err := s.d.Switch.PersonalTokensEnabled(ctx, a.ID)
 		if err != nil {
-			return err
+			return nil, err
 		}
 		if !on {
-			return errs.New(errs.CodeFeatureDisabled, "Personal API tokens are switched off.")
+			return nil, errs.New(errs.CodeFeatureDisabled, "Personal API tokens are switched off.")
 		}
 	case identity.TokenKindAgent:
 	}
-	return nil
+	return requested, nil
 }
 
 // ListTokens implements identity.TokenAdmin: token.list on the principal (owner, or the principal

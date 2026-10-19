@@ -60,6 +60,10 @@ import 'package:api_client/src/generated/model/app.dart';
 import 'package:api_client/src/generated/model/app_install.dart';
 import 'package:api_client/src/generated/model/app_installation.dart';
 import 'package:api_client/src/generated/model/app_manifest.dart';
+import 'package:api_client/src/generated/model/app_manifest_delivery.dart';
+import 'package:api_client/src/generated/model/app_manifest_incoming_webhooks_inner.dart';
+import 'package:api_client/src/generated/model/app_manifest_requested_grants_inner.dart';
+import 'package:api_client/src/generated/model/app_manifest_scopes.dart';
 import 'package:api_client/src/generated/model/app_page.dart';
 import 'package:api_client/src/generated/model/app_scope.dart';
 import 'package:api_client/src/generated/model/app_scopes_put.dart';
@@ -627,6 +631,10 @@ part 'serializers.g.dart';
   AppInstall,
   AppInstallation,
   AppManifest,
+  AppManifestDelivery,
+  AppManifestIncomingWebhooksInner,
+  AppManifestRequestedGrantsInner,
+  AppManifestScopes,
   AppPage,
   AppScope,
   AppScopesPut,
@@ -1255,6 +1263,12 @@ Serializers serializers =
             () => ListBuilder<CommandRegister>(),
           )
           ..addBuilderFactory(
+            const FullType(BuiltList, [
+              FullType(AppManifestRequestedGrantsInner),
+            ]),
+            () => ListBuilder<AppManifestRequestedGrantsInner>(),
+          )
+          ..addBuilderFactory(
             const FullType(BuiltList, [FullType(SearchHit)]),
             () => ListBuilder<SearchHit>(),
           )
@@ -1313,10 +1327,6 @@ Serializers serializers =
           ..addBuilderFactory(
             const FullType(BuiltList, [FullType(BillingMode)]),
             () => ListBuilder<BillingMode>(),
-          )
-          ..addBuilderFactory(
-            const FullType(BuiltList, [FullType(WebhookSubscriptionCreate)]),
-            () => ListBuilder<WebhookSubscriptionCreate>(),
           )
           ..addBuilderFactory(
             const FullType(BuiltList, [FullType(StatsLiveSli)]),
@@ -1398,6 +1408,12 @@ Serializers serializers =
               FullType.nullable(JsonObject),
             ]),
             () => MapBuilder<String, JsonObject?>(),
+          )
+          ..addBuilderFactory(
+            const FullType(BuiltList, [
+              FullType(AppManifestIncomingWebhooksInner),
+            ]),
+            () => ListBuilder<AppManifestIncomingWebhooksInner>(),
           )
           ..addBuilderFactory(
             const FullType(BuiltList, [FullType(ForumTag)]),

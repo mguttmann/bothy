@@ -22,7 +22,7 @@ class TokensApi {
   const TokensApi(this._dio, this._serializers);
 
   /// Create an API token
-  /// Kind follows the principal (&#x60;agt&#x60; agent, &#x60;app&#x60; app, &#x60;pat&#x60; person, 08 section 12). A personal token only for oneself and only with the flag &#x60;tokens.personal_enabled&#x60;. Until app installations exist (M2) a token for an app answers &#x60;409 conflict&#x60; with &#x60;reason&#x60; &#x60;app_not_installed&#x60;. The secret is shown once; a replay with the same &#x60;Idempotency-Key&#x60; answers &#x60;409 conflict&#x60; with &#x60;reason&#x60; &#x60;one_time_secret&#x60; (06, 7).
+  /// Kind follows the principal (&#x60;agt&#x60; agent, &#x60;app&#x60; app, &#x60;pat&#x60; person, 08 section 12). A personal token only for oneself and only with the flag &#x60;tokens.personal_enabled&#x60;. A token for an app needs an active installation (else &#x60;409 conflict&#x60; with &#x60;reason&#x60; &#x60;app_not_installed&#x60;, also while the app is suspended); its scopes are the requested subset of the granted scopes of the installation, or all of them when &#x60;scopes&#x60; is absent or empty, and a scope the installation does not grant gives &#x60;400 validation_failed&#x60; at &#x60;/scopes/&lt;i&gt;&#x60;. An app request needs the scope of its action in the token and in the installation. The secret is shown once; a replay with the same &#x60;Idempotency-Key&#x60; answers &#x60;409 conflict&#x60; with &#x60;reason&#x60; &#x60;one_time_secret&#x60; (06, 7).
   ///
   /// Parameters:
   /// * [principalId]

@@ -387,7 +387,7 @@ func (m *refWorld) syncPrincipal(p *refPrincipal) {
 	if p.disabled {
 		st = authz.PrincipalDisabled
 	}
-	m.fPrincipal.Put(authz.PrincipalFacts{ID: p.id, Kind: actor.Kind(p.kind), Status: st, IsOwner: p.owner})
+	m.fPrincipal.Put(authz.PrincipalFacts{ID: p.id, Kind: actor.Kind(p.kind), Status: st, IsOwner: p.owner, AppInstallationActive: !p.install.IsZero()})
 }
 
 func (m *refWorld) syncChannel(c *refChannel) {
@@ -400,7 +400,7 @@ func (m *refWorld) syncChannel(c *refChannel) {
 
 func (m *refWorld) actorOf(p *refPrincipal) actor.Actor {
 	a := actor.Actor{ID: p.id, Kind: actor.Kind(p.kind), SessionID: p.session, DeviceID: p.device, TokenID: p.token,
-		InstallationID: p.install, GrantedScopes: p.scopes, StepUpAt: m.now}
+		InstallationID: p.install, GrantedScopes: p.scopes, Scopes: p.scopes, StepUpAt: m.now}
 	if p.kind == domain.KindUser {
 		a.StepUpMethod, a.ClientComponent = "device_key", "app"
 	}

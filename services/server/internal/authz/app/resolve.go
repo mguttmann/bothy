@@ -184,8 +184,9 @@ func (a *Authorizer) gather(ctx context.Context, s *actingPrincipal, spec domain
 		Action: spec.ID, Spec: spec, Req: req, Now: t, StepUpMaxAge: a.cfg.StepUpMaxAge,
 		Principal: domain.Principal{
 			ID: s.id, Kind: s.kind, HasSession: !s.ref.SessionID.IsZero(), StepUpAt: s.p.StepUpTime(),
-			DeviceID: s.ref.DeviceID, GrantedScopes: s.p.AppGrantedScopes(),
-			ViewAs: s.viewAs != nil, ActingFor: s.actingFor != nil,
+			DeviceID: s.ref.DeviceID, GrantedScopes: s.p.AppGrantedScopes(), TokenScopes: s.p.AppTokenScopes(),
+			HasToken: !s.ref.TokenID.IsZero(),
+			ViewAs:   s.viewAs != nil, ActingFor: s.actingFor != nil,
 		},
 		Resource: domain.ResourceFacts{Kind: string(r.Kind), ID: r.ID, OwnerID: r.OwnerID,
 			HasAttachments: r.HasAttachments, RestrictedTags: r.RestrictedTags},

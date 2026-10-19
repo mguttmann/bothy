@@ -119,6 +119,10 @@ var appPrivileges = map[string][]string{
 	// 03 local_credentials (M1-39): one row per local identity, changed in place; it goes with
 	// its identity (ON DELETE CASCADE).
 	"local_credentials": {"SELECT", "INSERT", "UPDATE"},
+	// 03 section 4.4 (M2-24): apps and installations are never deleted; an uninstall sets the
+	// state, a reinstall adds an installation.
+	"apps":              {"SELECT", "INSERT", "UPDATE"},
+	"app_installations": {"SELECT", "INSERT", "UPDATE"},
 }
 
 // allPrivileges are the table rights PostgreSQL 18 knows (MAINTAIN since 17).

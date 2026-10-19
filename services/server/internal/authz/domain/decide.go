@@ -132,8 +132,10 @@ type Principal struct {
 	// Pending is the reason of a pending person or device (CheckPending passed the action); empty
 	// otherwise.
 	Pending Reason
-	// GrantedScopes are the scopes of an app installation.
-	GrantedScopes []string
+	// GrantedScopes are the scopes of an app installation; TokenScopes the scopes of the API token
+	// of the request and HasToken whether there is one (M2-24).
+	GrantedScopes, TokenScopes []string
+	HasToken                   bool
 	// ViewAs reports "view as"; ActingFor a run of a triggering person.
 	ViewAs, ActingFor bool
 }
@@ -320,7 +322,7 @@ func decideRequirement(in *Input) (Decision, bool, error) {
 		return deny(OutcomeForbidden, reason), true, nil
 	}
 	if in.Principal.Kind == KindApp {
-		if r := CheckAppScope(in.Action, in.Principal.GrantedScopes); r != "" {
+		if r := CheckAppScope(in.Action, in.Principal.GrantedScopes, in.Principal.TokenScopes, in.Principal.HasToken); r != "" {
 			return deny(OutcomeForbidden, r), true, nil
 		}
 	}
