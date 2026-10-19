@@ -270,10 +270,13 @@ func (r *Relay) apply(s *slot, acts []domain.RelayAction) effects {
 			detail := a.Detail
 			fx = append(fx, func(ctx context.Context) { r.call(ctx, r.uc.RelayOpenFailed(ctx, id, detail)) })
 		case domain.ActMeetDeadline:
+			// A new generation: a deadline already waiting for the lock does nothing.
+			s.gen++
 			if s.stop != nil {
 				s.stop()
 			}
 		case domain.ActRearmDeadline:
+			s.gen++
 			if s.stop != nil {
 				s.stop()
 			}
@@ -653,12 +656,14 @@ func (r *Relay) ObserveLogEvent(ctx context.Context, typ string, resourceID ids.
 }
 
 // Shutdown is the stop step of the relay (Design note 14 of M2-44, 02 section 15.3 step 3): no
-// new side attaches; every side closes with 4013; it waits for their readers within ctx.
+// new side attaches; every side closes with 4013 and the counts of every pairing that ends here are
+// written (the pool closes after this phase); it waits for the readers within ctx.
 func (r *Relay) Shutdown(ctx context.Context) error {
 	r.mu.Lock()
 	r.closing = true
+	var fx effects
 	for _, s := range r.slots {
-		r.apply(s, domain.Decide(s.state(), domain.RelayEvent{Kind: domain.EvShutdown}))
+		fx = append(fx, r.apply(s, domain.Decide(s.state(), domain.RelayEvent{Kind: domain.EvShutdown}))...)
 		if s.stop != nil {
 			s.stop()
 		}
@@ -666,6 +671,9 @@ func (r *Relay) Shutdown(ctx context.Context) error {
 	for sd := range r.sides {
 		sd.close(int(domain.StreamServerRestart), "")
 	}
+	r.mu.Unlock()
+	fx.run(ctx)
+	r.mu.Lock()
 	done := make(chan struct{})
 	go func() {
 		r.mu.Lock()

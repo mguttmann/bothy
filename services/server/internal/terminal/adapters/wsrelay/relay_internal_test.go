@@ -118,8 +118,24 @@ func TestShutdown_Relay4013(t *testing.T) {
 	if err := dev.Write(ctx, websocket.MessageBinary, []byte("m1")); err != nil {
 		t.Fatal(err)
 	}
+	for paired := false; !paired; {
+		r.mu.Lock()
+		paired = r.slots[session] != nil && r.slots[session].paired
+		r.mu.Unlock()
+		if ctx.Err() != nil {
+			t.Fatal("the sides never paired")
+		}
+		time.Sleep(5 * time.Millisecond)
+	}
 	if err := r.Shutdown(ctx); err != nil {
 		t.Fatalf("shutdown: %v", err)
+	}
+	// The pairing ended here: its counts are written (code review M2-44, M1).
+	uc.mu.Lock()
+	calls := strings.Join(uc.calls, ",")
+	uc.mu.Unlock()
+	if !strings.Contains(calls, "counters") {
+		t.Fatalf("callbacks %s, want the counters of the pairing", calls)
 	}
 	for name, ch := range map[string]chan int{"device": devCode, "host": hostCode} {
 		select {
