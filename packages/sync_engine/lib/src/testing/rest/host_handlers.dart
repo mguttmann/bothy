@@ -1,8 +1,9 @@
 // SPDX-License-Identifier: Apache-2.0
 
-/// Handlers of the hosts of the terminal, their pairing and their session users, and the
-/// audit of the assignments (brief M4-37 Scope; 24 2.2, 3, 7.3, 10.1; 05 `host.*`,
-/// `audit.read`).
+/// Handlers of the hosts of the terminal, their pairing and their session users; the
+/// assignments are written to the [FakeAuditLog] that `listAuditEvents` of
+/// `audit_handlers.dart` serves (brief M4-37 Scope; 24 2.2, 3, 7.3, 10.1; 05 `host.*`;
+/// INT-W46/2).
 ///
 /// A small model of the server: `createHost` and `issueHostPairingCode` give a code, the tests
 /// play `bothy-host pair` with [FakeWorld.pairHost], `confirmHost` compares the typed prefix
@@ -15,6 +16,7 @@ library;
 import 'dart:math';
 
 import '../action_catalog.dart';
+import '../audit_log.dart';
 import '../fake_host.dart';
 import '../rest_fake.dart';
 import '../world.dart';
@@ -25,8 +27,13 @@ import 'admin_handlers.dart' show requireCatalogStepUp;
 const int _confirmChars = 8;
 const int _maxAttempts = 3;
 
-/// Registers the host handlers on [rest], with the step-up of [catalog].
-void registerHostHandlers(RestFake rest, ActionCatalog catalog) {
+/// Registers the host handlers on [rest], with the step-up of [catalog]; the assignments go
+/// to [log].
+void registerHostHandlers(
+  RestFake rest,
+  ActionCatalog catalog,
+  FakeAuditLog log,
+) {
   final world = rest.world;
   final random = Random(37);
   // 06 7: the pairing code is a one-time secret.
@@ -70,19 +77,14 @@ void registerHostHandlers(RestFake rest, ActionCatalog catalog) {
   }
 
   void audit(FakeRequest r, FakeHost h, JsonMap details) {
-    world.auditEvents.add({
-      'seq': world.auditEvents.length + 1,
-      'id': world.nextId(),
-      'occurred_at': world.stamp(),
-      'actor_principal_id': r.person.id,
-      'action': 'host.manage',
-      'decision': 'allow',
-      'resource_kind': 'host',
-      'resource_id': h.id,
-      'details': details,
-      'prev_hash': '00',
-      'hash': '00',
-    });
+    log.add(
+      world,
+      action: 'host.manage',
+      actor: r.person.id,
+      resourceKind: 'host',
+      resourceId: h.id,
+      details: details,
+    );
   }
 
   /// I6 (24 7.3): with a personal login only the holder may hold a valid grant on [h].
@@ -333,19 +335,5 @@ void registerHostHandlers(RestFake rest, ActionCatalog catalog) {
     ..handle(
       'listTerminalSessions',
       (r) => const FakeResponse(200, {'items': <Object?>[]}),
-    )
-    ..handle('listAuditEvents', (r) {
-      owner(r);
-      stepUp(r);
-      final action = r.query('action');
-      final resource = r.query('resource_id');
-      return FakeResponse(200, {
-        'items': [
-          for (final e in world.auditEvents.reversed)
-            if ((action == null || e['action'] == action) &&
-                (resource == null || e['resource_id'] == resource))
-              e,
-        ],
-      });
-    });
+    );
 }

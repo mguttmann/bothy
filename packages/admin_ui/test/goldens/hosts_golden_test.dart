@@ -80,7 +80,7 @@ FakeAdminRepository _repository() {
       HostReportedName('term-sam'),
     ],
   );
-  r.audit['build'] = {'term-robin': 'robin'};
+  r.hostAudit['build'] = {'term-robin': 'robin'};
   r.sessionCounts['build'] = 2;
   r.grantList.add(
     AdminGrant(

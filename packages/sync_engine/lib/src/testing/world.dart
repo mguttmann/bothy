@@ -480,10 +480,6 @@ final class FakeWorld {
   /// The hosts of the terminal by ID (brief M4-37).
   final Map<String, FakeHost> hosts = {};
 
-  /// The audit entries the fake writes (`AuditEvent`): the assignments and ends of session
-  /// users of hosts (24 10.1), which `listAuditEvents` returns.
-  final List<JsonMap> auditEvents = [];
-
   /// Simulates `bothy-host pair` on [hostId] (24 3.2 item 2): the host stores keys with
   /// [fingerprint] and the reported [names], becomes `confirming` and connected, and its key
   /// generation rises.
