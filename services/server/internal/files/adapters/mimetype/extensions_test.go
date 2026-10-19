@@ -20,7 +20,7 @@ func TestExtensions(t *testing.T) {
 		{"IMAGE/PNG", []string{".png"}},
 		{"application/x-pdf", []string{".pdf"}},
 		{"application/vnd.microsoft.portable-executable", []string{".exe"}},
-		{"application/x-unknown-bothy", nil},
+		{"application/x-unknown-example", nil},
 	} {
 		if got := (mimetype.Extensions{}).Extensions(c.in); !slices.Equal(got, c.want) {
 			t.Errorf("Extensions(%q) = %v, want %v", c.in, got, c.want)
