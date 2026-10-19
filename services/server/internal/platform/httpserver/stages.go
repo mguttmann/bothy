@@ -124,12 +124,6 @@ func (c *Chain) authenticateStage(next http.Handler) http.Handler {
 			WriteProblem(w, r, err)
 			return
 		}
-		// ConsoleGuard (M6-01): a request the cookie authenticated passes the CSRF check before
-		// any later stage and the handler see it.
-		if err := c.consoleGuard(r, creds, a); err != nil {
-			WriteProblem(w, r, err)
-			return
-		}
 		// The request span names the principal kind and, for a person, its pseudonym (DP-T09).
 		otel.AnnotatePrincipal(r.Context(), string(a.Kind), a.ID.String())
 		next.ServeHTTP(w, r.WithContext(actor.WithActor(r.Context(), a)))
