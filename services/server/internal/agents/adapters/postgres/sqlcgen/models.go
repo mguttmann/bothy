@@ -310,6 +310,57 @@ type FeatureFlag struct {
 	UpdatedAt pgtype.Timestamptz
 }
 
+type File struct {
+	ID                 pgtype.UUID
+	ObjectKey          string
+	Sha256             []byte
+	SizeBytes          int64
+	MimeType           string
+	DeclaredMimeType   pgtype.Text
+	OriginalName       string
+	UploadedBy         pgtype.UUID
+	Purpose            string
+	ScopeChannelID     pgtype.UUID
+	UploadState        string
+	ScanStatus         string
+	ScanEngine         pgtype.Text
+	ScannedAt          pgtype.Timestamptz
+	Width              pgtype.Int4
+	Height             pgtype.Int4
+	DurationMs         pgtype.Int8
+	TranscriptStatus   string
+	TranscriptText     pgtype.Text
+	TranscriptLanguage pgtype.Text
+	TranscriptSource   pgtype.Text
+	CreatedAt          pgtype.Timestamptz
+	DeletedAt          pgtype.Timestamptz
+	SearchVector       interface{}
+}
+
+type FileUploadPart struct {
+	FileID     pgtype.UUID
+	PartNumber int32
+	SizeBytes  int64
+	Sha256     []byte
+	Etag       pgtype.Text
+	ReceivedAt pgtype.Timestamptz
+}
+
+type FileUploadSession struct {
+	FileID            pgtype.UUID
+	Mode              string
+	State             string
+	DeclaredSizeBytes int64
+	DeclaredSha256    []byte
+	PartSizeBytes     int64
+	PartCount         int32
+	StorageUploadID   pgtype.Text
+	FailureReason     pgtype.Text
+	CreatedAt         pgtype.Timestamptz
+	CompletedAt       pgtype.Timestamptz
+	ExpiresAt         pgtype.Timestamptz
+}
+
 type ForumTag struct {
 	ID         pgtype.UUID
 	ChannelID  pgtype.UUID

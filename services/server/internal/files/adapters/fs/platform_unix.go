@@ -47,3 +47,13 @@ func notEmpty(err error) bool {
 // renameRaced reports the EINVAL of macOS renameat when a concurrent rmdir removes the target
 // directory during the call.
 func renameRaced(err error) bool { return errors.Is(err, syscall.EINVAL) }
+
+// freeBytes returns the bytes of the file system of path that an unprivileged user may still
+// write (statfs, f_bavail times the block size).
+func freeBytes(path string) (int64, error) {
+	var st syscall.Statfs_t
+	if err := syscall.Statfs(path, &st); err != nil {
+		return 0, err
+	}
+	return int64(st.Bavail) * int64(st.Bsize), nil //nolint:gosec,unconvert // G115: block counts and sizes of a mounted file system fit int64; the field types differ per platform
+}
