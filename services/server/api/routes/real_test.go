@@ -1065,6 +1065,12 @@ func TestRealTable_Enabled(t *testing.T) {
 		"stepUpWithPassword":       {"POST /api/v1/auth/step-up/password", "auth.step_up", "rl.public_auth"},
 		"beginStepUpOidcReauth":    {"POST /api/v1/auth/step-up/oidc", "auth.step_up", "rl.public_auth"},
 		"completeStepUpOidcReauth": {"POST /api/v1/auth/step-up/oidc/complete", "auth.step_up", "rl.public_auth"},
+		// M2-44
+		"openTerminalSession":   {"POST /api/v1/hosts/{host_id}/terminal/sessions", "terminal.open", "rl.terminal"},
+		"listTerminalSessions":  {"GET /api/v1/terminal/sessions", "terminal.read_own", "rl.read"},
+		"getTerminalSession":    {"GET /api/v1/terminal/sessions/{session_id}", "terminal.read_own", "rl.read"},
+		"attachTerminalSession": {"POST /api/v1/terminal/sessions/{session_id}/attach", "terminal.attach", "rl.terminal"},
+		"closeTerminalSession":  {"POST /api/v1/terminal/sessions/{session_id}/close", "terminal.close", "rl.write"},
 	}
 	ops := routes.Enabled()
 	if len(ops) != len(want) {

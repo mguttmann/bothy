@@ -695,6 +695,23 @@ type Device struct {
 	queue   [][]byte
 	cerr    error
 	cond    *gosync.Cond
+	// paused holds the reader before its next read (Pause, Resume): a slow device.
+	paused bool
+}
+
+// Pause stops reading from the server before the next message, so the server's writes back up.
+func (dv *Device) Pause() {
+	dv.mu.Lock()
+	dv.paused = true
+	dv.mu.Unlock()
+}
+
+// Resume reads again.
+func (dv *Device) Resume() {
+	dv.mu.Lock()
+	dv.paused = false
+	dv.cond.Broadcast()
+	dv.mu.Unlock()
 }
 
 // DialDevice opens the device stream of session at baseURL as the client p and sends identify as
@@ -788,10 +805,15 @@ func identifyFrame(publicURL string, session ids.ID, nonce string, p Prover, dp 
 	return b
 }
 
-// read queues the binary messages until the connection ends.
+// read queues the binary messages until the connection ends; it waits while paused.
 func (dv *Device) read() {
 	defer close(dv.done)
 	for {
+		dv.mu.Lock()
+		for dv.paused {
+			dv.cond.Wait()
+		}
+		dv.mu.Unlock()
 		typ, b, err := dv.ws.Read(context.Background())
 		dv.mu.Lock()
 		if err != nil {

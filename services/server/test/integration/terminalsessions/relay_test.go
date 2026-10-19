@@ -121,19 +121,16 @@ func TestRelay_TextFrameAfterIdentify4002(t *testing.T) {
 	w.closeCode("device after host over the limit", func() (int, string) { return d2.CloseCode(ctx) }, 4102, "")
 }
 
-// TestRelay_SlowDevice4014: with a small relay buffer the device that does not read gets 4014,
-// the host side 1000, the session is detached.
+// TestRelay_SlowDevice4014: with a small relay buffer the device that does not read is closed
+// as the slow end (4014, when its socket still takes the close frame), the host side gets 1000 and
+// the session is detached.
 func TestRelay_SlowDevice4014(t *testing.T) {
 	w := newWorld(t, map[string]string{"terminal.relay_buffer_max_bytes": "4096"})
 	ctx := w.ctx()
-	w.h1.Default(fakehost.Script{Kind: fakehost.Pair})
-	g := w.opened(w.alex, w.r1, openBody("shell"))
-	d := w.device(w.alex, g.Session.ID, fakehost.DeviceParams{})
-	h, err := w.h1.WaitData(ctx, ids.MustParse(g.Session.ID))
-	if err != nil {
-		t.Fatal(err)
-	}
-	// The device never reads past its socket buffers; the host floods.
+	g, d := w.started(w.alex)
+	h := w.h1.Data(ids.MustParse(g.Session.ID))
+	d.Pause()
+	// The host floods; the device never reads, so the queue toward it fills.
 	go func() {
 		for i := 0; i < 4000; i++ {
 			if h.Send(ctx, make([]byte, 60000)) != nil {
@@ -141,8 +138,12 @@ func TestRelay_SlowDevice4014(t *testing.T) {
 			}
 		}
 	}()
-	w.closeCode("slow device", func() (int, string) { return d.CloseCode(ctx) }, 4014, "")
 	w.closeCode("host of a slow device", func() (int, string) { return h.CloseCode(ctx) }, 1000, "")
+	w.waitState(g.Session.ID, "detached")
+	d.Resume()
+	if code, _ := d.CloseCode(ctx); code != 4014 && code != 0 {
+		t.Fatalf("slow device closed with %d, want 4014 (or no close frame when its socket was full)", code)
+	}
 }
 
 // TestRelay_OpenTimeoutHostMissing, TestRelay_OpenTimeoutDeviceMissing and
