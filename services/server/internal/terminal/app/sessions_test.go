@@ -58,7 +58,9 @@ func (s *memStore) Host(_ context.Context, id ids.ID) (domain.Host, bool, error)
 	return h, ok, nil
 }
 
-func (s *memStore) LockHost(ctx context.Context, id ids.ID) (domain.Host, bool, error) { return s.Host(ctx, id) }
+func (s *memStore) LockHost(ctx context.Context, id ids.ID) (domain.Host, bool, error) {
+	return s.Host(ctx, id)
+}
 
 func (s *memStore) OwnSessionUsers(_ context.Context, userID ids.ID) ([]domain.OwnSessionUser, error) {
 	s.mu.Lock()

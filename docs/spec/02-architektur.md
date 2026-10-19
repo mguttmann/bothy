@@ -873,6 +873,13 @@ Benachrichtigung erst nach dem Commit zu [Q1, belegt].
   und liest ab `local_head`. Weil `seq` lückenlos ist, geht dabei nichts verloren.
 - Er gibt Ereignisse in `seq`-Reihenfolge an den Rechte-Cache und dann an den Hub, in einer
   Goroutine. Grund: Reihenfolge ist nur dann einfach zu garantieren, wenn ein Leser sie erzeugt.
+- Third consumer (M2-44, D-M2-44-7): after the hub every event goes to the observer of the
+  terminal relay (`Relay.ObserveLogEvent`, non-blocking). For a `terminal_session.changed` whose
+  payload has `state = closed` it closes the device stream (`StreamCodeForEnd`, the
+  `close_reason` as close reason) and the data connection (`4100`), drops the slot without
+  writing its counters and sends `session.close` to the host service. Every end of a session, from
+  any module and any process (a worker or another node), commits a row of `event_log`, so it
+  reaches the connections and the host service without an after-commit hook (`txn` has none).
 
 ### 11.3 Rechte-Cache
 
@@ -1258,7 +1265,11 @@ Clients nehmen nach 04 wieder auf.
    first, so the purpose gets a fresh active key; this runs after audit, sync, authz and identity
    (steps 6a to 6d of `internal/wire`), whose unit of work records `signing_key.transition`.
 7. Routen registrieren und Routen-Metadaten prüfen: Jede Operation hat eine bekannte Aktion, sonst
-   Abbruch (05, Regel 3).
+   Abbruch (05, Regel 3). Roles `api` and `all` with one node (M2-44, D-M2-44-9): before the
+   public listener opens, the terminal module ends every session in `opening` with `open_failed`
+   and `open_timeout` and sets every `active` session `detached`, one unit of work per session in
+   ascending `id`, because the relay slots and connections lived only in the memory of the previous
+   process. With several nodes (`cluster.mode = multi`, M2-47) this step does nothing.
 8. Rolle `api`: Log-Tail starten, `local_head` auf den aktuellen Kopf, öffentlichen Listener
    öffnen. Rolle `worker`: River und Verbraucher starten.
 9. Bereit melden.
@@ -1307,7 +1318,8 @@ Rolle `api`:
    server_restart` schließen (04, 6.4; Clients verbinden mit Zufallsverzögerung neu). Control
    connections of host services (24 3.5, M2-43): the sessions of each host turn `detached`, then
    the connection closes with `4013`; the host service reconnects after a random delay below
-   `host_service.reconnect_backoff_base` and keeps its PTYs until `terminal.detach_grace`.
+   `host_service.reconnect_backoff_base` and keeps its PTYs until `terminal.detach_grace`. The
+   relay of the terminal (M2-44) closes every device stream and data connection with `4013`.
 4. Log-Tail und `LISTEN` beenden.
 5. Telemetrie leeren, höchstens `shutdown.telemetry_flush_timeout`.
 6. Pool schließen.
