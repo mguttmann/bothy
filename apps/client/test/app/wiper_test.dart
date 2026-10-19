@@ -146,5 +146,9 @@ void main() {
     expect(back.toJson(), info.toJson());
     expect(InstanceInfo.fromJson('x'), isNull);
     expect(InstanceInfo.fromJson({'address': 'https://a.example.com'}), isNull);
+    expect(
+      InstanceInfo.fromJson({...info.toJson(), 'instance_id': '../..'}),
+      isNull,
+    );
   });
 }

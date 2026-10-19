@@ -41,12 +41,13 @@ ResponseBody json(int status, Object body) => ResponseBody.fromString(
 
 Map<String, Object?> discovery({
   bool setupRequired = false,
+  String instanceId = '0193f2a7-0000-7000-8000-0000000000aa',
   List<Map<String, Object?>> providers = const [],
   bool? password,
   List<Map<String, Object?>>? minVersions,
   String? logoUrl,
 }) => {
-  'instance_id': '0193f2a7-0000-7000-8000-0000000000aa',
+  'instance_id': instanceId,
   'setup_required': setupRequired,
   'api_versions': ['v1'],
   'spec_version': '1.0.0',
@@ -79,6 +80,34 @@ Future<DiscoveryOutcome> run(
 ).discover(Uri.parse(address));
 
 void main() {
+  test(
+    'an instance ID that is no UUID is no instance (storage scope)',
+    () async {
+      for (final id in [
+        '../..',
+        '..',
+        'a/b',
+        '',
+        '0193f2a7-0000-7000-8000-0000000000a',
+      ]) {
+        final outcome = await run(
+          (o) async => json(200, discovery(instanceId: id)),
+        );
+        expect(outcome, isA<DiscoveryNoInstance>(), reason: id);
+      }
+      final upper = await run(
+        (o) async => json(
+          200,
+          discovery(instanceId: '0193F2A7-0000-7000-8000-0000000000AA'),
+        ),
+      );
+      expect(
+        (upper as DiscoveryFound).instance.instanceId,
+        '0193f2a7-0000-7000-8000-0000000000aa',
+      );
+    },
+  );
+
   test(
     'a valid answer gives the instance with its methods and branding',
     () async {

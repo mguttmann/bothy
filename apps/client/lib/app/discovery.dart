@@ -10,6 +10,7 @@ import 'dart:typed_data';
 
 import 'package:api_client/api_client.dart';
 import 'package:dio/dio.dart';
+import 'package:domain/domain.dart' show canonicalUuid;
 
 /// A login method of the instance as E2 offers it.
 final class LoginProvider {
@@ -107,9 +108,17 @@ final class InstanceInfo {
     final name = json['product_name'];
     final providers = json['providers'];
     if (address == null || id is! String || name is! String) return null;
+    // The ID is a storage scope (see ApiDiscoveryClient.discover); a stored one that is no
+    // UUID is not trusted either.
+    final String instanceId;
+    try {
+      instanceId = canonicalUuid(id, 'instance ID');
+    } on FormatException {
+      return null;
+    }
     return InstanceInfo(
       address: address,
-      instanceId: id,
+      instanceId: instanceId,
       productName: name,
       accentColor: json['accent_color'] is String
           ? json['accent_color']! as String
@@ -241,6 +250,10 @@ final class ApiDiscoveryClient implements DiscoveryClient {
       return const DiscoveryNoInstance();
     }
     if (discovery.setupRequired) return const DiscoverySetupRequired();
+    // The instance ID names the data folder, the device key scope and the secret prefix, and a
+    // wipe deletes that folder recursively; anything but a UUID (`..`, a path) is no instance.
+    final instanceId = _instanceId(discovery.instanceId);
+    if (instanceId == null) return const DiscoveryNoInstance();
     final required = discovery.minClientVersions
         ?.where((r) => r.platform.name == platform)
         .firstOrNull;
@@ -261,7 +274,7 @@ final class ApiDiscoveryClient implements DiscoveryClient {
     return DiscoveryFound(
       InstanceInfo(
         address: address,
-        instanceId: discovery.instanceId,
+        instanceId: instanceId,
         productName: discovery.branding.productName,
         accentColor: discovery.branding.accentColor,
         logo: logo,
@@ -283,6 +296,14 @@ final class ApiDiscoveryClient implements DiscoveryClient {
         passwordEnabled: discovery.localPasswordEnabled ?? false,
       ),
     );
+  }
+
+  static String? _instanceId(String text) {
+    try {
+      return canonicalUuid(text, 'instance ID');
+    } on FormatException {
+      return null;
+    }
   }
 
   static DiscoveryOutcome _classify(DioException e) {
