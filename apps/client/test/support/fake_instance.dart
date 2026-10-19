@@ -119,10 +119,11 @@ class FakeInstance {
       keys.scopes.isEmpty &&
       !secure.values.keys.any((k) => k.contains(server.world.instanceId));
 
-  /// Deletes the data folder of a [sibling]; the fake keeps running.
-  Future<void> stopSibling() async {
-    if (root.existsSync()) await root.delete(recursive: true);
-  }
+  /// Deletes the data folder of a [sibling]; the fake keeps running. The folder goes as in
+  /// [stop], once the sibling's database is closed.
+  Future<void> stopSibling({
+    Duration closeTimeout = const Duration(seconds: 10),
+  }) => _deleteRoot(closeTimeout);
 
   /// Stops the fake and deletes the data folder.
   ///
@@ -134,6 +135,10 @@ class FakeInstance {
     Duration closeTimeout = const Duration(seconds: 10),
   }) async {
     await server.stop();
+    await _deleteRoot(closeTimeout);
+  }
+
+  Future<void> _deleteRoot(Duration closeTimeout) async {
     final end = DateTime.now().add(closeTimeout);
     while (root.existsSync()) {
       try {
