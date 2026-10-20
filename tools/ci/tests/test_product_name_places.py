@@ -65,7 +65,7 @@ CLIENT_FILES = re.compile(r"^(apps|packages)/")
 
 # A bare word is the binary when one of its subcommands follows (bothy migrate up, `bothy serve`).
 BINARY_USE = re.compile(
-    r"bothy[`\"']?\s+[`\"']?(serve|migrate|secrets|config|telemetry|healthcheck|setup|import|version|<command>)\b",
+    r"bothy[`\"']?\s+[`\"']?(serve|migrate|secrets|config|telemetry|healthcheck|setup|import|restore|version|<command>)\b",
 )
 
 # A bare word as a whole value: a quoted literal ("bothy", 'bothy', `bothy`) or a configuration

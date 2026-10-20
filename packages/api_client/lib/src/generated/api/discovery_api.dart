@@ -28,7 +28,7 @@ class DiscoveryApi {
   const DiscoveryApi(this._dio, this._serializers);
 
   /// Download the instance logo
-  ///
+  /// Serves the variant &#x60;medium&#x60; of the logo (longest edge &#x60;file.thumbnail.medium_px&#x60;, re-encoded by the server without metadata, 12 3.7 and 7.3), never the original. Answers 404 while no logo is set and while the logo file is not deliverable (pending, blocked, failed or deleted) or has no variant &#x60;medium&#x60;, always with the same status, body and headers. The response carries &#x60;Content-Disposition: inline&#x60;, &#x60;Cache-Control: no-store&#x60;, &#x60;ETag&#x60; and &#x60;Repr-Digest&#x60; over the variant and &#x60;Access-Control-Allow-Origin: *&#x60; without credentials; &#x60;Range&#x60; is ignored.
   ///
   /// Parameters:
   /// * [cancelToken] - A [CancelToken] that can be used to cancel the operation
