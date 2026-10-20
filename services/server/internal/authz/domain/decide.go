@@ -148,6 +148,9 @@ type ResourceFacts struct {
 	ID, OwnerID ids.ID
 	// HasAttachments and RestrictedTags feed HasCapIf.
 	HasAttachments, RestrictedTags bool
+	// IssueTicket marks file.read through createFileTicket (M3-05): only a person in a session
+	// may hold a download ticket (decidePrincipalRules).
+	IssueTicket bool
 	// File are the facts of a file resource (M3-03); nil for every other kind and for a file
 	// event decided in filter or delivery mode.
 	File *FileFacts
@@ -303,6 +306,7 @@ func humanSession(p Principal) bool { return p.Kind == KindUser && p.HasSession 
 // unknown resource kind, a deferred or system requirement, a missing descriptor); it is never an
 // allow.
 func Decide(in Input) (Decision, error) {
+	in.Req = fileReadRequirement(in)
 	if d, done, err := decideVisibility(&in); done || err != nil {
 		return d, err
 	}
@@ -320,6 +324,25 @@ func Decide(in Input) (Decision, error) {
 		d.QuickReattach = in.quickReattach
 	}
 	return d, err
+}
+
+// fileReadRequirement is the requirement of file.read by purpose (brief M3-05 design note 7): an
+// attachment keeps the read of the table, an avatar needs Auth and a branding file is Public. A
+// file of another purpose has no channel path and thus no effective rights, so read could never
+// hold for it; the table keeps read because list scopes and filter mode decide file events by
+// their channel path. Every other input keeps in.Req.
+func fileReadRequirement(in Input) Expr {
+	f := in.Resource.File
+	if in.Action != actionFileRead || f == nil {
+		return in.Req
+	}
+	switch f.Purpose {
+	case purposeAvatar:
+		return Auth
+	case purposeBranding:
+		return Public
+	}
+	return in.Req
 }
 
 // decideVisibility is step 5: no visibility gives not_found; a pending device lists only itself.
@@ -388,11 +411,17 @@ func decideArchived(in *Input) (Decision, bool, error) {
 }
 
 // decidePrincipalRules are steps 7 and 8: "view as" is read-only, step-up needs a fresh
-// confirmation in a session of a person; a waived conditional step-up needs only the session.
+// confirmation in a session of a person; a waived conditional step-up needs only the session. A
+// download ticket (file.read with IssueTicket) binds to a login session (12 section 9.2), so a
+// principal without one is refused like a step-up without a session (07 section 4.1 "token without
+// a session"); it runs after visibility, so an invisible file stays not_found.
 func decidePrincipalRules(in *Input) (Decision, bool) {
 	p := in.Principal
 	if p.ViewAs && Writes(in.Action) {
 		return deny(OutcomeForbidden, ReasonViewAsReadOnly), true
+	}
+	if in.Action == actionFileRead && in.Resource.IssueTicket && !humanSession(p) {
+		return deny(OutcomeForbidden, ReasonStepUpNotPossible), true
 	}
 	if !in.Spec.StepUp {
 		return Decision{}, false
