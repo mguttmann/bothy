@@ -12,6 +12,7 @@ import (
 	"github.com/OWNER/bothy/services/server/internal/gateway/adapters/wstest"
 	"github.com/OWNER/bothy/services/server/internal/identity"
 	"github.com/OWNER/bothy/services/server/internal/kernel/ids"
+	"github.com/OWNER/bothy/services/server/internal/platform/testkit"
 )
 
 // typingFrame is a server frame as the typing test reads it.
@@ -23,7 +24,7 @@ type typingFrame struct {
 // readUntilOp reads the frames of c until one with op arrives (included).
 func readUntilOp(t *testing.T, c *wstest.Client, op string) []typingFrame {
 	t.Helper()
-	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), testkit.Patience)
 	defer cancel()
 	var out []typingFrame
 	for {
