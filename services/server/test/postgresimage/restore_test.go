@@ -137,8 +137,8 @@ func seedRestoreData(t *testing.T, db string) map[string]string {
 		content := fmt.Sprintf("object-%d-EXAMPLE", i)
 		sum := sha256.Sum256([]byte(content))
 		objects[key] = content
-		psql(t, db, fmt.Sprintf(`INSERT INTO files (id, object_key, sha256, size_bytes, mime_type, original_name, uploaded_by, purpose, upload_state)
-			VALUES (gen_random_uuid(), '%s', '\x%s', %d, 'text/plain', 'a.txt', '%s', 'avatar', 'complete')`,
+		psql(t, db, fmt.Sprintf(`INSERT INTO files (id, object_key, sha256, size_bytes, mime_type, original_name, uploaded_by, purpose, upload_state, scan_status)
+			VALUES (gen_random_uuid(), '%s', '\x%s', %d, 'text/plain', 'a.txt', '%s', 'avatar', 'complete', 'clean')`,
 			key, hex.EncodeToString(sum[:]), len(content), seedPerson))
 	}
 	return objects
@@ -288,6 +288,11 @@ func TestRestoreTest(t *testing.T) {
 		t.Logf("restore test on the seeded data took %s; checks:", took)
 		for _, c := range row.Checks.Checks {
 			t.Logf("  %-13s %-7s %6d ms  %d items", c.Name, c.Result, c.DurationMS, c.Items)
+		}
+		for _, c := range row.Checks.Checks {
+			if c.Name == "file_sample" && c.Items != restoreObjects {
+				t.Errorf("file sample checked %d objects, want all %d", c.Items, restoreObjects)
+			}
 		}
 		probe := mustDocker(t, "exec", backup, "cat", "/tmp/restore-test-tcp")
 		if ports := listeningPorts(probe); !slices.Equal(ports, []string{tlsPortHex}) {

@@ -52,8 +52,9 @@ type ScratchDB interface {
 	// ThreadSample returns at most n threads drawn at random from all threads, or all of them
 	// when there are fewer, each with the count and bounds of thread_seq of its messages.
 	ThreadSample(ctx context.Context, n int) ([]ThreadSeqs, error)
-	// FileSample returns at most n files drawn at random from the files with deleted_at IS NULL
-	// and upload_state complete, or all of them when there are fewer.
+	// FileSample returns at most n files drawn at random from the files with deleted_at IS NULL,
+	// upload_state complete and scan_status clean or skipped (the files that have an object), or
+	// all of them when there are fewer.
 	FileSample(ctx context.Context, n int) ([]SampleFile, error)
 }
 

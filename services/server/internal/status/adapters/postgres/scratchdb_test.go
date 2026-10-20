@@ -99,7 +99,7 @@ func TestScratchDBThreadSample(t *testing.T) {
 }
 
 // TestScratchDBFilesAndAudit holds the facts of checks 2, 4 and 6: Facts equals the manifest
-// snapshot, the file sample holds only complete files that are not deleted, and the audit chain
+// snapshot, the file sample holds only complete, clean files that are not deleted, and the audit chain
 // yields every row and checkpoint in seq order with the instance of the copy.
 func TestScratchDBFilesAndAudit(t *testing.T) {
 	t.Parallel()
@@ -107,7 +107,13 @@ func TestScratchDBFilesAndAudit(t *testing.T) {
 	db := pgtest.New(t)
 	super := db.SuperConn(t)
 	seed(t, super)
-	mustExec(t, super, `UPDATE files SET upload_state = 'complete', sha256 = sha256(object_key::bytea) WHERE object_key <> 'objects/b'`)
+	mustExec(t, super, `UPDATE files SET upload_state = 'complete', scan_status = 'clean', sha256 = sha256(object_key::bytea) WHERE object_key <> 'objects/b'`)
+	// A complete upload that the scan found infected or could not scan has no object any more
+	// (the scan pass deletes it), so it never enters the sample.
+	for _, scan := range []string{"infected", "error"} {
+		mustExec(t, super, `INSERT INTO files (id, object_key, sha256, size_bytes, mime_type, original_name, uploaded_by, purpose, upload_state, scan_status)
+			SELECT gen_random_uuid(), 'objects/' || $1, '\x00', 1, 'image/png', 'a.png', uploaded_by, 'avatar', 'complete', $1 FROM files LIMIT 1`, scan)
+	}
 	pool := db.OpenPool(t, db.SuperConfig())
 	copyDB := postgres.NewScratchDB(pool)
 
@@ -132,7 +138,7 @@ func TestScratchDBFilesAndAudit(t *testing.T) {
 		}
 	}
 	slices.Sort(keys)
-	// objects/b is pending, objects/c is deleted.
+	// objects/b is pending, objects/c is deleted, objects/infected and objects/error have no object.
 	if !slices.Equal(keys, []string{"objects/a"}) {
 		t.Errorf("file sample %v, want only objects/a", keys)
 	}
