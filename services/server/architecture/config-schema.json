@@ -2917,6 +2917,18 @@
       "doc": "How long the audit log is kept before it is trimmed with an anchor."
     },
     {
+      "name": "run.queued_max_age",
+      "env": "BOTHY_RUN__QUEUED_MAX_AGE",
+      "kind": "duration",
+      "default": "48h",
+      "required": false,
+      "enum": [],
+      "min": "1s",
+      "max": "",
+      "chapter": "09-agenten.md",
+      "doc": "How old a run that was not started may become; then it fails with agent_unavailable."
+    },
+    {
       "name": "run.step_detail_max_bytes",
       "env": "BOTHY_RUN__STEP_DETAIL_MAX_BYTES",
       "kind": "int",
