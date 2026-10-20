@@ -23,7 +23,8 @@
    port, the NoCloud seed from the same static server (SMBIOS `ds=nocloud;s=...`), KVM on
    Linux, HVF on macOS, TCG otherwise. A test-only cloud-config part in front of the module's
    user data forwards `127.0.0.1:<registry port>` and `127.0.0.1:<server port>` inside the VM to
-   the host (`10.0.2.2`) with nftables DNAT, so the registry and download address of the bundle
+   the host (`192.0.2.2`: the user network of QEMU runs in the documentation range `192.0.2.0/24`
+   instead of its default) with nftables DNAT, so the registry and download address of the bundle
    work unchanged. Docker Engine accepts a registry on a loopback address over plain HTTP, so
    the VM needs no `insecure-registries` entry.
 4. `cloud-init status --wait`, then a check that the enrollment code is not in the cloud-init log.

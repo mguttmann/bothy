@@ -13,9 +13,10 @@ D-W-127, OQ-09):
 3. a pinned Ubuntu cloud image (verified by SHA-256) booted in QEMU with user networking and a
    NoCloud seed from the same static server (KVM or HVF where available, TCG otherwise); a test
    only cloud-config part forwards 127.0.0.1:<registry port> and 127.0.0.1:<server port> inside
-   the VM to the host (QEMU's 10.0.2.2), so the bundle's registry and download address work
-   unchanged inside the VM, and the Docker Engine there pulls from a loopback registry, which it
-   accepts over plain HTTP without an insecure-registries entry;
+   the VM to the host (192.0.2.2: QEMU's user network moved to TEST-NET-1), so the bundle's
+   registry and download address work unchanged inside the VM, and the Docker Engine there
+   pulls from a loopback registry, which it accepts over plain HTTP without an
+   insecure-registries entry;
 4. after cloud-init: the smoke probe of M1-73 (`bothy-smoke run`) against the stack through an
    SSH port forward, with a fresh enrollment code of the owner;
 5. a second delivery of the same setup over SSH (`provision_over_ssh = true`, `tofu apply`) that
@@ -85,8 +86,10 @@ PUBLIC_HOSTNAME = "chat.example.com"
 OWNER = "alex"
 SSH_USER = "bothy"
 STACK = "/srv/bothy"
-# QEMU user networking: the host's loopback as seen from the guest.
-HOST_FROM_GUEST = "10.0.2.2"
+# QEMU user networking with its network moved to the documentation range TEST-NET-1 (RFC 5737)
+# instead of its default private range: the host's loopback as seen from the guest.
+GUEST_NET = "192.0.2.0/24"
+HOST_FROM_GUEST = "192.0.2.2"
 VM_MEMORY_MB = 6144
 VM_CPUS = 4
 BOOT_TIMEOUT_S = 1800
@@ -171,7 +174,8 @@ def qemu_command(  # noqa: PLR0913, PLR0917 - one flag group per argument
     cmd += [
         "-smp", str(VM_CPUS), "-m", str(VM_MEMORY_MB),
         "-drive", f"if=virtio,format=qcow2,file={disk}",
-        "-netdev", f"user,id=n0,hostfwd=tcp:127.0.0.1:{ssh_port}-:22",
+        "-netdev", f"user,id=n0,net={GUEST_NET},host={HOST_FROM_GUEST},"
+                   f"hostfwd=tcp:127.0.0.1:{ssh_port}-:22",
         "-device", "virtio-net-pci,netdev=n0",
         "-smbios", f"type=1,serial=ds=nocloud;s={seed_url}",
         "-display", "none", "-monitor", "none", "-serial", f"file:{console}",
