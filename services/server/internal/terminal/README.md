@@ -219,3 +219,15 @@ Nur dieses Modul schreibt und liest diese Tabellen per SQL (03-datenmodell.md, G
   quick reattach race, redaction, reconcile), `adapters/wsrelay` (`FuzzReadFrame`, shutdown) and
   `test/integration/terminalsessions` over the full-server harness with the Fake-Host of
   `test/terminal/fakehost`.
+
+## Built in M2-45
+
+- `hello` of the control and the data connection (`adapters/wsrelay`, `helloFrame`) carries the
+  server values the host service applies to a session: `clock_leeway_ms` from `auth.clock_leeway`
+  (the tolerance on `exp` of the session token and its `jti` memory), `idle_timeout_ms` from
+  `terminal.idle_timeout` and `detach_grace_ms` from `terminal.detach_grace` (its timers); the
+  host service takes them from the `hello` of the data connection that carries the handshake
+  (M2-45 Design note 2a). `internal/wire` binds the three keys into `wsrelay.Config`; the two
+  terminal keys are registered here, and the server's own checks with them follow in M2-46. The
+  Fake-Host's script `EndAfterHandshake` plays the close order of the host service after message 2
+  (`session.ended`, data connection kept open), proven by `TestRelay_HostEndCloseOrder`.

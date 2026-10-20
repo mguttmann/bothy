@@ -170,12 +170,29 @@ func (c *Conn) Close(code int, reason string) {
 // Done is closed when the connection ended.
 func (c *Conn) Done() <-chan struct{} { return c.done }
 
+// The server values Hello sends: the defaults of auth.clock_leeway, terminal.idle_timeout and
+// terminal.detach_grace in milliseconds, as the server's recording carries them.
+const (
+	HelloLeewayMs int64 = 30000
+	HelloIdleMs   int64 = 1800000
+	HelloDetachMs int64 = 900000
+)
+
 // Hello returns the body of hello with the challenge of the recording, heartbeat_interval_ms
-// intervalMs, heartbeat_miss_limit missLimit and one key of purpose terminal.
+// intervalMs, heartbeat_miss_limit missLimit, the server values HelloLeewayMs, HelloIdleMs and
+// HelloDetachMs and one key of purpose terminal.
 func Hello(intervalMs int64, missLimit int) map[string]any {
+	return HelloWith(intervalMs, missLimit, HelloLeewayMs, HelloIdleMs, HelloDetachMs)
+}
+
+// HelloWith is Hello with the server values clock_leeway_ms leewayMs, idle_timeout_ms idleMs and
+// detach_grace_ms detachMs (M2-45 Design note 2a), for tests that set the windows of a session
+// through hello.
+func HelloWith(intervalMs int64, missLimit int, leewayMs, idleMs, detachMs int64) map[string]any {
 	return map[string]any{
 		"protocol_versions": []int{1}, "challenge": "SGVsbG8gZnJvbSB0aGUgcmVjb3JkaW5nIG9mIE0yLTQzIQ",
 		"server_time": "2026-10-14T09:00:00.000Z", "heartbeat_interval_ms": intervalMs, "heartbeat_miss_limit": missLimit,
+		"clock_leeway_ms": leewayMs, "idle_timeout_ms": idleMs, "detach_grace_ms": detachMs,
 		"jwks": map[string]any{"keys": []any{Key("terminal-key-1")}},
 	}
 }

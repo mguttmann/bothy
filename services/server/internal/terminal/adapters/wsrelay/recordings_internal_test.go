@@ -39,7 +39,8 @@ func recordedServerFrames() [][]byte {
 	keys := []app.JWK{{Kty: "OKP", Crv: "Ed25519", X: "11qYAYKxCrfVS_7TyWQHOg7hcvPapiMlrwIaaPcHURo", Kid: "terminal-key-1", Alg: "EdDSA", Use: "sig"}}
 	session := ids.MustParse("0192f4a0-7b1c-7b22-9d4f-5a6b7c8d9e10")
 	return [][]byte{
-		helloFrame("SGVsbG8gZnJvbSB0aGUgcmVjb3JkaW5nIG9mIE0yLTQzIQ", recordingTime, 20*time.Second, 3, keys),
+		helloFrame("SGVsbG8gZnJvbSB0aGUgcmVjb3JkaW5nIG9mIE0yLTQzIQ", recordingTime, Config{HeartbeatInterval: 20 * time.Second,
+			HeartbeatMissLimit: 3, ClockLeeway: 30 * time.Second, IdleTimeout: 30 * time.Minute, DetachGrace: 15 * time.Minute}, keys),
 		readyFrame(app.Ready{HostID: recordingHost, State: "active", LLMCredentials: "organization"}),
 		heartbeatAckFrame(recordingTime, nil),
 		heartbeatAckFrame(recordingTime, keys),
