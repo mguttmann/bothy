@@ -6,6 +6,7 @@ package image_test
 
 import (
 	"encoding/json"
+	"regexp"
 	"slices"
 	"strings"
 	"testing"
@@ -23,6 +24,9 @@ var keepContent = map[string]bool{
 	consoleDir + "/version.json": true,
 }
 
+// htmlComment matches an HTML comment; the checks of index.html read the markup only.
+var htmlComment = regexp.MustCompile(`(?s)<!--.*?-->`)
+
 // TestConsoleInImage: the image carries the console build at the path its default
 // configuration names in console.assets_dir, so the api process serves index.html under
 // /console/ (the serving itself is TestConsoleServing of internal/platform/httpserver); its
@@ -38,8 +42,14 @@ func TestConsoleInImage(t *testing.T) {
 	if !ok {
 		t.Fatalf("%s/index.html is missing", consoleDir)
 	}
-	if !strings.Contains(string(index.data), `<base href="/console/">`) {
-		t.Errorf("index.html has no base href /console/")
+	// M6-03: no <base> element (the CSP has base-uri 'none'); the bootstrap script has the
+	// absolute path below /console/ and the nonce placeholder the server replaces.
+	markup := htmlComment.ReplaceAllString(string(index.data), "")
+	if strings.Contains(markup, "<base") {
+		t.Errorf("index.html has a base element, which base-uri 'none' blocks")
+	}
+	if !strings.Contains(markup, `<script src="/console/flutter_bootstrap.js" async nonce="__BOTHY_CSP_NONCE__">`) {
+		t.Errorf("index.html has no bootstrap script below /console/ with the nonce placeholder")
 	}
 	for _, name := range []string{"main.dart.js", "flutter_bootstrap.js", "canvaskit/canvaskit.wasm"} {
 		if _, ok := fs[consoleDir+"/"+name]; !ok {
