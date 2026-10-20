@@ -78,7 +78,7 @@ func (w *instance) canaryValue(name string) string {
 
 // checkCanary collects the sinks of TM-T06 and scans them: the positive control is that the
 // output of a session holds the concatenation of the canaries the step names in expect.output.
-func (w *instance) checkCanary(s Step, exp Expect) []string {
+func (w *instance) checkCanary(exp Expect) []string {
 	w.mu.Lock()
 	reg := w.canaries
 	w.mu.Unlock()
