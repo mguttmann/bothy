@@ -2984,6 +2984,7 @@ paths:
     post:
       operationId: addOwner
       summary: Make a person owner
+      description: 'Optional `resolve_i1` runs the guided flow (05 rule 1.6, 10 section 11): the listed agents are authorized with `agent.billing_mode.set` and switched to `organization` first, in the same transaction as the change; I1 is checked before the commit, and either both parts commit or none.'
       tags: [Users]
       x-authz-action: owner.add
       x-rate-limit-class: rl.admin
@@ -4106,6 +4107,7 @@ paths:
     post:
       operationId: addGroupMember
       summary: Add a member
+      description: 'Optional `resolve_i1` runs the guided flow (05 rule 1.6, 10 section 11): the listed agents are authorized with `agent.billing_mode.set` and switched to `organization` first, in the same transaction as the change; I1 is checked before the commit, and either both parts commit or none.'
       tags: [Groups]
       x-authz-action: group.member.add
       x-rate-limit-class: rl.admin
@@ -4272,6 +4274,7 @@ paths:
     post:
       operationId: createGrant
       summary: Create a grant
+      description: 'Optional `resolve_i1` runs the guided flow (05 rule 1.6, 10 section 11): the listed agents are authorized with `agent.billing_mode.set` and switched to `organization` first, in the same transaction as the change; I1 is checked before the commit, and either both parts commit or none.'
       tags: [Access]
       x-authz-action: grant.create
       x-rate-limit-class: rl.admin
@@ -4291,6 +4294,18 @@ paths:
                   target_kind: instance
                   level: read
                   reason: Support team works in this space
+              guided:
+                summary: Switch the operator to organization first (guided flow)
+                value:
+                  subject_kind: user
+                  subject_id: 0192f4a0-7b1c-7f89-8d6b-6960453241bc
+                  target_kind: channel
+                  target_id: 0192f4a0-7b1c-7a3d-9f1e-2b4c6d8e0a12
+                  level: trigger
+                  reason: Sam works in the research notes
+                  resolve_i1:
+                    switch_to_organization: [0192f4a0-7b1c-7c55-8e21-3f5a7b9d1c34]
+                    reason: Sam triggers the assistant too
       responses:
         '201':
           description: Created.
@@ -4343,7 +4358,10 @@ paths:
         The caller needs read access to the target (else `404`) and `owner` or `manage` on it (else
         `403`); limits of delegation give `200` with `allowed: false` and `denial_reason`. `text`
         is in the caller's language (`de` or `en`, else `de`) with dates in the caller's time zone
-        (07, 9.3).
+        (07, 9.3). With `resolve_i1` the preview is a dry run of the whole guided flow: every listed
+        agent needs `access.preview` with the target action `agent.billing_mode.set` (owner, no
+        step-up; an unknown or invisible agent gives `404`), the agents are switched to
+        `organization` before the grant, and `text` names each agent the request would switch.
       x-authz-action: access.preview
       x-rate-limit-class: rl.admin
       x-idempotency-exempt: read_only
@@ -5614,6 +5632,7 @@ paths:
     put:
       operationId: setSpaceOperator
       summary: Set the default operator of a space
+      description: 'Optional `resolve_i1` runs the guided flow (05 rule 1.6, 10 section 11): the listed agents are authorized with `agent.billing_mode.set` and switched to `organization` first, in the same transaction as the change; I1 is checked before the commit, and either both parts commit or none.'
       tags: [Spaces]
       x-authz-action: space.operator.set
       x-rate-limit-class: rl.admin
@@ -6261,6 +6280,7 @@ paths:
     put:
       operationId: setChannelOperator
       summary: Set or inherit the operator of a channel
+      description: 'Optional `resolve_i1` runs the guided flow (05 rule 1.6, 10 section 11): the listed agents are authorized with `agent.billing_mode.set` and switched to `organization` first, in the same transaction as the change; I1 is checked before the commit, and either both parts commit or none.'
       tags: [Channels]
       x-authz-action: channel.operator.set
       x-rate-limit-class: rl.admin
@@ -22197,6 +22217,23 @@ components:
           type: string
           minLength: 1
           examples: [Left the team]
+    ResolveI1:
+      type: object
+      additionalProperties: false
+      description: 'Guided flow (05 rule 1.6, 10 section 11): switch these agents to `organization` first, in the same transaction as the change.'
+      required: [switch_to_organization, reason]
+      properties:
+        switch_to_organization:
+          type: array
+          minItems: 1
+          uniqueItems: true
+          items:
+            $ref: '#/components/schemas/Uuid'
+        reason:
+          type: string
+          minLength: 1
+          description: Reason of the switch, in the audit entry of every switched agent; at most `audit.reason_max_chars` characters, no control or bidi characters.
+          examples: [Sam triggers the assistant too]
     OwnerAdd:
       type: object
       additionalProperties: false
@@ -22207,6 +22244,8 @@ components:
         reason:
           type: string
           examples: [Second owner as deputy]
+        resolve_i1:
+          $ref: '#/components/schemas/ResolveI1'
     Owner:
       type: object
       required: [user, granted_at, reason]
@@ -22571,6 +22610,8 @@ components:
           $ref: '#/components/schemas/Uuid'
         expires_at:
           $ref: '#/components/schemas/Timestamp'
+        resolve_i1:
+          $ref: '#/components/schemas/ResolveI1'
     TargetKind:
       type: string
       description: '`host` is a connected host for the terminal; it has no level and only the capability `terminal` (24, 8.1).'
@@ -22649,6 +22690,8 @@ components:
         reason:
           type: string
           examples: [Support team works in this space]
+        resolve_i1:
+          $ref: '#/components/schemas/ResolveI1'
     GrantPreview:
       type: object
       description: Effect of a grant before it is created. No state changes (07, 9.3).
@@ -22917,6 +22960,8 @@ components:
         reason:
           type: string
           examples: [Support agent takes over]
+        resolve_i1:
+          $ref: '#/components/schemas/ResolveI1'
     SpaceView:
       type: object
       required: [space, level, capabilities]

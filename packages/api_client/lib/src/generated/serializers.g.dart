@@ -493,6 +493,7 @@ Serializers _$serializers =
           ..add(ReadStateUpdatedEventTypeEnum.serializer)
           ..add(ReasonBody.serializer)
           ..add(ReconcileEntry.serializer)
+          ..add(ResolveI1.serializer)
           ..add(Run.serializer)
           ..add(RunApiRetry.serializer)
           ..add(RunAwaitInput.serializer)
@@ -1879,6 +1880,10 @@ Serializers _$serializers =
               const FullType.nullable(JsonObject),
             ]),
             () => MapBuilder<String, JsonObject?>(),
+          )
+          ..addBuilderFactory(
+            const FullType(BuiltSet, const [const FullType(String)]),
+            () => SetBuilder<String>(),
           )
           ..addBuilderFactory(
             const FullType(BuiltSet, const [const FullType(String)]),

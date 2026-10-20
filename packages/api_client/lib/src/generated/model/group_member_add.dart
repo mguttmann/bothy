@@ -3,6 +3,7 @@
 //
 
 // ignore_for_file: unused_element
+import 'package:api_client/src/generated/model/resolve_i1.dart';
 import 'package:built_value/built_value.dart';
 import 'package:built_value/serializer.dart';
 
@@ -13,6 +14,7 @@ part 'group_member_add.g.dart';
 /// Properties:
 /// * [userId] - UUIDv7 (RFC 9562), lowercase canonical form.
 /// * [expiresAt] - RFC 3339 timestamp in UTC with millisecond precision and suffix `Z`.
+/// * [resolveI1]
 @BuiltValue()
 abstract class GroupMemberAdd
     implements Built<GroupMemberAdd, GroupMemberAddBuilder> {
@@ -23,6 +25,9 @@ abstract class GroupMemberAdd
   /// RFC 3339 timestamp in UTC with millisecond precision and suffix `Z`.
   @BuiltValueField(wireName: r'expires_at')
   DateTime? get expiresAt;
+
+  @BuiltValueField(wireName: r'resolve_i1')
+  ResolveI1? get resolveI1;
 
   GroupMemberAdd._();
 
@@ -60,6 +65,13 @@ class _$GroupMemberAddSerializer
       yield serializers.serialize(
         object.expiresAt,
         specifiedType: const FullType(DateTime),
+      );
+    }
+    if (object.resolveI1 != null) {
+      yield r'resolve_i1';
+      yield serializers.serialize(
+        object.resolveI1,
+        specifiedType: const FullType(ResolveI1),
       );
     }
   }
@@ -103,6 +115,14 @@ class _$GroupMemberAddSerializer
           ) as DateTime?;
           if (valueDes == null) continue;
           result.expiresAt = valueDes;
+          break;
+        case r'resolve_i1':
+          final valueDes = serializers.deserialize(
+            value,
+            specifiedType: const FullType.nullable(ResolveI1),
+          ) as ResolveI1?;
+          if (valueDes == null) continue;
+          result.resolveI1.replace(valueDes);
           break;
         default:
           unhandled.add(key);
