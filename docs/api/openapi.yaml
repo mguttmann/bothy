@@ -6933,7 +6933,16 @@ paths:
       operationId: exportChannel
       summary: Export the history of a channel
       tags: [Privacy]
-      description: Streams one `Message` per line in `thread_seq` order per thread. Requires step-up.
+      description: |-
+        Streams one `Message` per line in `thread_seq` order per thread. Requires step-up.
+
+        `from` must be strictly before `to`, else `400 validation_failed` at `#query/to` with code
+        `invalid`; the range has no upper bound, so clients split long ranges. Each line carries the
+        full `content_md` without `content_truncated` and without `my_reactions`; deleted messages
+        appear as tombstones at their `thread_seq`. Threads come ascending by id, the messages of a
+        thread ascending by `thread_seq`. Read rights are checked again before every batch, so a
+        revocation ends the stream. An export cut after the first byte ends without a complete
+        response (no final chunk); a range without messages gives `200` with an empty body.
       x-authz-action: export.channel
       x-rate-limit-class: rl.export
       parameters:

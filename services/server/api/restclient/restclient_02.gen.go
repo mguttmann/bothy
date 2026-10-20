@@ -16,6 +16,40 @@ import (
 	"github.com/oapi-codegen/runtime"
 )
 
+// UpdateComponentWithBody Disable or change an own component
+//
+// Takes any type of body and a specified content type.
+//
+// Corresponds with PATCH /components/{component_id} (the `UpdateComponent` operationId).
+func (c *Client) UpdateComponentWithBody(ctx context.Context, componentId ComponentIdPath, params *UpdateComponentParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewUpdateComponentRequestWithBody(c.Server, componentId, params, contentType, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// UpdateComponent Disable or change an own component
+//
+// Takes a body of the `application/json` content type.
+//
+// Corresponds with PATCH /components/{component_id} (the `UpdateComponent` operationId).
+func (c *Client) UpdateComponent(ctx context.Context, componentId ComponentIdPath, params *UpdateComponentParams, body UpdateComponentJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewUpdateComponentRequest(c.Server, componentId, params, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
 // CreateInteractionWithBody Use a button, select or form
 //
 // Single-use components accept exactly one interaction; later ones get 409 `component_used`.
@@ -22289,6 +22323,14 @@ type ClientWithResponsesInterface interface {
 	//
 	// Streams one `Message` per line in `thread_seq` order per thread. Requires step-up.
 	//
+	// `from` must be strictly before `to`, else `400 validation_failed` at `#query/to` with code
+	// `invalid`; the range has no upper bound, so clients split long ranges. Each line carries the
+	// full `content_md` without `content_truncated` and without `my_reactions`; deleted messages
+	// appear as tombstones at their `thread_seq`. Threads come ascending by id, the messages of a
+	// thread ascending by `thread_seq`. Read rights are checked again before every batch, so a
+	// revocation ends the stream. An export cut after the first byte ends without a complete
+	// response (no final chunk); a range without messages gives `200` with an empty body.
+	//
 	// Returns a wrapper object for the known response body format(s).
 	//
 	// Corresponds with GET /channels/{channel_id}/export (the `ExportChannel` operationId).
@@ -27222,85 +27264,4 @@ type EnableAgentResponse429Headers struct {
 // EnableAgentResponseDefaultHeaders the declared response headers of an HTTP default response for EnableAgent
 type EnableAgentResponseDefaultHeaders struct {
 	CorrelationId *CorrelationId
-}
-
-type EnableAgentResponse struct {
-	Body         []byte
-	HTTPResponse *http.Response
-	// JSON200 the response for an HTTP 200 `application/json` response
-	JSON200 *Agent
-	// ApplicationproblemJSON400 the response for an HTTP 400 `application/problem+json` response
-	ApplicationproblemJSON400 *BadRequest
-	// ApplicationproblemJSON401 the response for an HTTP 401 `application/problem+json` response
-	ApplicationproblemJSON401 *Unauthorized
-	// ApplicationproblemJSON403 the response for an HTTP 403 `application/problem+json` response
-	ApplicationproblemJSON403 *Forbidden
-	// ApplicationproblemJSON404 the response for an HTTP 404 `application/problem+json` response
-	ApplicationproblemJSON404 *NotFound
-	// ApplicationproblemJSON409 the response for an HTTP 409 `application/problem+json` response
-	ApplicationproblemJSON409 *Conflict
-	// ApplicationproblemJSON422 the response for an HTTP 422 `application/problem+json` response
-	ApplicationproblemJSON422 *UnprocessableEntity
-	// ApplicationproblemJSON429 the response for an HTTP 429 `application/problem+json` response
-	ApplicationproblemJSON429 *TooManyRequests
-	// ApplicationproblemJSONDefault the response for an HTTP default `application/problem+json` response
-	ApplicationproblemJSONDefault *Error
-	// Headers200 the parsed response headers for an HTTP 200 response
-	Headers200 *EnableAgentResponse200Headers
-	// Headers400 the parsed response headers for an HTTP 400 response
-	Headers400 *EnableAgentResponse400Headers
-	// Headers401 the parsed response headers for an HTTP 401 response
-	Headers401 *EnableAgentResponse401Headers
-	// Headers403 the parsed response headers for an HTTP 403 response
-	Headers403 *EnableAgentResponse403Headers
-	// Headers404 the parsed response headers for an HTTP 404 response
-	Headers404 *EnableAgentResponse404Headers
-	// Headers409 the parsed response headers for an HTTP 409 response
-	Headers409 *EnableAgentResponse409Headers
-	// Headers422 the parsed response headers for an HTTP 422 response
-	Headers422 *EnableAgentResponse422Headers
-	// Headers429 the parsed response headers for an HTTP 429 response
-	Headers429 *EnableAgentResponse429Headers
-	// HeadersDefault the parsed response headers for an HTTP default response
-	HeadersDefault *EnableAgentResponseDefaultHeaders
-}
-
-// GetJSON200 returns the response for an HTTP 200 `application/json` response
-func (r EnableAgentResponse) GetJSON200() *Agent {
-	return r.JSON200
-}
-
-// GetApplicationproblemJSON400 returns the response for an HTTP 400 `application/problem+json` response
-func (r EnableAgentResponse) GetApplicationproblemJSON400() *BadRequest {
-	return r.ApplicationproblemJSON400
-}
-
-// GetApplicationproblemJSON401 returns the response for an HTTP 401 `application/problem+json` response
-func (r EnableAgentResponse) GetApplicationproblemJSON401() *Unauthorized {
-	return r.ApplicationproblemJSON401
-}
-
-// GetApplicationproblemJSON403 returns the response for an HTTP 403 `application/problem+json` response
-func (r EnableAgentResponse) GetApplicationproblemJSON403() *Forbidden {
-	return r.ApplicationproblemJSON403
-}
-
-// GetApplicationproblemJSON404 returns the response for an HTTP 404 `application/problem+json` response
-func (r EnableAgentResponse) GetApplicationproblemJSON404() *NotFound {
-	return r.ApplicationproblemJSON404
-}
-
-// GetApplicationproblemJSON409 returns the response for an HTTP 409 `application/problem+json` response
-func (r EnableAgentResponse) GetApplicationproblemJSON409() *Conflict {
-	return r.ApplicationproblemJSON409
-}
-
-// GetApplicationproblemJSON422 returns the response for an HTTP 422 `application/problem+json` response
-func (r EnableAgentResponse) GetApplicationproblemJSON422() *UnprocessableEntity {
-	return r.ApplicationproblemJSON422
-}
-
-// GetApplicationproblemJSON429 returns the response for an HTTP 429 `application/problem+json` response
-func (r EnableAgentResponse) GetApplicationproblemJSON429() *TooManyRequests {
-	return r.ApplicationproblemJSON429
 }

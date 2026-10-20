@@ -13,6 +13,128 @@ import (
 	"github.com/oapi-codegen/runtime"
 )
 
+type GetMySidebarResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// JSON200 the response for an HTTP 200 `application/json` response
+	JSON200 *SidebarStateList
+	// ApplicationproblemJSON401 the response for an HTTP 401 `application/problem+json` response
+	ApplicationproblemJSON401 *Unauthorized
+	// ApplicationproblemJSON403 the response for an HTTP 403 `application/problem+json` response
+	ApplicationproblemJSON403 *Forbidden
+	// ApplicationproblemJSON429 the response for an HTTP 429 `application/problem+json` response
+	ApplicationproblemJSON429 *TooManyRequests
+	// ApplicationproblemJSONDefault the response for an HTTP default `application/problem+json` response
+	ApplicationproblemJSONDefault *Error
+	// Headers200 the parsed response headers for an HTTP 200 response
+	Headers200 *GetMySidebarResponse200Headers
+	// Headers401 the parsed response headers for an HTTP 401 response
+	Headers401 *GetMySidebarResponse401Headers
+	// Headers403 the parsed response headers for an HTTP 403 response
+	Headers403 *GetMySidebarResponse403Headers
+	// Headers429 the parsed response headers for an HTTP 429 response
+	Headers429 *GetMySidebarResponse429Headers
+	// HeadersDefault the parsed response headers for an HTTP default response
+	HeadersDefault *GetMySidebarResponseDefaultHeaders
+}
+
+// GetJSON200 returns the response for an HTTP 200 `application/json` response
+func (r GetMySidebarResponse) GetJSON200() *SidebarStateList {
+	return r.JSON200
+}
+
+// GetApplicationproblemJSON401 returns the response for an HTTP 401 `application/problem+json` response
+func (r GetMySidebarResponse) GetApplicationproblemJSON401() *Unauthorized {
+	return r.ApplicationproblemJSON401
+}
+
+// GetApplicationproblemJSON403 returns the response for an HTTP 403 `application/problem+json` response
+func (r GetMySidebarResponse) GetApplicationproblemJSON403() *Forbidden {
+	return r.ApplicationproblemJSON403
+}
+
+// GetApplicationproblemJSON429 returns the response for an HTTP 429 `application/problem+json` response
+func (r GetMySidebarResponse) GetApplicationproblemJSON429() *TooManyRequests {
+	return r.ApplicationproblemJSON429
+}
+
+// GetApplicationproblemJSONDefault returns the response for an HTTP default `application/problem+json` response
+func (r GetMySidebarResponse) GetApplicationproblemJSONDefault() *Error {
+	return r.ApplicationproblemJSONDefault
+}
+
+// GetBody returns the raw response body bytes
+func (r GetMySidebarResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r GetMySidebarResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r GetMySidebarResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r GetMySidebarResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
+// PutMySidebarSpaceResponse200Headers the declared response headers of an HTTP 200 response for PutMySidebarSpace
+type PutMySidebarSpaceResponse200Headers struct {
+	CorrelationId   *CorrelationId
+	RateLimit       *string
+	RateLimitPolicy *string
+}
+
+// PutMySidebarSpaceResponse400Headers the declared response headers of an HTTP 400 response for PutMySidebarSpace
+type PutMySidebarSpaceResponse400Headers struct {
+	CorrelationId *CorrelationId
+}
+
+// PutMySidebarSpaceResponse401Headers the declared response headers of an HTTP 401 response for PutMySidebarSpace
+type PutMySidebarSpaceResponse401Headers struct {
+	CorrelationId   *CorrelationId
+	DPoPNonce       *string
+	SetCookie       *string
+	WWWAuthenticate *string
+}
+
+// PutMySidebarSpaceResponse403Headers the declared response headers of an HTTP 403 response for PutMySidebarSpace
+type PutMySidebarSpaceResponse403Headers struct {
+	CorrelationId *CorrelationId
+}
+
+// PutMySidebarSpaceResponse404Headers the declared response headers of an HTTP 404 response for PutMySidebarSpace
+type PutMySidebarSpaceResponse404Headers struct {
+	CorrelationId *CorrelationId
+}
+
+// PutMySidebarSpaceResponse429Headers the declared response headers of an HTTP 429 response for PutMySidebarSpace
+type PutMySidebarSpaceResponse429Headers struct {
+	CorrelationId   *CorrelationId
+	RateLimit       *string
+	RateLimitPolicy *string
+	RetryAfter      *int
+}
+
+// PutMySidebarSpaceResponseDefaultHeaders the declared response headers of an HTTP default response for PutMySidebarSpace
+type PutMySidebarSpaceResponseDefaultHeaders struct {
+	CorrelationId *CorrelationId
+}
+
 type PutMySidebarSpaceResponse struct {
 	Body         []byte
 	HTTPResponse *http.Response
@@ -17603,6 +17725,14 @@ func (c *ClientWithResponses) PutChannelDraftWithResponse(ctx context.Context, c
 // ExportChannelWithResponse Export the history of a channel
 //
 // Streams one `Message` per line in `thread_seq` order per thread. Requires step-up.
+//
+// `from` must be strictly before `to`, else `400 validation_failed` at `#query/to` with code
+// `invalid`; the range has no upper bound, so clients split long ranges. Each line carries the
+// full `content_md` without `content_truncated` and without `my_reactions`; deleted messages
+// appear as tombstones at their `thread_seq`. Threads come ascending by id, the messages of a
+// thread ascending by `thread_seq`. Read rights are checked again before every batch, so a
+// revocation ends the stream. An export cut after the first byte ends without a complete
+// response (no final chunk); a range without messages gives `200` with an empty body.
 //
 // Returns a wrapper object for the known response body format(s).
 //

@@ -94,6 +94,14 @@ def sync_detailed(
 
      Streams one `Message` per line in `thread_seq` order per thread. Requires step-up.
 
+    `from` must be strictly before `to`, else `400 validation_failed` at `#query/to` with code
+    `invalid`; the range has no upper bound, so clients split long ranges. Each line carries the
+    full `content_md` without `content_truncated` and without `my_reactions`; deleted messages
+    appear as tombstones at their `thread_seq`. Threads come ascending by id, the messages of a
+    thread ascending by `thread_seq`. Read rights are checked again before every batch, so a
+    revocation ends the stream. An export cut after the first byte ends without a complete
+    response (no final chunk); a range without messages gives `200` with an empty body.
+
     Args:
         channel_id (UUID): UUIDv7 (RFC 9562), lowercase canonical form.
         from_ (datetime.datetime): RFC 3339 timestamp in UTC with millisecond precision and suffix
@@ -133,6 +141,14 @@ def sync(
 
      Streams one `Message` per line in `thread_seq` order per thread. Requires step-up.
 
+    `from` must be strictly before `to`, else `400 validation_failed` at `#query/to` with code
+    `invalid`; the range has no upper bound, so clients split long ranges. Each line carries the
+    full `content_md` without `content_truncated` and without `my_reactions`; deleted messages
+    appear as tombstones at their `thread_seq`. Threads come ascending by id, the messages of a
+    thread ascending by `thread_seq`. Read rights are checked again before every batch, so a
+    revocation ends the stream. An export cut after the first byte ends without a complete
+    response (no final chunk); a range without messages gives `200` with an empty body.
+
     Args:
         channel_id (UUID): UUIDv7 (RFC 9562), lowercase canonical form.
         from_ (datetime.datetime): RFC 3339 timestamp in UTC with millisecond precision and suffix
@@ -166,6 +182,14 @@ async def asyncio_detailed(
     """Export the history of a channel
 
      Streams one `Message` per line in `thread_seq` order per thread. Requires step-up.
+
+    `from` must be strictly before `to`, else `400 validation_failed` at `#query/to` with code
+    `invalid`; the range has no upper bound, so clients split long ranges. Each line carries the
+    full `content_md` without `content_truncated` and without `my_reactions`; deleted messages
+    appear as tombstones at their `thread_seq`. Threads come ascending by id, the messages of a
+    thread ascending by `thread_seq`. Read rights are checked again before every batch, so a
+    revocation ends the stream. An export cut after the first byte ends without a complete
+    response (no final chunk); a range without messages gives `200` with an empty body.
 
     Args:
         channel_id (UUID): UUIDv7 (RFC 9562), lowercase canonical form.
@@ -203,6 +227,14 @@ async def asyncio(
     """Export the history of a channel
 
      Streams one `Message` per line in `thread_seq` order per thread. Requires step-up.
+
+    `from` must be strictly before `to`, else `400 validation_failed` at `#query/to` with code
+    `invalid`; the range has no upper bound, so clients split long ranges. Each line carries the
+    full `content_md` without `content_truncated` and without `my_reactions`; deleted messages
+    appear as tombstones at their `thread_seq`. Threads come ascending by id, the messages of a
+    thread ascending by `thread_seq`. Read rights are checked again before every batch, so a
+    revocation ends the stream. An export cut after the first byte ends without a complete
+    response (no final chunk); a range without messages gives `200` with an empty body.
 
     Args:
         channel_id (UUID): UUIDv7 (RFC 9562), lowercase canonical form.
