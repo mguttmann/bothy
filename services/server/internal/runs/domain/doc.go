@@ -22,8 +22,16 @@
 //   - TriggerOnOpen and TriggerOnTransition map the opening and every transition of a run to the
 //     trigger_state of its triggering message (09 6).
 //
+// And it holds the rules of the invocation token (09 4.5, 05 section 5, M2-06):
+//
+//   - NewInvocationClaims builds the claims of an InvocationGrant after the table of trigger
+//     kinds and refuses an incomplete grant; Payload encodes them.
+//   - ParseInvocationToken checks the header (alg EdDSA, typ agent-invocation+jwt byte for byte,
+//     a kid) with kernel/jose, Claims decodes and checks the payload, and CheckInvocationClaims
+//     compares iss, aud, run, iat and exp with the expectation of the server.
+//
 // The package imports only the standard library and kernel-core (kernel/ids, kernel/errs,
-// kernel/textcheck); it has
+// kernel/textcheck, kernel/jose); it has
 // no I/O, no clock, no randomness, no context and never calls authorize (D-B7, ADR 0017). Every
 // permission fact is an input that the application layer gathers from authz, so the authz guard of
 // agent.invoke stays the only place that decides permissions and these functions only choose the
