@@ -163,3 +163,12 @@ def test_a_push_to_main_is_never_cancelled_by_the_next_merge() -> None:
     # waits instead (GitHub keeps at most one pending run per group).
     concurrency = _workflow()["concurrency"]
     assert concurrency["cancel-in-progress"] == "${{ github.event_name != 'push' }}"
+
+
+def test_main_analysis_waits_for_the_main_branch_switch() -> None:
+    # SonarQube Cloud analyses `main` as a short-lived branch until its main branch is named
+    # `main`, and that analysis fails on the server (docs/quality/sonarqube-local.md). So the
+    # scan of a run on main needs the repository variable SONAR_MAIN_ANALYSIS; pull requests
+    # and every other ref are not affected.
+    condition = " ".join(str(_workflow()["jobs"]["sonar"]["if"]).split())
+    assert "(github.ref != 'refs/heads/main' || vars.SONAR_MAIN_ANALYSIS == 'true')" in condition
