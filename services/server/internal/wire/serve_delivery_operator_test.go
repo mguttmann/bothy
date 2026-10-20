@@ -16,6 +16,7 @@ import (
 	"github.com/OWNER/bothy/services/server/internal/identity/adapters/identitytest"
 	"github.com/OWNER/bothy/services/server/internal/identity/domain/dpop"
 	"github.com/OWNER/bothy/services/server/internal/kernel/ids"
+	"github.com/OWNER/bothy/services/server/internal/platform/testkit"
 )
 
 // restIfMatch is dlWorld.rest with an If-Match header; it returns status, body and ETag.
@@ -27,7 +28,7 @@ func (w *dlWorld) restIfMatch(p gwPerson, method, path, ifMatch string, body any
 		b, _ := json.Marshal(body)
 		rd = bytes.NewReader(b)
 	}
-	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), testkit.Patience)
 	defer cancel()
 	req, _ := http.NewRequestWithContext(ctx, method, w.base+path, rd)
 	req.Header.Set("Authorization", "DPoP "+p.access)
@@ -75,7 +76,7 @@ func TestGateway_SpaceDefaultOperatorGetsNewChannelLive(t *testing.T) {
 	cm := w.post(ch.thread, "for the operator")
 	// A second, later event the agent sees anyway is not needed: with cursor_advance_every=1 the
 	// hub sends cursor frames to the agent's live connection for every processed event.
-	ctx, cancel := context.WithTimeout(context.Background(), 8*time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), testkit.Patience)
 	defer cancel()
 	var live []frame
 	gotMsg := false
@@ -109,7 +110,7 @@ func TestGateway_SpaceDefaultOperatorGetsNewChannelLive(t *testing.T) {
 	c2 := w.dial()
 	p := params
 	p.Cursor, p.SyncEpoch = &r.HeadSeq, r.SyncEpoch.String()
-	ictx, icancel := context.WithTimeout(context.Background(), 15*time.Second)
+	ictx, icancel := context.WithTimeout(context.Background(), testkit.Patience)
 	if _, err := c2.Identify(ictx, p); err != nil {
 		icancel()
 		t.Fatalf("identify with cursor: %v", err)
@@ -172,7 +173,7 @@ func TestGateway_OperatorNewChannelWhileCatchingUp(t *testing.T) {
 			e.permission_version
 		FROM h, generate_series(1, $2::bigint) g, (SELECT * FROM event_log WHERE client_msg_id = $1 LIMIT 1) e`, cm, backlog)
 	tail := w.post(other.thread, "tail passed")
-	wctx, wcancel := context.WithTimeout(context.Background(), 3*time.Minute)
+	wctx, wcancel := context.WithTimeout(context.Background(), testkit.Patience)
 	for {
 		op, d, err := watch.Next(wctx)
 		if err != nil {
@@ -185,7 +186,7 @@ func TestGateway_OperatorNewChannelWhileCatchingUp(t *testing.T) {
 	}
 	wcancel()
 	c2 := w.dial(wstest.WithoutHeartbeat())
-	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), testkit.Patience)
 	p := params
 	p.Cursor, p.SyncEpoch = &r.HeadSeq, r.SyncEpoch.String()
 	if _, err := c2.Identify(ctx, p); err != nil {
@@ -197,7 +198,7 @@ func TestGateway_OperatorNewChannelWhileCatchingUp(t *testing.T) {
 	tickets := w.newChannel(sup, "tickets")
 	cm2 := w.post(tickets.thread, "for the operator")
 	after := w.post(work.thread, "after")
-	rctx, rcancel := context.WithTimeout(context.Background(), 90*time.Second)
+	rctx, rcancel := context.WithTimeout(context.Background(), testkit.Patience)
 	defer rcancel()
 	got, complete := false, false
 	var maxCursor, msgSeq int64

@@ -13,6 +13,7 @@ import (
 	"github.com/OWNER/bothy/services/server/internal/gateway/adapters/wstest"
 	"github.com/OWNER/bothy/services/server/internal/kernel/ids"
 	"github.com/OWNER/bothy/services/server/internal/platform/pg"
+	"github.com/OWNER/bothy/services/server/internal/platform/testkit"
 )
 
 // TestGateway_TokenRevokeRacingAMessageCommit: a message transaction reads permission_version in the
@@ -59,7 +60,7 @@ func TestGateway_TokenRevokeRacingAMessageCommit(t *testing.T) {
 		posted <- code
 	}()
 	// Wait until the message transaction waits in the trigger, after its pv read.
-	deadline := time.Now().Add(20 * time.Second)
+	deadline := testkit.Deadline()
 	for {
 		var n int
 		if err := pool.QueryRow(ctx, `SELECT count(*) FROM pg_locks WHERE locktype = 'advisory' AND NOT granted`).Scan(&n); err != nil {
@@ -91,7 +92,7 @@ func TestGateway_TokenRevokeRacingAMessageCommit(t *testing.T) {
 	}
 	t.Logf("permission_version before DELETE %d, after DELETE %d, carried by the racing message %d", pvBefore, pvAfter, evPV)
 
-	rctx, cancel := context.WithTimeout(ctx, 15*time.Second)
+	rctx, cancel := context.WithTimeout(ctx, testkit.Patience)
 	defer cancel()
 	for {
 		op, d, err := c.Next(rctx)
