@@ -44,7 +44,7 @@ BASE_REF = "origin/main"
 ZERO_SHA = "0" * 40
 # A push of component source files alone (components.is_component_source) leaves the tools gates
 # out, except the few tools tests that read component sources (TOOLS_SOURCE_TESTS in the
-# Makefile), which `make test` runs then; CI decides the job test (tools) by the same rule.
+# Makefile), which `make test` runs then. CI runs the job test (tools) on every change.
 # git exports these to hooks; make and the tools it starts must see the repository as CI does
 # (docs/DECISIONS.md D-M4-05-6).
 HOOK_VARIABLES = ("GIT_DIR", "GIT_WORK_TREE", "GIT_INDEX_FILE", "GIT_COMMON_DIR", "GIT_PREFIX")

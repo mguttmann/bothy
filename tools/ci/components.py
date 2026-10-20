@@ -77,12 +77,12 @@ GATE_COMPONENT_INPUT_PREFIXES: dict[str, tuple[str, ...]] = {
 NO_COMPONENT_PREFIXES = ("docs/", "infra/")
 NO_COMPONENT_ROOT_FILES = re.compile(r"^[^/]+\.md$|^(?:LICENSE|NOTICE)$")
 
-# Source files of a component (component directory and source suffix). No tools test reads them,
-# except the few in TOOLS_SOURCE_TESTS of the Makefile, which every component test job runs too
-# (`AREAS=none`); manifests, lock files, configuration, test data and docs of a component are no
-# source files, because tools tests read some of them (go.mod, Dockerfile, .golangci.yml). The
-# pre-push plan (tools/hooks/push_plan.py) decides the tools tests by it. CI runs them on every
-# change, because some also build component sources for other platforms (the release builds).
+# Source files of a component (component directory and source suffix). A push of only these
+# leaves the tools gates out of the pre-push plan (tools/hooks/push_plan.py), except the tools
+# tests in TOOLS_SOURCE_TESTS of the Makefile; manifests, lock files, configuration, test data and
+# docs of a component are no source files, because tools tests read some of them (go.mod,
+# Dockerfile, .golangci.yml). CI runs the tools tests on every change, because some also build
+# component sources for other platforms (the release builds).
 COMPONENT_DIRS = ("services/", "apps/", "packages/", "sdk/", "plugins/")
 SOURCE_SUFFIXES = (".go", ".dart", ".ts", ".tsx", ".kt", ".swift", ".py")
 
