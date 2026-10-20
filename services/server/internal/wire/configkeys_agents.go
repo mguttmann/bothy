@@ -18,7 +18,7 @@ func agentsConfigKeys() []config.Key {
 		// The presence of agents (M2-20): 04, 03 and 10 "Konfigurationswerte dieses Kapitels".
 		{Name: keyPresenceTimeout, Kind: config.KindDuration, Default: "90s", Min: minDeadline, Chapter: chapter04,
 			Doc: "Without a heartbeat for this long an agent is offline."},
-		{Name: "agent.heartbeat_persist_interval", Kind: config.KindDuration, Default: "60s", Min: minDeadline, Chapter: chapter03,
+		{Name: "agent.heartbeat_persist_interval", Kind: config.KindDuration, Default: denyAggregateWindowDefault, Min: minDeadline, Chapter: chapter03,
 			Doc: "Heartbeat fields are stored at most this often."},
 		{Name: "billing.mismatch_alert_after", Kind: config.KindDuration, Default: "5m", Min: minDeadline, Chapter: chapter10,
 			Doc: "How long the reported mode may differ from the configured one before the warning and the alarm."},

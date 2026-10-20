@@ -309,11 +309,7 @@ func agentBody(v agents.Agent) agentJSON {
 		ID: v.ID.String(), Handle: v.Handle, DisplayName: v.DisplayName, AvatarFileID: optionalID(v.AvatarFileID), Status: v.Status,
 		AdapterKind: v.AdapterKind, Description: v.Description, BillingMode: v.BillingMode,
 		CredentialHolderID: optionalID(v.CredentialHolderID), BillingModeChangedAt: stamp(v.BillingModeChangedAt), ToolClass: v.ToolClass,
-		Presence: presenceJSON{
-			State: v.Presence.State, ReportedBillingMode: v.Presence.ReportedBillingMode, RuntimeVersion: v.Presence.RuntimeVersion,
-			LastHeartbeatAt: stamp(v.Presence.LastHeartbeatAt), BillingModesSupported: v.Presence.BillingModesSupported,
-			ReportedToolClass: v.Presence.ReportedToolClass, BillingModeMatches: v.Presence.BillingModeMatches,
-		},
+		Presence:       presenceBody(v.Presence),
 		OperatorConfig: config, Version: v.Version,
 	}
 }

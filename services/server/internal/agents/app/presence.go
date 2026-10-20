@@ -307,9 +307,13 @@ func (t *Tracker) publish(ctx context.Context, e *entry, by *ids.ID) {
 		ev.Actor = &eventlog.ActorRef{Kind: eventlog.ActorAgent, PrincipalID: *by}
 	}
 	if err := pub.PublishEphemeral(ctx, ev); err != nil {
-		t.d.Log.LogAttrs(ctx, slog.LevelError, "agent.presence_changed not published", slog.String("bothy.agent.id", e.id.String()))
+		t.d.Log.LogAttrs(ctx, slog.LevelError, "agent.presence_changed not published", slog.String(logKeyAgentID, e.id.String()))
 	}
 }
+
+// logKeyAgentID is the log key of the agent of a failed publish (signals.md 7: IDs only in logs
+// and spans).
+const logKeyAgentID = "bothy.agent.id"
 
 // presencePayload is the schema AgentPresencePayload; the last reported mode stays while offline
 // and is left out when not reported (ADR 0053: no null).

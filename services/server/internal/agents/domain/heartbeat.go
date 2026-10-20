@@ -619,27 +619,9 @@ func (d *decoder) readiness(raw json.RawMessage) []Readiness {
 	out := make([]Readiness, 0, len(items))
 	dup := false
 	for i, it := range items {
-		ip := index(p, i)
-		m, ok := d.object(ip, it, "channel_id", "ready")
+		r, ok := d.readinessItem(index(p, i), it)
 		if !ok {
 			continue
-		}
-		var r Readiness
-		if v, has := m["channel_id"]; has {
-			if s, ok := d.str(ip+"/channel_id", v); ok {
-				id, err := ids.Parse(s)
-				if err != nil {
-					d.fail(ip+"/channel_id", codeInvalidFormat)
-				}
-				r.ChannelID = id
-			}
-		} else {
-			d.fail(ip+"/channel_id", codeRequired)
-		}
-		if v, has := m["ready"]; has {
-			r.Ready, _ = d.boolean(ip+"/ready", v)
-		} else {
-			d.fail(ip+"/ready", codeRequired)
 		}
 		if !r.ChannelID.IsZero() && slices.ContainsFunc(out, func(o Readiness) bool { return o.ChannelID == r.ChannelID }) {
 			dup = true
@@ -650,6 +632,33 @@ func (d *decoder) readiness(raw json.RawMessage) []Readiness {
 		d.fail(p, codeDuplicate)
 	}
 	return out
+}
+
+// readinessItem reads one entry of project_readiness (schema ProjectReadiness); ok is false when
+// it is no object.
+func (d *decoder) readinessItem(ip string, raw json.RawMessage) (Readiness, bool) {
+	m, ok := d.object(ip, raw, "channel_id", "ready")
+	if !ok {
+		return Readiness{}, false
+	}
+	var r Readiness
+	if v, has := m["channel_id"]; has {
+		if s, ok := d.str(ip+"/channel_id", v); ok {
+			id, err := ids.Parse(s)
+			if err != nil {
+				d.fail(ip+"/channel_id", codeInvalidFormat)
+			}
+			r.ChannelID = id
+		}
+	} else {
+		d.fail(ip+"/channel_id", codeRequired)
+	}
+	if v, has := m["ready"]; has {
+		r.Ready, _ = d.boolean(ip+"/ready", v)
+	} else {
+		d.fail(ip+"/ready", codeRequired)
+	}
+	return r, true
 }
 
 // AuditDetails are the details of the audit entry agent.heartbeat of a change of the reported

@@ -20,15 +20,6 @@ var (
 	runB = ids.New().String()
 )
 
-// pointers returns the pointers of fes.
-func pointers(fes []errs.FieldError) []string {
-	out := make([]string, 0, len(fes))
-	for _, fe := range fes {
-		out = append(out, fe.Pointer)
-	}
-	return out
-}
-
 // hasError reports whether fes holds a field error at pointer, with code when code is not "".
 func hasError(fes []errs.FieldError, pointer, code string) bool {
 	return slices.ContainsFunc(fes, func(fe errs.FieldError) bool {
@@ -124,7 +115,7 @@ func TestDecodeHeartbeat(t *testing.T) {
 // codes, '=', control and bidi characters at their pointers (brief M2-20 note 3).
 func TestHeartbeatForms(t *testing.T) {
 	t.Parallel()
-	bad := []string{"a/b", `a\b`, "a b", "a\tb", "ab=", "a\u0007b", "a‮b", ""}
+	bad := []string{"a/b", `a\b`, "a b", "a\tb", "ab=", "a\u0007b", "a\u202eb", ""}
 	places := map[string]func(v string) string{
 		"/runtime_version": func(v string) string { return `{"state":"online","runtime_version":` + quote(v) + `}` },
 		"/details/adapter/version": func(v string) string {

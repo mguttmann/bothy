@@ -142,11 +142,10 @@ func warnings(p map[string]any) []string {
 	return out
 }
 
-// stored reads the reported columns of agent id.
-func (w *world) stored(id ids.ID) (mode, class, state, details string) {
+// stored reads the reported mode, state and details of agent id.
+func (w *world) stored(id ids.ID) (mode, state, details string) {
 	w.t.Helper()
 	return w.text(`SELECT coalesce(reported_billing_mode, '') FROM agents WHERE principal_id = $1`, id.String()),
-		w.text(`SELECT coalesce(reported_tool_class, '') FROM agents WHERE principal_id = $1`, id.String()),
 		w.text(`SELECT reported_runtime_state FROM agents WHERE principal_id = $1`, id.String()),
 		w.text(`SELECT reported_details::text FROM agents WHERE principal_id = $1`, id.String())
 }
@@ -203,7 +202,7 @@ func TestBR05_ServerPart_ActualDiffersFromDesired(t *testing.T) {
 	}
 	first := len(w.allows("agent.heartbeat"))
 	w.beatOK("support-agent", bodyPersonal)
-	if mode, _, state, _ := w.stored(agent); mode != "personal" || state != "online" {
+	if mode, state, _ := w.stored(agent); mode != "personal" || state != "online" {
 		t.Fatalf("stored %s %s before agent.heartbeat_persist_interval", mode, state)
 	}
 	allows := w.allows("agent.heartbeat")
@@ -264,16 +263,16 @@ func TestBR05_ServerPart_ChangeDuringRun(t *testing.T) {
 	w.beatOK("support-agent", bodyOrg)
 	events := w.eventCount()
 	w.beatOK("support-agent", `{"state":"online","reported_billing_mode":"organization","details":{"active_runs":["`+run+`"]}}`)
-	if _, _, _, details := w.stored(agent); strings.Contains(details, run) {
+	if _, _, details := w.stored(agent); strings.Contains(details, run) {
 		t.Fatal("active_runs stored before the flush")
 	}
 	must(t, w.presence.Flush(context.Background()))
-	if _, _, _, details := w.stored(agent); !strings.Contains(details, `"active_runs": ["`+run+`"]`) {
+	if _, _, details := w.stored(agent); !strings.Contains(details, `"active_runs": ["`+run+`"]`) {
 		t.Fatalf("details after the flush %s", details)
 	}
 	before := len(w.allows("agent.heartbeat"))
 	w.beatOK("support-agent", `{"state":"online","reported_billing_mode":"personal","details":{"active_runs":["`+run+`"]}}`)
-	if mode, _, _, _ := w.stored(agent); mode != "personal" || len(w.allows("agent.heartbeat")) != before+1 {
+	if mode, _, _ := w.stored(agent); mode != "personal" || len(w.allows("agent.heartbeat")) != before+1 {
 		t.Fatalf("change during the run: mode %s", mode)
 	}
 	if w.eventCount() != events {
@@ -447,7 +446,7 @@ func TestPresenceFlushMonotoneAcrossInstances(t *testing.T) {
 		t.Fatalf("A is not offline: %v", c)
 	}
 	must(t, w.presence.Flush(context.Background()))
-	if _, _, state, _ := w.stored(agent); state != "degraded" {
+	if _, state, _ := w.stored(agent); state != "degraded" {
 		t.Fatalf("A's offline write overwrote B's newer heartbeat: %s", state)
 	}
 }
@@ -478,7 +477,7 @@ func TestPresenceStartRule(t *testing.T) {
 		t.Fatal("online after start plus agent.presence_timeout without a heartbeat")
 	}
 	must(t, c.Stop(context.Background()))
-	if _, _, state, _ := w.stored(old); state != "offline" {
+	if _, state, _ := w.stored(old); state != "offline" {
 		t.Fatalf("the old agent is stored %s", state)
 	}
 }
@@ -493,7 +492,7 @@ func TestPresenceShutdownFlush(t *testing.T) {
 	w.beatOK("support-agent", `{"state":"degraded","reported_billing_mode":"organization","runtime_version":"9.9.9"}`)
 	published := len(w.pub.events())
 	must(t, w.presence.Stop(context.Background()))
-	if _, _, state, _ := w.stored(agent); state != "degraded" ||
+	if _, state, _ := w.stored(agent); state != "degraded" ||
 		w.text(`SELECT reported_runtime_version FROM agents WHERE principal_id = $1`, agent.String()) != "9.9.9" {
 		t.Fatalf("not flushed at shutdown: %s", state)
 	}
