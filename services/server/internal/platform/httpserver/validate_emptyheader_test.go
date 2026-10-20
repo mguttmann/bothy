@@ -29,7 +29,7 @@ paths:
         "204": {description: ok}
 `
 
-// TestValidate_EmptyEnumHeaderRejected (INT-W33/2): an optional header that is present with an
+// TestValidate_EmptyEnumHeaderRejected (D-M6-01-13): an optional header that is present with an
 // empty value is checked like any other value, so an empty X-Console-Request is 400 invalid_enum
 // as "2" is; the validator library treats an empty header as absent.
 func TestValidate_EmptyEnumHeaderRejected(t *testing.T) {
