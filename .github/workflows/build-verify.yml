@@ -47,23 +47,27 @@ jobs:
       - uses: astral-sh/setup-uv@1c37ad07a6a961277cf70c0d37d6f313000f5884 # v10.3.0
         with:
           enable-cache: false
-      # The pushed diff is measured from the merge base with main, as a pull request shows it;
-      # without one every job runs. The components and the conditional jobs come from the same
+      # The pushed diff is measured from the merge base with build-base/<ticket> when the build
+      # team pushed that ref before the build branch (the integration head it built on), else from
+      # the merge base with main, as a pull request shows it; without one every job runs
+      # (tools/ci/build_base.py). The components and the conditional jobs come from the same
       # plan as in ci.yml (tools/ci/components.py ci-plan, docs/quality/gates.md "Jobs a change
       # needs"); build-verify-ok accepts a skipped job only when the plan left it out.
       - id: jobs
         name: Select the components and jobs this change needs
         env:
+          BRANCH: ${{ github.ref_name }}
           HEAD_SHA: ${{ github.sha }}
           PUBLIC: ${{ github.event.repository.visibility == 'public' || (github.event_name == 'schedule' && vars.BOTHY_VISIBILITY == 'public') }}
         run: |
-          if base=$(git merge-base origin/main "$HEAD_SHA"); then
+          out=$(mktemp)
+          uv run --no-project --python 3.14 tools/ci/build_base.py --branch "$BRANCH" --head "$HEAD_SHA" --github-output "$out"
+          base=$(sed -n 's/^base=//p' "$out")
+          if [ -n "$base" ]; then
             plan=$(uv run --no-project --python 3.14 tools/ci/components.py ci-plan --base "$base" --head "$HEAD_SHA" --public "$PUBLIC")
           else
-            base=""
             plan=$(uv run --no-project --python 3.14 tools/ci/components.py ci-plan --components all --public "$PUBLIC")
           fi
-          echo "base: $base"
           echo "$plan"
           { echo "base=$base"; echo "$plan"; } >> "$GITHUB_OUTPUT"
 

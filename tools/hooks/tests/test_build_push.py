@@ -41,7 +41,14 @@ def change(repo: Path, *paths: str) -> None:
 
 @pytest.mark.parametrize(
     "ref",
-    ["refs/heads/build/M2-44", "refs/heads/build/M2-44/retry", "build/M4-31"],
+    [
+        "refs/heads/build/M2-44",
+        "refs/heads/build/M2-44/retry",
+        "build/M4-31",
+        # The base ref of a build branch (tools/ci/build_base.py), pushed on its own before it.
+        "refs/heads/build-base/M2-44",
+        "build-base/M4-31",
+    ],
 )
 def test_build_refs_are_selected(ref: str) -> None:
     assert build_push.is_build_ref(ref)
@@ -58,6 +65,10 @@ def test_build_refs_are_selected(ref: str) -> None:
         "refs/heads/rebuild/M2-44",
         "refs/heads/feat/build/M2-44",
         "refs/tags/build/v1.0.0",
+        "refs/heads/build-base",
+        "refs/heads/build-base/",
+        "refs/heads/build-basex/M2-44",
+        "refs/tags/build-base/M2-44",
     ],
 )
 def test_other_refs_are_not_selected(ref: str) -> None:
