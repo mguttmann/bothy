@@ -80,6 +80,7 @@ DEFAULT_PLACE = {
 RETIRED_ALLOWLIST = (
     "docs/PLAN.md",
     "docs/DECISIONS.md",
+    "docs/DECISIONS-FOUNDATION.md",
     "docs/briefs/M1-08-config-reference.md",
     "tools/configdoc/retired.yaml",
     "tools/configdoc/tests/",
