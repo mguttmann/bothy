@@ -4,6 +4,7 @@ package app
 
 import (
 	"context"
+	"time"
 
 	"github.com/OWNER/bothy/services/server/internal/gateway/domain"
 	"github.com/OWNER/bothy/services/server/internal/kernel/actor"
@@ -26,7 +27,7 @@ func (g *Gateway) heartbeat(ctx context.Context, c *Connection, d any) error {
 	// of session, device and token at that time, which authorize would trust.
 	if err := g.d.Authenticator.Revalidate(ctx, a); err != nil {
 		if errs.KindOf(err) == errs.KindUnauthenticated {
-			return closeWith(domain.CloseRevoked)
+			return closeWith(revalidateClose(err, a, g.d.Clock.Now()))
 		}
 		e, _ := errs.As(err)
 		return &OpError{Code: string(e.PublicCode())}
@@ -38,4 +39,19 @@ func (g *Gateway) heartbeat(ctx context.Context, c *Connection, d any) error {
 	c.beat(now)
 	_ = c.conn.Send(HeartbeatAck{ServerTime: now})
 	return nil
+}
+
+// revalidateClose is the close code of a credential the revalidation refused as unauthenticated:
+// 4011 like the tick of the expiry (tickReady) once the credential has reached its expiry, read
+// after the revalidation so an expiry during its query counts, because the revalidation reports an
+// expired API token as unauthenticated (docs/DECISIONS.md M1-64/14); a revoked session, and any
+// refusal before the expiry, 4012.
+func revalidateClose(err error, a actor.Actor, now time.Time) domain.CloseCode {
+	if e, ok := errs.As(err); ok && e.Code == errs.CodeSessionRevoked {
+		return domain.CloseRevoked
+	}
+	if !a.CredentialExpiresAt.IsZero() && !now.Before(a.CredentialExpiresAt) {
+		return domain.CloseTokenExpired
+	}
+	return domain.CloseRevoked
 }

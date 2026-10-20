@@ -75,6 +75,8 @@ type fakeAuth struct {
 	errs    map[string]error
 	creds   []actor.Credentials
 	revoked map[ids.ID]bool
+	// revalidate, when set, answers Revalidate instead of revoked.
+	revalidate func() error
 }
 
 func (a *fakeAuth) Authenticate(_ context.Context, c actor.Credentials) (actor.Actor, error) {
@@ -95,6 +97,9 @@ func (a *fakeAuth) Authenticate(_ context.Context, c actor.Credentials) (actor.A
 func (a *fakeAuth) Revalidate(_ context.Context, p actor.Actor) error {
 	a.mu.Lock()
 	defer a.mu.Unlock()
+	if a.revalidate != nil {
+		return a.revalidate()
+	}
 	if a.revoked[p.ID] {
 		return errs.New(errs.CodeSessionRevoked, "")
 	}

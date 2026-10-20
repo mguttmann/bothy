@@ -524,6 +524,40 @@ func TestHeartbeatRevalidates(t *testing.T) {
 	wantClosed(t, fc, domain.CloseRevoked)
 }
 
+// TestHeartbeatAtExpiryCloses4011: a heartbeat whose revalidation refuses the credential as
+// unauthenticated once it has reached its expiry (also when the expiry passes during the
+// revalidation) closes with 4011 like the tick of the expiry, not with 4012; before the expiry,
+// and for a revoked session at any time, it closes with 4012.
+func TestHeartbeatAtExpiryCloses4011(t *testing.T) {
+	t.Parallel()
+	for name, c := range map[string]struct {
+		at   time.Duration
+		err  error
+		want domain.CloseCode
+	}{
+		"expired during the revalidation": {0, errs.New(errs.CodeUnauthenticated, ""), domain.CloseTokenExpired},
+		"revoked before the expiry":       {-time.Second, errs.New(errs.CodeUnauthenticated, ""), domain.CloseRevoked},
+		"session revoked at the expiry":   {0, errs.New(errs.CodeSessionRevoked, ""), domain.CloseRevoked},
+	} {
+		t.Run(name, func(t *testing.T) {
+			t.Parallel()
+			e := newEnv(t, nil)
+			conn, fc := e.open()
+			e.identifyAlex(conn)
+			exp := e.alex.CredentialExpiresAt
+			e.clk.Set(exp.Add(-time.Second - time.Millisecond))
+			e.auth.mu.Lock()
+			e.auth.revalidate = func() error {
+				e.clk.Set(exp.Add(c.at))
+				return c.err
+			}
+			e.auth.mu.Unlock()
+			e.send(conn, "heartbeat", map[string]any{"last_seq": 0})
+			wantClosed(t, fc, c.want)
+		})
+	}
+}
+
 // TestSnapshotDenialCloses4018 (red team M1-64): when the snapshot of ready is refused after
 // gateway.connect allowed (an app: sync.snapshot.read has no app scope in the catalogue), the
 // connection closes with 4018 like any other forbidden at setup, not with 4000, so the client
