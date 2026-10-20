@@ -41,10 +41,20 @@
 /// ([GuidedSwitch], [GuidedFlow], [GuidedResult]) in the grant preview, the group members and
 /// the owners, and the data source [AgentsRepository] ([ApiAgentsRepository]), which
 /// [AdminRepository] includes.
+///
+/// M6-04 adds what the console needs to host the administration (01 5.2, 5.5): the
+/// [AdminBody] (the screen of one place without the navigation, at the full browser width when
+/// its `maxWidth` is null, which [AdminShell] uses on the desktop), the hook [AdminViewAs] that
+/// [WhoHasAccess], [PersonDetail] and [AdminBody] hand the chosen person to, and the stored
+/// view of "View as person": the [ViewAsBanner] with the time left and "End view", the
+/// [ViewAsStructure] (structure and access only, never content; ADR 0028) and
+/// [notVisibleSpaces].
 library;
 
 export 'src/access/source_chain.dart';
+export 'src/access/view_as_banner.dart';
 export 'src/access/view_as_person.dart';
+export 'src/access/view_as_structure.dart';
 export 'src/access/who_has_access.dart';
 export 'src/agents/agent_labels.dart';
 export 'src/agents/agent_page.dart';
@@ -105,6 +115,7 @@ export 'src/self/my_devices_view.dart';
 export 'src/self/my_sessions_view.dart';
 export 'src/self/revoke_confirm.dart';
 export 'src/self/self_feedback.dart' show SelfFailure, SelfNotice;
+export 'src/shell/admin_body.dart';
 export 'src/shell/admin_routes.dart';
 export 'src/shell/admin_shell.dart';
 export 'src/step_up/step_up_dialog.dart';

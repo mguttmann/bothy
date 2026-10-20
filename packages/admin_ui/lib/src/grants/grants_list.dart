@@ -27,7 +27,8 @@ import 'revoke_grant_dialog.dart';
 ///
 /// [targetKey] is the open target ([AdminTarget.key]), or null before one is chosen;
 /// [onTarget] opens another target (the shell maps it to `/grants/<key>`). A list the server
-/// refuses shows its reason (15 1 principle 1).
+/// refuses shows its reason (15 1 principle 1). [onViewAs] goes to [WhoHasAccess] (brief M6-04
+/// Design note 3).
 class GrantsList extends StatefulWidget {
   /// Creates the screen.
   const GrantsList({
@@ -38,6 +39,7 @@ class GrantsList extends StatefulWidget {
     this.timeZone = 'UTC',
     this.clock = DateTime.now,
     this.onChanged,
+    this.onViewAs,
   });
 
   /// The administration's calls.
@@ -57,6 +59,9 @@ class GrantsList extends StatefulWidget {
 
   /// Runs after a change.
   final VoidCallback? onChanged;
+
+  /// Starts the view as a person in the host, or null for the dialog of [WhoHasAccess].
+  final AdminViewAs? onViewAs;
 
   @override
   State<GrantsList> createState() => _GrantsListState();
@@ -293,6 +298,7 @@ class _GrantsListState extends State<GrantsList>
                 widget.onChanged?.call();
                 _loadGrants();
               },
+              onViewAs: widget.onViewAs,
             ),
           ],
         ],
