@@ -57,6 +57,7 @@ var Fixtures = map[string]ParamFixture{
 	},
 	"provider_id": extraFixture(func(e *Extras) string { return e.ProviderID }),
 	"host_id":     extraFixture(func(e *Extras) string { return e.HostID }),
+	"app_id":      extraFixture(func(e *Extras) string { return e.AppID }),
 }
 
 // isHuman reports whether r is one of the people of w.
@@ -70,12 +71,13 @@ func isHuman(w *harness.World, r *harness.Client) bool {
 }
 
 // Extras are the resources outside the matrix world of 07 "Examples" that some routes need a
-// foreign instance of: a login driver (05 identity_provider.read, owner only) and a host without
-// assignee (05 host.read, owner or assignee). PrepareExtras creates them through the public API as
-// the owner. The routes of apps and webhook subscriptions are not enabled yet; the ticket that
-// enables them adds their fixtures here (M1-70/9).
+// foreign instance of: a login driver (05 identity_provider.read, owner only), a host without
+// assignee (05 host.read, owner or assignee) and an installed app (05 app.read, owner only; the
+// app routes are enabled since M2-24). PrepareExtras creates them through the public API as the
+// owner. The routes of webhook subscriptions are not enabled yet; the ticket that enables them adds
+// their fixture here (M1-70/9).
 type Extras struct {
-	ProviderID, HostID string
+	ProviderID, HostID, AppID string
 }
 
 // extras holds the Extras per world.
@@ -93,7 +95,8 @@ func extraFixture(get func(*Extras) string) ParamFixture {
 }
 
 // PrepareExtras creates the Extras of w through the public API as the owner: a disabled
-// trusted-header login driver (createIdentityProvider) and a host without assignee (createHost).
+// trusted-header login driver (createIdentityProvider), a host without assignee (createHost) and
+// an app without a delivery (installApp).
 func PrepareExtras(tb testing.TB, w *harness.World) *Extras {
 	tb.Helper()
 	o := w.Owner
@@ -103,6 +106,14 @@ func PrepareExtras(tb testing.TB, w *harness.World) *Extras {
 	}}, http.StatusCreated))
 	e.HostID = createdID(tb, harness.MustDo(tb, o, harness.Request{Method: http.MethodPost, Path: "/hosts", Body: map[string]any{
 		"name": "build-host", "reason": "leak test",
+	}}, http.StatusCreated))
+	e.AppID = createdID(tb, harness.MustDo(tb, o, harness.Request{Method: http.MethodPost, Path: "/apps", Body: map[string]any{
+		"manifest": map[string]any{
+			"schema_version": 1, "slug": "leak-probe", "name": "Leak probe", "description": "An app the requesters may not read.",
+			"publisher": "Example Org", "version": "1.0.0", "min_api_version": "0.1",
+			"scopes": map[string]any{"required": []string{}, "optional": []string{}},
+		},
+		"granted_scopes": []string{}, "reason": "leak test",
 	}}, http.StatusCreated))
 	extras.Store(w, e)
 	return e
