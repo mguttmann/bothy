@@ -17,14 +17,22 @@ import 'ticket_player.dart';
 
 /// A file the person picked, dropped or pasted: where it lies and its name.
 final class PickedFile {
-  /// Creates the file at [path] named [name].
-  const PickedFile({required this.path, required this.name});
+  /// Creates the file at [path] named [name]; [owned] marks a file the app wrote itself (a
+  /// pasted image), which goes once its upload is complete.
+  const PickedFile({
+    required this.path,
+    required this.name,
+    this.owned = false,
+  });
 
   /// The file on disk.
   final String path;
 
   /// The name to send (the last path segment; the server sanitizes it again, 12 6.2).
   final String name;
+
+  /// Whether the app wrote the file (it deletes it after the upload).
+  final bool owned;
 }
 
 /// The open and save dialogs of the platform.
@@ -127,7 +135,7 @@ final class PasteboardSource implements PasteSource {
     final name = 'pasted-${DateTime.now().toUtc().millisecondsSinceEpoch}.png';
     final file = File('${scratch.path}${Platform.pathSeparator}$name');
     await file.writeAsBytes(image, flush: true);
-    return [PickedFile(path: file.path, name: name)];
+    return [PickedFile(path: file.path, name: name, owned: true)];
   }
 }
 

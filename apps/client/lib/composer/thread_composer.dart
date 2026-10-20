@@ -18,11 +18,16 @@ import 'package:sync_engine/sync_engine.dart';
 
 import '../app/providers/ports.dart';
 import '../app/providers/session.dart';
+import '../files/attach_controller.dart';
+import '../files/attachment_mapping.dart';
+import '../files/attachment_tile.dart';
+import '../files/providers.dart';
 import '../settings/settings_providers.dart';
 import '../telemetry/telemetry_providers.dart';
 import '../thread/providers.dart';
 import '../thread/thread_actions.dart';
 import '../thread/typing_line.dart';
+import '../voice/voice_button.dart';
 import 'composer_controller.dart';
 import 'draft_sync.dart';
 import 'templates_menu.dart';
@@ -57,6 +62,8 @@ class ThreadComposer extends ConsumerStatefulWidget {
 /// State of [ThreadComposer]; the history calls [startReply] for the action Reply.
 class ThreadComposerState extends ConsumerState<ThreadComposer> {
   ComposerController? _composer;
+  AttachController? _attach;
+  VoiceController? _voice;
   bool _overwritten = false;
 
   @override
@@ -80,6 +87,24 @@ class ThreadComposerState extends ConsumerState<ThreadComposer> {
       measurements: ref.read(appMeasurementsProvider),
     )..addListener(_changed);
     final composer = _composer!;
+    // M4-22: attachments and voice messages of this composer.
+    final ports = ref.read(filePortsProvider);
+    final attach = _attach = AttachController(
+      thread: widget.threadId,
+      channel: widget.channelId,
+      outbox: engine.outbox,
+      progress: ref.read(uploadProgressProvider),
+      newKey: ref.read(attachmentKeysProvider),
+    )..addListener(_changed);
+    composer.attach = attach;
+    _voice = VoiceController(
+      recorder: ports.recorder,
+      bitRate: ref.read(appConfigProvider).voiceBitrate,
+      scratch: () async => ref.read(outgoingFolderProvider),
+      onSend: (file) async {
+        await sendVoice(engine.outbox, attach, widget.threadId, file);
+      },
+    )..addListener(_changed);
     final thread = widget.threadId.value;
     unawaited(composer.restoreUnsent());
     ref.listenManual(
@@ -104,7 +129,96 @@ class ThreadComposerState extends ConsumerState<ThreadComposer> {
   void dispose() {
     _composer?.removeListener(_changed);
     _composer?.dispose();
+    _attach?.removeListener(_changed);
+    _attach?.dispose();
+    _voice?.removeListener(_changed);
+    _voice?.dispose();
     super.dispose();
+  }
+
+  Future<void> _pick() async {
+    final files = await ref.read(filePortsProvider).picker.pickFiles();
+    await _attach?.add(files);
+  }
+
+  /// The chips of the attached files with the state of their upload entries (12 2).
+  Widget _chips(AttachController attach) {
+    final outbox =
+        ref.watch(threadOutboxProvider(widget.threadId.value)).value ??
+        const <OutboxEntryView>[];
+    final progress = ref.watch(uploadProgressProvider);
+    final l = AppLocalizations.of(context);
+    return Padding(
+      key: const ValueKey('composer.attachments'),
+      padding: const EdgeInsets.only(bottom: DsSpace.s4),
+      child: Semantics(
+        container: true,
+        label: l.composerAttachments(attach.attachments.length),
+        child: ListenableBuilder(
+          listenable: progress,
+          builder: (context, _) => Wrap(
+            spacing: DsSpace.s6,
+            runSpacing: DsSpace.s6,
+            children: [
+              for (final a in attach.attachments)
+                () {
+                  OutboxEntryView? view;
+                  for (final v in outbox) {
+                    if (v.id == a.entryId) view = v;
+                  }
+                  final code = view?.failureCode;
+                  return UploadChip(
+                    attachmentKey: a.key,
+                    name: a.name,
+                    sizeBytes: a.sizeBytes,
+                    // A confirmed upload left the outbox: the server checks the file now.
+                    state: view == null
+                        ? AttachmentState.checking
+                        : stateOfUpload(view),
+                    percent: ((progress.fractionOf(a.key) ?? 0) * 100).round(),
+                    reason: code == null
+                        ? null
+                        : uploadFailureText(
+                            l,
+                            code,
+                            reason: view?.failureReason,
+                          ),
+                    onRemove: () => unawaited(attach.remove(a.key)),
+                    onRetry: () => unawaited(attach.retry(a.key)),
+                  );
+                }(),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  /// [child] with the drop area and the paste key of [attach] (brief M4-22 Scope).
+  Widget _withFiles(AttachController? attach, Widget child) {
+    if (attach == null) return child;
+    return AttachDropTarget(
+      controller: attach,
+      child: AttachPasteShortcut(
+        controller: attach,
+        paste: ref.read(filePortsProvider).paste,
+        scratch: () async => ref.read(outgoingFolderProvider),
+        child: child,
+      ),
+    );
+  }
+
+  String? _refusalText(AppLocalizations l, AttachRefusal? refusal) {
+    final locale = Localizations.localeOf(context).languageCode;
+    return switch (refusal) {
+      null => null,
+      FileTooLarge(:final name, :final limitBytes) => l.composerFileTooLarge(
+        dsIsolate(name),
+        fileSizeLabel(l, limitBytes, locale: locale),
+      ),
+      TooManyFiles(:final limit) => l.composerTooManyFiles(limit),
+      FileUnreadable(:final name) => l.composerFileUnreadable(dsIsolate(name)),
+    };
   }
 
   /// Prepares a reply to [message] of [authorName] and puts the focus into the field.
@@ -136,9 +250,14 @@ class ThreadComposerState extends ConsumerState<ThreadComposer> {
     final config = ref.watch(appConfigProvider);
     final me = ref.watch(myPrincipalIdProvider);
     final principals = ref.watch(principalsByIdProvider).value ?? const {};
+    final limits = ref.watch(instanceLimitsProvider).value;
     composer
       ..principals = principals
-      ..limits = ref.watch(instanceLimitsProvider).value;
+      ..limits = limits;
+    final attach = _attach;
+    final voice = _voice;
+    final maxVoice = limits?.voiceMaxDurationMs;
+    voice?.limit = maxVoice == null ? null : Duration(milliseconds: maxVoice);
     final phase = ref.watch(connectionStateProvider).value?.phase;
     final offline =
         phase == null ||
@@ -189,6 +308,20 @@ class ThreadComposerState extends ConsumerState<ThreadComposer> {
               DsTone.danger,
               l.composerTooLong(limit),
             ),
+          if (_refusalText(l, attach?.refusal) case final refused?)
+            note(
+              const ValueKey('composer.attachError'),
+              DsTone.danger,
+              refused,
+            ),
+          if (attach != null && attach.dragging)
+            note(
+              const ValueKey('composer.dropHint'),
+              DsTone.info,
+              l.composerDropFiles,
+            ),
+          if (attach != null && attach.attachments.isNotEmpty) _chips(attach),
+          if (voice != null) VoiceRecordingBar(controller: voice),
           if (composer.replyTo != null)
             Padding(
               key: const ValueKey('composer.reply'),
@@ -221,35 +354,49 @@ class ThreadComposerState extends ConsumerState<ThreadComposer> {
                   onChoice: _template,
                 ),
               Expanded(
-                child: Focus(
-                  canRequestFocus: false,
-                  skipTraversal: true,
-                  onFocusChange: composer.setFocused,
-                  child: DsComposer(
-                    key: const ValueKey('composer'),
-                    targetName: widget.targetName,
-                    maxLines: config.composerMaxLines,
-                    enterSends: ref.watch(personalSettingsProvider).enterSends,
-                    controller: composer.text,
-                    onChanged: composer.onChanged,
-                    onSend: (text) => unawaited(composer.send(text)),
-                    onEditLast: widget.onEditLast,
-                    offline: offline,
-                    readOnly: permissions.readOnly,
-                    typingNames: typing,
-                    suggestions: [
-                      for (final p in composer.suggestions)
-                        DsSuggestion(
-                          id: p.id.value,
-                          command: '@${p.handle}',
-                          description: p.displayName,
-                        ),
-                    ],
-                    onAcceptSuggestion: (s) {
-                      final p = principals[PrincipalId.parse(s.id)];
-                      if (p != null) composer.acceptSuggestion(p);
-                    },
-                    onDismissSuggestions: composer.dismissSuggestions,
+                child: _withFiles(
+                  attach,
+                  Focus(
+                    canRequestFocus: false,
+                    skipTraversal: true,
+                    onFocusChange: composer.setFocused,
+                    child: DsComposer(
+                      key: const ValueKey('composer'),
+                      targetName: widget.targetName,
+                      maxLines: config.composerMaxLines,
+                      enterSends: ref
+                          .watch(personalSettingsProvider)
+                          .enterSends,
+                      controller: composer.text,
+                      onChanged: composer.onChanged,
+                      onSend: (text) => unawaited(composer.send(text)),
+                      onEditLast: widget.onEditLast,
+                      offline: offline,
+                      readOnly: permissions.readOnly,
+                      typingNames: typing,
+                      suggestions: [
+                        for (final p in composer.suggestions)
+                          DsSuggestion(
+                            id: p.id.value,
+                            command: '@${p.handle}',
+                            description: p.displayName,
+                          ),
+                      ],
+                      onAcceptSuggestion: (s) {
+                        final p = principals[PrincipalId.parse(s.id)];
+                        if (p != null) composer.acceptSuggestion(p);
+                      },
+                      onDismissSuggestions: composer.dismissSuggestions,
+                      // M4-22: the attachment button, the microphone, and sending a message
+                      // of attachments only.
+                      onAttach: attach == null || permissions.readOnly
+                          ? null
+                          : () => unawaited(_pick()),
+                      onVoice: voice == null || permissions.readOnly
+                          ? null
+                          : () => unawaited(voice.start()),
+                      hasAttachments: attach?.attachments.isNotEmpty ?? false,
+                    ),
                   ),
                 ),
               ),

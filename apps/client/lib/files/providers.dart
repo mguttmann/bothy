@@ -5,12 +5,16 @@
 /// query the database or the server themselves.
 library;
 
+import 'dart:io';
+import 'dart:math';
+
 import 'package:domain/domain.dart';
 import 'package:local_store/local_store.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 
 import '../app/providers/ports.dart';
 import '../app/providers/session.dart';
+import '../voice/transcript_view.dart';
 import 'download_service.dart';
 import 'file_cache.dart';
 import 'file_ports.dart';
@@ -90,4 +94,57 @@ Future<DownloadResult?> thumbnail(
   final downloads = ref.watch(downloadServiceProvider);
   if (downloads == null || meta == null) return null;
   return downloads.fetch(meta.id, variant: variant);
+}
+
+/// The transcript operations of the signed-in instance (12 8.2), or null.
+@Riverpod(keepAlive: true)
+FileTranscripts? fileTranscripts(Ref ref) {
+  final engine = ref.watch(syncEngineProvider);
+  return engine == null ? null : FileTranscripts(engine.api);
+}
+
+/// The transcript text of [fileId] once `file.updated` reports `transcript_status = done`
+/// (12 8.2); null before. Read again on every change of the file.
+@riverpod
+Future<String?> transcriptText(Ref ref, String fileId) async {
+  final meta = ref.watch(fileMetaProvider(fileId)).value;
+  final transcripts = ref.watch(fileTranscriptsProvider);
+  if (meta == null ||
+      transcripts == null ||
+      meta.transcriptStatus != TranscriptStatus.done) {
+    return null;
+  }
+  return transcripts.text(meta.id);
+}
+
+/// Makes the attachment keys of the composers: UUIDv7 of the instance, or of a secure source
+/// of their own without one (tests).
+@Riverpod(keepAlive: true)
+String Function() attachmentKeys(Ref ref) {
+  final ids = ref.watch(signedInServicesProvider)?.ids;
+  if (ids != null) return ids.next;
+  final random = Random.secure();
+  return Uuid7Generator(
+    nowMillis: () => DateTime.now().millisecondsSinceEpoch,
+    random: (bits) {
+      var value = 0;
+      for (var left = bits; left > 0; left -= 30) {
+        final take = left > 30 ? 30 : left;
+        value = (value << take) | random.nextInt(1 << take);
+      }
+      return value;
+    },
+  ).next;
+}
+
+/// The folder of the files the app writes before their upload (recordings, pasted images):
+/// `<instance folder>/outgoing`, which the wipe deletes with the instance (D-M4-22-5).
+@Riverpod(keepAlive: true)
+Directory outgoingFolder(Ref ref) {
+  final cache = ref.watch(fileCacheProvider);
+  return cache == null
+      ? Directory(
+          '${Directory.systemTemp.path}${Platform.pathSeparator}outgoing',
+        )
+      : Directory('${cache.root.parent.path}${Platform.pathSeparator}outgoing');
 }

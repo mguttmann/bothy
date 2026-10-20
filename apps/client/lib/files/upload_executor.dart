@@ -96,12 +96,13 @@ abstract final class UploadOps {
 
   /// The upload entry of [source] in [threadId] of [channelId] for the attachment [key]; the
   /// entry shows in the thread's outbox, but sends in its own lane so a long upload never
-  /// holds the other writes of the thread.
+  /// holds the other writes of the thread. [owned] deletes the local file after the upload.
   static OutboxRequest request({
     required ThreadId threadId,
     required ChannelId channelId,
     required UploadSource source,
     required String key,
+    bool owned = false,
   }) => OutboxRequest(
     kind: upload,
     threadId: threadId,
@@ -113,6 +114,8 @@ abstract final class UploadOps {
       'sha256': source.sha256,
       'declared_mime_type': source.mimeType,
       'attachment_key': key,
+      // A file the app wrote (a recording, a pasted image) goes after its upload.
+      if (owned) 'delete_after': true,
     },
   );
 
@@ -240,6 +243,13 @@ abstract final class UploadOps {
       ),
     );
     progress._complete(key, fileId);
+    if (p['delete_after'] == true) {
+      try {
+        await local.delete();
+      } on FileSystemException {
+        // The wipe of the instance folder takes it later.
+      }
+    }
     return OutboxResponse(
       status: done.statusCode,
       body: done.data,

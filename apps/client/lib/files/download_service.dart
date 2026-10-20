@@ -97,11 +97,10 @@ final class DownloadService {
     String? name,
   }) {
     final key = '${fileId.value}/$variant';
-    return _running[key] ??= _fetch(
-      fileId,
-      variant,
-      name,
-    ).whenComplete(() => _running.remove(key));
+    return _running[key] ??= _fetch(fileId, variant, name).whenComplete(() {
+      // A block body: the removed future must not become the result of the callback.
+      _running.remove(key);
+    });
   }
 
   Future<DownloadResult> _fetch(

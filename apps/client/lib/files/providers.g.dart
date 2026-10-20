@@ -586,3 +586,241 @@ final class ThumbnailFamily extends $Family
   @override
   String toString() => r'thumbnailProvider';
 }
+
+/// The transcript operations of the signed-in instance (12 8.2), or null.
+
+@ProviderFor(fileTranscripts)
+final fileTranscriptsProvider = FileTranscriptsProvider._();
+
+/// The transcript operations of the signed-in instance (12 8.2), or null.
+
+final class FileTranscriptsProvider
+    extends
+        $FunctionalProvider<
+          FileTranscripts?,
+          FileTranscripts?,
+          FileTranscripts?
+        >
+    with $Provider<FileTranscripts?> {
+  /// The transcript operations of the signed-in instance (12 8.2), or null.
+  FileTranscriptsProvider._()
+    : super(
+        from: null,
+        argument: null,
+        retry: null,
+        name: r'fileTranscriptsProvider',
+        isAutoDispose: false,
+        dependencies: null,
+        $allTransitiveDependencies: null,
+      );
+
+  @override
+  String debugGetCreateSourceHash() => _$fileTranscriptsHash();
+
+  @$internal
+  @override
+  $ProviderElement<FileTranscripts?> $createElement($ProviderPointer pointer) =>
+      $ProviderElement(pointer);
+
+  @override
+  FileTranscripts? create(Ref ref) {
+    return fileTranscripts(ref);
+  }
+
+  /// {@macro riverpod.override_with_value}
+  Override overrideWithValue(FileTranscripts? value) {
+    return $ProviderOverride(
+      origin: this,
+      providerOverride: $SyncValueProvider<FileTranscripts?>(value),
+    );
+  }
+}
+
+String _$fileTranscriptsHash() => r'e533b9184d66627bdd3b1321256570aa45559a95';
+
+/// The transcript text of [fileId] once `file.updated` reports `transcript_status = done`
+/// (12 8.2); null before. Read again on every change of the file.
+
+@ProviderFor(transcriptText)
+final transcriptTextProvider = TranscriptTextFamily._();
+
+/// The transcript text of [fileId] once `file.updated` reports `transcript_status = done`
+/// (12 8.2); null before. Read again on every change of the file.
+
+final class TranscriptTextProvider
+    extends $FunctionalProvider<AsyncValue<String?>, String?, FutureOr<String?>>
+    with $FutureModifier<String?>, $FutureProvider<String?> {
+  /// The transcript text of [fileId] once `file.updated` reports `transcript_status = done`
+  /// (12 8.2); null before. Read again on every change of the file.
+  TranscriptTextProvider._({
+    required TranscriptTextFamily super.from,
+    required String super.argument,
+  }) : super(
+         retry: null,
+         name: r'transcriptTextProvider',
+         isAutoDispose: true,
+         dependencies: null,
+         $allTransitiveDependencies: null,
+       );
+
+  @override
+  String debugGetCreateSourceHash() => _$transcriptTextHash();
+
+  @override
+  String toString() {
+    return r'transcriptTextProvider'
+        ''
+        '($argument)';
+  }
+
+  @$internal
+  @override
+  $FutureProviderElement<String?> $createElement($ProviderPointer pointer) =>
+      $FutureProviderElement(pointer);
+
+  @override
+  FutureOr<String?> create(Ref ref) {
+    final argument = this.argument as String;
+    return transcriptText(ref, argument);
+  }
+
+  @override
+  bool operator ==(Object other) {
+    return other is TranscriptTextProvider && other.argument == argument;
+  }
+
+  @override
+  int get hashCode {
+    return argument.hashCode;
+  }
+}
+
+String _$transcriptTextHash() => r'6d9d0f935bc622e90e175108f0a7c0980e68d059';
+
+/// The transcript text of [fileId] once `file.updated` reports `transcript_status = done`
+/// (12 8.2); null before. Read again on every change of the file.
+
+final class TranscriptTextFamily extends $Family
+    with $FunctionalFamilyOverride<FutureOr<String?>, String> {
+  TranscriptTextFamily._()
+    : super(
+        retry: null,
+        name: r'transcriptTextProvider',
+        dependencies: null,
+        $allTransitiveDependencies: null,
+        isAutoDispose: true,
+      );
+
+  /// The transcript text of [fileId] once `file.updated` reports `transcript_status = done`
+  /// (12 8.2); null before. Read again on every change of the file.
+
+  TranscriptTextProvider call(String fileId) =>
+      TranscriptTextProvider._(argument: fileId, from: this);
+
+  @override
+  String toString() => r'transcriptTextProvider';
+}
+
+/// Makes the attachment keys of the composers: UUIDv7 of the instance, or of a secure source
+/// of their own without one (tests).
+
+@ProviderFor(attachmentKeys)
+final attachmentKeysProvider = AttachmentKeysProvider._();
+
+/// Makes the attachment keys of the composers: UUIDv7 of the instance, or of a secure source
+/// of their own without one (tests).
+
+final class AttachmentKeysProvider
+    extends
+        $FunctionalProvider<
+          String Function(),
+          String Function(),
+          String Function()
+        >
+    with $Provider<String Function()> {
+  /// Makes the attachment keys of the composers: UUIDv7 of the instance, or of a secure source
+  /// of their own without one (tests).
+  AttachmentKeysProvider._()
+    : super(
+        from: null,
+        argument: null,
+        retry: null,
+        name: r'attachmentKeysProvider',
+        isAutoDispose: false,
+        dependencies: null,
+        $allTransitiveDependencies: null,
+      );
+
+  @override
+  String debugGetCreateSourceHash() => _$attachmentKeysHash();
+
+  @$internal
+  @override
+  $ProviderElement<String Function()> $createElement(
+    $ProviderPointer pointer,
+  ) => $ProviderElement(pointer);
+
+  @override
+  String Function() create(Ref ref) {
+    return attachmentKeys(ref);
+  }
+
+  /// {@macro riverpod.override_with_value}
+  Override overrideWithValue(String Function() value) {
+    return $ProviderOverride(
+      origin: this,
+      providerOverride: $SyncValueProvider<String Function()>(value),
+    );
+  }
+}
+
+String _$attachmentKeysHash() => r'657867e936669f002387f3c5d055a7689d55ac0d';
+
+/// The folder of the files the app writes before their upload (recordings, pasted images):
+/// `<instance folder>/outgoing`, which the wipe deletes with the instance (D-M4-22-5).
+
+@ProviderFor(outgoingFolder)
+final outgoingFolderProvider = OutgoingFolderProvider._();
+
+/// The folder of the files the app writes before their upload (recordings, pasted images):
+/// `<instance folder>/outgoing`, which the wipe deletes with the instance (D-M4-22-5).
+
+final class OutgoingFolderProvider
+    extends $FunctionalProvider<Directory, Directory, Directory>
+    with $Provider<Directory> {
+  /// The folder of the files the app writes before their upload (recordings, pasted images):
+  /// `<instance folder>/outgoing`, which the wipe deletes with the instance (D-M4-22-5).
+  OutgoingFolderProvider._()
+    : super(
+        from: null,
+        argument: null,
+        retry: null,
+        name: r'outgoingFolderProvider',
+        isAutoDispose: false,
+        dependencies: null,
+        $allTransitiveDependencies: null,
+      );
+
+  @override
+  String debugGetCreateSourceHash() => _$outgoingFolderHash();
+
+  @$internal
+  @override
+  $ProviderElement<Directory> $createElement($ProviderPointer pointer) =>
+      $ProviderElement(pointer);
+
+  @override
+  Directory create(Ref ref) {
+    return outgoingFolder(ref);
+  }
+
+  /// {@macro riverpod.override_with_value}
+  Override overrideWithValue(Directory value) {
+    return $ProviderOverride(
+      origin: this,
+      providerOverride: $SyncValueProvider<Directory>(value),
+    );
+  }
+}
+
+String _$outgoingFolderHash() => r'a27677837bba0d4ae67b435915dbba1f3f21c9d5';

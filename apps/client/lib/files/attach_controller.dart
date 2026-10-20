@@ -181,13 +181,16 @@ final class AttachController extends ChangeNotifier {
       } on FileSystemException {
         return _refuse(FileUnreadable(f.name));
       }
-      _items.add(await _enqueue(source));
+      _items.add(await _enqueue(source, owned: f.owned));
       notifyListeners();
     }
     return true;
   }
 
-  Future<PendingAttachment> _enqueue(UploadSource source) async {
+  Future<PendingAttachment> _enqueue(
+    UploadSource source, {
+    bool owned = false,
+  }) async {
     final key = _newKey();
     final entry = await _outbox.enqueue(
       UploadOps.request(
@@ -195,6 +198,7 @@ final class AttachController extends ChangeNotifier {
         channelId: channel,
         source: source,
         key: key,
+        owned: owned,
       ),
     );
     return PendingAttachment(
@@ -264,7 +268,7 @@ final class AttachController extends ChangeNotifier {
       name: file.path.split(Platform.pathSeparator).last,
       mimeType: 'audio/mp4',
     );
-    return _attachmentsOf([await _enqueue(source)]);
+    return _attachmentsOf([await _enqueue(source, owned: true)]);
   }
 }
 

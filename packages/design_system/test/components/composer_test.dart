@@ -21,6 +21,7 @@ Widget _composer({
   List<DsSuggestion> suggestions = const [],
   ValueChanged<DsSuggestion>? onAcceptSuggestion,
   VoidCallback? onDismissSuggestions,
+  bool hasAttachments = false,
 }) => DsComposer(
   targetName: 'general',
   followupAgentName: followupAgentName,
@@ -36,6 +37,7 @@ Widget _composer({
   suggestions: suggestions,
   onAcceptSuggestion: onAcceptSuggestion,
   onDismissSuggestions: onDismissSuggestions,
+  hasAttachments: hasAttachments,
 );
 
 Future<void> _focus(WidgetTester tester) async {
@@ -148,6 +150,18 @@ void main() {
       findsOneWidget,
     );
     expect(find.text(l.composerTypingSeveral), findsOneWidget);
+  });
+
+  testWidgets('attachments allow sending without text (M4-22)', (tester) async {
+    final l = await en();
+    final sent = <String>[];
+    await pumpDs(tester, _composer(onSend: sent.add, hasAttachments: true));
+    expect(
+      tester.getSemantics(find.bySemanticsLabel(l.composerSend)),
+      isSemantics(isButton: true, hasEnabledState: true, isEnabled: true),
+    );
+    await tester.tap(find.bySemanticsLabel(l.composerSend));
+    expect(sent, ['']);
   });
 
   testWidgets('incomplete options disable send with the reason', (
