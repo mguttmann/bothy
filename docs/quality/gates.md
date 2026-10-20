@@ -30,7 +30,7 @@ once for the components of the plan, the tests split by component
 | `gates` | `fmt-check codegen-check lint typecheck arch register-check migrations-lint flag-check commitlint runners-check labels-check release-pins` | always |
 | `gates (docs and contracts)` | `docs config-doc-check linkcheck diagrams catalog-check api-lint api-checks api-breaking ops-check api-clients tokens` | always |
 | `gates (security and supply chain)` | `gitleaks semgrep trivy osv licenses` | always |
-| `test (tools)` | `test coverage` with no component (the Python tools) | when the plan needs it |
+| `test (tools)` | `test coverage` with no component (the Python tools) | always |
 | `test (server)` | `test coverage COMPONENTS=server AREAS=none` | when the plan needs it |
 | `test (apps)` | `test coverage COMPONENTS=apps AREAS=none` (Dart and JVM) | when the plan needs it |
 | `test (SDKs and plugins)` | `test coverage` for the planned `sdk-python`, `sdk-typescript`, `plugins` with `AREAS=none` | when the plan needs it |
@@ -44,13 +44,14 @@ One plan decides which jobs a change needs: `tools/ci/components.py ci-plan`, th
 that the gates (`COMPONENTS`) and the pre-push plan (`tools/hooks/push_plan.py`) use. The job
 `plan` of `ci.yml` and of `build-verify.yml` runs it and writes `components` and `jobs`; each
 conditional job runs exactly when `jobs` lists its id, and no other condition skips it
-(`tools/ci/tests/test_ci_ok.py`). The other jobs (`plan`, the three `gates` jobs, the deny list,
-`sonar`, `ci-ok`) run on every change.
+(`tools/ci/tests/test_ci_ok.py`). The other jobs (`plan`, the three `gates` jobs, `test (tools)`,
+the deny list, `sonar`, `ci-ok`) run on every change: the tools tests read workflows, the
+Makefile, docs and manifests, and some build component sources for other platforms (the release
+builds of server and host service).
 
 | Jobs | Run when the change touches |
 |---|---|
 | `test (server)`, `test (apps)`, `test (SDKs and plugins)` | their component in the component map (`server`; `apps`; `sdk-python`, `sdk-typescript` or `plugins`) |
-| `test (tools)` | any file that is not a source file of a component (a `.go`, `.dart`, `.ts`, `.tsx`, `.kt`, `.swift` or `.py` file under `services/`, `apps/`, `packages/`, `sdk/`, `plugins/`), because the tools tests read workflows, the Makefile, docs and manifests; the tools tests that read component sources run in the component test jobs |
 | `apps (macOS)`, `apps (Windows)`, `apps (Android API 26)`, `apps (Android API 36)` | `apps/`, `packages/` (with the native code of the members), the root `pubspec.yaml` (Flutter pin) or `pubspec.lock`; the Android jobs only in the public phase. Other inputs of the component `apps` (`design/`, the SLO generator, `analysis_options.yaml`, `tools/arch-check/`) feed the Dart gates and committed generated files under `packages/`, which `test (apps)` checks |
 | `postgres-image (amd64)`, `postgres-image (arm64)` | what `bothy-postgres` is built and tested from: `services/server/images/bothy-postgres/`, `internal/`, `cmd/bothy-backupd/`, `migrations/`, `migrations.sha256`, `test/postgresimage/`, `go.mod`, `go.sum`, `VERSION` and `.golangci.yml` under `services/server/` |
 
@@ -58,10 +59,10 @@ Every job runs on a push to `main`, on a manual run, for an empty diff and when 
 changes: every path the component map assigns to no component (among them the `Makefile`,
 `tools/` outside the few tool folders it assigns to a component, `.github/`, the root
 configuration files) and the API contract `docs/api/`. A release (`release.yml` calls `ci.yml`)
-runs the jobs of the components of its tag and `test (tools)`. Documentation (`docs/` outside
-`docs/api/`, `infra/`, the root Markdown files, `LICENSE`, `NOTICE`) needs only `test (tools)` of
-the conditional jobs, except the files the map assigns to a component (for example
-`docs/spec/actions.yaml` to `server`).
+runs the jobs of the components of its tag. Documentation (`docs/` outside `docs/api/`, `infra/`,
+the root Markdown files, `LICENSE`, `NOTICE`) needs no conditional job, except the files the map
+assigns to a component (for example `docs/spec/actions.yaml` to `server`). The plan reads the diff
+without rename detection, so a moved file counts for its old and its new path.
 
 A skip never hides a failure: `ci-ok` has no `needs`, so it runs the same plan step on the same
 commit itself and accepts a skipped conditional job only when the plan did not list it; a job that

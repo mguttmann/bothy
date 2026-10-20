@@ -125,7 +125,6 @@ jobs:
   test-tools:
     name: test (tools)
     needs: plan
-    if: contains(format(' {0} ', needs.plan.outputs.jobs), ' test-tools ')
     runs-on: ubuntu-24.04
     timeout-minutes: 60
     steps:

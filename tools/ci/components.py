@@ -81,25 +81,25 @@ NO_COMPONENT_ROOT_FILES = re.compile(r"^[^/]+\.md$|^(?:LICENSE|NOTICE)$")
 # except the few in TOOLS_SOURCE_TESTS of the Makefile, which every component test job runs too
 # (`AREAS=none`); manifests, lock files, configuration, test data and docs of a component are no
 # source files, because tools tests read some of them (go.mod, Dockerfile, .golangci.yml). The
-# pre-push plan (tools/hooks/push_plan.py) and ci_plan decide the tools tests by it.
+# pre-push plan (tools/hooks/push_plan.py) decides the tools tests by it. CI runs them on every
+# change, because some also build component sources for other platforms (the release builds).
 COMPONENT_DIRS = ("services/", "apps/", "packages/", "sdk/", "plugins/")
 SOURCE_SUFFIXES = (".go", ".dart", ".ts", ".tsx", ".kt", ".swift", ".py")
 
 # ---- CI jobs a change needs (docs/quality/gates.md, "Jobs a change needs") -----------------
-# Job ids, the same in ci.yml and build-verify.yml. Every other job runs on every change.
+# Job ids, the same in ci.yml and build-verify.yml. Every other job runs on every change, test
+# (tools) included.
 COMPONENT_TEST_JOBS: dict[str, tuple[str, ...]] = {
     "test-server": ("server",),
     "test-apps": ("apps",),
     "test-sdk-plugins": ("sdk-python", "sdk-typescript", "plugins"),
 }
-TOOLS_TEST_JOB = "test-tools"
 DESKTOP_JOBS = ("apps-macos", "apps-windows")
 # The emulator jobs run only while the repository is public (docs/DECISIONS.md D-M5-01-5).
 ANDROID_JOBS = ("apps-android-26", "apps-android-36")
 POSTGRES_IMAGE_JOBS = ("postgres-image-amd64", "postgres-image-arm64")
 CONDITIONAL_JOBS: tuple[str, ...] = (
     *COMPONENT_TEST_JOBS,
-    TOOLS_TEST_JOB,
     *DESKTOP_JOBS,
     *ANDROID_JOBS,
     *POSTGRES_IMAGE_JOBS,
@@ -206,8 +206,7 @@ def ci_plan(
         files: the changed files of a pull request or build branch. An empty list, a shared
             input (`changed` gives `all`) or the API contract runs every job.
         selected: gate components without a diff (`all` for a push to main or a manual run,
-            the gate components of a release tag); every job of these components runs, and
-            the tools tests always.
+            the gate components of a release tag); every job of these components runs.
         public: whether the repository is public; the Android emulator jobs need it.
 
     Returns:
@@ -223,7 +222,6 @@ def ci_plan(
     if files is not None:
         names = changed(files) if files else ["all"]
         full = names == ["all"] or any(f.startswith(API_PREFIX) for f in files)
-        tools = any(not is_component_source(f) for f in files)
         platform = any(f.startswith(PLATFORM_PREFIXES) or f in PLATFORM_FILES for f in files)
         postgres = any(
             f.startswith(POSTGRES_IMAGE_PREFIXES) or f in POSTGRES_IMAGE_FILES for f in files
@@ -234,14 +232,11 @@ def ci_plan(
         if unknown:
             raise ValueError(f"unknown component '{unknown[0]}'")
         full = "all" in names
-        tools = True
         platform = "apps" in names
         postgres = "server" in names
     jobs: set[str] = set(CONDITIONAL_JOBS) if full else set()
     if not full:
         jobs.update(job for job, owners in COMPONENT_TEST_JOBS.items() if set(owners) & set(names))
-        if tools:
-            jobs.add(TOOLS_TEST_JOB)
         if platform:
             jobs.update((*DESKTOP_JOBS, *ANDROID_JOBS))
         if postgres:
@@ -387,7 +382,8 @@ def pinned_server_problems(repo: Path) -> list[str]:
 
 def _diff_files(base: str, head: str) -> list[str]:
     out = subprocess.run(
-        ["git", "diff", "--name-only", f"{base}...{head}"],
+        # --no-renames lists the old path of a moved file too, so it counts for its old place.
+        ["git", "diff", "--name-only", "--no-renames", f"{base}...{head}"],
         check=True,
         capture_output=True,
         text=True,

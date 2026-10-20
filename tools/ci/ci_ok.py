@@ -69,7 +69,7 @@ RULES = (
     Rule(("gates",), SUCCESS),
     Rule(("gates (docs and contracts)",), SUCCESS),
     Rule(("gates (security and supply chain)",), SUCCESS),
-    Rule(("test (tools)",), SUCCESS, "test-tools"),
+    Rule(("test (tools)",), SUCCESS),
     Rule(("test (server)",), SUCCESS, "test-server"),
     Rule(("test (apps)",), SUCCESS, "test-apps"),
     Rule(("test (SDKs and plugins)",), SUCCESS, "test-sdk-plugins"),

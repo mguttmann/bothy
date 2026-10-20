@@ -94,7 +94,7 @@ def test_a_plan_without_conditional_jobs_accepts_their_skips() -> None:
     ("value", "expected"),
     [
         ("none", frozenset()),
-        ("test-server test-tools", frozenset({"test-server", "test-tools"})),
+        ("test-server test-apps", frozenset({"test-server", "test-apps"})),
         (" test-apps ", frozenset({"test-apps"})),
     ],
 )
@@ -349,6 +349,7 @@ def test_superseded_pull_request_runs_are_cancelled() -> None:
 GREEN_NEEDS = {
     "plan": "success",
     "static": "success",
+    "test-tools": "success",
     "denylist": "success",
     **dict.fromkeys(components.CONDITIONAL_JOBS, "success"),
 }
@@ -373,6 +374,7 @@ def test_needs_check_accepts_a_skip_only_when_the_plan_left_the_job_out(job: str
         ("plan", "failure", "plan: failure"),
         ("plan", "skipped", "plan: skipped"),
         ("static", "skipped", "static: skipped"),
+        ("test-tools", "skipped", "test-tools: skipped"),
         ("denylist", "cancelled", "denylist: cancelled"),
     ],
 )

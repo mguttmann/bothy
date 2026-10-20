@@ -283,12 +283,11 @@ jobs:
           COMPONENTS: ${{ needs.plan.outputs.components }}
         run: make gitleaks semgrep trivy osv licenses COMPONENTS="$COMPONENTS"
 
-  # The tests of the Python tools and their coverage: no component selected. Skipped when the
-  # change is component source files alone (tools/ci/components.py is_component_source).
+  # The tests of the Python tools and their coverage: no component selected. On every change:
+  # some also build component sources for other platforms (the release builds).
   test-tools:
     name: test (tools)
     needs: plan
-    if: contains(format(' {0} ', needs.plan.outputs.jobs), ' test-tools ')
     runs-on: ubuntu-24.04
     timeout-minutes: 60
     steps:
