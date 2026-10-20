@@ -47,6 +47,9 @@ go test -race -count=1 ./test/canary/... ./test/harness/...
   `scenario_files.go` is the path "file name" (M3-03): an upload of Alex whose name is a canary
   of a scope no observer reads (before attachment only the uploader reads a file), with a part,
   completion, `getUpload`, `getFile`, an aborted second upload and a `413` and a `400` with it.
+  `scenario_terminal.go` drives the terminal sessions (M2-44): a host paired and confirmed by the
+  owner and connected by a Fake-Host, a shell opened, listed, read, attached and closed; the session
+  tokens of the grants are registered as secrets.
 
 ## Sinks
 
