@@ -29,6 +29,9 @@ import (
 	"github.com/OWNER/bothy/services/server/internal/wire"
 )
 
+// The presence tests of M2-20 run one after the other: each builds its own world on its own
+// database, and the shared CI runner starts the processes of internal/wire at the same time.
+//
 // The windows of the presence tests of M2-20 (short and unequal; no test depends on a default):
 // agent.presence_timeout, agent.heartbeat_persist_interval, billing.mismatch_alert_after and
 // sync.heartbeat_interval.
@@ -190,7 +193,6 @@ const (
 // warning billing_mode_mismatch appears only after billing.mismatch_alert_after; back to
 // organization ends it with a second change entry.
 func TestBR05_ServerPart_ActualDiffersFromDesired(t *testing.T) {
-	t.Parallel()
 	w := newEmptyWorld(t)
 	agent := w.agent("support-agent")
 	p := w.beatOK("support-agent", bodyOrg)
@@ -238,7 +240,6 @@ func TestBR05_ServerPart_ActualDiffersFromDesired(t *testing.T) {
 // TestBR05_ServerPart_UnknownEvidence: key_type unknown without a reported mode warns at once and
 // lets the mismatch age grow; nothing else changes what authorize allows.
 func TestBR05_ServerPart_UnknownEvidence(t *testing.T) {
-	t.Parallel()
 	w := newEmptyWorld(t)
 	agent := w.agent("support-agent")
 	body := `{"state":"online","billing_evidence":{"key_type":"unknown"}}`
@@ -256,7 +257,6 @@ func TestBR05_ServerPart_UnknownEvidence(t *testing.T) {
 // audited at once; active_runs is stored with the next flush as run id strings; the server writes
 // no durable event.
 func TestBR05_ServerPart_ChangeDuringRun(t *testing.T) {
-	t.Parallel()
 	w := newEmptyWorld(t)
 	agent := w.agent("support-agent")
 	run := ids.New().String()
@@ -283,7 +283,6 @@ func TestBR05_ServerPart_ChangeDuringRun(t *testing.T) {
 // TestBR05_ServerPart_DesiredNotSupported: configured personal, no reported mode and only
 // organization supported warns billing_mode_unsupported; both modes end it.
 func TestBR05_ServerPart_DesiredNotSupported(t *testing.T) {
-	t.Parallel()
 	w := newEmptyWorld(t)
 	agent := w.agent("support-agent")
 	w.wantOK(w.setPersonal(agent, w.owner))
@@ -300,7 +299,6 @@ func TestBR05_ServerPart_DesiredNotSupported(t *testing.T) {
 // policy source at once without a new permission_version; with a configured host class a
 // reported chat leaves the effective class host.
 func TestReportedToolClassImmediateAndOnlyRaises(t *testing.T) {
-	t.Parallel()
 	w := newEmptyWorld(t)
 	agent := w.agent("support-agent")
 	policies := wire.NewAgentPolicySource(w.pool)
@@ -326,7 +324,6 @@ func TestReportedToolClassImmediateAndOnlyRaises(t *testing.T) {
 // rl.agent_runtime; a person who is no owner and an app get 404, the owner 403
 // subject_kind_not_allowed, all audited as aggregated denials.
 func TestSendHeartbeatRightsAndRoute(t *testing.T) {
-	t.Parallel()
 	i := slices.IndexFunc(routes.Enabled(), func(o routes.Operation) bool { return o.ID == "sendHeartbeat" })
 	if i < 0 || routes.Enabled()[i].Action != "agent.heartbeat" || routes.Enabled()[i].RateLimitClass != "rl.agent_runtime" ||
 		routes.Enabled()[i].IdempotencyKey {
@@ -369,7 +366,6 @@ func TestSendHeartbeatRightsAndRoute(t *testing.T) {
 // TestSendHeartbeatValidationLeaksNothing (SEC-IN-1, BR-13 defence): a canary shaped like key
 // material in a code, a version, a name or a reason is refused with 400 and stored nowhere.
 func TestSendHeartbeatValidationLeaksNothing(t *testing.T) {
-	t.Parallel()
 	const canary = "QUJDREVGR0hJSktMTU5PUA/canary=="
 	w := newEmptyWorld(t)
 	agent := w.agent("support-agent")
@@ -404,7 +400,6 @@ func TestSendHeartbeatValidationLeaksNothing(t *testing.T) {
 // TestHeartbeatAuditOnActualChange: one entry per change of mode or class, none for a repeated
 // value; the same change sent to two server processes at once is audited exactly once.
 func TestHeartbeatAuditOnActualChange(t *testing.T) {
-	t.Parallel()
 	w := newEmptyWorld(t)
 	w.agent("support-agent")
 	w.beatOK("support-agent", bodyOrg)
@@ -433,7 +428,6 @@ func TestHeartbeatAuditOnActualChange(t *testing.T) {
 // TestPresenceFlushMonotoneAcrossInstances: process A goes offline for the agent while B stored
 // a newer heartbeat; A's flush does not overwrite B's row.
 func TestPresenceFlushMonotoneAcrossInstances(t *testing.T) {
-	t.Parallel()
 	w := newEmptyWorld(t)
 	agent := w.agent("support-agent")
 	w.beatOK("support-agent", bodyOrg)
@@ -455,7 +449,6 @@ func TestPresenceFlushMonotoneAcrossInstances(t *testing.T) {
 // a fresh heartbeat keeps it online until its start plus agent.presence_timeout; with an old one
 // it is offline at once.
 func TestPresenceStartRule(t *testing.T) {
-	t.Parallel()
 	w := newEmptyWorld(t)
 	fresh, old := w.agent("support-agent"), w.agent("runner")
 	w.sql(`UPDATE agents SET reported_runtime_state = 'online', last_heartbeat_at = $2 WHERE principal_id = $1`, fresh.String(), w.clk.Now().Add(-time.Second))
@@ -485,7 +478,6 @@ func TestPresenceStartRule(t *testing.T) {
 // TestPresenceShutdownFlush: a heartbeat right before the stop step is stored by it, and nothing
 // is published from then on.
 func TestPresenceShutdownFlush(t *testing.T) {
-	t.Parallel()
 	w := newEmptyWorld(t)
 	agent := w.agent("support-agent")
 	w.beatOK("support-agent", bodyOrg)
@@ -506,7 +498,6 @@ func TestPresenceShutdownFlush(t *testing.T) {
 // above billing.mismatch_alert_after after a lasting difference and 0 after it ends; with the rule
 // tests this proves metric, rule and the page route.
 func TestBillingModeMismatchAlarm(t *testing.T) {
-	t.Parallel()
 	w := newEmptyWorld(t)
 	w.agent("support-agent")
 	mp, reader := metricstest.Provider(t)
@@ -529,7 +520,6 @@ func TestBillingModeMismatchAlarm(t *testing.T) {
 // project_bindings.ready; the same list again does not call the port; ready false resets it; a
 // duplicate channel is 400 at /project_readiness.
 func TestHeartbeatProjectReadiness(t *testing.T) {
-	t.Parallel()
 	w := newPBWorld(t)
 	w.bind(w.projektA, "website")
 	readyOf := func() string {
