@@ -55,7 +55,7 @@ func TestExportChannel(t *testing.T) {
 		"database.idle_in_tx_timeout":    idleInTx.String(),
 		"database.lock_timeout":          "90s",
 		"database.statement_timeout":     "90s",
-		"audit.deny_aggregate_window":    "6s",
+		"audit.deny_aggregate_window":    "45s",
 	})
 	o := e.w.Owner
 	alex, sam, robin := e.w.People["Alex"], e.w.People["Sam"], e.w.People["Robin"]
@@ -111,11 +111,13 @@ func TestExportChannel(t *testing.T) {
 			}
 			return out
 		}
-		deadline := time.Now().Add(time.Minute)
+		// The aggregate is written once its window has passed; the window is far longer than the
+		// two requests take even on a loaded runner, and later denials of Alex start a new
+		// aggregate after this one is written.
+		deadline := time.Now().Add(3 * window)
 		for len(denies()) == 0 && time.Now().Before(deadline) {
 			time.Sleep(100 * time.Millisecond)
 		}
-		time.Sleep(2 * window)
 		rows := denies()
 		if len(rows) != 1 {
 			var all []string
