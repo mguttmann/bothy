@@ -491,7 +491,7 @@ operations:
     action: receive
     channel:
       $ref: '#/channels/gateway'
-    summary: Liveness signal with the last processed `seq`. Agents add their state; then `agent.heartbeat` is checked as well. Does not consume the `rl.gateway_connect` bucket, which counts only `identify` and `resume` (05 section 3).
+    summary: Liveness signal with the last processed `seq`. Agents add their state; then `agent.heartbeat` is checked as well. Does not consume the `rl.gateway_connect` bucket, which counts only `identify` and `resume` (05 section 3). Errors of the agent part answer `error` and keep the connection.
     messages:
     - $ref: '#/channels/gateway/messages/op.heartbeat'
     x-authz-action: gateway.connect

@@ -186,6 +186,7 @@ enabled:             # operationIds that have a handler; sorted ascending
   - revokeSession
   - revokeToken
   - rotateSigningKey
+  - sendHeartbeat
   - setAgentBillingMode
   - setAgentToolClass
   - setAllAgentsBillingMode
@@ -458,9 +459,6 @@ later:               # every other operationId of docs/api/openapi.yaml; sorted 
   - operation_id: searchThreadTitles
     etappe: M3
     ticket: M3-14
-  - operation_id: sendHeartbeat
-    etappe: M2
-    ticket: M2-20
   - operation_id: setChannelReadOnly
     etappe: M8
     ticket: M8-05

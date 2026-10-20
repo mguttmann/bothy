@@ -10,7 +10,8 @@ import (
 )
 
 // Reported is the actual state the adapter reported in its last stored heartbeat (03 agents,
-// reported_* columns). Nothing writes it before M2-20; the zero value is "no heartbeat".
+// reported_* columns and reported_details); the heartbeat of M2-20 writes it. The zero value is
+// "no heartbeat".
 type Reported struct {
 	// State is reported_runtime_state; unknown without a heartbeat.
 	State RuntimeState
@@ -24,6 +25,8 @@ type Reported struct {
 	LastHeartbeatAt time.Time
 	// BillingModesSupported comes from reported_details.billing_modes_supported.
 	BillingModesSupported []BillingMode
+	// Evidence comes from reported_details.billing_evidence; nil when not reported.
+	Evidence *Evidence
 }
 
 // Agent is the operating record of an agent principal, a row of agents (03 section 4.4). The

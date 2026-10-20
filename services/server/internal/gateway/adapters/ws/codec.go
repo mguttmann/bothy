@@ -121,7 +121,15 @@ func (d *Decoder) Decode(op string, raw json.RawMessage) (any, error) {
 		if err := strictUnmarshal(raw, &f); err != nil {
 			return nil, err
 		}
-		return app.Heartbeat{LastSeq: f.LastSeq, Agent: f.Agent != nil}, nil
+		// The member agent goes on raw: agents.Presence is the only mapping of the heartbeat body
+		// (brief M2-20 note 1); the schema check above already covered it.
+		var member struct {
+			Agent json.RawMessage `json:"agent"`
+		}
+		if err := json.Unmarshal(raw, &member); err != nil {
+			return nil, err
+		}
+		return app.Heartbeat{LastSeq: f.LastSeq, Agent: member.Agent}, nil
 	case "ack":
 		return decodeAck(raw)
 	case "reauth":
