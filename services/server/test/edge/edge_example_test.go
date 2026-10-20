@@ -31,7 +31,7 @@ import (
 var nodes = []string{"api", "api-2"}
 
 // nodeHeader names the responder that answered a request.
-const nodeHeader = "X-Bothy-Node"
+const nodeHeader = "X-Test-Node"
 
 // The port nginx listens on in every container, as in the example edge.
 const nginxPort = "8080/tcp"
