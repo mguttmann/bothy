@@ -476,11 +476,18 @@ func (s *Service) SetState(ctx context.Context, a actor.Actor, cmd terminal.SetH
 		out, err = s.stateWrite(ctx, cmd, causes[cmd.State], reason)
 		return err
 	}, rightsChange(cmd.HostID, holder))
-	if err == nil && (out.State == string(domain.StateDisabled) || out.State == string(domain.StateRetired)) {
-		// The control connection ends with the state change, after the commit (24 section 3.1).
-		s.control().CloseHost(cmd.HostID, domain.CodeHostDisabled)
+	if err == nil && leavesConnection(out.State) {
+		// The control connections end with the state change, after the commit and on every node
+		// (24 section 3.1, terminal.host_close of M2-47).
+		s.committed(ctx, hostCloseSignal(cmd.HostID))
 	}
 	return out, err
+}
+
+// leavesConnection reports a state without a control connection: disabled and retired (24 section
+// 3.1); a transition into it stages terminal.host_close.
+func leavesConnection(state string) bool {
+	return state == string(domain.StateDisabled) || state == string(domain.StateRetired)
 }
 
 // stateCheck is the first unit of SetState: authorize, the reason, If-Match, a request without
@@ -527,6 +534,11 @@ func (s *Service) stateWrite(ctx context.Context, cmd terminal.SetHostState, cau
 	}
 	if r.EndSessions {
 		if _, err := s.EndSessions(ctx, SessionSelector{HostID: h.ID}, r.CloseReason); err != nil {
+			return terminal.HostView{}, err
+		}
+	}
+	if leavesConnection(string(next.State)) {
+		if err := s.stage(ctx, hostCloseSignal(h.ID)); err != nil {
 			return terminal.HostView{}, err
 		}
 	}

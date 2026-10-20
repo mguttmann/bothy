@@ -116,8 +116,9 @@ func (s *Service) IssuePairingCode(ctx context.Context, a actor.Actor, cmd termi
 	if err != nil {
 		return terminal.PairingCodeIssued{}, err
 	}
-	// The re-pairing dropped the keys: the old connection ends after the commit (24 section 3.3).
-	s.control().CloseHost(cmd.HostID, domain.CodeHostUnpaired)
+	// The re-pairing dropped the keys: the old connections end after the commit, on every node (24
+	// section 3.3, terminal.host_close of M2-47).
+	s.committed(ctx, hostCloseSignal(cmd.HostID))
 	return out, nil
 }
 
@@ -144,6 +145,9 @@ func (s *Service) repairWrite(ctx context.Context, hostID ids.ID, hash []byte, r
 	t := s.d.Clock.Now()
 	expires := t.Add(s.cfg.PairingCodeTTL)
 	if err := s.d.Store.SetPairingCode(ctx, h.ID, hash, expires, plan.DropKeys, h.Version+1); err != nil {
+		return time.Time{}, err
+	}
+	if err := s.stage(ctx, hostCloseSignal(h.ID)); err != nil {
 		return time.Time{}, err
 	}
 	attrs := auditing.Attrs{
@@ -416,20 +420,20 @@ func (s *Service) Confirm(ctx context.Context, a actor.Actor, cmd terminal.Confi
 	if err != nil {
 		return terminal.HostView{}, err
 	}
-	return s.afterConfirm(cmd.HostID, out)
+	return s.afterConfirm(ctx, cmd.HostID, out)
 }
 
 // afterConfirm tells the control connection of the host what the committed confirmation did
 // (M2-43): the fallback to pairing dropped the keys, so the connection ends with 4110; a
 // confirmation makes the host active, so its connection gets ready again with the state and the
 // declaration (M2-42 Design note 15). A mismatch answers 409 fingerprint_mismatch.
-func (s *Service) afterConfirm(hostID ids.ID, out confirmOutcome) (terminal.HostView, error) {
+func (s *Service) afterConfirm(ctx context.Context, hostID ids.ID, out confirmOutcome) (terminal.HostView, error) {
 	if !out.mismatch {
 		s.control().SendReady(hostID)
 		return out.view, nil
 	}
 	if out.remaining == 0 {
-		s.control().CloseHost(hostID, domain.CodeHostUnpaired)
+		s.committed(ctx, hostCloseSignal(hostID))
 	}
 	return terminal.HostView{}, errs.FingerprintMismatch(out.remaining)
 }
@@ -543,6 +547,9 @@ func (s *Service) fallback(ctx context.Context, h domain.Host, reason string) (c
 		return confirmOutcome{}, err
 	}
 	if err := s.d.Store.SetPairingCode(ctx, h.ID, code.Hash, s.d.Clock.Now(), true, h.Version+1); err != nil {
+		return confirmOutcome{}, err
+	}
+	if err := s.stage(ctx, hostCloseSignal(h.ID)); err != nil {
 		return confirmOutcome{}, err
 	}
 	attrs := confirmAttrs(h, resultMaxAttempts, reason)

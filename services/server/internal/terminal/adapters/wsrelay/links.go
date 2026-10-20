@@ -52,6 +52,66 @@ type Links struct {
 	// relay is the relay of this process (M2-44): it learns of session.started and of the end of
 	// a control connection; nil before BindRelay.
 	relay *Relay
+	// hub is the handler of the signals across nodes (M2-47): connection IDs, presence and
+	// probation; nil before NewHub, which a process without the relay never builds.
+	hub *Hub
+}
+
+// bindHub sets the hub of the process (NewHub).
+func (l *Links) bindHub(h *Hub) {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	l.hub = h
+}
+
+// hubOf returns the bound hub, nil before NewHub.
+func (l *Links) hubOf() *Hub {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	return l.hub
+}
+
+// newConnID returns the connection ID of a new control connection: from the hub's generator on the
+// node's clock, else ids.New.
+func (l *Links) newConnID() ids.ID {
+	if h := l.hubOf(); h != nil {
+		return h.connID()
+	}
+	return ids.New()
+}
+
+// ownConn reports whether conn is the ID of the registered link of host on this node.
+func (l *Links) ownConn(host, conn ids.ID) bool {
+	k := l.get(host)
+	return k != nil && k.conn == conn
+}
+
+// hosts returns the hosts with a registered link.
+func (l *Links) hosts() []ids.ID {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	out := make([]ids.ID, 0, len(l.byHost))
+	for id := range l.byHost {
+		out = append(out, id)
+	}
+	return out
+}
+
+// eligible returns the registered links whose first report was applied.
+func (l *Links) eligible() []*link {
+	l.mu.Lock()
+	list := make([]*link, 0, len(l.byHost))
+	for _, k := range l.byHost {
+		list = append(list, k)
+	}
+	l.mu.Unlock()
+	out := list[:0]
+	for _, k := range list {
+		if k.isReported() && !k.isClosing() {
+			out = append(out, k)
+		}
+	}
+	return out
 }
 
 // BindRelay sets the relay the control connections tell of session.started and of their end
@@ -149,6 +209,10 @@ func (l *Links) OpenSession(_ context.Context, hostID ids.ID, cmd app.SessionOpe
 	if !k.isReported() {
 		return app.ErrHostNotReady
 	}
+	if h := l.hubOf(); h != nil && h.holdOpen(k, hostID, cmd) {
+		// A new connection in probation waits (M2-47 Design note 7 d).
+		return nil
+	}
 	k.send(sessionOpenFrame(cmd))
 	return nil
 }
@@ -169,10 +233,14 @@ func (l *Links) CloseHost(hostID ids.ID, code domain.CloseCode) {
 	}
 }
 
-// Connected implements app.ControlLinks: a link whose first report after ready was applied.
+// Connected implements app.ControlLinks: a link whose first report after ready was applied, or
+// with cluster.mode multi a counting entry of another node's presence (M2-47 Design note 6).
 func (l *Links) Connected(hostID ids.ID) bool {
-	k := l.get(hostID)
-	return k != nil && k.isReported()
+	if k := l.get(hostID); k != nil && k.isReported() {
+		return true
+	}
+	h := l.hubOf()
+	return h != nil && h.remoteConnected(hostID)
 }
 
 // SendReady implements app.ControlLinks: ready again with the row read now (M2-42 Design note
@@ -267,6 +335,62 @@ type link struct {
 	// lastJWKS is the key set last sent on the link (hello or heartbeat_ack).
 	lastJWKS     string
 	writeTimeout time.Duration
+	// conn is the connection ID of a control connection (M2-47 Design note 7); firstPresent the
+	// time of its first terminal.host_present (the start of its probation); probing marks a
+	// running probe; withdrawn marks the terminal.host_gone sent.
+	conn         ids.ID
+	firstPresent time.Time
+	probing      bool
+	withdrawn    bool
+}
+
+// announced records the time of the first announcement of k.
+func (k *link) announced(at time.Time) {
+	k.mu.Lock()
+	defer k.mu.Unlock()
+	if k.firstPresent.IsZero() {
+		k.firstPresent = at
+	}
+}
+
+// firstAnnounce returns the time of the first announcement of k; a link not yet announced starts
+// its probation at now.
+func (k *link) firstAnnounce(now time.Time) time.Time {
+	k.mu.Lock()
+	defer k.mu.Unlock()
+	if k.firstPresent.IsZero() {
+		k.firstPresent = now
+	}
+	return k.firstPresent
+}
+
+// withdraw reports once whether an announced link is to be withdrawn.
+func (k *link) withdraw() bool {
+	k.mu.Lock()
+	defer k.mu.Unlock()
+	if k.firstPresent.IsZero() || k.withdrawn {
+		return false
+	}
+	k.withdrawn = true
+	return true
+}
+
+// startProbe marks a probe of k and reports whether none was running.
+func (k *link) startProbe() bool {
+	k.mu.Lock()
+	defer k.mu.Unlock()
+	if k.probing {
+		return false
+	}
+	k.probing = true
+	return true
+}
+
+// endProbe clears the mark of a probe.
+func (k *link) endProbe() {
+	k.mu.Lock()
+	k.probing = false
+	k.mu.Unlock()
 }
 
 // newLink returns a link over ws with a queue of queueMax frames.

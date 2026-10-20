@@ -63,16 +63,15 @@ func (s *Service) attachSession(ctx context.Context, p actor.Actor, cmd terminal
 	if err != nil {
 		return terminal.Grant{}, err
 	}
-	now := s.d.Clock.Now()
 	var g terminal.Grant
-	var started bool
-	var wdi *int
+	s.noteAttach(h, ses)
 	err = s.d.UoW.Do(ctx, func(ctx context.Context) error {
 		var err error
-		g, started, wdi, err = s.attachUnit(ctx, p, h, cmd, d.QuickReattach, owner)
+		g, err = s.attachUnit(ctx, p, h, cmd, d.QuickReattach, owner)
 		return err
 	})
 	if err != nil {
+		s.notes.take(cmd.SessionID)
 		return terminal.Grant{}, s.stepUpDenied(ctx, err, authorize.ActionTerminalAttach, authorize.ResourceTerminalSession, cmd.SessionID)
 	}
 	if err := s.recheck(ctx, p, authorize.ActionTerminalAttach, cmd.SessionID, func(domain.Host) (authorize.Resource, error) {
@@ -84,47 +83,58 @@ func (s *Service) attachSession(ctx context.Context, p actor.Actor, cmd terminal
 	}, h.ID); err != nil {
 		return terminal.Grant{}, err
 	}
-	ses.DeviceID = p.DeviceID
-	s.announce(ctx, h, ses, now, started, wdi)
+	s.committed(ctx, sessionOpenSignal(h.ID, cmd.SessionID))
 	return g, nil
 }
 
+// noteAttach remembers the working directory index the relay slot of this node keeps for an
+// attach to an opening of a claude profile, so the handler of terminal.session_open keeps it in
+// the new expectation (ruling D-M2-44-4).
+func (s *Service) noteAttach(h domain.Host, ses domain.Session) {
+	if ses.State != domain.SessionOpening || domain.ProfileKind(h.Profiles, ses.Profile) != domain.ProfileKindClaude {
+		return
+	}
+	if wdi, ok := s.relayControl().OpeningWorkdir(ses.ID); ok {
+		s.notes.put(ses.ID, wdi)
+	}
+}
+
 // attachUnit is the unit of work of an attach (Design note 6 b to e): the step-up (unless quick
-// reattach), the locked row, the session user, the token and the writes. It returns the grant,
-// whether the PTY started and the working directory index the opening keeps.
-func (s *Service) attachUnit(ctx context.Context, p actor.Actor, h domain.Host, cmd terminal.AttachSession, quick, owner bool) (terminal.Grant, bool, *int, error) {
+// reattach), the locked row, the session user, the token and the writes; it stages
+// terminal.session_open (M2-47). It returns the grant.
+func (s *Service) attachUnit(ctx context.Context, p actor.Actor, h domain.Host, cmd terminal.AttachSession, quick, owner bool) (terminal.Grant, error) {
 	if !quick {
 		if err := s.consume(ctx, p); err != nil {
-			return terminal.Grant{}, false, nil, err
+			return terminal.Grant{}, err
 		}
 	}
 	ses, att, u, err := s.lockAttach(ctx, p, cmd.SessionID, quick)
 	if err != nil {
-		return terminal.Grant{}, false, nil, err
+		return terminal.Grant{}, err
 	}
 	kind := domain.ProfileKind(h.Profiles, ses.Profile)
 	wdi, err := s.openingWorkdir(ses.ID, att, kind)
 	if err != nil {
-		return terminal.Grant{}, false, nil, err
+		return terminal.Grant{}, err
 	}
 	ses.DeviceID, ses.AuthSessionID, ses.TokenJTI = p.DeviceID, p.SessionID, ids.New()
 	if err := s.d.Store.AttachSession(ctx, ses.ID, ses.DeviceID, ses.AuthSessionID, ses.TokenJTI); err != nil {
-		return terminal.Grant{}, false, nil, err
+		return terminal.Grant{}, err
 	}
 	ses.Version++
 	tg := domain.TokenGrant{HostID: ses.HostID, UserID: ses.UserID, SessionID: ses.ID, DeviceID: ses.DeviceID, Profile: ses.Profile,
 		ProfileKind: kind, CEK: cmd.CEK, Owner: owner, OSUser: u.OSUser, WorkdirIndex: wdi, Attach: att == domain.AttAttach}
 	g, err := s.grant(ctx, h, ses, tg, s.d.Clock.Now())
 	if err != nil {
-		return terminal.Grant{}, false, nil, err
+		return terminal.Grant{}, err
 	}
 	if err := s.recordGrant(ctx, authorize.ActionTerminalAttach, h, ses, cmd.PinChanged, owner); err != nil {
-		return terminal.Grant{}, false, nil, err
+		return terminal.Grant{}, err
 	}
 	if err := s.emitSessionChangedBy(ctx, ses, p.ID); err != nil {
-		return terminal.Grant{}, false, nil, err
+		return terminal.Grant{}, err
 	}
-	return g, att == domain.AttAttach, wdi, nil
+	return g, s.stage(ctx, sessionOpenSignal(h.ID, ses.ID))
 }
 
 // lockAttach locks the session of an attach and checks it (Design note 6 b and c): not closed
