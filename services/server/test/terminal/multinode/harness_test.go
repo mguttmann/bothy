@@ -127,7 +127,9 @@ func (s *switchSignals) Stage(ctx context.Context, sig domain.Signal) error {
 }
 
 // Committed implements terminalapp.Signals.
-func (s *switchSignals) Committed(ctx context.Context, sig domain.Signal) { s.inner.Committed(ctx, sig) }
+func (s *switchSignals) Committed(ctx context.Context, sig domain.Signal) {
+	s.inner.Committed(ctx, sig)
+}
 
 // Send implements terminalapp.Signals.
 func (s *switchSignals) Send(ctx context.Context, sig domain.Signal) error {
@@ -316,22 +318,24 @@ func (c *cluster) must(node string, cl *harness.Client, method, path string, bod
 }
 
 // profiles are the profiles of lab-1.
-func profiles() []any { return []any{map[string]any{"name": "shell", "display_name": "Shell", "kind": "shell"}} }
+func profiles() []any {
+	return []any{map[string]any{"name": "shell", "display_name": "Shell", "kind": "shell"}}
+}
 
 // reportedUsers are the session users lab-1 reports.
 func reportedUsers() []any {
 	return []any{map[string]any{"os_user": "bothy-s-alex", "workdirs": []string{}}}
 }
 
-// report is a report of lab-1 that passes, with local confirmation confirm.
-func report(confirm bool) map[string]any {
+// report is a report of lab-1 that passes, without local confirmation.
+func report() map[string]any {
 	var doctor []any
 	for _, ch := range []string{"hd1_user", "hd2_groups", "hd3_sudo", "hd4_state_dir", "hd5_server_host", "hd6_llm_login",
 		"hd7_profiles", "hd8_separation", "hd9_foreign_homes", "hd10_helper_integrity", "hd11_shared_locations"} {
 		doctor = append(doctor, map[string]any{"check": ch, "ok": true})
 	}
 	return map[string]any{"profiles": profiles(), "session_users": reportedUsers(), "doctor": doctor, "is_server_host": false,
-		"require_local_confirm": confirm, "os_version": "Debian 13"}
+		"require_local_confirm": false, "os_version": "Debian 13"}
 }
 
 // pairedHost creates, pairs and confirms a host named name with the holder and Alex's session
@@ -374,22 +378,21 @@ func (c *cluster) grant(subject string, host ids.ID) {
 		"target_id": host.String(), "capabilities": []string{"terminal"}, "reason": "terminal test"}, http.StatusCreated)
 }
 
-// connect connects a Fake-Host of the host with key through the edge, its control connection on
-// node on.
-func (c *cluster) connect(on string, key hosttest.Key, confirm bool, live ...ids.ID) *fakehost.Host {
+// connect connects the Fake-Host of lab-1 through the edge, its control connection on node on.
+func (c *cluster) connect(on string) *fakehost.Host {
 	c.t.Helper()
-	return c.connectHost(on, c.host, key, confirm, live...)
+	return c.connectHost(on, c.host, c.key)
 }
 
 // connectHost is connect for host. Connections are not REST, so the edge takes its default node:
 // the call holds the edge lock of the default while it connects.
-func (c *cluster) connectHost(on string, host ids.ID, key hosttest.Key, confirm bool, live ...ids.ID) *fakehost.Host {
+func (c *cluster) connectHost(on string, host ids.ID, key hosttest.Key) *fakehost.Host {
 	c.t.Helper()
 	connectMu.Lock()
 	defer connectMu.Unlock()
 	c.edge.setRest(on)
 	defer c.edge.setRest(nodeA)
-	h := fakehost.Connect(c.t, c.edge.URL, host, key, report(confirm), live...)
+	h := fakehost.Connect(c.t, c.edge.URL, host, key, report())
 	h.Default(fakehost.Script{Kind: fakehost.Accept})
 	return h
 }

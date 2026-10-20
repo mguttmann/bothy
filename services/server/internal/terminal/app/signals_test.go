@@ -121,14 +121,18 @@ func (s *memStore) LockOpenSessions(_ context.Context, hostID, userID ids.ID) ([
 	return out, nil
 }
 
-func (s *memStore) SessionUsers(context.Context, ids.ID) ([]domain.SessionUserRow, error) { return nil, nil }
+func (s *memStore) SessionUsers(context.Context, ids.ID) ([]domain.SessionUserRow, error) {
+	return nil, nil
+}
 
 func (s *memStore) ValidSessionUsers(context.Context, []ids.ID) (map[ids.ID][]domain.SessionUser, error) {
 	return map[ids.ID][]domain.SessionUser{}, nil
 }
 
 func (s *memStore) CloseSessionByPerson(_ context.Context, id ids.ID, reason domain.CloseReason, by ids.ID, at time.Time) error {
-	return s.update(id, func(x *domain.Session) { x.State, x.CloseReason, x.ClosedBy, x.ClosedAt = domain.SessionClosed, reason, by, at })
+	return s.update(id, func(x *domain.Session) {
+		x.State, x.CloseReason, x.ClosedBy, x.ClosedAt = domain.SessionClosed, reason, by, at
+	})
 }
 
 // TestUseCasesStageSignals (M2-47 Design note 4): every use case that acts on a live connection

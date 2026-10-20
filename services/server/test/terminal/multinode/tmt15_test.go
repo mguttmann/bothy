@@ -31,7 +31,7 @@ func other(n string) string {
 func TestTMT15_TwoNodesWithHashRouting(t *testing.T) {
 	t.Parallel()
 	c := newCluster(t, "multi")
-	h := c.connect(nodeB, c.key, false)
+	h := c.connect(nodeB)
 	seen := map[string]bool{}
 	for i := 0; i < 16 && len(seen) < 2; i++ {
 		g := c.opened(nodeA, c.alex)
@@ -126,7 +126,7 @@ func (c *cluster) runHashSession(h *fakehost.Host, g grantBody, hn string) {
 func TestTMT15_WithoutHashRouting(t *testing.T) {
 	t.Parallel()
 	c := newCluster(t, "multi")
-	h := c.connect(nodeB, c.key, false)
+	h := c.connect(nodeB)
 	c.edge.setMode(modeSplit)
 	g := c.opened(nodeA, c.alex)
 	ctx := c.ctx()
@@ -203,7 +203,7 @@ func containsRecord(recs []map[string]any, s string) bool {
 func TestTMT15_WithoutHashRouting_Attach(t *testing.T) {
 	t.Parallel()
 	c := newCluster(t, "multi")
-	h := c.connect(nodeB, c.key, false)
+	h := c.connect(nodeB)
 	var g grantBody
 	for i := 0; i < 16; i++ {
 		g = c.opened(nodeA, c.alex)

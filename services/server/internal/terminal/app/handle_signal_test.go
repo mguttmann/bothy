@@ -31,7 +31,9 @@ type noLinks struct {
 	recLinks
 }
 
-func (*noLinks) OpenSession(context.Context, ids.ID, app.SessionOpen) error { return app.ErrHostNotConnected }
+func (*noLinks) OpenSession(context.Context, ids.ID, app.SessionOpen) error {
+	return app.ErrHostNotConnected
+}
 
 // TestHandleSignal_SessionOpenExpectsOnEveryNode (M2-47 Design note 3): every node registers the
 // expectation of terminal.session_open with the device of the row and its own receipt time; only a

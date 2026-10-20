@@ -113,6 +113,7 @@ func TestSignalPayloadBound(t *testing.T) {
 			sig.SessionID = full
 		case domain.SignalHostPresent, domain.SignalHostGone:
 			sig.ConnID = full
+		case domain.SignalHostClose:
 		}
 		b, err := domain.EncodeSignal(sig)
 		if err != nil {

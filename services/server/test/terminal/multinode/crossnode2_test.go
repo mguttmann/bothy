@@ -43,7 +43,7 @@ func TestCrossNode_HostTransitionsCloseEverywhere(t *testing.T) {
 	t.Parallel()
 	c := newCluster(t, "multi")
 	ctx := c.ctx()
-	h := c.connect(nodeB, c.key, false)
+	h := c.connect(nodeB)
 	_, d, dc := c.relayed(h)
 	c.setState(nodeA, c.host, "disabled")
 	c.controlClose("disabled", h, int(domain.CodeHostDisabled))
@@ -51,12 +51,12 @@ func TestCrossNode_HostTransitionsCloseEverywhere(t *testing.T) {
 	c.closeCode("host data", func() (int, string) { return dc.CloseCode(ctx) }, int(domain.StreamTerminalClosed), "host_disabled")
 
 	key2, host2 := c.newHost("lab-2")
-	h2 := c.connectHost(nodeB, host2, key2, false)
+	h2 := c.connectHost(nodeB, host2, key2)
 	c.setState(nodeA, host2, "retired")
 	c.controlClose("retired", h2, int(domain.CodeHostDisabled))
 
 	key3, host3 := c.newHost("lab-3")
-	h3 := c.connectHost(nodeB, host3, key3, false)
+	h3 := c.connectHost(nodeB, host3, key3)
 	c.repair(nodeA, host3)
 	c.controlClose("re-paired", h3, int(domain.CodeHostUnpaired))
 }
@@ -67,9 +67,9 @@ func TestCrossNode_DuplicateControlConnection(t *testing.T) {
 	c := newCluster(t, "multi")
 	t.Run("older_answers", func(t *testing.T) {
 		key, host := c.newHost("dup-1")
-		h1 := c.connectHost(nodeA, host, key, false)
+		h1 := c.connectHost(nodeA, host, key)
 		g := c.openOnHost(nodeA, host)
-		h2 := c.connectHost(nodeB, host, key, false)
+		h2 := c.connectHost(nodeB, host, key)
 		c.controlClose("older on A", h1, int(domain.CodeHostDuplicate))
 		c.controlClose("newer on B", h2, int(domain.CodeHostDuplicate))
 		c.eventually("disabled duplicate_connection", func() bool {
@@ -87,11 +87,11 @@ func TestCrossNode_DuplicateControlConnection(t *testing.T) {
 	})
 	t.Run("older_silent", func(t *testing.T) {
 		key, host := c.newHost("dup-2")
-		h1 := c.connectHost(nodeA, host, key, false)
+		h1 := c.connectHost(nodeA, host, key)
 		h1.Control.StopHeartbeat()
 		h1.Control.Pause()
 		gone := c.countKind(domain.SignalHostGone)
-		h2 := c.connectHost(nodeB, host, key, false)
+		h2 := c.connectHost(nodeB, host, key)
 		c.eventually("host_gone of the older connection", func() bool { return c.countKind(domain.SignalHostGone) > gone })
 		h1.Control.Unpause()
 		c.controlClose("older on A", h1, int(domain.CodeHeartbeatTimeout))
@@ -105,13 +105,13 @@ func TestCrossNode_DuplicateControlConnection(t *testing.T) {
 	})
 	t.Run("probation_defers_open", func(t *testing.T) {
 		key, host := c.newHost("dup-3")
-		h1 := c.connectHost(nodeA, host, key, false)
+		h1 := c.connectHost(nodeA, host, key)
 		h1.Control.StopHeartbeat()
 		h1.Control.Pause()
 		// A paused client cannot finish its close handshake at the cleanup.
 		defer h1.Control.Unpause()
 		h1.Default(fakehost.Script{Kind: fakehost.Ignore})
-		h2 := c.connectHost(nodeB, host, key, false)
+		h2 := c.connectHost(nodeB, host, key)
 		h2.Default(fakehost.Script{Kind: fakehost.Ignore})
 		connected := time.Now()
 		r := c.openOn(nodeA, c.alex, host)
@@ -128,8 +128,8 @@ func TestCrossNode_DuplicateControlConnection(t *testing.T) {
 		}
 		// With the older connection answering, the newer one never gets a session.open.
 		key4, host4 := c.newHost("dup-4")
-		c.connectHost(nodeA, host4, key4, false)
-		h4 := c.connectHost(nodeB, host4, key4, false)
+		c.connectHost(nodeA, host4, key4)
+		h4 := c.connectHost(nodeB, host4, key4)
 		h4.Default(fakehost.Script{Kind: fakehost.Ignore})
 		c.openOn(nodeA, c.alex, host4)
 		c.controlClose("newer of dup-4", h4, int(domain.CodeHostDuplicate))
@@ -139,12 +139,12 @@ func TestCrossNode_DuplicateControlConnection(t *testing.T) {
 	})
 	t.Run("announcement_lost", func(t *testing.T) {
 		key, host := c.newHost("dup-5")
-		c.connectHost(nodeA, host, key, false)
+		c.connectHost(nodeA, host, key)
 		a := c.n(nodeA)
 		a.gate.close()
 		c.terminateListeners()
 		c.eventually("A deaf", func() bool { return len(a.logs.records("terminal ephemeral listener lost")) > 0 })
-		c.connectHost(nodeB, host, key, false)
+		c.connectHost(nodeB, host, key)
 		time.Sleep(500 * time.Millisecond)
 		if c.count(`SELECT count(*) FROM hosts WHERE id = $1 AND state = 'active'`, host.String()) != 1 {
 			t.Fatal("the duplicate was decided while A was deaf")
@@ -201,13 +201,13 @@ func TestCrossNode_HostUnavailableParity(t *testing.T) {
 			t.Fatalf("no connection, through %s: %d %s", n, r.Status, r.Body)
 		}
 	}
-	h := c.connect(nodeB, c.key, false)
-	c.eventually("201 through A", func() bool { return c.openStatus(nodeA) == http.StatusCreated })
+	h := c.connect(nodeB)
+	c.eventually("201 through A", func() bool { return c.openStatusA() == http.StatusCreated })
 	h.Close()
-	c.eventually("409 through A", func() bool { return c.openStatus(nodeA) == http.StatusConflict })
+	c.eventually("409 through A", func() bool { return c.openStatusA() == http.StatusConflict })
 
-	h2 := c.connect(nodeB, c.key, false)
-	c.eventually("201 through A", func() bool { return c.openStatus(nodeA) == http.StatusCreated })
+	h2 := c.connect(nodeB)
+	c.eventually("201 through A", func() bool { return c.openStatusA() == http.StatusCreated })
 	c.n(nodeB).signals.set(true, false)
 	h2.Drop()
 	r := c.open(nodeA, c.alex)
@@ -216,13 +216,13 @@ func TestCrossNode_HostUnavailableParity(t *testing.T) {
 	}
 	var g grantBody
 	r.JSON(t, &g)
-	c.eventually("409 after the window", func() bool { return c.openStatus(nodeA) == http.StatusConflict })
+	c.eventually("409 after the window", func() bool { return c.openStatusA() == http.StatusConflict })
 	c.n(nodeA).timers.Fire()
 	c.waitState(g.Session.ID, "closed:open_failed:open_timeout")
 }
 
-// openStatus opens through node and returns the status.
-func (c *cluster) openStatus(node string) int { return c.open(node, c.alex).Status }
+// openStatusA opens through A and returns the status.
+func (c *cluster) openStatusA() int { return c.open(nodeA, c.alex).Status }
 
 // hasCode reports a problem body with code.
 func hasCode(r harness.Response, code string) bool {
@@ -240,7 +240,7 @@ func TestCrossNode_ListenerLossReconciles(t *testing.T) {
 	// otherwise close the control connection by itself (M2-43).
 	c := newClusterWith(t, "multi", map[string]string{"terminal.host_heartbeat_interval": "30s"})
 	ctx := c.ctx()
-	h := c.connect(nodeA, c.key, false)
+	h := c.connect(nodeA)
 	g := c.hashedTo(nodeA, c.host)
 	d := c.device(c.alex, g.Session.ID)
 	c.handshake(d, g.SessionToken)
@@ -275,8 +275,8 @@ func TestCrossNode_ListenerLossReconciles(t *testing.T) {
 func TestCrossNode_StepUpConsumedOnce(t *testing.T) {
 	t.Parallel()
 	c := newCluster(t, "multi")
-	c.connect(nodeB, c.key, false)
-	c.eventually("the presence on A", func() bool { return c.openStatus(nodeA) == http.StatusCreated })
+	c.connect(nodeB)
+	c.eventually("the presence on A", func() bool { return c.openStatusA() == http.StatusCreated })
 	before := c.count(`SELECT count(*) FROM terminal_sessions`)
 	if err := c.alex.StepUp(c.t.Context()); err != nil {
 		t.Fatal(err)
