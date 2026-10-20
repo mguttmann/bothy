@@ -58,6 +58,21 @@ type Principal interface {
 	ActingForPerson() ids.ID
 }
 
+// RecheckMarker is implemented by a principal that can carry the marker of the check without a
+// request (05 section 5, R-AZ-29; kernel/actor.Actor). IsRecheckPrincipal reports the marker; authz
+// treats a principal without this method as an ordinary request principal. It is a different thing
+// from the context marker Recheck of the terminal checks after a commit.
+type RecheckMarker interface {
+	IsRecheckPrincipal() bool
+}
+
+// IsRecheckPrincipal reports whether p is the principal of a check without a request (R-AZ-29);
+// false for nil and for a principal that does not implement RecheckMarker.
+func IsRecheckPrincipal(p Principal) bool {
+	r, ok := p.(RecheckMarker)
+	return ok && r.IsRecheckPrincipal()
+}
+
 // CredentialObserver is implemented by a principal whose authenticator read the state of its
 // session, device and device key for the request (kernel/actor.Actor, M1-34). observed is false
 // when it read none. authz uses these facts in check_active instead of its cached ones, so a

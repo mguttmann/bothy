@@ -399,6 +399,7 @@ func (a *Authorizer) invokeFacts(ctx context.Context, s *actingPrincipal, f *aut
 	ch := res.channel
 	out := &domain.InvokeFacts{
 		AgentID: f.AgentID, TriggerOrigin: f.TriggerOrigin, MentionsAgent: f.MentionsAgent, ActiveRunAgentID: f.ActiveRunAgentID,
+		NewThread: f.NewThread,
 		RequireMention: ch.RequireMention, ThreadRequireMention: ch.ThreadRequireMention, FreeResponse: ch.FreeResponse,
 		AllowMentionedAgents: ch.AllowMentionedAgents, ProjectBound: ch.ProjectBound, ProjectReady: ch.ProjectReady,
 	}

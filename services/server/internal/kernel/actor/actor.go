@@ -94,7 +94,27 @@ type Actor struct {
 	// ActingFor is the checked invocation token of the run an agent acts in (SR9); the zero value
 	// for none. Filled from M2 on.
 	ActingFor ActingFor
+	// RecheckPrincipal marks the principal of the check without a request (05 section 5, R-AZ-29):
+	// a person evaluated by the server itself, without a request of the person, for example
+	// agent.invoke before every delivery to an agent (M2-08). Only Recheck builds it, never the
+	// authentication of a request. authz takes liveness only from the principal status and the
+	// owner status from the current owner list without a session, keeps its snapshot apart from
+	// every request principal of the same person and refuses the marker with any other action or
+	// with a session, device, token, view_as or acting_for (an internal error).
+	RecheckPrincipal bool
 }
+
+// Recheck returns the principal of the check without a request for the person id (R-AZ-29): kind
+// user, the marker RecheckPrincipal and nothing else, so it never carries a session, device or
+// token of the person.
+//
+// Example:
+//
+//	d, err := az.Authorize(authorize.Filter(ctx), actor.Recheck(run.TriggeredBy), authorize.ActionAgentInvoke, res)
+func Recheck(id ids.ID) Actor { return Actor{ID: id, Kind: KindUser, RecheckPrincipal: true} }
+
+// IsRecheckPrincipal reports the marker RecheckPrincipal (kernel/authorize.RecheckMarker).
+func (a Actor) IsRecheckPrincipal() bool { return a.RecheckPrincipal }
 
 // The device states of Actor.DeviceState (devices.state plus unknown for a device that does not
 // exist or belongs to someone else).
