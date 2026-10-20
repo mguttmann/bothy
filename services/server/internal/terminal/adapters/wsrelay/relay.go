@@ -492,6 +492,12 @@ func (r *Relay) applyOne(s *slot, a domain.RelayAction) func(context.Context) {
 	case domain.ActCloseHost:
 		r.closeSide(s, s.hst, a.Code, a.Reason)
 	case domain.ActActivate:
+		// The detach limit stops now on this node, the mirror of ActDetach; the committed row of
+		// the log tail replaces the local state (red team M2-46, B1).
+		if s.times.State == domain.SessionDetached {
+			s.times.State, s.times.DetachedAt = domain.SessionActive, time.Time{}
+			r.armLimit(s)
+		}
 		return func(ctx context.Context) { r.call(ctx, r.uc.RelayActivate(ctx, id)) }
 	case domain.ActDetach:
 		// The detach limit starts now on this node; the committed detached_at of the log tail

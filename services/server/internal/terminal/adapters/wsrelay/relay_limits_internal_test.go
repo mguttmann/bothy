@@ -245,3 +245,37 @@ func TestRelayLimits_OnlyTheHoldingNode(t *testing.T) {
 		t.Fatalf("ends A %v, B %v after a new grant on nodes without a side", ea, eb)
 	}
 }
+
+// TestRelayLimits_ActivateClearsDetach (red team M2-46, B1): a reattach that pairs just before
+// detached_at plus terminal.detach_grace makes the session active on this node at once; the limit
+// timer must not end it with detach_expired before the log tail delivered the active row, and idle
+// still applies.
+func TestRelayLimits_ActivateClearsDetach(t *testing.T) {
+	t.Parallel()
+	r, uc, timers := limitRelay(t)
+	t0 := timers.Clock.Now()
+	id, host := ids.New(), ids.New()
+	r.Expect(app.Expectation{SessionID: id, HostID: host, DeviceID: ids.New(), Deadline: t0.Add(farDeadline), Started: true,
+		Times: domain.SessionTimes{State: domain.SessionActive, OpenedAt: t0, StartedAt: t0}})
+	r.mu.Lock()
+	r.hold(r.slots[id])
+	r.mu.Unlock()
+	timers.Advance(10 * time.Second)
+	detached := timers.Clock.Now()
+	payload := `{"host_id":"` + host.String() + `","state":"detached","opened_at":"` + t0.Format(time.RFC3339Nano) +
+		`","started_at":"` + t0.Format(time.RFC3339Nano) + `","detached_at":"` + detached.Format(time.RFC3339Nano) + `"}`
+	r.ObserveLogEvent(t.Context(), eventSessionChg, id, []byte(payload))
+	timers.Advance(limitWindows.DetachGrace - time.Second)
+	r.mu.Lock()
+	call := r.applyOne(r.slots[id], domain.RelayAction{Kind: domain.ActActivate})
+	r.mu.Unlock()
+	call(t.Context())
+	timers.Advance(2 * time.Second)
+	if e := uc.ends(); len(e) != 0 {
+		t.Fatalf("ends %v after a reattach before the detach deadline", e)
+	}
+	timers.Advance(t0.Add(limitWindows.Idle + limitWindows.IdleGrace).Sub(timers.Clock.Now()))
+	if e := uc.ends(); !slices.Equal(e, []string{"end:idle_timeout"}) {
+		t.Fatalf("ends %v, want idle_timeout", e)
+	}
+}
