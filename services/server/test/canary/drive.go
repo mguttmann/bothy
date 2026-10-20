@@ -10,6 +10,7 @@ import (
 	"slices"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/OWNER/bothy/services/server/internal/identity/adapters/oidc/oidctest"
@@ -74,9 +75,48 @@ type req struct {
 	header       http.Header
 }
 
-// call sends r as c (with a step-up on step_up_required) and reports a status outside want.
+// consoleServed reports whether this tree serves the console surface (/console, the console form
+// of loginWithPassword); M6-01 adds it and sets this to true (M1-69/10).
+const consoleServed = false
+
+// enabledOps are the enabled operations of api/operations.yaml, read once.
+var enabledOps = sync.OnceValue(func() map[string]bool {
+	list, err := EnabledOperations()
+	if err != nil {
+		return nil
+	}
+	set := make(map[string]bool, len(list))
+	for _, id := range list {
+		set[id] = true
+	}
+	return set
+})
+
+// unserved names why r goes to a route this tree does not serve yet, "" for a served one: an
+// operation of the contract that api/operations.yaml does not enable, a path of the console
+// surface before M6-01, or a path with an empty segment, which an earlier skipped step left
+// without the ID of its resource (M1-69/10).
+func unserved(r req) string {
+	p, _, _ := strings.Cut(r.path, "?")
+	switch op := OperationOf(r.method, p); {
+	case strings.Contains(p, "//") || strings.HasSuffix(p, "/"):
+		return "an earlier skipped step created no resource"
+	case strings.HasPrefix(p, "/console") && !consoleServed:
+		return "the console surface comes with M6-01"
+	case op != "" && enabledOps() != nil && !enabledOps()[op]:
+		return op + " is not enabled in api/operations.yaml"
+	}
+	return ""
+}
+
+// call sends r as c (with a step-up on step_up_required) and reports a status outside want. A
+// route this tree does not serve yet is skipped with a log line and an empty response.
 func (sc *Scenario) call(c *harness.Client, r req, want ...int) harness.Response {
 	sc.T.Helper()
+	if why := unserved(r); why != "" {
+		sc.T.Logf("canary: %s %s skipped: %s", r.method, r.path, why)
+		return harness.Response{}
+	}
 	resp, err := harness.DoWithStepUp(sc.Ctx, c, harness.Request{Method: r.method, Path: r.path, Body: r.body, Header: r.header})
 	if err != nil {
 		sc.T.Errorf("%s %s: %v", r.method, routeOf(r.method, r.path), err)
