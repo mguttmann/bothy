@@ -144,16 +144,6 @@ func homeOpen(t *testing.T, p string) bool {
 	return strings.Contains(out, `BUILTIN\Users:`)
 }
 
-// closedDir creates p with an ACL for SYSTEM and Administrators only.
-func closedDir(t *testing.T, p string) {
-	t.Helper()
-	if err := os.MkdirAll(p, 0o700); err != nil {
-		t.Fatal(err)
-	}
-	sh(t, "icacls", p, "/inheritance:r", "/grant:r", "*S-1-5-18:(OI)(CI)F", "*S-1-5-32-544:(OI)(CI)F")
-	t.Cleanup(func() { _ = os.RemoveAll(p) })
-}
-
 // removeAddedUser removes what session-user add created for user (its helper service and the
 // account), never the host service, its state or its configuration.
 func removeAddedUser(_ *testing.T, user string) {

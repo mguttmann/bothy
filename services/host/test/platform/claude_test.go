@@ -99,9 +99,13 @@ func TestPlatform_TMT29c_Open(t *testing.T) {
 	track(t)
 	resetStartLog(t)
 	shared, wa, further := programDir("work-shared"), programDir("work-alex"), programDir("work-sam-further")
-	// Closed to both session users: HD11 checks every configured working directory as a place of
-	// each session user, also one HD7 drops, and a folder both could read would block both.
-	closedDir(t, shared)
+	// A folder of a trusted owner both session users reach, listed for both (the brief's setup).
+	// The product's HD11 currently checks it as a place of each session user although HD7 drops
+	// it, which ends Sam's opening with shared_location: this test then fails and names that gap.
+	if err := os.MkdirAll(shared, 0o755); err != nil { //nolint:gosec // G301: both session users reach it
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = os.RemoveAll(shared) })
 	mkdirOwned(t, wa, userA)
 	mkdirOwned(t, further, userB)
 	w := newWorld(t, "organization", claudeYAML(t)+workdirsYAML(map[string][][2]string{

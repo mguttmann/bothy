@@ -145,18 +145,6 @@ func homeOpen(t *testing.T, p string) bool {
 	return fi.Mode().Perm()&0o005 != 0
 }
 
-// closedDir creates p for the administrator only.
-func closedDir(t *testing.T, p string) {
-	t.Helper()
-	if err := os.MkdirAll(p, 0o700); err != nil {
-		t.Fatal(err)
-	}
-	if err := os.Chmod(p, 0o700); err != nil { //nolint:gosec // G302: a folder needs its search bit
-		t.Fatal(err)
-	}
-	t.Cleanup(func() { _ = os.RemoveAll(p) })
-}
-
 // removeAddedUser removes what session-user add created for user (its helper and the account),
 // never the host service, its state or its configuration.
 func removeAddedUser(t *testing.T, user string) {
