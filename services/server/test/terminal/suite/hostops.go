@@ -35,7 +35,7 @@ func (w *instance) hostStep(s Step) []string {
 			res, err = h.Exec(w.ctx, nil, args...)
 		}
 	case "restart_service":
-		res, err = h.Bothy(w.ctx, "restart")
+		res, err = h.Service(w.ctx, "restart")
 	case "doctor":
 		res, err = h.Doctor(w.ctx)
 	case "reboot":
