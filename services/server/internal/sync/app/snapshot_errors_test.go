@@ -27,8 +27,10 @@ var errStub = errors.New("stub failure")
 type snapStubs struct {
 	fail  string
 	space ids.ID
-	// syncmod.Settings is embedded for the methods the snapshot never calls.
+	// syncmod.Settings and authorize.Authorizer are embedded (nil) for the methods the snapshot
+	// never calls.
 	syncmod.Settings
+	authorize.Authorizer
 }
 
 func (s *snapStubs) err(step string) error {
