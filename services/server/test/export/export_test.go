@@ -12,6 +12,7 @@ package export_test
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"maps"
@@ -148,7 +149,7 @@ func TestExportChannel(t *testing.T) {
 		}
 	})
 
-	e.grantExport(t, alex, "space", e.w.Spaces["Support"])
+	e.grantExport(t, alex, e.w.Spaces["Support"])
 
 	t.Run("StreamsVisibleHistory", func(t *testing.T) {
 		r := e.export(t, alex, allgemein, from, to)
@@ -323,7 +324,7 @@ func TestExportChannel(t *testing.T) {
 		first := lr.count()
 		g.release(t)
 		body, tail, err := lr.finish(t)
-		if err != io.EOF || len(tail) != 0 || first < 1 || first > pageSize {
+		if !errors.Is(err, io.EOF) || len(tail) != 0 || first < 1 || first > pageSize {
 			t.Errorf("first batch %d lines; end %v tail %q", first, err, tail)
 		}
 		r := result{req: req, status: resp.StatusCode, header: resp.Header, body: body}
@@ -471,7 +472,7 @@ func TestExportChannel(t *testing.T) {
 		stepUp(t, c)
 		g := e.lockMessages(t)
 		ctx, cancel := context.WithTimeout(t.Context(), streamWait)
-		_, resp := e.open(t, ctx, e.callerOf(t, c), exportPath(batches, all0, all1))
+		_, resp := e.open(t, ctx, e.callerOf(t, c), exportPath(batches, all0, all1)) //nolint:bodyclose // the returned done function closes it
 		if resp.StatusCode != http.StatusOK {
 			cancel()
 			t.Fatalf("status %d", resp.StatusCode)
@@ -505,7 +506,7 @@ func TestExportChannel(t *testing.T) {
 	}
 
 	t.Run("RevocationBetweenBatches", func(t *testing.T) {
-		grant := e.grantExport(t, robin, "space", e.w.Spaces["Support"])
+		grant := e.grantExport(t, robin, e.w.Spaces["Support"])
 		g, lr, sent, done := stopAtSecondThreadPage(t, robin)
 		defer done()
 		harness.MustDo(t, o, harness.Request{Method: http.MethodPost, Path: "/grants/" + grant + "/revoke", Body: map[string]any{"reason": "export test"}}, http.StatusOK)
@@ -523,7 +524,7 @@ func TestExportChannel(t *testing.T) {
 	})
 
 	t.Run("SessionRevokedBetweenBatches", func(t *testing.T) {
-		e.grantExport(t, robin, "space", e.w.Spaces["Support"])
+		e.grantExport(t, robin, e.w.Spaces["Support"])
 		other, err := e.s.UserSession(t.Context(), robin.PrincipalID)
 		if err != nil {
 			t.Fatal(err)
@@ -589,7 +590,7 @@ func TestExportChannel(t *testing.T) {
 		}
 		close(hold)
 		body, tail, err := lr.finish(t)
-		if err != io.EOF || len(tail) != 0 {
+		if !errors.Is(err, io.EOF) || len(tail) != 0 {
 			t.Fatalf("after a pause longer than database.idle_in_tx_timeout the stream ended with %v", err)
 		}
 		r := result{req: req, status: resp.StatusCode, header: resp.Header, body: body}
@@ -648,7 +649,7 @@ func TestExportChannelLimits(t *testing.T) {
 	alex, sam, robin := e.w.People["Alex"], e.w.People["Sam"], e.w.People["Robin"]
 	allgemein := e.w.Channels["Support/Allgemein"]
 	for _, c := range []*harness.Client{alex, sam, robin} {
-		e.grantExport(t, c, "space", e.w.Spaces["Support"])
+		e.grantExport(t, c, e.w.Spaces["Support"])
 	}
 	all0, all1 := time.Date(2000, 1, 1, 0, 0, 0, 0, time.UTC), time.Date(2100, 1, 1, 0, 0, 0, 0, time.UTC)
 	want := e.selection(t, allgemein, all0, all1)
@@ -716,7 +717,7 @@ func TestExportChannelLimits(t *testing.T) {
 		}
 		g.release(t)
 		body, tail, err := lr.finish(t)
-		if err != io.EOF || len(tail) != 0 {
+		if !errors.Is(err, io.EOF) || len(tail) != 0 {
 			t.Fatalf("an export longer than http.request_timeout ended with %v", err)
 		}
 		r := result{req: req, status: resp.StatusCode, header: resp.Header, body: body}

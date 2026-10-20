@@ -256,7 +256,7 @@ func TestExportChannel_AbortIsVisible(t *testing.T) {
 	st := &scripted{batches: [][]messaging.Message{first}, err: errs.New(errs.CodeInternalError, "read failed on the second batch")}
 	h, logs := exportHarness(t, fakeExport{stream: st}, nil)
 	req := h.NewRequest(http.MethodGet, exportPath(), "", "Authorization", "Bearer alex")
-	resp, err := h.Server.Client().Do(req) //nolint:gosec // G704: the harness's own test server on 127.0.0.1
+	resp, err := h.Server.Client().Do(req)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -299,7 +299,7 @@ func TestExportChannel_FlushAndDeadline(t *testing.T) {
 	st := &scripted{batches: [][]messaging.Message{{lineMessage("early")}}, gate: gate}
 	h, _ := exportHarness(t, fakeExport{stream: st}, &cfg)
 	start := time.Now()
-	resp, err := h.Server.Client().Do(h.NewRequest(http.MethodGet, exportPath(), "", "Authorization", "Bearer alex")) //nolint:gosec // G704: test server
+	resp, err := h.Server.Client().Do(h.NewRequest(http.MethodGet, exportPath(), "", "Authorization", "Bearer alex"))
 	if err != nil {
 		t.Fatal(err)
 	}

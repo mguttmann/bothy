@@ -842,13 +842,13 @@ func (lr *lineReader) finish(t *testing.T) ([]byte, []byte, error) {
 
 // grant creates a grant of level read with the capability export on target as the owner and
 // returns its id.
-func (e *env) grantExport(t *testing.T, subject *harness.Client, targetKind, target string) string {
+func (e *env) grantExport(t *testing.T, subject *harness.Client, space string) string {
 	t.Helper()
 	var g struct {
 		ID string `json:"id"`
 	}
 	harness.MustDo(t, e.w.Owner, harness.Request{Method: http.MethodPost, Path: "/grants", Body: map[string]any{
-		"subject_kind": "user", "subject_id": subject.PrincipalID, "target_kind": targetKind, "target_id": target,
+		"subject_kind": "user", "subject_id": subject.PrincipalID, "target_kind": "space", "target_id": space,
 		"level": "read", "capabilities": []string{"export"}, "reason": "export test",
 	}}, http.StatusCreated).JSON(t, &g)
 	if g.ID == "" {

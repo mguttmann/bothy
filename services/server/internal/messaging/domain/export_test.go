@@ -182,6 +182,7 @@ func TestExportCursor(t *testing.T) {
 				if c.ThreadID == th[0] && len(got) == 2 {
 					data[th[0]] = append(data[th[0]], 4)
 				}
+			case domain.ExportReadDone:
 			}
 		}
 		want := []pair{{th[0], 1}, {th[0], 2}, {th[0], 3}, {th[0], 4}, {th[1], 1}}
