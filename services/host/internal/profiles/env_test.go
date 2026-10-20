@@ -353,13 +353,13 @@ func TestEnvClaudeOrganization(t *testing.T) {
 	}
 	// A home reached through a link still holds the folder at exactly its place.
 	w, e := unixWorld(t)
-	w.Link("/users/alex", "0", alexHome)
-	e.Self.Home = "/users/alex"
+	w.Link("/srv/homes/alex", "0", alexHome)
+	e.Self.Home = "/srv/homes/alex"
 	s, err = ClaudeOrganization(e, claudeBin, searchList, alexRepo, apiKey)
 	if err != nil {
 		t.Fatalf("home through a link: %v", err)
 	}
-	if envMap(t, "linux", s.Env)["CLAUDE_CONFIG_DIR"] != "/users/alex/.config/bothy-host/claude" {
+	if envMap(t, "linux", s.Env)["CLAUDE_CONFIG_DIR"] != "/srv/homes/alex/.config/bothy-host/claude" {
 		t.Errorf("config dir %v", s.Env)
 	}
 	_, e = unixWorld(t)
