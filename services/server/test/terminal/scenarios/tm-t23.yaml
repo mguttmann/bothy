@@ -1,0 +1,53 @@
+# SPDX-License-Identifier: Apache-2.0
+# TM-T23 of 24 14: a second control connection with the same keys (the state directory of r1
+# copied into a second container with the same session users). When the older one answers, both
+# are closed with 4112 and r1 is disabled with disabled_reason duplicate_connection, audited on
+# host.connect; when the older one is silent (paused), the new connection is accepted within
+# terminal.host_duplicate_probe_timeout and serves a session, and the older one shows 4009 after
+# unpause (24 3.4, brief M2-48 Design note 9).
+id: tm-t23
+title: Second control connection with the same keys, the older one answers; then the older one does not answer
+sources: ["24 14 TM-T23", "24 3.4", "24 13"]
+profile: default
+world:
+  people: [alex]
+  hosts:
+    - {name: r1, assigned_to: alex, session_users: [term-alex], assign: {alex: term-alex}}
+    - {name: r1b, pair: installed, session_users: [term-alex]}
+  grants:
+    - {subject: alex, host: r1}
+cases:
+  - name: older_answers
+    steps:
+      - {host: r1b, do: exec, run: [systemctl, stop, bothy-host.service]}
+      - {host: r1, do: clone_state, to: r1b}
+      - {host: r1b, do: exec, run: [systemctl, start, bothy-host.service]}
+      - check: host
+        host: r1
+        expect: {state: disabled, disabled_reason: duplicate_connection, journal: ['"code":4112']}
+      - check: host
+        host: r1b
+        expect: {journal: ['"code":4112']}
+      - check: audit
+        expect: {resource: r1, action: host.connect, details: {code: duplicate_connection}, at_least: 1}
+  - name: older_silent
+    steps:
+      - {host: r1b, do: exec, run: [systemctl, stop, bothy-host.service]}
+      - {host: r1, do: clone_state, to: r1b}
+      - {host: r1, do: pause}
+      - {host: r1b, do: exec, run: [systemctl, start, bothy-host.service]}
+      - wait: terminal.host_duplicate_probe_timeout
+      - check: host
+        host: r1
+        expect: {state: active, connected: true}
+      - {device: alex, do: step_up}
+      - {device: alex, do: open, on: r1, session: s1, expect: {status: 201}}
+      - {device: alex, do: connect, session: s1, expect: {}}
+      - {device: alex, do: handshake, session: s1, expect: {}}
+      - {device: alex, do: start, session: s1}
+      - {device: alex, do: send, session: s1, text: "printf '%s-%s\\n' ready ${marker}\n"}
+      - {device: alex, do: expect_output, session: s1, expect: {output: "ready-${marker}"}}
+      - {host: r1, do: unpause}
+      - check: host
+        host: r1
+        expect: {state: active, journal: ['"code":4009']}

@@ -346,10 +346,17 @@ func (s *Stack) SQL(ctx context.Context, query string, bypass bool) ([]map[strin
 }
 
 // CopyFrom copies path of the Compose service svc into dst on the machine of the tests (compose
-// cp) and sets its mode to 0600.
+// cp) and sets the mode of a file to 0600 and of a folder to 0700.
 func (s *Stack) CopyFrom(ctx context.Context, svc, path, dst string) error {
 	if _, err := s.Compose(ctx, "cp", svc+":"+path, dst); err != nil {
 		return err
+	}
+	info, err := os.Stat(dst)
+	if err != nil {
+		return err
+	}
+	if info.IsDir() {
+		return os.Chmod(dst, 0o700) //nolint:gosec // G302: a folder of the test's temp dir, only for the test user
 	}
 	return os.Chmod(dst, 0o600)
 }

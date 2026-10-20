@@ -1,0 +1,91 @@
+# SPDX-License-Identifier: Apache-2.0
+# TM-T17 of 24 14 (SR4, AZ-M59): an agent or app token on each of the five session operations
+# gives 403 forbidden with reason subject_kind_not_allowed and 4004 on the device stream, each
+# with a deny entry (24 8.1, 05 4.14).
+id: tm-t17
+title: Agent or app token calls a terminal action
+sources: ["24 14 TM-T17", "24 8.1", "05 4.14", "07 11.1 AZ-M59", "04 6.4"]
+profile: default
+world:
+  people: [alex]
+  agents: [lotse]
+  apps: [tracker]
+  hosts:
+    - {name: r1, assigned_to: alex, session_users: [term-alex], assign: {alex: term-alex}}
+  grants:
+    - {subject: alex, host: r1}
+cases:
+  - name: agent_token
+    steps:
+      - {device: alex, do: step_up}
+      - {device: alex, do: open, on: r1, session: s1, expect: {status: 201}}
+      - as: lotse
+        call: openTerminalSession
+        params: {host_id: "${r1.id}"}
+        with: {profile: shell, cols: 80, rows: 24, client_ephemeral_key_hash: AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA}
+        expect: {status: 403, code: forbidden, reason: subject_kind_not_allowed}
+      - as: lotse
+        call: attachTerminalSession
+        params: {session_id: "${s1.id}"}
+        with: {cols: 80, rows: 24, client_ephemeral_key_hash: AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA}
+        expect: {status: 403, code: forbidden, reason: subject_kind_not_allowed}
+      - as: lotse
+        call: listTerminalSessions
+        expect: {status: 403, code: forbidden, reason: subject_kind_not_allowed}
+      - as: lotse
+        call: getTerminalSession
+        params: {session_id: "${s1.id}"}
+        expect: {status: 403, code: forbidden, reason: subject_kind_not_allowed}
+      - as: lotse
+        call: closeTerminalSession
+        params: {session_id: "${s1.id}"}
+        with: {reason: terminal suite}
+        expect: {status: 403, code: forbidden, reason: subject_kind_not_allowed}
+      - {device: lotse, do: connect, session: s1, expect: {close: {code: 4004}}}
+      - check: audit
+        expect: {actor: lotse, action: terminal.open, decision: deny}
+      - check: audit
+        expect: {actor: lotse, action: terminal.attach, decision: deny}
+      - check: audit
+        expect: {actor: lotse, action: terminal.read_own, decision: deny, count: 2}
+      - check: audit
+        expect: {actor: lotse, action: terminal.close, decision: deny}
+      - check: audit
+        expect: {actor: lotse, action: terminal.stream, decision: deny}
+  - name: app_token
+    steps:
+      - {device: alex, do: step_up}
+      - {device: alex, do: open, on: r1, session: s1, expect: {status: 201}}
+      - as: tracker
+        call: openTerminalSession
+        params: {host_id: "${r1.id}"}
+        with: {profile: shell, cols: 80, rows: 24, client_ephemeral_key_hash: AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA}
+        expect: {status: 403, code: forbidden, reason: subject_kind_not_allowed}
+      - as: tracker
+        call: attachTerminalSession
+        params: {session_id: "${s1.id}"}
+        with: {cols: 80, rows: 24, client_ephemeral_key_hash: AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA}
+        expect: {status: 403, code: forbidden, reason: subject_kind_not_allowed}
+      - as: tracker
+        call: listTerminalSessions
+        expect: {status: 403, code: forbidden, reason: subject_kind_not_allowed}
+      - as: tracker
+        call: getTerminalSession
+        params: {session_id: "${s1.id}"}
+        expect: {status: 403, code: forbidden, reason: subject_kind_not_allowed}
+      - as: tracker
+        call: closeTerminalSession
+        params: {session_id: "${s1.id}"}
+        with: {reason: terminal suite}
+        expect: {status: 403, code: forbidden, reason: subject_kind_not_allowed}
+      - {device: tracker, do: connect, session: s1, expect: {close: {code: 4004}}}
+      - check: audit
+        expect: {actor: tracker, action: terminal.open, decision: deny}
+      - check: audit
+        expect: {actor: tracker, action: terminal.attach, decision: deny}
+      - check: audit
+        expect: {actor: tracker, action: terminal.read_own, decision: deny, count: 2}
+      - check: audit
+        expect: {actor: tracker, action: terminal.close, decision: deny}
+      - check: audit
+        expect: {actor: tracker, action: terminal.stream, decision: deny}

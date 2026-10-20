@@ -1,0 +1,41 @@
+# SPDX-License-Identifier: Apache-2.0
+# TM-T19 of 24 14: pairing through bothy-host pair in a container, then confirmHost with a wrong
+# prefix until terminal.fingerprint_max_attempts: 409 fingerprint_mismatch each time, then the host
+# is back in pairing without keys, and the next control connection of the host service closes
+# with 4110 (24 3.2, 3.3, 13).
+id: tm-t19
+title: Pairing with a wrong fingerprint up to terminal.fingerprint_max_attempts
+sources: ["24 14 TM-T19", "24 3.2", "24 3.3", "24 13"]
+profile: default
+world:
+  people: [alex]
+  hosts:
+    - {name: r1, assigned_to: alex, pair: unpaired, session_users: [term-alex]}
+cases:
+  - name: fingerprint_max_attempts
+    steps:
+      - {host: r1, do: pair, text: "${r1.pairing_code}", expect: {exit: 0}}
+      - as: owner
+        call: confirmHost
+        params: {host_id: "${r1.id}"}
+        if_match: /hosts/${r1.id}
+        step_up: true
+        with: {fingerprint_prefix: "${r1.wrong_prefix}", llm_credentials: organization, declared_server_host: false, reason: terminal suite}
+        expect: {status: 409, code: fingerprint_mismatch, fields: {/attempts_remaining: 2}}
+      - as: owner
+        call: confirmHost
+        params: {host_id: "${r1.id}"}
+        if_match: /hosts/${r1.id}
+        step_up: true
+        with: {fingerprint_prefix: "${r1.wrong_prefix}", llm_credentials: organization, declared_server_host: false, reason: terminal suite}
+        expect: {status: 409, code: fingerprint_mismatch, fields: {/attempts_remaining: 1}}
+      - as: owner
+        call: confirmHost
+        params: {host_id: "${r1.id}"}
+        if_match: /hosts/${r1.id}
+        step_up: true
+        with: {fingerprint_prefix: "${r1.wrong_prefix}", llm_credentials: organization, declared_server_host: false, reason: terminal suite}
+        expect: {status: 409, code: fingerprint_mismatch, fields: {/attempts_remaining: 0}}
+      - check: host
+        host: r1
+        expect: {state: pairing, no_keys: true, connected: false, journal: ['"code":4110']}

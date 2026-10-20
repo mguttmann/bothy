@@ -1,0 +1,150 @@
+# SPDX-License-Identifier: Apache-2.0
+# TM-T28 of 24 14 (T12, SR12) without part (d), which runs only on macOS (M2-45's
+# TestPlatform_TMT28d): (a) owner and host assignee with grant terminal, both without an
+# assignment, open: 403 terminal_denied no_session_user; (b) a taken name for a second person and a
+# second assignment of one person: 409 conflict session_user_taken, nothing changed; (c) tokens with
+# an osu outside host_service.session_users and with an osu the host service gave to another sub,
+# the assignments changed in the database bypassing the server (the only writes of the suite
+# outside the API): no PTY, 4104 with session_user_unknown and session_user_mismatch; (e) a name
+# the host does not report: 400 validation_failed with session_user_not_on_host on confirmHost and
+# updateHost, nothing stored; a name the operator removed from host_service.session_users: after
+# the next report 403 terminal_denied no_session_user, no 4104.
+id: tm-t28
+title: One session user per person (T12)
+sources: ["24 14 TM-T28", "24 2.2", "24 5.3", "24 13", "07 SR12", "03 hosts host_session_users"]
+profile: default
+world:
+  people: [alex, sam, robin]
+  owners: [robin]
+  hosts:
+    - {name: r1, assigned_to: alex, session_users: [term-alex, term-sam, term-robin], assign: {alex: term-alex, sam: term-sam, robin: term-robin}}
+    - {name: r1n, assigned_to: alex, session_users: [term-alex]}
+    - {name: r1c, assigned_to: alex, pair: unconfirmed, session_users: [term-alex]}
+    - {name: r1s, assigned_to: alex, session_users: [term-alex, term-sam], assign: {alex: term-alex}}
+  grants:
+    - {subject: alex, host: r1}
+    - {subject: alex, host: r1n}
+    - {subject: sam, host: r1}
+cases:
+  - name: a_no_session_user
+    hosts: [r1n]
+    steps:
+      - {device: alex, do: step_up}
+      - {device: alex, do: open, on: r1n, session: s1, expect: {status: 403, code: terminal_denied, reason: no_session_user}}
+      - {device: owner, do: step_up}
+      - {device: owner, do: open, on: r1n, session: s2, expect: {status: 403, code: terminal_denied, reason: no_session_user}}
+      - check: audit
+        expect: {actor: alex, resource: r1n, action: terminal.open, decision: deny}
+      - check: audit
+        expect: {actor: owner, resource: r1n, action: terminal.open, decision: deny}
+  - name: b_name_taken
+    hosts: [r1n]
+    steps:
+      - as: owner
+        call: updateHost
+        params: {host_id: "${r1n.id}"}
+        if_match: /hosts/${r1n.id}
+        with: {add_session_users: [{user_id: "${alex.id}", os_user: term-alex}], reason: terminal suite}
+        expect: {status: 200}
+      - as: owner
+        call: updateHost
+        params: {host_id: "${r1n.id}"}
+        if_match: /hosts/${r1n.id}
+        with: {add_session_users: [{user_id: "${sam.id}", os_user: term-alex}], reason: terminal suite}
+        expect: {status: 409, code: conflict, reason: session_user_taken}
+      - check: host
+        host: r1n
+        expect: {session_users: {alex: term-alex}}
+  - name: b_second_assignment
+    hosts: [r1s]
+    steps:
+      - as: owner
+        call: updateHost
+        params: {host_id: "${r1s.id}"}
+        if_match: /hosts/${r1s.id}
+        with: {add_session_users: [{user_id: "${alex.id}", os_user: term-sam}], reason: terminal suite}
+        expect: {status: 409, code: conflict, reason: session_user_taken}
+      - check: host
+        host: r1s
+        expect: {session_users: {alex: term-alex}}
+  - name: c_unknown_name
+    hosts: [r1]
+    steps:
+      - server: sql
+        bypass: true
+        sql: >-
+          UPDATE host_session_users SET os_user = 'term-ghost' WHERE host_id = '${r1.id}' AND user_id = '${alex.id}';
+          UPDATE hosts SET reported_session_users = reported_session_users || '[{"os_user":"term-ghost","workdirs":[]}]'::jsonb WHERE id = '${r1.id}';
+          UPDATE sequence_counters SET value = value + 1 WHERE name = 'permission_version';
+      - {device: alex, do: step_up}
+      - {device: alex, do: open, on: r1, session: s1, expect: {status: 201}}
+      - {device: alex, do: connect, session: s1, expect: {}}
+      - {device: alex, do: handshake, session: s1, expect: {close: {code: 4104, reason: session_user_unknown}}}
+      - check: processes
+        host: r1
+        user: term-alex
+        expect: {shells: 0, processes: 0}
+  - name: c_bound_name
+    hosts: [r1]
+    steps:
+      - {device: alex, do: step_up}
+      - {device: alex, do: open, on: r1, session: s1, expect: {status: 201}}
+      - {device: alex, do: connect, session: s1, expect: {}}
+      - {device: alex, do: handshake, session: s1, expect: {}}
+      - {device: alex, do: start, session: s1}
+      - {device: alex, do: send, session: s1, text: "printf '%s-%s\\n' ready ${marker}\n"}
+      - {device: alex, do: expect_output, session: s1, expect: {output: "ready-${marker}"}}
+      - {device: alex, do: close, session: s1}
+      - check: session
+        session: s1
+        expect: {state: closed}
+      - server: sql
+        bypass: true
+        sql: >-
+          UPDATE host_session_users SET os_user = 'term-gone' WHERE host_id = '${r1.id}' AND user_id = '${alex.id}';
+          UPDATE host_session_users SET os_user = 'term-robin-gone' WHERE host_id = '${r1.id}' AND user_id = '${robin.id}';
+          UPDATE host_session_users SET os_user = 'term-alex' WHERE host_id = '${r1.id}' AND user_id = '${robin.id}';
+          UPDATE sequence_counters SET value = value + 1 WHERE name = 'permission_version';
+      - {device: robin, do: step_up}
+      - {device: robin, do: open, on: r1, session: s2, expect: {status: 201}}
+      - {device: robin, do: connect, session: s2, expect: {}}
+      - {device: robin, do: handshake, session: s2, expect: {close: {code: 4104, reason: session_user_mismatch}}}
+      - check: processes
+        host: r1
+        user: term-alex
+        expect: {shells: 0, processes: 0}
+  - name: e_not_reported
+    hosts: [r1c, r1n]
+    steps:
+      - as: owner
+        call: confirmHost
+        params: {host_id: "${r1c.id}"}
+        if_match: /hosts/${r1c.id}
+        step_up: true
+        with: {fingerprint_prefix: "${r1c.fp_prefix}", llm_credentials: organization, declared_server_host: false, session_users: [{user_id: "${alex.id}", os_user: term-ghost}], reason: terminal suite}
+        expect: {status: 400, code: validation_failed, errors: [{code: session_user_not_on_host}]}
+      - check: host
+        host: r1c
+        expect: {state: confirming, session_users: {}}
+      - as: owner
+        call: updateHost
+        params: {host_id: "${r1n.id}"}
+        if_match: /hosts/${r1n.id}
+        with: {add_session_users: [{user_id: "${alex.id}", os_user: term-ghost}], reason: terminal suite}
+        expect: {status: 400, code: validation_failed, errors: [{code: session_user_not_on_host}]}
+      - check: host
+        host: r1n
+        expect: {session_users: {}}
+  - name: e_name_removed
+    hosts: [r1]
+    steps:
+      - host: r1
+        do: exec
+        script: "sed -i '/- term-alex$/d' /etc/bothy-host/config.yaml && /opt/bothy-host/bin/bothy-host restart"
+      - check: host
+        host: r1
+        expect: {connected: true, reported_session_users: [term-robin, term-sam]}
+      - {device: alex, do: step_up}
+      - {device: alex, do: open, on: r1, session: s1, expect: {status: 403, code: terminal_denied, reason: no_session_user}}
+      - check: audit
+        expect: {actor: alex, resource: r1, action: terminal.open, decision: deny}

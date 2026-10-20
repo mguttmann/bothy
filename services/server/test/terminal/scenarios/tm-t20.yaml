@@ -1,0 +1,38 @@
+# SPDX-License-Identifier: Apache-2.0
+# TM-T20 of 24 14: a pairing code used twice, an expired code and a code with a wrong checksum each
+# make bothy-host pair exit 1 after 401 unauthenticated (M2-41: pairHost answers every failed
+# redemption so; pair prints the code of the refusal); state and keys of the host stay as they were. "Without database access" of the
+# wrong checksum stays M2-41's TestTMT20_WrongChecksumNoDatabase (catalogue run of kind unit).
+id: tm-t20
+title: Pairing code twice, expired, with a wrong checksum
+sources: ["24 14 TM-T20", "24 3.2", "M2-41 pairHost"]
+profile: default
+world:
+  people: [alex]
+  hosts:
+    - {name: r1, assigned_to: alex, session_users: [term-alex], assign: {alex: term-alex}}
+    - {name: r1u, assigned_to: alex, pair: unpaired, session_users: [term-alex]}
+    - {name: r1b, pair: installed, session_users: [term-alex]}
+cases:
+  - name: code_twice
+    hosts: [r1, r1b]
+    steps:
+      - {host: r1b, do: pair, text: "${r1.pairing_code}", expect: {exit: 1, stderr_contains: ["server refused: unauthenticated"]}}
+      - check: host
+        host: r1
+        expect: {state: active, connected: true, no_keys: false}
+  - name: code_expired
+    hosts: [r1u]
+    steps:
+      - wait: terminal.pairing_code_ttl
+      - {host: r1u, do: pair, text: "${r1u.pairing_code}", expect: {exit: 1, stderr_contains: ["server refused: unauthenticated"]}}
+      - check: host
+        host: r1u
+        expect: {state: pairing, no_keys: true}
+  - name: wrong_checksum
+    hosts: [r1u]
+    steps:
+      - {host: r1u, do: pair, text: "${r1u.bad_code}", expect: {exit: 1, stderr_contains: ["server refused: unauthenticated"]}}
+      - check: host
+        host: r1u
+        expect: {state: pairing, no_keys: true}

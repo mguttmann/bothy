@@ -1,0 +1,38 @@
+# SPDX-License-Identifier: Apache-2.0
+# TM-T22 of 24 14: from a session the shell reads host_service.state_dir and the key file and gets
+# "Permission denied"; when the operator grants the session user read access with setfacl and runs
+# bothy-host restart, the start is refused with exit status 78 and Host.doctor has an HD8 entry
+# with ok false and one of M2-42's HD8 codes (24 2.2 HD8, brief M2-48 Design note 9).
+id: tm-t22
+title: Read host_service.state_dir and the key file from a session; start a PTY helper with read permission on the directory
+sources: ["24 14 TM-T22", "24 2.2 HD8", "24 4.2"]
+profile: default
+world:
+  people: [alex]
+  hosts:
+    - {name: r1, assigned_to: alex, session_users: [term-alex], assign: {alex: term-alex}}
+  grants:
+    - {subject: alex, host: r1}
+cases:
+  - name: read_state
+    steps:
+      - {device: alex, do: step_up}
+      - {device: alex, do: open, on: r1, session: s1, expect: {status: 201}}
+      - {device: alex, do: connect, session: s1, expect: {}}
+      - {device: alex, do: handshake, session: s1, expect: {}}
+      - {device: alex, do: start, session: s1}
+      - {device: alex, do: send, session: s1, text: "ls /var/lib/bothy-host; cat /var/lib/bothy-host/keys\n"}
+      - {device: alex, do: expect_output, session: s1, expect: {output: "Permission denied"}}
+      - check: session
+        session: s1
+        expect: {state: active}
+  - name: helper_with_read_access
+    steps:
+      - {host: r1, do: exec, run: [setfacl, -m, "u:term-alex:rx", /var/lib/bothy-host]}
+      - {host: r1, do: restart_service}
+      - check: host
+        host: r1
+        expect:
+          connected: false
+          doctor: [{check: hd8_separation, ok: false, code_in: [state_access_for_session_user, helper_reads_state]}]
+          unit: {exec_main_status: 78, active: false}

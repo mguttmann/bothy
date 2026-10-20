@@ -1,0 +1,33 @@
+# SPDX-License-Identifier: Apache-2.0
+# TM-T06 of 24 14 end to end: random canary parts of test/canary (class content) typed into a shell
+# as printf '%s%s\n' <part1> <part2>; the output holds the concatenation (positive control); the
+# session token is registered as class secret. Afterwards no part, no concatenation and no token is
+# in the binary messages the device sent and received (the relay view), the container logs, a
+# database dump, the collector export and the journal of the host service (24 10.4, 19 SEC-TERM-1,
+# SEC-T10; brief M2-48 Design note 9).
+id: tm-t06
+title: Relay capture, server logs, database dump and telemetry after a session with a canary value
+sources: ["24 14 TM-T06", "24 10.4", "19 SEC-TERM-1", "19 SEC-T10", "19 SEC-LOG-2"]
+profile: default
+world:
+  people: [alex]
+  hosts:
+    - {name: r1, assigned_to: alex, session_users: [term-alex], assign: {alex: term-alex}}
+  grants:
+    - {subject: alex, host: r1}
+cases:
+  - name: canary_session
+    steps:
+      - {device: alex, do: step_up}
+      - {device: alex, do: open, on: r1, session: s1, expect: {status: 201}}
+      - {device: alex, do: connect, session: s1, expect: {}}
+      - {device: alex, do: handshake, session: s1, expect: {}}
+      - {device: alex, do: start, session: s1}
+      - {device: alex, do: send, session: s1, text: "printf '%s%s\\n' ${canary:part1} ${canary:part2}\n"}
+      - {device: alex, do: expect_output, session: s1, expect: {output: "${canary:part1}${canary:part2}"}}
+      - {device: alex, do: close, session: s1}
+      - check: session
+        session: s1
+        expect: {state: closed, close_reason: client_closed}
+      - check: canary
+        expect: {output: "${canary:part1}${canary:part2}", findings: 0}

@@ -9,6 +9,7 @@ import (
 	"errors"
 	"fmt"
 	"sync"
+	"time"
 )
 
 // The frame types of 24 5.4 (protocol constants, written literally from the chapter).
@@ -55,6 +56,10 @@ type Conn struct {
 	CEK string
 	// Message1 is the Noise message 1 this connection sent (the relay view of TM-T03).
 	Message1 []byte
+	// Token and StreamPath are session_token and stream_path of the grant of this connection;
+	// Opened is the time of that grant. They stay in memory and are never printed.
+	Token, StreamPath string
+	Opened            time.Time
 
 	mu          sync.Mutex
 	cond        *sync.Cond
@@ -83,6 +88,24 @@ func NewConn(bin string) (*Conn, error) {
 	c := &Conn{Sidecar: sc, CEK: cek}
 	c.cond = sync.NewCond(&c.mu)
 	return c, nil
+}
+
+// ReplaceSidecar replaces the sidecar by a fresh one with another ephemeral key, so the handshake
+// uses a key whose hash differs from the cek of the grant (TM-T04 wrong cek).
+//
+// Errors: the new sidecar could not start or draw its key.
+func (c *Conn) ReplaceSidecar(bin string) error {
+	sc, err := StartSidecar(bin)
+	if err != nil {
+		return err
+	}
+	if _, _, err := sc.Keypair(); err != nil {
+		_ = sc.Close()
+		return err
+	}
+	_ = c.Sidecar.Close()
+	c.Sidecar = sc
+	return nil
 }
 
 // Handshake runs start of the sidecar with the host's static key and the IDs, sends message 1

@@ -1,0 +1,66 @@
+# SPDX-License-Identifier: Apache-2.0
+# TM-T09 of 24 14 (I6, SR11): a grant to a second person, a grant to a group and the switch to
+# personal with grants to others give 409 i6_violation and change nothing; a second owner who is
+# not the holder of the login gets 403 terminal_denied with reason i6_holder_only.
+id: tm-t09
+title: "I6: grant to a second person, grant to a group, switching to personal with an existing grant to others, a second owner opens"
+sources: ["24 14 TM-T09", "24 7.3", "24 13", "07 SR11", "07 11.1 AZ-M56 AZ-M57"]
+profile: default
+world:
+  people: [alex, sam, robin]
+  owners: [robin]
+  groups: [{name: leser, members: [sam]}]
+  hosts:
+    - {name: r1, assigned_to: alex, session_users: [term-alex, term-sam], assign: {alex: term-alex, sam: term-sam}}
+    - {name: r2, assigned_to: robin, llm_credentials: personal, credential_holder: robin, session_users: [term-robin, term-owner], assign: {robin: term-robin, owner: term-owner}}
+  grants:
+    - {subject: alex, host: r1}
+    - {subject: sam, host: r1}
+cases:
+  - name: grant_second_person
+    hosts: [r2]
+    steps:
+      - as: owner
+        call: createGrant
+        with: {subject_kind: user, subject_id: "${alex.id}", target_kind: host, target_id: "${r2.id}", capabilities: [terminal], reason: terminal suite}
+        expect: {status: 409, code: i6_violation}
+      - check: host
+        host: r2
+        expect: {state: active, connected: true}
+  - name: grant_group
+    hosts: [r2]
+    steps:
+      - as: owner
+        call: createGrant
+        with: {subject_kind: group, subject_id: "${leser.id}", target_kind: host, target_id: "${r2.id}", capabilities: [terminal], reason: terminal suite}
+        expect: {status: 409, code: i6_violation}
+      - check: host
+        host: r2
+        expect: {state: active, connected: true}
+  - name: switch_to_personal
+    hosts: [r1]
+    steps:
+      - as: owner
+        call: setHostLlmCredentials
+        params: {host_id: "${r1.id}"}
+        if_match: /hosts/${r1.id}
+        with: {llm_credentials: personal, credential_holder_id: "${alex.id}", reason: terminal suite}
+        expect: {status: 409, code: i6_violation}
+      - as: owner
+        call: getHost
+        params: {host_id: "${r1.id}"}
+        expect: {status: 200, fields: {/llm_credentials: organization}}
+      - check: host
+        host: r1
+        expect: {state: active, connected: true}
+  - name: second_owner_opens
+    hosts: [r2]
+    steps:
+      - {device: owner, do: step_up}
+      - device: owner
+        do: open
+        on: r2
+        session: s1
+        expect: {status: 403, code: terminal_denied, reason: i6_holder_only}
+      - check: audit
+        expect: {actor: owner, resource: r2, action: terminal.open, decision: deny}
