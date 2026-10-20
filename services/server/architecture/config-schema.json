@@ -26,6 +26,18 @@
       "doc": "Without an ack within this time the server delivers again from acked_seq + 1 with redelivered."
     },
     {
+      "name": "agent.heartbeat_persist_interval",
+      "env": "BOTHY_AGENT__HEARTBEAT_PERSIST_INTERVAL",
+      "kind": "duration",
+      "default": "60s",
+      "required": false,
+      "enum": [],
+      "min": "1ms",
+      "max": "",
+      "chapter": "03-datenmodell.md",
+      "doc": "Heartbeat fields are stored at most this often."
+    },
+    {
       "name": "agent.invocation_token_ttl",
       "env": "BOTHY_AGENT__INVOCATION_TOKEN_TTL",
       "kind": "duration",
@@ -60,6 +72,18 @@
       "max": "2147483647",
       "chapter": "04-sync-protokoll.md",
       "doc": "Most unacknowledged events on the way per agent consumer."
+    },
+    {
+      "name": "agent.presence_timeout",
+      "env": "BOTHY_AGENT__PRESENCE_TIMEOUT",
+      "kind": "duration",
+      "default": "90s",
+      "required": false,
+      "enum": [],
+      "min": "1ms",
+      "max": "",
+      "chapter": "04-sync-protokoll.md",
+      "doc": "Without a heartbeat for this long an agent is offline."
     },
     {
       "name": "api.cors_allowed_origins",
@@ -924,6 +948,18 @@
       "max": "",
       "chapter": "16-betrieb.md",
       "doc": "Number of full backups kept in the off-site repository repo2."
+    },
+    {
+      "name": "billing.mismatch_alert_after",
+      "env": "BOTHY_BILLING__MISMATCH_ALERT_AFTER",
+      "kind": "duration",
+      "default": "5m",
+      "required": false,
+      "enum": [],
+      "min": "1ms",
+      "max": "",
+      "chapter": "10-backend-richtlinie.md",
+      "doc": "How long the reported mode may differ from the configured one before the warning and the alarm."
     },
     {
       "name": "branding.product_name_max_chars",

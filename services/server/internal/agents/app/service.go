@@ -413,3 +413,8 @@ func (s *Service) notifyPresence(ctx context.Context, list []ids.ID) {
 		s.d.Presence.d.Log.LogAttrs(ctx, slog.LevelError, "agent presence not reassessed")
 	}
 }
+
+// BindPresence binds the presence tracker of the process (internal/wire, before the routes serve):
+// from then on getAgent and listAgents show its presence and the changes of the configured values
+// notify it.
+func (s *Service) BindPresence(t *Tracker) { s.d.Presence = t }

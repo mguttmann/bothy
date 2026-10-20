@@ -133,7 +133,7 @@ modules:
     ephemeral_events: [agent.presence_changed]
     ws_ops: [ack]
     depends_on: [identity, authz, chat]
-    adapter_vendors: [pgx]   # sqlc code and the repository (M1-51)
+    adapter_vendors: [otel, pgx]   # sqlc code and the repository (M1-51); adapters/otelmetrics observes the presence gauges (M2-20)
   files:
     tables: [files, file_upload_sessions, file_upload_parts, file_thumbnails, message_attachments,
              file_text_extracts]
