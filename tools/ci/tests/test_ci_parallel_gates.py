@@ -14,6 +14,7 @@ from pathlib import Path
 from typing import Any
 
 import ci_ok
+import components as component_map
 import pytest
 import yaml
 
@@ -107,10 +108,9 @@ def test_component_tests_leave_the_tools_suite_to_its_job(job: str) -> None:
 def test_component_tests_run_when_the_plan_selects_their_component(
     job: str, components: set[str]
 ) -> None:
-    condition = _jobs()[job]["if"]
-    assert "needs.plan.outputs.components == 'all'" in condition
-    for component in components:
-        assert f"' {component} '" in condition
+    # The plan lists the job for these components (tools/ci/components.py COMPONENT_TEST_JOBS).
+    assert _jobs()[job]["if"] == f"contains(format(' {{0}} ', needs.plan.outputs.jobs), ' {job} ')"
+    assert set(component_map.COMPONENT_TEST_JOBS[job]) == components
 
 
 @pytest.mark.parametrize("job", ["gates", "gates-docs", "gates-security"])

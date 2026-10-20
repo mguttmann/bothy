@@ -30,15 +30,49 @@ once for the components of the plan, the tests split by component
 | `gates` | `fmt-check codegen-check lint typecheck arch register-check migrations-lint flag-check commitlint runners-check labels-check release-pins` | always |
 | `gates (docs and contracts)` | `docs config-doc-check linkcheck diagrams catalog-check api-lint api-checks api-breaking ops-check api-clients tokens` | always |
 | `gates (security and supply chain)` | `gitleaks semgrep trivy osv licenses` | always |
-| `test (tools)` | `test coverage` with no component (the Python tools) | always |
-| `test (server)` | `test coverage COMPONENTS=server AREAS=none` | when the plan selects `server` |
-| `test (apps)` | `test coverage COMPONENTS=apps AREAS=none` (Dart and JVM) | when the plan selects `apps` |
-| `test (SDKs and plugins)` | `test coverage` for the planned `sdk-python`, `sdk-typescript`, `plugins` with `AREAS=none` | when the plan selects one of them |
+| `test (tools)` | `test coverage` with no component (the Python tools) | when the plan needs it |
+| `test (server)` | `test coverage COMPONENTS=server AREAS=none` | when the plan needs it |
+| `test (apps)` | `test coverage COMPONENTS=apps AREAS=none` (Dart and JVM) | when the plan needs it |
+| `test (SDKs and plugins)` | `test coverage` for the planned `sdk-python`, `sdk-typescript`, `plugins` with `AREAS=none` | when the plan needs it |
 
-A component test job the plan leaves out is skipped, and `ci-ok` accepts that, as the single job
-skipped the component's tests before. `AREAS=none` leaves the tools suite to `test (tools)`; only
-the three tools tests that read component sources (`TOOLS_SOURCE_TESTS`) run in each test job as
-well.
+`AREAS=none` leaves the tools suite to `test (tools)`; only the three tools tests that read
+component sources (`TOOLS_SOURCE_TESTS`) run in each test job as well.
+
+## Jobs a change needs
+
+One plan decides which jobs a change needs: `tools/ci/components.py ci-plan`, the component map
+that the gates (`COMPONENTS`) and the pre-push plan (`tools/hooks/push_plan.py`) use. The job
+`plan` of `ci.yml` and of `build-verify.yml` runs it and writes `components` and `jobs`; each
+conditional job runs exactly when `jobs` lists its id, and no other condition skips it
+(`tools/ci/tests/test_ci_ok.py`). The other jobs (`plan`, the three `gates` jobs, the deny list,
+`sonar`, `ci-ok`) run on every change.
+
+| Jobs | Run when the change touches |
+|---|---|
+| `test (server)`, `test (apps)`, `test (SDKs and plugins)` | their component in the component map (`server`; `apps`; `sdk-python`, `sdk-typescript` or `plugins`) |
+| `test (tools)` | any file that is not a source file of a component (a `.go`, `.dart`, `.ts`, `.tsx`, `.kt`, `.swift` or `.py` file under `services/`, `apps/`, `packages/`, `sdk/`, `plugins/`), because the tools tests read workflows, the Makefile, docs and manifests; the tools tests that read component sources run in the component test jobs |
+| `apps (macOS)`, `apps (Windows)`, `apps (Android API 26)`, `apps (Android API 36)` | `apps/`, `packages/` (with the native code of the members), the root `pubspec.yaml` (Flutter pin) or `pubspec.lock`; the Android jobs only in the public phase. Other inputs of the component `apps` (`design/`, the SLO generator, `analysis_options.yaml`, `tools/arch-check/`) feed the Dart gates and committed generated files under `packages/`, which `test (apps)` checks |
+| `postgres-image (amd64)`, `postgres-image (arm64)` | what `bothy-postgres` is built and tested from: `services/server/images/bothy-postgres/`, `internal/`, `cmd/bothy-backupd/`, `migrations/`, `migrations.sha256`, `test/postgresimage/`, `go.mod`, `go.sum`, `VERSION` and `.golangci.yml` under `services/server/` |
+
+Every job runs on a push to `main`, on a manual run, for an empty diff and when a shared input
+changes: every path the component map assigns to no component (among them the `Makefile`,
+`tools/` outside the few tool folders it assigns to a component, `.github/`, the root
+configuration files) and the API contract `docs/api/`. A release (`release.yml` calls `ci.yml`)
+runs the jobs of the components of its tag and `test (tools)`. Documentation (`docs/` outside
+`docs/api/`, `infra/`, the root Markdown files, `LICENSE`, `NOTICE`) needs only `test (tools)` of
+the conditional jobs, except the files the map assigns to a component (for example
+`docs/spec/actions.yaml` to `server`).
+
+A skip never hides a failure: `ci-ok` has no `needs`, so it runs the same plan step on the same
+commit itself and accepts a skipped conditional job only when the plan did not list it; a job that
+ran must pass, listed or not, and a missing, empty or unknown plan fails `ci-ok`
+(`tools/ci/ci_ok.py`). `build-verify-ok` applies the same check to the results of its `needs`
+(`ci_ok.py needs`; docs/DECISIONS.md PL/14). `sonar` and the deny-list pair keep their own rules: `sonar` is skipped without
+the secrets and after a failed or cancelled test job, which fails `ci-ok` through that job.
+
+A new commit of a pull request cancels the run of the older commit, and so does an edit of title or
+body, which starts a new run (the `concurrency` group of `ci.yml` per pull request); a newer push
+to a build branch cancels its older `build-verify` run.
 
 Source of the diagram: `docs/quality/pipeline.mmd`.
 
@@ -72,7 +106,7 @@ Source of the diagram: `docs/quality/pipeline.mmd`.
 | `release-pins` | `tools/ci/components.py pins` | the server version that the product bundle pins (`BOTHY_VERSION=` in `infra/compose/.env.example`): exactly one line, SemVer without `v` or the placeholder of the template, and a stable product (`VERSION` without a pre-release identifier) pins no server pre-release, which only a product beta (`X.Y.Z-beta.N`) may pin; so a typo fails at the latest in the required check `ci-ok` of the pull request with the release commit, that is before the tag, not only in the build of the release chain; the push of the tag alone starts no check ([18 2.1](../spec/18-release.md#21-server-version-and-registry-in-the-product-bundle), D-W-98) | | yes |
 | `labels-check` | `tools/ci/labels.py` | label file valid, templates and GOVERNANCE.md use only defined labels | | yes |
 | `gitleaks` | gitleaks with `.gitleaks.toml` | secrets in every commit reachable from `HEAD`; before going public, in all refs; the EXAMPLE marker exempts only this product's own token formats and generic key-like values | | yes |
-| `apps-platform` (not in `gates`) | `tools/ci/apps_platform.py` | the platform tests that a member lists in `platform-tests.json` (argument lists per system, no shell) for the host system, in the member folder; SKIP for the other system and without such a member; the system `android` runs on any host when `adb devices` lists exactly one device or emulator (`SKIP ... android: no device` without one, a failure with two or more; `--system android` runs only it); needs a desktop session or a device, so CI runs it in the jobs `apps (macOS)` (`macos-15`), `apps (Windows)` (`windows-2025`), `apps (Android API 26)` and `apps (Android API 36)` (`ubuntu-24.04` with hardware acceleration, x86_64 Google APIs emulator images; only in the public phase), which `ci-ok` accepts as `success` or `skipped` | | SKIP until the first member has platform tests (M4-10) |
+| `apps-platform` (not in `gates`) | `tools/ci/apps_platform.py` | the platform tests that a member lists in `platform-tests.json` (argument lists per system, no shell) for the host system, in the member folder; SKIP for the other system and without such a member; the system `android` runs on any host when `adb devices` lists exactly one device or emulator (`SKIP ... android: no device` without one, a failure with two or more; `--system android` runs only it); needs a desktop session or a device, so CI runs it in the jobs `apps (macOS)` (`macos-15`), `apps (Windows)` (`windows-2025`), `apps (Android API 26)` and `apps (Android API 36)` (`ubuntu-24.04` with hardware acceleration, x86_64 Google APIs emulator images; only in the public phase), which `ci-ok` accepts as `skipped` only when the plan does not need them (section "Jobs a change needs") | | SKIP until the first member has platform tests (M4-10) |
 | `semgrep` | Semgrep with `.semgrep/` | project rules and their rule tests | | yes |
 | `trivy` | Trivy `config` on a copy of the tracked and not ignored files (`tools/ci/tracked_tree.py`) | misconfiguration in Dockerfiles, Kubernetes, Helm, Terraform | `HIGH`, `CRITICAL` | once such files exist |
 | `osv` | OSV-Scanner, govulncheck | known vulnerabilities of all lock files; reachable Go vulnerabilities | | yes |
@@ -103,8 +137,8 @@ platforms build without emulation. `make postgres-image-test` runs the two-conta
 point-in-time restore, `pgbackrest verify`, a foreign client certificate rejected, no egress of the
 database container, labels, both platforms). Neither is part of `check`. The CI jobs
 `postgres-image (amd64)` and `postgres-image (arm64)` run both targets natively on `ubuntu-24.04`
-and `ubuntu-24.04-arm` when the plan selects the component `server`; `ci-ok` requires each to pass
-or be skipped.
+and `ubuntu-24.04-arm` when the plan needs them (section "Jobs a change needs"); `ci-ok` accepts a
+skip only then.
 
 ## Skipping and failing
 

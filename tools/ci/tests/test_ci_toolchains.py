@@ -116,7 +116,7 @@ def test_apps_jobs_run_the_platform_tests(job: str, runner: str) -> None:
     assert spec["needs"] == "plan"
     assert spec["permissions"] == {"contents": "read"}
     assert isinstance(spec["timeout-minutes"], int)
-    assert "needs.plan.outputs.components" in spec["if"]
+    assert spec["if"] == f"contains(format(' {{0}} ', needs.plan.outputs.jobs), ' {job} ')"
     [run] = [s for s in spec["steps"] if "run" in s]
     assert run["run"] == "uv run --project tools --locked --quiet python tools/ci/apps_platform.py"
     assert run["shell"] == "bash"
@@ -127,10 +127,12 @@ def test_ci_ok_requires_the_apps_jobs_by_name() -> None:
     # ci-ok has no `needs`; tools/ci/ci_ok.py requires the jobs of ci.yml by name.
     import ci_ok
 
-    names = {_jobs()[job]["name"] for job in APPS_JOBS}
-    rules = {n: rule.ok for rule in ci_ok.RULES for n in rule.names}
-    for name in names:
-        assert rules[name] == frozenset({"success", "skipped"}), name
+    # A skip passes only when the plan left the job out (tools/ci/tests/test_ci_ok.py).
+    rules = {n: rule for rule in ci_ok.RULES for n in rule.names}
+    for job in APPS_JOBS:
+        rule = rules[_jobs()[job]["name"]]
+        assert rule.ok == frozenset({"success"}), job
+        assert rule.job == job
 
 
 @pytest.mark.parametrize("level", [26, 36])
@@ -143,8 +145,11 @@ def test_apps_android_runs_the_instrumented_tests_on_an_emulator(level: int) -> 
     assert spec["needs"] == "plan"
     assert spec["permissions"] == {"contents": "read"}
     assert isinstance(spec["timeout-minutes"], int)
-    assert "needs.plan.outputs.components" in spec["if"]
-    assert spec["if"].startswith("(github.event.repository.visibility == 'public'")
+    job = f"apps-android-{level}"
+    assert spec["if"] == f"contains(format(' {{0}} ', needs.plan.outputs.jobs), ' {job} ')"
+    # Only in the public phase: the plan leaves the emulator jobs out otherwise.
+    [plan] = [s for s in _jobs()["plan"]["steps"] if s.get("id") == "jobs"]
+    assert plan["env"]["PUBLIC"].startswith("${{ github.event.repository.visibility == 'public'")
     steps = spec["steps"]
     assert any("kvm" in str(s.get("run", "")) for s in steps), "hardware acceleration"
     assert any(_uses(s, "actions/setup-java") for s in steps)

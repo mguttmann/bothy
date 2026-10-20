@@ -18,6 +18,9 @@ product beta (`X.Y.Z-beta.N`) may.
 Usage:
   components.py changed --base <sha> --head <sha>   print components for `make COMPONENTS=`
   components.py changed --files <path>...
+  components.py ci-plan (--base <sha> --head <sha> | --files <path>... | --components <names>)
+                        --public true|false        print `components=` and `jobs=` for the
+                                                    plan of ci.yml and build-verify.yml
   components.py release --tag <tag> [--github-output]
                                                     print release info as JSON, or as
                                                     key=value lines for $GITHUB_OUTPUT
@@ -32,6 +35,7 @@ import json
 import re
 import subprocess
 import sys
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
@@ -72,6 +76,58 @@ GATE_COMPONENT_INPUT_PREFIXES: dict[str, tuple[str, ...]] = {
 # Areas without component gates; their repository-wide gates always run.
 NO_COMPONENT_PREFIXES = ("docs/", "infra/")
 NO_COMPONENT_ROOT_FILES = re.compile(r"^[^/]+\.md$|^(?:LICENSE|NOTICE)$")
+
+# Source files of a component (component directory and source suffix). No tools test reads them,
+# except the few in TOOLS_SOURCE_TESTS of the Makefile, which every component test job runs too
+# (`AREAS=none`); manifests, lock files, configuration, test data and docs of a component are no
+# source files, because tools tests read some of them (go.mod, Dockerfile, .golangci.yml). The
+# pre-push plan (tools/hooks/push_plan.py) and ci_plan decide the tools tests by it.
+COMPONENT_DIRS = ("services/", "apps/", "packages/", "sdk/", "plugins/")
+SOURCE_SUFFIXES = (".go", ".dart", ".ts", ".tsx", ".kt", ".swift", ".py")
+
+# ---- CI jobs a change needs (docs/quality/gates.md, "Jobs a change needs") -----------------
+# Job ids, the same in ci.yml and build-verify.yml. Every other job runs on every change.
+COMPONENT_TEST_JOBS: dict[str, tuple[str, ...]] = {
+    "test-server": ("server",),
+    "test-apps": ("apps",),
+    "test-sdk-plugins": ("sdk-python", "sdk-typescript", "plugins"),
+}
+TOOLS_TEST_JOB = "test-tools"
+DESKTOP_JOBS = ("apps-macos", "apps-windows")
+# The emulator jobs run only while the repository is public (docs/DECISIONS.md D-M5-01-5).
+ANDROID_JOBS = ("apps-android-26", "apps-android-36")
+POSTGRES_IMAGE_JOBS = ("postgres-image-amd64", "postgres-image-arm64")
+CONDITIONAL_JOBS: tuple[str, ...] = (
+    *COMPONENT_TEST_JOBS,
+    TOOLS_TEST_JOB,
+    *DESKTOP_JOBS,
+    *ANDROID_JOBS,
+    *POSTGRES_IMAGE_JOBS,
+)
+# What the platform tests (tools/ci/apps_platform.py) build and run: the members of the Dart
+# workspace with their native code, and its root manifest (Flutter pin) and lock file. The other
+# inputs of the component apps (design/, the SLO generator) feed generated Dart files that are
+# committed under packages/, and the Dart gates of test (apps) catch a stale one.
+PLATFORM_PREFIXES = ("apps/", "packages/")
+PLATFORM_FILES = ("pubspec.yaml", "pubspec.lock")
+# What bothy-postgres is built and tested from: the build context of
+# services/server/images/bothy-postgres/Dockerfile.dockerignore (bothy-backupd and the internal
+# packages it imports, the scripts of the image), the Dockerfile, the two-container test, the
+# migrations and the module files and lint configuration the test is built with.
+POSTGRES_IMAGE_PREFIXES = (
+    "services/server/images/bothy-postgres/",
+    "services/server/test/postgresimage/",
+    "services/server/internal/",
+    "services/server/cmd/bothy-backupd/",
+    "services/server/migrations/",
+)
+POSTGRES_IMAGE_FILES = (
+    "services/server/go.mod",
+    "services/server/go.sum",
+    "services/server/VERSION",
+    "services/server/migrations.sha256",
+    "services/server/.golangci.yml",
+)
 
 # Release component -> (directory, gate component).
 RELEASE_COMPONENTS: dict[str, tuple[str, str]] = {
@@ -126,6 +182,73 @@ def changed(files: list[str]) -> list[str]:
         else:
             return ["all"]
     return sorted(selected)
+
+
+def is_component_source(path: str) -> bool:
+    """Return whether `path` is a source file of a component (see COMPONENT_DIRS)."""
+    return path.startswith(COMPONENT_DIRS) and path.endswith(SOURCE_SUFFIXES)
+
+
+@dataclass(frozen=True)
+class CIPlan:
+    """The gate components of a CI run and the conditional jobs it needs (CONDITIONAL_JOBS)."""
+
+    components: list[str]
+    jobs: list[str]
+
+
+def ci_plan(
+    *, files: list[str] | None = None, selected: list[str] | None = None, public: bool
+) -> CIPlan:
+    """Return the components and conditional jobs a change needs.
+
+    Args:
+        files: the changed files of a pull request or build branch. An empty list, a shared
+            input (`changed` gives `all`) or the API contract runs every job.
+        selected: gate components without a diff (`all` for a push to main or a manual run,
+            the gate components of a release tag); every job of these components runs, and
+            the tools tests always.
+        public: whether the repository is public; the Android emulator jobs need it.
+
+    Returns:
+        The plan; `jobs` lists job ids of CONDITIONAL_JOBS, sorted.
+
+    Raises:
+        ValueError: not exactly one of `files` and `selected`, or an unknown component.
+
+    Example: `ci_plan(files=["services/host/x.go"], public=True).jobs` is `["test-server"]`.
+    """
+    if (files is None) == (selected is None):
+        raise ValueError("ci_plan needs exactly one of files or selected")
+    if files is not None:
+        names = changed(files) if files else ["all"]
+        full = names == ["all"] or any(f.startswith(API_PREFIX) for f in files)
+        tools = any(not is_component_source(f) for f in files)
+        platform = any(f.startswith(PLATFORM_PREFIXES) or f in PLATFORM_FILES for f in files)
+        postgres = any(
+            f.startswith(POSTGRES_IMAGE_PREFIXES) or f in POSTGRES_IMAGE_FILES for f in files
+        )
+    else:
+        names = list(selected or [])
+        unknown = [n for n in names if n != "all" and n not in GATE_COMPONENTS]
+        if unknown:
+            raise ValueError(f"unknown component '{unknown[0]}'")
+        full = "all" in names
+        tools = True
+        platform = "apps" in names
+        postgres = "server" in names
+    jobs: set[str] = set(CONDITIONAL_JOBS) if full else set()
+    if not full:
+        jobs.update(job for job, owners in COMPONENT_TEST_JOBS.items() if set(owners) & set(names))
+        if tools:
+            jobs.add(TOOLS_TEST_JOB)
+        if platform:
+            jobs.update((*DESKTOP_JOBS, *ANDROID_JOBS))
+        if postgres:
+            jobs.update(POSTGRES_IMAGE_JOBS)
+    if not public:
+        jobs.difference_update(ANDROID_JOBS)
+    return CIPlan(components=names, jobs=sorted(jobs & set(CONDITIONAL_JOBS)))
 
 
 def format_for_make(names: list[str]) -> str:
@@ -272,14 +395,35 @@ def _diff_files(base: str, head: str) -> list[str]:
     return [line for line in out.splitlines() if line]
 
 
+def _print_ci_plan(args: argparse.Namespace, parser: argparse.ArgumentParser) -> int:
+    public = args.public == "true"
+    if args.files is not None:
+        plan = ci_plan(files=args.files, public=public)
+    elif args.base and args.head:
+        plan = ci_plan(files=_diff_files(args.base, args.head), public=public)
+    elif args.components:
+        plan = ci_plan(selected=args.components.split(), public=public)
+    else:
+        parser.error("ci-plan needs --files, --base and --head, or --components")
+    print(f"components={format_for_make(plan.components)}")
+    print(f"jobs={' '.join(plan.jobs) or 'none'}")
+    return 0
+
+
 def main(argv: list[str] | None = None) -> int:
-    """Command line entry point (`changed` or `release`); returns the process exit code."""
+    """Command line entry point (`changed`, `ci-plan`, `pins`, `release`); returns the exit code."""
     parser = argparse.ArgumentParser(description="Component map for CI and releases.")
     sub = parser.add_subparsers(dest="cmd", required=True)
     p_changed = sub.add_parser("changed")
     p_changed.add_argument("--base")
     p_changed.add_argument("--head")
     p_changed.add_argument("--files", nargs="*")
+    p_plan = sub.add_parser("ci-plan")
+    p_plan.add_argument("--base")
+    p_plan.add_argument("--head")
+    p_plan.add_argument("--files", nargs="*")
+    p_plan.add_argument("--components")
+    p_plan.add_argument("--public", choices=["true", "false"], required=True)
     p_release = sub.add_parser("release")
     p_release.add_argument("--tag", required=True)
     p_release.add_argument("--repo", type=Path, default=Path.cwd())
@@ -297,6 +441,8 @@ def main(argv: list[str] | None = None) -> int:
             parser.error("changed needs --files or --base and --head")
         print(format_for_make(changed(files)))
         return 0
+    if args.cmd == "ci-plan":
+        return _print_ci_plan(args, parser)
     if args.cmd == "pins":
         problems = pinned_server_problems(args.repo)
         for problem in problems:

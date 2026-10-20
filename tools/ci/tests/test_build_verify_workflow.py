@@ -151,5 +151,5 @@ def test_build_verify_ok_sums_up_every_job() -> None:
     assert ok["if"] == "always()"
     assert set(ok["needs"]) == set(jobs) - {"build-verify-ok"}
     [run] = [s["run"] for s in ok["steps"] if "run" in s]
-    assert '.plan.result == "success"' in run
-    assert 'all(. == "success" or . == "skipped")' in run
+    # tools/ci/ci_ok.py needs: the plan and every needed job passed (tools/ci/tests/test_ci_ok.py).
+    assert run.rstrip().endswith("tools/ci/ci_ok.py needs")

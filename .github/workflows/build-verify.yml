@@ -36,8 +36,9 @@ jobs:
     runs-on: ubuntu-24.04
     timeout-minutes: 5
     outputs:
-      base: ${{ steps.plan.outputs.base }}
-      components: ${{ steps.plan.outputs.components }}
+      base: ${{ steps.jobs.outputs.base }}
+      components: ${{ steps.jobs.outputs.components }}
+      jobs: ${{ steps.jobs.outputs.jobs }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -47,21 +48,24 @@ jobs:
         with:
           enable-cache: false
       # The pushed diff is measured from the merge base with main, as a pull request shows it;
-      # without one every component runs.
-      - id: plan
-        name: Select components from the diff against main
+      # without one every job runs. The components and the conditional jobs come from the same
+      # plan as in ci.yml (tools/ci/components.py ci-plan, docs/quality/gates.md "Jobs a change
+      # needs"); build-verify-ok accepts a skipped job only when the plan left it out.
+      - id: jobs
+        name: Select the components and jobs this change needs
         env:
           HEAD_SHA: ${{ github.sha }}
+          PUBLIC: ${{ github.event.repository.visibility == 'public' || (github.event_name == 'schedule' && vars.BOTHY_VISIBILITY == 'public') }}
         run: |
           if base=$(git merge-base origin/main "$HEAD_SHA"); then
-            components=$(uv run --no-project --python 3.14 tools/ci/components.py changed --base "$base" --head "$HEAD_SHA")
+            plan=$(uv run --no-project --python 3.14 tools/ci/components.py ci-plan --base "$base" --head "$HEAD_SHA" --public "$PUBLIC")
           else
             base=""
-            components=all
+            plan=$(uv run --no-project --python 3.14 tools/ci/components.py ci-plan --components all --public "$PUBLIC")
           fi
-          echo "base=$base" >> "$GITHUB_OUTPUT"
-          echo "components=$components" >> "$GITHUB_OUTPUT"
-          echo "base: $base, components: $components"
+          echo "base: $base"
+          echo "$plan"
+          { echo "base=$base"; echo "$plan"; } >> "$GITHUB_OUTPUT"
 
   # Code and repository structure gates; commitlint covers the commits since the merge base.
   static:
@@ -121,6 +125,7 @@ jobs:
   test-tools:
     name: test (tools)
     needs: plan
+    if: contains(format(' {0} ', needs.plan.outputs.jobs), ' test-tools ')
     runs-on: ubuntu-24.04
     timeout-minutes: 60
     steps:
@@ -172,7 +177,7 @@ jobs:
   test-server:
     name: test (server)
     needs: plan
-    if: needs.plan.outputs.components == 'all' || contains(format(' {0} ', needs.plan.outputs.components), ' server ')
+    if: contains(format(' {0} ', needs.plan.outputs.jobs), ' test-server ')
     runs-on: ubuntu-24.04
     timeout-minutes: 90
     steps:
@@ -224,7 +229,7 @@ jobs:
   test-apps:
     name: test (apps)
     needs: plan
-    if: needs.plan.outputs.components == 'all' || contains(format(' {0} ', needs.plan.outputs.components), ' apps ')
+    if: contains(format(' {0} ', needs.plan.outputs.jobs), ' test-apps ')
     runs-on: ubuntu-24.04
     timeout-minutes: 90
     steps:
@@ -276,7 +281,7 @@ jobs:
   test-sdk-plugins:
     name: test (SDKs and plugins)
     needs: plan
-    if: needs.plan.outputs.components == 'all' || contains(format(' {0} ', needs.plan.outputs.components), ' sdk-python ') || contains(format(' {0} ', needs.plan.outputs.components), ' sdk-typescript ') || contains(format(' {0} ', needs.plan.outputs.components), ' plugins ')
+    if: contains(format(' {0} ', needs.plan.outputs.jobs), ' test-sdk-plugins ')
     runs-on: ubuntu-24.04
     timeout-minutes: 60
     steps:
@@ -461,7 +466,7 @@ jobs:
   postgres-image-amd64:
     name: postgres-image (amd64)
     needs: plan
-    if: needs.plan.outputs.components == 'all' || contains(format(' {0} ', needs.plan.outputs.components), ' server ')
+    if: contains(format(' {0} ', needs.plan.outputs.jobs), ' postgres-image-amd64 ')
     runs-on: ubuntu-24.04
     timeout-minutes: 45
     steps:
@@ -483,7 +488,7 @@ jobs:
   postgres-image-arm64:
     name: postgres-image (arm64)
     needs: plan
-    if: needs.plan.outputs.components == 'all' || contains(format(' {0} ', needs.plan.outputs.components), ' server ')
+    if: contains(format(' {0} ', needs.plan.outputs.jobs), ' postgres-image-arm64 ')
     runs-on: ubuntu-24.04-arm
     timeout-minutes: 45
     steps:
@@ -506,7 +511,7 @@ jobs:
   apps-macos:
     name: apps (macOS)
     needs: plan
-    if: needs.plan.outputs.components == 'all' || contains(format(' {0} ', needs.plan.outputs.components), ' apps ')
+    if: contains(format(' {0} ', needs.plan.outputs.jobs), ' apps-macos ')
     runs-on: macos-15
     timeout-minutes: 45
     steps:
@@ -528,7 +533,7 @@ jobs:
   apps-windows:
     name: apps (Windows)
     needs: plan
-    if: needs.plan.outputs.components == 'all' || contains(format(' {0} ', needs.plan.outputs.components), ' apps ')
+    if: contains(format(' {0} ', needs.plan.outputs.jobs), ' apps-windows ')
     runs-on: windows-2025
     timeout-minutes: 45
     steps:
@@ -550,7 +555,7 @@ jobs:
   apps-android-26:
     name: apps (Android API 26)
     needs: plan
-    if: github.event.repository.visibility == 'public' && (needs.plan.outputs.components == 'all' || contains(format(' {0} ', needs.plan.outputs.components), ' apps '))
+    if: contains(format(' {0} ', needs.plan.outputs.jobs), ' apps-android-26 ')
     runs-on: ubuntu-24.04
     timeout-minutes: 45
     steps:
@@ -582,7 +587,7 @@ jobs:
   apps-android-36:
     name: apps (Android API 36)
     needs: plan
-    if: github.event.repository.visibility == 'public' && (needs.plan.outputs.components == 'all' || contains(format(' {0} ', needs.plan.outputs.components), ' apps '))
+    if: contains(format(' {0} ', needs.plan.outputs.jobs), ' apps-android-36 ')
     runs-on: ubuntu-24.04
     timeout-minutes: 45
     steps:
@@ -611,8 +616,9 @@ jobs:
           emulator-options: -no-window -gpu swiftshader_indirect -no-snapshot -noaudio -no-boot-anim
           script: uv run --project tools --locked --quiet python tools/ci/apps_platform.py --system android
 
-  # One result per push: every job passed, or was skipped because the push does not touch its
-  # component. A failed, cancelled or missing plan fails it.
+  # One result per push: the plan and every job it needs passed; a conditional job may be
+  # skipped only when the plan left it out (tools/ci/ci_ok.py needs). A failed, cancelled or
+  # missing plan fails it.
   build-verify-ok:
     name: build-verify-ok
     needs: [plan, static, test-tools, test-server, test-apps, test-sdk-plugins, docs, security, denylist, postgres-image-amd64, postgres-image-arm64, apps-macos, apps-windows, apps-android-26, apps-android-36]
@@ -620,12 +626,17 @@ jobs:
     runs-on: ubuntu-24.04
     timeout-minutes: 5
     steps:
-      - name: All jobs passed or were skipped
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: astral-sh/setup-uv@1c37ad07a6a961277cf70c0d37d6f313000f5884 # v10.3.0
+        with:
+          enable-cache: false
+      - name: Every job the plan needs passed
         env:
           RESULTS: ${{ toJSON(needs) }}
+          CI_JOBS: ${{ needs.plan.outputs.jobs }}
         run: |
           printf '%s' "$RESULTS" | jq -r 'to_entries[] | "| \(.key) | \(.value.result) |"' \
             | { echo "| job | result |"; echo "|---|---|"; cat; } >> "$GITHUB_STEP_SUMMARY"
-          printf '%s' "$RESULTS" | jq -e '.plan.result == "success" and ([.[] | .result] | all(. == "success" or . == "skipped"))' >/dev/null \
-            || { printf '%s' "$RESULTS" | jq -r 'to_entries[] | select(.value.result != "success" and .value.result != "skipped") | "failed: \(.key) (\(.value.result))"'; exit 1; }
-          echo "build-verify-ok: every job passed or was skipped"
+          uv run --no-project --python 3.14 tools/ci/ci_ok.py needs
