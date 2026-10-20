@@ -636,7 +636,8 @@ sonar-scan: ## SonarQube analysis of the coverage reports already on disk (CI jo
 	elif [ "$${SONAR_SKIP:-0}" = 1 ]; then $(call skip,sonar,SONAR_SKIP=1 for fork contributors; maintainers and CI run it); \
 	elif [ -z "$${SONAR_TOKEN:-}" ]; then echo "sonar: SONAR_TOKEN is not set (docs/quality/sonarqube-local.md)"; exit 1; \
 	else $(call need_node,sonar-scanner-npm); $(NODE_BIN)/sonar-scanner-npm -Dsonar.host.url=$(SONAR_HOST_URL) -Dsonar.projectKey=$(SONAR_PROJECT_KEY) \
-	  $(if $(SONAR_ORGANIZATION),-Dsonar.organization=$(SONAR_ORGANIZATION)) -Dsonar.qualitygate.wait=true; fi
+	  $(if $(SONAR_ORGANIZATION),-Dsonar.organization=$(SONAR_ORGANIZATION)) -Dsonar.qualitygate.wait=true \
+	  || { SONAR_HOST_URL=$(SONAR_HOST_URL) SONAR_ORGANIZATION=$(SONAR_ORGANIZATION) $(UVRUN) python tools/sonarqube/quality_sync.py ce-error; exit 1; }; fi
 
 sonar-up: ## Start the local SonarQube Community Build (tools/sonarqube/compose.yaml)
 	@if [ ! -f tools/sonarqube/.env ]; then umask 077; \

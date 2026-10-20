@@ -11,6 +11,11 @@ Usage (token only from the environment variable SONAR_TOKEN, never printed):
   quality_sync.py apply --url http://127.0.0.1:9000
   quality_sync.py check --url https://sonarcloud.io --organization <org> --project <key>
   quality_sync.py main-branch --url https://sonarcloud.io --organization <org> --project <key>
+  quality_sync.py ce-error --url https://sonarcloud.io --organization <org>
+
+`ce-error` prints why the server's background task of the last scan failed: the scanner only
+reports "CE Task finished abnormally", the reason stays on the server (api/ce/task with the
+ceTaskId of .scannerwork/report-task.txt).
 
 `main-branch` names the project's main branch `main` (api/project_branches/rename) when it
 carries another name, such as the `master` a new SonarQube Cloud project starts with; until
@@ -44,6 +49,7 @@ from pathlib import Path
 from typing import Any
 
 DEFAULT_CONFIG = Path(__file__).resolve().parents[2] / "quality" / "sonar"
+DEFAULT_REPORT_TASK = Path(".scannerwork") / "report-task.txt"
 # How SonarQube Cloud words a refusal by the organization's plan, for example
 # "Organization '<id>' is not allowed to perform this action" (set_default, add_project) or
 # "... is not allowed to modify Quality gates" (select), both seen on 2026-10-14.
@@ -494,13 +500,14 @@ def _check_project_profile(
 
 
 def main(argv: list[str] | None = None) -> int:
-    """Command line entry point (`apply`, `check`, `main-branch`); returns the exit code."""
+    """Command line entry point (`apply`, `check`, `main-branch`, `ce-error`); returns exit code."""
     parser = argparse.ArgumentParser(description="Apply or check the SonarQube quality setup.")
-    parser.add_argument("command", choices=("apply", "check", "main-branch"))
+    parser.add_argument("command", choices=("apply", "check", "main-branch", "ce-error"))
     parser.add_argument("--url", default=os.environ.get("SONAR_HOST_URL", "http://127.0.0.1:9000"))
     parser.add_argument("--organization", default=os.environ.get("SONAR_ORGANIZATION") or None)
     parser.add_argument("--project", default=os.environ.get("SONAR_PROJECT_KEY") or None)
     parser.add_argument("--config", type=Path, default=DEFAULT_CONFIG)
+    parser.add_argument("--report-task", type=Path, default=DEFAULT_REPORT_TASK)
     args = parser.parse_args(argv)
     token = os.environ.get("SONAR_TOKEN", "")
     if not token:
@@ -512,6 +519,8 @@ def main(argv: list[str] | None = None) -> int:
     client = Client(args.url, token, args.organization, args.project)
     if args.command == "main-branch":
         return _main_branch(client)
+    if args.command == "ce-error":
+        return _ce_error(client, args.report_task)
     try:
         config = load_config(args.config)
         report = apply(client, config) if args.command == "apply" else check(client, config)
@@ -527,6 +536,38 @@ def main(argv: list[str] | None = None) -> int:
     if report.problems:
         return 1
     print(f"quality_sync: {args.command} ok for {args.url}")
+    return 0
+
+
+def ce_task_id(report_task: Path) -> str | None:
+    """Return the ceTaskId the scanner wrote to `report_task`, or None without one."""
+    try:
+        lines = report_task.read_text(encoding="utf-8").splitlines()
+    except OSError:
+        return None
+    return next((ln.split("=", 1)[1].strip() for ln in lines if ln.startswith("ceTaskId=")), None)
+
+
+def _ce_error(client: Client, report_task: Path) -> int:
+    """Run `ce-error`: print status and error message of the scan's background task."""
+    task_id = ce_task_id(report_task)
+    if not task_id:
+        print(f"quality_sync: no ceTaskId in {report_task}", file=sys.stderr)
+        return 1
+    try:
+        task = client.get_json("api/ce/task", id=task_id)["task"]
+    except (SonarError, LookupError, urllib.error.URLError) as exc:
+        print(f"quality_sync: {exc}", file=sys.stderr)
+        return 1
+    status = task.get("status")
+    if status == "SUCCESS":
+        # The task went through; the scanner failed for another reason (such as the gate),
+        # which its own output above names. A task still PENDING or IN_PROGRESS is reported
+        # with its status below: the scanner gave up waiting for it.
+        print(f"quality_sync: background task {task_id} {status}, not the cause")
+        return 0
+    reason = str(task.get("errorMessage", ""))[:_MAX_ERROR_CHARS]
+    print(f"quality_sync: background task {task_id} {status}: {reason or 'no message'}")
     return 0
 
 
