@@ -6,6 +6,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"log/slog"
 	"time"
 
 	"github.com/OWNER/bothy/services/server/internal/agents"
@@ -55,6 +56,10 @@ type Deps struct {
 	Cursors Cursors
 	// Clock gives the time of a policy switch; nil means clock.System().
 	Clock clock.Clock
+	// Presence is the presence tracker of the process (M2-20): getAgent and listAgents show its
+	// presence, and the changes of the configured values notify it after the commit. nil shows the
+	// stored columns and notifies nothing.
+	Presence *Tracker
 }
 
 // Service implements agents.Agents. It is safe for concurrent use.
@@ -166,19 +171,21 @@ func (s *Service) view(ctx context.Context, rec domain.Agent) (agents.Agent, err
 	if err != nil {
 		return agents.Agent{}, err
 	}
-	return agentView(rec, p), nil
+	return s.agentView(rec, p), nil
+}
+
+// presence returns the presence of rec: from the tracker when one is bound (M2-20 ends the
+// placeholder of M1-63/3), otherwise from the stored columns.
+func (s *Service) presence(rec domain.Agent) agents.PresenceStatus {
+	if s.d.Presence != nil {
+		return s.d.Presence.recordStatus(rec)
+	}
+	return recordPresence(rec, s.d.Clock.Now(), 0)
 }
 
 // agentView converts a record and its principal.
-func agentView(rec domain.Agent, p identity.PrincipalView) agents.Agent {
-	pr := rec.Presence()
-	presence := agents.Presence{
-		State: string(pr.State), ReportedBillingMode: string(pr.ReportedBillingMode), RuntimeVersion: pr.RuntimeVersion,
-		LastHeartbeatAt: pr.LastHeartbeatAt, ReportedToolClass: string(pr.ReportedToolClass), BillingModeMatches: pr.BillingModeMatches,
-	}
-	for _, m := range pr.BillingModesSupported {
-		presence.BillingModesSupported = append(presence.BillingModesSupported, string(m))
-	}
+func (s *Service) agentView(rec domain.Agent, p identity.PrincipalView) agents.Agent {
+	presence := s.presence(rec)
 	return agents.Agent{
 		ID: rec.ID, Handle: p.Handle, DisplayName: p.DisplayName, AvatarFileID: p.AvatarFileID, Status: string(p.Status),
 		AdapterKind: rec.AdapterKind, Description: rec.Description, BillingMode: string(rec.Policy.Mode),
@@ -229,6 +236,29 @@ type presenceJSON struct {
 	BillingModesSupported []string `json:"billing_modes_supported,omitempty"`
 	ReportedToolClass     string   `json:"reported_tool_class,omitempty"`
 	BillingModeMatches    bool     `json:"billing_mode_matches"`
+	// BillingEvidence and Warnings are the members of M2-20 (D-M2-20-12).
+	BillingEvidence *evidenceJSON `json:"billing_evidence,omitempty"`
+	Warnings        []string      `json:"warnings,omitempty"`
+}
+
+// evidenceJSON is the schema BillingEvidence.
+type evidenceJSON struct {
+	Provider string `json:"provider,omitempty"`
+	KeyType  string `json:"key_type"`
+	Method   string `json:"method,omitempty"`
+}
+
+// presenceBody converts a presence into the JSON form of AgentRuntimeStatus.
+func presenceBody(p agents.PresenceStatus) presenceJSON {
+	out := presenceJSON{
+		State: p.State, ReportedBillingMode: p.ReportedBillingMode, RuntimeVersion: p.RuntimeVersion,
+		LastHeartbeatAt: stamp(p.LastHeartbeatAt), BillingModesSupported: p.BillingModesSupported,
+		ReportedToolClass: p.ReportedToolClass, BillingModeMatches: p.BillingModeMatches, Warnings: p.Warnings,
+	}
+	if e := p.BillingEvidence; e != nil {
+		out.BillingEvidence = &evidenceJSON{Provider: e.Provider, KeyType: e.KeyType, Method: e.Method}
+	}
+	return out
 }
 
 // agentJSON is the schema Agent of docs/api/openapi.yaml: the payload member agent of
@@ -279,11 +309,7 @@ func agentBody(v agents.Agent) agentJSON {
 		ID: v.ID.String(), Handle: v.Handle, DisplayName: v.DisplayName, AvatarFileID: optionalID(v.AvatarFileID), Status: v.Status,
 		AdapterKind: v.AdapterKind, Description: v.Description, BillingMode: v.BillingMode,
 		CredentialHolderID: optionalID(v.CredentialHolderID), BillingModeChangedAt: stamp(v.BillingModeChangedAt), ToolClass: v.ToolClass,
-		Presence: presenceJSON{
-			State: v.Presence.State, ReportedBillingMode: v.Presence.ReportedBillingMode, RuntimeVersion: v.Presence.RuntimeVersion,
-			LastHeartbeatAt: stamp(v.Presence.LastHeartbeatAt), BillingModesSupported: v.Presence.BillingModesSupported,
-			ReportedToolClass: v.Presence.ReportedToolClass, BillingModeMatches: v.Presence.BillingModeMatches,
-		},
+		Presence:       presenceBody(v.Presence),
 		OperatorConfig: config, Version: v.Version,
 	}
 }
@@ -360,3 +386,31 @@ func codes(names []string) auditing.Value {
 	}
 	return auditing.List(vs...)
 }
+
+// presenceChanged tells the tracker after a committed change of the configured values or the
+// status of the agent out (M2-20 note 13) and shows the reassessed presence in out. A failure
+// only logs: the change is committed, and the next heartbeat reads the values again.
+func (s *Service) presenceChanged(ctx context.Context, out *agents.Agent) {
+	if s.d.Presence == nil {
+		return
+	}
+	s.notifyPresence(ctx, []ids.ID{out.ID})
+	if st, ok := s.d.Presence.memory(out.ID, s.d.Clock.Now()); ok {
+		out.Presence = st
+	}
+}
+
+// notifyPresence tells the tracker about the committed change of the agents list.
+func (s *Service) notifyPresence(ctx context.Context, list []ids.ID) {
+	if s.d.Presence == nil || len(list) == 0 {
+		return
+	}
+	if err := s.d.Presence.Changed(ctx, list); err != nil {
+		s.d.Presence.d.Log.LogAttrs(ctx, slog.LevelError, "agent presence not reassessed")
+	}
+}
+
+// BindPresence binds the presence tracker of the process (internal/wire, before the routes serve):
+// from then on getAgent and listAgents show its presence and the changes of the configured values
+// notify it.
+func (s *Service) BindPresence(t *Tracker) { s.d.Presence = t }

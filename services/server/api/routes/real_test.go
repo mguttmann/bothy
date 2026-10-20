@@ -809,6 +809,10 @@ func (stubServer) AckAgentEvents(context.Context, rest.AckAgentEventsRequestObje
 	return nil, nil
 }
 
+func (stubServer) SendHeartbeat(context.Context, rest.SendHeartbeatRequestObject) (rest.SendHeartbeatResponseObject, error) {
+	return nil, nil
+}
+
 func (stubServer) UpdateAgent(context.Context, rest.UpdateAgentRequestObject) (rest.UpdateAgentResponseObject, error) {
 	return nil, nil
 }
@@ -1219,6 +1223,8 @@ func TestRealTable_Enabled(t *testing.T) {
 		"submitCspReport": {"POST /api/v1/csp-reports", "console.csp_report", "rl.public_auth"},
 		// M3-11
 		"exportChannel": {"GET /api/v1/channels/{channel_id}/export", "export.channel", "rl.export"},
+		// M2-20
+		"sendHeartbeat": {"POST /api/v1/agents/me/heartbeat", "agent.heartbeat", "rl.agent_runtime"},
 	}
 	ops := routes.Enabled()
 	if len(ops) != len(want) {

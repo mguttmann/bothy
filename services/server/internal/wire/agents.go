@@ -48,6 +48,8 @@ type Agents struct {
 	Consumers *agentsapp.ConsumerService
 	// Handlers are the REST handlers.
 	Handlers *agentshttp.Agents
+	// Presence is the presence tracker of the process (M2-20, BindPresence); nil until bound.
+	Presence *agentsapp.Tracker
 }
 
 // NewAgents builds the agents module over pool with the unit of work uow, the Authorizer az, the

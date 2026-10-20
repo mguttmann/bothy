@@ -3,6 +3,7 @@
 package app
 
 import (
+	"encoding/json"
 	"time"
 
 	"github.com/OWNER/bothy/services/server/internal/kernel/ids"
@@ -43,11 +44,11 @@ type Resume struct {
 	SyncEpoch   *ids.ID `json:"sync_epoch,omitempty"`
 }
 
-// Heartbeat is the body of heartbeat (schema GatewayHeartbeat). Agent reports that the member
-// agent was sent; it is accepted and ignored until M2-20.
+// Heartbeat is the body of heartbeat (schema GatewayHeartbeat). Agent is the raw member agent
+// (schema Heartbeat), nil when absent; agents.Presence decodes it (M2-20).
 type Heartbeat struct {
-	LastSeq int64 `json:"last_seq"`
-	Agent   bool  `json:"-"`
+	LastSeq int64           `json:"last_seq"`
+	Agent   json.RawMessage `json:"agent,omitempty"`
 }
 
 // Reauth is the body of reauth (schema GatewayReauth).

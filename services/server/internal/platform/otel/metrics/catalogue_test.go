@@ -268,6 +268,8 @@ func TestCatalogue_M1InstrumentSet(t *testing.T) {
 		"bothy.client.push.placeholder", "bothy.client.push_display.duration", "bothy.client.reconnects",
 		"bothy.client.resync", "bothy.client.send_local.duration", "bothy.client.thread_open.duration",
 		"bothy.client_metrics.discarded",
+		// M2-20: the presence gauges of 4.3.
+		"bothy.agent.heartbeat.age", "bothy.agent.billing_mode.mismatch_age",
 	}
 	slices.Sort(want)
 	var got []string

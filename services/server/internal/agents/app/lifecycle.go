@@ -72,6 +72,9 @@ func (s *Service) setStatus(ctx context.Context, a actor.Actor, id ids.ID, reaso
 		out, err = s.statusWrite(ctx, a, id, reason, act, target)
 		return err
 	}, rightsChange(act, agentRef(id), id))
+	if err == nil {
+		s.presenceChanged(ctx, &out)
+	}
 	return out, err
 }
 

@@ -23,6 +23,10 @@ class _$AgentRuntimeStatus extends AgentRuntimeStatus {
   final bool? billingModeMatches;
   @override
   final AgentRateLimitState? rateLimit;
+  @override
+  final BillingEvidence? billingEvidence;
+  @override
+  final BuiltList<String>? warnings;
 
   factory _$AgentRuntimeStatus([
     void Function(AgentRuntimeStatusBuilder)? updates,
@@ -37,6 +41,8 @@ class _$AgentRuntimeStatus extends AgentRuntimeStatus {
     this.reportedToolClass,
     this.billingModeMatches,
     this.rateLimit,
+    this.billingEvidence,
+    this.warnings,
   }) : super._();
   @override
   AgentRuntimeStatus rebuild(
@@ -58,7 +64,9 @@ class _$AgentRuntimeStatus extends AgentRuntimeStatus {
         billingModesSupported == other.billingModesSupported &&
         reportedToolClass == other.reportedToolClass &&
         billingModeMatches == other.billingModeMatches &&
-        rateLimit == other.rateLimit;
+        rateLimit == other.rateLimit &&
+        billingEvidence == other.billingEvidence &&
+        warnings == other.warnings;
   }
 
   @override
@@ -72,6 +80,8 @@ class _$AgentRuntimeStatus extends AgentRuntimeStatus {
     _$hash = $jc(_$hash, reportedToolClass.hashCode);
     _$hash = $jc(_$hash, billingModeMatches.hashCode);
     _$hash = $jc(_$hash, rateLimit.hashCode);
+    _$hash = $jc(_$hash, billingEvidence.hashCode);
+    _$hash = $jc(_$hash, warnings.hashCode);
     _$hash = $jf(_$hash);
     return _$hash;
   }
@@ -86,7 +96,9 @@ class _$AgentRuntimeStatus extends AgentRuntimeStatus {
           ..add('billingModesSupported', billingModesSupported)
           ..add('reportedToolClass', reportedToolClass)
           ..add('billingModeMatches', billingModeMatches)
-          ..add('rateLimit', rateLimit))
+          ..add('rateLimit', rateLimit)
+          ..add('billingEvidence', billingEvidence)
+          ..add('warnings', warnings))
         .toString();
   }
 }
@@ -136,6 +148,17 @@ class AgentRuntimeStatusBuilder
   set rateLimit(AgentRateLimitStateBuilder? rateLimit) =>
       _$this._rateLimit = rateLimit;
 
+  BillingEvidenceBuilder? _billingEvidence;
+  BillingEvidenceBuilder get billingEvidence =>
+      _$this._billingEvidence ??= BillingEvidenceBuilder();
+  set billingEvidence(BillingEvidenceBuilder? billingEvidence) =>
+      _$this._billingEvidence = billingEvidence;
+
+  ListBuilder<String>? _warnings;
+  ListBuilder<String> get warnings =>
+      _$this._warnings ??= ListBuilder<String>();
+  set warnings(ListBuilder<String>? warnings) => _$this._warnings = warnings;
+
   AgentRuntimeStatusBuilder() {
     AgentRuntimeStatus._defaults(this);
   }
@@ -151,6 +174,8 @@ class AgentRuntimeStatusBuilder
       _reportedToolClass = $v.reportedToolClass;
       _billingModeMatches = $v.billingModeMatches;
       _rateLimit = $v.rateLimit?.toBuilder();
+      _billingEvidence = $v.billingEvidence?.toBuilder();
+      _warnings = $v.warnings?.toBuilder();
       _$v = null;
     }
     return this;
@@ -187,6 +212,8 @@ class AgentRuntimeStatusBuilder
             reportedToolClass: reportedToolClass,
             billingModeMatches: billingModeMatches,
             rateLimit: _rateLimit?.build(),
+            billingEvidence: _billingEvidence?.build(),
+            warnings: _warnings?.build(),
           );
     } catch (_) {
       late String _$failedField;
@@ -196,6 +223,10 @@ class AgentRuntimeStatusBuilder
 
         _$failedField = 'rateLimit';
         _rateLimit?.build();
+        _$failedField = 'billingEvidence';
+        _billingEvidence?.build();
+        _$failedField = 'warnings';
+        _warnings?.build();
       } catch (e) {
         throw BuiltValueNestedFieldError(
           r'AgentRuntimeStatus',

@@ -12,10 +12,12 @@ import (
 )
 
 // Register declares what the agents module emits and accepts (M1-25, docs/spec/05-aktionen.md
-// sections 6 and 7): the durable event agent.updated (M1-51) and the client op ack of agent
-// consumers (M2-07). internal/wire lists it in moduleRegistrations.
+// sections 6 and 7): the durable event agent.updated (M1-51), the ephemeral event
+// agent.presence_changed (M2-20) and the client op ack of agent consumers (M2-07). internal/wire
+// lists it in moduleRegistrations.
 func Register(r *authorize.Registry) {
 	r.Event("agents", authorize.EventAgentUpdated)
+	r.Event("agents", authorize.EventAgentPresenceChanged)
 	r.Op("agents", authorize.OpAck)
 }
 
@@ -38,26 +40,6 @@ const (
 	ToolHost            = "host"
 )
 
-// Presence is the reported state of the runtime (schema AgentRuntimeStatus). Empty values are
-// absent members.
-type Presence struct {
-	// State is unknown, online, degraded or offline.
-	State string
-	// ReportedBillingMode is the mode of the runtime configuration; "" when the adapter follows
-	// the target per run.
-	ReportedBillingMode string
-	// RuntimeVersion is the reported version of the runtime.
-	RuntimeVersion string
-	// LastHeartbeatAt is the time of the last stored heartbeat; zero for none.
-	LastHeartbeatAt time.Time
-	// BillingModesSupported are the modes the adapter can prove.
-	BillingModesSupported []string
-	// ReportedToolClass is the class the runtime loaded; "" for none.
-	ReportedToolClass string
-	// BillingModeMatches is false only when a reported mode exists and differs from BillingMode.
-	BillingModeMatches bool
-}
-
 // Agent is an agent as the API shows it (schema Agent): the principal of identity with the
 // record of agents. Zero values are absent members; nothing in it is a credential.
 type Agent struct {
@@ -78,8 +60,8 @@ type Agent struct {
 	BillingModeChangedAt time.Time
 	// ToolClass is the target tool class.
 	ToolClass string
-	// Presence is the reported state.
-	Presence Presence
+	// Presence is the presence and reported state (M2-20: from Presence.Statuses).
+	Presence PresenceStatus
 	// OperatorConfig is agent_operator_config.v1 as a JSON object value.
 	OperatorConfig map[string]any
 	// Version is the ETag.

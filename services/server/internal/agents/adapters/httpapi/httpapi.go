@@ -26,10 +26,14 @@ import (
 
 // Agents implements listAgents, createAgent, getAgent, updateAgent, disableAgent, enableAgent,
 // setAgentBillingMode, setAllAgentsBillingMode, setCredentialHolder and setAgentToolClass, and the
-// consumer operations getConsumerState, pollAgentEvents and ackAgentEvents (M2-07).
+// consumer operations getConsumerState, pollAgentEvents and ackAgentEvents (M2-07) and
+// sendHeartbeat (M2-20).
 type Agents struct {
 	agents    agents.Agents
 	consumers agents.ConsumerAPI
+	// presence and interval serve sendHeartbeat (M2-20, WithPresence).
+	presence agents.Presence
+	interval time.Duration
 }
 
 // New returns the handlers over the use cases of the records a and of the consumers c.
@@ -221,27 +225,7 @@ func (h *Agents) SetAgentToolClass(ctx context.Context, req rest.SetAgentToolCla
 // toREST converts an agent (schema Agent); empty values become absent members, never null (ADR
 // 0053).
 func toREST(a agents.Agent) rest.Agent {
-	p := a.Presence
-	presence := rest.AgentRuntimeStatus{
-		State: rest.AgentRuntimeState(p.State), RuntimeVersion: optional(p.RuntimeVersion), LastHeartbeatAt: optionalTime(p.LastHeartbeatAt),
-	}
-	matches := p.BillingModeMatches
-	presence.BillingModeMatches = &matches
-	if p.ReportedBillingMode != "" {
-		m := rest.BillingMode(p.ReportedBillingMode)
-		presence.ReportedBillingMode = &m
-	}
-	if p.ReportedToolClass != "" {
-		c := rest.ToolClass(p.ReportedToolClass)
-		presence.ReportedToolClass = &c
-	}
-	if len(p.BillingModesSupported) > 0 {
-		modes := make([]rest.BillingMode, 0, len(p.BillingModesSupported))
-		for _, m := range p.BillingModesSupported {
-			modes = append(modes, rest.BillingMode(m))
-		}
-		presence.BillingModesSupported = &modes
-	}
+	presence := presenceREST(a.Presence)
 	config := rest.JsonObject(a.OperatorConfig)
 	if config == nil {
 		config = rest.JsonObject{}

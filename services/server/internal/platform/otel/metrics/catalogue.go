@@ -213,6 +213,21 @@ var (
 		Description: "Age of the oldest event a worker consumer has not processed.",
 		Attrs:       []Attr{{Key: "bothy.consumer.name", Values: []string{"push", "webhooks"}}},
 	}
+	// AgentHeartbeatAge is bothy.agent.heartbeat.age (4.3, M2-20): now minus the last heartbeat of
+	// every active agent the tracker of an api process holds.
+	AgentHeartbeatAge = Spec{
+		Name: "bothy.agent.heartbeat.age", Kind: KindGauge, Unit: "s", Float: true,
+		Description: "Seconds since the last heartbeat of an active agent.",
+		Attrs:       []Attr{{Key: keyAgentHandle, Source: SourceAgentHandles}},
+	}
+	// AgentBillingModeMismatchAge is bothy.agent.billing_mode.mismatch_age (4.3, M2-20): seconds
+	// since a difference between configured and reported mode began according to the heartbeat;
+	// 0 without one. BothyBillingModeMismatch fires on it after billing.mismatch_alert_after.
+	AgentBillingModeMismatchAge = Spec{
+		Name: "bothy.agent.billing_mode.mismatch_age", Kind: KindGauge, Unit: "s", Float: true,
+		Description: "Seconds since the start of a mismatch between configured and reported billing mode; 0 without one.",
+		Attrs:       []Attr{{Key: keyAgentHandle, Source: SourceAgentHandles}},
+	}
 	// DeliveryDuration is bothy.delivery.duration (4.2): occurred_at to the successful write,
 	// live delivery only.
 	DeliveryDuration = Spec{
@@ -435,7 +450,7 @@ func All() []Spec {
 		GatewayConnectionsActive, GatewayConnectDuration, GatewayCatchupDuration, GatewayResync,
 		GatewayClose, GatewayOutboundDropped,
 		MessageCreated, EventAppended, EventSeqLockWait, EventFanoutLag, EventConsumerLag,
-		EventConsumerPendingAge, DeliveryDuration,
+		EventConsumerPendingAge, DeliveryDuration, AgentHeartbeatAge, AgentBillingModeMismatchAge,
 		JobDuration, JobQueue, EgressBlocked, FileUploadSize, FileScan, FileScanDuration, FileScanQueue,
 		RunActive, RunStartLatency, RunDuration, RunFinished,
 		DBClientOperationDuration, DBPoolConnections,

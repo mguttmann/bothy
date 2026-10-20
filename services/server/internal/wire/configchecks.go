@@ -64,6 +64,21 @@ var configChecks = []configCheck{
 	{name: "webhook_retry_within_retention", keys: []string{keyWebhookRetryMaxAge, keySyncEventRetention}, fn: webhookRetryWithinRetention},
 	{name: "backup_schedules", keys: backupScheduleKeys, fn: backupSchedules},
 	{name: "backup_offsite_target", keys: []string{keyBackupOffsiteTarget}, fn: backupOffsiteTarget},
+	{name: "presence_timeout_above_heartbeat_interval", keys: []string{keyPresenceTimeout, keyHeartbeatInterval}, fn: presenceTimeoutAboveHeartbeatInterval},
+}
+
+// keyHeartbeatInterval is sync.heartbeat_interval, the interval the gateway announces in hello and
+// sendHeartbeat in interval_ms.
+const keyHeartbeatInterval = "sync.heartbeat_interval"
+
+// presenceTimeoutAboveHeartbeatInterval requires agent.presence_timeout to be greater than
+// sync.heartbeat_interval (M2-20, docs/DECISIONS.md D-M2-20-11): an adapter that follows
+// interval_ms would otherwise flap to offline between two heartbeats. The error names both keys.
+func presenceTimeoutAboveHeartbeatInterval(v *config.Values) error {
+	if v.Duration(keyPresenceTimeout) <= v.Duration(keyHeartbeatInterval) {
+		return errors.New(keyPresenceTimeout + " must be greater than " + keyHeartbeatInterval)
+	}
+	return nil
 }
 
 // backupSchedules requires every schedule of bothy-backupd to be a five-field cron expression

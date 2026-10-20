@@ -142,6 +142,13 @@ type world struct {
 	chat *chatapp.Service
 	// uow is the unit of work of the modules.
 	uow txn.UnitOfWork
+	// presence is the presence tracker of M2-20 over the fake clock with fake timers and a
+	// recording publisher; readiness goes to chat.
+	presence *agentsapp.Tracker
+	timers   *fakeTimers
+	pub      *recPublisher
+	// logs captures every log record of the modules (M2-20 leak checks).
+	logs *httpservertest.LogCapture
 	// azConfig and azDeps built az; newAuthorizer builds a second instance from them, the
 	// Authorizer of another process (M1-62).
 	azConfig authzapp.AuthorizerConfig
@@ -191,8 +198,9 @@ func newEmptyWorldWith(t *testing.T, search searchlang.Map) *world {
 	cfg := db.Config(pg.RoleApp)
 	cfg.MaxConns = 16
 	pool := db.OpenPool(t, cfg)
-	log := slog.New(&httpservertest.LogCapture{})
-	w := &world{t: t, pool: pool, db: db.Pool(t, pg.RoleOwner), clk: clock.NewFake(start), actors: httpservertest.NewActors(),
+	capture := &httpservertest.LogCapture{}
+	log := slog.New(capture)
+	w := &world{t: t, logs: capture, pool: pool, db: db.Pool(t, pg.RoleOwner), clk: clock.NewFake(start), actors: httpservertest.NewActors(),
 		acts: map[string]actor.Actor{}, versions: map[ids.ID]int64{}}
 	repo := identitypg.NewRepository(pool)
 	principals := identityapp.NewPrincipalSource(repo)
@@ -248,6 +256,10 @@ func newEmptyWorldWith(t *testing.T, search searchlang.Map) *world {
 	must(t, err)
 	ag, err := wire.NewAgents(agentsapp.Config{PageSizeDefault: 20, PageSizeMax: 50}, pool, uow, w.az, hook, writes, w.id, w.clk, log)
 	must(t, err)
+	w.timers, w.pub = &fakeTimers{clk: w.clk}, &recPublisher{}
+	must(t, ag.BindPresence(presenceConfig, pool, wire.PresenceDeps{UoW: uow, Authorizer: w.az, Audit: w.rec, Clock: w.clk, Timers: w.timers, Log: log}))
+	w.presence = ag.Presence
+	w.presence.BindPublisher(w.pub)
 	w.admin, err = authzapp.NewAdminService(authzapp.AdminDeps{
 		UoW: uow, Authorizer: w.az, Store: authzpg.NewRepository(pool), Principals: principals, Structure: structure, Hosts: hosts,
 		Rights: hook, Audit: w.rec, Clock: w.clk, Events: appender, Scopes: w.az, Cursors: authzhttp.Cursors{},
@@ -258,6 +270,7 @@ func newEmptyWorldWith(t *testing.T, search searchlang.Map) *world {
 		Directory: w.id.Directory}, nil, w.clk)
 	must(t, err)
 	w.chat = c.Service
+	w.presence.BindReadiness(c.Service)
 	// Messaging, threads and the instance settings serve the search tests of M3-13.
 	// The template, list and page limits (M1-57, M1-60) and the write ports (M1-58) are required (INT-W22/3).
 	m, err := wire.NewMessaging(messagingapp.Config{MaxContentBytes: 4096, MaxMentions: 4, EventPayloadMaxBytes: 65536,

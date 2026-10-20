@@ -4,6 +4,7 @@ package app
 
 import (
 	"context"
+	"time"
 
 	"github.com/OWNER/bothy/services/server/internal/agents"
 	"github.com/OWNER/bothy/services/server/internal/agents/domain"
@@ -78,4 +79,39 @@ type ConsumerStore interface {
 	AckConsumer(ctx context.Context, key agents.ConsumerKey, seq int64) (acked int64, found bool, err error)
 	// GetConsumer reads acked_seq of key; found is false for an unknown consumer.
 	GetConsumer(ctx context.Context, key agents.ConsumerKey) (acked int64, found bool, err error)
+}
+
+// PresenceStore is the outgoing port of the presence tracker over the reported columns of agents
+// (implemented by adapters/postgres, M2-20). Reads run in the ambient transaction of ctx when
+// there is one and on the pool otherwise; writes and locks run only inside a unit of work. A
+// transaction of the tracker locks at most one agents row and no row of another module (03
+// section 6.3). Errors are kernel/errs errors without SQL text or values.
+type PresenceStore interface {
+	// GetPresenceRow returns the configured values and the stored reported state of id; found is
+	// false for an unknown id.
+	GetPresenceRow(ctx context.Context, id ids.ID) (row domain.PresenceRow, found bool, err error)
+	// LockPresenceRow returns the same row and locks it until the end of the unit of work.
+	LockPresenceRow(ctx context.Context, id ids.ID) (row domain.PresenceRow, found bool, err error)
+	// GetPresenceRows returns the rows of the known ids of list in ascending id.
+	GetPresenceRows(ctx context.Context, list []ids.ID) ([]domain.PresenceRow, error)
+	// ListLivePresence returns the rows stored as online or degraded in ascending id.
+	ListLivePresence(ctx context.Context) ([]domain.PresenceRow, error)
+	// WriteReportedChange stores a change of the reported mode or class with the whole reported
+	// state of w; the only write of reported_billing_mode and reported_tool_class.
+	WriteReportedChange(ctx context.Context, w PresenceWrite) error
+	// PersistHeartbeat stores state, version, details and last heartbeat of w unless the row
+	// holds a fresher heartbeat; updated is false then.
+	PersistHeartbeat(ctx context.Context, w PresenceWrite) (updated bool, err error)
+}
+
+// PresenceWrite is one write of the reported state of an agent.
+type PresenceWrite struct {
+	// ID is the agent.
+	ID ids.ID
+	// State is the presence state to store (offline after the deadline).
+	State domain.RuntimeState
+	// Report is the last report; its mode and class are written only by WriteReportedChange.
+	Report domain.Report
+	// LastHeartbeatAt is the time of the last heartbeat of the report.
+	LastHeartbeatAt time.Time
 }

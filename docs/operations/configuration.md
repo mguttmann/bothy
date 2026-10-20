@@ -223,7 +223,7 @@ Quelle: [03-datenmodell.md](../spec/03-datenmodell.md), Abschnitt 9.
 | `auth.refresh_token_ttl` | `BOTHY_AUTH__REFRESH_TOKEN_TTL` | Server | duration | `14d` | Lebensdauer eines Refresh-Tokens | aktiv |
 | `auth.step_up_max_age` | `BOTHY_AUTH__STEP_UP_MAX_AGE` | Server | duration | `5m` | so lange gilt eine Step-up-Bestätigung als frisch | aktiv |
 | `auth.refresh_reuse_grace` | `BOTHY_AUTH__REFRESH_REUSE_GRACE` | Server | duration | `30s` | Nachsicht für die unmittelbar vorige Refresh-Generation mit demselben DPoP-Schlüssel | aktiv |
-| `agent.heartbeat_persist_interval` | `BOTHY_AGENT__HEARTBEAT_PERSIST_INTERVAL` | Server |  | `60s` | höchstens so oft werden Heartbeat-Felder gespeichert | geplant (M2) |
+| `agent.heartbeat_persist_interval` | `BOTHY_AGENT__HEARTBEAT_PERSIST_INTERVAL` | Server | duration | `60s` | höchstens so oft werden Heartbeat-Felder gespeichert | aktiv |
 | `channel.history_backfill_limit_default` | `BOTHY_CHANNEL__HISTORY_BACKFILL_LIMIT_DEFAULT` | Server | int | `20` | Standard für `history_backfill_limit` | aktiv |
 | `channel.history_backfill_limit_max` | `BOTHY_CHANNEL__HISTORY_BACKFILL_LIMIT_MAX` | Server | int | `200` | Obergrenze für `history_backfill_limit` | aktiv |
 | `channel.prompt_max_bytes` | `BOTHY_CHANNEL__PROMPT_MAX_BYTES` | Server | int | `32768` | Größe eines Kanal-Prompts | aktiv |
@@ -283,7 +283,7 @@ Quelle: [04-sync-protokoll.md](../spec/04-sync-protokoll.md), Abschnitt 18.
 | `agent.ack_persist_interval` | `BOTHY_AGENT__ACK_PERSIST_INTERVAL` | Server | duration | `1s` | spätestens so oft wird `acked_seq` gespeichert | aktiv |
 | `agent.max_inflight_events` | `BOTHY_AGENT__MAX_INFLIGHT_EVENTS` | Server | int | `100` | unbestätigte Ereignisse je Verbraucher | aktiv |
 | `agent.run_update_min_interval` | `BOTHY_AGENT__RUN_UPDATE_MIN_INTERVAL` | Server |  | `500ms` | Adapter-Drossel für `run.update` | geplant (M2) |
-| `agent.presence_timeout` | `BOTHY_AGENT__PRESENCE_TIMEOUT` | Server |  | `90s` | ohne Heartbeat gilt der Agent als `offline` | geplant (M2) |
+| `agent.presence_timeout` | `BOTHY_AGENT__PRESENCE_TIMEOUT` | Server | duration | `90s` | ohne Heartbeat gilt der Agent als `offline` | aktiv |
 | `agent.cancel_grace` | `BOTHY_AGENT__CANCEL_GRACE` | Server |  | `30s` | Zeit für den Adapter, einen Abbruch zu melden | geplant (M2) |
 
 ### 05 Aktionskatalog der Autorisierung
@@ -451,7 +451,7 @@ Quelle: [10-backend-richtlinie.md](../spec/10-backend-richtlinie.md), Abschnitt 
 | Schlüssel | Umgebung | Ort | Typ | Standard | Bedeutung | Stand |
 |---|---|---|---|---|---|---|
 | `billing.show_personal_estimates` | `BOTHY_BILLING__SHOW_PERSONAL_ESTIMATES` | Server |  | `false` | Beträge auch im Modus `personal` anzeigen, als Information | geplant (M2) |
-| `billing.mismatch_alert_after` | `BOTHY_BILLING__MISMATCH_ALERT_AFTER` | Server |  | `5m` | so lange darf Ist von Soll abweichen, bevor ein Alarm ausgeht | geplant (M2) |
+| `billing.mismatch_alert_after` | `BOTHY_BILLING__MISMATCH_ALERT_AFTER` | Server | duration | `5m` | so lange darf Ist von Soll abweichen, bevor ein Alarm ausgeht | aktiv |
 | `reconciler.min_request_interval` |  | Abgleich-App |  | `60s` | Abstand der Anfragen an die Cost-API |  |
 | `reconciler.lookback` |  | Abgleich-App |  | `3d` | so viele Tage rückwärts wird abgeglichen |  |
 | `reconciler.workspace_map` |  | Abgleich-App |  | leer | Zuordnung Arbeitsbereich zu Agent |  |

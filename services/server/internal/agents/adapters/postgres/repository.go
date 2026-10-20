@@ -193,7 +193,8 @@ func toAgent(row sqlcgen.Agent) (domain.Agent, error) {
 	if err != nil {
 		return domain.Agent{}, errs.Wrap(errs.CodeInternalError, err, "agents: a stored operator_config outside its schema")
 	}
-	modes, err := domain.ReportedDetailsFromStore(row.ReportedDetails)
+	stored, err := domain.ReportFromStore(domain.RuntimeState(row.ReportedRuntimeState), row.ReportedRuntimeVersion.String,
+		domain.BillingMode(row.ReportedBillingMode.String), domain.ToolClass(row.ReportedToolClass.String), row.ReportedDetails)
 	if err != nil {
 		return domain.Agent{}, errs.Wrap(errs.CodeInternalError, err, "agents: stored reported_details outside its schema")
 	}
@@ -202,12 +203,8 @@ func toAgent(row sqlcgen.Agent) (domain.Agent, error) {
 		Policy:               domain.Policy{Mode: domain.BillingMode(row.BillingMode), HolderID: idOf(row.CredentialHolderID)},
 		BillingModeChangedAt: timeOf(row.BillingModeChangedAt), BillingModeChangedBy: idOf(row.BillingModeChangedBy),
 		ToolClass: domain.ToolClass(row.ToolClass),
-		Reported: domain.Reported{
-			State: domain.RuntimeState(row.ReportedRuntimeState), BillingMode: domain.BillingMode(row.ReportedBillingMode.String),
-			ToolClass: domain.ToolClass(row.ReportedToolClass.String), RuntimeVersion: row.ReportedRuntimeVersion.String,
-			LastHeartbeatAt: timeOf(row.LastHeartbeatAt), BillingModesSupported: modes,
-		},
-		Version: row.Version,
+		Reported:  reportedOf(stored, timeOf(row.LastHeartbeatAt)),
+		Version:   row.Version,
 	}, nil
 }
 

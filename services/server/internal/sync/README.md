@@ -339,8 +339,11 @@ through `test/messagingworld` with `NewPersonal`) and
   `last_message_seq - GREATEST(last_read_seq, unread_floor_seq)`, the mentions from
   `messaging.Mentions.CountUnread` above the same position, each listed thread checked with
   `thread.read` in filter mode (M1-63/4); `active_runs` from `RunSummarySource` (bound
-  to `adapters/runsummary` over the runs module since M2-05); `agents` from the listing behind `listAgents`, each `state: unknown`
-  without `reported_billing_mode` until heartbeats exist (M2-20, M1-63/3); `features` from
+  to `adapters/runsummary` over the runs module since M2-05); `agents` from the listing behind `listAgents` as `AgentPresence {agent_id, state,
+  reported_billing_mode}`, whose presence the listing takes from the presence tracker of the
+  process (`agents.Presence`, M2-20; ends the presence part of M1-63/3): tracked agents from memory, the
+  others as stored (`unknown` or `offline`); only agents the principal may read, and only agents
+  have presence; `features` from
   `instance.Flags`. Agents and apps get empty `sidebar`, `unread_threads`, `settings` and
   `drafts`. The snapshot carries no thread content.
 - **Configuration.** `sync.catchup_page_size`, `sync.catchup_max_events` (04).
