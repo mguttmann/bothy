@@ -17,15 +17,26 @@ import '../self/self_feedback.dart';
 /// The text of a refused or failed administration call [error], or null when the person
 /// cancelled the step-up (nothing to say).
 ///
-/// Two problems get an explanation beyond the code: a replayed enrollment code
-/// (`409 conflict`, `one_time_secret`, 06 7) and `409 i1_violation` on enabling a person,
-/// which the agent administration resolves (10 5.4, M4-28). Everything else is
+/// Three problems get an explanation beyond the code: a replayed enrollment code
+/// (`409 conflict`, `one_time_secret`, 06 7), `409 i1_violation` on enabling a person,
+/// which the agent administration resolves (10 5.4, M4-28), and `409 i6_violation` of a grant
+/// or a change of a host, with what I6 means and the server's `hint` (24 7.3). Everything else is
 /// `problemText` of the code and its reason; a `403` is [SelfFailure.denied].
 SelfFailure? adminFailure(AppLocalizations l, Object error) {
   if (error is SelfActionFailed) {
     final problem = error.problem;
     if (problem?.code == 'conflict' && problem?.reason == 'one_time_secret') {
       return SelfFailure(l.adminOneTimeSecret);
+    }
+    if (problem?.code == 'i6_violation') {
+      // 24 7.3: explained with what I6 means and the server's way out, not just rejected.
+      return SelfFailure(
+        [
+          '${problemText(l, 'i6_violation')}.',
+          l.hostLlmI6Explained,
+          ?problem?.hint,
+        ].join(' '),
+      );
     }
     if (problem?.code == 'i1_violation') {
       return SelfFailure(

@@ -3,7 +3,8 @@
 // No permission logic in the administration (brief M4-26 fixed requirement 9; 15 1 principle
 // 1): a 403 of a list hides the section and shows the server's reason; a refused change hides
 // its control; no source of the package reads grants, except the grant screens of M4-27 and
-// their data source, which show grants and never derive a control from them.
+// their data source and the grants of a host (M4-37), which show grants and never derive a
+// control from them.
 
 import 'dart:io' as io;
 
@@ -103,7 +104,9 @@ void main() {
     bool showsGrants(String path) =>
         path.startsWith('lib/src/grants/') ||
         path.startsWith('lib/src/access/') ||
-        path == 'lib/src/data/access_repository.dart';
+        path == 'lib/src/data/access_repository.dart' ||
+        // The grants on a host with the server's preview of each (M4-37, 07 9.3).
+        path == 'lib/src/hosts/host_grants_section.dart';
     final offenders = [
       for (final f in io.Directory(
         'lib',

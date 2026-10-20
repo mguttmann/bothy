@@ -11,7 +11,8 @@ import 'package:l10n/l10n.dart';
 import '../data/access_repository.dart';
 import 'grant_labels.dart';
 
-/// The capabilities the wizard offers; `terminal` belongs to host targets (M4-37).
+/// The capabilities the wizard offers on a space, channel or the instance; a host target has
+/// exactly `terminal` (07 2.12).
 const List<AccessCapability> wizardCapabilities = [
   AccessCapability.approveActions,
   AccessCapability.upload,
@@ -21,7 +22,8 @@ const List<AccessCapability> wizardCapabilities = [
 
 /// The level (`read`, `write`, `trigger`), the capabilities, the optional last day
 /// (`YYYY-MM-DD`) and the required reason. The text controllers belong to the wizard, which
-/// previews the full request after every change.
+/// previews the full request after every change. On a [host] target there is no level and the
+/// one capability `terminal` is fixed (07 2.12, `GrantCreate`).
 class LevelStep extends StatelessWidget {
   /// Creates the step.
   const LevelStep({
@@ -33,7 +35,11 @@ class LevelStep extends StatelessWidget {
     required this.reason,
     required this.onLevel,
     required this.onCapability,
+    this.host = false,
   });
+
+  /// Whether the target is a host.
+  final bool host;
 
   /// The chosen level, or null.
   final AccessLevel? level;
@@ -66,34 +72,44 @@ class LevelStep extends StatelessWidget {
       crossAxisAlignment: CrossAxisAlignment.stretch,
       mainAxisSize: MainAxisSize.min,
       children: [
-        Wrap(
-          spacing: DsSpace.s8,
-          children: [
-            for (final v in const [
-              AccessLevel.read,
-              AccessLevel.write,
-              AccessLevel.trigger,
-            ])
-              ChoiceChip(
-                key: ValueKey('level.${v.wire}'),
-                label: Text(levelLabel(l, v)),
-                selected: level == v,
-                onSelected: (_) => onLevel(v),
-              ),
-          ],
-        ),
-        const SizedBox(height: DsSpace.s12),
+        if (!host) ...[
+          Wrap(
+            spacing: DsSpace.s8,
+            children: [
+              for (final v in const [
+                AccessLevel.read,
+                AccessLevel.write,
+                AccessLevel.trigger,
+              ])
+                ChoiceChip(
+                  key: ValueKey('level.${v.wire}'),
+                  label: Text(levelLabel(l, v)),
+                  selected: level == v,
+                  onSelected: (_) => onLevel(v),
+                ),
+            ],
+          ),
+          const SizedBox(height: DsSpace.s12),
+        ],
         Text(l.adminWizardCapabilities, style: label),
         Wrap(
           spacing: DsSpace.s8,
           children: [
-            for (final c in wizardCapabilities)
+            if (host)
               FilterChip(
-                key: ValueKey('capability.${c.wire}'),
-                label: Text(capabilityLabel(l, c)),
-                selected: capabilities.contains(c),
-                onSelected: (on) => onCapability(c, on),
-              ),
+                key: ValueKey('capability.${AccessCapability.terminal.wire}'),
+                label: Text(capabilityLabel(l, AccessCapability.terminal)),
+                selected: true,
+                onSelected: null,
+              )
+            else
+              for (final c in wizardCapabilities)
+                FilterChip(
+                  key: ValueKey('capability.${c.wire}'),
+                  label: Text(capabilityLabel(l, c)),
+                  selected: capabilities.contains(c),
+                  onSelected: (on) => onCapability(c, on),
+                ),
           ],
         ),
         TextField(

@@ -3079,4 +3079,476 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get problemForbiddenSubjectKind => 'Not allowed for agents or apps';
+
+  @override
+  String get adminNavHosts => 'Hosts';
+
+  @override
+  String get hostsAdd => 'Add host';
+
+  @override
+  String get hostsEmpty => 'No hosts yet.';
+
+  @override
+  String get hostOwnersOnly => 'Owners only';
+
+  @override
+  String get hostStatePairing => 'Pairing';
+
+  @override
+  String get hostStateConfirming => 'Waiting for confirmation';
+
+  @override
+  String get hostStateActive => 'active';
+
+  @override
+  String get hostStateDisabled => 'disabled';
+
+  @override
+  String get hostStateDuplicate =>
+      'disabled: a second connection used the same keys, only a new pairing helps';
+
+  @override
+  String get hostStateRetired => 'retired';
+
+  @override
+  String get hostStateUnknown => 'unknown';
+
+  @override
+  String get hostConnected => 'connected';
+
+  @override
+  String get hostDisconnected => 'disconnected';
+
+  @override
+  String hostLastSeen(String when) {
+    return 'last seen $when';
+  }
+
+  @override
+  String get hostBack => 'Back to the hosts';
+
+  @override
+  String get hostFieldAssignee => 'Assignee';
+
+  @override
+  String get hostFieldPlatform => 'Platform';
+
+  @override
+  String get hostFieldConnection => 'Connection';
+
+  @override
+  String get hostFieldFingerprint => 'Fingerprint';
+
+  @override
+  String get hostFieldLlmLogin => 'LLM login';
+
+  @override
+  String get hostFieldServerHost => 'Server host';
+
+  @override
+  String get hostFieldChecks => 'Checks';
+
+  @override
+  String get hostFieldProfiles => 'Profiles';
+
+  @override
+  String get hostFieldGrants => 'Access grants';
+
+  @override
+  String get hostFieldSessionUsers => 'Session users';
+
+  @override
+  String get hostFieldSessions => 'Terminal sessions';
+
+  @override
+  String hostPlatformValue(String platform, String version) {
+    return '$platform, version $version';
+  }
+
+  @override
+  String get hostNotReported => 'Not reported yet';
+
+  @override
+  String hostFingerprintValue(String value, int generation) {
+    return '$value   Key generation $generation';
+  }
+
+  @override
+  String get hostNoKeys => 'No keys';
+
+  @override
+  String get hostLlmNone => 'None';
+
+  @override
+  String get hostLlmPersonal => 'Personal';
+
+  @override
+  String hostLlmPersonalOf(String name) {
+    return 'Personal of $name';
+  }
+
+  @override
+  String get hostLlmOrganization => 'Organization';
+
+  @override
+  String get hostLlmI6Explained =>
+      'Personal: only this person may open a terminal here, not even other owners.';
+
+  @override
+  String get hostLlmHolder => 'Holder of the login';
+
+  @override
+  String hostLlmTitle(String name) {
+    return 'LLM login on $name';
+  }
+
+  @override
+  String get hostLlmBody =>
+      'A change to Personal or a new holder ends the terminal sessions of other people on this host.';
+
+  @override
+  String hostLlmChanged(String name) {
+    return 'The LLM login of $name is changed.';
+  }
+
+  @override
+  String get hostServerHostQuestion =>
+      'Is this host the server of the instance?';
+
+  @override
+  String get hostYes => 'Yes';
+
+  @override
+  String get hostNo => 'No';
+
+  @override
+  String hostServerHostDeclared(String answer) {
+    return 'Declared: $answer';
+  }
+
+  @override
+  String hostServerHostReported(String answer) {
+    return 'Report of the host service: $answer';
+  }
+
+  @override
+  String hostDoctorOk(String check) {
+    return '$check ok';
+  }
+
+  @override
+  String hostDoctorFailed(String check, String code) {
+    return '$check failed: $code';
+  }
+
+  @override
+  String hostDoctorAssigned(String osUser, String name) {
+    return '$osUser (assigned to $name)';
+  }
+
+  @override
+  String hostDoctorFormer(String osUser, String name) {
+    return '$osUser (formerly assigned to $name)';
+  }
+
+  @override
+  String hostDoctorUnknown(String osUser) {
+    return '$osUser (no assignment known)';
+  }
+
+  @override
+  String get hostDoctorNone => 'No check results yet.';
+
+  @override
+  String get hostDoctorAuditFailed =>
+      'The audit of this host could not be read, so former session users show without their person.';
+
+  @override
+  String hostWorkdirs(String folders) {
+    return 'Work folders: $folders';
+  }
+
+  @override
+  String get hostWorkdirsNone => 'Work folders: none';
+
+  @override
+  String hostSessionUsersUnassigned(String osUser) {
+    return 'Reported, not assigned: $osUser';
+  }
+
+  @override
+  String get hostSessionUsersSr12 =>
+      'Without a session user no terminal (SR12).';
+
+  @override
+  String get hostSessionUsersOnlyReported =>
+      'Only names that the host reported during pairing or in its last report.';
+
+  @override
+  String get hostSessionUserAssign => 'Assign';
+
+  @override
+  String get hostSessionUserAssignTitle => 'Assign a session user';
+
+  @override
+  String get hostSessionUserAssignBody =>
+      'A name once given to a person stays bound to that person on this host.';
+
+  @override
+  String get hostSessionUserPerson => 'Person';
+
+  @override
+  String get hostSessionUserName => 'Reported name';
+
+  @override
+  String hostSessionUserAssigned(String name, String osUser) {
+    return '$name now has the session user $osUser.';
+  }
+
+  @override
+  String get hostSessionUserEnd => 'End';
+
+  @override
+  String hostSessionUserEndTitle(String name) {
+    return 'End the assignment of $name?';
+  }
+
+  @override
+  String hostSessionUserEndBody(String name, String osUser) {
+    return '$name can no longer open a terminal on this host. The name $osUser stays taken on this host and is never given to another person.';
+  }
+
+  @override
+  String hostSessionUserEnded(String name, String osUser) {
+    return 'The assignment of $name ended; $osUser stays taken.';
+  }
+
+  @override
+  String get hostSessionUserTaken =>
+      'This name is taken: a name once given to a person stays bound to that person on this host, also after the assignment ends, and each person has one session user per host.';
+
+  @override
+  String get hostSessionUserNotOnHost =>
+      'The host has not reported this name. The host must report the name before it can be assigned.';
+
+  @override
+  String get hostSessionRowsTitle => 'Session user per person';
+
+  @override
+  String get hostSessionRowsAdd => 'Add a session user';
+
+  @override
+  String get hostSessionRowRemove => 'Remove';
+
+  @override
+  String get hostChange => 'Change';
+
+  @override
+  String hostAssigneeTitle(String name) {
+    return 'Assignee of $name';
+  }
+
+  @override
+  String get hostAssigneeBody =>
+      'A person who is not an owner gets a terminal only on the host assigned to them (SR10).';
+
+  @override
+  String hostAssigneeChanged(String name) {
+    return 'The assignee of $name is changed.';
+  }
+
+  @override
+  String get hostGrantsAdd => 'Grant terminal';
+
+  @override
+  String get hostGrantsNone => 'No access grants on this host.';
+
+  @override
+  String get hostNotEffective => 'Not effective';
+
+  @override
+  String hostSessionsCount(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count open terminal sessions',
+      one: '1 open terminal session',
+      zero: 'No open terminal sessions',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get hostRepair => 'Re-pair';
+
+  @override
+  String hostRepairTitle(String name) {
+    return 'Re-pair $name?';
+  }
+
+  @override
+  String get hostRepairBody =>
+      'The keys of the host are dropped now, its connections close and its terminal sessions end. A new pairing code follows; the key generation rises with the next pairing.';
+
+  @override
+  String get hostPair => 'Continue pairing';
+
+  @override
+  String get hostDisable => 'Disable';
+
+  @override
+  String hostDisableTitle(String name) {
+    return 'Disable $name?';
+  }
+
+  @override
+  String get hostDisableBody =>
+      'All terminal sessions on this host end now. No one can open a terminal here until it is enabled again.';
+
+  @override
+  String get hostEnable => 'Enable';
+
+  @override
+  String hostEnableTitle(String name) {
+    return 'Enable $name?';
+  }
+
+  @override
+  String get hostEnableBody =>
+      'Terminal sessions are possible again for the people who may open them.';
+
+  @override
+  String get hostRetire => 'Retire';
+
+  @override
+  String hostRetireTitle(String name) {
+    return 'Retire $name?';
+  }
+
+  @override
+  String get hostRetireBody =>
+      'All terminal sessions end now and the host is retired for good. It cannot be paired or enabled again.';
+
+  @override
+  String hostStateChanged(String name, String state) {
+    return '$name is now $state.';
+  }
+
+  @override
+  String get hostPairingTitle => 'Pair host';
+
+  @override
+  String get hostCreateName => 'Name';
+
+  @override
+  String get hostCreateAssignee => 'Assignee (optional)';
+
+  @override
+  String get hostCreateSubmit => 'Create and get a code';
+
+  @override
+  String get hostPairingCommandIntro =>
+      'Enter this command on the host as the user of the host service (a one-time code that expires soon):';
+
+  @override
+  String hostPairingExpiresIn(String time) {
+    return 'Expires in $time';
+  }
+
+  @override
+  String get hostPairingExpired =>
+      'The pairing code has expired. Issue a new code.';
+
+  @override
+  String get hostPairingNewCode => 'New code';
+
+  @override
+  String get hostPairingNotYet =>
+      'The host has not reported yet. Enter the command on the host, then try again.';
+
+  @override
+  String get hostPairingNeedsCode =>
+      'This host waits for a pairing code. Issue a new code to continue.';
+
+  @override
+  String get hostPairingClose => 'Close';
+
+  @override
+  String hostFingerprintLabel(int count) {
+    return 'Type the fingerprint from the host (first $count characters)';
+  }
+
+  @override
+  String get hostFingerprintCompare =>
+      'Compare with the output on the host and type it again.';
+
+  @override
+  String hostAttemptsLeft(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count attempts left',
+      one: '1 attempt left',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get hostFingerprintFallback =>
+      'No attempts left: the host is back in pairing and its keys are dropped. Issue a new pairing code.';
+
+  @override
+  String get hostLlmQuestion => 'LLM login on this host';
+
+  @override
+  String get hostConfirmSubmit => 'Confirm with passkey / device';
+
+  @override
+  String hostConfirmed(String name) {
+    return '$name is active.';
+  }
+
+  @override
+  String stepUpPurposeCreateHost(String name) {
+    return 'Create the host $name';
+  }
+
+  @override
+  String stepUpPurposePairingCode(String name) {
+    return 'Issue a pairing code for $name';
+  }
+
+  @override
+  String stepUpPurposeConfirmHost(String name) {
+    return 'Confirm the host $name';
+  }
+
+  @override
+  String stepUpPurposeUpdateHost(String name) {
+    return 'Change the host $name';
+  }
+
+  @override
+  String stepUpPurposeHostLlmLogin(String name) {
+    return 'Change the LLM login of $name';
+  }
+
+  @override
+  String stepUpPurposeHostState(String name) {
+    return 'Change the state of $name';
+  }
+
+  @override
+  String stepUpPurposeHostAudit(String name) {
+    return 'Read the audit of $name';
+  }
+
+  @override
+  String adminTargetHost(String name) {
+    return 'Host $name';
+  }
+
+  @override
+  String get adminTargetsHosts => 'Hosts';
 }

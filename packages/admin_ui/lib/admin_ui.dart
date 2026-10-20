@@ -26,6 +26,13 @@
 /// ([AuditEntryDetail]), "Check chain" ([AuditChainCheckButton], [AuditChainPanel]), the export
 /// ([AuditExportBar], [AuditSaveTarget], [auditNdjsonToCsv]) and the data source
 /// [AuditRepository] ([ApiAuditRepository]), which [AdminRepository] includes.
+///
+/// M4-37 adds screen A8 for owners (01 5.2; 24 2.2, 3, 7, 8): the [HostsList], the
+/// [HostDetail] with [LlmLoginSection], [ServerHostSection], [DoctorResults],
+/// [HostGrantsSection], [SessionUsersSection] and [HostStateActions], the [PairingWizard] with
+/// [CreateHostDialog], [FingerprintConfirm], [LlmLoginChoice], [ServerHostChoice] and
+/// [SessionUserRows], the host target in the [GrantWizard] and the data source
+/// [HostsRepository] ([ApiHostsRepository]), which [AdminRepository] includes.
 library;
 
 export 'src/access/source_chain.dart';
@@ -43,6 +50,7 @@ export 'src/common/confirm_change.dart';
 export 'src/common/problem_banner.dart';
 export 'src/data/access_repository.dart';
 export 'src/data/admin_repository.dart';
+export 'src/data/hosts_repository.dart';
 export 'src/data/self_repository.dart';
 export 'src/devices/approve_device_dialog.dart';
 export 'src/devices/waiting_devices.dart';
@@ -53,6 +61,18 @@ export 'src/grants/revoke_grant_dialog.dart';
 export 'src/groups/group_detail.dart';
 export 'src/groups/groups_list.dart';
 export 'src/groups/member_editor.dart';
+export 'src/hosts/create_host_dialog.dart';
+export 'src/hosts/doctor_results.dart';
+export 'src/hosts/fingerprint_confirm.dart';
+export 'src/hosts/host_grants_section.dart';
+export 'src/hosts/host_labels.dart';
+export 'src/hosts/host_page.dart';
+export 'src/hosts/host_state_actions.dart';
+export 'src/hosts/hosts_list.dart';
+export 'src/hosts/llm_login_section.dart';
+export 'src/hosts/pairing_wizard.dart';
+export 'src/hosts/server_host_section.dart';
+export 'src/hosts/session_users_section.dart';
 export 'src/people/create_person_dialog.dart';
 export 'src/people/credentials_section.dart';
 export 'src/people/enrollment_code_view.dart';

@@ -11,20 +11,24 @@ import 'package:l10n/l10n.dart';
 import '../data/access_repository.dart';
 import 'grant_labels.dart';
 
-/// The target of a grant: the instance or a space or channel from the server's lists, which
-/// hold only targets the caller sees. Whether the caller may grant on the instance is the
-/// server's decision, which the preview shows (07 2.6, 9.3).
+/// The target of a grant: the instance, a space or channel, or a host from the server's lists,
+/// which hold only targets the caller sees. Whether the caller may grant on the instance or a
+/// host is the server's decision, which the preview shows (07 2.6, 2.12, 9.3).
 class TargetStep extends StatelessWidget {
   /// Creates the step.
   const TargetStep({
     super.key,
     required this.targets,
+    this.hosts = const [],
     required this.selected,
     required this.onSelect,
   });
 
   /// The spaces and channels the caller sees.
   final List<AdminTarget> targets;
+
+  /// The hosts the caller sees (target `host`, capability `terminal` only).
+  final List<AdminTarget> hosts;
 
   /// The chosen target, or null.
   final AdminTarget? selected;
@@ -49,6 +53,25 @@ class TargetStep extends StatelessWidget {
                   ? DsSpace.s24
                   : DsSpace.s8,
             ),
+            selected: t == selected,
+            selectedColor: colors.textPrimary,
+            selectedTileColor: colors.accentSubtle,
+            onTap: () => onSelect(t),
+          ),
+        if (hosts.isNotEmpty)
+          Padding(
+            padding: const EdgeInsets.only(left: DsSpace.s8, top: DsSpace.s12),
+            child: Text(
+              l.adminTargetsHosts,
+              style: dsTextStyle(DsType.label)
+                  .copyWith(color: colors.textSecondary),
+            ),
+          ),
+        for (final t in hosts)
+          ListTile(
+            key: ValueKey('target.${t.key}'),
+            title: Text(targetLabel(l, t)),
+            contentPadding: const EdgeInsets.only(left: DsSpace.s8),
             selected: t == selected,
             selectedColor: colors.textPrimary,
             selectedTileColor: colors.accentSubtle,

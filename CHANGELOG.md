@@ -68,6 +68,16 @@ operated, and the order of the build.
   drivers. The headless scenarios 16.1 to 16.5 run against `SyncEngine` with its local
   database. `make arch` gains rule 10: a `testing.dart` library is imported only from `test/`
   and `integration_test/` folders.
+- Hosts of the administration (M4-37): `packages/admin_ui` has screen A8 of 01 5.2 for owners:
+  the hosts list, the host page (state, assignee, platform and version, connection, fingerprint
+  and key generation, LLM login with I6 explained, server host, check results whose named session
+  users show the person of their assignment, also an ended one from the audit of the host,
+  profiles, grants with the preview state, session users), the pairing wizard in three steps
+  (code with the command and its remaining time, the fingerprint prefix with the attempts the
+  server names, the mandatory questions, session users only from the reported names), disable,
+  enable, re-pair and retire with reason and step-up, and the host target in the grant wizard
+  (capability `terminal`, no level, "Not effective" badge); the fake server answers the host
+  operations.
 - Permission screens of the administration (M4-27): `packages/admin_ui` has the grant wizard of
   01 5.2 A2 in three steps with the server's plain-language preview (text, effects, I1 and SR8
   explained, hints such as H1 and a missing expiry, delegation denials with their reason) before

@@ -321,6 +321,101 @@ void main() {
       ),
     );
     await audit.verifyAuditChain(auditVerifyRequest: AuditVerifyRequest());
+    // Hosts (M4-37): create, pair, a wrong and a right fingerprint, session users, the
+    // declaration, the state, a grant `terminal`, the audit and the sessions.
+    final hosts = api.getHostsApi();
+    final code = (await hosts.createHost(
+      hostCreate: HostCreate(
+        (b) => b
+          ..name = 'Build host'
+          ..reason = 'Builds',
+      ),
+    )).data!;
+    await hosts.listHosts();
+    h.server.world.pairHost(code.hostId, ['term-alex', 'term-sam']);
+    var host = (await hosts.getHost(hostId: code.hostId)).data!;
+    HostConfirm confirm(String prefix) => HostConfirm(
+      (b) => b
+        ..fingerprintPrefix = prefix
+        ..llmCredentials = LlmCredentials.organization
+        ..declaredServerHost = false
+        ..sessionUsers.add(
+          HostSessionUserAssign(
+            (u) => u
+              ..userId = w.sam.id
+              ..osUser = 'term-sam',
+          ),
+        )
+        ..reason = 'Builds',
+    );
+    final mismatch = await hosts
+        .confirmHost(
+          hostId: host.id,
+          ifMatch: '"${host.version}"',
+          hostConfirm: confirm('ZZZZ-ZZZZ'),
+        )
+        .then<DioException?>(
+          (_) => null,
+          onError: (Object e) => e as DioException,
+        );
+    expect(mismatch?.response?.statusCode, 409);
+    expect((mismatch?.response?.data as Map)['attempts_remaining'], 2);
+    host = (await hosts.confirmHost(
+      hostId: host.id,
+      ifMatch: '"${host.version}"',
+      hostConfirm: confirm('7kq2 9xta'),
+    )).data!;
+    expect(host.state, HostState.active);
+    host = (await hosts.updateHost(
+      hostId: host.id,
+      ifMatch: '"${host.version}"',
+      hostUpdate: HostUpdate(
+        (b) => b
+          ..assignedUserId = w.sam.id
+          ..revokeSessionUsers.add(w.sam.id)
+          ..reason = 'Rotate',
+      ),
+    )).data!;
+    host = (await hosts.setHostLlmCredentials(
+      hostId: host.id,
+      ifMatch: '"${host.version}"',
+      hostLlmCredentialsSet: HostLlmCredentialsSet(
+        (b) => b
+          ..llmCredentials = LlmCredentials.none
+          ..reason = 'No login',
+      ),
+    )).data!;
+    host = (await hosts.setHostState(
+      hostId: host.id,
+      ifMatch: '"${host.version}"',
+      hostStateSet: HostStateSet(
+        (b) => b
+          ..state = HostStateSetStateEnum.disabled
+          ..reason = 'Maintenance',
+      ),
+    )).data!;
+    final onHost = GrantCreate(
+      (b) => b
+        ..subjectKind = GrantSubjectKind.user
+        ..subjectId = w.sam.id
+        ..targetKind = TargetKind.host
+        ..targetId = host.id
+        ..capabilities.add(Capability.terminal)
+        ..reason = 'Builds',
+    );
+    final preview = (await access.previewGrant(grantCreate: onHost)).data!;
+    expect(preview.text, contains('no session user (SR12)'));
+    await access.createGrant(grantCreate: onHost);
+    final events = (await api.getAuditApi().listAuditEvents(
+      action: 'host.manage',
+      resourceId: host.id,
+    )).data!;
+    expect(
+      [for (final e in events.items) e.details['change']?.value],
+      ['revoked', 'assigned'],
+    );
+    await api.getTerminalApi().listTerminalSessions(hostId: host.id);
+    await hosts.issueHostPairingCode(hostId: host.id, reasonBody: why);
 
     await alex.auth.refresh.refreshNow();
     await api.getMeApi().getMe();

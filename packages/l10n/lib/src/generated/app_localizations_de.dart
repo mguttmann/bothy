@@ -3096,4 +3096,476 @@ class AppLocalizationsDe extends AppLocalizations {
   @override
   String get problemForbiddenSubjectKind =>
       'Für Agenten oder Apps nicht erlaubt';
+
+  @override
+  String get adminNavHosts => 'Rechner';
+
+  @override
+  String get hostsAdd => 'Rechner hinzufügen';
+
+  @override
+  String get hostsEmpty => 'Noch keine Rechner.';
+
+  @override
+  String get hostOwnersOnly => 'Nur Owner';
+
+  @override
+  String get hostStatePairing => 'Kopplung';
+
+  @override
+  String get hostStateConfirming => 'Wartet auf Bestätigung';
+
+  @override
+  String get hostStateActive => 'aktiv';
+
+  @override
+  String get hostStateDisabled => 'deaktiviert';
+
+  @override
+  String get hostStateDuplicate =>
+      'deaktiviert: eine zweite Verbindung nutzte dieselben Schlüssel, nur eine neue Kopplung hilft';
+
+  @override
+  String get hostStateRetired => 'stillgelegt';
+
+  @override
+  String get hostStateUnknown => 'unbekannt';
+
+  @override
+  String get hostConnected => 'verbunden';
+
+  @override
+  String get hostDisconnected => 'getrennt';
+
+  @override
+  String hostLastSeen(String when) {
+    return 'zuletzt gesehen $when';
+  }
+
+  @override
+  String get hostBack => 'Zurück zu den Rechnern';
+
+  @override
+  String get hostFieldAssignee => 'Zugewiesen an';
+
+  @override
+  String get hostFieldPlatform => 'Plattform';
+
+  @override
+  String get hostFieldConnection => 'Verbindung';
+
+  @override
+  String get hostFieldFingerprint => 'Fingerabdruck';
+
+  @override
+  String get hostFieldLlmLogin => 'LLM-Anmeldung';
+
+  @override
+  String get hostFieldServerHost => 'Server-Rechner';
+
+  @override
+  String get hostFieldChecks => 'Prüfungen';
+
+  @override
+  String get hostFieldProfiles => 'Profile';
+
+  @override
+  String get hostFieldGrants => 'Freigaben';
+
+  @override
+  String get hostFieldSessionUsers => 'Sitzungsbenutzer';
+
+  @override
+  String get hostFieldSessions => 'Terminal-Sitzungen';
+
+  @override
+  String hostPlatformValue(String platform, String version) {
+    return '$platform, Version $version';
+  }
+
+  @override
+  String get hostNotReported => 'Noch nicht gemeldet';
+
+  @override
+  String hostFingerprintValue(String value, int generation) {
+    return '$value   Schlüsselgeneration $generation';
+  }
+
+  @override
+  String get hostNoKeys => 'Keine Schlüssel';
+
+  @override
+  String get hostLlmNone => 'Keine';
+
+  @override
+  String get hostLlmPersonal => 'Persönlich';
+
+  @override
+  String hostLlmPersonalOf(String name) {
+    return 'Persönlich von $name';
+  }
+
+  @override
+  String get hostLlmOrganization => 'Organisation';
+
+  @override
+  String get hostLlmI6Explained =>
+      'Persönlich: nur diese Person darf hier ein Terminal öffnen, auch keine anderen Owner.';
+
+  @override
+  String get hostLlmHolder => 'Inhaber der Anmeldung';
+
+  @override
+  String hostLlmTitle(String name) {
+    return 'LLM-Anmeldung auf $name';
+  }
+
+  @override
+  String get hostLlmBody =>
+      'Ein Wechsel auf Persönlich oder ein neuer Inhaber beendet die Terminal-Sitzungen anderer Personen auf diesem Rechner.';
+
+  @override
+  String hostLlmChanged(String name) {
+    return 'Die LLM-Anmeldung von $name ist geändert.';
+  }
+
+  @override
+  String get hostServerHostQuestion =>
+      'Ist dieser Rechner der Server der Instanz?';
+
+  @override
+  String get hostYes => 'Ja';
+
+  @override
+  String get hostNo => 'Nein';
+
+  @override
+  String hostServerHostDeclared(String answer) {
+    return 'Angegeben: $answer';
+  }
+
+  @override
+  String hostServerHostReported(String answer) {
+    return 'Meldung des Host-Dienstes auf dem Rechner: $answer';
+  }
+
+  @override
+  String hostDoctorOk(String check) {
+    return '$check ok';
+  }
+
+  @override
+  String hostDoctorFailed(String check, String code) {
+    return '$check nicht bestanden: $code';
+  }
+
+  @override
+  String hostDoctorAssigned(String osUser, String name) {
+    return '$osUser (zugewiesen an $name)';
+  }
+
+  @override
+  String hostDoctorFormer(String osUser, String name) {
+    return '$osUser (früher zugewiesen an $name)';
+  }
+
+  @override
+  String hostDoctorUnknown(String osUser) {
+    return '$osUser (keine Zuweisung bekannt)';
+  }
+
+  @override
+  String get hostDoctorNone => 'Noch keine Prüfergebnisse.';
+
+  @override
+  String get hostDoctorAuditFailed =>
+      'Das Audit dieses Rechners war nicht lesbar, deshalb stehen frühere Sitzungsbenutzer ohne ihre Person da.';
+
+  @override
+  String hostWorkdirs(String folders) {
+    return 'Arbeitsordner: $folders';
+  }
+
+  @override
+  String get hostWorkdirsNone => 'Arbeitsordner: keine';
+
+  @override
+  String hostSessionUsersUnassigned(String osUser) {
+    return 'Gemeldet, nicht zugewiesen: $osUser';
+  }
+
+  @override
+  String get hostSessionUsersSr12 =>
+      'Ohne Sitzungsbenutzer kein Terminal (SR12).';
+
+  @override
+  String get hostSessionUsersOnlyReported =>
+      'Nur Namen, die der Rechner bei der Kopplung oder in seiner letzten Meldung gemeldet hat.';
+
+  @override
+  String get hostSessionUserAssign => 'Zuweisen';
+
+  @override
+  String get hostSessionUserAssignTitle => 'Sitzungsbenutzer zuweisen';
+
+  @override
+  String get hostSessionUserAssignBody =>
+      'Ein einmal vergebener Name bleibt auf diesem Rechner an seine Person gebunden.';
+
+  @override
+  String get hostSessionUserPerson => 'Person';
+
+  @override
+  String get hostSessionUserName => 'Gemeldeter Name';
+
+  @override
+  String hostSessionUserAssigned(String name, String osUser) {
+    return '$name hat jetzt den Sitzungsbenutzer $osUser.';
+  }
+
+  @override
+  String get hostSessionUserEnd => 'Beenden';
+
+  @override
+  String hostSessionUserEndTitle(String name) {
+    return 'Zuweisung von $name beenden?';
+  }
+
+  @override
+  String hostSessionUserEndBody(String name, String osUser) {
+    return '$name kann auf diesem Rechner kein Terminal mehr öffnen. Der Name $osUser bleibt auf diesem Rechner vergeben und geht nie an eine andere Person.';
+  }
+
+  @override
+  String hostSessionUserEnded(String name, String osUser) {
+    return 'Die Zuweisung von $name ist beendet; $osUser bleibt vergeben.';
+  }
+
+  @override
+  String get hostSessionUserTaken =>
+      'Dieser Name ist vergeben: ein einmal vergebener Name bleibt auf diesem Rechner an seine Person gebunden, auch nach dem Ende der Zuweisung, und jede Person hat einen Sitzungsbenutzer je Rechner.';
+
+  @override
+  String get hostSessionUserNotOnHost =>
+      'Der Rechner hat diesen Namen nicht gemeldet. Erst muss der Rechner den Namen melden, dann lässt er sich zuweisen.';
+
+  @override
+  String get hostSessionRowsTitle => 'Sitzungsbenutzer je Person';
+
+  @override
+  String get hostSessionRowsAdd => 'Sitzungsbenutzer hinzufügen';
+
+  @override
+  String get hostSessionRowRemove => 'Entfernen';
+
+  @override
+  String get hostChange => 'Ändern';
+
+  @override
+  String hostAssigneeTitle(String name) {
+    return 'Zuweisung von $name';
+  }
+
+  @override
+  String get hostAssigneeBody =>
+      'Eine Person, die kein Owner ist, bekommt ein Terminal nur auf dem Rechner, der ihr zugewiesen ist (SR10).';
+
+  @override
+  String hostAssigneeChanged(String name) {
+    return 'Die Zuweisung von $name ist geändert.';
+  }
+
+  @override
+  String get hostGrantsAdd => 'Terminal freigeben';
+
+  @override
+  String get hostGrantsNone => 'Keine Freigaben auf diesem Rechner.';
+
+  @override
+  String get hostNotEffective => 'Nicht wirksam';
+
+  @override
+  String hostSessionsCount(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count offene Terminal-Sitzungen',
+      one: '1 offene Terminal-Sitzung',
+      zero: 'Keine offenen Terminal-Sitzungen',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get hostRepair => 'Neu koppeln';
+
+  @override
+  String hostRepairTitle(String name) {
+    return '$name neu koppeln?';
+  }
+
+  @override
+  String get hostRepairBody =>
+      'Die Schlüssel des Rechners verfallen sofort, seine Verbindungen schließen und seine Terminal-Sitzungen enden. Ein neuer Kopplungs-Code folgt; die Schlüsselgeneration steigt mit der nächsten Kopplung.';
+
+  @override
+  String get hostPair => 'Kopplung fortsetzen';
+
+  @override
+  String get hostDisable => 'Deaktivieren';
+
+  @override
+  String hostDisableTitle(String name) {
+    return '$name deaktivieren?';
+  }
+
+  @override
+  String get hostDisableBody =>
+      'Alle Terminal-Sitzungen auf diesem Rechner enden jetzt. Niemand kann hier ein Terminal öffnen, bis er wieder aktiviert ist.';
+
+  @override
+  String get hostEnable => 'Aktivieren';
+
+  @override
+  String hostEnableTitle(String name) {
+    return '$name aktivieren?';
+  }
+
+  @override
+  String get hostEnableBody =>
+      'Terminal-Sitzungen sind für die Personen, die sie öffnen dürfen, wieder möglich.';
+
+  @override
+  String get hostRetire => 'Stilllegen';
+
+  @override
+  String hostRetireTitle(String name) {
+    return '$name stilllegen?';
+  }
+
+  @override
+  String get hostRetireBody =>
+      'Alle Terminal-Sitzungen enden jetzt, und der Rechner ist für immer stillgelegt. Er lässt sich weder koppeln noch wieder aktivieren.';
+
+  @override
+  String hostStateChanged(String name, String state) {
+    return '$name ist jetzt $state.';
+  }
+
+  @override
+  String get hostPairingTitle => 'Rechner koppeln';
+
+  @override
+  String get hostCreateName => 'Name';
+
+  @override
+  String get hostCreateAssignee => 'Zugewiesen an (optional)';
+
+  @override
+  String get hostCreateSubmit => 'Anlegen und Code holen';
+
+  @override
+  String get hostPairingCommandIntro =>
+      'Diesen Befehl auf dem Rechner als Benutzer des Host-Dienstes eingeben (ein Einmal-Code, der bald abläuft):';
+
+  @override
+  String hostPairingExpiresIn(String time) {
+    return 'Läuft ab in $time';
+  }
+
+  @override
+  String get hostPairingExpired =>
+      'Der Kopplungs-Code ist abgelaufen. Einen neuen Code ausstellen.';
+
+  @override
+  String get hostPairingNewCode => 'Neuer Code';
+
+  @override
+  String get hostPairingNotYet =>
+      'Der Rechner hat sich noch nicht gemeldet. Den Befehl auf dem Rechner eingeben, dann erneut versuchen.';
+
+  @override
+  String get hostPairingNeedsCode =>
+      'Dieser Rechner wartet auf einen Kopplungs-Code. Einen neuen Code ausstellen, um fortzufahren.';
+
+  @override
+  String get hostPairingClose => 'Schließen';
+
+  @override
+  String hostFingerprintLabel(int count) {
+    return 'Fingerabdruck vom Rechner eingeben (erste $count Zeichen)';
+  }
+
+  @override
+  String get hostFingerprintCompare =>
+      'Mit der Ausgabe auf dem Rechner vergleichen und erneut eingeben.';
+
+  @override
+  String hostAttemptsLeft(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count Versuche übrig',
+      one: '1 Versuch übrig',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get hostFingerprintFallback =>
+      'Keine Versuche mehr: der Rechner ist zurück in der Kopplung, seine Schlüssel sind verworfen. Einen neuen Kopplungs-Code ausstellen.';
+
+  @override
+  String get hostLlmQuestion => 'LLM-Anmeldung auf diesem Rechner';
+
+  @override
+  String get hostConfirmSubmit => 'Mit Passkey / Gerät bestätigen';
+
+  @override
+  String hostConfirmed(String name) {
+    return '$name ist aktiv.';
+  }
+
+  @override
+  String stepUpPurposeCreateHost(String name) {
+    return 'Den Rechner $name anlegen';
+  }
+
+  @override
+  String stepUpPurposePairingCode(String name) {
+    return 'Einen Kopplungs-Code für $name ausstellen';
+  }
+
+  @override
+  String stepUpPurposeConfirmHost(String name) {
+    return 'Den Rechner $name bestätigen';
+  }
+
+  @override
+  String stepUpPurposeUpdateHost(String name) {
+    return 'Den Rechner $name ändern';
+  }
+
+  @override
+  String stepUpPurposeHostLlmLogin(String name) {
+    return 'Die LLM-Anmeldung von $name ändern';
+  }
+
+  @override
+  String stepUpPurposeHostState(String name) {
+    return 'Den Zustand von $name ändern';
+  }
+
+  @override
+  String stepUpPurposeHostAudit(String name) {
+    return 'Das Audit von $name lesen';
+  }
+
+  @override
+  String adminTargetHost(String name) {
+    return 'Rechner $name';
+  }
+
+  @override
+  String get adminTargetsHosts => 'Rechner';
 }

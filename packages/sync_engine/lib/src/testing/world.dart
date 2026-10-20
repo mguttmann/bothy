@@ -12,6 +12,8 @@ import 'dart:typed_data';
 import 'package:crypto/crypto.dart';
 import 'package:domain/domain.dart' show EventCatalog, FractionalIndex;
 
+import 'fake_host.dart';
+
 /// A JSON object of the API.
 typedef JsonMap = Map<String, Object?>;
 
@@ -26,6 +28,7 @@ final class FakeProblem implements Exception {
     this.reason,
     this.retryAfter,
     this.errors,
+    this.extra = const {},
   });
 
   /// The HTTP status.
@@ -45,6 +48,9 @@ final class FakeProblem implements Exception {
 
   /// Field errors of `400 validation_failed`.
   final List<JsonMap>? errors;
+
+  /// Further members of the problem body, for example `hint` or `attempts_remaining`.
+  final JsonMap extra;
 
   @override
   String toString() => 'FakeProblem($status $code)';
@@ -462,6 +468,30 @@ final class FakeWorld {
   /// The grants by ID as the API returns them (`Grant`, brief M4-27); a revoked grant keeps
   /// its `revoked_at`.
   final Map<String, JsonMap> grants = {};
+
+  /// The hosts of the terminal by ID (brief M4-37).
+  final Map<String, FakeHost> hosts = {};
+
+  /// Simulates `bothy-host pair` on [hostId] (24 3.2 item 2): the host stores keys with
+  /// [fingerprint] and the reported [names], becomes `confirming` and connected, and its key
+  /// generation rises.
+  void pairHost(
+    String hostId,
+    List<String> names, {
+    String fingerprint =
+        '7KQ2-9XTA-M4PB-1C8D-0000-0000-0000-0000-0000-0000-0000-0000-0000',
+  }) {
+    final h = hosts[hostId]!;
+    h
+      ..state = 'confirming'
+      ..fingerprint = fingerprint
+      ..keyGeneration += 1
+      ..failures = 0
+      ..reported = List.of(names)
+      ..connected = true
+      ..pairingCode = null
+      ..version += 1;
+  }
 
   /// People whose `enableUser` answers `409 i1_violation` (10 5.4), a switch of the tests.
   final Set<String> i1OnEnable = {};

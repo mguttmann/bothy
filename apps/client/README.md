@@ -6,7 +6,8 @@ M4-25 fill. Settings (M4-25): the sections of 01 5.1 D8 under `/settings/<sectio
 device and session views of `admin_ui`. Administration (M4-26): the `AdminShell` of `admin_ui`
 at `/admin`, `/admin/<section>` and `/admin/<section>/<id>` (`lib/admin/admin_route.dart`),
 over the REST client of the signed-in session; grants (M4-27) at `/admin/grants/<target key>`
-with the grant wizard, "Who has access?" and "View as person". iOS and Android follow in M5.
+with the grant wizard, "Who has access?" and "View as person"; hosts (M4-37) at
+`/admin/hosts` and `/admin/hosts/<id>` for owners. iOS and Android follow in M5.
 
 Flutter app for macOS and Windows, later iOS and Android. One code base for interface and
 logic; native code only where the system requires it.
@@ -94,7 +95,10 @@ without one.
   person" included). `integration_test/grant_preview_test.dart` runs the example of 07 9.3 from
   the wizard to "Who has access?"; `test/admin/grant_preview_test.dart` runs it headless over
   REST. Both compare the preview with the example the fake reads from the specification at run
-  time.
+  time. `integration_test/host_admin_test.dart` runs screen A8 (M4-37): create a host, the fake
+  plays `bothy-host pair`, a wrong and a right fingerprint prefix, the mandatory answers, a
+  session user, a grant `terminal` that is not effective until the person is the assignee; the
+  step-up enumeration includes the host operations and `listAuditEvents`.
 
 ## Sidebar and post list
 
