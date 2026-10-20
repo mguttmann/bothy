@@ -149,6 +149,7 @@ var appPrivileges = map[string][]string{
 	"files":                {"SELECT", "INSERT", "UPDATE", "DELETE"},
 	"file_upload_sessions": {"SELECT", "INSERT", "UPDATE", "DELETE"},
 	"file_upload_parts":    {"SELECT", "INSERT", "UPDATE", "DELETE"},
+	"file_thumbnails":      {"SELECT", "INSERT", "UPDATE", "DELETE"},
 	// 03 local_credentials (M1-39): one row per local identity, changed in place; it goes with
 	// its identity (ON DELETE CASCADE).
 	"local_credentials": {"SELECT", "INSERT", "UPDATE"},
