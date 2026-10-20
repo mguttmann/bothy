@@ -735,7 +735,11 @@ jobs:
       - name: Unpack the coverage reports
         run: |
           shopt -s nullglob
-          for archive in "$RUNNER_TEMP"/sonar-coverage/*/coverage.tar; do tar -xvf "$archive"; done
+          # download-artifact puts a single matching artifact straight into the path and several
+          # into one folder each.
+          for archive in "$RUNNER_TEMP"/sonar-coverage/coverage.tar "$RUNNER_TEMP"/sonar-coverage/*/coverage.tar; do
+            if [ -e "$archive" ]; then tar -xvf "$archive"; fi
+          done
       - name: make sonar-scan
         env:
           COMPONENTS: ${{ needs.plan.outputs.components }}

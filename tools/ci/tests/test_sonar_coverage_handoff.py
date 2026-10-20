@@ -172,3 +172,40 @@ def test_main_analysis_waits_for_the_main_branch_switch() -> None:
     # and every other ref are not affected.
     condition = " ".join(str(_workflow()["jobs"]["sonar"]["if"]).split())
     assert "(github.ref != 'refs/heads/main' || vars.SONAR_MAIN_ANALYSIS == 'true')" in condition
+
+
+@pytest.mark.parametrize("single", [True, False])
+def test_unpack_step_reads_one_or_several_artifacts(tmp_path: Path, single: bool) -> None:
+    """download-artifact puts a single matching artifact straight into its path and several into
+    one folder each; the unpack step must read both layouts, or the scan sees no coverage."""
+    steps = _steps("sonar")
+    [unpack] = [s for s in steps if "coverage.tar" in str(s.get("run", ""))]
+    source = tmp_path / "source"
+    reports = {"server": "services/server/coverage.out", "apps": "packages/a/coverage/lcov.info"}
+    parts = ["server"] if single else ["server", "apps"]
+    temp = tmp_path / "runner"
+    for part in parts:
+        (source / reports[part]).parent.mkdir(parents=True, exist_ok=True)
+        (source / reports[part]).write_text(part, encoding="utf-8")
+        folder = temp / SONAR_ARTIFACT
+        if not single:
+            folder = folder / f"{SONAR_ARTIFACT}-{part}"
+        folder.mkdir(parents=True, exist_ok=True)
+        subprocess.run(  # nosec B603 B607 - a fixed tar call on test files
+            ["tar", "-cf", str(folder / "coverage.tar"), reports[part]],
+            cwd=source,
+            check=True,
+        )
+    work = tmp_path / "repo"
+    work.mkdir()
+    done = subprocess.run(  # nosec B603 B607 - the workflow's own step with a fixed environment
+        ["bash", "-e", "-c", str(unpack["run"])],
+        cwd=work,
+        env={"PATH": "/usr/bin:/bin", "RUNNER_TEMP": str(temp)},
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    assert done.returncode == 0, done.stderr
+    for part in parts:
+        assert (work / reports[part]).read_text(encoding="utf-8") == part
