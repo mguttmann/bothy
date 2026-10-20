@@ -52,11 +52,19 @@ type consumerWorld struct {
 // newConsumerWorld starts the world with short agent windows and a deny aggregation of a second.
 func newConsumerWorld(t *testing.T) *consumerWorld {
 	t.Helper()
-	w := newDeliveryWorld(t, "BOTHY_AGENT__ACK_TIMEOUT="+consumerAckTimeout.String(),
-		"BOTHY_AGENT__ACK_PERSIST_INTERVAL="+consumerPersist.String(), "BOTHY_AGENT__MAX_INFLIGHT_EVENTS="+strconv.Itoa(consumerInflight),
+	return newConsumerWorldWith(t)
+}
+
+// newConsumerWorldWith is newConsumerWorld with the further environment entries extra (M2-16).
+func newConsumerWorldWith(t *testing.T, extra ...string) *consumerWorld {
+	t.Helper()
+	env := append([]string{"BOTHY_AGENT__ACK_TIMEOUT=" + consumerAckTimeout.String(),
+		"BOTHY_AGENT__ACK_PERSIST_INTERVAL=" + consumerPersist.String(), "BOTHY_AGENT__MAX_INFLIGHT_EVENTS=" + strconv.Itoa(consumerInflight),
 		"BOTHY_AUDIT__DENY_AGGREGATE_WINDOW=1s", "BOTHY_SYNC__CURSOR_ADVANCE_EVERY=5",
 		// The Owner builds and posts for every subtest; the suite must not depend on its speed.
-		"BOTHY_RATELIMIT__RL__MESSAGE__BURST=1000", "BOTHY_RATELIMIT__RL__ADMIN__BURST=1000", "BOTHY_RATELIMIT__RL__WRITE__BURST=1000")
+		"BOTHY_RATELIMIT__RL__MESSAGE__BURST=1000", "BOTHY_RATELIMIT__RL__ADMIN__BURST=1000", "BOTHY_RATELIMIT__RL__WRITE__BURST=1000"},
+		extra...)
+	w := newDeliveryWorld(t, env...)
 	return &consumerWorld{dlWorld: w, space: w.newSpace("Support")}
 }
 
