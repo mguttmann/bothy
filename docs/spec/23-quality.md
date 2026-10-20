@@ -210,7 +210,8 @@ fixed and the delta is checked again; the threat model (chapter 19) is updated. 
 | `quality.sonar.local_port` | `9000` | port | Port of the local SonarQube on `127.0.0.1` | `tools/sonarqube/compose.yaml`, `Makefile` (`SONAR_HOST_URL`) |
 | `quality.sonar.startup_timeout_s` | `300` | seconds | Wait time of `make sonar-up` for the status UP | `Makefile` (`SONAR_STARTUP_TIMEOUT_S`) |
 | `commit.header_max_length` | `100` | characters | Longest commit header line | `tools/hooks/commit_msg.py` |
-| `repo.max_file_kb` | `1024` | KiB | Largest file in the repository | `.pre-commit-config.yaml` |
+| `repo.max_file_kb` | `1024` | KiB | Largest file in the repository, except the files of `api.contract_max_file_kb` | `.pre-commit-config.yaml` |
+| `api.contract_max_file_kb` | `2048` | KiB | Largest REST contract file and its single-file copies (`docs/api/openapi.yaml`, `services/server/api/rest/openapi.gen.yaml`, `sdk/typescript/src/generated/openapi.ts`; docs/DECISIONS.md PL/9) | `.pre-commit-config.yaml` |
 | `license.spdx_header_lines` | `5` | lines | Range in which the SPDX header line must be | `tools/ci/license_check.py` |
 | `deps.min_release_age` | `7 days` | duration | Wait time before Renovate proposes a new version | `renovate.json` |
 | `security.report_ack_target` | `3` | business days | Acknowledgment of a vulnerability report | `SECURITY.md` |

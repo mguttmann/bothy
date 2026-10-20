@@ -44,14 +44,49 @@ def _gate_value(key: str) -> str:
     return str(cond["error"])
 
 
-def _max_file_kb() -> str:
+def _size_hooks() -> list[dict]:
     config = yaml.safe_load((REPO / ".pre-commit-config.yaml").read_text())
-    for repo in config["repos"]:
-        for hook in repo["hooks"]:
-            if hook["id"] == "check-added-large-files":
-                [arg] = [a for a in hook["args"] if a.startswith("--maxkb=")]
-                return arg.split("=", 1)[1]
-    raise AssertionError("check-added-large-files hook missing")
+    return [h for r in config["repos"] for h in r["hooks"] if h["id"] == "check-added-large-files"]
+
+
+def _maxkb(hook: dict) -> str:
+    [arg] = [a for a in hook["args"] if a.startswith("--maxkb=")]
+    return arg.split("=", 1)[1]
+
+
+def _max_file_kb() -> str:
+    """The hook over every file except the REST contract and its single-file copies."""
+    [hook] = [h for h in _size_hooks() if "files" not in h]
+    return _maxkb(hook)
+
+
+def _contract_max_file_kb() -> str:
+    """The hook over the REST contract and its single-file copies (docs/DECISIONS.md PL/9)."""
+    [hook] = [h for h in _size_hooks() if "files" in h]
+    return _maxkb(hook)
+
+
+def test_size_hooks_split_the_files_between_them() -> None:
+    """The contract hook checks exactly the files the general hook leaves out, and they exist."""
+    general = [h for h in _size_hooks() if "files" not in h]
+    contract = [h for h in _size_hooks() if "files" in h]
+    assert len(general) == len(contract) == 1
+    assert general[0]["exclude"] == contract[0]["files"]
+    assert "--enforce-all" in general[0]["args"]
+    assert "--enforce-all" in contract[0]["args"]
+    tracked = subprocess.run(
+        ["git", "ls-files"], cwd=REPO, check=True, capture_output=True, text=True
+    ).stdout.split()
+    matched = [f for f in tracked if re.search(contract[0]["files"], f)]
+    assert sorted(matched) == sorted(CONTRACT_FILES), matched
+
+
+# The REST contract and the files generated from it as one file each (docs/DECISIONS.md PL/9).
+CONTRACT_FILES = [
+    "docs/api/openapi.yaml",
+    "sdk/typescript/src/generated/openapi.ts",
+    "services/server/api/rest/openapi.gen.yaml",
+]
 
 
 def _sonar_port() -> str:
@@ -134,6 +169,7 @@ SOURCES = {
     "quality.sonar.local_port": _sonar_port,
     "commit.header_max_length": lambda: str(commit_msg.HEADER_MAX_LENGTH),
     "repo.max_file_kb": _max_file_kb,
+    "api.contract_max_file_kb": _contract_max_file_kb,
     "license.spdx_header_lines": lambda: str(license_check.HEADER_SEARCH_LINES),
     "deps.min_release_age": lambda: json.loads((REPO / "renovate.json").read_text())[
         "minimumReleaseAge"
