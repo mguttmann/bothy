@@ -42,8 +42,16 @@ import pytest
         (["docs/spec/actions.yaml"], ["server"]),
         (["docs/spec/actions.yaml", "docs/spec/05-aktionen.md"], ["server"]),
         (["docs/spec/05-aktionen.md"], []),
-        (["docs/spec/07-rechte.md", "infra/compose/compose.yaml", "README.md"], ["plugins"]),
-        (["docs/spec/07-rechte.md", "infra/compose/secrets.yaml", "README.md"], []),
+        # The terminal suite of the server starts the Compose stack with its test overlays and
+        # the collector configuration, so infra/compose/ and infra/otel/ run the server gates
+        # (brief M2-48 Design note 14).
+        (
+            ["docs/spec/07-rechte.md", "infra/compose/compose.yaml", "README.md"],
+            ["plugins", "server"],
+        ),
+        (["docs/spec/07-rechte.md", "infra/compose/secrets.yaml", "README.md"], ["server"]),
+        (["infra/compose/test/compose.terminal.yaml"], ["server"]),
+        (["infra/otel/collector.yaml"], ["server"]),
         # The panel plugin reads the TypeScript tokens, its dashboard and the Grafana pin (M7-25).
         (["design/build/ts/tokens.gen.ts"], ["apps", "plugins"]),
         (["infra/observability/grafana/dashboards/bothy-live.json"], ["plugins"]),

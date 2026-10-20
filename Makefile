@@ -446,6 +446,7 @@ perf: ## Load and chaos tests against the performance targets (end of an etappe 
 # ---- documentation --------------------------------------------------------------------
 docs: ## Documentation site builds strictly with the API references and the Dart API pages; ADR index is current; no external assets
 	$(UVRUN) python tools/docs/adr_index.py --check
+	$(UVRUN) python tools/docs/terminal_catalogue.py --check
 	@# docs/reference/dart-api.md links the generated Dart API pages, so they are built for every
 	@# component selection, not only for `apps` (docs/DECISIONS.md D-M4-01-6).
 	@if [ -z "$(DART_PKGS)" ]; then $(call skip,dart-api-docs,no Dart package tracked under apps/ or packages/); \

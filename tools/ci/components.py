@@ -37,7 +37,10 @@ from typing import Any
 
 # Gate component -> path prefixes owned by it.
 GATE_COMPONENTS: dict[str, tuple[str, ...]] = {
-    "server": ("services/",),
+    # The terminal suite in services/server/test/terminal starts the installation Compose file
+    # with its test overlays and the collector configuration (docs/DECISIONS.md, brief M2-48
+    # Design note 14).
+    "server": ("services/", "infra/compose/", "infra/otel/"),
     # The Dart tests of packages/bothy_noise read the Noise test vectors, recordings and
     # fingerprint vectors of the host service (docs/DECISIONS.md D-M2-38-5). The architecture
     # test of the Dart workspace belongs to its gates (docs/DECISIONS.md D-M4-01-8).

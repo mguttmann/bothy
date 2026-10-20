@@ -1,0 +1,916 @@
+# SPDX-License-Identifier: Apache-2.0
+# Terminal test catalogue (brief M2-48 Design note 7): for every ID of docs/spec/24-terminal.md
+# section 14 and every AZ-M, ID-T and SEC-T ID that threat model section 6.7 names, where it runs
+# and which ticket implemented it. `make docs` checks it with tools/docs/terminal_catalogue.py
+# against chapter 24, the PLAN row M2-48, exit criterion 8 and threat model section 6.7.
+#
+# title and expected: for TM-T the cells of the 24 14 row; for AZ-M the cells Principal, Target,
+# Action and Condition of the 07 11.1 row joined with " | ", and its Expected cell; for ID-T28 and
+# SEC-T05 the Test cell and the Expected or Controls cell of the 08 and 19 test tables.
+# runs: kind e2e (`e2e/<package>:scenarios/<file>.yaml` or `e2e/<package>:<TestFunc>`, relative to
+# this folder), platform (a test of services/host/test/platform with os), perf (the chaos test of
+# make perf) or unit (`<package dir>:<TestFunc>` for Go, `<file>.dart:<test name>` for Dart).
+# The platform runs on linux execute in make check through e2e/hostplatform.
+# Generated once from the chapters; edit by hand, the gate keeps it equal to them.
+
+format: 1
+entries:
+- id: TM-T01
+  title: Conformance of the handshake in Go and Dart with the entries for `Noise_NK_25519_ChaChaPoly_SHA256` from the vector files in 5.2
+  expected: identical bytes
+  runs:
+  - kind: unit
+    ref: services/host/internal/noise:TestVectorsTMT01
+  - kind: unit
+    ref: packages/bothy_noise/test/vectors_test.dart:TM-T01 cacophony
+  - kind: unit
+    ref: packages/bothy_noise/test/vectors_test.dart:TM-T01 noise-c
+  implemented_by:
+  - ticket: M2-38
+    tests:
+    - TestVectorsTMT01
+  threats:
+  - T-TM-01
+- id: TM-T02
+  title: Mutual handshake Go against Dart, with a wrong prologue, a wrong static key, a swapped host ID
+  expected: only the correct one succeeds
+  runs:
+  - kind: unit
+    ref: services/host/internal/noise:TestRecordingsTMT02Dart
+  - kind: unit
+    ref: services/host/internal/noise:TestRecordingsTMT02Negative
+  - kind: unit
+    ref: packages/bothy_noise/test/recordings_test.dart:TM-T02 replays the Go recording as initiator
+  - kind: unit
+    ref: packages/bothy_noise/test/recordings_test.dart:TM-T02 replays the Go recording as responder
+  - kind: unit
+    ref: packages/bothy_noise/test/recordings_test.dart:TM-T02 wrong prologue, wrong static key and swapped host ID fail
+  implemented_by:
+  - ticket: M2-38
+    tests:
+    - TestRecordingsTMT02Dart
+    - TestRecordingsTMT02Negative
+  threats:
+  - T-TM-01
+- id: TM-T03
+  title: Relay replays message 1 (same token)
+  expected: host service rejects (`token_replayed`, `4101`), no second PTY
+  runs:
+  - kind: e2e
+    ref: e2e/conformance:scenarios/tm-t03.yaml
+  - kind: unit
+    ref: services/host/internal/session:TestTMT03Replay
+  implemented_by:
+  - ticket: M2-45
+    tests:
+    - TestTMT03Replay
+  threats:
+  - T-TM-02
+- id: TM-T04
+  title: Token with a wrong `aud`, `sid`, `cek`, a foreign `kid`, the `typ` of the invocation token; expired token
+  expected: 'no PTY; `4104` with `token_invalid`; expired: `4101` with `token_expired`'
+  runs:
+  - kind: e2e
+    ref: e2e/conformance:scenarios/tm-t04.yaml
+  - kind: unit
+    ref: services/host/internal/session:TestTMT04TokenFailures
+  implemented_by:
+  - ticket: M2-45
+    tests:
+    - TestTMT04TokenFailures
+  threats:
+  - T-TM-02
+- id: TM-T05
+  title: Messages 1 and 2 complete, but no `start`
+  expected: no PTY
+  runs:
+  - kind: e2e
+    ref: e2e/conformance:scenarios/tm-t05.yaml
+  - kind: unit
+    ref: services/host/internal/session:TestTMT05NoStart
+  - kind: unit
+    ref: services/server/test/integration/terminalsessions:TestRelay_OpenTimeout
+  implemented_by:
+  - ticket: M2-44
+    tests:
+    - TestRelay_OpenTimeout
+  - ticket: M2-45
+    tests:
+    - TestTMT05NoStart
+  threats:
+  - T-TM-02
+- id: TM-T06
+  title: Relay capture, server logs, database dump and telemetry after a session with a canary value
+  expected: canary nowhere (19, SEC-T10)
+  runs:
+  - kind: e2e
+    ref: e2e/conformance:scenarios/tm-t06.yaml
+  - kind: unit
+    ref: services/server/test/terminal:TestTMT06_NoContentAnywhere
+  implemented_by:
+  - ticket: M2-46
+    tests:
+    - TestTMT06_NoContentAnywhere
+  threats:
+  - T-TM-01
+- id: TM-T07
+  title: '`terminal.open` without step-up, with one that is too old, with one already consumed, in the console with a password step-up'
+  expected: '`401 step_up_required`'
+  runs:
+  - kind: e2e
+    ref: e2e/conformance:scenarios/tm-t07.yaml
+  - kind: unit
+    ref: services/server/test/integration/terminalsessions:TestOpen_TMT07_StepUp
+  implemented_by:
+  - ticket: M2-44
+    tests:
+    - TestOpen_TMT07_StepUp
+  deferred_parts:
+  - part: in the console with a password step-up
+    ticket: M6-18
+  threats:
+  - T-TM-03
+- id: TM-T08
+  title: Non-owner with a grant on someone else's host, on their own host, on the server host
+  expected: '`403 terminal_denied` `not_host_assignee`, allowed, `403 terminal_denied` `server_host_owner_only`'
+  runs:
+  - kind: e2e
+    ref: e2e/conformance:scenarios/tm-t08.yaml
+  - kind: unit
+    ref: services/server/internal/authz/app:TestTMT08_SR10
+  - kind: unit
+    ref: services/server/internal/authz/domain:TestTerminalGuard
+  implemented_by:
+  - ticket: M2-40
+    tests:
+    - TestTMT08_SR10
+  threats:
+  - T-TM-03
+- id: TM-T09
+  title: 'I6: grant to a second person, grant to a group, switching to `personal` with an existing grant to others, a second owner opens'
+  expected: '`409 i6_violation` or `403 terminal_denied` `i6_holder_only`, respectively'
+  runs:
+  - kind: e2e
+    ref: e2e/conformance:scenarios/tm-t09.yaml
+  - kind: unit
+    ref: services/server/internal/terminal/app:TestTMT09_I6
+  implemented_by:
+  - ticket: M2-40
+    tests:
+    - TestTMT09_I6
+  threats:
+  - T-TM-08
+- id: TM-T10
+  title: 'Revocation of each kind from 8.3 during an active session in which a background process runs with `setsid` or `nohup` (Windows: detached child process)'
+  expected: connections closed, PTY and background process ended, `close_reason` correct, audit
+  runs:
+  - kind: e2e
+    ref: e2e/conformance:scenarios/tm-t10.yaml
+  - kind: unit
+    ref: services/server/test/terminal:TestTMT10_RevocationKinds
+  - kind: unit
+    ref: services/server/test/terminal:TestTMT10_CloseReachesOtherProcess
+  - kind: unit
+    ref: services/server/test/terminal:TestTMT10_HostOfflineGetsCloseOnReconnect
+  - kind: unit
+    ref: services/server/test/terminal:TestTMT10_IdentityAndRightsBothFire
+  - kind: unit
+    ref: services/server/test/terminal:TestTMT10_NoReattachAfterEnd
+  - kind: unit
+    ref: services/host/internal/session:TestTMT10_SessionCloseEndsProcessTree
+  - kind: unit
+    ref: services/server/internal/terminal/adapters/wsrelay:TestReport_DroppedNameEndsSessions_SR12
+  - kind: unit
+    ref: services/server/internal/terminal/adapters/wsrelay:TestReport_ServerHostEndsNonOwnerSessions_SR10
+  - kind: unit
+    ref: services/server/test/terminal:TestTMT11_SweepCatchesDeadNode
+  implemented_by:
+  - ticket: M2-46
+    tests:
+    - TestTMT10_RevocationKinds
+    - TestTMT10_SessionCloseEndsProcessTree
+  threats:
+  - T-TM-11
+- id: TM-T11
+  title: Idle, maximum duration, detach beyond `terminal.detach_grace`, tampered host service without an idle report
+  expected: end with the correct reason, also without a report from the host service
+  runs:
+  - kind: e2e
+    ref: e2e/limits:scenarios/tm-t11.yaml
+  - kind: unit
+    ref: services/server/test/terminal:TestTMT11_IdleWithoutHostReport
+  - kind: unit
+    ref: services/server/test/terminal:TestTMT11_IdleReportedByHost
+  - kind: unit
+    ref: services/server/test/terminal:TestTMT11_InputResetsIdle
+  - kind: unit
+    ref: services/server/test/terminal:TestTMT11_MaxDurationAcrossReattach
+  - kind: unit
+    ref: services/server/test/terminal:TestTMT11_DetachGraceWithoutHost
+  - kind: unit
+    ref: services/server/test/terminal:TestTMT11_ProgressPersistence
+  - kind: unit
+    ref: services/server/test/terminal:TestTMT11_SweepCatchesDeadNode
+  - kind: unit
+    ref: services/server/internal/terminal/adapters/wsrelay:TestRelayLimits_IdleAtInstant
+  implemented_by:
+  - ticket: M2-46
+    tests:
+    - TestTMT11_IdleWithoutHostReport
+  threats:
+  - T-TM-11
+- id: TM-T12
+  title: 'Reattach: another device without step-up, the same device within and after `terminal.quick_reattach_window`, web console within the window without a passkey'
+  expected: '`401`, allowed, `401`, `401` with `reason: passkey_required`'
+  runs:
+  - kind: e2e
+    ref: e2e/conformance:scenarios/tm-t12.yaml
+  - kind: unit
+    ref: services/server/test/integration/terminalsessions:TestAttach_TMT12
+  implemented_by:
+  - ticket: M2-44
+    tests:
+    - TestAttach_TMT12
+  deferred_parts:
+  - part: web console within the window without a passkey
+    ticket: M6-18
+  threats: []
+- id: TM-T13
+  title: '`bothy-host doctor` as root, in group `sudo`, in group `docker`, with a writable Docker socket, with passwordless sudo, with a subscription login with `organization`, with the same service and session user, with an empty `host_service.session_users`, with two identical session users'
+  expected: start refused with a code
+  runs:
+  - kind: e2e
+    ref: e2e/conformance:TestBaselineDoctorPasses
+  - &id001
+    kind: e2e
+    ref: e2e/hostplatform:TestPlatformSuiteLinux
+  - kind: platform
+    ref: TestPlatform_TMT13
+    os: linux
+  - kind: platform
+    ref: TestPlatform_TMT13
+    os: macos
+  - kind: platform
+    ref: TestPlatform_TMT13
+    os: windows10
+  - kind: platform
+    ref: TestPlatform_TMT13
+    os: windows11
+  implemented_by:
+  - ticket: M2-42
+    tests:
+    - TestPlatform_TMT13
+  threats:
+  - T-TM-04
+  - T-TM-08
+- id: TM-T14
+  title: 'Renderer: OSC 52, OSC 8, title query'
+  expected: nothing into the clipboard, no link without confirmation, no response
+  runs: []
+  implemented_by: []
+  deferred:
+    ticket: M4-35
+    reason: the renderer is the terminal view of the clients, outside exit criterion 8
+  threats:
+  - T-TM-10
+- id: TM-T15
+  title: Two api nodes with hash routing; then without hash routing
+  expected: session runs; without routing `4102` and a metric
+  runs:
+  - kind: e2e
+    ref: e2e/twonode:scenarios/tm-t15.yaml
+  - kind: unit
+    ref: services/server/test/terminal/multinode:TestTMT15_TwoNodesWithHashRouting
+  - kind: unit
+    ref: services/server/test/terminal/multinode:TestTMT15_WithoutHashRouting
+  - kind: unit
+    ref: services/server/test/terminal/multinode:TestTMT15_WithoutHashRouting_Attach
+  implemented_by:
+  - ticket: M2-47
+    tests:
+    - TestTMT15_TwoNodesWithHashRouting
+    - TestTMT15_WithoutHashRouting
+  threats:
+  - T-TM-15
+- id: TM-T16
+  title: 'Chaos: restart of the server, network loss of the device, network loss of the host service during a session; then a restart of the host service (`bothy-host restart`) during a session in which a background process runs'
+  expected: PTY survives up to `terminal.detach_grace`, reattaching replays the scrollback; after the restart of the host service the session ends with `host_restarted`, PTY and background process are ended, and attaching fails (6.2)
+  runs:
+  - kind: e2e
+    ref: e2e/restart:scenarios/tm-t16.yaml
+  - kind: perf
+    ref: services/server/test/chaos:TestChaosTMT16
+  - kind: unit
+    ref: services/server/internal/terminal/adapters/wsrelay:TestLiveSessions_HostRestarted_TMT16
+  - kind: unit
+    ref: services/server/internal/terminal/domain:TestReconcileLiveSessions
+  implemented_by:
+  - ticket: M2-43
+    tests:
+    - TestLiveSessions_HostRestarted_TMT16
+  threats:
+  - T-TM-11
+- id: TM-T17
+  title: Agent or app token calls a terminal action
+  expected: '`403 forbidden` with `reason` `subject_kind_not_allowed`, audit'
+  runs:
+  - kind: e2e
+    ref: e2e/conformance:scenarios/tm-t17.yaml
+  - kind: unit
+    ref: services/server/test/integration/terminalsessions:TestOpen_DeniedOpensNothing
+  - kind: unit
+    ref: services/server/test/integration/terminalsessions:TestClose_RightsAndRepeats
+  - kind: unit
+    ref: services/server/test/integration/terminalsessions:TestStream_IdentifyDecisions
+  - kind: unit
+    ref: services/server/internal/authz/app:TestHostRequirement
+  - kind: unit
+    ref: services/server/internal/terminal/app:TestHostRequirement_HTTP
+  implemented_by:
+  - ticket: M2-39
+    tests:
+    - TestHostRequirement
+  - ticket: M2-44
+    tests:
+    - TestOpen_DeniedOpensNothing
+    - TestClose_RightsAndRepeats
+    - TestStream_IdentifyDecisions
+  threats:
+  - T-TM-09
+- id: TM-T18
+  title: 'Re-pairing: a device with a pinned old key opens'
+  expected: hard warning, connection only after confirmation, audit `pin_changed`
+  runs: []
+  implemented_by: []
+  deferred:
+    ticket: M4-35
+    reason: pinning and its warning are in the terminal view of the clients, outside exit criterion 8
+  threats:
+  - T-TM-05
+- id: TM-T19
+  title: Pairing with a wrong fingerprint up to `terminal.fingerprint_max_attempts`
+  expected: host back to `pairing`, key discarded
+  runs:
+  - kind: e2e
+    ref: e2e/conformance:scenarios/tm-t19.yaml
+  - kind: unit
+    ref: services/server/internal/terminal/app:TestTMT19_FingerprintMaxAttempts
+  - kind: unit
+    ref: services/server/internal/terminal/domain:TestNextAttempt
+  - kind: unit
+    ref: services/server/test/terminal:TestHostPairAgainstServer
+  implemented_by:
+  - ticket: M2-41
+    tests:
+    - TestTMT19_FingerprintMaxAttempts
+  threats:
+  - T-TM-06
+- id: TM-T20
+  title: Pairing code twice, expired, with a wrong checksum
+  expected: rejected; wrong checksum without database access
+  runs:
+  - kind: e2e
+    ref: e2e/conformance:scenarios/tm-t20.yaml
+  - kind: unit
+    ref: services/server/internal/terminal/app:TestTMT20_PairingCodeRejections
+  - kind: unit
+    ref: services/server/internal/terminal/app:TestTMT20_WrongChecksumNoDatabase
+  - kind: unit
+    ref: services/server/internal/identity/app:TestHashHostPairingCode_RejectsWithoutLookup
+  implemented_by:
+  - ticket: M2-41
+    tests:
+    - TestTMT20_PairingCodeRejections
+    - TestTMT20_WrongChecksumNoDatabase
+  threats:
+  - T-TM-06
+- id: TM-T21
+  title: 'Standstill through HD6 (T-TM-14): (a) in a shell session on a host with `organization`, a first person logs in with a subscription; then a second person opens; (b) the second person also logs in with a subscription in their account; (c) the instance operator removes the login of the second person, locks the session user of the first only on the host, then the owner ends their assignment; (d) the instance operator takes this session user out with `bothy-host session-user remove`, whose home is readable by all; (e) `bothy-host session-user add` with the removed name; (f) `bothy-host session-user add` with a new name while the second person has a session, then the owner assigns the new name to a third person; (g) while the host service is stopped, a subscription login file lies in the account of the second person, then the host restarts; then the instance operator removes the file and calls `bothy-host restart`'
+  expected: '(a) running sessions end with `host_policy_violation`, opening fails with `subscription_login_detected`, audit and `host.updated`; `reported_doctor` names, for HD6, the session user of the first person; (b) `reported_doctor` has two HD6 entries, each with one of the two names; (c) the host stays blocked, `reported_doctor` still names the first name; (d) the home of the removed session user is then accessible only to that user, the restart passes HD9 and HD6, the host no longer reports the name, the second person opens again, the first gets `403 terminal_denied` with `reason: no_session_user`; (e) rejected, because the name is bound to the first person in the state directory; (f) the session of the second person ends with `host_restarted`, after the next `report` the new name is in `reported_session_users` without any further step, and the assignment succeeds; (g) `bothy-host` does not start, but sends `report` first: `reported_doctor` names, for HD6, the name of the second person, and the console shows it with the person while the host stays disconnected; `bothy-host doctor` on the host names the same name and ends with an exit code other than 0; the service manager does not restart the host service on its own (exactly one login at the server); after `bothy-host restart` HD6 passes, and the second person opens again'
+  runs:
+  - kind: e2e
+    ref: e2e/hostpolicy:scenarios/tm-t21.yaml
+  - *id001
+  - kind: platform
+    ref: TestPlatform_TMT21_Sessions
+    os: linux
+  - kind: platform
+    ref: TestPlatform_TMT21_Sessions
+    os: macos
+  - kind: platform
+    ref: TestPlatform_TMT21_Sessions
+    os: windows10
+  - kind: platform
+    ref: TestPlatform_TMT21_Sessions
+    os: windows11
+  - kind: platform
+    ref: TestPlatform_TMT21_SessionUserAddRemove
+    os: linux
+  - kind: platform
+    ref: TestPlatform_TMT21_SessionUserAddRemove
+    os: macos
+  - kind: platform
+    ref: TestPlatform_TMT21_SessionUserAddRemove
+    os: windows10
+  - kind: platform
+    ref: TestPlatform_TMT21_SessionUserAddRemove
+    os: windows11
+  - kind: unit
+    ref: services/host/internal/control:TestRefusedStart_ReportsOnceAndStops
+  implemented_by:
+  - ticket: M2-42
+    tests:
+    - TestPlatform_TMT21_SessionUserAddRemove
+  - ticket: M2-45
+    tests:
+    - TestPlatform_TMT21_Sessions
+  threats:
+  - T-TM-14
+- id: TM-T22
+  title: Read `host_service.state_dir` and the key file from a session; start a PTY helper with read permission on the directory
+  expected: access denied; start refused (HD8)
+  runs:
+  - kind: e2e
+    ref: e2e/conformance:scenarios/tm-t22.yaml
+  - *id001
+  - kind: platform
+    ref: TestPlatform_TMT22
+    os: linux
+  - kind: platform
+    ref: TestPlatform_TMT22
+    os: macos
+  - kind: platform
+    ref: TestPlatform_TMT22
+    os: windows10
+  - kind: platform
+    ref: TestPlatform_TMT22
+    os: windows11
+  implemented_by:
+  - ticket: M2-42
+    tests:
+    - TestPlatform_TMT22
+  threats:
+  - T-TM-05
+  - T-TM-12
+- id: TM-T23
+  title: Second control connection with the same keys, the older one answers; then the older one does not answer
+  expected: host `disabled` with `duplicate_connection`, both closed with `4112`, audit; without an answer the older one closed with `4009`, the new one accepted
+  runs:
+  - kind: e2e
+    ref: e2e/conformance:scenarios/tm-t23.yaml
+  - kind: unit
+    ref: services/server/internal/terminal/adapters/wsrelay:TestDuplicate_TMT23
+  - kind: unit
+    ref: services/server/test/terminal/multinode:TestCrossNode_DuplicateControlConnection
+  implemented_by:
+  - ticket: M2-43
+    tests:
+    - TestDuplicate_TMT23
+  threats:
+  - T-TM-05
+- id: TM-T24
+  title: 'Foreign home folders (2.2 item 4): `bothy-host doctor` with a session user who can list the home folder of a user who is not a session user (under macOS: member of `staff` with default permissions on the home folders); then without this permission; then session user A, in a session, sets up a long-running process (an entry in their crontab, under Windows a scheduled task) that reopens their home to everyone at a fixed time after the following `remove`, and opens their home to all others while B has a session; then the host service restarts; then the instance operator takes A out with `bothy-host session-user remove`; then the long-running process opens the home of A, and the instance operator calls `bothy-host doctor`; then the instance operator removes the long-running processes of A, ends its processes, deletes A together with its home and calls `bothy-host restart`'
+  expected: start refused with a code (HD9), the output on the host names the user with the readable home, the entry in `reported_doctor` names no name; without the permission passed; with the open home of A, HD11 not passed with the name of A, only the sessions of A end, the one of B keeps running; after the restart the host starts, HD9 passes, and HD11 still names A; after `session-user remove` the home of A is accessible only to A, and the start passes HD9; with the reopened home HD9 does not pass, `doctor` ends with an exit code other than 0, the host service reports `report` and exits, `reported_doctor` has an entry HD9 with the name of A, and the console names it with the person of its assignment; after the deletion and `bothy-host restart` HD9 passes, and B opens again
+  runs:
+  - kind: e2e
+    ref: e2e/hostpolicy:scenarios/tm-t24.yaml
+  - *id001
+  - kind: platform
+    ref: TestPlatform_TMT24
+    os: linux
+  - kind: platform
+    ref: TestPlatform_TMT24
+    os: macos
+  - kind: platform
+    ref: TestPlatform_TMT24
+    os: windows10
+  - kind: platform
+    ref: TestPlatform_TMT24
+    os: windows11
+  implemented_by:
+  - ticket: M2-42
+    tests:
+    - TestPlatform_TMT24
+  threats:
+  - T-TM-04
+  - T-TM-13
+  - T-TM-14
+- id: TM-T25
+  title: '`llm_credentials = personal`, canary token in the file of the session user; start and end profile `claude`'
+  expected: canary neither in the state directory nor in the local channel nor in messages to the server; the service user opens no file in the home of the session user (system call trace); `claude auth status` in the session reports `oauth_token`
+  runs:
+  - *id001
+  - kind: platform
+    ref: TestPlatform_TMT25
+    os: linux
+  - kind: platform
+    ref: TestPlatform_TMT25
+    os: macos
+  - kind: platform
+    ref: TestPlatform_TMT25
+    os: windows10
+  - kind: platform
+    ref: TestPlatform_TMT25
+    os: windows11
+  implemented_by:
+  - ticket: M2-45
+    tests:
+    - TestPlatform_TMT25
+  threats: []
+- id: TM-T26
+  title: A process of the session user ends the helper and listens on the endpoint of the channel, or creates the named pipe first; a second one tries to attach to the running helper (`ptrace`, `task_for_pid`, `OpenProcess` with write access); an owner opens on another person's host
+  expected: the fake helper gets no frame and no plaintext, HD10 not passed, and `reported_doctor` names this session user for HD10, no session; attaching fails; the client shows the warning before the step-up (widget test), audit `foreign_assignee = true`
+  runs:
+  - *id001
+  - kind: platform
+    ref: TestPlatform_TMT26
+    os: linux
+  - kind: platform
+    ref: TestPlatform_TMT26
+    os: macos
+  - kind: platform
+    ref: TestPlatform_TMT26
+    os: windows10
+  - kind: platform
+    ref: TestPlatform_TMT26
+    os: windows11
+  implemented_by:
+  - ticket: M2-42
+    tests:
+    - TestPlatform_TMT26
+  threats:
+  - T-TM-12
+  - T-TM-14
+- id: TM-T27
+  title: '`llm_credentials = organization`, subscription login in the account of a session user; a program `claude` in the `PATH` and in the startup files of the session user reports `authMethod = api_key`; then `host_service.claude_bin` pointing to a file that the session user can write; then `host_service.claude_bin` as a script with `#!/usr/bin/env node`, a fake `node` in the `PATH` of the session user, then a `node` in the search list that the session user can write; then, under Linux, the checked `node` in the folder of `host_service.claude_bin`, but `/bin` writable for the session user'
+  expected: HD6 calls only `host_service.claude_bin` and detects the subscription login, no session; with the writable file HD10 not passed; the fake `node` never runs (trace of the process starts); with the writable interpreter and with the writable folder of the search list HD10 not passed (7.4)
+  runs:
+  - *id001
+  - kind: platform
+    ref: TestPlatform_TMT27
+    os: linux
+  - kind: platform
+    ref: TestPlatform_TMT27
+    os: macos
+  - kind: platform
+    ref: TestPlatform_TMT27
+    os: windows10
+  - kind: platform
+    ref: TestPlatform_TMT27
+    os: windows11
+  implemented_by:
+  - ticket: M2-42
+    tests:
+    - TestPlatform_TMT27
+  threats:
+  - T-TM-08
+- id: TM-T28
+  title: 'One session user per person (T12): (a) owner and host assignee with grant `terminal`, both without an assignment, open; (b) the owner assigns a session user that already belongs or belonged to one person to a second person, and gives a person a second valid assignment; (c) token with an `osu` outside `host_service.session_users`; token with an `osu` that the host service has already given to another `sub` (assignment changed in the database, bypassing the server); (d) macOS, `llm_credentials = organization`, `host_service.claude_bin` empty, A is owner, B is host assignee with grant `terminal`, both with their own assignment; A starts a `claude` from their `PATH` in their shell session and logs in with a subscription using `/login` (keychain), then B opens a shell on the same host and calls `claude auth status` there; (e) `confirmHost` and `updateHost` with a name that the host does not report; then the instance operator removes an assigned name from `host_service.session_users`, and its person opens'
+  expected: '(a) `403 terminal_denied` with `reason: no_session_user`, audit; (b) `409 conflict` with `reason: session_user_taken`, nothing changed; (c) no PTY, `4104` with `session_user_unknown` or `session_user_mismatch`, respectively; (d) `doctor` warns with `auth_status_unchecked`, and the host reports no profile `claude` (HD7, warning); B''s session runs in B''s own session user, `claude auth status` in B''s session reports `authMethod = none`, and B''s helper cannot read the home and keychain of A (HD11 for the home of A); (e) `400 validation_failed` with `errors[].code = session_user_not_on_host`, nothing stored; after the next `report` `403 terminal_denied` with `reason: no_session_user`, no `4104`'
+  runs:
+  - kind: e2e
+    ref: e2e/conformance:scenarios/tm-t28.yaml
+  - kind: e2e
+    ref: e2e/conformance:TestSessionRunsAsSessionUser
+  - *id001
+  - kind: platform
+    ref: TestPlatform_TMT28c
+    os: linux
+  - kind: platform
+    ref: TestPlatform_TMT28c
+    os: macos
+  - kind: platform
+    ref: TestPlatform_TMT28c
+    os: windows10
+  - kind: platform
+    ref: TestPlatform_TMT28c
+    os: windows11
+  - kind: platform
+    ref: TestPlatform_TMT28d
+    os: macos
+  - kind: unit
+    ref: services/server/internal/authz/app:TestTMT28a_NoSessionUser
+  - kind: unit
+    ref: services/server/internal/terminal/app:TestUpdateHost_SessionUserTaken_TMT28b
+  - kind: unit
+    ref: services/server/internal/terminal/app:TestUpdateHost_NameNotReported_TMT28e
+  - kind: unit
+    ref: services/server/internal/terminal/app:TestTMT28b_ConfirmSessionUserTaken
+  - kind: unit
+    ref: services/server/internal/terminal/app:TestTMT28e_ConfirmNameNotReported
+  - kind: unit
+    ref: services/server/internal/terminal/app:TestConfirmHost_I6Violation
+  - kind: unit
+    ref: services/server/test/integration/terminalsessions:TestOpen_NoSessionUserIsDeniedNot4104
+  - kind: unit
+    ref: services/server/internal/terminal/domain:TestPlanAssignments
+  implemented_by:
+  - ticket: M2-39
+    tests:
+    - TestUpdateHost_SessionUserTaken_TMT28b
+    - TestUpdateHost_NameNotReported_TMT28e
+  - ticket: M2-40
+    tests:
+    - TestTMT28a_NoSessionUser
+  - ticket: M2-41
+    tests:
+    - TestTMT28b_ConfirmSessionUserTaken
+    - TestTMT28e_ConfirmNameNotReported
+  - ticket: M2-45
+    tests:
+    - TestPlatform_TMT28c
+    - TestPlatform_TMT28d
+  threats:
+  - T-TM-08
+  - T-TM-11
+  - T-TM-12
+- id: TM-T29
+  title: 'No shared locations (T13): (a) a working directory of B that A can write, and A creates `.claude/settings.json` there with a hook and an `apiKeyHelper`, then B opens the profile `claude` there; (b) a folder above a working directory of B that A can write; (c) a working directory under two session users in `host_service.claude_workdirs`, placed first in the list of B, followed by a further folder of B; (d) a `CLAUDE_CONFIG_DIR` of the profile `claude` of B that A can read; (e) an entry in the working directory of B that belongs to A; then the instance operator removes it, a periodic run passes, then they call `bothy-host doctor`; then a home of B whose check of the entries at start takes longer than `host_service.entry_scan_timeout`, and A opens during this run; (f) the program of a profile `command` that a session user can write; one that belongs to another user of the host who is neither a session user nor a trusted owner; one in a folder that belongs to such a user; with `organization` the same three cases for `host_service.claude_bin`, for example in a folder of a package manager that belongs to the account of a person with administrator rights; under Windows `host_service.claude_bin` as a `.cmd`; in addition, the program of a profile `command` that becomes writable for a session user only during operation, while A and B have sessions; (g) B sends a `workdir_index` outside their own list; a token with a `wdi` outside the list of `osu` (server bypassing the host service); (h) in a folder above a working directory of B, a `CLAUDE.md` that belongs to A; there a `CLAUDE.md` of `root` that A can write; there a folder `.claude` that belongs to A; (i) Windows 10 and Windows 11 with default permissions on `C:\`, helper under `C:\Program Files\bothy-host`, `host_service.claude_bin` under `C:\Program Files`, home and working directory of B under `C:\Users`, plus a test folder in `C:\` whose DACL carries an inherited entry before an explicit one: `doctor` before `bothy-host install`; `install` with the confirmation refused, then with it given; then A tries `mkdir C:\.git`; then a `C:\.git` that A created before the installation; (j) a working directory of B whose configured path leads, through a link owned by `root`, into a folder of A that B can traverse; above a working directory of B, a `CLAUDE.md` as a link owned by `root` to a file of A; the same working directory for A and for B outside the home folders, for B through a link, under macOS and Windows additionally in different upper and lower case; B has further working directories in their home, and one working directory of B leads through a link into a working directory of A in the home of A (mode `0700`), another one is missing; (k) `llm_credentials = personal`, the login shell of the holder sets `CLAUDE_CONFIG_DIR` to a folder outside their home, then to a link in the home that points outside, then to a link in the home that points nowhere, then to a folder in the home; (l) `llm_credentials = organization`, another `claude` in the `PATH` of the session user and of the service, B opens the profile `claude`; then `host_service.claude_bin` as a script with `#!/usr/bin/env node`, no `node` in the search list, a `node` only in the remaining `PATH` of the profile, B opens the profile `claude`'
+  expected: '(a), (b), (d), (e) and (h) HD11 not passed with the name of B, B gets no session (`open_failed` with `shared_location`, running ones end with `host_policy_violation`), hook and `apiKeyHelper` never run (trace of the process starts), other session users still get sessions; with (e), B stays blocked after the removal of the entry beyond the periodic run and gets sessions again only after `bothy-host doctor`, and with the long run HD11 does not pass for B (`entry_scan_timeout` with the name of B), while A already gets a session before the end of this run; (c) HD7 not passed, the folder is missing from both lists, `pair` and `report` report the lists without it, and the index of the further folder in the reported list of B starts `claude` in exactly this folder; (f) in all cases start refused (HD10, HD11); during operation the host rejects new sessions, those of A and B end with `host_policy_violation` and `shared_location`, the report names no session user, and after the correction both open again after the next periodic run; (g) `403 terminal_denied` with `reason: profile_unknown`; with the token no PTY, `4104` with `profile_unknown`; (i) before `install` and after a refused confirmation HD11 not passed with `drive_root_writable`, start refused, the ACL of `C:\` unchanged; after the confirmation only the entry `(AD)` is missing at `C:\`, the remaining entries stand in the same order with the same control bits, and the security descriptor of every direct subfolder of `C:\` is the same before and after, including that of the test folder, which a propagation of the inheritance would have reordered or protected (2.2 item 6), HD10 and HD11 pass, `mkdir C:\.git` as A fails; with the old `C:\.git` HD11 not passed for every other session user with their name, passed after the entry is removed (T-TM-14); (j) the first two like (a), the third like (c); the folder in the home of A and the missing folder are missing only from the reported list of B (HD7, warning), the list of A keeps its folder, HD11 passes for A and B, and B opens the profile `claude` in their working directories in the home (their PTY helper resolved them); (k) in the first three cases the profile `claude` does not start (`open_failed` with `shared_location`), the profile `shell` opens; in the fourth `claude` runs with exactly this folder as `CLAUDE_CONFIG_DIR`; (l) exactly the resolved path of `host_service.claude_bin` starts, the other `claude` never (trace of the process starts); with the script without `node` in the search list the host reports no profile `claude` (HD7, warning), `doctor` warns with `auth_status_unchecked`, opening fails with `403 terminal_denied` and `reason: profile_unknown`, and the `node` from the remaining `PATH` never runs (trace of the process starts)'
+  runs:
+  - kind: e2e
+    ref: e2e/hostpolicy:scenarios/tm-t29.yaml
+  - *id001
+  - kind: platform
+    ref: TestPlatform_TMT29_Parts
+    os: linux
+  - kind: platform
+    ref: TestPlatform_TMT29_Parts
+    os: macos
+  - kind: platform
+    ref: TestPlatform_TMT29_Parts
+    os: windows10
+  - kind: platform
+    ref: TestPlatform_TMT29_Parts
+    os: windows11
+  - kind: platform
+    ref: TestPlatform_TMT29a_Session
+    os: linux
+  - kind: platform
+    ref: TestPlatform_TMT29a_Session
+    os: macos
+  - kind: platform
+    ref: TestPlatform_TMT29a_Session
+    os: windows10
+  - kind: platform
+    ref: TestPlatform_TMT29a_Session
+    os: windows11
+  - kind: platform
+    ref: TestPlatform_TMT29c_Open
+    os: linux
+  - kind: platform
+    ref: TestPlatform_TMT29c_Open
+    os: macos
+  - kind: platform
+    ref: TestPlatform_TMT29c_Open
+    os: windows10
+  - kind: platform
+    ref: TestPlatform_TMT29c_Open
+    os: windows11
+  - kind: platform
+    ref: TestPlatform_TMT29f_Operation
+    os: linux
+  - kind: platform
+    ref: TestPlatform_TMT29f_Operation
+    os: macos
+  - kind: platform
+    ref: TestPlatform_TMT29f_Operation
+    os: windows10
+  - kind: platform
+    ref: TestPlatform_TMT29f_Operation
+    os: windows11
+  - kind: platform
+    ref: TestPlatform_TMT29g_Token
+    os: linux
+  - kind: platform
+    ref: TestPlatform_TMT29g_Token
+    os: macos
+  - kind: platform
+    ref: TestPlatform_TMT29g_Token
+    os: windows10
+  - kind: platform
+    ref: TestPlatform_TMT29g_Token
+    os: windows11
+  - kind: platform
+    ref: TestPlatform_TMT29k
+    os: linux
+  - kind: platform
+    ref: TestPlatform_TMT29k
+    os: macos
+  - kind: platform
+    ref: TestPlatform_TMT29k
+    os: windows10
+  - kind: platform
+    ref: TestPlatform_TMT29k
+    os: windows11
+  - kind: platform
+    ref: TestPlatform_TMT29l
+    os: linux
+  - kind: platform
+    ref: TestPlatform_TMT29l
+    os: macos
+  - kind: platform
+    ref: TestPlatform_TMT29l
+    os: windows10
+  - kind: platform
+    ref: TestPlatform_TMT29l
+    os: windows11
+  - kind: unit
+    ref: services/server/test/integration/terminalsessions:TestOpen_TMT29g_WorkdirIndexOutsideOwnList
+  - kind: unit
+    ref: services/server/internal/terminal/adapters/wsrelay:TestReport_StoresListsAfterHD7_TMT29c
+  - kind: unit
+    ref: services/server/internal/terminal/domain:TestProfileKnown
+  - kind: unit
+    ref: services/host/internal/doctor:TestChainFileLinkToAnotherPerson
+  - kind: unit
+    ref: services/host/internal/doctor:TestHD11SkipsDroppedWorkdir
+  implemented_by:
+  - ticket: M2-42
+    tests:
+    - TestPlatform_TMT29_Parts
+  - ticket: M2-43
+    tests:
+    - TestReport_StoresListsAfterHD7_TMT29c
+  - ticket: M2-44
+    tests:
+    - TestOpen_TMT29g_WorkdirIndexOutsideOwnList
+  - ticket: M2-45
+    tests:
+    - TestPlatform_TMT29a_Session
+    - TestPlatform_TMT29c_Open
+    - TestPlatform_TMT29f_Operation
+    - TestPlatform_TMT29g_Token
+    - TestPlatform_TMT29k
+    - TestPlatform_TMT29l
+  threats:
+  - T-TM-08
+  - T-TM-13
+  - T-TM-14
+- id: AZ-M54
+  title: Alex | host R1 (assignee Alex, `organization`) | `terminal.open` | grant `terminal` to Alex, fresh step-up
+  expected: '`allow`'
+  runs:
+  - &id002
+    kind: e2e
+    ref: e2e/conformance:scenarios/az-m54-61.yaml
+  - kind: unit
+    ref: services/server/internal/authz/app:TestAZ_M54_AlexOpensOwnHost
+  implemented_by:
+  - ticket: M2-40
+    tests:
+    - TestAZ_M54_AlexOpensOwnHost
+  threats:
+  - T-TM-03
+- id: AZ-M55
+  title: Sam | host R1 | `terminal.open` | grant `terminal` to Sam
+  expected: '`forbidden` `terminal_not_host_assignee` (SR10)'
+  runs:
+  - *id002
+  - kind: unit
+    ref: services/server/internal/authz/app:TestAZ_M55_SamOnForeignHost
+  - kind: unit
+    ref: services/server/internal/authz/domain:TestTerminalGuard
+  implemented_by:
+  - ticket: M2-40
+    tests:
+    - TestAZ_M55_SamOnForeignHost
+  threats:
+  - T-TM-03
+- id: AZ-M56
+  title: Owner | host R2 (`personal`, holder of the login Robin, Robin is a second owner) | `terminal.open` |
+  expected: '`forbidden` `i6_holder_only` (SR11)'
+  runs:
+  - *id002
+  - kind: unit
+    ref: services/server/internal/authz/app:TestAZ_M56_SecondOwnerOnPersonalHost
+  - kind: unit
+    ref: services/server/internal/authz/domain:TestTerminalGuard
+  implemented_by:
+  - ticket: M2-40
+    tests:
+    - TestAZ_M56_SecondOwnerOnPersonalHost
+  threats:
+  - T-TM-08
+- id: AZ-M57
+  title: Owner | host R2 | `grant.create` group Leser `terminal` |
+  expected: '`invariant_violation` `i6_violation`'
+  runs:
+  - *id002
+  - kind: unit
+    ref: services/server/internal/authz/app:TestAZ_M57_GroupGrantOnPersonalHost
+  - kind: unit
+    ref: services/server/internal/authz/domain:TestCheckI6
+  - kind: unit
+    ref: services/server/internal/terminal/app:TestTMT09_I6
+  implemented_by:
+  - ticket: M2-40
+    tests:
+    - TestAZ_M57_GroupGrantOnPersonalHost
+  threats:
+  - T-TM-08
+- id: AZ-M58
+  title: Alex | host R1 | `terminal.open` | step-up already used for another opening
+  expected: '`step_up_required` `terminal_step_up_not_fresh`'
+  runs:
+  - *id002
+  - kind: unit
+    ref: services/server/internal/authz/app:TestAZ_M58_ConsumedStepUp
+  - kind: unit
+    ref: services/server/internal/identity/adapters/httpapi:TestIDT28_TwoOpeningsNeedTwoConfirmations
+  implemented_by:
+  - ticket: M2-40
+    tests:
+    - TestAZ_M58_ConsumedStepUp
+  threats:
+  - T-TM-03
+- id: AZ-M59
+  title: Lotse | host R1 | `terminal.open` | agent token
+  expected: '`forbidden` `subject_kind_not_allowed`'
+  runs:
+  - *id002
+  - kind: unit
+    ref: services/server/internal/authz/app:TestAZ_M59_AgentToken
+  implemented_by:
+  - ticket: M2-40
+    tests:
+    - TestAZ_M59_AgentToken
+  threats:
+  - T-TM-09
+- id: AZ-M60
+  title: Alex | host R3 (without assignee) | `terminal.open` | grant on the instance with `trigger` and all capabilities, no grant on R3
+  expected: '`not_found` (host not visible)'
+  runs:
+  - *id002
+  - kind: unit
+    ref: services/server/internal/authz/app:TestAZ_M60_InstanceGrantGivesNoTerminal
+  - kind: unit
+    ref: services/server/internal/authz/app:TestAZM60_InstanceGrantGivesNoHost
+  - kind: unit
+    ref: services/server/internal/terminal/app:TestAZM60_InstanceGrantGivesNoHost
+  - kind: unit
+    ref: services/server/test/integration/terminalsessions:TestOpen_DeniedOpensNothing
+  implemented_by:
+  - ticket: M2-39
+    tests:
+    - TestAZM60_InstanceGrantGivesNoHost
+  - ticket: M2-40
+    tests:
+    - TestAZ_M60_InstanceGrantGivesNoTerminal
+  threats:
+  - T-TM-03
+- id: AZ-M61
+  title: Owner | host R1 | `terminal.open` | fresh step-up, no valid assignment of the owner to a session user on R1
+  expected: '`forbidden` `terminal_no_session_user` (SR12)'
+  runs:
+  - *id002
+  - kind: unit
+    ref: services/server/internal/authz/app:TestAZ_M61_OwnerWithoutSessionUser
+  - kind: unit
+    ref: services/server/internal/authz/domain:TestTerminalGuard
+  implemented_by:
+  - ticket: M2-40
+    tests:
+    - TestAZ_M61_OwnerWithoutSessionUser
+  threats:
+  - T-TM-08
+- id: ID-T28
+  title: 'Terminal: step-up with password and TOTP, older than `terminal.step_up_max_age`, twice for two openings, in the console with a passkey without `userVerification = required`, reattach in the console within `terminal.quick_reattach_window` without passkey, simultaneous openings with one confirmation'
+  expected: 'each `401 step_up_required` (in the console with `reason: passkey_required`); for simultaneous openings exactly one session'
+  runs:
+  - kind: e2e
+    ref: e2e/conformance:scenarios/id-t28.yaml
+  - kind: unit
+    ref: services/server/internal/identity/adapters/httpapi:TestIDT28_ConcurrentOpeningsOneConfirmation
+  - kind: unit
+    ref: services/server/internal/identity/adapters/httpapi:TestIDT28_StepUpTooOld
+  - kind: unit
+    ref: services/server/internal/identity/adapters/httpapi:TestIDT28_TwoOpeningsNeedTwoConfirmations
+  - kind: unit
+    ref: services/server/internal/identity/adapters/httpapi:TestIDT28_PasswordTotpAndOidcStepUp
+  - kind: unit
+    ref: services/server/internal/authz/domain:TestFreshStepUp
+  - kind: unit
+    ref: services/server/test/terminal/multinode:TestCrossNode_StepUpConsumedOnce
+  implemented_by:
+  - ticket: M2-40
+    tests:
+    - TestIDT28_ConcurrentOpeningsOneConfirmation
+    - TestIDT28_StepUpTooOld
+    - TestIDT28_TwoOpeningsNeedTwoConfirmations
+    - TestIDT28_PasswordTotpAndOidcStepUp
+  deferred_parts:
+  - part: in the console with a passkey without userVerification = required, and reattach in the console within terminal.quick_reattach_window without passkey
+    ticket: M6-18
+  threats:
+  - T-TM-07
+- id: SEC-T05
+  title: 'Console in a headless browser with an enforced CSP: zero violations, no fetch from a foreign origin, WebSocket works'
+  expected: Section 5
+  runs: []
+  implemented_by: []
+  deferred_parts:
+  - part: the terminal of the web console under the enforced CSP (origin test)
+    ticket: M6-18
+  threats:
+  - T-TM-07
