@@ -130,16 +130,16 @@ type facts struct {
 
 // run is one service-side run in progress.
 type run struct {
-	env       Env
-	res       *Result
-	facts     facts
-	users     []string // configured session users that passed HD1's per-name rules and exist
+	env   Env
+	res   *Result
+	facts facts
+	users []string // configured session users that passed HD1's per-name rules and exist
 	// workdirCodes are the HD11 codes of the working directories per session user, by path.
 	workdirCodes map[string]map[string]string
-	subjects  []hostos.Subject
-	claudeBin string
-	search    []string
-	former    []string
+	subjects     []hostos.Subject
+	claudeBin    string
+	search       []string
+	former       []string
 }
 
 // RunService runs HD1 to HD11 as the service user in mode (ModeFull or ModeLight), asking each
