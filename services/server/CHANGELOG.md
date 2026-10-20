@@ -11,6 +11,25 @@ documented in this file. The format is based on
 
 ### Added
 
+- Runs, state machine and trigger state (M2-05): tables `runs` and `run_steps` (migrations 00051
+  and 00052) with the partial unique index of the active run of a thread and the deferred FK
+  `messages.run_id`. A human text message that the trigger decision turns into an invocation
+  opens a run in `queued` in the transaction of the message, with the silent live box anchor
+  (`kind = run`), `run.state_changed` and `trigger_state = received` on the message (a main
+  thread with `auto_thread` gets a new thread with the message as parent, created only after
+  `agent.invoke` allowed); a rejection writes `trigger_state = failed` with the reason of 09 3.5
+  and no run, and denials of `agent.invoke` are audited. Every later state change goes through
+  the compare-and-swap `Transition` of `runs/app` on `state` and `version`: transitions outside
+  03 `runs` give `409 invalid_state_transition`, reasons follow 09 5.2 (an unknown adapter reason
+  becomes `adapter_error` with the original in a status step), each change appends
+  `run.state_changed` and moves `trigger_state` (`working`, `done`, `failed`, `cancelled`) with
+  `message.updated`. New operations `listThreadRuns`, `getRun`, `listRunSteps` and
+  `listActiveRuns`; the snapshot names the running runs the caller may read
+  (`sync/adapters/runsummary` replaces `noruns`). `createMessage` appends `message.created`
+  before it publishes `MessagePosted`, and its `201` and replay bodies are the stored row after
+  the unit of work, with `trigger_state`, `trigger_state_at`, `trigger_state_reason` and `run_id`
+  in the message representation. Metrics `bothy.run.active`, `bothy.run.start.latency`,
+  `bothy.run.duration` and `bothy.run.finished`; new key `run.step_detail_max_bytes`.
 - Scan pass with clamd (M3-04): every completed upload runs through the job `files.scan` (queue
   `files`, inserted in the transaction of `completeUpload`), which reads the stored bytes once,
   checks size and SHA-256 against the declaration, detects the type from the first
