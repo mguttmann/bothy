@@ -3,6 +3,7 @@
 package wire
 
 import (
+	"crypto/rand"
 	"errors"
 	"log/slog"
 
@@ -12,6 +13,7 @@ import (
 	"github.com/OWNER/bothy/services/server/internal/kernel/authorize"
 	"github.com/OWNER/bothy/services/server/internal/kernel/clock"
 	"github.com/OWNER/bothy/services/server/internal/kernel/eventlog"
+	"github.com/OWNER/bothy/services/server/internal/kernel/ids"
 	"github.com/OWNER/bothy/services/server/internal/kernel/txn"
 	"github.com/OWNER/bothy/services/server/internal/platform/config"
 	"github.com/OWNER/bothy/services/server/internal/platform/pg"
@@ -39,6 +41,9 @@ type Runs struct {
 	Service *runsapp.Service
 	// Handlers are the REST handlers.
 	Handlers *runshttp.Runs
+	// Invocations issues and verifies the invocation tokens (M2-06); nil until
+	// BindInvocationTokens, which the signing keys step calls.
+	Invocations *runsapp.InvocationTokens
 }
 
 // RunsDeps are the collaborators of the runs module from the other steps of the start: the
@@ -98,4 +103,36 @@ func (r *Runs) fillHandlers(h *Handlers) {
 	if r != nil && h.Runs == nil {
 		h.Runs = r.Handlers
 	}
+}
+
+// InvocationTokenConfigFrom binds the keys of the invocation tokens (agent.invocation_token_ttl,
+// auth.clock_leeway; M2-06). The error names the key whose binding failed, never a value.
+func InvocationTokenConfigFrom(v *config.Values) (runsapp.InvocationTokenConfig, error) {
+	var c runsapp.InvocationTokenConfig
+	if err := config.Bind(v, &c); err != nil {
+		return runsapp.InvocationTokenConfig{}, err
+	}
+	return c, nil
+}
+
+// BindInvocationTokens builds the invocation tokens of the runs module (M2-06) once per process
+// over the signing keys of instance (purpose invocation), the instance row (the issuer), the
+// process clock and a UUIDv7 generator over it. The start calls it in the signing keys step, which
+// runs after the chat step that built r. Errors: a second bind, a configuration the service
+// refuses.
+func (r *Runs) BindInvocationTokens(cfg runsapp.InvocationTokenConfig, keys runsapp.InvocationKeys, state runsapp.InstanceState,
+	clk clock.Clock) error {
+	if r.Invocations != nil {
+		return errors.New("wire: the invocation tokens are bound already")
+	}
+	if clk == nil {
+		clk = clock.System()
+	}
+	it, err := runsapp.NewInvocationTokens(cfg, runsapp.InvocationTokenDeps{Keys: keys, State: state, Clock: clk,
+		IDs: ids.NewGenerator(clk, rand.Reader)})
+	if err != nil {
+		return err
+	}
+	r.Invocations = it
+	return nil
 }
