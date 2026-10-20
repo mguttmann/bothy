@@ -180,10 +180,16 @@ type Server struct {
 	// values and env are the configuration of the server; the setup service reads them.
 	values *config.Values
 	env    []string
+	// external marks a server of External (M2-48): no database and no setup service of the
+	// harness.
+	external bool
 }
 
 // AdminDB returns a pool of the superuser of the disposable container; only for assertions.
 func (s *Server) AdminDB() *pgxpool.Pool {
+	if s.external {
+		s.tb.Fatal("harness: AdminDB of an external server: read its database through the tools of the stack")
+	}
 	s.adminOnce.Do(func() { s.admin = s.db.OpenPool(s.tb, s.db.SuperConfig()).PGX() })
 	return s.admin
 }

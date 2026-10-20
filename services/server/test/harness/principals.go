@@ -190,6 +190,9 @@ func jsonInt(v int64) string {
 // service (bothy setup issue-enrollment-code), independent of every existing session, and returns
 // its client. The credential broker of G7 uses it for fresh owner sessions.
 func (s *Server) OwnerSession(ctx context.Context) (*Client, error) {
+	if s.external {
+		return nil, errExternal
+	}
 	setup, err := wire.NewSetup(ctx, s.values, s.env, slog.New(slog.DiscardHandler))
 	if err != nil {
 		return nil, err
