@@ -143,6 +143,9 @@ exceptions:
   - query: sync.EventsAfter
     category: log_tail
     reason: "the log tail reads every event; delivery checks authorize per receiver (07 section 8.1)"
+  - query: sync.EventBySeq
+    category: system_job
+    reason: "one event by its seq for the webhook delivery job (M2-26); webhook_out.deliver authorizes it for the app of the subscription before it leaves"
   - query: sync.LockResourceEvents
     category: after_authorize
     reason: "the stored events of the one resource whose deletion authorize allowed, locked for the redaction (03 section 6.5)"
