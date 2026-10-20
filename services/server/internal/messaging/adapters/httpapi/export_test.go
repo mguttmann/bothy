@@ -276,7 +276,7 @@ func TestExportChannel_AbortIsVisible(t *testing.T) {
 		t.Fatalf("body %q, want the lines of the first batch %q", body, want)
 	}
 	rec, ok := logs.Find("messaging: channel export aborted after the first byte")
-	if !ok || rec.Attrs["http.route"] != "GET /api/v1/channels/{channel_id}/export" || rec.Attrs["bothy.cause"] != "read_failed" {
+	if !ok || rec.Attrs["http.route"] != "GET /api/v1/channels/{channel_id}/export" || rec.Attrs["bothy.reason"] != "read_failed" {
 		t.Fatalf("abort record %+v %v", rec, ok)
 	}
 	for _, v := range rec.Attrs {

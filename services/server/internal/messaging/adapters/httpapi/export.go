@@ -22,7 +22,7 @@ const (
 	exportPattern   = "GET /api/v1/channels/{channel_id}/export"
 	msgExportAbort  = "messaging: channel export aborted after the first byte"
 	keyRoute        = "http.route"
-	keyCause        = "bothy.cause"
+	keyAbortReason  = "bothy.reason"
 	causeAborted    = "export_aborted"
 	causeDeadline   = "deadline"
 	causeCanceled   = "canceled"
@@ -88,7 +88,7 @@ func (r exportResponse) VisitExportChannelResponse(w http.ResponseWriter) error 
 // abort logs the cause code and ends the response visibly (the recover stage of M1-18 passes
 // http.ErrAbortHandler on to net/http).
 func (r exportResponse) abort(code string) {
-	r.log.LogAttrs(r.ctx, slog.LevelWarn, msgExportAbort, slog.String(keyRoute, exportPattern), slog.String(keyCause, code))
+	r.log.LogAttrs(r.ctx, slog.LevelWarn, msgExportAbort, slog.String(keyRoute, exportPattern), slog.String(keyAbortReason, code))
 	panic(http.ErrAbortHandler)
 }
 
