@@ -151,6 +151,20 @@ func (h *handshake) failOpening(ctx context.Context, cl Claims, detail string) {
 	m.closeAfterReport(h.o.SessionID, h.dc, h.window)
 }
 
+// claimRefused handles an opening that may not register its session: session.close, the end of
+// all sessions, a newer session.open or a violation found by a run during the gate or the
+// confirmation. A violation is reported like a refusal of the gate; a stale opening reports
+// nothing (failOpening checks that).
+func (h *handshake) claimRefused(ctx context.Context, cl Claims) {
+	if g := h.m.d.Gate; g != nil {
+		if d := g.Current().Refusal(cl.Osu); d != "" {
+			h.failOpening(ctx, cl, d)
+			return
+		}
+	}
+	h.abandon()
+}
+
 // abandon closes the data connection of a stale opening with 1000 and reports nothing.
 func (h *handshake) abandon() {
 	h.dc.close(CodeNormal, "")
@@ -219,16 +233,7 @@ func (h *handshake) open(ctx context.Context, cl Claims, tr *noise.Transport, ki
 	}
 	s, ok := m.claimSession(cl, l, h.sidb, h.dc, tr, h.window)
 	if !ok {
-		// session.close, the end of all sessions, a newer session.open or a violation found by a
-		// run during the gate or the confirmation: no PTY. A violation is reported like a refusal
-		// of the gate; a stale opening reports nothing (failOpening checks that).
-		if m.d.Gate != nil {
-			if d := m.d.Gate.Current().Refusal(cl.Osu); d != "" {
-				h.failOpening(ctx, cl, d)
-				return
-			}
-		}
-		h.abandon()
+		h.claimRefused(ctx, cl)
 		return
 	}
 	if d := l.start(ctx, req); d != "" {
