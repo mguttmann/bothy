@@ -508,13 +508,36 @@ func (q *Queries) SaveThread(ctx context.Context, arg SaveThreadParams) error {
 }
 
 const shareThread = `-- name: ShareThread :one
-SELECT id, channel_id, kind, parent_message_id, title, title_source, state, closed_at, closed_by, operator_agent_id, last_message_seq, unread_floor_seq, last_activity_at, message_count, created_by, created_at, moved_at, version, search_language, title_search FROM threads WHERE id = $1 FOR SHARE
+SELECT id, channel_id, kind, parent_message_id, title, title_source, state, closed_at, closed_by, operator_agent_id,
+    last_message_seq, unread_floor_seq, last_activity_at, message_count, created_by, created_at, moved_at, version
+FROM threads WHERE id = $1 FOR SHARE
 `
 
+type ShareThreadRow struct {
+	ID              pgtype.UUID
+	ChannelID       pgtype.UUID
+	Kind            string
+	ParentMessageID pgtype.UUID
+	Title           string
+	TitleSource     string
+	State           string
+	ClosedAt        pgtype.Timestamptz
+	ClosedBy        pgtype.UUID
+	OperatorAgentID pgtype.UUID
+	LastMessageSeq  int64
+	UnreadFloorSeq  int64
+	LastActivityAt  pgtype.Timestamptz
+	MessageCount    int32
+	CreatedBy       pgtype.UUID
+	CreatedAt       pgtype.Timestamptz
+	MovedAt         pgtype.Timestamptz
+	Version         int64
+}
+
 // The thread held against a concurrent move while sync copies its channel (M1-61).
-func (q *Queries) ShareThread(ctx context.Context, id pgtype.UUID) (Thread, error) {
+func (q *Queries) ShareThread(ctx context.Context, id pgtype.UUID) (ShareThreadRow, error) {
 	row := q.db.QueryRow(ctx, shareThread, id)
-	var i Thread
+	var i ShareThreadRow
 	err := row.Scan(
 		&i.ID,
 		&i.ChannelID,
@@ -534,8 +557,6 @@ func (q *Queries) ShareThread(ctx context.Context, id pgtype.UUID) (Thread, erro
 		&i.CreatedAt,
 		&i.MovedAt,
 		&i.Version,
-		&i.SearchLanguage,
-		&i.TitleSearch,
 	)
 	return i, err
 }

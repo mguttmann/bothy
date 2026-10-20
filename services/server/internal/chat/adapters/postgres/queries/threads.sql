@@ -21,7 +21,9 @@ FROM threads WHERE id = @id FOR UPDATE;
 
 -- name: ShareThread :one
 -- The thread held against a concurrent move while sync copies its channel (M1-61).
-SELECT * FROM threads WHERE id = @id FOR SHARE;
+SELECT id, channel_id, kind, parent_message_id, title, title_source, state, closed_at, closed_by, operator_agent_id,
+    last_message_seq, unread_floor_seq, last_activity_at, message_count, created_by, created_at, moved_at, version
+FROM threads WHERE id = @id FOR SHARE;
 
 -- name: InsertThread :one
 -- search_language goes in as text and is cast here, so pgx needs no codec for regconfig.
