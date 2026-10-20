@@ -23,8 +23,8 @@ func TestRunWithoutArgumentsPrintsUsageAndExits2(t *testing.T) {
 	if stdout.Len() != 0 {
 		t.Errorf("stdout = %q, want empty", stdout.String())
 	}
-	if want := usageHeader + "  (none in this build)\n"; stderr.String() != want {
-		t.Errorf("stderr = %q, want %q", stderr.String(), want)
+	if !strings.HasPrefix(stderr.String(), usageHeader) || !strings.Contains(stderr.String(), "  doctor ") {
+		t.Errorf("stderr = %q", stderr.String())
 	}
 }
 

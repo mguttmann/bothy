@@ -418,6 +418,33 @@ Installation of the host service on a host:
    the step from item 1 is missing for this drive; the local output of `bothy-host doctor`
    names the drive.
 
+Implementation (M2-42; the rows `D-M2-42-<n>` of [DECISIONS.md](../DECISIONS.md) give the
+reasons):
+
+- Program folder: Linux `/opt/bothy-host/bin/`, macOS
+  `/Library/Application Support/bothy-host/bin/` (the binary is signed ad hoc with the hardened
+  runtime unless it already carries a signature with it), Windows `%ProgramFiles%\bothy-host\`.
+  Configuration file: Linux `/etc/bothy-host/config.yaml`, macOS
+  `/Library/Application Support/bothy-host/config.yaml`, Windows
+  `%ProgramFiles%\bothy-host\config.yaml`; `install` writes it only when it is missing. On
+  Windows the state folder has a protected DACL for the virtual account `NT SERVICE\bothy-host`,
+  `SYSTEM` and `Administrators`; on macOS a session user is hidden and has an own primary group.
+- Services: systemd `bothy-host.service`, `bothy-host-helper-<name>.socket` and `.service`;
+  launchd `bothy-host` and `bothy-host.helper.<name>` in `/Library/LaunchDaemons`; Windows
+  services `bothy-host` and `bothy-host-helper-<name>`. A refused start ends with exit code `78`,
+  which the service manager does not restart.
+- `bothy-host pair --server <url> --code <code> [--ca-file <pem>]` pairs with the identity of the
+  service user: as an administrator it goes through the running service (on Windows the service
+  must run) and restarts it afterwards; it prints the fingerprint in groups of four. As an
+  administrator `bothy-host doctor` runs the full run inside the running service. Exit codes of
+  `doctor`: `0` passed (warnings allowed), `1` a check failed, `2` usage or environment error
+  (missing administrator rights, unreadable configuration).
+- `--drive-root-confirm yes|no` answers the question about the drive root for unattended
+  installs; without a terminal and without the flag the answer is no.
+- Peer check: on a platform whose platform run has not proven the peer check of the local channel,
+  HD10 fails with `peer_check_unavailable` and the host gives no terminal (RK-23); the operator
+  waits for a release with the recorded platform run.
+
 ## 5. Configuration and secrets
 
 ### 5.1 Configuration (ADR 0011)

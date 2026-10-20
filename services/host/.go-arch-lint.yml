@@ -9,10 +9,42 @@ allow:
 excludeFiles: ["^.*_test\\.go$"]
 vendors:
   v-noise: { in: [github.com/flynn/noise] }
+  v-sys:   { in: [golang.org/x/sys/**] }
+  v-yaml:  { in: [go.yaml.in/yaml/v3] }
 components:
   cmd:         { in: cmd/** }
   noise:       { in: internal/noise }
   frame:       { in: internal/frame }
   fingerprint: { in: internal/fingerprint }
+  buildinfo:   { in: internal/buildinfo }
+  clock:       { in: internal/clock }
+  clocktest:   { in: internal/clock/clocktest }
+  config:      { in: internal/config }
+  state:       { in: internal/state }
+  hostos:      { in: internal/hostos }
+  hostostest:  { in: internal/hostos/hostostest }
+  doctor:      { in: internal/doctor }
+  localchan:   { in: internal/localchan }
+  helper:      { in: internal/helper }
+  install:     { in: internal/install }
+  startup:     { in: internal/startup }
+  pairing:     { in: internal/pairing }
+  testkit:     { in: internal/platform/testkit }
+  platformtest: { in: test/** }
+  testdata:    { in: testdata/** }
+# M2-42: cmd may use every internal package; doctor, install, helper, startup and pairing use
+# hostos only through its interfaces (they receive implementations from cmd).
 deps:
-  noise: { canUse: [v-noise] }
+  noise:      { canUse: [v-noise] }
+  cmd:        { anyProjectDeps: true, canUse: [v-sys] }
+  clocktest:  { mayDependOn: [clock] }
+  config:     { canUse: [v-yaml] }
+  state:      { canUse: [v-sys] }
+  hostos:     { canUse: [v-sys] }
+  hostostest: { mayDependOn: [hostos] }
+  localchan:  { mayDependOn: [frame], canUse: [v-sys] }
+  doctor:     { mayDependOn: [clock, config, hostos, state] }
+  helper:     { mayDependOn: [doctor, hostos, localchan], canUse: [v-sys] }
+  install:    { mayDependOn: [config, hostos, localchan], canUse: [v-sys] }
+  startup:    { mayDependOn: [config, doctor, hostos, localchan, pairing, state] }
+  pairing:    { mayDependOn: [doctor, fingerprint, noise, state] }

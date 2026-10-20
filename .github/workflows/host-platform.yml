@@ -1,0 +1,58 @@
+# SPDX-License-Identifier: Apache-2.0
+#
+# Platform suite of the host service (brief M2-42 design note 19, docs/DECISIONS.md D-M2-42-19).
+# It creates and deletes operating system users, services and ACLs with administrator rights, so
+# it runs only on throwaway GitHub-hosted runners: Linux with systemd, macOS and Windows 11 (Windows
+# 10 has no hosted runner and stays unmeasured). Manual or scheduled; a required gate before
+# M2-48. The result file of each platform is kept as an artifact.
+
+name: host-platform
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: "17 3 * * 1"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: host-platform-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  platform:
+    name: platform suite (${{ matrix.os }})
+    if: github.event.repository.visibility == 'public' || (github.event_name == 'schedule' && vars.BOTHY_VISIBILITY == 'public')
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 90
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-24.04, macos-15, windows-2025]
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version-file: services/host/go.mod
+          cache: false
+      - name: Platform suite (Linux and macOS, as root)
+        if: runner.os != 'Windows'
+        shell: bash
+        # sudo resets PATH to secure_path; env hands the Go of setup-go to make.
+        run: sudo env "PATH=$PATH" "GOPATH=$(go env GOPATH)" "GOCACHE=$(go env GOCACHE)" "GOMODCACHE=$(go env GOMODCACHE)" BOTHY_PLATFORM_DISPOSABLE=1 make -C services/host platform-test
+      - name: Platform suite (Windows, elevated)
+        if: runner.os == 'Windows'
+        shell: bash
+        env:
+          BOTHY_PLATFORM_DISPOSABLE: "1"
+        run: make -C services/host platform-test
+      - name: Keep the result file
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: host-platform-${{ matrix.os }}
+          path: services/host/.platform/result-*.json
+          if-no-files-found: warn

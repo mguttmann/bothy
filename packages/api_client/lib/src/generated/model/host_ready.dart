@@ -3,17 +3,19 @@
 //
 
 // ignore_for_file: unused_element
+import 'package:api_client/src/generated/model/llm_credentials.dart';
 import 'package:api_client/src/generated/model/host_state.dart';
 import 'package:built_value/built_value.dart';
 import 'package:built_value/serializer.dart';
 
 part 'host_ready.g.dart';
 
-/// HostReady
+/// Sent after login and again on every change of `llm_credentials`; the host service treats each `ready` as the current declaration (24, 2.2 and 7.4).
 ///
 /// Properties:
 /// * [hostId] - UUIDv7 (RFC 9562), lowercase canonical form.
 /// * [state]
+/// * [llmCredentials]
 @BuiltValue()
 abstract class HostReady implements Built<HostReady, HostReadyBuilder> {
   /// UUIDv7 (RFC 9562), lowercase canonical form.
@@ -23,6 +25,10 @@ abstract class HostReady implements Built<HostReady, HostReadyBuilder> {
   @BuiltValueField(wireName: r'state')
   HostState get state;
   // enum stateEnum {  pairing,  confirming,  active,  disabled,  retired,  };
+
+  @BuiltValueField(wireName: r'llm_credentials')
+  LlmCredentials get llmCredentials;
+  // enum llmCredentialsEnum {  none,  personal,  organization,  };
 
   HostReady._();
 
@@ -56,6 +62,11 @@ class _$HostReadySerializer implements PrimitiveSerializer<HostReady> {
     yield serializers.serialize(
       object.state,
       specifiedType: const FullType(HostState),
+    );
+    yield r'llm_credentials';
+    yield serializers.serialize(
+      object.llmCredentials,
+      specifiedType: const FullType(LlmCredentials),
     );
   }
 
@@ -97,6 +108,13 @@ class _$HostReadySerializer implements PrimitiveSerializer<HostReady> {
             specifiedType: const FullType(HostState),
           ) as HostState;
           result.state = valueDes;
+          break;
+        case r'llm_credentials':
+          final valueDes = serializers.deserialize(
+            value,
+            specifiedType: const FullType(LlmCredentials),
+          ) as LlmCredentials;
+          result.llmCredentials = valueDes;
           break;
         default:
           unhandled.add(key);

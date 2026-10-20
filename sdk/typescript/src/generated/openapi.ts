@@ -10349,9 +10349,11 @@ export interface components {
             /** @description Only on the control connection, always present there (empty when none). The sessions the host service knows, those whose PTY still runs and those whose end it could not report yet (it reports that end with `session.ended` after `ready`). After a restart of the host service the list is empty. The server ends every other session of the host in state `active` or `detached` with `host_restarted` (24, 6.2). */
             live_sessions?: components["schemas"]["Uuid"][];
         };
+        /** @description Sent after login and again on every change of `llm_credentials`; the host service treats each `ready` as the current declaration (24, 2.2 and 7.4). */
         HostReady: {
             host_id: components["schemas"]["Uuid"];
             state: components["schemas"]["HostState"];
+            llm_credentials: components["schemas"]["LlmCredentials"];
         };
         HostHeartbeat: {
             active_sessions: number;

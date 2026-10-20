@@ -11,11 +11,17 @@ class _$HostReady extends HostReady {
   final String hostId;
   @override
   final HostState state;
+  @override
+  final LlmCredentials llmCredentials;
 
   factory _$HostReady([void Function(HostReadyBuilder)? updates]) =>
       (HostReadyBuilder()..update(updates))._build();
 
-  _$HostReady._({required this.hostId, required this.state}) : super._();
+  _$HostReady._({
+    required this.hostId,
+    required this.state,
+    required this.llmCredentials,
+  }) : super._();
   @override
   HostReady rebuild(void Function(HostReadyBuilder) updates) =>
       (toBuilder()..update(updates)).build();
@@ -26,7 +32,10 @@ class _$HostReady extends HostReady {
   @override
   bool operator ==(Object other) {
     if (identical(other, this)) return true;
-    return other is HostReady && hostId == other.hostId && state == other.state;
+    return other is HostReady &&
+        hostId == other.hostId &&
+        state == other.state &&
+        llmCredentials == other.llmCredentials;
   }
 
   @override
@@ -34,6 +43,7 @@ class _$HostReady extends HostReady {
     var _$hash = 0;
     _$hash = $jc(_$hash, hostId.hashCode);
     _$hash = $jc(_$hash, state.hashCode);
+    _$hash = $jc(_$hash, llmCredentials.hashCode);
     _$hash = $jf(_$hash);
     return _$hash;
   }
@@ -42,7 +52,8 @@ class _$HostReady extends HostReady {
   String toString() {
     return (newBuiltValueToStringHelper(r'HostReady')
           ..add('hostId', hostId)
-          ..add('state', state))
+          ..add('state', state)
+          ..add('llmCredentials', llmCredentials))
         .toString();
   }
 }
@@ -58,6 +69,11 @@ class HostReadyBuilder implements Builder<HostReady, HostReadyBuilder> {
   HostState? get state => _$this._state;
   set state(HostState? state) => _$this._state = state;
 
+  LlmCredentials? _llmCredentials;
+  LlmCredentials? get llmCredentials => _$this._llmCredentials;
+  set llmCredentials(LlmCredentials? llmCredentials) =>
+      _$this._llmCredentials = llmCredentials;
+
   HostReadyBuilder() {
     HostReady._defaults(this);
   }
@@ -67,6 +83,7 @@ class HostReadyBuilder implements Builder<HostReady, HostReadyBuilder> {
     if ($v != null) {
       _hostId = $v.hostId;
       _state = $v.state;
+      _llmCredentials = $v.llmCredentials;
       _$v = null;
     }
     return this;
@@ -98,6 +115,11 @@ class HostReadyBuilder implements Builder<HostReady, HostReadyBuilder> {
             state,
             r'HostReady',
             'state',
+          ),
+          llmCredentials: BuiltValueNullFieldError.checkNotNull(
+            llmCredentials,
+            r'HostReady',
+            'llmCredentials',
           ),
         );
     replace(_$result);

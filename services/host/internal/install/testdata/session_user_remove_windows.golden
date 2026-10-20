@@ -1,0 +1,4 @@
+config.remove C:\Program Files\bothy-host\config.yaml bothy-s-sam
+win.service.del bothy-host-helper-bothy-s-sam
+win.acl ~bothy-s-sam D:P(A;OICI;FA;;;SY)(A;OICI;FA;;;BA)(A;OICI;FA;;;<user-sid>)
+win.restart bothy-host

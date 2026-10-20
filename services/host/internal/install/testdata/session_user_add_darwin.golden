@@ -1,0 +1,15 @@
+run /usr/bin/dscl . -create /Groups/bothy-s-robin
+run /usr/bin/dscl . -create /Groups/bothy-s-robin PrimaryGroupID 501
+run /usr/bin/dscl . -create /<Users>/bothy-s-robin
+run /usr/bin/dscl . -create /<Users>/bothy-s-robin UniqueID 501
+run /usr/bin/dscl . -create /<Users>/bothy-s-robin PrimaryGroupID 501
+run /usr/bin/dscl . -create /<Users>/bothy-s-robin UserShell /bin/zsh
+run /usr/bin/dscl . -create /<Users>/bothy-s-robin NFSHomeDirectory /<Users>/bothy-s-robin
+run /usr/bin/dscl . -create /<Users>/bothy-s-robin IsHidden 1
+run /usr/sbin/createhomedir -c -u bothy-s-robin
+chmod ~bothy-s-robin 0700 bothy-s-robin
+write /Library/LaunchDaemons/bothy-host.helper.bothy-s-robin.plist 0644 root (1357 bytes)
+run? /bin/launchctl bootout system/bothy-host.helper.bothy-s-robin
+run /bin/launchctl bootstrap system /Library/LaunchDaemons/bothy-host.helper.bothy-s-robin.plist
+config.add /Library/Application Support/bothy-host/config.yaml bothy-s-robin
+run /bin/launchctl kickstart -k system/bothy-host

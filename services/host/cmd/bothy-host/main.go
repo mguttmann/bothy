@@ -6,8 +6,9 @@
 // ticket builds it (M2-42 registers install, pair, doctor, run, restart, session-user and
 // pty-helper).
 //
-// Exit codes: 0 success, 1 failure, 2 usage error. Codes from 3 upwards are specific to a
-// command and documented in its help.
+// Exit codes: 0 success, 1 failure (a failed check of doctor, a runtime failure), 2 usage or
+// environment error (unknown flag, missing administrator rights, unreadable configuration), 78 a
+// refused start of run (EX_CONFIG, after which no service manager restarts it).
 //
 // Example:
 //
@@ -72,9 +73,6 @@ func dispatch(ctx context.Context, table []command, args []string, stdout, stder
 func writeUsage(w io.Writer, table []command) {
 	var b strings.Builder
 	b.WriteString("Usage: bothy-host <command> [arguments]\n\nCommands:\n")
-	if len(table) == 0 {
-		b.WriteString("  (none in this build)\n")
-	}
 	sorted := slices.Clone(table)
 	slices.SortFunc(sorted, func(a, b command) int { return strings.Compare(a.name, b.name) })
 	// tabwriter pads the names to the longest one plus two spaces before the summaries.
