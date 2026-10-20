@@ -57,6 +57,14 @@ wird bei jeder Zustellung neu ausgestellt (R-SY-07); der Server prüft sie beim 
   verzögerten Zustellung.
 - Szenario AG-09: doppelte Zustellung führt zu genau einem erfolgreichen `run.start`.
 - Ein Schema-Test hält die Claims gleich mit docs/spec/05-aktionen.md Abschnitt 5.
+- M2-06: the schema test `TestInvocationClaims_MatchSpec` (`internal/runs/domain`) holds the claim
+  set of the code equal to 05 section 5 and 09 4.5; the reference verifier
+  (`internal/runs/adapters/runstest`, `TestReferenceVerifier_RejectsAlgAndTyp`,
+  `TestReferenceVerifier_Points`, `TestReferenceVerifier_JWKSCache`) and the server verifier
+  (`TestVerify_Reasons`, `TestInvocationToken_ForeignPurposeKey`) reject every other `alg`, `typ`
+  and key purpose; AG-22 at token level: `TestAG22_ScheduledRotationFailsNoToken` and
+  `TestAG22_EmergencyRotationTokenLevel` (`test/integration/invocationtoken`); the run level is
+  M2-31's.
 
 ## Pros and Cons of the Options
 
