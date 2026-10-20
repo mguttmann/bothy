@@ -546,20 +546,22 @@ func TestTMT11_ProgressPersistence(t *testing.T) {
 		}
 		w.advance(idleGrace - tick)
 		b := dlEcho(w, l.dev, dlBytes(50))
+		typed := w.clk.Now()
 		in, out = in+b, out+b
 		time.Sleep(dlQuiet)
 		if got := dlCounts(w, l.id); got != fmt.Sprintf("%d:0", len("start")) {
 			t.Fatalf("written again one tick before terminal.idle_grace: %s", got)
 		}
+		// At terminal.idle_grace the flush timer writes the waiting counts without a further
+		// frame (D-M2-46-22).
 		w.advance(tick)
+		w.eventually("the write after terminal.idle_grace", func() bool { return dlCounts(w, l.id) == fmt.Sprintf("%d:%d", in, out) })
+		if got := dlTime(w, l.id, "last_input_at"); !got.Equal(typed) {
+			t.Fatalf("last_input_at %s, want %s", got, typed)
+		}
 		c := dlEcho(w, l.dev, dlBytes(25))
 		last := w.clk.Now()
 		in, out = in+c, out+c
-		// The write happens on the device frame; its echo is counted after it.
-		w.eventually("the write after terminal.idle_grace", func() bool { return dlCounts(w, l.id) == fmt.Sprintf("%d:%d", in, out-c) })
-		if got := dlTime(w, l.id, "last_input_at"); !got.Equal(last) {
-			t.Fatalf("last_input_at %s, want %s", got, last)
-		}
 		if got := w.text(`SELECT version::text FROM terminal_sessions WHERE id = $1`, l.id); got != version {
 			t.Fatalf("version %s after the progress writes, was %s", got, version)
 		}
