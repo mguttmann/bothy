@@ -64,6 +64,7 @@ func TestRelayLimits_IdleAtInstant(t *testing.T) {
 	r.mu.Lock()
 	sd := r.newSide(domain.SideClient, id, nil)
 	r.slots[id].dev = sd
+	r.hold(r.slots[id])
 	r.mu.Unlock()
 
 	timers.Advance(30 * time.Second)
@@ -91,6 +92,7 @@ func TestRelayLimits_MaxAcrossGrant(t *testing.T) {
 	r.mu.Lock()
 	sd := r.newSide(domain.SideClient, id, nil)
 	r.slots[id].dev = sd
+	r.hold(r.slots[id])
 	r.mu.Unlock()
 	// Input every half idle window keeps idle away; a reattach in between renews the grant.
 	for step := time.Duration(0); step < limitWindows.MaxDuration-limitWindows.Idle/2; step += limitWindows.Idle / 2 {
@@ -112,6 +114,7 @@ func TestRelayLimits_MaxAcrossGrant(t *testing.T) {
 			r.mu.Lock()
 			sd = r.newSide(domain.SideClient, id, nil)
 			r.slots[id].dev = sd
+			r.hold(r.slots[id])
 			r.mu.Unlock()
 		}
 	}
@@ -133,6 +136,10 @@ func TestRelayLimits_DetachGrace(t *testing.T) {
 	id, host := ids.New(), ids.New()
 	r.Expect(app.Expectation{SessionID: id, HostID: host, DeviceID: ids.New(), Deadline: t0.Add(farDeadline), Started: true,
 		Times: domain.SessionTimes{State: domain.SessionActive, OpenedAt: t0, StartedAt: t0}})
+	// The device side was here and left: the node holds the session.
+	r.mu.Lock()
+	r.hold(r.slots[id])
+	r.mu.Unlock()
 	timers.Advance(10 * time.Second)
 	detached := timers.Clock.Now()
 	payload := `{"host_id":"` + host.String() + `","state":"detached","opened_at":"` + t0.Format(time.RFC3339Nano) +
@@ -161,6 +168,7 @@ func TestRelayLimits_ProgressWrittenAtMostOncePerGrace(t *testing.T) {
 	r.mu.Lock()
 	dev, hst := r.newSide(domain.SideClient, id, nil), r.newSide(domain.SideHost, id, nil)
 	r.slots[id].dev, r.slots[id].hst, r.slots[id].paired = dev, hst, true
+	r.hold(r.slots[id])
 	r.mu.Unlock()
 	counters := func() int {
 		uc.mu.Lock()
@@ -187,5 +195,53 @@ func TestRelayLimits_ProgressWrittenAtMostOncePerGrace(t *testing.T) {
 	timers.Advance(limitWindows.Idle + limitWindows.IdleGrace)
 	if e := uc.ends(); !slices.Equal(e, []string{"end:idle_timeout"}) {
 		t.Fatalf("ends %v", e)
+	}
+}
+
+// TestRelayLimits_OnlyTheHoldingNode (code review M2-46, M1): with several nodes every node expects
+// the session, but only the node that holds a side runs the limits; a node without a side never
+// ends a session whose device types on another node, and a new grant clears the mark.
+func TestRelayLimits_OnlyTheHoldingNode(t *testing.T) {
+	t.Parallel()
+	clk := clock.NewFake(time.Date(2026, 10, 20, 9, 0, 0, 0, time.UTC))
+	timers := fakehost.NewClockTimers(clk)
+	cfg := RelayConfig{BufferMaxBytes: 1 << 16, OpenTimeout: limitWindows.OpenTimeout, Windows: limitWindows, Multi: true}
+	ucA, ucB := &fakeRelayUC{}, &fakeRelayUC{}
+	a, err := NewRelay(cfg, ucA, nil, timers, clk, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	b, err := NewRelay(cfg, ucB, nil, timers, clk, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	t0 := clk.Now()
+	id, host, dev := ids.New(), ids.New(), ids.New()
+	e := app.Expectation{SessionID: id, HostID: host, DeviceID: dev, Deadline: t0.Add(farDeadline), Started: true, Grant: ids.New(),
+		Times: domain.SessionTimes{State: domain.SessionActive, OpenedAt: t0, StartedAt: t0}}
+	a.Expect(e)
+	b.Expect(e)
+	a.mu.Lock()
+	sd := a.newSide(domain.SideClient, id, nil)
+	a.slots[id].dev = sd
+	a.hold(a.slots[id])
+	a.mu.Unlock()
+	for range 20 {
+		timers.Advance(limitWindows.Idle / 2)
+		a.forward(sd, []byte("k"))
+	}
+	if ea, eb := ucA.ends(), ucB.ends(); len(ea) != 0 || len(eb) != 0 {
+		t.Fatalf("ends A %v, B %v during steady input on A", ea, eb)
+	}
+	// A new grant: the pairing may now live on B; A's mark is cleared, B holds nothing yet.
+	e.Grant = ids.New()
+	a.mu.Lock()
+	a.slots[id].dev = nil
+	a.mu.Unlock()
+	a.Expect(e)
+	b.Expect(e)
+	timers.Advance(limitWindows.Idle + limitWindows.IdleGrace)
+	if ea, eb := ucA.ends(), ucB.ends(); len(ea) != 0 || len(eb) != 0 {
+		t.Fatalf("ends A %v, B %v after a new grant on nodes without a side", ea, eb)
 	}
 }

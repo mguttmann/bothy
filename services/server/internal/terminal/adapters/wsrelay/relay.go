@@ -172,6 +172,11 @@ type slot struct {
 	limitGen  int
 	persisted time.Time
 	counted   string
+	// held marks a slot that held a side on this node since its grant: only such a node runs the
+	// limits (Design note 7: "one set per session the process holds a side of"). With several
+	// nodes every node expects the session, but only the node of the pairing sees the device's
+	// bytes; a new grant clears the mark there, because the next pairing may live elsewhere.
+	held bool
 }
 
 // queue is one direction of a slot, bounded by terminal.relay_buffer_max_bytes.
@@ -250,6 +255,10 @@ func (r *Relay) Expect(e app.Expectation) {
 	s.host, s.device, s.started, s.confirm, s.wdi, s.grant = e.HostID, e.DeviceID, e.Started, e.LocalConfirm, e.WorkdirIndex, e.Grant
 	s.toDev, s.toHost, s.seenDev, s.seenHost, s.paired = queue{}, queue{}, false, false, false
 	s.pairedOnce, s.pairedElsewhere, s.overdue = false, false, false
+	if r.cfg.Multi {
+		s.held = false
+		s.stopLimit()
+	}
 	s.gen++
 	r.arm(s, max(e.Deadline.Sub(r.clk.Now()), 0))
 	if !e.Times.OpenedAt.IsZero() {
@@ -264,7 +273,7 @@ func (r *Relay) Expect(e app.Expectation) {
 // (domain.RelayDeadline); r.mu is held. Without configured windows or without the times of a row
 // nothing runs.
 func (r *Relay) armLimit(s *slot) {
-	if r.cfg.Windows.Idle <= 0 || s.times.OpenedAt.IsZero() {
+	if r.cfg.Windows.Idle <= 0 || s.times.OpenedAt.IsZero() || !s.held {
 		return
 	}
 	if s.limitStop != nil {
@@ -284,7 +293,7 @@ func (r *Relay) armLimit(s *slot) {
 func (r *Relay) limitDeadline(id ids.ID, gen int) {
 	r.mu.Lock()
 	s := r.slots[id]
-	if s == nil || s.limitGen != gen {
+	if s == nil || s.limitGen != gen || !s.held {
 		r.mu.Unlock()
 		return
 	}
@@ -299,6 +308,15 @@ func (r *Relay) limitDeadline(id ids.ID, gen int) {
 	r.mu.Unlock()
 	ctx := context.Background()
 	r.call(ctx, r.uc.RelayEnd(ctx, id, reason, domain.Progress{BytesIn: c.In, BytesOut: c.Out, LastInputAt: c.LastInput}))
+}
+
+// hold marks s as held by this node and starts its limits, once per grant; r.mu is held.
+func (r *Relay) hold(s *slot) {
+	if s.held {
+		return
+	}
+	s.held = true
+	r.armLimit(s)
 }
 
 // countState moves the state s counts in bothy.terminal.sessions.active to state ("" stops
@@ -509,12 +527,17 @@ func (r *Relay) applyOne(s *slot, a domain.RelayAction) func(context.Context) {
 	return nil
 }
 
-// forget removes the slot s: its timers stop and it no longer counts as held; r.mu is held.
-func (r *Relay) forget(s *slot) {
+// stopLimit stops the timer of the limits of s, if any; r.mu is held.
+func (s *slot) stopLimit() {
 	if s.limitStop != nil {
 		s.limitStop()
 	}
 	s.limitGen++
+}
+
+// forget removes the slot s: its timers stop and it no longer counts as held; r.mu is held.
+func (r *Relay) forget(s *slot) {
+	s.stopLimit()
 	r.countState(s, "")
 	delete(r.slots, s.id)
 }
@@ -592,6 +615,7 @@ func (r *Relay) attachDevice(sessionID, deviceID ids.ID, ws *websocket.Conn) (*s
 	if s.counted == "" {
 		r.countState(s, s.heldState())
 	}
+	r.hold(s)
 	fx = append(fx, r.pairIfBoth(s)...)
 	r.armLone(s, sd)
 	r.mu.Unlock()
@@ -632,6 +656,7 @@ func (r *Relay) attachHost(sessionID, hostID ids.ID, ws *websocket.Conn) (*side,
 	if s.counted == "" {
 		r.countState(s, s.heldState())
 	}
+	r.hold(s)
 	fx = append(fx, r.pairIfBoth(s)...)
 	r.armLone(s, sd)
 	r.mu.Unlock()
