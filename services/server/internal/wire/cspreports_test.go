@@ -14,7 +14,10 @@ import (
 	"testing"
 	"time"
 
+	"go.opentelemetry.io/otel/metric"
+
 	"github.com/OWNER/bothy/services/server/api/routes"
+	instancemetrics "github.com/OWNER/bothy/services/server/internal/instance/adapters/otelmetrics"
 	"github.com/OWNER/bothy/services/server/internal/kernel/authorize"
 	"github.com/OWNER/bothy/services/server/internal/kernel/clock"
 	"github.com/OWNER/bothy/services/server/internal/platform/httpserver"
@@ -24,6 +27,16 @@ import (
 // cspCanary stands in for content a report may carry: a path of the document URL, a query of the
 // blocked URL and the script sample. It must never reach a log record.
 const cspCanary = "cspcanary7f3a"
+
+// cspCounter is the counter bothy.console.csp_violations on mp.
+func cspCounter(t *testing.T, mp metric.MeterProvider) *instancemetrics.CSPViolations {
+	t.Helper()
+	c, err := instancemetrics.NewCSPViolations(mp)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return c
+}
 
 // publicAllow is an Authorizer that allows every action and records the check, as the authz
 // module does for the public action console.csp_report (05 2.7).
@@ -53,7 +66,7 @@ func TestCspReport(t *testing.T) {
 	}
 	metricstest.Strict(t)
 	mp, reader := metricstest.Provider(t)
-	reports, err := NewCSPReports(publicAllow{}, log, mp, 20)
+	reports, err := NewCSPReports(publicAllow{}, log, cspCounter(t, mp), 20)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -146,7 +159,7 @@ func TestCspReport_LogRecordsAreBounded(t *testing.T) {
 	}
 	metricstest.Strict(t)
 	mp, reader := metricstest.Provider(t)
-	reports, err := NewCSPReports(publicAllow{}, log, mp, 5)
+	reports, err := NewCSPReports(publicAllow{}, log, cspCounter(t, mp), 5)
 	if err != nil {
 		t.Fatal(err)
 	}

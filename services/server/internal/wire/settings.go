@@ -6,8 +6,6 @@ import (
 	"log/slog"
 	"time"
 
-	"go.opentelemetry.io/otel/metric"
-
 	"github.com/OWNER/bothy/services/server/api/routes"
 	authzflags "github.com/OWNER/bothy/services/server/internal/authz/adapters/flagsource"
 	authzpg "github.com/OWNER/bothy/services/server/internal/authz/adapters/postgres"
@@ -59,13 +57,16 @@ func (st *InstanceSettings) fillHandlers(h *Handlers) {
 const KeyCSPReportMaxRecords = "console.csp_report_max_records"
 
 // NewCSPReports returns the handler of submitCspReport over the Authorizer az, the logger log, the
-// counter bothy.console.csp_violations on mp (nil means the global meter provider) and
-// maxRecords (console.csp_report_max_records). Errors: the meter provider refuses the counter, az
-// is nil or maxRecords is below 1.
-func NewCSPReports(az authorize.Authorizer, log *slog.Logger, mp metric.MeterProvider, maxRecords int) (*instancehttp.CSPReports, error) {
-	counter, err := instancemetrics.NewCSPViolations(mp)
-	if err != nil {
-		return nil, err
+// counter of bothy.console.csp_violations (nil means the counter on the global meter provider of
+// platform/otel) and maxRecords (console.csp_report_max_records). Errors: the meter provider
+// refuses the counter, az is nil or maxRecords is below 1.
+func NewCSPReports(az authorize.Authorizer, log *slog.Logger, counter instanceapp.CSPViolationCounter, maxRecords int) (*instancehttp.CSPReports, error) {
+	if counter == nil {
+		c, err := instancemetrics.NewCSPViolations(nil)
+		if err != nil {
+			return nil, err
+		}
+		counter = c
 	}
 	reports, err := instanceapp.NewCSPReports(az, log, counter, maxRecords)
 	if err != nil {

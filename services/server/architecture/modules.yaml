@@ -54,7 +54,7 @@ modules:
     ephemeral_events: []
     ws_ops: []
     depends_on: []
-    adapter_vendors: [pgx]
+    adapter_vendors: [otel, pgx]   # adapters/otelmetrics counts the CSP violation reports (M6-03); sqlc code and the repository (M1-15)
   billing:
     tables: [price_table, cost_entries]
     actions: [cost.read.thread, cost.read.aggregate, price.read, price.manage, cost.reconcile,
