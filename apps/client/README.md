@@ -7,7 +7,8 @@ device and session views of `admin_ui`. Administration (M4-26): the `AdminShell`
 at `/admin`, `/admin/<section>` and `/admin/<section>/<id>` (`lib/admin/admin_route.dart`),
 over the REST client of the signed-in session; grants (M4-27) at `/admin/grants/<target key>`
 with the grant wizard, "Who has access?" and "View as person"; hosts (M4-37) at
-`/admin/hosts` and `/admin/hosts/<id>` for owners. iOS and Android follow in M5.
+`/admin/hosts` and `/admin/hosts/<id>` for owners; agents (M4-28) at `/admin/agents` and
+`/admin/agents/<id>`, whose page gets the agent's presence from the engine's `EphemeralStore`. iOS and Android follow in M5.
 
 Flutter app for macOS and Windows, later iOS and Android. One code base for interface and
 logic; native code only where the system requires it.
@@ -107,6 +108,11 @@ Crash reports need a target in the build configuration (docs/spec/15-client-arch
   plays `bothy-host pair`, a wrong and a right fingerprint prefix, the mandatory answers, a
   session user, a grant `terminal` that is not effective until the person is the assignee; the
   step-up enumeration includes the host operations and `listAuditEvents`.
+  `integration_test/guided_flow_test.dart` runs the guided flow of 10 11 (M4-28): a personal
+  agent operates a space, Alex grants Sam `trigger` there, takes "Switch to Organization and
+  grant" with a reason and step-up, and the agent page warns until the fake's heartbeat reports
+  organization; `test/admin/guided_flow_test.dart` runs the agent calls headless over REST,
+  and the step-up enumeration includes the agent and token operations.
 
 ## Sidebar and post list
 

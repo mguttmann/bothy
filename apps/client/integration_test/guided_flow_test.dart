@@ -68,6 +68,15 @@ void main() {
       await app.waitFor(
         find.byKey(const ValueKey('preview.violation.i1_violation')),
       );
+      // The offer follows the preview of the current request, which includes the reason.
+      await app.waitFor(
+        find.byWidgetPredicate(
+          (w) =>
+              w is ButtonStyleButton &&
+              w.key == const ValueKey('guided.offer') &&
+              w.onPressed != null,
+        ),
+      );
       await tap('guided.offer');
       await tester.enterText(
         find.byKey(const ValueKey('confirm.reason')),
