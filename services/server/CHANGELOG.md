@@ -77,7 +77,7 @@ documented in this file. The format is based on
   stays; `messages.channel_id`, `read_states.channel_id` and `drafts.channel_id` follow in the same
   transaction through the new in-transaction event `chat.ThreadMoved`, and the tags are removed.
   `thread.moved_out` (source, never naming the target) and `thread.moved` (target) are appended in
-  this order. Main threads, the same channel, archived targets and dm channels are refused.
+  this order. Main threads, the same channel, archived targets and DM channels are refused.
 - Catch-up over REST and the snapshot (M1-63): `listEvents` (`GET /api/v1/events`) delivers every
   durable event after a cursor that the caller may receive at delivery time (personal events only
   to their audience, every other event through `authorize` with its receive action) with a cursor

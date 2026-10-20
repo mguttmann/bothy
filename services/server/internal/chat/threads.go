@@ -251,7 +251,7 @@ type Threads interface {
 	//
 	// Example:
 	//
-	//	th, err := threads.Move(ctx, a, chat.MoveThread{ThreadID: id, TargetChannelID: eskalation, Reason: "Escalated"})
+	//	th, err := threads.Move(ctx, a, chat.MoveThread{ThreadID: id, TargetChannelID: escalation, Reason: "Escalated"})
 	Move(ctx context.Context, a actor.Actor, cmd MoveThread) (Thread, error)
 	// SetTags replaces the tags of a forum post (thread.tags.set; restricted tags need manage).
 	// Errors: validation_failed on /tag_ids, version_conflict for a stale If-Match, forbidden.
