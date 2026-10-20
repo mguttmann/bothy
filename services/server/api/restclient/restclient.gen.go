@@ -487,6 +487,24 @@ func (e AgentUpdatedEventType) Valid() bool {
 	}
 }
 
+// Defines values for AlertmanagerAlertStatus.
+const (
+	AlertmanagerAlertStatusFiring   AlertmanagerAlertStatus = "firing"
+	AlertmanagerAlertStatusResolved AlertmanagerAlertStatus = "resolved"
+)
+
+// Valid indicates whether the value is a known member of the AlertmanagerAlertStatus enum.
+func (e AlertmanagerAlertStatus) Valid() bool {
+	switch e {
+	case AlertmanagerAlertStatusFiring:
+		return true
+	case AlertmanagerAlertStatusResolved:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for AppInstallationState.
 const (
 	AppInstallationStateActive      AppInstallationState = "active"
@@ -2380,6 +2398,39 @@ func (e ImportSourceState) Valid() bool {
 	case ImportSourceStatePaused:
 		return true
 	case ImportSourceStateRunning:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for IncomingWebhookPostStatus.
+const (
+	IncomingWebhookPostStatusFiring   IncomingWebhookPostStatus = "firing"
+	IncomingWebhookPostStatusResolved IncomingWebhookPostStatus = "resolved"
+)
+
+// Valid indicates whether the value is a known member of the IncomingWebhookPostStatus enum.
+func (e IncomingWebhookPostStatus) Valid() bool {
+	switch e {
+	case IncomingWebhookPostStatusFiring:
+		return true
+	case IncomingWebhookPostStatusResolved:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for IncomingWebhookPostVersion.
+const (
+	N4 IncomingWebhookPostVersion = "4"
+)
+
+// Valid indicates whether the value is a known member of the IncomingWebhookPostVersion enum.
+func (e IncomingWebhookPostVersion) Valid() bool {
+	switch e {
+	case N4:
 		return true
 	default:
 		return false
@@ -6338,6 +6389,25 @@ type AgentUpdatedEventAudience string
 // AgentUpdatedEventType defines model for AgentUpdatedEvent.Type.
 type AgentUpdatedEventType string
 
+// AlertmanagerAlert One alert of an Alertmanager webhook payload; `status` and `labels` are required (checked with `errors[].code` `required`).
+type AlertmanagerAlert struct {
+	// Annotations Annotations of the alert; every value is a string.
+	Annotations *JsonObject `json:"annotations,omitempty"`
+	EndsAt      *time.Time  `json:"endsAt,omitempty"`
+	Fingerprint *string     `json:"fingerprint,omitempty"`
+
+	// GeneratorURL Address of the rule's source; written as text, never fetched.
+	GeneratorURL *string `json:"generatorURL,omitempty"`
+
+	// Labels Labels of the alert; every value is a string.
+	Labels   *JsonObject              `json:"labels,omitempty"`
+	StartsAt *time.Time               `json:"startsAt,omitempty"`
+	Status   *AlertmanagerAlertStatus `json:"status,omitempty"`
+}
+
+// AlertmanagerAlertStatus defines model for AlertmanagerAlert.Status.
+type AlertmanagerAlertStatus string
+
 // ApiToken defines model for ApiToken.
 type ApiToken struct {
 	// CreatedAt RFC 3339 timestamp in UTC with millisecond precision and suffix `Z`.
@@ -10228,7 +10298,11 @@ type IncomingWebhook struct {
 	ThreadId *Uuid `json:"thread_id,omitempty"`
 }
 
-// IncomingWebhookCreate defines model for IncomingWebhookCreate.
+// IncomingWebhookCreate Body of `createIncomingWebhook`. `app_id` names an app principal whose installation is
+// `active` (else `400 validation_failed` with `errors[].code` `app_not_installed`) and that may
+// write in the channel (else `app_cannot_write`); `thread_id`, when present, is a thread of this
+// channel (else `not_in_channel`, an unknown ID too). `name` is not empty and has no control or
+// bidi characters.
 type IncomingWebhookCreate struct {
 	// AppId UUIDv7 (RFC 9562), lowercase canonical form.
 	AppId Uuid `json:"app_id"`
@@ -10242,38 +10316,86 @@ type IncomingWebhookCreate struct {
 
 // IncomingWebhookCreated defines model for IncomingWebhookCreated.
 type IncomingWebhookCreated struct {
-	// Url Full URL including the token. Shown once.
+	// Url Absolute URL from `server.public_url` including the token, shown once. Senders that set a
+	// header drop the last segment and send the token as `Authorization: Bearer <token>`.
 	//
-	// Examples: /api/v1/hooks/0192f4a0-7b1c-7000-8a00-000000000901/iwt_EXAMPLEStGXR8Z5jdH
+	// Examples: https://chat.example.com/api/v1/hooks/0192f4a0-7b1c-7000-8a00-000000000901/bothy_whi_EXAMPLE000000000000000000000000000000000000_2WwD3e
 	Url     string          `json:"url"`
 	Webhook IncomingWebhook `json:"webhook"`
 }
 
-// IncomingWebhookList defines model for IncomingWebhookList.
+// IncomingWebhookList The active incoming webhooks of a channel in creation order; revoked ones are not listed.
 type IncomingWebhookList struct {
 	Items []IncomingWebhook `json:"items"`
 }
 
-// IncomingWebhookPost defines model for IncomingWebhookPost.
+// IncomingWebhookPost Body of an incoming webhook call in one of two shapes, recognised per request (11 8.2,
+// docs/DECISIONS.md D-M2-27-5). A body with at least one Alertmanager member (`version`,
+// `groupKey`, `truncatedAlerts`, `status`, `receiver`, `groupLabels`, `commonLabels`,
+// `commonAnnotations`, `externalURL`, `alerts`) is the unchanged webhook payload of Prometheus
+// Alertmanager (format `alertmanager`) and must contain no native member; every other body is
+// `native` and needs `content_md`. Unknown members are refused.
 type IncomingWebhookPost struct {
-	// ClientMsgId Optional; makes retries of the sender idempotent.
+	// Alerts Alertmanager. The alerts of the notification.
+	Alerts *[]AlertmanagerAlert `json:"alerts,omitempty"`
+
+	// ClientMsgId Native. Optional UUIDv7; makes retries of the sender idempotent.
 	ClientMsgId *Uuid `json:"client_msg_id,omitempty"`
 
-	// ContentMd Examples: Disk usage above threshold on build host.
-	ContentMd string `json:"content_md"`
+	// CommonAnnotations Alertmanager. Annotations all alerts share; every value is a string.
+	CommonAnnotations *JsonObject `json:"commonAnnotations,omitempty"`
 
-	// Title Title of a new thread when the webhook has no fixed thread.
+	// CommonLabels Alertmanager. Labels all alerts share; every value is a string.
+	CommonLabels *JsonObject `json:"commonLabels,omitempty"`
+
+	// ContentMd Native. Markdown content, at most `message.max_content_bytes` UTF-8 bytes.
+	//
+	// Examples: Disk usage above threshold on build host.
+	ContentMd *string `json:"content_md,omitempty"`
+
+	// ExternalURL Alertmanager. Address of the sending Alertmanager; written as text, never fetched.
+	ExternalURL *string `json:"externalURL,omitempty"`
+
+	// GroupKey Alertmanager. Key of the alert group.
+	GroupKey *string `json:"groupKey,omitempty"`
+
+	// GroupLabels Alertmanager. Labels of the group; every value is a string.
+	GroupLabels *JsonObject `json:"groupLabels,omitempty"`
+
+	// Receiver Alertmanager. Name of the receiver.
+	Receiver *string `json:"receiver,omitempty"`
+
+	// Status Alertmanager. State of the group.
+	Status *IncomingWebhookPostStatus `json:"status,omitempty"`
+
+	// ThreadId Native. Thread of the webhook's channel to write into when the webhook has no fixed thread.
+	ThreadId *Uuid `json:"thread_id,omitempty"`
+
+	// Title Native. Title of a new thread when the webhook has no fixed thread; required in a forum.
 	//
 	// Examples: Disk alert
 	Title *string `json:"title,omitempty"`
+
+	// TruncatedAlerts Alertmanager. Number of alerts left out of `alerts`.
+	TruncatedAlerts *int64 `json:"truncatedAlerts,omitempty"`
+
+	// Version Alertmanager. Version of the webhook payload.
+	Version *IncomingWebhookPostVersion `json:"version,omitempty"`
 }
+
+// IncomingWebhookPostStatus Alertmanager. State of the group.
+type IncomingWebhookPostStatus string
+
+// IncomingWebhookPostVersion Alertmanager. Version of the webhook payload.
+type IncomingWebhookPostVersion string
 
 // IncomingWebhookResult defines model for IncomingWebhookResult.
 type IncomingWebhookResult struct {
 	// MessageId UUIDv7 (RFC 9562), lowercase canonical form.
 	MessageId Uuid `json:"message_id"`
 
-	// ThreadId UUIDv7 (RFC 9562), lowercase canonical form.
+	// ThreadId The thread the message landed in; with a `title` in a text channel the new thread that
+	// starts from the message, which itself stands in the main thread.
 	ThreadId Uuid `json:"thread_id"`
 }
 
@@ -15682,7 +15804,7 @@ type ThreadIdPath = Uuid
 // TokenIdPath UUIDv7 (RFC 9562), lowercase canonical form.
 type TokenIdPath = Uuid
 
-// TokenPath Examples: iwt_EXAMPLEStGXR8Z5jdH
+// TokenPath Examples: bothy_whi_EXAMPLE000000000000000000000000000000000000_2WwD3e
 type TokenPath = string
 
 // UserIdPath UUIDv7 (RFC 9562), lowercase canonical form.
@@ -17752,6 +17874,9 @@ type UpdateGroupJSONRequestBody = GroupUpdate
 
 // AddGroupMemberJSONRequestBody defines body for AddGroupMember for application/json ContentType.
 type AddGroupMemberJSONRequestBody = GroupMemberAdd
+
+// PostIncomingWebhookWithBearerJSONRequestBody defines body for PostIncomingWebhookWithBearer for application/json ContentType.
+type PostIncomingWebhookWithBearerJSONRequestBody = IncomingWebhookPost
 
 // PostIncomingWebhookJSONRequestBody defines body for PostIncomingWebhook for application/json ContentType.
 type PostIncomingWebhookJSONRequestBody = IncomingWebhookPost
@@ -21512,10 +21637,84 @@ type ClientInterface interface {
 	// Corresponds with DELETE /groups/{group_id}/members/{user_id} (the `RemoveGroupMember` operationId).
 	RemoveGroupMember(ctx context.Context, groupId GroupIdPath, userId UserIdPath, reqEditors ...RequestEditorFn) (*http.Response, error)
 
+	// PostIncomingWebhookWithBearerWithBody Post a message through an incoming webhook with the token in Authorization
+	//
+	// The token of the incoming webhook is sent as `Authorization: Bearer <token>`; the path ends with the webhook ID. Use this variant where the sender can set a header, so the token never appears in a URL. Of the root security only `bearerAuth` applies here, with the token of the incoming webhook; any other scheme or credential counts as a wrong token (`404`).
+	//
+	// The format is recognised per request from the body: a body with at least one Alertmanager member
+	// (`version`, `groupKey`, `truncatedAlerts`, `status`, `receiver`, `groupLabels`, `commonLabels`,
+	// `commonAnnotations`, `externalURL`, `alerts`) is the unchanged webhook payload of Prometheus
+	// Alertmanager and gives one message per notification; it must carry no native member (`400
+	// validation_failed`, `format_mixed`). Every other body is `native`: Markdown in `content_md` with
+	// optional `title`, `thread_id` and `client_msg_id`. A format outside `webhook_in.formats_enabled`
+	// gives `400 validation_failed` with `format_disabled`.
+	//
+	// Order of checks (11 8.4): `rl.webhook_in` of the webhook (`429`), the token (`404`), the body up to
+	// `webhook_in.max_body_bytes` (`413`), the format (`400`), `authorize` of the app (`404`), then the
+	// message (`201`). An unknown or revoked webhook, a wrong or malformed token, a suspended or
+	// uninstalled app and every refusal of the app's rights give the same `404`. A failed token check
+	// counts against `rl.public_auth` of the client IP.
+	//
+	// The message has `origin = app` with the app as author, resolves no mentions and never triggers an
+	// agent. `native` with `client_msg_id` is idempotent: a repeat answers `200` with the original and
+	// `Idempotent-Replay: true`, other content with the same `client_msg_id` `422 idempotency_key_reuse`.
+	// Senders inside the stack reach the same path on the internal listener.
+	//
+	// Takes any type of body and a specified content type.
+	//
+	// Corresponds with POST /hooks/{webhook_id} (the `PostIncomingWebhookWithBearer` operationId).
+	PostIncomingWebhookWithBearerWithBody(ctx context.Context, webhookId WebhookIdPath, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// PostIncomingWebhookWithBearer Post a message through an incoming webhook with the token in Authorization
+	//
+	// The token of the incoming webhook is sent as `Authorization: Bearer <token>`; the path ends with the webhook ID. Use this variant where the sender can set a header, so the token never appears in a URL. Of the root security only `bearerAuth` applies here, with the token of the incoming webhook; any other scheme or credential counts as a wrong token (`404`).
+	//
+	// The format is recognised per request from the body: a body with at least one Alertmanager member
+	// (`version`, `groupKey`, `truncatedAlerts`, `status`, `receiver`, `groupLabels`, `commonLabels`,
+	// `commonAnnotations`, `externalURL`, `alerts`) is the unchanged webhook payload of Prometheus
+	// Alertmanager and gives one message per notification; it must carry no native member (`400
+	// validation_failed`, `format_mixed`). Every other body is `native`: Markdown in `content_md` with
+	// optional `title`, `thread_id` and `client_msg_id`. A format outside `webhook_in.formats_enabled`
+	// gives `400 validation_failed` with `format_disabled`.
+	//
+	// Order of checks (11 8.4): `rl.webhook_in` of the webhook (`429`), the token (`404`), the body up to
+	// `webhook_in.max_body_bytes` (`413`), the format (`400`), `authorize` of the app (`404`), then the
+	// message (`201`). An unknown or revoked webhook, a wrong or malformed token, a suspended or
+	// uninstalled app and every refusal of the app's rights give the same `404`. A failed token check
+	// counts against `rl.public_auth` of the client IP.
+	//
+	// The message has `origin = app` with the app as author, resolves no mentions and never triggers an
+	// agent. `native` with `client_msg_id` is idempotent: a repeat answers `200` with the original and
+	// `Idempotent-Replay: true`, other content with the same `client_msg_id` `422 idempotency_key_reuse`.
+	// Senders inside the stack reach the same path on the internal listener.
+	//
+	// Takes a body of the `application/json` content type.
+	//
+	// Corresponds with POST /hooks/{webhook_id} (the `PostIncomingWebhookWithBearer` operationId).
+	PostIncomingWebhookWithBearer(ctx context.Context, webhookId WebhookIdPath, body PostIncomingWebhookWithBearerJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
+
 	// PostIncomingWebhookWithBody Post a message through an incoming webhook
 	//
-	// The token in the path authenticates the call; servers redact it in logs. Messages have `origin =
-	// app` and never trigger agents. Unknown or revoked webhooks give 404.
+	// The token is the last path segment; `Authorization` is ignored. Servers write the path only as its pattern `/api/v1/hooks/{webhook_id}/{token}` in logs, traces and `Problem.instance`, and reverse proxies must redact it (16 4.3).
+	//
+	// The format is recognised per request from the body: a body with at least one Alertmanager member
+	// (`version`, `groupKey`, `truncatedAlerts`, `status`, `receiver`, `groupLabels`, `commonLabels`,
+	// `commonAnnotations`, `externalURL`, `alerts`) is the unchanged webhook payload of Prometheus
+	// Alertmanager and gives one message per notification; it must carry no native member (`400
+	// validation_failed`, `format_mixed`). Every other body is `native`: Markdown in `content_md` with
+	// optional `title`, `thread_id` and `client_msg_id`. A format outside `webhook_in.formats_enabled`
+	// gives `400 validation_failed` with `format_disabled`.
+	//
+	// Order of checks (11 8.4): `rl.webhook_in` of the webhook (`429`), the token (`404`), the body up to
+	// `webhook_in.max_body_bytes` (`413`), the format (`400`), `authorize` of the app (`404`), then the
+	// message (`201`). An unknown or revoked webhook, a wrong or malformed token, a suspended or
+	// uninstalled app and every refusal of the app's rights give the same `404`. A failed token check
+	// counts against `rl.public_auth` of the client IP.
+	//
+	// The message has `origin = app` with the app as author, resolves no mentions and never triggers an
+	// agent. `native` with `client_msg_id` is idempotent: a repeat answers `200` with the original and
+	// `Idempotent-Replay: true`, other content with the same `client_msg_id` `422 idempotency_key_reuse`.
+	// Senders inside the stack reach the same path on the internal listener.
 	//
 	// Takes any type of body and a specified content type.
 	//
@@ -21524,8 +21723,26 @@ type ClientInterface interface {
 
 	// PostIncomingWebhook Post a message through an incoming webhook
 	//
-	// The token in the path authenticates the call; servers redact it in logs. Messages have `origin =
-	// app` and never trigger agents. Unknown or revoked webhooks give 404.
+	// The token is the last path segment; `Authorization` is ignored. Servers write the path only as its pattern `/api/v1/hooks/{webhook_id}/{token}` in logs, traces and `Problem.instance`, and reverse proxies must redact it (16 4.3).
+	//
+	// The format is recognised per request from the body: a body with at least one Alertmanager member
+	// (`version`, `groupKey`, `truncatedAlerts`, `status`, `receiver`, `groupLabels`, `commonLabels`,
+	// `commonAnnotations`, `externalURL`, `alerts`) is the unchanged webhook payload of Prometheus
+	// Alertmanager and gives one message per notification; it must carry no native member (`400
+	// validation_failed`, `format_mixed`). Every other body is `native`: Markdown in `content_md` with
+	// optional `title`, `thread_id` and `client_msg_id`. A format outside `webhook_in.formats_enabled`
+	// gives `400 validation_failed` with `format_disabled`.
+	//
+	// Order of checks (11 8.4): `rl.webhook_in` of the webhook (`429`), the token (`404`), the body up to
+	// `webhook_in.max_body_bytes` (`413`), the format (`400`), `authorize` of the app (`404`), then the
+	// message (`201`). An unknown or revoked webhook, a wrong or malformed token, a suspended or
+	// uninstalled app and every refusal of the app's rights give the same `404`. A failed token check
+	// counts against `rl.public_auth` of the client IP.
+	//
+	// The message has `origin = app` with the app as author, resolves no mentions and never triggers an
+	// agent. `native` with `client_msg_id` is idempotent: a repeat answers `200` with the original and
+	// `Idempotent-Replay: true`, other content with the same `client_msg_id` `422 idempotency_key_reuse`.
+	// Senders inside the stack reach the same path on the internal listener.
 	//
 	// Takes a body of the `application/json` content type.
 	//
@@ -25604,337 +25821,6 @@ func (c *Client) ListChannelThreads(ctx context.Context, channelId ChannelIdPath
 // Corresponds with POST /channels/{channel_id}/threads (the `CreateThread` operationId).
 func (c *Client) CreateThreadWithBody(ctx context.Context, channelId ChannelIdPath, params *CreateThreadParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
 	req, err := NewCreateThreadRequestWithBody(c.Server, channelId, params, contentType, body)
-	if err != nil {
-		return nil, err
-	}
-	req = req.WithContext(ctx)
-	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
-		return nil, err
-	}
-	return c.Client.Do(req)
-}
-
-// CreateThread Create a forum post or a thread from a message
-//
-// A `first_message` uses its `client_msg_id` for idempotency; without it, send `Idempotency-Key`.
-//
-// Takes a body of the `application/json` content type.
-//
-// Corresponds with POST /channels/{channel_id}/threads (the `CreateThread` operationId).
-func (c *Client) CreateThread(ctx context.Context, channelId ChannelIdPath, params *CreateThreadParams, body CreateThreadJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
-	req, err := NewCreateThreadRequest(c.Server, channelId, params, body)
-	if err != nil {
-		return nil, err
-	}
-	req = req.WithContext(ctx)
-	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
-		return nil, err
-	}
-	return c.Client.Do(req)
-}
-
-// CreateUploadWithBody Start an upload
-//
-// Checks in this order (12, 3.1): size against `file.max_upload_bytes` (413 `payload_too_large`), quota `file.quota_bytes_per_principal` (409 `conflict` with `reason` `quota_exceeded`), open sessions (429), free space of the file system driver (503 `unavailable` with `reason` `storage_full`). A denied type answers 415 `unsupported_media_type` with `reason` `file_type_denied`.
-//
-// Takes any type of body and a specified content type.
-//
-// Corresponds with POST /channels/{channel_id}/uploads (the `CreateUpload` operationId).
-func (c *Client) CreateUploadWithBody(ctx context.Context, channelId ChannelIdPath, params *CreateUploadParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
-	req, err := NewCreateUploadRequestWithBody(c.Server, channelId, params, contentType, body)
-	if err != nil {
-		return nil, err
-	}
-	req = req.WithContext(ctx)
-	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
-		return nil, err
-	}
-	return c.Client.Do(req)
-}
-
-// CreateUpload Start an upload
-//
-// Checks in this order (12, 3.1): size against `file.max_upload_bytes` (413 `payload_too_large`), quota `file.quota_bytes_per_principal` (409 `conflict` with `reason` `quota_exceeded`), open sessions (429), free space of the file system driver (503 `unavailable` with `reason` `storage_full`). A denied type answers 415 `unsupported_media_type` with `reason` `file_type_denied`.
-//
-// Takes a body of the `application/json` content type.
-//
-// Corresponds with POST /channels/{channel_id}/uploads (the `CreateUpload` operationId).
-func (c *Client) CreateUpload(ctx context.Context, channelId ChannelIdPath, params *CreateUploadParams, body CreateUploadJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
-	req, err := NewCreateUploadRequest(c.Server, channelId, params, body)
-	if err != nil {
-		return nil, err
-	}
-	req = req.WithContext(ctx)
-	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
-		return nil, err
-	}
-	return c.Client.Do(req)
-}
-
-// SubmitClientMetricsWithBody Submit anonymous client measurements
-//
-// Only when `privacy.client_metrics` is on; otherwise `403 feature_disabled`. At most once per `client.metrics.flush_interval` (15, section 17).
-//
-// Takes any type of body and a specified content type.
-//
-// Corresponds with POST /client-metrics (the `SubmitClientMetrics` operationId).
-func (c *Client) SubmitClientMetricsWithBody(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
-	req, err := NewSubmitClientMetricsRequestWithBody(c.Server, contentType, body)
-	if err != nil {
-		return nil, err
-	}
-	req = req.WithContext(ctx)
-	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
-		return nil, err
-	}
-	return c.Client.Do(req)
-}
-
-// SubmitClientMetrics Submit anonymous client measurements
-//
-// Only when `privacy.client_metrics` is on; otherwise `403 feature_disabled`. At most once per `client.metrics.flush_interval` (15, section 17).
-//
-// Takes a body of the `application/json` content type.
-//
-// Corresponds with POST /client-metrics (the `SubmitClientMetrics` operationId).
-func (c *Client) SubmitClientMetrics(ctx context.Context, body SubmitClientMetricsJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
-	req, err := NewSubmitClientMetricsRequest(c.Server, body)
-	if err != nil {
-		return nil, err
-	}
-	req = req.WithContext(ctx)
-	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
-		return nil, err
-	}
-	return c.Client.Do(req)
-}
-
-// AnswerAutocompleteWithBody Answer an autocomplete request
-//
-// Takes any type of body and a specified content type.
-//
-// Corresponds with POST /command-autocompletions/{request_id}/answer (the `AnswerAutocomplete` operationId).
-func (c *Client) AnswerAutocompleteWithBody(ctx context.Context, requestId RequestIdPath, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
-	req, err := NewAnswerAutocompleteRequestWithBody(c.Server, requestId, contentType, body)
-	if err != nil {
-		return nil, err
-	}
-	req = req.WithContext(ctx)
-	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
-		return nil, err
-	}
-	return c.Client.Do(req)
-}
-
-// AnswerAutocomplete Answer an autocomplete request
-//
-// Takes a body of the `application/json` content type.
-//
-// Corresponds with POST /command-autocompletions/{request_id}/answer (the `AnswerAutocomplete` operationId).
-func (c *Client) AnswerAutocomplete(ctx context.Context, requestId RequestIdPath, body AnswerAutocompleteJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
-	req, err := NewAnswerAutocompleteRequest(c.Server, requestId, body)
-	if err != nil {
-		return nil, err
-	}
-	req = req.WithContext(ctx)
-	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
-		return nil, err
-	}
-	return c.Client.Do(req)
-}
-
-// RegisterCommandWithBody Register a command
-//
-// Takes any type of body and a specified content type.
-//
-// Corresponds with POST /commands (the `RegisterCommand` operationId).
-func (c *Client) RegisterCommandWithBody(ctx context.Context, params *RegisterCommandParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
-	req, err := NewRegisterCommandRequestWithBody(c.Server, params, contentType, body)
-	if err != nil {
-		return nil, err
-	}
-	req = req.WithContext(ctx)
-	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
-		return nil, err
-	}
-	return c.Client.Do(req)
-}
-
-// RegisterCommand Register a command
-//
-// Takes a body of the `application/json` content type.
-//
-// Corresponds with POST /commands (the `RegisterCommand` operationId).
-func (c *Client) RegisterCommand(ctx context.Context, params *RegisterCommandParams, body RegisterCommandJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
-	req, err := NewRegisterCommandRequest(c.Server, params, body)
-	if err != nil {
-		return nil, err
-	}
-	req = req.WithContext(ctx)
-	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
-		return nil, err
-	}
-	return c.Client.Do(req)
-}
-
-// RemoveCommand Remove a command
-//
-// Corresponds with DELETE /commands/{command_id} (the `RemoveCommand` operationId).
-func (c *Client) RemoveCommand(ctx context.Context, commandId CommandIdPath, reqEditors ...RequestEditorFn) (*http.Response, error) {
-	req, err := NewRemoveCommandRequest(c.Server, commandId)
-	if err != nil {
-		return nil, err
-	}
-	req = req.WithContext(ctx)
-	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
-		return nil, err
-	}
-	return c.Client.Do(req)
-}
-
-// GetCommand Read a command
-//
-// Corresponds with GET /commands/{command_id} (the `GetCommand` operationId).
-func (c *Client) GetCommand(ctx context.Context, commandId CommandIdPath, reqEditors ...RequestEditorFn) (*http.Response, error) {
-	req, err := NewGetCommandRequest(c.Server, commandId)
-	if err != nil {
-		return nil, err
-	}
-	req = req.WithContext(ctx)
-	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
-		return nil, err
-	}
-	return c.Client.Do(req)
-}
-
-// UpdateCommandWithBody Replace a command definition
-//
-// Takes any type of body and a specified content type.
-//
-// Corresponds with PUT /commands/{command_id} (the `UpdateCommand` operationId).
-func (c *Client) UpdateCommandWithBody(ctx context.Context, commandId CommandIdPath, params *UpdateCommandParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
-	req, err := NewUpdateCommandRequestWithBody(c.Server, commandId, params, contentType, body)
-	if err != nil {
-		return nil, err
-	}
-	req = req.WithContext(ctx)
-	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
-		return nil, err
-	}
-	return c.Client.Do(req)
-}
-
-// UpdateCommand Replace a command definition
-//
-// Takes a body of the `application/json` content type.
-//
-// Corresponds with PUT /commands/{command_id} (the `UpdateCommand` operationId).
-func (c *Client) UpdateCommand(ctx context.Context, commandId CommandIdPath, params *UpdateCommandParams, body UpdateCommandJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
-	req, err := NewUpdateCommandRequest(c.Server, commandId, params, body)
-	if err != nil {
-		return nil, err
-	}
-	req = req.WithContext(ctx)
-	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
-		return nil, err
-	}
-	return c.Client.Do(req)
-}
-
-// UpdateComponentWithBody Disable or change an own component
-//
-// Takes any type of body and a specified content type.
-//
-// Corresponds with PATCH /components/{component_id} (the `UpdateComponent` operationId).
-func (c *Client) UpdateComponentWithBody(ctx context.Context, componentId ComponentIdPath, params *UpdateComponentParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
-	req, err := NewUpdateComponentRequestWithBody(c.Server, componentId, params, contentType, body)
-	if err != nil {
-		return nil, err
-	}
-	req = req.WithContext(ctx)
-	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
-		return nil, err
-	}
-	return c.Client.Do(req)
-}
-
-// UpdateComponent Disable or change an own component
-//
-// Takes a body of the `application/json` content type.
-//
-// Corresponds with PATCH /components/{component_id} (the `UpdateComponent` operationId).
-func (c *Client) UpdateComponent(ctx context.Context, componentId ComponentIdPath, params *UpdateComponentParams, body UpdateComponentJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
-	req, err := NewUpdateComponentRequest(c.Server, componentId, params, body)
-	if err != nil {
-		return nil, err
-	}
-	req = req.WithContext(ctx)
-	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
-		return nil, err
-	}
-	return c.Client.Do(req)
-}
-
-// CreateInteractionWithBody Use a button, select or form
-//
-// Single-use components accept exactly one interaction; later ones get 409 `component_used`.
-// Idempotent by `(principal, client_interaction_id)`.
-//
-// Takes any type of body and a specified content type.
-//
-// Corresponds with POST /components/{component_id}/interactions (the `CreateInteraction` operationId).
-func (c *Client) CreateInteractionWithBody(ctx context.Context, componentId ComponentIdPath, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
-	req, err := NewCreateInteractionRequestWithBody(c.Server, componentId, contentType, body)
-	if err != nil {
-		return nil, err
-	}
-	req = req.WithContext(ctx)
-	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
-		return nil, err
-	}
-	return c.Client.Do(req)
-}
-
-// CreateInteraction Use a button, select or form
-//
-// Single-use components accept exactly one interaction; later ones get 409 `component_used`.
-// Idempotent by `(principal, client_interaction_id)`.
-//
-// Takes a body of the `application/json` content type.
-//
-// Corresponds with POST /components/{component_id}/interactions (the `CreateInteraction` operationId).
-func (c *Client) CreateInteraction(ctx context.Context, componentId ComponentIdPath, body CreateInteractionJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
-	req, err := NewCreateInteractionRequest(c.Server, componentId, body)
-	if err != nil {
-		return nil, err
-	}
-	req = req.WithContext(ctx)
-	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
-		return nil, err
-	}
-	return c.Client.Do(req)
-}
-
-// GetConsoleSession Read the console session
-//
-// Corresponds with GET /console/session (the `GetConsoleSession` operationId).
-func (c *Client) GetConsoleSession(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error) {
-	req, err := NewGetConsoleSessionRequest(c.Server)
-	if err != nil {
-		return nil, err
-	}
-	req = req.WithContext(ctx)
-	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
-		return nil, err
-	}
-	return c.Client.Do(req)
-}
-
-// EndViewAs End the stored view as person
-//
-// Corresponds with DELETE /console/session/view-as (the `EndViewAs` operationId).
-func (c *Client) EndViewAs(ctx context.Context, params *EndViewAsParams, reqEditors ...RequestEditorFn) (*http.Response, error) {
-	req, err := NewEndViewAsRequest(c.Server, params)
 	if err != nil {
 		return nil, err
 	}

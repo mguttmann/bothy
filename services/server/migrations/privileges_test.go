@@ -164,6 +164,9 @@ var appPrivileges = map[string][]string{
 	// deliveries (M7-05).
 	"webhook_subscriptions": {"SELECT", "INSERT", "UPDATE", "DELETE"},
 	"webhook_deliveries":    {"SELECT", "INSERT", "UPDATE", "DELETE"},
+	// 03 incoming_webhooks (M2-27): a revoke sets revoked_at; the retention job of class config
+	// deletes revoked rows (M7-05).
+	"incoming_webhooks": {"SELECT", "INSERT", "UPDATE", "DELETE"},
 	// 03 backup_runs (M7-02): the console and the status page read the runs; only bothy_backup
 	// writes them (TestMigrationBackupRuns holds its rights).
 	"backup_runs": {"SELECT"},

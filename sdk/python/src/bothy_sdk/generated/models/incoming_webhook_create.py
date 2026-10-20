@@ -13,11 +13,16 @@ T = TypeVar("T", bound="IncomingWebhookCreate")
 
 @_attrs_define
 class IncomingWebhookCreate:
-    """
-    Attributes:
-        app_id (UUID): UUIDv7 (RFC 9562), lowercase canonical form.
-        name (str):
-        thread_id (UUID | Unset): UUIDv7 (RFC 9562), lowercase canonical form.
+    """Body of `createIncomingWebhook`. `app_id` names an app principal whose installation is
+    `active` (else `400 validation_failed` with `errors[].code` `app_not_installed`) and that may
+    write in the channel (else `app_cannot_write`); `thread_id`, when present, is a thread of this
+    channel (else `not_in_channel`, an unknown ID too). `name` is not empty and has no control or
+    bidi characters.
+
+        Attributes:
+            app_id (UUID): UUIDv7 (RFC 9562), lowercase canonical form.
+            name (str):
+            thread_id (UUID | Unset): UUIDv7 (RFC 9562), lowercase canonical form.
     """
 
     app_id: UUID

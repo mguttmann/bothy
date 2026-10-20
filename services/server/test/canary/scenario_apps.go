@@ -114,3 +114,52 @@ func (sc *Scenario) hosts() {
 		"state": "disabled", "reason": sc.Reg.New(ClassAdminReason, "", "host state reason"),
 	}}, ok...)
 }
+
+// incomingWebhooks drives the incoming webhooks (M2-27, SEC-T10): an app with messages:write and
+// write on Support/Eskalation, a webhook with a canary name, posts with the token in the path and
+// in Authorization and canary message texts, the list and the revoke. The token is registered as a
+// secret, so the scan proves it appears nowhere (access log, spans and problems carry only the
+// route pattern).
+func (sc *Scenario) incomingWebhooks() {
+	sc.T.Helper()
+	o := sc.W.Owner
+	eskalation := sc.W.Channels["Support/Eskalation"]
+	app := firstID(sc.post(o, "/apps", map[string]any{
+		"manifest": map[string]any{
+			"schema_version": 1, "slug": "notifier", "name": sc.Reg.New(ClassContent, "", "incoming app name"),
+			"description": sc.Reg.New(ClassContent, "", "incoming app description"), "publisher": "Example Org",
+			"version": "1.0.0", "min_api_version": "0.1",
+			"scopes": map[string]any{"required": []string{"messages:write"}, "optional": []string{}},
+		},
+		"granted_scopes": []string{"messages:write"}, "reason": sc.Reg.New(ClassAdminReason, "", "incoming app install reason"),
+	}, created...), "id", "app.id")
+	sc.post(o, "/grants", map[string]any{"subject_kind": "app", "subject_id": app, "target_kind": "channel", "target_id": eskalation,
+		"level": "write", "reason": sc.Reg.New(ClassAdminReason, "", "incoming app grant reason")}, created...)
+	res := obj(sc.post(o, "/channels/"+eskalation+"/incoming-webhooks", map[string]any{
+		"app_id": app, "name": sc.Reg.New(ClassContent, "", "incoming webhook name"),
+	}, created...))
+	url := str(res, "url")
+	token := url[strings.LastIndex(url, "/")+1:]
+	sc.Reg.Register(token, ClassSecret, "", "incoming webhook token")
+	hook := ""
+	if w, ok := res["webhook"].(map[string]any); ok {
+		hook = jsonText(w["id"])
+	}
+	body := func(what string) []byte {
+		b, _ := json.Marshal(map[string]any{"content_md": sc.Reg.New(ClassContent, "", what), "client_msg_id": newID()})
+		return b
+	}
+	if r := sc.raw(http.MethodPost, "/hooks/"+hook+"/"+token, nil, body("incoming webhook message (path)"), "incoming webhook"); r.Status != http.StatusCreated {
+		sc.T.Errorf("postIncomingWebhook: %d", r.Status)
+	}
+	hdr := http.Header{}
+	hdr.Set("Authorization", "Bearer "+token)
+	if r := sc.raw(http.MethodPost, "/hooks/"+hook, hdr, body("incoming webhook message (bearer)"), "incoming webhook"); r.Status != http.StatusCreated {
+		sc.T.Errorf("postIncomingWebhookWithBearer: %d", r.Status)
+	}
+	sc.get(o, "/channels/"+eskalation+"/incoming-webhooks", ok...)
+	sc.del(o, "/incoming-webhooks/"+hook, none...)
+	if r := sc.raw(http.MethodPost, "/hooks/"+hook+"/"+token, nil, body("incoming webhook message (revoked)"), "incoming webhook"); r.Status != http.StatusNotFound {
+		sc.T.Errorf("post after revoke: %d", r.Status)
+	}
+}

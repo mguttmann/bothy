@@ -15,7 +15,8 @@ T = TypeVar("T", bound="IncomingWebhookList")
 
 @_attrs_define
 class IncomingWebhookList:
-    """
+    """The active incoming webhooks of a channel in creation order; revoked ones are not listed.
+
     Attributes:
         items (list[IncomingWebhook]):
     """

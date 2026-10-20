@@ -12,7 +12,7 @@ part 'incoming_webhook_result.g.dart';
 ///
 /// Properties:
 /// * [messageId] - UUIDv7 (RFC 9562), lowercase canonical form.
-/// * [threadId] - UUIDv7 (RFC 9562), lowercase canonical form.
+/// * [threadId] - The thread the message landed in; with a `title` in a text channel the new thread that starts from the message, which itself stands in the main thread.
 @BuiltValue()
 abstract class IncomingWebhookResult
     implements Built<IncomingWebhookResult, IncomingWebhookResultBuilder> {
@@ -20,7 +20,7 @@ abstract class IncomingWebhookResult
   @BuiltValueField(wireName: r'message_id')
   String get messageId;
 
-  /// UUIDv7 (RFC 9562), lowercase canonical form.
+  /// The thread the message landed in; with a `title` in a text channel the new thread that starts from the message, which itself stands in the main thread.
   @BuiltValueField(wireName: r'thread_id')
   String get threadId;
 

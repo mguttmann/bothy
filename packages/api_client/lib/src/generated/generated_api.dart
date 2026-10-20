@@ -80,6 +80,7 @@ export 'package:api_client/src/generated/model/agent_session_report.dart';
 export 'package:api_client/src/generated/model/agent_triggerers.dart';
 export 'package:api_client/src/generated/model/agent_update.dart';
 export 'package:api_client/src/generated/model/agent_updated_event.dart';
+export 'package:api_client/src/generated/model/alertmanager_alert.dart';
 export 'package:api_client/src/generated/model/api_token.dart';
 export 'package:api_client/src/generated/model/api_token_create.dart';
 export 'package:api_client/src/generated/model/api_token_created.dart';

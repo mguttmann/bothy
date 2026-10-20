@@ -7204,7 +7204,7 @@ paths:
                       channel_id: 0192f4a0-7b1c-72d4-8bae-7661d2b2f203
                       name: Monitoring alerts
                       created_at: '2026-10-10T09:30:00.000Z'
-                    url: /api/v1/hooks/0192f4a0-7b1c-7000-8a00-000000000901/iwt_EXAMPLEStGXR8Z5jdH
+                    url: https://chat.example.com/api/v1/hooks/0192f4a0-7b1c-784b-80fa-070d5a412eea/bothy_whi_EXAMPLE000000000000000000000000000000000000_2WwD3e
         '400':
           $ref: '#/components/responses/BadRequest'
         '401':
@@ -7252,20 +7252,37 @@ paths:
         default:
           $ref: '#/components/responses/Error'
 
-  /hooks/{webhook_id}/{token}:
+  /hooks/{webhook_id}:
     post:
-      operationId: postIncomingWebhook
-      summary: Post a message through an incoming webhook
+      operationId: postIncomingWebhookWithBearer
+      summary: Post a message through an incoming webhook with the token in Authorization
       tags: [Webhooks]
       description: |-
-        The token in the path authenticates the call; servers redact it in logs. Messages have `origin =
-        app` and never trigger agents. Unknown or revoked webhooks give 404.
+        The token of the incoming webhook is sent as `Authorization: Bearer <token>`; the path ends with the webhook ID. Use this variant where the sender can set a header, so the token never appears in a URL. Of the root security only `bearerAuth` applies here, with the token of the incoming webhook; any other scheme or credential counts as a wrong token (`404`).
+
+        The format is recognised per request from the body: a body with at least one Alertmanager member
+        (`version`, `groupKey`, `truncatedAlerts`, `status`, `receiver`, `groupLabels`, `commonLabels`,
+        `commonAnnotations`, `externalURL`, `alerts`) is the unchanged webhook payload of Prometheus
+        Alertmanager and gives one message per notification; it must carry no native member (`400
+        validation_failed`, `format_mixed`). Every other body is `native`: Markdown in `content_md` with
+        optional `title`, `thread_id` and `client_msg_id`. A format outside `webhook_in.formats_enabled`
+        gives `400 validation_failed` with `format_disabled`.
+
+        Order of checks (11 8.4): `rl.webhook_in` of the webhook (`429`), the token (`404`), the body up to
+        `webhook_in.max_body_bytes` (`413`), the format (`400`), `authorize` of the app (`404`), then the
+        message (`201`). An unknown or revoked webhook, a wrong or malformed token, a suspended or
+        uninstalled app and every refusal of the app's rights give the same `404`. A failed token check
+        counts against `rl.public_auth` of the client IP.
+
+        The message has `origin = app` with the app as author, resolves no mentions and never triggers an
+        agent. `native` with `client_msg_id` is idempotent: a repeat answers `200` with the original and
+        `Idempotent-Replay: true`, other content with the same `client_msg_id` `422 idempotency_key_reuse`.
+        Senders inside the stack reach the same path on the internal listener.
       x-authz-action: webhook_in.post
       x-rate-limit-class: rl.webhook_in
       x-idempotency-exempt: client_id
       parameters:
       - $ref: '#/components/parameters/WebhookIdPath'
-      - $ref: '#/components/parameters/TokenPath'
       requestBody:
         required: true
         content:
@@ -7273,10 +7290,38 @@ paths:
             schema:
               $ref: '#/components/schemas/IncomingWebhookPost'
             examples:
-              default:
+              native:
                 value:
                   content_md: Disk usage above threshold on build host.
                   title: Disk alert
+                  client_msg_id: 0192f4a0-7b1c-7f4e-8959-c3574b6ad93b
+              alertmanager:
+                value:
+                  version: '4'
+                  groupKey: '{}:{alertname="DiskFull"}'
+                  truncatedAlerts: 0
+                  status: firing
+                  receiver: bothy-ops
+                  groupLabels:
+                    alertname: DiskFull
+                  commonLabels:
+                    alertname: DiskFull
+                    severity: warning
+                  commonAnnotations:
+                    summary: Disk usage above threshold.
+                  externalURL: https://alertmanager.example.com
+                  alerts:
+                  - status: firing
+                    labels:
+                      alertname: DiskFull
+                      instance: build.example.com
+                      severity: warning
+                    annotations:
+                      summary: Disk usage above threshold.
+                    startsAt: '2026-10-10T09:30:00.000Z'
+                    endsAt: '0001-01-01T00:00:00Z'
+                    generatorURL: https://prometheus.example.com/graph
+                    fingerprint: 4a1f0c2b9d3e5f60
       responses:
         '201':
           description: Created.
@@ -7296,12 +7341,157 @@ paths:
                   value:
                     message_id: 0192f4a0-7b1c-7353-8d8c-dea659467151
                     thread_id: 0192f4a0-7b1c-78f9-8074-fa94e84bab7d
+        '200':
+          description: 'Replay: the original created by an earlier `native` request with the same `client_msg_id`.'
+          headers:
+            Correlation-Id:
+              $ref: '#/components/headers/Correlation-Id'
+            RateLimit:
+              $ref: '#/components/headers/RateLimit'
+            RateLimit-Policy:
+              $ref: '#/components/headers/RateLimit-Policy'
+            Idempotent-Replay:
+              $ref: '#/components/headers/Idempotent-Replay'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/IncomingWebhookResult'
+              examples:
+                default:
+                  value:
+                    message_id: 0192f4a0-7b1c-7353-8d8c-dea659467151
+                    thread_id: 0192f4a0-7b1c-78f9-8074-fa94e84bab7d
         '400':
           $ref: '#/components/responses/BadRequest'
         '404':
           $ref: '#/components/responses/NotFound'
         '413':
           $ref: '#/components/responses/PayloadTooLarge'
+        '422':
+          $ref: '#/components/responses/UnprocessableEntity'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        default:
+          $ref: '#/components/responses/Error'
+
+  /hooks/{webhook_id}/{token}:
+    post:
+      operationId: postIncomingWebhook
+      summary: Post a message through an incoming webhook
+      tags: [Webhooks]
+      description: |-
+        The token is the last path segment; `Authorization` is ignored. Servers write the path only as its pattern `/api/v1/hooks/{webhook_id}/{token}` in logs, traces and `Problem.instance`, and reverse proxies must redact it (16 4.3).
+
+        The format is recognised per request from the body: a body with at least one Alertmanager member
+        (`version`, `groupKey`, `truncatedAlerts`, `status`, `receiver`, `groupLabels`, `commonLabels`,
+        `commonAnnotations`, `externalURL`, `alerts`) is the unchanged webhook payload of Prometheus
+        Alertmanager and gives one message per notification; it must carry no native member (`400
+        validation_failed`, `format_mixed`). Every other body is `native`: Markdown in `content_md` with
+        optional `title`, `thread_id` and `client_msg_id`. A format outside `webhook_in.formats_enabled`
+        gives `400 validation_failed` with `format_disabled`.
+
+        Order of checks (11 8.4): `rl.webhook_in` of the webhook (`429`), the token (`404`), the body up to
+        `webhook_in.max_body_bytes` (`413`), the format (`400`), `authorize` of the app (`404`), then the
+        message (`201`). An unknown or revoked webhook, a wrong or malformed token, a suspended or
+        uninstalled app and every refusal of the app's rights give the same `404`. A failed token check
+        counts against `rl.public_auth` of the client IP.
+
+        The message has `origin = app` with the app as author, resolves no mentions and never triggers an
+        agent. `native` with `client_msg_id` is idempotent: a repeat answers `200` with the original and
+        `Idempotent-Replay: true`, other content with the same `client_msg_id` `422 idempotency_key_reuse`.
+        Senders inside the stack reach the same path on the internal listener.
+      x-authz-action: webhook_in.post
+      x-rate-limit-class: rl.webhook_in
+      x-idempotency-exempt: client_id
+      parameters:
+      - $ref: '#/components/parameters/WebhookIdPath'
+      - $ref: '#/components/parameters/TokenPath'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/IncomingWebhookPost'
+            examples:
+              native:
+                value:
+                  content_md: Disk usage above threshold on build host.
+                  title: Disk alert
+                  client_msg_id: 0192f4a0-7b1c-7f4e-8959-c3574b6ad93b
+              alertmanager:
+                value:
+                  version: '4'
+                  groupKey: '{}:{alertname="DiskFull"}'
+                  truncatedAlerts: 0
+                  status: firing
+                  receiver: bothy-ops
+                  groupLabels:
+                    alertname: DiskFull
+                  commonLabels:
+                    alertname: DiskFull
+                    severity: warning
+                  commonAnnotations:
+                    summary: Disk usage above threshold.
+                  externalURL: https://alertmanager.example.com
+                  alerts:
+                  - status: firing
+                    labels:
+                      alertname: DiskFull
+                      instance: build.example.com
+                      severity: warning
+                    annotations:
+                      summary: Disk usage above threshold.
+                    startsAt: '2026-10-10T09:30:00.000Z'
+                    endsAt: '0001-01-01T00:00:00Z'
+                    generatorURL: https://prometheus.example.com/graph
+                    fingerprint: 4a1f0c2b9d3e5f60
+      responses:
+        '201':
+          description: Created.
+          headers:
+            Correlation-Id:
+              $ref: '#/components/headers/Correlation-Id'
+            RateLimit:
+              $ref: '#/components/headers/RateLimit'
+            RateLimit-Policy:
+              $ref: '#/components/headers/RateLimit-Policy'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/IncomingWebhookResult'
+              examples:
+                default:
+                  value:
+                    message_id: 0192f4a0-7b1c-7353-8d8c-dea659467151
+                    thread_id: 0192f4a0-7b1c-78f9-8074-fa94e84bab7d
+        '200':
+          description: 'Replay: the original created by an earlier `native` request with the same `client_msg_id`.'
+          headers:
+            Correlation-Id:
+              $ref: '#/components/headers/Correlation-Id'
+            RateLimit:
+              $ref: '#/components/headers/RateLimit'
+            RateLimit-Policy:
+              $ref: '#/components/headers/RateLimit-Policy'
+            Idempotent-Replay:
+              $ref: '#/components/headers/Idempotent-Replay'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/IncomingWebhookResult'
+              examples:
+                default:
+                  value:
+                    message_id: 0192f4a0-7b1c-7353-8d8c-dea659467151
+                    thread_id: 0192f4a0-7b1c-78f9-8074-fa94e84bab7d
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '413':
+          $ref: '#/components/responses/PayloadTooLarge'
+        '422':
+          $ref: '#/components/responses/UnprocessableEntity'
         '429':
           $ref: '#/components/responses/TooManyRequests'
         default:
@@ -19886,7 +20076,8 @@ components:
       scheme: bearer
       description: |-
         API token of an agent, app or personal tool without key binding (`Authorization: Bearer
-        <token>`).
+        <token>`). On `postIncomingWebhookWithBearer` only, the token of an incoming webhook
+        (`bothy_whi_...`) instead.
     consoleSession:
       type: apiKey
       in: cookie
@@ -20093,7 +20284,7 @@ components:
       required: true
       schema:
         type: string
-        examples: [iwt_EXAMPLEStGXR8Z5jdH]
+        examples: [bothy_whi_EXAMPLE000000000000000000000000000000000000_2WwD3e]
     ThreadIdPath:
       name: thread_id
       in: path
@@ -25863,6 +26054,12 @@ components:
     IncomingWebhookCreate:
       type: object
       additionalProperties: false
+      description: |-
+        Body of `createIncomingWebhook`. `app_id` names an app principal whose installation is
+        `active` (else `400 validation_failed` with `errors[].code` `app_not_installed`) and that may
+        write in the channel (else `app_cannot_write`); `thread_id`, when present, is a thread of this
+        channel (else `not_in_channel`, an unknown ID too). `name` is not empty and has no control or
+        bidi characters.
       required: [app_id, name]
       properties:
         app_id:
@@ -25880,11 +26077,14 @@ components:
           $ref: '#/components/schemas/IncomingWebhook'
         url:
           type: string
-          description: Full URL including the token. Shown once.
+          description: |-
+            Absolute URL from `server.public_url` including the token, shown once. Senders that set a
+            header drop the last segment and send the token as `Authorization: Bearer <token>`.
           examples:
-          - /api/v1/hooks/0192f4a0-7b1c-7000-8a00-000000000901/iwt_EXAMPLEStGXR8Z5jdH
+          - https://chat.example.com/api/v1/hooks/0192f4a0-7b1c-7000-8a00-000000000901/bothy_whi_EXAMPLE000000000000000000000000000000000000_2WwD3e
     IncomingWebhookList:
       type: object
+      description: The active incoming webhooks of a channel in creation order; revoked ones are not listed.
       required: [items]
       properties:
         items:
@@ -25894,18 +26094,90 @@ components:
     IncomingWebhookPost:
       type: object
       additionalProperties: false
-      required: [content_md]
+      description: |-
+        Body of an incoming webhook call in one of two shapes, recognised per request (11 8.2,
+        docs/DECISIONS.md D-M2-27-5). A body with at least one Alertmanager member (`version`,
+        `groupKey`, `truncatedAlerts`, `status`, `receiver`, `groupLabels`, `commonLabels`,
+        `commonAnnotations`, `externalURL`, `alerts`) is the unchanged webhook payload of Prometheus
+        Alertmanager (format `alertmanager`) and must contain no native member; every other body is
+        `native` and needs `content_md`. Unknown members are refused.
       properties:
         content_md:
           type: string
+          description: Native. Markdown content, at most `message.max_content_bytes` UTF-8 bytes.
           examples: [Disk usage above threshold on build host.]
         client_msg_id:
           $ref: '#/components/schemas/Uuid'
-          description: Optional; makes retries of the sender idempotent.
+          description: Native. Optional UUIDv7; makes retries of the sender idempotent.
         title:
           type: string
-          description: Title of a new thread when the webhook has no fixed thread.
+          description: Native. Title of a new thread when the webhook has no fixed thread; required in a forum.
           examples: [Disk alert]
+        thread_id:
+          $ref: '#/components/schemas/Uuid'
+          description: Native. Thread of the webhook's channel to write into when the webhook has no fixed thread.
+        version:
+          type: string
+          enum: ['4']
+          description: Alertmanager. Version of the webhook payload.
+        groupKey:
+          type: string
+          description: Alertmanager. Key of the alert group.
+        truncatedAlerts:
+          type: integer
+          format: int64
+          minimum: 0
+          description: Alertmanager. Number of alerts left out of `alerts`.
+        status:
+          type: string
+          enum: [firing, resolved]
+          description: Alertmanager. State of the group.
+        receiver:
+          type: string
+          description: Alertmanager. Name of the receiver.
+        groupLabels:
+          $ref: '#/components/schemas/JsonObject'
+          description: Alertmanager. Labels of the group; every value is a string.
+        commonLabels:
+          $ref: '#/components/schemas/JsonObject'
+          description: Alertmanager. Labels all alerts share; every value is a string.
+        commonAnnotations:
+          $ref: '#/components/schemas/JsonObject'
+          description: Alertmanager. Annotations all alerts share; every value is a string.
+        externalURL:
+          type: string
+          description: Alertmanager. Address of the sending Alertmanager; written as text, never fetched.
+        alerts:
+          type: array
+          minItems: 1
+          description: Alertmanager. The alerts of the notification.
+          items:
+            $ref: '#/components/schemas/AlertmanagerAlert'
+    AlertmanagerAlert:
+      type: object
+      additionalProperties: false
+      description: One alert of an Alertmanager webhook payload; `status` and `labels` are required (checked with `errors[].code` `required`).
+      properties:
+        status:
+          type: string
+          enum: [firing, resolved]
+        labels:
+          $ref: '#/components/schemas/JsonObject'
+          description: Labels of the alert; every value is a string.
+        annotations:
+          $ref: '#/components/schemas/JsonObject'
+          description: Annotations of the alert; every value is a string.
+        startsAt:
+          type: string
+          format: date-time
+        endsAt:
+          type: string
+          format: date-time
+        generatorURL:
+          type: string
+          description: Address of the rule's source; written as text, never fetched.
+        fingerprint:
+          type: string
     AuditEvent:
       type: object
       required:
@@ -27409,6 +27681,9 @@ components:
           $ref: '#/components/schemas/Uuid'
         thread_id:
           $ref: '#/components/schemas/Uuid'
+          description: |-
+            The thread the message landed in; with a `title` in a text channel the new thread that
+            starts from the message, which itself stands in the main thread.
     StatsMetric:
       type: string
       description: Metric of the own measurement in `stats_minutes` (docs/spec/25-visualisierung.md, section 3.2).

@@ -142,6 +142,9 @@ type Handlers struct {
 	// updateWebhookSubscription, deleteWebhookSubscription, listWebhookDeliveries and
 	// redeliverWebhook (apps, M2-26).
 	*appshttp.Webhooks
+	// Incoming implements listIncomingWebhooks, createIncomingWebhook, revokeIncomingWebhook,
+	// postIncomingWebhook and postIncomingWebhookWithBearer (apps, M2-27).
+	*appshttp.Incoming
 	// Personal implements listMyReadStates, putReadState, markThreadUnread, putThreadDraft,
 	// deleteThreadDraft, putChannelDraft, deleteChannelDraft, listMyDrafts, listMySettings,
 	// putMySetting, deleteMySetting and getMySidebar (sync, M1-61).
@@ -174,11 +177,31 @@ func RouteOptions() routes.Options {
 	}
 }
 
+// actionWebhookInPost is the action of the two post operations of the incoming webhooks (M2-27).
+const actionWebhookInPost = "webhook_in.post"
+
+// RouteOption adjusts the chain operation of a route before it is wrapped.
+type RouteOption func(*httpserver.Operation)
+
+// WebhookBodyLimit sets the body limit of the two post operations of the incoming webhooks to
+// limit bytes (webhook_in.max_body_bytes, M2-27 design note 1 a) instead of
+// http.max_json_body_bytes.
+func WebhookBodyLimit(limit int64) RouteOption {
+	return func(op *httpserver.Operation) {
+		if op.Action == actionWebhookInPost {
+			op.BodyLimit, op.BodyLimitKey = limit, keyWebhookInMaxBodyBytes
+		}
+	}
+}
+
 // HTTPOperation converts an operation of the route table into the operation type of the HTTP
-// chain, which must not depend on the generated layer.
+// chain, which must not depend on the generated layer. The operations with action webhook_in.post
+// keep their credential away from the authenticator (AnonymousCredentials, M2-27 design note 2):
+// their token is no API token, and the token check of apps verifies it.
 func HTTPOperation(op routes.Operation) httpserver.Operation {
 	return httpserver.Operation{
-		ID: op.ID, Method: op.Method, Path: op.Path, Pattern: op.Pattern, Action: op.Action,
+		AnonymousCredentials: op.Action == actionWebhookInPost,
+		ID:                   op.ID, Method: op.Method, Path: op.Path, Pattern: op.Pattern, Action: op.Action,
 		RateLimitClass: op.RateLimitClass,
 		Public:         op.Public, IdempotencyKey: op.IdempotencyKey,
 		IfMatch:      httpserver.IfMatchMode(op.IfMatch),
@@ -215,15 +238,15 @@ func HTTPOperation(op routes.Operation) httpserver.Operation {
 //	if err := wire.MountRoutes(role, publicMux, handlers, authzCatalog, chain, log); err != nil {
 //		return err // exit code 1, never ready
 //	}
-func MountRoutes(role Role, mux Mux, h Handlers, cat routes.Catalog, chain *httpserver.Chain, log *slog.Logger) error {
+func MountRoutes(role Role, mux Mux, h Handlers, cat routes.Catalog, chain *httpserver.Chain, log *slog.Logger, opts ...RouteOption) error {
 	return mountRoutes(role, mux, func(opts routes.Options, c routes.Catalog) ([]routes.Route, error) {
 		return routes.Build(h, opts, c)
-	}, cat, chain, log)
+	}, cat, chain, log, opts...)
 }
 
 // mountRoutes is MountRoutes with the builder as a parameter, so tests run the start step on the
 // generator's fixture surface.
-func mountRoutes(role Role, mux Mux, build routeBuilder, cat routes.Catalog, chain *httpserver.Chain, log *slog.Logger) error {
+func mountRoutes(role Role, mux Mux, build routeBuilder, cat routes.Catalog, chain *httpserver.Chain, log *slog.Logger, opts ...RouteOption) error {
 	switch role {
 	case RoleWorker:
 		return nil
@@ -239,7 +262,7 @@ func mountRoutes(role Role, mux Mux, build routeBuilder, cat routes.Catalog, cha
 	}
 	rs, err := build(RouteOptions(), cat)
 	if err == nil {
-		rs = wrapRoutes(chain, rs)
+		rs = wrapRoutes(chain, rs, opts...)
 		// A scratch mux first: routes that conflict with each other fail before the real mux
 		// holds any of them.
 		err = mount(http.NewServeMux(), rs)
@@ -275,12 +298,16 @@ func mount(mux Mux, rs []routes.Route) (err error) {
 // wrapRoutes returns the routes with the chain around each handler, plus one preflight route per
 // enabled path when CORS origins are configured. Preflight routes carry the pattern
 // "OPTIONS <path>" and an Operation with only Pattern and Method set.
-func wrapRoutes(chain *httpserver.Chain, rs []routes.Route) []routes.Route {
+func wrapRoutes(chain *httpserver.Chain, rs []routes.Route, opts ...RouteOption) []routes.Route {
 	out := make([]routes.Route, 0, len(rs))
 	methods := map[string][]string{}
 	var paths []string
 	for _, r := range rs {
-		out = append(out, routes.Route{Operation: r.Operation, Handler: chain.Wrap(HTTPOperation(r.Operation), r.Handler)})
+		op := HTTPOperation(r.Operation)
+		for _, o := range opts {
+			o(&op)
+		}
+		out = append(out, routes.Route{Operation: r.Operation, Handler: chain.Wrap(op, r.Handler)})
 		if _, seen := methods[r.Operation.Path]; !seen {
 			paths = append(paths, r.Operation.Path)
 		}

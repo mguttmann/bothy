@@ -62,6 +62,8 @@ Serializers _$serializers =
           ..add(AgentUpdate.serializer)
           ..add(AgentUpdatedEvent.serializer)
           ..add(AgentUpdatedEventTypeEnum.serializer)
+          ..add(AlertmanagerAlert.serializer)
+          ..add(AlertmanagerAlertStatusEnum.serializer)
           ..add(ApiToken.serializer)
           ..add(ApiTokenCreate.serializer)
           ..add(ApiTokenCreated.serializer)
@@ -359,6 +361,8 @@ Serializers _$serializers =
           ..add(IncomingWebhookCreated.serializer)
           ..add(IncomingWebhookList.serializer)
           ..add(IncomingWebhookPost.serializer)
+          ..add(IncomingWebhookPostStatusEnum.serializer)
+          ..add(IncomingWebhookPostVersionEnum.serializer)
           ..add(IncomingWebhookResult.serializer)
           ..add(InstanceInfo.serializer)
           ..add(InstanceLimits.serializer)
@@ -1875,6 +1879,47 @@ Serializers _$serializers =
               const FullType.nullable(JsonObject),
             ]),
             () => MapBuilder<String, JsonObject?>(),
+          )
+          ..addBuilderFactory(
+            const FullType(BuiltMap, const [
+              const FullType(String),
+              const FullType.nullable(JsonObject),
+            ]),
+            () => MapBuilder<String, JsonObject?>(),
+          )
+          ..addBuilderFactory(
+            const FullType(BuiltMap, const [
+              const FullType(String),
+              const FullType.nullable(JsonObject),
+            ]),
+            () => MapBuilder<String, JsonObject?>(),
+          )
+          ..addBuilderFactory(
+            const FullType(BuiltMap, const [
+              const FullType(String),
+              const FullType.nullable(JsonObject),
+            ]),
+            () => MapBuilder<String, JsonObject?>(),
+          )
+          ..addBuilderFactory(
+            const FullType(BuiltMap, const [
+              const FullType(String),
+              const FullType.nullable(JsonObject),
+            ]),
+            () => MapBuilder<String, JsonObject?>(),
+          )
+          ..addBuilderFactory(
+            const FullType(BuiltMap, const [
+              const FullType(String),
+              const FullType.nullable(JsonObject),
+            ]),
+            () => MapBuilder<String, JsonObject?>(),
+          )
+          ..addBuilderFactory(
+            const FullType(BuiltList, const [
+              const FullType(AlertmanagerAlert),
+            ]),
+            () => ListBuilder<AlertmanagerAlert>(),
           )
           ..addBuilderFactory(
             const FullType(BuiltSet, const [const FullType(String)]),

@@ -10,6 +10,8 @@ import (
 	"slices"
 	"strings"
 
+	appspg "github.com/OWNER/bothy/services/server/internal/apps/adapters/postgres"
+	appsapp "github.com/OWNER/bothy/services/server/internal/apps/app"
 	auditapp "github.com/OWNER/bothy/services/server/internal/audit/app"
 	authzapp "github.com/OWNER/bothy/services/server/internal/authz/app"
 	"github.com/OWNER/bothy/services/server/internal/kernel/txn"
@@ -49,6 +51,9 @@ type Modules struct {
 	// triggering message, M2-05); required. It writes nothing until the chat step binds it to the
 	// runs use cases (Acceptor.Bind, D-M2-05-19).
 	RunsAcceptor *runsapp.Acceptor
+	// AppsArchive is the in-transaction subscriber of apps (ChannelArchived revokes the incoming
+	// webhooks of the channel, M2-27); required.
+	AppsArchive *appsapp.ArchiveSubscriber
 }
 
 // NewModules returns the module objects over pool with log for their reports; pool may be nil
@@ -57,7 +62,8 @@ type Modules struct {
 func NewModules(pool *pg.Pool, log *slog.Logger) *Modules {
 	return &Modules{Authz: mustRightsHook(pool, RightsSources{}, nil, log), Sync: newSyncHook(pool, log), Audit: newAuditChain(pool, log),
 		SyncSubscribers: newSyncSubscribers(pool), NotifySubscribers: newNotifySubscribers(pool),
-		MessagingSubscribers: newMessagingSubscribers(pool), RunsAcceptor: runsapp.NewAcceptor()}
+		MessagingSubscribers: newMessagingSubscribers(pool), RunsAcceptor: runsapp.NewAcceptor(),
+		AppsArchive: appsapp.NewArchiveSubscriber(appspg.NewRepository(pool))}
 }
 
 // NewTxnRegistry returns the sealed txn registry of a process role: every role (api, worker,
@@ -160,7 +166,8 @@ func registerTxn(reg *txn.Registry, m *Modules) error {
 }
 
 // subscribeArchivesAndRuns registers chat.ChannelArchived and chat.SpaceArchived -> notify, then
-// messaging.MessagePosted -> runs after the existing subscribers (M2-05).
+// messaging.MessagePosted -> runs after the existing subscribers (M2-05), then
+// chat.ChannelArchived -> apps (the incoming webhooks of the channel, M2-27).
 func subscribeArchivesAndRuns(reg *txn.Registry, m *Modules) error {
 	if err := txn.Subscribe(reg, m.NotifySubscribers.OnChannelArchived); err != nil {
 		return err
@@ -171,8 +178,18 @@ func subscribeArchivesAndRuns(reg *txn.Registry, m *Modules) error {
 	if m.RunsAcceptor == nil {
 		return errNoRunsAcceptor
 	}
-	return txn.Subscribe(reg, m.RunsAcceptor.OnMessagePosted)
+	if err := txn.Subscribe(reg, m.RunsAcceptor.OnMessagePosted); err != nil {
+		return err
+	}
+	if m.AppsArchive == nil {
+		return errNoAppsArchive
+	}
+	return txn.Subscribe(reg, m.AppsArchive.OnChannelArchived)
 }
+
+// errNoAppsArchive reports Modules without the archive subscriber of apps: an archived channel
+// would keep incoming webhooks that can never post again.
+var errNoAppsArchive = errors.New("wire: the txn registry needs the archive subscriber of apps (Modules.AppsArchive)")
 
 // UnitConfig binds the configuration of the unit of work (database.tx_retry_max and the three
 // transaction deadlines) from v. The error names the key whose binding failed, never a value.

@@ -28,6 +28,7 @@ import (
 	appshttp "github.com/OWNER/bothy/services/server/internal/apps/adapters/httpapi"
 	appspg "github.com/OWNER/bothy/services/server/internal/apps/adapters/postgres"
 	appsapp "github.com/OWNER/bothy/services/server/internal/apps/app"
+	chatapp "github.com/OWNER/bothy/services/server/internal/chat/app"
 	"github.com/OWNER/bothy/services/server/internal/audit/adapters/logs"
 	auditpg "github.com/OWNER/bothy/services/server/internal/audit/adapters/postgres"
 	auditapp "github.com/OWNER/bothy/services/server/internal/audit/app"
@@ -49,6 +50,7 @@ import (
 	"github.com/OWNER/bothy/services/server/internal/kernel/ids"
 	"github.com/OWNER/bothy/services/server/internal/kernel/jose"
 	"github.com/OWNER/bothy/services/server/internal/kernel/txn"
+	messagingapp "github.com/OWNER/bothy/services/server/internal/messaging/app"
 	"github.com/OWNER/bothy/services/server/internal/platform/egress"
 	"github.com/OWNER/bothy/services/server/internal/platform/httpserver"
 	"github.com/OWNER/bothy/services/server/internal/platform/httpserver/httpservertest"
@@ -99,6 +101,14 @@ var idCfg = identityapp.Config{
 var appsCfg = appsapp.Config{
 	ManifestMaxBytes: 65536, AllowedHosts: []string{AllowedHost, IPHost, LongHost}, CommandMax: 100, CommandDescriptionMaxChars: 100,
 	HandleMaxChars: 32, DisplayNameMaxChars: 64, ReasonMaxChars: 500, PageSizeDefault: 2, PageSizeMax: 3,
+}
+
+// chatConfig is the configuration of the chat use cases of the world (the keys NewChat requires).
+var chatConfig = chatapp.Config{
+	SpaceNameMaxChars: 40, ChannelNameMaxChars: 40, ChannelTopicMaxChars: 200, TagNameMaxChars: 20,
+	HistoryBackfillLimitDefault: 20, HistoryBackfillLimitMax: 200, ThreadTitleMaxChars: 200, ThreadMaxTags: 5,
+	PlaceholderTitles: []string{"New chat", "Untitled"}, PageSizeDefault: 20, PageSizeMax: 50,
+	ProjectBindingTextMaxChars: 64, ReasonMaxChars: 200,
 }
 
 // testPepper is the token pepper of the world (never a secret).
@@ -272,9 +282,26 @@ func (w *World) buildApps(o Options, pool *pg.Pool, hook *authzapp.RightsHook, a
 	w.web.deps = appsapp.WebhookDeps{Store: repo, Repo: repo, UoW: w.uow, Authorizer: az, Audit: w.rec, Sender: sender, Master: master,
 		Keys: keys, State: instanceapp.NewState(instancepg.NewRepository(pool), w.uow), Log: syncRepo, Cursors: appshttp.Cursors{},
 		Clock: w.Clk, Logger: log}
+	// Chat and messaging serve the incoming webhooks the module builds (M2-27); the tests of this
+	// world reach them only through uninstall, which revokes the webhooks of the app.
+	rights, ok := az.(authz.RightsQuery)
+	if !ok {
+		t.Fatal("appsworld: the Authorizer is no rights query")
+	}
+	ch, err := wire.NewChat(chatConfig, pool, w.uow, az, rights, wire.ChatWrites{Audit: w.rec, Events: w.appender, Rights: hook,
+		Directory: w.id.Directory}, nil, w.Clk)
+	Must(t, err)
+	msgs, err := wire.NewMessaging(messagingapp.Config{MaxContentBytes: 4096, MaxMentions: 4, EventPayloadMaxBytes: 65536,
+		TemplateNameMaxChars: 64, TemplateMaxPerScope: 100, ListContentMaxBytes: 4096, PageSizeDefault: 20, PageSizeMax: 50,
+		EmojiMaxBytes: 64, MaxDistinctReactions: 20, MaxPinsPerThread: 50},
+		pool, w.uow, az, wire.MessagingWrites{Events: w.appender, Redactor: syncpg.NewRedactor(pool), Audit: w.rec}, ch.Service, w.id.Directory, w.Clk, log)
+	Must(t, err)
 	w.apps, err = wire.NewApps(cfg, pool, wire.AppsDeps{UoW: w.uow, Rights: hook, Authorizer: az, Audit: w.rec, Identity: w.id, Grants: w.admin,
 		Clock: w.Clk, Webhooks: wire.WebhookDeps{Config: wcfg, Keys: keys, State: instanceapp.NewState(instancepg.NewRepository(pool), w.uow),
-			Log: syncRepo, Master: master, Sender: sender, Logger: log}})
+			Log: syncRepo, Master: master, Sender: sender, Logger: log},
+		Incoming: appsapp.IncomingConfig{MaxContentBytes: 4096, FormatsEnabled: []string{"native", "alertmanager"},
+			LastUsedGranularity: idCfg.LastActiveGranularity, PublicURL: httpservertest.PublicURL},
+		Chat: ch, Messages: msgs})
 	Must(t, err)
 	w.migrateJobs()
 	w.apps.BindJobs(w.newRuntime(jobs.RoleAPI).Inserter())

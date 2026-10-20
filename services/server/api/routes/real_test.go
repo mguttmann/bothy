@@ -221,6 +221,26 @@ func (stubServer) UpdateWebhookSubscription(context.Context, rest.UpdateWebhookS
 	return nil, nil
 }
 
+func (stubServer) ListIncomingWebhooks(context.Context, rest.ListIncomingWebhooksRequestObject) (rest.ListIncomingWebhooksResponseObject, error) {
+	return nil, nil
+}
+
+func (stubServer) CreateIncomingWebhook(context.Context, rest.CreateIncomingWebhookRequestObject) (rest.CreateIncomingWebhookResponseObject, error) {
+	return nil, nil
+}
+
+func (stubServer) RevokeIncomingWebhook(context.Context, rest.RevokeIncomingWebhookRequestObject) (rest.RevokeIncomingWebhookResponseObject, error) {
+	return nil, nil
+}
+
+func (stubServer) PostIncomingWebhook(context.Context, rest.PostIncomingWebhookRequestObject) (rest.PostIncomingWebhookResponseObject, error) {
+	return nil, nil
+}
+
+func (stubServer) PostIncomingWebhookWithBearer(context.Context, rest.PostIncomingWebhookWithBearerRequestObject) (rest.PostIncomingWebhookWithBearerResponseObject, error) {
+	return nil, nil
+}
+
 func (stubServer) DeleteWebhookSubscription(context.Context, rest.DeleteWebhookSubscriptionRequestObject) (rest.DeleteWebhookSubscriptionResponseObject, error) {
 	return nil, nil
 }
@@ -1152,6 +1172,12 @@ func TestRealTable_Enabled(t *testing.T) {
 		"suspendApp":         {"POST /api/v1/apps/{app_id}/suspend", "app.suspend", "rl.admin"},
 		"resumeApp":          {"POST /api/v1/apps/{app_id}/resume", "app.resume", "rl.admin"},
 		"uninstallApp":       {"POST /api/v1/apps/{app_id}/uninstall", "app.uninstall", "rl.admin"},
+		// M2-27
+		"listIncomingWebhooks":          {"GET /api/v1/channels/{channel_id}/incoming-webhooks", "webhook_in.read", "rl.read"},
+		"createIncomingWebhook":         {"POST /api/v1/channels/{channel_id}/incoming-webhooks", "webhook_in.create", "rl.admin"},
+		"revokeIncomingWebhook":         {"DELETE /api/v1/incoming-webhooks/{webhook_id}", "webhook_in.revoke", "rl.admin"},
+		"postIncomingWebhook":           {"POST /api/v1/hooks/{webhook_id}/{token}", "webhook_in.post", "rl.webhook_in"},
+		"postIncomingWebhookWithBearer": {"POST /api/v1/hooks/{webhook_id}", "webhook_in.post", "rl.webhook_in"},
 		// M2-26
 		"getWebhookKeys":            {"GET /api/v1/instance/webhook-keys", "instance.discovery.read", "rl.public_auth"},
 		"listWebhookSubscriptions":  {"GET /api/v1/apps/{app_id}/webhooks", "webhook_out.read", "rl.read"},

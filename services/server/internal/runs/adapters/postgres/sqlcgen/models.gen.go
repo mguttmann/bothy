@@ -349,6 +349,16 @@ type File struct {
 	SearchVector       interface{}
 }
 
+type FileThumbnail struct {
+	FileID    pgtype.UUID
+	Variant   string
+	ObjectKey string
+	MimeType  string
+	Width     int32
+	Height    int32
+	SizeBytes int64
+}
+
 type FileUploadPart struct {
 	FileID     pgtype.UUID
 	PartNumber int32
@@ -502,6 +512,19 @@ type IdentityProvider struct {
 	AllowProvisioning bool
 	CreatedAt         pgtype.Timestamptz
 	UpdatedAt         pgtype.Timestamptz
+}
+
+type IncomingWebhook struct {
+	ID         pgtype.UUID
+	AppID      pgtype.UUID
+	ChannelID  pgtype.UUID
+	ThreadID   pgtype.UUID
+	Name       string
+	TokenHash  []byte
+	CreatedBy  pgtype.UUID
+	CreatedAt  pgtype.Timestamptz
+	LastUsedAt pgtype.Timestamptz
+	RevokedAt  pgtype.Timestamptz
 }
 
 type Instance struct {

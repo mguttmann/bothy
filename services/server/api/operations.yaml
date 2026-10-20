@@ -49,6 +49,7 @@ enabled:             # operationIds that have a handler; sorted ascending
   - createGroup
   - createHost
   - createIdentityProvider
+  - createIncomingWebhook
   - createMessage
   - createPersonalTemplate
   - createQuietHoursRule
@@ -128,6 +129,7 @@ enabled:             # operationIds that have a handler; sorted ascending
   - listGroups
   - listHosts
   - listIdentityProviders
+  - listIncomingWebhooks
   - listInstanceSettings
   - listMessageRevisions
   - listMyDevices
@@ -168,6 +170,8 @@ enabled:             # operationIds that have a handler; sorted ascending
   - pairHost
   - pinMessage
   - pollAgentEvents
+  - postIncomingWebhook
+  - postIncomingWebhookWithBearer
   - previewGrant
   - putChannelBehavior
   - putChannelDraft
@@ -189,6 +193,7 @@ enabled:             # operationIds that have a handler; sorted ascending
   - resumeApp
   - revokeDevice
   - revokeGrant
+  - revokeIncomingWebhook
   - revokeOwner
   - revokePasskey
   - revokeSession
@@ -275,9 +280,6 @@ later:               # every other operationId of docs/api/openapi.yaml; sorted 
   - operation_id: createImportFile
     etappe: M8
     ticket: M8-03
-  - operation_id: createIncomingWebhook
-    etappe: M2
-    ticket: M2-27
   - operation_id: createInteraction
     etappe: M2
     ticket: M2-15
@@ -388,9 +390,6 @@ later:               # every other operationId of docs/api/openapi.yaml; sorted 
   - operation_id: listImports
     etappe: M8
     ticket: M8-03
-  - operation_id: listIncomingWebhooks
-    etappe: M2
-    ticket: M2-27
   - operation_id: listMyDms
     etappe: V3
     ticket: V3-01
@@ -403,9 +402,6 @@ later:               # every other operationId of docs/api/openapi.yaml; sorted 
   - operation_id: pauseImport
     etappe: M8
     ticket: M8-03
-  - operation_id: postIncomingWebhook
-    etappe: M2
-    ticket: M2-27
   - operation_id: reconcileCosts
     etappe: M2
     ticket: M2-28
@@ -433,9 +429,6 @@ later:               # every other operationId of docs/api/openapi.yaml; sorted 
   - operation_id: resumeRun
     etappe: M2
     ticket: M2-09
-  - operation_id: revokeIncomingWebhook
-    etappe: M2
-    ticket: M2-27
   - operation_id: search
     etappe: M3
     ticket: M3-14

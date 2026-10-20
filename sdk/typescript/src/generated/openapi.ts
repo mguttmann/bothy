@@ -2046,6 +2046,45 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/hooks/{webhook_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Post a message through an incoming webhook with the token in Authorization
+         * @description The token of the incoming webhook is sent as `Authorization: Bearer <token>`; the path ends with the webhook ID. Use this variant where the sender can set a header, so the token never appears in a URL. Of the root security only `bearerAuth` applies here, with the token of the incoming webhook; any other scheme or credential counts as a wrong token (`404`).
+         *
+         *     The format is recognised per request from the body: a body with at least one Alertmanager member
+         *     (`version`, `groupKey`, `truncatedAlerts`, `status`, `receiver`, `groupLabels`, `commonLabels`,
+         *     `commonAnnotations`, `externalURL`, `alerts`) is the unchanged webhook payload of Prometheus
+         *     Alertmanager and gives one message per notification; it must carry no native member (`400
+         *     validation_failed`, `format_mixed`). Every other body is `native`: Markdown in `content_md` with
+         *     optional `title`, `thread_id` and `client_msg_id`. A format outside `webhook_in.formats_enabled`
+         *     gives `400 validation_failed` with `format_disabled`.
+         *
+         *     Order of checks (11 8.4): `rl.webhook_in` of the webhook (`429`), the token (`404`), the body up to
+         *     `webhook_in.max_body_bytes` (`413`), the format (`400`), `authorize` of the app (`404`), then the
+         *     message (`201`). An unknown or revoked webhook, a wrong or malformed token, a suspended or
+         *     uninstalled app and every refusal of the app's rights give the same `404`. A failed token check
+         *     counts against `rl.public_auth` of the client IP.
+         *
+         *     The message has `origin = app` with the app as author, resolves no mentions and never triggers an
+         *     agent. `native` with `client_msg_id` is idempotent: a repeat answers `200` with the original and
+         *     `Idempotent-Replay: true`, other content with the same `client_msg_id` `422 idempotency_key_reuse`.
+         *     Senders inside the stack reach the same path on the internal listener.
+         */
+        post: operations["postIncomingWebhookWithBearer"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/hooks/{webhook_id}/{token}": {
         parameters: {
             query?: never;
@@ -2057,8 +2096,26 @@ export interface paths {
         put?: never;
         /**
          * Post a message through an incoming webhook
-         * @description The token in the path authenticates the call; servers redact it in logs. Messages have `origin =
-         *     app` and never trigger agents. Unknown or revoked webhooks give 404.
+         * @description The token is the last path segment; `Authorization` is ignored. Servers write the path only as its pattern `/api/v1/hooks/{webhook_id}/{token}` in logs, traces and `Problem.instance`, and reverse proxies must redact it (16 4.3).
+         *
+         *     The format is recognised per request from the body: a body with at least one Alertmanager member
+         *     (`version`, `groupKey`, `truncatedAlerts`, `status`, `receiver`, `groupLabels`, `commonLabels`,
+         *     `commonAnnotations`, `externalURL`, `alerts`) is the unchanged webhook payload of Prometheus
+         *     Alertmanager and gives one message per notification; it must carry no native member (`400
+         *     validation_failed`, `format_mixed`). Every other body is `native`: Markdown in `content_md` with
+         *     optional `title`, `thread_id` and `client_msg_id`. A format outside `webhook_in.formats_enabled`
+         *     gives `400 validation_failed` with `format_disabled`.
+         *
+         *     Order of checks (11 8.4): `rl.webhook_in` of the webhook (`429`), the token (`404`), the body up to
+         *     `webhook_in.max_body_bytes` (`413`), the format (`400`), `authorize` of the app (`404`), then the
+         *     message (`201`). An unknown or revoked webhook, a wrong or malformed token, a suspended or
+         *     uninstalled app and every refusal of the app's rights give the same `404`. A failed token check
+         *     counts against `rl.public_auth` of the client IP.
+         *
+         *     The message has `origin = app` with the app as author, resolves no mentions and never triggers an
+         *     agent. `native` with `client_msg_id` is idempotent: a repeat answers `200` with the original and
+         *     `Idempotent-Replay: true`, other content with the same `client_msg_id` `422 idempotency_key_reuse`.
+         *     Senders inside the stack reach the same path on the internal listener.
          */
         post: operations["postIncomingWebhook"];
         delete?: never;
@@ -8124,6 +8181,13 @@ export interface components {
             last_used_at?: components["schemas"]["Timestamp"];
             revoked_at?: components["schemas"]["Timestamp"];
         };
+        /**
+         * @description Body of `createIncomingWebhook`. `app_id` names an app principal whose installation is
+         *     `active` (else `400 validation_failed` with `errors[].code` `app_not_installed`) and that may
+         *     write in the channel (else `app_cannot_write`); `thread_id`, when present, is a thread of this
+         *     channel (else `not_in_channel`, an unknown ID too). `name` is not empty and has no control or
+         *     bidi characters.
+         */
         IncomingWebhookCreate: {
             app_id: components["schemas"]["Uuid"];
             /** @example Monitoring alerts */
@@ -8133,24 +8197,84 @@ export interface components {
         IncomingWebhookCreated: {
             webhook: components["schemas"]["IncomingWebhook"];
             /**
-             * @description Full URL including the token. Shown once.
-             * @example /api/v1/hooks/0192f4a0-7b1c-7000-8a00-000000000901/iwt_EXAMPLEStGXR8Z5jdH
+             * @description Absolute URL from `server.public_url` including the token, shown once. Senders that set a
+             *     header drop the last segment and send the token as `Authorization: Bearer <token>`.
+             * @example https://chat.example.com/api/v1/hooks/0192f4a0-7b1c-7000-8a00-000000000901/bothy_whi_EXAMPLE000000000000000000000000000000000000_2WwD3e
              */
             url: string;
         };
+        /** @description The active incoming webhooks of a channel in creation order; revoked ones are not listed. */
         IncomingWebhookList: {
             items: components["schemas"]["IncomingWebhook"][];
         };
+        /**
+         * @description Body of an incoming webhook call in one of two shapes, recognised per request (11 8.2,
+         *     docs/DECISIONS.md D-M2-27-5). A body with at least one Alertmanager member (`version`,
+         *     `groupKey`, `truncatedAlerts`, `status`, `receiver`, `groupLabels`, `commonLabels`,
+         *     `commonAnnotations`, `externalURL`, `alerts`) is the unchanged webhook payload of Prometheus
+         *     Alertmanager (format `alertmanager`) and must contain no native member; every other body is
+         *     `native` and needs `content_md`. Unknown members are refused.
+         */
         IncomingWebhookPost: {
-            /** @example Disk usage above threshold on build host. */
-            content_md: string;
-            /** @description Optional; makes retries of the sender idempotent. */
+            /**
+             * @description Native. Markdown content, at most `message.max_content_bytes` UTF-8 bytes.
+             * @example Disk usage above threshold on build host.
+             */
+            content_md?: string;
+            /** @description Native. Optional UUIDv7; makes retries of the sender idempotent. */
             client_msg_id?: components["schemas"]["Uuid"];
             /**
-             * @description Title of a new thread when the webhook has no fixed thread.
+             * @description Native. Title of a new thread when the webhook has no fixed thread; required in a forum.
              * @example Disk alert
              */
             title?: string;
+            /** @description Native. Thread of the webhook's channel to write into when the webhook has no fixed thread. */
+            thread_id?: components["schemas"]["Uuid"];
+            /**
+             * @description Alertmanager. Version of the webhook payload.
+             * @enum {string}
+             */
+            version?: "4";
+            /** @description Alertmanager. Key of the alert group. */
+            groupKey?: string;
+            /**
+             * Format: int64
+             * @description Alertmanager. Number of alerts left out of `alerts`.
+             */
+            truncatedAlerts?: number;
+            /**
+             * @description Alertmanager. State of the group.
+             * @enum {string}
+             */
+            status?: "firing" | "resolved";
+            /** @description Alertmanager. Name of the receiver. */
+            receiver?: string;
+            /** @description Alertmanager. Labels of the group; every value is a string. */
+            groupLabels?: components["schemas"]["JsonObject"];
+            /** @description Alertmanager. Labels all alerts share; every value is a string. */
+            commonLabels?: components["schemas"]["JsonObject"];
+            /** @description Alertmanager. Annotations all alerts share; every value is a string. */
+            commonAnnotations?: components["schemas"]["JsonObject"];
+            /** @description Alertmanager. Address of the sending Alertmanager; written as text, never fetched. */
+            externalURL?: string;
+            /** @description Alertmanager. The alerts of the notification. */
+            alerts?: components["schemas"]["AlertmanagerAlert"][];
+        };
+        /** @description One alert of an Alertmanager webhook payload; `status` and `labels` are required (checked with `errors[].code` `required`). */
+        AlertmanagerAlert: {
+            /** @enum {string} */
+            status?: "firing" | "resolved";
+            /** @description Labels of the alert; every value is a string. */
+            labels?: components["schemas"]["JsonObject"];
+            /** @description Annotations of the alert; every value is a string. */
+            annotations?: components["schemas"]["JsonObject"];
+            /** Format: date-time */
+            startsAt?: string;
+            /** Format: date-time */
+            endsAt?: string;
+            /** @description Address of the rule's source; written as text, never fetched. */
+            generatorURL?: string;
+            fingerprint?: string;
         };
         AuditEvent: {
             /** Format: int64 */
@@ -8926,6 +9050,10 @@ export interface components {
         };
         IncomingWebhookResult: {
             message_id: components["schemas"]["Uuid"];
+            /**
+             * @description The thread the message landed in; with a `title` in a text channel the new thread that
+             *     starts from the message, which itself stands in the main thread.
+             */
             thread_id: components["schemas"]["Uuid"];
         };
         /**
@@ -15430,6 +15558,54 @@ export interface operations {
             default: components["responses"]["Error"];
         };
     };
+    postIncomingWebhookWithBearer: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                webhook_id: components["parameters"]["WebhookIdPath"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["IncomingWebhookPost"];
+            };
+        };
+        responses: {
+            /** @description Replay: the original created by an earlier `native` request with the same `client_msg_id`. */
+            200: {
+                headers: {
+                    "Correlation-Id": components["headers"]["Correlation-Id"];
+                    RateLimit: components["headers"]["RateLimit"];
+                    "RateLimit-Policy": components["headers"]["RateLimit-Policy"];
+                    "Idempotent-Replay": components["headers"]["Idempotent-Replay"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["IncomingWebhookResult"];
+                };
+            };
+            /** @description Created. */
+            201: {
+                headers: {
+                    "Correlation-Id": components["headers"]["Correlation-Id"];
+                    RateLimit: components["headers"]["RateLimit"];
+                    "RateLimit-Policy": components["headers"]["RateLimit-Policy"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["IncomingWebhookResult"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            404: components["responses"]["NotFound"];
+            413: components["responses"]["PayloadTooLarge"];
+            422: components["responses"]["UnprocessableEntity"];
+            429: components["responses"]["TooManyRequests"];
+            default: components["responses"]["Error"];
+        };
+    };
     postIncomingWebhook: {
         parameters: {
             query?: never;
@@ -15446,6 +15622,19 @@ export interface operations {
             };
         };
         responses: {
+            /** @description Replay: the original created by an earlier `native` request with the same `client_msg_id`. */
+            200: {
+                headers: {
+                    "Correlation-Id": components["headers"]["Correlation-Id"];
+                    RateLimit: components["headers"]["RateLimit"];
+                    "RateLimit-Policy": components["headers"]["RateLimit-Policy"];
+                    "Idempotent-Replay": components["headers"]["Idempotent-Replay"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["IncomingWebhookResult"];
+                };
+            };
             /** @description Created. */
             201: {
                 headers: {
@@ -15461,6 +15650,7 @@ export interface operations {
             400: components["responses"]["BadRequest"];
             404: components["responses"]["NotFound"];
             413: components["responses"]["PayloadTooLarge"];
+            422: components["responses"]["UnprocessableEntity"];
             429: components["responses"]["TooManyRequests"];
             default: components["responses"]["Error"];
         };
