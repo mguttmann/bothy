@@ -80,20 +80,20 @@ func TestPostIncomingWebhook_NotFoundEquality(t *testing.T) {
 	h.must(o, http.MethodDelete, "/incoming-webhooks/"+revoked.id, nil, http.StatusNoContent)
 	// A second app whose installation is uninstalled, one suspended, one whose grant is revoked.
 	gone := h.install("gone", scopeMessagesWrite)
-	h.grantApp(gone, h.eskalation, "write")
+	h.grantApp(gone, h.eskalation)
 	goneHook := h.create(gone, h.eskalation, "")
 	h.must(o, http.MethodPost, "/apps/"+gone+"/uninstall", map[string]any{"reason": "No longer used"}, http.StatusNoContent)
 	paused := h.install("paused", scopeMessagesWrite)
-	h.grantApp(paused, h.eskalation, "write")
+	h.grantApp(paused, h.eskalation)
 	pausedHook := h.create(paused, h.eskalation, "")
 	h.must(o, http.MethodPost, "/apps/"+paused+"/suspend", nil, http.StatusNoContent)
 	lost := h.install("lost", scopeMessagesWrite)
-	lostGrant := h.grantApp(lost, h.eskalation, "write")
+	lostGrant := h.grantApp(lost, h.eskalation)
 	lostHook := h.create(lost, h.eskalation, "")
 	h.must(o, http.MethodPost, "/grants/"+lostGrant+"/revoke", map[string]any{"reason": "Revoked"}, http.StatusOK)
 	// An archived channel and a fixed thread moved to another channel.
 	archived := created(t, h.must(o, http.MethodPost, "/spaces/"+h.w.Spaces["Support"]+"/channels", map[string]any{"kind": "text", "name": "Alt"}, http.StatusCreated))
-	h.grantApp(h.tracker, archived, "write")
+	h.grantApp(h.tracker, archived)
 	archivedHook := h.create(h.tracker, archived, "")
 	h.must(o, http.MethodPost, "/channels/"+archived+"/archive", map[string]any{"reason": "Done"}, http.StatusOK)
 	thread := h.w.Threads["Support/Eskalation"]
@@ -191,7 +191,7 @@ func TestPostIncomingWebhook_OrderOfChecks(t *testing.T) {
 		"ratelimit.rl.webhook_in.per_minute": "1", "ratelimit.rl.webhook_in.burst": "8",
 	}})
 	k := h.create(h.tracker, h.eskalation, "")
-	wrong := hook{id: k.id, token: "bothy_whi_wrong"}
+	wrong := hook{id: k.id, token: "bothy_whi_wrong"} //nolint:gosec // G101: a malformed token, no secret
 	big := native(strings.Repeat("x", 4096))
 	if r := h.postPath(wrong, big); r.status != http.StatusNotFound {
 		t.Fatalf("wrong token, big body: %d %s", r.status, r.body)
@@ -225,7 +225,7 @@ func TestPostIncomingWebhook_OrderOfChecks(t *testing.T) {
 		t.Fatalf("exhausted: %d %s %v", r.status, r.body, r.header)
 	}
 	// Another webhook keeps its own bucket (TestPostIncomingWebhook_RateLimitPerWebhook).
-	h.grantApp(h.tracker, h.eskalation, "write")
+	h.grantApp(h.tracker, h.eskalation)
 	other := h.create(h.tracker, h.eskalation, "")
 	if r := h.postPath(other, native("other")); r.status != http.StatusCreated {
 		t.Fatalf("other webhook: %d %s", r.status, r.body)
@@ -421,7 +421,7 @@ func TestPostIncomingWebhook_TokenOnlyAsPattern(t *testing.T) {
 	for _, rec := range sinks.Logs.Records() {
 		dump.WriteString(rec.Body().String())
 		rec.WalkAttributes(func(kv attribute.KeyValue) bool {
-			v := kv.Value.Emit()
+			v := kv.Value.String()
 			dump.WriteString(" " + string(kv.Key) + "=" + v)
 			if kv.Key == "http.route" && v == "/api/v1/hooks/{webhook_id}/{token}" {
 				pattern = true
@@ -436,7 +436,7 @@ func TestPostIncomingWebhook_TokenOnlyAsPattern(t *testing.T) {
 			spanPattern = true
 		}
 		for _, a := range sp.Attributes {
-			dump.WriteString(" " + string(a.Key) + "=" + a.Value.Emit())
+			dump.WriteString(" " + string(a.Key) + "=" + a.Value.String())
 		}
 	}
 	if strings.Contains(dump.String(), secret) || strings.Contains(dump.String(), "Bearer ") {

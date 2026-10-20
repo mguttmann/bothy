@@ -120,13 +120,7 @@ func (s *Service) applyTransition(ctx context.Context, a actor.Actor, c stateCha
 	attrs := c.attrs(inst.ID)
 	switch c.t {
 	case domain.TransitionUninstall:
-		if err := s.revokeAll(ctx, a, c.appID, c.reason, attrs); err != nil {
-			return err
-		}
-		if err := s.d.Webhooks.disableInstallation(ctx, inst.ID); err != nil {
-			return err
-		}
-		if err := s.d.Incoming.revokeIncomingForApp(ctx, c.appID); err != nil {
+		if err := s.uninstallParts(ctx, a, c, inst.ID, attrs); err != nil {
 			return err
 		}
 	case domain.TransitionResume:
@@ -156,4 +150,17 @@ func (s *Service) revokeAll(ctx context.Context, a actor.Actor, appID ids.ID, re
 	attrs[attrTokensRevoked] = auditing.Int(int64(tokens))
 	attrs[attrGrantsRevoked] = auditing.Int(int64(grants))
 	return nil
+}
+
+// uninstallParts is the uninstall work of 11 section 4.3 inside the rights change: revoke the
+// tokens and grants, disable the subscriptions of the installation (M2-26) and revoke the active
+// incoming webhooks of the app (M2-27 design note 11 a).
+func (s *Service) uninstallParts(ctx context.Context, a actor.Actor, c stateChange, installation ids.ID, attrs auditing.Attrs) error {
+	if err := s.revokeAll(ctx, a, c.appID, c.reason, attrs); err != nil {
+		return err
+	}
+	if err := s.d.Webhooks.disableInstallation(ctx, installation); err != nil {
+		return err
+	}
+	return s.d.Incoming.revokeIncomingForApp(ctx, c.appID)
 }

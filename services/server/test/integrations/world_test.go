@@ -45,9 +45,8 @@ type hw struct {
 
 // options are the knobs of a world.
 type options struct {
-	cfg   map[string]string
-	clock interface{ Now() time.Time }
-	opts  func(*harness.Options)
+	cfg  map[string]string
+	opts func(*harness.Options)
 }
 
 // newHW starts a server with raised rate limits (unless cfg sets a class) and builds the world.
@@ -72,10 +71,10 @@ func newHW(t *testing.T, o options) *hw {
 	h.must(h.w.Owner, http.MethodGet, "/channels/"+h.eskalation, nil, http.StatusOK).JSON(t, &ch)
 	h.eskalationMain = ch.Channel.MainThreadID
 	h.tracker = h.install("tracker", scopeMessagesWrite)
-	h.g6 = h.grantApp(h.tracker, h.eskalation, "write")
+	h.g6 = h.grantApp(h.tracker, h.eskalation)
 	h.forum = created(t, h.must(h.w.Owner, http.MethodPost, "/spaces/"+h.w.Spaces["Support"]+"/channels",
 		map[string]any{"kind": "forum", "name": "Meldungen"}, http.StatusCreated))
-	h.grantApp(h.tracker, h.forum, "write")
+	h.grantApp(h.tracker, h.forum)
 	return h
 }
 
@@ -98,11 +97,11 @@ func (h *hw) install(slug string, granted ...string) string {
 	}, http.StatusCreated))
 }
 
-// grantApp grants app the level on channel as the owner and returns the grant id.
-func (h *hw) grantApp(app, channel, level string) string {
+// grantApp grants app write on channel as the owner and returns the grant id.
+func (h *hw) grantApp(app, channel string) string {
 	h.t.Helper()
 	return created(h.t, h.must(h.w.Owner, http.MethodPost, "/grants", map[string]any{
-		"subject_kind": "app", "subject_id": app, "target_kind": "channel", "target_id": channel, "level": level,
+		"subject_kind": "app", "subject_id": app, "target_kind": "channel", "target_id": channel, "level": "write",
 		"reason": "Posts of the app",
 	}, http.StatusCreated))
 }

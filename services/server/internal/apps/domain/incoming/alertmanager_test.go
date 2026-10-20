@@ -35,7 +35,7 @@ var goldenCases = []string{
 // readPayload decodes one fixture.
 func readPayload(t testing.TB, path string) incoming.Payload {
 	t.Helper()
-	raw, err := os.ReadFile(path)
+	raw, err := os.ReadFile(path) //nolint:gosec // G304: a fixture below testdata, not input.
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -50,7 +50,7 @@ func readPayload(t testing.TB, path string) incoming.Payload {
 // end-of-file rule demands, which is not part of the message.
 func readGolden(t *testing.T, path string) string {
 	t.Helper()
-	raw, err := os.ReadFile(path)
+	raw, err := os.ReadFile(path) //nolint:gosec // G304: a golden file below testdata, not input.
 	if err != nil {
 		t.Fatal(err)
 	}

@@ -258,24 +258,8 @@ func (s *IncomingService) CreateIncoming(ctx context.Context, a actor.Actor, cmd
 	if err := s.authorizeOn(ctx, a, authorize.ActionWebhookInCreate, res); err != nil {
 		return apps.IncomingCreated{}, err
 	}
-	name := strings.TrimSpace(cmd.Name)
-	switch {
-	case name == "":
-		return apps.IncomingCreated{}, fieldErr("/name", domain.CodeRequired, "A name is required.")
-	case textcheck.DisplayText(cmd.Name) != nil:
-		return apps.IncomingCreated{}, fieldErr("/name", domain.CodeInvalid, "The name contains a forbidden character (SEC-IN-4).")
-	}
-	if err := s.checkApp(ctx, cmd.AppID, ch); err != nil {
+	if err := s.checkCreate(ctx, cmd, ch); err != nil {
 		return apps.IncomingCreated{}, err
-	}
-	if cmd.ThreadID != nil {
-		info, err := s.d.Threads.Info(ctx, *cmd.ThreadID)
-		if errs.KindOf(err) == errs.KindNotFound || err == nil && info.ChannelID != ch.ChannelID {
-			return apps.IncomingCreated{}, fieldErr("/thread_id", codeNotInChannel, "The thread is not a thread of this channel.")
-		}
-		if err != nil {
-			return apps.IncomingCreated{}, err
-		}
 	}
 	var out apps.IncomingCreated
 	err = s.d.UoW.Do(ctx, func(ctx context.Context) error {
@@ -307,6 +291,30 @@ func (s *IncomingService) CreateIncoming(ctx context.Context, a actor.Actor, cmd
 		return apps.IncomingCreated{}, err
 	}
 	return out, nil
+}
+
+// checkCreate holds the body rules of design note 8 b in their order: the name, the app
+// (checkApp) and the fixed thread, which must be a thread of the channel (not_in_channel, the same
+// for an unknown thread).
+func (s *IncomingService) checkCreate(ctx context.Context, cmd apps.CreateIncomingCmd, ch chat.TriggerChannel) error {
+	name := strings.TrimSpace(cmd.Name)
+	switch {
+	case name == "":
+		return fieldErr("/name", domain.CodeRequired, "A name is required.")
+	case textcheck.DisplayText(cmd.Name) != nil:
+		return fieldErr("/name", domain.CodeInvalid, "The name contains a forbidden character (SEC-IN-4).")
+	}
+	if err := s.checkApp(ctx, cmd.AppID, ch); err != nil {
+		return err
+	}
+	if cmd.ThreadID == nil {
+		return nil
+	}
+	info, err := s.d.Threads.Info(ctx, *cmd.ThreadID)
+	if errs.KindOf(err) == errs.KindNotFound || err == nil && info.ChannelID != ch.ChannelID {
+		return fieldErr("/thread_id", codeNotInChannel, "The thread is not a thread of this channel.")
+	}
+	return err
 }
 
 // checkApp holds the two app rules of design note 8 b: an app principal with an active
@@ -606,29 +614,7 @@ func (s *IncomingService) send(ctx context.Context, a actor.Actor, ch chat.Trigg
 		}
 		return sent{messageID: tc.FirstMessage.ID, threadID: tc.ThreadID, channelID: tc.FirstMessage.ChannelID, replay: tc.Replay}, nil
 	case incoming.TargetTextThread:
-		msg.ThreadID = t.ThreadID
-		c, err := s.d.Messages.Create(ctx, a, msg)
-		if err != nil {
-			return sent{}, err
-		}
-		out := sent{messageID: c.Message.ID, threadID: c.Message.ThreadID, channelID: c.Message.ChannelID, replay: c.Replay}
-		if c.Replay {
-			info, found, err := s.d.ByParent.ThreadByParentMessage(ctx, c.Message.ID)
-			if err != nil {
-				return sent{}, err
-			}
-			if found {
-				out.threadID = info.ID
-			}
-			return out, nil
-		}
-		title, parent := t.Title, c.Message.ID
-		tc, err := s.d.Messages.CreateThread(ctx, a, messaging.CreateThreadCmd{ChannelID: ch.ChannelID, Title: &title, ParentMessageID: &parent})
-		if err != nil {
-			return sent{}, err
-		}
-		out.threadID = tc.ThreadID
-		return out, nil
+		return s.sendTitledText(ctx, a, ch, t, msg)
 	case incoming.TargetExisting:
 	}
 	msg.ThreadID = t.ThreadID
@@ -637,6 +623,35 @@ func (s *IncomingService) send(ctx context.Context, a actor.Actor, ch chat.Trigg
 		return sent{}, err
 	}
 	return sent{messageID: c.Message.ID, threadID: c.Message.ThreadID, channelID: c.Message.ChannelID, replay: c.Replay}, nil
+}
+
+// sendTitledText writes a titled post into a text channel (design note 5 rule 3): the message
+// goes into the main thread and a new thread starts from it. A replay creates no thread and
+// answers the thread whose parent is the original message.
+func (s *IncomingService) sendTitledText(ctx context.Context, a actor.Actor, ch chat.TriggerChannel, t incoming.Target, msg messaging.CreateMessageCmd) (sent, error) {
+	msg.ThreadID = t.ThreadID
+	c, err := s.d.Messages.Create(ctx, a, msg)
+	if err != nil {
+		return sent{}, err
+	}
+	out := sent{messageID: c.Message.ID, threadID: c.Message.ThreadID, channelID: c.Message.ChannelID, replay: c.Replay}
+	if c.Replay {
+		info, found, err := s.d.ByParent.ThreadByParentMessage(ctx, c.Message.ID)
+		if err != nil {
+			return sent{}, err
+		}
+		if found {
+			out.threadID = info.ID
+		}
+		return out, nil
+	}
+	title, parent := t.Title, c.Message.ID
+	tc, err := s.d.Messages.CreateThread(ctx, a, messaging.CreateThreadCmd{ChannelID: ch.ChannelID, Title: &title, ParentMessageID: &parent})
+	if err != nil {
+		return sent{}, err
+	}
+	out.threadID = tc.ThreadID
+	return out, nil
 }
 
 // threadFact reads what chat knows about a thread named by the webhook or the body.
@@ -655,12 +670,10 @@ func (s *IncomingService) threadFact(ctx context.Context, id ids.ID) (*incoming.
 // unauthenticated, step_up_required) into the 404 of an unknown webhook (11 section 8.4); body
 // errors and internal errors stay.
 func asNotFound(err error) error {
-	switch errs.KindOf(err) {
-	case errs.KindNotFound, errs.KindForbidden, errs.KindUnauthenticated, errs.KindStepUpRequired:
+	if k := errs.KindOf(err); k == errs.KindNotFound || k == errs.KindForbidden || k == errs.KindUnauthenticated || k == errs.KindStepUpRequired {
 		return notFound()
-	default:
-		return err
 	}
+	return err
 }
 
 // ArchiveSubscriber is the in-transaction subscriber of apps for chat.ChannelArchived (02 section

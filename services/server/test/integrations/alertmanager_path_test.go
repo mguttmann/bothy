@@ -21,11 +21,11 @@ var fixtureDir = filepath.Join("..", "..", "internal", "apps", "domain", "incomi
 // the one line break the end-of-file rule of the repository adds, which the message does not have.
 func fixture(t *testing.T, name string) (payload []byte, want string) {
 	t.Helper()
-	payload, err := os.ReadFile(filepath.Join(fixtureDir, name+".json"))
+	payload, err := os.ReadFile(filepath.Join(fixtureDir, name+".json")) //nolint:gosec // G304: a fixture of the repository, not input.
 	if err != nil {
 		t.Fatal(err)
 	}
-	md, err := os.ReadFile(filepath.Join(fixtureDir, name+".md"))
+	md, err := os.ReadFile(filepath.Join(fixtureDir, name+".md")) //nolint:gosec // G304: a fixture of the repository, not input.
 	if err != nil {
 		t.Fatal(err)
 	}

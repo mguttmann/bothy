@@ -229,8 +229,9 @@ func RenderAlertmanager(n Notification, maxBytes int) string {
 		prefix[i+1] = prefix[i] + len(it)
 	}
 	for k := len(items); k >= 0; k-- {
-		if assembledLen(len(header), prefix[k], k, truncated+uint64(len(items)-k), len(footer)) <= maxBytes {
-			return assemble(header, items[:k], truncated+uint64(len(items)-k), footer)
+		more := truncated + uint64(len(items)-k) //nolint:gosec // G115: k <= len(items), never negative
+		if assembledLen(len(header), prefix[k], k, more, len(footer)) <= maxBytes {
+			return assemble(header, items[:k], more, footer)
 		}
 	}
 	s := assemble(header, nil, truncated+uint64(len(items)), "")

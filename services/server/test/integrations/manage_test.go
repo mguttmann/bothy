@@ -128,7 +128,7 @@ func TestCreateIncomingWebhook(t *testing.T) {
 			{map[string]any{"app_id": reporter, "name": "X"}, "/app_id", "app_cannot_write"},
 			{map[string]any{"app_id": h.tracker, "name": "X", "thread_id": h.w.Threads["Support/Allgemein"]}, "/thread_id", "not_in_channel"},
 			{map[string]any{"app_id": h.tracker, "name": "X", "thread_id": newID()}, "/thread_id", "not_in_channel"},
-			{map[string]any{"app_id": h.tracker, "name": "Alerts ‮"}, "/name", ""},
+			{map[string]any{"app_id": h.tracker, "name": "Alerts \u202e"}, "/name", ""},
 		} {
 			r := h.must(o, http.MethodPost, path, c.body, http.StatusBadRequest)
 			if !strings.Contains(string(r.Body), `"pointer":"`+c.pointer+`"`) || c.code != "" && !strings.Contains(string(r.Body), `"code":"`+c.code+`"`) {

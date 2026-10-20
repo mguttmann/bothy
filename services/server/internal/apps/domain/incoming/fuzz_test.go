@@ -22,7 +22,7 @@ func seedFixtures(f *testing.F, add func(raw []byte)) {
 		f.Fatalf("no fixtures: %v", err)
 	}
 	for _, path := range files {
-		raw, err := os.ReadFile(path)
+		raw, err := os.ReadFile(path) //nolint:gosec // G304: a fixture below testdata, not input.
 		if err != nil {
 			f.Fatal(err)
 		}

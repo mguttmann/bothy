@@ -71,7 +71,7 @@ func TestChannelArchiveRevokesIncomingWebhooks(t *testing.T) {
 	h := newHW(t, options{})
 	o := h.w.Owner
 	ch := created(t, h.must(o, http.MethodPost, "/spaces/"+h.w.Spaces["Support"]+"/channels", map[string]any{"kind": "text", "name": "Alt"}, http.StatusCreated))
-	h.grantApp(h.tracker, ch, "write")
+	h.grantApp(h.tracker, ch)
 	gone := h.create(h.tracker, ch, "")
 	stays := h.create(h.tracker, h.eskalation, "")
 	h.must(o, http.MethodPost, "/channels/"+ch+"/archive", map[string]any{"reason": "Done"}, http.StatusOK)
