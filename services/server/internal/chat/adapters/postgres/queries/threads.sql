@@ -76,3 +76,9 @@ WHERE t.channel_id = @channel_id AND t.kind = 'thread'
   AND (NOT @has_after::boolean OR (t.created_at, t.id) < (@after_at::timestamptz, @after_id::uuid))
 ORDER BY t.created_at DESC, t.id DESC
 LIMIT @max_rows;
+
+-- name: DecrementMessageCount :execrows
+-- One message of the locked thread was deleted (M1-58, 03 threads: message_count counts messages
+-- without deleted ones); a count of zero is left alone, so the caller sees no row and fails.
+UPDATE threads SET message_count = message_count - 1, version = version + 1
+WHERE id = @id AND message_count > 0;

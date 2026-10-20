@@ -9,6 +9,7 @@ import (
 	authztelemetry "github.com/OWNER/bothy/services/server/internal/authz/adapters/telemetry"
 	"github.com/OWNER/bothy/services/server/internal/chat"
 	"github.com/OWNER/bothy/services/server/internal/identity"
+	"github.com/OWNER/bothy/services/server/internal/kernel/auditing"
 	"github.com/OWNER/bothy/services/server/internal/kernel/authorize"
 	"github.com/OWNER/bothy/services/server/internal/kernel/clock"
 	"github.com/OWNER/bothy/services/server/internal/kernel/eventlog"
@@ -32,12 +33,12 @@ func MessagingConfig(v *config.Values) (messagingapp.Config, error) {
 	return c, nil
 }
 
-// Messaging is the messaging module of the process (M1-56, M1-57, M1-60): the use cases of
+// Messaging is the messaging module of the process (M1-56, M1-57, M1-58, M1-60): the use cases of
 // messaging.Messages, Mentions and Templates and their REST handlers. Filter mismatches of the
 // history and mention lists count in bothy.authz.errors on the global meter provider of
-// platform/otel. Its in-transaction event messaging.MessagePosted has no production subscriber
-// yet (runs, sync and notify subscribe from M1-61 and M2 on, registerTxn); the golden file of the
-// registrations is unchanged.
+// platform/otel. Its in-transaction events messaging.MessagePosted and messaging.MessageDeleted
+// have no production subscriber yet (runs, sync and notify subscribe from M1-61 and M2 on,
+// registerTxn); the golden file of the registrations is unchanged.
 type Messaging struct {
 	// Service implements messaging.Messages; Service.Mentions and Service.Templates the other
 	// two ports.
@@ -46,14 +47,23 @@ type Messaging struct {
 	Handlers *messaginghttp.Messages
 }
 
+// MessagingWrites are the write ports of other modules the messaging module receives: the
+// appender of sync, the redactor of sync (M1-58) and the audit recorder (M1-58, the deletion of
+// another principal's message).
+type MessagingWrites struct {
+	Events   eventlog.Appender
+	Redactor eventlog.Redactor
+	Audit    auditing.Recorder
+}
+
 // NewMessaging builds the messaging module over pool with the unit of work uow, the Authorizer
-// az, the appender events, the thread port of chat, the principal directory dir of identity with
+// az, the write ports w, the thread port of chat, the principal directory dir of identity with
 // the search language configuration (Identity.Directory: mentions, authors and the language of
 // every message, M3-13), the clock (nil means clock.System()) and log (nil means slog.Default()),
 // which with bothy.authz.errors on the global meter provider of platform/otel records a history
 // item that fails message.read (filter_mismatch, M1-57). It opens no connection. Errors: a missing
 // collaborator, a limit the use cases refuse or the counter.
-func NewMessaging(cfg messagingapp.Config, pool *pg.Pool, uow txn.UnitOfWork, az authorize.Authorizer, events eventlog.Appender,
+func NewMessaging(cfg messagingapp.Config, pool *pg.Pool, uow txn.UnitOfWork, az authorize.Authorizer, w MessagingWrites,
 	threads chat.Threads, dir identity.Directory, clk clock.Clock, log *slog.Logger) (*Messaging, error) {
 	if az == nil || threads == nil || dir == nil {
 		return nil, errors.New("wire: the messaging module needs the Authorizer, the threads of chat and the directory of identity")
@@ -63,8 +73,8 @@ func NewMessaging(cfg messagingapp.Config, pool *pg.Pool, uow txn.UnitOfWork, az
 		return nil, err
 	}
 	svc, err := messagingapp.New(cfg, messagingapp.Deps{
-		Store: messagingpg.NewRepository(pool), UoW: uow, Authorizer: az, Events: events, Threads: threads,
-		Directory: dir, Cursors: messaginghttp.Cursors{}, Errors: counter, Clock: clk, Log: log,
+		Store: messagingpg.NewRepository(pool), UoW: uow, Authorizer: az, Events: w.Events, Redactor: w.Redactor, Audit: w.Audit,
+		Threads: threads, Directory: dir, Cursors: messaginghttp.Cursors{}, Errors: counter, Clock: clk, Log: log,
 	})
 	if err != nil {
 		return nil, err

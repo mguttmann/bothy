@@ -10,6 +10,7 @@ import (
 
 	"github.com/OWNER/bothy/services/server/internal/chat"
 	"github.com/OWNER/bothy/services/server/internal/identity"
+	"github.com/OWNER/bothy/services/server/internal/kernel/auditing"
 	"github.com/OWNER/bothy/services/server/internal/kernel/authorize"
 	"github.com/OWNER/bothy/services/server/internal/kernel/errs"
 	"github.com/OWNER/bothy/services/server/internal/kernel/eventlog"
@@ -98,7 +99,7 @@ func TestHistory_FilterMismatchDropsLogsAndCounts(t *testing.T) {
 	svc, err := app.New(app.Config{MaxContentBytes: 100, MaxMentions: 1, EventPayloadMaxBytes: 100, TemplateNameMaxChars: 10, TemplateMaxPerScope: 5, ListContentMaxBytes: 100, PageSizeDefault: 10, PageSizeMax: 10},
 		app.Deps{Store: rowsStore{rows: app.HistoryRows{Below: below}}, UoW: noUoW{}, Authorizer: az, Events: noEvents{},
 			Threads: oneThread{info: chat.ThreadInfo{ID: thread, ChannelID: ch}}, Directory: anyone{}, Log: slog.New(logs), Errors: cnt,
-			Cursors: noCursors{}})
+			Cursors: noCursors{}, Redactor: struct{ eventlog.Redactor }{}, Audit: struct{ auditing.Recorder }{}})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -188,7 +189,7 @@ func TestGet_Paths(t *testing.T) {
 	az := &decideAuthz{outcomes: map[ids.ID]authorize.Outcome{scoped.ID: authorize.OutcomeForbidden, foreign.ID: authorize.OutcomeNotFound}}
 	svc, err := app.New(app.Config{MaxContentBytes: 100, MaxMentions: 1, EventPayloadMaxBytes: 100, TemplateNameMaxChars: 10, TemplateMaxPerScope: 5, ListContentMaxBytes: 2, PageSizeDefault: 10, PageSizeMax: 10},
 		app.Deps{Store: store, UoW: noUoW{}, Authorizer: az, Events: noEvents{}, Threads: oneThread{}, Directory: anyone{},
-			Cursors: noCursors{}})
+			Cursors: noCursors{}, Redactor: struct{ eventlog.Redactor }{}, Audit: struct{ auditing.Recorder }{}})
 	if err != nil {
 		t.Fatal(err)
 	}

@@ -24,7 +24,14 @@ func (p posted) onPosted(ctx context.Context, ev messaging.MessagePosted) error 
 	return p.rec.On(ctx, ev)
 }
 
-// subscribe registers the test subscriber for the world.
+func (p posted) onDeleted(ctx context.Context, ev messaging.MessageDeleted) error {
+	return p.rec.OnDeleted(ctx, ev)
+}
+
+// subscribe registers the test subscribers of MessagePosted and MessageDeleted for the world.
 func subscribe(reg *txn.Registry, rec *mw.Recorder) error {
-	return txn.Subscribe(reg, posted{rec}.onPosted)
+	if err := txn.Subscribe(reg, posted{rec}.onPosted); err != nil {
+		return err
+	}
+	return txn.Subscribe(reg, posted{rec}.onDeleted)
 }

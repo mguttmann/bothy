@@ -17,6 +17,7 @@ import (
 	"github.com/OWNER/bothy/services/server/internal/chat"
 	"github.com/OWNER/bothy/services/server/internal/identity"
 	"github.com/OWNER/bothy/services/server/internal/kernel/actor"
+	"github.com/OWNER/bothy/services/server/internal/kernel/auditing"
 	"github.com/OWNER/bothy/services/server/internal/kernel/authorize"
 	"github.com/OWNER/bothy/services/server/internal/kernel/eventlog"
 	"github.com/OWNER/bothy/services/server/internal/kernel/ids"
@@ -120,6 +121,7 @@ func TestListMyMentions_DropsItemDeniedByAuthorize(t *testing.T) {
 		Store: fakeMentionStore{rows: rows}, UoW: struct{ txn.UnitOfWork }{}, Authorizer: denyOne{deny: denied, channel: channel},
 		Events: struct{ eventlog.Appender }{}, Threads: struct{ chat.Threads }{}, Directory: fakeDirectory{},
 		Cursors: plainCursors{}, Errors: cnt, Log: slog.New(logs),
+		Redactor: struct{ eventlog.Redactor }{}, Audit: struct{ auditing.Recorder }{},
 	})
 	if err != nil {
 		t.Fatal(err)

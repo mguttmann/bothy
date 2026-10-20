@@ -11,6 +11,7 @@ import (
 	"github.com/OWNER/bothy/services/server/internal/chat"
 	"github.com/OWNER/bothy/services/server/internal/identity"
 	"github.com/OWNER/bothy/services/server/internal/kernel/actor"
+	"github.com/OWNER/bothy/services/server/internal/kernel/auditing"
 	"github.com/OWNER/bothy/services/server/internal/kernel/authorize"
 	"github.com/OWNER/bothy/services/server/internal/kernel/clock"
 	"github.com/OWNER/bothy/services/server/internal/kernel/errs"
@@ -73,8 +74,12 @@ type Deps struct {
 	UoW txn.UnitOfWork
 	// Authorizer decides message.create, thread.create and the mention checks (07 section 4.6).
 	Authorizer authorize.Authorizer
-	// Events appends message.created.
+	// Events appends message.created, message.updated and message.deleted.
 	Events eventlog.Appender
+	// Redactor redacts the stored payloads of a deleted message (sync, M1-58).
+	Redactor eventlog.Redactor
+	// Audit records the deletion of another principal's message (M1-58).
+	Audit auditing.Recorder
 	// Threads hands out the thread sequence, reopens and creates threads (chat, M1-55).
 	Threads chat.Threads
 	// Directory resolves mention handles and the author of a message (identity).
@@ -99,7 +104,7 @@ type Cursors interface {
 	Decode(list string, binding []byte, s string, key any) error
 }
 
-// Service implements messaging.Messages (M1-56); Service.Mentions and Service.Templates return
+// Service implements messaging.Messages (M1-56, M1-57, M1-58); Service.Mentions and Service.Templates return
 // the ports messaging.Mentions and messaging.Templates over it (M1-60). It is safe for concurrent
 // use.
 type Service struct {
@@ -116,7 +121,8 @@ var (
 
 // New returns the use cases. Errors: a missing collaborator or a limit below 1.
 func New(cfg Config, d Deps) (*Service, error) {
-	if d.Store == nil || d.UoW == nil || d.Authorizer == nil || d.Events == nil || d.Threads == nil || d.Directory == nil || d.Cursors == nil {
+	if d.Store == nil || d.UoW == nil || d.Authorizer == nil || d.Events == nil || d.Threads == nil || d.Directory == nil ||
+		d.Cursors == nil || d.Redactor == nil || d.Audit == nil {
 		return nil, errors.New("messaging: New needs every collaborator")
 	}
 	if err := cfg.check(); err != nil {

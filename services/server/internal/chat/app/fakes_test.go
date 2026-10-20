@@ -528,6 +528,20 @@ func (s *store) AppendToThread(_ context.Context, id ids.ID, reopen bool, at tim
 	return th, s.fail
 }
 
+func (s *store) DecrementMessageCount(_ context.Context, id ids.ID) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.ensureThreads()
+	th, ok := s.threads[id]
+	if !ok || th.MessageCount < 1 {
+		return errs.New(errs.CodeInternalError, "no thread with a message")
+	}
+	th.MessageCount--
+	th.Version++
+	s.threads[id] = th
+	return s.fail
+}
+
 func (s *store) ListThreads(_ context.Context, q app.ThreadQuery) ([]domain.Thread, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()

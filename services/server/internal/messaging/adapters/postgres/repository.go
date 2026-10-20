@@ -1,9 +1,9 @@
 // SPDX-License-Identifier: Apache-2.0
 
-// Package postgres is the PostgreSQL adapter of the messaging module (M1-56, M1-60): the sqlc
-// queries in queries/, the generated code in sqlcgen/ and Repository, which implements app.Store
-// over the tables messages, mentions and message_templates (docs/spec/03-data-model.md section
-// 4.6). Only this package runs SQL on them (03 principle 12).
+// Package postgres is the PostgreSQL adapter of the messaging module (M1-56, M1-58, M1-60): the
+// sqlc queries in queries/, the generated code in sqlcgen/ and Repository, which implements
+// app.Store over the tables messages, message_revisions, mentions and message_templates
+// (docs/spec/03-data-model.md section 4.6). Only this package runs SQL on them (03 principle 12).
 //
 // Example:
 //
@@ -110,12 +110,8 @@ func (r *Repository) InsertMentions(ctx context.Context, message, thread ids.ID,
 	if err != nil {
 		return err
 	}
-	list := make([]pgtype.UUID, 0, len(principals))
-	for _, p := range principals {
-		list = append(list, uuid(p))
-	}
 	err = q.InsertMentions(ctx, sqlcgen.InsertMentionsParams{
-		MessageID: uuid(message), ThreadID: uuid(thread), CreatedAt: pgtype.Timestamptz{Time: at, Valid: true}, PrincipalIds: list,
+		MessageID: uuid(message), ThreadID: uuid(thread), CreatedAt: pgtype.Timestamptz{Time: at, Valid: true}, PrincipalIds: uuids(principals),
 	})
 	return mapError(err, "inserting mentions")
 }
@@ -161,6 +157,97 @@ type messageRow struct {
 	DeletedAt           pgtype.Timestamptz
 	DeletedBy           pgtype.UUID
 	CreatedAt           pgtype.Timestamptz
+}
+
+// LockMessage implements app.Store.
+func (r *Repository) LockMessage(ctx context.Context, id ids.ID, visible []ids.ID) (domain.Message, bool, error) {
+	q, err := r.write(ctx)
+	if err != nil {
+		return domain.Message{}, false, err
+	}
+	row, err := q.LockVisibleMessage(ctx, sqlcgen.LockVisibleMessageParams{ID: uuid(id), Visible: uuids(visible)})
+	return one(messageRow(row), err, "locking a message")
+}
+
+// UpdateContent implements app.Store.
+func (r *Repository) UpdateContent(ctx context.Context, id ids.ID, visible []ids.ID, content string, at time.Time) (domain.Message, error) {
+	q, err := r.write(ctx)
+	if err != nil {
+		return domain.Message{}, err
+	}
+	row, err := q.UpdateMessageContent(ctx, sqlcgen.UpdateMessageContentParams{
+		ID: uuid(id), Visible: uuids(visible), ContentMd: content, EditedAt: pgtype.Timestamptz{Time: at, Valid: true},
+	})
+	return changed(messageRow(row), err, "editing a message")
+}
+
+// Tombstone implements app.Store.
+func (r *Repository) Tombstone(ctx context.Context, id ids.ID, visible []ids.ID, by ids.ID, at time.Time) (domain.Message, error) {
+	q, err := r.write(ctx)
+	if err != nil {
+		return domain.Message{}, err
+	}
+	row, err := q.TombstoneMessage(ctx, sqlcgen.TombstoneMessageParams{
+		ID: uuid(id), Visible: uuids(visible), DeletedBy: uuid(by), DeletedAt: pgtype.Timestamptz{Time: at, Valid: true},
+	})
+	return changed(messageRow(row), err, "deleting a message")
+}
+
+// changed converts the row of an UPDATE of a locked message; no row is internal, because the
+// caller holds the lock of a live message.
+func changed(row messageRow, err error, what string) (domain.Message, error) {
+	m, found, err := one(row, err, what)
+	if err == nil && !found {
+		return domain.Message{}, errs.New(errs.CodeInternalError, "messaging: "+what+" changed no row")
+	}
+	return m, err
+}
+
+// InsertRevision implements app.Store.
+func (r *Repository) InsertRevision(ctx context.Context, rev domain.Revision, visible []ids.ID) error {
+	q, err := r.write(ctx)
+	if err != nil {
+		return err
+	}
+	return mapError(q.InsertRevision(ctx, sqlcgen.InsertRevisionParams{
+		ID: uuid(rev.ID), MessageID: uuid(rev.MessageID), Visible: uuids(visible), ContentMd: rev.ContentMD,
+		EditedBy: uuid(rev.EditedBy), CreatedAt: pgtype.Timestamptz{Time: rev.CreatedAt, Valid: true},
+	}), "inserting a revision")
+}
+
+// Revisions implements app.Store.
+func (r *Repository) Revisions(ctx context.Context, message ids.ID, visible []ids.ID) ([]domain.Revision, error) {
+	rows, err := r.read(ctx).ListRevisions(ctx, sqlcgen.ListRevisionsParams{MessageID: uuid(message), Visible: uuids(visible)})
+	if err != nil {
+		return nil, mapError(err, "reading revisions")
+	}
+	out := make([]domain.Revision, 0, len(rows))
+	for _, row := range rows {
+		out = append(out, domain.Revision{
+			MessageID: message, Number: int(row.Revision), ContentMD: row.ContentMd, EditedBy: idOf(row.EditedBy), CreatedAt: timeOf(row.CreatedAt),
+		})
+	}
+	return out, nil
+}
+
+// DeleteRevisions implements app.Store.
+func (r *Repository) DeleteRevisions(ctx context.Context, message ids.ID, visible []ids.ID) error {
+	q, err := r.write(ctx)
+	if err != nil {
+		return err
+	}
+	return mapError(q.DeleteRevisions(ctx, sqlcgen.DeleteRevisionsParams{MessageID: uuid(message), Visible: uuids(visible)}), "deleting revisions")
+}
+
+// DeleteMentionsExcept implements app.Store.
+func (r *Repository) DeleteMentionsExcept(ctx context.Context, message ids.ID, visible, keep []ids.ID) error {
+	q, err := r.write(ctx)
+	if err != nil {
+		return err
+	}
+	return mapError(q.DeleteMentionsExcept(ctx, sqlcgen.DeleteMentionsExceptParams{
+		MessageID: uuid(message), Visible: uuids(visible), Keep: uuids(keep),
+	}), "deleting mentions")
 }
 
 // one converts a single-row result: no row is found == false.
