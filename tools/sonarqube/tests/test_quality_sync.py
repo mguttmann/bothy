@@ -401,3 +401,49 @@ def test_error_body_is_read_bounded() -> None:
     body = Body()
     assert qs._read_error_body(body) == b'{"errors": [{"msg": "refused"}]}'
     assert body.asked == qs._MAX_ERROR_BODY_BYTES
+
+
+def test_main_branch_is_renamed_to_main_on_cloud() -> None:
+    state = State(cloud=True)
+    with running(state) as url:
+        assert qs.ensure_main_branch(_client(url, organization=ORG), "main") == "master"
+        assert state.main_branch == "main"
+        assert _posts(state, "/api/project_branches/rename") == [
+            {"project": PROJECT, "name": "main", "organization": ORG}
+        ]
+
+
+def test_main_branch_already_main_is_not_renamed() -> None:
+    state = State(cloud=True, main_branch="main")
+    with running(state) as url:
+        assert qs.ensure_main_branch(_client(url, organization=ORG), "main") is None
+        assert _posts(state, "/api/project_branches/rename") == []
+
+
+def test_main_branch_refusal_fails_with_the_server_message(
+    monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    state = State(cloud=True, branch_rename_refused=True)
+    monkeypatch.setenv("SONAR_TOKEN", TOKEN)
+    monkeypatch.setenv("SONAR_PROJECT_KEY", PROJECT)
+    with running(state) as url:
+        assert qs.main(["main-branch", "--url", url, "--organization", ORG]) == 1
+    assert state.main_branch == "master"
+    err = capsys.readouterr().err
+    assert "api/project_branches/rename: HTTP 400: Organization 'example-org' is not allowed" in err
+
+
+def test_main_command_renames_then_reports_ok(
+    monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    state = State(cloud=True)
+    monkeypatch.setenv("SONAR_TOKEN", TOKEN)
+    monkeypatch.setenv("SONAR_PROJECT_KEY", PROJECT)
+    with running(state) as url:
+        args = ["main-branch", "--url", url, "--organization", ORG]
+        assert qs.main(args) == 0
+        assert qs.main(args) == 0
+    out = capsys.readouterr().out
+    assert "quality_sync: main branch renamed from 'master' to 'main'" in out
+    assert "quality_sync: main branch is already 'main'" in out
+    assert len(_posts(state, "/api/project_branches/rename")) == 1
