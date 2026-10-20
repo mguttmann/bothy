@@ -34,6 +34,7 @@ var configKeyGroups = []func() []config.Key{
 	consumerConfigKeys,
 	instanceConfigKeys,
 	terminalConfigKeys,
+	clusterConfigKeys,
 	appsConfigKeys,
 	searchConfigKeys,
 	webhookConfigKeys,

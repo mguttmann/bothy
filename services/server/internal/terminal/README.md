@@ -1,6 +1,6 @@
 # Modul `terminal`
 
-Status: Datensätze der Rechner (M2-39), Rechte des Terminals (M2-40), Kopplung (M2-41), control connection of the host services (M2-43), terminal sessions, session token and relay (M2-44). Revocation of every kind, idle and maximum duration, session limits and the remaining metrics come with M2-46, several nodes with M2-47. Normativ ist [docs/spec/24-terminal.md](../../../../docs/spec/24-terminal.md); bei Abweichung gilt das Kapitel.
+Status: Datensätze der Rechner (M2-39), Rechte des Terminals (M2-40), Kopplung (M2-41), control connection of the host services (M2-43), terminal sessions, session token and relay (M2-44), the terminal across several api nodes (M2-47). Revocation of every kind, idle and maximum duration, session limits and the remaining metrics come with M2-46. Normativ ist [docs/spec/24-terminal.md](../../../../docs/spec/24-terminal.md); bei Abweichung gilt das Kapitel.
 
 ## Zweck
 
@@ -161,7 +161,8 @@ Nur dieses Modul schreibt und liest diese Tabellen per SQL (03-datenmodell.md, G
 
 - M2-44: ruft `identity.StepUp.ConsumeFresh` in den Transaktionen von `openTerminalSession` und `attachTerminalSession`, setzt `Resource.HostID` und `Resource.Terminal` und ergänzt nach SR12 `host_not_active` und `terminal_profile_unknown`.
 - M2-44: produces `session.open` and `session.close` through `app.ControlLinks` (`ErrHostNotConnected` and `ErrHostNotReady` map to `409 host_unavailable`) and reuses the login of `Authenticate` for `hostData`.
-- M2-47: the duplicate probe and the presence across nodes behind `app.ControlLinks`.
+- M2-47 (built, see "Built in M2-47"): the duplicate probe and the presence across nodes behind `app.ControlLinks`, the signals through `app.Signals` and `app.SignalHandler`.
+- M7-17: the rest of the operation of several nodes on the same `cluster.mode`; it may merge the listener `terminal_ephemeral` with its own `LISTEN ephemeral` connection, which the namespaced kinds (prefix `terminal.`) allow, and may add a signal kind for the re-sent `ready` (D-M2-47-17).
 - M2-44: Sitzungen und Relais; ergänzt `EndSessions` um `terminal_session.changed`, den Schließ-Code `4100` und `session.close` an den Host-Dienst.
 - M2-46: Entzug, Grenzen und Metriken (`bothy.terminal.sessions.closed`), Job `terminal.sweep`.
 
@@ -219,3 +220,72 @@ Nur dieses Modul schreibt und liest diese Tabellen per SQL (03-datenmodell.md, G
   quick reattach race, redaction, reconcile), `adapters/wsrelay` (`FuzzReadFrame`, shutdown) and
   `test/integration/terminalsessions` over the full-server harness with the Fake-Host of
   `test/terminal/fakehost`.
+
+## Built in M2-47
+
+Several api nodes serve the terminal as one ([24-terminal.md](../../../../docs/spec/24-terminal.md)
+sections 3.4 and 9; the reasons are the rows `D-M2-47-<n>` of
+[DECISIONS.md](../../../../docs/DECISIONS.md)).
+
+- Cluster mode: `cluster.mode` (`single` or `multi`, `internal/wire/configkeys_cluster.go`). With
+  `single` the use cases bind `app.LocalSignals`, no listener runs and no `NOTIFY` is sent; the
+  behaviour of M2-43 and M2-44 stays. With `multi` they bind `adapters/postgres.NotifySignals`; the
+  roles `api` and `all` run the listener, the role `worker` only sends (it holds no connection).
+  `internal/wire` (`terminal_cluster.go`) chooses by the mode; `app.New` binds `LocalSignals` over
+  the `Service` itself, so a process without wiring behaves like one node.
+- Signals (`domain/cluster.go`, `app/signals.go`): kinds `terminal.session_open` (host, session),
+  `terminal.host_close` (host), `terminal.host_present` and `terminal.host_gone` (host, connection)
+  and `terminal.session_paired` (host, session); compact JSON with exactly these IDs, strict
+  `DecodeSignal`, foreign kinds ignored, the payload below `NotifyPayloadMax`. Port `app.Signals`:
+  `Stage` in the unit of work (with `multi` a `NOTIFY ephemeral` in the transaction, delivered only
+  after the commit), `Committed` after it (with `single` the local handler), `Send` outside any unit
+  (presence and pairing). The end of a session has no signal: it reaches every node through the log
+  tail of M2-44.
+- Handler: the hub of `adapters/wsrelay` (`Hub`, `cluster.go`) is the `app.SignalHandler`. It hands
+  `terminal.session_open` and `terminal.host_close` to `app.Service.HandleSignal`, which reads the
+  rows and calls `RelayControl.Expect` (every node) and `ControlLinks.OpenSession` (only the node of
+  an eligible control connection of an `active` host, for every session that is not `closed`), or
+  closes the control connections with the code of the host's state (`4110`, `4111`, `4112`); data
+  connections and device streams close with the end of their sessions through the log tail.
+- Listener: `adapters/postgres.EphemeralListener`, the component `terminal_ephemeral` started after
+  the HTTP listeners (application name `bothy-terminal-ephemeral`, dialer `pg.Pool.DialDedicated`);
+  on a loss it logs once, retries at once and then every `database.listen_reconnect_backoff_cap`,
+  and after `LISTEN` succeeded again the hub reconciles (`Reconcile`: host states of all its
+  connections, closes what may no longer be connected, announces its eligible connections). Soft
+  dependency: no readiness check; stop step in `lifecycle.PhaseEventTail`; an unexpected end of its
+  goroutine fails the process. One listener per process.
+- Presence view: `domain.PresenceView` of the control connections of other nodes, renewed by
+  `terminal.host_present` after the first `report` and after each `heartbeat`; an entry counts for
+  `terminal.host_heartbeat_interval` times `terminal.host_heartbeat_miss_limit`. "Host connected"
+  (`ControlLinks.Connected`) is a local eligible connection or a counting remote entry.
+- Probe and probation: every control connection gets a connection ID (UUIDv7 on the node's clock,
+  `domain.OlderConnection`); the node of the older connection probes it when a newer one is
+  announced elsewhere (`terminal.host_duplicate_probe_timeout`, `4009` or the duplicate verdict with
+  `4112`); a new connection gets no `session.open` before `domain.ProbationEnd` (twice the probe
+  timeout after its first announcement), then the session is checked again in the database.
+- Lone side (`domain.LoneSideOutcome`, `LoneDeadline`): each side has its own timer of
+  `terminal.open_timeout` from its accepted `identify`; a lone side closes with `4102` and counts
+  `bothy.terminal.relay.unpaired` with `bothy.terminal.side`; an `opening` ends `open_failed` with
+  `open_timeout` through the compare-and-swap `RelayOpeningTimedOut`; a `detached` session stays
+  `detached`; a host data connection of a started session waits without a timer. The slot deadline
+  waits while an unpaired side is present, and a slot that never saw `session.started` reads the
+  session state at its deadline.
+- Log records (constant messages, no ID): `terminal relay side unpaired`, `terminal signal
+  dropped`, `terminal ephemeral listener lost`, `terminal ephemeral listener restored`, `terminal
+  duplicate control connection`. No new instrument and no new attribute.
+- Edge requirement: both stream paths of a session must reach one node (consistent hashing over
+  `{session_id}`, 16 section 4.4); the example is `infra/compose/compose.multi-node.yaml` with
+  `infra/compose/edge/nginx.conf`. Without it a side fails visibly with `4102`.
+- Limits: the order of two control connections on two nodes rests on synchronized clocks; a dead
+  node's presence counts for at most the window above; after a start or a reconnect the view is
+  complete within one `terminal.host_heartbeat_interval`; while a node's `LISTEN ephemeral` is down
+  it misses every signal (its control connections of a host disabled elsewhere stay open until the
+  reconciliation, openings through them end `open_failed`). The re-sent `ready` of
+  `setHostLlmCredentials` and `confirmHost` stays local to the node that served the call
+  (D-M2-47-17).
+- What M7-17 adds: `NOTIFY ephemeral` for gateway, `runs` and `agents`, possibly one shared
+  listener per process, rate limits and the rest of the operation of several nodes.
+- Tests: `domain/cluster_test.go` (codec, fuzz, payload bound, order, presence, probation, lone
+  side), `app` (`LocalSignals`, staged signals), `adapters/wsrelay` (the handler), `internal/wire`
+  (key and wiring), `test/terminal/multinode` (TM-T15 and the cross-node tests over two in-process
+  nodes) and `test/edge` (the example edge with the real nginx image and the overlay).
