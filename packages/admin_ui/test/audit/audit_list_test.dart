@@ -161,7 +161,7 @@ void main() {
     expect(
       find.descendant(
         of: find.byKey(const ValueKey('audit.entry.3')),
-        matching: find.text('Today 10:00\u202fAM'),
+        matching: find.text('Today 10:00\u00a0AM'),
       ),
       findsOneWidget,
     );
@@ -170,7 +170,7 @@ void main() {
     expect(
       find.descendant(
         of: find.byKey(const ValueKey('audit.entry.3')),
-        matching: find.text('Today 4:00\u202fAM'),
+        matching: find.text('Today 4:00\u00a0AM'),
       ),
       findsOneWidget,
     );
