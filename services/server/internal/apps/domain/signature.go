@@ -30,8 +30,7 @@ const SecretPrefix = "whsec_"
 // (webhooks.md section 2).
 func SignedContent(webhookID ids.ID, ts int64, body []byte) []byte {
 	head := webhookID.String() + "." + strconv.FormatInt(ts, 10) + "."
-	out := make([]byte, 0, len(head)+len(body))
-	return append(append(out, head...), body...)
+	return append([]byte(head), body...)
 }
 
 // hmacLabel starts the derivation input, separating this use of the master key from any other.
