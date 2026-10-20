@@ -206,6 +206,9 @@ func DeliveryGrant(f DeliveryFacts) (InvocationGrant, error) {
 		g.InteractionID = f.ObjectID
 	case TriggerCommand:
 		g.CommandID = f.ObjectID
+	case TriggerAutocomplete:
+		// Autocomplete has no run and no delivery of these events (M2-17).
+		return InvocationGrant{}, ErrUnknownDelivery
 	default:
 		return InvocationGrant{}, ErrUnknownDelivery
 	}
