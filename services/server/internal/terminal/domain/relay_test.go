@@ -25,6 +25,8 @@ func TestRelayDecide(t *testing.T) {
 	startedDev := domain.SlotState{Started: true, DevicePresent: true}
 	confirm := both
 	confirm.LocalConfirm = true
+	ending := started
+	ending.HostEnding = true
 	cases := []struct {
 		name string
 		s    domain.SlotState
@@ -87,6 +89,12 @@ func TestRelayDecide(t *testing.T) {
 		{"control link lost, opening with local confirmation", confirm, domain.RelayEvent{Kind: domain.EvControlLost, Code: 1006},
 			[]domain.RelayAction{a(domain.ActCloseDevice, 4102, ""), a(domain.ActCloseHost, 1000, ""), a(domain.ActRearmDeadline, 0, "")}},
 		{"control link ends with 4111", started, domain.RelayEvent{Kind: domain.EvControlLost, Code: 4111}, nil},
+		// The host service ends its data connections when its control connection closes with 4110,
+		// 4111 or 4112; those sessions ended in the commit of the change, whose
+		// terminal_session.changed closes the device with 4100 and the reason, so the loss of the
+		// host side neither closes the device with 4102 nor detaches (found by M2-48).
+		{"host side ends while the host is ending", ending, domain.RelayEvent{Kind: domain.EvHostClosed, Code: 1000}, nil},
+		{"host side refuses while the host is ending", ending, domain.RelayEvent{Kind: domain.EvHostClosed, Code: 4104, Reason: "token_invalid"}, nil},
 		{"shutdown", started, domain.RelayEvent{Kind: domain.EvShutdown},
 			[]domain.RelayAction{a(domain.ActCloseDevice, 4013, ""), a(domain.ActCloseHost, 4013, "")}},
 	}

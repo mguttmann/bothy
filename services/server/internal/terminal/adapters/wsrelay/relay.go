@@ -144,7 +144,10 @@ func NewRelay(cfg RelayConfig, uc RelayUseCases, links app.ControlLinks, timers 
 type slot struct {
 	id, host, device ids.ID
 	started, confirm bool
-	wdi              *int
+	// hostEnding is set by HostEnding: the control connection of the host closes with a state
+	// change, so the loss of the host side detaches nothing.
+	hostEnding bool
+	wdi        *int
 	// gen counts the grants; a deadline of an older grant does nothing.
 	gen int
 	// grant is the grant of the expectation (M2-47): the same grant again changes nothing.
@@ -198,7 +201,8 @@ type queue struct {
 
 // state returns the facts of domain.Decide.
 func (s *slot) state() domain.SlotState {
-	return domain.SlotState{Started: s.started, LocalConfirm: s.confirm, DevicePresent: s.dev != nil, HostPresent: s.hst != nil, Paired: s.paired}
+	return domain.SlotState{Started: s.started, LocalConfirm: s.confirm, DevicePresent: s.dev != nil, HostPresent: s.hst != nil, Paired: s.paired,
+		HostEnding: s.hostEnding}
 }
 
 // side is one connection of a slot: the device stream or the data connection.
@@ -1071,6 +1075,20 @@ func (r *Relay) Started(sessionID ids.ID) {
 	s.started = true
 	r.mu.Unlock()
 	fx.run(context.Background())
+}
+
+// HostEnding marks every slot of hostID on this node before the control connection closes with
+// 4110, 4111 or 4112: the host service ends its data connections then, and the loss of such a
+// host side neither closes the device with 4102 nor detaches; the terminal_session.changed of
+// the change closes the device with 4100 and the reason (24 13, found by M2-48).
+func (r *Relay) HostEnding(hostID ids.ID) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	for _, s := range r.slots {
+		if s.host == hostID {
+			s.hostEnding = true
+		}
+	}
 }
 
 // ControlLost is the hook after the control connection of hostID ended with code (Design note

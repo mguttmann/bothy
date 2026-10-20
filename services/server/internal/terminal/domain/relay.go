@@ -24,6 +24,10 @@ type SlotState struct {
 	LocalConfirm bool
 	// DevicePresent and HostPresent report a connected side; Paired both since their pairing.
 	DevicePresent, HostPresent, Paired bool
+	// HostEnding reports that this node closes the control connection of the host with 4110,
+	// 4111 or 4112: the sessions ended in the commit of that change, and their
+	// terminal_session.changed closes the device with 4100 and the reason (found by M2-48).
+	HostEnding bool
 }
 
 // RelayEventKind names an event of a slot.
@@ -231,6 +235,11 @@ func (d *decision) offender(side Side, code int) {
 // 4104 with its close_detail) reaches the device with the same code and reason; any other close
 // gives the device 4102.
 func (d *decision) hostClosed(ev RelayEvent) {
+	if d.s.HostEnding {
+		// The host service ends its data connections at 4110, 4111 and 4112; the end of the
+		// session closes the device, and nothing detaches.
+		return
+	}
 	detail, refused := HostRefusal(ev.Code, ev.Reason)
 	if !refused {
 		d.dev(codeHostUnavail, "")
