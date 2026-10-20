@@ -452,6 +452,10 @@ operated, and the order of the build.
 
 ### Fixed
 
+- `make sonar-main-branch` (`quality_sync.py main-branch`, also a step of the manual workflow
+  `sonar-config.yml`) names the main branch of the SonarQube Cloud project `main` through
+  `api/project_branches/rename` when it carries another name; before, the cloud took the
+  analysis of `main` for a short-lived branch and failed it.
 - `quality_sync.py` addresses the quality gate by its id on SonarQube Cloud, whose
   `api/qualitygates/create_condition` and `set_as_default` take `gateId` and `id` instead of
   the gate name (https://sonarcloud.io/api/webservices/list, retrieved 2026-10-13), and lets the profiles inherit there from `cloud_parent` of

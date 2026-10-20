@@ -10,6 +10,11 @@ same profile delta (docs/quality/sonarqube-local.md).
 Usage (token only from the environment variable SONAR_TOKEN, never printed):
   quality_sync.py apply --url http://127.0.0.1:9000
   quality_sync.py check --url https://sonarcloud.io --organization <org> --project <key>
+  quality_sync.py main-branch --url https://sonarcloud.io --organization <org> --project <key>
+
+`main-branch` names the project's main branch `main` (api/project_branches/rename) when it
+carries another name, such as the `master` a new SonarQube Cloud project starts with; until
+then the server takes an analysis of `main` for a short-lived branch and fails it.
 
 Languages the server does not know (Dart and Swift on the Community Build) are skipped
 and listed; the Cloud check covers them.
@@ -369,6 +374,24 @@ def apply(client: Client, config: Config) -> Report:
     return report
 
 
+def ensure_main_branch(client: Client, name: str) -> str | None:
+    """Rename the project's main branch to `name`; return its old name, None if unchanged.
+
+    Raises SonarError if the server refuses the rename or the project has no main branch.
+    """
+    project = _cloud_project(client) if client.is_cloud else client.project
+    if not project:
+        raise SonarError("the main branch needs the project key (--project or SONAR_PROJECT_KEY)")
+    branches = client.get_json("api/project_branches/list", project=project)["branches"]
+    current = next((b["name"] for b in branches if b.get("isMain")), None)
+    if current is None:
+        raise SonarError(f"project '{project}' has no main branch")
+    if current == name:
+        return None
+    client.post("api/project_branches/rename", project=project, name=name)
+    return str(current)
+
+
 def check(client: Client, config: Config) -> Report:
     """Compare gate and profiles on the server with the config without changing anything."""
     report = Report()
@@ -466,9 +489,9 @@ def _check_project_profile(
 
 
 def main(argv: list[str] | None = None) -> int:
-    """Command line entry point (`apply` or `check`); returns the process exit code."""
+    """Command line entry point (`apply`, `check`, `main-branch`); returns the exit code."""
     parser = argparse.ArgumentParser(description="Apply or check the SonarQube quality setup.")
-    parser.add_argument("command", choices=("apply", "check"))
+    parser.add_argument("command", choices=("apply", "check", "main-branch"))
     parser.add_argument("--url", default=os.environ.get("SONAR_HOST_URL", "http://127.0.0.1:9000"))
     parser.add_argument("--organization", default=os.environ.get("SONAR_ORGANIZATION") or None)
     parser.add_argument("--project", default=os.environ.get("SONAR_PROJECT_KEY") or None)
@@ -482,6 +505,8 @@ def main(argv: list[str] | None = None) -> int:
         )
         return 2
     client = Client(args.url, token, args.organization, args.project)
+    if args.command == "main-branch":
+        return _main_branch(client)
     try:
         config = load_config(args.config)
         report = apply(client, config) if args.command == "apply" else check(client, config)
@@ -497,6 +522,20 @@ def main(argv: list[str] | None = None) -> int:
     if report.problems:
         return 1
     print(f"quality_sync: {args.command} ok for {args.url}")
+    return 0
+
+
+def _main_branch(client: Client) -> int:
+    """Run `main-branch`: name the project's main branch `main`."""
+    try:
+        old = ensure_main_branch(client, "main")
+    except (SonarError, LookupError, urllib.error.URLError) as exc:
+        print(f"quality_sync: {exc}", file=sys.stderr)
+        return 1
+    if old is None:
+        print("quality_sync: main branch is already 'main'")
+    else:
+        print(f"quality_sync: main branch renamed from '{old}' to 'main'")
     return 0
 
 

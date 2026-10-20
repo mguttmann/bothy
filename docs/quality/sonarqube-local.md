@@ -104,9 +104,9 @@ The scanner (`@sonar/scan`, without a local Java installation) reads
 In the public state (public-switch.md), against the cloud:
 
 ```sh
-SONAR_HOST_URL=https://sonarcloud.io SONAR_ORGANIZATION=<organization> \
+SONAR_HOST_URL=https://sonarcloud.io SONAR_ORGANIZATION="<organization>" SONAR_PROJECT_KEY="<project-key>" \
   SONAR_TOKEN="<token from the password manager>" make sonar-config        # once
-SONAR_HOST_URL=https://sonarcloud.io SONAR_ORGANIZATION=<organization> \
+SONAR_HOST_URL=https://sonarcloud.io SONAR_ORGANIZATION="<organization>" SONAR_PROJECT_KEY="<project-key>" \
   SONAR_TOKEN="<token>" make sonar-config-check
 ```
 
@@ -114,12 +114,13 @@ The analysis of `main` (ci.yml on every push to `main`) needs the main branch of
 project to be named `main`. Until it is, the scanner reports `Branch name: main, type: short`
 and the cloud fails the analysis ("CE Task finished abnormally with status: FAILED"). The job
 `sonar` therefore runs on `main` only when the repository variable `SONAR_MAIN_ANALYSIS` is
-`true`. Once, by a project administrator: in SonarQube Cloud, Administration, Branches and Pull
-Requests, rename the main branch to `main`; then
+`true`. Once: `make sonar-main-branch` (same variables as above) renames the main branch of the
+project to `main` through the Web API (`api/project_branches/list`, then
+`api/project_branches/rename` only when it carries another name); then
 `gh variable set SONAR_MAIN_ANALYSIS --body true`. Pull requests are analysed either way.
 
 Where the token exists only as the GitHub Actions secret `SONAR_TOKEN`, the manual workflow
-`.github/workflows/sonar-config.yml` runs both targets against the cloud
+`.github/workflows/sonar-config.yml` runs these targets against the cloud
 (`gh workflow run sonar-config.yml --ref main`, variable `SONAR_ORGANIZATION`). The cloud
 addresses the gate by its id in `create_condition` and `set_as_default`
 (https://sonarcloud.io/api/webservices/list, retrieved 2026-10-13) [verified], the Community

@@ -13,6 +13,7 @@ Step-by-step procedure: [docs/quality/sonarqube-local.md](../../docs/quality/son
 make sonar-up             # start and wait for UP
 make sonar-config         # apply gate and profiles (token with admin permissions)
 make sonar-config-check   # check equality with quality/sonar/
+make sonar-main-branch    # SonarQube Cloud: name the main branch of the project main
 make sonar                # analyze (from the first product code on)
 make sonar-down           # stop, the data is kept
 ```

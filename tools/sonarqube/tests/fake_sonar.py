@@ -13,7 +13,9 @@ sonar-config run of 2026-10-14; `gate_select_forbidden` answers select with HTTP
 "Organization ... is not allowed to modify Quality gates", as it did on a later run that day.
 `project_permission_denied` answers add_project with HTTP 403 "Insufficient privileges", as
 for a token without the needed permission. A project uses the profile or gate assigned to it,
-otherwise the default one; the built-in gate is "Sonar way".
+otherwise the default one; the built-in gate is "Sonar way". `main_branch` is the name of the
+project's main branch (api/project_branches/list and rename); `branch_rename_refused` answers
+rename with HTTP 400 "Organization ... is not allowed to perform this action".
 """
 
 from __future__ import annotations
@@ -54,6 +56,8 @@ class State:
     gate_select_forbidden: bool = False
     project_permission_denied: bool = False
     project_gate: str | None = None
+    main_branch: str = "master"
+    branch_rename_refused: bool = False
     project_profiles: dict[str, str] = field(default_factory=dict)
     profiles: list[Profile] = field(default_factory=list)
     calls: list[tuple[str, str, dict[str, str]]] = field(default_factory=list)
@@ -338,6 +342,23 @@ def _qp_backup(state: State, p: dict[str, str]) -> tuple[int, Any, str]:
     return 200, _backup_xml(state, prof), "application/xml"
 
 
+def _branches(state: State, p: dict[str, str]) -> tuple[int, Any, str]:
+    if not p.get("project"):
+        return _BAD_REQUEST
+    others = [{"name": "feature", "isMain": False, "type": "SHORT"}]
+    main = {"name": state.main_branch, "isMain": True, "type": "LONG"}
+    return 200, {"branches": [*others, main]}, "application/json"
+
+
+def _branch_rename(state: State, p: dict[str, str]) -> tuple[int, Any, str]:
+    if state.branch_rename_refused:
+        return _NOT_ALLOWED
+    if not p.get("project") or not p.get("name"):
+        return _BAD_REQUEST
+    state.main_branch = p["name"]
+    return 204, "", "text/plain"
+
+
 ROUTES = {
     ("GET", "/api/languages/list"): _languages,
     ("GET", "/api/qualitygates/show"): _gate_show,
@@ -356,6 +377,8 @@ ROUTES = {
     ("POST", "/api/qualityprofiles/set_default"): _qp_default,
     ("POST", "/api/qualityprofiles/add_project"): _qp_add_project,
     ("GET", "/api/qualityprofiles/backup"): _qp_backup,
+    ("GET", "/api/project_branches/list"): _branches,
+    ("POST", "/api/project_branches/rename"): _branch_rename,
 }
 
 
