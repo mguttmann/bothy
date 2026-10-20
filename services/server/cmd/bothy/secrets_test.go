@@ -136,7 +136,8 @@ func TestConfigPrintNeverShowsSecrets(t *testing.T) {
 	writeSecret(t, dir, "webhook_hmac_master_key", strings.Repeat("4e", 32), 0o600)
 	for _, args := range [][]string{{"config", "print", "--redacted"}, {"config", "check", "--secrets"}} {
 		code, stdout, stderr = runBothy(t, []string{"BOTHY_SECRETS__DIR=" + dir}, args...)
-		if code != 0 || stderr != "" {
+		// check warns about the empty backup.offsite.target of the defaults, print never warns.
+		if wantErr := map[string]string{"print": "", "check": offsiteWarning}[args[1]]; code != 0 || stderr != wantErr {
 			t.Errorf("run %q: exit %d, stderr %q", args, code, stderr)
 		}
 		noCanary(t, canaries, stdout, stderr)
@@ -157,6 +158,7 @@ func TestConfigPrintNeverShowsSecrets(t *testing.T) {
 		"secret file.s3.access_key_ref" + s3Skipped +
 		"secret file.s3.secret_key_ref" + s3Skipped +
 		"secret migrate.app_password_ref" + skipped +
+		"secret migrate.backup_password_ref" + skipped +
 		"secret migrate.bootstrap_password_ref" + skipped +
 		"secret migrate.maint_password_ref" + skipped +
 		"secret migrate.monitor_password_ref" + skipped +

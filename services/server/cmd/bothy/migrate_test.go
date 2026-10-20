@@ -331,7 +331,8 @@ func TestMigrateUpHonoursLockTimeout(t *testing.T) {
 	}
 	var stdout, stderr bytes.Buffer
 	e := defaultMigrateEnv(migrateEnvFor(db, pg.RoleOwner, "BOTHY_MIGRATE__LOCK_TIMEOUT=300ms"), &stdout, &stderr)
-	e.fsys = fsys
+	// Two migrations are pending on an existing schema: a fresh backup lets the check pass.
+	e.fsys, e.backupHistory, e.now = fsys, freshBackup, func() time.Time { return backupNow }
 	code := migrateCommand(ctx, []string{"up"}, e)
 	if code != 1 || !strings.Contains(stderr.String(), "55P03") {
 		t.Errorf("exit %d, stdout %q, stderr %q; want exit 1 with lock_not_available (55P03)", code, stdout.String(), stderr.String())

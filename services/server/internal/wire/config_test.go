@@ -189,6 +189,20 @@ func TestConfigSchemaBuilds(t *testing.T) {
 		"migrate.app_password_ref":              {Kind: config.KindSecretRef, Default: "file:<secrets.dir>/db_app_password", Chapter: "16-betrieb.md"},
 		"migrate.maint_password_ref":            {Kind: config.KindSecretRef, Default: "file:<secrets.dir>/db_maint_password", Chapter: "16-betrieb.md"},
 		"migrate.monitor_password_ref":          {Kind: config.KindSecretRef, Default: "file:<secrets.dir>/db_monitor_password", Chapter: "16-betrieb.md"},
+		"migrate.backup_password_ref":           {Kind: config.KindSecretRef, Default: "file:<secrets.dir>/db_backup_password", Chapter: "16-betrieb.md"},
+		"migrate.require_recent_backup":         {Kind: config.KindBool, Default: "true", Chapter: "16-betrieb.md"},
+		"migrate.recent_backup_max_age":         {Kind: config.KindDuration, Default: "24h", Min: "1m", Chapter: "16-betrieb.md"},
+		"backup.pg.full_schedule":               {Kind: config.KindString, Default: "0 2 * * 0", Chapter: "16-betrieb.md"},
+		"backup.pg.diff_schedule":               {Kind: config.KindString, Default: "0 2 * * 1-6", Chapter: "16-betrieb.md"},
+		"backup.pg.retention_full":              {Kind: config.KindInt, Default: "4", Min: "1", Chapter: "16-betrieb.md"},
+		"backup.pg.local_retention_full":        {Kind: config.KindInt, Default: "1", Min: "1", Chapter: "16-betrieb.md"},
+		"backup.logical.schedule":               {Kind: config.KindString, Default: "0 3 * * *", Chapter: "16-betrieb.md"},
+		"backup.logical.retention":              {Kind: config.KindDuration, Default: "30d", Min: "1d", Chapter: "16-betrieb.md"},
+		"backup.objects.schedule":               {Kind: config.KindString, Default: "30 3 * * *", Chapter: "16-betrieb.md"},
+		"backup.objects.retention":              {Kind: config.KindDuration, Default: "90d", Min: "1d", Chapter: "16-betrieb.md"},
+		"backup.offsite.target":                 {Kind: config.KindString, Default: "", Chapter: "16-betrieb.md"},
+		"backup.offsite.region":                 {Kind: config.KindString, Default: "us-east-1", Chapter: "16-betrieb.md"},
+		"backup.offsite.use_path_style":         {Kind: config.KindBool, Default: "true", Chapter: "16-betrieb.md"},
 
 		"instance.environment":                 {Kind: config.KindEnum, Default: "prod", Enum: []string{"dev", "staging", "prod"}, Chapter: "16-betrieb.md"},
 		"telemetry.enabled":                    {Kind: config.KindBool, Default: "true", Chapter: "17-observability.md"},
@@ -1070,6 +1084,48 @@ func TestConfig_FingerprintKeysChecked(t *testing.T) {
 		got := load(t, env)
 		if len(got) == 0 || !strings.Contains(got[0].Key+" "+got[0].Message, key) {
 			t.Errorf("%s: problems %v, want one naming %s", env, got, key)
+		}
+	}
+}
+
+// TestConfigCheckBackupSchedules: every schedule of the backup service must be a five-field cron
+// expression (cross-check backup_schedules, M7-02); the problem names the key and no value.
+func TestConfigCheckBackupSchedules(t *testing.T) {
+	t.Parallel()
+	for _, key := range []string{"backup.pg.full_schedule", "backup.pg.diff_schedule", "backup.logical.schedule", "backup.objects.schedule"} {
+		env := "BOTHY_" + strings.ToUpper(strings.ReplaceAll(key, ".", "__"))
+		if got := load(t, env+"=15 4 * * 1-5"); len(got) != 0 {
+			t.Errorf("%s = 15 4 * * 1-5: problems %v, want none", key, got)
+		}
+		got := load(t, env+"=61 99 never")
+		if len(got) != 1 {
+			t.Errorf("%s = 61 99 never: problems %v, want one", key, got)
+			continue
+		}
+		if msg := got[0].String(); !strings.Contains(msg, key) || strings.Contains(msg, "never") {
+			t.Errorf("%s: the problem does not name the key or names the value: %q", key, msg)
+		}
+	}
+}
+
+// TestConfigCheckBackupOffsiteTarget: backup.offsite.target is empty (local backup only) or an
+// S3 target ParseOffsiteTarget accepts (cross-check backup_offsite_target, M7-02); the problem
+// names the key and no value.
+func TestConfigCheckBackupOffsiteTarget(t *testing.T) {
+	t.Parallel()
+	for _, target := range []string{"", "s3:https://s3.example.com/bothy-backup", "s3:https://192.0.2.10:8333/bothy-backup/instance-1"} {
+		if got := load(t, "BOTHY_BACKUP__OFFSITE__TARGET="+target); len(got) != 0 {
+			t.Errorf("target %q: problems %v, want none", target, got)
+		}
+	}
+	for _, target := range []string{"https://s3.example.com/bothy-backup", "s3:http://s3.example.com/bothy-backup", "s3:https://s3.example.com/"} {
+		got := load(t, "BOTHY_BACKUP__OFFSITE__TARGET="+target)
+		if len(got) != 1 {
+			t.Errorf("target %q: problems %v, want one", target, got)
+			continue
+		}
+		if msg := got[0].String(); !strings.Contains(msg, "backup.offsite.target") || strings.Contains(msg, "s3.example.com") {
+			t.Errorf("target %q: the problem does not name the key or names the value: %q", target, msg)
 		}
 	}
 }

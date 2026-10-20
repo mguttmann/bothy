@@ -53,8 +53,8 @@ func databaseConfigKeys() []config.Key {
 }
 
 // migrateConfigKeys returns the keys of bothy migrate from docs/spec/16-betrieb.md
-// "Konfigurationswerte dieses Kapitels" (brief M1-12 D3). migrate.require_recent_backup and
-// migrate.recent_backup_max_age need the table backup_runs and come with M7-02.
+// "Konfigurationswerte dieses Kapitels" (brief M1-12 D3). The password of bothy_backup and the
+// recent-backup check of migrate up (16 10 item 1) came with the table backup_runs (M7-02).
 func migrateConfigKeys() []config.Key {
 	return []config.Key{
 		{Name: "migrate.lock_timeout", Kind: config.KindDuration, Default: "5s", Min: minDeadline, Max: maxPGTimeout, Chapter: chapter16,
@@ -71,5 +71,11 @@ func migrateConfigKeys() []config.Key {
 			Doc: "Secret reference of the password bothy migrate up --bootstrap sets for bothy_maint."},
 		{Name: "migrate.monitor_password_ref", Kind: config.KindSecretRef, Default: "file:<secrets.dir>/db_monitor_password", Chapter: chapter16,
 			Doc: "Secret reference of the password bothy migrate up --bootstrap sets for bothy_monitor."},
+		{Name: "migrate.backup_password_ref", Kind: config.KindSecretRef, Default: "file:<secrets.dir>/db_backup_password", Chapter: chapter16,
+			Doc: "Secret reference of the password bothy migrate up --bootstrap sets for bothy_backup."},
+		{Name: "migrate.require_recent_backup", Kind: config.KindBool, Default: "true", Chapter: chapter16,
+			Doc: "Whether bothy migrate up refuses pending migrations without a successful backup younger than migrate.recent_backup_max_age."},
+		{Name: "migrate.recent_backup_max_age", Kind: config.KindDuration, Default: "24h", Min: "1m", Chapter: chapter16,
+			Doc: "Largest age of the last successful pg_full, pg_diff or logical backup that bothy migrate up accepts."},
 	}
 }

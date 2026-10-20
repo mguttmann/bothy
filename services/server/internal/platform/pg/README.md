@@ -9,7 +9,7 @@ this file differs, the chapter wins.
 ## Purpose
 
 The only way the server reaches PostgreSQL 18: one pgx v5 pool per process with the deadlines of
-02 "Fristen", the schema check at start, the four database roles and their bootstrap, and the
+02 "Fristen", the schema check at start, the five database roles and their bootstrap, and the
 migrator behind `bothy migrate`. Migrations never run at `bothy serve` (R-AR-16).
 
 ## Code
@@ -128,6 +128,7 @@ err := uow.Do(ctx, func(ctx context.Context) error {
 | `bothy_app` | `CONNECT`, `USAGE` on `public`, and what each migration grants on its tables |
 | `bothy_maint` | `CONNECT`, `USAGE` on `public`; trims the audit log (its grants come with the audit tables) |
 | `bothy_monitor` | `CONNECT`, member of `pg_monitor` |
+| `bothy_backup` | `CONNECT`, `USAGE` on `public`; writes only `backup_runs` for `bothy-backupd` (its grants come with that table) |
 
 `Bootstrap(ctx, superConn, database, passwords)` runs `BootstrapRoles` (cluster-wide: `CREATE ROLE`
 or `ALTER ROLE` with `LOGIN NOSUPERUSER NOCREATEDB NOCREATEROLE NOREPLICATION NOBYPASSRLS`, the

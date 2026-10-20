@@ -12,6 +12,7 @@ import (
 	"log/slog"
 	"time"
 
+	"github.com/OWNER/bothy/services/server/internal/kernel/clock"
 	"github.com/OWNER/bothy/services/server/internal/platform/config"
 	"github.com/OWNER/bothy/services/server/internal/platform/jobs"
 	"github.com/OWNER/bothy/services/server/internal/platform/pg"
@@ -37,6 +38,12 @@ up        applies every pending migration of this binary as database.user, which
           sync.event_log_partitions_ahead asks for and detaches those older than
           sync.event_retention. Against a schema newer than this binary it prints
           "schema is newer than this binary; nothing to do" and changes nothing.
+          While migrate.require_recent_backup holds and migrations are pending on a
+          database that is not empty, it first requires a successful pg_full, pg_diff
+          or logical backup in backup_runs younger than migrate.recent_backup_max_age;
+          without one it applies nothing and exits 1. A schema without backup_runs
+          passes with "no backup_runs table yet; the recent-backup check starts with
+          the next upgrade".
 status    prints "<version> <name> <applied|pending> <applied_at|->" per migration of this
           binary, "database version <n>, binary requires <m>, pending <k>" and "river schema
           <s> version <n>, binary requires <m>, pending <k>"; it only reads.
@@ -45,9 +52,9 @@ validate  checks the embedded migrations without a database (names, numbering, g
           "migrations ok" and "river migrations ok, version <n>".
 
 --bootstrap    up only: first connect as migrate.bootstrap_user and create or update the roles
-               bothy_owner, bothy_app, bothy_maint and bothy_monitor with the passwords of
-               migrate.*_password_ref (sent only as SCRAM-SHA-256 verifiers) and the grants on
-               database.name. Managed databases create the roles with their own tooling.
+               bothy_owner, bothy_app, bothy_maint, bothy_monitor and bothy_backup with the
+               passwords of migrate.*_password_ref (sent only as SCRAM-SHA-256 verifiers) and
+               the grants on database.name. Managed databases create the roles with their own tooling.
 --config FILE  configuration file, not empty (default: BOTHY_CONFIG_FILE, else none)
 
 Both up and status wait up to startup.dependency_wait for the database.
@@ -67,12 +74,17 @@ const (
 const newerSchemaNotice = "schema is newer than this binary; nothing to do\n"
 
 // migrateEnv is what the migrate subcommands need besides their flags; tests replace the
-// migrations and the schema.
+// migrations, the schema, the backup history and the clock.
 type migrateEnv struct {
 	env    []string
 	schema func() (*config.Schema, error)
 	fsys   fs.FS
 	steps  func(pool *pg.Pool, fsys fs.FS, cfg wire.MigrateUpConfig, result *jobs.MigrateResult) (pg.MigratorOptions, error)
+	// backupHistory returns the start of the newest successful pg_full, pg_diff or logical
+	// backup (wire.LastBackupSuccess), wire.ErrNoBackupTable without the table.
+	backupHistory func(ctx context.Context, pool *pg.Pool) (time.Time, bool, error)
+	// now is the clock the age of that backup is measured with.
+	now    func() time.Time
 	stdout io.Writer
 	stderr io.Writer
 }
@@ -273,11 +285,17 @@ func (r *migrateRun) up(ctx context.Context, bootstrap bool) int {
 		_, _ = io.WriteString(r.e.stdout, "bootstrap: roles and grants are in place\n")
 	}
 	var river jobs.MigrateResult
-	m, _, closeAll, err := r.migrator(ctx, &river)
+	m, pool, closeAll, err := r.migrator(ctx, &river)
 	if err != nil {
 		return r.failf("%v", err)
 	}
 	defer closeAll()
+	// Before m.Up: River's step runs inside it, so a refusal leaves both schemas untouched.
+	if r.settings.RequireRecentBackup {
+		if code, ok := r.requireRecentBackup(ctx, m, pool); !ok {
+			return code
+		}
+	}
 	res, err := m.Up(ctx)
 	if river.Version > 0 {
 		// River ran before goose (upgrade.md rule M11); its line comes first.
@@ -295,6 +313,44 @@ func (r *migrateRun) up(ctx context.Context, bootstrap bool) int {
 	return exitOK
 }
 
+// noBackupTableNotice is what migrate up prints when the schema has no backup_runs yet: it was
+// migrated by a version before M7-02, so no backup can have been recorded.
+const noBackupTableNotice = "no backup_runs table yet; the recent-backup check starts with the next upgrade\n"
+
+// requireRecentBackup is the check of docs/spec/16-betrieb.md 10 item 1 (R-OP-13): with pending
+// migrations on a database that is not empty, a pg_full, pg_diff or logical backup must have
+// succeeded within migrate.recent_backup_max_age. An empty database (first install, version 0),
+// nothing pending and a schema without backup_runs pass. It returns ok true to go on, else the
+// exit code after it printed the reason.
+func (r *migrateRun) requireRecentBackup(ctx context.Context, m *pg.Migrator, pool *pg.Pool) (int, bool) {
+	entries, version, err := m.Status(ctx)
+	if err != nil {
+		return r.failf("%v", err), false
+	}
+	pending := 0
+	for _, s := range entries {
+		if !s.Applied {
+			pending++
+		}
+	}
+	if version == 0 || pending == 0 {
+		return exitOK, true
+	}
+	at, found, err := r.e.backupHistory(ctx, pool)
+	switch {
+	case errors.Is(err, wire.ErrNoBackupTable):
+		_, _ = io.WriteString(r.e.stdout, noBackupTableNotice)
+		return exitOK, true
+	case err != nil:
+		return r.failf("read the last successful backup: %v", err), false
+	case !found || r.e.now().Sub(at) > r.settings.RecentBackupMaxAge:
+		return r.failf("%d pending migrations and no successful backup (pg_full, pg_diff or logical) younger than "+
+			"migrate.recent_backup_max_age; run \"bothy-backupd backup pg_full\" in the service backup first, "+
+			"or set migrate.require_recent_backup = false", pending), false
+	}
+	return exitOK, true
+}
+
 func (r *migrateRun) printApplied(applied []pg.AppliedMigration) {
 	for _, a := range applied {
 		_, _ = fmt.Fprintf(r.e.stdout, "applied %d %s\n", a.Version, a.Name)
@@ -302,7 +358,7 @@ func (r *migrateRun) printApplied(applied []pg.AppliedMigration) {
 }
 
 // bootstrap connects as migrate.bootstrap_user to database.name and runs pg.Bootstrap with the
-// four passwords of migrate.*_password_ref (docs/spec/16-betrieb.md "Rollen").
+// five passwords of migrate.*_password_ref (docs/spec/16-betrieb.md "Rollen").
 func (r *migrateRun) bootstrap(ctx context.Context) error {
 	passwords := make(map[pg.Role]secrets.Value, len(pg.Roles()))
 	for role, ref := range r.settings.PasswordRefs() {
@@ -356,10 +412,12 @@ func (r *migrateRun) status(ctx context.Context) int {
 }
 
 // defaultMigrateEnv is the environment of the real command: the server schema, the embedded
-// migrations and the steps of internal/wire.
+// migrations, the steps of internal/wire, the backup history in backup_runs and the system
+// clock.
 func defaultMigrateEnv(env []string, stdout, stderr io.Writer) migrateEnv {
 	return migrateEnv{
 		env: env, schema: wire.ConfigSchema, fsys: migrations.FS, steps: wire.MigrateUpSteps,
+		backupHistory: wire.LastBackupSuccess, now: clock.System().Now,
 		stdout: stdout, stderr: stderr,
 	}
 }

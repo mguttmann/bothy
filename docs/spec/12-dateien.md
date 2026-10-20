@@ -420,7 +420,8 @@ S3 driver rules (M3-02, `internal/files/adapters/s3`, docs/DECISIONS.md M3-02/1 
   `HeadObject`, `DeleteObject`, `CreateMultipartUpload`, `UploadPart`,
   `CompleteMultipartUpload`, `AbortMultipartUpload` and a presign interface with only
   `PresignUploadPart`. Only this package and the audit checkpoint sink
-  `internal/audit/adapters/s3sink` (M7-22) import the AWS SDK (depguard in `make lint`,
+  `internal/audit/adapters/s3sink` (M7-22) and the object mirror of the backup service
+  `internal/status/adapters/s3mirror` (M7-02) import the AWS SDK (depguard in `make lint`,
   `TestS3SDKOnlyInAdapter`); forbidigo forbids `DeleteObjects` and `PresignGetObject`. No request
   of the files driver sets server-side encryption, ACL, tagging, object lock, storage class or
   conditional headers.
@@ -871,7 +872,7 @@ Signaturnamen nur im Audit-Log.
 | Test | Hält |
 |---|---|
 | Treiber-Konformität: dieselbe Testreihe gegen Dateisystem und gegen SeaweedFS (testcontainers) | Port-Vertrag, Bereiche, Multipart, Löschen fehlender Objekte |
-| S3-Treiber hängt nur von einer Go-Schnittstelle mit den Port-Operationen ab; Architektur-Regel: nur `internal/files/adapters/s3` importiert das S3-SDK (and, since M7-22, the audit checkpoint sink `internal/audit/adapters/s3sink`) | "nur Kern-S3", kein `DeleteObjects` |
+| S3-Treiber hängt nur von einer Go-Schnittstelle mit den Port-Operationen ab; Architektur-Regel: nur `internal/files/adapters/s3` importiert das S3-SDK (and, since M7-22, the audit checkpoint sink `internal/audit/adapters/s3sink`; since M7-02, the backup mirror `internal/status/adapters/s3mirror`) | "nur Kern-S3", kein `DeleteObjects` |
 | EICAR-Testdatei gegen echten clamd-Container | `infected`, nie auslieferbar, Objekte gelöscht, Audit-Eintrag |
 | clamd gestoppt | Datei bleibt `pending`, `409 file_not_ready`; nach Start `clean` |
 | Archiv über `MaxRecursion` | `Heuristics.Limits.Exceeded` wird `error`, nicht `clean` |

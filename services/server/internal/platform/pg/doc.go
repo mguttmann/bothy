@@ -2,7 +2,7 @@
 
 // Package pg is the only way the server reaches PostgreSQL 18 (ADR 0006, ADR 0007): one pgx
 // pool per process with the deadlines of docs/spec/02-architektur.md "Fristen", the schema
-// check at start, the four database roles and their bootstrap, and the migrator behind
+// check at start, the five database roles and their bootstrap, and the migrator behind
 // `bothy migrate` (migrations never run at `bothy serve`, R-AR-16).
 //
 // Contents:

@@ -794,6 +794,138 @@
       "doc": "Longest duration of view as: from its start plus this duration every decision of the view is step_up_required."
     },
     {
+      "name": "backup.logical.retention",
+      "env": "BOTHY_BACKUP__LOGICAL__RETENTION",
+      "kind": "duration",
+      "default": "30d",
+      "required": false,
+      "enum": [],
+      "min": "1d",
+      "max": "",
+      "chapter": "16-betrieb.md",
+      "doc": "How long the snapshots of the logical backup are kept."
+    },
+    {
+      "name": "backup.logical.schedule",
+      "env": "BOTHY_BACKUP__LOGICAL__SCHEDULE",
+      "kind": "string",
+      "default": "0 3 * * *",
+      "required": false,
+      "enum": [],
+      "min": "",
+      "max": "",
+      "chapter": "16-betrieb.md",
+      "doc": "Five-field cron schedule in UTC of the logical backup with pg_dump."
+    },
+    {
+      "name": "backup.objects.retention",
+      "env": "BOTHY_BACKUP__OBJECTS__RETENTION",
+      "kind": "duration",
+      "default": "90d",
+      "required": false,
+      "enum": [],
+      "min": "1d",
+      "max": "",
+      "chapter": "16-betrieb.md",
+      "doc": "How long the snapshots of the object backup are kept."
+    },
+    {
+      "name": "backup.objects.schedule",
+      "env": "BOTHY_BACKUP__OBJECTS__SCHEDULE",
+      "kind": "string",
+      "default": "30 3 * * *",
+      "required": false,
+      "enum": [],
+      "min": "",
+      "max": "",
+      "chapter": "16-betrieb.md",
+      "doc": "Five-field cron schedule in UTC of the object backup."
+    },
+    {
+      "name": "backup.offsite.region",
+      "env": "BOTHY_BACKUP__OFFSITE__REGION",
+      "kind": "string",
+      "default": "us-east-1",
+      "required": false,
+      "enum": [],
+      "min": "",
+      "max": "",
+      "chapter": "16-betrieb.md",
+      "doc": "Region of the S3 off-site target."
+    },
+    {
+      "name": "backup.offsite.target",
+      "env": "BOTHY_BACKUP__OFFSITE__TARGET",
+      "kind": "string",
+      "default": "",
+      "required": false,
+      "enum": [],
+      "min": "",
+      "max": "",
+      "chapter": "16-betrieb.md",
+      "doc": "Off-site target s3:https://<host>[:<port>]/<bucket>[/<prefix>]; empty means local backup only."
+    },
+    {
+      "name": "backup.offsite.use_path_style",
+      "env": "BOTHY_BACKUP__OFFSITE__USE_PATH_STYLE",
+      "kind": "bool",
+      "default": "true",
+      "required": false,
+      "enum": [],
+      "min": "",
+      "max": "",
+      "chapter": "16-betrieb.md",
+      "doc": "Whether the off-site target is addressed path-style instead of by bucket host name."
+    },
+    {
+      "name": "backup.pg.diff_schedule",
+      "env": "BOTHY_BACKUP__PG__DIFF_SCHEDULE",
+      "kind": "string",
+      "default": "0 2 * * 1-6",
+      "required": false,
+      "enum": [],
+      "min": "",
+      "max": "",
+      "chapter": "16-betrieb.md",
+      "doc": "Five-field cron schedule in UTC of the differential pgBackRest backup."
+    },
+    {
+      "name": "backup.pg.full_schedule",
+      "env": "BOTHY_BACKUP__PG__FULL_SCHEDULE",
+      "kind": "string",
+      "default": "0 2 * * 0",
+      "required": false,
+      "enum": [],
+      "min": "",
+      "max": "",
+      "chapter": "16-betrieb.md",
+      "doc": "Five-field cron schedule in UTC of the full pgBackRest backup."
+    },
+    {
+      "name": "backup.pg.local_retention_full",
+      "env": "BOTHY_BACKUP__PG__LOCAL_RETENTION_FULL",
+      "kind": "int",
+      "default": "1",
+      "required": false,
+      "enum": [],
+      "min": "1",
+      "max": "",
+      "chapter": "16-betrieb.md",
+      "doc": "Number of full backups kept in the local repository repo1."
+    },
+    {
+      "name": "backup.pg.retention_full",
+      "env": "BOTHY_BACKUP__PG__RETENTION_FULL",
+      "kind": "int",
+      "default": "4",
+      "required": false,
+      "enum": [],
+      "min": "1",
+      "max": "",
+      "chapter": "16-betrieb.md",
+      "doc": "Number of full backups kept in the off-site repository repo2."
+    },
+    {
       "name": "branding.product_name_max_chars",
       "env": "BOTHY_BRANDING__PRODUCT_NAME_MAX_CHARS",
       "kind": "int",
@@ -1926,6 +2058,18 @@
       "doc": "Secret reference of the password bothy migrate up --bootstrap sets for bothy_app."
     },
     {
+      "name": "migrate.backup_password_ref",
+      "env": "BOTHY_MIGRATE__BACKUP_PASSWORD_REF",
+      "kind": "secret_ref",
+      "default": "file:<secrets.dir>/db_backup_password",
+      "required": false,
+      "enum": [],
+      "min": "",
+      "max": "",
+      "chapter": "16-betrieb.md",
+      "doc": "Secret reference of the password bothy migrate up --bootstrap sets for bothy_backup."
+    },
+    {
       "name": "migrate.bootstrap_password_ref",
       "env": "BOTHY_MIGRATE__BOOTSTRAP_PASSWORD_REF",
       "kind": "secret_ref",
@@ -1996,6 +2140,30 @@
       "max": "",
       "chapter": "16-betrieb.md",
       "doc": "Secret reference of the password bothy migrate up --bootstrap sets for bothy_owner."
+    },
+    {
+      "name": "migrate.recent_backup_max_age",
+      "env": "BOTHY_MIGRATE__RECENT_BACKUP_MAX_AGE",
+      "kind": "duration",
+      "default": "24h",
+      "required": false,
+      "enum": [],
+      "min": "1m",
+      "max": "",
+      "chapter": "16-betrieb.md",
+      "doc": "Largest age of the last successful pg_full, pg_diff or logical backup that bothy migrate up accepts."
+    },
+    {
+      "name": "migrate.require_recent_backup",
+      "env": "BOTHY_MIGRATE__REQUIRE_RECENT_BACKUP",
+      "kind": "bool",
+      "default": "true",
+      "required": false,
+      "enum": [],
+      "min": "",
+      "max": "",
+      "chapter": "16-betrieb.md",
+      "doc": "Whether bothy migrate up refuses pending migrations without a successful backup younger than migrate.recent_backup_max_age."
     },
     {
       "name": "notify.user_default_level",

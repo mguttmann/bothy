@@ -171,6 +171,18 @@ type AuthSession struct {
 	ViewAsStartedAt  pgtype.Timestamptz
 }
 
+type BackupRun struct {
+	ID         pgtype.UUID
+	Kind       string
+	State      string
+	StartedAt  pgtype.Timestamptz
+	FinishedAt pgtype.Timestamptz
+	SizeBytes  pgtype.Int8
+	Manifest   []byte
+	Checks     []byte
+	Error      pgtype.Text
+}
+
 type Channel struct {
 	ID                       pgtype.UUID
 	SpaceID                  pgtype.UUID

@@ -137,7 +137,7 @@ func TestDatabaseIsDroppedAtCleanup(t *testing.T) {
 func TestSecretsDirHoldsRolePasswords(t *testing.T) {
 	t.Parallel()
 	db := New(t, WithoutMigrations())
-	for _, name := range []string{"db_owner_password", "db_app_password", "db_maint_password", "db_monitor_password", "db_superuser_password"} {
+	for _, name := range []string{"db_owner_password", "db_app_password", "db_maint_password", "db_monitor_password", "db_backup_password", "db_superuser_password"} {
 		fi, err := os.Stat(filepath.Join(db.SecretsDir(), name))
 		if err != nil {
 			t.Fatal(err)

@@ -328,7 +328,7 @@ func environment(db *pgtest.DB, opts Options, public, secretsDir, keys, files st
 func initSecrets(tb testing.TB, db *pgtest.DB) string {
 	tb.Helper()
 	src := tb.TempDir()
-	for _, name := range []string{"db_superuser_password", "db_owner_password", "db_app_password", "db_maint_password", "db_monitor_password"} {
+	for _, name := range []string{"db_superuser_password", "db_owner_password", "db_app_password", "db_maint_password", "db_monitor_password", "db_backup_password"} {
 		b, err := os.ReadFile(filepath.Join(db.SecretsDir(), name)) // #nosec G304 -- a fixed name in the pgtest directory
 		if err != nil {
 			tb.Fatal(err)

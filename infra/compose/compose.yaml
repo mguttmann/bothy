@@ -122,6 +122,8 @@ services:
       POSTGRES_PASSWORD_FILE: /run/bothy/secrets/db_superuser_password
       BOTHY_PG_ARCHIVE_TIMEOUT: ${BOTHY_PG_ARCHIVE_TIMEOUT:-60s}
       BOTHY_PGBACKREST_REPO_HOST: backup
+      # "on" with an off-site target: archive-push also writes every WAL segment to repo2.
+      BOTHY_PGBACKREST_REPO2: ${BOTHY_BACKUP_OFFSITE_TARGET:+on}
     volumes:
       - pgdata:/var/lib/postgresql
       - type: volume
@@ -255,13 +257,19 @@ services:
     image: ${BOTHY_REGISTRY}/bothy-postgres:pg18-${BOTHY_VERSION}
     command: ["bothy-backupd"]
     restart: unless-stopped
+    # restic reads the volume files (user 65532 of the server, mode 0700) through its file
+    # capability; the container must offer it, else the kernel refuses to start restic.
+    cap_add: [DAC_READ_SEARCH]
     logging: *logging
+    # bothy-backupd reads the server configuration (backup.*, database.*, file.*): it records its
+    # runs as bothy_backup, which may write only backup_runs; pgBackRest and pg_dump connect as
+    # migrate.bootstrap_user (16-betrieb.md 7.1). Off-site credentials: secrets/offsite/.
     environment:
+      <<: *server-env
+      BOTHY_DATABASE__USER: bothy_backup
+      BOTHY_DATABASE__PASSWORD_REF: file:/run/bothy/secrets/db_backup_password
       BOTHY_PGBACKREST_PG_HOST: postgres
       BOTHY_BACKUP__OFFSITE__TARGET: ${BOTHY_BACKUP_OFFSITE_TARGET:-}
-      BOTHY_FILE__STORAGE__DRIVER: ${BOTHY_STORAGE_DRIVER:-fs}
-      OTEL_EXPORTER_OTLP_ENDPOINT: http://otel-collector:4317
-      OTEL_RESOURCE_ATTRIBUTES: deployment.environment.name=${BOTHY_ENVIRONMENT:-prod}
     volumes:
       - pgbackrest-repo:/var/lib/pgbackrest
       - backup-scratch:/var/lib/bothy-backup

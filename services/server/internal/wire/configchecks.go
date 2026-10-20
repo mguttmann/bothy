@@ -17,6 +17,7 @@ import (
 	"github.com/OWNER/bothy/services/server/internal/platform/config"
 	"github.com/OWNER/bothy/services/server/internal/platform/httpserver"
 	"github.com/OWNER/bothy/services/server/internal/platform/jobs"
+	statusdomain "github.com/OWNER/bothy/services/server/internal/status/domain"
 )
 
 // configCheck is a cross-check of the configuration schema.
@@ -60,6 +61,33 @@ var configChecks = []configCheck{
 	{name: "search_locale_map", keys: []string{keySearchLanguages, keySearchLocaleMap}, fn: searchLocaleMapCheck},
 	{name: "webhook_backoff_order", keys: []string{keyWebhookBackoffBase, keyWebhookBackoffCap}, fn: webhookBackoffOrder},
 	{name: "webhook_retry_within_retention", keys: []string{keyWebhookRetryMaxAge, keySyncEventRetention}, fn: webhookRetryWithinRetention},
+	{name: "backup_schedules", keys: backupScheduleKeys, fn: backupSchedules},
+	{name: "backup_offsite_target", keys: []string{keyBackupOffsiteTarget}, fn: backupOffsiteTarget},
+}
+
+// backupSchedules requires every schedule of bothy-backupd to be a five-field cron expression
+// (M7-02), so a typo stops the start instead of silently never running a backup. The error
+// names the keys, never a value.
+func backupSchedules(v *config.Values) error {
+	var problems []error
+	for _, key := range backupScheduleKeys {
+		if _, err := statusdomain.ParseSchedule(v.String(key)); err != nil {
+			problems = append(problems, errors.New(key+" must be a five-field cron schedule"))
+		}
+	}
+	return errors.Join(problems...)
+}
+
+// backupOffsiteTarget requires backup.offsite.target to be empty (local backup only) or a target
+// statusdomain.ParseOffsiteTarget accepts (M7-02). Its error names the key and the form, never
+// the value.
+func backupOffsiteTarget(v *config.Values) error {
+	target := v.String(keyBackupOffsiteTarget)
+	if target == "" {
+		return nil
+	}
+	_, err := statusdomain.ParseOffsiteTarget(target)
+	return err
 }
 
 // webhookBackoffOrder requires webhook.retry_backoff_base to be at most webhook.retry_backoff_cap

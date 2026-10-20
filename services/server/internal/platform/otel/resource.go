@@ -29,10 +29,12 @@ const (
 
 // newResource builds the resource of the process (D2): the attributes of
 // OTEL_RESOURCE_ATTRIBUTES and the SDK attributes first, then the attributes of the process,
-// which win. deployment.environment.name comes from OTEL_RESOURCE_ATTRIBUTES when it is set
-// there, else from instance.environment. started is the start time that makes
+// which win. name is service.name: bothy-server for Setup, the name of the process for
+// SetupMetrics (bothy-backupd). deployment.environment.name comes from OTEL_RESOURCE_ATTRIBUTES
+// when it is set there, else from instance.environment; bothy.server.role is left out when
+// cfg.Role is empty, because only the server has a role. started is the start time that makes
 // service.instance.id unique per process next to the host name.
-func newResource(ctx context.Context, cfg Config, version string, started time.Time) (*resource.Resource, error) {
+func newResource(ctx context.Context, cfg Config, name, version string, started time.Time) (*resource.Resource, error) {
 	fromEnv, err := resource.New(ctx, resource.WithFromEnv(), resource.WithTelemetrySDK())
 	if err != nil {
 		// The error of package resource quotes the value; the message names the variable only.
@@ -43,10 +45,12 @@ func newResource(ctx context.Context, cfg Config, version string, started time.T
 		host = "unknown"
 	}
 	own := []attribute.KeyValue{
-		attribute.String(resServiceName, serviceName),
+		attribute.String(resServiceName, name),
 		attribute.String(resServiceNamespace, serviceNamespace),
 		attribute.String(resServiceInstanceID, host+"-"+strconv.FormatInt(started.UnixNano(), 10)),
-		attribute.String(attr.ServerRole, cfg.Role),
+	}
+	if cfg.Role != "" {
+		own = append(own, attribute.String(attr.ServerRole, cfg.Role))
 	}
 	if version != "" {
 		own = append(own, attribute.String(resServiceVersion, version))
