@@ -138,7 +138,8 @@ func New(t *testing.T, subscribe Subscribe) *World {
 	log := slog.New(&httpservertest.LogCapture{})
 	w := &World{t: t, Pool: pool, Owner: db.Pool(t, pg.RoleOwner), Clock: clock.NewFake(start), creds: fake.NewCredentials(),
 		actors: httpservertest.NewActors(), policies: fake.NewPolicies(), rec: &Recorder{t: t}}
-	principals := identityapp.NewPrincipalSource(identitypg.NewRepository(pool))
+	// The installations of apps decide whether an app acts (M2-24), as in the process.
+	principals := identityapp.NewPrincipalSource(identitypg.NewRepository(pool)).WithApps(wire.NewAppInstallations(pool))
 	str := wire.NewStructureSource(pool)
 	hook, err := wire.NewRightsHook(pool, wire.RightsSources{Principals: principals, Structure: str, Policies: w.policies}, w.Clock, log)
 	if err != nil {
@@ -299,14 +300,19 @@ func (w *World) Agent(name string) ids.ID {
 	return id
 }
 
-// App inserts an active app with handle name and registers token name with the granted scopes.
+// App inserts an active app with handle name and its active installation with the granted
+// scopes (M2-24), and registers token name for it with the same scopes.
 func (w *World) App(name string, scopes ...string) ids.ID {
 	w.t.Helper()
-	id, tok := ids.New(), ids.New()
+	id, tok, inst := ids.New(), ids.New(), ids.New()
 	w.SQL(`INSERT INTO principals (id, kind, status, handle, display_name) VALUES ($1, 'app', 'active', $2, $2)`, id.String(), name)
+	w.SQL(`INSERT INTO apps (principal_id, slug, manifest, manifest_version, manifest_sha256) VALUES ($1, $2, '{}', '1', '\x00')`,
+		id.String(), name)
+	w.SQL(`INSERT INTO app_installations (id, app_id, granted_scopes, installed_by) VALUES ($1, $2, $3, $4)`,
+		inst.String(), id.String(), scopes, w.OwnerID.String())
 	w.creds.PutToken(tok, fake.Token{PrincipalID: id})
 	a := httpservertest.WithToken(id, actor.KindApp, tok)
-	a.InstallationID, a.GrantedScopes = ids.New(), scopes
+	a.InstallationID, a.GrantedScopes, a.Scopes = inst, scopes, scopes
 	w.actors.Set(name, a)
 	return id
 }
