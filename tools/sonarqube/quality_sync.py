@@ -11,7 +11,12 @@ Usage (token only from the environment variable SONAR_TOKEN, never printed):
   quality_sync.py apply --url http://127.0.0.1:9000
   quality_sync.py check --url https://sonarcloud.io --organization <org> --project <key>
   quality_sync.py main-branch --url https://sonarcloud.io --organization <org> --project <key>
+  quality_sync.py visibility --url https://sonarcloud.io --organization <org> --project <key>
   quality_sync.py ce-error --url https://sonarcloud.io --organization <org>
+
+`visibility` makes the project public (api/projects/update_visibility) when it is private: the
+free plan of SonarQube Cloud caps the lines of code of a private project and refuses a larger
+analysis, while a public project has no such cap. The repository is public anyway.
 
 `ce-error` prints why the server's background task of the last scan failed: the scanner only
 reports "CE Task finished abnormally", the reason stays on the server (api/ce/task with the
@@ -21,6 +26,9 @@ ceTaskId of .scannerwork/report-task.txt).
 carries another name, such as the `master` a new SonarQube Cloud project starts with; until
 then the server takes an analysis of `main` for a short-lived branch and fails it. A
 short-lived branch `main` those analyses left is deleted before the rename.
+
+`apply` restores each profile before it sets the parent: restore overwrites a profile of the
+same name, its parent link included.
 
 Languages the server does not know (Dart and Swift on the Community Build) are skipped
 and listed; the Cloud check covers them.
@@ -340,17 +348,18 @@ def apply(client: Client, config: Config) -> Report:
             )
         if _profile(client, language, config.profile_name) is None:
             client.post("api/qualityprofiles/create", language=language, name=config.profile_name)
-        client.post(
-            "api/qualityprofiles/change_parent",
-            language=language,
-            qualityProfile=config.profile_name,
-            parentQualityProfile=parent,
-        )
+        # Restore overwrites the profile, parent link included, so the parent is set after it.
         client.post_file(
             "api/qualityprofiles/restore",
             "backup",
             xml_path.name,
             xml_path.read_text(encoding="utf-8"),
+        )
+        client.post(
+            "api/qualityprofiles/change_parent",
+            language=language,
+            qualityProfile=config.profile_name,
+            parentQualityProfile=parent,
         )
         if not client.is_cloud:
             client.post(
@@ -400,6 +409,24 @@ def ensure_main_branch(client: Client, name: str) -> str | None:
     if any(b["name"] == name and not b.get("isMain") for b in branches):
         client.post("api/project_branches/delete", project=project, branch=name)
     client.post("api/project_branches/rename", project=project, name=name)
+    return str(current)
+
+
+def ensure_public(client: Client) -> str | None:
+    """Make the project public; return its old visibility, None if it already was public.
+
+    Raises SonarError if the server refuses the change or does not know the project.
+    """
+    project = _cloud_project(client) if client.is_cloud else client.project
+    if not project:
+        raise SonarError("the visibility needs the project key (--project or SONAR_PROJECT_KEY)")
+    found = client.get_json("api/projects/search", projects=project)["components"]
+    current = next((c.get("visibility") for c in found if c.get("key") == project), None)
+    if current is None:
+        raise SonarError(f"project '{project}' was not found")
+    if current == "public":
+        return None
+    client.post("api/projects/update_visibility", project=project, visibility="public")
     return str(current)
 
 
@@ -500,9 +527,13 @@ def _check_project_profile(
 
 
 def main(argv: list[str] | None = None) -> int:
-    """Command line entry point (`apply`, `check`, `main-branch`, `ce-error`); returns exit code."""
+    """Command line entry point (`apply`, `check`, `main-branch`, `visibility`, `ce-error`).
+
+    Returns the exit code.
+    """
     parser = argparse.ArgumentParser(description="Apply or check the SonarQube quality setup.")
-    parser.add_argument("command", choices=("apply", "check", "main-branch", "ce-error"))
+    commands = ("apply", "check", "main-branch", "visibility", "ce-error")
+    parser.add_argument("command", choices=commands)
     parser.add_argument("--url", default=os.environ.get("SONAR_HOST_URL", "http://127.0.0.1:9000"))
     parser.add_argument("--organization", default=os.environ.get("SONAR_ORGANIZATION") or None)
     parser.add_argument("--project", default=os.environ.get("SONAR_PROJECT_KEY") or None)
@@ -521,6 +552,8 @@ def main(argv: list[str] | None = None) -> int:
         return _main_branch(client)
     if args.command == "ce-error":
         return _ce_error(client, args.report_task)
+    if args.command == "visibility":
+        return _visibility(client)
     try:
         config = load_config(args.config)
         report = apply(client, config) if args.command == "apply" else check(client, config)
@@ -582,6 +615,20 @@ def _main_branch(client: Client) -> int:
         print("quality_sync: main branch is already 'main'")
     else:
         print(f"quality_sync: main branch renamed from '{old}' to 'main'")
+    return 0
+
+
+def _visibility(client: Client) -> int:
+    """Run `visibility`: make the project public."""
+    try:
+        old = ensure_public(client)
+    except (SonarError, LookupError, urllib.error.URLError) as exc:
+        print(f"quality_sync: {exc}", file=sys.stderr)
+        return 1
+    if old is None:
+        print(f"quality_sync: project '{client.project}' is already public")
+    else:
+        print(f"quality_sync: project '{client.project}' changed from {old} to public")
     return 0
 
 

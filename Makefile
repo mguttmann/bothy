@@ -123,7 +123,7 @@ TOOLS_SOURCE_TESTS := ci/tests/test_product_name_places.py docs/tests/test_confi
   ci/tests/test_bothy_noise_package.py
 
 .PHONY: help bootstrap bootstrap-ci check gates fmt fmt-check lint typecheck test coverage \
-        sonar sonar-scan sonar-up sonar-down sonar-config sonar-config-check sonar-main-branch semgrep trivy osv gitleaks \
+        sonar sonar-scan sonar-up sonar-down sonar-config sonar-config-check sonar-main-branch sonar-visibility semgrep trivy osv gitleaks \
         gitleaks-staged denylist denylist-history licenses docs adr-index config-reference config-doc-check app-config event-catalog contract-documents catalog catalog-check linkcheck \
         trivy-image portability linkcheck-external diagrams tokens api-lint api-checks api-breaking api-tables api-clients \
         runners-check release-pins commitlint \
@@ -663,6 +663,10 @@ sonar-config-check: ## Check that SONAR_HOST_URL enforces exactly quality/sonar
 sonar-main-branch: ## Name the main branch of the SonarQube Cloud project main
 	SONAR_HOST_URL=$(SONAR_HOST_URL) SONAR_ORGANIZATION=$(SONAR_ORGANIZATION) SONAR_PROJECT_KEY=$(SONAR_PROJECT_KEY) \
 	  $(UVRUN) python tools/sonarqube/quality_sync.py main-branch
+
+sonar-visibility: ## Make the SonarQube Cloud project public (a private one is capped in lines)
+	SONAR_HOST_URL=$(SONAR_HOST_URL) SONAR_ORGANIZATION=$(SONAR_ORGANIZATION) SONAR_PROJECT_KEY=$(SONAR_PROJECT_KEY) \
+	  $(UVRUN) python tools/sonarqube/quality_sync.py visibility
 
 # ---- release support ------------------------------------------------------------------
 release-build: ## Product release bundle (tag v<version>): Compose installation, license, changelog

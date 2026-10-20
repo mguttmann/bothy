@@ -119,6 +119,10 @@ project to `main` through the Web API (`api/project_branches/list`, then
 `api/project_branches/rename` only when it carries another name, after deleting a short-lived
 branch `main` that the failed analyses left, because the rename refuses a name in use); then
 `gh variable set SONAR_MAIN_ANALYSIS --body true`. Pull requests are analysed either way.
+The analysis of `main` also needs the project to be public: the free plan caps the lines
+of code of a private project and refuses a larger analysis ("maximum allowed lines limit"),
+a public one has no such cap. `make sonar-visibility` (same variables) sets the visibility to
+`public` through `api/projects/update_visibility` when `api/projects/search` reports it private.
 
 Where the token exists only as the GitHub Actions secret `SONAR_TOKEN`, the manual workflow
 `.github/workflows/sonar-config.yml` runs these targets against the cloud

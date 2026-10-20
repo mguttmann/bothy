@@ -520,3 +520,55 @@ def test_ce_error_fails_for_an_unknown_task(
     with running(State(cloud=True)) as url:
         assert qs.main(["ce-error", "--url", url, "--report-task", str(report)]) == 1
     assert "/api/ce/task" in capsys.readouterr().err
+
+
+def test_apply_sets_the_parent_after_the_restore_that_drops_it() -> None:
+    # Restore overwrites the profile and drops its parent (sonar-config run of 2026-10-20).
+    state = State(cloud=True, builtin_profile="Sonar way comprehensive")
+    config = qs.load_config(REPO / "quality" / "sonar")
+    with running(state) as url:
+        qs.apply(_client(url, organization=ORG), config)
+        for language in CLOUD_LANGUAGES:
+            prof = state.profile(language, "Bothy way")
+            assert prof is not None
+            assert prof.parent == "Sonar way comprehensive"
+        assert qs.check(_client(url, organization=ORG), config).problems == []
+
+
+def test_private_project_is_made_public() -> None:
+    state = State(cloud=True)
+    with running(state) as url:
+        assert qs.ensure_public(_client(url, organization=ORG)) == "private"
+        assert state.visibility == "public"
+        assert _posts(state, "/api/projects/update_visibility") == [
+            {"project": PROJECT, "visibility": "public", "organization": ORG}
+        ]
+
+
+def test_visibility_command_reports_change_then_no_change(
+    monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    state = State(cloud=True)
+    monkeypatch.setenv("SONAR_TOKEN", TOKEN)
+    monkeypatch.setenv("SONAR_PROJECT_KEY", PROJECT)
+    with running(state) as url:
+        args = ["visibility", "--url", url, "--organization", ORG]
+        assert qs.main(args) == 0
+        assert qs.main(args) == 0
+    out = capsys.readouterr().out
+    assert f"quality_sync: project '{PROJECT}' changed from private to public" in out
+    assert f"quality_sync: project '{PROJECT}' is already public" in out
+    assert len(_posts(state, "/api/projects/update_visibility")) == 1
+
+
+def test_visibility_refusal_fails_with_the_server_message(
+    monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    state = State(cloud=True, visibility_refused=True)
+    monkeypatch.setenv("SONAR_TOKEN", TOKEN)
+    monkeypatch.setenv("SONAR_PROJECT_KEY", PROJECT)
+    with running(state) as url:
+        assert qs.main(["visibility", "--url", url, "--organization", ORG]) == 1
+    assert state.visibility == "private"
+    err = capsys.readouterr().err
+    assert "update_visibility: HTTP 400: Organization 'example-org' is not allowed" in err
