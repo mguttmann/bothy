@@ -80,8 +80,18 @@ def sync_detailed(
 ) -> Response[ManifestValidation | Problem]:
     """Validate a manifest without installing
 
+     Owner only. Schema violations give `400 validation_failed`; the check rules of 11, 3.2 give `200`
+    with `valid` false and every rule error, pointers relative to the manifest root. Nothing is stored
+    and no audit entry is written.
+
     Args:
-        body (AppManifest): Schema `app_manifest.v1`.
+        body (AppManifest): Schema `app_manifest.v1` (11, 3.1). Unknown members are an error.
+            Beyond the schema the server applies the check rules of 11, 3.2: scopes from the
+            catalogue, only subscribable events with the scope of their receive action and
+            `events:subscribe`, `https` delivery addresses whose host is in `webhook.allowed_hosts`,
+            `requested_grants` at most `write` and at most the capability `upload` and never on a
+            host, commands without reserved names and at most `command.max_per_principal`, and at most
+            `app.manifest_max_bytes`.
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
@@ -109,8 +119,18 @@ def sync(
 ) -> ManifestValidation | Problem | None:
     """Validate a manifest without installing
 
+     Owner only. Schema violations give `400 validation_failed`; the check rules of 11, 3.2 give `200`
+    with `valid` false and every rule error, pointers relative to the manifest root. Nothing is stored
+    and no audit entry is written.
+
     Args:
-        body (AppManifest): Schema `app_manifest.v1`.
+        body (AppManifest): Schema `app_manifest.v1` (11, 3.1). Unknown members are an error.
+            Beyond the schema the server applies the check rules of 11, 3.2: scopes from the
+            catalogue, only subscribable events with the scope of their receive action and
+            `events:subscribe`, `https` delivery addresses whose host is in `webhook.allowed_hosts`,
+            `requested_grants` at most `write` and at most the capability `upload` and never on a
+            host, commands without reserved names and at most `command.max_per_principal`, and at most
+            `app.manifest_max_bytes`.
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
@@ -133,8 +153,18 @@ async def asyncio_detailed(
 ) -> Response[ManifestValidation | Problem]:
     """Validate a manifest without installing
 
+     Owner only. Schema violations give `400 validation_failed`; the check rules of 11, 3.2 give `200`
+    with `valid` false and every rule error, pointers relative to the manifest root. Nothing is stored
+    and no audit entry is written.
+
     Args:
-        body (AppManifest): Schema `app_manifest.v1`.
+        body (AppManifest): Schema `app_manifest.v1` (11, 3.1). Unknown members are an error.
+            Beyond the schema the server applies the check rules of 11, 3.2: scopes from the
+            catalogue, only subscribable events with the scope of their receive action and
+            `events:subscribe`, `https` delivery addresses whose host is in `webhook.allowed_hosts`,
+            `requested_grants` at most `write` and at most the capability `upload` and never on a
+            host, commands without reserved names and at most `command.max_per_principal`, and at most
+            `app.manifest_max_bytes`.
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
@@ -160,8 +190,18 @@ async def asyncio(
 ) -> ManifestValidation | Problem | None:
     """Validate a manifest without installing
 
+     Owner only. Schema violations give `400 validation_failed`; the check rules of 11, 3.2 give `200`
+    with `valid` false and every rule error, pointers relative to the manifest root. Nothing is stored
+    and no audit entry is written.
+
     Args:
-        body (AppManifest): Schema `app_manifest.v1`.
+        body (AppManifest): Schema `app_manifest.v1` (11, 3.1). Unknown members are an error.
+            Beyond the schema the server applies the check rules of 11, 3.2: scopes from the
+            catalogue, only subscribable events with the scope of their receive action and
+            `events:subscribe`, `https` delivery addresses whose host is in `webhook.allowed_hosts`,
+            `requested_grants` at most `write` and at most the capability `upload` and never on a
+            host, commands without reserved names and at most `command.max_per_principal`, and at most
+            `app.manifest_max_bytes`.
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.

@@ -71,6 +71,13 @@ Serializers _$serializers =
           ..add(AppInstallation.serializer)
           ..add(AppInstallationStateEnum.serializer)
           ..add(AppManifest.serializer)
+          ..add(AppManifestComponentsEnum.serializer)
+          ..add(AppManifestDelivery.serializer)
+          ..add(AppManifestDeliveryModeEnum.serializer)
+          ..add(AppManifestIncomingWebhooksInner.serializer)
+          ..add(AppManifestRequestedGrantsInner.serializer)
+          ..add(AppManifestSchemaVersionEnum.serializer)
+          ..add(AppManifestScopes.serializer)
           ..add(AppPage.serializer)
           ..add(AppScope.serializer)
           ..add(AppScopesPut.serializer)
@@ -779,8 +786,8 @@ Serializers _$serializers =
             () => ListBuilder<AppScope>(),
           )
           ..addBuilderFactory(
-            const FullType(BuiltList, const [const FullType(String)]),
-            () => ListBuilder<String>(),
+            const FullType(BuiltList, const [const FullType(AppScope)]),
+            () => ListBuilder<AppScope>(),
           )
           ..addBuilderFactory(
             const FullType(BuiltList, const [const FullType(AppScope)]),
@@ -805,16 +812,6 @@ Serializers _$serializers =
           ..addBuilderFactory(
             const FullType(BuiltList, const [const FullType(String)]),
             () => ListBuilder<String>(),
-          )
-          ..addBuilderFactory(
-            const FullType(BuiltList, const [const FullType(CommandRegister)]),
-            () => ListBuilder<CommandRegister>(),
-          )
-          ..addBuilderFactory(
-            const FullType(BuiltList, const [
-              const FullType(WebhookSubscriptionCreate),
-            ]),
-            () => ListBuilder<WebhookSubscriptionCreate>(),
           )
           ..addBuilderFactory(
             const FullType(BuiltList, const [const FullType(Attachment)]),
@@ -875,6 +872,10 @@ Serializers _$serializers =
               ]),
             ]),
             () => ListBuilder<BuiltMap<String, JsonObject?>>(),
+          )
+          ..addBuilderFactory(
+            const FullType(BuiltList, const [const FullType(Capability)]),
+            () => ListBuilder<Capability>(),
           )
           ..addBuilderFactory(
             const FullType(BuiltList, const [const FullType(Capability)]),
@@ -1452,6 +1453,32 @@ Serializers _$serializers =
           ..addBuilderFactory(
             const FullType(BuiltList, const [const FullType(String)]),
             () => ListBuilder<String>(),
+          )
+          ..addBuilderFactory(
+            const FullType(BuiltList, const [const FullType(String)]),
+            () => ListBuilder<String>(),
+          )
+          ..addBuilderFactory(
+            const FullType(BuiltList, const [const FullType(CommandRegister)]),
+            () => ListBuilder<CommandRegister>(),
+          )
+          ..addBuilderFactory(
+            const FullType(BuiltList, const [
+              const FullType(AppManifestComponentsEnum),
+            ]),
+            () => ListBuilder<AppManifestComponentsEnum>(),
+          )
+          ..addBuilderFactory(
+            const FullType(BuiltList, const [
+              const FullType(AppManifestRequestedGrantsInner),
+            ]),
+            () => ListBuilder<AppManifestRequestedGrantsInner>(),
+          )
+          ..addBuilderFactory(
+            const FullType(BuiltList, const [
+              const FullType(AppManifestIncomingWebhooksInner),
+            ]),
+            () => ListBuilder<AppManifestIncomingWebhooksInner>(),
           )
           ..addBuilderFactory(
             const FullType(BuiltList, const [const FullType(String)]),

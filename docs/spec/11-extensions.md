@@ -79,8 +79,9 @@ with its hash (`apps.manifest_sha256`).
 2. For every event, the scope of its receive action is contained in `scopes`
    (for example `message.created` needs `messages:read`).
 3. All addresses are `https`; at installation their host is in `webhook.allowed_hosts`
-   (R-DM-17). If it is missing, the consent offers to add it in the same confirmed
-   action.
+   (R-DM-17). If it is missing, the server rejects the manifest with `400 webhook_host_not_allowed`;
+   the operator adds the host to the process configuration (`webhook.allowed_hosts` changes
+   only at start, docs/DECISIONS.md D-M2-24-5).
 4. `requested_grants` never contains `trigger` (R-DM-08) and at most `upload` as a capability
    (R-DM-20; check in `grants`). Reason for excluding `manage`: an app with `manage`
    could create grants itself (R-AZ-05) and read channel prompts; an integration never
@@ -105,7 +106,7 @@ homepage_url: https://bridge.example.com
 min_api_version: "1.0"
 scopes:
   required: [messages:write, commands:write, components:write]
-  optional: [messages:read]
+  optional: [messages:read, events:subscribe]
 events: [message.created]
 delivery:
   mode: webhook
@@ -113,9 +114,9 @@ delivery:
   interactions_url: https://bridge.example.com/hooks/interactions
 commands:
   - name: issue
-    description: {de: "Ticket anlegen", en: "Create an issue"}
+    description: Create an issue
     options:
-      - {name: title, type: string, required: true}
+      - {name: title, description: Title of the issue, type: string, required: true}
     required_level: write
 components: [button, form]
 requested_grants:
@@ -151,15 +152,22 @@ sequenceDiagram
   data. Reason: the owner decides on a data outflow; they must see it.
 - Grants are created with concrete targets (`grant.create` per target, with audit). A
   manifest can never set a target itself.
+- The installation (`app.install`) creates the principal, `apps` and `app_installations` and
+  creates neither a token nor a grant: grants follow per target with `grant.create`, tokens with
+  `token.create` (`createToken`). The diagram above shows the whole consent flow, not one
+  transaction (docs/DECISIONS.md D-M2-24-8).
 - The token appears exactly once. Rotation: create a new token, revoke the old one
   (`token.create`, `token.revoke`).
 
 ### 4.2 Update
 
-A new manifest with the same `slug` shows a diff. New scopes, events, hosts
-or grants need a new consent (`app.scopes.update`, step-up). Until then the
-app runs with the old granted scopes; new commands and events that need new scopes stay
-inactive. Removed scopes, events and commands take effect immediately.
+A new manifest with the same `slug` shows a diff. New scopes and events need a new consent
+(`app.scopes.update`, step-up). Until then the app runs with the old granted scopes; new commands
+and events that need new scopes stay inactive. Removed scopes, events and commands take effect
+immediately. An update never adds a grant; grants arise only with `grant.create`. New target hosts
+of the delivery are confirmed by the update itself (owner, step-up, `app.install`); they must be in
+`webhook.allowed_hosts`. A token keeps the scopes it was created with: a withdrawn scope takes
+effect from the next request, a newly granted one needs a new token.
 
 ### 4.3 Suspension and uninstallation
 
@@ -181,7 +189,8 @@ reinstallation with a new consent.
 An app may perform an action only if **both** hold (05 section 2.6):
 
 1. The grants of the app allow the action on the target (as for people, at most `write`).
-2. The installation has granted the scope of the action.
+2. The installation has granted the scope of the action, and the token of the request carries it too
+   ([08-identity.md](08-identity.md), section 12).
 
 Which actions a scope allows is stated only in the table in [05-actions.md](05-actions.md#26-scopes-for-apps), section 2.6 (source:
 `app_scope` per action in the action catalogue, [ADR 0049](../adr/0049-machine-readable-action-catalogue-as-the-single-source.md)). The scopes themselves are the enum

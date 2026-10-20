@@ -130,7 +130,7 @@ func newWorldWith(t testing.TB, cfg app.AuthorizerConfig) *world {
 		w.addToken(*p)
 	}
 	w.tracker = ids.New()
-	w.principals.Put(authz.PrincipalFacts{ID: w.tracker, Kind: actor.KindApp, Status: authz.PrincipalActive})
+	w.principals.Put(authz.PrincipalFacts{ID: w.tracker, Kind: actor.KindApp, Status: authz.PrincipalActive, AppInstallationActive: true})
 	w.addToken(w.tracker)
 	w.install = ids.New()
 
@@ -239,10 +239,11 @@ func (w *world) agent(id ids.ID) actor.Actor {
 	return actor.Actor{ID: id, Kind: actor.KindAgent, TokenID: w.tokens[id]}
 }
 
-// app returns the principal of the app Tracker with scope messages:write.
+// app returns the principal of the app Tracker with scope messages:write in its installation and
+// in its token (M2-24: an app needs the scope in both).
 func (w *world) app() actor.Actor {
 	return actor.Actor{ID: w.tracker, Kind: actor.KindApp, TokenID: w.tokens[w.tracker], InstallationID: w.install,
-		GrantedScopes: []string{domain.ScopeMessagesWrite}}
+		GrantedScopes: []string{domain.ScopeMessagesWrite}, Scopes: []string{domain.ScopeMessagesWrite}}
 }
 
 // msg is a message in the main thread of channel, written by author.

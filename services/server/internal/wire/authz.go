@@ -165,7 +165,7 @@ func NewAuthorizer(pool *pg.Pool, cfg authzapp.AuthorizerConfig, cat *authzapp.C
 	return authzapp.NewAuthorizer(cfg, authzapp.AuthorizerDeps{
 		Catalog:     cat,
 		Store:       authzpg.NewRepository(pool),
-		Principals:  identityapp.NewPrincipalSource(identitypg.NewRepository(pool)),
+		Principals:  principalSource(pool),
 		Credentials: identityapp.NewCredentialSource(identitypg.NewRepository(pool), identitypg.NewRepository(pool), identitypg.NewRepository(pool)),
 		Structure:   NewStructureSource(pool),
 		Policies:    NewAgentPolicySource(pool),
@@ -199,7 +199,7 @@ type RightsSources struct {
 // Errors: those of authzapp.NewRightsHook.
 func NewRightsHook(pool *pg.Pool, src RightsSources, clk clock.Clock, log *slog.Logger) (*authzapp.RightsHook, error) {
 	if src.Principals == nil {
-		src.Principals = identityapp.NewPrincipalSource(identitypg.NewRepository(pool))
+		src.Principals = principalSource(pool)
 	}
 	if src.Structure == nil {
 		src.Structure = NewStructureSource(pool)
@@ -253,7 +253,7 @@ func NewExpiryService(pool *pg.Pool, a *Audit, sy *Sync, cfg authzapp.ExpiryConf
 	}
 	return authzapp.NewExpiryService(cfg, authzapp.ExpiryDeps{
 		UoW: a.UoW(), Expiry: authzpg.NewRepository(pool), Rights: a.RightsHook(),
-		Principals: identityapp.NewPrincipalSource(identitypg.NewRepository(pool)),
+		Principals: principalSource(pool),
 		Events:     sy.Appender(), Clock: clock.System(), Log: orDiscard(log),
 	})
 }

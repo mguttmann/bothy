@@ -14,7 +14,7 @@ part 'api_token_create.g.dart';
 ///
 /// Properties:
 /// * [name]
-/// * [scopes] - Only for app tokens, a subset of the granted scopes of the installation. Agent tokens (all agent scopes implicitly) and personal tokens (the grants of the person) carry none.
+/// * [scopes] - Only for app tokens, a subset of the granted scopes of the installation; absent or empty takes all granted scopes at this moment. A scope granted later needs a new token. Agent tokens (all agent scopes implicitly) and personal tokens (the grants of the person) carry none.
 /// * [dpopJkt] - RFC 7638 thumbprint (43 base64url characters) of the key the token is bound to; requests must then use DPoP. Required for the kinds in `auth.dpop_required_for`.
 /// * [expiresAt] - Required; at most `auth.api_token_max_ttl` (agents, apps) or `auth.personal_token_max_ttl` (personal) ahead.
 @BuiltValue()
@@ -23,7 +23,7 @@ abstract class ApiTokenCreate
   @BuiltValueField(wireName: r'name')
   String get name;
 
-  /// Only for app tokens, a subset of the granted scopes of the installation. Agent tokens (all agent scopes implicitly) and personal tokens (the grants of the person) carry none.
+  /// Only for app tokens, a subset of the granted scopes of the installation; absent or empty takes all granted scopes at this moment. A scope granted later needs a new token. Agent tokens (all agent scopes implicitly) and personal tokens (the grants of the person) carry none.
   @BuiltValueField(wireName: r'scopes')
   BuiltList<AppScope>? get scopes;
 

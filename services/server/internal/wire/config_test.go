@@ -234,6 +234,12 @@ func TestConfigSchemaBuilds(t *testing.T) {
 		"client.recommended_version.android": {Kind: config.KindString, Default: "", Chapter: "18-release.md"},
 		"client.recommended_version.macos":   {Kind: config.KindString, Default: "", Chapter: "18-release.md"},
 		"client.recommended_version.windows": {Kind: config.KindString, Default: "", Chapter: "18-release.md"},
+
+		// M2-24
+		"app.manifest_max_bytes":        {Kind: config.KindInt, Default: "65536", Min: "1", Chapter: "11-extensions.md"},
+		"webhook.allowed_hosts":         {Kind: config.KindStringList, Default: "", Chapter: "03-data-model.md"},
+		"command.max_per_principal":     {Kind: config.KindInt, Default: "100", Min: "1", Chapter: "09-agents.md"},
+		"command.description_max_chars": {Kind: config.KindInt, Default: "100", Min: "1", Chapter: "09-agents.md"},
 	}
 	// Two keys per class of 05 "Rate-limit classes" (M1-19), with the defaults of 05 section 10.
 	for class, def := range map[string][2]string{

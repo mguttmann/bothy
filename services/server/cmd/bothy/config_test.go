@@ -166,6 +166,7 @@ func TestConfigPrintShowsSourcePerKey(t *testing.T) {
 		"api.cors_allowed_origins =   # default\n" +
 		"api.page_size_default = 50  # default\n" +
 		"api.page_size_max = 200  # default\n" +
+		"app.manifest_max_bytes = 65536  # default\n" +
 		"audit.checkpoint_interval = 1h  # default\n" +
 		"audit.checkpoint_s3_access_key_ref = file:/run/bothy/secrets/audit_checkpoint_s3_access_key  # default\n" +
 		"audit.checkpoint_s3_endpoint =   # default\n" +
@@ -234,6 +235,8 @@ func TestConfigPrintShowsSourcePerKey(t *testing.T) {
 		"client.recommended_version.ios =   # default\n" +
 		"client.recommended_version.macos =   # default\n" +
 		"client.recommended_version.windows =   # default\n" +
+		"command.description_max_chars = 100  # default\n" +
+		"command.max_per_principal = 100  # default\n" +
 		"consumer.batch_size = 500  # default\n" +
 		"consumer.pending_alert_after = 15m  # default\n" +
 		"consumer.poll_interval = 1s  # default\n" +
@@ -389,6 +392,7 @@ func TestConfigPrintShowsSourcePerKey(t *testing.T) {
 		"thread.placeholder_titles = Neuer Chat, New chat, Chat, Ohne Titel, Untitled, Test  # default\n" +
 		"thread.title_max_chars = 200  # default\n" +
 		"voice.max_duration = 15m  # default\n" +
+		"webhook.allowed_hosts =   # default\n" +
 		"webhook.delivery_timeout = 15s  # default\n"
 	if code != 0 || stdout != want || stderr != "" {
 		t.Fatalf("exit %d, stderr %q, stdout\n%s\nwant\n%s", code, stderr, stdout, want)

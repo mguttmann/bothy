@@ -73,8 +73,9 @@ type Actor struct {
 	// principal: Idempotency-Key never replays a stored answer to it, the rate limiter keys it by
 	// the client IP and the failed-credentials precheck counts it as a failure.
 	CredentialInactive bool
-	// Scopes are the scopes of the API token (api_tokens.scopes, 07 section 3 token_scopes). They
-	// are not evaluated before M2 (docs/briefs/M1-28-authz-core.md D6).
+	// Scopes are the scopes of the API token (api_tokens.scopes, 07 section 3 token_scopes). For
+	// an app, authz requires the scope of each action here as well as in GrantedScopes (M2-24,
+	// docs/DECISIONS.md D-M2-24-10, which replaces M1-28 D6); agents and people carry none.
 	Scopes []string
 	// InstallationID is the app installation (apps only).
 	InstallationID ids.ID
@@ -168,6 +169,9 @@ func (a Actor) CredentialState() (sessionActive bool, deviceState string, device
 
 // AppGrantedScopes returns a.GrantedScopes (kernel/authorize.Principal); the slice is shared.
 func (a Actor) AppGrantedScopes() []string { return a.GrantedScopes }
+
+// AppTokenScopes returns a.Scopes (kernel/authorize.Principal); the slice is shared.
+func (a Actor) AppTokenScopes() []string { return a.Scopes }
 
 // ViewAsPerson returns the viewed person of a.ViewAs, zero for none (kernel/authorize.Principal).
 func (a Actor) ViewAsPerson() ids.ID {

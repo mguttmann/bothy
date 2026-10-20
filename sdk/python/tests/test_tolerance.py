@@ -258,9 +258,12 @@ def test_event_type_enums_stay_strict() -> None:
             with pytest.raises(ValueError, match="is not a valid"):
                 cls("unknown_example")
         else:
-            value = cls("unknown_example")
+            # An unknown value of the enum's own data type (the integer enum of schema_version
+            # takes integers).
+            unknown: object = 999_999 if issubclass(cls, int) else "unknown_example"
+            value = cls(unknown)
             assert tolerance.is_unknown(value), name
-            assert value.value == "unknown_example", name
+            assert value.value == unknown, name
 
 
 def _properties(name: str) -> dict[str, Any]:

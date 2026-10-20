@@ -12,6 +12,7 @@ import (
 	"strings"
 
 	"github.com/OWNER/bothy/services/server/internal/authz"
+	"github.com/OWNER/bothy/services/server/internal/identity"
 	identityhttp "github.com/OWNER/bothy/services/server/internal/identity/adapters/httpapi"
 	"github.com/OWNER/bothy/services/server/internal/identity/adapters/instanceflags"
 	"github.com/OWNER/bothy/services/server/internal/identity/adapters/locale"
@@ -161,15 +162,19 @@ type Identity struct {
 	// LocalHandlers are the REST handlers of loginWithPassword and setMyLocalCredential; nil until
 	// BindLocal.
 	LocalHandlers *identityhttp.Local
-	cfg           app.Config
-	state         instance.State
-	repo          *identitypg.Repository
-	uow           txn.UnitOfWork
-	az            authorize.Authorizer
-	writes        IdentityWrites
-	pepper        []byte
-	clk           clock.Clock
-	log           *slog.Logger
+	// Directory is the port identity.Directory; PrincipalWrites the port identity.PrincipalWrites
+	// for the principals of apps (M2-24).
+	Directory       *app.Directory
+	PrincipalWrites *app.PrincipalWrites
+	cfg             app.Config
+	state           instance.State
+	repo            *identitypg.Repository
+	uow             txn.UnitOfWork
+	az              authorize.Authorizer
+	writes          IdentityWrites
+	pepper          []byte
+	clk             clock.Clock
+	log             *slog.Logger
 }
 
 // IdentityWrites are the collaborators of the writing use cases of identity (M1-31): the
@@ -188,6 +193,9 @@ type IdentityWrites struct {
 	// Fresh is the fresh step-up check of authz (terminal.step_up_max_age, M2-40) for
 	// StepUp.ConsumeFresh; nil fails it closed.
 	Fresh authz.FreshStepUpCheck
+	// Apps are the installations of app principals (NewAppInstallations, M2-24); createToken and
+	// the authenticator read them. nil means identity.NoAppInstallations: no app is installed.
+	Apps identity.AppInstallations
 }
 
 // NewIdentity builds the identity module over pool with the unit of work uow, the Authorizer az,
@@ -238,15 +246,20 @@ func NewIdentity(cfg app.Config, pool *pg.Pool, uow txn.UnitOfWork, az authorize
 	}
 	tokens, err := app.NewTokens(cfg, pepper, app.TokensDeps{
 		Store: repo, Principals: repo, UoW: uow, Authorizer: az, Audit: w.Audit, Cursors: identityhttp.Cursors{},
-		Switch: personal, Clock: clk,
+		Switch: personal, Clock: clk, Apps: w.Apps,
 	})
+	if err != nil {
+		return nil, err
+	}
+	writes, err := app.NewPrincipalWrites(cfg, repo, clk)
 	if err != nil {
 		return nil, err
 	}
 	return &Identity{
 		Devices: devices, People: people, PeopleHandlers: identityhttp.NewPeople(people, people), DPoP: verifier, Replay: store,
 		Handlers: identityhttp.NewDevices(devices), Tokens: tokens, TokenHandlers: identityhttp.NewTokens(tokens),
-		Enrollment: enrollment, TrustedHeader: driver, Principals: principals, cfg: cfg, state: instanceapp.NewState(instanceRepo, uow),
+		Enrollment: enrollment, TrustedHeader: driver, Principals: principals,
+		Directory: app.NewDirectory(repo), PrincipalWrites: writes, cfg: cfg, state: instanceapp.NewState(instanceRepo, uow),
 		repo: repo, uow: uow, az: az, writes: w, pepper: append([]byte(nil), pepper...), clk: clk, log: orDiscard(log),
 	}, nil
 }
@@ -276,6 +289,7 @@ func (i *Identity) BindSessions(keys instance.Keys, instanceID ids.ID) error {
 	auth, err := app.NewAuthenticator(i.cfg, app.AuthenticatorDeps{
 		AccessTokens: tokens, DPoP: i.DPoP, Sessions: i.repo, APITokens: i.repo, Pepper: i.pepper, Clock: i.clk, Log: i.log,
 		Binding: i.TrustedHeader, Revoker: sessions, UoW: i.uow, Audit: i.writes.Audit,
+		Apps: i.writes.Apps,
 	})
 	if err != nil {
 		return err

@@ -831,12 +831,19 @@ the person knew, rotate secrets in their dev environment.
   tokens.
 - **Scopes.** Only app tokens carry scopes: a subset of the granted scopes of the installation.
   Agent tokens carry none (agents have their scopes implicitly, 05 section 2.6), personal tokens
-  none either (they act with the grants of the person). Permissions additionally from grants (07). In
-  M1, `authorize` checks for apps only `app_installations.granted_scopes` of the token's installation
-  (07, section 2.10); how the scopes of the token itself are added and how long-lived connections recheck the
-  state of the installation is set by milestone M2 (apps) before an app token
-  is issued. Until then, `token.create` for an app responds `409 conflict` with `reason:
-  app_not_installed` (PLAN M2-24).
+  none either (they act with the grants of the person). Permissions additionally from grants (07).
+  `token.create` for an app requires an active installation (otherwise `409 conflict` with
+  `reason: app_not_installed`, also while the app is suspended); if `scopes` is missing from the body
+  or the list is empty, the token receives the granted scopes of the installation at that moment,
+  otherwise exactly the named ones, which must all be granted (`400 validation_failed` at
+  `/scopes/<i>`). An app request needs the scope of the action in the token **and** in the
+  installation; a check without a token (for example a webhook delivery) only in the installation. A
+  scope that is withdrawn from the installation takes effect from the next request of every token; a
+  scope granted later needs a new token (rotation). The installation is part of the credential:
+  the check of every app token reads the active installation on every request (without a cache); if
+  it is not active, the app is not authenticated (`app_not_installed`), its permission state is
+  empty, and `Revalidate` closes an open connection as soon as the installation is no longer active
+  or no longer grants a scope of the connection (docs/DECISIONS.md D-M2-24-10 and D-M2-24-11).
 - **Binding.** Agent tokens are DPoP-bound when `agent` is in `auth.dpop_required_for`
   (default; allowed values `agent`, `app`, `personal`). For this, the adapter creates a key pair during
   setup. A bound token requires the `DPoP` scheme and a proof

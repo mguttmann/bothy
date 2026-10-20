@@ -11,6 +11,25 @@ documented in this file. The format is based on
 
 ### Added
 
+- Apps (M2-24): the migrations `00030_apps.sql` and `00031_app_installations.sql` (with the trigger
+  `apps_principal_kind_check`), the port `apps.Apps` and the operations `listApps`, `installApp`,
+  `validateManifest`, `getApp`, `upgradeAppManifest`, `setAppScopes`, `suspendApp`, `resumeApp` and
+  `uninstallApp` (owner only; the writing ones with step-up, audit and a new rights version). The
+  manifest `app_manifest.v1` follows 11 3.1 in `openapi.yaml` and is checked against the rules of
+  11 3.2 (scopes of the catalogue, subscribable events, `https` delivery hosts from
+  `webhook.allowed_hosts`, never `trigger` or `manage`, no reserved command names); the server stores
+  it with the SHA-256 of the bytes as received. An upgrade never adds a scope, an event or a grant;
+  `setAppScopes` is the consent. Suspend keeps grants and tokens, uninstall revokes them and
+  disables the principal. `createToken` issues app tokens with a subset of the granted scopes of an
+  active installation; authz requires the scope of an action in the token and in the installation,
+  and an app without an active installation is unauthenticated (`app_not_installed`) with an empty
+  rights snapshot. New ports `identity.AppInstallations`, `identity.PrincipalWrites`,
+  `authz.AppScopes` and `authz.Admin.RevokeSubjectGrants`; new configuration keys
+  `app.manifest_max_bytes`, `webhook.allowed_hosts`, `command.max_per_principal`,
+  `command.description_max_chars` and `audit.reason_max_chars`; `httpserver.RawJSONBody`; a
+  `depguard` rule forbids the package `plugin` in the server module (ADR 0022). Manifests with
+  the escape of NUL or of an unpaired surrogate are refused, and manifest values that are no audit
+  code enter the audit hashed, so no checked manifest makes install or upgrade fail with 500.
 - Release chain (M7-10): `make -C services/server release-build VERSION=<v> OUT=<dir>` builds the
   static binaries `bothy_<v>_linux_amd64` and `bothy_<v>_linux_arm64`. A tag `server/vX.Y.Z`
   publishes `bothy-server:X.Y.Z` and `bothy-postgres:pg18-X.Y.Z` (multi-arch, built without

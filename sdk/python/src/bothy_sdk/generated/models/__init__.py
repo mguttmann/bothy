@@ -62,6 +62,13 @@ from .app_install import AppInstall
 from .app_installation import AppInstallation
 from .app_installation_state import AppInstallationState
 from .app_manifest import AppManifest
+from .app_manifest_components_item import AppManifestComponentsItem
+from .app_manifest_delivery import AppManifestDelivery
+from .app_manifest_delivery_mode import AppManifestDeliveryMode
+from .app_manifest_incoming_webhooks_item import AppManifestIncomingWebhooksItem
+from .app_manifest_requested_grants_item import AppManifestRequestedGrantsItem
+from .app_manifest_schema_version import AppManifestSchemaVersion
+from .app_manifest_scopes import AppManifestScopes
 from .app_page import AppPage
 from .app_scope import AppScope
 from .app_scopes_put import AppScopesPut
@@ -789,6 +796,13 @@ __all__ = (
     "AppInstallation",
     "AppInstallationState",
     "AppManifest",
+    "AppManifestComponentsItem",
+    "AppManifestDelivery",
+    "AppManifestDeliveryMode",
+    "AppManifestIncomingWebhooksItem",
+    "AppManifestRequestedGrantsItem",
+    "AppManifestSchemaVersion",
+    "AppManifestScopes",
     "AppPage",
     "AppScope",
     "AppScopesPut",

@@ -62,6 +62,11 @@ def _parse_response(
 
         return response_404
 
+    if response.status_code == 409:
+        response_409 = Problem.from_dict(response.json())
+
+        return response_409
+
     if response.status_code == 429:
         response_429 = Problem.from_dict(response.json())
 
@@ -90,6 +95,13 @@ def sync_detailed(
     body: AppScopesPut,
 ) -> Response[App | Problem]:
     """Change granted scopes and subscriptions
+
+     Owner only with a fresh step-up; the consent for new scopes and events. `granted_scopes` is a subset
+    of the scopes of the manifest; `event_subscriptions` absent keeps the current ones the new scopes
+    still allow, present it replaces them (each needs `events:subscribe` and the scope of the event). A
+    removed scope acts on the next request of every token; a newly granted scope needs a new token,
+    because a token keeps the scopes it was created with. Equal lists answer `200` without effect; an
+    uninstalled app is `409 conflict`.
 
     Args:
         app_id (UUID): UUIDv7 (RFC 9562), lowercase canonical form.
@@ -123,6 +135,13 @@ def sync(
 ) -> App | Problem | None:
     """Change granted scopes and subscriptions
 
+     Owner only with a fresh step-up; the consent for new scopes and events. `granted_scopes` is a subset
+    of the scopes of the manifest; `event_subscriptions` absent keeps the current ones the new scopes
+    still allow, present it replaces them (each needs `events:subscribe` and the scope of the event). A
+    removed scope acts on the next request of every token; a newly granted scope needs a new token,
+    because a token keeps the scopes it was created with. Equal lists answer `200` without effect; an
+    uninstalled app is `409 conflict`.
+
     Args:
         app_id (UUID): UUIDv7 (RFC 9562), lowercase canonical form.
         body (AppScopesPut):
@@ -149,6 +168,13 @@ async def asyncio_detailed(
     body: AppScopesPut,
 ) -> Response[App | Problem]:
     """Change granted scopes and subscriptions
+
+     Owner only with a fresh step-up; the consent for new scopes and events. `granted_scopes` is a subset
+    of the scopes of the manifest; `event_subscriptions` absent keeps the current ones the new scopes
+    still allow, present it replaces them (each needs `events:subscribe` and the scope of the event). A
+    removed scope acts on the next request of every token; a newly granted scope needs a new token,
+    because a token keeps the scopes it was created with. Equal lists answer `200` without effect; an
+    uninstalled app is `409 conflict`.
 
     Args:
         app_id (UUID): UUIDv7 (RFC 9562), lowercase canonical form.
@@ -179,6 +205,13 @@ async def asyncio(
     body: AppScopesPut,
 ) -> App | Problem | None:
     """Change granted scopes and subscriptions
+
+     Owner only with a fresh step-up; the consent for new scopes and events. `granted_scopes` is a subset
+    of the scopes of the manifest; `event_subscriptions` absent keeps the current ones the new scopes
+    still allow, present it replaces them (each needs `events:subscribe` and the scope of the event). A
+    removed scope acts on the next request of every token; a newly granted scope needs a new token,
+    because a token keeps the scopes it was created with. Equal lists answer `200` without effect; an
+    uninstalled app is `409 conflict`.
 
     Args:
         app_id (UUID): UUIDv7 (RFC 9562), lowercase canonical form.

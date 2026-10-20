@@ -56,6 +56,7 @@ type Authenticator struct {
 	store  SessionStore
 	api    APITokenStore
 	pepper []byte
+	apps   identity.AppInstallations
 	clk    clock.Clock
 	log    *slog.Logger
 	bind   SessionBinding
@@ -79,6 +80,9 @@ type AuthenticatorDeps struct {
 	APITokens APITokenStore
 	// Pepper is the raw token pepper, the HMAC key of the API token lookup.
 	Pepper []byte
+	// Apps reads the installation of an app principal on every request of its token (M2-24);
+	// nil means identity.NoAppInstallations: no app is installed.
+	Apps identity.AppInstallations
 	// Clock is the time of the state checks; nil means clock.System().
 	Clock clock.Clock
 	// Log receives failed activity writes; nil means slog.Default().
@@ -113,9 +117,12 @@ func NewAuthenticator(cfg Config, d AuthenticatorDeps) (*Authenticator, error) {
 	if d.Log == nil {
 		d.Log = slog.Default()
 	}
+	if d.Apps == nil {
+		d.Apps = identity.NoAppInstallations{}
+	}
 	return &Authenticator{
 		cfg: cfg, tokens: d.AccessTokens, dpop: d.DPoP, store: d.Sessions, api: d.APITokens, pepper: append([]byte(nil), d.Pepper...),
-		clk: d.Clock, log: d.Log, bind: d.Binding, revoke: d.Revoker, uow: d.UoW, audit: d.Audit,
+		apps: d.Apps, clk: d.Clock, log: d.Log, bind: d.Binding, revoke: d.Revoker, uow: d.UoW, audit: d.Audit,
 	}, nil
 }
 

@@ -103,7 +103,7 @@ func (a *Authorizer) lists(ctx context.Context, spec domain.ActionSpec, s *actin
 	switch {
 	case isHostList(spec):
 		return a.buildHostScope(ctx, s, v)
-	case s.kind != domain.KindApp || domain.CheckAppScope(spec.ID, p.AppGrantedScopes()) == "":
+	case s.kind != domain.KindApp || domain.CheckAppScope(spec.ID, p.AppGrantedScopes(), p.AppTokenScopes(), !s.ref.TokenID.IsZero()) == "":
 		return a.buildScope(ctx, s, v)
 	}
 	return authorize.Scope{PermissionVersion: v}, nil

@@ -343,13 +343,13 @@ func TestDecidePrincipalRules(t *testing.T) {
 	write := domain.Rights{Level: domain.LevelWrite}
 	app := userIn("message.create", domain.Auth, write)
 	app.Principal = domain.Principal{ID: ids.New(), Kind: domain.KindApp}
-	if r := domain.CheckAppScope("message.create", nil); r != "" {
+	if r := domain.CheckAppScope("message.create", nil, nil, false); r != "" {
 		wantDecision(t, "app scope", mustDecide(t, app), domain.OutcomeForbidden, r)
 	}
 	if _, listed := domain.AppScopeOf("no.such.action"); listed || len(domain.ScopeTableActions()) == 0 {
 		t.Fatal("scope table")
 	}
-	if r := domain.CheckAppScope("no.such.action", nil); r != domain.ReasonSubjectKindNotAllowed {
+	if r := domain.CheckAppScope("no.such.action", nil, nil, false); r != domain.ReasonSubjectKindNotAllowed {
 		t.Fatalf("unlisted action: %q", r)
 	}
 	view := userIn("message.create", domain.Auth, write)

@@ -247,7 +247,7 @@ Source: [03-data-model.md](../spec/03-data-model.md), section 9.
 | `run.stall_after` | `BOTHY_RUN__STALL_AFTER` | Server |  | `10m` | without progress: stall notice | planned (M2) |
 | `component.default_ttl` | `BOTHY_COMPONENT__DEFAULT_TTL` | Server |  | `24h` | expiry of a component without its own value | planned (M2) |
 | `push.max_consecutive_failures` | `BOTHY_PUSH__MAX_CONSECUTIVE_FAILURES` | Server |  | `5` | after that, a push registration is deactivated | planned (M3) |
-| `webhook.allowed_hosts` | `BOTHY_WEBHOOK__ALLOWED_HOSTS` | Server |  | empty | allowed target hosts for outgoing webhooks | planned (M2) |
+| `webhook.allowed_hosts` | `BOTHY_WEBHOOK__ALLOWED_HOSTS` | Server | list(string) | empty | allowed target hosts for outgoing webhooks | active |
 | `webhook.max_consecutive_failures` | `BOTHY_WEBHOOK__MAX_CONSECUTIVE_FAILURES` | Server |  | `20` | after that, a subscription is deactivated | planned (M2) |
 | `webhook.retry_backoff_base` | `BOTHY_WEBHOOK__RETRY_BACKOFF_BASE` | Server |  | `10s` | base of the backoff | planned (M2) |
 | `webhook.retry_backoff_cap` | `BOTHY_WEBHOOK__RETRY_BACKOFF_CAP` | Server |  | `1h` | largest interval | planned (M2) |
@@ -424,8 +424,8 @@ Source: [09-agents.md](../spec/09-agents.md), section 21.
 | `interaction.ack_timeout` | `BOTHY_INTERACTION__ACK_TIMEOUT` | Server |  | `30s` | after that the card shows "not acknowledged" | planned (M2) |
 | `command.autocomplete_timeout` | `BOTHY_COMMAND__AUTOCOMPLETE_TIMEOUT` | Server |  | `2500ms` | wait time for suggestions | planned (M2) |
 | `command.autocomplete_max_choices` | `BOTHY_COMMAND__AUTOCOMPLETE_MAX_CHOICES` | Server |  | `25` | suggestions per answer | planned (M2) |
-| `command.max_per_principal` | `BOTHY_COMMAND__MAX_PER_PRINCIPAL` | Server |  | `100` | commands per agent or app | planned (M2) |
-| `command.description_max_chars` | `BOTHY_COMMAND__DESCRIPTION_MAX_CHARS` | Server |  | `100` | length of a description | planned (M2) |
+| `command.max_per_principal` | `BOTHY_COMMAND__MAX_PER_PRINCIPAL` | Server | int | `100` | commands per agent or app | active |
+| `command.description_max_chars` | `BOTHY_COMMAND__DESCRIPTION_MAX_CHARS` | Server | int | `100` | length of a description | active |
 | `component.max_per_message` | `BOTHY_COMPONENT__MAX_PER_MESSAGE` | Server |  | `25` | components per message | planned (M2) |
 | `component.custom_id_max_chars` | `BOTHY_COMPONENT__CUSTOM_ID_MAX_CHARS` | Server |  | `100` | length of `custom_id` | planned (M2) |
 | `component.form_max_fields` | `BOTHY_COMPONENT__FORM_MAX_FIELDS` | Server |  | `10` | fields per form | planned (M2) |
@@ -464,7 +464,7 @@ Source: [11-extensions.md](../spec/11-extensions.md), section 16.
 
 | Key | Environment | Place | Type | Default | Meaning | Status |
 |---|---|---|---|---|---|---|
-| `app.manifest_max_bytes` | `BOTHY_APP__MANIFEST_MAX_BYTES` | Server |  | `65536` | size of a manifest | planned (M2) |
+| `app.manifest_max_bytes` | `BOTHY_APP__MANIFEST_MAX_BYTES` | Server | int | `65536` | size of a manifest | active |
 | `app.interaction_timeout` | `BOTHY_APP__INTERACTION_TIMEOUT` | Server |  | `3s` | deadline for synchronous responses through `interactions_url` | planned (M2) |
 | `webhook.delivery_timeout` | `BOTHY_WEBHOOK__DELIVERY_TIMEOUT` | Server | duration | `15s` | timeout of a delivery | active |
 | `webhook.max_pending_per_subscription` | `BOTHY_WEBHOOK__MAX_PENDING_PER_SUBSCRIPTION` | Server |  | `10000` | open deliveries per subscription, above that `paused` | planned (M2) |
