@@ -142,3 +142,11 @@ def test_pack_step_skips_reports_a_partial_run_did_not_write(tmp_path: Path) -> 
     assert done.returncode == 0, done.stderr
     listed = (temp / SONAR_ARTIFACT / "reports.txt").read_text(encoding="utf-8").split()
     assert listed == ["services/server/coverage.out"]
+
+
+def test_a_push_to_main_is_never_cancelled_by_the_next_merge() -> None:
+    # Merges come faster than one full run; with cancel-in-progress every main run was
+    # cancelled by the next merge, and SonarQube never got an analysis of main. A newer push
+    # waits instead (GitHub keeps at most one pending run per group).
+    concurrency = _workflow()["concurrency"]
+    assert concurrency["cancel-in-progress"] == "${{ github.event_name != 'push' }}"

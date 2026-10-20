@@ -493,7 +493,8 @@ operated, and the order of the build.
   coverage reports of its `make test` as the artifact `sonar-coverage`; `sonar` needs `gates`,
   unpacks them and runs the new target `make sonar-scan` (the scan alone, same quality gate).
   `make sonar` and `make check` still test first. ci.yml also runs on pushes to `main`, so
-  SonarQube keeps an analysis of `main` (docs/quality/gates.md).
+  SonarQube keeps an analysis of `main` (docs/quality/gates.md). A run on `main` in progress is
+  not cancelled by a later push; the newest push waits as the one pending run.
 - CodeRabbit: the knowledge base stores learnings for this repository (no Jira, Linear or MCP
   sources), and the review instructions name settled facts that are no findings (`go.sum`
   excluded on purpose, dark default theme, git variables cleared by the pre-push hook, test

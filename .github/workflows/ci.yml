@@ -43,9 +43,12 @@ on:
 permissions:
   contents: read
 
+# A new commit of a pull request cancels its older run. A push to main never cancels the run
+# in progress: merges come faster than one full run, and SonarQube needs a finished analysis of
+# main. The newer push waits; GitHub keeps at most one pending run per group.
 concurrency:
   group: ci-${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
-  cancel-in-progress: true
+  cancel-in-progress: ${{ github.event_name != 'push' }}
 
 jobs:
   plan:
