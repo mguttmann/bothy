@@ -397,7 +397,8 @@ the connections that may see them. Test controls: `addPerson`, `addSpace`, `addC
 `deleteMySetting`, `getRun`, `cancelRun`; since M4-19 also `getMySidebar`,
 `putMySidebarSpace` (the `fracindex` check of the server: a `sort_key` outside the fractional
 index is `400 validation_failed` at `/sort_key`), `listForumTags`, `createThread` (forum posts
-only; without `first_message` `400 required_for_forum_post`), `getBrandingLogo` (bytes of
+only; without `first_message` `400 validation_failed` at `/first_message` with the reason
+`required_for_forum_post`), `getBrandingLogo` (bytes of
 `world.logo`, else `404`) and `listChannelThreads` with `state`, `tag_id`, `sort`, `limit` and
 an offset cursor; and from M4-25 in `rest/self_handlers.dart` `listMyDevices`, `revokeDevice`,
 `listMySessions` (with `current`), `revokeSession`, `updateMyProfile`, `createStepUpChallenge`
