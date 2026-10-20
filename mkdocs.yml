@@ -199,6 +199,7 @@ nav:
       - ADR index: adr/README.md
       - Ruling log: DECISIONS.md
       - 'Ruling log: planning and resumption': DECISIONS-PLANNING.md
+      - 'Ruling log: foundation tickets': DECISIONS-FOUNDATION.md
       - Open questions: OPEN-QUESTIONS.md
       - Risks: RISKS.md
   - Build briefs:
