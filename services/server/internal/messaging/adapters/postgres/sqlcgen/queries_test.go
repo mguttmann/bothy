@@ -76,7 +76,7 @@ func TestQueries_RunAgainstTheSchema(t *testing.T) {
 	}
 	rest, err := q.ListMyMentions(ctx, sqlcgen.ListMyMentionsParams{PrincipalID: uuid(sam), VisibleChannelIds: visible, RowLimit: 5,
 		HasAfter: true, AfterAt: page[0].MentionedAt, AfterID: page[0].ID})
-	if err != nil || len(rest) != 1 || rest[0].Message.ID != m.ID {
+	if err != nil || len(rest) != 1 || rest[0].ID != m.ID {
 		t.Fatalf("ListMyMentions after %+v %v", rest, err)
 	}
 	counts, err := q.CountUnreadMentions(ctx, sqlcgen.CountUnreadMentionsParams{ReadThreadIds: []pgtype.UUID{uuid(main)}, ReadSeqs: []int64{1},

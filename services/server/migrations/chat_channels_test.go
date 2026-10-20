@@ -117,7 +117,7 @@ func TestChatChannelsMigration_Schema(t *testing.T) {
 			{"created_at", ts, false, "now()"},
 			{"moved_at", ts, true, ""},
 			{"version", "bigint", false, "1"},
-			// Added by 00034 (M3-13); the vector is a stored generated column without a default.
+			// Added by 00035 (M3-13); the vector is a stored generated column without a default.
 			{"search_language", "regconfig", false, "'simple'::regconfig"},
 			{"title_search", "tsvector", false, ""},
 		}, []string{
@@ -136,7 +136,7 @@ func TestChatChannelsMigration_Schema(t *testing.T) {
 		}, []string{
 			"CREATE INDEX threads_channel_state_activity_idx ON public.threads USING btree (channel_id, state, last_activity_at DESC)",
 			"CREATE INDEX threads_operator_agent_channel_idx ON public.threads USING btree (operator_agent_id, channel_id) WHERE (operator_agent_id IS NOT NULL)",
-			// Added by 00035 (M3-13).
+			// Added by 00036 (M3-13).
 			"CREATE INDEX threads_title_search_idx ON public.threads USING gin (title_search)",
 			"CREATE UNIQUE INDEX threads_channel_main_key ON public.threads USING btree (channel_id) WHERE (kind = 'main'::text)",
 			"CREATE UNIQUE INDEX threads_parent_message_id_key ON public.threads USING btree (parent_message_id) WHERE (parent_message_id IS NOT NULL)",

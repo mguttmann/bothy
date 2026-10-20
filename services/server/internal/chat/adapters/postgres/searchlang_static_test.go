@@ -67,7 +67,7 @@ func TestThreadInsertsSetSearchLanguage(t *testing.T) {
 		t.Fatal(err)
 	}
 	for _, f := range generated {
-		if filepath.Base(f) == "models.go" {
+		if base := filepath.Base(f); base == "models.go" || base == "models.gen.go" {
 			continue
 		}
 		data, err := os.ReadFile(f) // #nosec G304 -- a generated file of this package.

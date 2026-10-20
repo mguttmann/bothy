@@ -11,11 +11,11 @@ documented in this file. The format is based on
 
 ### Added
 
-- Search vectors (M3-13): migration `00034` adds `messages.search_language`,
+- Search vectors (M3-13): migration `00035` adds `messages.search_language`,
   `messages.search_vector`, `threads.search_language` and `threads.title_search` as `STORED`
   generated columns with the expressions of 03 section 5 and the platform function
   `search_tsquery(regconfig[], text)` of 14 4.2 (executable only by `bothy_app`); migration
-  `00035` builds their GIN indexes concurrently. Every new message and thread takes the language
+  `00036` builds their GIN indexes concurrently. Every new message and thread takes the language
   of its author or creator through `search.locale_map` (the instance language for agents, apps
   and system lines), set once at creation and never from a request. New configuration keys
   `search.languages` and `search.locale_map` with the new kind `map(string)` and the checks

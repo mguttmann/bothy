@@ -160,7 +160,7 @@ $$;
 
 A NULL result means "no term" (4.1). With `'{german,english}'`, `Rechnungen` becomes
 `'rechnung' | 'rechnungen' | 'rechnungen'`; the GIN query uses the index (plan checked).
-The function is created by a platform migration. Migration `00034_search_vectors.sql` (M3-13) creates it; it belongs
+The function is created by a platform migration. Migration `00035_search_vectors.sql` (M3-13) creates it; it belongs
 to `bothy_owner`, runs as the caller, and only `bothy_app` may execute it (`REVOKE ALL ... FROM
 PUBLIC`, D-M3-13-9). On PostgreSQL 18 the examples give the same text as on 16: `the` gives
 `'the' | 'the'` (the English branch holds only a stop word), only punctuation, empty text, white

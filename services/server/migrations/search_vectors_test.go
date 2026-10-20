@@ -15,7 +15,7 @@ import (
 	"github.com/OWNER/bothy/services/server/internal/platform/pg/pgtest"
 )
 
-// TestSearchColumnsOnPostgres18 holds the search columns of 00034 and the indexes of 00035
+// TestSearchColumnsOnPostgres18 holds the search columns of 00035 and the indexes of 00036
 // against the catalog of the real PostgreSQL 18 (docs/spec/14-search.md 3.2, 03 section 5): the
 // vectors are stored generated columns, not virtual ones, the languages are regconfig NOT NULL
 // DEFAULT 'simple', and both GIN indexes are valid. This holds the row "Migrations-Lint" of 14

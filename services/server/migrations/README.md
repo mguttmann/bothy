@@ -51,16 +51,16 @@ for every step (rule M6). A generated column states `STORED` (`make migrations-l
 
 ## Search vectors and the platform function `search_tsquery` (M3-13)
 
-`00034_search_vectors.sql` adds `search_language regconfig NOT NULL DEFAULT 'simple'` and the
+`00035_search_vectors.sql` adds `search_language regconfig NOT NULL DEFAULT 'simple'` and the
 `STORED` generated vectors `messages.search_vector` and `threads.title_search` with the
 expressions of [03-data-model.md](../../../docs/spec/03-data-model.md) section 5, and the
 platform function `search_tsquery(langs regconfig[], q text) RETURNS tsquery` of
 [14-search.md](../../../docs/spec/14-search.md) 4.2 (owner `bothy_owner`, `EXECUTE` only for
-`bothy_app`). `00035_search_vector_indexes.sql` builds the two GIN indexes `CONCURRENTLY` outside a
+`bothy_app`). `00036_search_vector_indexes.sql` builds the two GIN indexes `CONCURRENTLY` outside a
 transaction and first drops an invalid leftover of an interrupted build.
 
 Rewrite note (RK-38, docs/DECISIONS.md D-M3-13-8): adding a `STORED` generated column rewrites the
-table under an exclusive lock. 00034 does it once, before the first server release; existing rows
+table under an exclusive lock. 00035 does it once, before the first server release; existing rows
 keep `simple`. Any later change of a vector expression (weights, languages, columns) rewrites
 `messages` again and is a release with a maintenance window, whose duration the load test of
 M3-16 measures.
