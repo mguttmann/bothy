@@ -1,0 +1,190 @@
+// SPDX-License-Identifier: Apache-2.0
+
+// The administration of the app against the fake server, headless (brief M4-26 Design note 3;
+// the same enumeration as integration_test/admin_step_up_test.dart): every changing operation
+// the screens call asks the step-up prompt exactly when its action has `step_up: true` in
+// docs/spec/actions.yaml, which the fake reads; never for `false`. Also the paths of `/admin`.
+
+import 'dart:io';
+
+import 'package:admin_ui/admin_ui.dart';
+import 'package:auth/auth.dart';
+import 'package:client/admin/admin_route.dart';
+import 'package:client/onboarding/onboarding_controller.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter_test/flutter_test.dart';
+import 'package:sync_engine/testing.dart';
+
+import '../support/fake_instance.dart';
+
+/// Answers every step-up with yes and records its purpose.
+class RecordingPrompt implements StepUpPrompt {
+  /// The purposes asked.
+  final List<String> asked = [];
+
+  @override
+  Future<bool> ask(String purposeText) async {
+    asked.add(purposeText);
+    return true;
+  }
+}
+
+/// A pending device of [userId] that logged in with [method], as the server stores it.
+String addWaiting(FakeWorld world, String userId, String name, String method) {
+  final id = world.nextId();
+  world.devices[id] = FakeDevice(
+    id: id,
+    userId: userId,
+    name: name,
+    platform: 'android',
+    state: 'pending',
+    jkt: 'jkt-$id',
+    createdAt: world.stamp(),
+  );
+  final sid = world.nextId();
+  world.sessions[sid] = FakeSession(
+    id: sid,
+    userId: userId,
+    deviceId: id,
+    authMethod: method,
+    createdAt: world.stamp(),
+    expiresAt: world.stamp(world.now().add(const Duration(days: 1))),
+    jkt: 'jkt-$id',
+  );
+  return id;
+}
+
+void main() {
+  group('the paths of the administration', () {
+    test('map to locations and back', () {
+      expect(adminLocationOf(['admin']), AdminLocation.start);
+      expect(
+        adminLocationOf(['admin', 'people', 'x']),
+        const AdminLocation(AdminSection.people, id: 'x'),
+      );
+      expect(adminLocationOf(['admin', 'grants']), isNull);
+      expect(adminLocationOf(['admin', 'devices', 'x']), isNull);
+      expect(
+        adminPathOf(const AdminLocation(AdminSection.groups, id: 'g')),
+        '/admin/groups/g',
+      );
+    });
+  });
+
+  HttpOverrides? saved;
+  late FakeInstance fake;
+  late ProviderContainer c;
+  late RecordingPrompt prompt;
+
+  setUp(() async {
+    saved = HttpOverrides.current;
+    HttpOverrides.global = null;
+    prompt = RecordingPrompt();
+    fake = await FakeInstance.start(stepUpPrompt: prompt);
+    c = appContainer(fake);
+  });
+
+  tearDown(() async {
+    c.dispose();
+    await fake.stop();
+    HttpOverrides.global = saved;
+  });
+
+  test('every change asks for step-up exactly as actions.yaml says', () async {
+    final control = await connected(c, fake);
+    await control.loginWithPassword(
+      WorldSeed.alexLogin,
+      WorldSeed.password,
+      WorldSeed.totp,
+    );
+    expect(c.read(onboardingControllerProvider).step, OnboardingStep.signedIn);
+    final admin = c.read(adminRepositoryProvider)!;
+    final world = fake.server.world;
+    final sam = fake.seed.sam.id;
+    final pending = addWaiting(world, sam, 'Pixel', 'oidc');
+    final other = addWaiting(world, sam, 'Old tablet', 'password_totp');
+    final passkey = world.addPasskey(sam, name: 'Sam laptop');
+    final identity = world.addIdentity(sam, subject: 'sam');
+
+    final waiting = await admin.waitingDevices();
+    expect(waiting.map((w) => w.device.name), ['Pixel', 'Old tablet']);
+    expect(waiting.first.origin, SelfAuthMethod.oidc);
+    expect(waiting.first.person.displayName, 'Sam');
+
+    late AdminGroup group;
+    final code = world.devices[pending]!.verificationCode;
+    final samSession = world.sessions.values
+        .firstWhere((s) => s.deviceId == other)
+        .id;
+    final steps = <String, Future<void> Function()>{
+      'createUser': () => admin.createPerson(
+        handle: 'robin.k',
+        displayName: 'Robin K',
+        localAccount: true,
+        purpose: 'createUser',
+      ),
+      'createEnrollmentCode': () =>
+          admin.newEnrollmentCode(sam, purpose: 'createEnrollmentCode'),
+      'unlinkIdentity': () =>
+          admin.unlinkIdentity(sam, identity, purpose: 'unlinkIdentity'),
+      'revokePasskey': () =>
+          admin.revokePasskey(sam, passkey, purpose: 'revokePasskey'),
+      'approveDevice': () =>
+          admin.approveDevice(pending, code, purpose: 'approveDevice'),
+      'revokeSession': () => admin.endSession(samSession),
+      'revokeDevice': () =>
+          admin.revokeDevice(other, reason: 'Lost', purpose: 'revokeDevice'),
+      'addOwner': () =>
+          admin.addOwner(sam, reason: 'Deputy', purpose: 'addOwner'),
+      'revokeOwner': () =>
+          admin.revokeOwner(sam, reason: 'Back', purpose: 'revokeOwner'),
+      'createGroup': () async => group = await admin.createGroup(
+        'Support',
+        description: '',
+        purpose: 'createGroup',
+      ),
+      'updateGroup': () =>
+          admin.renameGroup(group.id, 'Help desk', purpose: 'updateGroup'),
+      'addGroupMember': () => admin.addMember(
+        group.id,
+        sam,
+        expiresAt: DateTime.utc(2026, 12, 31),
+        purpose: 'addGroupMember',
+      ),
+      'removeGroupMember': () =>
+          admin.removeMember(group.id, sam, purpose: 'removeGroupMember'),
+      'deleteGroup': () => admin.deleteGroup(group.id, purpose: 'deleteGroup'),
+      'disableUser': () =>
+          admin.disablePerson(sam, reason: 'Left', purpose: 'disableUser'),
+      'enableUser': () =>
+          admin.enablePerson(sam, reason: 'Back', purpose: 'enableUser'),
+    };
+
+    final seen = <String>[];
+    for (final MapEntry(key: op, value: run) in steps.entries) {
+      for (final s in world.sessions.values) {
+        s.stepUpAt = null;
+      }
+      prompt.asked.clear();
+      await run();
+      final stepUp = fake.server.stepUpOf(op);
+      expect(
+        stepUp,
+        anyOf('true', 'false'),
+        reason: '$op: fresh and conditional are not used by these screens',
+      );
+      expect(
+        prompt.asked,
+        stepUp == 'true' ? [op] : isEmpty,
+        reason: '$op (${fake.server.actionOf(op)}, step_up $stepUp)',
+      );
+      final last = fake.server.requestsOf(op).last.status;
+      expect(last, inInclusiveRange(200, 299), reason: op);
+      seen.add('$op ${fake.server.actionOf(op)} $stepUp');
+    }
+    // The table the report names (brief M4-26 Report item 4).
+    // ignore: avoid_print
+    print(seen.join('\n'));
+    expect(fake.server.violations, isEmpty);
+  });
+}

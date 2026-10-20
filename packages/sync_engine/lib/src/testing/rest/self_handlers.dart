@@ -121,10 +121,15 @@ void registerSelfHandlers(RestFake rest) {
     )
     ..handle('revokeSession', (r) {
       final session = world.sessions[r.param('session_id')];
-      if (session == null || session.userId != r.person.id) {
+      if (session == null ||
+          (session.userId != r.person.id && !r.person.isOwner)) {
         throw const FakeProblem(404, 'not_found');
       }
-      world.revokeSession(session.id, reason: 'logout');
+      // `session.revoke`: self or owner (05), never a step-up.
+      world.revokeSession(
+        session.id,
+        reason: session.userId == r.person.id ? 'logout' : 'admin',
+      );
       return const FakeResponse.noContent();
     })
     ..handle('updateMyProfile', (r) {
