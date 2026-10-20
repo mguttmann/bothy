@@ -59,6 +59,9 @@ exceptions:
   - query: chat.ShareChannel
     category: after_authorize
     reason: "holds the one channel whose preference write authorize allowed (M3-18)"
+  - query: chat.ChannelIDsOfSpace
+    category: after_authorize
+    reason: "ids of the channels of the one space whose archive authorize allowed, for the cleanup of notification preferences (M3-18)"
   - query: chat.ListForumTags
     category: after_authorize
     reason: "the tags of the one forum channel authorize allowed (channel.read or forum_tag.manage)"
