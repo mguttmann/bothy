@@ -263,11 +263,13 @@ func (s *ScratchDB) ThreadSample(ctx context.Context, n int) ([]app.ThreadSeqs, 
 }
 
 // FileSample implements app.ScratchDB: at most n files by random() among those with deleted_at
-// IS NULL and upload_state complete; a pending upload has no object yet (docs/DECISIONS.md
-// D-M7-03-5).
+// IS NULL, upload_state complete and scan_status clean or skipped: a pending upload has no
+// object yet, and the scan pass deletes the object of an infected or unscannable file
+// (docs/DECISIONS.md D-M7-03-4).
 func (s *ScratchDB) FileSample(ctx context.Context, n int) ([]app.SampleFile, error) {
 	rows, err := s.pool.Query(ctx, `SELECT id::text, object_key, sha256 FROM public.files
-		WHERE deleted_at IS NULL AND upload_state = 'complete' ORDER BY random() LIMIT $1`, n)
+		WHERE deleted_at IS NULL AND upload_state = 'complete' AND scan_status IN ('clean', 'skipped')
+		ORDER BY random() LIMIT $1`, n)
 	if err != nil {
 		return nil, fmt.Errorf("status: sampling files: %w", err)
 	}
