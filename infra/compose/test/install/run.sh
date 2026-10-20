@@ -142,8 +142,13 @@ render() {
 }
 INSTALL=$WORK/install.sh
 INSTALL_EVIL=$WORK/install-evil.sh
+# As the trial release renders it: the download address is a static server on 127.0.0.1.
+INSTALL_TRIAL=$WORK/install-trial.sh
+TRIAL_BASE_URL=http://127.0.0.1:41234/
 render "$GOOD_SHA" "$INSTALL" || printf 'install-test: %s is missing; every test will fail\n' "$SOURCE_SCRIPT" >&2
 render "$(sha256_of "$WORK/dl-evil/$TEST_BUNDLE_NAME")" "$INSTALL_EVIL"
+render "$GOOD_SHA" "$INSTALL_TRIAL" && sed "s|^BOTHY_INSTALL_BASE_URL='[^']*'\$|BOTHY_INSTALL_BASE_URL='$TRIAL_BASE_URL'|" \
+	"$INSTALL_TRIAL" >"$INSTALL_TRIAL.tmp" && mv "$INSTALL_TRIAL.tmp" "$INSTALL_TRIAL"
 
 # ---- helpers for the cases ------------------------------------------------------------------
 

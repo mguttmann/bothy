@@ -486,3 +486,11 @@ test_other_version_in_the_folder_is_no_upgrade() {
 	expect_in "$ERR" "does not upgrade"
 	[ "$(cksum <"$(std_env)")" = "$env_sum" ] || fail ".env changed"
 }
+
+test_trial_address_installs() {
+	inst sh "$INSTALL_TRIAL" --yes --public-url "$PUBLIC_URL" --owner-handle alex --owner-name Alex
+	expect_rc 0
+	expect_in "$STUB_LOG" "url $TRIAL_BASE_URL$TEST_BUNDLE_NAME"
+	expect_in "$ERR" "not a GitHub release"
+	expect_in "$OUT" "Enrollment code (shown once): "
+}
