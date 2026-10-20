@@ -6415,5 +6415,357 @@
         "example": "example.com"
       }
     }
+  },
+  "fileStateUploading": "Uploading {percent}%",
+  "@fileStateUploading": {
+    "description": "State of an attachment while its parts are sent (12 2 'Upload running').",
+    "placeholders": {
+      "percent": {
+        "type": "int",
+        "example": "40"
+      }
+    }
+  },
+  "fileStateWaiting": "Waiting to upload",
+  "@fileStateWaiting": {
+    "description": "State of an attachment whose upload has not started yet (offline, 15 7.5)."
+  },
+  "fileStateChecking": "Being checked",
+  "@fileStateChecking": {
+    "description": "State of a file after the upload while the server checks it (12 2)."
+  },
+  "fileStateUploadFailed": "Upload failed",
+  "@fileStateUploadFailed": {
+    "description": "State of a file whose upload or check failed (12 2)."
+  },
+  "fileStateBlocked": "Blocked",
+  "@fileStateBlocked": {
+    "description": "State of a file the malware scan blocked (12 2)."
+  },
+  "fileStateCanceled": "Upload canceled",
+  "@fileStateCanceled": {
+    "description": "State of a file whose upload session was aborted or expired (12 2)."
+  },
+  "fileDeleted": "File deleted",
+  "@fileDeleted": {
+    "description": "Tombstone of a deleted file (04 2.2 rule 5)."
+  },
+  "fileSizeBytes": "{size} B",
+  "@fileSizeBytes": {
+    "description": "File size in bytes.",
+    "placeholders": {
+      "size": {
+        "type": "String",
+        "example": "512"
+      }
+    }
+  },
+  "fileSizeKilobytes": "{size} KB",
+  "@fileSizeKilobytes": {
+    "description": "File size in kilobytes.",
+    "placeholders": {
+      "size": {
+        "type": "String",
+        "example": "48.2"
+      }
+    }
+  },
+  "fileSizeMegabytes": "{size} MB",
+  "@fileSizeMegabytes": {
+    "description": "File size in megabytes.",
+    "placeholders": {
+      "size": {
+        "type": "String",
+        "example": "3.5"
+      }
+    }
+  },
+  "fileSizeGigabytes": "{size} GB",
+  "@fileSizeGigabytes": {
+    "description": "File size in gigabytes.",
+    "placeholders": {
+      "size": {
+        "type": "String",
+        "example": "1.2"
+      }
+    }
+  },
+  "fileTileLabel": "{name}, {size}, {state}",
+  "@fileTileLabel": {
+    "description": "Screen reader label of an attachment: name, size and state.",
+    "placeholders": {
+      "name": {
+        "type": "String",
+        "example": "report.pdf"
+      },
+      "size": {
+        "type": "String",
+        "example": "48 KB"
+      },
+      "state": {
+        "type": "String",
+        "example": "Being checked"
+      }
+    }
+  },
+  "fileOpen": "Open",
+  "@fileOpen": {
+    "description": "Opens a downloaded file with the system (12 9)."
+  },
+  "fileSaveAs": "Save as",
+  "@fileSaveAs": {
+    "description": "Saves a file at a place the person chooses (12 9)."
+  },
+  "fileSaved": "Saved {name}",
+  "@fileSaved": {
+    "description": "Notice after a file was saved.",
+    "placeholders": {
+      "name": {
+        "type": "String",
+        "example": "report.pdf"
+      }
+    }
+  },
+  "fileDownloadFailed": "Download failed: {reason}",
+  "@fileDownloadFailed": {
+    "description": "Notice when a download failed, with the reason.",
+    "placeholders": {
+      "reason": {
+        "type": "String",
+        "example": "Not found"
+      }
+    }
+  },
+  "fileDownloadDamaged": "The download was damaged and has been deleted. Try again.",
+  "@fileDownloadDamaged": {
+    "description": "Notice when the received bytes do not match Repr-Digest (12 9.3)."
+  },
+  "fileImageOpen": "Open image {name}",
+  "@fileImageOpen": {
+    "description": "Screen reader label of an image preview that opens the full view.",
+    "placeholders": {
+      "name": {
+        "type": "String",
+        "example": "screenshot.png"
+      }
+    }
+  },
+  "fileImageClose": "Close",
+  "@fileImageClose": {
+    "description": "Closes the full view of an image."
+  },
+  "fileImageLoading": "Loading image",
+  "@fileImageLoading": {
+    "description": "Placeholder while a thumbnail loads from the server."
+  },
+  "fileMediaPlay": "Play {name}",
+  "@fileMediaPlay": {
+    "description": "Plays an audio or video attachment through a file ticket (12 9.2).",
+    "placeholders": {
+      "name": {
+        "type": "String",
+        "example": "clip.mp4"
+      }
+    }
+  },
+  "fileMediaPause": "Pause",
+  "@fileMediaPause": {
+    "description": "Pauses an audio or video attachment."
+  },
+  "fileMediaFailed": "Playback failed",
+  "@fileMediaFailed": {
+    "description": "Notice when an audio or video attachment cannot be played."
+  },
+  "fileUploadAgain": "Upload again",
+  "@fileUploadAgain": {
+    "description": "Sends a failed upload again as a new upload (brief M4-22 Design note 1)."
+  },
+  "fileRemove": "Remove {name}",
+  "@fileRemove": {
+    "description": "Removes an attachment from the input before sending.",
+    "placeholders": {
+      "name": {
+        "type": "String",
+        "example": "report.pdf"
+      }
+    }
+  },
+  "fileFailPartConflict": "A part was sent twice with different content",
+  "@fileFailPartConflict": {
+    "description": "Reason of a failed upload: 409 conflict with reason part_conflict (12 3.2)."
+  },
+  "fileFailSessionEnded": "The upload session has ended",
+  "@fileFailSessionEnded": {
+    "description": "Reason of a failed upload whose session was aborted or expired (410 gone, 12 3.6)."
+  },
+  "fileFailQuota": "The storage quota is used up",
+  "@fileFailQuota": {
+    "description": "Reason of a failed upload: 409 conflict with reason quota_exceeded (12 3.1)."
+  },
+  "fileFailNotAttachable": "This file cannot be attached",
+  "@fileFailNotAttachable": {
+    "description": "Reason of a failed message: 409 conflict with reason file_not_attachable (12 10)."
+  },
+  "fileFailUnreadable": "The file cannot be read anymore",
+  "@fileFailUnreadable": {
+    "description": "Reason of a failed upload whose local file is gone."
+  },
+  "composerFileTooLarge": "{name} is larger than the limit of {limit}",
+  "@composerFileTooLarge": {
+    "description": "Refusal of an attachment over file_max_upload_bytes (15 14).",
+    "placeholders": {
+      "name": {
+        "type": "String",
+        "example": "video.mov"
+      },
+      "limit": {
+        "type": "String",
+        "example": "100 MB"
+      }
+    }
+  },
+  "composerTooManyFiles": "At most {count} files per message",
+  "@composerTooManyFiles": {
+    "description": "Refusal of attachments over message_max_attachments (12 10 item 2).",
+    "placeholders": {
+      "count": {
+        "type": "int",
+        "example": "10"
+      }
+    }
+  },
+  "composerFileUnreadable": "{name} cannot be read",
+  "@composerFileUnreadable": {
+    "description": "Refusal of an attachment whose file cannot be read.",
+    "placeholders": {
+      "name": {
+        "type": "String",
+        "example": "report.pdf"
+      }
+    }
+  },
+  "composerDropFiles": "Drop files to attach them",
+  "@composerDropFiles": {
+    "description": "Hint while files are dragged over the input."
+  },
+  "composerAttachments": "Attachments ({count})",
+  "@composerAttachments": {
+    "description": "Screen reader label of the attachments of the input.",
+    "placeholders": {
+      "count": {
+        "type": "int",
+        "example": "2"
+      }
+    }
+  },
+  "voiceRecording": "Recording {elapsed}",
+  "@voiceRecording": {
+    "description": "The recording bar while a voice message is recorded.",
+    "placeholders": {
+      "elapsed": {
+        "type": "String",
+        "example": "0:12"
+      }
+    }
+  },
+  "voiceRecorded": "Voice message {elapsed}",
+  "@voiceRecorded": {
+    "description": "The recording bar after a recording stopped.",
+    "placeholders": {
+      "elapsed": {
+        "type": "String",
+        "example": "0:12"
+      }
+    }
+  },
+  "voiceSend": "Send voice message",
+  "@voiceSend": {
+    "description": "Sends the recorded voice message."
+  },
+  "voiceStop": "Stop recording",
+  "@voiceStop": {
+    "description": "Stops the recording."
+  },
+  "voiceCancel": "Discard recording",
+  "@voiceCancel": {
+    "description": "Discards the recording."
+  },
+  "voiceMicrophoneDenied": "Microphone access is off. Allow it in the system settings under Privacy and Security, Microphone.",
+  "@voiceMicrophoneDenied": {
+    "description": "Notice when the microphone permission is denied (15 13)."
+  },
+  "voiceLimitReached": "The recording stopped at the limit of {limit}",
+  "@voiceLimitReached": {
+    "description": "Notice when a recording reached voice_max_duration_ms (15 13).",
+    "placeholders": {
+      "limit": {
+        "type": "String",
+        "example": "15:00"
+      }
+    }
+  },
+  "voiceFailed": "The recording failed",
+  "@voiceFailed": {
+    "description": "Notice when the recorder failed."
+  },
+  "voiceSpeed": "Playback speed {speed}",
+  "@voiceSpeed": {
+    "description": "Screen reader label of the speed button of a voice message (15 13).",
+    "placeholders": {
+      "speed": {
+        "type": "String",
+        "example": "1.5x"
+      }
+    }
+  },
+  "voiceSpeedValue": "{speed}x",
+  "@voiceSpeedValue": {
+    "description": "The speed of a voice message on its button.",
+    "placeholders": {
+      "speed": {
+        "type": "String",
+        "example": "1.5"
+      }
+    }
+  },
+  "transcriptLabel": "Transcript",
+  "@transcriptLabel": {
+    "description": "Heading of the transcript of a voice message (12 8.2)."
+  },
+  "transcriptFailed": "No transcript",
+  "@transcriptFailed": {
+    "description": "Transcript state failed (12 8.2)."
+  },
+  "transcriptRequest": "Transcribe",
+  "@transcriptRequest": {
+    "description": "Asks the server for a transcript (file.transcribe, 12 8.2)."
+  },
+  "transcriptUnavailable": "Transcription is not available here",
+  "@transcriptUnavailable": {
+    "description": "Answer 409 transcription_unavailable (12 8.2)."
+  },
+  "sessionFiles": "Files ({count})",
+  "@sessionFiles": {
+    "description": "Heading of the files section of the session column (01 5.1 D1).",
+    "placeholders": {
+      "count": {
+        "type": "int",
+        "example": "3"
+      }
+    }
+  },
+  "sessionFilesEmpty": "No files",
+  "@sessionFilesEmpty": {
+    "description": "The files section without files."
+  },
+  "fileVideoTitle": "Video {name}",
+  "@fileVideoTitle": {
+    "description": "Title of the dialog that plays a video attachment through a file ticket (12 9.2).",
+    "placeholders": {
+      "name": {
+        "type": "String",
+        "example": "clip.mp4"
+      }
+    }
   }
 }

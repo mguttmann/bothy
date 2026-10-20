@@ -35,7 +35,39 @@ Future<ApiProblem> problemOf(Future<Object?> call) async {
   fail('the call did not fail');
 }
 
+/// An interceptor in the slot of `auth` that records the problem it sees on an error.
+class _Seen extends Interceptor {
+  final List<Object?> bodies = [];
+
+  @override
+  void onError(DioException err, ErrorInterceptorHandler handler) {
+    bodies.add(err.response?.data);
+    handler.next(err);
+  }
+}
+
 void main() {
+  for (final type in [ResponseType.bytes, ResponseType.stream]) {
+    test(
+      'a problem of a ${type.name} response is a JSON object before the auth '
+      'interceptors (M4-22)',
+      () async {
+        final adapter = FakeAdapter()
+          ..problem(401, problemBody(401, 'use_dpop_nonce'));
+        final seen = _Seen();
+        final client = fakeClient(adapter, authInterceptors: [seen]);
+        final p = await problemOf(
+          client.dio.get<Object?>(
+            '/files/x/content',
+            options: Options(responseType: type),
+          ),
+        );
+        expect(p.code, 'use_dpop_nonce');
+        expect(seen.bodies.single, isA<Map<String, Object?>>());
+      },
+    );
+  }
+
   test('403 forbidden carries reason', () async {
     final adapter = FakeAdapter()
       ..problem(

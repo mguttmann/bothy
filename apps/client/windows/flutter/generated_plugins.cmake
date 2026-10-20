@@ -3,8 +3,13 @@
 #
 
 list(APPEND FLUTTER_PLUGIN_LIST
+  audioplayers_windows
+  desktop_drop
   device_key
+  file_selector_windows
   flutter_secure_storage_windows
+  pasteboard
+  record_windows
   sentry_flutter
   url_launcher_windows
 )

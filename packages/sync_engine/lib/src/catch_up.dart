@@ -249,6 +249,7 @@ final class CatchUpListener implements SessionListener {
     ThreadSeq from,
     ThreadSeq to,
   ) async {
+    final erased = <String>[];
     await _db.transaction(() async {
       if (_wiped || _sync.removedTargets.contains(threadId.value)) return;
       final thread = await _db.threadsDao.byId(threadId);
@@ -258,10 +259,11 @@ final class CatchUpListener implements SessionListener {
       }
       for (final b in bundles) {
         if (b.message.threadId != threadId) continue;
-        await storeMessage(_db, b, me: _sync.me);
+        await storeMessage(_db, b, me: _sync.me, onErased: erased.addAll);
       }
       await _db.messagesDao.addLoadedRange(threadId, from, to);
     });
+    if (erased.isNotEmpty) await _sync.eraser.erase(erased);
   }
 
   /// Whether the database was wiped after a revocation; nothing is applied any more.
@@ -539,11 +541,12 @@ final class CatchUpListener implements SessionListener {
   Future<void> _loadNewestPage(ThreadId threadId) async {
     final page = await _sync.fetcher.threadPage(threadId);
     if (page.messages.isEmpty) return;
+    final erased = <String>[];
     await _db.transaction(() async {
       for (final b in page.messages) {
         final m = b.message;
         if (!await _sync.holdsContent(_db, m.channelId, threadId)) return;
-        await storeMessage(_db, b, me: _sync.me);
+        await storeMessage(_db, b, me: _sync.me, onErased: erased.addAll);
       }
       await _db.messagesDao.addLoadedRange(
         threadId,
@@ -551,6 +554,7 @@ final class CatchUpListener implements SessionListener {
         page.messages.last.message.threadSeq,
       );
     });
+    if (erased.isNotEmpty) await _sync.eraser.erase(erased);
   }
 
   /// The thread [threadId] got the focus: a recorded gap is loaded again (Design note 4).

@@ -48,6 +48,18 @@ Planning stage (milestone M0). Nothing is installable yet.
   console of the server image under that policy in Chromium, Firefox and WebKit against the
   Compose smoke stack (zero violations, no foreign origin, WebSocket, a passkey step-up, a blocked
   and reported inline script), and the CI job `console-e2e` feeds `ci-ok`.
+- Files, images and voice messages on the desktop (M4-22): attaching by the attachment button,
+  drag and drop and paste writes one upload entry per file into the outbox before the message;
+  uploads follow 12 3 with `Content-Digest` per part, at most two parts at a time, resumption
+  from the parts `getUpload` confirmed and completion, and the message attaches the files after
+  completion (12 3.4); files over `file_max_upload_bytes` or `message_max_attachments` are
+  refused before any entry. Attachments show the states of 12 2, images show thumbnails from
+  `downloadThumbnail` only (SEC-OUT-2), downloads keep only bytes that match `Repr-Digest`,
+  audio and video play through file tickets, and voice messages record AAC-LC mono in `.m4a`
+  up to `voice_max_duration_ms`, play at 1, 1.5 and 2 and show their transcript. The session
+  column gets the section "Files". The fake server serves the file operations with the faults
+  "abort after part n", `file_not_ready` and "blocked".
+
 - Compose smoke test (M1-73): `make portability` runs `infra/compose/smoke.sh`, which starts the
   server core from the real `bothy-server` image with the installation Compose file and a test
   overlay (`infra/compose/test/`), proves secrets init, migrations, the setup lock, the first

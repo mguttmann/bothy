@@ -7008,6 +7008,318 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Host: {name}'**
   String terminalLinkHost(String name);
+
+  /// State of an attachment while its parts are sent (12 2 'Upload running').
+  ///
+  /// In en, this message translates to:
+  /// **'Uploading {percent}%'**
+  String fileStateUploading(int percent);
+
+  /// State of an attachment whose upload has not started yet (offline, 15 7.5).
+  ///
+  /// In en, this message translates to:
+  /// **'Waiting to upload'**
+  String get fileStateWaiting;
+
+  /// State of a file after the upload while the server checks it (12 2).
+  ///
+  /// In en, this message translates to:
+  /// **'Being checked'**
+  String get fileStateChecking;
+
+  /// State of a file whose upload or check failed (12 2).
+  ///
+  /// In en, this message translates to:
+  /// **'Upload failed'**
+  String get fileStateUploadFailed;
+
+  /// State of a file the malware scan blocked (12 2).
+  ///
+  /// In en, this message translates to:
+  /// **'Blocked'**
+  String get fileStateBlocked;
+
+  /// State of a file whose upload session was aborted or expired (12 2).
+  ///
+  /// In en, this message translates to:
+  /// **'Upload canceled'**
+  String get fileStateCanceled;
+
+  /// Tombstone of a deleted file (04 2.2 rule 5).
+  ///
+  /// In en, this message translates to:
+  /// **'File deleted'**
+  String get fileDeleted;
+
+  /// File size in bytes.
+  ///
+  /// In en, this message translates to:
+  /// **'{size} B'**
+  String fileSizeBytes(String size);
+
+  /// File size in kilobytes.
+  ///
+  /// In en, this message translates to:
+  /// **'{size} KB'**
+  String fileSizeKilobytes(String size);
+
+  /// File size in megabytes.
+  ///
+  /// In en, this message translates to:
+  /// **'{size} MB'**
+  String fileSizeMegabytes(String size);
+
+  /// File size in gigabytes.
+  ///
+  /// In en, this message translates to:
+  /// **'{size} GB'**
+  String fileSizeGigabytes(String size);
+
+  /// Screen reader label of an attachment: name, size and state.
+  ///
+  /// In en, this message translates to:
+  /// **'{name}, {size}, {state}'**
+  String fileTileLabel(String name, String size, String state);
+
+  /// Opens a downloaded file with the system (12 9).
+  ///
+  /// In en, this message translates to:
+  /// **'Open'**
+  String get fileOpen;
+
+  /// Saves a file at a place the person chooses (12 9).
+  ///
+  /// In en, this message translates to:
+  /// **'Save as'**
+  String get fileSaveAs;
+
+  /// Notice after a file was saved.
+  ///
+  /// In en, this message translates to:
+  /// **'Saved {name}'**
+  String fileSaved(String name);
+
+  /// Notice when a download failed, with the reason.
+  ///
+  /// In en, this message translates to:
+  /// **'Download failed: {reason}'**
+  String fileDownloadFailed(String reason);
+
+  /// Notice when the received bytes do not match Repr-Digest (12 9.3).
+  ///
+  /// In en, this message translates to:
+  /// **'The download was damaged and has been deleted. Try again.'**
+  String get fileDownloadDamaged;
+
+  /// Screen reader label of an image preview that opens the full view.
+  ///
+  /// In en, this message translates to:
+  /// **'Open image {name}'**
+  String fileImageOpen(String name);
+
+  /// Closes the full view of an image.
+  ///
+  /// In en, this message translates to:
+  /// **'Close'**
+  String get fileImageClose;
+
+  /// Placeholder while a thumbnail loads from the server.
+  ///
+  /// In en, this message translates to:
+  /// **'Loading image'**
+  String get fileImageLoading;
+
+  /// Plays an audio or video attachment through a file ticket (12 9.2).
+  ///
+  /// In en, this message translates to:
+  /// **'Play {name}'**
+  String fileMediaPlay(String name);
+
+  /// Pauses an audio or video attachment.
+  ///
+  /// In en, this message translates to:
+  /// **'Pause'**
+  String get fileMediaPause;
+
+  /// Notice when an audio or video attachment cannot be played.
+  ///
+  /// In en, this message translates to:
+  /// **'Playback failed'**
+  String get fileMediaFailed;
+
+  /// Sends a failed upload again as a new upload (brief M4-22 Design note 1).
+  ///
+  /// In en, this message translates to:
+  /// **'Upload again'**
+  String get fileUploadAgain;
+
+  /// Removes an attachment from the input before sending.
+  ///
+  /// In en, this message translates to:
+  /// **'Remove {name}'**
+  String fileRemove(String name);
+
+  /// Reason of a failed upload: 409 conflict with reason part_conflict (12 3.2).
+  ///
+  /// In en, this message translates to:
+  /// **'A part was sent twice with different content'**
+  String get fileFailPartConflict;
+
+  /// Reason of a failed upload whose session was aborted or expired (410 gone, 12 3.6).
+  ///
+  /// In en, this message translates to:
+  /// **'The upload session has ended'**
+  String get fileFailSessionEnded;
+
+  /// Reason of a failed upload: 409 conflict with reason quota_exceeded (12 3.1).
+  ///
+  /// In en, this message translates to:
+  /// **'The storage quota is used up'**
+  String get fileFailQuota;
+
+  /// Reason of a failed message: 409 conflict with reason file_not_attachable (12 10).
+  ///
+  /// In en, this message translates to:
+  /// **'This file cannot be attached'**
+  String get fileFailNotAttachable;
+
+  /// Reason of a failed upload whose local file is gone.
+  ///
+  /// In en, this message translates to:
+  /// **'The file cannot be read anymore'**
+  String get fileFailUnreadable;
+
+  /// Refusal of an attachment over file_max_upload_bytes (15 14).
+  ///
+  /// In en, this message translates to:
+  /// **'{name} is larger than the limit of {limit}'**
+  String composerFileTooLarge(String name, String limit);
+
+  /// Refusal of attachments over message_max_attachments (12 10 item 2).
+  ///
+  /// In en, this message translates to:
+  /// **'At most {count} files per message'**
+  String composerTooManyFiles(int count);
+
+  /// Refusal of an attachment whose file cannot be read.
+  ///
+  /// In en, this message translates to:
+  /// **'{name} cannot be read'**
+  String composerFileUnreadable(String name);
+
+  /// Hint while files are dragged over the input.
+  ///
+  /// In en, this message translates to:
+  /// **'Drop files to attach them'**
+  String get composerDropFiles;
+
+  /// Screen reader label of the attachments of the input.
+  ///
+  /// In en, this message translates to:
+  /// **'Attachments ({count})'**
+  String composerAttachments(int count);
+
+  /// The recording bar while a voice message is recorded.
+  ///
+  /// In en, this message translates to:
+  /// **'Recording {elapsed}'**
+  String voiceRecording(String elapsed);
+
+  /// The recording bar after a recording stopped.
+  ///
+  /// In en, this message translates to:
+  /// **'Voice message {elapsed}'**
+  String voiceRecorded(String elapsed);
+
+  /// Sends the recorded voice message.
+  ///
+  /// In en, this message translates to:
+  /// **'Send voice message'**
+  String get voiceSend;
+
+  /// Stops the recording.
+  ///
+  /// In en, this message translates to:
+  /// **'Stop recording'**
+  String get voiceStop;
+
+  /// Discards the recording.
+  ///
+  /// In en, this message translates to:
+  /// **'Discard recording'**
+  String get voiceCancel;
+
+  /// Notice when the microphone permission is denied (15 13).
+  ///
+  /// In en, this message translates to:
+  /// **'Microphone access is off. Allow it in the system settings under Privacy and Security, Microphone.'**
+  String get voiceMicrophoneDenied;
+
+  /// Notice when a recording reached voice_max_duration_ms (15 13).
+  ///
+  /// In en, this message translates to:
+  /// **'The recording stopped at the limit of {limit}'**
+  String voiceLimitReached(String limit);
+
+  /// Notice when the recorder failed.
+  ///
+  /// In en, this message translates to:
+  /// **'The recording failed'**
+  String get voiceFailed;
+
+  /// Screen reader label of the speed button of a voice message (15 13).
+  ///
+  /// In en, this message translates to:
+  /// **'Playback speed {speed}'**
+  String voiceSpeed(String speed);
+
+  /// The speed of a voice message on its button.
+  ///
+  /// In en, this message translates to:
+  /// **'{speed}x'**
+  String voiceSpeedValue(String speed);
+
+  /// Heading of the transcript of a voice message (12 8.2).
+  ///
+  /// In en, this message translates to:
+  /// **'Transcript'**
+  String get transcriptLabel;
+
+  /// Transcript state failed (12 8.2).
+  ///
+  /// In en, this message translates to:
+  /// **'No transcript'**
+  String get transcriptFailed;
+
+  /// Asks the server for a transcript (file.transcribe, 12 8.2).
+  ///
+  /// In en, this message translates to:
+  /// **'Transcribe'**
+  String get transcriptRequest;
+
+  /// Answer 409 transcription_unavailable (12 8.2).
+  ///
+  /// In en, this message translates to:
+  /// **'Transcription is not available here'**
+  String get transcriptUnavailable;
+
+  /// Heading of the files section of the session column (01 5.1 D1).
+  ///
+  /// In en, this message translates to:
+  /// **'Files ({count})'**
+  String sessionFiles(int count);
+
+  /// The files section without files.
+  ///
+  /// In en, this message translates to:
+  /// **'No files'**
+  String get sessionFilesEmpty;
+
+  /// Title of the dialog that plays a video attachment through a file ticket (12 9.2).
+  ///
+  /// In en, this message translates to:
+  /// **'Video {name}'**
+  String fileVideoTitle(String name);
 }
 
 class _AppLocalizationsDelegate

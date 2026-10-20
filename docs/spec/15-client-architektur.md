@@ -419,8 +419,11 @@ stateDiagram-v2
 
 Regeln aus [04](04-sync-protokoll.md) Abschnitt 13.2 und 13.3; zusätzlich: Ein Eintrag zeigt nach
 `client.outbox_stuck_after` im Zustand `Waiting` den Hinweis "Senden verzögert". Datei-Uploads sind
-eigene Einträge vor der Nachricht, die sie anhängt; die Nachricht wartet, bis ihre Dateien
-`complete` sind.
+eigene Einträge vor der Nachricht, die sie anhängt; die Nachricht wartet, bis die Upload-Sitzung
+jeder ihrer Dateien abgeschlossen ist (`completeUpload` mit `200`, [12](12-dateien.md) 3.4), und
+hängt die Dateien dann an; die Prüfung des Servers läuft danach weiter, und den Agentenaufruf hält
+der Server bis zum Abschluss der Prüfung zurück ([12](12-dateien.md) 10; docs/DECISIONS.md
+D-M4-22-1).
 
 `409 request_in_progress` (the first request with the same `Idempotency-Key` is still running,
 04 5.2) is retried like a `5xx` with the same ID. `412 version_conflict` ends in `Failed` with the
@@ -690,8 +693,11 @@ Transkript erscheint, sobald `file.updated` es meldet.
 
 Größe vor dem Senden gegen `file.max_upload_bytes` prüfen (Server prüft erneut). Upload-Protokoll
 (Teile, Wiederaufnahme, vorab signierte URLs) legt [12-dateien.md](12-dateien.md) fest; der Client
-setzt es als Eintrag im Ausgangsfach mit Fortschritt um, nimmt nach Abbruch beim letzten bestätigten
-Teil wieder auf und hängt die Datei erst an, wenn `upload_state = complete`. Fotos aus der
+setzt es als Eintrag im Ausgangsfach mit Fortschritt um, nimmt nach Abbruch bei den Teilen wieder auf, die `getUpload` nicht bestätigt hat, und hängt
+die Datei an, sobald ihre Upload-Sitzung abgeschlossen ist (`completeUpload` mit `200`,
+[12](12-dateien.md) 3.4), nicht erst bei `upload_state = complete`: Bis zum Ergebnis der Prüfung
+zeigt die Nachricht die Datei als "Wird geprüft" ([12](12-dateien.md) 2), und der Server hält den
+Agentenaufruf zurück ([12](12-dateien.md) 10; docs/DECISIONS.md D-M4-22-1). Fotos aus der
 Mediathek lädt die App als JPEG hoch: Sie fordert beim System eine JPEG-Darstellung an oder wandelt
 selbst ([12-dateien.md](12-dateien.md), Abschnitt 7.1;
 [ADR 0047](../adr/0047-bild-metadaten-verlustfrei-entfernen.md)). Grund: HEIC entfernt der Server

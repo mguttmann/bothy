@@ -4,11 +4,13 @@
 // response and every frame validate against docs/api/; an invalid body or frame sent to the
 // fake fails with the JSON Pointer.
 
+import 'dart:convert';
 import 'dart:typed_data';
 
 import 'package:api_client/api_client.dart';
 import 'package:auth/auth.dart';
 import 'package:built_value/json_object.dart';
+import 'package:crypto/crypto.dart';
 import 'package:dio/dio.dart';
 import 'package:domain/domain.dart' show EventCatalog;
 import 'package:sync_engine/testing.dart';
@@ -477,6 +479,55 @@ void main() {
     );
     await api.getTerminalApi().listTerminalSessions(hostId: host.id);
     await hosts.issueHostPairingCode(hostId: host.id, reasonBody: why);
+
+    // The file operations of M4-22 (12 3, 8, 9): a PNG in one part, a second session that is
+    // aborted, a third file that is deleted before it is attached.
+    final fileApi = api.getFilesApi();
+    final png = base64.decode(
+      'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==',
+    );
+    Future<UploadSession> startUpload(List<int> bytes) async =>
+        (await fileApi.createUpload(
+          channelId: w.general,
+          idempotencyKey: h.server.world.nextId(),
+          uploadCreate: UploadCreate(
+            (b) => b
+              ..name = 'shot.png'
+              ..sizeBytes = bytes.length
+              ..sha256 = sha256.convert(bytes).toString()
+              ..declaredMimeType = 'image/png',
+          ),
+        )).data!;
+    final upload = await startUpload(png);
+    final part = (await fileApi.uploadPart(
+      fileId: upload.fileId,
+      partNumber: 1,
+      contentDigest: 'sha-256=:${base64.encode(sha256.convert(png).bytes)}:',
+      body: MultipartFile.fromBytes(png),
+    )).data!;
+    await fileApi.getUpload(fileId: upload.fileId);
+    await fileApi.completeUpload(
+      fileId: upload.fileId,
+      idempotencyKey: h.server.world.nextId(),
+      uploadComplete: UploadComplete((b) => b.parts.replace([part])),
+    );
+    await fileApi.getFile(fileId: upload.fileId);
+    await fileApi.downloadFile(fileId: upload.fileId);
+    await fileApi.downloadThumbnail(fileId: upload.fileId, variant: 'small');
+    await fileApi.createFileTicket(
+      fileId: upload.fileId,
+      fileTicketCreate: FileTicketCreate(
+        (b) => b..variant = FileTicketCreateVariantEnum.original,
+      ),
+    );
+    h.server.world.fileSettings.transcriptionMode = 'service';
+    await fileApi.requestTranscription(
+      fileId: upload.fileId,
+      idempotencyKey: h.server.world.nextId(),
+    );
+    await fileApi.getTranscript(fileId: upload.fileId);
+    await fileApi.abortUpload(fileId: (await startUpload(png)).fileId);
+    await fileApi.deleteFile(fileId: (await startUpload(png)).fileId);
 
     await alex.auth.refresh.refreshNow();
     await api.getMeApi().getMe();

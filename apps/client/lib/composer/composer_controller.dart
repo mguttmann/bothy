@@ -12,6 +12,7 @@ import 'package:domain/domain.dart';
 import 'package:flutter/widgets.dart';
 import 'package:sync_engine/sync_engine.dart';
 
+import '../files/attach_controller.dart';
 import '../telemetry/measurements.dart';
 import '../thread/thread_actions.dart';
 import 'draft_sync.dart';
@@ -81,7 +82,16 @@ final class ComposerController extends ChangeNotifier {
   final TextEditingController text = TextEditingController();
 
   /// The limits of the instance, or null while unknown (the server checks then).
-  InstanceLimits? limits;
+  InstanceLimits? get limits => _limits;
+  set limits(InstanceLimits? value) {
+    _limits = value;
+    attach?.limits = value;
+  }
+
+  InstanceLimits? _limits;
+
+  /// The attachments of the composer (M4-22), or null without file support.
+  AttachController? attach;
 
   /// The stored principals (mention suggestions).
   Map<PrincipalId, Principal> principals = const {};
@@ -262,11 +272,13 @@ final class ComposerController extends ChangeNotifier {
     onChanged(next);
   }
 
-  /// Sends [value]; returns false and sets [error] when it is over the limit of the
-  /// instance (checked before sending, D-W-115).
+  /// Sends [value] with the attachments of [attach]; returns false and sets [error] when it
+  /// is over the limit of the instance (checked before sending, D-W-115). A message of
+  /// attachments only has no text.
   Future<bool> send(String value) async {
     final body = value.trim();
-    if (body.isEmpty) return false;
+    final hasFiles = attach?.attachments.isNotEmpty ?? false;
+    if (body.isEmpty && !hasFiles) return false;
     final started = measurements?.sendStarted();
     final max = limits?.messageMaxContentBytes;
     if (max != null && utf8.encode(body).length > max) {
@@ -284,8 +296,9 @@ final class ComposerController extends ChangeNotifier {
     _markEditing();
     _typing?.onSent(thread);
     notifyListeners();
+    final files = attach?.take();
     await _drafts.dropWaiting();
-    await _actions.send(thread, body, replyTo: reply);
+    await _actions.send(thread, body, replyTo: reply, attachments: files);
     // The outbox write is done; the history shows it in the next frame.
     if (started != null) measurements!.sendShown(started);
     return true;

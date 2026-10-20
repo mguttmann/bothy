@@ -21,6 +21,9 @@ import 'package:sync_engine/sync_engine.dart';
 import '../app/providers/ports.dart';
 import '../app/providers/session.dart';
 import '../composer/thread_composer.dart';
+import '../files/attachment_tile.dart';
+import '../files/providers.dart';
+import '../files/upload_executor.dart';
 import '../forum/forum_model.dart' show timeLabel;
 import '../sidebar/providers.dart';
 import '../telemetry/telemetry_providers.dart';
@@ -347,6 +350,13 @@ class HistoryColumnState extends ConsumerState<HistoryColumn> {
       ref.read(appMeasurementsProvider).threadShown(_thread);
     }
     final outbox = ref.watch(threadOutboxProvider(_thread)).value ?? const [];
+    // The upload entries by attachment key, for the files of a waiting message (M4-22).
+    final uploads = {
+      for (final v in outbox)
+        if (v.entry.kind == UploadOps.upload)
+          v.payload['attachment_key']! as String: v,
+    };
+    final progress = ref.watch(uploadProgressProvider);
     final principals = ref.watch(principalsByIdProvider).value ?? const {};
     final me = ref.watch(myPrincipalIdProvider);
     final permissions = ref.watch(threadPermissionsProvider(channelId));
@@ -455,6 +465,9 @@ class HistoryColumnState extends ConsumerState<HistoryColumn> {
                 onEdit: () => setState(() => _editingEntry = view.id),
                 onDiscard: () => unawaited(_actions?.discard(view.id)),
                 onOpenLink: _openLink,
+                uploads: uploads,
+                progress: progress,
+                onRetryUpload: (id) => unawaited(_actions?.retry(id)),
               ),
       ),
       FailedWriteItem(:final view) => KeyedSubtree(
@@ -571,6 +584,10 @@ class _MessageRow extends ConsumerWidget {
     final replied = replyId == null
         ? null
         : ref.watch(storedMessageProvider(replyId.value)).value;
+    // The files of the message (M4-22): tiles below the content, and the resolver of the
+    // internal image references in it (SEC-OUT-2).
+    final files =
+        ref.watch(messageFilesProvider(message.id.value)).value ?? const [];
     return MessageTile(
       data: messageData(
         message,
@@ -587,6 +604,13 @@ class _MessageRow extends ConsumerWidget {
       onOpenLink: onOpenLink,
       highlighted: highlighted,
       editing: editing,
+      attachments: files.isEmpty || message.deletedAt != null
+          ? null
+          : MessageAttachmentsView(
+              messageId: message.id,
+              voice: message.kind == MessageKind.voice,
+            ),
+      resolver: files.isEmpty ? null : attachmentResolver(files),
       started: [
         for (final t in started)
           ThreadStarterLine(thread: t, onOpen: () => onOpenThread(t)),

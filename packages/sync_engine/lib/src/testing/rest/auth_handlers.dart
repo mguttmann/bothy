@@ -218,13 +218,7 @@ void registerAuthHandlers(RestFake rest, {required Duration accessTokenTtl}) {
         'locale_default': 'en',
         'spec_version': '1',
         'features': <Object?>[],
-        'limits': {
-          'message_max_content_bytes': 65536,
-          'message_max_attachments': 10,
-          'file_max_upload_bytes': 104857600,
-          'thread_title_max_chars': 120,
-          'voice_max_duration_ms': 600000,
-        },
+        'limits': Map.of(world.limits),
       }),
     );
 }
