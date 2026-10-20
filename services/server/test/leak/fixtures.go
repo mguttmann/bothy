@@ -58,6 +58,8 @@ var Fixtures = map[string]ParamFixture{
 	"provider_id": extraFixture(func(e *Extras) string { return e.ProviderID }),
 	"host_id":     extraFixture(func(e *Extras) string { return e.HostID }),
 	"app_id":      extraFixture(func(e *Extras) string { return e.AppID }),
+	// The subscription of the app (05 webhook.read, owner only; the routes are enabled since M2-26).
+	"subscription_id": extraFixture(func(e *Extras) string { return e.SubscriptionID }),
 }
 
 // isHuman reports whether r is one of the people of w.
@@ -73,11 +75,21 @@ func isHuman(w *harness.World, r *harness.Client) bool {
 // Extras are the resources outside the matrix world of 07 "Examples" that some routes need a
 // foreign instance of: a login driver (05 identity_provider.read, owner only), a host without
 // assignee (05 host.read, owner or assignee) and an installed app (05 app.read, owner only; the
-// app routes are enabled since M2-24). PrepareExtras creates them through the public API as the
-// owner. The routes of webhook subscriptions are not enabled yet; the ticket that enables them adds
-// their fixture here (M1-70/9).
+// app routes are enabled since M2-24) with a webhook subscription (05 webhook.read, owner only; the
+// routes are enabled since M2-26, M1-70/11). PrepareExtras creates them through the public API as
+// the owner.
 type Extras struct {
-	ProviderID, HostID, AppID string
+	ProviderID, HostID, AppID, SubscriptionID string
+}
+
+// extrasWebhookHost is the host of the webhook subscription of the Extras; the server must allow it
+// in webhook.allowed_hosts (ExtrasConfig). No delivery reaches it: EgressDenyAll is set.
+const extrasWebhookHost = "hooks.example.com"
+
+// ExtrasConfig returns cfg with webhook.allowed_hosts set for the subscription of PrepareExtras.
+func ExtrasConfig(cfg map[string]string) map[string]string {
+	cfg["webhook.allowed_hosts"] = extrasWebhookHost
+	return cfg
 }
 
 // extras holds the Extras per world.
@@ -95,8 +107,8 @@ func extraFixture(get func(*Extras) string) ParamFixture {
 }
 
 // PrepareExtras creates the Extras of w through the public API as the owner: a disabled
-// trusted-header login driver (createIdentityProvider), a host without assignee (createHost) and
-// an app without a delivery (installApp).
+// trusted-header login driver (createIdentityProvider), a host without assignee (createHost), an
+// app (installApp) and a webhook subscription of the app (createWebhookSubscription).
 func PrepareExtras(tb testing.TB, w *harness.World) *Extras {
 	tb.Helper()
 	o := w.Owner
@@ -111,9 +123,13 @@ func PrepareExtras(tb testing.TB, w *harness.World) *Extras {
 		"manifest": map[string]any{
 			"schema_version": 1, "slug": "leak-probe", "name": "Leak probe", "description": "An app the requesters may not read.",
 			"publisher": "Example Org", "version": "1.0.0", "min_api_version": "0.1",
-			"scopes": map[string]any{"required": []string{}, "optional": []string{}},
+			"scopes": map[string]any{"required": []string{"messages:read", "events:subscribe"}, "optional": []string{}},
+			"events": []string{"message.created"}, "delivery": map[string]any{"mode": "gateway"}, "data_egress": "None, a test app.",
 		},
-		"granted_scopes": []string{}, "reason": "leak test",
+		"granted_scopes": []string{"messages:read", "events:subscribe"}, "event_subscriptions": []string{"message.created"}, "reason": "leak test",
+	}}, http.StatusCreated))
+	e.SubscriptionID = createdID(tb, harness.MustDo(tb, o, harness.Request{Method: http.MethodPost, Path: "/apps/" + e.AppID + "/webhooks", Body: map[string]any{
+		"url": "https://" + extrasWebhookHost + "/leak", "event_types": []string{"message.created"},
 	}}, http.StatusCreated))
 	extras.Store(w, e)
 	return e
@@ -130,7 +146,7 @@ func createdID(tb testing.TB, r harness.Response) string {
 			return id
 		}
 	}
-	for _, k := range []string{"host", "provider"} {
+	for _, k := range []string{"host", "provider", "subscription"} {
 		if m, ok := body[k].(map[string]any); ok {
 			if id, ok := m["id"].(string); ok && id != "" {
 				return id
