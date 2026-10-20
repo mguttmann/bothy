@@ -128,6 +128,9 @@ type Store interface {
 	ListSessions(ctx context.Context, userID, hostID ids.ID, state string, beforeID ids.ID, limit int) ([]domain.Session, error)
 	// UnfinishedSessions returns the sessions in opening or active, ascending (M2-44).
 	UnfinishedSessions(ctx context.Context) ([]ids.ID, error)
+	// HostStatesByIDs returns state and disabled_reason of the hosts of list that exist, ordered by
+	// id (M2-47, the reconciliation after a lost listener).
+	HostStatesByIDs(ctx context.Context, list []ids.ID) ([]HostState, error)
 }
 
 // PairingWrite is what host.pair stores (M2-41, Design note 3h): the checked keys, the

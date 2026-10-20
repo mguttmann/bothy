@@ -118,6 +118,10 @@ Die Ausnahme schränkt Owner ein und erweitert nichts; L22 bleibt für I1 unver�
   (docs/DECISIONS.md D-M2-45-18).
 * Kanarien-Test über Relais, Logs, Datenbank und Telemetrie (TM-T06).
 * Rechte-Testmatrix AZ-M54 bis AZ-M60 und I6-Tests (TM-T09) in `make test`.
+* Two api nodes with and without hash routing (TM-T15). Since M2-47 TM-T15 holds
+  `TestTMT15_TwoNodesWithHashRouting`, `TestTMT15_WithoutHashRouting` and
+  `TestTMT15_WithoutHashRouting_Attach` in `services/server/test/terminal/multinode`, at the server
+  level with the fake host of M2-44; M2-48 runs it again end to end with the real host service.
 * Red Team Terminal am Ende von M2, M4, M5, M6 (Bedrohungsmodell, Abschnitt 6.7).
 
 ## Pros and Cons of the Options

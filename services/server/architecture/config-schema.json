@@ -1106,6 +1106,21 @@
       "doc": "App version below which the app shows an update note on this platform; empty means none."
     },
     {
+      "name": "cluster.mode",
+      "env": "BOTHY_CLUSTER__MODE",
+      "kind": "enum",
+      "default": "single",
+      "required": false,
+      "enum": [
+        "single",
+        "multi"
+      ],
+      "min": "",
+      "max": "",
+      "chapter": "02-architektur.md",
+      "doc": "single or multi (several api nodes behind a proxy that routes both terminal stream paths of a session to one node)."
+    },
+    {
       "name": "command.description_max_chars",
       "env": "BOTHY_COMMAND__DESCRIPTION_MAX_CHARS",
       "kind": "int",

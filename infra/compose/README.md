@@ -9,6 +9,8 @@ Anleitung: [docs/operations/install-compose.md](../../docs/operations/install-co
 |---|---|
 | `compose.yaml` | alle Dienste, Profile, Netze, Volumes |
 | `.env.example` | Vorlage für `.env`; nur Platzhalter und Standardwerte, keine Geheimnisse |
+| `compose.multi-node.yaml` | overlay with two api nodes behind the example edge (profile `direct` only; section "Several api nodes") |
+| `edge/nginx.conf` | example edge (nginx) of the overlay: hash routing of the terminal stream paths, timeouts, no access log |
 | `secrets/` | nicht im Repository: vom Owner gelieferte Geheimnisse als Dateien (Katalog in [configuration.md](../../docs/operations/configuration.md) 5) |
 | `install.sh` | source of the setup wizard (POSIX `sh`, [16-betrieb.md](../../docs/spec/16-betrieb.md) 3.1); the release ships it rendered with version, checksum and download address next to the bundle (`make release-build`), not inside it; tests in [test/install/](test/install/README.md) (`make install-test`) |
 | `smoke.sh` | the Compose smoke test (`make portability`, M1-73); test only |
@@ -39,6 +41,35 @@ docker compose up -d
 | `observability` | `prometheus`, `alertmanager`, `loki`, `tempo`, `grafana` | dazu `BOTHY_OTEL_EXPORTER=local` |
 
 Genau eines von `direct` und `tailscale`.
+
+## Several api nodes
+
+```
+docker compose -f compose.yaml -f compose.multi-node.yaml config --quiet
+docker compose -f compose.yaml -f compose.multi-node.yaml up -d
+```
+
+The overlay `compose.multi-node.yaml` runs `api` and `api-2` with `BOTHY_CLUSTER__MODE=multi` (the
+worker too) and puts the example edge `edge` (nginx, image tag `BOTHY_NGINX_VERSION`) in front of
+them. Rules ([16-betrieb.md](../../docs/spec/16-betrieb.md) 4.4,
+[install-compose.md](../../docs/operations/install-compose.md) 5.3):
+
+1. Profile `direct` only. With `tailscale` neither `edge` nor `api-2` starts: `tailscale serve`
+   has no hash rule, so that profile runs one api node.
+2. The api nodes publish no port; only `edge` publishes on
+   `127.0.0.1:${BOTHY_HTTP_PUBLISH_PORT}`. The operator's TLS edge stays in front of it.
+3. `edge/nginx.conf` routes `/api/v1/terminal/sessions/{session_id}/stream` and
+   `/api/v1/hosts/sessions/{session_id}/stream` by consistent hashing over the session ID to the
+   same api node; everything else may land on either node. An edge of your own needs the same
+   rule, otherwise both sides of a session close with `4102`.
+4. `BOTHY_TRUSTED_PROXIES` names the subnet of the network `<project>_default` (field `Subnet` of
+   `docker network inspect <project>_default`), because the server sees the address of `edge`.
+5. Both api nodes mount the same key store `signing-keys` (ADR 0066); `api-2` takes image,
+   command, hardening, volumes and health check from `api` through `extends`.
+6. `edge` restarts when an api node is recreated, because nginx resolves the node names only at
+   start.
+7. `edge` runs as a non-root user with a read-only root file system, without capabilities, with
+   `no-new-privileges` and writes no access log.
 
 ## Sicherheitsregeln in dieser Datei
 
@@ -71,3 +102,10 @@ first setup, enrollment, live delivery over WebSocket, catch-up, revocation and 
 the collector export and the container logs. It runs on the official PostgreSQL 18 image without
 `backup`; `bothy-postgres`, `bothy-backupd`, the profiles `scan`, `s3`, `tailscale` and
 `observability` and the full portability test stay for M7 (M7-14).
+
+Checks of the overlay and the example edge (`services/server/test/edge`, needs Docker):
+`TestComposeMultiNodeOverlay` renders compose.yaml with the overlay and `.env.example` for the
+profiles `direct` and `tailscale`; `TestEdgeExample_Config` runs `edge/nginx.conf` in the pinned
+image and compares its directives and timeouts with the defaults in
+[configuration.md](../../docs/operations/configuration.md); `TestEdgeExample_HashRoutesBothStreamPaths`
+proves that both stream paths of a session reach the same node.

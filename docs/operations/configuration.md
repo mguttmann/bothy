@@ -146,7 +146,7 @@ Quelle: [02-architektur.md](../spec/02-architektur.md), Abschnitt 22.
 
 | Schlüssel | Umgebung | Ort | Typ | Standard | Bedeutung | Stand |
 |---|---|---|---|---|---|---|
-| `cluster.mode` | `BOTHY_CLUSTER__MODE` | Server |  | `single` | `single` oder `multi` (mehrere api-Knoten) | geplant (M2) |
+| `cluster.mode` | `BOTHY_CLUSTER__MODE` | Server | enum(single, multi) | `single` | `single` oder `multi` (mehrere api-Knoten) | aktiv |
 | `http.read_header_timeout` | `BOTHY_HTTP__READ_HEADER_TIMEOUT` | Server | duration | `5s` | Frist für Kopfzeilen | aktiv |
 | `http.request_timeout` | `BOTHY_HTTP__REQUEST_TIMEOUT` | Server | duration | `15s` | Kontext-Frist normaler Anfragen | aktiv |
 | `http.transfer_timeout` | `BOTHY_HTTP__TRANSFER_TIMEOUT` | Server | duration | `10m` | Frist für Upload und Download | aktiv |
@@ -1031,6 +1031,7 @@ Diese Variablen sind keine Server-Konfiguration; Compose setzt daraus Werte der 
 | `BOTHY_LOKI_VERSION` | `3.7.8` | Image-Version von Loki |
 | `BOTHY_TEMPO_VERSION` | `3.1.0` | Image-Version von Tempo |
 | `BOTHY_GRAFANA_VERSION` | `13.2.3` | Image-Version von Grafana |
+| `BOTHY_NGINX_VERSION` | `1.30.6-alpine` | image version of the example edge (nginx-unprivileged) of the overlay `compose.multi-node.yaml` ([install-compose.md](install-compose.md) 5.3) |
 | `BOTHY_CLAMAV_MEMORY_LIMIT` | `4g` | Speichergrenze des ClamAV-Containers |
 | `BOTHY_LOG_MAX_SIZE` | `20m` | Größe einer Container-Logdatei bis zur Rotation |
 | `BOTHY_LOG_MAX_FILE` | `5` | behaltene Container-Logdateien je Dienst |

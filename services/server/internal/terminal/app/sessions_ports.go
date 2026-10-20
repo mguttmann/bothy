@@ -37,6 +37,10 @@ type Expectation struct {
 	Started                     bool
 	LocalConfirm                bool
 	WorkdirIndex                *int
+	// Grant names the grant (the token jti of the row, M2-47): an expectation of the grant the
+	// slot already holds changes nothing, so a signal that arrives after a side built the
+	// expectation from the row, or twice, never resets the slot.
+	Grant ids.ID
 }
 
 // Counts are the live counts of the pairing of a session: bytes of the transport messages from and

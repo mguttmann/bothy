@@ -320,6 +320,7 @@ func (c *conn) register(ctx context.Context, l app.Login, in app.Identify) bool 
 		return false
 	}
 	k.login = l
+	k.conn = h.d.Links.newConnID()
 	if !h.d.Links.put(k) {
 		unlock()
 		k.close(domain.CodeServerRestart)
@@ -361,6 +362,9 @@ func (c *conn) duplicate(ctx context.Context, hostID ids.ID) bool {
 	old.markHandled()
 	if h.d.Links.remove(old) && old.isReported() {
 		h.d.Links.publish(hostID, false)
+	}
+	if hub := h.d.Links.hubOf(); hub != nil {
+		hub.gone(ctx, old)
 	}
 	if err != nil {
 		old.close(domain.CodeHeartbeatTimeout)
@@ -442,6 +446,10 @@ func (c *conn) heartbeat(ctx context.Context) {
 	}
 	c.heartbeatDeadline()
 	c.k.send(heartbeatAckFrame(c.h.d.Clock.Now(), send))
+	if hub := c.h.d.Links.hubOf(); hub != nil && c.k.isReported() && c.h.d.Links.current(c.k) {
+		// The presence across nodes is renewed with every heartbeat (M2-47 Design note 6).
+		hub.announce(ctx, c.k)
+	}
 }
 
 // report applies a report; the first applied report after ready makes the host connected.
@@ -460,6 +468,10 @@ func (c *conn) report(ctx context.Context, r domain.Report) {
 	}
 	if c.k.markReported() && c.h.d.Links.current(c.k) {
 		c.h.d.Links.publish(c.k.login.HostID, true)
+		if hub := c.h.d.Links.hubOf(); hub != nil {
+			// The first report makes the connection eligible: announce it to the other nodes.
+			hub.announce(ctx, c.k)
+		}
 	}
 }
 
@@ -499,6 +511,9 @@ func (c *conn) end(ctx context.Context) {
 	k.close(domain.CodeNormal)
 	if removed && k.isReported() {
 		c.h.d.Links.publish(k.login.HostID, false)
+	}
+	if hub := c.h.d.Links.hubOf(); hub != nil && removed {
+		hub.gone(ctx, k)
 	}
 	if r := c.h.d.Links.relayOf(); r != nil && removed {
 		// The relay closes the streams of the host's sessions (Design note 10 of M2-44); it does

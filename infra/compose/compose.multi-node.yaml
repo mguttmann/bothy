@@ -1,0 +1,71 @@
+# Overlay with two api nodes behind an example edge (docs/spec/16-betrieb.md 4.4,
+# docs/operations/install-compose.md 5.3).
+#
+#   docker compose -f compose.yaml -f compose.multi-node.yaml up -d
+#
+# Only with the profile `direct`. The edge (nginx, ./edge/nginx.conf) routes both stream paths of
+# a terminal session by consistent hashing over the session ID to the same api node; REST, the
+# gateway and the control connection of the host service may land on either node. The api nodes
+# publish no port; only the edge publishes on 127.0.0.1 of the host.
+#
+# The operator's TLS edge stays in front of this edge. The server then sees the address of this
+# edge, which appends the gateway's address to X-Forwarded-For (docs/spec/16-betrieb.md 4.3), so
+# BOTHY_TRUSTED_PROXIES names the subnet of the network <project>_default (field Subnet of
+# `docker network inspect <project>_default`), not only its gateway.
+#
+# Both api nodes share the signing-keys key store (ADR 0066) through the volumes of `api`.
+# The profile `tailscale` runs one api node: `tailscale serve` has no hash rule, so neither
+# `edge` nor `api-2` starts with that profile.
+
+services:
+
+  api:
+    ports: !reset []
+    environment:
+      BOTHY_CLUSTER__MODE: multi
+
+  api-2:
+    extends:
+      file: compose.yaml
+      service: api
+    ports: !reset []
+    environment:
+      BOTHY_CLUSTER__MODE: multi
+    # Written out, because extends need not carry depends_on.
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+      otel-collector:
+        condition: service_started
+
+  worker:
+    environment:
+      BOTHY_CLUSTER__MODE: multi
+
+  edge:
+    image: nginxinc/nginx-unprivileged:${BOTHY_NGINX_VERSION:-1.30.6-alpine}
+    profiles: [direct]
+    restart: unless-stopped
+    read_only: true
+    cap_drop: [ALL]
+    security_opt: ["no-new-privileges:true"]
+    tmpfs: [/tmp]
+    logging:
+      driver: local
+      options:
+        max-size: ${BOTHY_LOG_MAX_SIZE:-20m}
+        max-file: ${BOTHY_LOG_MAX_FILE:-5}
+    volumes:
+      - ./edge/nginx.conf:/etc/nginx/nginx.conf:ro
+    ports:
+      - "127.0.0.1:${BOTHY_HTTP_PUBLISH_PORT:-8090}:8080"
+    networks: [default]
+    # restart: nginx resolves api and api-2 once at start, so a recreated api node (an upgrade)
+    # restarts the edge with the new addresses.
+    depends_on:
+      api:
+        condition: service_healthy
+        restart: true
+      api-2:
+        condition: service_healthy
+        restart: true

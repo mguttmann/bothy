@@ -123,18 +123,22 @@ func (s *Service) openSession(ctx context.Context, p actor.Actor, cmd terminal.O
 	tg := domain.TokenGrant{HostID: h.ID, UserID: p.ID, SessionID: ses.ID, DeviceID: p.DeviceID, Profile: cmd.Profile,
 		ProfileKind: domain.ProfileKind(h.Profiles, cmd.Profile), CEK: cmd.CEK, Owner: owner, OSUser: f.assignment.OSUser, WorkdirIndex: cmd.WorkdirIndex}
 	var g terminal.Grant
+	s.noteGrant(h, ses, false, cmd.WorkdirIndex)
 	err = s.d.UoW.Do(ctx, func(ctx context.Context) error {
 		var err error
 		g, err = s.openUnit(ctx, p, h, ses, tg, cmd.PinChanged, owner)
 		return err
 	})
 	if err != nil {
+		s.notes.take(ses.ID)
 		return terminal.Grant{}, s.stepUpDenied(ctx, err, authorize.ActionTerminalOpen, authorize.ResourceHost, h.ID)
 	}
 	if err := s.recheck(ctx, p, authorize.ActionTerminalOpen, ses.ID, s.openRecheck(ctx, p, cmd), h.ID); err != nil {
 		return terminal.Grant{}, err
 	}
-	s.announce(ctx, h, ses, now, false, cmd.WorkdirIndex)
+	// The relay of every node expects the session, the node of the control connection sends
+	// session.open (24 section 6.1 step 4, M2-47 Design note 3).
+	s.committed(ctx, sessionOpenSignal(h.ID, ses.ID))
 	return g, nil
 }
 
@@ -156,6 +160,9 @@ func (s *Service) openUnit(ctx context.Context, p actor.Actor, h domain.Host, se
 		return terminal.Grant{}, err
 	}
 	if err := s.emitSessionChangedBy(ctx, ses, p.ID); err != nil {
+		return terminal.Grant{}, err
+	}
+	if err := s.stage(ctx, sessionOpenSignal(h.ID, ses.ID)); err != nil {
 		return terminal.Grant{}, err
 	}
 	if s.d.BeforeOpenCommit != nil {
@@ -268,19 +275,14 @@ func (s *Service) recheck(ctx context.Context, p actor.Actor, act authorize.Acti
 	return errs.New(errs.CodeForbidden, "")
 }
 
-// announce tells the relay of the grant and asks the host service for its data connection
-// (session.open, 24 section 6.1 step 4). An error of the send after the commit (the link dropped
-// in between) does not fail the request: the deadline of the slot ends the opening.
-func (s *Service) announce(ctx context.Context, h domain.Host, ses domain.Session, now time.Time, started bool, wdi *int) {
-	deadline := now.Add(s.cfg.OpenTimeout)
-	confirm := h.RequireLocalConfirm != nil && *h.RequireLocalConfirm
-	var keep *int
+// noteGrant remembers the working directory index of an opening of a claude profile for the
+// handler of terminal.session_open on this node (ruling D-M2-44-4); other grants keep none.
+func (s *Service) noteGrant(h domain.Host, ses domain.Session, started bool, wdi *int) {
 	if !started && domain.ProfileKind(h.Profiles, ses.Profile) == domain.ProfileKindClaude {
-		keep = wdi
+		s.notes.put(ses.ID, wdi)
+		return
 	}
-	s.relayControl().Expect(Expectation{SessionID: ses.ID, HostID: h.ID, DeviceID: ses.DeviceID, Deadline: deadline, Started: started,
-		LocalConfirm: confirm, WorkdirIndex: keep})
-	_ = s.control().OpenSession(ctx, h.ID, SessionOpen{SessionID: ses.ID, DataPath: DataPath(ses.ID), Profile: ses.Profile, ExpiresAt: deadline})
+	s.notes.put(ses.ID, nil)
 }
 
 // sessionView converts a session row (schema TerminalSession).
