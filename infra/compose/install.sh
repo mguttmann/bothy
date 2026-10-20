@@ -1,8 +1,8 @@
 #!/bin/sh
 # SPDX-License-Identifier: Apache-2.0
 #
-# Setup wizard of Bothy: installs one instance with Docker Compose in one command. Normative
-# description: docs/spec/16-betrieb.md, section 3.1; release artifact of the component bothy,
+# Setup wizard of the product: installs one instance with Docker Compose in one command. Normative
+# description: docs/spec/16-betrieb.md, section 3.1; release artifact of the product component,
 # docs/spec/18-release.md, section 2.1. It does nothing the manual path
 # (docs/operations/install-compose.md) does not also do: check the host, fetch and verify the
 # installation bundle of its built-in version, write infra/compose/.env, start the stack, wait for
@@ -91,7 +91,7 @@ usage() {
 	cat <<EOF
 Usage: install.sh [options]
 
-Installs Bothy $BOTHY_INSTALL_VERSION with Docker Compose into a folder.
+Installs version $BOTHY_INSTALL_VERSION of the chat server with Docker Compose into a folder.
 
 Options (--opt value or --opt=value):
   --dir <path>                target folder (default ./bothy)
@@ -371,7 +371,7 @@ step_preflight() {
 		die preflight "docker info failed; check that the Docker engine runs"
 	case $pf_arch in
 	x86_64 | amd64 | aarch64 | arm64) ;;
-	*) die preflight "the architecture '$pf_arch' of the Docker engine is not supported; Bothy runs on linux/amd64 and linux/arm64" ;;
+	*) die preflight "the architecture '$pf_arch' of the Docker engine is not supported; the server runs on linux/amd64 and linux/arm64" ;;
 	esac
 	pf_mem=$(docker info --format '{{.MemTotal}}' </dev/null 2>/dev/null) ||
 		die preflight "docker info failed; check that the Docker engine runs"
@@ -1029,8 +1029,8 @@ step_finish() {
 		fi
 	fi
 	sf_url=$(env_get BOTHY_PUBLIC_URL)
-	printf '\nBothy is installed in %s.\n\nNext steps:\n' "$compose_dir"
-	printf '  1. Open the Bothy app and enter the server address: %s\n' "$sf_url"
+	printf '\nThe instance is installed in %s.\n\nNext steps:\n' "$compose_dir"
+	printf '  1. Open the app and enter the server address: %s\n' "$sf_url"
 	if [ "$code_shown" = 1 ]; then
 		printf '  2. Enter the enrollment code shown above to enroll the first device of the owner.\n'
 	else

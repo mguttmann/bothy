@@ -189,6 +189,21 @@ def test_public_sign_order_images_binaries_then_checksums(tmp_path: Path) -> Non
     assert (tmp_path / "images.txt").read_text() == f"bothy-server r/bothy-server@{DIGEST_A}\n"
 
 
+def test_files_only_release_signs_files_and_writes_no_image_list(tmp_path: Path) -> None:
+    """The product release (brief M7-29) signs the bundle and install.sh, no image."""
+    files = [tmp_path / "bothy-compose-1.0.0.tar.gz", tmp_path / "install.sh"]
+    for f in files:
+        f.write_bytes(b"x")
+    write_sboms(tmp_path, chain.sbom_names("1.0.0", [], files, []))
+    fake = Fake()
+    chain.sign(fake_tools(fake), "public", tmp_path, "1.0.0", [], files, [])
+    assert [c[1] for c in fake.calls] == ["sign-blob", "sign-blob", "sign-blob"]
+    assert not (tmp_path / "images.txt").exists()
+    sums = (tmp_path / "SHA256SUMS").read_text()
+    assert "install.sh" in sums
+    assert "bothy-compose-1.0.0.tar.gz" in sums
+
+
 def test_private_signing_config_names_no_service(tmp_path: Path, cosign: str) -> None:
     tools = chain.Tools(cosign=cosign, syft="syft")
     config = json.loads(chain.private_signing_config(tools, tmp_path / "c.json").read_text())

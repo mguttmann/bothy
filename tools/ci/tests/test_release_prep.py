@@ -7,6 +7,7 @@ components and runs the pinned git-cliff against it, so the version rule is the 
 
 from __future__ import annotations
 
+import re
 import subprocess
 from pathlib import Path
 
@@ -88,7 +89,13 @@ def fx(tmp_path: Path) -> Fixture:
     return Fixture(tmp_path)
 
 
-def prep(fx: Fixture, git_cliff: Path, component: str = "server", channel: str = "stable"):
+def prep(
+    fx: Fixture,
+    git_cliff: Path,
+    component: str = "server",
+    channel: str = "stable",
+    server_version: str | None = None,
+):
     return release_prep.prepare(
         component,
         channel=channel,
@@ -96,7 +103,63 @@ def prep(fx: Fixture, git_cliff: Path, component: str = "server", channel: str =
         git_cliff=git_cliff,
         config=CLIFF_CONFIG,
         date=DATE,
+        server_version=server_version,
     )
+
+
+ENV_EXAMPLE = "infra/compose/.env.example"
+README = "README.md"
+INSTALL_DOC = "docs/operations/install-compose.md"
+PRODUCT_FILES = ("VERSION", "CHANGELOG.md", ENV_EXAMPLE, README, INSTALL_DOC)
+
+
+def install_url(version: str) -> str:
+    return f"https://github.com/OWNER/bothy/releases/download/v{version}/install.sh"
+
+
+def env_example(pinned: str) -> str:
+    return (
+        "# Template of infra/compose/.env.\n"
+        "BOTHY_REGISTRY=ghcr.io/OWNER\n"
+        f"BOTHY_VERSION={pinned}\n"
+        "BOTHY_PUBLIC_URL=https://chat.example.com\n"
+    )
+
+
+def product(fx: Fixture, pinned: str = "0.0.0-placeholder") -> Fixture:
+    """Release the product as v0.1.0 with its bundle files, then add a fix to release.
+
+    The server tags `server/v1.4.0` and `server/v2.0.0-beta.1` exist. README.md and the
+    installation guide name the documented command for v0.1.0, next to a bundle URL of the
+    same release that release-prep must leave alone.
+    """
+    (fx.root / "infra/compose").mkdir(parents=True, exist_ok=True)
+    (fx.root / "docs/operations").mkdir(parents=True, exist_ok=True)
+    (fx.root / ENV_EXAMPLE).write_text(env_example(pinned), encoding="utf-8")
+    (fx.root / README).write_text(
+        f"# Product\n\n```sh\ncurl -fsSL {install_url('0.1.0')} | sh\n```\n\n"
+        "Bundle: https://github.com/OWNER/bothy/releases/download/v0.1.0/bothy-compose.tar.gz\n",
+        encoding="utf-8",
+    )
+    (fx.root / INSTALL_DOC).write_text(
+        f"# Install\n\n```sh\ncurl -fsSL {install_url('0.1.0')} \\\n  | sh -s -- --yes\n```\n\n"
+        f"Again: {install_url('0.1.0')}\n",
+        encoding="utf-8",
+    )
+    fx.commit("chore(release): v0.1.0", "VERSION")
+    fx.tag("v0.1.0")
+    fx.tag("server/v1.4.0")
+    fx.tag("server/v2.0.0-beta.1")
+    fx.commit("fix(compose): repair", "infra/compose/compose.yaml")
+    return fx
+
+
+def snapshot(fx: Fixture) -> dict[str, bytes | None]:
+    """The bytes of every file a product release-prep may write (None when missing)."""
+    return {
+        name: (fx.root / name).read_bytes() if (fx.root / name).is_file() else None
+        for name in PRODUCT_FILES
+    }
 
 
 def released(fx: Fixture, component: str = "server") -> Fixture:
@@ -297,9 +360,7 @@ def test_unknown_component_and_channel(fx: Fixture, git_cliff: Path) -> None:
 
 
 def test_root_component_uses_plain_tags(fx: Fixture, git_cliff: Path) -> None:
-    fx.commit("chore(release): v0.1.0", "VERSION")
-    fx.tag("v0.1.0")
-    fx.commit("fix(compose): repair", "infra/compose/compose.yaml")
+    product(fx, pinned="1.4.0")
     assert prep(fx, git_cliff, "bothy").version == "0.1.1"
     assert fx.read("VERSION") == "0.1.1\n"
 
@@ -342,3 +403,181 @@ def test_no_commit_since_the_tag_is_nothing_to_release(fx: Fixture, git_cliff: P
     fx.commit("fix(sdk-python): elsewhere", "sdk/python/b.py")
     with pytest.raises(release_prep.ReleasePrepError, match="nothing to release: no commit"):
         prep(fx, git_cliff)
+
+
+def test_server_version_writes_the_pin(fx: Fixture, git_cliff: Path) -> None:
+    product(fx)
+    before = fx.read(ENV_EXAMPLE)
+    result = prep(fx, git_cliff, "bothy", server_version="1.4.0")
+    assert result.version == "0.1.1"
+    assert fx.read(ENV_EXAMPLE) == before.replace(
+        "BOTHY_VERSION=0.0.0-placeholder\n", "BOTHY_VERSION=1.4.0\n"
+    )
+    assert fx.read("VERSION") == "0.1.1\n"
+    assert "## [0.1.1] - 2026-10-15" in fx.read("CHANGELOG.md")
+    assert ENV_EXAMPLE in result.other_files
+
+
+def test_server_version_without_its_tag_writes_nothing(fx: Fixture, git_cliff: Path) -> None:
+    product(fx)
+    before = snapshot(fx)
+    with pytest.raises(release_prep.ReleasePrepError, match=r"server/v1\.5\.0"):
+        prep(fx, git_cliff, "bothy", server_version="1.5.0")
+    assert snapshot(fx) == before
+
+
+@pytest.mark.parametrize("value", ["v1.4.0", "1.4", "latest", ""])
+def test_server_version_that_is_not_semver_writes_nothing(
+    fx: Fixture, git_cliff: Path, value: str
+) -> None:
+    product(fx)
+    before = snapshot(fx)
+    with pytest.raises(release_prep.ReleasePrepError, match="SERVER_VERSION"):
+        prep(fx, git_cliff, "bothy", server_version=value)
+    assert snapshot(fx) == before
+
+
+def test_stable_product_rejects_a_server_pre_release(fx: Fixture, git_cliff: Path) -> None:
+    product(fx)
+    before = snapshot(fx)
+    with pytest.raises(release_prep.ReleasePrepError, match=r"2\.0\.0-beta\.1.*CHANNEL=beta"):
+        prep(fx, git_cliff, "bothy", server_version="2.0.0-beta.1")
+    assert snapshot(fx) == before
+
+
+def test_product_beta_accepts_a_server_pre_release(fx: Fixture, git_cliff: Path) -> None:
+    product(fx)
+    result = prep(fx, git_cliff, "bothy", channel="beta", server_version="2.0.0-beta.1")
+    assert result.version == "0.1.1-beta.1"
+    assert "BOTHY_VERSION=2.0.0-beta.1\n" in fx.read(ENV_EXAMPLE)
+
+
+def test_missing_server_version_with_the_placeholder_writes_nothing(
+    fx: Fixture, git_cliff: Path
+) -> None:
+    product(fx)
+    before = snapshot(fx)
+    with pytest.raises(release_prep.ReleasePrepError, match="SERVER_VERSION"):
+        prep(fx, git_cliff, "bothy")
+    assert snapshot(fx) == before
+
+
+def test_missing_server_version_keeps_a_pinned_line(fx: Fixture, git_cliff: Path) -> None:
+    product(fx, pinned="1.4.0")
+    before = fx.read(ENV_EXAMPLE)
+    assert prep(fx, git_cliff, "bothy").version == "0.1.1"
+    assert fx.read(ENV_EXAMPLE) == before
+
+
+def test_server_version_for_another_component_writes_nothing(fx: Fixture, git_cliff: Path) -> None:
+    released(fx).commit("fix(server): repair it", "services/server/a.go")
+    before = (fx.read("services/server/VERSION"), fx.read("services/server/CHANGELOG.md"))
+    with pytest.raises(release_prep.ReleasePrepError, match="only to the component"):
+        prep(fx, git_cliff, "server", server_version="1.4.0")
+    assert (fx.read("services/server/VERSION"), fx.read("services/server/CHANGELOG.md")) == before
+
+
+def test_cli_rejects_server_version_for_another_component(
+    fx: Fixture, git_cliff: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    with pytest.raises(SystemExit) as exc:
+        release_prep.main(
+            [
+                "--component",
+                "server",
+                "--server-version",
+                "1.4.0",
+                "--repo",
+                str(fx.root),
+                "--git-cliff",
+                str(git_cliff),
+            ]
+        )
+    assert exc.value.code == 2
+    assert "--server-version" in capsys.readouterr().err
+
+
+def test_documented_install_command_follows_the_product_version(
+    fx: Fixture, git_cliff: Path
+) -> None:
+    product(fx)
+    readme, guide = fx.read(README), fx.read(INSTALL_DOC)
+    result = prep(fx, git_cliff, "bothy", server_version="1.4.0")
+    # Only URLs of the documented command change; the bundle URL of v0.1.0 stays.
+    assert fx.read(README) == readme.replace(install_url("0.1.0"), install_url("0.1.1"))
+    assert fx.read(INSTALL_DOC) == guide.replace(install_url("0.1.0"), install_url("0.1.1"))
+    assert "bothy-compose.tar.gz" in fx.read(README)
+    assert "v0.1.0/bothy-compose.tar.gz" in fx.read(README)
+    assert {README, INSTALL_DOC} <= set(result.other_files)
+
+
+def test_documented_command_of_a_beta_names_the_beta(fx: Fixture, git_cliff: Path) -> None:
+    product(fx)
+    prep(fx, git_cliff, "bothy", channel="beta", server_version="1.4.0")
+    assert install_url("0.1.1-beta.1") in fx.read(README)
+    assert install_url("0.1.0") not in fx.read(INSTALL_DOC)
+
+
+@pytest.mark.parametrize("name", [README, INSTALL_DOC])
+def test_missing_documented_command_writes_nothing(fx: Fixture, git_cliff: Path, name: str) -> None:
+    product(fx)
+    (fx.root / name).write_text("# No command here.\n", encoding="utf-8")
+    before = snapshot(fx)
+    with pytest.raises(release_prep.ReleasePrepError, match=re.escape(name)):
+        prep(fx, git_cliff, "bothy", server_version="1.4.0")
+    assert snapshot(fx) == before
+
+
+@pytest.mark.parametrize("name", [README, INSTALL_DOC, ENV_EXAMPLE])
+def test_missing_product_file_writes_nothing(fx: Fixture, git_cliff: Path, name: str) -> None:
+    product(fx)
+    (fx.root / name).unlink()
+    before = snapshot(fx)
+    with pytest.raises(release_prep.ReleasePrepError, match=re.escape(name)):
+        prep(fx, git_cliff, "bothy", server_version="1.4.0")
+    assert snapshot(fx) == before
+
+
+def test_two_pin_lines_write_nothing(fx: Fixture, git_cliff: Path) -> None:
+    product(fx)
+    path = fx.root / ENV_EXAMPLE
+    path.write_text(path.read_text(encoding="utf-8") + "BOTHY_VERSION=1.0.0\n", encoding="utf-8")
+    before = snapshot(fx)
+    with pytest.raises(release_prep.ReleasePrepError, match="exactly one line BOTHY_VERSION="):
+        prep(fx, git_cliff, "bothy", server_version="1.4.0")
+    assert snapshot(fx) == before
+
+
+def test_later_changelog_error_leaves_the_product_files(fx: Fixture, git_cliff: Path) -> None:
+    product(fx)
+    (fx.root / "CHANGELOG.md").write_text("# Changelog\n", encoding="utf-8")
+    before = snapshot(fx)
+    with pytest.raises(release_prep.ReleasePrepError, match="Unreleased"):
+        prep(fx, git_cliff, "bothy", server_version="1.4.0")
+    assert snapshot(fx) == before
+
+
+def test_cli_passes_the_server_version(
+    fx: Fixture, git_cliff: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    product(fx)
+    rc = release_prep.main(
+        [
+            "--component",
+            "bothy",
+            "--server-version",
+            "1.4.0",
+            "--repo",
+            str(fx.root),
+            "--git-cliff",
+            str(git_cliff),
+            "--config",
+            str(CLIFF_CONFIG),
+            "--date",
+            DATE,
+        ]
+    )
+    out = capsys.readouterr().out
+    assert rc == 0
+    assert "BOTHY_VERSION=1.4.0" in fx.read(ENV_EXAMPLE)
+    assert ENV_EXAMPLE in out
