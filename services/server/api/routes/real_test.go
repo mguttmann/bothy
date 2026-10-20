@@ -785,6 +785,10 @@ func (stubServer) StepUpWithPassword(context.Context, rest.StepUpWithPasswordReq
 	return nil, nil
 }
 
+func (stubServer) SubmitCspReport(context.Context, rest.SubmitCspReportRequestObject) (rest.SubmitCspReportResponseObject, error) {
+	return nil, nil
+}
+
 func (stubServer) BeginStepUpOidcReauth(context.Context, rest.BeginStepUpOidcReauthRequestObject) (rest.BeginStepUpOidcReauthResponseObject, error) {
 	return nil, nil
 }
@@ -1045,6 +1049,8 @@ func TestRealTable_Enabled(t *testing.T) {
 		"stepUpWithPassword":       {"POST /api/v1/auth/step-up/password", "auth.step_up", "rl.public_auth"},
 		"beginStepUpOidcReauth":    {"POST /api/v1/auth/step-up/oidc", "auth.step_up", "rl.public_auth"},
 		"completeStepUpOidcReauth": {"POST /api/v1/auth/step-up/oidc/complete", "auth.step_up", "rl.public_auth"},
+		// M6-03
+		"submitCspReport": {"POST /api/v1/csp-reports", "console.csp_report", "rl.public_auth"},
 	}
 	ops := routes.Enabled()
 	if len(ops) != len(want) {
