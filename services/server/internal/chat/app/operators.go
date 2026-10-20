@@ -272,20 +272,7 @@ func (s *Service) setSpaceOperatorWrite(ctx context.Context, cmd chat.SetSpaceOp
 	if err := s.d.Store.SaveSpaceOperator(ctx, sp); err != nil {
 		return domain.Space{}, err
 	}
-	var bound []ids.ID
-	for i := range inheriting {
-		inheriting[i].Channel.Touch()
-		inheriting[i].SpaceDefaultOperatorID = sp.DefaultOperatorAgentID
-		if err := s.d.Store.TouchChannel(ctx, inheriting[i].Channel); err != nil {
-			return domain.Space{}, err
-		}
-		if inheriting[i].ProjectBound {
-			bound = append(bound, inheriting[i].Channel.ID)
-		}
-	}
-	// Every inheriting forum has a new effective operator: its readiness came from the old one
-	// (M2-03 design note 7).
-	if err := s.resetReadiness(ctx, bound); err != nil {
+	if err := s.touchInheriting(ctx, inheriting, sp.DefaultOperatorAgentID); err != nil {
 		return domain.Space{}, err
 	}
 	if err := s.record(ctx, authorize.ActionSpaceOperatorSet, sp.ID, operatorAttrs(resourceSpace, sp.ID, old, want, cmd.Reason)); err != nil {
@@ -300,4 +287,22 @@ func (s *Service) setSpaceOperatorWrite(ctx context.Context, cmd chat.SetSpaceOp
 		}
 	}
 	return sp, nil
+}
+
+// touchInheriting bumps the version of every inheriting channel of a space whose default operator
+// became operator and resets the readiness of the bound forums among them: their effective
+// operator changed, so the readiness came from the old one (M2-03 design note 7).
+func (s *Service) touchInheriting(ctx context.Context, inheriting []ChannelRow, operator ids.ID) error {
+	var bound []ids.ID
+	for i := range inheriting {
+		inheriting[i].Channel.Touch()
+		inheriting[i].SpaceDefaultOperatorID = operator
+		if err := s.d.Store.TouchChannel(ctx, inheriting[i].Channel); err != nil {
+			return err
+		}
+		if inheriting[i].ProjectBound {
+			bound = append(bound, inheriting[i].Channel.ID)
+		}
+	}
+	return s.resetReadiness(ctx, bound)
 }

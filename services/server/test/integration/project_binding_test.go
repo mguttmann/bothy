@@ -652,6 +652,10 @@ func TestApplyProjectReadiness_OnlyEffectiveOperator(t *testing.T) {
 	if got := w.bindingState(archived); got != "false:1" {
 		t.Fatalf("archived forum: %s", got)
 	}
+	w.ready(w.runner, w.projektA, false)
+	if got := w.bindingState(w.projektA); got != "false:3" {
+		t.Fatalf("report not ready: %s", got)
+	}
 	must(t, w.rec.Aggregator().Flush(context.Background()))
 	if w.settingsVersion(w.projektA) != settings || w.eventCount() != events || w.count(`SELECT count(*) FROM audit_events`) != audits {
 		t.Fatal("a readiness report wrote settings_version, an event or an audit entry")
