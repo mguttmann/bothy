@@ -1,4 +1,5 @@
 config.remove /etc/bothy-host/config.yaml bothy-s-sam
+run /usr/bin/systemctl stop bothy-host.service
 run /usr/bin/systemctl disable --now bothy-host-helper-bothy-s-sam.socket bothy-host-helper-bothy-s-sam.service
 remove /etc/systemd/system/bothy-host-helper-bothy-s-sam.socket
 remove /etc/systemd/system/bothy-host-helper-bothy-s-sam.service
