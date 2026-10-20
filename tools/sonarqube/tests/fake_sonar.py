@@ -334,8 +334,12 @@ def _qp_restore(state: State, p: dict[str, str]) -> tuple[int, Any, str]:
     if prof is None:
         prof = Profile(f"r-{lang}", name, lang)
         state.profiles.append(prof)
+    # A rule already active through the parent stays inherited, so a change of the parent
+    # still reaches it; only the others become the profile's own rules.
     for repo, key in re.findall(r"<repositoryKey>(.*?)</repositoryKey>\s*<key>(.*?)</key>", xml):
-        prof.own_rules.add(f"{repo}:{key}")
+        rule = f"{repo}:{key}"
+        if rule not in state.active_rules(prof):
+            prof.own_rules.add(rule)
     return 200, {"profile": {"key": prof.key}}, "application/json"
 
 

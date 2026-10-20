@@ -583,3 +583,25 @@ def test_visibility_of_an_unknown_project_fails_without_a_change() -> None:
             qs.ensure_public(_client(url, organization=ORG))
         assert state.visibility == "private"
         assert _posts(state, "/api/projects/update_visibility") == []
+
+
+def test_restore_keeps_a_rule_of_the_parent_inherited() -> None:
+    state = State()
+    with running(state) as url:
+        client = _client(url)
+        client.post("api/qualityprofiles/create", language="go", name="Bothy way")
+        client.post(
+            "api/qualityprofiles/change_parent",
+            language="go",
+            qualityProfile="Bothy way",
+            parentQualityProfile="Sonar way",
+        )
+        backup = (
+            "<profile><name>Bothy way</name><language>go</language><rules>"
+            "<rule><repositoryKey>go</repositoryKey><key>S100</key></rule>"
+            "<rule><repositoryKey>go</repositoryKey><key>S1135</key></rule></rules></profile>"
+        )
+        client.post_file("api/qualityprofiles/restore", "backup", "go.xml", backup)
+    prof = state.profile("go", "Bothy way")
+    assert prof is not None
+    assert prof.own_rules == {"go:S1135"}
