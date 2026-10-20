@@ -3,23 +3,20 @@
 package ws
 
 import (
-	"context"
 	"crypto/rand"
 	"encoding/base64"
 	"net/http"
 	"testing"
-	"time"
 
 	"github.com/OWNER/bothy/services/server/internal/kernel/actor"
+	"github.com/OWNER/bothy/services/server/internal/platform/testkit"
 )
 
 // upgrade sends a WebSocket upgrade request with the cookie and the Origin (each only when not
 // empty) and returns the status of the answer.
 func upgrade(t *testing.T, url, cookie, origin string) int {
 	t.Helper()
-	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
-	defer cancel()
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
+	req, err := http.NewRequestWithContext(testkit.Context(t), http.MethodGet, url, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
