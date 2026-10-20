@@ -1,0 +1,33 @@
+{
+  "version": "4",
+  "groupKey": "{}:{alertname=\"InstanceDown\"}",
+  "truncatedAlerts": 3,
+  "status": "firing",
+  "receiver": "bothy-ops",
+  "groupLabels": {
+    "alertname": "InstanceDown"
+  },
+  "commonLabels": {
+    "alertname": "InstanceDown",
+    "severity": "critical"
+  },
+  "commonAnnotations": {},
+  "externalURL": "https://alertmanager.example.com",
+  "alerts": [
+    {
+      "status": "firing",
+      "labels": {
+        "alertname": "InstanceDown",
+        "instance": "web1.example.com",
+        "severity": "critical"
+      },
+      "annotations": {
+        "summary": "Instance web1 is down"
+      },
+      "startsAt": "2026-10-10T09:00:00Z",
+      "endsAt": "0001-01-01T00:00:00Z",
+      "generatorURL": "https://prometheus.example.com/graph?g0.expr=up",
+      "fingerprint": "f60718293a4b5c6d"
+    }
+  ]
+}

@@ -441,7 +441,7 @@ func (s *Service) TriggerChannel(ctx context.Context, channelID ids.ID) (chat.Tr
 	c := row.Channel
 	return chat.TriggerChannel{
 		ChannelID: c.ID, SpaceID: c.SpaceID, Kind: string(c.Kind), EffectiveOperatorID: c.Operator(row.SpaceDefaultOperatorID).EffectiveAgentID,
-		RequireMention: c.RequireMention, ThreadRequireMention: c.ThreadRequireMention, FreeResponse: c.FreeResponse,
+		MainThreadID: c.MainThreadID, RequireMention: c.RequireMention, ThreadRequireMention: c.ThreadRequireMention, FreeResponse: c.FreeResponse,
 		AutoThread: c.AutoThread, AllowMentionedAgents: c.AllowMentionedAgents,
 	}, nil
 }

@@ -469,8 +469,8 @@ Quelle: [11-erweiterungen.md](../spec/11-erweiterungen.md), Abschnitt 16.
 | `webhook.retry_max_age` | `BOTHY_WEBHOOK__RETRY_MAX_AGE` | Server | duration | `72h` | after that a delivery becomes `dead` ([webhooks.md](../api/webhooks.md), section 4) | aktiv |
 | `webhook.secret_rotation_overlap` | `BOTHY_WEBHOOK__SECRET_ROTATION_OVERLAP` | Server | duration | `24h` | how long the server signs with the old and the new HMAC generation | aktiv |
 | `webhook.hmac_master_key_ref` | `BOTHY_WEBHOOK__HMAC_MASTER_KEY_REF` | Server | secret_ref | `file:<secrets.dir>/webhook_hmac_master_key` | reference to the master key from which the HMAC secrets of the subscriptions are derived ([webhooks.md](../api/webhooks.md), section 2.1) | aktiv |
-| `webhook_in.max_body_bytes` | `BOTHY_WEBHOOK_IN__MAX_BODY_BYTES` | Server |  | `1048576` | Größe eines eingehenden Körpers | geplant (M2) |
-| `webhook_in.formats_enabled` | `BOTHY_WEBHOOK_IN__FORMATS_ENABLED` | Server |  | `native, alertmanager` | eingeschaltete Eingangsformate | geplant (M2) |
+| `webhook_in.max_body_bytes` | `BOTHY_WEBHOOK_IN__MAX_BODY_BYTES` | Server | int | `1048576` | Größe eines eingehenden Körpers | aktiv |
+| `webhook_in.formats_enabled` | `BOTHY_WEBHOOK_IN__FORMATS_ENABLED` | Server | list(string) | `["native", "alertmanager"]` | eingeschaltete Eingangsformate; the start check `webhook_in_formats` allows only `native` and `alertmanager`, each at most once; an empty list switches every format off | aktiv |
 | `sdk.http_timeout` |  | SDK |  | `30s` | Zeitgrenze einer REST-Anfrage |  |
 | `sdk.retry_max_attempts` |  | SDK |  | `5` | Versuche je idempotenter Operation |  |
 | `sdk.retry_backoff_base` |  | SDK |  | `500ms` | Basis des Backoffs |  |

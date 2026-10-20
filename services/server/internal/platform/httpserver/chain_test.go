@@ -70,7 +70,7 @@ func TestChainOrder_Golden(t *testing.T) {
 	c := newChain(t, "getThing")
 	var entered []string
 	httpserver.SetTrace(c, func(name string) { entered = append(entered, name) })
-	for _, s := range []httpserver.Stage{httpserver.StageRateLimit, httpserver.StageMaintenance, httpserver.StageIdempotency} {
+	for _, s := range []httpserver.Stage{httpserver.StageRateLimit, httpserver.StageWebhookToken, httpserver.StageMaintenance, httpserver.StageIdempotency} {
 		c.Use(s, func(next http.Handler) http.Handler { return next })
 	}
 	mux := http.NewServeMux()

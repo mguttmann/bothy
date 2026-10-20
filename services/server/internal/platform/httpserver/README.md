@@ -1,6 +1,6 @@
 # Package `platform/httpserver`
 
-Status: built (listeners M1-11, chain M1-18, transport protection and HSTS M1-21). Normative are [02-architektur.md](../../../../../docs/spec/02-architektur.md) "Request-Pfad",
+Status: built (listeners M1-11, chain M1-18, transport protection and HSTS M1-21, the webhook token slot and the per-operation body limit M2-27). Normative are [02-architektur.md](../../../../../docs/spec/02-architektur.md) "Request-Pfad",
 "Fehlerarten" and "Fristen", [06-api.md](../../../../../docs/spec/06-api.md) "Grundregeln",
 "Fehler", "Nebenläufigkeit" and "Paginierung",
 [19-sicherheit.md](../../../../../docs/spec/19-sicherheit.md) SEC-TLS, SEC-HDR, SEC-CORS, SEC-IN and SEC-LOG,
@@ -61,6 +61,18 @@ chapters win on any difference. Rulings: [DECISIONS.md](../../../../../docs/DECI
 - `Operation.AuthorizedInBand`: the one route that authenticates and authorizes on the connection
   it opens (`GET /api/v1/gateway`, M1-64); `Chain.Wrap` runs no per-route stage for it, only the
   outer steps 1 to 4, and puts the operation into the context.
+- `Operation.BodyLimit` and `Operation.BodyLimitKey` (M2-27): a `BodyLimit` above zero replaces
+  `http.max_json_body_bytes` (and `file.max_upload_bytes`) as the body limit of the operation, and
+  the `413 payload_too_large` names `BodyLimitKey` in its `detail` (the two post operations of the
+  incoming webhooks: `webhook_in.max_body_bytes`, set by `wire.WebhookBodyLimit`). For such an
+  operation a declared `Content-Length` above the limit is refused at the start of `StageBody`
+  instead of `StageRoute`, so the stages before it (rate limit, webhook token) answer first (11
+  8.4: token before size); the body is still never read beyond the limit.
+- `Operation.AnonymousCredentials` (M2-27): the credential of the operation is not an identity
+  credential (the token of an incoming webhook). `StageAuthenticate` runs neither the credentials
+  precheck nor the `Authenticator` nor ConsoleGuard for it and puts the anonymous actor into the
+  context, whatever `Authorization` holds; the stage at `StageWebhookToken` checks the credential
+  and counts its failures itself (`ratelimit.Limiter.FailedCredentialGuard`).
 - `NewValidator(spec, operationIDs)`, `CheckJSON`, `SanitizeJSON`, `ClientIP`, `CheckOrigin`,
   `FormatETag`, `ParseIfMatch`, `EncodeCursor`, `DecodeCursor`, `OperationFrom`.
 - `NewIdempotencyStage(cfg, store, uow, clock)`, `IdempotencyConfig`, `Fingerprint`,
@@ -74,17 +86,18 @@ chapters win on any difference. Rulings: [DECISIONS.md](../../../../../docs/DECI
 | 2 | trace | `otel.Middleware` (span, access log, duration metric); correlation ID from the trace ID into `kernel/reqmeta` |
 | 3 | headers | `Correlation-Id`; client IP into `kernel/reqmeta` |
 | 4 | mux | routing; no pattern: `404 not_found`, wrong method: `405 method_not_allowed` with `Allow` |
-| 5 | `StageRoute` | operation into the context, `Cache-Control: no-store`, CORP, body limit, deadline, response writer |
+| 5 | `StageRoute` | operation into the context, `Cache-Control: no-store`, CORP, body limit (a declared `Content-Length` above it: `413`, except for an operation with `BodyLimit`, see step 12), deadline, response writer |
 | 6 | `StageCORS` | none by default; `*` for `instance.discovery.read`; exact origins of `api.cors_allowed_origins` |
-| 7 | `StageAuthenticate` | precheck for requests with credentials (M1-19: `429` while `rl.public_auth` of the client IP is empty), `actor.Authenticator` with method, htu from `server.public_url`, `Authorization`, `DPoP`, client IP; `reqmeta.Transport` (TCP peer from `RemoteAddr`, header, action) into the context for the trusted header driver (M1-43); failed-credentials hook |
+| 7 | `StageAuthenticate` | precheck for requests with credentials (M1-19: `429` while `rl.public_auth` of the client IP is empty), `actor.Authenticator` with method, htu from `server.public_url`, `Authorization`, `DPoP`, client IP; `reqmeta.Transport` (TCP peer from `RemoteAddr`, header, action) into the context for the trusted header driver (M1-43); failed-credentials hook; an operation with `AnonymousCredentials` skips precheck and `Authenticator` and stays anonymous (M2-27) |
 | 8 | `StageRateLimit` | token bucket of the operation's class (`platform/ratelimit`, M1-19): `RateLimit-Policy`, `RateLimit`; exhausted: `429 rate_limited` with `Retry-After` |
-| 9 | `StageMaintenance` | slot (M7-08) |
-| 10 | `StageIdempotency` | `Idempotency-Key` in the unit of work (M1-20, below) |
-| 11 | `StageBody` | media type (`415`), JSON guard (`400 malformed_request`), required body |
-| 12 | `StagePreconditions` | `IfMatchRequired` without `If-Match` or with `*`: `428` |
-| 13 | `StageValidate` | parameters and JSON body against the contract (`400 validation_failed`) |
-| 14 | `StageProof` | check log of `kernel/authorize` |
-| 15 | handler | generated wrapper, strict handler, module adapter, use case with `authorize` |
+| 9 | `StageWebhookToken` | slot (M2-27): the token check of the incoming webhooks (`apps/adapters/httpapi.TokenStage`, installed by `wire.InstallWebhookToken`), after `rl.webhook_in` and before any body stage |
+| 10 | `StageMaintenance` | slot (M7-08) |
+| 11 | `StageIdempotency` | `Idempotency-Key` in the unit of work (M1-20, below) |
+| 12 | `StageBody` | declared `Content-Length` above `Operation.BodyLimit` (`413`, M2-27), media type (`415`), JSON guard (`400 malformed_request`), required body |
+| 13 | `StagePreconditions` | `IfMatchRequired` without `If-Match` or with `*`: `428` |
+| 14 | `StageValidate` | parameters and JSON body against the contract (`400 validation_failed`) |
+| 15 | `StageProof` | check log of `kernel/authorize` |
+| 16 | handler | generated wrapper, strict handler, module adapter, use case with `authorize` |
 
 `TestChainOrder_Golden` holds this order (`testdata/chain_order.golden`).
 
@@ -174,7 +187,8 @@ the proof applies to every success of a route.
 ## Error contract
 
 - Status and code come from `kernel/errs`; titles from `x-problem-codes` of `openapi.yaml`.
-- `*http.MaxBytesError` is `413 payload_too_large` with `detail` naming the key; an error wrapping
+- `*http.MaxBytesError` is `413 payload_too_large` with `detail` naming the key (`Operation.BodyLimitKey`
+  when the operation sets `BodyLimit`, else `file.max_upload_bytes` or `http.max_json_body_bytes`); an error wrapping
   `context.DeadlineExceeded` of the request is `503 unavailable` (`bothy.reason =
   deadline_exceeded` in the log); anything else is `500 internal_error` with only its Go type in
   the log.

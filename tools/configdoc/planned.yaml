@@ -85,5 +85,3 @@ rules:
     etappe: M2
   - match: "voice."  # M3-09
     etappe: M3
-  - match: "webhook_in."  # M2-27
-    etappe: M2

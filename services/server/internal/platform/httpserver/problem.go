@@ -179,8 +179,13 @@ func toError(r *http.Request, err error) *errs.Error {
 // payloadTooLarge is 413 with detail naming the key of the route's body limit.
 func payloadTooLarge(ctx context.Context) *errs.Error {
 	key := keyMaxJSONBodyBytes
-	if op, ok := OperationFrom(ctx); ok && op.RequestBody.transfer() {
-		key = keyMaxUploadBytes
+	if op, ok := OperationFrom(ctx); ok {
+		switch {
+		case op.BodyLimit > 0 && op.BodyLimitKey != "":
+			key = op.BodyLimitKey
+		case op.RequestBody.transfer():
+			key = keyMaxUploadBytes
+		}
 	}
 	return errs.New(errs.CodePayloadTooLarge, "Body exceeds "+key+".")
 }

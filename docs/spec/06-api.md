@@ -41,7 +41,7 @@ flowchart LR
 | REST | `https://<host>/api/v1/...` | openapi.yaml, Abschnitte 2 bis 10 |
 | Gateway (WebSocket) | `wss://<host>/api/v1/gateway` | asyncapi.yaml, 04, Abschnitt 11 |
 | Ausgehende Webhooks | HTTPS-Ziel der App | `webhooks:` in openapi.yaml, webhooks.md |
-| Eingangs-Webhooks | `POST /api/v1/hooks/{webhook_id}/{token}` | openapi.yaml, webhooks.md |
+| Eingangs-Webhooks | `POST /api/v1/hooks/{webhook_id}/{token}` (`postIncomingWebhook`); `POST /api/v1/hooks/{webhook_id}` with the token in `Authorization: Bearer <token>` (`postIncomingWebhookWithBearer`) | openapi.yaml, webhooks.md |
 
 Der Server-Eintrag in openapi.yaml ist relativ (`/api/v1`), weil jede Instanz ihren eigenen Host
 hat. Das Präfix `/api/v1` gilt für alle Flächen, auch im Kern-Vertrag (04). Liveness und
@@ -66,7 +66,7 @@ Readiness gehören nicht zur öffentlichen API; sie liegen auf dem internen List
 | Kein `null` | Der Server sendet nie JSON `null`. Fehlt ein Feld, hat es keinen Wert. Clients behandeln ein empfangenes `null` wie ein fehlendes Feld. Werte werden über eigene Felder oder Modi entfernt (z. B. `use_global_order: true`, `OperatorSet.mode = none`), nie durch `null`. | dart-dio kennt den Null-Typ nicht [belegt, Q4]; ein Weg für alle Generatoren (R-API-03, [ADR 0053](../adr/0053-kein-json-null-in-api-und-ereignissen.md)). |
 | Unbekanntes | Clients ignorieren unbekannte Felder, Enum-Werte, Ereignistypen und Problem-Codes. Der Server lehnt unbekannte Felder in Anfragen und Gateway-Rahmen ab (`400 validation_failed` bzw. Schließ-Code `4002`); schreibende Schemas haben `additionalProperties: false` ([19-sicherheit.md](19-sicherheit.md), SEC-IN-1; PLAN W7). Ob ein Server ein neues Feld kennt, sieht ein Client an `features` der Discovery. | Ein still verworfenes Feld verschluckt bei einem älteren Server eine Absicht; Antworten und Ereignisse bleiben additiv (Abschnitt 13). |
 | Medientypen | JSON als `application/json` (UTF-8); Fehler als `application/problem+json`; Datei-Teile als `application/octet-stream`; Bilder für Avatar und Logo als `multipart/form-data` (Teil `file`); Exporte als `application/x-ndjson`. CSP violation reports of the web console (`submitCspReport`, M6-03) as `application/reports+json` (Reporting API) or `application/csp-report` (legacy `report-uri`), both JSON under `http.max_json_body_bytes` and the JSON guard; the only operation with two request media types. | Ein Format je Zweck; NDJSON lässt große Exporte streamen. |
-| Größe | JSON-Körper bis `http.max_json_body_bytes`, Schachtelung bis `http.max_json_depth` ([02-architektur.md](02-architektur.md)), sonst `413 payload_too_large` bzw. `400 malformed_request`. `http.max_json_body_bytes` ist echt größer als `message.max_content_bytes`. | Schutz vor Speicherdruck ohne lange Nachrichten zu verhindern. |
+| Größe | JSON-Körper bis `http.max_json_body_bytes`, Schachtelung bis `http.max_json_depth` ([02-architektur.md](02-architektur.md)), sonst `413 payload_too_large` bzw. `400 malformed_request`. `http.max_json_body_bytes` ist echt größer als `message.max_content_bytes`. The two post operations of the incoming webhooks use `webhook_in.max_body_bytes` instead, and their `413` names that key (02 section 9.1). | Schutz vor Speicherdruck ohne lange Nachrichten zu verhindern. |
 | Caching | Authentifizierte JSON-Antworten tragen `Cache-Control: no-store`. Datei-Inhalte tragen `Cache-Control: private, immutable`, weil sich der Inhalt einer Datei-ID nie ändert. | Kein Inhalt in fremden Caches; der Client löscht bei `access.changed` selbst (04, 8.3). |
 | Korrelation | Jede Antwort trägt `Correlation-Id`: die Trace-ID der Anfrage als UUID geschrieben (Schema `CorrelationId`, keine UUIDv7). Derselbe Wert steht in Problemen, Ereignissen (`correlation_id`) und im Audit. Der Server erzeugt ihn; eine gesendete `Correlation-Id` ignoriert er, und ein eingehender `traceparent` wird nur als Span-Link übernommen, nicht als Eltern-Trace ([17-observability.md](17-observability.md), Abschnitt 3). | Ein fälschbarer Client-Wert würde Audit-Spuren verfälschen. |
 | Client-Kennung | `User-Agent: <app>/<version> (<plattform>)`. | Diagnose und `min_client_versions` in der Discovery. |
@@ -82,13 +82,20 @@ Readiness gehören nicht zur öffentlichen API; sie liegen auf dem internen List
 | Mensch in der Web-Konsole | wie oben; Ergebnis ist eine Cookie-Sitzung nach dem BFF-Muster, keine Tokens im Browser ([08-identitaet.md](08-identitaet.md), Abschnitt 7.5) | Cookie `__Host-console_session` and the CSRF header `X-Console-Request: 1` with the own `Origin` on every request except `GET`, `HEAD`, `OPTIONS` (security scheme `consoleSession`, parameter `ConsoleRequest`) | Cookie, als HMAC an der Sitzung | `auth.console_session_max_age`, Leerlauf `auth.console_session_idle_timeout` | Passkey, sonst erneute OIDC-Anmeldung bzw. Passwort mit TOTP |
 | Agent | API-Token, vom Owner erzeugt (`token.create`) | `Authorization: Bearer <token>`; bei Token mit `dpop_jkt` `Authorization: DPoP` plus `DPoP` | optional `dpop_jkt` | bis Widerruf oder `expires_at` | nie (R-AZ-03) |
 | App | API-Token mit Scopes (05, 2.6) | wie Agent | optional | wie Agent | nie |
-| Eingangs-Webhook | geheimer Token im Pfad | keine | keine | bis Widerruf | nie |
+| Eingangs-Webhook | secret token of `createIncomingWebhook`, verified by the token check of `apps`, not by the authenticator (02 section 9.1) | none with the token in the path (`postIncomingWebhook`); `Authorization: Bearer <token>` on `postIncomingWebhookWithBearer` | keine | bis Widerruf | nie |
 | Anonym | keine | keine | keine | | nie |
 
 Anonym erreichbar sind nur Operationen mit `security: []`: Discovery, JWKS, Webhook-Schlüssel,
 Logo, Problem-Typen, öffentliche Statusseite, Anmeldeabläufe, Eingangs-Webhooks und die
 Kopplung eines Rechners (`pairHost`, der Kopplungs-Code ist der Nachweis, 24 Abschnitt 3.2). Sie
 laufen trotzdem durch `authorize` mit dem Prinzipal `anonymous` (05, 2.1).
+`postIncomingWebhookWithBearer` has no security of its own and so carries the root security,
+because the route generator records only public or the root security; of the root schemes only
+`bearerAuth` applies there, with the token of the incoming webhook. Both post operations (action
+`webhook_in.post`) never reach the authenticator: they stay `anonymous` until the token check of
+`apps` replaces the actor with the app of the webhook, which then passes `authorize`; every failed
+check answers `404 not_found` like an unknown webhook ([11-erweiterungen.md](11-erweiterungen.md),
+section 8.4).
 
 ### 3.1 DPoP
 
@@ -387,6 +394,7 @@ alle Texte der YAML-Dateien (R-API-15); jede Antwort-Komponente nennt ihren Stat
 | `awaitRunInput` | POST | `/api/v1/runs/{run_id}/await-input` | Agenten-Laufzeit: monoton oder Compare-and-swap |
 | `finishRun` | POST | `/api/v1/runs/{run_id}/finish` | Agenten-Laufzeit: monoton oder Compare-and-swap |
 | `answerAutocomplete` | POST | `/api/v1/command-autocompletions/{request_id}/answer` | Agenten-Laufzeit: monoton oder Compare-and-swap |
+| `postIncomingWebhookWithBearer` | POST | `/api/v1/hooks/{webhook_id}` | Client-ID im Körper (Tabelle oben) |
 | `postIncomingWebhook` | POST | `/api/v1/hooks/{webhook_id}/{token}` | Client-ID im Körper (Tabelle oben) |
 | `createMessage` | POST | `/api/v1/threads/{thread_id}/messages` | Client-ID im Körper (Tabelle oben) |
 | `createInteraction` | POST | `/api/v1/components/{component_id}/interactions` | Client-ID im Körper (Tabelle oben) |
@@ -1040,6 +1048,7 @@ Erzeugt aus openapi.yaml.
 | GET | `/api/v1/channels/{channel_id}/incoming-webhooks` | `listIncomingWebhooks` | `webhook_in.read` | List incoming webhooks of a channel |
 | POST | `/api/v1/channels/{channel_id}/incoming-webhooks` | `createIncomingWebhook` | `webhook_in.create` | Create an incoming webhook |
 | DELETE | `/api/v1/incoming-webhooks/{webhook_id}` | `revokeIncomingWebhook` | `webhook_in.revoke` | Revoke an incoming webhook |
+| POST | `/api/v1/hooks/{webhook_id}` | `postIncomingWebhookWithBearer` | `webhook_in.post` | Post a message through an incoming webhook with the token in Authorization |
 | POST | `/api/v1/hooks/{webhook_id}/{token}` | `postIncomingWebhook` | `webhook_in.post` | Post a message through an incoming webhook |
 | GET | `/api/v1/agents/{agent_id}/webhooks` | `listAgentWebhookSubscriptions` | `webhook_out.read` | List webhook subscriptions of an agent |
 | POST | `/api/v1/agents/{agent_id}/webhooks` | `createAgentWebhookSubscription` | `webhook_out.manage` | Subscribe an agent to webhooks |

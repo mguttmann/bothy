@@ -26,6 +26,13 @@ SELECT id, channel_id, kind, parent_message_id, title, title_source, state, clos
     last_message_seq, unread_floor_seq, last_activity_at, message_count, created_by, created_at, moved_at, version
 FROM threads WHERE id = @id FOR SHARE;
 
+-- name: GetThreadByParentMessage :one
+-- The thread that started from a message of a main thread (03 threads: parent_message_id is unique;
+-- the replay of an incoming webhook post with a title in a text channel, M2-27).
+SELECT id, channel_id, kind, parent_message_id, title, title_source, state, closed_at, closed_by, operator_agent_id,
+    last_message_seq, unread_floor_seq, last_activity_at, message_count, created_by, created_at, moved_at, version
+FROM threads WHERE parent_message_id = @parent_message_id;
+
 -- name: InsertThread :one
 -- search_language goes in as text and is cast here, so pgx needs no codec for regconfig.
 INSERT INTO threads (id, channel_id, kind, parent_message_id, title, title_source, operator_agent_id, created_by, created_at,

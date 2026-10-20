@@ -20,7 +20,10 @@ import (
 )
 
 // Compile-time check: the incoming thread port.
-var _ chat.Threads = (*Service)(nil)
+var (
+	_ chat.Threads         = (*Service)(nil)
+	_ chat.ThreadsByParent = (*Service)(nil)
+)
 
 // threadResource describes the thread th for authorize: its channel as path hint and its creator
 // as owner (the "Ersteller" of thread.title.update).
@@ -173,6 +176,20 @@ func (s *Service) Info(ctx context.Context, threadID ids.ID) (chat.ThreadInfo, e
 		return chat.ThreadInfo{}, err
 	}
 	return info(th, c), nil
+}
+
+// ThreadByParentMessage implements chat.ThreadsByParent: the routing data of the thread that
+// started from messageID, without authorization; callers authorize first.
+func (s *Service) ThreadByParentMessage(ctx context.Context, messageID ids.ID) (chat.ThreadInfo, bool, error) {
+	th, found, err := s.d.Store.ThreadByParentMessage(ctx, messageID)
+	if err != nil || !found {
+		return chat.ThreadInfo{}, false, err
+	}
+	c, err := s.threadChannel(ctx, th)
+	if err != nil {
+		return chat.ThreadInfo{}, false, err
+	}
+	return info(th, c), true, nil
 }
 
 // InfoForShare implements chat.Threads: Info under FOR SHARE on the thread row (M1-61), without

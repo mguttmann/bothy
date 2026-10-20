@@ -1,0 +1,42 @@
+{
+  "version": "4",
+  "groupKey": "{}:{alertname=\"BackupMissing\"}",
+  "truncatedAlerts": 0,
+  "status": "firing",
+  "receiver": "bothy-ops",
+  "groupLabels": {
+    "alertname": "BackupMissing"
+  },
+  "commonLabels": {
+    "alertname": "BackupMissing"
+  },
+  "commonAnnotations": {},
+  "externalURL": "https://alertmanager.example.com",
+  "alerts": [
+    {
+      "status": "firing",
+      "labels": {
+        "alertname": "BackupMissing",
+        "severity": "warning",
+        "job": "backup",
+        "instance": "nas.example.com"
+      },
+      "annotations": {},
+      "startsAt": "2026-10-10T13:00:00Z",
+      "endsAt": "0001-01-01T00:00:00Z",
+      "generatorURL": "https://prometheus.example.com/graph?g0.expr=backup_age_seconds",
+      "fingerprint": "3a4b5c6d7e8f9001"
+    },
+    {
+      "status": "firing",
+      "labels": {
+        "alertname": "BackupMissing"
+      },
+      "annotations": {},
+      "startsAt": "2026-10-10T13:00:00Z",
+      "endsAt": "0001-01-01T00:00:00Z",
+      "generatorURL": "",
+      "fingerprint": "4b5c6d7e8f900112"
+    }
+  ]
+}

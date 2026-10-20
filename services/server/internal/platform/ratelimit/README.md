@@ -27,6 +27,9 @@ Status: built (M1-19). Normative are [05-aktionen.md](../../../../../docs/spec/0
 - `HeaderValues(class, decision)`: the values of `RateLimit-Policy` and `RateLimit`.
 - `Install(chain, limiter)`: `Middleware` as `httpserver.StageRateLimit`, plus the
   failed-credentials precheck of `StageAuthenticate`.
+- `Limiter.FailedCredentialGuard(r)` (M2-27): the failed-credentials rule for a credential check
+  outside `StageAuthenticate` (the token check of the incoming webhooks at
+  `httpserver.StageWebhookToken`); see "Failed credentials".
 
 The gateway uses the same API: M1-64 calls `Allow("rl.gateway_connect", DeviceOrTokenKey(actor))`
 at `identify` and `resume` once the credentials are verified, M1-66 calls
@@ -75,6 +78,17 @@ Because the token is reserved before the verification, concurrent requests of on
 all pass on the same token: at most `burst` verifications run per refill. The price: more than
 `burst` requests with credentials of one client IP in flight at the same instant get `429` even
 when their credentials are valid.
+
+The precheck of `StageAuthenticate` is built on `Limiter.FailedCredentialGuard(r)` (M2-27), which
+other credential checks call directly: it reserves one token of `rl.public_auth` of the client IP
+of `r` before the check. While the bucket is empty it returns `429 rate_limited` (with
+`Retry-After` and the `RateLimit-Policy` and `RateLimit` headers of `rl.public_auth`) and no settle
+function, and the caller must not check the credential. Otherwise the caller calls
+`settle(failed)` exactly once: `true` keeps the token (the credential failed), `false` gives it
+back. The token check of the incoming webhooks (`apps/adapters/httpapi.TokenStage`) uses it, so a
+wrong webhook token costs the same token of the client IP as a wrong API token; operations with
+`httpserver.Operation.AnonymousCredentials` skip the precheck of `StageAuthenticate`, so one
+request never pays twice.
 
 ## Memory
 

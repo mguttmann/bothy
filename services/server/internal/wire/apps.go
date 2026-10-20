@@ -65,6 +65,17 @@ type webhookKeys struct {
 	MasterRef string `config:"webhook.hmac_master_key_ref"`
 }
 
+// IncomingConfig binds the keys of the incoming webhooks (M2-27): message.max_content_bytes,
+// webhook_in.formats_enabled, identity.last_active_granularity and server.public_url. The error
+// names the key whose binding failed, never a value.
+func IncomingConfig(v *config.Values) (appsapp.IncomingConfig, error) {
+	var c appsapp.IncomingConfig
+	if err := config.Bind(v, &c); err != nil {
+		return appsapp.IncomingConfig{}, err
+	}
+	return c, nil
+}
+
 // WebhooksConfig binds the keys of the outgoing webhooks (M2-26): the values of the use cases and
 // webhook.hmac_master_key_ref. The error names the key whose binding failed, never a value.
 func WebhooksConfig(v *config.Values) (appsapp.WebhookConfig, string, error) {
@@ -127,7 +138,10 @@ type Apps struct {
 	WebhookHandlers *appshttp.Webhooks
 	// Scheduler inserts apps.webhook_deliver; BindJobs gives it the job runtime.
 	Scheduler *appsjobs.Scheduler
-	keys      *lateSigners
+	// Incoming implements apps.IncomingWebhooks (M2-27); IncomingHandlers are its REST handlers.
+	Incoming         *appsapp.IncomingService
+	IncomingHandlers *appshttp.Incoming
+	keys             *lateSigners
 }
 
 // lateSigners forwards to the signing keys once they are bound (Apps.BindKeys); before, every
@@ -198,6 +212,12 @@ type AppsDeps struct {
 	Clock clock.Clock
 	// Webhooks are the collaborators of the outgoing webhooks (M2-26).
 	Webhooks WebhookDeps
+	// Incoming is the configuration of the incoming webhooks (IncomingConfig, M2-27).
+	Incoming appsapp.IncomingConfig
+	// Chat gives the incoming webhooks the channel facts, the threads and the thread of a parent
+	// message; Messages writes their messages (M2-27).
+	Chat     *Chat
+	Messages *Messaging
 }
 
 // NewApps builds the module apps over pool: the repository, the use cases with the ports of
@@ -207,8 +227,9 @@ type AppsDeps struct {
 // scheduler (bound later with BindJobs), and the REST handlers. It opens no connection. Errors: a
 // missing collaborator or a value the use cases refuse.
 func NewApps(cfg appsapp.Config, pool *pg.Pool, d AppsDeps) (*Apps, error) {
-	if d.UoW == nil || d.Rights == nil || d.Authorizer == nil || d.Audit == nil || d.Identity == nil || d.Grants == nil {
-		return nil, errors.New("wire: NewApps needs the unit of work, the rights hook, the Authorizer, the recorder, identity and the authz Admin")
+	if d.UoW == nil || d.Rights == nil || d.Authorizer == nil || d.Audit == nil || d.Identity == nil || d.Grants == nil || d.Chat == nil ||
+		d.Messages == nil {
+		return nil, errors.New("wire: NewApps needs the unit of work, the rights hook, the Authorizer, the recorder, identity, the authz Admin, chat and messaging")
 	}
 	if d.Clock == nil {
 		d.Clock = clock.System()
@@ -224,17 +245,25 @@ func NewApps(cfg appsapp.Config, pool *pg.Pool, d AppsDeps) (*Apps, error) {
 	if err != nil {
 		return nil, err
 	}
+	in, err := appsapp.NewIncoming(d.Incoming, appsapp.IncomingDeps{
+		Store: repo, Repo: repo, UoW: d.UoW, Authorizer: d.Authorizer, Audit: d.Audit, Tokens: d.Identity.Tokens,
+		Channels: d.Chat.Service, Threads: d.Chat.Service, ByParent: d.Chat.Service, Messages: d.Messages.Service, Clock: d.Clock,
+		Logger: d.Webhooks.Logger,
+	})
+	if err != nil {
+		return nil, err
+	}
 	svc, err := appsapp.New(cfg, appsapp.Deps{
 		Repo: repo, UoW: d.UoW, Authorizer: d.Authorizer, Audit: d.Audit,
 		Principals: appsapp.IdentityPrincipals{Directory: d.Identity.Directory, Writes: d.Identity.PrincipalWrites},
 		Tokens:     d.Identity.Tokens, Grants: d.Grants, Rights: d.Rights, Scopes: authzapp.ScopeTable{}, Cursors: appshttp.Cursors{},
-		Webhooks: hooks, SpecVersion: routes.SpecVersion, Clock: d.Clock,
+		Webhooks: hooks, Incoming: in, SpecVersion: routes.SpecVersion, Clock: d.Clock,
 	})
 	if err != nil {
 		return nil, err
 	}
 	return &Apps{Service: svc, Handlers: appshttp.NewApps(svc), Webhooks: hooks, WebhookHandlers: appshttp.NewWebhooks(hooks),
-		Scheduler: sched, keys: keys}, nil
+		Scheduler: sched, Incoming: in, IncomingHandlers: appshttp.NewIncoming(in), keys: keys}, nil
 }
 
 // fillHandlers sets h.Apps to the handlers of ap when it is nil, so an injected handler stays; a
@@ -243,5 +272,6 @@ func (ap *Apps) fillHandlers(h *Handlers) {
 	if ap != nil {
 		fill(&h.Apps, ap.Handlers)
 		fill(&h.Webhooks, ap.WebhookHandlers)
+		fill(&h.Incoming, ap.IncomingHandlers)
 	}
 }

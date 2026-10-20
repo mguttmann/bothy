@@ -171,6 +171,27 @@ func (s *Tokens) HashHostPairingCode(_ context.Context, raw string) ([]byte, err
 	return apitoken.Hash(s.pepper, raw), nil
 }
 
+// NewIncomingWebhookToken implements identity.Tokens: a token of kind whi from the random source
+// of the use cases (crypto/rand unless a test sets one) and its HMAC with the pepper (M2-27).
+func (s *Tokens) NewIncomingWebhookToken(context.Context) (identity.IncomingWebhookToken, error) {
+	secret, err := apitoken.Generate(s.d.Random, apitoken.KindIncomingWebhook)
+	if err != nil {
+		return identity.IncomingWebhookToken{}, errs.Wrap(errs.CodeInternalError, err, "identity: random source")
+	}
+	return identity.IncomingWebhookToken{Secret: identity.NewToken(secret), Hash: apitoken.Hash(s.pepper, secret)}, nil
+}
+
+// HashIncomingWebhookToken implements identity.Tokens: apitoken.Parse checks form, checksum and
+// range, then the kind must be whi; only then is the HMAC computed (M2-27 design note 2 b). Every
+// other value is identity.ErrTokenMalformed.
+func (s *Tokens) HashIncomingWebhookToken(_ context.Context, raw string) ([]byte, error) {
+	p, err := apitoken.Parse(raw)
+	if err != nil || p.Kind != apitoken.KindIncomingWebhook {
+		return nil, identity.ErrTokenMalformed
+	}
+	return apitoken.Hash(s.pepper, raw), nil
+}
+
 // now is the time of the clock at the precision of PostgreSQL, so answers equal stored values.
 func (s *Tokens) now() time.Time { return s.d.Clock.Now().Truncate(time.Microsecond) }
 

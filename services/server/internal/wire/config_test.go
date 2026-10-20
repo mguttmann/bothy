@@ -316,6 +316,9 @@ func TestConfigSchemaBuilds(t *testing.T) {
 		"webhook.allowed_hosts":         {Kind: config.KindStringList, Default: "", Chapter: "03-datenmodell.md"},
 		"command.max_per_principal":     {Kind: config.KindInt, Default: "100", Min: "1", Chapter: "09-agenten.md"},
 		"command.description_max_chars": {Kind: config.KindInt, Default: "100", Min: "1", Chapter: "09-agenten.md"},
+		// M2-27
+		"webhook_in.max_body_bytes":  {Kind: config.KindInt, Default: "1048576", Min: "1", Chapter: "11-erweiterungen.md"},
+		"webhook_in.formats_enabled": {Kind: config.KindStringList, Default: `["native", "alertmanager"]`, Chapter: "11-erweiterungen.md"},
 
 		// M3-13
 		"search.languages":  {Kind: config.KindStringList, Default: `["german","english"]`, Chapter: "14-suche.md"},
@@ -1185,6 +1188,39 @@ func TestConfig_PresenceTimeoutAboveHeartbeatInterval(t *testing.T) {
 		if !strings.Contains(msg, "agent.presence_timeout") || !strings.Contains(msg, "sync.heartbeat_interval") ||
 			strings.Contains(msg, " "+c.timeout) {
 			t.Errorf("problem %q", msg)
+		}
+	}
+}
+
+// TestConfigCheck_FormatsEnabled (M2-27): every entry of webhook_in.formats_enabled is native or
+// alertmanager and appears once; an unknown value and a duplicate fail the start with the key in
+// the message and without the value; the default and an empty list pass.
+func TestConfigCheck_FormatsEnabled(t *testing.T) {
+	t.Parallel()
+	for _, c := range []struct {
+		env string
+		ok  bool
+	}{
+		{"", true},
+		{`BOTHY_WEBHOOK_IN__FORMATS_ENABLED=[]`, true},
+		{`BOTHY_WEBHOOK_IN__FORMATS_ENABLED=["alertmanager"]`, true},
+		{`BOTHY_WEBHOOK_IN__FORMATS_ENABLED=["native", "slackish"]`, false},
+		{`BOTHY_WEBHOOK_IN__FORMATS_ENABLED=["native", "native"]`, false},
+	} {
+		var env []string
+		if c.env != "" {
+			env = append(env, c.env)
+		}
+		got := load(t, env...)
+		if (len(got) == 0) != c.ok {
+			t.Errorf("%s: problems %v, want ok %v", c.env, got, c.ok)
+			continue
+		}
+		for _, p := range got {
+			msg := p.Key + " " + p.Message
+			if !strings.Contains(msg, "webhook_in.formats_enabled") || strings.Contains(msg, "slackish") {
+				t.Errorf("%s: problem %q does not name the key or names the value", c.env, msg)
+			}
 		}
 	}
 }

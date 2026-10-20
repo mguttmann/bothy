@@ -156,6 +156,61 @@ func (q *Queries) GetThread(ctx context.Context, id pgtype.UUID) (GetThreadRow, 
 	return i, err
 }
 
+const getThreadByParentMessage = `-- name: GetThreadByParentMessage :one
+SELECT id, channel_id, kind, parent_message_id, title, title_source, state, closed_at, closed_by, operator_agent_id,
+    last_message_seq, unread_floor_seq, last_activity_at, message_count, created_by, created_at, moved_at, version
+FROM threads WHERE parent_message_id = $1
+`
+
+type GetThreadByParentMessageRow struct {
+	ID              pgtype.UUID
+	ChannelID       pgtype.UUID
+	Kind            string
+	ParentMessageID pgtype.UUID
+	Title           string
+	TitleSource     string
+	State           string
+	ClosedAt        pgtype.Timestamptz
+	ClosedBy        pgtype.UUID
+	OperatorAgentID pgtype.UUID
+	LastMessageSeq  int64
+	UnreadFloorSeq  int64
+	LastActivityAt  pgtype.Timestamptz
+	MessageCount    int32
+	CreatedBy       pgtype.UUID
+	CreatedAt       pgtype.Timestamptz
+	MovedAt         pgtype.Timestamptz
+	Version         int64
+}
+
+// The thread that started from a message of a main thread (03 threads: parent_message_id is unique;
+// the replay of an incoming webhook post with a title in a text channel, M2-27).
+func (q *Queries) GetThreadByParentMessage(ctx context.Context, parentMessageID pgtype.UUID) (GetThreadByParentMessageRow, error) {
+	row := q.db.QueryRow(ctx, getThreadByParentMessage, parentMessageID)
+	var i GetThreadByParentMessageRow
+	err := row.Scan(
+		&i.ID,
+		&i.ChannelID,
+		&i.Kind,
+		&i.ParentMessageID,
+		&i.Title,
+		&i.TitleSource,
+		&i.State,
+		&i.ClosedAt,
+		&i.ClosedBy,
+		&i.OperatorAgentID,
+		&i.LastMessageSeq,
+		&i.UnreadFloorSeq,
+		&i.LastActivityAt,
+		&i.MessageCount,
+		&i.CreatedBy,
+		&i.CreatedAt,
+		&i.MovedAt,
+		&i.Version,
+	)
+	return i, err
+}
+
 const insertThread = `-- name: InsertThread :one
 INSERT INTO threads (id, channel_id, kind, parent_message_id, title, title_source, operator_agent_id, created_by, created_at,
     last_activity_at, search_language)

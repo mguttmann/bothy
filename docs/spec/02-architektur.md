@@ -190,7 +190,7 @@ tieferer Module, die das Modul implementiert.
 | `authz` | `Admin` (Gruppen, Freigaben, Abgleich der Claim-Gruppen, Erklärung, Vorschau, Ansicht als Person, Widerruf aller Freigaben eines Subjekts in der Rechte-Änderung des Aufrufers), `AppScopes` (Scope-Tabelle für die Ereignis-Abos einer App); deklariert `PrincipalSource`, `CredentialSource`, `StructureSource`, `AgentPolicySource`, `HostSource` | kernel `authorize.AccessChanged` (mit der auslösenden Aktion; `runs` bricht bei `user.disable` mit Grund `user_disabled` ab, sonst mit `access_revoked`) | | kernel `authorize.Authorizer`, `instance.FlagGroupSource` |
 | `billing` | `Costs` (Buchen, Korrektur, Summen), `Prices` | | | |
 | `identity` | `Auth` (Anmeldung, Refresh, Logout, Kind-Sitzungen, Step-up), `Directory`, `Devices`, `Tokens`, `Owners`, `PrincipalWrites` (Prinzipale von Agenten und Apps); deklariert `AvatarFiles`, `AppInstallations` (aktive Installation einer App) | `DeviceRevoked`, `SessionEnded` | | kernel `actor.Authenticator`, `authz.PrincipalSource`, `authz.CredentialSource` (Sitzung, Gerät, Token für die Prüfung `check_active`, 07 Abschnitt 4.2), `instance.LoginOptionsSource`, `instance.FlagUserSource`, kernel `personaldata.Participant` |
-| `chat` | `Structure` (Bereiche, Kanäle, Schreibschutz), `Threads` (Anlegen für `messaging`, `AppendToThread`, Nachrichtenzahl bei Löschung, Schließen, Öffnen, Verschieben, Info), `AgentConfig` | `ThreadMoved`, `ChannelArchived`, `ChannelReadOnlySet`, `SpaceArchived` | | `authz.StructureSource`, kernel `personaldata.Participant` |
+| `chat` | `Structure` (Bereiche, Kanäle, Schreibschutz), `Threads` (Anlegen für `messaging`, `AppendToThread`, Nachrichtenzahl bei Löschung, Schließen, Öffnen, Verschieben, Info), `ThreadsByParent` (the thread that started from a message, for the replay of an incoming webhook post in `apps`), `AgentConfig` | `ThreadMoved`, `ChannelArchived`, `ChannelReadOnlySet`, `SpaceArchived` | | `authz.StructureSource`, kernel `personaldata.Participant` |
 | `agents` | `Agents` (Verwaltung, Richtlinie, Werkzeugklasse), `Presence`, `Consumers` (Cursor, Bestätigung, Übernahme mit Fencing), `Commands` (Register), `Sessions`, `DevEnvironments` (Etappe); declares `ConsumerFeed` (the stream of the REST consumer operations, M2-07) | `AgentDisabled` | | `authz.AgentPolicySource` (Richtlinie, Werkzeugklasse, Bereitschaft der Dev-Umgebung), kernel `personaldata.Participant` |
 | `files` | `Uploads` (Sitzungen, Teile), `Files` (Lesen, Öffnen, Vorschau, Abruf-Tickets, Löschen), `Attachments`, `Transcripts`, `TextExtracts`; deklariert `AttachmentLocator` | `FileFinalized` (Scan und gegebenenfalls Transkript endgültig) | | `identity.AvatarFiles`, `instance.LogoFiles` (both in `adapters/profileimages`), kernel `personaldata.Participant` |
 | `messaging` | `Messages` (Anlegen, Thread mit erster Nachricht anlegen, Bearbeiten, Löschen, Verlauf, `SetTriggerState`, Anker), `Reactions`, `Pins`, `Templates`, `Mentions` (Liste, ungelesene je Thread), `Export`; deklariert `ComponentReader` | `MessagePosted`, `MessageDeleted` | `chat.ThreadMoved` | `files.AttachmentLocator`, kernel `personaldata.Participant` |
@@ -790,10 +790,11 @@ Je Route, um den Handler jeder Operation gelegt (Muster und Operation sind bekan
 
 | Schritt | Ort | Aufgabe |
 |---|---|---|
-| 5 | `platform/httpserver` | Operation mit Aktion und Rate-Limit-Klasse aus `api/routes` in den Kontext; Grenzen je Routenklasse: `http.max_json_body_bytes` bzw. `file.max_upload_bytes`, Frist `http.request_timeout` bzw. `http.transfer_timeout`; Antwort-Schreiber mit Nachweis-Prüfung (9.3) |
+| 5 | `platform/httpserver` | Operation mit Aktion und Rate-Limit-Klasse aus `api/routes` in den Kontext; Grenzen je Routenklasse: `http.max_json_body_bytes` bzw. `file.max_upload_bytes`, Frist `http.request_timeout` bzw. `http.transfer_timeout`; Antwort-Schreiber mit Nachweis-Prüfung (9.3). The two operations with action `webhook_in.post` have the body limit `webhook_in.max_body_bytes` (`Operation.BodyLimit`); a declared `Content-Length` above it is refused at step 11 instead of here, so the token check of step 8a answers first (11 section 8.4: token before size) |
 | 6 | `platform/httpserver` | CORS (SEC-CORS-1, SEC-CORS-2) |
-| 7 | `kernel/actor` (von `identity`) | Zugriffstoken mit DPoP oder API-Token prüfen, Sitzung, Gerät, Prinzipal-Status; ohne Anmeldedaten: Prinzipal `anonymous` |
+| 7 | `kernel/actor` (von `identity`) | Zugriffstoken mit DPoP oder API-Token prüfen, Sitzung, Gerät, Prinzipal-Status; ohne Anmeldedaten: Prinzipal `anonymous`. Operations with action `webhook_in.post` (`Operation.AnonymousCredentials`) skip the credentials precheck and the authenticator and stay `anonymous`, whatever `Authorization` holds |
 | 8 | `platform/ratelimit` | Token-Bucket der Klasse, `429` mit `Retry-After` |
+| 8a | `apps/adapters/httpapi` (`TokenStage` at `httpserver.StageWebhookToken`, installed by `internal/wire`) | Only for action `webhook_in.post`: `apps` checks the token of the incoming webhook (11 section 8.4), from the path value `token` (`postIncomingWebhook`) or from `Authorization: Bearer` (`postIncomingWebhookWithBearer`). A failed check answers `404 not_found` and keeps one token of `rl.public_auth` of the client IP (`ratelimit.Limiter.FailedCredentialGuard`); while that bucket is empty the answer is `429` without a check. Success replaces the anonymous actor with the webhook actor |
 | 9 | `platform/httpserver` | Wartungsmodus (05, Regel 9) |
 | 10 | `platform/httpserver` | `Idempotency-Key` (8.4) |
 | 11 | `platform/httpserver` | Medientyp; JSON-Wächter: doppelte Schlüssel, ungültiges UTF-8, Schachtelung über `http.max_json_depth` (SEC-IN-2) |
@@ -813,6 +814,12 @@ sind), verbraucht die Anfrage ein Token aus `rl.public_auth` der Client-IP. Ist 
 antwortet Schritt 7 für Anfragen mit Anmeldedaten von dieser Client-IP mit `429`, ohne die
 Anmeldedaten zu prüfen (05, Abschnitt 3). Grund: Jede Prüfung kostet eine Signaturprüfung, und ohne
 diese Regel wäre sie unbegrenzt.
+
+The internal listener (3.2) serves only the two operations with action `webhook_in.post`, through
+a chain of its own with the same per-route steps: it has no trusted proxies, so the client IP of
+step 3 is the peer address and forwarded headers are never read
+([19-sicherheit.md](19-sicherheit.md), R-SE-09), and it has its own rate limiter, so
+`rl.webhook_in` and `rl.public_auth` count per listener.
 
 ### 9.2 404 statt 403
 

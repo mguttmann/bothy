@@ -24,10 +24,13 @@ geht an `external-oncall` und `bothy-ops`, `ticket` an `bothy-ops`, `Watchdog` a
 
 1. Der Owner legt einen Kanal "Betrieb" an (nur Owner und Vertretung mit `read`) und dort einen
    Eingangs-Webhook ([05-aktionen.md](../spec/05-aktionen.md) `webhook_in.create`).
-2. Alertmanager sendet sein eigenes JSON-Format. Der Eingangs-Webhook braucht dafür ein Format
-   `alertmanager`, das daraus eine Nachricht macht (Alarmname, Stufe, Zusammenfassung,
-   Runbook-Link, Zustand firing oder resolved). Das ist eine Anforderung an Kapitel 06 und 11
-   (Bericht, Ticket).
+2. Alertmanager sends its own unchanged JSON payload. The server recognises the format per
+   request from the body (format `alertmanager`, [webhooks.md](../api/webhooks.md) section 8),
+   so the URL that `createIncomingWebhook` returns serves both `native` and `alertmanager`; no
+   format is chosen when the webhook is created. Each notification becomes one message with
+   alert name, severity, summary, runbook link and the state firing or resolved. Alertmanager in
+   the stack uses the same path `/api/v1/hooks/{webhook_id}/{token}` on
+   `server.internal_listen_addr` (point 3).
 3. Die URL des Webhooks ist ein Geheimnis und liegt in
    `secrets/alertmanager/alertmanager_bothy_webhook_url`. Alertmanager erreicht den Server über den
    internen Listener (`http://api:8081`).

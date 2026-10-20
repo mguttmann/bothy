@@ -65,6 +65,7 @@ var configChecks = []configCheck{
 	{name: "backup_schedules", keys: backupScheduleKeys, fn: backupSchedules},
 	{name: "backup_offsite_target", keys: []string{keyBackupOffsiteTarget}, fn: backupOffsiteTarget},
 	{name: "presence_timeout_above_heartbeat_interval", keys: []string{keyPresenceTimeout, keyHeartbeatInterval}, fn: presenceTimeoutAboveHeartbeatInterval},
+	{name: "webhook_in_formats", keys: []string{keyWebhookInFormatsEnabled}, fn: webhookInFormats},
 }
 
 // keyHeartbeatInterval is sync.heartbeat_interval, the interval the gateway announces in hello and
@@ -77,6 +78,20 @@ const keyHeartbeatInterval = "sync.heartbeat_interval"
 func presenceTimeoutAboveHeartbeatInterval(v *config.Values) error {
 	if v.Duration(keyPresenceTimeout) <= v.Duration(keyHeartbeatInterval) {
 		return errors.New(keyPresenceTimeout + " must be greater than " + keyHeartbeatInterval)
+	}
+	return nil
+}
+
+// webhookInFormats requires every entry of webhook_in.formats_enabled to be native or
+// alertmanager and to appear once (M2-27); an empty list switches every format off. The error
+// names the key, never a value.
+func webhookInFormats(v *config.Values) error {
+	seen := map[string]bool{}
+	for _, f := range v.Strings(keyWebhookInFormatsEnabled) {
+		if f != "native" && f != "alertmanager" || seen[f] {
+			return errors.New(keyWebhookInFormatsEnabled + " must list native and alertmanager at most once each")
+		}
+		seen[f] = true
 	}
 	return nil
 }

@@ -192,6 +192,12 @@ type ServerInterface interface {
 	// ExportChannel Export the history of a channel
 	// (GET /channels/{channel_id}/export)
 	ExportChannel(w http.ResponseWriter, r *http.Request, channelId ChannelIdPath, params ExportChannelParams)
+	// ListIncomingWebhooks List incoming webhooks of a channel
+	// (GET /channels/{channel_id}/incoming-webhooks)
+	ListIncomingWebhooks(w http.ResponseWriter, r *http.Request, channelId ChannelIdPath)
+	// CreateIncomingWebhook Create an incoming webhook
+	// (POST /channels/{channel_id}/incoming-webhooks)
+	CreateIncomingWebhook(w http.ResponseWriter, r *http.Request, channelId ChannelIdPath, params CreateIncomingWebhookParams)
 	// MoveChannel Change the position of a channel in its space
 	// (POST /channels/{channel_id}/move)
 	MoveChannel(w http.ResponseWriter, r *http.Request, channelId ChannelIdPath, params MoveChannelParams)
@@ -318,6 +324,12 @@ type ServerInterface interface {
 	// RemoveGroupMember Remove a member
 	// (DELETE /groups/{group_id}/members/{user_id})
 	RemoveGroupMember(w http.ResponseWriter, r *http.Request, groupId GroupIdPath, userId UserIdPath)
+	// PostIncomingWebhookWithBearer Post a message through an incoming webhook with the token in Authorization
+	// (POST /hooks/{webhook_id})
+	PostIncomingWebhookWithBearer(w http.ResponseWriter, r *http.Request, webhookId WebhookIdPath)
+	// PostIncomingWebhook Post a message through an incoming webhook
+	// (POST /hooks/{webhook_id}/{token})
+	PostIncomingWebhook(w http.ResponseWriter, r *http.Request, webhookId WebhookIdPath, token TokenPath)
 	// ListHosts List hosts
 	// (GET /hosts)
 	ListHosts(w http.ResponseWriter, r *http.Request, params ListHostsParams)
@@ -363,6 +375,9 @@ type ServerInterface interface {
 	// UpdateIdentityProvider Change an identity provider
 	// (PATCH /identity-providers/{provider_id})
 	UpdateIdentityProvider(w http.ResponseWriter, r *http.Request, providerId ProviderIdPath, params UpdateIdentityProviderParams)
+	// RevokeIncomingWebhook Revoke an incoming webhook
+	// (DELETE /incoming-webhooks/{webhook_id})
+	RevokeIncomingWebhook(w http.ResponseWriter, r *http.Request, webhookId WebhookIdPath)
 	// GetInstance Instance settings for clients
 	// (GET /instance)
 	GetInstance(w http.ResponseWriter, r *http.Request)
@@ -3042,6 +3057,82 @@ func (siw *ServerInterfaceWrapper) ExportChannel(w http.ResponseWriter, r *http.
 	handler.ServeHTTP(w, r)
 }
 
+// ListIncomingWebhooks operation middleware
+func (siw *ServerInterfaceWrapper) ListIncomingWebhooks(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "channel_id" -------------
+	var channelId ChannelIdPath
+
+	err = runtime.BindStyledParameterWithOptions("simple", "channel_id", r.PathValue("channel_id"), &channelId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "uuid", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "channel_id", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.ListIncomingWebhooks(w, r, channelId)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// CreateIncomingWebhook operation middleware
+func (siw *ServerInterfaceWrapper) CreateIncomingWebhook(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "channel_id" -------------
+	var channelId ChannelIdPath
+
+	err = runtime.BindStyledParameterWithOptions("simple", "channel_id", r.PathValue("channel_id"), &channelId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "uuid", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "channel_id", Err: err})
+		return
+	}
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params CreateIncomingWebhookParams
+
+	headers := r.Header
+
+	// ------------- Optional header parameter "Idempotency-Key" -------------
+	if valueList, found := headers[http.CanonicalHeaderKey("Idempotency-Key")]; found {
+		var IdempotencyKey IdempotencyKey
+		n := len(valueList)
+		if n != 1 {
+			siw.ErrorHandlerFunc(w, r, &TooManyValuesForParamError{ParamName: "Idempotency-Key", Count: n})
+			return
+		}
+
+		err = runtime.BindStyledParameterWithOptions("simple", "Idempotency-Key", valueList[0], &IdempotencyKey, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: "uuid"})
+		if err != nil {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "Idempotency-Key", Err: err})
+			return
+		}
+
+		params.IdempotencyKey = &IdempotencyKey
+
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.CreateIncomingWebhook(w, r, channelId, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
 // MoveChannel operation middleware
 func (siw *ServerInterfaceWrapper) MoveChannel(w http.ResponseWriter, r *http.Request) {
 
@@ -4888,6 +4979,67 @@ func (siw *ServerInterfaceWrapper) RemoveGroupMember(w http.ResponseWriter, r *h
 	handler.ServeHTTP(w, r)
 }
 
+// PostIncomingWebhookWithBearer operation middleware
+func (siw *ServerInterfaceWrapper) PostIncomingWebhookWithBearer(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "webhook_id" -------------
+	var webhookId WebhookIdPath
+
+	err = runtime.BindStyledParameterWithOptions("simple", "webhook_id", r.PathValue("webhook_id"), &webhookId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "uuid", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "webhook_id", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.PostIncomingWebhookWithBearer(w, r, webhookId)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// PostIncomingWebhook operation middleware
+func (siw *ServerInterfaceWrapper) PostIncomingWebhook(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "webhook_id" -------------
+	var webhookId WebhookIdPath
+
+	err = runtime.BindStyledParameterWithOptions("simple", "webhook_id", r.PathValue("webhook_id"), &webhookId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "uuid", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "webhook_id", Err: err})
+		return
+	}
+
+	// ------------- Path parameter "token" -------------
+	var token TokenPath
+
+	err = runtime.BindStyledParameterWithOptions("simple", "token", r.PathValue("token"), &token, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "token", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.PostIncomingWebhook(w, r, webhookId, token)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
 // ListHosts operation middleware
 func (siw *ServerInterfaceWrapper) ListHosts(w http.ResponseWriter, r *http.Request) {
 
@@ -5512,6 +5664,32 @@ func (siw *ServerInterfaceWrapper) UpdateIdentityProvider(w http.ResponseWriter,
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		siw.Handler.UpdateIdentityProvider(w, r, providerId, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// RevokeIncomingWebhook operation middleware
+func (siw *ServerInterfaceWrapper) RevokeIncomingWebhook(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "webhook_id" -------------
+	var webhookId WebhookIdPath
+
+	err = runtime.BindStyledParameterWithOptions("simple", "webhook_id", r.PathValue("webhook_id"), &webhookId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "uuid", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "webhook_id", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.RevokeIncomingWebhook(w, r, webhookId)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -9829,6 +10007,11 @@ func HandlerWithOptions(si ServerInterface, options StdHTTPServerOptions) http.H
 	m.HandleFunc(http.MethodDelete+" "+options.BaseURL+"/templates/{template_id}", wrapper.DeleteTemplate)
 	m.HandleFunc(http.MethodPatch+" "+options.BaseURL+"/templates/{template_id}", wrapper.UpdateTemplate)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/channels/{channel_id}/export", wrapper.ExportChannel)
+	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/channels/{channel_id}/incoming-webhooks", wrapper.ListIncomingWebhooks)
+	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/channels/{channel_id}/incoming-webhooks", wrapper.CreateIncomingWebhook)
+	m.HandleFunc(http.MethodDelete+" "+options.BaseURL+"/incoming-webhooks/{webhook_id}", wrapper.RevokeIncomingWebhook)
+	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/hooks/{webhook_id}", wrapper.PostIncomingWebhookWithBearer)
+	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/hooks/{webhook_id}/{token}", wrapper.PostIncomingWebhook)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/channels/{channel_id}/threads", wrapper.ListChannelThreads)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/channels/{channel_id}/threads", wrapper.CreateThread)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/threads/{thread_id}", wrapper.GetThread)
@@ -10284,6 +10467,12 @@ type StrictServerInterface interface {
 	// ExportChannel Export the history of a channel
 	// (GET /channels/{channel_id}/export)
 	ExportChannel(ctx context.Context, request ExportChannelRequestObject) (ExportChannelResponseObject, error)
+	// ListIncomingWebhooks List incoming webhooks of a channel
+	// (GET /channels/{channel_id}/incoming-webhooks)
+	ListIncomingWebhooks(ctx context.Context, request ListIncomingWebhooksRequestObject) (ListIncomingWebhooksResponseObject, error)
+	// CreateIncomingWebhook Create an incoming webhook
+	// (POST /channels/{channel_id}/incoming-webhooks)
+	CreateIncomingWebhook(ctx context.Context, request CreateIncomingWebhookRequestObject) (CreateIncomingWebhookResponseObject, error)
 	// MoveChannel Change the position of a channel in its space
 	// (POST /channels/{channel_id}/move)
 	MoveChannel(ctx context.Context, request MoveChannelRequestObject) (MoveChannelResponseObject, error)
@@ -10410,6 +10599,12 @@ type StrictServerInterface interface {
 	// RemoveGroupMember Remove a member
 	// (DELETE /groups/{group_id}/members/{user_id})
 	RemoveGroupMember(ctx context.Context, request RemoveGroupMemberRequestObject) (RemoveGroupMemberResponseObject, error)
+	// PostIncomingWebhookWithBearer Post a message through an incoming webhook with the token in Authorization
+	// (POST /hooks/{webhook_id})
+	PostIncomingWebhookWithBearer(ctx context.Context, request PostIncomingWebhookWithBearerRequestObject) (PostIncomingWebhookWithBearerResponseObject, error)
+	// PostIncomingWebhook Post a message through an incoming webhook
+	// (POST /hooks/{webhook_id}/{token})
+	PostIncomingWebhook(ctx context.Context, request PostIncomingWebhookRequestObject) (PostIncomingWebhookResponseObject, error)
 	// ListHosts List hosts
 	// (GET /hosts)
 	ListHosts(ctx context.Context, request ListHostsRequestObject) (ListHostsResponseObject, error)
@@ -10455,6 +10650,9 @@ type StrictServerInterface interface {
 	// UpdateIdentityProvider Change an identity provider
 	// (PATCH /identity-providers/{provider_id})
 	UpdateIdentityProvider(ctx context.Context, request UpdateIdentityProviderRequestObject) (UpdateIdentityProviderResponseObject, error)
+	// RevokeIncomingWebhook Revoke an incoming webhook
+	// (DELETE /incoming-webhooks/{webhook_id})
+	RevokeIncomingWebhook(ctx context.Context, request RevokeIncomingWebhookRequestObject) (RevokeIncomingWebhookResponseObject, error)
 	// GetInstance Instance settings for clients
 	// (GET /instance)
 	GetInstance(ctx context.Context, request GetInstanceRequestObject) (GetInstanceResponseObject, error)
@@ -12607,6 +12805,66 @@ func (sh *strictHandler) ExportChannel(w http.ResponseWriter, r *http.Request, c
 	}
 }
 
+// ListIncomingWebhooks operation middleware
+func (sh *strictHandler) ListIncomingWebhooks(w http.ResponseWriter, r *http.Request, channelId ChannelIdPath) {
+	var request ListIncomingWebhooksRequestObject
+
+	request.ChannelId = channelId
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.ListIncomingWebhooks(ctx, request.(ListIncomingWebhooksRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "ListIncomingWebhooks")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(ListIncomingWebhooksResponseObject); ok {
+		if err := validResponse.VisitListIncomingWebhooksResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// CreateIncomingWebhook operation middleware
+func (sh *strictHandler) CreateIncomingWebhook(w http.ResponseWriter, r *http.Request, channelId ChannelIdPath, params CreateIncomingWebhookParams) {
+	var request CreateIncomingWebhookRequestObject
+
+	request.ChannelId = channelId
+	request.Params = params
+
+	var body CreateIncomingWebhookJSONRequestBody
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
+		return
+	}
+	request.Body = &body
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.CreateIncomingWebhook(ctx, request.(CreateIncomingWebhookRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "CreateIncomingWebhook")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(CreateIncomingWebhookResponseObject); ok {
+		if err := validResponse.VisitCreateIncomingWebhookResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
 // MoveChannel operation middleware
 func (sh *strictHandler) MoveChannel(w http.ResponseWriter, r *http.Request, channelId ChannelIdPath, params MoveChannelParams) {
 	var request MoveChannelRequestObject
@@ -13867,6 +14125,73 @@ func (sh *strictHandler) RemoveGroupMember(w http.ResponseWriter, r *http.Reques
 	}
 }
 
+// PostIncomingWebhookWithBearer operation middleware
+func (sh *strictHandler) PostIncomingWebhookWithBearer(w http.ResponseWriter, r *http.Request, webhookId WebhookIdPath) {
+	var request PostIncomingWebhookWithBearerRequestObject
+
+	request.WebhookId = webhookId
+
+	var body PostIncomingWebhookWithBearerJSONRequestBody
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
+		return
+	}
+	request.Body = &body
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.PostIncomingWebhookWithBearer(ctx, request.(PostIncomingWebhookWithBearerRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "PostIncomingWebhookWithBearer")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(PostIncomingWebhookWithBearerResponseObject); ok {
+		if err := validResponse.VisitPostIncomingWebhookWithBearerResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// PostIncomingWebhook operation middleware
+func (sh *strictHandler) PostIncomingWebhook(w http.ResponseWriter, r *http.Request, webhookId WebhookIdPath, token TokenPath) {
+	var request PostIncomingWebhookRequestObject
+
+	request.WebhookId = webhookId
+	request.Token = token
+
+	var body PostIncomingWebhookJSONRequestBody
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
+		return
+	}
+	request.Body = &body
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.PostIncomingWebhook(ctx, request.(PostIncomingWebhookRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "PostIncomingWebhook")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(PostIncomingWebhookResponseObject); ok {
+		if err := validResponse.VisitPostIncomingWebhookResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
 // ListHosts operation middleware
 func (sh *strictHandler) ListHosts(w http.ResponseWriter, r *http.Request, params ListHostsParams) {
 	var request ListHostsRequestObject
@@ -14322,6 +14647,32 @@ func (sh *strictHandler) UpdateIdentityProvider(w http.ResponseWriter, r *http.R
 		sh.options.ResponseErrorHandlerFunc(w, r, err)
 	} else if validResponse, ok := response.(UpdateIdentityProviderResponseObject); ok {
 		if err := validResponse.VisitUpdateIdentityProviderResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// RevokeIncomingWebhook operation middleware
+func (sh *strictHandler) RevokeIncomingWebhook(w http.ResponseWriter, r *http.Request, webhookId WebhookIdPath) {
+	var request RevokeIncomingWebhookRequestObject
+
+	request.WebhookId = webhookId
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.RevokeIncomingWebhook(ctx, request.(RevokeIncomingWebhookRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "RevokeIncomingWebhook")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(RevokeIncomingWebhookResponseObject); ok {
+		if err := validResponse.VisitRevokeIncomingWebhookResponse(w); err != nil {
 			sh.options.ResponseErrorHandlerFunc(w, r, err)
 		}
 	} else if response != nil {

@@ -117,6 +117,19 @@ type Operation struct {
 	// registration check counts the route with its action and class (AZ-P1), and a test in
 	// internal/wire holds that no other route sets the marker.
 	AuthorizedInBand bool
+	// BodyLimit, when above zero, replaces http.max_json_body_bytes as the body limit of this
+	// operation, and BodyLimitKey is the configuration key a 413 payload_too_large names in its
+	// detail (the incoming webhooks use webhook_in.max_body_bytes, M2-27). For such an operation the
+	// check of a declared Content-Length runs at the start of StageBody instead of StageRoute, so
+	// the stages before StageBody (rate limit, webhook token) answer first (11 8.4: token before
+	// size); the body is still never read beyond the limit.
+	BodyLimit    int64
+	BodyLimitKey string
+	// AnonymousCredentials marks an operation whose credential is not an identity credential (the
+	// incoming webhook token, M2-27 design note 2): StageAuthenticate neither runs the credentials
+	// precheck nor calls the Authenticator and the actor stays anonymous, whatever Authorization
+	// holds; a later stage checks the credential itself.
+	AnonymousCredentials bool
 }
 
 // transfer reports whether the route class of op is that of transfers (uploads and downloads):

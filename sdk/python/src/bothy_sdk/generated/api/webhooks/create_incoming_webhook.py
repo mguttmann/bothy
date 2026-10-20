@@ -103,7 +103,15 @@ def sync_detailed(
     Args:
         channel_id (UUID): UUIDv7 (RFC 9562), lowercase canonical form.
         idempotency_key (UUID | Unset): UUIDv7 (RFC 9562), lowercase canonical form.
-        body (IncomingWebhookCreate):
+        body (IncomingWebhookCreate): Body of `createIncomingWebhook`. `app_id` names an app
+            principal whose installation is
+            `active` (else `400 validation_failed` with `errors[].code` `app_not_installed`) and that
+            may
+            write in the channel (else `app_cannot_write`); `thread_id`, when present, is a thread of
+            this
+            channel (else `not_in_channel`, an unknown ID too). `name` is not empty and has no control
+            or
+            bidi characters.
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
@@ -138,7 +146,15 @@ def sync(
     Args:
         channel_id (UUID): UUIDv7 (RFC 9562), lowercase canonical form.
         idempotency_key (UUID | Unset): UUIDv7 (RFC 9562), lowercase canonical form.
-        body (IncomingWebhookCreate):
+        body (IncomingWebhookCreate): Body of `createIncomingWebhook`. `app_id` names an app
+            principal whose installation is
+            `active` (else `400 validation_failed` with `errors[].code` `app_not_installed`) and that
+            may
+            write in the channel (else `app_cannot_write`); `thread_id`, when present, is a thread of
+            this
+            channel (else `not_in_channel`, an unknown ID too). `name` is not empty and has no control
+            or
+            bidi characters.
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
@@ -168,7 +184,15 @@ async def asyncio_detailed(
     Args:
         channel_id (UUID): UUIDv7 (RFC 9562), lowercase canonical form.
         idempotency_key (UUID | Unset): UUIDv7 (RFC 9562), lowercase canonical form.
-        body (IncomingWebhookCreate):
+        body (IncomingWebhookCreate): Body of `createIncomingWebhook`. `app_id` names an app
+            principal whose installation is
+            `active` (else `400 validation_failed` with `errors[].code` `app_not_installed`) and that
+            may
+            write in the channel (else `app_cannot_write`); `thread_id`, when present, is a thread of
+            this
+            channel (else `not_in_channel`, an unknown ID too). `name` is not empty and has no control
+            or
+            bidi characters.
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
@@ -201,7 +225,15 @@ async def asyncio(
     Args:
         channel_id (UUID): UUIDv7 (RFC 9562), lowercase canonical form.
         idempotency_key (UUID | Unset): UUIDv7 (RFC 9562), lowercase canonical form.
-        body (IncomingWebhookCreate):
+        body (IncomingWebhookCreate): Body of `createIncomingWebhook`. `app_id` names an app
+            principal whose installation is
+            `active` (else `400 validation_failed` with `errors[].code` `app_not_installed`) and that
+            may
+            write in the channel (else `app_cannot_write`); `thread_id`, when present, is a thread of
+            this
+            channel (else `not_in_channel`, an unknown ID too). `name` is not empty and has no control
+            or
+            bidi characters.
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.

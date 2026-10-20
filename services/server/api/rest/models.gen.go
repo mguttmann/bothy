@@ -485,6 +485,24 @@ func (e AgentUpdatedEventType) Valid() bool {
 	}
 }
 
+// Defines values for AlertmanagerAlertStatus.
+const (
+	AlertmanagerAlertStatusFiring   AlertmanagerAlertStatus = "firing"
+	AlertmanagerAlertStatusResolved AlertmanagerAlertStatus = "resolved"
+)
+
+// Valid indicates whether the value is a known member of the AlertmanagerAlertStatus enum.
+func (e AlertmanagerAlertStatus) Valid() bool {
+	switch e {
+	case AlertmanagerAlertStatusFiring:
+		return true
+	case AlertmanagerAlertStatusResolved:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for AppInstallationState.
 const (
 	AppInstallationStateActive      AppInstallationState = "active"
@@ -2378,6 +2396,39 @@ func (e ImportSourceState) Valid() bool {
 	case ImportSourceStatePaused:
 		return true
 	case ImportSourceStateRunning:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for IncomingWebhookPostStatus.
+const (
+	IncomingWebhookPostStatusFiring   IncomingWebhookPostStatus = "firing"
+	IncomingWebhookPostStatusResolved IncomingWebhookPostStatus = "resolved"
+)
+
+// Valid indicates whether the value is a known member of the IncomingWebhookPostStatus enum.
+func (e IncomingWebhookPostStatus) Valid() bool {
+	switch e {
+	case IncomingWebhookPostStatusFiring:
+		return true
+	case IncomingWebhookPostStatusResolved:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for IncomingWebhookPostVersion.
+const (
+	N4 IncomingWebhookPostVersion = "4"
+)
+
+// Valid indicates whether the value is a known member of the IncomingWebhookPostVersion enum.
+func (e IncomingWebhookPostVersion) Valid() bool {
+	switch e {
+	case N4:
 		return true
 	default:
 		return false
@@ -6282,6 +6333,25 @@ type AgentUpdatedEventAudience string
 // AgentUpdatedEventType defines model for AgentUpdatedEvent.Type.
 type AgentUpdatedEventType string
 
+// AlertmanagerAlert One alert of an Alertmanager webhook payload; `status` and `labels` are required (checked with `errors[].code` `required`).
+type AlertmanagerAlert struct {
+	// Annotations Annotations of the alert; every value is a string.
+	Annotations *JsonObject `json:"annotations,omitempty"`
+	EndsAt      *time.Time  `json:"endsAt,omitempty"`
+	Fingerprint *string     `json:"fingerprint,omitempty"`
+
+	// GeneratorURL Address of the rule's source; written as text, never fetched.
+	GeneratorURL *string `json:"generatorURL,omitempty"`
+
+	// Labels Labels of the alert; every value is a string.
+	Labels   *JsonObject              `json:"labels,omitempty"`
+	StartsAt *time.Time               `json:"startsAt,omitempty"`
+	Status   *AlertmanagerAlertStatus `json:"status,omitempty"`
+}
+
+// AlertmanagerAlertStatus defines model for AlertmanagerAlert.Status.
+type AlertmanagerAlertStatus string
+
 // ApiToken defines model for ApiToken.
 type ApiToken struct {
 	// CreatedAt RFC 3339 timestamp in UTC with millisecond precision and suffix `Z`.
@@ -10176,7 +10246,11 @@ type IncomingWebhook struct {
 	ThreadId *Uuid `json:"thread_id,omitempty"`
 }
 
-// IncomingWebhookCreate defines model for IncomingWebhookCreate.
+// IncomingWebhookCreate Body of `createIncomingWebhook`. `app_id` names an app principal whose installation is
+// `active` (else `400 validation_failed` with `errors[].code` `app_not_installed`) and that may
+// write in the channel (else `app_cannot_write`); `thread_id`, when present, is a thread of this
+// channel (else `not_in_channel`, an unknown ID too). `name` is not empty and has no control or
+// bidi characters.
 type IncomingWebhookCreate struct {
 	// AppId UUIDv7 (RFC 9562), lowercase canonical form.
 	AppId Uuid `json:"app_id"`
@@ -10190,38 +10264,86 @@ type IncomingWebhookCreate struct {
 
 // IncomingWebhookCreated defines model for IncomingWebhookCreated.
 type IncomingWebhookCreated struct {
-	// Url Full URL including the token. Shown once.
+	// Url Absolute URL from `server.public_url` including the token, shown once. Senders that set a
+	// header drop the last segment and send the token as `Authorization: Bearer <token>`.
 	//
-	// Examples: /api/v1/hooks/0192f4a0-7b1c-7000-8a00-000000000901/iwt_EXAMPLEStGXR8Z5jdH
+	// Examples: https://chat.example.com/api/v1/hooks/0192f4a0-7b1c-7000-8a00-000000000901/bothy_whi_EXAMPLE000000000000000000000000000000000000_2WwD3e
 	Url     string          `json:"url"`
 	Webhook IncomingWebhook `json:"webhook"`
 }
 
-// IncomingWebhookList defines model for IncomingWebhookList.
+// IncomingWebhookList The active incoming webhooks of a channel in creation order; revoked ones are not listed.
 type IncomingWebhookList struct {
 	Items []IncomingWebhook `json:"items"`
 }
 
-// IncomingWebhookPost defines model for IncomingWebhookPost.
+// IncomingWebhookPost Body of an incoming webhook call in one of two shapes, recognised per request (11 8.2,
+// docs/DECISIONS.md D-M2-27-5). A body with at least one Alertmanager member (`version`,
+// `groupKey`, `truncatedAlerts`, `status`, `receiver`, `groupLabels`, `commonLabels`,
+// `commonAnnotations`, `externalURL`, `alerts`) is the unchanged webhook payload of Prometheus
+// Alertmanager (format `alertmanager`) and must contain no native member; every other body is
+// `native` and needs `content_md`. Unknown members are refused.
 type IncomingWebhookPost struct {
-	// ClientMsgId Optional; makes retries of the sender idempotent.
+	// Alerts Alertmanager. The alerts of the notification.
+	Alerts *[]AlertmanagerAlert `json:"alerts,omitempty"`
+
+	// ClientMsgId Native. Optional UUIDv7; makes retries of the sender idempotent.
 	ClientMsgId *Uuid `json:"client_msg_id,omitempty"`
 
-	// ContentMd Examples: Disk usage above threshold on build host.
-	ContentMd string `json:"content_md"`
+	// CommonAnnotations Alertmanager. Annotations all alerts share; every value is a string.
+	CommonAnnotations *JsonObject `json:"commonAnnotations,omitempty"`
 
-	// Title Title of a new thread when the webhook has no fixed thread.
+	// CommonLabels Alertmanager. Labels all alerts share; every value is a string.
+	CommonLabels *JsonObject `json:"commonLabels,omitempty"`
+
+	// ContentMd Native. Markdown content, at most `message.max_content_bytes` UTF-8 bytes.
+	//
+	// Examples: Disk usage above threshold on build host.
+	ContentMd *string `json:"content_md,omitempty"`
+
+	// ExternalURL Alertmanager. Address of the sending Alertmanager; written as text, never fetched.
+	ExternalURL *string `json:"externalURL,omitempty"`
+
+	// GroupKey Alertmanager. Key of the alert group.
+	GroupKey *string `json:"groupKey,omitempty"`
+
+	// GroupLabels Alertmanager. Labels of the group; every value is a string.
+	GroupLabels *JsonObject `json:"groupLabels,omitempty"`
+
+	// Receiver Alertmanager. Name of the receiver.
+	Receiver *string `json:"receiver,omitempty"`
+
+	// Status Alertmanager. State of the group.
+	Status *IncomingWebhookPostStatus `json:"status,omitempty"`
+
+	// ThreadId Native. Thread of the webhook's channel to write into when the webhook has no fixed thread.
+	ThreadId *Uuid `json:"thread_id,omitempty"`
+
+	// Title Native. Title of a new thread when the webhook has no fixed thread; required in a forum.
 	//
 	// Examples: Disk alert
 	Title *string `json:"title,omitempty"`
+
+	// TruncatedAlerts Alertmanager. Number of alerts left out of `alerts`.
+	TruncatedAlerts *int64 `json:"truncatedAlerts,omitempty"`
+
+	// Version Alertmanager. Version of the webhook payload.
+	Version *IncomingWebhookPostVersion `json:"version,omitempty"`
 }
+
+// IncomingWebhookPostStatus Alertmanager. State of the group.
+type IncomingWebhookPostStatus string
+
+// IncomingWebhookPostVersion Alertmanager. Version of the webhook payload.
+type IncomingWebhookPostVersion string
 
 // IncomingWebhookResult defines model for IncomingWebhookResult.
 type IncomingWebhookResult struct {
 	// MessageId UUIDv7 (RFC 9562), lowercase canonical form.
 	MessageId Uuid `json:"message_id"`
 
-	// ThreadId UUIDv7 (RFC 9562), lowercase canonical form.
+	// ThreadId The thread the message landed in; with a `title` in a text channel the new thread that
+	// starts from the message, which itself stands in the main thread.
 	ThreadId Uuid `json:"thread_id"`
 }
 
@@ -15630,7 +15752,7 @@ type ThreadIdPath = Uuid
 // TokenIdPath UUIDv7 (RFC 9562), lowercase canonical form.
 type TokenIdPath = Uuid
 
-// TokenPath Examples: iwt_EXAMPLEStGXR8Z5jdH
+// TokenPath Examples: bothy_whi_EXAMPLE000000000000000000000000000000000000_2WwD3e
 type TokenPath = string
 
 // UserIdPath UUIDv7 (RFC 9562), lowercase canonical form.
@@ -16004,6 +16126,12 @@ type ExportChannelParams struct {
 
 	// To End of the range (exclusive).
 	To Timestamp `form:"to" json:"to"`
+}
+
+// CreateIncomingWebhookParams defines parameters for CreateIncomingWebhook.
+type CreateIncomingWebhookParams struct {
+	// IdempotencyKey UUIDv7 chosen by the client per logical operation. A repeat with the same request returns the stored response; a different request gives 422 `idempotency_key_reuse`; a repeat while the first is running gives 409 `request_in_progress`. Kept for `sync.idempotency_key_ttl`.
+	IdempotencyKey *IdempotencyKey `json:"Idempotency-Key,omitempty"`
 }
 
 // MoveChannelParams defines parameters for MoveChannel.
@@ -16759,6 +16887,9 @@ type PutChannelBehaviorJSONRequestBody = ChannelBehaviorPut
 // PutChannelDraftJSONRequestBody defines body for PutChannelDraft for application/json ContentType.
 type PutChannelDraftJSONRequestBody = DraftPut
 
+// CreateIncomingWebhookJSONRequestBody defines body for CreateIncomingWebhook for application/json ContentType.
+type CreateIncomingWebhookJSONRequestBody = IncomingWebhookCreate
+
 // MoveChannelJSONRequestBody defines body for MoveChannel for application/json ContentType.
 type MoveChannelJSONRequestBody = MovePosition
 
@@ -16821,6 +16952,12 @@ type UpdateGroupJSONRequestBody = GroupUpdate
 
 // AddGroupMemberJSONRequestBody defines body for AddGroupMember for application/json ContentType.
 type AddGroupMemberJSONRequestBody = GroupMemberAdd
+
+// PostIncomingWebhookWithBearerJSONRequestBody defines body for PostIncomingWebhookWithBearer for application/json ContentType.
+type PostIncomingWebhookWithBearerJSONRequestBody = IncomingWebhookPost
+
+// PostIncomingWebhookJSONRequestBody defines body for PostIncomingWebhook for application/json ContentType.
+type PostIncomingWebhookJSONRequestBody = IncomingWebhookPost
 
 // CreateHostJSONRequestBody defines body for CreateHost for application/json ContentType.
 type CreateHostJSONRequestBody = HostCreate

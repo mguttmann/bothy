@@ -520,7 +520,9 @@ func TestConfigPrintShowsSourcePerKey(t *testing.T) {
 		"webhook.retry_backoff_base = 10s  # default\n" +
 		"webhook.retry_backoff_cap = 1h  # default\n" +
 		"webhook.retry_max_age = 3d  # default\n" +
-		"webhook.secret_rotation_overlap = 1d  # default\n"
+		"webhook.secret_rotation_overlap = 1d  # default\n" +
+		"webhook_in.formats_enabled = native, alertmanager  # default\n" +
+		"webhook_in.max_body_bytes = 1048576  # default\n"
 	if code != 0 || stdout != want || stderr != "" {
 		t.Fatalf("exit %d, stderr %q, stdout\n%s\nwant\n%s", code, stderr, stdout, want)
 	}
