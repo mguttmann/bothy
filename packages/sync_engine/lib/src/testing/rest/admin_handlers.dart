@@ -5,15 +5,19 @@
 ///
 /// Every handler asks for the step-up through [requireCatalogStepUp], which reads the `step_up`
 /// value of the operation's `x-authz-action` from `docs/spec/actions.yaml` (Design note 3), so
-/// the fake never holds its own copy of 05.
+/// the fake never holds its own copy of 05. Since M4-28 `addGroupMember` and `addOwner` run
+/// through [FakeI1Guard]: `resolve_i1`, the I1 check after the change and the audit rows
+/// (10 5.1, 11).
 library;
 
 import 'dart:math';
 
 import '../action_catalog.dart';
+import '../audit_log.dart';
 import '../rest_fake.dart';
 import '../schema_validator.dart';
 import '../world.dart';
+import 'agent_handlers.dart' show FakeI1Guard;
 import 'self_handlers.dart' show requireStepUp;
 
 /// Throws `401 step_up_required` (or `403 step_up_not_possible`) for an operation whose action
@@ -30,9 +34,15 @@ void requireCatalogStepUp(
   if (value == 'true' || value == 'fresh') requireStepUp(r);
 }
 
-/// Registers the administration handlers on [rest], with the step-up of [catalog].
-void registerAdminHandlers(RestFake rest, ActionCatalog catalog) {
+/// Registers the administration handlers on [rest], with the step-up of [catalog]; the audit
+/// rows of `addGroupMember` and `addOwner` go to [audit].
+void registerAdminHandlers(
+  RestFake rest,
+  ActionCatalog catalog,
+  FakeAuditLog audit,
+) {
   final world = rest.world;
+  final guard = FakeI1Guard(world, audit);
   final random = Random(7);
   // 06 7: the enrollment code is a one-time secret.
   rest.oneTimeSecrets.addAll(const {'createUser', 'createEnrollmentCode'});
@@ -247,17 +257,29 @@ void registerAdminHandlers(RestFake rest, ActionCatalog catalog) {
         throw const FakeProblem(404, 'not_found');
       }
       if (p.isOwner) throw const FakeProblem(409, 'conflict');
-      p
-        ..isOwner = true
-        ..ownerGrantedAt = world.stamp()
-        ..ownerReason = r.json['reason']! as String;
-      world.permissionVersion++;
-      return FakeResponse(201, {
-        'user': p.ref,
-        'granted_by': r.person.id,
-        'granted_at': p.ownerGrantedAt,
-        'reason': p.ownerReason,
-      });
+      // An owner triggers every agent, so I1 covers all personal agents (10 5.1).
+      return guard.run(
+        r,
+        action: 'owner.add',
+        resourceKind: 'user',
+        apply: () {
+          p
+            ..isOwner = true
+            ..ownerGrantedAt = world.stamp()
+            ..ownerReason = r.json['reason']! as String;
+          world.permissionVersion++;
+          return (
+            response: FakeResponse(201, {
+              'user': p.ref,
+              'granted_by': r.person.id,
+              'granted_at': p.ownerGrantedAt,
+              'reason': p.ownerReason,
+            }),
+            resourceId: p.id,
+            details: {'reason': p.ownerReason},
+          );
+        },
+      );
     })
     ..handle('revokeOwner', (r) {
       owner(r);
@@ -336,15 +358,27 @@ void registerAdminHandlers(RestFake rest, ActionCatalog catalog) {
       if (p == null || p.kind != 'user') {
         throw const FakeProblem(404, 'not_found');
       }
-      final member = <String, Object?>{
-        'user': p.ref,
-        'added_by': r.person.id,
-        'added_at': world.stamp(),
-        'expires_at': ?r.json['expires_at'],
-      };
-      world.groupMembers[g['id']]![p.id] = member;
-      world.permissionVersion++;
-      return FakeResponse(201, member);
+      // A new member gains the group's grants, so I1 covers all personal agents (10 5.1).
+      return guard.run(
+        r,
+        action: 'group.member.add',
+        resourceKind: 'group',
+        apply: () {
+          final member = <String, Object?>{
+            'user': p.ref,
+            'added_by': r.person.id,
+            'added_at': world.stamp(),
+            'expires_at': ?r.json['expires_at'],
+          };
+          world.groupMembers[g['id']]![p.id] = member;
+          world.permissionVersion++;
+          return (
+            response: FakeResponse(201, member),
+            resourceId: g['id']! as String,
+            details: {'user_id': p.id, 'expires_at': ?r.json['expires_at']},
+          );
+        },
+      );
     })
     ..handle('removeGroupMember', (r) {
       owner(r);

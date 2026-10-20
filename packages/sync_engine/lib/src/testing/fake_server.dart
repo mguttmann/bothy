@@ -14,6 +14,7 @@ import 'faults.dart';
 import 'gateway_fake.dart';
 import 'rest/access_handlers.dart';
 import 'rest/admin_handlers.dart';
+import 'rest/agent_handlers.dart';
 import 'rest/audit_handlers.dart';
 import 'rest/auth_handlers.dart';
 import 'rest/host_handlers.dart';
@@ -156,11 +157,12 @@ final class FakeServer {
     registerSelfHandlers(rest);
     registerThreadViewHandlers(rest);
     final actions = ActionCatalog.load();
-    registerAdminHandlers(rest, actions);
-    registerAccessHandlers(rest, actions);
     final audit = FakeAuditLog();
+    registerAdminHandlers(rest, actions, audit);
+    registerAccessHandlers(rest, actions, audit);
     registerAuditHandlers(rest, actions, audit);
     registerHostHandlers(rest, actions, audit);
+    registerAgentHandlers(rest, actions, audit);
     final server = FakeServer._(
       http,
       world,
