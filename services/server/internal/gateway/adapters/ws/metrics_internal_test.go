@@ -14,6 +14,7 @@ import (
 	"github.com/OWNER/bothy/services/server/internal/gateway/app"
 	"github.com/OWNER/bothy/services/server/internal/gateway/domain"
 	"github.com/OWNER/bothy/services/server/internal/kernel/clock"
+	"github.com/OWNER/bothy/services/server/internal/platform/testkit"
 )
 
 // recMetrics records what the adapter measures.
@@ -71,7 +72,7 @@ func TestGatewayMetrics_QueueDroppedAt4014(t *testing.T) {
 	})
 	t.Cleanup(func() { close(release) })
 	c := s.dial(t, wstest.WithoutHeartbeat())
-	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), testkit.Patience)
 	defer cancel()
 	if _, err := c.Identify(ctx, wstest.IdentifyParams{APIToken: agentToken}); err != nil {
 		t.Fatal(err)
@@ -99,13 +100,13 @@ func TestGatewayMetrics_PeerCloseCounted(t *testing.T) {
 	m := &recMetrics{}
 	s := newTestServerWith(t, 16, nil, m)
 	c := s.dial(t)
-	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), testkit.Patience)
 	defer cancel()
 	if _, err := c.Identify(ctx, wstest.IdentifyParams{APIToken: agentToken}); err != nil {
 		t.Fatal(err)
 	}
 	c.Close()
-	deadline := time.Now().Add(10 * time.Second)
+	deadline := testkit.Deadline()
 	for {
 		if _, lines := m.snapshot(); slices.Contains(lines, "close 1000") {
 			return

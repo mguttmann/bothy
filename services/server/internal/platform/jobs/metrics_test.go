@@ -28,7 +28,7 @@ func TestJobsMetrics_DurationAndQueue(t *testing.T) {
 	e.insert(t, rt.Inserter(), fakemodule.Echo{Target: ids.New(), Seq: 2}, nil)
 	receive(t, ran)
 
-	deadline := time.Now().Add(testkit.Patience)
+	deadline := testkit.Deadline()
 	for {
 		got := metricstest.Collect(t, reader)
 		done := metricstest.Sum(got["bothy.job.duration"], map[string]string{"bothy.job.kind": "fakemodule.echo", "bothy.outcome": "completed"})
