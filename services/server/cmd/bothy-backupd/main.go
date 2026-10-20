@@ -3,9 +3,10 @@
 // Command bothy-backupd runs in the container backup of the image bothy-postgres
 // (docs/spec/16-operations.md 2 and 8.2, briefs M7-01 and M7-02): it supervises the pgBackRest TLS
 // server of the repository host, creates the stanza on its first start, and runs the backup
-// kinds pg_full, pg_diff, logical and objects on their backup.* schedules. The use cases live in
-// the module status (internal/status/app); this command only loads the configuration, starts the
-// metrics and drives them through internal/wire. The restore test comes with M7-03.
+// kinds pg_full, pg_diff, logical and objects on their backup.* schedules and the automatic
+// restore test on backup.restore_test.schedule (M7-03). The use cases live in the module status
+// (internal/status/app); this command only loads the configuration, starts the metrics and drives
+// them through internal/wire.
 //
 // It is a second program of the server module and not a command of the server binary, because the server
 // binary with its API role has no business in the database image (docs/DECISIONS.md
@@ -17,6 +18,7 @@
 //	bothy-backupd [--pgbackrest PATH] [--stanza NAME] [--retry DURATION] [--config FILE]
 //	bothy-backupd backup <pg_full|pg_diff|logical|objects> [--config FILE]
 //	bothy-backupd expire --offsite --credentials DIR [--config FILE]
+//	bothy-backupd restore-test [--config FILE]
 //	bothy-backupd healthcheck [--addr HOST:PORT] [--server-name NAME] [--ca FILE] [--cert FILE] [--key FILE] [--timeout DURATION]
 //	bothy-backupd version
 //
@@ -49,6 +51,7 @@ const (
 const usage = `Usage: bothy-backupd [--pgbackrest PATH] [--stanza NAME] [--retry DURATION] [--config FILE]
        bothy-backupd backup <pg_full|pg_diff|logical|objects> [--config FILE]
        bothy-backupd expire --offsite --credentials DIR [--config FILE]
+       bothy-backupd restore-test [--config FILE]
        bothy-backupd healthcheck [--addr HOST:PORT] [--server-name NAME] [--ca FILE]
                                  [--cert FILE] [--key FILE] [--timeout DURATION]
        bothy-backupd version
@@ -56,8 +59,8 @@ const usage = `Usage: bothy-backupd [--pgbackrest PATH] [--stanza NAME] [--retry
 Without a command it runs the repository host of the container backup: it starts
 "pgbackrest server" (the TLS server that postgres pushes WAL to), runs "pgbackrest
 stanza-create" until it succeeds, runs every backup kind on its schedule (backup.*, five-field
-cron in UTC, at most one run per kind; missed times are not caught up), and stops on SIGTERM or
-SIGINT. pgBackRest reads /etc/pgbackrest/pgbackrest.conf, which the image's entry point writes;
+cron in UTC, at most one run per kind; missed times are not caught up) and the restore test on
+backup.restore_test.schedule, and stops on SIGTERM or SIGINT. pgBackRest reads /etc/pgbackrest/pgbackrest.conf, which the image's entry point writes;
 repo2 (backup.offsite.target) comes from bothy-backupd. With an empty backup.offsite.target the
 start log warns "local backup only".
 
@@ -75,6 +78,11 @@ expire       --offsite --credentials DIR: the owner's expiry of the off-site tar
              pgbackrest expire on repo2 (backup.pg.retention_full) and restic forget --prune
              (backup.logical.retention, backup.objects.retention). The service itself never
              deletes off-site (docs/operations/backup-restore.md 9).
+
+restore-test runs the automatic restore test now: restores the latest pg_full or pg_diff into
+             /var/lib/bothy-backup/restore, starts a PostgreSQL there on a Unix socket only, runs
+             the seven checks (docs/spec/16-betrieb.md 8.3), clears the directory and writes a
+             restore_test row of backup_runs. Exit 0 when every check passed, 1 otherwise.
 
 healthcheck  succeeds when the TLS server completes a handshake with the client certificate
              and presents a certificate of the stack's CA for --server-name.
@@ -102,6 +110,8 @@ func run(ctx context.Context, args, env []string, stdout, stderr io.Writer) int 
 			return backupCommand(ctx, args[1:], env, stderr)
 		case "expire":
 			return expireCommand(ctx, args[1:], env, stderr)
+		case "restore-test":
+			return restoreTestCommand(ctx, args[1:], env, stderr)
 		case "version":
 			if len(args) > 1 {
 				return usageError(stderr, "version takes no arguments")

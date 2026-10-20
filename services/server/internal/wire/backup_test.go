@@ -23,6 +23,7 @@ func TestBackupSettingsDefaults(t *testing.T) {
 		ObjectsSchedule: "30 3 * * *", ObjectsRetention: 90 * 24 * time.Hour,
 		OffsiteTarget: "", OffsiteRegion: "us-east-1", OffsiteUsePathStyle: true,
 		FilesDriver: "fs", FilesRoot: "/var/lib/bothy/files",
+		RestoreTestSchedule: "0 5 * * 6", RestoreTestSampleFiles: 200, RestoreTestSampleThreads: 200, RTOTarget: 4 * time.Hour,
 	}
 	if got != want {
 		t.Errorf("BackupSettings = %+v\nwant %+v", got, want)
@@ -40,6 +41,8 @@ func TestBackupSettingsValues(t *testing.T) {
 		"BOTHY_BACKUP__OFFSITE__TARGET=s3:https://s3.example.com/bothy-backup/instance-1",
 		"BOTHY_BACKUP__OFFSITE__REGION=eu-central-1", "BOTHY_BACKUP__OFFSITE__USE_PATH_STYLE=false",
 		"BOTHY_FILE__FS__ROOT=/srv/files",
+		"BOTHY_BACKUP__RESTORE_TEST__SCHEDULE=15 6 * * 0", "BOTHY_BACKUP__RESTORE_TEST__SAMPLE_FILES=7",
+		"BOTHY_BACKUP__RESTORE_TEST__SAMPLE_THREADS=9", "BOTHY_DR__RTO_TARGET=90m",
 	))
 	if err != nil {
 		t.Fatal(err)
@@ -50,6 +53,7 @@ func TestBackupSettingsValues(t *testing.T) {
 		ObjectsSchedule: "45 4 * * *", ObjectsRetention: 60 * 24 * time.Hour,
 		OffsiteTarget: "s3:https://s3.example.com/bothy-backup/instance-1", OffsiteRegion: "eu-central-1",
 		OffsiteUsePathStyle: false, FilesDriver: "fs", FilesRoot: "/srv/files",
+		RestoreTestSchedule: "15 6 * * 0", RestoreTestSampleFiles: 7, RestoreTestSampleThreads: 9, RTOTarget: 90 * time.Minute,
 	}
 	if got != want {
 		t.Errorf("BackupSettings = %+v\nwant %+v", got, want)

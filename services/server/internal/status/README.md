@@ -37,9 +37,9 @@ Normative: [16-operations.md](../../../../docs/spec/16-operations.md) sections 7
 
 ## Dependencies
 
-May use the ports of these modules: `agents`.
+May use the ports of these modules: `agents`, `audit`.
 
-Reason: agent presence as a status component.
+Reason: agent presence as a status component; the restore test verifies the audit chain of the restored copy through `audit.RowsVerifier`, the verification of `audit.verify` (M7-03).
 
 In addition, for all modules: `internal/kernel`; `internal/platform` and `api/` only in `adapters/`.
 Checked by go-arch-lint (ADR 0008).

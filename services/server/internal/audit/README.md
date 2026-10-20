@@ -235,7 +235,7 @@ allow entry (20: every read of the log is audited).
 
 ## Port (root package `internal/audit`)
 
-- Inbound: `Log` (query, verification).
+- Inbound: `Log` (query, verification), `RowsVerifier` (verification of a supplied chain, M7-03).
 - Emits in-tx events: none.
 - Subscribes to in-tx events: none.
 - Implements source ports and cross-cutting ports: kernel `auditing.Recorder` (`app.Recorder`).
