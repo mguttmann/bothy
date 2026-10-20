@@ -98,6 +98,8 @@ PLACES = frozenset(
         "SDK",
         "Abgleich-App",
         "Werkzeug `bothy import`",
+        # Options of the setup wizard infra/compose/install.sh (16 section 3.1, brief M7-29).
+        "Installationsskript",
     }
 )
 # The two forms of the header of a table "Konfigurationswerte dieses Kapitels".

@@ -889,63 +889,66 @@ Die Kennzahl `bothy.storage.volume.free` warnt rechtzeitig (Alarm `BothyVolumeFu
 
 ## 14. Konfigurationswerte dieses Kapitels
 
-| Name | Standard | Bedeutung |
-|---|---|---|
-| `instance.environment` | `prod` | `dev`, `staging` oder `prod` (6.1) |
-| `server.role` | `all` | `api`, `worker` oder `all` |
-| `server.listen_addr` | `127.0.0.1:8080` | öffentlicher Listener (REST, Gateway) |
-| `server.internal_listen_addr` | `127.0.0.1:8081` | Health, Readiness, Eingangs-Webhooks aus dem Stack |
-| `server.public_url` | keiner, Pflicht | Origin, unter dem Apps den Server erreichen (Schema, Host, optional Port; ohne Pfad, Query und Fragment, sonst scheitert `bothy config check`); Grundlage von `aud`, DPoP-`htu` und WebAuthn ([08-identitaet.md](08-identitaet.md), Abschnitte 7.2 und 7.3) |
-| `server.trusted_proxies` | `127.0.0.1/32, ::1/128` | Gegenstellen, deren Weiterleitungs- und Identitäts-Kopfzeilen gelten und die Klartext senden dürfen ([19-sicherheit.md](19-sicherheit.md), SEC-TLS-1) |
-| `server.maintenance_mode` | `off` | `off` oder `read_only` (Umzug, Upgrade; [ADR 0065](../adr/0065-wartungsmodus-read-only.md)) |
-| `secrets.dir` | `/run/bothy/secrets` | Basis der Standardverweise `file:`; absoluter Pfad in sauberer Form (kein `.` oder `..`, kein doppelter oder abschließender `/`), nicht `/`, ohne NUL-Zeichen und ohne `<`, sonst scheitert `bothy config check` |
-| `secrets.cache_ttl` | `5m` | so lange gilt ein gelesenes Geheimnis; mindestens `1s` |
-| `secrets.signing_key_dir` | `/var/lib/bothy/signing-keys` | beschreibbares Verzeichnis der privaten Signierschlüssel; im Besitz des Dienstbenutzers, Modus `0700` (5.2, [ADR 0066](../adr/0066-signierschluessel-im-beschreibbaren-schluesselspeicher.md)) |
-| `console.assets_dir` | leer | directory of the built web console (`flutter build web` of `apps/console`) that the api process serves under `/console/` ([02-architektur.md](02-architektur.md), 3.1); empty: no console, `404` under `/console/`; the image sets `/usr/share/bothy/console`; a set directory without `index.html` ends the start |
-| `server.tls_cert_ref` | leer | Verweis auf die Zertifikatskette (PEM, Blatt zuerst); leer: der Server beendet kein TLS (SEC-TLS-2) |
-| `server.tls_key_ref` | leer | Verweis auf den privaten Schlüssel (PEM); nur zusammen mit `server.tls_cert_ref` |
-| `database.host` | `localhost` | Host der Datenbank |
-| `database.port` | `5432` | Port der Datenbank im Netz des Servers |
-| `database.name` | `bothy` | Datenbankname |
-| `database.user` | `bothy_app` | Rolle des Servers |
-| `database.password_ref` | `file:<secrets.dir>/db_app_password` | Verweis auf das Passwort |
-| `database.sslmode` | `verify-full` | TLS zur Datenbank; im internen Compose-Netz `disable` (SEC-TLS-5) |
-| `database.sslrootcert` | leer | CA-Bündel für `verify-full`; leer nutzt die Wurzeln des Systems |
-| `database.max_conns` | `20` | Größe des Verbindungspools je Prozess (Startwert bis zum Lasttest) |
-| `migrate.require_recent_backup` | `true` | `migrate` verlangt eine frische Sicherung |
-| `migrate.recent_backup_max_age` | `24h` | so alt darf diese Sicherung sein |
-| `migrate.lock_timeout` | `5s` | `lock_timeout` je Migrationsschritt |
-| `migrate.bootstrap_user` | `postgres` | Superuser-Anmeldung nur für `migrate up --bootstrap` |
-| `migrate.bootstrap_password_ref` | `file:<secrets.dir>/db_superuser_password` | dessen Passwort |
-| `migrate.owner_password_ref` | `file:<secrets.dir>/db_owner_password` | Passwort, das `--bootstrap` für `bothy_owner` setzt |
-| `migrate.app_password_ref` | `file:<secrets.dir>/db_app_password` | Passwort für `bothy_app` |
-| `migrate.maint_password_ref` | `file:<secrets.dir>/db_maint_password` | Passwort für `bothy_maint` |
-| `migrate.monitor_password_ref` | `file:<secrets.dir>/db_monitor_password` | Passwort für `bothy_monitor` |
-| `backup.pg.full_schedule` | `0 2 * * 0` | Plan der Vollsicherung (cron) |
-| `backup.pg.diff_schedule` | `0 2 * * 1-6` | Plan der Differenzsicherung (cron) |
-| `backup.pg.archive_timeout` | `60s` | spätestens dann wird ein WAL-Segment archiviert |
-| `backup.pg.retention_full` | `4` | behaltene Vollsicherungen in repo2 |
-| `backup.pg.local_retention_full` | `1` | behaltene Vollsicherungen in repo1 |
-| `backup.logical.schedule` | `0 3 * * *` | Plan von `pg_dump` (cron) |
-| `backup.logical.retention` | `30d` | Aufbewahrung der logischen Sicherung |
-| `backup.objects.schedule` | `30 3 * * *` | Plan der Objektsicherung (cron) |
-| `backup.objects.retention` | `90d` | Aufbewahrung der Objekt-Snapshots |
-| `backup.offsite.target` | leer | Off-site-Ziel; leer heißt nur lokal (Warnung in Konsole und Status) |
-| `backup.max_age` | `26h` | ohne erfolgreiche Sicherung länger als das: Alarm |
-| `backup.restore_test.schedule` | `0 5 * * 6` | Plan des Wiederherstellungstests (cron) |
-| `backup.restore_test.sample_files` | `200` | geprüfte Dateien je Test |
-| `backup.restore_test.sample_threads` | `200` | geprüfte Threads je Test |
-| `backup.restore_test.max_age` | `8d` | ohne erfolgreichen Test länger als das: Alarm |
-| `dr.rpo_target` | `5m` | Ziel für den größten Datenverlust |
-| `dr.rto_target` | `4h` | Ziel für die Dauer der Wiederherstellung |
-| `status.check_interval` | `30s` | Abstand der automatischen Prüfungen |
-| `status.degrade_after` | `2m` | so lange Fehler bis `degraded` |
-| `status.incident_after` | `5m` | so lange `major_outage` bis zur automatischen Störung |
-| `status.resolve_after` | `10m` | so lange gesund bis zur automatischen Auflösung |
-| `status.error_ratio_degraded` | `0.05` | Fehleranteil, ab dem eine Prüfung scheitert |
-| `status.error_ratio_outage` | `0.5` | Fehleranteil, ab dem `major_outage` gilt |
-| `status.fanout_lag_degraded` | `5s` | Fan-out-Verzug, ab dem `sync.fanout` scheitert |
-| `install.ready_timeout` | `5m` | option `--ready-timeout` of the installation script `install.sh` (3.1), not a key of the server: how long `install.sh` waits for `/readyz` after `docker compose up -d` |
+Column "Ort": Server = configuration reference of the server; Installationsskript = option of
+`install.sh` (3.1), not a variable of the server.
+
+| Name | Ort | Standard | Bedeutung |
+|---|---|---|---|
+| `instance.environment` | Server | `prod` | `dev`, `staging` oder `prod` (6.1) |
+| `server.role` | Server | `all` | `api`, `worker` oder `all` |
+| `server.listen_addr` | Server | `127.0.0.1:8080` | öffentlicher Listener (REST, Gateway) |
+| `server.internal_listen_addr` | Server | `127.0.0.1:8081` | Health, Readiness, Eingangs-Webhooks aus dem Stack |
+| `server.public_url` | Server | keiner, Pflicht | Origin, unter dem Apps den Server erreichen (Schema, Host, optional Port; ohne Pfad, Query und Fragment, sonst scheitert `bothy config check`); Grundlage von `aud`, DPoP-`htu` und WebAuthn ([08-identitaet.md](08-identitaet.md), Abschnitte 7.2 und 7.3) |
+| `server.trusted_proxies` | Server | `127.0.0.1/32, ::1/128` | Gegenstellen, deren Weiterleitungs- und Identitäts-Kopfzeilen gelten und die Klartext senden dürfen ([19-sicherheit.md](19-sicherheit.md), SEC-TLS-1) |
+| `server.maintenance_mode` | Server | `off` | `off` oder `read_only` (Umzug, Upgrade; [ADR 0065](../adr/0065-wartungsmodus-read-only.md)) |
+| `secrets.dir` | Server | `/run/bothy/secrets` | Basis der Standardverweise `file:`; absoluter Pfad in sauberer Form (kein `.` oder `..`, kein doppelter oder abschließender `/`), nicht `/`, ohne NUL-Zeichen und ohne `<`, sonst scheitert `bothy config check` |
+| `secrets.cache_ttl` | Server | `5m` | so lange gilt ein gelesenes Geheimnis; mindestens `1s` |
+| `secrets.signing_key_dir` | Server | `/var/lib/bothy/signing-keys` | beschreibbares Verzeichnis der privaten Signierschlüssel; im Besitz des Dienstbenutzers, Modus `0700` (5.2, [ADR 0066](../adr/0066-signierschluessel-im-beschreibbaren-schluesselspeicher.md)) |
+| `console.assets_dir` | Server | leer | directory of the built web console (`flutter build web` of `apps/console`) that the api process serves under `/console/` ([02-architektur.md](02-architektur.md), 3.1); empty: no console, `404` under `/console/`; the image sets `/usr/share/bothy/console`; a set directory without `index.html` ends the start |
+| `server.tls_cert_ref` | Server | leer | Verweis auf die Zertifikatskette (PEM, Blatt zuerst); leer: der Server beendet kein TLS (SEC-TLS-2) |
+| `server.tls_key_ref` | Server | leer | Verweis auf den privaten Schlüssel (PEM); nur zusammen mit `server.tls_cert_ref` |
+| `database.host` | Server | `localhost` | Host der Datenbank |
+| `database.port` | Server | `5432` | Port der Datenbank im Netz des Servers |
+| `database.name` | Server | `bothy` | Datenbankname |
+| `database.user` | Server | `bothy_app` | Rolle des Servers |
+| `database.password_ref` | Server | `file:<secrets.dir>/db_app_password` | Verweis auf das Passwort |
+| `database.sslmode` | Server | `verify-full` | TLS zur Datenbank; im internen Compose-Netz `disable` (SEC-TLS-5) |
+| `database.sslrootcert` | Server | leer | CA-Bündel für `verify-full`; leer nutzt die Wurzeln des Systems |
+| `database.max_conns` | Server | `20` | Größe des Verbindungspools je Prozess (Startwert bis zum Lasttest) |
+| `migrate.require_recent_backup` | Server | `true` | `migrate` verlangt eine frische Sicherung |
+| `migrate.recent_backup_max_age` | Server | `24h` | so alt darf diese Sicherung sein |
+| `migrate.lock_timeout` | Server | `5s` | `lock_timeout` je Migrationsschritt |
+| `migrate.bootstrap_user` | Server | `postgres` | Superuser-Anmeldung nur für `migrate up --bootstrap` |
+| `migrate.bootstrap_password_ref` | Server | `file:<secrets.dir>/db_superuser_password` | dessen Passwort |
+| `migrate.owner_password_ref` | Server | `file:<secrets.dir>/db_owner_password` | Passwort, das `--bootstrap` für `bothy_owner` setzt |
+| `migrate.app_password_ref` | Server | `file:<secrets.dir>/db_app_password` | Passwort für `bothy_app` |
+| `migrate.maint_password_ref` | Server | `file:<secrets.dir>/db_maint_password` | Passwort für `bothy_maint` |
+| `migrate.monitor_password_ref` | Server | `file:<secrets.dir>/db_monitor_password` | Passwort für `bothy_monitor` |
+| `backup.pg.full_schedule` | Server | `0 2 * * 0` | Plan der Vollsicherung (cron) |
+| `backup.pg.diff_schedule` | Server | `0 2 * * 1-6` | Plan der Differenzsicherung (cron) |
+| `backup.pg.archive_timeout` | Server | `60s` | spätestens dann wird ein WAL-Segment archiviert |
+| `backup.pg.retention_full` | Server | `4` | behaltene Vollsicherungen in repo2 |
+| `backup.pg.local_retention_full` | Server | `1` | behaltene Vollsicherungen in repo1 |
+| `backup.logical.schedule` | Server | `0 3 * * *` | Plan von `pg_dump` (cron) |
+| `backup.logical.retention` | Server | `30d` | Aufbewahrung der logischen Sicherung |
+| `backup.objects.schedule` | Server | `30 3 * * *` | Plan der Objektsicherung (cron) |
+| `backup.objects.retention` | Server | `90d` | Aufbewahrung der Objekt-Snapshots |
+| `backup.offsite.target` | Server | leer | Off-site-Ziel; leer heißt nur lokal (Warnung in Konsole und Status) |
+| `backup.max_age` | Server | `26h` | ohne erfolgreiche Sicherung länger als das: Alarm |
+| `backup.restore_test.schedule` | Server | `0 5 * * 6` | Plan des Wiederherstellungstests (cron) |
+| `backup.restore_test.sample_files` | Server | `200` | geprüfte Dateien je Test |
+| `backup.restore_test.sample_threads` | Server | `200` | geprüfte Threads je Test |
+| `backup.restore_test.max_age` | Server | `8d` | ohne erfolgreichen Test länger als das: Alarm |
+| `dr.rpo_target` | Server | `5m` | Ziel für den größten Datenverlust |
+| `dr.rto_target` | Server | `4h` | Ziel für die Dauer der Wiederherstellung |
+| `status.check_interval` | Server | `30s` | Abstand der automatischen Prüfungen |
+| `status.degrade_after` | Server | `2m` | so lange Fehler bis `degraded` |
+| `status.incident_after` | Server | `5m` | so lange `major_outage` bis zur automatischen Störung |
+| `status.resolve_after` | Server | `10m` | so lange gesund bis zur automatischen Auflösung |
+| `status.error_ratio_degraded` | Server | `0.05` | Fehleranteil, ab dem eine Prüfung scheitert |
+| `status.error_ratio_outage` | Server | `0.5` | Fehleranteil, ab dem `major_outage` gilt |
+| `status.fanout_lag_degraded` | Server | `5s` | Fan-out-Verzug, ab dem `sync.fanout` scheitert |
+| `install.ready_timeout` | Installationsskript | `5m` | how long `install.sh` waits for `/readyz` after `docker compose up -d` (option `--ready-timeout`, 3.1); not a key of the server |
 
 ## 15. Entscheidungen dieses Kapitels
 
