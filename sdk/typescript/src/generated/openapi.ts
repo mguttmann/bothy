@@ -10334,7 +10334,7 @@ export interface components {
             dpop?: string;
             device_id: components["schemas"]["Uuid"];
         };
-        /** @description First text frame on the control and data connections of a host service. */
+        /** @description First text frame on the control and data connections of a host service. It carries server values the host service applies; the values of the `hello` of a data connection apply to the session of that connection (24, 5.3, 6.2 and 6.3). */
         HostChannelHello: {
             protocol_versions: number[];
             /** @description Random value; the host signs it with its Ed25519 key in `identify`. */
@@ -10346,6 +10346,21 @@ export interface components {
              */
             heartbeat_interval_ms: number;
             heartbeat_miss_limit: number;
+            /**
+             * Format: int64
+             * @description `auth.clock_leeway` in milliseconds. The host service applies it to the session of this data connection: the tolerance on `exp` of the session token and how long it remembers the `jti` after `exp` (24, 5.3).
+             */
+            clock_leeway_ms: number;
+            /**
+             * Format: int64
+             * @description `terminal.idle_timeout` in milliseconds. The host service applies it to the idle timer of the session of this data connection (24, 6.3).
+             */
+            idle_timeout_ms: number;
+            /**
+             * Format: int64
+             * @description `terminal.detach_grace` in milliseconds. The host service applies it to the detach timer of the session of this data connection (24, 6.2).
+             */
+            detach_grace_ms: number;
             /** @description Public keys with purpose `terminal` for checking session tokens. */
             jwks: components["schemas"]["Jwks"];
         };
