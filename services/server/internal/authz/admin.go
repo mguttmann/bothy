@@ -110,10 +110,13 @@ type UpdateGroupCmd struct {
 	Name, Description *string
 }
 
-// AddMemberCmd is the input of AddGroupMember; a zero ExpiresAt means no expiry.
+// AddMemberCmd is the input of AddGroupMember; a zero ExpiresAt means no expiry. ResolveI1 is
+// the optional guided flow (05 rule 1.6, M2-21): the listed agents are switched to organization
+// in the same transaction before the membership is written.
 type AddMemberCmd struct {
 	UserID    ids.ID
 	ExpiresAt time.Time
+	ResolveI1 *ResolveI1
 }
 
 // CreateGrantCmd is the input of CreateGrant with the column values of grants; a zero TargetID
@@ -127,6 +130,10 @@ type CreateGrantCmd struct {
 	Capabilities []string
 	ExpiresAt    time.Time
 	Reason       string
+	// ResolveI1 is the optional guided flow (05 rule 1.6, M2-21): CreateGrant switches the listed
+	// agents to organization in the same transaction before the grant is written, PreviewGrant
+	// runs the same request as a dry run.
+	ResolveI1 *ResolveI1
 }
 
 // PageQuery is the cursor and the requested page size of a list; a zero Limit means

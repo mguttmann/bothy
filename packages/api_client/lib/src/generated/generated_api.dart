@@ -432,6 +432,7 @@ export 'package:api_client/src/generated/model/read_state_put.dart';
 export 'package:api_client/src/generated/model/read_state_updated_event.dart';
 export 'package:api_client/src/generated/model/reason_body.dart';
 export 'package:api_client/src/generated/model/reconcile_entry.dart';
+export 'package:api_client/src/generated/model/resolve_i1.dart';
 export 'package:api_client/src/generated/model/run.dart';
 export 'package:api_client/src/generated/model/run_api_retry.dart';
 export 'package:api_client/src/generated/model/run_await_input.dart';

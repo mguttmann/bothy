@@ -210,6 +210,22 @@ Agenten, Backend-Richtlinie und Werkzeugklasse (Soll), gemeldeter Ist-Zustand, V
 
 Rulings: docs/DECISIONS.md M1-51.
 
+### Switch to organization (M2-21)
+
+`applySwitchToOrganization` (`app/switch.go`) is the one apply step of every switch to
+`organization`: `SetBillingMode`, `SetBillingModeAll` and `SwitchToOrganization` write the same row
+(holder NULL, `billing_mode_changed_at`, `billing_mode_changed_by`, version + 1) and the same
+`agent.updated`; each caller keeps its own audit entry (one per agent for the single switch and the
+guided flow, one with the list for `set_all`). `SwitchToOrganization` is the use case behind
+`authz.AgentPolicySwitch` (`adapters/authzsource.Switch`): only authz calls it, after authorizing
+every agent, inside the unit of work of the outer action; it locks the rows in ascending id, gives
+an agent already on `organization` an entry with `no_change`, switches disabled agents too and
+reads no If-Match. The reasons of `BillingModeSet`, `BillingModeSetAll` and `CredentialHolderSet`
+have at most `audit.reason_max_chars` characters (`Config.ReasonMaxChars`). The tracker learns a
+mode changed by the guided flow with the agent's next heartbeat; `billing_mode_matches` in
+`getAgent` and `agent.updated` compares the reported mode with the desired mode of that read
+(docs/DECISIONS.md D-M2-21-7).
+
 ### Tests
 
 `domain/domain_test.go` (operator config, policy transitions, tool class, presence),

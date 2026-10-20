@@ -10,7 +10,7 @@
 //
 // Example:
 //
-//	svc, err := app.New(app.Config{PageSizeDefault: 50, PageSizeMax: 200}, app.Deps{...})
+//	svc, err := app.New(app.Config{PageSizeDefault: 50, PageSizeMax: 200, ReasonMaxChars: 500}, app.Deps{...})
 //	agent, err := svc.SetBillingMode(ctx, caller, agentID, agents.BillingModeCmd{
 //		BillingMode: agents.BillingOrganization, Reason: "Switch to the company key",
 //		IfMatch: agents.Precondition{Present: true, Valid: true, Version: 3},

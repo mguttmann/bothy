@@ -177,6 +177,14 @@ Rulings: docs/DECISIONS.md M1-54. Tests: `domain/operator_test.go` and the cross
 `services/server/test/integration` (AZ-M21 to AZ-M25, AZ-M29, BR-01 to BR-03, AZ-P7 for both
 actions, explanation, preview and view-as with real sources).
 
+### Guided flow of the operator actions (M2-21)
+
+`SetSpaceOperatorCmd` and `SetChannelOperatorCmd` carry an optional `*chat.ResolveI1`. The first
+unit validates it with the body (`checkOperatorBody`); an assignment without effect switches
+nothing (docs/DECISIONS.md D-M2-21-3). The second unit calls `authz.I1Resolver.ResolveI1` after the
+checks under the lock (archive state, If-Match, no-op) and before the operator columns change.
+`internal/wire` passes the resolver of authz (`ChatWrites.Resolver`, `Deps.Resolver`).
+
 ## Threads (M1-55)
 
 - Port `chat.Threads` (`threads.go`): `Create`, `AppendToThread`, `Info` and `View` for

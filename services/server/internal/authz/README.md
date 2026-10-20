@@ -427,6 +427,29 @@ applies the intersection, `view_as_read_only` and SR6 exactly as for the snapsho
 `auth.step_up` on the caller's own session and `self.read` on the caller without the view, so an
 owner can always leave the view, log out and confirm a step-up.
 
+## Guided flow `resolve_i1` (M2-21)
+
+The request member `resolve_i1 = {switch_to_organization, reason}` of `grant.create`,
+`group.member.add`, `owner.add`, `space.operator.set` and `channel.operator.set` switches the
+listed agents to `organization` in the transaction of the change, before its first write (05 rule
+1.6, R-AZ-17, 10 section 11).
+
+- Port `I1Resolver` (`resolvei1.go`): `CheckResolveI1` validates the request (at least one agent,
+  no repeated id, a reason that is not blank, passes SEC-IN-4 and has at most
+  `audit.reason_max_chars` characters; `domain.CheckResolveI1`), `ResolveI1` runs inside the unit
+  of work of the outer action. `identity` (owner.add) and `chat` (the operator actions) get it
+  through their constructors; `CreateGrant` and `AddGroupMember` call it themselves.
+- Source port `AgentPolicySwitch`: the agents module implements it (`agents/adapters/authzsource`
+  `Switch`); `EmptyAgentPolicySwitch` fails closed until `internal/wire` binds the real one in the
+  agents step (`bindGuidedFlow` fails the start otherwise).
+- `app.Resolver`: authorizes `agent.billing_mode.set` for every agent in ascending id (unknown ids
+  and principals that are not agents give the same `404` as invisible agents; the Authorizer audits
+  the denial), then `AddAffected` and the switch. Every error rolls the whole unit back (BR-07).
+- The preview (`PreviewGrant`) authorizes `access.preview` with the target action
+  `agent.billing_mode.set` per agent (`AuthorizePreview`), switches in the dry run
+  (`ApplyPreview`) and adds the switch lines of `previewtext` (`Input.Switches`).
+- Field errors of the outer body and of `resolve_i1` come in one answer (`joinFields`).
+
 ## Expiry (M1-30)
 
 Expiry is decided at every `authorize` call: a grant or membership is invalid from the second of

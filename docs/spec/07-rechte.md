@@ -989,6 +989,19 @@ Hinweis: Die Freigabe für Sam hat kein Ablaufdatum.
 
 Die Konsole zeigt die Vorschau vor jeder Bestätigung; der Step-up folgt danach.
 
+Preview with `resolve_i1` (guided flow, [10-backend-richtlinie.md](10-backend-richtlinie.md)
+section 11; M2-21): the preview is a dry run of the whole request. After `access.preview` for the
+grant target, every listed agent needs `access.preview` with the target action
+`agent.billing_mode.set` in ascending id (owner, never step-up, never audit; a visible agent and a
+caller who is not an owner give `403` with `owner_only`, an unknown or invisible agent the `404`
+of an unknown id). In the rolled-back transaction the agents are switched to `organization` before
+the grant is applied, so `allowed`, `effects`, `invariant_violations` and `hints` describe both
+parts. `text` starts with one line per agent the request switches from `personal` ("First ... is
+switched to Organization; the organization key then bears the costs.") and, when `organization` is
+not in the agent's `billing_modes_supported`, the line "The adapter of ... does not report an
+organization key yet. Invocations fail until it is switched." (German catalogue accordingly;
+docs/DECISIONS.md D-M2-21-8).
+
 ### 9.4 Erinnerung vor Ablauf
 
 Der Job `authz.expiry_reminder` läuft mit `authz.expiry_sweep_interval` und findet Freigaben und

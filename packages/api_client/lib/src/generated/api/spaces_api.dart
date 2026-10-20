@@ -534,7 +534,7 @@ class SpacesApi {
   }
 
   /// Set the default operator of a space
-  ///
+  /// Optional &#x60;resolve_i1&#x60; runs the guided flow (05 rule 1.6, 10 section 11): the listed agents are authorized with &#x60;agent.billing_mode.set&#x60; and switched to &#x60;organization&#x60; first, in the same transaction as the change; I1 is checked before the commit, and either both parts commit or none.
   ///
   /// Parameters:
   /// * [spaceId]

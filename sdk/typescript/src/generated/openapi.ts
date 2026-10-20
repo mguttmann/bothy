@@ -928,7 +928,10 @@ export interface paths {
         /** List owners */
         get: operations["listOwners"];
         put?: never;
-        /** Make a person owner */
+        /**
+         * Make a person owner
+         * @description Optional `resolve_i1` runs the guided flow (05 rule 1.6, 10 section 11): the listed agents are authorized with `agent.billing_mode.set` and switched to `organization` first, in the same transaction as the change; I1 is checked before the commit, and either both parts commit or none.
+         */
         post: operations["addOwner"];
         delete?: never;
         options?: never;
@@ -1247,7 +1250,10 @@ export interface paths {
         /** List members */
         get: operations["listGroupMembers"];
         put?: never;
-        /** Add a member */
+        /**
+         * Add a member
+         * @description Optional `resolve_i1` runs the guided flow (05 rule 1.6, 10 section 11): the listed agents are authorized with `agent.billing_mode.set` and switched to `organization` first, in the same transaction as the change; I1 is checked before the commit, and either both parts commit or none.
+         */
         post: operations["addGroupMember"];
         delete?: never;
         options?: never;
@@ -1282,7 +1288,10 @@ export interface paths {
         /** List grants of a target or subject */
         get: operations["listGrants"];
         put?: never;
-        /** Create a grant */
+        /**
+         * Create a grant
+         * @description Optional `resolve_i1` runs the guided flow (05 rule 1.6, 10 section 11): the listed agents are authorized with `agent.billing_mode.set` and switched to `organization` first, in the same transaction as the change; I1 is checked before the commit, and either both parts commit or none.
+         */
         post: operations["createGrant"];
         delete?: never;
         options?: never;
@@ -1306,7 +1315,10 @@ export interface paths {
          *     The caller needs read access to the target (else `404`) and `owner` or `manage` on it (else
          *     `403`); limits of delegation give `200` with `allowed: false` and `denial_reason`. `text`
          *     is in the caller's language (`de` or `en`, else `de`) with dates in the caller's time zone
-         *     (07, 9.3).
+         *     (07, 9.3). With `resolve_i1` the preview is a dry run of the whole guided flow: every listed
+         *     agent needs `access.preview` with the target action `agent.billing_mode.set` (owner, no
+         *     step-up; an unknown or invisible agent gives `404`), the agents are switched to
+         *     `organization` before the grant, and `text` names each agent the request would switch.
          */
         post: operations["previewGrant"];
         delete?: never;
@@ -1652,7 +1664,10 @@ export interface paths {
             cookie?: never;
         };
         get?: never;
-        /** Set the default operator of a space */
+        /**
+         * Set the default operator of a space
+         * @description Optional `resolve_i1` runs the guided flow (05 rule 1.6, 10 section 11): the listed agents are authorized with `agent.billing_mode.set` and switched to `organization` first, in the same transaction as the change; I1 is checked before the commit, and either both parts commit or none.
+         */
         put: operations["setSpaceOperator"];
         post?: never;
         delete?: never;
@@ -1797,7 +1812,10 @@ export interface paths {
             cookie?: never;
         };
         get?: never;
-        /** Set or inherit the operator of a channel */
+        /**
+         * Set or inherit the operator of a channel
+         * @description Optional `resolve_i1` runs the guided flow (05 rule 1.6, 10 section 11): the listed agents are authorized with `agent.billing_mode.set` and switched to `organization` first, in the same transaction as the change; I1 is checked before the commit, and either both parts commit or none.
+         */
         put: operations["setChannelOperator"];
         post?: never;
         delete?: never;
@@ -6142,10 +6160,20 @@ export interface components {
             /** @example Left the team */
             reason: string;
         };
+        /** @description Guided flow (05 rule 1.6, 10 section 11): switch these agents to `organization` first, in the same transaction as the change. */
+        ResolveI1: {
+            switch_to_organization: components["schemas"]["Uuid"][];
+            /**
+             * @description Reason of the switch, in the audit entry of every switched agent; at most `audit.reason_max_chars` characters, no control or bidi characters.
+             * @example Sam triggers the assistant too
+             */
+            reason: string;
+        };
         OwnerAdd: {
             user_id: components["schemas"]["Uuid"];
             /** @example Second owner as deputy */
             reason: string;
+            resolve_i1?: components["schemas"]["ResolveI1"];
         };
         Owner: {
             user: components["schemas"]["PrincipalRef"];
@@ -6346,6 +6374,7 @@ export interface components {
         GroupMemberAdd: {
             user_id: components["schemas"]["Uuid"];
             expires_at?: components["schemas"]["Timestamp"];
+            resolve_i1?: components["schemas"]["ResolveI1"];
         };
         /**
          * @description `host` is a connected host for the terminal; it has no level and only the capability `terminal` (24, 8.1).
@@ -6385,6 +6414,7 @@ export interface components {
             expires_at?: components["schemas"]["Timestamp"];
             /** @example Support team works in this space */
             reason: string;
+            resolve_i1?: components["schemas"]["ResolveI1"];
         };
         /** @description Effect of a grant before it is created. No state changes (07, 9.3). */
         GrantPreview: {
@@ -6547,6 +6577,7 @@ export interface components {
             agent_id?: components["schemas"]["Uuid"];
             /** @example Support agent takes over */
             reason: string;
+            resolve_i1?: components["schemas"]["ResolveI1"];
         };
         SpaceView: {
             space: components["schemas"]["Space"];

@@ -9033,6 +9033,9 @@ type GrantCreate struct {
 	// Reason Examples: Support team works in this space
 	Reason string `json:"reason"`
 
+	// ResolveI1 Guided flow (05 rule 1.6, 10 section 11): switch these agents to `organization` first, in the same transaction as the change.
+	ResolveI1 *ResolveI1 `json:"resolve_i1,omitempty"`
+
 	// SubjectId UUIDv7 (RFC 9562), lowercase canonical form.
 	SubjectId   Uuid             `json:"subject_id"`
 	SubjectKind GrantSubjectKind `json:"subject_kind"`
@@ -9207,6 +9210,9 @@ type GroupMember struct {
 type GroupMemberAdd struct {
 	// ExpiresAt RFC 3339 timestamp in UTC with millisecond precision and suffix `Z`.
 	ExpiresAt *Timestamp `json:"expires_at,omitempty"`
+
+	// ResolveI1 Guided flow (05 rule 1.6, 10 section 11): switch these agents to `organization` first, in the same transaction as the change.
+	ResolveI1 *ResolveI1 `json:"resolve_i1,omitempty"`
 
 	// UserId UUIDv7 (RFC 9562), lowercase canonical form.
 	UserId Uuid `json:"user_id"`
@@ -11245,6 +11251,9 @@ type OperatorSet struct {
 
 	// Reason Examples: Support agent takes over
 	Reason string `json:"reason"`
+
+	// ResolveI1 Guided flow (05 rule 1.6, 10 section 11): switch these agents to `organization` first, in the same transaction as the change.
+	ResolveI1 *ResolveI1 `json:"resolve_i1,omitempty"`
 }
 
 // Owner defines model for Owner.
@@ -11264,6 +11273,9 @@ type Owner struct {
 type OwnerAdd struct {
 	// Reason Examples: Second owner as deputy
 	Reason string `json:"reason"`
+
+	// ResolveI1 Guided flow (05 rule 1.6, 10 section 11): switch these agents to `organization` first, in the same transaction as the change.
+	ResolveI1 *ResolveI1 `json:"resolve_i1,omitempty"`
 
 	// UserId UUIDv7 (RFC 9562), lowercase canonical form.
 	UserId Uuid `json:"user_id"`
@@ -12249,6 +12261,15 @@ type ReconcileEntry struct {
 
 	// RunId UUIDv7 (RFC 9562), lowercase canonical form.
 	RunId Uuid `json:"run_id"`
+}
+
+// ResolveI1 Guided flow (05 rule 1.6, 10 section 11): switch these agents to `organization` first, in the same transaction as the change.
+type ResolveI1 struct {
+	// Reason Reason of the switch, in the audit entry of every switched agent; at most `audit.reason_max_chars` characters, no control or bidi characters.
+	//
+	// Examples: Sam triggers the assistant too
+	Reason               string `json:"reason"`
+	SwitchToOrganization []Uuid `json:"switch_to_organization"`
 }
 
 // Run Run document (`run_document.v1`), the content of the live box.

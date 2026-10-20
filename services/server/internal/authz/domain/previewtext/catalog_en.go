@@ -37,6 +37,9 @@ var catalogEN = catalog{
 	"hint.group_reach.one":                       "Note: the group {group} reaches one person.",
 	"hint.expiry_missing":                        "Note: the grant for {subject} has no expiry date.",
 	"date":                                       "2006-01-02",
+	// The guided flow resolve_i1 (M2-21, 10 section 11 point 2).
+	"switch.organization": "First {agent} is switched to Organization; the organization key then bears the costs.",
+	"switch.not_ready":    "The adapter of {agent} does not report an organization key yet. Invocations fail until it is switched.",
 	// The grant on a host (M2-40, 07 section 9.3).
 	"summary.host": `{subject} gets the additional right "Terminal" on host {host}{until}.`,
 	"hint.i6":      "Rejected: {host} uses the personal LLM login of {holder}. Only {holder} may hold a grant there.",

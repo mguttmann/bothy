@@ -11,6 +11,20 @@ documented in this file. The format is based on
 
 ### Added
 
+- Guided flow `resolve_i1` and the shared switch of I4 (M2-21, 05 rule 1.6, R-AZ-17, 10 section
+  11): `addOwner`, `addGroupMember`, `createGrant`, `setSpaceOperator` and `setChannelOperator`
+  accept the optional member `resolve_i1 = {switch_to_organization, reason}` (schema `ResolveI1`
+  in `OwnerAdd`, `GroupMemberAdd`, `GrantCreate` and `OperatorSet`). After the outer checks and
+  before the first write the server authorizes `agent.billing_mode.set` for every listed agent
+  (unknown and invisible agents give the same `404`), switches them to `organization` in the same
+  transaction, applies the change and checks I1 before the commit, with one audit entry per action
+  and one `correlation_id` (BR-07). `previewGrant` with `resolve_i1` is a dry run of the whole
+  request and names each switched agent in `text`. New ports `authz.I1Resolver` and
+  `authz.AgentPolicySwitch` (implemented by `agents`), `EmptyAgentPolicySwitch` fails closed and
+  the start fails when the switch is not bound. `setAgentBillingMode`, `setAllAgentsBillingMode`
+  and the guided flow share one apply step; the reasons of `BillingModeSet`, `BillingModeSetAll`
+  and `CredentialHolderSet` have at most `audit.reason_max_chars` characters;
+  `presence.billing_mode_matches` compares with the desired mode of the read.
 - Images without metadata and thumbnails (M3-06, Ruling L16, ADR 0047): a clean or skipped JPEG,
   PNG, GIF or WebP stays `pending` after the scan until the new job `files.thumbnail` (queue
   `files`, River timeout `file.image.processing_timeout`, at most `file.image.max_concurrent` per
@@ -1518,6 +1532,12 @@ documented in this file. The format is based on
   (`app.DeviceExpirer`), and `AuthCleanup.Run` returns deleted challenges plus revoked devices.
 
 ### Fixed
+
+- A heartbeat that waits for the agents row or a channel row no longer blocks a request that holds
+  that row and reads or updates the presence tracker (a switch to `organization` per agent, for all
+  agents or in the guided flow of M2-21, `disableAgent` and `enableAgent` under `Idempotency-Key`):
+  both waited on each other until a lock timeout and answered `5xx`. The tracker entry lock is no
+  longer held across a database call (docs/DECISIONS.md D-M2-21-11).
 
 - `instance` registers the event type `instance.updated` it emits, so the start check and gate G9
   see it (M1-67).

@@ -3,6 +3,7 @@
 //
 
 // ignore_for_file: unused_element
+import 'package:api_client/src/generated/model/resolve_i1.dart';
 import 'package:api_client/src/generated/model/operator_mode.dart';
 import 'package:built_value/built_value.dart';
 import 'package:built_value/serializer.dart';
@@ -15,6 +16,7 @@ part 'operator_set.g.dart';
 /// * [mode]
 /// * [agentId] - Required for mode `agent`.
 /// * [reason]
+/// * [resolveI1]
 @BuiltValue()
 abstract class OperatorSet implements Built<OperatorSet, OperatorSetBuilder> {
   @BuiltValueField(wireName: r'mode')
@@ -27,6 +29,9 @@ abstract class OperatorSet implements Built<OperatorSet, OperatorSetBuilder> {
 
   @BuiltValueField(wireName: r'reason')
   String get reason;
+
+  @BuiltValueField(wireName: r'resolve_i1')
+  ResolveI1? get resolveI1;
 
   OperatorSet._();
 
@@ -68,6 +73,13 @@ class _$OperatorSetSerializer implements PrimitiveSerializer<OperatorSet> {
       object.reason,
       specifiedType: const FullType(String),
     );
+    if (object.resolveI1 != null) {
+      yield r'resolve_i1';
+      yield serializers.serialize(
+        object.resolveI1,
+        specifiedType: const FullType(ResolveI1),
+      );
+    }
   }
 
   @override
@@ -116,6 +128,14 @@ class _$OperatorSetSerializer implements PrimitiveSerializer<OperatorSet> {
             specifiedType: const FullType(String),
           ) as String;
           result.reason = valueDes;
+          break;
+        case r'resolve_i1':
+          final valueDes = serializers.deserialize(
+            value,
+            specifiedType: const FullType.nullable(ResolveI1),
+          ) as ResolveI1?;
+          if (valueDes == null) continue;
+          result.resolveI1.replace(valueDes);
           break;
         default:
           unhandled.add(key);

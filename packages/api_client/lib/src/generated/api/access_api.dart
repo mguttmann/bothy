@@ -28,7 +28,7 @@ class AccessApi {
   const AccessApi(this._dio, this._serializers);
 
   /// Create a grant
-  ///
+  /// Optional &#x60;resolve_i1&#x60; runs the guided flow (05 rule 1.6, 10 section 11): the listed agents are authorized with &#x60;agent.billing_mode.set&#x60; and switched to &#x60;organization&#x60; first, in the same transaction as the change; I1 is checked before the commit, and either both parts commit or none.
   ///
   /// Parameters:
   /// * [grantCreate]
@@ -549,7 +549,7 @@ class AccessApi {
   }
 
   /// Show what a grant would change
-  /// Dry run of &#x60;createGrant&#x60; (action &#x60;access.preview&#x60;): affected principals, level changes and invariant violations. No step-up needed; the transaction is rolled back, nothing is stored. The caller needs read access to the target (else &#x60;404&#x60;) and &#x60;owner&#x60; or &#x60;manage&#x60; on it (else &#x60;403&#x60;); limits of delegation give &#x60;200&#x60; with &#x60;allowed: false&#x60; and &#x60;denial_reason&#x60;. &#x60;text&#x60; is in the caller&#39;s language (&#x60;de&#x60; or &#x60;en&#x60;, else &#x60;de&#x60;) with dates in the caller&#39;s time zone (07, 9.3).
+  /// Dry run of &#x60;createGrant&#x60; (action &#x60;access.preview&#x60;): affected principals, level changes and invariant violations. No step-up needed; the transaction is rolled back, nothing is stored. The caller needs read access to the target (else &#x60;404&#x60;) and &#x60;owner&#x60; or &#x60;manage&#x60; on it (else &#x60;403&#x60;); limits of delegation give &#x60;200&#x60; with &#x60;allowed: false&#x60; and &#x60;denial_reason&#x60;. &#x60;text&#x60; is in the caller&#39;s language (&#x60;de&#x60; or &#x60;en&#x60;, else &#x60;de&#x60;) with dates in the caller&#39;s time zone (07, 9.3). With &#x60;resolve_i1&#x60; the preview is a dry run of the whole guided flow: every listed agent needs &#x60;access.preview&#x60; with the target action &#x60;agent.billing_mode.set&#x60; (owner, no step-up; an unknown or invisible agent gives &#x60;404&#x60;), the agents are switched to &#x60;organization&#x60; before the grant, and &#x60;text&#x60; names each agent the request would switch.
   ///
   /// Parameters:
   /// * [grantCreate]

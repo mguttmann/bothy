@@ -206,6 +206,9 @@ type IdentityWrites struct {
 	// Directory answers the language of new messages and threads with it and with Settings. The
 	// zero Map gives simple for every locale.
 	Search searchlang.Map
+	// Resolver is the guided flow of authz (AuthzAdmin.Resolver, M2-21) for owner.add with
+	// resolve_i1; nil refuses such a request with kind internal.
+	Resolver authz.I1Resolver
 }
 
 // NewSearchDirectory returns the principal directory of identity over pool that answers the text
@@ -245,7 +248,7 @@ func NewIdentity(cfg app.Config, pool *pg.Pool, uow txn.UnitOfWork, az authorize
 	people, err := app.NewPeople(cfg, app.PeopleDeps{
 		Store: repo, UoW: uow, Authorizer: az, Audit: w.Audit, Events: w.Events, Cursors: identityhttp.Cursors{},
 		Versions: instanceapp.NewVersions(instanceRepo), Locales: locale.Parser{}, Providers: repo, Identities: repo,
-		Enrollment: enrollment, Settings: w.Settings, Clock: clk,
+		Enrollment: enrollment, Settings: w.Settings, Clock: clk, Resolver: w.Resolver,
 	})
 	if err != nil {
 		return nil, err
