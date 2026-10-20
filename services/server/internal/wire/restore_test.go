@@ -12,6 +12,7 @@ import (
 	"strconv"
 	"strings"
 	gosync "sync"
+	"sync/atomic"
 	"syscall"
 	"testing"
 	"time"
@@ -19,6 +20,7 @@ import (
 	"github.com/jackc/pgx/v5"
 
 	"github.com/OWNER/bothy/services/server/api/rest"
+	agentsapp "github.com/OWNER/bothy/services/server/internal/agents/app"
 	"github.com/OWNER/bothy/services/server/internal/audit/app"
 	"github.com/OWNER/bothy/services/server/internal/gateway/adapters/wstest"
 	"github.com/OWNER/bothy/services/server/internal/identity"
@@ -246,8 +248,12 @@ func TestStart_RestoreNotFinalized_NotReady(t *testing.T) {
 	t.Parallel()
 	db := newServeDB(t)
 	simulateRestore(t, db)
+	// presenceStarts counts the starts of the presence tracker (M2-20), whose start rule and flush
+	// loop write the agents table: the lock holds them too (INT-W51/14).
+	var presenceStarts atomic.Int32
+	gauges := func(func() []agentsapp.GaugeSample) error { presenceStarts.Add(1); return nil }
 	for _, role := range []wire.Role{wire.RoleAPI, wire.RoleWorker, wire.RoleAll} {
-		p := start(t, role, serveEnv(t, db), wire.Deps{})
+		p := start(t, role, serveEnv(t, db), wire.Deps{PresenceGauges: gauges})
 		internal := p.waitInternal(t)
 		deadline := time.Now().Add(30 * time.Second)
 		for !strings.Contains(p.logs.String(), `"msg":"server started, not ready"`) && time.Now().Before(deadline) {
@@ -280,6 +286,9 @@ func TestStart_RestoreNotFinalized_NotReady(t *testing.T) {
 		if listeners != 0 {
 			t.Fatalf("%s: %d log tail or consumer connections while the restore is not finalized", role, listeners)
 		}
+		if n := presenceStarts.Load(); n != 0 {
+			t.Fatalf("%s: the presence tracker started %d times while the restore is not finalized", role, n)
+		}
 		stopProcess(t, p)
 	}
 	off := start(t, wire.RoleAll, serveEnv(t, db, "BOTHY_DATABASE__RESTORE_GUARD=off"), wire.Deps{})
@@ -289,10 +298,13 @@ func TestStart_RestoreNotFinalized_NotReady(t *testing.T) {
 	if _, err := finalizeRestore(t, db, nil); err != nil {
 		t.Fatal(err)
 	}
-	p := start(t, wire.RoleAll, serveEnv(t, db), wire.Deps{})
+	p := start(t, wire.RoleAll, serveEnv(t, db), wire.Deps{PresenceGauges: gauges})
 	waitReadyz(t, p.waitInternal(t), http.StatusOK)
 	if p.logs.port("public listener started") == 0 {
 		t.Fatal("no public listener after finalize")
+	}
+	if presenceStarts.Load() != 1 {
+		t.Fatalf("presence tracker starts after finalize = %d, want 1", presenceStarts.Load())
 	}
 }
 

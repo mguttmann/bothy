@@ -479,7 +479,7 @@ func (s *server) components() []lifecycle.Component {
 		step("routes", s.mountRoutes),
 	}
 	if s.api() {
-		cs = append(cs, step("log_tail", s.whileFinalized(s.startLogTail)), step("agent_presence", s.startPresence))
+		cs = append(cs, step("log_tail", s.whileFinalized(s.startLogTail)), step("agent_presence", s.whileFinalized(s.startPresence)))
 	}
 	cs = append(cs, step("jobs", s.whileFinalized(s.startJobs)))
 	if s.worker() {

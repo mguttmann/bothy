@@ -24,7 +24,7 @@ the assembly of `bothy serve` (M1-11). Only `cmd` imports it.
 | `ratelimit.go`, `configkeys_ratelimit.go` | `RateLimitConfig`, `InstallRateLimits` and the start check (M1-19); the keys `ratelimit.*` |
 | `serve.go` | `Serve`, `ServeConfig`, `Deps`: start order and stop steps of `bothy serve` |
 | `setup.go` | `InstallSetupGate` and `RouteActions` (the setup gate over the instance row, M1-37); `Setup` (`NewSetup`, `BootstrapOwner`, `IssueRecoveryCode`, `Close`): the parts of the server `bothy setup` needs, as `bothy_app` |
-| `restore.go` | `RestoreFinalize` (`NewRestoreFinalize`, `Finalize`, `Close`): `bothy restore finalize` as `database.user` (the schema owner); `NewRestoreService`, `RestoreCursors` (the cursor ports of agents, apps and sync, in this order), `ParseRelocationManifest` (`backup_manifest.v1`); the start lock `checkRestoreGuard` with the readiness check `restore_not_finalized` and `database.restore_guard`; while it holds, `whileFinalized` skips the steps `log_tail`, `jobs`, `event_consumers` and `public_listener` (M7-04, R-DM-50) |
+| `restore.go` | `RestoreFinalize` (`NewRestoreFinalize`, `Finalize`, `Close`): `bothy restore finalize` as `database.user` (the schema owner); `NewRestoreService`, `RestoreCursors` (the cursor ports of agents, apps and sync, in this order), `ParseRelocationManifest` (`backup_manifest.v1`); the start lock `checkRestoreGuard` with the readiness check `restore_not_finalized` and `database.restore_guard`; while it holds, `whileFinalized` skips the steps `log_tail`, `agent_presence`, `jobs`, `event_consumers` and `public_listener` (M7-04, R-DM-50, INT-W51/14) |
 | `switchlog.go` | the process logger that follows the switch from stdout JSON to the telemetry logger |
 
 ## Serve assembly
