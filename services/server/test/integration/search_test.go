@@ -132,6 +132,8 @@ func (w *searchWorld) weights(table, vec string, id ids.ID) map[string][]string 
 	return out
 }
 
+// language-check: off
+
 // TestLanguageExamplesFromChapter14 holds the language rows of 14 section 12 and the limits of
 // 14 3.3 and 4.2 on PostgreSQL 18 through the real write path.
 func TestLanguageExamplesFromChapter14(t *testing.T) {
@@ -155,9 +157,7 @@ func TestLanguageExamplesFromChapter14(t *testing.T) {
 		{q: `"err_conn_reset"`, want: []ids.ID{kennung}, limitation: "identifier as a phrase"},
 		{q: "Rechnung", want: []ids.ID{rechnung, offen}, not: []ids.ID{adresse}, limitation: "no compound splitting (14 3.3)"},
 		{q: verfuegbar, want: []ids.ID{verfuegbarMsg}, limitation: "umlaut"},
-		// language-check: off
 		{q: "ärger", want: []ids.ID{aergerMsg}, limitation: "case folding of non-ASCII letters"},
-		// language-check: on
 		{q: "offen -Rechnungen", want: []ids.ID{offen}, limitation: "negation per sub-query is best effort (14 4.2)"},
 	} {
 		got := w.find(c.q)
@@ -173,6 +173,10 @@ func TestLanguageExamplesFromChapter14(t *testing.T) {
 		}
 	}
 }
+
+// language-check: on
+
+// language-check: off
 
 // TestSearchVectorWeights holds the weights of 14 section 2: message stems B and unchanged words
 // D, both forms of an umlaut (14 3.3), and only A in a thread title.
@@ -191,15 +195,15 @@ func TestSearchVectorWeights(t *testing.T) {
 	}; !equalWeights(got, want) {
 		t.Errorf("%s: %v, want %v", verfuegbar, got, want)
 	}
-	// language-check: off
 	th, _ := w.forumPost("alex", w.fragen, "Ärger mit Rechnungen", "Siehe Anhang")
 	if got, want := w.weights("threads", "title_search", th), map[string][]string{
 		"arg": {"A"}, "mit": {"A"}, "rechnung": {"A"}, "rechnungen": {"A"}, "ärger": {"A"},
-		// language-check: on
 	}; !equalWeights(got, want) {
 		t.Errorf("thread title: %v, want %v", got, want)
 	}
 }
+
+// language-check: on
 
 func equalWeights(a, b map[string][]string) bool {
 	if len(a) != len(b) {
@@ -279,7 +283,7 @@ func TestSearchLanguageAssignedAtCreation(t *testing.T) {
 	}
 }
 
-// TestSearchLanguageWithoutMapEntry holds "Kein Eintrag in der Abbildung: simple" (14 3.1): with
+// TestSearchLanguageWithoutMapEntry holds "No entry in the map: simple" (14 3.1): with
 // search.locale_map {"de":"german"} Sam's message gets simple, Alex's still german.
 func TestSearchLanguageWithoutMapEntry(t *testing.T) {
 	t.Parallel()

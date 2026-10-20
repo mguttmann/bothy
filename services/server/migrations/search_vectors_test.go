@@ -131,7 +131,7 @@ func show(s *string) string {
 	return *s
 }
 
-// TestSearchTsqueryUsesIndex holds "die GIN-Abfrage nutzt den Index" of 14 4.2: with sequential
+// TestSearchTsqueryUsesIndex holds "the GIN query uses the index" of 14 4.2: with sequential
 // scans off, the planner answers the search predicate of both vectors with a bitmap index scan on
 // their GIN index.
 func TestSearchTsqueryUsesIndex(t *testing.T) {
@@ -231,8 +231,8 @@ func TestTextSearchCaseFolding(t *testing.T) {
 
 // language-check: on
 
-// FuzzSearchTsquery holds 14 4.1 "jede Eingabe ist sicher" for the query function (PLAN M3 test
-// strategy "Fuzzing der Sucheingabe"): for any valid text the call never fails, and the result is
+// FuzzSearchTsquery holds 14 4.1 "every input is safe" for the query function (PLAN M3 test
+// strategy, fuzzing of the search input): for any valid text the call never fails, and the result is
 // NULL or a tsquery with nodes. The round trip tq::text to ::tsquery inside the function loses
 // nothing: the result equals the OR of the same non-empty sub-queries joined with the tsquery
 // operator || (no text in between), and its own text form is stable under a second parse.

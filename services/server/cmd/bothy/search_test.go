@@ -32,8 +32,8 @@ func TestServeAbortsOnUnknownTextSearchConfig(t *testing.T) {
 	}
 }
 
-// TestConfigCheckRejectsLocaleMapLanguageMissing holds the row of 14 section 12 "Start mit
-// Sprache in search.locale_map, die in search.languages fehlt": bothy config check exits 1 and
+// TestConfigCheckRejectsLocaleMapLanguageMissing holds the row of 14 section 12 "Start with a
+// language in search.locale_map that is missing from search.languages": bothy config check exits 1 and
 // bothy serve exits with the configuration error code before any listener; both name
 // search.locale_map and not the configured value.
 func TestConfigCheckRejectsLocaleMapLanguageMissing(t *testing.T) {
