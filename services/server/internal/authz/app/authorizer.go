@@ -470,11 +470,39 @@ func (a *Authorizer) authorizeDelivery(ctx context.Context, p authorize.Principa
 	}
 	inner := r
 	inner.DeliveryOf, inner.Audience = "", ids.ID{}
+	inner, found, err := a.deliveryTarget(of, inner)
+	if err != nil || !found {
+		return outcome(domain.Decision{Outcome: domain.OutcomeNotFound, Reason: domain.ReasonNoGrant}), err
+	}
 	ospec, oreq, preview, err := a.actionFor(of, inner)
 	if err != nil {
 		return authorize.Decision{}, err
 	}
 	return a.decideFor(ctx, s, of, inner, ospec, oreq, preview, t)
+}
+
+// deliveryTarget returns the object a stored event r is delivered on for its receive action of:
+// r itself when its kind is a resource of of, otherwise the thread, channel or space of its scope
+// that of takes (pin.added names a message, thread.read takes a thread, M1-59). found is false
+// when the scope holds none of them; the event is then not delivered.
+func (a *Authorizer) deliveryTarget(of authorize.Action, r authorize.Resource) (authorize.Resource, bool, error) {
+	spec, _, err := a.requirement(of)
+	if err != nil {
+		return authorize.Resource{}, false, err
+	}
+	if slices.Contains(spec.Resources, string(r.Kind)) {
+		return r, true, nil
+	}
+	for _, c := range []authorize.Resource{
+		{Kind: authorize.ResourceThread, ID: r.ThreadID},
+		{Kind: authorize.ResourceChannel, ID: r.ChannelID},
+		{Kind: authorize.ResourceSpace, ID: r.SpaceID},
+	} {
+		if !c.ID.IsZero() && slices.Contains(spec.Resources, string(c.Kind)) {
+			return c, true, nil
+		}
+	}
+	return authorize.Resource{}, false, nil
 }
 
 // actionFor returns spec and requirement of act, the previewed action of access.preview, and

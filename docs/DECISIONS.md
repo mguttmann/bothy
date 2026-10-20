@@ -750,6 +750,7 @@ with the same IDs (ruling PL/12).
 | M1-59/5 | 2026-10-15 | `pinMessage` locks the thread before the message. | Exact `pin.max_per_thread`. |
 | M1-59/6 | 2026-10-15 | `removeReaction` authorizes on the own reaction; read-only gives `403 channel_read_only`. | 05 table 4.7, rule 1.8. |
 | M1-59/7 | 2026-10-16 | Port onto main: migration `00041` (was `00041`, INT-W24/2). | Next number on main. |
+| M1-59/8 | 2026-10-20 | Port onto main after M2-26: `webhook_out.deliver` decides a stored event whose resource kind is not a resource of its receive action on the thread, channel or space of its scope that the action takes (`deliveryTarget`); `pin.added` and `pin.removed` name a message and are received with `thread.read`, so they are decided on the thread. A scope without such an object is not delivered. | Without it `actionFor` refused the pin events with an internal error, the delivery job of M2-26 retried the head delivery forever and no later event of the subscription left. |
 
 ## Integration int/m1-wave15
 
