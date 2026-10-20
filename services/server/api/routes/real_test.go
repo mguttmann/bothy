@@ -485,6 +485,14 @@ func (stubServer) ReopenThread(context.Context, rest.ReopenThreadRequestObject) 
 	return nil, nil
 }
 
+func (stubServer) CreateMessage(context.Context, rest.CreateMessageRequestObject) (rest.CreateMessageResponseObject, error) {
+	return nil, nil
+}
+
+func (stubServer) CreateThread(context.Context, rest.CreateThreadRequestObject) (rest.CreateThreadResponseObject, error) {
+	return nil, nil
+}
+
 func (stubServer) SetThreadTags(context.Context, rest.SetThreadTagsRequestObject) (rest.SetThreadTagsResponseObject, error) {
 	return nil, nil
 }
@@ -579,7 +587,8 @@ func (stubServer) SetMyLocalCredential(context.Context, rest.SetMyLocalCredentia
 // (M1-35), the providers and credentials (M1-36), the API tokens (M1-44), the audit log (M1-50),
 // the enrollment codes (M1-37), the device approval and pairing (M1-38), the passkeys (M1-40),
 // the OIDC login (M1-41), the trusted header login (M1-43), the revocations (M1-45), the host
-// records (M2-39), the local accounts (M1-39) and the nine app operations (M2-24). A handler
+// records (M2-39), the local accounts (M1-39), the nine app operations (M2-24) and sending
+// (M1-56). A handler
 // ticket that enables an operation changes this test together with
 // api/operations.yaml.
 func TestRealTable_Enabled(t *testing.T) {
@@ -749,6 +758,10 @@ func TestRealTable_Enabled(t *testing.T) {
 		"suspendApp":         {"POST /api/v1/apps/{app_id}/suspend", "app.suspend", "rl.admin"},
 		"resumeApp":          {"POST /api/v1/apps/{app_id}/resume", "app.resume", "rl.admin"},
 		"uninstallApp":       {"POST /api/v1/apps/{app_id}/uninstall", "app.uninstall", "rl.admin"},
+
+		// M1-56
+		"createMessage": {"POST /api/v1/threads/{thread_id}/messages", "message.create", "rl.message"},
+		"createThread":  {"POST /api/v1/channels/{channel_id}/threads", "thread.create", "rl.message"},
 	}
 	ops := routes.Enabled()
 	if len(ops) != len(want) {

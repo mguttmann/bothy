@@ -62,6 +62,21 @@ documented in this file. The format is based on
   and offers `healthcheck` (TLS handshake with the stack's CA) and `version`.
 - `bothy secrets init` generates `pgbackrest_tls/` (M7-01): an own CA and ECDSA P-256 certificates
   for `postgres` and `backup`, copied only to those two services; the CA key is not kept.
+- Sending messages (M1-56): `createMessage` and `createThread`. Migrations `00032` and `00033`
+  create `messages` and `mentions` and give `threads.parent_message_id` its deferred foreign key.
+  A message is idempotent by its author and `client_msg_id` (a repetition answers `200` with
+  `Idempotent-Replay: true`, another body `422 idempotency_key_reuse`, two concurrent identical
+  requests make one message), takes the gapless `thread_seq` under the thread lock, gets its
+  `origin` from the principal kind, may quote a message of the same thread and resolves mentions
+  by the content format of 03 and the rule of 07 section 4.6 (at most `message.max_mentions`
+  distinct handles, no collective mentions). A message into a closed thread reopens it and leaves
+  a system line `thread.reopened`. Every new message publishes the in-transaction event
+  `MessagePosted` and appends `message.created`, whose content is cut with `truncated` above
+  `sync.event_payload_max_bytes`. `createThread` creates a forum post or a thread from a message
+  of the main thread, with its first message in the same transaction. Attachments, voice, cards,
+  components and `run_id` are refused with `not_enabled` until their tickets. New key
+  `message.max_mentions`; `identity.Directory` adds the batched handle lookup `ActiveByHandles`.
+
 - Local accounts with password and TOTP (M1-39): the migration
   `00029_identity_local_credentials.sql` (`local_credentials` with the failure window column), the
   operations `setMyLocalCredential` (set the password, start a TOTP enrollment whose otpauth URI is

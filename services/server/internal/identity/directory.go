@@ -81,6 +81,10 @@ type Directory interface {
 	// PrincipalByHandle returns the principal whose handle equals handle without regard to
 	// case. Errors: kind not_found when there is none.
 	PrincipalByHandle(ctx context.Context, handle string) (PrincipalView, error)
+	// ActiveByHandles returns the active people and agents whose handle equals one of handles
+	// without regard to case, keyed by the lower-case handle, in one read (the mention lookup of
+	// messaging, M1-56); apps, other states and unknown handles are absent.
+	ActiveByHandles(ctx context.Context, handles []string) (map[string]PrincipalView, error)
 	// User returns the person id. Errors: kind not_found for an unknown id and for a principal
 	// that is not a person.
 	User(ctx context.Context, id ids.ID) (UserView, error)

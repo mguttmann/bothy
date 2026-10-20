@@ -516,3 +516,13 @@ func FuzzParse(f *testing.F) {
 		}
 	})
 }
+
+func TestStringOrEmpty(t *testing.T) {
+	if got := (ids.ID{}).StringOrEmpty(); got != "" {
+		t.Errorf("zero ID: StringOrEmpty() = %q, want empty", got)
+	}
+	id := ids.New()
+	if got := id.StringOrEmpty(); got != id.String() {
+		t.Errorf("StringOrEmpty() = %q, want %q", got, id.String())
+	}
+}

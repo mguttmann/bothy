@@ -15842,6 +15842,12 @@ type ListChannelThreadsParams struct {
 	Sort *ForumSort `form:"sort,omitempty" json:"sort,omitempty"`
 }
 
+// CreateThreadParams defines parameters for CreateThread.
+type CreateThreadParams struct {
+	// IdempotencyKey UUIDv7 chosen by the client per logical operation. A repeat with the same request returns the stored response; a different request gives 422 `idempotency_key_reuse`; a repeat while the first is running gives 409 `request_in_progress`. Kept for `sync.idempotency_key_ttl`.
+	IdempotencyKey *IdempotencyKey `json:"Idempotency-Key,omitempty"`
+}
+
 // ApproveDeviceParams defines parameters for ApproveDevice.
 type ApproveDeviceParams struct {
 	// IdempotencyKey UUIDv7 chosen by the client per logical operation. A repeat with the same request returns the stored response; a different request gives 422 `idempotency_key_reuse`; a repeat while the first is running gives 409 `request_in_progress`. Kept for `sync.idempotency_key_ttl`.
@@ -16290,6 +16296,9 @@ type UpdateForumTagJSONRequestBody = ForumTagUpdate
 // MoveForumTagJSONRequestBody defines body for MoveForumTag for application/json ContentType.
 type MoveForumTagJSONRequestBody = MovePosition
 
+// CreateThreadJSONRequestBody defines body for CreateThread for application/json ContentType.
+type CreateThreadJSONRequestBody = ThreadCreate
+
 // ApproveDeviceJSONRequestBody defines body for ApproveDevice for application/json ContentType.
 type ApproveDeviceJSONRequestBody = DeviceApprove
 
@@ -16406,6 +16415,9 @@ type MoveSpaceJSONRequestBody = MovePosition
 
 // SetSpaceOperatorJSONRequestBody defines body for SetSpaceOperator for application/json ContentType.
 type SetSpaceOperatorJSONRequestBody = OperatorSet
+
+// CreateMessageJSONRequestBody defines body for CreateMessage for application/json ContentType.
+type CreateMessageJSONRequestBody = MessageCreate
 
 // SetThreadTagsJSONRequestBody defines body for SetThreadTags for application/json ContentType.
 type SetThreadTagsJSONRequestBody = ThreadTagsPut

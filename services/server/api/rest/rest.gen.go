@@ -167,6 +167,9 @@ type ServerInterface interface {
 	// ListChannelThreads List threads or forum posts of a channel
 	// (GET /channels/{channel_id}/threads)
 	ListChannelThreads(w http.ResponseWriter, r *http.Request, channelId ChannelIdPath, params ListChannelThreadsParams)
+	// CreateThread Create a forum post or a thread from a message
+	// (POST /channels/{channel_id}/threads)
+	CreateThread(w http.ResponseWriter, r *http.Request, channelId ChannelIdPath, params CreateThreadParams)
 	// GetDevice Read a device
 	// (GET /devices/{device_id})
 	GetDevice(w http.ResponseWriter, r *http.Request, deviceId DeviceIdPath)
@@ -383,6 +386,9 @@ type ServerInterface interface {
 	// CloseThread Mark a thread as done
 	// (POST /threads/{thread_id}/close)
 	CloseThread(w http.ResponseWriter, r *http.Request, threadId ThreadIdPath, params CloseThreadParams)
+	// CreateMessage Send a message
+	// (POST /threads/{thread_id}/messages)
+	CreateMessage(w http.ResponseWriter, r *http.Request, threadId ThreadIdPath)
 	// ReopenThread Reopen a thread
 	// (POST /threads/{thread_id}/reopen)
 	ReopenThread(w http.ResponseWriter, r *http.Request, threadId ThreadIdPath, params ReopenThreadParams)
@@ -2587,6 +2593,56 @@ func (siw *ServerInterfaceWrapper) ListChannelThreads(w http.ResponseWriter, r *
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		siw.Handler.ListChannelThreads(w, r, channelId, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// CreateThread operation middleware
+func (siw *ServerInterfaceWrapper) CreateThread(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "channel_id" -------------
+	var channelId ChannelIdPath
+
+	err = runtime.BindStyledParameterWithOptions("simple", "channel_id", r.PathValue("channel_id"), &channelId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "uuid", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "channel_id", Err: err})
+		return
+	}
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params CreateThreadParams
+
+	headers := r.Header
+
+	// ------------- Optional header parameter "Idempotency-Key" -------------
+	if valueList, found := headers[http.CanonicalHeaderKey("Idempotency-Key")]; found {
+		var IdempotencyKey IdempotencyKey
+		n := len(valueList)
+		if n != 1 {
+			siw.ErrorHandlerFunc(w, r, &TooManyValuesForParamError{ParamName: "Idempotency-Key", Count: n})
+			return
+		}
+
+		err = runtime.BindStyledParameterWithOptions("simple", "Idempotency-Key", valueList[0], &IdempotencyKey, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: "uuid"})
+		if err != nil {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "Idempotency-Key", Err: err})
+			return
+		}
+
+		params.IdempotencyKey = &IdempotencyKey
+
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.CreateThread(w, r, channelId, params)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -5267,6 +5323,32 @@ func (siw *ServerInterfaceWrapper) CloseThread(w http.ResponseWriter, r *http.Re
 	handler.ServeHTTP(w, r)
 }
 
+// CreateMessage operation middleware
+func (siw *ServerInterfaceWrapper) CreateMessage(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "thread_id" -------------
+	var threadId ThreadIdPath
+
+	err = runtime.BindStyledParameterWithOptions("simple", "thread_id", r.PathValue("thread_id"), &threadId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "uuid", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "thread_id", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.CreateMessage(w, r, threadId)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
 // ReopenThread operation middleware
 func (siw *ServerInterfaceWrapper) ReopenThread(w http.ResponseWriter, r *http.Request) {
 
@@ -6242,11 +6324,13 @@ func HandlerWithOptions(si ServerInterface, options StdHTTPServerOptions) http.H
 	m.HandleFunc(http.MethodPatch+" "+options.BaseURL+"/channels/{channel_id}/tags/{tag_id}", wrapper.UpdateForumTag)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/channels/{channel_id}/tags/{tag_id}/move", wrapper.MoveForumTag)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/channels/{channel_id}/threads", wrapper.ListChannelThreads)
+	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/channels/{channel_id}/threads", wrapper.CreateThread)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/threads/{thread_id}", wrapper.GetThread)
 	m.HandleFunc(http.MethodPut+" "+options.BaseURL+"/threads/{thread_id}/title", wrapper.SetThreadTitle)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/threads/{thread_id}/close", wrapper.CloseThread)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/threads/{thread_id}/reopen", wrapper.ReopenThread)
 	m.HandleFunc(http.MethodPut+" "+options.BaseURL+"/threads/{thread_id}/tags", wrapper.SetThreadTags)
+	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/threads/{thread_id}/messages", wrapper.CreateMessage)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/agents", wrapper.ListAgents)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/agents", wrapper.CreateAgent)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/agents/{agent_id}", wrapper.GetAgent)
@@ -6574,6 +6658,9 @@ type StrictServerInterface interface {
 	// ListChannelThreads List threads or forum posts of a channel
 	// (GET /channels/{channel_id}/threads)
 	ListChannelThreads(ctx context.Context, request ListChannelThreadsRequestObject) (ListChannelThreadsResponseObject, error)
+	// CreateThread Create a forum post or a thread from a message
+	// (POST /channels/{channel_id}/threads)
+	CreateThread(ctx context.Context, request CreateThreadRequestObject) (CreateThreadResponseObject, error)
 	// GetDevice Read a device
 	// (GET /devices/{device_id})
 	GetDevice(ctx context.Context, request GetDeviceRequestObject) (GetDeviceResponseObject, error)
@@ -6790,6 +6877,9 @@ type StrictServerInterface interface {
 	// CloseThread Mark a thread as done
 	// (POST /threads/{thread_id}/close)
 	CloseThread(ctx context.Context, request CloseThreadRequestObject) (CloseThreadResponseObject, error)
+	// CreateMessage Send a message
+	// (POST /threads/{thread_id}/messages)
+	CreateMessage(ctx context.Context, request CreateMessageRequestObject) (CreateMessageResponseObject, error)
 	// ReopenThread Reopen a thread
 	// (POST /threads/{thread_id}/reopen)
 	ReopenThread(ctx context.Context, request ReopenThreadRequestObject) (ReopenThreadResponseObject, error)
@@ -8415,6 +8505,40 @@ func (sh *strictHandler) ListChannelThreads(w http.ResponseWriter, r *http.Reque
 		sh.options.ResponseErrorHandlerFunc(w, r, err)
 	} else if validResponse, ok := response.(ListChannelThreadsResponseObject); ok {
 		if err := validResponse.VisitListChannelThreadsResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// CreateThread operation middleware
+func (sh *strictHandler) CreateThread(w http.ResponseWriter, r *http.Request, channelId ChannelIdPath, params CreateThreadParams) {
+	var request CreateThreadRequestObject
+
+	request.ChannelId = channelId
+	request.Params = params
+
+	var body CreateThreadJSONRequestBody
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
+		return
+	}
+	request.Body = &body
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.CreateThread(ctx, request.(CreateThreadRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "CreateThread")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(CreateThreadResponseObject); ok {
+		if err := validResponse.VisitCreateThreadResponse(w); err != nil {
 			sh.options.ResponseErrorHandlerFunc(w, r, err)
 		}
 	} else if response != nil {
@@ -10547,6 +10671,39 @@ func (sh *strictHandler) CloseThread(w http.ResponseWriter, r *http.Request, thr
 		sh.options.ResponseErrorHandlerFunc(w, r, err)
 	} else if validResponse, ok := response.(CloseThreadResponseObject); ok {
 		if err := validResponse.VisitCloseThreadResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// CreateMessage operation middleware
+func (sh *strictHandler) CreateMessage(w http.ResponseWriter, r *http.Request, threadId ThreadIdPath) {
+	var request CreateMessageRequestObject
+
+	request.ThreadId = threadId
+
+	var body CreateMessageJSONRequestBody
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
+		return
+	}
+	request.Body = &body
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.CreateMessage(ctx, request.(CreateMessageRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "CreateMessage")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(CreateMessageResponseObject); ok {
+		if err := validResponse.VisitCreateMessageResponse(w); err != nil {
 			sh.options.ResponseErrorHandlerFunc(w, r, err)
 		}
 	} else if response != nil {

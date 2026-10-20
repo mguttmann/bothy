@@ -4,6 +4,7 @@ package app
 
 import (
 	"context"
+	"strings"
 
 	"github.com/OWNER/bothy/services/server/internal/identity"
 	"github.com/OWNER/bothy/services/server/internal/identity/domain"
@@ -68,6 +69,28 @@ func (d *Directory) PrincipalByHandle(ctx context.Context, handle string) (ident
 		return identity.PrincipalView{}, notFound("principal")
 	}
 	return principalView(p), nil
+}
+
+// ActiveByHandles implements identity.Directory: the handles are lower-cased and read in one
+// query; an empty list reads nothing.
+func (d *Directory) ActiveByHandles(ctx context.Context, handles []string) (map[string]identity.PrincipalView, error) {
+	out := map[string]identity.PrincipalView{}
+	if len(handles) == 0 {
+		return out, nil
+	}
+	lower := make([]string, 0, len(handles))
+	for _, h := range handles {
+		lower = append(lower, strings.ToLower(h))
+	}
+	ps, err := d.store.ActivePrincipalsByHandles(ctx, lower)
+	if err != nil {
+		return nil, err
+	}
+	for _, p := range ps {
+		v := principalView(p)
+		out[strings.ToLower(v.Handle)] = v
+	}
+	return out, nil
 }
 
 // User implements identity.Directory. Errors: kind not_found for an unknown id and for a
