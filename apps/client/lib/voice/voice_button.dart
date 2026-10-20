@@ -131,8 +131,15 @@ final class VoiceController extends ChangeNotifier {
     }
   }
 
-  /// Stops the recording; it then waits to be sent.
-  Future<void> stop() async {
+  /// Stops the recording; it then waits to be sent. A second call while one stops (a double
+  /// click, or Stop at the moment of the limit) waits for the first.
+  Future<void> stop() => _stopping ??= _stop().whenComplete(() {
+    _stopping = null;
+  });
+
+  Future<void>? _stopping;
+
+  Future<void> _stop() async {
     if (phase != VoicePhase.recording) return;
     _ticker?.cancel();
     _stopper?.cancel();

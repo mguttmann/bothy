@@ -151,9 +151,14 @@ abstract final class UploadOps {
     final path = p['path']! as String;
     final size = p['size_bytes']! as int;
     final local = File(path);
-    if (!local.existsSync() || local.lengthSync() != size) {
-      // The file changed or went away since it was attached: nothing to resume from.
-      throw const ApiProblem(status: 400, code: 'file_unreadable');
+    try {
+      if (!local.existsSync() || local.lengthSync() != size) {
+        throw const FileSystemException('changed since it was attached');
+      }
+    } on FileSystemException {
+      // The file changed or went away since it was attached: nothing to resume from. A final
+      // failure, never a retry (a file error is an IOException, which the outbox retries).
+      throw _unreadable;
     }
     final files = api.getFilesApi();
     progress._begin(key, size);
@@ -194,7 +199,12 @@ abstract final class UploadOps {
       Future<void> worker() async {
         while (!stopped && next < todo.length) {
           final part = todo[next++];
-          final bytes = await readPart(path, part);
+          final List<int> bytes;
+          try {
+            bytes = await readPart(path, part);
+          } on FileSystemException {
+            throw _unreadable;
+          }
           final digest = contentDigestOf(bytes);
           etags[part.number] = session.mode == UploadSessionModeEnum.presigned
               ? await _putPresigned(
@@ -256,6 +266,11 @@ abstract final class UploadOps {
       result: {slotOf(key): fileId},
     );
   }
+
+  static const ApiProblem _unreadable = ApiProblem(
+    status: 400,
+    code: 'file_unreadable',
+  );
 
   static Future<String> _putPresigned(
     Dio store,

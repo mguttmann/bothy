@@ -9,7 +9,9 @@
 import 'dart:async';
 import 'dart:io';
 
+import 'package:audioplayers/audioplayers.dart' show AudioLogLevel, AudioLogger;
 import 'package:client/files/attach_controller.dart';
+import 'package:client/files/ticket_player.dart';
 import 'package:client/files/upload_executor.dart';
 import 'package:client/thread/history_column.dart';
 import 'package:client/voice/recorder.dart';
@@ -72,6 +74,27 @@ void main() {
       voice.dispose();
     });
 
+    testWidgets('two stops at once keep the recording', (tester) async {
+      final voice = VoiceController(
+        recorder: FakeRecorder.new,
+        bitRate: 64000,
+        scratch: () async => scratch,
+        onSend: (_) async {},
+      );
+      await tester.runAsync(() async {
+        await voice.start();
+        await Future.wait([voice.stop(), voice.stop()]);
+      });
+      expect(voice.phase, VoicePhase.recorded);
+      expect(voice.recorded, isNotNull);
+      voice.dispose();
+    });
+
+    test('the audio player logs nothing, so no ticket URL reaches a log', () {
+      AudioTicketPlayer.silenceLogs();
+      expect(AudioLogger.logLevel, AudioLogLevel.none);
+    });
+
     testWidgets('a denied microphone explains the system settings', (
       tester,
     ) async {
@@ -102,6 +125,7 @@ void main() {
         outbox: host.engine.outbox,
         progress: UploadProgress(),
         newKey: () => 'voice-key',
+        outgoing: () async => scratch,
       );
       await sendVoice(
         host.engine.outbox,

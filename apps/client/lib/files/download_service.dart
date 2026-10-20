@@ -119,7 +119,6 @@ final class DownloadService {
         path,
         options: Options(
           responseType: ResponseType.stream,
-          validateStatus: (_) => true,
           // The security marker of the generated operations, so the auth interceptors of
           // M4-09 sign this request with DPoP (never a ticket, 12 9.2).
           extra: {
@@ -131,19 +130,25 @@ final class DownloadService {
         ),
       );
     } on DioException catch (e) {
-      final problem = ApiProblem.of(e);
-      return problem == null
-          ? const DownloadFailed('network')
-          : _failure(problem.code, problem.reason);
+      // Errors pass the interceptors of `auth` first (DPoP nonce, refresh, revocation); a
+      // binary operation then still carries its problem as a stream.
+      final failed = e.response;
+      if (failed == null) return const DownloadFailed('network');
+      final data = failed.data;
+      final problem = data is ResponseBody
+          ? await _problemOf(data)
+          : const <String, Object?>{};
+      final mapped = ApiProblem.of(e);
+      return _failure(
+        problem['code'] as String? ??
+            mapped?.code ??
+            'http_${failed.statusCode ?? 0}',
+        problem['reason'] as String? ?? mapped?.reason,
+      );
     }
     final body = response.data;
-    final status = response.statusCode ?? 0;
-    if (status != 200 || body == null) {
-      final problem = await _problemOf(body);
-      return _failure(
-        problem['code'] as String? ?? 'http_$status',
-        problem['reason'] as String?,
-      );
+    if (response.statusCode != 200 || body == null) {
+      return DownloadFailed('http_${response.statusCode ?? 0}');
     }
     final expected = _reprDigest(response.headers.value('repr-digest'));
     final partial = await cache.partial(fileId, variant);

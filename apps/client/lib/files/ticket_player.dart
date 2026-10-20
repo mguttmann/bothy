@@ -64,8 +64,17 @@ abstract interface class TicketPlayer {
 /// [TicketPlayer] over package `audioplayers` (MIT): AVPlayer on macOS, Media Foundation on
 /// Windows.
 final class AudioTicketPlayer implements TicketPlayer {
-  /// Creates the player.
-  AudioTicketPlayer() : _player = ap.AudioPlayer();
+  /// Creates the player; the package logs nothing ([silenceLogs]).
+  AudioTicketPlayer() : _player = _quiet();
+
+  static ap.AudioPlayer _quiet() {
+    silenceLogs();
+    return ap.AudioPlayer();
+  }
+
+  /// Turns off the logger of `audioplayers`, which prints the source URL of a failed playback:
+  /// a ticket URL must never reach a log (12 9.2 item 4).
+  static void silenceLogs() => ap.AudioLogger.logLevel = ap.AudioLogLevel.none;
 
   final ap.AudioPlayer _player;
   double _speed = 1;

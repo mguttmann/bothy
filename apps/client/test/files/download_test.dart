@@ -70,6 +70,21 @@ void main() {
     expect(h.server.requestsOf('downloadFile'), hasLength(1));
   });
 
+  test('a stale DPoP nonce is renewed by the auth interceptors', () async {
+    final id = ready();
+    await downloads.fetch(ready());
+    // Both nonces the client knows become stale: the next request gets `use_dpop_nonce`.
+    h.server.verifier
+      ..rotateNonce()
+      ..rotateNonce();
+    final result = await downloads.fetch(id);
+    expect(result, isA<Downloaded>());
+    expect(
+      h.server.requestsOf('downloadFile').map((r) => r.status),
+      containsAllInOrder([401, 200]),
+    );
+  });
+
   test('a mismatching Repr-Digest deletes the bytes', () async {
     final id = ready();
     h.server.world.fileSettings.wrongDigest.add(id.value);

@@ -173,6 +173,7 @@ AttachController? composerAttachments(
     outbox: engine.outbox,
     progress: ref.watch(uploadProgressProvider),
     newKey: ref.watch(attachmentKeysProvider),
+    outgoing: () async => ref.read(outgoingFolderProvider),
   );
   ref.onDispose(attach.dispose);
   return attach;

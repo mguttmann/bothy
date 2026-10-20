@@ -18,6 +18,7 @@ import 'package:crypto/crypto.dart';
 import 'package:domain/domain.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:local_store/local_store.dart';
+import 'package:sync_engine/sync_engine.dart' show decodePayload;
 
 import '../support/fake_instance.dart' show eventually;
 import '../support/file_fakes.dart';
@@ -108,6 +109,23 @@ void main() {
         h.server.world.files.values.single.json['upload_state'],
         'complete',
       );
+    },
+  );
+
+  test(
+    'a file that cannot be read fails the entry instead of retrying',
+    () async {
+      final f = await h.file('locked.txt', utf8.encode('secret'));
+      final id = await enqueueUpload(f, 'k1');
+      await Process.run('chmod', ['000', f.path]);
+      addTearDown(() => Process.run('chmod', ['644', f.path]));
+      await h.outbox.start();
+      await eventually(
+        'failed',
+        () async =>
+            (await h.db.outboxDao.byId(id))?.state == OutboxState.failed,
+      );
+      expect((await h.db.outboxDao.byId(id))!.lastErrorCode, 'file_unreadable');
     },
   );
 
@@ -210,6 +228,7 @@ void main() {
         outbox: h.outbox,
         progress: h.progress,
         newKey: () => 'key${keys++}',
+        outgoing: () async => Directory('${h.folder.path}/outgoing'),
       );
     });
     tearDown(() => attach.dispose());
@@ -253,6 +272,24 @@ void main() {
       expect(ok, isFalse);
       expect(attach.refusal, isA<TooManyFiles>());
       expect(await h.db.outboxDao.allEntries(), isEmpty);
+    });
+
+    test('an attached file is copied, so the upload does not need the '
+        'original (macOS sandbox after a restart)', () async {
+      final original = await picked('a.bin', 5);
+      expect(await attach.add([original]), isTrue);
+      final entry = (await h.db.outboxDao.allEntries()).single;
+      final path = decodePayload(entry.payload)['path']! as String;
+      expect(path, startsWith('${h.folder.path}/outgoing'));
+      expect(decodePayload(entry.payload)['delete_after'], isTrue);
+      await File(original.path).delete();
+      await h.outbox.start();
+      await eventually('upload confirmed', () => gone(entry.id));
+      expect(
+        File(path).existsSync(),
+        isFalse,
+        reason: 'deleted after the upload',
+      );
     });
 
     test('files within the limits become upload entries', () async {

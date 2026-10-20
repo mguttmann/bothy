@@ -18,6 +18,7 @@ import 'package:flutter/services.dart';
 import 'package:sync_engine/sync_engine.dart';
 
 import '../voice/recorder.dart';
+import 'file_cache.dart';
 import 'file_ports.dart';
 import 'upload_executor.dart';
 import 'upload_planner.dart';
@@ -116,6 +117,7 @@ final class AttachController extends ChangeNotifier {
     required this._outbox,
     required this._progress,
     required this._newKey,
+    required this._outgoing,
     this.limits,
   });
 
@@ -128,6 +130,11 @@ final class AttachController extends ChangeNotifier {
   final Outbox _outbox;
   final UploadProgress _progress;
   final String Function() _newKey;
+
+  /// The folder the attached files are copied into: the upload reads the copy, so it can
+  /// resume after a restart without the original (a sandboxed macOS app loses access to a
+  /// picked file when it quits) and a later change of the original never mixes two versions.
+  final Future<Directory> Function() _outgoing;
 
   /// The limits of the instance (D-W-115), or null.
   InstanceLimits? limits;
@@ -175,13 +182,22 @@ final class AttachController extends ChangeNotifier {
       }
     }
     for (final f in files) {
+      final key = _newKey();
       final UploadSource source;
       try {
-        source = await prepareUpload(f.path, name: f.name);
+        final dir = Directory(
+          '${(await _outgoing()).path}${Platform.pathSeparator}$key',
+        );
+        await dir.create(recursive: true);
+        final copy = await File(f.path).copy(
+          '${dir.path}${Platform.pathSeparator}${FileCache.safeFileName(f.name)}',
+        );
+        if (f.owned) await File(f.path).delete();
+        source = await prepareUpload(copy.path, name: f.name);
       } on FileSystemException {
         return _refuse(FileUnreadable(f.name));
       }
-      _items.add(await _enqueue(source, owned: f.owned));
+      _items.add(await _enqueue(source, key: key, owned: true));
       notifyListeners();
     }
     return true;
@@ -189,20 +205,21 @@ final class AttachController extends ChangeNotifier {
 
   Future<PendingAttachment> _enqueue(
     UploadSource source, {
+    String? key,
     bool owned = false,
   }) async {
-    final key = _newKey();
+    final attachmentKey = key ?? _newKey();
     final entry = await _outbox.enqueue(
       UploadOps.request(
         threadId: thread,
         channelId: channel,
         source: source,
-        key: key,
+        key: attachmentKey,
         owned: owned,
       ),
     );
     return PendingAttachment(
-      key: key,
+      key: attachmentKey,
       entryId: entry.id,
       name: source.name,
       sizeBytes: source.sizeBytes,

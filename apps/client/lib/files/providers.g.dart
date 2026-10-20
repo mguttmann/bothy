@@ -988,7 +988,7 @@ final class ComposerAttachmentsProvider
 }
 
 String _$composerAttachmentsHash() =>
-    r'5be7c0b663e8f212185b796b3df9f30d8ac75bc1';
+    r'102e5a9857964edc98fb3437487964f3403f3630';
 
 /// The attachments of the composer of [threadId] in [channelId], or null without an engine.
 /// They last while the app runs, so files attached and not sent yet are still there when the
