@@ -248,7 +248,7 @@ func (v *Validator) parameterErrors(r *http.Request, entry opEntry) []*verrors.V
 }
 
 // emptyEnumHeaders reports the header parameters of the operation of r that arrive with only an
-// empty value although their enum does not list "" (INT-W33/2): the validator library treats an
+// empty value although their enum does not list "" (D-M6-01-13): the validator library treats an
 // empty header as absent, so an optional X-Console-Request: with no value would pass where "2" is
 // 400 invalid_enum.
 func emptyEnumHeaders(r *http.Request, item *v3.PathItem) []*verrors.ValidationError {
