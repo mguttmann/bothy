@@ -254,10 +254,12 @@ func TestKillTreeEndsBackground(t *testing.T) {
 			waitGone(t, pids[:2]...)
 			_ = unix.Kill(pids[2], unix.SIGKILL)
 		}
-		out.waitEnd(t)
+		// The supervisor keeps its copy of the terminal side until Kill, so the output of a leader
+		// that exits at once stays readable; reading ends with Kill (the helper calls it after Wait).
 		if err := p.Kill(); err != nil {
 			t.Fatalf("Kill after the end: %v", err)
 		}
+		out.waitEnd(t)
 	})
 }
 
