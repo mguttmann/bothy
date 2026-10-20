@@ -253,27 +253,34 @@ func (s *Service) send(ctx context.Context, a actor.Actor, p prepared, info chat
 		return messaging.Created{}, err
 	}
 	m := view(row, author, mentions)
+	posted := s.posted(a, info, m, p.clearDraft)
+	posted.CreatedThread, posted.ReopenedThread = created, line != nil
+	if err := s.announce(ctx, a, info, line, m, posted); err != nil {
+		return messaging.Created{}, err
+	}
+	return messaging.Created{Message: m}, nil
+}
+
+// announce appends message.created of the reopen line (when there is one) and of m, then
+// publishes MessagePosted of the line and posted of m, in this order (ruling D-M2-05-3).
+func (s *Service) announce(ctx context.Context, a actor.Actor, info chat.ThreadInfo, line *messaging.Message, m messaging.Message,
+	posted messaging.MessagePosted) error {
 	if line != nil {
 		if err := s.emitCreated(ctx, info, *line, false); err != nil {
-			return messaging.Created{}, err
+			return err
 		}
 	}
 	if err := s.emitCreated(ctx, info, m, true); err != nil {
-		return messaging.Created{}, err
+		return err
 	}
 	if line != nil {
 		lp := s.posted(a, info, *line, false)
 		lp.AuthorDeviceID = nil
 		if err := txn.Publish(ctx, lp); err != nil {
-			return messaging.Created{}, err
+			return err
 		}
 	}
-	posted := s.posted(a, info, m, p.clearDraft)
-	posted.CreatedThread, posted.ReopenedThread = created, line != nil
-	if err := txn.Publish(ctx, posted); err != nil {
-		return messaging.Created{}, err
-	}
-	return messaging.Created{Message: m}, nil
+	return txn.Publish(ctx, posted)
 }
 
 // searchLanguage returns the text search configuration of a message by a (docs/spec/14-suche.md

@@ -49,12 +49,8 @@ func (s *Service) CreateThread(ctx context.Context, a actor.Actor, cmd messaging
 		out, err = s.createThread(ctx, a, cmd, p)
 		return err
 	})
-	if err == nil && !out.Replay && out.FirstMessage != nil {
-		// The first message as committed, like the 201 of createMessage (M2-05 brief note 7).
-		var m messaging.Message
-		if m, err = s.reread(ctx, a, out.FirstMessage.ID); err == nil {
-			out.FirstMessage = &m
-		}
+	if err == nil {
+		out, err = s.committedFirst(ctx, a, out)
 	}
 	if errors.Is(err, ErrClientMsgIDTaken) && p != nil {
 		var c messaging.Created
@@ -70,6 +66,20 @@ func (s *Service) CreateThread(ctx context.Context, a actor.Actor, cmd messaging
 		}
 	}
 	return out, err
+}
+
+// committedFirst replaces the first message of a new thread with the row as committed, like the
+// 201 of createMessage (M2-05 brief note 7): a subscriber may have changed it in the unit.
+func (s *Service) committedFirst(ctx context.Context, a actor.Actor, out messaging.ThreadCreated) (messaging.ThreadCreated, error) {
+	if out.Replay || out.FirstMessage == nil {
+		return out, nil
+	}
+	m, err := s.reread(ctx, a, out.FirstMessage.ID)
+	if err != nil {
+		return messaging.ThreadCreated{}, err
+	}
+	out.FirstMessage = &m
+	return out, nil
 }
 
 // createThread is the unit of work of CreateThread.

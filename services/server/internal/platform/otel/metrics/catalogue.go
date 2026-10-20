@@ -29,6 +29,12 @@ const LibraryOtelPGX = "github.com/exaring/otelpgx"
 // droppedScopes are the instrumentation scopes whose instruments never leave the process.
 var droppedScopes = map[string]bool{LibraryOtelPGX: true}
 
+// The values failed and cancelled of bothy.outcome and bothy.run.state.
+const (
+	valueFailed    = "failed"
+	valueCancelled = "cancelled"
+)
+
 // Attribute keys and units several instruments share.
 const (
 	keyReason        = "bothy.reason"
@@ -57,7 +63,7 @@ var (
 	// volumes are bothy.volume: the volumes bothy-backupd measures (signals.md 4.6).
 	volumes = []string{"pgdata", "files", "pgbackrest-repo", "backup-scratch"}
 	// runEndStates are bothy.run.state of an ended run (09 5.1).
-	runEndStates = []string{"completed", "failed", "cancelled"}
+	runEndStates = []string{"completed", valueFailed, valueCancelled}
 	// runReasons are bothy.reason of bothy.run.finished: the codes of runs.state_reason, the 17
 	// rows of 09 5.2 plus user_disabled (02 4.3, D-M2-05-7). The platform cannot import the runs
 	// domain, so the adapter test holds this list equal to domain's reason table.
@@ -249,7 +255,7 @@ var (
 		Description: "Duration of one job attempt.",
 		Attrs: []Attr{
 			{Key: "bothy.job.kind", Source: SourceJobKinds},
-			{Key: keyOutcome, Values: []string{"completed", "failed", "cancelled", "snoozed"}},
+			{Key: keyOutcome, Values: []string{"completed", valueFailed, valueCancelled, "snoozed"}},
 		},
 		Buckets: BucketsLong,
 	}
@@ -358,7 +364,7 @@ var (
 		Description: "Time from queued_at until a run leaves the state queued.",
 		Attrs: []Attr{
 			{Key: keyAgentHandle, Source: SourceAgentHandles},
-			{Key: keyOutcome, Values: []string{"started", "failed", "cancelled"}},
+			{Key: keyOutcome, Values: []string{"started", valueFailed, valueCancelled}},
 			{Key: "bothy.billing_mode", Values: []string{"personal", "organization"}},
 		},
 		Buckets: BucketsSeconds,
