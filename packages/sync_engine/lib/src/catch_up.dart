@@ -607,8 +607,9 @@ final class CatchUpListener implements SessionListener {
     await _states?.cancel();
     await idle();
     await ephemeral.dispose();
-    await _sync.counterChanges.close();
-    await _notices.close();
+    // Not awaited: a paused listener would hold the done event (D-M4-25-8, D-M4-19-14).
+    unawaited(_sync.counterChanges.close());
+    unawaited(_notices.close());
   }
 }
 

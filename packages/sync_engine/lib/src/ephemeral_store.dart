@@ -119,7 +119,8 @@ final class EphemeralStore {
 
   /// Closes the streams.
   Future<void> dispose() async {
-    await _typingChanges.close();
-    await _presenceChanges.close();
+    // Not awaited: a paused listener would hold the done event (D-M4-19-14).
+    unawaited(_typingChanges.close());
+    unawaited(_presenceChanges.close());
   }
 }
