@@ -46,6 +46,10 @@ PLATFORM_OUT ?= $(CURDIR)/.platform
 platform-test: ## Platform suite on a disposable machine: make platform-test (needs administrator rights)
 	@[ "$${BOTHY_PLATFORM_DISPOSABLE:-}" = 1 ] || { echo "platform-test: set BOTHY_PLATFORM_DISPOSABLE=1 only on a disposable machine"; exit 2; }
 	@mkdir -p "$(PLATFORM_OUT)"
+	@# Linux: the per-session cgroup needs root and a cgroup it may write (M2-45 TestSessionCgroup).
+	@if [ "$$(go env GOOS)" = linux ]; then \
+	  GOTOOLCHAIN=local go test -tags platform -count=1 -run '^TestSessionCgroup$$' ./internal/pty; \
+	fi
 	@ext=""; [ "$$(go env GOOS)" = windows ] && ext=.exe; \
 	  CGO_ENABLED=0 GOTOOLCHAIN=local go build -trimpath -ldflags "-X github.com/OWNER/bothy/services/host/internal/buildinfo.PlatformSuite=1" \
 	    -o "$(PLATFORM_OUT)/bothy-host$$ext" ./cmd/bothy-host && \

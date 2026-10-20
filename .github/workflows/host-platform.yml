@@ -38,6 +38,21 @@ jobs:
         with:
           go-version-file: services/host/go.mod
           cache: false
+      # The unit tests as the normal runner user first, so a platform run also proves them on
+      # each system (brief M2-45 "Platform runs"); Windows has no cgo for the race detector.
+      - name: Unit tests (Linux and macOS, runner user)
+        if: runner.os != 'Windows'
+        shell: bash
+        run: cd services/host && go test -race -count=1 ./...
+      - name: Unit tests (Windows, runner user)
+        if: runner.os == 'Windows'
+        shell: bash
+        run: cd services/host && go test -count=1 ./...
+      # TestPlatform_TMT25 traces the file opens and local channels of the service user on Linux.
+      - name: Install strace (Linux)
+        if: runner.os == 'Linux'
+        shell: bash
+        run: sudo apt-get update && sudo apt-get install --yes --no-install-recommends strace
       - name: Platform suite (Linux and macOS, as root)
         if: runner.os != 'Windows'
         shell: bash
