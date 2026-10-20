@@ -20,6 +20,7 @@ import (
 	"github.com/OWNER/bothy/services/server/internal/identity/adapters/identitytest"
 	"github.com/OWNER/bothy/services/server/internal/identity/domain/dpop"
 	"github.com/OWNER/bothy/services/server/internal/kernel/ids"
+	"github.com/OWNER/bothy/services/server/internal/platform/testkit"
 	"github.com/OWNER/bothy/services/server/internal/wire"
 )
 
@@ -66,7 +67,7 @@ func (w *conformanceWorld) call(t *testing.T, p gwPerson, method, path string, b
 		}
 		rd = bytes.NewReader(b)
 	}
-	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), testkit.Patience)
 	defer cancel()
 	req, err := http.NewRequestWithContext(ctx, method, w.base+path, rd)
 	if err != nil {
@@ -135,7 +136,7 @@ func (w *conformanceWorld) observed() map[string]int {
 // waitFor waits until every key was observed by some client; it fails with the missing keys.
 func (w *conformanceWorld) waitFor(t *testing.T, keys ...string) {
 	t.Helper()
-	deadline := time.Now().Add(30 * time.Second)
+	deadline := testkit.Deadline()
 	for {
 		seen := w.observed()
 		var missing []string
@@ -266,7 +267,7 @@ func TestConformance_M1EventCorpus(t *testing.T) {
 	if err := a1.Send("focus", map[string]any{"thread_ids": []string{support.thread}}); err != nil {
 		t.Fatal(err)
 	}
-	deadline := time.Now().Add(30 * time.Second)
+	deadline := testkit.Deadline()
 	for w.observed()["dispatch typing.started"] == 0 {
 		if time.Now().After(deadline) {
 			t.Fatal("typing.started never reached the focusing connection")
@@ -301,7 +302,7 @@ func TestConformance_M1EventCorpus(t *testing.T) {
 	w.track(s1)
 	s1.Abort()
 	s2 := w.track(w.dial(t))
-	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), testkit.Patience)
 	defer cancel()
 	if _, err := s2.Resume(ctx, wstest.ResumeParams{SessionID: sr.GatewaySessionId.String(), AccessToken: sam.access,
 		Proof: w.proofFor(sam.key, sam.access, gwHTU), Cursor: sr.HeadSeq}); err != nil {

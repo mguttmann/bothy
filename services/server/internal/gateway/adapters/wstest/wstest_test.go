@@ -17,11 +17,11 @@ import (
 	"strings"
 	gosync "sync"
 	"testing"
-	"time"
 
 	"github.com/coder/websocket"
 
 	"github.com/OWNER/bothy/services/server/internal/gateway/adapters/wstest"
+	"github.com/OWNER/bothy/services/server/internal/platform/testkit"
 )
 
 // recordTB stands in for the testing.TB of a harness user: it records what the cleanup reports
@@ -81,7 +81,7 @@ func fakeServer(t *testing.T, code websocket.StatusCode, frames ...string) strin
 		if err != nil {
 			return
 		}
-		ctx, cancel := context.WithTimeout(r.Context(), 5*time.Second)
+		ctx, cancel := context.WithTimeout(r.Context(), testkit.Patience)
 		defer cancel()
 		for _, f := range frames {
 			if err := ws.Write(ctx, websocket.MessageText, []byte(f)); err != nil {
@@ -99,7 +99,7 @@ func fakeServer(t *testing.T, code websocket.StatusCode, frames ...string) strin
 func runFake(t *testing.T, url string) []string {
 	t.Helper()
 	rec := &recordTB{TB: t}
-	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), testkit.Patience)
 	defer cancel()
 	c, err := wstest.Dial(rec, ctx, url, wstest.WithoutHeartbeat())
 	if err != nil {
@@ -159,7 +159,7 @@ func TestHarness_ClientFrameValidated(t *testing.T) {
 	t.Parallel()
 	url := fakeServer(t, websocket.StatusNormalClosure, hello)
 	rec := &recordTB{TB: t}
-	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), testkit.Patience)
 	defer cancel()
 	c, err := wstest.Dial(rec, ctx, url, wstest.WithoutHeartbeat())
 	if err != nil {
@@ -196,7 +196,7 @@ func TestHarness_PausedClientDrainedAtCleanup(t *testing.T) {
 	}))
 	t.Cleanup(srv.Close)
 	rec := &recordTB{TB: t}
-	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), testkit.Patience)
 	defer cancel()
 	c, err := wstest.Dial(rec, ctx, srv.URL, wstest.WithoutHeartbeat())
 	if err != nil {

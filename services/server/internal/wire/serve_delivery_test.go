@@ -327,10 +327,8 @@ func TestGatewayDelivery(t *testing.T) {
 		)
 		// The server may still hold the first connection of the device for a moment (4017).
 		for range 50 {
-			c2 = w.dial()
-			ctx, cancel := context.WithTimeout(context.Background(), testkit.Patience)
 			c2 = w.dial(t)
-			ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
+			ctx, cancel := context.WithTimeout(context.Background(), testkit.Patience)
 			p := w.params(sam)
 			p.Cursor, p.SyncEpoch = &cur, r.SyncEpoch.String()
 			_, err = c2.Identify(ctx, p)
@@ -603,10 +601,8 @@ func TestGateway_TokenRevokedDuringCatchUpCloses4012(t *testing.T) {
 	}
 	wcancel()
 	// Without heartbeats the revalidation of a heartbeat cannot close it: only a page can.
-	c2 := w.dial(wstest.WithoutHeartbeat())
-	ctx, cancel := context.WithTimeout(context.Background(), testkit.Patience)
 	c2 := w.dial(t, wstest.WithoutHeartbeat())
-	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), testkit.Patience)
 	p := params
 	p.Cursor, p.SyncEpoch = &r.HeadSeq, r.SyncEpoch.String()
 	_, err := c2.Identify(ctx, p)
