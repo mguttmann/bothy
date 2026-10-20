@@ -61,7 +61,30 @@ func (s *Service) Create(ctx context.Context, a actor.Actor, cmd messaging.Creat
 	if errors.Is(err, ErrClientMsgIDTaken) {
 		return s.afterRace(ctx, a, p)
 	}
+	if err != nil || out.Replay {
+		return out, err
+	}
+	out.Message, err = s.reread(ctx, a, out.Message.ID)
 	return out, err
+}
+
+// reread returns the stored representation of the new message id after its unit of work (04
+// section 16.5, M2-05 brief note 7): a subscriber of MessagePosted may have changed the row in
+// the same unit (runs sets trigger_state received, version 2), so the 201 body is the row as
+// committed, read through stored like a replay.
+func (s *Service) reread(ctx context.Context, a actor.Actor, id ids.ID) (messaging.Message, error) {
+	m, found, err := s.d.Store.Message(ctx, id)
+	if err != nil {
+		return messaging.Message{}, err
+	}
+	if !found {
+		return messaging.Message{}, errs.New(errs.CodeInternalError, "messaging: a created message is missing after its unit of work")
+	}
+	visible, err := s.visible(ctx, a)
+	if err != nil {
+		return messaging.Message{}, err
+	}
+	return s.stored(ctx, m, visible)
 }
 
 // afterRace answers the request whose insert lost against a concurrent identical one (04 section
@@ -189,9 +212,12 @@ func (s *Service) repetition(ctx context.Context, a actor.Actor, p prepared) (me
 }
 
 // send is step 5 of brief D1 inside the unit of work for the thread of info: a repetition answers
-// the original; otherwise the mentions, the thread number (with the reopen and its system line),
-// the rows, MessagePosted and message.created. created marks the first message of a thread
-// created in the same unit.
+// the original; otherwise the mentions, the thread number (with the reopen and its system line)
+// and the rows, then message.created of the unit (the system line first, then the message) and
+// only then MessagePosted in the same order (ruling D-M2-05-3): a subscriber that appends a
+// message to the same thread, the run anchor, must not overtake the message in the log (04
+// section 10). created marks the first message of a thread created in the same unit. The
+// returned message is the row as inserted; the callers read it again after the unit (reread).
 func (s *Service) send(ctx context.Context, a actor.Actor, p prepared, info chat.ThreadInfo, created bool) (messaging.Created, error) {
 	if m, found, err := s.repetition(ctx, a, p); err != nil || found {
 		return messaging.Created{Message: m, Replay: found}, err
@@ -227,17 +253,27 @@ func (s *Service) send(ctx context.Context, a actor.Actor, p prepared, info chat
 		return messaging.Created{}, err
 	}
 	m := view(row, author, mentions)
-	posted := s.posted(a, info, m, p.clearDraft)
-	posted.CreatedThread, posted.ReopenedThread = created, line != nil
-	if err := txn.Publish(ctx, posted); err != nil {
-		return messaging.Created{}, err
-	}
 	if line != nil {
 		if err := s.emitCreated(ctx, info, *line, false); err != nil {
 			return messaging.Created{}, err
 		}
 	}
-	return messaging.Created{Message: m}, s.emitCreated(ctx, info, m, true)
+	if err := s.emitCreated(ctx, info, m, true); err != nil {
+		return messaging.Created{}, err
+	}
+	if line != nil {
+		lp := s.posted(a, info, *line, false)
+		lp.AuthorDeviceID = nil
+		if err := txn.Publish(ctx, lp); err != nil {
+			return messaging.Created{}, err
+		}
+	}
+	posted := s.posted(a, info, m, p.clearDraft)
+	posted.CreatedThread, posted.ReopenedThread = created, line != nil
+	if err := txn.Publish(ctx, posted); err != nil {
+		return messaging.Created{}, err
+	}
+	return messaging.Created{Message: m}, nil
 }
 
 // searchLanguage returns the text search configuration of a message by a (docs/spec/14-suche.md
@@ -291,7 +327,8 @@ func (s *Service) nextSeq(ctx context.Context, a actor.Actor, info chat.ThreadIn
 	return appended.Seq, line, info, nil
 }
 
-// systemLine writes the line a reopen leaves at seq (brief D6) and publishes its MessagePosted.
+// systemLine writes the line a reopen leaves at seq (brief D6); send appends its message.created
+// and publishes its MessagePosted.
 func (s *Service) systemLine(ctx context.Context, a actor.Actor, info chat.ThreadInfo, author messaging.PrincipalRef,
 	seq int64, now time.Time) (*messaging.Message, error) {
 	line := domain.SystemLine(domain.SystemThreadReopened, info.ID, info.ChannelID, a.ID, seq)
@@ -308,11 +345,6 @@ func (s *Service) systemLine(ctx context.Context, a actor.Actor, info chat.Threa
 	}
 	s.countCreated(ctx, line)
 	m := view(row, author, nil)
-	posted := s.posted(a, info, m, false)
-	posted.AuthorDeviceID = nil
-	if err := txn.Publish(ctx, posted); err != nil {
-		return nil, err
-	}
 	return &m, nil
 }
 

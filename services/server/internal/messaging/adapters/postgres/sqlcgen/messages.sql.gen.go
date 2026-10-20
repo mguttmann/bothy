@@ -152,11 +152,11 @@ func (q *Queries) GetMessageByClientID(ctx context.Context, arg GetMessageByClie
 const insertMessage = `-- name: InsertMessage :one
 
 INSERT INTO messages (id, thread_id, channel_id, thread_seq, author_principal_id, client_msg_id, client_payload_sha256,
-                      origin, kind, system_code, content_md, content_format, reply_to_message_id, silent, version, created_at,
-                      search_language)
+                      origin, kind, system_code, content_md, content_format, reply_to_message_id, run_id, silent, version,
+                      created_at, search_language)
 VALUES ($1, $2, $3, $4, $5, $6, $7,
-        $8, $9, $10, $11, $12, $13, $14, 1, $15,
-        $16::text::regconfig)
+        $8, $9, $10, $11, $12, $13, $14, $15, 1,
+        $16, $17::text::regconfig)
 RETURNING id, thread_id, channel_id, thread_seq, author_principal_id, client_msg_id, client_payload_sha256, origin, kind,
     system_code, content_md, content_format, reply_to_message_id, run_id, trigger_state, trigger_state_reason, trigger_state_at,
     silent, import_item_id, version, edited_at, deleted_at, deleted_by, created_at
@@ -176,6 +176,7 @@ type InsertMessageParams struct {
 	ContentMd           string
 	ContentFormat       int16
 	ReplyToMessageID    pgtype.UUID
+	RunID               pgtype.UUID
 	Silent              bool
 	CreatedAt           pgtype.Timestamptz
 	SearchLanguage      string
@@ -216,7 +217,9 @@ type InsertMessageRow struct {
 // of 14 3.1 (M3-13); the static test TestMessageInsertsSetSearchLanguage holds it.
 // A new message; thread_seq comes from threads.last_message_seq under the row lock (03 section
 // 6.2). A second (author_principal_id, client_msg_id) violates messages_author_client_msg_id_key.
-// search_language goes in as text and is cast here, so pgx needs no codec for regconfig.
+// search_language goes in as text and is cast here, so pgx needs no codec for regconfig. run_id is
+// set exactly for the live box anchor of a run (kind run, M2-05); the deferred foreign key lets
+// the anchor and its run be written in either order.
 func (q *Queries) InsertMessage(ctx context.Context, arg InsertMessageParams) (InsertMessageRow, error) {
 	row := q.db.QueryRow(ctx, insertMessage,
 		arg.ID,
@@ -232,6 +235,7 @@ func (q *Queries) InsertMessage(ctx context.Context, arg InsertMessageParams) (I
 		arg.ContentMd,
 		arg.ContentFormat,
 		arg.ReplyToMessageID,
+		arg.RunID,
 		arg.Silent,
 		arg.CreatedAt,
 		arg.SearchLanguage,
@@ -310,6 +314,92 @@ type LockVisibleMessageRow struct {
 func (q *Queries) LockVisibleMessage(ctx context.Context, arg LockVisibleMessageParams) (LockVisibleMessageRow, error) {
 	row := q.db.QueryRow(ctx, lockVisibleMessage, arg.ID, arg.Visible)
 	var i LockVisibleMessageRow
+	err := row.Scan(
+		&i.ID,
+		&i.ThreadID,
+		&i.ChannelID,
+		&i.ThreadSeq,
+		&i.AuthorPrincipalID,
+		&i.ClientMsgID,
+		&i.ClientPayloadSha256,
+		&i.Origin,
+		&i.Kind,
+		&i.SystemCode,
+		&i.ContentMd,
+		&i.ContentFormat,
+		&i.ReplyToMessageID,
+		&i.RunID,
+		&i.TriggerState,
+		&i.TriggerStateReason,
+		&i.TriggerStateAt,
+		&i.Silent,
+		&i.ImportItemID,
+		&i.Version,
+		&i.EditedAt,
+		&i.DeletedAt,
+		&i.DeletedBy,
+		&i.CreatedAt,
+	)
+	return i, err
+}
+
+const setTriggerState = `-- name: SetTriggerState :one
+UPDATE messages SET trigger_state = $1, trigger_state_reason = $2,
+    trigger_state_at = $3, version = version + 1
+WHERE id = $4 AND origin = 'human'
+  AND (trigger_state IS DISTINCT FROM $1::text OR trigger_state_reason IS DISTINCT FROM $2::text)
+RETURNING id, thread_id, channel_id, thread_seq, author_principal_id, client_msg_id, client_payload_sha256, origin, kind,
+    system_code, content_md, content_format, reply_to_message_id, run_id, trigger_state, trigger_state_reason, trigger_state_at,
+    silent, import_item_id, version, edited_at, deleted_at, deleted_by, created_at
+`
+
+type SetTriggerStateParams struct {
+	TriggerState       pgtype.Text
+	TriggerStateReason pgtype.Text
+	TriggerStateAt     pgtype.Timestamptz
+	ID                 pgtype.UUID
+}
+
+type SetTriggerStateRow struct {
+	ID                  pgtype.UUID
+	ThreadID            pgtype.UUID
+	ChannelID           pgtype.UUID
+	ThreadSeq           int64
+	AuthorPrincipalID   pgtype.UUID
+	ClientMsgID         pgtype.UUID
+	ClientPayloadSha256 []byte
+	Origin              string
+	Kind                string
+	SystemCode          pgtype.Text
+	ContentMd           string
+	ContentFormat       int16
+	ReplyToMessageID    pgtype.UUID
+	RunID               pgtype.UUID
+	TriggerState        pgtype.Text
+	TriggerStateReason  pgtype.Text
+	TriggerStateAt      pgtype.Timestamptz
+	Silent              bool
+	ImportItemID        pgtype.UUID
+	Version             int64
+	EditedAt            pgtype.Timestamptz
+	DeletedAt           pgtype.Timestamptz
+	DeletedBy           pgtype.UUID
+	CreatedAt           pgtype.Timestamptz
+}
+
+// The trigger state of a message of a person (M2-05, 09 section 6): the three columns and the
+// next version, only when state or reason differ from the stored ones (D-M2-05-17). No row means
+// an unknown message, another origin or no change; the caller reads the message to tell them
+// apart. The row lock of this UPDATE comes after the runs row of the caller (lock order of the
+// README: runs before messages).
+func (q *Queries) SetTriggerState(ctx context.Context, arg SetTriggerStateParams) (SetTriggerStateRow, error) {
+	row := q.db.QueryRow(ctx, setTriggerState,
+		arg.TriggerState,
+		arg.TriggerStateReason,
+		arg.TriggerStateAt,
+		arg.ID,
+	)
+	var i SetTriggerStateRow
 	err := row.Scan(
 		&i.ID,
 		&i.ThreadID,

@@ -1,6 +1,6 @@
 # Modul `messaging`
 
-Status: sending built (M1-56): `createMessage` and `createThread`, the tables `messages` and `mentions`, the in-transaction event `MessagePosted` and the durable event `message.created`. Reading built (M1-57): `listThreadMessages` and `getMessage`. Editing, deleting and revisions built (M1-58): `updateMessage`, `deleteMessage`, `listMessageRevisions`, the table `message_revisions`, the in-transaction event `MessageDeleted` and the durable events `message.updated` and `message.deleted`. Mentions and templates built (M1-60): `listMyMentions`, the port `Mentions` with `CountUnread`, the table `message_templates` and its six operations. Reactions and pins built (M1-59): `addReaction`, `removeReaction`, `listReactions`, `pinMessage`, `unpinMessage`, `listPins`, the tables `reactions` and `pins` and the durable events `reaction.added`, `reaction.removed`, `pin.added` and `pin.removed`. The port `ReplyTargets` and the first subscriber of `MessagePosted`, sync for `clear_draft`, came with M1-61. The export follows with its ticket.
+Status: sending built (M1-56): `createMessage` and `createThread`, the tables `messages` and `mentions`, the in-transaction event `MessagePosted` and the durable event `message.created`. Reading built (M1-57): `listThreadMessages` and `getMessage`. Editing, deleting and revisions built (M1-58): `updateMessage`, `deleteMessage`, `listMessageRevisions`, the table `message_revisions`, the in-transaction event `MessageDeleted` and the durable events `message.updated` and `message.deleted`. Mentions and templates built (M1-60): `listMyMentions`, the port `Mentions` with `CountUnread`, the table `message_templates` and its six operations. Reactions and pins built (M1-59): `addReaction`, `removeReaction`, `listReactions`, `pinMessage`, `unpinMessage`, `listPins`, the tables `reactions` and `pins` and the durable events `reaction.added`, `reaction.removed`, `pin.added` and `pin.removed`. The port `ReplyTargets` and the first subscriber of `MessagePosted`, sync for `clear_draft`, came with M1-61. The ports of runs built (M2-05): `SetTriggerState`, `CreateRunAnchor`, `run_id` and the trigger state in every representation, and the order "append `message.created`, then publish `MessagePosted`". The export follows with its ticket.
 Normativ ist [docs/spec/02-architektur.md](../../../../docs/spec/02-architektur.md); bei Abweichung gilt das Kapitel.
 
 ## Zweck
@@ -71,7 +71,7 @@ Nachrichten, Revisionen, Erwähnungen, Reaktionen, Anheften, Vorlagen, Kanal-Exp
 
 ## Metrics (M1-68)
 
-`bothy.message.created` counts every inserted message, the reopen line included, with
+`bothy.message.created` counts every inserted message, the reopen line and the run anchor included, with
 `bothy.message.origin` and `bothy.message.kind` once its unit of work committed
 (`txn.AfterCommit`), so a rolled-back message counts nothing. The use cases record through the
 port `app.Metrics` (`app/metrics.go`); `adapters/otelmetrics` implements it with the declaration
@@ -127,10 +127,16 @@ Nur dieses Modul schreibt und liest diese Tabellen per SQL (03-datenmodell.md, G
    `Idempotent-Replay` or `422 idempotency_key_reuse` by the canonical hash; otherwise the
    mentions are resolved, `chat.Threads.AppendToThread` hands out `thread_seq` and reopens a
    closed thread (then the system line takes that number and a second append gives the message
-   its own), the rows are written, `MessagePosted` is published (system line first) and
-   `message.created` appended. A concurrent identical request that committed first makes the
+   its own), the rows are written, `message.created` is appended for the unit (system line
+   first, then the message) and only then `MessagePosted` is published in the same order
+   (ruling D-M2-05-3): a subscriber that appends a message to the same thread, the run anchor,
+   must not overtake the message in the log (04 section 10). A concurrent identical request that committed first makes the
    insert fail on the unique index; the unit rolls back with its thread number and a new unit
    answers like a repetition.
+4. After the unit of work the `201` body is the stored row read again through the one
+   representation (`stored`), like the replay: a subscriber may have changed the row in the same
+   unit (runs sets `trigger_state = received`, version 2; 04 section 16.5). The first message of
+   `createThread` is read the same way.
 
 Canonical hash (`client_payload_sha256`): SHA-256 over `bothy-msg-v1`, then context, kind,
 content, reply target and the attachment ids joined by `,`, each as `uvarint(length)` and bytes.
@@ -163,7 +169,9 @@ thread by its channel path and the flow of `createMessage` with `CreatedThread`.
 Events: `message.created` per message with `message.read` as receive action, scope space,
 channel and thread, resource the message with version 1, `client_msg_id` echoed (not for a system
 line) and the payload `{message: Message}` with empty attachments, reactions and components,
-`pinned: false` and no `my_reactions`. A payload that is not smaller than
+`pinned: false` and no `my_reactions`; `run_id`, `trigger_state`, `trigger_state_at` and
+`trigger_state_reason` are members only when set, never `null` (ADR 0053), in events and in REST
+alike, and a tombstone keeps them because they are not content (03 `messages`). A payload that is not smaller than
 `sync.event_payload_max_bytes` gets the longest valid UTF-8 prefix of `content_md` that fits,
 `content_truncated: true` and the envelope flag `truncated`; REST answers are never cut.
 
@@ -171,8 +179,9 @@ In-transaction event `MessagePosted`: published for every new message, system li
 inside the writing transaction; a subscriber error rolls everything back. It carries ids, the
 thread kind and sequence, author and origin, `AuthorDeviceID` (people only), the reply target,
 the sorted mentions, `Silent`, `ClearDraft`, `CreatedThread` and `ReopenedThread`, never content.
-sync subscribes since M1-61 (it deletes the author's draft for `ClearDraft`); runs follow in M2,
-notify in M3.
+`Kind` is `text`, `system` or `run` (the anchor). sync subscribes since M1-61 (it deletes the
+author's draft for `ClearDraft`, so `draft.deleted` follows `message.created`); runs since M2-05
+(the acceptance); notify in M3.
 
 `ReplyTargets.InThread` (M1-61, `replies.go`) answers whether a message lies in a thread, deleted
 ones included, with the rule of `createMessage`; an unknown id is false. It does not authorize:
@@ -181,6 +190,35 @@ sync checks the reply target of a thread draft with it after `draft.write`.
 System codes (`messages.system_code`, CHECK of 03): `thread.reopened`, written when a message
 reopens a closed thread, with origin `system`, empty content, `silent`, the author of the
 reopening message and the sequence right before it. M2-12 adds `agent_session.resume_failed`.
+
+## Runs (M2-05)
+
+The two ports of runs run only inside the caller's unit of work (internal otherwise) and never
+authorize: runs accepted the trigger or changed the run.
+
+`SetTriggerState(ctx, SetTriggerStateCmd{MessageID, State, Reason})` (09 section 6): `State` is a
+value of schema `TriggerState`, `Reason` is non-empty exactly for `failed` and `cancelled` (03
+check). One `UPDATE` sets the three columns (`trigger_state_at` from the service clock) and raises
+`version` by one, only for a message of origin `human` whose state or reason differ; without a row
+the message is read: unknown or not of a person is internal, the same state and reason writes
+nothing and appends nothing (D-M2-05-17). A change appends `message.updated` like an edit (the
+representation and truncation of `message.created`, reactions and pin decorated, a tombstone in
+its tombstone form), scope from `chat.Threads.Info`.
+
+`CreateRunAnchor(ctx, RunAnchorCmd{ThreadID, RunID, AgentID})` (09 section 5.4): the next
+`thread_seq` through `chat.Threads.AppendToThread` without reopen (as the principal of the unit,
+which chat requires; the agent only outside a request), then the row of `domain.RunAnchor`: kind
+`run`, origin `agent`, the agent as author, empty content, `silent`, `run_id`, a server
+`client_msg_id` and the hash over the context `run-anchor:<run id>` and kind `run`, the instance
+language, no mentions. `bothy.message.created` counts it, `message.created` follows without the
+`client_msg_id` echo, then `MessagePosted` with `Kind run`, `Origin agent`, `AuthorKind agent` and
+no device. It returns `AnchorRef{MessageID, ThreadSeq}`. The deferred foreign key `messages.run_id`
+lets the run and its anchor be written in either order.
+
+Lock order: neither port takes the thread lock for a message change. runs holds its `runs` row
+and then updates the message (`SetTriggerState` last in the acceptance), so both orders of runs
+take `runs` before `messages`; the anchor's `AppendToThread` locks the thread row like any new
+message.
 
 ## Reading (M1-57)
 
@@ -309,7 +347,7 @@ The same content and mention set, an empty body included, answers the current me
 the original; not for a run anchor), the row gets the content, `edited_at` and the next version,
 removed mentions go, added ones are inserted, and `message.updated` carries the message like
 `message.created` (cut above `sync.event_payload_max_bytes`, no `client_msg_id`). An edit never
-publishes `MessagePosted` and never changes `trigger_state`. The `Idempotency-Key` stage answers a
+publishes `MessagePosted` and never changes `trigger_state` (only `SetTriggerState` does). The `Idempotency-Key` stage answers a
 repetition with the stored response.
 
 `deleteMessage`: `authorize(message.delete)`; an already deleted message is `204` without a

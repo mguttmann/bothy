@@ -17,7 +17,8 @@ WITH page AS (
     LIMIT @row_limit
 )
 SELECT p.id, p.thread_id, p.channel_id, p.thread_seq, p.author_principal_id, p.client_msg_id, p.origin, p.kind,
-       p.system_code, p.content_md, p.content_format, p.reply_to_message_id, p.silent, p.version, p.edited_at,
+       p.system_code, p.content_md, p.content_format, p.reply_to_message_id, p.run_id, p.trigger_state, p.trigger_state_reason,
+       p.trigger_state_at, p.silent, p.version, p.edited_at,
        p.deleted_at, p.deleted_by, p.created_at, true AS before_side, false AS opposite
 FROM (SELECT 1) f LEFT JOIN page p ON true
 ORDER BY p.thread_seq;
@@ -37,7 +38,8 @@ WITH page AS (
     ) AS opposite
 )
 SELECT p.id, p.thread_id, p.channel_id, p.thread_seq, p.author_principal_id, p.client_msg_id, p.origin, p.kind,
-       p.system_code, p.content_md, p.content_format, p.reply_to_message_id, p.silent, p.version, p.edited_at,
+       p.system_code, p.content_md, p.content_format, p.reply_to_message_id, p.run_id, p.trigger_state, p.trigger_state_reason,
+       p.trigger_state_at, p.silent, p.version, p.edited_at,
        p.deleted_at, p.deleted_by, p.created_at, true AS before_side, f.opposite
 FROM f LEFT JOIN page p ON true
 ORDER BY p.thread_seq;
@@ -57,7 +59,8 @@ WITH page AS (
     ) AS opposite
 )
 SELECT p.id, p.thread_id, p.channel_id, p.thread_seq, p.author_principal_id, p.client_msg_id, p.origin, p.kind,
-       p.system_code, p.content_md, p.content_format, p.reply_to_message_id, p.silent, p.version, p.edited_at,
+       p.system_code, p.content_md, p.content_format, p.reply_to_message_id, p.run_id, p.trigger_state, p.trigger_state_reason,
+       p.trigger_state_at, p.silent, p.version, p.edited_at,
        p.deleted_at, p.deleted_by, p.created_at, false AS before_side, f.opposite
 FROM f LEFT JOIN page p ON true
 ORDER BY p.thread_seq;
@@ -81,7 +84,8 @@ WITH below AS (
     SELECT a.*, false AS before_side FROM above a
 )
 SELECT p.id, p.thread_id, p.channel_id, p.thread_seq, p.author_principal_id, p.client_msg_id, p.origin, p.kind,
-       p.system_code, p.content_md, p.content_format, p.reply_to_message_id, p.silent, p.version, p.edited_at,
+       p.system_code, p.content_md, p.content_format, p.reply_to_message_id, p.run_id, p.trigger_state, p.trigger_state_reason,
+       p.trigger_state_at, p.silent, p.version, p.edited_at,
        p.deleted_at, p.deleted_by, p.created_at, coalesce(p.before_side, false)::boolean AS before_side, false AS opposite
 FROM (SELECT 1) f LEFT JOIN page p ON true
 ORDER BY p.thread_seq;

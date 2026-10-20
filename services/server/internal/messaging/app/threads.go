@@ -49,6 +49,13 @@ func (s *Service) CreateThread(ctx context.Context, a actor.Actor, cmd messaging
 		out, err = s.createThread(ctx, a, cmd, p)
 		return err
 	})
+	if err == nil && !out.Replay && out.FirstMessage != nil {
+		// The first message as committed, like the 201 of createMessage (M2-05 brief note 7).
+		var m messaging.Message
+		if m, err = s.reread(ctx, a, out.FirstMessage.ID); err == nil {
+			out.FirstMessage = &m
+		}
+	}
 	if errors.Is(err, ErrClientMsgIDTaken) && p != nil {
 		var c messaging.Created
 		if c, err = s.afterRace(ctx, a, *p); err == nil {

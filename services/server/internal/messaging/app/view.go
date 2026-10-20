@@ -111,7 +111,8 @@ func (s *Service) decorate(ctx context.Context, visible []ids.ID, list []messagi
 // view converts a row into the port DTO; the mentions are never nil. It is the one representation
 // of a message (brief M1-57 note 6, also for M1-58 and M1-59): a deleted message is a tombstone
 // with empty content, no mentions, no reactions and not pinned, every other field as stored
-// (attachments and components stay empty in the REST and event forms). Reactions and the pin
+// (attachments and components stay empty in the REST and event forms); run_id and the trigger
+// state are not content, so a tombstone keeps them (03 messages, M2-05). Reactions and the pin
 // start empty; decorate fills them for a stored message.
 func view(m domain.Message, author messaging.PrincipalRef, mentions []ids.ID) messaging.Message {
 	if mentions == nil || !m.DeletedAt.IsZero() {
@@ -123,7 +124,8 @@ func view(m domain.Message, author messaging.PrincipalRef, mentions []ids.ID) me
 	return messaging.Message{
 		ID: m.ID, ThreadID: m.ThreadID, ChannelID: m.ChannelID, ThreadSeq: m.ThreadSeq, Author: author, ClientMsgID: m.ClientMsgID,
 		Origin: string(m.Origin), Kind: string(m.Kind), SystemCode: m.SystemCode, ContentMD: m.ContentMD,
-		ContentFormat: int(m.ContentFormat), ReplyToID: m.ReplyToID, Silent: m.Silent, MentionIDs: mentions,
+		ContentFormat: int(m.ContentFormat), ReplyToID: m.ReplyToID, RunID: m.RunID, TriggerState: m.TriggerState,
+		TriggerStateReason: m.TriggerStateReason, TriggerStateAt: m.TriggerStateAt, Silent: m.Silent, MentionIDs: mentions,
 		Reactions: []messaging.ReactionCount{}, MyReactions: []string{}, Version: m.Version,
 		EditedAt: m.EditedAt, DeletedAt: m.DeletedAt, CreatedAt: m.CreatedAt,
 	}
@@ -180,6 +182,10 @@ type messageJSON struct {
 	ContentFormat    int                 `json:"content_format"`
 	ContentTruncated bool                `json:"content_truncated,omitempty"`
 	ReplyToMessageID string              `json:"reply_to_message_id,omitempty"`
+	RunID            string              `json:"run_id,omitempty"`
+	TriggerState     string              `json:"trigger_state,omitempty"`
+	TriggerStateAt   string              `json:"trigger_state_at,omitempty"`
+	TriggerReason    string              `json:"trigger_state_reason,omitempty"`
 	Silent           bool                `json:"silent"`
 	Attachments      []struct{}          `json:"attachments"`
 	MentionIDs       []string            `json:"mention_ids"`
@@ -209,7 +215,8 @@ func messageBody(m messaging.Message) messageJSON {
 			AvatarFileID: optionalID(m.Author.AvatarFileID),
 		},
 		ClientMsgID: m.ClientMsgID.String(), Origin: m.Origin, Kind: m.Kind, SystemCode: m.SystemCode, ContentMD: m.ContentMD,
-		ContentFormat: m.ContentFormat, ReplyToMessageID: optionalID(m.ReplyToID), Silent: m.Silent, Attachments: []struct{}{},
+		ContentFormat: m.ContentFormat, ReplyToMessageID: optionalID(m.ReplyToID), RunID: optionalID(m.RunID), TriggerState: m.TriggerState,
+		TriggerStateAt: stamp(m.TriggerStateAt), TriggerReason: m.TriggerStateReason, Silent: m.Silent, Attachments: []struct{}{},
 		MentionIDs: mentions, Reactions: reactions, Pinned: m.Pinned, Components: []struct{}{}, Version: m.Version, EditedAt: stamp(m.EditedAt),
 		DeletedAt: stamp(m.DeletedAt), CreatedAt: stamp(m.CreatedAt),
 	}
