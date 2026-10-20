@@ -21,7 +21,6 @@ import (
 	"fmt"
 	"math/rand/v2"
 	"net/http"
-	"strings"
 	gosync "sync"
 	"time"
 
@@ -157,9 +156,11 @@ func DialStatus(ctx context.Context, baseURL string, opts ...Option) (int, error
 	return resp.StatusCode, nil
 }
 
-// wsURL returns the WebSocket URL of the gateway below baseURL.
+// wsURL returns the URL of the gateway below baseURL. The scheme stays http or https:
+// websocket.Dial takes both and maps ws and wss to them itself, so the client never spells out a
+// cleartext WebSocket URL.
 func wsURL(baseURL string) string {
-	return strings.Replace(strings.Replace(baseURL, "https://", "wss://", 1), "http://", "ws://", 1) + Path
+	return baseURL + Path
 }
 
 // readLoop reads every frame into in until the connection ends.
