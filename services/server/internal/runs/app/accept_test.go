@@ -120,7 +120,8 @@ func TestAccept_Outcomes(t *testing.T) {
 			r.State != domain.StateQueued || r.TriggerKind != "message" || r.BillingModeExpected != "organization" {
 			t.Fatalf("run %+v", r)
 		}
-		want := []string{"authz:agent.invoke:filter", "authz:agent.invoke:request", "anchor", "event", "trigger"}
+		// The last event is agent.invocation (M2-08).
+		want := []string{"authz:agent.invoke:filter", "authz:agent.invoke:request", "anchor", "event", "trigger", "event"}
 		got := slices.DeleteFunc(w.j.whats(), func(s string) bool { return !strings.HasPrefix(s, "authz:agent.invoke") && !slices.Contains(writes, s) })
 		if !slices.Equal(got, want) {
 			t.Fatalf("calls %v, want %v", got, want)
@@ -237,7 +238,7 @@ func TestAccept_AutoThreadOnlyOnAllow(t *testing.T) {
 		ev := w.posted(w.main, w.lotse)
 		w.mustPost(ev)
 		got := slices.DeleteFunc(w.j.whats(), func(s string) bool { return !slices.Contains(writes, s) })
-		if want := []string{"thread", "anchor", "event", "trigger"}; !slices.Equal(got, want) {
+		if want := []string{"thread", "anchor", "event", "trigger", "event"}; !slices.Equal(got, want) {
 			t.Fatalf("writes %v, want %v", got, want)
 		}
 		var anchor messaging.RunAnchorCmd
