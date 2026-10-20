@@ -138,6 +138,7 @@ final class CatchUpListener implements SessionListener {
   StreamSubscription<ConnectionState>? _states;
   Future<void> _background = Future<void>.value();
   int _pendingReads = 0;
+  bool _disposed = false;
   bool _live = false;
   bool _halted = false;
   bool _resyncing = false;
@@ -564,7 +565,7 @@ final class CatchUpListener implements SessionListener {
   Future<void> _inBackground(Future<void> Function() read) {
     _pendingReads++;
     final run = _background.then((_) async {
-      if (_wiped) return;
+      if (_wiped || _disposed) return;
       try {
         await read();
       } on Object catch (e) {
@@ -603,9 +604,14 @@ final class CatchUpListener implements SessionListener {
   void _log(String line) => _logHook?.call('catch-up: $line');
 
   /// Stops watching the connection and closes the streams.
+  ///
+  /// Background reads that still wait for the network are not awaited: a read that never gets
+  /// its answer would keep the engine, and with it the database, open. Queued reads do not
+  /// start; a running read that ends later fails on the closed database and is logged like
+  /// every failed read (D-M4-19-15).
   Future<void> dispose() async {
+    _disposed = true;
     await _states?.cancel();
-    await idle();
     await ephemeral.dispose();
     // Not awaited: a paused listener would hold the done event (D-M4-25-8, D-M4-19-14).
     unawaited(_sync.counterChanges.close());
