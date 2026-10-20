@@ -345,9 +345,14 @@ final class InstanceServices {
   Future<String?> storedDeviceId() =>
       secrets.read('auth/${instance.address.origin}/device_id');
 
+  Future<void>? _closing;
+
   /// Stops the engine and closes the database without deleting anything (the app quits or
-  /// switches to another address).
-  Future<void> close() async {
+  /// switches to another address). Every call returns the one close: a caller that comes
+  /// later, such as a test that deletes the data folder, waits for the close begun before.
+  Future<void> close() => _closing ??= _close();
+
+  Future<void> _close() async {
     await engine.dispose();
     await database.close();
     await auth.dispose();

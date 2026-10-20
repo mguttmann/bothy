@@ -129,8 +129,10 @@ class FakeInstance {
   ///
   /// When a test removes the app, the app closes its database without waiting, as it does
   /// when it quits (`OnboardingController` on dispose). Windows refuses to delete an open
-  /// file, so the delete is retried until the close is done, at most [closeTimeout]
-  /// (docs/DECISIONS.md D-M4-18-18).
+  /// file, so the caller first waits for that close (`InstanceServices.close`, as
+  /// `TestApp.stop` does) and stops the fake only then. The bounded retry of the delete, at
+  /// most [closeTimeout], stays as the last resort for a handle the system itself holds for a
+  /// moment (docs/DECISIONS.md D-M4-18-18, D-M4-18-21).
   Future<void> stop({
     Duration closeTimeout = const Duration(seconds: 10),
   }) async {
