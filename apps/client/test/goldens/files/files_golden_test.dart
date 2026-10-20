@@ -7,6 +7,7 @@
 
 import 'dart:convert';
 import 'dart:io';
+import 'dart:typed_data';
 
 import 'package:alchemist/alchemist.dart';
 import 'package:client/files/attachment_mapping.dart';
@@ -20,6 +21,7 @@ import 'package:design_system/testing.dart';
 import 'package:domain/domain.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter_test/flutter_test.dart';
 
 import '../../support/file_fakes.dart';
 import '../../support/file_widgets.dart';
@@ -185,7 +187,41 @@ Widget voice() => _scope(
   ),
 );
 
+/// Largest share of differing pixels a golden of this file may show (one pixel in 100,000).
+///
+/// The rasterizer anti-aliases the close icon of a tile one colour step apart on macOS and on
+/// the Linux runner, so an exact CI golden cannot match both hosts (docs/DECISIONS.md D-M4-22-12).
+const double _tolerance = 0.00001;
+
+/// A [LocalFileComparator] that passes a comparison whose difference stays within [_tolerance].
+class _TolerantComparator extends LocalFileComparator {
+  _TolerantComparator(super.testFile);
+
+  @override
+  Future<bool> compare(Uint8List imageBytes, Uri golden) async {
+    final result = await GoldenFileComparator.compareLists(
+      imageBytes,
+      await getGoldenBytes(golden),
+    );
+    if (result.passed || result.diffPercent <= _tolerance) {
+      result.dispose();
+      return true;
+    }
+    final error = await generateFailureOutput(result, golden, basedir);
+    result.dispose();
+    throw FlutterError(error);
+  }
+}
+
 void main() {
+  setUpAll(() {
+    final previous = goldenFileComparator;
+    if (previous is LocalFileComparator) {
+      goldenFileComparator = _TolerantComparator(
+        previous.basedir.resolve('files_golden_test.dart'),
+      );
+    }
+  });
   final scenes = {
     'attachment_tiles': ('attachment tiles in every state of 12 2', tiles),
     'image_preview': ('image preview from the server', images),
