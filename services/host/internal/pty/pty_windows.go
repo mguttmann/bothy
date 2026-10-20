@@ -22,10 +22,11 @@ type winProcess struct {
 	in      *os.File
 	out     *os.File
 
-	// mu guards console against a Resize after ClosePseudoConsole.
-	mu      sync.Mutex
-	console windows.Handle
-	closed  bool
+	// mu guards console against a Resize after ClosePseudoConsole; consoleOnce closes it once.
+	mu          sync.Mutex
+	console     windows.Handle
+	closed      bool
+	consoleOnce sync.Once
 
 	// done is closed once the leader exited and the rest of its tree was terminated; code is set
 	// before.
@@ -185,6 +186,22 @@ func (p *winProcess) reap() {
 		p.code = -1
 	}
 	close(p.done)
+	// The pseudo console holds the write end of the output until it is closed; closing it ends
+	// Read once the remaining output is read, as the end of the terminal does on Unix. It may
+	// wait for that reading, so it runs after done, and Kill unblocks it by closing the output.
+	p.closeConsole()
+}
+
+// closeConsole closes the pseudo console once. It marks the console closed under mu, so no
+// Resize uses it afterwards, but calls ClosePseudoConsole outside mu, because that call can wait
+// until the output is drained or closed.
+func (p *winProcess) closeConsole() {
+	p.consoleOnce.Do(func() {
+		p.mu.Lock()
+		p.closed = true
+		p.mu.Unlock()
+		windows.ClosePseudoConsole(p.console)
+	})
 }
 
 // Read reads output of the pseudo console.
@@ -218,18 +235,17 @@ func (p *winProcess) Resize(cols, rows uint16) error {
 	return nil
 }
 
-// Kill terminates the job, waits for the leader, closes the pseudo console, which ends the
-// output, and releases every handle.
+// Kill terminates the job, waits for the leader, closes the output and the pseudo console and
+// releases every handle.
 func (p *winProcess) Kill() error {
 	p.killOnce.Do(func() {
 		termErr := windows.TerminateJobObject(p.job, killedExitCode)
 		<-p.done
-		p.mu.Lock()
-		p.closed = true
-		windows.ClosePseudoConsole(p.console)
-		p.mu.Unlock()
-		_ = p.in.Close()
+		// Closing the output first makes the pseudo console's last writes fail instead of
+		// waiting for a reader that may never come.
 		_ = p.out.Close()
+		_ = p.in.Close()
+		p.closeConsole()
 		_ = windows.CloseHandle(p.process)
 		_ = windows.CloseHandle(p.job)
 		p.sup.forget(p)

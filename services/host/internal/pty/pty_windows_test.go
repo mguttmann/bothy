@@ -296,3 +296,48 @@ func TestJobObjectKillOnClose(t *testing.T) {
 	_ = cmd.Wait()
 	waitGone(t, leader, child)
 }
+
+func TestOutputEndsWhenTheTreeEnds(t *testing.T) {
+	// Like on Unix, reading ends once the leader exited by itself, before any Kill.
+	s, err := New(testOptions(t))
+	if err != nil {
+		t.Fatalf("New: %v", err)
+	}
+	t.Cleanup(func() { _ = s.Close() })
+	p, err := s.Start(shellSpec(t, testSessionID(60), "echo DONE & exit 3"))
+	if err != nil {
+		t.Fatalf("Start: %v", err)
+	}
+	t.Cleanup(func() { _ = p.Kill() })
+	out := collect(p)
+	out.waitMatch(t, regexp.MustCompile(`DONE`))
+	if code := waitCode(t, p); code != 3 {
+		t.Fatalf("exit code = %d, want 3", code)
+	}
+	out.waitEnd(t)
+}
+
+func TestKillWithoutReader(t *testing.T) {
+	// Nobody drains the output; Kill must still return, so KillAll cannot hang on a stalled
+	// consumer.
+	s, err := New(testOptions(t))
+	if err != nil {
+		t.Fatalf("New: %v", err)
+	}
+	t.Cleanup(func() { _ = s.Close() })
+	p, err := s.Start(shellSpec(t, testSessionID(61), "for /L %i in (1,0,2) do @echo flooding the pseudo console output"))
+	if err != nil {
+		t.Fatalf("Start: %v", err)
+	}
+	time.Sleep(time.Second)
+	killed := make(chan error, 1)
+	go func() { killed <- p.Kill() }()
+	select {
+	case err := <-killed:
+		if err != nil {
+			t.Fatalf("Kill: %v", err)
+		}
+	case <-time.After(waitLimit):
+		t.Fatal("Kill without a reader never returned")
+	}
+}
