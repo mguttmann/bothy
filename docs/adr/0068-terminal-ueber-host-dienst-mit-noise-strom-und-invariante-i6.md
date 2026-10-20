@@ -103,7 +103,19 @@ Die Ausnahme schränkt Owner ein und erweitert nichts; L22 bleibt für I1 unver�
   `TestHostPairAgainstServer` in `services/server/test/terminal` hold the rules on every build
   host. Until a recorded platform run proves a platform, HD10 fails there with
   `peer_check_unavailable` and the host gives no terminal (docs/DECISIONS.md D-M2-42-19).
-* Wiedereinspiel- und Marken-Tests im Host-Dienst (TM-T03 bis TM-T05).
+* Wiedereinspiel- und Marken-Tests im Host-Dienst (TM-T03 bis TM-T05). Since M2-45 they hold in
+  `services/host/internal/session`: `TestTMT03Replay`, `TestTMT04TokenFailures`,
+  `TestTMT05NoStart`, `TestVerifyOrder` (the check order of 24 5.3 with one row per step) and the
+  fuzz target `FuzzVerifySessionToken`. The host module verifies session tokens with its own
+  smaller implementation of the ADR 0067 profile, tested with the Ed25519 example of RFC 8037
+  A.4 (`TestVerifyRFC8037Vector`) and the negative cases of `TestVerifyOrder` (`alg`, `typ`,
+  `crit`, `jwk`, extra dots, `null` and missing claims) (docs/DECISIONS.md D-M2-45-5).
+* Since M2-45 the host side of TM-T21, TM-T25, TM-T28 (c) and (d) and the TM-T29 parts with a
+  session holds the platform suite of `services/host/test/platform` (`TestPlatform_TMT21_Sessions`,
+  `TestPlatform_TMT25`, `TestPlatform_TMT28c`, `TestPlatform_TMT28d`, `TestPlatform_TMT29a_Session`,
+  `TestPlatform_TMT29c_Open`, `TestPlatform_TMT29f_Operation`, `TestPlatform_TMT29g_Token`,
+  `TestPlatform_TMT29k`, `TestPlatform_TMT29l`) on disposable GitHub-hosted runners
+  (docs/DECISIONS.md D-M2-45-18).
 * Kanarien-Test über Relais, Logs, Datenbank und Telemetrie (TM-T06).
 * Rechte-Testmatrix AZ-M54 bis AZ-M60 und I6-Tests (TM-T09) in `make test`.
 * Red Team Terminal am Ende von M2, M4, M5, M6 (Bedrohungsmodell, Abschnitt 6.7).
