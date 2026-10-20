@@ -13,6 +13,22 @@ import (
 	"github.com/oapi-codegen/runtime"
 )
 
+// Status returns HTTPResponse.Status
+func (r ListMySessionsResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r ListMySessionsResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
 // ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
 func (r ListMySessionsResponse) ContentType() string {
 	if r.HTTPResponse != nil {
@@ -5077,9 +5093,10 @@ func (r RenewInvocationTokenResponse) ContentType() string {
 
 // ResumeRunResponse200Headers the declared response headers of an HTTP 200 response for ResumeRun
 type ResumeRunResponse200Headers struct {
-	CorrelationId   *CorrelationId
-	RateLimit       *string
-	RateLimitPolicy *string
+	CorrelationId    *CorrelationId
+	IdempotentReplay *bool
+	RateLimit        *string
+	RateLimitPolicy  *string
 }
 
 // ResumeRunResponse400Headers the declared response headers of an HTTP 400 response for ResumeRun
@@ -5231,9 +5248,10 @@ func (r ResumeRunResponse) ContentType() string {
 
 // StartRunResponse200Headers the declared response headers of an HTTP 200 response for StartRun
 type StartRunResponse200Headers struct {
-	CorrelationId   *CorrelationId
-	RateLimit       *string
-	RateLimitPolicy *string
+	CorrelationId    *CorrelationId
+	IdempotentReplay *bool
+	RateLimit        *string
+	RateLimitPolicy  *string
 }
 
 // StartRunResponse400Headers the declared response headers of an HTTP 400 response for StartRun

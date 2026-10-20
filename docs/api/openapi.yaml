@@ -12825,10 +12825,12 @@ paths:
                   model: model-large
       responses:
         '200':
-          description: OK.
+          description: 'OK. A repeated start with the same token while the run is `running` answers the current run with `Idempotent-Replay: true` and changes nothing (06 section 7 point 5).'
           headers:
             Correlation-Id:
               $ref: '#/components/headers/Correlation-Id'
+            Idempotent-Replay:
+              $ref: '#/components/headers/Idempotent-Replay'
             RateLimit:
               $ref: '#/components/headers/RateLimit'
             RateLimit-Policy:
@@ -12914,10 +12916,12 @@ paths:
                   model: model-large
       responses:
         '200':
-          description: OK.
+          description: 'OK. A repeated start with the same token while the run is `running` answers the current run with `Idempotent-Replay: true` and changes nothing (06 section 7 point 5).'
           headers:
             Correlation-Id:
               $ref: '#/components/headers/Correlation-Id'
+            Idempotent-Replay:
+              $ref: '#/components/headers/Idempotent-Replay'
             RateLimit:
               $ref: '#/components/headers/RateLimit'
             RateLimit-Policy:
@@ -27114,7 +27118,7 @@ components:
           $ref: '#/components/schemas/Uuid'
         reason:
           type: string
-          enum: [user_cancelled, access_revoked, agent_disabled, user_disabled]
+          enum: [user_cancelled, access_revoked, agent_disabled, user_disabled, channel_read_only]
         requested_by:
           $ref: '#/components/schemas/Uuid'
     InteractionCreatedPayload:

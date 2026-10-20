@@ -16,6 +16,21 @@ import (
 	"github.com/oapi-codegen/runtime"
 )
 
+// ListTemplates List own and channel templates
+//
+// Corresponds with GET /channels/{channel_id}/templates (the `ListTemplates` operationId).
+func (c *Client) ListTemplates(ctx context.Context, channelId ChannelIdPath, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewListTemplatesRequest(c.Server, channelId)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
 // CreateChannelTemplateWithBody Create a channel template
 //
 // Takes any type of body and a specified content type.
@@ -27153,17 +27168,4 @@ func (r UpdateAgentResponse) ContentType() string {
 		return r.HTTPResponse.Header.Get("Content-Type")
 	}
 	return ""
-}
-
-// SetAgentBillingModeResponse200Headers the declared response headers of an HTTP 200 response for SetAgentBillingMode
-type SetAgentBillingModeResponse200Headers struct {
-	CorrelationId   *CorrelationId
-	ETag            *string
-	RateLimit       *string
-	RateLimitPolicy *string
-}
-
-// SetAgentBillingModeResponse400Headers the declared response headers of an HTTP 400 response for SetAgentBillingMode
-type SetAgentBillingModeResponse400Headers struct {
-	CorrelationId *CorrelationId
 }

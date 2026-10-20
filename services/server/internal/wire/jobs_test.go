@@ -16,7 +16,7 @@ import (
 // already. Empty until M1-16 registers the first handler.
 func TestWireJobArgsOnlyIDs(t *testing.T) {
 	t.Parallel()
-	reg, err := wire.NewJobRegistry(&wire.JobModules{PartitionInterval: time.Minute, CleanupInterval: time.Hour, ExpiryInterval: time.Minute, KeyRotationInterval: time.Minute, AuthCleanupInterval: time.Hour, ChainVerifyInterval: time.Hour})
+	reg, err := wire.NewJobRegistry(&wire.JobModules{PartitionInterval: time.Minute, CleanupInterval: time.Hour, ExpiryInterval: time.Minute, KeyRotationInterval: time.Minute, AuthCleanupInterval: time.Hour, ChainVerifyInterval: time.Hour, StallInterval: time.Minute})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -68,7 +68,7 @@ func TestJobRoleMapping(t *testing.T) {
 func TestJobRegistryHasAuthCleanup(t *testing.T) {
 	t.Parallel()
 	m := wire.JobModules{PartitionInterval: time.Minute, CleanupInterval: time.Hour, ExpiryInterval: time.Minute, KeyRotationInterval: time.Minute,
-		AuthCleanupInterval: 3 * time.Hour, ChainVerifyInterval: time.Hour}
+		AuthCleanupInterval: 3 * time.Hour, ChainVerifyInterval: time.Hour, StallInterval: time.Minute}
 	reg, err := wire.NewJobRegistry(&m)
 	if err != nil {
 		t.Fatal(err)
@@ -95,7 +95,7 @@ func TestJobRegistryHasAuthCleanup(t *testing.T) {
 func TestJobRegistryHasChainVerify(t *testing.T) {
 	t.Parallel()
 	m := wire.JobModules{PartitionInterval: time.Minute, CleanupInterval: time.Hour, ExpiryInterval: time.Minute, KeyRotationInterval: time.Minute,
-		AuthCleanupInterval: time.Hour, ChainVerifyInterval: 2 * time.Hour}
+		AuthCleanupInterval: time.Hour, ChainVerifyInterval: 2 * time.Hour, StallInterval: time.Minute}
 	reg, err := wire.NewJobRegistry(&m)
 	if err != nil {
 		t.Fatal(err)

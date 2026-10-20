@@ -67,28 +67,31 @@ func (q *Queries) LockRun(ctx context.Context, id pgtype.UUID) (Run, error) {
 const recordDelivery = `-- name: RecordDelivery :one
 UPDATE runs
 SET invocation_jti = CASE WHEN $1::boolean THEN $2::uuid ELSE invocation_jti END,
-    renewed_from_jti = CASE WHEN $1::boolean THEN NULL ELSE renewed_from_jti END,
-    billing_mode_expected = $3::text,
+    renewed_from_jti = CASE WHEN $1::boolean THEN $3::uuid ELSE renewed_from_jti END,
+    billing_mode_expected = $4::text,
     version = version + 1
-WHERE id = $4
+WHERE id = $5
 RETURNING id, thread_id, agent_id, agent_session_id, trigger_kind, triggering_message_id, triggering_command_id, triggering_interaction_id, triggered_by, state, state_reason, version, billing_mode_expected, billing_mode_used, billing_evidence, invocation_jti, started_jti, renewed_from_jti, dev_environment_id, model, status_line, last_text_excerpt, plan, metrics, cost_micros, currency, cost_is_estimate, summary, stall_warned_at, queued_at, invocation_held_until, started_at, finished_at, duration_ms
 `
 
 type RecordDeliveryParams struct {
 	Record              bool
 	Jti                 pgtype.UUID
+	RenewedFrom         pgtype.UUID
 	BillingModeExpected string
 	ID                  pgtype.UUID
 }
 
-// An allowed delivery: invocation_jti is replaced and renewed_from_jti cleared when record is
-// true (a delivery that may start the run), billing_mode_expected is the configured mode now. The
+// An allowed delivery: invocation_jti is replaced and renewed_from_jti set to renewed_from (NULL
+// for a delivery, the replaced jti for a renewal of M2-09) when record is true (a token that may
+// start the run), billing_mode_expected is the configured mode now. The
 // caller holds the row lock and calls this only when one of the columns changes, so version rises
 // by exactly one per change (03 runs.version).
 func (q *Queries) RecordDelivery(ctx context.Context, arg RecordDeliveryParams) (Run, error) {
 	row := q.db.QueryRow(ctx, recordDelivery,
 		arg.Record,
 		arg.Jti,
+		arg.RenewedFrom,
 		arg.BillingModeExpected,
 		arg.ID,
 	)

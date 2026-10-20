@@ -112,6 +112,11 @@ type JobModules struct {
 	FilesImageTimeout time.Duration
 	// QueuedExpiry is the use case of runs.queued_expiry (M2-08); nil only where no job runs.
 	QueuedExpiry runsjobs.Expirer
+	// RunsLifecycle is the use case of runs.cancel_timeout and runs.stall_check (M2-09); nil only
+	// where no job runs. StallInterval is agent.presence_timeout, the interval of
+	// runs.stall_check.
+	RunsLifecycle runsjobs.Lifecycle
+	StallInterval time.Duration
 }
 
 // NewJobRegistry returns the job registry of a process: every role (api, worker, all) builds
@@ -120,8 +125,9 @@ type JobModules struct {
 // authz.expiry_reminder (M1-30), instance.key_rotation (M1-32), identity.auth_cleanup (M1-35) and
 // audit.chain_verify (M1-50), apps.webhook_deliver on the queue delivery (M2-26), files.scan
 // on the queue files without a River job timeout (M3-04) and files.thumbnail on the queue files
-// with the timeout file.image.processing_timeout (M3-06) and runs.queued_expiry on the queue
-// default (M2-08); the error is the first rejected registration.
+// with the timeout file.image.processing_timeout (M3-06), runs.queued_expiry on the queue
+// default (M2-08) and runs.cancel_timeout and the periodic runs.stall_check on the queue
+// maintenance (M2-09); the error is the first rejected registration.
 func NewJobRegistry(m *JobModules) (*jobs.Registry, error) {
 	if m == nil {
 		return nil, errors.New("wire: NewJobRegistry needs the job modules")
@@ -155,6 +161,9 @@ func NewJobRegistry(m *JobModules) (*jobs.Registry, error) {
 		return nil, err
 	}
 	if err := runsjobs.Register(reg, m.QueuedExpiry); err != nil {
+		return nil, err
+	}
+	if err := runsjobs.RegisterLifecycle(reg, m.RunsLifecycle, m.StallInterval); err != nil {
 		return nil, err
 	}
 	return reg, nil

@@ -7,6 +7,19 @@ import (
 	"net/http"
 )
 
+// SetAgentBillingModeResponse200Headers the declared response headers of an HTTP 200 response for SetAgentBillingMode
+type SetAgentBillingModeResponse200Headers struct {
+	CorrelationId   *CorrelationId
+	ETag            *string
+	RateLimit       *string
+	RateLimitPolicy *string
+}
+
+// SetAgentBillingModeResponse400Headers the declared response headers of an HTTP 400 response for SetAgentBillingMode
+type SetAgentBillingModeResponse400Headers struct {
+	CorrelationId *CorrelationId
+}
+
 // SetAgentBillingModeResponse401Headers the declared response headers of an HTTP 401 response for SetAgentBillingMode
 type SetAgentBillingModeResponse401Headers struct {
 	CorrelationId   *CorrelationId
@@ -25895,20 +25908,4 @@ func (r ListMySessionsResponse) GetApplicationproblemJSONDefault() *Error {
 // GetBody returns the raw response body bytes
 func (r ListMySessionsResponse) GetBody() []byte {
 	return r.Body
-}
-
-// Status returns HTTPResponse.Status
-func (r ListMySessionsResponse) Status() string {
-	if r.HTTPResponse != nil {
-		return r.HTTPResponse.Status
-	}
-	return http.StatusText(0)
-}
-
-// StatusCode returns HTTPResponse.StatusCode
-func (r ListMySessionsResponse) StatusCode() int {
-	if r.HTTPResponse != nil {
-		return r.HTTPResponse.StatusCode
-	}
-	return 0
 }

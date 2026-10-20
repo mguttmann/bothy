@@ -3306,10 +3306,11 @@ func (e RunCancelRequestedEventType) Valid() bool {
 
 // Defines values for RunCancelRequestedPayloadReason.
 const (
-	RunCancelRequestedPayloadReasonAccessRevoked RunCancelRequestedPayloadReason = "access_revoked"
-	RunCancelRequestedPayloadReasonAgentDisabled RunCancelRequestedPayloadReason = "agent_disabled"
-	RunCancelRequestedPayloadReasonUserCancelled RunCancelRequestedPayloadReason = "user_cancelled"
-	RunCancelRequestedPayloadReasonUserDisabled  RunCancelRequestedPayloadReason = "user_disabled"
+	RunCancelRequestedPayloadReasonAccessRevoked   RunCancelRequestedPayloadReason = "access_revoked"
+	RunCancelRequestedPayloadReasonAgentDisabled   RunCancelRequestedPayloadReason = "agent_disabled"
+	RunCancelRequestedPayloadReasonChannelReadOnly RunCancelRequestedPayloadReason = "channel_read_only"
+	RunCancelRequestedPayloadReasonUserCancelled   RunCancelRequestedPayloadReason = "user_cancelled"
+	RunCancelRequestedPayloadReasonUserDisabled    RunCancelRequestedPayloadReason = "user_disabled"
 )
 
 // Valid indicates whether the value is a known member of the RunCancelRequestedPayloadReason enum.
@@ -3318,6 +3319,8 @@ func (e RunCancelRequestedPayloadReason) Valid() bool {
 	case RunCancelRequestedPayloadReasonAccessRevoked:
 		return true
 	case RunCancelRequestedPayloadReasonAgentDisabled:
+		return true
+	case RunCancelRequestedPayloadReasonChannelReadOnly:
 		return true
 	case RunCancelRequestedPayloadReasonUserCancelled:
 		return true
@@ -25640,21 +25643,6 @@ func (c *Client) MoveForumTagWithBody(ctx context.Context, channelId ChannelIdPa
 // Corresponds with POST /channels/{channel_id}/tags/{tag_id}/move (the `MoveForumTag` operationId).
 func (c *Client) MoveForumTag(ctx context.Context, channelId ChannelIdPath, tagId TagIdPath, params *MoveForumTagParams, body MoveForumTagJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
 	req, err := NewMoveForumTagRequest(c.Server, channelId, tagId, params, body)
-	if err != nil {
-		return nil, err
-	}
-	req = req.WithContext(ctx)
-	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
-		return nil, err
-	}
-	return c.Client.Do(req)
-}
-
-// ListTemplates List own and channel templates
-//
-// Corresponds with GET /channels/{channel_id}/templates (the `ListTemplates` operationId).
-func (c *Client) ListTemplates(ctx context.Context, channelId ChannelIdPath, reqEditors ...RequestEditorFn) (*http.Response, error) {
-	req, err := NewListTemplatesRequest(c.Server, channelId)
 	if err != nil {
 		return nil, err
 	}

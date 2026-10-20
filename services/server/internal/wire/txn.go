@@ -113,8 +113,8 @@ var errNoAuditHook = errors.New("wire: the txn registry needs the audit hook (Mo
 // chat.ChannelArchived and chat.SpaceArchived -> notify (preferences, M3-18) and, after the
 // existing subscribers, messaging.MessagePosted -> runs (the acceptance of a triggering message,
 // M2-05).
-// authorize.AccessChanged, published by authz, has no production subscriber in M1 (runs
-// subscribes in M2, 02 section 4.3).
+// authorize.AccessChanged, published by authz, and agents.AgentDisabled reach runs last (M2-09,
+// 02 section 4.3).
 func registerTxn(reg *txn.Registry, m *Modules) error {
 	reg.SetTracer(otel.SubscriberSpan)
 	if m == nil || m.Audit == nil {
@@ -160,7 +160,8 @@ func registerTxn(reg *txn.Registry, m *Modules) error {
 }
 
 // subscribeArchivesAndRuns registers chat.ChannelArchived and chat.SpaceArchived -> notify, then
-// messaging.MessagePosted -> runs after the existing subscribers (M2-05).
+// messaging.MessagePosted -> runs after the existing subscribers (M2-05), then
+// authorize.AccessChanged and agents.AgentDisabled -> runs (M2-09).
 func subscribeArchivesAndRuns(reg *txn.Registry, m *Modules) error {
 	if err := txn.Subscribe(reg, m.NotifySubscribers.OnChannelArchived); err != nil {
 		return err
@@ -171,7 +172,15 @@ func subscribeArchivesAndRuns(reg *txn.Registry, m *Modules) error {
 	if m.RunsAcceptor == nil {
 		return errNoRunsAcceptor
 	}
-	return txn.Subscribe(reg, m.RunsAcceptor.OnMessagePosted)
+	if err := txn.Subscribe(reg, m.RunsAcceptor.OnMessagePosted); err != nil {
+		return err
+	}
+	// The revocation and the disabled agent end or stop the affected runs in the same
+	// transaction (R-SY-11, 09 2.1; M2-09).
+	if err := txn.Subscribe(reg, m.RunsAcceptor.OnAccessChanged); err != nil {
+		return err
+	}
+	return txn.Subscribe(reg, m.RunsAcceptor.OnAgentDisabled)
 }
 
 // UnitConfig binds the configuration of the unit of work (database.tx_retry_max and the three

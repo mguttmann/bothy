@@ -342,6 +342,9 @@ func TestConfigSchemaBuilds(t *testing.T) {
 		"billing.mismatch_alert_after":     {Kind: config.KindDuration, Default: "5m", Min: "1ms", Chapter: "10-backend-richtlinie.md"},
 		// M2-08
 		"run.queued_max_age": {Kind: config.KindDuration, Default: "48h", Min: "1s", Chapter: "09-agenten.md"},
+		// M2-09
+		"agent.cancel_grace": {Kind: config.KindDuration, Default: "30s", Min: "1ms", Chapter: "04-sync-protokoll.md"},
+		"run.orphan_timeout": {Kind: config.KindDuration, Default: "15m", Min: "1ms", Chapter: "09-agenten.md"},
 		// M1-64
 		"sync.ws_max_frame_bytes":   {Kind: config.KindInt, Default: "1048576", Min: "1024", Max: "16777216", Chapter: "04-sync-protokoll.md"},
 		"sync.identify_timeout":     {Kind: config.KindDuration, Default: "10s", Min: "1ms", Chapter: "04-sync-protokoll.md"},
