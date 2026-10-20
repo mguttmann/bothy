@@ -150,6 +150,7 @@ var requirementGroups = []struct {
 	}},
 	{"write und `agent.invoke`", Deferred("M2"), []string{"run.followup.create"}},
 	{"agent-self und Marke gültig", Deferred("M2"), []string{"run.start"}},
+	{"agent-self und Marke aktuell", Deferred("M2"), []string{"run.token.renew"}},
 	{"auth und self", All(Auth, Self), []string{"self.read"}},
 	{"owner oder manage", ByKind(map[string]Expr{kindInstance: Owner, kindSpace: Any(Owner, HasCap(CapManage))}), []string{
 		"stats.read",

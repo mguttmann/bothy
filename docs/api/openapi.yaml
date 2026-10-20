@@ -12796,9 +12796,13 @@ paths:
       tags: [Agent runtime]
       description: |-
         Compare-and-swap `queued -> running` after checking the invocation token. Repeating the call
-        with the same token after success returns 200 with `Idempotent-Replay: true`; any other token
-        gets 409 `already_started`. A different `billing_mode_used` fails the run with
-        `billing_mode_mismatch`.
+        with the same token after success returns 200 with `Idempotent-Replay: true` while the run is
+        `running`; any other token gets 409 `already_started`. Once the run waits for input, the start
+        token is consumed and gets 403 `invocation_token_invalid` with `reason: superseded`. A different `billing_mode_used` fails the run with
+        `billing_mode_mismatch`; a `tool_class_used` above the `tool_class` of the token fails it with
+        409 `tool_class_mismatch`. A token error gives 403 `invocation_token_invalid` with `reason`
+        `expired` (renew with `renewInvocationToken`, then start again), `superseded` (a newer
+        delivery replaced it) or `invalid` (09 section 4.5).
       x-authz-action: run.start
       x-rate-limit-class: rl.agent_runtime
       x-idempotency-exempt: agent_runtime
@@ -12812,9 +12816,11 @@ paths:
               $ref: '#/components/schemas/RunStart'
             examples:
               default:
+                summary: Request
                 value:
                   invocation_token: eyJhbGciOiJFZERTQSIsImtpZCI6Imludi0yMDI2LTEwIn0.e30.sig
                   billing_mode_used: personal
+                  tool_class_used: scoped
                   external_session_ref: sess-7f3a
                   model: model-large
       responses:
@@ -12833,6 +12839,7 @@ paths:
                 $ref: '#/components/schemas/Run'
               examples:
                 default:
+                  summary: Response
                   value:
                     id: 0192f4a0-7b1c-70cd-8013-27d7ac09a77f
                     thread_id: 0192f4a0-7b1c-78f9-8074-fa94e84bab7d
@@ -12884,7 +12891,7 @@ paths:
       operationId: resumeRun
       summary: Resume a run that waited for input
       tags: [Agent runtime]
-      description: '`waiting_input -> running` with the token of the interaction or follow-up delivery.'
+      description: '`waiting_input -> running` with the token of the interaction or follow-up delivery. The consumed start token (its `jti` equals `runs.started_jti`) gets 403 `invocation_token_invalid` with `reason: superseded` (09 section 4.5).'
       x-authz-action: run.start
       x-rate-limit-class: rl.agent_runtime
       x-idempotency-exempt: agent_runtime
@@ -12898,9 +12905,11 @@ paths:
               $ref: '#/components/schemas/RunStart'
             examples:
               default:
+                summary: Request
                 value:
                   invocation_token: eyJhbGciOiJFZERTQSIsImtpZCI6Imludi0yMDI2LTEwIn0.e30.sig
                   billing_mode_used: personal
+                  tool_class_used: scoped
                   external_session_ref: sess-7f3a
                   model: model-large
       responses:
@@ -12919,6 +12928,7 @@ paths:
                 $ref: '#/components/schemas/Run'
               examples:
                 default:
+                  summary: Response
                   value:
                     id: 0192f4a0-7b1c-70cd-8013-27d7ac09a77f
                     thread_id: 0192f4a0-7b1c-78f9-8074-fa94e84bab7d
@@ -12950,6 +12960,74 @@ paths:
                         message_id: 0192f4a0-7b1c-7353-8d8c-dea659467151
                         state: queued
                     queued_at: '2026-10-10T09:30:00.000Z'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        default:
+          $ref: '#/components/responses/Error'
+
+  /runs/{run_id}/invocation-token:
+    post:
+      operationId: renewInvocationToken
+      summary: Get a fresh invocation token for an own waiting run
+      tags: [Agent runtime]
+      description: |-
+        For a run in `queued` or `waiting_input` whose invocation token expired before the start
+        (09 section 4.5.1). The body carries the current token; its expiry is not checked, but its
+        signature, audience, run and `jti` are: the `jti` equals the current one (`runs.invocation_jti`)
+        or the one the last renewal replaced (`runs.renewed_from_jti`, retry after a lost answer), and
+        it is not consumed by a start (`runs.started_jti` is NULL or differs, SQL `started_jti IS
+        DISTINCT FROM jti`). A retry with the replaced token issues a
+        fresh token again; the run still starts at most once. The server repeats every check it runs
+        before a delivery (`agent.invoke` for the triggering person with current permissions, I2, SR2,
+        SR3); on failure the run becomes `failed` and the answer is 403 `agent_invocation_denied`. A
+        replaced or consumed token gets 403 `invocation_token_invalid` with `reason: superseded`; a
+        run that already started gets 409 `already_started`.
+      x-authz-action: run.token.renew
+      x-rate-limit-class: rl.agent_runtime
+      x-idempotency-exempt: agent_runtime
+      parameters:
+      - $ref: '#/components/parameters/RunIdPath'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/InvocationTokenRenew'
+            examples:
+              default:
+                summary: Request
+                value:
+                  invocation_token: eyJhbGciOiJFZERTQSIsImtpZCI6Imludi0yMDI2LTEwIn0.e30.sig
+      responses:
+        '200':
+          description: OK.
+          headers:
+            Correlation-Id:
+              $ref: '#/components/headers/Correlation-Id'
+            RateLimit:
+              $ref: '#/components/headers/RateLimit'
+            RateLimit-Policy:
+              $ref: '#/components/headers/RateLimit-Policy'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/InvocationTokenGrant'
+              examples:
+                default:
+                  summary: Response
+                  value:
+                    invocation_token: eyJhbGciOiJFZERTQSIsImtpZCI6Imludi0yMDI2LTEwIn0.e30.signature
+                    expires_at: '2026-10-10T09:31:00.000Z'
         '400':
           $ref: '#/components/responses/BadRequest'
         '401':
@@ -20993,8 +21071,8 @@ components:
       - code: invocation_token_invalid
         status: 403
         title: 'Invocation token invalid'
-        description: 'The invocation token is wrongly signed, expired, issued for another agent, or its `jti` does not match.'
-        client_action: 'The adapter starts nothing and reports the run as `failed`.'
+        description: 'The invocation token is not accepted by `startRun`, `resumeRun` or `renewInvocationToken`; `reason` is `expired` (valid and current, only `exp` passed), `superseded` (valid, but no longer current: a newer delivery or renewal replaced its `jti`, or a start consumed it while the run waits for input) or `invalid` (signature, `kid`, `typ`, audience or run wrong).'
+        client_action: '`expired`: renew the token (`renewInvocationToken`) and start again. `superseded`: start nothing, keep the run; start with the newer token of the redelivery or, for a waiting run, of the answer. `invalid`: start nothing and report the run as `failed` with `invalid_invocation_token`.'
       - code: not_found
         status: 404
         title: 'Not found'
@@ -25089,7 +25167,7 @@ components:
     RunStart:
       type: object
       additionalProperties: false
-      required: [invocation_token, billing_mode_used]
+      required: [invocation_token, billing_mode_used, tool_class_used]
       properties:
         invocation_token:
           type: string
@@ -25097,6 +25175,8 @@ components:
           examples: [eyJhbGciOiJFZERTQSIsImtpZCI6Imludi0yMDI2LTEwIn0.e30.sig]
         billing_mode_used:
           $ref: '#/components/schemas/BillingMode'
+        tool_class_used:
+          $ref: '#/components/schemas/ToolClass'
         external_session_ref:
           type: string
           description: Absent when the runtime creates the reference only during the run; then the first `reportAgentSession` creates the session row.
@@ -25106,6 +25186,27 @@ components:
           examples: [model-large]
         billing_evidence:
           $ref: '#/components/schemas/BillingEvidence'
+    InvocationTokenRenew:
+      type: object
+      additionalProperties: false
+      required: [invocation_token]
+      properties:
+        invocation_token:
+          type: string
+          description: The current invocation token of the run, or on a retry after a lost answer the token the last renewal replaced; it may have expired (09 section 4.5.1).
+          examples: [eyJhbGciOiJFZERTQSIsImtpZCI6Imludi0yMDI2LTEwIn0.e30.sig]
+    InvocationTokenGrant:
+      type: object
+      required: [invocation_token, expires_at]
+      properties:
+        invocation_token:
+          type: string
+          description: Fresh invocation token with a new `jti`; it replaces the current one of the run.
+          examples: [eyJhbGciOiJFZERTQSIsImtpZCI6Imludi0yMDI2LTEwIn0.e30.signature]
+        expires_at:
+          type: string
+          format: date-time
+          examples: ['2026-10-10T09:31:00.000Z']
     RunAwaitInput:
       type: object
       additionalProperties: false

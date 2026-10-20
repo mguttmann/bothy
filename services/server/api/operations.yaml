@@ -413,6 +413,9 @@ later:               # every other operationId of docs/api/openapi.yaml; sorted 
   - operation_id: removeCommand
     etappe: M2
     ticket: M2-16
+  - operation_id: renewInvocationToken
+    etappe: M2
+    ticket: M2-09
   - operation_id: reportAgentSession
     etappe: M2
     ticket: M2-12

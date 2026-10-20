@@ -10507,6 +10507,25 @@ type InvariantViolation struct {
 	PrincipalIds []Uuid `json:"principal_ids"`
 }
 
+// InvocationTokenGrant defines model for InvocationTokenGrant.
+type InvocationTokenGrant struct {
+	// ExpiresAt Examples: 2026-10-10T09:31:00.000Z
+	ExpiresAt time.Time `json:"expires_at"`
+
+	// InvocationToken Fresh invocation token with a new `jti`; it replaces the current one of the run.
+	//
+	// Examples: eyJhbGciOiJFZERTQSIsImtpZCI6Imludi0yMDI2LTEwIn0.e30.signature
+	InvocationToken string `json:"invocation_token"`
+}
+
+// InvocationTokenRenew defines model for InvocationTokenRenew.
+type InvocationTokenRenew struct {
+	// InvocationToken The current invocation token of the run, or on a retry after a lost answer the token the last renewal replaced; it may have expired (09 section 4.5.1).
+	//
+	// Examples: eyJhbGciOiJFZERTQSIsImtpZCI6Imludi0yMDI2LTEwIn0.e30.sig
+	InvocationToken string `json:"invocation_token"`
+}
+
 // JsonObject Free-form JSON object whose schema is named in the field description.
 type JsonObject map[string]interface{}
 
@@ -12608,6 +12627,9 @@ type RunStart struct {
 
 	// Model Examples: model-large
 	Model *string `json:"model,omitempty"`
+
+	// ToolClassUsed Tool class of an agent runtime, ordered `chat` < `scoped` < `host` (07, 2.11).
+	ToolClassUsed ToolClass `json:"tool_class_used"`
 }
 
 // RunState defines model for RunState.

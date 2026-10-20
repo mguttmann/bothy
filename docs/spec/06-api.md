@@ -253,7 +253,7 @@ alle Texte der YAML-Dateien (R-API-15); jede Antwort-Komponente nennt ihren Stat
 | `feature_disabled` | 403 | The feature is switched off (for example personal tokens). | Do not retry. |
 | `agent_invocation_denied` | 403 | `agent.invoke` denies; `reason` for example `billing_mode_personal_not_holder`, `project_not_ready`. | Show the reason; do not retry. |
 | `terminal_denied` | 403 | The `terminal` right exists, but a guard rule or limit blocks; `reason` is `not_host_assignee`, `server_host_owner_only`, `i6_holder_only`, `session_limit` or `profile_unknown` (24 section 13). | Show the reason; do not retry. |
-| `invocation_token_invalid` | 403 | The invocation token is wrongly signed, expired, issued for another agent, or its `jti` does not match. | The adapter starts nothing and reports the run as `failed`. |
+| `invocation_token_invalid` | 403 | The invocation token is not accepted by `startRun`, `resumeRun` or `renewInvocationToken`; `reason` is `expired` (valid and current, only `exp` passed), `superseded` (valid, but no longer current: a newer delivery or renewal replaced its `jti`, or a start consumed it while the run waits for input) or `invalid` (signature, `kid`, `typ`, audience or run wrong). | `expired`: renew the token (`renewInvocationToken`) and start again. `superseded`: start nothing, keep the run; start with the newer token of the redelivery or, for a waiting run, of the answer. `invalid`: start nothing and report the run as `failed` with `invalid_invocation_token`. |
 | `not_found` | 404 | The resource does not exist or is not visible; both answer the same (R-AZ-01). | Mark the outbox entry as failed. |
 | `method_not_allowed` | 405 | The method is not defined on this path. | Programming error. |
 | `conflict` | 409 | The state prevents the change (for example a name is taken); `reason` names the cause where one is defined. | Reload the state; a person decides. |
@@ -384,6 +384,7 @@ alle Texte der YAML-Dateien (R-API-15); jede Antwort-Komponente nennt ihren Stat
 | `patchRun` | PATCH | `/api/v1/runs/{run_id}` | Agenten-Laufzeit: monoton oder Compare-and-swap |
 | `startRun` | POST | `/api/v1/runs/{run_id}/start` | Agenten-Laufzeit: monoton oder Compare-and-swap |
 | `resumeRun` | POST | `/api/v1/runs/{run_id}/resume` | Agenten-Laufzeit: monoton oder Compare-and-swap |
+| `renewInvocationToken` | POST | `/api/v1/runs/{run_id}/invocation-token` | Agenten-Laufzeit: monoton oder Compare-and-swap |
 | `awaitRunInput` | POST | `/api/v1/runs/{run_id}/await-input` | Agenten-Laufzeit: monoton oder Compare-and-swap |
 | `finishRun` | POST | `/api/v1/runs/{run_id}/finish` | Agenten-Laufzeit: monoton oder Compare-and-swap |
 | `answerAutocomplete` | POST | `/api/v1/command-autocompletions/{request_id}/answer` | Agenten-Laufzeit: monoton oder Compare-and-swap |
@@ -992,6 +993,7 @@ Erzeugt aus openapi.yaml.
 | PATCH | `/api/v1/runs/{run_id}` | `patchRun` | `run.update` | Apply a live-box patch |
 | POST | `/api/v1/runs/{run_id}/start` | `startRun` | `run.start` | Start a queued run |
 | POST | `/api/v1/runs/{run_id}/resume` | `resumeRun` | `run.start` | Resume a run that waited for input |
+| POST | `/api/v1/runs/{run_id}/invocation-token` | `renewInvocationToken` | `run.token.renew` | Get a fresh invocation token for an own waiting run |
 | POST | `/api/v1/runs/{run_id}/await-input` | `awaitRunInput` | `run.finish` | Wait for input from a person |
 | POST | `/api/v1/runs/{run_id}/finish` | `finishRun` | `run.finish` | End a run |
 | POST | `/api/v1/command-autocompletions/{request_id}/answer` | `answerAutocomplete` | `command.autocomplete.respond` | Answer an autocomplete request |
