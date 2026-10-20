@@ -37,9 +37,10 @@ commit per feature, signed and linear.
    was fixed. Never paste a raw review report, bot or agent output, local paths, user or
    machine names, temporary folder names or notes about tools. Section
    "Pull request title and body" below describes the gate.
-7. **CI.** `ci.yml` runs the same make targets. The only required check: `ci-ok`. It
-   starts with every run and waits for the other jobs (`tools/ci/ci_ok.py`), so it is
-   pending from the first second of a run.
+7. **CI.** `ci.yml` runs the same make targets. The only required check: `ci-ok`. It is
+   the last job of the run: it needs every other job, runs with `always()` and combines their
+   results (`tools/ci/ci_ok.py`), so it reports on every run; the job `plan` marks it pending
+   for the head commit at the start of a pull request run.
 8. **Merge.** "Squash and merge". GitHub signs the resulting commit; its message is the
    pull request body (repository setting below). `main` stays linear.
 
@@ -149,11 +150,13 @@ text of the pull request goes through the same deny list as every commit:
   job and with it `ci-ok`. `ci.yml` also runs on `pull_request` type `edited`, so every
   change of title or body is checked again before the merge; an edit restarts the whole
   run, because `ci-ok` must cover the current text and the current code together.
-- **No stale green.** `ci-ok` has no `needs`: a job with `needs` gets its check run only
-  when the other jobs are done, so after an edit the older green `ci-ok` of the same head
-  commit would stay the latest result for the whole new run. Instead the `ci-ok` job starts
-  with the run, is pending at once, and `tools/ci/ci_ok.py` reads the jobs of its run through
-  the API (`actions: read`) and combines their results.
+- **No stale green.** `ci-ok` is the last job and needs every other job, and a job with
+  `needs` gets its check run only when those jobs are done, so after an edit the older green
+  `ci-ok` of the same head commit would stay the latest result for the whole new run. So the
+  first step of the job `plan` creates a check run `ci-ok` with status `in_progress` for the
+  head commit (`checks: write`), the latest `ci-ok` of that commit, and the job `ci-ok`
+  completes it with its own conclusion. A fork or a dependency bot's run gets a token that
+  cannot write checks; it skips the mark.
 - **Rules.** The body is checked like a commit message: every line gets the private and
   the generic rules. A `Signed-off-by` or `Co-authored-by` line of the exact form
   `Key: Name <local@domain>` (a plain address) gets the private list as a whole and the
@@ -175,11 +178,13 @@ text of the pull request goes through the same deny list as every commit:
 What the gate does not cover, so `denylist-main.yml` stays the check after the merge (it
 scans what actually reached `main`):
 
-- the seconds between an edit and the start of the new run (GitHub delivers the event);
+- the time between an edit and the first step of the job `plan` of the new run (GitHub
+  delivers the event, and the job waits for a free runner);
+- an edit of a fork or dependency bot pull request: its run cannot mark `ci-ok` pending, so
+  the older result stays the latest until the new `ci-ok` ends (wait for it before the
+  merge);
 - a manual `workflow_dispatch` of `ci.yml` on the pull request branch or "Re-run all jobs"
   of a run from before the edit: both run without the current text (maintainers only);
-- a re-run of a single job: `ci-ok` has no `needs`, so it is not re-run with it
-  (maintainers only; re-run all jobs instead);
 - a run that waits for a maintainer's approval (first contribution from a fork) has no
   `ci-ok` yet, so the older result stays the latest until the maintainer approves;
 - a message typed into the merge dialog instead of the pull request body.

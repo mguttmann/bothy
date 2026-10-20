@@ -123,16 +123,17 @@ def test_apps_jobs_run_the_platform_tests(job: str, runner: str) -> None:
     assert any(_uses(s, "astral-sh/setup-uv") for s in spec["steps"])
 
 
-def test_ci_ok_requires_the_apps_jobs_by_name() -> None:
-    # ci-ok has no `needs`; tools/ci/ci_ok.py requires the jobs of ci.yml by name.
+def test_ci_ok_requires_the_apps_jobs() -> None:
+    # ci-ok needs every job; a skip passes only when the plan left the job out
+    # (tools/ci/tests/test_ci_ok.py).
     import ci_ok
 
-    # A skip passes only when the plan left the job out (tools/ci/tests/test_ci_ok.py).
-    rules = {n: rule for rule in ci_ok.RULES for n in rule.names}
+    needs = _jobs()["ci-ok"]["needs"]
+    green = dict.fromkeys(needs, "success")
     for job in APPS_JOBS:
-        rule = rules[_jobs()[job]["name"]]
-        assert rule.ok == frozenset({"success"}), job
-        assert rule.job == job
+        assert job in needs, job
+        assert ci_ok.check_needs({**green, job: "skipped"}, frozenset({job})) != [], job
+        assert ci_ok.check_needs({**green, job: "skipped"}, frozenset()) == [], job
 
 
 @pytest.mark.parametrize("level", [26, 36])

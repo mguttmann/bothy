@@ -65,11 +65,11 @@ the root Markdown files, `LICENSE`, `NOTICE`) needs no conditional job, except t
 assigns to a component (for example `docs/spec/actions.yaml` to `server`). The plan reads the diff
 without rename detection, so a moved file counts for its old and its new path.
 
-A skip never hides a failure: `ci-ok` has no `needs`, so it runs the same plan step on the same
-commit itself and accepts a skipped conditional job only when the plan did not list it; a job that
-ran must pass, listed or not, and a missing, empty or unknown plan fails `ci-ok`
-(`tools/ci/ci_ok.py`). `build-verify-ok` applies the same check to the results of its `needs`
-(`ci_ok.py needs`; docs/DECISIONS.md PL/14). `sonar` and the deny-list pair keep their own rules: `sonar` is skipped without
+A skip never hides a failure: `ci-ok` and `build-verify-ok` are the last job of their run, need
+every other job and run with `always()`, and `tools/ci/ci_ok.py needs` checks the results of their
+`needs` against the plan of the run. A skipped conditional job passes only when the plan did not
+list it; a job that ran must pass, listed or not; a missing, empty or unknown plan fails
+(docs/DECISIONS.md PL/14, PL/15). `sonar` and the deny-list pair keep their own rules: `sonar` is skipped without
 the secrets and after a failed or cancelled test job, which fails `ci-ok` through that job.
 
 A new commit of a pull request cancels the run of the older commit, and so does an edit of title or

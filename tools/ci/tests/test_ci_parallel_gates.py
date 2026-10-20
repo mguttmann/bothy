@@ -151,6 +151,7 @@ def test_gate_jobs_install_every_toolchain_with_caches(job: str) -> None:
 
 
 def test_ci_ok_requires_every_gate_job() -> None:
-    required = {n for rule in ci_ok.RULES for n in rule.names}
+    assert set(GATE_JOBS) <= set(_jobs()["ci-ok"]["needs"])
+    green = dict.fromkeys(_jobs()["ci-ok"]["needs"], "success")
     for job in GATE_JOBS:
-        assert _jobs()[job]["name"] in required, job
+        assert ci_ok.check_needs({**green, job: "failure"}, frozenset()) == [f"{job}: failure"]

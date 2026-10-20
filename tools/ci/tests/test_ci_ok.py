@@ -1,13 +1,17 @@
 # SPDX-License-Identifier: Apache-2.0
-"""Tests for the ci-ok job (tools/ci/ci_ok.py).
+"""Tests for ci-ok of ci.yml and build-verify-ok of build-verify.yml (tools/ci/ci_ok.py).
 
-ci-ok starts with the run, without `needs`, so that its check run is pending from the first
-second of every run: an edit of the pull request text can never leave an older green ci-ok
-as the latest result while the new run is still going.
+Both are the last job of their run: they need every other job, run with `always()` and decide
+from the results of their `needs` and the plan of the run. So the required check always reports,
+also after a failed, skipped or cancelled job, and holds no runner while the others run. The
+plan job of ci.yml marks ci-ok pending for the head commit at the start of a pull request run,
+so an older green ci-ok of the same commit never stands while the run after an edit of title or
+body is still going; ci-ok completes that check run with its own conclusion.
 """
 
 from __future__ import annotations
 
+import json
 from pathlib import Path
 from typing import Any
 
@@ -23,71 +27,143 @@ BUILD_VERIFY = REPO / ".github" / "workflows" / "build-verify.yml"
 # Every conditional job needed: a push to main, or a change of a shared input.
 ALL = frozenset(components.CONDITIONAL_JOBS)
 
+# The results of the `needs` of ci-ok in a green run with the secrets.
 GREEN = {
     "plan": "success",
     "gates": "success",
-    "gates (docs and contracts)": "success",
-    "gates (security and supply chain)": "success",
-    "test (tools)": "success",
-    "test (server)": "success",
-    "test (apps)": "success",
-    "test (SDKs and plugins)": "success",
-    "denylist (private list)": "success",
-    "denylist (generic rules, fork)": "skipped",
+    "gates-docs": "success",
+    "gates-security": "success",
+    "test-tools": "success",
+    "denylist": "success",
+    "denylist-fork": "skipped",
     "sonar": "success",
-    "postgres-image (amd64)": "success",
-    "postgres-image (arm64)": "success",
-    "apps (macOS)": "success",
-    "apps (Windows)": "success",
-    "apps (Android API 26)": "success",
-    "apps (Android API 36)": "success",
+    **dict.fromkeys(components.CONDITIONAL_JOBS, "success"),
+}
+# The results of the `needs` of build-verify-ok in a green run.
+GREEN_BUILD = {
+    "plan": "success",
+    "static": "success",
+    "test-tools": "success",
+    "docs": "success",
+    "security": "success",
+    "denylist": "success",
+    **dict.fromkeys(components.CONDITIONAL_JOBS, "success"),
 }
 
 
-def jobs(results: dict[str, str | None], prefix: str = "", own: str = "runner-9") -> list[Any]:
-    out: list[dict[str, Any]] = [
-        {
-            "name": f"{prefix}{name}",
-            "status": "completed" if conclusion else "in_progress",
-            "conclusion": conclusion,
-            "runner_name": f"runner-{i}",
-        }
-        for i, (name, conclusion) in enumerate(results.items())
-    ]
-    out.append(
-        {"name": f"{prefix}ci-ok", "status": "in_progress", "conclusion": None, "runner_name": own}
-    )
-    return out
+def _load(path: Path) -> dict[Any, Any]:
+    data = yaml.safe_load(path.read_text(encoding="utf-8"))
+    assert isinstance(data, dict)
+    return data
 
 
-def test_all_green_passes() -> None:
-    assert ci_ok.evaluate(jobs(GREEN), "runner-9", ALL)[0] == "pass"
+# --- the evaluation -----------------------------------------------------------------
 
 
-RULE_OF_JOB = {rule.job: rule.names[0] for rule in ci_ok.RULES if rule.job}
+@pytest.mark.parametrize("green", [GREEN, GREEN_BUILD])
+def test_a_green_run_passes(green: dict[str, str]) -> None:
+    assert ci_ok.check_needs(green, ALL) == []
 
 
+@pytest.mark.parametrize("green", [GREEN, GREEN_BUILD])
 @pytest.mark.parametrize("job", sorted(components.CONDITIONAL_JOBS))
-def test_a_skipped_job_passes_only_when_the_plan_left_it_out(job: str) -> None:
+def test_a_skipped_job_passes_only_when_the_plan_left_it_out(
+    green: dict[str, str], job: str
+) -> None:
     """A skip never hides a failure: a needed job must succeed, an unneeded one must not fail."""
-    name = RULE_OF_JOB[job]
-    skipped = jobs({**GREEN, name: "skipped"})
-    assert ci_ok.evaluate(skipped, "runner-9", ALL)[0] == "fail"
-    assert ci_ok.evaluate(skipped, "runner-9", ALL - {job})[0] == "pass"
-    for conclusion in ("failure", "cancelled", "timed_out"):
-        ran = jobs({**GREEN, name: conclusion})
-        assert ci_ok.evaluate(ran, "runner-9", ALL - {job})[0] == "fail"
-        assert ci_ok.evaluate(ran, "runner-9", ALL)[0] == "fail"
-
-
-def test_every_conditional_job_has_a_rule() -> None:
-    assert set(RULE_OF_JOB) == ALL
+    skipped = {**green, job: "skipped"}
+    assert ci_ok.check_needs(skipped, ALL - {job}) == []
+    assert ci_ok.check_needs(skipped, ALL) == [f"{job}: skipped, but the plan needs it"]
+    for result in ("failure", "cancelled"):
+        ran = {**green, job: result}
+        assert ci_ok.check_needs(ran, ALL - {job}) == [f"{job}: {result}"]
+        assert ci_ok.check_needs(ran, ALL) == [f"{job}: {result}"]
 
 
 def test_a_plan_without_conditional_jobs_accepts_their_skips() -> None:
-    results = {**GREEN, **{RULE_OF_JOB[job]: "skipped" for job in ALL}}
-    assert ci_ok.evaluate(jobs(results), "runner-9", frozenset())[0] == "pass"
-    assert ci_ok.evaluate(jobs(results), "runner-9", frozenset({"test-server"}))[0] == "fail"
+    results = {**GREEN, **dict.fromkeys(ALL, "skipped")}
+    assert ci_ok.check_needs(results, frozenset()) == []
+    assert ci_ok.check_needs(results, frozenset({"test-server"})) == [
+        "test-server: skipped, but the plan needs it"
+    ]
+
+
+@pytest.mark.parametrize(
+    ("job", "result"),
+    [
+        ("plan", "failure"),
+        ("plan", "skipped"),
+        ("plan", "cancelled"),
+        ("gates", "failure"),
+        ("gates", "cancelled"),
+        ("gates", "skipped"),
+        ("gates-docs", "skipped"),
+        ("gates-security", "failure"),
+        ("test-tools", "skipped"),
+        ("sonar", "failure"),
+        ("sonar", "cancelled"),
+        ("denylist", "failure"),
+        ("denylist", "cancelled"),
+    ],
+)
+def test_every_other_job_must_pass(job: str, result: str) -> None:
+    problems = ci_ok.check_needs({**GREEN, job: result}, ALL)
+    assert f"{job}: {result}" in problems
+
+
+@pytest.mark.parametrize(
+    ("job", "result"),
+    [
+        ("static", "skipped"),
+        ("test-tools", "skipped"),
+        ("docs", "failure"),
+        ("security", "cancelled"),
+        ("denylist", "skipped"),
+    ],
+)
+def test_every_other_build_verify_job_must_pass(job: str, result: str) -> None:
+    assert ci_ok.check_needs({**GREEN_BUILD, job: result}, ALL) == [f"{job}: {result}"]
+
+
+def test_sonar_may_be_skipped() -> None:
+    """Without the secrets, on main without SONAR_MAIN_ANALYSIS, and after a failed test job,
+    which fails its own rule."""
+    assert ci_ok.check_needs({**GREEN, "sonar": "skipped"}, ALL) == []
+    failed = {**GREEN, "test-server": "failure", "sonar": "skipped"}
+    assert ci_ok.check_needs(failed, ALL) == ["test-server: failure"]
+
+
+def test_fork_path_passes() -> None:
+    fork = {**GREEN, "denylist": "skipped", "denylist-fork": "success", "sonar": "skipped"}
+    assert ci_ok.check_needs(fork, ALL) == []
+
+
+def test_exactly_one_deny_list_job_must_pass() -> None:
+    both_skipped = {**GREEN, "denylist": "skipped"}
+    assert ci_ok.check_needs(both_skipped, ALL) == [
+        "denylist: skipped",
+        "denylist-fork: skipped",
+    ]
+    fork_failed = {**GREEN, "denylist": "skipped", "denylist-fork": "failure"}
+    assert ci_ok.check_needs(fork_failed, ALL) == [
+        "denylist: skipped",
+        "denylist-fork: failure",
+    ]
+    private_failed = {**GREEN, "denylist": "failure"}
+    assert ci_ok.check_needs(private_failed, ALL) == [
+        "denylist: failure",
+        "denylist-fork: skipped",
+    ]
+
+
+@pytest.mark.parametrize("job", ["plan", *sorted(components.CONDITIONAL_JOBS)])
+def test_a_missing_plan_or_conditional_job_fails(job: str) -> None:
+    results = {k: v for k, v in GREEN.items() if k != job}
+    assert ci_ok.check_needs(results, ALL - {job}) == [f"{job}: missing"]
+
+
+def test_an_unknown_result_fails() -> None:
+    assert ci_ok.check_needs({**GREEN, "gates": "neutral"}, ALL) == ["gates: neutral"]
 
 
 @pytest.mark.parametrize(
@@ -108,175 +184,145 @@ def test_a_missing_or_unknown_plan_fails_closed(value: str) -> None:
         ci_ok.parse_jobs(value)
 
 
-def test_fork_path_passes() -> None:
-    fork = {
-        **GREEN,
-        "denylist (private list)": "skipped",
-        "denylist (generic rules, fork)": "success",
-        "sonar": "skipped",
-    }
-    assert ci_ok.evaluate(jobs(fork), "runner-9", ALL)[0] == "pass"
+def _needs(results: dict[str, str]) -> str:
+    return json.dumps({k: {"result": v, "outputs": {}} for k, v in results.items()})
 
 
-@pytest.mark.parametrize(
-    ("name", "conclusion"),
-    [
-        ("plan", "failure"),
-        ("gates", "failure"),
-        ("gates", "cancelled"),
-        ("gates", "skipped"),
-        ("sonar", "failure"),
-    ],
-)
-def test_a_failed_job_fails(name: str, conclusion: str) -> None:
-    assert ci_ok.evaluate(jobs({**GREEN, name: conclusion}), "runner-9", ALL)[0] == "fail"
+def test_cli(monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]) -> None:
+    monkeypatch.setenv("GITHUB_JOB", "ci-ok")
+    monkeypatch.setenv("RESULTS", _needs(GREEN))
+    monkeypatch.setenv("CI_JOBS", " ".join(sorted(ALL)))
+    assert ci_ok.main(["needs"]) == 0
+    assert "ci-ok: every job the plan needs passed" in capsys.readouterr().out
+    monkeypatch.setenv("RESULTS", _needs({**GREEN, "test-apps": "skipped"}))
+    assert ci_ok.main(["needs"]) == 1
+    assert "ci-ok: test-apps: skipped, but the plan needs it" in capsys.readouterr().out
 
 
-def test_failed_private_deny_list_fails_once_the_fork_job_is_skipped() -> None:
-    results: dict[str, str | None] = {**GREEN, "denylist (private list)": "failure"}
-    assert ci_ok.evaluate(jobs(results), "runner-9", ALL)[0] == "fail"
-
-
-def test_both_deny_list_jobs_skipped_fails() -> None:
-    results = {**GREEN, "denylist (private list)": "skipped"}
-    assert ci_ok.evaluate(jobs(results), "runner-9", ALL)[0] == "fail"
-
-
-def test_running_or_missing_jobs_wait() -> None:
-    assert ci_ok.evaluate(jobs({**GREEN, "gates": None}), "runner-9", ALL)[0] == "wait"
-    missing = {k: v for k, v in GREEN.items() if k != "sonar"}
-    assert ci_ok.evaluate(jobs(missing), "runner-9", ALL)[0] == "wait"
-
-
-def test_a_failure_decides_before_other_jobs_finish() -> None:
-    results = {**GREEN, "plan": "failure", "gates": None}
-    assert ci_ok.evaluate(jobs(results), "runner-9", ALL)[0] == "fail"
-
-
-def test_called_workflow_uses_the_prefix_of_the_own_job() -> None:
-    listed = jobs(GREEN, prefix="gates / ")
-    # A job of the calling workflow with a colliding name must not count.
-    listed.append(
-        {"name": "gates", "status": "completed", "conclusion": "failure", "runner_name": "runner-x"}
-    )
-    assert ci_ok.evaluate(listed, "runner-9", ALL)[0] == "pass"
-
-
-def test_own_job_not_listed_yet_waits() -> None:
-    listed = [j for j in jobs(GREEN) if j["name"] != "ci-ok"]
-    assert ci_ok.evaluate(listed, "runner-9", ALL)[0] == "wait"
-
-
-def test_single_running_ci_ok_is_the_own_job_without_a_runner_match() -> None:
-    assert ci_ok.evaluate(jobs(GREEN), "runner-unknown", ALL)[0] == "pass"
-
-
-def test_run_polls_until_decided() -> None:
-    pages = [jobs({**GREEN, "gates": None}), jobs(GREEN)]
-    slept: list[float] = []
-    rc = ci_ok.run(lambda: pages.pop(0), "runner-9", ALL, sleep=slept.append, interval=1.0)
-    assert rc == 0
-    assert slept == [1.0]
-
-
-def test_run_retries_api_errors() -> None:
-    calls: list[int] = []
-
-    def fetch() -> list[Any]:
-        calls.append(1)
-        if len(calls) == 1:
-            raise OSError("temporary")
-        return jobs({**GREEN, "gates": "failure"})
-
-    assert ci_ok.run(fetch, "runner-9", ALL, sleep=lambda _s: None, interval=1.0) == 1
-
-
-# --- the real workflow ------------------------------------------------------------
-
-
-def _load(path: Path) -> dict[Any, Any]:
-    data = yaml.safe_load(path.read_text(encoding="utf-8"))
-    assert isinstance(data, dict)
-    return data
-
-
-@pytest.mark.parametrize(
-    "job",
-    [
-        "gates",
-        "gates (docs and contracts)",
-        "gates (security and supply chain)",
-        "test (tools)",
-        "test (server)",
-        "test (apps)",
-        "test (SDKs and plugins)",
-    ],
-)
-def test_the_parallel_gate_jobs(job: str) -> None:
-    """Every part of `make gates` the plan needs must pass; a skip of a needed one fails."""
-    assert ci_ok.evaluate(jobs({**GREEN, job: "failure"}), "runner-9", ALL)[0] == "fail"
-    assert ci_ok.evaluate(jobs({**GREEN, job: "skipped"}), "runner-9", ALL)[0] == "fail"
-
-
-def test_required_names_are_the_other_jobs_of_ci_yml() -> None:
-    names = {job.get("name", key) for key, job in _load(CI)["jobs"].items() if key != "ci-ok"}
-    assert {n for rule in ci_ok.RULES for n in rule.names} == names
-
-
-def test_ci_ok_starts_with_the_run_and_may_read_the_jobs() -> None:
-    job = _load(CI)["jobs"]["ci-ok"]
-    assert job["name"] == "ci-ok"
-    assert "needs" not in job
-    assert "if" not in job
-    assert job["permissions"]["actions"] == "read"
-
-
-def test_release_grants_the_called_ci_ok_read_access_to_the_jobs() -> None:
-    assert _load(RELEASE)["jobs"]["gates"]["permissions"]["actions"] == "read"
-
-
-def test_a_job_that_only_ends_with_the_name_is_not_the_own_job() -> None:
-    listed = jobs(GREEN)
-    listed.append(
-        {"name": "not-ci-ok", "status": "in_progress", "conclusion": None, "runner_name": "r"}
-    )
-    assert ci_ok.evaluate(listed, "runner-unknown", ALL)[0] == "pass"
-
-
-def test_run_retries_any_reading_error_and_names_the_status(
-    capsys: pytest.CaptureFixture[str],
+def test_cli_names_the_job(
+    monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
 ) -> None:
-    import io
-    import urllib.error
-    from email.message import Message
-
-    denied = urllib.error.HTTPError(
-        "https://api.example.com", 403, "forbidden", Message(), io.BytesIO()
-    )
-    errors: list[Exception] = [denied, TypeError("bad payload")]
-
-    def fetch() -> list[Any]:
-        if errors:
-            raise errors.pop(0)
-        return jobs(GREEN)
-
-    assert ci_ok.run(fetch, "runner-9", ALL, sleep=lambda _s: None, interval=1.0) == 0
-    denied.close()
-    assert "HTTP 403" in capsys.readouterr().out
+    monkeypatch.setenv("GITHUB_JOB", "build-verify-ok")
+    monkeypatch.setenv("RESULTS", _needs({**GREEN_BUILD, "docs": "failure"}))
+    monkeypatch.setenv("CI_JOBS", "none")
+    assert ci_ok.main(["needs"]) == 1
+    assert "build-verify-ok: docs: failure" in capsys.readouterr().out
 
 
-def test_duplicate_job_names_fail_closed() -> None:
-    listed = jobs(GREEN)
-    listed.insert(
-        0,
-        {
-            "name": "gates",
-            "status": "completed",
-            "conclusion": "failure",
-            "runner_name": "runner-y",
-        },
-    )
-    assert ci_ok.evaluate(listed, "runner-9", ALL)[0] == "fail"
+@pytest.mark.parametrize("value", ["", "nope"])
+def test_cli_fails_without_a_plan(
+    monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str], value: str
+) -> None:
+    """A failed plan job leaves its output empty; the check fails and names the plan."""
+    monkeypatch.setenv("GITHUB_JOB", "ci-ok")
+    monkeypatch.setenv("RESULTS", _needs({**GREEN, "plan": "failure"}))
+    monkeypatch.setenv("CI_JOBS", value)
+    assert ci_ok.main(["needs"]) == 1
+    out = capsys.readouterr().out
+    assert "ci-ok: CI_JOBS" in out
+    assert "ci-ok: plan: failure" in out
+
+
+def test_cli_rejects_other_arguments() -> None:
+    with pytest.raises(SystemExit):
+        ci_ok.main([])
+
+
+# --- the real workflows -----------------------------------------------------------------
+
+
+def _ok_job(path: Path) -> tuple[str, dict[str, Any], dict[str, Any]]:
+    jobs = _load(path)["jobs"]
+    name = "ci-ok" if path == CI else "build-verify-ok"
+    return name, jobs[name], jobs
+
+
+@pytest.mark.parametrize("path", [CI, BUILD_VERIFY])
+def test_the_result_job_is_last_and_always_reports(path: Path) -> None:
+    """It needs every other job, so it cannot start before they end, and runs with always(), so
+    it reports after a failure, a skip or a cancellation too: the check never stays missing."""
+    name, job, jobs = _ok_job(path)
+    assert job["name"] == name
+    assert job["if"] == "always()"
+    assert isinstance(job["needs"], list)
+    assert set(job["needs"]) == set(jobs) - {name}
+    assert len(job["needs"]) == len(set(job["needs"]))
+    assert int(job["timeout-minutes"]) <= 10
+
+
+@pytest.mark.parametrize("path", [CI, BUILD_VERIFY])
+def test_the_result_job_checks_the_needs_against_the_plan(path: Path) -> None:
+    _, job, _ = _ok_job(path)
+    [check] = [s for s in job["steps"] if "ci_ok.py needs" in str(s.get("run", ""))]
+    assert check["env"]["RESULTS"] == "${{ toJSON(needs) }}"
+    assert check["env"]["CI_JOBS"] == "${{ needs.plan.outputs.jobs }}"
+    assert str(check["run"]).rstrip().endswith("tools/ci/ci_ok.py needs")
+
+
+def test_every_job_of_ci_yml_without_a_fixed_rule_must_succeed() -> None:
+    """Only the conditional jobs, sonar and the deny-list pair may end skipped."""
+    jobs = set(_load(CI)["jobs"]) - {"ci-ok"}
+    lenient = ALL | ci_ok.MAY_SKIP | {j for group in ci_ok.ONE_OF for j in group}
+    assert lenient <= jobs
+    assert {"sonar"} == ci_ok.MAY_SKIP
+    assert (frozenset({"denylist", "denylist-fork"}),) == ci_ok.ONE_OF
+    for job in jobs - lenient:
+        assert ci_ok.check_needs({**GREEN, job: "skipped"}, ALL) == [f"{job}: skipped"], job
+
+
+def _plan_step(job: dict[str, Any], step_id: str) -> dict[str, Any]:
+    found: list[dict[str, Any]] = [s for s in job["steps"] if s.get("id") == step_id]
+    [step] = found
+    return step
+
+
+MARK_IF = (
+    "github.event_name == 'pull_request'"
+    " && github.event.pull_request.head.repo.full_name == github.repository"
+    " && github.actor != 'dependabot[bot]' && github.actor != 'renovate[bot]'"
+)
+
+
+def test_the_plan_job_marks_ci_ok_pending_first() -> None:
+    """Before anything else the plan job creates a pending check run `ci-ok` for the head commit
+    of a pull request; the latest ci-ok of that commit is then pending until ci-ok ends."""
+    plan = _load(CI)["jobs"]["plan"]
+    assert plan["permissions"] == {"checks": "write", "contents": "read"}
+    first = plan["steps"][0]
+    assert first["id"] == "mark"
+    assert first["if"] == MARK_IF
+    assert first["env"]["HEAD_SHA"] == "${{ github.event.pull_request.head.sha }}"
+    assert first["env"]["GH_TOKEN"] == "${{ github.token }}"
+    run = str(first["run"])
+    assert "-X POST" in run
+    assert "check-runs" in run
+    assert "name=ci-ok" in run
+    assert "status=in_progress" in run
+    assert plan["outputs"]["marker"] == "${{ steps.mark.outputs.marker }}"
+
+
+def test_ci_ok_completes_the_pending_check_run_with_its_conclusion() -> None:
+    job = _load(CI)["jobs"]["ci-ok"]
+    assert job["permissions"] == {"checks": "write", "contents": "read"}
+    steps = job["steps"]
+    check = _plan_step(job, "check")
+    done = steps[-1]
+    assert steps.index(check) < len(steps) - 1
+    assert done["if"] == "always() && needs.plan.outputs.marker != ''"
+    assert done["env"]["MARKER"] == "${{ needs.plan.outputs.marker }}"
+    conclusion = "${{ steps.check.outcome == 'success' && 'success' || 'failure' }}"
+    assert done["env"]["CONCLUSION"] == conclusion
+    run = str(done["run"])
+    assert "-X PATCH" in run
+    assert "status=completed" in run
+    assert 'conclusion="$CONCLUSION"' in run
+
+
+def test_release_grants_the_called_workflow_its_check_permission() -> None:
+    assert _load(RELEASE)["jobs"]["gates"]["permissions"] == {
+        "checks": "write",
+        "contents": "read",
+    }
 
 
 # --- the plan of ci.yml and build-verify.yml -------------------------------------------------
@@ -294,110 +340,31 @@ def test_each_conditional_job_runs_exactly_when_the_plan_lists_it(path: Path) ->
         assert workflow[job]["if"] == _condition(job), job
         assert workflow[job]["needs"] == "plan", job
     others = {job for job, spec in workflow.items() if "if" in spec} - ALL
-    expected = {"denylist", "denylist-fork", "sonar"} if path == CI else {"build-verify-ok"}
+    expected = (
+        {"denylist", "denylist-fork", "sonar", "ci-ok"} if path == CI else {"build-verify-ok"}
+    )
     assert others == expected
 
 
-def test_rules_name_the_conditional_jobs_of_ci_yml() -> None:
-    workflow = _load(CI)["jobs"]
-    assert {job: workflow[job]["name"] for job in ALL} == RULE_OF_JOB
-
-
-def _plan_step(job: dict[str, Any]) -> dict[str, Any]:
-    [step] = [s for s in job["steps"] if s.get("id") == "jobs"]
-    return step
-
-
-def test_ci_ok_plans_the_jobs_with_the_step_of_the_plan_job() -> None:
-    """ci-ok has no `needs`, so it plans again with the same step on the same commit."""
-    workflow = _load(CI)["jobs"]
-    plan, ok = workflow["plan"], workflow["ci-ok"]
-    assert _plan_step(ok) == _plan_step(plan)
-    assert "components.py ci-plan" in _plan_step(plan)["run"]
+def test_the_plan_writes_the_jobs_output() -> None:
+    plan = _load(CI)["jobs"]["plan"]
+    assert "components.py ci-plan" in _plan_step(plan, "jobs")["run"]
     assert plan["outputs"]["jobs"] == "${{ steps.jobs.outputs.jobs }}"
     assert plan["outputs"]["components"] == "${{ steps.jobs.outputs.components }}"
-    [check] = [s for s in ok["steps"] if "ci_ok.py" in str(s.get("run", ""))]
-    assert check["env"]["CI_JOBS"] == "${{ steps.jobs.outputs.jobs }}"
-    # The diff needs the history of both commits.
-    [checkout] = [s for s in ok["steps"] if str(s.get("uses", "")).startswith("actions/checkout@")]
-    assert checkout["with"]["fetch-depth"] == 0
 
 
 def test_build_verify_plans_with_the_same_command() -> None:
     plan = _load(BUILD_VERIFY)["jobs"]["plan"]
-    run = _plan_step(plan)["run"]
+    run = _plan_step(plan, "jobs")["run"]
     assert "components.py ci-plan" in run
     assert plan["outputs"]["jobs"] == "${{ steps.jobs.outputs.jobs }}"
     assert (
-        _plan_step(plan)["env"]["PUBLIC"] == _plan_step(_load(CI)["jobs"]["plan"])["env"]["PUBLIC"]
+        _plan_step(plan, "jobs")["env"]["PUBLIC"]
+        == _plan_step(_load(CI)["jobs"]["plan"], "jobs")["env"]["PUBLIC"]
     )
-
-
-def test_build_verify_ok_checks_skips_against_the_plan() -> None:
-    ok = _load(BUILD_VERIFY)["jobs"]["build-verify-ok"]
-    [check] = [s for s in ok["steps"] if "ci_ok.py needs" in str(s.get("run", ""))]
-    assert check["env"]["RESULTS"] == "${{ toJSON(needs) }}"
-    assert check["env"]["CI_JOBS"] == "${{ needs.plan.outputs.jobs }}"
 
 
 def test_superseded_pull_request_runs_are_cancelled() -> None:
     concurrency = _load(CI)["concurrency"]
     assert "github.event.pull_request.number" in concurrency["group"]
     assert concurrency["cancel-in-progress"] == "${{ github.event_name != 'push' }}"
-
-
-GREEN_NEEDS = {
-    "plan": "success",
-    "static": "success",
-    "test-tools": "success",
-    "denylist": "success",
-    **dict.fromkeys(components.CONDITIONAL_JOBS, "success"),
-}
-
-
-def test_needs_check_passes_a_green_run() -> None:
-    assert ci_ok.check_needs(GREEN_NEEDS, ALL) == []
-
-
-@pytest.mark.parametrize("job", sorted(components.CONDITIONAL_JOBS))
-def test_needs_check_accepts_a_skip_only_when_the_plan_left_the_job_out(job: str) -> None:
-    skipped = {**GREEN_NEEDS, job: "skipped"}
-    assert ci_ok.check_needs(skipped, ALL - {job}) == []
-    assert ci_ok.check_needs(skipped, ALL) == [f"{job}: skipped, but the plan needs it"]
-    failed = {**GREEN_NEEDS, job: "failure"}
-    assert ci_ok.check_needs(failed, ALL - {job}) == [f"{job}: failure"]
-
-
-@pytest.mark.parametrize(
-    ("job", "result", "problem"),
-    [
-        ("plan", "failure", "plan: failure"),
-        ("plan", "skipped", "plan: skipped"),
-        ("static", "skipped", "static: skipped"),
-        ("test-tools", "skipped", "test-tools: skipped"),
-        ("denylist", "cancelled", "denylist: cancelled"),
-    ],
-)
-def test_needs_check_requires_every_other_job(job: str, result: str, problem: str) -> None:
-    assert ci_ok.check_needs({**GREEN_NEEDS, job: result}, ALL) == [problem]
-
-
-def test_needs_check_requires_the_plan() -> None:
-    results = {k: v for k, v in GREEN_NEEDS.items() if k != "plan"}
-    assert ci_ok.check_needs(results, ALL) == ["plan: missing"]
-
-
-def test_needs_cli(monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]) -> None:
-    import json
-
-    results = {k: {"result": v, "outputs": {}} for k, v in GREEN_NEEDS.items()}
-    monkeypatch.setenv("RESULTS", json.dumps(results))
-    monkeypatch.setenv("CI_JOBS", " ".join(sorted(ALL)))
-    assert ci_ok.main(["needs"]) == 0
-    results["test-apps"]["result"] = "skipped"
-    monkeypatch.setenv("RESULTS", json.dumps(results))
-    assert ci_ok.main(["needs"]) == 1
-    assert "test-apps: skipped, but the plan needs it" in capsys.readouterr().out
-    monkeypatch.setenv("CI_JOBS", "")
-    with pytest.raises(ValueError, match="CI_JOBS is empty"):
-        ci_ok.main(["needs"])

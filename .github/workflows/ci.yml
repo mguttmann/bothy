@@ -9,9 +9,10 @@
 # own branch, never from a fork, so no fork code runs with the secrets.
 # The pull request title and body become the squash commit on main, so the deny-list jobs
 # scan them too (PR_TITLE, PR_BODY), and an edit of title or body ("edited") runs the whole
-# workflow again. ci-ok starts with every run (no `needs`), so its check run is pending from
-# the first second of the new run; what this does not cover is listed in
-# docs/quality/push-discipline.md, section "Pull request title and body".
+# workflow again. ci-ok is the last job (it needs every other job), and the plan job marks
+# ci-ok pending for the head commit at once, so an older green ci-ok never stands for the new
+# run; what this does not cover is listed in docs/quality/push-discipline.md, section
+# "Pull request title and body".
 #
 # Runners (ADR 0039): every job runs on a GitHub-hosted runner with a fixed label;
 # tools/ci/check_runners.py enforces it on every job.
@@ -55,11 +56,38 @@ jobs:
     name: plan
     runs-on: ubuntu-24.04
     timeout-minutes: 5
+    permissions:
+      checks: write # mark ci-ok pending for the head commit
+      contents: read
     outputs:
       components: ${{ steps.jobs.outputs.components }}
       jobs: ${{ steps.jobs.outputs.jobs }}
+      marker: ${{ steps.mark.outputs.marker }}
       private_checks: ${{ steps.plan.outputs.private_checks }}
     steps:
+      # ci-ok is the last job, and a job with `needs` gets its check run only when the jobs it
+      # needs have ended. So that an older green ci-ok of the same head commit (a run before an
+      # edit of title or body, or before a reopen) never stands while this run goes, the first
+      # step creates a check run `ci-ok` in progress; it is the latest ci-ok of the commit, and
+      # ci-ok completes it with its own conclusion (tools/ci/ci_ok.py). Not for a fork or a
+      # dependency bot's run: their token cannot write checks (D-DEPS-3).
+      - id: mark
+        name: Mark ci-ok pending for the head commit
+        if: github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository && github.actor != 'dependabot[bot]' && github.actor != 'renovate[bot]'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+          DETAILS_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          marker=$(gh api -X POST "repos/$REPO/check-runs" -f name=ci-ok -f head_sha="$HEAD_SHA" \
+            -f status=in_progress -f details_url="$DETAILS_URL" \
+            -f 'output[title]=Waiting for the jobs of this run' \
+            -f 'output[summary]=The job ci-ok of this run completes this check run with its own conclusion.' \
+            --jq .id)
+          case "$marker" in '' | *[!0-9]*) echo "unexpected check run id: $marker"; exit 1 ;; esac
+          echo "ci-ok pending: check run $marker"
+          echo "marker=$marker" >> "$GITHUB_OUTPUT"
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           fetch-depth: 0
@@ -69,9 +97,8 @@ jobs:
           enable-cache: false
       # The components and the conditional jobs this change needs (tools/ci/components.py
       # ci-plan, docs/quality/gates.md "Jobs a change needs"): a pull request by its diff, a push
-      # to main and a manual run everything, a release the components of its tag. ci-ok runs the
-      # same step on the same commit and accepts a skipped job only when the plan left it out
-      # (tools/ci/tests/test_ci_ok.py keeps both steps equal).
+      # to main and a manual run everything, a release the components of its tag. ci-ok accepts
+      # a skipped job only when this plan left it out (tools/ci/ci_ok.py).
       - id: jobs
         name: Select the components and jobs this change needs
         env:
@@ -948,47 +975,43 @@ jobs:
 
   ci-ok:
     name: ci-ok
-    # No `needs` on purpose: a job with `needs` gets its check run only when the others are
-    # done, so an older green ci-ok would stay the latest result of the head commit while the
-    # run after an edit of the pull request text is still going. tools/ci/ci_ok.py waits for
-    # the other jobs of this run through the API and combines their results. Its timeout
-    # covers plan, gates and sonar in a row, with margin for queueing.
+    # The last job: it needs every other job and runs with always(), so it starts when they have
+    # ended, holds no runner while they run, and reports on every run, also after a failed,
+    # skipped or cancelled job. tools/ci/ci_ok.py checks the results against the plan: a needed
+    # job must succeed, a job that ran must pass, a missing plan fails. It then completes the
+    # pending check run that the plan job created (docs/quality/push-discipline.md).
+    needs: [plan, gates, gates-docs, gates-security, test-tools, test-server, test-apps, test-sdk-plugins, denylist, denylist-fork, sonar, postgres-image-amd64, postgres-image-arm64, apps-macos, apps-windows, apps-android-26, apps-android-36]
+    if: always()
     runs-on: ubuntu-24.04
-    timeout-minutes: 150
+    timeout-minutes: 10
     permissions:
-      actions: read # list the jobs of this run
+      checks: write # complete the pending ci-ok check run of the plan job
       contents: read
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
-          fetch-depth: 0
           persist-credentials: false
       - uses: astral-sh/setup-uv@1c37ad07a6a961277cf70c0d37d6f313000f5884 # v10.3.0
         with:
           enable-cache: false
-      # The components and the conditional jobs this change needs (tools/ci/components.py
-      # ci-plan, docs/quality/gates.md "Jobs a change needs"): a pull request by its diff, a push
-      # to main and a manual run everything, a release the components of its tag. ci-ok runs the
-      # same step on the same commit and accepts a skipped job only when the plan left it out
-      # (tools/ci/tests/test_ci_ok.py keeps both steps equal).
-      - id: jobs
-        name: Select the components and jobs this change needs
+      - id: check
+        name: Every job the plan needs passed
         env:
-          EVENT: ${{ github.event_name }}
-          BASE_SHA: ${{ github.event.pull_request.base.sha }}
-          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
-          INPUT_COMPONENTS: ${{ inputs.components }}
-          PUBLIC: ${{ github.event.repository.visibility == 'public' || (github.event_name == 'schedule' && vars.BOTHY_VISIBILITY == 'public') }}
+          RESULTS: ${{ toJSON(needs) }}
+          CI_JOBS: ${{ needs.plan.outputs.jobs }}
         run: |
-          if [ "$EVENT" = pull_request ]; then
-            plan=$(uv run --no-project --python 3.14 tools/ci/components.py ci-plan --base "$BASE_SHA" --head "$HEAD_SHA" --public "$PUBLIC")
-          else
-            plan=$(uv run --no-project --python 3.14 tools/ci/components.py ci-plan --components "${INPUT_COMPONENTS:-all}" --public "$PUBLIC")
-          fi
-          echo "$plan"
-          echo "$plan" >> "$GITHUB_OUTPUT"
-      - name: All required jobs passed
+          printf '%s' "$RESULTS" | jq -r 'to_entries[] | "| \(.key) | \(.value.result) |"' \
+            | { echo "| job | result |"; echo "|---|---|"; cat; } >> "$GITHUB_STEP_SUMMARY"
+          uv run --no-project --python 3.14 tools/ci/ci_ok.py needs
+      - name: Complete the pending ci-ok check run
+        if: always() && needs.plan.outputs.marker != ''
         env:
           GH_TOKEN: ${{ github.token }}
-          CI_JOBS: ${{ steps.jobs.outputs.jobs }}
-        run: uv run --no-project --python 3.14 tools/ci/ci_ok.py
+          REPO: ${{ github.repository }}
+          MARKER: ${{ needs.plan.outputs.marker }}
+          CONCLUSION: ${{ steps.check.outcome == 'success' && 'success' || 'failure' }}
+        run: |
+          case "$MARKER" in *[!0-9]*) echo "unexpected check run id: $MARKER"; exit 1 ;; esac
+          gh api -X PATCH "repos/$REPO/check-runs/$MARKER" -f status=completed \
+            -f conclusion="$CONCLUSION" -f "output[title]=ci-ok: $CONCLUSION" \
+            -f 'output[summary]=The conclusion of the job ci-ok of this run.' --silent

@@ -120,13 +120,10 @@ def test_make_sonar_tests_first_and_sonar_scan_does_not() -> None:
     assert _rule("sonar-scan").split(":", 1)[1].split() == []
 
 
-def test_ci_ok_outlasts_the_longest_chain() -> None:
-    # ci-ok has no `needs` and waits for the others; sonar runs after the test jobs, so its
-    # timeout must cover plan, the longest test job and sonar in a row.
-    jobs = _workflow()["jobs"]
-    longest = max(int(jobs[j]["timeout-minutes"]) for j in TEST_JOBS)
-    chain = int(jobs["plan"]["timeout-minutes"]) + longest + int(jobs["sonar"]["timeout-minutes"])
-    assert int(jobs["ci-ok"]["timeout-minutes"]) > chain
+def test_ci_ok_waits_for_sonar_and_the_test_jobs() -> None:
+    # ci-ok is the last job: it needs sonar and every test job, so it decides after them.
+    needs = set(_workflow()["jobs"]["ci-ok"]["needs"])
+    assert {"sonar", *TEST_JOBS} <= needs
 
 
 @pytest.mark.parametrize("job", sorted(TEST_JOBS))
