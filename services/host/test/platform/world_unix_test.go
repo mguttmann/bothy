@@ -251,3 +251,8 @@ func openForAll(p string) error {
 	_ = f.Close()
 	return os.Chmod(p, 0o666)
 }
+
+// sharedBin is a folder in the PATH of every account, the service user included (systemd's
+// default PATH; launchd's default PATH lacks it, so on macOS only the session user's PATH carries
+// the canary).
+func sharedBin() string { return "/usr/local/bin" }

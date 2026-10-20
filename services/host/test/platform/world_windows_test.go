@@ -212,3 +212,6 @@ func openForAll(p string) error {
 	}
 	return nil
 }
+
+// sharedBin is a folder in the system PATH of every account and service.
+func sharedBin() string { return os.Getenv("SystemRoot") }

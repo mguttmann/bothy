@@ -666,3 +666,33 @@ func noCanaryIn(t *testing.T, w *world, dir, canary string) {
 		}
 	}
 }
+
+// failedFor reports a failed entry of check that names sessionUser ("" for an entry without a
+// session user name, a location for all).
+func failedFor(r sessiontest.Report, check, sessionUser string) bool {
+	return slices.ContainsFunc(r.Doctor, func(c sessiontest.ReportCheck) bool {
+		return c.Check == check && !c.OK && c.SessionUser == sessionUser
+	})
+}
+
+// parkExisting moves a file at p aside for the test and puts it back afterwards (a runner may
+// ship a program of that name).
+func parkExisting(t *testing.T, p string) {
+	t.Helper()
+	if _, err := os.Lstat(p); err != nil {
+		return
+	}
+	parked := p + ".bothy-platform-parked"
+	if err := os.Rename(p, parked); err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = os.Rename(parked, p) })
+}
+
+// realPath resolves links of p (macOS has /var and /tmp as links); p itself when it fails.
+func realPath(p string) string {
+	if r, err := filepath.EvalSymlinks(p); err == nil {
+		return r
+	}
+	return p
+}
