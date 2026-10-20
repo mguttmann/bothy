@@ -57,9 +57,22 @@ builds of server and host service).
 | `postgres-image (amd64)`, `postgres-image (arm64)` | what `bothy-postgres` is built and tested from: `services/server/images/bothy-postgres/`, `internal/`, `cmd/bothy-backupd/`, `migrations/`, `migrations.sha256`, `test/postgresimage/`, `go.mod`, `go.sum`, `VERSION` and `.golangci.yml` under `services/server/` |
 
 Every job runs on a push to `main`, on a manual run, for an empty diff and when a shared input
-changes: every path the component map assigns to no component (among them the `Makefile`,
-`tools/` outside the few tool folders it assigns to a component, `.github/`, the root
-configuration files) and the API contract `docs/api/`. A release (`release.yml` calls `ci.yml`)
+changes: every path the component map does not know (among them the `Makefile`, `.github/`, the
+root configuration files and the shared parts of `tools/`) and the API contract `docs/api/`.
+
+Under `tools/` the self-contained tool folders are components of the map
+(`TOOL_COMPONENTS` in `tools/ci/components.py`): a change runs the conditional jobs of the
+components that read the tool, and the repository-wide gates and `test (tools)` as on every
+change. Most tools (`catalog`, `configdoc`, `denylist`, `doccheck`, `docs`, `opscheck`,
+`scancode`, `sonarqube`, `testing`, `api-checks`, `tools/README.md`) are read only by
+repository-wide gates and the tools tests, so they need no conditional job. Some files select a
+component: `tools/api-checks/breaking.py` (`make api-breaking` runs for `server`),
+`tools/sonarqube/compose.yaml` (a test of the server reads its image pin) and
+`tools/design-tokens/` (`apps` like `design/`, and `server`, whose designkeys generator and tests
+read `design/build/tokens.resolved.json`, which also selects `server`). Shared stay the folders every gate depends on
+(`SHARED_TOOL_FOLDERS`: `tools/bin/`, `tools/ci/` with the component map, `tools/hooks/`,
+`tools/node/` with its lock file), the root files of the tools project (`pyproject.toml`,
+`uv.lock`, `conftest.py`) and any tool folder the map does not name yet. A release (`release.yml` calls `ci.yml`)
 runs the jobs of the components of its tag. Documentation (`docs/` outside `docs/api/`, `infra/`,
 the root Markdown files, `LICENSE`, `NOTICE`) needs no conditional job, except the files the map
 assigns to a component (for example `docs/spec/actions.yaml` to `server`). The plan reads the diff

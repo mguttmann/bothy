@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import json
 import re
+import subprocess
 from pathlib import Path
 
 import components
@@ -433,3 +434,117 @@ def test_a_renamed_file_counts_with_its_old_path(
     assert components.main(["ci-plan", "--base", base, "--head", head, "--public", "true"]) == 0
     # The image lost a file of its build context, so the image jobs run.
     assert "postgres-image-amd64" in capsys.readouterr().out
+
+
+# --- tool folders (docs/quality/gates.md, "Jobs a change needs") -----------------------------
+
+ALL_COMPONENTS = ["apps", "plugins", "sdk-python", "sdk-typescript", "server"]
+
+
+@pytest.mark.parametrize(
+    ("path", "expected"),
+    [
+        # Read only by repository-wide gates and the tools tests, which run on every change.
+        ("tools/configdoc/planned.yaml", []),
+        ("tools/configdoc/configdoc.py", []),
+        ("tools/catalog/action_catalog.py", []),
+        ("tools/catalog/event_catalog_dart.py", []),
+        ("tools/docs/language_check.py", []),
+        ("tools/docs/tests/test_config_values.py", []),
+        ("tools/doccheck/register_check.py", []),
+        ("tools/opscheck/opscheck.py", []),
+        ("tools/denylist/generic.rules", []),
+        ("tools/scancode/Dockerfile", []),
+        ("tools/sonarqube/quality_sync.py", []),
+        ("tools/testing/git_fixtures.py", []),
+        ("tools/api-checks/api_checks.py", []),
+        ("tools/README.md", []),
+        # make api-breaking runs only for the component server.
+        ("tools/api-checks/breaking.py", ["server"]),
+        # The server test of pgtest reads the image pin of the local SonarQube.
+        ("tools/sonarqube/compose.yaml", ["server"]),
+        # The token generator writes the committed Dart tokens and icons, like design/.
+        ("tools/design-tokens/tokens.py", ["apps", "server"]),
+        # The server's designkeys generator and tests read the resolved tokens.
+        ("design/build/tokens.resolved.json", ["apps", "server"]),
+        ("design/tokens/color.json", ["apps"]),
+        ("tools/arch-check/rules.yaml", ["apps"]),
+        ("tools/observability/sli_bounds.py", ["apps", "server"]),
+    ],
+)
+def test_a_tool_folder_selects_the_components_that_read_it(path: str, expected: list[str]) -> None:
+    assert components.changed([path]) == expected
+
+
+@pytest.mark.parametrize(
+    "path",
+    [
+        "tools/uv.lock",
+        "tools/pyproject.toml",
+        "tools/conftest.py",
+        "tools/.python-version",
+        "tools/bin/tools.lock.json",
+        "tools/bin/fetch_tools.py",
+        "tools/node/package-lock.json",
+        "tools/node/package.json",
+        "tools/ci/components.py",
+        "tools/ci/ci_ok.py",
+        "tools/ci/tests/test_components.py",
+        "tools/hooks/push_plan.py",
+        "tools/hooks/commit_msg.py",
+        # A new tool folder is shared until the map assigns it.
+        "tools/newtool/x.py",
+        "tools/configdocs/x.py",
+        "tools/sonarqube",
+    ],
+)
+def test_shared_tool_inputs_still_select_everything(path: str) -> None:
+    assert components.changed([path]) == ["all"]
+    plan = components.ci_plan(files=[path], public=True)
+    assert plan.jobs == sorted(components.CONDITIONAL_JOBS)
+
+
+def _tracked_tool_entries() -> set[str]:
+    repo = Path(__file__).resolve().parents[3]
+    out = subprocess.run(
+        ["git", "-C", str(repo), "ls-files", "--", "tools/"],
+        check=True,
+        capture_output=True,
+        text=True,
+    ).stdout
+    return {line.split("/")[1] for line in out.splitlines() if line.count("/") >= 2}
+
+
+def test_every_tool_folder_is_assigned_or_shared() -> None:
+    """A tool folder the map does not name stays shared; this list makes each choice explicit."""
+    assigned = {key.split("/")[1] for key in components.TOOL_COMPONENTS}
+    assigned |= {"arch-check", "observability"}
+    tracked = _tracked_tool_entries()
+    assert tracked - assigned == set(components.SHARED_TOOL_FOLDERS)
+    for folder in components.SHARED_TOOL_FOLDERS:
+        assert components.changed([f"tools/{folder}/x"]) == ["all"], folder
+
+
+@pytest.mark.parametrize(
+    ("files", "expected"),
+    [
+        # The feature pull request that adds a planned configuration key with server code.
+        (
+            ["tools/configdoc/planned.yaml", "services/host/internal/x.go"],
+            {"test-server"},
+        ),
+        (["tools/configdoc/planned.yaml", "docs/operations/configuration.md"], set()),
+        (["tools/sonarqube/compose.yaml"], {"test-server"}),
+        (["tools/design-tokens/tokens.py"], {"test-apps", "test-server"}),
+        (["tools/api-checks/breaking.py"], {"test-server"}),
+        (["tools/catalog/action_catalog.py", "tools/uv.lock"], set(components.CONDITIONAL_JOBS)),
+    ],
+)
+def test_ci_plan_of_tool_changes(files: list[str], expected: set[str]) -> None:
+    assert set(components.ci_plan(files=files, public=True).jobs) == expected
+
+
+def test_tool_components_name_known_components() -> None:
+    for key, owners in components.TOOL_COMPONENTS.items():
+        assert key.startswith("tools/"), key
+        assert set(owners) <= set(components.GATE_COMPONENTS), key
