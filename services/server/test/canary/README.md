@@ -52,6 +52,9 @@ go test -race -count=1 ./test/canary/... ./test/harness/...
   tokens of the grants are registered as secrets.
   `scenario_images.go` drives avatar and logo (M3-10): Alex sets and deletes the avatar, the owner
   uploads, reads and deletes the instance logo.
+  `scenario_commands.go` drives the six command operations (M2-16): Lotse registers, reads, updates
+  and removes a control command of Support/Allgemein whose description is a canary, Alex lists,
+  reads and invokes it with a canary option value, once more with a value outside SEC-IN-4 (400).
 
 ## Sinks
 

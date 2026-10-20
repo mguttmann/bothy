@@ -74,6 +74,9 @@ var Fixtures = map[string]ParamFixture{
 	// The run of Texter in the thread of Marketing/Kampagnen that the first message of the world
 	// opened (M2-05): neither requester reads Marketing (05 run.read).
 	"run_id": extraFixture(func(e *Extras) string { return e.RunID }),
+	// A command of Texter scoped to Marketing/Kampagnen (M2-16): neither Alex nor Lotse sees its
+	// scope target, and neither owns it (05 command.read on kind command).
+	"command_id": extraFixture(func(e *Extras) string { return e.CommandID }),
 }
 
 // isHuman reports whether r is one of the people of w.
@@ -99,6 +102,8 @@ type Extras struct {
 	pairingCode string
 	// RunID is the run of Texter in Marketing/Kampagnen (M2-05).
 	RunID string
+	// CommandID is a command of Texter scoped to Marketing/Kampagnen (M2-16).
+	CommandID string
 }
 
 // ExtrasConfig are the Options.Config entries PrepareExtras needs: the host of the webhook
@@ -127,7 +132,8 @@ func extraFixture(get func(*Extras) string) ParamFixture {
 // PrepareExtras creates the Extras of w through the public API as the owner: a disabled
 // trusted-header login driver (createIdentityProvider), an app with a webhook subscription
 // (installApp, createWebhookSubscription; the server needs ExtrasConfig), a host without
-// assignee (createHost) and, as Sam, an upload (createUpload).
+// assignee (createHost), as Sam an upload (createUpload) and as Texter a command scoped to
+// Marketing/Kampagnen (registerCommand, M2-16).
 func PrepareExtras(tb testing.TB, w *harness.World) *Extras {
 	tb.Helper()
 	o := w.Owner
@@ -159,6 +165,9 @@ func PrepareExtras(tb testing.TB, w *harness.World) *Extras {
 	e.pairingCode = code.PairingCode
 	e.FileID = uploadOfSam(tb, w)
 	e.RunID = runOfMarketing(tb, w)
+	e.CommandID = createdID(tb, harness.MustDo(tb, w.Agents["Texter"], harness.Request{Method: http.MethodPost, Path: "/commands", Body: map[string]any{
+		"name": "campaign", "description": "Plan a campaign", "scope_kind": "channel", "scope_id": w.Channels["Marketing/Kampagnen"],
+	}}, http.StatusCreated))
 	extras.Store(w, e)
 	return e
 }

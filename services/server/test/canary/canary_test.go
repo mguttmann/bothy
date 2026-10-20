@@ -244,6 +244,7 @@ func runScenario(t *testing.T) *scenarioResult {
 	sc.images()
 	sc.behavior()
 	sc.runs()
+	sc.commands()
 	sc.projectBinding()
 	sc.people()
 	sc.agents()
