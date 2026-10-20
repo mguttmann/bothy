@@ -44,6 +44,7 @@ import (
 
 	"github.com/jackc/pgx/v5/pgxpool"
 
+	filesapp "github.com/OWNER/bothy/services/server/internal/files/app"
 	"github.com/OWNER/bothy/services/server/internal/kernel/clock"
 	"github.com/OWNER/bothy/services/server/internal/kernel/ids"
 	"github.com/OWNER/bothy/services/server/internal/platform/config"
@@ -115,6 +116,9 @@ type Options struct {
 	// TerminalBeforeOpenCommit runs inside the unit of work of every terminal opening before its
 	// commit (wire.Deps.TerminalBeforeOpenCommit, M2-44); nil runs nothing.
 	TerminalBeforeOpenCommit func()
+	// FilesImageHooks are the test seams of the job files.thumbnail (wire.Deps.FilesImageHooks,
+	// M3-06): hold, fail or observe a run; nil in every other test.
+	FilesImageHooks *filesapp.ImageHooks
 }
 
 // Server is a running harness server.
@@ -247,6 +251,8 @@ func start(tb testing.TB, db *pgtest.DB, opts Options, clk clock.Clock, secretsD
 	deps := wire.Deps{
 		Env: env, Stdout: out, Signals: sigs, Clock: clk, EgressDenyAll: opts.EgressDenyAll, OIDCRootCAs: opts.OIDCRootCAs,
 		TerminalTimers: opts.TerminalTimers, TerminalBeforeOpenCommit: opts.TerminalBeforeOpenCommit,
+
+		FilesImageHooks: opts.FilesImageHooks,
 	}
 	if opts.Telemetry != nil {
 		deps.TelemetryExporters = opts.Telemetry.exporters()

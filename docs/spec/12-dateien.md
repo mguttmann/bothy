@@ -38,6 +38,8 @@ Upload-Session (Abschnitt 3.1; Tabelle `file_upload_sessions` in 03).
 | Upload läuft | `pending` | `pending` | `open` | nein |
 | Client fertig, Prüfung läuft | `pending` | `pending` | `completed` | nein; Anzeige "wird geprüft" |
 | Prüfsumme oder Größe falsch | `failed` | `pending` | `completed` | nein; Anzeige "Upload fehlgeschlagen" |
+| image being cleaned (JPEG, PNG, GIF, WebP; 7.1) | `pending` | `clean` or `skipped` | `completed` | no; shown as "being checked" |
+| broken image structure (JPEG or PNG; 7.1) | `failed` | `clean` or `skipped` | `completed` | no; shown as "upload failed" |
 | bereit | `complete` | `clean` oder `skipped` | `completed` | ja |
 | blockiert | `complete` | `infected` oder `error` | `completed` | nein; Anzeige "blockiert" |
 | abgebrochen oder abgelaufen | `failed` | `pending` | `aborted` oder `expired` | nein |
@@ -60,7 +62,11 @@ stateDiagram-v2
     offen --> pruefung: complete
     pruefung --> pruefung: clamd nicht bereit, erneut versuchen
     pruefung --> fehl: Größe oder SHA-256 falsch
-    pruefung --> bereit: clean oder skipped
+    state "Bild wird bereinigt" as bereinigung
+    pruefung --> bereit: clean oder skipped, kein Bild nach 7.1
+    pruefung --> bereinigung: clean oder skipped, JPEG, PNG, GIF oder WebP
+    bereinigung --> bereit: bereinigtes Original gespeichert
+    bereinigung --> fehl: Bildstruktur beschädigt
     pruefung --> blockiert: infected oder error
     bereit --> weg: Nachricht gelöscht, Datei gelöscht, Aufräumen
     blockiert --> weg: Aufräumen
@@ -213,7 +219,16 @@ The checksum per part (3.2) catches transfer errors early; the total checksum he
 errors during joining and in presigned mode.
 
 If all is well: `upload_state = 'complete'`, `mime_type` = detected type, `scan_status` per
-section 5.2, `scanned_at`, `scan_engine`, event `file.updated`.
+section 5.2, `scanned_at`, `scan_engine`, event `file.updated`. Exception for images (M3-06,
+docs/DECISIONS.md D-M3-06-1): when the detected type is `image/jpeg`, `image/png`, `image/apng`,
+`image/gif` or `image/webp` and the verdict is `clean` or `skipped`, the same transaction writes
+`scan_status`, `scanned_at`, `scan_engine` and `mime_type` but leaves `upload_state = 'pending'`
+and inserts the job `files.thumbnail`; the image becomes `complete` only in the transaction of
+that job that stores its cleaned original (section 7.1), so the original with its location data
+is never deliverable and never "final" for a held agent invocation (section 10). MP4 and
+QuickTime files (`video/mp4`, `video/quicktime`, `video/x-m4v`, `audio/mp4`, `audio/x-m4a`)
+become `complete` as before and get `files.thumbnail` for their display size and duration
+(section 7.3). Blocked and failed files never get the job.
 
 Rules of the pass (M3-04, docs/DECISIONS.md D-M3-04-1 to D-M3-04-15): the job reads
 `object_key` when it exists (after an earlier attempt or, on S3, after the pass ran
@@ -229,9 +244,9 @@ transaction that locks the session and then the file, writes `file.updated` with
 publishes `files.FileFinalized` for a final file; objects of failed and blocked files and the
 parts are deleted after the commit. A transient failure inserts the next `files.scan` with a
 delay that doubles from `file.scan.health_interval` up to `file.scan.retry_backoff_cap`, without
-an attempt limit, and changes nothing else. If the file is servable,
-the processing of sections 7 and 8 follows and, if supported, the text extraction
-([14-suche.md](14-suche.md)).
+an attempt limit, and changes nothing else. If the file is servable or an
+image being cleaned, the processing of sections 7 and 8 follows in the job `files.thumbnail`
+(02 "Job-Katalog") and, if supported, the text extraction ([14-suche.md](14-suche.md)).
 
 ### 3.5 Sequence (direct upload with scan)
 
@@ -261,8 +276,10 @@ sequenceDiagram
     W->>W: SHA-256, size, type detection
     W->>AV: INSTREAM in chunks
     AV-->>W: stream: OK
-    W->>DB: upload_state complete, scan_status clean, file.updated
-    W->>W: remove metadata, thumbnails
+    W->>DB: scan_status clean, image stays pending, job files.thumbnail, file.updated
+    W->>OS: read orig-1 twice through the filter, write orig-2
+    W->>DB: object_key orig-2, sha256, size, width, height, upload_state complete, file.updated
+    W->>OS: delete orig-1, read orig-2, write small, medium, large
     W->>DB: file_thumbnails, file.updated
 ```
 
@@ -643,13 +660,39 @@ tragen und gedreht gespeichert sind; ohne beides sähen sie blass oder gekippt a
 Neukodieren der Vorschaubilder wendet der Server die Orientierung selbst an, weil das Dekodieren
 sie verwirft [Q16, abgeleitet].
 
+Rulings of M3-06 (docs/DECISIONS.md section 10):
+
+- **Deliverable only when cleaned (D-M3-06-1).** A JPEG, PNG (also `image/apng`), GIF or WebP
+  stays `upload_state = 'pending'` after the scan; the job `files.thumbnail` writes the cleaned
+  original and sets `complete` in one transaction. Until then delivery answers `409
+  file_not_ready` and an agent invocation waits (section 10).
+- **JPEG (D-M3-06-2).** Kept are the markers T.81 needs to decode (`SOI`, `DQT`, `DHT`, `DAC`,
+  `DRI`, `DNL`, `DHP`, `EXP`, `SOFn`, `SOS` with its data and `RST0` to `RST7`, `EOI`), the first
+  `APP0` `JFIF` rewritten without its embedded thumbnail, every `APP2` `ICC_PROFILE` part, `APP14`
+  `Adobe`, and one new `APP1` with only "Orientation" (written only for the values 2 to 8,
+  D-M3-06-3). Output order: `SOI`, `APP0`, `APP1`, then the other kept segments in input order.
+- **PNG (D-M3-06-4).** A CRC mismatch, a chunk beyond the input, `IHDR` not first or a missing
+  `IEND` is a broken structure (`failed`, reason `image_malformed`, D-M3-06-7); bytes after `IEND`
+  are dropped. The orientation of an `eXIf` chunk is not applied, so original and thumbnails show
+  the same pixels.
+- **GIF and WebP (D-M3-06-5).** A still WebP is stored with its EXIF orientation applied to the
+  pixels, its ICC profile unchanged (dropped only when it does not fit the output, for example a
+  CMYK profile) and without any other metadata; `mime_type` becomes `image/png` or `image/jpeg`,
+  `original_name` keeps its extension (6.1). A GIF or still WebP above `file.image.max_pixels` or
+  failing to decode, and every animated WebP, stays unchanged as revision 1, becomes `complete`
+  without thumbnails and is shown as a download card.
+- **Revision marker (D-M3-06-12).** Every processed original is revision 2 (`orig-2`), also when
+  the filter changed no byte; revision 1 is deleted after the switch. The revision in
+  `object_key` tells a processed original from an unchanged one.
+
 ### 7.2 Schutz vor Dekompressions-Bomben
 
 Vor dem Dekodieren liest der Server nur Kopf und Maße (`image.DecodeConfig`). Ist Breite mal
 Höhe (bei GIF mal Bildzahl) größer als `file.image.max_pixels`, dekodiert er nicht: keine
 Vorschau, Anzeige als Download-Karte. Jede Verarbeitung hat das Zeitlimit
 `file.image.processing_timeout`; höchstens `file.image.max_concurrent` Bild-Jobs laufen je
-Worker gleichzeitig.
+Worker gleichzeitig. JPEG and PNG above the limit are still cleaned, because the filter never
+decodes pixels; a GIF or WebP above it stays unchanged (D-M3-06-5).
 
 ### 7.3 Vorschaubilder
 
@@ -665,6 +708,18 @@ Nie größer als das Original (kein Hochskalieren). Ausgabe JPEG mit
 Go nicht erzeugen; der Client sendet es mit der Anmeldung (`poster`), der Server behandelt es
 wie jedes Bild (Neukodieren, Grenzen). Breite, Höhe und Dauer eines MP4- oder QuickTime-Videos
 liest der Server aus den Container-Boxen (`mvhd`, `tkhd`) mit einem kleinen eigenen Leser.
+
+Rulings of M3-06: the server renders `small`, `medium` and `large` for every decodable image,
+also when they end up the same size, from the first frame of an animated GIF or the default
+image of an APNG, with the orientation applied and the resampler Catmull-Rom; PNG when the
+decoded image is not opaque, JPEG otherwise; the colour profile of the original only when its
+colour space fits the thumbnail (no profile for CMYK input); a PNG profile larger than the
+`APP2` capacity of a JPEG means no thumbnails (D-M3-06-6). `width` and `height` of images and
+videos are display sizes after orientation or rotation (the `tkhd` matrix of the first video
+track); the duration comes from `mvhd`, else from `mehd`; a box error leaves the values absent
+and never blocks the file (D-M3-06-9). Every change of the values writes `file.updated`
+(D-M3-06-8). `File.thumbnails` lists the variants in the order `small`, `medium`, `large`,
+`poster` (D-M3-06-10). The `poster` of a video is not built: `UploadCreate` has no field for it.
 
 ## 8. Sprachnachrichten
 

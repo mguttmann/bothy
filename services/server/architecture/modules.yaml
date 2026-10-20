@@ -149,8 +149,9 @@ modules:
     # M3-04: the type detection of the scan pass (mimetype), the span file.scan and the scan
     # instruments (otel), and the throwaway clamd container of adapters/clamd/clamdtest, used only
     # by tests (testcontainers, mobyapi). No scanner library: the clamd client uses the standard
-    # library only (ADR 0033).
-    adapter_vendors: [awssdk, pgx, xtext, mimetype, otel, testcontainers, mobyapi]
+    # library only (ADR 0033). M3-06: WebP decoding and resampling of thumbnails in pure Go
+    # (ximage, adapters/imaging only, ADR 0047).
+    adapter_vendors: [awssdk, pgx, xtext, mimetype, otel, testcontainers, mobyapi, ximage]
   messaging:
     tables: [messages, message_revisions, mentions, reactions, pins, message_templates]
     actions: [thread.create, message.read, message.create, message.update, message.delete,
@@ -293,6 +294,8 @@ vendors:                    # <group>: [<import path>, <import path>/**]
   # The type table of file formats: the extensions of file.denied_mime_types (files
   # adapters/mimetype, M3-03) and the type detection of the scan pass (M3-04).
   mimetype: [github.com/gabriel-vasile/mimetype]
+  # WebP decoding and the resampler of thumbnails (files adapters/imaging, M3-06, ADR 0047).
+  ximage: [golang.org/x/image, golang.org/x/image/**]
   # Argon2id password hashes of local accounts (identity adapters/passwordhash, M1-39).
   xcrypto: [golang.org/x/crypto/argon2]
   libopenapi: [github.com/pb33f/libopenapi, github.com/pb33f/libopenapi/**, github.com/pb33f/libopenapi-validator,

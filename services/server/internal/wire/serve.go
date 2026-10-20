@@ -23,6 +23,7 @@ import (
 	"github.com/OWNER/bothy/services/server/api/routes"
 	"github.com/OWNER/bothy/services/server/internal/authz"
 	authzapp "github.com/OWNER/bothy/services/server/internal/authz/app"
+	filesapp "github.com/OWNER/bothy/services/server/internal/files/app"
 	gatewayapp "github.com/OWNER/bothy/services/server/internal/gateway/app"
 	"github.com/OWNER/bothy/services/server/internal/identity/adapters/secretbox"
 	"github.com/OWNER/bothy/services/server/internal/identity/domain/trustedheader"
@@ -30,6 +31,7 @@ import (
 	instancepg "github.com/OWNER/bothy/services/server/internal/instance/adapters/postgres"
 	instanceapp "github.com/OWNER/bothy/services/server/internal/instance/app"
 	"github.com/OWNER/bothy/services/server/internal/kernel/actor"
+	"github.com/OWNER/bothy/services/server/internal/kernel/auditing"
 	"github.com/OWNER/bothy/services/server/internal/kernel/authorize"
 	"github.com/OWNER/bothy/services/server/internal/kernel/clock"
 	"github.com/OWNER/bothy/services/server/internal/kernel/searchlang"
@@ -129,6 +131,9 @@ type Deps struct {
 	// the commit, so a test commits a revocation between the decision and the commit. nil in
 	// production.
 	TerminalBeforeOpenCommit func()
+	// FilesImageHooks are the test seams of the job files.thumbnail (app.ImageHooks, ADR 0071),
+	// for the integration tests of M3-06; nil in production.
+	FilesImageHooks *filesapp.ImageHooks
 }
 
 // server is the state of one serve process that the components fill and the stop steps read.
@@ -1463,8 +1468,9 @@ func (s *server) startJobs(ctx context.Context) error {
 		KeyRotation: keys.Keys, KeyRotationInterval: keyCheck,
 		AuthCleanup: id.AuthCleanup, AuthCleanupInterval: id.cfg.CleanupInterval,
 		ChainVerify: a.Log(), ChainVerifyInterval: a.cfg.CheckpointInterval,
-		Deliveries: ap.Webhooks,
-		FilesScan:  files.ScanRunner(),
+		Deliveries:  ap.Webhooks,
+		FilesScan:   files.ScanRunner(),
+		FilesImages: files.ImageRunner(), FilesImageTimeout: s.imageTimeout(),
 	})
 	if err != nil {
 		return err
@@ -1599,11 +1605,7 @@ func (s *server) startFiles(ctx context.Context) error {
 		return err
 	}
 	if s.worker() {
-		scanCfg, clamdCfg, err := ScanConfigs(s.values)
-		if err == nil {
-			err = f.EnableScan(scanCfg, clamdCfg, a.Recorder(), s.deps.Clock, s.logger())
-		}
-		if err != nil {
+		if err := s.enableFilesJobs(f, a.Recorder()); err != nil {
 			_ = f.Close()
 			return err
 		}
@@ -1612,6 +1614,29 @@ func (s *server) startFiles(ctx context.Context) error {
 	s.files = f
 	s.mu.Unlock()
 	return nil
+}
+
+// enableFilesJobs builds the use cases of files.scan (M3-04) and files.thumbnail (M3-06) in a
+// role that runs jobs.
+func (s *server) enableFilesJobs(f *Files, audit auditing.Recorder) error {
+	scanCfg, clamdCfg, err := ScanConfigs(s.values)
+	if err != nil {
+		return err
+	}
+	if err := f.EnableScan(scanCfg, clamdCfg, audit, s.deps.Clock, s.logger()); err != nil {
+		return err
+	}
+	imgCfg, err := ImageConfig(s.values)
+	if err != nil {
+		return err
+	}
+	return f.EnableImages(imgCfg, s.logger(), s.deps.FilesImageHooks)
+}
+
+// imageTimeout is file.image.processing_timeout, the River timeout of files.thumbnail in every
+// role (M3-06).
+func (s *server) imageTimeout() time.Duration {
+	return s.values.Duration("file.image.processing_timeout")
 }
 
 // startScanHealth starts the health monitor of the virus scanner in the roles worker and all

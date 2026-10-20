@@ -35,6 +35,37 @@ type FileRecord struct {
 	CreatedAt                            time.Time
 	// Deleted reports deleted_at IS NOT NULL.
 	Deleted bool
+	// Thumbnails are the rows of file_thumbnails (M3-06), in any order; FileView orders them.
+	// Only File and the reads of the job files.thumbnail fill them.
+	Thumbnails []ThumbnailRecord
+}
+
+// ThumbnailRecord is a row of file_thumbnails (docs/spec/03-datenmodell.md).
+type ThumbnailRecord struct {
+	Variant   domain.Variant
+	ObjectKey string
+	MIMEType  string
+	Width     int
+	Height    int
+	SizeBytes int64
+}
+
+// StoredOriginal is what T1 of the job files.thumbnail writes to the files row (brief M3-06 design
+// note 10a): the stored original after the removal of the metadata.
+type StoredOriginal struct {
+	ObjectKey string
+	SHA256    [32]byte
+	SizeBytes int64
+	MIMEType  string
+	// Width and Height are the display size; zero writes NULL.
+	Width, Height int
+}
+
+// MediaInfo is what T3 of the job files.thumbnail writes (design note 10d); a zero value keeps
+// the column.
+type MediaInfo struct {
+	Width, Height int
+	DurationMS    int64
 }
 
 // SessionRecord is a row of file_upload_sessions with its file.
@@ -105,8 +136,27 @@ type Repository interface {
 	CompleteSession(ctx context.Context, fileID ids.ID, at time.Time) error
 	// AbortSession sets an open session aborted, its file failed and deletes its parts.
 	AbortSession(ctx context.Context, fileID ids.ID) error
-	// File reads a file that is not deleted.
+	// File reads a file that is not deleted, with its thumbnails.
 	File(ctx context.Context, fileID ids.ID) (FileRecord, bool, error)
+
+	// ImageFile reads a file by id with its thumbnails, deleted or not (FileRecord.Deleted), for
+	// the job files.thumbnail, which has no principal (M3-06).
+	ImageFile(ctx context.Context, fileID ids.ID) (FileRecord, bool, error)
+	// LockImageFile reads as ImageFile and locks the files row FOR UPDATE (03 6.3: only this
+	// row). It needs a unit of work.
+	LockImageFile(ctx context.Context, fileID ids.ID) (FileRecord, bool, error)
+	// StoreImageOriginal writes the stored original and upload_state complete to a pending file
+	// that is not deleted. It needs a unit of work.
+	StoreImageOriginal(ctx context.Context, fileID ids.ID, o StoredOriginal) error
+	// FailImage sets a pending file failed and the failure_reason of its session. It needs a
+	// unit of work.
+	FailImage(ctx context.Context, fileID ids.ID, reason string) error
+	// InsertThumbnails inserts the rows of fileID unless a row of the variant exists and
+	// returns how many it inserted. It needs a unit of work.
+	InsertThumbnails(ctx context.Context, fileID ids.ID, rows []ThumbnailRecord) (int, error)
+	// SetMediaInfo writes the non-zero values of m to a file that is not deleted. It needs a
+	// unit of work.
+	SetMediaInfo(ctx context.Context, fileID ids.ID, m MediaInfo) error
 }
 
 // FreeSpace reports the free bytes of the file system of file.fs.root (adapters/fs); only the

@@ -17,6 +17,8 @@ import (
 	filesclamd "github.com/OWNER/bothy/services/server/internal/files/adapters/clamd"
 	filesfs "github.com/OWNER/bothy/services/server/internal/files/adapters/fs"
 	fileshttp "github.com/OWNER/bothy/services/server/internal/files/adapters/httpapi"
+	filesimaging "github.com/OWNER/bothy/services/server/internal/files/adapters/imaging"
+	filesisobmff "github.com/OWNER/bothy/services/server/internal/files/adapters/isobmff"
 	filesjobs "github.com/OWNER/bothy/services/server/internal/files/adapters/jobs"
 	filesmimetype "github.com/OWNER/bothy/services/server/internal/files/adapters/mimetype"
 	filesmetrics "github.com/OWNER/bothy/services/server/internal/files/adapters/otelmetrics"
@@ -208,6 +210,8 @@ type Files struct {
 	// Pass is the scan pass and Health its monitor; nil until EnableScan (role api).
 	Pass   *filesapp.ScanPass
 	Health *filesapp.ScanHealth
+	// Images is the use case of files.thumbnail (M3-06); nil until EnableImages (role api).
+	Images *filesapp.ImageProcessor
 	// store is the object store; Close releases it.
 	store filesapp.ObjectStore
 	// The collaborators the scan pass shares with the upload use cases.
@@ -318,6 +322,52 @@ func (f *Files) EnableScan(cfg filesapp.ScanConfig, cc filesclamd.Config, audit 
 	}
 	f.Pass, f.Health = pass, health
 	return nil
+}
+
+// ImageConfig binds the keys of the job files.thumbnail (file.image.max_pixels,
+// file.image.jpeg_quality, file.image.processing_timeout, file.image.max_concurrent and
+// file.thumbnail.*). The error names the key whose binding failed, never a value.
+func ImageConfig(v *config.Values) (filesapp.ImageConfig, error) {
+	var c filesapp.ImageConfig
+	if err := config.Bind(v, &c); err != nil {
+		return filesapp.ImageConfig{}, err
+	}
+	return c, nil
+}
+
+// EnableImages builds the use case of files.thumbnail (roles worker and all, M3-06): the pure Go
+// codec of adapters/imaging, the box reader of adapters/isobmff, the per-process limit
+// file.image.max_concurrent, log (nil means slog.Default()) and the test seams hooks (nil in
+// production, ADR 0071). Errors: the use case refuses cfg.
+func (f *Files) EnableImages(cfg filesapp.ImageConfig, log *slog.Logger, hooks *filesapp.ImageHooks) error {
+	p, err := filesapp.NewImageProcessor(cfg, filesapp.ImageDeps{
+		Repo: f.repo, Store: f.store, UoW: f.uow, Events: f.events, Channels: f.channels, Codec: filesimaging.Codec{},
+		Movies: filesisobmff.Reader{}, Log: log, Hooks: hooks,
+	})
+	if err != nil {
+		return err
+	}
+	f.Images = p
+	return nil
+}
+
+// ImageRunner returns the use case of files.thumbnail for the job registry: the processor in a
+// role that runs jobs, nil otherwise (the api role never runs the job).
+func (f *Files) ImageRunner() filesjobs.ImageRunner {
+	if f == nil || f.Images == nil {
+		return nil
+	}
+	return f.Images
+}
+
+// thumbnailSizesOrdered is the cross-check thumbnail_sizes_ordered (docs/DECISIONS.md D-M3-06-11):
+// file.thumbnail.small_px is below file.thumbnail.medium_px, which is below
+// file.thumbnail.large_px, so the three variants of 12 7.3 differ.
+func thumbnailSizesOrdered(v *config.Values) error {
+	if v.Int(keyThumbnailSmallPx) < v.Int(keyThumbnailMediumPx) && v.Int(keyThumbnailMediumPx) < v.Int(keyThumbnailLargePx) {
+		return nil
+	}
+	return errors.New(keyThumbnailSmallPx + " must be below " + keyThumbnailMediumPx + ", and that below " + keyThumbnailLargePx)
 }
 
 // ScanRunner returns the use case of files.scan for the job registry: the pass in a role that

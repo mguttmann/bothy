@@ -143,6 +143,9 @@ var appPrivileges = map[string][]string{
 	"files":                {"SELECT", "INSERT", "UPDATE", "DELETE"},
 	"file_upload_sessions": {"SELECT", "INSERT", "UPDATE", "DELETE"},
 	"file_upload_parts":    {"SELECT", "INSERT", "UPDATE", "DELETE"},
+	// 03 file_thumbnails (M3-06): a variant row is inserted once and never changed, so its object
+	// is never written again (12 4.4); the deletion of a file removes its rows (ON DELETE CASCADE).
+	"file_thumbnails": {"SELECT", "INSERT", "DELETE"},
 	// 03 section 4.14 (M2-39): hosts and terminal sessions are security history; a session user
 	// row is never deleted while its host is not retired (ruling T12, R-DM-39). The retention
 	// job of class security grants its own DELETE (M7).

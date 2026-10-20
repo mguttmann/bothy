@@ -9,6 +9,8 @@ import (
 	"encoding/base64"
 	"encoding/hex"
 	"fmt"
+	"image"
+	"image/png"
 	"net/http"
 	"os"
 	"strconv"
@@ -198,8 +200,37 @@ func strOf(p *string) string {
 	return *p
 }
 
-// pngBytes is the start of a PNG file.
-var pngBytes = append([]byte("\x89PNG\r\n\x1a\n\x00\x00\x00\rIHDR"), bytes.Repeat([]byte{0}, 64)...)
+// pngBytes is a complete small PNG file: since M3-06 a PNG is cleaned by files.thumbnail before it
+// becomes complete, and a broken one fails.
+var pngBytes = func() []byte {
+	var buf bytes.Buffer
+	if err := png.Encode(&buf, image.NewGray(image.Rect(0, 0, 4, 3))); err != nil {
+		panic(err)
+	}
+	return buf.Bytes()
+}()
+
+// thumbnailJobs counts the files.thumbnail jobs of a file.
+func thumbnailJobs(t *testing.T, db *pgxpool.Pool, id string) int {
+	t.Helper()
+	return count(t, db, `SELECT count(*) FROM jobs.river_job WHERE kind = 'files.thumbnail' AND args->>'file_id' = $1`, id)
+}
+
+// waitComplete waits until files.thumbnail moved an image out of upload_state pending.
+func waitComplete(t *testing.T, db *pgxpool.Pool, id string) fileRow {
+	t.Helper()
+	deadline := time.Now().Add(waitScan)
+	for {
+		r := readFile(t, db, id)
+		if r.UploadState != "pending" {
+			return r
+		}
+		if time.Now().After(deadline) {
+			t.Fatalf("file %s still pending after %v", id, waitScan)
+		}
+		time.Sleep(100 * time.Millisecond)
+	}
+}
 
 // gifBytes is the start of a GIF file.
 var gifBytes = append([]byte("GIF89a"), bytes.Repeat([]byte{1}, 64)...)

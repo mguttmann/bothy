@@ -76,11 +76,14 @@ type repo struct {
 	// usedBytes and openCount override the computed limits when set.
 	usedBytes *int64
 	openCount *int
+	// thumbs are the file_thumbnails rows; writes records T1 and T2 in order.
+	thumbs map[ids.ID][]app.ThumbnailRecord
+	writes []string
 }
 
 func newRepo() *repo {
 	return &repo{files: map[ids.ID]app.FileRecord{}, sessions: map[ids.ID]app.SessionRecord{}, parts: map[ids.ID]map[int]app.PartRecord{},
-		failure: map[ids.ID]string{}}
+		failure: map[ids.ID]string{}, thumbs: map[ids.ID][]app.ThumbnailRecord{}}
 }
 
 var errNoUnit = errors.New("fake repo: write outside a unit of work")
@@ -247,6 +250,7 @@ func (r *repo) File(_ context.Context, fileID ids.ID) (app.FileRecord, bool, err
 	if !ok || f.Deleted {
 		return app.FileRecord{}, false, nil
 	}
+	f.Thumbnails = append([]app.ThumbnailRecord(nil), r.thumbs[fileID]...)
 	return f, true, nil
 }
 
@@ -317,7 +321,7 @@ func (s *store) Put(ctx context.Context, key string, body io.Reader, size int64)
 	return nil
 }
 
-func (s *store) Get(ctx context.Context, key string, _ *app.ByteRange) (io.ReadCloser, error) {
+func (s *store) Get(ctx context.Context, key string, rng *app.ByteRange) (io.ReadCloser, error) {
 	if err := s.enter(ctx, "Get"); err != nil {
 		return nil, err
 	}
@@ -326,6 +330,12 @@ func (s *store) Get(ctx context.Context, key string, _ *app.ByteRange) (io.ReadC
 	b, ok := s.objects[key]
 	if !ok {
 		return nil, app.ErrNotFound
+	}
+	if rng != nil {
+		if rng.Offset < 0 || rng.Length < 1 || rng.Offset >= int64(len(b)) {
+			return nil, app.ErrInvalidRange
+		}
+		b = b[rng.Offset:min(int64(len(b)), rng.Offset+rng.Length)]
 	}
 	return io.NopCloser(bytes.NewReader(b)), nil
 }

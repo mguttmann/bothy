@@ -514,14 +514,14 @@ Quelle: [12-dateien.md](../spec/12-dateien.md), Abschnitt 18.
 | `file.scan.clamd_stream_max_bytes` | `BOTHY_FILE__SCAN__CLAMD_STREAM_MAX_BYTES` | Server | int | `104857600` | Spiegel von clamd `StreamMaxLength` | aktiv |
 | `file.invocation_hold_max` | `BOTHY_FILE__INVOCATION_HOLD_MAX` | Server |  | `120s` | längstes Warten des Agenten-Aufrufs auf Anhänge | geplant (M3) |
 | `file.image.libvips_enabled` | `BOTHY_FILE__IMAGE__LIBVIPS_ENABLED` | Server |  | `false` | libvips-Build nutzen | geplant (M3) |
-| `file.image.max_pixels` | `BOTHY_FILE__IMAGE__MAX_PIXELS` | Server |  | `50000000` | größte dekodierte Pixelzahl | geplant (M3) |
-| `file.image.jpeg_quality` | `BOTHY_FILE__IMAGE__JPEG_QUALITY` | Server |  | `90` | Qualität beim Umwandeln unbewegter WebP-Bilder ohne Alpha in JPEG | geplant (M3) |
-| `file.image.processing_timeout` | `BOTHY_FILE__IMAGE__PROCESSING_TIMEOUT` | Server |  | `60s` | Zeitlimit eines Bild-Jobs | geplant (M3) |
-| `file.image.max_concurrent` | `BOTHY_FILE__IMAGE__MAX_CONCURRENT` | Server |  | `2` | Bild-Jobs je Worker-Prozess | geplant (M3) |
-| `file.thumbnail.small_px` | `BOTHY_FILE__THUMBNAIL__SMALL_PX` | Server |  | `320` | längste Kante `small` | geplant (M3) |
-| `file.thumbnail.medium_px` | `BOTHY_FILE__THUMBNAIL__MEDIUM_PX` | Server |  | `1024` | längste Kante `medium` | geplant (M3) |
-| `file.thumbnail.large_px` | `BOTHY_FILE__THUMBNAIL__LARGE_PX` | Server |  | `2048` | längste Kante `large` | geplant (M3) |
-| `file.thumbnail.jpeg_quality` | `BOTHY_FILE__THUMBNAIL__JPEG_QUALITY` | Server |  | `82` | Qualität der Vorschaubilder | geplant (M3) |
+| `file.image.max_pixels` | `BOTHY_FILE__IMAGE__MAX_PIXELS` | Server | int | `50000000` | größte dekodierte Pixelzahl | aktiv |
+| `file.image.jpeg_quality` | `BOTHY_FILE__IMAGE__JPEG_QUALITY` | Server | int | `90` | Qualität beim Umwandeln unbewegter WebP-Bilder ohne Alpha in JPEG | aktiv |
+| `file.image.processing_timeout` | `BOTHY_FILE__IMAGE__PROCESSING_TIMEOUT` | Server | duration | `60s` | Zeitlimit eines Bild-Jobs | aktiv |
+| `file.image.max_concurrent` | `BOTHY_FILE__IMAGE__MAX_CONCURRENT` | Server | int | `2` | Bild-Jobs je Worker-Prozess | aktiv |
+| `file.thumbnail.small_px` | `BOTHY_FILE__THUMBNAIL__SMALL_PX` | Server | int | `320` | längste Kante `small` | aktiv |
+| `file.thumbnail.medium_px` | `BOTHY_FILE__THUMBNAIL__MEDIUM_PX` | Server | int | `1024` | längste Kante `medium` | aktiv |
+| `file.thumbnail.large_px` | `BOTHY_FILE__THUMBNAIL__LARGE_PX` | Server | int | `2048` | längste Kante `large` | aktiv |
+| `file.thumbnail.jpeg_quality` | `BOTHY_FILE__THUMBNAIL__JPEG_QUALITY` | Server | int | `82` | Qualität der Vorschaubilder | aktiv |
 | `file.ticket_ttl` | `BOTHY_FILE__TICKET_TTL` | Server |  | `5m` | Gültigkeit eines Abruf-Tickets | geplant (M3) |
 | `file.ticket_key_ref` | `BOTHY_FILE__TICKET_KEY_REF` | Server |  | `file:<secrets.dir>/file_ticket_key` | Verweis auf den Ticket-Schlüssel im Secret-Provider | geplant (M3) |
 | `file.unattached_ttl` | `BOTHY_FILE__UNATTACHED_TTL` | Server |  | `24h` | Frist für nie angehängte Dateien | geplant (M3) |

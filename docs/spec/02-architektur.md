@@ -1019,7 +1019,7 @@ Grund: Jeder andere Job schriebe Zustand, der auf dem Ziel fehlen würde.
 | Job | Modul | Auslöser | Warteschlange | Fachregel in |
 |---|---|---|---|---|
 | `files.scan` | `files` | `InsertTx` beim Abschluss eines Uploads | `files` | 12 |
-| `files.thumbnail` | `files` | nach `clean` | `files` | 12 |
+| `files.thumbnail` | `files` | after `clean` or `skipped`: image originals (12 7.1), thumbnails (12 7.3), dimensions and duration of MP4 and QuickTime | `files` | 12 |
 | `files.extract_text` | `files` | nach `clean`, unterstützter Typ | `files` | 14 |
 | `files.transcribe` | `files` | `file.transcribe` bei Server-Transkription | `files` | 09, 12 |
 | `files.cleanup_pending` | `files` | periodisch | `maintenance` | 12 |

@@ -366,7 +366,8 @@ func (p *ScanPass) finish(ctx context.Context, t SessionRecord, st passState, ou
 	if !transitioned {
 		// Another run decided the file, or it was deleted: keep the state, remove only what this
 		// run wrote and nobody may serve.
-		if st.written && !domain.Deliverable(current.File.UploadState, current.File.ScanStatus, current.File.Deleted) {
+		if st.written && !domain.Deliverable(current.File.UploadState, current.File.ScanStatus, current.File.Deleted) &&
+			!awaitingImage(current.File) {
 			p.deleteKeys(ctx, t.FileID, t.File.ObjectKey)
 		}
 		return PassResult{Outcome: OutcomeNone}, nil
@@ -390,6 +391,11 @@ func (p *ScanPass) write(ctx context.Context, fileID ids.ID, st passState, out d
 		return cur, false, err
 	}
 	res := p.result(cur, st, out)
+	thumbnail := thumbnailJob(res)
+	if thumbnail && domain.OriginalPlanFor(res.MIMEType) != domain.PlanNone {
+		// An image becomes deliverable only with its cleaned original (docs/DECISIONS.md D-M3-06-1).
+		res.UploadState = domain.UploadPending
+	}
 	if err := p.d.Scans.FinishScan(ctx, fileID, res); err != nil {
 		return cur, false, err
 	}
@@ -408,9 +414,30 @@ func (p *ScanPass) write(ctx context.Context, fileID ids.ID, st passState, out d
 			return cur, false, err
 		}
 	}
-	// M3-06 inserts files.thumbnail and M3-15 files.extract_text here for a deliverable file, in
-	// this unit of work (12 3.4 last paragraph).
+	// files.thumbnail for the images of 12 7.1 and the MP4 and QuickTime files of 12 7.3 (M3-06);
+	// M3-15 inserts files.extract_text here for a deliverable file, in this unit of work (12 3.4
+	// last paragraph).
+	if thumbnail {
+		if err := p.d.Queue.EnqueueThumbnail(ctx, fileID); err != nil {
+			return cur, false, err
+		}
+	}
 	return cur, true, nil
+}
+
+// awaitingImage reports a file the winning run left pending for files.thumbnail (M3-06): its
+// original must stay for the job.
+func awaitingImage(f FileRecord) bool {
+	return !f.Deleted && f.UploadState == domain.UploadPending && (f.ScanStatus == domain.ScanClean || f.ScanStatus == domain.ScanSkipped)
+}
+
+// thumbnailJob reports a scan result that inserts files.thumbnail (brief M3-06 design note 1a):
+// a deliverable file whose type has an original plan or container values.
+func thumbnailJob(res ScanResult) bool {
+	if !domain.Deliverable(res.UploadState, res.ScanStatus, false) {
+		return false
+	}
+	return domain.OriginalPlanFor(res.MIMEType) != domain.PlanNone || domain.HasContainerMetadata(res.MIMEType)
 }
 
 // result builds the row change of out.
