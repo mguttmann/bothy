@@ -255,7 +255,7 @@ class WebhooksApi {
   }
 
   /// Subscribe a URL to events
-  /// The host must be in &#x60;webhook.allowed_hosts&#x60;; otherwise 400 &#x60;webhook_host_not_allowed&#x60;.
+  /// The host and port must be in &#x60;webhook.allowed_hosts&#x60;; otherwise 400 &#x60;webhook_host_not_allowed&#x60;. With &#x60;enable_hmac&#x60; the response carries the &#x60;v1&#x60; secret once; it is a one-time secret, so a replay with the same &#x60;Idempotency-Key&#x60; answers 409 &#x60;conflict&#x60; with &#x60;reason&#x60; &#x60;one_time_secret&#x60;.
   ///
   /// Parameters:
   /// * [appId]
@@ -1058,7 +1058,7 @@ class WebhooksApi {
   }
 
   /// Change, pause or rotate a subscription
-  ///
+  /// A new host must be in &#x60;webhook.allowed_hosts&#x60;. &#x60;rotate_hmac_secret&#x60; returns the new &#x60;v1&#x60; secret once; it is a one-time secret, so a replay with the same &#x60;Idempotency-Key&#x60; answers 409 &#x60;conflict&#x60; with &#x60;reason&#x60; &#x60;one_time_secret&#x60;.
   ///
   /// Parameters:
   /// * [subscriptionId]

@@ -16,7 +16,7 @@ class _$WebhookDelivery extends WebhookDelivery {
   @override
   final int eventSeq;
   @override
-  final String eventType;
+  final String? eventType;
   @override
   final int attempt;
   @override
@@ -40,7 +40,7 @@ class _$WebhookDelivery extends WebhookDelivery {
     required this.subscriptionId,
     required this.eventId,
     required this.eventSeq,
-    required this.eventType,
+    this.eventType,
     required this.attempt,
     required this.status,
     this.responseCode,
@@ -227,11 +227,7 @@ class WebhookDeliveryBuilder
             r'WebhookDelivery',
             'eventSeq',
           ),
-          eventType: BuiltValueNullFieldError.checkNotNull(
-            eventType,
-            r'WebhookDelivery',
-            'eventType',
-          ),
+          eventType: eventType,
           attempt: BuiltValueNullFieldError.checkNotNull(
             attempt,
             r'WebhookDelivery',

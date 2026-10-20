@@ -16,7 +16,7 @@ part 'webhook_delivery.g.dart';
 /// * [subscriptionId] - UUIDv7 (RFC 9562), lowercase canonical form.
 /// * [eventId] - UUIDv7 (RFC 9562), lowercase canonical form.
 /// * [eventSeq]
-/// * [eventType]
+/// * [eventType] - Type of the event, read from the event log; absent once the event left the event log (`sync.event_retention`).
 /// * [attempt]
 /// * [status]
 /// * [responseCode]
@@ -42,8 +42,9 @@ abstract class WebhookDelivery
   @BuiltValueField(wireName: r'event_seq')
   int get eventSeq;
 
+  /// Type of the event, read from the event log; absent once the event left the event log (`sync.event_retention`).
   @BuiltValueField(wireName: r'event_type')
-  String get eventType;
+  String? get eventType;
 
   @BuiltValueField(wireName: r'attempt')
   int get attempt;
@@ -116,11 +117,13 @@ class _$WebhookDeliverySerializer
       object.eventSeq,
       specifiedType: const FullType(int),
     );
-    yield r'event_type';
-    yield serializers.serialize(
-      object.eventType,
-      specifiedType: const FullType(String),
-    );
+    if (object.eventType != null) {
+      yield r'event_type';
+      yield serializers.serialize(
+        object.eventType,
+        specifiedType: const FullType(String),
+      );
+    }
     yield r'attempt';
     yield serializers.serialize(
       object.attempt,
@@ -222,8 +225,9 @@ class _$WebhookDeliverySerializer
         case r'event_type':
           final valueDes = serializers.deserialize(
             value,
-            specifiedType: const FullType(String),
-          ) as String;
+            specifiedType: const FullType.nullable(String),
+          ) as String?;
+          if (valueDes == null) continue;
           result.eventType = valueDes;
           break;
         case r'attempt':

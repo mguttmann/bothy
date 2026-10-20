@@ -13,7 +13,7 @@ part 'webhook_key.g.dart';
 ///
 /// Properties:
 /// * [kid]
-/// * [publicKey] - Ed25519 public key, base64, with prefix `whpk_`.
+/// * [publicKey] - Ed25519 public key with prefix `whpk_`, followed by the standard base64 (with padding) of its DER-encoded SubjectPublicKeyInfo (RFC 8410).
 /// * [state]
 /// * [notAfter] - RFC 3339 timestamp in UTC with millisecond precision and suffix `Z`.
 @BuiltValue()
@@ -21,7 +21,7 @@ abstract class WebhookKey implements Built<WebhookKey, WebhookKeyBuilder> {
   @BuiltValueField(wireName: r'kid')
   String get kid;
 
-  /// Ed25519 public key, base64, with prefix `whpk_`.
+  /// Ed25519 public key with prefix `whpk_`, followed by the standard base64 (with padding) of its DER-encoded SubjectPublicKeyInfo (RFC 8410).
   @BuiltValueField(wireName: r'public_key')
   String get publicKey;
 
