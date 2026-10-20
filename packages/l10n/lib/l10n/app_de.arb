@@ -1239,6 +1239,5 @@
   "adminGuidedTitle": "Auf Organisation umstellen",
   "adminGuidedDone": "{agent} läuft jetzt mit Organisation, und die Änderung ist gespeichert.",
   "adminGuidedStillReports": "Der Adapter von {agent} meldet noch {mode}.",
-  "adminGuidedDoneClose": "Schließen",
-  "adminGuidedOpenAgent": "{agent} öffnen"
+  "adminGuidedDoneClose": "Schließen"
 }

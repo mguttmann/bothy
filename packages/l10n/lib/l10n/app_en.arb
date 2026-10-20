@@ -7049,15 +7049,5 @@
   "adminGuidedDoneClose": "Close",
   "@adminGuidedDoneClose": {
     "description": "Button that closes the result of the guided flow."
-  },
-  "adminGuidedOpenAgent": "Open {agent}",
-  "@adminGuidedOpenAgent": {
-    "description": "Button that opens the agent page after the guided flow.",
-    "placeholders": {
-      "agent": {
-        "type": "String",
-        "example": "Support"
-      }
-    }
   }
 }

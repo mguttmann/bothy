@@ -7542,12 +7542,6 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Close'**
   String get adminGuidedDoneClose;
-
-  /// Button that opens the agent page after the guided flow.
-  ///
-  /// In en, this message translates to:
-  /// **'Open {agent}'**
-  String adminGuidedOpenAgent(String agent);
 }
 
 class _AppLocalizationsDelegate

@@ -4687,9 +4687,4 @@ class AppLocalizationsDe extends AppLocalizations {
 
   @override
   String get adminGuidedDoneClose => 'Schließen';
-
-  @override
-  String adminGuidedOpenAgent(String agent) {
-    return '$agent öffnen';
-  }
 }
