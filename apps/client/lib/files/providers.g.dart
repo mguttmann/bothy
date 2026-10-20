@@ -912,3 +912,109 @@ final class CachedBytesFamily extends $Family
   @override
   String toString() => r'cachedBytesProvider';
 }
+
+/// The attachments of the composer of [threadId] in [channelId], or null without an engine.
+/// They last while the app runs, so files attached and not sent yet are still there when the
+/// person comes back to the thread (brief M4-22 Design note 2).
+
+@ProviderFor(composerAttachments)
+final composerAttachmentsProvider = ComposerAttachmentsFamily._();
+
+/// The attachments of the composer of [threadId] in [channelId], or null without an engine.
+/// They last while the app runs, so files attached and not sent yet are still there when the
+/// person comes back to the thread (brief M4-22 Design note 2).
+
+final class ComposerAttachmentsProvider
+    extends
+        $FunctionalProvider<
+          AttachController?,
+          AttachController?,
+          AttachController?
+        >
+    with $Provider<AttachController?> {
+  /// The attachments of the composer of [threadId] in [channelId], or null without an engine.
+  /// They last while the app runs, so files attached and not sent yet are still there when the
+  /// person comes back to the thread (brief M4-22 Design note 2).
+  ComposerAttachmentsProvider._({
+    required ComposerAttachmentsFamily super.from,
+    required (String, String) super.argument,
+  }) : super(
+         retry: null,
+         name: r'composerAttachmentsProvider',
+         isAutoDispose: false,
+         dependencies: null,
+         $allTransitiveDependencies: null,
+       );
+
+  @override
+  String debugGetCreateSourceHash() => _$composerAttachmentsHash();
+
+  @override
+  String toString() {
+    return r'composerAttachmentsProvider'
+        ''
+        '$argument';
+  }
+
+  @$internal
+  @override
+  $ProviderElement<AttachController?> $createElement(
+    $ProviderPointer pointer,
+  ) => $ProviderElement(pointer);
+
+  @override
+  AttachController? create(Ref ref) {
+    final argument = this.argument as (String, String);
+    return composerAttachments(ref, argument.$1, argument.$2);
+  }
+
+  /// {@macro riverpod.override_with_value}
+  Override overrideWithValue(AttachController? value) {
+    return $ProviderOverride(
+      origin: this,
+      providerOverride: $SyncValueProvider<AttachController?>(value),
+    );
+  }
+
+  @override
+  bool operator ==(Object other) {
+    return other is ComposerAttachmentsProvider && other.argument == argument;
+  }
+
+  @override
+  int get hashCode {
+    return argument.hashCode;
+  }
+}
+
+String _$composerAttachmentsHash() =>
+    r'5be7c0b663e8f212185b796b3df9f30d8ac75bc1';
+
+/// The attachments of the composer of [threadId] in [channelId], or null without an engine.
+/// They last while the app runs, so files attached and not sent yet are still there when the
+/// person comes back to the thread (brief M4-22 Design note 2).
+
+final class ComposerAttachmentsFamily extends $Family
+    with $FunctionalFamilyOverride<AttachController?, (String, String)> {
+  ComposerAttachmentsFamily._()
+    : super(
+        retry: null,
+        name: r'composerAttachmentsProvider',
+        dependencies: null,
+        $allTransitiveDependencies: null,
+        isAutoDispose: false,
+      );
+
+  /// The attachments of the composer of [threadId] in [channelId], or null without an engine.
+  /// They last while the app runs, so files attached and not sent yet are still there when the
+  /// person comes back to the thread (brief M4-22 Design note 2).
+
+  ComposerAttachmentsProvider call(String threadId, String channelId) =>
+      ComposerAttachmentsProvider._(
+        argument: (threadId, channelId),
+        from: this,
+      );
+
+  @override
+  String toString() => r'composerAttachmentsProvider';
+}

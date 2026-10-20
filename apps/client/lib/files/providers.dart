@@ -16,6 +16,7 @@ import 'package:riverpod_annotation/riverpod_annotation.dart';
 import '../app/providers/ports.dart';
 import '../app/providers/session.dart';
 import '../voice/transcript_view.dart';
+import 'attach_controller.dart';
 import 'download_service.dart';
 import 'file_cache.dart';
 import 'file_ports.dart';
@@ -154,3 +155,25 @@ Directory outgoingFolder(Ref ref) {
 /// `Repr-Digest`), for `Image.memory`; read once per path while shown.
 @riverpod
 Future<Uint8List> cachedBytes(Ref ref, String path) => File(path).readAsBytes();
+
+/// The attachments of the composer of [threadId] in [channelId], or null without an engine.
+/// They last while the app runs, so files attached and not sent yet are still there when the
+/// person comes back to the thread (brief M4-22 Design note 2).
+@Riverpod(keepAlive: true)
+AttachController? composerAttachments(
+  Ref ref,
+  String threadId,
+  String channelId,
+) {
+  final engine = ref.watch(syncEngineProvider);
+  if (engine == null) return null;
+  final attach = AttachController(
+    thread: ThreadId.parse(threadId),
+    channel: ChannelId.parse(channelId),
+    outbox: engine.outbox,
+    progress: ref.watch(uploadProgressProvider),
+    newKey: ref.watch(attachmentKeysProvider),
+  );
+  ref.onDispose(attach.dispose);
+  return attach;
+}

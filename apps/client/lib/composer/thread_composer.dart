@@ -89,13 +89,12 @@ class ThreadComposerState extends ConsumerState<ThreadComposer> {
     final composer = _composer!;
     // M4-22: attachments and voice messages of this composer.
     final ports = ref.read(filePortsProvider);
-    final attach = _attach = AttachController(
-      thread: widget.threadId,
-      channel: widget.channelId,
-      outbox: engine.outbox,
-      progress: ref.read(uploadProgressProvider),
-      newKey: ref.read(attachmentKeysProvider),
-    )..addListener(_changed);
+    final attach = _attach = ref.read(
+      composerAttachmentsProvider(
+        widget.threadId.value,
+        widget.channelId.value,
+      ),
+    )!..addListener(_changed);
     composer.attach = attach;
     _voice = VoiceController(
       recorder: ports.recorder,
@@ -129,8 +128,8 @@ class ThreadComposerState extends ConsumerState<ThreadComposer> {
   void dispose() {
     _composer?.removeListener(_changed);
     _composer?.dispose();
+    // The attachments outlive the composer (composerAttachmentsProvider).
     _attach?.removeListener(_changed);
-    _attach?.dispose();
     _voice?.removeListener(_changed);
     _voice?.dispose();
     super.dispose();
