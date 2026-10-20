@@ -2298,6 +2298,20 @@ closed it within the opening window after a `session.ended` (6.1 step 7), and wi
 The cases from TM-T07 to TM-T10, TM-T17 and TM-T28 (a) also appear in the test matrix of 07
 (AZ-M54 to AZ-M61).
 
+Where the tests run (M2-48): the tests of this table run data driven in
+`services/server/test/terminal`. Scenario files with literal expectations from this chapter run
+end to end in every `make check` against the real server, built from the worktree with its image,
+real host services `bothy-host` in Linux containers with systemd and a Go test device that speaks
+Noise through the host service's own packages. The host-local parts (the `doctor` matrix, the PTY
+and process tree tests and the parts that need macOS, Windows or a case-insensitive file system)
+are the platform suite `services/host/test/platform`: it runs in a Linux container in every
+`make check` and also on disposable macOS, Windows 10 and Windows 11 test machines. TM-T16 runs in
+`make check` and again under load in `make perf` (`services/server/test/chaos`). TM-T01 and TM-T02
+stay the vector and cross tests of M2-38, and the module tests of the implementing tickets stay
+where they are. The catalogue `services/server/test/terminal/catalogue.yaml` is the list of places:
+for every ID of this table it names each run, the implementing ticket and the threats of
+[threat model](../security/threat-model.md) 6.7; `make docs` holds it equal to this table.
+
 ## 15. Milestones
 
 | Milestone | Content |

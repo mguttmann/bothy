@@ -15,7 +15,7 @@ Guide: [docs/operations/install-compose.md](../../docs/operations/install-compos
 | `install.sh` | source of the setup wizard (POSIX `sh`, [16-operations.md](../../docs/spec/16-operations.md) 3.1); the release ships it rendered with version, checksum and download address next to the bundle (`make release-build`), not inside it; tests in [test/install/](test/install/README.md) (`make install-test`) |
 | `smoke.sh` | the Compose smoke test (`make portability`, M1-73); test only |
 | `alert-setup.sh` | guided setup of the alert routes (POSIX `sh`, M7-20): reads a webhook URL from standard input and writes `secrets/alertmanager_*` with mode `0600`, printing only the fingerprint ([alerting-setup.md](../../docs/operations/alerting-setup.md)); tests in `tools/observability/tests/test_alert_setup.py` |
-| `test/` | the test overlay, its variables and the collector overlay `file` of the smoke test; test only, not in the release bundle ([test/README.md](test/README.md)) |
+| `test/` | the test overlay, its variables and the collector overlay `file` of the smoke test; the test overlays `test/compose.terminal.yaml` and `test/compose.terminal-twonode.yaml`, the host image `test/host/Dockerfile` and the TLS front `test/terminal/` of the terminal conformance suite (M2-48); test only, never for an installation, not in the release bundle ([test/README.md](test/README.md)) |
 
 The stack also mounts `../otel` (Collector) and `../observability` (Prometheus, Alertmanager,
 Loki, Tempo, Grafana), read-only. The release bundle therefore contains both folders

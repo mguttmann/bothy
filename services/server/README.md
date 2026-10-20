@@ -110,6 +110,14 @@ part of `make check`, which only vets and lints the tagged code. The thresholds 
 of chapter 02, never from a literal. The production validator compiles request schemas only; the
 test build with `contract_validate` keeps the responses for G8.
 
+Terminal conformance suite (M2-48): [`test/terminal`](test/terminal/README.md) runs the tests of
+24 section 14 data driven against the server image built from this tree, real host services
+`bothy-host` in Linux containers and a Go test device, one Compose stack per package under
+`test/terminal/e2e/`; they run in `make check` and need Docker with `docker buildx`, privileged
+containers, cgroup version 2 and `kernel.yama.ptrace_scope` of at least `1`. TM-T16 runs again
+under load in `make perf` (`TestChaosTMT16` in `test/chaos`). One scenario case:
+`go test -count=1 -run 'TestScenarios/tm-t08/own_host' ./test/terminal/e2e/conformance/`.
+
 ## Image
 
 The image `bothy-server` (ADR 0012, 18-release.md "Server images") is built from
