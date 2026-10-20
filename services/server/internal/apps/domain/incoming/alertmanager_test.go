@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"testing"
 	"unicode/utf8"
@@ -197,4 +198,30 @@ func TestRenderAlertmanager_FitsMaxContentBytes(t *testing.T) {
 			}
 		}
 	})
+}
+
+// TestRenderAlertmanager_ManyAlertsLinear (code review M2-27, Major): a payload with tens of
+// thousands of minimal alerts, as the body limit allows, renders within the limit with the
+// dropped alerts counted; the choice of how many items fit costs one pass over the items, so the
+// call stays fast (the quadratic version needed seconds of CPU for this payload).
+func TestRenderAlertmanager_ManyAlertsLinear(t *testing.T) {
+	t.Parallel()
+	n := incoming.Notification{Status: "firing", CommonLabels: map[string]string{"alertname": "A"}}
+	for range 40000 {
+		n.Alerts = append(n.Alerts, incoming.Alert{Status: "firing", Labels: map[string]string{"alertname": "A"}, Annotations: map[string]string{}})
+	}
+	const limit = 4096
+	got := incoming.RenderAlertmanager(n, limit)
+	if len(got) > limit || !utf8.ValidString(got) {
+		t.Fatalf("%d bytes, valid UTF-8 %v", len(got), utf8.ValidString(got))
+	}
+	kept := strings.Count(got, "\n- **firing**")
+	if !strings.HasSuffix(got, "- and "+strconv.Itoa(40000-kept)+" more alerts") || kept == 0 {
+		t.Fatalf("kept %d items, tail %q", kept, got[max(0, len(got)-60):])
+	}
+	// The kept items are the most that fit: one more item would exceed the limit.
+	one := len("\n- **firing** A: no summary")
+	if len(got)+one-len(strconv.Itoa(40000-kept))+len(strconv.Itoa(40000-kept-1)) <= limit {
+		t.Fatalf("%d bytes with %d items: one more would have fit", len(got), kept)
+	}
 }

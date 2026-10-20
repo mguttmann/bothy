@@ -222,9 +222,15 @@ func RenderAlertmanager(n Notification, maxBytes int) string {
 		footer = "\n\nAlertmanager: <" + u + ">"
 	}
 	truncated := uint64(max(n.TruncatedAlerts, 0))
+	// The length of every candidate comes from prefix sums, so finding the most items that fit is
+	// one pass and the message is assembled once (a payload may hold tens of thousands of alerts).
+	prefix := make([]int, len(items)+1)
+	for i, it := range items {
+		prefix[i+1] = prefix[i] + len(it)
+	}
 	for k := len(items); k >= 0; k-- {
-		if s := assemble(header, items[:k], truncated+uint64(len(items)-k), footer); len(s) <= maxBytes {
-			return s
+		if assembledLen(len(header), prefix[k], k, truncated+uint64(len(items)-k), len(footer)) <= maxBytes {
+			return assemble(header, items[:k], truncated+uint64(len(items)-k), footer)
 		}
 	}
 	s := assemble(header, nil, truncated+uint64(len(items)), "")
@@ -232,6 +238,20 @@ func RenderAlertmanager(n Notification, maxBytes int) string {
 		return s
 	}
 	return cut(s, maxBytes)
+}
+
+// assembledLen is len(assemble(...)) for a header, k kept items of itemBytes bytes in total, the
+// item counting more alerts and a footer, computed without building the text.
+func assembledLen(header, itemBytes, k int, more uint64, footer int) int {
+	parts, n := k, header+itemBytes+footer
+	if more > 0 {
+		parts++
+		n += len("- and ") + len(strconv.FormatUint(more, 10)) + len(" more alerts")
+	}
+	if parts > 0 {
+		n += len("\n\n") + parts - 1
+	}
+	return n
 }
 
 // assemble joins the header, the kept items, the item counting more alerts and the footer.
