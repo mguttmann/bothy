@@ -994,6 +994,211 @@ func TestSlashCommands(t *testing.T) {
 		}
 	})
 
+	t.Run("TestInvokeCommand_Rights", func(t *testing.T) {
+		a, ch := w.fresh("rights")
+		trig := w.mustRegister(a, escalate("rights"))
+		write := w.mustRegister(a, escalate("rights-write"))
+		w.sql(`UPDATE commands SET required_level = 'write' WHERE id = $1`, write.ID)
+		th := w.thread(ch)
+		body := map[string]any{"thread_id": th, "options": opts("ticket", "T-6")}
+		code, hidden := w.invoke(w.outsider, ch, trig.ID, body)
+		_, unknown := w.invoke(w.outsider, ch, ids.New().String(), body)
+		if code != http.StatusNotFound || !sameProblem(hidden, unknown) {
+			t.Fatalf("outsider %d %s", code, hidden)
+		}
+		code, _ = w.invoke(w.sam, w.kampagnen, trig.ID, map[string]any{"options": opts("ticket", "T-6")})
+		if code != http.StatusNotFound {
+			t.Fatalf("Sam in Kampagnen = %d", code)
+		}
+		w.must(w.owner, http.MethodPost, "/api/v1/grants", map[string]any{
+			"subject_kind": "user", "subject_id": w.robin.user.String(), "target_kind": "channel", "target_id": ch.id, "level": "write", "reason": "test"})
+		for _, c := range []commandBody{trig, write} {
+			code, b := w.invoke(w.robin, ch, c.ID, body)
+			wantProblem(t, code, b, http.StatusForbidden, "agent_invocation_denied", "level_insufficient", "", "")
+		}
+		w.sql(`UPDATE channels SET read_only = true WHERE id = $1`, ch.id)
+		code, b := w.invoke(w.sam, ch, trig.ID, body)
+		wantProblem(t, code, b, http.StatusForbidden, "channel_read_only", "channel_read_only", "", "")
+		w.sql(`UPDATE channels SET read_only = false WHERE id = $1`, ch.id)
+		b2, ch2 := w.fresh("archived")
+		arch := w.mustRegister(b2, def("usage", "control", true))
+		w.must(w.owner, http.MethodPost, "/api/v1/channels/"+ch2.id+"/archive", map[string]any{"reason": "done"})
+		code, b = w.invoke(w.sam, ch2, arch.ID, map[string]any{})
+		wantProblem(t, code, b, http.StatusForbidden, "channel_read_only", "channel_archived", "", "")
+		guest := w.agent()
+		gc := w.mustRegister(guest, def("guestcmd", "control", true))
+		code, b = w.invoke(w.sam, ch, gc.ID, map[string]any{"thread_id": th})
+		wantProblem(t, code, b, http.StatusForbidden, "agent_invocation_denied", "agent_not_reachable", "", "")
+		esk := w.mustRegister(w.lotse, def("only-esk", "control", true, "scope_kind", "channel", "scope_id", w.eskalation.id))
+		code, _ = w.invoke(w.sam, w.allgemein, esk.ID, map[string]any{})
+		if code != http.StatusNotFound {
+			t.Fatalf("not covered = %d", code)
+		}
+		wide := w.mustRegister(w.lotse, def("shadowed", "control", true))
+		w.mustRegister(w.lotse, def("shadowed", "control", true, "scope_kind", "channel", "scope_id", w.allgemein.id))
+		code, _ = w.invoke(w.sam, w.allgemein, wide.ID, map[string]any{})
+		if code != http.StatusNotFound {
+			t.Fatalf("shadowed = %d", code)
+		}
+		w.denials(t, `action = 'command.invoke' AND actor_principal_id = $1 AND resource_id = $2`, w.outsider.user.String(), th)
+		w.denials(t, `action = 'command.invoke' AND actor_principal_id = $1 AND deny_reason = 'level_insufficient'`, w.robin.user.String())
+		w.denials(t, `action = 'agent.invoke' AND actor_principal_id = $1 AND deny_reason = 'level_insufficient' AND resource_id = $2`,
+			w.robin.user.String(), th)
+		w.denials(t, `action = 'agent.invoke' AND actor_principal_id = $1 AND deny_reason = 'agent_not_reachable' AND resource_id = $2`,
+			w.sam.user.String(), th)
+		w.removeAll(w.lotse)
+	})
+
+	t.Run("TestInvokeCommand_I2", func(t *testing.T) {
+		a, ch := w.fresh("personal")
+		cmd := w.mustRegister(a, def("usage", "control", true))
+		w.sql(`UPDATE agents SET billing_mode = 'personal', credential_holder_id = $1 WHERE principal_id = $2`, w.owner.user.String(), a.id.String())
+		defer w.sql(`UPDATE agents SET billing_mode = 'organization', credential_holder_id = NULL WHERE principal_id = $1`, a.id.String())
+		code, b := w.invoke(w.sam, ch, cmd.ID, map[string]any{})
+		wantProblem(t, code, b, http.StatusForbidden, "agent_invocation_denied", "billing_mode_personal_not_holder", "", "")
+		w.denials(t, `action = 'agent.invoke' AND deny_reason = 'billing_mode_personal_not_holder' AND actor_principal_id = $1`, w.sam.user.String())
+		w.mustInvoke(w.owner, ch, cmd.ID, map[string]any{})
+	})
+
+	t.Run("TestInvokeCommand_SR2", func(t *testing.T) {
+		a, ch := w.fresh("werkzeuge")
+		cmd := w.mustRegister(a, def("build", "control", true))
+		w.sql(`UPDATE agents SET tool_class = 'host' WHERE principal_id = $1`, a.id.String())
+		code, b := w.invoke(w.sam, ch, cmd.ID, map[string]any{})
+		wantProblem(t, code, b, http.StatusForbidden, "agent_invocation_denied", "tool_class_owner_only", "", "")
+		w.mustInvoke(w.owner, ch, cmd.ID, map[string]any{})
+	})
+
+	t.Run("TestInvokeCommand_SR4", func(t *testing.T) {
+		a, ch := w.fresh("selfcall")
+		cmd := w.mustRegister(a, def("usage", "control", true))
+		w.sql(`UPDATE commands SET required_level = 'write' WHERE id = $1`, cmd.ID)
+		code, b, _ := w.do(send{agent: &a, method: http.MethodPost, path: "/api/v1/channels/" + ch.id + "/commands/" + cmd.ID + "/invoke",
+			body: map[string]any{}, headers: map[string]string{"Idempotency-Key": ids.New().String()}})
+		// agent.invoke needs trigger, which an agent never holds (07 2.1), before its origin rule.
+		wantProblem(t, code, b, http.StatusForbidden, "agent_invocation_denied", "level_insufficient", "", "")
+		if w.count(`SELECT count(*) FROM event_log WHERE type = 'command.invoked' AND resource_id = $1`, cmd.ID) != 0 {
+			t.Fatal("an agent invoked a command")
+		}
+	})
+
+	t.Run("TestInvokeCommand_OptionValidation", func(t *testing.T) {
+		a, ch := w.fresh("options")
+		secret := "OPTSECRET" + ids.New().String()[24:]
+		cmd := w.mustRegister(a, def("usage", "control", true, "options", []any{
+			map[string]any{"name": "ticket", "description": "Ticket", "type": "string", "required": true},
+			map[string]any{"name": "count", "description": "Count", "type": "integer", "required": false},
+			map[string]any{"name": "urgent", "description": "Urgent", "type": "boolean", "required": false},
+			map[string]any{"name": "prio", "description": "Priority", "type": "choice", "required": false,
+				"choices": []any{map[string]any{"name": "High", "value": "high"}}},
+			map[string]any{"name": "owner", "description": "Owner", "type": "user", "required": false},
+			map[string]any{"name": "file", "description": "File", "type": "file", "required": false},
+		}))
+		cases := []struct {
+			values        []any
+			pointer, code string
+		}{
+			{opts("count", "1"), "/options", "required"},
+			{opts("ticket", "a", "nope", secret), "/options/1/name", "unknown_member"},
+			{opts("ticket", "a", "ticket", secret), "/options/1/name", "invalid"},
+			{opts("ticket", secret+"\u202e"), "/options/0/value", "invalid"},
+			{opts("ticket", "a", "count", "007"), "/options/1/value", "invalid_format"},
+			{opts("ticket", "a", "urgent", secret), "/options/1/value", "invalid_enum"},
+			{opts("ticket", "a", "prio", secret), "/options/1/value", "invalid_enum"},
+			{opts("ticket", "a", "owner", secret), "/options/1/value", "invalid_format"},
+			{opts("ticket", "a", "file", ids.New().String()), "/options/1/value", "not_enabled"},
+			{opts("ticket", strings.Repeat("x", cmdPayloadMax)), "/options", "too_large"},
+		}
+		for _, tc := range cases {
+			code, b := w.invoke(w.sam, ch, cmd.ID, map[string]any{"options": tc.values})
+			wantProblem(t, code, b, http.StatusBadRequest, "validation_failed", "", tc.pointer, tc.code)
+			if strings.Contains(string(b), secret) {
+				t.Fatalf("the error body repeats a value: %s", b)
+			}
+		}
+		if w.count(`SELECT count(*) FROM event_log WHERE type = 'command.invoked' AND resource_id = $1`, cmd.ID) != 0 {
+			t.Fatal("a refused invocation wrote an event")
+		}
+	})
+
+	t.Run("TestInvokeCommand_Idempotency", func(t *testing.T) {
+		a, ch := w.fresh("idem")
+		cmd := w.mustRegister(a, escalate("idem"))
+		th := w.thread(ch)
+		key := ids.New().String()
+		path := "/api/v1/channels/" + ch.id + "/commands/" + cmd.ID + "/invoke"
+		body := map[string]any{"thread_id": th, "options": opts("ticket", "T-7")}
+		code, first, _ := w.do(send{person: &w.sam, method: http.MethodPost, path: path, body: body, headers: map[string]string{"Idempotency-Key": key}})
+		if code != http.StatusAccepted {
+			t.Fatalf("first = %d %s", code, first)
+		}
+		code, again, h := w.do(send{person: &w.sam, method: http.MethodPost, path: path, body: body, headers: map[string]string{"Idempotency-Key": key}})
+		if code != http.StatusAccepted || !sameProblem(first, again) || h.Get("Idempotent-Replay") != "true" {
+			t.Fatalf("replay = %d %s %v", code, again, h)
+		}
+		if w.count(`SELECT count(*) FROM runs WHERE triggering_command_id = $1`, cmd.ID) != 1 ||
+			w.count(`SELECT count(*) FROM event_log WHERE type = 'agent.invocation' AND payload->>'command_id' = $1`, cmd.ID) != 1 {
+			t.Fatal("the replay wrote again")
+		}
+		code, b, _ := w.do(send{person: &w.sam, method: http.MethodPost, path: path, body: map[string]any{"thread_id": th, "options": opts("ticket", "T-8")},
+			headers: map[string]string{"Idempotency-Key": key}})
+		wantProblem(t, code, b, http.StatusUnprocessableEntity, "idempotency_key_reuse", "", "", "")
+	})
+
+	t.Run("TestInvokeCommand_RecheckAtDelivery", func(t *testing.T) {
+		a, ch := w.fresh("recheck")
+		first := w.connect(t, a)
+		first.Close()
+		p := w.newPerson("sam", identity.DeviceStateActive)
+		g := w.triggerGrant(p, ch)
+		ctl := w.mustRegister(a, def("usage", "control", true))
+		model := w.mustRegister(a, escalate("recheck"))
+		ci := w.mustInvoke(p, ch, ctl.ID, map[string]any{"thread_id": w.thread(ch)})
+		mi := w.mustInvoke(p, ch, model.ID, map[string]any{"thread_id": w.thread(ch), "options": opts("ticket", "T-9")})
+		w.must(w.owner, http.MethodPost, "/api/v1/grants/"+g+"/revoke", map[string]any{"reason": "left the team"})
+		c, _ := w.ready(t, w.agentParams(a, ""))
+		if f, ok := w.nextOf(c, "command.invoked", 5*time.Second); ok {
+			t.Fatalf("a revoked control command was delivered: %+v", f)
+		}
+		eventually(t, 10*time.Second, "the failed command run", func() bool {
+			return w.count(`SELECT count(*) FROM runs WHERE id = $1 AND state = 'failed' AND state_reason = 'access_revoked'`, mi.RunID) == 1
+		})
+		if n := w.count(`SELECT count(*) FROM audit_events WHERE action = 'agent.invoke' AND decision = 'deny' AND actor_principal_id = $1
+			AND details->>'stage' = 'delivery' AND details->>'event_type' = 'command.invoked' AND details->>'command_id' = $2
+			AND details->>'trigger_kind' = 'command'`, p.user.String(), ctl.ID); n != 1 {
+			t.Fatalf("deny entries of command.invoked: %d (%s)", n, ci.InvocationID)
+		}
+		if n := w.count(`SELECT count(*) FROM audit_events WHERE action = 'agent.invoke' AND decision = 'deny' AND actor_principal_id = $1
+			AND details->>'stage' = 'delivery' AND details->>'event_type' = 'agent.invocation' AND details->>'run_id' = $2
+			AND details->>'trigger_kind' = 'command'`, p.user.String(), mi.RunID); n != 1 {
+			t.Fatalf("deny entries of agent.invocation: %d", n)
+		}
+	})
+
+	t.Run("TestCommandsNeverLeakValues", func(t *testing.T) {
+		a, ch := w.fresh("leak")
+		desc, value := "DESCMARK"+ids.New().String()[24:], "VALUEMARK"+ids.New().String()[24:]
+		cmd := w.mustRegister(a, def("leak", "description", desc, "control", true, "options", []any{
+			map[string]any{"name": "ticket", "description": "Ticket", "type": "string", "required": true}}))
+		w.mustInvoke(w.sam, ch, cmd.ID, map[string]any{"options": opts("ticket", value)})
+		code, b := w.invoke(w.sam, ch, cmd.ID, map[string]any{"options": opts("ticket", value+"\u202e")})
+		if code != http.StatusBadRequest || strings.Contains(string(b), value) {
+			t.Fatalf("error body %d %s", code, b)
+		}
+		for _, m := range []string{desc, value} {
+			if n := w.count(`SELECT count(*) FROM audit_events WHERE details::text LIKE '%' || $1 || '%'`, m); n != 0 {
+				t.Fatal("a marker is in audit_events")
+			}
+			if strings.Contains(w.p.logs.String(), m) {
+				t.Fatal("a marker is in the log")
+			}
+		}
+		if n := w.count(`SELECT count(*) FROM event_log WHERE payload::text LIKE '%' || $1 || '%' AND type NOT IN ('command.changed', 'command.invoked')`,
+			value); n != 0 {
+			t.Fatal("the value is in another event")
+		}
+	})
+
 	t.Run("TestRegisterCommand_HumansRefused", func(t *testing.T) {
 		for _, p := range []gwPerson{w.sam, w.owner} {
 			code, b, _ := w.do(send{person: &p, method: http.MethodPost, path: "/api/v1/commands", body: def("human"),
