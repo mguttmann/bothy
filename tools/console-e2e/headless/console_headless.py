@@ -14,6 +14,8 @@ enforced. Per browser of ``E2E_BROWSERS``:
   copy of ``index.html`` (served with the headers of the server) is blocked and reported.
 * Firefox and WebKit: the same login, step-up with password and TOTP and navigation as a smoke test.
 
+With ``E2E_MODE=admin`` the module runs phase 2 of brief M6-04 instead (``admin_suites.py``).
+
 Every browser fails on any ``securitypolicyviolation`` event, on any request to an origin other
 than the console origin and on a WebSocket the policy blocks. The result of each browser goes to
 ``/out/results/<browser>.json`` (violations, foreign requests, the observed Trusted Types policy
@@ -167,6 +169,11 @@ class Login:
             time.sleep(1)
         self._last = int(time.time()) // TOTP_PERIOD
         return totp(self._secret, self._last)
+
+    def skip_current_step(self) -> None:
+        """Treats the current step as used: a later run of the same seed (phase 2 of
+        console_e2e.py) does not know which steps an earlier one took."""
+        self._last = max(self._last, int(time.time()) // TOTP_PERIOD)
 
 
 class Session:
@@ -527,7 +534,15 @@ def run_browser(pw: Playwright, name: str, login: Login, spki: str) -> dict[str,
 
 
 def main() -> int:
-    """Runs every browser of E2E_BROWSERS and writes the results; 0 when all passed."""
+    """Runs every browser of E2E_BROWSERS and writes the results; 0 when all passed.
+
+    ``E2E_MODE=admin`` runs phase 2 instead, the patrol suites of the console administration in
+    Chromium (admin_suites.py, brief M6-04 Design note 4).
+    """
+    if os.environ.get("E2E_MODE") == "admin":
+        import admin_suites  # noqa: PLC0415 - phase 2 only; it imports this module
+
+        return admin_suites.main()
     RESULTS.mkdir(parents=True, exist_ok=True)
     login = Login(OUT / "console-login.json")
     spki = os.environ.get("E2E_SPKI", "")
