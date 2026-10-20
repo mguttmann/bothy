@@ -37,9 +37,9 @@ Normative: [16-betrieb.md](../../../../docs/spec/16-betrieb.md) sections 7.1, 8.
 
 ## Abhängigkeiten
 
-Darf die Ports dieser Module nutzen: `agents`.
+Darf die Ports dieser Module nutzen: `agents`, `audit`.
 
-Grund: Agenten-Präsenz als Status-Komponente.
+Grund: Agenten-Präsenz als Status-Komponente; the restore test verifies the audit chain of the restored copy through `audit.RowsVerifier`, the verification of `audit.verify` (M7-03).
 
 Zusätzlich für alle Module: `internal/kernel`; `internal/platform` und `api/` nur in `adapters/`.
 Geprüft durch go-arch-lint (ADR 0008).

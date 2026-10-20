@@ -235,7 +235,7 @@ allow entry (20: every read of the log is audited).
 
 ## Port (Wurzelpaket `internal/audit`)
 
-- Eingehend: `Log` (Abfrage, Prüfung).
+- Eingehend: `Log` (Abfrage, Prüfung), `RowsVerifier` (Prüfung einer gelieferten Kette, M7-03).
 - Gibt In-Tx-Ereignisse aus: keine.
 - Abonniert In-Tx-Ereignisse: keine.
 - Implementiert Quellen-Ports und Querschnitts-Ports: kernel `auditing.Recorder` (`app.Recorder`).

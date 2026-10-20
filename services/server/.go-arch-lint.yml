@@ -383,9 +383,9 @@ deps:
   status-domain:
     mayDependOn: [status-domain]
   status-app:
-    mayDependOn: [status-app, status, status-domain, kernel-ports, agents]
+    mayDependOn: [status-app, status, status-domain, kernel-ports, agents, audit]
   status-adapters:
-    mayDependOn: [status-adapters, status, status-app, status-domain, kernel-ports, platform-buildinfo, platform-config, platform-egress, platform-health, platform-httpserver, platform-jobs, platform-jsoncanon, platform-lifecycle, platform-otel, platform-pg, platform-ratelimit, platform-secrets, api, agents]
+    mayDependOn: [status-adapters, status, status-app, status-domain, kernel-ports, platform-buildinfo, platform-config, platform-egress, platform-health, platform-httpserver, platform-jobs, platform-jsoncanon, platform-lifecycle, platform-otel, platform-pg, platform-ratelimit, platform-secrets, api, agents, audit]
     canUse: [v-pgx, v-otel, v-awssdk]
   terminal:
     mayDependOn: [terminal, kernel-ports]

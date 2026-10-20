@@ -172,7 +172,9 @@ modules:
     events: [status.updated]
     ephemeral_events: []
     ws_ops: []
-    depends_on: [agents]
+    # audit (M7-03): the restore test verifies the audit chain of the restored copy through the
+    # port audit.RowsVerifier, the verification of audit.verify, never a second one.
+    depends_on: [agents, audit]
     # M7-02: sqlc code, Runs and ManifestSource (pgx); adapters/otelmetrics records
     # bothy.backup.* and bothy.storage.volume.* (otel); adapters/s3mirror copies the objects of the
     # driver s3 into the off-site bucket (awssdk).

@@ -186,7 +186,7 @@ tieferer Module, die das Modul implementiert.
 | Modul | Port (Auszug) | Gibt aus (In-Tx) | Abonniert (In-Tx) | Implementiert Quellen |
 |---|---|---|---|---|
 | `instance` | `Settings`, `Flags`, `Keys` (Signer je Zweck, `Signers` and `PublicKeys` of a purpose for the outgoing webhooks, JWKS, Rotation), `Counters` (nur für die Phasen-Hooks von `authz`, `sync`, `audit`), `Versions` (Zählerstände ohne Sperre lesen, z. B. `permission_version` für den Rechte-Cache, `event_seq` für Catch-up); deklariert `LoginOptionsSource` (Anmelde-Treiber und Passwortweg für die Discovery), `FlagUserSource` (Menschen eines Rollouts), `FlagGroupSource` (gültige Gruppen eines Menschen für die Auswertung) | | | |
-| `audit` | `Log` (Abfrage, Prüfung) | | | kernel `auditing.Recorder` |
+| `audit` | `Log` (Abfrage, Prüfung), `RowsVerifier` (Prüfung einer gelieferten Kette, M7-03) | | | kernel `auditing.Recorder` |
 | `authz` | `Admin` (Gruppen, Freigaben, Abgleich der Claim-Gruppen, Erklärung, Vorschau, Ansicht als Person, Widerruf aller Freigaben eines Subjekts in der Rechte-Änderung des Aufrufers), `AppScopes` (Scope-Tabelle für die Ereignis-Abos einer App); deklariert `PrincipalSource`, `CredentialSource`, `StructureSource`, `AgentPolicySource`, `HostSource` | kernel `authorize.AccessChanged` (mit der auslösenden Aktion; `runs` bricht bei `user.disable` mit Grund `user_disabled` ab, sonst mit `access_revoked`) | | kernel `authorize.Authorizer`, `instance.FlagGroupSource` |
 | `billing` | `Costs` (Buchen, Korrektur, Summen), `Prices` | | | |
 | `identity` | `Auth` (Anmeldung, Refresh, Logout, Kind-Sitzungen, Step-up), `Directory`, `Devices`, `Tokens`, `Owners`, `PrincipalWrites` (Prinzipale von Agenten und Apps); deklariert `AvatarFiles`, `AppInstallations` (aktive Installation einer App) | `DeviceRevoked`, `SessionEnded` | | kernel `actor.Authenticator`, `authz.PrincipalSource`, `authz.CredentialSource` (Sitzung, Gerät, Token für die Prüfung `check_active`, 07 Abschnitt 4.2), `instance.LoginOptionsSource`, `instance.FlagUserSource`, kernel `personaldata.Participant` |
@@ -222,7 +222,7 @@ andere ist verboten und schlägt im Gate fehl (Abschnitt 7).
 | `agents` | `identity`, `authz`, `chat` | Agent-Prinzipal anlegen, Zugangsdaten-Inhaber ist Mensch; implementiert `AgentPolicySource`; Thread für Sitzungen, Geltung von Befehlen |
 | `files` | `identity`, `chat` | implementiert `AvatarFiles`; Upload-Kanal prüfen |
 | `messaging` | `identity`, `chat`, `files` | Erwähnungen auflösen; Thread-Sequenz und Wiederöffnen; Anhänge binden und lesen |
-| `status` | `agents` | Agenten-Präsenz als Status-Komponente |
+| `status` | `agents`, `audit` | Agenten-Präsenz als Status-Komponente; the restore test verifies the audit chain of the restored copy with the verification of `audit.verify` (`audit.RowsVerifier`, M7-03) |
 | `runs` | `instance`, `chat`, `agents`, `messaging`, `billing` | Marke signieren; Bediener, Erwähnungsregel, Projektbindung; Richtlinie und Sitzung; Anker und `trigger_state`; Kosten buchen |
 | `search` | `chat`, `messaging`, `files` | Thread-Titel, Nachrichten, Dateinamen und Transkripte |
 | `importer` | `identity`, `chat`, `agents`, `messaging`, `files` | legt Menschen, Struktur, Nachrichten, frühere Sitzungs-Referenzen und Dateien an; setzt den Schreibschutz der gespiegelten Kanäle |

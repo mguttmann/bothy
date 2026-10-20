@@ -13,8 +13,9 @@ import (
 	"github.com/OWNER/bothy/services/server/internal/kernel/clock"
 )
 
-// TestBackupAndExpireUsage holds the command lines of backup and expire: unknown kinds, missing
-// flags and a configuration that does not load are usage errors (2), before anything runs.
+// TestBackupAndExpireUsage holds the command lines of backup, expire and restore-test: unknown
+// kinds, missing flags and a configuration that does not load are usage errors (2), before
+// anything runs.
 func TestBackupAndExpireUsage(t *testing.T) {
 	t.Parallel()
 	// No server.public_url: the configuration does not load.
@@ -33,6 +34,9 @@ func TestBackupAndExpireUsage(t *testing.T) {
 		{[]string{"expire", "--offsite"}, "--credentials needs"},
 		{[]string{"expire", "--offsite", "--credentials", "/tmp/x", "extra"}, "unexpected argument"},
 		{[]string{"expire", "--offsite", "--credentials", "/tmp/x"}, "server.public_url"},
+		{[]string{"restore-test", "extra"}, "unexpected argument"},
+		{[]string{"restore-test", "--bogus"}, "flag provided but not defined"},
+		{[]string{"restore-test"}, "server.public_url"},
 	} {
 		var stdout, stderr bytes.Buffer
 		if got := run(context.Background(), tc.args, env, &stdout, &stderr); got != exitUsage {
