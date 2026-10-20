@@ -586,9 +586,23 @@ A host is a target outside the tree instance, space, channel (07 section 2.12):
   action evaluates only this branch. `app.FreshCheck` implements `authz.FreshStepUpCheck` for
   `identity.StepUp.ConsumeFresh`, so the consumption judges with the same rule.
 - **Guards.** `TerminalGuard` after step 8: SR10 server host, SR10 assignee, SR11 (I6, also other
-  owners), SR12 (an own reported session user, also owners). Extension point after SR12: M2-44
-  adds `host_not_active` and `terminal_profile_unknown`, M2-46 `terminal_session_limit`. The
-  reasons map to `403 terminal_denied` with the `reason` of 24 13 (`kernel/authorize.Decision.Err`).
+  owners), SR12 (an own reported session user, also owners). After SR12 `TerminalLiveGuard`:
+  `terminal_session_limit` (M2-46), then `host_not_active` and `terminal_profile_unknown` (M2-44).
+  The reasons map to `403 terminal_denied` with the `reason` of 24 13
+  (`kernel/authorize.Decision.Err`).
+- **Session limits (M2-46).** The terminal module counts the sessions of the person and of the host
+  that are not `closed` under its person lock and host row lock and passes them in
+  `TerminalFacts.OpenSessionsOfPerson` and `OpenSessionsOfHost`; `domain.TerminalSessionLimit`
+  denies `terminal.open` with `terminal_session_limit` (`403 terminal_denied`, `reason`
+  `session_limit`, audited like every denial) when a count is at least
+  `terminal.max_sessions_per_person` or `terminal.max_sessions_per_host`
+  (`AuthorizerConfig.MaxSessionsPerPerson`, `MaxSessionsPerHost`). Attaching is never counted. A
+  zero limit in a hand-built configuration is not configured (the binding through `internal/wire`
+  requires at least 1), a negative one is refused by `NewAuthorizer`. `terminal.open` without
+  `Resource.Terminal` is an internal error, so a caller cannot pass the limit by leaving the counts
+  out. Tests: `TestTerminalSessionLimit`, `TestTerminalLiveGuard_SessionLimit`,
+  `TestTerminalOpenLimitGuard`, `TestTerminalOpenLimitGuard_NotConfigured`,
+  `TestNewAuthorizer_NegativeSessionLimit`, `TestDecisionErr_TerminalSessionLimit`.
 - **Rights state.** `HostSource.SessionUsersOf` fills `Snapshot.SessionUsers` for people and
   `HostSource.PersonalHosts` fills `Snapshot.PersonalHosts` for effective owners; both are cached
   per rights version (a change of an assignment, a report or a declaration raises it).

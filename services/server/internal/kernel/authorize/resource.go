@@ -106,7 +106,8 @@ type EventScope struct {
 
 // TerminalFacts describes a terminal session for the step-up rule of terminal.attach (08 section
 // 6.3 point 5): its state, the device and login session that opened it and the time it was
-// detached (zero when it is not detached).
+// detached (zero when it is not detached); for terminal.open it carries the live facts and the
+// open session counts, and a nil value there is an internal error (M2-46).
 //
 // Example:
 //
@@ -128,6 +129,12 @@ type TerminalFacts struct {
 	// terminal.open (terminal/domain.ProfileKnown, M2-44); false gives terminal_profile_unknown.
 	// Ignored by every other action.
 	ProfileKnown bool
+	// OpenSessionsOfPerson and OpenSessionsOfHost are the sessions of the person and of the host
+	// that are not closed, counted by the terminal module under its person lock and host row lock
+	// for terminal.open (M2-46 Design note 9); the guard terminal_session_limit compares them
+	// with terminal.max_sessions_per_person and terminal.max_sessions_per_host. Ignored by every
+	// other action: attaching creates no session.
+	OpenSessionsOfPerson, OpenSessionsOfHost int
 }
 
 // HostAuthVerdict is the result of the proof check of a host service (24 section 3.5): the
