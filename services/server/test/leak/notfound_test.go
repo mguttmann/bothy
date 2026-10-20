@@ -15,6 +15,7 @@ import (
 	"time"
 
 	"github.com/OWNER/bothy/services/server/internal/kernel/ids"
+	"github.com/OWNER/bothy/services/server/internal/platform/testkit"
 	"github.com/OWNER/bothy/services/server/test/harness"
 )
 
@@ -180,7 +181,8 @@ func TestAZ_P4_NotFoundEquality(t *testing.T) {
 // at most authz.not_found_timing_tolerance.
 func TestAZ_P4_TimingMedian(t *testing.T) {
 	t.Parallel()
-	tolerance := notFoundTimingTolerance(t)
+	// Under the race detector the bound grows (testkit.TimingBound, PL/21).
+	tolerance := testkit.TimingBound(notFoundTimingTolerance(t))
 	p := newP4World(t)
 	for _, r := range p.routes {
 		for _, name := range requesterNames {

@@ -26,6 +26,7 @@ import (
 	"github.com/OWNER/bothy/services/server/internal/kernel/ids"
 	"github.com/OWNER/bothy/services/server/internal/platform/httpserver/httpservertest"
 	"github.com/OWNER/bothy/services/server/internal/platform/pg/pgtest"
+	"github.com/OWNER/bothy/services/server/internal/platform/testkit"
 )
 
 // The paths of the local account operations (M1-39).
@@ -40,13 +41,6 @@ const testPassword = "EXAMPLE-correct-horse-1"
 // notFoundTimingTolerance is the standard of authz.not_found_timing_tolerance
 // (docs/operations/configuration.md), the allowed difference of the medians in ID-T21.
 const notFoundTimingTolerance = 20 * time.Millisecond
-
-// raceTimingFactor widens notFoundTimingTolerance under the race detector, which makes Go code
-// 2 to 20 times slower (https://go.dev/doc/articles/race_detector, "Runtime Overhead"): there the
-// test measures the database work only (constant hasher), and a wrong password writes the failure
-// counter while an unknown name writes nothing, so the instrumented driver turns a write of about
-// a millisecond into a gap above the tolerance on a loaded runner (median pair difference 23.5 ms).
-const raceTimingFactor = 5
 
 // countingHasher counts the verifications of the hasher it wraps.
 type countingHasher struct {
@@ -615,10 +609,8 @@ func TestIDT21_UnknownNameTimingEqualsWrongPassword(t *testing.T) {
 	d := median(diffs)
 	t.Logf("race detector %v: medians unknown name %v, wrong password %v, median pair difference %v",
 		raceEnabled, median(unknown), median(wrong), d)
-	tolerance := notFoundTimingTolerance
-	if raceEnabled {
-		tolerance *= raceTimingFactor
-	}
+	// Under the race detector the bound grows (testkit.TimingBound, PL/21).
+	tolerance := testkit.TimingBound(notFoundTimingTolerance)
 	if d.Abs() >= tolerance {
 		t.Fatalf("median pair difference %v reaches the tolerance %v", d, tolerance)
 	}
