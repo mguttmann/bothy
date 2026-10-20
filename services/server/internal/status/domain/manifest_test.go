@@ -38,6 +38,8 @@ func validManifest(kind domain.Kind) domain.Manifest {
 		m.PgBackRest = &domain.PgBackRestRef{Label: "20261018-020000F_20261019-020000D"}
 	case domain.KindLogical, domain.KindObjects:
 		m.Restic = &domain.ResticRef{SnapshotID: strings.Repeat("0f", 32)}
+	case domain.KindRestoreTest:
+		// No backup kind: the restore test writes no manifest.
 	}
 	return m
 }

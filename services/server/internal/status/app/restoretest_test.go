@@ -59,8 +59,8 @@ func newRestoreEnv(t *testing.T, mutate func(*app.RestoreConfig)) *restoreEnv {
 	return r
 }
 
-// test runs the restore test and returns its error, its row and its parsed checks.
-func (r *restoreEnv) test(t *testing.T) (error, fakeRow, domain.RestoreChecks) {
+// test runs the restore test and returns its row, its parsed checks and its error.
+func (r *restoreEnv) test(t *testing.T) (fakeRow, domain.RestoreChecks, error) {
 	t.Helper()
 	err := r.svc.RestoreTest(context.Background())
 	rows := r.runs.snapshot()
@@ -72,7 +72,7 @@ func (r *restoreEnv) test(t *testing.T) (error, fakeRow, domain.RestoreChecks) {
 	if perr != nil {
 		t.Fatalf("checks of the row: %v\n%s", perr, row.checks)
 	}
-	return err, row, checks
+	return row, checks, err
 }
 
 // result returns the result of check name.
@@ -110,7 +110,7 @@ var allPassed = []string{"pgbackrest:passed", "manifest:passed", "event_log:pass
 func TestRestoreTestAllPass(t *testing.T) {
 	t.Parallel()
 	r := newRestoreEnv(t, nil)
-	err, row, checks := r.test(t)
+	row, checks, err := r.test(t)
 	if err != nil {
 		t.Fatalf("RestoreTest: %v", err)
 	}
@@ -180,7 +180,7 @@ func TestRestoreFailureSkipsDependentChecks(t *testing.T) {
 			t.Parallel()
 			r := newRestoreEnv(t, nil)
 			c.mutate(r)
-			err, row, checks := r.test(t)
+			row, checks, err := r.test(t)
 			if err == nil {
 				t.Error("RestoreTest returned nil for a failed test")
 			}
@@ -240,7 +240,7 @@ func TestRestoreChecksDetectDamage(t *testing.T) {
 			t.Parallel()
 			r := newRestoreEnv(t, nil)
 			c.mutate(r)
-			err, _, checks := r.test(t)
+			_, checks, err := r.test(t)
 			if err == nil {
 				t.Error("RestoreTest returned nil for a damaged copy")
 			}
@@ -263,7 +263,7 @@ func TestRestoreManifestWindow(t *testing.T) {
 	r := newRestoreEnv(t, nil)
 	r.scratch.db.facts.HeadSeq = 110
 	r.scratch.db.facts.RowCounts = map[string]int64{"messages": 90, "event_log": 110}
-	if err, _, checks := r.test(t); err != nil || !checks.Passed() {
+	if _, checks, err := r.test(t); err != nil || !checks.Passed() {
 		t.Errorf("copy behind its manifest: %v %v", err, outcomes(checks))
 	}
 	q := newRestoreEnv(t, nil)
@@ -272,7 +272,7 @@ func TestRestoreManifestWindow(t *testing.T) {
 	if err := q.svc.Run(context.Background(), domain.KindPGFull); err != nil {
 		t.Fatal(err)
 	}
-	if err, _, checks := q.test(t); err != nil || !checks.Passed() {
+	if _, checks, err := q.test(t); err != nil || !checks.Passed() {
 		t.Errorf("backup_runs differs: %v %v", err, outcomes(checks))
 	}
 }
@@ -283,7 +283,7 @@ func TestDurationOverRTOFails(t *testing.T) {
 	t.Parallel()
 	r := newRestoreEnv(t, func(c *app.RestoreConfig) { c.RTOTarget = time.Hour })
 	r.scratch.restoreTook = 2 * time.Hour
-	err, _, checks := r.test(t)
+	_, checks, err := r.test(t)
 	if err == nil {
 		t.Error("RestoreTest returned nil over dr.rto_target")
 	}
@@ -301,7 +301,7 @@ func TestDurationOverRTOFails(t *testing.T) {
 func TestSampleSizes(t *testing.T) {
 	t.Parallel()
 	r := newRestoreEnv(t, nil)
-	if err, _, checks := r.test(t); err != nil || result(checks, domain.CheckThreadSample).Items != 3 || result(checks, domain.CheckFileSample).Items != 5 {
+	if _, checks, err := r.test(t); err != nil || result(checks, domain.CheckThreadSample).Items != 3 || result(checks, domain.CheckFileSample).Items != 5 {
 		t.Errorf("fewer rows than the sample: %v, threads %d files %d, want 3 and 5", err,
 			result(checks, domain.CheckThreadSample).Items, result(checks, domain.CheckFileSample).Items)
 	}
@@ -315,7 +315,7 @@ func TestSampleSizes(t *testing.T) {
 	big := newRestoreEnv(t, func(c *app.RestoreConfig) { c.SampleThreads, c.SampleFiles = 4, 2 })
 	big.scratch.db.setThreads(10)
 	big.scratch.setFiles(10)
-	if err, _, checks := big.test(t); err != nil || result(checks, domain.CheckThreadSample).Items != 4 || result(checks, domain.CheckFileSample).Items != 2 {
+	if _, checks, err := big.test(t); err != nil || result(checks, domain.CheckThreadSample).Items != 4 || result(checks, domain.CheckFileSample).Items != 2 {
 		t.Errorf("more rows than the sample: %v, threads %d files %d, want 4 and 2", err,
 			result(checks, domain.CheckThreadSample).Items, result(checks, domain.CheckFileSample).Items)
 	}

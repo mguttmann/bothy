@@ -264,6 +264,9 @@ func (s *Service) steps(ctx context.Context, kind domain.Kind, id ids.ID, starte
 	case domain.KindObjects:
 		out, code, err = s.objects(ctx)
 		retain, thinning = s.cfg.ObjectsRetention, true
+	case domain.KindRestoreTest:
+		// Run refuses it before; the restore test has its own use case (RestoreTest).
+		return nil, out, "kind_invalid", fmt.Errorf("status: %q is not a backup kind", kind)
 	}
 	if err != nil {
 		return nil, out, code, err

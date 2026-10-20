@@ -54,53 +54,68 @@ func VerifyRows(ctx context.Context, in audit.RowsInput) (audit.VerifyResult, er
 		return audit.VerifyResult{}, err
 	}
 	walk := domain.NewWalk(1, domain.ZeroHash, true, chain.Hashes)
-	var first, head int64
-	nonEmpty := false
+	b, err := walkEvents(ctx, walk, in)
+	if err != nil {
+		return audit.VerifyResult{}, err
+	}
+	res := audit.VerifyResult{Warnings: []string{}, LastCheckpointSeq: chain.Last}
+	var rowFailure domain.Failure
+	var rowFailed bool
+	if b.nonEmpty {
+		walk.End(b.head)
+		rowFailure, rowFailed = walk.Failure()
+		res.CheckpointsCompared = walk.Compared()
+		res.CheckedFromSeq, res.CheckedToSeq = b.first, b.head
+	}
+	failure, failed := verdict(rowFailure, rowFailed, chain, b.nonEmpty, true, true, b.first, b.head)
+	res.OK = !failed
+	if failed {
+		res.FirstBrokenSeq, res.FailureReason = failure.Seq, string(failure.Reason)
+	}
+	return res, nil
+}
+
+// rowBounds are the first and the last seq the events of a RowsInput yielded.
+type rowBounds struct {
+	first, head int64
+	nonEmpty    bool
+}
+
+// walkEvents feeds the events of in to walk in batches of rowsBatch and returns their bounds.
+// After the first failure the rows are still read for the bounds, but no longer walked.
+func walkEvents(ctx context.Context, walk *domain.Walk, in audit.RowsInput) (rowBounds, error) {
+	var b rowBounds
 	batch := make([]domain.Row, 0, rowsBatch)
 	flush := func() error {
 		walk.Add(batch)
 		batch = batch[:0]
 		return ctx.Err()
 	}
-	if in.Events != nil {
-		for e, err := range in.Events {
-			if err != nil {
-				return audit.VerifyResult{}, err
-			}
-			if !nonEmpty {
-				first, nonEmpty = e.Seq, true
-			}
-			head = e.Seq
-			if walk.Failed() {
-				// The first failure is final; the bounds still come from every row.
-				continue
-			}
-			batch = append(batch, RowOf(e))
-			if len(batch) == rowsBatch {
-				if err := flush(); err != nil {
-					return audit.VerifyResult{}, err
-				}
+	if in.Events == nil {
+		return b, nil
+	}
+	for e, err := range in.Events {
+		if err != nil {
+			return rowBounds{}, err
+		}
+		if !b.nonEmpty {
+			b.first, b.nonEmpty = e.Seq, true
+		}
+		b.head = e.Seq
+		if walk.Failed() {
+			continue
+		}
+		batch = append(batch, RowOf(e))
+		if len(batch) == rowsBatch {
+			if err := flush(); err != nil {
+				return rowBounds{}, err
 			}
 		}
 	}
 	if err := flush(); err != nil {
-		return audit.VerifyResult{}, err
+		return rowBounds{}, err
 	}
-	res := audit.VerifyResult{Warnings: []string{}, LastCheckpointSeq: chain.Last}
-	var rowFailure domain.Failure
-	var rowFailed bool
-	if nonEmpty {
-		walk.End(head)
-		rowFailure, rowFailed = walk.Failure()
-		res.CheckpointsCompared = walk.Compared()
-		res.CheckedFromSeq, res.CheckedToSeq = first, head
-	}
-	failure, failed := verdict(rowFailure, rowFailed, chain, nonEmpty, true, true, first, head)
-	res.OK = !failed
-	if failed {
-		res.FirstBrokenSeq, res.FailureReason = failure.Seq, string(failure.Reason)
-	}
-	return res, nil
+	return b, nil
 }
 
 // verdict merges the failures of a verification as Log.Verify does: the walk, a trusted

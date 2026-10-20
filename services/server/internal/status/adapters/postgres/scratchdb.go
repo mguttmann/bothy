@@ -76,21 +76,8 @@ func (s *ScratchDB) EventLog(ctx context.Context) (app.EventLogFacts, error) {
 		if err != nil {
 			return fmt.Errorf("status: reading the partitions of event_log: %w", err)
 		}
-		rows, err = q.Query(ctx, `SELECT name, value FROM public.sequence_counters`)
-		if err != nil {
-			return fmt.Errorf("status: reading sequence_counters: %w", err)
-		}
-		for rows.Next() {
-			var name string
-			var v int64
-			if err := rows.Scan(&name, &v); err != nil {
-				rows.Close()
-				return fmt.Errorf("status: reading sequence_counters: %w", err)
-			}
-			out.Counters[name] = v
-		}
-		if err := rows.Err(); err != nil {
-			return fmt.Errorf("status: reading sequence_counters: %w", err)
+		if out.Counters, err = readCounters(ctx, q); err != nil {
+			return err
 		}
 		if err := q.QueryRow(ctx, `SELECT COALESCE(max(seq), 0)::bigint FROM public.audit_events`).Scan(&out.AuditHead); err != nil {
 			return fmt.Errorf("status: reading the head of audit_events: %w", err)
@@ -99,6 +86,33 @@ func (s *ScratchDB) EventLog(ctx context.Context) (app.EventLogFacts, error) {
 	})
 	if err != nil {
 		return app.EventLogFacts{}, err
+	}
+	return out, nil
+}
+
+// counter is one row of sequence_counters.
+type counter struct {
+	name  string
+	value int64
+}
+
+// readCounters reads sequence_counters by name.
+func readCounters(ctx context.Context, q pg.DBTX) (map[string]int64, error) {
+	rows, err := q.Query(ctx, `SELECT name, value FROM public.sequence_counters`)
+	if err != nil {
+		return nil, fmt.Errorf("status: reading sequence_counters: %w", err)
+	}
+	all, err := pgx.CollectRows(rows, func(r pgx.CollectableRow) (counter, error) {
+		var c counter
+		err := r.Scan(&c.name, &c.value)
+		return c, err
+	})
+	if err != nil {
+		return nil, fmt.Errorf("status: reading sequence_counters: %w", err)
+	}
+	out := make(map[string]int64, len(all))
+	for _, c := range all {
+		out[c.name] = c.value
 	}
 	return out, nil
 }
@@ -141,14 +155,9 @@ func pages[T any](ctx context.Context, pool *pg.Pool, query string, scan func(pg
 		var zero T
 		after := int64(math.MinInt64)
 		for {
-			rows, err := pool.Query(ctx, query, after, auditBatch)
+			page, err := readPage(ctx, pool, query, after, scan)
 			if err != nil {
-				yield(zero, fmt.Errorf("status: reading the audit log of the copy: %w", err))
-				return
-			}
-			page, err := pgx.CollectRows(rows, scan)
-			if err != nil {
-				yield(zero, fmt.Errorf("status: reading the audit log of the copy: %w", err))
+				yield(zero, err)
 				return
 			}
 			for _, v := range page {
@@ -162,6 +171,19 @@ func pages[T any](ctx context.Context, pool *pg.Pool, query string, scan func(pg
 			after = seq(page[len(page)-1])
 		}
 	}
+}
+
+// readPage reads one page of query after the seq after.
+func readPage[T any](ctx context.Context, pool *pg.Pool, query string, after int64, scan func(pgx.CollectableRow) (T, error)) ([]T, error) {
+	rows, err := pool.Query(ctx, query, after, auditBatch)
+	if err != nil {
+		return nil, fmt.Errorf("status: reading the audit log of the copy: %w", err)
+	}
+	page, err := pgx.CollectRows(rows, scan)
+	if err != nil {
+		return nil, fmt.Errorf("status: reading the audit log of the copy: %w", err)
+	}
+	return page, nil
 }
 
 // scanEvent reads one row of audit_events as the module audit stores it: details decoded with
