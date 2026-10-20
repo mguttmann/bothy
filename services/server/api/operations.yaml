@@ -41,6 +41,7 @@ enabled:             # operationIds that have a handler; sorted ascending
   - createChannelTemplate
   - createEnrollmentCode
   - createExtensionSession
+  - createFileTicket
   - createForumTag
   - createGrant
   - createGroup
@@ -69,6 +70,8 @@ enabled:             # operationIds that have a handler; sorted ascending
   - deleteWebhookSubscription
   - disableAgent
   - disableUser
+  - downloadFile
+  - downloadThumbnail
   - enableAgent
   - enableUser
   - endViewAs
@@ -99,6 +102,7 @@ enabled:             # operationIds that have a handler; sorted ascending
   - getSnapshot
   - getSpace
   - getThread
+  - getTranscript
   - getUpload
   - getUser
   - getUserCredentials
@@ -257,9 +261,6 @@ later:               # every other operationId of docs/api/openapi.yaml; sorted 
   - operation_id: createDm
     etappe: V3
     ticket: V3-01
-  - operation_id: createFileTicket
-    etappe: M3
-    ticket: M3-05
   - operation_id: createGdprRequest
     etappe: M7
   - operation_id: createImport
@@ -300,14 +301,8 @@ later:               # every other operationId of docs/api/openapi.yaml; sorted 
   - operation_id: deleteStatusComponent
     etappe: M7
     ticket: M7-09
-  - operation_id: downloadFile
-    etappe: M3
-    ticket: M3-05
   - operation_id: downloadGdprExport
     etappe: M7
-  - operation_id: downloadThumbnail
-    etappe: M3
-    ticket: M3-05
   - operation_id: exportChannel
     etappe: M3
     ticket: M3-11
@@ -371,9 +366,6 @@ later:               # every other operationId of docs/api/openapi.yaml; sorted 
   - operation_id: getToolCallStats
     etappe: M6
     ticket: M6-05
-  - operation_id: getTranscript
-    etappe: M3
-    ticket: M3-05
   - operation_id: getUsageStats
     etappe: M6
     ticket: M6-05

@@ -743,6 +743,29 @@ Medien-Player (Audio, Video) und "Öffnen mit" senden ihre eigenen HTTP-Anfragen
    aus eigenen Logs und Telemetrie-Attributen; der Collector filtert ihn zusätzlich
    ([17-observability.md](17-observability.md)).
 
+Additions of M3-05 (rulings D-M3-05-1 to D-M3-05-4 and D-M3-05-13 in
+[docs/DECISIONS.md](../DECISIONS.md)):
+
+- **Session required.** A ticket binds to a login session. A principal without one (API token,
+  agent, app) gets `403 forbidden` with `reason` `step_up_not_possible` on `createFileTicket`
+  ([07-rechte.md](07-rechte.md) section 4.1); the rule runs after visibility, so a file the
+  principal cannot see still answers `404`.
+- **Current and previous key.** The server keeps the key it saw before the last version change of
+  `file.ticket_key_ref` as the previous key and verifies against both; it mints only with the
+  current key. A key change takes effect per process after `secrets.cache_ttl`; tickets minted
+  before keep working in that process until they expire. The previous key lives only in the
+  memory of a process that saw it: a process that starts after the change, and every process
+  after a second change within `file.ticket_ttl`, refuses tickets of the older key, and the player
+  asks for a new ticket.
+- **One answer for every failure.** Every failure of the ticket path gives the same `404` as an
+  unknown file id: bad encoding or signature, expiry, another file or variant, an unknown or ended
+  session, and every decision of `authorize(file.read)` that is not an allow.
+- **Where a ticket counts.** The ticket is accepted only in the query parameter `ticket` and only
+  by `downloadFile` and `downloadThumbnail` (security scheme `fileTicket`); every other operation
+  and every header ignores it. A request with an `Authorization` header is authenticated by that
+  header, and a `ticket` parameter beside it is ignored (the response then carries the
+  `Cache-Control` of normal authentication).
+
 ### 9.3 Antwort
 
 | Kopfzeile | Wert |
@@ -765,6 +788,29 @@ Nicht auslieferbare Dateien: Metadaten (`GET /api/v1/files/{id}`) sind für Lese
 sichtbar (Name, Größe, Zustand). `content`, Vorschaubilder und Transkript antworten mit `409
 file_not_ready` und `Retry-After` (Prüfung läuft) oder `409 file_blocked` (blockiert,
 fehlgeschlagen). Ohne Leserecht immer `404`.
+
+Additions of M3-05 (rulings D-M3-05-5, D-M3-05-9 to D-M3-05-12 in
+[docs/DECISIONS.md](../DECISIONS.md)):
+
+- **`Retry-After`.** The `Retry-After` of `409 file_not_ready` is `file.not_ready_retry_after` in
+  whole seconds; `409 file_blocked` carries none.
+- **Ranges.** Only the unit `bytes`. Exactly one range in the form `first-last`, `first-` or
+  `-suffix` gives `206` with `Content-Range: bytes <first>-<last>/<size>` (`last` is capped at the
+  end of the variant; a suffix longer than the variant means the whole variant). Several ranges or
+  a syntactically invalid value give `200` with the whole variant. A range whose first byte is at
+  or after the end of the variant, or a zero suffix, gives `416 range_not_satisfiable` with
+  `Content-Range: bytes */<size>`. `If-Range` lets the range apply only when it equals the current
+  strong `ETag`; any other value, an HTTP date included, gives `200`. `If-None-Match` is not
+  evaluated and there is no `304`, because content never changes once it is deliverable (section
+  4.4).
+- **Missing variant.** A thumbnail variant the file does not have answers `404` like an unknown
+  id; clients request only the variants that `File.thumbnails` lists.
+- **Thumbnail digest.** `file_thumbnails` has no checksum column, so the `ETag` and the
+  `Repr-Digest` of a thumbnail are computed from its bytes when it is served.
+- **File names.** The name of a thumbnail is the original name without its last extension, then
+  `-<variant>`, then `.jpg` or `.png` after the thumbnail's type. In the ASCII fallback
+  (`filename="..."`) every character outside printable ASCII and every `"`, `\`, `%` and `;`
+  becomes `_`; an empty name becomes `file`.
 
 ## 10. Anhängen und Agenten-Aufruf
 
@@ -971,6 +1017,7 @@ Werte aus anderen Kapiteln (nur Verweis): `file.max_upload_bytes`, `message.max_
 | `file.thumbnail.jpeg_quality` | `82` | Qualität der Vorschaubilder |
 | `file.ticket_ttl` | `5m` | Gültigkeit eines Abruf-Tickets |
 | `file.ticket_key_ref` | `file:<secrets.dir>/file_ticket_key` | Verweis auf den Ticket-Schlüssel im Secret-Provider |
+| `file.not_ready_retry_after` | `5s` | `Retry-After` of the `409 file_not_ready` responses (in whole seconds) |
 | `file.unattached_ttl` | `24h` | Frist für nie angehängte Dateien |
 | `file.failed_row_ttl` | `7d` | Frist für Zeilen fehlgeschlagener oder blockierter Dateien |
 | `file.gc_interval` | `10m` | Abstand des Aufräum-Jobs |

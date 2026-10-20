@@ -77,6 +77,9 @@ func OriginalKey(fileID ids.ID, revision int) (string, error) {
 func VariantKey(fileID ids.ID, v Variant) (string, error) {
 	switch v {
 	case VariantSmall, VariantMedium, VariantLarge, VariantPoster:
+	case VariantOriginal:
+		// The original has the key of OriginalKey, never a variant key.
+		return "", fmt.Errorf("%w: unknown variant", ErrInvalidKey)
 	default:
 		return "", fmt.Errorf("%w: unknown variant", ErrInvalidKey)
 	}

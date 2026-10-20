@@ -104,7 +104,8 @@ func (l *logBuffer) port(msg string) int {
 	return 0
 }
 
-// secretsDir writes the app password of db, a telemetry key and the audit KEK into a fresh directory with
+// secretsDir writes the app password of db, a telemetry key, the audit KEK and the other server keys
+// (the ticket key of M3-05 included) into a fresh directory with
 // mode 0600 files, as the Compose stack mounts them.
 func secretsDir(t *testing.T, db *pgtest.DB) string {
 	t.Helper()
@@ -117,6 +118,7 @@ func secretsDir(t *testing.T, db *pgtest.DB) string {
 		"db_app_password": pw, "telemetry_pseudonym_key": bytes.Repeat([]byte("k"), 48),
 		"audit_ip_kek": []byte(strings.Repeat("6b", 32) + "\n"), "token_pepper": []byte(strings.Repeat("7c", 32) + "\n"),
 		"totp_key": []byte(strings.Repeat("5d", 32) + "\n"), "webhook_hmac_master_key": []byte(strings.Repeat("4e", 32) + "\n"),
+		"file_ticket_key": []byte(strings.Repeat("3f", 32) + "\n"),
 	}
 	for name, b := range files {
 		if err := os.WriteFile(filepath.Join(dir, name), b, 0o600); err != nil {
