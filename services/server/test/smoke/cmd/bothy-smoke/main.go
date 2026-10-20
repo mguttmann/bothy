@@ -166,7 +166,7 @@ func seed(baseURL, publicURL, out string) error {
 	if err != nil {
 		return err
 	}
-	b, err := json.Marshal(login)
+	b, err := json.Marshal(login) // #nosec G117 -- the login of the test seed, written with mode 0600 and never printed
 	if err != nil {
 		return err
 	}

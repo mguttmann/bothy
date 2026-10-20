@@ -47,6 +47,13 @@ type InstanceSettings struct {
 	CSPReports *instancehttp.CSPReports
 }
 
+// fillHandlers sets every nil instance handler of h to the one st built: the settings operations
+// and submitCspReport.
+func (st *InstanceSettings) fillHandlers(h *Handlers) {
+	fill(&h.Admin, st.Handlers)
+	fill(&h.CSPReports, st.CSPReports)
+}
+
 // KeyCSPReportMaxRecords is console.csp_report_max_records, the most log records one request of
 // submitCspReport writes (M6-03).
 const KeyCSPReportMaxRecords = "console.csp_report_max_records"

@@ -58,7 +58,7 @@ func TestSeed(t *testing.T) {
 	if login.LoginName != smokeHandle || len(login.Password) < 20 || login.TOTPSecret == "" || login.LastStep == 0 {
 		t.Fatalf("login %+v", login)
 	}
-	b, err := json.Marshal(login)
+	b, err := json.Marshal(login) // #nosec G117 -- a fake login of the test
 	if err != nil || !strings.Contains(string(b), `"totp_secret"`) {
 		t.Fatalf("json %s %v", b, err)
 	}
