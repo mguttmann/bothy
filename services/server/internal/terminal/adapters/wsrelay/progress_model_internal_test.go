@@ -39,7 +39,7 @@ func TestRelayProgress_Model(t *testing.T) {
 // progressRun is one random sequence; it returns the first broken rule.
 func progressRun(t *testing.T, seed uint64) error {
 	t.Helper()
-	rng := rand.New(rand.NewPCG(seed, 46))
+	rng := rand.New(rand.NewPCG(seed, 46)) //nolint:gosec // G404: reproducible test sequences from a fixed seed, not security
 	grace := progressWindows.IdleGrace
 	clk := clock.NewFake(time.Date(2026, 10, 20, 9, 0, 0, 0, time.UTC))
 	timers := fakehost.NewClockTimers(clk)
