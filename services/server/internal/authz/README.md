@@ -233,8 +233,19 @@ visibility rule (`domain/visibility.go`, `fileVisible`; docs/DECISIONS.md D-M3-0
   the channel's other readers, the owner and everybody else get `not_found`;
 - attached (M3-07 sets the fact): visible with read on the path of the message (`ThreadID` or
   `ChannelID`);
-- purposes `avatar`, `branding`, `gdpr_export`: not visible (`no_grant`) until M3-10 and M7-06
-  give them read rules; their resource needs no path (`resolve` gives them none).
+- purposes `avatar`, `branding`, `gdpr_export` need no path (`resolve` gives them none). For
+  `file.read` (M3-05, brief design note 7) an avatar is visible to every authenticated principal
+  with the requirement `Auth`, a branding file to everybody with `Public` (an anonymous caller still gets `401` on `downloadFile`, which is not a public operation; it reaches the logo through `getBrandingLogo`, M3-10), and a `gdpr_export` to
+  nobody (`no_grant`; it leaves only through `gdpr.export.download`). The requirement table keeps
+  read for `file.read`, because list scopes and filter mode decide file events by their channel
+  path; `domain.Decide` replaces it by purpose (`fileReadRequirement`). Every other action, such
+  as `file.delete`, sees no file of these purposes.
+
+Session rule of download tickets (M3-05): `createFileTicket` sets `authorize.Resource.IssueTicket`.
+A ticket binds to a login session (12 section 9.2), so for `file.read` with `IssueTicket` a
+principal that is not a person in a session (API token, agent, app) gets `forbidden`
+`step_up_not_possible` (07 section 4.1 "token without a session"). The rule runs after visibility
+and requirement, like step 8 of 07 section 4.2, so an invisible file still answers `not_found`.
 
 `File == nil` is allowed only in filter and delivery mode (a stored `file.updated` decided by
 `ResourceFromEvent`, where the event scope is the path); in request mode it is an internal error,

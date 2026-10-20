@@ -114,7 +114,12 @@ the gateway registers exactly these. The terminal channels are not gateway ops a
 der Aktion und nicht `none`, keine Aktion mit Recht `system` (05, Regel 10), genau ein Server
 `/api/v1` (W6), keine Health-Operation (L2), und Formen, die die Routen-Tabelle nicht beschreiben
 könnte (DECISIONS.md, M1-17/13). Eine freigeschaltete Operation darf keine eigenen
-Sicherheitsanforderungen haben (M1-17/19). Jedes Objekt-Schema, das ein Anfragekörper einer Operation
+Sicherheitsanforderungen haben (M1-17/19). One exception since M3-05 (DECISIONS.md D-M3-05-14):
+an operation may list the requirement `fileTicket` (the download ticket in the query parameter
+`ticket`) beside a subset of the root security requirements; the generator records it as root
+security, so the chain authenticates the header as on every route and lets an anonymous request
+reach the handler, which checks the ticket itself (`downloadFile`, `downloadThumbnail`). Any other
+own requirement is still an override and fails. Jedes Objekt-Schema, das ein Anfragekörper einer Operation
 unter `paths` erreicht, muss unbekannte Mitglieder ablehnen (`additionalProperties: false`, bei `allOf`
 `unevaluatedProperties: false`; ausgenommen `JsonObject` und Maps), sonst nennt der Generator das
 Schema (W7, DECISIONS.md M1-18/12). Prüfungen und Metadaten stammen aus dem Dokument, das

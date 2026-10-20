@@ -87,7 +87,8 @@ def sync_detailed(
     """Read the transcript of a voice message
 
      409 `file_not_ready` or `file_blocked` as for `downloadFile`; without read access always 404 (12,
-    9.3).
+    9.3). Normal authentication only, never a fetch ticket. `text`, `language` and `source` are present
+    only with `status` `done`.
 
     Args:
         file_id (UUID): UUIDv7 (RFC 9562), lowercase canonical form.
@@ -119,7 +120,8 @@ def sync(
     """Read the transcript of a voice message
 
      409 `file_not_ready` or `file_blocked` as for `downloadFile`; without read access always 404 (12,
-    9.3).
+    9.3). Normal authentication only, never a fetch ticket. `text`, `language` and `source` are present
+    only with `status` `done`.
 
     Args:
         file_id (UUID): UUIDv7 (RFC 9562), lowercase canonical form.
@@ -146,7 +148,8 @@ async def asyncio_detailed(
     """Read the transcript of a voice message
 
      409 `file_not_ready` or `file_blocked` as for `downloadFile`; without read access always 404 (12,
-    9.3).
+    9.3). Normal authentication only, never a fetch ticket. `text`, `language` and `source` are present
+    only with `status` `done`.
 
     Args:
         file_id (UUID): UUIDv7 (RFC 9562), lowercase canonical form.
@@ -176,7 +179,8 @@ async def asyncio(
     """Read the transcript of a voice message
 
      409 `file_not_ready` or `file_blocked` as for `downloadFile`; without read access always 404 (12,
-    9.3).
+    9.3). Normal authentication only, never a fetch ticket. `text`, `language` and `source` are present
+    only with `status` `done`.
 
     Args:
         file_id (UUID): UUIDv7 (RFC 9562), lowercase canonical form.

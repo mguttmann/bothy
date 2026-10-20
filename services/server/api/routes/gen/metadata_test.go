@@ -308,6 +308,32 @@ func TestLoadInputs_RejectsSecurityOverrideOfEnabledOperation(t *testing.T) {
 	}
 }
 
+// TestLoadInputs_AcceptsFileTicketBesideRootSecurity: downloadFile and downloadThumbnail accept
+// the root security or a fetch ticket in the query (security scheme fileTicket, 12 9.2, ADR 0048).
+// The route table records them as root security: the chain authenticates the header as for every
+// route and an anonymous request reaches the handler, which checks the ticket (docs/DECISIONS.md
+// D-M3-05-14). Any other extra requirement stays an override.
+func TestLoadInputs_AcceptsFileTicketBesideRootSecurity(t *testing.T) {
+	schemes := "  securitySchemes:\n    fileTicket:\n      type: apiKey\n      in: query\n      name: ticket\n" +
+		"    otherKey:\n      type: apiKey\n      in: query\n      name: key\n"
+	spec, catalog, list := specWith(t, "      operationId: updateThing\n", "      operationId: updateThing\n      security:\n      - bearerAuth: []\n      - fileTicket: []\n",
+		"  securitySchemes:\n", schemes)
+	in, err := loadInputs(spec, catalog, list)
+	if err != nil {
+		t.Fatalf("root security plus fileTicket is no override: %v", err)
+	}
+	if op := opByID(t, in, "updateThing"); op.Public {
+		t.Errorf("updateThing with a fetch ticket is public: %+v", op)
+	}
+
+	spec, catalog, list = specWith(t, "      operationId: updateThing\n", "      operationId: updateThing\n      security:\n      - bearerAuth: []\n      - otherKey: []\n",
+		"  securitySchemes:\n", schemes)
+	_, err = loadInputs(spec, catalog, list)
+	if joined := strings.Join(problemsOf(t, err), "\n"); !strings.Contains(joined, "updateThing") {
+		t.Errorf("another extra requirement is an override; problems:\n%s", joined)
+	}
+}
+
 // TestLoadInputs_RejectsClassNone: rate-limit class none belongs to system actions and internal
 // delivery checks (05 "Rate-Limit-Klassen"), which have no REST route (06 "Autorisierung in der
 // API", point 7).

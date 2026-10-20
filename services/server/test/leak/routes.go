@@ -35,10 +35,18 @@ type Route struct {
 	Params []string
 }
 
-// Build returns the path of r with every parameter of values replaced.
+// FixedParams are valid values of the path parameters that are no ID, so a route reaches its
+// handler: the variant of downloadThumbnail (M3-05). A and B of a pair carry the same value.
+var FixedParams = map[string]string{"variant": "small"}
+
+// Build returns the path of r with every parameter of values replaced, and every parameter of
+// FixedParams.
 func (r Route) Build(values map[string]string) string {
 	p := r.Path
 	for name, v := range values {
+		p = strings.ReplaceAll(p, "{"+name+"}", v)
+	}
+	for name, v := range FixedParams {
 		p = strings.ReplaceAll(p, "{"+name+"}", v)
 	}
 	return p

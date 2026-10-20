@@ -32,6 +32,9 @@ func ScenarioConfig() map[string]string {
 	cfg["telemetry.traces.sampler_ratio"] = "1.0"
 	cfg["telemetry.logs.exporter"] = "both"
 	cfg["telemetry.logs.level"] = "debug"
+	// The scan is off, so the file of the files step becomes deliverable (skipped) without a
+	// clamd and the downloads of M3-05 answer with bytes.
+	cfg["file.scan.mode"] = "off"
 	return cfg
 }
 

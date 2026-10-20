@@ -208,7 +208,7 @@ class FilesApi {
   }
 
   /// Create a short-lived fetch ticket
-  /// For media players and \&quot;open with\&quot; that cannot send a DPoP proof. Every fetch with the ticket checks signature, expiry, session and &#x60;file.read&#x60; again (12, 9.2).
+  /// For media players and \&quot;open with\&quot; that cannot send a DPoP proof. Every fetch with the ticket checks signature, expiry, session and &#x60;file.read&#x60; again (12, 9.2). A ticket binds to the login session of the caller: a principal without a session (agent, app, API token) gets 403 &#x60;forbidden&#x60; with &#x60;reason&#x60; &#x60;step_up_not_possible&#x60;. No ticket is issued for a file that is not deliverable (409 &#x60;file_not_ready&#x60; or &#x60;file_blocked&#x60;), and a variant the file does not have gives 404. A repeated call mints a new ticket.
   ///
   /// Parameters:
   /// * [fileId]
@@ -499,10 +499,13 @@ class FilesApi {
   }
 
   /// Download a file
-  /// Answers 200 with the bytes (supports &#x60;Range&#x60;); there are no presigned GET URLs (ADR 0048). Media players without DPoP use a ticket (&#x60;createFileTicket&#x60;) in the query parameter &#x60;ticket&#x60; instead of &#x60;Authorization&#x60;. 409 &#x60;file_not_ready&#x60; while the scan is pending, 409 &#x60;file_blocked&#x60; for blocked or failed files; without read access always 404 (12, 9.3).
+  /// Answers 200 with the bytes (supports &#x60;Range&#x60;); there are no presigned GET URLs (ADR 0048). Media players without DPoP use a ticket (&#x60;createFileTicket&#x60;) in the query parameter &#x60;ticket&#x60; instead of &#x60;Authorization&#x60;. 409 &#x60;file_not_ready&#x60; while the scan is pending, 409 &#x60;file_blocked&#x60; for blocked or failed files; without read access always 404 (12, 9.3). Exactly one byte range gives 206, several ranges are ignored (200 with the whole file), a range outside the file gives 416. Types outside the inline list of 12 9.3 (HTML, SVG, PDF and every other type) are sent as &#x60;application/octet-stream&#x60; with &#x60;Content-Disposition: attachment&#x60;, &#x60;nosniff&#x60; and the sandbox CSP. An &#x60;Authorization&#x60; header wins over a &#x60;ticket&#x60; parameter. Pass-through via the server only (ADR 0048).
   ///
   /// Parameters:
   /// * [fileId]
+  /// * [ticket] - Fetch ticket of `createFileTicket` (security scheme `fileTicket`, 12 9.2). Accepted only by `downloadFile` and `downloadThumbnail`; ignored when the request carries `Authorization`. A bearer secret: never logged.
+  /// * [range] - One byte range (RFC 9110 section 14), for example `bytes=0-1023`, `bytes=1024-` or `bytes=-500`. Exactly one range gives 206; several ranges and invalid values are ignored (200); a range that starts at or after the end gives 416 (12, 9.3).
+  /// * [ifRange] - Applies `Range` only when equal to the current strong `ETag`; any other value, an HTTP date included, gives the whole variant (200).
   /// * [cancelToken] - A [CancelToken] that can be used to cancel the operation
   /// * [headers] - Can be used to add additional headers to the request
   /// * [extras] - Can be used to add flags to the request
@@ -514,6 +517,9 @@ class FilesApi {
   /// Throws [DioException] if API call or serialization fails
   Future<Response<Uint8List>> downloadFile({
     required String fileId,
+    String? ticket,
+    String? range,
+    String? ifRange,
     CancelToken? cancelToken,
     Map<String, dynamic>? headers,
     Map<String, dynamic>? extra,
@@ -534,7 +540,11 @@ class FilesApi {
     final _options = Options(
       method: r'GET',
       responseType: ResponseType.bytes,
-      headers: <String, dynamic>{...?headers},
+      headers: <String, dynamic>{
+        if (range != null) r'Range': range,
+        if (ifRange != null) r'If-Range': ifRange,
+        ...?headers,
+      },
       extra: <String, dynamic>{
         'secure': <Map<String, String>>[
           {'type': 'http', 'scheme': 'DPoP', 'name': 'dpopAuth'},
@@ -551,9 +561,19 @@ class FilesApi {
       validateStatus: validateStatus,
     );
 
+    final _queryParameters = <String, dynamic>{
+      if (ticket != null)
+        r'ticket': encodeQueryParameter(
+          _serializers,
+          ticket,
+          const FullType(String),
+        ),
+    };
+
     final _response = await _dio.request<Object>(
       _path,
       options: _options,
+      queryParameters: _queryParameters,
       cancelToken: cancelToken,
       onSendProgress: onSendProgress,
       onReceiveProgress: onReceiveProgress,
@@ -587,11 +607,14 @@ class FilesApi {
   }
 
   /// Download a thumbnail
-  /// Accepts a fetch ticket in the query parameter &#x60;ticket&#x60; like &#x60;downloadFile&#x60; (push preview &#x60;image_url&#x60;, ADR 0048). 409 &#x60;file_not_ready&#x60; or &#x60;file_blocked&#x60; as for &#x60;downloadFile&#x60;.
+  /// Accepts a fetch ticket in the query parameter &#x60;ticket&#x60; like &#x60;downloadFile&#x60; (push preview &#x60;image_url&#x60;, ADR 0048). 409 &#x60;file_not_ready&#x60; or &#x60;file_blocked&#x60; as for &#x60;downloadFile&#x60;; a variant the file does not have gives 404. Thumbnails are always inline with their own type; range, headers and caching as for &#x60;downloadFile&#x60; (12, 9.3).
   ///
   /// Parameters:
   /// * [fileId]
   /// * [variant]
+  /// * [ticket] - Fetch ticket of `createFileTicket` (security scheme `fileTicket`, 12 9.2). Accepted only by `downloadFile` and `downloadThumbnail`; ignored when the request carries `Authorization`. A bearer secret: never logged.
+  /// * [range] - One byte range (RFC 9110 section 14), for example `bytes=0-1023`, `bytes=1024-` or `bytes=-500`. Exactly one range gives 206; several ranges and invalid values are ignored (200); a range that starts at or after the end gives 416 (12, 9.3).
+  /// * [ifRange] - Applies `Range` only when equal to the current strong `ETag`; any other value, an HTTP date included, gives the whole variant (200).
   /// * [cancelToken] - A [CancelToken] that can be used to cancel the operation
   /// * [headers] - Can be used to add additional headers to the request
   /// * [extras] - Can be used to add flags to the request
@@ -604,6 +627,9 @@ class FilesApi {
   Future<Response<Uint8List>> downloadThumbnail({
     required String fileId,
     required String variant,
+    String? ticket,
+    String? range,
+    String? ifRange,
     CancelToken? cancelToken,
     Map<String, dynamic>? headers,
     Map<String, dynamic>? extra,
@@ -635,7 +661,11 @@ class FilesApi {
     final _options = Options(
       method: r'GET',
       responseType: ResponseType.bytes,
-      headers: <String, dynamic>{...?headers},
+      headers: <String, dynamic>{
+        if (range != null) r'Range': range,
+        if (ifRange != null) r'If-Range': ifRange,
+        ...?headers,
+      },
       extra: <String, dynamic>{
         'secure': <Map<String, String>>[
           {'type': 'http', 'scheme': 'DPoP', 'name': 'dpopAuth'},
@@ -652,9 +682,19 @@ class FilesApi {
       validateStatus: validateStatus,
     );
 
+    final _queryParameters = <String, dynamic>{
+      if (ticket != null)
+        r'ticket': encodeQueryParameter(
+          _serializers,
+          ticket,
+          const FullType(String),
+        ),
+    };
+
     final _response = await _dio.request<Object>(
       _path,
       options: _options,
+      queryParameters: _queryParameters,
       cancelToken: cancelToken,
       onSendProgress: onSendProgress,
       onReceiveProgress: onReceiveProgress,
@@ -780,7 +820,7 @@ class FilesApi {
   }
 
   /// Read the transcript of a voice message
-  /// 409 &#x60;file_not_ready&#x60; or &#x60;file_blocked&#x60; as for &#x60;downloadFile&#x60;; without read access always 404 (12, 9.3).
+  /// 409 &#x60;file_not_ready&#x60; or &#x60;file_blocked&#x60; as for &#x60;downloadFile&#x60;; without read access always 404 (12, 9.3). Normal authentication only, never a fetch ticket. &#x60;text&#x60;, &#x60;language&#x60; and &#x60;source&#x60; are present only with &#x60;status&#x60; &#x60;done&#x60;.
   ///
   /// Parameters:
   /// * [fileId]
