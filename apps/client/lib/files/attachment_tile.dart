@@ -219,20 +219,27 @@ class _AttachmentTileState extends ConsumerState<AttachmentTile> {
                 ),
                 const SizedBox(width: DsSpace.s6),
                 Flexible(child: details),
-                if (media)
-                  button(
-                    'play',
-                    _playing
-                        ? l.fileMediaPause
-                        : l.fileMediaPlay(dsIsolate(file.originalName)),
-                    () => unawaited(_play()),
-                  ),
-                if (ready && !widget.compact) ...[
-                  button('open', l.fileOpen, () => unawaited(_open())),
-                  button('save', l.fileSaveAs, () => unawaited(_save())),
-                ],
               ],
             ),
+            // The actions wrap below the name, so 200 percent text never overflows (01 8).
+            if (media || (ready && !widget.compact))
+              Wrap(
+                spacing: DsSpace.s4,
+                children: [
+                  if (media)
+                    button(
+                      'play',
+                      _playing
+                          ? l.fileMediaPause
+                          : l.fileMediaPlay(dsIsolate(file.originalName)),
+                      () => unawaited(_play()),
+                    ),
+                  if (ready && !widget.compact) ...[
+                    button('open', l.fileOpen, () => unawaited(_open())),
+                    button('save', l.fileSaveAs, () => unawaited(_save())),
+                  ],
+                ],
+              ),
             if (_notice case final notice?)
               Padding(
                 padding: const EdgeInsets.only(top: DsSpace.s4),
@@ -392,6 +399,13 @@ class UploadChip extends StatelessWidget {
                       style: dsTextStyle(DsType.caption)
                           .copyWith(color: colors.textSecondary),
                     ),
+                  if (failed && onRetry != null)
+                    DsButton(
+                      key: ValueKey('upload.$attachmentKey.retry'),
+                      label: l.fileUploadAgain,
+                      style: DsButtonStyle.ghost,
+                      onPressed: onRetry,
+                    ),
                   if (state == AttachmentState.uploading)
                     SizedBox(
                       width: DsSize.avatarLg * 2,
@@ -404,13 +418,6 @@ class UploadChip extends StatelessWidget {
                 ],
               ),
             ),
-            if (failed && onRetry != null)
-              DsButton(
-                key: ValueKey('upload.$attachmentKey.retry'),
-                label: l.fileUploadAgain,
-                style: DsButtonStyle.ghost,
-                onPressed: onRetry,
-              ),
             if (onRemove != null)
               DsTappable(
                 key: ValueKey('upload.$attachmentKey.remove'),

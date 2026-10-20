@@ -83,12 +83,17 @@ void main() {
     // server's answer filled.
     final shown = tester.widgetList<Image>(find.byType(Image)).toList();
     expect(shown, isNotEmpty);
+    final cachedFile = File(
+      (await host.run(
+        tester,
+        () => host.db.fileCacheDao.entry(image.id, 'medium'),
+      ))!.path,
+    );
+    expect(cachedFile.path, startsWith(services.cache.root.path));
+    final served = await host.run(tester, cachedFile.readAsBytes);
     for (final i in shown) {
-      expect(i.image, isA<FileImage>());
-      expect(
-        (i.image as FileImage).file.path,
-        startsWith(services.cache.root.path),
-      );
+      // The bytes on screen are the checked server copy in the cache.
+      expect((i.image as MemoryImage).bytes, served);
     }
     expect(
       find.byKey(ValueKey('file.${image.id.value}.inline')),

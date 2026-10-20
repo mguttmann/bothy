@@ -64,14 +64,17 @@ class ImagePreview extends ConsumerWidget {
       key: ValueKey('file.${file.id.value}.state'),
       style: dsTextStyle(DsType.caption).copyWith(color: colors.textSecondary),
     );
+    final bytes = result is Downloaded
+        ? ref.watch(cachedBytesProvider(result.file.path)).value
+        : null;
     final Widget body = switch (result) {
-      Downloaded(:final file) => Image.file(
-        file,
-        key: ValueKey('file.${this.file.id.value}.thumbnail'),
+      Downloaded() when bytes != null => Image.memory(
+        bytes,
+        key: ValueKey('file.${file.id.value}.thumbnail'),
         fit: BoxFit.contain,
         width: size.extent,
         height: size.extent,
-        semanticLabel: l.fileImageOpen(this.file.originalName),
+        semanticLabel: l.fileImageOpen(file.originalName),
         gaplessPlayback: true,
       ),
       DownloadNotReady() => label(l.fileStateChecking),
@@ -93,7 +96,7 @@ class ImagePreview extends ConsumerWidget {
         ),
       ),
     };
-    if (result is! Downloaded) return body;
+    if (result is! Downloaded || bytes == null) return body;
     return DsTappable(
       key: ValueKey('file.${file.id.value}.view'),
       onTap: () => showImageViewer(context, file),

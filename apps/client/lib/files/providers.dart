@@ -7,6 +7,7 @@ library;
 
 import 'dart:io';
 import 'dart:math';
+import 'dart:typed_data';
 
 import 'package:domain/domain.dart';
 import 'package:local_store/local_store.dart';
@@ -148,3 +149,8 @@ Directory outgoingFolder(Ref ref) {
         )
       : Directory('${cache.root.parent.path}${Platform.pathSeparator}outgoing');
 }
+
+/// The bytes of the cached file at [path] (a thumbnail the server sent, checked against
+/// `Repr-Digest`), for `Image.memory`; read once per path while shown.
+@riverpod
+Future<Uint8List> cachedBytes(Ref ref, String path) => File(path).readAsBytes();

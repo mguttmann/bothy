@@ -824,3 +824,91 @@ final class OutgoingFolderProvider
 }
 
 String _$outgoingFolderHash() => r'a27677837bba0d4ae67b435915dbba1f3f21c9d5';
+
+/// The bytes of the cached file at [path] (a thumbnail the server sent, checked against
+/// `Repr-Digest`), for `Image.memory`; read once per path while shown.
+
+@ProviderFor(cachedBytes)
+final cachedBytesProvider = CachedBytesFamily._();
+
+/// The bytes of the cached file at [path] (a thumbnail the server sent, checked against
+/// `Repr-Digest`), for `Image.memory`; read once per path while shown.
+
+final class CachedBytesProvider
+    extends
+        $FunctionalProvider<
+          AsyncValue<Uint8List>,
+          Uint8List,
+          FutureOr<Uint8List>
+        >
+    with $FutureModifier<Uint8List>, $FutureProvider<Uint8List> {
+  /// The bytes of the cached file at [path] (a thumbnail the server sent, checked against
+  /// `Repr-Digest`), for `Image.memory`; read once per path while shown.
+  CachedBytesProvider._({
+    required CachedBytesFamily super.from,
+    required String super.argument,
+  }) : super(
+         retry: null,
+         name: r'cachedBytesProvider',
+         isAutoDispose: true,
+         dependencies: null,
+         $allTransitiveDependencies: null,
+       );
+
+  @override
+  String debugGetCreateSourceHash() => _$cachedBytesHash();
+
+  @override
+  String toString() {
+    return r'cachedBytesProvider'
+        ''
+        '($argument)';
+  }
+
+  @$internal
+  @override
+  $FutureProviderElement<Uint8List> $createElement($ProviderPointer pointer) =>
+      $FutureProviderElement(pointer);
+
+  @override
+  FutureOr<Uint8List> create(Ref ref) {
+    final argument = this.argument as String;
+    return cachedBytes(ref, argument);
+  }
+
+  @override
+  bool operator ==(Object other) {
+    return other is CachedBytesProvider && other.argument == argument;
+  }
+
+  @override
+  int get hashCode {
+    return argument.hashCode;
+  }
+}
+
+String _$cachedBytesHash() => r'529ba510322cfcbd35032ce04f11516b6756b7b4';
+
+/// The bytes of the cached file at [path] (a thumbnail the server sent, checked against
+/// `Repr-Digest`), for `Image.memory`; read once per path while shown.
+
+final class CachedBytesFamily extends $Family
+    with $FunctionalFamilyOverride<FutureOr<Uint8List>, String> {
+  CachedBytesFamily._()
+    : super(
+        retry: null,
+        name: r'cachedBytesProvider',
+        dependencies: null,
+        $allTransitiveDependencies: null,
+        isAutoDispose: true,
+      );
+
+  /// The bytes of the cached file at [path] (a thumbnail the server sent, checked against
+  /// `Repr-Digest`), for `Image.memory`; read once per path while shown.
+
+  CachedBytesProvider call(String path) =>
+      CachedBytesProvider._(argument: path, from: this);
+
+  @override
+  String toString() => r'cachedBytesProvider';
+}
