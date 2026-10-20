@@ -1193,3 +1193,33 @@ func TestConfig_PresenceTimeoutAboveHeartbeatInterval(t *testing.T) {
 		}
 	}
 }
+
+// TestConfig_HeartbeatPersistBelowOrphanTimeout: agent.heartbeat_persist_interval must be below
+// run.orphan_timeout (cross-check heartbeat_persist_below_orphan_timeout, M2-09, D-M2-09-21):
+// equal or larger values abort the start with a problem naming both keys and no value.
+func TestConfig_HeartbeatPersistBelowOrphanTimeout(t *testing.T) {
+	t.Parallel()
+	for _, c := range []struct {
+		persist, orphan string
+		ok              bool
+	}{
+		{"60s", "15m", true},
+		{"14m", "15m", true},
+		{"15m", "15m", false},
+		{"20m", "15m", false},
+	} {
+		got := load(t, "BOTHY_AGENT__HEARTBEAT_PERSIST_INTERVAL="+c.persist, "BOTHY_RUN__ORPHAN_TIMEOUT="+c.orphan)
+		if (len(got) == 0) != c.ok {
+			t.Errorf("persist %s, orphan %s: problems %v, want ok %v", c.persist, c.orphan, got, c.ok)
+			continue
+		}
+		if len(got) == 0 {
+			continue
+		}
+		msg := got[0].String()
+		if !strings.Contains(msg, "agent.heartbeat_persist_interval") || !strings.Contains(msg, "run.orphan_timeout") ||
+			strings.Contains(msg, " "+c.persist) {
+			t.Errorf("problem %q", msg)
+		}
+	}
+}

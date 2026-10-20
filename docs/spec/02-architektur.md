@@ -288,7 +288,7 @@ Tabelle mit dem Katalog (Abschnitt 7.3).
 | `agents` | `agent.read`, `agent.create`, `agent.update`, `agent.disable`, `agent.enable`, `agent.billing_mode.set`, `agent.billing_mode.set_all`, `agent.credential_holder.set`, `agent.tool_class.set`, `agent.heartbeat`, `agent.events.consume`, `agent.triggerers.read`, `agent_session.read`, `agent_session.reset`, `agent_session.bind`, `agent_session.report`, `command.read`, `command.register`, `command.remove`, `dev_environment.read`, `dev_environment.manage`, `dev_environment.report` |
 | `files` | `file.upload`, `file.read`, `file.delete`, `file.transcribe`, `file.transcript.submit` |
 | `messaging` | `thread.create`, `message.read`, `message.create`, `message.update`, `message.delete`, `message.revisions.read`, `reaction.add`, `reaction.remove`, `pin.create`, `pin.delete`, `mention.list`, `template.read`, `template.manage`, `export.channel` |
-| `runs` | `agent.invoke`, `run.read`, `run.overview.read`, `run.context.read`, `run.start`, `run.update`, `run.finish`, `run.cancel`, `run.followup.create`, `component.update`, `interaction.create`, `interaction.respond`, `command.autocomplete`, `command.autocomplete.respond`, `command.invoke` |
+| `runs` | `agent.invoke`, `run.read`, `run.overview.read`, `run.context.read`, `run.start`, `run.token.renew`, `run.update`, `run.finish`, `run.cancel`, `run.followup.create`, `component.update`, `interaction.create`, `interaction.respond`, `command.autocomplete`, `command.autocomplete.respond`, `command.invoke` |
 | `billing` | `cost.read.thread`, `cost.read.aggregate`, `price.read`, `price.manage`, `cost.reconcile`, `cost.reconcile.submit` |
 | `sync` | `read_state.update`, `read_state.mark_unread`, `draft.read`, `draft.write`, `settings.read`, `settings.update`, `sync.snapshot.read`, `events.catch_up` |
 | `notify` | `notification_pref.update`, `quiet_hours.update`, `push.register`, `push.unregister`, `push.deliver` |
@@ -1051,8 +1051,8 @@ Grund: Jeder andere Job schriebe Zustand, der auf dem Ziel fehlen würde.
 | `files.purge_objects` | `files` | periodisch, gelöschte Dateien | `maintenance` | 12, 20 |
 | `notify.push_send` | `notify` | Verbraucher `push` | `delivery` | 13 |
 | `apps.webhook_deliver` | `apps` | one attempt of a subscription (args: the subscription only, M2-26): a round of the consumer `webhooks`, the chain after a finished delivery, a scheduled retry, the lease wake-up after `webhook.delivery_timeout`, an owner resume or re-enable, `webhook_out.redeliver` and `app.resume`; jobs of one subscription serialize on its row lock | `delivery` | 11 |
-| `runs.cancel_timeout` | `runs` | periodisch, `agent.cancel_grace` | `maintenance` | 09 |
-| `runs.stall_check` | `runs` | periodisch, `run.stall_after` | `maintenance` | 09 |
+| `runs.cancel_timeout` | `runs` | scheduled with `InsertTx` per `run.cancel_requested` that does not end the run at once, at now plus `agent.cancel_grace` (args: the run only): a run still `queued`, `running` or `waiting_input` then ends `cancelled` with `cancel_timeout`; an ended run is left as it is (M2-09, D-M2-09-17) | `maintenance` | 09 |
+| `runs.stall_check` | `runs` | periodic, `agent.presence_timeout`: fails runs in `running` or `waiting_input` with `interrupted` or `stale` from the persisted heartbeat (09 section 5.5), never retried; `agent_unavailable` stays with `runs.queued_expiry` (M2-09, D-M2-09-19) | `maintenance` | 09 |
 | `runs.component_expiry` | `runs` | periodisch, `component.default_ttl` | `maintenance` | 09 |
 | `runs.invocation_hold_timeout` | `runs` | terminiert, `file.invocation_hold_max` bzw. `voice.transcript_hold_max` | `default` | 04, 12 |
 | `runs.queued_expiry` | `runs` | scheduled with `InsertTx` in the transaction that creates the run, at `queued_at` plus `run.queued_max_age` (args: the run only): a run still `queued` then fails with `agent_unavailable`; a run not yet due (the key was raised) schedules the job again (M2-08) | `default` | 09 |
