@@ -20,6 +20,29 @@ Planning stage (milestone M0). Nothing is installable yet.
 
 ### Added
 
+- Setup wizard (M7-29): `infra/compose/install.sh`, a POSIX shell script and release artifact
+  of the product, installs an instance with one command
+  (`curl -fsSL https://github.com/OWNER/bothy/releases/download/v<version>/install.sh | sh`):
+  preflight of Docker Engine 26 and Compose 2.26 before any write, the bundle of its version with
+  a SHA-256 check (download or `--bundle`) and a signature check when `cosign` is installed,
+  prompts through `/dev/tty` or options, `.env` (mode `0600`) and `secrets/` (mode `0700`), the
+  gateway of the Compose network in `BOTHY_TRUSTED_PROXIES` with the edge `direct`, start with
+  readiness, the discovery check through the published port, the first owner with the
+  enrollment code shown once, and the next steps. A second run keeps `.env` and `secrets/`; the
+  script never calls `sudo`. Tests with stubs in a pinned Debian container (`make install-test`),
+  ShellCheck 0.11.0 in `make lint`.
+- `make release-build` of the product writes the bundle with the server version of the commit and
+  the registry `ghcr.io/<owner>` and a rendered `install.sh` with version, checksum and download
+  address, and aborts without output on a placeholder, a bad or pre-release server version in a
+  stable product, a missing `GITHUB_REPOSITORY_OWNER` or `GITHUB_REPOSITORY`, `OWNER` left in the
+  result or an image missing in the registry. The bundle now contains `infra/otel` and
+  `infra/observability`, which `compose.yaml` mounts. `release.yml` signs bundle and `install.sh`.
+- `make release-prep COMPONENT=bothy SERVER_VERSION=<version>` pins the server version of the
+  bundle and updates the version of the documented install command; gates `release-pins` and
+  `install-options` (`tests/portability/install-options`, the options of the portability test).
+- `make release-trial COMPONENT=bothy` builds bundle and `install.sh` against the local trial
+  registry and checks them like an installation.
+
 - Compose smoke test (M1-73): `make portability` runs `infra/compose/smoke.sh`, which starts the
   server core from the real `bothy-server` image with the installation Compose file and a test
   overlay (`infra/compose/test/`), proves secrets init, migrations, the setup lock, the first

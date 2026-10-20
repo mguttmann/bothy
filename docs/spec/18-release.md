@@ -20,7 +20,7 @@ Die Namen, Verzeichnisse und Tag-Präfixe stehen an einer Stelle: `RELEASE_COMPO
 
 | Komponente | Verzeichnis | Tag-Präfix | Artefakte | Kanäle |
 |---|---|---|---|---|
-| `bothy` | root | none (`vX.Y.Z`) | installation bundle from `make release-build`: `infra/compose` without `infra/compose/test` (test overlays), `LICENSE`, `NOTICE`, `CHANGELOG.md`, `VERSION`; its `infra/compose/.env.example` contains the pinned server version and the registry (section 2.1); in addition `install.sh` as a separate file with a built-in version, SHA-256 and download address of the bundle (section 2.1, [16-betrieb.md](16-betrieb.md), section 3.1) | stable, beta |
+| `bothy` | root | none (`vX.Y.Z`) | installation bundle `bothy-compose-<version>.tar.gz` from `make release-build`: `infra/compose` without `infra/compose/test` (test overlays) and without the source of `install.sh`, the folders `infra/otel` and `infra/observability` that `compose.yaml` mounts relative to itself, `LICENSE`, `NOTICE`, `CHANGELOG.md`, `VERSION`; its `infra/compose/.env.example` contains the pinned server version and the registry (section 2.1); in addition `install.sh` as a separate file with a built-in version, SHA-256 and download address of the bundle (section 2.1, [16-betrieb.md](16-betrieb.md), section 3.1) | stable, beta |
 | `server` | `services/server` | `server/` | Images `bothy-server`, `bothy-postgres` (linux/amd64, linux/arm64), Binärdateien `bothy` | stable, beta |
 | `host` | `services/host` | `host/` | Binärdateien `bothy-host` für macOS (arm64, amd64), Linux (amd64, arm64) und Windows (amd64), je mit Signatur und SBOM; Installationspakete der Dienste ([24-terminal.md](24-terminal.md), [16-betrieb.md](16-betrieb.md) Abschnitt 4.4) | stable, beta |
 | `client` | `apps/client` | `client/` | iOS, Android, macOS, Windows (eine Flutter-Codebasis, B5) | stable, beta |
@@ -128,6 +128,23 @@ a pushed tag cannot be taken back. Registry and download address come from the b
 depend on the location of the repository (fork, replacing `OWNER` in V1-03), not on the commit:
 even a tag whose source still names `OWNER` delivers an `install.sh` that finds its bundle. PLAN M7-29
 takes on the build (with tests), M7-10 takes on `make release-prep` itself.
+
+As built (M7-29, [docs/DECISIONS.md](../DECISIONS.md) D-M7-29-2, D-M7-29-3, D-M7-29-5): `make
+release-build VERSION=<v> OUT=<dir>` runs `tools/ci/product_release.py build`. It reads
+`VERSION`, `infra/compose/.env.example`, `compose.yaml` and `install.sh` from the commit `HEAD`,
+not from the working tree; it checks each image with `docker manifest inspect` (the release job
+logs in to `ghcr.io` first); it writes the bundle reproducibly (file order, modes and times of
+the commit, a gzip header without a time) and `install.sh` with mode `0755`, and only after every
+check, so an abort leaves no file. In `install.sh` the three values are the lines
+`BOTHY_INSTALL_VERSION=`, `BOTHY_INSTALL_BUNDLE_SHA256=` and `BOTHY_INSTALL_BASE_URL=`; the
+words `OWNER` and `placeholder` must not occur in the finished script in any case. Trial only
+(D-W-127): `RELEASE_TRIAL_REGISTRY=127.0.0.1:<port>` replaces `ghcr.io/<owner>` and
+`RELEASE_TRIAL_BASE_URL=http://127.0.0.1:<port>/` the download address; both are refused when
+`GITHUB_ACTIONS` is set and for any other host, and the image check then uses
+`docker manifest inspect --insecure`. `make release-trial COMPONENT=bothy` sets them (section 6.2).
+In `release.yml` the job `product-signing` (environment `release`) writes SBOMs, signs bundle,
+`install.sh` and `SHA256SUMS` with `tools/ci/release_chain.py` and verifies them like the server
+files (section 6.1), and `publish` takes that set by artifact id.
 
 ## 3. Semantische Versionierung je Komponente
 
@@ -259,6 +276,17 @@ repository or creates a release, and refuses to run when `GITHUB_ACTIONS` is set
 scan and ScanCode are separate targets and not part of the trial. Not proven by the trial:
 the keyless path and the attestations of the public phase, and a push to `ghcr.io`; both run
 first with the owner's first tag.
+
+`make release-trial COMPONENT=bothy` (M7-29) runs the trial of `server` first and then, against
+the same local registry, the product build of section 2.1 from a throwaway repository with the
+bundle paths of the commit and `BOTHY_VERSION` set to the trial server version, with
+`RELEASE_TRIAL_REGISTRY` and `RELEASE_TRIAL_BASE_URL` pointing at the local registry and a static
+HTTP server on `127.0.0.1`. It then checks what an installation needs: `install.sh` and the bundle
+downloaded from that address, the bundle's SHA-256 equal to the value in `install.sh`, registry
+and server version of the bundle equal to the trial's, every image of the bundle's
+`compose.yaml` present there with the signed digest, and a `docker pull` of each by the Docker
+daemon. A full installation from that result is the local end-to-end run of M7-14
+([16-betrieb.md](16-betrieb.md) 11.1).
 
 ## 7. Server-Images
 
