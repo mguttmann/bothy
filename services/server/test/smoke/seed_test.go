@@ -70,7 +70,8 @@ func TestSeed(t *testing.T) {
 // TestTOTPCode holds RFC 6238 appendix B (SHA-1, 8 digits there; the last 6 here).
 func TestTOTPCode(t *testing.T) {
 	t.Parallel()
-	secret := []byte("12345678901234567890")
+	// The key of appendix B: the ASCII digits 1 to 9 and 0, twice.
+	secret := []byte(strings.Repeat("1234567890", 2))
 	for step, want := range map[int64]string{59 / 30: "287082", 1111111109 / 30: "081804", 1234567890 / 30: "005924"} {
 		if got := TOTPCode(secret, step); got != want {
 			t.Errorf("step %d: %s, want %s", step, got, want)
