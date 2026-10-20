@@ -396,7 +396,7 @@ func TestSessionCloseAndDataClose(t *testing.T) {
 			t.Fatal("background process missing")
 		}
 		if viaClose {
-			r.mgr.Close(r.ctx, controlClose(id, "access_revoked"))
+			r.mgr.Close(r.ctx, controlClose(id))
 		} else {
 			dc.Close(CodeClosed, "")
 		}
@@ -437,7 +437,7 @@ func TestSessionCloseAndDataClose(t *testing.T) {
 	}
 	// A session.close for an unknown session changes nothing.
 	before := r.mgr.Active()
-	r.mgr.Close(r.ctx, controlClose(sessiontest.NewID(), "access_revoked"))
+	r.mgr.Close(r.ctx, controlClose(sessiontest.NewID()))
 	if r.mgr.Active() != before {
 		t.Error("a close of an unknown session changed something")
 	}
@@ -494,7 +494,7 @@ func TestSessionCloseDuringOpening(t *testing.T) {
 		defer fc.mu.Unlock()
 		return len(fc.asked) == 1
 	})
-	r.mgr.Close(r.ctx, controlClose(sessA, "access_revoked"))
+	r.mgr.Close(r.ctx, controlClose(sessA))
 	if code, _ := r.closedWith(dc); code != CodeNormal {
 		t.Errorf("data connection closed with %d", code)
 	}
@@ -677,7 +677,7 @@ func TestOpeningAtomicAgainstEnd(t *testing.T) {
 				return ok
 			})
 			if end == "close" {
-				r.mgr.Close(r.ctx, controlClose(id, "access_revoked"))
+				r.mgr.Close(r.ctx, controlClose(id))
 			} else {
 				r.mgr.EndAll(r.ctx)
 			}

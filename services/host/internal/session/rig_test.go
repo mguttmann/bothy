@@ -301,7 +301,7 @@ type rig struct {
 	sock    string
 	// startDelay slows every PTY start of the helper.
 	startDelay time.Duration
-	helper  *exec.Cmd
+	helper     *exec.Cmd
 }
 
 type rigOption func(*rig)
@@ -310,7 +310,7 @@ func withConfirm(f *fakeConfirm) rigOption { return func(r *rig) { r.confirm = f
 func withStartDelay(d time.Duration) rigOption {
 	return func(r *rig) { r.startDelay = d }
 }
-func withClock(c clock.Clock) rigOption    { return func(r *rig) { r.clk = c } }
+func withClock(c clock.Clock) rigOption { return func(r *rig) { r.clk = c } }
 func withValues(v sessiontest.Values) rigOption {
 	return func(r *rig) { r.values = v }
 }
@@ -597,6 +597,7 @@ func waitFor(t *testing.T, what string, cond func() bool) {
 	t.Fatalf("timeout waiting for %s", what)
 }
 
-func controlClose(id, reason string) control.SessionClose {
-	return control.SessionClose{SessionID: id, CloseReason: reason}
+// controlClose is session.close of id with the reason of a revocation.
+func controlClose(id string) control.SessionClose {
+	return control.SessionClose{SessionID: id, CloseReason: "access_revoked"}
 }
