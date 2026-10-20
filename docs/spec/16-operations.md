@@ -192,6 +192,23 @@ Rules:
    `--storage` changes per run). The source of the script is a parameter (table above); with
    `release-download` only `--bundle` is added. ShellCheck checks the script in the gate.
 
+As built (M7-29, [docs/DECISIONS.md](../DECISIONS.md) D-M7-29-1 to D-M7-29-8): the bundle unpacks
+into the target folder with its own layout, so the Compose folder is `<dir>/infra/compose`
+with `.env` and `secrets/` there, and the marker file `<dir>/.bothy-install` names an earlier
+installation of this script (step 1). Further options: `--dir <path>` (default `./bothy`),
+`--bundle <file>`, `--ready-timeout <duration>` (`install.ready_timeout`), `--yes` and
+`--help`. `TS_AUTHKEY` is never an option, because the arguments of a process are visible to
+other users of the host: with a terminal it is a hidden prompt, without one the script reads the
+environment variable `TS_AUTHKEY` and aborts naming it when it is missing. Exit codes: `0`
+success, `1` a failed step, `2` an invalid option; every message names the step
+(`install.sh: <step>: <reason>`). The signature check of step 2 uses the identity of the release
+workflow of the repository named in the download address; with another address (the trial
+release) or without `cosign` it names the command. The tests are `make install-test` (POSIX shell
+tests with stubs for `docker`, `curl`, `cosign` and `sudo` in a Debian container pinned by
+digest), ShellCheck runs in `make lint`, and `make install-options` holds the options of the
+portability test equal to the second block above and the version of the documented command in
+`README.md` and `install-compose.md` equal to `VERSION`.
+
 ## 4. Network
 
 ### 4.1 Basic rules
@@ -916,8 +933,9 @@ Rules:
    three variables aborts before the test downloads, pulls or installs anything, and names the
    variable.
 2. The options after `sh -s --` are stated exactly once, in `tests/portability/install-options`
-   (M7-29 creates the file, M7-14 reads it). The check from M7-29 compares them with the
-   second block from 3.1; only `--storage` (the test sets it per run) and `--bundle` may
+   (M7-29 creates the file, M7-14 reads it). The check from M7-29 (`make install-options`,
+   `tools/ci/install_options_check.py`, part of `make check`) compares them with the second
+   block from 3.1 in order; only `--storage` (the test sets it per run) and `--bundle` may
    differ.
 3. Source `url`: the test builds the URL of the second block from 3.1 itself, with
    `GITHUB_REPOSITORY` in place of `OWNER/bothy` and `PORTABILITY_TAG` in place of

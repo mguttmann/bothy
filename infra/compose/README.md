@@ -10,18 +10,19 @@ Guide: [docs/operations/install-compose.md](../../docs/operations/install-compos
 | `compose.yaml` | all services, profiles, networks, volumes |
 | `.env.example` | template for `.env`; only placeholders and default values, no secrets |
 | `secrets/` | not in the repository: secrets delivered by the owner as files (catalogue in [configuration.md](../../docs/operations/configuration.md) 5) |
+| `install.sh` | source of the setup wizard (POSIX `sh`, [16-operations.md](../../docs/spec/16-operations.md) 3.1); the release ships it rendered with version, checksum and download address next to the bundle (`make release-build`), not inside it; tests in [test/install/](test/install/README.md) (`make install-test`) |
 | `smoke.sh` | the Compose smoke test (`make portability`, M1-73); test only |
 | `test/` | the test overlay, its variables and the collector overlay `file` of the smoke test; test only, not in the release bundle ([test/README.md](test/README.md)) |
 
 The stack also mounts `../otel` (Collector) and `../observability` (Prometheus, Alertmanager,
-Loki, Tempo, Grafana), read-only.
+Loki, Tempo, Grafana), read-only. The release bundle therefore contains both folders
+(docs/spec/18-release.md, section 2).
 
 ## Short form
 
-One command: the setup wizard `install.sh` (planned, PLAN M7-29; flow in
-[docs/spec/16-operations.md](../../docs/spec/16-operations.md), section 3.1). It is created as
-`install.sh` in this folder and is published with every release of the component `bothy`. The
-manual path:
+One command: the setup wizard `install.sh` in this folder (flow in
+[docs/spec/16-operations.md](../../docs/spec/16-operations.md), section 3.1); it is published
+with every release of the component `bothy`. The manual path:
 
 ```
 cp .env.example .env          # set values

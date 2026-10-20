@@ -44,6 +44,14 @@ curl -fsSL https://github.com/OWNER/bothy/releases/download/v0.0.0/install.sh \
       --owner-handle alex --owner-name Alex
 ```
 
+`TS_AUTHKEY` for the edge `tailscale` comes from a hidden prompt or, without a terminal, from the
+environment, never from an option. The target folder is `--dir` (default `./bothy`); the stack
+then runs in `bothy/infra/compose` (`cd bothy/infra/compose && docker compose ps`). The wizard
+never calls `sudo` and changes nothing outside its folder; a second run in the same folder keeps
+`.env` and `secrets/`. With a bundle that is already downloaded (`gh release download
+v<version>`), `--bundle bothy-compose-<version>.tar.gz` replaces the download; the checksum
+check stays.
+
 Whoever wants to check the script before running it downloads it with `SHA256SUMS` and the
 signature and checks both like any release artifact ([release.md](release.md), section 5); then
 `sh install.sh`. The wizard does not create supplied secrets (push keys, access to the off-site
