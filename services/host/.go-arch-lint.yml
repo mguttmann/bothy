@@ -64,7 +64,7 @@ deps:
   # control client; pty alone uses creack/pty; profiles and confirm reach the system through
   # golang.org/x/sys only.
   session:     { mayDependOn: [clock, config, control, doctor, frame, localchan, noise, state], canUse: [v-websocket] }
-  sessiontest: { mayDependOn: [frame, noise], canUse: [v-websocket] }
+  sessiontest: { mayDependOn: [fingerprint, frame, noise], canUse: [v-websocket] }
   pty:         { canUse: [v-pty, v-sys] }
   profiles:    { mayDependOn: [config, doctor, hostos, state], canUse: [v-sys] }
   confirm:     { mayDependOn: [hostos], canUse: [v-sys] }
