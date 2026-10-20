@@ -20,6 +20,7 @@ import (
 	"github.com/pb33f/libopenapi-validator/schema_validation"
 
 	"github.com/OWNER/bothy/services/server/api/rest"
+	"github.com/OWNER/bothy/services/server/internal/gateway/adapters/wstest"
 	"github.com/OWNER/bothy/services/server/internal/identity"
 	"github.com/OWNER/bothy/services/server/internal/identity/adapters/identitytest"
 	"github.com/OWNER/bothy/services/server/internal/identity/domain/dpop"
@@ -288,6 +289,99 @@ func (w *cmdWorld) thread(ch channel) string {
 	}
 	_ = json.Unmarshal(b, &out)
 	return out.Thread.ID
+}
+
+// dispatchFrame is a dispatch of an invocation-bearing event as the command tests read it.
+type dispatchFrame struct {
+	Seq             int64           `json:"seq"`
+	Type            string          `json:"type"`
+	InvocationToken string          `json:"invocation_token"`
+	Audience        string          `json:"audience"`
+	Resource        json.RawMessage `json:"resource"`
+	Payload         json.RawMessage `json:"payload"`
+}
+
+// nextOf reads frames of c until a dispatch of typ arrives or d passed, acknowledging every other
+// dispatch; ok is false when none came.
+func (w *cmdWorld) nextOf(c *wstest.Client, typ string, d time.Duration) (dispatchFrame, bool) {
+	w.t.Helper()
+	ctx, cancel := context.WithTimeout(context.Background(), d)
+	defer cancel()
+	for {
+		op, raw, err := c.Next(ctx)
+		if errors.Is(err, context.DeadlineExceeded) {
+			return dispatchFrame{}, false
+		}
+		if err != nil {
+			w.t.Fatal(err)
+		}
+		if op != "dispatch" {
+			continue
+		}
+		var f dispatchFrame
+		if err := json.Unmarshal(raw, &f); err != nil {
+			w.t.Fatal(err)
+		}
+		if f.InvocationToken != "" {
+			w.remember(f.InvocationToken)
+		}
+		if f.Type != typ {
+			sendAck(w.t, c, f.Seq)
+			continue
+		}
+		return f, true
+	}
+}
+
+// fresh creates a new agent operating a new text channel of Support without auto_thread.
+func (w *cmdWorld) fresh(name string) (consumerAgent, channel) {
+	w.t.Helper()
+	a := w.agent()
+	return a, w.operatedBy(w.space, name+"-"+ids.New().String()[30:], a)
+}
+
+// connect opens the default consumer of a and reads until the catch-up is complete.
+func (w *cmdWorld) connect(t *testing.T, a consumerAgent) *wstest.Client {
+	t.Helper()
+	c, _ := w.ready(t, w.agentParams(a, ""))
+	readUntil(t, c, func(f frame) bool { return f.op == "catchup.complete" })
+	return c
+}
+
+// mention posts a message of p mentioning a in thread and returns the run it opened.
+func (w *cmdWorld) mention(p gwPerson, thread string, a consumerAgent) runRow {
+	w.t.Helper()
+	m, _ := w.say(p, thread, "@"+w.handleOf(a.id)+" please look")
+	r, ok := w.runOf(m)
+	if !ok || r.state != "queued" {
+		w.t.Fatalf("no active run of the mention: %+v", r)
+	}
+	if n := w.count(`SELECT count(*) FROM runs WHERE id = $1 AND agent_id = $2`, r.id, a.id.String()); n != 1 {
+		var ment, agent, thop string
+		_ = w.queryRow(context.Background(), `SELECT coalesce(string_agg(mentioned_principal_id::text, ','), '') FROM mentions WHERE message_id = $1`, m).Scan(&ment)
+		_ = w.queryRow(context.Background(), `SELECT agent_id::text FROM runs WHERE id = $1`, r.id).Scan(&agent)
+		_ = w.queryRow(context.Background(), `SELECT coalesce(operator_agent_id::text, '') FROM threads WHERE id = $1`, thread).Scan(&thop)
+		w.t.Fatalf("the run of the mention is not the run of the mentioned agent: mentions %s agent %s want %s thread op %s", ment, agent, a.id, thop)
+	}
+	return r
+}
+
+// escalate is the model command of the invocation tests: a required string and a choice.
+func escalate(name string) map[string]any {
+	return def(name, "options", []any{
+		map[string]any{"name": "ticket", "description": "Ticket number", "type": "string", "required": true},
+		map[string]any{"name": "priority", "description": "Priority", "type": "choice", "required": false,
+			"choices": []any{map[string]any{"name": "High", "value": "high"}, map[string]any{"name": "Low", "value": "low"}}},
+	})
+}
+
+// opts are option values.
+func opts(kv ...string) []any {
+	out := []any{}
+	for i := 0; i+1 < len(kv); i += 2 {
+		out = append(out, map[string]any{"name": kv[i], "value": kv[i+1]})
+	}
+	return out
 }
 
 // TestSlashCommands is the integration suite of M2-16 against a started api process: the command
@@ -681,6 +775,225 @@ func TestSlashCommands(t *testing.T) {
 		w.removeAll(w.texter)
 	})
 
+	t.Run("TestInvokeModelCommand_CreatesRun", func(t *testing.T) {
+		a, ch := w.fresh("model")
+		c := w.connect(t, a)
+		cmd := w.mustRegister(a, escalate("escalate"))
+		th := w.thread(ch)
+		inv := w.mustInvoke(w.sam, ch, cmd.ID, map[string]any{"thread_id": th, "options": opts("priority", "high", "ticket", "T-1")})
+		if inv.InvocationID == "" || inv.RunID == "" || inv.ThreadID != th || !inv.Accepted || inv.CommandID != cmd.ID || inv.ChannelID != ch.id {
+			t.Fatalf("invocation %+v", inv)
+		}
+		if n := w.count(`SELECT count(*) FROM runs WHERE id = $1 AND state = 'queued' AND trigger_kind = 'command' AND triggering_command_id = $2
+			AND triggered_by = $3 AND triggering_message_id IS NULL AND thread_id = $4`, inv.RunID, cmd.ID, w.sam.user.String(), th); n != 1 {
+			t.Fatal("the run of the command")
+		}
+		if n := w.count(`SELECT count(*) FROM messages WHERE run_id = $1 AND thread_id = $2 AND kind = 'run'`, inv.RunID, th); n != 1 {
+			t.Fatal("no anchor")
+		}
+		if n := w.count(`SELECT count(*) FROM event_log WHERE type = 'run.state_changed' AND resource_id = $1`, inv.RunID); n != 1 {
+			t.Fatalf("run.state_changed %d", n)
+		}
+		if n := w.count(`SELECT count(*) FROM event_log WHERE type = 'command.invoked' AND resource_id = $1`, cmd.ID); n != 0 {
+			t.Fatal("a model command sent command.invoked")
+		}
+		if n := w.count(`SELECT count(*) FROM messages WHERE thread_id = $1 AND trigger_state IS NOT NULL`, th); n != 0 {
+			t.Fatal("a trigger_state changed")
+		}
+		if n := w.count(`SELECT count(*) FROM jobs.river_job WHERE kind = 'runs.queued_expiry' AND args->>'run_id' = $1::text`, inv.RunID); n != 1 {
+			t.Fatal("no runs.queued_expiry job")
+		}
+		var payload []byte
+		if err := w.queryRow(context.Background(), `SELECT payload FROM event_log WHERE type = 'agent.invocation' AND resource_id = $1`, inv.RunID).
+			Scan(&payload); err != nil {
+			t.Fatal(err)
+		}
+		wantSchema(t, "AgentInvocationPayload", payload)
+		var p struct {
+			TriggerKind  string `json:"trigger_kind"`
+			InvocationID string `json:"command_invocation_id"`
+			CommandID    string `json:"command_id"`
+			CommandName  string `json:"command_name"`
+			MessageID    string `json:"message_id"`
+			Options      []struct {
+				Name string `json:"name"`
+			} `json:"options"`
+		}
+		_ = json.Unmarshal(payload, &p)
+		if p.TriggerKind != "command" || p.InvocationID != inv.InvocationID || p.CommandID != cmd.ID || p.CommandName != "escalate" ||
+			p.MessageID != "" || len(p.Options) != 2 || p.Options[0].Name != "ticket" || p.Options[1].Name != "priority" {
+			t.Fatalf("payload %s", payload)
+		}
+		f, ok := w.nextOf(c, "agent.invocation", 15*time.Second)
+		if !ok || f.InvocationToken == "" {
+			t.Fatal("no agent.invocation")
+		}
+		cl, err := w.verifier(a).Check(context.Background(), f.InvocationToken, runstest.ReferenceExpectation{RunID: ids.MustParse(inv.RunID),
+			ThreadID: ids.MustParse(th), CommandID: ids.MustParse(cmd.ID), ActualBillingMode: "organization", ActualToolClass: "chat"})
+		var jti string
+		_ = w.queryRow(context.Background(), `SELECT invocation_jti::text FROM runs WHERE id = $1`, inv.RunID).Scan(&jti)
+		if err != nil || cl.TriggerKind != "command" || cl.CommandID != cmd.ID || cl.RunID != inv.RunID || cl.Sub != w.sam.user.String() ||
+			cl.MessageID != "" || cl.Jti != jti {
+			t.Fatalf("claims %+v %v jti %s", cl, err, jti)
+		}
+	})
+
+	t.Run("TestInvokeModelCommand_RunActive", func(t *testing.T) {
+		a, ch := w.fresh("busy")
+		cmd := w.mustRegister(a, escalate("busy"))
+		th := w.thread(ch)
+		w.mention(w.sam, th, a)
+		runsBefore := w.count(`SELECT count(*) FROM runs WHERE thread_id = $1`, th)
+		anchors := w.count(`SELECT count(*) FROM messages WHERE thread_id = $1 AND kind = 'run'`, th)
+		code, b := w.invoke(w.sam, ch, cmd.ID, map[string]any{"thread_id": th, "options": opts("ticket", "T-2")})
+		wantProblem(t, code, b, http.StatusForbidden, "agent_invocation_denied", "run_active", "", "")
+		// The active run of a guest refuses the same way.
+		guest := w.guestIn(ch)
+		th2 := w.thread(ch)
+		w.mention(w.sam, th2, guest)
+		code, b = w.invoke(w.sam, ch, cmd.ID, map[string]any{"thread_id": th2, "options": opts("ticket", "T-2")})
+		wantProblem(t, code, b, http.StatusForbidden, "agent_invocation_denied", "run_active", "", "")
+		if w.count(`SELECT count(*) FROM runs WHERE thread_id = $1`, th) != runsBefore ||
+			w.count(`SELECT count(*) FROM messages WHERE thread_id = $1 AND kind = 'run'`, th) != anchors ||
+			w.count(`SELECT count(*) FROM runs WHERE trigger_kind = 'command' AND triggering_command_id = $1`, cmd.ID) != 0 ||
+			w.count(`SELECT count(*) FROM event_log WHERE type = 'agent.invocation' AND payload->>'command_id' = $1`, cmd.ID) != 0 {
+			t.Fatal("a refused model command wrote")
+		}
+		w.denials(t, `action = 'command.invoke' AND deny_reason = 'run_active' AND resource_id = $1`, th)
+	})
+
+	t.Run("TestInvokeModelCommand_ConcurrentOneRun", func(t *testing.T) {
+		a, ch := w.fresh("race")
+		cmd := w.mustRegister(a, escalate("race"))
+		th := w.thread(ch)
+		var wg sync.WaitGroup
+		codes := make([]int, 2)
+		bodies := make([][]byte, 2)
+		for i := range 2 {
+			wg.Add(1)
+			go func() {
+				defer wg.Done()
+				codes[i], bodies[i] = w.invoke(w.sam, ch, cmd.ID, map[string]any{"thread_id": th, "options": opts("ticket", "T-3")})
+			}()
+		}
+		wg.Wait()
+		ok, refused := 0, 0
+		for i, c := range codes {
+			switch {
+			case c == http.StatusAccepted:
+				ok++
+			case c == http.StatusForbidden && strings.Contains(string(bodies[i]), `"reason":"run_active"`):
+				refused++
+			}
+		}
+		if ok != 1 || refused != 1 {
+			t.Fatalf("codes %v %s %s", codes, bodies[0], bodies[1])
+		}
+		if n := w.count(`SELECT count(*) FROM runs WHERE thread_id = $1 AND state IN ('queued', 'running', 'waiting_input')`, th); n != 1 {
+			t.Fatalf("%d active runs", n)
+		}
+	})
+
+	t.Run("TestInvokeModelCommand_ThreadResolution", func(t *testing.T) {
+		a, ch := w.fresh("resolve")
+		model := w.mustRegister(a, escalate("resolve"))
+		ctl := w.mustRegister(a, def("usage", "control", true))
+		w.sql(`UPDATE channels SET auto_thread = true WHERE id = $1`, ch.id)
+		threads := func() int { return w.count(`SELECT count(*) FROM threads WHERE channel_id = $1`, ch.id) }
+		before := threads()
+		code, b := w.invoke(w.sam, ch, model.ID, map[string]any{"options": opts("ticket", "T-4")})
+		wantProblem(t, code, b, http.StatusBadRequest, "validation_failed", "", "/thread_id", "required")
+		if threads() != before || w.count(`SELECT count(*) FROM runs WHERE triggering_command_id = $1`, model.ID) != 0 {
+			t.Fatal("a refused invocation wrote")
+		}
+		inv := w.mustInvoke(w.sam, ch, ctl.ID, map[string]any{})
+		if inv.ThreadID != ch.thread || inv.RunID != "" || w.count(`SELECT count(*) FROM event_log WHERE type = 'command.invoked'
+			AND resource_id = $1 AND thread_id = $2`, ctl.ID, ch.thread) != 1 {
+			t.Fatalf("control without thread %+v", inv)
+		}
+		w.sql(`UPDATE channels SET auto_thread = false WHERE id = $1`, ch.id)
+		inv = w.mustInvoke(w.sam, ch, model.ID, map[string]any{"options": opts("ticket", "T-4")})
+		if inv.ThreadID != ch.thread || w.count(`SELECT count(*) FROM runs WHERE id = $1 AND thread_id = $2`, inv.RunID, ch.thread) != 1 ||
+			threads() != before {
+			t.Fatalf("model without thread %+v", inv)
+		}
+		forum := w.must(w.owner, http.MethodPost, "/api/v1/spaces/"+w.space+"/channels", map[string]any{"name": "forum", "kind": "forum"})
+		w.sql(`UPDATE channels SET operator_inherit = false, operator_agent_id = $1 WHERE id = $2`, a.id.String(), forum)
+		code, b = w.invoke(w.sam, channel{id: forum}, ctl.ID, map[string]any{})
+		wantProblem(t, code, b, http.StatusBadRequest, "validation_failed", "", "/thread_id", "required")
+		code, b = w.invoke(w.sam, ch, ctl.ID, map[string]any{"thread_id": w.allgemein.thread})
+		wantProblem(t, code, b, http.StatusNotFound, "not_found", "", "", "")
+	})
+
+	t.Run("TestInvokeControlCommand_NeverToModel", func(t *testing.T) {
+		a, ch := w.fresh("control")
+		c := w.connect(t, a)
+		ctl := w.mustRegister(a, def("usage", "control", true, "options", []any{
+			map[string]any{"name": "ticket", "description": "Ticket", "type": "string", "required": false}}))
+		th := w.thread(ch)
+		check := func(inv invocationBody, wantRun string) {
+			t.Helper()
+			var payload []byte
+			var audience, receive, kind string
+			var version *int64
+			if err := w.queryRow(context.Background(), `SELECT payload, audience_principal_id::text, receive_action, resource_kind, resource_version
+				FROM event_log WHERE type = 'command.invoked' AND payload->>'invocation_id' = $1`, inv.InvocationID).
+				Scan(&payload, &audience, &receive, &kind, &version); err != nil {
+				t.Fatal(err)
+			}
+			wantSchema(t, "CommandInvokedPayload", payload)
+			var p struct {
+				Control bool   `json:"control"`
+				RunID   string `json:"run_id"`
+			}
+			_ = json.Unmarshal(payload, &p)
+			if audience != a.id.String() || receive != "agent.events.consume" || kind != "command" || (version != nil && *version != 0) ||
+				!p.Control || p.RunID != wantRun || inv.RunID != "" {
+				t.Fatalf("command.invoked %s %s %s %s %v", payload, audience, receive, kind, version)
+			}
+			f, ok := w.nextOf(c, "command.invoked", 15*time.Second)
+			if !ok || f.InvocationToken == "" {
+				t.Fatal("no command.invoked to the owner")
+			}
+			e := runstest.ReferenceExpectation{CommandID: ids.MustParse(ctl.ID), ThreadID: ids.MustParse(inv.ThreadID)}
+			if wantRun != "" {
+				e.RunID = ids.MustParse(wantRun)
+			}
+			cl, err := w.verifier(a).Check(context.Background(), f.InvocationToken, e)
+			if err != nil || cl.TriggerKind != "command" || cl.CommandID != ctl.ID || cl.RunID != wantRun || cl.MessageID != "" {
+				t.Fatalf("claims %+v %v", cl, err)
+			}
+			sendAck(t, c, f.Seq)
+		}
+		inv := w.mustInvoke(w.sam, ch, ctl.ID, map[string]any{"thread_id": th, "options": opts("ticket", "T-5")})
+		check(inv, "")
+		if w.count(`SELECT count(*) FROM runs WHERE thread_id = $1`, th) != 0 ||
+			w.count(`SELECT count(*) FROM messages WHERE thread_id = $1 AND kind = 'run'`, th) != 0 {
+			t.Fatal("a control command opened a run")
+		}
+		r := w.mention(w.sam, th, a)
+		// The delivery of the run's own invocation records its jti first.
+		if f, ok := w.nextOf(c, "agent.invocation", 15*time.Second); !ok {
+			t.Fatal("no invocation of the mention")
+		} else {
+			sendAck(t, c, f.Seq)
+		}
+		r, _ = w.runOf(w.lastTrigger(r.id))
+		inv = w.mustInvoke(w.sam, ch, ctl.ID, map[string]any{"thread_id": th})
+		check(inv, r.id)
+		if r2, _ := w.runOf(w.lastTrigger(r.id)); r2.state != r.state || r2.jti != r.jti || r2.version != r.version {
+			t.Fatalf("the control command changed the run %+v, was %+v", r2, r)
+		}
+		guest := w.guestIn(ch)
+		th2 := w.thread(ch)
+		w.mention(w.sam, th2, guest)
+		inv = w.mustInvoke(w.sam, ch, ctl.ID, map[string]any{"thread_id": th2})
+		check(inv, "")
+		if n := w.count(`SELECT count(*) FROM event_log WHERE type = 'agent.invocation' AND payload->>'command_id' = $1`, ctl.ID); n != 0 {
+			t.Fatal("a control command reached the model")
+		}
+	})
+
 	t.Run("TestRegisterCommand_HumansRefused", func(t *testing.T) {
 		for _, p := range []gwPerson{w.sam, w.owner} {
 			code, b, _ := w.do(send{person: &p, method: http.MethodPost, path: "/api/v1/commands", body: def("human"),
@@ -736,6 +1049,27 @@ func validateSchema(name string, p []byte) error {
 		return errors.New(strings.Join(msgs, "; "))
 	}
 	return nil
+}
+
+// guestIn creates an agent that may be mentioned as a guest in ch (allow_mentioned_agents, its
+// own write on ch) and that Sam can mention: it operates a channel of Support of its own (07 4.6,
+// agent.read).
+func (w *cmdWorld) guestIn(ch channel) consumerAgent {
+	w.t.Helper()
+	g, _ := w.fresh("guest-home")
+	w.sql(`UPDATE channels SET allow_mentioned_agents = true WHERE id = $1`, ch.id)
+	w.agentGrant(g, ch, "write")
+	return g
+}
+
+// lastTrigger returns the triggering message of run.
+func (w *cmdWorld) lastTrigger(run string) string {
+	w.t.Helper()
+	var m string
+	if err := w.queryRow(context.Background(), `SELECT triggering_message_id::text FROM runs WHERE id = $1`, run).Scan(&m); err != nil {
+		w.t.Fatal(err)
+	}
+	return m
 }
 
 // removeAll removes every live command of a, so the next subtest starts below the limit.
