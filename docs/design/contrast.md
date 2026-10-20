@@ -7,7 +7,7 @@ für jedes Theme. Schwellen: `text` 4.5:1 (SC 1.4.3), `large-text` 3:1 (SC 1.4.3
 `ui` 3:1 (SC 1.4.11), Quelle https://www.w3.org/TR/WCAG22/ (abgerufen 2026-10-10).
 Das Werkzeug bricht ab, wenn eine Paarung darunter liegt; diese Seite entsteht nur bei Erfolg.
 
-Ergebnis: 766 Paarungen geprüft, 0 unter der Schwelle (288 davon in den Akzent-Varianten).
+Ergebnis: 806 Paarungen geprüft, 0 unter der Schwelle (288 davon in den Akzent-Varianten).
 
 Palettenwächter (Verbotsliste als Test): alle eingehalten.
 
@@ -227,6 +227,26 @@ Palettenwächter (Verbotsliste als Test): alle eingehalten.
 | `color.category.granite.fg` | `color.surface.canvas` | ui | `#3f5154` auf `#fbfeff` | 8.24 | 3 | bestanden | Kategorie-Punkt und Icon auf Inhaltsflächen |
 | `color.category.granite.fg` | `color.surface.list` | ui | `#3f5154` auf `#eff6f7` | 7.63 | 3 | bestanden | Kategorie-Punkt und Icon auf Inhaltsflächen |
 | `color.category.granite.fg` | `color.surface.overlay` | ui | `#3f5154` auf `#fbfeff` | 8.24 | 3 | bestanden | Kategorie-Punkt und Icon auf Inhaltsflächen |
+| `color.terminal.fg` | `color.terminal.bg` | text | `#102326` auf `#f5fbfc` | 15.57 | 4.5 | bestanden | Terminal: default text and text colors |
+| `color.terminal.ansi.red` | `color.terminal.bg` | text | `#890f18` auf `#f5fbfc` | 9.36 | 4.5 | bestanden | Terminal: default text and text colors |
+| `color.terminal.ansi.green` | `color.terminal.bg` | text | `#0c5828` auf `#f5fbfc` | 8.23 | 4.5 | bestanden | Terminal: default text and text colors |
+| `color.terminal.ansi.yellow` | `color.terminal.bg` | text | `#59470a` auf `#f5fbfc` | 8.62 | 4.5 | bestanden | Terminal: default text and text colors |
+| `color.terminal.ansi.blue` | `color.terminal.bg` | text | `#0b4d79` auf `#f5fbfc` | 8.54 | 4.5 | bestanden | Terminal: default text and text colors |
+| `color.terminal.ansi.magenta` | `color.terminal.bg` | text | `#810e55` auf `#f5fbfc` | 9.44 | 4.5 | bestanden | Terminal: default text and text colors |
+| `color.terminal.ansi.cyan` | `color.terminal.bg` | text | `#0c5450` auf `#f5fbfc` | 8.37 | 4.5 | bestanden | Terminal: default text and text colors |
+| `color.terminal.ansi.bright-black` | `color.terminal.bg` | text | `#3f5154` auf `#f5fbfc` | 7.98 | 4.5 | bestanden | Terminal: default text and text colors |
+| `color.terminal.ansi.bright-red` | `color.terminal.bg` | text | `#b21622` auf `#f5fbfc` | 6.63 | 4.5 | bestanden | Terminal: default text and text colors |
+| `color.terminal.ansi.bright-green` | `color.terminal.bg` | text | `#137337` auf `#f5fbfc` | 5.68 | 4.5 | bestanden | Terminal: default text and text colors |
+| `color.terminal.ansi.bright-yellow` | `color.terminal.bg` | text | `#735e10` auf `#f5fbfc` | 6.02 | 4.5 | bestanden | Terminal: default text and text colors |
+| `color.terminal.ansi.bright-blue` | `color.terminal.bg` | text | `#12659d` auf `#f5fbfc` | 5.95 | 4.5 | bestanden | Terminal: default text and text colors |
+| `color.terminal.ansi.bright-magenta` | `color.terminal.bg` | text | `#a51f6f` auf `#f5fbfc` | 6.64 | 4.5 | bestanden | Terminal: default text and text colors |
+| `color.terminal.ansi.bright-cyan` | `color.terminal.bg` | text | `#136f69` auf `#f5fbfc` | 5.73 | 4.5 | bestanden | Terminal: default text and text colors |
+| `color.terminal.ansi.black` | `color.terminal.bg` | ui | `#102326` auf `#f5fbfc` | 15.57 | 3 | bestanden | Terminal: gray tones at the ends (ANSI 0, 7, 15) and cursor |
+| `color.terminal.ansi.white` | `color.terminal.bg` | ui | `#59696c` auf `#f5fbfc` | 5.49 | 3 | bestanden | Terminal: gray tones at the ends (ANSI 0, 7, 15) and cursor |
+| `color.terminal.ansi.bright-white` | `color.terminal.bg` | ui | `#748486` auf `#f5fbfc` | 3.73 | 3 | bestanden | Terminal: gray tones at the ends (ANSI 0, 7, 15) and cursor |
+| `color.terminal.cursor` | `color.terminal.bg` | ui | `#136f69` auf `#f5fbfc` | 5.73 | 3 | bestanden | Terminal: gray tones at the ends (ANSI 0, 7, 15) and cursor |
+| `color.terminal.cursor-text` | `color.terminal.cursor` | text | `#f5fbfc` auf `#136f69` | 5.73 | 4.5 | bestanden | Terminal: character under the block cursor |
+| `color.terminal.fg` | `color.terminal.selection-bg` | text | `#102326` auf `#ccf5f0` | 13.86 | 4.5 | bestanden | Terminal: selected text |
 | `color.viz.series.1` | `color.surface.canvas` | ui | `#197fc3` auf `#fbfeff` | 4.26 | 3 | bestanden | Charts: series and axes against the surface |
 | `color.viz.series.1` | `color.surface.list` | ui | `#197fc3` auf `#eff6f7` | 3.95 | 3 | bestanden | Charts: series and axes against the surface |
 | `color.viz.series.1` | `color.surface.raised` | ui | `#197fc3` auf `#f5fbfc` | 4.13 | 3 | bestanden | Charts: series and axes against the surface |
@@ -471,6 +491,26 @@ Palettenwächter (Verbotsliste als Test): alle eingehalten.
 | `color.category.granite.fg` | `color.surface.canvas` | ui | `#afbec0` auf `#15282b` | 7.99 | 3 | bestanden | Kategorie-Punkt und Icon auf Inhaltsflächen |
 | `color.category.granite.fg` | `color.surface.list` | ui | `#afbec0` auf `#102326` | 8.49 | 3 | bestanden | Kategorie-Punkt und Icon auf Inhaltsflächen |
 | `color.category.granite.fg` | `color.surface.overlay` | ui | `#afbec0` auf `#24363a` | 6.58 | 3 | bestanden | Kategorie-Punkt und Icon auf Inhaltsflächen |
+| `color.terminal.fg` | `color.terminal.bg` | text | `#e5eef0` auf `#08191c` | 15.28 | 4.5 | bestanden | Terminal: default text and text colors |
+| `color.terminal.ansi.red` | `color.terminal.bg` | text | `#fb827a` auf `#08191c` | 7.35 | 4.5 | bestanden | Terminal: default text and text colors |
+| `color.terminal.ansi.green` | `color.terminal.bg` | text | `#62c37a` auf `#08191c` | 8.24 | 4.5 | bestanden | Terminal: default text and text colors |
+| `color.terminal.ansi.yellow` | `color.terminal.bg` | text | `#d9c42b` auf `#08191c` | 10.19 | 4.5 | bestanden | Terminal: default text and text colors |
+| `color.terminal.ansi.blue` | `color.terminal.bg` | text | `#58b3fa` auf `#08191c` | 7.93 | 4.5 | bestanden | Terminal: default text and text colors |
+| `color.terminal.ansi.magenta` | `color.terminal.bg` | text | `#f878ba` auf `#08191c` | 7.19 | 4.5 | bestanden | Terminal: default text and text colors |
+| `color.terminal.ansi.cyan` | `color.terminal.bg` | text | `#49c0b7` auf `#08191c` | 8.15 | 4.5 | bestanden | Terminal: default text and text colors |
+| `color.terminal.ansi.bright-black` | `color.terminal.bg` | text | `#748486` auf `#08191c` | 4.62 | 4.5 | bestanden | Terminal: default text and text colors |
+| `color.terminal.ansi.bright-red` | `color.terminal.bg` | text | `#fcaaa3` auf `#08191c` | 9.79 | 4.5 | bestanden | Terminal: default text and text colors |
+| `color.terminal.ansi.bright-green` | `color.terminal.bg` | text | `#89d89a` auf `#08191c` | 10.59 | 4.5 | bestanden | Terminal: default text and text colors |
+| `color.terminal.ansi.bright-yellow` | `color.terminal.bg` | text | `#eddc59` auf `#08191c` | 12.85 | 4.5 | bestanden | Terminal: default text and text colors |
+| `color.terminal.ansi.bright-blue` | `color.terminal.bg` | text | `#8ec9fb` auf `#08191c` | 10.20 | 4.5 | bestanden | Terminal: default text and text colors |
+| `color.terminal.ansi.bright-magenta` | `color.terminal.bg` | text | `#fca3cd` auf `#08191c` | 9.66 | 4.5 | bestanden | Terminal: default text and text colors |
+| `color.terminal.ansi.bright-cyan` | `color.terminal.bg` | text | `#7cd5cd` auf `#08191c` | 10.51 | 4.5 | bestanden | Terminal: default text and text colors |
+| `color.terminal.ansi.black` | `color.terminal.bg` | ui | `#59696c` auf `#08191c` | 3.14 | 3 | bestanden | Terminal: gray tones at the ends (ANSI 0, 7, 15) and cursor |
+| `color.terminal.ansi.white` | `color.terminal.bg` | ui | `#afbec0` auf `#08191c` | 9.39 | 3 | bestanden | Terminal: gray tones at the ends (ANSI 0, 7, 15) and cursor |
+| `color.terminal.ansi.bright-white` | `color.terminal.bg` | ui | `#eff6f7` auf `#08191c` | 16.46 | 3 | bestanden | Terminal: gray tones at the ends (ANSI 0, 7, 15) and cursor |
+| `color.terminal.cursor` | `color.terminal.bg` | ui | `#d9c42b` auf `#08191c` | 10.19 | 3 | bestanden | Terminal: gray tones at the ends (ANSI 0, 7, 15) and cursor |
+| `color.terminal.cursor-text` | `color.terminal.cursor` | text | `#08191c` auf `#d9c42b` | 10.19 | 4.5 | bestanden | Terminal: character under the block cursor |
+| `color.terminal.fg` | `color.terminal.selection-bg` | text | `#e5eef0` auf `#0f4643` | 9.01 | 4.5 | bestanden | Terminal: selected text |
 | `color.viz.series.1` | `color.surface.canvas` | ui | `#58b3fa` auf `#15282b` | 6.75 | 3 | bestanden | Charts: series and axes against the surface |
 | `color.viz.series.1` | `color.surface.list` | ui | `#58b3fa` auf `#102326` | 7.16 | 3 | bestanden | Charts: series and axes against the surface |
 | `color.viz.series.1` | `color.surface.raised` | ui | `#58b3fa` auf `#1b2e31` | 6.24 | 3 | bestanden | Charts: series and axes against the surface |

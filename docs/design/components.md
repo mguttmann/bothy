@@ -357,7 +357,41 @@ Regeln:
 - TV-Modus: dunkles Theme, Dichte `comfortable`, Schriftgrößen eine Stufe größer; keine Bewegung im
   Kontext `reduced`.
 
-## 12. Review-Liste (nicht automatisch prüfbar)
+## 12. Terminal view
+
+Purpose: shows a terminal session on a connected host
+([24-terminal.md](../spec/24-terminal.md)); screens D11 (desktop and console) and M8 (phone) in
+[01-produkt.md](../spec/01-produkt.md). Package `packages/terminal_ui`, renderer `xterm` (PLAN M4-35).
+
+| Part | Appearance | Tokens |
+|---|---|---|
+| Header | icon `terminal-window`, host name (`type.heading`), connection as a dot with text, LLM login badge (section 10), start of the fingerprint in mono, remaining time as text | `color.text.*`, `color.badge.*`, `font.family.mono` |
+| Tabs | one tab per own session on the host; selected like a selected row; on the right "Detach" (secondary) and "End" (danger, outlined) | `color.surface.selected`, buttons |
+| Screen | surface `color.terminal.bg`, text `color.terminal.fg` in `font.family.mono` with the size from `type.code`, adjustable separately (01, section 8); cursor as a block `color.terminal.cursor` with the character in `color.terminal.cursor-text`; selection `color.terminal.selection-bg` | `color.terminal.*` |
+| ANSI colors | SGR 30 to 37 and 90 to 97 map to `color.terminal.ansi.<name>` and `color.terminal.ansi.bright-<name>`; the renderer shows 256 colors and truecolor unchanged, because the program chooses them | `color.terminal.ansi.*` |
+| Footer | "End-to-end encrypted" with a lock icon, profile, "Idle timeout active" | `type.caption`, `color.text.secondary` |
+| Extra keys bar (mobile) | keys Esc, Tab, Ctrl, Alt, arrows, vertical bar, `~`, `/`, `-` with height `density.control-height`; a latched modifier is filled in `color.accent.bg` with `color.text.on-accent` | button roles, `density.*` |
+| Confirmation on opening | dialog with host, profile and badge; main button "Confirm with passkey" or device key; note "Every opening is logged" | `elevation.dialog`, `color.surface.overlay` |
+| Key change warning | dialog with border `color.danger.border`, old and new fingerprint in mono; the danger button "Do not connect" is the main action | `color.danger.*` |
+| States | connected, detached (banner `info` with "Reattach"), ended (reason as text, screen stays readable), blocked by revocation (banner `danger`) | banner roles |
+
+Rules:
+
+- The roles `color.terminal.*` apply only in the screen of the terminal. Header, tabs, dialogs and
+  bars follow the theme of the app.
+- Contrast: default text and the twelve chromatic colors as well as bright black (ANSI 8, often for
+  dimmed text) reach `text` against `color.terminal.bg`; the grays at the ends (ANSI 0, 7, 15) and
+  the cursor reach `ui`. Reason: programs use these three grays as background or
+  border; full text contrast is not possible in both themes for all three at once. All
+  pairings are in `design/design-rules.json` and in [contrast.md](contrast.md).
+- No glow, no scanline effect, no imitation of old screens.
+- Motion: the cursor blinks only in the `full` context of `motion.*`; in the `reduced` context it
+  stays still.
+- Semantics: the line at the cursor and, on command, the visible screen are readable; running output
+  is not read aloud (01, section 8). Extra keys carry labels ("Control, latched").
+- Golden tests in light and dark with warning, detached and extra keys bar (M4-35).
+
+## 13. Review-Liste (nicht automatisch prüfbar)
 
 - Keine Glas-, Unschärfe- oder Leuchteffekte; keine Verläufe.
 - Keine schwebenden Karten mit großem Schatten; Schatten nur aus `elevation.*`.
@@ -367,7 +401,7 @@ Regeln:
 - Golden-Tests in hell und dunkel, in `comfortable` und `touch`, mit Textskalierung 1 und 2
   (15-client-architektur.md, Teststrategie).
 
-## 13. Konfigurationswerte
+## 14. Konfigurationswerte
 
 Die Werte `ui.*` und `a11y.*`, die diese Seite nennt, stehen mit Standard in
 [01-produkt.md](../spec/01-produkt.md), Abschnitt "Konfigurationswerte dieses Kapitels".

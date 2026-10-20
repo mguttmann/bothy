@@ -117,6 +117,33 @@
       "fg": {"$value": "{palette.granite.900}"},
       "bg": {"$value": "{palette.granite.100}"}
     },
+    "terminal": {
+      "$description": "Terminal view (components.md, section 12): surface, text, cursor, selection and the 16 ANSI colors. Pairings in design-rules.json.",
+      "bg": {"$value": "{palette.granite.25}", "$description": "Surface of the terminal."},
+      "fg": {"$value": "{palette.granite.900}", "$description": "Default text (SGR 39)."},
+      "cursor": {"$value": "{palette.spruce.700}", "$description": "Block and bar cursor."},
+      "cursor-text": {"$value": "{palette.granite.25}", "$description": "Character under the block cursor."},
+      "selection-bg": {"$value": "{palette.spruce.100}", "$description": "Background of selected text; text on it in terminal.fg."},
+      "ansi": {
+        "$description": "ANSI colors 0 to 7 (SGR 30 to 37) and 8 to 15 (bright, SGR 90 to 97). The gray tones 0, 7 and 15 are the ends toward the surface and need only 3:1; all others are text with 4.5:1.",
+        "black": {"$value": "{palette.granite.900}", "$description": "0"},
+        "red": {"$value": "{palette.rowan.800}", "$description": "1"},
+        "green": {"$value": "{palette.moss.800}", "$description": "2"},
+        "yellow": {"$value": "{palette.gorse.800}", "$description": "3"},
+        "blue": {"$value": "{palette.loch.800}", "$description": "4"},
+        "magenta": {"$value": "{palette.heather.800}", "$description": "5"},
+        "cyan": {"$value": "{palette.spruce.800}", "$description": "6"},
+        "white": {"$value": "{palette.granite.600}", "$description": "7"},
+        "bright-black": {"$value": "{palette.granite.700}", "$description": "8"},
+        "bright-red": {"$value": "{palette.rowan.700}", "$description": "9"},
+        "bright-green": {"$value": "{palette.moss.700}", "$description": "10"},
+        "bright-yellow": {"$value": "{palette.gorse.700}", "$description": "11"},
+        "bright-blue": {"$value": "{palette.loch.700}", "$description": "12"},
+        "bright-magenta": {"$value": "{palette.heather.700}", "$description": "13"},
+        "bright-cyan": {"$value": "{palette.spruce.700}", "$description": "14"},
+        "bright-white": {"$value": "{palette.granite.500}", "$description": "15"}
+      }
+    },
     "viz": {
       "$description": "Charts in bothy_viz and in the Grafana panel (components.md, section 11; 25-visualisierung.md, section 10).",
       "series": {
