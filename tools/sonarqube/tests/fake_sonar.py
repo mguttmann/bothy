@@ -19,6 +19,7 @@ rename with HTTP 400 "Organization ... is not allowed to perform this action". `
 are the names of the project's other branches; rename to one of them answers HTTP 400
 "Impossible to update branch name: a branch with name ... already exists", as SonarQube Cloud
 answered on 2026-10-20 for a `main` its failed analyses had left as a short-lived branch.
+`ce_tasks` are the background tasks of api/ce/task by ID.
 """
 
 from __future__ import annotations
@@ -62,6 +63,7 @@ class State:
     main_branch: str = "master"
     branch_rename_refused: bool = False
     other_branches: list[str] = field(default_factory=lambda: ["feature"])
+    ce_tasks: dict[str, dict[str, str]] = field(default_factory=dict)
     project_profiles: dict[str, str] = field(default_factory=dict)
     profiles: list[Profile] = field(default_factory=list)
     calls: list[tuple[str, str, dict[str, str]]] = field(default_factory=list)
@@ -376,6 +378,13 @@ def _branch_delete(state: State, p: dict[str, str]) -> tuple[int, Any, str]:
     return 204, "", "text/plain"
 
 
+def _ce_task(state: State, p: dict[str, str]) -> tuple[int, Any, str]:
+    task = state.ce_tasks.get(p.get("id", ""))
+    if task is None:
+        return 404, {"errors": [{"msg": "No activity found"}]}, "application/json"
+    return 200, {"task": {"id": p["id"], **task}}, "application/json"
+
+
 ROUTES = {
     ("GET", "/api/languages/list"): _languages,
     ("GET", "/api/qualitygates/show"): _gate_show,
@@ -397,6 +406,7 @@ ROUTES = {
     ("GET", "/api/project_branches/list"): _branches,
     ("POST", "/api/project_branches/rename"): _branch_rename,
     ("POST", "/api/project_branches/delete"): _branch_delete,
+    ("GET", "/api/ce/task"): _ce_task,
 }
 
 

@@ -475,6 +475,9 @@ operated, and the order of the build.
 
 ### Fixed
 
+- When the SonarQube background task of a scan fails, `make sonar-scan` prints its reason
+  (`quality_sync.py ce-error`, from `api/ce/task`); the scanner itself only reports "CE Task
+  finished abnormally".
 - `make sonar-main-branch` (`quality_sync.py main-branch`, also a step of the manual workflow
   `sonar-config.yml`) names the main branch of the SonarQube Cloud project `main` through
   `api/project_branches/rename` when it carries another name, after deleting a short-lived

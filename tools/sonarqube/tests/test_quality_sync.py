@@ -459,3 +459,36 @@ def test_short_lived_branch_with_the_name_is_deleted_before_the_rename() -> None
         assert _posts(state, "/api/project_branches/delete") == [
             {"project": PROJECT, "branch": "main", "organization": ORG}
         ]
+
+
+def _report_task(tmp_path: Path, task_id: str) -> Path:
+    path = tmp_path / "report-task.txt"
+    path.write_text(
+        f"projectKey={PROJECT}\nserverUrl=https://sonarcloud.io\nceTaskId={task_id}\n",
+        encoding="utf-8",
+    )
+    return path
+
+
+def test_ce_error_prints_why_the_background_task_failed(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    state = State(cloud=True)
+    state.ce_tasks["T1"] = {"status": "FAILED", "errorMessage": "the reason of the server"}
+    monkeypatch.setenv("SONAR_TOKEN", TOKEN)
+    report = _report_task(tmp_path, "T1")
+    with running(state) as url:
+        args = ["ce-error", "--url", url, "--organization", ORG, "--report-task", str(report)]
+        assert qs.main(args) == 0
+    out = capsys.readouterr().out
+    assert "quality_sync: background task T1 FAILED: the reason of the server" in out
+    assert TOKEN not in out
+
+
+def test_ce_error_without_a_report_names_the_missing_file(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    monkeypatch.setenv("SONAR_TOKEN", TOKEN)
+    missing = tmp_path / "report-task.txt"
+    assert qs.main(["ce-error", "--url", "http://127.0.0.1:9", "--report-task", str(missing)]) == 1
+    assert f"quality_sync: no ceTaskId in {missing}" in capsys.readouterr().err
