@@ -23,23 +23,26 @@ REPO = Path(__file__).resolve().parents[3]
 
 OPENAPI = "openapi: 3.1.0\ninfo: {title: t, version: '1'}\npaths: {}\n" + "x: ü\n" * 200
 ASYNCAPI = "asyncapi: 3.0.0\ninfo: {title: t, version: '1'}\n"
+ACTIONS = "actions:\n  - {id: user.disable, step_up: true}\n"
 
 
 def _repo(tmp_path: Path, openapi: str = OPENAPI, asyncapi: str = ASYNCAPI) -> Path:
     (tmp_path / "docs/api").mkdir(parents=True)
+    (tmp_path / "docs/spec").mkdir(parents=True)
     (tmp_path / gen.OPENAPI).write_text(openapi, encoding="utf-8")
     (tmp_path / gen.ASYNCAPI).write_text(asyncapi, encoding="utf-8")
+    (tmp_path / gen.ACTIONS).write_text(ACTIONS, encoding="utf-8")
     return tmp_path
 
 
-def test_render_round_trips_both_documents() -> None:
-    text = gen.render(OPENAPI, ASYNCAPI)
+def test_render_round_trips_every_document() -> None:
+    text = gen.render(OPENAPI, ASYNCAPI, ACTIONS)
     assert "part of 'schema_validator.dart';" in text
-    assert gen.embedded(text) == (OPENAPI, ASYNCAPI)
+    assert gen.embedded(text) == (OPENAPI, ASYNCAPI, ACTIONS)
     assert all(len(line) <= 100 for line in text.splitlines())
 
 
-def test_embedded_rejects_a_file_without_both_lists() -> None:
+def test_embedded_rejects_a_file_without_the_lists() -> None:
     with pytest.raises(gen.EmbeddedError, match="_openapiGzip"):
         gen.embedded("// nothing\n")
 
@@ -51,6 +54,9 @@ def test_main_check_fails_when_stale(tmp_path: Path, capsys: pytest.CaptureFixtu
     assert gen.main(["--root", str(root)]) == 0
     assert gen.main(["--root", str(root), "--check"]) == 0
     (root / gen.ASYNCAPI).write_text(ASYNCAPI + "y: 1\n", encoding="utf-8")
+    assert gen.main(["--root", str(root), "--check"]) == 1
+    assert gen.main(["--root", str(root)]) == 0
+    (root / gen.ACTIONS).write_text(ACTIONS + "  - {id: user.enable, step_up: true}\n")
     assert gen.main(["--root", str(root), "--check"]) == 1
     target = root / gen.OUTPUT
     target.write_text("broken", encoding="utf-8")

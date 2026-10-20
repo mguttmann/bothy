@@ -597,3 +597,9 @@ final class ContractSchemas {
     _ => node,
   };
 }
+
+/// The text of `docs/spec/actions.yaml` compiled into this library (`contract_documents.g.dart`,
+/// docs/DECISIONS.md D-M4-26-9), for the action catalogue of the fake where the repository
+/// cannot be read.
+String embeddedActionsYaml() =>
+    utf8.decode(gzip.decode(base64.decode(_actionsGzip.join())));

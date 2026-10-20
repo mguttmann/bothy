@@ -9,6 +9,8 @@ import 'dart:io';
 
 import 'package:yaml/yaml.dart';
 
+import 'schema_validator.dart' show embeddedActionsYaml;
+
 /// The `step_up` value of every action of `docs/spec/actions.yaml` (05 2.4).
 ///
 /// Values are the strings `true`, `false`, `fresh` (the terminal's fresh step-up, 08 6.3) and
@@ -27,30 +29,34 @@ final class ActionCatalog {
   final Map<String, String> _stepUp;
 
   /// Loads `docs/spec/actions.yaml` of the repository that holds [from] (default: the working
-  /// directory), walking up to the folder that has it; read once per isolate.
-  ///
-  /// Throws a [StateError] when no repository root is found above [from].
-  static ActionCatalog load({Directory? from}) {
-    final cached = _loaded;
-    if (cached != null) return cached;
+  /// directory), see [read]; read once per isolate.
+  static ActionCatalog load({Directory? from}) => _loaded ??= read(from: from);
+
+  /// Reads `docs/spec/actions.yaml` of the repository that holds [from] (default: the working
+  /// directory), walking up to the folder that has it. Without such a folder (an app under
+  /// test in the macOS app sandbox, which cannot read the repository) it uses [embedded].
+  static ActionCatalog read({Directory? from}) {
     var dir = (from ?? Directory.current).absolute;
     while (true) {
       final file = File('${dir.path}/docs/spec/actions.yaml');
-      if (file.existsSync()) {
-        final doc = loadYaml(file.readAsStringSync()) as YamlMap;
-        return _loaded = ActionCatalog._({
-          for (final action in doc['actions'] as YamlList)
-            (action as YamlMap)['id'] as String: '${action['step_up']}',
-        });
-      }
+      if (file.existsSync()) return _parse(file.readAsStringSync());
       final parent = dir.parent;
-      if (parent.path == dir.path) {
-        throw StateError(
-          'no docs/spec/actions.yaml above the working directory',
-        );
-      }
+      if (parent.path == dir.path) return embedded();
       dir = parent;
     }
+  }
+
+  /// The copy of `docs/spec/actions.yaml` compiled into the fake (`contract_documents.g.dart`,
+  /// written by `make contract-documents`; `make codegen-check` keeps it equal to the file,
+  /// docs/DECISIONS.md D-M4-26-9).
+  static ActionCatalog embedded() => _parse(embeddedActionsYaml());
+
+  static ActionCatalog _parse(String yaml) {
+    final doc = loadYaml(yaml) as YamlMap;
+    return ActionCatalog._({
+      for (final action in doc['actions'] as YamlList)
+        (action as YamlMap)['id'] as String: '${action['step_up']}',
+    });
   }
 
   /// The `step_up` value of [action]; throws an [ArgumentError] for an unknown action.
