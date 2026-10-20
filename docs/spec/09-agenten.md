@@ -595,7 +595,10 @@ stateDiagram-v2
 | `cancel_timeout` | `cancelled` | Server | Adapter meldete den Abbruch nicht in `agent.cancel_grace` |
 | `agent_disabled` | `cancelled` | Server | Agent gesperrt |
 | `billing_mode_personal_not_holder` | `failed` | Server | I2 bei Zustellung |
+| `channel_read_only` | `cancelled` | Server | Channel became read-only or archived (04 section 8.3) |
 | `billing_mode_mismatch` | `failed` | Adapter oder Server | I3 |
+| `tool_class_owner_only` | `failed` | Server | SR2 at delivery or at `run.token.renew` |
+| `tool_class_mismatch` | `failed` | Adapter or Server | actual tool class higher than the `tool_class` of the token (SR2) |
 | `invalid_invocation_token` | `failed` | Adapter | Marke ungültig |
 | `project_not_ready` | `failed` | Server | Projektbindung nicht bereit |
 | `agent_unavailable` | `failed` | Server | länger als `run.queued_max_age` in `queued` |
