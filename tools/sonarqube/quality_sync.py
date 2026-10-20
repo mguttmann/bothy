@@ -500,7 +500,7 @@ def _check_project_profile(
 
 
 def main(argv: list[str] | None = None) -> int:
-    """Command line entry point (`apply`, `check`, `main-branch`); returns the exit code."""
+    """Command line entry point (`apply`, `check`, `main-branch`, `ce-error`); returns exit code."""
     parser = argparse.ArgumentParser(description="Apply or check the SonarQube quality setup.")
     parser.add_argument("command", choices=("apply", "check", "main-branch", "ce-error"))
     parser.add_argument("--url", default=os.environ.get("SONAR_HOST_URL", "http://127.0.0.1:9000"))
@@ -559,8 +559,14 @@ def _ce_error(client: Client, report_task: Path) -> int:
     except (SonarError, LookupError, urllib.error.URLError) as exc:
         print(f"quality_sync: {exc}", file=sys.stderr)
         return 1
+    status = task.get("status")
+    if status not in ("FAILED", "CANCELED"):
+        # The task went through; the scanner failed for another reason (such as the gate),
+        # which its own output above names.
+        print(f"quality_sync: background task {task_id} {status}, not the cause")
+        return 0
     reason = str(task.get("errorMessage", ""))[:_MAX_ERROR_CHARS]
-    print(f"quality_sync: background task {task_id} {task.get('status')}: {reason or 'no message'}")
+    print(f"quality_sync: background task {task_id} {status}: {reason or 'no message'}")
     return 0
 
 

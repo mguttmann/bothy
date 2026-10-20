@@ -492,3 +492,29 @@ def test_ce_error_without_a_report_names_the_missing_file(
     missing = tmp_path / "report-task.txt"
     assert qs.main(["ce-error", "--url", "http://127.0.0.1:9", "--report-task", str(missing)]) == 1
     assert f"quality_sync: no ceTaskId in {missing}" in capsys.readouterr().err
+
+
+def test_ce_error_shortens_the_message_and_names_a_task_that_went_through(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    state = State(cloud=True)
+    state.ce_tasks["LONG"] = {"status": "FAILED", "errorMessage": "x" * 1000}
+    state.ce_tasks["OK"] = {"status": "SUCCESS"}
+    monkeypatch.setenv("SONAR_TOKEN", TOKEN)
+    with running(state) as url:
+        for task_id in ("LONG", "OK"):
+            report = _report_task(tmp_path, task_id)
+            assert qs.main(["ce-error", "--url", url, "--report-task", str(report)]) == 0
+    out = capsys.readouterr().out
+    assert f"quality_sync: background task LONG FAILED: {'x' * qs._MAX_ERROR_CHARS}\n" in out
+    assert "quality_sync: background task OK SUCCESS, not the cause" in out
+
+
+def test_ce_error_fails_for_an_unknown_task(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    monkeypatch.setenv("SONAR_TOKEN", TOKEN)
+    report = _report_task(tmp_path, "GONE")
+    with running(State(cloud=True)) as url:
+        assert qs.main(["ce-error", "--url", url, "--report-task", str(report)]) == 1
+    assert "/api/ce/task" in capsys.readouterr().err
