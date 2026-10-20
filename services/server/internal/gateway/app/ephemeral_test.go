@@ -13,6 +13,7 @@ import (
 	"github.com/OWNER/bothy/services/server/internal/kernel/actor"
 	"github.com/OWNER/bothy/services/server/internal/kernel/eventlog"
 	"github.com/OWNER/bothy/services/server/internal/kernel/ids"
+	"github.com/OWNER/bothy/services/server/internal/platform/testkit"
 )
 
 // Compile-time check: the hub is the EphemeralPublisher of the process.
@@ -131,7 +132,7 @@ func TestEphemeral_PublishNeverBlocks(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-	case <-time.After(2 * time.Second):
+	case <-time.After(testkit.Patience):
 		t.Fatal("PublishEphemeral blocked on a full queue")
 	}
 }
