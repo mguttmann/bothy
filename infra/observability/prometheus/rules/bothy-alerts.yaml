@@ -94,7 +94,7 @@ groups:
           runbook_url: "docs/observability/alerting.md#bothyagentoffline"
 
       - alert: BothyBillingModeMismatch
-        expr: sum by (bothy_agent_handle) (increase(bothy_agent_billing_mode_mismatch_total[1h])) > 0
+        expr: sum by (bothy_agent_handle) (increase(bothy_agent_billing_mode_mismatch_total[1h])) > 0 or max by (bothy_agent_handle) (bothy_agent_billing_mode_mismatch_age_seconds{job="bothy/bothy-server"}) > 300
         labels:
           severity: page
         annotations:

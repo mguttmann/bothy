@@ -310,6 +310,38 @@ tests:
         alertname: BothyBillingModeMismatch
         exp_alerts: []
 
+  - name: BothyBillingModeMismatch fires above 300 s of a heartbeat mismatch
+    interval: 1m
+    input_series:
+      - series: 'bothy_agent_billing_mode_mismatch_age_seconds{job="bothy/bothy-server", bothy_agent_handle="helper"}'
+        values: '300 301 301'
+    alert_rule_test:
+      # No `for`: quiet at the threshold, firing at the first evaluation above it.
+      - eval_time: 0m
+        alertname: BothyBillingModeMismatch
+        exp_alerts: []
+      - eval_time: 1m
+        alertname: BothyBillingModeMismatch
+        exp_alerts:
+          - exp_labels:
+              severity: page
+              bothy_agent_handle: helper
+            exp_annotations:
+              summary: "Agent helper reported a billing mode that differs from its policy."
+              runbook_url: "docs/observability/alerting.md#bothybillingmodemismatch"
+
+  - name: BothyBillingModeMismatch stays quiet at 300 s of a heartbeat mismatch
+    interval: 1m
+    input_series:
+      - series: 'bothy_agent_billing_mode_mismatch_age_seconds{job="bothy/bothy-server", bothy_agent_handle="helper"}'
+        values: '300x10'
+      - series: 'bothy_agent_billing_mode_mismatch_age_seconds{job="bothy/bothy-server", bothy_agent_handle="runner"}'
+        values: '0x10'
+    alert_rule_test:
+      - eval_time: 10m
+        alertname: BothyBillingModeMismatch
+        exp_alerts: []
+
   - name: BothyAuthzError fires at once with the reason
     interval: 1m
     input_series:

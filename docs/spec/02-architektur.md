@@ -1324,6 +1324,10 @@ Rolle `api`:
    the connection closes with `4013`; the host service reconnects after a random delay below
    `host_service.reconnect_backoff_base` and keeps its PTYs until `terminal.detach_grace`. The
    relay of the terminal (M2-44) closes every device stream and data connection with `4013`.
+   Store the presence state of the agents, without an event. (Stop step `agent_presence` in the
+   phase of the connections, after the gateway's step, so no gateway heartbeat arrives later: it
+   stops the deadline timers and flushes every unsaved heartbeat within the rest of
+   `shutdown.total_timeout`; a restart of the server is not an agent going offline.)
 4. Log-Tail und `LISTEN` beenden.
 5. Telemetrie leeren, höchstens `shutdown.telemetry_flush_timeout`.
 6. Pool schließen.

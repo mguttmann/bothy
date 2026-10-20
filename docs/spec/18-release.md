@@ -372,7 +372,9 @@ Folgen:
    Deprecation-Policy fest (ADR 0014, Team B). Release Notes nennen das Datum.
 4. Der Server ist die führende Seite: Ein Server-Upgrade setzt die Mindestversion nie höher als
    die älteste App, die laut Deprecation-Policy noch unterstützt wird.
-5. Adapter melden ihre Version im Heartbeat (`reported_runtime_version`); die Admin-Konsole zeigt
+5. Adapters report their version in the heartbeat in `details.adapter.version` (stored in
+   `agents.reported_details`); `reported_runtime_version` (heartbeat member `runtime_version`) is
+   the version of the runtime ([09-agenten.md](09-agenten.md) section 4.8). Die Admin-Konsole zeigt
    Adapter, deren SDK-Version nicht mehr unterstützt ist.
 
 ### 9.1 Host-Dienst und Server

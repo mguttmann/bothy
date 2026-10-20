@@ -11,7 +11,7 @@ abgerufen 2026-10-10) [belegt].
 |---|---|---|---|
 | `server-overview.json` | `bothy-server-overview` | Bothy / Server overview | REST-Erfolg und -Latenz, Prozesse je Rolle, Gateway-Verbindungen, Nachrichten nach Herkunft, Autorisierung, Rate-Limits, Fehler-Logs |
 | `delivery-sync.json` | `bothy-delivery-sync` | Bothy / Delivery and sync | Zustell-Latenz, Fan-out-Verzug, Ereignisse je Typ, Warten am Sequenz-Zähler, Verbinden, Nachholen, `resync_required`, Schließ-Codes, worker consumers (lag and age of the oldest pending event per `bothy_consumer_name`) |
-| `agent-runs.json` | `bothy-agent-runs` | Bothy / Agent runs | aktive Läufe, Start-Latenz, Turn-Dauer, Fehlergründe, Schritte, Tokens, Kosten je Währung (Schätzung), Verbraucher-Rückstand, Heartbeat, Ablehnungen (I2), Modus-Abweichungen (I3) |
+| `agent-runs.json` | `bothy-agent-runs` | Bothy / Agent runs | aktive Läufe, Start-Latenz, Turn-Dauer, Fehlergründe, Schritte, Tokens, Kosten je Währung (Schätzung), Verbraucher-Rückstand, Heartbeat, Ablehnungen (I2), mode mismatches (heartbeat and I3) |
 | `push.json` | `bothy-push` | Bothy / Push | Annahme beim Anbieter, Abruf-Quote, Sendungen nach Ergebnis, Sendedauer, Auslassungen |
 | `database.json` | `bothy-database` | Bothy / Database and backup | Verbindungen, Größe, Deadlocks, Commits und Rollbacks, Abfragedauer, Pool, größte Tabellen, Alter der Sicherungen, WAL-Archiv, Wiederherstellungstest, freier Platz |
 | `slo-overview.json` | `bothy-slo-overview` | Bothy / SLO overview | Ziele, Erfüllung über 30 Tage, verbleibendes Fehlerbudget, Burn-Rate, aktive Alarme |
