@@ -16,6 +16,11 @@ damit bleiben Tokens, Geräte und Aufruf-Marken gültig.
 
 1. Ziel mit OpenTofu bereitstellen ([infra/tofu/README.md](../../infra/tofu/README.md)), gleiche
    `BOTHY_VERSION` wie die alte Instanz.
+   On a VM target the module `generic-vm` sets up the host and runs the setup wizard; its input
+   `bothy_version` is the product release whose bundle pins that server version
+   ([infra/tofu/modules/generic-vm/README.md](../../infra/tofu/modules/generic-vm/README.md)).
+   The wizard generates fresh secrets on the target; step 2 replaces them with the bundle of the
+   old instance before the first start of the restored data.
 2. Secrets-Bündel einspielen. Push-Schlüssel und App-Identität bleiben gleich; Push-Registrierungen
    der Geräte bleiben darum gültig.
 3. Probe: letzte Sicherung der alten Instanz auf dem Ziel zurückspielen

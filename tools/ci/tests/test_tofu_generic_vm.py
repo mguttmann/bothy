@@ -66,14 +66,27 @@ def tofu() -> str:
 
 @pytest.fixture(scope="module")
 def data_dir(tofu: str, tmp_path_factory: pytest.TempPathFactory) -> Path:
-    """An initialised data directory of the test root (no providers, offline)."""
+    """An initialised data directory of the test root; the only provider source is an empty
+    local mirror, as in `make tofu-check`, so init never downloads."""
     data = tmp_path_factory.mktemp("tofu-data")
-    _tofu(tofu, data, "init", "-backend=false", "-input=false")
+    (data / "mirror").mkdir()
+    (data / "offline.tfrc").write_text(
+        f'provider_installation {{\n  filesystem_mirror {{\n    path = "{data / "mirror"}"\n'
+        "  }\n}\n",
+        encoding="utf-8",
+    )
+    proc = _tofu(tofu, data, "init", "-backend=false", "-input=false")
+    assert proc.returncode == 0, proc.stdout + proc.stderr
     return data
 
 
 def _tofu(tofu: str, data: Path, *args: str) -> subprocess.CompletedProcess[str]:
-    env = {**os.environ, "TF_DATA_DIR": str(data), "TF_IN_AUTOMATION": "1"}
+    env = {
+        **os.environ,
+        "TF_DATA_DIR": str(data),
+        "TF_IN_AUTOMATION": "1",
+        "TF_CLI_CONFIG_FILE": str(data / "offline.tfrc"),
+    }
     env.pop("TF_CLI_ARGS", None)
     return subprocess.run(
         [tofu, f"-chdir={ROOT}", *args, "-no-color"],
