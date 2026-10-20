@@ -43,7 +43,7 @@ http://127.0.0.1:*/api/v1/instance/discovery)
 	}
 	printf '%s' "${STUB_DISCOVERY_STATUS:-200}"
 	;;
-https://*)
+https://* | http://127.0.0.1:*)
 	printf 'url %s\n' "$url" >>"$log"
 	[ -n "$out" ] || {
 		echo "curl stub: a download needs -o <file>" >&2

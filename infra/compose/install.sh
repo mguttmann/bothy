@@ -431,6 +431,9 @@ check_rendered() {
 	[ ${#BOTHY_INSTALL_BUNDLE_SHA256} -eq 64 ] || cr_ok=0
 	case $BOTHY_INSTALL_BASE_URL in
 	https://*/v"$BOTHY_INSTALL_VERSION"/) ;;
+	# The trial release serves its result on the loopback address of the build host
+	# (RELEASE_TRIAL_BASE_URL, docs/spec/18-release.md section 2.1).
+	http://127.0.0.1:[0-9]*/) ;;
 	*) cr_ok=0 ;;
 	esac
 	[ "$cr_ok" = 1 ] || die bundle "this is the unrendered source of install.sh; use the install.sh of a release"
