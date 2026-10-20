@@ -7854,6 +7854,60 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Close'**
   String get adminGuidedDoneClose;
+
+  /// Button on a person's detail that starts 'View as person' (01 section 5.2 A1 and A4).
+  ///
+  /// In en, this message translates to:
+  /// **'View as this person'**
+  String get adminPersonViewAs;
+
+  /// Remaining time of the stored view in the banner of the console, minutes and seconds (07 section 9.2).
+  ///
+  /// In en, this message translates to:
+  /// **'{time} left'**
+  String adminViewAsRemaining(String time);
+
+  /// Button of the banner that ends the stored view (endViewAs, 07 section 9.2).
+  ///
+  /// In en, this message translates to:
+  /// **'End view'**
+  String get adminViewAsEnd;
+
+  /// Heading of the structure list of 'View as person' in the console (01 section 5.2 A4).
+  ///
+  /// In en, this message translates to:
+  /// **'Sidebar as {name} sees it'**
+  String adminViewAsSidebarOf(String name);
+
+  /// Spaces the owner sees and the viewed person does not, their names joined with commas (01 section 5.2 A4).
+  ///
+  /// In en, this message translates to:
+  /// **'Not visible for {name}: {names}'**
+  String adminViewAsNotVisible(String name, String names);
+
+  /// Note under the structure of 'View as person' in the console (ADR 0028; 01 section 5.2 A4).
+  ///
+  /// In en, this message translates to:
+  /// **'The console shows structure and access only, never the content of a channel.'**
+  String get adminViewAsStructureOnly;
+
+  /// Shown when the console reloads during a stored view: the structure came only with the start (07 section 9.2).
+  ///
+  /// In en, this message translates to:
+  /// **'The structure appears when a view starts. End this view and start it again to see it.'**
+  String get adminViewAsStructureLater;
+
+  /// Second line of the step-up of an action in the console when the person has a passkey (08 section 6.2).
+  ///
+  /// In en, this message translates to:
+  /// **'Next, your browser asks for your passkey.'**
+  String get consoleStepUpPasskeyNext;
+
+  /// Step-up of an action in the console when only the OIDC login is available: the tab leaves, so the change is not repeated (08 section 6.2).
+  ///
+  /// In en, this message translates to:
+  /// **'This change needs a new login at your login service. Confirm there, then make the change again.'**
+  String get consoleStepUpOidcAction;
 }
 
 class _AppLocalizationsDelegate
