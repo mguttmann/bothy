@@ -92,11 +92,14 @@ jobs:
             --head-repo "$HEAD_REPO" --author "$AUTHOR" --actor "$ACTOR" \
             --github-output "$GITHUB_OUTPUT" --summary "$GITHUB_STEP_SUMMARY"
 
+  # The gates of `make gates` run in parallel jobs (docs/quality/gates.md, "CI jobs"); together
+  # they run exactly the targets of `make gates` for the planned components
+  # (tools/ci/tests/test_ci_parallel_gates.py). This one: code and repository structure.
   gates:
     name: gates
     needs: plan
     runs-on: ubuntu-24.04
-    timeout-minutes: 90
+    timeout-minutes: 45
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -143,22 +146,256 @@ jobs:
             ~/.cache/pre-commit
           key: gates-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('tools/bin/tools.lock.json', '.pre-commit-config.yaml') }}
       - run: make bootstrap-ci
-      - name: make gates
+      - name: make fmt-check codegen-check lint typecheck arch register-check migrations-lint flag-check commitlint runners-check labels-check release-pins
         env:
-          # Chromium's sandbox can be blocked where user namespaces are restricted; the
-          # renderer only processes this repository's own diagrams.
-          MMDC_PUPPETEER_CONFIG: tools/node/puppeteer-ci.json
           COMPONENTS: ${{ needs.plan.outputs.components }}
           COMMIT_RANGE: ${{ github.event_name == 'pull_request' && format('{0}..{1}', github.event.pull_request.base.sha, github.event.pull_request.head.sha) || '' }}
           PR_TITLE: ${{ github.event.pull_request.title }}
           # A dependency bot's own commits need no sign-off in its pull request (D-DEPS-3).
           PR_AUTHOR: ${{ github.event.pull_request.user.login }}
           GH_TOKEN: ${{ github.token }}
-        run: make gates COMPONENTS="$COMPONENTS"
-      # The coverage reports of `make test` for the job sonar, which scans them instead of
-      # running the tests again. REPORTS covers every report path of sonar-project.properties
-      # (tools/ci/tests/test_sonar_coverage_handoff.py); a component that was not selected wrote
-      # no report, as before. The list file always exists, so the artifact is never empty.
+        run: make fmt-check codegen-check lint typecheck arch register-check migrations-lint flag-check commitlint runners-check labels-check release-pins COMPONENTS="$COMPONENTS"
+
+  # Documentation, configuration reference, diagrams, API contract and client gates.
+  gates-docs:
+    name: gates (docs and contracts)
+    needs: plan
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: astral-sh/setup-uv@1c37ad07a6a961277cf70c0d37d6f313000f5884 # v10.3.0
+        with:
+          enable-cache: true
+          cache-dependency-glob: tools/uv.lock
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: "24"
+          cache: npm
+          cache-dependency-path: tools/node/package-lock.json
+      # One Go for every tracked module: all modules share the go and toolchain lines
+      # (tools/ci/tests/test_ci_toolchains.py, docs/DECISIONS.md D-M2-38-1).
+      - if: hashFiles('services/*/go.mod') != ''
+        uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version-file: ${{ hashFiles('services/server/go.mod') != '' && 'services/server/go.mod' || 'services/host/go.mod' }}
+          cache-dependency-path: services/*/go.sum
+      # Flutter for every tracked Dart package, pinned in the root pubspec.yaml of the Dart
+      # workspace (docs/DECISIONS.md D-M4-01-1).
+      - if: hashFiles('apps/*/pubspec.yaml', 'packages/*/pubspec.yaml') != ''
+        uses: subosito/flutter-action@1a449444c387b1966244ae4d4f8c696479add0b2 # v2.23.0
+        with:
+          channel: stable
+          flutter-version-file: pubspec.yaml
+          cache: true
+      # JDK and Android SDK for the JVM tests of the Android core that `make test` runs
+      # (brief M5-01; docs/DECISIONS.md D-M5-01-5).
+      - if: hashFiles('packages/*/android/gradlew') != ''
+        uses: actions/setup-java@b843ebf9b913146b38da2eaa7aeddf76074ae1ad # v6.1.0
+        with:
+          distribution: temurin
+          java-version: "17"
+      - if: hashFiles('packages/*/android/gradlew') != ''
+        uses: android-actions/setup-android@be39fa834029ff78f1a44aa3bb0819b8fc2bd8fd # v4.0.4
+      - name: Restore pinned binaries and hook environments
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: |
+            .cache/tools
+            ~/.cache/pre-commit
+          key: gates-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('tools/bin/tools.lock.json', '.pre-commit-config.yaml') }}
+      - run: make bootstrap-ci
+      - name: make docs config-doc-check linkcheck diagrams catalog-check api-lint api-checks api-breaking ops-check api-clients tokens
+        env:
+          MMDC_PUPPETEER_CONFIG: tools/node/puppeteer-ci.json
+          COMPONENTS: ${{ needs.plan.outputs.components }}
+        run: make docs config-doc-check linkcheck diagrams catalog-check api-lint api-checks api-breaking ops-check api-clients tokens COMPONENTS="$COMPONENTS"
+
+  # Secret scan of the history, Semgrep, Trivy, OSV and the license gate.
+  gates-security:
+    name: gates (security and supply chain)
+    needs: plan
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: astral-sh/setup-uv@1c37ad07a6a961277cf70c0d37d6f313000f5884 # v10.3.0
+        with:
+          enable-cache: true
+          cache-dependency-glob: tools/uv.lock
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: "24"
+          cache: npm
+          cache-dependency-path: tools/node/package-lock.json
+      # One Go for every tracked module: all modules share the go and toolchain lines
+      # (tools/ci/tests/test_ci_toolchains.py, docs/DECISIONS.md D-M2-38-1).
+      - if: hashFiles('services/*/go.mod') != ''
+        uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version-file: ${{ hashFiles('services/server/go.mod') != '' && 'services/server/go.mod' || 'services/host/go.mod' }}
+          cache-dependency-path: services/*/go.sum
+      # Flutter for every tracked Dart package, pinned in the root pubspec.yaml of the Dart
+      # workspace (docs/DECISIONS.md D-M4-01-1).
+      - if: hashFiles('apps/*/pubspec.yaml', 'packages/*/pubspec.yaml') != ''
+        uses: subosito/flutter-action@1a449444c387b1966244ae4d4f8c696479add0b2 # v2.23.0
+        with:
+          channel: stable
+          flutter-version-file: pubspec.yaml
+          cache: true
+      # JDK and Android SDK for the JVM tests of the Android core that `make test` runs
+      # (brief M5-01; docs/DECISIONS.md D-M5-01-5).
+      - if: hashFiles('packages/*/android/gradlew') != ''
+        uses: actions/setup-java@b843ebf9b913146b38da2eaa7aeddf76074ae1ad # v6.1.0
+        with:
+          distribution: temurin
+          java-version: "17"
+      - if: hashFiles('packages/*/android/gradlew') != ''
+        uses: android-actions/setup-android@be39fa834029ff78f1a44aa3bb0819b8fc2bd8fd # v4.0.4
+      - name: Restore pinned binaries and hook environments
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: |
+            .cache/tools
+            ~/.cache/pre-commit
+          key: gates-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('tools/bin/tools.lock.json', '.pre-commit-config.yaml') }}
+      - run: make bootstrap-ci
+      - name: make gitleaks semgrep trivy osv licenses
+        env:
+          COMPONENTS: ${{ needs.plan.outputs.components }}
+        run: make gitleaks semgrep trivy osv licenses COMPONENTS="$COMPONENTS"
+
+  # The tests of the Python tools and their coverage: no component selected.
+  test-tools:
+    name: test (tools)
+    needs: plan
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: astral-sh/setup-uv@1c37ad07a6a961277cf70c0d37d6f313000f5884 # v10.3.0
+        with:
+          enable-cache: true
+          cache-dependency-glob: tools/uv.lock
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: "24"
+          cache: npm
+          cache-dependency-path: tools/node/package-lock.json
+      # One Go for every tracked module: all modules share the go and toolchain lines
+      # (tools/ci/tests/test_ci_toolchains.py, docs/DECISIONS.md D-M2-38-1).
+      - if: hashFiles('services/*/go.mod') != ''
+        uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version-file: ${{ hashFiles('services/server/go.mod') != '' && 'services/server/go.mod' || 'services/host/go.mod' }}
+          cache-dependency-path: services/*/go.sum
+      # Flutter for every tracked Dart package, pinned in the root pubspec.yaml of the Dart
+      # workspace (docs/DECISIONS.md D-M4-01-1).
+      - if: hashFiles('apps/*/pubspec.yaml', 'packages/*/pubspec.yaml') != ''
+        uses: subosito/flutter-action@1a449444c387b1966244ae4d4f8c696479add0b2 # v2.23.0
+        with:
+          channel: stable
+          flutter-version-file: pubspec.yaml
+          cache: true
+      # JDK and Android SDK for the JVM tests of the Android core that `make test` runs
+      # (brief M5-01; docs/DECISIONS.md D-M5-01-5).
+      - if: hashFiles('packages/*/android/gradlew') != ''
+        uses: actions/setup-java@b843ebf9b913146b38da2eaa7aeddf76074ae1ad # v6.1.0
+        with:
+          distribution: temurin
+          java-version: "17"
+      - if: hashFiles('packages/*/android/gradlew') != ''
+        uses: android-actions/setup-android@be39fa834029ff78f1a44aa3bb0819b8fc2bd8fd # v4.0.4
+      - name: Restore pinned binaries and hook environments
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: |
+            .cache/tools
+            ~/.cache/pre-commit
+          key: gates-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('tools/bin/tools.lock.json', '.pre-commit-config.yaml') }}
+      - run: make bootstrap-ci
+      - name: make test coverage
+        env:
+          # Chromium's sandbox can be blocked where user namespaces are restricted; the
+          # renderer only processes this repository's own diagrams.
+          MMDC_PUPPETEER_CONFIG: tools/node/puppeteer-ci.json
+          COMPONENTS: none
+        run: make test coverage COMPONENTS="$COMPONENTS"
+
+  # Go tests against PostgreSQL and SeaweedFS (Docker on the runner) and the coverage threshold;
+  # AREAS=none leaves the tools suite to test-tools.
+  test-server:
+    name: test (server)
+    needs: plan
+    if: needs.plan.outputs.components == 'all' || contains(format(' {0} ', needs.plan.outputs.components), ' server ')
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: astral-sh/setup-uv@1c37ad07a6a961277cf70c0d37d6f313000f5884 # v10.3.0
+        with:
+          enable-cache: true
+          cache-dependency-glob: tools/uv.lock
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: "24"
+          cache: npm
+          cache-dependency-path: tools/node/package-lock.json
+      # One Go for every tracked module: all modules share the go and toolchain lines
+      # (tools/ci/tests/test_ci_toolchains.py, docs/DECISIONS.md D-M2-38-1).
+      - if: hashFiles('services/*/go.mod') != ''
+        uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version-file: ${{ hashFiles('services/server/go.mod') != '' && 'services/server/go.mod' || 'services/host/go.mod' }}
+          cache-dependency-path: services/*/go.sum
+      # Flutter for every tracked Dart package, pinned in the root pubspec.yaml of the Dart
+      # workspace (docs/DECISIONS.md D-M4-01-1).
+      - if: hashFiles('apps/*/pubspec.yaml', 'packages/*/pubspec.yaml') != ''
+        uses: subosito/flutter-action@1a449444c387b1966244ae4d4f8c696479add0b2 # v2.23.0
+        with:
+          channel: stable
+          flutter-version-file: pubspec.yaml
+          cache: true
+      # JDK and Android SDK for the JVM tests of the Android core that `make test` runs
+      # (brief M5-01; docs/DECISIONS.md D-M5-01-5).
+      - if: hashFiles('packages/*/android/gradlew') != ''
+        uses: actions/setup-java@b843ebf9b913146b38da2eaa7aeddf76074ae1ad # v6.1.0
+        with:
+          distribution: temurin
+          java-version: "17"
+      - if: hashFiles('packages/*/android/gradlew') != ''
+        uses: android-actions/setup-android@be39fa834029ff78f1a44aa3bb0819b8fc2bd8fd # v4.0.4
+      - name: Restore pinned binaries and hook environments
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: |
+            .cache/tools
+            ~/.cache/pre-commit
+          key: gates-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('tools/bin/tools.lock.json', '.pre-commit-config.yaml') }}
+      - run: make bootstrap-ci
+      - name: make test coverage
+        env:
+          # As every step that reaches `make test` (docs/quality/gates.md, "Individual gates").
+          MMDC_PUPPETEER_CONFIG: tools/node/puppeteer-ci.json
+          COMPONENTS: server
+        run: make test coverage COMPONENTS="$COMPONENTS" AREAS=none
+      # The coverage reports of `make test` in this job for the job sonar, which scans them
+      # instead of running the tests again. REPORTS covers every report path of
+      # sonar-project.properties (tools/ci/tests/test_sonar_coverage_handoff.py); a component
+      # this job did not test wrote no report. The list file always exists, so the artifact is
+      # never empty.
       - name: Pack the coverage reports for sonar
         env:
           REPORTS: >-
@@ -173,8 +410,8 @@ jobs:
           shopt -s nullglob
           dir="$RUNNER_TEMP/sonar-coverage"
           mkdir -p "$dir"
-          # A run that selects only some components writes only their reports: nullglob drops the
-          # globs without a match, the test drops the literal paths that do not exist.
+          # A job writes only the reports of its components: nullglob drops the globs without a
+          # match, the test drops the literal paths that do not exist.
           files=()
           # shellcheck disable=SC2086 # REPORTS is a list of globs, expanded on purpose
           for f in $REPORTS; do
@@ -186,7 +423,206 @@ jobs:
       - name: Upload the coverage reports for sonar
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
-          name: sonar-coverage
+          name: sonar-coverage-server
+          path: ${{ runner.temp }}/sonar-coverage/coverage.tar
+          if-no-files-found: error
+          retention-days: 1
+
+  # Dart tests of the workspace, the JVM tests of the Android code and their coverage threshold.
+  test-apps:
+    name: test (apps)
+    needs: plan
+    if: needs.plan.outputs.components == 'all' || contains(format(' {0} ', needs.plan.outputs.components), ' apps ')
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: astral-sh/setup-uv@1c37ad07a6a961277cf70c0d37d6f313000f5884 # v10.3.0
+        with:
+          enable-cache: true
+          cache-dependency-glob: tools/uv.lock
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: "24"
+          cache: npm
+          cache-dependency-path: tools/node/package-lock.json
+      # One Go for every tracked module: all modules share the go and toolchain lines
+      # (tools/ci/tests/test_ci_toolchains.py, docs/DECISIONS.md D-M2-38-1).
+      - if: hashFiles('services/*/go.mod') != ''
+        uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version-file: ${{ hashFiles('services/server/go.mod') != '' && 'services/server/go.mod' || 'services/host/go.mod' }}
+          cache-dependency-path: services/*/go.sum
+      # Flutter for every tracked Dart package, pinned in the root pubspec.yaml of the Dart
+      # workspace (docs/DECISIONS.md D-M4-01-1).
+      - if: hashFiles('apps/*/pubspec.yaml', 'packages/*/pubspec.yaml') != ''
+        uses: subosito/flutter-action@1a449444c387b1966244ae4d4f8c696479add0b2 # v2.23.0
+        with:
+          channel: stable
+          flutter-version-file: pubspec.yaml
+          cache: true
+      # JDK and Android SDK for the JVM tests of the Android core that `make test` runs
+      # (brief M5-01; docs/DECISIONS.md D-M5-01-5).
+      - if: hashFiles('packages/*/android/gradlew') != ''
+        uses: actions/setup-java@b843ebf9b913146b38da2eaa7aeddf76074ae1ad # v6.1.0
+        with:
+          distribution: temurin
+          java-version: "17"
+      - if: hashFiles('packages/*/android/gradlew') != ''
+        uses: android-actions/setup-android@be39fa834029ff78f1a44aa3bb0819b8fc2bd8fd # v4.0.4
+      - name: Restore pinned binaries and hook environments
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: |
+            .cache/tools
+            ~/.cache/pre-commit
+          key: gates-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('tools/bin/tools.lock.json', '.pre-commit-config.yaml') }}
+      - run: make bootstrap-ci
+      - name: make test coverage
+        env:
+          # As every step that reaches `make test` (docs/quality/gates.md, "Individual gates").
+          MMDC_PUPPETEER_CONFIG: tools/node/puppeteer-ci.json
+          COMPONENTS: apps
+        run: make test coverage COMPONENTS="$COMPONENTS" AREAS=none
+      # The coverage reports of `make test` in this job for the job sonar, which scans them
+      # instead of running the tests again. REPORTS covers every report path of
+      # sonar-project.properties (tools/ci/tests/test_sonar_coverage_handoff.py); a component
+      # this job did not test wrote no report. The list file always exists, so the artifact is
+      # never empty.
+      - name: Pack the coverage reports for sonar
+        env:
+          REPORTS: >-
+            services/*/coverage.out
+            sdk/python/coverage.xml
+            plugins/*/coverage.xml
+            sdk/typescript/coverage/lcov.info
+            apps/*/coverage/lcov.info
+            packages/*/coverage/lcov.info
+            packages/*/*/coverage/lcov.info
+        run: |
+          shopt -s nullglob
+          dir="$RUNNER_TEMP/sonar-coverage"
+          mkdir -p "$dir"
+          # A job writes only the reports of its components: nullglob drops the globs without a
+          # match, the test drops the literal paths that do not exist.
+          files=()
+          # shellcheck disable=SC2086 # REPORTS is a list of globs, expanded on purpose
+          for f in $REPORTS; do
+            if [ -e "$f" ]; then files+=("$f"); fi
+          done
+          printf '%s\n' "${files[@]}" > "$dir/reports.txt"
+          tar -cf "$dir/coverage.tar" -T "$dir/reports.txt"
+          echo "coverage reports for sonar: ${#files[@]}"
+      - name: Upload the coverage reports for sonar
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: sonar-coverage-apps
+          path: ${{ runner.temp }}/sonar-coverage/coverage.tar
+          if-no-files-found: error
+          retention-days: 1
+
+  # The SDK and plugin components of the plan; server and apps have their own jobs.
+  test-sdk-plugins:
+    name: test (SDKs and plugins)
+    needs: plan
+    if: needs.plan.outputs.components == 'all' || contains(format(' {0} ', needs.plan.outputs.components), ' sdk-python ') || contains(format(' {0} ', needs.plan.outputs.components), ' sdk-typescript ') || contains(format(' {0} ', needs.plan.outputs.components), ' plugins ')
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: astral-sh/setup-uv@1c37ad07a6a961277cf70c0d37d6f313000f5884 # v10.3.0
+        with:
+          enable-cache: true
+          cache-dependency-glob: tools/uv.lock
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: "24"
+          cache: npm
+          cache-dependency-path: tools/node/package-lock.json
+      # One Go for every tracked module: all modules share the go and toolchain lines
+      # (tools/ci/tests/test_ci_toolchains.py, docs/DECISIONS.md D-M2-38-1).
+      - if: hashFiles('services/*/go.mod') != ''
+        uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version-file: ${{ hashFiles('services/server/go.mod') != '' && 'services/server/go.mod' || 'services/host/go.mod' }}
+          cache-dependency-path: services/*/go.sum
+      # Flutter for every tracked Dart package, pinned in the root pubspec.yaml of the Dart
+      # workspace (docs/DECISIONS.md D-M4-01-1).
+      - if: hashFiles('apps/*/pubspec.yaml', 'packages/*/pubspec.yaml') != ''
+        uses: subosito/flutter-action@1a449444c387b1966244ae4d4f8c696479add0b2 # v2.23.0
+        with:
+          channel: stable
+          flutter-version-file: pubspec.yaml
+          cache: true
+      # JDK and Android SDK for the JVM tests of the Android core that `make test` runs
+      # (brief M5-01; docs/DECISIONS.md D-M5-01-5).
+      - if: hashFiles('packages/*/android/gradlew') != ''
+        uses: actions/setup-java@b843ebf9b913146b38da2eaa7aeddf76074ae1ad # v6.1.0
+        with:
+          distribution: temurin
+          java-version: "17"
+      - if: hashFiles('packages/*/android/gradlew') != ''
+        uses: android-actions/setup-android@be39fa834029ff78f1a44aa3bb0819b8fc2bd8fd # v4.0.4
+      - name: Restore pinned binaries and hook environments
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: |
+            .cache/tools
+            ~/.cache/pre-commit
+          key: gates-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('tools/bin/tools.lock.json', '.pre-commit-config.yaml') }}
+      - run: make bootstrap-ci
+      - name: make test coverage
+        env:
+          MMDC_PUPPETEER_CONFIG: tools/node/puppeteer-ci.json
+          PLANNED: ${{ needs.plan.outputs.components }}
+        run: |
+          selected=""
+          for c in $PLANNED; do
+            case "$c" in
+              all) selected="sdk-python sdk-typescript plugins" ;;
+              sdk-python|sdk-typescript|plugins) selected="$selected $c" ;;
+            esac
+          done
+          make test coverage COMPONENTS="${selected# }" AREAS=none
+      # The coverage reports of `make test` in this job for the job sonar, which scans them
+      # instead of running the tests again. REPORTS covers every report path of
+      # sonar-project.properties (tools/ci/tests/test_sonar_coverage_handoff.py); a component
+      # this job did not test wrote no report. The list file always exists, so the artifact is
+      # never empty.
+      - name: Pack the coverage reports for sonar
+        env:
+          REPORTS: >-
+            services/*/coverage.out
+            sdk/python/coverage.xml
+            plugins/*/coverage.xml
+            sdk/typescript/coverage/lcov.info
+            apps/*/coverage/lcov.info
+            packages/*/coverage/lcov.info
+            packages/*/*/coverage/lcov.info
+        run: |
+          shopt -s nullglob
+          dir="$RUNNER_TEMP/sonar-coverage"
+          mkdir -p "$dir"
+          # A job writes only the reports of its components: nullglob drops the globs without a
+          # match, the test drops the literal paths that do not exist.
+          files=()
+          # shellcheck disable=SC2086 # REPORTS is a list of globs, expanded on purpose
+          for f in $REPORTS; do
+            if [ -e "$f" ]; then files+=("$f"); fi
+          done
+          printf '%s\n' "${files[@]}" > "$dir/reports.txt"
+          tar -cf "$dir/coverage.tar" -T "$dir/reports.txt"
+          echo "coverage reports for sonar: ${#files[@]}"
+      - name: Upload the coverage reports for sonar
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: sonar-coverage-sdk-plugins
           path: ${{ runner.temp }}/sonar-coverage/coverage.tar
           if-no-files-found: error
           retention-days: 1
@@ -248,10 +684,13 @@ jobs:
 
   sonar:
     name: sonar
-    # Scans the coverage reports of the job gates instead of running the tests again; skipped
-    # when gates fails, which already fails ci-ok.
-    needs: [plan, gates]
-    if: needs.plan.outputs.private_checks == 'true'
+    # Scans the coverage reports of the test jobs instead of running the tests again. A test job
+    # of a component the plan left out is skipped; a failed or cancelled one skips the scan,
+    # which ci-ok already fails.
+    needs: [plan, test-server, test-apps, test-sdk-plugins]
+    if: >-
+      always() && needs.plan.result == 'success' && needs.plan.outputs.private_checks == 'true'
+      && !contains(needs.*.result, 'failure') && !contains(needs.*.result, 'cancelled')
     runs-on: ubuntu-24.04
     timeout-minutes: 30
     steps:
@@ -285,13 +724,15 @@ jobs:
       - if: hashFiles('apps/*/pubspec.yaml', 'packages/*/pubspec.yaml') != ''
         run: flutter pub get --enforce-lockfile
       - run: make bootstrap-ci
-      - name: Download the coverage reports of gates
+      - name: Download the coverage reports of the test jobs
         uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
-          name: sonar-coverage
+          pattern: sonar-coverage-*
           path: ${{ runner.temp }}/sonar-coverage
       - name: Unpack the coverage reports
-        run: tar -xvf "$RUNNER_TEMP/sonar-coverage/coverage.tar"
+        run: |
+          shopt -s nullglob
+          for archive in "$RUNNER_TEMP"/sonar-coverage/*/coverage.tar; do tar -xvf "$archive"; done
       - name: make sonar-scan
         env:
           COMPONENTS: ${{ needs.plan.outputs.components }}

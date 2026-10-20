@@ -42,7 +42,15 @@ class Rule:
 
 RULES = (
     Rule(("plan",), frozenset({"success"})),
+    # `make gates` in parallel jobs (docs/quality/gates.md, "CI jobs"); a test job of a component
+    # the plan left out is skipped.
     Rule(("gates",), frozenset({"success"})),
+    Rule(("gates (docs and contracts)",), frozenset({"success"})),
+    Rule(("gates (security and supply chain)",), frozenset({"success"})),
+    Rule(("test (tools)",), frozenset({"success"})),
+    Rule(("test (server)",), frozenset({"success", "skipped"})),
+    Rule(("test (apps)",), frozenset({"success", "skipped"})),
+    Rule(("test (SDKs and plugins)",), frozenset({"success", "skipped"})),
     Rule(("denylist (private list)", "denylist (generic rules, fork)"), frozenset({"success"})),
     Rule(("sonar",), frozenset({"success", "skipped"})),
     # Skipped when the component server did not change (M7-01).

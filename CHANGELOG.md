@@ -497,6 +497,11 @@ operated, and the order of the build.
 
 ### Changed
 
+- CI: `make gates` runs in seven parallel jobs (static gates, docs and contracts, security and
+  supply chain, and the tests of the tools, the server, the apps and the SDKs and plugins) with
+  every toolchain and its caches; together they run exactly the targets of `make gates`, `ci-ok`
+  requires each of them, and `sonar` scans the coverage reports of the test jobs (PL/11 in
+  [DECISIONS.md](docs/DECISIONS.md), docs/quality/gates.md "CI jobs").
 - CI: the job `sonar` no longer runs every test a second time. The job `gates` uploads the
   coverage reports of its `make test` as the artifact `sonar-coverage`; `sonar` needs `gates`,
   unpacks them and runs the new target `make sonar-scan` (the scan alone, same quality gate).

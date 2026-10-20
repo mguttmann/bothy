@@ -1950,7 +1950,8 @@ def test_every_ci_step_that_starts_chromium_sets_the_puppeteer_config() -> None:
                 checked.add(f"{path.name}: {job_id}")
                 if _env(data, job, step).get(PUPPETEER_CONFIG) != config:
                     wrong.append(where)
-    assert "ci.yml: gates" in checked, checked
+    # `make gates` runs in parallel jobs (PL/10): the tools tests and the diagrams start Chromium.
+    assert {"ci.yml: test-tools", "ci.yml: gates-docs"} <= checked, checked
     assert "ci.yml: sonar" not in checked, checked
     assert wrong == []
 
