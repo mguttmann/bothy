@@ -27,6 +27,7 @@ import (
 	"github.com/OWNER/bothy/services/server/internal/platform/pg"
 	"github.com/OWNER/bothy/services/server/internal/platform/pg/pgtest"
 	"github.com/OWNER/bothy/services/server/internal/platform/secrets"
+	"github.com/OWNER/bothy/services/server/internal/platform/testkit"
 	"github.com/OWNER/bothy/services/server/internal/wire"
 )
 
@@ -224,7 +225,7 @@ func (w *gwWorld) newAgent() ids.ID {
 // dial connects with the instance origin.
 func (w *gwWorld) dial(opts ...wstest.Option) *wstest.Client {
 	w.t.Helper()
-	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), testkit.Patience)
 	defer cancel()
 	c, err := wstest.Dial(ctx, w.base, append([]wstest.Option{wstest.WithOrigin(gwPublicURL)}, opts...)...)
 	if err != nil {
@@ -238,7 +239,7 @@ func (w *gwWorld) dial(opts ...wstest.Option) *wstest.Client {
 // expectClose waits for the close of c and requires code.
 func (w *gwWorld) expectClose(t *testing.T, c *wstest.Client, code int) string {
 	t.Helper()
-	ctx, cancel := context.WithTimeout(context.Background(), 20*time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), testkit.Patience)
 	defer cancel()
 	got, reason, err := c.ExpectClose(ctx)
 	if err != nil {
@@ -260,7 +261,7 @@ func (w *gwWorld) expectClose(t *testing.T, c *wstest.Client, code int) string {
 func (w *gwWorld) identifyErr(t *testing.T, p wstest.IdentifyParams, code int) {
 	t.Helper()
 	c := w.dial()
-	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), testkit.Patience)
 	defer cancel()
 	_, err := c.Identify(ctx, p)
 	var ce *wstest.CloseError
@@ -279,7 +280,7 @@ func (w *gwWorld) identifyErr(t *testing.T, p wstest.IdentifyParams, code int) {
 func (w *gwWorld) ready(t *testing.T, p wstest.IdentifyParams, opts ...wstest.Option) (*wstest.Client, rest.GatewayReady) {
 	t.Helper()
 	c := w.dial(opts...)
-	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), testkit.Patience)
 	defer cancel()
 	r, err := c.Identify(ctx, p)
 	if err != nil {
@@ -353,11 +354,11 @@ func TestGateway(t *testing.T) {
 			t.Fatal(err)
 		}
 		if h.HeartbeatIntervalMs != 1000 || h.ResumeWindowMs != 3000 || len(h.ProtocolVersions) != 1 || h.ProtocolVersions[0] != 1 ||
-			h.SyncEpoch.String() != epoch || h.DpopNonce == "" || time.Since(h.ServerTime) > time.Minute {
+			h.SyncEpoch.String() != epoch || h.DpopNonce == "" || time.Since(h.ServerTime) > time.Minute { // nosemgrep: bothy-go-test-wall-clock-wait -- the clock of the hello, not a wait
 			t.Fatalf("hello %+v", h)
 		}
 		p := w.newPerson("alex", identity.DeviceStateActive)
-		ctx, cancel := context.WithTimeout(ctx, 15*time.Second)
+		ctx, cancel := context.WithTimeout(ctx, testkit.Patience)
 		defer cancel()
 		if _, err := c.Identify(ctx, w.params(p)); err != nil {
 			t.Fatalf("identify with the nonce of hello: %v", err)
@@ -483,7 +484,7 @@ func TestGateway(t *testing.T) {
 	t.Run("TestClose4006ResumeUnknown", func(t *testing.T) {
 		p := w.newPerson("alex", identity.DeviceStateActive)
 		c := w.dial()
-		cctx, cancel := context.WithTimeout(ctx, 15*time.Second)
+		cctx, cancel := context.WithTimeout(ctx, testkit.Patience)
 		defer cancel()
 		_, err := c.Resume(cctx, wstest.ResumeParams{SessionID: ids.New().String(), AccessToken: p.access, Proof: w.proofFor(p.key, p.access, gwHTU)})
 		if ce := (*wstest.CloseError)(nil); !errors.As(err, &ce) || ce.Code != 4006 {
@@ -497,7 +498,7 @@ func TestGateway(t *testing.T) {
 		c.Abort()
 		time.Sleep(100 * time.Millisecond)
 		n := w.dial()
-		cctx, cancel := context.WithTimeout(ctx, 15*time.Second)
+		cctx, cancel := context.WithTimeout(ctx, testkit.Patience)
 		defer cancel()
 		res, err := n.Resume(cctx, wstest.ResumeParams{SessionID: r.GatewaySessionId.String(), AccessToken: p.access, Proof: w.proofFor(p.key, p.access, gwHTU), Cursor: r.HeadSeq})
 		if err != nil {
@@ -514,7 +515,7 @@ func TestGateway(t *testing.T) {
 		c.Abort()
 		time.Sleep(3500 * time.Millisecond)
 		n := w.dial()
-		cctx, cancel := context.WithTimeout(ctx, 15*time.Second)
+		cctx, cancel := context.WithTimeout(ctx, testkit.Patience)
 		defer cancel()
 		_, err := n.Resume(cctx, wstest.ResumeParams{SessionID: r.GatewaySessionId.String(), AccessToken: p.access, Proof: w.proofFor(p.key, p.access, gwHTU)})
 		if ce := (*wstest.CloseError)(nil); !errors.As(err, &ce) || ce.Code != 4006 {
@@ -534,7 +535,7 @@ func TestGateway(t *testing.T) {
 		var last *wstest.Client
 		for i := 0; ; i++ {
 			c := w.dial()
-			cctx, cancel := context.WithTimeout(ctx, 15*time.Second)
+			cctx, cancel := context.WithTimeout(ctx, testkit.Patience)
 			_, err := c.Identify(cctx, w.params(p))
 			cancel()
 			if err == nil {
@@ -572,7 +573,7 @@ func TestGateway(t *testing.T) {
 		if err := c.Send("heartbeat", map[string]any{"last_seq": 0}); err != nil {
 			t.Fatal(err)
 		}
-		cctx, cancel := context.WithTimeout(ctx, 5*time.Second)
+		cctx, cancel := context.WithTimeout(ctx, testkit.Patience)
 		defer cancel()
 		op, _, err := c.Next(cctx)
 		if err != nil {
@@ -623,7 +624,7 @@ func TestGateway(t *testing.T) {
 		sessions.Store(second, r2.GatewaySessionId.String())
 		w.expectClose(t, first, 4017)
 		third := w.dial()
-		cctx, cancel := context.WithTimeout(ctx, 15*time.Second)
+		cctx, cancel := context.WithTimeout(ctx, testkit.Patience)
 		defer cancel()
 		_, err := third.Resume(cctx, wstest.ResumeParams{SessionID: r.GatewaySessionId.String(), AccessToken: p.access, Proof: w.proofFor(p.key, p.access, gwHTU)})
 		if ce := (*wstest.CloseError)(nil); !errors.As(err, &ce) || ce.Code != 4006 {
@@ -631,7 +632,7 @@ func TestGateway(t *testing.T) {
 		}
 		// Resume of the live session replaces its connection with 4017 before resumed.
 		fourth := w.dial()
-		cctx2, cancel2 := context.WithTimeout(ctx, 15*time.Second)
+		cctx2, cancel2 := context.WithTimeout(ctx, testkit.Patience)
 		defer cancel2()
 		if _, err := fourth.Resume(cctx2, wstest.ResumeParams{SessionID: liveSession(t, second), AccessToken: p.access,
 			Proof: w.proofFor(p.key, p.access, gwHTU)}); err != nil {
@@ -647,7 +648,7 @@ func TestGateway(t *testing.T) {
 		params.Cursor = &cursor
 		params.SyncEpoch = ids.New().String()
 		c, r := w.ready(t, params)
-		cctx, cancel := context.WithTimeout(ctx, 10*time.Second)
+		cctx, cancel := context.WithTimeout(ctx, testkit.Patience)
 		defer cancel()
 		op, d, err := c.Next(cctx)
 		if err != nil || op != "resync_required" {
@@ -696,7 +697,7 @@ func TestGatewayTokenExpiry(t *testing.T) {
 	ctx := context.Background()
 	next := func(t *testing.T, c *wstest.Client) (string, []byte) {
 		t.Helper()
-		cctx, cancel := context.WithTimeout(ctx, 15*time.Second)
+		cctx, cancel := context.WithTimeout(ctx, testkit.Patience)
 		defer cancel()
 		op, d, err := c.Next(cctx)
 		if err != nil {
