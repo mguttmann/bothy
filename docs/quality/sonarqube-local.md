@@ -116,7 +116,8 @@ and the cloud fails the analysis ("CE Task finished abnormally with status: FAIL
 `sonar` therefore runs on `main` only when the repository variable `SONAR_MAIN_ANALYSIS` is
 `true`. Once: `make sonar-main-branch` (same variables as above) renames the main branch of the
 project to `main` through the Web API (`api/project_branches/list`, then
-`api/project_branches/rename` only when it carries another name); then
+`api/project_branches/rename` only when it carries another name, after deleting a short-lived
+branch `main` that the failed analyses left, because the rename refuses a name in use); then
 `gh variable set SONAR_MAIN_ANALYSIS --body true`. Pull requests are analysed either way.
 
 Where the token exists only as the GitHub Actions secret `SONAR_TOKEN`, the manual workflow

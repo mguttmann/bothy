@@ -447,3 +447,15 @@ def test_main_command_renames_then_reports_ok(
     assert "quality_sync: main branch renamed from 'master' to 'main'" in out
     assert "quality_sync: main branch is already 'main'" in out
     assert len(_posts(state, "/api/project_branches/rename")) == 1
+
+
+def test_short_lived_branch_with_the_name_is_deleted_before_the_rename() -> None:
+    # The failed analyses of main left a short-lived branch `main` in the cloud project.
+    state = State(cloud=True, other_branches=["feature", "main"])
+    with running(state) as url:
+        assert qs.ensure_main_branch(_client(url, organization=ORG), "main") == "master"
+        assert state.main_branch == "main"
+        assert state.other_branches == ["feature"]
+        assert _posts(state, "/api/project_branches/delete") == [
+            {"project": PROJECT, "branch": "main", "organization": ORG}
+        ]

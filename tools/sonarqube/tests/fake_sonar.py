@@ -15,7 +15,10 @@ sonar-config run of 2026-10-14; `gate_select_forbidden` answers select with HTTP
 for a token without the needed permission. A project uses the profile or gate assigned to it,
 otherwise the default one; the built-in gate is "Sonar way". `main_branch` is the name of the
 project's main branch (api/project_branches/list and rename); `branch_rename_refused` answers
-rename with HTTP 400 "Organization ... is not allowed to perform this action".
+rename with HTTP 400 "Organization ... is not allowed to perform this action". `other_branches`
+are the names of the project's other branches; rename to one of them answers HTTP 400
+"Impossible to update branch name: a branch with name ... already exists", as SonarQube Cloud
+answered on 2026-10-20 for a `main` its failed analyses had left as a short-lived branch.
 """
 
 from __future__ import annotations
@@ -58,6 +61,7 @@ class State:
     project_gate: str | None = None
     main_branch: str = "master"
     branch_rename_refused: bool = False
+    other_branches: list[str] = field(default_factory=lambda: ["feature"])
     project_profiles: dict[str, str] = field(default_factory=dict)
     profiles: list[Profile] = field(default_factory=list)
     calls: list[tuple[str, str, dict[str, str]]] = field(default_factory=list)
@@ -345,7 +349,7 @@ def _qp_backup(state: State, p: dict[str, str]) -> tuple[int, Any, str]:
 def _branches(state: State, p: dict[str, str]) -> tuple[int, Any, str]:
     if not p.get("project"):
         return _BAD_REQUEST
-    others = [{"name": "feature", "isMain": False, "type": "SHORT"}]
+    others = [{"name": n, "isMain": False, "type": "SHORT"} for n in state.other_branches]
     main = {"name": state.main_branch, "isMain": True, "type": "LONG"}
     return 200, {"branches": [*others, main]}, "application/json"
 
@@ -355,7 +359,20 @@ def _branch_rename(state: State, p: dict[str, str]) -> tuple[int, Any, str]:
         return _NOT_ALLOWED
     if not p.get("project") or not p.get("name"):
         return _BAD_REQUEST
+    if p["name"] in state.other_branches:
+        msg = (
+            "Impossible to update branch name: a branch with name "
+            f'"{p["name"]}" already exists in the project.'
+        )
+        return 400, {"errors": [{"msg": msg}]}, "application/json"
     state.main_branch = p["name"]
+    return 204, "", "text/plain"
+
+
+def _branch_delete(state: State, p: dict[str, str]) -> tuple[int, Any, str]:
+    if not p.get("project") or p.get("branch") not in state.other_branches:
+        return _BAD_REQUEST
+    state.other_branches.remove(p["branch"])
     return 204, "", "text/plain"
 
 
@@ -379,6 +396,7 @@ ROUTES = {
     ("GET", "/api/qualityprofiles/backup"): _qp_backup,
     ("GET", "/api/project_branches/list"): _branches,
     ("POST", "/api/project_branches/rename"): _branch_rename,
+    ("POST", "/api/project_branches/delete"): _branch_delete,
 }
 
 
