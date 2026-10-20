@@ -26,6 +26,11 @@
 log=${STUB_LOG:?STUB_LOG is not set}
 printf 'docker %s\n' "$*" >>"$log"
 printf 'cwd %s\n' "$PWD" >>"$log"
+# Compose prefers the shell environment over .env, so the tests see whether TS_AUTHKEY reaches
+# docker compose from the environment of install.sh.
+if [ -n "${TS_AUTHKEY+set}" ]; then
+	printf 'env TS_AUTHKEY=%s\n' "$TS_AUTHKEY" >>"$log"
+fi
 
 # unexpected reports a call the stub does not know, so a test sees it in the output.
 # Arguments: none (uses the arguments of the stub). Exit code: 64.

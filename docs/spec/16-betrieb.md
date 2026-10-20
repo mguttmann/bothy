@@ -198,7 +198,9 @@ installation of this script (step 1). Further options: `--dir <path>` (default `
 `--bundle <file>`, `--ready-timeout <duration>` (`install.ready_timeout`), `--yes` and
 `--help`. `TS_AUTHKEY` is never an option, because the arguments of a process are visible to
 other users of the host: with a terminal it is a hidden prompt, without one the script reads the
-environment variable `TS_AUTHKEY` and aborts naming it when it is missing. Exit codes: `0`
+environment variable `TS_AUTHKEY` and aborts naming it when it is missing. The script removes
+`TS_AUTHKEY` from the environment of every `docker compose` call, because Compose prefers the
+shell environment over `.env`: `.env` is the only source of the key. Exit codes: `0`
 success, `1` a failed step, `2` an invalid option; every message names the step
 (`install.sh: <step>: <reason>`). The signature check of step 2 uses the identity of the release
 workflow of the repository named in the download address; with another address (the trial

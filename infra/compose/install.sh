@@ -69,6 +69,8 @@ storage=
 observability=
 offsite=
 ts_authkey=
+# TS_AUTHKEY of the environment, taken in main before any docker call (see there).
+env_ts_authkey=
 api_service=
 code_shown=0
 tmp_dir=
@@ -629,7 +631,7 @@ require() {
 # environment variable), otherwise the environment variable. Never an option (ps shows options).
 # Arguments: none. Sets ts_authkey. Exit code: 1 (die prompts) when no valid key is available.
 read_ts_authkey() {
-	rt_env=${TS_AUTHKEY:-}
+	rt_env=$env_ts_authkey
 	if [ "$tty" = 1 ] && { [ "$opt_yes" = 0 ] || [ -z "$rt_env" ]; }; then
 		while :; do
 			if [ -n "$rt_env" ]; then
@@ -1058,6 +1060,11 @@ main() {
 	trap cleanup EXIT
 	trap 'exit 1' HUP INT TERM
 	parse_options "$@"
+	# Compose prefers the shell environment over .env, so an exported TS_AUTHKEY would override
+	# the key this script writes to .env (a typed one) and the one it clears there after the
+	# first login; from here on .env is the only source of the key.
+	env_ts_authkey=${TS_AUTHKEY:-}
+	unset TS_AUTHKEY
 	if (: </dev/tty) 2>/dev/null; then
 		tty=1
 	fi
