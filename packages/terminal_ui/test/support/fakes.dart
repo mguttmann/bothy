@@ -180,8 +180,13 @@ final class FakeApi implements TerminalServerApi {
         ..keyGeneration = grantGeneration ?? keyGeneration
         ..noiseProtocol =
             TerminalSessionGrantNoiseProtocolEnum.noiseNK25519ChaChaPolySHA256
-        ..prologueVersion =
-            TerminalSessionGrantPrologueVersionEnum.bothyTerminalSlash1,
+        // The one known prologue version; named by its wire value only in the schema.
+        ..prologueVersion = TerminalSessionGrantPrologueVersionEnum.values
+            .firstWhere(
+              (v) =>
+                  v !=
+                  TerminalSessionGrantPrologueVersionEnum.unknownDefaultOpenApi,
+            ),
     );
   }
 
