@@ -9,6 +9,12 @@ a test CA generated for this run, and runs the headless browsers of
 namespace of ``api``. Afterwards it checks that the violation report of the negative test reached
 the server log, and always tears the stack down, also after a failure.
 
+Phase 2 (brief M6-04 Design note 4) follows a passed phase 1 on the same stack: ``api`` is
+recreated with the overlay ``compose.console-e2e-admin.yaml``, which serves the web bundle of the
+patrol suites of the console administration (built from the target ``console-e2e-web`` of
+``services/server/Dockerfile`` into the temp directory) as the console and holds a step-up for 3 s;
+then the TLS sidecar and the browser container with ``E2E_MODE=admin`` (headless/admin_suites.py).
+
 Exit codes: 0 pass, 1 a check failed, 2 a precondition is missing (Docker, Compose, the image).
 Each step is announced as ``console-e2e: <step>`` on stderr; no secret is ever printed.
 
@@ -48,6 +54,10 @@ MIN_COMPOSE = (2, 26, 0)
 REPORT_LOG = "csp violation reported"
 # The services whose last log lines a failure prints.
 DIAGNOSE_SERVICES = ("api", "migrate", "tls")
+# The overlay of phase 2 (brief M6-04 Design note 4) and the directory of the bundle in the temp
+# directory of the run.
+ADMIN_OVERLAY = COMPOSE_DIR / "test" / "compose.console-e2e-admin.yaml"
+ADMIN_BUNDLE = "admin-bundle"
 
 
 class PreconditionError(Exception):
@@ -329,6 +339,54 @@ def save_results(results: Path, target: str | None) -> None:
         shutil.copy2(f, dest / f.name)
 
 
+def bundle_build_args(tmp: Path, version: str) -> list[str]:
+    """The build of the web bundle of the patrol suites: the target ``console-e2e-web`` of the
+    server Dockerfile, exported by the local exporter to ``<tmp>/admin-bundle``."""
+    return [
+        "docker", "buildx", "build", "--quiet",
+        "--file", str(ROOT / "services" / "server" / "Dockerfile"),
+        "--target", "console-e2e-web",
+        "--build-arg", f"VERSION={version}",
+        "--output", f"type=local,dest={tmp / ADMIN_BUNDLE}",
+        str(ROOT),
+    ]  # fmt: skip
+
+
+def share_bundle(bundle: Path) -> None:
+    """Makes the exported bundle readable for the user of the api container (65532), which
+    mounts it read-only, and checks that it holds the index.html the server needs."""
+    if not (bundle / "index.html").is_file():
+        raise StepError("the admin bundle holds no index.html")
+    bundle.chmod(0o755)
+    for path in bundle.rglob("*"):
+        path.chmod(0o755 if path.is_dir() else 0o644)
+
+
+def build_bundle(stack: Stack, tmp: Path, version: str) -> None:
+    """Builds the bundle of phase 2 into the temp directory; raises StepError on a failure."""
+    res = stack.run(bundle_build_args(tmp, version), env=stack.env)
+    if res.returncode != 0:
+        raise StepError(f"the build of the admin bundle failed with exit code {res.returncode}")
+    share_bundle(tmp / ADMIN_BUNDLE)
+
+
+def run_admin(stack: Stack) -> None:
+    """Phase 2: api with the admin overlay, the sidecar after it (it shares the network
+    namespace of api, so it must follow the new container), then the patrol suites."""
+    stack.files.append(ADMIN_OVERLAY)
+    stack.env["E2E_MODE"] = "admin"
+    say("phase 2: api with the admin bundle and a step-up of 3 s")
+    stack.compose(
+        "up", "--detach", "--wait", "--wait-timeout", "240", "--no-deps", "--force-recreate", "api"
+    )
+    say("phase 2: restart the TLS sidecar")
+    stack.compose("up", "--detach", "--no-deps", "--force-recreate", "tls")
+    say("phase 2: patrol suites of the console administration (chromium)")
+    res = stack.compose("run", "--rm", "--no-deps", "console-browser", check=False)
+    if res.returncode != 0:
+        raise StepError("the patrol suites failed; see the lines above and out/results/admin.json")
+
+
 def run_test(stack: Stack, tmp: Path, version: str) -> None:
     """The steps of the test on a stack whose variables are set; raises StepError."""
     say("validate")
@@ -337,6 +395,8 @@ def run_test(stack: Stack, tmp: Path, version: str) -> None:
     stack.compose("build", "--quiet", "--build-arg", f"VERSION={version}", "smoke-probe")
     stack.compose("build", "--quiet", "console-browser")
     stack.compose("pull", "--quiet", "postgres", "tls")
+    say("build the web bundle of the patrol suites")
+    build_bundle(stack, tmp, version)
     say("start (secrets init, migrate up --bootstrap, api)")
     stack.compose("up", "--detach", "--wait", "--wait-timeout", "240", "api")
     say("bootstrap owner")
@@ -372,6 +432,7 @@ def run_test(stack: Stack, tmp: Path, version: str) -> None:
     logs = stack.compose("logs", "--no-color", "api", capture_output=True).stdout
     if not report_seen(logs):
         raise StepError("no violation report of the negative test reached the endpoint")
+    run_admin(stack)
 
 
 UV_EXPORT = (
@@ -425,7 +486,9 @@ def stack_env(environ: dict[str, str], tmp: Path, image: str, run_id: str) -> di
         E2E_BROWSER_CONTEXT=str(tmp / "browser"),
         E2E_SPKI=certs.spki_sha256,
         E2E_UID_GID=f"{os.getuid()}:{os.getgid()}",
+        E2E_ADMIN_BUNDLE=str(tmp / ADMIN_BUNDLE),
     )
+    env.pop("E2E_MODE", None)
     return env
 
 
