@@ -101,6 +101,9 @@ func (s *Service) run(ctx context.Context, a actor.Actor, id ids.ID, c change) (
 		out, err = s.runWrite(ctx, id, c)
 		return err
 	}, rightsChange(c.act, agentRef(id), id))
+	if err == nil {
+		s.presenceChanged(ctx, &out)
+	}
 	return out, err
 }
 
@@ -260,6 +263,9 @@ func (s *Service) SetBillingModeAll(ctx context.Context, a actor.Actor, cmd agen
 		changed, err = s.switchAll(ctx, a, cmd, target, list)
 		return err
 	}, rightsChange(authorize.ActionAgentBillingModeSetAll, txn.Ref{Kind: resourceInstance}, list...))
+	if err == nil {
+		s.notifyPresence(ctx, changed)
+	}
 	return changed, err
 }
 

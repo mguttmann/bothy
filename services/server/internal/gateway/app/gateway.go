@@ -12,6 +12,7 @@ import (
 	gosync "sync"
 	"time"
 
+	"github.com/OWNER/bothy/services/server/internal/agents"
 	"github.com/OWNER/bothy/services/server/internal/gateway/domain"
 	"github.com/OWNER/bothy/services/server/internal/kernel/actor"
 	"github.com/OWNER/bothy/services/server/internal/kernel/authorize"
@@ -111,8 +112,12 @@ type Deps struct {
 	// Consumers is the delivery engine of agent consumers (M2-07); nil leaves agent sessions on
 	// the delivery of people (tests of the connection) and registers no handler of ack.
 	Consumers *ConsumerEngine
-	// AgentLimiter is rl.agent_runtime of the ack op; nil applies no limit (tests).
+	// AgentLimiter is rl.agent_runtime of the ack op and of the member agent of heartbeat; nil
+	// applies no limit (tests).
 	AgentLimiter AgentLimiter
+	// Presence takes the member agent of heartbeat (agents, M2-20); nil leaves the member without
+	// effect (tests of the connection).
+	Presence agents.Presence
 	// Clock is the time of deadlines and frames; nil means clock.System().
 	Clock clock.Clock
 	// Log receives the errors of ops; nil means slog.Default(). It never receives tokens,

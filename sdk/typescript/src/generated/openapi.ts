@@ -3198,7 +3198,12 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Report state and actual billing mode */
+        /**
+         * Report state and actual billing mode
+         * @description The adapter reports the whole state of its runtime (`agent_heartbeat.v1`, 09 section 4.8); the member `agent` of the gateway op `heartbeat` has the same effect. Only an agent may call it (`agent-self`); the body carries no agent id. The last heartbeat wins: an absent optional member means "not reported", except `project_readiness`, which is applied only when present and changed since the last list this server process applied (`ApplyProjectReadiness` of M2-03, in its own transaction).
+         *
+         *     The server validates every member and the closed keys of `details` itself, also the patterns of names, versions and codes; a violation answers `400 validation_failed` with every field error, `rate_limit` answers `errors[].code` `not_enabled` until it is built. A change of `reported_billing_mode` or `reported_tool_class`, also from or to "not reported", is stored at once and audited with action `agent.heartbeat`; the other fields are stored at most once per `agent.heartbeat_persist_interval`. The presence becomes `offline` once `agent.presence_timeout` passes without a heartbeat. The server compares the reported with the configured mode at each heartbeat and returns the warnings of `AgentRuntimeStatus.warnings`; the reported mode is evidence for display, warning, audit and alarm and never a permission (BR-05). `interval_ms` is `sync.heartbeat_interval`.
+         */
         post: operations["sendHeartbeat"];
         delete?: never;
         options?: never;
@@ -7396,6 +7401,9 @@ export interface components {
             /** @description False when the reported mode differs from the configured `billing_mode`. */
             billing_mode_matches?: boolean;
             rate_limit?: components["schemas"]["AgentRateLimitState"];
+            billing_evidence?: components["schemas"]["BillingEvidence"];
+            /** @description Known values `billing_mode_mismatch` (the reported mode has differed from the configured one for longer than `billing.mismatch_alert_after`), `billing_mode_unsupported` (no reported mode and the configured one is not in `billing_modes_supported`), `billing_evidence_unknown` (`billing_evidence.key_type` is `unknown`) and `tool_class_mismatch` (the reported tool class differs from the configured one). Only while the state is `online` or `degraded`. */
+            warnings?: string[];
         };
         AgentCreate: {
             /** @example support-agent */
@@ -7442,16 +7450,21 @@ export interface components {
         Heartbeat: {
             /** @enum {string} */
             state: "online" | "degraded";
-            /** @example 2.3.1 */
+            /**
+             * @description Version of the agent runtime (column `reported_runtime_version`); the adapter's own version is `details.adapter.version`.
+             * @example 2.3.1
+             */
             runtime_version?: string;
             /** @description Absent when the adapter follows the configured mode per run; then `billing_modes_supported` names both modes and the per-run check binds (ruling L8). */
             reported_billing_mode?: components["schemas"]["BillingMode"];
             billing_modes_supported?: components["schemas"]["BillingMode"][];
             billing_evidence?: components["schemas"]["BillingEvidence"];
             reported_tool_class?: components["schemas"]["ToolClass"];
+            /** @description Not accepted yet; the server answers `errors[].code` `not_enabled` at `/rate_limit` until M6-14 builds the field. */
             rate_limit?: components["schemas"]["AgentRateLimitState"];
-            /** @description Further fields of schema `agent_heartbeat.v1` (capabilities, active runs). No secrets, no content. */
+            /** @description Further fields of schema `agent_heartbeat.v1`, a closed object; any other key, also inside `capabilities`, `adapter` and `runtime`, is refused. Keys: `capabilities` (object: `followups` `steer` or `queue`; `components`, `voice_input`, `title`, `files_out` booleans), `active_runs` (distinct run ids), `degraded_reasons` (distinct codes), `adapter` (`name` required, `version` optional), `runtime` (`name` required), `protocol_version` (integer, at least 1). Names match `^[a-z0-9][a-z0-9._-]*$`, versions `^[0-9A-Za-z][0-9A-Za-z.+_-]*$`, codes `^[a-z0-9][a-z0-9_.:-]*$`. No secrets, no content, no paths. */
             details?: components["schemas"]["JsonObject"];
+            /** @description Readiness per bound forum of a runner (M2-03); the channels must be distinct. Applied only when present and different from the last list this server process applied; absent means "unchanged". */
             project_readiness?: components["schemas"]["ProjectReadiness"][];
         };
         ProjectReadiness: {
@@ -7462,7 +7475,7 @@ export interface components {
             presence: components["schemas"]["AgentRuntimeStatus"];
             /**
              * Format: int64
-             * @description Interval the adapter should keep.
+             * @description Interval the adapter should keep, `sync.heartbeat_interval`.
              */
             interval_ms: number;
         };
@@ -8847,7 +8860,7 @@ export interface components {
         GatewayHeartbeat: {
             /** Format: int64 */
             last_seq: number;
-            /** @description Agents only; equivalent to `POST /agents/me/heartbeat`. */
+            /** @description Agents only; equivalent to `POST /agents/me/heartbeat`. The liveness rules of the op run first (`heartbeat_ack`); then the agent part passes `rl.agent_runtime` and `agent.heartbeat`. Its errors (`forbidden`, `validation_failed`, `rate_limited`, `internal_error`) answer `error` and keep the connection. A heartbeat of an agent without this member changes no presence. */
             agent?: components["schemas"]["Heartbeat"];
         };
         GatewayHeartbeatAck: {

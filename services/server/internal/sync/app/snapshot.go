@@ -97,10 +97,6 @@ func NewSnapshot(d SnapshotDeps) (*SnapshotService, error) {
 	return &SnapshotService{d: d}, nil
 }
 
-// agentStateUnknown is the runtime state of every agent until heartbeats exist (M2-20,
-// docs/DECISIONS.md M1-63/3).
-const agentStateUnknown = "unknown"
-
 // Build implements sync.Snapshot (brief M1-63 design notes 7 to 10): sync.snapshot.read, then
 // head_seq and sync_epoch first and every other part after them (READ COMMITTED), so every change
 // with seq <= head_seq is contained and later ones arrive by catch-up (04 section 9). It carries no
@@ -302,9 +298,10 @@ func (s *SnapshotService) positions(ctx context.Context, a actor.Actor, channels
 	return read, position, mentions, nil
 }
 
-// agents fills the agents a may read (agent.read per item, the listing behind listAgents), each
-// with state unknown and without a reported billing mode until heartbeats exist (M2-20). A caller
-// the listing refuses as a whole (an app without agents:read) sees none.
+// agents fills the agents a may read (agent.read per item, the listing behind listAgents) with
+// their presence: state and reported billing mode as the listing shows them, which takes them from
+// the presence tracker of the process (agents.Presence, M2-20). Only agents have presence; a
+// caller the listing refuses as a whole (an app without agents:read) sees none.
 func (s *SnapshotService) agents(ctx context.Context, a actor.Actor, v *sync.SnapshotView) error {
 	p := agents.Page{}
 	for {
@@ -316,7 +313,11 @@ func (s *SnapshotService) agents(ctx context.Context, a actor.Actor, v *sync.Sna
 			return err
 		}
 		for _, ag := range page.Items {
-			v.Agents = append(v.Agents, sync.AgentPresence{AgentID: ag.ID, State: agentStateUnknown})
+			state := ag.Presence.State
+			if state == "" {
+				state = agents.StateUnknown
+			}
+			v.Agents = append(v.Agents, sync.AgentPresence{AgentID: ag.ID, State: state, ReportedBillingMode: ag.Presence.ReportedBillingMode})
 		}
 		if page.NextCursor == "" {
 			return nil

@@ -330,6 +330,10 @@ func TestConfigSchemaBuilds(t *testing.T) {
 		"agent.ack_timeout":          {Kind: config.KindDuration, Default: "30s", Min: "1ms", Chapter: "04-sync-protokoll.md"},
 		"agent.ack_persist_interval": {Kind: config.KindDuration, Default: "1s", Min: "1ms", Chapter: "04-sync-protokoll.md"},
 		"agent.max_inflight_events":  {Kind: config.KindInt, Default: "100", Min: "1", Max: "2147483647", Chapter: "04-sync-protokoll.md"},
+		// The presence of agents (M2-20).
+		"agent.presence_timeout":           {Kind: config.KindDuration, Default: "90s", Min: "1ms", Chapter: "04-sync-protokoll.md"},
+		"agent.heartbeat_persist_interval": {Kind: config.KindDuration, Default: "60s", Min: "1ms", Chapter: "03-datenmodell.md"},
+		"billing.mismatch_alert_after":     {Kind: config.KindDuration, Default: "5m", Min: "1ms", Chapter: "10-backend-richtlinie.md"},
 		// M1-64
 		"sync.ws_max_frame_bytes":   {Kind: config.KindInt, Default: "1048576", Min: "1024", Max: "16777216", Chapter: "04-sync-protokoll.md"},
 		"sync.identify_timeout":     {Kind: config.KindDuration, Default: "10s", Min: "1ms", Chapter: "04-sync-protokoll.md"},
@@ -1145,6 +1149,36 @@ func TestConfigCheckBackupOffsiteTarget(t *testing.T) {
 		}
 		if msg := got[0].String(); !strings.Contains(msg, "backup.offsite.target") || strings.Contains(msg, "s3.example.com") {
 			t.Errorf("target %q: the problem does not name the key or names the value: %q", target, msg)
+		}
+	}
+}
+
+// TestConfig_PresenceTimeoutAboveHeartbeatInterval: agent.presence_timeout must be greater than
+// sync.heartbeat_interval (cross-check presence_timeout_above_heartbeat_interval, M2-20): equal
+// values abort the start with a problem naming both keys and no value.
+func TestConfig_PresenceTimeoutAboveHeartbeatInterval(t *testing.T) {
+	t.Parallel()
+	for _, c := range []struct {
+		timeout, interval string
+		ok                bool
+	}{
+		{"90s", "30s", true},
+		{"31s", "30s", true},
+		{"30s", "30s", false},
+		{"20s", "30s", false},
+	} {
+		got := load(t, "BOTHY_AGENT__PRESENCE_TIMEOUT="+c.timeout, "BOTHY_SYNC__HEARTBEAT_INTERVAL="+c.interval)
+		if (len(got) == 0) != c.ok {
+			t.Errorf("timeout %s, interval %s: problems %v, want ok %v", c.timeout, c.interval, got, c.ok)
+			continue
+		}
+		if len(got) == 0 {
+			continue
+		}
+		msg := got[0].String()
+		if !strings.Contains(msg, "agent.presence_timeout") || !strings.Contains(msg, "sync.heartbeat_interval") ||
+			strings.Contains(msg, " "+c.timeout) {
+			t.Errorf("problem %q", msg)
 		}
 	}
 }

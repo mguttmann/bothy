@@ -4,6 +4,7 @@ package metrics
 
 import (
 	"fmt"
+	"regexp"
 	"slices"
 	"strings"
 )
@@ -64,12 +65,23 @@ const (
 	// SourceTables are the table names of the module register, read from the embedded
 	// migrations (platform/pg).
 	SourceTables Source = "tables"
+	// SourceAgentHandles are the handles of the agents, a set the owner limits (signals.md 2 item
+	// 1) that is not known when the instrument is built: the binder admits every value of the
+	// handle form instead of a list (docs/DECISIONS.md D-M2-20-13).
+	SourceAgentHandles Source = "agent_handles"
 )
+
+// handleForm is the form of principals.handle (identity): lower-case letters, digits, '.', '_'
+// and '-'; the length is bounded by principal.handle_max_chars when the handle is created.
+var handleForm = regexp.MustCompile(`^[a-z0-9][a-z0-9._-]*$`)
+
+// formSources are the sources whose values the binder checks by a form instead of a list.
+var formSources = map[Source]*regexp.Regexp{SourceAgentHandles: handleForm}
 
 // knownSources is the set of Source constants.
 var knownSources = map[Source]bool{
 	SourceActions: true, SourceRateClasses: true, SourceEventTypes: true, SourceRoutes: true,
-	SourceHTTPStatus: true, SourceCloseCodes: true, SourceJobKinds: true, SourceTables: true,
+	SourceHTTPStatus: true, SourceCloseCodes: true, SourceJobKinds: true, SourceTables: true, SourceAgentHandles: true,
 }
 
 // Other is the value an attribute takes when the recorded value lies outside its closed set; it

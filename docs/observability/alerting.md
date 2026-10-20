@@ -66,7 +66,7 @@ steht ``über `<name>` ``, ist sie echt größer. Die Alarme der Tabelle sind ge
 | `BothyEventConsumerLag` | page | the oldest unprocessed event of a worker consumer is older than `consumer.pending_alert_after` | `consumer.pending_alert_after` |
 | `BothyAgentConsumerLag` | ticket | über 1000 Ereignisse Rückstand des Verbrauchers | |
 | `BothyAgentOffline` | ticket | kein Heartbeat seit 5 Minuten | über `agent.presence_timeout` |
-| `BothyBillingModeMismatch` | page | Ist-Modus weicht vom Soll ab (I3) | |
+| `BothyBillingModeMismatch` | page | reported mode differs from the configured mode, according to the heartbeat for longer than the threshold or at a run (I3) | `billing.mismatch_alert_after` |
 | `BothyAuthzError` | page | Rechteprüfung meldet einen Programmfehler (`authz_not_checked`, `unknown_action`) oder einen Unterschied zwischen SQL-Filter und `authorize` (`filter_mismatch`) | |
 | `BothySecretRefreshFailing` | ticket | erneutes Lesen eines Geheimnisses scheitert | |
 | `BothyMalwareScanFailing` | ticket | nur Fehler, kein Ergebnis | |
@@ -121,6 +121,7 @@ Adapter-Prozess und seine Laufzeit prüfen; Status der Komponente des Agenten.
 ### bothybillingmodemismatch
 Sofort prüfen: Läuft ein Agent mit `personal` gegen einen Organisationsschlüssel oder umgekehrt?
 Konfiguration der Laufzeit des Adapters; nichts am Server ändern, bevor die Ursache klar ist.
+The heartbeat cause comes from the gauge of the heartbeat comparison (`bothy_agent_billing_mode_mismatch_age_seconds`): the agent card (`getAgent`) names the kind in `presence.warnings` (`billing_mode_mismatch`, `billing_mode_unsupported`, `billing_evidence_unknown`), and the audit entries `agent.heartbeat` show when the reported mode changed.
 
 ### bothyauthzerror
 Als Fehler mit Sicherheitsbezug behandeln: Eine Route hat ohne ihre Rechteprüfung geantwortet

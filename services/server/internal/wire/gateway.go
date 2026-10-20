@@ -118,6 +118,8 @@ type GatewayDeps struct {
 	// Consumers is the cursor port of agents (M2-07); with the hub it gives the consumer engine
 	// and the ack op. Required when Delivery is nil.
 	Consumers agents.Consumers
+	// Presence takes the member agent of the op heartbeat (M2-20); nil leaves it without effect.
+	Presence agents.Presence
 	// Clock nil means clock.System(); Log nil means slog.Default().
 	Clock clock.Clock
 	Log   *slog.Logger
@@ -207,7 +209,7 @@ func NewGateway(cfg GatewayConfig, d GatewayDeps) (*Gateway, error) {
 		Snapshot: d.Reads.Snapshot, CatchUp: d.Reads.CatchUp, Epoch: epochSource{d.Instance}, Delivery: d.Delivery,
 		Decoder: gatewayws.NewDecoder(schemas, check), Alarm: proofAlarm{alarm}, Clock: d.Clock, Log: orDiscard(d.Log),
 		Threads: d.Threads, OpLimiter: opLimiter{l: d.Limiter}, Publisher: publisher, Metrics: d.Metrics,
-		Consumers: engine, AgentLimiter: agentLimiter{l: d.Limiter},
+		Consumers: engine, AgentLimiter: agentLimiter{l: d.Limiter}, Presence: d.Presence,
 	})
 	if err != nil {
 		return nil, err
