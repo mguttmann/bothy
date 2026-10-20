@@ -55,6 +55,18 @@ jobs:
         if: ${{ !cancelled() && runner.os == 'Linux' }}
         shell: bash
         run: sudo apt-get update && sudo apt-get install --yes --no-install-recommends strace
+      # The test binary refuses to run without the marker of a disposable machine (brief M2-48
+      # design note 11); a hosted runner is thrown away after the job.
+      - name: Mark the runner as a disposable test machine (Linux and macOS)
+        if: ${{ !cancelled() && runner.os != 'Windows' }}
+        shell: bash
+        run: |
+          printf 'termsuite - disposable test machine (GitHub-hosted runner)\n' | sudo tee /etc/termsuite-disposable >/dev/null
+      - name: Mark the runner as a disposable test machine (Windows)
+        if: ${{ !cancelled() && runner.os == 'Windows' }}
+        shell: pwsh
+        run: |
+          Set-Content -LiteralPath (Join-Path $env:ProgramData 'termsuite-disposable') -Value 'termsuite - disposable test machine (GitHub-hosted runner)'
       # The suite runs even when a unit test failed: both results are kept.
       - name: Platform suite (Linux and macOS, as root)
         if: ${{ !cancelled() && runner.os != 'Windows' }}
