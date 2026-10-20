@@ -1,6 +1,6 @@
 # Modul `instance`
 
-Status: built in part (M1-15): the instance row, the sequence counters with the port `Counters`, the port `State` and the start check of `instance.min_server_version`. M1-28 adds the lock-free read of the rights version (`Versions.PermissionVersion`, `app.NewVersions`) for the rights cache of authz. M1-32 adds the server signing keys (`Keys`) with JWKS, rotation and the job `instance.key_rotation`. M1-46 adds the instance settings, the branding, discovery, the instance view and the problem types (`Settings`, `Admin`, `LoginOptionsSource`). M1-47 adds the feature flags (`Flags`, `FlagAdmin`, `FlagGroupSource`, `FlagUserSource`, the registry and `tools/flagcheck`). M1-63 adds `Versions.EventSeq`, the lock-free read of `event_seq`, the head of catch-up and snapshot. M7-04 adds the database identity of the instance row (R-DM-50), `State.CheckIdentity` for the start lock and the port `Restore` of `bothy restore finalize`.
+Status: built in part (M1-15): the instance row, the sequence counters with the port `Counters`, the port `State` and the start check of `instance.min_server_version`. M1-28 adds the lock-free read of the rights version (`Versions.PermissionVersion`, `app.NewVersions`) for the rights cache of authz. M1-32 adds the server signing keys (`Keys`) with JWKS, rotation and the job `instance.key_rotation`. M1-46 adds the instance settings, the branding, discovery, the instance view and the problem types (`Settings`, `Admin`, `LoginOptionsSource`). M1-47 adds the feature flags (`Flags`, `FlagAdmin`, `FlagGroupSource`, `FlagUserSource`, the registry and `tools/flagcheck`). M1-63 adds `Versions.EventSeq`, the lock-free read of `event_seq`, the head of catch-up and snapshot. M3-10 adds the logo operations (`Logos`) over the source port `LogoFiles`. M7-04 adds the database identity of the instance row (R-DM-50), `State.CheckIdentity` for the start lock and the port `Restore` of `bothy restore finalize`.
 Normativ ist [docs/spec/02-architektur.md](../../../../docs/spec/02-architektur.md); bei Abweichung gilt das Kapitel.
 
 ## Zweck
@@ -11,12 +11,12 @@ Instanz-Identität, Sync-Epoche, Mindest-Server-Version, Einstellungen und Brand
 
 | Package | Content |
 |---|---|
-| `internal/instance` | port: `CounterName` and the three counter constants, `Counters`, `Record` (`SetupCompleted`), `State`, `Versions`; signing keys (`keys.go`): `Purpose`, `KeyState`, `RotateMode`, `Signer`, `PublicKey`, `JWK`, `JWKSet`, `RotateCommand`, `Rotation`, `Keys`, `ErrJWSInvalid`, `SignatureAlgs`, `FormatWebhookPublicKey`; settings (`settings.go`): `SupportedLocales`, `Settings`, `Branding`, `LoginOptionsSource`, `LoginOptions`, `ProviderInfo`, `Admin` with its DTOs (`Setting`, `IfMatch`, `PutSetting`, `UpdateBranding`, `Info`, `Limits`, `Discovery`, `ClientVersion`, `ProblemType`); feature flags (`flags.go`): the registry `RegisteredFlags` with `FlagDefinition`, `FlagKind` and the key constants, `Flags`, `FlagSubject`, `SubjectOf`, `EvaluatedFlag`, `FlagAdmin` with `FeatureFlag`, `FlagRollout`, `PutFlagCmd`, the source ports `FlagGroupSource` and `FlagUserSource`; restore (`restore.go`, M7-04): `DatabaseIdentity`, `IdentityCheck`, `Restore` with `FinalizeRestore`, `RelocationManifest`, `FinalizeResult`, `ErrServerConnected`, `RelocationMismatchError`, the audit actions `ActionRestoreFinalize` and `ActionRelocationFinalize` |
-| `domain/` | counter names and the phase rule (`CheckAdvance`, `CheckRead`, `CheckAdvanceCount`), `CompareSemVer`, `ValidateSemVer`, `CheckServerVersion` (SemVer 2.0.0 precedence, hand-written: the domain layer imports no third-party library); the transitions of the signing keys (`signingkey.go`: `DueTransitions`, `EmergencyTransitions`, `LostTransitions`, `PendingNext`, `ActiveKey`, `Window`); the settings registry (`settings.go`: `Registry`, `Validate`, `ValidateProductName`, `ValidateAccentColor`, `DefaultProductName`), the branding version and changes (`branding.go`) and the discovery rules (`discovery.go`: `MinClientVersions`, `LocalPasswordEnabled`, `DiscoveryFeatures`, `ContentETag`); the flag rules (`flags.go`: `FlagSpec`, `CheckRegistry`, `Evaluate`, `InRollout`, `Rollout`, `NormalizeRollout`, `ReachedRemoveBy`); the start lock and the relocation check (`restore.go`: `Identity`, `IdentityMismatch`, `RelocationFacts`, `RelocationDifference`) |
-| `app/` | `NewCounters` (phase guard, then the repository) and `NewState` (row in a unit of work), outgoing port `Repository`; `NewKeys` (`Keys`, `KeysConfig`) with the outgoing ports `KeyRepository` and `KeyStore`; `NewAdmin` (`Admin`, `Config`, `Contract`) with the outgoing ports `SettingsRepository` and `FlagRepository` (`flags.go`: `Admin` also implements `Flags` and `FlagAdmin`; `FlagSpecs`); `NewRestore` (`restore.go`, `RestoreDeps`) with the outgoing ports `RestoreRepository`, `CursorMover` and `AuditHeadSource` |
+| `internal/instance` | port: `CounterName` and the three counter constants, `Counters`, `Record` (`SetupCompleted`), `State`, `Versions`; signing keys (`keys.go`): `Purpose`, `KeyState`, `RotateMode`, `Signer`, `PublicKey`, `JWK`, `JWKSet`, `RotateCommand`, `Rotation`, `Keys`, `ErrJWSInvalid`, `SignatureAlgs`, `FormatWebhookPublicKey`; settings (`settings.go`): `SupportedLocales`, `Settings`, `Branding`, `LoginOptionsSource`, `LoginOptions`, `ProviderInfo`, `Admin` with its DTOs (`Setting`, `IfMatch`, `PutSetting`, `UpdateBranding`, `Info`, `Limits`, `Discovery`, `ClientVersion`, `ProblemType`); feature flags (`flags.go`): the registry `RegisteredFlags` with `FlagDefinition`, `FlagKind` and the key constants, `Flags`, `FlagSubject`, `SubjectOf`, `EvaluatedFlag`, `FlagAdmin` with `FeatureFlag`, `FlagRollout`, `PutFlagCmd`, the source ports `FlagGroupSource` and `FlagUserSource`; logo (`logo.go`): `Logos`, `LogoOpener`, `LogoImage`, `LogoVariant`, the source port `LogoFiles`; restore (`restore.go`, M7-04): `DatabaseIdentity`, `IdentityCheck`, `Restore` with `FinalizeRestore`, `RelocationManifest`, `FinalizeResult`, `ErrServerConnected`, `RelocationMismatchError`, the audit actions `ActionRestoreFinalize` and `ActionRelocationFinalize` |
+| `domain/` | counter names and the phase rule (`CheckAdvance`, `CheckRead`, `CheckAdvanceCount`), `CompareSemVer`, `ValidateSemVer`, `CheckServerVersion` (SemVer 2.0.0 precedence, hand-written: the domain layer imports no third-party library); the transitions of the signing keys (`signingkey.go`: `DueTransitions`, `EmergencyTransitions`, `LostTransitions`, `PendingNext`, `ActiveKey`, `Window`); the settings registry (`settings.go`: `Registry`, `Validate`, `ValidateProductName`, `ValidateAccentColor`, `DefaultProductName`, `NoLogo`), the branding version and changes and the logo rule (`branding.go`: `LogoFileID`) and the discovery rules (`discovery.go`: `MinClientVersions`, `LocalPasswordEnabled`, `DiscoveryFeatures`, `ContentETag`, `DiscoveryLogoURL`); the flag rules (`flags.go`: `FlagSpec`, `CheckRegistry`, `Evaluate`, `InRollout`, `Rollout`, `NormalizeRollout`, `ReachedRemoveBy`); the start lock and the relocation check (`restore.go`: `Identity`, `IdentityMismatch`, `RelocationFacts`, `RelocationDifference`) |
+| `app/` | `NewCounters` (phase guard, then the repository) and `NewState` (row in a unit of work), outgoing port `Repository`; `NewKeys` (`Keys`, `KeysConfig`) with the outgoing ports `KeyRepository` and `KeyStore`; `NewAdmin` (`Admin`, `Config`, `Contract`) with the outgoing ports `SettingsRepository` and `FlagRepository` (`flags.go`: `Admin` also implements `Flags` and `FlagAdmin`; `FlagSpecs`; `logo.go`: `Admin` also implements `Logos`, `BindLogoFiles`); `NewRestore` (`restore.go`, `RestoreDeps`) with the outgoing ports `RestoreRepository`, `CursorMover` and `AuditHeadSource` |
 | `adapters/postgres/` | `Repository` over `platform/pg` (both outgoing ports), sqlc queries in `queries/`, generated code in `sqlcgen/` (entry in `services/server/sqlc.yaml`) |
 | `adapters/keystore/` | `Store`: the key store `secrets.signing_key_dir` over the secret provider (Ed25519, PKCS#8 PEM, `Thumbprint` after RFC 7638) |
-| `adapters/httpapi/` | `Keys`: the REST handlers `getJwks` and `rotateSigningKey`; `Admin`: `getDiscovery`, `getInstance`, `listInstanceSettings`, `putInstanceSetting`, `updateBranding`, `getProblemType`, `listFeatureFlags`, `putFeatureFlag` |
+| `adapters/httpapi/` | `Keys`: the REST handlers `getJwks` and `rotateSigningKey`; `Admin`: `getDiscovery`, `getInstance`, `listInstanceSettings`, `putInstanceSetting`, `updateBranding`, `getProblemType`, `listFeatureFlags`, `putFeatureFlag`; `Logos`: `uploadBrandingLogo`, `deleteBrandingLogo`, `getBrandingLogo` |
 | `adapters/jobs/` | `Register`, `Handler`: the periodic job `instance.key_rotation` |
 
 Migration `00002_instance_counters.sql` creates both tables, the three counter rows with value 0
@@ -228,7 +228,7 @@ Normative: [01-produkt.md](../../../../docs/spec/01-produkt.md) sections 9 and 1
 **Settings registry.** `domain.Registry` holds one entry per key of
 [configuration.md](../../../../docs/operations/configuration.md) section 6 with its JSON type,
 default and route: `branding.accent_color` (`spruce`, an accent key of `kernel/designkeys`),
-`branding.logo_file_id` (no default, UUIDv7, written only by M3-10), `branding.product_name`
+`branding.logo_file_id` (no default, a UUIDv7 or the empty string for no logo, written only by the logo operations of M3-10), `branding.product_name`
 (`DefaultProductName`, trimmed, 1 to `branding.product_name_max_chars` characters, the display text
 check of `kernel/textcheck`) and `locale.default` (`de`, one of `SupportedLocales()`).
 `TestSettingsRegistryMatchesConfigurationDoc` parses section 6 and fails on a difference. Migration
@@ -263,6 +263,55 @@ the configuration and `features`, the registered flags evaluated for the caller 
 `auth.local_password_enabled`, and `internal/wire` (`NewInstanceSettings`, start step `settings`
 before `identity`) passes it in. `identity` reads `locale.default` through `Settings` for
 `createUser`.
+
+### Logo (M3-10)
+
+Normative: [12-dateien.md](../../../../docs/spec/12-dateien.md) 3.7 and 9.3,
+[06-api.md](../../../../docs/spec/06-api.md) sections 8 and 16, 05 rows
+`instance.branding.update` and `instance.discovery.read`, SEC-HDR-4 and SEC-CORS-2. Rulings:
+[DECISIONS.md](../../../../docs/DECISIONS.md) `D-M3-10-<n>`.
+
+**Setting.** `branding.logo_file_id` holds the UUIDv7 of the logo file or `domain.NoLogo`, the
+empty string. The row is never deleted: removing the logo stores the empty string, so the
+branding version (the sum of the three row versions) rises on every change and an old
+`If-Match` of `updateBranding` never matches again. `domain.LogoFileID` turns the empty string
+into the zero id, so `Branding.logo_file_id` and discovery `logo_url` (`domain.DiscoveryLogoURL`)
+are omitted exactly as for an absent row. `putInstanceSetting` keeps refusing the key
+(`use_branding_endpoint`); only the logo operations write it.
+
+**Source port.** `instance` may use no other module (02 4.4), so it declares `LogoFiles`; the
+module `files` implements it (`files/adapters/profileimages`) and `internal/wire` binds it once
+at start with `Admin.BindLogoFiles`, because it builds `files` after `instance`
+(docs/DECISIONS.md D-M3-10-1). Before the binding `uploadBrandingLogo` (and `deleteBrandingLogo`
+while a logo exists) answers `503 unavailable` and `getBrandingLogo` `404`.
+
+**`uploadBrandingLogo`** (owner with fresh step-up, audit, `multipart/form-data` with the part
+`file`). `Admin.UploadLogo` authorizes `instance.branding.update` before the opener reads one
+byte of the body; a denial (`unauthenticated`, `owner_only`, `step_up_required`,
+`step_up_not_possible`) costs no byte and the Authorizer writes its deny audit. Then
+`LogoFiles.Stage` checks and stores the image outside any unit of work (no object store call in a
+transaction, 02 8.5). One unit of work follows: lock the setting row (the advisory lock of all
+settings writers, then the row lock; a lost first insert reads the winner's row again, as
+`putInstanceSetting` does), write the new id with version + 1, `updated_by` and `updated_at`,
+`LogoFiles.Attach` (completes the staged session and inserts the scan job), `LogoFiles.Release`
+of the previous logo if any, `instance.updated` with `changed_keys = ["branding.logo_file_id"]`,
+and the allow audit with `changed_keys` and `file_id`. The answer is `Branding` with the new
+version. There is no `If-Match`: the logo is replaced as a whole, the row lock serializes
+concurrent uploads and the last one wins (06 8 point 2, design note 10).
+
+**`deleteBrandingLogo`** (same right, idempotent). Without a logo it writes nothing and appends no
+event, but records the allow audit with empty `changed_keys`; with a logo it stores the empty
+string with version + 1, releases the file, appends `instance.updated` and records the allow
+audit with `changed_keys = ["branding.logo_file_id"]`. Audit entries carry only ids and keys.
+
+**`getBrandingLogo`** (public through `instance.discovery.read`, also anonymous and before
+setup). `Admin.OpenLogo` answers one and the same `404` for an absent or empty setting, an unbound
+port and every `not_found` of `LogoFiles.OpenVariant` (pending, blocked, failed, deleted, no
+variant `medium`). The handler reads the variant once, at most its stored size plus one byte
+(another count is `503 unavailable`), hashes it and answers `200` with the headers of
+`httpserver.SetFileHeaders` (`inline`, file name `logo.png` or `logo.jpg`), `ETag` (the SHA-256
+in hex), `Repr-Digest` and `Content-Length`. `Cache-Control: no-store` and
+`Access-Control-Allow-Origin: *` without credentials come from the chain; `Range` is ignored.
 
 ### Feature flags (M1-47)
 
@@ -321,7 +370,7 @@ becomes an `option`; a lasting switch gets a new key.
 
 ## Port (Wurzelpaket `internal/instance`)
 
-- Eingehend: `Settings`, `Flags`, `Keys` (Signer je Zweck, JWKS, Rotation), `Counters` (nur für die Phasen-Hooks von `authz`, `sync`, `audit`), `Versions` (Zählerstände ohne Sperre lesen, z. B. `permission_version` für den Rechte-Cache, `event_seq` für Catch-up); deklariert `LoginOptionsSource` (Anmelde-Treiber und Passwortweg für die Discovery), `FlagUserSource` (Menschen eines Rollouts), `FlagGroupSource` (gültige Gruppen eines Menschen für die Auswertung).
+- Eingehend: `Settings`, `Flags`, `Keys` (Signer je Zweck, JWKS, Rotation), `Counters` (nur für die Phasen-Hooks von `authz`, `sync`, `audit`), `Versions` (Zählerstände ohne Sperre lesen, z. B. `permission_version` für den Rechte-Cache, `event_seq` für Catch-up), `Logos` (upload, removal and the public variant of the logo, M3-10); deklariert `LoginOptionsSource` (Anmelde-Treiber und Passwortweg für die Discovery), `FlagUserSource` (Menschen eines Rollouts), `FlagGroupSource` (gültige Gruppen eines Menschen für die Auswertung), `LogoFiles` (staging, linking, release and the variant `medium` of logo files).
 - Gibt In-Tx-Ereignisse aus: keine.
 - Abonniert In-Tx-Ereignisse: keine.
 - Implementiert Quellen-Ports und Querschnitts-Ports: keine.

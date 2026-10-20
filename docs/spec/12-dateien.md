@@ -314,6 +314,47 @@ Pfad je Zweck. Die Spalte `files.purpose` (03) trägt eine eigene Rechte-Regel j
 
 Alle Zwecke laufen durch dieselbe Prüfung und denselben Scan.
 
+**Avatar and logo (M3-10).** `setMyAvatar` and `uploadBrandingLogo` take the image as the one
+multipart part `file` (`ImageUpload` in `openapi.yaml`); `authorize` runs before the first byte of
+the body is read. The server then stages the file outside any transaction, in this order, and
+stores nothing when a check fails:
+
+1. The first part is named `file`, else `400 validation_failed` (pointer `/file`, code
+   `required`).
+2. The declared type is `image/jpeg`, `image/png` or `image/webp`, else `415
+   unsupported_media_type`; a declared type in `file.denied_mime_types` gives `415` with `reason`
+   `file_type_denied` (6.1, first step).
+3. The part is read into memory up to the smaller of `file.max_upload_bytes` and
+   `file.upload_part_bytes`, counted and hashed with SHA-256; more bytes give `413
+   payload_too_large` whose `detail` names the key that set the cap, no byte gives `400
+   validation_failed`. A further part after `file` gives `400 validation_failed`.
+4. The limits of 3.1 for open sessions and free space apply; the quota is not checked, because
+   an avatar or a logo replaces the previous one.
+5. Rows before bytes: a `files` row with the purpose, `scope_channel_id` NULL and the fixed
+   `original_name` `avatar` or `logo` (the client's file name is ignored, because every
+   signed-in principal may read these files), a session in mode `direct` with the counted size
+   and hash as declared values, then the one part through the part logic of 3.2.
+
+One unit of work per operation then locks the anchor row (the principal row, or the setting row
+`branding.logo_file_id`), completes the session and inserts `files.scan` (3.4), links the new file
+and marks the previous file of the same purpose and uploader deleted (`deleted_at`). The file is
+linked before it is deliverable: until then readers get `409 file_not_ready` with `Retry-After`
+(9.3) and `getBrandingLogo` answers `404`, so the login screen shows the product mark. The pass
+of 3.4 and 7 also applies the purpose rule: an avatar or logo is accepted only as filtered JPEG,
+filtered PNG or converted still WebP; any other detected type, an animated WebP and a still WebP
+above `file.image.max_pixels` end `upload_state = 'failed'` with `failure_reason`
+`file_type_denied` before they can become deliverable, because only originals the server
+filtered or converted are free of metadata (7.1). A JPEG or PNG above `file.image.max_pixels` is
+filtered, stays deliverable and gets no thumbnails (7.2). Every state change of such a file
+writes `file.updated` as a personal event of the uploader (`audience_principal_id =
+uploaded_by`, empty scope), because only the uploader waits for the result; other readers learn
+of the new file through `user.updated` or `instance.updated`. `getBrandingLogo` serves only the
+variant `medium` (7.3) of a deliverable `branding` file, re-encoded by the server, with
+`Cache-Control: no-store` and without `Range`; a missing, pending, blocked, failed or deleted logo
+and one without that variant give the same `404`. Avatars of agents have no operation in
+`openapi.yaml` yet, although the table names `agent.update` (spec gap). Rulings D-M3-10-1 to
+D-M3-10-16 in [docs/DECISIONS.md](../DECISIONS.md).
+
 ## 4. Objektspeicher
 
 ### 4.1 Port
@@ -922,6 +963,7 @@ damit ein großer Import Live-Uploads nicht verzögert; kein Kontingent; die Nac
 |---|---|
 | Nachricht gelöscht | In derselben Transaktion: `message_attachments` weg ([03-datenmodell.md](03-datenmodell.md)), `files.deleted_at` gesetzt, Job `files.purge_objects` eingereiht (02 12.3). Der Job löscht Original und Varianten über ihre bekannten Schlüssel. |
 | `file.delete` | nur nicht angehängte eigene Dateien (oder mit `manage`); gleicher Weg |
+| Avatar replaced or removed, logo replaced or removed | In the same transaction as the change of `principals.avatar_file_id` or `branding.logo_file_id`: `files.deleted_at` of the previous file is set; its objects go through `files.purge_objects` (M3-08). A staged file whose session never completes expires like every open session (row below). |
 | Nie angehängt | Dateien mit `purpose = 'attachment'`, `upload_state = 'complete'`, ohne Anhang und ohne Verweis aus einem Entwurf des Hochladenden (`drafts.file_ids` mit `drafts.user_id = files.uploaded_by`), älter als `file.unattached_ttl`: löschen. Grund für "des Hochladenden": Ein Entwurf prüft `file_ids` beim Speichern nur in der Form (04 Abschnitt 14); eine fremde ID darin darf keine Datei am Leben halten |
 | Session offen und abgelaufen | nach `file.upload_session_ttl`: Teile löschen, Multipart-Upload abbrechen, `upload_state = 'failed'`, Session `expired` |
 | Fehlgeschlagen oder blockiert | Objekte sofort löschen; Zeile bleibt bis `file.failed_row_ttl` für die Anzeige beim Hochladenden |
@@ -957,8 +999,17 @@ der Spec wieder.
 | `PUT /api/v1/files/{id}/transcript` | `file.transcript.submit` | `rl.agent_runtime` |
 | `DELETE /api/v1/files/{id}` | `file.delete` | `rl.write` |
 
-Uploads für Avatare und Logo nutzen dieselben Session-Endpunkte unter dem jeweiligen Pfad der
-Profil- bzw. Branding-Ressource mit der Aktion aus 3.7.
+Avatar and logo have no upload sessions of their own: they arrive as one `multipart/form-data`
+request with the part `file` (`ImageUpload`) and use the action of 3.7, and the server opens and
+completes the session itself (3.7).
+
+| Methode und Pfad | Aktion | RL-Klasse |
+|---|---|---|
+| `PUT /api/v1/me/avatar` (`setMyAvatar`) | `self.profile.update` | `rl.write` |
+| `DELETE /api/v1/me/avatar` (`deleteMyAvatar`) | `self.profile.update` | `rl.write` |
+| `PUT /api/v1/instance/branding/logo` (`uploadBrandingLogo`) | `instance.branding.update` | `rl.admin` |
+| `DELETE /api/v1/instance/branding/logo` (`deleteBrandingLogo`) | `instance.branding.update` | `rl.admin` |
+| `GET /api/v1/instance/branding/logo` (`getBrandingLogo`) | `instance.discovery.read` (public, variant `medium`) | `rl.public_auth` |
 
 ## 14. Beobachtbarkeit
 

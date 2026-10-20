@@ -153,3 +153,32 @@ func (q *Queries) QuotaUsedBytes(ctx context.Context, uploadedBy pgtype.UUID) (i
 	err := row.Scan(&used)
 	return used, err
 }
+
+const releaseFile = `-- name: ReleaseFile :execrows
+UPDATE files SET deleted_at = $1
+WHERE id = $2 AND purpose = $3 AND deleted_at IS NULL
+  AND ($4::uuid IS NULL OR uploaded_by = $4::uuid)
+`
+
+type ReleaseFileParams struct {
+	DeletedAt  pgtype.Timestamptz
+	ID         pgtype.UUID
+	Purpose    string
+	UploadedBy pgtype.UUID
+}
+
+// The release of a replaced or removed avatar or logo (M3-10, docs/DECISIONS.md D-M3-10-5): the
+// deleted mark of one file of the purpose, of the uploader when one is named; the objects go with
+// files.purge_objects (M3-08).
+func (q *Queries) ReleaseFile(ctx context.Context, arg ReleaseFileParams) (int64, error) {
+	result, err := q.db.Exec(ctx, releaseFile,
+		arg.DeletedAt,
+		arg.ID,
+		arg.Purpose,
+		arg.UploadedBy,
+	)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
+}

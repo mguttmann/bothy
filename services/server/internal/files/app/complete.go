@@ -47,7 +47,8 @@ func (s *Service) complete(ctx context.Context, a actor.Actor, cmd files.Complet
 	if err != nil {
 		return files.File{}, 0, false, err
 	}
-	if !found {
+	if !found || rec.File.Purpose != purposeAttachment {
+		// An avatar or logo is completed by its own operation (CompleteStagedImage, M3-10).
 		return files.File{}, 0, false, notFound()
 	}
 	d, err := s.decide(ctx, a, authorize.ActionFileUpload, authorize.Resource{Kind: authorize.ResourceChannel, ID: rec.File.ScopeChannelID})

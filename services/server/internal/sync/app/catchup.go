@@ -228,7 +228,7 @@ func admit(ctx context.Context, az authorize.Authorizer, a actor.Actor, ev sync.
 		// A receive action outside the catalogue of this build cannot be decided: fail closed.
 		return false, authorize.Decision{}, nil
 	}
-	r := authorize.ResourceFromEvent(ev.ResourceKind, ev.ResourceID, ev.SpaceID, ev.ChannelID, ev.ThreadID)
+	r := authorize.ResourceFromEvent(ev.ResourceKind, ev.ResourceID, ev.SpaceID, ev.ChannelID, ev.ThreadID, ev.AudiencePrincipalID)
 	d, err := az.Authorize(ctx, a, act, r)
 	if err != nil {
 		return false, authorize.Decision{}, err

@@ -429,6 +429,11 @@ alle Texte der YAML-Dateien (R-API-15); jede Antwort-Komponente nennt ihren Stat
    Agenten, Backend-Richtlinie, Zugangsdaten-Inhaber, Vorlagen, Komponenten, Befehle, Branding und
    "als ungelesen markieren". Fehlt `If-Match`: `428 precondition_required`. Passt er nicht:
    `412 version_conflict` mit der aktuellen Fassung in `current`.
+   Branding here means name and accent (`updateBranding`). The logo is replaced or removed as a
+   whole with `uploadBrandingLogo` and `deleteBrandingLogo` without `If-Match`: last write wins,
+   and the lock on the setting row `branding.logo_file_id` serializes concurrent writes. Every
+   logo change still raises the branding version, so an older `If-Match` of `updateBranding`
+   fails with `412` (D-M3-10-11).
 3. Wo "letzte Schreibung gewinnt" gilt (Instanz-Einstellungen, Schalter, Projektbindung,
    Thread-Tags), ist `If-Match` optional und wird geprüft, wenn er kommt.
 4. Persönliche Sync-Daten folgen 04, Abschnitt 14: Entwürfe mit `base_version` und

@@ -87,6 +87,9 @@ type Identity struct {
 	People *app.People
 	// PeopleHandlers are the REST handlers of the ten people, owner and self operations.
 	PeopleHandlers *identityhttp.People
+	// AvatarHandlers are the REST handlers of setMyAvatar and deleteMyAvatar (M3-10); they work
+	// once BindAvatarFiles bound the files module.
+	AvatarHandlers *identityhttp.Avatars
 	// DPoP is the port identity.DPoP; M1-34 hands it to the Authenticator.
 	DPoP *app.DPoPVerifier
 	// Replay is the jti store of DPoP; Start sweeps it.
@@ -274,7 +277,7 @@ func NewIdentity(cfg app.Config, pool *pg.Pool, uow txn.UnitOfWork, az authorize
 		return nil, err
 	}
 	return &Identity{
-		Devices: devices, People: people, PeopleHandlers: identityhttp.NewPeople(people, people), DPoP: verifier, Replay: store,
+		Devices: devices, People: people, PeopleHandlers: identityhttp.NewPeople(people, people), AvatarHandlers: identityhttp.NewAvatars(people), DPoP: verifier, Replay: store,
 		Handlers: identityhttp.NewDevices(devices), Tokens: tokens, TokenHandlers: identityhttp.NewTokens(tokens),
 		Enrollment: enrollment, TrustedHeader: driver, Principals: principals,
 		Directory: NewSearchDirectory(pool, w.Search, w.Settings), PrincipalWrites: writes, cfg: cfg, state: instanceapp.NewState(instanceRepo, uow),

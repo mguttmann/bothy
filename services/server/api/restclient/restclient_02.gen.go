@@ -16,6 +16,76 @@ import (
 	"github.com/oapi-codegen/runtime"
 )
 
+// CreateInteractionWithBody Use a button, select or form
+//
+// Single-use components accept exactly one interaction; later ones get 409 `component_used`.
+// Idempotent by `(principal, client_interaction_id)`.
+//
+// Takes any type of body and a specified content type.
+//
+// Corresponds with POST /components/{component_id}/interactions (the `CreateInteraction` operationId).
+func (c *Client) CreateInteractionWithBody(ctx context.Context, componentId ComponentIdPath, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewCreateInteractionRequestWithBody(c.Server, componentId, contentType, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// CreateInteraction Use a button, select or form
+//
+// Single-use components accept exactly one interaction; later ones get 409 `component_used`.
+// Idempotent by `(principal, client_interaction_id)`.
+//
+// Takes a body of the `application/json` content type.
+//
+// Corresponds with POST /components/{component_id}/interactions (the `CreateInteraction` operationId).
+func (c *Client) CreateInteraction(ctx context.Context, componentId ComponentIdPath, body CreateInteractionJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewCreateInteractionRequest(c.Server, componentId, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// GetConsoleSession Read the console session
+//
+// Corresponds with GET /console/session (the `GetConsoleSession` operationId).
+func (c *Client) GetConsoleSession(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewGetConsoleSessionRequest(c.Server)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// EndViewAs End the stored view as person
+//
+// Corresponds with DELETE /console/session/view-as (the `EndViewAs` operationId).
+func (c *Client) EndViewAs(ctx context.Context, params *EndViewAsParams, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewEndViewAsRequest(c.Server, params)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
 // ReconcileCostsWithBody Reconcile estimates with invoices
 //
 // Takes any type of body and a specified content type.
@@ -1859,6 +1929,8 @@ func (c *Client) DeleteBrandingLogo(ctx context.Context, reqEditors ...RequestEd
 
 // GetBrandingLogo Download the instance logo
 //
+// Serves the variant `medium` of the logo (longest edge `file.thumbnail.medium_px`, re-encoded by the server without metadata, 12 3.7 and 7.3), never the original. Answers 404 while no logo is set and while the logo file is not deliverable (pending, blocked, failed or deleted) or has no variant `medium`, always with the same status, body and headers. The response carries `Content-Disposition: inline`, `Cache-Control: no-store`, `ETag` and `Repr-Digest` over the variant and `Access-Control-Allow-Origin: *` without credentials; `Range` is ignored.
+//
 // Corresponds with GET /instance/branding/logo (the `GetBrandingLogo` operationId).
 func (c *Client) GetBrandingLogo(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error) {
 	req, err := NewGetBrandingLogoRequest(c.Server)
@@ -1873,6 +1945,8 @@ func (c *Client) GetBrandingLogo(ctx context.Context, reqEditors ...RequestEdito
 }
 
 // UploadBrandingLogoWithBody Upload the logo
+//
+// Owner with fresh step-up; nothing of the body is read before `authorize` allowed the action. Checks in this order (12 3.7): the first part is `file` (400 `validation_failed`); the declared type is JPEG, PNG or WebP (415 `unsupported_media_type`, with `reason` `file_type_denied` for a type in `file.denied_mime_types`); the part holds at most the smaller of `file.max_upload_bytes` and `file.upload_part_bytes` (413 `payload_too_large`) and at least one byte, and no further part follows (400 `validation_failed`); open sessions (429) and free space of the file system driver (503 `unavailable` with `reason` `storage_full`). The new file is linked at once and replaces the previous logo; it becomes deliverable later, after scan and metadata removal, and until then `getBrandingLogo` answers 404. Last write wins; no `If-Match` (06 8).
 //
 // Takes any type of body and a specified content type.
 //
@@ -2048,6 +2122,8 @@ func (c *Client) DeleteMyAvatar(ctx context.Context, reqEditors ...RequestEditor
 }
 
 // SetMyAvatarWithBody Upload own avatar
+//
+// Only for people; nothing of the body is read before `authorize` allowed the action. Checks in this order (12 3.7): the first part is `file` (400 `validation_failed`); the declared type is JPEG, PNG or WebP (415 `unsupported_media_type`, with `reason` `file_type_denied` for a type in `file.denied_mime_types`); the part holds at most the smaller of `file.max_upload_bytes` and `file.upload_part_bytes` (413 `payload_too_large`) and at least one byte, and no further part follows (400 `validation_failed`); open sessions (429) and free space of the file system driver (503 `unavailable` with `reason` `storage_full`). The new file is linked at once (`avatar_file_id`) and replaces the previous avatar; it becomes deliverable later, after scan and metadata removal, and until then file downloads answer 409 `file_not_ready`.
 //
 // Takes any type of body and a specified content type.
 //
@@ -23430,12 +23506,16 @@ type ClientWithResponsesInterface interface {
 
 	// GetBrandingLogoWithResponse Download the instance logo
 	//
+	// Serves the variant `medium` of the logo (longest edge `file.thumbnail.medium_px`, re-encoded by the server without metadata, 12 3.7 and 7.3), never the original. Answers 404 while no logo is set and while the logo file is not deliverable (pending, blocked, failed or deleted) or has no variant `medium`, always with the same status, body and headers. The response carries `Content-Disposition: inline`, `Cache-Control: no-store`, `ETag` and `Repr-Digest` over the variant and `Access-Control-Allow-Origin: *` without credentials; `Range` is ignored.
+	//
 	// Returns a wrapper object for the known response body format(s).
 	//
 	// Corresponds with GET /instance/branding/logo (the `GetBrandingLogo` operationId).
 	GetBrandingLogoWithResponse(ctx context.Context, reqEditors ...RequestEditorFn) (*GetBrandingLogoResponse, error)
 
 	// UploadBrandingLogoWithBodyWithResponse Upload the logo
+	//
+	// Owner with fresh step-up; nothing of the body is read before `authorize` allowed the action. Checks in this order (12 3.7): the first part is `file` (400 `validation_failed`); the declared type is JPEG, PNG or WebP (415 `unsupported_media_type`, with `reason` `file_type_denied` for a type in `file.denied_mime_types`); the part holds at most the smaller of `file.max_upload_bytes` and `file.upload_part_bytes` (413 `payload_too_large`) and at least one byte, and no further part follows (400 `validation_failed`); open sessions (429) and free space of the file system driver (503 `unavailable` with `reason` `storage_full`). The new file is linked at once and replaces the previous logo; it becomes deliverable later, after scan and metadata removal, and until then `getBrandingLogo` answers 404. Last write wins; no `If-Match` (06 8).
 	//
 	// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
 	//
@@ -23513,6 +23593,8 @@ type ClientWithResponsesInterface interface {
 	DeleteMyAvatarWithResponse(ctx context.Context, reqEditors ...RequestEditorFn) (*DeleteMyAvatarResponse, error)
 
 	// SetMyAvatarWithBodyWithResponse Upload own avatar
+	//
+	// Only for people; nothing of the body is read before `authorize` allowed the action. Checks in this order (12 3.7): the first part is `file` (400 `validation_failed`); the declared type is JPEG, PNG or WebP (415 `unsupported_media_type`, with `reason` `file_type_denied` for a type in `file.denied_mime_types`); the part holds at most the smaller of `file.max_upload_bytes` and `file.upload_part_bytes` (413 `payload_too_large`) and at least one byte, and no further part follows (400 `validation_failed`); open sessions (429) and free space of the file system driver (503 `unavailable` with `reason` `storage_full`). The new file is linked at once (`avatar_file_id`) and replaces the previous avatar; it becomes deliverable later, after scan and metadata removal, and until then file downloads answer 409 `file_not_ready`.
 	//
 	// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
 	//
@@ -27221,172 +27303,4 @@ func (r EnableAgentResponse) GetApplicationproblemJSON422() *UnprocessableEntity
 // GetApplicationproblemJSON429 returns the response for an HTTP 429 `application/problem+json` response
 func (r EnableAgentResponse) GetApplicationproblemJSON429() *TooManyRequests {
 	return r.ApplicationproblemJSON429
-}
-
-// GetApplicationproblemJSONDefault returns the response for an HTTP default `application/problem+json` response
-func (r EnableAgentResponse) GetApplicationproblemJSONDefault() *Error {
-	return r.ApplicationproblemJSONDefault
-}
-
-// GetBody returns the raw response body bytes
-func (r EnableAgentResponse) GetBody() []byte {
-	return r.Body
-}
-
-// Status returns HTTPResponse.Status
-func (r EnableAgentResponse) Status() string {
-	if r.HTTPResponse != nil {
-		return r.HTTPResponse.Status
-	}
-	return http.StatusText(0)
-}
-
-// StatusCode returns HTTPResponse.StatusCode
-func (r EnableAgentResponse) StatusCode() int {
-	if r.HTTPResponse != nil {
-		return r.HTTPResponse.StatusCode
-	}
-	return 0
-}
-
-// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
-func (r EnableAgentResponse) ContentType() string {
-	if r.HTTPResponse != nil {
-		return r.HTTPResponse.Header.Get("Content-Type")
-	}
-	return ""
-}
-
-// SetAgentToolClassResponse200Headers the declared response headers of an HTTP 200 response for SetAgentToolClass
-type SetAgentToolClassResponse200Headers struct {
-	CorrelationId   *CorrelationId
-	ETag            *string
-	RateLimit       *string
-	RateLimitPolicy *string
-}
-
-// SetAgentToolClassResponse400Headers the declared response headers of an HTTP 400 response for SetAgentToolClass
-type SetAgentToolClassResponse400Headers struct {
-	CorrelationId *CorrelationId
-}
-
-// SetAgentToolClassResponse401Headers the declared response headers of an HTTP 401 response for SetAgentToolClass
-type SetAgentToolClassResponse401Headers struct {
-	CorrelationId   *CorrelationId
-	DPoPNonce       *string
-	SetCookie       *string
-	WWWAuthenticate *string
-}
-
-// SetAgentToolClassResponse403Headers the declared response headers of an HTTP 403 response for SetAgentToolClass
-type SetAgentToolClassResponse403Headers struct {
-	CorrelationId *CorrelationId
-}
-
-// SetAgentToolClassResponse404Headers the declared response headers of an HTTP 404 response for SetAgentToolClass
-type SetAgentToolClassResponse404Headers struct {
-	CorrelationId *CorrelationId
-}
-
-// SetAgentToolClassResponse409Headers the declared response headers of an HTTP 409 response for SetAgentToolClass
-type SetAgentToolClassResponse409Headers struct {
-	CorrelationId *CorrelationId
-}
-
-// SetAgentToolClassResponse412Headers the declared response headers of an HTTP 412 response for SetAgentToolClass
-type SetAgentToolClassResponse412Headers struct {
-	CorrelationId *CorrelationId
-}
-
-// SetAgentToolClassResponse428Headers the declared response headers of an HTTP 428 response for SetAgentToolClass
-type SetAgentToolClassResponse428Headers struct {
-	CorrelationId *CorrelationId
-}
-
-// SetAgentToolClassResponse429Headers the declared response headers of an HTTP 429 response for SetAgentToolClass
-type SetAgentToolClassResponse429Headers struct {
-	CorrelationId   *CorrelationId
-	RateLimit       *string
-	RateLimitPolicy *string
-	RetryAfter      *int
-}
-
-// SetAgentToolClassResponseDefaultHeaders the declared response headers of an HTTP default response for SetAgentToolClass
-type SetAgentToolClassResponseDefaultHeaders struct {
-	CorrelationId *CorrelationId
-}
-
-type SetAgentToolClassResponse struct {
-	Body         []byte
-	HTTPResponse *http.Response
-	// JSON200 the response for an HTTP 200 `application/json` response
-	JSON200 *Agent
-	// ApplicationproblemJSON400 the response for an HTTP 400 `application/problem+json` response
-	ApplicationproblemJSON400 *BadRequest
-	// ApplicationproblemJSON401 the response for an HTTP 401 `application/problem+json` response
-	ApplicationproblemJSON401 *Unauthorized
-	// ApplicationproblemJSON403 the response for an HTTP 403 `application/problem+json` response
-	ApplicationproblemJSON403 *Forbidden
-	// ApplicationproblemJSON404 the response for an HTTP 404 `application/problem+json` response
-	ApplicationproblemJSON404 *NotFound
-	// ApplicationproblemJSON409 the response for an HTTP 409 `application/problem+json` response
-	ApplicationproblemJSON409 *Conflict
-	// ApplicationproblemJSON412 the response for an HTTP 412 `application/problem+json` response
-	ApplicationproblemJSON412 *PreconditionFailed
-	// ApplicationproblemJSON428 the response for an HTTP 428 `application/problem+json` response
-	ApplicationproblemJSON428 *PreconditionRequired
-	// ApplicationproblemJSON429 the response for an HTTP 429 `application/problem+json` response
-	ApplicationproblemJSON429 *TooManyRequests
-	// ApplicationproblemJSONDefault the response for an HTTP default `application/problem+json` response
-	ApplicationproblemJSONDefault *Error
-	// Headers200 the parsed response headers for an HTTP 200 response
-	Headers200 *SetAgentToolClassResponse200Headers
-	// Headers400 the parsed response headers for an HTTP 400 response
-	Headers400 *SetAgentToolClassResponse400Headers
-	// Headers401 the parsed response headers for an HTTP 401 response
-	Headers401 *SetAgentToolClassResponse401Headers
-	// Headers403 the parsed response headers for an HTTP 403 response
-	Headers403 *SetAgentToolClassResponse403Headers
-	// Headers404 the parsed response headers for an HTTP 404 response
-	Headers404 *SetAgentToolClassResponse404Headers
-	// Headers409 the parsed response headers for an HTTP 409 response
-	Headers409 *SetAgentToolClassResponse409Headers
-	// Headers412 the parsed response headers for an HTTP 412 response
-	Headers412 *SetAgentToolClassResponse412Headers
-	// Headers428 the parsed response headers for an HTTP 428 response
-	Headers428 *SetAgentToolClassResponse428Headers
-	// Headers429 the parsed response headers for an HTTP 429 response
-	Headers429 *SetAgentToolClassResponse429Headers
-	// HeadersDefault the parsed response headers for an HTTP default response
-	HeadersDefault *SetAgentToolClassResponseDefaultHeaders
-}
-
-// GetJSON200 returns the response for an HTTP 200 `application/json` response
-func (r SetAgentToolClassResponse) GetJSON200() *Agent {
-	return r.JSON200
-}
-
-// GetApplicationproblemJSON400 returns the response for an HTTP 400 `application/problem+json` response
-func (r SetAgentToolClassResponse) GetApplicationproblemJSON400() *BadRequest {
-	return r.ApplicationproblemJSON400
-}
-
-// GetApplicationproblemJSON401 returns the response for an HTTP 401 `application/problem+json` response
-func (r SetAgentToolClassResponse) GetApplicationproblemJSON401() *Unauthorized {
-	return r.ApplicationproblemJSON401
-}
-
-// GetApplicationproblemJSON403 returns the response for an HTTP 403 `application/problem+json` response
-func (r SetAgentToolClassResponse) GetApplicationproblemJSON403() *Forbidden {
-	return r.ApplicationproblemJSON403
-}
-
-// GetApplicationproblemJSON404 returns the response for an HTTP 404 `application/problem+json` response
-func (r SetAgentToolClassResponse) GetApplicationproblemJSON404() *NotFound {
-	return r.ApplicationproblemJSON404
-}
-
-// GetApplicationproblemJSON409 returns the response for an HTTP 409 `application/problem+json` response
-func (r SetAgentToolClassResponse) GetApplicationproblemJSON409() *Conflict {
-	return r.ApplicationproblemJSON409
 }

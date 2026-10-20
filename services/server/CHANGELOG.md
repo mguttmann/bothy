@@ -11,6 +11,22 @@ documented in this file. The format is based on
 
 ### Added
 
+- Avatar and logo (M3-10): `setMyAvatar` and `deleteMyAvatar` (`self.profile.update`, people
+  only), `uploadBrandingLogo` and `deleteBrandingLogo` (`instance.branding.update`, owner with
+  fresh step-up, audited) and the public `getBrandingLogo` (`instance.discovery.read`). The image
+  arrives as the one multipart part `file`; `authorize` runs before the body is read, and the
+  server stages it as a file with purpose `avatar` or `branding` in a session of one part capped
+  by the smaller of `file.max_upload_bytes` and `file.upload_part_bytes`, with the fixed name
+  `avatar` or `logo`, then links it and releases the previous file (`deleted_at`) in one unit of
+  work. The file runs through the same scan and metadata removal as every upload; an avatar or
+  logo that would not be stored as filtered JPEG, filtered PNG or converted still WebP fails with
+  `file_type_denied`. `getBrandingLogo` serves only the variant `medium` of a deliverable logo
+  with `Cache-Control: no-store`, `ETag`, `Repr-Digest` and `Access-Control-Allow-Origin: *`, and
+  the same `404` otherwise. `file.read` now decides by purpose (`avatar` and `branding` for every
+  signed-in principal, `gdpr_export` never), and `file.updated` of these files reaches only the
+  uploader. Events `user.updated` and `instance.updated` (only `branding.logo_file_id`); removing
+  the logo stores the empty string and raises the branding version. No new configuration key,
+  metric or job.
 - Images without metadata and thumbnails (M3-06, Ruling L16, ADR 0047): a clean or skipped JPEG,
   PNG, GIF or WebP stays `pending` after the scan until the new job `files.thumbnail` (queue
   `files`, River timeout `file.image.processing_timeout`, at most `file.image.max_concurrent` per
@@ -41,9 +57,9 @@ documented in this file. The format is based on
   answers the unknown-id `404`. `getTranscript` returns the
   status of every readable deliverable file, with text, language and source once done. A pending
   file answers `409 file_not_ready` with `Retry-After`, a blocked or failed one `409 file_blocked`.
-  `file.read` now follows the purpose of the file (an avatar for every authenticated principal, a
-  branding file with the requirement `Public`, which anonymous callers reach only through
-  `getBrandingLogo` of M3-10 because `downloadFile` is not public, a `gdpr_export` for nobody), and a principal without a login
+  `file.read` now follows the purpose of the file (an avatar or branding file for every signed-in
+  principal, as M3-10 defines it; anonymous callers reach the logo only through `getBrandingLogo`
+  because `downloadFile` is not public; a `gdpr_export` for nobody, INT-W51/3), and a principal without a login
   session gets `403 forbidden` `step_up_not_possible` on `createFileTicket`. New port method
   `identity.Auth.SessionActor` builds the actor of a ticket per fetch. The table
   `file_thumbnails` of M3-06 (migration `00051`) holds the variants. The keys `file.ticket_ttl`, `file.ticket_key_ref`,

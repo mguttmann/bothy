@@ -9960,7 +9960,7 @@ type IdentityProviderUpdate struct {
 	Name    *string     `json:"name,omitempty"`
 }
 
-// ImageUpload Image as multipart part `file`. The server detects the type (PNG, JPEG, WebP) and re-encodes it without metadata.
+// ImageUpload Image as the one multipart part `file` (a further part is rejected with 400 `validation_failed`). The server detects the type from the bytes; it accepts only JPEG and PNG, whose metadata it removes losslessly, and still WebP, which it converts to PNG or JPEG without metadata. Thumbnails are re-encoded. Any other detected type ends the file `failed` with `file_type_denied`.
 type ImageUpload struct {
 	File openapi_types.File `json:"file"`
 }
@@ -21909,10 +21909,14 @@ type ClientInterface interface {
 
 	// GetBrandingLogo Download the instance logo
 	//
+	// Serves the variant `medium` of the logo (longest edge `file.thumbnail.medium_px`, re-encoded by the server without metadata, 12 3.7 and 7.3), never the original. Answers 404 while no logo is set and while the logo file is not deliverable (pending, blocked, failed or deleted) or has no variant `medium`, always with the same status, body and headers. The response carries `Content-Disposition: inline`, `Cache-Control: no-store`, `ETag` and `Repr-Digest` over the variant and `Access-Control-Allow-Origin: *` without credentials; `Range` is ignored.
+	//
 	// Corresponds with GET /instance/branding/logo (the `GetBrandingLogo` operationId).
 	GetBrandingLogo(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// UploadBrandingLogoWithBody Upload the logo
+	//
+	// Owner with fresh step-up; nothing of the body is read before `authorize` allowed the action. Checks in this order (12 3.7): the first part is `file` (400 `validation_failed`); the declared type is JPEG, PNG or WebP (415 `unsupported_media_type`, with `reason` `file_type_denied` for a type in `file.denied_mime_types`); the part holds at most the smaller of `file.max_upload_bytes` and `file.upload_part_bytes` (413 `payload_too_large`) and at least one byte, and no further part follows (400 `validation_failed`); open sessions (429) and free space of the file system driver (503 `unavailable` with `reason` `storage_full`). The new file is linked at once and replaces the previous logo; it becomes deliverable later, after scan and metadata removal, and until then `getBrandingLogo` answers 404. Last write wins; no `If-Match` (06 8).
 	//
 	// Takes any type of body and a specified content type.
 	//
@@ -21978,6 +21982,8 @@ type ClientInterface interface {
 	DeleteMyAvatar(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// SetMyAvatarWithBody Upload own avatar
+	//
+	// Only for people; nothing of the body is read before `authorize` allowed the action. Checks in this order (12 3.7): the first part is `file` (400 `validation_failed`); the declared type is JPEG, PNG or WebP (415 `unsupported_media_type`, with `reason` `file_type_denied` for a type in `file.denied_mime_types`); the part holds at most the smaller of `file.max_upload_bytes` and `file.upload_part_bytes` (413 `payload_too_large`) and at least one byte, and no further part follows (400 `validation_failed`); open sessions (429) and free space of the file system driver (503 `unavailable` with `reason` `storage_full`). The new file is linked at once (`avatar_file_id`) and replaces the previous avatar; it becomes deliverable later, after scan and metadata removal, and until then file downloads answer 409 `file_not_ready`.
 	//
 	// Takes any type of body and a specified content type.
 	//
@@ -25865,76 +25871,6 @@ func (c *Client) UpdateComponentWithBody(ctx context.Context, componentId Compon
 // Corresponds with PATCH /components/{component_id} (the `UpdateComponent` operationId).
 func (c *Client) UpdateComponent(ctx context.Context, componentId ComponentIdPath, params *UpdateComponentParams, body UpdateComponentJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
 	req, err := NewUpdateComponentRequest(c.Server, componentId, params, body)
-	if err != nil {
-		return nil, err
-	}
-	req = req.WithContext(ctx)
-	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
-		return nil, err
-	}
-	return c.Client.Do(req)
-}
-
-// CreateInteractionWithBody Use a button, select or form
-//
-// Single-use components accept exactly one interaction; later ones get 409 `component_used`.
-// Idempotent by `(principal, client_interaction_id)`.
-//
-// Takes any type of body and a specified content type.
-//
-// Corresponds with POST /components/{component_id}/interactions (the `CreateInteraction` operationId).
-func (c *Client) CreateInteractionWithBody(ctx context.Context, componentId ComponentIdPath, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
-	req, err := NewCreateInteractionRequestWithBody(c.Server, componentId, contentType, body)
-	if err != nil {
-		return nil, err
-	}
-	req = req.WithContext(ctx)
-	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
-		return nil, err
-	}
-	return c.Client.Do(req)
-}
-
-// CreateInteraction Use a button, select or form
-//
-// Single-use components accept exactly one interaction; later ones get 409 `component_used`.
-// Idempotent by `(principal, client_interaction_id)`.
-//
-// Takes a body of the `application/json` content type.
-//
-// Corresponds with POST /components/{component_id}/interactions (the `CreateInteraction` operationId).
-func (c *Client) CreateInteraction(ctx context.Context, componentId ComponentIdPath, body CreateInteractionJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
-	req, err := NewCreateInteractionRequest(c.Server, componentId, body)
-	if err != nil {
-		return nil, err
-	}
-	req = req.WithContext(ctx)
-	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
-		return nil, err
-	}
-	return c.Client.Do(req)
-}
-
-// GetConsoleSession Read the console session
-//
-// Corresponds with GET /console/session (the `GetConsoleSession` operationId).
-func (c *Client) GetConsoleSession(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error) {
-	req, err := NewGetConsoleSessionRequest(c.Server)
-	if err != nil {
-		return nil, err
-	}
-	req = req.WithContext(ctx)
-	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
-		return nil, err
-	}
-	return c.Client.Do(req)
-}
-
-// EndViewAs End the stored view as person
-//
-// Corresponds with DELETE /console/session/view-as (the `EndViewAs` operationId).
-func (c *Client) EndViewAs(ctx context.Context, params *EndViewAsParams, reqEditors ...RequestEditorFn) (*http.Response, error) {
-	req, err := NewEndViewAsRequest(c.Server, params)
 	if err != nil {
 		return nil, err
 	}

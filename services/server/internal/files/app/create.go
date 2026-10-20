@@ -128,6 +128,21 @@ func (s *Service) checkLimits(ctx context.Context, principal ids.ID, size int64,
 			return conflict(reasonQuotaExceeded, "the upload would exceed file.quota_bytes_per_principal")
 		}
 	}
+	return s.checkOpenAndSpace(ctx, principal, size, now)
+}
+
+// checkSessionsAndSpace is checkLimits without the quota, for avatar and logo images, which
+// replace the previous one (brief M3-10 design note 2e, docs/DECISIONS.md D-M3-10-4).
+func (s *Service) checkSessionsAndSpace(ctx context.Context, principal ids.ID, size int64, now time.Time) error {
+	if err := s.d.Repo.LockPrincipalUploads(ctx, principal); err != nil {
+		return err
+	}
+	return s.checkOpenAndSpace(ctx, principal, size, now)
+}
+
+// checkOpenAndSpace checks the open sessions of the principal and the free space of the file
+// system driver under the advisory lock the caller took (D-M3-03-7 and -8).
+func (s *Service) checkOpenAndSpace(ctx context.Context, principal ids.ID, size int64, now time.Time) error {
 	open, earliest, err := s.d.Repo.OpenSessions(ctx, principal, now)
 	if err != nil {
 		return err

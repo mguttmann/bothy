@@ -177,7 +177,7 @@ func (w *WebhookService) mayReceive(ctx context.Context, inst InstallationRecord
 	}
 	// The descriptor of catch-up and gateway (M1-63): the current path decides, and authz takes the
 	// object the receive action accepts when the stored kind is not one of its resources.
-	r := authorize.ResourceFromEvent(string(kind), ev.ResourceID, ev.SpaceID, ev.ChannelID, ev.ThreadID)
+	r := authorize.ResourceFromEvent(string(kind), ev.ResourceID, ev.SpaceID, ev.ChannelID, ev.ThreadID, ev.AudiencePrincipalID)
 	r.DeliveryOf, r.Audience = of, ev.AudiencePrincipalID
 	d, err := w.d.Authorizer.Authorize(authorize.Filter(ctx), p, authorize.ActionWebhookOutDeliver, r)
 	if err != nil {

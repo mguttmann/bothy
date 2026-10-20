@@ -464,6 +464,9 @@ kennt; ein Test des Anwendungsfalls findet genau einen Eintrag.
 - DM-Kanal oder Inhalt darin: `p` ist Teilnehmer.
 - Ressource ist ein Rechner und 2.12, Punkt 5 gilt; bei einer Terminal-Sitzung: `p` ist ihr Mensch
   oder Owner.
+- File with `purpose = 'avatar'` or `'branding'`: `p` is logged in (05, 2.2); `gdpr_export` never
+  through `file.read`. A `file` built from an event row without scope is visible only to its
+  audience (`audience_principal_id`).
 
 ### 4.4 Invarianten in der Transaktion
 

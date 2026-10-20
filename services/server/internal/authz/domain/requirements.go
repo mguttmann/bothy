@@ -40,6 +40,7 @@ const (
 	opAll
 	opAny
 	opByKind
+	opByFilePurpose
 	opDeferred
 	opSystem
 	opHumanSession
@@ -61,12 +62,13 @@ const (
 
 // Expr is a requirement expression. The zero Expr is invalid and fails closed.
 type Expr struct {
-	op     op
-	level  Level
-	cap    Capability
-	fact   Fact
-	args   []Expr
-	byKind map[string]Expr
+	op    op
+	level Level
+	cap   Capability
+	fact  Fact
+	args  []Expr
+	// byKey maps a resource kind (ByKind) or a file purpose (ByFilePurpose) to its expression.
+	byKey  map[string]Expr
 	etappe string
 }
 
@@ -141,7 +143,26 @@ func All(parts ...Expr) Expr { return Expr{op: opAll, args: parts} }
 func Any(alts ...Expr) Expr { return Expr{op: opAny, args: alts} }
 
 // ByKind chooses the expression by resource kind; a kind not listed is an internal error.
-func ByKind(m map[string]Expr) Expr { return Expr{op: opByKind, byKind: m} }
+func ByKind(m map[string]Expr) Expr { return Expr{op: opByKind, byKey: m} }
+
+// The keys of ByFilePurpose for a file resource without facts: the descriptor of an event row
+// (authorize.ResourceFromEvent) in filter or delivery mode, which knows no purpose.
+const (
+	// FileEventPath is the entry of an event row that names a path (thread, channel or space).
+	FileEventPath = "event_path"
+	// FileEventSelf is the entry of an event row without a path: a personal file.updated of an
+	// avatar or logo file, whose OwnerID is its audience (brief M3-10 design note 7).
+	FileEventSelf = "event_self"
+)
+
+// ByFilePurpose chooses the expression by files.purpose of a file resource (05 section 2.2, brief
+// M3-10 design note 6), like ByKind by resource kind. A file without facts takes FileEventPath or,
+// when its path resolved to none, FileEventSelf. A purpose or key not listed is an internal error.
+//
+// Example:
+//
+//	ByFilePurpose(map[string]Expr{"attachment": AtLeast(LevelRead), "avatar": Auth, FileEventSelf: Self})
+func ByFilePurpose(m map[string]Expr) Expr { return Expr{op: opByFilePurpose, byKey: m} }
 
 // Deferred marks an action whose requirement needs facts of a later etappe (07 section 4.2). It
 // behaves like an unknown action.
@@ -172,7 +193,7 @@ func (e Expr) IsReadLevel() bool { return e.op == opLevel && e.level == LevelRea
 
 // Contains reports whether the atom a occurs anywhere in e (for example Owner).
 func (e Expr) Contains(a Expr) bool {
-	if e.op == a.op && e.level == a.level && e.cap == a.cap && e.fact == a.fact && len(a.args) == 0 && a.byKind == nil {
+	if e.op == a.op && e.level == a.level && e.cap == a.cap && e.fact == a.fact && len(a.args) == 0 && a.byKey == nil {
 		return true
 	}
 	for _, x := range e.args {
@@ -180,8 +201,8 @@ func (e Expr) Contains(a Expr) bool {
 			return true
 		}
 	}
-	for _, k := range slices.Sorted(maps.Keys(e.byKind)) {
-		if e.byKind[k].Contains(a) {
+	for _, k := range slices.Sorted(maps.Keys(e.byKey)) {
+		if e.byKey[k].Contains(a) {
 			return true
 		}
 	}
@@ -197,6 +218,9 @@ var exprNames = map[op]string{
 	opSystem: "System", opHumanSession: "HumanSession", opAssignee: "Assignee", opTerminal: "Terminal",
 	opDelivery: "Delivery", opHostSelf: "HostSelf",
 }
+
+// byKeyNames are the names of the nodes that choose by a key.
+var byKeyNames = map[op]string{opByKind: "ByKind", opByFilePurpose: "ByFilePurpose"}
 
 // capOpNames are the names of the nodes with a capability.
 var capOpNames = map[op]string{opCap: "Cap", opCapIf: "CapIf", opTargetCap: "TargetCap"}
@@ -226,13 +250,13 @@ func (e Expr) String() string {
 		}
 		return name + "(" + strings.Join(parts, ",") + ")"
 	}
-	if e.op == opByKind {
-		keys := slices.Sorted(maps.Keys(e.byKind))
+	if n, ok := byKeyNames[e.op]; ok {
+		keys := slices.Sorted(maps.Keys(e.byKey))
 		parts := make([]string, len(keys))
 		for i, k := range keys {
-			parts[i] = k + ":" + e.byKind[k].String()
+			parts[i] = k + ":" + e.byKey[k].String()
 		}
-		return "ByKind(" + strings.Join(parts, ",") + ")"
+		return n + "(" + strings.Join(parts, ",") + ")"
 	}
 	return "Invalid"
 }

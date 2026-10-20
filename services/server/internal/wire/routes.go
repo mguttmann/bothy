@@ -152,6 +152,11 @@ type Handlers struct {
 	// Files implements createUpload, uploadPart, getUpload, completeUpload, abortUpload and
 	// getFile (files, M3-03).
 	*fileshttp.Files
+	// Avatars implements setMyAvatar and deleteMyAvatar (identity, M3-10).
+	*identityhttp.Avatars
+	// Logos implements uploadBrandingLogo, deleteBrandingLogo and getBrandingLogo (instance,
+	// M3-10).
+	*instancehttp.Logos
 	// ClientMetrics implements submitClientMetrics (stats, M4-31).
 	*statshttp.ClientMetrics
 }

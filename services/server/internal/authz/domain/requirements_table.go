@@ -106,8 +106,14 @@ var requirementGroups = []struct {
 	}},
 	{"read und +export", All(AtLeast(LevelRead), HasCap(CapExport)), []string{"export.channel"}},
 	{"self oder manage", Any(Self, HasCap(CapManage)), []string{"file.delete", "template.manage"}},
-	// file.read (M3-03): read on the path; the visibility of kind file adds the uploader rule.
-	{"read", AtLeast(LevelRead), []string{"file.read"}},
+	// file.read by purpose (05 section 2.2; M3-03, brief M3-10 design note 6): an attachment needs
+	// read on its path (the visibility of kind file adds the uploader rule); an avatar or a logo
+	// any signed-in principal; gdpr_export read, never reached because its visibility refuses it;
+	// an event row without facts read on its path or, without a path, the audience itself.
+	{"read", ByFilePurpose(map[string]Expr{
+		purposeAttachment: AtLeast(LevelRead), purposeAvatar: Auth, purposeBranding: Auth, purposeGDPRExport: AtLeast(LevelRead),
+		FileEventPath: AtLeast(LevelRead), FileEventSelf: Self,
+	}), []string{"file.read"}},
 	{"write", AtLeast(LevelWrite), []string{
 		"file.transcribe", "reaction.add", "thread.close", "thread.create", "thread.reopen",
 	}},

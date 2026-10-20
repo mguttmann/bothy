@@ -9898,7 +9898,7 @@ type IdentityProviderUpdate struct {
 	Name    *string     `json:"name,omitempty"`
 }
 
-// ImageUpload Image as multipart part `file`. The server detects the type (PNG, JPEG, WebP) and re-encodes it without metadata.
+// ImageUpload Image as the one multipart part `file` (a further part is rejected with 400 `validation_failed`). The server detects the type from the bytes; it accepts only JPEG and PNG, whose metadata it removes losslessly, and still WebP, which it converts to PNG or JPEG without metadata. Thumbnails are re-encoded. Any other detected type ends the file `failed` with `file_type_denied`.
 type ImageUpload struct {
 	File openapi_types.File `json:"file"`
 }
@@ -16810,8 +16810,14 @@ type SetAllAgentsBillingModeJSONRequestBody = BillingModeSetAll
 // UpdateBrandingJSONRequestBody defines body for UpdateBranding for application/json ContentType.
 type UpdateBrandingJSONRequestBody = BrandingUpdate
 
+// UploadBrandingLogoMultipartRequestBody defines body for UploadBrandingLogo for multipart/form-data ContentType.
+type UploadBrandingLogoMultipartRequestBody = ImageUpload
+
 // PutInstanceSettingJSONRequestBody defines body for PutInstanceSetting for application/json ContentType.
 type PutInstanceSettingJSONRequestBody = InstanceSettingPut
+
+// SetMyAvatarMultipartRequestBody defines body for SetMyAvatar for multipart/form-data ContentType.
+type SetMyAvatarMultipartRequestBody = ImageUpload
 
 // ApprovePairingJSONRequestBody defines body for ApprovePairing for application/json ContentType.
 type ApprovePairingJSONRequestBody = PairingApprove

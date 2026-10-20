@@ -1090,9 +1090,7 @@ func (s *server) handlers() Handlers {
 	if h.Log == nil && s.audit != nil {
 		h.Log = s.audit.Handlers()
 	}
-	if s.settings != nil {
-		s.settings.fillHandlers(&h)
-	}
+	s.settings.fillHandlers(&h)
 	if h.Access == nil && s.authzAdmin != nil {
 		h.Access = s.authzAdmin.Handlers
 	}
@@ -1104,6 +1102,7 @@ func (s *server) handlers() Handlers {
 func (id *Identity) fillHandlers(h *Handlers) {
 	fill(&h.Devices, id.Handlers)
 	fill(&h.People, id.PeopleHandlers)
+	fill(&h.Avatars, id.AvatarHandlers)
 	fill(&h.Sessions, id.SessionHandlers)
 	fill(&h.StepUps, id.StepUpHandlers)
 	fill(&h.Providers, id.ProviderHandlers)
@@ -1681,7 +1680,9 @@ func (s *server) startFiles(ctx context.Context) error {
 	}
 	s.mu.Lock()
 	s.files = f
+	id, st := s.identity, s.settings
 	s.mu.Unlock()
+	f.BindProfileImages(id, st)
 	return nil
 }
 

@@ -249,7 +249,8 @@ func (s *Service) ownSession(ctx context.Context, a actor.Actor, fileID ids.ID, 
 	if err != nil {
 		return SessionRecord{}, err
 	}
-	if !found {
+	if !found || rec.File.Purpose != purposeAttachment {
+		// An avatar or logo has no scope channel; its session belongs to its operation (M3-10).
 		return SessionRecord{}, notFound()
 	}
 	r := authorize.Resource{Kind: authorize.ResourceChannel, ID: rec.File.ScopeChannelID}

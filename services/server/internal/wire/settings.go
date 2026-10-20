@@ -43,13 +43,9 @@ type InstanceSettings struct {
 	Handlers *instancehttp.Admin
 	// CSPReports is the handler of submitCspReport (M6-03); NewCSPReports builds it.
 	CSPReports *instancehttp.CSPReports
-}
-
-// fillHandlers sets every nil instance handler of h to the one st built: the settings operations
-// and submitCspReport.
-func (st *InstanceSettings) fillHandlers(h *Handlers) {
-	fill(&h.Admin, st.Handlers)
-	fill(&h.CSPReports, st.CSPReports)
+	// LogoHandlers are the REST handlers of the three logo operations (M3-10); they work once
+	// BindLogoFiles bound the files module.
+	LogoHandlers *instancehttp.Logos
 }
 
 // KeyCSPReportMaxRecords is console.csp_report_max_records, the most log records one request of
@@ -82,6 +78,17 @@ type SettingsWrites struct {
 	Audit auditing.Recorder
 	// Events appends instance.updated.
 	Events eventlog.Appender
+}
+
+// fillHandlers sets the nil settings, submitCspReport and logo handlers of h to the ones st built;
+// a nil st leaves h unchanged.
+func (st *InstanceSettings) fillHandlers(h *Handlers) {
+	if st == nil {
+		return
+	}
+	fill(&h.Admin, st.Handlers)
+	fill(&h.CSPReports, st.CSPReports)
+	fill(&h.Logos, st.LogoHandlers)
 }
 
 // Contract returns the values of the API contract the instance use cases report, from the
@@ -126,7 +133,7 @@ func NewInstanceSettings(cfg instanceapp.Config, localPassword bool, pool *pg.Po
 	if err != nil {
 		return nil, err
 	}
-	return &InstanceSettings{Admin: admin, Handlers: instancehttp.NewAdmin(admin)}, nil
+	return &InstanceSettings{Admin: admin, Handlers: instancehttp.NewAdmin(admin), LogoHandlers: instancehttp.NewLogos(admin)}, nil
 }
 
 // DefaultInstanceConfig returns InstanceConfig of the schema defaults (no client versions set),

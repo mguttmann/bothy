@@ -59,11 +59,13 @@ enabled:             # operationIds that have a handler; sorted ascending
   - createUpload
   - createUser
   - createWebhookSubscription
+  - deleteBrandingLogo
   - deleteChannelDraft
   - deleteForumTag
   - deleteGroup
   - deleteIdentityProvider
   - deleteMessage
+  - deleteMyAvatar
   - deleteMySetting
   - deleteNotificationPreference
   - deleteProjectBinding
@@ -83,6 +85,7 @@ enabled:             # operationIds that have a handler; sorted ascending
   - exportAuditEvents
   - getAgent
   - getApp
+  - getBrandingLogo
   - getChannel
   - getChannelBehavior
   - getConsoleSession
@@ -198,6 +201,7 @@ enabled:             # operationIds that have a handler; sorted ascending
   - setCredentialHolder
   - setHostLlmCredentials
   - setHostState
+  - setMyAvatar
   - setMyLocalCredential
   - setSpaceOperator
   - setThreadTags
@@ -223,6 +227,7 @@ enabled:             # operationIds that have a handler; sorted ascending
   - updateUser
   - updateWebhookSubscription
   - upgradeAppManifest
+  - uploadBrandingLogo
   - uploadPart
   - validateManifest
   - verifyAuditChain
@@ -288,15 +293,9 @@ later:               # every other operationId of docs/api/openapi.yaml; sorted 
     ticket: M7-09
   - operation_id: decideGdprRequest
     etappe: M7
-  - operation_id: deleteBrandingLogo
-    etappe: M3
-    ticket: M3-10
   - operation_id: deleteFile
     etappe: M3
     ticket: M3-08
-  - operation_id: deleteMyAvatar
-    etappe: M3
-    ticket: M3-10
   - operation_id: deleteStatusComponent
     etappe: M7
     ticket: M7-09
@@ -310,9 +309,6 @@ later:               # every other operationId of docs/api/openapi.yaml; sorted 
     ticket: M2-09
   - operation_id: getAgentTriggerers
     etappe: M2
-  - operation_id: getBrandingLogo
-    etappe: M3
-    ticket: M3-10
   - operation_id: getCommand
     etappe: M2
     ticket: M2-16
@@ -462,9 +458,6 @@ later:               # every other operationId of docs/api/openapi.yaml; sorted 
   - operation_id: setImportLead
     etappe: M8
     ticket: M8-03
-  - operation_id: setMyAvatar
-    etappe: M3
-    ticket: M3-10
   - operation_id: startImport
     etappe: M8
     ticket: M8-03
@@ -489,9 +482,6 @@ later:               # every other operationId of docs/api/openapi.yaml; sorted 
   - operation_id: updateStatusComponent
     etappe: M7
     ticket: M7-09
-  - operation_id: uploadBrandingLogo
-    etappe: M3
-    ticket: M3-10
 # WebSocket ops a client, agent or app sends on the channel gateway of docs/api/asyncapi.yaml
 # (M1-64). The gateway dispatcher registers exactly the ops under `enabled`; every other client op
 # of the channel stands under `later` and is treated as unknown (close code 4001) until its ticket

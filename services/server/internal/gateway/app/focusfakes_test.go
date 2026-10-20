@@ -177,7 +177,7 @@ func (w *focusWorld) Admit(_ context.Context, a actor.Actor, ev sync.Event) (boo
 	}
 	w.mu.Lock()
 	defer w.mu.Unlock()
-	r := authorize.ResourceFromEvent(ev.ResourceKind, ev.ResourceID, ev.SpaceID, ev.ChannelID, ev.ThreadID)
+	r := authorize.ResourceFromEvent(ev.ResourceKind, ev.ResourceID, ev.SpaceID, ev.ChannelID, ev.ThreadID, ev.AudiencePrincipalID)
 	return w.decide(a, authorize.Action(ev.ReceiveAction), r).Allowed(), nil
 }
 
