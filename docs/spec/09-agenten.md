@@ -157,6 +157,23 @@ Für eine neue Nachricht M eines Prinzipals P im Thread T des Kanals C gilt in d
    `trigger_state = received`. Bei Ablehnung: M bleibt gespeichert, `trigger_state = failed` mit
    Grund.
 
+Position of the voice rule (D-M2-04-2): the rejection `voice_unsupported` of section 13 is decided
+after step 4 and before step 5. A voice message without a transcription path
+(`voice.transcription_mode` is `off`, or `agent` and the candidate lacks the effective feature
+`voice_input`) is rejected at acceptance; it creates neither a new thread nor a follow-up. A voice
+message that would not trigger at all stays without trigger.
+
+Mapping of the deny reasons of step 7 to `messages.trigger_state_reason` (D-M2-04-3): the closed
+deny list of 07 4.1 has no `agent_disabled`, and the guard of `agent.invoke` answers
+`agent_not_reachable` for an inactive agent, so the acceptance maps the reason the person sees:
+
+| Deny reason of `authorize` (07 4.1) | `trigger_state_reason` |
+|---|---|
+| `agent_not_reachable`, candidate not active | `agent_disabled` |
+| `agent_not_reachable`, candidate active | `agent_not_allowed_here` |
+| `level_insufficient`, `no_grant` | `no_trigger_right` |
+| every other reason (`billing_mode_personal_not_holder`, `project_not_ready`, `run_active_other_agent`, `tool_class_owner_only`, `dev_environment_not_ready`, `channel_read_only`, ...) | unchanged |
+
 Eine Nachricht mit `trigger_state = failed` zeigt ihren Grund aus `messages.trigger_state_reason`
 (03). Grund für das eigene Feld: Eine Ablehnung bei der Annahme erzeugt keinen Lauf, an dem
 `state_reason` stehen könnte.
@@ -203,6 +220,11 @@ flowchart TD
 
 Die Texte sind Schlüssel im Sprachkatalog der Apps ([01-produkt.md](01-produkt.md)); die Tabelle
 nennt nur den Sinn.
+
+The codes of this table are the values of `messages.trigger_state_reason` that the acceptance
+writes itself. A deny reason of `authorize` in step 7 appears mapped by the table after step 7 of
+3.4; a deny reason without a row there is stored unchanged. `run_active` answers a command and is never stored on a message, because a command has no
+trigger message.
 
 ### 3.6 Gast-Agenten
 
