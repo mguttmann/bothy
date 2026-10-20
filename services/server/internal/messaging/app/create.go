@@ -132,7 +132,8 @@ func (s *Service) loadThread(ctx context.Context, a actor.Actor, id ids.ID) (cha
 }
 
 // prepare checks the body of a new message for the thread (zero for a thread created with it)
-// and computes the request hash with hashContext (brief D2, D3).
+// and computes the request hash with hashContext, or with cmd.HashContext when the caller set
+// one (brief D2, D3, M2-27 design note 6c).
 func (s *Service) prepare(ctx context.Context, a actor.Actor, cmd messaging.CreateMessageCmd, thread ids.ID, hashContext string) (prepared, error) {
 	if err := domain.CheckClientMsgID(cmd.ClientMsgID); err != nil {
 		return prepared{}, err
@@ -160,13 +161,17 @@ func (s *Service) prepare(ctx context.Context, a actor.Actor, cmd messaging.Crea
 	if err := domain.CheckContent(content, s.cfg.MaxContentBytes); err != nil {
 		return prepared{}, err
 	}
-	handles := domain.ScanMentions(content)
-	if err := domain.CheckMentionCount(handles, s.cfg.MaxMentions); err != nil {
-		return prepared{}, err
+	p := prepared{clientMsgID: cmd.ClientMsgID, origin: origin, content: content, silent: cmd.Silent, clearDraft: cmd.ClearDraft}
+	// SkipMentions leaves handles empty, so send resolves and stores no mention (R-EX-09).
+	if !cmd.SkipMentions {
+		p.handles = domain.ScanMentions(content)
+		if err := domain.CheckMentionCount(p.handles, s.cfg.MaxMentions); err != nil {
+			return prepared{}, err
+		}
+		p.mentionCheck, p.checkMentions = cmd.MentionIDs, cmd.MentionIDs != nil
 	}
-	p := prepared{
-		clientMsgID: cmd.ClientMsgID, origin: origin, content: content, silent: cmd.Silent, clearDraft: cmd.ClearDraft,
-		mentionCheck: cmd.MentionIDs, checkMentions: cmd.MentionIDs != nil, handles: handles,
+	if cmd.HashContext != "" {
+		hashContext = cmd.HashContext
 	}
 	replyTo := ""
 	if cmd.ReplyToID != nil {
