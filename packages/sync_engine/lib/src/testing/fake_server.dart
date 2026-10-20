@@ -159,7 +159,7 @@ final class FakeServer {
     registerAccessHandlers(rest, actions);
     final audit = FakeAuditLog();
     registerAuditHandlers(rest, actions, audit);
-    registerHostHandlers(rest, actions);
+    registerHostHandlers(rest, actions, audit);
     final server = FakeServer._(
       http,
       world,
