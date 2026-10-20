@@ -9,9 +9,12 @@ import 'package:design_system/design_system.dart';
 import 'package:flutter/material.dart';
 import 'package:l10n/l10n.dart';
 
+import '../agents/agent_page.dart';
+import '../agents/agents_list.dart';
 import '../audit/audit_export.dart';
 import '../audit/audit_list.dart';
 import '../data/admin_repository.dart';
+import '../data/agents_repository.dart';
 import '../devices/waiting_devices.dart';
 import '../grants/grants_list.dart';
 import '../groups/group_detail.dart';
@@ -29,6 +32,7 @@ String adminSectionLabel(AppLocalizations l, AdminSection section) =>
       AdminSection.groups => l.adminNavGroups,
       AdminSection.grants => l.adminNavGrants,
       AdminSection.devices => l.adminNavDevices,
+      AdminSection.agents => l.adminNavAgents,
       AdminSection.audit => l.adminNavAudit,
       AdminSection.hosts => l.adminNavHosts,
       // Entries without a screen are not listed (AdminSection.listed).
@@ -65,6 +69,7 @@ class AdminShell extends StatefulWidget {
     this.timeZone = 'UTC',
     this.clock = DateTime.now,
     this.saveTarget,
+    this.agentPresence,
   });
 
   /// The administration's calls.
@@ -88,6 +93,11 @@ class AdminShell extends StatefulWidget {
   /// The host's save dialog for the audit export, or null for no export (brief M4-29 Design
   /// note 3).
   final AuditSaveTarget? saveTarget;
+
+  /// The live presence of an agent for its page, or null to show the presence of `getAgent`
+  /// (brief M4-28 Design note 1: the desktop app maps the engine's `EphemeralStore`, the
+  /// console has none).
+  final Stream<AgentLiveState> Function(String agentId)? agentPresence;
 
   @override
   State<AdminShell> createState() => _AdminShellState();
@@ -162,6 +172,23 @@ class _AdminShellState extends State<AdminShell> {
         clock: widget.clock,
         onTarget: (key) =>
             widget.onNavigate(AdminLocation(AdminSection.grants, id: key)),
+        onChanged: changed,
+      ),
+      AdminSection.agents when id != null => AgentPage(
+        key: ValueKey('admin.agent.$id'),
+        repository: r,
+        agentId: id,
+        presence: widget.agentPresence?.call(id),
+        timeZone: widget.timeZone,
+        clock: widget.clock,
+        onBack: () =>
+            widget.onNavigate(const AdminLocation(AdminSection.agents)),
+        onChanged: changed,
+      ),
+      AdminSection.agents => AgentsList(
+        repository: r,
+        onOpen: (a) =>
+            widget.onNavigate(AdminLocation(AdminSection.agents, id: a)),
         onChanged: changed,
       ),
       AdminSection.audit => AuditLogView(

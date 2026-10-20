@@ -8,6 +8,7 @@ import 'package:design_system/design_system.dart';
 import 'package:flutter/material.dart';
 import 'package:l10n/l10n.dart';
 
+import '../agents/guided_flow.dart';
 import '../data/access_repository.dart';
 import 'grant_labels.dart';
 
@@ -19,16 +20,37 @@ import 'grant_labels.dart';
 /// [names] turns the IDs of violations and hints into names. While [preview] is null the panel
 /// says that the effect is being checked.
 ///
+/// With [onGuided], the I1 violations are followed by the guided option of 10 11 ([GuidedSwitch]
+/// for [person]): its button passes those violations to [onGuided], which sends the one request
+/// with `resolve_i1`; [guidedReady] false disables the button. Without [onGuided] the panel
+/// only explains.
+///
 /// Example: `PreviewPanel(preview: answer, names: names)`.
 class PreviewPanel extends StatelessWidget {
   /// Creates the panel.
-  const PreviewPanel({super.key, required this.preview, required this.names});
+  const PreviewPanel({
+    super.key,
+    required this.preview,
+    required this.names,
+    this.person = '',
+    this.onGuided,
+    this.guidedReady = true,
+  });
 
   /// The server's answer, or null while it loads.
   final GrantPreviewResult? preview;
 
   /// The names of the IDs the answer names.
   final AccessNames names;
+
+  /// The name of the subject the grant is for, in the guided explanation.
+  final String person;
+
+  /// Takes the guided option with the I1 violations of [preview], or null for none.
+  final ValueChanged<List<InvariantFinding>>? onGuided;
+
+  /// Whether the guided option's button is enabled.
+  final bool guidedReady;
 
   @override
   Widget build(BuildContext context) {
@@ -113,6 +135,16 @@ class PreviewPanel extends StatelessWidget {
             for (final v in p.violations) ...[
               const SizedBox(height: DsSpace.s8),
               _Violation(finding: v, names: names),
+            ],
+            if (onGuided case final take?
+                when guidedAgentIds(p.violations).isNotEmpty) ...[
+              const SizedBox(height: DsSpace.s8),
+              GuidedSwitch(
+                conflicts: p.violations,
+                person: person,
+                names: names,
+                onTake: guidedReady ? () => take(p.violations) : null,
+              ),
             ],
             if (p.hints.isNotEmpty) ...[
               const SizedBox(height: DsSpace.s12),
@@ -208,7 +240,7 @@ class NotEffectiveBadge extends StatelessWidget {
 }
 
 /// One invariant violation: the server's problem text, the agent and the affected principals,
-/// and for I1 the guidance "switch to organization first" (the guided switch is M4-28).
+/// and for I1 the guidance "switch to organization first" (the guided switch follows it).
 class _Violation extends StatelessWidget {
   const _Violation({required this.finding, required this.names});
 

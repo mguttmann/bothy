@@ -11,6 +11,8 @@ import 'package:api_client/api_client.dart';
 import 'package:auth/auth.dart';
 import 'package:dio/dio.dart';
 
+import 'access_repository.dart' show InvariantFinding;
+
 /// The state of an own device (`Device.state`).
 enum SelfDeviceState {
   /// Waits for the confirmation with its code (08 5.2).
@@ -120,11 +122,15 @@ final class SelfSession {
 /// A refused or failed call: [problem] is the answer of the server, null without an answer
 /// (no network).
 final class SelfActionFailed implements Exception {
-  /// Creates the failure.
-  const SelfActionFailed(this.problem);
+  /// Creates the failure; [conflicts] are the entries of `Problem.conflicts` (a
+  /// `409 i1_violation`, 10 5.4).
+  const SelfActionFailed(this.problem, {this.conflicts = const []});
 
   /// The problem of the server, or null.
   final ApiProblem? problem;
+
+  /// The agents and principals of an I1 rejection (10 5.4), empty for every other problem.
+  final List<InvariantFinding> conflicts;
 
   @override
   String toString() => 'SelfActionFailed(${problem ?? 'no answer'})';

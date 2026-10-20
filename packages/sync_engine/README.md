@@ -439,6 +439,20 @@ delivery by visibility at delivery time, `heartbeat_ack`, `reauth`, `focus` (wit
 connections, coalesced `run.updated` with the whole document on focus, one connection per
 device (`4017`) and the close codes of 04 6.4 for the session checks.
 
+From M4-28 `rest/agent_handlers.dart` serves the agent administration of screen A5:
+`listAgents`, `getAgent` (the card of `FakeWorld.agentJson` with the warnings of 10 8; the fake
+treats `billing.mismatch_alert_after` as zero), `setAgentBillingMode` and `setCredentialHolder`
+(`If-Match`), `setAllAgentsBillingMode` (all or nothing, BR-08) and the agent tokens
+`listTokens`, `createToken` (secret of ADR 0061, shown once) and `revokeToken`. Tests build
+agents with `world.addAgent`, operators with `setSpaceOperator` and `setChannelOperator`, and
+reported values with `agentHeartbeat`; an agent added with `addPerson` alone gets the defaults.
+`FakeI1Guard` checks I1 (10 5.4) after every change of these handlers and of `createGrant`,
+`addGroupMember` and `addOwner`: a violation restores everything and answers `409 i1_violation`
+with `conflicts`; `resolve_i1` switches the listed agents to `organization` first, and all audit
+rows of the request share one `correlation_id` (10 11, BR-07). `previewGrant` reports a
+violation as `invariant_violations`. The trigger set is simplified: no thread operators, and a
+space's default operator serves all its channels.
+
 ### Faults
 
 `server.faults` is a `FaultPlan`, a queue of rules matched in order and fully deterministic

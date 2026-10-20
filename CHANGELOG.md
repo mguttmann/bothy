@@ -46,6 +46,14 @@ Planning stage (milestone M0). Nothing is installable yet.
   modules offline; `make tofu-vm-test` boots a pinned Ubuntu cloud image in QEMU against the
   product trial, runs the smoke probe, a second delivery that changes nothing, and a wrong
   checksum and signature that stop the setup.
+- Administration of agents (M4-28, screen A5 of 01 5.2): the agent list with the badges
+  "Personal" and "Organization", an agent's page with adapter, presence, the configured next to
+  the reported mode and the server's warnings of 10 8, the operated spaces and channels and the
+  holder; switching the backend per agent and for several agents with a required reason and
+  step-up (all to personal with a holder and an editable list proposed from the last global
+  switch, all or nothing), the explanation of an I1 rejection, the guided flow of 10 11 in the
+  grant preview and when adding a group member or an owner (one request with `resolve_i1`), and
+  the agent's API tokens with the secret shown once; the fake server serves the same operations.
 - Setup wizard (M7-29): `infra/compose/install.sh`, a POSIX shell script and release artifact
   of the product, installs an instance with one command
   (`curl -fsSL https://github.com/OWNER/bothy/releases/download/v<version>/install.sh | sh`):

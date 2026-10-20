@@ -10,10 +10,10 @@ library;
 
 import 'package:api_client/api_client.dart';
 import 'package:auth/auth.dart';
-import 'package:dio/dio.dart';
 
 import '../audit/audit_repository.dart';
 import 'access_repository.dart';
+import 'agents_repository.dart';
 import 'hosts_repository.dart';
 import 'self_repository.dart';
 
@@ -293,7 +293,11 @@ final class WaitingDevice {
 /// Errors: [SelfActionFailed] with the server's problem (null without an answer),
 /// [StepUpCancelled] when the person cancels the step-up.
 abstract interface class AdminRepository
-    implements AccessRepository, AuditRepository, HostsRepository {
+    implements
+        AccessRepository,
+        AgentsRepository,
+        AuditRepository,
+        HostsRepository {
   /// One page of people; [query] and [status] are request parameters of `listUsers`.
   Future<AdminPage<AdminPerson>> people({
     String? query,
@@ -382,11 +386,13 @@ abstract interface class AdminRepository
   /// The owners (`listOwners`).
   Future<List<AdminOwner>> owners();
 
-  /// Makes [userId] an owner (`addOwner`).
+  /// Makes [userId] an owner (`addOwner`); with [resolveI1] the listed agents are switched to
+  /// organization in the same transaction (10 11).
   Future<void> addOwner(
     String userId, {
     required String reason,
     required String purpose,
+    I1Resolution? resolveI1,
   });
 
   /// Revokes the owner [userId] (`revokeOwner`); the last owner gives `409 last_owner`.
@@ -422,12 +428,14 @@ abstract interface class AdminRepository
   /// The members of [groupId] (`listGroupMembers`, all pages).
   Future<List<AdminGroupMember>> members(String groupId);
 
-  /// Adds [userId] to [groupId], until [expiresAt] when given (`addGroupMember`).
+  /// Adds [userId] to [groupId], until [expiresAt] when given (`addGroupMember`); with
+  /// [resolveI1] the listed agents are switched to organization in the same transaction (10 11).
   Future<void> addMember(
     String groupId,
     String userId, {
     DateTime? expiresAt,
     required String purpose,
+    I1Resolution? resolveI1,
   });
 
   /// Removes [userId] from [groupId] (`removeGroupMember`).
@@ -471,12 +479,89 @@ final class ApiAdminRepository implements AdminRepository {
   ApiAdminRepository(this._api, {required String Function() newIdempotencyKey})
     : _newKey = newIdempotencyKey,
       _access = ApiAccessRepository(_api, newIdempotencyKey: newIdempotencyKey),
+      _agents = ApiAgentsRepository(_api, newIdempotencyKey: newIdempotencyKey),
       _hosts = ApiHostsRepository(_api, newIdempotencyKey: newIdempotencyKey);
 
   final ApiClient _api;
   final String Function() _newKey;
   final ApiAccessRepository _access;
+  final ApiAgentsRepository _agents;
   final ApiHostsRepository _hosts;
+
+  @override
+  Future<List<AgentRecord>> agentRecords() => _agents.agentRecords();
+
+  @override
+  Future<AgentRecord> agentRecord(String agentId) =>
+      _agents.agentRecord(agentId);
+
+  @override
+  Future<List<OperatedTarget>> operatedTargets(String agentId) =>
+      _agents.operatedTargets(agentId);
+
+  @override
+  Future<AgentRecord> setMode(
+    AgentRecord agent,
+    AgentBillingMode mode, {
+    String? holderId,
+    required String reason,
+    required String purpose,
+  }) => _agents.setMode(
+    agent,
+    mode,
+    holderId: holderId,
+    reason: reason,
+    purpose: purpose,
+  );
+
+  @override
+  Future<SwitchAllResult> setAllModes(
+    AgentBillingMode mode, {
+    String? holderId,
+    List<String>? agentIds,
+    required String reason,
+    required String purpose,
+  }) => _agents.setAllModes(
+    mode,
+    holderId: holderId,
+    agentIds: agentIds,
+    reason: reason,
+    purpose: purpose,
+  );
+
+  @override
+  Future<AgentRecord> setHolder(
+    AgentRecord agent,
+    String holderId, {
+    required String reason,
+    required String purpose,
+  }) => _agents.setHolder(agent, holderId, reason: reason, purpose: purpose);
+
+  @override
+  Future<SwitchAllProposal?> lastGlobalSwitch({required String purpose}) =>
+      _agents.lastGlobalSwitch(purpose: purpose);
+
+  @override
+  Future<List<AgentToken>> tokens(String principalId) =>
+      _agents.tokens(principalId);
+
+  @override
+  Future<AgentTokenCreated> createToken(
+    String principalId, {
+    required String name,
+    required DateTime expiresAt,
+    String? dpopJkt,
+    required String purpose,
+  }) => _agents.createToken(
+    principalId,
+    name: name,
+    expiresAt: expiresAt,
+    dpopJkt: dpopJkt,
+    purpose: purpose,
+  );
+
+  @override
+  Future<void> revokeToken(String tokenId) => _agents.revokeToken(tokenId);
 
   @override
   String get serverOrigin => _hosts.serverOrigin;
@@ -582,7 +667,8 @@ final class ApiAdminRepository implements AdminRepository {
   Future<AdminGrant> createGrant(
     GrantRequest request, {
     required String purpose,
-  }) => _access.createGrant(request, purpose: purpose);
+    I1Resolution? resolveI1,
+  }) => _access.createGrant(request, purpose: purpose, resolveI1: resolveI1);
 
   @override
   Future<List<AdminGrant>> grantsOn(AdminTarget target) =>
@@ -872,12 +958,14 @@ final class ApiAdminRepository implements AdminRepository {
     String userId, {
     required String reason,
     required String purpose,
+    I1Resolution? resolveI1,
   }) => _call(
     () => _users.addOwner(
       ownerAdd: OwnerAdd(
         (b) => b
           ..userId = userId
-          ..reason = reason,
+          ..reason = reason
+          ..resolveI1 = resolveI1?.wire.toBuilder(),
       ),
       idempotencyKey: _newKey(),
       extra: _purpose(purpose),
@@ -977,13 +1065,15 @@ final class ApiAdminRepository implements AdminRepository {
     String userId, {
     DateTime? expiresAt,
     required String purpose,
+    I1Resolution? resolveI1,
   }) => _call(
     () => _groups.addGroupMember(
       groupId: groupId,
       groupMemberAdd: GroupMemberAdd(
         (b) => b
           ..userId = userId
-          ..expiresAt = expiresAt?.toUtc(),
+          ..expiresAt = expiresAt?.toUtc()
+          ..resolveI1 = resolveI1?.wire.toBuilder(),
       ),
       idempotencyKey: _newKey(),
       extra: _purpose(purpose),
@@ -1109,17 +1199,5 @@ final class ApiAdminRepository implements AdminRepository {
 
   /// Runs [call] and turns its errors into [SelfActionFailed]; an error of the login layer
   /// ([StepUpCancelled], a lost session) passes as it is.
-  static Future<T> _call<T>(Future<T> Function() call) async {
-    try {
-      return await call();
-    } on DioException catch (e) {
-      final cause = e.error;
-      if (cause is AuthException) throw cause;
-      final response = e.response;
-      throw SelfActionFailed(
-        ApiProblem.of(e) ??
-            (response == null ? null : ApiProblem.fromResponse(response)),
-      );
-    }
-  }
+  static Future<T> _call<T>(Future<T> Function() call) => adminCall(call);
 }
