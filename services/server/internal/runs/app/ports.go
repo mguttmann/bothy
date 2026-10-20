@@ -1,0 +1,164 @@
+// SPDX-License-Identifier: Apache-2.0
+
+package app
+
+import (
+	"context"
+	"time"
+
+	"github.com/OWNER/bothy/services/server/internal/kernel/ids"
+	"github.com/OWNER/bothy/services/server/internal/runs/domain"
+)
+
+// RunRow is one row of runs as this module reads it. Zero values are NULL, except DurationMS,
+// which HasDuration marks, and the JSON columns, which hold the stored object ("{}" at least).
+type RunRow struct {
+	ID, ThreadID, AgentID ids.ID
+	// AgentSessionID is NULL until M2-12.
+	AgentSessionID ids.ID
+	// TriggerKind is message, command or interaction.
+	TriggerKind string
+	// TriggeringMessageID, TriggeringCommandID and TriggeringInteractionID name the trigger.
+	TriggeringMessageID, TriggeringCommandID, TriggeringInteractionID ids.ID
+	// TriggeredBy is the person who triggered.
+	TriggeredBy ids.ID
+	State       domain.State
+	// StateReason is a reason of 09 5.2; "" for NULL.
+	StateReason string
+	Version     int64
+	// BillingModeExpected is never empty; BillingModeUsed "" for NULL.
+	BillingModeExpected, BillingModeUsed string
+	// InvocationJTI is runs.invocation_jti.
+	InvocationJTI ids.ID
+	// Model, StatusLine, LastTextExcerpt and Summary are "" for NULL.
+	Model, StatusLine, LastTextExcerpt, Summary string
+	// Plan and Metrics are the stored JSON objects.
+	Plan, Metrics []byte
+	// CostMicros, Currency and CostIsEstimate are the cost columns.
+	CostMicros     int64
+	Currency       string
+	CostIsEstimate bool
+	// QueuedAt is never zero; StartedAt and FinishedAt are zero for NULL.
+	QueuedAt, StartedAt, FinishedAt time.Time
+	// DurationMS is runs.duration_ms when HasDuration.
+	DurationMS  int64
+	HasDuration bool
+}
+
+// StepRow is one row of run_steps. Zero values are NULL.
+type StepRow struct {
+	ID, RunID ids.ID
+	// Ordinal is given by AppendStep; ignored on input.
+	Ordinal int
+	// ParentStepID is zero for none.
+	ParentStepID ids.ID
+	// Kind, Name, Title and Status are the column values.
+	Kind, Name, Title, Status string
+	// Detail is the stored JSON object; nil or empty means "{}".
+	Detail []byte
+	// StartedAt is the start; FinishedAt zero for NULL.
+	StartedAt, FinishedAt time.Time
+}
+
+// NewRun is the input of Repository.InsertRun: a run in queued with version 1.
+type NewRun struct {
+	ID, ThreadID, AgentID, TriggeredBy ids.ID
+	// TriggerKind is message, command or interaction; TriggeringMessageID is set for message.
+	TriggerKind         string
+	TriggeringMessageID ids.ID
+	// BillingModeExpected is the agent's billing mode at the acceptance (ruling D-M2-05-5).
+	BillingModeExpected string
+	// InvocationJTI is a fresh UUIDv7 that no token carries (ruling D-M2-05-4).
+	InvocationJTI ids.ID
+	// QueuedAt is the acceptance time.
+	QueuedAt time.Time
+}
+
+// TransitionWrite is the input of Repository.TransitionRun: the compare-and-swap on state and
+// version of 03 runs.
+type TransitionWrite struct {
+	ID ids.ID
+	// From and Version are the expected current state and version.
+	From    domain.State
+	Version int64
+	// To is the new state; Reason the stored state_reason ("" for NULL).
+	To     domain.State
+	Reason string
+	// At is the time of the change: started_at = COALESCE(started_at, At) for running, finished_at
+	// = At and duration_ms = At - started_at (NULL when never started) for an end state.
+	At time.Time
+}
+
+// RunKey is the keyset position (queued_at DESC, id DESC) of the run lists.
+type RunKey struct {
+	QueuedAt time.Time
+	ID       ids.ID
+}
+
+// ThreadRunsRead is the input of Repository.ThreadRuns.
+type ThreadRunsRead struct {
+	ThreadID ids.ID
+	// After is the keyset position the page starts after; nil for the first page.
+	After *RunKey
+	Limit int
+}
+
+// ActiveRunsRead is the input of Repository.ActiveRuns.
+type ActiveRunsRead struct {
+	// AgentID keeps one agent; zero for all.
+	AgentID ids.ID
+	// After is the keyset position the batch starts after; nil for the first batch.
+	After *RunKey
+	Limit int
+}
+
+// StepsRead is the input of Repository.Steps: the steps of RunID with ordinal above AfterOrdinal
+// (0 for the first page), ascending, at most Limit.
+type StepsRead struct {
+	RunID        ids.ID
+	AfterOrdinal int
+	Limit        int
+}
+
+// ActiveCount is one group of the gauge bothy.run.active: the number of active runs of one agent
+// in one state.
+type ActiveCount struct {
+	AgentID ids.ID
+	State   domain.State
+	Count   int64
+}
+
+// Repository is the outgoing port of the run rows; adapters/postgres implements it over runs and
+// run_steps. Reads join the ambient transaction of ctx; writes need one. The queries follow the
+// visibility rule of D-M2-05-9: they read the rows of one thread or run whose visibility the use
+// case checked first, the active runs whose threads the use case resolves and filters, or (the
+// gauge) all active runs without a principal. Errors are kernel/errs errors.
+type Repository interface {
+	// InsertRun inserts r in queued with ON CONFLICT on the partial unique index of the active
+	// run of a thread DO NOTHING; inserted is false when the thread has an active run (R-DM-14).
+	InsertRun(ctx context.Context, r NewRun) (row RunRow, inserted bool, err error)
+	// Run reads the run id; found is false for an unknown id.
+	Run(ctx context.Context, id ids.ID) (row RunRow, found bool, err error)
+	// ActiveRunOfThread reads the run in queued, running or waiting_input of the thread.
+	ActiveRunOfThread(ctx context.Context, threadID ids.ID) (row RunRow, found bool, err error)
+	// TransitionRun runs the compare-and-swap of w; changed is false when no row has the id, From
+	// and Version (the caller reads the row to tell a missing run from a concurrent change).
+	TransitionRun(ctx context.Context, w TransitionWrite) (row RunRow, changed bool, err error)
+	// AppendStep inserts s with the next ordinal of its run (one more than the highest, 1 for the
+	// first) and returns it as stored. The caller holds the row lock of the run (TransitionRun).
+	AppendStep(ctx context.Context, s StepRow) (StepRow, error)
+	// StepCounts counts the steps of each of runIDs in one statement; a run without steps is
+	// absent.
+	StepCounts(ctx context.Context, runIDs []ids.ID) (map[ids.ID]int, error)
+	// Steps reads one page of steps of a run by ordinal.
+	Steps(ctx context.Context, q StepsRead) ([]StepRow, error)
+	// AllSteps reads every step of a run by ordinal.
+	AllSteps(ctx context.Context, runID ids.ID) ([]StepRow, error)
+	// ThreadRuns reads the runs of one thread in keyset order (queued_at DESC, id DESC).
+	ThreadRuns(ctx context.Context, q ThreadRunsRead) ([]RunRow, error)
+	// ActiveRuns reads the runs in queued, running or waiting_input in keyset order (queued_at
+	// DESC, id DESC), optionally of one agent.
+	ActiveRuns(ctx context.Context, q ActiveRunsRead) ([]RunRow, error)
+	// ActiveCounts groups the active runs by agent and state for the gauge bothy.run.active.
+	ActiveCounts(ctx context.Context) ([]ActiveCount, error)
+}

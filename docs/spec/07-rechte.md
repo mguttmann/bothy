@@ -815,6 +815,15 @@ Regeln:
    reviewed exception list with a category and a reason per query is
    `tools/lint/sql_visibility.yaml`. Schreibende Abfragen treffen nur Zeilen einer Ressource, die `authorize` vorher
    geprüft hat (z. B. die Kopien von `channel_id` beim Verschieben); der Lint prüft sie nicht.
+   Thread-scoped tables without `channel_id` (`runs`, `run_steps`; a run follows its thread when
+   the thread moves, 03 `threads`) follow one of two forms instead (D-M2-05-9): (a) the query reads
+   the rows of exactly one thread or run whose visibility was checked first (`getRun`,
+   `listRunSteps`, `listThreadRuns`, the active run of a thread at the acceptance; exception
+   category `after_authorize`, the load before `authorize` in `getRun` `authorize_resolution`),
+   or (b) for the active-run lists (`listActiveRuns`, `Snapshot.active_runs`) it reads the active
+   runs, resolves their threads through the port of `chat`, keeps only threads whose channel is
+   in `Scope.ChannelIDs` and runs `authorize` per row (category `thread_scope`). The gauge query
+   of `bothy.run.active` has no principal (`system_job`).
 2. Gesamtzahlen (`total`), Facetten und "weitere Treffer" zählen nur innerhalb dieses Prädikats.
 3. Nach dem SQL-Filter läuft für jedes Ergebnis zusätzlich `authorize` mit der Lese-Aktion (z. B.
    `message.read`). Der SQL-Filter ist die Leistung, `authorize` die Wahrheit. Ein Unterschied

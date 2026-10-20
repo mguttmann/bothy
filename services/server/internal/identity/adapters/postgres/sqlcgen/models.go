@@ -720,6 +720,57 @@ type RefreshTokenFamily struct {
 	RevokeReason      pgtype.Text
 }
 
+type Run struct {
+	ID                      pgtype.UUID
+	ThreadID                pgtype.UUID
+	AgentID                 pgtype.UUID
+	AgentSessionID          pgtype.UUID
+	TriggerKind             string
+	TriggeringMessageID     pgtype.UUID
+	TriggeringCommandID     pgtype.UUID
+	TriggeringInteractionID pgtype.UUID
+	TriggeredBy             pgtype.UUID
+	State                   string
+	StateReason             pgtype.Text
+	Version                 int64
+	BillingModeExpected     string
+	BillingModeUsed         pgtype.Text
+	BillingEvidence         []byte
+	InvocationJti           pgtype.UUID
+	StartedJti              pgtype.UUID
+	RenewedFromJti          pgtype.UUID
+	DevEnvironmentID        pgtype.UUID
+	Model                   pgtype.Text
+	StatusLine              pgtype.Text
+	LastTextExcerpt         pgtype.Text
+	Plan                    []byte
+	Metrics                 []byte
+	CostMicros              int64
+	Currency                string
+	CostIsEstimate          bool
+	Summary                 pgtype.Text
+	StallWarnedAt           pgtype.Timestamptz
+	QueuedAt                pgtype.Timestamptz
+	InvocationHeldUntil     pgtype.Timestamptz
+	StartedAt               pgtype.Timestamptz
+	FinishedAt              pgtype.Timestamptz
+	DurationMs              pgtype.Int8
+}
+
+type RunStep struct {
+	ID           pgtype.UUID
+	RunID        pgtype.UUID
+	Ordinal      int32
+	ParentStepID pgtype.UUID
+	Kind         string
+	Name         string
+	Title        string
+	Status       string
+	Detail       []byte
+	StartedAt    pgtype.Timestamptz
+	FinishedAt   pgtype.Timestamptz
+}
+
 type SequenceCounter struct {
 	Name  string
 	Value int64

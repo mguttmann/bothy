@@ -1,6 +1,6 @@
 # Modul `runs`
 
-Status: skeleton (M1-05) and the trigger decision as pure functions in `domain/` (M2-04). Interfaces, use cases and tables come with the tickets of the milestone; M2-05 applies the decision.
+Status: the trigger decision as pure functions in `domain/` (M2-04); runs, the state machine, the acceptance of a triggering message and the run reads (M2-05). Delivery (M2-08), start, finish and cancel (M2-09), patches (M2-10) and follow-ups (M2-11) build on `app.Open` and `app.Transition`.
 Normativ ist [docs/spec/02-architektur.md](../../../../docs/spec/02-architektur.md); bei Abweichung gilt das Kapitel.
 
 ## Zweck
@@ -9,9 +9,10 @@ Auslöse-Entscheidung, Läufe und Lauf-Dokument, Schritte, Nachträge, Komponent
 
 ## Code
 
-- `internal/runs` (`doc.go`): Port als Wurzelpaket, bisher nur mit Paketkommentar. Schnittstellen, DTOs und In-Tx-Ereignisse kommen mit dem Ticket, das sie umsetzt.
-- `internal/runs/domain` (M2-04): the trigger decision of [09-agenten.md](../../../../docs/spec/09-agenten.md) section 3 as pure functions. `trigger.go` holds the input types and `Decide`, `trigger_command.go` holds `DecideCommand`, `trigger_settle.go` holds `Verdict`, `Settlement` and `Settle`, `trigger_reasons.go` holds `Reason` (one constant per code of 09 3.5) and the constants of `Outcome`, `Step`, `Check`, `TranscriptSource` and `TriggerState`. The package imports only the standard library and `kernel-core` (`kernel/ids`, `kernel/errs`); it has no I/O, no clock, no randomness and never calls `authorize`.
-- `app/` und `adapters/<art>/` entstehen mit dem ersten Anwendungsfall. Ihre Komponenten erzeugt `tools/archgen` aus `architecture/modules.yaml`; ein Paket außerhalb dieser Schichten scheitert in `make arch`.
+- `internal/runs` (`runs.go`, M2-05): the port. `Runs` is the read side (`Get`, `ListByThread`, `ListSteps`, `ListActive`, `ActiveForActor`) with the DTOs `Run`, `RunSummary`, `RunStep`, `Money`, the pages and the queries; `Register` declares `run.state_changed`. No other module changes run states.
+- `internal/runs/domain` (M2-04, M2-05): the trigger decision of [09-agenten.md](../../../../docs/spec/09-agenten.md) section 3 as pure functions. `trigger.go` holds the input types and `Decide`, `trigger_command.go` holds `DecideCommand`, `trigger_settle.go` holds `Verdict`, `Settlement` and `Settle`, `trigger_reasons.go` holds `Reason` (one constant per code of 09 3.5) and the constants of `Outcome`, `Step`, `Check`, `TranscriptSource` and `TriggerState`. M2-05 adds `state.go` (the six states, `Active`, `Ended`, `CanTransition` with the ten pairs of 03 `runs`), `reason.go` (the reason table of 09 5.2 plus `user_disabled` with state and setter, `ValidateServerReason`, `NormalizeAdapterReason`, `OriginalReasonDetail`) and `triggerstate.go` (`TriggerOnOpen`, `TriggerOnTransition`, the mapping of 09 6). The package imports only the standard library and `kernel-core` (`kernel/ids`, `kernel/errs`, `kernel/textcheck`); it has no I/O, no clock, no randomness and never calls `authorize`.
+- `internal/runs/app` (M2-05): `Service` with the lifecycle `Open` and `Transition`, the reads, `ActiveGroups` (the gauge), and `Acceptor`, the in-transaction subscriber of `messaging.MessagePosted`; `ports.go` holds `Repository` and its row types, `metrics.go` the outgoing `Metrics` port.
+- `internal/runs/adapters/postgres` (M2-05): the sqlc queries over `runs` and `run_steps` and `Repository`. `adapters/httpapi`: the four REST operations and the cursor codec. `adapters/otelmetrics`: the run metrics of signals.md 4.3 and the gauge `bothy.run.active`.
 
 ## Trigger decision
 
@@ -85,10 +86,23 @@ This package never yields `queued`, `working`, `done`, `cancelled` or `followup_
 
 ## Port (Wurzelpaket `internal/runs`)
 
-- Eingehend: `Runs` (Lesen, Kontext, Start, Wiederaufnahme, Patch, Ende, Abbruch, Übersicht), `Delivery` (Zustellvorbereitung mit I2, Schutzregeln und Marke), `Interactions`, `CommandExec` (inklusive Autovervollständigung).
+- Incoming (M2-05): `Runs` (reads). Planned: start, resume, patch, finish, cancel (M2-09, M2-10), `Delivery` (M2-08), `Interactions` (M2-15), `CommandExec` (M2-16).
 - Gibt In-Tx-Ereignisse aus: keine.
-- Abonniert In-Tx-Ereignisse: `messaging.MessagePosted`, `messaging.MessageDeleted`, `files.FileFinalized` (zurückgehaltenen Aufruf schreiben), `agents.AgentDisabled`, `chat.ChannelReadOnlySet`, kernel `authorize.AccessChanged`.
-- Implementiert Quellen-Ports und Querschnitts-Ports: `messaging.ComponentReader`, kernel `personaldata.Participant`.
+- Subscribes (M2-05): `messaging.MessagePosted` (the acceptance, `app.Acceptor`, registered after the subscriber of sync). Planned: `messaging.MessageDeleted`, `files.FileFinalized`, `agents.AgentDisabled`, `chat.ChannelReadOnlySet`, kernel `authorize.AccessChanged`.
+- Uses the ports `chat.Threads` (`Info`, `Locate`, `Create`), `chat.TriggerFacts`, `agents.Facts` and `messaging.Messages` (`CreateRunAnchor`, `SetTriggerState`).
+- Implementiert Quellen-Ports und Querschnitts-Ports: `messaging.ComponentReader` (M2-15), kernel `personaldata.Participant` (M7-06).
+
+## Run lifecycle (M2-05)
+
+- `Open` (inside the caller's unit of work): `INSERT ... ON CONFLICT` on the partial unique index of the active run of a thread `DO NOTHING` (R-DM-14; `ActiveRunExistsError` otherwise, nothing written), the anchor through `messaging.CreateRunAnchor`, `run.state_changed`, then `trigger_state = received`.
+- `Transition`: the pair must be one of 03 `runs` (`409 invalid_state_transition` otherwise), the reason one of 09 5.2 for its setter (an unknown adapter reason becomes `adapter_error` with a status step `adapter_reason`), one compare-and-swap `UPDATE` on `state` and `version` (`ConcurrentChangeError` with the current run when it lost, `not_found` for an unknown run), `run.state_changed`, then `trigger_state` per 09 6 through `messaging.SetTriggerState`. The metrics are recorded after the commit (`txn.AfterCommit`).
+- Lock order: `runs` before `messages`; the acceptance holds the thread row of the message.
+- Every state change, the creation included, appends `run.state_changed`: resource `run` with the version of the run row, the receive action of reading a run, payload `RunStateChangedPayload` (the summary, the triggering message and the trigger state this change set).
+- Acceptance (`Acceptor.OnMessagePosted`): only `origin = human`, `kind = text`, no DM; facts through the ports; `Decide`; a candidate without mention is checked in filter mode first (no trigger right: nothing written, no audit); then `agent.invoke` in request mode, which audits denials; the auto thread only after `allow`; a disagreement of `Decide` and `authorize` fails closed. Until `Bind` the acceptor writes nothing (D-M2-05-19).
+
+## Visibility of `runs` and `run_steps`
+
+The tables have no `channel_id` (07 7.4 rule 1, D-M2-05-9): every query reads the rows of one thread or run whose visibility the use case checked first, or (the active-run lists) the active runs whose threads `chat.Threads.Locate` resolves, kept only when the channel is in `Scope.ChannelIDs` and `run.read` allows each row in filter mode (category `thread_scope` of `tools/lint/sql_visibility.yaml`); the gauge query has no principal.
 
 ## Abhängigkeiten
 
@@ -111,7 +125,7 @@ Nur dieses Modul schreibt und liest diese Tabellen per SQL (03-datenmodell.md, G
 
 ## Ereignisse und WebSocket-Ops
 
-- Dauerhaft: `run.state_changed`, `agent.invocation`, `agent.followup`, `run.cancel_requested`, `interaction.created`, `command.invoked`.
+- Dauerhaft: `run.state_changed`, `agent.invocation`, `agent.followup`, `run.cancel_requested`, `interaction.created`, `command.invoked`. Since M2-05 the first of them is written; the others come with their tickets.
 - Kurzlebig: `run.updated`, `command.autocomplete_requested`.
 - WebSocket-Ops (Client an Server): `run.update`, `command.autocomplete_result`.
 

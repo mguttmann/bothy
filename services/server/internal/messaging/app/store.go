@@ -28,6 +28,11 @@ type Store interface {
 	// InsertMessage writes m and returns it as stored. Errors: ErrClientMsgIDTaken (wrapped) for
 	// a second (author, client_msg_id).
 	InsertMessage(ctx context.Context, m domain.Message) (domain.Message, error)
+	// SetTriggerState sets trigger_state, trigger_state_reason (NULL for "") and trigger_state_at
+	// of the message id of origin human and raises its version, only when state or reason differ
+	// from the stored ones (M2-05). changed is false, and nothing is written, for an unknown id,
+	// another origin and the same state and reason; the caller tells them apart by reading.
+	SetTriggerState(ctx context.Context, id ids.ID, state, reason string, at time.Time) (m domain.Message, changed bool, err error)
 	// InsertMentions writes one mentions row per principal of message in thread, in one statement.
 	InsertMentions(ctx context.Context, message, thread ids.ID, principals []ids.ID, at time.Time) error
 	// Mentions returns the mentioned principals of message, sorted.

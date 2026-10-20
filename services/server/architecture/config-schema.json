@@ -2980,6 +2980,18 @@
       "doc": "How long the audit log is kept before it is trimmed with an anchor."
     },
     {
+      "name": "run.step_detail_max_bytes",
+      "env": "BOTHY_RUN__STEP_DETAIL_MAX_BYTES",
+      "kind": "int",
+      "default": "16384",
+      "required": false,
+      "enum": [],
+      "min": "64",
+      "max": "1048576",
+      "chapter": "03-datenmodell.md",
+      "doc": "Largest encoded run_steps.detail in bytes; a longer detail is cut."
+    },
+    {
       "name": "search.languages",
       "env": "BOTHY_SEARCH__LANGUAGES",
       "kind": "list(string)",

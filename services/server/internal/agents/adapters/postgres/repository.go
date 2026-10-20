@@ -83,12 +83,27 @@ func (r *Repository) LockAgents(ctx context.Context, list []ids.ID) ([]domain.Ag
 	if len(list) == 0 {
 		return nil, nil
 	}
+	rows, err := q.LockAgents(ctx, sortedKeys(list))
+	return many(rows, err, "locking agents")
+}
+
+// Agents implements app.Store: the list is sorted and deduplicated like LockAgents, so the
+// statement sees each id once.
+func (r *Repository) Agents(ctx context.Context, list []ids.ID) ([]domain.Agent, error) {
+	if len(list) == 0 {
+		return nil, nil
+	}
+	rows, err := r.read(ctx).GetAgents(ctx, sortedKeys(list))
+	return many(rows, err, "reading agents")
+}
+
+// sortedKeys returns the ids of list ascending and without duplicates as query parameters.
+func sortedKeys(list []ids.ID) []pgtype.UUID {
 	keys := make([]pgtype.UUID, 0, len(list))
 	for _, id := range slices.Compact(slices.SortedFunc(slices.Values(list), func(a, b ids.ID) int { return bytes.Compare(a[:], b[:]) })) {
 		keys = append(keys, uuid(id))
 	}
-	rows, err := q.LockAgents(ctx, keys)
-	return many(rows, err, "locking agents")
+	return keys
 }
 
 // LockPersonalAgents implements app.Store.

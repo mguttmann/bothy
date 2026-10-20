@@ -3,6 +3,7 @@
 package postgres_test
 
 import (
+	"bytes"
 	"context"
 	"os"
 	"strings"
@@ -197,5 +198,45 @@ func wantField(t *testing.T, err error, pointer string) {
 		if strings.Contains(s, "agents_") || strings.Contains(s, "INSERT") {
 			t.Errorf("error text %q leaks SQL", s)
 		}
+	}
+}
+
+// TestRepositoryAgents reads the records of a list without a lock (M2-05): unknown ids, people
+// and duplicates are left out, the order is ascending by id, an empty list reads nothing, and the
+// read works on the pool as well as inside a unit of work.
+func TestRepositoryAgents(t *testing.T) {
+	t.Parallel()
+	e := newEnv(t)
+	ctx := context.Background()
+	sam := e.principal(t, "user", "sam")
+	a := domain.NewAgent(e.principal(t, "agent", "lotse"), "hermes", "", domain.OperatorConfig{})
+	b := domain.NewAgent(e.principal(t, "agent", "scout"), "custom", "", domain.OperatorConfig{})
+	if err := e.uow.Do(ctx, func(ctx context.Context) error {
+		if err := e.repo.InsertAgent(ctx, a); err != nil {
+			return err
+		}
+		return e.repo.InsertAgent(ctx, b)
+	}); err != nil {
+		t.Fatal(err)
+	}
+	first, second := a.ID, b.ID
+	if bytes.Compare(first[:], second[:]) > 0 {
+		first, second = second, first
+	}
+	rows, err := e.repo.Agents(ctx, []ids.ID{second, sam, ids.New(), first, second})
+	if err != nil || len(rows) != 2 || rows[0].ID != first || rows[1].ID != second {
+		t.Fatalf("Agents = %+v, %v", rows, err)
+	}
+	if rows, err := e.repo.Agents(ctx, nil); err != nil || len(rows) != 0 {
+		t.Fatalf("Agents empty = %+v, %v", rows, err)
+	}
+	if err := e.uow.Do(ctx, func(ctx context.Context) error {
+		rows, err := e.repo.Agents(ctx, []ids.ID{a.ID})
+		if err != nil || len(rows) != 1 || rows[0].ID != a.ID || rows[0].AdapterKind != "hermes" {
+			t.Fatalf("Agents in a unit of work = %+v, %v", rows, err)
+		}
+		return nil
+	}); err != nil {
+		t.Fatal(err)
 	}
 }

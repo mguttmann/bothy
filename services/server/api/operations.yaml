@@ -104,6 +104,7 @@ enabled:             # operationIds that have a handler; sorted ascending
   - getMyCredentials
   - getMySidebar
   - getProblemType
+  - getRun
   - getServedChannelConfig
   - getSnapshot
   - getSpace
@@ -117,6 +118,7 @@ enabled:             # operationIds that have a handler; sorted ascending
   - handleOidcCallback
   - installApp
   - issueHostPairingCode
+  - listActiveRuns
   - listAgents
   - listApps
   - listAuditEvents
@@ -143,12 +145,14 @@ enabled:             # operationIds that have a handler; sorted ascending
   - listOwners
   - listPins
   - listReactions
+  - listRunSteps
   - listServedChannels
   - listSpaceChannels
   - listSpaces
   - listTemplates
   - listTerminalSessions
   - listThreadMessages
+  - listThreadRuns
   - listTokens
   - listUserDevices
   - listUserSessions
@@ -328,9 +332,6 @@ later:               # every other operationId of docs/api/openapi.yaml; sorted 
     ticket: M7-09
   - operation_id: getPushPreview
     etappe: M3
-  - operation_id: getRun
-    etappe: M2
-    ticket: M2-05
   - operation_id: getRunContext
     etappe: M2
     ticket: M2-13
@@ -367,9 +368,6 @@ later:               # every other operationId of docs/api/openapi.yaml; sorted 
   - operation_id: leaveDm
     etappe: V3
     ticket: V3-01
-  - operation_id: listActiveRuns
-    etappe: M2
-    ticket: M2-05
   - operation_id: listAgentSessions
     etappe: M2
     ticket: M2-12
@@ -395,12 +393,6 @@ later:               # every other operationId of docs/api/openapi.yaml; sorted 
   - operation_id: listPrices
     etappe: M2
     ticket: M2-22
-  - operation_id: listRunSteps
-    etappe: M2
-    ticket: M2-05
-  - operation_id: listThreadRuns
-    etappe: M2
-    ticket: M2-05
   - operation_id: patchRun
     etappe: M2
     ticket: M2-10

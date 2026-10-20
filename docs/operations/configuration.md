@@ -239,7 +239,7 @@ Quelle: [03-datenmodell.md](../spec/03-datenmodell.md), Abschnitt 9.
 | `template.max_per_scope` | `BOTHY_TEMPLATE__MAX_PER_SCOPE` | Server | int | `100` | Vorlagen je Person bzw. je Kanal; `listTemplates` ist nicht seitenweise | aktiv |
 | `file.max_upload_bytes` | `BOTHY_FILE__MAX_UPLOAD_BYTES` | Server | int | `104857600` | Größe einer Datei | aktiv |
 | `run.excerpt_max_chars` | `BOTHY_RUN__EXCERPT_MAX_CHARS` | Server |  | `500` | Länge von `last_text_excerpt` | geplant (M2) |
-| `run.step_detail_max_bytes` | `BOTHY_RUN__STEP_DETAIL_MAX_BYTES` | Server |  | `16384` | Größe von `run_steps.detail` | geplant (M2) |
+| `run.step_detail_max_bytes` | `BOTHY_RUN__STEP_DETAIL_MAX_BYTES` | Server | int | `16384` | Größe von `run_steps.detail` | aktiv |
 | `run.max_steps_persisted` | `BOTHY_RUN__MAX_STEPS_PERSISTED` | Server |  | `2000` | gespeicherte Schritte je Lauf | geplant (M2) |
 | `run.stall_after` | `BOTHY_RUN__STALL_AFTER` | Server |  | `10m` | ohne Fortschritt: Stillstandshinweis | geplant (M2) |
 | `component.default_ttl` | `BOTHY_COMPONENT__DEFAULT_TTL` | Server |  | `24h` | Ablauf einer Komponente ohne eigene Angabe | geplant (M2) |
