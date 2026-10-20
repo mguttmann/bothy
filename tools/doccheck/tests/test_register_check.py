@@ -1934,8 +1934,8 @@ def _starts_chromium(call: str) -> bool:
 
 
 def test_every_ci_step_that_starts_chromium_sets_the_puppeteer_config() -> None:
-    # Without it Chromium starts with its sandbox, which a CI runner may block (red team H1:
-    # the job "sonar" runs `make test` first). Steps of all workflows, ci.yml's value.
+    # Without it Chromium starts with its sandbox, which a CI runner may block (red team H1).
+    # Steps of all workflows, ci.yml's value. The job sonar runs `make sonar-scan`, no tests.
     config = _ci_puppeteer_config()
     checked: set[str] = set()
     wrong: list[str] = []
@@ -1950,7 +1950,8 @@ def test_every_ci_step_that_starts_chromium_sets_the_puppeteer_config() -> None:
                 checked.add(f"{path.name}: {job_id}")
                 if _env(data, job, step).get(PUPPETEER_CONFIG) != config:
                     wrong.append(where)
-    assert {"ci.yml: gates", "ci.yml: sonar"} <= checked, checked
+    assert "ci.yml: gates" in checked, checked
+    assert "ci.yml: sonar" not in checked, checked
     assert wrong == []
 
 

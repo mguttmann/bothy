@@ -30,8 +30,8 @@ FLUTTER_IF = "hashFiles('apps/*/pubspec.yaml', 'packages/*/pubspec.yaml') != ''"
 # The root pubspec.yaml of the workspace carries the pin (docs/DECISIONS.md D-M4-01-1).
 FLUTTER_VERSION_FILE = "pubspec.yaml"
 APPS_JOBS = ("apps-macos", "apps-windows", "apps-android-26", "apps-android-36")
-# The JVM tests of the Android core run in `make test` (brief M5-01): gates and sonar install a
-# JDK and the Android SDK when a Gradle project of a member is tracked.
+# The JVM tests of the Android core run in `make test` (brief M5-01): gates installs a JDK and
+# the Android SDK when a Gradle project of a member is tracked.
 ANDROID_IF = "hashFiles('packages/*/android/gradlew') != ''"
 
 
@@ -156,9 +156,9 @@ def test_apps_android_runs_the_instrumented_tests_on_an_emulator(level: int) -> 
     assert emulator["with"]["script"] == f"{platform} --system android"
 
 
-@pytest.mark.parametrize("job", ["gates", "sonar"])
-def test_jdk_and_android_sdk_for_the_jvm_tests(job: str) -> None:
-    steps = _steps(job)
+def test_jdk_and_android_sdk_for_the_jvm_tests() -> None:
+    # Only gates: the job sonar runs no tests (tools/ci/tests/test_sonar_coverage_handoff.py).
+    steps = _steps("gates")
     [java] = [s for s in steps if _uses(s, "actions/setup-java")]
     assert java["if"] == ANDROID_IF
     assert java["with"]["java-version"] == "17"

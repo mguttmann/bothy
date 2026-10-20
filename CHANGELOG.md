@@ -478,6 +478,11 @@ operated, and the order of the build.
 
 ### Changed
 
+- CI: the job `sonar` no longer runs every test a second time. The job `gates` uploads the
+  coverage reports of its `make test` as the artifact `sonar-coverage`; `sonar` needs `gates`,
+  unpacks them and runs the new target `make sonar-scan` (the scan alone, same quality gate).
+  `make sonar` and `make check` still test first. ci.yml also runs on pushes to `main`, so
+  SonarQube keeps an analysis of `main` (docs/quality/gates.md).
 - Design tokens: series and state roles moved along their scales so that they stay apart under
   the simulation: light `color.viz.series.3` `spruce.600` to `spruce.700`, `.6` `moss.600` to
   `moss.900`, `color.warning.fg` `amber.700` to `amber.800`, `color.danger.fg` `rowan.700` to

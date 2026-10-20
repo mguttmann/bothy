@@ -19,8 +19,8 @@ Every finding names a rule:
                                 of its release (D-W-111)
   pull-request-target           the pull_request_target trigger
   push-on-branch                a push trigger that is not limited to tags (only the
-                                post-merge workflows may name exactly `main`, only
-                                build-verify.yml exactly `build/**`)
+                                post-merge workflows and MAIN_PUSH_WORKFLOWS may name
+                                exactly `main`, only build-verify.yml exactly `build/**`)
   release-trigger               a release, post-merge or build verification workflow with
                                 other triggers than its own (release.yml: tag push;
                                 portability.yml: the call from release.yml and
@@ -83,6 +83,9 @@ POST_MERGE_WORKFLOWS: dict[str, frozenset[str]] = {
 # nothing else (docs/quality/push-discipline.md, "Build branches"). It is no required check.
 BUILD_VERIFY_WORKFLOWS: dict[str, frozenset[str]] = {"build-verify.yml": frozenset({"push"})}
 BUILD_VERIFY_PUSH = {"branches": ["build/**"]}
+# Workflows that also run on every push to main next to their other triggers: ci.yml, so that
+# SonarQube keeps an analysis of main (docs/quality/gates.md).
+MAIN_PUSH_WORKFLOWS = frozenset({"ci.yml"})
 RELEASE_ENVIRONMENT_PREFIX = "release"
 PUBLIC_GUARD = (
     "github.event.repository.visibility == 'public' || "
@@ -201,7 +204,9 @@ def _check_triggers(file: str, triggers: dict[str, Any], out: list[Finding]) -> 
             and "branches" not in push
             and "branches-ignore" not in push
         )
-        main_only = file in POST_MERGE_WORKFLOWS and push == {"branches": ["main"]}
+        main_only = (file in POST_MERGE_WORKFLOWS or file in MAIN_PUSH_WORKFLOWS) and push == {
+            "branches": ["main"]
+        }
         build_only = file in BUILD_VERIFY_WORKFLOWS and push == BUILD_VERIFY_PUSH
         if not tag_only and not main_only and not build_only:
             out.append(Finding(file, "on.push", "push-on-branch", "push must be limited to tags"))
