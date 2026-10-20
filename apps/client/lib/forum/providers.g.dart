@@ -863,19 +863,22 @@ abstract class _$PostListOffset extends $Notifier<double> {
 
 /// The paging of the post list of [channelId] in the order [sort] (a `ForumSort` code):
 /// pages of `listChannelThreads` go into `threads` (brief M4-19 Design note 3;
-/// docs/DECISIONS.md D-M4-19-5).
+/// docs/DECISIONS.md D-M4-19-5). A new engine (a logout, a new login) starts the paging again,
+/// because the new database holds none of the loaded pages (D-M4-19-16).
 
 @ProviderFor(ForumPager)
 final forumPagerProvider = ForumPagerFamily._();
 
 /// The paging of the post list of [channelId] in the order [sort] (a `ForumSort` code):
 /// pages of `listChannelThreads` go into `threads` (brief M4-19 Design note 3;
-/// docs/DECISIONS.md D-M4-19-5).
+/// docs/DECISIONS.md D-M4-19-5). A new engine (a logout, a new login) starts the paging again,
+/// because the new database holds none of the loaded pages (D-M4-19-16).
 final class ForumPagerProvider
     extends $NotifierProvider<ForumPager, PagerState> {
   /// The paging of the post list of [channelId] in the order [sort] (a `ForumSort` code):
   /// pages of `listChannelThreads` go into `threads` (brief M4-19 Design note 3;
-  /// docs/DECISIONS.md D-M4-19-5).
+  /// docs/DECISIONS.md D-M4-19-5). A new engine (a logout, a new login) starts the paging again,
+  /// because the new database holds none of the loaded pages (D-M4-19-16).
   ForumPagerProvider._({
     required ForumPagerFamily super.from,
     required (String, String) super.argument,
@@ -920,11 +923,12 @@ final class ForumPagerProvider
   }
 }
 
-String _$forumPagerHash() => r'ff6c6c9e5eaeb9c43fe61ec7f82a714a52c78785';
+String _$forumPagerHash() => r'1a461fead8f43303d4dc12fbfe1a80362d3a0ce2';
 
 /// The paging of the post list of [channelId] in the order [sort] (a `ForumSort` code):
 /// pages of `listChannelThreads` go into `threads` (brief M4-19 Design note 3;
-/// docs/DECISIONS.md D-M4-19-5).
+/// docs/DECISIONS.md D-M4-19-5). A new engine (a logout, a new login) starts the paging again,
+/// because the new database holds none of the loaded pages (D-M4-19-16).
 
 final class ForumPagerFamily extends $Family
     with
@@ -946,7 +950,8 @@ final class ForumPagerFamily extends $Family
 
   /// The paging of the post list of [channelId] in the order [sort] (a `ForumSort` code):
   /// pages of `listChannelThreads` go into `threads` (brief M4-19 Design note 3;
-  /// docs/DECISIONS.md D-M4-19-5).
+  /// docs/DECISIONS.md D-M4-19-5). A new engine (a logout, a new login) starts the paging again,
+  /// because the new database holds none of the loaded pages (D-M4-19-16).
 
   ForumPagerProvider call(String channelId, String sort) =>
       ForumPagerProvider._(argument: (channelId, sort), from: this);
@@ -957,7 +962,8 @@ final class ForumPagerFamily extends $Family
 
 /// The paging of the post list of [channelId] in the order [sort] (a `ForumSort` code):
 /// pages of `listChannelThreads` go into `threads` (brief M4-19 Design note 3;
-/// docs/DECISIONS.md D-M4-19-5).
+/// docs/DECISIONS.md D-M4-19-5). A new engine (a logout, a new login) starts the paging again,
+/// because the new database holds none of the loaded pages (D-M4-19-16).
 
 abstract class _$ForumPager extends $Notifier<PagerState> {
   late final _$args = ref.$arg as (String, String);

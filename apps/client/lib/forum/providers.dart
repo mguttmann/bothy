@@ -186,11 +186,15 @@ final class PagerState {
 
 /// The paging of the post list of [channelId] in the order [sort] (a `ForumSort` code):
 /// pages of `listChannelThreads` go into `threads` (brief M4-19 Design note 3;
-/// docs/DECISIONS.md D-M4-19-5).
+/// docs/DECISIONS.md D-M4-19-5). A new engine (a logout, a new login) starts the paging again,
+/// because the new database holds none of the loaded pages (D-M4-19-16).
 @Riverpod(keepAlive: true)
 class ForumPager extends _$ForumPager {
   @override
-  PagerState build(String channelId, String sort) => const PagerState();
+  PagerState build(String channelId, String sort) {
+    ref.watch(syncEngineProvider);
+    return const PagerState();
+  }
 
   /// Loads the next page; does nothing while one loads, after the last one and without an
   /// engine. A failed read (offline, an error answer) keeps the cursor and marks the state
