@@ -9,20 +9,10 @@ import 'package:design_system/design_system.dart';
 import 'package:flutter/material.dart';
 import 'package:l10n/l10n.dart';
 
-import '../agents/agent_page.dart';
-import '../agents/agents_list.dart';
 import '../audit/audit_export.dart';
-import '../audit/audit_list.dart';
 import '../data/admin_repository.dart';
 import '../data/agents_repository.dart';
-import '../devices/waiting_devices.dart';
-import '../grants/grants_list.dart';
-import '../groups/group_detail.dart';
-import '../groups/groups_list.dart';
-import '../hosts/host_page.dart';
-import '../hosts/hosts_list.dart';
-import '../people/people_list.dart';
-import '../people/person_detail.dart';
+import 'admin_body.dart';
 import 'admin_routes.dart';
 
 /// The name of the entry [section] in the navigation.
@@ -133,103 +123,6 @@ class _AdminShellState extends State<AdminShell> {
     }
   }
 
-  Widget _body() {
-    final r = widget.repository;
-    final at = widget.location;
-    final id = at.id;
-    void changed() => _count();
-    return switch (at.section) {
-      AdminSection.people when id != null => PersonDetail(
-        key: ValueKey('admin.person.$id'),
-        repository: r,
-        userId: id,
-        timeZone: widget.timeZone,
-        clock: widget.clock,
-        onBack: () => widget.onNavigate(AdminLocation.start),
-        onChanged: changed,
-      ),
-      AdminSection.groups when id != null => GroupDetail(
-        key: ValueKey('admin.group.$id'),
-        repository: r,
-        groupId: id,
-        timeZone: widget.timeZone,
-        clock: widget.clock,
-        onBack: () =>
-            widget.onNavigate(const AdminLocation(AdminSection.groups)),
-        onChanged: changed,
-      ),
-      AdminSection.groups => GroupsList(
-        repository: r,
-        onOpen: (g) =>
-            widget.onNavigate(AdminLocation(AdminSection.groups, id: g)),
-        onChanged: changed,
-      ),
-      AdminSection.grants => GrantsList(
-        key: ValueKey('admin.grants.$id'),
-        repository: r,
-        targetKey: id,
-        timeZone: widget.timeZone,
-        clock: widget.clock,
-        onTarget: (key) =>
-            widget.onNavigate(AdminLocation(AdminSection.grants, id: key)),
-        onChanged: changed,
-      ),
-      AdminSection.agents when id != null => AgentPage(
-        key: ValueKey('admin.agent.$id'),
-        repository: r,
-        agentId: id,
-        presence: widget.agentPresence?.call(id),
-        timeZone: widget.timeZone,
-        clock: widget.clock,
-        onBack: () =>
-            widget.onNavigate(const AdminLocation(AdminSection.agents)),
-        onChanged: changed,
-      ),
-      AdminSection.agents => AgentsList(
-        repository: r,
-        onOpen: (a) =>
-            widget.onNavigate(AdminLocation(AdminSection.agents, id: a)),
-        onChanged: changed,
-      ),
-      AdminSection.audit => AuditLogView(
-        repository: r,
-        timeZone: widget.timeZone,
-        clock: widget.clock,
-        saveTarget: widget.saveTarget,
-      ),
-      AdminSection.hosts when id != null => HostDetail(
-        key: ValueKey('admin.host.$id'),
-        repository: r,
-        hostId: id,
-        timeZone: widget.timeZone,
-        clock: widget.clock,
-        onBack: () =>
-            widget.onNavigate(const AdminLocation(AdminSection.hosts)),
-        onChanged: changed,
-      ),
-      AdminSection.hosts => HostsList(
-        repository: r,
-        clock: widget.clock,
-        onOpen: (h) =>
-            widget.onNavigate(AdminLocation(AdminSection.hosts, id: h)),
-        onChanged: changed,
-      ),
-      AdminSection.devices => WaitingDevicesView(
-        repository: r,
-        timeZone: widget.timeZone,
-        clock: widget.clock,
-        onChanged: changed,
-      ),
-      _ => PeopleList(
-        repository: r,
-        timeZone: widget.timeZone,
-        onOpen: (p) =>
-            widget.onNavigate(AdminLocation(AdminSection.people, id: p)),
-        onChanged: changed,
-      ),
-    };
-  }
-
   @override
   Widget build(BuildContext context) {
     final l = AppLocalizations.of(context);
@@ -288,28 +181,16 @@ class _AdminShellState extends State<AdminShell> {
             ),
           ),
           Expanded(
-            child: widget.location.section == AdminSection.audit
-                // The audit list scrolls itself (virtualized), so it gets the body's height.
-                ? Padding(
-                    padding: const EdgeInsets.all(DsSpace.s24),
-                    child: KeyedSubtree(
-                      key: ValueKey('admin.body.${widget.location.path}'),
-                      child: _body(),
-                    ),
-                  )
-                : SingleChildScrollView(
-                    padding: const EdgeInsets.all(DsSpace.s24),
-                    child: Align(
-                      alignment: Alignment.topLeft,
-                      child: ConstrainedBox(
-                        constraints: const BoxConstraints(maxWidth: 880),
-                        child: KeyedSubtree(
-                          key: ValueKey('admin.body.${widget.location.path}'),
-                          child: _body(),
-                        ),
-                      ),
-                    ),
-                  ),
+            child: AdminBody(
+              repository: widget.repository,
+              location: widget.location,
+              onNavigate: widget.onNavigate,
+              onChanged: _count,
+              timeZone: widget.timeZone,
+              clock: widget.clock,
+              saveTarget: widget.saveTarget,
+              agentPresence: widget.agentPresence,
+            ),
           ),
         ],
       ),

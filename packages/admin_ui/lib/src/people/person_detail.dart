@@ -9,6 +9,7 @@ import 'package:design_system/design_system.dart';
 import 'package:flutter/material.dart';
 import 'package:l10n/l10n.dart';
 
+import '../access/who_has_access.dart' show AdminViewAs;
 import '../common/admin_action.dart';
 import '../common/confirm_change.dart';
 import '../common/problem_banner.dart';
@@ -30,7 +31,8 @@ import 'people_list.dart' show personStatusText;
 /// `device.approve`, `device.revoke` have step-up; `session.revoke` has none). Disabling says
 /// that every session ends (08 11); enabling explains `409 i1_violation` (M4-28 resolves
 /// it). A section whose list the server refuses shows the reason instead (fixed requirement
-/// 9). [onBack] returns to the list.
+/// 9). [onBack] returns to the list; [onViewAs] adds "View as this person", which the host
+/// starts (the console's stored view, brief M6-04 Design note 3).
 class PersonDetail extends StatefulWidget {
   /// Creates the detail.
   const PersonDetail({
@@ -41,6 +43,7 @@ class PersonDetail extends StatefulWidget {
     this.clock = DateTime.now,
     this.onBack,
     this.onChanged,
+    this.onViewAs,
   });
 
   /// The administration's calls.
@@ -60,6 +63,10 @@ class PersonDetail extends StatefulWidget {
 
   /// Runs after a change.
   final VoidCallback? onChanged;
+
+  /// Starts the view as this person in the host, or null for no button. The detail only hands
+  /// the person over: whether the caller may view is the server's answer to `viewAsUser`.
+  final AdminViewAs? onViewAs;
 
   @override
   State<PersonDetail> createState() => _PersonDetailState();
@@ -404,6 +411,12 @@ class _PersonDetailState extends State<PersonDetail>
                   ),
                   onPressed: busy ? null : () => _disable(person),
                   child: Text(l.adminPersonDisable),
+                ),
+              if (widget.onViewAs case final viewAs?)
+                OutlinedButton(
+                  key: const ValueKey('person.viewAs'),
+                  onPressed: busy ? null : () => viewAs(person),
+                  child: Text(l.adminPersonViewAs),
                 ),
             ],
           ),

@@ -20,11 +20,24 @@ import '../self/self_feedback.dart';
 import 'source_chain.dart';
 import 'view_as_person.dart';
 
+/// Starts "View as person" for [person] in the host (brief M6-04 Design note 3).
+///
+/// The console passes one to [WhoHasAccess], `PersonDetail` and `AdminBody`: it calls
+/// `viewAsUser` itself and keeps the stored view with its banner on every page, so the screens
+/// only hand over the chosen person and never load the snapshot. The desktop passes none and
+/// keeps the dialog with [ViewAsPerson].
+///
+/// Example:
+/// ```dart
+/// AdminViewAs start = (person) => session.startViewAs(person.id);
+/// ```
+typedef AdminViewAs = void Function(AdminPerson person);
+
 /// Every principal with access to [target] as the server explains it (`explainSpaceAccess`,
 /// `explainChannelAccess`): the effective level, the capabilities and the [SourceChain]. An
 /// entry only via an agent shows the level "No level" and hint H1; a disabled principal is
 /// struck through. Actions: "Create access grant" on the target, "Revoke" on a direct grant,
-/// and "View as person" ([ViewAsPerson]).
+/// and "View as person": the dialog with [ViewAsPerson], or [onViewAs] when the host passes one.
 ///
 /// Example:
 /// ```dart
@@ -39,6 +52,7 @@ class WhoHasAccess extends StatefulWidget {
     this.timeZone = 'UTC',
     this.clock = DateTime.now,
     this.onChanged,
+    this.onViewAs,
   });
 
   /// The administration's calls.
@@ -55,6 +69,10 @@ class WhoHasAccess extends StatefulWidget {
 
   /// Runs after a change.
   final VoidCallback? onChanged;
+
+  /// Starts the view as the chosen person in the host instead of the dialog, or null for the
+  /// dialog with [ViewAsPerson].
+  final AdminViewAs? onViewAs;
 
   @override
   State<WhoHasAccess> createState() => _WhoHasAccessState();
@@ -269,7 +287,12 @@ class _WhoHasAccessState extends State<WhoHasAccess>
                       ),
                   ],
                   onChanged: (p) {
-                    if (p != null) _viewAs(p);
+                    if (p == null) return;
+                    if (widget.onViewAs case final hook?) {
+                      hook(p);
+                    } else {
+                      _viewAs(p);
+                    }
                   },
                 ),
             ],
