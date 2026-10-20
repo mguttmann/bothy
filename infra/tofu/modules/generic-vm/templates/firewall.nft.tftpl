@@ -1,0 +1,26 @@
+# Firewall of the host, rendered by the OpenTofu module generic-vm (infra/tofu/README.md rule 3):
+# only the edge port is public, besides SSH for the maintenance. The Compose stack publishes its
+# ports on 127.0.0.1 only (infra/compose/compose.yaml), so this table is the second guard.
+# The first line creates the table if it is missing, so the delete never fails and every run
+# replaces the table atomically with the same content.
+table inet bothy_edge
+delete table inet bothy_edge
+table inet bothy_edge {
+	chain input {
+		type filter hook input priority filter; policy drop;
+		ct state established,related accept
+		ct state invalid drop
+		iifname "lo" accept
+		# Containers reach the host through the Docker bridges (for example the gateway that
+		# install.sh trusts as the reverse proxy peer).
+		iifname "docker0" accept
+		iifname "br-*" accept
+		meta l4proto { icmp, ipv6-icmp } accept
+		# DHCP and DHCPv6 replies of the address lease.
+		udp dport { 68, 546 } accept
+		tcp dport 22 accept
+%{ if edge_port != "" ~}
+		tcp dport ${edge_port} accept
+%{ endif ~}
+	}
+}
