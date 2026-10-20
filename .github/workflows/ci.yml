@@ -208,11 +208,11 @@ jobs:
             ~/.cache/pre-commit
           key: gates-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('tools/bin/tools.lock.json', '.pre-commit-config.yaml') }}
       - run: make bootstrap-ci
-      - name: make docs config-doc-check linkcheck diagrams catalog-check api-lint api-checks api-breaking ops-check api-clients tokens
+      - name: make docs config-doc-check linkcheck diagrams catalog-check api-lint api-checks api-breaking ops-check signal-check api-clients tokens
         env:
           MMDC_PUPPETEER_CONFIG: tools/node/puppeteer-ci.json
           COMPONENTS: ${{ needs.plan.outputs.components }}
-        run: make docs config-doc-check linkcheck diagrams catalog-check api-lint api-checks api-breaking ops-check api-clients tokens COMPONENTS="$COMPONENTS"
+        run: make docs config-doc-check linkcheck diagrams catalog-check api-lint api-checks api-breaking ops-check signal-check api-clients tokens COMPONENTS="$COMPONENTS"
 
   # Secret scan of the history, Semgrep, Trivy, OSV and the license gate.
   gates-security:
