@@ -420,7 +420,7 @@ Quelle: [09-agenten.md](../spec/09-agenten.md), Abschnitt 21.
 | `run.orphan_timeout` | `BOTHY_RUN__ORPHAN_TIMEOUT` | Server |  | `15m` | ohne Heartbeat bei aktivem Lauf: `stale` | geplant (M2) |
 | `interaction.ack_timeout` | `BOTHY_INTERACTION__ACK_TIMEOUT` | Server |  | `30s` | danach zeigt die Karte "nicht bestätigt" | geplant (M2) |
 | `command.autocomplete_timeout` | `BOTHY_COMMAND__AUTOCOMPLETE_TIMEOUT` | Server |  | `2500ms` | Wartezeit auf Vorschläge | geplant (M2) |
-| `command.autocomplete_max_choices` | `BOTHY_COMMAND__AUTOCOMPLETE_MAX_CHOICES` | Server |  | `25` | Vorschläge je Antwort | geplant (M2) |
+| `command.autocomplete_max_choices` | `BOTHY_COMMAND__AUTOCOMPLETE_MAX_CHOICES` | Server | int | `25` | Vorschläge je Antwort | aktiv |
 | `command.max_per_principal` | `BOTHY_COMMAND__MAX_PER_PRINCIPAL` | Server | int | `100` | Befehle je Agent oder App | aktiv |
 | `command.description_max_chars` | `BOTHY_COMMAND__DESCRIPTION_MAX_CHARS` | Server | int | `100` | Länge einer Beschreibung | aktiv |
 | `component.max_per_message` | `BOTHY_COMPONENT__MAX_PER_MESSAGE` | Server |  | `25` | Komponenten je Nachricht | geplant (M2) |
