@@ -490,10 +490,10 @@ operated, and the order of the build.
 - `make sonar-visibility` (`quality_sync.py visibility`, also a step of the manual workflow
   `sonar-config.yml`) makes the SonarQube Cloud project public through
   `api/projects/update_visibility` when it is private: the free plan caps the lines of code of a
-  private project and refused the analysis of `main`. `make sonar-config` now sets the
-  parent of each quality profile after restoring it, because the restore overwrites the
-  profile including its parent link; before, `make sonar-config-check` failed with
-  "parent is None" for every language.
+  private project and refused the analysis of `main`. `make sonar-config-check` resolves
+  the parent of each quality profile by its key: `api/qualityprofiles/search` filtered to one
+  profile names the parent only by `parentKey`, so the check failed with "parent is None" for
+  every language although the parent was set.
 - When the SonarQube background task of a scan fails, `make sonar-scan` prints its reason
   (`quality_sync.py ce-error`, from `api/ce/task`); the scanner itself only reports "CE Task
   finished abnormally".

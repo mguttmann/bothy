@@ -9,7 +9,7 @@ from pathlib import Path
 
 import pytest
 import quality_sync as qs
-from fake_sonar import State, running
+from fake_sonar import Profile, State, running
 
 REPO = Path(__file__).resolve().parents[3]
 TOKEN = "fake-token-for-tests"
@@ -522,17 +522,19 @@ def test_ce_error_fails_for_an_unknown_task(
     assert "/api/ce/task" in capsys.readouterr().err
 
 
-def test_apply_sets_the_parent_after_the_restore_that_drops_it() -> None:
-    # Restore overwrites the profile and drops its parent (sonar-config run of 2026-10-20).
+def test_check_resolves_the_parent_by_key() -> None:
+    # A search filtered to one profile names the parent by key only (SonarQube Cloud, 2026-10-20).
     state = State(cloud=True, builtin_profile="Sonar way comprehensive")
     config = qs.load_config(REPO / "quality" / "sonar")
     with running(state) as url:
         qs.apply(_client(url, organization=ORG), config)
-        for language in CLOUD_LANGUAGES:
-            prof = state.profile(language, "Bothy way")
-            assert prof is not None
-            assert prof.parent == "Sonar way comprehensive"
         assert qs.check(_client(url, organization=ORG), config).problems == []
+        state.profiles.append(Profile("other-go", "Other", "go", builtin=True))
+        prof = state.profile("go", "Bothy way")
+        assert prof is not None
+        prof.parent = "Other"
+        problems = qs.check(_client(url, organization=ORG), config).problems
+    assert problems == ["profile go: parent is 'key other-go', want 'Sonar way comprehensive'"]
 
 
 def test_private_project_is_made_public() -> None:
@@ -581,3 +583,25 @@ def test_visibility_of_an_unknown_project_fails_without_a_change() -> None:
             qs.ensure_public(_client(url, organization=ORG))
         assert state.visibility == "private"
         assert _posts(state, "/api/projects/update_visibility") == []
+
+
+def test_restore_keeps_a_rule_of_the_parent_inherited() -> None:
+    state = State()
+    with running(state) as url:
+        client = _client(url)
+        client.post("api/qualityprofiles/create", language="go", name="Bothy way")
+        client.post(
+            "api/qualityprofiles/change_parent",
+            language="go",
+            qualityProfile="Bothy way",
+            parentQualityProfile="Sonar way",
+        )
+        backup = (
+            "<profile><name>Bothy way</name><language>go</language><rules>"
+            "<rule><repositoryKey>go</repositoryKey><key>S100</key></rule>"
+            "<rule><repositoryKey>go</repositoryKey><key>S1135</key></rule></rules></profile>"
+        )
+        client.post_file("api/qualityprofiles/restore", "backup", "go.xml", backup)
+    prof = state.profile("go", "Bothy way")
+    assert prof is not None
+    assert prof.own_rules == {"go:S1135"}
