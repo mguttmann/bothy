@@ -170,8 +170,13 @@ jobs:
           shopt -s nullglob
           dir="$RUNNER_TEMP/sonar-coverage"
           mkdir -p "$dir"
+          # A run that selects only some components writes only their reports: nullglob drops the
+          # globs without a match, the test drops the literal paths that do not exist.
+          files=()
           # shellcheck disable=SC2086 # REPORTS is a list of globs, expanded on purpose
-          files=($REPORTS)
+          for f in $REPORTS; do
+            if [ -e "$f" ]; then files+=("$f"); fi
+          done
           printf '%s\n' "${files[@]}" > "$dir/reports.txt"
           tar -cf "$dir/coverage.tar" -T "$dir/reports.txt"
           echo "coverage reports for sonar: ${#files[@]}"
