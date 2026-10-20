@@ -279,3 +279,33 @@ func TestRelayLimits_ActivateClearsDetach(t *testing.T) {
 		t.Fatalf("ends %v, want idle_timeout", e)
 	}
 }
+
+// TestRelayLimits_EndsOnce (M2-46): once the limit timer ended a session with the counts of this
+// node, a row of the log tail that arrives before the closed row (the active row of a reattach)
+// must not start the timer again: a second end would carry no counts and race the first.
+func TestRelayLimits_EndsOnce(t *testing.T) {
+	t.Parallel()
+	r, uc, timers := limitRelay(t)
+	t0 := timers.Clock.Now()
+	id, host := ids.New(), ids.New()
+	r.Expect(app.Expectation{SessionID: id, HostID: host, DeviceID: ids.New(), Deadline: t0.Add(farDeadline), Started: true,
+		Times: domain.SessionTimes{State: domain.SessionActive, OpenedAt: t0, StartedAt: t0}})
+	r.mu.Lock()
+	r.hold(r.slots[id])
+	r.mu.Unlock()
+	timers.Advance(limitWindows.Idle + limitWindows.IdleGrace)
+	if e := uc.ends(); !slices.Equal(e, []string{"end:idle_timeout"}) {
+		t.Fatalf("ends %v, want idle_timeout", e)
+	}
+	payload := `{"host_id":"` + host.String() + `","state":"active","opened_at":"` + t0.Format(time.RFC3339Nano) +
+		`","started_at":"` + t0.Format(time.RFC3339Nano) + `"}`
+	r.ObserveLogEvent(t.Context(), eventSessionChg, id, []byte(payload))
+	// A reached deadline runs its timer at once in its own goroutine (fakehost.ClockTimers).
+	for range 50 {
+		timers.Advance(time.Second)
+		if e := uc.ends(); !slices.Equal(e, []string{"end:idle_timeout"}) {
+			t.Fatalf("ends %v after a late active row, want one idle_timeout", e)
+		}
+		time.Sleep(2 * time.Millisecond)
+	}
+}

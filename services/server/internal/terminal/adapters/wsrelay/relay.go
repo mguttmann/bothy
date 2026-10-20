@@ -177,6 +177,10 @@ type slot struct {
 	// nodes every node expects the session, but only the node of the pairing sees the device's
 	// bytes; a new grant clears the mark there, because the next pairing may live elsewhere.
 	held bool
+	// limitEnded marks a slot whose limit timer ended the session on this node: a later row of
+	// the log tail (the active row of a reattach before the closed row) must not start it again,
+	// because a second end would carry no counts. A new grant clears it.
+	limitEnded bool
 }
 
 // queue is one direction of a slot, bounded by terminal.relay_buffer_max_bytes.
@@ -254,7 +258,7 @@ func (r *Relay) Expect(e app.Expectation) {
 	}
 	s.host, s.device, s.started, s.confirm, s.wdi, s.grant = e.HostID, e.DeviceID, e.Started, e.LocalConfirm, e.WorkdirIndex, e.Grant
 	s.toDev, s.toHost, s.seenDev, s.seenHost, s.paired = queue{}, queue{}, false, false, false
-	s.pairedOnce, s.pairedElsewhere, s.overdue = false, false, false
+	s.pairedOnce, s.pairedElsewhere, s.overdue, s.limitEnded = false, false, false, false
 	if r.cfg.Multi {
 		s.held = false
 		s.stopLimit()
@@ -273,7 +277,7 @@ func (r *Relay) Expect(e app.Expectation) {
 // (domain.RelayDeadline); r.mu is held. Without configured windows or without the times of a row
 // nothing runs.
 func (r *Relay) armLimit(s *slot) {
-	if r.cfg.Windows.Idle <= 0 || s.times.OpenedAt.IsZero() || !s.held {
+	if r.cfg.Windows.Idle <= 0 || s.times.OpenedAt.IsZero() || !s.held || s.limitEnded {
 		return
 	}
 	if s.limitStop != nil {
@@ -305,6 +309,7 @@ func (r *Relay) limitDeadline(id ids.ID, gen int) {
 	}
 	c := s.take()
 	s.limitGen++
+	s.limitEnded = true
 	r.mu.Unlock()
 	ctx := context.Background()
 	r.call(ctx, r.uc.RelayEnd(ctx, id, reason, domain.Progress{BytesIn: c.In, BytesOut: c.Out, LastInputAt: c.LastInput}))
