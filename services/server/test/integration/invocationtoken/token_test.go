@@ -23,12 +23,12 @@ import (
 	runsapp "github.com/OWNER/bothy/services/server/internal/runs/app"
 )
 
-// wantReason fails the test unless err is 403 invocation_token_invalid with reason.
-func wantReason(t *testing.T, name string, err error, reason string) {
+// wantInvalid fails the test unless err is 403 invocation_token_invalid with reason invalid.
+func wantInvalid(t *testing.T, name string, err error) {
 	t.Helper()
 	e, ok := errs.As(err)
-	if !ok || e.Code != errs.CodeInvocationTokenInvalid || e.Reason != reason || errs.KindOf(err) != errs.KindForbidden {
-		t.Errorf("%s: %v, want invocation_token_invalid with reason %s", name, err, reason)
+	if !ok || e.Code != errs.CodeInvocationTokenInvalid || e.Reason != "invalid" || errs.KindOf(err) != errs.KindForbidden {
+		t.Errorf("%s: %v, want invocation_token_invalid with reason invalid", name, err)
 	}
 }
 
@@ -85,12 +85,12 @@ func TestInvocationToken_ForeignPurposeKey(t *testing.T) {
 	forged := identitytest.SignJWS(sign, jose.Header{Kid: sg.KeyID(), Typ: "agent-invocation+jwt"}, payload)
 	for name, p := range map[string]*proc{"A": x.a, "B": x.b} {
 		_, err := p.tokens.Verify(ctx, forged, x.verify())
-		wantReason(t, "access_token key in "+name, err, "invalid")
+		wantInvalid(t, "access_token key in "+name, err)
 	}
 	// The access-token header with the access_token key: rejected by both verifiers.
 	at := identitytest.SignJWS(sign, jose.Header{Kid: sg.KeyID(), Typ: "at+jwt"}, payload)
 	_, err = x.a.tokens.Verify(ctx, at, x.verify())
-	wantReason(t, "at+jwt", err, "invalid")
+	wantInvalid(t, "at+jwt", err)
 	if _, err := x.verifier().Check(ctx, at, x.expect()); !errors.Is(err, runstest.ErrRefInvalid) {
 		t.Fatalf("reference verifier on at+jwt: %v", err)
 	}
@@ -102,7 +102,7 @@ func TestInvocationToken_ForeignPurposeKey(t *testing.T) {
 	tsign := jose.SignerFunc{Algorithm: ts.Alg(), Fn: func(in []byte) ([]byte, error) { return ts.Sign(ctx, in) }}
 	term := identitytest.SignJWS(tsign, jose.Header{Kid: ts.KeyID(), Typ: "agent-invocation+jwt"}, payload)
 	_, err = x.a.tokens.Verify(ctx, term, x.verify())
-	wantReason(t, "terminal key", err, "invalid")
+	wantInvalid(t, "terminal key", err)
 	if _, err := x.verifier().Check(ctx, term, x.expect()); !errors.Is(err, runstest.ErrRefUnknownKey) {
 		t.Fatalf("reference verifier on a terminal key: %v", err)
 	}
@@ -128,7 +128,7 @@ func TestAG22_ScheduledRotationFailsNoToken(t *testing.T) {
 	clk := x.w.Clock
 	k := x.cfg.Keys
 	tick := x.cfg.CheckInterval
-	if !(k.CacheTTL < k.JWKSMaxAge && x.tok.TTL+x.tok.ClockLeeway < k.JWKSMaxAge && k.JWKSMaxAge < k.InvocationRotation && tick < x.tok.TTL) {
+	if k.CacheTTL >= k.JWKSMaxAge || x.tok.TTL+x.tok.ClockLeeway >= k.JWKSMaxAge || k.JWKSMaxAge >= k.InvocationRotation || tick >= x.tok.TTL {
 		t.Fatalf("the test values break the order of the brief: %+v %+v %v", k, x.tok, tick)
 	}
 	X, Y, Z := x.verifier(), x.verifier(), x.verifier()
@@ -308,12 +308,12 @@ func TestAG22_EmergencyRotationTokenLevel(t *testing.T) {
 		t.Fatalf("rotation %+v", rot)
 	}
 	_, err = x.a.tokens.Verify(ctx, oldTok, x.verify())
-	wantReason(t, "old key in A at once", err, "invalid")
+	wantInvalid(t, "old key in A at once", err)
 	_, err = x.a.tokens.Verify(ctx, oldTok, runsapp.VerifyInvocation{Audience: x.lotse, RunID: x.run, IgnoreExpiry: true})
-	wantReason(t, "old key in A with IgnoreExpiry", err, "invalid")
+	wantInvalid(t, "old key in A with IgnoreExpiry", err)
 	x.w.Clock.Advance(x.cfg.Keys.CacheTTL)
 	_, err = x.b.tokens.Verify(ctx, oldTok, x.verify())
-	wantReason(t, "old key in B after signing_key.cache_ttl", err, "invalid")
+	wantInvalid(t, "old key in B after signing_key.cache_ttl", err)
 	fresh := x.verifier()
 	if err := fresh.Refresh(ctx); err != nil {
 		t.Fatal(err)

@@ -191,6 +191,24 @@ func (c InvocationClaims) validate(issued bool) error {
 // that is not negative. issued says whether dev_environment_id must be absent (the issuer never
 // writes it); a verified token may carry it as a canonical ID.
 func (c InvocationClaims) validateShape(issued bool) error {
+	if err := c.validateIDs(issued); err != nil {
+		return err
+	}
+	if err := c.validateTrigger(); err != nil {
+		return err
+	}
+	if !oneOf(c.Level, invocationLevels) || !oneOf(c.BillingMode, invocationBillingModes) || !oneOf(c.ToolClass, invocationToolClasses) {
+		return fmt.Errorf("%w: unknown level, billing_mode or tool_class", ErrInvocationInvalid)
+	}
+	if c.PermissionVersion < 0 || c.Exp <= c.Iat {
+		return fmt.Errorf("%w: negative permission_version or exp not after iat", ErrInvocationInvalid)
+	}
+	return nil
+}
+
+// validateIDs checks that the required IDs are present and every ID is canonical; issued forbids
+// dev_environment_id, which the issuer never writes.
+func (c InvocationClaims) validateIDs(issued bool) error {
 	for _, s := range []string{c.Aud, c.Sub, c.Jti, c.ThreadID, c.ChannelID, c.SpaceID} {
 		if !canonicalID(s) {
 			return fmt.Errorf("%w: a required ID is missing or not canonical", ErrInvocationInvalid)
@@ -204,6 +222,12 @@ func (c InvocationClaims) validateShape(issued bool) error {
 	if c.DevEnvironmentID != "" && (issued || !canonicalID(c.DevEnvironmentID)) {
 		return fmt.Errorf("%w: dev_environment_id", ErrInvocationInvalid)
 	}
+	return nil
+}
+
+// validateTrigger checks the table of Design note 2: exactly one triggering object, the one of
+// the trigger kind, and run_id absent exactly for autocomplete.
+func (c InvocationClaims) validateTrigger() error {
 	var object string
 	switch TriggerKind(c.TriggerKind) {
 	case TriggerMessage, TriggerFollowup:
@@ -224,16 +248,10 @@ func (c InvocationClaims) validateShape(issued bool) error {
 	if object == "" || set != 1 {
 		return fmt.Errorf("%w: exactly one triggering object of the trigger kind", ErrInvocationInvalid)
 	}
-	// run_id is absent exactly for autocomplete; a command without a run (control command of an
-	// owner without an active run, R-AZ-25) is refused until M2-16 adds that grant.
+	// A command without a run (control command of an owner without an active run, R-AZ-25) is
+	// refused until M2-16 adds that grant.
 	if (c.RunID == "") != (TriggerKind(c.TriggerKind) == TriggerAutocomplete) {
 		return fmt.Errorf("%w: run_id does not fit the trigger kind", ErrInvocationInvalid)
-	}
-	if !oneOf(c.Level, invocationLevels) || !oneOf(c.BillingMode, invocationBillingModes) || !oneOf(c.ToolClass, invocationToolClasses) {
-		return fmt.Errorf("%w: unknown level, billing_mode or tool_class", ErrInvocationInvalid)
-	}
-	if c.PermissionVersion < 0 || c.Exp <= c.Iat {
-		return fmt.Errorf("%w: negative permission_version or exp not after iat", ErrInvocationInvalid)
 	}
 	return nil
 }
