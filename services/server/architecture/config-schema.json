@@ -998,6 +998,18 @@
       "doc": "Longest channel topic in Unicode characters."
     },
     {
+      "name": "client.cache_max_age",
+      "env": "BOTHY_CLIENT__CACHE_MAX_AGE",
+      "kind": "duration",
+      "default": "30d",
+      "required": false,
+      "enum": [],
+      "min": "1s",
+      "max": "",
+      "chapter": "04-sync-protokoll.md",
+      "doc": "Age after which clients drop unused cache entries; the max-age of an authenticated file download."
+    },
+    {
       "name": "client.min_version.android",
       "env": "BOTHY_CLIENT__MIN_VERSION__ANDROID",
       "kind": "string",
@@ -1493,6 +1505,18 @@
       "doc": "Longest file name in UTF-8 bytes; longer names are shortened before their extension."
     },
     {
+      "name": "file.not_ready_retry_after",
+      "env": "BOTHY_FILE__NOT_READY_RETRY_AFTER",
+      "kind": "duration",
+      "default": "5s",
+      "required": false,
+      "enum": [],
+      "min": "1s",
+      "max": "1h",
+      "chapter": "12-dateien.md",
+      "doc": "Retry-After of the 409 file_not_ready responses, in whole seconds."
+    },
+    {
       "name": "file.quota_bytes_per_principal",
       "env": "BOTHY_FILE__QUOTA_BYTES_PER_PRINCIPAL",
       "kind": "int",
@@ -1788,6 +1812,30 @@
       "max": "",
       "chapter": "12-dateien.md",
       "doc": "Longest edge of the thumbnail variant small in pixels."
+    },
+    {
+      "name": "file.ticket_key_ref",
+      "env": "BOTHY_FILE__TICKET_KEY_REF",
+      "kind": "secret_ref",
+      "default": "file:<secrets.dir>/file_ticket_key",
+      "required": false,
+      "enum": [],
+      "min": "",
+      "max": "",
+      "chapter": "12-dateien.md",
+      "doc": "Secret reference of the HMAC key of the download tickets; 32 bytes as hex. Roles api and all do not start without it."
+    },
+    {
+      "name": "file.ticket_ttl",
+      "env": "BOTHY_FILE__TICKET_TTL",
+      "kind": "duration",
+      "default": "5m",
+      "required": false,
+      "enum": [],
+      "min": "1s",
+      "max": "",
+      "chapter": "12-dateien.md",
+      "doc": "Validity of a download ticket (createFileTicket)."
     },
     {
       "name": "file.upload_max_open_sessions",

@@ -16,6 +16,80 @@ import (
 	"github.com/oapi-codegen/runtime"
 )
 
+// ReconcileCosts Reconcile estimates with invoices
+//
+// Takes a body of the `application/json` content type.
+//
+// Corresponds with POST /costs/reconcile (the `ReconcileCosts` operationId).
+func (c *Client) ReconcileCosts(ctx context.Context, params *ReconcileCostsParams, body ReconcileCostsJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewReconcileCostsRequest(c.Server, params, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// SubmitCostReconciliationWithBody Submit reconciled cost entries (app)
+//
+// For the reconciliation app with scope `costs:reconcile`, without step-up. Only adds `reconciled` entries to existing runs; deletes nothing (10, 12.4).
+//
+// Takes any type of body and a specified content type.
+//
+// Corresponds with POST /costs/reconciliations (the `SubmitCostReconciliation` operationId).
+func (c *Client) SubmitCostReconciliationWithBody(ctx context.Context, params *SubmitCostReconciliationParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewSubmitCostReconciliationRequestWithBody(c.Server, params, contentType, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// SubmitCostReconciliation Submit reconciled cost entries (app)
+//
+// For the reconciliation app with scope `costs:reconcile`, without step-up. Only adds `reconciled` entries to existing runs; deletes nothing (10, 12.4).
+//
+// Takes a body of the `application/json` content type.
+//
+// Corresponds with POST /costs/reconciliations (the `SubmitCostReconciliation` operationId).
+func (c *Client) SubmitCostReconciliation(ctx context.Context, params *SubmitCostReconciliationParams, body SubmitCostReconciliationJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewSubmitCostReconciliationRequest(c.Server, params, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// SubmitCspReportWithBody Accept a CSP violation report of the web console
+//
+// Endpoint of `report-to csp` and of `Reporting-Endpoints: csp="/api/v1/csp-reports"` on every console response (19-security 5 rule 6, R-AZ-33). Public, because browsers send reports without cookies in many cases; a console cookie is not checked by the CSRF guard here, the action changes nothing. Accepts the Reporting API format (`application/reports+json`, an array of reports) and the legacy `report-uri` format (`application/csp-report`), both limited by `http.max_json_body_bytes`. The server stores no report; it logs only the effective directive, the disposition and the origin of the blocked URL and counts `bothy.console.csp_violations`. Members it does not read are ignored.
+//
+// Takes any type of body and a specified content type.
+//
+// Corresponds with POST /csp-reports (the `SubmitCspReport` operationId).
+func (c *Client) SubmitCspReportWithBody(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewSubmitCspReportRequestWithBody(c.Server, contentType, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
 // SubmitCspReportWithApplicationReportsPlusJSONBody Accept a CSP violation report of the web console
 //
 // Endpoint of `report-to csp` and of `Reporting-Endpoints: csp="/api/v1/csp-reports"` on every console response (19-security 5 rule 6, R-AZ-33). Public, because browsers send reports without cookies in many cases; a console cookie is not checked by the CSRF guard here, the action changes nothing. Accepts the Reporting API format (`application/reports+json`, an array of reports) and the legacy `report-uri` format (`application/csp-report`), both limited by `http.max_json_body_bytes`. The server stores no report; it logs only the effective directive, the disposition and the origin of the blocked URL and counts `bothy.console.csp_violations`. Members it does not read are ignored.
@@ -269,11 +343,16 @@ func (c *Client) GetFile(ctx context.Context, fileId FileIdPath, reqEditors ...R
 // Answers 200 with the bytes (supports `Range`); there are no presigned GET URLs (ADR 0048).
 // Media players without DPoP use a ticket (`createFileTicket`) in the query parameter `ticket`
 // instead of `Authorization`. 409 `file_not_ready` while the scan is pending, 409 `file_blocked`
-// for blocked or failed files; without read access always 404 (12, 9.3).
+// for blocked or failed files; without read access always 404 (12, 9.3). Exactly one byte range
+// gives 206, several ranges are ignored (200 with the whole file), a range outside the file gives
+// 416. Types outside the inline list of 12 9.3 (HTML, SVG, PDF and every other type) are sent as
+// `application/octet-stream` with `Content-Disposition: attachment`, `nosniff` and the sandbox
+// CSP. An `Authorization` header wins over a `ticket` parameter. Pass-through via the server
+// only (ADR 0048).
 //
 // Corresponds with GET /files/{file_id}/content (the `DownloadFile` operationId).
-func (c *Client) DownloadFile(ctx context.Context, fileId FileIdPath, reqEditors ...RequestEditorFn) (*http.Response, error) {
-	req, err := NewDownloadFileRequest(c.Server, fileId)
+func (c *Client) DownloadFile(ctx context.Context, fileId FileIdPath, params *DownloadFileParams, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewDownloadFileRequest(c.Server, fileId, params)
 	if err != nil {
 		return nil, err
 	}
@@ -286,11 +365,14 @@ func (c *Client) DownloadFile(ctx context.Context, fileId FileIdPath, reqEditors
 
 // DownloadThumbnail Download a thumbnail
 //
-// Accepts a fetch ticket in the query parameter `ticket` like `downloadFile` (push preview `image_url`, ADR 0048). 409 `file_not_ready` or `file_blocked` as for `downloadFile`.
+// Accepts a fetch ticket in the query parameter `ticket` like `downloadFile` (push preview
+// `image_url`, ADR 0048). 409 `file_not_ready` or `file_blocked` as for `downloadFile`; a variant
+// the file does not have gives 404. Thumbnails are always inline with their own type; range,
+// headers and caching as for `downloadFile` (12, 9.3).
 //
 // Corresponds with GET /files/{file_id}/thumbnails/{variant} (the `DownloadThumbnail` operationId).
-func (c *Client) DownloadThumbnail(ctx context.Context, fileId FileIdPath, variant DownloadThumbnailParamsVariant, reqEditors ...RequestEditorFn) (*http.Response, error) {
-	req, err := NewDownloadThumbnailRequest(c.Server, fileId, variant)
+func (c *Client) DownloadThumbnail(ctx context.Context, fileId FileIdPath, variant DownloadThumbnailParamsVariant, params *DownloadThumbnailParams, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewDownloadThumbnailRequest(c.Server, fileId, variant, params)
 	if err != nil {
 		return nil, err
 	}
@@ -303,7 +385,12 @@ func (c *Client) DownloadThumbnail(ctx context.Context, fileId FileIdPath, varia
 
 // CreateFileTicketWithBody Create a short-lived fetch ticket
 //
-// For media players and "open with" that cannot send a DPoP proof. Every fetch with the ticket checks signature, expiry, session and `file.read` again (12, 9.2).
+// For media players and "open with" that cannot send a DPoP proof. Every fetch with the ticket
+// checks signature, expiry, session and `file.read` again (12, 9.2). A ticket binds to the login
+// session of the caller: a principal without a session (agent, app, API token) gets 403
+// `forbidden` with `reason` `step_up_not_possible`. No ticket is issued for a file that is not
+// deliverable (409 `file_not_ready` or `file_blocked`), and a variant the file does not have gives
+// 404. A repeated call mints a new ticket.
 //
 // Takes any type of body and a specified content type.
 //
@@ -322,7 +409,12 @@ func (c *Client) CreateFileTicketWithBody(ctx context.Context, fileId FileIdPath
 
 // CreateFileTicket Create a short-lived fetch ticket
 //
-// For media players and "open with" that cannot send a DPoP proof. Every fetch with the ticket checks signature, expiry, session and `file.read` again (12, 9.2).
+// For media players and "open with" that cannot send a DPoP proof. Every fetch with the ticket
+// checks signature, expiry, session and `file.read` again (12, 9.2). A ticket binds to the login
+// session of the caller: a principal without a session (agent, app, API token) gets 403
+// `forbidden` with `reason` `step_up_not_possible`. No ticket is issued for a file that is not
+// deliverable (409 `file_not_ready` or `file_blocked`), and a variant the file does not have gives
+// 404. A repeated call mints a new ticket.
 //
 // Takes a body of the `application/json` content type.
 //
@@ -358,7 +450,7 @@ func (c *Client) RequestTranscription(ctx context.Context, fileId FileIdPath, pa
 
 // GetTranscript Read the transcript of a voice message
 //
-// 409 `file_not_ready` or `file_blocked` as for `downloadFile`; without read access always 404 (12, 9.3).
+// 409 `file_not_ready` or `file_blocked` as for `downloadFile`; without read access always 404 (12, 9.3). Normal authentication only, never a fetch ticket. `text`, `language` and `source` are present only with `status` `done`.
 //
 // Corresponds with GET /files/{file_id}/transcript (the `GetTranscript` operationId).
 func (c *Client) GetTranscript(ctx context.Context, fileId FileIdPath, reqEditors ...RequestEditorFn) (*http.Response, error) {
@@ -10642,7 +10734,7 @@ func NewGetFileRequest(server string, fileId FileIdPath) (*http.Request, error) 
 }
 
 // NewDownloadFileRequest constructs an http.Request for the DownloadFile method
-func NewDownloadFileRequest(server string, fileId FileIdPath) (*http.Request, error) {
+func NewDownloadFileRequest(server string, fileId FileIdPath, params *DownloadFileParams) (*http.Request, error) {
 	var err error
 
 	var pathParam0 string
@@ -10667,16 +10759,69 @@ func NewDownloadFileRequest(server string, fileId FileIdPath) (*http.Request, er
 		return nil, err
 	}
 
+	if params != nil {
+		// queryValues collects non-styled parameters (passthrough, JSON)
+		// that are safe to round-trip through url.Values.Encode().
+		queryValues := queryURL.Query()
+		// rawQueryFragments collects pre-encoded query fragments from
+		// styled parameters, preserving literal commas as delimiters
+		// per the OpenAPI spec (e.g. "color=blue,black,brown").
+		var rawQueryFragments []string
+
+		if params.Ticket != nil {
+
+			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "ticket", *params.Ticket, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			} else {
+				for _, qp := range strings.Split(queryFrag, "&") {
+					rawQueryFragments = append(rawQueryFragments, qp)
+				}
+			}
+
+		}
+
+		if encoded := queryValues.Encode(); encoded != "" {
+			rawQueryFragments = append(rawQueryFragments, encoded)
+		}
+		queryURL.RawQuery = strings.Join(rawQueryFragments, "&")
+	}
+
 	req, err := http.NewRequest(http.MethodGet, queryURL.String(), nil)
 	if err != nil {
 		return nil, err
+	}
+
+	if params != nil {
+
+		if params.Range != nil {
+			var headerParam0 string
+
+			headerParam0, err = runtime.StyleParamWithOptions("simple", false, "Range", *params.Range, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationHeader, Type: "string", Format: ""})
+			if err != nil {
+				return nil, err
+			}
+
+			req.Header.Set("Range", headerParam0)
+		}
+
+		if params.IfRange != nil {
+			var headerParam1 string
+
+			headerParam1, err = runtime.StyleParamWithOptions("simple", false, "If-Range", *params.IfRange, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationHeader, Type: "string", Format: ""})
+			if err != nil {
+				return nil, err
+			}
+
+			req.Header.Set("If-Range", headerParam1)
+		}
+
 	}
 
 	return req, nil
 }
 
 // NewDownloadThumbnailRequest constructs an http.Request for the DownloadThumbnail method
-func NewDownloadThumbnailRequest(server string, fileId FileIdPath, variant DownloadThumbnailParamsVariant) (*http.Request, error) {
+func NewDownloadThumbnailRequest(server string, fileId FileIdPath, variant DownloadThumbnailParamsVariant, params *DownloadThumbnailParams) (*http.Request, error) {
 	var err error
 
 	var pathParam0 string
@@ -10708,9 +10853,62 @@ func NewDownloadThumbnailRequest(server string, fileId FileIdPath, variant Downl
 		return nil, err
 	}
 
+	if params != nil {
+		// queryValues collects non-styled parameters (passthrough, JSON)
+		// that are safe to round-trip through url.Values.Encode().
+		queryValues := queryURL.Query()
+		// rawQueryFragments collects pre-encoded query fragments from
+		// styled parameters, preserving literal commas as delimiters
+		// per the OpenAPI spec (e.g. "color=blue,black,brown").
+		var rawQueryFragments []string
+
+		if params.Ticket != nil {
+
+			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "ticket", *params.Ticket, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			} else {
+				for _, qp := range strings.Split(queryFrag, "&") {
+					rawQueryFragments = append(rawQueryFragments, qp)
+				}
+			}
+
+		}
+
+		if encoded := queryValues.Encode(); encoded != "" {
+			rawQueryFragments = append(rawQueryFragments, encoded)
+		}
+		queryURL.RawQuery = strings.Join(rawQueryFragments, "&")
+	}
+
 	req, err := http.NewRequest(http.MethodGet, queryURL.String(), nil)
 	if err != nil {
 		return nil, err
+	}
+
+	if params != nil {
+
+		if params.Range != nil {
+			var headerParam0 string
+
+			headerParam0, err = runtime.StyleParamWithOptions("simple", false, "Range", *params.Range, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationHeader, Type: "string", Format: ""})
+			if err != nil {
+				return nil, err
+			}
+
+			req.Header.Set("Range", headerParam0)
+		}
+
+		if params.IfRange != nil {
+			var headerParam1 string
+
+			headerParam1, err = runtime.StyleParamWithOptions("simple", false, "If-Range", *params.IfRange, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationHeader, Type: "string", Format: ""})
+			if err != nil {
+				return nil, err
+			}
+
+			req.Header.Set("If-Range", headerParam1)
+		}
+
 	}
 
 	return req, nil
@@ -22508,25 +22706,38 @@ type ClientWithResponsesInterface interface {
 	// Answers 200 with the bytes (supports `Range`); there are no presigned GET URLs (ADR 0048).
 	// Media players without DPoP use a ticket (`createFileTicket`) in the query parameter `ticket`
 	// instead of `Authorization`. 409 `file_not_ready` while the scan is pending, 409 `file_blocked`
-	// for blocked or failed files; without read access always 404 (12, 9.3).
+	// for blocked or failed files; without read access always 404 (12, 9.3). Exactly one byte range
+	// gives 206, several ranges are ignored (200 with the whole file), a range outside the file gives
+	// 416. Types outside the inline list of 12 9.3 (HTML, SVG, PDF and every other type) are sent as
+	// `application/octet-stream` with `Content-Disposition: attachment`, `nosniff` and the sandbox
+	// CSP. An `Authorization` header wins over a `ticket` parameter. Pass-through via the server
+	// only (ADR 0048).
 	//
 	// Returns a wrapper object for the known response body format(s).
 	//
 	// Corresponds with GET /files/{file_id}/content (the `DownloadFile` operationId).
-	DownloadFileWithResponse(ctx context.Context, fileId FileIdPath, reqEditors ...RequestEditorFn) (*DownloadFileResponse, error)
+	DownloadFileWithResponse(ctx context.Context, fileId FileIdPath, params *DownloadFileParams, reqEditors ...RequestEditorFn) (*DownloadFileResponse, error)
 
 	// DownloadThumbnailWithResponse Download a thumbnail
 	//
-	// Accepts a fetch ticket in the query parameter `ticket` like `downloadFile` (push preview `image_url`, ADR 0048). 409 `file_not_ready` or `file_blocked` as for `downloadFile`.
+	// Accepts a fetch ticket in the query parameter `ticket` like `downloadFile` (push preview
+	// `image_url`, ADR 0048). 409 `file_not_ready` or `file_blocked` as for `downloadFile`; a variant
+	// the file does not have gives 404. Thumbnails are always inline with their own type; range,
+	// headers and caching as for `downloadFile` (12, 9.3).
 	//
 	// Returns a wrapper object for the known response body format(s).
 	//
 	// Corresponds with GET /files/{file_id}/thumbnails/{variant} (the `DownloadThumbnail` operationId).
-	DownloadThumbnailWithResponse(ctx context.Context, fileId FileIdPath, variant DownloadThumbnailParamsVariant, reqEditors ...RequestEditorFn) (*DownloadThumbnailResponse, error)
+	DownloadThumbnailWithResponse(ctx context.Context, fileId FileIdPath, variant DownloadThumbnailParamsVariant, params *DownloadThumbnailParams, reqEditors ...RequestEditorFn) (*DownloadThumbnailResponse, error)
 
 	// CreateFileTicketWithBodyWithResponse Create a short-lived fetch ticket
 	//
-	// For media players and "open with" that cannot send a DPoP proof. Every fetch with the ticket checks signature, expiry, session and `file.read` again (12, 9.2).
+	// For media players and "open with" that cannot send a DPoP proof. Every fetch with the ticket
+	// checks signature, expiry, session and `file.read` again (12, 9.2). A ticket binds to the login
+	// session of the caller: a principal without a session (agent, app, API token) gets 403
+	// `forbidden` with `reason` `step_up_not_possible`. No ticket is issued for a file that is not
+	// deliverable (409 `file_not_ready` or `file_blocked`), and a variant the file does not have gives
+	// 404. A repeated call mints a new ticket.
 	//
 	// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
 	//
@@ -22535,7 +22746,12 @@ type ClientWithResponsesInterface interface {
 
 	// CreateFileTicketWithResponse Create a short-lived fetch ticket
 	//
-	// For media players and "open with" that cannot send a DPoP proof. Every fetch with the ticket checks signature, expiry, session and `file.read` again (12, 9.2).
+	// For media players and "open with" that cannot send a DPoP proof. Every fetch with the ticket
+	// checks signature, expiry, session and `file.read` again (12, 9.2). A ticket binds to the login
+	// session of the caller: a principal without a session (agent, app, API token) gets 403
+	// `forbidden` with `reason` `step_up_not_possible`. No ticket is issued for a file that is not
+	// deliverable (409 `file_not_ready` or `file_blocked`), and a variant the file does not have gives
+	// 404. A repeated call mints a new ticket.
 	//
 	// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
 	//
@@ -22553,7 +22769,7 @@ type ClientWithResponsesInterface interface {
 
 	// GetTranscriptWithResponse Read the transcript of a voice message
 	//
-	// 409 `file_not_ready` or `file_blocked` as for `downloadFile`; without read access always 404 (12, 9.3).
+	// 409 `file_not_ready` or `file_blocked` as for `downloadFile`; without read access always 404 (12, 9.3). Normal authentication only, never a fetch ticket. `text`, `language` and `source` are present only with `status` `done`.
 	//
 	// Returns a wrapper object for the known response body format(s).
 	//
@@ -27171,212 +27387,4 @@ func (r SetAgentToolClassResponse) GetApplicationproblemJSON428() *PreconditionR
 // GetApplicationproblemJSON429 returns the response for an HTTP 429 `application/problem+json` response
 func (r SetAgentToolClassResponse) GetApplicationproblemJSON429() *TooManyRequests {
 	return r.ApplicationproblemJSON429
-}
-
-// GetApplicationproblemJSONDefault returns the response for an HTTP default `application/problem+json` response
-func (r SetAgentToolClassResponse) GetApplicationproblemJSONDefault() *Error {
-	return r.ApplicationproblemJSONDefault
-}
-
-// GetBody returns the raw response body bytes
-func (r SetAgentToolClassResponse) GetBody() []byte {
-	return r.Body
-}
-
-// Status returns HTTPResponse.Status
-func (r SetAgentToolClassResponse) Status() string {
-	if r.HTTPResponse != nil {
-		return r.HTTPResponse.Status
-	}
-	return http.StatusText(0)
-}
-
-// StatusCode returns HTTPResponse.StatusCode
-func (r SetAgentToolClassResponse) StatusCode() int {
-	if r.HTTPResponse != nil {
-		return r.HTTPResponse.StatusCode
-	}
-	return 0
-}
-
-// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
-func (r SetAgentToolClassResponse) ContentType() string {
-	if r.HTTPResponse != nil {
-		return r.HTTPResponse.Header.Get("Content-Type")
-	}
-	return ""
-}
-
-// ListAgentWebhookSubscriptionsResponse200Headers the declared response headers of an HTTP 200 response for ListAgentWebhookSubscriptions
-type ListAgentWebhookSubscriptionsResponse200Headers struct {
-	CorrelationId   *CorrelationId
-	RateLimit       *string
-	RateLimitPolicy *string
-}
-
-// ListAgentWebhookSubscriptionsResponse401Headers the declared response headers of an HTTP 401 response for ListAgentWebhookSubscriptions
-type ListAgentWebhookSubscriptionsResponse401Headers struct {
-	CorrelationId   *CorrelationId
-	DPoPNonce       *string
-	SetCookie       *string
-	WWWAuthenticate *string
-}
-
-// ListAgentWebhookSubscriptionsResponse403Headers the declared response headers of an HTTP 403 response for ListAgentWebhookSubscriptions
-type ListAgentWebhookSubscriptionsResponse403Headers struct {
-	CorrelationId *CorrelationId
-}
-
-// ListAgentWebhookSubscriptionsResponse404Headers the declared response headers of an HTTP 404 response for ListAgentWebhookSubscriptions
-type ListAgentWebhookSubscriptionsResponse404Headers struct {
-	CorrelationId *CorrelationId
-}
-
-// ListAgentWebhookSubscriptionsResponse429Headers the declared response headers of an HTTP 429 response for ListAgentWebhookSubscriptions
-type ListAgentWebhookSubscriptionsResponse429Headers struct {
-	CorrelationId   *CorrelationId
-	RateLimit       *string
-	RateLimitPolicy *string
-	RetryAfter      *int
-}
-
-// ListAgentWebhookSubscriptionsResponseDefaultHeaders the declared response headers of an HTTP default response for ListAgentWebhookSubscriptions
-type ListAgentWebhookSubscriptionsResponseDefaultHeaders struct {
-	CorrelationId *CorrelationId
-}
-
-type ListAgentWebhookSubscriptionsResponse struct {
-	Body         []byte
-	HTTPResponse *http.Response
-	// JSON200 the response for an HTTP 200 `application/json` response
-	JSON200 *WebhookSubscriptionList
-	// ApplicationproblemJSON401 the response for an HTTP 401 `application/problem+json` response
-	ApplicationproblemJSON401 *Unauthorized
-	// ApplicationproblemJSON403 the response for an HTTP 403 `application/problem+json` response
-	ApplicationproblemJSON403 *Forbidden
-	// ApplicationproblemJSON404 the response for an HTTP 404 `application/problem+json` response
-	ApplicationproblemJSON404 *NotFound
-	// ApplicationproblemJSON429 the response for an HTTP 429 `application/problem+json` response
-	ApplicationproblemJSON429 *TooManyRequests
-	// ApplicationproblemJSONDefault the response for an HTTP default `application/problem+json` response
-	ApplicationproblemJSONDefault *Error
-	// Headers200 the parsed response headers for an HTTP 200 response
-	Headers200 *ListAgentWebhookSubscriptionsResponse200Headers
-	// Headers401 the parsed response headers for an HTTP 401 response
-	Headers401 *ListAgentWebhookSubscriptionsResponse401Headers
-	// Headers403 the parsed response headers for an HTTP 403 response
-	Headers403 *ListAgentWebhookSubscriptionsResponse403Headers
-	// Headers404 the parsed response headers for an HTTP 404 response
-	Headers404 *ListAgentWebhookSubscriptionsResponse404Headers
-	// Headers429 the parsed response headers for an HTTP 429 response
-	Headers429 *ListAgentWebhookSubscriptionsResponse429Headers
-	// HeadersDefault the parsed response headers for an HTTP default response
-	HeadersDefault *ListAgentWebhookSubscriptionsResponseDefaultHeaders
-}
-
-// GetJSON200 returns the response for an HTTP 200 `application/json` response
-func (r ListAgentWebhookSubscriptionsResponse) GetJSON200() *WebhookSubscriptionList {
-	return r.JSON200
-}
-
-// GetApplicationproblemJSON401 returns the response for an HTTP 401 `application/problem+json` response
-func (r ListAgentWebhookSubscriptionsResponse) GetApplicationproblemJSON401() *Unauthorized {
-	return r.ApplicationproblemJSON401
-}
-
-// GetApplicationproblemJSON403 returns the response for an HTTP 403 `application/problem+json` response
-func (r ListAgentWebhookSubscriptionsResponse) GetApplicationproblemJSON403() *Forbidden {
-	return r.ApplicationproblemJSON403
-}
-
-// GetApplicationproblemJSON404 returns the response for an HTTP 404 `application/problem+json` response
-func (r ListAgentWebhookSubscriptionsResponse) GetApplicationproblemJSON404() *NotFound {
-	return r.ApplicationproblemJSON404
-}
-
-// GetApplicationproblemJSON429 returns the response for an HTTP 429 `application/problem+json` response
-func (r ListAgentWebhookSubscriptionsResponse) GetApplicationproblemJSON429() *TooManyRequests {
-	return r.ApplicationproblemJSON429
-}
-
-// GetApplicationproblemJSONDefault returns the response for an HTTP default `application/problem+json` response
-func (r ListAgentWebhookSubscriptionsResponse) GetApplicationproblemJSONDefault() *Error {
-	return r.ApplicationproblemJSONDefault
-}
-
-// GetBody returns the raw response body bytes
-func (r ListAgentWebhookSubscriptionsResponse) GetBody() []byte {
-	return r.Body
-}
-
-// Status returns HTTPResponse.Status
-func (r ListAgentWebhookSubscriptionsResponse) Status() string {
-	if r.HTTPResponse != nil {
-		return r.HTTPResponse.Status
-	}
-	return http.StatusText(0)
-}
-
-// StatusCode returns HTTPResponse.StatusCode
-func (r ListAgentWebhookSubscriptionsResponse) StatusCode() int {
-	if r.HTTPResponse != nil {
-		return r.HTTPResponse.StatusCode
-	}
-	return 0
-}
-
-// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
-func (r ListAgentWebhookSubscriptionsResponse) ContentType() string {
-	if r.HTTPResponse != nil {
-		return r.HTTPResponse.Header.Get("Content-Type")
-	}
-	return ""
-}
-
-// CreateAgentWebhookSubscriptionResponse201Headers the declared response headers of an HTTP 201 response for CreateAgentWebhookSubscription
-type CreateAgentWebhookSubscriptionResponse201Headers struct {
-	CorrelationId   *CorrelationId
-	RateLimit       *string
-	RateLimitPolicy *string
-}
-
-// CreateAgentWebhookSubscriptionResponse400Headers the declared response headers of an HTTP 400 response for CreateAgentWebhookSubscription
-type CreateAgentWebhookSubscriptionResponse400Headers struct {
-	CorrelationId *CorrelationId
-}
-
-// CreateAgentWebhookSubscriptionResponse401Headers the declared response headers of an HTTP 401 response for CreateAgentWebhookSubscription
-type CreateAgentWebhookSubscriptionResponse401Headers struct {
-	CorrelationId   *CorrelationId
-	DPoPNonce       *string
-	SetCookie       *string
-	WWWAuthenticate *string
-}
-
-// CreateAgentWebhookSubscriptionResponse403Headers the declared response headers of an HTTP 403 response for CreateAgentWebhookSubscription
-type CreateAgentWebhookSubscriptionResponse403Headers struct {
-	CorrelationId *CorrelationId
-}
-
-// CreateAgentWebhookSubscriptionResponse404Headers the declared response headers of an HTTP 404 response for CreateAgentWebhookSubscription
-type CreateAgentWebhookSubscriptionResponse404Headers struct {
-	CorrelationId *CorrelationId
-}
-
-// CreateAgentWebhookSubscriptionResponse409Headers the declared response headers of an HTTP 409 response for CreateAgentWebhookSubscription
-type CreateAgentWebhookSubscriptionResponse409Headers struct {
-	CorrelationId *CorrelationId
-}
-
-// CreateAgentWebhookSubscriptionResponse429Headers the declared response headers of an HTTP 429 response for CreateAgentWebhookSubscription
-type CreateAgentWebhookSubscriptionResponse429Headers struct {
-	CorrelationId   *CorrelationId
-	RateLimit       *string
-	RateLimitPolicy *string
-	RetryAfter      *int
-}
-
-// CreateAgentWebhookSubscriptionResponseDefaultHeaders the declared response headers of an HTTP default response for CreateAgentWebhookSubscription
-type CreateAgentWebhookSubscriptionResponseDefaultHeaders struct {
-	CorrelationId *CorrelationId
 }

@@ -1604,6 +1604,14 @@ func (s *server) startFiles(ctx context.Context) error {
 		}
 		return err
 	}
+	if s.api() {
+		// Downloads, tickets and transcripts are served by the roles with routes; the ticket key
+		// must exist and be long enough before such a role starts (D-M3-05-15).
+		if err := s.enableDownloads(ctx, f); err != nil {
+			_ = f.Close()
+			return err
+		}
+	}
 	if s.worker() {
 		if err := s.enableFilesJobs(f, a.Recorder()); err != nil {
 			_ = f.Close()
@@ -1637,6 +1645,22 @@ func (s *server) enableFilesJobs(f *Files, audit auditing.Recorder) error {
 // role (M3-06).
 func (s *server) imageTimeout() time.Duration {
 	return s.values.Duration("file.image.processing_timeout")
+}
+
+// enableDownloads binds the download keys and the ticket key source and adds the downloads to f.
+func (s *server) enableDownloads(ctx context.Context, f *Files) error {
+	cfg, err := DownloadConfig(s.values)
+	if err != nil {
+		return err
+	}
+	keys, err := NewTicketKeys(ctx, s.sp, s.values.String(keyTicketKeyRef))
+	if err != nil {
+		return err
+	}
+	s.mu.Lock()
+	id := s.identity
+	s.mu.Unlock()
+	return f.EnableDownloads(cfg, id, keys)
 }
 
 // startScanHealth starts the health monitor of the virus scanner in the roles worker and all

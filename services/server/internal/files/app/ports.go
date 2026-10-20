@@ -32,7 +32,9 @@ type FileRecord struct {
 	TranscriptStatus string
 	// TranscriptLanguage and TranscriptSource are "" for NULL.
 	TranscriptLanguage, TranscriptSource string
-	CreatedAt                            time.Time
+	// TranscriptText is "" for NULL; only FileForDelivery reads it (M3-05).
+	TranscriptText string
+	CreatedAt      time.Time
 	// Deleted reports deleted_at IS NOT NULL.
 	Deleted bool
 	// Thumbnails are the rows of file_thumbnails (M3-06), in any order; FileView orders them.
@@ -40,8 +42,10 @@ type FileRecord struct {
 	Thumbnails []ThumbnailRecord
 }
 
-// ThumbnailRecord is a row of file_thumbnails (docs/spec/03-datenmodell.md).
+// ThumbnailRecord is a row of file_thumbnails (docs/spec/03-datenmodell.md). FileID is filled by
+// the read path of downloads (DeliveryReader.Thumbnail, M3-05) and empty elsewhere (INT-W50/3).
 type ThumbnailRecord struct {
+	FileID    ids.ID
 	Variant   domain.Variant
 	ObjectKey string
 	MIMEType  string

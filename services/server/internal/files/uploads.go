@@ -48,11 +48,31 @@ type Uploads interface {
 	Abort(ctx context.Context, fileID ids.ID) error
 }
 
-// Files reads file metadata (12 13, GET /api/v1/files/{id}).
+// Files reads file metadata (12 13, GET /api/v1/files/{id}) and, from M3-05 on, the bytes of a
+// file and its thumbnails, the download tickets and the transcript (12 9). The actor comes from
+// kernel/actor in the context; every method calls authorize(file.read) with the rights at call
+// time and answers an unknown, a deleted and a foreign file with the same 404 not_found.
 type Files interface {
 	// Get returns the file with file.read for the actor of ctx; a deleted, unknown or invisible
 	// file is 404 not_found.
 	Get(ctx context.Context, fileID ids.ID) (File, error)
+	// Open opens the bytes of a file or one of its thumbnails for a download (downloadFile,
+	// downloadThumbnail; 12 9.1 and 9.3). An anonymous actor with req.Ticket set is replaced by
+	// the actor of the ticket; every failure of the ticket path is the unknown-id 404. A file
+	// that is not deliverable gives 409 file_not_ready (with Retry-After) or 409 file_blocked, a
+	// range outside the variant 416 range_not_satisfiable. The caller closes Delivery.Body.
+	//
+	// Example:
+	//
+	//	d, err := f.Open(ctx, files.OpenRequest{FileID: id, Variant: "original", Range: "bytes=0-99"})
+	Open(ctx context.Context, req OpenRequest) (Delivery, error)
+	// IssueTicket mints a download ticket for variant of a deliverable file (createFileTicket,
+	// 12 9.2). The actor needs a login session: a principal without one gets 403 forbidden with
+	// reason step_up_not_possible. A variant the file does not have is 404 not_found.
+	IssueTicket(ctx context.Context, fileID ids.ID, variant string) (IssuedTicket, error)
+	// Transcript returns the transcript of a deliverable file (getTranscript, 12 8.2); it never
+	// accepts a ticket.
+	Transcript(ctx context.Context, fileID ids.ID) (TranscriptView, error)
 }
 
 // CreateUpload is the request of createUpload (schema UploadCreate).

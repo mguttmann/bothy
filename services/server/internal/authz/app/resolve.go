@@ -42,7 +42,8 @@ func (a *Authorizer) resolve(ctx context.Context, act authorize.Action, r author
 	kind := string(r.Kind)
 	switch {
 	case r.Kind == authorize.ResourceFile && r.File != nil && r.File.Purpose != purposeAttachment:
-		// A file of another purpose has no channel path; its visibility rule refuses it (M3-03).
+		// A file of another purpose has no channel path; its visibility rule and the file.read
+		// requirement by purpose decide it (M3-03, M3-05).
 		return resolved{path: domain.Path{Kind: domain.PathNone}}, true, nil
 	case domain.IsChannelPathKind(kind):
 		threadID, channelID := r.ThreadID, r.ChannelID
@@ -192,7 +193,8 @@ func (a *Authorizer) gather(ctx context.Context, s *actingPrincipal, spec domain
 			ViewAs:   s.viewAs != nil, ActingFor: s.actingFor != nil,
 		},
 		Resource: domain.ResourceFacts{Kind: string(r.Kind), ID: r.ID, OwnerID: r.OwnerID,
-			HasAttachments: r.HasAttachments, RestrictedTags: r.RestrictedTags, File: fileFacts(r.File)},
+			HasAttachments: r.HasAttachments, RestrictedTags: r.RestrictedTags, IssueTicket: r.IssueTicket,
+			File: fileFacts(r.File)},
 		Path: res.path, Eff: eff, BaseEff: base, GrantTarget: res.grantTarget,
 	}
 	in.Principal.Pending = pendingReason(s.liveness())

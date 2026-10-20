@@ -275,7 +275,7 @@ Quelle: [04-sync-protokoll.md](../spec/04-sync-protokoll.md), Abschnitt 18.
 | `sync.run_patch_coalesce_interval` | `BOTHY_SYNC__RUN_PATCH_COALESCE_INTERVAL` | Server |  | `250ms` | Sammelfenster für `run.updated` | geplant (M2) |
 | `sync.typing_min_interval` | `BOTHY_SYNC__TYPING_MIN_INTERVAL` | Server | duration | `5s` | höchstens so oft `typing.start` | aktiv |
 | `sync.typing_ttl` | `BOTHY_SYNC__TYPING_TTL` | Server | duration | `8s` | Tipp-Anzeige ohne Erneuerung | aktiv |
-| `client.cache_max_age` | `BOTHY_CLIENT__CACHE_MAX_AGE` | Server |  | `30d` | ungenutzte Cache-Einträge | geplant (M3) |
+| `client.cache_max_age` | `BOTHY_CLIENT__CACHE_MAX_AGE` | Server | duration | `30d` | ungenutzte Cache-Einträge | aktiv |
 | `client.outbox_retry_base` | `BOTHY_CLIENT__OUTBOX_RETRY_BASE` | Server |  | `2s` | Basis des Backoffs im Ausgangsfach | geplant (M4) |
 | `client.outbox_retry_cap` | `BOTHY_CLIENT__OUTBOX_RETRY_CAP` | Server |  | `5m` | größter Abstand im Ausgangsfach | geplant (M4) |
 | `agent.invocation_token_ttl` | `BOTHY_AGENT__INVOCATION_TOKEN_TTL` | Server | duration | `60s` | Gültigkeit einer Aufruf-Marke | aktiv |
@@ -522,8 +522,9 @@ Quelle: [12-dateien.md](../spec/12-dateien.md), Abschnitt 18.
 | `file.thumbnail.medium_px` | `BOTHY_FILE__THUMBNAIL__MEDIUM_PX` | Server | int | `1024` | längste Kante `medium` | aktiv |
 | `file.thumbnail.large_px` | `BOTHY_FILE__THUMBNAIL__LARGE_PX` | Server | int | `2048` | längste Kante `large` | aktiv |
 | `file.thumbnail.jpeg_quality` | `BOTHY_FILE__THUMBNAIL__JPEG_QUALITY` | Server | int | `82` | Qualität der Vorschaubilder | aktiv |
-| `file.ticket_ttl` | `BOTHY_FILE__TICKET_TTL` | Server |  | `5m` | Gültigkeit eines Abruf-Tickets | geplant (M3) |
-| `file.ticket_key_ref` | `BOTHY_FILE__TICKET_KEY_REF` | Server |  | `file:<secrets.dir>/file_ticket_key` | Verweis auf den Ticket-Schlüssel im Secret-Provider | geplant (M3) |
+| `file.ticket_ttl` | `BOTHY_FILE__TICKET_TTL` | Server | duration | `5m` | Gültigkeit eines Abruf-Tickets | aktiv |
+| `file.ticket_key_ref` | `BOTHY_FILE__TICKET_KEY_REF` | Server | secret_ref | `file:<secrets.dir>/file_ticket_key` | Verweis auf den Ticket-Schlüssel im Secret-Provider | aktiv |
+| `file.not_ready_retry_after` | `BOTHY_FILE__NOT_READY_RETRY_AFTER` | Server | duration | `5s` | `Retry-After` of the `409 file_not_ready` responses (in whole seconds) | aktiv |
 | `file.unattached_ttl` | `BOTHY_FILE__UNATTACHED_TTL` | Server |  | `24h` | Frist für nie angehängte Dateien | geplant (M3) |
 | `file.failed_row_ttl` | `BOTHY_FILE__FAILED_ROW_TTL` | Server |  | `7d` | Frist für Zeilen fehlgeschlagener oder blockierter Dateien | geplant (M3) |
 | `file.gc_interval` | `BOTHY_FILE__GC_INTERVAL` | Server |  | `10m` | Abstand des Aufräum-Jobs | geplant (M3) |

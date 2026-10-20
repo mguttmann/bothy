@@ -145,8 +145,8 @@ func TestDeliverableAndFinal(t *testing.T) {
 		{"complete", "pending", false, false, false},
 	}
 	for _, c := range cases {
-		if got := domain.Deliverable(c.up, c.scan, c.deleted); got != c.deliverable {
-			t.Errorf("Deliverable(%s,%s,%v) = %v", c.up, c.scan, c.deleted, got)
+		if got := domain.IsDeliverable(c.up, c.scan, c.deleted); got != c.deliverable {
+			t.Errorf("IsDeliverable(%s,%s,%v) = %v", c.up, c.scan, c.deleted, got)
 		}
 		if got := domain.Final(c.up, c.scan, c.deleted); got != c.isFinal {
 			t.Errorf("Final(%s,%s,%v) = %v", c.up, c.scan, c.deleted, got)

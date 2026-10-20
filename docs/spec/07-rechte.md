@@ -280,7 +280,7 @@ verrät (bei `404` nie).
 | `delegation_exceeds_own_level` | `forbidden` | Delegation über die eigene Stufe |
 | `delegation_exceeds_own_capabilities` | `forbidden` | Delegation über die eigenen Zusatzrechte |
 | `step_up_required` | `step_up_required` | frische Bestätigung fehlt |
-| `step_up_not_possible` | `forbidden` | Token ohne Sitzung (Agent, App, persönliches Token) |
+| `step_up_not_possible` | `forbidden` | Token ohne Sitzung (Agent, App, persönliches Token); also `createFileTicket` without a login session, because a download ticket binds to a login session ([12-dateien.md](12-dateien.md) section 9.2) |
 | `view_as_read_only` | `forbidden` | schreibende Aktion während "Als Person ansehen" |
 | `i1_violation` | `invariant_violation` | Änderung würde I1 verletzen |
 | `last_owner` | `invariant_violation` | Änderung ließe keinen aktiven Owner übrig |

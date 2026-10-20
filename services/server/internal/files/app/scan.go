@@ -366,7 +366,7 @@ func (p *ScanPass) finish(ctx context.Context, t SessionRecord, st passState, ou
 	if !transitioned {
 		// Another run decided the file, or it was deleted: keep the state, remove only what this
 		// run wrote and nobody may serve.
-		if st.written && !domain.Deliverable(current.File.UploadState, current.File.ScanStatus, current.File.Deleted) &&
+		if st.written && !domain.IsDeliverable(current.File.UploadState, current.File.ScanStatus, current.File.Deleted) &&
 			!awaitingImage(current.File) {
 			p.deleteKeys(ctx, t.FileID, t.File.ObjectKey)
 		}
@@ -434,7 +434,7 @@ func awaitingImage(f FileRecord) bool {
 // thumbnailJob reports a scan result that inserts files.thumbnail (brief M3-06 design note 1a):
 // a deliverable file whose type has an original plan or container values.
 func thumbnailJob(res ScanResult) bool {
-	if !domain.Deliverable(res.UploadState, res.ScanStatus, false) {
+	if !domain.IsDeliverable(res.UploadState, res.ScanStatus, false) {
 		return false
 	}
 	return domain.OriginalPlanFor(res.MIMEType) != domain.PlanNone || domain.HasContainerMetadata(res.MIMEType)

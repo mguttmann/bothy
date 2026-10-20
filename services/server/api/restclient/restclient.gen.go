@@ -15562,6 +15562,9 @@ type EmojiPath = string
 // FileIdPath UUIDv7 (RFC 9562), lowercase canonical form.
 type FileIdPath = Uuid
 
+// FileTicketQuery defines model for FileTicketQuery.
+type FileTicketQuery = string
+
 // GrantIdPath UUIDv7 (RFC 9562), lowercase canonical form.
 type GrantIdPath = Uuid
 
@@ -15579,6 +15582,9 @@ type IdempotencyKey = Uuid
 
 // IdentityIdPath UUIDv7 (RFC 9562), lowercase canonical form.
 type IdentityIdPath = Uuid
+
+// IfRange defines model for If-Range.
+type IfRange = string
 
 // IfMatchOptional Examples: "7"
 type IfMatchOptional = string
@@ -15618,6 +15624,9 @@ type PrincipalIdPath = Uuid
 
 // ProviderIdPath UUIDv7 (RFC 9562), lowercase canonical form.
 type ProviderIdPath = Uuid
+
+// Range defines model for Range.
+type Range = string
 
 // RegistrationIdPath UUIDv7 (RFC 9562), lowercase canonical form.
 type RegistrationIdPath = Uuid
@@ -15699,6 +15708,10 @@ type ConsoleLogin = ConsoleSession
 // Error Error body after RFC 9457 (`application/problem+json`). `type` is a relative URI with full
 // path `/api/v1/problems/{code}`; `code` repeats its last segment for convenience.
 type Error = Problem
+
+// FileConflict Error body after RFC 9457 (`application/problem+json`). `type` is a relative URI with full
+// path `/api/v1/problems/{code}`; `code` repeats its last segment for convenience.
+type FileConflict = Problem
 
 // Forbidden Error body after RFC 9457 (`application/problem+json`). `type` is a relative URI with full
 // path `/api/v1/problems/{code}`; `code` repeats its last segment for convenience.
@@ -16212,6 +16225,40 @@ type ListEventsParams struct {
 type PutFeatureFlagParams struct {
 	// IfMatch Optional ETag; when given, a mismatch gives 412 `version_conflict`.
 	IfMatch *IfMatchOptional `json:"If-Match,omitempty"`
+}
+
+// DownloadFileParams defines parameters for DownloadFile.
+type DownloadFileParams struct {
+	// Ticket Fetch ticket of `createFileTicket` (security scheme `fileTicket`, 12 9.2). Accepted only by
+	// `downloadFile` and `downloadThumbnail`; ignored when the request carries `Authorization`. A
+	// bearer secret: never logged.
+	Ticket *FileTicketQuery `form:"ticket,omitempty" json:"ticket,omitempty"`
+
+	// Range One byte range (RFC 9110 section 14), for example `bytes=0-1023`, `bytes=1024-` or
+	// `bytes=-500`. Exactly one range gives 206; several ranges and invalid values are ignored (200);
+	// a range that starts at or after the end gives 416 (12, 9.3).
+	Range *Range `json:"Range,omitempty"`
+
+	// IfRange Applies `Range` only when equal to the current strong `ETag`; any other value, an HTTP date
+	// included, gives the whole variant (200).
+	IfRange *IfRange `json:"If-Range,omitempty"`
+}
+
+// DownloadThumbnailParams defines parameters for DownloadThumbnail.
+type DownloadThumbnailParams struct {
+	// Ticket Fetch ticket of `createFileTicket` (security scheme `fileTicket`, 12 9.2). Accepted only by
+	// `downloadFile` and `downloadThumbnail`; ignored when the request carries `Authorization`. A
+	// bearer secret: never logged.
+	Ticket *FileTicketQuery `form:"ticket,omitempty" json:"ticket,omitempty"`
+
+	// Range One byte range (RFC 9110 section 14), for example `bytes=0-1023`, `bytes=1024-` or
+	// `bytes=-500`. Exactly one range gives 206; several ranges and invalid values are ignored (200);
+	// a range that starts at or after the end gives 416 (12, 9.3).
+	Range *Range `json:"Range,omitempty"`
+
+	// IfRange Applies `Range` only when equal to the current strong `ETag`; any other value, an HTTP date
+	// included, gives the whole variant (200).
+	IfRange *IfRange `json:"If-Range,omitempty"`
 }
 
 // DownloadThumbnailParamsVariant defines parameters for DownloadThumbnail.
@@ -21204,21 +21251,34 @@ type ClientInterface interface {
 	// Answers 200 with the bytes (supports `Range`); there are no presigned GET URLs (ADR 0048).
 	// Media players without DPoP use a ticket (`createFileTicket`) in the query parameter `ticket`
 	// instead of `Authorization`. 409 `file_not_ready` while the scan is pending, 409 `file_blocked`
-	// for blocked or failed files; without read access always 404 (12, 9.3).
+	// for blocked or failed files; without read access always 404 (12, 9.3). Exactly one byte range
+	// gives 206, several ranges are ignored (200 with the whole file), a range outside the file gives
+	// 416. Types outside the inline list of 12 9.3 (HTML, SVG, PDF and every other type) are sent as
+	// `application/octet-stream` with `Content-Disposition: attachment`, `nosniff` and the sandbox
+	// CSP. An `Authorization` header wins over a `ticket` parameter. Pass-through via the server
+	// only (ADR 0048).
 	//
 	// Corresponds with GET /files/{file_id}/content (the `DownloadFile` operationId).
-	DownloadFile(ctx context.Context, fileId FileIdPath, reqEditors ...RequestEditorFn) (*http.Response, error)
+	DownloadFile(ctx context.Context, fileId FileIdPath, params *DownloadFileParams, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// DownloadThumbnail Download a thumbnail
 	//
-	// Accepts a fetch ticket in the query parameter `ticket` like `downloadFile` (push preview `image_url`, ADR 0048). 409 `file_not_ready` or `file_blocked` as for `downloadFile`.
+	// Accepts a fetch ticket in the query parameter `ticket` like `downloadFile` (push preview
+	// `image_url`, ADR 0048). 409 `file_not_ready` or `file_blocked` as for `downloadFile`; a variant
+	// the file does not have gives 404. Thumbnails are always inline with their own type; range,
+	// headers and caching as for `downloadFile` (12, 9.3).
 	//
 	// Corresponds with GET /files/{file_id}/thumbnails/{variant} (the `DownloadThumbnail` operationId).
-	DownloadThumbnail(ctx context.Context, fileId FileIdPath, variant DownloadThumbnailParamsVariant, reqEditors ...RequestEditorFn) (*http.Response, error)
+	DownloadThumbnail(ctx context.Context, fileId FileIdPath, variant DownloadThumbnailParamsVariant, params *DownloadThumbnailParams, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// CreateFileTicketWithBody Create a short-lived fetch ticket
 	//
-	// For media players and "open with" that cannot send a DPoP proof. Every fetch with the ticket checks signature, expiry, session and `file.read` again (12, 9.2).
+	// For media players and "open with" that cannot send a DPoP proof. Every fetch with the ticket
+	// checks signature, expiry, session and `file.read` again (12, 9.2). A ticket binds to the login
+	// session of the caller: a principal without a session (agent, app, API token) gets 403
+	// `forbidden` with `reason` `step_up_not_possible`. No ticket is issued for a file that is not
+	// deliverable (409 `file_not_ready` or `file_blocked`), and a variant the file does not have gives
+	// 404. A repeated call mints a new ticket.
 	//
 	// Takes any type of body and a specified content type.
 	//
@@ -21227,7 +21287,12 @@ type ClientInterface interface {
 
 	// CreateFileTicket Create a short-lived fetch ticket
 	//
-	// For media players and "open with" that cannot send a DPoP proof. Every fetch with the ticket checks signature, expiry, session and `file.read` again (12, 9.2).
+	// For media players and "open with" that cannot send a DPoP proof. Every fetch with the ticket
+	// checks signature, expiry, session and `file.read` again (12, 9.2). A ticket binds to the login
+	// session of the caller: a principal without a session (agent, app, API token) gets 403
+	// `forbidden` with `reason` `step_up_not_possible`. No ticket is issued for a file that is not
+	// deliverable (409 `file_not_ready` or `file_blocked`), and a variant the file does not have gives
+	// 404. A repeated call mints a new ticket.
 	//
 	// Takes a body of the `application/json` content type.
 	//
@@ -21243,7 +21308,7 @@ type ClientInterface interface {
 
 	// GetTranscript Read the transcript of a voice message
 	//
-	// 409 `file_not_ready` or `file_blocked` as for `downloadFile`; without read access always 404 (12, 9.3).
+	// 409 `file_not_ready` or `file_blocked` as for `downloadFile`; without read access always 404 (12, 9.3). Normal authentication only, never a fetch ticket. `text`, `language` and `source` are present only with `status` `done`.
 	//
 	// Corresponds with GET /files/{file_id}/transcript (the `GetTranscript` operationId).
 	GetTranscript(ctx context.Context, fileId FileIdPath, reqEditors ...RequestEditorFn) (*http.Response, error)
@@ -25878,80 +25943,6 @@ func (c *Client) EndViewAs(ctx context.Context, params *EndViewAsParams, reqEdit
 // Corresponds with POST /costs/reconcile (the `ReconcileCosts` operationId).
 func (c *Client) ReconcileCostsWithBody(ctx context.Context, params *ReconcileCostsParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
 	req, err := NewReconcileCostsRequestWithBody(c.Server, params, contentType, body)
-	if err != nil {
-		return nil, err
-	}
-	req = req.WithContext(ctx)
-	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
-		return nil, err
-	}
-	return c.Client.Do(req)
-}
-
-// ReconcileCosts Reconcile estimates with invoices
-//
-// Takes a body of the `application/json` content type.
-//
-// Corresponds with POST /costs/reconcile (the `ReconcileCosts` operationId).
-func (c *Client) ReconcileCosts(ctx context.Context, params *ReconcileCostsParams, body ReconcileCostsJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
-	req, err := NewReconcileCostsRequest(c.Server, params, body)
-	if err != nil {
-		return nil, err
-	}
-	req = req.WithContext(ctx)
-	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
-		return nil, err
-	}
-	return c.Client.Do(req)
-}
-
-// SubmitCostReconciliationWithBody Submit reconciled cost entries (app)
-//
-// For the reconciliation app with scope `costs:reconcile`, without step-up. Only adds `reconciled` entries to existing runs; deletes nothing (10, 12.4).
-//
-// Takes any type of body and a specified content type.
-//
-// Corresponds with POST /costs/reconciliations (the `SubmitCostReconciliation` operationId).
-func (c *Client) SubmitCostReconciliationWithBody(ctx context.Context, params *SubmitCostReconciliationParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
-	req, err := NewSubmitCostReconciliationRequestWithBody(c.Server, params, contentType, body)
-	if err != nil {
-		return nil, err
-	}
-	req = req.WithContext(ctx)
-	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
-		return nil, err
-	}
-	return c.Client.Do(req)
-}
-
-// SubmitCostReconciliation Submit reconciled cost entries (app)
-//
-// For the reconciliation app with scope `costs:reconcile`, without step-up. Only adds `reconciled` entries to existing runs; deletes nothing (10, 12.4).
-//
-// Takes a body of the `application/json` content type.
-//
-// Corresponds with POST /costs/reconciliations (the `SubmitCostReconciliation` operationId).
-func (c *Client) SubmitCostReconciliation(ctx context.Context, params *SubmitCostReconciliationParams, body SubmitCostReconciliationJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
-	req, err := NewSubmitCostReconciliationRequest(c.Server, params, body)
-	if err != nil {
-		return nil, err
-	}
-	req = req.WithContext(ctx)
-	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
-		return nil, err
-	}
-	return c.Client.Do(req)
-}
-
-// SubmitCspReportWithBody Accept a CSP violation report of the web console
-//
-// Endpoint of `report-to csp` and of `Reporting-Endpoints: csp="/api/v1/csp-reports"` on every console response (19-security 5 rule 6, R-AZ-33). Public, because browsers send reports without cookies in many cases; a console cookie is not checked by the CSRF guard here, the action changes nothing. Accepts the Reporting API format (`application/reports+json`, an array of reports) and the legacy `report-uri` format (`application/csp-report`), both limited by `http.max_json_body_bytes`. The server stores no report; it logs only the effective directive, the disposition and the origin of the blocked URL and counts `bothy.console.csp_violations`. Members it does not read are ignored.
-//
-// Takes any type of body and a specified content type.
-//
-// Corresponds with POST /csp-reports (the `SubmitCspReport` operationId).
-func (c *Client) SubmitCspReportWithBody(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
-	req, err := NewSubmitCspReportRequestWithBody(c.Server, contentType, body)
 	if err != nil {
 		return nil, err
 	}

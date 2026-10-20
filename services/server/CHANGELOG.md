@@ -25,6 +25,30 @@ documented in this file. The format is based on
   `file_thumbnails` (migration 00051), `File.thumbnails` in `getFile` and `file.updated`, the
   start check `thumbnail_sizes_ordered`, and `golang.org/x/image` (only in
   `internal/files/adapters/imaging`).
+- File download with download tickets (M3-05): the operations `downloadFile`, `downloadThumbnail`,
+  `createFileTicket` and `getTranscript` are enabled. Bytes leave only through the server after
+  `authorize(file.read)` at fetch time and stream from the object storage under
+  `http.transfer_timeout`, with the headers of 12 9.3: `Content-Type` and `inline` only for the
+  inline list (everything else, HTML and SVG above all, as `attachment` with
+  `application/octet-stream`), both file name parameters, `nosniff`, the sandbox CSP,
+  `Cross-Origin-Resource-Policy`, `Cache-Control` per path, `ETag` and `Repr-Digest` of the
+  variant and `Accept-Ranges`. Exactly one byte range gives `206`, several ranges `200`, a range
+  outside the variant `416 range_not_satisfiable`. `createFileTicket` mints an HMAC ticket bound to
+  file, variant, principal and login session and valid for `file.ticket_ttl`, signed with a key
+  ring of the current and the previous key of `file.ticket_key_ref`; a player fetches with it in
+  the query parameter `ticket` alone, and every failed ticket check and every refusal of
+  `file.read` on the ticket path, a revoked grant or session or an expired ticket included,
+  answers the unknown-id `404`. `getTranscript` returns the
+  status of every readable deliverable file, with text, language and source once done. A pending
+  file answers `409 file_not_ready` with `Retry-After`, a blocked or failed one `409 file_blocked`.
+  `file.read` now follows the purpose of the file (an avatar for every authenticated principal, a
+  branding file with the requirement `Public`, which anonymous callers reach only through
+  `getBrandingLogo` of M3-10 because `downloadFile` is not public, a `gdpr_export` for nobody), and a principal without a login
+  session gets `403 forbidden` `step_up_not_possible` on `createFileTicket`. New port method
+  `identity.Auth.SessionActor` builds the actor of a ticket per fetch. The table `file_thumbnails` of M3-06
+  (migration `00051`) holds the variants. The keys `file.ticket_ttl`, `file.ticket_key_ref`,
+  `file.not_ready_retry_after` (new) and `client.cache_max_age` are now active; the roles `api` and
+  `all` do not start without a readable ticket key of at least the length of `file_ticket_key`.
 - Scan pass with clamd (M3-04): every completed upload runs through the job `files.scan` (queue
   `files`, inserted in the transaction of `completeUpload`), which reads the stored bytes once,
   checks size and SHA-256 against the declaration, detects the type from the first

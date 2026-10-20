@@ -29,6 +29,12 @@ const (
 	jpegQualityMax = "100"
 )
 
+// The keys of the download tickets (M3-05): the start check ticket key and DownloadKeys read them.
+const (
+	keyTicketTTL    = "file.ticket_ttl"
+	keyTicketKeyRef = "file.ticket_key_ref"
+)
+
 // The keys of the upload checks of M3-03 (docs/DECISIONS.md D-M3-03-19).
 const (
 	keyMaxUploadBytes  = "file.max_upload_bytes"
@@ -56,6 +62,10 @@ const (
 // file.image.libvips_enabled, whose build does not exist, and file.thumbnail.*; the cross-check
 // thumbnail_sizes_ordered holds small below medium below large. file.poster_max_bytes enters with
 // the poster of a video, which UploadCreate cannot carry yet.
+//
+// The keys of the downloads (M3-05) follow: file.ticket_ttl and file.ticket_key_ref of the
+// download tickets, file.not_ready_retry_after of 409 file_not_ready, and client.cache_max_age of
+// chapter 04, the max-age of an authenticated download (12 9.3).
 //
 // voice.max_duration is here because getInstance reports it as a client limit (M1-46) before the
 // voice messages of M3 read it.
@@ -232,6 +242,26 @@ func filesConfigKeys() []config.Key {
 			Name: "file.thumbnail.jpeg_quality", Kind: config.KindInt, Default: "82", Min: jpegQualityMin, Max: jpegQualityMax,
 			Doc:     "JPEG quality of the thumbnails of images without alpha.",
 			Chapter: chapter12,
+		},
+		{
+			Name: keyTicketTTL, Kind: config.KindDuration, Default: "5m", Min: "1s",
+			Doc:     "Validity of a download ticket (createFileTicket).",
+			Chapter: chapter12,
+		},
+		{
+			Name: keyTicketKeyRef, Kind: config.KindSecretRef, Default: "file:<secrets.dir>/file_ticket_key",
+			Doc:     "Secret reference of the HMAC key of the download tickets; 32 bytes as hex. Roles api and all do not start without it.",
+			Chapter: chapter12,
+		},
+		{
+			Name: "file.not_ready_retry_after", Kind: config.KindDuration, Default: "5s", Min: "1s", Max: "1h",
+			Doc:     "Retry-After of the 409 file_not_ready responses, in whole seconds.",
+			Chapter: chapter12,
+		},
+		{
+			Name: "client.cache_max_age", Kind: config.KindDuration, Default: sessionMaxAgeDefault, Min: "1s",
+			Doc:     "Age after which clients drop unused cache entries; the max-age of an authenticated file download.",
+			Chapter: chapter04,
 		},
 		{
 			Name: "file.s3.access_key_ref", Kind: config.KindSecretRef, Default: "file:<secrets.dir>/s3_access_key",

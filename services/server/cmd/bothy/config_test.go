@@ -271,6 +271,7 @@ func TestConfigPrintShowsSourcePerKey(t *testing.T) {
 		"channel.name_max_chars = 100  # default\n" +
 		"channel.prompt_max_bytes = 32768  # default\n" +
 		"channel.topic_max_chars = 1024  # default\n" +
+		"client.cache_max_age = 30d  # default\n" +
 		"client.min_version.android =   # default\n" +
 		"client.min_version.ios =   # default\n" +
 		"client.min_version.macos =   # default\n" +
@@ -308,6 +309,7 @@ func TestConfigPrintShowsSourcePerKey(t *testing.T) {
 		"file.fs.root = /var/lib/bothy/files  # default\n" +
 		"file.max_upload_bytes = 104857600  # default\n" +
 		"file.name_max_bytes = 255  # default\n" +
+		"file.not_ready_retry_after = 5s  # default\n" +
 		"file.quota_bytes_per_principal = 0  # default\n" +
 		"file.s3.access_key_ref = file:/run/bothy/secrets/s3_access_key  # default\n" +
 		"file.s3.bucket =   # default\n" +
@@ -328,6 +330,8 @@ func TestConfigPrintShowsSourcePerKey(t *testing.T) {
 		"file.scan.timeout = 2m  # default\n" +
 		"file.sniff_bytes = 1048576  # default\n" +
 		"file.storage.driver = fs  # default\n" +
+		"file.ticket_key_ref = file:/run/bothy/secrets/file_ticket_key  # default\n" +
+		"file.ticket_ttl = 5m  # default\n" +
 		"file.upload_max_open_sessions = 20  # default\n" +
 		"file.upload_part_bytes = 8388608  # default\n" +
 		"file.upload_session_ttl = 1d  # default\n" +
