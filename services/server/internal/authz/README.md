@@ -113,6 +113,9 @@ states, with named constraints (`grants_subject_shape_check`, `grants_bot_limits
   advance a process-wide structure generation; snapshots of an older generation are rebuilt
   (DECISIONS M1-65). `channel.settings_changed` does the same, because the channel facts carry
   the mention switches `agent.invoke` evaluates at delivery time (DECISIONS D-M2-02-8).
+- The project facts of `agent.invoke` (`ChannelFacts.ProjectBound`, `ProjectReady`, M2-03) are
+  read fresh even inside a structure scope, because a readiness change writes no event
+  (DECISIONS D-M2-03-11).
 
 `authorize.Delivery(ctx)` marks the checks of the hub and the gateway catch-up: the snapshot is
 validated against that state instead of reading `permission_version` per check; a rebuilt snapshot

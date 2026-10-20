@@ -241,6 +241,7 @@ func runScenario(t *testing.T) *scenarioResult {
 	sc := NewScenario(ctx, r)
 	sc.content()
 	sc.behavior()
+	sc.projectBinding()
 	sc.people()
 	sc.agents()
 	sc.settings()

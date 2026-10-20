@@ -137,6 +137,11 @@ type world struct {
 	hook   *authzapp.RightsHook
 	// structure is the production structure source of chat the hook and authorize read.
 	structure authz.StructureSource
+	// chat is the chat module; the tests of M2-03 call ApplyProjectReadiness and Threads.Create
+	// on it the way M2-20 and messaging will.
+	chat *chatapp.Service
+	// uow is the unit of work of the modules.
+	uow txn.UnitOfWork
 	// azConfig and azDeps built az; newAuthorizer builds a second instance from them, the
 	// Authorizer of another process (M1-62).
 	azConfig authzapp.AuthorizerConfig
@@ -213,6 +218,7 @@ func newEmptyWorldWith(t *testing.T, search searchlang.Map) *world {
 	must(t, txn.Subscribe(reg, mods.SyncSubscribers.OnThreadMoved))
 	reg.Seal()
 	uow := pg.NewUnitOfWork(pool, pg.UnitConfig{RetryMax: 3, StatementTimeout: 30 * time.Second, LockTimeout: 20 * time.Second, IdleInTxTimeout: 60 * time.Second}, reg)
+	w.uow = uow
 	w.rec, err = auditapp.NewRecorder(auditapp.Config{
 		DenyAggregateWindow: time.Hour, DenyAggregateMaxKeys: 100, IPKeyPeriod: 30 * 24 * time.Hour,
 		IPKeyRetention: 90 * 24 * time.Hour, IPKEKRef: "file:<secrets.dir>/audit_ip_kek",
@@ -251,6 +257,7 @@ func newEmptyWorldWith(t *testing.T, search searchlang.Map) *world {
 	c, err := wire.NewChat(chatConfig, pool, uow, w.az, w.az, wire.ChatWrites{Audit: w.rec, Events: appender, Rights: w.hook,
 		Directory: w.id.Directory}, nil, w.clk)
 	must(t, err)
+	w.chat = c.Service
 	// Messaging, threads and the instance settings serve the search tests of M3-13.
 	// The template, list and page limits (M1-57, M1-60) and the write ports (M1-58) are required (INT-W22/3).
 	m, err := wire.NewMessaging(messagingapp.Config{MaxContentBytes: 4096, MaxMentions: 4, EventPayloadMaxBytes: 65536,
@@ -263,7 +270,7 @@ func newEmptyWorldWith(t *testing.T, search searchlang.Map) *world {
 		pool, uow, w.az, appender, c.Service, m.Service, w.clk)
 	must(t, err)
 	built, err := routes.Build(wire.Handlers{Access: authzhttp.New(w.admin), Agents: ag.Handlers, Spaces: c.Handlers, Channels: c.ChannelHandlers,
-		People: w.id.PeopleHandlers, Threads: c.ThreadHandlers, Messages: m.Handlers, Admin: settings.Handlers, Personal: personal.Handlers},
+		People: w.id.PeopleHandlers, Threads: c.ThreadHandlers, Behavior: c.BehaviorHandlers, Messages: m.Handlers, Admin: settings.Handlers, Personal: personal.Handlers},
 		wire.RouteOptions(), routes.SpecCatalog())
 	must(t, err)
 	var rs []httpservertest.Route

@@ -489,6 +489,14 @@ func (stubServer) GetServedChannelConfig(context.Context, rest.GetServedChannelC
 	return nil, nil
 }
 
+func (stubServer) PutProjectBinding(context.Context, rest.PutProjectBindingRequestObject) (rest.PutProjectBindingResponseObject, error) {
+	return nil, nil
+}
+
+func (stubServer) DeleteProjectBinding(context.Context, rest.DeleteProjectBindingRequestObject) (rest.DeleteProjectBindingResponseObject, error) {
+	return nil, nil
+}
+
 func (stubServer) UpdateChannel(context.Context, rest.UpdateChannelRequestObject) (rest.UpdateChannelResponseObject, error) {
 	return nil, nil
 }
@@ -1066,6 +1074,9 @@ func TestRealTable_Enabled(t *testing.T) {
 		"putChannelBehavior":     {"PUT /api/v1/channels/{channel_id}/behavior", "channel.behavior.update", "rl.admin"},
 		"listServedChannels":     {"GET /api/v1/agents/me/channels", "agent.config.read", "rl.read"},
 		"getServedChannelConfig": {"GET /api/v1/agents/me/channels/{channel_id}/config", "agent.config.read", "rl.read"},
+		// M2-03
+		"putProjectBinding":    {"PUT /api/v1/channels/{channel_id}/project-binding", "channel.project.bind", "rl.admin"},
+		"deleteProjectBinding": {"DELETE /api/v1/channels/{channel_id}/project-binding", "channel.project.bind", "rl.admin"},
 	}
 	ops := routes.Enabled()
 	if len(ops) != len(want) {
