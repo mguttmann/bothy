@@ -44,4 +44,10 @@ type PrincipalWriter interface {
 	// validated name equals the current one. Errors: not_found, validation_failed on
 	// /display_name.
 	SetDisplayName(ctx context.Context, id ids.ID, displayName string) (p PrincipalView, changed bool, err error)
+	// LockPrincipal locks the principals row of id (SELECT ... FOR UPDATE) until the end of the
+	// ambient unit of work, without changing it (M2-16): the registrations of slash commands of one
+	// agent or app serialize on it, so two registrations at command.max_per_principal cannot both
+	// pass under READ COMMITTED (03 section 1 point 11, 03 section 6.3 point 2). Errors: not_found
+	// for an unknown id; internal outside a unit of work and for a person.
+	LockPrincipal(ctx context.Context, id ids.ID) error
 }
