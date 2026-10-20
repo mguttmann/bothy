@@ -27,6 +27,10 @@ type RelayUseCases interface {
 	RelayOpenFailed(ctx context.Context, id ids.ID, detail domain.CloseDetail) error
 	RelayCounters(ctx context.Context, id ids.ID, c app.Counts) error
 	RelayUnpaired(ctx context.Context, side domain.Side)
+	// RelaySessionState and RelayOpeningTimedOut are the reads and the compare-and-swap end of
+	// M2-47 (Design notes 3 and 8).
+	RelaySessionState(ctx context.Context, id ids.ID) (string, bool, error)
+	RelayOpeningTimedOut(ctx context.Context, id ids.ID) error
 }
 
 // Compile-time check: the use cases of the module.
@@ -38,14 +42,20 @@ type RelayConfig struct {
 	// direction and session.
 	BufferMaxBytes int
 	// OpenTimeout is terminal.open_timeout: the new deadline after a pairing that ended before
-	// session.started on a host with local confirmation.
+	// session.started on a host with local confirmation, and the lone timer of a side (M2-47
+	// Design note 8).
 	OpenTimeout time.Duration
+	// Multi is cluster.mode multi (M2-47): session.started arrives only on the node of the
+	// control connection, so a node without the pairing never detaches on it, and a pairing of a
+	// session waiting for local confirmation is announced with terminal.session_paired.
+	Multi bool
 }
 
 // The log messages and keys of the relay: length, time, side, close code and session ID only
 // (SEC-TERM-1, ruling D-M2-44-5); never frame content, a token, an address or a name.
 const (
 	msgSideClosed   = "terminal relay connection closed"
+	msgSideUnpaired = "terminal relay side unpaired"
 	msgRelayFailed  = "terminal relay callback failed"
 	logSessionID    = "bothy.terminal.session_id"
 	logFrames       = "bothy.terminal.frames"
@@ -67,6 +77,10 @@ type Relay struct {
 	timers app.Timers
 	clk    clock.Clock
 	log    *slog.Logger
+
+	// send delivers terminal.session_paired to the other nodes (app.Service.SendSignal, M2-47);
+	// nil sends nothing.
+	send func(ctx context.Context, s domain.Signal) error
 
 	mu      gosync.Mutex
 	slots   map[ids.ID]*slot
@@ -118,6 +132,10 @@ type slot struct {
 	paired   bool
 	toDev    queue
 	toHost   queue
+	// pairedOnce marks a pairing since the grant on this node; pairedElsewhere a
+	// terminal.session_paired of another node since the grant; overdue a deadline that passed
+	// while an unpaired side was present (its lone timer decides, M2-47 Design note 8).
+	pairedOnce, pairedElsewhere, overdue bool
 	// in and out are the transport bytes of the pairings since the last take; lastInput the time
 	// of the last device frame; seenDev and seenHost mark the handshake message of each direction
 	// since the grant.
@@ -148,6 +166,10 @@ type side struct {
 	opened    time.Time
 	frames    int64
 	bytes     int64
+	// lone stops the lone timer of the side (M2-47 Design note 8); paired marks a side that was
+	// paired once and never counts as unpaired.
+	lone   func() bool
+	paired bool
 }
 
 // close closes the connection once with code and reason, in its own goroutine, so no caller waits
@@ -192,6 +214,7 @@ func (r *Relay) Expect(e app.Expectation) {
 	}
 	s.host, s.device, s.started, s.confirm, s.wdi = e.HostID, e.DeviceID, e.Started, e.LocalConfirm, e.WorkdirIndex
 	s.toDev, s.toHost, s.seenDev, s.seenHost, s.paired = queue{}, queue{}, false, false, false
+	s.pairedOnce, s.pairedElsewhere, s.overdue = false, false, false
 	s.gen++
 	r.arm(s, max(e.Deadline.Sub(r.clk.Now()), 0))
 	r.mu.Unlock()
@@ -204,18 +227,80 @@ func (r *Relay) arm(s *slot, d time.Duration) {
 	s.stop = r.timers.AfterFunc(d, func() { r.deadline(id, gen) })
 }
 
-// deadline is the deadline of the grant gen of the session id.
+// deadline is the deadline of the grant gen of the session id (M2-44 Design note 7, refined by
+// M2-47 Design notes 3 and 8): while an unpaired side is present its lone timer decides; a slot
+// that never saw session.started asks the database, because session.started arrives only on the
+// node of the control connection; then a session that started elsewhere is met, an expectation
+// without sides of a session waiting for local confirmation that paired elsewhere removes itself,
+// and everything else follows the table of M2-44.
 func (r *Relay) deadline(id ids.ID, gen int) {
+	ctx := context.Background()
 	r.mu.Lock()
 	s := r.slots[id]
 	if s == nil || s.gen != gen {
 		r.mu.Unlock()
 		return
 	}
-	fx := r.apply(s, domain.Decide(s.state(), domain.RelayEvent{Kind: domain.EvDeadline}))
+	if s.lonePresent() {
+		s.overdue = true
+		r.mu.Unlock()
+		return
+	}
+	started := s.started
 	r.mu.Unlock()
-	fx.run(context.Background())
+	state := domain.SessionOpening
+	if !started {
+		st, found, err := r.uc.RelaySessionState(ctx, id)
+		switch {
+		case err != nil:
+			r.call(ctx, err)
+		case found:
+			state = st
+		}
+	}
+	r.mu.Lock()
+	s = r.slots[id]
+	if s == nil || s.gen != gen {
+		r.mu.Unlock()
+		return
+	}
+	fx := r.expire(s, started || state != domain.SessionOpening, state)
+	r.mu.Unlock()
+	fx.run(ctx)
 }
+
+// expire applies the deadline of s; started says whether the session started (here or on
+// another node), state is the state read; r.mu is held.
+func (r *Relay) expire(s *slot, started bool, state string) effects {
+	if s.lonePresent() {
+		s.overdue = true
+		return nil
+	}
+	if started && !s.started {
+		// Started on another node: the deadline is met; a pairing of this node that ended before
+		// session.started leaves the session detached, as session.started without a pairing
+		// does on one node.
+		s.started = true
+		s.gen++
+		s.stopDeadline()
+		if s.pairedOnce && !s.paired && state == domain.SessionActive {
+			id := s.id
+			return effects{func(ctx context.Context) { r.call(ctx, r.uc.RelayDetach(ctx, id)) }}
+		}
+		return nil
+	}
+	if !started && s.dev == nil && s.hst == nil && s.confirm && s.pairedElsewhere {
+		// The pairing on another node met the opening deadline there; the host service bounds
+		// start and consent itself (ruling D-M2-47-3).
+		s.stopDeadline()
+		delete(r.slots, s.id)
+		return nil
+	}
+	return r.apply(s, domain.Decide(s.state(), domain.RelayEvent{Kind: domain.EvDeadline}))
+}
+
+// lonePresent reports a present side without its counterpart.
+func (s *slot) lonePresent() bool { return !s.paired && (s.dev != nil) != (s.hst != nil) }
 
 // Counters implements app.RelayControl: it takes the live counts of the session's pairings, so the
 // end path writes them once and the relay never writes them again.
@@ -285,6 +370,11 @@ func (r *Relay) applyOne(s *slot, a domain.RelayAction) func(context.Context) {
 		return func(ctx context.Context) { r.call(ctx, r.uc.RelayDetach(ctx, id)) }
 	case domain.ActEndOpenFailed:
 		detail := a.Detail
+		if detail == domain.DetailOpenTimeout {
+			// The end of an opening at its deadline is a compare-and-swap on opening: a second node
+			// that times out the same session writes nothing (M2-47 Design note 8 c).
+			return func(ctx context.Context) { r.call(ctx, r.uc.RelayOpeningTimedOut(ctx, id)) }
+		}
 		return func(ctx context.Context) { r.call(ctx, r.uc.RelayOpenFailed(ctx, id, detail)) }
 	case domain.ActMeetDeadline:
 		// A new generation: a deadline already waiting for the lock does nothing.
@@ -374,6 +464,7 @@ func (r *Relay) attachDevice(sessionID, deviceID ids.ID, ws *websocket.Conn) (*s
 	sd := r.newSide(domain.SideClient, sessionID, ws)
 	s.dev = sd
 	fx = append(fx, r.pairIfBoth(s)...)
+	r.armLone(s, sd)
 	r.mu.Unlock()
 	r.wakeSide(sd)
 	fx.run(context.Background())
@@ -409,21 +500,77 @@ func (r *Relay) attachHost(sessionID, hostID ids.ID, ws *websocket.Conn) (*side,
 	sd := r.newSide(domain.SideHost, sessionID, ws)
 	s.hst = sd
 	fx = append(fx, r.pairIfBoth(s)...)
+	r.armLone(s, sd)
 	r.mu.Unlock()
 	r.wakeSide(sd)
 	fx.run(context.Background())
 	return sd, 0
 }
 
-// pairIfBoth pairs the two sides of s when both are present; r.mu is held.
+// pairIfBoth pairs the two sides of s when both are present; r.mu is held. The lone timers of
+// both sides stop; with several nodes the pairing of a session waiting for local confirmation is
+// announced with terminal.session_paired (M2-47 Design note 3).
 func (r *Relay) pairIfBoth(s *slot) effects {
 	if s.dev == nil || s.hst == nil || s.paired {
 		return nil
 	}
-	s.paired = true
+	s.paired, s.pairedOnce, s.overdue = true, true, false
+	for _, sd := range []*side{s.dev, s.hst} {
+		sd.paired = true
+		if sd.lone != nil {
+			sd.lone()
+		}
+	}
 	r.wakeLocked(s.dev)
 	r.wakeLocked(s.hst)
-	return r.apply(s, domain.Decide(s.state(), domain.RelayEvent{Kind: domain.EvPaired}))
+	fx := r.apply(s, domain.Decide(s.state(), domain.RelayEvent{Kind: domain.EvPaired}))
+	if r.cfg.Multi && r.send != nil && !s.started && s.confirm {
+		sig := domain.Signal{Kind: domain.SignalSessionPaired, HostID: s.host, SessionID: s.id}
+		fx = append(fx, func(ctx context.Context) { r.call(ctx, r.send(ctx, sig)) })
+	}
+	return fx
+}
+
+// armLone starts the lone timer of sd when it is not paired (M2-47 Design note 8 e): from the
+// acceptance of its identify, terminal.open_timeout; a host data connection of a started session
+// waits without one (Design note 8 d). r.mu is held.
+func (r *Relay) armLone(s *slot, sd *side) {
+	if sd.paired || !domain.LoneSideOutcome(sd.kind, s.phase()).Timer {
+		return
+	}
+	sd.lone = r.timers.AfterFunc(r.cfg.OpenTimeout, func() { r.loneDeadline(sd) })
+}
+
+// phase is the state of the session as this node knows it for the rules of the lone side.
+func (s *slot) phase() string {
+	if s.started {
+		return domain.SessionDetached
+	}
+	return domain.SessionOpening
+}
+
+// loneDeadline is the lone timer of sd (M2-47 Design note 8): a side that is still current and
+// was never paired closes with 4102, counts bothy.terminal.relay.unpaired with its side and logs
+// one record; a session still in opening then ends open_failed with open_timeout through the
+// compare-and-swap. Its frames never left the node.
+func (r *Relay) loneDeadline(sd *side) {
+	r.mu.Lock()
+	s, ok := r.current(sd)
+	if !ok || sd.paired {
+		r.mu.Unlock()
+		return
+	}
+	out := domain.LoneSideOutcome(sd.kind, s.phase())
+	r.closeSide(s, sd, out.Code, "")
+	id := s.id
+	fx := effects{func(ctx context.Context) { r.uc.RelayUnpaired(ctx, out.Side) }}
+	if out.End {
+		fx = append(fx, func(ctx context.Context) { r.call(ctx, r.uc.RelayOpeningTimedOut(ctx, id)) })
+	}
+	r.mu.Unlock()
+	r.log.LogAttrs(context.Background(), slog.LevelWarn, msgSideUnpaired, slog.String(attr.TerminalSide, string(out.Side)),
+		slog.Int(attr.CloseCode, out.Code))
+	fx.run(context.Background())
 }
 
 // wakeSide and wakeLocked signal the writer of sd.
@@ -567,10 +714,28 @@ func (r *Relay) closed(sd *side, code int, reason string) {
 		if sd.close(code, reason) {
 			r.logClose(sd, code)
 		}
+		if sd.lone != nil {
+			sd.lone()
+		}
+		fx = append(fx, r.afterOverdue(s)...)
 	}
 	r.release(sd)
 	r.mu.Unlock()
 	fx.run(context.Background())
+}
+
+// afterOverdue applies a deadline that passed while a lone side was present, once the slot has
+// no side left (M2-47 Design note 8); r.mu is held.
+func (r *Relay) afterOverdue(s *slot) effects {
+	if !s.overdue || s.dev != nil || s.hst != nil || r.slots[s.id] != s {
+		return nil
+	}
+	s.overdue = false
+	if s.started {
+		return nil
+	}
+	id := s.id
+	return effects{func(ctx context.Context) { r.call(ctx, r.uc.RelayOpeningTimedOut(ctx, id)) }}
 }
 
 // protocolError closes sd for a text frame after identify or a message above the Noise limit
@@ -602,6 +767,14 @@ func (r *Relay) Started(sessionID ids.ID) {
 	r.mu.Lock()
 	s := r.slots[sessionID]
 	if s == nil {
+		r.mu.Unlock()
+		return
+	}
+	if r.cfg.Multi && !s.paired && !s.pairedOnce {
+		// The pairing may live on another node (M2-47): the deadline is met, nothing detaches here.
+		s.started = true
+		s.gen++
+		s.stopDeadline()
 		r.mu.Unlock()
 		return
 	}
@@ -699,4 +872,38 @@ func (r *Relay) Shutdown(ctx context.Context) error {
 	case <-ctx.Done():
 		return ctx.Err()
 	}
+}
+
+// BindSender sets how the relay announces terminal.session_paired to the other nodes
+// (app.Service.SendSignal, M2-47); internal/wire binds it with cluster.mode multi.
+func (r *Relay) BindSender(send func(ctx context.Context, s domain.Signal) error) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	r.send = send
+}
+
+// MarkPairedElsewhere records terminal.session_paired of another node for the slot of the session
+// (M2-47 Design note 3): an expectation without sides then only removes itself at its deadline.
+func (r *Relay) MarkPairedElsewhere(sessionID ids.ID) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	if s := r.slots[sessionID]; s != nil {
+		s.pairedElsewhere = true
+	}
+}
+
+// hostsWithSides returns the hosts of the slots of this node that hold a side (the reconciliation
+// of M2-47 Design note 9).
+func (r *Relay) hostsWithSides() []ids.ID {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	seen := map[ids.ID]bool{}
+	var out []ids.ID
+	for _, s := range r.slots {
+		if (s.dev != nil || s.hst != nil) && !seen[s.host] {
+			seen[s.host] = true
+			out = append(out, s.host)
+		}
+	}
+	return out
 }

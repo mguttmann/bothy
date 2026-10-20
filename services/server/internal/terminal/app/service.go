@@ -54,6 +54,9 @@ type Config struct {
 	// OpenTimeout is terminal.open_timeout: the deadline of an opening and HostSessionOpen.expires_at
 	// (M2-44).
 	OpenTimeout time.Duration `config:"terminal.open_timeout"`
+	// StatementTimeout is database.statement_timeout: the bound of every read of a signal handler
+	// (M2-47); zero means no bound of its own.
+	StatementTimeout time.Duration `config:"database.statement_timeout"`
 }
 
 // Deps are the collaborators of the host use cases.
@@ -109,6 +112,10 @@ type Service struct {
 	signer atomic.Pointer[signerHolder]
 	// metrics records the instruments of the relay (BindMetrics); NoMetrics until bound.
 	metrics atomic.Pointer[metricsHolder]
+	// signals carry the effects after a commit to every node (BindSignals, M2-47).
+	signals atomic.Pointer[signalsHolder]
+	// notes keep the working directory index of a grant for the handler of this node (M2-47).
+	notes grantNotes
 }
 
 // relayHolder, signerHolder and metricsHolder carry the bound ports through the atomic pointers.
@@ -235,7 +242,13 @@ func New(cfg Config, d Deps) (*Service, error) {
 	if d.Clock == nil {
 		d.Clock = clock.System()
 	}
-	return &Service{cfg: cfg, d: d}, nil
+	s := &Service{cfg: cfg, d: d}
+	// One node until internal/wire binds the signals of cluster.mode: the use cases themselves
+	// handle what they commit (M2-47 Design note 4).
+	local := NewLocalSignals()
+	local.Bind(s)
+	s.signals.Store(&signalsHolder{s: local})
+	return s, nil
 }
 
 // Values of the audit entries and of host.updated (05 sections 4.14 and 6, 24 section 10).

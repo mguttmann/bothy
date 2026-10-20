@@ -25,6 +25,8 @@ import (
 type fakeRelayUC struct {
 	mu    gosync.Mutex
 	calls []string
+	// state is the session state RelaySessionState answers ("" means opening).
+	state string
 }
 
 func (f *fakeRelayUC) add(s string) {
@@ -44,6 +46,18 @@ func (f *fakeRelayUC) RelayCounters(_ context.Context, _ ids.ID, c app.Counts) e
 	return nil
 }
 func (f *fakeRelayUC) RelayUnpaired(_ context.Context, s domain.Side) { f.add("unpaired:" + string(s)) }
+func (f *fakeRelayUC) RelaySessionState(context.Context, ids.ID) (string, bool, error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	if f.state == "" {
+		return domain.SessionOpening, true, nil
+	}
+	return f.state, true, nil
+}
+func (f *fakeRelayUC) RelayOpeningTimedOut(context.Context, ids.ID) error {
+	f.add("open_failed:" + string(domain.DetailOpenTimeout))
+	return nil
+}
 
 // manualTimers never fires on its own.
 type manualTimers struct{}
