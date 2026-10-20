@@ -56,6 +56,12 @@ const (
 	counterAuditSeq = "audit_seq"
 )
 
+// The keys of the log lines of the restore test: check names and results with reason codes only.
+const (
+	attrCheck  = "check"
+	attrChecks = "checks"
+)
+
 // uncomparedTable is the table whose count is never compared with the manifest: bothy-backupd
 // writes it itself, also while a backup runs (other kinds, the next run), so the copy and the
 // manifest differ by design.
@@ -148,9 +154,11 @@ func (s *Service) restoreFinished(ctx context.Context, id ids.ID, checks domain.
 	}
 	attrs := []slog.Attr{slog.String(attrKind, string(domain.KindRestoreTest)), slog.String(attrID, id.String()),
 		slog.String(attrState, state), slog.String(attrCode, code), slog.Bool(attrRecorded, recorded)}
+	results := make([]string, 0, len(checks.Checks))
 	for _, r := range checks.Checks {
-		attrs = append(attrs, slog.String("check_"+string(r.Name), string(r.Result)+reasonSuffix(r.Reason)))
+		results = append(results, string(r.Name)+"="+string(r.Result)+reasonSuffix(r.Reason))
 	}
+	attrs = append(attrs, slog.String(attrChecks, strings.Join(results, ",")))
 	s.log.LogAttrs(ctx, level, "restore test finished", attrs...)
 	if s.deps.Metrics == nil {
 		return
@@ -213,7 +221,7 @@ func (t *restoreRun) record(name domain.CheckName, check func() domain.CheckResu
 	res := func() (res domain.CheckResult) {
 		defer func() {
 			if p := recover(); p != nil {
-				t.s.log.LogAttrs(context.WithoutCancel(t.ctx), slog.LevelError, "restore test check panicked", slog.String("check", string(name)))
+				t.s.log.LogAttrs(context.WithoutCancel(t.ctx), slog.LevelError, "restore test check panicked", slog.String(attrCheck, string(name)))
 				res = failed(reasonPanicked)
 			}
 		}()
@@ -336,24 +344,34 @@ func (t *restoreRun) checkManifest(db ScratchDB, m domain.Manifest) domain.Check
 	case f.AuditLastSeq == m.Audit.LastSeq && fmt.Sprintf("%x", f.AuditLastHash) != m.Audit.LastHash:
 		return failed(reasonAuditHead)
 	}
-	for table := range m.RowCounts {
-		if _, ok := f.RowCounts[table]; !ok {
-			return failed(reasonTableMissing)
-		}
-	}
-	for table := range f.RowCounts {
-		if _, ok := m.RowCounts[table]; !ok {
-			return failed(reasonTableUnexpected)
-		}
-	}
-	if f.HeadSeq == m.EventLog.HeadSeq && f.AuditLastSeq == m.Audit.LastSeq {
-		for _, table := range slices.Sorted(maps.Keys(m.RowCounts)) {
-			if table != uncomparedTable && f.RowCounts[table] != m.RowCounts[table] {
-				return failed(reasonRowCounts)
-			}
-		}
+	if reason := compareTables(f.RowCounts, m.RowCounts, f.HeadSeq == m.EventLog.HeadSeq && f.AuditLastSeq == m.Audit.LastSeq); reason != "" {
+		return failed(reason)
 	}
 	return passed(items)
+}
+
+// compareTables returns the reason when the tables of the copy and of the manifest differ, or,
+// with counts, when a row count other than that of backup_runs differs; "" when they agree.
+func compareTables(copyCounts, manifestCounts map[string]int64, counts bool) string {
+	for table := range manifestCounts {
+		if _, ok := copyCounts[table]; !ok {
+			return reasonTableMissing
+		}
+	}
+	for table := range copyCounts {
+		if _, ok := manifestCounts[table]; !ok {
+			return reasonTableUnexpected
+		}
+	}
+	if !counts {
+		return ""
+	}
+	for _, table := range slices.Sorted(maps.Keys(manifestCounts)) {
+		if table != uncomparedTable && copyCounts[table] != manifestCounts[table] {
+			return reasonRowCounts
+		}
+	}
+	return ""
 }
 
 // checkEventLog is check 3: every partition of event_log without gaps, count(*) = max(seq) -

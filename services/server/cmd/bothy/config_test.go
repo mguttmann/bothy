@@ -267,6 +267,9 @@ func TestConfigPrintShowsSourcePerKey(t *testing.T) {
 		"backup.pg.full_schedule = 0 2 * * 0  # default\n" +
 		"backup.pg.local_retention_full = 1  # default\n" +
 		"backup.pg.retention_full = 4  # default\n" +
+		"backup.restore_test.sample_files = 200  # default\n" +
+		"backup.restore_test.sample_threads = 200  # default\n" +
+		"backup.restore_test.schedule = 0 5 * * 6  # default\n" +
 		"billing.mismatch_alert_after = 5m  # default\n" +
 		"branding.product_name_max_chars = 64  # default\n" +
 		"channel.history_backfill_limit_default = 20  # default\n" +
@@ -303,6 +306,7 @@ func TestConfigPrintShowsSourcePerKey(t *testing.T) {
 		"database.statement_timeout = 5s  # default\n" +
 		"database.tx_retry_max = 2  # default\n" +
 		"database.user = bothy_app  # default\n" +
+		"dr.rto_target = 4h  # default\n" +
 		"egress.allowed_hosts =   # default\n" +
 		"egress.max_response_bytes = 1048576  # default\n" +
 		"egress.timeout = 15s  # default\n" +

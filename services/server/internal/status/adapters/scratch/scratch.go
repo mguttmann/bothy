@@ -193,8 +193,9 @@ func (s *Scratch) Start(ctx context.Context) (app.ScratchDB, error) {
 	if bin, err = filepath.Abs(bin); err != nil {
 		return nil, execError(codeStartFailed)
 	}
+	// The server outlives this call: Clear stops it, so its context is never canceled here.
 	// #nosec G204 -- the configured server binary with a fixed argument list, no shell
-	cmd := exec.Command(bin, serverArgs(filepath.Join(s.cfg.Dir, dirPGData), socket, hba)...)
+	cmd := exec.CommandContext(context.WithoutCancel(ctx), bin, serverArgs(filepath.Join(s.cfg.Dir, dirPGData), socket, hba)...)
 	cmd.Env = []string{"PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin", "LANG=C.UTF-8", "HOME=/tmp"}
 	cmd.Stdout, cmd.Stderr = s.cfg.Stderr, s.cfg.Stderr
 	if err := cmd.Start(); err != nil {

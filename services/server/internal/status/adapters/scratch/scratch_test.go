@@ -179,8 +179,9 @@ func TestScratchFailures(t *testing.T) {
 	if st, err := os.Stat(filepath.Join(dir, "socket")); err != nil || st.Mode().Perm() != 0o700 {
 		t.Errorf("socket directory %v, %v; want mode 0700", st, err)
 	}
-	if b, err := os.ReadFile(filepath.Join(dir, "pg_hba.conf")); err != nil || !strings.HasPrefix(string(b), "local all all trust") {
-		t.Errorf("pg_hba.conf %q, %v", b, err)
+	hba, err := os.ReadFile(filepath.Join(dir, "pg_hba.conf")) //nolint:gosec // G304: a file of the test's own directory
+	if err != nil || !strings.HasPrefix(string(hba), "local all all trust") {
+		t.Errorf("pg_hba.conf %q, %v", hba, err)
 	}
 	if err := starts.Clear(ctx); err != nil {
 		t.Fatal(err)

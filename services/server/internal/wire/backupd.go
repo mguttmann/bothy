@@ -25,8 +25,8 @@ import (
 	"github.com/OWNER/bothy/services/server/internal/status/adapters/executor"
 	"github.com/OWNER/bothy/services/server/internal/status/adapters/otelmetrics"
 	statuspg "github.com/OWNER/bothy/services/server/internal/status/adapters/postgres"
-	"github.com/OWNER/bothy/services/server/internal/status/adapters/scratch"
 	"github.com/OWNER/bothy/services/server/internal/status/adapters/s3mirror"
+	"github.com/OWNER/bothy/services/server/internal/status/adapters/scratch"
 	statusapp "github.com/OWNER/bothy/services/server/internal/status/app"
 	statusdomain "github.com/OWNER/bothy/services/server/internal/status/domain"
 )

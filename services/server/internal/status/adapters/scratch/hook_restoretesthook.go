@@ -47,7 +47,7 @@ func afterStart(ctx context.Context, _ string, pool *pg.Pool) error {
 		}
 		probe = append(probe, b...)
 	}
-	if err := os.WriteFile(probeFile, probe, 0o600); err != nil {
+	if err := os.WriteFile(probeFile, probe, 0o600); err != nil { // #nosec G703 -- a fixed path of the test build
 		return err
 	}
 	switch hook() {

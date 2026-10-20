@@ -195,6 +195,8 @@ func TestRunWritesRowAndManifest(t *testing.T) {
 					t.Errorf("restic %+v, want the files root with tag objects", e.exec.restic[0])
 				}
 				assertForgets(t, e.exec.forgets, "objects", 90*day)
+			case domain.KindRestoreTest:
+				t.Fatal("the restore test is no backup kind of this table")
 			}
 
 			if len(e.m.finished) != 1 {
