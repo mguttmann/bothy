@@ -506,6 +506,9 @@ type ServerInterface interface {
 	// CreateMessage Send a message
 	// (POST /threads/{thread_id}/messages)
 	CreateMessage(w http.ResponseWriter, r *http.Request, threadId ThreadIdPath)
+	// MoveThread Move a thread to another channel
+	// (POST /threads/{thread_id}/move)
+	MoveThread(w http.ResponseWriter, r *http.Request, threadId ThreadIdPath, params MoveThreadParams)
 	// ListPins List pinned messages
 	// (GET /threads/{thread_id}/pins)
 	ListPins(w http.ResponseWriter, r *http.Request, threadId ThreadIdPath)
@@ -6770,6 +6773,56 @@ func (siw *ServerInterfaceWrapper) CreateMessage(w http.ResponseWriter, r *http.
 	handler.ServeHTTP(w, r)
 }
 
+// MoveThread operation middleware
+func (siw *ServerInterfaceWrapper) MoveThread(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "thread_id" -------------
+	var threadId ThreadIdPath
+
+	err = runtime.BindStyledParameterWithOptions("simple", "thread_id", r.PathValue("thread_id"), &threadId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "uuid", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "thread_id", Err: err})
+		return
+	}
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params MoveThreadParams
+
+	headers := r.Header
+
+	// ------------- Optional header parameter "Idempotency-Key" -------------
+	if valueList, found := headers[http.CanonicalHeaderKey("Idempotency-Key")]; found {
+		var IdempotencyKey IdempotencyKey
+		n := len(valueList)
+		if n != 1 {
+			siw.ErrorHandlerFunc(w, r, &TooManyValuesForParamError{ParamName: "Idempotency-Key", Count: n})
+			return
+		}
+
+		err = runtime.BindStyledParameterWithOptions("simple", "Idempotency-Key", valueList[0], &IdempotencyKey, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: "uuid"})
+		if err != nil {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "Idempotency-Key", Err: err})
+			return
+		}
+
+		params.IdempotencyKey = &IdempotencyKey
+
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.MoveThread(w, r, threadId, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
 // ListPins operation middleware
 func (siw *ServerInterfaceWrapper) ListPins(w http.ResponseWriter, r *http.Request) {
 
@@ -8078,6 +8131,7 @@ func HandlerWithOptions(si ServerInterface, options StdHTTPServerOptions) http.H
 	m.HandleFunc(http.MethodPut+" "+options.BaseURL+"/threads/{thread_id}/title", wrapper.SetThreadTitle)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/threads/{thread_id}/close", wrapper.CloseThread)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/threads/{thread_id}/reopen", wrapper.ReopenThread)
+	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/threads/{thread_id}/move", wrapper.MoveThread)
 	m.HandleFunc(http.MethodPut+" "+options.BaseURL+"/threads/{thread_id}/tags", wrapper.SetThreadTags)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/threads/{thread_id}/pins", wrapper.ListPins)
 	m.HandleFunc(http.MethodPut+" "+options.BaseURL+"/threads/{thread_id}/read-state", wrapper.PutReadState)
@@ -8783,6 +8837,9 @@ type StrictServerInterface interface {
 	// CreateMessage Send a message
 	// (POST /threads/{thread_id}/messages)
 	CreateMessage(ctx context.Context, request CreateMessageRequestObject) (CreateMessageResponseObject, error)
+	// MoveThread Move a thread to another channel
+	// (POST /threads/{thread_id}/move)
+	MoveThread(ctx context.Context, request MoveThreadRequestObject) (MoveThreadResponseObject, error)
 	// ListPins List pinned messages
 	// (GET /threads/{thread_id}/pins)
 	ListPins(ctx context.Context, request ListPinsRequestObject) (ListPinsResponseObject, error)
@@ -13713,6 +13770,40 @@ func (sh *strictHandler) CreateMessage(w http.ResponseWriter, r *http.Request, t
 		sh.options.ResponseErrorHandlerFunc(w, r, err)
 	} else if validResponse, ok := response.(CreateMessageResponseObject); ok {
 		if err := validResponse.VisitCreateMessageResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// MoveThread operation middleware
+func (sh *strictHandler) MoveThread(w http.ResponseWriter, r *http.Request, threadId ThreadIdPath, params MoveThreadParams) {
+	var request MoveThreadRequestObject
+
+	request.ThreadId = threadId
+	request.Params = params
+
+	var body MoveThreadJSONRequestBody
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
+		return
+	}
+	request.Body = &body
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.MoveThread(ctx, request.(MoveThreadRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "MoveThread")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(MoveThreadResponseObject); ok {
+		if err := validResponse.VisitMoveThreadResponse(w); err != nil {
 			sh.options.ResponseErrorHandlerFunc(w, r, err)
 		}
 	} else if response != nil {

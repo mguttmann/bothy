@@ -11,7 +11,7 @@ import (
 )
 
 // TestRegister_Events: chat declares the durable events of spaces and the sidebar (M1-52), of
-// channels and the main thread (M1-53) and of threads (M1-55).
+// channels and the main thread (M1-53), of threads (M1-55) and of moving threads (M1-62).
 func TestRegister_Events(t *testing.T) {
 	t.Parallel()
 	r := authorize.NewRegistry()
@@ -25,7 +25,7 @@ func TestRegister_Events(t *testing.T) {
 	}
 	slices.Sort(got)
 	want := []string{"channel.archived", "channel.created", "channel.updated", "sidebar.updated", "space.archived", "space.created", "space.updated", "thread.closed", "thread.created",
-		"thread.reopened", "thread.updated"}
+		"thread.moved", "thread.moved_out", "thread.reopened", "thread.updated"}
 	if !slices.Equal(got, want) {
 		t.Fatalf("events %v, want %v", got, want)
 	}

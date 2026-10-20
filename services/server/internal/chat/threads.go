@@ -138,6 +138,29 @@ type SetTagsCmd struct {
 	IfMatch Precondition
 }
 
+// MoveThread is the input of Threads.Move (moveThread, schema ThreadMove).
+type MoveThread struct {
+	// ThreadID is the thread to move; TargetChannelID the channel it moves into.
+	ThreadID, TargetChannelID ids.ID
+	// Reason is the required reason of the audit entry.
+	Reason string
+}
+
+// ThreadMoved is the in-transaction event of thread.move (M1-62, 02 section 4.3): published inside
+// the unit of work that moves the thread, after the thread row changed and before the durable
+// events. messaging changes messages.channel_id and sync read_states.channel_id and
+// drafts.channel_id of the thread in the same transaction (03 threads "A move changes
+// channel_id"); M3-07 adds message_attachments.channel_id. The subscribers write copies only:
+// no version change and no events.
+type ThreadMoved struct {
+	// ThreadID is the moved thread.
+	ThreadID ids.ID
+	// FromChannelID and FromSpaceID are the source; ToChannelID and ToSpaceID the target.
+	FromChannelID, FromSpaceID, ToChannelID, ToSpaceID ids.ID
+	// ThreadVersion is threads.version after the move.
+	ThreadVersion int64
+}
+
 // Threads is the incoming port of the threads of chat (M1-55): a fixed ID, the gapless thread
 // sequence, title with its source, done and reopen, forum posts with tags. The caller a is the
 // principal of the request. Errors are kernel/errs errors; a missing and an invisible thread give
@@ -217,6 +240,19 @@ type Threads interface {
 	Close(ctx context.Context, a actor.Actor, threadID ids.ID) (Thread, error)
 	// Reopen opens a closed thread (thread.reopen); an open thread answers without change.
 	Reopen(ctx context.Context, a actor.Actor, threadID ids.ID) (Thread, error)
+	// Move moves a thread of kind thread into another channel (thread.move, M1-62) in one unit of
+	// work: manage on source and target (an invisible or unknown target is the same 404 as an
+	// unknown thread), the domain rule domain.CanMove under the locks of the brief (thread FOR
+	// UPDATE, target channel and, when it inherits, its space FOR SHARE), then channel_id,
+	// moved_at and version + 1, the tags removed, ThreadMoved published, thread.moved_out and
+	// thread.moved appended in this order and the audit entry written. The thread id never
+	// changes. Errors: not_found, forbidden, conflict (main thread, archived target, dm channel),
+	// validation_failed on /target_channel_id (same channel) or /reason, operator_mismatch.
+	//
+	// Example:
+	//
+	//	th, err := threads.Move(ctx, a, chat.MoveThread{ThreadID: id, TargetChannelID: escalation, Reason: "Escalated"})
+	Move(ctx context.Context, a actor.Actor, cmd MoveThread) (Thread, error)
 	// SetTags replaces the tags of a forum post (thread.tags.set; restricted tags need manage).
 	// Errors: validation_failed on /tag_ids, version_conflict for a stale If-Match, forbidden.
 	SetTags(ctx context.Context, a actor.Actor, cmd SetTagsCmd) (Thread, error)
