@@ -418,7 +418,7 @@ func (s *Service) Create(ctx context.Context, a actor.Actor, cmd chat.CreateThre
 }
 
 // searchLanguage returns the text search configuration of a thread that a creates
-// (docs/spec/14-suche.md 3.1, docs/DECISIONS.md D-M3-13-1 and D-M3-13-2): the language of the
+// (docs/spec/14-search.md 3.1, docs/DECISIONS.md D-M3-13-1 and D-M3-13-2): the language of the
 // person through identity, or the instance language for an agent or an app, without reading the
 // principal. It reads inside the caller's unit of work; the value is set once at creation.
 func (s *Service) searchLanguage(ctx context.Context, a actor.Actor) (string, error) {

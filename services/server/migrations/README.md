@@ -53,9 +53,9 @@ for every step (rule M6). A generated column states `STORED` (`make migrations-l
 
 `00034_search_vectors.sql` adds `search_language regconfig NOT NULL DEFAULT 'simple'` and the
 `STORED` generated vectors `messages.search_vector` and `threads.title_search` with the
-expressions of [03-datenmodell.md](../../../docs/spec/03-datenmodell.md) section 5, and the
+expressions of [03-data-model.md](../../../docs/spec/03-data-model.md) section 5, and the
 platform function `search_tsquery(langs regconfig[], q text) RETURNS tsquery` of
-[14-suche.md](../../../docs/spec/14-suche.md) 4.2 (owner `bothy_owner`, `EXECUTE` only for
+[14-search.md](../../../docs/spec/14-search.md) 4.2 (owner `bothy_owner`, `EXECUTE` only for
 `bothy_app`). `00035_search_vector_indexes.sql` builds the two GIN indexes `CONCURRENTLY` outside a
 transaction and first drops an invalid leftover of an interrupted build.
 

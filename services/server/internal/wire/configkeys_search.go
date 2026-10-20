@@ -7,14 +7,14 @@ import (
 	"github.com/OWNER/bothy/services/server/internal/platform/config"
 )
 
-// The keys of the language configuration of full-text search (docs/spec/14-suche.md 3.1).
+// The keys of the language configuration of full-text search (docs/spec/14-search.md 3.1).
 const (
 	keySearchLanguages = "search.languages"
 	keySearchLocaleMap = "search.locale_map"
 )
 
-// searchConfigKeys returns the keys of the search from docs/spec/14-suche.md "Konfigurationswerte
-// dieses Kapitels" that the server reads so far: the language configuration of the search
+// searchConfigKeys returns the keys of the search from docs/spec/14-search.md "Configuration values
+// of this chapter" that the server reads so far: the language configuration of the search
 // vectors and of the query function (M3-13). The search coordinator (M3-14) adds the keys of the
 // query side.
 func searchConfigKeys() []config.Key {

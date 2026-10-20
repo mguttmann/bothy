@@ -204,7 +204,7 @@ type IdentityWrites struct {
 }
 
 // NewSearchDirectory returns the principal directory of identity over pool that answers the text
-// search language of new messages and threads (docs/spec/14-suche.md 3.1, M3-13) with langs and
+// search language of new messages and threads (docs/spec/14-search.md 3.1, M3-13) with langs and
 // locale.default from settings. NewIdentity builds its Directory with it; worlds that build chat
 // and messaging without the identity module pass one to NewChat and NewMessaging.
 func NewSearchDirectory(pool *pg.Pool, langs searchlang.Map, settings instance.Settings) *app.Directory {

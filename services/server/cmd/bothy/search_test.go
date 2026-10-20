@@ -7,7 +7,6 @@ import (
 	"context"
 	"strings"
 	"testing"
-	"time"
 )
 
 // TestServeAbortsOnUnknownTextSearchConfig holds the start check of the text search (M3-13,
@@ -18,7 +17,7 @@ func TestServeAbortsOnUnknownTextSearchConfig(t *testing.T) {
 	t.Parallel()
 	db := newServeDB(t)
 	c := startChild(t, serveTestEnv(t, db, `BOTHY_SEARCH__LANGUAGES=["german","english","klingonisch"]`), "serve")
-	if code := c.wait(t, 60*time.Second); code != 1 {
+	if code := c.wait(t); code != 1 {
 		t.Fatalf("exit %d; stderr:\n%s", code, c.stderr)
 	}
 	out := c.stdout.String() + c.stderr.String()

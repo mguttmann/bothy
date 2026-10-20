@@ -222,7 +222,7 @@ func New(t *testing.T, subscribe Subscribe, opts ...Option) *World {
 }
 
 // SearchLanguages returns the language configuration of the chapter defaults (search.languages
-// german and english, search.locale_map de and en; docs/spec/14-suche.md section 15).
+// german and english, search.locale_map de and en; docs/spec/14-search.md section 15).
 func SearchLanguages(t testing.TB) searchlang.Map {
 	t.Helper()
 	m, err := searchlang.New([]string{"german", "english"}, map[string]string{"de": "german", "en": "english"})

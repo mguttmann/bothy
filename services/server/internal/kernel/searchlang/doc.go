@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 // Package searchlang holds the validated language configuration of full-text search
-// (docs/spec/14-suche.md 3.1 "Sprache je Objekt"): the configuration keys search.languages, the
+// (docs/spec/14-search.md 3.1 "Language per object"): the configuration keys search.languages, the
 // text search configurations every query is built with, and search.locale_map, which maps the
 // first language subtag of a BCP 47 locale to the configuration a new message or thread is
 // indexed with. It is part of the kernel itself (standard library only): identity uses it to

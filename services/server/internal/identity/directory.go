@@ -91,7 +91,7 @@ type Directory interface {
 	// ActiveOwners returns the owners with revoked_at IS NULL, ordered by granted_at, then id.
 	ActiveOwners(ctx context.Context) ([]OwnerView, error)
 	// SearchLanguage returns the text search configuration of a new message or thread by the
-	// principal id (docs/spec/14-suche.md 3.1): for a person search.locale_map of the first
+	// principal id (docs/spec/14-search.md 3.1): for a person search.locale_map of the first
 	// language subtag of users.locale, for an agent or an app the same of locale.default, simple
 	// when the map has no entry. Errors: kind not_found for an unknown id; internal when the
 	// directory has no language configuration.

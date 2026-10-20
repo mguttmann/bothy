@@ -21,13 +21,15 @@ const (
 WHERE NOT EXISTS (SELECT 1 FROM pg_catalog.pg_ts_config c
                   WHERE c.cfgname = n.name AND pg_catalog.pg_ts_config_is_visible(c.oid))
 ORDER BY n.i LIMIT 1`
+	// language-check: off
 	caseFoldingQuery = "SELECT pg_catalog.to_tsvector('simple', 'Ä') = pg_catalog.to_tsvector('simple', 'ä')"
+	// language-check: on
 )
 
 // TextSearchConfigMissingError reports a configuration name that the database behind the pool
 // does not have as a text search configuration on its search path: every message insert and every
 // search with it would fail with a SQL error. It names the position, never the name, because the
-// name is a configured value (02 "Konfigurationsladen" item 4).
+// name is a configured value (02 "Configuration loading" item 4).
 type TextSearchConfigMissingError struct {
 	// Position is the 1-based position of the first missing name in the list CheckTextSearch got.
 	Position int
@@ -40,13 +42,13 @@ func (e *TextSearchConfigMissingError) Error() string {
 }
 
 // ErrTextSearchCaseFolding reports a database whose character classification does not fold the
-// case of non-ASCII letters in text search (for example LC_CTYPE C): a search for "ärger" would
-// never find "Ärger". The database needs a UTF-8 capable classification such as en_US.utf8
-// (docs/spec/16-betrieb.md 7.2).
+// case of non-ASCII letters in text search (for example LC_CTYPE C): a search for a word in lower
+// case would never find it with a capital umlaut. The database needs a UTF-8 capable classification such as en_US.utf8
+// (docs/spec/16-operations.md 7.2).
 var ErrTextSearchCaseFolding = errors.New("pg: the database does not fold the case of non-ASCII letters in text search; " +
 	"its character classification (LC_CTYPE) must be UTF-8 capable, for example en_US.utf8")
 
-// CheckTextSearch is the start check of the full-text search (docs/spec/02-architektur.md "Start"
+// CheckTextSearch is the start check of the full-text search (docs/spec/02-architecture.md "Start"
 // step 4, docs/DECISIONS.md D-M3-13-6): every name in configs must be a text search
 // configuration visible on the search path of the role of p, and the database must fold the case
 // of non-ASCII letters. It runs two short queries on one connection and changes nothing.

@@ -10,7 +10,7 @@ import (
 	"github.com/OWNER/bothy/services/server/internal/kernel/searchlang"
 )
 
-// chapterLanguages and chapterLocales are the defaults of docs/spec/14-suche.md section 15.
+// chapterLanguages and chapterLocales are the defaults of docs/spec/14-search.md section 15.
 var (
 	chapterLanguages = []string{"german", "english"}
 	chapterLocales   = map[string]string{"de": "german", "en": "english"}

@@ -157,7 +157,7 @@ func newWorld(t *testing.T) *world {
 }
 
 // newEmptyWorld builds the modules and the harness with only the owner and the language
-// configuration of the chapter defaults (docs/spec/14-suche.md section 15).
+// configuration of the chapter defaults (docs/spec/14-search.md section 15).
 func newEmptyWorld(t *testing.T) *world {
 	t.Helper()
 	return newEmptyWorldWith(t, chapterSearch(t))

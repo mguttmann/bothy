@@ -15,10 +15,14 @@ import (
 
 // The texts of the search tests with their non-ASCII letters written out: U+00C4 capital A with
 // diaeresis, U+00E4 small a with diaeresis, U+00FC small u with diaeresis.
+// language-check: off
+
 const (
 	verfuegbar = "verfügbar"
 	aerger     = "Ärger mit dem Abruf"
 )
+
+// language-check: on
 
 // searchWorld is the world of the M3-13 tests (brief "Integration with the real modules"): the
 // space Support with the text channel Allgemein and the forum channel Fragen; Alex (owner) and
@@ -151,7 +155,9 @@ func TestLanguageExamplesFromChapter14(t *testing.T) {
 		{q: `"err_conn_reset"`, want: []ids.ID{kennung}, limitation: "identifier as a phrase"},
 		{q: "Rechnung", want: []ids.ID{rechnung, offen}, not: []ids.ID{adresse}, limitation: "no compound splitting (14 3.3)"},
 		{q: verfuegbar, want: []ids.ID{verfuegbarMsg}, limitation: "umlaut"},
+		// language-check: off
 		{q: "ärger", want: []ids.ID{aergerMsg}, limitation: "case folding of non-ASCII letters"},
+		// language-check: on
 		{q: "offen -Rechnungen", want: []ids.ID{offen}, limitation: "negation per sub-query is best effort (14 4.2)"},
 	} {
 		got := w.find(c.q)
@@ -185,9 +191,11 @@ func TestSearchVectorWeights(t *testing.T) {
 	}; !equalWeights(got, want) {
 		t.Errorf("%s: %v, want %v", verfuegbar, got, want)
 	}
+	// language-check: off
 	th, _ := w.forumPost("alex", w.fragen, "Ärger mit Rechnungen", "Siehe Anhang")
 	if got, want := w.weights("threads", "title_search", th), map[string][]string{
 		"arg": {"A"}, "mit": {"A"}, "rechnung": {"A"}, "rechnungen": {"A"}, "ärger": {"A"},
+		// language-check: on
 	}; !equalWeights(got, want) {
 		t.Errorf("thread title: %v, want %v", got, want)
 	}

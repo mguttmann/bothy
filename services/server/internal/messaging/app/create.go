@@ -235,7 +235,7 @@ func (s *Service) send(ctx context.Context, a actor.Actor, p prepared, info chat
 	return messaging.Created{Message: m}, s.emitCreated(ctx, info, m, true)
 }
 
-// searchLanguage returns the text search configuration of a message by a (docs/spec/14-suche.md
+// searchLanguage returns the text search configuration of a message by a (docs/spec/14-search.md
 // 3.1, docs/DECISIONS.md D-M3-13-1): origin human takes the language of the person, origin agent
 // and app the instance language without reading the principal. It reads inside the unit of work
 // of the insert; the value is set once and no later write changes it.

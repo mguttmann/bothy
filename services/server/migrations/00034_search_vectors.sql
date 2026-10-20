@@ -1,6 +1,6 @@
 -- SPDX-License-Identifier: Apache-2.0
 -- Search vectors (M3-13): the language and the full-text vector of messages and threads as
--- docs/spec/03-datenmodell.md section 5 and docs/spec/14-suche.md 3.2 state them, and the platform
+-- docs/spec/03-data-model.md section 5 and docs/spec/14-search.md 3.2 state them, and the platform
 -- function search_tsquery of 14 4.2 that builds the query over every language of
 -- search.languages plus simple (R-SU-01 to R-SU-03, ADR 0032). The GIN indexes follow in 00035,
 -- concurrently and outside a transaction.

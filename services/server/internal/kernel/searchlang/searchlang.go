@@ -10,7 +10,7 @@ import (
 )
 
 // Simple is the configuration that keeps words unchanged; every vector and every query has it
-// (docs/spec/14-suche.md 3.2 and 4.2).
+// (docs/spec/14-search.md 3.2 and 4.2).
 const Simple = "simple"
 
 // The configuration keys the errors of New name.
@@ -23,7 +23,7 @@ const (
 // longer name would be cut and could then name another configuration.
 const maxIdentifierBytes = 63
 
-// Map is the validated language configuration of 14 3.1 "Sprache je Objekt". The zero value maps
+// Map is the validated language configuration of 14 3.1 "Language per object". The zero value maps
 // every locale to Simple and has no languages. A Map never changes after New, so it is safe for
 // concurrent use.
 type Map struct {
@@ -42,7 +42,7 @@ type Map struct {
 //
 // The error names the key and the position of the first entry that breaks a rule (1-based, the
 // map in key order), never a value: a configured value can be a secret in the wrong key
-// (docs/spec/02-architektur.md "Konfigurationsladen" item 4).
+// (docs/spec/02-architecture.md "Configuration loading" item 4).
 func New(languages []string, localeMap map[string]string) (Map, error) {
 	seen := make(map[string]bool, len(languages))
 	for i, l := range languages {

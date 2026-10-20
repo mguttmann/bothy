@@ -16,7 +16,7 @@ import (
 )
 
 // TestSearchColumnsOnPostgres18 holds the search columns of 00034 and the indexes of 00035
-// against the catalog of the real PostgreSQL 18 (docs/spec/14-suche.md 3.2, 03 section 5): the
+// against the catalog of the real PostgreSQL 18 (docs/spec/14-search.md 3.2, 03 section 5): the
 // vectors are stored generated columns, not virtual ones, the languages are regconfig NOT NULL
 // DEFAULT 'simple', and both GIN indexes are valid. This holds the row "Migrations-Lint" of 14
 // section 12 against the artifact itself.
@@ -89,7 +89,7 @@ func tsquery(t testing.TB, q interface {
 
 func ptr(s string) *string { return &s }
 
-// TestSearchTsqueryExamples runs every example of design note 5 of the brief (docs/spec/14-suche.md
+// TestSearchTsqueryExamples runs every example of design note 5 of the brief (docs/spec/14-search.md
 // 4.1 and 4.2) as bothy_app on PostgreSQL 18 and compares the exact text form.
 func TestSearchTsqueryExamples(t *testing.T) {
 	t.Parallel()
@@ -212,6 +212,8 @@ func TestSearchTsqueryPrivileges(t *testing.T) {
 	}
 }
 
+// language-check: off
+
 // TestTextSearchCaseFolding confirms that the pgtest database folds the case of non-ASCII letters
 // in text search: simple turns "Ärger" into 'ärger' (the start check of design note 9 asks the
 // same of every production database).
@@ -227,6 +229,8 @@ func TestTextSearchCaseFolding(t *testing.T) {
 	}
 }
 
+// language-check: on
+
 // FuzzSearchTsquery holds 14 4.1 "jede Eingabe ist sicher" for the query function (PLAN M3 test
 // strategy "Fuzzing der Sucheingabe"): for any valid text the call never fails, and the result is
 // NULL or a tsquery with nodes. The round trip tq::text to ::tsquery inside the function loses
@@ -241,7 +245,9 @@ func FuzzSearchTsquery(f *testing.F) {
 	for _, seed := range []string{
 		"Rechnungen", `"quoted phrase"`, `it's`, `'`, `''`, `\`, `\\'`, `a\'b`, "a & b", "a | b", "!a", "a <-> b",
 		"a:*", "a:*B", "(a | b) & c", "a or b", "or", "a - b", "-a", "--a", "- -", "-", `"-a"`, `" "`, `"a" or -"b c"`,
+		// language-check: off
 		"\u00a0word\u2003word\u3000", "\u200fRTL\u202e mark\u2066", "e\u0301cole", "A\u030a", "\u00c4rger \u00fcber \u00dcbel",
+		// language-check: on
 		strings.Repeat("Donaudampfschifffahrt", 40), "ERR_CONN_RESET", "a:1", "a:A", "{x}", "a\tb\nc", "\U0001f600 emoji",
 		"Rechnung -offen", "'x':1", "1 2 3", "a&!b|c", "<->", ":*", "!", "()", "\"", "x or (y z) or -w", `"a b" "c d" or e`,
 	} {
