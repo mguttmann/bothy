@@ -1,0 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
+# Written by the Flutter tool on every `pub get` and build once a plugin (patrol) is a
+# dependency; never tracked.
+.flutter-plugins-dependencies

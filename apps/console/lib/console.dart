@@ -12,6 +12,8 @@
 /// - [versionsMatch]: the version check against the server.
 library;
 
+export 'admin/console_route.dart';
+export 'admin/step_up.dart';
 export 'app.dart';
 export 'http/console_client.dart';
 export 'login/logged_out_view.dart';
