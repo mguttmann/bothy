@@ -28,8 +28,10 @@ type fakeRelayUC struct {
 	state string
 	// progress are the counts of every RelayEnd (M2-46).
 	progress []domain.Progress
-	// written are the counts of every RelayCounters write (M2-46).
-	written []app.Counts
+	// written are the counts of every RelayCounters write (M2-46); failCounters makes every
+	// write fail.
+	written      []app.Counts
+	failCounters bool
 }
 
 func (f *fakeRelayUC) add(s string) {
@@ -47,8 +49,11 @@ func (f *fakeRelayUC) RelayOpenFailed(_ context.Context, _ ids.ID, d domain.Clos
 func (f *fakeRelayUC) RelayCounters(_ context.Context, _ ids.ID, c app.Counts) error {
 	f.add("counters")
 	f.mu.Lock()
+	defer f.mu.Unlock()
 	f.written = append(f.written, c)
-	f.mu.Unlock()
+	if f.failCounters {
+		return errors.New("counters: database unavailable")
+	}
 	return nil
 }
 func (f *fakeRelayUC) RelayUnpaired(_ context.Context, s domain.Side) { f.add("unpaired:" + string(s)) }

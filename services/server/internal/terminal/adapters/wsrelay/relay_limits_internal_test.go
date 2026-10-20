@@ -352,3 +352,36 @@ func TestRelayLimits_InputAfterOutputOnlyWriteIsStored(t *testing.T) {
 			stored.Sub(t0), typed.Sub(t0), typed.Sub(stored), limitWindows.IdleGrace)
 	}
 }
+
+// TestRelayLimits_FailedWriteRetriesOncePerGrace (red team M2-46, M3): while the progress write
+// keeps failing, the relay retries at most once per terminal.idle_grace, not on every frame.
+func TestRelayLimits_FailedWriteRetriesOncePerGrace(t *testing.T) {
+	t.Parallel()
+	r, uc, timers := limitRelay(t)
+	uc.failCounters = true
+	t0 := timers.Clock.Now()
+	id := ids.New()
+	r.Expect(app.Expectation{SessionID: id, HostID: ids.New(), DeviceID: ids.New(), Deadline: t0.Add(farDeadline), Started: true,
+		Times: domain.SessionTimes{State: domain.SessionActive, OpenedAt: t0, StartedAt: t0}})
+	r.mu.Lock()
+	dev, hst := r.newSide(domain.SideClient, id, nil), r.newSide(domain.SideHost, id, nil)
+	r.slots[id].dev, r.slots[id].hst, r.slots[id].paired = dev, hst, true
+	r.hold(r.slots[id])
+	r.mu.Unlock()
+	r.forward(dev, []byte("handshake-1"))
+	r.forward(hst, []byte("handshake-2"))
+	r.forward(dev, []byte("k"))
+	// 200 host frames within 2 seconds, far less than one grace.
+	for range 200 {
+		time.Sleep(time.Millisecond) // let a failed write give its counts back
+		r.forward(hst, []byte("out"))
+		timers.Advance(10 * time.Millisecond)
+	}
+	time.Sleep(50 * time.Millisecond)
+	uc.mu.Lock()
+	n := len(uc.written)
+	uc.mu.Unlock()
+	if n > 2 {
+		t.Fatalf("%d progress writes within one grace while the database fails, want at most 2", n)
+	}
+}

@@ -864,9 +864,6 @@ func (r *Relay) giveBack(id ids.ID, c app.Counts) {
 		if c.LastInput.After(s.lastInput) {
 			s.lastInput = c.LastInput
 		}
-		if !c.LastInput.IsZero() && s.storedInput.Equal(c.LastInput) {
-			s.storedInput = time.Time{}
-		}
 	}
 }
 
