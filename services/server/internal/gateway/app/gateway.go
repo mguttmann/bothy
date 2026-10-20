@@ -236,13 +236,15 @@ func (g *Gateway) tickAwaiting(c *Connection, now time.Time) tick {
 // tickReady are the deadlines of a ready connection; c.mu is held.
 func (g *Gateway) tickReady(c *Connection, now time.Time) tick {
 	beat := domain.HeartbeatDeadline(c.lastBeat, g.cfg.HeartbeatInterval, g.cfg.HeartbeatMissLimit)
+	// The expiry goes first: when both have passed, 4011 lets the client renew its token instead
+	// of reconnecting with the expired one, and Tick keeps it while a frame is in flight.
 	switch {
+	case !c.expiresAt.IsZero() && !now.Before(c.expiresAt):
+		return tick{close: domain.CloseTokenExpired}
 	case !now.Before(beat):
 		return tick{close: domain.CloseHeartbeatTimeout}
 	case c.expiresAt.IsZero():
 		return tick{next: beat}
-	case !now.Before(c.expiresAt):
-		return tick{close: domain.CloseTokenExpired}
 	}
 	t := tick{next: earliest(beat, c.expiresAt)}
 	if c.actor.Kind != actor.KindUser || c.reauthSent {

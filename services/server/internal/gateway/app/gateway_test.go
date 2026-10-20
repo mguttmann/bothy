@@ -559,6 +559,31 @@ func TestDeadlineWaitsForAFrameInFlight(t *testing.T) {
 	wantClosed(t, fc, domain.CloseHeartbeatTimeout)
 }
 
+// TestExpiryBeforeHeartbeatDeadline: when the heartbeat deadline and the expiry of the credential
+// have both passed, the tick closes with 4011, also while a frame is in flight, so the client
+// renews its token instead of reconnecting with the expired one.
+func TestExpiryBeforeHeartbeatDeadline(t *testing.T) {
+	t.Parallel()
+	ctx := context.Background()
+	e := newEnv(t, nil)
+	c, fc := e.open()
+	e.identifyAlex(c)
+	e.gw.Tick(ctx, c, e.alex.CredentialExpiresAt.Add(time.Second))
+	wantClosed(t, fc, domain.CloseTokenExpired)
+
+	e = newEnv(t, nil)
+	c, fc = e.open()
+	e.identifyAlex(c)
+	e.auth.mu.Lock()
+	e.auth.revalidate = func() error {
+		e.gw.Tick(ctx, c, e.alex.CredentialExpiresAt.Add(time.Second))
+		return nil
+	}
+	e.auth.mu.Unlock()
+	e.send(c, "heartbeat", map[string]any{"last_seq": 0})
+	wantClosed(t, fc, domain.CloseTokenExpired)
+}
+
 // TestHeartbeatAtExpiryCloses4011: a heartbeat whose revalidation refuses the credential as
 // unauthenticated once it has reached its expiry (also when the expiry passes during the
 // revalidation) closes with 4011 like the tick of the expiry, not with 4012; before the expiry,
