@@ -341,6 +341,9 @@ type ServerInterface interface {
 	// CreatePersonalTemplate Create a personal template
 	// (POST /me/templates)
 	CreatePersonalTemplate(w http.ResponseWriter, r *http.Request, params CreatePersonalTemplateParams)
+	// GetMessage Read a message
+	// (GET /messages/{message_id})
+	GetMessage(w http.ResponseWriter, r *http.Request, messageId MessageIdPath)
 	// ListOwners List owners
 	// (GET /owners)
 	ListOwners(w http.ResponseWriter, r *http.Request)
@@ -407,6 +410,9 @@ type ServerInterface interface {
 	// CloseThread Mark a thread as done
 	// (POST /threads/{thread_id}/close)
 	CloseThread(w http.ResponseWriter, r *http.Request, threadId ThreadIdPath, params CloseThreadParams)
+	// ListThreadMessages Read thread history
+	// (GET /threads/{thread_id}/messages)
+	ListThreadMessages(w http.ResponseWriter, r *http.Request, threadId ThreadIdPath, params ListThreadMessagesParams)
 	// CreateMessage Send a message
 	// (POST /threads/{thread_id}/messages)
 	CreateMessage(w http.ResponseWriter, r *http.Request, threadId ThreadIdPath)
@@ -4708,6 +4714,32 @@ func (siw *ServerInterfaceWrapper) CreatePersonalTemplate(w http.ResponseWriter,
 	handler.ServeHTTP(w, r)
 }
 
+// GetMessage operation middleware
+func (siw *ServerInterfaceWrapper) GetMessage(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "message_id" -------------
+	var messageId MessageIdPath
+
+	err = runtime.BindStyledParameterWithOptions("simple", "message_id", r.PathValue("message_id"), &messageId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "uuid", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "message_id", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.GetMessage(w, r, messageId)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
 // ListOwners operation middleware
 func (siw *ServerInterfaceWrapper) ListOwners(w http.ResponseWriter, r *http.Request) {
 
@@ -5611,6 +5643,87 @@ func (siw *ServerInterfaceWrapper) CloseThread(w http.ResponseWriter, r *http.Re
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		siw.Handler.CloseThread(w, r, threadId, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// ListThreadMessages operation middleware
+func (siw *ServerInterfaceWrapper) ListThreadMessages(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "thread_id" -------------
+	var threadId ThreadIdPath
+
+	err = runtime.BindStyledParameterWithOptions("simple", "thread_id", r.PathValue("thread_id"), &threadId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "uuid", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "thread_id", Err: err})
+		return
+	}
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params ListThreadMessagesParams
+
+	// ------------- Optional query parameter "before_seq" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "before_seq", r.URL.Query(), &params.BeforeSeq, runtime.BindQueryParameterOptions{Type: "integer", Format: "int64"})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "before_seq"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "before_seq", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "after_seq" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "after_seq", r.URL.Query(), &params.AfterSeq, runtime.BindQueryParameterOptions{Type: "integer", Format: "int64"})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "after_seq"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "after_seq", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "around_seq" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "around_seq", r.URL.Query(), &params.AroundSeq, runtime.BindQueryParameterOptions{Type: "integer", Format: "int64"})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "around_seq"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "around_seq", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "limit" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "limit", r.URL.Query(), &params.Limit, runtime.BindQueryParameterOptions{Type: "integer", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "limit"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "limit", Err: err})
+		}
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.ListThreadMessages(w, r, threadId, params)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -6634,7 +6747,9 @@ func HandlerWithOptions(si ServerInterface, options StdHTTPServerOptions) http.H
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/threads/{thread_id}/close", wrapper.CloseThread)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/threads/{thread_id}/reopen", wrapper.ReopenThread)
 	m.HandleFunc(http.MethodPut+" "+options.BaseURL+"/threads/{thread_id}/tags", wrapper.SetThreadTags)
+	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/threads/{thread_id}/messages", wrapper.ListThreadMessages)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/threads/{thread_id}/messages", wrapper.CreateMessage)
+	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/messages/{message_id}", wrapper.GetMessage)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/agents", wrapper.ListAgents)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/agents", wrapper.CreateAgent)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/agents/{agent_id}", wrapper.GetAgent)
@@ -7136,6 +7251,9 @@ type StrictServerInterface interface {
 	// CreatePersonalTemplate Create a personal template
 	// (POST /me/templates)
 	CreatePersonalTemplate(ctx context.Context, request CreatePersonalTemplateRequestObject) (CreatePersonalTemplateResponseObject, error)
+	// GetMessage Read a message
+	// (GET /messages/{message_id})
+	GetMessage(ctx context.Context, request GetMessageRequestObject) (GetMessageResponseObject, error)
 	// ListOwners List owners
 	// (GET /owners)
 	ListOwners(ctx context.Context, request ListOwnersRequestObject) (ListOwnersResponseObject, error)
@@ -7202,6 +7320,9 @@ type StrictServerInterface interface {
 	// CloseThread Mark a thread as done
 	// (POST /threads/{thread_id}/close)
 	CloseThread(ctx context.Context, request CloseThreadRequestObject) (CloseThreadResponseObject, error)
+	// ListThreadMessages Read thread history
+	// (GET /threads/{thread_id}/messages)
+	ListThreadMessages(ctx context.Context, request ListThreadMessagesRequestObject) (ListThreadMessagesResponseObject, error)
 	// CreateMessage Send a message
 	// (POST /threads/{thread_id}/messages)
 	CreateMessage(ctx context.Context, request CreateMessageRequestObject) (CreateMessageResponseObject, error)
@@ -10550,6 +10671,32 @@ func (sh *strictHandler) CreatePersonalTemplate(w http.ResponseWriter, r *http.R
 	}
 }
 
+// GetMessage operation middleware
+func (sh *strictHandler) GetMessage(w http.ResponseWriter, r *http.Request, messageId MessageIdPath) {
+	var request GetMessageRequestObject
+
+	request.MessageId = messageId
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.GetMessage(ctx, request.(GetMessageRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "GetMessage")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(GetMessageResponseObject); ok {
+		if err := validResponse.VisitGetMessageResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
 // ListOwners operation middleware
 func (sh *strictHandler) ListOwners(w http.ResponseWriter, r *http.Request) {
 	var request ListOwnersRequestObject
@@ -11199,6 +11346,33 @@ func (sh *strictHandler) CloseThread(w http.ResponseWriter, r *http.Request, thr
 		sh.options.ResponseErrorHandlerFunc(w, r, err)
 	} else if validResponse, ok := response.(CloseThreadResponseObject); ok {
 		if err := validResponse.VisitCloseThreadResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// ListThreadMessages operation middleware
+func (sh *strictHandler) ListThreadMessages(w http.ResponseWriter, r *http.Request, threadId ThreadIdPath, params ListThreadMessagesParams) {
+	var request ListThreadMessagesRequestObject
+
+	request.ThreadId = threadId
+	request.Params = params
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.ListThreadMessages(ctx, request.(ListThreadMessagesRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "ListThreadMessages")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(ListThreadMessagesResponseObject); ok {
+		if err := validResponse.VisitListThreadMessagesResponse(w); err != nil {
 			sh.options.ResponseErrorHandlerFunc(w, r, err)
 		}
 	} else if response != nil {

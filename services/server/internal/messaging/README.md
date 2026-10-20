@@ -1,6 +1,6 @@
 # Module `messaging`
 
-Status: sending built (M1-56): `createMessage` and `createThread`, the tables `messages` and `mentions`, the in-transaction event `MessagePosted` and the durable event `message.created`. Mentions and templates built (M1-60): `listMyMentions`, the port `Mentions` with `CountUnread`, the table `message_templates` and its six operations. Reading, editing, reactions, pins and the export follow with the tickets of the milestone.
+Status: sending built (M1-56): `createMessage` and `createThread`, the tables `messages` and `mentions`, the in-transaction event `MessagePosted` and the durable event `message.created`. Reading built (M1-57): `listThreadMessages` and `getMessage`. Mentions and templates built (M1-60): `listMyMentions`, the port `Mentions` with `CountUnread`, the table `message_templates` and its six operations. Editing, reactions, pins and the export follow with the tickets of the milestone.
 The normative source is [docs/spec/02-architecture.md](../../../../docs/spec/02-architecture.md); if this file differs, the chapter applies.
 
 ## Purpose
@@ -9,9 +9,9 @@ Messages, revisions, mentions, reactions, pins, templates, channel export.
 
 ## Code
 
-- `internal/messaging` (`messaging.go`, `mentions.go`, `templates.go`): the port. `Messages` with `Create` and `CreateThread`,
-  the DTOs `Message`, `PrincipalRef`, `CreateMessageCmd`, `Created`, `CreateThreadCmd` and
-  `ThreadCreated`, the in-transaction event `MessagePosted`, and `Register` (declares
+- `internal/messaging` (`messaging.go`, `mentions.go`, `templates.go`): the port. `Messages` with `Create`, `CreateThread`,
+  `History` and `Get`, the DTOs `Message`, `PrincipalRef`, `CreateMessageCmd`, `Created`,
+  `CreateThreadCmd`, `ThreadCreated`, `HistoryQuery` (with `HistoryMode`) and `HistoryPage`, the in-transaction event `MessagePosted`, and `Register` (declares
   `message.created`). The port depends on no other module (02 section 7.2): `ThreadCreated` names
   the thread by id, and the handler reads it through `chat.Threads.View` (no `thread.read`, so
   an app with only `messages:write` gets the thread it created; a replay authorizes
@@ -21,21 +21,24 @@ Messages, revisions, mentions, reactions, pins, templates, channel export.
 - `domain/`: the message row (`Message`), `OriginFor` (09 section 3.2), `CheckClientMsgID`,
   `CheckContent`, `CheckMentionCount`, the mention scanner `ScanMentions` with `CodeMask` (the code
   structure of CommonMark 0.31.2), `RequestHash` (04 section 5.1 point 3), `SystemLine` and
-  `TruncateForEvent` (04 payload rule 2); the template row `Template` with `Apply` (no-op
+  `TruncateForEvent` (04 payload rule 2); for reading `ValidateHistoryRequest`, `PickAround`,
+  `PageFlags` and `CutForList`; the template row `Template` with `Apply` (no-op
   detection), `TemplateRules` (name and content), `LimitReached`, `ScopeLockKey` and the mention
   keyset `MentionKey` (M1-60).
-- `app/`: `Service` with `Create` and `CreateThread`, `Service.Mentions()` and
-  `Service.Templates()` (the two other ports over the same service), the outgoing ports `Store`,
-  `Cursors` and `ErrorCounter`, and `ErrClientMsgIDTaken`. `Config` binds
-  `message.max_content_bytes`, `message.max_mentions`, `sync.event_payload_max_bytes`,
-  `template.name_max_chars`, `template.max_per_scope`, `api.page_size_default` and
-  `api.page_size_max` (`wire.MessagingConfig`).
-- `adapters/postgres/`: `queries/messages.sql`, `queries/mentions.sql` and
-  `queries/templates.sql`, the sqlc output in `sqlcgen/` and `Repository` (implements
-  `app.Store`); the mentions of a message are one `INSERT ... SELECT FROM unnest`.
-- `adapters/httpapi/`: `Messages`, the handlers of `createMessage` and `createThread` (a
-  repetition answers `200` with `Idempotent-Replay: true`), `listMyMentions` and the template
-  operations; `Cursors`, the cursor codec of platform/httpserver.
+- `app/`: `Service` with `Create`, `CreateThread`, `History` and `Get`, `Service.Mentions()` and
+  `Service.Templates()` (the two other ports over the same service), the outgoing ports `Store`
+  (with `HistoryRead` and `HistoryRows`), `Cursors` and `ErrorCounter`, and `ErrClientMsgIDTaken`.
+  `Config` binds `message.max_content_bytes`, `message.max_mentions`, `sync.event_payload_max_bytes`,
+  `message.list_content_max_bytes`, `template.name_max_chars`, `template.max_per_scope`,
+  `api.page_size_default` and `api.page_size_max` (`wire.MessagingConfig`).
+- `adapters/postgres/`: `queries/messages.sql`, `queries/mentions.sql`, `queries/templates.sql` and
+  `queries/history.sql` (`ListThreadNewest`, `ListThreadBefore`, `ListThreadAfter`,
+  `ListThreadAround`, `GetVisibleMessage`), the sqlc output in `sqlcgen/` and `Repository`
+  (implements `app.Store`); the mentions of a message are one `INSERT ... SELECT FROM unnest`.
+  `predicate_test.go` holds `TestQueriesCarryVisibleChannelPredicate` with its allowlist.
+- `adapters/httpapi/`: `Messages`, the handlers of `createMessage`, `createThread`,
+  `listThreadMessages`, `getMessage`, `listMyMentions` and the template operations (a repetition
+  answers `200` with `Idempotent-Replay: true`); `Cursors`, the cursor codec of platform/httpserver.
 - Migrations `00032_messaging_messages.sql` (`messages` and `mentions` as 03 section 4.6 with
   the deviations its header names, and `threads.parent_message_id -> messages(id)` deferred and
   `NOT VALID`), `00033_threads_parent_fk_validate.sql` (validates it) and
@@ -142,6 +145,41 @@ reopens a closed thread, with origin `system`, empty content, `silent`, the auth
 reopening message and the sequence right before it. The CHECK also allows `agent_session.resume_failed`,
 which M2-12 writes (R-DM-42).
 
+## Reading (M1-57)
+
+`listThreadMessages` (`GET /api/v1/threads/{thread_id}/messages`, `thread.read`, `rl.read`; 06
+section 6 item 5):
+
+1. The anchors without any lookup: more than one of `before_seq`, `after_seq`, `around_seq` is
+   `400 validation_failed` with one `mutually_exclusive` entry per given parameter
+   (`#query/<name>`); `after_seq` below 0, `before_seq` or `around_seq` below 1, or any anchor at
+   or above 2^53 is `out_of_range`.
+2. `chat.Threads.Info` and `thread.read` on the thread; an unknown and an invisible thread take
+   the same path and give the same `404`.
+3. `Authorizer.Scope(message.read)` gives the visible channels; the one statement of the mode
+   carries `m.thread_id = @thread_id AND m.channel_id = ANY(@visible_channel_ids)`.
+4. Window with `L = min(limit or api.page_size_default, api.page_size_max)`: the newest page is the
+   `L` highest `thread_seq`, `before_seq = X` the `L` highest below `X`, `after_seq = X` the `L`
+   lowest above `X`, `around_seq = X` at most `(L - 1) / 2` below `X` and the rest from `X` on,
+   where a short side gives its share to the other. Items are ascending and contiguous;
+   `has_more_before` and `has_more_after` come from the same statement (rows `L + 1` per side and
+   `EXISTS` for the opposite side). With no items, `before_seq = X` reports later messages
+   (`thread_seq >= X`) and `after_seq = X` earlier ones (`thread_seq <= X`).
+5. Every item passes `message.read` in filter mode; a refused one is dropped, logged with the
+   action only and counted in `bothy.authz.errors` as `filter_mismatch` (07 section 7.4 rule 3).
+6. Each item in the representation of M1-56, `content_md` cut above
+   `message.list_content_max_bytes` at a UTF-8 boundary with `content_truncated: true`.
+
+`getMessage` (`GET /api/v1/messages/{message_id}`, `message.read`, `rl.read`): the row read with the
+visible channels of `message.read`, then `message.read` on it; a foreign and an unknown id give the
+same `404`. When the visible read misses, an existing message is still decided by `message.read`,
+so an app with a grant on the channel but without `messages:read` gets `403 scope_missing`. `200` with the full content, never `content_truncated`, and `ETag: "<version>"`; a
+tombstone is `200` too. It is the reload path for content cut in lists and events.
+
+Tombstones: a deleted message keeps its row and `thread_seq`; its form has `content_md = ""`, empty
+`attachments`, `mention_ids`, `reactions` and `components`, `pinned: false` and `deleted_at`, all
+other fields as stored. Logs and metrics never carry content, query strings or names.
+
 ## Mentions and templates (M1-60)
 
 `listMyMentions` (`GET /me/mentions`): `mention.list` on the caller as resource `user` (an agent
@@ -193,7 +231,7 @@ template has `channel_id` and is checked against the channel (`template.read` wi
 - Deletion empties the content and redacts the payload of the events in the same transaction (03, 6.5).
 - A mention of a principal without read permission is stored but triggers nothing (03, `mentions`).
 
-Rulings: docs/DECISIONS.md M1-56 and M1-60.
+Rulings: docs/DECISIONS.md M1-56, M1-57 and M1-60.
 
 ## Chapters
 

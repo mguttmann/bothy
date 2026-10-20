@@ -116,7 +116,7 @@ func TestListMyMentions_DropsItemDeniedByAuthorize(t *testing.T) {
 	logs := &httpservertest.LogCapture{}
 	cnt := &counter{}
 	svc, err := app.New(app.Config{MaxContentBytes: 100, MaxMentions: 4, EventPayloadMaxBytes: 1000, TemplateNameMaxChars: 10,
-		TemplateMaxPerScope: 5, PageSizeDefault: 3, PageSizeMax: 3}, app.Deps{
+		TemplateMaxPerScope: 5, ListContentMaxBytes: 100, PageSizeDefault: 3, PageSizeMax: 3}, app.Deps{
 		Store: fakeMentionStore{rows: rows}, UoW: struct{ txn.UnitOfWork }{}, Authorizer: denyOne{deny: denied, channel: channel},
 		Events: struct{ eventlog.Appender }{}, Threads: struct{ chat.Threads }{}, Directory: fakeDirectory{},
 		Cursors: plainCursors{}, Errors: cnt, Log: slog.New(logs),

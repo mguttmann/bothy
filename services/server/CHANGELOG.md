@@ -72,6 +72,17 @@ documented in this file. The format is based on
   `user`, `self`) and channel templates (`read` to list, `manage` to change), bounded exactly by
   the new key `template.max_per_scope`; names are display texts of at most the new key
   `template.name_max_chars`. Templates append no event.
+- Reading history (M1-57): `listThreadMessages` pages a thread by `thread_seq` (the newest page,
+  `before_seq`, `after_seq` and `around_seq`, at most one of them) and `getMessage` returns one
+  message in full with `ETag: "<version>"`. Pages are keyset pages: items ascending and without a
+  gap, tombstones at the positions of deleted messages, `has_more_before` and `has_more_after`
+  from the same statement as the items. Both operations read with the visible channels of
+  `message.read`, check every listed item with `authorize` in filter mode (a mismatch is dropped,
+  logged and counted in `bothy.authz.errors` as `filter_mismatch`) and answer a foreign thread or
+  message exactly like an unknown one. Lists cut `content_md` above
+  `message.list_content_max_bytes` (now an active key) with `content_truncated`; `limit` defaults
+  to `api.page_size_default` and is capped at `api.page_size_max`. The port
+  `messaging.Messages` adds `History` and `Get` for later callers.
 
 - Sending messages (M1-56): `createMessage` and `createThread`. Migrations `00032` and `00033`
   create `messages` and `mentions` and give `threads.parent_message_id` its deferred foreign key.

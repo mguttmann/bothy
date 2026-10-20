@@ -16150,6 +16150,21 @@ type CloseThreadParams struct {
 	IdempotencyKey *IdempotencyKey `json:"Idempotency-Key,omitempty"`
 }
 
+// ListThreadMessagesParams defines parameters for ListThreadMessages.
+type ListThreadMessagesParams struct {
+	// BeforeSeq Messages with `thread_seq` below this value.
+	BeforeSeq *int64 `form:"before_seq,omitempty" json:"before_seq,omitempty"`
+
+	// AfterSeq Messages with `thread_seq` above this value.
+	AfterSeq *int64 `form:"after_seq,omitempty" json:"after_seq,omitempty"`
+
+	// AroundSeq Messages centered on this value.
+	AroundSeq *int64 `form:"around_seq,omitempty" json:"around_seq,omitempty"`
+
+	// Limit Page size.
+	Limit *PageLimit `form:"limit,omitempty" json:"limit,omitempty"`
+}
+
 // ReopenThreadParams defines parameters for ReopenThread.
 type ReopenThreadParams struct {
 	// IdempotencyKey UUIDv7 chosen by the client per logical operation. A repeat with the same request returns the stored response; a different request gives 422 `idempotency_key_reuse`; a repeat while the first is running gives 409 `request_in_progress`. Kept for `sync.idempotency_key_ttl`.

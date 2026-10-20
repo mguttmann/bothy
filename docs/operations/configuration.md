@@ -345,7 +345,7 @@ Source: [06-api.md](../spec/06-api.md), section 20.
 | `api.deprecation_min_notice` | `BOTHY_API__DEPRECATION_MIN_NOTICE` | Server |  | `180d` | minimum gap from `Deprecation` to `Sunset` | planned (M1) |
 | `api.major_version_overlap` | `BOTHY_API__MAJOR_VERSION_OVERLAP` | Server |  | `365d` | how long an old major version stays after the new one appears | planned (M7) |
 | `api.stats_max_buckets` | `BOTHY_API__STATS_MAX_BUCKETS` | Server |  | `1000` | time buckets per statistics query; more yields `400` | planned (M6) |
-| `message.list_content_max_bytes` | `BOTHY_MESSAGE__LIST_CONTENT_MAX_BYTES` | Server |  | `16384` | largest `content_md` per message in lists; above that truncated with `content_truncated` (section 6) | planned (M1) |
+| `message.list_content_max_bytes` | `BOTHY_MESSAGE__LIST_CONTENT_MAX_BYTES` | Server | int | `16384` | largest `content_md` per message in lists; above that truncated with `content_truncated` (section 6) | active |
 | `status.history_window` | `BOTHY_STATUS__HISTORY_WINDOW` | Server |  | `7d` | how long the status page shows resolved incidents | planned (M7) |
 
 ### 07 Permissions and authorization
