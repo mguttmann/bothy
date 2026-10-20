@@ -32,6 +32,8 @@ type fakeRelayUC struct {
 	// write fail.
 	written      []app.Counts
 	failCounters bool
+	// okWritten are the counts of the writes that succeeded.
+	okWritten []app.Counts
 }
 
 func (f *fakeRelayUC) add(s string) {
@@ -54,6 +56,7 @@ func (f *fakeRelayUC) RelayCounters(_ context.Context, _ ids.ID, c app.Counts) e
 	if f.failCounters {
 		return errors.New("counters: database unavailable")
 	}
+	f.okWritten = append(f.okWritten, c)
 	return nil
 }
 func (f *fakeRelayUC) RelayUnpaired(_ context.Context, s domain.Side) { f.add("unpaired:" + string(s)) }

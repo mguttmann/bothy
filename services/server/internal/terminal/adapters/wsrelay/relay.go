@@ -99,6 +99,8 @@ type Relay struct {
 	closing bool
 	// idle is signalled when the last side ends (the stop step waits for it).
 	idle *gosync.Cond
+	// writes counts the progress writes in flight, each until its counts are back after a failure.
+	writes gosync.WaitGroup
 }
 
 // Compile-time check: the outgoing port of the use cases.
@@ -174,6 +176,9 @@ type slot struct {
 	persisted   time.Time
 	storedInput time.Time
 	counted     string
+	// flushStop and flushGen are the flush timer of the progress (persist).
+	flushStop func() bool
+	flushGen  int
 	// held marks a slot that held a side on this node since its grant: only such a node runs the
 	// limits (Design note 7: "one set per session the process holds a side of"). With several
 	// nodes every node expects the session, but only the node of the pairing sees the device's
@@ -551,6 +556,7 @@ func (s *slot) stopLimit() {
 // forget removes the slot s: its timers stop and it no longer counts as held; r.mu is held.
 func (r *Relay) forget(s *slot) {
 	s.stopLimit()
+	s.stopFlush()
 	r.countState(s, "")
 	delete(r.slots, s.id)
 }
@@ -819,33 +825,45 @@ func (r *Relay) forward(sd *side, msg []byte) {
 	q.msgs = append(q.msgs, msg)
 	q.bytes += len(msg)
 	r.wakeLocked(to)
-	fx := r.persistDue(s)
+	fx := r.persist(s)
 	r.mu.Unlock()
 	fx.run(context.Background())
 }
 
-// persistDue returns the write of the progress of s when terminal.idle_grace passed since the last
-// one and there is something to write (M2-46 Design note 7 d, domain.PersistDue), and also when
-// unwritten input is a full idle grace newer than the last input written, so an output-only write
-// never holds input back and the stored last_input_at lags the true one by less than the grace:
-// the counts since the last write are added once and last_input_at moves forward, without an
-// event and without a new version; a failed write gives the counts back to the slot. r.mu is held.
-func (r *Relay) persistDue(s *slot) effects {
-	if r.cfg.Windows.Idle <= 0 || (s.in == 0 && s.out == 0 && s.lastInput.IsZero()) {
+// persist is the one place that decides the progress write of s (M2-46 Design note 7 d,
+// D-M2-46-7 and D-M2-46-22): the counts since the last write are added once and last_input_at moves
+// forward, without an event and without a new version. It writes when terminal.idle_grace passed
+// since the last attempt (domain.PersistDue) and also at once when unwritten input is a full grace
+// newer than the last input sent, so an output-only write never holds input back. Otherwise, while
+// unwritten input waits, a flush timer writes it at the last attempt plus the grace, so input reaches
+// the store within one grace even when no further frame arrives. A failed write gives its counts
+// back and comes through here again, so it is retried at most once per grace. Together: the stored
+// last_input_at lags the true one by less than the grace while the store works, and the relay
+// writes at most twice per grace. r.mu is held.
+func (r *Relay) persist(s *slot) effects {
+	if r.cfg.Windows.Idle <= 0 || r.closing || (s.in == 0 && s.out == 0 && s.lastInput.IsZero()) {
 		return nil
 	}
 	now, grace := r.clk.Now(), r.cfg.Windows.IdleGrace
 	inputDue := !s.lastInput.IsZero() && s.lastInput.Sub(s.storedInput) >= grace
 	if !inputDue && !domain.PersistDue(s.persisted, now, grace) {
+		if !s.lastInput.IsZero() && s.flushStop == nil {
+			s.flushGen++
+			id, gen := s.id, s.flushGen
+			s.flushStop = r.timers.AfterFunc(s.persisted.Add(grace).Sub(now), func() { r.flush(id, gen) })
+		}
 		return nil
 	}
+	s.stopFlush()
 	s.persisted = now
 	id, c := s.id, s.take()
 	if !c.LastInput.IsZero() {
 		s.storedInput = c.LastInput
 	}
+	r.writes.Add(1)
 	return effects{func(ctx context.Context) {
 		go func() {
+			defer r.writes.Done()
 			if err := r.uc.RelayCounters(ctx, id, c); err != nil {
 				r.call(ctx, err)
 				r.giveBack(id, c)
@@ -854,17 +872,45 @@ func (r *Relay) persistDue(s *slot) effects {
 	}}
 }
 
-// giveBack adds counts of a failed write back to the slot of the session, if it still exists.
+// flush is the flush timer of the progress of the session id (persist).
+func (r *Relay) flush(id ids.ID, gen int) {
+	r.mu.Lock()
+	s := r.slots[id]
+	if s == nil || s.flushGen != gen {
+		r.mu.Unlock()
+		return
+	}
+	s.flushStop = nil
+	fx := r.persist(s)
+	r.mu.Unlock()
+	fx.run(context.Background())
+}
+
+// stopFlush stops the flush timer of s, if any; r.mu is held.
+func (s *slot) stopFlush() {
+	if s.flushStop != nil {
+		s.flushStop()
+		s.flushStop = nil
+	}
+	s.flushGen++
+}
+
+// giveBack adds counts of a failed write back to the slot of the session, if it still exists, and
+// lets persist schedule the retry.
 func (r *Relay) giveBack(id ids.ID, c app.Counts) {
 	r.mu.Lock()
-	defer r.mu.Unlock()
-	if s := r.slots[id]; s != nil {
+	s := r.slots[id]
+	var fx effects
+	if s != nil {
 		s.in += c.In
 		s.out += c.Out
 		if c.LastInput.After(s.lastInput) {
 			s.lastInput = c.LastInput
 		}
+		fx = r.persist(s)
 	}
+	r.mu.Unlock()
+	fx.run(context.Background())
 }
 
 // count adds a message of n bytes from kind to the counters of s; r.mu is held.
@@ -1175,6 +1221,7 @@ func (r *Relay) Shutdown(ctx context.Context) error {
 		if s.limitStop != nil {
 			s.limitStop()
 		}
+		s.stopFlush()
 	}
 	for sd := range r.sides {
 		sd.close(int(domain.StreamServerRestart), "")
