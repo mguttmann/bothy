@@ -311,6 +311,15 @@ func (m msgs) TriggerMessageOf(_ context.Context, id ids.ID) (messaging.TriggerM
 	return f, nil
 }
 
+// PrincipalRefs renders every id as a person named Alex (M2-16).
+func (m msgs) PrincipalRefs(_ context.Context, list []ids.ID) (map[ids.ID]messaging.PrincipalRef, error) {
+	out := map[ids.ID]messaging.PrincipalRef{}
+	for _, id := range list {
+		out[id] = messaging.PrincipalRef{ID: id, Kind: "user", Handle: "alex", DisplayName: "Alex"}
+	}
+	return out, nil
+}
+
 func (m msgs) CreateRunAnchor(_ context.Context, cmd messaging.RunAnchorCmd) (messaging.AnchorRef, error) {
 	m.j.add("anchor", cmd)
 	return messaging.AnchorRef{MessageID: ids.New(), ThreadSeq: 1}, nil
@@ -340,6 +349,12 @@ func (t *threads) Info(_ context.Context, id ids.ID) (chat.ThreadInfo, error) {
 		return in, nil
 	}
 	return chat.ThreadInfo{}, errs.New(errs.CodeNotFound, "")
+}
+
+// LockForMessageChange records the thread lock of a model command (M2-16).
+func (t *threads) LockForMessageChange(_ context.Context, id ids.ID) error {
+	t.j.add("lock-thread", id)
+	return nil
 }
 
 func (t *threads) Locate(_ context.Context, list []ids.ID) ([]chat.ThreadInfo, error) {
@@ -577,7 +592,8 @@ func newWorld(t *testing.T) *world {
 
 // build (re)creates the use cases over the fakes of w.
 func (w *world) build() {
-	svc, err := app.New(app.Config{PageSizeDefault: 3, PageSizeMax: 5, StepDetailMaxBytes: 256, QueuedMaxAge: queuedMaxAge}, app.Deps{
+	svc, err := app.New(app.Config{PageSizeDefault: 3, PageSizeMax: 5, StepDetailMaxBytes: 256, QueuedMaxAge: queuedMaxAge,
+		EventPayloadMaxBytes: 65536}, app.Deps{
 		Repo: w.repo, UoW: uow{}, Authorizer: w.authz, Events: events{w.j}, Messages: msgs{w.j, w.msgFacts}, Threads: w.threads, Channels: w.channels,
 		Agents: w.agents, Cursors: cursors{}, Errors: w.errs, Log: slog.New(slog.NewJSONHandler(w.log, nil)), Clock: w.clk, Metrics: w.metrics,
 		Versions: versions{}, Audit: w.audit, Telemetry: w.telemetry, Expiry: expiryJournal{w.j},

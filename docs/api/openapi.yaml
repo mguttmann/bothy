@@ -13209,6 +13209,12 @@ paths:
       operationId: listChannelCommands
       summary: List commands usable in a channel
       tags: [Commands]
+      description: |-
+        Lists the registered commands offered in the channel: those of the channel's effective operator first, then those
+        of guest agents (only with `allow_mentioned_agents`) and of apps with `write` on the channel, each group ordered by
+        lower-case name, owner and ID. Per owner and name only the most specific scope appears (`channel` before `space`
+        before `instance`). The built-in commands are not part of the list; the client shows them from its own list. A dm
+        channel lists nothing.
       x-authz-action: command.read
       x-rate-limit-class: rl.read
       parameters:
@@ -13262,6 +13268,10 @@ paths:
       operationId: registerCommand
       summary: Register a command
       tags: [Commands]
+      description: |-
+        Registers a command of the calling agent or app. A built-in name answers `409 conflict` with `reason:
+        command_name_reserved`; a name the owner already uses on the same scope target answers `409 conflict` without a
+        reason.
       x-authz-action: command.register
       x-rate-limit-class: rl.admin
       parameters:
@@ -13379,6 +13389,10 @@ paths:
       operationId: updateCommand
       summary: Replace a command definition
       tags: [Commands]
+      description: |-
+        Replaces the definition of a command of the caller. A built-in name answers `409 conflict` with `reason:
+        command_name_reserved`; a name the owner already uses on the same scope target answers `409 conflict` without a
+        reason. An identical definition answers the command unchanged.
       x-authz-action: command.register
       x-rate-limit-class: rl.admin
       parameters:
@@ -25460,7 +25474,9 @@ components:
       properties:
         thread_id:
           $ref: '#/components/schemas/Uuid'
-          description: Absent invokes in the main thread or creates a thread per `auto_thread`.
+          description: 'Absent: in a text channel the main thread for a control command, and for a model command only when
+            `auto_thread` is false; otherwise `400 validation_failed` (`/thread_id`, `required`), because a command has no
+            message from which the `auto_thread` thread could start.'
         options:
           type: array
           items:
@@ -25471,6 +25487,8 @@ components:
       properties:
         invocation_id:
           $ref: '#/components/schemas/Uuid'
+          description: New per accepted invocation; it appears as `invocation_id` in `command.invoked` and as
+            `command_invocation_id` in `agent.invocation`.
         command_id:
           $ref: '#/components/schemas/Uuid'
         channel_id:
@@ -25482,6 +25500,7 @@ components:
           description: Run created for non-control commands.
         accepted:
           type: boolean
+          description: Always true; a refusal is an error response.
     AutocompleteQuery:
       type: object
       additionalProperties: false
@@ -26982,6 +27001,18 @@ components:
           $ref: '#/components/schemas/Uuid'
         command_invocation_id:
           $ref: '#/components/schemas/Uuid'
+        command_id:
+          $ref: '#/components/schemas/Uuid'
+          description: Triggering command; set exactly for `trigger_kind = command`.
+        command_name:
+          type: string
+          description: Name of the triggering command; set exactly for `trigger_kind = command`.
+          examples: [escalate]
+        options:
+          type: array
+          description: Parsed option values in the order of the command definition; set exactly for `trigger_kind = command`.
+          items:
+            $ref: '#/components/schemas/CommandOptionValue'
         triggered_by:
           $ref: '#/components/schemas/PrincipalRef'
         billing_mode:
@@ -27048,6 +27079,8 @@ components:
           $ref: '#/components/schemas/Uuid'
         run_id:
           $ref: '#/components/schemas/Uuid'
+          description: Active run of the command owner in the thread at execution time; absent when the owner has none
+            (R-AZ-25). Never the run of another agent.
         invoked_by:
           $ref: '#/components/schemas/PrincipalRef'
         options:

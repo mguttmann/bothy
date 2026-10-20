@@ -16,6 +16,63 @@ import (
 	"github.com/oapi-codegen/runtime"
 )
 
+// CreateThreadWithBody Create a forum post or a thread from a message
+//
+// A `first_message` uses its `client_msg_id` for idempotency; without it, send `Idempotency-Key`.
+//
+// Takes any type of body and a specified content type.
+//
+// Corresponds with POST /channels/{channel_id}/threads (the `CreateThread` operationId).
+func (c *Client) CreateThreadWithBody(ctx context.Context, channelId ChannelIdPath, params *CreateThreadParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewCreateThreadRequestWithBody(c.Server, channelId, params, contentType, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// CreateThread Create a forum post or a thread from a message
+//
+// A `first_message` uses its `client_msg_id` for idempotency; without it, send `Idempotency-Key`.
+//
+// Takes a body of the `application/json` content type.
+//
+// Corresponds with POST /channels/{channel_id}/threads (the `CreateThread` operationId).
+func (c *Client) CreateThread(ctx context.Context, channelId ChannelIdPath, params *CreateThreadParams, body CreateThreadJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewCreateThreadRequest(c.Server, channelId, params, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// CreateUploadWithBody Start an upload
+//
+// Checks in this order (12, 3.1): size against `file.max_upload_bytes` (413 `payload_too_large`), quota `file.quota_bytes_per_principal` (409 `conflict` with `reason` `quota_exceeded`), open sessions (429), free space of the file system driver (503 `unavailable` with `reason` `storage_full`). A denied type answers 415 `unsupported_media_type` with `reason` `file_type_denied`.
+//
+// Takes any type of body and a specified content type.
+//
+// Corresponds with POST /channels/{channel_id}/uploads (the `CreateUpload` operationId).
+func (c *Client) CreateUploadWithBody(ctx context.Context, channelId ChannelIdPath, params *CreateUploadParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewCreateUploadRequestWithBody(c.Server, channelId, params, contentType, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
 // CreateUpload Start an upload
 //
 // Checks in this order (12, 3.1): size against `file.max_upload_bytes` (413 `payload_too_large`), quota `file.quota_bytes_per_principal` (409 `conflict` with `reason` `quota_exceeded`), open sessions (429), free space of the file system driver (503 `unavailable` with `reason` `storage_full`). A denied type answers 415 `unsupported_media_type` with `reason` `file_type_denied`.
@@ -109,6 +166,10 @@ func (c *Client) AnswerAutocomplete(ctx context.Context, requestId RequestIdPath
 
 // RegisterCommandWithBody Register a command
 //
+// Registers a command of the calling agent or app. A built-in name answers `409 conflict` with `reason:
+// command_name_reserved`; a name the owner already uses on the same scope target answers `409 conflict` without a
+// reason.
+//
 // Takes any type of body and a specified content type.
 //
 // Corresponds with POST /commands (the `RegisterCommand` operationId).
@@ -125,6 +186,10 @@ func (c *Client) RegisterCommandWithBody(ctx context.Context, params *RegisterCo
 }
 
 // RegisterCommand Register a command
+//
+// Registers a command of the calling agent or app. A built-in name answers `409 conflict` with `reason:
+// command_name_reserved`; a name the owner already uses on the same scope target answers `409 conflict` without a
+// reason.
 //
 // Takes a body of the `application/json` content type.
 //
@@ -173,6 +238,10 @@ func (c *Client) GetCommand(ctx context.Context, commandId CommandIdPath, reqEdi
 
 // UpdateCommandWithBody Replace a command definition
 //
+// Replaces the definition of a command of the caller. A built-in name answers `409 conflict` with `reason:
+// command_name_reserved`; a name the owner already uses on the same scope target answers `409 conflict` without a
+// reason. An identical definition answers the command unchanged.
+//
 // Takes any type of body and a specified content type.
 //
 // Corresponds with PUT /commands/{command_id} (the `UpdateCommand` operationId).
@@ -189,6 +258,10 @@ func (c *Client) UpdateCommandWithBody(ctx context.Context, commandId CommandIdP
 }
 
 // UpdateCommand Replace a command definition
+//
+// Replaces the definition of a command of the caller. A built-in name answers `409 conflict` with `reason:
+// command_name_reserved`; a name the owner already uses on the same scope target answers `409 conflict` without a
+// reason. An identical definition answers the command unchanged.
 //
 // Takes a body of the `application/json` content type.
 //
@@ -22456,6 +22529,12 @@ type ClientWithResponsesInterface interface {
 
 	// ListChannelCommandsWithResponse List commands usable in a channel
 	//
+	// Lists the registered commands offered in the channel: those of the channel's effective operator first, then those
+	// of guest agents (only with `allow_mentioned_agents`) and of apps with `write` on the channel, each group ordered by
+	// lower-case name, owner and ID. Per owner and name only the most specific scope appears (`channel` before `space`
+	// before `instance`). The built-in commands are not part of the list; the client shows them from its own list. A dm
+	// channel lists nothing.
+	//
 	// Returns a wrapper object for the known response body format(s).
 	//
 	// Corresponds with GET /channels/{channel_id}/commands (the `ListChannelCommands` operationId).
@@ -22786,12 +22865,20 @@ type ClientWithResponsesInterface interface {
 
 	// RegisterCommandWithBodyWithResponse Register a command
 	//
+	// Registers a command of the calling agent or app. A built-in name answers `409 conflict` with `reason:
+	// command_name_reserved`; a name the owner already uses on the same scope target answers `409 conflict` without a
+	// reason.
+	//
 	// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
 	//
 	// Corresponds with POST /commands (the `RegisterCommand` operationId).
 	RegisterCommandWithBodyWithResponse(ctx context.Context, params *RegisterCommandParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*RegisterCommandResponse, error)
 
 	// RegisterCommandWithResponse Register a command
+	//
+	// Registers a command of the calling agent or app. A built-in name answers `409 conflict` with `reason:
+	// command_name_reserved`; a name the owner already uses on the same scope target answers `409 conflict` without a
+	// reason.
 	//
 	// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
 	//
@@ -22814,12 +22901,20 @@ type ClientWithResponsesInterface interface {
 
 	// UpdateCommandWithBodyWithResponse Replace a command definition
 	//
+	// Replaces the definition of a command of the caller. A built-in name answers `409 conflict` with `reason:
+	// command_name_reserved`; a name the owner already uses on the same scope target answers `409 conflict` without a
+	// reason. An identical definition answers the command unchanged.
+	//
 	// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
 	//
 	// Corresponds with PUT /commands/{command_id} (the `UpdateCommand` operationId).
 	UpdateCommandWithBodyWithResponse(ctx context.Context, commandId CommandIdPath, params *UpdateCommandParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*UpdateCommandResponse, error)
 
 	// UpdateCommandWithResponse Replace a command definition
+	//
+	// Replaces the definition of a command of the caller. A built-in name answers `409 conflict` with `reason:
+	// command_name_reserved`; a name the owner already uses on the same scope target answers `409 conflict` without a
+	// reason. An identical definition answers the command unchanged.
 	//
 	// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
 	//
@@ -27130,120 +27225,4 @@ type SetCredentialHolderResponse429Headers struct {
 // SetCredentialHolderResponseDefaultHeaders the declared response headers of an HTTP default response for SetCredentialHolder
 type SetCredentialHolderResponseDefaultHeaders struct {
 	CorrelationId *CorrelationId
-}
-
-type SetCredentialHolderResponse struct {
-	Body         []byte
-	HTTPResponse *http.Response
-	// JSON200 the response for an HTTP 200 `application/json` response
-	JSON200 *Agent
-	// ApplicationproblemJSON400 the response for an HTTP 400 `application/problem+json` response
-	ApplicationproblemJSON400 *BadRequest
-	// ApplicationproblemJSON401 the response for an HTTP 401 `application/problem+json` response
-	ApplicationproblemJSON401 *Unauthorized
-	// ApplicationproblemJSON403 the response for an HTTP 403 `application/problem+json` response
-	ApplicationproblemJSON403 *Forbidden
-	// ApplicationproblemJSON404 the response for an HTTP 404 `application/problem+json` response
-	ApplicationproblemJSON404 *NotFound
-	// ApplicationproblemJSON409 the response for an HTTP 409 `application/problem+json` response
-	ApplicationproblemJSON409 *Conflict
-	// ApplicationproblemJSON412 the response for an HTTP 412 `application/problem+json` response
-	ApplicationproblemJSON412 *PreconditionFailed
-	// ApplicationproblemJSON428 the response for an HTTP 428 `application/problem+json` response
-	ApplicationproblemJSON428 *PreconditionRequired
-	// ApplicationproblemJSON429 the response for an HTTP 429 `application/problem+json` response
-	ApplicationproblemJSON429 *TooManyRequests
-	// ApplicationproblemJSONDefault the response for an HTTP default `application/problem+json` response
-	ApplicationproblemJSONDefault *Error
-	// Headers200 the parsed response headers for an HTTP 200 response
-	Headers200 *SetCredentialHolderResponse200Headers
-	// Headers400 the parsed response headers for an HTTP 400 response
-	Headers400 *SetCredentialHolderResponse400Headers
-	// Headers401 the parsed response headers for an HTTP 401 response
-	Headers401 *SetCredentialHolderResponse401Headers
-	// Headers403 the parsed response headers for an HTTP 403 response
-	Headers403 *SetCredentialHolderResponse403Headers
-	// Headers404 the parsed response headers for an HTTP 404 response
-	Headers404 *SetCredentialHolderResponse404Headers
-	// Headers409 the parsed response headers for an HTTP 409 response
-	Headers409 *SetCredentialHolderResponse409Headers
-	// Headers412 the parsed response headers for an HTTP 412 response
-	Headers412 *SetCredentialHolderResponse412Headers
-	// Headers428 the parsed response headers for an HTTP 428 response
-	Headers428 *SetCredentialHolderResponse428Headers
-	// Headers429 the parsed response headers for an HTTP 429 response
-	Headers429 *SetCredentialHolderResponse429Headers
-	// HeadersDefault the parsed response headers for an HTTP default response
-	HeadersDefault *SetCredentialHolderResponseDefaultHeaders
-}
-
-// GetJSON200 returns the response for an HTTP 200 `application/json` response
-func (r SetCredentialHolderResponse) GetJSON200() *Agent {
-	return r.JSON200
-}
-
-// GetApplicationproblemJSON400 returns the response for an HTTP 400 `application/problem+json` response
-func (r SetCredentialHolderResponse) GetApplicationproblemJSON400() *BadRequest {
-	return r.ApplicationproblemJSON400
-}
-
-// GetApplicationproblemJSON401 returns the response for an HTTP 401 `application/problem+json` response
-func (r SetCredentialHolderResponse) GetApplicationproblemJSON401() *Unauthorized {
-	return r.ApplicationproblemJSON401
-}
-
-// GetApplicationproblemJSON403 returns the response for an HTTP 403 `application/problem+json` response
-func (r SetCredentialHolderResponse) GetApplicationproblemJSON403() *Forbidden {
-	return r.ApplicationproblemJSON403
-}
-
-// GetApplicationproblemJSON404 returns the response for an HTTP 404 `application/problem+json` response
-func (r SetCredentialHolderResponse) GetApplicationproblemJSON404() *NotFound {
-	return r.ApplicationproblemJSON404
-}
-
-// GetApplicationproblemJSON409 returns the response for an HTTP 409 `application/problem+json` response
-func (r SetCredentialHolderResponse) GetApplicationproblemJSON409() *Conflict {
-	return r.ApplicationproblemJSON409
-}
-
-// GetApplicationproblemJSON412 returns the response for an HTTP 412 `application/problem+json` response
-func (r SetCredentialHolderResponse) GetApplicationproblemJSON412() *PreconditionFailed {
-	return r.ApplicationproblemJSON412
-}
-
-// GetApplicationproblemJSON428 returns the response for an HTTP 428 `application/problem+json` response
-func (r SetCredentialHolderResponse) GetApplicationproblemJSON428() *PreconditionRequired {
-	return r.ApplicationproblemJSON428
-}
-
-// GetApplicationproblemJSON429 returns the response for an HTTP 429 `application/problem+json` response
-func (r SetCredentialHolderResponse) GetApplicationproblemJSON429() *TooManyRequests {
-	return r.ApplicationproblemJSON429
-}
-
-// GetApplicationproblemJSONDefault returns the response for an HTTP default `application/problem+json` response
-func (r SetCredentialHolderResponse) GetApplicationproblemJSONDefault() *Error {
-	return r.ApplicationproblemJSONDefault
-}
-
-// GetBody returns the raw response body bytes
-func (r SetCredentialHolderResponse) GetBody() []byte {
-	return r.Body
-}
-
-// Status returns HTTPResponse.Status
-func (r SetCredentialHolderResponse) Status() string {
-	if r.HTTPResponse != nil {
-		return r.HTTPResponse.Status
-	}
-	return http.StatusText(0)
-}
-
-// StatusCode returns HTTPResponse.StatusCode
-func (r SetCredentialHolderResponse) StatusCode() int {
-	if r.HTTPResponse != nil {
-		return r.HTTPResponse.StatusCode
-	}
-	return 0
 }

@@ -14,6 +14,139 @@ import (
 )
 
 // Status returns HTTPResponse.Status
+func (r ListMySettingsResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r ListMySettingsResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r ListMySettingsResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
+// DeleteMySettingResponse204Headers the declared response headers of an HTTP 204 response for DeleteMySetting
+type DeleteMySettingResponse204Headers struct {
+	CorrelationId   *CorrelationId
+	RateLimit       *string
+	RateLimitPolicy *string
+}
+
+// DeleteMySettingResponse400Headers the declared response headers of an HTTP 400 response for DeleteMySetting
+type DeleteMySettingResponse400Headers struct {
+	CorrelationId *CorrelationId
+}
+
+// DeleteMySettingResponse401Headers the declared response headers of an HTTP 401 response for DeleteMySetting
+type DeleteMySettingResponse401Headers struct {
+	CorrelationId   *CorrelationId
+	DPoPNonce       *string
+	SetCookie       *string
+	WWWAuthenticate *string
+}
+
+// DeleteMySettingResponse403Headers the declared response headers of an HTTP 403 response for DeleteMySetting
+type DeleteMySettingResponse403Headers struct {
+	CorrelationId *CorrelationId
+}
+
+// DeleteMySettingResponse404Headers the declared response headers of an HTTP 404 response for DeleteMySetting
+type DeleteMySettingResponse404Headers struct {
+	CorrelationId *CorrelationId
+}
+
+// DeleteMySettingResponse429Headers the declared response headers of an HTTP 429 response for DeleteMySetting
+type DeleteMySettingResponse429Headers struct {
+	CorrelationId   *CorrelationId
+	RateLimit       *string
+	RateLimitPolicy *string
+	RetryAfter      *int
+}
+
+// DeleteMySettingResponseDefaultHeaders the declared response headers of an HTTP default response for DeleteMySetting
+type DeleteMySettingResponseDefaultHeaders struct {
+	CorrelationId *CorrelationId
+}
+
+type DeleteMySettingResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// ApplicationproblemJSON400 the response for an HTTP 400 `application/problem+json` response
+	ApplicationproblemJSON400 *BadRequest
+	// ApplicationproblemJSON401 the response for an HTTP 401 `application/problem+json` response
+	ApplicationproblemJSON401 *Unauthorized
+	// ApplicationproblemJSON403 the response for an HTTP 403 `application/problem+json` response
+	ApplicationproblemJSON403 *Forbidden
+	// ApplicationproblemJSON404 the response for an HTTP 404 `application/problem+json` response
+	ApplicationproblemJSON404 *NotFound
+	// ApplicationproblemJSON429 the response for an HTTP 429 `application/problem+json` response
+	ApplicationproblemJSON429 *TooManyRequests
+	// ApplicationproblemJSONDefault the response for an HTTP default `application/problem+json` response
+	ApplicationproblemJSONDefault *Error
+	// Headers204 the parsed response headers for an HTTP 204 response
+	Headers204 *DeleteMySettingResponse204Headers
+	// Headers400 the parsed response headers for an HTTP 400 response
+	Headers400 *DeleteMySettingResponse400Headers
+	// Headers401 the parsed response headers for an HTTP 401 response
+	Headers401 *DeleteMySettingResponse401Headers
+	// Headers403 the parsed response headers for an HTTP 403 response
+	Headers403 *DeleteMySettingResponse403Headers
+	// Headers404 the parsed response headers for an HTTP 404 response
+	Headers404 *DeleteMySettingResponse404Headers
+	// Headers429 the parsed response headers for an HTTP 429 response
+	Headers429 *DeleteMySettingResponse429Headers
+	// HeadersDefault the parsed response headers for an HTTP default response
+	HeadersDefault *DeleteMySettingResponseDefaultHeaders
+}
+
+// GetApplicationproblemJSON400 returns the response for an HTTP 400 `application/problem+json` response
+func (r DeleteMySettingResponse) GetApplicationproblemJSON400() *BadRequest {
+	return r.ApplicationproblemJSON400
+}
+
+// GetApplicationproblemJSON401 returns the response for an HTTP 401 `application/problem+json` response
+func (r DeleteMySettingResponse) GetApplicationproblemJSON401() *Unauthorized {
+	return r.ApplicationproblemJSON401
+}
+
+// GetApplicationproblemJSON403 returns the response for an HTTP 403 `application/problem+json` response
+func (r DeleteMySettingResponse) GetApplicationproblemJSON403() *Forbidden {
+	return r.ApplicationproblemJSON403
+}
+
+// GetApplicationproblemJSON404 returns the response for an HTTP 404 `application/problem+json` response
+func (r DeleteMySettingResponse) GetApplicationproblemJSON404() *NotFound {
+	return r.ApplicationproblemJSON404
+}
+
+// GetApplicationproblemJSON429 returns the response for an HTTP 429 `application/problem+json` response
+func (r DeleteMySettingResponse) GetApplicationproblemJSON429() *TooManyRequests {
+	return r.ApplicationproblemJSON429
+}
+
+// GetApplicationproblemJSONDefault returns the response for an HTTP default `application/problem+json` response
+func (r DeleteMySettingResponse) GetApplicationproblemJSONDefault() *Error {
+	return r.ApplicationproblemJSONDefault
+}
+
+// GetBody returns the raw response body bytes
+func (r DeleteMySettingResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
 func (r DeleteMySettingResponse) Status() string {
 	if r.HTTPResponse != nil {
 		return r.HTTPResponse.Status
@@ -17819,6 +17952,12 @@ func (c *ClientWithResponses) PutChannelBehaviorWithResponse(ctx context.Context
 
 // ListChannelCommandsWithResponse List commands usable in a channel
 //
+// Lists the registered commands offered in the channel: those of the channel's effective operator first, then those
+// of guest agents (only with `allow_mentioned_agents`) and of apps with `write` on the channel, each group ordered by
+// lower-case name, owner and ID. Per owner and name only the most specific scope appears (`channel` before `space`
+// before `instance`). The built-in commands are not part of the list; the client shows them from its own list. A dm
+// channel lists nothing.
+//
 // Returns a wrapper object for the known response body format(s).
 //
 // Corresponds with GET /channels/{channel_id}/commands (the `ListChannelCommands` operationId).
@@ -18401,6 +18540,10 @@ func (c *ClientWithResponses) AnswerAutocompleteWithResponse(ctx context.Context
 
 // RegisterCommandWithBodyWithResponse Register a command
 //
+// Registers a command of the calling agent or app. A built-in name answers `409 conflict` with `reason:
+// command_name_reserved`; a name the owner already uses on the same scope target answers `409 conflict` without a
+// reason.
+//
 // Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
 //
 // Corresponds with POST /commands (the `RegisterCommand` operationId).
@@ -18413,6 +18556,10 @@ func (c *ClientWithResponses) RegisterCommandWithBodyWithResponse(ctx context.Co
 }
 
 // RegisterCommandWithResponse Register a command
+//
+// Registers a command of the calling agent or app. A built-in name answers `409 conflict` with `reason:
+// command_name_reserved`; a name the owner already uses on the same scope target answers `409 conflict` without a
+// reason.
 //
 // Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
 //
@@ -18453,6 +18600,10 @@ func (c *ClientWithResponses) GetCommandWithResponse(ctx context.Context, comman
 
 // UpdateCommandWithBodyWithResponse Replace a command definition
 //
+// Replaces the definition of a command of the caller. A built-in name answers `409 conflict` with `reason:
+// command_name_reserved`; a name the owner already uses on the same scope target answers `409 conflict` without a
+// reason. An identical definition answers the command unchanged.
+//
 // Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
 //
 // Corresponds with PUT /commands/{command_id} (the `UpdateCommand` operationId).
@@ -18465,6 +18616,10 @@ func (c *ClientWithResponses) UpdateCommandWithBodyWithResponse(ctx context.Cont
 }
 
 // UpdateCommandWithResponse Replace a command definition
+//
+// Replaces the definition of a command of the caller. A built-in name answers `409 conflict` with `reason:
+// command_name_reserved`; a name the owner already uses on the same scope target answers `409 conflict` without a
+// reason. An identical definition answers the command unchanged.
 //
 // Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
 //

@@ -89,6 +89,7 @@ enabled:             # operationIds that have a handler; sorted ascending
   - getBrandingLogo
   - getChannel
   - getChannelBehavior
+  - getCommand
   - getConsoleSession
   - getConsumerState
   - getDevice
@@ -118,11 +119,13 @@ enabled:             # operationIds that have a handler; sorted ascending
   - getWebhookKeys
   - handleOidcCallback
   - installApp
+  - invokeCommand
   - issueHostPairingCode
   - listActiveRuns
   - listAgents
   - listApps
   - listAuditEvents
+  - listChannelCommands
   - listChannelThreads
   - listEvents
   - listFeatureFlags
@@ -187,6 +190,8 @@ enabled:             # operationIds that have a handler; sorted ascending
   - redeemEnrollmentCode
   - redeliverWebhook
   - refreshToken
+  - registerCommand
+  - removeCommand
   - removeGroupMember
   - removeReaction
   - reopenThread
@@ -222,6 +227,7 @@ enabled:             # operationIds that have a handler; sorted ascending
   - updateAgent
   - updateBranding
   - updateChannel
+  - updateCommand
   - updateForumTag
   - updateGroup
   - updateHost
@@ -312,9 +318,6 @@ later:               # every other operationId of docs/api/openapi.yaml; sorted 
     ticket: M2-09
   - operation_id: getAgentTriggerers
     etappe: M2
-  - operation_id: getCommand
-    etappe: M2
-    ticket: M2-16
   - operation_id: getCostStats
     etappe: M6
     ticket: M6-05
@@ -361,9 +364,6 @@ later:               # every other operationId of docs/api/openapi.yaml; sorted 
   - operation_id: getUsageStats
     etappe: M6
     ticket: M6-05
-  - operation_id: invokeCommand
-    etappe: M2
-    ticket: M2-16
   - operation_id: leaveDm
     etappe: V3
     ticket: V3-01
@@ -372,9 +372,6 @@ later:               # every other operationId of docs/api/openapi.yaml; sorted 
     ticket: M2-12
   - operation_id: listAgentWebhookSubscriptions
     etappe: M2
-  - operation_id: listChannelCommands
-    etappe: M2
-    ticket: M2-16
   - operation_id: listGdprRequests
     etappe: M7
   - operation_id: listImportItems
@@ -404,15 +401,9 @@ later:               # every other operationId of docs/api/openapi.yaml; sorted 
   - operation_id: reconcileCosts
     etappe: M2
     ticket: M2-28
-  - operation_id: registerCommand
-    etappe: M2
-    ticket: M2-16
   - operation_id: registerPush
     etappe: M3
     ticket: M3-22
-  - operation_id: removeCommand
-    etappe: M2
-    ticket: M2-16
   - operation_id: reportAgentSession
     etappe: M2
     ticket: M2-12
@@ -461,9 +452,6 @@ later:               # every other operationId of docs/api/openapi.yaml; sorted 
   - operation_id: unregisterPush
     etappe: M3
     ticket: M3-22
-  - operation_id: updateCommand
-    etappe: M2
-    ticket: M2-16
   - operation_id: updateComponent
     etappe: M2
     ticket: M2-15

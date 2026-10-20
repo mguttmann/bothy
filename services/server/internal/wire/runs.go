@@ -26,7 +26,7 @@ import (
 )
 
 // RunsConfig binds the keys of the runs use cases (api.page_size_default, api.page_size_max,
-// run.step_detail_max_bytes, run.queued_max_age). The error names the key whose binding failed, never a value.
+// run.step_detail_max_bytes, run.queued_max_age, sync.event_payload_max_bytes). The error names the key whose binding failed, never a value.
 func RunsConfig(v *config.Values) (runsapp.Config, error) {
 	var c runsapp.Config
 	if err := config.Bind(v, &c); err != nil {
@@ -43,6 +43,8 @@ type Runs struct {
 	Service *runsapp.Service
 	// Handlers are the REST handlers.
 	Handlers *runshttp.Runs
+	// CommandHandlers is the handler of invokeCommand (M2-16).
+	CommandHandlers *runshttp.CommandExec
 	// Invocations issues and verifies the invocation tokens (M2-06); nil until
 	// BindInvocationTokens, which the signing keys step calls.
 	Invocations *runsapp.InvocationTokens
@@ -108,7 +110,7 @@ func NewRuns(cfg runsapp.Config, pool *pg.Pool, uow txn.UnitOfWork, az authorize
 	if err != nil {
 		return nil, err
 	}
-	return &Runs{Service: svc, Handlers: runshttp.New(svc), Expiry: sched}, nil
+	return &Runs{Service: svc, Handlers: runshttp.New(svc), CommandHandlers: runshttp.NewCommandExec(svc), Expiry: sched}, nil
 }
 
 // BindJobs gives the scheduler of runs.queued_expiry the inserter of the job runtime; the jobs
@@ -127,10 +129,14 @@ func (r *Runs) RegisterActiveGauge() error {
 	return err
 }
 
-// fillHandlers sets the nil runs handler of h to the one r built; a nil r leaves h unchanged.
+// fillHandlers sets the nil runs handlers of h to the ones r built (the reads and invokeCommand);
+// a nil r leaves h unchanged.
 func (r *Runs) fillHandlers(h *Handlers) {
 	if r != nil && h.Runs == nil {
 		h.Runs = r.Handlers
+	}
+	if r != nil && h.CommandExec == nil {
+		h.CommandExec = r.CommandHandlers
 	}
 }
 

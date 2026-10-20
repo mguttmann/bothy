@@ -95,11 +95,14 @@ type trigger struct {
 type resolver func(s *Service, ctx context.Context, run RunRow, in runs.DeliveryInput) (trigger, error)
 
 // resolvers is the table of design note 5: one entry per event type, for agent.invocation one per
-// runs.trigger_kind. interaction.created, command.invoked and the trigger kinds command and
-// interaction come with M2-15 and M2-16; until then such an event is never sent.
+// runs.trigger_kind; the trigger kind command and command.invoked come with M2-16
+// (delivery_command.go; command.invoked has no run and takes its own path, prepareInvoked).
+// interaction.created and the trigger kind interaction come with M2-15; until then such an event
+// is never sent.
 var resolvers = map[string]map[string]resolver{
-	domain.EventAgentInvocation: {triggerKindMessage: resolveInvocationMessage},
+	domain.EventAgentInvocation: {triggerKindMessage: resolveInvocationMessage, triggerKindCommand: resolveInvocationCommand},
 	domain.EventAgentFollowup:   {"": resolveFollowup},
+	domain.EventCommandInvoked:  {},
 }
 
 // resolveInvocationMessage is agent.invocation with trigger_kind message: the run's trigger and
@@ -198,7 +201,11 @@ func (s *Service) Prepare(ctx context.Context, in runs.DeliveryInput) (runs.Deli
 	var res outcome
 	err := s.d.UoW.Do(ctx, func(ctx context.Context) error {
 		var err error
-		res, err = s.prepare(ctx, in, box.issuer)
+		if in.Type == domain.EventCommandInvoked {
+			res, err = s.prepareInvoked(ctx, in, box.issuer)
+		} else {
+			res, err = s.prepare(ctx, in, box.issuer)
+		}
 		return err
 	})
 	if err != nil {

@@ -5913,14 +5913,25 @@ type AgentInvocationPayload struct {
 	// ChannelId UUIDv7 (RFC 9562), lowercase canonical form.
 	ChannelId Uuid `json:"channel_id"`
 
+	// CommandId Triggering command; set exactly for `trigger_kind = command`.
+	CommandId *Uuid `json:"command_id,omitempty"`
+
 	// CommandInvocationId UUIDv7 (RFC 9562), lowercase canonical form.
 	CommandInvocationId *Uuid `json:"command_invocation_id,omitempty"`
+
+	// CommandName Name of the triggering command; set exactly for `trigger_kind = command`.
+	//
+	// Examples: escalate
+	CommandName *string `json:"command_name,omitempty"`
 
 	// InteractionId UUIDv7 (RFC 9562), lowercase canonical form.
 	InteractionId *Uuid `json:"interaction_id,omitempty"`
 
 	// MessageId Triggering message; the adapter reads its content with `run.context.read` (09, 4.6). Events outside resource `message` never carry message content (04, 2.2).
 	MessageId *Uuid `json:"message_id,omitempty"`
+
+	// Options Parsed option values in the order of the command definition; set exactly for `trigger_kind = command`.
+	Options *[]CommandOptionValue `json:"options,omitempty"`
 
 	// RunId UUIDv7 (RFC 9562), lowercase canonical form.
 	RunId Uuid `json:"run_id"`
@@ -7369,6 +7380,7 @@ type CommandChoice struct {
 
 // CommandInvocation defines model for CommandInvocation.
 type CommandInvocation struct {
+	// Accepted Always true; a refusal is an error response.
 	Accepted bool `json:"accepted"`
 
 	// ChannelId UUIDv7 (RFC 9562), lowercase canonical form.
@@ -7377,7 +7389,7 @@ type CommandInvocation struct {
 	// CommandId UUIDv7 (RFC 9562), lowercase canonical form.
 	CommandId Uuid `json:"command_id"`
 
-	// InvocationId UUIDv7 (RFC 9562), lowercase canonical form.
+	// InvocationId New per accepted invocation; it appears as `invocation_id` in `command.invoked` and as `command_invocation_id` in `agent.invocation`.
 	InvocationId Uuid `json:"invocation_id"`
 
 	// RunId Run created for non-control commands.
@@ -7391,7 +7403,7 @@ type CommandInvocation struct {
 type CommandInvoke struct {
 	Options *[]CommandOptionValue `json:"options,omitempty"`
 
-	// ThreadId Absent invokes in the main thread or creates a thread per `auto_thread`.
+	// ThreadId Absent: in a text channel the main thread for a control command, and for a model command only when `auto_thread` is false; otherwise `400 validation_failed` (`/thread_id`, `required`), because a command has no message from which the `auto_thread` thread could start.
 	ThreadId *Uuid `json:"thread_id,omitempty"`
 }
 
@@ -7473,7 +7485,7 @@ type CommandInvokedPayload struct {
 	InvokedBy PrincipalRef         `json:"invoked_by"`
 	Options   []CommandOptionValue `json:"options"`
 
-	// RunId UUIDv7 (RFC 9562), lowercase canonical form.
+	// RunId Active run of the command owner in the thread at execution time; absent when the owner has none (R-AZ-25). Never the run of another agent.
 	RunId *Uuid `json:"run_id,omitempty"`
 
 	// ThreadId UUIDv7 (RFC 9562), lowercase canonical form.
@@ -15997,6 +16009,12 @@ type PutChannelBehaviorParams struct {
 	IfMatch IfMatchRequired `json:"If-Match"`
 }
 
+// InvokeCommandParams defines parameters for InvokeCommand.
+type InvokeCommandParams struct {
+	// IdempotencyKey UUIDv7 chosen by the client per logical operation. A repeat with the same request returns the stored response; a different request gives 422 `idempotency_key_reuse`; a repeat while the first is running gives 409 `request_in_progress`. Kept for `sync.idempotency_key_ttl`.
+	IdempotencyKey *IdempotencyKey `json:"Idempotency-Key,omitempty"`
+}
+
 // ExportChannelParams defines parameters for ExportChannel.
 type ExportChannelParams struct {
 	// From Start of the range (inclusive).
@@ -16074,6 +16092,18 @@ type CreateThreadParams struct {
 type CreateUploadParams struct {
 	// IdempotencyKey UUIDv7 chosen by the client per logical operation. A repeat with the same request returns the stored response; a different request gives 422 `idempotency_key_reuse`; a repeat while the first is running gives 409 `request_in_progress`. Kept for `sync.idempotency_key_ttl`.
 	IdempotencyKey *IdempotencyKey `json:"Idempotency-Key,omitempty"`
+}
+
+// RegisterCommandParams defines parameters for RegisterCommand.
+type RegisterCommandParams struct {
+	// IdempotencyKey UUIDv7 chosen by the client per logical operation. A repeat with the same request returns the stored response; a different request gives 422 `idempotency_key_reuse`; a repeat while the first is running gives 409 `request_in_progress`. Kept for `sync.idempotency_key_ttl`.
+	IdempotencyKey *IdempotencyKey `json:"Idempotency-Key,omitempty"`
+}
+
+// UpdateCommandParams defines parameters for UpdateCommand.
+type UpdateCommandParams struct {
+	// IfMatch ETag of the version the change is based on, e.g. `"7"`. Mismatch gives 412 `version_conflict`.
+	IfMatch IfMatchRequired `json:"If-Match"`
 }
 
 // EndViewAsParams defines parameters for EndViewAs.
@@ -16756,6 +16786,9 @@ type ArchiveChannelJSONRequestBody = ReasonBody
 // PutChannelBehaviorJSONRequestBody defines body for PutChannelBehavior for application/json ContentType.
 type PutChannelBehaviorJSONRequestBody = ChannelBehaviorPut
 
+// InvokeCommandJSONRequestBody defines body for InvokeCommand for application/json ContentType.
+type InvokeCommandJSONRequestBody = CommandInvoke
+
 // PutChannelDraftJSONRequestBody defines body for PutChannelDraft for application/json ContentType.
 type PutChannelDraftJSONRequestBody = DraftPut
 
@@ -16788,6 +16821,12 @@ type CreateUploadJSONRequestBody = UploadCreate
 
 // SubmitClientMetricsJSONRequestBody defines body for SubmitClientMetrics for application/json ContentType.
 type SubmitClientMetricsJSONRequestBody = ClientMetricsBatch
+
+// RegisterCommandJSONRequestBody defines body for RegisterCommand for application/json ContentType.
+type RegisterCommandJSONRequestBody = CommandRegister
+
+// UpdateCommandJSONRequestBody defines body for UpdateCommand for application/json ContentType.
+type UpdateCommandJSONRequestBody = CommandRegister
 
 // SubmitCspReportApplicationReportsPlusJSONRequestBody defines body for SubmitCspReport for application/reports+json ContentType.
 type SubmitCspReportApplicationReportsPlusJSONRequestBody = CspReportList

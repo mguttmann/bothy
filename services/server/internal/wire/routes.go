@@ -62,6 +62,11 @@ type Handlers struct {
 	// setAgentBillingMode, setAllAgentsBillingMode, setCredentialHolder and setAgentToolClass
 	// (agents, M1-51).
 	*agentshttp.Agents
+	// Commands implements registerCommand, updateCommand, removeCommand, getCommand and
+	// listChannelCommands (agents, M2-16).
+	*agentshttp.Commands
+	// CommandExec implements invokeCommand (runs, M2-16).
+	*runshttp.CommandExec
 	// Spaces implements listSpaces, createSpace, getSpace, updateSpace, moveSpace, archiveSpace
 	// and putMySidebarSpace (chat, M1-52).
 	*chathttp.Spaces

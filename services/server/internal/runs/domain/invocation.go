@@ -69,7 +69,7 @@ var ErrInvocationExpired = errors.New("runs: invocation token expired")
 //
 //	message, followup: RunID and MessageID
 //	interaction:       RunID and InteractionID
-//	command:           RunID and CommandID
+//	command:           RunID and CommandID; RunID may be zero only with Control (R-AZ-25)
 //	autocomplete:      CommandID, never RunID
 type InvocationGrant struct {
 	// AgentID becomes aud, TriggeredBy sub.
@@ -88,6 +88,10 @@ type InvocationGrant struct {
 	BillingMode, ToolClass string
 	// PermissionVersion is the permission version at delivery time; never negative.
 	PermissionVersion int64
+	// Control marks a command.invoked of a control command (M2-16 design note 13 c): only such a
+	// command grant may lack RunID, because the owner has no active run in the thread (R-AZ-25).
+	// Any other trigger kind with Control is refused (fail closed).
+	Control bool
 }
 
 // InvocationClaims are the claims of an invocation token, members in the order of the table of
@@ -140,6 +144,12 @@ type InvocationExpectation struct {
 func NewInvocationClaims(g InvocationGrant, jti ids.ID, now time.Time, ttl time.Duration) (InvocationClaims, error) {
 	if jti.IsZero() || ttl < time.Second {
 		return InvocationClaims{}, fmt.Errorf("%w: zero jti or ttl below one second", ErrInvocationInvalid)
+	}
+	if g.Control && g.TriggerKind != TriggerCommand {
+		return InvocationClaims{}, fmt.Errorf("%w: control on a grant that is not a command", ErrInvocationInvalid)
+	}
+	if g.TriggerKind == TriggerCommand && g.RunID.IsZero() && !g.Control {
+		return InvocationClaims{}, fmt.Errorf("%w: a command grant without run that is not a control command", ErrInvocationInvalid)
 	}
 	iat := now.Unix()
 	c := InvocationClaims{
@@ -248,9 +258,10 @@ func (c InvocationClaims) validateTrigger() error {
 	if object == "" || set != 1 {
 		return fmt.Errorf("%w: exactly one triggering object of the trigger kind", ErrInvocationInvalid)
 	}
-	// A command without a run (control command of an owner without an active run, R-AZ-25) is
-	// refused until M2-16 adds that grant.
-	if (c.RunID == "") != (TriggerKind(c.TriggerKind) == TriggerAutocomplete) {
+	// A command may lack run_id: a control command of an owner without an active run in the thread
+	// (R-AZ-25, M2-16); the issuer allows that only for a control grant (NewInvocationClaims).
+	switch k := TriggerKind(c.TriggerKind); {
+	case k == TriggerAutocomplete && c.RunID != "", k != TriggerAutocomplete && k != TriggerCommand && c.RunID == "":
 		return fmt.Errorf("%w: run_id does not fit the trigger kind", ErrInvocationInvalid)
 	}
 	return nil

@@ -5975,14 +5975,25 @@ type AgentInvocationPayload struct {
 	// ChannelId UUIDv7 (RFC 9562), lowercase canonical form.
 	ChannelId Uuid `json:"channel_id"`
 
+	// CommandId Triggering command; set exactly for `trigger_kind = command`.
+	CommandId *Uuid `json:"command_id,omitempty"`
+
 	// CommandInvocationId UUIDv7 (RFC 9562), lowercase canonical form.
 	CommandInvocationId *Uuid `json:"command_invocation_id,omitempty"`
+
+	// CommandName Name of the triggering command; set exactly for `trigger_kind = command`.
+	//
+	// Examples: escalate
+	CommandName *string `json:"command_name,omitempty"`
 
 	// InteractionId UUIDv7 (RFC 9562), lowercase canonical form.
 	InteractionId *Uuid `json:"interaction_id,omitempty"`
 
 	// MessageId Triggering message; the adapter reads its content with `run.context.read` (09, 4.6). Events outside resource `message` never carry message content (04, 2.2).
 	MessageId *Uuid `json:"message_id,omitempty"`
+
+	// Options Parsed option values in the order of the command definition; set exactly for `trigger_kind = command`.
+	Options *[]CommandOptionValue `json:"options,omitempty"`
 
 	// RunId UUIDv7 (RFC 9562), lowercase canonical form.
 	RunId Uuid `json:"run_id"`
@@ -7431,6 +7442,7 @@ type CommandChoice struct {
 
 // CommandInvocation defines model for CommandInvocation.
 type CommandInvocation struct {
+	// Accepted Always true; a refusal is an error response.
 	Accepted bool `json:"accepted"`
 
 	// ChannelId UUIDv7 (RFC 9562), lowercase canonical form.
@@ -7439,7 +7451,7 @@ type CommandInvocation struct {
 	// CommandId UUIDv7 (RFC 9562), lowercase canonical form.
 	CommandId Uuid `json:"command_id"`
 
-	// InvocationId UUIDv7 (RFC 9562), lowercase canonical form.
+	// InvocationId New per accepted invocation; it appears as `invocation_id` in `command.invoked` and as `command_invocation_id` in `agent.invocation`.
 	InvocationId Uuid `json:"invocation_id"`
 
 	// RunId Run created for non-control commands.
@@ -7453,7 +7465,7 @@ type CommandInvocation struct {
 type CommandInvoke struct {
 	Options *[]CommandOptionValue `json:"options,omitempty"`
 
-	// ThreadId Absent invokes in the main thread or creates a thread per `auto_thread`.
+	// ThreadId Absent: in a text channel the main thread for a control command, and for a model command only when `auto_thread` is false; otherwise `400 validation_failed` (`/thread_id`, `required`), because a command has no message from which the `auto_thread` thread could start.
 	ThreadId *Uuid `json:"thread_id,omitempty"`
 }
 
@@ -7535,7 +7547,7 @@ type CommandInvokedPayload struct {
 	InvokedBy PrincipalRef         `json:"invoked_by"`
 	Options   []CommandOptionValue `json:"options"`
 
-	// RunId UUIDv7 (RFC 9562), lowercase canonical form.
+	// RunId Active run of the command owner in the thread at execution time; absent when the owner has none (R-AZ-25). Never the run of another agent.
 	RunId *Uuid `json:"run_id,omitempty"`
 
 	// ThreadId UUIDv7 (RFC 9562), lowercase canonical form.
@@ -20742,6 +20754,12 @@ type ClientInterface interface {
 
 	// ListChannelCommands List commands usable in a channel
 	//
+	// Lists the registered commands offered in the channel: those of the channel's effective operator first, then those
+	// of guest agents (only with `allow_mentioned_agents`) and of apps with `write` on the channel, each group ordered by
+	// lower-case name, owner and ID. Per owner and name only the most specific scope appears (`channel` before `space`
+	// before `instance`). The built-in commands are not part of the list; the client shows them from its own list. A dm
+	// channel lists nothing.
+	//
 	// Corresponds with GET /channels/{channel_id}/commands (the `ListChannelCommands` operationId).
 	ListChannelCommands(ctx context.Context, channelId ChannelIdPath, reqEditors ...RequestEditorFn) (*http.Response, error)
 
@@ -21052,12 +21070,20 @@ type ClientInterface interface {
 
 	// RegisterCommandWithBody Register a command
 	//
+	// Registers a command of the calling agent or app. A built-in name answers `409 conflict` with `reason:
+	// command_name_reserved`; a name the owner already uses on the same scope target answers `409 conflict` without a
+	// reason.
+	//
 	// Takes any type of body and a specified content type.
 	//
 	// Corresponds with POST /commands (the `RegisterCommand` operationId).
 	RegisterCommandWithBody(ctx context.Context, params *RegisterCommandParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// RegisterCommand Register a command
+	//
+	// Registers a command of the calling agent or app. A built-in name answers `409 conflict` with `reason:
+	// command_name_reserved`; a name the owner already uses on the same scope target answers `409 conflict` without a
+	// reason.
 	//
 	// Takes a body of the `application/json` content type.
 	//
@@ -21076,12 +21102,20 @@ type ClientInterface interface {
 
 	// UpdateCommandWithBody Replace a command definition
 	//
+	// Replaces the definition of a command of the caller. A built-in name answers `409 conflict` with `reason:
+	// command_name_reserved`; a name the owner already uses on the same scope target answers `409 conflict` without a
+	// reason. An identical definition answers the command unchanged.
+	//
 	// Takes any type of body and a specified content type.
 	//
 	// Corresponds with PUT /commands/{command_id} (the `UpdateCommand` operationId).
 	UpdateCommandWithBody(ctx context.Context, commandId CommandIdPath, params *UpdateCommandParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// UpdateCommand Replace a command definition
+	//
+	// Replaces the definition of a command of the caller. A built-in name answers `409 conflict` with `reason:
+	// command_name_reserved`; a name the owner already uses on the same scope target answers `409 conflict` without a
+	// reason. An identical definition answers the command unchanged.
 	//
 	// Takes a body of the `application/json` content type.
 	//
@@ -25063,6 +25097,12 @@ func (c *Client) PutChannelBehavior(ctx context.Context, channelId ChannelIdPath
 
 // ListChannelCommands List commands usable in a channel
 //
+// Lists the registered commands offered in the channel: those of the channel's effective operator first, then those
+// of guest agents (only with `allow_mentioned_agents`) and of apps with `write` on the channel, each group ordered by
+// lower-case name, owner and ID. Per owner and name only the most specific scope appears (`channel` before `space`
+// before `instance`). The built-in commands are not part of the list; the client shows them from its own list. A dm
+// channel lists nothing.
+//
 // Corresponds with GET /channels/{channel_id}/commands (the `ListChannelCommands` operationId).
 func (c *Client) ListChannelCommands(ctx context.Context, channelId ChannelIdPath, reqEditors ...RequestEditorFn) (*http.Response, error) {
 	req, err := NewListChannelCommandsRequest(c.Server, channelId)
@@ -25633,63 +25673,6 @@ func (c *Client) CreateChannelTemplate(ctx context.Context, channelId ChannelIdP
 // Corresponds with GET /channels/{channel_id}/threads (the `ListChannelThreads` operationId).
 func (c *Client) ListChannelThreads(ctx context.Context, channelId ChannelIdPath, params *ListChannelThreadsParams, reqEditors ...RequestEditorFn) (*http.Response, error) {
 	req, err := NewListChannelThreadsRequest(c.Server, channelId, params)
-	if err != nil {
-		return nil, err
-	}
-	req = req.WithContext(ctx)
-	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
-		return nil, err
-	}
-	return c.Client.Do(req)
-}
-
-// CreateThreadWithBody Create a forum post or a thread from a message
-//
-// A `first_message` uses its `client_msg_id` for idempotency; without it, send `Idempotency-Key`.
-//
-// Takes any type of body and a specified content type.
-//
-// Corresponds with POST /channels/{channel_id}/threads (the `CreateThread` operationId).
-func (c *Client) CreateThreadWithBody(ctx context.Context, channelId ChannelIdPath, params *CreateThreadParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
-	req, err := NewCreateThreadRequestWithBody(c.Server, channelId, params, contentType, body)
-	if err != nil {
-		return nil, err
-	}
-	req = req.WithContext(ctx)
-	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
-		return nil, err
-	}
-	return c.Client.Do(req)
-}
-
-// CreateThread Create a forum post or a thread from a message
-//
-// A `first_message` uses its `client_msg_id` for idempotency; without it, send `Idempotency-Key`.
-//
-// Takes a body of the `application/json` content type.
-//
-// Corresponds with POST /channels/{channel_id}/threads (the `CreateThread` operationId).
-func (c *Client) CreateThread(ctx context.Context, channelId ChannelIdPath, params *CreateThreadParams, body CreateThreadJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
-	req, err := NewCreateThreadRequest(c.Server, channelId, params, body)
-	if err != nil {
-		return nil, err
-	}
-	req = req.WithContext(ctx)
-	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
-		return nil, err
-	}
-	return c.Client.Do(req)
-}
-
-// CreateUploadWithBody Start an upload
-//
-// Checks in this order (12, 3.1): size against `file.max_upload_bytes` (413 `payload_too_large`), quota `file.quota_bytes_per_principal` (409 `conflict` with `reason` `quota_exceeded`), open sessions (429), free space of the file system driver (503 `unavailable` with `reason` `storage_full`). A denied type answers 415 `unsupported_media_type` with `reason` `file_type_denied`.
-//
-// Takes any type of body and a specified content type.
-//
-// Corresponds with POST /channels/{channel_id}/uploads (the `CreateUpload` operationId).
-func (c *Client) CreateUploadWithBody(ctx context.Context, channelId ChannelIdPath, params *CreateUploadParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
-	req, err := NewCreateUploadRequestWithBody(c.Server, channelId, params, contentType, body)
 	if err != nil {
 		return nil, err
 	}

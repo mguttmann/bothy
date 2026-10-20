@@ -316,6 +316,8 @@ func TestConfigSchemaBuilds(t *testing.T) {
 		"webhook.allowed_hosts":         {Kind: config.KindStringList, Default: "", Chapter: "03-datenmodell.md"},
 		"command.max_per_principal":     {Kind: config.KindInt, Default: "100", Min: "1", Chapter: "09-agenten.md"},
 		"command.description_max_chars": {Kind: config.KindInt, Default: "100", Min: "1", Chapter: "09-agenten.md"},
+		// M2-16
+		"command.autocomplete_max_choices": {Kind: config.KindInt, Default: "25", Min: "1", Chapter: "09-agenten.md"},
 
 		// M3-13
 		"search.languages":  {Kind: config.KindStringList, Default: `["german","english"]`, Chapter: "14-suche.md"},
