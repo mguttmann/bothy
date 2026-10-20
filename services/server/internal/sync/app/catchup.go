@@ -229,6 +229,8 @@ func admit(ctx context.Context, az authorize.Authorizer, a actor.Actor, ev sync.
 		return false, authorize.Decision{}, nil
 	}
 	r := authorize.ResourceFromEvent(ev.ResourceKind, ev.ResourceID, ev.SpaceID, ev.ChannelID, ev.ThreadID)
+	// The audience is matched above; a receive action on the agent itself decides on it (M2-08).
+	r.Event.AudienceID = ev.AudiencePrincipalID
 	d, err := az.Authorize(ctx, a, act, r)
 	if err != nil {
 		return false, authorize.Decision{}, err
