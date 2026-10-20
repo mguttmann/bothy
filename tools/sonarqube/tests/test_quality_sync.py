@@ -572,3 +572,12 @@ def test_visibility_refusal_fails_with_the_server_message(
     assert state.visibility == "private"
     err = capsys.readouterr().err
     assert "update_visibility: HTTP 400: Organization 'example-org' is not allowed" in err
+
+
+def test_visibility_of_an_unknown_project_fails_without_a_change() -> None:
+    state = State(cloud=True, project="another-project")
+    with running(state) as url:
+        with pytest.raises(qs.SonarError, match=f"project '{PROJECT}' was not found"):
+            qs.ensure_public(_client(url, organization=ORG))
+        assert state.visibility == "private"
+        assert _posts(state, "/api/projects/update_visibility") == []
