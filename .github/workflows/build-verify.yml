@@ -1,0 +1,637 @@
+# SPDX-License-Identifier: Apache-2.0
+#
+# Full verification of build branches on GitHub-hosted runners (docs/quality/push-discipline.md,
+# "Build branches"). A push to build/<ticket> runs every gate of the required CI, the make
+# targets of `make gates` and the platform jobs of ci.yml, split into parallel jobs; the job
+# build-verify-ok sums them up. No secrets: the private deny list and SonarQube stay in the
+# pull request CI (ci.yml), this workflow scans with the generic deny rules. It is no required
+# check of main; ci-ok of the pull request stays the merge gate.
+# tools/ci/tests/test_build_verify_workflow.py keeps the target set equal to `make gates`.
+#
+# Runners (ADR 0039): every job runs on a GitHub-hosted runner with a fixed label;
+# tools/ci/check_runners.py enforces it and limits the trigger to exactly build/**.
+
+name: build-verify
+
+on:
+  push:
+    branches: ['build/**']
+
+permissions:
+  contents: read
+
+# A newer push to the same build branch cancels the older run.
+concurrency:
+  group: build-verify-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  GIT_AUTHOR_NAME: Alex
+  GIT_AUTHOR_EMAIL: alex@example.com
+  GIT_COMMITTER_NAME: Alex
+  GIT_COMMITTER_EMAIL: alex@example.com
+  # Build branch only: the runner check of this older base does not know the build trigger.
+  PYTEST_ADDOPTS: --deselect ci/tests/test_check_runners.py::test_repository_workflows_pass
+  # Chromium's sandbox can be blocked where user namespaces are restricted; the renderer only
+  # processes this repository's own diagrams (as in ci.yml).
+  MMDC_PUPPETEER_CONFIG: tools/node/puppeteer-ci.json
+
+jobs:
+  plan:
+    name: plan
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    outputs:
+      base: ${{ steps.plan.outputs.base }}
+      components: ${{ steps.plan.outputs.components }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: astral-sh/setup-uv@1c37ad07a6a961277cf70c0d37d6f313000f5884 # v10.3.0
+        with:
+          enable-cache: false
+      # The pushed diff is measured from the merge base with main, as a pull request shows it;
+      # without one every component runs.
+      - id: plan
+        name: Select components from the diff against main
+        env:
+          HEAD_SHA: ${{ github.sha }}
+        run: |
+          if base=$(git merge-base origin/main "$HEAD_SHA"); then
+            components=$(uv run --no-project --python 3.14 tools/ci/components.py changed --base "$base" --head "$HEAD_SHA")
+          else
+            base=""
+            components=all
+          fi
+          echo "base=$base" >> "$GITHUB_OUTPUT"
+          echo "components=$components" >> "$GITHUB_OUTPUT"
+          echo "base: $base, components: $components"
+
+  # Code and repository structure gates; commitlint covers the commits since the merge base.
+  static:
+    name: static (format, codegen, lint, types, structure)
+    needs: plan
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: astral-sh/setup-uv@1c37ad07a6a961277cf70c0d37d6f313000f5884 # v10.3.0
+        with:
+          enable-cache: true
+          cache-dependency-glob: tools/uv.lock
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: "24"
+          cache: npm
+          cache-dependency-path: tools/node/package-lock.json
+      - if: hashFiles('services/*/go.mod') != ''
+        uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version-file: ${{ hashFiles('services/server/go.mod') != '' && 'services/server/go.mod' || 'services/host/go.mod' }}
+          cache-dependency-path: services/*/go.sum
+      - if: hashFiles('apps/*/pubspec.yaml', 'packages/*/pubspec.yaml') != ''
+        uses: subosito/flutter-action@1a449444c387b1966244ae4d4f8c696479add0b2 # v2.23.0
+        with:
+          channel: stable
+          flutter-version-file: pubspec.yaml
+          cache: true
+      - if: hashFiles('packages/*/android/gradlew') != ''
+        uses: actions/setup-java@b843ebf9b913146b38da2eaa7aeddf76074ae1ad # v6.1.0
+        with:
+          distribution: temurin
+          java-version: "17"
+      - if: hashFiles('packages/*/android/gradlew') != ''
+        uses: android-actions/setup-android@be39fa834029ff78f1a44aa3bb0819b8fc2bd8fd # v4.0.4
+      - name: Restore pinned binaries and hook environments
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: |
+            .cache/tools
+            ~/.cache/pre-commit
+          key: gates-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('tools/bin/tools.lock.json', '.pre-commit-config.yaml') }}
+      - run: make bootstrap-ci
+      - name: make fmt-check codegen-check lint typecheck arch register-check migrations-lint flag-check commitlint runners-check labels-check release-pins
+        env:
+          COMPONENTS: ${{ needs.plan.outputs.components }}
+          COMMIT_RANGE: ${{ needs.plan.outputs.base && format('{0}..{1}', needs.plan.outputs.base, github.sha) || '' }}
+          # zizmor's online audits in make lint read public data with the run's token.
+          GH_TOKEN: ${{ github.token }}
+        run: make fmt-check codegen-check lint typecheck arch register-check migrations-lint flag-check commitlint runners-check labels-check release-pins COMPONENTS="$COMPONENTS"
+
+  # The Python tools: `make test coverage` with no component selected runs only their tests.
+  test-tools:
+    name: test (tools)
+    needs: plan
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: astral-sh/setup-uv@1c37ad07a6a961277cf70c0d37d6f313000f5884 # v10.3.0
+        with:
+          enable-cache: true
+          cache-dependency-glob: tools/uv.lock
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: "24"
+          cache: npm
+          cache-dependency-path: tools/node/package-lock.json
+      - if: hashFiles('services/*/go.mod') != ''
+        uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version-file: ${{ hashFiles('services/server/go.mod') != '' && 'services/server/go.mod' || 'services/host/go.mod' }}
+          cache-dependency-path: services/*/go.sum
+      - if: hashFiles('apps/*/pubspec.yaml', 'packages/*/pubspec.yaml') != ''
+        uses: subosito/flutter-action@1a449444c387b1966244ae4d4f8c696479add0b2 # v2.23.0
+        with:
+          channel: stable
+          flutter-version-file: pubspec.yaml
+          cache: true
+      - if: hashFiles('packages/*/android/gradlew') != ''
+        uses: actions/setup-java@b843ebf9b913146b38da2eaa7aeddf76074ae1ad # v6.1.0
+        with:
+          distribution: temurin
+          java-version: "17"
+      - if: hashFiles('packages/*/android/gradlew') != ''
+        uses: android-actions/setup-android@be39fa834029ff78f1a44aa3bb0819b8fc2bd8fd # v4.0.4
+      - name: Restore pinned binaries and hook environments
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: |
+            .cache/tools
+            ~/.cache/pre-commit
+          key: gates-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('tools/bin/tools.lock.json', '.pre-commit-config.yaml') }}
+      - run: make bootstrap-ci
+      - name: make test coverage
+        env:
+          COMPONENTS: none
+        run: make test coverage COMPONENTS="$COMPONENTS"
+
+  # Go tests against a real Postgres (Docker on the runner) and their coverage threshold.
+  test-server:
+    name: test (server)
+    needs: plan
+    if: needs.plan.outputs.components == 'all' || contains(format(' {0} ', needs.plan.outputs.components), ' server ')
+    runs-on: ubuntu-24.04
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: astral-sh/setup-uv@1c37ad07a6a961277cf70c0d37d6f313000f5884 # v10.3.0
+        with:
+          enable-cache: true
+          cache-dependency-glob: tools/uv.lock
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: "24"
+          cache: npm
+          cache-dependency-path: tools/node/package-lock.json
+      - if: hashFiles('services/*/go.mod') != ''
+        uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version-file: ${{ hashFiles('services/server/go.mod') != '' && 'services/server/go.mod' || 'services/host/go.mod' }}
+          cache-dependency-path: services/*/go.sum
+      - if: hashFiles('apps/*/pubspec.yaml', 'packages/*/pubspec.yaml') != ''
+        uses: subosito/flutter-action@1a449444c387b1966244ae4d4f8c696479add0b2 # v2.23.0
+        with:
+          channel: stable
+          flutter-version-file: pubspec.yaml
+          cache: true
+      - if: hashFiles('packages/*/android/gradlew') != ''
+        uses: actions/setup-java@b843ebf9b913146b38da2eaa7aeddf76074ae1ad # v6.1.0
+        with:
+          distribution: temurin
+          java-version: "17"
+      - if: hashFiles('packages/*/android/gradlew') != ''
+        uses: android-actions/setup-android@be39fa834029ff78f1a44aa3bb0819b8fc2bd8fd # v4.0.4
+      - name: Restore pinned binaries and hook environments
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: |
+            .cache/tools
+            ~/.cache/pre-commit
+          key: gates-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('tools/bin/tools.lock.json', '.pre-commit-config.yaml') }}
+      - run: make bootstrap-ci
+      - name: make test coverage
+        env:
+          COMPONENTS: server
+        run: make test coverage COMPONENTS="$COMPONENTS"
+
+  # Dart tests of the workspace, the JVM tests of the Android code and their coverage threshold.
+  test-apps:
+    name: test (apps)
+    needs: plan
+    if: needs.plan.outputs.components == 'all' || contains(format(' {0} ', needs.plan.outputs.components), ' apps ')
+    runs-on: ubuntu-24.04
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: astral-sh/setup-uv@1c37ad07a6a961277cf70c0d37d6f313000f5884 # v10.3.0
+        with:
+          enable-cache: true
+          cache-dependency-glob: tools/uv.lock
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: "24"
+          cache: npm
+          cache-dependency-path: tools/node/package-lock.json
+      - if: hashFiles('services/*/go.mod') != ''
+        uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version-file: ${{ hashFiles('services/server/go.mod') != '' && 'services/server/go.mod' || 'services/host/go.mod' }}
+          cache-dependency-path: services/*/go.sum
+      - if: hashFiles('apps/*/pubspec.yaml', 'packages/*/pubspec.yaml') != ''
+        uses: subosito/flutter-action@1a449444c387b1966244ae4d4f8c696479add0b2 # v2.23.0
+        with:
+          channel: stable
+          flutter-version-file: pubspec.yaml
+          cache: true
+      - if: hashFiles('packages/*/android/gradlew') != ''
+        uses: actions/setup-java@b843ebf9b913146b38da2eaa7aeddf76074ae1ad # v6.1.0
+        with:
+          distribution: temurin
+          java-version: "17"
+      - if: hashFiles('packages/*/android/gradlew') != ''
+        uses: android-actions/setup-android@be39fa834029ff78f1a44aa3bb0819b8fc2bd8fd # v4.0.4
+      - name: Restore pinned binaries and hook environments
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: |
+            .cache/tools
+            ~/.cache/pre-commit
+          key: gates-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('tools/bin/tools.lock.json', '.pre-commit-config.yaml') }}
+      - run: make bootstrap-ci
+      - name: make test coverage
+        env:
+          COMPONENTS: apps
+        run: make test coverage COMPONENTS="$COMPONENTS"
+
+  # The SDK and plugin test suites, each with its own threshold.
+  test-sdk-plugins:
+    name: test (SDKs and plugins)
+    needs: plan
+    if: needs.plan.outputs.components == 'all' || contains(format(' {0} ', needs.plan.outputs.components), ' sdk-python ') || contains(format(' {0} ', needs.plan.outputs.components), ' sdk-typescript ') || contains(format(' {0} ', needs.plan.outputs.components), ' plugins ')
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: astral-sh/setup-uv@1c37ad07a6a961277cf70c0d37d6f313000f5884 # v10.3.0
+        with:
+          enable-cache: true
+          cache-dependency-glob: tools/uv.lock
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: "24"
+          cache: npm
+          cache-dependency-path: tools/node/package-lock.json
+      - if: hashFiles('services/*/go.mod') != ''
+        uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version-file: ${{ hashFiles('services/server/go.mod') != '' && 'services/server/go.mod' || 'services/host/go.mod' }}
+          cache-dependency-path: services/*/go.sum
+      - if: hashFiles('apps/*/pubspec.yaml', 'packages/*/pubspec.yaml') != ''
+        uses: subosito/flutter-action@1a449444c387b1966244ae4d4f8c696479add0b2 # v2.23.0
+        with:
+          channel: stable
+          flutter-version-file: pubspec.yaml
+          cache: true
+      - if: hashFiles('packages/*/android/gradlew') != ''
+        uses: actions/setup-java@b843ebf9b913146b38da2eaa7aeddf76074ae1ad # v6.1.0
+        with:
+          distribution: temurin
+          java-version: "17"
+      - if: hashFiles('packages/*/android/gradlew') != ''
+        uses: android-actions/setup-android@be39fa834029ff78f1a44aa3bb0819b8fc2bd8fd # v4.0.4
+      - name: Restore pinned binaries and hook environments
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: |
+            .cache/tools
+            ~/.cache/pre-commit
+          key: gates-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('tools/bin/tools.lock.json', '.pre-commit-config.yaml') }}
+      - run: make bootstrap-ci
+      - name: make test coverage
+        env:
+          PLANNED: ${{ needs.plan.outputs.components }}
+        # Only the SDK and plugin components of the plan; server and apps have their own jobs.
+        run: |
+          selected=""
+          for c in $PLANNED; do
+            case "$c" in
+              all) selected="sdk-python sdk-typescript plugins" ;;
+              sdk-python|sdk-typescript|plugins) selected="$selected $c" ;;
+            esac
+          done
+          make test coverage COMPONENTS="${selected# }"
+
+  # Documentation, configuration reference, diagrams, API contract and client gates.
+  docs:
+    name: docs and contracts
+    needs: plan
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: astral-sh/setup-uv@1c37ad07a6a961277cf70c0d37d6f313000f5884 # v10.3.0
+        with:
+          enable-cache: true
+          cache-dependency-glob: tools/uv.lock
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: "24"
+          cache: npm
+          cache-dependency-path: tools/node/package-lock.json
+      - if: hashFiles('services/*/go.mod') != ''
+        uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version-file: ${{ hashFiles('services/server/go.mod') != '' && 'services/server/go.mod' || 'services/host/go.mod' }}
+          cache-dependency-path: services/*/go.sum
+      - if: hashFiles('apps/*/pubspec.yaml', 'packages/*/pubspec.yaml') != ''
+        uses: subosito/flutter-action@1a449444c387b1966244ae4d4f8c696479add0b2 # v2.23.0
+        with:
+          channel: stable
+          flutter-version-file: pubspec.yaml
+          cache: true
+      - if: hashFiles('packages/*/android/gradlew') != ''
+        uses: actions/setup-java@b843ebf9b913146b38da2eaa7aeddf76074ae1ad # v6.1.0
+        with:
+          distribution: temurin
+          java-version: "17"
+      - if: hashFiles('packages/*/android/gradlew') != ''
+        uses: android-actions/setup-android@be39fa834029ff78f1a44aa3bb0819b8fc2bd8fd # v4.0.4
+      - name: Restore pinned binaries and hook environments
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: |
+            .cache/tools
+            ~/.cache/pre-commit
+          key: gates-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('tools/bin/tools.lock.json', '.pre-commit-config.yaml') }}
+      - run: make bootstrap-ci
+      - name: make docs config-doc-check linkcheck diagrams catalog-check api-lint api-checks api-breaking ops-check api-clients tokens
+        env:
+          COMPONENTS: ${{ needs.plan.outputs.components }}
+        run: make docs config-doc-check linkcheck diagrams catalog-check api-lint api-checks api-breaking ops-check api-clients tokens COMPONENTS="$COMPONENTS"
+
+  # Secret scan of the whole history, Semgrep, Trivy, OSV and the license gate.
+  security:
+    name: security and supply chain
+    needs: plan
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: astral-sh/setup-uv@1c37ad07a6a961277cf70c0d37d6f313000f5884 # v10.3.0
+        with:
+          enable-cache: true
+          cache-dependency-glob: tools/uv.lock
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: "24"
+          cache: npm
+          cache-dependency-path: tools/node/package-lock.json
+      - if: hashFiles('services/*/go.mod') != ''
+        uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version-file: ${{ hashFiles('services/server/go.mod') != '' && 'services/server/go.mod' || 'services/host/go.mod' }}
+          cache-dependency-path: services/*/go.sum
+      - if: hashFiles('apps/*/pubspec.yaml', 'packages/*/pubspec.yaml') != ''
+        uses: subosito/flutter-action@1a449444c387b1966244ae4d4f8c696479add0b2 # v2.23.0
+        with:
+          channel: stable
+          flutter-version-file: pubspec.yaml
+          cache: true
+      - if: hashFiles('packages/*/android/gradlew') != ''
+        uses: actions/setup-java@b843ebf9b913146b38da2eaa7aeddf76074ae1ad # v6.1.0
+        with:
+          distribution: temurin
+          java-version: "17"
+      - if: hashFiles('packages/*/android/gradlew') != ''
+        uses: android-actions/setup-android@be39fa834029ff78f1a44aa3bb0819b8fc2bd8fd # v4.0.4
+      - name: Restore pinned binaries and hook environments
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: |
+            .cache/tools
+            ~/.cache/pre-commit
+          key: gates-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('tools/bin/tools.lock.json', '.pre-commit-config.yaml') }}
+      - run: make bootstrap-ci
+      - name: make gitleaks semgrep trivy osv licenses
+        env:
+          COMPONENTS: ${{ needs.plan.outputs.components }}
+        run: make gitleaks semgrep trivy osv licenses COMPONENTS="$COMPONENTS"
+
+  # The generic deny rules over the pushed commits, the files and the branch name; the private
+  # list needs a secret and runs in ci.yml for the pull request.
+  denylist:
+    name: denylist (generic rules)
+    needs: plan
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: astral-sh/setup-uv@1c37ad07a6a961277cf70c0d37d6f313000f5884 # v10.3.0
+        with:
+          enable-cache: true
+          cache-dependency-glob: tools/uv.lock
+      - name: make denylist (generic rules only)
+        env:
+          BOTHY_DENYLIST_NAMES: ${{ github.ref_name }}
+          DENYLIST_RANGE: ${{ needs.plan.outputs.base && format('{0}..{1}', needs.plan.outputs.base, github.sha) || '' }}
+        run: make denylist DENYLIST_FLAGS=--allow-missing
+
+  # As in ci.yml: bothy-postgres built natively per architecture with its two-container test.
+  postgres-image-amd64:
+    name: postgres-image (amd64)
+    needs: plan
+    if: needs.plan.outputs.components == 'all' || contains(format(' {0} ', needs.plan.outputs.components), ' server ')
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: astral-sh/setup-uv@1c37ad07a6a961277cf70c0d37d6f313000f5884 # v10.3.0
+        with:
+          enable-cache: true
+          cache-dependency-glob: tools/uv.lock
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version-file: services/server/go.mod
+          cache-dependency-path: services/server/go.sum
+      - uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
+      - name: make postgres-image postgres-image-test
+        run: make postgres-image postgres-image-test
+
+  postgres-image-arm64:
+    name: postgres-image (arm64)
+    needs: plan
+    if: needs.plan.outputs.components == 'all' || contains(format(' {0} ', needs.plan.outputs.components), ' server ')
+    runs-on: ubuntu-24.04-arm
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: astral-sh/setup-uv@1c37ad07a6a961277cf70c0d37d6f313000f5884 # v10.3.0
+        with:
+          enable-cache: true
+          cache-dependency-glob: tools/uv.lock
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version-file: services/server/go.mod
+          cache-dependency-path: services/server/go.sum
+      - uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
+      - name: make postgres-image postgres-image-test
+        run: make postgres-image postgres-image-test
+
+  # As in ci.yml: platform tests of the apps on macOS, Windows and Android emulators.
+  apps-macos:
+    name: apps (macOS)
+    needs: plan
+    if: needs.plan.outputs.components == 'all' || contains(format(' {0} ', needs.plan.outputs.components), ' apps ')
+    runs-on: macos-15
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: subosito/flutter-action@1a449444c387b1966244ae4d4f8c696479add0b2 # v2.23.0
+        with:
+          channel: stable
+          flutter-version-file: pubspec.yaml
+          cache: true
+      - uses: astral-sh/setup-uv@1c37ad07a6a961277cf70c0d37d6f313000f5884 # v10.3.0
+        with:
+          enable-cache: false
+      - name: make apps-platform
+        shell: bash
+        run: uv run --project tools --locked --quiet python tools/ci/apps_platform.py
+
+  apps-windows:
+    name: apps (Windows)
+    needs: plan
+    if: needs.plan.outputs.components == 'all' || contains(format(' {0} ', needs.plan.outputs.components), ' apps ')
+    runs-on: windows-2025
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: subosito/flutter-action@1a449444c387b1966244ae4d4f8c696479add0b2 # v2.23.0
+        with:
+          channel: stable
+          flutter-version-file: pubspec.yaml
+          cache: true
+      - uses: astral-sh/setup-uv@1c37ad07a6a961277cf70c0d37d6f313000f5884 # v10.3.0
+        with:
+          enable-cache: false
+      - name: make apps-platform
+        shell: bash
+        run: uv run --project tools --locked --quiet python tools/ci/apps_platform.py
+
+  apps-android-26:
+    name: apps (Android API 26)
+    needs: plan
+    if: github.event.repository.visibility == 'public' && (needs.plan.outputs.components == 'all' || contains(format(' {0} ', needs.plan.outputs.components), ' apps '))
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Enable hardware acceleration (kvm)
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
+      - uses: actions/setup-java@b843ebf9b913146b38da2eaa7aeddf76074ae1ad # v6.1.0
+        with:
+          distribution: temurin
+          java-version: "17"
+      - uses: astral-sh/setup-uv@1c37ad07a6a961277cf70c0d37d6f313000f5884 # v10.3.0
+        with:
+          enable-cache: false
+      - name: make apps-platform (Android)
+        uses: reactivecircus/android-emulator-runner@a421e43855164a8197daf9d8d40fe71c6996bb0d # v2.38.0
+        with:
+          api-level: 26
+          arch: x86_64
+          target: google_apis
+          disable-animations: true
+          emulator-options: -no-window -gpu swiftshader_indirect -no-snapshot -noaudio -no-boot-anim
+          script: uv run --project tools --locked --quiet python tools/ci/apps_platform.py --system android
+
+  apps-android-36:
+    name: apps (Android API 36)
+    needs: plan
+    if: github.event.repository.visibility == 'public' && (needs.plan.outputs.components == 'all' || contains(format(' {0} ', needs.plan.outputs.components), ' apps '))
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Enable hardware acceleration (kvm)
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
+      - uses: actions/setup-java@b843ebf9b913146b38da2eaa7aeddf76074ae1ad # v6.1.0
+        with:
+          distribution: temurin
+          java-version: "17"
+      - uses: astral-sh/setup-uv@1c37ad07a6a961277cf70c0d37d6f313000f5884 # v10.3.0
+        with:
+          enable-cache: false
+      - name: make apps-platform (Android)
+        uses: reactivecircus/android-emulator-runner@a421e43855164a8197daf9d8d40fe71c6996bb0d # v2.38.0
+        with:
+          api-level: 36
+          arch: x86_64
+          target: google_apis
+          disable-animations: true
+          emulator-options: -no-window -gpu swiftshader_indirect -no-snapshot -noaudio -no-boot-anim
+          script: uv run --project tools --locked --quiet python tools/ci/apps_platform.py --system android
+
+  # One result per push: every job passed, or was skipped because the push does not touch its
+  # component. A failed, cancelled or missing plan fails it.
+  build-verify-ok:
+    name: build-verify-ok
+    needs: [plan, static, test-tools, test-server, test-apps, test-sdk-plugins, docs, security, denylist, postgres-image-amd64, postgres-image-arm64, apps-macos, apps-windows, apps-android-26, apps-android-36]
+    if: always()
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - name: All jobs passed or were skipped
+        env:
+          RESULTS: ${{ toJSON(needs) }}
+        run: |
+          printf '%s' "$RESULTS" | jq -r 'to_entries[] | "| \(.key) | \(.value.result) |"' \
+            | { echo "| job | result |"; echo "|---|---|"; cat; } >> "$GITHUB_STEP_SUMMARY"
+          printf '%s' "$RESULTS" | jq -e '.plan.result == "success" and ([.[] | .result] | all(. == "success" or . == "skipped"))' >/dev/null \
+            || { printf '%s' "$RESULTS" | jq -r 'to_entries[] | select(.value.result != "success" and .value.result != "skipped") | "failed: \(.key) (\(.value.result))"'; exit 1; }
+          echo "build-verify-ok: every job passed or was skipped"

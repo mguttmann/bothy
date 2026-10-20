@@ -9,6 +9,9 @@
 name: host-platform
 
 on:
+  # Build branch only: the platform runs of M2-45 on the throwaway runners.
+  push:
+    branches: ['build/M2-45']
   workflow_dispatch:
   schedule:
     - cron: "17 3 * * 1"
