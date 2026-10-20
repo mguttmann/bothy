@@ -1,17 +1,17 @@
-# Module `runs`
+# Modul `runs`
 
 Status: skeleton (M1-05) and the trigger decision as pure functions in `domain/` (M2-04). Interfaces, use cases and tables come with the tickets of the milestone; M2-05 applies the decision.
-The normative source is [docs/spec/02-architektur.md](../../../../docs/spec/02-architektur.md); where they differ, the chapter applies.
+Normativ ist [docs/spec/02-architektur.md](../../../../docs/spec/02-architektur.md); bei Abweichung gilt das Kapitel.
 
-## Purpose
+## Zweck
 
-Trigger decision, runs and run document, steps, follow-ups, components, interactions, command execution, invocation tokens.
+Auslöse-Entscheidung, Läufe und Lauf-Dokument, Schritte, Nachträge, Komponenten, Interaktionen, Befehlsausführung, Aufruf-Marken.
 
 ## Code
 
-- `internal/runs` (`doc.go`): port as the root package, so far only with a package comment. Interfaces, DTOs and In-Tx events come with the ticket that implements them.
+- `internal/runs` (`doc.go`): Port als Wurzelpaket, bisher nur mit Paketkommentar. Schnittstellen, DTOs und In-Tx-Ereignisse kommen mit dem Ticket, das sie umsetzt.
 - `internal/runs/domain` (M2-04): the trigger decision of [09-agenten.md](../../../../docs/spec/09-agenten.md) section 3 as pure functions. `trigger.go` holds the input types and `Decide`, `trigger_command.go` holds `DecideCommand`, `trigger_settle.go` holds `Verdict`, `Settlement` and `Settle`, `trigger_reasons.go` holds `Reason` (one constant per code of 09 3.5) and the constants of `Outcome`, `Step`, `Check`, `TranscriptSource` and `TriggerState`. The package imports only the standard library and `kernel-core` (`kernel/ids`, `kernel/errs`); it has no I/O, no clock, no randomness and never calls `authorize`.
-- `app/` and `adapters/<kind>/` are created with the first use case. `tools/archgen` generates their components from `architecture/modules.yaml`; a package outside these layers fails `make arch`.
+- `app/` und `adapters/<art>/` entstehen mit dem ersten Anwendungsfall. Ihre Komponenten erzeugt `tools/archgen` aus `architecture/modules.yaml`; ein Paket außerhalb dieser Schichten scheitert in `make arch`.
 
 ## Trigger decision
 
@@ -83,53 +83,53 @@ This package never yields `queued`, `working`, `done`, `cancelled` or `followup_
 - D-M2-04-4: the descriptor of the acceptance check above.
 - D-M2-04-5: invalid input (an unknown value of `Origin`, `ChannelKind`, `ThreadKind`, `BillingMode` or `VoiceMode`; `ThreadOperator` on a main thread; a main thread in a forum channel; an operator on a DM channel; a zero ID) returns an error with code `internal_error` and the zero `Decision`, which never invokes. The error names the field, never a value.
 
-## Port (root package `internal/runs`)
+## Port (Wurzelpaket `internal/runs`)
 
-- Inbound: `Runs` (read, context, start, resume, patch, end, cancel, overview), `Delivery` (delivery preparation with I2, guard rules and token), `Interactions`, `CommandExec` (including autocompletion).
-- Emits in-tx events: none.
-- Subscribes to in-tx events: `messaging.MessagePosted`, `messaging.MessageDeleted`, `files.FileFinalized` (write the held-back invocation), `agents.AgentDisabled`, `chat.ChannelReadOnlySet`, kernel `authorize.AccessChanged`.
-- Implements source ports and cross-cutting ports: `messaging.ComponentReader`, kernel `personaldata.Participant`.
+- Eingehend: `Runs` (Lesen, Kontext, Start, Wiederaufnahme, Patch, Ende, Abbruch, Übersicht), `Delivery` (Zustellvorbereitung mit I2, Schutzregeln und Marke), `Interactions`, `CommandExec` (inklusive Autovervollständigung).
+- Gibt In-Tx-Ereignisse aus: keine.
+- Abonniert In-Tx-Ereignisse: `messaging.MessagePosted`, `messaging.MessageDeleted`, `files.FileFinalized` (zurückgehaltenen Aufruf schreiben), `agents.AgentDisabled`, `chat.ChannelReadOnlySet`, kernel `authorize.AccessChanged`.
+- Implementiert Quellen-Ports und Querschnitts-Ports: `messaging.ComponentReader`, kernel `personaldata.Participant`.
 
-## Dependencies
+## Abhängigkeiten
 
-May use the ports of these modules: `instance`, `chat`, `agents`, `messaging`, `billing`.
+Darf die Ports dieser Module nutzen: `instance`, `chat`, `agents`, `messaging`, `billing`.
 
-Reason: sign the token; operator, mention rule, project binding; policy and session; anchor and `trigger_state`; post costs.
+Grund: Marke signieren; Bediener, Erwähnungsregel, Projektbindung; Richtlinie und Sitzung; Anker und `trigger_state`; Kosten buchen.
 
-In addition, for all modules: `internal/kernel`; `internal/platform` and `api/` only in `adapters/`. The domain layer imports only `kernel-core`.
-Checked by go-arch-lint (ADR 0008).
+Zusätzlich für alle Module: `internal/kernel`; `internal/platform` und `api/` nur in `adapters/`.
+Geprüft durch go-arch-lint (ADR 0008).
 
-## Tables
+## Tabellen
 
 `runs`, `run_steps`, `run_followups`, `message_components`, `interactions`.
 
-Only this module writes and reads these tables via SQL (03-datenmodell.md, principle 12).
+Nur dieses Modul schreibt und liest diese Tabellen per SQL (03-datenmodell.md, Grundsatz 12).
 
-## Actions (05-aktionen.md)
+## Aktionen (05-aktionen.md)
 
 `agent.invoke`, `run.read`, `run.overview.read`, `run.context.read`, `run.start`, `run.update`, `run.finish`, `run.cancel`, `run.followup.create`, `component.update`, `interaction.create`, `interaction.respond`, `command.autocomplete`, `command.autocomplete.respond`, `command.invoke`.
 
-## Events and WebSocket ops
+## Ereignisse und WebSocket-Ops
 
-- Durable: `run.state_changed`, `agent.invocation`, `agent.followup`, `run.cancel_requested`, `interaction.created`, `command.invoked`.
-- Ephemeral: `run.updated`, `command.autocomplete_requested`.
-- WebSocket ops (client to server): `run.update`, `command.autocomplete_result`.
+- Dauerhaft: `run.state_changed`, `agent.invocation`, `agent.followup`, `run.cancel_requested`, `interaction.created`, `command.invoked`.
+- Kurzlebig: `run.updated`, `command.autocomplete_requested`.
+- WebSocket-Ops (Client an Server): `run.update`, `command.autocomplete_result`.
 
-## Background jobs
+## Hintergrundjobs
 
-| Job | Trigger | Queue |
+| Job | Auslöser | Warteschlange |
 |---|---|---|
-| `runs.cancel_timeout` | periodic, `agent.cancel_grace` | `maintenance` |
-| `runs.stall_check` | periodic, `run.stall_after` | `maintenance` |
-| `runs.component_expiry` | periodic, `component.default_ttl` | `maintenance` |
-| `runs.invocation_hold_timeout` | scheduled, `file.invocation_hold_max` or `voice.transcript_hold_max` | `default` |
+| `runs.cancel_timeout` | periodisch, `agent.cancel_grace` | `maintenance` |
+| `runs.stall_check` | periodisch, `run.stall_after` | `maintenance` |
+| `runs.component_expiry` | periodisch, `component.default_ttl` | `maintenance` |
+| `runs.invocation_hold_timeout` | terminiert, `file.invocation_hold_max` bzw. `voice.transcript_hold_max` | `default` |
 
-## Notes for the build
+## Hinweise für den Bau
 
-- State transitions are compare-and-swap on `state` and `version` (03, `runs`).
-- Live box patches are stored without `event_log` and go out as ephemeral `run.updated` to focused connections (04, 11).
-- The invocation token is created anew at every delivery, after `agent.invoke` and I2 with current permissions; if the check fails, the run becomes `failed` (fail closed, 04, 15.3).
+- Zustandsübergänge sind Compare-and-swap auf `state` und `version` (03, `runs`).
+- Live-Box-Patches speichern ohne `event_log` und gehen kurzlebig als `run.updated` an fokussierte Verbindungen (04, 11).
+- Die Aufruf-Marke entsteht bei jeder Zustellung neu, nach `agent.invoke` und I2 mit aktuellen Rechten; scheitert die Prüfung, wird der Lauf `failed` (fail closed, 04, 15.3).
 
-## Chapters
+## Kapitel
 
 [02-architektur.md](../../../../docs/spec/02-architektur.md), [09-agenten.md](../../../../docs/spec/09-agenten.md), [10-backend-richtlinie.md](../../../../docs/spec/10-backend-richtlinie.md)
