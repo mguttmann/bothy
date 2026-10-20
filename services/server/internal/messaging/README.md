@@ -216,6 +216,10 @@ language, no mentions. `bothy.message.created` counts it, `message.created` foll
 no device. It returns `AnchorRef{MessageID, ThreadSeq}`. The deferred foreign key `messages.run_id`
 lets the run and its anchor be written in either order.
 
+`TriggerMessageOf(ctx, messageID)` (M2-08): the trigger facts of one message for the delivery
+check of runs, without content and without an authorization: place, author as `PrincipalRef`,
+origin, kind, the stored mentions and the trigger state. `not_found` for an unknown message.
+
 Lock order: neither port takes the thread lock for a message change. runs holds its `runs` row
 and then updates the message (`SetTriggerState` last in the acceptance), so both orders of runs
 take `runs` before `messages`; the anchor's `AppendToThread` locks the thread row like any new
