@@ -186,6 +186,9 @@ type server struct {
 	chat *Chat
 	// messaging is the messaging module (M1-56), built in the chat step over the threads of chat.
 	messaging *Messaging
+	// runs is the runs module (M2-05), built in the chat step over messaging, chat and agents; the
+	// chat step binds the acceptance of the unit of work to it.
+	runs *Runs
 	// personal is the personal data of sync (M1-61), built in the chat step over chat and messaging.
 	personal *Personal
 	// stats is the client metrics part of the stats module (M4-31), built in the chat step.
@@ -834,6 +837,10 @@ func (s *server) startChat(context.Context) error {
 	if err != nil {
 		return err
 	}
+	rn, err := s.buildRuns(pool, a, az, sy, c, m)
+	if err != nil {
+		return err
+	}
 	pcfg, err := PersonalConfig(s.values)
 	if err != nil {
 		return err
@@ -846,7 +853,7 @@ func (s *server) startChat(context.Context) error {
 	if err != nil {
 		return err
 	}
-	r, err := s.buildSyncReads(pool, a.UoW(), az, c, m, p)
+	r, err := s.buildSyncReads(pool, a.UoW(), az, c, m, p, rn)
 	if err != nil {
 		return err
 	}
@@ -855,9 +862,41 @@ func (s *server) startChat(context.Context) error {
 		return err
 	}
 	s.mu.Lock()
-	s.chat, s.messaging, s.personal, s.notify, s.syncReads, s.stats = c, m, p, n, r, st
+	s.chat, s.messaging, s.runs, s.personal, s.notify, s.syncReads, s.stats = c, m, rn, p, n, r, st
 	s.mu.Unlock()
 	return nil
+}
+
+// buildRuns builds the runs module (M2-05) in the chat step over messaging (anchor and trigger
+// state), the threads and channel facts of chat and the agent facts of the agents step, binds the
+// acceptance of the unit of work to it and, in the worker role, registers the gauge
+// bothy.run.active on the global meter provider.
+func (s *server) buildRuns(pool *pg.Pool, a *Audit, az authorize.Authorizer, sy *Sync, c *Chat, m *Messaging) (*Runs, error) {
+	cfg, err := RunsConfig(s.values)
+	if err != nil {
+		return nil, err
+	}
+	s.mu.Lock()
+	ag := s.agents
+	s.mu.Unlock()
+	if ag == nil {
+		return nil, errors.New("wire: the runs module needs the agents step")
+	}
+	rn, err := NewRuns(cfg, pool, a.UoW(), az, RunsDeps{
+		Events: sy.Appender(), Messages: m.Service, Threads: c.Service, Channels: c.Service, Agents: ag.Service,
+	}, s.deps.Clock, s.logger())
+	if err != nil {
+		return nil, err
+	}
+	if err := a.RunsAcceptor().Bind(rn.Service); err != nil {
+		return nil, err
+	}
+	if s.worker() {
+		if err := rn.RegisterActiveGauge(); err != nil {
+			return nil, err
+		}
+	}
+	return rn, nil
 }
 
 // startNotify builds the notify module (M3-18) in the chat step over the chat service, the
@@ -882,7 +921,8 @@ func (s *server) startNotify(pool *pg.Pool, a *Audit, az authorize.Authorizer, s
 // buildSyncReads builds catch-up and snapshot of sync (M1-63) over the chat and messaging modules
 // and the personal data of the chat step, the agents and identity steps and the instance
 // settings (feature flags).
-func (s *server) buildSyncReads(pool *pg.Pool, uow txn.UnitOfWork, az authorize.Authorizer, c *Chat, m *Messaging, p *Personal) (*SyncReads, error) {
+func (s *server) buildSyncReads(pool *pg.Pool, uow txn.UnitOfWork, az authorize.Authorizer, c *Chat, m *Messaging, p *Personal,
+	rn *Runs) (*SyncReads, error) {
 	cfg, err := CatchUpConfig(s.values)
 	if err != nil {
 		return nil, err
@@ -894,6 +934,7 @@ func (s *server) buildSyncReads(pool *pg.Pool, uow txn.UnitOfWork, az authorize.
 		return nil, errors.New("wire: catch-up and snapshot need the agents, identity and settings steps")
 	}
 	return NewSyncReads(cfg, SyncReadDeps{Pool: pool, UoW: uow, Authorizer: az, Chat: c.Service, Messaging: m.Service, Personal: p.Service,
+		Runs:   rn.Service,
 		Agents: ag.Service, Directory: id.Directory, Flags: st.Admin})
 }
 
@@ -1023,6 +1064,7 @@ func (s *server) handlers() Handlers {
 		s.chat.fillHandlers(&h)
 	}
 	s.messaging.fillHandlers(&h)
+	s.runs.fillHandlers(&h)
 	s.personal.fillHandlers(&h)
 	s.notify.fillHandlers(&h)
 	s.syncReads.fillHandlers(&h)
