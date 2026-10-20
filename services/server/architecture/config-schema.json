@@ -926,6 +926,42 @@
       "doc": "Number of full backups kept in the off-site repository repo2."
     },
     {
+      "name": "backup.restore_test.sample_files",
+      "env": "BOTHY_BACKUP__RESTORE_TEST__SAMPLE_FILES",
+      "kind": "int",
+      "default": "200",
+      "required": false,
+      "enum": [],
+      "min": "1",
+      "max": "",
+      "chapter": "16-betrieb.md",
+      "doc": "Number of files whose object the restore test fetches from the object backup and hashes."
+    },
+    {
+      "name": "backup.restore_test.sample_threads",
+      "env": "BOTHY_BACKUP__RESTORE_TEST__SAMPLE_THREADS",
+      "kind": "int",
+      "default": "200",
+      "required": false,
+      "enum": [],
+      "min": "1",
+      "max": "",
+      "chapter": "16-betrieb.md",
+      "doc": "Number of threads whose thread_seq the restore test checks for gaps."
+    },
+    {
+      "name": "backup.restore_test.schedule",
+      "env": "BOTHY_BACKUP__RESTORE_TEST__SCHEDULE",
+      "kind": "string",
+      "default": "0 5 * * 6",
+      "required": false,
+      "enum": [],
+      "min": "",
+      "max": "",
+      "chapter": "16-betrieb.md",
+      "doc": "Five-field cron schedule in UTC of the automatic restore test."
+    },
+    {
       "name": "branding.product_name_max_chars",
       "env": "BOTHY_BRANDING__PRODUCT_NAME_MAX_CHARS",
       "kind": "int",
@@ -1389,6 +1425,18 @@
       "max": "",
       "chapter": "16-betrieb.md",
       "doc": "Database role of the process: bothy_app for api and worker, bothy_owner for bothy migrate."
+    },
+    {
+      "name": "dr.rto_target",
+      "env": "BOTHY_DR__RTO_TARGET",
+      "kind": "duration",
+      "default": "4h",
+      "required": false,
+      "enum": [],
+      "min": "1s",
+      "max": "",
+      "chapter": "16-betrieb.md",
+      "doc": "Target for the time to restore operation; the restore test fails when it takes longer."
     },
     {
       "name": "egress.allowed_hosts",

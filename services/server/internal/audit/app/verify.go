@@ -66,12 +66,7 @@ func (l *Log) Verify(ctx context.Context, req audit.VerifyRequest) (audit.Verify
 		rowFailure, rowFailed = walk.Failure()
 		res.CheckpointsCompared = walk.Compared()
 	}
-	missing, hasMissing := missingCheckpointRow(chain.Hashes, nonEmpty, from == first, to == head, first, head)
-	failure, failed := domain.FirstFailure(rowFailure, rowFailed, missing, hasMissing)
-	failure, failed = domain.FirstFailure(failure, failed, domain.Failure{Seq: chain.InvalidSeq, Reason: domain.CheckpointInvalid}, chain.Invalid)
-	// A row below 1 lies outside the chain, which starts at row 1 (see walk): never checked, so
-	// never ok.
-	failure, failed = domain.FirstFailure(failure, failed, domain.Failure{Seq: first, Reason: domain.SeqGap}, nonEmpty && first < 1)
+	failure, failed := verdict(rowFailure, rowFailed, chain, nonEmpty, from == first, to == head, first, head)
 	res.CheckedFromSeq, res.CheckedToSeq, res.OK = from, to, !failed
 	if failed {
 		res.FirstBrokenSeq, res.FailureReason = failure.Seq, string(failure.Reason)

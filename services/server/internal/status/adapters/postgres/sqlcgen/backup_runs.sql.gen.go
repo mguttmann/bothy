@@ -31,8 +31,8 @@ func (q *Queries) BackupRunsExists(ctx context.Context) (bool, error) {
 const finishBackupRun = `-- name: FinishBackupRun :execrows
 UPDATE backup_runs
 SET state = $1, finished_at = $2, size_bytes = $3,
-    manifest = $4, error = $5
-WHERE id = $6 AND state = 'running'
+    manifest = $4, checks = $5, error = $6
+WHERE id = $7 AND state = 'running'
 `
 
 type FinishBackupRunParams struct {
@@ -40,6 +40,7 @@ type FinishBackupRunParams struct {
 	FinishedAt pgtype.Timestamptz
 	SizeBytes  pgtype.Int8
 	Manifest   []byte
+	Checks     []byte
 	Error      pgtype.Text
 	ID         pgtype.UUID
 }
@@ -51,6 +52,7 @@ func (q *Queries) FinishBackupRun(ctx context.Context, arg FinishBackupRunParams
 		arg.FinishedAt,
 		arg.SizeBytes,
 		arg.Manifest,
+		arg.Checks,
 		arg.Error,
 		arg.ID,
 	)
@@ -88,4 +90,33 @@ func (q *Queries) LastBackupSuccess(ctx context.Context, kinds []string) (pgtype
 	var last_success pgtype.Timestamptz
 	err := row.Scan(&last_success)
 	return last_success, err
+}
+
+const latestBackupRun = `-- name: LatestBackupRun :one
+SELECT id, kind, started_at, manifest
+FROM backup_runs
+WHERE state = 'succeeded' AND kind = ANY ($1::text[])
+ORDER BY started_at DESC, id DESC
+LIMIT 1
+`
+
+type LatestBackupRunRow struct {
+	ID        pgtype.UUID
+	Kind      string
+	StartedAt pgtype.Timestamptz
+	Manifest  []byte
+}
+
+// The newest succeeded run of the kinds with its manifest: the backup the restore test restores
+// (M7-03). The index (kind, started_at DESC) serves this per kind.
+func (q *Queries) LatestBackupRun(ctx context.Context, kinds []string) (LatestBackupRunRow, error) {
+	row := q.db.QueryRow(ctx, latestBackupRun, kinds)
+	var i LatestBackupRunRow
+	err := row.Scan(
+		&i.ID,
+		&i.Kind,
+		&i.StartedAt,
+		&i.Manifest,
+	)
+	return i, err
 }

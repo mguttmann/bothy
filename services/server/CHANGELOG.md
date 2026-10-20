@@ -84,6 +84,16 @@ documented in this file. The format is based on
   clamd options in `infra/compose/clamav/clamd.conf`. `platform/jobs.HandlerOptions.Timeout` sets
   River's job timeout per kind.
 
+- Automatic restore test (M7-03): `bothy-backupd` restores the newest `pg_full` or `pg_diff` into
+  the volume `backup-scratch` on `backup.restore_test.schedule` (and at once with
+  `bothy-backupd restore-test`), starts a PostgreSQL there on a Unix socket only, runs the seven
+  checks of 16 8.3 (restore and `pgbackrest verify`, manifest, event log and
+  `sequence_counters`, audit chain through the new port `audit.RowsVerifier`, thread sample, file
+  sample from the object backup, duration against `dr.rto_target`), clears the directory and
+  writes a `restore_test` row of `backup_runs` with `restore_test_checks.v1` and the metrics
+  `bothy.backup.restore_test.*`. New keys `backup.restore_test.schedule`,
+  `backup.restore_test.sample_files`, `backup.restore_test.sample_threads` and `dr.rto_target`;
+  the module `status` may use the port of `audit`.
 - Backup service (M7-02): `bothy-backupd` runs `pg_full` and `pg_diff` (pgBackRest into repo1
   and, with `backup.offsite.target`, repo2), `logical` (`pg_dump -Fc` into restic) and `objects`
   (restic over the volume `files`, or a mirror without deletion for the driver `s3`) on the

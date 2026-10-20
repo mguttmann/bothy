@@ -93,6 +93,41 @@ func expireCommand(ctx context.Context, args, env []string, stderr io.Writer) in
 	return exitOK
 }
 
+// restoreTestCommand runs "bothy-backupd restore-test [--config FILE]": the automatic restore
+// test once now (docs/spec/16-betrieb.md 8.3, brief M7-03), for the runbook and the tests. It
+// returns 0 when every check passed, 1 when a check failed or a test runs already, 2 for a usage
+// or configuration error. The test writes its restore_test row of backup_runs; its metrics are
+// exported before the command ends.
+func restoreTestCommand(ctx context.Context, args, env []string, stderr io.Writer) int {
+	fs := flag.NewFlagSet("bothy-backupd restore-test", flag.ContinueOnError)
+	fs.SetOutput(io.Discard)
+	file := fs.String("config", "", "configuration file")
+	if err := fs.Parse(args); err != nil {
+		return usageError(stderr, "restore-test: "+err.Error())
+	}
+	if fs.NArg() > 0 {
+		return usageError(stderr, fmt.Sprintf("restore-test: unexpected argument %q", fs.Arg(0)))
+	}
+	d, code := loadDaemon(ctx, env, *file, stderr, stderr)
+	if d == nil {
+		return code
+	}
+	defer d.close(ctx)
+	if err := d.d.WaitReady(ctx); err != nil {
+		_, _ = fmt.Fprintf(stderr, "bothy-backupd: %v\n", err)
+		return exitFailure
+	}
+	_ = d.d.Prime(ctx) // logged by Prime; the test itself needs no history
+	err := d.d.RestoreTest(ctx)
+	d.d.Sample(ctx)
+	if err != nil {
+		_, _ = fmt.Fprintf(stderr, "bothy-backupd: restore-test: %v\n", err)
+		return exitFailure
+	}
+	_, _ = io.WriteString(stderr, "bothy-backupd: restore-test succeeded\n")
+	return exitOK
+}
+
 // scheduleTarget is what the scheduler loop drives; daemonTarget adapts *wire.BackupDaemon.
 type scheduleTarget interface {
 	Prime(ctx context.Context) error

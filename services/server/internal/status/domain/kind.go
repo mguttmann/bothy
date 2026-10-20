@@ -2,8 +2,8 @@
 
 package domain
 
-// Kind is a backup kind of docs/spec/16-betrieb.md 8.1, the value of backup_runs.kind. The
-// restore test (M7-03) is not a backup kind of this package.
+// Kind is a backup kind of docs/spec/16-betrieb.md 8.1, the value of backup_runs.kind, or the
+// restore test of 8.3 (KindRestoreTest), which is no backup kind: Kinds and ParseKind leave it out.
 type Kind string
 
 // The backup kinds, in the order DueKinds and the scheduler report them.
@@ -13,6 +13,10 @@ const (
 	KindLogical Kind = "logical"
 	KindObjects Kind = "objects"
 )
+
+// KindRestoreTest is the restore test (16 8.3, M7-03): the scheduler starts it on
+// backup.restore_test.schedule in its own slot. It is not one of Kinds.
+const KindRestoreTest Kind = "restore_test"
 
 // Kinds returns the four backup kinds in a fixed order: pg_full, pg_diff, logical, objects.
 func Kinds() []Kind { return []Kind{KindPGFull, KindPGDiff, KindLogical, KindObjects} }

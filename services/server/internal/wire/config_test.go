@@ -223,6 +223,10 @@ func TestConfigSchemaBuilds(t *testing.T) {
 		"backup.offsite.target":                 {Kind: config.KindString, Default: "", Chapter: "16-betrieb.md"},
 		"backup.offsite.region":                 {Kind: config.KindString, Default: "us-east-1", Chapter: "16-betrieb.md"},
 		"backup.offsite.use_path_style":         {Kind: config.KindBool, Default: "true", Chapter: "16-betrieb.md"},
+		"backup.restore_test.schedule":          {Kind: config.KindString, Default: "0 5 * * 6", Chapter: "16-betrieb.md"},
+		"backup.restore_test.sample_files":      {Kind: config.KindInt, Default: "200", Min: "1", Chapter: "16-betrieb.md"},
+		"backup.restore_test.sample_threads":    {Kind: config.KindInt, Default: "200", Min: "1", Chapter: "16-betrieb.md"},
+		"dr.rto_target":                         {Kind: config.KindDuration, Default: "4h", Min: "1s", Chapter: "16-betrieb.md"},
 
 		"instance.environment":                 {Kind: config.KindEnum, Default: "prod", Enum: []string{"dev", "staging", "prod"}, Chapter: "16-betrieb.md"},
 		"telemetry.enabled":                    {Kind: config.KindBool, Default: "true", Chapter: "17-observability.md"},
@@ -1112,7 +1116,7 @@ func TestConfig_FingerprintKeysChecked(t *testing.T) {
 // expression (cross-check backup_schedules, M7-02); the problem names the key and no value.
 func TestConfigCheckBackupSchedules(t *testing.T) {
 	t.Parallel()
-	for _, key := range []string{"backup.pg.full_schedule", "backup.pg.diff_schedule", "backup.logical.schedule", "backup.objects.schedule"} {
+	for _, key := range []string{"backup.pg.full_schedule", "backup.pg.diff_schedule", "backup.logical.schedule", "backup.objects.schedule", "backup.restore_test.schedule"} {
 		env := "BOTHY_" + strings.ToUpper(strings.ReplaceAll(key, ".", "__"))
 		if got := load(t, env+"=15 4 * * 1-5"); len(got) != 0 {
 			t.Errorf("%s = 15 4 * * 1-5: problems %v, want none", key, got)

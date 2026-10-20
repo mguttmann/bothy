@@ -41,8 +41,11 @@ func NewScheduler(svc *Service, start time.Time) *Scheduler {
 // next due time comes anyway. A now that is not after the previous tick starts nothing and keeps
 // the window.
 //
-// It returns the kinds it started, in the order of domain.Kinds(). The runs report their outcome
-// through backup_runs, the log and the metrics; Wait waits for them.
+// After the backups it starts the restore test (domain.KindRestoreTest) when
+// backup.restore_test.schedule is due in the window, in its own slot (M7-03).
+//
+// It returns the kinds it started, in the order of domain.Kinds(), the restore test last. The runs
+// report their outcome through backup_runs, the log and the metrics; Wait waits for them.
 func (s *Scheduler) Tick(ctx context.Context, now time.Time) []domain.Kind {
 	s.mu.Lock()
 	from := s.prev
@@ -65,7 +68,29 @@ func (s *Scheduler) Tick(ctx context.Context, now time.Time) []domain.Kind {
 			_ = s.svc.run(ctx, kind) // the run logs and records its outcome itself
 		})
 	}
+	if s.restoreDue(from, now) {
+		if !s.svc.acquire(domain.KindRestoreTest) {
+			s.svc.log.LogAttrs(ctx, slog.LevelWarn, "restore test skipped: the previous restore test is still running")
+			return started
+		}
+		started = append(started, domain.KindRestoreTest)
+		s.wg.Go(func() {
+			defer s.svc.release(domain.KindRestoreTest)
+			_ = s.svc.restoreTest(ctx) // the test logs and records its outcome itself
+		})
+	}
 	return started
+}
+
+// restoreDue reports whether backup.restore_test.schedule has a matching minute in the window
+// (from, to] and the service can run the restore test.
+func (s *Scheduler) restoreDue(from, to time.Time) bool {
+	r := s.svc.cfg.Restore
+	if !r.Scheduled || s.svc.deps.Scratch == nil || s.svc.deps.Chain == nil || !to.After(from) {
+		return false
+	}
+	next := r.Schedule.Next(from)
+	return !next.IsZero() && !next.After(to)
 }
 
 // Wait blocks until every run started by Tick has finished.

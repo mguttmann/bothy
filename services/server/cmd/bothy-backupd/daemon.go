@@ -32,10 +32,12 @@ const telemetryFlushTimeout = 10 * time.Second
 
 // The mount points of the Compose service backup (infra/compose/compose.yaml). The image
 // defines them, so they are constants and not configuration: pgBackRest's repo1, the scratch
-// volume and the database volume, which bothy-backupd sees read-only to measure it.
+// volume and the database volume, which bothy-backupd sees read-only to measure it. The restore
+// test uses its own directory of the scratch volume (M7-03).
 const (
 	repoDir    = "/var/lib/pgbackrest"
 	scratchDir = "/var/lib/bothy-backup"
+	restoreDir = scratchDir + "/restore"
 	pgdataDir  = "/var/lib/postgresql"
 )
 
@@ -92,7 +94,7 @@ func loadDaemon(ctx context.Context, env []string, file string, out io.Writer, s
 		Volumes: map[string]string{
 			"pgdata": pgdataDir, "pgbackrest-repo": repoDir, "backup-scratch": scratchDir,
 		},
-		DumpDir: scratchDir + "/logical", LocalResticRepo: repoDir + "/restic",
+		DumpDir: scratchDir + "/logical", LocalResticRepo: repoDir + "/restic", RestoreDir: restoreDir,
 	})
 	if err != nil {
 		_ = tel.Shutdown(ctx)
