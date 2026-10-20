@@ -4637,7 +4637,7 @@ export interface paths {
         put?: never;
         /**
          * Open a terminal session
-         * @description Needs a fresh, unused step-up (passkey or step-up device key; in the console only a passkey with `userVerification = required`), the `terminal` right, SR10, SR11 (I6) and SR12 (an own session user on the host whose name the host reports, otherwise 403 `terminal_denied` with `reason: no_session_user`). With a `claude` profile `workdir_index` must point into the caller's own working directories (ruling T13). Consumes the step-up and returns a one-time session token for the Noise handshake (24, 5 and 6.1). The device then connects to `stream_path`.
+         * @description Needs a fresh, unused step-up (passkey or step-up device key; in the console only a passkey with `userVerification = required`), the `terminal` right, SR10, SR11 (I6) and SR12 (an own session user on the host whose name the host reports, otherwise 403 `terminal_denied` with `reason: no_session_user`). Consumes the step-up and returns a one-time session token for the Noise handshake (24, 5 and 6.1). The device then connects to `stream_path`.
          */
         post: operations["openTerminalSession"];
         delete?: never;
@@ -4694,7 +4694,7 @@ export interface paths {
         put?: never;
         /**
          * Attach to an own session again
-         * @description For a session in state `opening`, `active` or `detached`. Needs a fresh step-up, except from the same device in the same login session within `terminal.quick_reattach_window` after the disconnect. Returns a new session token; older tokens become worthless. A connection of another device is closed with `4103` (24, 6.2).
+         * @description For a session in state `opening`, `active` or `detached`. Needs a fresh step-up, except from the same device in the same login session within `terminal.quick_reattach_window` after the disconnect. Returns a new session token; older tokens become worthless. A connection of another device is closed with `4103` (24, 6.2). An attach to an `opening` session restarts the opening (`att = open`, new deadline).
          */
         post: operations["attachTerminalSession"];
         delete?: never;
@@ -10242,7 +10242,7 @@ export interface components {
         TerminalSessionOpen: {
             /** @example shell */
             profile: string;
-            /** @description Only with a `claude` profile: index into `workdirs` of the caller's own entry in `reported_session_users` (ruling T13). Another index gives 403 `terminal_denied` with `reason: profile_unknown`. The session token carries it as `wdi` (24, 5.3 and 11.1). */
+            /** @description Required exactly with a `claude` profile: index into `workdirs` of the caller's own entry in `reported_session_users` (ruling T13). Otherwise 403 `terminal_denied` with `reason: profile_unknown`. The token carries it as `wdi` (24, 5.3, 11.1). */
             workdir_index?: number;
             cols: number;
             rows: number;
@@ -10326,7 +10326,7 @@ export interface components {
             dpop_nonce: string;
             server_time: components["schemas"]["Timestamp"];
         };
-        /** @description Native apps send an access token with DPoP proof (`htm = GET`, `htu` = HTTPS form of the stream URL, `nonce` from `hello`, `ath`). The web console sends neither: its stream authenticates with the console session cookie of the upgrade request and the same-origin check of the upgrade (docs/spec/08-identitaet.md section 7.5, docs/spec/15-client-architektur.md section 23.2); the server rejects an identify without token from any other session. Only the device of the current session token passes (`terminal.stream`). */
+        /** @description Native apps send an access token with DPoP proof (`htm = GET`, `htu` = HTTPS form of the stream URL, `nonce` from `hello`, `ath`). The web console sends neither: its stream authenticates with the console session cookie of the upgrade request and the same-origin check of the upgrade (08 7.5, 15 23.2); the server rejects an identify without token from any other session. Only the device of the current session token passes (`terminal.stream`). */
         TerminalStreamIdentify: {
             /** @example 1 */
             protocol_version: number;

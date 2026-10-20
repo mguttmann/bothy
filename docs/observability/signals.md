@@ -291,6 +291,7 @@ Diese Liste ist gleich der Allowlist in [infra/otel/collector.yaml](../../infra/
 | `bothy.signing_key.kid` | `kid` eines Server-Schlüssels (Fingerabdruck nach RFC 7638, öffentlich) | nur in Logs der Schlüsselwechsel, nie an Metriken |
 | `bothy.signing_key.from_state`, `bothy.signing_key.to_state` | `none`, `next`, `active`, `retiring`, `retired` | nur in Logs der Schlüsselwechsel |
 | `bothy.step.kind` | `tool_call`, `status`, `subagent`, `workflow`, `background_job` | |
+| `bothy.terminal.side` | `client`, `host` | side of a connection in the relay ([24-terminal.md](../spec/24-terminal.md) section 9); on `bothy.terminal.relay.unpaired` and the log records of the relay (M2-44) |
 | `bothy.version.own`, `bothy.version.required` | SemVer der eigenen Server-Version und `instance.min_server_version` | nur in der Startzeile der Schema-Prüfung ([02-architektur.md](../spec/02-architektur.md) 15.1, Schritt 5) |
 | `bothy.webhook_subscription.id` | UUID of an outgoing webhook subscription; never on metrics | logs `webhook delivery failed` (info) and `webhook subscription state changed` (warn) of the apps module (M2-26), with `bothy.event.seq`, `bothy.event.type`, `bothy.reason` (the `last_error` code or the cause) and `server.address` |
 

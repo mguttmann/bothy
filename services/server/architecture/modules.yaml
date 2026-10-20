@@ -183,8 +183,9 @@ modules:
     ws_ops: []
     depends_on: [instance, identity, authz, agents]
     # sqlc code and the repository (M2-39); the control connection of the host services and its
-    # test client (adapters/wsrelay and adapters/hosttest, M2-43).
-    adapter_vendors: [pgx, websocket]
+    # test client (adapters/wsrelay and adapters/hosttest, M2-43); adapters/otelmetrics counts
+    # bothy.terminal.relay.unpaired (M2-44).
+    adapter_vendors: [otel, pgx, websocket]
   runs:
     tables: [runs, run_steps, run_followups, message_components, interactions]
     actions: [agent.invoke, run.read, run.overview.read, run.context.read, run.start, run.update,

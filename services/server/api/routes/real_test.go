@@ -453,6 +453,26 @@ func (stubServer) GetHost(context.Context, rest.GetHostRequestObject) (rest.GetH
 	return nil, nil
 }
 
+func (stubServer) OpenTerminalSession(context.Context, rest.OpenTerminalSessionRequestObject) (rest.OpenTerminalSessionResponseObject, error) {
+	return nil, nil
+}
+
+func (stubServer) AttachTerminalSession(context.Context, rest.AttachTerminalSessionRequestObject) (rest.AttachTerminalSessionResponseObject, error) {
+	return nil, nil
+}
+
+func (stubServer) ListTerminalSessions(context.Context, rest.ListTerminalSessionsRequestObject) (rest.ListTerminalSessionsResponseObject, error) {
+	return nil, nil
+}
+
+func (stubServer) GetTerminalSession(context.Context, rest.GetTerminalSessionRequestObject) (rest.GetTerminalSessionResponseObject, error) {
+	return nil, nil
+}
+
+func (stubServer) CloseTerminalSession(context.Context, rest.CloseTerminalSessionRequestObject) (rest.CloseTerminalSessionResponseObject, error) {
+	return nil, nil
+}
+
 func (stubServer) UpdateHost(context.Context, rest.UpdateHostRequestObject) (rest.UpdateHostResponseObject, error) {
 	return nil, nil
 }
@@ -1103,6 +1123,12 @@ func TestRealTable_Enabled(t *testing.T) {
 		"getServedChannelConfig": {"GET /api/v1/agents/me/channels/{channel_id}/config", "agent.config.read", "rl.read"},
 		// M4-31
 		"submitClientMetrics": {"POST /api/v1/client-metrics", "client_metrics.submit", "rl.write"},
+		// M2-44
+		"openTerminalSession":   {"POST /api/v1/hosts/{host_id}/terminal/sessions", "terminal.open", "rl.terminal"},
+		"listTerminalSessions":  {"GET /api/v1/terminal/sessions", "terminal.read_own", "rl.read"},
+		"getTerminalSession":    {"GET /api/v1/terminal/sessions/{session_id}", "terminal.read_own", "rl.read"},
+		"attachTerminalSession": {"POST /api/v1/terminal/sessions/{session_id}/attach", "terminal.attach", "rl.terminal"},
+		"closeTerminalSession":  {"POST /api/v1/terminal/sessions/{session_id}/close", "terminal.close", "rl.write"},
 	}
 	ops := routes.Enabled()
 	if len(ops) != len(want) {

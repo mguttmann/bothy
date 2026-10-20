@@ -75,6 +75,9 @@ func (a *Authorizer) terminalFacts(s *actingPrincipal, spec domain.ActionSpec, r
 			},
 		}
 	}
+	if spec.ID == domain.ActionTerminalOpen || spec.ID == domain.ActionTerminalAttach || spec.ID == domain.ActionTerminalStream {
+		in.Live = liveFacts(r.Terminal)
+	}
 	if spec.ID != domain.ActionTerminalOpen && spec.ID != domain.ActionTerminalAttach {
 		return nil
 	}
@@ -87,6 +90,16 @@ func (a *Authorizer) terminalFacts(s *actingPrincipal, spec domain.ActionSpec, r
 	}
 	in.Terminal = g
 	return nil
+}
+
+// liveFacts returns the live facts of a terminal descriptor (M2-44); nil without one, which the
+// guards treat as a host that is not connected and a device that is not the session's (fail
+// closed).
+func liveFacts(t *authorize.TerminalFacts) *domain.TerminalLiveFacts {
+	if t == nil {
+		return nil
+	}
+	return &domain.TerminalLiveFacts{HostConnected: t.HostConnected, ProfileKnown: t.ProfileKnown, SessionDeviceID: t.SessionDeviceID}
 }
 
 // FreshCheck implements authz.FreshStepUpCheck with domain.FreshStepUp and
@@ -112,7 +125,7 @@ func (c FreshCheck) Fresh(f authz.FreshStepUpFacts, now time.Time) bool {
 func hostGuardFacts(h authz.HostFacts) domain.HostFacts {
 	return domain.HostFacts{
 		ID: h.ID, AssignedUserID: h.AssignedUserID, LLMCredentials: h.LLMCredentials, CredentialHolderID: h.CredentialHolderID,
-		DeclaredServerHost: h.DeclaredServerHost, ReportedIsServerHost: h.ReportedIsServerHost,
+		DeclaredServerHost: h.DeclaredServerHost, ReportedIsServerHost: h.ReportedIsServerHost, State: h.State,
 	}
 }
 

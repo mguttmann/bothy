@@ -69,14 +69,8 @@ const (
 // delegation limits of grant.create and grant.revoke belong to the requirement (decideDelegation).
 func guards(in *Input) (Decision, error) {
 	switch in.Action {
-	case ActionTerminalOpen, ActionTerminalAttach:
-		if in.Terminal == nil {
-			return Decision{}, internalError(in.Action + " without its terminal facts")
-		}
-		if r, ok := TerminalGuard(*in.Terminal); !ok {
-			return deny(OutcomeForbidden, r), nil
-		}
-		return Allow, nil
+	case ActionTerminalOpen, ActionTerminalAttach, ActionTerminalStream:
+		return terminalGuards(in)
 	case actionTokenCreate:
 		if in.Token == nil {
 			return Decision{}, internalError("token.create without the holder")
@@ -185,4 +179,30 @@ func devRules(owner bool, f *InvokeFacts) Reason {
 		return ReasonDevEnvironmentNotReady
 	}
 	return ""
+}
+
+// terminalGuards are the guards of the terminal actions: SR10, SR11 and SR12 and then the live
+// guards of M2-44 (host_not_active, terminal_profile_unknown) for terminal.open and
+// terminal.attach; for terminal.stream only the device of the current session token passes
+// (not_self). Missing facts are internal errors.
+func terminalGuards(in *Input) (Decision, error) {
+	if in.Action == ActionTerminalStream {
+		if in.Live == nil {
+			return Decision{}, internalError(in.Action + " without its terminal facts")
+		}
+		if in.Live.SessionDeviceID.IsZero() || in.Live.SessionDeviceID != in.Principal.DeviceID {
+			return deny(OutcomeForbidden, ReasonNotSelf), nil
+		}
+		return Allow, nil
+	}
+	if in.Terminal == nil {
+		return Decision{}, internalError(in.Action + " without its terminal facts")
+	}
+	if r, ok := TerminalGuard(*in.Terminal); !ok {
+		return deny(OutcomeForbidden, r), nil
+	}
+	if r, ok := TerminalLiveGuard(in.Action, in.Terminal.Host, in.Live); !ok {
+		return deny(OutcomeForbidden, r), nil
+	}
+	return Allow, nil
 }

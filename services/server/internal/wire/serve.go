@@ -48,6 +48,7 @@ import (
 	"github.com/OWNER/bothy/services/server/internal/platform/secrets"
 	"github.com/OWNER/bothy/services/server/internal/sync"
 	"github.com/OWNER/bothy/services/server/internal/sync/adapters/otelmetrics"
+	terminalapp "github.com/OWNER/bothy/services/server/internal/terminal/app"
 	"github.com/OWNER/bothy/services/server/migrations"
 )
 
@@ -120,6 +121,14 @@ type Deps struct {
 	// They exist for in-process tests against the fake provider of M1-41 (the canary test of
 	// M1-69); nil means the system roots, as in production.
 	OIDCRootCAs *x509.CertPool
+	// TerminalTimers drive the deadlines of the terminal relay (M2-44); nil means the real timers.
+	// Tests pass a fake that they fire, so no test sleeps for terminal.open_timeout.
+	TerminalTimers terminalapp.Timers
+	// TerminalBeforeOpenCommit is a test seam of the terminal openings (M2-44,
+	// terminalapp.Deps.BeforeOpenCommit): it runs inside the unit of work of an opening before
+	// the commit, so a test commits a revocation between the decision and the commit. nil in
+	// production.
+	TerminalBeforeOpenCommit func()
 }
 
 // server is the state of one serve process that the components fill and the stop steps read.
@@ -193,6 +202,9 @@ type server struct {
 	gateway *Gateway
 	// terminal is the terminal module (M2-39): the host records and their REST handlers.
 	terminal *Terminal
+	// terminalStreams are the relay and the stream routes of api and all (M2-44); the log tail
+	// feeds the relay.
+	terminalStreams *TerminalStreams
 	// apps is the module apps (M2-24): the app use cases and their REST handlers.
 	apps *Apps
 	// signingKeys are the server signing keys (M1-32) and keyCheck the interval of their job.
@@ -896,7 +908,8 @@ func (s *server) startTerminal(context.Context) error {
 	if a == nil || az == nil || sy == nil || id == nil {
 		return errors.New("wire: the terminal step needs audit, sync, the Authorizer and identity")
 	}
-	tm, err := NewTerminal(cfg, pool, a.UoW(), az, IdentityWrites{Audit: a.Recorder(), Events: sy.Appender()}, id, s.deps.Clock, s.logger())
+	tm, err := NewTerminal(cfg, pool, a.UoW(), az, IdentityWrites{Audit: a.Recorder(), Events: sy.Appender()}, id, s.deps.Clock,
+		s.deps.TerminalBeforeOpenCommit, s.logger())
 	if err != nil {
 		return err
 	}
@@ -1012,9 +1025,7 @@ func (s *server) handlers() Handlers {
 	s.syncReads.fillHandlers(&h)
 	s.files.fillHandlers(&h)
 	s.stats.fillHandlers(&h)
-	if h.Hosts == nil && s.terminal != nil {
-		h.Hosts = s.terminal.Handlers
-	}
+	s.terminal.fillHandlers(&h)
 	if h.Keys == nil && s.signingKeys != nil {
 		h.Keys = s.signingKeys.Handlers
 	}
@@ -1144,7 +1155,9 @@ func (s *server) mountRoutes(context.Context) error {
 	if s.api() {
 		mount = func() error { return s.mountAPI(cat, log) }
 	}
-	return startRoutes(append(RouteBindings(routes.Enabled()), GatewayRouteBinding(), HostConnectRouteBinding()), BuildRegistry(s.deps.Registrations),
+	bindings := append(RouteBindings(routes.Enabled()), GatewayRouteBinding(), HostConnectRouteBinding())
+	bindings = append(bindings, TerminalStreamRouteBindings()...)
+	return startRoutes(bindings, BuildRegistry(s.deps.Registrations),
 		cat, log, mount)
 }
 
@@ -1207,6 +1220,38 @@ func (s *server) mountHostControl(mux Mux, chain *httpserver.Chain, log *slog.Lo
 	}
 	hc.Mount(mux, chain)
 	s.runner.OnStop(hc.StopConnections())
+	return s.mountTerminalStreams(mux, chain, tm, hc, log)
+}
+
+// mountTerminalStreams builds the relay and the two stream routes of the terminal sessions
+// (M2-44) over the module, the control connection, identity's authenticator and nonces and the
+// signing keys, reconciles the sessions of the previous process (Design note 14: one node, the
+// only mode this build runs; M2-47 adds cluster.mode multi, which skips it), mounts both routes on
+// mux and registers the stop step of the relay.
+func (s *server) mountTerminalStreams(mux Mux, chain *httpserver.Chain, tm *Terminal, hc *HostControl, log *slog.Logger) error {
+	cfg, err := TerminalStreamsConfigFrom(s.values)
+	if err != nil {
+		return err
+	}
+	s.mu.Lock()
+	id, keys := s.identity, s.signingKeys
+	s.mu.Unlock()
+	if id == nil || id.Authenticator == nil || id.DPoP == nil || keys == nil {
+		return errors.New("wire: the terminal streams need identity's authenticator and nonces and the signing keys")
+	}
+	ts, err := NewTerminalStreams(cfg, tm, hc, TerminalStreamsDeps{Authenticator: id.Authenticator, Nonces: id.DPoP, Signer: keys.Keys,
+		Timers: s.deps.TerminalTimers, Clock: s.deps.Clock, Log: log})
+	if err != nil {
+		return err
+	}
+	if err := tm.Service.Reconcile(context.Background()); err != nil {
+		return err
+	}
+	ts.Mount(mux, chain)
+	s.runner.OnStop(ts.StopConnections())
+	s.mu.Lock()
+	s.terminalStreams = ts
+	s.mu.Unlock()
 	return nil
 }
 
@@ -1356,14 +1401,18 @@ func (s *server) startEventConsumers(ctx context.Context) error {
 // startLogTail starts the log tail of api and all (02 "Start" step 8, startTail).
 func (s *server) startLogTail(ctx context.Context) error {
 	s.mu.Lock()
-	pool, sy, az, gw := s.pool, s.sync, s.authorizer, s.gateway
+	pool, sy, az, gw, ts := s.pool, s.sync, s.authorizer, s.gateway, s.terminalStreams
 	s.mu.Unlock()
 	var hub *gatewayapp.Hub
 	if gw != nil {
 		hub = gw.Hub
 	}
+	var observers []LogObserver
+	if ts != nil {
+		observers = append(observers, ts.Observer())
+	}
 	versions := instanceapp.NewVersions(instancepg.NewRepository(pool))
-	tail := sy.NewTail(DeliverySink(az, hub, versions))
+	tail := sy.NewTail(DeliverySink(az, hub, versions, observers...))
 	if err := startTail(ctx, s.runner, s.reg, tail); err != nil {
 		return err
 	}

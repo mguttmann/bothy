@@ -1079,6 +1079,14 @@ gemeldeten Liste von `osu` nur auf einen Fehler oder eine Manipulation im Server
 Grund für `cek`: Ein Relais kann die Marke nicht in einen eigenen Handshake setzen, weil der Hash
 an den ephemeren Schlüssel des Geräts gebunden ist.
 
+Refusal by the host service (M2-44, D-M2-44-6): the host service refuses a handshake by closing
+its data connection with `4101` (`token_expired`, `token_replayed`) or `4104` (every other detail
+of the table above) and the `close_detail` code as the close reason; on `4104` for a started
+session it also ends the PTY. The relay hands the same code and reason to the device stream, and an
+opening without a PTY ends with `open_failed` and that detail. A refusal reported through
+`session.ended` instead reaches the device with the same code (`StreamCodeForEnd`), so the device
+gets exactly one code either way.
+
 JWKS refresh (M2-43, D-M2-43-11): `heartbeat_ack` carries `jwks` whenever the set of purpose
 `terminal` differs from the last set sent on the connection, and the host service replaces its
 set. A scheduled rotation publishes the `next` key `agent.jwks_max_age` before it signs, so a
@@ -1144,12 +1152,25 @@ Diagramm: [seq-8-terminal-oeffnen.svg](../architecture/seq-8-terminal-oeffnen.sv
    Marke, Stream-Pfad, `noise_public_key`, `key_fingerprint`, `key_generation`.
 4. Der Server weist den Host-Dienst über die Steuerverbindung an (`session.open` mit Sitzungs-ID
    und Datenpfad). Der Host-Dienst öffnet die Datenverbindung
-   `/api/v1/hosts/sessions/{session_id}/stream`.
+   `/api/v1/hosts/sessions/{session_id}/stream`. M2-44: exactly one data connection per
+   `session.open` (D-M2-44-4); `session.open` goes only over a control connection whose `report`
+   was applied, after the commit and after a recheck of the decision (D-M2-44-8); a send that fails
+   after the commit does not fail the request, the deadline of step 6 ends the opening.
 5. Das Gerät öffnet `/api/v1/terminal/sessions/{session_id}/stream` und sendet Nachricht 1.
 6. Das Relais verbindet beide Seiten, sobald beide da sind; kommt eine Seite nicht innerhalb von
-   `terminal.open_timeout`, endet die Sitzung mit `open_failed`.
+   `terminal.open_timeout`, endet die Sitzung mit `open_failed`. M2-44 (D-M2-44-5): the server
+   cannot see the handshake, so the deadline (grant time plus `terminal.open_timeout`) is met by
+   `session.started` for a session that never started and by the pairing for a started one; at the
+   deadline an opening ends with `open_failed` and `close_detail = open_timeout` (the device gets
+   `4102` without a host side, else `4100`). On a host whose last `report` says
+   `require_local_confirm = true` the pairing meets the deadline of an opening, because the consent
+   window `host_service.local_confirm_timeout` (6.4) may be longer; the host service bounds the
+   rest itself and ends a refused or unanswered opening with `session.ended` `open_failed`; a
+   pairing that ends before `session.started` gives the slot a new deadline of
+   `terminal.open_timeout` from that moment.
 7. Nach Nachricht 2 und dem Rahmen `start` startet der Host-Dienst die PTY; er meldet
-   `session.started` über die Steuerverbindung; der Server setzt `state = 'active'`.
+   `session.started` über die Steuerverbindung; der Server setzt `state = 'active'`. M2-44: a
+   `session.started` without a paired device side makes the session `detached` at once.
 
 ### 6.2 Trennen und Wiederanhängen
 
@@ -1169,8 +1190,16 @@ Diagramm: [seq-8-terminal-oeffnen.svg](../architecture/seq-8-terminal-oeffnen.sv
   frischen Passkey ([ADR 0070](../adr/0070-terminal-in-der-web-konsole.md)).
 - Hängt ein anderes Gerät an, schließt der Server die ältere Verbindung mit `4103`.
 - Bricht die Steuer- oder Datenverbindung des Host-Dienstes ab, setzt der Server die Sitzung auf
-  `detached`. Der Host-Dienst hält die PTY und baut die Datenverbindung nach dem Wiederverbinden
-  neu auf; das Gerät hängt danach mit `terminal.attach` neu an.
+  `detached`. Der Host-Dienst hält die PTY und öffnet die Datenverbindung neu, sobald das Gerät
+  anhängt (`session.open`); das Gerät hängt danach mit `terminal.attach` neu an. M2-44
+  (D-M2-44-4): every grant (open or attach) sends one `session.open`, and the host service opens
+  exactly one data connection per `session.open`, so a new handshake always runs on a fresh pair
+  of connections. Between grants a data connection without an expectation on the node gets `1000`.
+- Attach to a session in `opening` (M2-44, D-M2-44-4): the PTY never started, so the token says
+  `att = open`; for a `claude` profile it carries the `wdi` of the opening, which the relay slot of
+  this node keeps for the life of the opening (03 does not store it); the grant restarts the opening
+  with a new deadline. Without that slot (another node, a restart) the attach answers `409
+  invalid_state_transition`.
 - Startet der Host-Dienst neu (`bothy-host restart`, `bothy-host session-user add` oder `remove`,
   ein Absturz, ein Neustart des Rechners), enden alle Sitzungen des Rechners. Jeder PTY-Helfer
   beendet seine PTYs samt Prozessbaum (6.5), sobald sein Kanal zum Host-Dienst abbricht. Bei der
@@ -1682,10 +1711,10 @@ Schließ-Codes der Terminal-Kanäle (Quelle der Namen und Client-Reaktionen auf 
 |---|---|---|---|
 | `4000` | `unknown_error` | Steuer- und Datenverbindung | internal error of the server (a panic, an error without a better code); reconnect with backoff (M2-43) |
 | `4100` | `terminal_closed` | Strom, Datenverbindung | Sitzung beendet, Grund in `close_reason` (10.3); nicht neu verbinden, der Host-Dienst beendet die PTY |
-| `4101` | `terminal_token_stale` | Strom | Sitzungs-Marke abgelaufen (`token_expired`) oder schon benutzt (`token_replayed`); mit neuem Step-up neu öffnen bzw. anhängen (5.3) |
+| `4101` | `terminal_token_stale` | Strom; Datenverbindung, vom Host-Dienst (M2-44) | Sitzungs-Marke abgelaufen (`token_expired`) oder schon benutzt (`token_replayed`); mit neuem Step-up neu öffnen bzw. anhängen (5.3) |
 | `4102` | `terminal_host_unavailable` | Strom | Gegenseite fehlt (Host-Dienst getrennt oder auf diesem Knoten keine Gegenseite, 9); Sitzung `detached`, später anhängen |
 | `4103` | `terminal_replaced` | Strom | ein anderes Gerät hat angehängt (6.2); nicht von selbst neu verbinden |
-| `4104` | `terminal_handshake_failed` | Strom | jeder andere Fehler der Marke oder des Handshakes (5.3); harte Warnung, kein neuer Versuch |
+| `4104` | `terminal_handshake_failed` | Strom; Datenverbindung, vom Host-Dienst (M2-44) | jeder andere Fehler der Marke oder des Handshakes (5.3); harte Warnung, kein neuer Versuch |
 | `4110` | `host_unpaired` | Steuer- und Datenverbindung | Schlüssel unbekannt oder durch eine Neukopplung ersetzt (3.3); anhalten, `bothy-host pair` erneut ausführen |
 | `4111` | `host_disabled` | Steuer- und Datenverbindung | Rechner `disabled` oder `retired` (3.1); alle PTYs beenden, erst nach langem Backoff neu verbinden |
 | `4112` | `host_duplicate` | Steuer- und Datenverbindung | zweite lebende Steuerverbindung mit denselben Schlüsseln (3.4); Rechner gesperrt, nicht neu verbinden |
