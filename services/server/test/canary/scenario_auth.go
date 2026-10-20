@@ -260,6 +260,10 @@ func (sc *Scenario) password() {
 		sc.alexPhone = phone
 	}
 	// The console of the owner: a cookie session from the console form of loginWithPassword.
+	if !consoleServed {
+		sc.T.Logf("canary: the console login is skipped: the console surface comes with M6-01")
+		return
+	}
 	body, _ := json.Marshal(map[string]any{"client": "console", "login_name": "owner", "password": own.password, "totp_code": sc.code(own)})
 	resp := sc.console(http.MethodPost, "/auth/password/login", body)
 	if resp.Status != http.StatusOK {
@@ -292,6 +296,10 @@ func (sc *Scenario) console(method, path string, body []byte) harness.Response {
 // in oidc), and the logout.
 func (sc *Scenario) consoleSteps(p *IDP, prov string) {
 	sc.T.Helper()
+	if !consoleServed {
+		sc.T.Logf("canary: the console steps are skipped: the console surface comes with M6-01")
+		return
+	}
 	if sc.consoleCookie == nil || sc.owner == nil {
 		sc.T.Errorf("no console session")
 		return
