@@ -1,0 +1,29 @@
+# SPDX-License-Identifier: Apache-2.0
+# TM-T05 of 24 14: messages 1 and 2 complete, but no start: no PTY; the session never reaches
+# active and ends open_failed with open_timeout, the stream closes with 4100 (24 5.2, 6.1, 10.3).
+id: tm-t05
+title: Messages 1 and 2 complete, but no start
+sources: ["24 14 TM-T05", "24 5.2", "24 6.1", "24 10.3", "24 13"]
+profile: default
+world:
+  people: [alex]
+  hosts:
+    - {name: r1, assigned_to: alex, session_users: [term-alex], assign: {alex: term-alex}}
+  grants:
+    - {subject: alex, host: r1}
+cases:
+  - name: no_start
+    steps:
+      - {device: alex, do: step_up}
+      - {device: alex, do: open, on: r1, session: s1, expect: {status: 201}}
+      - {device: alex, do: connect, session: s1, expect: {}}
+      - {device: alex, do: handshake, session: s1, expect: {}}
+      - wait: terminal.open_timeout
+      - {device: alex, do: wait_close, session: s1, expect: {close: {code: 4100}}}
+      - check: session
+        session: s1
+        expect: {state: closed, close_reason: open_failed, close_detail: open_timeout}
+      - check: processes
+        host: r1
+        user: term-alex
+        expect: {shells: 0, processes: 0}

@@ -1,0 +1,44 @@
+# SPDX-License-Identifier: Apache-2.0
+# TM-T03 of 24 14: the relay forwards every binary message unchanged (M2-44), so a message the
+# device sends reaches the host as if the relay had inserted it. Message 1 of the first opening,
+# replayed on the stream of a quick reattach before its exp plus auth.clock_leeway, gives 4101
+# with token_replayed; the session stays detached and exactly one shell exists before and after
+# (24 5.3, brief M2-48 Design note 9).
+id: tm-t03
+title: Relay replays message 1 (same token)
+sources: ["24 14 TM-T03", "24 5.3", "24 6.2", "24 13"]
+profile: default
+world:
+  people: [alex]
+  hosts:
+    - {name: r1, assigned_to: alex, session_users: [term-alex], assign: {alex: term-alex}}
+  grants:
+    - {subject: alex, host: r1}
+cases:
+  - name: replay_message1
+    steps:
+      - {device: alex, do: step_up}
+      - {device: alex, do: open, on: r1, session: s1, expect: {status: 201}}
+      - {device: alex, do: connect, session: s1, expect: {}}
+      - {device: alex, do: handshake, session: s1, expect: {}}
+      - {device: alex, do: start, session: s1}
+      - {device: alex, do: send, session: s1, text: "printf '%s-%s\\n' ready ${marker}\n"}
+      - {device: alex, do: expect_output, session: s1, expect: {output: "ready-${marker}"}}
+      - {device: alex, do: cut, session: s1}
+      - check: session
+        session: s1
+        expect: {state: detached}
+      - check: processes
+        host: r1
+        user: term-alex
+        expect: {shells: 1}
+      - {device: alex, do: attach, session: s1, expect: {status: 200}}
+      - {device: alex, do: connect, session: s1, expect: {}}
+      - {device: alex, do: replay_message1, session: s1, from: 0, expect: {close: {code: 4101, reason: token_replayed}}}
+      - check: session
+        session: s1
+        expect: {state: detached}
+      - check: processes
+        host: r1
+        user: term-alex
+        expect: {shells: 1}

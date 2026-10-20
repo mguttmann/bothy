@@ -1,0 +1,106 @@
+# SPDX-License-Identifier: Apache-2.0
+# TM-T04 of 24 14: a token with a wrong aud, sid, cek, a foreign kid or the typ of the invocation
+# token gives 4104 with token_invalid; the own token after terminal.session_token_ttl plus
+# auth.clock_leeway gives 4101 with token_expired; no PTY in any case, and the session ends
+# open_failed with that detail (24 5.3, brief M2-48 Design note 9).
+id: tm-t04
+title: "Token with a wrong aud, sid, cek, a foreign kid, the typ of the invocation token; expired token"
+sources: ["24 14 TM-T04", "24 5.3", "24 10.3", "24 13"]
+profile: default
+world:
+  people: [alex]
+  hosts:
+    - {name: r1, assigned_to: alex, session_users: [term-alex], assign: {alex: term-alex}}
+    - {name: r1b, assigned_to: alex, session_users: [term-alex], assign: {alex: term-alex}}
+  grants:
+    - {subject: alex, host: r1}
+    - {subject: alex, host: r1b}
+cases:
+  - name: wrong_aud
+    steps:
+      - {device: alex, do: step_up}
+      - {device: alex, do: open, on: r1, session: s1, expect: {status: 201}}
+      - {device: alex, do: step_up}
+      - {device: alex, do: open, on: r1b, session: s2, expect: {status: 201}}
+      - {device: alex, do: connect, session: s2, expect: {}}
+      - {device: alex, do: handshake, session: s2, token: {of: s1}, expect: {close: {code: 4104, reason: token_invalid}}}
+      - check: session
+        session: s2
+        expect: {state: closed, close_reason: open_failed, close_detail: token_invalid}
+      - check: processes
+        host: r1b
+        user: term-alex
+        expect: {shells: 0, processes: 0}
+  - name: wrong_sid
+    hosts: [r1]
+    steps:
+      - {device: alex, do: step_up}
+      - {device: alex, do: open, on: r1, session: s1, expect: {status: 201}}
+      - {device: alex, do: step_up}
+      - {device: alex, do: open, on: r1, session: s2, expect: {status: 201}}
+      - {device: alex, do: connect, session: s2, expect: {}}
+      - {device: alex, do: handshake, session: s2, token: {of: s1}, expect: {close: {code: 4104, reason: token_invalid}}}
+      - check: session
+        session: s2
+        expect: {state: closed, close_reason: open_failed, close_detail: token_invalid}
+      - check: processes
+        host: r1
+        user: term-alex
+        expect: {shells: 0, processes: 0}
+  - name: wrong_cek
+    hosts: [r1]
+    steps:
+      - {device: alex, do: step_up}
+      - {device: alex, do: open, on: r1, session: s1, expect: {status: 201}}
+      - {device: alex, do: connect, session: s1, expect: {}}
+      - {device: alex, do: handshake, session: s1, ephemeral: other, expect: {close: {code: 4104, reason: token_invalid}}}
+      - check: session
+        session: s1
+        expect: {state: closed, close_reason: open_failed, close_detail: token_invalid}
+      - check: processes
+        host: r1
+        user: term-alex
+        expect: {shells: 0, processes: 0}
+  - name: foreign_kid
+    hosts: [r1]
+    steps:
+      - {device: alex, do: step_up}
+      - {device: alex, do: open, on: r1, session: s1, expect: {status: 201}}
+      - {device: alex, do: connect, session: s1, expect: {}}
+      - {device: alex, do: handshake, session: s1, token: {forge: foreign_kid}, expect: {close: {code: 4104, reason: token_invalid}}}
+      - check: session
+        session: s1
+        expect: {state: closed, close_reason: open_failed, close_detail: token_invalid}
+      - check: processes
+        host: r1
+        user: term-alex
+        expect: {shells: 0, processes: 0}
+  - name: invocation_typ
+    hosts: [r1]
+    steps:
+      - {device: alex, do: step_up}
+      - {device: alex, do: open, on: r1, session: s1, expect: {status: 201}}
+      - {device: alex, do: connect, session: s1, expect: {}}
+      - {device: alex, do: handshake, session: s1, token: {forge: invocation_typ}, expect: {close: {code: 4104, reason: token_invalid}}}
+      - check: session
+        session: s1
+        expect: {state: closed, close_reason: open_failed, close_detail: token_invalid}
+      - check: processes
+        host: r1
+        user: term-alex
+        expect: {shells: 0, processes: 0}
+  - name: expired
+    hosts: [r1]
+    steps:
+      - {device: alex, do: step_up}
+      - {device: alex, do: open, on: r1, session: s1, expect: {status: 201}}
+      - {device: alex, do: connect, session: s1, expect: {}}
+      - wait: [terminal.session_token_ttl, auth.clock_leeway]
+      - {device: alex, do: handshake, session: s1, expect: {close: {code: 4101, reason: token_expired}}}
+      - check: session
+        session: s1
+        expect: {state: closed, close_reason: open_failed, close_detail: token_expired}
+      - check: processes
+        host: r1
+        user: term-alex
+        expect: {shells: 0, processes: 0}

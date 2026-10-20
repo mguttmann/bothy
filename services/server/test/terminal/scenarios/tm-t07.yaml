@@ -1,0 +1,50 @@
+# SPDX-License-Identifier: Apache-2.0
+# TM-T07 of 24 14 without the console part (M6-18): terminal.open without a step-up, with one that
+# is too old and with one already consumed gives 401 step_up_required (24 13, 08 6.3), each with a
+# deny entry of terminal.open.
+id: tm-t07
+title: terminal.open without step-up, with one that is too old, with one already consumed
+sources: ["24 14 TM-T07", "24 13", "08 6.3", "07 11.1 AZ-M58"]
+profile: default
+world:
+  people: [alex]
+  hosts:
+    - {name: r1, assigned_to: alex, session_users: [term-alex], assign: {alex: term-alex}}
+  grants:
+    - {subject: alex, host: r1}
+cases:
+  - name: no_step_up
+    steps:
+      - device: alex
+        do: open
+        on: r1
+        session: s1
+        expect: {status: 401, code: step_up_required}
+      - check: audit
+        expect: {actor: alex, resource: r1, action: terminal.open, decision: deny}
+  - name: too_old
+    steps:
+      - {device: alex, do: step_up}
+      - wait: terminal.step_up_max_age
+      - device: alex
+        do: open
+        on: r1
+        session: s1
+        expect: {status: 401, code: step_up_required}
+      - check: audit
+        expect: {actor: alex, resource: r1, action: terminal.open, decision: deny}
+  - name: consumed
+    steps:
+      - {device: alex, do: step_up}
+      - device: alex
+        do: open
+        on: r1
+        session: s1
+        expect: {status: 201}
+      - device: alex
+        do: open
+        on: r1
+        session: s2
+        expect: {status: 401, code: step_up_required}
+      - check: audit
+        expect: {actor: alex, resource: r1, action: terminal.open, decision: deny}

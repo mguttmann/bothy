@@ -1,0 +1,50 @@
+# SPDX-License-Identifier: Apache-2.0
+# TM-T08 of 24 14 (SR10), end to end with real host services; expectations literally from 24 14,
+# 07 2.12 and SR10, and the world of M2-40 with neutral names (brief M2-48 Design note 9).
+id: tm-t08
+title: Non-owner with a grant on someone else's host, on their own host, on the server host
+sources: ["24 14 TM-T08", "07 2.12 SR10", "24 2.3"]
+profile: default
+world:
+  people: [alex, sam]
+  hosts:
+    - {name: r1, assigned_to: alex, session_users: [term-alex, term-sam], assign: {alex: term-alex, sam: term-sam}}
+    - {name: r3, assigned_to: sam, declared_server_host: true, session_users: [term-sam, term-owner], assign: {sam: term-sam, owner: term-owner}}
+  grants:
+    - {subject: alex, host: r1}
+    - {subject: sam, host: r1}
+    - {subject: sam, host: r3}
+cases:
+  - name: foreign_host
+    hosts: [r1]
+    steps:
+      - {device: sam, do: step_up}
+      - device: sam
+        do: open
+        on: r1
+        session: s1
+        expect: {status: 403, code: terminal_denied, reason: not_host_assignee}
+      - check: audit
+        expect: {actor: sam, resource: r1, action: terminal.open, decision: deny}
+  - name: own_host
+    hosts: [r1]
+    steps:
+      - {device: alex, do: step_up}
+      - device: alex
+        do: open
+        on: r1
+        session: s1
+        expect: {status: 201, fields: {/session/state: opening}}
+      - check: audit
+        expect: {actor: alex, resource: s1, action: terminal.open, decision: allow, details: {profile: shell}}
+  - name: server_host
+    hosts: [r3]
+    steps:
+      - {device: sam, do: step_up}
+      - device: sam
+        do: open
+        on: r3
+        session: s1
+        expect: {status: 403, code: terminal_denied, reason: server_host_owner_only}
+      - check: audit
+        expect: {actor: sam, resource: r3, action: terminal.open, decision: deny}

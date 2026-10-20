@@ -1,0 +1,248 @@
+# SPDX-License-Identifier: Apache-2.0
+#
+# Profiles of the stack of the terminal conformance suite (brief M2-48 Design note 4). Test
+# values only, never product defaults: every key is a row of docs/operations/configuration.md,
+# keyed by its dotted name. Server keys reach api, worker (and api-2) as BOTHY_* variables through
+# the env_file of infra/compose/test/compose.terminal.yaml; host-service keys go into
+# /etc/bothy-host/config.yaml of every host container. The loader (suite/profiles.go) checks the
+# relations the scenarios rely on and names both keys when one breaks. auth.session_max_age is
+# never shortened: it would also end the session of the stack's bootstrap owner.
+format: 1
+profiles:
+  default:
+    server:
+      # TM-T04 sends the own token after it expired; TM-T03 needs its first token alive while it
+      # disconnects, attaches and replays message 1.
+      terminal.session_token_ttl: 20s
+      # Short, so the expired token of TM-T04 is late after seconds; containers keep the clock of
+      # the Docker host, so no drift needs more.
+      auth.clock_leeway: 5s
+      # Above session_token_ttl plus auth.clock_leeway, so TM-T04 sees token_expired before the
+      # opening times out; TM-T05 waits for it.
+      terminal.open_timeout: 40s
+      # TM-T12 attaches again after it; below terminal.detach_grace.
+      terminal.quick_reattach_window: 20s
+      # Long, so no scenario of this profile reaches it by accident; TM-T16 stays below it.
+      terminal.detach_grace: 10m
+      # The server notices a lost host (TM-T16) after interval times miss limit, well before
+      # terminal.detach_grace; the reconnects of the host services stay quick.
+      terminal.host_heartbeat_interval: 5s
+      # Three missed heartbeats close the control connection.
+      terminal.host_heartbeat_miss_limit: 3
+      # Long, so no scenario of this profile reaches idle by accident.
+      terminal.idle_timeout: 30m
+      # Long, with terminal.idle_timeout.
+      terminal.idle_grace: 2m
+      # Long, so no scenario of this profile reaches the maximum duration.
+      terminal.max_session_duration: 12h
+      # TM-T07 and ID-T28 wait until a step-up is too old.
+      terminal.step_up_max_age: 20s
+      # TM-T20 waits until a code expired; long enough for one pairing after createHost.
+      terminal.pairing_code_ttl: 45s
+      # TM-T23: the new connection is accepted within this time when the older one is silent.
+      terminal.host_duplicate_probe_timeout: 3s
+      # The parallel cases of a package open many sessions per person and host.
+      terminal.max_sessions_per_person: 100
+      # The parallel cases of a package open many sessions per host.
+      terminal.max_sessions_per_host: 100
+      # TM-T10 and TM-T11 wait for the sweeps; short periods keep the cases quick.
+      terminal.sweep_interval: 5s
+      # TM-T10 waits for the expiry of a grant and of a membership.
+      authz.expiry_sweep_interval: 5s
+      # Every case writes its own deny entries; aggregation must not merge two of them.
+      audit.deny_aggregate_window: 1ms
+      # The parallel cases of a package open sessions and connect hosts at once.
+      ratelimit.rl.terminal.per_minute: 100000
+      # With ratelimit.rl.terminal.per_minute.
+      ratelimit.rl.terminal.burst: 100000
+      # Every host container connects, reports and reconnects.
+      ratelimit.rl.host.per_minute: 100000
+      # With ratelimit.rl.host.per_minute.
+      ratelimit.rl.host.burst: 100000
+      # Pairing and enrollment of every case go through the public auth class.
+      ratelimit.rl.public_auth.per_minute: 100000
+      # With ratelimit.rl.public_auth.per_minute.
+      ratelimit.rl.public_auth.burst: 100000
+      # The owners of the cases create hosts, people, groups and grants.
+      ratelimit.rl.admin.per_minute: 100000
+      # With ratelimit.rl.admin.per_minute.
+      ratelimit.rl.admin.burst: 100000
+      # The checks poll getHost and getTerminalSession.
+      ratelimit.rl.read.per_minute: 100000
+      # With ratelimit.rl.read.per_minute.
+      ratelimit.rl.read.burst: 100000
+      # Every case writes through the API.
+      ratelimit.rl.write.per_minute: 100000
+      # With ratelimit.rl.write.per_minute.
+      ratelimit.rl.write.burst: 100000
+      # TM-T06 scans the most verbose output.
+      telemetry.logs.level: debug
+      # TM-T06 scans every trace.
+      telemetry.traces.sampler_ratio: "1.0"
+    host_service:
+      # TM-T21, TM-T24 and TM-T29 wait for the periodic runs of HD6 and HD11.
+      host_service.credential_check_interval: 3s
+      # TM-T29 (e) fills a home until the entry scan exceeds it; normal homes scan in milliseconds.
+      host_service.entry_scan_timeout: 3s
+      # The Fake-claude answers at once; a hung call ends quickly.
+      host_service.auth_status_timeout: 10s
+      # The host service reconnects quickly after a restart of the server (TM-T16).
+      host_service.reconnect_backoff_base: 200ms
+      # With host_service.reconnect_backoff_base; also the time a refused start tries its report.
+      host_service.reconnect_backoff_cap: 3s
+  limits:
+    server:
+      # As in default.
+      terminal.session_token_ttl: 20s
+      # As in default.
+      auth.clock_leeway: 5s
+      # As in default.
+      terminal.open_timeout: 40s
+      # Below terminal.detach_grace of this profile.
+      terminal.quick_reattach_window: 5s
+      # TM-T11 waits until a detached session expires.
+      terminal.detach_grace: 30s
+      # Interval times miss limit stays below terminal.detach_grace.
+      terminal.host_heartbeat_interval: 5s
+      # With terminal.host_heartbeat_interval.
+      terminal.host_heartbeat_miss_limit: 3
+      # TM-T11 waits until a session without input ends.
+      terminal.idle_timeout: 20s
+      # TM-T11 (manipulated host): the server ends after idle_timeout plus this grace.
+      terminal.idle_grace: 5s
+      # TM-T11 reaches the maximum duration across an attach; above idle_timeout plus idle_grace.
+      terminal.max_session_duration: 60s
+      # As in default.
+      terminal.step_up_max_age: 20s
+      # As in default.
+      terminal.pairing_code_ttl: 45s
+      # As in default.
+      terminal.host_duplicate_probe_timeout: 3s
+      # As in default.
+      terminal.max_sessions_per_person: 100
+      # As in default.
+      terminal.max_sessions_per_host: 100
+      # The server-side limits of TM-T11 are enforced by terminal.sweep as well.
+      terminal.sweep_interval: 2s
+      # As in default.
+      authz.expiry_sweep_interval: 5s
+      # As in default.
+      audit.deny_aggregate_window: 1ms
+      # As in default.
+      ratelimit.rl.terminal.per_minute: 100000
+      # As in default.
+      ratelimit.rl.terminal.burst: 100000
+      # As in default.
+      ratelimit.rl.host.per_minute: 100000
+      # As in default.
+      ratelimit.rl.host.burst: 100000
+      # As in default.
+      ratelimit.rl.public_auth.per_minute: 100000
+      # As in default.
+      ratelimit.rl.public_auth.burst: 100000
+      # As in default.
+      ratelimit.rl.admin.per_minute: 100000
+      # As in default.
+      ratelimit.rl.admin.burst: 100000
+      # As in default.
+      ratelimit.rl.read.per_minute: 100000
+      # As in default.
+      ratelimit.rl.read.burst: 100000
+      # As in default.
+      ratelimit.rl.write.per_minute: 100000
+      # As in default.
+      ratelimit.rl.write.burst: 100000
+      # As in default.
+      telemetry.logs.level: debug
+      # As in default.
+      telemetry.traces.sampler_ratio: "1.0"
+    host_service:
+      # As in default.
+      host_service.credential_check_interval: 3s
+      # As in default.
+      host_service.entry_scan_timeout: 3s
+      # As in default.
+      host_service.auth_status_timeout: 10s
+      # As in default.
+      host_service.reconnect_backoff_base: 200ms
+      # As in default.
+      host_service.reconnect_backoff_cap: 3s
+  twonode:
+    server:
+      # M2-47's overlay sets it for api, api-2 and worker; the loader checks that both agree.
+      cluster.mode: multi
+      # As in default.
+      terminal.session_token_ttl: 20s
+      # As in default.
+      auth.clock_leeway: 5s
+      # TM-T15 waits for it when the two ends land on different nodes.
+      terminal.open_timeout: 40s
+      # As in default.
+      terminal.quick_reattach_window: 20s
+      # As in default.
+      terminal.detach_grace: 10m
+      # As in default.
+      terminal.host_heartbeat_interval: 5s
+      # As in default.
+      terminal.host_heartbeat_miss_limit: 3
+      # As in default.
+      terminal.idle_timeout: 30m
+      # As in default.
+      terminal.idle_grace: 2m
+      # As in default.
+      terminal.max_session_duration: 12h
+      # As in default.
+      terminal.step_up_max_age: 20s
+      # As in default.
+      terminal.pairing_code_ttl: 45s
+      # As in default.
+      terminal.host_duplicate_probe_timeout: 3s
+      # TM-T15 opens sessions until both nodes have one.
+      terminal.max_sessions_per_person: 100
+      # As in default.
+      terminal.max_sessions_per_host: 100
+      # As in default.
+      terminal.sweep_interval: 5s
+      # As in default.
+      authz.expiry_sweep_interval: 5s
+      # As in default.
+      audit.deny_aggregate_window: 1ms
+      # As in default.
+      ratelimit.rl.terminal.per_minute: 100000
+      # As in default.
+      ratelimit.rl.terminal.burst: 100000
+      # As in default.
+      ratelimit.rl.host.per_minute: 100000
+      # As in default.
+      ratelimit.rl.host.burst: 100000
+      # As in default.
+      ratelimit.rl.public_auth.per_minute: 100000
+      # As in default.
+      ratelimit.rl.public_auth.burst: 100000
+      # As in default.
+      ratelimit.rl.admin.per_minute: 100000
+      # As in default.
+      ratelimit.rl.admin.burst: 100000
+      # As in default.
+      ratelimit.rl.read.per_minute: 100000
+      # As in default.
+      ratelimit.rl.read.burst: 100000
+      # As in default.
+      ratelimit.rl.write.per_minute: 100000
+      # As in default.
+      ratelimit.rl.write.burst: 100000
+      # As in default.
+      telemetry.logs.level: debug
+      # As in default.
+      telemetry.traces.sampler_ratio: "1.0"
+    host_service:
+      # As in default.
+      host_service.credential_check_interval: 3s
+      # As in default.
+      host_service.entry_scan_timeout: 3s
+      # As in default.
+      host_service.auth_status_timeout: 10s
+      # As in default.
+      host_service.reconnect_backoff_base: 200ms
+      # As in default.
+      host_service.reconnect_backoff_cap: 3s

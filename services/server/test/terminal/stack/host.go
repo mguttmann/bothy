@@ -260,15 +260,25 @@ var fingerprintRE = regexp.MustCompile(`(?m)^fingerprint: (\S+)$`)
 // exec only, never written to the container's disk or the test output. It returns the fingerprint
 // (empty when pair failed) and the exit code.
 func (h *Host) Pair(ctx context.Context, code string) (string, int, error) {
-	r, err := h.Bothy(ctx, "pair", "--server", InstanceOrigin, "--code", code)
+	r, err := h.PairResult(ctx, code)
 	if err != nil {
 		return "", 0, err
 	}
+	return Fingerprint(r), r.Code, nil
+}
+
+// PairResult runs bothy-host pair like Pair and returns the whole result of the command.
+func (h *Host) PairResult(ctx context.Context, code string) (ExecResult, error) {
+	return h.Bothy(ctx, "pair", "--server", InstanceOrigin, "--code", code)
+}
+
+// Fingerprint returns the fingerprint of the output of a successful bothy-host pair, or "".
+func Fingerprint(r ExecResult) string {
 	m := fingerprintRE.FindSubmatch(r.Stdout)
 	if r.Code != 0 || m == nil {
-		return "", r.Code, nil
+		return ""
 	}
-	return string(m[1]), r.Code, nil
+	return string(m[1])
 }
 
 // Doctor runs bothy-host doctor and returns its output and exit code.
@@ -314,7 +324,8 @@ func (h *Host) NetUp(ctx context.Context) error {
 }
 
 // CloneState copies the state directory and the configuration of h as a tar stream into to (a
-// container with the same session users) and restarts its host service (TM-T23).
+// container with the same session users, its host service stopped); the step that starts it is
+// the caller's (TM-T23).
 func (h *Host) CloneState(ctx context.Context, to *Host) error {
 	r, err := h.Exec(ctx, nil, "tar", "-C", "/", "-cf", "-", strings.TrimPrefix(HostStateDir, "/"), strings.TrimPrefix(HostConfig, "/"))
 	if err != nil {
@@ -329,13 +340,6 @@ func (h *Host) CloneState(ctx context.Context, to *Host) error {
 	}
 	if w.Code != 0 {
 		return fmt.Errorf("stack: untar of the state into %s exited %d", to.Name, w.Code)
-	}
-	res, err := to.Bothy(ctx, "restart")
-	if err != nil {
-		return err
-	}
-	if res.Code != 0 {
-		return fmt.Errorf("stack: restart on %s exited %d", to.Name, res.Code)
 	}
 	return nil
 }

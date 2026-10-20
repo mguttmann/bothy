@@ -1,0 +1,65 @@
+# SPDX-License-Identifier: Apache-2.0
+# TM-T12 of 24 14 without the console part (M6-18): reattach from another device without a
+# step-up gives 401, the same device in the same login session within
+# terminal.quick_reattach_window is allowed, after it 401 (24 6.2, 08 6.3).
+id: tm-t12
+title: "Reattach: another device without step-up, the same device within and after terminal.quick_reattach_window"
+sources: ["24 14 TM-T12", "24 6.2", "24 13", "08 6.3"]
+profile: default
+world:
+  people: [alex]
+  devices: [{name: alex2, person: alex}]
+  hosts:
+    - {name: r1, assigned_to: alex, session_users: [term-alex], assign: {alex: term-alex}}
+  grants:
+    - {subject: alex, host: r1}
+cases:
+  - name: other_device
+    steps:
+      - {device: alex, do: step_up}
+      - {device: alex, do: open, on: r1, session: s1, expect: {status: 201}}
+      - {device: alex, do: connect, session: s1, expect: {}}
+      - {device: alex, do: handshake, session: s1, expect: {}}
+      - {device: alex, do: start, session: s1}
+      - {device: alex, do: send, session: s1, text: "printf '%s-%s\\n' ready ${marker}\n"}
+      - {device: alex, do: expect_output, session: s1, expect: {output: "ready-${marker}"}}
+      - {device: alex, do: cut, session: s1}
+      - check: session
+        session: s1
+        expect: {state: detached}
+      - {device: alex2, do: attach, session: s1, expect: {status: 401, code: step_up_required}}
+      - check: audit
+        expect: {actor: alex, resource: s1, action: terminal.attach, decision: deny}
+  - name: same_device_within_window
+    steps:
+      - {device: alex, do: step_up}
+      - {device: alex, do: open, on: r1, session: s1, expect: {status: 201}}
+      - {device: alex, do: connect, session: s1, expect: {}}
+      - {device: alex, do: handshake, session: s1, expect: {}}
+      - {device: alex, do: start, session: s1}
+      - {device: alex, do: send, session: s1, text: "printf '%s-%s\\n' ready ${marker}\n"}
+      - {device: alex, do: expect_output, session: s1, expect: {output: "ready-${marker}"}}
+      - {device: alex, do: cut, session: s1}
+      - check: session
+        session: s1
+        expect: {state: detached}
+      - {device: alex, do: attach, session: s1, expect: {status: 200}}
+      - check: audit
+        expect: {actor: alex, resource: s1, action: terminal.attach, decision: allow}
+  - name: same_device_after_window
+    steps:
+      - {device: alex, do: step_up}
+      - {device: alex, do: open, on: r1, session: s1, expect: {status: 201}}
+      - {device: alex, do: connect, session: s1, expect: {}}
+      - {device: alex, do: handshake, session: s1, expect: {}}
+      - {device: alex, do: start, session: s1}
+      - {device: alex, do: send, session: s1, text: "printf '%s-%s\\n' ready ${marker}\n"}
+      - {device: alex, do: expect_output, session: s1, expect: {output: "ready-${marker}"}}
+      - {device: alex, do: cut, session: s1}
+      - check: session
+        session: s1
+        expect: {state: detached}
+      - wait: terminal.quick_reattach_window
+      - {device: alex, do: attach, session: s1, expect: {status: 401, code: step_up_required}}
+      - check: audit
+        expect: {actor: alex, resource: s1, action: terminal.attach, decision: deny}

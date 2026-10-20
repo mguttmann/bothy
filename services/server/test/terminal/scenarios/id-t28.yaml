@@ -1,0 +1,42 @@
+# SPDX-License-Identifier: Apache-2.0
+# ID-T28 of 08 without the console part (M6-18) and without the password and TOTP step-up, which
+# stays M2-40's TestIDT28_PasswordTotpAndOidcStepUp: the device-key step-up for terminal.open is
+# refused when older than terminal.step_up_max_age or used for an earlier opening, and two
+# parallel openings with one confirmation give exactly one session (08 6.3).
+id: id-t28
+title: Fresh step-up for the terminal with the device key
+sources: ["08 6.3", "08 tests ID-T28", "24 13"]
+profile: default
+world:
+  people: [alex]
+  hosts:
+    - {name: r1, assigned_to: alex, session_users: [term-alex], assign: {alex: term-alex}}
+  grants:
+    - {subject: alex, host: r1}
+cases:
+  - name: too_old
+    steps:
+      - {device: alex, do: step_up}
+      - wait: terminal.step_up_max_age
+      - {device: alex, do: open, on: r1, session: s1, expect: {status: 401, code: step_up_required}}
+      - check: audit
+        expect: {actor: alex, resource: r1, action: terminal.open, decision: deny}
+  - name: used_for_earlier_opening
+    steps:
+      - {device: alex, do: step_up}
+      - {device: alex, do: open, on: r1, session: s1, expect: {status: 201}}
+      - {device: alex, do: open, on: r1, session: s2, expect: {status: 401, code: step_up_required}}
+      - check: audit
+        expect: {actor: alex, resource: s1, action: terminal.open, decision: allow}
+  - name: concurrent_one_confirmation
+    steps:
+      - {device: alex, do: step_up}
+      - parallel:
+          - {device: alex, do: open, on: r1, session: s1, expect: {}}
+          - {device: alex, do: open, on: r1, session: s2, expect: {}}
+        expect: {statuses: [201, 401]}
+      - as: alex
+        call: listTerminalSessions
+        expect: {status: 200, lengths: {/items: 1}}
+      - check: audit
+        expect: {actor: alex, action: terminal.open, decision: allow, count: 1}
