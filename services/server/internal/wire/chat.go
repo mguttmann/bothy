@@ -58,6 +58,9 @@ type ChatWrites struct {
 	// (Identity.Directory, M3-13): every thread takes the language of its creator from it
 	// (14 3.1). The operator checks of M1-54 read the agents through it as well.
 	Directory identity.Directory
+	// Resolver is the guided flow of authz (AuthzAdmin.Resolver, M2-21) for the operator actions
+	// with resolve_i1; nil refuses such a request with kind internal.
+	Resolver authz.I1Resolver
 }
 
 // Chat is the chat module of the process (M1-52 to M1-55): the space, sidebar, channel, forum tag
@@ -100,7 +103,7 @@ func NewChat(cfg chatapp.Config, pool *pg.Pool, uow txn.UnitOfWork, az authorize
 	svc, err := chatapp.New(cfg, chatapp.Deps{
 		Store: repo, UoW: uow, Authorizer: az, Rights: rights, Audit: w.Audit, Events: w.Events,
 		RightsChanges: w.Rights, Directory: w.Directory,
-		Policies: policies, Cursors: chathttp.Cursors{}, Clock: clk, Behaviors: repo, Errors: counter,
+		Policies: policies, Cursors: chathttp.Cursors{}, Clock: clk, Behaviors: repo, Errors: counter, Resolver: w.Resolver,
 	})
 	if err != nil {
 		return nil, err

@@ -79,6 +79,10 @@ var chatConfig = chatapp.Config{
 	ProjectBindingTextMaxChars: 64, ReasonMaxChars: 200,
 }
 
+// reasonMaxChars is audit.reason_max_chars of the world (the guided flow and the policy bodies,
+// M2-21); short so the tests reach it.
+const reasonMaxChars = 200
+
 // pepper is the token pepper of the world (a fixed test value, never a secret).
 var pepper = []byte("0123456789abcdef0123456789abcdef")
 
@@ -149,6 +153,8 @@ type world struct {
 	pub      *recPublisher
 	// logs captures every log record of the modules (M2-20 leak checks).
 	logs *httpservertest.LogCapture
+	// resolver is the guided flow resolve_i1 of M2-21 with the switch of the agents module.
+	resolver *authzapp.Resolver
 	// azConfig and azDeps built az; newAuthorizer builds a second instance from them, the
 	// Authorizer of another process (M1-62).
 	azConfig authzapp.AuthorizerConfig
@@ -251,11 +257,16 @@ func newEmptyWorldWith(t *testing.T, search searchlang.Map) *world {
 	must(t, err)
 	settings, err := wire.NewInstanceSettings(wire.DefaultInstanceConfig(), true, pool, uow, w.az, wire.SettingsWrites{Audit: w.rec, Events: appender}, w.clk)
 	must(t, err)
-	writes := wire.IdentityWrites{Audit: w.rec, Events: appender, Settings: settings.Admin, Flags: settings.Admin, Search: search}
+	// The guided flow resolve_i1 of M2-21: authz authorizes and names the agents, the agents
+	// module switches them (bound below, as the start steps of internal/wire do).
+	w.resolver, err = authzapp.NewResolver(authzapp.ResolverDeps{Authorizer: w.az, Policies: policies, Rights: hook, ReasonMaxChars: reasonMaxChars})
+	must(t, err)
+	writes := wire.IdentityWrites{Audit: w.rec, Events: appender, Settings: settings.Admin, Flags: settings.Admin, Search: search, Resolver: w.resolver}
 	w.id, err = wire.NewIdentity(idConfig, pool, uow, w.az, writes, pepper, w.clk, log)
 	must(t, err)
-	ag, err := wire.NewAgents(agentsapp.Config{PageSizeDefault: 20, PageSizeMax: 50, ReasonMaxChars: 200}, pool, uow, w.az, hook, writes, w.id, w.clk, log)
+	ag, err := wire.NewAgents(agentsapp.Config{PageSizeDefault: 20, PageSizeMax: 50, ReasonMaxChars: reasonMaxChars}, pool, uow, w.az, hook, writes, w.id, w.clk, log)
 	must(t, err)
+	w.resolver.BindSwitch(ag.Switch)
 	w.timers, w.pub = &fakeTimers{clk: w.clk}, &recPublisher{}
 	must(t, ag.BindPresence(presenceConfig, pool, wire.PresenceDeps{UoW: uow, Authorizer: w.az, Audit: w.rec, Clock: w.clk, Timers: w.timers, Log: log}))
 	w.presence = ag.Presence
@@ -263,11 +274,13 @@ func newEmptyWorldWith(t *testing.T, search searchlang.Map) *world {
 	w.admin, err = authzapp.NewAdminService(authzapp.AdminDeps{
 		UoW: uow, Authorizer: w.az, Store: authzpg.NewRepository(pool), Principals: principals, Structure: structure, Hosts: hosts,
 		Rights: hook, Audit: w.rec, Clock: w.clk, Events: appender, Scopes: w.az, Cursors: authzhttp.Cursors{},
-		Config: authzapp.AdminConfig{GroupNameMaxChars: 100, GroupDescriptionMaxChars: 500, PageSizeDefault: 20, PageSizeMax: 50},
+		Config: authzapp.AdminConfig{GroupNameMaxChars: 100, GroupDescriptionMaxChars: 500, PageSizeDefault: 20, PageSizeMax: 50,
+			ReasonMaxChars: reasonMaxChars},
+		Resolver: w.resolver,
 	})
 	must(t, err)
 	c, err := wire.NewChat(chatConfig, pool, uow, w.az, w.az, wire.ChatWrites{Audit: w.rec, Events: appender, Rights: w.hook,
-		Directory: w.id.Directory}, nil, w.clk)
+		Directory: w.id.Directory, Resolver: w.resolver}, nil, w.clk)
 	must(t, err)
 	w.chat = c.Service
 	w.presence.BindReadiness(c.Service)

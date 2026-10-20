@@ -144,6 +144,7 @@ func (h *Access) AddGroupMember(ctx context.Context, req rest.AddGroupMemberRequ
 		if b.ExpiresAt != nil {
 			cmd.ExpiresAt = *b.ExpiresAt
 		}
+		cmd.ResolveI1 = resolveCmd(b.ResolveI1)
 	}
 	m, err := h.admin.AddGroupMember(ctx, principal(ctx), ids.ID(req.GroupId), cmd)
 	if err != nil {
@@ -225,7 +226,20 @@ func grantCmd(b *rest.GrantCreate) authz.CreateGrantCmd {
 	if b.ExpiresAt != nil {
 		cmd.ExpiresAt = *b.ExpiresAt
 	}
+	cmd.ResolveI1 = resolveCmd(b.ResolveI1)
 	return cmd
+}
+
+// resolveCmd converts the member resolve_i1 (schema ResolveI1, M2-21); nil stays nil.
+func resolveCmd(r *rest.ResolveI1) *authz.ResolveI1 {
+	if r == nil {
+		return nil
+	}
+	out := &authz.ResolveI1{Reason: r.Reason, AgentIDs: make([]ids.ID, 0, len(r.SwitchToOrganization))}
+	for _, id := range r.SwitchToOrganization {
+		out.AgentIDs = append(out.AgentIDs, ids.ID(id))
+	}
+	return out
 }
 
 // GetGrant implements rest.StrictServerInterface (GET /grants/{grant_id}).

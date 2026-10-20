@@ -228,22 +228,35 @@ type OperatorAssignment struct {
 	AgentID ids.ID
 }
 
-// SetSpaceOperatorCmd is the request of setSpaceOperator (M1-54): the space, the new default
-// operator (none or agent), the reason and the If-Match of the request.
-type SetSpaceOperatorCmd struct {
-	SpaceID  ids.ID
-	Operator OperatorAssignment
+// ResolveI1 is the request member resolve_i1 of the operator actions (OpenAPI ResolveI1, M2-21):
+// the agents to switch to organization first, in request order, and the reason of the switch.
+// chat/app converts it into authz.ResolveI1; the port keeps its own type (02 section 5 rule 1,
+// R-AR-03).
+type ResolveI1 struct {
+	AgentIDs []ids.ID
 	Reason   string
-	IfMatch  Precondition
+}
+
+// SetSpaceOperatorCmd is the request of setSpaceOperator (M1-54): the space, the new default
+// operator (none or agent), the reason and the If-Match of the request. ResolveI1 is the optional
+// guided flow (05 rule 1.6, M2-21); nil for none.
+type SetSpaceOperatorCmd struct {
+	SpaceID   ids.ID
+	Operator  OperatorAssignment
+	Reason    string
+	IfMatch   Precondition
+	ResolveI1 *ResolveI1
 }
 
 // SetChannelOperatorCmd is the request of setChannelOperator (M1-54): the channel, the new
-// operator (inherit, none or agent), the reason and the If-Match of the request.
+// operator (inherit, none or agent), the reason and the If-Match of the request. ResolveI1 is the
+// optional guided flow (05 rule 1.6, M2-21); nil for none.
 type SetChannelOperatorCmd struct {
 	ChannelID ids.ID
 	Operator  OperatorAssignment
 	Reason    string
 	IfMatch   Precondition
+	ResolveI1 *ResolveI1
 }
 
 // Structure is the incoming port of the structure, here its space, sidebar, channel, forum tag

@@ -37,6 +37,9 @@ var catalogDE = catalog{
 	"hint.group_reach.one":                       "Hinweis: Die Gruppe {group} erreicht einen Menschen.",
 	"hint.expiry_missing":                        "Hinweis: Die Freigabe für {subject} hat kein Ablaufdatum.",
 	"date":                                       "02.01.2006",
+	// The guided flow resolve_i1 (M2-21, 10 section 11 point 2).
+	"switch.organization": "Zuerst wird {agent} auf Organisation umgestellt; die Kosten trägt dann der Organisations-Key.",
+	"switch.not_ready":    "Der Adapter von {agent} meldet noch keinen Organisations-Key. Aufrufe scheitern, bis er umgestellt ist.",
 	// The grant on a host (M2-40, 07 section 9.3).
 	"summary.host": `{subject} erhält{until} das Zusatzrecht "Terminal" auf dem Rechner {host}.`,
 	"hint.i6":      "Abgelehnt: Auf {host} gilt die persönliche LLM-Anmeldung von {holder}. Dort darf nur {holder} eine Freigabe haben.",
