@@ -83,6 +83,9 @@ type Env struct {
 	// HelperGrace is added to the bound of every helper call (zero means helperGrace): a helper
 	// that does not answer in time counts as unreachable, so no session user can hold the run.
 	HelperGrace time.Duration
+	// Mode is the mode of the check.run requests (ModeFull when empty); Runner sets ModeLight for
+	// RunLight and RunLightUser.
+	Mode string
 	// InterfaceAddrs and LookupIP serve HD5.
 	InterfaceAddrs func() ([]net.IP, error)
 	LookupIP       func(ctx context.Context, host string) ([]net.IP, error)
@@ -156,6 +159,7 @@ func RunService(ctx context.Context, env Env) *Result {
 	results := r.askHelpers(ctx)
 	r.aggregate(results)
 	r.res.facts = r.facts
+	r.res.ClaudeBin, r.res.SearchList = r.claudeBin, slices.Clone(r.search)
 	r.res.evaluate(env.Declaration)
 	return r.res
 }
@@ -600,12 +604,16 @@ type helperAnswer struct {
 
 // Request returns the check.run request for sessionUser.
 func (r *run) request(u string) Request {
+	mode := r.env.Mode
+	if mode == "" {
+		mode = ModeFull
+	}
 	var dirs []string
 	for _, w := range r.env.Config.Workdirs(u) {
 		dirs = append(dirs, w.Path)
 	}
 	return Request{
-		Mode: ModeFull, SessionUser: u, Others: slices.DeleteFunc(slices.Clone(r.users), func(s string) bool { return s == u }),
+		Mode: mode, SessionUser: u, Others: slices.DeleteFunc(slices.Clone(r.users), func(s string) bool { return s == u }),
 		ServiceUser: r.env.ServiceUser, ClaudeBin: r.claudeBin, SearchList: r.search, Declaration: r.env.Declaration,
 		Workdirs: dirs, ForeignHomes: r.foreignHomes(), StateDir: r.env.StateDir, KeyFile: r.env.KeyFile,
 		AuthStatusTimeout: r.env.Config.AuthStatusTimeout, EntryScanTimeout: r.env.Config.EntryScanTimeout,

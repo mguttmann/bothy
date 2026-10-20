@@ -100,6 +100,12 @@ func fdConn(fd int) (*net.UnixConn, error) {
 // passes one end with SCM_RIGHTS, closes the accepted connection and serves the other end with h
 // until ctx ends.
 func ServeHelper(ctx context.Context, l net.Listener, allowUID string, h Handler) error {
+	return ServeHelperConns(ctx, l, allowUID, func(ctx context.Context, c *Conn) { _ = ServeConn(ctx, c, h) })
+}
+
+// ServeHelperConns is ServeHelper with a function that owns each verified channel until it returns
+// (the session channel of M2-45, whose PTYs end when it breaks); serve must close c.
+func ServeHelperConns(ctx context.Context, l net.Listener, allowUID string, serve func(context.Context, *Conn)) error {
 	stop := context.AfterFunc(ctx, func() { _ = l.Close() })
 	defer stop()
 	for {
@@ -114,7 +120,7 @@ func ServeHelper(ctx context.Context, l net.Listener, allowUID string, h Handler
 		if err != nil {
 			continue
 		}
-		go func() { _ = ServeConn(ctx, NewConn(pair, Peer{UID: allowUID}), h) }()
+		go serve(ctx, NewConn(pair, Peer{UID: allowUID}))
 	}
 }
 

@@ -153,6 +153,11 @@ type Result struct {
 	// Workdirs are the working directories after HD7 per session user, in the reported order;
 	// M2-45 resolves the index of wdi in exactly this list. The paths never leave the host.
 	Workdirs map[string][]Workdir
+	// ClaudeBin is the resolved host_service.claude_bin of HD10, "" when it is empty or counts as
+	// empty; SearchList is the fixed search list of HD6 that goes first into PATH of the profile
+	// claude with organization (24 7.4). M2-45 uses both and never resolves them again.
+	ClaudeBin  string
+	SearchList []string
 
 	facts    facts
 	requests map[string]Request
