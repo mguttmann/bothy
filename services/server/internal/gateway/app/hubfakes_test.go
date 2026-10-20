@@ -16,6 +16,7 @@ import (
 	"github.com/OWNER/bothy/services/server/internal/kernel/authorize"
 	"github.com/OWNER/bothy/services/server/internal/kernel/errs"
 	"github.com/OWNER/bothy/services/server/internal/kernel/ids"
+	"github.com/OWNER/bothy/services/server/internal/platform/testkit"
 	"github.com/OWNER/bothy/services/server/internal/sync"
 )
 
@@ -476,10 +477,10 @@ func accessGranted(seq int64, audience ids.ID, added ...ids.ID) sync.Event {
 		ResourceID: audience, ReceiveAction: "self", AudiencePrincipalID: audience, Payload: b, PermissionVersion: 3}
 }
 
-// waitFor polls cond until it holds or the test deadline of two seconds passes.
+// waitFor polls cond until it holds or testkit.Patience passes.
 func waitFor(t testing.TB, what string, cond func() bool) {
 	t.Helper()
-	deadline := time.Now().Add(2 * time.Second)
+	deadline := testkit.Deadline()
 	for !cond() {
 		if time.Now().After(deadline) {
 			t.Fatalf("timed out waiting for %s", what)

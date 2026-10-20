@@ -20,6 +20,7 @@ import (
 	"github.com/OWNER/bothy/services/server/internal/gateway/domain"
 	"github.com/OWNER/bothy/services/server/internal/kernel/actor"
 	"github.com/OWNER/bothy/services/server/internal/kernel/ids"
+	"github.com/OWNER/bothy/services/server/internal/platform/testkit"
 	"github.com/OWNER/bothy/services/server/internal/sync"
 )
 
@@ -457,7 +458,7 @@ func (m *model) stepRunner(c *modelConn) {
 // settle waits until the runner of c stopped: at the gate, waiting for queue space, done (live)
 // or closed.
 func (m *model) settle(c *modelConn) {
-	deadline := time.Now().Add(30 * time.Second)
+	deadline := testkit.Deadline()
 	for {
 		c.mu.Lock()
 		gated := c.atGate

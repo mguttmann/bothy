@@ -13,6 +13,7 @@ import (
 	"github.com/OWNER/bothy/services/server/internal/gateway/domain"
 	"github.com/OWNER/bothy/services/server/internal/kernel/actor"
 	"github.com/OWNER/bothy/services/server/internal/kernel/ids"
+	"github.com/OWNER/bothy/services/server/internal/platform/testkit"
 	"github.com/OWNER/bothy/services/server/internal/sync"
 )
 
@@ -38,7 +39,7 @@ func TestHub_DispatchNeverBlocksOnSlowConnection(t *testing.T) {
 		}()
 		select {
 		case <-done:
-		case <-time.After(2 * time.Second):
+		case <-time.After(testkit.Patience):
 			t.Fatalf("Dispatch of seq %d waited on a connection", seq)
 		}
 	}

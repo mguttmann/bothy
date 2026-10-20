@@ -26,6 +26,7 @@ import (
 	"github.com/OWNER/bothy/services/server/internal/platform/health"
 	"github.com/OWNER/bothy/services/server/internal/platform/lifecycle"
 	"github.com/OWNER/bothy/services/server/internal/platform/pg"
+	"github.com/OWNER/bothy/services/server/internal/platform/testkit"
 	"github.com/OWNER/bothy/services/server/internal/wire"
 	"github.com/OWNER/bothy/services/server/migrations"
 )
@@ -71,7 +72,7 @@ func (w *dlWorld) rest(base string, p gwPerson, method, path string, body any) (
 		}
 		rd = bytes.NewReader(b)
 	}
-	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), testkit.Patience)
 	defer cancel()
 	req, err := http.NewRequestWithContext(ctx, method, base+path, rd)
 	if err != nil {
@@ -214,7 +215,7 @@ type frame struct {
 // readUntil reads the frames of c until stop holds for one (included) and returns them.
 func readUntil(t *testing.T, c *wstest.Client, stop func(frame) bool) []frame {
 	t.Helper()
-	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), testkit.Patience)
 	defer cancel()
 	var out []frame
 	for {
@@ -327,7 +328,7 @@ func TestGatewayDelivery(t *testing.T) {
 		// The server may still hold the first connection of the device for a moment (4017).
 		for range 50 {
 			c2 = w.dial()
-			ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
+			ctx, cancel := context.WithTimeout(context.Background(), testkit.Patience)
 			p := w.params(sam)
 			p.Cursor, p.SyncEpoch = &cur, r.SyncEpoch.String()
 			_, err = c2.Identify(ctx, p)
@@ -425,7 +426,7 @@ func TestGatewayDelivery(t *testing.T) {
 		// not change, 04 section 8.2), and it closes with 4012.
 		closedWithout := func(t *testing.T, c *wstest.Client, cm string) {
 			t.Helper()
-			ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+			ctx, cancel := context.WithTimeout(context.Background(), testkit.Patience)
 			defer cancel()
 			for {
 				op, d, err := c.Next(ctx)
@@ -469,7 +470,7 @@ func TestGatewayDelivery(t *testing.T) {
 	bBase := "http://127.0.0.1:" + strconv.Itoa(b.logs.port("public listener started"))
 	dialB := func(t *testing.T, p wstest.IdentifyParams) *wstest.Client {
 		t.Helper()
-		ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
+		ctx, cancel := context.WithTimeout(context.Background(), testkit.Patience)
 		defer cancel()
 		c, err := wstest.Dial(ctx, bBase, wstest.WithOrigin(gwPublicURL))
 		if err != nil {
@@ -588,7 +589,7 @@ func TestGateway_TokenRevokedDuringCatchUpCloses4012(t *testing.T) {
 		FROM h, generate_series(1, $2::bigint) g, (SELECT * FROM event_log WHERE client_msg_id = $1 LIMIT 1) e`, cm, backlog)
 	// The log tail passes the backlog before the reconnect, so it is not buffered as live events.
 	tail := w.post(other.thread, "tail passed")
-	wctx, wcancel := context.WithTimeout(context.Background(), 3*time.Minute)
+	wctx, wcancel := context.WithTimeout(context.Background(), testkit.Patience)
 	for {
 		op, d, err := watch.Next(wctx)
 		if err != nil {
@@ -602,7 +603,7 @@ func TestGateway_TokenRevokedDuringCatchUpCloses4012(t *testing.T) {
 	wcancel()
 	// Without heartbeats the revalidation of a heartbeat cannot close it: only a page can.
 	c2 := w.dial(wstest.WithoutHeartbeat())
-	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), testkit.Patience)
 	p := params
 	p.Cursor, p.SyncEpoch = &r.HeadSeq, r.SyncEpoch.String()
 	_, err := c2.Identify(ctx, p)
@@ -611,7 +612,7 @@ func TestGateway_TokenRevokedDuringCatchUpCloses4012(t *testing.T) {
 		t.Fatalf("identify with cursor: %v", err)
 	}
 	w.must(w.owner, http.MethodDelete, "/api/v1/tokens/"+tok, nil)
-	rctx, rcancel := context.WithTimeout(context.Background(), 60*time.Second)
+	rctx, rcancel := context.WithTimeout(context.Background(), testkit.Patience)
 	defer rcancel()
 	n := 0
 	for {
