@@ -6,6 +6,7 @@ import (
 	"context"
 	"time"
 
+	"github.com/OWNER/bothy/services/server/internal/chat"
 	"github.com/OWNER/bothy/services/server/internal/chat/domain"
 	"github.com/OWNER/bothy/services/server/internal/kernel/ids"
 )
@@ -153,6 +154,9 @@ type Store interface {
 	// DecrementMessageCount lowers message_count of the locked thread id by one and raises its
 	// version (M1-58). Errors: internal when no row changed (unknown thread or a count of zero).
 	DecrementMessageCount(ctx context.Context, id ids.ID) error
+	// ThreadCounters returns the counters of the threads in channels with last_message_seq above
+	// unread_floor_seq, ascending by thread (M1-63).
+	ThreadCounters(ctx context.Context, channels []ids.ID) ([]chat.ThreadCounter, error)
 	// ListThreads returns the threads of q in the order of its sort.
 	ListThreads(ctx context.Context, q ThreadQuery) ([]domain.Thread, error)
 	// ThreadTags returns the live tags of each of threads in the order of the tags; a thread

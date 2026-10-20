@@ -4,9 +4,9 @@ package wire
 
 import "github.com/OWNER/bothy/services/server/internal/platform/config"
 
-// syncConfigKeys returns the keys of the event log (M1-16) and the idempotency keys (M1-20): the
-// partition size of 03, the retention, payload limit and key TTL of 04 and the tail, maintenance
-// and cleanup keys of 02 "Configuration values of this chapter".
+// syncConfigKeys returns the keys of the event log (M1-16), the idempotency keys (M1-20) and
+// catch-up (M1-63): the partition size of 03, the retention, payload limit, key TTL and catch-up
+// limits of 04 and the tail, maintenance and cleanup keys of 02 "Configuration values of this chapter".
 // database.listen_reconnect_backoff_cap and database.lock_timeout, which the tail and the
 // maintenance read too, are database keys (configkeys_database.go).
 // defaultEventRetention is the default of sync.event_retention (04 "Configuration values of this chapter").
@@ -32,6 +32,10 @@ func syncConfigKeys() []config.Key {
 			Doc: "Interval of the job sync.idempotency_cleanup."},
 		{Name: "sync.idempotency_cleanup_batch_size", Kind: config.KindInt, Default: "1000", Min: "1", Max: "2147483647", Chapter: chapter02,
 			Doc: "Rows per delete batch of the job sync.idempotency_cleanup."},
+		{Name: "sync.catchup_page_size", Kind: config.KindInt, Default: "500", Min: "1", Max: "2147483647", Chapter: chapter04,
+			Doc: "Events per catch-up page; the default and the largest limit of GET /api/v1/events."},
+		{Name: "sync.catchup_max_events", Kind: config.KindInt, Default: "50000", Min: "1", Max: "1000000000000", Chapter: chapter04,
+			Doc: "A client further behind the head than this many events gets resync_required with too_far_behind."},
 		{Name: "sync.event_log_partitions_ahead", Kind: config.KindInt, Default: "3", Min: "1", Max: "1000", Chapter: chapter02,
 			Doc: "Partitions of event_log that stand ready above the head."},
 	}

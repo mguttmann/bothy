@@ -129,6 +129,8 @@ type Handlers struct {
 	// deleteThreadDraft, putChannelDraft, deleteChannelDraft, listMyDrafts, listMySettings,
 	// putMySetting, deleteMySetting and getMySidebar (sync, M1-61).
 	*synchttp.Personal
+	// Sync implements listEvents and getSnapshot (sync, M1-63).
+	*synchttp.Sync
 }
 
 // routeBuilder builds and verifies the routes of one REST surface against a catalogue with the

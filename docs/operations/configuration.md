@@ -270,8 +270,8 @@ Source: [04-sync-protocol.md](../spec/04-sync-protocol.md), section 18.
 | `sync.reauth_lead_time` | `BOTHY_SYNC__REAUTH_LEAD_TIME` | Server |  | `60s` | lead time of `reauth_required` before the token expires | planned (M1) |
 | `sync.reconnect_backoff_base` | `BOTHY_SYNC__RECONNECT_BACKOFF_BASE` | Server |  | `1s` | base of the backoff when reconnecting | planned (M2) |
 | `sync.reconnect_backoff_cap` | `BOTHY_SYNC__RECONNECT_BACKOFF_CAP` | Server |  | `60s` | largest interval when reconnecting | planned (M2) |
-| `sync.catchup_page_size` | `BOTHY_SYNC__CATCHUP_PAGE_SIZE` | Server |  | `500` | events per catch-up page | planned (M1) |
-| `sync.catchup_max_events` | `BOTHY_SYNC__CATCHUP_MAX_EVENTS` | Server |  | `50000` | a larger backlog yields `resync_required` | planned (M1) |
+| `sync.catchup_page_size` | `BOTHY_SYNC__CATCHUP_PAGE_SIZE` | Server | int | `500` | events per catch-up page | active |
+| `sync.catchup_max_events` | `BOTHY_SYNC__CATCHUP_MAX_EVENTS` | Server | int | `50000` | a larger backlog yields `resync_required` | active |
 | `sync.cursor_advance_every` | `BOTHY_SYNC__CURSOR_ADVANCE_EVERY` | Server |  | `1000` | one `cursor` frame after this many skipped events | planned (M1) |
 | `sync.outbound_queue_max` | `BOTHY_SYNC__OUTBOUND_QUEUE_MAX` | Server |  | `10000` | frames in the outbound queue of a connection until `4014` | planned (M1) |
 | `sync.idempotency_key_ttl` | `BOTHY_SYNC__IDEMPOTENCY_KEY_TTL` | Server | duration | `24h` | retention of `Idempotency-Key` | active |

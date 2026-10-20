@@ -386,16 +386,17 @@ func (a *Authorizer) authorize(ctx context.Context, p authorize.Principal, act a
 	if act == authorize.ActionWebhookOutDeliver {
 		return a.authorizeDelivery(ctx, p, r)
 	}
+	r, found, err := a.eventTarget(ctx, act, r)
+	if err != nil || !found {
+		return outcome(domain.Decision{Outcome: domain.OutcomeNotFound, Reason: domain.ReasonNoGrant}), err
+	}
 	spec, req, preview, err := a.actionFor(act, r)
 	if err != nil {
 		return authorize.Decision{}, err
 	}
 	t := a.clock.Now()
-	if p == nil || p.PrincipalKind() == domain.KindAnonymous {
-		if isPublic(req) {
-			return authorize.Decision{Outcome: authorize.OutcomeAllow}, nil
-		}
-		return authorize.Decision{Outcome: authorize.OutcomeUnauthenticated, Reason: authorize.Reason(domain.ReasonUnauthenticated)}, nil
+	if d, anonymous := anonymousDecision(p, req); anonymous {
+		return d, nil
 	}
 	s, d, err := a.acting(ctx, p, spec.ID, t)
 	if err != nil || d.Outcome != domain.OutcomeAllow {
@@ -526,6 +527,18 @@ func (a *Authorizer) actionFor(act authorize.Action, r authorize.Resource) (doma
 		return domain.ActionSpec{}, domain.Expr{}, nil, internal(fmt.Sprintf("resource kind %q is not a resource of %s", r.Kind, spec.ID))
 	}
 	return spec, req, preview, nil
+}
+
+// anonymousDecision decides for a caller without a principal or an anonymous one: allow for a
+// Public requirement, unauthenticated otherwise. anonymous is false for every other caller.
+func anonymousDecision(p authorize.Principal, req domain.Expr) (d authorize.Decision, anonymous bool) {
+	if p != nil && p.PrincipalKind() != domain.KindAnonymous {
+		return authorize.Decision{}, false
+	}
+	if isPublic(req) {
+		return authorize.Decision{Outcome: authorize.OutcomeAllow}, true
+	}
+	return authorize.Decision{Outcome: authorize.OutcomeUnauthenticated, Reason: authorize.Reason(domain.ReasonUnauthenticated)}, true
 }
 
 // isPublic reports a requirement that is exactly Public.

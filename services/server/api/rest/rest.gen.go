@@ -197,6 +197,9 @@ type ServerInterface interface {
 	// RevokeDevice Revoke a device
 	// (POST /devices/{device_id}/revoke)
 	RevokeDevice(w http.ResponseWriter, r *http.Request, deviceId DeviceIdPath, params RevokeDeviceParams)
+	// ListEvents Catch up on events after a sequence
+	// (GET /events)
+	ListEvents(w http.ResponseWriter, r *http.Request, params ListEventsParams)
 	// ListFeatureFlags List feature flags
 	// (GET /feature-flags)
 	ListFeatureFlags(w http.ResponseWriter, r *http.Request)
@@ -455,6 +458,9 @@ type ServerInterface interface {
 	// SetSpaceOperator Set the default operator of a space
 	// (PUT /spaces/{space_id}/operator)
 	SetSpaceOperator(w http.ResponseWriter, r *http.Request, spaceId SpaceIdPath, params SetSpaceOperatorParams)
+	// GetSnapshot Load a snapshot
+	// (GET /sync/snapshot)
+	GetSnapshot(w http.ResponseWriter, r *http.Request)
 	// DeleteTemplate Delete a template
 	// (DELETE /templates/{template_id})
 	DeleteTemplate(w http.ResponseWriter, r *http.Request, templateId TemplateIdPath)
@@ -3084,6 +3090,65 @@ func (siw *ServerInterfaceWrapper) RevokeDevice(w http.ResponseWriter, r *http.R
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		siw.Handler.RevokeDevice(w, r, deviceId, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// ListEvents operation middleware
+func (siw *ServerInterfaceWrapper) ListEvents(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params ListEventsParams
+
+	// ------------- Required query parameter "after" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, true, "after", r.URL.Query(), &params.After, runtime.BindQueryParameterOptions{Type: "integer", Format: "int64"})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "after"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "after", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "epoch" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "epoch", r.URL.Query(), &params.Epoch, runtime.BindQueryParameterOptions{Type: "string", Format: "uuid"})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "epoch"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "epoch", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "limit" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "limit", r.URL.Query(), &params.Limit, runtime.BindQueryParameterOptions{Type: "integer", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "limit"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "limit", Err: err})
+		}
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.ListEvents(w, r, params)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -6145,6 +6210,20 @@ func (siw *ServerInterfaceWrapper) SetSpaceOperator(w http.ResponseWriter, r *ht
 	handler.ServeHTTP(w, r)
 }
 
+// GetSnapshot operation middleware
+func (siw *ServerInterfaceWrapper) GetSnapshot(w http.ResponseWriter, r *http.Request) {
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.GetSnapshot(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
 // DeleteTemplate operation middleware
 func (siw *ServerInterfaceWrapper) DeleteTemplate(w http.ResponseWriter, r *http.Request) {
 
@@ -7806,6 +7885,8 @@ func HandlerWithOptions(si ServerInterface, options StdHTTPServerOptions) http.H
 	m.HandleFunc(http.MethodPut+" "+options.BaseURL+"/messages/{message_id}/reactions/{emoji}", wrapper.AddReaction)
 	m.HandleFunc(http.MethodDelete+" "+options.BaseURL+"/messages/{message_id}/pin", wrapper.UnpinMessage)
 	m.HandleFunc(http.MethodPut+" "+options.BaseURL+"/messages/{message_id}/pin", wrapper.PinMessage)
+	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/sync/snapshot", wrapper.GetSnapshot)
+	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/events", wrapper.ListEvents)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/me/read-states", wrapper.ListMyReadStates)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/me/drafts", wrapper.ListMyDrafts)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/me/settings", wrapper.ListMySettings)
@@ -8174,6 +8255,9 @@ type StrictServerInterface interface {
 	// RevokeDevice Revoke a device
 	// (POST /devices/{device_id}/revoke)
 	RevokeDevice(ctx context.Context, request RevokeDeviceRequestObject) (RevokeDeviceResponseObject, error)
+	// ListEvents Catch up on events after a sequence
+	// (GET /events)
+	ListEvents(ctx context.Context, request ListEventsRequestObject) (ListEventsResponseObject, error)
 	// ListFeatureFlags List feature flags
 	// (GET /feature-flags)
 	ListFeatureFlags(ctx context.Context, request ListFeatureFlagsRequestObject) (ListFeatureFlagsResponseObject, error)
@@ -8432,6 +8516,9 @@ type StrictServerInterface interface {
 	// SetSpaceOperator Set the default operator of a space
 	// (PUT /spaces/{space_id}/operator)
 	SetSpaceOperator(ctx context.Context, request SetSpaceOperatorRequestObject) (SetSpaceOperatorResponseObject, error)
+	// GetSnapshot Load a snapshot
+	// (GET /sync/snapshot)
+	GetSnapshot(ctx context.Context, request GetSnapshotRequestObject) (GetSnapshotResponseObject, error)
 	// DeleteTemplate Delete a template
 	// (DELETE /templates/{template_id})
 	DeleteTemplate(ctx context.Context, request DeleteTemplateRequestObject) (DeleteTemplateResponseObject, error)
@@ -10409,6 +10496,32 @@ func (sh *strictHandler) RevokeDevice(w http.ResponseWriter, r *http.Request, de
 		sh.options.ResponseErrorHandlerFunc(w, r, err)
 	} else if validResponse, ok := response.(RevokeDeviceResponseObject); ok {
 		if err := validResponse.VisitRevokeDeviceResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// ListEvents operation middleware
+func (sh *strictHandler) ListEvents(w http.ResponseWriter, r *http.Request, params ListEventsParams) {
+	var request ListEventsRequestObject
+
+	request.Params = params
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.ListEvents(ctx, request.(ListEventsRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "ListEvents")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(ListEventsResponseObject); ok {
+		if err := validResponse.VisitListEventsResponse(w); err != nil {
 			sh.options.ResponseErrorHandlerFunc(w, r, err)
 		}
 	} else if response != nil {
@@ -12903,6 +13016,30 @@ func (sh *strictHandler) SetSpaceOperator(w http.ResponseWriter, r *http.Request
 		sh.options.ResponseErrorHandlerFunc(w, r, err)
 	} else if validResponse, ok := response.(SetSpaceOperatorResponseObject); ok {
 		if err := validResponse.VisitSetSpaceOperatorResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// GetSnapshot operation middleware
+func (sh *strictHandler) GetSnapshot(w http.ResponseWriter, r *http.Request) {
+	var request GetSnapshotRequestObject
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.GetSnapshot(ctx, request.(GetSnapshotRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "GetSnapshot")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(GetSnapshotResponseObject); ok {
+		if err := validResponse.VisitGetSnapshotResponse(w); err != nil {
 			sh.options.ResponseErrorHandlerFunc(w, r, err)
 		}
 	} else if response != nil {

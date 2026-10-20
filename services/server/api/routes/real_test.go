@@ -641,6 +641,14 @@ func (stubServer) GetMySidebar(context.Context, rest.GetMySidebarRequestObject) 
 	return nil, nil
 }
 
+func (stubServer) ListEvents(context.Context, rest.ListEventsRequestObject) (rest.ListEventsResponseObject, error) {
+	return nil, nil
+}
+
+func (stubServer) GetSnapshot(context.Context, rest.GetSnapshotRequestObject) (rest.GetSnapshotResponseObject, error) {
+	return nil, nil
+}
+
 func (stubServer) SetThreadTags(context.Context, rest.SetThreadTagsRequestObject) (rest.SetThreadTagsResponseObject, error) {
 	return nil, nil
 }
@@ -954,6 +962,9 @@ func TestRealTable_Enabled(t *testing.T) {
 		"putMySetting":       {"PUT /api/v1/me/settings/{key}", "settings.update", "rl.write"},
 		"deleteMySetting":    {"DELETE /api/v1/me/settings/{key}", "settings.update", "rl.write"},
 		"getMySidebar":       {"GET /api/v1/me/sidebar", "settings.read", "rl.read"},
+		// M1-63
+		"listEvents":  {"GET /api/v1/events", "events.catch_up", "rl.read"},
+		"getSnapshot": {"GET /api/v1/sync/snapshot", "sync.snapshot.read", "rl.read"},
 	}
 	ops := routes.Enabled()
 	if len(ops) != len(want) {

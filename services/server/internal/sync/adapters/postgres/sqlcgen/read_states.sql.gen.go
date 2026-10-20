@@ -84,6 +84,45 @@ func (q *Queries) GetReadState(ctx context.Context, arg GetReadStateParams) (Rea
 	return i, err
 }
 
+const listReadStatesInChannels = `-- name: ListReadStatesInChannels :many
+SELECT user_id, thread_id, channel_id, last_read_seq, version, updated_by_device_id, updated_at FROM read_states WHERE user_id = $1 AND channel_id = ANY($2::uuid[]) ORDER BY thread_id
+`
+
+type ListReadStatesInChannelsParams struct {
+	UserID     pgtype.UUID
+	ChannelIds []pgtype.UUID
+}
+
+// The rows of the person in the given channels (the visible set), for the unread counters of the
+// snapshot (M1-63).
+func (q *Queries) ListReadStatesInChannels(ctx context.Context, arg ListReadStatesInChannelsParams) ([]ReadState, error) {
+	rows, err := q.db.Query(ctx, listReadStatesInChannels, arg.UserID, arg.ChannelIds)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []ReadState
+	for rows.Next() {
+		var i ReadState
+		if err := rows.Scan(
+			&i.UserID,
+			&i.ThreadID,
+			&i.ChannelID,
+			&i.LastReadSeq,
+			&i.Version,
+			&i.UpdatedByDeviceID,
+			&i.UpdatedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const listReadStatesOfChannel = `-- name: ListReadStatesOfChannel :many
 SELECT user_id, thread_id, channel_id, last_read_seq, version, updated_by_device_id, updated_at FROM read_states WHERE user_id = $1 AND channel_id = $2 ORDER BY thread_id
 `

@@ -88,6 +88,9 @@ the numbers and changes only on a real restore. Normative in
 - Test: a webhook delivery after the restore carries the new epoch.
 - Restore test (ADR 0058) and portability test (16, section 11.1): the manifest names
   `sync_epoch`.
+- Test `TestListEventsResync` (M1-63, `services/server/internal/sync/adapters/httpapi`), case
+  `epoch_changed`: `GET /api/v1/events` with an `epoch` other than `instance.sync_epoch` answers
+  `410 resync_required` with `reason = epoch_changed`, also when the cursor is above `head_seq`.
 
 ## Pros and Cons of the Options
 

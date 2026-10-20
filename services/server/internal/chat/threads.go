@@ -59,6 +59,13 @@ type ThreadInfo struct {
 	LastMessageSeq, UnreadFloorSeq int64
 }
 
+// ThreadCounter are the counters of one thread for the unread counters of the snapshot (M1-63):
+// a person's unread count there is LastMessageSeq - GREATEST(last_read_seq, UnreadFloorSeq).
+type ThreadCounter struct {
+	ThreadID, ChannelID            ids.ID
+	LastMessageSeq, UnreadFloorSeq int64
+}
+
 // ParentMessage is the message of the main thread a thread starts from. The caller (messaging)
 // has verified that it exists and is not deleted.
 type ParentMessage struct {
@@ -178,6 +185,16 @@ type Threads interface {
 	//
 	//	info, err := threads.InfoForShare(ctx, threadID) // inside uow.Do
 	InfoForShare(ctx context.Context, threadID ids.ID) (ThreadInfo, error)
+	// Counters returns the counters of the threads in channelIDs whose last_message_seq is above
+	// unread_floor_seq, ascending by thread (M1-63, the unread counters of the snapshot of sync);
+	// other threads have nothing unread for anybody. It does not authorize: the caller passes
+	// only channels the principal may read (Authorizer.Scope) and checks thread.read per thread
+	// it reveals. Errors: the database error.
+	//
+	// Example:
+	//
+	//	counters, err := threads.Counters(ctx, scope.ChannelIDs)
+	Counters(ctx context.Context, channelIDs []ids.ID) ([]ThreadCounter, error)
 
 	// List returns a page of the threads of kind thread of a channel (thread.read on the channel,
 	// then per item in filter mode, 07 section 7.4), newest first by last_activity or created,

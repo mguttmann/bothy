@@ -81,6 +81,7 @@ enabled:             # operationIds that have a handler; sorted ascending
   - getMyCredentials
   - getMySidebar
   - getProblemType
+  - getSnapshot
   - getSpace
   - getThread
   - getUser
@@ -93,6 +94,7 @@ enabled:             # operationIds that have a handler; sorted ascending
   - listApps
   - listAuditEvents
   - listChannelThreads
+  - listEvents
   - listFeatureFlags
   - listForumTags
   - listGrants
@@ -351,9 +353,6 @@ later:               # every other operationId of docs/api/openapi.yaml; sorted 
   - operation_id: getServedChannelConfig
     milestone: M2
     ticket: M2-02
-  - operation_id: getSnapshot
-    milestone: M1
-    ticket: M1-63
   - operation_id: getStatsBackends
     milestone: M6
     ticket: M6-14
@@ -407,9 +406,6 @@ later:               # every other operationId of docs/api/openapi.yaml; sorted 
   - operation_id: listCostEstimates
     milestone: M2
     ticket: M2-28
-  - operation_id: listEvents
-    milestone: M1
-    ticket: M1-63
   - operation_id: listGdprRequests
     milestone: M7
   - operation_id: listImportItems

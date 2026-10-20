@@ -11,7 +11,7 @@ import (
 	"github.com/OWNER/bothy/services/server/internal/kernel/ids"
 )
 
-// Register declares the durable personal events sync appends (M1-25, docs/spec/05-aktionen.md
+// Register declares the durable personal events sync appends (M1-25, docs/spec/05-actions.md
 // section 6): read_state.updated, draft.updated, draft.deleted and settings.updated (M1-61).
 // internal/wire lists it in moduleRegistrations.
 func Register(r *authorize.Registry) {
