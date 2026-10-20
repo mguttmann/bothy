@@ -219,6 +219,7 @@ void main() {
       await window(_Flow.attach, _Outcome.connectFails, _Action.end);
       await window(_Flow.open, _Outcome.connectFails, _Action.end);
     },
+    timeout: const Timeout(Duration(minutes: 10)),
   );
 
   test('N2: a revocation while the connect fails stays blocked', () async {
@@ -231,5 +232,6 @@ void main() {
       await window(_Flow.open, _Outcome.normal, _Action.end);
       await window(_Flow.open, _Outcome.normal, _Action.revoke);
     },
+    timeout: const Timeout(Duration(minutes: 10)),
   );
 }

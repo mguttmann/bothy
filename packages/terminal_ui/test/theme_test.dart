@@ -11,13 +11,9 @@ import 'package:xterm/xterm.dart' show TerminalTheme;
 /// Every field of xterm's [TerminalTheme] with the token it must carry (components.md 12
 /// "Terminal view": screen, cursor, selection, ANSI colours).
 Map<String, (Color, Color)> pairs(TerminalTheme t, DsColors c) => {
-  // The cursor is opaque (an underline); the selection keeps its token colour at
-  // terminalOverlayAlpha (D-M4-35-9).
-  'cursor': (t.cursor, c.terminalCursor),
-  'selection': (
-    t.selection,
-    c.terminalSelectionBg.withValues(alpha: terminalOverlayAlpha),
-  ),
+  // xterm paints neither cursor nor selection; the view paints both opaque (D-M4-35-18).
+  'cursor': (t.cursor, c.terminalCursor.withValues(alpha: 0)),
+  'selection': (t.selection, c.terminalSelectionBg.withValues(alpha: 0)),
   'foreground': (t.foreground, c.terminalFg),
   'background': (t.background, c.terminalBg),
   'black': (t.black, c.terminalAnsiBlack),

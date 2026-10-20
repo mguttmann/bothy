@@ -113,14 +113,16 @@ issues. What xterm itself does with hostile output (read in its source):
   these but CPR, DA1 and DA2.
 - DCS is not parsed; its content would be printed as text. The filter drops it.
 - Known bugs: palette index 15 (SGR 97) resolves to white instead of bright white; selection
-  and block cursor are painted over the text; `TerminalView.onTapUp` is never called (the view
+  and block cursor are painted over the text, underline and bar cursor in row 0;
+  `TerminalView.onTapUp` is never called (the view
   detects link clicks with its own pointer listener); several sequences throw or hang (see the
   escape filter above).
 
 The theme comes from the tokens: `buildTerminalTheme` maps `DsColors` `color.terminal.*` to
-xterm's `TerminalTheme`. xterm paints cursor and selection over the text and has no field for
-`cursor-text`, so the cursor is an opaque underline and the selection keeps its token colour
-at `terminalOverlayAlpha` (15 23.4).
+xterm's `TerminalTheme`. xterm's cursor and selection are transparent; `TerminalMarksPainter`
+paints both over the view, opaque in the pairings of components.md 12: the cursor cell in
+`cursor` with its character in `cursor-text`, a selected cell in `selection-bg` with its
+character in `fg`, and a frame in `cursor` without the focus (15 23.4, D-M4-35-18).
 
 ## Layout
 

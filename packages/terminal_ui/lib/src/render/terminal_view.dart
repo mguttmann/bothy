@@ -16,16 +16,13 @@ import 'package:flutter/services.dart';
 import 'package:terminal_ui/src/controller/terminal_controller.dart';
 import 'package:terminal_ui/src/render/paste_guard.dart';
 import 'package:terminal_ui/src/render/semantics.dart';
+import 'package:terminal_ui/src/render/terminal_marks.dart';
 import 'package:terminal_ui/src/render/terminal_screen.dart';
 import 'package:terminal_ui/src/render/terminal_theme.dart';
 import 'package:terminal_ui/src/widgets/link_confirm_dialog.dart';
+import 'package:xterm/xterm.dart' as xterm show TerminalController;
 import 'package:xterm/xterm.dart'
-    show
-        CellOffset,
-        TerminalCursorType,
-        TerminalStyle,
-        TerminalView,
-        TerminalViewState;
+    show CellOffset, Terminal, TerminalStyle, TerminalView, TerminalViewState;
 
 /// The intent of a paste through the guard; the shortcuts of the view map the paste keys to
 /// it instead of xterm's own paste, which would paste without asking.
@@ -88,10 +85,41 @@ class TerminalScreenView extends StatefulWidget {
 
 class _TerminalScreenViewState extends State<TerminalScreenView> {
   final GlobalKey<TerminalViewState> _view = GlobalKey();
+  // The selection, the focus and the scroll position of the view; the marks painter follows
+  // them (D-M4-35-18).
+  final xterm.TerminalController _selection = xterm.TerminalController();
+  final FocusNode _focus = FocusNode(debugLabel: 'terminal');
+  final ScrollController _scroll = ScrollController();
+  final _Pulse _terminalChanged = _Pulse();
+  Terminal? _watched;
   String? _hoverTarget;
   Offset? _down;
 
   TerminalController get _c => widget.controller;
+
+  @override
+  void dispose() {
+    _watched?.removeListener(_terminalChanged.fire);
+    _terminalChanged.dispose();
+    _selection.dispose();
+    _focus.dispose();
+    _scroll.dispose();
+    super.dispose();
+  }
+
+  void _watch(Terminal terminal) {
+    if (identical(terminal, _watched)) return;
+    _watched?.removeListener(_terminalChanged.fire);
+    _watched = terminal..addListener(_terminalChanged.fire);
+  }
+
+  TerminalGeometry? _geometry() {
+    final view = _view.currentState;
+    if (view == null || view.context.findRenderObject() == null) return null;
+    final render = view.renderTerminal;
+    if (!render.hasSize) return null;
+    return _Geometry(render.cellSize, render.getOffset);
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -102,6 +130,12 @@ class _TerminalScreenViewState extends State<TerminalScreenView> {
       listenable: _c.screen,
       builder: (context, _) {
         final terminal = _c.screen.terminal;
+        _watch(terminal);
+        final textStyle = TerminalStyle(
+          fontSize: widget.fontSize,
+          fontFamily: mono.fontFamily!,
+          fontFamilyFallback: mono.fontFamilyFallback!,
+        );
         return Actions(
           actions: {
             GuardedPasteIntent: CallbackAction<GuardedPasteIntent>(
@@ -125,19 +159,38 @@ class _TerminalScreenViewState extends State<TerminalScreenView> {
                       child: TerminalView(
                         terminal,
                         key: _view,
+                        controller: _selection,
+                        focusNode: _focus,
+                        scrollController: _scroll,
                         theme: buildTerminalTheme(c),
-                        textStyle: TerminalStyle(
-                          fontSize: widget.fontSize,
-                          fontFamily: mono.fontFamily!,
-                          fontFamilyFallback: mono.fontFamilyFallback!,
-                        ),
+                        textStyle: textStyle,
                         autofocus: widget.autofocus,
-                        // xterm 4.0.0 cannot draw the character under a block cursor in
-                        // color.terminal.cursor-text; an underline keeps the character at full
-                        // contrast and the cursor opaque (D-M4-35-9).
-                        cursorType: TerminalCursorType.underline,
                         shortcuts: terminalShortcuts(defaultTargetPlatform),
                       ),
+                    ),
+                  ),
+                ),
+              ),
+              // The cursor and the selection, opaque in the token pairings; xterm paints
+              // them transparent (D-M4-35-18).
+              Positioned.fill(
+                child: IgnorePointer(
+                  child: CustomPaint(
+                    painter: TerminalMarksPainter(
+                      terminal: terminal,
+                      geometry: _geometry,
+                      selection: () => _selection.selection,
+                      focused: () => _focus.hasFocus,
+                      colors: terminalMarkColors(c),
+                      textStyle: textStyle,
+                      textScaler: MediaQuery.textScalerOf(context),
+                      devicePixelRatio: MediaQuery.devicePixelRatioOf(context),
+                      repaint: Listenable.merge([
+                        _terminalChanged,
+                        _selection,
+                        _focus,
+                        _scroll,
+                      ]),
                     ),
                   ),
                 ),
@@ -212,4 +265,21 @@ class _TerminalScreenViewState extends State<TerminalScreenView> {
     if (clean.isEmpty || !await confirmPaste(context, clean)) return;
     _c.screen.paste(clean);
   }
+}
+
+/// Turns xterm's own listener callbacks into a [Listenable] for the marks painter.
+final class _Pulse extends ChangeNotifier {
+  void fire() => notifyListeners();
+}
+
+final class _Geometry implements TerminalGeometry {
+  _Geometry(this.cellSize, this._offsetOf);
+
+  @override
+  final Size cellSize;
+
+  final Offset Function(CellOffset cell) _offsetOf;
+
+  @override
+  Offset offsetOf(CellOffset cell) => _offsetOf(cell);
 }
