@@ -279,14 +279,16 @@ func TestIssue_RefusesIncompleteGrant(t *testing.T) {
 	t.Parallel()
 	e := newInvEnv(t)
 	broken := map[string]func(*domain.InvocationGrant){
-		"no run":         func(g *domain.InvocationGrant) { g.RunID = ids.ID{} },
-		"no object":      func(g *domain.InvocationGrant) { g.MessageID = ids.ID{} },
-		"two objects":    func(g *domain.InvocationGrant) { g.CommandID = ids.New() },
-		"zero thread":    func(g *domain.InvocationGrant) { g.ThreadID = ids.ID{} },
-		"unknown level":  func(g *domain.InvocationGrant) { g.Level = "owner" },
-		"negative pv":    func(g *domain.InvocationGrant) { g.PermissionVersion = -1 },
-		"autocomplete":   func(g *domain.InvocationGrant) { g.TriggerKind = domain.TriggerAutocomplete },
-		"command no run": func(g *domain.InvocationGrant) { g.TriggerKind, g.MessageID, g.CommandID, g.RunID = domain.TriggerCommand, ids.ID{}, ids.New(), ids.ID{} },
+		"no run":        func(g *domain.InvocationGrant) { g.RunID = ids.ID{} },
+		"no object":     func(g *domain.InvocationGrant) { g.MessageID = ids.ID{} },
+		"two objects":   func(g *domain.InvocationGrant) { g.CommandID = ids.New() },
+		"zero thread":   func(g *domain.InvocationGrant) { g.ThreadID = ids.ID{} },
+		"unknown level": func(g *domain.InvocationGrant) { g.Level = "owner" },
+		"negative pv":   func(g *domain.InvocationGrant) { g.PermissionVersion = -1 },
+		"autocomplete":  func(g *domain.InvocationGrant) { g.TriggerKind = domain.TriggerAutocomplete },
+		"command no run": func(g *domain.InvocationGrant) {
+			g.TriggerKind, g.MessageID, g.CommandID, g.RunID = domain.TriggerCommand, ids.ID{}, ids.New(), ids.ID{}
+		},
 	}
 	for name, f := range broken {
 		g := invGrant()
