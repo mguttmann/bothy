@@ -407,8 +407,9 @@ weiteren Person `trigger` geben. Die nackte Änderung scheitert an I1. Die Konso
 durch eine bestätigte Aktion:
 
 1. Beim Anlegen der Freigabe ruft die Konsole die Vorschau auf ("was würde diese Freigabe
-   bewirken", [06-api.md](06-api.md)). Die Vorschau liefert `i1_conflicts`: je Agent `agent_id`,
-   Name, Inhaber und `organization_ready` (Soll `organization` in `billing_modes_supported`).
+   bewirken", [06-api.md](06-api.md)). Die Vorschau liefert `invariant_violations` (`GrantPreview`): je Agent `agent_id`,
+   Inhaber und `organization_ready` (Soll `organization` in `billing_modes_supported`); den Namen
+   des Agenten liest die Konsole mit `getAgent`.
 2. Die Konsole zeigt im Klartext: "Diese Freigabe erlaubt Sam, den Agenten Support auszulösen.
    Support läuft auf dem persönlichen Abo von Alex. Vorher muss Support auf Organisation umgestellt
    werden; die Kosten trägt dann der Organisations-Key." Ist `organization_ready` falsch, steht
@@ -430,7 +431,7 @@ sequenceDiagram
     participant DB as PostgreSQL
     participant A as Adapter
     O->>S: Vorschau Freigabe trigger für Sam auf Bereich Support
-    S-->>O: i1_conflicts: Agent Support, Inhaber Alex, organization_ready
+    S-->>O: invariant_violations: Agent Support, Inhaber Alex, organization_ready
     O->>O: Klartext-Dialog, Grund, Step-up
     O->>S: grant.create + resolve_i1 (switch_to_organization)
     S->>DB: BEGIN, permission_version sperren
@@ -444,6 +445,22 @@ sequenceDiagram
     A->>S: Heartbeat (organization)
     S-->>O: Warnung erlischt
 ```
+
+Server rules of point 4 (M2-21, docs/DECISIONS.md D-M2-21-2 to D-M2-21-6): the server first
+validates the whole body (the reason of `resolve_i1` is not blank, passes SEC-IN-4 and has at most
+`audit.reason_max_chars` characters), then runs the outer action's `authorize` and its checks that
+write nothing (`404`, `403`, `401 step_up_required`, `409 conflict`, `428`, `412`), so a caller
+without read access to the outer target learns nothing about the listed agents. An operator
+change without effect switches nothing. Then, inside the transaction of the outer action and
+before its first write, it authorizes `agent.billing_mode.set` for every listed agent in ascending
+id: an unknown id, a principal that is not an agent and an agent the caller cannot read give the
+same `404 not_found`, a visible agent and a caller who is not an owner `403 forbidden` with
+`owner_only`. It switches the agents (an agent already on `organization` keeps its row and gets an
+entry with `no_change`), applies the change and checks I1 and SR8 before the commit. Audit: one
+allow entry `agent.billing_mode.set` per listed agent and the entry of the outer action, all with
+the request's `correlation_id`. The preview of `createGrant` with `resolve_i1` is a dry run of the
+whole request ([07-rechte.md](07-rechte.md) section 9.3). The presence tracker learns the new
+desired mode with the agent's next heartbeat; `billing_mode_matches` compares at read time.
 
 Der umgekehrte Weg (zurück auf `personal`) ist kein geführter Ablauf: Die Konsole zeigt, welche
 Freigaben, Gruppen und Owner I1 verletzen würden; der Owner entzieht sie erst selbst. Grund:

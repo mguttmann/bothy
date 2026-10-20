@@ -57,7 +57,7 @@ func (w *world) policy(id ids.ID) string {
 // corrEvent is one event of a request.
 type corrEvent struct {
 	Type, ResourceID, Audience string
-	PermissionVersion        int64
+	PermissionVersion          int64
 }
 
 // eventsOf returns the events with correlation_id corr in seq order.
