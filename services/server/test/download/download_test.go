@@ -287,7 +287,8 @@ func TestDownload(t *testing.T) {
 			r.Header.Get("Repr-Digest") != "sha-256=:"+base64.StdEncoding.EncodeToString(sum[:])+":" || r.Header.Get("Cache-Control") != noStore {
 			t.Errorf("thumbnail with ticket: %d %v", r.Status, r.Header)
 		}
-		if r := e.alex.Do(t.Context(), harness.Request{Method: http.MethodPost, Path: "/files/" + png + "/tickets", Body: map[string]any{"variant": "large"}}); r.Status != http.StatusNotFound {
+		// The job of M3-06 renders small, medium and large of an image, never a poster (INT-W50/7).
+		if r := e.alex.Do(t.Context(), harness.Request{Method: http.MethodPost, Path: "/files/" + png + "/tickets", Body: map[string]any{"variant": "poster"}}); r.Status != http.StatusNotFound {
 			t.Errorf("ticket of a missing variant: %d", r.Status)
 		}
 	})

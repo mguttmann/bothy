@@ -7,6 +7,8 @@ import (
 	"crypto/sha256"
 	"encoding/base64"
 	"encoding/hex"
+	"image"
+	"image/png"
 	"io"
 	"net/http"
 	"os"
@@ -179,13 +181,15 @@ func (e *env) state(t *testing.T, id string) string {
 	return up + "/" + scan
 }
 
-// waitFinal waits until the file left upload_state and scan_status pending and returns its state.
+// waitFinal waits until the file left upload_state pending and returns its state. An image stays
+// pending after its scan until the job files.thumbnail of M3-06 stored its cleaned original
+// (INT-W50/7).
 func (e *env) waitFinal(t *testing.T, id string) string {
 	t.Helper()
 	deadline := time.Now().Add(waitScan)
 	for {
 		st := e.state(t, id)
-		if st != "pending/pending" {
+		if !strings.HasPrefix(st, "pending/") {
 			return st
 		}
 		if time.Now().After(deadline) {
@@ -222,9 +226,33 @@ func (e *env) seedThumbnail(t *testing.T, id, variant, mimeType string, body []b
 	if err != nil {
 		t.Fatal(err)
 	}
+	e.waitThumbnails(t, id)
 	e.writeObject(t, key, body)
-	e.exec(t, `INSERT INTO file_thumbnails (file_id, variant, object_key, mime_type, width, height, size_bytes) VALUES ($1, $2, $3, $4, 8, 8, $5)`,
+	e.exec(t, `INSERT INTO file_thumbnails (file_id, variant, object_key, mime_type, width, height, size_bytes) VALUES ($1, $2, $3, $4, 8, 8, $5)
+		ON CONFLICT (file_id, variant) DO UPDATE SET object_key = EXCLUDED.object_key, mime_type = EXCLUDED.mime_type,
+		width = EXCLUDED.width, height = EXCLUDED.height, size_bytes = EXCLUDED.size_bytes`,
 		id, variant, key, mimeType, len(body))
+}
+
+// waitThumbnails waits until the job files.thumbnail of M3-06 wrote the three variants of the
+// image id, so a seeded variant replaces the job's row and object and the job writes neither
+// again (INT-W50/7).
+func (e *env) waitThumbnails(t *testing.T, id string) {
+	t.Helper()
+	deadline := time.Now().Add(waitScan)
+	for {
+		var n int
+		if err := e.db.QueryRow(t.Context(), `SELECT count(*) FROM file_thumbnails WHERE file_id = $1`, id).Scan(&n); err != nil {
+			t.Fatal(err)
+		}
+		if n == 3 {
+			return
+		}
+		if time.Now().After(deadline) {
+			t.Fatalf("file %s has %d thumbnails after %v", id, n, waitScan)
+		}
+		time.Sleep(50 * time.Millisecond)
+	}
 }
 
 // seedFile stores a deliverable file of purpose without a scope channel, uploaded by uploader.
@@ -336,5 +364,19 @@ func headerSet(r harness.Response) map[string]string {
 	return out
 }
 
-// pngBytes is the start of a PNG file.
-var pngBytes = append([]byte("\x89PNG\r\n\x1a\n\x00\x00\x00\rIHDR"), bytes.Repeat([]byte{7}, 300)...)
+// pngBytes is a valid 32 by 32 PNG with only IHDR, IDAT and IEND, so the job files.thumbnail of
+// M3-06 keeps its bytes as the cleaned original and renders its variants (INT-W50/7).
+var pngBytes = func() []byte {
+	img := image.NewNRGBA(image.Rect(0, 0, 32, 32))
+	for i := range img.Pix {
+		img.Pix[i] = byte(i * 7)
+	}
+	for i := 3; i < len(img.Pix); i += 4 {
+		img.Pix[i] = 0xff
+	}
+	var b bytes.Buffer
+	if err := png.Encode(&b, img); err != nil {
+		panic(err)
+	}
+	return b.Bytes()
+}()
