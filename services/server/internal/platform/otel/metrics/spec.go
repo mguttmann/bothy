@@ -71,9 +71,9 @@ const (
 	SourceAgentHandles Source = "agent_handles"
 )
 
-// handleForm is the form of principals.handle (identity) with the length bound of the handle
-// column: lower-case letters, digits, '.', '_' and '-', at most 64 characters.
-var handleForm = regexp.MustCompile(`^[a-z0-9][a-z0-9._-]{0,63}$`)
+// handleForm is the form of principals.handle (identity): lower-case letters, digits, '.', '_'
+// and '-'; the length is bounded by principal.handle_max_chars when the handle is created.
+var handleForm = regexp.MustCompile(`^[a-z0-9][a-z0-9._-]*$`)
 
 // formSources are the sources whose values the binder checks by a form instead of a list.
 var formSources = map[Source]*regexp.Regexp{SourceAgentHandles: handleForm}

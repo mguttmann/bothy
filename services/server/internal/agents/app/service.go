@@ -174,8 +174,8 @@ func (s *Service) view(ctx context.Context, rec domain.Agent) (agents.Agent, err
 	return s.agentView(rec, p), nil
 }
 
-// presence returns the presence of rec: from the tracker when one is bound (D-G-280 ends for
-// presence with M2-20), otherwise from the stored columns.
+// presence returns the presence of rec: from the tracker when one is bound (M2-20 ends the
+// placeholder of M1-63/3), otherwise from the stored columns.
 func (s *Service) presence(rec domain.Agent) agents.PresenceStatus {
 	if s.d.Presence != nil {
 		return s.d.Presence.recordStatus(rec)

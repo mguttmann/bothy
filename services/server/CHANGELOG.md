@@ -11,6 +11,27 @@ documented in this file. The format is based on
 
 ### Added
 
+- Heartbeat, presence and desired versus actual mode (M2-20, 09 section 4.8, 10 section 8):
+  `sendHeartbeat` (`POST /api/v1/agents/me/heartbeat`, `agent.heartbeat`, `rl.agent_runtime`) and
+  the member `agent` of the gateway op `heartbeat` report the whole state of an agent runtime
+  (`agent_heartbeat.v1`, closed `details`, forms for names, versions and codes, `rate_limit` not
+  enabled yet) through one decoder and one use case. A process-wide tracker in the roles `api` and
+  `all` keeps the presence in memory (`unknown`, `online`, `degraded`, `offline` at and after the
+  last heartbeat plus `agent.presence_timeout`), stores the heartbeat fields at most once per
+  `agent.heartbeat_persist_interval` with a monotone write and at shutdown (stop step
+  `agent_presence`), stores and audits a change of the reported mode or tool class at once
+  (`agent.heartbeat` `allow` with old and new values, `key_type` and `method`), applies project
+  readiness only on a change, and publishes the ephemeral `agent.presence_changed` when state or
+  reported mode change. The snapshot (`getSnapshot`, `ready`) and the agent card (`getAgent`,
+  `listAgents`) show this presence instead of `unknown`; `AgentRuntimeStatus` gains
+  `billing_evidence` and `warnings` (`billing_mode_mismatch` after
+  `billing.mismatch_alert_after`, `billing_mode_unsupported`, `billing_evidence_unknown`,
+  `tool_class_mismatch`). New gauge `bothy.agent.billing_mode.mismatch_age` next to
+  `bothy.agent.heartbeat.age`; the alarm `BothyBillingModeMismatch` also fires on a lasting
+  heartbeat difference, and the dashboard `agent-runs` gets the panel "Reported billing mode
+  differs". The start fails when `agent.presence_timeout` is not greater than
+  `sync.heartbeat_interval`. The reported mode is evidence for display, warning, audit and alarm
+  and never a permission (BR-05).
 - Scan pass with clamd (M3-04): every completed upload runs through the job `files.scan` (queue
   `files`, inserted in the transaction of `completeUpload`), which reads the stored bytes once,
   checks size and SHA-256 against the declaration, detects the type from the first

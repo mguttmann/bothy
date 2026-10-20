@@ -4,7 +4,6 @@ package metrics_test
 
 import (
 	"context"
-	"strings"
 	"testing"
 
 	"go.opentelemetry.io/otel/metric"
@@ -39,7 +38,7 @@ func TestAgentHandlesSource(t *testing.T) {
 		t.Fatal(err)
 	}
 	if _, err := m2.Register(func(_ context.Context, o metric.Observer) error {
-		m2.Observe(o, 6, strings.Repeat("a", 65))
+		m2.Observe(o, 6, "support/agent")
 		return nil
 	}); err != nil {
 		t.Fatal(err)
@@ -53,6 +52,6 @@ func TestAgentHandlesSource(t *testing.T) {
 		t.Errorf("a value outside the form = %v under other, want 5", v)
 	}
 	if v := metricstest.Sum(mismatch, map[string]string{"bothy.agent.handle": metrics.Other}); v != 6 {
-		t.Errorf("a handle above 64 characters = %v under other, want 6", v)
+		t.Errorf("a value with a path separator = %v under other, want 6", v)
 	}
 }

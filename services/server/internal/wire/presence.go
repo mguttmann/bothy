@@ -66,15 +66,18 @@ func (a *Agents) BindPresence(cfg agentsapp.PresenceConfig, pool *pg.Pool, d Pre
 }
 
 // StartPresence is the start of the tracker in the roles api and all (D-M2-20-6): the start rule
-// over the stored live agents, the flush loop, and the two presence gauges on the global meter
-// provider of platform/otel (the registration lives as long as the process). Errors: the start's
-// and the meter's.
-func (a *Agents) StartPresence(ctx context.Context) error {
+// over the stored live agents, the flush loop, and the two presence gauges through gauges, nil
+// meaning the global meter provider of platform/otel (the registration lives as long as the
+// process). Errors: the start's and the meter's.
+func (a *Agents) StartPresence(ctx context.Context, gauges func(samples func() []agentsapp.GaugeSample) error) error {
 	if a == nil || a.Presence == nil {
 		return errors.New("wire: no presence tracker bound")
 	}
 	if err := a.Presence.Start(ctx); err != nil {
 		return err
+	}
+	if gauges != nil {
+		return gauges(a.Presence.Samples)
 	}
 	_, err := agentsmetrics.RegisterPresence(nil, a.Presence.Samples)
 	return err

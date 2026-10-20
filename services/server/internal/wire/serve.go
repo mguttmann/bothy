@@ -21,6 +21,7 @@ import (
 
 	"github.com/OWNER/bothy/services/server/api/rest"
 	"github.com/OWNER/bothy/services/server/api/routes"
+	agentsapp "github.com/OWNER/bothy/services/server/internal/agents/app"
 	"github.com/OWNER/bothy/services/server/internal/authz"
 	authzapp "github.com/OWNER/bothy/services/server/internal/authz/app"
 	gatewayapp "github.com/OWNER/bothy/services/server/internal/gateway/app"
@@ -110,6 +111,10 @@ type Deps struct {
 	// otelmetrics.RegisterConsumerGauges on the global meter provider of otel.Setup. Tests read
 	// the gauges of a role through their own meter provider here.
 	ConsumerGauges func(consumers sync.Consumers) error
+	// PresenceGauges registers the presence gauges of the agents in the roles api and all (M2-20)
+	// over the samples of the tracker; nil means agents/adapters/otelmetrics.RegisterPresence on the
+	// global meter provider of otel.Setup. Tests read the gauges through their own meter provider.
+	PresenceGauges func(samples func() []agentsapp.GaugeSample) error
 	// EgressDenyAll makes every outgoing client of the process (OIDC providers, webhook delivery,
 	// audit checkpoint sink) refuse every target before resolution (egress.Deps.DenyAll). Only
 	// test servers set it (the contract server of G7, M1-71); production leaves it false.
@@ -824,7 +829,7 @@ func (s *server) startPresence(ctx context.Context) error {
 	s.mu.Lock()
 	ag := s.agents
 	s.mu.Unlock()
-	return ag.StartPresence(ctx)
+	return ag.StartPresence(ctx, s.deps.PresenceGauges)
 }
 
 // startChat is start step 6f (M1-52): the chat module over the pool, the unit of work and the
