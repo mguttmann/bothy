@@ -225,7 +225,7 @@ maschinenlesbare Katalog trägt es je Aktion ([ADR 0049](../adr/0049-maschinenle
 - die Aktionen, deren ID auf `.read` oder `.list` endet, dazu `cost.read.thread` und
   `cost.read.aggregate`, außer `audit.read` (Audit `ja`);
 - `access.explain`, `search.query`, `events.catch_up`, `gateway.connect`, `gateway.focus`,
-  `typing.start`, `command.autocomplete`, `command.autocomplete.respond`, `client_metrics.submit`,
+  `typing.start`, `command.autocomplete`, `command.autocomplete.respond`, `client_metrics.submit`, `console.csp_report`,
   `push.deliver`, `webhook_out.deliver` und `terminal.read_own`.
 
 Alle anderen haben `write`. Grund für die geschlossene Liste: Eine neue Aktion ohne Eintrag ist
@@ -276,6 +276,7 @@ Abschnitt 6.3).
 | ID | Beschreibung | Ressource | Recht | Owner | Step-up | Audit | Rechte | RL-Klasse |
 |---|---|---|---|---|---|---|---|---|
 | `instance.discovery.read` | JWKS, Protokollversionen, minimales Branding, Branding-Logo | instance | public | nein | nein | nein | nein | `rl.public_auth` |
+| `console.csp_report` | accept a Content Security Policy violation report of the web console, without content in the log ([19-sicherheit.md](19-sicherheit.md), section 5, rule 6; R-AZ-33) | instance | public | nein | nein | nein | nein | `rl.public_auth` |
 | `auth.login.begin` | Anmeldung starten (OIDC, Passkey-Challenge, Header-Login, Geräte-Kopplung) | instance | public | nein | nein | abl | nein | `rl.public_auth` |
 | `auth.login.complete` | Anmeldung abschließen (OIDC-Server-Code, Passkey, Einladungs-Code, Passwort mit TOTP, Kopplung), Gerät und Geräteschlüssel registrieren, Sitzung anlegen | instance | public | nein | nein | ja | nein | `rl.public_auth` |
 | `auth.token.refresh` | Refresh-Token rotieren (mit Nachsicht `auth.refresh_reuse_grace`; im Wartungsmodus ohne Rotation, ADR 0065); Wiederverwendung sperrt die Familie | auth_session | public (gültiges Refresh-Token und DPoP-Beweis der Familie) | nein | nein | abl | nein | `rl.public_auth` |
@@ -795,6 +796,7 @@ Terminal-Kanäle ([24-terminal.md](24-terminal.md); [asyncapi.yaml](../api/async
 | R-AZ-24 | Rechner sind ein eigenes Ziel außerhalb des Baums; Freigaben dort nur durch Owner. | Eine Freigabe auf Instanz oder Bereich darf nie still einen Rechner öffnen; `manage` ist auf Rechnern sinnlos. |
 | R-AZ-27 | Automatic state changes of outgoing subscriptions (`disabled` after `410`, after `webhook.max_consecutive_failures`, after `webhook.retry_max_age` and on a gap; `paused` by the delivery quota) are the system action `webhook_out.transition`: per change one audit entry without an actor in the transaction of the change, with the subscription, the old and new state and the cause as a code. Changes by the owner stay `webhook_out.manage`; the disabling at uninstallation is covered by the entry of `app.uninstall`. | Rule 1.10: every audit entry names a known action, and [webhooks.md](../api/webhooks.md), section 4, requires the disabling in the audit log; as with R-AZ-15, a system action does not pretend to be an action of a person. One action for all causes, because the cause is in the details (D-W-104). |
 | R-AZ-32 | New action `access.view_as.end` on the person's own console session (`auth_session`, self, without step-up, audit always, `rl.admin`): it ends "View as person" stored on the console session (03 `auth_sessions`, R-DM-49) before `authz.view_as_max_duration`; `access.view_as` from a console session starts the stored view. While a view is stored, the actions `access.view_as.end`, `auth.logout`, `auth.step_up` and `self.read` on the person's own session are decided without `view_as` ([07-rechte.md](07-rechte.md) section 4.2 steps 4 and 7 would otherwise deny them); every other decision of the session follows 07 section 9.2, and the first request after the end time gets `step_up_required`. The module `identity` owns the action, because the state lives on `auth_sessions`. | [07-rechte.md](07-rechte.md) section 9.2 requires audit at start and end and operations to start and end the view; ending must not need a fresh step-up, which `access.view_as` requires, so that an owner can always leave the view (D-W-100 extended to M5 and M6). |
+| R-AZ-33 | New public action `console.csp_report` on the instance (no login, without step-up and audit, `rl.public_auth`, owned by `instance`): the endpoint of the web console's `report-to` accepts violation reports, logs only the directive, the disposition and the blocked origin and stores nothing; its effect is `read` (05 2.7), so reports are accepted in maintenance mode as well ([19-sicherheit.md](19-sicherheit.md), section 5, rule 6). | Browsers send reports without the session cookie in many cases, so the endpoint cannot require a session; every operation needs an action from the catalogue (05 section 1), and the rate class of public endpoints bounds abuse (D-W-123). |
 
 ## 9. Tests, die diesen Katalog halten
 

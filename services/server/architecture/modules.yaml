@@ -47,14 +47,14 @@ testsupport: {paths: [test, perf]}   # test code across modules (02 "Code-Layout
 modules:
   instance:
     tables: [instance, instance_settings, server_signing_keys, feature_flags, sequence_counters]
-    actions: [instance.discovery.read, instance.read, instance.settings.read,
+    actions: [instance.discovery.read, console.csp_report, instance.read, instance.settings.read,
               instance.settings.update, instance.branding.update, feature_flag.read,
               feature_flag.update, signing_key.rotate, signing_key.transition]
     events: [instance.updated]
     ephemeral_events: []
     ws_ops: []
     depends_on: []
-    adapter_vendors: [pgx]
+    adapter_vendors: [otel, pgx]   # adapters/otelmetrics counts the CSP violation reports (M6-03); sqlc code and the repository (M1-15)
   billing:
     tables: [price_table, cost_entries]
     actions: [cost.read.thread, cost.read.aggregate, price.read, price.manage, cost.reconcile,

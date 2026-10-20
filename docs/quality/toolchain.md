@@ -18,6 +18,7 @@ selben make-Ziel in GitHub Actions. Alle Gate-Werkzeuge laufen an beiden Orten.
 | `pyyaml` | `6.0.3` | YAML lesen in den Prüfskripten | MIT | Standard für YAML in Python; `on:` wird bewusst nicht als Wahrheitswert gelesen |
 | `ruff` | `0.17.0` | Format und Lint für Python | MIT | ersetzt mehrere Linter, schnell |
 | `mypy` | `2.4.0` | Typprüfung (strict) | MIT | Referenz-Typprüfer für Python |
+| `playwright` | `1.64.0` | headless browsers of `make console-e2e` (SEC-T05, M6-03); the browsers come from the Playwright image of the same version, pinned by digest in `infra/compose/test/compose.console-e2e.yaml` | Apache-2.0 | the browser automation with Chromium, Firefox and WebKit, CDP access for the virtual WebAuthn authenticator |
 | `bandit` | `1.9.4` | Sicherheitsmuster in Python | Apache-2.0 | von der Anforderung gefordert; ergänzt ruff um Sicherheitsregeln |
 | `pytest` | `9.1.1` | Tests der Werkzeuge | MIT | Standard |
 | `pytest-cov` | `7.1.0` | Abdeckung in pytest | MIT | Standard |

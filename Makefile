@@ -107,7 +107,7 @@ TS_ON := $(and $(TS_PROJECTS),$(or $(call want,sdk-typescript),$(call want,plugi
 .PHONY: help bootstrap bootstrap-ci check gates fmt fmt-check lint typecheck test coverage \
         sonar sonar-up sonar-down sonar-config sonar-config-check semgrep trivy osv gitleaks \
         gitleaks-staged denylist denylist-history licenses docs adr-index config-reference config-doc-check app-config event-catalog catalog catalog-check linkcheck \
-        trivy-image portability linkcheck-external diagrams tokens api-lint api-checks api-breaking api-tables api-clients \
+        trivy-image portability console-e2e linkcheck-external diagrams tokens api-lint api-checks api-breaking api-tables api-clients \
         runners-check release-pins install-options commitlint \
         review labels-check labels-sync tools-lock release-build release-prep release-trial scancode install-test clean \
         codegen-check arch register-check migrations-lint migrations-lock sql-visibility flag-check perf ops-check signal-check \
@@ -183,7 +183,7 @@ lint: ## Linters: file hygiene hooks, ruff, bandit, Dockerfile pins, actionlint,
 	$(UVRUN) ruff check tools
 	@# Every FROM of a tracked Dockerfile is pinned by digest (SEC-SC-4, docs/spec/18-release.md "Server-Images").
 	$(UVRUN) python tools/ci/dockerfile_pins.py
-	$(UVRUN) bandit -q -c tools/pyproject.toml -r tools/api-checks tools/arch-check tools/bin tools/catalog tools/ci tools/configdoc tools/contract tools/denylist tools/design-tokens tools/doccheck tools/docs tools/hooks tools/lint tools/observability tools/opscheck tools/signalcheck tools/sonarqube
+	$(UVRUN) bandit -q -c tools/pyproject.toml -r tools/api-checks tools/arch-check tools/bin tools/catalog tools/ci tools/console-e2e tools/configdoc tools/contract tools/denylist tools/design-tokens tools/doccheck tools/docs tools/hooks tools/lint tools/observability tools/opscheck tools/signalcheck tools/sonarqube
 	$(UVRUN) check-jsonschema --builtin-schema vendor.github-issue-forms $(filter-out %/config.yml,$(wildcard .github/ISSUE_TEMPLATE/*.yml))
 	$(UVRUN) check-jsonschema --builtin-schema vendor.github-issue-config .github/ISSUE_TEMPLATE/config.yml
 	$(UVRUN) check-jsonschema --builtin-schema vendor.renovate renovate.json
@@ -780,6 +780,9 @@ install-test: ## Tests of infra/compose/install.sh with stubs (container; INSTAL
 portability: ## Compose smoke test with the server image (SMOKE_SERVER_IMAGE, default the tag of make image; infra/compose/test/README.md)
 	@[ -x infra/compose/smoke.sh ] || { echo "portability: infra/compose/smoke.sh is missing (docs/quality/gates.md)"; exit 1; }
 	infra/compose/smoke.sh
+
+console-e2e: ## SEC-T05: the console under its CSP in Chromium, Firefox and WebKit against the Compose smoke stack (E2E_SERVER_IMAGE, default the tag of make image; tools/console-e2e/README.md)
+	$(UVRUN) python tools/console-e2e/console_e2e.py
 
 # ---- platform tests of the apps (not part of `gates`: they need a desktop session or a device) -
 apps-platform: ## Platform tests of the members on this host and an attached Android device (platform-tests.json; CI jobs apps-macos, apps-windows, apps-android)

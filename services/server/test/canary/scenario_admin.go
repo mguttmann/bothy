@@ -6,6 +6,7 @@ import (
 	"crypto/ecdsa"
 	"crypto/elliptic"
 	"crypto/rand"
+	"encoding/json"
 	"net/http"
 	"net/url"
 	"strings"
@@ -202,6 +203,7 @@ func (sc *Scenario) instance() {
 	sc.get(o, "/instance/jwks", ok...)
 	sc.get(o, "/instance/webhook-keys", ok...)
 	sc.get(o, "/problems/not_found", ok...)
+	sc.cspReport()
 	sc.post(o, "/signing-keys/rotate", map[string]any{"mode": "scheduled", "purpose": "webhook_out", "reason": sc.Reg.New(ClassAdminReason, "", "key rotation reason")}, ok...)
 	sc.get(o, "/audit/events?limit=50", ok...)
 	from, to := timestamp(time.Now().Add(-time.Hour)), timestamp(time.Now().Add(time.Hour))
@@ -234,4 +236,23 @@ func atoi(s string) int64 {
 		n = n*10 + int64(c-'0')
 	}
 	return n
+}
+
+// cspReport sends a violation report of the web console like a browser (submitCspReport, M6-03):
+// without credentials, in the Reporting API format, with content canaries in the document URL and
+// the sample; the server logs only directive, disposition and blocked origin (R-AZ-33).
+func (sc *Scenario) cspReport() {
+	sc.T.Helper()
+	doc := "https://chat.example.com/console/" + sc.Reg.New(ClassContent, "", "CSP report document path")
+	report, err := json.Marshal([]map[string]any{{"type": "csp-violation", "url": doc, "body": map[string]any{
+		"documentURL": doc, "blockedURL": "inline", "effectiveDirective": "script-src-elem", "disposition": "enforce",
+		"sample": sc.Reg.New(ClassContent, "", "CSP report sample"),
+	}}})
+	if err != nil {
+		sc.T.Errorf("encode the CSP report: %v", err)
+		return
+	}
+	if r := sc.raw(http.MethodPost, "/csp-reports", header("Content-Type", "application/reports+json"), report, "browser"); r.Status != http.StatusNoContent {
+		sc.T.Errorf("submitCspReport: status %d", r.Status)
+	}
 }

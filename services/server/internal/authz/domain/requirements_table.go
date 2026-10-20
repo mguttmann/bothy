@@ -49,7 +49,7 @@ var requirementGroups = []struct {
 		"thread.read",
 	}},
 	{"public", Public, []string{
-		"auth.login.begin", "auth.login.complete", "instance.discovery.read", "status.public.read",
+		"auth.login.begin", "auth.login.complete", "console.csp_report", "instance.discovery.read", "status.public.read",
 	}},
 	{"self", Self, []string{
 		"access.view_as.end", "auth.logout", "auth.step_up", "identity.link", "local_credential.set",

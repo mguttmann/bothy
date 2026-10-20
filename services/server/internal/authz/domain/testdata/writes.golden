@@ -41,6 +41,7 @@ command.invoke
 command.register
 command.remove
 component.update
+console.csp_report
 cost.reconcile
 cost.reconcile.submit
 dev_environment.manage

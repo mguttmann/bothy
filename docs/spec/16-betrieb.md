@@ -945,6 +945,7 @@ Column "Ort": Server = configuration reference of the server; Installationsskrip
 | `secrets.cache_ttl` | Server | `5m` | so lange gilt ein gelesenes Geheimnis; mindestens `1s` |
 | `secrets.signing_key_dir` | Server | `/var/lib/bothy/signing-keys` | beschreibbares Verzeichnis der privaten Signierschlüssel; im Besitz des Dienstbenutzers, Modus `0700` (5.2, [ADR 0066](../adr/0066-signierschluessel-im-beschreibbaren-schluesselspeicher.md)) |
 | `console.assets_dir` | Server | leer | directory of the built web console (`flutter build web` of `apps/console`) that the api process serves under `/console/` ([02-architektur.md](02-architektur.md), 3.1); empty: no console, `404` under `/console/`; the image sets `/usr/share/bothy/console`; a set directory without `index.html` ends the start |
+| `console.csp_report_max_records` | Server | `20` | most log records one request of `submitCspReport` writes (1 to 1000): identical violations share one record, every violation is counted in `bothy.console.csp_violations`; the rate class `rl.public_auth` bounds the requests ([19-sicherheit.md](19-sicherheit.md) 5 rule 6, M6-03) |
 | `server.tls_cert_ref` | Server | leer | Verweis auf die Zertifikatskette (PEM, Blatt zuerst); leer: der Server beendet kein TLS (SEC-TLS-2) |
 | `server.tls_key_ref` | Server | leer | Verweis auf den privaten Schlüssel (PEM); nur zusammen mit `server.tls_cert_ref` |
 | `database.host` | Server | `localhost` | Host der Datenbank |

@@ -128,6 +128,15 @@ documented in this file. The format is based on
   process; shutdown closes the relay with `4013`. Configuration keys `terminal.open_timeout` and
   `terminal.relay_buffer_max_bytes`; metric `bothy.terminal.relay.unpaired` with the attribute
   `bothy.terminal.side`; the Fake-Host `test/terminal/fakehost`.
+- Console CSP (M6-03): the console mount sets the Content Security Policy of 19 5 with a fresh
+  128-bit nonce per response (also written into `index.html`, whose placeholder
+  `__BOTHY_CSP_NONCE__` the start requires), `Cross-Origin-Embedder-Policy: require-corp`,
+  `Cross-Origin-Resource-Policy: same-origin` and `Reporting-Endpoints`. `submitCspReport`
+  (`POST /api/v1/csp-reports`, public, `rl.public_auth`) takes Reporting API and legacy reports as
+  the new body kind `report`, logs only directive, disposition and blocked origin, counts
+  `bothy.console.csp_violations` and stores nothing; identical violations share a log record, at
+  most `console.csp_report_max_records` records per request. `bothy-smoke seed` prepares the
+  console test.
 - Control connection of the host services (M2-43): `GET /api/v1/hosts/connect` on the public
   listener of the roles `api` and `all` (asyncapi `hostControl`). Login with an EdDSA proof over
   the challenge of `hello` with the key registered at pairing; close codes `4110` to `4114`, `4002`,

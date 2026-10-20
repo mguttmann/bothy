@@ -42,7 +42,12 @@ Planning stage (milestone M0). Nothing is installable yet.
   `install-options` (`tests/portability/install-options`, the options of the portability test).
 - `make release-trial COMPONENT=bothy` builds bundle and `install.sh` against the local trial
   registry and checks them like an installation.
-
+- Content Security Policy of the web console with a headless test (M6-03): every response below
+  `/console/` carries the policy of 19 5 with a nonce per response, COOP, COEP, CORP and the
+  reporting endpoint `POST /api/v1/csp-reports` (`submitCspReport`); `make console-e2e` runs the
+  console of the server image under that policy in Chromium, Firefox and WebKit against the
+  Compose smoke stack (zero violations, no foreign origin, WebSocket, a passkey step-up, a blocked
+  and reported inline script), and the CI job `console-e2e` feeds `ci-ok`.
 - Compose smoke test (M1-73): `make portability` runs `infra/compose/smoke.sh`, which starts the
   server core from the real `bothy-server` image with the installation Compose file and a test
   overlay (`infra/compose/test/`), proves secrets init, migrations, the setup lock, the first

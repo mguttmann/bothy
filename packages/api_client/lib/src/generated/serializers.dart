@@ -137,6 +137,7 @@ import 'package:api_client/src/generated/model/cost_report.dart';
 import 'package:api_client/src/generated/model/cost_series.dart';
 import 'package:api_client/src/generated/model/credential_holder_set.dart';
 import 'package:api_client/src/generated/model/credential_overview.dart';
+import 'package:api_client/src/generated/model/csp_report_legacy.dart';
 import 'package:api_client/src/generated/model/device.dart';
 import 'package:api_client/src/generated/model/device_approve.dart';
 import 'package:api_client/src/generated/model/device_key_registration.dart';
@@ -706,6 +707,7 @@ part 'serializers.g.dart';
   CostSeries,
   CredentialHolderSet,
   CredentialOverview,
+  CspReportLegacy,
   Device,
   DeviceApprove,
   DeviceKeyRegistration,
@@ -1267,6 +1269,10 @@ Serializers serializers =
           ..addBuilderFactory(
             const FullType(BuiltList, [FullType(SearchHit)]),
             () => ListBuilder<SearchHit>(),
+          )
+          ..addBuilderFactory(
+            const FullType(BuiltList, [FullType(BuiltMap)]),
+            () => ListBuilder<BuiltMap>(),
           )
           ..addBuilderFactory(
             const FullType(BuiltList, [FullType(AccessEffect)]),

@@ -58,6 +58,13 @@ func serverConfigKeys() []config.Key {
 			Chapter: chapter16,
 		},
 		{
+			// The rate class rl.public_auth bounds the requests; this bounds the log records of
+			// one request (brief M6-03 Design note 4, docs/DECISIONS.md D-M6-03-5).
+			Name: KeyCSPReportMaxRecords, Kind: config.KindInt, Default: "20", Min: "1", Max: "1000",
+			Doc:     "Most log records one CSP violation report request writes; identical violations share one record, every violation is counted.",
+			Chapter: chapter16,
+		},
+		{
 			Name: keyTLSKeyRef, Kind: config.KindSecretRef, Default: "",
 			Doc:     "Reference to the PEM private key of the certificate; only together with server.tls_cert_ref.",
 			Chapter: chapter16,

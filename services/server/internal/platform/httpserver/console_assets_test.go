@@ -16,8 +16,24 @@ import (
 	"github.com/OWNER/bothy/services/server/internal/platform/httpserver/httpservertest"
 )
 
-// consoleIndex is the index.html of the fixture build.
-const consoleIndex = "<!DOCTYPE html><html><head><base href=\"/console/\"></head><body></body></html>"
+// consoleIndex is the index.html of the fixture build, with the nonce placeholder in the
+// bootstrap script tag as in apps/console/web/index.html.
+const consoleIndex = "<!DOCTYPE html><html><head></head><body><script src=\"/console/flutter_bootstrap.js\" async nonce=\"" +
+	httpserver.NoncePlaceholder + "\"></script></body></html>"
+
+// isIndex reports whether body is consoleIndex with some nonce in place of the placeholder.
+func isIndex(body string) bool {
+	m := bodyNonce.FindStringSubmatch(body)
+	return m != nil && m[1] != "" && body == strings.Replace(consoleIndex, httpserver.NoncePlaceholder, m[1], 1)
+}
+
+// writeIndex writes index.html with body into dir.
+func writeIndex(t *testing.T, dir, body string) {
+	t.Helper()
+	if err := os.WriteFile(filepath.Join(dir, "index.html"), []byte(body), 0o600); err != nil {
+		t.Fatal(err)
+	}
+}
 
 // consoleBuild writes a small console build into a temporary directory: index.html, the files a
 // Flutter web build has (main.dart.js, CanvasKit, a font, version.json), a hashed asset and a
@@ -114,7 +130,7 @@ func do(t *testing.T, h http.Handler, method, target string) (answer, string) {
 // TestConsoleServing holds the serving rules of the console (brief M6-02 Design note 4): exact
 // files with their content type and cache rule, the SPA fallback to index.html only below
 // /console/, /api/ untouched, traversal refused before the file system, the headers of SEC-HDR-1
-// and of SEC-HDR-3 without CSP and COEP, and 404 when console.assets_dir is empty.
+// and of SEC-HDR-3 (the CSP itself in csp_test.go), and 404 when console.assets_dir is empty.
 func TestConsoleServing(t *testing.T) {
 	t.Parallel()
 	h := consoleServer(t, consoleBuild(t))
@@ -142,7 +158,7 @@ func TestConsoleServing(t *testing.T) {
 		}
 		for _, c := range cases {
 			res, body := do(t, h, http.MethodGet, c.path)
-			if res.StatusCode != http.StatusOK || body != c.body {
+			if res.StatusCode != http.StatusOK || (body != c.body && (c.body != consoleIndex || !isIndex(body))) {
 				t.Errorf("GET %s = %d %q, want 200 %q", c.path, res.StatusCode, body, c.body)
 			}
 			if got := res.Header.Get("Content-Type"); got != c.typ {
@@ -162,7 +178,7 @@ func TestConsoleServing(t *testing.T) {
 			"/console/missing.js", "/console/assets/", "/console/canvaskit",
 		} {
 			res, body := do(t, h, http.MethodGet, p)
-			if res.StatusCode != http.StatusOK || body != consoleIndex {
+			if res.StatusCode != http.StatusOK || !isIndex(body) {
 				t.Errorf("GET %s = %d %q, want index.html", p, res.StatusCode, body)
 			}
 			if got := res.Header.Get("Cache-Control"); got != "no-store" {
@@ -205,7 +221,7 @@ func TestConsoleServing(t *testing.T) {
 			"/console/assets\\AssetManifest.bin", "/console/escape.txt", "/console/x%00.js",
 		} {
 			res, body := do(t, h, http.MethodGet, p)
-			if res.StatusCode != http.StatusNotFound || strings.Contains(body, "secret") || body == consoleIndex {
+			if res.StatusCode != http.StatusNotFound || strings.Contains(body, "secret") || isIndex(body) {
 				t.Errorf("GET %s = %d %q, want 404 without content", p, res.StatusCode, body)
 			}
 		}
@@ -228,8 +244,8 @@ func TestConsoleServing(t *testing.T) {
 					t.Errorf("GET %s %s = %q, want %q", p, k, got, v)
 				}
 			}
-			// M6-03 adds the CSP and COEP; until then they are absent rather than half set.
-			for _, k := range []string{"Content-Security-Policy", "Cross-Origin-Embedder-Policy", "Server"} {
+			// The CSP and COEP of M6-03 are held by TestCSPHeader and TestConsoleIsolationHeaders.
+			for _, k := range []string{"Server"} {
 				if got := res.Header.Get(k); got != "" {
 					t.Errorf("GET %s %s = %q, want none", p, k, got)
 				}

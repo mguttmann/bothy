@@ -829,6 +829,10 @@ func (stubServer) StepUpWithPassword(context.Context, rest.StepUpWithPasswordReq
 	return nil, nil
 }
 
+func (stubServer) SubmitCspReport(context.Context, rest.SubmitCspReportRequestObject) (rest.SubmitCspReportResponseObject, error) {
+	return nil, nil
+}
+
 func (stubServer) BeginStepUpOidcReauth(context.Context, rest.BeginStepUpOidcReauthRequestObject) (rest.BeginStepUpOidcReauthResponseObject, error) {
 	return nil, nil
 }
@@ -1140,6 +1144,8 @@ func TestRealTable_Enabled(t *testing.T) {
 		// M2-03
 		"putProjectBinding":    {"PUT /api/v1/channels/{channel_id}/project-binding", "channel.project.bind", "rl.admin"},
 		"deleteProjectBinding": {"DELETE /api/v1/channels/{channel_id}/project-binding", "channel.project.bind", "rl.admin"},
+		// M6-03
+		"submitCspReport": {"POST /api/v1/csp-reports", "console.csp_report", "rl.public_auth"},
 	}
 	ops := routes.Enabled()
 	if len(ops) != len(want) {

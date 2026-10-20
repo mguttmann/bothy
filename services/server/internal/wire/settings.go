@@ -3,6 +3,7 @@
 package wire
 
 import (
+	"log/slog"
 	"time"
 
 	"github.com/OWNER/bothy/services/server/api/routes"
@@ -13,6 +14,7 @@ import (
 	identitypg "github.com/OWNER/bothy/services/server/internal/identity/adapters/postgres"
 	"github.com/OWNER/bothy/services/server/internal/instance"
 	instancehttp "github.com/OWNER/bothy/services/server/internal/instance/adapters/httpapi"
+	instancemetrics "github.com/OWNER/bothy/services/server/internal/instance/adapters/otelmetrics"
 	instancepg "github.com/OWNER/bothy/services/server/internal/instance/adapters/postgres"
 	instanceapp "github.com/OWNER/bothy/services/server/internal/instance/app"
 	"github.com/OWNER/bothy/services/server/internal/kernel/auditing"
@@ -39,6 +41,38 @@ type InstanceSettings struct {
 	Admin *instanceapp.Admin
 	// Handlers are the REST handlers of the six settings operations and the two flag operations.
 	Handlers *instancehttp.Admin
+	// CSPReports is the handler of submitCspReport (M6-03); NewCSPReports builds it.
+	CSPReports *instancehttp.CSPReports
+}
+
+// fillHandlers sets every nil instance handler of h to the one st built: the settings operations
+// and submitCspReport.
+func (st *InstanceSettings) fillHandlers(h *Handlers) {
+	fill(&h.Admin, st.Handlers)
+	fill(&h.CSPReports, st.CSPReports)
+}
+
+// KeyCSPReportMaxRecords is console.csp_report_max_records, the most log records one request of
+// submitCspReport writes (M6-03).
+const KeyCSPReportMaxRecords = "console.csp_report_max_records"
+
+// NewCSPReports returns the handler of submitCspReport over the Authorizer az, the logger log, the
+// counter of bothy.console.csp_violations (nil means the counter on the global meter provider of
+// platform/otel) and maxRecords (console.csp_report_max_records). Errors: the meter provider
+// refuses the counter, az is nil or maxRecords is below 1.
+func NewCSPReports(az authorize.Authorizer, log *slog.Logger, counter instanceapp.CSPViolationCounter, maxRecords int) (*instancehttp.CSPReports, error) {
+	if counter == nil {
+		c, err := instancemetrics.NewCSPViolations(nil)
+		if err != nil {
+			return nil, err
+		}
+		counter = c
+	}
+	reports, err := instanceapp.NewCSPReports(az, log, counter, maxRecords)
+	if err != nil {
+		return nil, err
+	}
+	return instancehttp.NewCSPReports(reports), nil
 }
 
 // SettingsWrites are the collaborators of the writing settings use cases: the recorder of audit

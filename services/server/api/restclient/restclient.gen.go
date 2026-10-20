@@ -7817,6 +7817,15 @@ type CredentialOverview struct {
 	TotpEnrolled     bool       `json:"totp_enrolled"`
 }
 
+// CspReportLegacy Legacy report of the `report-uri` directive (CSP Level 2). The server reads only `effective-directive` (else `violated-directive`), `blocked-uri` and `disposition` of `csp-report`.
+type CspReportLegacy struct {
+	// CspReport Free-form JSON object whose schema is named in the field description.
+	CspReport JsonObject `json:"csp-report"`
+}
+
+// CspReportList Reports of the Reporting API (https://www.w3.org/TR/reporting-1/); each item is a report object whose `body` is a CSP violation report (https://www.w3.org/TR/CSP3/#reporting). The server reads only `type`, `body.effectiveDirective`, `body.blockedURL` and `body.disposition`.
+type CspReportList = []JsonObject
+
 // Cursor Opaque pagination cursor. Clients must not parse or build cursors.
 //
 // Examples: eyJrIjoiMDE5MmY0YTAtN2IxYy03MDAwLThhMDAtMDAwMDAwMDAwMDAxIn0
@@ -17643,6 +17652,9 @@ type ReconcileCostsJSONRequestBody = CostReconcile
 // SubmitCostReconciliationJSONRequestBody defines body for SubmitCostReconciliation for application/json ContentType.
 type SubmitCostReconciliationJSONRequestBody = CostReconcile
 
+// SubmitCspReportApplicationReportsPlusJSONRequestBody defines body for SubmitCspReport for application/reports+json ContentType.
+type SubmitCspReportApplicationReportsPlusJSONRequestBody = CspReportList
+
 // ApproveDeviceJSONRequestBody defines body for ApproveDevice for application/json ContentType.
 type ApproveDeviceJSONRequestBody = DeviceApprove
 
@@ -21069,6 +21081,24 @@ type ClientInterface interface {
 	//
 	// Corresponds with POST /costs/reconciliations (the `SubmitCostReconciliation` operationId).
 	SubmitCostReconciliation(ctx context.Context, params *SubmitCostReconciliationParams, body SubmitCostReconciliationJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// SubmitCspReportWithBody Accept a CSP violation report of the web console
+	//
+	// Endpoint of `report-to csp` and of `Reporting-Endpoints: csp="/api/v1/csp-reports"` on every console response (19-security 5 rule 6, R-AZ-33). Public, because browsers send reports without cookies in many cases; a console cookie is not checked by the CSRF guard here, the action changes nothing. Accepts the Reporting API format (`application/reports+json`, an array of reports) and the legacy `report-uri` format (`application/csp-report`), both limited by `http.max_json_body_bytes`. The server stores no report; it logs only the effective directive, the disposition and the origin of the blocked URL and counts `bothy.console.csp_violations`. Members it does not read are ignored.
+	//
+	// Takes any type of body and a specified content type.
+	//
+	// Corresponds with POST /csp-reports (the `SubmitCspReport` operationId).
+	SubmitCspReportWithBody(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// SubmitCspReportWithApplicationReportsPlusJSONBody Accept a CSP violation report of the web console
+	//
+	// Endpoint of `report-to csp` and of `Reporting-Endpoints: csp="/api/v1/csp-reports"` on every console response (19-security 5 rule 6, R-AZ-33). Public, because browsers send reports without cookies in many cases; a console cookie is not checked by the CSRF guard here, the action changes nothing. Accepts the Reporting API format (`application/reports+json`, an array of reports) and the legacy `report-uri` format (`application/csp-report`), both limited by `http.max_json_body_bytes`. The server stores no report; it logs only the effective directive, the disposition and the origin of the blocked URL and counts `bothy.console.csp_violations`. Members it does not read are ignored.
+	//
+	// Takes a body of the `application/reports+json` content type.
+	//
+	// Corresponds with POST /csp-reports (the `SubmitCspReport` operationId).
+	SubmitCspReportWithApplicationReportsPlusJSONBody(ctx context.Context, body SubmitCspReportApplicationReportsPlusJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// GetDevice Read a device
 	//
@@ -25913,109 +25943,15 @@ func (c *Client) SubmitCostReconciliation(ctx context.Context, params *SubmitCos
 	return c.Client.Do(req)
 }
 
-// GetDevice Read a device
+// SubmitCspReportWithBody Accept a CSP violation report of the web console
 //
-// A pending device polls this to learn when it was approved.
-//
-// Corresponds with GET /devices/{device_id} (the `GetDevice` operationId).
-func (c *Client) GetDevice(ctx context.Context, deviceId DeviceIdPath, reqEditors ...RequestEditorFn) (*http.Response, error) {
-	req, err := NewGetDeviceRequest(c.Server, deviceId)
-	if err != nil {
-		return nil, err
-	}
-	req = req.WithContext(ctx)
-	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
-		return nil, err
-	}
-	return c.Client.Do(req)
-}
-
-// ApproveDeviceWithBody Approve a pending device
-//
-// The approving person types the verification code shown on the pending device (08, 5.2). A wrong code revokes the pending device; the answer is then `200` with `state` `revoked`, because the request had an effect.
+// Endpoint of `report-to csp` and of `Reporting-Endpoints: csp="/api/v1/csp-reports"` on every console response (19-security 5 rule 6, R-AZ-33). Public, because browsers send reports without cookies in many cases; a console cookie is not checked by the CSRF guard here, the action changes nothing. Accepts the Reporting API format (`application/reports+json`, an array of reports) and the legacy `report-uri` format (`application/csp-report`), both limited by `http.max_json_body_bytes`. The server stores no report; it logs only the effective directive, the disposition and the origin of the blocked URL and counts `bothy.console.csp_violations`. Members it does not read are ignored.
 //
 // Takes any type of body and a specified content type.
 //
-// Corresponds with POST /devices/{device_id}/approve (the `ApproveDevice` operationId).
-func (c *Client) ApproveDeviceWithBody(ctx context.Context, deviceId DeviceIdPath, params *ApproveDeviceParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
-	req, err := NewApproveDeviceRequestWithBody(c.Server, deviceId, params, contentType, body)
-	if err != nil {
-		return nil, err
-	}
-	req = req.WithContext(ctx)
-	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
-		return nil, err
-	}
-	return c.Client.Do(req)
-}
-
-// ApproveDevice Approve a pending device
-//
-// The approving person types the verification code shown on the pending device (08, 5.2). A wrong code revokes the pending device; the answer is then `200` with `state` `revoked`, because the request had an effect.
-//
-// Takes a body of the `application/json` content type.
-//
-// Corresponds with POST /devices/{device_id}/approve (the `ApproveDevice` operationId).
-func (c *Client) ApproveDevice(ctx context.Context, deviceId DeviceIdPath, params *ApproveDeviceParams, body ApproveDeviceJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
-	req, err := NewApproveDeviceRequest(c.Server, deviceId, params, body)
-	if err != nil {
-		return nil, err
-	}
-	req = req.WithContext(ctx)
-	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
-		return nil, err
-	}
-	return c.Client.Do(req)
-}
-
-// RevokeDeviceWithBody Revoke a device
-//
-// Closes its gateway connections with 4012 and revokes its sessions.
-//
-// Takes any type of body and a specified content type.
-//
-// Corresponds with POST /devices/{device_id}/revoke (the `RevokeDevice` operationId).
-func (c *Client) RevokeDeviceWithBody(ctx context.Context, deviceId DeviceIdPath, params *RevokeDeviceParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
-	req, err := NewRevokeDeviceRequestWithBody(c.Server, deviceId, params, contentType, body)
-	if err != nil {
-		return nil, err
-	}
-	req = req.WithContext(ctx)
-	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
-		return nil, err
-	}
-	return c.Client.Do(req)
-}
-
-// RevokeDevice Revoke a device
-//
-// Closes its gateway connections with 4012 and revokes its sessions.
-//
-// Takes a body of the `application/json` content type.
-//
-// Corresponds with POST /devices/{device_id}/revoke (the `RevokeDevice` operationId).
-func (c *Client) RevokeDevice(ctx context.Context, deviceId DeviceIdPath, params *RevokeDeviceParams, body RevokeDeviceJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
-	req, err := NewRevokeDeviceRequest(c.Server, deviceId, params, body)
-	if err != nil {
-		return nil, err
-	}
-	req = req.WithContext(ctx)
-	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
-		return nil, err
-	}
-	return c.Client.Do(req)
-}
-
-// CreateDmWithBody Open a direct message channel
-//
-// Returns the existing channel with 200 when the same participants already have one. 403
-// `feature_disabled` when `dm.enabled` is off.
-//
-// Takes any type of body and a specified content type.
-//
-// Corresponds with POST /dms (the `CreateDm` operationId).
-func (c *Client) CreateDmWithBody(ctx context.Context, params *CreateDmParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
-	req, err := NewCreateDmRequestWithBody(c.Server, params, contentType, body)
+// Corresponds with POST /csp-reports (the `SubmitCspReport` operationId).
+func (c *Client) SubmitCspReportWithBody(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewSubmitCspReportRequestWithBody(c.Server, contentType, body)
 	if err != nil {
 		return nil, err
 	}

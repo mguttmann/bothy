@@ -65,7 +65,7 @@ Readiness gehören nicht zur öffentlichen API; sie liegen auf dem internen List
 | Geld | `amount_micros` (int64) plus `currency` (ISO 4217). | 03, R-DM-04. |
 | Kein `null` | Der Server sendet nie JSON `null`. Fehlt ein Feld, hat es keinen Wert. Clients behandeln ein empfangenes `null` wie ein fehlendes Feld. Werte werden über eigene Felder oder Modi entfernt (z. B. `use_global_order: true`, `OperatorSet.mode = none`), nie durch `null`. | dart-dio kennt den Null-Typ nicht [belegt, Q4]; ein Weg für alle Generatoren (R-API-03, [ADR 0053](../adr/0053-kein-json-null-in-api-und-ereignissen.md)). |
 | Unbekanntes | Clients ignorieren unbekannte Felder, Enum-Werte, Ereignistypen und Problem-Codes. Der Server lehnt unbekannte Felder in Anfragen und Gateway-Rahmen ab (`400 validation_failed` bzw. Schließ-Code `4002`); schreibende Schemas haben `additionalProperties: false` ([19-sicherheit.md](19-sicherheit.md), SEC-IN-1; PLAN W7). Ob ein Server ein neues Feld kennt, sieht ein Client an `features` der Discovery. | Ein still verworfenes Feld verschluckt bei einem älteren Server eine Absicht; Antworten und Ereignisse bleiben additiv (Abschnitt 13). |
-| Medientypen | JSON als `application/json` (UTF-8); Fehler als `application/problem+json`; Datei-Teile als `application/octet-stream`; Bilder für Avatar und Logo als `multipart/form-data` (Teil `file`); Exporte als `application/x-ndjson`. | Ein Format je Zweck; NDJSON lässt große Exporte streamen. |
+| Medientypen | JSON als `application/json` (UTF-8); Fehler als `application/problem+json`; Datei-Teile als `application/octet-stream`; Bilder für Avatar und Logo als `multipart/form-data` (Teil `file`); Exporte als `application/x-ndjson`. CSP violation reports of the web console (`submitCspReport`, M6-03) as `application/reports+json` (Reporting API) or `application/csp-report` (legacy `report-uri`), both JSON under `http.max_json_body_bytes` and the JSON guard; the only operation with two request media types. | Ein Format je Zweck; NDJSON lässt große Exporte streamen. |
 | Größe | JSON-Körper bis `http.max_json_body_bytes`, Schachtelung bis `http.max_json_depth` ([02-architektur.md](02-architektur.md)), sonst `413 payload_too_large` bzw. `400 malformed_request`. `http.max_json_body_bytes` ist echt größer als `message.max_content_bytes`. | Schutz vor Speicherdruck ohne lange Nachrichten zu verhindern. |
 | Caching | Authentifizierte JSON-Antworten tragen `Cache-Control: no-store`. Datei-Inhalte tragen `Cache-Control: private, immutable`, weil sich der Inhalt einer Datei-ID nie ändert. | Kein Inhalt in fremden Caches; der Client löscht bei `access.changed` selbst (04, 8.3). |
 | Korrelation | Jede Antwort trägt `Correlation-Id`: die Trace-ID der Anfrage als UUID geschrieben (Schema `CorrelationId`, keine UUIDv7). Derselbe Wert steht in Problemen, Ereignissen (`correlation_id`) und im Audit. Der Server erzeugt ihn; eine gesendete `Correlation-Id` ignoriert er, und ein eingehender `traceparent` wird nur als Span-Link übernommen, nicht als Eltern-Trace ([17-observability.md](17-observability.md), Abschnitt 3). | Ein fälschbarer Client-Wert würde Audit-Spuren verfälschen. |
@@ -392,6 +392,7 @@ alle Texte der YAML-Dateien (R-API-15); jede Antwort-Komponente nennt ihren Stat
 | `createInteraction` | POST | `/api/v1/components/{component_id}/interactions` | Client-ID im Körper (Tabelle oben) |
 | `applyImportBatch` | POST | `/api/v1/imports/{import_id}/batches` | Herkunftsschlüssel des Imports ([22-import-migration.md](22-import-migration.md)) |
 | `createImportFile` | POST | `/api/v1/imports/{import_id}/files` | Herkunftsschlüssel des Imports ([22-import-migration.md](22-import-migration.md)) |
+| `submitCspReport` | POST | `/api/v1/csp-reports` | anonyme Messwerte; eine Wiederholung zählt eine Stichprobe doppelt |
 | `submitClientMetrics` | POST | `/api/v1/client-metrics` | anonyme Messwerte; eine Wiederholung zählt eine Stichprobe doppelt |
 <!-- END GENERATED: idempotency_exempt -->
 4. Eine Wiederholung liefert die gespeicherte Antwort, ohne den Handler, die Schema-Prüfung oder
@@ -681,6 +682,7 @@ Erzeugt aus openapi.yaml.
 | GET | `/api/v1/instance/webhook-keys` | `getWebhookKeys` | `instance.discovery.read` | Public keys for webhook signatures |
 | GET | `/api/v1/instance/branding/logo` | `getBrandingLogo` | `instance.discovery.read` | Download the instance logo |
 | GET | `/api/v1/problems/{code}` | `getProblemType` | `instance.discovery.read` | Documentation of a problem type |
+| POST | `/api/v1/csp-reports` | `submitCspReport` | `console.csp_report` | Accept a CSP violation report of the web console |
 
 #### Auth
 

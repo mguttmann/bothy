@@ -23,6 +23,16 @@ var (
 	hdr1 = map[string]string{"X-Content-Type-Options": "nosniff", "Referrer-Policy": "no-referrer"}
 	// hdr2 is SEC-HDR-2 without Content-Type, which each kind names itself.
 	hdr2 = map[string]string{"Cache-Control": "no-store", "Cross-Origin-Resource-Policy": "same-origin"}
+	// hdr3 is SEC-HDR-3 without the CSP, whose nonce differs per response (TestCSPHeader); the
+	// console rows of SEC-T03 are TestConsoleIsolationHeaders in csp_test.go (M6-03).
+	hdr3 = map[string]string{
+		"Cross-Origin-Opener-Policy":   "same-origin",
+		"Cross-Origin-Embedder-Policy": "require-corp",
+		"Cross-Origin-Resource-Policy": "same-origin",
+		"X-Frame-Options":              "DENY",
+		"Permissions-Policy":           "camera=(), microphone=(), geolocation=(), payment=(), usb=()",
+		"Reporting-Endpoints":          `csp="/api/v1/csp-reports"`,
+	}
 )
 
 const (

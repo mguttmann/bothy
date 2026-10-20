@@ -94,6 +94,21 @@ var (
 		Description: "Requests refused because their rate-limit class was exhausted.",
 		Attrs:       []Attr{{Key: "bothy.ratelimit.class", Source: SourceRateClasses}},
 	}
+	// ConsoleCSPViolations is bothy.console.csp_violations (4.1, M6-03): accepted violation
+	// reports of the web console (submitCspReport). The directive set is the fixed list of the
+	// report handler of the instance module; every other value records as other.
+	ConsoleCSPViolations = Spec{
+		Name: "bothy.console.csp_violations", Kind: KindCounter, Unit: "{report}",
+		Description: "CSP violation reports of the web console the server accepted.",
+		Attrs: []Attr{
+			{Key: "bothy.csp.directive", Values: []string{
+				"base-uri", "child-src", "connect-src", "default-src", "fenced-frame-src", "font-src", "form-action",
+				"frame-ancestors", "frame-src", "img-src", "manifest-src", "media-src", "object-src",
+				"require-trusted-types-for", "sandbox", "script-src", "script-src-attr", "script-src-elem", "style-src",
+				"style-src-attr", "style-src-elem", "trusted-types", "webrtc", "worker-src"}},
+			{Key: "bothy.csp.disposition", Values: []string{"enforce", "report"}},
+		},
+	}
 	// GatewayConnectionsActive is bothy.gateway.connections.active (4.1): +1 at ready or
 	// resumed, -1 when such a connection closes.
 	GatewayConnectionsActive = Spec{
@@ -330,7 +345,7 @@ var (
 // fresh slice per call.
 func All() []Spec {
 	return append([]Spec{
-		HTTPServerRequestDuration, AuthzDecisions, AuthzErrors, RateLimitRejected,
+		HTTPServerRequestDuration, AuthzDecisions, AuthzErrors, RateLimitRejected, ConsoleCSPViolations,
 		GatewayConnectionsActive, GatewayConnectDuration, GatewayCatchupDuration, GatewayResync,
 		GatewayClose, GatewayOutboundDropped,
 		MessageCreated, EventAppended, EventSeqLockWait, EventFanoutLag, EventConsumerLag,

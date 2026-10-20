@@ -83,6 +83,15 @@ const (
 	ConsumerName = "bothy.consumer.name"
 	// CorrelationID is the trace id as UUID text; logs only, in spans it is the trace id.
 	CorrelationID = "bothy.correlation_id"
+	// CSPDirective is the effective directive of a CSP violation report of the console, a name
+	// of the fixed list of the report handler or other (submitCspReport, M6-03).
+	CSPDirective = "bothy.csp.directive"
+	// CSPDisposition is enforce, report or other, the disposition of a CSP violation report.
+	CSPDisposition = "bothy.csp.disposition"
+	// CSPBlockedOrigin is the origin of the blocked URL of a CSP violation report (scheme, host,
+	// port) or a keyword such as inline or eval, never a path or query; logs only, never on
+	// metrics.
+	CSPBlockedOrigin = "bothy.csp.blocked_origin"
 	// Decision is an authorization decision of 05-aktionen.md 2.5.
 	Decision = "bothy.decision"
 	// EgressPurpose is the purpose of an egress client; logs of refused connections only.
@@ -171,6 +180,7 @@ var scopes = map[string]scope{
 	BackupKind: scopeSpanLog, BillingMode: scopeSpanLog, ChannelID: scopeSpanLog,
 	SpaceID: scopeSpanLog, ThreadID: scopeSpanLog, MessageID: scopeSpanLog, RunID: scopeSpanLog,
 	FileID: scopeSpanLog, CloseCode: scopeSpanLog, ConsumerName: scopeSpanLog, CorrelationID: scopeSpanLog,
+	CSPDirective: scopeSpanLog, CSPDisposition: scopeSpanLog, CSPBlockedOrigin: scopeSpanLog,
 	Decision: scopeSpanLog, EgressPurpose: scopeSpanLog, EventDurability: scopeSpanLog,
 	EventSeq: scopeSpanLog, EventType: scopeSpanLog, JobKind: scopeSpanLog,
 	Outcome: scopeSpanLog, PrincipalKind: scopeSpanLog, PrincipalPseudoID: scopeSpanLog,

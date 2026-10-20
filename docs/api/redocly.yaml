@@ -125,6 +125,7 @@ rules:
         - command.register
         - command.remove
         - component.update
+        - console.csp_report
         - cost.read.aggregate
         - cost.read.thread
         - cost.reconcile
@@ -380,6 +381,7 @@ rules:
         - command.register
         - command.remove
         - component.update
+        - console.csp_report
         - cost.read.aggregate
         - cost.read.thread
         - cost.reconcile

@@ -200,6 +200,7 @@ enabled:             # operationIds that have a handler; sorted ascending
   - setThreadTitle
   - stepUpWithPassword
   - submitClientMetrics
+  - submitCspReport
   - suspendApp
   - uninstallApp
   - unlinkIdentity

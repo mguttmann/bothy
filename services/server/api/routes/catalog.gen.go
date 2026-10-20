@@ -58,6 +58,7 @@ var catalogEntries = []CatalogEntry{
 	{ID: "command.register", Right: "agent-self bzw. app-self mit Scope", RateLimitClass: "rl.admin"},
 	{ID: "command.remove", Right: "agent-self bzw. app-self mit Scope", RateLimitClass: "rl.admin"},
 	{ID: "component.update", Right: "Autor der Nachricht (agent-self bzw. app-self)", RateLimitClass: "rl.write"},
+	{ID: "console.csp_report", Right: "public", RateLimitClass: "rl.public_auth"},
 	{ID: "cost.read.aggregate", Right: "owner; Bereich mit manage", RateLimitClass: "rl.read"},
 	{ID: "cost.read.thread", Right: "read", RateLimitClass: "rl.read"},
 	{ID: "cost.reconcile", Right: "owner", RateLimitClass: "rl.admin"},
