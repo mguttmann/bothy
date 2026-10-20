@@ -6474,6 +6474,540 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Hosts'**
   String get adminTargetsHosts;
+
+  /// Connection text in the header of the terminal view (components.md 12).
+  ///
+  /// In en, this message translates to:
+  /// **'Connected'**
+  String get terminalHeaderConnected;
+
+  /// Connection text while the terminal stream and handshake run.
+  ///
+  /// In en, this message translates to:
+  /// **'Connecting'**
+  String get terminalHeaderConnecting;
+
+  /// Connection text of the header when the terminal stream is closed.
+  ///
+  /// In en, this message translates to:
+  /// **'Not connected'**
+  String get terminalHeaderOffline;
+
+  /// Start of the host key fingerprint in the terminal header (screen D11).
+  ///
+  /// In en, this message translates to:
+  /// **'Fp {value}'**
+  String terminalHeaderFingerprint(String value);
+
+  /// Screen reader label of the fingerprint in the terminal header.
+  ///
+  /// In en, this message translates to:
+  /// **'Fingerprint of the host: {fingerprint}'**
+  String terminalHeaderFingerprintLabel(String fingerprint);
+
+  /// Remaining time until terminal.max_session_duration in the terminal header (screen D11).
+  ///
+  /// In en, this message translates to:
+  /// **'Left {time}'**
+  String terminalHeaderRemaining(String time);
+
+  /// Badge of the LLM login of a host with llm_credentials none (24 section 12).
+  ///
+  /// In en, this message translates to:
+  /// **'No LLM login'**
+  String get terminalLlmLoginNone;
+
+  /// Label of one terminal session tab: profile and running number.
+  ///
+  /// In en, this message translates to:
+  /// **'{profile} {number}'**
+  String terminalTabLabel(String profile, int number);
+
+  /// Button that detaches the terminal session; it keeps running on the host.
+  ///
+  /// In en, this message translates to:
+  /// **'Detach'**
+  String get terminalDetach;
+
+  /// Button that ends the terminal session.
+  ///
+  /// In en, this message translates to:
+  /// **'End'**
+  String get terminalEnd;
+
+  /// Button that attaches to a detached terminal session again.
+  ///
+  /// In en, this message translates to:
+  /// **'Reattach'**
+  String get terminalReattach;
+
+  /// Banner while the terminal session opens.
+  ///
+  /// In en, this message translates to:
+  /// **'Opening the encrypted connection to the host'**
+  String get terminalStateConnecting;
+
+  /// Banner of a terminal session the person detached.
+  ///
+  /// In en, this message translates to:
+  /// **'Detached. The terminal session keeps going on the host.'**
+  String get terminalStateDetached;
+
+  /// Banner of a detached terminal session after the stream broke.
+  ///
+  /// In en, this message translates to:
+  /// **'The connection broke. The terminal session keeps going on the host.'**
+  String get terminalStateDetachedLost;
+
+  /// Banner after close code 4102.
+  ///
+  /// In en, this message translates to:
+  /// **'The host is not connected. Try to reattach later.'**
+  String get terminalStateDetachedHostUnavailable;
+
+  /// Banner after close code 4101; reattaching asks for a new step-up.
+  ///
+  /// In en, this message translates to:
+  /// **'The session token expired or was already used. Reattach confirms again.'**
+  String get terminalStateDetachedTokenStale;
+
+  /// Banner after close code 4103; no automatic new attempt.
+  ///
+  /// In en, this message translates to:
+  /// **'Another device attached to this terminal session.'**
+  String get terminalStateDetachedReplaced;
+
+  /// Banner after close codes 1001 and 4013.
+  ///
+  /// In en, this message translates to:
+  /// **'The server restarted. The terminal session keeps going on the host.'**
+  String get terminalStateDetachedServer;
+
+  /// Banner after close code 4014.
+  ///
+  /// In en, this message translates to:
+  /// **'The connection could not keep up. The terminal session keeps going on the host.'**
+  String get terminalStateDetachedSlow;
+
+  /// Banner after close code 4004.
+  ///
+  /// In en, this message translates to:
+  /// **'The login of the connection failed. Sign in again, then reattach.'**
+  String get terminalStateDetachedAuth;
+
+  /// Banner after close code 4008.
+  ///
+  /// In en, this message translates to:
+  /// **'Too many attempts. Wait a moment, then reattach.'**
+  String get terminalStateDetachedRateLimited;
+
+  /// Banner after the frame exit; the tab stays open.
+  ///
+  /// In en, this message translates to:
+  /// **'The process exited with code {code}.'**
+  String terminalStateExited(int code);
+
+  /// Banner of an ended terminal session; the screen stays readable.
+  ///
+  /// In en, this message translates to:
+  /// **'The terminal session ended: {reason}'**
+  String terminalStateEnded(String reason);
+
+  /// Danger banner of a revoked terminal session.
+  ///
+  /// In en, this message translates to:
+  /// **'Access ended: {reason}'**
+  String terminalStateBlockedRevoked(String reason);
+
+  /// Hard warning after close code 4104 or a Noise or frame error.
+  ///
+  /// In en, this message translates to:
+  /// **'The encrypted connection failed its check. Someone may have tampered with it. No new attempt is made.'**
+  String get terminalStateBlockedHandshake;
+
+  /// Hard warning when the key of the grant differs from the checked one (15 23.2 item 3).
+  ///
+  /// In en, this message translates to:
+  /// **'The server sent a different host key than the checked one. The terminal session was closed.'**
+  String get terminalStateBlockedKeyMismatch;
+
+  /// Hard warning after close code 4002 or an unexpected message.
+  ///
+  /// In en, this message translates to:
+  /// **'The connection broke the terminal protocol. No new attempt is made.'**
+  String get terminalStateBlockedProtocol;
+
+  /// Banner of a refused opening with the problem text.
+  ///
+  /// In en, this message translates to:
+  /// **'The terminal could not be opened: {problem}'**
+  String terminalStateFailed(String problem);
+
+  /// Text of a close_reason of a terminal session (24 section 10.3).
+  ///
+  /// In en, this message translates to:
+  /// **'{reason, select, client_closed{ended by you} closed_by_owner{ended by an owner} process_exited{the process exited} idle_timeout{no input for too long} max_duration{the maximum duration was reached} detach_expired{it was detached for too long} access_revoked{access was revoked} i6_violation{the LLM login of the host changed} host_disabled{the host was disabled} host_retired{the host was retired} host_rekeyed{the host was paired again} host_restarted{the host service restarted} user_disabled{the account was disabled} device_revoked{this device was removed} session_revoked{the login was ended} logout{you signed out} open_failed{the opening failed} host_policy_violation{a check on the host failed} other{no reason given}}'**
+  String terminalCloseReason(String reason);
+
+  /// Footer of the terminal view with a lock icon.
+  ///
+  /// In en, this message translates to:
+  /// **'End-to-end encrypted'**
+  String get terminalFooterEncrypted;
+
+  /// Footer of the terminal view: profile of the session.
+  ///
+  /// In en, this message translates to:
+  /// **'Profile {profile}'**
+  String terminalFooterProfile(String profile);
+
+  /// Footer of the terminal view: the idle limit of the host applies.
+  ///
+  /// In en, this message translates to:
+  /// **'Idle timeout active'**
+  String get terminalFooterIdle;
+
+  /// Title of the dialog that confirms an opening (screen D11).
+  ///
+  /// In en, this message translates to:
+  /// **'Open terminal'**
+  String get terminalOpenTitle;
+
+  /// Label of the host in the dialog Open terminal.
+  ///
+  /// In en, this message translates to:
+  /// **'Host'**
+  String get terminalOpenHost;
+
+  /// Label of the profile choice in the dialog Open terminal.
+  ///
+  /// In en, this message translates to:
+  /// **'Profile'**
+  String get terminalOpenProfile;
+
+  /// Label of the working folder choice for a profile of kind claude.
+  ///
+  /// In en, this message translates to:
+  /// **'Working folder'**
+  String get terminalOpenWorkdir;
+
+  /// Label of the LLM login badge in the dialog Open terminal.
+  ///
+  /// In en, this message translates to:
+  /// **'LLM login'**
+  String get terminalOpenLogin;
+
+  /// Note in the dialog Open terminal.
+  ///
+  /// In en, this message translates to:
+  /// **'Every opening is logged.'**
+  String get terminalOpenLogged;
+
+  /// Main button of the dialog Open terminal; the step-up follows.
+  ///
+  /// In en, this message translates to:
+  /// **'Confirm with passkey or device key'**
+  String get terminalOpenConfirm;
+
+  /// Cancel button of the terminal dialogs.
+  ///
+  /// In en, this message translates to:
+  /// **'Cancel'**
+  String get terminalCancel;
+
+  /// Title of the hard warning of a changed host key (24 section 5.5).
+  ///
+  /// In en, this message translates to:
+  /// **'The host\'s key has changed'**
+  String get terminalKeyChangedTitle;
+
+  /// Label of the pinned fingerprint in the key change warning.
+  ///
+  /// In en, this message translates to:
+  /// **'Stored'**
+  String get terminalKeyChangedStored;
+
+  /// Label of the current fingerprint in the key change warning.
+  ///
+  /// In en, this message translates to:
+  /// **'Now'**
+  String get terminalKeyChangedNow;
+
+  /// Body of the key change warning.
+  ///
+  /// In en, this message translates to:
+  /// **'Without pairing again by an owner, this is a sign of an attack. Connect only after you have checked the new fingerprint on the host.'**
+  String get terminalKeyChangedBody;
+
+  /// Main action of the key change warning; opens nothing.
+  ///
+  /// In en, this message translates to:
+  /// **'Do not connect'**
+  String get terminalKeyChangedReject;
+
+  /// Secondary action of the key change warning; opens with pin_changed.
+  ///
+  /// In en, this message translates to:
+  /// **'Accept new key'**
+  String get terminalKeyChangedAccept;
+
+  /// Title of the warning of 24 section 8.4 before the step-up.
+  ///
+  /// In en, this message translates to:
+  /// **'This host belongs to another person'**
+  String get terminalForeignTitle;
+
+  /// Body of the warning of 24 section 8.4.
+  ///
+  /// In en, this message translates to:
+  /// **'{host} is assigned to another person. Your terminal session works in your own session user, but that person sets up the host and could read along through a local privilege escalation. Do not type secrets here unless you trust the host.'**
+  String terminalForeignBody(String host);
+
+  /// Button of the warning of 24 section 8.4 that continues to the step-up.
+  ///
+  /// In en, this message translates to:
+  /// **'Connect anyway'**
+  String get terminalForeignConfirm;
+
+  /// Title of the confirmation before a terminal hyperlink opens (24 section 11.2).
+  ///
+  /// In en, this message translates to:
+  /// **'Open link?'**
+  String get terminalLinkTitle;
+
+  /// Body of the link confirmation; the full target follows.
+  ///
+  /// In en, this message translates to:
+  /// **'The program in the terminal links to this address:'**
+  String get terminalLinkBody;
+
+  /// Button that opens the confirmed link.
+  ///
+  /// In en, this message translates to:
+  /// **'Open link'**
+  String get terminalLinkOpen;
+
+  /// Note in the link confirmation for any other scheme.
+  ///
+  /// In en, this message translates to:
+  /// **'Only https and http links open. This address stays closed.'**
+  String get terminalLinkUnsupported;
+
+  /// Hint with the target of a terminal hyperlink under the pointer.
+  ///
+  /// In en, this message translates to:
+  /// **'Link: {target}'**
+  String terminalLinkHover(String target);
+
+  /// Title of the confirmation before pasting text with line breaks (15 23.4).
+  ///
+  /// In en, this message translates to:
+  /// **'Paste with line breaks?'**
+  String get terminalPasteTitle;
+
+  /// Body of the paste confirmation.
+  ///
+  /// In en, this message translates to:
+  /// **'The text has {count, plural, =1{1 line} other{{count} lines}}. Every line break can start a command.'**
+  String terminalPasteBody(int count);
+
+  /// Button that pastes the text.
+  ///
+  /// In en, this message translates to:
+  /// **'Paste'**
+  String get terminalPasteConfirm;
+
+  /// Screen reader action that reads the visible terminal screen (01 section 8).
+  ///
+  /// In en, this message translates to:
+  /// **'Read screen'**
+  String get terminalReadScreen;
+
+  /// Screen reader label of the terminal screen.
+  ///
+  /// In en, this message translates to:
+  /// **'Terminal, line at the cursor: {line}'**
+  String terminalScreenLabel(String line);
+
+  /// Screen reader label of the extra keys bar (01 screen M8).
+  ///
+  /// In en, this message translates to:
+  /// **'Extra keys bar'**
+  String get terminalExtraKeys;
+
+  /// Visible label of the extra key Escape.
+  ///
+  /// In en, this message translates to:
+  /// **'Esc'**
+  String get terminalKeyEsc;
+
+  /// Visible label of the extra key Tab.
+  ///
+  /// In en, this message translates to:
+  /// **'Tab'**
+  String get terminalKeyTab;
+
+  /// Visible label of the extra key Control.
+  ///
+  /// In en, this message translates to:
+  /// **'Ctrl'**
+  String get terminalKeyCtrl;
+
+  /// Visible label of the extra key Alt.
+  ///
+  /// In en, this message translates to:
+  /// **'Alt'**
+  String get terminalKeyAlt;
+
+  /// Visible label of the extra key Arrow up.
+  ///
+  /// In en, this message translates to:
+  /// **'↑'**
+  String get terminalKeyUp;
+
+  /// Visible label of the extra key Arrow down.
+  ///
+  /// In en, this message translates to:
+  /// **'↓'**
+  String get terminalKeyDown;
+
+  /// Visible label of the extra key Arrow left.
+  ///
+  /// In en, this message translates to:
+  /// **'←'**
+  String get terminalKeyLeft;
+
+  /// Visible label of the extra key Arrow right.
+  ///
+  /// In en, this message translates to:
+  /// **'→'**
+  String get terminalKeyRight;
+
+  /// Visible label of the extra key Vertical bar.
+  ///
+  /// In en, this message translates to:
+  /// **'|'**
+  String get terminalKeyPipe;
+
+  /// Visible label of the extra key Tilde.
+  ///
+  /// In en, this message translates to:
+  /// **'~'**
+  String get terminalKeyTilde;
+
+  /// Visible label of the extra key Slash.
+  ///
+  /// In en, this message translates to:
+  /// **'/'**
+  String get terminalKeySlash;
+
+  /// Visible label of the extra key Minus.
+  ///
+  /// In en, this message translates to:
+  /// **'-'**
+  String get terminalKeyMinus;
+
+  /// Screen reader label of the extra key Escape.
+  ///
+  /// In en, this message translates to:
+  /// **'Escape'**
+  String get terminalKeyEscName;
+
+  /// Screen reader label of the extra key Tab.
+  ///
+  /// In en, this message translates to:
+  /// **'Tab'**
+  String get terminalKeyTabName;
+
+  /// Screen reader label of the extra key Control.
+  ///
+  /// In en, this message translates to:
+  /// **'Control'**
+  String get terminalKeyCtrlName;
+
+  /// Screen reader label of the extra key Alt.
+  ///
+  /// In en, this message translates to:
+  /// **'Alt'**
+  String get terminalKeyAltName;
+
+  /// Screen reader label of the extra key Arrow up.
+  ///
+  /// In en, this message translates to:
+  /// **'Arrow up'**
+  String get terminalKeyUpName;
+
+  /// Screen reader label of the extra key Arrow down.
+  ///
+  /// In en, this message translates to:
+  /// **'Arrow down'**
+  String get terminalKeyDownName;
+
+  /// Screen reader label of the extra key Arrow left.
+  ///
+  /// In en, this message translates to:
+  /// **'Arrow left'**
+  String get terminalKeyLeftName;
+
+  /// Screen reader label of the extra key Arrow right.
+  ///
+  /// In en, this message translates to:
+  /// **'Arrow right'**
+  String get terminalKeyRightName;
+
+  /// Screen reader label of the extra key Vertical bar.
+  ///
+  /// In en, this message translates to:
+  /// **'Vertical bar'**
+  String get terminalKeyPipeName;
+
+  /// Screen reader label of the extra key Tilde.
+  ///
+  /// In en, this message translates to:
+  /// **'Tilde'**
+  String get terminalKeyTildeName;
+
+  /// Screen reader label of the extra key Slash.
+  ///
+  /// In en, this message translates to:
+  /// **'Slash'**
+  String get terminalKeySlashName;
+
+  /// Screen reader label of the extra key Minus.
+  ///
+  /// In en, this message translates to:
+  /// **'Minus'**
+  String get terminalKeyMinusName;
+
+  /// Screen reader label of a modifier that applies to the next key only.
+  ///
+  /// In en, this message translates to:
+  /// **'{key}, latched'**
+  String terminalKeyLatched(String key);
+
+  /// Screen reader label of a modifier that stays on until tapped again.
+  ///
+  /// In en, this message translates to:
+  /// **'{key}, held'**
+  String terminalKeyHeld(String key);
+
+  /// Step-up purpose of terminal.open.
+  ///
+  /// In en, this message translates to:
+  /// **'Open a terminal on {name}'**
+  String terminalStepUpOpen(String name);
+
+  /// Step-up purpose of terminal.attach.
+  ///
+  /// In en, this message translates to:
+  /// **'Reattach to the terminal on {name}'**
+  String terminalStepUpAttach(String name);
+
+  /// The host of a terminal link in the link confirmation, shown before the full target.
+  ///
+  /// In en, this message translates to:
+  /// **'Host: {name}'**
+  String terminalLinkHost(String name);
 }
 
 class _AppLocalizationsDelegate

@@ -16,7 +16,7 @@ reads the manifest and every `import` and `export` directive under `lib/`, `test
   root `workspace:` list, or a member without its manifest;
 - rule 10: a test library (`package:<member>/testing.dart` or its `src/testing/` folder,
   brief M4-17) imported or exported outside the `test/` and `integration_test/` folders, also
-  relatively inside its own member.
+  relatively inside its own member; a test library itself may import another one.
 
 Usage: arch_check.py [--root <repository>] [--rules <rules.yaml>]
 Exit 0 prints `arch-check: <n> members, <m> files, ok`; exit 1 prints one line per finding
@@ -422,16 +422,20 @@ class _Checker:
         tests = self.rules.test_libraries
         if tests is None or top in tests.dirs:
             return False
+        lib = f"{member.path}/lib/"
+        if rel.startswith(lib) and tests.is_test_library(rel.removeprefix(lib)):
+            # Test support may build on the test support of a member it reaches (brief
+            # M4-35); production code still never imports a test library, so it cannot reach
+            # one through another.
+            return False
         if uri.startswith("package:"):
             package, _, inner = uri[len("package:") :].partition("/")
             target = f"package:{package}/{tests.library}"
         elif re.match(r"^[a-z][a-z0-9+.-]*:", uri):
             return False
         else:
-            lib = f"{member.path}/lib/"
             resolved = posixpath.normpath(posixpath.join(posixpath.dirname(rel), uri))
-            own = rel.removeprefix(lib) if rel.startswith(lib) else None
-            if not resolved.startswith(lib) or (own is not None and tests.is_test_library(own)):
+            if not resolved.startswith(lib):
                 return False
             inner = resolved.removeprefix(lib)
             target = f"package:{member.name}/{tests.library}"

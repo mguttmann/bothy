@@ -1409,6 +1409,90 @@
           "type": "color",
           "value": "#e5eef0"
         },
+        "color.terminal.ansi.black": {
+          "type": "color",
+          "value": "#102326"
+        },
+        "color.terminal.ansi.blue": {
+          "type": "color",
+          "value": "#0b4d79"
+        },
+        "color.terminal.ansi.bright-black": {
+          "type": "color",
+          "value": "#3f5154"
+        },
+        "color.terminal.ansi.bright-blue": {
+          "type": "color",
+          "value": "#12659d"
+        },
+        "color.terminal.ansi.bright-cyan": {
+          "type": "color",
+          "value": "#136f69"
+        },
+        "color.terminal.ansi.bright-green": {
+          "type": "color",
+          "value": "#137337"
+        },
+        "color.terminal.ansi.bright-magenta": {
+          "type": "color",
+          "value": "#a51f6f"
+        },
+        "color.terminal.ansi.bright-red": {
+          "type": "color",
+          "value": "#b21622"
+        },
+        "color.terminal.ansi.bright-white": {
+          "type": "color",
+          "value": "#748486"
+        },
+        "color.terminal.ansi.bright-yellow": {
+          "type": "color",
+          "value": "#735e10"
+        },
+        "color.terminal.ansi.cyan": {
+          "type": "color",
+          "value": "#0c5450"
+        },
+        "color.terminal.ansi.green": {
+          "type": "color",
+          "value": "#0c5828"
+        },
+        "color.terminal.ansi.magenta": {
+          "type": "color",
+          "value": "#810e55"
+        },
+        "color.terminal.ansi.red": {
+          "type": "color",
+          "value": "#890f18"
+        },
+        "color.terminal.ansi.white": {
+          "type": "color",
+          "value": "#59696c"
+        },
+        "color.terminal.ansi.yellow": {
+          "type": "color",
+          "value": "#59470a"
+        },
+        "color.terminal.bg": {
+          "type": "color",
+          "value": "#f5fbfc"
+        },
+        "color.terminal.cursor": {
+          "type": "color",
+          "value": "#136f69"
+        },
+        "color.terminal.cursor-text": {
+          "type": "color",
+          "value": "#f5fbfc"
+        },
+        "color.terminal.fg": {
+          "type": "color",
+          "value": "#102326"
+        },
+        "color.terminal.selection-bg": {
+          "type": "color",
+          "value": "#ccf5f0"
+        },
         "color.text.link": {
           "type": "color",
           "value": "#136f69"
@@ -2006,6 +2090,90 @@
         "color.surface.sunken": {
           "type": "color",
           "value": "#0c1e21"
+        },
+        "color.terminal.ansi.black": {
+          "type": "color",
+          "value": "#59696c"
+        },
+        "color.terminal.ansi.blue": {
+          "type": "color",
+          "value": "#58b3fa"
+        },
+        "color.terminal.ansi.bright-black": {
+          "type": "color",
+          "value": "#748486"
+        },
+        "color.terminal.ansi.bright-blue": {
+          "type": "color",
+          "value": "#8ec9fb"
+        },
+        "color.terminal.ansi.bright-cyan": {
+          "type": "color",
+          "value": "#7cd5cd"
+        },
+        "color.terminal.ansi.bright-green": {
+          "type": "color",
+          "value": "#89d89a"
+        },
+        "color.terminal.ansi.bright-magenta": {
+          "type": "color",
+          "value": "#fca3cd"
+        },
+        "color.terminal.ansi.bright-red": {
+          "type": "color",
+          "value": "#fcaaa3"
+        },
+        "color.terminal.ansi.bright-white": {
+          "type": "color",
+          "value": "#eff6f7"
+        },
+        "color.terminal.ansi.bright-yellow": {
+          "type": "color",
+          "value": "#eddc59"
+        },
+        "color.terminal.ansi.cyan": {
+          "type": "color",
+          "value": "#49c0b7"
+        },
+        "color.terminal.ansi.green": {
+          "type": "color",
+          "value": "#62c37a"
+        },
+        "color.terminal.ansi.magenta": {
+          "type": "color",
+          "value": "#f878ba"
+        },
+        "color.terminal.ansi.red": {
+          "type": "color",
+          "value": "#fb827a"
+        },
+        "color.terminal.ansi.white": {
+          "type": "color",
+          "value": "#afbec0"
+        },
+        "color.terminal.ansi.yellow": {
+          "type": "color",
+          "value": "#d9c42b"
+        },
+        "color.terminal.bg": {
+          "type": "color",
+          "value": "#08191c"
+        },
+        "color.terminal.cursor": {
+          "type": "color",
+          "value": "#d9c42b"
+        },
+        "color.terminal.cursor-text": {
+          "type": "color",
+          "value": "#08191c"
+        },
+        "color.terminal.fg": {
+          "type": "color",
+          "value": "#e5eef0"
+        },
+        "color.terminal.selection-bg": {
+          "type": "color",
+          "value": "#0f4643"
         },
         "color.text.link": {
           "type": "color",

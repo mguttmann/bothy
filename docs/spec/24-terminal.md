@@ -1678,8 +1678,22 @@ Abschnitt 1).
 Ein Flutter-Widget für alle Clients. Renderer: Paket `xterm` von TerminalStudio, MIT, Version
 4.0.0, für Android, iOS, Linux, macOS, Web und Windows (https://pub.dev/packages/xterm, abgerufen
 2026-10-10 [belegt]). Die letzte Veröffentlichung liegt laut pub.dev rund zwei Jahre zurück
-[belegt]; das Bau-Ticket prüft vor der Aufnahme Pflegezustand und offene Sicherheitsmeldungen und
-hält die Sperren aus 11.2 mit eigenen Tests (TM-T14).
+[belegt]. Check of the build ticket M4-35 on 2026-10-20 [belegt]:
+
+- Release: 4.0.0 is the latest, published 2024-02-27, MIT; it depends on `convert`, `meta`,
+  `quiver`, `equatable` ^2.0.3 and `zmodem` 0.0.6 (MIT) (https://pub.dev/packages/xterm,
+  https://pub.dev/api/packages/xterm).
+- Maintenance: the repository https://github.com/TerminalStudio/xterm.dart is not archived,
+  last push 2025-06-19, 109 open issues and pull requests.
+- Security reports: none. OSV (https://api.osv.dev, query for ecosystem `Pub`, package `xterm`)
+  lists no vulnerability; the GitHub advisory database
+  (https://github.com/advisories?query=ecosystem%3Apub+xterm) has no entry; the issues hold no
+  security report for OSC 52, OSC 8, hyperlinks, the clipboard or titles.
+- Behaviour and bugs of 4.0.0, read in its source:
+  [15-client-architektur.md](15-client-architektur.md), section 23.4.
+
+The package is taken as is; the locks of 11.2 live in `terminal_ui` in front of the renderer and
+hold with own tests (TM-T14), independent of the renderer version (docs/DECISIONS.md D-M4-35).
 
 Jeder Client zeigt: Sitzungsliste je Rechner mit Zustand, Wiederanhängen, Fingerabdruck des
 Rechners, Abzeichen der LLM-Anmeldung ("Persönlich", "Organisation", "Keine"), Restzeit bis zur

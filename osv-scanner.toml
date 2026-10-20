@@ -205,10 +205,10 @@ reason = "deps.dev knows no license for this pub package; its LICENSE file on pu
 
 [[PackageOverrides]]
 name = "equatable"
-version = "3.0.0"
+version = "2.1.0"
 ecosystem = "Pub"
 license.override = ["MIT"]
-reason = "deps.dev knows no license for this pub package; its LICENSE file on pub.dev is MIT. Transitive package of alchemist."
+reason = "deps.dev knows no license for this pub package; its LICENSE file on pub.dev is MIT (checked 2026-10-20 for M4-35: xterm 4.0.0 needs equatable ^2.0.3, so the workspace resolves 2.1.0 instead of 3.0.0). Transitive package of alchemist and xterm."
 
 [[PackageOverrides]]
 name = "fake_async"
@@ -1185,3 +1185,20 @@ version = "10.1.0"
 ecosystem = "Pub"
 license.override = ["MIT"]
 reason = "deps.dev knows no license for this pub package; its LICENSE file is MIT. Crash reports of apps/client (docs/spec/15-client-architektur.md 16, M4-31)."
+
+# The renderer of the terminal view (M4-35, docs/DECISIONS.md D-M4-35-5), checked against the
+# LICENSE files of these versions on pub.dev on 2026-10-20.
+
+[[PackageOverrides]]
+name = "xterm"
+version = "4.0.0"
+ecosystem = "Pub"
+license.override = ["MIT"]
+reason = "deps.dev knows no license for this pub package; its LICENSE file on pub.dev is MIT (TerminalStudio). Runtime dependency of terminal_ui."
+
+[[PackageOverrides]]
+name = "zmodem"
+version = "0.0.6"
+ecosystem = "Pub"
+license.override = ["MIT"]
+reason = "deps.dev knows no license for this pub package; its LICENSE file on pub.dev is MIT. Transitive runtime package of xterm."

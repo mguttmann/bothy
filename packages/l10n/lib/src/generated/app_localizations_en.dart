@@ -3940,4 +3940,352 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get adminTargetsHosts => 'Hosts';
+
+  @override
+  String get terminalHeaderConnected => 'Connected';
+
+  @override
+  String get terminalHeaderConnecting => 'Connecting';
+
+  @override
+  String get terminalHeaderOffline => 'Not connected';
+
+  @override
+  String terminalHeaderFingerprint(String value) {
+    return 'Fp $value';
+  }
+
+  @override
+  String terminalHeaderFingerprintLabel(String fingerprint) {
+    return 'Fingerprint of the host: $fingerprint';
+  }
+
+  @override
+  String terminalHeaderRemaining(String time) {
+    return 'Left $time';
+  }
+
+  @override
+  String get terminalLlmLoginNone => 'No LLM login';
+
+  @override
+  String terminalTabLabel(String profile, int number) {
+    return '$profile $number';
+  }
+
+  @override
+  String get terminalDetach => 'Detach';
+
+  @override
+  String get terminalEnd => 'End';
+
+  @override
+  String get terminalReattach => 'Reattach';
+
+  @override
+  String get terminalStateConnecting =>
+      'Opening the encrypted connection to the host';
+
+  @override
+  String get terminalStateDetached =>
+      'Detached. The terminal session keeps going on the host.';
+
+  @override
+  String get terminalStateDetachedLost =>
+      'The connection broke. The terminal session keeps going on the host.';
+
+  @override
+  String get terminalStateDetachedHostUnavailable =>
+      'The host is not connected. Try to reattach later.';
+
+  @override
+  String get terminalStateDetachedTokenStale =>
+      'The session token expired or was already used. Reattach confirms again.';
+
+  @override
+  String get terminalStateDetachedReplaced =>
+      'Another device attached to this terminal session.';
+
+  @override
+  String get terminalStateDetachedServer =>
+      'The server restarted. The terminal session keeps going on the host.';
+
+  @override
+  String get terminalStateDetachedSlow =>
+      'The connection could not keep up. The terminal session keeps going on the host.';
+
+  @override
+  String get terminalStateDetachedAuth =>
+      'The login of the connection failed. Sign in again, then reattach.';
+
+  @override
+  String get terminalStateDetachedRateLimited =>
+      'Too many attempts. Wait a moment, then reattach.';
+
+  @override
+  String terminalStateExited(int code) {
+    return 'The process exited with code $code.';
+  }
+
+  @override
+  String terminalStateEnded(String reason) {
+    return 'The terminal session ended: $reason';
+  }
+
+  @override
+  String terminalStateBlockedRevoked(String reason) {
+    return 'Access ended: $reason';
+  }
+
+  @override
+  String get terminalStateBlockedHandshake =>
+      'The encrypted connection failed its check. Someone may have tampered with it. No new attempt is made.';
+
+  @override
+  String get terminalStateBlockedKeyMismatch =>
+      'The server sent a different host key than the checked one. The terminal session was closed.';
+
+  @override
+  String get terminalStateBlockedProtocol =>
+      'The connection broke the terminal protocol. No new attempt is made.';
+
+  @override
+  String terminalStateFailed(String problem) {
+    return 'The terminal could not be opened: $problem';
+  }
+
+  @override
+  String terminalCloseReason(String reason) {
+    String _temp0 = intl.Intl.selectLogic(reason, {
+      'client_closed': 'ended by you',
+      'closed_by_owner': 'ended by an owner',
+      'process_exited': 'the process exited',
+      'idle_timeout': 'no input for too long',
+      'max_duration': 'the maximum duration was reached',
+      'detach_expired': 'it was detached for too long',
+      'access_revoked': 'access was revoked',
+      'i6_violation': 'the LLM login of the host changed',
+      'host_disabled': 'the host was disabled',
+      'host_retired': 'the host was retired',
+      'host_rekeyed': 'the host was paired again',
+      'host_restarted': 'the host service restarted',
+      'user_disabled': 'the account was disabled',
+      'device_revoked': 'this device was removed',
+      'session_revoked': 'the login was ended',
+      'logout': 'you signed out',
+      'open_failed': 'the opening failed',
+      'host_policy_violation': 'a check on the host failed',
+      'other': 'no reason given',
+    });
+    return '$_temp0';
+  }
+
+  @override
+  String get terminalFooterEncrypted => 'End-to-end encrypted';
+
+  @override
+  String terminalFooterProfile(String profile) {
+    return 'Profile $profile';
+  }
+
+  @override
+  String get terminalFooterIdle => 'Idle timeout active';
+
+  @override
+  String get terminalOpenTitle => 'Open terminal';
+
+  @override
+  String get terminalOpenHost => 'Host';
+
+  @override
+  String get terminalOpenProfile => 'Profile';
+
+  @override
+  String get terminalOpenWorkdir => 'Working folder';
+
+  @override
+  String get terminalOpenLogin => 'LLM login';
+
+  @override
+  String get terminalOpenLogged => 'Every opening is logged.';
+
+  @override
+  String get terminalOpenConfirm => 'Confirm with passkey or device key';
+
+  @override
+  String get terminalCancel => 'Cancel';
+
+  @override
+  String get terminalKeyChangedTitle => 'The host\'s key has changed';
+
+  @override
+  String get terminalKeyChangedStored => 'Stored';
+
+  @override
+  String get terminalKeyChangedNow => 'Now';
+
+  @override
+  String get terminalKeyChangedBody =>
+      'Without pairing again by an owner, this is a sign of an attack. Connect only after you have checked the new fingerprint on the host.';
+
+  @override
+  String get terminalKeyChangedReject => 'Do not connect';
+
+  @override
+  String get terminalKeyChangedAccept => 'Accept new key';
+
+  @override
+  String get terminalForeignTitle => 'This host belongs to another person';
+
+  @override
+  String terminalForeignBody(String host) {
+    return '$host is assigned to another person. Your terminal session works in your own session user, but that person sets up the host and could read along through a local privilege escalation. Do not type secrets here unless you trust the host.';
+  }
+
+  @override
+  String get terminalForeignConfirm => 'Connect anyway';
+
+  @override
+  String get terminalLinkTitle => 'Open link?';
+
+  @override
+  String get terminalLinkBody =>
+      'The program in the terminal links to this address:';
+
+  @override
+  String get terminalLinkOpen => 'Open link';
+
+  @override
+  String get terminalLinkUnsupported =>
+      'Only https and http links open. This address stays closed.';
+
+  @override
+  String terminalLinkHover(String target) {
+    return 'Link: $target';
+  }
+
+  @override
+  String get terminalPasteTitle => 'Paste with line breaks?';
+
+  @override
+  String terminalPasteBody(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count lines',
+      one: '1 line',
+    );
+    return 'The text has $_temp0. Every line break can start a command.';
+  }
+
+  @override
+  String get terminalPasteConfirm => 'Paste';
+
+  @override
+  String get terminalReadScreen => 'Read screen';
+
+  @override
+  String terminalScreenLabel(String line) {
+    return 'Terminal, line at the cursor: $line';
+  }
+
+  @override
+  String get terminalExtraKeys => 'Extra keys bar';
+
+  @override
+  String get terminalKeyEsc => 'Esc';
+
+  @override
+  String get terminalKeyTab => 'Tab';
+
+  @override
+  String get terminalKeyCtrl => 'Ctrl';
+
+  @override
+  String get terminalKeyAlt => 'Alt';
+
+  @override
+  String get terminalKeyUp => '↑';
+
+  @override
+  String get terminalKeyDown => '↓';
+
+  @override
+  String get terminalKeyLeft => '←';
+
+  @override
+  String get terminalKeyRight => '→';
+
+  @override
+  String get terminalKeyPipe => '|';
+
+  @override
+  String get terminalKeyTilde => '~';
+
+  @override
+  String get terminalKeySlash => '/';
+
+  @override
+  String get terminalKeyMinus => '-';
+
+  @override
+  String get terminalKeyEscName => 'Escape';
+
+  @override
+  String get terminalKeyTabName => 'Tab';
+
+  @override
+  String get terminalKeyCtrlName => 'Control';
+
+  @override
+  String get terminalKeyAltName => 'Alt';
+
+  @override
+  String get terminalKeyUpName => 'Arrow up';
+
+  @override
+  String get terminalKeyDownName => 'Arrow down';
+
+  @override
+  String get terminalKeyLeftName => 'Arrow left';
+
+  @override
+  String get terminalKeyRightName => 'Arrow right';
+
+  @override
+  String get terminalKeyPipeName => 'Vertical bar';
+
+  @override
+  String get terminalKeyTildeName => 'Tilde';
+
+  @override
+  String get terminalKeySlashName => 'Slash';
+
+  @override
+  String get terminalKeyMinusName => 'Minus';
+
+  @override
+  String terminalKeyLatched(String key) {
+    return '$key, latched';
+  }
+
+  @override
+  String terminalKeyHeld(String key) {
+    return '$key, held';
+  }
+
+  @override
+  String terminalStepUpOpen(String name) {
+    return 'Open a terminal on $name';
+  }
+
+  @override
+  String terminalStepUpAttach(String name) {
+    return 'Reattach to the terminal on $name';
+  }
+
+  @override
+  String terminalLinkHost(String name) {
+    return 'Host: $name';
+  }
 }
