@@ -101,6 +101,11 @@ type FileFacts struct {
 // EventScope is the scope of a stored event (event_log.space_id, channel_id, thread_id).
 type EventScope struct {
 	SpaceID, ChannelID, ThreadID ids.ID
+	// AudienceID is the audience of a personal event whose receive action is not self; zero for
+	// none. sync sets it (M2-08): a receive action on the principal kind agent
+	// (agent.events.consume of agent.invocation, 05 section 6) is decided on the audience, whom
+	// the delivery rule already matched with the receiver.
+	AudienceID ids.ID
 }
 
 // TerminalFacts describes a terminal session for the step-up rule of terminal.attach (08 section
@@ -192,6 +197,12 @@ type InvokeFacts struct {
 	// ActiveRunAgentID is the agent of the active run of the thread; zero for none (set by runs
 	// from M2).
 	ActiveRunAgentID ids.ID
+	// NewThread reports that the thread of the resource is the auto thread of the triggering
+	// message (09 section 3.7): the guard applies the channel's main-thread mention rule, which 05
+	// section 5 point 3 names "in the main thread and for new threads", instead of
+	// thread_require_mention. runs sets it at delivery (M2-08); the acceptance decides on the main
+	// thread itself and leaves it false.
+	NewThread bool
 }
 
 // ResourceFromEvent returns the descriptor of a stored event for the check of its receive action

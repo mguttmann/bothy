@@ -145,6 +145,7 @@ SOURCES = {
     "quality.contract.max_examples": lambda: _makefile_var("CONTRACT_MAX_EXAMPLES"),
     "quality.contract.timeout": lambda: _makefile_var("CONTRACT_TIMEOUT"),
     "quality.perf.timeout": lambda: _makefile_var("PERF_TIMEOUT"),
+    "quality.test.go_timeout": lambda: _makefile_var("GO_TEST_TIMEOUT"),
     "quality.sonar.new_issues_max": lambda: _gate_value("quality.sonar.new_issues_max"),
     "quality.sonar.new_hotspots_reviewed_min_percent": lambda: _gate_value(
         "quality.sonar.new_hotspots_reviewed_min_percent"

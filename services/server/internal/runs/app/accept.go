@@ -12,8 +12,11 @@ import (
 	"github.com/OWNER/bothy/services/server/internal/chat"
 	"github.com/OWNER/bothy/services/server/internal/kernel/actor"
 	"github.com/OWNER/bothy/services/server/internal/kernel/authorize"
+	"github.com/OWNER/bothy/services/server/internal/kernel/errs"
+	"github.com/OWNER/bothy/services/server/internal/kernel/eventlog"
 	"github.com/OWNER/bothy/services/server/internal/kernel/ids"
 	"github.com/OWNER/bothy/services/server/internal/messaging"
+	"github.com/OWNER/bothy/services/server/internal/runs"
 	"github.com/OWNER/bothy/services/server/internal/runs/domain"
 )
 
@@ -305,7 +308,7 @@ func (s *Service) invoke(ctx context.Context, ev messaging.MessagePosted, info c
 	if mode == "" {
 		mode = string(d.Agent.BillingMode)
 	}
-	_, err = s.Open(ctx, OpenCmd{
+	sum, err := s.Open(ctx, OpenCmd{
 		ThreadID: target, AgentID: d.Agent.ID, TriggeredBy: ev.AuthorID, TriggeringMessageID: ev.MessageID,
 		TriggerKind: triggerKindMessage, BillingModeExpected: mode,
 	})
@@ -313,5 +316,44 @@ func (s *Service) invoke(ctx context.Context, ev messaging.MessagePosted, info c
 	if errors.As(err, &exists) && d.NewThread == nil {
 		return &domain.ActiveRun{RunID: exists.Active.ID, AgentID: exists.Active.AgentID}, nil
 	}
-	return nil, err
+	if err != nil {
+		return nil, err
+	}
+	return nil, s.emitInvocation(ctx, sum, ev.MessageID, mode)
+}
+
+// emitInvocation appends agent.invocation as the last write of the acceptance (M2-08 design note
+// 14): audience the agent, receive action agent.events.consume, resource the run without version,
+// the scope of the run's thread and the payload AgentInvocationPayload without a token. The token
+// is a delivery field that Prepare adds per delivery (R-SY-07, R-SY-17).
+func (s *Service) emitInvocation(ctx context.Context, sum runs.RunSummary, message ids.ID, mode string) error {
+	info, err := s.d.Threads.Info(ctx, sum.ThreadID)
+	if err != nil {
+		return err
+	}
+	m, err := s.d.Messages.TriggerMessageOf(ctx, message)
+	if err != nil {
+		return err
+	}
+	ch, err := s.d.Channels.TriggerChannel(ctx, info.ChannelID)
+	if err != nil {
+		return err
+	}
+	p, err := domain.InvocationPayload(domain.InvocationPayloadInput{
+		RunID: sum.ID, ThreadID: sum.ThreadID, ChannelID: info.ChannelID, SpaceID: info.SpaceID, MessageID: message,
+		TriggeredBy: domain.PrincipalRefPayload{
+			ID: m.Author.ID.String(), Kind: m.Author.Kind, Handle: m.Author.Handle, DisplayName: m.Author.DisplayName,
+			AvatarFileID: optionalID(m.Author.AvatarFileID),
+		},
+		BillingMode: mode, SettingsVersion: ch.SettingsVersion,
+	})
+	if err != nil {
+		return errs.Wrap(errs.CodeInternalError, err, "runs: the payload of agent.invocation")
+	}
+	kind, actorID := eventActor(ctx)
+	return s.d.Events.Append(ctx, eventlog.Event{
+		Type: string(authorize.EventAgentInvocation), SchemaVersion: 1, ActorKind: kind, ActorPrincipalID: actorID,
+		SpaceID: info.SpaceID, ChannelID: info.ChannelID, ThreadID: sum.ThreadID, ResourceKind: resourceRun, ResourceID: sum.ID,
+		AudiencePrincipalID: sum.AgentID, ReceiveAction: string(authorize.ActionAgentEventsConsume), Payload: p,
+	})
 }

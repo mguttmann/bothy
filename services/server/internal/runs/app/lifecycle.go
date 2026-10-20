@@ -84,7 +84,8 @@ type TransitionCmd struct {
 
 // Open writes a new run in queued in the caller's unit of work (brief note 5): the run row (ON
 // CONFLICT on the active run of the thread DO NOTHING), the live box anchor in the run's thread,
-// run.state_changed and, with a triggering message, trigger_state received. The lock order is
+// run.state_changed, with a triggering message trigger_state received, and the job
+// runs.queued_expiry at queued_at + run.queued_max_age (M2-08). The lock order is
 // runs before messages; the caller (the acceptance) holds the thread row of the message.
 //
 // Errors: *ActiveRunExistsError when the thread has an active run (nothing written); internal
@@ -132,6 +133,11 @@ func (s *Service) Open(ctx context.Context, cmd OpenCmd) (runs.RunSummary, error
 		if err := s.d.Messages.SetTriggerState(ctx, messaging.SetTriggerStateCmd{MessageID: row.TriggeringMessageID, State: string(change.State)}); err != nil {
 			return runs.RunSummary{}, err
 		}
+	}
+	// The run fails with agent_unavailable when nobody starts it within run.queued_max_age
+	// (M2-08 design note 11); every run of this creation function gets the job.
+	if err := s.scheduleExpiry(ctx, row); err != nil {
+		return runs.RunSummary{}, err
 	}
 	return sum, nil
 }
