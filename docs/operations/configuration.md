@@ -1039,6 +1039,7 @@ These variables are not server configuration; Compose derives values of the serv
 | `BOTHY_LOKI_VERSION` | `3.7.8` | image version of Loki |
 | `BOTHY_TEMPO_VERSION` | `3.1.0` | image version of Tempo |
 | `BOTHY_GRAFANA_VERSION` | `13.2.3` | image version of Grafana |
+| `BOTHY_NGINX_VERSION` | `1.30.6-alpine` | image version of the example edge (nginx-unprivileged) of the overlay `compose.multi-node.yaml` ([install-compose.md](install-compose.md) 5.3) |
 | `BOTHY_CLAMAV_MEMORY_LIMIT` | `4g` | memory limit of the ClamAV container |
 | `BOTHY_LOG_MAX_SIZE` | `20m` | size of a container log file until rotation |
 | `BOTHY_LOG_MAX_FILE` | `5` | kept container log files per service |

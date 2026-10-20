@@ -130,6 +130,41 @@ profile.
 
 See [tailscale.md](tailscale.md).
 
+### 5.3 Several api nodes (overlay)
+
+The overlay `infra/compose/compose.multi-node.yaml` runs two api nodes, `api` and `api-2`, behind
+an example edge (nginx in the image `nginxinc/nginx-unprivileged`, tag `BOTHY_NGINX_VERSION`):
+
+```
+docker compose -f compose.yaml -f compose.multi-node.yaml up -d
+```
+
+1. Profile `direct` only. The profile `tailscale` runs one api node, because `tailscale serve` has
+   no hash rule; with it the overlay starts neither `edge` nor `api-2`.
+2. Only `edge` publishes a port, on `127.0.0.1:BOTHY_HTTP_PUBLISH_PORT`; the api nodes publish
+   none. Your TLS reverse proxy stays in front of `edge` and forwards to that port as in 5.1.
+3. `edge` routes `/api/v1/terminal/sessions/{session_id}/stream` and
+   `/api/v1/hosts/sessions/{session_id}/stream` by consistent hashing over the session ID to the
+   same api node, where the relay pairs them. A side that lands on another node closes after
+   `terminal.open_timeout` with `4102` and counts in `bothy.terminal.relay.unpaired`; check that
+   metric after changing the edge.
+4. The server sees the address of `edge`, which appends to `X-Forwarded-For` the address it sees
+   for your proxy, the gateway of the network. `BOTHY_TRUSTED_PROXIES` therefore names the subnet of the network
+   `<project>_default`, not only its gateway:
+
+   ```
+   docker network inspect <project>_default --format '{{(index .IPAM.Config 0).Subnet}}'
+   ```
+
+5. `edge` restarts when an api node is recreated (for example by an upgrade), because nginx
+   resolves the node names only at start.
+6. Both api nodes share the key store volume `signing-keys` (ADR 0066) and run with
+   `cluster.mode = multi`, as the worker does.
+7. The idle timeouts of `edge` follow the defaults of `terminal.idle_timeout` plus
+   `terminal.idle_grace` on the stream paths and of `terminal.host_heartbeat_interval` times
+   `terminal.host_heartbeat_miss_limit` elsewhere. If you change these keys, change
+   `infra/compose/edge/nginx.conf` and the timeouts of your own proxy with them.
+
 ## 6. Mac notes
 
 1. Docker runs in a VM; volumes live on its disk. The VM needs enough memory and
